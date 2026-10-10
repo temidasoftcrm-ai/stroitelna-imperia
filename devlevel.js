@@ -1,0 +1,90 @@
+// devlevel.js — Фаза 7: ниво на развитие на фирмата (1–10).
+// Опит (XP) от обекти, жп линии, магистрали, филиали и куести. Всяко ниво: +2% към цената на поръчките.
+// Отключвания: ниво 5 (+ Балканите) — оферти от доставчици; ниво 8 — стокова борса.
+// Записът е в S.dev = { xp, lv }. deps: S(), toast, sound, save, pop(key, cap, sub), balkansOpen()
+export const THRESH = [0, 1000, 4000, 10000, 20000, 40000, 70000, 110000, 170000, 250000];
+export const XP = { house: 50, shop: 200, office: 600, tower: 2000, rail: 1000, highway: 1500, branch: 3000, quest: 100 };
+// стари скали (по версия на записа) — за преизчисляване на опита
+const SCALES = { 1: [0, 100, 250, 500, 900, 1500, 2400, 3600, 5200, 7500], 2: [0, 500, 1500, 3500, 7000, 12000, 20000, 35000, 60000, 100000] }, VER = 3;
+// записи със старата скала: същото ниво и същата част от пътя до следващото
+function migrate(d) {
+  if (!d || d.v === VER) return d;
+  const OLD = SCALES[d.v || 1], L = d.lv || 1, a = OLD[L - 1], b = OLD[L] ?? a, f = b > a ? Math.min(1, Math.max(0, (d.xp - a) / (b - a))) : 0;
+  const A = THRESH[L - 1], B = THRESH[L] ?? A;
+  d.xp = Math.round(A + f * (B - A)); d.v = VER;
+  return d;
+}
+const UNLOCKS = {
+  1: '🏁 Начало — София, Пловдив, Стара Загора и Варна',
+  2: '🇧🇬 Всички български градове · 🛤️ жп линии и 🛣️ магистрали',
+  3: '📈 +4% към цената на поръчките',
+  4: '👷‍♂️ Специалисти: архитект и инженер',
+  5: '🌍 Балканите — жп линии и магистрали до съседите',
+  6: '🛂 Международна репутация: филиали на Балканите · 📜 оферти от доставчици',
+  7: '📈 Стокова борса',
+  8: '🇪🇺 Европа — Париж, Лондон, Амстердам, Хага, Ротердам, Люксембург, Прага, Виена…',
+  9: '✈️ Летища, самолети и авиолинии · 🌐 световна карта',
+  10: '🌎 Целият свят — филиали в Ню Йорк, Сингапур, Токио, Рио… по авиолиния',
+};
+export const LV = { BG_ALL: 2, LINKS: 2, STAFF: 4, BALKANS: 5, FOREIGN: 6, OFFERS: 6, STOCKS: 7, EUROPE: 8, AIR: 9, WORLD: 10 };
+export const OFFERS_LV = LV.OFFERS, STOCKS_LV = LV.STOCKS;
+const lvOf = xp => { let l = 1; for (let i = 0; i < THRESH.length; i++) if (xp >= THRESH[i]) l = i + 1; return l; };
+
+export function createDevLevel(deps) {
+  const st = () => {
+    const S = deps.S(); if (!S) return null;
+    if (S.dev) migrate(S.dev);
+    if (!S.dev) {   // стар запис: опитът се изчислява от досегашните постижения
+      const xp = (S.done || 0) * 100 + (S.rails || []).filter(r => r.built).length * XP.rail + (S.hwDone || []).length * XP.highway
+        + (S.branches || []).length * XP.branch + Object.keys((S.quests || {}).claimed || {}).length * XP.quest;
+      S.dev = { xp, lv: lvOf(xp), v: VER };
+    }
+    return S.dev;
+  };
+  const level = () => (st() || { lv: 1 }).lv;
+  const offerMul = () => 1 + 0.02 * (level() - 1);
+  // общите за фирмата неща (оферти, борса) се отключват от най-развития ти град
+  const best = () => Math.max(level(), deps.maxLevel ? deps.maxLevel() : 1);
+  const offersOpen = () => best() >= OFFERS_LV;
+  const has = k => best() >= LV[k];
+  const stocksOpen = () => best() >= STOCKS_LV;
+
+  function add(n, why) {
+    const d = st(); if (!d || !n) return;
+    d.xp += n;
+    const nl = lvOf(d.xp);
+    while (d.lv < nl) {
+      d.lv++;
+      deps.sound('levelup');
+      deps.toast(`🏅 Фирмата е ниво ${d.lv}! ${UNLOCKS[d.lv] || ''}`, 'good', open);
+      if (deps.pop && !deps.pop(`lv-${d.lv}`, `🏅 Ниво на развитие ${d.lv}`, UNLOCKS[d.lv] || '')) deps.pop('office-up', `🏅 Ниво на развитие ${d.lv}`, UNLOCKS[d.lv] || '');
+    }
+    render();
+    deps.save();
+  }
+
+  // значка в горната лента
+  const css = document.createElement('style');
+  css.textContent = `#devBtn { display:flex; align-items:center; gap:6px; } #devBtn .dbar { width:46px; height:6px; border-radius:3px; background:rgba(255,255,255,.15); overflow:hidden; } #devBtn .dbar i { display:block; height:100%; background:linear-gradient(90deg,#c9a14a,#ffd54a); }
+  .dvrow { display:flex; gap:10px; align-items:center; padding:6px 8px; border-radius:9px; } .dvrow.on { background:rgba(255,213,74,.12); } .dvrow.cur { box-shadow:0 0 0 1px var(--acc) inset; } .dvrow b { min-width:64px; }`;
+  document.head.appendChild(css);
+  const btn = document.createElement('button');
+  btn.id = 'devBtn'; btn.className = 'btn2'; btn.title = 'Ниво на развитие';
+  const top = document.getElementById('top'), q = document.getElementById('qBtn');
+  top.insertBefore(btn, q || top.querySelector('.sp'));
+  btn.onclick = open;
+  function render() {
+    const d = st(); if (!d) { btn.style.display = 'none'; return; }
+    btn.style.display = '';
+    const a = THRESH[d.lv - 1], b = THRESH[d.lv] ?? a, k = d.lv >= 10 ? 1 : (d.xp - a) / (b - a);
+    btn.innerHTML = `🏅 Ниво ${d.lv}<span class="dbar"><i style="width:${(k * 100).toFixed(0)}%"></i></span>`;
+  }
+  function open() {
+    const d = st(); if (!d) return;
+    const rows = THRESH.map((t, i) => `<div class="dvrow ${i + 1 <= d.lv ? 'on' : ''} ${i + 1 === d.lv ? 'cur' : ''}"><b>${i + 1 <= d.lv ? '✅' : '🔒'} Ниво ${i + 1}</b><span class="meta" style="margin:0;flex:1">${UNLOCKS[i + 1] || 'Начало'}</span><span class="meta" style="margin:0">${t} XP</span></div>`).join('');
+    const nxt = THRESH[d.lv];
+    deps.modal(`🏅 Ниво на развитие · ${deps.cityName ? deps.cityName() : ''}`, `Всеки твой град се развива отделно. Отключванията (градове, линии, Балканите, Европа, борса) идват от най-развития ти град; специалистите — от нивото на текущия град.<br>Опит: <b>${Math.round(d.xp)} XP</b>${nxt != null ? ` · до ниво ${d.lv + 1}: ${Math.round(nxt - d.xp)} XP` : ' · максимално ниво'}<br>
+      <span style="color:var(--mut)">XP: къща ${XP.house}, магазин ${XP.shop}, офис ${XP.office}, небостъргач ${XP.tower}, жп линия ${XP.rail}, участък магистрала ${XP.highway}, филиал ${XP.branch}, куест ${XP.quest}.</span><br><br>${rows}`, [['Затвори', null]]);
+  }
+  return { add, level, best, has, offerMul, offersOpen, stocksOpen, render, open, XP };
+}

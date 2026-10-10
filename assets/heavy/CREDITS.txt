@@ -1,0 +1,6 @@
+Модели от poly.pizza (свалени 2026-10-10):
+- bulldozer-a.glb, bulldozer-b.glb, bulldozer-c.glb — "Bulldozer" от Poly by Google, CC-BY 3.0 (https://poly.pizza/m/ddxtaegI3HQ, /m/eY1N7Rz9Drr, /m/9-cyY0XbvKi)
+- dump-truck.glb — "Dump truck" от jeremy, CC-BY 3.0 (https://poly.pizza/m/1BpGYg14QGD)
+- crane-a.glb — "Crane" от Max Hancock, CC-BY 3.0 (https://poly.pizza/m/aZFdGwasy60)
+- crane-c.glb — "Crane" от J-Toastie, CC-BY 3.0 (https://poly.pizza/m/gCcpjaxFdv)
+CC-BY 3.0: https://creativecommons.org/licenses/by/3.0/ — изисква посочване на автора (този файл / екран „Автори“).

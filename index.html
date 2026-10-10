@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Строителна империя</title>
+<link rel="preload" as="image" href="assets/ui/splash.webp">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🏗️%3C/text%3E%3C/svg%3E">
+<style>
+  :root { --bg:#0f141c; --panel:rgba(16,21,30,.92); --line:rgba(255,255,255,.12); --acc:#ffb300; --acc2:#ff8f00; --ok:#4cd07d; --bad:#ff6b6b; --txt:#eef1f6; --mut:#9aa3b5; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { width:100%; height:100%; overflow:hidden; background:var(--bg); color:var(--txt); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  #app canvas { display:block; }
+  button { font:inherit; color:inherit; cursor:pointer; }
+  .hidden { display:none !important; }
+
+  /* горна лента */
+  #top { position:fixed; top:0; left:0; right:0; height:52px; display:flex; align-items:center; gap:14px; padding:0 14px; background:var(--panel); border-bottom:1px solid var(--line); z-index:5; }
+  #top .logo { font-weight:900; letter-spacing:.06em; color:var(--acc); white-space:nowrap; }
+  #top .stat { font-size:15px; white-space:nowrap; }
+  #top .stat b { font-size:17px; }
+  #money.neg { color:var(--bad); }
+  #top .sp { flex:1; }
+  .speed { display:flex; gap:4px; }
+  .speed button, .btn2 { border:1px solid var(--line); background:rgba(255,255,255,.06); border-radius:9px; padding:6px 11px; font-weight:700; }
+  .speed button.on { background:var(--acc); color:#1a1200; border-color:var(--acc); }
+  .btn2:hover, .speed button:hover { background:rgba(255,255,255,.14); }
+  .btn { border:0; border-radius:10px; padding:9px 16px; font-weight:800; color:#1a1200; background:linear-gradient(180deg,#ffd54a,#ffb300); }
+  .btn:disabled { background:#ffffff1c; color:#ffffff60; cursor:default; }
+  .stars { color:var(--acc); letter-spacing:1px; }
+
+  /* десен панел */
+  #panel { position:fixed; top:52px; right:0; bottom:0; width:360px; background:var(--panel); border-left:1px solid var(--line); display:flex; flex-direction:column; z-index:4; }
+  #tabs { display:flex; border-bottom:1px solid var(--line); }
+  #tabs button { flex:1; min-width:0; border:0; background:transparent; padding:12px 2px; font-size:13px; font-weight:700; color:var(--mut); border-bottom:3px solid transparent; }
+  #tabs button { font-size:11.5px; padding:12px 1px; letter-spacing:-.01em; min-width:0; }
+  #tabs .badge { margin-left:2px; padding:0 4px; font-size:10px; }
+  #tabs button.on { color:var(--txt); border-bottom-color:var(--acc); }
+  #tabs .badge { display:inline-block; min-width:18px; padding:0 5px; border-radius:9px; background:var(--acc); color:#1a1200; font-size:11px; margin-left:4px; }
+  #panelBody { flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:10px; }
+  .card { background:rgba(255,255,255,.05); border:1px solid var(--line); border-radius:12px; padding:12px; }
+  .card.sel { border-color:var(--acc); box-shadow:0 0 0 1px var(--acc) inset; }
+  .card h3 { font-size:15px; display:flex; align-items:center; gap:8px; }
+  .card .ico { font-size:22px; }
+  .card .meta { color:var(--mut); font-size:13px; margin-top:4px; line-height:1.45; }
+  .card .row { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:8px; }
+  .money { color:var(--ok); font-weight:800; }
+  .need { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+  .need span { font-size:12px; padding:2px 7px; border-radius:8px; background:rgba(255,255,255,.08); }
+  .need span.ok { background:rgba(76,208,125,.2); color:#9ff0bd; }
+  .need span.miss { background:rgba(255,107,107,.18); color:#ffb3b3; }
+  .need span.go { background:rgba(255,179,0,.18); color:#ffd77a; }
+  .bar { height:8px; background:rgba(255,255,255,.1); border-radius:5px; overflow:hidden; margin-top:6px; }
+  .bar i { display:block; height:100%; background:linear-gradient(90deg,var(--acc2),var(--acc)); }
+  .stages { display:flex; gap:3px; margin-top:6px; }
+  .stages span { flex:1; height:4px; border-radius:2px; background:rgba(255,255,255,.12); }
+  .stages span.done { background:var(--ok); }
+  .stages span.cur { background:var(--acc); }
+  .late { color:var(--bad); font-weight:700; }
+  .empty { color:var(--mut); text-align:center; padding:30px 10px; font-size:14px; line-height:1.5; }
+  .sect { font-size:12px; text-transform:uppercase; letter-spacing:.1em; color:var(--mut); margin-top:4px; }
+
+  /* съобщения */
+  #quickBuy { position:fixed; top:62px; left:14px; z-index:7; border:0; border-radius:12px; padding:10px 14px; font-weight:800; font-size:14px; color:#1a1200;
+    background:linear-gradient(180deg,#ffd54a,#ffb300); box-shadow:0 4px 14px rgba(0,0,0,.35); display:flex; gap:8px; align-items:center; animation:qbPulse 1.6s ease-in-out infinite; }
+  #quickBuy:disabled { background:#5a4a1a; color:#ffffff90; animation:none; cursor:default; }
+  #quickBuy span { font-size:16px; letter-spacing:1px; }
+  @keyframes qbPulse { 50% { box-shadow:0 4px 22px rgba(255,179,0,.7); } }
+  body.qb #toasts { top:112px; }
+  /* събития (events.js): чипове в горната лента */
+  #evchips { display:flex; gap:6px; flex-wrap:wrap; max-width:460px; }
+  .evchip { font-size:12px; padding:3px 8px; border-radius:9px; background:rgba(255,255,255,.08); border:1px solid var(--line); white-space:nowrap; }
+  .evchip.good { background:rgba(76,208,125,.18); color:#9ff0bd; } .evchip.bad { background:rgba(255,107,107,.18); color:#ffb3b3; }
+  #buyPop { position:fixed; inset:0; z-index:9; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.45); cursor:pointer; animation:bpIn .35s ease-out; }
+  #buyPop.out { opacity:0; transition:opacity .5s; }
+  #buyPop .bp-card { width:min(620px,90vw); border-radius:18px; overflow:hidden; background:#111; border:2px solid var(--acc); box-shadow:0 20px 60px rgba(0,0,0,.6), 0 0 40px rgba(255,179,0,.35); transform-origin:center; animation:bpPop .45s cubic-bezier(.2,1.4,.4,1); }
+  #buyPop img { display:block; width:100%; max-height:62vh; object-fit:contain; background:#0e0e12; }
+  #buyPop .bp-cap { padding:12px 16px 2px; font-size:22px; font-weight:900; color:var(--acc); }
+  #buyPop .bp-sub { padding:0 16px 14px; color:var(--mut); font-size:14px; }
+  @keyframes bpIn { from { opacity:0; } }
+  @keyframes bpPop { from { transform:scale(.6); opacity:0; } }
+  #bigWin { position:fixed; inset:52px 0 0 0; z-index:8; background:rgba(5,8,14,.6); display:flex; justify-content:center; padding:18px; }
+  #bigWin.hidden { display:none; }
+  #bigWin .bw-box { width:min(920px,100%); background:#141b27; border:1px solid var(--line); border-radius:16px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,.6); }
+  #bigWin .bw-head { display:flex; align-items:center; padding:12px 16px; border-bottom:1px solid var(--line); background:rgba(0,0,0,.25); }
+  #bigWin .bw-head b { flex:1; font-size:20px; color:var(--acc); display:flex; align-items:center; gap:8px; }
+  #bwBody { overflow-y:auto; padding:14px 16px 24px; display:flex; flex-direction:column; gap:10px; }
+  .bw-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; }
+  .bw-stats div { background:rgba(255,255,255,.05); border:1px solid var(--line); border-radius:12px; padding:10px; text-align:center; }
+  .bw-stats b { display:block; font-size:22px; color:var(--acc); } .bw-stats span { font-size:12px; color:var(--mut); }
+  /* държавните поръчки: златна светеща рамка, защото са важни */
+  .card.tender-card { border:2px solid #ffc83d; animation:tenderGlow 1.8s ease-in-out infinite; }
+  @keyframes tenderGlow { 0%,100% { box-shadow:0 0 6px rgba(255,200,61,.35), inset 0 0 4px rgba(255,200,61,.15); } 50% { box-shadow:0 0 22px rgba(255,200,61,.9), inset 0 0 10px rgba(255,200,61,.3); border-color:#ffe28a; } }
+  #toasts { position:fixed; top:64px; left:14px; display:flex; flex-direction:column; gap:8px; z-index:11; pointer-events:none; max-width:380px; }
+  .toast { background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--acc); border-radius:10px; padding:10px 12px; font-size:14px; animation:tin .25s ease-out; }
+  .toast.good { border-left-color:var(--ok); } .toast.bad { border-left-color:var(--bad); }
+  @keyframes tin { from { opacity:0; transform:translateX(-10px); } }
+
+  /* карта на България */
+  #mapScreen { position:fixed; inset:52px 0 0 0; background:#1d4f7a; z-index:3; }
+  #mapSvg { width:100%; height:100%; display:block; }
+  #mapSvg { touch-action:none; cursor:grab; }
+  #mapZoom { position:absolute; left:16px; bottom:16px; display:flex; flex-direction:column; gap:6px; z-index:2; }
+  #mapZoom button { width:44px; height:44px; font-size:22px; padding:0; background:var(--panel); }
+  #mapSvg .country { fill:#e8e1cf; stroke:#b9ae95; stroke-width:.6; }
+  #mapSvg .country.bg { fill:#9fd38a; stroke:#4f8a3e; stroke-width:1.4; }
+  #mapSvg .country.won { fill:#5fc85a; stroke:#e0b000; stroke-width:2.2; }
+  #mapSvg .cwon { font-weight:900; fill:#3a4a2a; paint-order:stroke; stroke:#ffffffd9; stroke-width:3px; pointer-events:none; }
+  #mapSvg .cwon.ok { fill:#1d7a2a; }
+  #mapSvg .clabel { fill:#8a7f68; font-size:11px; font-weight:700; letter-spacing:.15em; text-anchor:middle; pointer-events:none; }
+  #mapSvg .sea { fill:#a9d4f5; opacity:.8; font-size:13px; font-style:italic; text-anchor:middle; letter-spacing:.2em; pointer-events:none; }
+  #mapSvg .city { cursor:pointer; }
+  #mapSvg .city circle { fill:#fff; stroke:#33402c; stroke-width:1.5; }
+  #mapSvg .city:hover circle:not(.hit) { fill:var(--acc); }
+  #mapSvg.eu .city text { font-size:46px !important; stroke-width:10px; }
+  #mapSvg.eu .hqico { font-size:60px; }
+  #mapSvg.world .city text { font-size:200px !important; stroke-width:42px; }
+  #mapSvg.world .hqico { font-size:260px !important; }
+  #mapSvg.world .country { vector-effect:non-scaling-stroke; stroke-width:.8; }
+  #mapSvg.world .country.bg { stroke-width:1.2; }
+  #mapSvg .city.locked { opacity:.45; filter:grayscale(1); }
+  #mapSvg.wide .city text { font-size:16px !important; stroke-width:4px; }
+  #mapSvg.wide .clabel { font-size:18px; }
+  #mapSvg.wide .hqico { font-size:22px; }
+  #mapSvg .city text { font-size:10px; font-weight:700; fill:#1f2a19; paint-order:stroke; stroke:#ffffffcc; stroke-width:3px; }
+  #mapSvg .city circle.hit { fill:transparent; stroke:none; }
+  #mapSvg .city:hover circle.hit { fill:transparent; }
+  #mapSvg .city.hq circle { fill:var(--acc); stroke:#7a4b00; stroke-width:2; }
+  #mapSvg .city.done circle:not(.hit) { fill:#4cd07d; stroke:#1d7a43; stroke-width:2; }
+  #finBtn { color:#4cd07d; font-weight:800; }
+  #mapSvg .city.hq text { font-size:12px; }
+  #mapSvg .hqico { font-size:18px; pointer-events:none; }
+  /* надписите се свиват при приближаване (--ls идва от game.js: mapLS) */
+  #mapSvg .city text { font-size:calc(10px * var(--ls, 1)); stroke-width:calc(3px * var(--ls, 1)); }
+  #mapSvg .city.hq text { font-size:calc(12px * var(--ls, 1)); }
+  #mapSvg.wide .city text { font-size:calc(16px * var(--ls, 1)) !important; stroke-width:calc(4px * var(--ls, 1)); }
+  #mapSvg.eu .city text { font-size:calc(46px * var(--ls, 1)) !important; stroke-width:calc(10px * var(--ls, 1)); }
+  #mapSvg.world .city text { font-size:calc(200px * var(--ls, 1)) !important; stroke-width:calc(42px * var(--ls, 1)); }
+  #mapSvg .hqico { font-size:calc(18px * var(--ls, 1)); }
+  #mapSvg.wide .hqico { font-size:calc(22px * var(--ls, 1)); }
+  #mapSvg.eu .hqico { font-size:calc(60px * var(--ls, 1)); }
+  #mapSvg.world .hqico { font-size:calc(260px * var(--ls, 1)) !important; }
+  #mapSvg .clabel { font-size:calc(11px * var(--ls, 1)); }
+  #mapSvg.wide .clabel { font-size:calc(18px * var(--ls, 1)); }
+  #mapSvg .sea { font-size:calc(13px * var(--ls, 1)); }
+  #mapHud { position:absolute; right:16px; bottom:16px; max-height:calc(100% - 32px); overflow-y:auto; background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 16px; max-width:360px; display:flex; flex-direction:column; gap:10px; }
+  #mapHud h2 { font-size:20px; color:var(--acc); }
+  #mapHud p { color:var(--mut); font-size:14px; line-height:1.45; }
+
+  /* модален прозорец */
+  #modal { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:10; padding:16px; }
+  #modal .box { max-height:90vh; overflow-y:auto; background:#18202c; border:1px solid var(--line); border-radius:16px; padding:22px; max-width:560px; width:100%; display:flex; flex-direction:column; gap:12px; }
+  #modal h2 { font-size:20px; }
+  #modal p { color:var(--mut); line-height:1.5; font-size:14px; }
+  #modal .actions { display:flex; gap:10px; justify-content:flex-end; margin-top:6px; flex-wrap:wrap; }
+  #modal .actions button { flex:1 1 auto; }
+  #modal input { width:100%; padding:10px; border-radius:9px; border:1px solid var(--line); background:#0f141c; color:var(--txt); font-size:15px; }
+
+  #loading { position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#0b0d12; transition:opacity .6s; }
+  #loading.out { opacity:0; pointer-events:none; }
+  #loading .ld-bg { position:absolute; inset:-30px; background:url(assets/ui/splash.webp) center/cover; filter:blur(18px) brightness(.55); }
+  /* картината е 1672×941 — кутията пази пропорцията, за да е лентата точно на нарисуваното място */
+  #loading .ld-box { position:relative; width:min(100vw, 177.7vh); aspect-ratio:1672/941; background:url(assets/ui/splash.webp) center/100% 100% no-repeat; box-shadow:0 0 60px rgba(0,0,0,.6); }
+  #loading .ld-bar { position:absolute; left:31.9%; top:90.8%; width:36.3%; height:3.6%; border-radius:999px; background:#0d1424; box-shadow:0 0 0 2px #c9a14a, inset 0 2px 6px rgba(0,0,0,.6); overflow:hidden; }
+  #loading .ld-bar i { display:block; height:100%; width:3%; border-radius:999px; background:linear-gradient(90deg,#f7c64a,#ffe28a 60%,#fff6cf); box-shadow:0 0 12px #ffd25a; transition:width .25s ease-out; }
+  #loading .ld-txt { position:absolute; left:0; right:0; top:85.2%; text-align:center; color:#fff; font-weight:700; font-size:clamp(11px,1.9vw,24px); text-shadow:0 2px 6px #000; background:linear-gradient(90deg,transparent,rgba(30,22,10,.85) 35%,rgba(30,22,10,.85) 65%,transparent); padding:.2em 0; }
+
+  /* горна лента: бутоните не се пренасят на два реда; при тесен екран всичко се свива, а чиповете за събития се скриват първи */
+  #top { gap:10px; }
+  #top > * { flex-shrink:0; }
+  #top .btn2 { white-space:nowrap; padding:6px 9px; }
+  #top #evchips { flex-shrink:1; min-width:0; max-width:300px; flex-wrap:nowrap; overflow:hidden; }
+  #top .sp { flex-shrink:1; min-width:0; }
+  @media (max-width:1950px) {
+    #top { gap:7px; padding:0 10px; }
+    #top .logo { font-size:14px; letter-spacing:.02em; } #top .stat { font-size:14px; } #top .stat b { font-size:15px; }
+    #top .btn2 { padding:5px 7px; font-size:13px; }
+    .speed button { padding:5px 8px; }
+  }
+  @media (max-width:1600px) { #top #evchips { display:none; } #top .stars { display:none; } #top { gap:5px; } #top .btn2 { padding:5px 6px; font-size:12px; } }
+  @media (max-width:760px) {
+    #panel { top:auto; width:100%; height:42%; border-left:0; border-top:1px solid var(--line); }
+    #top { gap:8px; padding:0 8px; } #top .logo { display:none; } #top .stat { font-size:13px; }
+  }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="top">
+  <div class="logo">🏗️ СТРОИТЕЛНА ИМПЕРИЯ</div>
+  <div class="stat">💶 <b id="money">0</b></div>
+  <div class="stat">📅 Ден <b id="day">1</b></div>
+  <div class="stat">🕐 <b id="clock">06:00</b></div>
+  <button class="btn2" id="btnSound" title="Звук">🔊</button>
+  <div class="stat stars" id="rep">☆☆☆☆☆</div>
+  <div class="stat" id="wx" style="font-size:20px" title="Времето">☀️</div>
+  <div id="evchips"></div>
+  <div class="sp"></div>
+  <div class="speed" id="speed">
+    <button data-s="0" title="Пауза (интервал)">⏸</button>
+    <button data-s="1" class="on">▶</button>
+    <button data-s="2">▶▶</button>
+    <button data-s="4">▶▶▶</button>
+  </div>
+  <button class="btn2" id="btnMapToggle">🗺️ Карта</button>
+</div>
+
+<div id="panel" class="hidden">
+  <div id="tabs">
+    <button data-t="offers" class="on">Поръчки</button>
+    <button data-t="projects">Обекти</button>
+    <button data-t="fleet">Техника</button>
+    <button data-t="bank">Банка</button>
+    <button data-t="store">Склад</button>
+    <button data-t="estate">Имоти</button>
+    <button data-t="hq">Офис</button>
+  </div>
+  <div id="panelBody"></div>
+</div>
+
+<button id="quickBuy" class="hidden"></button>
+<div id="toasts"></div>
+<div id="buyPop" class="hidden"></div>
+
+<div id="mapScreen">
+  <svg id="mapSvg"></svg>
+  <div id="mapZoom"><button class="btn2" id="mzIn" title="Приближи">＋</button><button class="btn2" id="mzOut" title="Отдалечи">－</button><button class="btn2" id="mzReset" title="Цялата карта">⟳</button></div>
+  <div id="mapHud">
+    <h2 id="mapTitle">Избери град</h2>
+    <p id="mapText">Къде ще основеш строителната си фирма? Натисни град на картата.</p>
+    <div id="mapBtns" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+  </div>
+</div>
+
+<div id="modal" class="hidden"><div class="box" id="modalBox"></div></div>
+<div id="loading"><div class="ld-bg"></div><div class="ld-box"><div class="ld-txt" id="ldTxt">Зареждане… 0%</div><div class="ld-bar"><i id="ldBar"></i></div></div></div>
+
+<script type="module" src="game.js"></script>
+</body>
+</html>

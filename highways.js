@@ -1,0 +1,237 @@
+// highways.js — Фаза 4: строеж на магистрали (държавни поръчки).
+// Данни за истинските български магистрали + 3D модел на участък, който се „строи“ по етапи.
+// game.js ползва: HIGHWAYS, HW_STAGES, segmentQuote(km), HW_MODELS, buildHighwayView(A, opts).
+import * as THREE from 'three';
+
+// Истинските магистрали, разделени на участъци между градовете от картата
+export const HIGHWAYS = [
+  { id: 'A1', nm: 'Тракия', color: '#1e6fd9', segs: [['sofia', 'pazardzhik'], ['pazardzhik', 'plovdiv'], ['plovdiv', 'stz'], ['stz', 'burgas']] },
+  { id: 'A2', nm: 'Хемус', color: '#1e6fd9', segs: [['sofia', 'pleven'], ['pleven', 'vt'], ['vt', 'shumen'], ['shumen', 'varna']] },
+  { id: 'A3', nm: 'Струма', color: '#1e6fd9', segs: [['sofia', 'pernik'], ['pernik', 'blg']] },
+  { id: 'A4', nm: 'Марица', color: '#1e6fd9', segs: [['stz', 'haskovo']] },
+  { id: 'A5', nm: 'Черно море', color: '#1e6fd9', segs: [['varna', 'burgas']] },
+  { id: 'A7', nm: 'Русе — В. Търново', color: '#1e6fd9', segs: [['ruse', 'vt']] },
+  // международни коридори (до съседните държави)
+  { id: 'E80', nm: 'Тракия — Истанбул', color: '#1e6fd9', intl: true, segs: [['haskovo', 'edirne'], ['edirne', 'istanbul']] },
+  { id: 'E75', nm: 'Коридор 10 — Белград', color: '#1e6fd9', intl: true, segs: [['sofia', 'nis'], ['nis', 'belgrade']] },
+  { id: 'E79', nm: 'Струма — Солун — Атина', color: '#1e6fd9', intl: true, segs: [['blg', 'thessaloniki'], ['thessaloniki', 'athens']] },
+  { id: 'E85', nm: 'Дунав мост — Букурещ', color: '#1e6fd9', intl: true, segs: [['ruse', 'bucharest']] },
+  { id: 'E87', nm: 'Черноморски — Констанца', color: '#1e6fd9', intl: true, segs: [['varna', 'constanta']] },
+  { id: 'E871', nm: 'София — Скопие', color: '#1e6fd9', intl: true, segs: [['sofia', 'skopje']] },
+];
+export const segId = (hw, i) => `${hw.id}-${i}`;
+
+// Етапи на строежа на участък. need: техника, която отива на трасето (не е в града, докато трае).
+export const HW_STAGES = [
+  { nm: 'Земни работи', ico: '🚜', need: { bulldozer: 1, grader: 1, truck: 2, crew: 1 } },
+  { nm: 'Пътна основа', ico: '🪨', need: { grader: 1, roller: 1, truck: 2, crew: 1 } },
+  { nm: 'Асфалт', ico: '🛣️', need: { paver: 1, roller: 2, truck: 1, crew: 2 } },
+  { nm: 'Мантинели и табели', ico: '🚧', need: { marker: 1, crane: 1, crew: 2 } },
+];
+// старите нужди (без пътна техника) — за участъци, започнати преди нея, за да не блокират старите записи
+export const HW_NEED_OLD = [{ loader: 2, truck: 2, crew: 1 }, { truck: 2, tractor: 1, crew: 1 }, { truck: 1, tractor: 1, crew: 2 }, { crew: 2, crane: 1 }];
+// цялата пътна техника, нужна за един участък (максимумът по етапите)
+export const HW_FLEET = HW_STAGES.reduce((o, st) => { for (const [k, n] of Object.entries(st.need)) o[k] = Math.max(o[k] || 0, n); return o; }, {});
+export const HW_REP = 2;              // нужна репутация за държавни поръчки
+export const TOLL_PER_KM_DAY = 6;     // основна тол такса, € на км на ден (расте с дължината на магистралата — виж hwToll в game.js)
+
+// Цена, срок и материали за участък с дължина km (държавата плаща reward при завършване)
+export function segmentQuote(km) {
+  const reward = Math.round((km * 5200 + 60000) / 5000) * 5000;
+  const days = Math.max(6, Math.round(km / 9));
+  // материалите по етапи (ще се купуват през economy.js)
+  const mats = [
+    { gravel: Math.round(km * 40), sand: Math.round(km * 30) },
+    { gravel: Math.round(km * 55), concrete: Math.round(km * 8) },
+    { concrete: Math.round(km * 10), sand: Math.round(km * 20) },
+    { steel: Math.round(km * 1.2), concrete: Math.round(km * 3) },
+  ];
+  return { reward, days, mats, toll: Math.round(km * TOLL_PER_KM_DAY) };
+}
+
+// Модели, които трябва да са заредени в A (от assets/highway/ и assets/vehicles/)
+export const HW_MODELS = {
+  highway: ['road-straight-barrier', 'light-curved-double', 'sign-highway-wide', 'bridge-pillar-wide', 'road-bridge', 'construction-barrier', 'construction-light'],
+};
+
+// ---------------------------------------------------------------- машини за асфалта (процедурни)
+const YEL = new THREE.MeshStandardMaterial({ color: 0xffb300, roughness: 0.55 });
+const DARK = new THREE.MeshStandardMaterial({ color: 0x2a2a2c, roughness: 0.8 });
+const STEEL = new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.35, metalness: 0.7 });
+const box = (w, h, d, m, x, y, z, g) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.castShadow = true; o.receiveShadow = true; g.add(o); return o; };
+// кабина без стени: 4 стойки + покрив (ROPS)
+function canopy(g, x, y, z, w, d, h) {
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) box(0.1, h, 0.1, DARK, x + sx * w / 2, y + h / 2, z + sz * d / 2, g);
+  box(w + 0.3, 0.12, d + 0.3, YEL, x, y + h, z, g);
+}
+// асфалтополагач: бункер отпред, вериги, платформа на оператора, широка плоча (screed) отзад през цялото платно
+function makePaver(laneW) {
+  const g = new THREE.Group();
+  for (const sx of [-1, 1]) box(0.6, 0.8, 4.2, DARK, sx * 1.25, 0.4, 0.4, g);                    // вериги
+  box(2.8, 1.2, 3.4, YEL, 0, 1.3, 0.3, g);                                                       // тяло
+  // бункер за асфалт (отворен отгоре, с наклонени крила) — отпред
+  box(3.2, 0.15, 1.9, YEL, 0, 1.05, 2.9, g);
+  for (const sx of [-1, 1]) { const w = box(0.12, 1.1, 1.9, YEL, sx * 1.55, 1.6, 2.9, g); w.rotation.z = sx * 0.35; }
+  box(3.2, 0.9, 0.12, YEL, 0, 1.5, 3.85, g);
+  const load = box(2.6, 0.5, 1.6, new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.9 }), 0, 1.35, 2.9, g);   // горещ асфалт в бункера
+  load.castShadow = false;
+  // платформа и покрив на оператора, конзола и седалка
+  box(2.6, 0.12, 1.4, DARK, 0, 1.95, -0.7, g);
+  box(0.5, 0.6, 0.5, DARK, -0.6, 2.3, -0.8, g);
+  box(0.8, 0.5, 0.3, DARK, 0.4, 2.25, -0.3, g);
+  canopy(g, 0, 2.0, -0.7, 2.4, 1.6, 1.6);
+  // ауспух и маяк
+  box(0.12, 1.2, 0.12, DARK, 1.0, 2.5, 0.9, g);
+  const beacon = box(0.22, 0.2, 0.22, new THREE.MeshStandardMaterial({ color: 0xff8a00, emissive: 0xff6a00, emissiveIntensity: 1 }), 0, 3.75, -0.7, g);
+  beacon.castShadow = false;
+  // широка изглаждаща плоча отзад — покрива цялото платно
+  box(laneW - 0.4, 0.45, 0.9, YEL, 0, 0.35, -1.9, g);
+  box(laneW - 0.4, 0.1, 1.0, STEEL, 0, 0.08, -1.95, g);
+  for (const sx of [-1, 1]) box(0.12, 0.9, 1.0, YEL, sx * (laneW / 2 - 0.2), 0.5, -1.9, g);    // странични щитове
+  return g;
+}
+// тандемен валяк: два стоманени барабана, жълто шаси, ROPS с покрив
+function makeRoller() {
+  const g = new THREE.Group(), drums = [];
+  for (const sz of [-1, 1]) {
+    const d = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 1.9, 24), STEEL);
+    d.rotation.z = Math.PI / 2; d.position.set(0, 0.75, sz * 1.35); d.castShadow = true; g.add(d); drums.push(d);
+    box(2.1, 0.5, 0.25, YEL, 0, 1.25, sz * 1.35, g);                                              // капак над барабана
+  }
+  box(1.6, 0.9, 1.6, YEL, 0, 1.55, 0, g);                                                          // шаси/двигател
+  box(1.2, 0.12, 1.1, DARK, 0, 2.05, 0, g);
+  box(0.5, 0.5, 0.45, DARK, 0, 2.35, 0.1, g);
+  canopy(g, 0, 2.05, 0, 1.5, 1.3, 1.5);
+  g.userData.drums = drums;
+  return g;
+}
+
+// ---------------------------------------------------------------- 3D изглед на участък
+// Права отсечка с дължина LEN по оста Z: насип → чакъл → асфалт → оборудване. По средата — мост над река.
+const CW = 9, MED = 3;     // ширина на платно и на разделителя (м)
+const RIVER_W = 26;
+
+function clone(A, n, s) {
+  const o = A[n].scene.clone(true);
+  o.scale.setScalar(s);
+  o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+  return o;
+}
+// прави нещо видимо само до текущия фронт на строежа
+function reveal(list, front) { for (const o of list) o.visible = o.userData.z <= front; }
+
+// opts: { len = 240, river = true, ground = true, title } — без река/терен може да се сложи покрай град
+export function buildHighwayView(A, opts = {}) {
+  const g = new THREE.Group();
+  const LEN = opts.len || 240, z0 = -LEN / 2, RIVER_Z = opts.river === false ? 1e9 : 20;
+  if (opts.ground !== false) {
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshStandardMaterial({ color: 0x8fb36a, roughness: 1 }));
+    ground.rotation.x = -Math.PI / 2; ground.position.y = -0.02; ground.receiveShadow = true; g.add(ground);
+  }
+  if (opts.river !== false) {
+    const river = new THREE.Mesh(new THREE.PlaneGeometry(600, RIVER_W), new THREE.MeshStandardMaterial({ color: 0x3f86c9, roughness: 0.3, metalness: 0.1 }));
+    river.rotation.x = -Math.PI / 2; river.position.set(0, 0.01, RIVER_Z); g.add(river);
+  }
+  const onBridge = z => Math.abs(z - RIVER_Z) < RIVER_W / 2 + 6;
+  const H = () => 0.9;     // платното е на една височина, мостът е продължение на насипа
+
+  const W = CW * 2 + MED;
+  // 1) насип (пръст) — сегменти по 10 м
+  const earth = [], gravel = [], asphalt = [], gear = [];
+  const earthMat = new THREE.MeshStandardMaterial({ color: 0x7a5a3a, roughness: 1 });
+  const gravelMat = new THREE.MeshStandardMaterial({ color: 0x9c968c, roughness: 1 });
+  for (let z = z0; z < z0 + LEN; z += 10) {
+    const zc = z + 5;
+    if (onBridge(zc)) continue;
+    const e = new THREE.Mesh(new THREE.BoxGeometry(W + 6, 0.6, 10), earthMat);
+    e.position.set(0, 0.3, zc); e.receiveShadow = true; e.userData.z = zc; g.add(e); earth.push(e);
+    const gr = new THREE.Mesh(new THREE.BoxGeometry(W + 1, 0.3, 10), gravelMat);
+    gr.position.set(0, 0.75, zc); gr.receiveShadow = true; gr.userData.z = zc; g.add(gr); gravel.push(gr);
+  }
+  // мост: колони + плоча (колоните се появяват в етап 1, плочата в етап 2)
+  for (let z = RIVER_Z - RIVER_W / 2 - 4; z <= RIVER_Z + RIVER_W / 2 + 4; z += 9) {
+    for (const x of [-W / 2 + 2, 0, W / 2 - 2]) {
+      const p = clone(A, 'bridge-pillar-wide', 3); p.scale.y = 1.6; p.position.set(x, 0, z); p.userData.z = z; g.add(p); gravel.push(p);
+    }
+  }
+  // 2) асфалт: две платна от плочки road-straight-barrier (по 9 м) — на моста отгоре
+  for (let z = z0; z < z0 + LEN; z += CW) {
+    const zc = z + CW / 2;
+    for (const x of [-(CW + MED) / 2, (CW + MED) / 2]) {
+      const t = clone(A, 'road-straight-barrier', CW);
+      t.position.set(x, H(zc) + 0.02, zc);
+      if (onBridge(zc)) { const deck = new THREE.Mesh(new THREE.BoxGeometry(CW, 0.8, CW), gravelMat); deck.position.set(x, H(zc) - 0.4, zc); deck.castShadow = true; deck.userData.z = zc; g.add(deck); asphalt.push(deck); }
+      t.userData.z = zc; g.add(t); asphalt.push(t);
+    }
+  }
+  // 3) оборудване: бетонен разделител, двойно осветление, сини табели
+  const medMat = new THREE.MeshStandardMaterial({ color: 0xd8d8d0, roughness: 0.8 });
+  for (let z = z0; z < z0 + LEN; z += 10) {
+    const zc = z + 5;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.9, 10), medMat);
+    m.position.set(0, H(zc) + 0.45, zc); m.castShadow = true; m.userData.z = zc; g.add(m); gear.push(m);
+  }
+  for (let z = z0 + 10; z < z0 + LEN; z += 30) {
+    const l = clone(A, 'light-curved-double', 14); l.position.set(0, H(z) + 0.9, z); l.rotation.y = Math.PI / 2; l.userData.z = z; g.add(l); gear.push(l);
+  }
+  for (const z of [z0 + 30, z0 + LEN - 40]) {
+    const sgn = clone(A, 'sign-highway-wide', 11); sgn.position.set(W / 2 + 1.5, 0, z); sgn.rotation.y = Math.PI / 2; sgn.userData.z = z; g.add(sgn); gear.push(sgn);
+  }
+  if (opts.title) {   // табела с името на магистралата
+    const c = document.createElement('canvas'); c.width = 512; c.height = 160;
+    const x = c.getContext('2d'); x.fillStyle = '#1e5fbf'; x.fillRect(0, 0, 512, 160); x.strokeStyle = '#fff'; x.lineWidth = 8; x.strokeRect(10, 10, 492, 140);
+    x.fillStyle = '#fff'; x.font = 'bold 60px system-ui'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(opts.title, 256, 82, 470);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    const board = new THREE.Mesh(new THREE.PlaneGeometry(9, 2.8), new THREE.MeshBasicMaterial({ map: t }));
+    board.position.set(0, 8.5, z0 + LEN - 15); board.rotation.y = Math.PI; board.userData.z = z0 + LEN - 15; g.add(board); gear.push(board);
+    const post = new THREE.Mesh(new THREE.BoxGeometry(W + 2, 0.4, 0.4), new THREE.MeshStandardMaterial({ color: 0x888888 }));
+    post.position.set(0, 10, z0 + LEN - 15); post.userData.z = z0 + LEN - 15; g.add(post); gear.push(post);
+  }
+  // строителна площадка на фронта: конуси, бариери, лампи
+  const front = new THREE.Group(); g.add(front);
+  for (const x of [-W / 2 - 2, W / 2 + 2]) { const b = clone(A, 'construction-barrier', 5); b.position.set(x, 0, 0); front.add(b); }
+  const fl = clone(A, 'construction-light', 6); fl.position.set(W / 2 + 3, 0, -3); front.add(fl);
+  // машини: асфалтополагач и валяк (процедурни), плюс самосвали от Kenney, ако са заредени
+  const paver = makePaver(CW), rollers = [makeRoller(), makeRoller()];
+  g.add(paver, ...rollers);
+  // пресен (горещ) асфалт зад полагача — по-тъмна ивица, която валяците изглаждат
+  const fresh = new THREE.Mesh(new THREE.PlaneGeometry(CW - 0.6, 16), new THREE.MeshStandardMaterial({ color: 0x1c1c1e, roughness: 0.55, transparent: true, opacity: 0.85 }));
+  fresh.rotation.x = -Math.PI / 2; g.add(fresh);
+  const trucks = [];
+  if (A.truck) for (let k = 0; k < 2; k++) { const t = clone(A, 'truck', 2.2); g.add(t); trucks.push(t); }
+  if (A['tractor-shovel']) { const l = clone(A, 'tractor-shovel', 2.2); g.add(l); trucks.push(l); }
+
+  // stage: 0..3, prog: 0..1 в рамките на етапа, t: секунди (за анимация)
+  function update(stage, prog, t = 0) {
+    const fz = z0 + LEN * prog;      // фронт на текущия етап
+    reveal(earth, stage > 0 ? 1e9 : fz);
+    reveal(gravel, stage > 1 ? 1e9 : stage === 1 ? fz : -1e9);
+    reveal(asphalt, stage > 2 ? 1e9 : stage === 2 ? fz : -1e9);
+    reveal(gear, stage > 3 ? 1e9 : stage === 3 ? fz : -1e9);
+    const done = stage > 3;
+    front.visible = !done;
+    front.position.z = fz;
+    const asph = stage === 2, lx = -(CW + MED) / 2;
+    paver.visible = fresh.visible = asph;
+    rollers.forEach(r => r.visible = asph);
+    // полагачът върви напред по фронта; плочата му е точно на ръба на асфалта
+    paver.position.set(lx, H(fz) - 0.1, fz + 1.2);
+    fresh.position.set(lx, H(fz) + 0.06, fz - 7);
+    // два валяка ходят напред-назад по пресния асфалт, в двете половини на платното
+    rollers.forEach((r, k) => {
+      const zz = fz - 6 - k * 7 + Math.sin(t * 0.9 + k * 1.7) * 4;
+      r.position.set(lx + (k ? 2.2 : -2.2), H(zz) - 0.1, zz);
+      const dir = Math.cos(t * 0.9 + k * 1.7);
+      r.rotation.y = dir >= 0 ? 0 : Math.PI;
+      r.userData.drums.forEach(d => d.rotation.x += 0.05 * Math.sign(dir || 1));
+    });
+    trucks.forEach((tr, k) => {
+      tr.visible = !done && stage < 3;
+      const zz = fz - 10 - k * 9 + Math.sin(t * 0.8 + k) * 4;
+      tr.position.set((k % 2 ? 1 : -1) * (W / 2 + 4), 0, zz);
+      tr.rotation.y = Math.cos(t * 0.8 + k) >= 0 ? 0 : Math.PI;   // гледа накъдето се движи
+    });
+  }
+  update(opts.stage ?? 0, opts.prog ?? 0);
+  return { group: g, update, length: LEN, width: CW * 2 + MED };
+}
