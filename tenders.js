@@ -40,7 +40,7 @@ export function createTenders(deps) {
   const refund = (t, s, why) => { if (!s.bond) return; deps.econ().earn(s.bond, 'гаранция', `Върната гаранция: ${t.nm}`); if (why) deps.toast(`🔐 ${why}: върнаха ти гаранцията ${deps.fmt(s.bond)} €.`, 'good'); s.bond = 0; };
   // наличност за гаранцията: сметката + депозитът в банката (недостигът се взима от депозита)
   const avail = () => { const e = deps.econ(); return Math.max(0, e.s.money) + (e.s.deposit || 0); };
-  const eligible = t => deps.devBest() >= t.dev && deps.rep() >= t.rep - 1;
+  const eligible = t => deps.devBest() >= t.dev && deps.rep() >= t.rep - 1 && (!deps.canTender || deps.canTender(t));   // canTender — напр. само в държави, където имаш град
   const profitAt = (t, m) => Math.round(t.budget * (m - t.matShare) - Object.entries(t.need).reduce((a, [, n]) => a + n, 0) * 600 * t.days);   // грубо: минус заплати/гориво
   // ефективна оценка на офертата: по-ниска е по-добра; всяка звезда репутация = 1% по-изгодна за държавата
   const score = (m, rep) => m * (1 - 0.01 * rep);

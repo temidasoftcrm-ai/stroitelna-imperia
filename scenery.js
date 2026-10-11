@@ -39,6 +39,14 @@ function warnSign() {
 }
 
 // group: групата на изгледа; deps: { model(name, scale), A, houses: [имена] };
+// нива с редове (браздите са по-тъмни ивици)
+function rowsTex(col, w, d) {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 64; const x = c.getContext('2d'), base = new THREE.Color(col);
+  x.fillStyle = '#' + base.getHexString(); x.fillRect(0, 0, 64, 64);
+  x.fillStyle = '#' + base.clone().multiplyScalar(0.78).getHexString(); for (let k = 0; k < 64; k += 8) x.fillRect(0, k, 64, 3);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(w / 16, d / 6); t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
 // opts: { len = 240, half = 12 (половин ширина на трасето), riverZ = 20, riverW = 26, title, kind: 'rail' | 'road', seed }
 export function addRouteScenery(group, deps, opts = {}) {
   const g = new THREE.Group(); group.add(g);
@@ -65,7 +73,7 @@ export function addRouteScenery(group, deps, opts = {}) {
   }
   // стари каменни мостове над реката, встрани от трасето (ако в изгледа има река)
   if (rz < 1e8) loadBridges().then(() => {
-    for (const [k, x, len] of [['stone', -95 - r() * 40, rw * 2 + 14], ['rail', 110 + r() * 50, rw * 2 + 22]]) { const o = bridgeModel(k, len); if (!o) continue; o.position.set(x, 0, rz); g.add(o); }
+    for (const [k, x, len] of [['stone', -95 - r() * 40, rw * 2 + 24], ['rail', 110 + r() * 50, rw * 2 + 34]]) { const o = bridgeModel(k, len); if (!o) continue; o.position.set(x, 0, rz); g.add(o); }
   });
   loadMountains().then(() => { for (const [parts, x, z, w, h, k, rot] of swaps) { const o = mtnModel(k, w, h, rot); if (!o) continue; o.position.set(x, 0, z); g.add(o); parts.forEach(p => p.visible = false); } });
   // ниви (жито, разорана земя, слънчоглед, ливада)
@@ -73,7 +81,8 @@ export function addRouteScenery(group, deps, opts = {}) {
   for (let k = 0; k < 16; k++) {
     const w = 30 + r() * 40, d = 30 + r() * 50, x = (r() < 0.5 ? -1 : 1) * (half + 18 + w / 2 + r() * 120), z = -230 + r() * 460;
     if (!free(x, z, Math.max(w, d) / 2)) continue;
-    const f = new THREE.Mesh(new THREE.PlaneGeometry(w, d), flat(fields[k % fields.length])); f.rotation.x = -Math.PI / 2; f.rotation.z = (r() - 0.5) * 0.4; f.position.set(x, 0.02, z); f.receiveShadow = true; g.add(f);
+    const f = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ color: 0xffffff, map: rowsTex(fields[k % fields.length], w, d), roughness: 1 })); f.rotation.x = -Math.PI / 2; f.rotation.z = (r() - 0.5) * 0.4; f.position.set(x, 0.02, z); f.receiveShadow = true; g.add(f);
+    if (r() < 0.6) { const hd = new THREE.Mesh(new THREE.BoxGeometry(w, 1.6, 1.4), flat(0x4f7a3a)); hd.position.set(x, 0.8, z + d / 2 + 1); hd.rotation.y = -f.rotation.z; hd.castShadow = true; g.add(hd); }   // жив плет
   }
   // горички и единични дървета
   for (let k = 0; k < 26; k++) {
@@ -81,16 +90,21 @@ export function addRouteScenery(group, deps, opts = {}) {
     for (let j = 0; j < 4 + (r() * 6 | 0); j++) {
       const x = cx + (r() - 0.5) * 24, z = cz + (r() - 0.5) * 24;
       if (!free(x, z)) continue;
-      const n = r() < 0.5 ? 'tree-large' : 'tree-small';
+      const nice = ['sf-tree-0', 'sf-tree-1', 'sf-tree-2', 'sf-pine-0', 'sf-pine-1'].filter(q => deps.A[q]);
+      const n = nice.length && r() < 0.75 ? nice[(r() * nice.length) | 0] : r() < 0.5 ? 'tree-large' : 'tree-small';
       if (!deps.A[n]) continue;
-      const t = deps.model(n, 6 + r() * 4); t.position.set(x, 0, z); t.rotation.y = r() * 6; g.add(t);
+      const t = deps.model(n, n.startsWith('sf-') ? 7 + r() * 6 : 6 + r() * 4); t.position.set(x, 0, z); t.rotation.y = r() * 6; g.add(t);
     }
   }
   // скали
-  for (let k = 0; k < 30; k++) {
-    const x = (r() < 0.5 ? -1 : 1) * (half + 10 + r() * 150), z = -240 + r() * 480;
-    if (!free(x, z)) continue;
-    const s = 0.6 + r() * 2.2, rock = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), flat(0x8c8a84)); rock.position.set(x, s * 0.4, z); rock.rotation.set(r(), r(), r()); rock.castShadow = true; g.add(rock);
+  const rockC = [0x8c8a84, 0x7a746a, 0x9a9488, 0x6f6a62];
+  for (let k = 0; k < 22; k++) {   // купчини камъни: 2–6 скали, понякога голям скален блок
+    const cx = (r() < 0.5 ? -1 : 1) * (half + 10 + r() * 150), cz = -240 + r() * 480;
+    for (let j = 0, n = 2 + (r() * 5 | 0); j < n; j++) {
+      const x = cx + (r() - 0.5) * 8, z = cz + (r() - 0.5) * 8; if (!free(x, z)) continue;
+      const s = j === 0 && r() < 0.35 ? 3 + r() * 3 : 0.5 + r() * 1.8, rock = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 1), flat(rockC[(r() * rockC.length) | 0]));
+      rock.scale.set(1, 0.55 + r() * 0.4, 0.8 + r() * 0.5); rock.position.set(x, s * 0.25, z); rock.rotation.set(r() * 0.4, r() * 6, r() * 0.4); rock.castShadow = rock.receiveShadow = true; g.add(rock);
+    }
   }
   // малко село встрани
   const vx = (r() < 0.5 ? -1 : 1) * (half + 70), vz = -150 + r() * 80;

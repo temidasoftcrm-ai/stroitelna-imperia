@@ -71,3 +71,14 @@ People and resort hotel in assets/heavy/people/ — from Sketchfab, Creative Com
 - sky/night.glb — "city building" by Griffin M (CC-BY 4.0) — https://sketchfab.com/3d-models/f38a12b260c042c39b4906494be9c26e
 - lm/colosseo.glb — "Colosseum" by Carlos.Maciel (CC-BY 4.0) — https://sketchfab.com/3d-models/e749705838044be78ced42205f9f9dda
 - resort/aframe.glb — "A-Frame Cabin (NEW VERSION)" by Jen S Abbott (CC-BY 4.0) — https://sketchfab.com/3d-models/6a61d1fcba4d45afad744c0b3b6bdec9
+- blocks/richmond.glb — "Richmond Apartments 02" by hamma085 (CC-BY 4.0) — https://sketchfab.com/3d-models/885d323ad9c7450791e1158a91ae226c
+- blocks/panel12.glb — "Detailed 12 storey panel apartment building" by bean(alwayshasbean) (CC-BY 4.0) — https://sketchfab.com/3d-models/cb7064bec48845fea62a830b2c692fb1
+- blocks/gamecity.glb — "Game Ready City Buildings" by ModelMaker (CC-BY 4.0) — https://sketchfab.com/3d-models/12ac98aa701548adbfa463157f05f6cf
+- blocks/soviet.glb — "LOW POLY - SOVIET APARTMENT BUILDING 8K" by Colin.Greenall (CC-BY 4.0) — https://sketchfab.com/3d-models/05229ac1d1f94e6c8cacaad91110c602
+- blocks/oldbld.glb — "Old Building | Lowpoly" by Frid.blend (CC-BY 4.0) — https://sketchfab.com/3d-models/1f304c6e56324c19955a18aa79b15b9f
+- blocks/dbrick.glb — "Double Brick Apartment Block" by novusod (CC-BY 4.0) — https://sketchfab.com/3d-models/1c5ff0638a9a4c63bccce4510b76c66e
+- blocks/brick.glb — "Brick Apartment Block" by Ikarian (CC-BY 4.0) — https://sketchfab.com/3d-models/ff25dd59f13040b59ef5034489ac66ca
+- blocks/asian.glb — "LOW POLY - ASIAN TOWER BLOCK" by Colin.Greenall (CC-BY 4.0) — https://sketchfab.com/3d-models/694adf5094fa41f99a245ed822293f47
+- blocks/modoffice.glb — "Modern Office Building" by Bl4ckGh0st (CC-BY 4.0) — https://sketchfab.com/3d-models/c6b0308c2ebb4842ae49aff70ce14ad0
+- blocks/jade.glb — "Jade Appartment Block" by novusod (CC-BY 4.0) — https://sketchfab.com/3d-models/4fcd254849a749c5b4e71b9f95dff22f
+  (текстурите в blocks/ са смалени до 1024 px webp)

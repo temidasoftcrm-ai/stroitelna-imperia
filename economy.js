@@ -803,9 +803,9 @@ function ensureStyle() {
   .fin-btns button:disabled { opacity:.4; cursor:default; }
   #quickDep { position:fixed; top:62px; left:14px; z-index:7; border:0; border-radius:12px; padding:10px 14px; font-weight:800; font-size:14px; color:#062a12;
     background:linear-gradient(180deg,#9dffb8,#3fd46a); box-shadow:0 4px 14px rgba(0,0,0,.35); cursor:pointer; animation:qdPulse 1.6s ease-in-out infinite; }
-  body.qb #quickDep { top:112px; }
-  body.qd #toasts { top:112px; }
-  body.qb.qd #toasts { top:162px; }
+  body.qb #quickDep { top:calc(var(--topH, 52px) + 64px); }
+  body.qd #toasts { top:calc(var(--topH, 52px) + 66px); }   /* под бутона, не върху него */
+  body.qb.qd #toasts { top:calc(var(--topH, 52px) + 120px); }
   @keyframes qdPulse { 50% { box-shadow:0 4px 22px rgba(76,208,125,.8); } }
   .fin-chart { width:100%; height:120px; display:block; margin-top:8px; }
   .fin-chart text { font-size:10px; fill:var(--mut); }

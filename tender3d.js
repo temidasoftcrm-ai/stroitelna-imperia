@@ -74,7 +74,7 @@ export function buildUniversity(group, deps, opts = {}) {
   cyl(0.3, 0.4, 1.6, trim, 0, 1.2, 10, s6, 8);
   for (const sd of [-1, 1]) { box(1.2, 1.4, 1.2, trim, sd * 6.5, 0.7, 8.5, s6); cyl(0.35, 0.35, 1.8, mat(0x5b6e5a, 0.4, 0.6), sd * 6.5, 2.3, 8.5, s6, 8); }
   for (const [x, z] of [[-11, 10], [11, 10], [-11, -10], [11, -10], [-11, 0], [11, 0]]) { cyl(0.25, 0.3, 2, mat(0x6b4a2b), x, 1, z, s6, 6); const c = new THREE.Mesh(new THREE.SphereGeometry(1.6, 10, 8), mat(0x3f8f3a)); c.position.set(x, 3, z); c.castShadow = true; s6.add(c); }
-  const sign = deps.label ? deps.label('🎓 СОФИЙСКИ УНИВЕРСИТЕТ', '#ffe9a8', 16) : null;
+  const sign = deps.label ? deps.label(opts.sign || '🎓 СОФИЙСКИ УНИВЕРСИТЕТ', '#ffe9a8', 16) : null;
   if (sign) { sign.position.set(0, 26, 0); g.add(sign); }
   const kit = siteKit(g, 24, 16, 16);
 

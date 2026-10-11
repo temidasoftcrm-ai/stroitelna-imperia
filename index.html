@@ -199,6 +199,9 @@
   body #qPanel { top:var(--topH); }
   #quickBuy, body #quickDep { top:calc(var(--topH) + 10px); }
   #toasts { top:calc(var(--topH) + 12px); }
+  /* под плаващия бутон (материали / лихва) — съобщенията слизат надолу, за да не го закриват */
+  body.qb #toasts, body.qd #toasts { top:calc(var(--topH) + 66px); }
+  body.qb.qd #toasts { top:calc(var(--topH) + 120px); }
   @media (min-width:761px) { #panel { top:var(--topH); } #top .stars { display:block; } }
 </style>
 <script type="importmap">
