@@ -2,6 +2,7 @@
 // за всяка посока, и до 5 влака едновременно — товарни и пътнически (електрически мотриси). Не влияят на играта.
 import * as THREE from 'three';
 import { placeCars } from './trackpath.js';
+import { hasTrainModel, trainCar } from './trainmodels.js';
 
 const LEN = 600, CAR = 6.2, SCALE = 2.2, GAP = 6.5, MAX = 5;   // от край до край на земята
 const FREIGHT = ['train-carriage-box', 'train-carriage-flatbed-wood', 'train-carriage-coal', 'train-carriage-container-red'];
@@ -21,9 +22,24 @@ export function createPassingTrains(deps) {
   let wait = 4 + Math.random() * 6;
   const count = () => lines.reduce((a, L) => a + L.list.length, 0);
 
-  function make(passenger) {
+  function make(passenger, express) {
     const g = new THREE.Group();
     let n;
+    const lenOf = () => g.children.reduce((a, m) => a + (m.userData.len ? m.userData.len + 0.5 : CAR), 0);
+    if (express === 'oe' && hasTrainModel('oeLoco') && hasTrainModel('oeCar')) {   // „Ориент Експрес“ — след изпълнената поръчка
+      g.add(trainCar('oeLoco')); for (let i = 0; i < 5; i++) g.add(trainCar('oeCar'));
+      return { g, len: lenOf(), express: true };
+    }
+    if (express && hasTrainModel('ave')) {   // „Стрела“ — скоростен влак (челен вагон отпред и отзад)
+      g.add(trainCar('ave')); if (hasTrainModel('hsw')) for (let i = 0; i < 2 + (Math.random() * 3 | 0); i++) g.add(trainCar('hsw')); g.add(trainCar('aveTail'));
+      return { g, len: lenOf(), express: true };
+    }
+    if (!passenger && hasTrainModel('loco')) {   // товарен: дизелов локомотив + бункери и платформи с контейнери
+      n = 4 + (Math.random() * 6 | 0);
+      g.add(trainCar('loco'));
+      for (let i = 1; i <= n; i++) g.add(trainCar(Math.random() < 0.45 ? 'hopper' : 'flat', (Math.random() * 99) | 0));
+      return { g, len: lenOf() };
+    }
     if (passenger && deps.model && hasModel('train-electric-city-a')) {
       n = 3 + (Math.random() * 3 | 0);
       for (let i = 0; i <= n; i++) {
@@ -44,12 +60,12 @@ export function createPassingTrains(deps) {
   function spawn() {
     const free = lines.filter(L => { const last = L.list[L.list.length - 1]; return !last || Math.abs(last.z - (-L.dir * LEN)) > last.len + 90; });
     if (!free.length) return;
-    const L = free[(Math.random() * free.length) | 0], passenger = Math.random() < 0.45;
-    const { g, len } = make(passenger);
+    const L = free[(Math.random() * free.length) | 0], passenger = Math.random() < 0.45, express = passenger && deps.orient && deps.orient() && Math.random() < 0.3 ? 'oe' : passenger && Math.random() < 0.35;
+    const { g, len } = make(passenger, express);
     const z = -L.dir * LEN;
     placeCars(g, path, L.x, z, L.dir, CAR, 0.3);
     deps.scene.add(g);
-    const speed = passenger ? 20 + Math.random() * 6 : 11 + Math.random() * 5;
+    const speed = express === 'oe' ? 16 + Math.random() * 3 : express ? 34 + Math.random() * 6 : passenger ? 20 + Math.random() * 6 : 11 + Math.random() * 5;
     L.list.push({ g, z, len, speed, v: speed });
     if (deps.horn && Math.random() < 0.5) deps.horn();
   }

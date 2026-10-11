@@ -1,6 +1,6 @@
 // airport.js — 3D летище в града (Фаза WORLD, ниво 9): писта по z източно от града, рулежна пътека, перон,
 // терминал с ръкави, контролна кула, хангари и карго зона. Нивата 1–5 добавят ръкави/самолети на перона.
-// Самолетите са процедурни (нямаме модели): регионален, A320, широкофюзелажен и карго.
+// Самолетите: истински модели от Sketchfab (loadAirModels), иначе процедурни — регионален, A320, широкофюзелажен и карго.
 // Един самолет каца (подход от юг над магистралата → пробег → излиза на рулежката), друг излита на север над морето.
 import * as THREE from 'three';
 
@@ -22,9 +22,40 @@ export const PLANE_KINDS = {
   cargo:    { len: 34, wing: 34, r: 2.1, eng: 4, tail: 5.6, color: 0xe8e2d4 },
 };
 
+// ---- истински модели от Sketchfab (CC-BY, авторите са в CREDITS.txt и „📜 Автори“): самолетите по вид и контролна кула.
+// Зареждат се с другите модели на играта (loadAirModels в game.js); ако липсват — процедурните.
+//   yaw — завъртане около y, след което носът е към +z (моделите са завъртени различно)
+const AIR_CFG = { regional: { f: 'regional', yaw: 0.26 }, a320: { f: 'a320', yaw: Math.PI / 2 }, wide: { f: 'wide', yaw: 0 }, cargo: { f: 'cargo', yaw: -0.28, tint: 0xe8e2d4 }, tower: { f: 'tower' } };
+const AIR = {};
+function normPlane(scene, K, yaw) {
+  const g = new THREE.Group(), inner = new THREE.Group(); inner.add(scene); g.add(inner);
+  inner.rotation.y = yaw; g.updateMatrixWorld(true);
+  let bb = new THREE.Box3().setFromObject(g), sz = bb.getSize(new THREE.Vector3());
+  inner.scale.setScalar(K.len * 1.25 / sz.z); g.updateMatrixWorld(true);
+  bb = new THREE.Box3().setFromObject(g); sz = bb.getSize(new THREE.Vector3()); const c = bb.getCenter(new THREE.Vector3());
+  const gearY = K.r + K.r * 0.8;
+  inner.position.set(-c.x, -bb.min.y - gearY, -c.z);
+  g.userData.span = sz.x;
+  return g;
+}
+export function loadAirModels(load, base = 'assets/heavy/air/') {
+  return Promise.all(Object.entries(AIR_CFG).map(([k, c]) => load(base + c.f + '.glb').then(gl => {
+    const sc = gl.scene;
+    sc.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; if (c.tint) { m.material = m.material.clone(); m.material.color.setHex(c.tint); } } });
+    AIR[k] = k === 'tower' ? sc : normPlane(sc, PLANE_KINDS[k], c.yaw);
+  }).catch(e => console.warn('airmodels', k, e))));
+}
+
 // процедурен самолет: нос към +z
 export function makePlane(kind = 'a320', livery = 0) {
   const K = PLANE_KINDS[kind] || PLANE_KINDS.a320, g = new THREE.Group();
+  if (AIR[kind]) {   // истинският модел + навигационните светлини на върховете на крилата
+    const o = AIR[kind].clone(true), half = AIR[kind].userData.span / 2;
+    const navR = new THREE.Mesh(new THREE.SphereGeometry(0.35, 6, 6), mat(0xff2020, 0.5, 0, 0xff2020)), navG = new THREE.Mesh(new THREE.SphereGeometry(0.35, 6, 6), mat(0x20ff40, 0.5, 0, 0x20ff40));
+    navR.position.set(-half, -K.r * 0.3, -K.len * 0.05); navG.position.set(half, -K.r * 0.3, -K.len * 0.05); o.add(navR, navG);
+    o.userData = { kind, gearY: K.r + K.r * 0.8, nav: [navR, navG], len: K.len, span: half * 2 };
+    return o;
+  }
   const body = mat(K.color || 0xf4f6f8, 0.45, 0.2), stripe = mat(LIVERY[livery % LIVERY.length], 0.5), dark = mat(0x2a3038, 0.5, 0.4), glass = mat(0x1a2a3a, 0.2, 0.6);
   const fus = new THREE.Mesh(new THREE.CylinderGeometry(K.r, K.r, K.len, 14).rotateX(Math.PI / 2), body); g.add(fus);
   const nose = new THREE.Mesh(new THREE.SphereGeometry(K.r, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(Math.PI / 2), body); nose.scale.z = 1.6; nose.position.z = K.len / 2; g.add(nose);
@@ -110,9 +141,15 @@ export function buildAirport(group, deps, opts = {}) {
     }
     // контролна кула до северния край на терминала
     const tw = new THREE.Group(); tw.position.set(TERM.x - 4, 0, tz - tLen / 2 - 10); lvG.add(tw);
+    if (AIR.tower) {   // истинската кула, висока колкото процедурната
+      const o = AIR.tower.clone(true), w = new THREE.Group(); w.add(o); w.updateMatrixWorld(true);
+      const bb = new THREE.Box3().setFromObject(w), sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3()), k = (27 + n * 2) / sz.y;
+      o.position.set(-c.x, -bb.min.y, -c.z); w.scale.setScalar(k); tw.add(w);
+    } else {
     box(4, 22 + n * 2, 4, wall, 0, (22 + n * 2) / 2, 0, tw);
     const cab = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 3.4, 4, 8), glassM); cab.position.y = 24 + n * 2; tw.add(cab);
     box(9, 0.6, 9, roof, 0, 26.3 + n * 2, 0, tw);
+    }
     const bm = mat(0x40ff60, 0.4, 0, 0x40ff60); const b = new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 6), bm); b.position.y = 27.2 + n * 2; tw.add(b); beacons.length = 0; beacons.push(bm);
     // паркинг пред терминала
     flat(20, tLen * 0.7, mat(0x3a3d42, 0.95), TERM.x - 26, 0.03, tz, lvG);

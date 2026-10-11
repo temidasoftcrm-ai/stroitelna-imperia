@@ -72,4 +72,23 @@ export const AIRPORT_MAX = {
 };
 // по-малките градове по света (без истинско голямо летище)
 export const WORLD_SMALL = { ajman: 0, luxor: 2, aswan: 2, mardelplata: 2, cancun: 3, portelizabeth: 2, sharjah: 3, salvador: 3, fortaleza: 3, adelaide: 3, perth: 4, heraklion: 3, patras: 1, nice: 4 };
+// 🌍 Африка (africa.js)
+Object.assign(WORLD_SMALL, { casablanca: 5, rabat: 2, marrakesh: 4, tangier: 2, fes: 2, algiers: 4, oran: 3, constantine: 2, annaba: 1, setif: 0, tunis: 4, sfax: 1, sousse: 2, kairouan: 0, bizerte: 0,
+  dakar: 4, thies: 0, saintlouis: 1, kaolack: 0, ziguinchor: 1, accra: 4, kumasi: 2, tamale: 1, takoradi: 1, capecoast: 0, lagos: 5, abuja: 4, kano: 3, ibadan: 1, portharcourt: 3,
+  addisababa: 5, diredawa: 2, mekelle: 2, gondar: 1, bahirdar: 1, nairobi: 5, mombasa: 3, kisumu: 2, nakuru: 0, eldoret: 1, daressalaam: 4, dodoma: 1, arusha: 3, mwanza: 2, zanzibar: 3,
+  luanda: 4, huambo: 1, lobito: 0, benguela: 1, lubango: 1, kinshasa: 4, lubumbashi: 3, mbujimayi: 1, kisangani: 1, goma: 1,
+  tripoli: 3, nouakchott: 2, abidjan: 4, douala: 3, kampala: 4, khartoum: 3, lusaka: 3, harare: 3 });
+// 🗽 Северна Америка (namerica.js)
+Object.assign(WORLD_SMALL, { washington: 5, boston: 5, philadelphia: 4, atlanta: 5, houston: 5, dallas: 5, denver: 5, seattle: 5, lasvegas: 4, phoenix: 4, sanantonio: 3, neworleans: 3,
+  jacksonville: 3, saltlake: 4, kansascity: 3, elpaso: 2, winnipeg: 3, quebec: 2, halifax: 3, edmonton: 3, tijuana: 3, guatemalacity: 3, quetzaltenango: 1, escuintla: 0, coban: 0, flores: 1,
+  sanjose: 4, limon: 1, alajuela: 0, puntarenas: 0, liberiacr: 2, panama: 5, colon: 1, david: 1, santiagopa: 0, chitre: 0, havana: 4, santiagocuba: 2, camaguey: 1, holguin: 2, varadero: 3,
+  santodomingo: 4, santiagodr: 2, puntacana: 4, puertoplata: 2, laromana: 2, sansalvador: 3, managua: 2 });
+Object.assign(AIRPORT_MAX, { moscow: 5, stpetersburg: 5, nnovgorod: 3, kazan: 4, voronezh: 2, novorossiysk: 1 });   // 🇷🇺 Русия
+Object.assign(WORLD_SMALL, { bogota: 5, medellin: 4, cali: 3, barranquilla: 2, cartagena: 3, caracas: 4, maracaibo: 3, valenciave: 2, barquisimeto: 1, maracay: 0, quito: 4, guayaquil: 4, cuenca: 2, manta: 1, ambato: 0,
+  lima: 5, arequipa: 3, cusco: 3, trujillo: 2, chiclayo: 2, santiagocl: 5, valparaiso: 0, concepcion: 2, antofagasta: 2, laserena: 2, lapaz: 3, asuncion: 3, montevideo: 4 });   // 🌎 Южна Америка
+Object.assign(WORLD_SMALL, { bangkok: 5, chiangmai: 3, phuket: 4, pattaya: 1, hatyai: 2, hanoi: 5, hochiminh: 5, danang: 4, haiphong: 2, nhatrang: 3, kualalumpur: 5, penang: 4, johorbahru: 2, malacca: 1, kotakinabalu: 3,
+  jakarta: 5, surabaya: 4, bandung: 2, denpasar: 4, medan: 3, manila: 5, cebu: 4, davao: 3, baguio: 0, iloilo: 2, riyadh: 5, jeddah: 5, mecca: 0, medina: 3, dammam: 4,
+  chengdu: 5, chongqing: 4, wuhan: 4, xian: 4, yekaterinburg: 4, novosibirsk: 4, irkutsk: 3, khabarovsk: 3, vladivostok: 3, tehran: 4, tashkent: 4, almaty: 4, karachi: 4, dhaka: 4, yangon: 3 });   // 🌏 Азия
+Object.assign(WORLD_SMALL, { canberra: 3, goldcoast: 3, darwin: 3, hobart: 2, cairns: 3, townsville: 2, alicesprings: 1, auckland: 5, wellington: 3, christchurch: 3, queenstown: 2, hamilton: 1, suva: 3, portmoresby: 2 });   // 🦘 Океания
+Object.assign(AIRPORT_MAX, { kyiv: 5, kharkiv: 3, odesa: 4, dnipro: 3, lviv: 3 });   // 🇺🇦 Украйна
 export const airportMax = id => id in AIRPORT_MAX ? AIRPORT_MAX[id] : id in WORLD_SMALL ? WORLD_SMALL[id] : WORLD_IDS.has(id) ? 5 : 0;

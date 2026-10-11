@@ -2,16 +2,22 @@
 // Истанбул: джамия с купол и минарета, Галатската кула и модерни кули като в Левент (Сапфир, извита кула, двойни кули).
 // game.js ги слага на парцели в центъра на града (вместо обикновени небостъргачи); всяка сграда се побира в ~15×15.
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 export const CITY_LANDMARKS = {
-  istanbul: ['mosque', 'galata', 'sapphire', 'twist', 'twin', 'mosque2'],
-  rome: ['colosseum', 'stpeter', 'pantheon', 'vittoriano'],
+  istanbul: ['hagia', 'mosque', 'galata', 'sapphire', 'twist', 'twin', 'mosque2'],
+  rome: ['colosseo', 'stpeter', 'pantheon', 'vittoriano'],
+  paris: ['eiffel', 'arc', 'notredame', 'ladefense'],
+  london: ['bigben', 'londoneye', 'towerbridge', 'shard'],
+  berlin: ['brandenburg', 'fernsehturm', 'reichstag'],
   rotterdam: ['erasmus', 'cubes', 'markthal', 'derotterdam', 'euromast'],
   amsterdam: ['canal', 'rijks', 'centraal', 'adam', 'windmill', 'canal2'],
+  // истински модели от Sketchfab (GLB_LM по-долу)
+  dubai: ['burj'], newyork: ['manhattan', 'liberty'], sydney: ['opera'], moscow: ['stbasil'], toronto: ['cntower'], chicago: ['willis'], shanghai: ['shtower'], rio: ['redeemer'],
 };
-export const LANDMARK_NM = { mosque: 'Синята джамия', mosque2: 'Сюлейманийе', galata: 'Галатска кула', sapphire: 'Истанбул Сапфир', twist: 'Левент Туист', twin: 'Левент Туинс', colosseum: 'Колизеума', stpeter: 'Базилика „Св. Петър“', pantheon: 'Пантеона', vittoriano: 'Витториано', erasmus: 'Мостът Еразъм', cubes: 'Кубичните къщи', markthal: 'Маркетхал', derotterdam: 'Де Ротердам', euromast: 'Евромаст', canal: 'Канал с къщи', canal2: 'Канал с къщи', rijks: 'Райксмузеум', centraal: 'Централна гара', adam: 'A’DAM Лукаут', windmill: 'Вятърна мелница' };
+export const LANDMARK_NM = { burj: 'Бурж Халифа', manhattan: 'Манхатън', liberty: 'Статуята на свободата', opera: 'Операта в Сидни', stbasil: 'Храмът „Св. Василий Блажени“', cntower: 'Си Ен Тауър', willis: 'Уилис Тауър', shtower: 'Шанхайската кула', redeemer: 'Христос Спасителя', mosque: 'Синята джамия', mosque2: 'Сюлейманийе', galata: 'Галатска кула', sapphire: 'Истанбул Сапфир', twist: 'Левент Туист', twin: 'Левент Туинс', colosseum: 'Колизеума', hagia: 'Света София', colosseo: 'Колизеума', vatican: 'Ватикана и „Св. Петър“', stpeter: 'Базилика „Св. Петър“', pantheon: 'Пантеона', vittoriano: 'Витториано', erasmus: 'Мостът Еразъм', cubes: 'Кубичните къщи', markthal: 'Маркетхал', derotterdam: 'Де Ротердам', euromast: 'Евромаст', canal: 'Канал с къщи', canal2: 'Канал с къщи', rijks: 'Райксмузеум', centraal: 'Централна гара', adam: 'A’DAM Лукаут', windmill: 'Вятърна мелница', eiffel: 'Айфеловата кула', arc: 'Триумфалната арка', notredame: 'Нотр Дам', ladefense: 'Ла Дефанс', bigben: 'Биг Бен', londoneye: 'Лондонското око', towerbridge: 'Тауър Бридж', shard: 'Шард', brandenburg: 'Бранденбургската врата', fernsehturm: 'Телевизионната кула', reichstag: 'Райхстагът' };
 // кои стоят в центъра на града (останалите — в стария град извън центъра)
-export const LANDMARK_CENTER = new Set(['sapphire', 'twist', 'twin', 'colosseum', 'vittoriano', 'derotterdam', 'markthal', 'cubes', 'canal', 'rijks', 'centraal']);
+export const LANDMARK_CENTER = new Set(['burj', 'manhattan', 'cntower', 'willis', 'shtower', 'eiffel', 'arc', 'bigben', 'shard', 'brandenburg', 'reichstag', 'ladefense', 'sapphire', 'twist', 'twin', 'colosseum', 'colosseo', 'vatican', 'vittoriano', 'derotterdam', 'markthal', 'cubes', 'canal', 'rijks', 'centraal']);
 
 const mat = (c, r = 0.8, m = 0, extra = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m, ...extra });
 const add = (g, geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; g.add(o); return o; };
@@ -37,6 +43,32 @@ function windowTex(cols, rows, seed, base = '#5d7f9a', frame = '#c9d6df') {
 }
 const glassMat = (cols, rows, seed, base, frame) => { const t = windowTex(cols, rows, seed, base, frame); return mat(0xffffff, 0.25, 0.35, { map: t.map, emissiveMap: t.emissiveMap, emissive: 0xffffff, emissiveIntensity: 0 }); };
 
+// ---------------------------------------------------------------- Света София (Айя София): розово-оранжеви стени, плосък огромен купол
+// на барабан с прозорци, два полукупола (изток–запад), контрафорси, 4 минарета и куполни тюрбета отстрани
+function hagia() {
+  const g = new THREE.Group(), lit = [];
+  const wall = mat(0xd98a62, 0.85, 0, { emissive: 0xffc890, emissiveIntensity: 0 }), wall2 = mat(0xc77a55, 0.9, 0, { emissive: 0xffc890, emissiveIntensity: 0 });
+  const lead = mat(0x6f7f8c, 0.5, 0.45, { emissive: 0x9fb8ff, emissiveIntensity: 0 }), stone = mat(0xe8dcc4, 0.85, 0, { emissive: 0xffd8a0, emissiveIntensity: 0 });
+  const dark = mat(0x2a2f3a, 0.6), gold = mat(0xd8b44a, 0.35, 0.7), win = mat(0xfff2c0, 0.4, 0, { emissive: 0xffd890, emissiveIntensity: 0 }); lit.push(win);
+  box(g, 15, 0.3, 15, mat(0xcfc8b8, 0.95), 0, 0.15, 0);
+  box(g, 10, 4.6, 8.4, wall, 0, 2.6, 0);                        // основният обем
+  box(g, 11.2, 3.2, 3, wall2, 0, 1.9, -5.2);                    // нартекс отпред
+  for (const sx of [-1, 1]) for (const z of [-2.6, 2.6]) box(g, 1.4, 6.2, 1.8, wall2, sx * 5.3, 3.4, z);   // контрафорси
+  for (const sz of [-1, 1]) { const h = new THREE.Mesh(new THREE.SphereGeometry(2.9, 18, 8, 0, Math.PI, 0, Math.PI / 2), lead); h.position.set(0, 4.9, sz * 2.4); h.rotation.y = sz > 0 ? Math.PI : 0; h.scale.y = 0.75; h.castShadow = true; g.add(h); }   // полукуполи
+  cyl(g, 3.4, 3.5, 1.4, wall, 0, 5.6, 0, 32);                   // барабан
+  for (let k = 0; k < 24; k++) { const a = k / 24 * Math.PI * 2; const w = box(g, 0.32, 0.7, 0.08, win, Math.sin(a) * 3.48, 5.6, Math.cos(a) * 3.48); w.rotation.y = a; }
+  dome(g, 3.6, lead, 0, 6.3, 0, 0.6);                           // плоският голям купол
+  cyl(g, 0.05, 0.05, 1, gold, 0, 8.9, 0, 6);
+  for (const [x, z] of [[-6.4, -4.6], [6.4, -4.6], [-6.4, 4.6], [6.4, 4.6]]) {   // 4 минарета (тънки, с конусни върхове)
+    const h = x < 0 && z < 0 ? 14 : 16, m = x < 0 && z < 0 ? wall2 : stone;
+    cyl(g, 0.6, 0.7, 2.2, m, x, 1.1, z, 10); cyl(g, 0.36, 0.42, h, m, x, 2.2 + h / 2, z, 10);
+    for (const b of [0.6, 0.85]) { cyl(g, 0.62, 0.55, 0.28, m, x, 2.2 + h * b, z, 12); const l = cyl(g, 0.46, 0.46, 0.1, win, x, 2.35 + h * b, z, 12); l.castShadow = false; }
+    add(g, new THREE.ConeGeometry(0.42, 2.8, 10), lead, x, 2.2 + h + 1.4, z);
+  }
+  for (const x of [-2.5, 0, 2.5]) { cyl(g, 1.05, 1.05, 1.8, stone, x, 1.2, 6.2, 12); dome(g, 1.05, lead, x, 2.1, 6.2); }   // тюрбета
+  g.userData.lit = lit; g.userData.flood = [wall, wall2, stone, lead];
+  return g;
+}
 // ---------------------------------------------------------------- джамия (Синята джамия / Сюлейманийе)
 function mosque(variant = 0) {
   const g = new THREE.Group(), lit = [];
@@ -347,7 +379,216 @@ function windmill() {   // холандска мелница: осмоъгълн
   return g;
 }
 
-const BUILD = { erasmus, cubes, markthal, derotterdam, euromast, canal: () => canal(0), canal2: () => canal(1), rijks, centraal, adam, windmill, mosque: () => mosque(0), mosque2: () => mosque(1), galata, sapphire, twist, twin, colosseum, stpeter, pantheon, vittoriano };
+// ---------------------------------------------------------------- Париж, Лондон, Берлин
+// решетъчен крак (кутия от 4 ъглови пръта и X-диагонали) от точка a до точка b
+function lattice(g, a, b, w, m) {
+  const grp = new THREE.Group(), d = new THREE.Vector3().subVectors(b, a), len = d.length();
+  for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) box(grp, 0.12, len, 0.12, m, x * w / 2, len / 2, z * w / 2);
+  for (let y = 0; y < len - 0.5; y += w * 1.2) for (const r of [0, Math.PI / 2]) { const f = new THREE.Group(); f.rotation.y = r; grp.add(f); const dg = Math.hypot(w, w * 1.2); for (const sg of [1, -1]) { const x = box(f, 0.08, dg, 0.08, m, 0, y + w * 0.6, w / 2); x.rotation.z = sg * Math.atan2(w, w * 1.2); } }
+  grp.position.copy(a); grp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.clone().normalize()); g.add(grp); return grp;
+}
+function eiffel() {
+  const g = new THREE.Group(), iron = mat(0x8a6e4b, 0.6, 0.5, { emissive: 0xffb050, emissiveIntensity: 0 }), lamp = mat(0xfff2c0, 0.4, 0, { emissive: 0xffd890, emissiveIntensity: 0 });
+  box(g, 15, 0.3, 15, mat(0x8fae6a, 1), 0, 0.15, 0);
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { lattice(g, V(sx * 5.5, 0.3, sz * 5.5), V(sx * 2.4, 9, sz * 2.4), 1.2, iron); lattice(g, V(sx * 2.4, 9, sz * 2.4), V(sx * 1, 20, sz * 1), 0.8, iron); }
+  for (const [sx, sz] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) { const a = new THREE.Mesh(new THREE.TorusGeometry(3.6, 0.18, 6, 16, Math.PI), iron); a.position.set(sx * 4, 0.3, sz * 4); a.rotation.y = sx ? Math.PI / 2 : 0; g.add(a); }
+  box(g, 6.4, 0.6, 6.4, iron, 0, 9, 0); box(g, 3, 0.5, 3, iron, 0, 20, 0);
+  lattice(g, V(0, 20, 0), V(0, 33, 0), 1.1, iron);
+  box(g, 1.4, 1, 1.4, lamp, 0, 33.4, 0); cyl(g, 0.08, 0.08, 3, iron, 0, 35.4, 0, 6);
+  const beacon = add(g, new THREE.SphereGeometry(0.35, 8, 6), mat(0xffffff, 0.3, 0, { emissive: 0xffffff, emissiveIntensity: 0 }), 0, 37, 0);
+  g.userData.flood = [iron]; g.userData.lit = [lamp]; g.userData.blink = [beacon.material];
+  // истински модел (assets/heavy/eiffel.glb — „( FREE ) La tour Eiffel“, SDC PERFORMANCE™, CC-BY); докато се зарежда — простата кула
+  const simple = g.children.slice(1);
+  loadEiffel().then(src => {
+    if (!src) return;
+    const m = src.clone(true), b = new THREE.Box3().setFromObject(m), k = 34 / (b.max.y - b.min.y);   // краката да се съберат в парцела (15 м)
+    m.scale.setScalar(k); m.position.y = 0.3 - b.min.y * k;
+    m.traverse(o => { if (o.isMesh) { o.material = iron; o.castShadow = true; o.receiveShadow = true; } });
+    for (const o of simple) if (o !== beacon) o.visible = false;
+    beacon.position.y = 34.6; g.add(m);
+  });
+  return g;
+}
+let eiffelP = null;
+function loadEiffel() {
+  return eiffelP || (eiffelP = new GLTFLoader().loadAsync('assets/heavy/eiffel.glb').then(gl => {
+    gl.scene.traverse(o => { if (o.isMesh && !o.geometry.attributes.normal) o.geometry.computeVertexNormals(); });
+    return gl.scene;
+  }).catch(() => null));
+}
+function arc() {
+  const g = new THREE.Group(), st = mat(0xe8dcc0, 0.85, 0, { emissive: 0xffd8a0, emissiveIntensity: 0 }), dark = mat(0x2a2522);
+  box(g, 15, 0.3, 15, mat(0xb8b0a0, 0.95), 0, 0.15, 0);
+  for (let r = 0; r < 3; r++) { const ring = new THREE.Mesh(new THREE.RingGeometry(5 + r * 1.6, 5.8 + r * 1.6, 32), mat(0x6f9a4e, 1)); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.32; g.add(ring); }
+  for (const sx of [-1, 1]) box(g, 2.4, 9, 4, st, sx * 2.6, 4.8, 0);
+  box(g, 7.6, 2.8, 4, st, 0, 10.7, 0); box(g, 7.9, 0.4, 4.3, st, 0, 12.3, 0);
+  const vault = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 4.02, 16, 1, false, 0, Math.PI), dark); vault.rotation.z = Math.PI / 2; vault.rotation.y = Math.PI / 2; vault.position.set(0, 9.3, 0); g.add(vault);
+  box(g, 2.8, 0.1, 3.9, dark, 0, 4.3, 0);
+  g.userData.flood = [st];
+  return g;
+}
+function notredame() {
+  const g = new THREE.Group(), st = mat(0xcfc3a5, 0.9, 0, { emissive: 0xffd8a0, emissiveIntensity: 0 }), roof = mat(0x5a6670, 0.6, 0.3), win = mat(0x3a2f5a, 0.3, 0.2, { emissive: 0xc08aff, emissiveIntensity: 0 });
+  box(g, 15, 0.3, 15, mat(0xb8b0a0, 0.95), 0, 0.15, 0);
+  box(g, 5, 7, 11, st, 0, 3.8, -1); gable(g, 5.4, 2.6, 11, roof, 0, 7.3, -1);   // корабът
+  for (const sx of [-1, 1]) box(g, 2.2, 11, 2.2, st, sx * 1.9, 5.8, 5.4);   // двете кули
+  box(g, 6, 6, 1.4, st, 0, 3.3, 5.6);
+  const rose = new THREE.Mesh(new THREE.CircleGeometry(1, 20), win); rose.position.set(0, 6.4, 6.32); g.add(rose);
+  for (const sx of [-1, 1]) box(g, 0.8, 2.2, 0.05, dark0(), sx * 1.4, 1.4, 6.32);
+  add(g, new THREE.ConeGeometry(0.5, 6, 8), roof, 0, 11.6, -1);   // шпилът
+  for (let k = 0; k < 4; k++) for (const sx of [-1, 1]) { const b = box(g, 0.25, 3.2, 0.25, st, sx * 3.4, 4.5, -5 + k * 2.6); b.rotation.z = sx * 0.5; }   // контрафорси
+  box(g, 15, 0.1, 3, mat(0x3f7fb0, 0.25, 0.1), 0, 0.32, -6.5);   // Сена
+  g.userData.flood = [st]; g.userData.lit = [win];
+  return g;
+}
+const dark0 = () => mat(0x2a2522, 0.8);
+function ladefense() {   // Гранд Арш + стъклени кули
+  const g = new THREE.Group(), w = mat(0xf2f2ee, 0.5, 0.2, { emissive: 0xdde8ff, emissiveIntensity: 0 }), gl = glassMat(6, 30, 21, '#5e7f9c', '#d4e2ec');
+  box(g, 15, 0.3, 15, mat(0xb0b4b8, 0.95), 0, 0.15, 0);
+  for (const sx of [-1, 1]) box(g, 1.6, 10, 5, w, sx * 4, 5.3, 2);
+  box(g, 9.6, 1.6, 5, w, 0, 11.1, 2); box(g, 9.6, 1.2, 5, w, 0, 0.9, 2);
+  box(g, 3.5, 26, 3.5, gl, -5, 13.3, -5); box(g, 3, 20, 3, gl, 5.5, 10.3, -5.5);
+  g.userData.flood = [w]; g.userData.glass = [gl];
+  return g;
+}
+function bigben() {   // часовникова кула + парламентът
+  const g = new THREE.Group(), st = mat(0xc9b27a, 0.85, 0, { emissive: 0xffd090, emissiveIntensity: 0 }), roof = mat(0x3d4a52, 0.6, 0.3), gold = mat(0xd8b44a, 0.3, 0.8), face = mat(0xfff6dc, 0.4, 0, { emissive: 0xfff2c0, emissiveIntensity: 0 });
+  box(g, 15, 0.3, 15, mat(0xb8b0a0, 0.95), 0, 0.15, 0);
+  box(g, 14, 5, 4, st, 0, 2.8, -4.5); gable(g, 14, 1.6, 4.2, roof, 0, 5.3, -4.5);
+  for (let k = -6; k <= 6; k += 1.5) box(g, 0.25, 6.8, 0.25, st, k, 3.7, -2.45);
+  box(g, 3, 4, 3, st, 4.5, 2.3, -4.5); box(g, 2.6, 11, 2.6, st, 4.5, 7.8, -4.5);   // Виктория кула
+  box(g, 2.4, 16, 2.4, st, -4.5, 8.3, 2.5);   // Биг Бен
+  box(g, 3, 3.4, 3, st, -4.5, 17.9, 2.5);
+  for (const [dx, dz, ry] of [[0, 1.52, 0], [0, -1.52, Math.PI], [1.52, 0, Math.PI / 2], [-1.52, 0, -Math.PI / 2]]) { const c = new THREE.Mesh(new THREE.CircleGeometry(1.1, 20), face); c.position.set(-4.5 + dx, 17.9, 2.5 + dz); c.rotation.y = ry; g.add(c); }
+  box(g, 2.4, 1.6, 2.4, st, -4.5, 20.4, 2.5); add(g, new THREE.ConeGeometry(1.8, 4.4, 4), roof, -4.5, 23.4, 2.5).rotation.y = Math.PI / 4; add(g, new THREE.SphereGeometry(0.2, 6, 4), gold, -4.5, 25.8, 2.5);
+  box(g, 15, 0.1, 3, mat(0x3f7fb0, 0.25, 0.1), 0, 0.32, 6.3);   // Темза
+  g.userData.flood = [st]; g.userData.lit = [face];
+  return g;
+}
+function londoneye() {
+  const g = new THREE.Group(), w = mat(0xf2f4f6, 0.4, 0.4), pod = mat(0xbfe0ff, 0.2, 0.3, { emissive: 0x8fc8ff, emissiveIntensity: 0 }), ring = mat(0xf2f4f6, 0.4, 0.4, { emissive: 0x6fa0ff, emissiveIntensity: 0 });
+  box(g, 15, 0.3, 15, mat(0xb8b0a0, 0.95), 0, 0.15, 0); box(g, 15, 0.1, 5, mat(0x3f7fb0, 0.25, 0.1), 0, 0.32, -4.5);
+  const wheel = new THREE.Group(); wheel.position.set(0, 13, -2); g.add(wheel);
+  wheel.add(new THREE.Mesh(new THREE.TorusGeometry(11, 0.25, 8, 48), ring));
+  for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2; const sp = box(wheel, 0.08, 11, 0.08, w, Math.sin(a) * 5.5, Math.cos(a) * 5.5, 0); sp.rotation.z = -a; const p = add(wheel, new THREE.SphereGeometry(0.55, 8, 6), pod, Math.sin(a) * 11, Math.cos(a) * 11, 0.6); p.scale.z = 1.6; }
+  for (const sx of [-1, 1]) { const l = box(g, 0.4, 14, 0.4, w, sx * 2.5, 6.5, 1); l.rotation.z = sx * -0.2; }
+  g.userData.spin = wheel; g.userData.spinAxis = 'z'; g.userData.lit = [pod, ring];
+  return g;
+}
+function towerbridge() {
+  const g = new THREE.Group(), st = mat(0xd8cfb8, 0.85, 0, { emissive: 0xffd8a0, emissiveIntensity: 0 }), blue = mat(0x5f9fd6, 0.5, 0.3), roof = mat(0x3d4a52, 0.6, 0.3);
+  box(g, 15, 0.12, 15, mat(0x3f7fb0, 0.25, 0.1), 0, 0.06, 0);
+  for (const sx of [-1, 1]) { box(g, 2.6, 2, 3.6, st, sx * 3.5, 1, 0); box(g, 2.2, 11, 3, st, sx * 3.5, 6.5, 0); for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) add(g, new THREE.ConeGeometry(0.35, 2, 4), roof, sx * 3.5 + dx * 0.9, 13, dz * 1.3); add(g, new THREE.ConeGeometry(1.4, 3, 4), roof, sx * 3.5, 13.5, 0).rotation.y = Math.PI / 4; }
+  box(g, 4.8, 0.5, 3, blue, 0, 3, 0); for (const y of [10.5, 11.3]) box(g, 4.8, 0.4, 0.5, blue, 0, y, 0);
+  for (const sx of [-1, 1]) { box(g, 5, 0.5, 3, blue, sx * 7.2, 3, 0); const c = box(g, 6, 0.25, 0.25, blue, sx * 6.8, 6.5, 1.4); c.rotation.z = sx * 0.55; const c2 = c.clone(); c2.position.z = -1.4; g.add(c2); }
+  g.userData.flood = [st];
+  return g;
+}
+function shard() {
+  const g = new THREE.Group(), gl = glassMat(8, 50, 31, '#7f9db5', '#e2eaf0');
+  box(g, 15, 0.3, 15, mat(0xb0b4b8, 0.95), 0, 0.15, 0);
+  const sh = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 5.2, 46, 4, 1), gl); sh.rotation.y = Math.PI / 4; sh.position.y = 23.3; sh.castShadow = true; g.add(sh);
+  const tip = add(g, new THREE.SphereGeometry(0.3, 6, 4), mat(0xff3030, 0.4, 0, { emissive: 0xff2020, emissiveIntensity: 0 }), 0, 46.6, 0);
+  g.userData.glass = [gl]; g.userData.blink = [tip.material];
+  return g;
+}
+function brandenburg() {
+  const g = new THREE.Group(), st = mat(0xe3d7b8, 0.85, 0, { emissive: 0xffd8a0, emissiveIntensity: 0 }), bronze = mat(0x4f6b55, 0.5, 0.6);
+  box(g, 15, 0.3, 15, mat(0xc8c0ae, 0.95), 0, 0.15, 0);
+  box(g, 13, 0.6, 3.6, st, 0, 0.6, 0);
+  for (let k = 0; k < 6; k++) { const x = -5.5 + k * 2.2; cyl(g, 0.38, 0.42, 7, st, x, 4.4, 0.9, 12); cyl(g, 0.38, 0.42, 7, st, x, 4.4, -0.9, 12); }
+  box(g, 13.2, 1.6, 3.8, st, 0, 8.7, 0); box(g, 8, 1.2, 3, st, 0, 10.1, 0);
+  for (const sx of [-1, 1]) box(g, 2.2, 6, 3.4, st, sx * 7.6, 3.6, 0);
+  const q = new THREE.Group(); q.position.set(0, 10.7, 0); g.add(q);   // квадригата
+  for (let h = 0; h < 4; h++) box(q, 0.4, 1.2, 1.6, bronze, -0.9 + h * 0.6, 0.8, 0.6);
+  box(q, 2, 0.8, 1, bronze, 0, 0.5, -0.6); add(q, new THREE.ConeGeometry(0.3, 2, 6), bronze, 0, 1.9, -0.6);
+  g.userData.flood = [st];
+  return g;
+}
+function fernsehturm() {
+  const g = new THREE.Group(), conc = mat(0xd9d6cf, 0.6), ball = mat(0xb8c0c8, 0.3, 0.7, { emissive: 0x9fb8ff, emissiveIntensity: 0 }), red = mat(0xd62828, 0.5), win = mat(0x2b3440, 0.3, 0.2, { emissive: 0xffd890, emissiveIntensity: 0 });
+  box(g, 15, 0.3, 15, mat(0x8fae6a, 1), 0, 0.15, 0);
+  for (let k = 0; k < 3; k++) { const a = k / 3 * Math.PI * 2, f = box(g, 1.2, 4, 3, conc, Math.sin(a) * 2, 2, Math.cos(a) * 2); f.rotation.y = a; }
+  cyl(g, 0.9, 1.4, 30, conc, 0, 15.3, 0, 16);
+  add(g, new THREE.SphereGeometry(3.2, 24, 16), ball, 0, 31.5, 0); cyl(g, 3.25, 3.25, 0.8, win, 0, 31.5, 0, 24);
+  for (let k = 0; k < 6; k++) cyl(g, 0.25 - k * 0.025, 0.28 - k * 0.025, 2, k % 2 ? conc : red, 0, 35.5 + k * 2, 0, 8);
+  const tip = add(g, new THREE.SphereGeometry(0.25, 6, 4), mat(0xff3030, 0.4, 0, { emissive: 0xff2020, emissiveIntensity: 0 }), 0, 47.2, 0);
+  g.userData.lit = [win, ball]; g.userData.blink = [tip.material];
+  return g;
+}
+function reichstag() {
+  const g = new THREE.Group(), st = mat(0xcfc6b2, 0.85, 0, { emissive: 0xffd8a0, emissiveIntensity: 0 }), glass = mat(0xbfe0ff, 0.15, 0.4, { emissive: 0x9fc8ff, emissiveIntensity: 0, transparent: true, opacity: 0.75 });
+  box(g, 15, 0.3, 15, mat(0x8fae6a, 1), 0, 0.15, 0);
+  box(g, 13, 6, 9, st, 0, 3.3, -0.5);
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) box(g, 2.6, 8, 2.6, st, sx * 5.6, 4.3, sz * 3.6 - 0.5);
+  for (let k = 0; k < 6; k++) cyl(g, 0.32, 0.34, 4.6, st, -2.5 + k, 3, 4.2, 10);
+  const tri = new THREE.Shape(); tri.moveTo(-3.2, 0); tri.lineTo(3.2, 0); tri.lineTo(0, 1.4); tri.closePath(); const ped = new THREE.Mesh(new THREE.ExtrudeGeometry(tri, { depth: 0.8, bevelEnabled: false }), st); ped.position.set(0, 5.6, 3.7); g.add(ped);
+  const dome = add(g, new THREE.SphereGeometry(3, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), glass, 0, 6.3, -0.5); dome.scale.y = 1.15;
+  for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2, r = box(g, 0.06, 3.4, 0.06, mat(0x9aa0a6, 0.3, 0.8), Math.sin(a) * 2.2, 7.8, -0.5 + Math.cos(a) * 2.2); r.rotation.set(Math.cos(a) * 0.6, 0, -Math.sin(a) * 0.6); }
+  const flag = new THREE.Group(); flag.position.set(0, 10.8, -0.5); g.add(flag); cyl(flag, 0.05, 0.05, 2.2, mat(0xdddddd), 0, 0, 0, 6);
+  [0x111111, 0xd62828, 0xffcc00].forEach((c, i) => box(flag, 1.6, 0.3, 0.04, new THREE.MeshStandardMaterial({ color: c, side: THREE.DoubleSide }), 0.85, 0.95 - i * 0.3, 0));
+  g.userData.flood = [st]; g.userData.lit = [glass];
+  return g;
+}
+
+// ---- забележителности от готови модели (assets/heavy/lm/*.glb, Sketchfab, CC-BY — виж assets/heavy/CREDITS.txt)
+// h — височина в метри на играта; fit — най-много толкова ширина/дължина (парцелът е ~15 м); grid — пакет от сгради, подредени в квартал
+const GLB_LM = {
+  burj: { h: 70, fit: 14 }, cntower: { h: 58, fit: 14 }, willis: { h: 46, fit: 14 }, shtower: { h: 56, fit: 14 },
+  liberty: { h: 22, fit: 13, plate: 0x7d9a6a }, redeemer: { h: 18, fit: 14, plate: 0x6f8f55 }, stbasil: { h: 20, fit: 15, plate: 0xb9b0a3 },
+  opera: { h: 30, fit: 40, plate: 0x4f86b8 }, manhattan: { h: 34, fit: 15, grid: true },
+  colosseo: { h: 13, fit: 15, plate: 0xb9ad98 },   // Рим: Колизеумът (Carlos.Maciel)
+};
+const glbCache = {};
+function loadLm(kind) {
+  return glbCache[kind] || (glbCache[kind] = new GLTFLoader().loadAsync(`assets/heavy/lm/${kind}.glb`).then(gl => {
+    gl.scene.traverse(o => { if (o.isMesh && !o.geometry.attributes.normal) o.geometry.computeVertexNormals(); });
+    return gl.scene;
+  }).catch(() => null));
+}
+// пакет от сгради в редица → плътен квартал: възлите, които се застъпват (кула + шпил), са една сграда.
+// Ниските с широка основа отпадат, останалите се нареждат на редове (най-високите отзад), за да е колкото може по-висок в 15 м
+function gridOf(src) {
+  src.updateMatrixWorld(true);
+  let items = [];
+  src.traverse(o => { if (!o.isMesh) return; const b = new THREE.Box3().setFromObject(o); const c = b.getCenter(new THREE.Vector3()), it = items.find(x => c.x > x.b0.min.x && c.x < x.b0.max.x && c.z > x.b0.min.z && c.z < x.b0.max.z); if (it) { it.b.union(b); it.m.push(o); } else items.push({ b, b0: b.clone(), m: [o] }); });
+  for (const it of items) { it.w = it.b.max.x - it.b.min.x; it.d = it.b.max.z - it.b.min.z; it.h = it.b.max.y - it.b.min.y; }
+  const med = [...items].map(x => x.w * x.d).sort((a, b) => a - b)[items.length >> 1];
+  items = items.filter(x => x.w * x.d < med * 2.5 || x.h > 4).sort((a, b) => b.h - a.h);
+  const gap = 0.06, row = Math.sqrt(items.reduce((a, x) => a + (x.w + gap) * (x.d + gap), 0)) * 1.1, g = new THREE.Group();
+  let x = 0, z = 0, rowD = 0;
+  for (const it of items) {
+    if (x > 0 && x + it.w > row) { x = 0; z += rowD + gap; rowD = 0; }
+    const part = new THREE.Group();
+    for (const m of it.m) { const c = m.clone(); c.matrixAutoUpdate = false; c.matrix.copy(m.matrixWorld); part.add(c); }
+    part.position.set(x - it.b.min.x, -it.b.min.y, z - it.b.min.z); g.add(part);
+    x += it.w + gap; rowD = Math.max(rowD, it.d);
+  }
+  return g;
+}
+function glbLm(kind) {
+  const C = GLB_LM[kind], g = new THREE.Group(), flood = [];
+  box(g, 15, 0.3, 15, mat(C.plate ?? 0x9a9a92, 0.95), 0, 0.15, 0);
+  const ph = add(g, new THREE.BoxGeometry(4, C.h, 4), mat(0x9aa4ae, 0.8, 0, { transparent: true, opacity: 0.25 }), 0, C.h / 2, 0);   // докато се зарежда
+  g.userData.flood = flood;
+  loadLm(kind).then(src => {
+    g.remove(ph); if (!src) return;
+    const m = C.grid ? gridOf(src) : src.clone(true), w = new THREE.Group(); w.add(m);
+    const b = new THREE.Box3().setFromObject(w), s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3());
+    const k = Math.min(C.h / s.y, C.fit / Math.max(s.x, s.z));
+    m.position.set(-c.x, -b.min.y, -c.z); w.scale.setScalar(k); w.position.y = 0.3;
+    w.traverse(o => {
+      if (!o.isMesh) return; o.castShadow = o.receiveShadow = true;
+      const mt = o.material; if (mt && mt.metalness > 0.4) { mt.metalness = 0.25; mt.roughness = Math.max(mt.roughness ?? 0.5, 0.45); }   // без огледална среда металът излиза черен
+      if (mt && mt.emissive && !mt.emissiveMap && !flood.includes(mt)) { mt.emissive.set(0xffe4b8); if (mt.map) { mt.emissiveMap = mt.map; mt.needsUpdate = true; } mt.emissiveIntensity = 0; flood.push(mt); }   // прожектори: светва текстурата, не плосък бежов цвят
+    });
+    g.add(w);
+    if (g.userData.sign) g.userData.sign.position.y = s.y * k + 4;
+  });
+  return g;
+}
+const BUILD = { ...Object.fromEntries(Object.keys(GLB_LM).map(k => [k, () => glbLm(k)])), hagia, eiffel, arc, notredame, ladefense, bigben, londoneye, towerbridge, shard, brandenburg, fernsehturm, reichstag, erasmus, cubes, markthal, derotterdam, euromast, canal: () => canal(0), canal2: () => canal(1), rijks, centraal, adam, windmill, mosque: () => mosque(0), mosque2: () => mosque(1), galata, sapphire, twist, twin, colosseum, stpeter, pantheon, vittoriano };
 
 // kind → { group, update(t, night) }
 export function buildLandmark(kind, deps = {}) {
@@ -359,10 +600,10 @@ export function buildLandmark(kind, deps = {}) {
   const flood = g.userData.flood || [], lit = g.userData.lit || [], glass = g.userData.glass || [], blink = g.userData.blink || [];
   function update(t, night = 0) {
     for (const m of lit) m.emissiveIntensity = 0.1 + 1.6 * night;
-    for (const m of flood) m.emissiveIntensity = 0.28 * night;
+    for (const m of flood) m.emissiveIntensity = (m.emissiveMap ? 0.55 : 0.28) * night;
     for (const m of glass) m.emissiveIntensity = 0.02 + 1.1 * night;
     for (const m of blink) m.emissiveIntensity = (Math.sin(t * 3) > 0.5 ? 2 : 0.2) * (0.3 + night);
-    if (g.userData.spin) g.userData.spin.rotation.z = t * 0.6;
+    if (g.userData.spin) g.userData.spin.rotation.z = t * (g.userData.spinAxis ? 0.05 : 0.6);
   }
   return { group: g, update };
 }

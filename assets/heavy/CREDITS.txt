@@ -4,3 +4,70 @@
 - crane-a.glb — "Crane" от Max Hancock, CC-BY 3.0 (https://poly.pizza/m/aZFdGwasy60)
 - crane-c.glb — "Crane" от J-Toastie, CC-BY 3.0 (https://poly.pizza/m/gCcpjaxFdv)
 CC-BY 3.0: https://creativecommons.org/licenses/by/3.0/ — изисква посочване на автора (този файл / екран „Автори“).
+
+"( FREE ) La tour Eiffel" (https://sketchfab.com) by SDC PERFORMANCE™ is licensed under Creative Commons Attribution (https://creativecommons.org/licenses/by/4.0/).
+Used in assets/heavy/eiffel.glb — simplified, normals recomputed, recolored.
+
+Landmarks in assets/heavy/lm/ — from Sketchfab, licensed under Creative Commons Attribution (https://creativecommons.org/licenses/by/4.0/); simplified, textures resized and converted to WebP:
+- burj.glb — "Burj Khalifa" by ManySince910
+- manhattan.glb — "New York Buildings" by sumitmangela (buildings rearranged into a block)
+- liberty.glb — "Statue of liberty" by 3Dystopia
+- opera.glb — "Sydney Opera House" by Nick Reinhardt
+- stbasil.glb — "Saint Basil's Cathedral" by Polskaball
+- cntower.glb — "Gula's CN Tower" by gula
+- willis.glb — "Willis Tower - Sears Tower" by BoldlyBuilding
+- shtower.glb — "Shanghai Tower" by NanoRay
+- redeemer.glb — "Christ the Redeemer" by JuanG3D
+- trains/gp38.glb — "Low Poly EMD GP38" by TheOminousDuck (CC-BY 4.0) — https://sketchfab.com/3d-models/4309098e34414bb897652120402b5832
+- trains/ave.glb — "AVEENG" by dannzjs (CC-BY 4.0) — https://sketchfab.com/3d-models/9cafbe3dbdeb499a8c4f86b267820228
+- trains/hsw.glb — "High Speed_ Wagon" by dannzjs (CC-BY 4.0) — https://sketchfab.com/3d-models/73f203c89f0c4da0b58f412c7ce52429
+- ships/container.glb — "Small Cargo Ship" by Styx (CC-BY 4.0) — https://sketchfab.com/3d-models/6362d3e9b11e4396aaafa854c3aa6f06 (текстурите са смалени до 1024 px)
+- ships/tanker.glb — "Tanker" by 3DDomino (CC-BY 4.0) — https://sketchfab.com/3d-models/52f55201f76143d4b080c644bf15a61c
+- ships/cruise.glb — "Viking Cruise Ship" by jfactory (CC-BY 4.0) — https://sketchfab.com/3d-models/c82a7e2bbf4c44e3ac1d1e7bac42e2b7 (текстурите са смалени до 1024 px)
+
+Resort trees in assets/heavy/trees/ — from Sketchfab, Creative Commons Attribution (https://creativecommons.org/licenses/by/4.0/); textures resized and converted to WebP, packs split into single trees in the game:
+- palms.glb — "Palm Trees" by YadroGames
+- snowpines.glb — "Snow Pine Tree and Bush Pack LOWPOLY" by EFX
+- pine.glb — "Pine tree" by Andriy Shekh
+- forest.glb — "Low Poly Forest Tree Pack" by 99.Miles
+- gear/roller.glb — "Road roller truck" by Sidra (CC-BY 4.0) — https://sketchfab.com/3d-models/744cd75cc35444c6bd7015b6a9db3e6f
+- gear/backhoe.glb — "Backhoe Loader" by doty_aecom (CC-BY 4.0) — https://sketchfab.com/3d-models/c517bece57d04acc9175fbc37293f280
+- gear/grader.glb — "Motor Grader" by doty_aecom (CC-BY 4.0) — https://sketchfab.com/3d-models/0e99a75aae6b446cbc4cfbbd91e331af
+- gear/dump.glb — "Japanese Dump Truck" by Pavel Gorbachev (CC-BY 4.0) — https://sketchfab.com/3d-models/bdd68dcc73be430dbffff61017c95fb8
+- gear/excavator.glb — "low pôly excavator" by KI NG (CC-BY 4.0) — https://sketchfab.com/3d-models/f870526642e14e4b9a8b9999cfa71a66
+- gear/mcrane.glb — "Crane Vehicle [Low-Poly]" by HanSoloSnipe (CC-BY 4.0) — https://sketchfab.com/3d-models/e09723a3d0ef4615ab41ea605b7fccc8
+- gear/cars.glb — "Free Low Poly Vehicles Pack" by RgsDev (CC-BY 4.0) — https://sketchfab.com/3d-models/cb7640039e7a40679a53be705ebff50e
+  (текстурите на моделите в gear/ са смалени до 1024 px webp)
+- mtn/peak.glb — "Snow Mountain" by hkp941111 (CC-BY 4.0) — https://sketchfab.com/3d-models/e84a8e5edb2040c591be36350e2536f5
+- mtn/far1.glb — "Mountain low poly For distant mountains" by Mehdi Shahsavan (CC-BY 4.0) — https://sketchfab.com/3d-models/cb7f28b5ee0e4ddfb12700ff9d9d35c8
+- mtn/far2.glb — "Mountain low poly" by Mehdi Shahsavan (CC-BY 4.0) — https://sketchfab.com/3d-models/cf8c27b8cc8344a78755505ee42e5a18
+  (текстурите в mtn/ са смалени до 1024 px webp)
+
+People and resort hotel in assets/heavy/people/ — from Sketchfab, Creative Commons Attribution (https://creativecommons.org/licenses/by/4.0/); reduced to 6 textured people, textures resized and converted to WebP:
+- people.glb — "WIP - Lowpoly People - 2" by Loïc Norgeot
+- skihotel.glb — "Rosa Khutor Golden Tulip" by Aleksandr Shevchenko (converted to metal/rough, simplified)
+- hotel-marina.glb — "Skyscraper Hotel Apartments Marina" by asleshka
+- hotel-miami.glb — "Miami style condominium" by aitortilla01
+- hotel-hirise.glb — "Hi rise apartment building" by aitortilla01
+- hotel-villa.glb — "restaurant home mountain rock villa hotel" by zigurat architecture studio (terrain removed)
+(hotel-skihotel.glb is the "Rosa Khutor Golden Tulip" listed above)
+- air/regional.glb — "Low Poly Airliner" by Mauro3D (CC-BY 4.0) — https://sketchfab.com/3d-models/f06d488f08764e3ca26f2917d4053c69
+- air/a320.glb — "Airbus A320 Airliner" by Yes (CC-BY 4.0) — https://sketchfab.com/3d-models/757aa190f27a407291187328d7125903
+- air/wide.glb — "Low Poly Boeing 787 Dreamliner" by Mauro3D (CC-BY 4.0) — https://sketchfab.com/3d-models/50baa323fabd49a6b861096cb88e5c25
+- air/cargo.glb — "Boeing 767-200ER" by beanz_ncheese (CC-BY 4.0) — https://sketchfab.com/3d-models/41d1b62ed48c4212bf3ef7cd1fca3995
+- air/tower.glb — "Air Traffic Control Tower" by abass20 (CC-BY 4.0) — https://sketchfab.com/3d-models/84f215391662453680e646649d42b264
+  (текстурите в air/ са смалени до 1024 px webp)
+- trains/oe-loco.glb — "BR 01 german steam locomotive" by Tom Zimmermann (CC-BY 4.0) — https://sketchfab.com/3d-models/cdf7e415aa75441897c0b5dfb384302f (опростен, текстури 256 px)
+- trains/oe-car.glb — "Train Car (WIP)" by evildavo (CC-BY 4.0) — https://sketchfab.com/3d-models/18b2160d27d54850906d4dfe7e90d63f (оцветен в тъмносиньо)
+- lift/lift.glb — "Chair Lift" by Kagelok (CC-BY 4.0) — https://sketchfab.com/3d-models/afd305cdd4cb450f80b59f24b4b3e236 (текстури 1024 px webp; ползват се станциите, стълб и седалка)
+- station/big.glb — "Milwaukee Road Depot" by hamma085 (CC-BY 4.0) — https://sketchfab.com/3d-models/9156c959180c4429a7f4bd16c8578ca3
+- station/small.glb — "Train Station - Nieborowice, Poland" by Balaclava3DStudio (CC-BY 4.0) — https://sketchfab.com/3d-models/a8c64b5719564007838493cf12960f31
+- bridge/stone.glb — "Stone Bridge_3arch" by xplanepilot (CC-BY 4.0) — https://sketchfab.com/3d-models/58691a67ba774f2bbccff7ce8f85d1d8
+- bridge/rail.glb — "Railway Stone Bridge" by xplanepilot (CC-BY 4.0) — https://sketchfab.com/3d-models/00df164503d14ef6ba42b39dc827dd33
+- sky/sing.glb — "Singapore Office Skyscraper [FREE]" by 99.Miles (CC-BY 4.0) — https://sketchfab.com/3d-models/2305f0fe03ba44229a1f768dcb48bd8f
+- sky/rand.glb — "Rand Tower" by hamma085 (CC-BY 4.0) — https://sketchfab.com/3d-models/9ecf85f8298b49aca24a02d673ded5a9
+- sky/usb.glb — "US Bank Tower" by Mitya Petrov (CC-BY 4.0) — https://sketchfab.com/3d-models/82227908aa5c446395c4b9847284da4a
+- sky/blue.glb — "Free Building" by 3DHorse (CC-BY 4.0) — https://sketchfab.com/3d-models/333910f2d3fa44f0958a2b3b598a4bfa
+- sky/night.glb — "city building" by Griffin M (CC-BY 4.0) — https://sketchfab.com/3d-models/f38a12b260c042c39b4906494be9c26e
+- lm/colosseo.glb — "Colosseum" by Carlos.Maciel (CC-BY 4.0) — https://sketchfab.com/3d-models/e749705838044be78ced42205f9f9dda
+- resort/aframe.glb — "A-Frame Cabin (NEW VERSION)" by Jen S Abbott (CC-BY 4.0) — https://sketchfab.com/3d-models/6a61d1fcba4d45afad744c0b3b6bdec9

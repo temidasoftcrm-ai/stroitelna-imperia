@@ -4,14 +4,14 @@ import * as THREE from 'three';
 
 // ключови моменти (час → цветове/сила)
 const KEYS = [
-  { h: 0, sky: 0x101c38, fog: 0x101c38, hemi: 0.6, hemiSky: 0x5a6fa8, sun: 0.0, sunC: 0x9fb4ff },
-  { h: 5, sky: 0x1b2244, fog: 0x1b2244, hemi: 0.62, hemiSky: 0x6a77b0, sun: 0.1, sunC: 0xffb07a },
+  { h: 0, sky: 0x14244c, fog: 0x18284e, hemi: 0.95, hemiSky: 0x7a8fd0, sun: 0.55, sunC: 0xa8bcff },   // нощ: лунна светлина — сградите се виждат
+  { h: 5, sky: 0x1e2a52, fog: 0x1e2a52, hemi: 0.9, hemiSky: 0x7a86c0, sun: 0.4, sunC: 0xffb07a },
   { h: 6.5, sky: 0xf6b48a, fog: 0xf0c0a0, hemi: 0.9, hemiSky: 0xffd2b0, sun: 1.2, sunC: 0xffb47a },
   { h: 9, sky: 0xbcd9ee, fog: 0xbcd9ee, hemi: 1.3, hemiSky: 0xdfefff, sun: 2.3, sunC: 0xfff2dc },
   { h: 17, sky: 0xbcd9ee, fog: 0xbcd9ee, hemi: 1.3, hemiSky: 0xdfefff, sun: 2.3, sunC: 0xfff2dc },
   { h: 19, sky: 0xf39a6a, fog: 0xe8a080, hemi: 0.9, hemiSky: 0xffc0a0, sun: 1.1, sunC: 0xff9a5a },
-  { h: 20.5, sky: 0x2a2850, fog: 0x2a2850, hemi: 0.65, hemiSky: 0x7070b0, sun: 0.15, sunC: 0x9fb4ff },
-  { h: 24, sky: 0x101c38, fog: 0x101c38, hemi: 0.6, hemiSky: 0x5a6fa8, sun: 0.0, sunC: 0x9fb4ff },
+  { h: 20.5, sky: 0x2a2f5a, fog: 0x2a2f5a, hemi: 0.9, hemiSky: 0x8080c0, sun: 0.45, sunC: 0xa8bcff },
+  { h: 24, sky: 0x14244c, fog: 0x18284e, hemi: 0.95, hemiSky: 0x7a8fd0, sun: 0.55, sunC: 0xa8bcff },
 ];
 const ca = new THREE.Color(), cb = new THREE.Color();
 const mix = (a, b, k, out) => out.copy(ca.setHex(a)).lerp(cb.setHex(b), k);

@@ -2,7 +2,12 @@
 // с лифт. Вилното селище се вижда според етапа: празен парцел → строеж (вилите растат) → готово (басейн, алеи).
 // Извън сезона: плажът е празен (затворени чадъри), а зимният курорт е зелен, без сняг.
 import * as THREE from 'three';
-import { EXTRAS } from './resorts.js';
+import { EXTRAS, hotelStylesOf } from './resorts.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { makeWater } from './water.js';
+import { loadLift, liftPart } from './liftmodel.js';
+
+import { loadMountains, mtnModel } from './mtn.js';
 
 const mat = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9, ...o });
 const rnd = (seed => () => (seed = (seed * 16807) % 2147483647) / 2147483647);
@@ -103,6 +108,30 @@ export const RESORT_MODELS = {
 
 // deps: { model(name, scale), houses: [имена], tintRoof(obj, seed), fitScale(name, size), label(text, color, w) }
 // r: курортът от RESORTS; st: състоянието му ({ stage, prog } или undefined); season: 'summer' | 'winter' | 'off'
+// скиор: наведен напред, с каска и очила, ски и щеки; предницата към +z (надолу по пистата)
+function skierMesh(jacket, helmet, seed) {
+  const p = new THREE.Group(), body = new THREE.Group(); p.add(body);
+  const dark = mat(0x22262e), skin = mat(0xf0c8a0), skiM = mat([0xff3b3b, 0x2a6fff, 0xffd23f, 0x111111][seed % 4], { roughness: 0.4 });
+  const skis = new THREE.Group(); p.add(skis); p.userData.skis = skis;
+  for (const sx of [-0.17, 0.17]) { const s = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.04, 1.9), skiM); s.position.set(sx, 0.03, 0.1); skis.add(s);
+    const tip = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.04, 0.18), skiM); tip.position.set(sx, 0.08, 1.07); tip.rotation.x = -0.6; skis.add(tip); }
+  for (const sx of [-0.17, 0.17]) {   // крака: свити в коленете
+    const sh = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.48, 0.16), dark); sh.position.set(sx, 0.3, 0.12); sh.rotation.x = 0.45; body.add(sh);
+    const th = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.46, 0.17), dark); th.position.set(sx, 0.7, 0.13); th.rotation.x = -0.5; body.add(th);
+    const boot = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.14, 0.3), mat(0x555a66)); boot.position.set(sx, 0.09, 0.05); body.add(boot);
+  }
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.62, 0.3), mat(jacket, { roughness: 0.6 })); torso.position.set(0, 1.12, 0.22); torso.rotation.x = 0.55; body.add(torso);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), skin); head.position.set(0, 1.5, 0.44); body.add(head);
+  const hel = new THREE.Mesh(new THREE.SphereGeometry(0.19, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(helmet, { roughness: 0.3 })); hel.position.copy(head.position); hel.position.y += 0.02; body.add(hel);
+  const gog = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.08, 0.06), mat(0xff9a1f, { roughness: 0.2, metalness: 0.5 })); gog.position.set(0, 1.52, 0.6); body.add(gog);
+  for (const sx of [-1, 1]) {   // ръце напред и щеки назад
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.5), mat(jacket)); arm.position.set(sx * 0.32, 1.08, 0.48); arm.rotation.x = 0.4; body.add(arm);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.25), mat(0xcfd3d8, { metalness: 0.6, roughness: 0.3 }));
+    pole.position.set(sx * 0.4, 0.55, 0.15); pole.rotation.x = -0.75; body.add(pole);
+  }
+  p.traverse(m => { if (m.isMesh) m.castShadow = true; });
+  return p;
+}
 export function buildResortView(A, r, st, season, deps) {
   const g = new THREE.Group(), rand = rnd(7 + r.id.length * 131);
   const summer = r.kind === 'summer', spa = r.kind === 'spa', inSeason = spa || season === r.kind, snowy = r.kind === 'winter' && inSeason;
@@ -147,7 +176,8 @@ export function buildResortView(A, r, st, season, deps) {
     const deep = new THREE.Color(autumn ? 0x2a74ad : 0x2f86c8), shal = new THREE.Color(0x5fb6e0), sc = [], sp = seaGeo.attributes.position;
     for (let i = 0; i < sp.count; i++) { const k = Math.max(0, Math.min(1, (sp.getZ(i) - 650) / 100)); const c = deep.clone().lerp(shal, k); sc.push(c.r, c.g, c.b); }
     seaGeo.setAttribute('color', new THREE.Float32BufferAttribute(sc, 3));
-    const sea = new THREE.Mesh(seaGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.25, metalness: 0 }));
+    const water = makeWater({ color: 0xffffff, vertexColors: true, repeat: 140 }); anim.water = water;   // вълни с отблясъци (water.js)
+    const sea = new THREE.Mesh(seaGeo, water.material);
     sea.position.set(0, -0.05, -798); g.add(sea);
     anim.waves = { geo: seaGeo, base: Float32Array.from(seaGeo.attributes.position.array) };
     const foam = new THREE.Mesh(new THREE.PlaneGeometry(3400, 3), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 }));
@@ -184,7 +214,8 @@ export function buildResortView(A, r, st, season, deps) {
     // палми по края на плажа
     for (let k = 0; k < 14; k++) {
       const x = -140 + k * 21 + rand() * 6, z = 2 + rand() * 6, h = 7 + rand() * 3;
-      const pmod = useModel(A, deps.model, ['tree_palm', 'tree_palmBend', 'tree_palmTall', 'tree_palmDetailedTall'][k % 4], 7 + rand() * 2);
+      const sfp = [0, 1, 2, 3].map(i => `sf-palm-${i}`).filter(n => A[n]);   // по-хубавите палми (Sketchfab), ако са заредени
+      const pmod = sfp.length ? deps.model(sfp[k % sfp.length], 8 + rand() * 3) : useModel(A, deps.model, ['tree_palm', 'tree_palmBend', 'tree_palmTall', 'tree_palmDetailedTall'][k % 4], 7 + rand() * 2);
       if (pmod) { pmod.position.set(x, 0, z); pmod.rotation.y = rand() * 6; g.add(pmod); continue; }
       const palm = new THREE.Group();
       for (let s = 0; s < 6; s++) { const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.38, h / 6, 7), mat(0x8a6a44)); seg.position.set(s * 0.12, h / 12 + s * h / 6, 0); palm.add(seg); }
@@ -203,33 +234,63 @@ export function buildResortView(A, r, st, season, deps) {
     const boat = boatMesh(0x2b6fff, false); boat.position.set(-64, 0, -78); g.add(boat); anim.boat = boat;
   } else {
     // далечни планини навсякъде около долината (за да няма празен хоризонт)
+    const cones = [];   // [меш(ове), x, z, ширина, височина, далечна?] — подменят се с истинските планини
     for (let k = 0; k < 22; k++) {
       const a = k / 22 * Math.PI * 2, d = 520 + rand() * 260, s = 120 + rand() * 140;
       const m = new THREE.Mesh(new THREE.ConeGeometry(s, s * (0.8 + rand() * 0.5), 7), new THREE.MeshStandardMaterial({ color: k % 2 ? 0x7d8a76 : 0x6b7a66, roughness: 1, flatShading: true }));
       m.position.set(Math.cos(a) * d, s * 0.35, Math.sin(a) * d - 120); g.add(m);
       const cap = new THREE.Mesh(new THREE.ConeGeometry(s * 0.35, s * 0.35, 7), mat(0xf4f6f8)); cap.position.set(m.position.x, s * 0.35 + s * 0.3, m.position.z); g.add(cap);
+      cones.push([[m, cap], m.position.x, m.position.z, s * 2.6, s * (0.8 + rand() * 0.5) + s * 0.3, true, a]);
     }
     // планини отзад, със ски писта и лифт на средната
     const mtns = [[-120, -170, 70, 95], [0, -190, 90, 130], [130, -165, 75, 100], [-210, -140, 55, 70], [220, -150, 60, 80]];
     for (const [x, z, rad, h] of mtns) {
       const m = new THREE.Mesh(new THREE.ConeGeometry(rad, h, 9), mat(0x8c939c)); m.position.set(x, h / 2, z); m.castShadow = m.receiveShadow = true; g.add(m);
-      if (snowy || h > 90) { const cap = new THREE.Mesh(new THREE.ConeGeometry(rad * 0.45, h * 0.45, 9), mat(0xffffff)); cap.position.set(x, h - h * 0.225 + 0.2, z); g.add(cap); }
+      const parts = [m];
+      if (snowy || h > 90) { const cap = new THREE.Mesh(new THREE.ConeGeometry(rad * 0.45, h * 0.45, 9), mat(0xffffff)); cap.position.set(x, h - h * 0.225 + 0.2, z); g.add(cap); parts.push(cap); }
+      cones.push([parts, x, z, rad * (x ? 2.6 : 2.3), h * (x ? 1.15 : 1.05), false, x * 0.01]);
     }
+    // истинските планини: заснежени отпред (в сезона), по-зелени/кафяви на хоризонта
+    loadMountains().then(() => {
+      for (const [parts, x, z, w, h, far, rot] of cones) {
+        const o = mtnModel(far ? (Math.round(rot * 10) % 2 ? 'far1' : 'far2') : (snowy ? 'peak' : 'far2'), w, h, rot * 3);
+        if (!o) continue;
+        o.position.set(x, 0, z); g.add(o); for (const p of parts) p.visible = false;
+      }
+      if (!snowy && g.userData.slope) g.userData.slope.visible = false;   // извън сезона пистата не стърчи пред истинската планина
+    });
     if (!spa) {
     const slope = new THREE.Mesh(new THREE.PlaneGeometry(26, 210), mat(snowy ? 0xffffff : 0x9fbf7e));
-    slope.rotation.x = -Math.PI / 2 + 0.55; slope.position.set(0, 55, -128); g.add(slope);
+    slope.rotation.x = -Math.PI / 2 + 0.55; slope.position.set(0, 55, -128); g.add(slope); g.userData.slope = slope;
     // лифт: стълбове, въже и седалки, които се движат
-    const lift = new THREE.Vector3(18, 0, -40), top = new THREE.Vector3(18, 112, -190);
-    for (let k = 0; k <= 6; k++) {
-      const p = lift.clone().lerp(top, k / 6), pole = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 10), mat(0x555a60));
-      pole.position.set(p.x, p.y + 5, p.z); g.add(pole);
+    // лифтът е по-едър и по-ярък, за да се вижда отдалеч: високи стълбове (LH), двойно дебело въже, цветни седалки
+    const lift = new THREE.Vector3(-8, 0, -22), top = new THREE.Vector3(-8, 66, -150), LH = 26;   // горната станция остава в кадъра
+    const poles = [];
+    for (let k = 0; k <= 8; k++) {
+      const p = lift.clone().lerp(top, k / 8), pole = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.2, LH), mat(0xffc400));
+      pole.position.set(p.x, p.y + LH / 2, p.z); g.add(pole); poles.push([pole, p]);
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(7, 0.9, 0.9), mat(0xffc400)); arm.position.set(p.x, p.y + LH, p.z); g.add(arm); pole.userData.arm = arm;
     }
-    const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, lift.distanceTo(top)), mat(0x222222));
-    cable.position.copy(lift.clone().lerp(top, 0.5)).add(new THREE.Vector3(0, 10, 0));
-    cable.lookAt(top.clone().add(new THREE.Vector3(0, 10, 0))); cable.rotateX(Math.PI / 2); g.add(cable);
-    for (let k = 0; k < 14; k++) {
-      const c = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1, 1), mat(0xff4a3a)); g.add(c);
-      anim.chairs.push({ c, u: k / 14, a: lift.clone().add(new THREE.Vector3(0, 9, 0)), b: top.clone().add(new THREE.Vector3(0, 9, 0)) });
+    // истинският лифт (liftmodel.js): станции горе и долу, стълбове и седалки — подменят процедурните, щом се заредят
+    loadLift().then(Lm => {
+      if (!Lm) return;
+      // стълбовете остават жълтите (на модела са тънки и тъмни — не се виждат отдалеч)
+      const st = liftPart('top', 24), sb = liftPart('bottom', 18);
+      if (st) { st.position.set(top.x, top.y, top.z - 6); g.add(st); }
+      if (sb) { sb.position.set(lift.x, 0, lift.z + 4); g.add(sb); }
+      for (const ch of anim.chairs) { const o = liftPart('chair', 5); if (!o) break; o.traverse(m => { if (m.isMesh && m.material) { m.material = m.material.clone(); if (m.material.color && m.material.color.getHSL({}).l < 0.35) m.material.color.setHex(ch.col); } }); ch.c.visible = false; (ch.c.parent || g).add(o); ch.c = o; }
+    });
+    // две въжета (нагоре и надолу), дебели и тъмни
+    for (const dx of [-2.6, 2.6]) {
+      const a2 = lift.clone().add(new THREE.Vector3(dx, LH, 0)), b2 = top.clone().add(new THREE.Vector3(dx, LH, 0));
+      const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, a2.distanceTo(b2)), mat(0x1a1a1a));
+      cable.position.copy(a2.clone().lerp(b2, 0.5)); cable.lookAt(b2); cable.rotateX(Math.PI / 2); g.add(cable);
+    }
+    const CH = [0xff3b30, 0xffcc00, 0x2b6fff, 0x34c759];
+    for (let k = 0; k < 18; k++) {
+      const col = CH[k % CH.length], c = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2, 2), mat(col)); g.add(c);
+      const dx = k % 2 ? 2.6 : -2.6;   // нагоре по едното въже, надолу по другото
+      anim.chairs.push({ c, col, u: k / 18, a: lift.clone().add(new THREE.Vector3(dx, LH - 2.4, 0)), b: top.clone().add(new THREE.Vector3(dx, LH - 2.4, 0)) });
     }
     } else {   // балнео: горещи минерални басейни с пара
       for (const [x, z, rr] of [[-60, -10, 6], [-45, 4, 4], [55, -6, 5]]) {
@@ -241,14 +302,15 @@ export function buildResortView(A, r, st, season, deps) {
       }
     }
     // борове (заснежени в сезона)
-    const pine = snowy ? ['tree-snow-a', 'tree-snow-b', 'tree-snow-c'] : ['tree'];
+    const sfk = snowy ? 'pinesnow' : 'pine', sf = [0, 1, 2, 3, 4].map(i => `sf-${sfk}-${i}`).filter(n => A[n]);   // по-хубавите борове (Sketchfab)
+    const pine = sf.length ? (snowy ? sf : [...sf, ...[0, 1, 2, 3].map(i => `sf-tree-${i}`).filter(n => A[n])]) : snowy ? ['tree-snow-a', 'tree-snow-b', 'tree-snow-c'] : ['tree'];
     for (let k = 0; k < 90; k++) {
       const x = (rand() - 0.5) * 380, z = -120 + rand() * 230;
       if (Math.abs(x) < 70 && z > -10) continue;   // мястото на селището и пистата остават свободни
       if (Math.abs(x) < 25 && z < -30) continue;
       const n = pine[k % pine.length];
       if (!A[n]) continue;
-      const t = deps.model(n, 6 + rand() * 4); t.position.set(x, 0, z); t.rotation.y = rand() * 6; g.add(t);
+      const t = deps.model(n, (n.startsWith('sf-') ? 9 : 6) + rand() * 4); t.position.set(x, 0, z); t.rotation.y = rand() * 6; g.add(t);
     }
     if (snowy) {   // падащ сняг
       const N = 1500, pos = new Float32Array(N * 3);
@@ -268,7 +330,8 @@ export function buildResortView(A, r, st, season, deps) {
     for (let ix = -1; ix <= 1; ix++) for (let iz = -1; iz <= 1; iz++) {
       if (!ix && !iz) continue;
       let o;
-      if (!summer && A['cabin-wall']) o = buildChalet(A, deps.model, 3.4, k);   // зимните курорти: дървени хижи
+      if (!summer && A['sf-aframe'] && k % 2 === 0) { o = deps.model('sf-aframe', deps.fitScale('sf-aframe', 13)); o.rotation.y = 0; }   // A-frame хижи (Sketchfab), редувани с дървените
+      else if (!summer && A['cabin-wall']) o = buildChalet(A, deps.model, 3.4, k);   // зимните курорти: дървени хижи
       else {
         const sub = RESORT_MODELS.suburban.filter(n => A[n]), pool = sub.length ? sub : deps.houses, n = pool[(k * 3 + r.id.length) % pool.length];
         o = deps.model(n, deps.fitScale(n, 11)); deps.tintRoof(o, k * 7 + r.id.length);
@@ -311,10 +374,29 @@ export function buildResortView(A, r, st, season, deps) {
     const tape = new THREE.Mesh(new THREE.BoxGeometry(80, 0.08, 64), new THREE.MeshBasicMaterial({ color: stage === 'land' ? 0x4cd07d : 0xff9a3c, transparent: true, opacity: 0.18 }));
     tape.position.set(plot.x, 0.06, plot.z); g.add(tape);
   }
+  // ---------- хора (Sketchfab „Lowpoly People“ — A['sf-person-N']): в сезона на плажа / долу при пистата, иначе малко разходка
+  { const P = [0, 1, 2, 3, 4, 5].map(i => `sf-person-${i}`).filter(n => A[n]), pr = rnd(7);
+    const n = P.length ? (inSeason ? 46 : 10) : 0;
+    for (let k = 0; k < n; k++) {
+      const [x, z] = summer ? [-130 + pr() * 260, -44 + pr() * 34] : [-60 + pr() * 120, -8 + pr() * 22];
+      const m = deps.model(P[k % P.length], 1.8 + pr() * 0.25); m.position.set(x, 0, z); m.rotation.y = pr() * 6.28; g.add(m);
+    }
+  }
   // ---------- разширения (хотел, лифт, аквапарк, СПА)
   const ext = (st && st.ext) || {}, eb = st && st.extBuild ? st.extBuild.key : null;
   const extra = (key, fn) => { if (ext[key] || eb === key) { const o = fn(); if (eb === key) o.scale.y = Math.max(0.05, st.extBuild.prog); g.add(o); } };
   extra('hotel', () => {
+    // хотелът по избрания стил (Sketchfab модели, resorts.js HOTEL_STYLES); 'kenney' или незареден модел — кулите по-долу
+    const style = (st && st.hotelStyle) || hotelStylesOf(r.kind)[0].key, HF = { marina: { fit: 44, h: 46, dx: 14, keepY: true }, miami: { fit: 26, h: 46 }, hirise: { fit: 26, h: 44 }, skihotel: { fit: 46, h: 40, ry: -Math.PI / 2 }, villa: { fit: 40, h: 22 } }[style];
+    if (HF && A['sf-hotel-' + style]) {
+      const h = new THREE.Group(), o = A['sf-hotel-' + style].scene.clone(true), w = new THREE.Group(); w.add(o); w.rotation.y = HF.ry || 0;
+      let bb = new THREE.Box3().setFromObject(w); const s = bb.getSize(new THREE.Vector3()), k = Math.min(HF.h / s.y, HF.fit / Math.max(s.x, s.z)); w.scale.setScalar(k);
+      bb = new THREE.Box3().setFromObject(w); const c = bb.getCenter(new THREE.Vector3()); w.position.set(-c.x, HF.keepY ? 0 : -bb.min.y, -c.z);   // keepY: нулата на модела е нивото на улицата (под нея — вода и мазета)
+      w.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); h.add(w);
+      const sg = deps.label(`🏨 ХОТЕЛ „${r.nm.toUpperCase()}“ ★★★★`, '#ffd54a', 18); sg.position.y = (HF.keepY ? bb.max.y : bb.max.y - bb.min.y) + 4; h.add(sg);
+      h.position.set(plot.x + 58 + (HF.dx || 0), 0, plot.z - 4);
+      return h;
+    }
     // истинска 3D сграда от Kenney Modular Buildings: три кули в редица + табела; иначе простата кутия
     if (A['building-sample-tower-c'] && A['building-sample-tower-d']) {
       const h = new THREE.Group(), parts = ['building-sample-tower-d', 'building-sample-tower-c', 'building-sample-tower-a', 'building-sample-tower-c', 'building-sample-tower-d'];
@@ -361,19 +443,30 @@ export function buildResortView(A, r, st, season, deps) {
     l.position.set(plot.x - 45, 0, plot.z - 50); return l;
   });
   extra('spa', () => {
-    const sp = new THREE.Group();
-    const hall = new THREE.Mesh(new THREE.CylinderGeometry(11, 12, 6, 24), mat(0xe9e2d4)); hall.position.y = 3; sp.add(hall);
-    const dome = new THREE.Mesh(new THREE.SphereGeometry(11, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), mat(0x9fd3ff, { transparent: true, opacity: 0.75, metalness: 0.3 })); dome.position.y = 6; sp.add(dome);
-    const sg = deps.label('🧖 СПА', '#ffffff', 8); sg.position.y = 20; sp.add(sg);
-    sp.position.set(plot.x + 58, 0, plot.z); return sp;
+    // СПА център пред хотела (не в него): ниска сграда с каменна облицовка, стъклен покрив и външен термален басейн с пара
+    const sp = new THREE.Group(), stone = mat(0xcfc3ad), wood = mat(0x7a4f2e), glass = mat(0x9fd3ff, { transparent: true, opacity: 0.55, metalness: 0.1, roughness: 0.2 });
+    const hall = new THREE.Mesh(new THREE.BoxGeometry(22, 5, 12), stone); hall.position.y = 2.5; sp.add(hall);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(23, 0.5, 13), wood); roof.position.y = 5.25; sp.add(roof);
+    const sky = new THREE.Mesh(new THREE.BoxGeometry(14, 1.6, 7), glass); sky.position.y = 6.3; sp.add(sky);
+    for (let k = 0; k < 5; k++) { const w = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.6, 0.2), glass); w.position.set(-8 + k * 4, 2.6, 6.05); sp.add(w); }
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(22, 0.3, 12), mat(0xb08a5a)); deck.position.set(0, 0.15, 13); sp.add(deck);
+    const pool = new THREE.Mesh(new THREE.BoxGeometry(14, 0.35, 7), mat(0x3fc6d8, { emissive: 0x0b4b55, roughness: 0.2 })); pool.position.set(0, 0.35, 13); sp.add(pool);
+    for (let k = 0; k < 4; k++) { const st = new THREE.Mesh(new THREE.SphereGeometry(1.4, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.22, depthWrite: false })); st.position.set(-5 + k * 3.4, 1.6 + (k % 2), 13); sp.add(st); }
+    sp.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    const sg = deps.label('🧖 СПА', '#ffffff', 8); sg.position.y = 11; sp.add(sg);
+    sp.position.set(plot.x - 72, 0, plot.z - 6); sp.rotation.y = Math.PI / 2; return sp;   // вляво от селището (хотелът е вдясно), басейнът към вилите
   });
 
   // ---------- туристи (в сезона, когато селището работи)
   if ((stage === 'built' || stage === 'sold') && inSeason) {
     const shirt = [0xff5a5a, 0x3fa7ff, 0xffd23f, 0x50d18b, 0xffffff, 0xff8ad8, 0x8a5cff];
     const n = summer ? 70 : spa ? 30 : 45;
+    const realPeople = !!A['sf-person-0'];   // пешеходците са истински хора (блокът по-горе) — тук остават скиорите и плувците
     for (let k = 0; k < n; k++) {
-      const p = new THREE.Group();
+      const kind0 = summer ? (k % 4 === 0 ? 'swim' : 'walk') : spa ? 'walk' : (k % 3 ? 'ski' : 'walk');
+      if (realPeople && kind0 === 'walk') continue;
+      const p = kind0 === 'ski' ? skierMesh(shirt[k % shirt.length], shirt[(k + 3) % shirt.length], k) : new THREE.Group();
+      if (kind0 === 'ski') { p.scale.setScalar(1.3); g.add(p); const t = { p, k, kind: 'ski', sp: 0.4 + rand() * 0.8, ph: rand() * 6.28, u: rand(), lane: (rand() - 0.5) * 18 }; anim.tourists = anim.tourists || []; anim.tourists.push(t); continue; }
       const body = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.3, 1.1, 8), mat(shirt[k % shirt.length])); body.position.y = 0.9; p.add(body);
       const legs = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.25, 0.7, 8), mat(summer ? 0xf0c8a0 : 0x2a3140)); legs.position.y = 0.35; p.add(legs);
       const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 8), mat(0xf0c8a0)); head.position.y = 1.7; p.add(head);
@@ -395,6 +488,7 @@ export function buildResortView(A, r, st, season, deps) {
 
   // t: секунди; prog: прогрес на строежа (0…1)
   function update(t, prog = 1) {
+    if (anim.water) anim.water.update(t);
     if (anim.waves) {
       const a = anim.waves.geo.attributes.position, b = anim.waves.base;
       for (let i = 0; i < a.count; i++) { const x = b[i * 3], z = b[i * 3 + 2]; const amp = Math.max(0.15, Math.min(1, (750 - z) / 80)); a.array[i * 3 + 1] = (Math.sin(x * 0.05 + t * 1.3) * 0.35 + Math.cos(z * 0.07 + t * 0.9) * 0.3) * amp; }   // до брега вълните са по-ниски
@@ -430,7 +524,9 @@ export function buildResortView(A, r, st, season, deps) {
       if (q.kind === 'ski') {   // спуск по пистата (пистата е наклонена равнина от (0,110,-225) до (0,0,-30))
         q.u = (q.u + 0.0025 * q.sp) % 1;
         const zz = -225 + q.u * 195, yy = 110 * (1 - q.u) * 0.97;
-        q.p.position.set(q.lane + Math.sin(q.u * 30 + q.ph) * 6, Math.max(0, yy), zz); q.p.rotation.y = Math.cos(q.u * 30 + q.ph) * 0.8;
+        const w = q.u * 30 + q.ph;   // слалом: завой наляво-надясно, наклон навътре в завоя
+        q.p.position.set(q.lane + Math.sin(w) * 6, Math.max(0, yy), zz); q.p.rotation.set(0, Math.cos(w) * 0.8, -Math.sin(w) * 0.35);
+        if (q.p.userData.skis) q.p.userData.skis.rotation.x = yy > 0.5 ? 0.46 : 0;
       } else if (q.kind === 'swim') {
         q.p.position.set(q.x + Math.sin(t * 0.3 * q.sp + q.ph) * 6, -0.9 + Math.sin(t * 2 + q.ph) * 0.1, -60 - (q.k % 7) * 4);
       } else {

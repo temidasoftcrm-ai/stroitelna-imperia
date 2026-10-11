@@ -2,6 +2,8 @@
 // разделителна ивица, мост над река и тунел в хълма, червено-бели мантинели, портални табели и много движение.
 // game.js ползва: AB_STAGES, AB_COST_MUL, AB_TOLL_MUL, AB_FULL_BONUS, AB_MAT_DISC, AB_MODELS, buildAutobahnView(A, opts).
 import * as THREE from 'three';
+import { loadMountains, mtnModel } from './mtn.js';
+import { makeWater } from './water.js';
 
 export const AB_STAGES = [
   { nm: 'Земни работи', ico: '🚜', need: { bulldozer: 2, grader: 1, truck: 3, crew: 2 } },
@@ -160,8 +162,10 @@ export function buildAutobahnView(A, opts = {}) {
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), mat(0x8fb36a, 1)); ground.rotation.x = -Math.PI / 2; ground.position.y = -0.02; ground.receiveShadow = true; g.add(ground);
   }
   if (opts.river !== false) {
-    const river = new THREE.Mesh(new THREE.PlaneGeometry(900, RIVER_W), new THREE.MeshStandardMaterial({ color: 0x3f86c9, roughness: 0.3, metalness: 0.1 }));
+    const water = makeWater({ color: 0x3f86c9, repeat: 30 }); g.userData.water = water;   // вълни (water.js)
+    const river = new THREE.Mesh(new THREE.PlaneGeometry(900, RIVER_W), water.material);
     river.rotation.x = -Math.PI / 2; river.position.set(0, 0.01, RIVER_Z); g.add(river);
+    for (const sz of [-1, 1]) { const bank = new THREE.Mesh(new THREE.PlaneGeometry(900, 3), mat(0xc9b27a, 1)); bank.rotation.x = -Math.PI / 2; bank.position.set(0, 0.02, RIVER_Z + sz * (RIVER_W / 2 + 1.4)); g.add(bank); }
   }
   const onBridge = z => Math.abs(z - RIVER_Z) < RIVER_W / 2 + 8;
   const inTunnel = z => z < TUNNEL_Z + 2;
@@ -182,6 +186,7 @@ export function buildAutobahnView(A, opts = {}) {
   }
   const hill = new THREE.Mesh(new THREE.SphereGeometry(70, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x6f9a4e, roughness: 1, flatShading: true }));
   hill.scale.set(1.2, 0.55, 0.9); hill.position.set(0, -2, TUNNEL_Z - 62); g.add(hill);
+  loadMountains().then(() => { const o = mtnModel('far1', 340, 62, 0.4); if (!o) return; o.position.set(0, -4, TUNNEL_Z - 92); g.add(o); hill.visible = false; });   // тунелът влиза в истинска планина
   for (const sx of [-1, 1]) {
     const portal = new THREE.Group();
     box(CW + SH + 4, 9, 2, M.concrete, 0, 4.5, 0, portal);
@@ -198,6 +203,34 @@ export function buildAutobahnView(A, opts = {}) {
     for (const sx of [-1, 1]) {
       const a = new THREE.Mesh(new THREE.PlaneGeometry(CW + SH, 10), aMat); a.rotation.x = -Math.PI / 2; a.position.set(sx * (CW + SH + MED) / 2, top(zc), zc); a.receiveShadow = true; a.userData.z = zc; g.add(a); asphalt.push(a);
     }
+  }
+  // готовото продължение на аутобана (предишният участък): от края на строежа до хоризонта, с мантинели, лампи и движение
+  const EXT0 = z0 + LEN, EXT1 = 440, extLen = EXT1 - EXT0;
+  if (opts.ground !== false && extLen > 20) {
+    const ext = new THREE.Group(); g.add(ext); g.userData.ext = ext;
+    const emb = box(W + 10, 0.8, extLen, M.earth, 0, 0.4, EXT0 + extLen / 2, ext);
+    box(W + 2, 0.35, extLen, M.gravel, 0, 0.97, EXT0 + extLen / 2, ext);
+    const et = laneTex(); et.wrapT = THREE.RepeatWrapping; et.repeat.set(1, extLen / 10);
+    const eMat = new THREE.MeshStandardMaterial({ map: et, roughness: 0.85 });
+    for (const sx of [-1, 1]) { const a = new THREE.Mesh(new THREE.PlaneGeometry(CW + SH, extLen), eMat); a.rotation.x = -Math.PI / 2; a.position.set(sx * (CW + SH + MED) / 2, 1.16, EXT0 + extLen / 2); a.receiveShadow = true; ext.add(a); }
+    const gr = mat(0xb9bec4, 0.4, 0.6);
+    for (const x of [-W / 2 + 0.3, -MED / 2 + 0.3, MED / 2 - 0.3, W / 2 - 0.3]) box(0.25, 0.7, extLen, gr, x, 1.55, EXT0 + extLen / 2, ext);
+    for (let z = EXT0 + 20; z < EXT1; z += 40) { box(0.3, 9, 0.3, M.steel, 0, 5.5, z, ext); box(MED + 8, 0.2, 0.4, M.steel, 0, 10, z, ext); }
+    // временна бариера там, където започва строежът
+    const bt0 = barrierTex(); bt0.repeat.set(W / 2, 1);
+    box(W, 1, 0.5, new THREE.MeshStandardMaterial({ map: bt0, roughness: 0.6 }), 0, 1.7, EXT0 + 1.5, ext);
+    // коли по готовата част (обръщат преди бариерата)
+    const cols = [0xd62828, 0x1f5fbf, 0xf2f2f2, 0x2d8f4e, 0xffb300, 0x333a44];
+    const cars = [];
+    for (let k = 0; k < 16; k++) {
+      const c = new THREE.Group(), col = cols[k % cols.length], big = k % 5 === 0;
+      box(big ? 2.4 : 1.8, big ? 2.6 : 1.2, big ? 9 : 4.2, mat(col, 0.45, 0.3), 0, big ? 1.5 : 0.75, 0, c);
+      if (!big) box(1.6, 0.7, 2.2, mat(0x1a2630, 0.2, 0.5), 0, 1.55, -0.2, c);
+      const side = k % 2 ? 1 : -1, lane = (k >> 1) % 3;
+      c.position.set(side * (MED / 2 + SH + LW * (lane + 0.5)), 1.16, 0); c.rotation.y = side > 0 ? 0 : Math.PI;
+      ext.add(c); cars.push({ c, side, u: (k * 0.137) % 1, sp: 0.012 + (k % 4) * 0.003 });
+    }
+    g.userData.extCars = cars; g.userData.extRange = [EXT0 + 8, EXT1];
   }
   // 4) червено-бели мантинели (отстрани и по средата), осветление, портални табели
   const bt = barrierTex(); bt.repeat.set(10 / 2, 1);
@@ -311,6 +344,8 @@ export function buildAutobahnView(A, opts = {}) {
   };
 
   function update(stage, prog, t = 0) {
+    if (g.userData.water) g.userData.water.update(t);
+    if (g.userData.extCars) { const [za, zb] = g.userData.extRange; for (const q of g.userData.extCars) { const u = (q.u + t * q.sp) % 1, zz = q.side > 0 ? zb - u * (zb - za) : za + u * (zb - za); q.c.position.z = zz; } }
     const fz = z0 + LEN * prog, done = stage >= AB_STAGES.length;
     for (const c of crowd) {
       if (c.st !== stage || done) { c.o.visible = false; continue; }

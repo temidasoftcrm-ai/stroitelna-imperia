@@ -2,6 +2,7 @@
 // Данни за истинските български магистрали + 3D модел на участък, който се „строи“ по етапи.
 // game.js ползва: HIGHWAYS, HW_STAGES, segmentQuote(km), HW_MODELS, buildHighwayView(A, opts).
 import * as THREE from 'three';
+import { makeWater } from './water.js';
 
 // Истинските магистрали, разделени на участъци между градовете от картата
 export const HIGHWAYS = [
@@ -129,7 +130,8 @@ export function buildHighwayView(A, opts = {}) {
     ground.rotation.x = -Math.PI / 2; ground.position.y = -0.02; ground.receiveShadow = true; g.add(ground);
   }
   if (opts.river !== false) {
-    const river = new THREE.Mesh(new THREE.PlaneGeometry(600, RIVER_W), new THREE.MeshStandardMaterial({ color: 0x3f86c9, roughness: 0.3, metalness: 0.1 }));
+    const water = makeWater({ color: 0x3f86c9, repeat: 24 }); g.userData.water = water;
+    const river = new THREE.Mesh(new THREE.PlaneGeometry(600, RIVER_W), water.material);
     river.rotation.x = -Math.PI / 2; river.position.set(0, 0.01, RIVER_Z); g.add(river);
   }
   const onBridge = z => Math.abs(z - RIVER_Z) < RIVER_W / 2 + 6;
@@ -203,6 +205,7 @@ export function buildHighwayView(A, opts = {}) {
 
   // stage: 0..3, prog: 0..1 в рамките на етапа, t: секунди (за анимация)
   function update(stage, prog, t = 0) {
+    if (g.userData.water) g.userData.water.update(t);
     const fz = z0 + LEN * prog;      // фронт на текущия етап
     reveal(earth, stage > 0 ? 1e9 : fz);
     reveal(gravel, stage > 1 ? 1e9 : stage === 1 ? fz : -1e9);

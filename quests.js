@@ -6,6 +6,11 @@ import { HIGHWAYS } from './highways.js';
 const M = n => n;   // за четимост на наградите
 // goal: [ключ на брояч, цел] за броени действия или функция (ctx) => [текущо, цел] за състояния
 import { EXTRA_CHAPTERS } from './questsx.js';
+import { AFRICA_CHAPTER } from './africa.js';
+import { NA_CHAPTER } from './namerica.js';
+import { SA_CHAPTER } from './samerica.js';
+import { AS_CHAPTER } from './asia.js';
+import { OC_CHAPTER } from './oceania.js';
 const CHAPTERS = [
   { id: 'c1', nm: 'Първи стъпки', ico: '🏠', quests: [
     { id: 'h1', ico: '🏠', nm: 'Първата къща', ds: 'Завърши първата си къща.', goal: ['house', 1], money: M(5000) },
@@ -95,7 +100,7 @@ const CHAPTERS = [
   ] },
 ];
 // главите за късната игра (questsx.js); Европа се отваря с ниво 8, без да чака Балканите
-CHAPTERS.push(...EXTRA_CHAPTERS);
+CHAPTERS.push(...EXTRA_CHAPTERS, AFRICA_CHAPTER, NA_CHAPTER, SA_CHAPTER, AS_CHAPTER, OC_CHAPTER);
 { const eu = CHAPTERS.find(c => c.id === 'c8'); if (eu && !eu.openIf) { eu.openIf = c => c.devBest() >= 8; eu.lockTxt = eu.lockTxt || 'Отключва се на ниво 8 на развитие.'; } }
 export const QUEST_COUNT = CHAPTERS.reduce((a, c) => a + c.quests.length, 0);
 const UNLOCK_SHARE = 0.7;   // следващата глава се отваря, когато вземеш наградите за 70% от текущата

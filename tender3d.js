@@ -3,6 +3,8 @@
 //   buildPortTerminal — нов контейнерен терминал до пристанището (seaside.js): кей, портални кранове, контейнери.
 // Двете връщат { group, setProg(p 0…1), update(t, night) }; докато p < 1 се виждат скеле, кран и строителна техника.
 import * as THREE from 'three';
+import { createPortLights } from './portlights.js';
+import { loadShipModels, hasShipModel, shipModel } from './shipmodels.js';
 
 const mat = (c, r = 0.8, m = 0, e) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m, ...(e ? { emissive: e, emissiveIntensity: 0 } : {}) });
 const box = (w, h, d, m, x, y, z, g) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; g.add(o); return o; };
@@ -105,11 +107,12 @@ export function buildPortTerminal(group, deps, opts = {}) {
   for (let x = -W / 2 + 4; x < W / 2; x += 10) cyl(0.5, 0.6, 0.8, dark, x, 1.6, -D + 0.8, pier, 8);   // кнехти
   box(W, 0.05, 12, dark, 0, 1.23, -D + 10, pier);   // път за кранове
   // 0.4–0.75 портални кранове (STS) — по-големи от старите
-  const cranes = [];
+  const cranes = [], PL = createPortLights(), lightsG = new THREE.Group(); g.add(lightsG);   // осветлението идва, щом кеят е насипан
+  for (const [mx, mz] of [[-56, -3], [-18, -3], [18, -3], [56, -3], [-56, -D + 3], [0, -D + 3], [56, -D + 3]]) PL.mast(lightsG, mx, mz, { h: 22, r: 28 });
   for (let k = 0; k < 3; k++) {
     const s = stage(g, 0.4 + k * 0.1, 0.55 + k * 0.1); stages.push(s); s.position.set(-35 + k * 35, 1.2, -D + 10);
     for (const [sx, sz] of [[-6, -4], [6, -4], [-6, 4], [6, 4]]) box(1, 30, 1, orange, sx, 15, sz, s);
-    box(14, 2, 10, orange, 0, 30, 0, s); box(1.6, 1.6, 64, white, 0, 32, -18, s); box(4, 3, 4, white, 0, 28, -6, s);
+    box(14, 2, 10, orange, 0, 30, 0, s); box(1.6, 1.6, 64, white, 0, 32, -18, s); box(4, 3, 4, white, 0, 28, -6, s); PL.beaconAt(s, 0, 31.6, 0, 0.7); PL.beaconAt(s, 0, 33.2, -49.5, 0.6);
     cranes.push(s);
   }
   // 0.7–1 контейнерни редове
@@ -120,11 +123,13 @@ export function buildPortTerminal(group, deps, opts = {}) {
   }
   // сграда на терминала и порта (в края)
   const s9 = stage(g, 0.9, 1); stages.push(s9); s9.position.y = 1.2;
-  box(16, 8, 10, mat(0xdfe5ea, 0.5, 0.2), W / 2 - 12, 4, -8, s9); box(16.4, 0.6, 10.4, mat(0x1f5fbf, 0.6), W / 2 - 12, 8.3, -8, s9);
+  box(16, 8, 10, mat(0xdfe5ea, 0.5, 0.2), W / 2 - 12, 4, -8, s9); box(14, 2.2, 10.2, PL.glow(mat(0x9fd3ff, 0.3, 0.2, 0xffd890), 1.6), W / 2 - 12, 5, -8, s9); box(16.4, 0.6, 10.4, mat(0x1f5fbf, 0.6), W / 2 - 12, 8.3, -8, s9);
   // контейнеровоз на кея, когато е готово
   let ship = null;
   if (deps.A && deps.model && deps.A['ship-cargo-b']) { ship = deps.model('ship-cargo-b', 7.5); ship.rotation.y = Math.PI / 2; ship.position.set(0, 0, -D - 16); g.add(ship); }
   else { ship = new THREE.Group(); box(90, 7, 16, mat(0x1f3a5f, 0.6), 0, 1, 0, ship); box(14, 10, 14, white, 36, 9, 0, ship); for (let c = 0; c < 8; c++) box(8, 5, 12, mat(cols[c % cols.length], 0.7), -34 + c * 9, 7, 0, ship); ship.position.set(0, 0, -D - 16); g.add(ship); }
+  // истински контейнеровоз (shipmodels.js), щом се зареди
+  loadShipModels().then(() => { if (!hasShipModel('container')) return; const o = shipModel('container'); o.rotation.y = Math.PI / 2; o.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(o); o.position.set(ship.position.x, ship.position.y, -D - (bb.max.z - bb.min.z) / 2 - 3); o.visible = ship.visible; g.remove(ship); g.add(o); ship = o; });
   // строителна техника в морето: шлеп с пилоботна установка и плаващ кран
   const kit = new THREE.Group(); g.add(kit);
   const barge = new THREE.Group(); box(24, 2, 12, mat(0x55585e, 0.8), 0, 0.6, 0, barge); box(1.2, 22, 1.2, mat(0xf2b705, 0.6), -6, 12, 0, barge); box(3, 2, 3, mat(0x333333), -6, 20, 0, barge);
@@ -139,11 +144,12 @@ export function buildPortTerminal(group, deps, opts = {}) {
     const k = Math.min(1, p / 0.4);   // кеят: дълбочина k × D
     pier.visible = k > 0.01; pier.scale.z = Math.max(0.01, k);
     applyStages(stages, p);
-    kit.visible = p < 1; ship.visible = p >= 1;
+    kit.visible = p < 1; ship.visible = p >= 1; lightsG.visible = k >= 1;
     barge.position.set(-20, 0, -D * Math.max(0.15, k) - 10); fc.position.set(30, 0, -D * Math.max(0.15, k) - 12);
     if (sign) sign.visible = p > 0;
   }
   function update(t, night = 0) {
+    PL.setNight(night, t);
     if (prog < 1) { hammer.position.y = 10 + Math.abs(Math.sin(t * 2.2)) * 7; boom.rotation.y = Math.sin(t * 0.3) * 0.8; barge.position.y = fc.position.y = Math.sin(t) * 0.15; }
     else { ship.position.y = Math.sin(t * 0.7) * 0.15; cranes.forEach((c, i) => { c.position.x = -35 + i * 35 + Math.sin(t * 0.15 + i) * 3; }); }
   }

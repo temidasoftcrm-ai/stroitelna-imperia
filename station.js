@@ -1,6 +1,25 @@
 // station.js — гарата на фирмата в града: нива 1–5, по един коловоз на ниво. Влаковете, които са у дома,
 // стоят паркирани на коловозите. Главната линия (коловоз 0) минава през целия град; останалите са гарови.
 import * as THREE from 'three';
+import { hasTrainModel, trainCar } from './trainmodels.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+// истински гарови сгради (Sketchfab, CC-BY): small — „Train Station - Nieborowice“ (нива 2–4), big — „Milwaukee Road Depot“ (ниво 5)
+const ST_MODEL = {};
+let stLoad = null;
+const loadStationModels = () => stLoad || (stLoad = Promise.all(['small', 'big'].map(k => new Promise(res => new GLTFLoader().load(`assets/heavy/station/${k}.glb`, g => { ST_MODEL[k] = g.scene; res(); }, undefined, () => res())))));
+// сградата, вписана в кутия: дължина L по z, без да надвишава ширина W; основата на y = 0
+function stationBuilding(k, L, W) {
+  const src = ST_MODEL[k]; if (!src) return null;
+  const o = src.clone(true), g = new THREE.Group(), inner = new THREE.Group(); inner.add(o); g.add(inner); g.updateMatrixWorld(true);
+  let bb = new THREE.Box3().setFromObject(g), sz = bb.getSize(new THREE.Vector3());
+  if (sz.x > sz.z) { inner.rotation.y = Math.PI / 2; g.updateMatrixWorld(true); bb = new THREE.Box3().setFromObject(g); sz = bb.getSize(new THREE.Vector3()); }
+  inner.scale.setScalar(Math.min(L / sz.z, W / sz.x)); g.updateMatrixWorld(true);
+  bb = new THREE.Box3().setFromObject(g); const c = bb.getCenter(new THREE.Vector3());
+  inner.position.set(-c.x, -bb.min.y, -c.z);
+  g.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; } });
+  g.userData.h = bb.max.y - bb.min.y;
+  return g;
+}
 
 export const STATION_LEVELS = [
   { nm: 'Спирка', cost: 40000, days: 2 },
@@ -37,7 +56,9 @@ export function createStation(deps) {
     return deps.instanced('track', mats);
   };
   // строи гарата за дадено ниво (0 = само главната линия); building: строи се следващото ниво (ограда и скеле)
+  let buildingNow = null;
   function build(lv, building = null) {
+    buildingNow = building;
     if (g) deps.group.remove(g);
     g = new THREE.Group(); lamps = []; pools = []; glows = [];
     deps.group.add(g);
@@ -90,6 +111,13 @@ export function createStation(deps) {
       }
       // гарова сграда в северния край на перона; расте с нивото
       const hw = 6, hh = 3.5 + lv * 1.3, hl = 8 + lv * 3;
+      const real = lv >= 2 ? stationBuilding(lv >= 5 ? 'big' : 'small', lv >= 5 ? 40 : hl + 4, lv >= 5 ? 13 : 10) : null;
+      if (lv >= 2 && !real && !stLoad) loadStationModels().then(() => { if (level === lv) build(lv, buildingNow); });
+      if (real) {   // истинската сграда — до перона, в северния му край
+        real.position.set(X + 5.5 + (lv >= 5 ? 4 : 3), 0, -plen - (lv >= 5 ? 20 : (hl + 4) / 2) - 1); g.add(real);
+        const lab = deps.label(`🚉 ${STATION_LEVELS[lv - 1].nm.toUpperCase()} · ${lv} ${lv === 1 ? 'коловоз' : 'коловоза'}`, '#ffffff', 9);
+        lab.position.set(real.position.x, real.userData.h + 4, real.position.z); g.add(lab);
+      } else {
       const hall = new THREE.Mesh(new THREE.BoxGeometry(hw, hh, hl), mat(lv >= 4 ? 0xd9d4c8 : 0xc9a27a));
       hall.position.set(X + 5.5, hh / 2, -plen - hl / 2 - 1); hall.castShadow = hall.receiveShadow = true; g.add(hall);
       const hroof = new THREE.Mesh(new THREE.BoxGeometry(hw + 0.6, 0.5, hl + 0.6), mat(0x5a3a2a));
@@ -109,6 +137,7 @@ export function createStation(deps) {
       }
       const lab = deps.label(`🚉 ${STATION_LEVELS[lv - 1].nm.toUpperCase()} · ${lv} ${lv === 1 ? 'коловоз' : 'коловоза'}`, '#ffffff', 9);
       lab.position.set(X + 5.5, hh + 3 + (lv >= 3 ? 4 + lv : 0), hall.position.z); g.add(lab);
+      }
     }
     site = null;
     if (building) {   // строеж на следващото ниво: оранжева ограда и скеле около новия коловоз
@@ -137,6 +166,7 @@ export function createStation(deps) {
     for (const [m, k] of glows) m.emissiveIntensity = 0.1 + k * n;
   }
   // trains: [{ id, nm }] — влаковете у дома; всеки стои на свой коловоз (отвън навътре)
+  const ROOF_Y = new THREE.MeshStandardMaterial({ color: 0xffd000, emissive: 0x6a5200, emissiveIntensity: 0.35, roughness: 0.5 });
   function setParked(trains) {
     for (const p of parked) g.remove(p.obj);
     parked = [];
@@ -147,7 +177,24 @@ export function createStation(deps) {
       const n = t.wagons || 3;
       const parts = t.pax ? ['train-electric-city-a', ...Array(Math.max(0, n - 2)).fill('train-electric-city-b'), 'train-electric-city-a']
         : ['train-locomotive-a', ...Array.from({ length: n }, (_, j) => FREIGHT[(j + t.id) % FREIGHT.length])];
-      parts.forEach((n, j) => { const m = deps.model(n, SCALE); m.position.z = -j * CAR; o.add(m); });
+      // истински модели (trainmodels.js): „Стрела“ — скоростният влак, товарните — дизелов локомотив с бункери и платформи
+      const real = t.express && hasTrainModel('ave') ? ['ave', ...Array(hasTrainModel('hsw') ? Math.min(4, Math.max(1, n - 2)) : 0).fill('hsw'), 'aveTail'] : !t.pax && !t.express && hasTrainModel('loco') ? ['loco', ...Array.from({ length: n }, (_, j) => (j + t.id) % 3 === 1 ? 'hopper' : 'flat')] : null;
+      if (real) {
+        let z = 0;
+        real.forEach((kd, j) => { const m = trainCar(kd, t.id * 7 + j); z -= m.userData.len / 2; m.position.z = z; z -= m.userData.len / 2 + 0.5; o.add(m); });
+        o.position.set(trackX(k), 0.3, -z / 2);
+        const lb = deps.label(`🚆 ${t.nm}`, '#ffffff', 5); lb.position.set(0, 6, z / 2); o.add(lb);
+        g.add(o); parked.push({ obj: o, info: t });
+        return;
+      }
+      parts.forEach((n, j) => {
+        const m = deps.model(n, SCALE); m.position.z = -j * CAR; o.add(m);
+        if (t.express) {   // Експрес „Стрела“: жълт покрив на всеки вагон, за да се познава на гарата
+          const bb = new THREE.Box3().setFromObject(m), sz = bb.getSize(new THREE.Vector3());
+          const roof = new THREE.Mesh(new THREE.BoxGeometry(sz.x * 0.8, 0.18, sz.z * 0.9), ROOF_Y);
+          roof.position.set(0, bb.max.y + 0.06, -j * CAR); roof.castShadow = true; o.add(roof);
+        }
+      });
       o.position.set(trackX(k), 0.3, (parts.length - 1) * CAR / 2);
       const lb = deps.label(`🚆 ${t.nm}`, '#ffffff', 5); lb.position.set(0, 6, -(parts.length - 1) * CAR / 2); o.add(lb);
       g.add(o);

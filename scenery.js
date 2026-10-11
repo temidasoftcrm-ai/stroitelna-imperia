@@ -2,6 +2,7 @@
 // скали, малко село; а по трасето — строителни табели, предупредителни знаци, конуси, бариери с мигащи лампи
 // и строителен лагер (фургони, тоалетна, материали). Трасето е по оста z (от −len/2 до len/2), центрирано в x = 0.
 import * as THREE from 'three';
+import { loadMountains, mtnModel, loadBridges, bridgeModel } from './mtn.js';
 
 const flat = (c, r = 1) => new THREE.MeshStandardMaterial({ color: c, roughness: r, flatShading: true });
 const rnd = seed => () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -46,19 +47,27 @@ export function addRouteScenery(group, deps, opts = {}) {
   const free = (x, z, pad = 0) => Math.abs(x) > half + 8 + pad && Math.abs(z - rz) > rw + pad;
   const beacons = [];
 
-  // хълмове наблизо и планини на хоризонта
+  // хълмове наблизо и планини на хоризонта (после се подменят с истински планини — mtn.js)
+  const swaps = [];
   const greens = [0x7fa65a, 0x6f9a4e, 0x8bb06a, 0x5f8a44];
   for (let k = 0; k < 18; k++) {
     const x = (r() < 0.5 ? -1 : 1) * (70 + r() * 200), z = -260 + r() * 520, s = 18 + r() * 40;
     if (!free(x, z, s * 0.6)) continue;
-    const h = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), flat(greens[k % greens.length]));
+    const h = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ color: greens[k % greens.length], roughness: 1, flatShading: false }));
+    h.geometry = new THREE.IcosahedronGeometry(1, 3);   // по-заоблени хълмове
     h.scale.set(s, s * (0.25 + r() * 0.25), s * (0.8 + r() * 0.5)); h.position.set(x, -s * 0.05, z); h.receiveShadow = true; g.add(h);
   }
   for (let k = 0; k < 9; k++) {
     const x = -300 + k * 75 + r() * 30, z = -330 - r() * 60, s = 60 + r() * 50;
     const m = new THREE.Mesh(new THREE.ConeGeometry(s, s * (0.9 + r() * 0.5), 7), flat(k % 2 ? 0x7d8a76 : 0x6b7a66)); m.position.set(x, s * 0.4, z); g.add(m);
     const cap = new THREE.Mesh(new THREE.ConeGeometry(s * 0.32, s * 0.35, 7), flat(0xf4f6f8)); cap.position.set(x, s * 0.4 + s * 0.3, z); g.add(cap);
+    swaps.push([[m, cap], x, z, s * 2.4, s * 1.1, k % 3 ? 'far1' : 'peak', k]);
   }
+  // стари каменни мостове над реката, встрани от трасето (ако в изгледа има река)
+  if (rz < 1e8) loadBridges().then(() => {
+    for (const [k, x, len] of [['stone', -95 - r() * 40, rw * 2 + 14], ['rail', 110 + r() * 50, rw * 2 + 22]]) { const o = bridgeModel(k, len); if (!o) continue; o.position.set(x, 0, rz); g.add(o); }
+  });
+  loadMountains().then(() => { for (const [parts, x, z, w, h, k, rot] of swaps) { const o = mtnModel(k, w, h, rot); if (!o) continue; o.position.set(x, 0, z); g.add(o); parts.forEach(p => p.visible = false); } });
   // ниви (жито, разорана земя, слънчоглед, ливада)
   const fields = [0xd9c46a, 0x8a6a46, 0xe8c23a, 0x9cc46e, 0xb5a25a];
   for (let k = 0; k < 16; k++) {

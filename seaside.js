@@ -2,6 +2,9 @@
 // морето е на север от града, с плаж и крайбрежна алея с палми, пристанище с кей, портални кранове и контейнери,
 // фар на вълнолома, кораби на котва и лодки, които плават. Жп линията минава по насип през морето.
 import * as THREE from 'three';
+import { createPortLights } from './portlights.js';
+import { makeWater } from './water.js';
+import { loadShipModels, hasShipModel, shipModel } from './shipmodels.js';
 
 import { EXTRA_COASTAL } from './countries.js';
 export const SEASIDE = ['varna', 'burgas', 'constanta', 'istanbul', 'thessaloniki', 'athens', 'barcelona', 'amsterdam', 'rotterdam', 'newyork', 'losangeles', 'rio', 'buenosaires', 'capetown', 'dubai', 'mumbai', 'singapore', 'hongkong', 'shanghai', 'tokyo', 'sydney'];
@@ -24,7 +27,7 @@ export function addSeaside(group, deps, opts) {
   const sand = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, beachD), mat(0xe6d29a, 1)); sand.rotation.x = -Math.PI / 2; sand.position.set((x0 + x1) / 2, 0.01, zE - beachD / 2); sand.receiveShadow = true; g.add(sand);
   const walk = new THREE.Mesh(new THREE.PlaneGeometry(opts.xMax - opts.xMin + 40, 5), mat(0xcfc3a8, 0.9)); walk.rotation.x = -Math.PI / 2; walk.position.set((opts.xMin + opts.xMax) / 2, 0.03, zE - 3); g.add(walk);
   // море: две части — от двете страни на жп насипа
-  const seaMat = new THREE.MeshStandardMaterial({ color: 0x2f86c8, roughness: 0.25, metalness: 0 });
+  const water = makeWater({ color: 0x2f86c8, repeat: 60 }), seaMat = water.material;   // вълни с отблясъци (water.js)
   const parts = [[x0, Math.min(rx1, x1)], [Math.max(rx2, x0), x1]].filter(([a, b]) => b - a > 1);
   const seaD = 900, waves = [];
   for (const [a, b] of parts) {
@@ -42,7 +45,9 @@ export function addSeaside(group, deps, opts) {
     for (let f = 0; f < 6; f++) { const l = new THREE.Mesh(new THREE.ConeGeometry(0.5, 3.6, 4).rotateX(Math.PI / 2).translate(0, 0, 1.8), mat(0x3f9a3a)); l.position.set(0.5, h, 0); l.rotation.set(-0.5, f / 6 * Math.PI * 2, 0); p.add(l); }
     p.traverse(m => { if (m.isMesh) m.castShadow = true; }); return p;
   };
-  for (let x = opts.xMin; x <= opts.xMax; x += 14) { const p = palm(); p.position.set(x + r() * 4, 0, zE - 6.5); g.add(p); }
+  const sfp = [0, 1, 2, 3].map(i => `sf-palm-${i}`).filter(n => A && A[n]);   // хубавите палми (Sketchfab), ако са заредени
+  let pk = 0;
+  for (let x = opts.xMin; x <= opts.xMax; x += 14) { const p = sfp.length ? model(sfp[pk++ % sfp.length], 8 + r() * 3) : palm(); p.position.set(x + r() * 4, 0, zE - 6.5); if (sfp.length) p.rotation.y = r() * 6; g.add(p); }
   // чадъри на плажа
   const cols = [0xff5a5a, 0xffd23f, 0x3fa7ff, 0x50d18b];
   for (let k = 0; k < 24; k++) {
@@ -53,12 +58,15 @@ export function addSeaside(group, deps, opts) {
   // пристанище (източната част): кей, портални кранове, контейнери, товарен кораб
   const px = opts.xMax - 60, pierZ = seaZ - 40;
   box(110, 1.4, 70, mat(0xb8b4aa, 0.9), px, 0.5, seaZ - 34, g);
-  const cranes = [];
+  const cranes = [], PL = createPortLights();
+  // нощно осветление на кея: прожектори по брега и по ръба на кея
+  for (const [mx, mz] of [[-50, -2], [0, -2], [50, -2], [-50, -64], [0, -64], [50, -64]]) PL.mast(g, px + mx, seaZ + mz, { h: 20, r: 26 });
   for (let k = 0; k < 3; k++) {
     const c = new THREE.Group(), red = mat(k % 2 ? 0xd62828 : 0x1f5fbf, 0.6);
     for (const [sx, sz] of [[-4, -3], [4, -3], [-4, 3], [4, 3]]) box(0.8, 22, 0.8, red, sx, 12, sz, c);
     box(10, 1.6, 8, red, 0, 23, 0, c); const boom = box(1.2, 1.2, 46, red, 0, 24.5, -14, c); boom.castShadow = true;
     box(3, 2.4, 3, mat(0xeeeeee), 0, 21, -4, c);
+    PL.beaconAt(c, 0, 24.4, 0); PL.beaconAt(c, 0, 25.6, -36.5, 0.5);
     c.position.set(px - 35 + k * 26, 1.2, pierZ + 8); g.add(c); cranes.push(c);
   }
   for (let k = 0; k < 40; k++) {
@@ -67,7 +75,7 @@ export function addSeaside(group, deps, opts) {
     o.position.set(px - 40 + (k % 10) * 8, 1.2 + Math.floor(k / 20) * 3.5, seaZ - 10 - Math.floor((k % 20) / 10) * 10); o.rotation.y = Math.PI / 2;
     g.add(o);
   }
-  const cargo = useModel(A, model, 'ship-cargo-a', 6);
+  let cargo = useModel(A, model, 'ship-cargo-a', 6);
   if (cargo) { cargo.position.set(px, 0, pierZ - 18); cargo.rotation.y = Math.PI / 2; g.add(cargo); }
   // фар на вълнолома (западната част)
   const lx = opts.xMin + 30, lz = seaZ - 90;
@@ -102,8 +110,13 @@ export function addSeaside(group, deps, opts) {
   const berthZ = seaZ - 69 - 9;
   let movers = [], portLv = 0, lastFleet = [];
   // кейове: 2 пред стария кей, още 2 пред разширението (ниво 4+); останалите кораби чакат на котва
-  const berthsAt = () => [[px - 27, berthZ], [px + 27, berthZ], ...(portLv >= 4 ? [[px - 108, seaZ - 64], [px - 72, seaZ - 64]] : [])];
+  // [x, ръбът на кея по z]; морето е към −z
+  const berthsAt = () => [[px - 27, seaZ - 69], [px + 27, seaZ - 69], ...(portLv >= 4 ? [[px - 108, seaZ - 55], [px - 72, seaZ - 55]] : [])];
+  // половината ширина на кораба (по z, след завъртането) — за да стои до кея, а не в него
+  const halfBeam = o => { o.position.set(0, 0, 0); o.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(o); return (b.max.z - b.min.z) / 2; };
   function makeShip(kind) {
+    if (hasShipModel(kind)) return shipModel(kind);   // истинските кораби (shipmodels.js)
+    if (kind === 'bulk' && hasShipModel('tanker')) return shipModel('tanker');   // насипният — същият голям корпус
     const [n, sc, tint, alt] = SHIP[kind] || SHIP.container;
     let o = useModel(A, model, n, sc) || (alt ? useModel(A, model, alt, sc) : null) || (SHIP[kind] ? null : useModel(A, model, 'ship-cargo-a', 6));
     if (o && tint) o.traverse(m => { if (m.isMesh && m.material) { m.material = m.material.clone(); const c = m.material.color; if (c && c.r + c.g + c.b > 0.6 && c.r + c.g + c.b < 2.4) c.setHex(tint); } });
@@ -118,7 +131,7 @@ export function addSeaside(group, deps, opts) {
       const o = makeShip(f.kind);
       const B = berthsAt();
       const small = f.kind === 'boat' || f.kind === 'coaster';
-      if (i < B.length) { o.position.set(B[i][0], 0, B[i][1] + (small ? 5 : 0)); o.rotation.y = Math.PI / 2; }
+      if (i < B.length) { o.rotation.y = Math.PI / 2; const hb = halfBeam(o); o.position.set(B[i][0], 0, B[i][1] - hb - (small ? 1 : 2)); }
       else { o.position.set(px - 140 + (i - B.length) * 60, 0, seaZ - 230 - (i % 2) * 50); o.rotation.y = 0.3 + i; }   // на котва, чакат кей
       fleetG.add(o); ships.push({ o, ph: i * 1.7, fleet: true });
     });
@@ -131,13 +144,18 @@ export function addSeaside(group, deps, opts) {
   // ниво на пристанището 0–5: всяко ниво добавя кранове, контейнери и складове около стария кей
   const lvG = [1, 2, 3, 4, 5].map(() => { const q = new THREE.Group(); q.visible = false; g.add(q); return q; });
   { const blue = mat(0x1f5fbf, 0.6), red = mat(0xd62828, 0.6), shed = mat(0xb8bec6, 0.5, 0.4);
-    const crane = (q, x, m) => { const c = new THREE.Group(); for (const [sx, sz] of [[-4, -3], [4, -3], [-4, 3], [4, 3]]) box(0.8, 22, 0.8, m, sx, 12, sz, c); box(10, 1.6, 8, m, 0, 23, 0, c); box(1.2, 1.2, 46, m, 0, 24.5, -14, c); c.position.set(x, 1.2, pierZ + 8); q.add(c); cranes.push(c); };
+    const crane = (q, x, m) => { const c = new THREE.Group(); for (const [sx, sz] of [[-4, -3], [4, -3], [-4, 3], [4, 3]]) box(0.8, 22, 0.8, m, sx, 12, sz, c); box(10, 1.6, 8, m, 0, 23, 0, c); box(1.2, 1.2, 46, m, 0, 24.5, -14, c); PL.beaconAt(c, 0, 24.4, 0); PL.beaconAt(c, 0, 25.6, -36.5, 0.5); c.position.set(x, 1.2, pierZ + 8); q.add(c); cranes.push(c); };
     crane(lvG[0], px + 44, blue);
     for (let k = 0; k < 20; k++) box(4.4, 3.5, 8.8, mat([0xd62828, 0x1f5fbf, 0x2d8f4e, 0xffb300][k % 4], 0.7), px - 40 + (k % 10) * 8, 1.2 + 1.75 + 7, seaZ - 10 - Math.floor(k / 10) * 10, lvG[1]).rotation.y = Math.PI / 2;
     for (let k = 0; k < 2; k++) { box(26, 9, 14, shed, px - 30 + k * 32, 5.7, seaZ - 2 + 12, lvG[2]); box(26.6, 0.8, 14.6, mat(0x8a3b2b, 0.7), px - 30 + k * 32, 10.5, seaZ + 10, lvG[2]); }
-    box(70, 1.4, 50, mat(0xb8b4aa, 0.9), px - 90, 0.5, seaZ - 30, lvG[3]); crane(lvG[3], px - 100, red); crane(lvG[3], px - 76, red);
+    box(70, 1.4, 50, mat(0xb8b4aa, 0.9), px - 90, 0.5, seaZ - 30, lvG[3]); PL.mast(lvG[3], px - 118, seaZ - 8, { h: 18, r: 24 }); PL.mast(lvG[3], px - 62, seaZ - 52, { h: 18, r: 24 }); crane(lvG[3], px - 100, red); crane(lvG[3], px - 76, red);
     for (let k = 0; k < 24; k++) box(4.4, 3.5, 8.8, mat([0x7b2cbf, 0x0a9396, 0xe8e2d4, 0xd62828][k % 4], 0.7), px - 115 + (k % 8) * 7, 3 + Math.floor(k / 16) * 3.5, seaZ - 14 - Math.floor((k % 16) / 8) * 11, lvG[4]).rotation.y = Math.PI / 2;
     const silo = mat(0xdcdcdc, 0.5, 0.3); for (let k = 0; k < 3; k++) { const c = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 18, 16), silo); c.position.set(px - 70 + k * 9, 9, seaZ + 14); c.castShadow = true; lvG[4].add(c); } }
+  // щом истинските кораби се заредят: пречертай флота и смени декоративния кораб на кея с танкер (до ръба на кея)
+  loadShipModels().then(() => {
+    if (cargo && hasShipModel('tanker')) { const o = shipModel('tanker'), p0 = cargo.position.clone(), hb0 = halfBeam(cargo); cargo.position.copy(p0); o.rotation.y = cargo.rotation.y; const hb = halfBeam(o); o.position.set(p0.x, 0, seaZ - 69 - hb - 2); o.visible = cargo.visible; g.remove(cargo); g.add(o); cargo = o; }
+    setFleet(lastFleet);
+  });
   function setPortLevel(lv = 0) { const was = portLv; portLv = lv; lvG.forEach((q, i) => { q.visible = lv >= i + 1; }); if ((was >= 4) !== (lv >= 4)) setFleet(lastFleet); }
 
   // t: секунди; night: 0…1 (фарът свети и се върти)
@@ -156,6 +174,7 @@ export function addSeaside(group, deps, opts) {
     for (const s of ships) { s.o.position.y = Math.sin(t * 0.8 + s.ph) * 0.25; s.o.rotation.z = Math.sin(t * 0.6 + s.ph) * 0.02; }
     for (const q of boats) { q.o.position.x = q.x0 + Math.sin(t * 0.04 * q.sp + q.ph) * 80; q.o.rotation.y = Math.cos(t * 0.04 * q.sp + q.ph) > 0 ? Math.PI / 2 : -Math.PI / 2; q.o.position.y = Math.sin(t * 1.3 + q.ph) * 0.2; }
     cranes.forEach((c, k) => { c.position.x += Math.sin(t * 0.2 + k) * 0.01; });
+    PL.setNight(night, t); water.update(t);
     beam.rotation.y = t * 0.8; beam.material.opacity = 0.04 + 0.16 * night; lamp.material.emissiveIntensity = 0.5 + 2 * night;
   }
   return { group: g, update, setFleet, setPortLevel, port: { x: px, z: seaZ, xMax: opts.xMax } };

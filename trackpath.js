@@ -16,9 +16,11 @@ export function makeTrackMap(curve) {
 // head — параметърът z на първия вагон, dir — +1 (към +z) или −1, gap — дължина на вагон
 export function placeCars(group, map, x, head, dir, gap, y = 0) {
   group.position.set(0, 0, 0); group.rotation.set(0, 0, 0);
+  let acc = 0;   // вагони с userData.len (истинските модели от trainmodels.js) са по-дълги от gap
   group.children.forEach((m, i) => {
     if (m.userData.rot0 == null) m.userData.rot0 = m.rotation.y;
-    const p = map(x, head - dir * i * gap);
+    const len = m.userData.len ? m.userData.len + 0.5 : gap, d = acc + len / 2 - gap / 2; acc += len;
+    const p = map(x, head - dir * d);
     m.position.set(p.x, y, p.z);
     m.rotation.y = m.userData.rot0 + (dir > 0 ? 0 : Math.PI) + p.yaw;
   });
