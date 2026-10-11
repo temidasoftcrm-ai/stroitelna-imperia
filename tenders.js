@@ -25,6 +25,32 @@ export const TENDERS = [
   // голям обект: size — парцели [по x, по z] (3×4 = 12 парцела); улиците между тях стават част от площадката
   { id: 'luzhniki-moscow', city: 'moscow', kind: 'stadium', size: [3, 4], ico: '🏟️', nm: 'Национален стадион „Лужники“ — Москва', budget: 140000000, days: 120, rep: 4.5, dev: 10,
     need: { crew: 8, crane: 4, loader: 4, truck: 6 }, matShare: 0.55, sign: '🏟️ ЛУЖНИКИ', ds: 'Стадион за 80 000 зрители с покрив, фен зона и огромни паркинги — заема цели 12 парцела в Москва.' },
+  // Африка (st- → видими, щом имаш филиал в държавата): летища, язовир на Нил, стадиони за Купата на Африка, соларен и вятърен парк, мост
+  { id: 'st-airterm-cairo', city: 'cairo', kind: 'airterm', size: [3, 4], ico: '✈️', nm: 'Нов терминал на летище Кайро', budget: 120000000, days: 120, rep: 4.5, dev: 10,
+    need: { crew: 8, crane: 4, loader: 4, truck: 6 }, matShare: 0.55, sign: '✈️ CAIRO · TERMINAL 4', ds: 'Най-натовареното летище в Африка получава нов терминал — пирамидите се виждат от пистата.' },
+  { id: 'st-airterm-lagos', city: 'lagos', kind: 'airterm', size: [3, 4], ico: '✈️', nm: 'Международно летище „Муртала Мохамед“ — Лагос', budget: 105000000, days: 115, rep: 4.5, dev: 10,
+    need: { crew: 8, crane: 4, loader: 3, truck: 6 }, matShare: 0.55, sign: '✈️ LAGOS · LOS', ds: 'Новият терминал на най-големия град в Африка.' },
+  { id: 'st-airterm-addisababa', city: 'addisababa', kind: 'airterm', size: [3, 4], ico: '✈️', nm: 'Хъбът на Африка — летище Адис Абеба', budget: 95000000, days: 110, rep: 4.5, dev: 10,
+    need: { crew: 7, crane: 4, loader: 3, truck: 5 }, matShare: 0.55, sign: '✈️ ADDIS ABABA · BOLE', ds: 'Етиопските авиолинии свързват цяла Африка оттук — трябва им двоен терминал.' },
+  { id: 'st-dam-bahirdar', city: 'bahirdar', kind: 'dam', size: [3, 2], outer: true, ico: '🏞️', nm: 'Голям етиопски язовир „Възраждане“ на Нил', budget: 150000000, days: 140, rep: 4.5, dev: 10,
+    need: { crew: 8, crane: 4, loader: 4, truck: 7 }, matShare: 0.55, sign: '🏞️ ЯЗОВИР НА НИЛ', ds: 'Най-голямата ВЕЦ в Африка — бетонна стена на Син Нил, ток за милиони домове.' },
+  { id: 'st-stadium-abidjan', city: 'abidjan', kind: 'stadium', size: [3, 3], ico: '🏟️', nm: 'Стадион за Купата на Африка — Абиджан', budget: 70000000, days: 95, rep: 4, dev: 10,
+    need: { crew: 6, crane: 3, loader: 3, truck: 5 }, matShare: 0.55, sign: '🏟️ КУПА НА АФРИКА', ds: 'Олимпийски стадион за 60 000 зрители за финала на Купата на африканските нации.' },
+  { id: 'st-stadium-casablanca', city: 'casablanca', kind: 'stadium', size: [3, 4], ico: '🏟️', nm: 'Голям стадион „Хасан II“ — Казабланка', budget: 130000000, days: 120, rep: 4.5, dev: 10,
+    need: { crew: 8, crane: 4, loader: 4, truck: 6 }, matShare: 0.55, sign: '🏟️ GRAND STADE HASSAN II', ds: 'Най-големият стадион в света за 115 000 зрители — за Световното първенство 2030.' },
+  { id: 'st-solar-marrakesh', city: 'marrakesh', kind: 'solar', size: [3, 2], outer: true, ico: '☀️', nm: 'Соларен парк „Нур“ — Мароко', budget: 60000000, days: 80, rep: 4, dev: 10,
+    need: { crew: 5, loader: 2, truck: 4 }, matShare: 0.5, sign: '☀️ NOOR SOLAR', ds: 'Един от най-големите соларни паркове на света, в края на Сахара.' },
+  { id: 'st-wind-capetown', city: 'capetown', kind: 'wind', size: [3, 2], outer: true, ico: '🌬️', nm: 'Вятърен парк на Нос Добра надежда', budget: 55000000, days: 75, rep: 4, dev: 10,
+    need: { crew: 4, crane: 3, loader: 2, truck: 3 }, matShare: 0.5, sign: '🌬️ ВЯТЪРЕН ПАРК', ds: 'Ветровете на два океана — турбини по брега край Кейптаун.' },
+  { id: 'st-bridge-lagos', city: 'lagos', kind: 'bridge', size: [3, 2], outer: true, ico: '🌉', nm: 'Четвъртият мост над лагуната — Лагос', budget: 85000000, days: 100, rep: 4.5, dev: 10,
+    need: { crew: 6, crane: 3, loader: 3, truck: 4 }, matShare: 0.55, sign: '🌉 4TH MAINLAND BRIDGE', ds: 'Висящ мост над лагуната — 38 км през най-задръстения град в Африка.' },
+  // нови международни терминали на летища (3×4 парцела)
+  { id: 'air-sofia', city: 'sofia', kind: 'airterm', size: [3, 4], ico: '✈️', nm: 'Терминал 3 на летище София', budget: 90000000, days: 100, rep: 4, dev: 8,
+    need: { crew: 7, crane: 3, loader: 3, truck: 5 }, matShare: 0.55, sign: '✈️ ТЕРМИНАЛ 3 · СОФИЯ', ds: 'Нов международен терминал със стъклена фасада, ръкави за самолетите и контролна кула.' },
+  { id: 'air-istanbul', city: 'istanbul', kind: 'airterm', size: [3, 4], ico: '✈️', nm: 'Новото летище на Истанбул', budget: 180000000, days: 130, rep: 4.5, dev: 10,
+    need: { crew: 9, crane: 5, loader: 4, truck: 7 }, matShare: 0.55, sign: '✈️ İSTANBUL HAVALİMANI', ds: 'Едно от най-големите летища в света — огромен терминал между Европа и Азия.' },
+  { id: 'air-berlin', city: 'berlin', kind: 'airterm', size: [3, 4], ico: '✈️', nm: 'Летище Берлин Бранденбург — Терминал 2', budget: 140000000, days: 120, rep: 4.5, dev: 9,
+    need: { crew: 8, crane: 4, loader: 4, truck: 6 }, matShare: 0.55, sign: '✈️ BER · TERMINAL 2', ds: 'Вторият терминал на новото летище на Берлин — този път навреме!' },
   { id: 'campnou-barcelona', city: 'barcelona', kind: 'stadium', variant: 'campnou', size: [3, 4], ico: '🏟️', nm: 'Стадион „Камп Ноу“ — Барселона', budget: 130000000, days: 115, rep: 4.5, dev: 9,
     need: { crew: 8, crane: 4, loader: 4, truck: 6 }, matShare: 0.55, sign: '🏟️ КАМП НОУ', ds: 'Новият дом на „Барса“ за 105 000 зрители — най-големият стадион в Европа, на 12 парцела в Барселона.' },
   { id: 'olympia-berlin', city: 'berlin', kind: 'stadium', variant: 'olympia', size: [3, 3], ico: '🏟️', nm: 'Олимпийски стадион — Берлин', budget: 110000000, days: 110, rep: 4.5, dev: 9,
@@ -166,5 +192,5 @@ export function createTenders(deps) {
   }
   const state = id => st()[id] || null;
   const progOf = id => { const s = st()[id]; return !s ? null : s.st === 'done' ? 1 : s.st === 'building' ? s.prog : null; };
-  return { dailyTick, cardsHtml, bind, openBid, state, progOf, announce: id => announce(T(id)), close: id => close(T(id)) };
+  return { dailyTick, cardsHtml, bind, openBid, state, progOf, missing: id => missing(T(id)), announce: id => announce(T(id)), close: id => close(T(id)) };
 }

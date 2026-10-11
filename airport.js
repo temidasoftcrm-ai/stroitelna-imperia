@@ -25,7 +25,9 @@ export const PLANE_KINDS = {
 // ---- истински модели от Sketchfab (CC-BY, авторите са в CREDITS.txt и „📜 Автори“): самолетите по вид и контролна кула.
 // Зареждат се с другите модели на играта (loadAirModels в game.js); ако липсват — процедурните.
 //   yaw — завъртане около y, след което носът е към +z (моделите са завъртени различно)
-const AIR_CFG = { regional: { f: 'regional', yaw: 0.26 }, a320: { f: 'a320', yaw: Math.PI / 2 }, wide: { f: 'wide', yaw: 0 }, cargo: { f: 'cargo', yaw: -0.28, tint: 0xe8e2d4 }, tower: { f: 'tower' } };
+const AIR_CFG = { regional: { f: 'regional', yaw: 0.26 }, a320: { f: 'a320', yaw: Math.PI / 2 }, wide: { f: 'wide', yaw: 0 }, cargo: { f: 'cargo', yaw: -0.28, tint: 0xe8e2d4 }, tower: { f: 'tower' },
+  // терминалите по нива: малко летище (1–2), регионално (3), международно (4–5)
+  term_s: { f: 'term-s' }, term_m: { f: 'term-m' }, term_l: { f: 'term-l' } };
 const AIR = {};
 function normPlane(scene, K, yaw) {
   const g = new THREE.Group(), inner = new THREE.Group(); inner.add(scene); g.add(inner);
@@ -39,13 +41,20 @@ function normPlane(scene, K, yaw) {
   return g;
 }
 export function loadAirModels(load, base = 'assets/heavy/air/') {
-  return Promise.all(Object.entries(AIR_CFG).map(([k, c]) => load(base + c.f + '.glb').then(gl => {
+  return Promise.all(Object.entries(AIR_CFG).filter(([k]) => !k.startsWith('term')).map(([k, c]) => load(base + c.f + '.glb').then(gl => {
     const sc = gl.scene;
     sc.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; if (c.tint) { m.material = m.material.clone(); m.material.color.setHex(c.tint); } } });
-    AIR[k] = k === 'tower' ? sc : normPlane(sc, PLANE_KINDS[k], c.yaw);
+    AIR[k] = k === 'tower' || k.startsWith('term') ? sc : normPlane(sc, PLANE_KINDS[k], c.yaw);
   }).catch(e => console.warn('airmodels', k, e))));
 }
 
+// терминалите се зареждат чак когато има летище (тежки са) — веднъж
+let termP = null;
+export function loadTerminals(load, base = 'assets/heavy/air/') {
+  return termP || (termP = Promise.all(['term_s', 'term_m', 'term_l'].map(k => load(base + AIR_CFG[k].f + '.glb').then(gl => { AIR[k] = gl.scene; }).catch(e => console.warn('terminal', k, e)))));
+}
+// истинската контролна кула (Sketchfab), ако е заредена — за държавната поръчка „терминал“ (tender3d.js)
+export const airTowerModel = () => AIR.tower ? AIR.tower.clone(true) : null;
 // процедурен самолет: нос към +z
 export function makePlane(kind = 'a320', livery = 0) {
   const K = PLANE_KINDS[kind] || PLANE_KINDS.a320, g = new THREE.Group();
@@ -120,6 +129,41 @@ export function buildAirport(group, deps, opts = {}) {
 
   // терминал, кула, хангари — пресъздават се при смяна на нивото
   const lvG = new THREE.Group(); g.add(lvG);
+  // ---- пътна мрежа откъм града: входен път (продължава улицата на града, z = ROAD_Z), булевард покрай летището (x = −42),
+  // отбивки към терминала, автобусна спирка и коли, които се движат
+  const ROAD_Z = opts.roadZ ?? -12, BX = -42, asph = mat(0x3d4045, 0.95), curb = mat(0xb9bcc0, 0.8), dash = new THREE.MeshBasicMaterial({ color: 0xf2f2f2 });
+  const road = (x1, z1, x2, z2, w = 8) => {
+    const len = Math.hypot(x2 - x1, z2 - z1), ax = Math.abs(x2 - x1) > Math.abs(z2 - z1), cx = (x1 + x2) / 2, cz = (z1 + z2) / 2;
+    flat(ax ? len : w, ax ? w : len, asph, cx, 0.045, cz, g);
+    for (const sd of [-1, 1]) box(ax ? len : 0.4, 0.18, ax ? 0.4 : len, curb, ax ? cx : cx + sd * (w / 2 + 0.2), 0.09, ax ? cz + sd * (w / 2 + 0.2) : cz, g);
+    for (let d = -len / 2 + 3; d < len / 2 - 2; d += 7) flat(ax ? 3 : 0.25, ax ? 0.25 : 3, dash, ax ? cx + d : cx, 0.06, ax ? cz : cz + d, g);
+  };
+  const xCity = opts.cityGap != null ? -opts.cityGap : -70;
+  road(xCity, ROAD_Z, BX, ROAD_Z);                  // входен път от града
+  road(BX, -100, BX, 112);                          // булевард покрай летището
+  // кръгово кръстовище и табела
+  { const rb = new THREE.Mesh(new THREE.CircleGeometry(6, 24), asph); rb.rotation.x = -Math.PI / 2; rb.position.set(BX, 0.05, ROAD_Z); g.add(rb);
+    const isl = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 0.4, 20), mat(0x6f9a4e, 1)); isl.position.set(BX, 0.2, ROAD_Z); g.add(isl);
+    const pole = box(0.3, 5, 0.3, mat(0x666a70), BX - 9, 2.5, ROAD_Z - 7, g), sgn = box(0.2, 2.2, 6, mat(0x1f5fbf, 0.5), BX - 9, 5.2, ROAD_Z - 7, g);
+    const wsg = box(0.25, 0.6, 3.5, new THREE.MeshBasicMaterial({ color: 0xffffff }), BX - 9.1, 5.4, ROAD_Z - 7, g); }
+  // улични лампи покрай булеварда
+  const lampM = mat(0xfff2c0, 0.4, 0, 0xffd890); lights.push(lampM);
+  for (let z = -95; z <= 105; z += 20) { box(0.2, 6, 0.2, mat(0x555a60), BX - 5, 3, z, g); box(1.6, 0.3, 0.5, lampM, BX - 4.3, 6, z, g); }
+  // движещи се коли: по входния път и по булеварда (затворени маршрути)
+  const traffic = [], carCols = [0xd62828, 0xf2f2f2, 0x1f5fbf, 0x2b2d31, 0xffb300, 0x2d8f4e];
+  const mkCar = (k, bus) => { if (!bus && deps.model) { try { const nm = ['sf-car-Taxi', 'sf-car-Sedan', 'sf-car-SUV', 'sf-car-Hatchback', 'sf-car-Van'][k % 5]; if (deps.A && deps.A[nm]) return deps.model(nm, 1.6); } catch (e) { /* без модел */ } }
+    const c = new THREE.Group(); box(bus ? 2.6 : 1.9, bus ? 3 : 1.3, bus ? 11 : 4, mat(bus ? 0x1f8f5f : carCols[k % carCols.length], 0.5, 0.3), 0, bus ? 1.7 : 0.8, 0, c); return c; };
+  const routes = [
+    { pts: [[xCity, ROAD_Z - 2], [BX + 2, ROAD_Z - 2], [BX + 2, 105], [BX - 2, 105], [BX - 2, ROAD_Z + 2], [xCity, ROAD_Z + 2]], n: 5 },
+    { pts: [[BX + 2, -95], [BX + 2, 105], [BX - 2, 105], [BX - 2, -95]], n: 4 },
+  ];
+  for (const R of routes) {
+    let L = 0; R.seg = R.pts.map((p, i) => { const q = R.pts[(i + 1) % R.pts.length], l = Math.hypot(q[0] - p[0], q[1] - p[1]); const s0 = L; L += l; return { p, q, l, s0 }; }); R.L = L;
+    for (let k = 0; k < R.n; k++) { const c = mkCar(k, R === routes[1] && k === 0); g.add(c); traffic.push({ c, R, s: k * L / R.n, v: 9 + (k % 3) * 2 }); }
+  }
+  const moveTraffic = dt => { for (const t of traffic) { t.s = (t.s + t.v * dt) % t.R.L; const sg = t.R.seg.find(q => t.s >= q.s0 && t.s < q.s0 + q.l) || t.R.seg[0], f = (t.s - sg.s0) / sg.l;
+    t.c.position.set(sg.p[0] + (sg.q[0] - sg.p[0]) * f, 0.06, sg.p[1] + (sg.q[1] - sg.p[1]) * f); t.c.rotation.y = Math.atan2(sg.q[0] - sg.p[0], sg.q[1] - sg.p[1]); } };
+  let lastT = null;
   const parked = [];
   let lv = 0;
   function setLevel(n) {
@@ -127,10 +171,23 @@ export function buildAirport(group, deps, opts = {}) {
     lvG.clear(); parked.length = 0; windows.length = 0;
     const tLen = 40 + n * 22, tz = -tLen / 2 + 20;
     const wall = mat(0xd9dde2, 0.6, 0.1), glassM = mat(0x5f8fb8, 0.2, 0.3, 0xffd890), roof = mat(0x9aa3ad, 0.5, 0.5);
+    const tk = n <= 2 ? 'term_s' : n === 3 ? 'term_m' : 'term_l';
+    if (AIR[tk]) {   // истинският терминал (Sketchfab), вписан в мястото на процедурния: дългата страна по z, ширина до ~24
+      const o = AIR[tk].clone(true), inner = new THREE.Group(), w = new THREE.Group(); inner.add(o); w.add(inner); w.updateMatrixWorld(true);
+      let bb = new THREE.Box3().setFromObject(w), sz = bb.getSize(new THREE.Vector3());
+      if (sz.x > sz.z) { inner.rotation.y = Math.PI / 2; w.updateMatrixWorld(true); bb = new THREE.Box3().setFromObject(w); sz = bb.getSize(new THREE.Vector3()); }
+      if (tk === 'term_l') { inner.rotation.y += Math.PI; w.updateMatrixWorld(true); }   // ръкавите — към перона (+x)
+      const k = Math.min(tLen / sz.z, (n <= 2 ? 22 : tk === 'term_l' ? 34 : 26) / sz.x); inner.scale.setScalar(k); w.updateMatrixWorld(true);
+      bb = new THREE.Box3().setFromObject(w); const cc = bb.getCenter(new THREE.Vector3());
+      inner.position.set(-cc.x, -bb.min.y, -cc.z); w.position.set(TERM.x - (tk === 'term_l' ? 4 : 6), 0.05, tz);
+      w.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; for (const x of [].concat(m.material)) if (x.metalness > 0.5) x.metalness = 0.3; } });
+      lvG.add(w);
+    } else {
     box(18, 9, tLen, wall, TERM.x - 6, 4.5, tz, lvG);
     box(0.4, 6, tLen - 4, glassM, TERM.x + 3.2, 4.6, tz, lvG); windows.push(glassM);
     box(21, 0.8, tLen + 3, roof, TERM.x - 5, 9.4, tz, lvG);   // покрив с козирка към перона
     box(12, 1.6, tLen - 6, roof, TERM.x - 7, 10.6, tz, lvG);
+    }
     // ръкави (един на ниво) и самолет до всеки
     const kinds = ['regional', 'a320', 'a320', 'wide', 'wide'];
     for (let k = 0; k < n; k++) {
@@ -153,6 +210,10 @@ export function buildAirport(group, deps, opts = {}) {
     const bm = mat(0x40ff60, 0.4, 0, 0x40ff60); const b = new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 6), bm); b.position.y = 27.2 + n * 2; tw.add(b); beacons.length = 0; beacons.push(bm);
     // паркинг пред терминала
     flat(20, tLen * 0.7, mat(0x3a3d42, 0.95), TERM.x - 26, 0.03, tz, lvG);
+    // отбивки от булеварда към паркинга и терминала (в двата края на паркинга) и автобусна спирка
+    for (const zz of [tz - tLen * 0.35 - 4, tz + tLen * 0.35 + 4]) { flat(BX - (TERM.x - 16) < 0 ? 0 : (TERM.x - 16) - BX, 7, asph, (BX + TERM.x - 16) / 2, 0.046, zz, lvG); }
+    flat(7, tLen * 0.7 + 15, asph, TERM.x - 19.5, 0.046, tz, lvG);   // алея пред входа на терминала (спиране за слизане)
+    { const st = new THREE.Group(); st.position.set(TERM.x - 23.5, 0, tz - tLen * 0.2); lvG.add(st); box(0.2, 2.6, 0.2, mat(0x666a70), -1.5, 1.3, 0, st); box(0.2, 2.6, 0.2, mat(0x666a70), 1.5, 1.3, 0, st); box(3.6, 0.2, 1.6, mat(0x1f8f5f, 0.5), 0, 2.7, 0, st); box(3.2, 1.8, 0.1, mat(0x9fd8ff, 0.2, 0.2), 0, 1.3, -0.7, st); }
     const rows = Math.floor(tLen * 0.7 / 5);
     for (let k = 0; k < rows * 2; k++) if (Math.random() < 0.6) box(2, 1.3, 4, mat(LIVERY[k % LIVERY.length], 0.5, 0.3), TERM.x - 26 + (k % 2 ? 4 : -4), 0.65, tz - tLen * 0.35 + 2.5 + Math.floor(k / 2) * 5, lvG);
     // хангари (ниво 3+): полуцилиндри южно от терминала, отворени към рулежката
@@ -192,6 +253,7 @@ export function buildAirport(group, deps, opts = {}) {
   };
 
   function update(t, night = 0) {
+    { const dt = lastT == null ? 0 : Math.min(0.2, Math.max(0, t - lastT)); lastT = t; moveTraffic(dt); }
     fly(land, LAND, t); fly(take, TAKE, t + T * 0.5);
     for (const m of lights) m.emissiveIntensity = 0.2 + 2.2 * night;
     for (const m of windows) m.emissiveIntensity = 0.05 + 1.8 * night;
@@ -203,5 +265,6 @@ export function buildAirport(group, deps, opts = {}) {
   function dispose() { group.remove(g); }
   // за клик: дали точка (световни координати) е върху летището
   const hit = (px, pz) => px > g.position.x - 30 && px < g.position.x + 60 && pz > g.position.z - 115 && pz < g.position.z + 120;
-  return { group: g, update, setLevel, setPos, dispose, hit, get level() { return lv; } };
+  const refresh = () => { const n = lv; lv = 0; setLevel(n); };   // след като се заредят терминалите
+  return { group: g, update, setLevel, setPos, dispose, hit, refresh, get level() { return lv; } };
 }

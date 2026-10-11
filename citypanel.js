@@ -32,7 +32,7 @@ export function createCityPanel(deps) {
   // ---- нова поръчка за град, в който не си: свободен парцел от запомнения списък
   function newOrder(id, c) {
     const rep = S().rep || 0, tier = deps.cityTier(id);
-    const avail = deps.offerTypes().filter(([k, t]) => rep >= t.rep && !(tier === 's' && (k === 'tower' || (k === 'office' && rep < 4))));
+    const avail = deps.offerTypes().filter(([k, t]) => rep >= t.rep && !(tier === 's' && (k === 'tower' || (k === 'office' && rep < 4))) && !(k === 'tower' && deps.noTower && deps.noTower(id)));
     if (!avail.length) return null;
     const w = avail.map((_, i) => avail.length - i * 0.6);
     let r = Math.random() * w.reduce((a, b) => a + b, 0), type = avail[0][0];
@@ -132,7 +132,7 @@ export function createCityPanel(deps) {
     const a = deps.THRESH[lv - 1], b = deps.THRESH[lv], k = b == null ? 1 : Math.max(0, Math.min(1, (d.xp - a) / (b - a)));
     const ps = projsOf(id, c), offers = (here ? s.offers : c.offers || []).length, units = unitsOf(id, c).length, C = cap(c);
     const roof = (c.cash || []).reduce((x, y) => x + (y.amount || 0), 0);
-    const next = b == null ? '<span style="color:var(--ok)">максимално ниво</span>' : `до ниво ${lv + 1}: ${f(Math.round(b - d.xp))} XP · <span style="color:#ffd54a">${deps.unlockText(lv + 1)}</span>`;
+    const next = b == null ? '<span style="color:var(--ok)">максимално ниво</span>' : `до ниво ${lv + 1}: ${f(Math.round(b - d.xp))} XP · ${deps.devBest && deps.devBest() >= lv + 1 ? `<span style="color:var(--ok)">💶 +2% към наградите в ${deps.cityName(id)}</span>` : `<span style="color:#ffd54a">🔓 ${deps.unlockText(lv + 1)}</span>`}`;
     let h = `<div class="card" style="${here ? 'border:1px solid var(--acc)' : ''}"><h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${deps.cityFlag(id)} ${deps.cityName(id)}${here ? ' <span class="meta" style="margin:0">📍 тук си</span>' : ''}
       <span style="margin-left:auto;display:flex;gap:6px;align-items:center">${fin ? '<span class="meta" style="margin:0;color:var(--ok)">🏁 завършен</span>' : ''}<b>🏅 Ниво ${lv}</b></span></h3>
       <div class="bar" style="margin:4px 0"><i style="width:${(k * 100).toFixed(0)}%;background:linear-gradient(90deg,#c9a14a,#ffd54a)"></i></div>
@@ -166,7 +166,7 @@ export function createCityPanel(deps) {
     h += `<div class="row" style="justify-content:flex-end;gap:6px;margin-top:6px;flex-wrap:wrap">
       ${here ? '' : `<label class="meta" style="margin:0 auto 0 0;display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" data-cpauto="${id}" ${auto(id) ? 'checked' : ''}> 🤖 Автопилот${auto(id) ? '' : ' (изкл.)'}</label>`}
       ${here ? '' : `<button class="btn2" data-cpgo="${id}">➡️ Влез</button>`}
-      ${canFin ? `<button class="btn" data-cpfin="${id}" title="Отваря картата „Завърши града“">🏁 Завърши града</button>` : ''}</div></div>`;
+      ${canFin ? `<button class="btn" data-cpfin="${id}" title="Завършва града направо оттук">🏁 Завърши града</button>` : ''}</div></div>`;
     return h;
   }
   function winHtml() {
@@ -189,7 +189,7 @@ export function createCityPanel(deps) {
     body.querySelectorAll('[data-cpsend]').forEach(b => b.onclick = () => { const [t, id, from] = b.dataset.cpsend.split('|'); if (deps.gearSend(t, from, id)) mark(id, t); redraw(); });
     body.querySelectorAll('[data-cpbuy]').forEach(b => b.onclick = () => { const [t, id] = b.dataset.cpbuy.split('|'); const n0 = deps.unitCount(id); deps.gearBuy(t, id); if (deps.unitCount(id) > n0) mark(id, t); redraw(); });
     body.querySelectorAll('[data-cpgo]').forEach(b => b.onclick = () => deps.goCity(b.dataset.cpgo, null));
-    body.querySelectorAll('[data-cpfin]').forEach(b => b.onclick = () => deps.goCity(b.dataset.cpfin, 'hq'));
+    body.querySelectorAll('[data-cpfin]').forEach(b => b.onclick = () => { if (b.dataset.cpfin === S().cityId || !deps.finishRemote) deps.goCity(b.dataset.cpfin, 'hq'); else { deps.finishRemote(b.dataset.cpfin); redraw(); } });
   }
   return { winHtml, bind, dailyTick, stash, workDay, addXp };
 }

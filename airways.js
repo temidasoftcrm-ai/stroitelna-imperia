@@ -4,19 +4,24 @@
 //   S.airRoutes = [{ a, b, km }]                                      — авиолиния: a е твое летище, b — всеки отключен град
 //   S.planes = [{ id, kind, nm, at, path: [a, b] | null, km, total }] — самолетите летят сами по случайни линии
 export const AIRPORT_LEVELS = [
-  { nm: 'Летище', gates: 1, cost: 4000000, days: 20 },
-  { nm: 'Летище с 2 гейта', gates: 2, cost: 3000000, days: 14 },
-  { nm: 'Регионално летище', gates: 4, cost: 6000000, days: 18 },
-  { nm: 'Международно летище', gates: 6, cost: 10000000, days: 24 },
-  { nm: 'Международен хъб', gates: 10, cost: 18000000, days: 30 },
+  { nm: 'Летище', gates: 1, cost: 100000000, days: 20 },
+  { nm: 'Летище с 2 гейта', gates: 2, cost: 150000000, days: 14 },
+  { nm: 'Регионално летище', gates: 4, cost: 220000000, days: 18 },
+  { nm: 'Международно летище', gates: 6, cost: 320000000, days: 24 },
+  { nm: 'Международен хъб', gates: 10, cost: 450000000, days: 30 },
 ];
 // seats × заетост × fare = приход на км; fuel — разход на км; speed — км на игрален ден
 export const PLANES = {
+  prop: { nm: 'Витлов самолет (Cessna)', ico: '🛩️', seats: 12, fare: 0.2, fuel: 1, range: 900, speed: 1100, cost: 900000, upkeep: 500 },
   regional: { nm: 'Регионален (ATR 72)', ico: '🛩️', seats: 70, fare: 0.14, fuel: 3, range: 1500, speed: 1800, cost: 2500000, upkeep: 1500 },
   narrow: { nm: 'Пътнически (A320)', ico: '✈️', seats: 180, fare: 0.12, fuel: 6, range: 5500, speed: 2200, cost: 6000000, upkeep: 3500 },
   wide: { nm: 'Далекомагистрален (B787)', ico: '✈️', seats: 300, fare: 0.11, fuel: 10, range: 14000, speed: 2600, cost: 14000000, upkeep: 7000 },
+  a380: { nm: 'Двуетажен (A380)', ico: '✈️', seats: 550, fare: 0.105, fuel: 17, range: 15000, speed: 2600, cost: 32000000, upkeep: 13000 },
   cargo: { nm: 'Товарен (B747F)', ico: '📦', cargo: true, tons: 110, fare: 0.2, fuel: 11, range: 8000, speed: 2300, cost: 11000000, upkeep: 6000 },
 };
+// стълбицата на пътническите самолети: купува се първият, после се надгражда стъпка по стъпка (цената — разликата)
+export const PLANE_LADDER = ['prop', 'regional', 'narrow', 'a380'];
+export const PLANE_PIC = { prop: 1, regional: 2, narrow: 3, wide: 3, a380: 4 };
 export const LOAD = 0.8;   // средна заетост на седалките
 // права за авиолиния: основа + на км
 export const ROUTE_COST = km => Math.round((300000 + km * 150) / 10000) * 10000;
@@ -57,7 +62,7 @@ export const WORLD = [
 ];
 export const WORLD_IDS = new Set(WORLD.map(c => c.id));
 // реални летища: в кои градове може да има летище и до какво ниво (останалите — без летище)
-export const AIRPORT_MAX = {
+export const AIRPORT_MAX = { alexandria: 3,
   sofia: 5, varna: 4, burgas: 4, plovdiv: 3, vt: 2 /* Горна Оряховица */, ruse: 2, stz: 1,
   istanbul: 5, athens: 5, bucharest: 4, belgrade: 4, ankara: 4, thessaloniki: 3, skopje: 3, constanta: 2, nis: 2,
   london: 5, paris: 5, amsterdam: 5, munich: 5, madrid: 5, rome: 5,

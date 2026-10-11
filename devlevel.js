@@ -78,7 +78,9 @@ export function createDevLevel(deps) {
     const d = st(); if (!d) { btn.style.display = 'none'; return; }
     btn.style.display = '';
     const a = THRESH[d.lv - 1], b = THRESH[d.lv] ?? a, k = d.lv >= 10 ? 1 : (d.xp - a) / (b - a);
-    btn.innerHTML = `🏅 Ниво ${d.lv}<span class="dbar"><i style="width:${(k * 100).toFixed(0)}%"></i></span>`;
+    const bst = best();   // градът е на своето ниво; фирмата — на нивото на най-развития град (от него идват отключванията)
+    btn.innerHTML = `🏅 ${deps.cityName ? deps.cityName() : 'Град'} ${d.lv}${bst > d.lv ? ` · 🏢 фирма ${bst}` : ''}<span class="dbar"><i style="width:${(k * 100).toFixed(0)}%"></i></span>`;
+    btn.title = `Ниво на ${deps.cityName ? deps.cityName() : 'града'}: ${d.lv}${bst > d.lv ? ` · ниво на фирмата (най-развитият град): ${bst} — отключванията идват от него` : ''}`;
   }
   function open() {
     const d = st(); if (!d) return;

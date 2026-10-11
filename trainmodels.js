@@ -33,7 +33,15 @@ function splitByX(scene, cuts) {
   const parts = cuts.map(() => new THREE.Group()).concat([new THREE.Group()]);
   scene.traverse(m => {
     if (!m.isMesh) return;
-    const geo = (m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone()).applyMatrix4(m.matrixWorld);
+    // квантизирани модели (KHR_mesh_quantization: Int16/Int8 с normalized) — първо в Float32, иначе applyMatrix4 и копирането ги развалят
+    const src = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone();
+    for (const [name, at] of Object.entries(src.attributes)) {
+      if (at.array instanceof Float32Array && !at.isInterleavedBufferAttribute) continue;
+      const f = new Float32Array(at.count * at.itemSize);
+      for (let i = 0; i < at.count; i++) for (let c = 0; c < at.itemSize; c++) f[i * at.itemSize + c] = at.getComponent ? at.getComponent(i, c) : [at.getX(i), at.getY(i), at.getZ(i), at.getW(i)][c];
+      src.setAttribute(name, new THREE.BufferAttribute(f, at.itemSize));
+    }
+    const geo = src.applyMatrix4(m.matrixWorld);
     const pos = geo.attributes.position, n = pos.count / 3, bins = parts.map(() => []);
     for (let t = 0; t < n; t++) {
       const cx = (pos.getX(t * 3) + pos.getX(t * 3 + 1) + pos.getX(t * 3 + 2)) / 3;
@@ -46,7 +54,7 @@ function splitByX(scene, cuts) {
       for (const [name, attr] of Object.entries(geo.attributes)) {
         const sz = attr.itemSize, arr = new attr.array.constructor(tris.length * 3 * sz);
         tris.forEach((t, i) => { for (let v = 0; v < 3; v++) for (let c = 0; c < sz; c++) arr[(i * 3 + v) * sz + c] = attr.array[(t * 3 + v) * sz + c]; });
-        out.setAttribute(name, new THREE.BufferAttribute(arr, sz, attr.normalized));
+        out.setAttribute(name, new THREE.BufferAttribute(arr, sz));
       }
       if (!out.attributes.normal) out.computeVertexNormals();
       parts[b].add(new THREE.Mesh(out, m.material));

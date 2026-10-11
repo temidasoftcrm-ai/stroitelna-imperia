@@ -3,12 +3,14 @@
 //   buildHospital — национална болница: модел „Low Poly Hospital“ (AlessioPassera, Sketchfab, CC-BY) с хеликоптерна площадка.
 //   buildStadium — национален стадион („Ekana Stadium Low Poly“, mshayan02, CC-BY); buildMetro — вход на метрото
 //     („Subway Entrance [Street Assets Vol. 01]“, whisper.alt, CC-BY) на площад с голямо „M“.
+//   buildAirTerminal — нов международен терминал: стъклена сграда с вълнообразен покрив, ръкави, кула и самолети на перона.
 //   buildPortTerminal — нов контейнерен терминал до пристанището (seaside.js): кей, портални кранове, контейнери.
 // Двете връщат { group, setProg(p 0…1), update(t, night) }; докато p < 1 се виждат скеле, кран и строителна техника.
 import * as THREE from 'three';
 import { createPortLights } from './portlights.js';
 import { loadShipModels, hasShipModel, shipModel } from './shipmodels.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { makePlane, airTowerModel } from './airport.js';
 
 const mat = (c, r = 0.8, m = 0, e) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m, ...(e ? { emissive: e, emissiveIntensity: 0 } : {}) });
 const box = (w, h, d, m, x, y, z, g) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; g.add(o); return o; };
@@ -208,6 +210,54 @@ export function buildMetro(group, deps, opts = {}) {
   function update(t, night = 0) { site.glow(0.05 + 0.5 * night); red.emissiveIntensity = 0.15 + 0.9 * night; white.emissiveIntensity = 0.1 + 0.9 * night; if (prog < 1) head.rotation.y = t * 1.5; }
   setProg(opts.prog ?? 0);
   return { group: g, setProg, update, dispose: () => { alive = false; group.remove(g); } };
+}
+
+// ---------------------------------------------------------------- международен терминал на летище
+// opts.ext = [W, D] (локални мерки): по z отзад е сградата (страна към града), отпред — перонът със самолетите
+export function buildAirTerminal(group, deps, opts = {}) {
+  const g = new THREE.Group(); g.position.set(opts.x || 0, 0, opts.z || 0); g.rotation.y = opts.rot || 0; g.scale.setScalar(opts.scale || 1); group.add(g);
+  const ext = opts.ext || [26, 34], [W, D] = ext, k0 = 1 / (opts.scale || 1), site = fencedDirt(g, ext);
+  const done = new THREE.Group(); g.add(done);
+  // перон (бетон) и паркинг/алея откъм града
+  const zT = -D / 2 + 7;   // фасадата на терминала откъм перона
+  box(W, 0.1, D - 12, mat(0x8f9297, 0.9), 0, 0.06, zT + (D - 12) / 2 - 1, done);
+  box(W, 0.1, 6, mat(0x3d4247, 0.9), 0, 0.06, -D / 2 + 3, done);
+  const yl = mat(0xf2c200, 0.6);
+  const body = new THREE.Group(); g.add(body);
+  // терминалът: стъклена кутия + вълнообразен бял покрив
+  const glassM = mat(0x5f8fb8, 0.15, 0.4, 0xffe7b0), win = [glassM], TW2 = W - 4, TD = 7, TH = 4.2;
+  box(TW2, TH, TD, glassM, 0, TH / 2, zT - TD / 2, body);
+  for (let i = 0; i <= 12; i++) box(0.18, TH, TD + 0.1, mat(0xe8ecef, 0.5, 0.3), -TW2 / 2 + i * TW2 / 12, TH / 2, zT - TD / 2, body);   // колони по фасадата
+  { const rg = new THREE.PlaneGeometry(TW2 + 3, TD + 4, 40, 4).rotateX(-Math.PI / 2), P = rg.attributes.position;
+    for (let i = 0; i < P.count; i++) P.setY(i, Math.sin(P.getX(i) / (TW2 + 3) * Math.PI * 3) * 0.6 + 0.4 * (1 - Math.abs(P.getZ(i)) / ((TD + 4) / 2)));
+    rg.computeVertexNormals(); const roof = new THREE.Mesh(rg, new THREE.MeshStandardMaterial({ color: 0xf4f6f8, roughness: 0.5, metalness: 0.2, side: THREE.DoubleSide })); roof.position.set(0, TH + 0.3, zT - TD / 2); roof.castShadow = true; body.add(roof); }
+  // ръкави към самолетите
+  const nG = Math.max(3, Math.min(6, Math.floor(TW2 / 7))), gx = i => -TW2 / 2 + (i + 0.5) * TW2 / nG;
+  for (let i = 0; i < nG; i++) { const jb = box(1.2, 1.2, 5, mat(0xd8dde2, 0.5, 0.3), gx(i) + 1.6, 2.4, zT + 2.5, body); const leg = box(0.3, 2.2, 0.3, mat(0x666a70), gx(i) + 1.6, 1.1, zT + 4.6, body); }
+  // контролна кула в ъгъла
+  const tower = new THREE.Group(); tower.position.set(W / 2 - 3, 0, -D / 2 + 5); body.add(tower);
+  const tm = airTowerModel();
+  if (tm) { const w = new THREE.Group(); w.add(tm); const bb = new THREE.Box3().setFromObject(w), s3 = bb.getSize(new THREE.Vector3()); w.scale.setScalar(13 / s3.y); w.updateMatrixWorld(true); const b2 = new THREE.Box3().setFromObject(w), c = b2.getCenter(new THREE.Vector3()); w.position.set(-c.x, -b2.min.y, -c.z); tower.add(w); }
+  else { cyl(0.9, 1.2, 11, mat(0xe8ecef, 0.6), 0, 5.5, 0, tower, 12); cyl(2, 1.6, 2, glassM, 0, 12, 0, tower, 12); cyl(2.2, 2.2, 0.4, mat(0x444a50), 0, 13.2, 0, tower, 12); }
+  // перон: жълти линии към ръкавите и самолетите (истинските модели от летищата, ако са заредени)
+  const planes = new THREE.Group(); done.add(planes);
+  for (let i = 0; i < nG; i++) {
+    box(0.2, 0.02, D - 22, yl, gx(i) + 1.6, 0.13, zT + (D - 22) / 2 + 5, done);
+    if (i % 2 === 0 || nG <= 4) { const kind = ['a320', 'wide', 'a320', 'regional', 'wide', 'a320'][i % 6], p = makePlane(kind, i); p.scale.multiplyScalar(k0 * 0.42); p.rotation.y = Math.PI; p.position.set(gx(i) + 1.6, (p.userData.gearY || 2) * k0 * 0.42, zT + 5.5 + (p.userData.len || 26) * k0 * 0.42 / 2); planes.add(p); }
+  }
+  const sign = deps.label ? deps.label(opts.sign || '✈️ НОВ ТЕРМИНАЛ', '#ffe9a8', 16) : null;
+  if (sign) { sign.position.set(0, 14, zT - TD / 2); g.add(sign); }
+  const kit = siteKit(g, TW2, TH + 2, TD + 4); kit.kit.position.z = zT - TD / 2;
+  let prog = -1;
+  function setProg(p) {
+    p = Math.max(0, Math.min(1, p)); if (p === prog) return; prog = p;
+    const k = Math.max(0, Math.min(1, (p - 0.1) / 0.85)); body.visible = k > 0; body.scale.y = Math.max(0.001, k);
+    kit.kit.visible = p < 1; kit.scaf.scale.y = Math.max(0.05, Math.min(1, p * 1.15)); kit.scaf.position.y = (TH + 2) / 2 * kit.scaf.scale.y;
+    if (sign) sign.visible = p >= 1; done.visible = p >= 1; site.show(p < 1);
+  }
+  function update(t, night = 0) { site.glow(0.05 + 0.5 * night); for (const m of win) m.emissiveIntensity = prog >= 1 ? 0.05 + 0.9 * night : 0; if (prog < 1) kit.jib.rotation.y = Math.sin(t * 0.25) * 1.2; }
+  setProg(opts.prog ?? 0);
+  return { group: g, setProg, update, dispose: () => group.remove(g) };
 }
 
 // ---------------------------------------------------------------- национална болница

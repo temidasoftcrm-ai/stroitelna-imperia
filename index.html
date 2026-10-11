@@ -92,6 +92,10 @@
   /* бутоните за обхват и статистиката остават горе при превъртане */
   .bw-scope { display:flex; gap:4px; flex-wrap:wrap; position:sticky; top:-14px; z-index:4; background:#141b27; margin:-14px -16px -10px; padding:14px 16px 8px; }
   .bw-scope + .bw-stats { top:30px; margin-top:0; padding-top:4px; }
+  /* подтабовете на „🚦 Транспорт“ — заедно с филтрите и числата остават горе при скрол */
+  .bw-tr { display:flex; gap:6px; flex-wrap:wrap; position:sticky; top:-14px; z-index:5; background:#141b27; margin:-14px -16px 0; padding:14px 16px 6px; }
+  .bw-tr + .bw-scope { top:32px; margin-top:0; padding-top:4px; }
+  .bw-tr + .bw-scope + .bw-stats { top:70px; }
   .bw-stats div { background:rgba(255,255,255,.05); border:1px solid var(--line); border-radius:12px; padding:10px; text-align:center; }
   .bw-stats b { display:block; font-size:22px; color:var(--acc); } .bw-stats span { font-size:12px; color:var(--mut); }
   /* държавните поръчки: златна светеща рамка, защото са важни */
@@ -111,6 +115,7 @@
   #mapSvg .country { fill:#e8e1cf; stroke:#b9ae95; stroke-width:.6; }
   #mapSvg .country.bg { fill:#9fd38a; stroke:#4f8a3e; stroke-width:1.4; }
   #mapSvg .country.won { fill:#5fc85a; stroke:#e0b000; stroke-width:2.2; }
+  #mapSvg .country.dim { fill:#8c877d; stroke:#77726a; opacity:.7; }   /* други континенти при изглед „Африка“ и т.н. */
   #mapSvg .cwon { font-weight:900; fill:#3a4a2a; paint-order:stroke; stroke:#ffffffd9; stroke-width:3px; pointer-events:auto; }
   #mapSvg .cwon.ok { fill:#1d7a2a; }
   #mapSvg .clabel { fill:#8a7f68; font-size:11px; font-weight:700; letter-spacing:.15em; text-anchor:middle; pointer-events:none; }

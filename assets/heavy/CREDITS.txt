@@ -104,3 +104,6 @@ People and resort hotel in assets/heavy/people/ — from Sketchfab, Creative Com
 - marina/motoryacht.glb — "Hinckley T44 FB Model" by mosak (CC-BY 4.0) — https://sketchfab.com/3d-models/1f4362d864424b7eb26bb429f6ef8f81
 - marina/sailboat.glb — "Sailboat 1" by masterjack20 (CC-BY 4.0) — https://sketchfab.com/3d-models/048ca9ab42b0453ab344a0691fbd5058
   (текстурите в marina/ са смалени до 512 px webp)
+- air/term-s.glb — "Airport Building" by Gerhald (CC-BY 4.0) — https://sketchfab.com/3d-models/31f007ca421840509221c3c7a1db8622
+- air/term-m.glb — "Small airport terminal building complex." by soysascha (CC-BY 4.0) — https://sketchfab.com/3d-models/f93a362f8a1f4e2c92f65310cfdd7fe2
+- air/term-l.glb — "Airport Terminal 1 South Concourse" by Patrick Kin Yu YOUNG (CC-BY 4.0) — https://sketchfab.com/3d-models/c9f6af88ed404709b72f58866fe3506a
