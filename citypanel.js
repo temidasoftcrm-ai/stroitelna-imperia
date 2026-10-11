@@ -163,8 +163,14 @@ export function createCityPanel(deps) {
     const canFin = here ? deps.canFinishHere() : okExt && okFree && okSh && fs.air !== false;
     const ck = ok => ok ? '✅' : '⬜';
     if (!canFin) h += `<div class="meta" style="margin:6px 0 0">🏁 За завършване: ${ck(okExt)} квартали ${fs.ext}/${fs.need} · ${ck(okFree)} свободни парцели ${fs.free == null ? '? (влез веднъж в града)' : `${fs.free} (най-много 1)`} · ${ck(okSh)} пазарен дял ${Math.round(fs.share * 100)}% (поне 60%)${fs.airNeed ? ` · ${ck(fs.air)} ✈️ летище` : ''}</div>`;
+    // 📦 складът: автоматичното пълнене се включва и оттук (всеки град има свое — c.autoFill)
+    if (!(c.autoFill && c.autoFill.on)) h += `<div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0 auto 0 0">📦 Склад: <span class="late">автоматичното пълнене е изключено</span></span><button class="btn2" data-cpaf="${id}" title="Складът сам поръчва ТИР-ове с материали (до 50 000 € на ден)">🔄 Включи</button></div>`;
+    // 🏘️ нови квартали — купуват се и оттук, без да влизаш в града
+    const dq = deps.district && !deps.isFinished(id) ? deps.district(id) : null;
+    if (dq && dq.ext < dq.max) h += `<div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0 auto 0 0">🏘️ Квартали <b style="color:var(--txt)">${dq.ext}/${dq.max}</b>${dq.ext < fs.need ? ` · за завършване ${fs.need}` : ''}</span>
+      <button class="btn" data-cpdist="${id}|0" ${deps.econ().canAfford(dq.cost) ? '' : 'disabled'}>🏘️ Купи квартал · ${f(dq.cost)} €</button>
+      ${dq.max - dq.ext > 1 ? `<button class="btn2" data-cpdist="${id}|1" ${deps.econ().canAfford(dq.all) ? '' : 'disabled'}>Всички ${dq.max - dq.ext} · ${f(dq.all)} €</button>` : ''}</div>`;
     h += `<div class="row" style="justify-content:flex-end;gap:6px;margin-top:6px;flex-wrap:wrap">
-      ${here ? '' : `<label class="meta" style="margin:0 auto 0 0;display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" data-cpauto="${id}" ${auto(id) ? 'checked' : ''}> 🤖 Автопилот${auto(id) ? '' : ' (изкл.)'}</label>`}
       ${here ? '' : `<button class="btn2" data-cpgo="${id}">➡️ Влез</button>`}
       ${canFin ? `<button class="btn" data-cpfin="${id}" title="Завършва града направо оттук">🏁 Завърши града</button>` : ''}</div></div>`;
     return h;
@@ -188,6 +194,8 @@ export function createCityPanel(deps) {
     body.querySelectorAll('[data-cpall]').forEach(b => b.onclick = () => { const s = S(), v = b.dataset.cpall === '1'; s.autoCity = Object.fromEntries(deps.ownedCities().filter(id => id !== s.cityId).map(id => [id, v])); deps.save(); redraw(); });
     body.querySelectorAll('[data-cpsend]').forEach(b => b.onclick = () => { const [t, id, from] = b.dataset.cpsend.split('|'); if (deps.gearSend(t, from, id)) mark(id, t); redraw(); });
     body.querySelectorAll('[data-cpbuy]').forEach(b => b.onclick = () => { const [t, id] = b.dataset.cpbuy.split('|'); const n0 = deps.unitCount(id); deps.gearBuy(t, id); if (deps.unitCount(id) > n0) mark(id, t); redraw(); });
+    body.querySelectorAll('[data-cpdist]').forEach(b => b.onclick = () => { const [id, all] = b.dataset.cpdist.split('|'); deps.buyDistrict(id, all === '1'); redraw(); });
+    body.querySelectorAll('[data-cpaf]').forEach(b => b.onclick = () => { const c = rec(b.dataset.cpaf); if (c) { c.autoFill = { budget: 50000, spent: 0, day: S().day, ...(c.autoFill || {}), on: true }; deps.save(); } redraw(); });
     body.querySelectorAll('[data-cpgo]').forEach(b => b.onclick = () => deps.goCity(b.dataset.cpgo, null));
     body.querySelectorAll('[data-cpfin]').forEach(b => b.onclick = () => { if (b.dataset.cpfin === S().cityId || !deps.finishRemote) deps.goCity(b.dataset.cpfin, 'hq'); else { deps.finishRemote(b.dataset.cpfin); redraw(); } });
   }

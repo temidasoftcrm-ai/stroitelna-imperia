@@ -14,11 +14,12 @@ export const CITY_LANDMARKS = {
   rotterdam: ['erasmus', 'cubes', 'markthal', 'derotterdam', 'euromast'],
   amsterdam: ['canal', 'rijks', 'centraal', 'adam', 'windmill', 'canal2'],
   // истински модели от Sketchfab (GLB_LM по-долу)
+  cairo: ['pyramids'], giza: ['pyramids'],
   dubai: ['burj'], newyork: ['manhattan', 'liberty'], sydney: ['opera'], moscow: ['stbasil'], toronto: ['cntower'], chicago: ['willis'], shanghai: ['shtower'], rio: ['redeemer'],
 };
-export const LANDMARK_NM = { burj: 'Бурж Халифа', manhattan: 'Манхатън', liberty: 'Статуята на свободата', opera: 'Операта в Сидни', stbasil: 'Храмът „Св. Василий Блажени“', cntower: 'Си Ен Тауър', willis: 'Уилис Тауър', shtower: 'Шанхайската кула', redeemer: 'Христос Спасителя', mosque: 'Синята джамия', mosque2: 'Сюлейманийе', galata: 'Галатска кула', sapphire: 'Истанбул Сапфир', twist: 'Левент Туист', twin: 'Левент Туинс', colosseum: 'Колизеума', hagia: 'Света София', colosseo: 'Колизеума', sagrada: 'Саграда Фамилия', vatican: 'Ватикана и „Св. Петър“', stpeter: 'Базилика „Св. Петър“', pantheon: 'Пантеона', vittoriano: 'Витториано', erasmus: 'Мостът Еразъм', cubes: 'Кубичните къщи', markthal: 'Маркетхал', derotterdam: 'Де Ротердам', euromast: 'Евромаст', canal: 'Канал с къщи', canal2: 'Канал с къщи', rijks: 'Райксмузеум', centraal: 'Централна гара', adam: 'A’DAM Лукаут', windmill: 'Вятърна мелница', eiffel: 'Айфеловата кула', arc: 'Триумфалната арка', notredame: 'Нотр Дам', ladefense: 'Ла Дефанс', bigben: 'Биг Бен', londoneye: 'Лондонското око', towerbridge: 'Тауър Бридж', shard: 'Шард', brandenburg: 'Бранденбургската врата', fernsehturm: 'Телевизионната кула', reichstag: 'Райхстагът' };
+export const LANDMARK_NM = { pyramids: 'Пирамидите в Гиза', burj: 'Бурж Халифа', manhattan: 'Манхатън', liberty: 'Статуята на свободата', opera: 'Операта в Сидни', stbasil: 'Храмът „Св. Василий Блажени“', cntower: 'Си Ен Тауър', willis: 'Уилис Тауър', shtower: 'Шанхайската кула', redeemer: 'Христос Спасителя', mosque: 'Синята джамия', mosque2: 'Сюлейманийе', galata: 'Галатска кула', sapphire: 'Истанбул Сапфир', twist: 'Левент Туист', twin: 'Левент Туинс', colosseum: 'Колизеума', hagia: 'Света София', colosseo: 'Колизеума', sagrada: 'Саграда Фамилия', vatican: 'Ватикана и „Св. Петър“', stpeter: 'Базилика „Св. Петър“', pantheon: 'Пантеона', vittoriano: 'Витториано', erasmus: 'Мостът Еразъм', cubes: 'Кубичните къщи', markthal: 'Маркетхал', derotterdam: 'Де Ротердам', euromast: 'Евромаст', canal: 'Канал с къщи', canal2: 'Канал с къщи', rijks: 'Райксмузеум', centraal: 'Централна гара', adam: 'A’DAM Лукаут', windmill: 'Вятърна мелница', eiffel: 'Айфеловата кула', arc: 'Триумфалната арка', notredame: 'Нотр Дам', ladefense: 'Ла Дефанс', bigben: 'Биг Бен', londoneye: 'Лондонското око', towerbridge: 'Тауър Бридж', shard: 'Шард', brandenburg: 'Бранденбургската врата', fernsehturm: 'Телевизионната кула', reichstag: 'Райхстагът' };
 // кои стоят в центъра на града (останалите — в стария град извън центъра)
-export const LANDMARK_CENTER = new Set(['burj', 'manhattan', 'cntower', 'willis', 'shtower', 'eiffel', 'arc', 'bigben', 'shard', 'brandenburg', 'reichstag', 'ladefense', 'sapphire', 'twist', 'twin', 'colosseum', 'colosseo', 'vatican', 'vittoriano', 'derotterdam', 'markthal', 'cubes', 'canal', 'rijks', 'centraal']);
+export const LANDMARK_CENTER = new Set(['pyramids', 'burj', 'manhattan', 'cntower', 'willis', 'shtower', 'eiffel', 'arc', 'bigben', 'shard', 'brandenburg', 'reichstag', 'ladefense', 'sapphire', 'twist', 'twin', 'colosseum', 'colosseo', 'vatican', 'vittoriano', 'derotterdam', 'markthal', 'cubes', 'canal', 'rijks', 'centraal']);
 
 const mat = (c, r = 0.8, m = 0, extra = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m, ...extra });
 const add = (g, geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; g.add(o); return o; };
@@ -608,7 +609,25 @@ function glbLm(kind) {
   });
   return g;
 }
-const BUILD = { ...Object.fromEntries(Object.keys(GLB_LM).map(k => [k, () => glbLm(k)])), hagia, eiffel, arc, notredame, ladefense, bigben, londoneye, towerbridge, shard, brandenburg, fernsehturm, reichstag, erasmus, cubes, markthal, derotterdam, euromast, canal: () => canal(0), canal2: () => canal(1), rijks, centraal, adam, windmill, mosque: () => mosque(0), mosque2: () => mosque(1), galata, sapphire, twist, twin, colosseum, stpeter, pantheon, vittoriano };
+function pyramids() {   // Гиза: Хеопс, Хефрен (с бялата облицовка на върха), Микерин, три малки „на царици“ и Сфинксът
+  const g = new THREE.Group(), sand = mat(0xe2c487, 1), st = mat(0xd4b06a, 0.95, 0, { emissive: 0xffb860, emissiveIntensity: 0 }), cap = mat(0xf1e6cc, 0.8, 0, { emissive: 0xffd9a0, emissiveIntensity: 0 });
+  box(g, 15, 0.3, 15, sand, 0, 0.15, 0);
+  const pyr = (s, h, x, z, m = st) => { const o = add(g, new THREE.ConeGeometry(s * Math.SQRT1_2, h, 4, 1), m, x, 0.3 + h / 2, z); o.rotation.y = Math.PI / 4; return o; };
+  pyr(6.2, 5.6, -3.2, -2.6);                     // Хеопс
+  pyr(5.6, 5.3, 2.4, 0.6);                       // Хефрен
+  const tip = add(g, new THREE.ConeGeometry(1.1 * Math.SQRT1_2, 1.05, 4, 1), cap, 2.4, 0.3 + 5.3 - 0.52, 0.6); tip.rotation.y = Math.PI / 4;
+  pyr(3, 2.8, 5.2, 4.8);                         // Микерин
+  for (let k = 0; k < 3; k++) pyr(1.2, 1.1, 2.6 + k * 1.6, 6.6);   // пирамидите на цариците
+  // Сфинксът: тяло, лапи и глава, гледа на изток
+  const sph = new THREE.Group(); sph.position.set(-4.6, 0.3, 4.4); sph.rotation.y = -Math.PI / 2; g.add(sph);
+  box(sph, 1.1, 0.9, 3, st, 0, 0.45, 0); box(sph, 1.1, 0.35, 1.2, st, 0, 0.18, 2); box(sph, 0.8, 0.9, 0.8, st, 0, 1.2, 1.2); box(sph, 1.2, 0.7, 0.3, st, 0, 1.25, 0.95);
+  // пясъчни дюни и палми покрай
+  for (const [x, z, r] of [[-6, 6.3, 1.1], [6.3, -5.8, 1.3], [-6.4, -6.4, 0.9]]) { const d = add(g, new THREE.SphereGeometry(r, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), sand, x, 0.3, z); d.scale.y = 0.35; }
+  for (const [x, z] of [[6.4, -1.8], [6.6, -3], [-6.6, 1.6]]) { add(g, new THREE.CylinderGeometry(0.08, 0.12, 2.2, 5), mat(0x7a5c3e), x, 1.4, z); for (let k = 0; k < 5; k++) { const l = add(g, new THREE.ConeGeometry(0.25, 1.4, 4), mat(0x3f8f3a), x, 2.5, z); l.rotation.z = 1.2; l.rotation.y = k * 1.26; l.position.x += Math.cos(k * 1.26) * 0.5; l.position.z -= Math.sin(k * 1.26) * 0.5; } }
+  g.userData.flood = [st, cap];
+  return g;
+}
+const BUILD = { pyramids, ...Object.fromEntries(Object.keys(GLB_LM).map(k => [k, () => glbLm(k)])), hagia, eiffel, arc, notredame, ladefense, bigben, londoneye, towerbridge, shard, brandenburg, fernsehturm, reichstag, erasmus, cubes, markthal, derotterdam, euromast, canal: () => canal(0), canal2: () => canal(1), rijks, centraal, adam, windmill, mosque: () => mosque(0), mosque2: () => mosque(1), galata, sapphire, twist, twin, colosseum, stpeter, pantheon, vittoriano };
 
 // kind → { group, update(t, night) }
 export function buildLandmark(kind, deps = {}) {

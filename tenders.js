@@ -44,6 +44,8 @@ export const TENDERS = [
     need: { crew: 4, crane: 3, loader: 2, truck: 3 }, matShare: 0.5, sign: '🌬️ ВЯТЪРЕН ПАРК', ds: 'Ветровете на два океана — турбини по брега край Кейптаун.' },
   { id: 'st-bridge-lagos', city: 'lagos', kind: 'bridge', size: [3, 2], outer: true, ico: '🌉', nm: 'Четвъртият мост над лагуната — Лагос', budget: 85000000, days: 100, rep: 4.5, dev: 10,
     need: { crew: 6, crane: 3, loader: 3, truck: 4 }, matShare: 0.55, sign: '🌉 4TH MAINLAND BRIDGE', ds: 'Висящ мост над лагуната — 38 км през най-задръстения град в Африка.' },
+  { id: 'st-canal-alexandria', city: 'alexandria', kind: 'canal', size: [3, 5], outer: true, ico: '⚓', nm: 'Новият Суецки канал — паралелен ръкав', budget: 220000000, days: 160, rep: 4.5, dev: 10,
+    need: { crew: 9, crane: 4, loader: 6, truck: 8 }, matShare: 0.5, sign: '⚓ НОВИЯТ СУЕЦКИ КАНАЛ', ds: '35 км нов ръкав на Суецкия канал, за да минават кораби в двете посоки едновременно — с вантов мост и фар на входа при Порт Саид.' },
   // нови международни терминали на летища (3×4 парцела)
   { id: 'air-sofia', city: 'sofia', kind: 'airterm', size: [3, 4], ico: '✈️', nm: 'Терминал 3 на летище София', budget: 90000000, days: 100, rep: 4, dev: 8,
     need: { crew: 7, crane: 3, loader: 3, truck: 5 }, matShare: 0.55, sign: '✈️ ТЕРМИНАЛ 3 · СОФИЯ', ds: 'Нов международен терминал със стъклена фасада, ръкави за самолетите и контролна кула.' },

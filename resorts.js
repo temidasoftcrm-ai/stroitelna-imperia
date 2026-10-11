@@ -36,6 +36,16 @@ export const RESORTS = [
   { id: 'karlovyvary', nm: 'Карлови Вари', cc: '🇨🇿', reg: 'Балнео Европа', dev: 8, kind: 'spa', ico: '♨️', lat: 50.23, lon: 12.87, lab: [12, 4, 'start'], land: 3000000, build: 5400000, days: 22, sell: 14000000, month: 42000 },
   { id: 'badenbaden', nm: 'Баден-Баден', cc: '🇩🇪', reg: 'Балнео Европа', dev: 8, kind: 'spa', ico: '🛁', lat: 48.76, lon: 8.24, lab: [12, 4, 'start'], land: 3300000, build: 6000000, days: 24, sell: 15600000, month: 46000 },
   { id: 'heviz', nm: 'Хевиз', cc: '🇭🇺', reg: 'Балнео Европа', dev: 8, kind: 'spa', ico: '🌊', lat: 46.79, lon: 17.19, lab: [12, 4, 'start'], land: 2400000, build: 4500000, days: 20, sell: 11500000, month: 34000 },
+  // 🌍 Африка — отключват се, когато имаш поне need.n филиала/града в държавата (need.cities)
+  { id: 'hurghada', nm: 'Хургада', cc: '🇪🇬', reg: 'Африка', cont: 'af', need: { n: 2, cities: ['cairo', 'alexandria', 'giza', 'luxor', 'aswan'] }, kind: 'summer', ico: '🐠', lat: 27.26, lon: 33.81, lab: [12, 4, 'start'], land: 3600000, build: 6600000, days: 26, sell: 17000000, month: 110000 },
+  { id: 'sharm', nm: 'Шарм ел Шейх', cc: '🇪🇬', reg: 'Африка', cont: 'af', need: { n: 3, cities: ['cairo', 'alexandria', 'giza', 'luxor', 'aswan'] }, kind: 'summer', ico: '🤿', lat: 27.91, lon: 34.33, lab: [12, 4, 'start'], land: 4200000, build: 7500000, days: 28, sell: 19500000, month: 125000 },
+  { id: 'hammamet', nm: 'Хамамет', cc: '🇹🇳', reg: 'Африка', cont: 'af', need: { n: 2, cities: ['tunis', 'sfax', 'sousse', 'kairouan', 'bizerte'] }, kind: 'summer', ico: '🏖️', lat: 36.40, lon: 10.62, lab: [12, 4, 'start'], land: 3000000, build: 5700000, days: 24, sell: 14400000, month: 88000 },
+  { id: 'djerba', nm: 'Джерба', cc: '🇹🇳', reg: 'Африка', cont: 'af', need: { n: 3, cities: ['tunis', 'sfax', 'sousse', 'kairouan', 'bizerte'] }, kind: 'summer', ico: '🏝️', lat: 33.81, lon: 10.86, lab: [12, 4, 'start'], land: 3300000, build: 6000000, days: 25, sell: 15600000, month: 95000 },
+  { id: 'agadir', nm: 'Агадир', cc: '🇲🇦', reg: 'Африка', cont: 'af', need: { n: 2, cities: ['casablanca', 'rabat', 'marrakesh', 'tangier', 'fes'] }, kind: 'summer', ico: '🌴', lat: 30.42, lon: -9.60, lab: [12, 4, 'start'], land: 3300000, build: 6000000, days: 25, sell: 15600000, month: 95000 },
+  { id: 'palmeraie', nm: 'Маракеш — Палмераие', cc: '🇲🇦', reg: 'Африка', cont: 'af', need: { n: 3, cities: ['casablanca', 'rabat', 'marrakesh', 'tangier', 'fes'] }, kind: 'spa', ico: '🕌', lat: 31.68, lon: -7.95, lab: [12, 4, 'start'], land: 3000000, build: 5700000, days: 24, sell: 15000000, month: 44000 },
+  { id: 'malindi', nm: 'Малинди', cc: '🇰🇪', reg: 'Африка', cont: 'af', need: { n: 2, cities: ['nairobi', 'mombasa', 'kisumu', 'nakuru', 'eldoret'] }, kind: 'summer', ico: '🐚', lat: -3.22, lon: 40.12, lab: [12, 4, 'start'], land: 3000000, build: 5700000, days: 24, sell: 14400000, month: 88000 },
+  { id: 'nungwi', nm: 'Нунгви (Занзибар)', cc: '🇹🇿', reg: 'Африка', cont: 'af', need: { n: 2, cities: ['daressalaam', 'dodoma', 'arusha', 'mwanza', 'zanzibar'] }, kind: 'summer', ico: '🏝️', lat: -5.73, lon: 39.30, lab: [12, 4, 'start'], land: 3900000, build: 7200000, days: 27, sell: 18000000, month: 115000 },
+  { id: 'campsbay', nm: 'Кампс Бей', cc: '🇿🇦', reg: 'Африка', cont: 'af', need: { n: 2, cities: ['capetown', 'johannesburg', 'durban', 'pretoria', 'portelizabeth'] }, kind: 'summer', ico: '🌊', lat: -33.95, lon: 18.38, lab: [12, 14, 'start'], land: 4500000, build: 8100000, days: 29, sell: 20400000, month: 130000 },
 ];
 // разширения след вилното селище: строят се за дни и вдигат наема (mul) и цената при продажба (sellAdd)
 export const EXTRAS = {
@@ -75,8 +85,10 @@ export function createResorts(deps) {
   const unlocked = () => { const S = deps.S(); return !!S && (S.resortsOpen || S.rep >= UNLOCK.rep || (S.done || 0) >= UNLOCK.done); };
   const R = id => RESORTS.find(r => r.id === id);
   // чуждите курорти се отварят с нивото на развитие (dev); символите на картата растат с мащаба ѝ (symK)
-  const avail = r => !r.dev || (deps.devBest ? deps.devBest() >= r.dev : true);
-  const RG_TITLE = { 'България': '🇧🇬 България', 'Турция': '🇹🇷 Турция', 'Алпите': '🏔️ Алпите', 'Ривиера': '🌊 Френската ривиера', 'Средиземно море': '🏝️ Средиземно море', 'Балнео Европа': '♨️ Балнео Европа' };
+  const haveIn = r => r.need ? r.need.cities.filter(id => (deps.owned ? deps.owned() : []).includes(id)).length : 0;
+  const avail = r => r.need ? haveIn(r) >= r.need.n : (!r.dev || (deps.devBest ? deps.devBest() >= r.dev : true));
+  const lockTxt = r => r.need ? `${r.need.n} града в ${r.cc} (имаш ${haveIn(r)})` : `ниво ${r.dev}`;
+  const RG_TITLE = { 'България': '🇧🇬 България', 'Турция': '🇹🇷 Турция', 'Алпите': '🏔️ Алпите', 'Ривиера': '🌊 Френската ривиера', 'Средиземно море': '🏝️ Средиземно море', 'Балнео Европа': '♨️ Балнео Европа', 'Африка': '🌍 Африка' };
   const REG = { '🇹🇷': 'Турция', '🇫🇷': 'Алпите', '🇨🇭': 'Алпите', '🇦🇹': 'Алпите', '🇮🇹': 'Алпите' };
   const inSeason = (r, day) => r.kind === 'spa' || seasonOf(day) === r.kind;   // балнео курортът работи целогодишно
   const mulOf = s => 1 + Object.keys(s.ext || {}).reduce((a, k) => a + (EXTRAS[k] ? EXTRAS[k].mul : 0), 0);
@@ -86,11 +98,11 @@ export function createResorts(deps) {
   const seasonWord = r => r.kind === 'winter' ? 'зимата' : r.kind === 'summer' ? 'лятото' : 'целогодишно';
 
   // символи на картата (SVG); заключените са сиви с катинар
-  function svg() {
+  function svg(cont = null) {   // cont — изгледът на континент ('af'…) или null за Европа/България
     const S = deps.S(); if (!S) return '';
     const open = unlocked();
     const k0 = deps.symK ? deps.symK() : 1;
-    return RESORTS.filter(r => k0 < 2.5 || r.cc).map(r => {   // на картата на Европа българските курорти се скриват (твърде са нагъсто)
+    return RESORTS.filter(r => (r.cont || null) === cont && (cont || k0 < 2.5 || r.cc)).map(r => {   // на картата на Европа българските курорти се скриват (твърде са нагъсто)
       const [x, y] = deps.proj(r.lon, r.lat), s = st()[r.id], stage = s ? s.stage : null, k = deps.symK ? deps.symK() : 1, ok = open && avail(r);
       const badge = stage === 'built' ? (inSeason(r, S.day) ? '💶' : '💤') : stage === 'building' ? '🔨' : stage === 'land' ? '🟩' : stage === 'sold' ? '✅' : '';
       return `<g class="resort" data-resort="${r.id}" style="cursor:pointer;opacity:${ok ? 1 : 0.55}" transform="translate(${x} ${y}) scale(${k}) translate(${-x} ${-y})">
@@ -107,7 +119,7 @@ export function createResorts(deps) {
     let reg = null;
     for (const r of RESORTS) {
       const s = st()[r.id], rg = r.reg || REG[r.cc] || 'България';
-      if (rg !== reg) { reg = rg; if (rg !== 'България') h += `<div class="meta" style="margin:6px 0 0;font-weight:700;color:var(--txt)">${RG_TITLE[rg] || rg} · ~${rg === 'Ривиера' ? 5 : 3}× по-скъпи и по-доходни${avail(r) ? '' : ` · 🔒 ниво ${r.dev}`}</div>`; }
+      if (rg !== reg) { reg = rg; if (rg !== 'България') h += `<div class="meta" style="margin:6px 0 0;font-weight:700;color:var(--txt)">${RG_TITLE[rg] || rg} · ~${rg === 'Ривиера' ? 5 : 3}× по-скъпи и по-доходни${avail(r) ? '' : ` · 🔒 ${lockTxt(r)}`}</div>`; }
       if (!avail(r)) continue;
       const txt = !s ? `свободен · земя ${deps.fmt(r.land)} €`
         : s.stage === 'land' ? 'твоя земя — строй вилно селище'
@@ -139,19 +151,20 @@ export function createResorts(deps) {
     return true;
   }
   // големият прозорец „🏔️ Курорти“ (бутонът с прихода горе в лентата)
-  function winHtml() {
+  function winHtml(ok = () => true) {   // ok(r) — филтър по обхват (България/Балкани/Европа…) от game.js
     const S = deps.S(); if (!S) return '';
     if (!unlocked()) return `<div class="card"><div class="meta">🔒 Курортите са Фаза 5 — отключват се при репутация ${UNLOCK.rep} ★ или ${UNLOCK.done} завършени обекта (сега: ${S.rep.toFixed(1)} ★, ${S.done || 0}).</div></div>`;
     const mine = RESORTS.filter(r => st()[r.id]?.stage === 'built'), earned = RESORTS.reduce((a, r) => a + (st()[r.id]?.earned || 0), 0);
     let h = `<div class="bw-stats"><div><b>${deps.fmt(dailyNow(S.day))} €</b><span>днес на ден</span></div><div><b>${deps.fmt(mine.reduce((a, r) => a + yearOf(r, st()[r.id]), 0))} €</b><span>~ на година</span></div><div><b>${mine.length} / ${RESORTS.filter(avail).length}</b><span>твои курорти</span></div><div><b>${deps.fmt(earned)} €</b><span>спечелено общо</span></div></div>
       <div class="meta" style="margin:10px 0 0">${monthName(S.day)} · ${SEASON_TXT[seasonOf(S.day)]}. ❄️ Ски: декември–март · ☀️ Море: юни–септември · ♨️ Балнео: целогодишно.</div>`;
     const groups = {};
-    for (const r of RESORTS) (groups[r.reg || REG[r.cc] || 'България'] ||= []).push(r);
+    for (const r of RESORTS) if (ok(r)) (groups[r.reg || REG[r.cc] || 'България'] ||= []).push(r);
+    if (!Object.keys(groups).length) h += `<div class="card"><div class="meta" style="margin:0">Няма курорти в този обхват.</div></div>`;
     for (const [rg, list] of Object.entries(groups)) {
       const lock = list.find(r => !avail(r));
       const rows = list.map(r => {
         const s = st()[r.id], on = s?.stage === 'built' && inSeason(r, S.day);
-        const txt = !avail(r) ? `🔒 ниво ${r.dev} · земя ${deps.fmt(r.land)} €`
+        const txt = !avail(r) ? `🔒 ${lockTxt(r)} · земя ${deps.fmt(r.land)} €`
           : !s ? `свободен · земя ${deps.fmt(r.land)} € · ~${deps.fmt(yearOf(r))} €/год. след строеж`
           : s.stage === 'land' ? '🟩 твоя земя — строй вилно селище'
           : s.stage === 'building' ? `🔨 строи се ${Math.round(s.prog * 100)}%`
@@ -167,6 +180,7 @@ export function createResorts(deps) {
   function open(id) {
     const S = deps.S(), r = R(id), s = st()[id], econ = deps.econ(), enter = deps.enter ? () => deps.enter(id) : null;
     const season = `${r.kind === 'winter' ? '❄️ Зимен курорт: приход декември–март' : r.kind === 'summer' ? '☀️ Летен курорт: приход юни–септември' : '♨️ Балнео курорт: приход целогодишно'}. Сега е ${monthName(S.day).toLowerCase()} (${SEASON_TXT[seasonOf(S.day)]}).`;
+    if (!avail(r) && r.need) return deps.modal(`🔒 ${r.cc} ${r.nm}`, `Курортите в Африка се отключват, когато имаш поне <b>${r.need.n} града</b> в ${r.cc} (сега: ${haveIn(r)}).<br>Купи филиали в: ${r.need.cities.map(id => deps.cityName ? deps.cityName(id) : id).join(', ')}.<br>Земя ${deps.fmt(r.land)} € · вилно селище ${deps.fmt(r.build)} € · продажба ~${deps.fmt(r.sell)} € · наем ${deps.fmt(r.month)} €/мес.<br><br>${season}`, [['Добре', null]]);
     if (!avail(r)) return deps.modal(`🔒 ${r.cc || ''} ${r.nm}`, `${(r.reg || REG[r.cc]) === 'Турция' ? 'Турските курорти' : r.reg === 'Ривиера' ? 'Курортите на Френската ривиера' : 'Курортите в Алпите'} се отключват на <b>ниво ${r.dev} на развитие</b>${deps.devBest ? ` (сега: ${deps.devBest()})` : ''}.<br>Земя ${deps.fmt(r.land)} € · вилно селище ${deps.fmt(r.build)} € · продажба ~${deps.fmt(r.sell)} € · наем ${deps.fmt(r.month)} €/мес.<br><br>${season}`, [['Добре', null]]);
     if (!unlocked()) return deps.modal(`🔒 ${r.nm}`, `Курортите са Фаза 5. Отключват се при репутация ${UNLOCK.rep} ★ или ${UNLOCK.done} завършени обекта.<br><br>${season}`, [['Добре', null]]);
     const plan = `Земя <b>${deps.fmt(r.land)} €</b> → вилно селище <b>${deps.fmt(r.build)} €</b> (${r.days} дни) → продажба за <b>${deps.fmt(r.sell)} €</b> или наем ~<b>${deps.fmt(r.month)} €/месец</b> в сезона — <b>~${deps.fmt(yearOf(r))} €/година</b>.`;
@@ -213,6 +227,12 @@ export function createResorts(deps) {
   // веднъж на ден (в края на деня): строеж, сезонен наем, отключване на фазата
   function dailyTick(day) {
     const S = deps.S(), econ = deps.econ();
+    // африканските курорти: съобщение, когато се отключи нов (достатъчно градове в държавата)
+    S.resortNew = S.resortNew || {};
+    for (const r of RESORTS) if (r.need && !S.resortNew[r.id] && avail(r)) {
+      S.resortNew[r.id] = day;
+      if (unlocked()) { deps.sound && deps.sound('offer'); const t = `${r.ico} Нов курорт: ${r.cc} ${r.nm}! Вече имаш ${haveIn(r)} града в държавата — купи земята и строй.`; deps.onNewResort ? deps.onNewResort(r, t) : deps.toast(t, 'good'); }
+    }
     if (!S.resortsOpen && unlocked()) {
       S.resortsOpen = true;
       deps.toast('🏔️ Отключи Фаза 5: Курорти! Отвори картата — шест курорта чакат инвестиции: ски, море и балнео.', 'good');
@@ -266,7 +286,7 @@ export function createResorts(deps) {
   function grant(prefer, ext = 'hotel') {
     const S = deps.S(); S.resortsOpen = true;
     const order = [...prefer, ...RESORTS.map(r => r.id).filter(id => !prefer.includes(id))];
-    let r = order.map(R).find(r => { const s = st()[r.id]; return !s || s.stage === 'sold' || s.stage === 'land'; });
+    let r = order.map(R).find(r => { const s = st()[r.id]; return !r.need && (!s || s.stage === 'sold' || s.stage === 'land'); });
     if (r) st()[r.id] = { stage: 'built', since: S.day, earned: 0, ext: EXTRAS[ext].kinds.includes(r.kind) ? { [ext]: true } : {} };
     else { r = order.map(R).find(r => { const s = st()[r.id]; return s.stage === 'built' && !(s.ext || {})[ext] && EXTRAS[ext].kinds.includes(r.kind); }); if (r) st()[r.id].ext = { ...(st()[r.id].ext || {}), [ext]: true }; }
     if (r && deps.onExtDone && ext) deps.onExtDone(ext);

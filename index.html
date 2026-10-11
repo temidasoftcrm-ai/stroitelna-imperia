@@ -135,6 +135,7 @@
   #mapSvg.wide .hqico { font-size:22px; }
   #mapSvg .city text { font-size:10px; font-weight:700; fill:#1f2a19; paint-order:stroke; stroke:#ffffffcc; stroke-width:3px; }
   #mapSvg .city circle.hit { fill:transparent; stroke:none; }
+  #mapSvg .city circle.keyc { fill:#ffc61a; stroke:#7a5a00; }   /* големите и важните градове */
   #mapSvg .city:hover circle.hit { fill:transparent; }
   #mapSvg .city.hq circle { fill:var(--acc); stroke:#7a4b00; stroke-width:2; }
   #mapSvg .city.done circle:not(.hit) { fill:#4cd07d; stroke:#1d7a43; stroke-width:2; }
@@ -143,6 +144,10 @@
   #mapSvg .hqico { font-size:18px; pointer-events:none; }
   /* надписите се свиват при приближаване (--ls идва от game.js: mapLS) */
   #mapSvg .city text { font-size:calc(10px * var(--ls, 1)); stroke-width:calc(3px * var(--ls, 1)); }
+  #mapSvg g.city polygon.gstar { fill:#ffcc1a; stroke:#7a5a00; pointer-events:none; }   /* ★ световни центрове (вместо кръгче) */
+  #mapSvg .city:hover polygon.gstar { fill:var(--acc); }
+  #mapSvg .city.hq polygon.gstar { fill:var(--acc); stroke:#7a4b00; }
+  #mapSvg .city.done polygon.gstar { fill:#4cd07d; stroke:#1d7a43; }
   #mapSvg .city.hq text { font-size:calc(12px * var(--ls, 1)); }
   #mapSvg.wide .city text { font-size:calc(16px * var(--ls, 1)) !important; stroke-width:calc(4px * var(--ls, 1)); }
   #mapSvg.eu .city text { font-size:calc(46px * var(--ls, 1)) !important; stroke-width:calc(10px * var(--ls, 1)); }

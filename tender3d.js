@@ -260,6 +260,66 @@ export function buildAirTerminal(group, deps, opts = {}) {
   return { group: g, setProg, update, dispose: () => group.remove(g) };
 }
 
+// ---------------------------------------------------------------- Суецкият канал: нов паралелен ръкав
+// opts.ext = [W, D]: каналът върви по z през целия парцел; по време на строежа — изкоп, водата идва накрая; после минават кораби
+export function buildCanal(group, deps, opts = {}) {
+  const g = new THREE.Group(); g.position.set(opts.x || 0, 0, opts.z || 0); g.rotation.y = opts.rot || 0; g.scale.setScalar(opts.scale || 1); group.add(g);
+  const ext = opts.ext || [26, 34], [W, D] = ext, CW = W * 0.42, site = fencedDirt(g, ext);
+  const sand = mat(0xe2c98f, 1), stone = mat(0xbfae8a, 0.9), dark = mat(0x7a5c3e, 1);
+  // пясъчни брегове и каменни откоси (винаги — изкопът ги разкрива)
+  const banks = new THREE.Group(); g.add(banks);
+  for (const sd of [-1, 1]) {
+    box((W - CW) / 2 - 0.5, 0.35, D, sand, sd * (CW / 2 + (W - CW) / 4 + 0.25), 0.17, 0, banks);
+    const slope = box(1.4, 0.9, D, stone, sd * (CW / 2 + 0.3), 0.15, 0, banks); slope.rotation.z = sd * 0.5;
+  }
+  const bed = box(CW, 0.3, D, dark, 0, 0.12, 0, g);
+  // водата — пълни се отпред назад в края на строежа
+  const waterM = new THREE.MeshStandardMaterial({ color: 0x2f86c8, roughness: 0.15, metalness: 0.15 });
+  const water = new THREE.Mesh(new THREE.BoxGeometry(CW + 0.6, 0.3, D), waterM); water.position.y = 0.2; g.add(water);
+  // мостът „Мубарак“ (вантов): два пилона и висока пътна плоча над канала
+  const done = new THREE.Group(); g.add(done);
+  const bz = -D * 0.18, pyl = mat(0xe8e2d4, 0.6), cab = new THREE.LineBasicMaterial({ color: 0xdddddd });
+  box(W, 0.5, 2.2, mat(0x9a9ea3, 0.8), 0, 5.2, bz, done);
+  for (const sd of [-1, 1]) { box(0.8, 11, 0.8, pyl, sd * (CW / 2 + 1.2), 5.5, bz, done); for (let k = 1; k <= 4; k++) for (const dd of [-1, 1]) {
+    const P = [new THREE.Vector3(sd * (CW / 2 + 1.2), 10.5, bz), new THREE.Vector3(sd * (CW / 2 + 1.2) - sd * k * 1.6 * (dd > 0 ? 1 : -1) * (dd > 0 ? 1 : -1) * dd, 5.4, bz)];
+    done.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(P), cab)); } }
+  // фар и сграда на канала (Порт Саид) в далечния край
+  const lh = new THREE.Group(); lh.position.set(CW / 2 + 3, 0, D / 2 - 3); done.add(lh);
+  cyl(0.9, 1.2, 9, mat(0xf4f1e8, 0.6), 0, 4.5, 0, lh, 10); for (let k = 0; k < 3; k++) cyl(1.21, 1.21, 0.8, mat(0x1d1d1d, 0.7), 0, 2 + k * 2.5, 0, lh, 10);
+  const lamp = mat(0xfff2c0, 0.4, 0, 0xffe080); cyl(0.7, 0.7, 1, lamp, 0, 9.5, 0, lh, 8);
+  const hq = new THREE.Group(); hq.position.set(-CW / 2 - 4, 0, D / 2 - 5); done.add(hq);
+  box(5, 3.5, 4, mat(0xf2eadb, 0.7), 0, 1.75, 0, hq); for (const dx of [-1.6, 0, 1.6]) { const d = new THREE.Mesh(new THREE.SphereGeometry(0.9, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), mat(0x3f8f6a, 0.5, 0.3)); d.position.set(dx, 3.5, 0); hq.add(d); }
+  for (const [x, z] of [[-W / 2 + 1.5, -D / 2 + 3], [W / 2 - 1.5, -D / 2 + 6], [-W / 2 + 1.5, 4], [W / 2 - 1.5, -2]]) { cyl(0.15, 0.2, 3, mat(0x7a5a3a), x, 1.5, z, done, 6); const fr = new THREE.Mesh(new THREE.ConeGeometry(1.4, 0.8, 7), mat(0x3f7f3a)); fr.position.set(x, 3.1, z); done.add(fr); }
+  // корабите, които минават (контейнеровоз от моделите на пристанищата, иначе кутия)
+  const ships = [];
+  const mkShip = (k, dir) => { const s0 = new THREE.Group(); box(CW * 0.42, 1.4, D * 0.22, mat(0xb03a2e, 0.6), 0, 0.7, 0, s0); for (let i = 0; i < 6; i++) box(CW * 0.36, 0.9, D * 0.025, mat([0xd62828, 0x1f5fbf, 0x2d8f4e, 0xffb300][i % 4], 0.6), 0, 1.85, -D * 0.08 + i * D * 0.03, s0); box(CW * 0.34, 1.6, D * 0.03, mat(0xf2f2f2, 0.6), 0, 2.2, -D * 0.1, s0);
+    s0.position.set(dir * CW * 0.18, 0.15, 0); s0.rotation.y = dir > 0 ? 0 : Math.PI; done.add(s0); ships.push({ o: s0, dir, ph: k }); return s0; };
+  mkShip(0, 1); mkShip(0.5, -1);
+  loadShipModels().then(() => { if (!hasShipModel('container')) return;
+    for (const sh of ships) { const o = shipModel('container'); o.updateMatrixWorld(true); let bb = new THREE.Box3().setFromObject(o), sz = bb.getSize(new THREE.Vector3());
+      const w = new THREE.Group(); w.add(o); if (sz.x > sz.z) { o.rotation.y = Math.PI / 2; } w.updateMatrixWorld(true); bb = new THREE.Box3().setFromObject(w); sz = bb.getSize(new THREE.Vector3());
+      w.scale.setScalar(D * 0.26 / sz.z); w.updateMatrixWorld(true); bb = new THREE.Box3().setFromObject(w); const c = bb.getCenter(new THREE.Vector3()); o.position.x -= c.x / w.scale.x; o.position.z -= c.z / w.scale.x;
+      const holder = new THREE.Group(); holder.add(w); w.position.y = -bb.min.y - (bb.max.y - bb.min.y) * 0.12; holder.position.copy(sh.o.position); holder.rotation.y = sh.o.rotation.y; done.remove(sh.o); done.add(holder); sh.o = holder; } });
+  const sign = deps.label ? deps.label(opts.sign || '⚓ СУЕЦКИ КАНАЛ', '#ffe9a8', 16) : null;
+  if (sign) { sign.position.set(0, 14, bz); g.add(sign); }
+  const kit = siteKit(g, CW, 3, D * 0.5);
+  let prog = -1;
+  function setProg(p) {
+    p = Math.max(0, Math.min(1, p)); if (p === prog) return; prog = p;
+    const dig = Math.min(1, p / 0.7); bed.scale.z = Math.max(0.02, dig); bed.position.z = -D / 2 * (1 - dig);
+    const fill = Math.max(0, (p - 0.7) / 0.3); water.visible = fill > 0 || p >= 1; water.scale.z = Math.max(0.02, p >= 1 ? 1 : fill); water.position.z = -D / 2 * (1 - water.scale.z);
+    kit.kit.visible = p < 1; kit.scaf.visible = false; banks.visible = true;
+    if (sign) sign.visible = p >= 1; done.visible = p >= 1; site.show(p < 1);
+  }
+  function update(t, night = 0) {
+    site.glow(0.05 + 0.5 * night); lamp.emissiveIntensity = 0.2 + 2 * night;
+    if (prog < 1) { kit.jib.rotation.y = Math.sin(t * 0.25) * 1.2; return; }
+    for (const sh of ships) { const u = ((t * 0.02 + sh.ph) % 1); sh.o.position.z = sh.dir * (-D / 2 - D * 0.15 + u * (D * 1.3)); sh.o.visible = Math.abs(sh.o.position.z) < D / 2 + D * 0.1; }
+  }
+  setProg(opts.prog ?? 0);
+  return { group: g, setProg, update, dispose: () => group.remove(g) };
+}
+
 // ---------------------------------------------------------------- национална болница
 const glbs = {};
 const loadGlb = url => glbs[url] || (glbs[url] = new Promise(res => new GLTFLoader().load(url, g => res(g.scene), undefined, () => res(null))));
