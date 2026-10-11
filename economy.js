@@ -17,7 +17,7 @@ export const UNIT_TYPES = {
   marker:  { nm: 'Маркировъчна машина', ico: '〰️', cost: 22000, upkeep: 90, road: true, desc: 'Боядисва маркировката и слага мантинели.' },
 };
 
-export const START = { money: 30000, units: ['crew', 'loader', 'truck'] };
+export const START = { money: 20000, units: ['crew', 'loader', 'truck'] };
 export const FUEL_PER_M = 0.04;            // € на метър път
 export const LOAN_STEP = 50000;
 export const LOAN_DAILY_RATE = 0.003;      // 0.3% на ден

@@ -257,6 +257,7 @@ export function createResorts(deps) {
         econ.earn(inc, 'курорти', `${r.nm}: наеми (${monthName(day).toLowerCase()})`);
         s.earned = (s.earned || 0) + inc; s.season = (s.season || 0) + inc;
         week.tot += inc; week.parts[r.nm] = (week.parts[r.nm] || 0) + inc;
+        S.resortMon = (S.resortMon || 0) + inc;
       }
       // край на сезона (за балнео — всеки месец): голямо съобщение колко е спечелено
       const spaMonth = r.kind === 'spa' && on && day % DAYS_PER_MONTH === 0;
@@ -272,6 +273,8 @@ export function createResorts(deps) {
     if (startList.length) deps.toast(`${startList[0].kind === 'winter' ? '❄️ Започна ски сезонът' : '☀️ Започна летният сезон'}! ${startList.map(r => r.nm).join(', ')} вече носят наеми — ~${deps.fmt(startList.reduce((a, r) => a + Math.round(r.month * mulOf(st()[r.id]) / DAYS_PER_MONTH), 0))} €/ден.`, 'good');
     // седмичен отчет през сезона
     S.resortWeek = week;
+    // края на месеца (30 дни): голяма картинка с прихода от курортите за месеца
+    if (day % DAYS_PER_MONTH === 0) { const m = S.resortMon || 0; S.resortMon = 0; if (m > 0 && deps.onMonth) deps.onMonth(m, monthName(day)); }
     if (day % 7 === 0 && week.tot > 0) {
       deps.toast(`🏔️ Курортите тази седмица: +${deps.fmt(week.tot)} € (${Object.entries(week.parts).map(([n, v]) => `${n} +${deps.fmt(v)}`).join(', ')})`, 'good');
       S.resortWeek = { tot: 0, parts: {} };

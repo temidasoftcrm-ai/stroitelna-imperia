@@ -158,11 +158,11 @@ export function createCityPanel(deps) {
       }).join('')}</div>`;
     }
     if (!here && (c.autoLog || []).length) h += `<div class="meta" style="margin-top:4px">✅ Последно: ${c.autoLog.slice(0, 3).map(x => `${x.t} (+${f(x.a)} €)`).join(' · ')}</div>`;
-    // „🏁 Завърши града“ — само когато градът е готов (квартали, свободни парцели ≤ 1, пазарен дял ≥ 60%)
-    const fs = deps.finishState(id), okExt = fs.ext >= fs.need, okFree = fs.free != null && fs.free <= 1, okSh = fs.share >= 0.6;
+    // „🏁 Завърши града“ — само когато градът е готов (квартали, свободни парцели ≤ 1, при важните градове 0, пазарен дял ≥ 60%)
+    const fs = deps.finishState(id), okExt = fs.ext >= fs.need, okFree = fs.free != null && fs.free <= (fs.freeMax ?? 1), okSh = fs.share >= 0.6;
     const canFin = here ? deps.canFinishHere() : okExt && okFree && okSh && fs.air !== false;
     const ck = ok => ok ? '✅' : '⬜';
-    if (!canFin) h += `<div class="meta" style="margin:6px 0 0">🏁 За завършване: ${ck(okExt)} квартали ${fs.ext}/${fs.need} · ${ck(okFree)} свободни парцели ${fs.free == null ? '? (влез веднъж в града)' : `${fs.free} (най-много 1)`} · ${ck(okSh)} пазарен дял ${Math.round(fs.share * 100)}% (поне 60%)${fs.airNeed ? ` · ${ck(fs.air)} ✈️ летище` : ''}</div>`;
+    if (!canFin) h += `<div class="meta" style="margin:6px 0 0">🏁 За завършване: ${ck(okExt)} квартали ${fs.ext}/${fs.need} · ${ck(okFree)} свободни парцели ${fs.free == null ? '? (влез веднъж в града)' : `${fs.free} (най-много ${fs.freeMax ?? 1})`} · ${ck(okSh)} пазарен дял ${Math.round(fs.share * 100)}% (поне 60%)${fs.airNeed ? ` · ${ck(fs.air)} ✈️ летище` : ''}</div>`;
     // 📦 складът: автоматичното пълнене се включва и оттук (всеки град има свое — c.autoFill)
     if (!(c.autoFill && c.autoFill.on)) h += `<div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0 auto 0 0">📦 Склад: <span class="late">автоматичното пълнене е изключено</span></span><button class="btn2" data-cpaf="${id}" title="Складът сам поръчва ТИР-ове с материали (до 50 000 € на ден)">🔄 Включи</button></div>`;
     // 🏘️ нови квартали — купуват се и оттук, без да влизаш в града

@@ -70,7 +70,28 @@ export const Sound = {
     const a = this.files[src] = this.files[src] || new Audio(src);
     a.volume = vol; a.currentTime = 0; a.play().catch(() => {});
   },
+  // мелодии за големите моменти (синтез, без файлове): ns — [честота, начало, продължителност], tp — тембър
+  brass(fs, at, dur, vol = 0.05) { const ctx = this.ctx; for (const f of fs) { const t = ctx.currentTime + at, o = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = ctx.createGain(); o.type = 'sawtooth'; o.frequency.value = f; lp.type = 'lowpass'; lp.frequency.setValueAtTime(500, t); lp.frequency.linearRampToValueAtTime(2400, t + 0.15); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.06); g.gain.setValueAtTime(vol, t + dur * 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); o.connect(lp); lp.connect(g); g.connect(this.master); o.start(t); o.stop(t + dur + 0.05); } },
+  bell(f, at, vol = 0.12) { for (const [m, v] of [[1, 1], [2.76, 0.4], [5.4, 0.15]]) this.tone(f * m, 1.4 / m + 0.2, vol * v, 'sine', null, at); },
+  drum(at, vol = 0.4) { this.tone(140, 0.25, vol, 'sine', 55, at); this.hit(900, 0.06, vol * 0.4, 1.5, at); },
+  jingle(name) {
+    const B = (fs, at, d, v) => this.brass(fs, at, d, v), T = (f, at, d = 0.18, v = 0.12, tp = 'triangle') => this.tone(f, d, v, tp, null, at);
+    switch (name) {
+      case 'offer': this.bell(1047, 0); this.bell(1319, 0.14, 0.09); break;                                  // нова оферта/търг — звънче
+      case 'branch': [0, 0.16, 0.32].forEach(t => this.drum(t, 0.3)); [392, 523, 659].forEach((f, i) => T(f, 0.48 + i * 0.12, 0.22)); B([523, 659, 784], 0.84, 0.7); break;   // нов филиал — кратък марш
+      case 'cityDone': this.drum(0, 0.45); B([392, 494, 587], 0, 0.35); B([440, 554, 659], 0.38, 0.35); B([523, 659, 784, 1047], 0.76, 1.6, 0.06); [1568, 2093, 2637].forEach((f, i) => this.bell(f, 0.8 + i * 0.12, 0.05)); this.drum(0.76, 0.5); break;   // завършен град — голяма фанфара
+      case 'tenderDone': this.bell(784, 0); this.bell(1047, 0.18); this.bell(1319, 0.36); B([523, 659, 784], 0.6, 1.2, 0.05); this.drum(0.6, 0.4); break;   // предадена държавна поръчка — камбани + акорд
+      case 'country': [0, 0.3, 0.6, 0.75, 0.9].forEach(t => this.drum(t, 0.35)); B([392, 494, 587], 0, 0.55); B([523, 659, 784], 0.6, 0.55); B([587, 740, 880], 1.2, 0.55); B([784, 988, 1175, 1568], 1.8, 2, 0.06); this.drum(1.8, 0.6); [2093, 2637, 3136].forEach((f, i) => this.bell(f, 1.85 + i * 0.1, 0.05)); break;   // завладяна държава — химн
+      case 'airport': this.tone(220, 1.6, 0.06, 'sawtooth', 880); this.hit(3000, 1.2, 0.05, 0.6, 0.1); this.bell(1319, 1.1, 0.08); this.bell(1760, 1.3, 0.06); break;   // летище — излитане и сигнал
+      case 'plane': this.tone(180, 1.4, 0.05, 'sawtooth', 620); this.hit(2500, 1.1, 0.05, 0.5); break;
+      case 'ship': [131, 165].forEach(f => this.tone(f, 1.6, 0.08, 'sawtooth')); break;   // корабна сирена
+      case 'quest': [1047, 1319, 1568, 2093].forEach((f, i) => T(f, i * 0.06, 0.25, 0.08)); break;
+      default: return false;
+    }
+    return true;
+  },
   play(name) {
+    if (this.ctx && !this.muted && this.jingle(name)) return;
     if (name === 'levelup') {   // „та-даа“ + мелодия (Kenney Music Jingles, CC0)
       this.tada();
       setTimeout(() => this.file('assets/sfx/levelup.ogg', 0.8), 650);

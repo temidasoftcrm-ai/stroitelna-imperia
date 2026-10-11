@@ -61,8 +61,9 @@ export const TENDERS = [
 export const BID_MS = [0.75, 0.8, 0.85, 0.9, 0.95, 1, 1.05];
 export const ADVANCE = 0.2, LATE_PEN = 0.005, OPEN_DAYS = 7;
 // гаранция за участие: 20% от бюджета се блокира при подаване на оферта; връща се на загубилите при отварянето
-// на офертите, а на спечелилия — при предаването на обекта. Закъснение над BOND_LOST дни — гаранцията се губи.
-export const BOND = 0.2, BOND_LOST = 30;
+// на офертите, а на спечелилия — при предаването на обекта. Закъснение над BOND_LOST дни — договорът се разваля и гаранцията се губи.
+// При закъснение: 🚀 подизпълнител (+10% напредък срещу пари), 📝 анекс (+60 дни срок, до 2 пъти), ✋ доброволен отказ.
+export const BOND = 0.2, BOND_LOST = 200, PEN_MAX = 0.3, ANNEX_DAYS = 60, ANNEX_MAX = 2, BOOST = 0.1;
 export const bondOf = t => Math.round(t.budget * BOND / 10000) * 10000;
 const T = id => TENDERS.find(t => t.id === id);
 
@@ -102,12 +103,48 @@ export function createTenders(deps) {
     } else {
       Object.assign(s, { st: 'lost', lostDay: day(), winner: w.nm, winM: w.m, result: all.map(x => [x.nm, x.m]) });
       refund(t, s);
+      if (s.my && deps.pop) deps.pop('tender-lost', `${t.ico} ${t.nm}`, `Спечели ${w.nm} с ${Math.round(w.m * 100)}% (ти: ${Math.round(s.my * 100)}%) · гаранцията се връща`);
       if (s.my) deps.toast(`🏛️ Търгът „${t.nm}“ го спечели ${w.nm} с ${Math.round(w.m * 100)}% от бюджета (ти: ${Math.round(s.my * 100)}%). Гаранцията ти се връща.`, 'bad');
     }
   }
   // колко от нужната техника има в града: 0…1 (най-слабото звено)
   const fleetRatio = t => { const f = deps.fleetIn(t.city) || {}; return Math.min(1, ...Object.entries(t.need).map(([k, n]) => (f[k] || 0) / n)); };
   const missing = t => { const f = deps.fleetIn(t.city) || {}; return Object.entries(t.need).filter(([k, n]) => (f[k] || 0) < n).map(([k, n]) => [k, n - (f[k] || 0)]); };
+
+  // краен срок преди разваляне (за стари записи, вече над прага — още 30 дни отсрочка)
+  const cancelAt = s => s.cancelAt ?? (s.cancelAt = Math.max(s.due + BOND_LOST, day() + 30));
+  const penOf = s => Math.min(Math.round(s.price * PEN_MAX), Math.round(s.price * LATE_PEN * Math.max(0, day() - s.due)));
+  const boostCost = t => Math.round(t.budget * t.matShare * BOOST * 1.6 / 10000) * 10000;   // материали + надценка на подизпълнителя
+  const annexCost = s => Math.round(s.price * 0.03 / 10000) * 10000;
+  function cancel(t, voluntary = false) {
+    const s = st()[t.id], S = deps.S(); if (!s || s.st !== 'building') return;
+    const lost = (s.bond || 0) + (s.bondLost || 0), dr = voluntary ? 0.3 : 0.5;
+    if (s.bond) { s.bondLost = s.bond; s.bond = 0; }
+    Object.assign(s, { st: 'lost', lostDay: day(), winner: voluntary ? 'ти се отказа от договора' : 'договорът е развален заради закъснението', winM: 0, cancelled: true });
+    S.rep = Math.max(0, (S.rep || 0) - dr);
+    deps.toast(`❌ ${t.ico} ${t.nm}: ${voluntary ? 'отказа се от договора' : `закъснение над ${BOND_LOST} дни — държавата развали договора`}. Гаранцията ${deps.fmt(lost)} € е загубена · −${dr} ★`, 'bad');
+    if (deps.sound) deps.sound('error');
+    if (deps.pop) deps.pop('tender-lost', `${t.ico} ${t.nm}`, voluntary ? `Отказа се от договора · гаранцията ${deps.fmt(lost)} € е загубена` : `Договорът е развален · гаранцията ${deps.fmt(lost)} € е загубена`);
+    if (deps.onCancel) deps.onCancel(t.id);
+    deps.save();
+  }
+  function boost(id) {
+    const t = T(id), s = st()[id]; if (!s || s.st !== 'building') return;
+    const c = boostCost(t);
+    if (!deps.econ().canAfford(c)) { deps.toast('Нямаш достатъчно пари за подизпълнителя.', 'bad'); return; }
+    deps.econ().spend(c, 'материали', `Подизпълнител: ${t.nm}`); s.spent += c;
+    s.prog = Math.min(0.999, s.prog + BOOST); if (deps.onProgress) deps.onProgress(t.id, s.prog);
+    deps.toast(`🚀 Подизпълнител пое част от „${t.nm}“: +${BOOST * 100}% (сега ${Math.round(s.prog * 100)}%).`, 'good'); deps.save();
+  }
+  function annex(id) {
+    const t = T(id), s = st()[id]; if (!s || s.st !== 'building' || (s.annex || 0) >= ANNEX_MAX) return;
+    const c = annexCost(s);
+    if (!deps.econ().canAfford(c)) { deps.toast('Нямаш достатъчно пари за анекса.', 'bad'); return; }
+    deps.econ().spend(c, 'глоба', `Анекс за срок: ${t.nm}`);
+    cancelAt(s); s.due += ANNEX_DAYS; s.cancelAt += ANNEX_DAYS; s.annex = (s.annex || 0) + 1;
+    deps.S().rep = Math.max(0, (deps.S().rep || 0) - 0.1);
+    deps.toast(`📝 Анекс за „${t.nm}“: срокът е удължен с ${ANNEX_DAYS} дни (до ден ${s.due}) · −${deps.fmt(c)} € · −0.1 ★`, 'good'); deps.save();
+  }
 
   function dailyTick() {
     const S = deps.S(); if (!S) return;
@@ -121,7 +158,11 @@ export function createTenders(deps) {
       const s = all[t.id]; if (!s) continue;
       if (s.st === 'open' && day() >= s.closes) close(t);
       else if (s.st === 'building') {
-        if (s.bond && day() > s.due + BOND_LOST) { deps.toast(`🔐 ${t.nm} закъснява над ${BOND_LOST} дни — държавата задържа гаранцията ти ${deps.fmt(s.bond)} €.`, 'bad'); s.bondLost = s.bond; s.bond = 0; }
+        if (day() > s.due) {
+          const left = cancelAt(s) - day();
+          if (left <= 0) { cancel(t); continue; }
+          if (left === 60 || left === 30 || left === 10) deps.toast(`⚠️ ${t.ico} ${t.nm} закъснява ${day() - s.due} дни — след ${left} дни държавата разваля договора и задържа гаранцията! Ускори с подизпълнител или поискай анекс.`, 'bad', deps.openWin);
+        }
         const r = fleetRatio(t); if (r <= 0) continue;
         const dp = Math.min(1 - s.prog, r / t.days);
         s.prog += dp;
@@ -129,7 +170,7 @@ export function createTenders(deps) {
         deps.econ().spend(mat, 'материали', `Материали: ${t.nm}`); s.spent += mat;
         if (deps.onProgress) deps.onProgress(t.id, s.prog);
         if (s.prog >= 1 - 1e-6) {
-          const late = Math.max(0, day() - s.due), pen = Math.round(s.price * LATE_PEN * late), rest = s.price - s.paidAdv - pen;
+          const late = Math.max(0, day() - s.due), pen = penOf(s), rest = s.price - s.paidAdv - pen;
           deps.econ().earn(rest, 'обект', `Предаден: ${t.nm}${pen ? ` (неустойка −${deps.fmt(pen)})` : ''}`);
           Object.assign(s, { st: 'done', doneDay: day(), profit: s.price - pen - s.spent - (s.bondLost || 0) });
           refund(t, s, `${t.nm} е предаден`);
@@ -173,20 +214,32 @@ export function createTenders(deps) {
       else if (s.st === 'building') { const miss = missing(t); body = `<div class="meta">Договор: <b style="color:var(--txt)">${deps.fmt(s.price)} €</b> · ${Math.round(s.prog * 100)}% · срок до ден ${s.due}${day() > s.due ? ' <span class="late">— закъснява!</span>' : ''}</div>
         <div class="bar"><i style="width:${(s.prog * 100).toFixed(1)}%"></i></div>
         ${s.bond ? `<div class="meta">🔐 Гаранция ${deps.fmt(s.bond)} € — връща се при предаването</div>` : s.bondLost ? `<div class="meta late">🔐 Гаранцията (${deps.fmt(s.bondLost)} €) е задържана заради закъснението</div>` : ''}
-        ${miss.length ? `<div class="meta late">⏸ Трябва техника в ${deps.cityName(t.city)}: ${miss.map(([k, n]) => `${ul(k)} ×${n}`).join(', ')}</div>` : ''}`; }
+        ${miss.length ? `<div class="meta late">⏸ Трябва техника в ${deps.cityName(t.city)}: ${miss.map(([k, n]) => `${ul(k)} ×${n}`).join(', ')}</div>` : ''}
+        ${day() > s.due ? (() => { const left = cancelAt(s) - day(), bc = boostCost(t), ac = annexCost(s), canA = (s.annex || 0) < ANNEX_MAX;
+          return `<div class="meta late">⚠️ Закъснява ${day() - s.due} д. · неустойка ${deps.fmt(penOf(s))} € (макс. ${PEN_MAX * 100}%) · <b>${left > 0 ? `договорът се разваля след ${left} д.` : 'договорът се разваля днес'}</b> и гаранцията се губи</div>
+          <div class="row" style="justify-content:flex-end;gap:6px;flex-wrap:wrap"><button class="btn" data-tboost="${t.id}" ${deps.econ().canAfford(bc) ? '' : 'disabled'} title="Подизпълнител поема 10% от работата">🚀 Подизпълнител +${BOOST * 100}% · ${deps.fmt(bc)} €</button>
+            <button class="btn2" data-tannex="${t.id}" ${canA && deps.econ().canAfford(ac) ? '' : 'disabled'} title="Удължава срока с ${ANNEX_DAYS} дни · −0.1 ★">📝 Анекс +${ANNEX_DAYS} дни · ${deps.fmt(ac)} €${canA ? '' : ' (изчерпан)'}</button>
+            <button class="btn2" data-tquit="${t.id}" title="Губиш гаранцията и 0.3 ★">✋ Откажи се</button></div>`; })() : ''}`; }
       else if (s.st === 'done') body = `<div class="meta" style="color:var(--ok)">✅ Предаден · печалба ${deps.fmt(s.profit)} €</div>`;
       else body = `<div class="meta late">Спечели ${s.winner} (${Math.round(s.winM * 100)}%).</div>`;
       out.push(`<div class="card tender-card"><h3><span class="ico">🏛️</span>${t.ico} ${t.nm}</h3><div class="meta">Държавна поръчка · ${deps.cityName(t.city)} · ${t.ds}</div>${body}</div>`);
     }
     return out.join('');
   }
-  function bind(el) { el.querySelectorAll('[data-tender]').forEach(b => b.onclick = () => openBid(b.dataset.tender)); el.querySelectorAll('[data-tshow]').forEach(b => b.onclick = () => deps.showCity(b.dataset.tshow)); }
+  function bind(el, redraw = deps.redraw) {
+    el.querySelectorAll('[data-tender]').forEach(b => b.onclick = () => openBid(b.dataset.tender)); el.querySelectorAll('[data-tshow]').forEach(b => b.onclick = () => deps.showCity(b.dataset.tshow));
+    const re = () => redraw && redraw();
+    el.querySelectorAll('[data-tboost]').forEach(b => b.onclick = () => { boost(b.dataset.tboost); re(); });
+    el.querySelectorAll('[data-tannex]').forEach(b => b.onclick = () => { annex(b.dataset.tannex); re(); });
+    el.querySelectorAll('[data-tquit]').forEach(b => b.onclick = () => { const t = T(b.dataset.tquit), s = st()[t.id];
+      deps.modal(`✋ Откажи се от „${t.nm}“?`, `Държавата задържа гаранцията ${deps.fmt((s.bond || 0) + (s.bondLost || 0))} € и губиш 0.3 ★ (при развален договор — 0.5 ★). Аванса не го връщаш.`, [['Не', null], ['✋ Откажи се', () => { cancel(t, true); re(); }]]); });
+  }
   function openBid(id) {
     const t = T(id), s = st()[id]; if (!s || s.st !== 'open') return;
     const rep = deps.rep(), lo = Math.min(...s.bids.map(b => b.m)), hi = Math.max(...s.bids.map(b => b.m));
     const rows = BID_MS.map(m => { const p = profitAt(t, m); return `<tr><td><b>${Math.round(m * 100)}%</b></td><td>${deps.fmt(Math.round(t.budget * m / 10000) * 10000)} €</td><td style="color:${p >= 0 ? 'var(--ok)' : 'var(--bad)'}">${p >= 0 ? '+' : ''}${deps.fmt(p)} €</td></tr>`; }).join('');
     deps.modal(`🏛️ ${t.nm}`, `${t.ds}<br><br>Бюджет на държавата: <b>${deps.fmt(t.budget)} €</b> · срок ${t.days} дни · аванс ${ADVANCE * 100}%.<br>
-      🔐 <b>Гаранция за участие ${deps.fmt(bondOf(t))} €</b> (${BOND * 100}% от бюджета) — ${s.bond ? 'вече е внесена' : 'взима се при подаване на офертата'}. Ако загубиш, се връща веднага; ако спечелиш — при предаването на обекта (при закъснение над ${BOND_LOST} дни я губиш).<br>
+      🔐 <b>Гаранция за участие ${deps.fmt(bondOf(t))} €</b> (${BOND * 100}% от бюджета) — ${s.bond ? 'вече е внесена' : 'взима се при подаване на офертата'}. Ако загубиш, се връща веднага; ако спечелиш — при предаването на обекта (при закъснение над ${BOND_LOST} дни договорът се разваля и я губиш).<br>
       Материалите струват ~${Math.round(t.matShare * 100)}% от бюджета, независимо от цената ти. Нужна техника в ${deps.cityName(t.city)}: ${Object.entries(t.need).map(([k, n]) => `${ul(k)} ×${n}`).join(', ')}.<br>
       Участват още ${s.bids.length} фирми (${s.bids.map(b => b.ico + ' ' + b.nm).join(', ')}). По слухове офертите им са между <b>${Math.round((lo - 0.04) * 100)}%</b> и <b>${Math.round((hi + 0.03) * 100)}%</b>. Печели най-ниската; твоите ${rep.toFixed(1)} ★ я правят с ${rep.toFixed(1)}% по-изгодна.
       <table style="width:100%;margin-top:8px;font-size:13px"><tr style="color:var(--mut)"><td>Оферта</td><td>Цена</td><td>Печалба (прибл.)</td></tr>${rows}</table>`,
