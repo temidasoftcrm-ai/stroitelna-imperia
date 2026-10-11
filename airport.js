@@ -170,7 +170,23 @@ export function buildAirport(group, deps, opts = {}) {
     n = Math.max(1, Math.min(7, n | 0)); if (n === lv) return; lv = n;
     const big = n; n = Math.min(5, n);   // ниво 6–7 (мега/световен хъб): терминалът е като на 5, плюс още хангари и самолети
     lvG.clear(); parked.length = 0; windows.length = 0;
-    const tLen = 40 + n * 22, tz = -tLen / 2 + 20;
+    const tLen = Math.min(40 + n * 22, 112), tz = -tLen / 2 + 20;   // до 112 — кулата в северния край остава на сушата (не над морето)
+    // още писти на изток (успоредни на главната): 2-ра от ниво 4, 3-та от ниво 6 — с маркировка, светлини и връзки към рулежката
+    { const extra = big >= 6 ? 2 : big >= 4 ? 1 : 0, wm = new THREE.MeshBasicMaterial({ color: 0xf2f2f2 }), asph = mat(0x2b2d31, 0.95), tw = mat(0x3a3d42, 0.95), em = mat(0xfff4c0, 0.4, 0, 0xffe080);
+      for (let k = 1; k <= extra; k++) {
+        const x = RW.x + k * 26, z0 = RW.z0 + 10 * k, z1 = RW.z1 - 10 * k;
+        flat(RW.w + 14, z1 - z0 + 20, mat(0x6f8f4e, 1), x, 0.016, (z0 + z1) / 2, lvG);   // трева под пистата (земята на летището е до x≈60)
+        flat(RW.w, z1 - z0, asph, x, 0.04, (z0 + z1) / 2, lvG);
+        for (let z = z0 + 22; z < z1 - 22; z += 12) flat(0.6, 6, wm, x, 0.06, z, lvG);
+        for (const zz of [z0 + 4, z1 - 4]) for (let q = -5; q <= 5; q += 2) if (q) flat(0.8, 7, wm, x + q * 0.6, 0.06, zz, lvG);
+        for (const sd of [-1, 1]) flat(0.3, z1 - z0, wm, x + sd * (RW.w / 2 - 0.6), 0.06, (z0 + z1) / 2, lvG);
+        for (let z = z0; z <= z1; z += 14) for (const sd of [-1, 1]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.4), em); l.position.set(x + sd * (RW.w / 2 + 0.6), 0.15, z); lvG.add(l); }
+        lights.push(em);
+        for (const z of [z0 + 14, -10, z1 - 14]) flat(26, 8, tw, x - 13, 0.036, z, lvG);   // връзки към предишната писта
+        // номер на пистата (09L/09R…) — бяла табела в края
+        box(4, 0.06, 2.4, wm, x, 0.07, z1 - 10, lvG);
+      }
+    }
     const wall = mat(0xd9dde2, 0.6, 0.1), glassM = mat(0x5f8fb8, 0.2, 0.3, 0xffd890), roof = mat(0x9aa3ad, 0.5, 0.5);
     const tk = n <= 2 ? 'term_s' : n === 3 ? 'term_m' : 'term_l';
     if (AIR[tk]) {   // истинският терминал (Sketchfab), вписан в мястото на процедурния: дългата страна по z, ширина до ~24
@@ -267,7 +283,7 @@ export function buildAirport(group, deps, opts = {}) {
   function setPos(x, z) { g.position.set(x, 0, z); }
   function dispose() { group.remove(g); }
   // за клик: дали точка (световни координати) е върху летището
-  const hit = (px, pz) => px > g.position.x - 30 && px < g.position.x + 60 && pz > g.position.z - 115 && pz < g.position.z + 120;
+  const hit = (px, pz) => px > g.position.x - 30 && px < g.position.x + 60 + (lv >= 6 ? 52 : lv >= 4 ? 26 : 0) && pz > g.position.z - 115 && pz < g.position.z + 120;
   const refresh = () => { const n = lv; lv = 0; setLevel(n); };   // след като се заредят терминалите
   return { group: g, update, setLevel, setPos, dispose, hit, refresh, get level() { return lv; } };
 }

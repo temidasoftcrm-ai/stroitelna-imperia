@@ -159,7 +159,9 @@ export function createCityPanel(deps) {
     }
     if (!here && (c.autoLog || []).length) h += `<div class="meta" style="margin-top:4px">✅ Последно: ${c.autoLog.slice(0, 3).map(x => `${x.t} (+${f(x.a)} €)`).join(' · ')}</div>`;
     // „🏁 Завърши града“ — само когато градът е готов (квартали, свободни парцели ≤ 1, при важните градове 0, пазарен дял ≥ 60%)
-    const fs = deps.finishState(id), okExt = fs.ext >= fs.need, okFree = fs.free != null && fs.free <= (fs.freeMax ?? 1), okSh = fs.share >= 0.6;
+    const fs = deps.finishState(id), bp = fs.built;
+    if (bp != null && !fin) h += `<div class="row" style="margin:6px 0 2px;gap:8px;align-items:center"><span class="meta" style="margin:0;white-space:nowrap">🏙️ Застроен <b style="color:var(--txt)">${bp}%</b></span><div class="bar" style="flex:1;height:6px;margin:0"><i style="width:${bp}%;background:linear-gradient(90deg,#3fae5a,#7dffa8)"></i></div></div>`;
+    const okExt = fs.ext >= fs.need, okFree = fs.free != null && fs.free <= (fs.freeMax ?? 1), okSh = fs.share >= 0.6;
     const canFin = here ? deps.canFinishHere() : okExt && okFree && okSh && fs.air !== false;
     const ck = ok => ok ? '✅' : '⬜';
     if (!canFin) h += `<div class="meta" style="margin:6px 0 0">🏁 За завършване: ${ck(okExt)} квартали ${fs.ext}/${fs.need} · ${ck(okFree)} свободни парцели ${fs.free == null ? '? (влез веднъж в града)' : `${fs.free} (най-много ${fs.freeMax ?? 1})`} · ${ck(okSh)} пазарен дял ${Math.round(fs.share * 100)}% (поне 60%)${fs.airNeed ? ` · ${ck(fs.air)} ✈️ летище` : ''}</div>`;
