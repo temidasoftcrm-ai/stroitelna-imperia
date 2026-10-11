@@ -15,8 +15,15 @@ export function mtnModel(k, w, h, rot = 0) {
   const src = MTN[k]; if (!src) return null;
   const o = src.clone(true), g = new THREE.Group(); g.add(o); o.rotation.y = rot; g.updateMatrixWorld(true);
   const bb = new THREE.Box3().setFromObject(o), sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3());
-  const kx = w / Math.max(sz.x, sz.z), ky = h / sz.y;
-  g.scale.set(kx, ky, kx); o.position.set(-c.x, -bb.min.y, -c.z);
+  // моделите са парчета терен с неравни ръбове: „земята“ е височината на ръба (80-и перцентил), не най-ниската точка —
+  // иначе ръбовете висят във въздуха. Под нея моделът потъва в тревата.
+  const ys = [], v = new THREE.Vector3();
+  o.traverse(m => { if (!m.isMesh) return; const P = m.geometry.attributes.position, step = Math.max(1, Math.floor(P.count / 20000));
+    for (let i = 0; i < P.count; i += step) { v.fromBufferAttribute(P, i).applyMatrix4(m.matrixWorld); if (Math.abs(v.x - c.x) > sz.x * 0.44 || Math.abs(v.z - c.z) > sz.z * 0.44) ys.push(v.y); } });
+  ys.sort((a, b) => a - b);
+  const ground = ys.length ? Math.min(bb.min.y + sz.y * 0.45, ys[Math.floor(ys.length * 0.8)]) : bb.min.y;
+  const kx = w / Math.max(sz.x, sz.z), ky = h / Math.max(1e-6, bb.max.y - ground);
+  g.scale.set(kx, ky, kx); o.position.set(-c.x, -ground, -c.z);
   g.traverse(m => { if (m.isMesh) { m.receiveShadow = true; m.castShadow = false; } });
   return g;
 }

@@ -7,6 +7,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 export const CITY_LANDMARKS = {
   istanbul: ['hagia', 'mosque', 'galata', 'sapphire', 'twist', 'twin', 'mosque2'],
   rome: ['colosseo', 'stpeter', 'pantheon', 'vittoriano'],
+  barcelona: ['sagrada'],
   paris: ['eiffel', 'arc', 'notredame', 'ladefense'],
   london: ['bigben', 'londoneye', 'towerbridge', 'shard'],
   berlin: ['brandenburg', 'fernsehturm', 'reichstag'],
@@ -15,7 +16,7 @@ export const CITY_LANDMARKS = {
   // истински модели от Sketchfab (GLB_LM по-долу)
   dubai: ['burj'], newyork: ['manhattan', 'liberty'], sydney: ['opera'], moscow: ['stbasil'], toronto: ['cntower'], chicago: ['willis'], shanghai: ['shtower'], rio: ['redeemer'],
 };
-export const LANDMARK_NM = { burj: 'Бурж Халифа', manhattan: 'Манхатън', liberty: 'Статуята на свободата', opera: 'Операта в Сидни', stbasil: 'Храмът „Св. Василий Блажени“', cntower: 'Си Ен Тауър', willis: 'Уилис Тауър', shtower: 'Шанхайската кула', redeemer: 'Христос Спасителя', mosque: 'Синята джамия', mosque2: 'Сюлейманийе', galata: 'Галатска кула', sapphire: 'Истанбул Сапфир', twist: 'Левент Туист', twin: 'Левент Туинс', colosseum: 'Колизеума', hagia: 'Света София', colosseo: 'Колизеума', vatican: 'Ватикана и „Св. Петър“', stpeter: 'Базилика „Св. Петър“', pantheon: 'Пантеона', vittoriano: 'Витториано', erasmus: 'Мостът Еразъм', cubes: 'Кубичните къщи', markthal: 'Маркетхал', derotterdam: 'Де Ротердам', euromast: 'Евромаст', canal: 'Канал с къщи', canal2: 'Канал с къщи', rijks: 'Райксмузеум', centraal: 'Централна гара', adam: 'A’DAM Лукаут', windmill: 'Вятърна мелница', eiffel: 'Айфеловата кула', arc: 'Триумфалната арка', notredame: 'Нотр Дам', ladefense: 'Ла Дефанс', bigben: 'Биг Бен', londoneye: 'Лондонското око', towerbridge: 'Тауър Бридж', shard: 'Шард', brandenburg: 'Бранденбургската врата', fernsehturm: 'Телевизионната кула', reichstag: 'Райхстагът' };
+export const LANDMARK_NM = { burj: 'Бурж Халифа', manhattan: 'Манхатън', liberty: 'Статуята на свободата', opera: 'Операта в Сидни', stbasil: 'Храмът „Св. Василий Блажени“', cntower: 'Си Ен Тауър', willis: 'Уилис Тауър', shtower: 'Шанхайската кула', redeemer: 'Христос Спасителя', mosque: 'Синята джамия', mosque2: 'Сюлейманийе', galata: 'Галатска кула', sapphire: 'Истанбул Сапфир', twist: 'Левент Туист', twin: 'Левент Туинс', colosseum: 'Колизеума', hagia: 'Света София', colosseo: 'Колизеума', sagrada: 'Саграда Фамилия', vatican: 'Ватикана и „Св. Петър“', stpeter: 'Базилика „Св. Петър“', pantheon: 'Пантеона', vittoriano: 'Витториано', erasmus: 'Мостът Еразъм', cubes: 'Кубичните къщи', markthal: 'Маркетхал', derotterdam: 'Де Ротердам', euromast: 'Евромаст', canal: 'Канал с къщи', canal2: 'Канал с къщи', rijks: 'Райксмузеум', centraal: 'Централна гара', adam: 'A’DAM Лукаут', windmill: 'Вятърна мелница', eiffel: 'Айфеловата кула', arc: 'Триумфалната арка', notredame: 'Нотр Дам', ladefense: 'Ла Дефанс', bigben: 'Биг Бен', londoneye: 'Лондонското око', towerbridge: 'Тауър Бридж', shard: 'Шард', brandenburg: 'Бранденбургската врата', fernsehturm: 'Телевизионната кула', reichstag: 'Райхстагът' };
 // кои стоят в центъра на града (останалите — в стария град извън центъра)
 export const LANDMARK_CENTER = new Set(['burj', 'manhattan', 'cntower', 'willis', 'shtower', 'eiffel', 'arc', 'bigben', 'shard', 'brandenburg', 'reichstag', 'ladefense', 'sapphire', 'twist', 'twin', 'colosseum', 'colosseo', 'vatican', 'vittoriano', 'derotterdam', 'markthal', 'cubes', 'canal', 'rijks', 'centraal']);
 
@@ -404,7 +405,25 @@ function eiffel() {
     if (!src) return;
     const m = src.clone(true), b = new THREE.Box3().setFromObject(m), k = 34 / (b.max.y - b.min.y);   // краката да се съберат в парцела (15 м)
     m.scale.setScalar(k); m.position.y = 0.3 - b.min.y * k;
-    m.traverse(o => { if (o.isMesh) { o.material = iron; o.castShadow = true; o.receiveShadow = true; } });
+    // нощем: топла светлина от прожекторите — най-силна долу, гасне нагоре, с ивици по решетката (не плосък жълт цвят)
+    const im = new THREE.MeshStandardMaterial({ color: 0x6b5a44, roughness: 0.55, metalness: 0.45, emissive: 0xffb860, emissiveIntensity: 0 });
+    m.updateMatrixWorld(true);
+    { const v = new THREE.Vector3(), H = b.max.y - b.min.y || 1;   // височината 0..1 на всеки връх (моделът може да е завъртян — меря в общото пространство)
+      m.traverse(o => { if (!o.isMesh || o.geometry.attributes.aH) return; const P = o.geometry.attributes.position, a = new Float32Array(P.count);
+        for (let i = 0; i < P.count; i++) a[i] = (v.fromBufferAttribute(P, i).applyMatrix4(o.matrixWorld).y - b.min.y) / H;
+        o.geometry.setAttribute('aH', new THREE.BufferAttribute(a, 1)); }); }
+    im.onBeforeCompile = sh => {
+      sh.vertexShader = sh.vertexShader.replace('void main() {', 'attribute float aH;\nvarying float vEH;\nvoid main() {').replace('#include <begin_vertex>', '#include <begin_vertex>\n  vEH = aH;');
+      sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'varying float vEH;\nvoid main() {').replace('#include <emissivemap_fragment>',
+        '#include <emissivemap_fragment>\n  float hh = clamp(vEH, 0.0, 1.0);\n  totalEmissiveRadiance *= (0.12 + 0.8 * pow(1.0 - hh, 2.2)) * (0.45 + 0.55 * smoothstep(-0.2, 0.9, sin(hh * 90.0)));');
+    };
+    m.traverse(o => { if (o.isMesh) { o.material = im; o.castShadow = true; o.receiveShadow = true; } });
+    g.userData.flood = [im];
+    // искрите (всеки час нощем в Париж) — бели точки по решетката, които примигват
+    const pts = []; m.traverse(o => { if (!o.isMesh) return; const P = o.geometry.attributes.position, step = Math.max(1, Math.floor(P.count / 260)); for (let i = 0; i < P.count; i += step) pts.push(P.getX(i), P.getY(i), P.getZ(i)); });
+    const sparks = [0, 1].map(k => { const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pts.filter((_, i) => Math.floor(i / 3) % 2 === k), 3));
+      const pm = new THREE.PointsMaterial({ color: 0xfff6e0, size: 0.45, sizeAttenuation: true, transparent: true, opacity: 0, depthWrite: false }); const o = new THREE.Points(geo, pm); m.add(o); return pm; });
+    g.userData.sparkle = (t, night) => { const on = night > 0.5 && (t % 60) < 12; sparks.forEach((pm, k) => { pm.opacity = on ? (Math.sin(t * 17 + k * 2.1) > 0 ? 1 : 0.15) : 0; }); };
     for (const o of simple) if (o !== beacon) o.visible = false;
     beacon.position.y = 34.6; g.add(m);
   });
@@ -539,6 +558,7 @@ const GLB_LM = {
   liberty: { h: 22, fit: 13, plate: 0x7d9a6a }, redeemer: { h: 18, fit: 14, plate: 0x6f8f55 }, stbasil: { h: 20, fit: 15, plate: 0xb9b0a3 },
   opera: { h: 30, fit: 40, plate: 0x4f86b8 }, manhattan: { h: 34, fit: 15, grid: true },
   colosseo: { h: 13, fit: 15, plate: 0xb9ad98 },   // Рим: Колизеумът (Carlos.Maciel)
+  sagrada: { h: 17, fit: 15, plate: 0xc9bfa8 },   // Барселона: Саграда Фамилия (vmmaniac)
 };
 const glbCache = {};
 function loadLm(kind) {
@@ -597,12 +617,14 @@ export function buildLandmark(kind, deps = {}) {
     const box3 = new THREE.Box3().setFromObject(g), s = deps.label(LANDMARK_NM[kind], '#ffe9a8', 10);
     s.position.set(0, box3.max.y + 4, 0); s.visible = false; g.add(s); g.userData.sign = s;
   }
-  const flood = g.userData.flood || [], lit = g.userData.lit || [], glass = g.userData.glass || [], blink = g.userData.blink || [];
+  const lit0 = g.userData;
+  const flood = { get length() { return (lit0.flood || []).length; }, [Symbol.iterator]() { return (lit0.flood || [])[Symbol.iterator](); } }, lit = g.userData.lit || [], glass = g.userData.glass || [], blink = g.userData.blink || [];
   function update(t, night = 0) {
     for (const m of lit) m.emissiveIntensity = 0.1 + 1.6 * night;
     for (const m of flood) m.emissiveIntensity = (m.emissiveMap ? 0.55 : 0.28) * night;
     for (const m of glass) m.emissiveIntensity = 0.02 + 1.1 * night;
     for (const m of blink) m.emissiveIntensity = (Math.sin(t * 3) > 0.5 ? 2 : 0.2) * (0.3 + night);
+    if (g.userData.sparkle) g.userData.sparkle(t, night);
     if (g.userData.spin) g.userData.spin.rotation.z = t * (g.userData.spinAxis ? 0.05 : 0.6);
   }
   return { group: g, update };

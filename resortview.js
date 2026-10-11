@@ -132,6 +132,54 @@ function skierMesh(jacket, helmet, seed) {
   p.traverse(m => { if (m.isMesh) m.castShadow = true; });
   return p;
 }
+// забележителности на конкретни курорти (Sketchfab, CC-BY; виж CREDITS.txt): url, без кои материали (морето от модела),
+// side — най-голямата хоризонтална мярка в метри, at — място, rot — завъртане, y — височина на основата
+const RESORT_LM = {
+  dubrovnik: [
+    { url: 'assets/heavy/resort/grebeni.glb', skip: /^more_/, side: 110, at: [-150, -175], rot: 0.4, y: -1.2 },   // фарът на остров Гребени
+    { url: 'assets/heavy/resort/dubrovnik.glb', skip: /^material$/, side: 62, at: [-150, 55], rot: -0.6, y: -3 },   // старият град: каменни къщи с червени покриви и кафене
+  ],
+};
+const lmCache = {};
+const loadGlbR = url => lmCache[url] || (lmCache[url] = new Promise(res => new GLTFLoader().load(url, gl => res(gl.scene), undefined, () => res(null))));
+// яхтите в марината (Sketchfab, CC-BY): дължина len (по x), sink — колко от височината на корпуса е под водата
+const YACHTS = {
+  superyacht: { url: 'assets/heavy/marina/superyacht.glb', sink: 0.1 },
+  sportyacht: { url: 'assets/heavy/marina/sportyacht.glb', sink: 0.2 },
+  motoryacht: { url: 'assets/heavy/marina/motoryacht.glb', sink: 0.2, skip: /^water/ },
+  sailboat: { url: 'assets/heavy/marina/sailboat.glb', sink: 0.06 },
+};
+function yacht(k, len, onReady) {
+  const Y = YACHTS[k], g = new THREE.Group();
+  loadGlbR(Y.url).then(src => {
+    if (!src) return;
+    const o = src.clone(true), drop = [];
+    o.traverse(m => { if (!m.isMesh) return; if (Y.skip && Y.skip.test(m.material?.name || '')) drop.push(m); else m.castShadow = true; });
+    drop.forEach(m => m.parent.remove(m));
+    const w = new THREE.Group(); w.add(o); let bb = new THREE.Box3().setFromObject(w), sz = bb.getSize(new THREE.Vector3());
+    if (sz.z > sz.x) { w.rotation.y = Math.PI / 2; bb = new THREE.Box3().setFromObject(w); sz = bb.getSize(new THREE.Vector3()); }
+    const k2 = len / sz.x; w.scale.setScalar(k2); bb = new THREE.Box3().setFromObject(w); const c = bb.getCenter(new THREE.Vector3());
+    // водолинията: за платноходката — по корпуса (без мачтата), иначе част от височината
+    const hullH = k === 'sailboat' ? (bb.max.y - bb.min.y) * 0.12 : bb.max.y - bb.min.y;
+    w.position.set(-c.x, -bb.min.y - hullH * Y.sink, -c.z); g.add(w); onReady && onReady(g);
+  });
+  return g;
+}
+function addResortLm(g, id) {
+  for (const L of RESORT_LM[id] || []) {
+    (lmCache[L.url] = lmCache[L.url] || new Promise(res => new GLTFLoader().load(L.url, gl => res(gl.scene), undefined, () => res(null)))).then(src => {
+      if (!src) return;
+      const o = src.clone(true), drop = [];
+      o.traverse(m => { if (!m.isMesh) return; if (L.skip && L.skip.test(m.material?.name || '')) drop.push(m); else { m.castShadow = m.receiveShadow = true; } });
+      drop.forEach(m => m.parent.remove(m));
+      const w = new THREE.Group(); w.add(o);
+      const bb = new THREE.Box3().setFromObject(w), sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3());
+      o.position.set(-c.x, -bb.min.y, -c.z); w.scale.setScalar(L.side / Math.max(sz.x, sz.z));
+      w.position.set(L.at[0], L.y || 0, L.at[1]); w.rotation.y = L.rot || 0; g.add(w);
+    });
+  }
+}
+
 export function buildResortView(A, r, st, season, deps) {
   const g = new THREE.Group(), rand = rnd(7 + r.id.length * 131);
   const summer = r.kind === 'summer', spa = r.kind === 'spa', inSeason = spa || season === r.kind, snowy = r.kind === 'winter' && inSeason;
@@ -442,6 +490,30 @@ export function buildResortView(A, r, st, season, deps) {
     for (let k = 0; k < 10; k++) { const c = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.1, 1.1), mat(0x2b6fff)); l.add(c); anim.chairs.push({ c, u: k / 10, a: a.clone().add(new THREE.Vector3(0, 10, 0)), b: b.clone().add(new THREE.Vector3(0, 10, 0)) }); }
     l.position.set(plot.x - 45, 0, plot.z - 50); return l;
   });
+  // ⛵ яхтено пристанище: дървен кей навътре в морето с понтони, яхти по местата и голяма яхта в края
+  if (summer) extra('marina', () => {
+    const m = new THREE.Group(), X = 150, wood = mat(0x9a7350), post = mat(0x5e4a36), z0 = -46, z1 = -150;
+    const main = new THREE.Mesh(new THREE.BoxGeometry(5, 0.6, z0 - z1), wood); main.position.set(X, 0.5, (z0 + z1) / 2); main.receiveShadow = true; m.add(main);
+    const tee = new THREE.Mesh(new THREE.BoxGeometry(70, 0.6, 5), wood); tee.position.set(X, 0.5, z1); m.add(tee);
+    for (let z = z0 - 6; z > z1; z -= 8) for (const sx of [-2.6, 2.6]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 4), post); p.position.set(X + sx, -1, z); m.add(p); }
+    anim.moored = anim.moored || [];
+    const boats = ['sportyacht', 'motoryacht', 'sailboat', 'sportyacht', 'motoryacht', 'sailboat', 'motoryacht', 'sportyacht'];
+    let k = 0;
+    for (let z = z0 - 16; z > z1 + 8; z -= 15) for (const sd of [-1, 1]) {
+      const f = new THREE.Mesh(new THREE.BoxGeometry(16, 0.45, 2), wood); f.position.set(X + sd * 10.5, 0.4, z); m.add(f);   // понтон-пръст
+      const lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 3), mat(0x333333)); lamp.position.set(X + sd * 18, 1.9, z); m.add(lamp);
+      const kk = boats[k++ % boats.length], len = kk === 'sailboat' ? 12 : kk === 'motoryacht' ? 12 : 15;
+      const b = yacht(kk, len); b.position.set(X + sd * 11, 0, z - 7.2); if (sd < 0) b.rotation.y = Math.PI; m.add(b);
+      anim.moored.push({ b, ph: k * 1.7 });
+    }
+    const big = yacht('superyacht', 44); big.position.set(X, 0, z1 - 12); m.add(big); anim.moored.push({ b: big, ph: 0.4, a: 0.4 });
+    // капитанството на брега
+    const hut = new THREE.Group(); hut.position.set(X + 14, 0, z0 + 8); m.add(hut);
+    const hb = new THREE.Mesh(new THREE.BoxGeometry(8, 4, 6), mat(0xf4efe6)); hb.position.y = 2; hb.castShadow = true; hut.add(hb);
+    const hr = new THREE.Mesh(new THREE.BoxGeometry(9, 0.5, 7), mat(0x2b6fff)); hr.position.y = 4.2; hut.add(hr);
+    const sg = deps.label('⛵ МАРИНА', '#ffffff', 6); sg.position.y = 7; hut.add(sg);
+    return m;
+  });
   extra('spa', () => {
     // СПА център пред хотела (не в него): ниска сграда с каменна облицовка, стъклен покрив и външен термален басейн с пара
     const sp = new THREE.Group(), stone = mat(0xcfc3ad), wood = mat(0x7a4f2e), glass = mat(0x9fd3ff, { transparent: true, opacity: 0.55, metalness: 0.1, roughness: 0.2 });
@@ -495,6 +567,7 @@ export function buildResortView(A, r, st, season, deps) {
       a.needsUpdate = true; anim.waves.geo.computeVertexNormals();
       anim.foam.material.opacity = 0.35 + Math.sin(t * 1.6) * 0.25; anim.foam.position.z = -49 + Math.sin(t * 1.6) * 1.2;
       if (anim.boat) { anim.boat.position.y = 0.3 + Math.sin(t * 1.4) * 0.25; anim.boat.rotation.z = Math.sin(t * 1.1) * 0.06; }
+      for (const q of anim.moored || []) { q.b.position.y = Math.sin(t * 1.1 + q.ph) * 0.15 * (q.a || 1); q.b.rotation.x = Math.sin(t * 0.8 + q.ph) * 0.02 * (q.a || 1); }
       for (const q of anim.boats || []) { q.b.position.y = 0.1 + Math.sin(t * 1.2 + q.ph) * 0.3; q.b.rotation.z = Math.sin(t * 0.9 + q.ph) * 0.07; q.b.position.x = q.x0 + Math.sin(t * 0.05 * q.sp + q.ph) * 30; }
     }
     for (const ch of anim.chairs) { ch.u = (ch.u + 0.0009) % 1; ch.c.position.copy(ch.a).lerp(ch.b, ch.u); }
@@ -542,5 +615,6 @@ export function buildResortView(A, r, st, season, deps) {
     minDist: 35, maxDist: 260, maxPolar: 1.32, bounds: 220,
     fog: [180, 900], horizon: HOR,
   };
+  addResortLm(g, r.id);
   return { group: g, update, view };
 }

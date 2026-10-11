@@ -82,3 +82,25 @@ People and resort hotel in assets/heavy/people/ — from Sketchfab, Creative Com
 - blocks/modoffice.glb — "Modern Office Building" by Bl4ckGh0st (CC-BY 4.0) — https://sketchfab.com/3d-models/c6b0308c2ebb4842ae49aff70ce14ad0
 - blocks/jade.glb — "Jade Appartment Block" by novusod (CC-BY 4.0) — https://sketchfab.com/3d-models/4fcd254849a749c5b4e71b9f95dff22f
   (текстурите в blocks/ са смалени до 1024 px webp)
+- hospital/hospital.glb — "Low Poly Hospital" by AlessioPassera (CC-BY 4.0) — https://sketchfab.com/3d-models/738972de7752491382457c068ab0a6ac
+- stadium/stadium.glb — "Ekana Stadium Low Poly Lucknow City game asset" by mshayan02 (CC-BY 4.0) — https://sketchfab.com/3d-models/d088ff7bbb0a477ab6dd492865d38f3b
+- metro/entrance.glb — "Subway Entrance [Street Assets Vol. 01]" by whisper.alt (CC-BY 4.0) — https://sketchfab.com/3d-models/35c02eee93ea4a2f80af8acb84351d8c
+- stadium/campnou.glb — "Camp Nou Stadium" by farhad.Guli (CC-BY 4.0) — https://sketchfab.com/3d-models/37c9bfbd9ee64b90bd67ab7f500317e1
+- stadium/olympia.glb — "Olympiastadion Berlin" by azadbal (CC-BY 4.0) — https://sketchfab.com/3d-models/1a4bba80003142debe0ddc19cde5992a (опростен до ~97k триъгълника, текстури 1024 webp)
+- lm/sagrada.glb — "Sagrada Familia" by vmmaniac (CC-BY 4.0) — https://sketchfab.com/3d-models/a53f0cde8a774dcd8e85831218e14e3a (опростен до ~74k триъгълника, текстури 1024 webp)
+- civic/school.glb — "school building" by swjeta (CC-BY 4.0) — https://sketchfab.com/3d-models/d34ac09a3ca544df999485c4b311abcc
+- civic/fire.glb — "Fire Station No. 1" by CommonSpence (CC-BY 4.0) — https://sketchfab.com/3d-models/87edf04deb28434993274d9f05070865
+- civic/police.glb — "Paris Police Station" by aitortilla01 (CC-BY 4.0) — https://sketchfab.com/3d-models/6314692176a44290b1ba432f9ea4840f
+- civic/cityhall.glb — "Rauma Town Hall" by Karumaki (CC-BY 4.0) — https://sketchfab.com/3d-models/e2c47838ebde464bbcea521c0ff5ce9e
+- civic/museum.glb — "Gothic City Palace - Het Markiezenhof" by 3DBuilder (CC-BY 4.0) — https://sketchfab.com/3d-models/7fd0bc0039fa40589dcc119c69000103
+- civic/opera.glb — "Aalto Opera House" by gduath (CC-BY 4.0) — https://sketchfab.com/3d-models/04fb8a4803c7412691650576c1d7a844
+- civic/bridge.glb — "LowPoly Manhattan Bridge" by SUSUSUBE (CC-BY 4.0) — https://sketchfab.com/3d-models/50861561576949f4931da99bdd2d940b
+- civic/water.glb — "Water Treament Plant" by novusod (CC-BY 4.0) — https://sketchfab.com/3d-models/9d6775bf625f46c1bfe000319392b8f0
+- civic/court.glb — "United States Courthouse Low Poly Game Ready" by Ruslan Malovsky (CC-BY 4.0) — https://sketchfab.com/3d-models/455a11a82a164545b7060bcae57430cd
+- resort/grebeni.glb — "Grebeni" by antekatavic82 (CC-BY 4.0) — https://sketchfab.com/3d-models/06cebc37613c4325807174d562e6a806 (опростен, текстури 1024 webp)
+- resort/dubrovnik.glb — "1DAE07 City Scene - Dubrovnik" by Wesley_De_Moye (CC-BY 4.0) — https://sketchfab.com/3d-models/5a1dbe8169be4a3a8ca222b2478c999c
+- marina/superyacht.glb — "Yacht" by sergeif (CC-BY 4.0) — https://sketchfab.com/3d-models/0dd451f295d049cea20c17d3ffa87ee3
+- marina/sportyacht.glb — "Yatch I (second edition)" by dannzjs (CC-BY 4.0) — https://sketchfab.com/3d-models/b826e1c52d604c599b893967bed8a254
+- marina/motoryacht.glb — "Hinckley T44 FB Model" by mosak (CC-BY 4.0) — https://sketchfab.com/3d-models/1f4362d864424b7eb26bb429f6ef8f81
+- marina/sailboat.glb — "Sailboat 1" by masterjack20 (CC-BY 4.0) — https://sketchfab.com/3d-models/048ca9ab42b0453ab344a0691fbd5058
+  (текстурите в marina/ са смалени до 512 px webp)

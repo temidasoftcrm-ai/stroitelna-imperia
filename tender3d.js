@@ -1,10 +1,14 @@
 // tender3d.js — 3D за държавните поръчки (tenders.js): уникални сгради, които растат по етапи според напредъка.
 //   buildUniversity — Софийски университет: неокласическа сграда с колонада, фронтон и меден купол, площад с фонтан.
+//   buildHospital — национална болница: модел „Low Poly Hospital“ (AlessioPassera, Sketchfab, CC-BY) с хеликоптерна площадка.
+//   buildStadium — национален стадион („Ekana Stadium Low Poly“, mshayan02, CC-BY); buildMetro — вход на метрото
+//     („Subway Entrance [Street Assets Vol. 01]“, whisper.alt, CC-BY) на площад с голямо „M“.
 //   buildPortTerminal — нов контейнерен терминал до пристанището (seaside.js): кей, портални кранове, контейнери.
 // Двете връщат { group, setProg(p 0…1), update(t, night) }; докато p < 1 се виждат скеле, кран и строителна техника.
 import * as THREE from 'three';
 import { createPortLights } from './portlights.js';
 import { loadShipModels, hasShipModel, shipModel } from './shipmodels.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const mat = (c, r = 0.8, m = 0, e) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m, ...(e ? { emissive: e, emissiveIntensity: 0 } : {}) });
 const box = (w, h, d, m, x, y, z, g) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; g.add(o); return o; };
@@ -92,6 +96,180 @@ export function buildUniversity(group, deps, opts = {}) {
   }
   setProg(opts.prog ?? 0);
   return { group: g, setProg, update, dispose: () => group.remove(g) };
+}
+
+// строителна площадка: кал и ограда (видими, докато p < 1)
+function fencedDirt(g, ext = [26, 26]) {
+  const [W, D] = ext, hw = W / 2, hd = D / 2;
+  const dirt = box(W, 0.1, D, mat(0x7a5c3e, 1), 0, 0.05, 0, g), fence = new THREE.Group(); g.add(fence);
+  // жълта рамка около целия парцел — вижда се отдалеч, че тук е държавната поръчка
+  const yel = mat(0xffc400, 0.6, 0, 0xffb000), blk = mat(0x1d1d1d, 0.8);
+  for (const [w, d, x, z] of [[W, 1, 0, -hd + 0.5], [W, 1, 0, hd - 0.5], [1, D - 2, -hw + 0.5, 0], [1, D - 2, hw - 0.5, 0]]) box(w, 0.06, d, yel, x, 0.12, z, fence);
+  // ограда на жълти и черни ивици
+  for (const [w, d, x, z] of [[W, 0.15, 0, -hd + 0.1], [W, 0.15, 0, hd - 0.1], [0.15, D, -hw + 0.1, 0], [0.15, D, hw - 0.1, 0]]) {
+    const len = Math.max(w, d), n = Math.max(5, Math.round(len / 2));
+    for (let i = 0; i < n; i++) { const o = -len / 2 + (i + 0.5) * len / n; box(w > 1 ? len / n : 0.15, 1.4, d > 1 ? len / n : 0.15, i % 2 ? blk : yel, x + (w > 1 ? o : 0), 0.8, z + (d > 1 ? o : 0), fence); }
+  }
+  for (const [x, z] of [[-hw + 0.1, -hd + 0.1], [hw - 0.1, -hd + 0.1], [-hw + 0.1, hd - 0.1], [hw - 0.1, hd - 0.1]]) { box(0.3, 3, 0.3, blk, x, 1.5, z, fence); box(1.4, 0.8, 0.05, yel, x + 0.7, 2.6, z, fence); }
+  return { show: v => { dirt.visible = fence.visible = v; }, glow: k => { yel.emissiveIntensity = k; } };
+}
+// GLB модел, вписан в квадрат side×side, основата на y = 0 (или произходът на модела, ако keepY)
+function placeGlb(url, parent, side, { keepY = false, skip = null, alive = () => true, each = null } = {}) {
+  loadGlb(url).then(src => {
+    if (!src || !alive()) return;
+    const o = src.clone(true), drop = [];
+    o.traverse(m => { if (!m.isMesh) return; if (skip && skip.test(m.material.name)) { drop.push(m); return; } m.castShadow = m.receiveShadow = true; each && each(m); });
+    drop.forEach(m => m.parent.remove(m));
+    let bb = new THREE.Box3().setFromObject(o);
+    if (keepY) {   // мери само надземната част (подземните ескалатори/тунели не влизат в размера)
+      const v = new THREE.Vector3(), up = new THREE.Box3(); o.updateMatrixWorld(true);
+      o.traverse(m => { if (!m.isMesh) return; const P = m.geometry.attributes.position; for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i).applyMatrix4(m.matrixWorld); if (v.y > 0.05) up.expandByPoint(v); } });
+      if (!up.isEmpty()) bb = up;
+    }
+    const sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3());
+    const w = new THREE.Group(); w.add(o); o.position.set(-c.x, keepY ? 0 : -bb.min.y, -c.z); w.scale.setScalar(side / Math.max(sz.x, sz.z)); parent.add(w);
+  });
+}
+
+// ---------------------------------------------------------------- национален стадион
+export function buildStadium(group, deps, opts = {}) {
+  const g = new THREE.Group(); g.position.set(opts.x || 0, 0, opts.z || 0); g.rotation.y = opts.rot || 0; g.scale.setScalar(opts.scale || 1); group.add(g);
+  const ext = opts.ext || [26, 26], site = fencedDirt(g, ext);
+  const done = new THREE.Group(); g.add(done);
+  box(ext[0], 0.1, ext[1], mat(0x6fae4f, 0.95), 0, 0.05, 0, done);
+  // голям стадион: паркинги с маркировка и коли в излишъка на парцела (по z), фен зона с флагове
+  for (const sd of [-1, 1]) {
+    const depth = (ext[1] - 26) / 2 - 1; if (depth < 3) continue;
+    const zc = sd * (13 + depth / 2 + 0.5), w = ext[0] - 3;
+    box(w, 0.12, depth, mat(0x3d4247, 0.9), 0, 0.08, zc, done);
+    const line = mat(0xf2f2f2, 0.6), rows = Math.max(1, Math.floor(depth / 4.2));
+    for (let r = 0; r < rows; r++) for (let c = 0; c < Math.floor(w / 1.8); c++) {
+      const xx = -w / 2 + 0.9 + c * 1.8, zz = zc - depth / 2 + 2.1 + r * 4.2;
+      box(0.12, 0.02, 2.6, line, xx - 0.9, 0.15, zz, done);
+      if (deps.model && ((c * 7 + r * 3) % 5) < 3) { try { const o = deps.model(['sf-car-Sedan', 'sf-car-SUV', 'sf-car-Hatchback', 'sf-car-Taxi', 'sf-car-Van', 'sf-car-Pickup'][(c + r) % 6], 1 / (opts.scale || 1)); if (o) { o.position.set(xx, 0.14, zz); o.rotation.y = r % 2 ? Math.PI : 0; done.add(o); } } catch (e) { /* няма модел */ } }
+    }
+    for (let f = 0; f < 6; f++) { const fx = -w / 2 + 2 + f * (w - 4) / 5, fz = sd * 13.6; box(0.15, 4, 0.15, mat(0xdddddd, 0.4, 0.6), fx, 2, fz, done); box(1.6, 1, 0.05, mat([0xd62828, 0xffffff, 0x1f4fbf][f % 3], 0.6), fx + 0.8, 3.4, fz, done); }
+  }
+  // модели: обикновеният национален стадион и известните (opts.variant)
+  const V = { ekana: { url: 'assets/heavy/stadium/stadium.glb', side: 25.5 }, campnou: { url: 'assets/heavy/stadium/campnou.glb', side: 25 }, olympia: { url: 'assets/heavy/stadium/olympia.glb', side: Math.min(ext[0], ext[1]) - 0.6 } }[opts.variant || 'ekana'];
+  const lamps = [], lampM = mat(0xffffff, 0.4, 0, 0xfff4d0);
+  if (!opts.variant) for (const [x, z] of [[-12, -12], [12, -12], [-12, 12], [12, 12]]) { const q = box(1.4, 0.5, 0.4, lampM, x, 8.2, z, done); q.lookAt(0, 0, 0); lamps.push(q); }
+  const body = new THREE.Group(); g.add(body);
+  let alive = true;
+  placeGlb(V.url, body, V.side, { alive: () => alive });
+  const sign = deps.label ? deps.label(opts.sign || '🏟️ НАЦИОНАЛЕН СТАДИОН', '#ffe9a8', 16) : null;
+  if (sign) { sign.position.set(0, 13, 0); g.add(sign); }
+  const kit = siteKit(g, 22, 6, 22);
+  let prog = -1;
+  function setProg(p) {
+    p = Math.max(0, Math.min(1, p)); if (p === prog) return; prog = p;
+    const k = Math.max(0, Math.min(1, (p - 0.1) / 0.85)); body.visible = k > 0; body.scale.y = Math.max(0.001, k);
+    kit.kit.visible = p < 1; kit.scaf.scale.y = Math.max(0.05, Math.min(1, p * 1.15)); kit.scaf.position.y = 3 * kit.scaf.scale.y;
+    if (sign) sign.visible = p >= 1; done.visible = p >= 1; site.show(p < 1);
+  }
+  function update(t, night = 0) { site.glow(0.05 + 0.5 * night); lampM.emissiveIntensity = 0.1 + 1.6 * night; if (prog < 1) kit.jib.rotation.y = Math.sin(t * 0.25) * 1.2; }
+  setProg(opts.prog ?? 0);
+  return { group: g, setProg, update, dispose: () => { alive = false; group.remove(g); } };
+}
+
+// ---------------------------------------------------------------- метро: площад с вход и голямо „M“
+export function buildMetro(group, deps, opts = {}) {
+  const g = new THREE.Group(); g.position.set(opts.x || 0, 0, opts.z || 0); g.rotation.y = opts.rot || 0; g.scale.setScalar(opts.scale || 1); group.add(g);
+  const site = fencedDirt(g);
+  // докато се строи: шахта и тунелна машина (TBM), купчини пръст
+  const work = new THREE.Group(); g.add(work);
+  box(12, 0.14, 8, mat(0x1b1b1b, 1), -2, 0.11, -3, work);
+  const tbm = new THREE.Group(); tbm.position.set(-2, 1.6, -3); tbm.rotation.z = Math.PI / 2; work.add(tbm);
+  cyl(1.7, 1.7, 7, mat(0xf2b705, 0.5, 0.4), 0, 0, 0, tbm, 20); const head = cyl(1.9, 1.9, 0.6, mat(0x555a60, 0.4, 0.8), 0, 3.8, 0, tbm, 20);
+  for (const [x, z, r] of [[7, 6, 2.2], [9, 2, 1.6], [4, 9, 1.8]]) { const h = new THREE.Mesh(new THREE.ConeGeometry(r, r * 0.9, 9), mat(0x6b4f33, 1)); h.position.set(x, r * 0.45, z); h.castShadow = true; work.add(h); }
+  // накрая: павиран площад, пейки, дървета, пилон „M“
+  const done = new THREE.Group(); g.add(done);
+  box(26, 0.1, 26, mat(0xbfb6a6, 0.95), 0, 0.05, 0, done);
+  const tile = mat(0xa79e8f, 0.95);
+  for (let i = -2; i <= 2; i++) { box(26, 0.02, 0.15, tile, 0, 0.11, i * 5, done); box(0.15, 0.02, 26, tile, i * 5, 0.11, 0, done); }
+  const red = mat(0xd62828, 0.5, 0, 0xff3030), white = mat(0xffffff, 0.5, 0, 0xffffff), pole = mat(0x3a3f45, 0.5, 0.6);
+  const pylon = (x, z, h) => { box(0.35, h, 0.35, pole, x, h / 2, z, done); const m = new THREE.Group(); m.position.set(x, h + 1, z); done.add(m);
+    box(2.2, 2.2, 0.3, red, 0, 0, 0, m); const L = box(0.3, 1.4, 0.34, white, -0.55, 0, 0, m), R = box(0.3, 1.4, 0.34, white, 0.55, 0, 0, m);
+    const a = box(0.28, 0.9, 0.34, white, -0.24, 0.25, 0, m), b = box(0.28, 0.9, 0.34, white, 0.24, 0.25, 0, m); a.rotation.z = 0.6; b.rotation.z = -0.6; return m; };
+  const signs = [pylon(8.5, 8.5, 5), pylon(-9, -9, 3.5)];
+  for (const [x, z, r] of [[-10, 5, 0], [-10, 9, 0], [5, -10, Math.PI / 2]]) { const bn = new THREE.Group(); bn.position.set(x, 0, z); bn.rotation.y = r; done.add(bn); box(2.4, 0.15, 0.7, mat(0x8a6a48, 0.8), 0, 0.55, 0, bn); box(0.15, 0.5, 0.6, pole, -1, 0.25, 0, bn); box(0.15, 0.5, 0.6, pole, 1, 0.25, 0, bn); }
+  for (const [x, z] of [[-11, -2], [11, -2], [2, 11], [-4, 11], [11, -11]]) { cyl(0.22, 0.28, 1.6, mat(0x6b4a2b), x, 0.8, z, done, 6); const c = new THREE.Mesh(new THREE.SphereGeometry(1.3, 10, 8), mat(0x3f8f3a)); c.position.set(x, 2.6, z); c.castShadow = true; done.add(c); }
+  const body = new THREE.Group(); body.position.set(0, 0.1, -1); done.add(body);
+  let alive = true;
+  placeGlb('assets/heavy/metro/entrance.glb', body, 10, { keepY: true, skip: /^Ground/, alive: () => alive });
+  const sign = deps.label ? deps.label(opts.sign || '🚇 МЕТРО', '#ffe9a8', 16) : null;
+  if (sign) { sign.position.set(0, 12, 0); g.add(sign); }
+  let prog = -1;
+  function setProg(p) {
+    p = Math.max(0, Math.min(1, p)); if (p === prog) return; prog = p;
+    if (sign) sign.visible = p >= 1; done.visible = p >= 1; site.show(p < 1); work.visible = p < 1;
+    tbm.position.x = -2 + Math.min(1, p) * 3;   // машината „влиза“ в тунела
+  }
+  function update(t, night = 0) { site.glow(0.05 + 0.5 * night); red.emissiveIntensity = 0.15 + 0.9 * night; white.emissiveIntensity = 0.1 + 0.9 * night; if (prog < 1) head.rotation.y = t * 1.5; }
+  setProg(opts.prog ?? 0);
+  return { group: g, setProg, update, dispose: () => { alive = false; group.remove(g); } };
+}
+
+// ---------------------------------------------------------------- национална болница
+const glbs = {};
+const loadGlb = url => glbs[url] || (glbs[url] = new Promise(res => new GLTFLoader().load(url, g => res(g.scene), undefined, () => res(null))));
+const loadHospital = () => loadGlb('assets/heavy/hospital/hospital.glb');
+// opts: { x, z, rot, scale, prog, sign } — същият парцел като университета (около 26×26 преди мащаба)
+export function buildHospital(group, deps, opts = {}) {
+  const g = new THREE.Group(); g.position.set(opts.x || 0, 0, opts.z || 0); g.rotation.y = opts.rot || 0; g.scale.setScalar(opts.scale || 1); group.add(g);
+  // терен: докато се строи — кал и ограда; накрая — морава, паркинг с линейки, площадка за спешните
+  const site = fencedDirt(g);
+  const done = new THREE.Group(); g.add(done);
+  box(26, 0.1, 26, mat(0x6fae4f, 0.95), 0, 0.05, 0, done);   // морава
+  box(17, 0.12, 9, mat(0x3d4247, 0.9), 3.5, 0.08, 8, done);   // паркинг отпред
+  const line = mat(0xf2f2f2, 0.6);
+  for (let i = 0; i < 7; i++) { box(0.18, 0.02, 3.2, line, -3.4 + i * 2.3, 0.15, 5.6, done); box(0.18, 0.02, 3.2, line, -3.4 + i * 2.3, 0.15, 10.4, done); }
+  box(6.5, 0.12, 9, mat(0xc9ccd0, 0.9), -8.6, 0.08, 8, done);   // площадка за линейките
+  const red = mat(0xd62828, 0.6), white = mat(0xffffff, 0.5, 0, 0xffffff);
+  box(5.6, 0.02, 0.3, red, -8.6, 0.15, 4.2, done); box(5.6, 0.02, 0.3, red, -8.6, 0.15, 11.8, done);
+  // пилон с червен кръст
+  box(0.4, 5, 0.4, mat(0x9aa0a6, 0.5, 0.5), 11, 2.5, 11, done);
+  const cross = new THREE.Group(); cross.position.set(11, 5.6, 11); done.add(cross);
+  box(2.4, 2.4, 0.3, white, 0, 0, 0, cross); box(1.7, 0.55, 0.36, red, 0, 0, 0, cross); box(0.55, 1.7, 0.36, red, 0, 0, 0, cross);
+  for (const [x, z] of [[-11.5, -11.5], [11.5, -11.5], [-11.5, -2], [11.5, -2], [11.5, 4]]) {
+    cyl(0.22, 0.28, 1.6, mat(0x6b4a2b), x, 0.8, z, done, 6); const c = new THREE.Mesh(new THREE.SphereGeometry(1.3, 10, 8), mat(0x3f8f3a)); c.position.set(x, 2.6, z); c.castShadow = true; done.add(c);
+  }
+  const k0 = 1 / (opts.scale || 1);   // колите са в мащаба на града
+  if (deps.model) {
+    const put = (n, x, z, ry) => { try { const o = deps.model(n, k0); o.position.set(x, 0.14, z); o.rotation.y = ry; done.add(o); } catch (e) { /* няма модел */ } };
+    put('sf-car-Ambulance', -10, 8, 0); put('sf-car-Ambulance', -7.2, 8, 0);
+    for (const [i, row, n] of [[0, 5.6, 'sf-car-Sedan'], [2, 5.6, 'sf-car-SUV'], [3, 10.4, 'sf-car-Hatchback'], [5, 10.4, 'sf-car-Taxi'], [4, 5.6, 'sf-car-Van']]) put(n, -2.25 + i * 2.3, row, 0);
+  }
+  const body = new THREE.Group(); body.position.z = -4; g.add(body);   // моделът „расте“ отдолу нагоре
+  const glass = [];
+  let alive = true;
+  loadHospital().then(src => {
+    if (!src || !alive) return;
+    const o = src.clone(true);
+    o.traverse(m => { if (!m.isMesh) return; m.castShadow = m.receiveShadow = true;
+      if (/^Vetro/.test(m.material.name)) { m.material = m.material.clone(); m.material.emissive = new THREE.Color(0xffe2a8); m.material.emissiveIntensity = 0; glass.push(m.material); } });
+    const bb = new THREE.Box3().setFromObject(o), sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3());
+    const k = 17 / Math.max(sz.x, sz.z), w = new THREE.Group(); w.add(o); o.position.set(-c.x, -bb.min.y, -c.z); w.scale.setScalar(k); body.add(w);
+  });
+  const sign = deps.label ? deps.label(opts.sign || '🏥 БОЛНИЦА', '#ffe9a8', 16) : null;
+  if (sign) { sign.position.set(0, 17, -4); g.add(sign); }
+  const kit = siteKit(g, 18, 10, 18); kit.kit.position.z = -4;
+  let prog = -1;
+  function setProg(p) {
+    p = Math.max(0, Math.min(1, p)); if (p === prog) return; prog = p;
+    const k = Math.max(0, Math.min(1, (p - 0.1) / 0.85)); body.visible = k > 0; body.scale.y = Math.max(0.001, k);
+    kit.kit.visible = p < 1; kit.scaf.scale.y = Math.max(0.05, Math.min(1, p * 1.15)); kit.scaf.position.y = 5 * kit.scaf.scale.y;
+    if (sign) sign.visible = p >= 1;
+    done.visible = p >= 1; site.show(p < 1);
+  }
+  function update(t, night = 0) {
+    site.glow(0.05 + 0.5 * night);
+    cross.children[0].material.emissiveIntensity = 0.1 + 0.8 * night;
+    for (const m of glass) m.emissiveIntensity = prog >= 1 ? 0.05 + 0.9 * night : 0;
+    if (prog < 1) kit.jib.rotation.y = Math.sin(t * 0.25) * 1.2;
+  }
+  setProg(opts.prog ?? 0);
+  return { group: g, setProg, update, dispose: () => { alive = false; group.remove(g); } };
 }
 
 // ---------------------------------------------------------------- контейнерен терминал

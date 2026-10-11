@@ -186,7 +186,29 @@ export function buildAutobahnView(A, opts = {}) {
   }
   const hill = new THREE.Mesh(new THREE.SphereGeometry(70, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x6f9a4e, roughness: 1, flatShading: true }));
   hill.scale.set(1.2, 0.55, 0.9); hill.position.set(0, -2, TUNNEL_Z - 62); g.add(hill);
-  loadMountains().then(() => { const o = mtnModel('far1', 340, 62, 0.4); if (!o) return; o.position.set(0, -4, TUNNEL_Z - 92); g.add(o); hill.visible = false; });   // тунелът влиза в истинска планина
+  // истинска планина: подножието ѝ (предният ръб) е точно при входа на тунела, иначе склонът покрива пътя
+  loadMountains().then(() => { const o = mtnModel('far1', 340, 62, 0.4); if (!o) return; o.position.set(0, -4, 0); g.add(o); o.updateMatrixWorld(true);
+    const bb = new THREE.Box3().setFromObject(o); o.position.z = TUNNEL_Z - 8 - bb.max.z; hill.visible = false; });
+  // скален откос в подножието и прокопаните отвори за двете платна — видими от самото начало (тунелът се копае паралелно)
+  { // неравен скален масив: кутия с много върхове, разместени с шум; челото е наклонено назад и почти равно (там са отворите)
+    const FW = W + 60, FH = 22, FD = 34, geo = new THREE.BoxGeometry(FW, FH, FD, 24, 8, 8), P = geo.attributes.position, v = new THREE.Vector3();
+    for (let i = 0; i < P.count; i++) {
+      v.fromBufferAttribute(P, i);
+      const h = (v.y + FH / 2) / FH, front = v.z > FD / 2 - 0.01, n = Math.sin(v.x * 0.35) * Math.cos(v.z * 0.4 + v.y * 0.3) + Math.sin(v.x * 0.9 + v.y) * 0.5;
+      if (v.y > -FH / 2 + 0.01) { v.x += n * 0.8; v.y += h > 0.95 ? n * 2.5 : 0; }
+      v.z = front ? v.z - h * 7 + (h > 0.15 ? n * 0.5 : 0) : v.z + n * 1.2 * h;   // челото се накланя назад
+      if (Math.abs(v.x) > FW / 2 - 1) v.y -= h * h * 8;   // краищата слизат към тревата
+      P.setXYZ(i, v.x, v.y, v.z);
+    }
+    geo.computeVertexNormals();
+    const face = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x6e5a49, roughness: 1, flatShading: true }));
+    face.position.set(0, FH / 2 - 0.5, TUNNEL_Z - FD / 2); face.castShadow = face.receiveShadow = true; g.add(face);
+    for (const sx of [-1, 1]) {
+      const hole = new THREE.Mesh(new THREE.CylinderGeometry(CW / 2 + 1.2, CW / 2 + 1.2, 1, 28, 1, false, 0, Math.PI).rotateX(Math.PI / 2).rotateZ(Math.PI / 2), M.dark);
+      hole.rotation.z = -Math.PI / 2; hole.scale.set(1, 0.6, 1); hole.position.set(sx * (CW + SH + MED) / 2, Y - 0.6, TUNNEL_Z + 0.05); g.add(hole);
+    }
+    // зеленина и скали по върха
+    for (let k = 0; k < 18; k++) { const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(2 + (k % 3), 1), mat(k % 2 ? 0x4f7a3a : 0x5f8a44, 1)); bush.position.set(-FW / 2 + 4 + k * (FW - 8) / 17, FH - 2 + (k % 3), TUNNEL_Z - 14 - (k % 4) * 4); bush.scale.y = 0.6; g.add(bush); } }
   for (const sx of [-1, 1]) {
     const portal = new THREE.Group();
     box(CW + SH + 4, 9, 2, M.concrete, 0, 4.5, 0, portal);

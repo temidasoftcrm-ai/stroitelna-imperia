@@ -100,6 +100,47 @@ export const FACTORIES = [
   { cityId: 'bucharest',    cityNm: 'Букурещ',     materialId: 'steel',     nm: 'Стоманодобивен комбинат „Букурещ“' },
   { cityId: 'belgrade',     cityNm: 'Белград',     materialId: 'wood',      nm: 'Дървообработване „Белград“' },
   { cityId: 'constanta',    cityNm: 'Констанца',   materialId: 'sand',      nm: 'Пристанищни кариери „Констанца“' },
+  // големите градове по света (отключват се с нивото на развитие)
+  { cityId: 'milan', cityNm: 'Милано', materialId: 'furniture', nm: 'Мебелна фабрика „Брианца“ — Милано' },
+  { cityId: 'warsaw', cityNm: 'Варшава', materialId: 'furniture', nm: 'Мебелна фабрика „Варшава“' },
+  { cityId: 'shanghai', cityNm: 'Шанхай', materialId: 'furniture', nm: 'Мебелен комбинат „Шанхай“' },
+  { cityId: 'florence', cityNm: 'Флоренция', materialId: 'marble', nm: 'Карарски мраморни кариери' },
+  { cityId: 'izmir', cityNm: 'Измир', materialId: 'marble', nm: 'Мраморни кариери „Измир“' },
+  { cityId: 'prague', cityNm: 'Прага', materialId: 'glass', nm: 'Бохемско стъкло „Прага“' },
+  { cityId: 'guangzhou', cityNm: 'Гуанджоу', materialId: 'glass', nm: 'Стъкларски завод „Гуанджоу“' },
+  { cityId: 'dnipro', cityNm: 'Днипро', materialId: 'steel', nm: 'Металургичен комбинат „Днипро“' },
+  { cityId: 'yekaterinburg', cityNm: 'Екатеринбург', materialId: 'steel', nm: 'Уралска стомана „Екатеринбург“' },
+  { cityId: 'chicago', cityNm: 'Чикаго', materialId: 'steel', nm: 'Стоманени заводи „Чикаго“' },
+  { cityId: 'mumbai', cityNm: 'Мумбай', materialId: 'steel', nm: 'Стоманодобивен завод „Мумбай“' },
+  { cityId: 'busan', cityNm: 'Пусан', materialId: 'steel', nm: 'Стоманен комбинат „Пусан“' },
+  { cityId: 'novosibirsk', cityNm: 'Новосибирск', materialId: 'wood', nm: 'Сибирски дървен материал „Новосибирск“' },
+  { cityId: 'vancouver', cityNm: 'Ванкувър', materialId: 'wood', nm: 'Дъскорезници „Ванкувър“' },
+  { cityId: 'stpetersburg', cityNm: 'Санкт Петербург', materialId: 'wood', nm: 'Карелски дървен материал „Санкт Петербург“' },
+  { cityId: 'monterrey', cityNm: 'Монтерей', materialId: 'concrete', nm: 'Циментов завод „Монтерей“' },
+  { cityId: 'beijing', cityNm: 'Пекин', materialId: 'concrete', nm: 'Циментов завод „Пекин“' },
+  { cityId: 'moscow', cityNm: 'Москва', materialId: 'bricks', nm: 'Тухларна „Москва“' },
+  { cityId: 'hamburg', cityNm: 'Хамбург', materialId: 'sand', nm: 'Пясъчни кариери на Елба „Хамбург“' },
+  { cityId: 'alexandria', cityNm: 'Александрия', materialId: 'sand', nm: 'Пясък от делтата на Нил „Александрия“' },
+  { cityId: 'innsbruck', cityNm: 'Инсбрук', materialId: 'gravel', nm: 'Алпийски кариери „Инсбрук“' },
+  { cityId: 'calgary', cityNm: 'Калгари', materialId: 'gravel', nm: 'Кариери в Скалистите планини „Калгари“' },
+  { cityId: 'lagos', cityNm: 'Лагос', materialId: 'concrete', nm: 'Циментов завод „Лагос“' },
+  { cityId: 'cairo', cityNm: 'Кайро', materialId: 'concrete', nm: 'Циментов завод „Кайро“' },
+  { cityId: 'delhi', cityNm: 'Делхи', materialId: 'concrete', nm: 'Циментов завод „Делхи“' },
+  { cityId: 'dhaka', cityNm: 'Дака', materialId: 'bricks', nm: 'Тухларни „Дака“' },
+  { cityId: 'manchester', cityNm: 'Манчестър', materialId: 'bricks', nm: 'Тухларна „Манчестър“ (червени тухли)' },
+  { cityId: 'osaka', cityNm: 'Осака', materialId: 'steel', nm: 'Стоманени заводи „Осака“' },
+  { cityId: 'johannesburg', cityNm: 'Йоханесбург', materialId: 'steel', nm: 'Стоманодобивен комбинат „Йоханесбург“' },
+  { cityId: 'saopaulo', cityNm: 'Сао Пауло', materialId: 'steel', nm: 'Стоманодобивен завод „Сао Пауло“' },
+  { cityId: 'kotakinabalu', cityNm: 'Кота Кинабалу', materialId: 'wood', nm: 'Тропически дървен материал „Борнео“' },
+  { cityId: 'kinshasa', cityNm: 'Киншаса', materialId: 'wood', nm: 'Дървен материал от Конго „Киншаса“' },
+  { cityId: 'hobart', cityNm: 'Хобарт', materialId: 'wood', nm: 'Тасманийски дървен материал „Хобарт“' },
+  { cityId: 'lviv', cityNm: 'Лвов', materialId: 'wood', nm: 'Карпатски дървен материал „Лвов“' },
+  { cityId: 'brno', cityNm: 'Бърно', materialId: 'glass', nm: 'Чешко стъкло „Бърно“' },
+  { cityId: 'istanbul', cityNm: 'Истанбул', materialId: 'glass', nm: 'Стъкларски завод „Истанбул“' },
+  { cityId: 'rome', cityNm: 'Рим', materialId: 'marble', nm: 'Травертинови кариери „Рим“' },
+  { cityId: 'guadalajara', cityNm: 'Гуадалахара', materialId: 'furniture', nm: 'Мебелна фабрика „Гуадалахара“' },
+  { cityId: 'hochiminh', cityNm: 'Хошимин', materialId: 'furniture', nm: 'Мебелна фабрика „Хошимин“' },
+  { cityId: 'kualalumpur', cityNm: 'Куала Лумпур', materialId: 'furniture', nm: 'Мебелна фабрика „Куала Лумпур“' },
 ];
 // само за показване (вече не влиза в цената)
 for (const f of FACTORIES) f.factoryPrice = MATERIALS[f.materialId].buyPrice;
@@ -727,6 +768,17 @@ export class Economy {
 }
 
 // ---- съвет на трейдъра: сигнал за всяка фирма от графиката (средна за 30 дни, посока за 5 дни), риска от фалит и печалбата ти
+// най-добрата продажба сега (за нотификацията на трейдъра): акция с печалба над 15% и цена над средната за месец
+export function bestSale(econ) {
+  let best = null;
+  for (const [id, h] of Object.entries(econ.s.shares || {})) {
+    const q = econ.s.market.c[id], c = COMPANIES.find(x => x.id === id); if (!q || !c || !h.qty || q.bust || (econ.s.subs || {})[id]) continue;
+    const a = tradeAdvice(econ, id), value = Math.round(q.price * h.qty), profit = value - Math.round(h.cost), gain = h.cost ? value / h.cost - 1 : 0;
+    if (a.sig !== 'sell' || profit <= 0 || gain < 0.15) continue;
+    if (!best || profit > best.profit) best = { id, nm: c.nm, ico: c.ico, qty: h.qty, value, profit, gain };
+  }
+  return best;
+}
 export function tradeAdvice(econ, id) {
   const c = COMPANIES.find(x => x.id === id), q = econ.s.market.c[id], h = econ.s.shares[id];
   const hist = q.hist.slice(-30), avg = hist.reduce((a, v) => a + v, 0) / hist.length, p = q.price;
@@ -886,6 +938,11 @@ export function renderFinance(el, econ, rep = 0, rerender = () => {}, unitTypes 
     </div>
   </div>`;
 
+  // блокирани пари: гаранции за участие в държавни поръчки (opts.blocked = [{ nm, amount, why }])
+  const blk = (opts.blocked || []).filter(b => b.amount > 0);
+  if (blk.length) html += `<div class="card" style="border-color:#ffb46b"><h3><span class="ico">🔐</span>Блокирани пари · ${fmt(blk.reduce((a, b) => a + b.amount, 0))}</h3>
+    ${blk.map(b => `<div class="fin-kv"><span>${esc(b.nm)}<br><span style="color:var(--mut);font-size:12px">${esc(b.why || '')}</span></span><b>${fmt(b.amount)}</b></div>`).join('')}
+    <div class="meta">Гаранциите за участие в търгове не са твои пари, докато не ги върнат: загубилите търга си ги получават при отварянето на офертите, спечелилият — при предаването на обекта.</div></div>`;
   // депозит
   const dep = econ.depositInfo(), canIn = n => s.money >= n;
   html += `<div class="card">

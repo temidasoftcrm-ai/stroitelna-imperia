@@ -22,6 +22,13 @@ export const TENDERS = [
     need: { crew: 5, crane: 3, loader: 3, truck: 5 }, matShare: 0.55, ds: 'Огромен терминал между Европа и Азия.' },
   { id: 'port-rotterdam', city: 'rotterdam', kind: 'port', ico: '⚓', nm: 'Maasvlakte 3 — Ротердам', budget: 70000000, days: 80, rep: 4.5, dev: 8,
     need: { crew: 6, crane: 4, loader: 3, truck: 6 }, matShare: 0.55, ds: 'Най-голямото пристанище в Европа се разширява.' },
+  // голям обект: size — парцели [по x, по z] (3×4 = 12 парцела); улиците между тях стават част от площадката
+  { id: 'luzhniki-moscow', city: 'moscow', kind: 'stadium', size: [3, 4], ico: '🏟️', nm: 'Национален стадион „Лужники“ — Москва', budget: 140000000, days: 120, rep: 4.5, dev: 10,
+    need: { crew: 8, crane: 4, loader: 4, truck: 6 }, matShare: 0.55, sign: '🏟️ ЛУЖНИКИ', ds: 'Стадион за 80 000 зрители с покрив, фен зона и огромни паркинги — заема цели 12 парцела в Москва.' },
+  { id: 'campnou-barcelona', city: 'barcelona', kind: 'stadium', variant: 'campnou', size: [3, 4], ico: '🏟️', nm: 'Стадион „Камп Ноу“ — Барселона', budget: 130000000, days: 115, rep: 4.5, dev: 9,
+    need: { crew: 8, crane: 4, loader: 4, truck: 6 }, matShare: 0.55, sign: '🏟️ КАМП НОУ', ds: 'Новият дом на „Барса“ за 105 000 зрители — най-големият стадион в Европа, на 12 парцела в Барселона.' },
+  { id: 'olympia-berlin', city: 'berlin', kind: 'stadium', variant: 'olympia', size: [3, 3], ico: '🏟️', nm: 'Олимпийски стадион — Берлин', budget: 110000000, days: 110, rep: 4.5, dev: 9,
+    need: { crew: 7, crane: 4, loader: 3, truck: 6 }, matShare: 0.55, sign: '🏟️ ОЛИМПИЙСКИ СТАДИОН', ds: 'Реконструкция на историческия стадион с парка, басейна и площада около него — 9 парцела в Берлин.' },
 ];
 export const BID_MS = [0.75, 0.8, 0.85, 0.9, 0.95, 1, 1.05];
 export const ADVANCE = 0.2, LATE_PEN = 0.005, OPEN_DAYS = 7;
@@ -32,7 +39,7 @@ export const bondOf = t => Math.round(t.budget * BOND / 10000) * 10000;
 const T = id => TENDERS.find(t => t.id === id);
 
 // deps: { S(), econ(), toast, modal(title, html, buttons), fmt, save, sound(n), rep(), devBest(), owns(cityId), cityName(id),
-//         fleetIn(cityId) → { type: count } (техниката в този град), emit?(ev), onProgress?(id, prog) — 3D, onDone?(id) }
+//         fleetIn(cityId) → { type: count } (техниката в този град), emit?(ev), onProgress?(id, prog) — 3D, onDone?(id), pop?(key, cap, sub) — снимка }
 export function createTenders(deps) {
   const st = () => { const S = deps.S(); S.tenders = S.tenders || {}; return S.tenders; };
   const day = () => deps.S().day;
@@ -62,6 +69,7 @@ export function createTenders(deps) {
       deps.econ().earn(adv, 'обект', `Аванс: ${t.nm}`);
       deps.toast(`🏆 Спечели търга „${t.nm}“ за ${deps.fmt(price)} €! Аванс ${deps.fmt(adv)} €. Срок: ${t.days} дни.`, 'good');
       if (deps.sound) deps.sound('done');
+      if (deps.pop) deps.pop('tender-won', `🏆 ${t.ico || '🏛️'} ${t.nm}`, `Спечели държавната поръчка за ${deps.fmt(price)} € · аванс ${deps.fmt(adv)} €`);
       if (deps.emit) deps.emit('tenderWon');
     } else {
       Object.assign(s, { st: 'lost', lostDay: day(), winner: w.nm, winM: w.m, result: all.map(x => [x.nm, x.m]) });

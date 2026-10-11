@@ -3,7 +3,7 @@
 // или магистрала от града на доставчика до някой от твоите градове. Ако не я направиш до срока — договорът пропада.
 // Записът е в S.supply = { offers: [...], deals: [...] } (общ за фирмата, не за града).
 // deps: S(), econ(), MATERIALS, FACTORIES, cityName(id), rail(a, b) → bool, road(a, b) → bool, ownedCities(),
-//       toast, fmt, save, sound, onRailDelivery(text), isForeign(id)
+//       toast, fmt, save, sound, onRailDelivery(text), isForeign(id), cityOk?(id) — градът е отключен за оферти
 const OFFER_DAYS = 6, DEAL_DAYS = 90, MAX_OFFERS = 3;
 // количества за една оферта (в единиците на материала)
 const LOT = { sand: 300, gravel: 300, concrete: 150, bricks: 40, steel: 20, wood: 60, glass: 300, furniture: 30, marble: 250 };
@@ -23,7 +23,7 @@ export function createSupply(deps) {
   function makeOffer() {
     const S = deps.S(), mine = new Set(deps.ownedCities());
     // доставчици извън твоите градове; чуждите и далечните имат по-голяма отстъпка
-    const pool = deps.FACTORIES.filter(f => !mine.has(f.cityId) && deps.MATERIALS[f.materialId] && !st().offers.some(o => o.from === f.cityId && o.mat === f.materialId));
+    const pool = deps.FACTORIES.filter(f => !mine.has(f.cityId) && deps.MATERIALS[f.materialId] && (!deps.cityOk || deps.cityOk(f.cityId)) && !st().offers.some(o => o.from === f.cityId && o.mat === f.materialId));
     if (!pool.length) return;
     const f = pool[(Math.random() * pool.length) | 0], M = deps.MATERIALS[f.materialId];
     const qty = Math.round((LOT[f.materialId] || 50) * rnd(0.7, 1.4));

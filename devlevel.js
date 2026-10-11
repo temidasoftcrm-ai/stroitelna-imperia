@@ -26,6 +26,7 @@ const UNLOCKS = {
   9: '✈️ Летища, самолети и авиолинии · 🌐 световна карта',
   10: '🌎 Целият свят — филиали в Ню Йорк, Сингапур, Токио, Рио… по авиолиния',
 };
+export const unlockText = lv => UNLOCKS[lv] || '';
 export const LV = { BG_ALL: 2, LINKS: 2, STAFF: 4, BALKANS: 5, FOREIGN: 6, OFFERS: 6, STOCKS: 7, EUROPE: 8, AIR: 9, WORLD: 10 };
 export const OFFERS_LV = LV.OFFERS, STOCKS_LV = LV.STOCKS;
 const lvOf = xp => { let l = 1; for (let i = 0; i < THRESH.length; i++) if (xp >= THRESH[i]) l = i + 1; return l; };

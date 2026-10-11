@@ -1,0 +1,60 @@
+// conquest.js — „Завладяване“: колко % от всеки континент е твой.
+// Броят се: завладени държави, завършени участъци магистрала и аутобан, пристанища и летища (построени от теб).
+// Процентът е общият брой завладени неща / всички неща на континента (напр. 3/10 + 5/10 + 2/5 + 3/30 + 1/20 = 14/75 ≈ 19%).
+// deps: { cities() → [id], contOf(id) → 'af'|'na'|'sa'|'as'|'oc'|null (null = Европа), conts() → [{ key, nm, ico }],
+//         countries() → [{ cc, nm, cities }], isFinished(id), hwSegs() → [{ id, a, b }], abSegs() → [{ id, a, b }], hwDone() → [id],
+//         portMax(id), portLv(id), airMax(id), airLv(id), modal(title, html, buttons) }
+const EU = { key: 'eu', nm: 'Европа', ico: '🇪🇺' };
+const CATS = [
+  { key: 'countries', ico: '🏳️', nm: 'Държави' },
+  { key: 'hw', ico: '🛣️', nm: 'Магистрали' },
+  { key: 'ab', ico: '🔴', nm: 'Аутобани' },
+  { key: 'ports', ico: '⚓', nm: 'Пристанища' },
+  { key: 'air', ico: '✈️', nm: 'Летища' },
+];
+
+export function createConquest(deps) {
+  const contKey = id => deps.contOf(id) || 'eu';
+  const all = () => [EU, ...deps.conts().map(k => ({ key: k.key, nm: k.nm, ico: k.ico }))];
+
+  // { eu: { countries: [done, total], hw: [...], ..., done, total, pct }, af: {...}, ... }
+  function stats() {
+    const out = {};
+    for (const k of all()) { out[k.key] = { done: 0, total: 0, pct: 0 }; for (const c of CATS) out[k.key][c.key] = [0, 0]; }
+    const add = (cont, cat, ok) => { const r = out[cont]; if (!r) return; r[cat][1]++; if (ok) r[cat][0]++; };
+    for (const k of deps.countries()) add(contKey(k.cities[0]), 'countries', k.cities.every(id => deps.isFinished(id)));
+    const done = new Set(deps.hwDone());
+    for (const s of deps.hwSegs()) add(contKey(s.a), 'hw', done.has(s.id));
+    for (const s of deps.abSegs()) if (!s.spur) add(contKey(s.a), 'ab', done.has(s.id));
+    for (const id of deps.cities()) {
+      if (deps.portMax(id) > 0) add(contKey(id), 'ports', deps.portLv(id) > 0);
+      if (deps.airMax(id) > 0) add(contKey(id), 'air', deps.airLv(id) > 0);
+    }
+    for (const r of Object.values(out)) {
+      for (const c of CATS) { r.done += r[c.key][0]; r.total += r[c.key][1]; }
+      r.pct = r.total ? Math.round(r.done / r.total * 100) : 0;
+    }
+    return out;
+  }
+
+  const bar = (pct, h = 8) => `<div style="height:${h}px;border-radius:${h}px;background:rgba(255,255,255,.08);overflow:hidden"><div style="height:100%;width:${pct}%;background:linear-gradient(90deg,var(--acc),var(--ok))"></div></div>`;
+
+  function html() {
+    const st = stats();
+    let world = [0, 0];
+    const rows = all().map(k => {
+      const r = st[k.key]; world[0] += r.done; world[1] += r.total;
+      const cats = CATS.filter(c => r[c.key][1]).map(c => `<span style="white-space:nowrap;margin-right:10px">${c.ico} ${c.nm} <b>${r[c.key][0]}/${r[c.key][1]}</b></span>`).join('');
+      return `<div style="margin:0 0 14px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><b>${k.ico} ${k.nm}</b><b style="color:var(--acc);font-size:18px">${r.pct}%</b></div>
+        ${bar(r.pct)}
+        <div style="color:var(--mut);font-size:12px;margin-top:5px;line-height:1.7">${cats}</div></div>`;
+    }).join('');
+    const wp = world[1] ? Math.round(world[0] / world[1] * 100) : 0;
+    return `<div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><b>🌍 Целият свят</b><b style="color:var(--ok);font-size:22px">${wp}%</b></div>${bar(wp, 12)}</div>${rows}
+      <div style="color:var(--mut);font-size:12px">Държава е завладяна, когато завършиш всичките ѝ ключови градове. Пристанищата и летищата се броят, щом построиш първото ниво.</div>`;
+  }
+
+  const open = () => deps.modal('🏆 Завладяване', html(), [['Добре', null]]);
+  return { stats, html, open };
+}

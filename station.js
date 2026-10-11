@@ -111,10 +111,10 @@ export function createStation(deps) {
       }
       // гарова сграда в северния край на перона; расте с нивото
       const hw = 6, hh = 3.5 + lv * 1.3, hl = 8 + lv * 3;
-      const real = lv >= 2 ? stationBuilding(lv >= 5 ? 'big' : 'small', lv >= 5 ? 40 : hl + 4, lv >= 5 ? 13 : 10) : null;
+      const real = lv >= 2 ? stationBuilding(lv >= 5 ? 'big' : 'small', lv >= 5 ? 47 : hl + 4, lv >= 5 ? 18 : 10) : null;
       if (lv >= 2 && !real && !stLoad) loadStationModels().then(() => { if (level === lv) build(lv, buildingNow); });
       if (real) {   // истинската сграда — до перона, в северния му край
-        real.position.set(X + 5.5 + (lv >= 5 ? 4 : 3), 0, -plen - (lv >= 5 ? 20 : (hl + 4) / 2) - 1); g.add(real);
+        real.position.set(X + 5.5 + (lv >= 5 ? 6 : 3), 0, lv >= 5 ? plen + 24.5 : -plen - (hl + 4) / 2 - 1); if (lv >= 5) real.rotation.y = Math.PI; g.add(real);
         const lab = deps.label(`🚉 ${STATION_LEVELS[lv - 1].nm.toUpperCase()} · ${lv} ${lv === 1 ? 'коловоз' : 'коловоза'}`, '#ffffff', 9);
         lab.position.set(real.position.x, real.userData.h + 4, real.position.z); g.add(lab);
       } else {
