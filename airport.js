@@ -102,7 +102,7 @@ function sample(keys, t) {
   return keys[keys.length - 1];
 }
 
-// group: групата на града; deps: { A, model, label(text, color, w) }; opts: { lv (1–5), x, z, seed }
+// group: групата на града; deps: { A, model, label(text, color, w) }; opts: { lv (1–7), x, z, seed }
 export function buildAirport(group, deps, opts = {}) {
   const g = new THREE.Group(); group.add(g);
   g.position.set(opts.x || 0, 0, opts.z || 0);
@@ -167,7 +167,8 @@ export function buildAirport(group, deps, opts = {}) {
   const parked = [];
   let lv = 0;
   function setLevel(n) {
-    n = Math.max(1, Math.min(5, n | 0)); if (n === lv) return; lv = n;
+    n = Math.max(1, Math.min(7, n | 0)); if (n === lv) return; lv = n;
+    const big = n; n = Math.min(5, n);   // ниво 6–7 (мега/световен хъб): терминалът е като на 5, плюс още хангари и самолети
     lvG.clear(); parked.length = 0; windows.length = 0;
     const tLen = 40 + n * 22, tz = -tLen / 2 + 20;
     const wall = mat(0xd9dde2, 0.6, 0.1), glassM = mat(0x5f8fb8, 0.2, 0.3, 0xffd890), roof = mat(0x9aa3ad, 0.5, 0.5);
@@ -217,7 +218,7 @@ export function buildAirport(group, deps, opts = {}) {
     const rows = Math.floor(tLen * 0.7 / 5);
     for (let k = 0; k < rows * 2; k++) if (Math.random() < 0.6) box(2, 1.3, 4, mat(LIVERY[k % LIVERY.length], 0.5, 0.3), TERM.x - 26 + (k % 2 ? 4 : -4), 0.65, tz - tLen * 0.35 + 2.5 + Math.floor(k / 2) * 5, lvG);
     // хангари (ниво 3+): полуцилиндри южно от терминала, отворени към рулежката
-    for (let k = 0; k < n - 2; k++) {
+    for (let k = 0; k < big - 2; k++) {
       const h = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 22, 18).rotateZ(Math.PI / 2), mat(0xb8bec6, 0.5, 0.5));
       h.position.set(TERM.x + 2, 0, 42 + k * 24); h.castShadow = h.receiveShadow = true; lvG.add(h);
       box(0.3, 8, 16, mat(0x2a3038, 0.6), TERM.x + 13.1, 3.5, 42 + k * 24, lvG);
@@ -228,6 +229,8 @@ export function buildAirport(group, deps, opts = {}) {
       for (let k = 0; k < 8; k++) box(2.4, 2.4, 6, mat(LIVERY[k % LIVERY.length], 0.6), TERM.x - 16 + (k % 2) * 3, 1.2, 58 + Math.floor(k / 2) * 7, lvG);
       const c = makePlane('cargo', 1); c.position.set(TW.x - 4, c.userData.gearY, 104); c.rotation.y = -Math.PI / 2; lvG.add(c); parked.push(c);
     }
+    // мега/световен хъб: още широкофюзелажни самолети на отделния перон до хангарите
+    for (let k = 0; k < big - 5; k++) { const p = makePlane('wide', 7 + k); p.position.set(TW.x - 4, p.userData.gearY, 140 + k * 40); p.rotation.y = -Math.PI / 2; lvG.add(p); parked.push(p); }
     if (sign) { sign.position.set(TERM.x - 6, 16, tz); }
   }
   const sign = deps.label ? deps.label('✈️ ЛЕТИЩЕ', '#ffffff', 12) : null;

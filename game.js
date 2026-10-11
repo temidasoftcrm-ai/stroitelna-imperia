@@ -38,7 +38,7 @@ import { CITY_LANDMARKS, LANDMARK_CENTER, buildLandmark } from './landmarks.js';
 import { OFFICE_STYLES, STYLE_LV, STYLE_COST, buildOfficeTower } from './officestyle.js';
 import { shipRange, PORT_LEVELS, portMax, SHIPS, seaKm, seaPath, SEA_ROUTE_COST, voyagePay, shipDaily, SEA_LV } from './seaways.js';
 import { makeTrackMap, placeCars } from './trackpath.js';
-import { airportMax, AIRPORT_LEVELS, PLANES, PLANE_LADDER, PLANE_PIC, ROUTE_COST, airKm, flightPay, planeDaily, WORLD, WORLD_IDS } from './airways.js';
+import { airportMax as airportMax0, AIRPORT_LEVELS, PLANES, PLANE_LADDER, PLANE_PIC, ROUTE_COST, airKm, flightPay, planeDaily, WORLD, WORLD_IDS } from './airways.js';
 import { MUNI_SHARE, linkPrices, buyoutPrice } from './linkoffers.js';
 import { EXTRA_BALKAN, EXTRA_EUROPE, EXTRA_WORLD, COUNTRIES, countryProgress, wonCountries, wonIncomeMul, countryLabelLL } from './countries.js';
 import { AFRICA, AFRICA_COUNTRIES, AFRICA_COASTAL, AFRICA_IDS, isAfrica, AFRICA_CHAPTER } from './africa.js';
@@ -2653,6 +2653,10 @@ function showCityOnMap(id) {
 // изгледът „Африка“ е разтегнат хоризонтално ×1.3 (около екватора меридианите са по-раздалечени) — само визуално, всичко се чертае през proj
 const projX = () => mapCont === 'af' ? 1.3 : 1;
 function proj(lon, lat) { return [(lon - 25.4) * Math.cos(42.7 * Math.PI / 180) * 100 * projX(), -(lat - 42.75) * 100]; }
+// ✈️ максимално ниво на летището: най-големите световни градове — 7; средните и големите — до 5; малките — до 3;
+// градовете с малко летище (Новоросийск…) остават на своето ниво от airways.js (напр. 1)
+const AIR_GIANT = new Set(['newyork', 'london', 'paris', 'tokyo', 'dubai', 'shanghai', 'singapore', 'hongkong', 'losangeles', 'moscow', 'istanbul', 'beijing', 'saopaulo', 'mumbai', 'sydney', 'frankfurt', 'chicago', 'seoul', 'cairo', 'johannesburg', 'lagos', 'mexicocity', 'toronto', 'buenosaires', 'kualalumpur', 'bangkok', 'amsterdam']);
+const airportMax = id => { const b = airportMax0(id); if (!b) return 0; if (AIR_GIANT.has(id)) return 7; return Math.min(b, (cityById(id)?.sz || 1) >= 2 ? 5 : 3); };
 function drawMap() {
   if (S) restoreSpurs();   // и без влизане в град (картата е първият екран)
   const svg = $('mapSvg');
@@ -3505,8 +3509,9 @@ const planeImg = (k, h = 40) => PLANE_PIC[k] ? `<img src="assets/ui/plane-${PLAN
 function upgradePlane(id) {
   const p = (S.planes || []).find(q => q.id === id); if (!p) return;
   const n = planeNext(p.kind); if (!n) return;
-  if (p.path) { toast('Самолетът е във въздуха — надгради го, щом кацне.', 'bad'); return; }
+  if (p.upTo) return;
   const c = planeUpCost(p.kind); if (!econ.canAfford(c)) { toast(`Нямаш ${fmt(c)} € за надграждането.`, 'bad'); return; }
+  if (p.path) { econ.spend(c, 'покупка', `Надграждане: ${PLANES[p.kind].nm} → ${PLANES[n].nm}`); p.upTo = n; toast(`⏳ Самолет №${p.id} е във въздуха — става ${PLANES[n].nm} щом кацне.`, 'good'); Sound.play('buy'); save(); return; }   // във въздуха: плащаш сега, сменя се при кацане
   econ.spend(c, 'покупка', `Надграждане: ${PLANES[p.kind].nm} → ${PLANES[n].nm}`);
   p.kind = n; p.nm = `${PLANES[n].ico} №${p.id}`;
   Sound.play('upgrade'); toast(`⬆️ Самолет №${p.id} вече е ${PLANES[n].nm} — ${PLANES[n].seats} места, обсег ${fmt(PLANES[n].range)} км.`, 'good'); save();
@@ -3542,6 +3547,7 @@ function updateAir(dtDays) {
     if (p.km < p.total) continue;
     const [from, to] = p.path, f = p.pay || flightPay(p.kind, p.total);
     p.at = to; p.path = null;
+    if (p.upTo) { const n = p.upTo; delete p.upTo; p.kind = n; p.nm = `${PLANES[n].ico} №${p.id}`; toast(`⬆️ Самолет №${p.id} кацна в ${cityById(to).nm} и вече е ${PLANES[n].nm}.`, 'good'); }
     if (p.ferry) econ.spend(f.fuel, 'гориво', `${p.nm}: прелитане ${cityById(from).nm} → ${cityById(to).nm}`);
     else {
       const net = Math.round((f.gross - f.fuel) * (isMuni('air', from) || isMuni('air', to) ? 1 - MUNI_SHARE : 1));
@@ -3995,7 +4001,7 @@ function airWinHtml() {
       <select id="arB"><option value="">— избери град —</option>${dests.filter(c => c.id !== airSelA && airportMax(c.id) && !hasRoute(airSelA, c.id)).map(c => `<option value="${c.id}" ${c.id === airSelB ? 'selected' : ''} ${interWhy(airSelA, c.id) ? 'disabled' : ''}>${interWhy(airSelA, c.id) ? '🔒 ' : isWorld(c.id) ? '🌐 ' : ''}${c.cc ? c.cc + ' ' : ''}${c.nm}</option>`).join('')}</select>
       <span class="meta" style="margin:0">${sel ? `${fmt(sel.km)} км · права ${fmt(sel.cost)} €` : ''}</span><button class="btn" id="arOpen" ${sel && routes.length < maxRoutes() ? '' : 'disabled'}>Отвори линия</button></div>` : '<div class="meta late">Първо построй летище.</div>'));
   // самолети
-  h += bwCard(`✈️ Самолети · ${planes.length}/${airGates()}`, planes.length ? planes.map(p => { const P = PLANES[p.kind], nx = planeNext(p.kind); return `<div class="row" style="margin:5px 0;align-items:center;gap:8px">${planeImg(p.kind, 42)}<span class="meta" style="margin:0;flex:1"><b style="color:var(--txt)">${p.nm}</b> ${P.nm}<br>${p.path ? `${p.ferry ? '↩️ прелита празен' : P.cargo ? '📦 товари' : '🎫 пътници'} ${cityById(p.path[0]).nm} → ${cityById(p.path[1]).nm} · ${Math.floor(p.km / Math.max(1, p.total) * 100)}%` : `на земята в ${cityById(p.at).nm} — няма линия в обсега му (${fmt(P.range)} км)`}</span>${p.path && !p.ferry ? `<b style="color:var(--ok)">+${fmt(p.pay.gross - p.pay.fuel)} €</b>` : ''}${nx ? `<button class="btn2" data-upplane="${p.id}" ${econ.canAfford(planeUpCost(p.kind)) && !p.path ? '' : 'disabled'} title="${p.path ? 'Във въздуха — надгражда се на земята' : ''}">⬆️ ${planeImg(nx, 22)} ${PLANES[nx].nm.replace(/ \(.*$/, '')} · ${fmt(planeUpCost(p.kind))} €</button>` : '<span class="meta" style="margin:0;color:var(--ok)">👑 макс.</span>'}</div>`; }).join('') : '<div class="meta">Нямаш самолети.</div>');
+  h += bwCard(`✈️ Самолети · ${planes.length}/${airGates()}`, planes.length ? planes.map(p => { const P = PLANES[p.kind], nx = planeNext(p.kind); return `<div class="row" style="margin:5px 0;align-items:center;gap:8px">${planeImg(p.kind, 42)}<span class="meta" style="margin:0;flex:1"><b style="color:var(--txt)">${p.nm}</b> ${P.nm}<br>${p.path ? `${p.ferry ? '↩️ прелита празен' : P.cargo ? '📦 товари' : '🎫 пътници'} ${cityById(p.path[0]).nm} → ${cityById(p.path[1]).nm} · ${Math.floor(p.km / Math.max(1, p.total) * 100)}%` : `на земята в ${cityById(p.at).nm} — няма линия в обсега му (${fmt(P.range)} км)`}</span>${p.path && !p.ferry ? `<b style="color:var(--ok)">+${fmt(p.pay.gross - p.pay.fuel)} €</b>` : ''}${p.upTo ? `<span class="meta" style="margin:0;color:#7dd3ff">⏳ става ${PLANES[p.upTo].nm.replace(/ \(.*$/, '')} при кацане</span>` : nx ? `<button class="btn2" data-upplane="${p.id}" ${econ.canAfford(planeUpCost(p.kind)) ? '' : 'disabled'} title="${p.path ? 'Във въздуха — плащаш сега, става при кацане' : ''}">⬆️ ${planeImg(nx, 22)} ${PLANES[nx].nm.replace(/ \(.*$/, '')} · ${fmt(planeUpCost(p.kind))} €</button>` : '<span class="meta" style="margin:0;color:var(--ok)">👑 макс.</span>'}</div>`; }).join('') : '<div class="meta">Нямаш самолети.</div>');
   h += bwCard('🛒 Купи самолет', `<div style="display:flex;gap:6px;align-items:flex-end;justify-content:space-between;margin:4px 0 8px;flex-wrap:wrap">${PLANE_LADDER.map((k, i) => `<div style="text-align:center;flex:1;min-width:90px">${planeImg(k, 64)}<div class="meta" style="margin:2px 0 0"><b style="color:var(--txt)">${i + 1}. ${PLANES[k].nm.replace(/ \(.*$/, '')}</b><br>${PLANES[k].seats} места · ${fmt(PLANES[k].range)} км<br>${i ? `⬆️ +${fmt(PLANES[k].cost - PLANES[PLANE_LADDER[i - 1]].cost)} €` : `${fmt(PLANES[k].cost)} €`}</div></div>`).join('<div style="align-self:center;color:var(--mut)">→</div>')}</div>
     <div class="meta" style="margin:0 0 6px">Купуваш витлов самолет и после го надграждаш (от „✈️ Самолети“ горе) — плащаш само разликата.</div>` + Object.entries(PLANES).filter(([k]) => k === 'prop' || k === 'cargo').map(([k, P]) => `<div class="row" style="margin:5px 0"><span class="meta" style="margin:0"><b style="color:var(--txt)">${P.ico} ${P.nm}</b><br>${P.cargo ? `${P.tons} т товар` : `${P.seats} места`} · обсег ${fmt(P.range)} км · ~${fmt(planeDaily(k))} €/ден чисто · поддръжка ${fmt(P.upkeep)} €/ден</span><button class="btn" data-plane="${k}" ${econ.canAfford(P.cost) && planes.length < airGates() ? '' : 'disabled'}>${fmt(P.cost)} €</button></div>`).join(''));
   { const g = gatePlan(); if (g) h += bwCard('⬆️ Гейтовете са пълни', `<div class="meta" style="margin:0 0 6px">Линиите (${(S.airRoutes || []).length}/${maxRoutes()}) или самолетите (${(S.planes || []).length}/${airGates()}) са на тавана. Най-изгодно е ${g.nm} в ${cityById(g.id).nm}: +${g.add} гейта (+${g.add * 2} линии).</div><div class="row" style="justify-content:flex-end"><button class="btn" data-addgates="${g.id}">⬆️ Добави гейтове · +${g.add} за ${fmt(g.cost)} €</button></div>`);
@@ -4267,6 +4273,15 @@ function seaWinHtml() {
       return pl.list.length ? `<div class="row" style="justify-content:flex-end;margin-top:6px"><span class="meta" style="margin:0 auto 0 0">${pl.list.map(c => cityById(c.id).nm).join(', ')}${pl.gain < pl.need ? ' · пристанищата не стигат за всички' : ''}</span><button class="btn" data-addberths="1" ${econ.canAfford(pl.list[0].cost) ? '' : 'disabled'}>⬆️ Добави кейове · +${pl.gain} за ${fmt(pl.cost)} €</button></div>`
         : '<div class="meta" style="margin-top:6px">Всички пристанища са на максимум или се строят — отвори пристанище в нов крайморски град.</div>'; })()}</div>`; }
   const coast = ownedCities().filter(id => (portMax(id) || portLv(id)) && (scopeNow() === 'intl' || inScope(id)));
+  // 🛒 корабите: стълбица като при самолетите и влаковете — купуваш кораб за линия без кораб и после го надграждаш
+  if (seaOn() && Object.keys(S.ports || {}).some(id => portLv(id))) {
+    const SL = Object.keys(SHIPS), idle = (S.seaRoutes || []).filter(r => !routeShip(r) && inScope(r.a, r.b)).sort((a, b) => a.km - b.km), freeB = portBerths() - (S.ships || []).length;
+    const lad = `<div style="display:flex;gap:4px;align-items:flex-end;justify-content:space-between;margin:4px 0 8px;flex-wrap:wrap">${SL.map((k, i) => { const P = SHIPS[k]; return `<div style="text-align:center;flex:1;min-width:84px">${shipImg(k, 40)}<div class="meta" style="margin:2px 0 0"><b style="color:var(--txt)">${i + 1}. ${P.nm}</b><br>${P.range ? `до ${fmt(P.range)} км` : 'без ограничение'}<br>${i ? `⬆️ +${fmt(upCost(SHIPS[SL[i - 1]], P))} €` : `${fmt(P.cost)} €`}</div></div>`; }).join('<div style="align-self:center;color:var(--mut)">→</div>')}</div>`;
+    const first = idle[0], fk = first && firstShipFor(first.km), cost = fk ? SHIPS[fk].cost : 0, many = idle.filter(r => firstShipFor(r.km)).slice(0, Math.max(0, freeB)), manyCost = many.reduce((a, r) => a + SHIPS[firstShipFor(r.km)].cost, 0);
+    h += bwCard('🛒 Купи кораб', lad + `<div class="meta" style="margin:0 0 6px">Корабът се купува за линия без кораб (най-малкият, който стига до другия край) и после се надгражда с ⬆️ при кораба — плащаш само разликата.</div>`
+      + (!idle.length ? '<div class="meta" style="margin:0;color:var(--ok)">✅ Всички морски линии имат кораб.</div>' : freeB <= 0 ? `<div class="meta late" style="margin:0">⚓ ${idle.length} линии чакат кораб, но няма свободен кей — надгради пристанищата.</div>`
+        : `<div class="row" style="margin:4px 0;align-items:center;gap:6px;flex-wrap:wrap"><span class="meta" style="margin:0;flex:1">${shipImg(fk, 20)} <b style="color:var(--txt)">${SHIPS[fk].nm}</b> за ${cityById(first.a).nm} — ${cityById(first.b).nm} (${fmt(first.km)} км) · свободни кейове ${freeB}</span><button class="btn" data-buyship1="1" ${econ.canAfford(cost) ? '' : 'disabled'}>${fmt(cost)} €</button>${many.length > 1 ? `<button class="btn2" data-buyshipall="1" ${econ.canAfford(manyCost) ? '' : 'disabled'}>🚢 За ${many.length} линии · ${fmt(manyCost)} €</button>` : ''}</div>`));
+  }
   h += bwCard('⚓ Пристанища', coast.length ? coast.map(id => {
     const pt = portOf(id), lv = pt?.lv || 0, mx = portMax(id), nx = lv < mx ? PORT_LEVELS[lv] : null;
     const st = pt?.build ? `🚧 строи се ${PORT_LEVELS[pt.build.target - 1].nm} · ${Math.floor(pt.build.prog * 100)}%` : (lv ? `${PORT_LEVELS[lv - 1].nm} · ${PORT_LEVELS[lv - 1].berths} кея` : 'още няма пристанище') + ` · макс. ниво ${Math.max(mx, lv)}`;
@@ -6210,6 +6225,7 @@ function renderBig() {
   on('[data-hwunq]', b => { S.hwQueue = hwQueue().filter(x => x !== b.dataset.hwunq); save(); renderBig(); });
   on('[data-hsup]', b => { startHsUpgrade(+b.dataset.hsup); renderBig(); });
   on('[data-sellship]', b => { sellShip(+b.dataset.sellship); renderBig(); });
+  on('[data-buyship1], [data-buyshipall]', b => { const all = !!b.dataset.buyshipall, idle = (S.seaRoutes || []).filter(r => !routeShip(r) && inScope(r.a, r.b)).sort((x, y) => x.km - y.km); let n = 0; for (const r of idle) { if (!addRouteShip(r, all)) break; n++; if (!all) break; } if (n) { Sound.play('ship'); if (all) toast(`🚢 Купи ${n} кораба за линиите без кораб.`, 'good'); save(); } renderBig(); });
   on('[data-upship]', b => { upgradeShip(+b.dataset.upship); renderBig(); });
   on('[data-selltrain]', b => { sellTrain(+b.dataset.selltrain); renderBig(); });
   on('[data-uptrain]', b => { upgradeTrain(+b.dataset.uptrain); renderBig(); });
@@ -6556,6 +6572,8 @@ if (AUTOTEST) {
       for (let d = 0; d < 5; d++) run('day ' + d, () => endOfDay());
       return errs;
     },
+    planeUpTest() { __dbg.airAutoTest(); const p = S.planes.find(q => planeNext(q.kind)); p.path = [S.cityId, 'rome']; p.km = 0; p.total = 900; const k0 = p.kind; openBig('air'); const btn = document.querySelector(`[data-upplane="${p.id}"]`), bi = btn ? [btn.disabled, btn.textContent] : 'nobtn'; upgradePlane(p.id); const mid = [p.kind, p.upTo]; p.km = 899; updateAir(1); return { k0, bi, mid, after: p.kind, up: p.upTo, next: planeNext(k0), cost: planeUpCost(k0), money: Math.round(econ.s.money) }; },
+    shipBuyTest() { __dbg.seaTest(); econ.earn(5e8, 'друго', 'тест'); S.ships = []; S.trTab = 'sea'; openBig('sea'); bwScope = 'all'; renderBig(); const card = [...document.querySelectorAll('#bwBody .card')].find(c => /Купи кораб/.test(c.innerText))?.innerText.slice(0, 300); const n0 = S.ships.length; document.querySelector('[data-buyshipall]')?.click() || document.querySelector('[data-buyship1]')?.click(); return { card, n0, n1: S.ships.length, routes: (S.seaRoutes || []).length }; },
     landCheck() { return { land: est().land, owned: est().owned.length, inv: projects.filter(p => p.invest).map(p => [p.type, p.lot, p.stage, +p.prog.toFixed(2), city.lots[p.lot].busy]), n: projects.length, q: S.buildQ }; },
     landTest(type = 'tower') { econ.earn(5e7, 'друго', 'тест'); S.rep = 5; S.officeLevel = 10; const fr = q => !q.built && !q.busy && !q.fresh, l = city.lots.find(q => q.zone === 'center' && fr(q)) || city.lots.find(fr); buyLand(l.id); buildOnLand(l.id, type); const p = projects.find(q => q.lot === l.id); tab = 'estate'; renderPanel(); return { lot: l.id, land: est().land.length, proj: p ? [p.type, p.invest, p.stage, l.busy] : null, q: S.buildQ, n: projects.length }; },
     cpGearTest() { __dbg.cpTest(3); for (const id of ['plovdiv', 'varna']) S.cities[id].units = ['crew']; endOfDay(); openBig('cities'); return ['plovdiv', 'varna'].map(id => [...(S.cities[id].projects || []), ...(S.cities[id].autoJobs || [])].map(p => p.waitNeed).join(';')); },

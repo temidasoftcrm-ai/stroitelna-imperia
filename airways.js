@@ -9,6 +9,8 @@ export const AIRPORT_LEVELS = [
   { nm: 'Регионално летище', gates: 4, cost: 220000000, days: 18 },
   { nm: 'Международно летище', gates: 6, cost: 320000000, days: 24 },
   { nm: 'Международен хъб', gates: 10, cost: 450000000, days: 30 },
+  { nm: 'Мега хъб', gates: 14, cost: 650000000, days: 36 },        // ниво 6–7: само най-големите световни градове
+  { nm: 'Световен хъб', gates: 20, cost: 900000000, days: 42 },
 ];
 // seats × заетост × fare = приход на км; fuel — разход на км; speed — км на игрален ден
 export const PLANES = {
