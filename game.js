@@ -4117,7 +4117,7 @@ function refreshMines3D() {
   // големите забележителности (МГУ…) — в собствена зона W×D парцела встрани; пазят парцелите си като площадките за добив
   for (const o of city.bigLm || []) city.group.remove(o.group);
   city.landmarks = (city.landmarks || []).filter(o => !o.big); city.bigLm = [];
-  for (const [kind, W, D, asp = 1] of BIG_LANDMARKS[S.cityId] || []) {
+  for (const [kind, W, D, asp = 1, turn = 0] of BIG_LANDMARKS[S.cityId] || []) {
     S.bigLm = S.bigLm || {}; const site = S.bigLm[S.cityId + ':' + kind] = S.bigLm[S.cityId + ':' + kind] || { kind };
     if (!site.near) { site.lots = null; site.near = 1; }   // старите записи (зона в покрайнините) — местят се до центъра
     const grp = mineGroup(site, W, D, true); if (!grp) continue;
@@ -4129,8 +4129,8 @@ function refreshMines3D() {
     for (const c of city.group.children) if (!c.userData.mine && !c.userData.tender && (c.position.x || c.position.z) && Math.abs(c.position.x - x) < hx && Math.abs(c.position.z - z) < hz) c.visible = false;
     const Lx = (3 * W - 1) * TILE - 2, Lz = (3 * D - 1) * TILE - 2, f = W === D ? side / 15 : Math.min(Lx / 15, Lz / (15 * asp));   // моделът по дългата страна (x)
     const o = buildLandmark(kind, { label }); o.big = true; o.group.userData.mine = true;
-    o.group.position.set(x, 0, z); o.group.scale.setScalar(f); o.group.rotation.y = W === D ? (hashStr(kind) % 4) * Math.PI / 2 : (hashStr(kind) % 2) * Math.PI;
-    const plate = o.group.children[0]; if (plate && W !== D) plate.scale.set(Lx / (15 * f), 1, Lz / (15 * f));   // плочата — цялата зона
+    o.group.position.set(x, 0, z); o.group.scale.setScalar(f); o.group.rotation.y = W === D ? (hashStr(kind) % 4) * Math.PI / 2 : (hashStr(kind) % 2) * Math.PI + turn * Math.PI / 2;
+    const plate = o.group.children[0]; if (plate && W !== D) plate.scale.set((turn ? Lz : Lx) / (15 * f), 1, (turn ? Lx : Lz) / (15 * f));   // плочата — цялата зона (при завъртян модел осите са разменени)
     city.group.add(o.group); city.landmarks.push(o); city.bigLm.push(o);
   }
   for (const site of (S.mines?.sites || []).filter(x => x.city === S.cityId)) {
