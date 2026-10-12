@@ -10,10 +10,10 @@ export const RESORTS = [
   { id: 'sunnybeach', nm: 'Слънчев бряг', kind: 'summer', ico: '🌴', lat: 42.73, lon: 27.72, lab: [0, -13, 'middle'], land: 1600000, build: 2800000, days: 24, sell: 7200000, month: 46000 },
   { id: 'velingrad', nm: 'Велинград', kind: 'spa', ico: '♨️', lat: 41.93, lon: 24.08, lab: [12, 4, 'start'], land: 700000, build: 1500000, days: 16, sell: 3600000, month: 14000 },
   // 🇹🇷 Турция (ниво 6 — чужбина) и 🏔️ Алпите (ниво 8 — Европа): ~3× по-скъпи от българските, но и с ~3× наем
-  { id: 'antalya', nm: 'Анталия', cc: '🇹🇷', dev: 6, kind: 'summer', ico: '🏖️', lat: 36.88, lon: 30.70, lab: [0, 21, 'middle'], land: 3000000, build: 6000000, days: 26, sell: 15000000, month: 90000 },
-  { id: 'bodrum', nm: 'Бодрум', cc: '🇹🇷', dev: 6, kind: 'summer', ico: '⛵', lat: 37.03, lon: 27.43, lab: [-12, 4, 'end'], land: 3600000, build: 6600000, days: 28, sell: 16800000, month: 105000 },
-  { id: 'marmaris', nm: 'Мармарис', cc: '🇹🇷', dev: 6, kind: 'summer', ico: '🌴', lat: 36.85, lon: 28.27, lab: [12, 14, 'start'], land: 3000000, build: 5700000, days: 25, sell: 14400000, month: 85000 },
-  { id: 'uludag', nm: 'Улудаг', cc: '🇹🇷', dev: 6, kind: 'winter', ico: '⛷️', lat: 40.10, lon: 29.12, lab: [12, 4, 'start'], land: 2700000, build: 5400000, days: 24, sell: 13500000, month: 78000 },
+  { id: 'antalya', nm: 'Анталия', cc: '🇹🇷', dev: 7, kind: 'summer', ico: '🏖️', lat: 36.88, lon: 30.70, lab: [0, 21, 'middle'], land: 3000000, build: 6000000, days: 26, sell: 15000000, month: 90000 },
+  { id: 'bodrum', nm: 'Бодрум', cc: '🇹🇷', dev: 7, kind: 'summer', ico: '⛵', lat: 37.03, lon: 27.43, lab: [-12, 4, 'end'], land: 3600000, build: 6600000, days: 28, sell: 16800000, month: 105000 },
+  { id: 'marmaris', nm: 'Мармарис', cc: '🇹🇷', dev: 7, kind: 'summer', ico: '🌴', lat: 36.85, lon: 28.27, lab: [12, 14, 'start'], land: 3000000, build: 5700000, days: 25, sell: 14400000, month: 85000 },
+  { id: 'uludag', nm: 'Улудаг', cc: '🇹🇷', dev: 7, kind: 'winter', ico: '⛷️', lat: 40.10, lon: 29.12, lab: [12, 4, 'start'], land: 2700000, build: 5400000, days: 24, sell: 13500000, month: 78000 },
   { id: 'chamonix', nm: 'Шамони', cc: '🇫🇷', dev: 8, kind: 'winter', ico: '🏔️', lat: 45.92, lon: 6.87, lab: [-12, 4, 'end'], land: 4800000, build: 8400000, days: 30, sell: 21600000, month: 138000 },
   { id: 'zermatt', nm: 'Церматт', cc: '🇨🇭', dev: 8, kind: 'winter', ico: '🗻', lat: 46.02, lon: 7.75, lab: [0, 21, 'middle'], land: 5400000, build: 9000000, days: 32, sell: 24000000, month: 150000 },
   { id: 'stanton', nm: 'Санкт Антон', cc: '🇦🇹', dev: 8, kind: 'winter', ico: '🎿', lat: 47.13, lon: 10.27, lab: [12, 4, 'start'], land: 4200000, build: 7800000, days: 28, sell: 19500000, month: 126000 },
@@ -82,7 +82,7 @@ export const hotelStylesOf = kind => HOTEL_STYLES[kind === 'summer' ? 'summer' :
 // deps: { S: () => S, econ, toast(text, kind), modal(title, html, buttons), proj(lon, lat) → [x, y], fmt(n), save(), redraw(), sound(name), onUnlock?(), enter?(id) — 3D изглед }
 export function createResorts(deps) {
   const st = () => { const S = deps.S(); S.resorts = S.resorts || {}; return S.resorts; };
-  const unlocked = () => { const S = deps.S(); return !!S && (S.resortsOpen || S.rep >= UNLOCK.rep || (S.done || 0) >= UNLOCK.done); };
+  const unlocked = () => { const S = deps.S(); return !!S && (S.resortsOpen || (deps.devBest ? deps.devBest() >= 4 : S.rep >= UNLOCK.rep)); };   // курортите — от ниво 4 на развитие
   const R = id => RESORTS.find(r => r.id === id);
   // чуждите курорти се отварят с нивото на развитие (dev); символите на картата растат с мащаба ѝ (symK)
   const haveIn = r => r.need ? r.need.cities.filter(id => (deps.owned ? deps.owned() : []).includes(id)).length : 0;
