@@ -14,9 +14,9 @@ export const WEATHER = {
 // вероятности по сезон (месецът от resorts.js: 0 = януари)
 export function rollWeather(month) {
   const winter = [11, 0, 1, 2].includes(month), summer = [5, 6, 7, 8].includes(month);
-  const t = winter ? [['clear', 30], ['cloudy', 20], ['snow', 35], ['fog', 15]]
+  const t = winter ? [['clear', 30], ['cloudy', 20], ['snow', 35], ['fog', 5]]
     : summer ? [['clear', 68], ['cloudy', 20], ['storm', 8], ['rain', 4]]
-    : [['clear', 32], ['cloudy', 25], ['rain', 28], ['fog', 12], ['storm', 3]];
+    : [['clear', 32], ['cloudy', 25], ['rain', 28], ['fog', 4], ['storm', 3]];
   let r = Math.random() * t.reduce((a, x) => a + x[1], 0);
   for (const [k, w] of t) if ((r -= w) <= 0) return k;
   return 'clear';

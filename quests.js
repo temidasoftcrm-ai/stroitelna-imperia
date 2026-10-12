@@ -220,7 +220,9 @@ export function createQuests(deps) {
   };
   const panel = document.createElement('div');
   panel.id = 'qPanel'; panel.className = 'hidden';
-  panel.innerHTML = `<div class="qh"><b>🎯 Куести</b><span id="qSum" class="meta"></span><button class="btn2" id="qClose">✕</button></div><div id="qList"></div>`;
+  panel.innerHTML = `<div class="qh"><b>🎯 Куести</b><span id="qSum" class="meta"></span><button class="btn2" id="qClose">✕</button></div><div id="qTabs" style="display:flex;gap:6px;padding:8px 14px 0"></div><div id="qList"></div>`;
+  let showDone = false;   // „✅ Изпълнени“ — взетите куести не стоят в текущия списък, а тук
+  panel.querySelector('#qTabs').onclick = e => { const b = e.target.closest('[data-qtab]'); if (!b) return; showDone = b.dataset.qtab === 'done'; panel.querySelector('#qList').scrollTop = 0; render(); };
   document.body.appendChild(panel);
   btn.onclick = () => { if (!S()) return; panel.classList.toggle('hidden'); render(); };
   panel.querySelector('#qClose').onclick = () => panel.classList.add('hidden');
@@ -230,15 +232,25 @@ export function createQuests(deps) {
     if (panel.classList.contains('hidden') || !S()) return;
     const total = QUEST_COUNT, got = Object.keys(qs().claimed).length;
     panel.querySelector('#qSum').textContent = `${got} / ${total}`;
+    const tab = (k, txt) => `<button class="${(k === 'done') === showDone ? 'btn' : 'btn2'}" data-qtab="${k}" style="flex:1;padding:6px 8px">${txt}</button>`;
+    panel.querySelector('#qTabs').innerHTML = tab('cur', '🎯 Текущи') + tab('done', `✅ Изпълнени (${got})`);
     let h = '';
-    CHAPTERS.forEach((c, i) => {
+    if (showDone) {
+      CHAPTERS.forEach(c => {
+        const qq = c.quests.filter(claimed); if (!qq.length) return;
+        h += `<div class="qch"><span>${c.ico} ${c.nm}</span><span>${qq.length}/${c.quests.length}</span></div>`;
+        for (const q of qq) h += `<div class="qc done"><div class="qi">${q.ico}</div><div class="qn">${q.nm}</div><div class="qr">+${deps.fmt(q.money)} €</div><div class="qd">${q.ds}</div><div class="qp"><span>✅ Изпълнен</span></div></div>`;
+      });
+      if (!h) h = '<div class="meta" style="padding:14px">Още няма изпълнени куести.</div>';
+    } else CHAPTERS.forEach((c, i) => {
       const open = chapterOpen(i), n = c.quests.filter(claimed).length;
       h += `<div class="qch ${open ? '' : 'lock'}"><span>${c.ico} ${c.nm}</span><span>${open ? `${n}/${c.quests.length}` : '🔒'}</span></div>`;
       if (!open && c.lockTxt) { h += `<div class="meta">${c.lockTxt}</div>`; return; }
       if (!open) { h += `<div class="meta">Вземи наградите за ${Math.ceil(CHAPTERS[i - 1].quests.length * UNLOCK_SHARE)} куеста от „${CHAPTERS[i - 1].nm}“, за да отключиш тази глава.</div>`; return; }
-      // първо готовите, после текущите, накрая взетите
-      const order = q => claimed(q) ? 2 : progress(q).ok ? 0 : 1;
-      for (const q of [...c.quests].sort((a, b) => order(a) - order(b))) {
+      // първо готовите, после текущите; взетите са в „✅ Изпълнени“
+      const order = q => progress(q).ok ? 0 : 1, left = c.quests.filter(q => !claimed(q));
+      if (!left.length) h += `<div class="meta">✅ Всички куести от тази глава са изпълнени.</div>`;
+      for (const q of left.sort((a, b) => order(a) - order(b))) {
         const p = progress(q), done = claimed(q);
         h += `<div class="qc ${done ? 'done' : p.ok ? 'ok' : ''}"><div class="qi">${q.ico}</div><div class="qn">${q.nm}</div><div class="qr">+${deps.fmt(q.money)} €</div><div class="qd">${q.ds}</div>
           ${done ? '' : `<div class="qbar"><i style="width:${(p.cur / p.tgt * 100).toFixed(1)}%"></i></div>`}

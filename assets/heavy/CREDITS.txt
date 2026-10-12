@@ -5,15 +5,13 @@
 - crane-c.glb — "Crane" от J-Toastie, CC-BY 3.0 (https://poly.pizza/m/gCcpjaxFdv)
 CC-BY 3.0: https://creativecommons.org/licenses/by/3.0/ — изисква посочване на автора (този файл / екран „Автори“).
 
-"( FREE ) La tour Eiffel" (https://sketchfab.com) by SDC PERFORMANCE™ is licensed under Creative Commons Attribution (https://creativecommons.org/licenses/by/4.0/).
-Used in assets/heavy/eiffel.glb — simplified, normals recomputed, recolored.
 
 Landmarks in assets/heavy/lm/ — from Sketchfab, licensed under Creative Commons Attribution (https://creativecommons.org/licenses/by/4.0/); simplified, textures resized and converted to WebP:
 - burj.glb — "Burj Khalifa" by ManySince910
 - manhattan.glb — "New York Buildings" by sumitmangela (buildings rearranged into a block)
 - liberty.glb — "Statue of liberty" by 3Dystopia
 - opera.glb — "Sydney Opera House" by Nick Reinhardt
-- stbasil.glb — "Saint Basil's Cathedral" by Polskaball
+- stbasil.glb — „Saint Basil's Cathedral“, генериран с Meshy AI (meshy.ai) от автора на играта
 - cntower.glb — "Gula's CN Tower" by gula
 - willis.glb — "Willis Tower - Sears Tower" by BoldlyBuilding
 - shtower.glb — "Shanghai Tower" by NanoRay
@@ -114,3 +112,8 @@ People and resort hotel in assets/heavy/people/ — from Sketchfab, Creative Com
 - air/term-l.glb — "Airport Terminal 1 South Concourse" by Patrick Kin Yu YOUNG (CC-BY 4.0) — https://sketchfab.com/3d-models/c9f6af88ed404709b72f58866fe3506a
 
 Релеф на завладените държави (assets/ui/bg-relief.webp, assets/ui/eu-relief.webp): височини — AWS Terrain Tiles (Mapzen; SRTM, NASA/USGS).
+lm/bellagio.glb — „Bellagio Las Vegas“, генериран с Meshy AI (meshy.ai) от автора на играта; езерото и фонтаните — процедурни
+lm/luxor.glb — „Luxor Las Vegas“, генериран с Meshy AI (meshy.ai) от автора на играта; лъчът — процедурен
+lm/mgu.glb — „Moscow State University“, генериран с Meshy AI (meshy.ai) от автора на играта
+lm/eiffel.glb — „Eiffel Tower“, генериран с Meshy AI (meshy.ai) от автора на играта; нощните светлини — процедурни
+lm/hagia.glb — „Hagia Sophia“, генериран с Meshy AI (meshy.ai) от автора на играта
