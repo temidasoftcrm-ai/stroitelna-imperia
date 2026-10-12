@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 export const CITY_LANDMARKS = {
-  istanbul: ['hagia', 'mosque', 'galata', 'sapphire', 'twist', 'twin', 'mosque2'],
+  istanbul: ['hagia', 'galata', 'sapphire', 'twist', 'twin', 'mosque2'],
   budapest: ['ststephen'],
   philadelphia: ['cityhall'],
   rome: ['colosseo', 'stpeter', 'pantheon', 'vittoriano'],
@@ -22,7 +22,7 @@ export const CITY_LANDMARKS = {
 // забележителности в морето пред града (game.js: refreshLandmarks, само при крайморските градове)
 export const SEA_LANDMARKS = { newyork: ['liberty'] };
 // големите забележителности в отделна зона W×D парцела встрани от центъра (game.js: refreshMines3D → bigLandmarks)
-export const BIG_LANDMARKS = { moscow: [['mgu', 4, 2, 0.52]], lasvegas: [['luxor', 2, 2]] };   // [вид, W, D, дълбочина/ширина на модела]
+export const BIG_LANDMARKS = { moscow: [['mgu', 4, 2, 0.52]], lasvegas: [['luxor', 2, 2]], istanbul: [['mosque', 2, 2]] };   // [вид, W, D, дълбочина/ширина на модела]
 export const LANDMARK_NM = { whitehouse: 'Белият дом', capitol: 'Капитолият', vegassign: '„Welcome to Fabulous Las Vegas“', bellagio: 'Беладжо', luxor: 'Луксор', cityhall: 'Кметството на Филаделфия', ststephen: 'Базилика „Св. Стефан“', mgu: 'Московският университет (МГУ)', pyramids: 'Пирамидите в Гиза', burj: 'Бурж Халифа', manhattan: 'Манхатън', liberty: 'Статуята на свободата', opera: 'Операта в Сидни', stbasil: 'Храмът „Св. Василий Блажени“', cntower: 'Си Ен Тауър', willis: 'Уилис Тауър', shtower: 'Шанхайската кула', redeemer: 'Христос Спасителя', mosque: 'Синята джамия', mosque2: 'Сюлейманийе', galata: 'Галатска кула', sapphire: 'Истанбул Сапфир', twist: 'Левент Туист', twin: 'Левент Туинс', colosseum: 'Колизеума', hagia: 'Света София', colosseo: 'Колизеума', sagrada: 'Саграда Фамилия', vatican: 'Ватикана и „Св. Петър“', stpeter: 'Базилика „Св. Петър“', pantheon: 'Пантеона', vittoriano: 'Витториано', erasmus: 'Мостът Еразъм', cubes: 'Кубичните къщи', markthal: 'Маркетхал', derotterdam: 'Де Ротердам', euromast: 'Евромаст', canal: 'Канал с къщи', canal2: 'Канал с къщи', rijks: 'Райксмузеум', centraal: 'Централна гара', adam: 'A’DAM Лукаут', windmill: 'Вятърна мелница', eiffel: 'Айфеловата кула', arc: 'Триумфалната арка', notredame: 'Нотр Дам', ladefense: 'Ла Дефанс', bigben: 'Биг Бен', londoneye: 'Лондонското око', towerbridge: 'Тауър Бридж', shard: 'Шард', brandenburg: 'Бранденбургската врата', fernsehturm: 'Телевизионната кула', reichstag: 'Райхстагът' };
 // кои стоят в центъра на града (останалите — в стария град извън центъра)
 export const LANDMARK_CENTER = new Set(['pyramids', 'burj', 'manhattan', 'cntower', 'willis', 'shtower', 'eiffel', 'arc', 'bigben', 'shard', 'brandenburg', 'reichstag', 'ladefense', 'sapphire', 'twist', 'twin', 'colosseum', 'colosseo', 'vatican', 'vittoriano', 'derotterdam', 'markthal', 'cubes', 'canal', 'rijks', 'centraal']);
@@ -492,6 +492,7 @@ const GLB_LM = {
   eiffel: { h: 26, fit: 15, plate: 0xc9bfa8, onLoad: eiffelLights },   // Париж: Айфеловата кула (Meshy AI); нощем златни светлини и проблясване
   cityhall: { h: 18, fit: 15, plate: 0xb9b2a5, flat: true },   // Филаделфия: City Hall (Meshy AI; оцветен по върхове — оригиналът е черно-бял)
   ststephen: { h: 16, fit: 15, plate: 0xc9bfa8 },   // Будапеща: базиликата „Св. Стефан“ (Meshy AI)
+  mosque: { h: 12, fit: 15, plate: 0xc9c0ae },   // Истанбул: Синята джамия (Meshy AI) — голяма зона 2×2 до центъра
   hagia: { h: 14, fit: 15, plate: 0xc9b99a },   // Истанбул: Света София (Meshy AI)
   bellagio: { h: 9, fit: 15, plate: 0xb9b09a, dz: -3.6 },
   luxor: { h: 9, fit: 15, sy: 1.9, plate: 0xd9c08a, onLoad: luxorBeam },   // Лас Вегас: „Луксор“ — черната пирамида със сфинкса (Meshy AI); нощем лъч от върха   // Лас Вегас: хотел „Беладжо“ (Meshy AI) — отпред езерото с фонтаните (bellagio() по-долу)
@@ -627,7 +628,7 @@ function bellagio() {
   };
   return g;
 }
-const BUILD = { pyramids, ...Object.fromEntries(Object.keys(GLB_LM).map(k => [k, () => glbLm(k)])), arc, notredame, ladefense, bigben, londoneye, towerbridge, shard, brandenburg, fernsehturm, reichstag, erasmus, cubes, markthal, derotterdam, euromast, canal: () => canal(0), canal2: () => canal(1), rijks, centraal, adam, windmill, bellagio, mosque: () => mosque(0), mosque2: () => mosque(1), galata, sapphire, twist, twin, colosseum, stpeter, pantheon, vittoriano };
+const BUILD = { pyramids, ...Object.fromEntries(Object.keys(GLB_LM).map(k => [k, () => glbLm(k)])), arc, notredame, ladefense, bigben, londoneye, towerbridge, shard, brandenburg, fernsehturm, reichstag, erasmus, cubes, markthal, derotterdam, euromast, canal: () => canal(0), canal2: () => canal(1), rijks, centraal, adam, windmill, bellagio, mosque2: () => mosque(1), galata, sapphire, twist, twin, colosseum, stpeter, pantheon, vittoriano };
 
 // остров в морето за забележителност (Статуята на свободата — на звездовидния Форт Ууд на остров Либърти)
 export function buildSeaLandmark(kind, deps = {}) {

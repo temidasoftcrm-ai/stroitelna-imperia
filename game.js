@@ -138,6 +138,9 @@ const EUROPE = [
 ];
 // по 5 града на държава (countries.js) — за завладяването на държави
 FOREIGN.push(...EXTRA_BALKAN); EUROPE.push(...EXTRA_EUROPE);
+// махнати малки градове (картата на България стана гъста): махат се, освен ако записаната игра вече ги ползва
+const RETIRED = ['kardzhali'];
+function pruneCities(st) { const js = st ? JSON.stringify(st) : ''; for (const id of RETIRED) { if (js.includes(`"${id}"`)) continue; const i = CITIES.findIndex(c => c.id === id); if (i >= 0) CITIES.splice(i, 1); } }
 // 🇷🇺 Русия (russia.js) — част от Европа
 for (const c of RUSSIA) if (!EUROPE.some(x => x.id === c.id)) EUROPE.push(c);
 if (!COUNTRIES.some(x => x.iso === 'RUS')) COUNTRIES.push(RUSSIA_COUNTRY);
@@ -1737,6 +1740,7 @@ let econ = null;
 const projects = [];   // активните обекти (огледало на S.projects с визуализация)
 
 function newGame(cityId, brand = null) {
+  pruneCities(null);
   S = { v: 1, brand, cityId, hqCity: cityId, cities: {}, day: 1, dayT: 0, rep: 0, cash: [], officeLevel: 1, garageLevel: 1, garageLot: null, whLevel: 0, whLot: null, cityExt: AUTOTEST ? +params.get('ext') || 0 : 0, rails: [], trains: [], jobs: [], econ: ECON.newEconState(), units: [...ECON.START.units], projects: [], offers: [], built: [], done: 0, seq: 1 };
   enterCity();
   S.projects = projects;
@@ -7216,6 +7220,7 @@ if (AUTOTEST) {
     seasonTest() { S.resortsOpen = true; S.resorts = { borovets: { stage: 'built', since: 1, earned: 0, ext: { hotel: true } }, velingrad: { stage: 'built', since: 1, earned: 0 } }; const m0 = econ.s.money, msgs = []; const t0 = window.__toasts = []; for (let d = 236; d <= 362; d++) { S.day = d; resorts.dailyTick(d); } updResBtn(); return { earned: S.resorts.borovets.earned, gain: Math.round(econ.s.money - m0) }; },
     r66Test(full) { S.dev.xp = 260000; S.dev.lv = 10; S.rep = 4; econ.earn(2e8, 'друго', 'тест'); S.r66 = { st: 'none' }; route66.offer(); route66.accept(); if (full) S.hwDone = [...new Set([...(S.hwDone || []), ...['chicago', 'kansascity', 'dallas', 'elpaso', 'phoenix', 'losangeles'].slice(1).map((b, k, arr) => abSegId(['chicago', 'kansascity', 'dallas', 'elpaso', 'phoenix', 'losangeles'][k], b))])]; route66.dailyTick(); openBig('hw'); return { st: route66.state().st, p: route66.progress() }; },
     buyHideTest() { S.dev.lv = 10; S.dev.xp = 260000; S.cpTab = 'buy'; S.cpScope = 'bg'; openBig('cities'); const before = document.getElementById('bwBody').innerText.includes('Шумен'); this.winIso(['BGR']); S.cpTab = 'buy'; openBig('cities'); const t = document.getElementById('bwBody').innerText; return { before, after: t.includes('Шумен'), note: t.match(/Скрити са.*/)?.[0] }; },
+    balkTest() { S.dev.lv = 8; S.dev.xp = 160000; setMapView('balkans'); const P = proj(17.5, 43.5); mapView.vb = [P[0] - 520, P[1] - 330, 1040, 660]; drawMap(); return { lv: ['zagreb', 'split', 'tirana'].map(id => [id, cityLv(id), isForeign(id)]), kard: !!cityById('kardzhali'), n: document.querySelectorAll('#mapSvg g.city').length }; },
     groupTest() { S.brand = 'titan'; S.group = {}; group.check(true); const g0 = { ...S.group }; S.rails = [{ a: 'sofia', b: 'plovdiv', km: 150, days: 5, prog: 1, built: true }]; S.ports = { varna: { lv: 1 } }; group.check(); updLogo();
       openBig('group'); return { g0, g: S.group, logo: document.querySelector('#top .logo').textContent, win: document.getElementById('bwBody').innerText.slice(0, 700) }; },
     nyRail() { S.dev.lv = 12; S.dev.xp = 800000; S.contOpen = { ...(S.contOpen || {}), na: true }; S.branches = [...new Set([...(S.branches || []), 'newyork'])]; startRailMode(); railClick('newyork'); const a = railPick; railClick('boston'); const m = document.getElementById('modal'); return { a, modal: m && !m.classList.contains('hidden') ? m.innerText.slice(0, 120) : null }; },
@@ -7258,6 +7263,6 @@ if (AUTOTEST) {
     cash: () => (S.cash || []).map(c => c.lot),
   };
 }
-else if (saved) { S = saved; setTimeout(() => { if (S && !S.brand) brandPick(); }, 2500); if (sessionStorage.getItem('stroiEnter')) { sessionStorage.removeItem('stroiEnter'); enterCity(); const tb = sessionStorage.getItem('stroiTab'); if (tb) { sessionStorage.removeItem('stroiTab'); setTimeout(() => { tab = tb; renderPanel(); }, 600); }  } else { setupWorld(); fastForward(); showMap(true); } }
+else if (saved) { S = saved; pruneCities(S); setTimeout(() => { if (S && !S.brand) brandPick(); }, 2500); if (sessionStorage.getItem('stroiEnter')) { sessionStorage.removeItem('stroiEnter'); enterCity(); const tb = sessionStorage.getItem('stroiTab'); if (tb) { sessionStorage.removeItem('stroiTab'); setTimeout(() => { tab = tb; renderPanel(); }, 600); }  } else { setupWorld(); fastForward(); showMap(true); } }
 else showMap(true);
 frame();

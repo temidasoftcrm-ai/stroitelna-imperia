@@ -10,6 +10,9 @@ export const EXTRA_BALKAN = [
   c('cluj', 'Клуж', 46.771, 23.624, 2, '🇷🇴'), c('timisoara', 'Тимишоара', 45.749, 21.208, 2, '🇷🇴'), c('iasi', 'Яш', 47.159, 27.587, 2, '🇷🇴'),
   c('novisad', 'Нови Сад', 45.267, 19.833, 2, '🇷🇸'), c('kragujevac', 'Крагуевац', 44.012, 20.911, 1, '🇷🇸'), c('subotica', 'Суботица', 46.100, 19.667, 1, '🇷🇸'),
   c('bitola', 'Битоля', 41.031, 21.335, 1, '🇲🇰'), c('ohrid', 'Охрид', 41.117, 20.802, 1, '🇲🇰'), c('kumanovo', 'Куманово', 42.132, 21.714, 1, '🇲🇰', { left: true }), c('prilep', 'Прилеп', 41.346, 21.555, 1, '🇲🇰'),
+  // Западните Балкани — по един-два града там, където картата беше празна
+  c('zagreb', 'Загреб', 45.815, 15.982, 3, '🇭🇷'), c('split', 'Сплит', 43.508, 16.440, 2, '🇭🇷', { left: true }), c('ljubljana', 'Любляна', 46.056, 14.506, 2, '🇸🇮', { left: true }),
+  c('sarajevo', 'Сараево', 43.856, 18.413, 2, '🇧🇦'), c('podgorica', 'Подгорица', 42.441, 19.263, 1, '🇲🇪'), c('tirana', 'Тирана', 41.328, 19.818, 2, '🇦🇱', { left: true }), c('pristina', 'Прищина', 42.663, 21.166, 1, '🇽🇰'),
   c('patras', 'Патра', 38.246, 21.735, 2, '🇬🇷'), c('heraklion', 'Ираклион', 35.339, 25.144, 2, '🇬🇷'), c('larissa', 'Лариса', 39.639, 22.419, 1, '🇬🇷'),
 ];
 // Европа (ниво 8)
@@ -44,7 +47,7 @@ export const EXTRA_WORLD = [
   c('osaka', 'Осака', 34.694, 135.502, 3, '🇯🇵'), c('kyoto', 'Киото', 35.012, 135.768, 2, '🇯🇵', { left: true }), c('yokohama', 'Йокохама', 35.444, 139.638, 3, '🇯🇵'), c('sapporo', 'Сапоро', 43.062, 141.354, 2, '🇯🇵'),
   c('melbourne', 'Мелбърн', -37.814, 144.963, 3, '🇦🇺'), c('brisbane', 'Бризбейн', -27.470, 153.026, 3, '🇦🇺'), c('perth', 'Пърт', -31.951, 115.861, 3, '🇦🇺'), c('adelaide', 'Аделаида', -34.929, 138.601, 2, '🇦🇺'),
 ];
-export const EXTRA_COASTAL = ['izmir', 'patras', 'heraklion', 'marseille', 'nice', 'liverpool', 'gdansk', 'naples', 'valencia', 'sanfrancisco', 'miami', 'vancouver', 'cancun', 'salvador', 'fortaleza', 'mardelplata',
+export const EXTRA_COASTAL = ['split', 'izmir', 'patras', 'heraklion', 'marseille', 'nice', 'liverpool', 'gdansk', 'naples', 'valencia', 'sanfrancisco', 'miami', 'vancouver', 'cancun', 'salvador', 'fortaleza', 'mardelplata',
   'alexandria', 'durban', 'portelizabeth', 'abudhabi', 'sharjah', 'chennai', 'busan', 'incheon', 'osaka', 'yokohama', 'melbourne', 'brisbane', 'perth', 'adelaide', 'antwerp'];
 
 // държавите: ключовите градове (5; България — 6; градовете-държави — 1) и кодът на държавата в картата (ISO3)
