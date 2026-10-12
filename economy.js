@@ -403,19 +403,27 @@ export class Economy {
     }
   }
   invRepay(i) { const l = (this.s.inv || [])[i]; if (!l || !this.canAfford(l.left)) return 0; this.spend(l.left, 'кредит', `Предсрочно погасяване: ${l.note}`); this.s.inv.splice(i, 1); return l.left; }
-  maxLoan(rep = 0) { return LOAN_STEP * (2 + Math.floor(rep)); }
-  canTakeLoan(rep) { return this.s.loan + LOAN_STEP <= this.maxLoan(rep) && !this.isBankrupt(); }
-  takeLoan(rep) {
-    if (!this.canTakeLoan(rep)) return false;
-    this.s.loan += LOAN_STEP; this.earn(LOAN_STEP, 'кредит', 'Банков кредит');
-    return true;
+  // лимит за кредит: расте с репутацията и с нетната стойност — от 1× (0 ★) до 2× нетната стойност (5 ★); най-малко старият лимит
+  maxLoan(rep = 0) {
+    const h = this.s.worthHist, nw = h && h.length ? Math.max(0, h[h.length - 1][1]) : 0;
+    return Math.max(LOAN_STEP * (2 + Math.floor(rep)), Math.round(nw * (1 + Math.min(5, Math.max(0, rep)) / 5) / 100000) * 100000);
   }
-  canRepay() { return this.s.loan > 0 && this.canAfford(Math.min(LOAN_STEP, this.s.loan)); }
-  repayLoan() {
-    if (!this.canRepay()) return false;
-    const n = Math.min(LOAN_STEP, this.s.loan);
+  // стъпката на бутоните: кръгло число (1/2/5 × 10ⁿ) около 5% от лимита
+  loanStep(rep = 0) { const x = this.maxLoan(rep) / 20, p = 10 ** Math.floor(Math.log10(Math.max(1, x))), m = x / p; return Math.max(LOAN_STEP, (m >= 5 ? 5 : m >= 2 ? 2 : 1) * p); }
+  loanRoom(rep = 0) { return Math.max(0, this.maxLoan(rep) - this.s.loan); }
+  canTakeLoan(rep, amt) { amt = amt ?? this.loanStep(rep); return amt > 0 && this.s.loan + amt <= this.maxLoan(rep) && !this.isBankrupt(); }
+  takeLoan(rep, amt) {
+    amt = amt ?? this.loanStep(rep);
+    if (!this.canTakeLoan(rep, amt)) return 0;
+    this.s.loan += amt; this.earn(amt, 'кредит', 'Банков кредит');
+    return amt;
+  }
+  canRepay(amt) { amt = Math.min(amt ?? LOAN_STEP, this.s.loan); return this.s.loan > 0 && this.canAfford(amt); }
+  repayLoan(amt) {
+    const n = Math.min(amt ?? LOAN_STEP, this.s.loan);
+    if (!this.canRepay(n)) return 0;
     this.s.loan -= n; this.spend(n, 'кредит', 'Погасяване на кредит');
-    return true;
+    return n;
   }
 
   // плащане при завършен обект: бонус за предсрочно, глоба за закъснение
@@ -908,7 +916,7 @@ export function renderFinance(el, econ, rep = 0, rerender = () => {}, unitTypes 
   // видимите на борсата: родните, чуждите от държави с твой филиал (econ.hooks.stockVisible) и тези, в които имаш акции/дъщерна
   const visCo = c => !econ.hooks.stockVisible || econ.hooks.stockVisible(c) || (econ.s.shares || {})[c.id] || (econ.s.subs || {})[c.id];
   ensureStyle();
-  const s = econ.s, max = econ.maxLoan(rep);
+  const s = econ.s, max = econ.maxLoan(rep), step = econ.loanStep(rep), room = econ.loanRoom(rep);
   const interest = Math.round(s.loan * LOAN_DAILY_RATE);
   const days = econ.lastDays(7);
   const wk = days.reduce((a, d) => ({ in: a.in + d.in, out: a.out + d.out }), { in: 0, out: 0 });
@@ -927,14 +935,16 @@ export function renderFinance(el, econ, rep = 0, rerender = () => {}, unitTypes 
   html += `<div class="card">
     <h3><span class="ico">🏦</span>Кредит</h3>
     <div class="fin-kv">Дълг <b>${fmt(s.loan)}</b></div>
-    <div class="fin-kv">Лимит (расте с репутацията) <b>${fmt(max)}</b></div>
+    <div class="fin-kv">Лимит (репутация и нетна стойност: до 2× при 5 ★) <b>${fmt(max)}</b></div>
     <div class="bar"><i style="width:${Math.min(100, s.loan / max * 100)}%"></i></div>
     <div class="fin-kv">Лихва ${(LOAN_DAILY_RATE * 100).toFixed(1)}% на ден <b>${fmt(interest)} / ден</b></div>
     ${(s.inv || []).length ? `<div class="sect" style="margin-top:6px">Инвестиционни кредити · ${fmt(econ.invDebt())}</div>` + s.inv.map((l, i) => `<div class="fin-row" style="flex-wrap:wrap"><span class="n">${esc(l.note)}<br><span style="color:var(--mut)">остават ${fmt(l.left)} · вноска ${fmt(l.daily + l.interest)}/ден · ~${Math.ceil(l.left / l.daily)} дни</span></span><button class="btn2" data-inv="${i}" ${econ.canAfford(l.left) ? '' : 'disabled'}>Погаси</button></div>`).join('') : ''}
     <div class="meta">🏗️ Инвестиционен кредит за покупки (филиали, пристанища, летища, кораби…): до 60% от нетната стойност — 10% лихва за 120 дни; до 120% — 20% за 150 дни; до 250% — 35% за 180 дни. Предлага се сам, когато нещо не ти стига пари.</div>
     <div class="fin-btns">
-      <button class="btn" data-fin="take" ${econ.canTakeLoan(rep) ? '' : 'disabled'}>Вземи ${fmt(LOAN_STEP)}</button>
-      <button class="btn2" data-fin="repay" ${econ.canRepay() ? '' : 'disabled'}>Погаси ${fmt(Math.min(LOAN_STEP, s.loan || LOAN_STEP))}</button>
+      <button class="btn" data-fin="take" ${econ.canTakeLoan(rep, step) ? '' : 'disabled'}>Вземи ${fmt(step)}</button>
+      <button class="btn" data-fin="takeall" ${room > 0 && econ.canTakeLoan(rep, room) ? '' : 'disabled'}>Вземи всичко · ${fmt(room)}</button>
+      <button class="btn2" data-fin="repay" ${econ.canRepay(step) ? '' : 'disabled'}>Погаси ${fmt(Math.min(step, s.loan || step))}</button>
+      <button class="btn2" data-fin="repayall" ${s.loan > 0 && econ.canAfford(s.loan) ? '' : 'disabled'}>Погаси всичко${s.loan ? ' · ' + fmt(s.loan) : ''}</button>
     </div>
   </div>`;
 
@@ -1088,9 +1098,9 @@ export function renderFinance(el, econ, rep = 0, rerender = () => {}, unitTypes 
   });
   el.querySelectorAll('[data-inv]').forEach(b => b.onclick = () => { const n = econ.invRepay(+b.dataset.inv), t = econ.hooks.toast || (() => {}); if (n) t(`🏦 Погаси предсрочно ${fmt(n)}.`, 'good'); rerender(); });
   el.querySelectorAll('[data-fin]').forEach(b => b.onclick = () => {
-    const take = b.dataset.fin === 'take';
-    const ok = take ? econ.takeLoan(rep) : econ.repayLoan();
-    if (ok && econ.hooks.toast) econ.hooks.toast(take ? `Кредит: +${fmt(LOAN_STEP)}` : 'Погасихте част от кредита', 'good');
+    const k = b.dataset.fin, take = k.startsWith('take'), step = econ.loanStep(rep);
+    const ok = k === 'take' ? econ.takeLoan(rep, step) : k === 'takeall' ? econ.takeLoan(rep, econ.loanRoom(rep)) : econ.repayLoan(k === 'repayall' ? econ.s.loan : step);
+    if (ok && econ.hooks.toast) econ.hooks.toast(take ? `🏦 Кредит: +${fmt(ok)}` : `🏦 Погаси ${fmt(ok)} от кредита${econ.s.loan ? '' : ' — вече нямаш дълг!'}`, 'good');
     rerender();
   });
 }

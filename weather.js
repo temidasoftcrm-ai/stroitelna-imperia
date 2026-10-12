@@ -9,7 +9,7 @@ export const WEATHER = {
   rain:   { ico: '🌧️', nm: 'Дъжд',      sun: 0.35, hemi: 0.7,  fog: 0.6 },
   storm:  { ico: '⛈️', nm: 'Буря',      sun: 0.2,  hemi: 0.55, fog: 0.45 },
   snow:   { ico: '🌨️', nm: 'Сняг',      sun: 0.45, hemi: 0.85, fog: 0.55 },
-  fog:    { ico: '🌫️', nm: 'Мъгла',     sun: 0.5,  hemi: 0.8,  fog: 0.22 },
+  fog:    { ico: '🌫️', nm: 'Мъгла',     sun: 0.5,  hemi: 0.8,  fog: 0.55 },
 };
 // вероятности по сезон (месецът от resorts.js: 0 = януари)
 export function rollWeather(month) {

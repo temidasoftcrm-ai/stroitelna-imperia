@@ -117,3 +117,5 @@ lm/luxor.glb — „Luxor Las Vegas“, генериран с Meshy AI (meshy.ai
 lm/mgu.glb — „Moscow State University“, генериран с Meshy AI (meshy.ai) от автора на играта
 lm/eiffel.glb — „Eiffel Tower“, генериран с Meshy AI (meshy.ai) от автора на играта; нощните светлини — процедурни
 lm/hagia.glb — „Hagia Sophia“, генериран с Meshy AI (meshy.ai) от автора на играта
+lm/ststephen.glb — „St. Stephen's Basilica, Budapest“, генериран с Meshy AI (meshy.ai) от автора на играта
+lm/cityhall.glb — „Philadelphia City Hall“, генериран с Meshy AI (meshy.ai) от автора на играта; оцветен в играта
