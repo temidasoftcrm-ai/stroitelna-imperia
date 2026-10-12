@@ -57,6 +57,9 @@ export const TENDERS = [
     need: { crew: 8, crane: 4, loader: 4, truck: 6 }, matShare: 0.55, sign: '🏟️ КАМП НОУ', ds: 'Новият дом на „Барса“ за 105 000 зрители — най-големият стадион в Европа, на 12 парцела в Барселона.' },
   { id: 'olympia-berlin', city: 'berlin', kind: 'stadium', variant: 'olympia', size: [3, 3], ico: '🏟️', nm: 'Олимпийски стадион — Берлин', budget: 110000000, days: 110, rep: 4.5, dev: 9,
     need: { crew: 7, crane: 4, loader: 3, truck: 6 }, matShare: 0.55, sign: '🏟️ ОЛИМПИЙСКИ СТАДИОН', ds: 'Реконструкция на историческия стадион с парка, басейна и площада около него — 9 парцела в Берлин.' },
+  // Азия: Великата китайска стена край Пекин — реставрация на участъка Бадалин с кулите по хълмовете, посетителски център и път (3D: greatwall3d.js)
+  { id: 'st-greatwall-beijing', city: 'beijing', kind: 'greatwall', size: [3, 3], outer: true, ico: '🏯', nm: 'Реставрация на Великата китайска стена — Бадалин', budget: 160000000, days: 140, rep: 4.5, dev: 16,
+    need: { crew: 9, crane: 3, loader: 4, truck: 6 }, matShare: 0.5, sign: '🏯 GREAT WALL · BADALING', ds: 'Каменната стена и сигналните кули по хълмовете над Пекин се реставрират камък по камък; долу — посетителски център, паркинг и нов път за милионите туристи.' },
 ];
 export const BID_MS = [0.75, 0.8, 0.85, 0.9, 0.95, 1, 1.05];
 export const ADVANCE = 0.2, LATE_PEN = 0.005, OPEN_DAYS = 7;

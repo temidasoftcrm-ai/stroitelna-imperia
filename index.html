@@ -2,7 +2,13 @@
 <html lang="bg">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Империя">
+<meta name="theme-color" content="#0f141c">
+<link rel="apple-touch-icon" href="assets/ui/icon-180.png">
 <title>Строителна империя</title>
 <link rel="preload" as="image" href="assets/ui/splash.webp">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🏗️%3C/text%3E%3C/svg%3E">
@@ -224,6 +230,76 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
 } }
 </script>
+<style id="mob">
+  /* ===== телефон (mobile.js слага body.mob; .land — хоризонтално) ===== */
+  body.mob { --sat:env(safe-area-inset-top,0px); --sal:env(safe-area-inset-left,0px); --sar:env(safe-area-inset-right,0px); --sab:env(safe-area-inset-bottom,0px); --topH:calc(86px + var(--sat)); -webkit-text-size-adjust:100%; }
+  body.mob, body.mob * { -webkit-tap-highlight-color:transparent; }
+  body.mob #top { height:var(--topH); padding:calc(4px + var(--sat)) calc(8px + var(--sar)) 4px calc(8px + var(--sal)); column-gap:6px; row-gap:4px; flex-wrap:wrap; align-content:center; }
+  body.mob #top::after { display:none; }
+  body.mob #top > .logo { display:none; }
+  body.mob #top > .stat { font-size:13px; order:0; } body.mob #top > .stat b { font-size:14px; }
+  body.mob #top > #wx { font-size:16px !important; }
+  body.mob #top > .speed { order:0; margin-left:auto; gap:3px; } body.mob .speed button { padding:4px 7px; font-size:12px; }
+  body.mob #topRow2 > #btnMapToggle { order:-1; }
+  body.mob #topRow2 { order:3; flex:0 0 100%; display:flex; gap:6px; align-items:center; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding-bottom:1px; }
+  body.mob #topRow2::-webkit-scrollbar { display:none; }
+  body.mob #topRow2 > * { flex-shrink:0; }
+  body.mob #topRow2 .sp, body.mob #topRow2 .stars, body.mob #topRow2 #evchips { display:none !important; }
+  body.mob #top .btn2 { padding:6px 9px; font-size:13px; }
+  /* хоризонтално: всичко на един ред, бутоните се плъзгат вдясно от скоростта */
+  body.mob.land { --topH:calc(46px + var(--sat)); }
+  body.mob.land #top { flex-wrap:nowrap; }
+  body.mob.land #topRow2 { flex:1 1 auto; min-width:0; order:3; }
+  body.mob.land #top > .speed { margin-left:0; }
+  /* десният панел: вертикално — долу (40%), хоризонтално — тесен вдясно; свива се до табовете */
+  body.mob #panel { top:auto; left:0; right:0; width:auto; height:40%; border-left:0; border-top:1px solid var(--line); padding-bottom:var(--sab); }
+  body.mob.land #panel { top:var(--topH); left:auto; height:auto; width:calc(290px + var(--sar)); padding-right:var(--sar); border-top:0; border-left:1px solid var(--line); }
+  body.mob #tabs button { padding:9px 1px; font-size:11px; }
+  body.mob #panelBody { padding:8px; gap:8px; }
+  body.mob .card { padding:10px; }
+  body.mob.panMin #panel { height:auto; bottom:0; }
+  body.mob.panMin #panelBody { display:none; }
+  body.mob.land.panMin #panel { bottom:auto; }
+  /* съобщения: по-малки, най-много 2 */
+  body.mob #toasts, body.mob.qb #toasts, body.mob.qd #toasts { top:auto; bottom:calc(40% + 8px); left:calc(8px + var(--sal)); right:8px; max-width:420px; gap:5px; flex-direction:column-reverse; }
+  body.mob.panMin #toasts { bottom:calc(56px + var(--sab)); }
+  body.mob.land #toasts { bottom:calc(8px + var(--sab)); right:auto; max-width:min(380px, 50vw); }
+  body.mob .toast { font-size:12px; padding:6px 9px; line-height:1.35; }
+  body.mob #toasts .toast:nth-child(n+3) { display:none; }
+  body.mob #mapLayers { top:10px; bottom:auto; left:calc(140px + var(--sal)); max-width:calc(100vw - 150px); gap:4px; }
+  body.mob #mapLayers label { padding:4px 7px; font-size:11px; gap:3px; }
+  body.mob:not(.land):has(#mapScreen:not(.hidden)) #toasts { bottom:calc(44% + 16px); }
+  body.mob:has(#bigWin:not(.hidden)) #toasts { bottom:calc(8px + var(--sab)); }
+  body.mob #buyPop { width:min(250px, calc(100vw - 24px)); left:calc(10px + var(--sal)); bottom:calc(10px + var(--sab)); }
+  body.mob #buyPop img { max-height:22vh; }
+  body.mob #buyPop .bp-cap { font-size:14px; } body.mob #buyPop .bp-sub { font-size:12px; }
+  body.mob:not(.land) #buyPop { bottom:calc(40% + 10px); }
+  body.mob:not(.land).panMin #buyPop { bottom:60px; }
+  body.mob #quickBuy, body.mob #quickDep { left:calc(8px + var(--sal)); padding:7px 10px; font-size:12px; }
+  /* големите прозорци — на цял екран */
+  body.mob #bigWin { padding:0; }
+  body.mob #bigWin .bw-box { width:100%; border-radius:0; border:0; }
+  body.mob #bigWin .bw-head { padding:8px calc(10px + var(--sar)) 8px calc(10px + var(--sal)); }
+  body.mob #bigWin .bw-head b { font-size:16px; }
+  body.mob #bwBody { padding:10px calc(10px + var(--sar)) calc(24px + var(--sab)) calc(10px + var(--sal)); }
+  body.mob #bwBody .bw-stick, body.mob .bw-stats, body.mob .bw-scope, body.mob .bw-tr { top:-10px; margin-left:-10px; margin-right:-10px; padding-left:10px; padding-right:10px; }
+  body.mob #bwBody .bw-stick { margin-top:-10px; padding-top:10px; }
+  body.mob .bw-stats { grid-template-columns:repeat(auto-fit,minmax(96px,1fr)); gap:5px; }
+  body.mob .bw-stats div { padding:6px; } body.mob .bw-stats b { font-size:16px; } body.mob .bw-stats span { font-size:11px; }
+  body.mob .card .row { flex-wrap:wrap; }
+  body.mob #qPanel { width:100vw; padding-bottom:var(--sab); }
+  /* модален прозорец */
+  body.mob #modal { padding:calc(8px + var(--sat)) 8px calc(8px + var(--sab)); }
+  body.mob #modal .box { padding:14px; max-height:100%; }
+  body.mob #modal h2 { font-size:17px; }
+  /* картата: панелът — долу като лист, бутоните за мащаб — горе вляво */
+  body.mob #mapHud { left:8px; right:8px; bottom:calc(8px + var(--sab)); max-width:none; max-height:44%; padding:10px 12px; gap:7px; }
+  body.mob #mapHud h2 { font-size:16px; } body.mob #mapHud p { font-size:13px; }
+  body.mob #mapZoom { top:10px; bottom:auto; left:calc(8px + var(--sal)); flex-direction:row; }
+  body.mob #mapZoom button { width:38px; height:38px; font-size:18px; }
+  body.mob.land #mapHud { left:auto; right:calc(8px + var(--sar)); top:8px; max-height:none; width:min(330px, 45vw); }
+  body.mob #globeView { inset:var(--topH) 0 0 0 !important; }
+</style>
 </head>
 <body>
 <div id="app"></div>
@@ -276,6 +352,7 @@
 <div id="modal" class="hidden"><div class="box" id="modalBox"></div></div>
 <div id="loading"><div class="ld-bg"></div><div class="ld-box"><div class="ld-txt" id="ldTxt">Зареждане… 0%</div><div class="ld-bar"><i id="ldBar"></i></div></div></div>
 
+<script src="mobile.js"></script>
 <script type="module" src="game.js"></script>
 </body>
 </html>

@@ -88,6 +88,11 @@ People and resort hotel in assets/heavy/people/ — from Sketchfab, Creative Com
 - stadium/campnou.glb — "Camp Nou Stadium" by farhad.Guli (CC-BY 4.0) — https://sketchfab.com/3d-models/37c9bfbd9ee64b90bd67ab7f500317e1
 - stadium/olympia.glb — "Olympiastadion Berlin" by azadbal (CC-BY 4.0) — https://sketchfab.com/3d-models/1a4bba80003142debe0ddc19cde5992a (опростен до ~97k триъгълника, текстури 1024 webp)
 - lm/sagrada.glb — "Sagrada Familia" by vmmaniac (CC-BY 4.0) — https://sketchfab.com/3d-models/a53f0cde8a774dcd8e85831218e14e3a (опростен до ~74k триъгълника, текстури 1024 webp)
+- lm/whitehouse.glb — "The White House" by Void (CC-BY 4.0) — https://sketchfab.com/3d-models/dbdb320ba4c6427ca4f2b2c2438034f9 (опростен до ~38k триъгълника, текстури 1024 webp)
+- lm/capitol.glb — "US_capitol_building" by ycpan3468 (CC-BY 4.0) — https://sketchfab.com/3d-models/d4049804543d4d49813767d2e9b72664 (опростен до ~105k триъгълника, текстури 1024 webp)
+- lm/vegassign.glb — "Las Vegas Sign" by sipulitrade (CC-BY 4.0) — https://sketchfab.com/3d-models/a750f99fd63045ec8d8d7b8a59d0a7af (опростен до ~30k триъгълника, текстури 1024 webp)
+- mines/refinery.glb — "Large industrial factory or refinery complex" by Chenzoss (CC-BY 4.0) — https://sketchfab.com/3d-models/599735133b5b4641907f72c55ef3c8bb (опростен до ~60k триъгълника, текстури 512 webp)
+- mines/tanks.glb — "Large Industrial Storage Tanks" by Duane's Mind (CC-BY 4.0) — https://sketchfab.com/3d-models/bd3ac97071104b64bc388a155b64f79e (текстури 512 webp)
 - civic/school.glb — "school building" by swjeta (CC-BY 4.0) — https://sketchfab.com/3d-models/d34ac09a3ca544df999485c4b311abcc
 - civic/fire.glb — "Fire Station No. 1" by CommonSpence (CC-BY 4.0) — https://sketchfab.com/3d-models/87edf04deb28434993274d9f05070865
 - civic/police.glb — "Paris Police Station" by aitortilla01 (CC-BY 4.0) — https://sketchfab.com/3d-models/6314692176a44290b1ba432f9ea4840f
@@ -107,3 +112,5 @@ People and resort hotel in assets/heavy/people/ — from Sketchfab, Creative Com
 - air/term-s.glb — "Airport Building" by Gerhald (CC-BY 4.0) — https://sketchfab.com/3d-models/31f007ca421840509221c3c7a1db8622
 - air/term-m.glb — "Small airport terminal building complex." by soysascha (CC-BY 4.0) — https://sketchfab.com/3d-models/f93a362f8a1f4e2c92f65310cfdd7fe2
 - air/term-l.glb — "Airport Terminal 1 South Concourse" by Patrick Kin Yu YOUNG (CC-BY 4.0) — https://sketchfab.com/3d-models/c9f6af88ed404709b72f58866fe3506a
+
+Релеф на завладените държави (assets/ui/bg-relief.webp, assets/ui/eu-relief.webp): височини — AWS Terrain Tiles (Mapzen; SRTM, NASA/USGS).

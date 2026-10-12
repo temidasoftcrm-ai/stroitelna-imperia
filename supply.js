@@ -92,5 +92,5 @@ export function createSupply(deps) {
     box.querySelectorAll('[data-sacc]').forEach(b => b.onclick = () => { accept(+b.dataset.sacc); rerender(); });
     box.querySelectorAll('[data-sdec]').forEach(b => b.onclick = () => { decline(+b.dataset.sdec); rerender(); });
   }
-  return { dailyTick, tryDeliver, hudHtml, bind, makeOffer, state: st };
+  return { dailyTick, tryDeliver, hudHtml, bind, makeOffer, state: st, accept, linkOf };
 }

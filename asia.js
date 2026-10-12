@@ -58,6 +58,9 @@ const asHw = c => (c.S().hwDone || []).filter(id => String(id).startsWith('ab:')
 const silk = ['istanbul', 'ankara', 'tehran', 'tashkent', 'almaty', 'xian', 'beijing'];
 export const AS_CHAPTER = { id: 'c16', nm: 'Азия', ico: '🌏', pic: 'unlock-asia', picTxt: 'Нов континент: Пътят на коприната от Истанбул до Пекин, тайландските плажове, мегаполисите на Китай и островите на Индонезия. Отвори „🌏 Азия“ на картата.',
   openIf: c => c.devBest() >= 10 && asOpen(own(c), id => fin(c).includes(id)), lockTxt: `Отключва се с ${AS_NEED} филиала в Южна Америка или една завладяна южноамериканска държава.`, quests: [
+    { id: 'as_oil1', ico: '🛢️', nm: 'Черното злато', ds: 'Купи концесия за петролно находище в Саудитска Арабия (⛏️ Добив).', goal: c => [(c.S().mines?.sites || []).filter(s => s.kind === 'oilwell').length, 1], money: 30000000 },
+    { id: 'as_oil2', ico: '🏭', nm: 'Рафинерия', ds: 'Построй рафинерия, свързана с находището.', goal: c => [(c.S().mines?.sites || []).filter(s => s.kind === 'refinery').length, 1], money: 40000000 },
+    { id: 'as_oil3', ico: '⚓', nm: 'От пустинята до пристанището', ds: 'Построй петролен терминал за износ.', goal: c => [(c.S().mines?.sites || []).filter(s => s.kind === 'terminal').length, 1], money: 50000000 },
     { id: 'as_br1', ico: '🌏', nm: 'Към Изтока', ds: 'Отвори филиал в Азия.', goal: c => [own(c).filter(isAsia).length, 1], money: 40000000 },
     { id: 'as_bkk', ico: '🛕', nm: 'Банкок', ds: 'Отвори филиал в Банкок.', goal: c => [own(c).includes('bangkok') ? 1 : 0, 1], money: 40000000 },
     { id: 'as_kl', ico: '🏙️', nm: 'Куала Лумпур', ds: 'Отвори филиал в Куала Лумпур.', goal: c => [own(c).includes('kualalumpur') ? 1 : 0, 1], money: 40000000 },

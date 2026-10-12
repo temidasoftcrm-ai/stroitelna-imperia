@@ -35,9 +35,15 @@ export const ocLockTxt = owned => `🔒 Австралия и Океания с�
 const own = c => [c.S().hqCity || c.S().cityId, ...(c.S().branches || [])];
 const fin = c => Object.keys((c.econ().s.finished) || {});
 const ocHw = c => (c.S().hwDone || []).filter(id => String(id).startsWith('ab:') && String(id).slice(3).split('-').some(isOceania)).length;
+const ms = c => c.S().mines?.sites || [];
 const AUS = ['sydney', 'melbourne', 'brisbane', 'perth', 'adelaide'];
 export const OC_CHAPTER = { id: 'c17', nm: 'Австралия и Океания', ico: '🦘', pic: 'unlock-oceania', picTxt: 'Последният континент: Магистрала 1 около Австралия, пустинята до Дарвин и Нова Зеландия. Отвори „🦘 Австралия“ на картата.',
   openIf: c => c.devBest() >= 10 && ocOpen(own(c), id => fin(c).includes(id)), lockTxt: `Отключва се с ${OC_NEED} филиала в Азия или една завладяна азиатска държава.`, quests: [
+    { id: 'oc_sun', ico: '☀️', nm: 'Слънцето на пустинята', ds: 'Построй соларен или вятърен парк в Австралия (⚡ Енергия).', goal: c => [ms(c).filter(s => s.kind === 'solar' || s.kind === 'wind').length, 1], money: 30000000 },
+    { id: 'oc_grid1', ico: '⚡', nm: 'В мрежата', ds: 'Построй подстанция и далекопровод.', goal: c => [ms(c).filter(s => s.kind === 'grid').length, 1], money: 25000000 },
+    { id: 'oc_batt', ico: '🔋', nm: 'Батерията', ds: 'Построй батерийна ферма до централа.', goal: c => [ms(c).filter(s => s.kind === 'battery').length, 1], money: 30000000 },
+    { id: 'oc_ngrid', ico: '🔌', nm: 'Национална енергийна мрежа', ds: 'Подстанции в 5 града и 3000 MWh/ден в мрежата. Отключва 🤖 Автоматизация.', goal: c => [c.S().gridDone ? 1 : 0, 1], money: 200000000 },
+    { id: 'oc_cable', ico: '🌏', nm: 'Sun Cable', ds: 'Подстанция в Дарвин: токът ти стига до мините и заводите в Азия.', goal: c => [ms(c).some(s => s.kind === 'grid' && s.city === 'darwin') && ms(c).some(s => s.pw && isAsia(s.city)) ? 1 : 0, 1], money: 150000000 },
     { id: 'oc_br1', ico: '🦘', nm: 'Долу под нас', ds: 'Отвори филиал в Австралия или Океания.', goal: c => [own(c).filter(isOceania).length, 1], money: 50000000 },
     { id: 'oc_syd', ico: '🎭', nm: 'Сидни', ds: 'Отвори филиал в Сидни.', goal: c => [own(c).includes('sydney') ? 1 : 0, 1], money: 50000000 },
     { id: 'oc_nz', ico: '🥝', nm: 'Нова Зеландия', ds: 'Отвори филиал в Окланд.', goal: c => [own(c).includes('auckland') ? 1 : 0, 1], money: 60000000 },
