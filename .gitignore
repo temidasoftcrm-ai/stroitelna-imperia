@@ -1,4 +1,6 @@
 _*.html
-tt-*.png
 *.log
 node_modules/
+supabase/.temp/
+tt-*.png
+_originali/

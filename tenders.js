@@ -152,10 +152,16 @@ export function createTenders(deps) {
   function dailyTick() {
     const S = deps.S(); if (!S) return;
     const all = st();
-    // нов търг: най-много един отворен наведнъж
-    if (!Object.values(all).some(s => s.st === 'open') && Math.random() < 0.05) {
-      const cand = TENDERS.filter(t => eligible(t) && (!all[t.id] || (all[t.id].st === 'lost' && day() - all[t.id].lostDay > 120)));
-      if (cand.length) announce(cand[(Math.random() * cand.length) | 0]);
+    // нов търг: по един отворен наведнъж във всеки континент (deps.groupOf) — с много държави търговете не трябва да чакат един друг
+    // (преди: един за целия свят → средно на 27 дни, понякога 4–5 месеца нищо). Градовете, в които имаш филиал, излизат 3× по-често (там можеш да участваш).
+    const grp = t => deps.groupOf ? deps.groupOf(t.city) : 'all';
+    const busy = new Set(TENDERS.filter(t => all[t.id]?.st === 'open').map(grp));
+    const cand = TENDERS.filter(t => !busy.has(grp(t)) && eligible(t) && (!all[t.id] || (all[t.id].st === 'lost' && day() - all[t.id].lostDay > 120)));
+    for (const g of new Set(cand.map(grp))) {
+      if (Math.random() >= 0.08) continue;
+      const cg = cand.filter(t => grp(t) === g), w = cg.map(t => deps.owns(t.city) ? 3 : 1);
+      let r = Math.random() * w.reduce((a, b) => a + b, 0), i = 0; while ((r -= w[i]) > 0 && i < cg.length - 1) i++;
+      announce(cg[i]);
     }
     for (const t of TENDERS) {
       const s = all[t.id]; if (!s) continue;

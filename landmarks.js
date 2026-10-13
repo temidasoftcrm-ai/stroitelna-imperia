@@ -373,21 +373,6 @@ function arc() {
   g.userData.flood = [st];
   return g;
 }
-function notredame() {
-  const g = new THREE.Group(), st = mat(0xcfc3a5, 0.9, 0, { emissive: 0xffd8a0, emissiveIntensity: 0 }), roof = mat(0x5a6670, 0.6, 0.3), win = mat(0x3a2f5a, 0.3, 0.2, { emissive: 0xc08aff, emissiveIntensity: 0 });
-  box(g, 15, 0.3, 15, mat(0xb8b0a0, 0.95), 0, 0.15, 0);
-  box(g, 5, 7, 11, st, 0, 3.8, -1); gable(g, 5.4, 2.6, 11, roof, 0, 7.3, -1);   // корабът
-  for (const sx of [-1, 1]) box(g, 2.2, 11, 2.2, st, sx * 1.9, 5.8, 5.4);   // двете кули
-  box(g, 6, 6, 1.4, st, 0, 3.3, 5.6);
-  const rose = new THREE.Mesh(new THREE.CircleGeometry(1, 20), win); rose.position.set(0, 6.4, 6.32); g.add(rose);
-  for (const sx of [-1, 1]) box(g, 0.8, 2.2, 0.05, dark0(), sx * 1.4, 1.4, 6.32);
-  add(g, new THREE.ConeGeometry(0.5, 6, 8), roof, 0, 11.6, -1);   // шпилът
-  for (let k = 0; k < 4; k++) for (const sx of [-1, 1]) { const b = box(g, 0.25, 3.2, 0.25, st, sx * 3.4, 4.5, -5 + k * 2.6); b.rotation.z = sx * 0.5; }   // контрафорси
-  box(g, 15, 0.1, 3, mat(0x3f7fb0, 0.25, 0.1), 0, 0.32, -6.5);   // Сена
-  g.userData.flood = [st]; g.userData.lit = [win];
-  return g;
-}
-const dark0 = () => mat(0x2a2522, 0.8);
 function ladefense() {   // Гранд Арш + стъклени кули
   const g = new THREE.Group(), w = mat(0xf2f2ee, 0.5, 0.2, { emissive: 0xdde8ff, emissiveIntensity: 0 }), gl = glassMat(6, 30, 21, '#5e7f9c', '#d4e2ec');
   box(g, 15, 0.3, 15, mat(0xb0b4b8, 0.95), 0, 0.15, 0);
@@ -494,6 +479,7 @@ const GLB_LM = {
   ststephen: { h: 16, fit: 15, plate: 0xc9bfa8 },   // Будапеща: базиликата „Св. Стефан“ (Meshy AI)
   mosque: { h: 12, fit: 15, plate: 0xc9c0ae },   // Истанбул: Синята джамия (Meshy AI) — голяма зона 2×2 до центъра
   hagia: { h: 14, fit: 15, plate: 0xc9b99a },   // Истанбул: Света София (Meshy AI)
+  notredame: { h: 13, fit: 15, plate: 0xc9bfa8 },   // Париж: Нотр Дам (Meshy AI)
   bellagio: { h: 9, fit: 15, plate: 0xb9b09a, dz: -3.6 },
   luxor: { h: 9, fit: 15, sy: 1.9, plate: 0xd9c08a, onLoad: luxorBeam },   // Лас Вегас: „Луксор“ — черната пирамида със сфинкса (Meshy AI); нощем лъч от върха   // Лас Вегас: хотел „Беладжо“ (Meshy AI) — отпред езерото с фонтаните (bellagio() по-долу)
 };
@@ -628,7 +614,7 @@ function bellagio() {
   };
   return g;
 }
-const BUILD = { pyramids, ...Object.fromEntries(Object.keys(GLB_LM).map(k => [k, () => glbLm(k)])), arc, notredame, ladefense, bigben, londoneye, towerbridge, shard, brandenburg, fernsehturm, reichstag, erasmus, cubes, markthal, derotterdam, euromast, canal: () => canal(0), canal2: () => canal(1), rijks, centraal, adam, windmill, bellagio, mosque2: () => mosque(1), galata, sapphire, twist, twin, colosseum, stpeter, pantheon, vittoriano };
+const BUILD = { pyramids, ...Object.fromEntries(Object.keys(GLB_LM).map(k => [k, () => glbLm(k)])), arc, ladefense, bigben, londoneye, towerbridge, shard, brandenburg, fernsehturm, reichstag, erasmus, cubes, markthal, derotterdam, euromast, canal: () => canal(0), canal2: () => canal(1), rijks, centraal, adam, windmill, bellagio, mosque2: () => mosque(1), galata, sapphire, twist, twin, colosseum, stpeter, pantheon, vittoriano };
 
 // остров в морето за забележителност (Статуята на свободата — на звездовидния Форт Ууд на остров Либърти)
 export function buildSeaLandmark(kind, deps = {}) {

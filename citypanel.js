@@ -123,7 +123,8 @@ export function createCityPanel(deps) {
     if (s.day % 7 === 0) { deps.toast(`🤖 Автопилот (${n} град${n > 1 ? 'а' : ''}): тази седмица ${s.autoWeek >= 0 ? '+' : ''}${f(Math.round(s.autoWeek))} €. Подробности в „🏙️ Градове“.`, 'good', () => deps.openWin()); s.autoWeek = 0; }
   }
   // при напускане на град: свободните парцели за автопилота
-  function stash(c, lots) { c.freeLots = lots.filter(l => !l.built && !l.busy && !l.fresh).map(l => [l.id, l.zone]); }
+  // и празните парцели на купените квартали (fresh) — иначе градът изглежда „готов за завършване“ отвън, а вътре има десетки свободни (freeV: 2 = новото броене)
+  function stash(c, lots) { c.freeLots = lots.filter(l => !l.built && !l.busy).map(l => [l.id, l.zone]); c.freeV = 2; }
 
   // ---- прозорецът
   function cityCard(id) {
