@@ -72,7 +72,7 @@ async function worldsScreen() {
     ${ws.length ? ws.map(w => `<div class="card"><div class="row"><div><h3>${w.private ? '🔒' : '🌍'} ${esc(w.name)}${w.test ? ' <span class="meta">(тестов)</span>' : ''}</h3>
       <div class="meta">ден ${w.day} · ${w.players} фирми · 1 ден = ${Math.round(w.day_seconds / 60)} мин${ST[w.status] || ''}${w.company ? ` · твоята фирма: <b style="color:var(--txt)">${esc(w.company.name)}</b>` : ''}</div></div>
       <div style="display:flex;gap:6px">${res.admin ? `<button class="btn2" data-adm="${w.id}" title="Администрация">🛠️</button>` : ''}${w.banned ? '<span class="bad">изгонен</span>' : w.status !== 'open' ? '' : `<button class="btn" data-w="${w.id}">${w.company ? '▶️ Влез' : '🏗️ Основи фирма'}</button>`}</div></div></div>`).join('')
-      : `<div class="card meta">Още нямаш достъп до свят. Пилотът е частен — въведи кода от поканата.</div>`}
+      : `<div class="card meta">Още нямаш достъп до свят. Пилотът е частен — въведи кода от поканата (8 букви и цифри, напр. AB12CD34).<br>Цифровият код от имейла служи само за вход — той не е покана. Поканата се получава от администратора.</div>`}
     <div class="card"><h3>🎟️ Покана</h3><div class="row" style="margin-top:8px"><input id="inv" placeholder="КОД" style="text-transform:uppercase;letter-spacing:3px"><button class="btn2" id="join">Влез</button></div><div class="err" id="er"></div></div>
     ${res.admin ? `<button class="btn2" id="newW">🛠️ Нов свят</button>` : ''}`);
   $('out').onclick = e => { e.preventDefault(); sb.auth.signOut(); };
@@ -80,6 +80,7 @@ async function worldsScreen() {
   document.querySelectorAll('[data-adm]').forEach(b => b.onclick = () => adminScreen(+b.dataset.adm));
   $('newW')?.addEventListener('click', newWorldScreen);
   $('join').onclick = async () => {
+    if (/^\s*\d{6,10}\s*$/.test($('inv').value)) { $('er').textContent = 'Това прилича на кода за вход от имейла — той не е покана. Поиска код за покана от администратора (8 букви и цифри).'; return; }
     $('join').disabled = true;
     try { const r = await api.join($('inv').value); toast(r.already ? 'Вече си член на този свят.' : '🎟️ Поканата е приета!'); worldsScreen(); }
     catch (e) { $('er').textContent = errMsg(e); $('join').disabled = false; }

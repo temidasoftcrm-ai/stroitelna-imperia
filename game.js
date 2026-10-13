@@ -20,6 +20,7 @@ import { createDevLevel, THRESH as DEV_THRESH, LV as DEV_LV, unlockText } from '
 import { createCityPanel } from './citypanel.js';
 import { createPlaytime } from './playtime.js';
 import { createBankrupt } from './bankrupt.js';
+import { createCoop } from './coop.js';
 import { RAIL_STAGES, railStageOf, buildRailView } from './railbuild.js';
 import { createStation, STATION_LEVELS } from './station.js';
 import { createResorts, RESORTS, seasonOf, monthName } from './resorts.js';
@@ -2806,6 +2807,7 @@ function keyCitiesMine() { const own = new Set(ownedCities()); return new Set(CO
   h = h.replace('<g class="city lbl', superRouteSvg() + oilMapSvg() + mwMapSvg() + '<g class="city lbl');   // трасетата на супер поръчките — над всички мрежи
   h += resorts.svg(mapCont || null);   // Фаза 5: курортите — европейските на картата на Европа, африканските на изгледа „Африка“
   h += '<g class="lay-rail"><g id="trainLayer"></g></g><g class="lay-air"><g id="planeLayer"></g></g><g class="lay-sea"><g id="shipLayer"></g></g>';
+  if (window.__coopMap) h += window.__coopMap((lo, la) => proj(lo, la), (mapEU ? 4.5 : mapWide ? 1.6 : 1) * mapK(), id => cityById(id));   // партньорът (coop.js) — в друг цвят
   const rlfOld = svg.querySelector('#rlfG');   // релефът не се пресъздава при зуум — иначе картината се декодира наново („мъгла“)
   svg.innerHTML = h;
   { const slot = svg.querySelector('#rlfSlot'); if (slot) { const key = wonD.map(w => w[0]).join(',') + (mapWorld ? 'W' : ''); let g = rlfOld && rlfOld.dataset.key === key ? rlfOld : null;
@@ -2912,6 +2914,33 @@ const bust = createBankrupt({ S: () => S, econ: () => econ, toast, modal, fmt, s
   newGame: () => { localStorage.removeItem(SAVE_KEY); location.reload(); }, openSaves: () => openSaves({ modal, toast, fmt, save, cityName: id => cityById(id).nm }),
   playDays: () => playtime.hrs(playtime.state()?.sec) + ' игра' });
 setTimeout(() => { try { if (S) bust.banner(); } catch {} }, 3000);
+// 🤝 партньорство в самостоятелната игра (coop.js): пари, техника, материали, общи поръчки, партньорът на картата
+const coop = createCoop({ S: () => S, econ: () => econ, toast, modal, fmt, save, renderPanel, drawMap: () => { try { if (!$('mapScreen').classList.contains('hidden')) drawMap(); } catch {} },
+  ready: () => !!(S && econ && city.ready), cityName: id => cityById(id)?.nm || id, ownedCities: () => ownedCities(), brand: () => brandOf(S),
+  netWorth: () => econ.netWorth(units.map(u => u.type)), unitsHere: () => units.filter(u => !u.proj).map(u => u.type),
+  takeUnit: type => { const u = units.find(q => q.type === type && !q.proj); if (!u) return false; scene.remove(u.obj); units.splice(units.indexOf(u), 1); S.units.splice(S.units.indexOf(type), 1); refreshGarageLabel(); save(); renderPanel(); return true; },
+  giveUnit: type => { if (!ECON.UNIT_TYPES[type]) return 'bad';
+    if (!isMachine(type) && crewCount() >= officeLv().crews) return 'office';
+    if (isMachine(type) && !isRoadGear(type) && machineCount() >= garageLv().cap) return 'garage';
+    S.units.push(type); const u = spawnUnit(type); refreshGarageLabel(); poofAt(u.x, u.z); dispatch(); save(); renderPanel(); return 'ok'; },
+  cityId: () => S && S.cityId,
+  // къде строиш в този град (координати на парцелите — градовете са еднакви при всички играчи)
+  sitesHere: () => [...(S.built || []).map(b => ({ l: city.lots[b.lot], k: 'b' })), ...projects.filter(p => !p.own).map(p => ({ l: city.lots[p.lot], k: 'p', t: p.type }))]
+    .filter(s => s.l).map(s => ({ x: Math.round(s.l.x * 10) / 10, z: Math.round(s.l.z * 10) / 10, k: s.k, t: s.t })),
+  // розовите маркери на партньора в 3D града: пръстен на парцела и табелка (готово / строи)
+  mark: (sites, name, col) => {
+    if (!city.group) return;
+    const sig = JSON.stringify([sites, name]); let g = city.group.getObjectByName('coopMarks');
+    if (g && g.userData.sig === sig) return g.children.length;
+    if (g) city.group.remove(g);
+    g = new THREE.Group(); g.name = 'coopMarks'; g.userData.sig = sig;
+    const ringM = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false });
+    for (const s of sites || []) {
+      const r = new THREE.Mesh(new THREE.RingGeometry(TILE * 0.56, TILE * 0.78, 40).rotateX(-Math.PI / 2), ringM); r.position.set(s.x, 0.15, s.z); g.add(r);
+      const lb = label(`🤝 ${name}${s.k === 'p' ? ' · строи' : ''}`, col, 13); lb.position.set(s.x, s.k === 'p' ? 11 : 18, s.z); g.add(lb);
+    }
+    city.group.add(g); return g.children.length;
+  } });
 const tutorial = createTutorial({ S: () => S, projects: () => projects, units: () => units, save,
   onMap: () => !$('mapScreen').classList.contains('hidden'), openTab: t => { tab = t; renderPanel(); } });
 const resorts = createResorts({
