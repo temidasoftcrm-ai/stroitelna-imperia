@@ -121,4 +121,4 @@ lm/ststephen.glb — „St. Stephen's Basilica, Budapest“, генериран 
 lm/cityhall.glb — „Philadelphia City Hall“, генериран с Meshy AI (meshy.ai) от автора на играта; оцветен в играта
 lm/mosque.glb — „Blue Mosque (Sultan Ahmed)“, генериран с Meshy AI (meshy.ai) от автора на играта
 lm/notredame.glb — „Notre-Dame de Paris“, генериран с Meshy AI (meshy.ai) от автора на играта
-cinema/newyork.mp4, cinema/vegas.mp4 — видео, генерирано с Kling AI от автора на играта
+cinema/newyork.mp4, cinema/vegas.mp4, cinema/paris.mp4, cinema/dubai.mp4, cinema/plane.mp4, cinema/oil.mp4, cinema/sofia.mp4, cinema/tokyo.mp4, cinema/lv20.mp4, cinema/sydney.mp4, cinema/cairo.mp4, cinema/rio.mp4, cinema/orient.mp4, cinema/route66.mp4, cinema/silk.mp4, cinema/chunnel.mp4, cinema/transsib.mp4, cinema/capecairo.mp4, cinema/darien.mp4, cinema/ghan.mp4, cinema/panama.mp4 — видео, генерирано с Kling AI от автора на играта

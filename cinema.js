@@ -8,13 +8,27 @@
 const LS = 'stroiCine';
 const DUR = 6.5;
 const SCENES = [
-  { key: 'sofia', city: 'sofia', ico: '🇧🇬', nm: 'София — начало', cap: 'София', sub: 'Изгрев над Витоша. Тук започва всичко.', lock: 'Започни игра в София' },
-  { key: 'newyork', city: 'newyork', ico: '🗽', nm: 'Ню Йорк', cap: 'Ню Йорк', sub: 'Строй високо. Мисли мащабно.', lock: 'Влез в Ню Йорк', video: 'assets/cinema/newyork.mp4', poster: 'assets/cinema/newyork.jpg' },
-  { key: 'vegas', resort: 'vegasstrip', ico: '🎰', nm: 'Лас Вегас', cap: '🎰 Лас Вегас', sub: 'Стрипът светна. Залозите започват.', lock: 'Построй курорта „Лас Вегас Стрип“', video: 'assets/cinema/vegas.mp4', poster: 'assets/cinema/vegas.jpg' },
-  { key: 'dubai', city: 'dubai', ico: '🌆', nm: 'Дубай', cap: 'Дубай', sub: 'От пясъка — до небето.', lock: 'Влез в Дубай' },
-  { key: 'plane', ico: '🛫', nm: 'Първи самолет', cap: '🛫 Първият ти самолет излита', sub: 'Небето вече е част от империята.', lock: 'Построй първото си летище' },
-  { key: 'oil', ico: '🛢️', nm: 'Първи петрол', cap: '🛢️ Ерата на черното злато', sub: 'Сондата заработи. Петролът потече.', lock: 'Пусни първия си петролен кладенец' },
-  { key: 'lv20', ico: '🌍', nm: 'Ниво 20 — Империя', cap: '🌍 Ниво 20 — Империя', sub: 'Целият свят е твоето строително поле.', lock: 'Стигни ниво 20' },
+  { key: 'sofia', city: 'sofia', start: true, ico: '🇧🇬', nm: 'София — начало', cap: 'София', sub: 'Изгрев над Витоша. Тук започва всичко.', lock: 'Започни нова игра в София', video: 'assets/cinema/sofia.mp4', poster: 'assets/cinema/sofia.jpg' },
+  { key: 'newyork', city: 'newyork', ico: '🗽', nm: 'Ню Йорк', cap: 'НЮ ЙОРК', sub: 'Строй високо. Мисли мащабно.', lock: 'Влез в Ню Йорк', video: 'assets/cinema/newyork.mp4', poster: 'assets/cinema/newyork.jpg' },
+  { key: 'vegas', resort: 'vegasstrip', ico: '🎰', nm: 'Лас Вегас', cap: 'ЛАС ВЕГАС', sub: 'Построй града на големите печалби.', lock: 'Построй курорта „Лас Вегас Стрип“', video: 'assets/cinema/vegas.mp4', poster: 'assets/cinema/vegas.jpg' },
+  { key: 'paris', city: 'paris', ico: '🗼', nm: 'Париж', cap: 'ПАРИЖ', sub: 'Създай империя със стил.', lock: 'Влез в Париж', video: 'assets/cinema/paris.mp4', poster: 'assets/cinema/paris.jpg' },
+  { key: 'tokyo', city: 'tokyo', ico: '🇯🇵', nm: 'Токио', cap: 'ТОКИО', sub: '', lock: 'Влез в Токио', video: 'assets/cinema/tokyo.mp4', poster: 'assets/cinema/tokyo.jpg' },
+  { key: 'sydney', city: 'sydney', ico: '🇦🇺', nm: 'Сидни', cap: 'СИДНИ', sub: 'Нов хоризонт за твоята империя.', lock: 'Влез в Сидни', video: 'assets/cinema/sydney.mp4', poster: 'assets/cinema/sydney.jpg' },
+  { key: 'cairo', city: 'cairo', ico: '🇪🇬', nm: 'Кайро', cap: 'КАЙРО', sub: 'Древно величие. Нова империя.', lock: 'Влез в Кайро', video: 'assets/cinema/cairo.mp4', poster: 'assets/cinema/cairo.jpg' },
+  { key: 'rio', city: 'rio', ico: '🇧🇷', nm: 'Рио де Жанейро', cap: 'РИО ДЕ ЖАНЕЙРО', sub: 'Дай на империята си нов ритъм.', lock: 'Влез в Рио де Жанейро', video: 'assets/cinema/rio.mp4', poster: 'assets/cinema/rio.jpg' },
+  { key: 'orient', when: s => s.orient?.st === 'done', ico: '🚂', nm: 'Ориент Експрес', cap: 'ОРИЕНТ ЕКСПРЕС', sub: 'Суперпоръчката е изпълнена. Легендата потегля.', lock: 'Изпълни суперпоръчката „Ориент Експрес“', video: 'assets/cinema/orient.mp4', poster: 'assets/cinema/orient.jpg' },
+  { key: 'route66', when: s => s.r66?.st === 'done', ico: '🛣️', nm: 'Route 66', cap: 'ROUTE 66', sub: 'Суперпоръчката е изпълнена. Пътят към легендата е открит.', lock: 'Изпълни суперпоръчката „Route 66“', video: 'assets/cinema/route66.mp4', poster: 'assets/cinema/route66.jpg' },
+  { key: 'silk', when: s => s.silk?.st === 'done', ico: '🐫', nm: 'Пътят на коприната', cap: 'ПЪТЯТ НА КОПРИНАТА', sub: 'Суперпоръчката е изпълнена. Изтокът и Западът са свързани.', lock: 'Изпълни суперпоръчката „Пътят на коприната“', video: 'assets/cinema/silk.mp4', poster: 'assets/cinema/silk.jpg' },
+  { key: 'chunnel', when: s => s.mega?.chunnel?.st === 'done', ico: '🚄', nm: 'Тунелът под Ламанша', cap: 'ТУНЕЛЪТ ПОД ЛАМАНША', sub: 'Суперпоръчката е изпълнена. Свърза два бряга под морето.', lock: 'Изпълни суперпоръчката „Тунелът под Ламанша“', video: 'assets/cinema/chunnel.mp4', poster: 'assets/cinema/chunnel.jpg' },
+  { key: 'transsib', when: s => s.mega?.transsib?.st === 'done', ico: '🚂', nm: 'Транссибирската железница', cap: 'ТРАНССИБИРСКАТА ЖЕЛЕЗНИЦА', sub: 'Суперпоръчката е изпълнена. Прекоси необятното.', lock: 'Изпълни суперпоръчката „Транссибирската железница“', video: 'assets/cinema/transsib.mp4', poster: 'assets/cinema/transsib.jpg' },
+  { key: 'capecairo', when: s => s.mega?.capecairo?.st === 'done', ico: '🚂', nm: 'Железницата Кейп — Кайро', cap: 'ЖЕЛЕЗНИЦАТА КЕЙП–КАЙРО', sub: 'Суперпоръчката е изпълнена. Един континент — една връзка.', lock: 'Изпълни суперпоръчката „Железницата Кейп — Кайро“', video: 'assets/cinema/capecairo.mp4', poster: 'assets/cinema/capecairo.jpg' },
+  { key: 'darien', when: s => s.mega?.darien?.st === 'done', ico: '🛣️', nm: 'Дариенският пролом', cap: 'ДАРИЕНСКИЯТ ПРОЛОМ', sub: 'Суперпоръчката е изпълнена. Пътят между двете Америки е открит.', lock: 'Изпълни суперпоръчката „Дариенският пролом“', video: 'assets/cinema/darien.mp4', poster: 'assets/cinema/darien.jpg' },
+  { key: 'ghan', when: s => s.mega?.ghan?.st === 'done', ico: '🚂', nm: 'Влакът „Гън“', cap: 'ВЛАКЪТ ГЪН', sub: 'Суперпоръчката е изпълнена. През червеното сърце на Австралия.', lock: 'Изпълни суперпоръчката „Влакът Гън“', video: 'assets/cinema/ghan.mp4', poster: 'assets/cinema/ghan.jpg' },
+  { key: 'panama', when: s => s.mega?.panama?.st === 'done', ico: '⚓', nm: 'Панамският канал', cap: 'ПАНАМСКИЯТ КАНАЛ — РАЗШИРЕН', sub: 'Суперпоръчката е изпълнена. Два океана. Нови хоризонти.', lock: 'Изпълни суперпоръчката „Разширение на Панамския канал“', video: 'assets/cinema/panama.mp4', poster: 'assets/cinema/panama.jpg' },
+  { key: 'dubai', city: 'dubai', ico: '🌆', nm: 'Дубай', cap: 'ДУБАЙ', sub: 'От пясъка до небето.', lock: 'Влез в Дубай', video: 'assets/cinema/dubai.mp4', poster: 'assets/cinema/dubai.jpg' },
+  { key: 'plane', ico: '🛫', nm: 'Първи самолет', cap: '🛫 Първият ти самолет излита', sub: 'Небето вече е част от империята.', lock: 'Построй първото си летище', video: 'assets/cinema/plane.mp4', poster: 'assets/cinema/plane.jpg' },
+  { key: 'oil', ico: '🛢️', nm: 'Първи петрол', cap: '🛢️ Ерата на черното злато', sub: 'Сондата заработи. Петролът потече.', lock: 'Пусни първия си петролен кладенец', video: 'assets/cinema/oil.mp4', poster: 'assets/cinema/oil.jpg' },
+  { key: 'lv20', ico: '🌍', nm: 'Ниво 20 — Империя', cap: 'СВЕТОВНА ИМПЕРИЯ', sub: 'Започна с една сграда. Свърза целия свят.', lock: 'Стигни ниво 20', video: 'assets/cinema/lv20.mp4', poster: 'assets/cinema/lv20.jpg' },
 ];
 const CSS = `
 #cine { position:fixed; inset:0; z-index:300; background:#000; opacity:0; transition:opacity .45s; overflow:hidden; user-select:none; }
@@ -478,7 +492,8 @@ export function createCinema(deps) {
       const fail = () => { if (ok) return; ok = true; v.remove(); cv.style.display = ''; res(false); };
       const unm = el.querySelector('.unm');
       v.addEventListener('error', fail);
-      v.addEventListener('timeupdate', () => { if (v.duration && v.currentTime >= v.duration - 2.3) cap.classList.add('on'); });
+      const capChk = () => { if (v.duration && v.currentTime >= v.duration - 2) cap.classList.add('on'); };   // timeupdate идва рядко при натоварване — и по таймер
+      v.addEventListener('timeupdate', capChk); const capIv = setInterval(capChk, 200); cleanup.push(() => clearInterval(capIv));
       v.addEventListener('ended', () => setTm(setTimeout(close, 1400)));
       cleanup.push(() => { try { v.pause(); } catch (e) {} });
       const go = () => v.play().then(() => { if (!ok) { ok = true; res(true); } });
@@ -499,12 +514,13 @@ export function createCinema(deps) {
   const resortBuilt = id => (S().resorts || {})[id]?.stage === 'built';
   function due() {
     const s = S(), sn = seen();
-    const city = SCENES.find(x => x.city && x.city === s.cityId);
+    const city = SCENES.find(x => x.city && x.city === s.cityId && (!x.start || (s.hqCity === x.city && (s.day || 1) <= 2)));   // start: само в началото на нова игра там
     if (city && !sn[city.key]) return city.key;
     if (!sn.plane && deps.firstPlane && deps.firstPlane()) return 'plane';
     if (!sn.oil && deps.firstOil && deps.firstOil()) return 'oil';
     if (!sn.lv20 && deps.lv20 && deps.lv20()) return 'lv20';
     const rs = SCENES.find(x => x.resort && !sn[x.key] && resortBuilt(x.resort)); if (rs) return rs.key;
+    const wh = SCENES.find(x => x.when && !sn[x.key] && x.when(s)); if (wh) return wh.key;
     return null;
   }
   function firstRun() {   // стари записи: вече постигнатото не се пуска наведнъж при първото зареждане
@@ -516,6 +532,7 @@ export function createCinema(deps) {
     if (deps.firstOil && deps.firstOil()) sn.oil = s.day;
     if (deps.lv20 && deps.lv20()) sn.lv20 = s.day;
     for (const x of SCENES) if (x.resort && resortBuilt(x.resort)) sn[x.key] = s.day;
+    for (const x of SCENES) if (x.when && x.when(s)) sn[x.key] = s.day;
   }
   function tick() {
     if (!S() || !deps.ready || !deps.ready()) return;
