@@ -101,7 +101,7 @@ function newWorldScreen() {
     toast('Светът е създаден.'); adminScreen(r.world);
   };
 }
-const EV = { company_created: '🏗️ нова фирма', join: '🎟️ влезе с покана', bid: '📨 оферта', tender_awarded: '🏆 спечелен търг', tender_no_bids: '— търг без оферти', contract_failed: '❌ провален договор',
+const EV = { ally_gift: '🎁 подарък за съюзник', ally_loan: '💸 заем между съюзници', ally_forgive: '🎁 опростен заем', company_created: '🏗️ нова фирма', join: '🎟️ влезе с покана', bid: '📨 оферта', tender_awarded: '🏆 спечелен търг', tender_no_bids: '— търг без оферти', contract_failed: '❌ провален договор',
   build_start: '🏗️ строеж', contract_start: '📑 старт на договор', build_done: '✅ предаден строеж', units: '🚜 техника', status: '⏸ статус', ban: '🚫 изгонен', unban: '↩️ върнат', cfg: '⚙️ настройки', invite: '🎟️ покана', world_created: '🌐 нов свят', clock_shift: '⏩ часовник', season_start: '🏁 нов сезон', season_end: '🏆 край на сезон', season_end_admin: '🏁 сезонът е приключен от админ', facility: '🏭 производство', ask: '📤 оферта на пазара', cons_found: '🤝 нов консорциум', cons_invite: '📨 покана за консорциум', cons_join: '🤝 влезе в консорциум', cons_building: '🏗️ консорциум строи', cons_operating: '✅ мегапроект работи', cons_dissolved: '✖ консорциум разпаднат', conc_bid: '⚓ оферта за концесия', conc_awarded: '⚓ концесия възложена' };
 async function adminScreen(id) {
   let o;
@@ -168,6 +168,7 @@ async function refresh(first) {
   state = s; srvOff = Date.parse(s.world.server_now) - Date.now();
   if (tab === 'tend') { try { const t = await api.tenders(worldId); if (t.ok) tenders = t; } catch {} }
   if (tab === 'co') { try { const k = await api.finance(worldId); if (k.ok) fin = k; } catch {} }
+  if (tab === 'co') { try { const k = await api.allyMoney(worldId); if (k.ok) amoney = k; } catch {} }
   if (tab === 'conc') { try { const k = await api.concessions(worldId); if (k.ok) conc = k; } catch {} }
   if (tab === 'cons') { try { const k = await api.consortia(worldId); if (k.ok) cons = k; } catch {} }
   if (tab === 'mkt') { try { const m = await api.market(worldId); if (m.ok) market = m; } catch {} }
@@ -177,7 +178,7 @@ async function refresh(first) {
   if (!busy && !document.activeElement?.dataset?.bidin && !['byQ', 'byP', 'slQ', 'slP', 'lnA', 'soP', 'soC'].includes(document.activeElement?.id) && !document.activeElement?.dataset?.shp && document.activeElement?.tagName !== 'SELECT' && !document.activeElement?.dataset?.cbin) render(); syncView();
 }
 const TABS = [['build', '🏗️ Строежи'], ['tend', '🏛️ Търгове'], ['mkt', '📦 Пазар'], ['cons', '🤝'], ['conc', '⚓'], ['units', '🚜 Техника'], ['rank', '🏆'], ['co', '🏦'], ['notes', '🔔']];
-let market = null, mktGood = 'concrete', cons = null, conc = null, concDraft = {}, fin = null;
+let market = null, mktGood = 'concrete', cons = null, conc = null, concDraft = {}, fin = null, amoney = null;
 let ranking = null, rankSort = 'value', profile = null, season = null, rankView = 'season', rels = null;
 const TIER = { local: '🏘️ Местни', national: '🇧🇬 Национални', global: '🌍 Световни' };
 let tenders = null, bidDraft = {};
@@ -194,6 +195,27 @@ function finHtml() {
     ${F.shareholders.map(x => `<div class="led"><span>👤 ${esc(x.name)} · ${x.pct}%</span><button class="btn2" style="padding:2px 8px;font-size:12px" data-bb="${x.company}">Изкупи (${eur(x.buyback)})</button></div>`).join('')}</div>`;
   if (F.my_stakes.length) h += `<div class="card"><h3>💼 Твоите дялове</h3>${F.my_stakes.map(x => `<div class="led"><span>${esc(x.name)} · ${x.pct}% · платено ${eur(x.paid)} · дивиденти ${eur(x.dividends)}</span><b>${eur(x.worth)}</b></div>`).join('')}</div>`;
   if (F.market.length) h += `<div class="card"><h3>🏛️ Дялове за продан</h3>${F.market.map(x => `<div class="led" style="flex-wrap:wrap"><span><b style="color:${brandOf(x.brand).col}">${esc(x.name)}</b> · ниво ${x.level} · печалба 7 дни ${short(x.profit7)}<br><span class="meta">${x.pct_left}% по ${eur(x.price_pct)} за 1% (справедлива ${eur(x.fair_pct)})</span></span><span style="display:flex;gap:4px"><input data-shp="${x.id}" inputmode="numeric" value="1" style="width:56px;padding:4px"><button class="btn" style="padding:4px 10px" data-shb="${x.id}">Купи</button></span></div>`).join('')}</div>`;
+  return h;
+}
+function allyHtml() {
+  const A = amoney; if (!A) return '';
+  if (!A.allies.length && !A.items.length) return `<div class="card"><h3>🤝 Пари между съюзници</h3><div class="meta">Нямаш съюзници. Предложи съюз от профила на фирма (🏆 → фирмата) — после ще можете да си подарявате пари и да си давате заеми.</div></div>`;
+  const ST = { done: '', offered: '⏳ чака отговор', open: 'активен', overdue: '<b class="bad">просрочен</b>', repaid: '✅ изплатен', forgiven: '🎁 опростен' };
+  let h = `<div class="card"><h3>🤝 Пари между съюзници</h3><div class="meta">Тази седмица можеш да изпратиш още <b style="color:var(--txt)">${eur(A.cap_left)}</b> (до ${Math.round(A.cap_pct * 100)}% от стойността на фирмата за 7 игрални дни; минимум ${eur(A.min_amount)}). Съюзът трябва да е поне на ${A.min_days} игрални дни. 🎁 Подаръците не се броят за ръст в сезона. 💸 Заемът се връща до срока — на падежа сървърът сам взима от наличността на длъжника.${A.overdue ? '<br><b class="bad">Имаш просрочен заем — докато не го върнеш, не можеш да изпращаш пари.</b>' : ''}</div>`;
+  for (const x of A.allies) h += `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--line)"><b>${esc(x.name)}</b>${x.ready ? '' : ` <span class="meta">— ще може след ~${x.ready_in_min} мин</span>`}
+    <div class="row" style="margin-top:6px;flex-wrap:wrap;gap:6px"><input data-amA="${x.id}" inputmode="numeric" placeholder="сума в €" style="padding:7px;max-width:130px">
+      <button class="btn" data-agift="${x.id}" ${x.ready && !A.overdue ? '' : 'disabled'}>🎁 Подари</button></div>
+    <div class="row" style="margin-top:6px;flex-wrap:wrap;gap:6px"><select data-amD="${x.id}" style="padding:6px;flex:1;min-width:0;width:auto">${[3, 5, 7, 10, 15, 20, 30].map(d => `<option value="${d}"${d === 7 ? ' selected' : ''}>${d} дни</option>`).join('')}</select>
+      <select data-amR="${x.id}" style="padding:6px;flex:1;min-width:0;width:auto">${[0, 1, 2, 3, 5, 7, 10].map(r => `<option value="${r}"${r === 2 ? ' selected' : ''}>лихва ${r}%</option>`).join('')}</select>
+      <button class="btn2" data-aloan="${x.id}" ${x.ready && !A.overdue ? '' : 'disabled'}>💸 Предложи заем</button></div></div>`;
+  h += '</div>';
+  if (A.items.length) h += `<div class="card"><h3>📑 Подаръци и заеми</h3>${A.items.map(x => {
+    const who = x.out ? `→ ${esc(x.other_name)}` : `← ${esc(x.other_name)}`, left = x.owed - x.paid;
+    const txt = x.kind === 'gift' ? `🎁 Подарък ${who} · ден ${x.day}` : `💸 Заем ${who} · ${eur(x.amount)}, ${x.days} дни, ${x.rate_pct}% · ${x.status === 'open' || x.status === 'overdue' ? `остават <b>${eur(left)}</b> до ден ${x.due_day} · ` : ''}${ST[x.status] || x.status}`;
+    let b = '';
+    if (x.kind === 'loan' && x.status === 'offered') b = x.out ? `<button class="btn2" data-lact="${x.id}:cancel">Оттегли</button>` : `<button class="btn" data-lact="${x.id}:accept">✅ Приеми</button><button class="btn2" data-lact="${x.id}:decline">Откажи</button>`;
+    if (x.kind === 'loan' && (x.status === 'open' || x.status === 'overdue')) b = x.out ? `<button class="btn2" data-lact="${x.id}:forgive">Опрости</button>` : `<button class="btn" data-lrepay="${x.id}:${left}">Върни ${eur(left)}</button>`;
+    return `<div class="led" style="flex-wrap:wrap;gap:6px"><span>${txt}</span>${x.kind === 'gift' ? `<b class="${x.out ? 'bad' : 'ok'}">${x.out ? '−' : '+'}${eur(x.amount)}</b>` : `<span class="row" style="gap:4px">${b}</span>`}</div>`; }).join('')}</div>`;
   return h;
 }
 function concHtml(U) {
@@ -262,7 +284,7 @@ const short = c => Math.abs(c) >= 1e11 ? (c / 1e11).toLocaleString('bg-BG', { ma
 function relHtml(p) {
   if (p.me || !rels) return '';
   const r = rels.companies.find(x => x.id === p.id); if (!r) return '';
-  const st = r.ally ? '<b class="ok">🤝 Съюзници</b> — търгувате без такса и виждате офертите си в търговете и концесиите.' : r.ally_pending_in ? `<b style="color:var(--acc)">🤝 ${esc(p.name)} ти предлага съюз</b>` : r.ally_pending_out ? '⏳ Предложи съюз — чакаш отговор.' : r.rival_out || r.rival_in ? `<b class="bad">⚔️ Съперници</b>${r.rival_in && !r.rival_out ? ' (той те обяви)' : r.rival_out && !r.rival_in ? ' (ти го обяви)' : ''} — всяка победа в търг или концесия носи бонус XP.` : 'Неутрални.';
+  const st = r.ally ? '<b class="ok">🤝 Съюзници</b> — търгувате без такса, виждате офертите си в търговете и концесиите и можете да си подарявате пари и да си давате заеми (таб 🏦).' : r.ally_pending_in ? `<b style="color:var(--acc)">🤝 ${esc(p.name)} ти предлага съюз</b>` : r.ally_pending_out ? '⏳ Предложи съюз — чакаш отговор.' : r.rival_out || r.rival_in ? `<b class="bad">⚔️ Съперници</b>${r.rival_in && !r.rival_out ? ' (той те обяви)' : r.rival_out && !r.rival_in ? ' (ти го обяви)' : ''} — всяка победа в търг или концесия носи бонус XP.` : 'Неутрални.';
   const btn = (act, txt, cls = 'btn2') => `<button class="${cls}" data-rel="${p.id}:${act}">${txt}</button>`;
   let b = '';
   if (r.ally) b = btn('unally', 'Прекрати съюза');
@@ -292,14 +314,14 @@ function rankHtml() {
   if (profile) {
     const p = profile.company, b = brandOf(p.brand);
     return `<button class="btn2" data-back="1">← Класация</button>
-      <div class="card" style="border-color:${b.col}"><h3 style="font-size:18px;color:${b.col}">${b.ico} ${esc(p.name)}${p.me ? ' <span class="meta">(ти)</span>' : ''}</h3>
+      <div class="card" style="border-color:${b.col}"><h3 style="font-size:18px;color:${b.col}">${b.ico} ${esc(p.name)}${p.me ? ' <span class="meta">(ти)</span>' : ''}${isOn(p.id) ? ' <span class="meta" style="color:#9ff0bd">🟢 онлайн сега</span>' : ''}</h3>
       <div class="meta">${esc(CITIES[p.city] || p.city)} · ниво ${p.level} · от ${new Date(p.since).toLocaleDateString('bg-BG')}</div>${(profile.trophies || []).length ? `<div style="margin-top:6px">${profile.trophies.map(t => `<span title="Сезон ${t.n}, ${DIV[t.division]}" style="font-size:13px;margin-right:8px">${['🥇', '🥈', '🥉'][t.rank - 1]} Сезон ${t.n}</span>`).join('')}</div>` : ''}</div>
       ${relHtml(p)}
       <div class="stats"><div><b>${short(p.value)}</b><span>стойност</span></div><div><b class="${p.profit7 < 0 ? 'bad' : ''}">${short(p.profit7)}</b><span>печалба за 7 дни</span></div>
         <div><b>${p.contracts_done}</b><span>изпълнени договора</span></div><div><b>${p.builds_done}</b><span>предадени строежа</span></div></div>
       <div class="card"><h3>🧮 Стойността по части</h3>
         <div class="led"><span>Наличност</span><b class="${p.cash < 0 ? 'bad' : ''}">${eur(p.cash)}</b></div><div class="led"><span>Блокирани депозити</span><b>${eur(p.held)}</b></div>
-        <div class="led"><span>Техника (50% от цената)</span><b>${eur(p.units)}</b></div><div class="led"><span>Строежи в ход (материали)</span><b>${eur(p.wip)}</b></div>${p.facilities ? `<div class="led"><span>Производства (50%)</span><b>${eur(p.facilities)}</b></div>` : ''}${p.goods ? `<div class="led"><span>Стоки (60%)</span><b>${eur(p.goods)}</b></div>` : ''}${p.stakes ? `<div class="led"><span>Консорциуми</span><b>${eur(p.stakes)}</b></div>` : ''}${p.concessions ? `<div class="led"><span>Концесии</span><b>${eur(p.concessions)}</b></div>` : ''}${p.debt ? `<div class="led"><span>Дълг</span><b class="bad">−${eur(p.debt)}</b></div>` : ''}${p.sold_pct ? `<div class="led"><span>Продадени дялове</span><b class="bad">−${p.sold_pct}%</b></div>` : ''}${p.shares ? `<div class="led"><span>Дялове в други фирми</span><b>${eur(p.shares)}</b></div>` : ''}
+        <div class="led"><span>Техника (50% от цената)</span><b>${eur(p.units)}</b></div><div class="led"><span>Строежи в ход (материали)</span><b>${eur(p.wip)}</b></div>${p.facilities ? `<div class="led"><span>Производства (50%)</span><b>${eur(p.facilities)}</b></div>` : ''}${p.goods ? `<div class="led"><span>Стоки (60%)</span><b>${eur(p.goods)}</b></div>` : ''}${p.stakes ? `<div class="led"><span>Консорциуми</span><b>${eur(p.stakes)}</b></div>` : ''}${p.concessions ? `<div class="led"><span>Концесии</span><b>${eur(p.concessions)}</b></div>` : ''}${p.debt ? `<div class="led"><span>Дълг</span><b class="bad">−${eur(p.debt)}</b></div>` : ''}${p.ally ? `<div class="led"><span>Съюзни заеми (вземания − задължения)</span><b class="${p.ally < 0 ? 'bad' : ''}">${eur(p.ally)}</b></div>` : ''}${p.sold_pct ? `<div class="led"><span>Продадени дялове</span><b class="bad">−${p.sold_pct}%</b></div>` : ''}${p.shares ? `<div class="led"><span>Дялове в други фирми</span><b>${eur(p.shares)}</b></div>` : ''}
         <div class="led"><span><b>Общо</b></span><b style="color:var(--acc)">${eur(p.value)}</b></div></div>
       ${profile.won.length ? `<div class="card"><h3>🏛️ Търгове</h3>${profile.won.map(k => `<div class="led"><span>${esc(k.title)}</span><b>${k.status === 'done' ? '✅' : k.status === 'failed' ? '❌' : '⏳'} ${eur(k.price)}</b></div>`).join('')}<div class="meta" style="margin-top:4px">Провалени: ${p.contracts_failed}</div></div>` : ''}
       ${profile.recent.length ? `<div class="card"><h3>🏗️ Последни строежи</h3>${profile.recent.map(r => `<div class="led"><span>${esc(r.title)}</span><span class="meta">ден ${r.day}</span></div>`).join('')}</div>` : ''}`;
@@ -311,7 +333,7 @@ function rankHtml() {
   return sw + `<div class="row" style="justify-content:flex-start;gap:4px">${Object.entries(col).map(([k, [nm]]) => `<button class="${k === rankSort ? 'btn' : 'btn2'}" style="padding:5px 10px;font-size:13px" data-sort="${k}">${nm}</button>`).join('')}</div>
     ${ranking.rows.map(r => { const b = brandOf(r.brand), v = r[col[rankSort][1]];
       return `<div class="card" data-prof="${r.id}" style="cursor:pointer;padding:9px 12px;${r.me ? 'border-color:var(--acc)' : ''}"><div class="row"><span style="font-size:${r.rank <= 3 ? 22 : 15}px;width:34px;text-align:center">${['🥇', '🥈', '🥉'][r.rank - 1] || r.rank}</span>
-        <span style="flex:1;min-width:0"><b style="color:${b.col}">${b.ico} ${esc(r.name)}</b>${r.me ? ' <span class="meta">(ти)</span>' : relIco(r.id)}<br><span class="meta">${esc(CITIES[r.city] || r.city)} · ниво ${r.level} · ${r.contracts_done} договора</span></span>
+        <span style="flex:1;min-width:0"><b style="color:${b.col}">${b.ico} ${esc(r.name)}</b>${onDot(r.id)}${r.me ? ' <span class="meta">(ти)</span>' : relIco(r.id)}<br><span class="meta">${esc(CITIES[r.city] || r.city)} · ниво ${r.level} · ${r.contracts_done} договора</span></span>
         <b class="${rankSort === 'profit' && v < 0 ? 'bad' : ''}" style="white-space:nowrap">${rankSort === 'contracts' ? v : short(v)}</b></div></div>`; }).join('')}
     <div class="meta">🧮 ${esc(ranking.formula)}</div>`;
 }
@@ -343,11 +365,34 @@ function tendHtml(s, U, needHtml) {
   if (tenders.closed.length) h += `<h3 style="margin:4px 0 0;font-size:14px">📰 Резултати</h3><div class="card">${tenders.closed.map(t => `<div class="led"><span>${esc(t.title)}${t.mine ? ` · ${t.mine === 'won' ? '🏆 ти' : t.mine === 'lost' ? 'загубен' : 'оттеглен'}` : ''}</span><b style="white-space:nowrap">${t.winner ? `${esc(t.winner)} · ${eur(t.price)}` : 'без оферти'}</b></div>`).join('')}</div>`;
   return h;
 }
+// кой е онлайн сега: сървърът връща фирмите, активни през последните 40 s (заедно с ol_state на всеки 5 s)
+const isOn = id => !!(state && (state.online || []).some(o => o.id === id));
+const onDot = id => isOn(id) ? ' <span title="Онлайн сега" style="font-size:.8em">🟢</span>' : '';
+let whoOpen = false;
+function whoRender() {
+  const L = (state && state.online) || [];
+  $('whoN').textContent = L.length;
+  $('who').title = L.length === 1 ? 'Само ти си онлайн сега' : `${L.length} фирми са онлайн сега`;
+  const box = $('whoBox'); box.classList.toggle('hidden', !whoOpen);
+  if (!whoOpen) return;
+  box.innerHTML = `<div class="meta" style="margin:0 6px 6px">🟢 Онлайн сега · ${L.length}</div>` + L.map(o => { const b = brandOf(o.brand);
+    return `<div class="wrow" data-who="${o.id}">🟢 <b style="color:${b.col}">${b.ico} ${esc(o.name)}</b><span class="meta" style="margin-left:auto">ниво ${o.level}${o.me ? ' · ти' : relIco(o.id)}</span></div>`; }).join('')
+    + (L.length === 1 ? '<div class="meta" style="margin:6px">Засега си само ти. Покани приятели — администраторът има код за покана.</div>' : '');
+  box.querySelectorAll('[data-who]').forEach(x => x.onclick = async () => {
+    whoOpen = false; whoRender();
+    const id = +x.dataset.who, p = await api.company(worldId, id); if (!p.ok) return;
+    const tr = await api.trophies(worldId, id).catch(() => null); p.trophies = tr?.trophies || [];
+    tab = 'rank'; profile = p; render(); refresh();
+  });
+}
+$('who').onclick = e => { e.stopPropagation(); whoOpen = !whoOpen; whoRender(); };
+document.addEventListener('click', e => { if (whoOpen && !$('whoBox').contains(e.target)) { whoOpen = false; whoRender(); } });
 function render() {
   const s = state, c = s.company, b = brandOf(c.brand), U = Object.fromEntries(s.catalog.units.map(u => [u.type, u]));
   $('coName').innerHTML = `<span style="color:${b.col}">${b.ico} ${esc(c.name)}</span>`;
   $('cash').textContent = eur(c.cash); $('cash').className = c.cash < 0 ? 'bad' : '';
-  $('day').textContent = `ден ${s.world.day} · ниво ${c.level}`;
+  whoRender();
+  $('day').innerHTML = `ден ${s.world.day}<span class="lvm"> · ниво ${c.level}</span>`;
   const unseen = s.notes.filter(n => !n.seen).length, run = s.builds.filter(x => x.status === 'running');
   $('tabs').innerHTML = TABS.map(([k, nm]) => `<button data-t="${k}" class="${k === tab ? 'on' : ''}">${nm}${k === 'notes' && unseen ? `<span class="badge">${unseen}</span>` : ''}${k === 'build' && run.length ? `<span class="badge">${run.length}</span>` : ''}</button>`).join('');
   $('tabs').querySelectorAll('[data-t]').forEach(x => x.onclick = () => { tab = x.dataset.t; render(); if (['tend', 'rank', 'mkt', 'cons', 'conc', 'co'].includes(tab)) { profile = null; refresh(); } if (tab === 'notes' && unseen) api.notesSeen(worldId, lastNote).then(() => refresh()); });
@@ -385,6 +430,7 @@ function render() {
       <div class="card"><h3>🌐 ${esc(s.world.name)}</h3><div class="meta">Ден ${s.world.day} · 1 игрален ден = ${Math.round(s.world.day_seconds / 60)} мин реално време — еднакво за всички фирми.<br>Централа: ${esc(CITIES[c.city] || c.city)}</div>
       <div class="bar" style="margin-top:8px"><i id="dayBar" style="width:${Math.round(s.world.frac * 100)}%"></i></div></div>
       ${finHtml()}
+      ${allyHtml()}
       <div class="card"><h3>📒 Финансов журнал</h3>${s.ledger.map(l => `<div class="led"><span>ден ${l.day} · ${esc(l.note || l.reason)}</span><b class="${l.amount < 0 ? 'bad' : 'ok'}">${l.amount < 0 ? '' : '+'}${eur(l.amount)}</b></div>`).join('') || '<div class="meta">Няма движения.</div>'}</div>
       <button class="btn2" id="toWorlds">🌐 Светове</button>`;
   } else if (tab === 'notes') {
@@ -398,6 +444,11 @@ function render() {
   document.querySelectorAll('[data-sell]').forEach(x => x.onclick = () => doAct(x, () => api.sellUnit(worldId, x.dataset.sell), 'Продадено.'));
   document.querySelectorAll('[data-focus]').forEach(x => x.onclick = () => view && view.focusLot(+x.dataset.focus));
   const eurIn = id => Math.round(+String($(id)?.value || '').replace(/[^\d]/g, '') * 100);
+  const amIn = id => Math.round(+String(document.querySelector(`[data-amA="${id}"]`)?.value || '').replace(/\s/g, '').replace(',', '.').replace(/[^\d.]/g, '') * 100);
+  document.querySelectorAll('[data-agift]').forEach(x => x.onclick = () => { const id = +x.dataset.agift; doAct(x, () => api.allyGift(worldId, id, amIn(id)), '🎁 Подаръкът е изпратен.'); });
+  document.querySelectorAll('[data-aloan]').forEach(x => x.onclick = () => { const id = +x.dataset.aloan; doAct(x, () => api.allyLoan(worldId, id, amIn(id), +document.querySelector(`[data-amD="${id}"]`).value, +document.querySelector(`[data-amR="${id}"]`).value), '💸 Предложението е изпратено — съюзникът трябва да го приеме.'); });
+  document.querySelectorAll('[data-lact]').forEach(x => x.onclick = () => { const [id, a] = x.dataset.lact.split(':'); doAct(x, () => api.allyLoanAct(worldId, +id, a), { accept: '💸 Заемът е приет — парите са при теб.', decline: 'Заемът е отказан.', cancel: 'Предложението е оттеглено.', forgive: '🎁 Заемът е опростен.' }[a]); });
+  document.querySelectorAll('[data-lrepay]').forEach(x => x.onclick = () => { const [id, v] = x.dataset.lrepay.split(':'); doAct(x, () => api.allyRepay(worldId, +id, +v), '💸 Върна заема.'); });
   $('lnGo')?.addEventListener('click', () => doAct($('lnGo'), () => api.loan(worldId, eurIn('lnA')), '🏦 Заемът е изтеглен.'));
   $('rpGo')?.addEventListener('click', () => doAct($('rpGo'), () => api.repay(worldId, eurIn('lnA') || fin.debt), 'Заемът е погасен.'));
   $('soGo')?.addEventListener('click', () => doAct($('soGo'), () => api.shareOffer(worldId, +$('soP').value, eurIn('soC')), '📤 Дялът е пуснат за продан.'));

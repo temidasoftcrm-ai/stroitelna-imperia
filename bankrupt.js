@@ -29,7 +29,7 @@ export function createBankrupt(deps) {
     if (!show) { if (bar) { bar.remove(); bar = null; } return; }
     if (!bar) {
       bar = document.createElement('div'); bar.id = 'bustBar';
-      bar.style.cssText = 'position:fixed;left:50%;top:calc(env(safe-area-inset-top, 0px) + 96px);transform:translateX(-50%);z-index:40;background:linear-gradient(90deg,#7a1010,#b3261e);color:#fff;border:1px solid #ff8a80;border-radius:10px;padding:7px 14px;font-weight:700;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.45);cursor:pointer;max-width:calc(100vw - 32px);text-align:center';
+      bar.style.cssText = 'position:fixed;left:50%;top:calc(env(safe-area-inset-top, 0px) + 96px);transform:translateX(-50%);z-index:9;background:linear-gradient(90deg,#7a1010,#b3261e);color:#fff;border:1px solid #ff8a80;border-radius:10px;padding:7px 14px;font-weight:700;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.45);cursor:pointer;max-width:calc(100vw - 32px);text-align:center';
       bar.onclick = () => st().over ? gameOver(-E().s.money, []) : explain();
       document.body.appendChild(bar);
     }
@@ -75,7 +75,7 @@ export function createBankrupt(deps) {
     S.rep = Math.max(0, (S.rep || 0) - REP_LOSS);
     if (deps.sound) deps.sound('error');
     if (E().s.money >= 0) {
-      deps.modal('💥 ФАЛИТ', `Фирмата не излезе от минуса навреме (${f(debt)} € дълг). Синдикът продаде:<br>${sold.map(x => '• ' + x).join('<br>') || '• нищо'}<br><br>
+      deps.modal('💥 ФАЛИТ', `<img src="assets/ui/bankrupt.webp" alt="" onerror="this.remove()" style="display:block;width:100%;max-width:300px;max-height:300px;object-fit:contain;margin:0 auto 8px">Фирмата не излезе от минуса навреме (${f(debt)} € дълг). Синдикът продаде:<br>${sold.map(x => '• ' + x).join('<br>') || '• нищо'}<br><br>
         Дългът е покрит — сега имаш ${f(E().s.money)} €. Репутацията падна с ${REP_LOSS} ★ (сега ${S.rep.toFixed(1)} ★).<br>Фирмата оцеля — започни отново, по-внимателно 🙂`, [['Продължи', null]]);
       if (deps.pop) deps.pop('bankrupt', '💥 Фалит', `Синдикът продаде активи за ${f(debt)} € · −${REP_LOSS} ★`);
       deps.save();
@@ -85,7 +85,7 @@ export function createBankrupt(deps) {
   }
   function gameOver(debt, sold) {
     const S = deps.S(), b = st(); b.over = true; deps.save(); banner();
-    deps.modal('💀 Фирмата фалира окончателно', `${sold.length ? `Синдикът продаде всичко, което можа:<br>${sold.map(x => '• ' + x).join('<br>')}<br><br>` : ''}
+    deps.modal('💀 Фирмата фалира окончателно', `<img src="assets/ui/bankrupt.webp" alt="" onerror="this.remove()" style="display:block;width:100%;max-width:300px;max-height:300px;object-fit:contain;margin:0 auto 8px">${sold.length ? `Синдикът продаде всичко, което можа:<br>${sold.map(x => '• ' + x).join('<br>')}<br><br>` : ''}
       Пак остават <b style="color:var(--bad)">${f(-E().s.money)} €</b> дълг. Империята приключи на ден ${S.day}${deps.playDays ? ` (${deps.playDays()})` : ''}.<br><br>
       Можеш да започнеш отначало или да заредиш по-стар запис от „💾 Записи“.`, [['💾 Записи', () => deps.openSaves()], ['🔄 Нова игра', () => deps.newGame()]]);
   }

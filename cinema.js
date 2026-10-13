@@ -5,6 +5,7 @@
 // Настройки (в браузъра): музика, ефекти, намалено движение, автоматично пускане.
 // deps: { S(), sound() → Sound (ctx, master, noise, muted, init), ready() → градът е зареден, cityById(id) → { lat, lon, nm },
 //         speed() → текуща скорост, setSpeed(n), save(), lv20() → ниво 20 (империя), firstPlane(), firstOil(), auto() → false в тестове }
+import './notif.js';   // бутонът 🔔 за известията (отделен модул; зарежда се оттук, за да не се пипа index.html)
 const LS = 'stroiCine';
 const DUR = 6.5;
 const SCENES = [

@@ -53,6 +53,10 @@
   #top .stat { font-size:15px; white-space:nowrap; } #top .stat b { font-size:17px; }
   #top .sp { flex:1; }
   #conn { font-size:15px; font-weight:800; letter-spacing:.04em; padding:6px 14px; border-radius:9px; border:1px solid #4cd07d66; background:#4cd07d22; color:#9ff0bd; white-space:nowrap; }
+  #who { font:inherit; font-size:14px; padding:5px 11px; border-radius:9px; border:1px solid var(--line); background:transparent; color:var(--txt); cursor:pointer; white-space:nowrap; }
+  #who:hover { border-color:#4cd07d88; }
+  #whoBox { position:fixed; top:58px; right:14px; width:min(320px, calc(100vw - 32px)); max-height:60vh; overflow:auto; z-index:20; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px; box-shadow:0 10px 30px #0008; }
+  #whoBox .wrow { display:flex; align-items:center; gap:8px; padding:7px 6px; border-radius:8px; cursor:pointer; } #whoBox .wrow:hover { background:#ffffff10; }
   #conn.retry { background:#ffb30026; color:#ffd77a; border-color:#ffb30066; } #conn.offline { background:#ff6b6b26; color:#ffb3b3; border-color:#ff6b6b66; }
   #view { position:fixed; top:52px; left:0; right:360px; bottom:0; }
   #view .ph { position:absolute; inset:0; background:url(assets/ui/splash.webp) center/cover; opacity:.35; }
@@ -79,7 +83,7 @@
     #view { right:0; bottom:45vh; }
     #panel { top:auto; height:45vh; width:100%; border-left:0; border-top:1px solid var(--line); }
     #top { gap:8px; padding:0 8px; } #top .logo { display:none; }
-    #conn { font-size:13px; padding:4px 9px; }
+    #conn { font-size:13px; padding:4px 9px; } #who { font-size:13px; padding:4px 8px; } #who .wl { display:none; } #top .lvm { display:none; } #top .stat { font-size:13px; } #top .stat b { font-size:15px; } #whoBox { right:16px; left:16px; width:auto; }
   }
 </style>
 </head>
@@ -93,8 +97,10 @@
     <span class="stat">💶 <b id="cash">—</b></span>
     <span class="stat">📅 <b id="day">—</b></span>
     <span id="conn" title="Онлайн режим: времето е общо за всички и не се ускорява">● Online</span>
+    <button id="who" title="Кои фирми са онлайн сега">🟢 <b id="whoN">1</b><span class="wl"> онлайн</span></button>
     <span class="sp"></span>
   </div>
+  <div id="whoBox" class="hidden"></div>
   <div id="view"><div class="ph" id="ph"></div><div class="ld" id="ld">Зареждане на града… <div class="bar"><i id="ldBar" style="width:3%"></i></div></div></div>
   <div id="panel"><div id="tabs"></div><div id="body"></div></div>
 </div>

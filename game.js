@@ -443,8 +443,23 @@ function splitTrees(scene, { trunksOnly = false, glow = 0x2c3a24, plain = false 
     return g;
   });
 }
+// по-истински дървета навсякъде: вместо конусите на Kenney ('tree-large'/'tree-small') — дърветата от горския пакет (и малко борове);
+// в пустинните и сухите градове (Африка, Залива, Лас Вегас, Калифорния, Флорида…) — палми. Височината остава като на конуса.
+const PALM_CITIES = new Set(['lasvegas', 'losangeles', 'phoenix', 'miami', 'sandiego', 'honolulu']);
+const treePools = {}; let treeN = 0;
+function niceTree(n, scale) {
+  const palm = !!S && (PALM_CITIES.has(S.cityId) || isDesert(S.cityId)), key = palm ? 'palm' : 'tree';
+  const pool = treePools[key] || (treePools[key] = palm ? Object.keys(A).filter(k => k.startsWith('sf-palm-')) : [...Object.keys(A).filter(k => k.startsWith('sf-tree-')).flatMap(k => [k, k]), ...Object.keys(A).filter(k => k.startsWith('sf-pine-'))]);
+  if (!pool.length) { delete treePools[key]; return null; }
+  const sz = sizeOf(n);
+  return [pool[(treeN++ * 7 + 3) % pool.length], scale * (sz.max.y - sz.min.y) * (palm ? 1.35 : 1.15)];
+}
+const plazaTree = h => { const sz = sizeOf('tree-large'); return model('tree-large', h / (sz.max.y - sz.min.y)); };   // дърво с височина ~h (по-истинско — niceTree)
 function model(n, scale = 1, shadow = true) {
+  let rot = null;
+  if (n === 'tree-large' || n === 'tree-small') { const t = niceTree(n, scale); if (t) { n = t[0]; scale = t[1]; rot = treeN * 2.39; } }
   const o = A[n].scene.clone(true);
+  if (rot != null) o.rotation.y = rot;
   o.scale.setScalar(scale); o.userData.src = n;
   o.traverse(m => { if (m.isMesh) { m.castShadow = shadow; m.receiveShadow = true; } });
   return o;
@@ -4086,7 +4101,7 @@ function amsPlaza(px, pz, add, tm) {
   });
   const flower = [0xe0407a, 0xf0c030].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.8 }));
   for (const [dx, dz, rot] of [[-24.5, 0, 0], [24.5, 0, 0], [0, -24.5, 1], [0, 24.5, 1]]) {
-    for (const t of [-1, 1]) { const tr = add(new THREE.Mesh(new THREE.ConeGeometry(1.3, 4.5, 8), tm)); tr.position.set(px + dx + (rot ? t * 4 : 3), 2.4, pz + dz + (rot ? 3 : t * 4)); tr.castShadow = true; }
+    for (const t of [-1, 1]) { const tr = add(plazaTree(5)); tr.position.set(px + dx + (rot ? t * 4 : 3), 0, pz + dz + (rot ? 3 : t * 4)); }
     for (const t of [-1, 1]) { const fb = add(new THREE.Mesh(new THREE.BoxGeometry(rot ? 3 : 1.2, 0.5, rot ? 1.2 : 3), flower[(t + 1) / 2])); fb.position.set(px + dx + (rot ? t * 4 : -3), 0.3, pz + dz + (rot ? -3 : t * 4)); }
   }
 }
@@ -4105,7 +4120,7 @@ function landmarkCenter(kinds) {
   ring.position.set(px, 0.16, pz);
   const afr = isDesert(S.cityId), tm = new THREE.MeshStandardMaterial({ color: afr ? 0x5f8f3a : 0x3f8f3a, roughness: 1 }), lawn = new THREE.MeshStandardMaterial({ color: afr ? 0xd2b77c : 0x7fb35a, roughness: 1 });   // Африка — пясък и палми
   const ams = kinds[0] === 'canal'; ring.visible = !ams;
-  if (!ams && !afr) for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) for (let t = 0; t < 4; t++) { const tr = add(new THREE.Mesh(new THREE.ConeGeometry(1.2, 4, 8), tm)); tr.position.set(px + sx * (W / 2 - 2.5), 2, pz + sz * (W / 2 - 2.5 - t * 4.5)); tr.castShadow = true; }
+  if (!ams && !afr) for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) for (let t = 0; t < 4; t++) { const tr = add(plazaTree(4.6)); tr.position.set(px + sx * (W / 2 - 2.5), 0, pz + sz * (W / 2 - 2.5 - t * 4.5)); }
   const main = buildLandmark(kinds[0], { label }); main.group.position.set(px, 0.14, pz); main.group.scale.setScalar(LM_MAIN_SCALE[kinds[0]] || 3.2); main.group.rotation.y = (hashStr(kinds[0]) % 4) * Math.PI / 2;
   main.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
   city.group.add(main.group); city.landmarks.push(main);
@@ -4124,7 +4139,7 @@ function landmarkCenter(kinds) {
     } else {
       const lw = add(new THREE.Mesh(new THREE.BoxGeometry(2 * TILE - 1, 0.12, 2 * TILE - 1), lawn)); lw.position.set(l.x, 0.06, l.z); lw.receiveShadow = true;
       const palms = afr ? Object.keys(A).filter(k => k.startsWith('sf-palm-')) : [];
-      for (let t = 0; t < 3; t++) { const h = hashStr(l.id + ':' + t), px2 = l.x + ((h % 9) - 4) * 1.4, pz2 = l.z + (((h >> 4) % 9) - 4) * 1.4; if (palms.length) { const pm = add(model(palms[h % palms.length], 7 + (h % 3))); pm.position.set(px2, 0, pz2); continue; } const tr = add(new THREE.Mesh(new THREE.ConeGeometry(1.3, 4.5, 8), tm)); tr.position.set(px2, 2.25, pz2); tr.castShadow = true; }
+      for (let t = 0; t < 3; t++) { const h = hashStr(l.id + ':' + t), px2 = l.x + ((h % 9) - 4) * 1.4, pz2 = l.z + (((h >> 4) % 9) - 4) * 1.4; if (palms.length) { const pm = add(model(palms[h % palms.length], 7 + (h % 3))); pm.position.set(px2, 0, pz2); continue; } const tr = add(plazaTree(5)); tr.position.set(px2, 0, pz2); }
     }
   }
 }
@@ -4160,7 +4175,7 @@ function refreshLandmarks() {
       const plaza = new THREE.Mesh(new THREE.BoxGeometry(W, 0.12, W), new THREE.MeshStandardMaterial({ color: 0xd9cfbd, roughness: 0.95 }));
       plaza.position.set(px, 0.06, pz); plaza.receiveShadow = true; city.group.add(plaza); city.plazaObjs.push(plaza);
       const tm = new THREE.MeshStandardMaterial({ color: 0x3f8f3a, roughness: 1 });
-      for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) for (let t = 0; t < 3; t++) { const tr = new THREE.Mesh(new THREE.ConeGeometry(1.1, 3.6, 8), tm); tr.position.set(px + sx * (W / 2 - 2), 2, pz + sz * (W / 2 - 2 - t * 4)); tr.castShadow = true; city.group.add(tr); city.plazaObjs.push(tr); }
+      for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) for (let t = 0; t < 3; t++) { const tr = plazaTree(4.2); tr.position.set(px + sx * (W / 2 - 2), 0, pz + sz * (W / 2 - 2 - t * 4)); city.group.add(tr); city.plazaObjs.push(tr); }
       const o = buildLandmark(k, { label }); o.group.position.set(px, 0.12, pz); o.group.scale.setScalar(2.2); o.group.rotation.y = (hashStr(k) % 4) * Math.PI / 2;
       o.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
       city.group.add(o.group); city.landmarks.push(o); used.push(...g4);
@@ -6426,8 +6441,7 @@ function fastForward() {
   delete S.ffFrom;
   if (days < 0.05) return;
   let done = 0;
-  for (const p of [...projects]) {
-    if (p.own) continue;
+  for (const p of [...projects]) {   // и собствените строежи (офис, гараж, склад) — иначе замръзваха, докато те няма
     if (p.demo) finishDemo(p);   // докато те нямаше, събарянето е приключило
     let left = days;
     while (left > 0 && projects.includes(p)) {
