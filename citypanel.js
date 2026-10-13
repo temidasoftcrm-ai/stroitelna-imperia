@@ -49,7 +49,7 @@ export function createCityPanel(deps) {
     const bt = deps.BTYPES[type], lv = devOf(c).lv;
     let reward = deps.ECON.quoteReward(type, rep) * ((c.staff || {}).architect ? 1.1 : 1) * (1 + 0.02 * (lv - 1)), days = bt.days, floors;
     if (type === 'tower') { const fs = deps.towerFloors(id); floors = fs[Math.floor(Math.random() * fs.length)] || 10; const m = deps.towerMul(floors); reward *= m; days = Math.round(days * (0.6 + 0.4 * m)); }
-    reward = Math.round(reward / 500) * 500;
+    reward = Math.round(reward * (deps.regionMul ? deps.regionMul(id) : 1) / 500) * 500;
     const cl = deps.clients(type, id), day = S().day;
     return { id: S().seq++, type, lot, client: cl, title: `${bt.nm}${floors ? ` (${floors} ет.)` : ''} — ${cl}`, reward, repGain: bt.repGain, startDay: day, deadlineDay: day + days, stage: 0, prog: 0, floors, model: deps.buildingFor(type, floors), auto: true };
   }
@@ -181,6 +181,20 @@ export function createCityPanel(deps) {
     const s = S(), own = deps.ownedCities();
     const order = [...own].sort((a, b) => (b === s.cityId) - (a === s.cityId) || deps.isFinished(a) - deps.isFinished(b) || devOf(rec(b) || {}).lv - devOf(rec(a) || {}).lv);
     const on = own.filter(id => id !== s.cityId && auto(id) && !deps.isFinished(id)).length, open = own.filter(id => !deps.isFinished(id) && id !== s.cityId);
+    const lv14 = deps.devBest && deps.devBest() >= 14 && deps.gearShort;
+    // от ниво 14: вместо автопилота (той е включен навсякъде с холдинга) — „купи всичко липсващо“ и „включи всички складове“
+    if (lv14) {
+      const g = deps.gearShort(), afOff = own.filter(id => !deps.isFinished(id) && !(rec(id)?.autoFill?.on)).length;
+      let h = `<div class="card"><div class="meta" style="margin:0">Управляваш империята наведнъж: един бутон праща свободната техника от другите градове и купува останалото, което липсва (бригади, багери, кранове…), а складовете си поръчват материалите сами.</div>
+        <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0 auto 0 0">🚜 Липсват <b style="color:${g.total ? 'var(--bad)' : 'var(--ok)'}">${g.total}</b>${g.moveN ? ` · ${g.moveN} идват от другите градове` : ''}${g.buy.length ? ` · за купуване ${g.buy.reduce((a, b) => a + b[2], 0)}` : ''}</span>
+          ${g.total ? `${g.moveN ? `<button class="btn2" data-cpbuyall="1" title="Евтино, но техниката пътува няколко дни">🚚 Изпрати ${g.moveN}${g.cost ? ` + купи · ${f(g.cost)} €` : ''}</button>` : ''}<button class="btn" data-cpbuynow="1" ${deps.econ().canAfford(Math.min(...g.now.map(([, t]) => deps.ECON.UNIT_TYPES[t].cost))) ? '' : 'disabled'} title="Купува всичко липсващо веднага във всеки град">🛒 Купи всичко необходимо · ${f(g.costNow)} €</button>` : '<span class="meta" style="margin:0;color:var(--ok)">✅ Нищо не липсва</span>'}</div>
+        <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0 auto 0 0">📦 Складове с автоматично пълнене: <b style="color:var(--txt)">${own.length - afOff - own.filter(id => deps.isFinished(id)).length}</b> от ${own.filter(id => !deps.isFinished(id)).length}</span>
+          ${afOff ? '<button class="btn" data-cpafall="1">📦 Включи всички</button>' : '<span class="meta" style="margin:0;color:var(--ok)">✅ Всички са включени</span>'}</div></div>`;
+      const shown = order.filter(id => !deps.inScope || deps.inScope(id));
+      for (const id of shown) h += cityCard(id);
+      if (!shown.length) h += '<div class="card"><div class="meta" style="margin:0">Нямаш градове в този обхват.</div></div>';
+      return h;
+    }
     let h = `<div class="card"><div class="meta" style="margin:0">Тук управляваш всички градове, без да влизаш във всеки. С <b>🤖 Автопилот</b> градът сам приема поръчки и ги строи със своята техника, а парите и опитът идват всеки ден.
       Нивото на всеки град расте от обектите в него; летищата се отключват, щом <b>един</b> град стигне ниво 9.</div>
       <div class="row" style="justify-content:flex-end;gap:6px;margin-top:6px"><span class="meta" style="margin:0 auto 0 0">🤖 включен в ${on} от ${open.length} града</span>
@@ -197,6 +211,9 @@ export function createCityPanel(deps) {
     body.querySelectorAll('[data-cpsend]').forEach(b => b.onclick = () => { const [t, id, from] = b.dataset.cpsend.split('|'); if (deps.gearSend(t, from, id)) mark(id, t); redraw(); });
     body.querySelectorAll('[data-cpbuy]').forEach(b => b.onclick = () => { const [t, id] = b.dataset.cpbuy.split('|'); const n0 = deps.unitCount(id); deps.gearBuy(t, id); if (deps.unitCount(id) > n0) mark(id, t); redraw(); });
     body.querySelectorAll('[data-cpdist]').forEach(b => b.onclick = () => { const [id, all] = b.dataset.cpdist.split('|'); deps.buyDistrict(id, all === '1'); redraw(); });
+    body.querySelectorAll('[data-cpbuyall]').forEach(b => b.onclick = () => { deps.gearBuyAll(); deps.save(); redraw(); });
+    body.querySelectorAll('[data-cpbuynow]').forEach(b => b.onclick = () => { deps.gearBuyNow(); deps.save(); redraw(); });
+    body.querySelectorAll('[data-cpafall]').forEach(b => b.onclick = () => { let n = 0; for (const id of deps.ownedCities()) { const c = rec(id); if (!c || deps.isFinished(id) || c.autoFill?.on) continue; c.autoFill = { budget: 50000, spent: 0, day: S().day, ...(c.autoFill || {}), on: true }; n++; } if (n) deps.toast(`📦 Включи автоматичното пълнене на складовете в ${n} града.`, 'good'); deps.save(); redraw(); });
     body.querySelectorAll('[data-cpaf]').forEach(b => b.onclick = () => { const c = rec(b.dataset.cpaf); if (c) { c.autoFill = { budget: 50000, spent: 0, day: S().day, ...(c.autoFill || {}), on: true }; deps.save(); } redraw(); });
     body.querySelectorAll('[data-cpgo]').forEach(b => b.onclick = () => deps.goCity(b.dataset.cpgo, null));
     body.querySelectorAll('[data-cpfin]').forEach(b => b.onclick = () => { if (b.dataset.cpfin === S().cityId || !deps.finishRemote) deps.goCity(b.dataset.cpfin, 'hq'); else { deps.finishRemote(b.dataset.cpfin); redraw(); } });

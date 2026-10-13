@@ -29,12 +29,12 @@ const UNLOCKS = {
   12: '🗽 Северна Америка',
   13: '🏗️ Специални поръчки в Европа и Африка (Ламанша, Кейп — Кайро)',
   14: '🌎 Южна Америка',
-  15: '🏙️ Небостъргачи с 40 етажа в мегаполисите',
-  16: '🌏 Азия',
-  17: '🚄 „Стрела“ по-бърза с 30% и с по-скъпи билети',
-  18: '🦘 Австралия и Океания',
-  19: '🛰️ Глобални мега проекти (Панама, Дариен, Транссибирска, „Гън“)',
-  20: '👑 Световна строителна империя',
+  15: '🏛️ Холдинг: автопилот, дружества и директори · 🏨 офисите стават хотели · 🏆 световната класация · 🏙️ кули с 40 етажа',
+  16: '🌏 Азия · 🛢️ петролна империя (кладенец → рафинерия → доставка) · 🤝 изкупуване на конкурентни фирми',
+  17: '🏦 Своя банка · 📈 фондова борса (IPO, транши, дивиденти) · 🚄 „Стрела“ +30%',
+  18: '🦘 Австралия · ⚡ енергийна мрежа · 🌍 световни мегапроекти (хиперлуп, Суец, Гибралтар, петролопровод)',
+  19: '🏙️ Твоят град от нулата · 🛰️ мегапоръчки (Панама, Дариен, Транссибирска, „Гън“)',
+  20: '👑 Световна империя: поглъщане на конгломерати · 🌐 световни концесии · надпревара за №1',
 };
 export const unlockText = lv => UNLOCKS[lv] || '';
 export const LV = { BG_ALL: 2, LINKS: 2, STAFF: 4, BALKANS: 5, FOREIGN: 6, OFFERS: 6, STOCKS: 7, EUROPE: 8, AIR: 9, WORLD: 10, MEGAHUB: 11, NA: 12, MEGA_EU: 13, SA: 14, SKY40: 15, AS: 16, FAST: 17, OC: 18, MEGA_WORLD: 19, EMPIRE: 20 };
@@ -94,10 +94,10 @@ export function createDevLevel(deps) {
   }
   function open() {
     const d = st(); if (!d) return;
-    const rows = THRESH.map((t, i) => `<div class="dvrow ${i + 1 <= d.lv ? 'on' : ''} ${i + 1 === d.lv ? 'cur' : ''}"><b>${i + 1 <= d.lv ? '✅' : '🔒'} Ниво ${i + 1}</b><span class="meta" style="margin:0;flex:1">${UNLOCKS[i + 1] || 'Начало'}</span><span class="meta" style="margin:0">${t} XP</span></div>`).join('');
+    const rows = THRESH.map((t, i) => `<div class="dvrow ${i + 1 <= d.lv ? 'on' : ''} ${i + 1 === d.lv ? 'cur' : ''}"><b>${i + 1 <= d.lv ? '✅' : '🔒'} Ниво ${i + 1}</b><span class="meta" style="margin:0;flex:1">${UNLOCKS[i + 1] || 'Начало'}</span><span class="meta" style="margin:0">${t} XP${deps.lvTime && deps.lvTime(i + 1) ? `<br><span style="color:#7dd3ff">⏱️ ${deps.lvTime(i + 1)}</span>` : ''}</span></div>`).join('');
     const nxt = THRESH[d.lv];
     deps.modal(`🏅 Ниво на развитие · ${deps.cityName ? deps.cityName() : ''}`, `Всеки твой град се развива отделно. Отключванията (градове, линии, Балканите, Европа, борса) идват от най-развития ти град; специалистите — от нивото на текущия град.<br>Опит: <b>${Math.round(d.xp)} XP</b>${nxt != null ? ` · до ниво ${d.lv + 1}: ${Math.round(nxt - d.xp)} XP` : ' · максимално ниво'}<br>
-      <span style="color:var(--mut)">XP: къща ${XP.house}, магазин ${XP.shop}, офис ${XP.office}, небостъргач ${XP.tower}, жп линия ${XP.rail}, участък магистрала ${XP.highway}, филиал ${XP.branch}, куест ${XP.quest}.</span><br><br>${rows}`, [['Затвори', null]]);
+      <span style="color:var(--mut)">XP: къща ${XP.house}, магазин ${XP.shop}, офис ${XP.office}, небостъргач ${XP.tower}, жп линия ${XP.rail}, участък магистрала ${XP.highway}, филиал ${XP.branch}, куест ${XP.quest}.</span><br><br>${deps.playSummary ? deps.playSummary() + '<br>' : ''}${rows}`, [['Затвори', null]]);
   }
   return { add, level, best, has, offerMul, offersOpen, stocksOpen, render, open, XP };
 }

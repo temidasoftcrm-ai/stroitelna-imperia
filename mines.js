@@ -142,7 +142,13 @@ export function createMines(deps) {
     // 4) износ през петролния терминал: веднъж седмично суровият петрол (и горивото, ако не отива към склада) — с премия 25%
     let exp = 0;
     const terms = m.sites.filter(s => s.kind === 'terminal');
-    if (terms.length && day % 7 === 0) for (const s of m.sites) {
+    // 🛢️ петролната империя (oil.js): терминалът не продава сам — всеки ден петролът и горивото отиват в танковата ферма
+    if (terms.length && deps.oilIntake) for (const s of m.sites) {
+      const K = MINE_KINDS[s.kind]; if (!['crude', 'fuel'].includes(K.out) || !s.store || (K.out === 'fuel' && s.keep)) continue;
+      if (!terms.some(t => t.city === s.city || deps.linked(t.city, s.city))) continue;
+      deps.oilIntake(K.out, Math.floor(s.store)); s.store -= Math.floor(s.store);
+    }
+    else if (terms.length && day % 7 === 0) for (const s of m.sites) {
       const K = MINE_KINDS[s.kind]; if (!['crude', 'fuel'].includes(K.out) || !s.store) continue;
       if (K.out === 'fuel' && s.keep) continue;   // „запази за собствените машини“
       if (!terms.some(t => t.city === s.city || deps.linked(t.city, s.city))) continue;

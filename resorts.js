@@ -46,10 +46,13 @@ export const RESORTS = [
   { id: 'malindi', nm: 'Малинди', cc: '🇰🇪', reg: 'Африка', cont: 'af', need: { n: 2, cities: ['nairobi', 'mombasa', 'kisumu', 'nakuru', 'eldoret'] }, kind: 'summer', ico: '🐚', lat: -3.22, lon: 40.12, lab: [12, 4, 'start'], land: 3000000, build: 5700000, days: 24, sell: 14400000, month: 88000 },
   { id: 'nungwi', nm: 'Нунгви (Занзибар)', cc: '🇹🇿', reg: 'Африка', cont: 'af', need: { n: 2, cities: ['daressalaam', 'dodoma', 'arusha', 'mwanza', 'zanzibar'] }, kind: 'summer', ico: '🏝️', lat: -5.73, lon: 39.30, lab: [12, 4, 'start'], land: 3900000, build: 7200000, days: 27, sell: 18000000, month: 115000 },
   { id: 'campsbay', nm: 'Кампс Бей', cc: '🇿🇦', reg: 'Африка', cont: 'af', need: { n: 2, cities: ['capetown', 'johannesburg', 'durban', 'pretoria', 'portelizabeth'] }, kind: 'summer', ico: '🌊', lat: -33.95, lon: 18.38, lab: [12, 14, 'start'], land: 4500000, build: 8100000, days: 29, sell: 20400000, month: 130000 },
+  // 🇺🇸 САЩ — курорти със събития (целогодишни): малък наем, а големите пари идват от концертите и изложенията (EVENTS по-долу)
+  { id: 'vegasstrip', nm: 'Лас Вегас Стрип', cc: '🇺🇸', reg: 'САЩ', cont: 'na', need: { n: 2, cities: ['lasvegas', 'losangeles', 'phoenix', 'sanfrancisco', 'saltlake'] }, kind: 'events', ico: '🎰', lat: 36.11, lon: -115.17, lab: [12, 4, 'start'], land: 8000000, build: 14000000, days: 36, sell: 36000000, month: 160000 },
+  { id: 'grandcanyon', nm: 'Гранд Каньон', cc: '🇺🇸', reg: 'САЩ', cont: 'na', need: { n: 2, cities: ['phoenix', 'lasvegas', 'saltlake', 'denver', 'elpaso'] }, kind: 'events', ico: '🏜️', lat: 36.06, lon: -112.14, lab: [12, 4, 'start'], land: 5000000, build: 9000000, days: 30, sell: 22000000, month: 90000 },
 ];
 // разширения след вилното селище: строят се за дни и вдигат наема (mul) и цената при продажба (sellAdd)
 export const EXTRAS = {
-  hotel:    { nm: 'Хотел', ico: '🏨', cost: 1500000, days: 15, mul: 0.5, sellAdd: 2500000, kinds: ['winter', 'summer', 'spa'] },
+  hotel:    { nm: 'Хотел', ico: '🏨', cost: 1500000, days: 15, mul: 0.5, sellAdd: 2500000, kinds: ['winter', 'summer', 'spa', 'events'] },
   lift:     { nm: 'Собствен лифт', ico: '🚡', cost: 800000, days: 10, mul: 0.3, sellAdd: 1200000, kinds: ['winter'] },
   aquapark: { nm: 'Аквапарк', ico: '🛝', cost: 900000, days: 12, mul: 0.35, sellAdd: 1300000, kinds: ['summer'] },
   spa:      { nm: 'СПА център', ico: '🧖', cost: 700000, days: 10, mul: 0.4, sellAdd: 1100000, kinds: ['spa'] },
@@ -57,9 +60,32 @@ export const EXTRAS = {
   snow:     { nm: 'Оръдия за сняг', ico: '❄️', cost: 500000, days: 6, mul: 0.25, sellAdd: 700000, kinds: ['winter'] },
   skischool:{ nm: 'Ски училище', ico: '⛷️', cost: 350000, days: 6, mul: 0.15, sellAdd: 500000, kinds: ['winter'] },
   marina:   { nm: 'Яхтено пристанище', ico: '⛵', cost: 1100000, days: 14, mul: 0.4, sellAdd: 1600000, kinds: ['summer'] },
-  golf:     { nm: 'Голф игрище', ico: '⛳', cost: 900000, days: 12, mul: 0.3, sellAdd: 1300000, kinds: ['summer', 'spa'] },
-  restaurant:{ nm: 'Ресторант', ico: '🍽️', cost: 300000, days: 5, mul: 0.15, sellAdd: 450000, kinds: ['winter', 'summer', 'spa'] },
+  golf:     { nm: 'Голф игрище', ico: '⛳', cost: 900000, days: 12, mul: 0.3, sellAdd: 1300000, kinds: ['summer', 'spa', 'events'] },
+  restaurant:{ nm: 'Ресторант', ico: '🍽️', cost: 300000, days: 5, mul: 0.15, sellAdd: 450000, kinds: ['winter', 'summer', 'spa', 'events'] },
+  // курортите със събития (only — само в тези курорти); arena/casino вдигат и прихода от събитията
+  arena:    { nm: 'Арена за концерти', ico: '🏟️', cost: 1200000, days: 16, mul: 0.3, sellAdd: 3000000, kinds: ['events'], evMul: 0.4 },
+  casino:   { nm: 'Казино', ico: '🎰', cost: 1500000, days: 18, mul: 0.6, sellAdd: 4000000, kinds: ['events'], only: ['vegasstrip'], evMul: 0.25 },
+  skywalk:  { nm: 'Стъклен мост над каньона', ico: '🌉', cost: 1600000, days: 14, mul: 0.45, sellAdd: 2400000, kinds: ['events'], only: ['grandcanyon'] },
+  heli:     { nm: 'Хеликоптерни разходки', ico: '🚁', cost: 900000, days: 8, mul: 0.3, sellAdd: 1300000, kinds: ['events'], only: ['grandcanyon'], evMul: 0.15 },
 };
+const extOk = (r, x) => x.kinds.includes(r.kind) && (!x.only || x.only.includes(r.id));
+// събитията в курортите със събития: rooms — нощувки (стаи × 3 нощи), seats — места за транспорт, rev — приход × месечния наем
+export const EVENTS = {
+  vegasstrip: [
+    { nm: 'Концерт на световна звезда', ico: '🎤', rooms: 1500, seats: 2500, rev: 9 },
+    { nm: 'Изложение CES', ico: '💻', rooms: 4000, seats: 6000, rev: 18 },
+    { nm: 'Мач за световната титла', ico: '🥊', rooms: 2500, seats: 3500, rev: 12 },
+    { nm: 'Гран при на Лас Вегас', ico: '🏎️', rooms: 5000, seats: 8000, rev: 24 },
+    { nm: 'Световно първенство по покер', ico: '🃏', rooms: 1200, seats: 1800, rev: 8 },
+  ],
+  grandcanyon: [
+    { nm: 'Фестивал под звездите', ico: '🌌', rooms: 800, seats: 1200, rev: 6 },
+    { nm: 'Ултрамаратон Rim-to-Rim', ico: '🏃', rooms: 1200, seats: 1500, rev: 7 },
+    { nm: 'Изложение „Дивият Запад“', ico: '🦅', rooms: 1500, seats: 2000, rev: 9 },
+    { nm: 'Концерт на ръба на каньона', ico: '🎸', rooms: 1000, seats: 1600, rev: 8 },
+  ],
+};
+const EV = { notice: [20, 30], gap: [8, 16], nights: 3, roomOwn: 40, roomRent: 110, seatAir: 45, seatBus: 90, close: 3, part: 0.3 };
 // разширенията в скъпите курорти (Турция, Алпите, Ривиера…) струват пропорционално повече — колкото е по-скъпа земята
 export const extCost = (r, x) => Math.round(x.cost * Math.max(1, r.land / 1000000) / 10000) * 10000;
 // кога се отключва фазата
@@ -88,14 +114,14 @@ export function createResorts(deps) {
   const haveIn = r => r.need ? r.need.cities.filter(id => (deps.owned ? deps.owned() : []).includes(id)).length : 0;
   const avail = r => r.need ? haveIn(r) >= r.need.n : (!r.dev || (deps.devBest ? deps.devBest() >= r.dev : true));
   const lockTxt = r => r.need ? `${r.need.n} града в ${r.cc} (имаш ${haveIn(r)})` : `ниво ${r.dev}`;
-  const RG_TITLE = { 'България': '🇧🇬 България', 'Турция': '🇹🇷 Турция', 'Алпите': '🏔️ Алпите', 'Ривиера': '🌊 Френската ривиера', 'Средиземно море': '🏝️ Средиземно море', 'Балнео Европа': '♨️ Балнео Европа', 'Африка': '🌍 Африка' };
+  const RG_TITLE = { 'България': '🇧🇬 България', 'Турция': '🇹🇷 Турция', 'Алпите': '🏔️ Алпите', 'Ривиера': '🌊 Френската ривиера', 'Средиземно море': '🏝️ Средиземно море', 'Балнео Европа': '♨️ Балнео Европа', 'Африка': '🌍 Африка', 'САЩ': '🇺🇸 САЩ — курорти със събития' };
   const REG = { '🇹🇷': 'Турция', '🇫🇷': 'Алпите', '🇨🇭': 'Алпите', '🇦🇹': 'Алпите', '🇮🇹': 'Алпите' };
-  const inSeason = (r, day) => r.kind === 'spa' || seasonOf(day) === r.kind;   // балнео курортът работи целогодишно
+  const inSeason = (r, day) => r.kind === 'spa' || r.kind === 'events' || seasonOf(day) === r.kind;   // балнео и курортите със събития работят целогодишно
   const mulOf = s => 1 + Object.keys(s.ext || {}).reduce((a, k) => a + (EXTRAS[k] ? EXTRAS[k].mul : 0), 0);
   const sellOf = (r, s) => r.sell + Object.keys(s.ext || {}).reduce((a, k) => a + (EXTRAS[k] ? EXTRAS[k].sellAdd : 0), 0);
  // приход на година: месечният наем × разширенията × месеците в сезона (4 за ски/море, 12 за балнео)
-  const yearOf = (r, s) => Math.round(r.month * (s ? mulOf(s) : 1) * (r.kind === 'spa' ? 12 : 4));
-  const seasonWord = r => r.kind === 'winter' ? 'зимата' : r.kind === 'summer' ? 'лятото' : 'целогодишно';
+  const yearOf = (r, s) => Math.round(r.month * (s ? mulOf(s) : 1) * (r.kind === 'spa' || r.kind === 'events' ? 12 : 4));
+  const seasonWord = r => r.kind === 'winter' ? 'зимата' : r.kind === 'summer' ? 'лятото' : r.kind === 'events' ? 'целогодишно + събития' : 'целогодишно';
 
   // символи на картата (SVG); заключените са сиви с катинар
   function svg(cont = null) {   // cont — изгледът на континент ('af'…) или null за Европа/България
@@ -130,11 +156,71 @@ export function createResorts(deps) {
     }
     return h;
   }
+  // ── събитията (Лас Вегас, Гранд Каньон): обявяват се 20–30 дни напред; стаите и транспортът се резервират предварително —
+  // колкото по-рано, толкова по-евтино; 3 дни преди събитието резервациите се затварят. И двете → целият приход, само едното → 30%.
+  const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+  const capOf = s => 300 + ((s.ext || {}).hotel ? 1500 : 0);   // собствени стаи: вилното селище + хотелът
+  const airOf = r => (deps.airLv ? (r.id === 'vegasstrip' ? ['lasvegas'] : ['phoenix', 'lasvegas']).some(id => deps.airLv(id) > 0) : false);
+  const lateK = dl => dl >= 14 ? 1 : dl >= 7 ? 1.3 : 1.7;
+  function evCost(r, s, ev, what, day) {
+    const k = lateK(ev.day - day);
+    if (what === 'rooms') { const own = Math.min(capOf(s), ev.rooms), rent = ev.rooms - own; return Math.round((own * EV.roomOwn + rent * EV.roomRent) * EV.nights * k / 1000) * 1000; }
+    return Math.round(ev.seats * (airOf(r) ? EV.seatAir : EV.seatBus) * k / 1000) * 1000;
+  }
+  const evMulOf = s => 1 + Object.keys(s.ext || {}).reduce((a, k) => a + (EXTRAS[k]?.evMul || 0), 0);
+  const evRevOf = (r, s, ev) => Math.round(r.month * ev.rev * evMulOf(s) / 1000) * 1000;
+  function book(id, what) {
+    const r = R(id), s = st()[id], ev = s?.ev, S = deps.S(), econ = deps.econ();
+    if (!r || !ev || ev[what] === true || ev.day - S.day < EV.close) return false;
+    const c = evCost(r, s, ev, what, S.day);
+    if (!econ.canAfford(c)) { deps.toast(`Нямаш достатъчно пари (${deps.fmt(c)} €).`, 'bad'); return false; }
+    econ.spend(c, 'покупка', `${r.nm}: ${what === 'rooms' ? 'стаи' : 'транспорт'} за „${ev.nm}“`);
+    ev[what === 'rooms' ? 'bRooms' : 'bTrans'] = c;
+    deps.sound('buy'); deps.toast(`${what === 'rooms' ? '🏨 Резервира стаите' : (airOf(r) ? '✈️ Осигури полетите' : '🚌 Осигури автобусите')} за „${ev.nm}“ (${deps.fmt(c)} €).`, 'good'); deps.save(); deps.redraw();
+    return true;
+  }
+  function evRow(r, s) {
+    if (!s || s.stage !== 'built' || r.kind !== 'events') return '';
+    const S = deps.S(), ev = s.ev;
+    if (!ev) return `<div class="meta" style="margin:0 0 8px 24px">🎟️ Следващото събитие се обявява около ден ${s.nextEv || S.day + 1}.${s.evDone ? ` Досега: ${s.evDone} събития · +${deps.fmt(s.evEarned || 0)} €.` : ''}</div>`;
+    const dl = ev.day - S.day, open = dl >= EV.close, rev = evRevOf(r, s, ev);
+    const btn = (what, ico, nm) => { const done = what === 'rooms' ? ev.bRooms : ev.bTrans, c = evCost(r, s, ev, what, S.day);
+      return done ? `<span class="meta" style="margin:0;color:var(--ok)">✅ ${nm}</span>` : open ? `<button class="btn" data-rev="${r.id}:${what}" style="padding:4px 9px;font-size:12px" ${deps.econ().canAfford(c) ? '' : 'disabled'}>${ico} ${nm} · ${deps.fmt(c)} €</button>` : `<span class="meta late" style="margin:0">✖ ${nm} — късно</span>`; };
+    return `<div style="margin:0 0 8px 24px;padding:8px 10px;border:1px solid #c9a14a;border-radius:10px;background:rgba(255,200,61,.06)">
+      <div class="meta" style="margin:0"><b style="color:var(--txt)">${ev.ico} ${ev.nm}</b> · ден ${ev.day} (след <b style="color:${dl < 7 ? 'var(--bad)' : 'var(--txt)'}">${dl} дни</b>) · приход до <b style="color:var(--ok)">${deps.fmt(rev)} €</b></div>
+      <div class="meta" style="margin:2px 0 6px">Нужни: 🏨 ${deps.fmt(ev.rooms)} стаи × ${EV.nights} нощи (твои: ${deps.fmt(capOf(s))}) · ${airOf(r) ? '✈️' : '🚌'} транспорт за ${deps.fmt(ev.seats)} души${airOf(r) ? ' (твоето летище — по-евтино)' : ' — с летище в града би било наполовина'}. ${dl >= 14 ? 'Сега е най-евтино.' : dl >= 7 ? 'Цените вече са +30%.' : dl >= EV.close ? 'Последни дни: +70%!' : 'Резервациите са затворени.'}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">${btn('rooms', '🏨', 'Стаи')}${btn('trans', airOf(r) ? '✈️' : '🚌', 'Транспорт')}</div></div>`;
+  }
+  function evTick(r, s, day) {
+    if (!s.ev) {
+      if (day < (s.nextEv || 0)) return;
+      const list = EVENTS[r.id] || [], t = list[rnd(0, list.length - 1)]; if (!t) return;
+      s.ev = { ...t, day: day + rnd(EV.notice[0], EV.notice[1]), at: day };
+      deps.sound && deps.sound('offer');
+      const msg = `${t.ico} ${r.nm}: „${t.nm}“ на ден ${s.ev.day}! Резервирай ${deps.fmt(t.rooms)} стаи и транспорт за ${deps.fmt(t.seats)} души — колкото по-рано, толкова по-евтино. Приход до ${deps.fmt(evRevOf(r, s, s.ev))} €.`;
+      deps.toast(msg, 'good', () => deps.openWin ? deps.openWin() : open(r.id));
+      if (deps.onEvent) deps.onEvent(r, s.ev, 'new');
+      return;
+    }
+    const ev = s.ev, dl = ev.day - day;
+    if (dl === 7 && !(ev.bRooms && ev.bTrans)) deps.toast(`⏳ ${ev.ico} „${ev.nm}“ в ${r.nm} е след 7 дни — ${!ev.bRooms && !ev.bTrans ? 'нямаш нито стаи, нито транспорт' : !ev.bRooms ? 'липсват стаите' : 'липсва транспортът'}!`, 'bad', () => deps.openWin ? deps.openWin() : open(r.id));
+    if (dl > 0) return;
+    const full = ev.bRooms && ev.bTrans, part = !full && (ev.bRooms || ev.bTrans), got = full ? evRevOf(r, s, ev) : part ? Math.round(evRevOf(r, s, ev) * EV.part / 1000) * 1000 : 0;
+    if (got) { deps.econ().earn(got, 'курорти', `${r.nm}: ${ev.nm}`); s.earned = (s.earned || 0) + got; S_mon(got); }
+    const spent = (ev.bRooms || 0) + (ev.bTrans || 0);
+    s.evDone = (s.evDone || 0) + 1; s.evEarned = (s.evEarned || 0) + got - spent;
+    if (full) { deps.sound('cash'); deps.toast(`🎉 ${ev.ico} „${ev.nm}“ в ${r.nm} мина с пълни зали! +${deps.fmt(got)} € (печалба ${deps.fmt(got - spent)} €).`, 'good'); }
+    else if (part) deps.toast(`😕 ${ev.ico} „${ev.nm}“: без ${ev.bRooms ? 'транспорт' : 'стаи'} дойдоха малко гости — само +${deps.fmt(got)} €.`, 'bad');
+    else deps.toast(`❌ ${ev.ico} „${ev.nm}“ в ${r.nm} мина без теб — нямаше нито стаи, нито транспорт.`, 'bad');
+    if (deps.onEvent) deps.onEvent(r, ev, full ? 'full' : part ? 'part' : 'miss', got, spent);
+    delete s.ev; s.nextEv = day + rnd(EV.gap[0], EV.gap[1]);
+  }
+  const S_mon = v => { const S = deps.S(); S.resortMon = (S.resortMon || 0) + v; };
   // бутони за разширенията направо в прозореца „Курорти“: едно натискане — строи (по едно наведнъж)
   function extRow(r, s) {
     if (!s || s.stage !== 'built') return '';
     const have = Object.keys(s.ext || {}), econ = deps.econ();
-    const opts = Object.entries(EXTRAS).filter(([k, x]) => x.kinds.includes(r.kind) && !have.includes(k));
+    const opts = Object.entries(EXTRAS).filter(([k, x]) => extOk(r, x) && !have.includes(k));
     if (!opts.length) return '';
     if (s.extBuild) return `<div class="meta" style="margin:0 0 6px 24px">🔨 Строи се ${EXTRAS[s.extBuild.key].ico} ${EXTRAS[s.extBuild.key].nm} — ${Math.round(s.extBuild.prog * 100)}%</div>`;
     return `<div style="display:flex;flex-wrap:wrap;gap:5px;margin:0 0 8px 24px">${opts.map(([k, x]) => { const c = extCost(r, x);
@@ -170,7 +256,7 @@ export function createResorts(deps) {
           : s.stage === 'building' ? `🔨 строи се ${Math.round(s.prog * 100)}%`
           : s.stage === 'built' ? `${on ? `<b style="color:var(--ok)">💶 +${deps.fmt(Math.round(r.month * mulOf(s) / DAYS_PER_MONTH))} €/ден</b>` : `💤 извън сезона`} · ~${deps.fmt(yearOf(r, s))} €/год.${Object.keys(s.ext || {}).map(k => ' ' + EXTRAS[k].ico).join('')}${s.extBuild ? ` · 🔨 ${EXTRAS[s.extBuild.key].nm} ${Math.round(s.extBuild.prog * 100)}%` : ''} · спечелено ${deps.fmt(s.earned || 0)} €`
           : `✅ продаден за ${deps.fmt(s.soldFor)} €`;
-        return `<div class="row" style="margin:4px 0;align-items:center"><span class="meta" style="margin:0">${r.ico} <b style="color:var(--txt)">${r.nm}</b> <span style="opacity:.7">${r.kind === 'winter' ? '❄️' : r.kind === 'summer' ? '☀️' : '♨️'}</span><br>${txt}</span><button class="btn${s?.stage === 'built' ? '2' : ''}" data-resort-open="${r.id}">Отвори</button></div>${extRow(r, s)}`;
+        return `<div class="row" style="margin:4px 0;align-items:center"><span class="meta" style="margin:0">${r.ico} <b style="color:var(--txt)">${r.nm}</b> <span style="opacity:.7">${r.kind === 'winter' ? '❄️' : r.kind === 'summer' ? '☀️' : r.kind === 'events' ? '🎟️' : '♨️'}</span><br>${txt}</span><button class="btn${s?.stage === 'built' ? '2' : ''}" data-resort-open="${r.id}">Отвори</button></div>${evRow(r, s)}${extRow(r, s)}`;
       }).join('');
       h += `<div class="card"><h3>${RG_TITLE[rg] || rg}${rg !== 'България' ? ` <span class="meta" style="margin:0 0 0 auto">~${rg === 'Ривиера' ? 5 : 3}× по-скъпи и по-доходни</span>` : ''}</h3>${rows}</div>`;
     }
@@ -180,7 +266,7 @@ export function createResorts(deps) {
   function open(id) {
     const S = deps.S(), r = R(id), s = st()[id], econ = deps.econ(), enter = deps.enter ? () => deps.enter(id) : null;
     const season = `${r.kind === 'winter' ? '❄️ Зимен курорт: приход декември–март' : r.kind === 'summer' ? '☀️ Летен курорт: приход юни–септември' : '♨️ Балнео курорт: приход целогодишно'}. Сега е ${monthName(S.day).toLowerCase()} (${SEASON_TXT[seasonOf(S.day)]}).`;
-    if (!avail(r) && r.need) return deps.modal(`🔒 ${r.cc} ${r.nm}`, `Курортите в Африка се отключват, когато имаш поне <b>${r.need.n} града</b> в ${r.cc} (сега: ${haveIn(r)}).<br>Купи филиали в: ${r.need.cities.map(id => deps.cityName ? deps.cityName(id) : id).join(', ')}.<br>Земя ${deps.fmt(r.land)} € · вилно селище ${deps.fmt(r.build)} € · продажба ~${deps.fmt(r.sell)} € · наем ${deps.fmt(r.month)} €/мес.<br><br>${season}`, [['Добре', null]]);
+    if (!avail(r) && r.need) return deps.modal(`🔒 ${r.cc} ${r.nm}`, `Курортите тук се отключват, когато имаш поне <b>${r.need.n} града</b> в ${r.cc} (сега: ${haveIn(r)}).<br>Купи филиали в: ${r.need.cities.map(id => deps.cityName ? deps.cityName(id) : id).join(', ')}.<br>Земя ${deps.fmt(r.land)} € · вилно селище ${deps.fmt(r.build)} € · продажба ~${deps.fmt(r.sell)} € · наем ${deps.fmt(r.month)} €/мес.<br><br>${season}`, [['Добре', null]]);
     if (!avail(r)) return deps.modal(`🔒 ${r.cc || ''} ${r.nm}`, `${(r.reg || REG[r.cc]) === 'Турция' ? 'Турските курорти' : r.reg === 'Ривиера' ? 'Курортите на Френската ривиера' : 'Курортите в Алпите'} се отключват на <b>ниво ${r.dev} на развитие</b>${deps.devBest ? ` (сега: ${deps.devBest()})` : ''}.<br>Земя ${deps.fmt(r.land)} € · вилно селище ${deps.fmt(r.build)} € · продажба ~${deps.fmt(r.sell)} € · наем ${deps.fmt(r.month)} €/мес.<br><br>${season}`, [['Добре', null]]);
     if (!unlocked()) return deps.modal(`🔒 ${r.nm}`, `Курортите са Фаза 5. Отключват се при репутация ${UNLOCK.rep} ★ или ${UNLOCK.done} завършени обекта.<br><br>${season}`, [['Добре', null]]);
     const plan = `Земя <b>${deps.fmt(r.land)} €</b> → вилно селище <b>${deps.fmt(r.build)} €</b> (${r.days} дни) → продажба за <b>${deps.fmt(r.sell)} €</b> или наем ~<b>${deps.fmt(r.month)} €/месец</b> в сезона — <b>~${deps.fmt(yearOf(r))} €/година</b>.`;
@@ -202,7 +288,7 @@ export function createResorts(deps) {
     if (s.stage === 'built') {
       const price = sellOf(r, s), have = Object.keys(s.ext || {});
       // разширенията, които още не са построени (по едно наведнъж)
-      const opts = Object.entries(EXTRAS).filter(([k, x]) => x.kinds.includes(r.kind) && !have.includes(k));
+      const opts = Object.entries(EXTRAS).filter(([k, x]) => extOk(r, x) && !have.includes(k));
       const extHtml = s.extBuild ? `<br>🔨 Строи се: <b>${EXTRAS[s.extBuild.key].nm}</b> — ${Math.round(s.extBuild.prog * 100)}%`
         : opts.length ? '<br><br>Разширения (вдигат наема и цената):<br>' + opts.map(([, x]) => `${x.ico} ${x.nm} — ${deps.fmt(extCost(r, x))} €, ${x.days} дни, наем +${Math.round(x.mul * 100)}% (+${deps.fmt(Math.round(r.month * x.mul * (r.kind === 'spa' ? 12 : 4)))} €/год.)`).join('<br>') : '';
       const styles = hotelStylesOf(r.kind), styleNm = () => (styles.find(t => t.key === s.hotelStyle) || styles[0]).nm;
@@ -242,6 +328,7 @@ export function createResorts(deps) {
     for (const r of RESORTS) {
       const s = st()[r.id];
       if (!s) continue;
+      if (s.stage === 'built' && r.kind === 'events') evTick(r, s, day);
       if (s.stage === 'building') {
         s.prog = Math.min(1, s.prog + 1 / r.days);
         if (s.prog >= 1) { s.stage = 'built'; s.earned = 0; deps.sound('done'); deps.toast(`🏡 Вилното селище в ${r.nm} е готово! Продай го или го дръж за наем (${seasonWord(r)}).`, 'good'); }
@@ -251,7 +338,7 @@ export function createResorts(deps) {
         if (s.extBuild.prog >= 1) { s.ext = { ...(s.ext || {}), [s.extBuild.key]: true }; delete s.extBuild; deps.onExtDone?.(x.key || Object.keys(EXTRAS).find(k => EXTRAS[k] === x)); deps.sound('done'); deps.toast(`${x.ico} ${x.nm} в ${r.nm} е готов! Наемът се вдига с ${Math.round(x.mul * 100)}%.`, 'good'); }
       }
       const on = s.stage === 'built' && inSeason(r, day), was = s.stage === 'built' && inSeason(r, day - 1);
-      if (on && !was && r.kind !== 'spa') { s.season = 0; startList.push(r); }
+      if (on && !was && r.kind !== 'spa' && r.kind !== 'events') { s.season = 0; startList.push(r); }
       if (on) {
         const inc = Math.round(r.month * mulOf(s) / DAYS_PER_MONTH);
         econ.earn(inc, 'курорти', `${r.nm}: наеми (${monthName(day).toLowerCase()})`);
@@ -296,5 +383,5 @@ export function createResorts(deps) {
     if (deps.redraw) deps.redraw();
     return r ? r.nm : null;
   }
-  return { svg, hudHtml, winHtml, startExt, open, dailyTick, value, unlocked, grant, dailyNow, yearOf: id => { const r = R(id); return yearOf(r, st()[id]); } };
+  return { svg, hudHtml, winHtml, startExt, book, open, dailyTick, value, unlocked, grant, dailyNow, yearOf: id => { const r = R(id); return yearOf(r, st()[id]); } };
 }

@@ -125,7 +125,8 @@ export function createRivals(deps) {
   function attach(o) {
     const S = deps.S(), big = { house: 0.25, shop: 0.4, office: 0.5, tower: 0.6 }[o.type] ?? 0.3;
     if (Math.random() > big * (0.6 + 0.1 * Math.min(4, S.day / 60))) return o;
-    const list = firmsFor(deps.cc && deps.cc()), f = list[(Math.random() * list.length) | 0];
+    const list = firmsFor(deps.cc && deps.cc()).filter(x => !(deps.acquired && deps.acquired(x.id))), f = list[(Math.random() * list.length) | 0];   // изкупените (corp.js) вече не се борят
+    if (!f) return o;
     o.rival = { firm: f.id, nm: f.nm, ico: f.ico, day: S.day + 1 + ((Math.random() * 2) | 0), bid: Math.round(o.reward * (0.88 + Math.random() * 0.08) / 500) * 500 };
     return o;
   }
@@ -160,7 +161,7 @@ export function createRivals(deps) {
   }
   // твоят дял от пазара (0..1) — за „Завърши града“
   function share() {
-    const s = st(), mine = deps.S().done || 0, theirs = firmsFor(deps.cc && deps.cc()).reduce((a, f) => a + ((s.firms[f.id] || {}).won || 0), 0);
+    const s = st(), own = f => deps.acquired && deps.acquired(f.id), L = firmsFor(deps.cc && deps.cc()), mine = (deps.S().done || 0) + L.filter(own).reduce((a, f) => a + ((s.firms[f.id] || {}).won || 0), 0), theirs = L.filter(f => !own(f)).reduce((a, f) => a + ((s.firms[f.id] || {}).won || 0), 0);   // сградите на изкупените фирми са вече твои
     return mine + theirs ? mine / (mine + theirs) : 1;
   }
   return { attach, dailyTick, busyLots, marketHtml, offerLine, share, firms: FIRMS };
