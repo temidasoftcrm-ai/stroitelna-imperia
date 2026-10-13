@@ -5,7 +5,7 @@ q() { psql -h "$H" -p "$PORT" -U postgres -d "$DB" -q -t -A -v ON_ERROR_STOP=1 -
 A=11111111-1111-1111-1111-111111111111; B=22222222-2222-2222-2222-222222222222
 W=$(q "select id from online.worlds where slug = 'tender-1'")
 q "delete from online.rate" >/dev/null
-T=$(q "select id from online.tenders where world_id = $W and tier = 'local' and status = 'open' order by id limit 1")
+T=$(q "select id from online.tenders tt where world_id = $W and tier = 'local' and status = 'open' and not exists (select 1 from online.bids b where b.tender_id = tt.id) order by id limit 1")
 BU=$(q "select budget from online.tenders where id = $T")
 for U in $A $B; do q "select t.as('$U'); select public.ol_bid(gen_random_uuid(), $W, $T, ($BU * 0.9)::bigint) ->> 'ok'" | tail -1 | grep -q true || { echo "FAIL bid"; exit 1; }; done
 echo " ok: две оферти подадени"

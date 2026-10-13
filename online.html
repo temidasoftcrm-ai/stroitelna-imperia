@@ -52,8 +52,8 @@
   #top .logo { font-weight:900; letter-spacing:.04em; white-space:nowrap; }
   #top .stat { font-size:15px; white-space:nowrap; } #top .stat b { font-size:17px; }
   #top .sp { flex:1; }
-  #conn { font-size:12px; padding:3px 9px; border-radius:20px; background:#4cd07d22; color:#9ff0bd; white-space:nowrap; }
-  #conn.retry { background:#ffb30026; color:#ffd77a; } #conn.offline { background:#ff6b6b26; color:#ffb3b3; }
+  #conn { font-size:15px; font-weight:800; letter-spacing:.04em; padding:6px 14px; border-radius:9px; border:1px solid #4cd07d66; background:#4cd07d22; color:#9ff0bd; white-space:nowrap; }
+  #conn.retry { background:#ffb30026; color:#ffd77a; border-color:#ffb30066; } #conn.offline { background:#ff6b6b26; color:#ffb3b3; border-color:#ff6b6b66; }
   #view { position:fixed; top:52px; left:0; right:360px; bottom:0; }
   #view .ph { position:absolute; inset:0; background:url(assets/ui/splash.webp) center/cover; opacity:.35; }
   #view canvas { display:block; }
@@ -79,6 +79,7 @@
     #view { right:0; bottom:45vh; }
     #panel { top:auto; height:45vh; width:100%; border-left:0; border-top:1px solid var(--line); }
     #top { gap:8px; padding:0 8px; } #top .logo { display:none; }
+    #conn { font-size:13px; padding:4px 9px; }
   }
 </style>
 </head>
@@ -91,8 +92,8 @@
     <span class="logo" id="coName"></span>
     <span class="stat">💶 <b id="cash">—</b></span>
     <span class="stat">📅 <b id="day">—</b></span>
+    <span id="conn" title="Онлайн режим: времето е общо за всички и не се ускорява">● Online</span>
     <span class="sp"></span>
-    <span id="conn">● на линия</span>
   </div>
   <div id="view"><div class="ph" id="ph"></div><div class="ld" id="ld">Зареждане на града… <div class="bar"><i id="ldBar" style="width:3%"></i></div></div></div>
   <div id="panel"><div id="tabs"></div><div id="body"></div></div>

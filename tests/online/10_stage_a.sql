@@ -16,7 +16,7 @@ select public.ol_admin_invite(:w, 5, 7) ->> 'code' as code \gset
 select t.as(:A);
 select t.ok((public.ol_admin_world('hack', 'Hack', false, 10, '{}') ->> 'err') = 'forbidden', 'играч не може да прави светове');
 -- частният свят не се вижда и не се влиза без покана
-select t.ok(jsonb_array_length(public.ol_worlds()) = 0, 'частният свят е скрит без покана');
+select t.ok(jsonb_array_length(public.ol_worlds() -> 'worlds') = 0 and not (public.ol_worlds() ->> 'admin')::boolean, 'частният свят е скрит без покана; не е админ');
 select t.ok((public.ol_create_company(gen_random_uuid(), :w, 'Без покана', 'titan', 'sofia') ->> 'err') = 'no_access', 'без покана няма фирма');
 select t.ok((public.ol_join(gen_random_uuid(), 'WRONG1') ->> 'err') = 'bad_invite', 'грешен код се отказва');
 select t.ok((public.ol_join(gen_random_uuid(), :'code') ->> 'ok')::boolean, 'А влиза с покана');

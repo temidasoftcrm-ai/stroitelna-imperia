@@ -375,9 +375,7 @@ export class Economy {
     this.s.today = emptyDay();
     this.s.day = day + 1;
 
-    if (this.s.money < 0 && this.hooks.toast) {
-      this.hooks.toast(this.isBankrupt() ? 'Фирмата фалира!' : `Сметката е на минус: ${fmt(this.s.money)}. Банката начислява 1% на ден.`, 'bad');
-    }
+    // минусът и фалитът — bankrupt.js (предупреждения, несъстоятелност, синдик)
     return sum;
   }
 
@@ -411,7 +409,7 @@ export class Economy {
   // стъпката на бутоните: кръгло число (1/2/5 × 10ⁿ) около 5% от лимита
   loanStep(rep = 0) { const x = this.maxLoan(rep) / 20, p = 10 ** Math.floor(Math.log10(Math.max(1, x))), m = x / p; return Math.max(LOAN_STEP, (m >= 5 ? 5 : m >= 2 ? 2 : 1) * p); }
   loanRoom(rep = 0) { return Math.max(0, this.maxLoan(rep) - this.s.loan); }
-  canTakeLoan(rep, amt) { amt = amt ?? this.loanStep(rep); return amt > 0 && this.s.loan + amt <= this.maxLoan(rep) && !this.isBankrupt(); }
+  canTakeLoan(rep, amt) { amt = amt ?? this.loanStep(rep); return amt > 0 && this.s.loan + amt <= this.maxLoan(rep); }   // и на минус — кредитът е начинът да се спасиш от фалит
   takeLoan(rep, amt) {
     amt = amt ?? this.loanStep(rep);
     if (!this.canTakeLoan(rep, amt)) return 0;
@@ -924,7 +922,7 @@ export function renderFinance(el, econ, rep = 0, rerender = () => {}, unitTypes 
   let html = `<div class="card">
     <h3><span class="ico">💶</span>Сметка</h3>
     <div class="fin-big ${s.money < 0 ? 'neg' : ''}">${fmt(s.money)}</div>
-    ${s.money < 0 ? `<div class="meta late">На минус: 1% лихва на ден. Фалит под ${fmt(BANKRUPT_AT)}.</div>` : ''}`;
+    ${econ.hooks.bustHtml ? econ.hooks.bustHtml() : s.money < 0 ? `<div class="meta late">На минус: 1% лихва на ден.</div>` : ''}`;
   if (unitTypes) {
     const upkeep = unitTypes.reduce((a, t) => a + (UNIT_TYPES[t] ? UNIT_TYPES[t].upkeep : 0), 0);
     html += `<div class="fin-kv">Заплати и поддръжка на ден <b>${fmt(upkeep)}</b></div>

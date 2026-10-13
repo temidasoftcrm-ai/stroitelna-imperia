@@ -18,7 +18,7 @@ addEventListener('online', () => setConn('ok'));
 addEventListener('offline', () => setConn('offline'));
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const netErr = e => !e || /fetch|network|timeout|Failed|ECONN|503|502|504/i.test(e.message || e.code || String(e));
+const netErr = e => !e || /fetch|network|timeout|Failed|ECONN|503|502|504|deadlock|40P01|40001|serialize|conflict/i.test(e.message || e.code || String(e));   // и временните конфликти в базата — повтаряме със същия req_id
 
 export class OnlineError extends Error { constructor(code, msg) { super(msg || code); this.code = code; } }
 
@@ -56,6 +56,32 @@ export const api = {
   sellUnit: (world, type) => act('ol_sell_unit', { p_world: world, p_type: type }),
   startBuild: (world, offer) => act('ol_start_build', { p_world: world, p_offer: offer }),
   tenders: world => read('ol_tenders', { p_world: world }),
+  ranking: (world, sort) => read('ol_ranking', { p_world: world, p_sort: sort }),
+  market: world => read('ol_market', { p_world: world }),
+  consortia: world => read('ol_consortia', { p_world: world }),
+  concessions: world => read('ol_concessions', { p_world: world }),
+  season: world => read('ol_season', { p_world: world }),
+  finance: world => read('ol_finance', { p_world: world }),
+  relations: world => read('ol_relations', { p_world: world }),
+  relation: (world, company, action) => act('ol_relation', { p_world: world, p_company: company, p_action: action }),
+  loan: (world, cents) => act('ol_loan', { p_world: world, p_amount: cents }),
+  repay: (world, cents) => act('ol_repay', { p_world: world, p_amount: cents }),
+  shareOffer: (world, pct, priceCents) => act('ol_share_offer', { p_world: world, p_pct: pct, p_price_pct: priceCents }),
+  buyShares: (world, offer, pct) => act('ol_buy_shares', { p_world: world, p_offer: offer, p_pct: pct }),
+  buyback: (world, holder) => act('ol_buyback', { p_world: world, p_holder: holder }),
+  trophies: (world, company) => read('ol_trophies', { p_world: world, p_company: company }),
+  concBid: (world, round, cents) => act('ol_conc_bid', { p_world: world, p_round: round, p_amount: cents }),
+  consFound: (world, mtype, pct, open) => act('ol_cons_found', { p_world: world, p_mtype: mtype, p_pct: pct, p_open: open }),
+  consInvite: (world, cons, company, pct) => act('ol_cons_invite', { p_world: world, p_cons: cons, p_company: company, p_pct: pct }),
+  consJoin: (world, cons, pct) => act('ol_cons_join', { p_world: world, p_cons: cons, p_pct: pct }),
+  consDecline: (world, cons) => act('ol_cons_decline', { p_world: world, p_cons: cons }),
+  consLeave: (world, cons) => act('ol_cons_leave', { p_world: world, p_cons: cons }),
+  buildFacility: (world, type) => act('ol_build_facility', { p_world: world, p_type: type }),
+  sellOrder: (world, good, qty, cents) => act('ol_sell_order', { p_world: world, p_good: good, p_qty: qty, p_price: cents }),
+  cancelOrder: (world, ask) => act('ol_cancel_order', { p_world: world, p_ask: ask }),
+  buy: (world, good, qty, maxCents) => act('ol_buy', { p_world: world, p_good: good, p_qty: qty, p_max: maxCents }),
+  sellState: (world, good, qty) => act('ol_sell_state', { p_world: world, p_good: good, p_qty: qty }),
+  company: (world, id) => read('ol_company', { p_world: world, p_company: id }),
   bid: (world, tender, cents) => act('ol_bid', { p_world: world, p_tender: tender, p_price: cents }),
   withdraw: (world, tender) => act('ol_withdraw', { p_world: world, p_tender: tender }),
   startContract: (world, contract) => act('ol_start_contract', { p_world: world, p_contract: contract }),

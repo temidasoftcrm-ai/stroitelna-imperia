@@ -6,13 +6,14 @@
 \set ADM '''33333333-3333-3333-3333-333333333333'''
 select t.su(); delete from online.rate;
 select t.as(:ADM);
-select (public.ol_admin_world('tender-1', 'Търгове', false, 600, '{"tenders_local":3,"tenders_national":2,"tenders_global":1,"max_contracts":2}', true) ->> 'world')::int as w \gset
+select (public.ol_admin_world('tender-1', 'Търгове', false, 600, '{"tenders_local":3,"tenders_national":2,"tenders_global":1,"max_contracts":5,"auto_start":0}', true) ->> 'world')::int as w \gset
 select public.ol_create_company(gen_random_uuid(), :w, 'В Админ', 'imperial', 'ruse') \gset
 select t.as(:A); select public.ol_create_company(gen_random_uuid(), :w, 'Т-А', 'titan', 'sofia') \gset
 select t.as(:B); select public.ol_create_company(gen_random_uuid(), :w, 'Т-Б', 'atlas', 'varna') \gset
 select t.su();
 select t.fund(t.co('Т-А'), 50000000), t.fund(t.co('Т-Б'), 50000000), t.fund(t.co('В Админ'), 50000000);
 select t.units(t.co(n), 'crane', 1) from unnest(array['Т-А', 'Т-Б', 'В Админ']) n;
+select t.units(t.co(n), k, 3) from unnest(array['Т-А', 'Т-Б', 'В Админ']) n, unnest(array['crew', 'loader', 'truck']) k;
 select online.tick() \gset
 select t.ok((select count(*) from online.tenders where world_id = :w and status = 'open') = 6, 'публикувани 3 местни, 2 национални, 1 световен търг');
 -- местен търг без кран (school/fire) и с нужда от кран (police) — ползваме първите два местни
@@ -83,6 +84,7 @@ select t.su(); select id as k1 from online.contracts where tender_id = :t1 \gset
 select id as k2 from online.contracts where tender_id = :t2 \gset
 select id as k3 from online.contracts where tender_id = :t3 \gset
 select price as p1 from online.contracts where id = :k1 \gset
+select t.units(t.co('Т-А'), k, 1) from unnest(array['crew', 'loader', 'truck']) k;   -- А има само по 1 бр. → вторият договор няма техника
 select t.as(:B);
 select t.ok((public.ol_start_contract(gen_random_uuid(), :w, :k1) ->> 'err') = 'no_contract', 'Б не може да изпълнява договор на А');
 select t.as(:A);
@@ -112,4 +114,14 @@ select t.ok((select held from online.companies where name = 'Т-А') = 0, 'А н
 select t.ok(exists (select 1 from online.notes n where n.company_id = t.co('Т-А') and n.title like '🏛️%'), 'известие за изпълнен договор и освободен депозит');
 select t.ok(t.balanced(), 'журнал = наличност за всички');
 select t.ok((select count(*) from online.tenders where world_id = :w and status = 'open') = 6, 'нови търгове заместват затворените');
+-- автоматичен старт (баланс 2): с включен auto_start спечелен договор тръгва сам, щом има свободна техника
+update online.worlds set cfg = cfg || '{"auto_start":1}' where id = :w;
+select t.units(t.co('Т-Б'), k, 5) from unnest(array['crew', 'loader', 'truck', 'crane']) k;
+select id as t9, budget as b9 from online.tenders where world_id = :w and tier = 'local' and status = 'open' order by id limit 1 \gset
+select t.as(:B); select public.ol_bid(gen_random_uuid(), :w, :t9, :b9) \gset
+select t.su(); update online.worlds set shift_s = shift_s + 600 * 4 where id = :w;
+select online.tick() \gset
+select t.ok((select k.status from online.contracts k where k.tender_id = :t9) = 'running', 'спечеленият договор започна автоматично');
+select t.ok(exists (select 1 from online.notes where company_id = t.co('Т-Б') and title like '▶️ Договорът%започна автоматично'), 'известие за автоматичния старт');
+select t.ok(t.balanced(), 'журнал = наличност');
 select 'STAGE C: ALL PASSED' as result;

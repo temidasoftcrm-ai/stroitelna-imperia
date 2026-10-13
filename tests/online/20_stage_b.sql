@@ -55,7 +55,7 @@ select online.tick() \gset
 select online.tick() \gset
 select t.ok((select count(*) from online.ledger l join online.companies c on c.id = l.company_id where c.name = 'А Строй' and l.reason = 'строеж') = 1, 'строежът е платен точно веднъж');
 select t.ok((select amount from online.ledger l join online.companies c on c.id = l.company_id where c.name = 'А Строй' and l.reason = 'строеж') = :rew, 'платена е договорената сума');
-select t.ok((select xp from online.companies where name = 'А Строй') = :rew / 10000, 'XP = бюджет / 100 € — точно веднъж');
+select t.ok((select xp from online.companies where name = 'А Строй') = :rew / 5000, 'XP = бюджет / 50 € — точно веднъж');
 -- отсъствие: А последно е влизал на ден 2; idle_days = 3 → поддръжка до ден 5, после „в покой“
 select t.ok((select sum(-amount) from online.ledger l join online.companies c on c.id = l.company_id where c.name = 'А Строй' and l.reason = 'поддръжка') = 51000 * 5, 'при отсъствие поддръжката спира 3 дни след последното влизане (дни 1–5)');
 select t.as(:A);

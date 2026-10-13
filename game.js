@@ -19,6 +19,7 @@ import { createRivals, LOCAL_FIRMS, FIRMS } from './rivals.js';
 import { createDevLevel, THRESH as DEV_THRESH, LV as DEV_LV, unlockText } from './devlevel.js';
 import { createCityPanel } from './citypanel.js';
 import { createPlaytime } from './playtime.js';
+import { createBankrupt } from './bankrupt.js';
 import { RAIL_STAGES, railStageOf, buildRailView } from './railbuild.js';
 import { createStation, STATION_LEVELS } from './station.js';
 import { createResorts, RESORTS, seasonOf, monthName } from './resorts.js';
@@ -1783,7 +1784,7 @@ function setupWorld() {
   city.ready = true;
   S.hqCity = S.hqCity || S.cityId; S.cities = S.cities || {};
   if (!S.tut && (S.done || 0) > 3) S.tut = { step: 99, off: true };   // опитен играч — без урок
-  econ = new ECON.Economy(S.econ, { toast, cityName: id => cityById(id)?.nm, changed: () => { save(); renderPanel(); }, takeover: id => takeoverChoice(id), stockVisible: c => !c.cc || ownedCities().some(id => cityById(id)?.cc === c.cc), liquidated: (c, total, pr) => { showEventPop('sold', `💰 Разпродажба: ${c.nm}`, `+${fmt(total)} € · ${pr >= 0 ? 'печалба' : 'загуба'} ${fmt(Math.abs(pr))} € спрямо цената`); quests.emit('liquidate'); }, incomeMul: id => wonIncomeMul(id, x => econ.isFinished(x)), stocksOpen: () => dev.stocksOpen() });
+  econ = new ECON.Economy(S.econ, { toast, bustHtml: () => bust.statusHtml(), cityName: id => cityById(id)?.nm, changed: () => { save(); renderPanel(); }, takeover: id => takeoverChoice(id), stockVisible: c => !c.cc || ownedCities().some(id => cityById(id)?.cc === c.cc), liquidated: (c, total, pr) => { showEventPop('sold', `💰 Разпродажба: ${c.nm}`, `+${fmt(total)} € · ${pr >= 0 ? 'печалба' : 'загуба'} ${fmt(Math.abs(pr))} € спрямо цената`); quests.emit('liquidate'); }, incomeMul: id => wonIncomeMul(id, x => econ.isFinished(x)), stocksOpen: () => dev.stocksOpen() });
   if (econ.setCity) econ.setCity(S.cityId);   // оборотът от обекти се води по градове
   buildCity(S.cityId);
   for (const u of units) scene.remove(u.obj);
@@ -2241,17 +2242,19 @@ function showBuyPop(type) {
   buyPopT = setTimeout(() => el.classList.add('out'), 3200);
   setTimeout(() => { if (el.classList.contains('out')) el.classList.add('hidden'); }, 3800);
 }
-function sellUnit(type) {
+function sellUnit(type, quiet = false) {   // quiet — синдикът при фалит (bankrupt.js) продава много наведнъж
   const u = units.find(q => q.type === type && !q.proj);
-  if (!u) return;
+  if (!u) return 0;
   const got = econ.sellUnit(type);
   scene.remove(u.obj);
   units.splice(units.indexOf(u), 1);
   refreshGarageLabel();
   S.units.splice(S.units.indexOf(type), 1);
+  if (quiet) return got;
   toast(`Продаде ${ECON.UNIT_TYPES[type].nm.toLowerCase()} за ${fmt(got)} €.`);
   save();
   renderPanel();
+  return got;
 }
 function poofAt(x, z) {
   const r = new THREE.Mesh(new THREE.RingGeometry(1.5, 2, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffd54a, transparent: true }));
@@ -2328,7 +2331,7 @@ function endOfDay() {
   for (const o of [...S.offers]) if (o.expires < S.day) { city.lots[o.lot].busy = null; S.offers.splice(S.offers.indexOf(o), 1); }
   while (S.offers.length < officeLv().offers) { const n = S.offers.length; makeOffer(); if (S.offers.length === n) break; }
   for (const p of projects) if (S.day === p.deadlineDay) toast(`⏰ Днес е крайният срок за „${p.title}“!`, 'bad');
-  if (econ.isBankrupt()) toast('⚠️ Фирмата е на ръба на фалита! Вземи кредит или продай техника.', 'bad');
+  bust.dailyTick();   // минус → несъстоятелност → фалит (bankrupt.js)
   save();
   renderPanel();
   return sum;
@@ -2888,6 +2891,12 @@ const rivals = createRivals({ S: () => S, acquired: id => corp.acquired(id), toa
 const dev = createDevLevel({ S: () => S, lvTime: l => playtime.levelTxt(l), playSummary: () => playtime.summaryHtml(), cityName: () => S ? cityName() : '', maxLevel: () => Math.max(S?.dev?.lv || 1, ...Object.values(S?.cities || {}).map(c => c.dev?.lv || 1), holdLv()), toast, sound: n => Sound.play(n), save, modal, pop: (k, a, b) => { if (k === 'lv-5' && !S.balkansPop) { S.balkansPop = S.day; return showEventPop('balkans-open', '👑 Балканите са твои!', 'Ниво 5: жп линии и магистрали до Сърбия, Румъния, Гърция, Турция и С. Македония.'); } return showEventPop(k, a, b); }, balkansOpen: () => true });   // първото ниво 5 — „Балканите са твои“
 // ⏱️ изиграно време и кога е достигнато всяко ниво (playtime.js)
 const playtime = createPlaytime({ S: () => S, level: () => dev.best(), speed: () => (AUTOTEST ? 0 : speed) });
+// 💥 фалит: дълъг минус → несъстоятелност (15 дни) → синдикът продава активите; ако не стигнат — край на играта
+const bust = createBankrupt({ S: () => S, econ: () => econ, toast, modal, fmt, save, sound: n => Sound.play(n),
+  sellHere: t => sellUnit(t, true), unitsHere: () => units.filter(u => !u.proj).map(u => u.type), cityName: id => cityById(id)?.nm || id,
+  newGame: () => { localStorage.removeItem(SAVE_KEY); location.reload(); }, openSaves: () => openSaves({ modal, toast, fmt, save, cityName: id => cityById(id).nm }),
+  playDays: () => playtime.hrs(playtime.state()?.sec) + ' игра' });
+setTimeout(() => { try { if (S) bust.banner(); } catch {} }, 3000);
 const tutorial = createTutorial({ S: () => S, projects: () => projects, units: () => units, save,
   onMap: () => !$('mapScreen').classList.contains('hidden'), openTab: t => { tab = t; renderPanel(); } });
 const resorts = createResorts({
@@ -7175,6 +7184,9 @@ if (AUTOTEST) {
   setSpeed(1);
   // достъп за headless тестовете
   window.__dbg = {
+    state: () => S,
+    bustTest(debt = 2e6, days = 32) { econ.s.money = -debt; const out = []; for (let d = 0; d < days; d++) { endOfDay(); out.push([S.day, Math.round(econ.s.money), S.bust?.stage || '-', S.bust?.red]); } return { out: out.filter((x, i) => i % 3 === 0 || x[2] !== '-' || i === out.length - 1), units: S.units.length, rep: S.rep, bar: document.getElementById('bustBar')?.innerText || null, modal: !document.getElementById('modal').classList.contains('hidden') && document.getElementById('modal').innerText.slice(0, 300) }; },
+    days(n = 1) { for (let d = 0; d < n; d++) endOfDay(); return S.day; },
     tenderAudit() { const cn = id => COUNTRIES.find(k => k.cities.includes(id)); return { n: TENDERS.length, list: TENDERS.map(t => ({ id: t.id, city: t.city, kind: t.kind, dev: t.dev, rep: t.rep, b: t.budget, days: t.days, cont: contKeyOf(t.city), cc: cityById(t.city)?.cc || null, country: cn(t.city)?.nm || cn(t.city)?.iso || null, exists: !!cityById(t.city), air: AIR_ONLY.has(t.city), lv: cityLv(t.city), st: t.id.startsWith('st-') })), countries: COUNTRIES.map(k => ({ iso: k.iso, nm: k.nm, n: k.cities.length, first: k.cities[0], cont: k.cities[0] ? contKeyOf(k.cities[0]) : null })) }; },
     tenderSim(days = 3650, lv = 20, rep = 5, all = true) { S.dev.lv = lv; S.dev.xp = 9e6; S.rep = rep; if (all === 'bg') S.branches = ['sofia', 'plovdiv', 'varna', 'burgas', 'ruse']; else if (all) S.branches = [...new Set([...(S.branches || []), ...COUNTRIES.flatMap(k => k.cities)])]; econ.earn(5e10, 'друго', 'тест'); S.tenders = {}; const seen = []; const t0 = S.day; for (let d = 0; d < days; d++) { S.day++; for (const [id, s] of Object.entries(S.tenders)) if (s.st === 'open' && !s._seen) { s._seen = 1; seen.push([S.day - t0, id]); } tenders.dailyTick(); } return { n: seen.length, ids: seen.map(x => x[1]), gaps: seen.map((x, i) => i ? x[0] - seen[i - 1][0] : x[0]) }; },
     lotReload(ext) { if (ext != null) S.cityExt = ext; sessionStorage.setItem('stroiAT', JSON.stringify(S, (k, v) => k === 'vis' ? undefined : v)); setTimeout(() => location.reload(), 50); return 'reload'; },
