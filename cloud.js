@@ -3,6 +3,7 @@
 // сравнява с облака: ако на друго устройство има по-нов запис — сваля го и презарежда.
 // Таблица public.saves (user_id, slot 's1'…'s3', data jsonb, meta jsonb, updated_at); RLS: всеки вижда само своите.
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
+import { backupRaw } from './saves.js';
 
 const URL_ = 'https://lpzjscttqieqnqozscpk.supabase.co';
 const KEY = 'sb_publishable_3Gats6iSx7BoyFUh63N1vQ__pHCBrul';   // публичен ключ — достъпът се пази от RLS
@@ -104,7 +105,8 @@ async function upload(n, raw) {
 // записът на текущия слот, свален от облака, не бива да се презапише от играта (тя още държи стария в паметта) преди презареждането
 const setItem0 = Storage.prototype.setItem; let locked = null;
 Storage.prototype.setItem = function (k, v) { if (k === locked) return; return setItem0.call(this, k, v); };
-function take(n, row) {
+async function take(n, row) {
+  await backupRaw(n, localStorage.getItem(keyOf(n)), 'преди облака');   // сегашният запис остава в „🕒 Автозаписи“
   const raw = JSON.stringify(row.data);
   setItem0.call(localStorage, keyOf(n), raw);
   if (n === curSlot()) locked = keyOf(n);
@@ -121,17 +123,19 @@ async function pullAll() {
     if (!c) { if (raw) await upload(n, raw); continue; }
     const localChanged = raw && (!s || s.sig !== sig(raw));
     const cloudNewer = !s || c.updated_at !== s.ts;
-    if (!raw || (cloudNewer && !localChanged)) { if (cloudNewer || !raw) { take(n, c); if (n === curSlot()) reload = true; } }
-    else if (cloudNewer && localChanged) {
+    // облакът е по-нов, но играта в него е по-назад (по-малко дни или друга фирма) → никога без питане
+    const lm0 = raw ? metaOf(raw) : null, cm0 = c.meta || metaOf(JSON.stringify(c.data)), behind = lm0 && cm0 && ((cm0.day | 0) < (lm0.day | 0) || (cm0.city && lm0.city && cm0.city !== lm0.city));
+    if (!raw || (cloudNewer && !localChanged && !behind)) { if (cloudNewer || !raw) { await take(n, c); if (n === curSlot()) reload = true; } }
+    else if (cloudNewer && (localChanged || behind)) {
       if (sig(JSON.stringify(c.data)) === sig(raw)) { setSync(n, { ts: c.updated_at, sig: sig(raw) }); continue; }
       const choice = await new Promise(res => {
         const lm = metaOf(raw), cm = c.meta || metaOf(JSON.stringify(c.data));
         dlg(`<h2 style="font-size:19px;color:var(--acc)">☁️ Два различни записа (слот ${n})</h2>
           <p style="color:var(--mut);font-size:14px;line-height:1.6">На това устройство: <b style="color:var(--txt)">ден ${lm.day} · ${fmt(lm.money)} € · ${lm.done} обекта</b><br>
-          В облака (от друго устройство): <b style="color:var(--txt)">ден ${cm.day} · ${fmt(cm.money)} € · ${cm.done} обекта</b><br><br>Кой да остане? Другият ще бъде заменен.</p>`,
-          [['📱 Този тук', () => res('local')], ['☁️ От облака', () => res('cloud'), 1]]);
+          В облака (от друго устройство): <b style="color:var(--txt)">ден ${cm.day} · ${fmt(cm.money)} € · ${cm.done} обекта</b><br><br>${behind ? '<b style="color:var(--bad)">⚠️ В облака играта е по-назад — може би е започната отначало на друго устройство.</b><br>' : ''}Кой да остане? Другият ще бъде заменен (но остава в „💾 Записи“ → „🕒 Автозаписи“).</p>`,
+          [['📱 Този тук', () => res('local'), behind ? 1 : 0], ['☁️ От облака', () => res('cloud'), behind ? 0 : 1]]);
       });
-      if (choice === 'cloud') { take(n, c); if (n === curSlot()) reload = true; } else await upload(n, raw);
+      if (choice === 'cloud') { await take(n, c); if (n === curSlot()) reload = true; } else await upload(n, raw);
     } else if (localChanged) await upload(n, raw);
   }
   if (reload) { toast('☁️ Зареждам по-новия запис от облака…'); setTimeout(() => location.reload(), 900); }

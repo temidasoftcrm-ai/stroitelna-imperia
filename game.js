@@ -9,7 +9,7 @@ import { Sound } from './sound.js';
 import { createPassingTrains } from './passtrains.js';
 import { createQuests } from './quests.js';
 import { createSupply } from './supply.js';
-import { saveKey, openSaves, currentSlot } from './saves.js';
+import { saveKey, openSaves, currentSlot, backupNow, backupRaw, logError } from './saves.js';
 import { createTutorial } from './tutorial.js';
 import { createMega } from './megaorders.js';
 import { createSilkRoad } from './silkroad.js';
@@ -2203,7 +2203,7 @@ function showEmpireEnd(force = false) {
   requestAnimationFrame(() => { el.style.opacity = '1'; el.querySelector('img').style.transform = 'scale(1)'; });
   Sound.play('country'); setTimeout(() => splashFanfare(), 4200);
   el.querySelector('#eeGo').onclick = () => { el.style.opacity = '0'; setTimeout(() => el.remove(), 900); };
-  el.querySelector('#eeNew').onclick = () => ($('modal').style.zIndex = '70', modal('🔄 Нова игра?', 'Империята в този слот ще бъде изтрита и започваш отначало. (За да я запазиш — първо „💾 Записи“ → „⬇️ Файл“ или ползвай друг слот.)', [['Отказ', null], ['Започни отначало', () => { localStorage.removeItem(SAVE_KEY); location.reload(); }]]));
+  el.querySelector('#eeNew').onclick = () => ($('modal').style.zIndex = '70', modal('🔄 Нова игра?', 'Империята в този слот ще бъде изтрита и започваш отначало. (За да я запазиш — първо „💾 Записи“ → „⬇️ Файл“ или ползвай друг слот.)', [['Отказ', null], ['Започни отначало', wipeSlot]]));
   return true;
 }
 function splashFanfare() {
@@ -2912,7 +2912,7 @@ const playtime = createPlaytime({ S: () => S, level: () => dev.best(), speed: ()
 // 💥 фалит: дълъг минус → несъстоятелност (15 дни) → синдикът продава активите; ако не стигнат — край на играта
 const bust = createBankrupt({ S: () => S, econ: () => econ, toast, modal, fmt, save, sound: n => Sound.play(n),
   sellHere: t => sellUnit(t, true), unitsHere: () => units.filter(u => !u.proj).map(u => u.type), cityName: id => cityById(id)?.nm || id,
-  newGame: () => { localStorage.removeItem(SAVE_KEY); location.reload(); }, openSaves: () => openSaves({ modal, toast, fmt, save, cityName: id => cityById(id).nm }),
+  newGame: () => wipeSlot(), openSaves: () => openSaves({ modal, toast, fmt, save, cityName: id => cityById(id)?.nm || id, lock: () => { saveLock = true; } }),
   playDays: () => playtime.hrs(playtime.state()?.sec) + ' игра' });
 setTimeout(() => { try { if (S) bust.banner(); } catch {} }, 3000);
 // 🤝 партньорство в самостоятелната игра (coop.js): пари, техника, материали, общи поръчки, партньорът на картата
@@ -3059,16 +3059,16 @@ function showMap(on) {
       $('mapBtns').insertAdjacentHTML('beforeend', viewBarHtml());
       $('mapBtns').querySelectorAll('[data-mview]').forEach(b => b.onclick = () => setMapView(b.dataset.mview));
       $('mbEnter').onclick = enterCity;
-      if ($('mbCredits')) $('mbCredits').onclick = showCredits; $('mbSaves').onclick = () => openSaves({ modal, toast, fmt, save, cityName: id => cityById(id).nm });
+      if ($('mbCredits')) $('mbCredits').onclick = showCredits; $('mbSaves').onclick = () => openSaves({ modal, toast, fmt, save, cityName: id => cityById(id)?.nm || id, lock: () => { saveLock = true; } });
       $('mapBtns').insertAdjacentHTML('afterend', '');
       if (!$('mapRail')) $('mapHud').insertAdjacentHTML('beforeend', '<div id="mapRail" style="display:flex;flex-direction:column;gap:8px"></div>');
       renderMapHud();
-      $('mbMore').onclick = () => modal('⚙️ Още', 'Авторите на моделите и музиката · или започни нова игра в този слот (сегашната фирма се изтрива — за отделна игра ползвай „💾 Записи“).', [['Затвори', null], ['📜 Автори', showCredits], ['🗑️ Нова игра', () => modal('Нова игра?', 'Сегашната фирма ще бъде изтрита.', [['Отказ', null], ['Изтрий и започни', () => { localStorage.removeItem(SAVE_KEY); location.reload(); }]])]]);
+      $('mbMore').onclick = () => modal('⚙️ Още', 'Авторите на моделите и музиката · или започни нова игра в този слот (сегашната фирма се изтрива — за отделна игра ползвай „💾 Записи“).', [['Затвори', null], ['📜 Автори', showCredits], ['🗑️ Нова игра', () => modal('Нова игра?', 'Сегашната фирма ще бъде изтрита.', [['Отказ', null], ['Изтрий и започни', wipeSlot]])]]);
     } else {
       $('mapTitle').textContent = 'Избери град';
       $('mapText').textContent = `Къде ще основеш строителната си фирма? Натисни град на картата. (слот ${currentSlot()})`;
       $('mapBtns').innerHTML = '<button class="btn2" id="mbSaves">💾 Записи</button><button class="btn2" id="mbCredits">📜 Автори</button>';
-      if ($('mbCredits')) $('mbCredits').onclick = showCredits; $('mbSaves').onclick = () => openSaves({ modal, toast, fmt, save, cityName: id => cityById(id).nm });
+      if ($('mbCredits')) $('mbCredits').onclick = showCredits; $('mbSaves').onclick = () => openSaves({ modal, toast, fmt, save, cityName: id => cityById(id)?.nm || id, lock: () => { saveLock = true; } });
     }
   } else if (S) $('panel').classList.remove('hidden');
 }
@@ -7106,7 +7106,11 @@ function hwWinHtml() {
 // ============================================================ запис
 // техниката в завършения град остава за поддръжка — economy.js плаща нейната издръжка и вдига прихода
 function syncFinishedFleet() { if (S && city.ready && econ.setFinishedFleet && econ.isFinished(S.cityId)) econ.setFinishedFleet(S.cityId, units.map(u => u.type)); }
-function save() { syncFinishedFleet(); if (AUTOTEST || !S) return; try { S.projects = projects; if (city.ready) syncUnits(); localStorage.setItem(SAVE_KEY, JSON.stringify(S, (k, v) => k === 'vis' ? undefined : v)); } catch { /* без запис */ } }
+var saveLock = false, saveWarned = false;   // saveLock: друг раздел/връщане на автозапис — този раздел вече не записва
+function save() { syncFinishedFleet(); if (AUTOTEST || !S || saveLock) return; try { S.projects = projects; if (city.ready) syncUnits(); localStorage.setItem(SAVE_KEY, JSON.stringify(S, (k, v) => k === 'vis' ? undefined : v)); saveWarned = false; }
+  catch (e) { logError('запис: ' + (e?.message || e), { day: S?.day }); if (!saveWarned) { saveWarned = true; toast('⚠️ Играта не успя да се запише в браузъра (няма място?). Автозаписите в „💾 Записи“ са запазени.', 'bad'); } } }
+// „Нова игра“: първо пази копие (може да се върне от „💾 Записи“ → „🕒 Автозаписи“), после трие слота
+function wipeSlot() { save(); saveLock = true; backupNow('преди нова игра').finally(() => { localStorage.removeItem(SAVE_KEY); location.reload(); }); }
 function loadSave() { if (AUTOTEST) return null; try { return JSON.parse(localStorage.getItem(SAVE_KEY)); } catch { return null; } }
 
 // клик върху парцел в 3D → избира обекта или офертата
@@ -7249,7 +7253,8 @@ function autobot() {
       projects: projects.map(p => `${p.type}:${p.stage}:${p.prog.toFixed(2)}`), units: units.map(u => u.type + ':' + u.state).join(','), offers: S.offers.length, city: S.cityId, hq: S.hqCity, cities: Object.keys(S.cities || {}), step: sessionStorage.getItem('mstep'), estate: S.estate ? { owned: S.estate.owned.map(o => `${o.kind}:${o.rent}:${o.value}${o.old ? ':old' : ''}${o.sale ? ':sale' + (o.sale.price || '') : ''}`), land: S.estate.land.length, listings: S.estate.listings.length } : null, hw: (S.hwJobs || []).map(j => `${j.seg}:${j.stage}:${j.prog.toFixed(2)}`), hwDone: S.hwDone, rails: S.rails.map(r => `${r.a}-${r.b}:${r.built ? 'ok' : Math.round(r.prog * 100) + '%'}`), trains: S.trains.map(t => t.job ? t.leg + ':' + Math.round(t.km) : 'idle@' + t.at), jobs: S.jobs.length, conn: connectedCities() });
   }
 }
-addEventListener('error', e => { document.title = 'ERR ' + e.message; });
+addEventListener('error', e => { document.title = 'ERR ' + e.message; if (!AUTOTEST) logError(e.message, { at: `${(e.filename || '').split('/').pop()}:${e.lineno}`, day: S?.day, city: S?.cityId }); });
+addEventListener('unhandledrejection', e => { if (!AUTOTEST) logError('promise: ' + (e.reason?.message || e.reason), { day: S?.day }); });
 
 // ============================================================ старт
 // началният екран стои поне 1.5 s и изчезва плавно
@@ -7259,6 +7264,19 @@ const cine = createCinema({ S: () => S, sound: () => Sound, ready: () => !!S && 
 cine.start();
 { const el = $('loading'); $('ldTxt').textContent = 'Готово!'; setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 700); }, AUTOTEST ? 0 : 900); }
 const saved = loadSave();
+if (saved && !AUTOTEST) backupRaw(currentSlot(), localStorage.getItem(SAVE_KEY), 'старт');
+// 💾 автозапис: записва всяка минута и при затваряне; на всеки 5 минути пази и резервно копие (🕒 Автозаписи)
+if (!AUTOTEST) {
+  let mins = 0;
+  setInterval(() => { if (!S || saveLock) return; save(); if (++mins % 5 === 0) backupNow('авто'); }, 60000);
+  addEventListener('pagehide', () => save());
+  // два раздела с една и съща игра: по-старият спира да записва, иначе би върнал прогреса назад
+  try {
+    const ch = new BroadcastChannel('stroi-tabs');
+    ch.onmessage = e => { if (e.data?.hello === SAVE_KEY && !saveLock) { save(); saveLock = true; modal('⚠️ Играта е отворена в друг раздел', 'За да не се загуби прогресът, този раздел спря да записва. Играй в новия раздел — или презареди този (тогава другият спира).', [['🔄 Презареди', () => location.reload()]]); } };
+    ch.postMessage({ hello: SAVE_KEY });
+  } catch { }
+}
 if (AUTOTEST) {
   const at = sessionStorage.getItem('stroiAT');
   if (at) { sessionStorage.removeItem('stroiAT'); sessionStorage.removeItem('stroiEnter'); S = JSON.parse(at); enterCity(); } else newGame(params.get('city') || 'sofia');
