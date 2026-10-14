@@ -4336,7 +4336,7 @@ function refreshLandmarks() {
     o.group.position.set(x0 + (p.xMax - x0) * (0.28 + i * 0.2), 0, p.z - 75); o.group.rotation.y = Math.PI;
     city.group.add(o.group); city.landmarks.push(o);
   });
-  const kinds = CITY_LANDMARKS[S.cityId]; if (!kinds || !city.lots) return;
+  const kinds = CITY_LANDMARKS[S.cityId] && [...CITY_LANDMARKS[S.cityId], ...(city.bigFail || [])]; if (!kinds || !city.lots) return;
   S.landmarks = S.landmarks || {}; const mem = S.landmarks[S.cityId] = S.landmarks[S.cityId] || {};
   const used = [];
   // площадът на главната забележителност: 2×2 парцела в центъра, улиците между тях стават площад
@@ -4411,7 +4411,7 @@ function mineGroup(site, W0, D0, near) {   // W0×D0 — за големите �
   const taken = new Set([...others, ...Object.values(S.tenderLots4 || {}).flat(), ...Object.values(S.tenderLots || {}), ...Object.values(S.landmarks?.[S.cityId] || {}).flat(), ...(S.parks || [])].map(Number));
   const centre = new Set((city.center || []).map(l => l.id)), ctr = city.center ? city.center[12] : city.hq, zr = { center: 0, mid: 1, outer: 2 };
   let built = false;   // първо празните парцели; ако няма 2×2 — и застроените (сградите се махат)
-  const free = l => l && !l.fresh && l !== city.hq && !centre.has(l.id) && !taken.has(l.id) && (!l.busy || l.busy === 'mine') && (built || !l.built);
+  const free = l => l && (near || !l.fresh) && l !== city.hq && !centre.has(l.id) && !taken.has(l.id) && (!l.busy || l.busy === 'mine') && (built || !l.built);   // забележителностите — и в купените (празни) квартали
   const dist = l => Math.hypot(l.x + 1.5 * TILE * (W - 1) - ctr.x, l.z + 1.5 * TILE * (D - 1) - ctr.z);   // до центъра на цялата зона
   for (built of near ? [true] : [false, true]) {
   const cands = city.lots.filter(free).sort(near ? (a, b) => dist(a) - dist(b) : (a, b) => (zr[b.zone] - zr[a.zone]) || Math.hypot(b.x - ctr.x, b.z - ctr.z) - Math.hypot(a.x - ctr.x, a.z - ctr.z));   // забележителностите — плътно до центъра; добивът — най-далеч
@@ -4429,13 +4429,13 @@ function refreshMines3D() {
   city.mine3D = {}; city.noRoadM = new Set();
   // големите забележителности (МГУ…) — в собствена зона W×D парцела встрани; пазят парцелите си като площадките за добив
   for (const o of city.bigLm || []) city.group.remove(o.group);
-  city.landmarks = (city.landmarks || []).filter(o => !o.big); city.bigLm = [];
+  city.landmarks = (city.landmarks || []).filter(o => !o.big); city.bigLm = []; city.bigFail = [];
   for (const [kind, W0, D0, asp = 1, turn = 0, alt] of BIG_LANDMARKS[S.cityId] || []) {
     S.bigLm = S.bigLm || {}; const site = S.bigLm[S.cityId + ':' + kind] = S.bigLm[S.cityId + ':' + kind] || { kind };
     if (!site.near) { site.lots = null; site.near = 1; }   // старите записи (зона в покрайнините) — местят се до центъра
     let W = W0, D = D0, grp = mineGroup(site, W, D, true);
     if (!grp && alt) { [W, D] = alt; grp = mineGroup(site, W, D, true); }   // малък град — по-малката зона
-    if (!grp) continue;
+    if (!grp) { city.bigFail.push(kind); continue; }   // никъде няма място — стои на 1 парцел до площада (refreshLandmarks), не изчезва
     const [l0] = grp, x = tx(3 * l0.bi + 1.5 * W), z = tx(3 * l0.bj + 1.5 * D);
     for (const lot of grp) { if (lot.obj || lot.built) clearLot(lot); for (const tr of lot.trees || []) city.group.remove(tr); lot.trees = []; lot.busy = 'mine'; }
     for (let a = 1; a < W; a++) for (let j = 3 * l0.bj + 1; j <= 3 * (l0.bj + D) - 1; j++) city.noRoadM.add(3 * (l0.bi + a) + ',' + j);
