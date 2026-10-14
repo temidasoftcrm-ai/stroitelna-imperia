@@ -87,7 +87,7 @@ export function createBankrupt(deps) {
     const S = deps.S(), b = st(); b.over = true; deps.save(); banner();
     deps.modal('💀 Фирмата фалира окончателно', `<img src="assets/ui/bankrupt.webp" alt="" onerror="this.remove()" style="display:block;width:100%;max-width:300px;max-height:300px;object-fit:contain;margin:0 auto 8px">${sold.length ? `Синдикът продаде всичко, което можа:<br>${sold.map(x => '• ' + x).join('<br>')}<br><br>` : ''}
       Пак остават <b style="color:var(--bad)">${f(-E().s.money)} €</b> дълг. Империята приключи на ден ${S.day}${deps.playDays ? ` (${deps.playDays()})` : ''}.<br><br>
-      Можеш да започнеш отначало или да заредиш по-стар запис от „💾 Записи“.`, [['💾 Записи', () => deps.openSaves()], ['🔄 Нова игра', () => deps.newGame()]]);
+      Можеш да започнеш отначало или да заредиш по-стар запис от „💾 Записи“.`, [['💾 Записи', () => deps.openSaves()], ['🔄 Нова игра', () => deps.newGame()]], { noClose: true });
   }
 
   // ---- всеки ден (след сметките на деня)

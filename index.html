@@ -156,6 +156,14 @@
   #mapSvg .city text { font-size:calc(10px * var(--ls, 1)); stroke-width:calc(3px * var(--ls, 1)); }
   #mapSvg g.city.lbl.lh { display:none; }   /* скрит надпис (няма място / далечен изглед) — показва се при посочване */
   #mapSvg g.city.lbl.lh.hov { display:inline; }
+  /* 🔦 избран град: връзките му светят, останалото избледнява */
+  #mapSvg.sel g[class^="lay-"] > :is(line, polyline, path, g:not([id])):not(.on), #mapSvg.sel #trainLayer > :not(.on) { opacity:.13; }
+  #mapSvg.sel g[class^="lay-"] > .on { filter:drop-shadow(0 0 2px #ffe082) drop-shadow(0 0 4px #ffb300); }
+  #mapSvg.sel g.city:not(.on) { opacity:.35; }
+  #mapSvg.sel g.resort { opacity:.35; }
+  #mapSelChip { position:absolute; left:72px; bottom:62px; z-index:3; background:#18202cee; border:1px solid var(--acc); border-radius:12px; padding:6px 10px; font-size:13px; color:var(--txt); display:flex; gap:8px; align-items:center; max-width:calc(100vw - 100px); box-shadow:0 4px 14px #0006; }
+  #mapSelChip span { color:var(--mut); }
+  #mapSelChip button { border:0; background:none; color:var(--txt); font-size:15px; cursor:pointer; padding:0 2px; }
   #mapSvg:not(.mid) g.resort text + text { display:none; }   /* курортите отдалеч — само символ; името — при посочване */
   #mapSvg g.resort:hover text + text { display:inline; }
   #mapSvg .city.here circle:not(.hit), #mapSvg .city.here polygon.gstar { filter:drop-shadow(0 0 2px #ffb300) drop-shadow(0 0 6px #ffb300); }
@@ -181,7 +189,9 @@
   /* модален прозорец */
   #modal { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:10; padding:16px; }
   #modal .box { max-height:90vh; overflow-y:auto; background:#18202c; border:1px solid var(--line); border-radius:16px; padding:22px; max-width:560px; width:100%; display:flex; flex-direction:column; gap:12px; }
-  #modal h2 { font-size:20px; }
+  #modal h2 { font-size:20px; padding-right:40px; }
+  #modal .box > .mx { position:sticky; top:-10px; align-self:flex-end; margin:-10px -8px -50px 0; width:36px; height:36px; flex:0 0 36px; border-radius:50%; border:1px solid var(--line); background:#0f141ce6; color:var(--txt); font-size:17px; line-height:1; cursor:pointer; z-index:3; }
+  #modal .box > .mx:hover { background:var(--acc); color:#1a1a1a; }
   #modal p { color:var(--mut); line-height:1.5; font-size:14px; }
   #modal .actions { display:flex; gap:10px; justify-content:flex-end; margin-top:6px; flex-wrap:wrap; }
   #modal .actions button { flex:1 1 auto; }

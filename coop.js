@@ -2,14 +2,19 @@
 // а двамата партньори си помагат през облака (Supabase, public.coop_* функции — миграция 20261014070000_coop.sql):
 //   • пари — подарък или заем (заемът се предлага, партньорът приема; връща се до срока, иначе играта сама го връща);
 //   • техника и материали — от твоя град/склад в неговия;
-//   • общи големи поръчки — и двамата влагат, след срока всеки получава вложеното × множител (ако и двамата са вложили ≥ 20%);
-//   • партньорът на картата — градовете му са с розов пръстен и името му; вижда се дали е онлайн.
+//   • общи големи поръчки — и двамата влагат, след срока всеки получава вложеното + половината от печалбата (ако и двамата са вложили ≥ 20%);
+//   • партньорът на картата — градовете му са със син пръстен (оранжев, ако твоята марка е синя) и името му; вижда се дали е онлайн;
+//   • холдинг (част 3, миграция 20261014100000_coop3.sql): 40% от печалбата на поръчките, спасяване от фалит на 10-ия ден на минус,
+//     дивидент 30% в края на всеки игрален месец, акции на борсата (след одобрение и от двамата). Общите строежи са лилави.
 // Сървърът е „пощата“: всяка пратка се записва веднъж (req_id) и се получава веднъж (claim). Изпращачът първо вади
 // парите/техниката от своята игра и пази заявката в localStorage, докато сървърът я потвърди — при срив се праща пак
 // със същия req_id (без двойно изпращане); при отказ от сървъра се връща обратно.
 import { UNIT_TYPES, MATERIALS } from './economy.js';
 
-const PCOL = '#ff4fa3';   // цветът на партньора на картата (различен от марките на фирмите)
+let PCOL = '#2f8cff';   // цветът на партньора: син, а ако твоята марка е синя — оранжев (pickCol)
+const JCOL = '#b45cff';   // общ строеж — лилав
+const ORDER_SHARE = 0.4, PROFIT_OF = 0.67;   // 40% от печалбата на поръчката (≈ сумата без материалите, ~⅓) → холдинга
+const hueOf = hex => { const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return null; const n = parseInt(m[1], 16), r = (n >> 16) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), c = mx - mn; if (c < 0.15) return null; const h = mx === r ? ((g - b) / c) % 6 : mx === g ? (b - r) / c + 2 : (r - g) / c + 4; return (h * 60 + 360) % 360; };
 const PEND = 'stroi-coop-pending', NAME = 'stroi-coop-name', POLL = 10000, SNAP_EVERY = 20000;
 const AUTOTEST = /[?&]autotest/.test(location.search);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -22,7 +27,7 @@ export function createCoop(d) {
   // облакът се зарежда отделно: ако няма интернет, самостоятелната игра работи както винаги
   let cloud = { user: () => null, sb: null }, sb = null;
   import('./cloud.js').then(m => { cloud = m.cloud; sb = cloud.sb; sb.auth.onAuthStateChange(() => setTimeout(tick, 300)); tick(); }).catch(() => {});
-  let st2 = null, tab = 'help', lastMarks = 0, st = null, open = false, busy = false, lastSnap = 0, user = null, applying = false;
+  let st3 = null, st2 = null, tab = 'help', lastMarks = 0, st = null, open = false, busy = false, lastSnap = 0, user = null, applying = false;
   const E = () => d.econ(), f = n => d.fmt(n);
   const pend = () => { try { return JSON.parse(localStorage.getItem(PEND)) || []; } catch { return []; } };
   const setPend = a => { try { localStorage.setItem(PEND, JSON.stringify(a)); } catch {} };
@@ -34,7 +39,7 @@ export function createCoop(d) {
       if (!sb) throw new Error('Няма връзка с облака.');
       let r; try { r = await sb.rpc(fn, args); } catch (e) { r = { error: e }; }
       if (!r.error) return r.data;
-      if (i >= tries || /not_authenticated|JWT|permission/i.test(r.error.message || '')) throw r.error;
+      if (i >= tries || /not_authenticated|JWT|permission|PGRST202|Could not find the function/i.test((r.error.message || '') + (r.error.code || ''))) throw r.error;
       await sleep(wait); wait = Math.min(6000, wait * 1.8);
     }
   }
@@ -60,7 +65,8 @@ export function createCoop(d) {
     try { localStorage.setItem(SITES, JSON.stringify(all)); } catch {}
     return all;
   }
-  // партньорът в моя 3D град: ако строи в същия град — розови пръстени и табелки на неговите парцели
+  function pickCol() { const h = hueOf(d.brand()?.col); PCOL = h != null && h >= 185 && h <= 265 ? '#ff8a1f' : '#2f8cff'; window.__coopCol = PCOL; }
+  // партньорът в моя 3D град: ако строи в същия град — пръстени в неговия цвят и табелки на парцелите му
   function markPartner() {
     if (!d.ready()) return;
     const P = st?.partner?.snap, id = d.cityId();
@@ -72,7 +78,10 @@ export function createCoop(d) {
   // op: { fn, args, refund: { money } | { unit } | { mat, qty }, what }
   async function runOp(op) {
     let r;
-    try { r = await rpc(op.fn, op.args); } catch (e) { return false; }   // остава в опашката — ще опита пак
+    try { r = await rpc(op.fn, op.args); } catch (e) {
+      if (!/PGRST202|Could not find the function/i.test((e?.message || '') + (e?.code || ''))) return false;   // остава в опашката — ще опита пак
+      r = { ok: false, msg: 'Сървърът още не поддържа това — парите се връщат.' };   // старият сървър (без новата функция) → връщане, не вечно чакане
+    }
     setPend(pend().filter(x => x.args.p_req !== op.args.p_req));
     if (r && r.ok === false) { refund(op.refund, r.msg); return r; }
     return r;
@@ -115,7 +124,7 @@ export function createCoop(d) {
           d.toast(`🤝 ${pn} ти прати ${m.ico} ${D.qty} ${m.unit} ${m.nm.toLowerCase()}.`, 'good');
         } else if (+D.amount > 0) {
           const amt = Math.round(+D.amount);
-          const why = { gift: `🎁 Подарък от ${pn}`, loan: `💸 Заем от ${pn} — върни ${f(D.owed)} € до ${D.hours} ч`, repay: `💸 ${pn} върна по заема`, refund: r.note || 'Върнати пари', mega: 'Обща поръчка', rent: `🏢 ${pn} плати наем за ${UNIT_TYPES[D.type]?.nm.toLowerCase() || 'техника'}`, vault: '🏦 От общата касичка' }[r.kind] || 'Партньор';
+          const why = { gift: `🎁 Подарък от ${pn}`, loan: `💸 Заем от ${pn} — върни ${f(D.owed)} € до ${D.hours} ч`, repay: `💸 ${pn} върна по заема`, refund: r.note || 'Върнати пари', mega: 'Обща поръчка', rent: `🏢 ${pn} плати наем за ${UNIT_TYPES[D.type]?.nm.toLowerCase() || 'техника'}`, vault: r.note || '🏦 От общата касичка' }[r.kind] || 'Партньор';
           E().earn(amt, 'партньор', why.replace(/^[^\wА-я]+\s*/, ''));
           d.toast(`${why}: +${f(amt)} €`, 'good');
         }
@@ -159,12 +168,17 @@ export function createCoop(d) {
     try {
       if (d.ready() && Date.now() - lastSnap > SNAP_EVERY) { lastSnap = Date.now(); await rpc('coop_snap', { p_data: snapshot() }, 1); }
       const r = await rpc('coop_status', {}, 1);
-      const before = JSON.stringify([st?.partner?.snap?.cities || [], st2?.joints || [], window.__coopShared?.v]);
+      pickCol();
+      const before = JSON.stringify([st?.partner?.snap?.cities || [], st2?.joints || [], window.__coopShared?.v, PCOL]);
       st = r && r.ok ? r : st;
       const r2 = st?.pair?.status === 'active' ? await rpc('coop_status2', {}, 1) : null;
       st2 = r2 && r2.ok && r2.active ? r2 : null;
+      const r3 = st2 ? await rpc('coop_status3', {}, 1).catch(() => null) : null;
+      st3 = r3 && r3.ok && r3.active ? r3 : null;
       shareMap();
-      if (JSON.stringify([st?.partner?.snap?.cities || [], st2?.joints || [], window.__coopShared?.v]) !== before) d.drawMap();
+      const J = (st2?.joints || []).filter(j => j.status === 'active');
+      window.__coopJoint = st2 ? { hw: new Set(J.filter(j => j.kind === 'hw').map(j => j.ref)), rail: new Set(J.filter(j => j.kind === 'rail').map(j => j.ref)) } : null;
+      if (JSON.stringify([st?.partner?.snap?.cities || [], st2?.joints || [], window.__coopShared?.v, PCOL]) !== before) d.drawMap();
     } catch { }
     await receive();
     await autoRepay();
@@ -214,22 +228,47 @@ export function createCoop(d) {
   window.__coopDay = () => {
     const sum = [...activeJoints('hw'), ...activeJoints('rail')].filter(j => j.done).reduce((a, j) => a + j.km * (j.kind === 'hw' ? 3 : 8), 0);
     if (sum > 0) E().earn(sum, 'партньор', `🤝 Общи магистрали и влакове с ${partnerName()}`);
+    holdDay();
+  };
+  // 🏦 холдингът всеки игрален ден: спасяване от фалит (10-ия ден на минус) и дивидент в края на месеца
+  function holdDay() {
+    const S = d.S(), b = S?.bust; if (!S || !st2) return;
+    if (b && b.red === 0) delete b.coopBail;
+    if (b && b.red >= 10 && E().money < 0 && !b.coopBail) {
+      b.coopBail = true; const debt = Math.ceil(-E().money);
+      rpc('coop_vault2', { p_req: uid(), p_amount: -debt, p_kind: 'bailout' }, 2).then(r => {
+        if (r?.ok) d.toast(`🏦 Холдингът покрива дълга ти: ${f(-r.amount)} € — идват след миг. ${partnerName()} е уведомен.`, 'good');
+        else { b.coopBail = false; if (r?.err === 'no_money') d.toast('🏦 Холдингът е празен — не може да покрие дълга. Помоли партньора (🆘).', 'bad'); }
+      }).catch(() => { b.coopBail = false; });
+    }
+    if (S.day % 30 === 0) rpc('coop_dividend', {}, 1).then(r => {
+      if (r?.ok && r.paid > 0) d.toast(`🏦 Месечен дивидент: холдингът раздаде ${f(r.paid)} € (30% от печалбата) — по ${f(r.each)} € на двамата${r.investors ? `, ${f(r.investors)} € на акционерите` : ''}.`, 'good');
+    }).catch(() => {});
+  }
+  // 💼 поръчка, платена в моята игра → 40% от печалбата отиват в общия холдинг (вика го game.js при прибирането на парите)
+  window.__coopOrder = (amount, title) => {
+    if (!st2 || !(amount > 0)) return;
+    const share = Math.round(amount * PROFIT_OF * ORDER_SHARE);
+    if (share <= 0) return;
+    E().spend(share, 'партньор', `🏦 40% от печалбата → холдинга: ${title}`);
+    queue({ fn: 'coop_vault2', args: { p_req: uid(), p_amount: share, p_kind: 'order' }, refund: { money: share } })
+      .then(r => { if (r?.ok) d.toast(`🏦 ${f(share)} € (40% от печалбата) → общия холдинг`, ''); });
   };
 
-  // ── партньорът на картата: розов пръстен около градовете му, звезда и име при централата ──
+  // ── партньорът на картата: пръстен в неговия цвят около градовете му, звезда и име при централата ──
   window.__coopMap = (proj, k, cityById) => {
     const P = st?.partner?.snap; if (!P || !P.cities) return '';
     let h = '<g class="coop-map" style="pointer-events:none">';
     const segs = d.segs();
-    for (const j of st2?.joints || []) {   // общите участъци/линии: розова пунктирна линия
+    for (const j of st2?.joints || []) {   // общите участъци/линии: лилава линия (пунктир, докато не са готови)
       const [ia, ib] = j.kind === 'hw' ? (() => { const s = segs.find(q => q.id === j.ref); return s ? [s.a, s.b] : []; })() : j.ref.split('|');
       const ca = ia && cityById(ia), cb = ib && cityById(ib); if (!ca || !cb) continue;
       const [x1, y1] = proj(ca.lon, ca.lat), [x2, y2] = proj(cb.lon, cb.lat);
-      h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${PCOL}" stroke-width="${(j.done ? 4 : 2.6) * k}" stroke-dasharray="${j.done ? '' : `${5 * k} ${4 * k}`}" stroke-linecap="round" opacity="${j.status === 'active' ? 0.9 : 0.5}"/>`;
+      h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${JCOL}" stroke-width="${(j.done ? 3 : 2.2) * k}" stroke-dasharray="${j.done ? '' : `${5 * k} ${4 * k}`}" stroke-linecap="round" opacity="${j.status === 'active' ? 0.9 : 0.5}"/>`;
     }
     for (const id of P.cities) {
       const c = cityById(id); if (!c) continue;
-      const [x, y] = proj(c.lon, c.lat), r = 9 * k, hq = id === P.hq;
+      const [x, y] = proj(c.lon, c.lat), r = 6 * k, hq = id === P.hq;
       h += `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${PCOL}" stroke-width="${2.6 * k}" stroke-dasharray="${hq ? '' : `${3 * k} ${2 * k}`}" opacity=".95"/>`;
       if (hq) h += `<text x="${x}" y="${y - r - 4 * k}" text-anchor="middle" font-size="${11 * k}" font-weight="800" fill="${PCOL}" stroke="#0008" stroke-width="${2.4 * k}" paint-order="stroke">🤝 ${esc(P.name)}${st.partner.online ? ' 🟢' : ''}</text>`;
     }
@@ -286,7 +325,7 @@ export function createCoop(d) {
     if (!st) { h += '<p class="mut">Зареждам…</p>'; el.innerHTML = h; bind(el); return; }
     const P = st.partner;
     if (!st.pair) {
-      h += `<p class="mut">Всеки играе своята игра — своята карта и своето темпо. Партньорите си помагат: пари (подарък или заем), техника, материали и общи големи поръчки. Градовете на партньора се виждат на картата ти в <b style="color:${PCOL}">розово</b>.</p>
+      h += `<p class="mut">Всеки играе своята игра — своята карта и своето темпо. Партньорите си помагат: пари (подарък или заем), техника, материали и общи големи поръчки. Градовете на партньора се виждат на картата ти в <b style="color:${PCOL}">синьо</b>.</p>
         <div class="card"><b>Имаш код от приятел?</b><div class="row"><input id="cpCode" maxlength="6" placeholder="КОД" style="text-transform:uppercase;width:110px"><button class="btn" data-c="join">Свържи се</button></div></div>
         <div class="card"><b>Или създай код и го дай на приятеля си</b><div class="row"><button class="btn2" data-c="create">🔑 Създай код</button></div></div>`;
     } else if (st.pair.status === 'waiting') {
@@ -298,7 +337,7 @@ export function createCoop(d) {
       h += `<div class="card" style="border-color:${PCOL}">`;
       h += s ? `<div style="font-size:16px;font-weight:800"><span style="color:${PCOL}">${esc(s.ico)} ${esc(s.name)}</span> ${P.online ? '<span class="ok" style="font-size:13px">🟢 онлайн</span>' : `<span class="mut">⚪ ${P.at ? ago(P.at) : ''}</span>`}</div>
         <div class="mut">Ден ${s.day} · ${'★'.repeat(Math.round(s.rep))}${'☆'.repeat(5 - Math.round(s.rep))} · офис ниво ${s.office} · пари ${f(s.money)} € · стойност ${f(s.worth)} €${s.loan ? ` · кредит ${f(s.loan)} €` : ''}<br>
-        Градове (${s.cities.length}): ${s.cities.slice(0, 12).map(id => esc(d.cityName(id)) + (id === s.hq ? ' ★' : '')).join(', ')}${s.cities.length > 12 ? '…' : ''} — <span style="color:${PCOL}">розови на картата ти</span>${(() => { const both = s.cities.filter(id => d.ownedCities().includes(id)); return both.length ? `<br>🏙️ Строите заедно в: <b>${both.map(id => esc(d.cityName(id))).join(', ')}</b> — в 3D града неговите обекти са с розов пръстен.` : ''; })()}</div>`
+        Градове (${s.cities.length}): ${s.cities.slice(0, 12).map(id => esc(d.cityName(id)) + (id === s.hq ? ' ★' : '')).join(', ')}${s.cities.length > 12 ? '…' : ''} — <span style="color:${PCOL}">в този цвят на картата ти</span>${(() => { const both = s.cities.filter(id => d.ownedCities().includes(id)); return both.length ? `<br>🏙️ Строите заедно в: <b>${both.map(id => esc(d.cityName(id))).join(', ')}</b> — в 3D града неговите обекти са с пръстен в неговия цвят.` : ''; })()}</div>`
         : '<div class="mut">Партньорът още не е отворил играта след свързването.</div>';
       h += `</div><div class="row"><span class="mut">Името ти за партньора:</span><input id="cpName" value="${esc(myName())}" maxlength="24"><button class="btn2" data-c="name">Запази</button></div>`;
       const nU = unread();
@@ -340,7 +379,7 @@ export function createCoop(d) {
   // ── раздел „Строим заедно“: общи участъци/линии, наем, изненада, общи поръчки ──
   function buildHtml() {
     const S = d.S(), P = st.partner?.snap || {}, pn = esc(partnerName());
-    let h = `<div class="mut">Изберете участък от магистрала или жп линия и го строите <b>заедно</b> — картата ви е обща. Докато и двамата работите по участъка, всеки строи <b>30% по-бързо</b>; щом единият го завърши, готов е и при другия. Тогава всеки получава еднократен бонус (магистрала 1 500 €/км, влак 800 €/км) и всеки ден допълнителен доход (3 €/км и 8 €/км). На картата е с розова линия.</div>`;
+    let h = `<div class="mut">Изберете участък от магистрала или жп линия и го строите <b>заедно</b> — картата ви е обща. Докато и двамата работите по участъка, всеки строи <b>30% по-бързо</b>; щом единият го завърши, готов е и при другия. Тогава всеки получава еднократен бонус (магистрала 1 500 €/км, влак 800 €/км) и всеки ден допълнителен доход (3 €/км и 8 €/км). На картата е с лилава линия.</div>`;
     const J = st2?.joints || [];
     if (J.length) h += `<div class="card">${J.map(j => { const ico = j.kind === 'hw' ? '🛣️' : '🚆';
       let b = '';
@@ -368,7 +407,7 @@ export function createCoop(d) {
       return `<div class="led"><span>${u.ico || ''} ${u.nm || r.type} ${r.out ? '→' : '←'} · ${r.hours} ч · ${r.price ? f(r.price) + ' €' : 'помощ'}<br><span class="mut">${s_}</span></span><span class="row" style="margin:0">${b}</span></div>`; }).join('')}</div>`;
     // изненада в общ град
     const shared = (P.cities || []).includes(S.cityId);
-    h += `<h3>🎁 Изненада в общ град</h3>` + (shared ? `<div class="mut">Остави табела (и подарък, ако искаш) на парцел в ${esc(d.cityName(S.cityId))} — ${pn} ще види розова кутия, когато влезе в града, и ще я отвори.</div>
+    h += `<h3>🎁 Изненада в общ град</h3>` + (shared ? `<div class="mut">Остави табела (и подарък, ако искаш) на парцел в ${esc(d.cityName(S.cityId))} — ${pn} ще види кутия-подарък, когато влезе в града, и ще я отвори.</div>
       <div class="row"><input id="cpST" maxlength="60" placeholder="Текст на табелата" style="width:200px"><input id="cpSA" inputmode="numeric" placeholder="подарък € (по желание)" style="width:150px"><button class="btn2" data-c="surp">🎁 Остави тук</button></div>`
       : `<div class="mut">Отиди в град, в който и ${pn} има фирма${(P.cities || []).length ? ` (${(P.cities || []).slice(0, 5).map(id => esc(d.cityName(id))).join(', ')})` : ''}, за да оставиш изненада.</div>`);
     const SM = st2?.surprises_mine || [];
@@ -390,8 +429,24 @@ export function createCoop(d) {
       <div style="font-size:24px;font-weight:900;color:var(--acc);margin:6px 0">${f(V.balance)} €</div>
       <div class="row"><input id="cpV" inputmode="numeric" placeholder="сума в €"><button class="btn" data-c="vput">⬆️ Внеси</button><button class="btn2" data-c="vtake">⬇️ Изтегли</button></div>
       <div class="row"><input id="cpVN" maxlength="40" placeholder="Име на холдинга" value="${esc(V.name || '')}" style="width:200px"><button class="btn2" data-c="vname">Запази името</button></div>
-      ${(V.log || []).map(l => `<div class="led"><span>${l.me ? 'Ти' : esc(partnerName())} ${l.amount > 0 ? 'внесе' : 'изтегли'}</span><span class="${l.amount > 0 ? 'ok' : 'bad'}">${l.amount > 0 ? '+' : ''}${f(l.amount)} € · ${ago(l.at)}</span></div>`).join('')}</div>`;
+      ${holdInfo()}
+      ${(st3?.log || V.log || []).map(l => `<div class="led"><span>${logTxt(l)}</span><span class="${l.amount > 0 ? 'ok' : 'bad'}">${l.amount > 0 ? '+' : ''}${f(l.amount)} € · ${ago(l.at)}</span></div>`).join('')}</div>`;
     h += `<h3>🏆 Най-силен тандем</h3><div class="mut">Стойността на двете фирми + касичката.</div><div class="card">${T.map((x, i) => `<div class="led" style="${x.me ? `color:${PCOL};font-weight:800` : ''}"><span>${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${esc(x.name)}${x.me ? ' (вие)' : ''}</span><b>${f(x.worth)} €</b></div>`).join('') || '<div class="mut">Още няма тандеми.</div>'}</div>`;
+    return h;
+  }
+  const KIND_TXT = { order: '40% от поръчка', ipo: 'от акциите на борсата', dividend: 'дивидент (30%)', bailout: 'покри дълг' };
+  const logTxt = l => { const who = l.kind === 'ipo' ? '📈 Инвеститори' : l.me ? 'Ти' : esc(partnerName());
+    return l.kind === 'dividend' ? '🏦 Дивидент за двамата' : l.kind === 'bailout' ? `🛟 Холдингът спаси ${l.me ? 'теб' : esc(partnerName())}` : `${who} · ${l.kind && KIND_TXT[l.kind] ? KIND_TXT[l.kind] : l.amount > 0 ? 'внесе' : 'изтегли'}`; };
+  function holdInfo() {
+    if (!st3) return '';
+    const I = st3.ipo, pp = st3.public_pct || 0;
+    let h = `<div class="mut" style="margin:4px 0">💼 От всяка поръчка на двама ви 40% от печалбата идват тук · 🛟 на 10-ия ден на минус холдингът покрива дълга · 📅 в края на всеки игрален месец раздава 30% от печалбата (сега за месеца: <b>${f(st3.month_profit)} €</b>)${pp ? ` · 📈 ${pp}% от холдинга е на борсата` : ''}.</div>`;
+    if (!d.stocksOpen?.()) return h + '<div class="mut">📈 Акции на борсата — щом отключиш борсата (ниво 7).</div>';
+    if (I && I.status === 'proposed') h += `<div class="card">📈 ${I.mine ? 'Предложи' : `${esc(partnerName())} предлага`} холдингът да пусне <b>${I.pct}%</b> акции за <b>${I.hours / 24} д.</b>
+      <div class="row">${I.mine ? '<button class="btn2" data-c="ipo:cancel">Оттегли</button>' : '<button class="btn" data-c="ipo:accept">✅ Одобри</button><button class="btn2" data-c="ipo:decline">Откажи</button>'}</div></div>`;
+    else if (I && I.status === 'active') h += `<div class="card">📈 Акциите се продават: <b>${I.pct}%</b> · събрани ${f(I.raised)} от ~${f(I.target)} € · остават ${left(I.ends_at)}<div class="bar" style="margin-top:6px"><i style="width:${Math.min(100, I.raised / Math.max(1, I.target) * 100)}%;background:var(--acc)"></i></div></div>`;
+    else if (pp < 49) h += `<div class="card">📈 <b>Пусни акции на борсата</b> — инвеститорите плащат постепенно през срока дял × касичката × 1.5. Партньорът трябва да одобри. Акционерите после получават своя дял от дивидента.
+      <div class="row"><select id="cpIP">${[5, 10, 20, 30].filter(x => pp + x <= 49).map(x => `<option value="${x}">${x}%</option>`).join('')}</select><select id="cpIH"><option value="24">за 1 ден</option><option value="72">за 3 дни</option><option value="168">за 7 дни</option></select><button class="btn" data-c="ipo:propose">📈 Предложи</button></div></div>`;
     return h;
   }
   const QUICK = ['Трябва ми кран! 🏗️', 'Може ли малко пари? 💶', 'Да строим заедно? 🛣️', 'Благодаря! 💖'];
@@ -405,7 +460,7 @@ export function createCoop(d) {
   }
   function megaHtml() {
     let h = '';
-      h += `<h3>🏗️ Общи големи поръчки</h3><div class="mut">Започва единият, влагат и двамата. Щом се събере сумата, строежът трае определено време (реално), после всеки получава вложеното × множителя. Бонусът важи, ако и двамата са вложили поне 20%.</div>`;
+      h += `<h3>🏗️ Общи големи поръчки</h3><div class="mut">Започва единият, влагат и двамата. Щом се събере сумата, строежът трае определено време (реално), после всеки получава вложеното + половината от печалбата (сумата × множителя − сумата). Бонусът важи, ако и двамата са вложили поне 20%.</div>`;
       const busyKeys = new Set(st.megas.filter(m => m.status !== 'done').map(m => m.key));
       for (const m of st.megas) {
         const t = st.mega_types.find(x => x.key === m.key); if (!t) continue;
@@ -414,9 +469,11 @@ export function createCoop(d) {
           <div class="bar" style="margin:6px 0"><i style="width:${pm}%;background:var(--acc)"></i><i style="width:${pt}%;background:${PCOL}"></i></div>
           <div class="mut">Ти: ${f(m.mine)} € (${pm}%) · ${esc(partnerName())}: ${f(m.theirs)} € (${pt}%) · събрани ${f(m.total)} от ${f(t.cost)} €</div>
           ${m.status === 'forming' ? `<div class="row"><input data-mp="${m.id}" inputmode="numeric" placeholder="сума в €"><button class="btn" data-c="put:${m.id}">Вложи</button></div>`
-            : m.status === 'building' ? `<div class="mut" style="margin-top:4px">🏗️ Строи се — готово след <b>${left(m.ends_at)}</b>. Награда за теб: ~${f(Math.floor(m.mine * (m.mine >= t.cost * 0.2 && m.theirs >= t.cost * 0.2 ? t.mult : 1)))} €</div>`
+            : m.status === 'building' ? `<div class="mut" style="margin-top:4px">🏗️ Строи се — готово след <b>${left(m.ends_at)}</b>. Награда за теб: ~${f(m.mine >= t.cost * 0.2 && m.theirs >= t.cost * 0.2 ? m.mine + Math.floor(m.total * (t.mult - 1) / 2) : m.mine)} €</div>`
             : `<div class="row"><button class="btn" data-c="claim:${m.id}">🏆 Вземи наградата</button></div>`}</div>`;
       }
+      for (const m of (st3?.megas_done || []).filter(m => m.claimed)) h += `<div class="card" style="border-color:var(--ok)"><div style="font-weight:800">✅ Изпълнена поръчка: ${m.ico} ${esc(m.nm)}</div>
+        <div class="mut">Обща сума ${f(m.total)} € · ти получи <b class="ok">${f(m.mine)} €</b> · ${esc(partnerName())} — <b>${f(m.theirs)} €</b> (вложеното + по равно от печалбата)</div></div>`;
       h += `<div class="card">${st.mega_types.map(t => `<div class="led"><span>${t.ico} <b>${esc(t.nm)}</b> · ${f(t.cost)} € · ${t.minutes < 60 ? t.minutes + ' мин' : t.minutes / 60 + ' ч'} · ×${t.mult}<br><span class="mut">${esc(t.descr)}</span></span>${busyKeys.has(t.key) ? '<span class="mut">в ход</span>' : `<button class="btn2" data-c="mega:${t.key}">Започни</button>`}</div>`).join('')}</div>`;
     return h;
   }
@@ -464,10 +521,12 @@ export function createCoop(d) {
       const r = await queue({ fn: 'coop_vault', args: { p_req: uid(), p_amount: n }, refund: { money: n } }); if (r?.ok) d.toast(`🏦 Внесе ${f(n)} €.`, 'good'); d.renderPanel(); return; }
     if (c === 'vtake') { const n = Math.round(num(el.querySelector('#cpV').value)); if (!(n > 0)) return d.toast('Въведи сума.', 'bad');
       if (say(await rpc('coop_vault', { p_req: uid(), p_amount: -n }))) d.toast(`🏦 Изтегли ${f(n)} € — идват след миг.`, 'good'); return; }
+    if (c === 'ipo') { const r = await rpc('coop_ipo', a === 'propose' ? { p_action: 'propose', p_pct: +el.querySelector('#cpIP').value, p_hours: +el.querySelector('#cpIH').value } : { p_action: a });
+      if (say(r)) d.toast({ propose: '📈 Предложението е пратено — партньорът трябва да го одобри.', accept: '📈 Акциите на холдинга тръгнаха на борсата!', decline: 'Отказано.', cancel: 'Оттеглено.' }[a] || 'Готово.', 'good'); return; }
     if (c === 'vname') { if (say(await rpc('coop_vault_name', { p_name: el.querySelector('#cpVN').value }))) d.toast('Името е запазено.'); return; }
     if (c === 'say' || c === 'quick') { const txt = c === 'quick' ? QUICK[+a] : el.querySelector('#cpMsg').value; if (!txt) return; if (say(await rpc('coop_say', { p_text: txt }))) tab = 'chat'; return; }
     if (c === 'sos') { say(await rpc('coop_say', { p_text: `Трябва ми помощ! Имам ${f(E().money)} €${E().money < 0 ? ' (на минус!)' : ''}.`, p_sos: true })); d.toast('🆘 Сигналът е изпратен.', 'good'); return; }
-    if (c === 'join') { const r = await rpc('coop_join', { p_code: el.querySelector('#cpCode').value }); if (say(r)) d.toast('🤝 Свързани сте! Градовете на партньора ще се появят на картата ти в розово.', 'good'); return; }
+    if (c === 'join') { const r = await rpc('coop_join', { p_code: el.querySelector('#cpCode').value }); if (say(r)) d.toast('🤝 Свързани сте! Градовете на партньора ще се появят на картата ти в синьо.', 'good'); return; }
     if (c === 'leave') { d.modal('Прекрати партньорството?', 'Пратките, които вече са тръгнали, ще пристигнат. После ще можете да се свържете отново с нов код.', [['Не', null], ['Прекрати', async () => { await rpc('coop_leave'); await tick(); }]]); return; }
     if (c === 'name') { try { localStorage.setItem(NAME, el.querySelector('#cpName').value.trim().slice(0, 24)); } catch {} lastSnap = 0; d.toast('Името е запазено.'); return; }
     if (c === 'gift') { const n = amtIn(); if (!money(n)) return; E().spend(n, 'партньор', `🎁 Подарък за ${partnerName()}`);
@@ -490,7 +549,7 @@ export function createCoop(d) {
       if (r?.ok) d.toast(r.building ? '🏗️ Сумата е събрана — строежът започна!' : `Вложи ${f(r.put)} €.`, 'good'); d.renderPanel(); return; }
     if (c === 'claim') { const r = await rpc('coop_mega_claim', { p_mega: +a }); if (!say(r)) return;
       E().earn(r.reward, 'партньор', `${r.nm} — обща поръчка`); d.save(); d.renderPanel();
-      d.toast(`${r.ico} ${r.nm} е готов! +${f(r.reward)} €${r.fair ? '' : ' (без бонус — единият е вложил под 20%)'}`, 'good'); return; }
+      d.toast(`✅ Изпълнена поръчка: ${r.ico} ${r.nm}! +${f(r.reward)} €${r.fair ? ' (вложеното + половината от печалбата)' : ' (без печалба — единият е вложил под 20%)'}`, 'good'); return; }
   }
 
   if (!AUTOTEST) {

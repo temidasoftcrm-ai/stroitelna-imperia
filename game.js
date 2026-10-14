@@ -1700,6 +1700,7 @@ function collectCash(g) {
   if (g.userData.fly != null) return;
   g.userData.fly = 0;
   econ.earn(cash.amount, 'обект', `${cash.title} — ${cash.note}`);
+  try { window.__coopOrder?.(cash.amount, cash.title); } catch (e) { console.warn('coop order', e); }   // 🤝 40% от печалбата → общия холдинг
   S.cash.splice(S.cash.indexOf(cash), 1);
   SFXcash();
   toast(`💶 +${fmt(cash.amount)} € от „${cash.title}“`, 'good');
@@ -2818,7 +2819,8 @@ function keyCitiesMine() { const own = new Set(ownedCities()); return new Set(CO
   updateMapTrains(); updateMapPlanes(); updateMapShips();
   svg.classList.toggle('near', mapNear()); svg.classList.toggle('mid', mapZoom() >= 1.5);
   declutterLabels(svg);
-  svg.querySelectorAll('.city').forEach(g => g.onclick = () => clickCity(g.dataset.city));
+  svg.querySelectorAll('.city').forEach(g => g.onclick = () => { mapSel = g.dataset.city; applySel(); clickCity(g.dataset.city); });
+  applySel();
   svg.querySelectorAll('[data-resort]').forEach(g => g.onclick = () => resorts.open(g.dataset.resort));
 }
 // ---- степени на детайлност на картата: отдалеч — само големите градове, тънки линии, локомотиви без вагони; отблизо (mapNear) — всичко
@@ -2840,7 +2842,43 @@ function declutterLabels(svg) {
 }
 // посочен град → надписът му се показва, дори да е скрит
 { const svg = $('mapSvg'); let cur = null;
-  svg.addEventListener('pointerover', e => { const id = e.target.closest?.('.city')?.dataset.city || null; if (id === cur) return; svg.querySelectorAll('g.city.lbl.hov').forEach(g => g.classList.remove('hov')); cur = id; if (id) svg.querySelector(`g.city.lbl[data-city="${id}"]`)?.classList.add('hov'); }); }
+  svg.addEventListener('pointerover', e => { const id = e.target.closest?.('.city')?.dataset.city || null; if (id === cur) return; svg.querySelectorAll('g.city.lbl.hov').forEach(g => g.classList.remove('hov')); cur = id; if (id) svg.querySelector(`g.city.lbl[data-city="${id}"]`)?.classList.add('hov'); mapHov = id; applySel(); });
+  svg.addEventListener('click', e => { if (!e.target.closest?.('.city, .resort, #mapSelChip')) { mapSel = null; applySel(); } });   // натискане на празно място → без избор
+  addEventListener('keydown', e => { if (e.key === 'Escape' && mapSel && $('modal').classList.contains('hidden')) { mapSel = null; applySel(); } }); }
+// 🔦 избран (натиснат) или посочен град: неговите линии, магистрали, полети, морски линии и влакове светят, останалото избледнява;
+// съседите по тези връзки също светят. Разпознава връзките по крайните им точки (без промяна в чертането на всеки слой).
+let mapSel = null, mapHov = null;
+const selId = () => mapHov || mapSel;
+function applySel() {
+  const svg = $('mapSvg'), id = selId(), c = id && cityById(id);
+  svg.querySelectorAll('.on').forEach(e => e.classList.remove('on'));
+  svg.classList.toggle('sel', !!c);
+  let chip = $('mapSelChip');
+  if (!c) { chip?.remove(); return; }
+  const [cx, cy] = proj(c.lon, c.lat), tol = 7 * (mapWorld ? 3 : 1), near = (x, y) => Math.hypot(x - cx, y - cy) <= tol;
+  const ends = el => { let n;
+    if (el.tagName === 'line') n = ['x1', 'y1', 'x2', 'y2'].map(a => +el.getAttribute(a));
+    else { const t = (el.tagName === 'polyline' ? el.getAttribute('points') : el.getAttribute('d')) || ''; const v = t.match(/-?\d+(\.\d+)?/g); if (!v || v.length < 4 || (el.tagName === 'path' && !/^\s*M/.test(t))) return null; n = [+v[0], +v[1], +v[v.length - 2], +v[v.length - 1]]; }
+    return n.some(isNaN) ? null : [[n[0], n[1]], [n[2], n[3]]]; };
+  const other = [], cnt = { rail: 0, road: 0, air: 0, sea: 0 };
+  for (const lay of svg.querySelectorAll('g[class^="lay-"]')) {
+    const kind = lay.getAttribute('class').slice(4);
+    for (const top of lay.children) { if (top.id === 'trainLayer' || top.id === 'planeLayer' || top.id === 'shipLayer') continue;
+      const els = top.matches('line, polyline, path') ? [top] : [...top.querySelectorAll('line, polyline, path')];
+      for (const el of els) { const e = ends(el); if (!e) continue; const a = near(...e[0]), b = near(...e[1]); if (!a && !b) continue;
+        if (!top.classList.contains('on')) { top.classList.add('on'); if (el.getAttribute('stroke') !== '#ffffff' && el.getAttribute('stroke') !== '#fff') cnt[kind] = (cnt[kind] || 0) + 1; }
+        other.push(a ? e[1] : e[0]); break; } } }
+  const nb = new Set([id]);
+  for (const g of svg.querySelectorAll('g.city:not(.lbl)')) { const q = cityById(g.dataset.city); if (!q) continue; const [x, y] = proj(q.lon, q.lat); if (other.some(([ox, oy]) => Math.hypot(ox - x, oy - y) <= tol)) nb.add(q.id); }
+  for (const g of svg.querySelectorAll('g.city')) if (nb.has(g.dataset.city)) { g.classList.add('on'); if (g.classList.contains('lbl')) g.classList.add('hov'); }
+  updateMapTrains();
+  // кратка карта горе вляво: какво е свързано с града
+  const tr = (S?.trains || []).filter(t => (t.path || [t.at]).includes(id)).length, jobs = (S?.hwJobs || []).filter(j => { const sg = segById(j.seg); return sg && (sg.a === id || sg.b === id); }).length;
+  const parts = [cnt.rail && `🛤️ ${cnt.rail}`, cnt.road && `🛣️ ${cnt.road}`, jobs && `🚧 ${jobs}`, tr && `🚆 ${tr}`, cnt.air && `✈️ ${cnt.air}`, cnt.sea && `⚓ ${cnt.sea}`].filter(Boolean);
+  if (!chip) { chip = document.createElement('div'); chip.id = 'mapSelChip'; $('mapScreen').appendChild(chip); }
+  chip.innerHTML = `<b>${c.cc ? c.cc + ' ' : ''}${c.nm}</b> <span>${parts.join(' · ') || 'още няма връзки'}${nb.size > 1 ? ` · ↔ ${nb.size - 1} града` : ''}</span>${mapSel ? '<button title="Махни избора">✕</button>' : ''}`;
+  chip.querySelector('button')?.addEventListener('click', () => { mapSel = null; mapHov = null; applySel(); });
+}
 // ---- Фаза 5: курорти (resorts.js)
 // главите с куести на континентите излизат, щом континентът е отключен И имаш връзка до „вратата“ му (линия/филиал там)
 for (const [ch, k] of [[AFRICA_CHAPTER, 'af'], [NA_CHAPTER, 'na'], [SA_CHAPTER, 'sa'], [AS_CHAPTER, 'as'], [OC_CHAPTER, 'oc']]) { const f = ch.openIf; ch.openIf = c => { if (!f(c) || !S || !contByKey(k)?.open()) return false; try { return contLinked(k); } catch { return false; } }; ch.lockTxt = (ch.lockTxt || '') + ' После създай линия до „вратата“ на континента.'; }
@@ -2938,7 +2976,7 @@ const bust = createBankrupt({ S: () => S, econ: () => econ, toast, modal, fmt, s
   playDays: () => playtime.hrs(playtime.state()?.sec) + ' игра' });
 setTimeout(() => { try { if (S) bust.banner(); } catch {} }, 3000);
 // 🤝 партньорство в самостоятелната игра (coop.js): пари, техника, материали, общи поръчки, партньорът на картата
-const coop = createCoop({ S: () => S, econ: () => econ, toast, modal, fmt, save, renderPanel, drawMap: () => { try { if (!$('mapScreen').classList.contains('hidden')) drawMap(); } catch {} },
+const coop = createCoop({ S: () => S, econ: () => econ, toast, modal, fmt, save, renderPanel, stocksOpen: () => !!S && dev.has('STOCKS'), drawMap: () => { try { if (!$('mapScreen').classList.contains('hidden')) drawMap(); } catch {} },
   ready: () => !!(S && econ && city.ready), cityName: id => cityById(id)?.nm || id, ownedCities: () => ownedCities(), brand: () => brandOf(S),
   netWorth: () => econ.netWorth(units.map(u => u.type)), unitsHere: () => units.filter(u => !u.proj).map(u => u.type),
   takeUnit: type => { const u = units.find(q => q.type === type && !q.proj); if (!u) return false; scene.remove(u.obj); units.splice(units.indexOf(u), 1); S.units.splice(S.units.indexOf(type), 1); refreshGarageLabel(); save(); renderPanel(); return true; },
@@ -2957,7 +2995,7 @@ const coop = createCoop({ S: () => S, econ: () => econ, toast, modal, fmt, save,
   // розовите маркери на партньора в 3D града: пръстен на парцела и табелка (готово / строи)
   mark: (sites, name, col) => {
     if (!city.group) return;
-    const sig = JSON.stringify([sites, name]); let g = city.group.getObjectByName('coopMarks');
+    const sig = JSON.stringify([sites, name, col]); let g = city.group.getObjectByName('coopMarks');
     if (g && g.userData.sig === sig) return g.children.length;
     if (g) city.group.remove(g);
     g = new THREE.Group(); g.name = 'coopMarks'; g.userData.sig = sig;
@@ -3161,11 +3199,15 @@ const conquest = createConquest({ cities: () => CITIES.map(c => c.id), contOf: i
   b.onclick = () => { if (S) conquest.open(); };
   $('btnGlobe').parentNode.insertBefore(b, $('btnGlobe')); }
 const mapLayers = createMapLayers(); mapLayers.mount($('mapScreen'));
-function modal(title, text, buttons) {
+addEventListener('keydown', e => { if (e.key === 'Escape' && !$('modal').classList.contains('hidden') && !$('modal').dataset.noclose) $('modal').classList.add('hidden'); });
+// opts.noClose — без ✕ и Esc (окончателен фалит, заключен раздел): затваря се само с бутоните
+function modal(title, text, buttons, opts = {}) {
   const box = $('modalBox');
-  box.innerHTML = `<h2>${title}</h2><p>${text}</p><div class="actions">${buttons.map((b, i) => `<button class="${i === buttons.length - 1 ? 'btn' : 'btn2'}" data-i="${i}">${b[0]}</button>`).join('')}</div>`;
+  if (opts.noClose) $('modal').dataset.noclose = '1'; else delete $('modal').dataset.noclose;
+  box.innerHTML = `${opts.noClose ? '' : '<button class="mx" title="Затвори (Esc)" aria-label="Затвори">✕</button>'}<h2>${title}</h2><p>${text}</p><div class="actions">${buttons.map((b, i) => `<button class="${i === buttons.length - 1 ? 'btn' : 'btn2'}" data-i="${i}">${b[0]}</button>`).join('')}</div>`;
   $('modal').classList.remove('hidden');
-  box.querySelectorAll('button').forEach(b => b.onclick = () => { $('modal').classList.add('hidden'); const f = buttons[+b.dataset.i][1]; if (f) f(); });
+  box.querySelectorAll(':scope > .actions > button').forEach(b => b.onclick = () => { $('modal').classList.add('hidden'); const f = buttons[+b.dataset.i][1]; if (f) f(); });
+  const mx = box.querySelector(':scope > .mx'); if (mx) mx.onclick = () => $('modal').classList.add('hidden');   // ✕ горе — затваря като „Отказ“ (без действие)
 }
 
 // ============================================================ Фаза 3: жп мрежа, влакове, превози
@@ -4761,6 +4803,7 @@ function railSvg() {
     const A = cityById(r.a), B = cityById(r.b), [x1, y1] = proj(A.lon, A.lat), [x2, y2] = r.c ? junXY(r) : proj(B.lon, B.lat);
     if (r.c && r.built) h += `<circle cx="${x2}" cy="${y2}" r="2.6" fill="#d8cbb0" stroke="#3b2f25" stroke-width="${(1.2 * zs).toFixed(2)}"/>`;
     const pts = r.c ? [[x1, y1], [x2, y2]] : railPts(r.a, r.b), ps = pts.map(p => p.map(v => v.toFixed(1)).join(',')).join(' ');
+    if (!r.c && coopJoint('rail', [r.a, r.b].sort().join('|'))) h += `<polyline points="${ps}" fill="none" stroke="${JCOL}" stroke-width="${(6 * zs).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round" opacity=".5"><title>🤝 Обща линия с партньора</title></polyline>`;   // строите заедно — лилаво
     if (r.built && !near) { h += `<polyline points="${pts.map(p => p.map(v => v.toFixed(1)).join(',')).join(' ')}" fill="none" stroke="#4a3b2e" stroke-width="${(1.5 * zs).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>`; continue; }   // отдалеч — тънка линия
     if (r.built && pts.length > 2) { h += `<polyline points="${ps}" fill="none" stroke="#3b2f25" stroke-width="${(3.2 * zs).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/><polyline points="${ps}" fill="none" stroke="#d8cbb0" stroke-width="${(1.6 * zs).toFixed(2)}" stroke-dasharray="1.2 2"/>`; continue; }
     if (r.built) h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#3b2f25" stroke-width="${(3.2 * zs).toFixed(2)}" stroke-linecap="round"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#d8cbb0" stroke-width="${(1.6 * zs).toFixed(2)}" stroke-dasharray="${(1.2 * zs).toFixed(2)} ${(2 * zs).toFixed(2)}"/>`;
@@ -4775,8 +4818,8 @@ function railSvg() {
   for (const [a, b] of window.__coopShared?.rails || []) {
     if (!cityById(a) || !cityById(b) || !mapIn(a, b) || (S?.rails || []).some(r => r.built && !r.c && ((r.a === a && r.b === b) || (r.a === b && r.b === a)))) continue;
     const ps = railPts(a, b).map(p => p.map(v => v.toFixed(1)).join(',')).join(' ');
-    if (!near) { h += `<polyline points="${ps}" fill="none" stroke="#ff4fa3" stroke-width="${(3 * zs).toFixed(2)}" stroke-linecap="round" opacity=".4"/><polyline points="${ps}" fill="none" stroke="#4a3b2e" stroke-width="${(1.5 * zs).toFixed(2)}" stroke-linecap="round" opacity=".85"/>`; continue; }
-    h += `<polyline points="${ps}" fill="none" stroke="#ff4fa3" stroke-width="${(4.6 * zs).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round" opacity=".45"/><polyline points="${ps}" fill="none" stroke="#3b2f25" stroke-width="${(3.2 * zs).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/><polyline points="${ps}" fill="none" stroke="#d8cbb0" stroke-width="${(1.6 * zs).toFixed(2)}" stroke-dasharray="${(1.2 * zs).toFixed(2)} ${(2 * zs).toFixed(2)}"/>`;
+    if (!near) { h += `<polyline points="${ps}" fill="none" stroke="${coopCol()}" stroke-width="${(3 * zs).toFixed(2)}" stroke-linecap="round" opacity=".4"/><polyline points="${ps}" fill="none" stroke="#4a3b2e" stroke-width="${(1.5 * zs).toFixed(2)}" stroke-linecap="round" opacity=".85"/>`; continue; }
+    h += `<polyline points="${ps}" fill="none" stroke="${coopCol()}" stroke-width="${(4.6 * zs).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round" opacity=".45"/><polyline points="${ps}" fill="none" stroke="#3b2f25" stroke-width="${(3.2 * zs).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/><polyline points="${ps}" fill="none" stroke="#d8cbb0" stroke-width="${(1.6 * zs).toFixed(2)}" stroke-dasharray="${(1.2 * zs).toFixed(2)} ${(2 * zs).toFixed(2)}"/>`;
   }
   return h;
 }
@@ -4788,9 +4831,10 @@ function updateMapTrains() {
     const [x, y] = trainXY(t), w = 20 * k, h = 15 * k;
     if (t.path && t.path.length > 1) {   // икона отгоре (пътнически / товарен), завъртяна по линията — накъдето е следващата точка
       const fwd = (t.km || 0) + 3 <= (t.total || 0), [x2, y2] = trainXY({ ...t, km: Math.max(0, (t.km || 0) + (fwd ? 3 : -3)) }), ang = Math.atan2(y2 - y, x2 - x) * 180 / Math.PI + (fwd ? 0 : 180), L = 50 * k, Ht = L * 0.095;
+      const on = selId() && (t.path || [t.at]).includes(selId()) ? ' class="on"' : '';
       if (!near) { const tt = trainType(t), col = tt.express ? '#e53935' : tt.pax ? '#1e88e5' : '#8d5a2b', l = 9 * k, w2 = 3.6 * k;   // отдалеч — само локомотив (без вагоните)
-        return `<g transform="translate(${x},${y}) rotate(${ang.toFixed(1)})" style="pointer-events:none"><rect x="${-l / 2}" y="${-w2 / 2}" width="${l}" height="${w2}" rx="${w2 * 0.35}" fill="${col}" stroke="#fff" stroke-width="${(0.9 * k).toFixed(2)}"/><path d="M${l / 2} ${-w2 / 2}L${l / 2 + w2 * 0.7} 0L${l / 2} ${w2 / 2}Z" fill="${col}"/></g>`; }
-      return `<image href="assets/ui/train-top-${trainType(t).express ? 'express' : trainType(t).pax ? 'pax' : 'freight'}.webp" x="${-L / 2}" y="${-Ht / 2}" width="${L}" height="${Ht}" transform="translate(${x},${y}) rotate(${ang.toFixed(1)})" style="pointer-events:none;filter:drop-shadow(0 0 ${(1.5 * k).toFixed(1)}px rgba(0,0,0,.45))"/>`;
+        return `<g${on} transform="translate(${x},${y}) rotate(${ang.toFixed(1)})" style="pointer-events:none"><rect x="${-l / 2}" y="${-w2 / 2}" width="${l}" height="${w2}" rx="${w2 * 0.35}" fill="${col}" stroke="#fff" stroke-width="${(0.9 * k).toFixed(2)}"/><path d="M${l / 2} ${-w2 / 2}L${l / 2 + w2 * 0.7} 0L${l / 2} ${w2 / 2}Z" fill="${col}"/></g>`; }
+      return `<image${on} href="assets/ui/train-top-${trainType(t).express ? 'express' : trainType(t).pax ? 'pax' : 'freight'}.webp" x="${-L / 2}" y="${-Ht / 2}" width="${L}" height="${Ht}" transform="translate(${x},${y}) rotate(${ang.toFixed(1)})" style="pointer-events:none;filter:drop-shadow(0 0 ${(1.5 * k).toFixed(1)}px rgba(0,0,0,.45))"/>`;
     }
     // обърнат хоризонтално, ако се движи на запад
     let west = false;
@@ -5464,6 +5508,9 @@ let _hwOwn = null, _hwV = -1, _hwAll = [];
 const hwAll = () => { const own = hwDone(), sh = window.__coopShared; if (!sh || !sh.hw?.length) return own;
   if (own !== _hwOwn || sh.v !== _hwV) { _hwOwn = own; _hwV = sh.v; _hwAll = [...new Set([...own, ...sh.hw])]; } return _hwAll; };
 const hwMine = id => hwDone().includes(id);
+const coopCol = () => window.__coopCol || '#2f8cff';   // цветът на партньора (син; ако твоята марка е синя — оранжев)
+const JCOL = '#b45cff';   // общ строеж (магистрала/линия, която строите заедно) — лилав
+const coopJoint = (kind, ref) => !!window.__coopJoint?.[kind]?.has(ref);
 // градове, свързани с централата по готови магистрали (за по-евтин превоз с камиони)
 function hwNetwork() {
   const done = [...allSegs(), ...ALL_AB].filter(s => hwAll().includes(s.id));
@@ -5657,7 +5704,9 @@ function hwSvg() {
     const off = 3;   // магистралата е леко изместена от жп линията
     const nx = -(y2 - y1), ny = x2 - x1, l = Math.hypot(nx, ny) || 1, ox = nx / l * off, oy = ny / l * off;
     const X1 = x1 + ox, Y1 = y1 + oy, X2 = x2 + ox, Y2 = y2 + oy;
-    if (hwAll().includes(s.id)) h += (hwMine(s.id) ? '' : `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#ff4fa3" stroke-width="${((near ? 5 : 3.6) * zs).toFixed(2)}" stroke-linecap="round" opacity=".45"/>`) + (near
+    const jt = coopJoint('hw', s.id);
+    if (jt) h += `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="${JCOL}" stroke-width="${((near ? 7 : 5) * zs).toFixed(2)}" stroke-linecap="round" opacity=".55"${hwAll().includes(s.id) || jobs[s.id] ? '' : ` stroke-dasharray="${(4 * zs).toFixed(2)} ${(3 * zs).toFixed(2)}"`}><title>🤝 Общ строеж с партньора</title></line>`;   // строите заедно — лилаво
+    if (hwAll().includes(s.id)) h += (hwMine(s.id) || jt ? '' : `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="${coopCol()}" stroke-width="${((near ? 5 : 3.6) * zs).toFixed(2)}" stroke-linecap="round" opacity=".45"/>`) + (near
       ? `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#2f66b3" stroke-width="${(3 * zs).toFixed(2)}" stroke-linecap="round"/><line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#ffffff" stroke-width="${(0.6 * zs).toFixed(2)}"/>`
       : `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#6b88b5" stroke-width="${(1.8 * zs).toFixed(2)}" stroke-linecap="round" opacity=".9"/>`);   // отдалеч — тънка и приглушена; строежите остават ярки
     else if (jobs[s.id]) {
@@ -7304,7 +7353,7 @@ if (!AUTOTEST) {
   // два раздела с една и съща игра: по-старият спира да записва, иначе би върнал прогреса назад
   try {
     const ch = new BroadcastChannel('stroi-tabs');
-    ch.onmessage = e => { if (e.data?.hello === SAVE_KEY && !saveLock) { save(); saveLock = true; modal('⚠️ Играта е отворена в друг раздел', 'За да не се загуби прогресът, този раздел спря да записва. Играй в новия раздел — или презареди този (тогава другият спира).', [['🔄 Презареди', () => location.reload()]]); } };
+    ch.onmessage = e => { if (e.data?.hello === SAVE_KEY && !saveLock) { save(); saveLock = true; modal('⚠️ Играта е отворена в друг раздел', 'За да не се загуби прогресът, този раздел спря да записва. Играй в новия раздел — или презареди този (тогава другият спира).', [['🔄 Презареди', () => location.reload()]], { noClose: true }); } };
     ch.postMessage({ hello: SAVE_KEY });
   } catch { }
 }

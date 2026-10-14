@@ -58,9 +58,9 @@ select t.ok(exists (select 1 from jsonb_array_elements(public.coop_status() -> '
 select t.ok((public.coop_mega_claim(:m) ->> 'err') = 'not_done', 'преди края — без награда');
 select t.su(); update coop.megas set ends_at = now() - interval '1 second' where id = :m;
 select t.as(:B);
-select t.ok((public.coop_mega_claim(:m) ->> 'reward')::int = 150000, 'Б получава 100 000 × 1,5');
+select t.ok((public.coop_mega_claim(:m) ->> 'reward')::int = 175000, 'Б получава 100 000 + половината от печалбата (75 000)');
 select t.ok((public.coop_mega_claim(:m) ->> 'err') = 'claimed', 'наградата е веднъж');
-select t.as(:A); select t.ok((public.coop_mega_claim(:m) ->> 'reward')::int = 300000, 'А получава 200 000 × 1,5');
+select t.as(:A); select t.ok((public.coop_mega_claim(:m) ->> 'reward')::int = 275000, 'А получава 200 000 + 75 000 (печалбата се дели по равно)');
 -- прекратяване
 select t.ok((public.coop_leave() ->> 'ok')::boolean, 'А прекратява партньорството');
 select t.as(:B); select t.ok((public.coop_send(gen_random_uuid(), 'gift', '{"amount": 1}') ->> 'err') = 'no_partner', 'след края — без пратки');
