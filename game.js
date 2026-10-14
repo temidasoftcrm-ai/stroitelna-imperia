@@ -2979,6 +2979,7 @@ const bust = createBankrupt({ S: () => S, econ: () => econ, toast, modal, fmt, s
   newGame: () => wipeSlot(), openSaves: () => openSaves({ modal, toast, fmt, save, cityName: id => cityById(id)?.nm || id, lock: () => { saveLock = true; } }),
   playDays: () => playtime.hrs(playtime.state()?.sec) + ' игра' });
 setTimeout(() => { try { if (S) bust.banner(); } catch {} }, 3000);
+window.__stroiMe = () => { if (!S || !S.hqCity) return null; const b = brandOf(S); return { name: b ? `${b.ico} ${b.nm}` : 'Фирма', city: cityById(S.cityId)?.nm || S.cityId, day: S.day | 0 }; };   // за „👥 Онлайн сега“ в ⚙️ Настройки (cloud.js)
 // 🤝 партньорство в самостоятелната игра (coop.js): пари, техника, материали, общи поръчки, партньорът на картата
 const coop = createCoop({ S: () => S, econ: () => econ, toast, modal, fmt, save, renderPanel, stocksOpen: () => !!S && dev.has('STOCKS'), drawMap: () => { try { if (!$('mapScreen').classList.contains('hidden')) drawMap(); } catch {} },
   ready: () => !!(S && econ && city.ready), cityName: id => cityById(id)?.nm || id, ownedCities: () => ownedCities(), brand: () => brandOf(S),
@@ -3134,7 +3135,7 @@ function showMap(on) {
     if (S) {
       $('mapTitle').textContent = `${S.cityId === S.hqCity ? 'Централа' : 'Филиал'}: ${cityName()}`;
       $('mapText').innerHTML = `Ден ${S.day} · ${fmt(econ.money)} € · завършени обекти: ${S.done}<br>Натисни града с 🏗️, за да влезеш.`;
-      $('mapBtns').innerHTML = `<button class="btn" id="mbEnter">Към ${cityName()}</button><button class="btn2" id="mbSaves">💾 Записи</button><button class="btn2" id="mbMore" title="Автори · Нова игра">⚙️</button>`;
+      $('mapBtns').innerHTML = `<button class="btn" id="mbEnter">Към ${cityName()}</button><button class="btn2" id="mbSaves">💾 Записи</button><button class="btn2" id="mbMore" title="Настройки: вход, изход, данни, хора онлайн">⚙️</button>`;
       $('mapBtns').insertAdjacentHTML('beforeend', viewBarHtml());
       $('mapBtns').querySelectorAll('[data-mview]').forEach(b => b.onclick = () => setMapView(b.dataset.mview));
       $('mbEnter').onclick = enterCity;
@@ -3142,7 +3143,7 @@ function showMap(on) {
       $('mapBtns').insertAdjacentHTML('afterend', '');
       if (!$('mapRail')) $('mapHud').insertAdjacentHTML('beforeend', '<div id="mapRail" style="display:flex;flex-direction:column;gap:8px"></div>');
       renderMapHud();
-      $('mbMore').onclick = () => modal('⚙️ Още', 'Авторите на моделите и музиката · или започни нова игра в този слот (сегашната фирма се изтрива — за отделна игра ползвай „💾 Записи“).', [['Затвори', null], ['📜 Автори', showCredits], ['🗑️ Нова игра', () => modal('Нова игра?', 'Сегашната фирма ще бъде изтрита.', [['Отказ', null], ['Изтрий и започни', wipeSlot]])]]);
+      $('mbMore').onclick = () => window.__settings ? window.__settings({ credits: showCredits, newGame: () => modal('Нова игра?', 'Сегашната фирма ще бъде изтрита.', [['Отказ', null], ['Изтрий и започни', wipeSlot]]), lock: () => { save(); saveLock = true; } }) : modal('⚙️ Още', 'Авторите на моделите и музиката · или започни нова игра в този слот (сегашната фирма се изтрива — за отделна игра ползвай „💾 Записи“).', [['Затвори', null], ['📜 Автори', showCredits], ['🗑️ Нова игра', () => modal('Нова игра?', 'Сегашната фирма ще бъде изтрита.', [['Отказ', null], ['Изтрий и започни', wipeSlot]])]]);
     } else {
       $('mapTitle').textContent = 'Избери град';
       $('mapText').textContent = `Къде ще основеш строителната си фирма? Натисни град на картата. (слот ${currentSlot()})`;
@@ -3624,12 +3625,17 @@ function autoTrip(t) {
   t.job = { pax, shuttle: !pax, from: t.at, to: dest, ico: T.express ? '🚄' : T.long ? '🚛' : pax ? '🎫' : '📦', cargo: T.express ? 'експрес' : T.long ? '50 вагона товари' : pax ? 'пътници' : 'товари', pay };
   startLeg(t, path, 'loaded');
 }
-function startLeg(t, path, leg) { t.path = path; t.km = 0; t.total = pathKm(path); t.leg = leg; }
+// без път (линията е продадена или е била на бивш партньор) → курсът се отменя, поръчката се връща в списъка
+function startLeg(t, path, leg) {
+  if (!path || !path.length) { if (t.job && !t.job.shuttle && !t.job.pax && !t.job.empty && t.job.id != null) (S.jobs = S.jobs || []).push(t.job); t.job = null; t.path = null; t.km = 0; t.total = 0; t.leg = 'idle'; return false; }
+  t.path = path; t.km = 0; t.total = pathKm(path); t.leg = leg; return true;
+}
 function updateTrains(dtDays) {
   for (const t of S.trains || []) {
     if (t.route) delete t.route;   // ръчните маршрути отпаднаха — всички курсове са случайни
     if (!t.job) autoTrip(t);
     if (!t.job) continue;
+    if (!t.path || !t.path.length) { startLeg(t, null); continue; }   // стар запис със счупен курс
     t.km += trainType(t).speed * (trainType(t).express && dev.has('FAST') ? 1.3 : 1) * dtDays;   // ниво 17: „Стрела“ +30%
     if (t.km < t.total) continue;
     const fuel = Math.round(t.total * TRAIN_EUR_KM); econ.spend(fuel, 'гориво', `${t.nm}: ${Math.round(t.total)} км`);
