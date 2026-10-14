@@ -68,6 +68,10 @@ export const EXTRAS = {
   skywalk:  { nm: 'Стъклен мост над каньона', ico: '🌉', cost: 1600000, days: 14, mul: 0.45, sellAdd: 2400000, kinds: ['events'], only: ['grandcanyon'] },
   heli:     { nm: 'Хеликоптерни разходки', ico: '🚁', cost: 900000, days: 8, mul: 0.3, sellAdd: 1300000, kinds: ['events'], only: ['grandcanyon'], evMul: 0.15 },
 };
+// баланс на наема (14.10.2026): месечният наем в RESORTS даваше ~4% годишно от вложеното — държането не си струваше.
+// Сега: ски и море ×8 (работят 4 месеца), балнео ×4 (целогодишно), курортите със събития ×2 (парите им идват от събитията).
+export const RENT_K = { winter: 8, summer: 8, spa: 4, events: 2 };
+export const rentOf = r => Math.round(r.month * (RENT_K[r.kind] || 1));
 const extOk = (r, x) => x.kinds.includes(r.kind) && (!x.only || x.only.includes(r.id));
 // събитията в курортите със събития: rooms — нощувки (стаи × 3 нощи), seats — места за транспорт, rev — приход × месечния наем
 export const EVENTS = {
@@ -120,7 +124,7 @@ export function createResorts(deps) {
   const mulOf = s => 1 + Object.keys(s.ext || {}).reduce((a, k) => a + (EXTRAS[k] ? EXTRAS[k].mul : 0), 0);
   const sellOf = (r, s) => r.sell + Object.keys(s.ext || {}).reduce((a, k) => a + (EXTRAS[k] ? EXTRAS[k].sellAdd : 0), 0);
  // приход на година: месечният наем × разширенията × месеците в сезона (4 за ски/море, 12 за балнео)
-  const yearOf = (r, s) => Math.round(r.month * (s ? mulOf(s) : 1) * (r.kind === 'spa' || r.kind === 'events' ? 12 : 4));
+  const yearOf = (r, s) => Math.round(rentOf(r) * (s ? mulOf(s) : 1) * (r.kind === 'spa' || r.kind === 'events' ? 12 : 4));
   const seasonWord = r => r.kind === 'winter' ? 'зимата' : r.kind === 'summer' ? 'лятото' : r.kind === 'events' ? 'целогодишно + събития' : 'целогодишно';
 
   // символи на картата (SVG); заключените са сиви с катинар
@@ -150,7 +154,7 @@ export function createResorts(deps) {
       const txt = !s ? `свободен · земя ${deps.fmt(r.land)} €`
         : s.stage === 'land' ? 'твоя земя — строй вилно селище'
         : s.stage === 'building' ? `строи се ${Math.round(s.prog * 100)}%`
-        : s.stage === 'built' ? `~${deps.fmt(yearOf(r, s))} €/год. (${deps.fmt(r.month * mulOf(s))} €/мес. ${seasonWord(r)})${Object.keys(s.ext || {}).map(k => ' ' + EXTRAS[k].ico).join('')}${s.extBuild ? ` · 🔨 ${EXTRAS[s.extBuild.key].nm} ${Math.round(s.extBuild.prog * 100)}%` : ''} · спечелено ${deps.fmt(s.earned || 0)} €`
+        : s.stage === 'built' ? `~${deps.fmt(yearOf(r, s))} €/год. (${deps.fmt(rentOf(r) * mulOf(s))} €/мес. ${seasonWord(r)})${Object.keys(s.ext || {}).map(k => ' ' + EXTRAS[k].ico).join('')}${s.extBuild ? ` · 🔨 ${EXTRAS[s.extBuild.key].nm} ${Math.round(s.extBuild.prog * 100)}%` : ''} · спечелено ${deps.fmt(s.earned || 0)} €`
         : `продаден за ${deps.fmt(s.soldFor)} €`;
       h += `<div class="row" style="margin:0"><span class="meta" style="margin:0">${r.ico} <b style="color:var(--txt)">${r.nm}</b> · ${txt}</span><button class="btn2" data-resort-open="${r.id}">Отвори</button></div>`;
     }
@@ -254,7 +258,7 @@ export function createResorts(deps) {
           : !s ? `свободен · земя ${deps.fmt(r.land)} € · ~${deps.fmt(yearOf(r))} €/год. след строеж`
           : s.stage === 'land' ? '🟩 твоя земя — строй вилно селище'
           : s.stage === 'building' ? `🔨 строи се ${Math.round(s.prog * 100)}%`
-          : s.stage === 'built' ? `${on ? `<b style="color:var(--ok)">💶 +${deps.fmt(Math.round(r.month * mulOf(s) / DAYS_PER_MONTH))} €/ден</b>` : `💤 извън сезона`} · ~${deps.fmt(yearOf(r, s))} €/год.${Object.keys(s.ext || {}).map(k => ' ' + EXTRAS[k].ico).join('')}${s.extBuild ? ` · 🔨 ${EXTRAS[s.extBuild.key].nm} ${Math.round(s.extBuild.prog * 100)}%` : ''} · спечелено ${deps.fmt(s.earned || 0)} €`
+          : s.stage === 'built' ? `${on ? `<b style="color:var(--ok)">💶 +${deps.fmt(Math.round(rentOf(r) * mulOf(s) / DAYS_PER_MONTH))} €/ден</b>` : `💤 извън сезона`} · ~${deps.fmt(yearOf(r, s))} €/год.${Object.keys(s.ext || {}).map(k => ' ' + EXTRAS[k].ico).join('')}${s.extBuild ? ` · 🔨 ${EXTRAS[s.extBuild.key].nm} ${Math.round(s.extBuild.prog * 100)}%` : ''} · спечелено ${deps.fmt(s.earned || 0)} €`
           : `✅ продаден за ${deps.fmt(s.soldFor)} €`;
         return `<div class="row" style="margin:4px 0;align-items:center"><span class="meta" style="margin:0">${r.ico} <b style="color:var(--txt)">${r.nm}</b> <span style="opacity:.7">${r.kind === 'winter' ? '❄️' : r.kind === 'summer' ? '☀️' : r.kind === 'events' ? '🎟️' : '♨️'}</span><br>${txt}</span><button class="btn${s?.stage === 'built' ? '2' : ''}" data-resort-open="${r.id}">Отвори</button></div>${evRow(r, s)}${extRow(r, s)}`;
       }).join('');
@@ -266,10 +270,10 @@ export function createResorts(deps) {
   function open(id) {
     const S = deps.S(), r = R(id), s = st()[id], econ = deps.econ(), enter = deps.enter ? () => deps.enter(id) : null;
     const season = `${r.kind === 'winter' ? '❄️ Зимен курорт: приход декември–март' : r.kind === 'summer' ? '☀️ Летен курорт: приход юни–септември' : '♨️ Балнео курорт: приход целогодишно'}. Сега е ${monthName(S.day).toLowerCase()} (${SEASON_TXT[seasonOf(S.day)]}).`;
-    if (!avail(r) && r.need) return deps.modal(`🔒 ${r.cc} ${r.nm}`, `Курортите тук се отключват, когато имаш поне <b>${r.need.n} града</b> в ${r.cc} (сега: ${haveIn(r)}).<br>Купи филиали в: ${r.need.cities.map(id => deps.cityName ? deps.cityName(id) : id).join(', ')}.<br>Земя ${deps.fmt(r.land)} € · вилно селище ${deps.fmt(r.build)} € · продажба ~${deps.fmt(r.sell)} € · наем ${deps.fmt(r.month)} €/мес.<br><br>${season}`, [['Добре', null]]);
-    if (!avail(r)) return deps.modal(`🔒 ${r.cc || ''} ${r.nm}`, `${(r.reg || REG[r.cc]) === 'Турция' ? 'Турските курорти' : r.reg === 'Ривиера' ? 'Курортите на Френската ривиера' : 'Курортите в Алпите'} се отключват на <b>ниво ${r.dev} на развитие</b>${deps.devBest ? ` (сега: ${deps.devBest()})` : ''}.<br>Земя ${deps.fmt(r.land)} € · вилно селище ${deps.fmt(r.build)} € · продажба ~${deps.fmt(r.sell)} € · наем ${deps.fmt(r.month)} €/мес.<br><br>${season}`, [['Добре', null]]);
+    if (!avail(r) && r.need) return deps.modal(`🔒 ${r.cc} ${r.nm}`, `Курортите тук се отключват, когато имаш поне <b>${r.need.n} града</b> в ${r.cc} (сега: ${haveIn(r)}).<br>Купи филиали в: ${r.need.cities.map(id => deps.cityName ? deps.cityName(id) : id).join(', ')}.<br>Земя ${deps.fmt(r.land)} € · вилно селище ${deps.fmt(r.build)} € · продажба ~${deps.fmt(r.sell)} € · наем ${deps.fmt(rentOf(r))} €/мес.<br><br>${season}`, [['Добре', null]]);
+    if (!avail(r)) return deps.modal(`🔒 ${r.cc || ''} ${r.nm}`, `${(r.reg || REG[r.cc]) === 'Турция' ? 'Турските курорти' : r.reg === 'Ривиера' ? 'Курортите на Френската ривиера' : 'Курортите в Алпите'} се отключват на <b>ниво ${r.dev} на развитие</b>${deps.devBest ? ` (сега: ${deps.devBest()})` : ''}.<br>Земя ${deps.fmt(r.land)} € · вилно селище ${deps.fmt(r.build)} € · продажба ~${deps.fmt(r.sell)} € · наем ${deps.fmt(rentOf(r))} €/мес.<br><br>${season}`, [['Добре', null]]);
     if (!unlocked()) return deps.modal(`🔒 ${r.nm}`, `Курортите са Фаза 5. Отключват се при репутация ${UNLOCK.rep} ★ или ${UNLOCK.done} завършени обекта.<br><br>${season}`, [['Добре', null]]);
-    const plan = `Земя <b>${deps.fmt(r.land)} €</b> → вилно селище <b>${deps.fmt(r.build)} €</b> (${r.days} дни) → продажба за <b>${deps.fmt(r.sell)} €</b> или наем ~<b>${deps.fmt(r.month)} €/месец</b> в сезона — <b>~${deps.fmt(yearOf(r))} €/година</b>.`;
+    const plan = `Земя <b>${deps.fmt(r.land)} €</b> → вилно селище <b>${deps.fmt(r.build)} €</b> (${r.days} дни) → продажба за <b>${deps.fmt(r.sell)} €</b> или наем ~<b>${deps.fmt(rentOf(r))} €/месец</b> в сезона — <b>~${deps.fmt(yearOf(r))} €/година</b>.`;
     if (!s) return deps.modal(`${r.ico} ${r.nm}`, `${season}<br><br>${plan}`, [['👁 Влез', enter], ['Затвори', null], [`Купи земята · ${deps.fmt(r.land)} €`, () => {
       if (!econ.canAfford(r.land)) { deps.toast('Нямаш достатъчно пари за земята. Вземи кредит или продай имот.', 'bad'); return; }
       econ.spend(r.land, 'покупка', `${r.nm}: земя за курорт`);
@@ -290,7 +294,7 @@ export function createResorts(deps) {
       // разширенията, които още не са построени (по едно наведнъж)
       const opts = Object.entries(EXTRAS).filter(([k, x]) => extOk(r, x) && !have.includes(k));
       const extHtml = s.extBuild ? `<br>🔨 Строи се: <b>${EXTRAS[s.extBuild.key].nm}</b> — ${Math.round(s.extBuild.prog * 100)}%`
-        : opts.length ? '<br><br>Разширения (вдигат наема и цената):<br>' + opts.map(([, x]) => `${x.ico} ${x.nm} — ${deps.fmt(extCost(r, x))} €, ${x.days} дни, наем +${Math.round(x.mul * 100)}% (+${deps.fmt(Math.round(r.month * x.mul * (r.kind === 'spa' ? 12 : 4)))} €/год.)`).join('<br>') : '';
+        : opts.length ? '<br><br>Разширения (вдигат наема и цената):<br>' + opts.map(([, x]) => `${x.ico} ${x.nm} — ${deps.fmt(extCost(r, x))} €, ${x.days} дни, наем +${Math.round(x.mul * 100)}% (+${deps.fmt(Math.round(rentOf(r) * x.mul * (r.kind === 'spa' ? 12 : 4)))} €/год.)`).join('<br>') : '';
       const styles = hotelStylesOf(r.kind), styleNm = () => (styles.find(t => t.key === s.hotelStyle) || styles[0]).nm;
       const pickStyle = (cap, then) => deps.modal(`🏨 ${cap}`, 'Избери как да изглежда хотелът:', [...styles.map(t => [`${t.key === (s.hotelStyle || styles[0].key) ? '✅ ' : ''}${t.nm}`, () => { s.hotelStyle = t.key; then(); }]), ['Отказ', null]]);
       const extBtns = s.extBuild ? [] : opts.map(([k, x]) => [`${x.ico} ${x.nm}`, () => {
@@ -301,7 +305,7 @@ export function createResorts(deps) {
         s.extBuild = { key: k, prog: 0 };
         deps.sound('buy'); deps.toast(`🔨 Започна строежът: ${x.nm} в ${r.nm} (${x.days} дни).`, 'good'); deps.save(); deps.redraw();
       }]);
-      return deps.modal(`${r.ico} ${r.nm} · вилно селище`, `${season}<br><br>Наем: ~<b>${deps.fmt(r.month * mulOf(s))} €/мес.</b> · <b style="color:var(--ok)">~${deps.fmt(yearOf(r, s))} €/година</b>${have.length ? ' (' + have.map(k => EXTRAS[k].ico + ' ' + EXTRAS[k].nm).join(', ') + ')' : ''}<br>Спечелено от наеми: <b>${deps.fmt(s.earned || 0)} €</b>.<br>Купувач предлага <b>${deps.fmt(price)} €</b>.${extHtml}`,
+      return deps.modal(`${r.ico} ${r.nm} · вилно селище`, `${season}<br><br>Наем: ~<b>${deps.fmt(rentOf(r) * mulOf(s))} €/мес.</b> · <b style="color:var(--ok)">~${deps.fmt(yearOf(r, s))} €/година</b>${have.length ? ' (' + have.map(k => EXTRAS[k].ico + ' ' + EXTRAS[k].nm).join(', ') + ')' : ''}<br>Спечелено от наеми: <b>${deps.fmt(s.earned || 0)} €</b>.<br>Купувач предлага <b>${deps.fmt(price)} €</b>.${extHtml}`,
         [['👁 Влез', enter], ...extBtns, ...(have.includes('hotel') ? [[`🏨 Стил: ${styleNm()} · ${deps.fmt(RESTYLE)} €`, () => pickStyle(`Преустройство на хотела в ${r.nm}`, () => { if (!econ.canAfford(RESTYLE)) { deps.toast('Нямаш достатъчно пари за преустройството.', 'bad'); return; } econ.spend(RESTYLE, 'покупка', `${r.nm}: нов стил на хотела`); deps.sound('buy'); deps.toast(`🏨 Хотелът в ${r.nm} вече е „${styleNm()}“.`, 'good'); deps.save(); deps.redraw(); })]] : []), ['Задръж', null], [`Продай · ${deps.fmt(price)} €`, () => {
           econ.earn(price, 'продажба', `${r.nm}: вилно селище`);
           Object.assign(s, { stage: 'sold', soldFor: price, soldDay: S.day });
@@ -340,7 +344,7 @@ export function createResorts(deps) {
       const on = s.stage === 'built' && inSeason(r, day), was = s.stage === 'built' && inSeason(r, day - 1);
       if (on && !was && r.kind !== 'spa' && r.kind !== 'events') { s.season = 0; startList.push(r); }
       if (on) {
-        const inc = Math.round(r.month * mulOf(s) / DAYS_PER_MONTH);
+        const inc = Math.round(rentOf(r) * mulOf(s) / DAYS_PER_MONTH);
         econ.earn(inc, 'курорти', `${r.nm}: наеми (${monthName(day).toLowerCase()})`);
         s.earned = (s.earned || 0) + inc; s.season = (s.season || 0) + inc;
         week.tot += inc; week.parts[r.nm] = (week.parts[r.nm] || 0) + inc;
@@ -357,7 +361,7 @@ export function createResorts(deps) {
       }
     }
     // начало на сезона: кои курорти започват да носят пари
-    if (startList.length) deps.toast(`${startList[0].kind === 'winter' ? '❄️ Започна ски сезонът' : '☀️ Започна летният сезон'}! ${startList.map(r => r.nm).join(', ')} вече носят наеми — ~${deps.fmt(startList.reduce((a, r) => a + Math.round(r.month * mulOf(st()[r.id]) / DAYS_PER_MONTH), 0))} €/ден.`, 'good');
+    if (startList.length) deps.toast(`${startList[0].kind === 'winter' ? '❄️ Започна ски сезонът' : '☀️ Започна летният сезон'}! ${startList.map(r => r.nm).join(', ')} вече носят наеми — ~${deps.fmt(startList.reduce((a, r) => a + Math.round(rentOf(r) * mulOf(st()[r.id]) / DAYS_PER_MONTH), 0))} €/ден.`, 'good');
     // седмичен отчет през сезона
     S.resortWeek = week;
     // края на месеца (30 дни): голяма картинка с прихода от курортите за месеца
@@ -368,7 +372,7 @@ export function createResorts(deps) {
     }
   }
   // приход от курортите днес (за горната лента)
-  const dailyNow = day => RESORTS.reduce((a, r) => { const s = st()[r.id]; return a + (s && s.stage === 'built' && inSeason(r, day) ? Math.round(r.month * mulOf(s) / DAYS_PER_MONTH) : 0); }, 0);
+  const dailyNow = day => RESORTS.reduce((a, r) => { const s = st()[r.id]; return a + (s && s.stage === 'built' && inSeason(r, day) ? Math.round(rentOf(r) * mulOf(s) / DAYS_PER_MONTH) : 0); }, 0);
   // стойност на курортите (за нетната стойност и статистики)
   const value = () => RESORTS.reduce((a, r) => { const s = st()[r.id]; return a + (!s ? 0 : s.stage === 'land' ? r.land : s.stage === 'building' ? r.land + r.build * s.prog : s.stage === 'built' ? sellOf(r, s) : 0); }, 0);
   // подарък (изкупена фирма): готово вилно селище с разширение в първия свободен курорт от списъка;

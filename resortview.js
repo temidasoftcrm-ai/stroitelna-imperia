@@ -2,7 +2,7 @@
 // с лифт. Вилното селище се вижда според етапа: празен парцел → строеж (вилите растат) → готово (басейн, алеи).
 // Извън сезона: плажът е празен (затворени чадъри), а зимният курорт е зелен, без сняг.
 import * as THREE from 'three';
-import { EXTRAS, hotelStylesOf } from './resorts.js';
+import { EXTRAS, hotelStylesOf, rentOf } from './resorts.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { makeWater } from './water.js';
 import { loadLift, liftPart } from './liftmodel.js';
@@ -553,7 +553,7 @@ export function buildResortView(A, r, st, season, deps) {
     }
   }
 
-  const perYear = Math.round(r.month * (1 + Object.keys((st && st.ext) || {}).reduce((q, k) => q + (EXTRAS[k] ? EXTRAS[k].mul : 0), 0)) * (spa ? 12 : 4));
+  const perYear = Math.round(rentOf(r) * (1 + Object.keys((st && st.ext) || {}).reduce((q, k) => q + (EXTRAS[k] ? EXTRAS[k].mul : 0), 0)) * (spa ? 12 : 4));
   const sign = deps.label(stage === 'built' ? `🏡 ${r.nm} · ~${perYear.toLocaleString('bg-BG')} €/год.` : stage === 'sold' ? `✅ ${r.nm} · продадено` : stage === 'building' ? `🔨 ${r.nm} · строи се` : stage === 'land' ? `🟩 ${r.nm} · твоя земя` : `🏷️ ${r.nm} · свободен парцел`, '#ffd54a', 26);
   sign.position.set(plot.x, 22, plot.z); g.add(sign);
   g.traverse(o => { if (o.isMesh && !o.material.transparent) o.receiveShadow = true; });
