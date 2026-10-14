@@ -2348,6 +2348,7 @@ function endOfDay() {
   while (S.offers.length < officeLv().offers) { const n = S.offers.length; makeOffer(); if (S.offers.length === n) break; }
   for (const p of projects) if (S.day === p.deadlineDay) toast(`⏰ Днес е крайният срок за „${p.title}“!`, 'bad');
   bust.dailyTick();   // минус → несъстоятелност → фалит (bankrupt.js)
+  try { window.__coopDay?.(); } catch (e) { console.warn('coop day', e); }   // дневните бонуси от партньорството (coop.js)
   save();
   renderPanel();
   return sum;
@@ -2924,6 +2925,10 @@ const coop = createCoop({ S: () => S, econ: () => econ, toast, modal, fmt, save,
     if (isMachine(type) && !isRoadGear(type) && machineCount() >= garageLv().cap) return 'garage';
     S.units.push(type); const u = spawnUnit(type); refreshGarageLabel(); poofAt(u.x, u.z); dispatch(); save(); renderPanel(); return 'ok'; },
   cityId: () => S && S.cityId,
+  hwInfo: () => ({ done: hwDone(), jobs: (S.hwJobs || []).filter(j => !j.ab).map(j => ({ seg: j.seg, pct: Math.floor((j.stage + j.prog) / stagesOf(j).length * 100) })) }),
+  segs: () => allSegs().map(s => ({ id: s.id, a: s.a, b: s.b, nm: s.hw.nm, km: Math.round(kmBetween(s.a, s.b)) })),
+  rails: () => (S.rails || []).filter(r => r.built && r.b).map(r => ({ ref: [r.a, r.b].sort().join('|'), a: r.a, b: r.b, km: Math.round(r.km || kmBetween(r.a, r.b)) })),
+  stats: () => ({ done: S.done || 0, hw: hwDone().length, earned: Math.round(econ.s.totals?.in || 0), cities: ownedCities().length }),
   // къде строиш в този град (координати на парцелите — градовете са еднакви при всички играчи)
   sitesHere: () => [...(S.built || []).map(b => ({ l: city.lots[b.lot], k: 'b' })), ...projects.filter(p => !p.own).map(p => ({ l: city.lots[p.lot], k: 'p', t: p.type }))]
     .filter(s => s.l).map(s => ({ x: Math.round(s.l.x * 10) / 10, z: Math.round(s.l.z * 10) / 10, k: s.k, t: s.t })),
@@ -2936,6 +2941,11 @@ const coop = createCoop({ S: () => S, econ: () => econ, toast, modal, fmt, save,
     g = new THREE.Group(); g.name = 'coopMarks'; g.userData.sig = sig;
     const ringM = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false });
     for (const s of sites || []) {
+      if (s.k === 'g') {   // изненада от партньора: розова кутия-подарък с панделка и табелка
+        const box = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.4, 2.4), new THREE.MeshStandardMaterial({ color: col, roughness: 0.5 })); box.position.set(s.x, 1.2, s.z); box.castShadow = true; g.add(box);
+        const rib = new THREE.MeshStandardMaterial({ color: 0xffe14d }); for (const [w, d] of [[2.5, 0.4], [0.4, 2.5]]) { const b = new THREE.Mesh(new THREE.BoxGeometry(w, 2.5, d), rib); b.position.set(s.x, 1.2, s.z); g.add(b); }
+        const lb = label(`🎁 ${s.text || name}`, col, 13); lb.position.set(s.x, 6, s.z); g.add(lb); continue;
+      }
       const r = new THREE.Mesh(new THREE.RingGeometry(TILE * 0.56, TILE * 0.78, 40).rotateX(-Math.PI / 2), ringM); r.position.set(s.x, 0.15, s.z); g.add(r);
       const lb = label(`🤝 ${name}${s.k === 'p' ? ' · строи' : ''}`, col, 13); lb.position.set(s.x, s.k === 'p' ? 11 : 18, s.z); g.add(lb);
     }
@@ -5556,7 +5566,7 @@ function hwMaterials(j) {
 function updateHighways(dtDays) {
   for (const j of [...(S.hwJobs || [])]) {
     if (!hwRoles(j).every(r => r.away >= r.cnt) || !hwMaterials(j)) continue;
-    j.prog += dtDays * stagesOf(j).length / j.days;
+    j.prog += dtDays * stagesOf(j).length / j.days * (window.__coopHwMul ? window.__coopHwMul(j.seg) : 1);   // общ участък с партньора (coop.js) — по-бързо
     if (j.prog < 1) continue;
     j.stage++; j.prog = 0;
     if (j.stage >= stagesOf(j).length) { j.ab ? finishAutobahn(j) : finishHighway(j); continue; }
