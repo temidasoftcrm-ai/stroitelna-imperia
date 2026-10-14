@@ -4908,6 +4908,7 @@ function renderMapHud() {
     const ch = contHudHtml(); if (ct.dataset.h !== ch) { ct.dataset.h = ch; ct.innerHTML = ch; ct.querySelectorAll('[data-contshow]').forEach(b => b.onclick = () => setMapView(viewOf(b.dataset.contshow).key)); } }
   let h = `<div class="sect">🏗️ Строй</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn2" id="mbRail">${railPick ? '✖ Откажи строежа' : '🛤️ Жп линия'}</button>${railPick ? '' : `<button class="btn2" id="mbHw">${hwPick ? '✖ Откажи магистралата' : '🛣️ Магистрала'}</button><button class="btn2" id="mbHwList" title="Всички участъци и опашката">📋</button>${dev.has('AIR') ? '<button class="btn2" id="mbAir">✈️ Летище</button>' : ''}${seaOn() ? '<button class="btn2" id="mbSea">⚓ Пристанище</button>' : ''}`}</div>
+    ${abUpList().length ? `<button class="btn" data-abuphud="1" style="width:100%;margin-top:6px">⬆️ Ъпгрейдвай магистрала в аутобан (${(n => n === 1 ? '1 участък' : n + ' участъка')(abUpList().reduce((a, o) => a + o.segs.length, 0))})</button>` : ''}
     <div class="meta" style="margin-top:4px">🎫 Тол ${fmt(hwToll())} €/ден${jobs ? ` · 🚧 строят се ${jobs} участъка${stuck ? ` · <span class="late">⏸ ${stuck} чакат техника</span>` : ''}` : ''}</div>`;
   { const tc = tenders.cardsHtml(); if (tc) { const n = (tc.match(/class="card/g) || []).length;   // свити до кратък ред — разгръщат се с натискане
     h += `<div class="sect" data-tendtog="1" style="cursor:pointer">🏛️ Държавни поръчки${n ? ` (${n})` : ''}${!tendOpen && /class="meta late/.test(tc) ? ' <span class="late">⚠️</span>' : ''} <span style="float:right">${tendOpen ? '▾' : '▸'}</span></div>${tendOpen ? tc : ''}`; } }
@@ -4933,6 +4934,7 @@ function renderMapHud() {
   $('mbRail').onclick = () => { if (railPick) { railPick = null; drawMap(); renderMapHud(); } else startRailMode(); };
   if ($('mbHw')) $('mbHw').onclick = () => { if (hwPick) { hwPick = null; mapSel = null; applySel(); renderMapHud(); } else startHwMode(); };
   if ($('mbHwList')) $('mbHwList').onclick = () => openBig('hw');
+  box.querySelectorAll('[data-abuphud]').forEach(b => b.onclick = () => openBig('hw'));
   if ($('mbAir')) $('mbAir').onclick = () => openBig('air');
   if ($('mbSea')) $('mbSea').onclick = () => openBig('sea');
 }
@@ -5502,15 +5504,50 @@ const abMissingTxt = () => { const m = Object.entries(abFleet()).map(([k, n]) =>
 const roadHubs = () => new Set([...allSegs(), ...ALL_AB].filter(s => hwAll().includes(s.id)).flatMap(s => [s.a, s.b]).concat(S ? Object.entries(CONT_GATE).filter(([k]) => contLinked(k)).map(([, g]) => g) : []));
 const abReach = sg => { const h = roadHubs(); return h.has(sg.a) || h.has(sg.b) || (sg.cont && (ownedCities().includes(sg.a) || ownedCities().includes(sg.b))); };
 const abShown = c => !c.cont || contByKey(c.cont).open();
+// ⬆️ ъпгрейд в аутобан: участък от основен аутобан (E1, E2, E3…), чиито два града вече свързва твоя готова магистрала
+// (почти по права линия) — става аутобан, без да се строи от нулата. Бутонът излиза, щом имаш поне AB_UP.hw готови участъка магистрала
+// и поне AB_UP.min участък от основен аутобан е покрит от тях.
+const AB_UP = { min: 1, hw: 2, stage: 2, pay: 0.5, days: 0.5 };   // hw — поне толкова твои готови магистрални участъка
+function hwOwnPathKm(a, b) {   // най-краткият път по ТВОИ готови магистрални участъци (без аутобаните)
+  const mine = allSegs().filter(x => hwMine(x.id)), dist = { [a]: 0 }, seen = new Set();
+  for (;;) { let u = null; for (const k in dist) if (!seen.has(k) && (u === null || dist[k] < dist[u])) u = k;
+    if (u === null) return null; if (u === b) return dist[u]; seen.add(u);
+    for (const x of mine) { if (x.a !== u && x.b !== u) continue; const v = x.a === u ? x.b : x.a, w = dist[u] + kmBetween(x.a, x.b); if (dist[v] == null || w < dist[v]) dist[v] = w; } }
+}
+const abUpOk = sg => { if (!sg || hwAll().includes(sg.id) || (S.hwJobs || []).some(j => j.seg === sg.id) || hwQueue().includes(sg.id) || (sg.cont && !contByKey(sg.cont)?.open())) return false;
+  const k = hwOwnPathKm(sg.a, sg.b); return k != null && k <= kmBetween(sg.a, sg.b) * 1.6; };
+let abUpMemo = { k: '', v: [] };   // картата пита всяка секунда — смята наново само при промяна
+const abUpList = () => { if (!S || dev.best() < AB_UP_LV() || allSegs().filter(x => hwMine(x.id)).length < AB_UP.hw) return [];
+  const k = [hwDone().length, (S.hwJobs || []).length, hwQueue().length, mapCont, ...(CONTS || []).map(c => c.open() ? 1 : 0)].join('|');
+  if (abUpMemo.k !== k) abUpMemo = { k, v: abUpList0() }; return abUpMemo.v; };
+const abUpList0 = () => AUTOBAHNS.map(c => ({ c, segs: corridorSegIds(c).map(id => ALL_AB.find(x => x.id === id)).filter(abUpOk) })).filter(o => o.segs.length >= AB_UP.min);
+const AB_UP_LV = () => AB_UNLOCK.lv;
+function abUpCard() {
+  if (!S || !dev.has('LINKS')) return '';
+  const L = abUpList();
+  if (!L.length) return dev.best() >= AB_UP_LV() ? '' : bwCard('⬆️ Ъпгрейд в аутобан', `<div class="meta">🔒 На ниво ${AB_UP_LV()} на развитие готовите ти магистрали по основните аутобани (E1 Париж — Истанбул през София и Пловдив, E3 до Варна…) ще могат да станат аутобан — щом имаш поне ${AB_UP.hw} готови участъка магистрала по тях.</div>`);
+  return bwCard('⬆️ Ъпгрейд в аутобан', L.map(o => { const km = o.segs.reduce((a, x) => a + kmBetween(x.a, x.b), 0), pay = o.segs.reduce((a, x) => a + Math.round(abQuoteSeg(x, kmBetween(x.a, x.b)).reward * AB_UP.pay / 5000) * 5000, 0);
+    return `<div class="row" style="margin:4px 0;align-items:center"><span class="meta" style="margin:0;flex:1">🔴 <b style="color:var(--txt)">${o.c.id} „${o.c.nm}“</b> · ${o.segs.length === 1 ? '1 участък' : o.segs.length + ' участъка'} по готовата ти магистрала (${fmt(km)} км): ${o.segs.map(x => `${cityById(x.a).nm} — ${cityById(x.b).nm}`).join(', ')}<br>Държавата плаща <b style="color:var(--ok)">${fmt(pay)} €</b> · строи се от „Пътна основа“ — наполовина по-бързо · тол ×${AB_K().toll}</span><button class="btn" data-abup="${o.c.id}">⬆️ Ъпгрейдвай в аутобан</button></div>`; }).join(''));
+}
+function abUpgrade(cid) {
+  const o = abUpList().find(x => x.c.id === cid); if (!o) return;
+  if (!hwRepOk()) { toast(`Държавните поръчки изискват репутация ${HW_REP} ★ или ниво 5 на развитие (голяма фирма).`, 'bad'); return; }
+  S.abUp = { ...(S.abUp || {}) }; for (const x of o.segs) S.abUp[x.id] = true;
+  for (const x of o.segs) takeSeg(x.id);
+  toast(`⬆️ Магистралата става аутобан „${o.c.nm}“: ${o.segs.length === 1 ? '1 участък' : o.segs.length + ' участъка'}.`, 'good'); save(); renderBig?.(); drawMap();
+}
 function takeAutobahn(id) {
-  if (!abUnlocked()) { toast(abLockTxt(), 'bad'); return; }
+  const up = !!(S.abUp || {})[id];   // ⬆️ ъпгрейд на готова магистрала: без земните работи и мостовете — от „Пътна основа“, половин срок и половин плащане
+  if (!abUnlocked() && !(up && dev.best() >= AB_UNLOCK.lv)) { toast(abLockTxt(), 'bad'); return; }
   if (!hwRepOk()) { toast(`Държавните поръчки изискват репутация ${HW_REP} ★ или ниво 5 на развитие (голяма фирма).`, 'bad'); return; }
   if ((S.hwJobs || []).length >= HW_MAX_JOBS()) { toast('Вече строиш максимума участъци. Надгради офиса за повече.', 'bad'); return; }
   const sg = segById(id); if (!sg || hwAll().includes(id) || (S.hwJobs || []).some(j => j.seg === id)) return;
-  if (!abReach(sg) && !sg.spur) { toast(`🛣️ ${cityById(sg.a).nm} — ${cityById(sg.b).nm}: аутобанът продължава съществуваща магистрала — първо стигни с готов участък до ${cityById(sg.a).nm} или ${cityById(sg.b).nm}.`, 'bad'); return; }
+  if (!up && !abReach(sg) && !sg.spur) { toast(`🛣️ ${cityById(sg.a).nm} — ${cityById(sg.b).nm}: аутобанът продължава съществуваща магистрала — първо стигни с готов участък до ${cityById(sg.a).nm} или ${cityById(sg.b).nm}.`, 'bad'); return; }
   const km = kmBetween(sg.a, sg.b);
-  S.hwJobs = [...(S.hwJobs || []), { seg: id, ab: true, km, ...abQuoteSeg(sg, km), stage: 0, prog: 0, mat: {}, start: S.day, v2: true, city: S.cityId }];
-  toast(`🔴 Взе участък от аутобан „${sg.hw.nm}“: ${cityById(sg.a).nm} — ${cityById(sg.b).nm} (${km} км).`, 'good');
+  const q = abQuoteSeg(sg, km);
+  if (up) { q.reward = Math.round(q.reward * AB_UP.pay / 5000) * 5000; q.days = Math.max(4, Math.round(q.days * AB_UP.days)); delete S.abUp[id]; }
+  S.hwJobs = [...(S.hwJobs || []), { seg: id, ab: true, km, ...q, stage: up ? AB_UP.stage : 0, prog: 0, mat: {}, start: S.day, v2: true, city: S.cityId, ...(up ? { up: true } : {}) }];
+  toast(`${up ? '⬆️ Ъпгрейд в аутобан' : '🔴 Взе участък от аутобан'} „${sg.hw.nm}“: ${cityById(sg.a).nm} — ${cityById(sg.b).nm} (${km} км).`, 'good');
   const miss = abMissingTxt(); if (miss) toast(`🚜 ${miss} — участъкът ще чака пътната техника (таб „Техника“).`, 'bad');
   Sound.play('buy');
   hwDispatch(); save(); renderMapHud(); drawMap();
@@ -7047,6 +7084,7 @@ function renderBig() {
   on('[data-hlink]', b => { const [act, id] = b.dataset.hlink.split('|'); linkAct(act, id); renderBig(); });
   on('[data-hw]', b => { takeSeg(b.dataset.hw); renderBig(); });
   on('[data-ab]', b => { takeSeg(b.dataset.ab); renderBig(); });
+  on('[data-abup]', b => abUpgrade(b.dataset.abup));
   on('[data-hwunq]', b => { S.hwQueue = hwQueue().filter(x => x !== b.dataset.hwunq); save(); renderBig(); });
   on('[data-hsup]', b => { startHsUpgrade(+b.dataset.hsup); renderBig(); });
   on('[data-sellship]', b => { sellShip(+b.dataset.sellship); renderBig(); });
@@ -7201,6 +7239,7 @@ function hwWinHtml() {
   const scAb = AUTOBAHNS.filter(c => abShown(c) && inScope(...c.cities)), scToll = all.reduce((a, hw) => a + hwTollOf(hw), 0) + scAb.reduce((a, c) => a + abTollOf(c), 0);
   const scDone = new Set([...all.flatMap(hw => hw.segs.map((_, i) => segId(hw, i))), ...scAb.flatMap(corridorSegIds)].filter(id => hwAll().includes(id))).size;
   let h = `<div class="bw-stats"><div><b>${fmt(scToll)} €</b><span>тол на ден</span></div><div><b>${scDone}</b><span>готови участъка</span></div><div><b>${all.filter(hw => doneSegs(hw) === hw.segs.length).length} / ${all.length}</b><span>цели магистрали</span></div><div><b>${jobs.length} / ${HW_MAX_JOBS()}</b><span>строят се</span></div></div>${lockMsg}${missTxt && !lockMsg ? `<div class="row" style="margin:0"><span class="meta late" style="margin:0">🚜 ${missTxt} — без нея участъците чакат.${roadNote(hwMissing())}</span><button class="btn" id="bwBuyRoad" ${econ.canAfford(roadCost(hwMissing())) ? '' : 'disabled'}>🚜 Купи липсващата · ${fmt(roadCost(hwMissing()))} €</button></div>` : ''}`;
+  h += abUpCard();
   if (['c:am', 'all'].includes(scopeNow())) h += route66.cardHtml();   // 🛣️ Route 66 (специална поръчка) — само в Америка
   const qIn = hwQueue().filter(id => { const g = segById(id); return g && inScope(g.a, g.b); });
   if (qIn.length) h += bwCard(`📋 На опашка (${qIn.length}) — започват сами при свободен екип`, hwQueue().map((id, i) => { const g = segById(id); return g && inScope(g.a, g.b) ? `<div class="row" style="margin:3px 0"><span class="meta" style="margin:0">${i + 1}. ${g.ab ? '🔴' : '🛣️'} ${cityById(g.a).nm} — ${cityById(g.b).nm} · ${kmBetween(g.a, g.b)} км</span><button class="btn2" data-hwunq="${id}">✕</button></div>` : ''; }).join(''));
@@ -7645,6 +7684,8 @@ if (AUTOTEST) {
       S.hwDone = [...new Set([...hwDone(), ...HIGHWAYS.filter(hw => !hw.intl).flatMap(hw => hw.segs.map((_, i) => segId(hw, i)))])];
       for (const [k, n] of Object.entries(abFleet())) for (let i = units.filter(u => u.type === k).length; i < n; i++) buyUnit(k);
       return { unlocked: abUnlocked(), bgFull: bgFullHighways(), toll: abToll(), miss: abMissingTxt(), segs: ALL_AB.length, AB: !!AB }; },
+    hwAllIds() { return allSegs().map(x => x.id); },
+    abUpDbg() { const e1 = ALL_AB.filter(x => ['sofia', 'plovdiv', 'varna', 'edirne', 'nis', 'bucharest'].includes(x.a) || ['sofia', 'plovdiv', 'varna', 'edirne', 'nis', 'bucharest'].includes(x.b)); return { lv: dev.best(), need: AB_UP_LV(), segs: e1.map(x => [x.id, Math.round(kmBetween(x.a, x.b)), hwOwnPathKm(x.a, x.b), abUpOk(x)]), list: abUpList0().map(o => [o.c.id, o.segs.length]) }; },
     abView() { const j = (S.hwJobs || []).find(q => q.ab); if (j) { j.stage = 3; j.prog = 0.55; openHwView(j.seg); } },
     mapEU() { mapEU = true; showMap(true); },
     dayEnd() { const m = econ.money; endOfDay(); return { gained: Math.round(econ.money - m), earned: econ.isFinished(S.cityId) ? econ.s.finished[S.cityId].earned : null }; },
