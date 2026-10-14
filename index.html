@@ -154,6 +154,11 @@
   #mapSvg .hqico { font-size:18px; pointer-events:none; }
   /* надписите се свиват при приближаване (--ls идва от game.js: mapLS) */
   #mapSvg .city text { font-size:calc(10px * var(--ls, 1)); stroke-width:calc(3px * var(--ls, 1)); }
+  #mapSvg g.city.lbl.lh { display:none; }   /* скрит надпис (няма място / далечен изглед) — показва се при посочване */
+  #mapSvg g.city.lbl.lh.hov { display:inline; }
+  #mapSvg:not(.mid) g.resort text + text { display:none; }   /* курортите отдалеч — само символ; името — при посочване */
+  #mapSvg g.resort:hover text + text { display:inline; }
+  #mapSvg .city.here circle:not(.hit), #mapSvg .city.here polygon.gstar { filter:drop-shadow(0 0 2px #ffb300) drop-shadow(0 0 6px #ffb300); }
   #mapSvg g.city polygon.gstar { fill:#ffcc1a; stroke:#7a5a00; pointer-events:none; }   /* ★ световни центрове (вместо кръгче) */
   #mapSvg .city:hover polygon.gstar { fill:var(--acc); }
   #mapSvg .city.hq polygon.gstar { fill:var(--acc); stroke:#7a4b00; }

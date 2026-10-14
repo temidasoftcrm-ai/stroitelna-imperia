@@ -2797,12 +2797,12 @@ function keyCitiesMine() { const own = new Set(ownedCities()); return new Set(CO
   if (!mapWorld) { const [x, y] = proj(28.9, 42.9); h += `<text class="sea" x="${x}" y="${y}">ЧЕРНО МОРЕ</text>`; }
   if (mapCont) h += contLabels(mapCont);
   // първо надписите, после точките отгоре — съседни градове (Пловдив/Пазарджик) не се закриват
-  const pts = CITIES.map(c => { const [x, y] = proj(c.lon, c.lat), hq = S && (S.hqCity || S.cityId) === c.id, here = S && S.cityId === c.id; return { c, x, y, hq, here, r: (hq || here ? 6 : 2 + c.sz) * (mapEU ? 4.5 : mapWide ? 1.6 : 1) * mapK() }; }).filter(o => mapCont ? (viewOf(mapCont).ids.has(o.c.id) || (!CONT_ISO[mapCont] && (o.hq || o.here || ownedCities().includes(o.c.id)))) : mapWorld ? ((isWorld(o.c.id) && (!contOf(o.c.id) || o.c.sz >= 3)) || WORLD_ANCHORS.includes(o.c.id) || o.hq || o.here || ownedCities().includes(o.c.id) || airportOf(o.c.id)) : (o.hq || o.here || !(mapEU && offEU(o.c.id))) && (!mapEU || (o.c.sz >= 2 && !isWorld(o.c.id)) || o.hq || o.here || ownedCities().includes(o.c.id) || keyCitiesMine().has(o.c.id)));
+  const pts = CITIES.map(c => { const [x, y] = proj(c.lon, c.lat), hq = S && (S.hqCity || S.cityId) === c.id, here = S && S.cityId === c.id; return { c, x, y, hq, here, r: (hq || here ? 4 : 1.2 + c.sz * 0.6) * (mapEU ? 4.5 : mapWide ? 1.6 : 1) * mapK() }; }).filter(o => mapCont ? (viewOf(mapCont).ids.has(o.c.id) || (!CONT_ISO[mapCont] && (o.hq || o.here || ownedCities().includes(o.c.id)))) : mapWorld ? ((isWorld(o.c.id) && (!contOf(o.c.id) || o.c.sz >= 3)) || WORLD_ANCHORS.includes(o.c.id) || o.hq || o.here || ownedCities().includes(o.c.id) || airportOf(o.c.id)) : (o.hq || o.here || !(mapEU && offEU(o.c.id))) && (!mapEU || (o.c.sz >= 2 && !isWorld(o.c.id)) || o.hq || o.here || ownedCities().includes(o.c.id) || keyCitiesMine().has(o.c.id)));
   for (let i = pts.length - 1; i >= 0; i--) if (gateHidden(pts[i].c.id)) pts.splice(i, 1);
   if (S && !dev.has('BALKANS')) for (let i = pts.length - 1; i >= 0; i--) if (isForeign(pts[i].c.id) && !ownedCities().includes(pts[i].c.id)) pts.splice(i, 1);   // в началото — само българските градове   // континентите — само „вратата“, докато нямаш връзка
   // ключовите градове са с по-голяма плътна жълта точка (1.3r) — надписът и иконите (🏗️🏢📍) отиват извън него
-  for (const { c, x, y, hq, here, r } of pts) { const kr = KEY_CITY.has(c.id), lo = kr ? r * 1.3 + 3 : r + 2, ix = kr ? (c.left ? x + r * 0.6 : x - r * 0.4) : x, iy = kr ? y - r * 0.4 : y; h += `${here && !hq ? `<text class="hqico" x="${ix - 7}" y="${iy - 9}">📍</text>` : ''}<g class="city lbl ${hq || here ? 'hq' : ''} ${S && dev.best() < cityLv(c.id) ? 'locked' : ''}" data-city="${c.id}"><text x="${c.left ? x - lo : x + lo}" y="${y + 3.5}" text-anchor="${c.left ? 'end' : 'start'}">${c.cc ? c.cc + ' ' : ''}${c.nm}${econ && econ.isFinished && econ.isFinished(c.id) ? ' 🏁' : ''}</text>${hq ? `<text class="hqico" x="${ix - 9}" y="${iy - 9}">🏗️</text>` : (S?.branches || []).includes(c.id) ? `<text class="hqico" x="${ix - 8}" y="${iy - 7}" style="font-size:${(13 * mapLS()).toFixed(1)}px">🏢</text>` : ''}${(ECON.FACTORIES || []).filter(f => f.cityId === c.id).map((f, i) => `<text class="hqico" x="${x - 4 + i * 11}" y="${y + (kr ? Math.max(16, r * 1.3 + 12) : 16)}" style="font-size:${(11 * mapLS()).toFixed(1)}px">${ECON.MATERIALS[f.materialId].ico}</text>`).join('')}</g>`; }
-  for (const { c, x, y, hq, r } of pts) h += `<g class="city ${hq ? 'hq' : ''} ${S && econ?.isFinished?.(c.id) ? 'done' : ''} ${S && dev.best() < cityLv(c.id) ? 'locked' : ''}" data-city="${c.id}"><circle class="hit" cx="${x}" cy="${y}" r="${(mapEU ? 34 : mapWide ? 11 : 7) * mapK()}"/>${AIR_ONLY.has(c.id) && !(S && ownedCities().includes(c.id)) ? `<text class="aironly" x="${x}" y="${y + r * 0.9}" text-anchor="middle" style="font-size:${(r * 2.6).toFixed(1)}px;pointer-events:none">✈️</text>` : GLOBAL_HUB.has(c.id) ? `<polygon class="gstar" points="${starPts(x, y, r * 2)}" style="stroke-width:${(r * 0.16).toFixed(2)}px"/>` : `<circle ${KEY_CITY.has(c.id) ? 'class="keyc" ' : ''}cx="${x}" cy="${y}" r="${KEY_CITY.has(c.id) ? (r * 1.3).toFixed(2) : r}"/>`}</g>`;   // ★ световните центрове — само звезда на мястото на кръгчето
+  for (const { c, x, y, hq, here, r } of pts) { const kr = KEY_CITY.has(c.id), lo = kr ? r * 1.3 + 3 : r + 2, ix = kr ? (c.left ? x + r * 0.6 : x - r * 0.4) : x, iy = kr ? y - r * 0.4 : y; h += `${here && !hq ? `<text class="hqico" x="${ix - 7}" y="${iy - 9}">📍</text>` : ''}<g class="city lbl ${hq || here ? 'hq' : ''} ${S && dev.best() < cityLv(c.id) ? 'locked' : ''} ${lblMajor(c, hq || here, KEY_CITY.has(c.id)) ? 'major' : ''}" data-city="${c.id}" data-pr="${lblPr(c, hq, here, KEY_CITY.has(c.id))}"><title>${c.cc ? c.cc + ' ' : ''}${c.nm}${econ && econ.isFinished && econ.isFinished(c.id) ? ' · завършен 🏁' : ''}</title><text x="${c.left ? x - lo : x + lo}" y="${y + 3.5}" text-anchor="${c.left ? 'end' : 'start'}">${c.nm}</text>${hq ? `<text class="hqico" x="${ix - 9}" y="${iy - 9}">🏗️</text>` : (S?.branches || []).includes(c.id) ? `<text class="hqico" x="${ix - 8}" y="${iy - 7}" style="font-size:${(13 * mapLS()).toFixed(1)}px">🏢</text>` : ''}${(ECON.FACTORIES || []).filter(f => f.cityId === c.id).map((f, i) => `<text class="hqico" x="${x - 4 + i * 11}" y="${y + (kr ? Math.max(16, r * 1.3 + 12) : 16)}" style="font-size:${(11 * mapLS()).toFixed(1)}px">${ECON.MATERIALS[f.materialId].ico}</text>`).join('')}</g>`; }
+  for (const { c, x, y, hq, r } of pts) h += `<g class="city ${hq ? 'hq' : ''} ${S && S.cityId === c.id ? 'here' : ''} ${S && econ?.isFinished?.(c.id) ? 'done' : ''} ${S && dev.best() < cityLv(c.id) ? 'locked' : ''}" data-city="${c.id}"><circle class="hit" cx="${x}" cy="${y}" r="${(mapEU ? 34 : mapWide ? 11 : 7) * mapK()}"/>${AIR_ONLY.has(c.id) && !(S && ownedCities().includes(c.id)) ? `<text class="aironly" x="${x}" y="${y + r * 0.9}" text-anchor="middle" style="font-size:${(r * 2.6).toFixed(1)}px;pointer-events:none">✈️</text>` : GLOBAL_HUB.has(c.id) ? `<polygon class="gstar" points="${starPts(x, y, r * 2)}" style="stroke-width:${(r * 0.16).toFixed(2)}px"/>` : `<circle ${KEY_CITY.has(c.id) ? 'class="keyc" ' : ''}cx="${x}" cy="${y}" r="${KEY_CITY.has(c.id) ? (r * 1.3).toFixed(2) : r}"/>`}</g>`;   // ★ световните центрове — само звезда на мястото на кръгчето
   h = h.replace('<g class="city lbl', mapLayers.wrap('rail', railSvg() + (mapWorld && (!mapCont || mapCont === 'as') ? silk.svg(id => proj(cityById(id).lon, cityById(id).lat), (mapEU ? 4 : 1) * mapK(), performance.now() / 1000) : '')) + '<g class="city lbl');
   h = h.replace('<g class="city lbl', mapLayers.wrap('road', hwSvg() + abSvg()) + mapLayers.wrap('air', airSvg()) + mapLayers.wrap('sea', seaSvg()) + '<g class="city lbl');
   h = h.replace('<g class="city lbl', superRouteSvg() + oilMapSvg() + mwMapSvg() + '<g class="city lbl');   // трасетата на супер поръчките — над всички мрежи
@@ -2816,9 +2816,31 @@ function keyCitiesMine() { const own = new Set(ownedCities()); return new Set(CO
     slot.replaceWith(g); } }
   mapLayers.apply();
   updateMapTrains(); updateMapPlanes(); updateMapShips();
+  svg.classList.toggle('near', mapNear()); svg.classList.toggle('mid', mapZoom() >= 1.5);
+  declutterLabels(svg);
   svg.querySelectorAll('.city').forEach(g => g.onclick = () => clickCity(g.dataset.city));
   svg.querySelectorAll('[data-resort]').forEach(g => g.onclick = () => resorts.open(g.dataset.resort));
 }
+// ---- степени на детайлност на картата: отдалеч — само големите градове, тънки линии, локомотиви без вагони; отблизо (mapNear) — всичко
+const mapNear = () => mapZoom() >= 2.2;
+const lblMajor = (c, hq, key) => hq || key || (c.sz || 0) >= (mapWide ? 3 : 2) || (!!S && ownedCities().includes(c.id));
+const lblPr = (c, hq, here, key) => here ? 0 : hq ? 1 : S && ownedCities().includes(c.id) ? 2 : key ? 3 : 7 - Math.min(3, c.sz || 0);
+// надписите не се застъпват: по реда на важност (текущият град винаги), който няма място — скрит до приближаване/посочване
+function declutterLabels(svg) {
+  const near = mapZoom() >= 1.5, taken = [];   // надписите на малките градове — още при леко приближаване
+  const gs = [...svg.querySelectorAll('g.city.lbl')].sort((a, b) => (+a.dataset.pr) - (+b.dataset.pr));
+  for (const g of gs) {
+    const pr = +g.dataset.pr;
+    if (!near && !g.classList.contains('major')) { g.classList.add('lh'); continue; }
+    const t = g.querySelector('text'); let bb; try { bb = t.getBBox(); } catch { continue; }
+    const pad = bb.height * 0.15, R = [bb.x - pad, bb.y - pad, bb.x + bb.width + pad, bb.y + bb.height + pad];
+    if (pr > 0 && taken.some(q => R[0] < q[2] && R[2] > q[0] && R[1] < q[3] && R[3] > q[1])) { g.classList.add('lh'); continue; }
+    g.classList.remove('lh'); taken.push(R);
+  }
+}
+// посочен град → надписът му се показва, дори да е скрит
+{ const svg = $('mapSvg'); let cur = null;
+  svg.addEventListener('pointerover', e => { const id = e.target.closest?.('.city')?.dataset.city || null; if (id === cur) return; svg.querySelectorAll('g.city.lbl.hov').forEach(g => g.classList.remove('hov')); cur = id; if (id) svg.querySelector(`g.city.lbl[data-city="${id}"]`)?.classList.add('hov'); }); }
 // ---- Фаза 5: курорти (resorts.js)
 // главите с куести на континентите излизат, щом континентът е отключен И имаш връзка до „вратата“ му (линия/филиал там)
 for (const [ch, k] of [[AFRICA_CHAPTER, 'af'], [NA_CHAPTER, 'na'], [SA_CHAPTER, 'sa'], [AS_CHAPTER, 'as'], [OC_CHAPTER, 'oc']]) { const f = ch.openIf; ch.openIf = c => { if (!f(c) || !S || !contByKey(k)?.open()) return false; try { return contLinked(k); } catch { return false; } }; ch.lockTxt = (ch.lockTxt || '') + ' После създай линия до „вратата“ на континента.'; }
@@ -2954,7 +2976,7 @@ const coop = createCoop({ S: () => S, econ: () => econ, toast, modal, fmt, save,
 const tutorial = createTutorial({ S: () => S, projects: () => projects, units: () => units, save,
   onMap: () => !$('mapScreen').classList.contains('hidden'), openTab: t => { tab = t; renderPanel(); } });
 const resorts = createResorts({
-  S: () => S, econ: () => econ, toast, modal, proj, fmt, save, devBest: () => dev.best(), symK: () => (mapEU ? 2.6 : mapWide ? 1.6 : 1) * mapK(),
+  S: () => S, econ: () => econ, toast, modal, proj, fmt, save, devBest: () => dev.best(), symK: () => (mapEU ? 2.6 : (mapWide ? 1.6 : 1) * (mapNear() ? 1 : 0.7)) * mapK(),   // отдалеч курортите са по-малки
   onExtDone: key => { if (key === 'hotel') quests.emit('resortHotel'); },
   onSeasonEnd: (r, got, total) => { showEventPop('resort-unlock', `🏁 Край на сезона в ${r.nm}`, `Спечели ${fmt(got)} € този сезон · общо ${fmt(total)} €`); SFXcash(); },
   onUnlock: () => showEventPop('resort-unlock', '🔓 Отключи курортите!', 'Боровец, Пампорово и Приморско — виж ги на картата.'),
@@ -4733,12 +4755,13 @@ function trainXY(t) {
 const mapIn = (...ids) => mapCont ? ids.every(id => viewOf(mapCont).ids.has(id)) : mapEU && !mapWorld ? !ids.some(id => isWorld(id) || offEU(id)) : true;
 function railSvg() {
   const zs = zShrink() * (mapCont ? (viewOf(mapCont).k || 2.4) : mapWorld ? 6 : 1);   // при приближаване линиите не дебелеят; на континентите/света — по-дебели (картата е по-едра)
-  let h = '';
+  let h = ''; const near = mapNear();
   for (const r of S?.rails || []) {
     if (!mapIn(r.a, r.b)) continue;
     const A = cityById(r.a), B = cityById(r.b), [x1, y1] = proj(A.lon, A.lat), [x2, y2] = r.c ? junXY(r) : proj(B.lon, B.lat);
     if (r.c && r.built) h += `<circle cx="${x2}" cy="${y2}" r="2.6" fill="#d8cbb0" stroke="#3b2f25" stroke-width="${(1.2 * zs).toFixed(2)}"/>`;
     const pts = r.c ? [[x1, y1], [x2, y2]] : railPts(r.a, r.b), ps = pts.map(p => p.map(v => v.toFixed(1)).join(',')).join(' ');
+    if (r.built && !near) { h += `<polyline points="${pts.map(p => p.map(v => v.toFixed(1)).join(',')).join(' ')}" fill="none" stroke="#4a3b2e" stroke-width="${(1.5 * zs).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>`; continue; }   // отдалеч — тънка линия
     if (r.built && pts.length > 2) { h += `<polyline points="${ps}" fill="none" stroke="#3b2f25" stroke-width="${(3.2 * zs).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/><polyline points="${ps}" fill="none" stroke="#d8cbb0" stroke-width="${(1.6 * zs).toFixed(2)}" stroke-dasharray="1.2 2"/>`; continue; }
     if (r.built) h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#3b2f25" stroke-width="${(3.2 * zs).toFixed(2)}" stroke-linecap="round"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#d8cbb0" stroke-width="${(1.6 * zs).toFixed(2)}" stroke-dasharray="${(1.2 * zs).toFixed(2)} ${(2 * zs).toFixed(2)}"/>`;
     else {
@@ -4752,17 +4775,21 @@ function railSvg() {
   for (const [a, b] of window.__coopShared?.rails || []) {
     if (!cityById(a) || !cityById(b) || !mapIn(a, b) || (S?.rails || []).some(r => r.built && !r.c && ((r.a === a && r.b === b) || (r.a === b && r.b === a)))) continue;
     const ps = railPts(a, b).map(p => p.map(v => v.toFixed(1)).join(',')).join(' ');
+    if (!near) { h += `<polyline points="${ps}" fill="none" stroke="#ff4fa3" stroke-width="${(3 * zs).toFixed(2)}" stroke-linecap="round" opacity=".4"/><polyline points="${ps}" fill="none" stroke="#4a3b2e" stroke-width="${(1.5 * zs).toFixed(2)}" stroke-linecap="round" opacity=".85"/>`; continue; }
     h += `<polyline points="${ps}" fill="none" stroke="#ff4fa3" stroke-width="${(4.6 * zs).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round" opacity=".45"/><polyline points="${ps}" fill="none" stroke="#3b2f25" stroke-width="${(3.2 * zs).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/><polyline points="${ps}" fill="none" stroke="#d8cbb0" stroke-width="${(1.6 * zs).toFixed(2)}" stroke-dasharray="${(1.2 * zs).toFixed(2)} ${(2 * zs).toFixed(2)}"/>`;
   }
   return h;
 }
+var tendOpen = (() => { try { return !!localStorage.getItem('stroi-tendopen'); } catch { return false; } })();   // „🏛️ Държавни поръчки“ в десния панел — свити по подразбиране
 function updateMapTrains() {
   const g = document.getElementById('trainLayer'); if (!g || !S) return;
-  const k = (mapEU ? 4 : mapWide ? 1.6 : 1) * mapK();
+  const k = (mapEU ? 4 : mapWide ? 1.6 : 1) * mapK(), near = mapNear();
   g.innerHTML = (S.trains || []).filter(t => mapIn(...(t.path || [t.at]))).map(t => {
     const [x, y] = trainXY(t), w = 20 * k, h = 15 * k;
     if (t.path && t.path.length > 1) {   // икона отгоре (пътнически / товарен), завъртяна по линията — накъдето е следващата точка
       const fwd = (t.km || 0) + 3 <= (t.total || 0), [x2, y2] = trainXY({ ...t, km: Math.max(0, (t.km || 0) + (fwd ? 3 : -3)) }), ang = Math.atan2(y2 - y, x2 - x) * 180 / Math.PI + (fwd ? 0 : 180), L = 50 * k, Ht = L * 0.095;
+      if (!near) { const tt = trainType(t), col = tt.express ? '#e53935' : tt.pax ? '#1e88e5' : '#8d5a2b', l = 9 * k, w2 = 3.6 * k;   // отдалеч — само локомотив (без вагоните)
+        return `<g transform="translate(${x},${y}) rotate(${ang.toFixed(1)})" style="pointer-events:none"><rect x="${-l / 2}" y="${-w2 / 2}" width="${l}" height="${w2}" rx="${w2 * 0.35}" fill="${col}" stroke="#fff" stroke-width="${(0.9 * k).toFixed(2)}"/><path d="M${l / 2} ${-w2 / 2}L${l / 2 + w2 * 0.7} 0L${l / 2} ${w2 / 2}Z" fill="${col}"/></g>`; }
       return `<image href="assets/ui/train-top-${trainType(t).express ? 'express' : trainType(t).pax ? 'pax' : 'freight'}.webp" x="${-L / 2}" y="${-Ht / 2}" width="${L}" height="${Ht}" transform="translate(${x},${y}) rotate(${ang.toFixed(1)})" style="pointer-events:none;filter:drop-shadow(0 0 ${(1.5 * k).toFixed(1)}px rgba(0,0,0,.45))"/>`;
     }
     // обърнат хоризонтално, ако се движи на запад
@@ -4783,7 +4810,8 @@ function renderMapHud() {
   let h = `<div class="sect">🏗️ Строй</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn2" id="mbRail">${railPick ? '✖ Откажи строежа' : '🛤️ Жп линия'}</button>${railPick ? '' : `<button class="btn2" id="mbHw">🛣️ Магистрала</button>${dev.has('AIR') ? '<button class="btn2" id="mbAir">✈️ Летище</button>' : ''}${seaOn() ? '<button class="btn2" id="mbSea">⚓ Пристанище</button>' : ''}`}</div>
     <div class="meta" style="margin-top:4px">🎫 Тол ${fmt(hwToll())} €/ден${jobs ? ` · 🚧 строят се ${jobs} участъка${stuck ? ` · <span class="late">⏸ ${stuck} чакат техника</span>` : ''}` : ''}</div>`;
-  { const tc = tenders.cardsHtml(); if (tc) h += `<div class="sect">🏛️ Държавни поръчки</div>${tc}`; }
+  { const tc = tenders.cardsHtml(); if (tc) { const n = (tc.match(/class="card/g) || []).length;   // свити до кратък ред — разгръщат се с натискане
+    h += `<div class="sect" data-tendtog="1" style="cursor:pointer">🏛️ Държавни поръчки${n ? ` (${n})` : ''}${!tendOpen && /class="meta late/.test(tc) ? ' <span class="late">⚠️</span>' : ''} <span style="float:right">${tendOpen ? '▾' : '▸'}</span></div>${tendOpen ? tc : ''}`; } }
   h += estateHudHtml();
   if (supply.state().offers.length || supply.state().deals.length) h += `<div class="row" style="margin:6px 0"><button class="btn2" style="flex:1" data-openoffers="1">📜 Оферти от доставчици (${supply.state().offers.length})</button></div>`;   // самите оферти — в прозореца „📜 Оферти“
   // подобренията на фирмата са в прозореца „🏢 Подобрения“ горе (по желание — отделно от картата)
@@ -4793,6 +4821,7 @@ function renderMapHud() {
   box._h = h;
   box.innerHTML = h;
   box.querySelectorAll('[data-resort-open]').forEach(b => b.onclick = () => resorts.open(b.dataset.resortOpen));
+  box.querySelectorAll('[data-tendtog]').forEach(b => b.onclick = () => { tendOpen = !tendOpen; try { localStorage.setItem('stroi-tendopen', tendOpen ? '1' : ''); } catch { } renderMapHud(); });
   tenders.bind(box);
   box.querySelectorAll('[data-contshow]').forEach(b => b.onclick = () => setMapView(viewOf(b.dataset.contshow).key));
   box.querySelectorAll('[data-upg]').forEach(b => b.onclick = () => { const [id, kind] = b.dataset.upg.split('|'); upgGo(id, kind); });
@@ -5617,7 +5646,7 @@ function finishHighway(j) {
 }
 // ---- карта
 function hwSvg() {
-  const zs = zShrink();   // при приближаване линиите не дебелеят
+  const zs = zShrink(), near = mapNear();   // при приближаване линиите не дебелеят
   if (!S) return '';   // още няма фирма (избор на град)
   let h = '';
   const jobs = Object.fromEntries((S?.hwJobs || []).map(j => [j.seg, j]));
@@ -5628,7 +5657,9 @@ function hwSvg() {
     const off = 3;   // магистралата е леко изместена от жп линията
     const nx = -(y2 - y1), ny = x2 - x1, l = Math.hypot(nx, ny) || 1, ox = nx / l * off, oy = ny / l * off;
     const X1 = x1 + ox, Y1 = y1 + oy, X2 = x2 + ox, Y2 = y2 + oy;
-    if (hwAll().includes(s.id)) h += (hwMine(s.id) ? '' : `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#ff4fa3" stroke-width="${(6.4 * zs).toFixed(2)}" stroke-linecap="round" opacity=".45"/>`) + `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#1e5fbf" stroke-width="${(4.2 * zs).toFixed(2)}" stroke-linecap="round"/><line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#ffffff" stroke-width="${(0.8 * zs).toFixed(2)}"/>`;
+    if (hwAll().includes(s.id)) h += (hwMine(s.id) ? '' : `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#ff4fa3" stroke-width="${((near ? 5 : 3.6) * zs).toFixed(2)}" stroke-linecap="round" opacity=".45"/>`) + (near
+      ? `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#2f66b3" stroke-width="${(3 * zs).toFixed(2)}" stroke-linecap="round"/><line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#ffffff" stroke-width="${(0.6 * zs).toFixed(2)}"/>`
+      : `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#6b88b5" stroke-width="${(1.8 * zs).toFixed(2)}" stroke-linecap="round" opacity=".9"/>`);   // отдалеч — тънка и приглушена; строежите остават ярки
     else if (jobs[s.id]) {
       const j = jobs[s.id], k = (j.stage + j.prog) / HW_STAGES.length;
       h += `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#8aa6cf" stroke-width="${(3 * zs).toFixed(2)}" stroke-dasharray="${(3 * zs).toFixed(2)} ${(2 * zs).toFixed(2)}"/><line x1="${X1}" y1="${Y1}" x2="${X1 + (X2 - X1) * k}" y2="${Y1 + (Y2 - Y1) * k}" stroke="#1e5fbf" stroke-width="${(4 * zs).toFixed(2)}"/>`;
