@@ -140,6 +140,12 @@ export function createCityPanel(deps) {
       <div class="meta" style="margin:0 0 6px">${next}</div>`;
     if (fin) return h + `<div class="meta">Градът е завършен и носи приход всеки ден.</div></div>`;
     h += `<div class="meta" style="margin:0">🏗️ Строят се <b style="color:var(--txt)">${ps.length}/${C.proj}</b> · 📨 оферти ${offers} · 🚜 техника ${units}${roof ? ` · 💶 по покривите ${f(roof)} €` : ''}${!here && c.freeLots ? ` · 🟩 свободни парцели ${c.freeLots.length}` : ''}</div>${!here && !c.freeLots && auto(id) ? '<div class="meta" style="margin:2px 0 0">ℹ️ Още не си влизал тук — новите обекти се строят „на хартия“ (плащат и дават опит). Влез веднъж, за да се появяват и в града.</div>' : ''}`;
+    { // 🔑 имотите в града с икони (без влизане): 🏠×2 🏪 🌆 · 🟩 земя
+      const E = c.estate || {}, own = E.owned || [], land = (E.land || []).length, by = {};
+      for (const o of own) by[o.kind] = (by[o.kind] || 0) + 1;
+      const order = ['house', 'shop', 'office', 'tower'], ks = Object.keys(by).sort((a, b) => (order.indexOf(a) + 1 || 9) - (order.indexOf(b) + 1 || 9));
+      h += `<div class="meta" style="margin:2px 0 0">🔑 Имоти <b style="color:var(--txt)">${own.length}</b>${own.length ? ': ' + ks.map(k => `<span title="${deps.BTYPES[k]?.nm || k}" style="font-size:15px">${deps.BTYPES[k]?.ico || '🏢'}</span>${by[k] > 1 ? `<b style="color:var(--txt)">×${by[k]}</b>` : ''}`).join(' ') : ' — още нямаш'}${land ? ` · 🟩 земя ${land}` : ''}</div>`;
+    }
     for (const p of ps.slice(0, 6)) {
       const st = deps.BTYPES[p.type].stages[p.stage], pct = Math.round(((p.stage + Math.min(1, p.prog || 0)) / deps.BTYPES[p.type].stages.length) * 100);
       const why = p.demo ? ' · 🧱 събаряне' : p.waitGear ? ' · <span class="late">⏸ липсва техника</span>' : p.waitMoney ? ' · <span class="late">⏸ няма пари за материали</span>' : '';

@@ -3034,7 +3034,8 @@ function clickCity(id) {
   if (!S) {
     modal(`🏗️ Основи фирмата в ${c.nm}`, `Започваш с ${fmt(ECON.START.money)} €, бригада работници, багер и самосвал. Градът е измислен, но се намира в ${c.nm}.<br><br><b>Избери името на фирмата.</b> С всеки нов бизнес ще основаваш дъщерни дружества: Толроуд, Рейл, Сийлайнс, Скай Еър, Петролиум и накрая Глобъл.`,
       [['Отказ', null], ...BRANDS.map(b => [`${b.ico} ${b.nm}`, () => newGame(id, b.k)])]);
-  } else if (railPick) railClick(id);
+  } else if (hwPick) hwClick(id);
+  else if (railPick) railClick(id);
   else if (S.cityId === id) enterCity();
   else if (ownedCities().includes(id)) modal(`${id === S.hqCity ? '🏗️ Централа' : '🏢 Филиал'} в ${c.nm}`, `Влез и играй в ${c.nm}: свои поръчки, обекти, имоти и техника. Парите и репутацията са общи.<br>Докато не си там, градът носи около ${fmt(1400 + 350 * S.rep + 120 * (S.officeLevel || 1))} € на ден, а обектите му продължават.${factoryInfo(id)}`, [['Отказ', null], [`Влез в ${c.nm}`, () => switchCity(id)]]);
   else if (coopCity(id)) { const pn = window.__coopShared.name || 'партньора';
@@ -3405,6 +3406,42 @@ function offerShortcut(a, b, after) {   // едно натискане — ст�
 }
 
 let railPick = null;   // избран начален град при строене
+// 🛣️ магистрала от А до Б (като жп линията): избираш два града, играта намира най-краткото трасе по участъците
+// (готовите и започнатите се ползват наготово) и взима всички липсващи като държавни поръчки — над капацитета на офиса отиват на опашка
+let hwPick = null;
+function startHwMode() {
+  if (!dev.has('LINKS')) { modal('🛣️ Магистрали', lockTxt(2), [['Добре', null]]); return; }
+  if (!hwRepOk()) { modal('🛣️ Магистрали', `Държавните поръчки за магистрали изискват репутация ${HW_REP} ★ или ниво 5 на развитие (голяма фирма).`, [['Добре', null], ['📋 Списък', () => openBig('hw')]]); return; }
+  railPick = null; hwPick = 'pickA'; showMap(true); renderMapHud(); toast('🛣️ Избери началния град на магистралата (точка А).');
+}
+const segUsable = x => x.ab ? abUnlocked() && (!x.cont || contByKey(x.cont)?.open()) : segOpen(x);
+function hwRoute(a, b) {   // Дейкстра: готов/започнат/на опашка участък тежи малко, нов — колкото километрите му
+  const have = new Set([...hwAll(), ...(S.hwJobs || []).map(j => j.seg), ...hwQueue()]), E = [...allSegs(), ...ALL_AB].filter(x => have.has(x.id) || segUsable(x));
+  const dist = { [a]: 0 }, prev = {}, done = new Set();
+  for (;;) { let u = null; for (const k in dist) if (!done.has(k) && (u === null || dist[k] < dist[u])) u = k;
+    if (u === null || u === b) break; done.add(u);
+    for (const x of E) { if (x.a !== u && x.b !== u) continue; const v = x.a === u ? x.b : x.a, w = kmBetween(x.a, x.b) * (have.has(x.id) ? 0.05 : 1);
+      if (dist[v] == null || dist[u] + w < dist[v]) { dist[v] = dist[u] + w; prev[v] = [u, x]; } } }
+  if (dist[b] == null) return null;
+  const segs = []; for (let k = b; k !== a; k = prev[k][0]) segs.unshift(prev[k][1]);
+  return { segs, todo: segs.filter(x => !have.has(x.id)) };
+}
+function hwClick(id) {
+  const c = cityById(id);
+  if (hwPick === 'pickA') { hwPick = id; mapSel = id; applySel(); toast(`Начало: ${c.nm}. Сега избери крайния град (точка Б).`); renderMapHud(); return; }
+  const a = hwPick; if (id === a) { hwPick = 'pickA'; mapSel = null; applySel(); return; }
+  const R = hwRoute(a, id);
+  if (!R) { toast(`Няма магистрално трасе ${cityById(a).nm} — ${c.nm}${abUnlocked() ? '' : ' (аутобаните още са заключени)'}. Избери друг град.`, 'bad'); return; }
+  const nm = x => x.ab ? `🔴 ${cityById(x.a).nm} — ${cityById(x.b).nm}` : `АМ „${x.hw?.nm || ''}“ ${cityById(x.a).nm} — ${cityById(x.b).nm}`;
+  const rows = R.todo.map(x => { const km = kmBetween(x.a, x.b), q = x.ab ? abQuoteSeg(x, km) : segmentQuote(km); return { x, km, q }; });
+  const km = R.segs.reduce((t, x) => t + kmBetween(x.a, x.b), 0), reward = rows.reduce((t, r) => t + (r.q.reward || 0), 0), free = Math.max(0, HW_MAX_JOBS() - (S.hwJobs || []).length);
+  const reset = () => { hwPick = null; mapSel = null; applySel(); renderMapHud(); };
+  if (!rows.length) { modal(`🛣️ ${cityById(a).nm} — ${c.nm}`, `Трасето (${fmt(km)} км, ${R.segs.length} участъка) вече е построено или се строи. 👍`, [['Добре', reset], ['📋 Списък', () => { reset(); openBig('hw'); }]]); return; }
+  modal(`🛣️ Магистрала ${cityById(a).nm} — ${c.nm}`, `Трасе ${fmt(km)} км · ${R.segs.length} участъка${R.segs.length > rows.length ? ` (${R.segs.length - rows.length} вече са готови/започнати)` : ''}.<br>
+    Държавата плаща общо <b style="color:var(--ok)">${fmt(reward)} €</b> за ${rows.length} нови участъка:<div style="margin:6px 0;max-height:220px;overflow:auto">${rows.map((r, i) => `<div class="meta" style="margin:2px 0">${i < free ? '🚧' : '📋'} ${nm(r.x)} · ${r.km} км · ${r.q.days} дни · <b style="color:var(--ok)">${fmt(r.q.reward)} €</b></div>`).join('')}</div>
+    ${rows.length > free ? `${free ? `🚧 ${free === 1 ? '1 започва' : free + ' започват'} веднага, 📋 останалите ${rows.length - free}` : `📋 Всички ${rows.length}`} ${rows.length - free === 1 ? 'чака' : 'чакат'} на опашка и ${rows.length - free === 1 ? 'тръгва' : 'тръгват'} сами, щом се освободи екип.` : 'Всички започват веднага.'}${hwMissing().length ? `<br><span class="late">🚜 ${hwMissingTxt()} — участъците ще чакат пътната техника.</span>` : ''}`,
+    [['Отказ', reset], ['📋 Списък', () => { reset(); openBig('hw'); }], [`🛣️ Строй ${rows.length} участъка`, () => { for (const r of rows) takeSeg(r.x.id); reset(); save(); drawMap(); }]]);
+}
 function startRailMode() { if (!dev.has('LINKS')) { modal('🛤️ Жп линии', lockTxt(2), [['Добре', null]]); return; } railPick = 'pickA'; showMap(true); toast('🚆 Избери начален град — централата или град от твоята жп мрежа.'); }
 function railClick(id) {
   const c = cityById(id), inNet = id === S.cityId || railEdges(true).some(([x, y]) => x === id || y === id) || (contOf(id) && ownedCities().includes(id));   // на другите континенти — всеки твой град (напр. Ню Йорк) може да е началото на първата линия там
@@ -4852,7 +4889,7 @@ function renderMapHud() {
   { let ct = $('mapCont'); if (!ct) { $('mapHud').insertAdjacentHTML('afterbegin', '<div id="mapCont"></div>'); ct = $('mapCont'); }
     const ch = contHudHtml(); if (ct.dataset.h !== ch) { ct.dataset.h = ch; ct.innerHTML = ch; ct.querySelectorAll('[data-contshow]').forEach(b => b.onclick = () => setMapView(viewOf(b.dataset.contshow).key)); } }
   let h = `<div class="sect">🏗️ Строй</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn2" id="mbRail">${railPick ? '✖ Откажи строежа' : '🛤️ Жп линия'}</button>${railPick ? '' : `<button class="btn2" id="mbHw">🛣️ Магистрала</button>${dev.has('AIR') ? '<button class="btn2" id="mbAir">✈️ Летище</button>' : ''}${seaOn() ? '<button class="btn2" id="mbSea">⚓ Пристанище</button>' : ''}`}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn2" id="mbRail">${railPick ? '✖ Откажи строежа' : '🛤️ Жп линия'}</button>${railPick ? '' : `<button class="btn2" id="mbHw">${hwPick ? '✖ Откажи магистралата' : '🛣️ Магистрала'}</button><button class="btn2" id="mbHwList" title="Всички участъци и опашката">📋</button>${dev.has('AIR') ? '<button class="btn2" id="mbAir">✈️ Летище</button>' : ''}${seaOn() ? '<button class="btn2" id="mbSea">⚓ Пристанище</button>' : ''}`}</div>
     <div class="meta" style="margin-top:4px">🎫 Тол ${fmt(hwToll())} €/ден${jobs ? ` · 🚧 строят се ${jobs} участъка${stuck ? ` · <span class="late">⏸ ${stuck} чакат техника</span>` : ''}` : ''}</div>`;
   { const tc = tenders.cardsHtml(); if (tc) { const n = (tc.match(/class="card/g) || []).length;   // свити до кратък ред — разгръщат се с натискане
     h += `<div class="sect" data-tendtog="1" style="cursor:pointer">🏛️ Държавни поръчки${n ? ` (${n})` : ''}${!tendOpen && /class="meta late/.test(tc) ? ' <span class="late">⚠️</span>' : ''} <span style="float:right">${tendOpen ? '▾' : '▸'}</span></div>${tendOpen ? tc : ''}`; } }
@@ -4876,7 +4913,8 @@ function renderMapHud() {
   supply.bind(box, () => { renderMapHud(); refreshWarehouse(); renderPanel(); });
   box.querySelectorAll('[data-openoffers]').forEach(b => b.onclick = () => openBig('offers'));
   $('mbRail').onclick = () => { if (railPick) { railPick = null; drawMap(); renderMapHud(); } else startRailMode(); };
-  if ($('mbHw')) $('mbHw').onclick = () => openBig('hw');
+  if ($('mbHw')) $('mbHw').onclick = () => { if (hwPick) { hwPick = null; mapSel = null; applySel(); renderMapHud(); } else startHwMode(); };
+  if ($('mbHwList')) $('mbHwList').onclick = () => openBig('hw');
   if ($('mbAir')) $('mbAir').onclick = () => openBig('air');
   if ($('mbSea')) $('mbSea').onclick = () => openBig('sea');
 }
