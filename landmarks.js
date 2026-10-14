@@ -17,12 +17,12 @@ export const CITY_LANDMARKS = {
   amsterdam: ['canal', 'rijks', 'centraal', 'adam', 'windmill', 'canal2'],
   // истински модели от Sketchfab (GLB_LM по-долу)
   cairo: ['pyramids'], giza: ['pyramids'],
-  dubai: ['burj'], newyork: ['manhattan'], sydney: ['opera'], moscow: ['stbasil'], toronto: ['cntower'], chicago: ['willis'], shanghai: ['shtower'], rio: ['redeemer'], washington: ['whitehouse', 'capitol'], lasvegas: ['bellagio', 'vegassign'],
+  dubai: ['burj'], newyork: ['manhattan'], sydney: ['opera'], moscow: ['stbasil'], toronto: ['cntower'], chicago: ['willis'], shanghai: ['shtower'], rio: ['redeemer'], washington: ['whitehouse'], lasvegas: ['bellagio', 'vegassign'],
 };
 // забележителности в морето пред града (game.js: refreshLandmarks, само при крайморските градове)
 export const SEA_LANDMARKS = { newyork: ['liberty'] };
 // големите забележителности в отделна зона W×D парцела встрани от центъра (game.js: refreshMines3D → bigLandmarks)
-export const BIG_LANDMARKS = { moscow: [['mgu', 4, 2, 0.52]], lasvegas: [['luxor', 2, 2]], istanbul: [['mosque', 3, 2, 0.59, 1]] };   // [вид, W, D, дълбочина/ширина на модела, завъртян на 90° (дългата страна на модела е по z)]
+export const BIG_LANDMARKS = { moscow: [['mgu', 4, 2, 0.52]], lasvegas: [['luxor', 2, 2]], istanbul: [['mosque', 3, 2, 0.59, 1]], washington: [['capitol', 3, 3, 1, 0, [3, 2]]] };   // [вид, W, D, дълбочина/ширина на модела, завъртян на 90° (дългата страна на модела е по z), [W, D] ако няма място (малък град) — щом градът порасне, се мести в голямата]
 export const LANDMARK_NM = { whitehouse: 'Белият дом', capitol: 'Капитолият', vegassign: '„Welcome to Fabulous Las Vegas“', bellagio: 'Беладжо', luxor: 'Луксор', cityhall: 'Кметството на Филаделфия', ststephen: 'Базилика „Св. Стефан“', mgu: 'Московският университет (МГУ)', pyramids: 'Пирамидите в Гиза', burj: 'Бурж Халифа', manhattan: 'Манхатън', liberty: 'Статуята на свободата', opera: 'Операта в Сидни', stbasil: 'Храмът „Св. Василий Блажени“', cntower: 'Си Ен Тауър', willis: 'Уилис Тауър', shtower: 'Шанхайската кула', redeemer: 'Христос Спасителя', mosque: 'Синята джамия', mosque2: 'Сюлейманийе', galata: 'Галатска кула', sapphire: 'Истанбул Сапфир', twist: 'Левент Туист', twin: 'Левент Туинс', colosseum: 'Колизеума', hagia: 'Света София', colosseo: 'Колизеума', sagrada: 'Саграда Фамилия', vatican: 'Ватикана и „Св. Петър“', stpeter: 'Базилика „Св. Петър“', pantheon: 'Пантеона', vittoriano: 'Витториано', erasmus: 'Мостът Еразъм', cubes: 'Кубичните къщи', markthal: 'Маркетхал', derotterdam: 'Де Ротердам', euromast: 'Евромаст', canal: 'Канал с къщи', canal2: 'Канал с къщи', rijks: 'Райксмузеум', centraal: 'Централна гара', adam: 'A’DAM Лукаут', windmill: 'Вятърна мелница', eiffel: 'Айфеловата кула', arc: 'Триумфалната арка', notredame: 'Нотр Дам', ladefense: 'Ла Дефанс', bigben: 'Биг Бен', londoneye: 'Лондонското око', towerbridge: 'Тауър Бридж', shard: 'Шард', brandenburg: 'Бранденбургската врата', fernsehturm: 'Телевизионната кула', reichstag: 'Райхстагът' };
 // кои стоят в центъра на града (останалите — в стария град извън центъра)
 export const LANDMARK_CENTER = new Set(['pyramids', 'burj', 'manhattan', 'cntower', 'willis', 'shtower', 'eiffel', 'arc', 'bigben', 'shard', 'brandenburg', 'reichstag', 'ladefense', 'sapphire', 'twist', 'twin', 'colosseum', 'colosseo', 'vatican', 'vittoriano', 'derotterdam', 'markthal', 'cubes', 'canal', 'rijks', 'centraal']);
@@ -470,8 +470,8 @@ const GLB_LM = {
   opera: { h: 30, fit: 40, plate: 0x4f86b8 }, manhattan: { h: 34, fit: 15, grid: true },
   colosseo: { h: 13, fit: 15, plate: 0xb9ad98 },   // Рим: Колизеумът (Carlos.Maciel)
   sagrada: { h: 17, fit: 15, plate: 0xc9bfa8 },   // Барселона: Саграда Фамилия (vmmaniac)
-  whitehouse: { h: 9, fit: 15, plate: 0x6f9a55, matte: 0xf4f1ea },   // Вашингтон: Белият дом с крилата (Void)
-  capitol: { h: 12, fit: 15, plate: 0x6f8f55 },     // Вашингтон: Капитолият (ycpan3468, photogrammetry; паркът наоколо е изрязан)
+  whitehouse: { h: 9, fit: 15, plate: 0x6f9a55, matte: 0xf4f1ea, rx: -0.28 },   // Вашингтон: Белият дом с крилата (Void); моделът е наклонен ~16° — rx го изправя (иначе едната страна и крилата висят във въздуха)
+  capitol: { h: 14, fit: 15, plate: 0x6f8f55, sink: 0.1 },     // Вашингтон: Капитолият (ycpan3468, photogrammetry; паркът наоколо е изрязан, хълмът е наклонен); голяма зона 3×3 (BIG_LANDMARKS)
   vegassign: { h: 14, fit: 12, plate: 0xc9b98a },   // Лас Вегас: табелата „Welcome to Fabulous Las Vegas“ (sipulitrade)
   mgu: { h: 16, fit: 15, plate: 0x6f8f55 },   // Москва: МГУ — сталинският небостъргач с крилата и парка (Meshy AI); голяма зона 2×2 (BIG_LANDMARKS)
   eiffel: { h: 26, fit: 15, plate: 0xc9bfa8, onLoad: eiffelLights },   // Париж: Айфеловата кула (Meshy AI); нощем златни светлини и проблясване
@@ -517,10 +517,10 @@ function glbLm(kind) {
   g.userData.flood = flood;
   loadLm(kind).then(src => {
     g.remove(ph); if (!src) return;
-    const m = C.grid ? gridOf(src) : src.clone(true), w = new THREE.Group(); w.add(m);
+    const m = C.grid ? gridOf(src) : src.clone(true), w = new THREE.Group(); w.add(m); if (C.rx) m.rotation.x = C.rx;
     const b = new THREE.Box3().setFromObject(w), s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3());
     const k = Math.min(C.h / s.y, C.fit / Math.max(s.x, s.z));
-    m.position.set(-c.x, -b.min.y, -c.z); w.scale.setScalar(k); w.position.y = 0.3; w.position.z = C.dz || 0; if (C.sy) w.scale.y *= C.sy;   // sy — по-стръмно (ниските модели от Meshy)
+    m.position.set(-c.x, -b.min.y, -c.z); w.scale.setScalar(k); w.position.y = 0.3 - (C.sink || 0) * s.y * k; w.position.z = C.dz || 0; if (C.sy) w.scale.y *= C.sy;   // sy — по-стръмно (ниските модели от Meshy)
     w.traverse(o => {
       if (!o.isMesh) return; o.castShadow = o.receiveShadow = true;
       if (C.matte && o.material) { o.material = o.material.clone(); o.material.color.set(C.matte); o.material.metalness = 0; o.material.roughness = 0.8; o.material.metalnessMap = o.material.roughnessMap = o.material.map = null; o.material.needsUpdate = true; }   // светла фасада (Белият дом): текстурата е тъмна — само бял цвят + релефът (normalMap)

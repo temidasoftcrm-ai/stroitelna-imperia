@@ -677,7 +677,7 @@ function buildCity(cityId) {
   for (const [i, j, vertical] of lights) {
     const l = model('light-square', 7, false);
     l.position.set(tx(i) + (vertical ? TILE * 0.42 : 0), 0, tx(j) + (vertical ? 0 : TILE * 0.42));
-    l.rotation.y = vertical ? -Math.PI / 2 : 0; l.userData.detail = true;
+    l.rotation.y = vertical ? -Math.PI / 2 : 0; l.userData.detail = true; l.userData.tile = [i, j];
     g.add(l);
     lampPos.push({ x: tx(i) + (vertical ? TILE * 0.42 - 1.6 : 0), y: 6.2, z: tx(j) + (vertical ? 0 : TILE * 0.42 - 1.6) });
   }
@@ -1237,18 +1237,24 @@ function buildSignals(g) {
     const sig = { i, j, x, z, t: Math.random() * (SIG_GREEN + SIG_YELLOW) * 2, heads: [] };
     // два стълба по диагонал; всеки има светлини за двете посоки
     for (const [sx, sz, ry] of [[1, 1, 0], [-1, -1, Math.PI]]) {
-      const pole = model('traffic-light', 9, false); pole.userData.detail = true;
+      const pole = model('traffic-light', 9, false); pole.userData.detail = true; pole.userData.tile = [i, j];
       pole.position.set(x + sx * TILE * 0.55, 0, z + sz * TILE * 0.55); pole.rotation.y = ry;
       g.add(pole);
       for (const axis of ['ns', 'ew']) {
         const head = { axis, r: new THREE.Mesh(lampGeo, mk(0xff3030)), y: new THREE.Mesh(lampGeo, mk(0xffc400)), gr: new THREE.Mesh(lampGeo, mk(0x30ff60)) };
         const off = axis === 'ns' ? [0, 0.5] : [0.5, 0];
-        [head.r, head.y, head.gr].forEach((m, k) => { m.position.set(pole.position.x + off[0] * sx, 4.1 - k * 0.6, pole.position.z + off[1] * sz); g.add(m); });
+        [head.r, head.y, head.gr].forEach((m, k) => { m.position.set(pole.position.x + off[0] * sx, 4.1 - k * 0.6, pole.position.z + off[1] * sz); m.userData.tile = [i, j]; g.add(m); });
         sig.heads.push(head);
       }
     }
     signals.push(sig);
   }
+}
+// лампите и светофарите върху улици, които после станаха площад (забележителност, голяма зона, държавна поръчка) — махат се
+function pruneStreetDetail() {
+  if (!city.group) return;
+  for (const o of [...city.group.children]) { const t = o.userData.tile; if (t && !isRoad(t[0], t[1])) city.group.remove(o); }
+  for (let k = signals.length - 1; k >= 0; k--) if (!isRoad(signals[k].i, signals[k].j)) signals.splice(k, 1);
 }
 const sigKey = (i, j) => i * 1000 + j;
 let sigMap = new Map();
@@ -4336,7 +4342,7 @@ function refreshLandmarks() {
   // площадът на главната забележителност: 2×2 парцела в центъра, улиците между тях стават площад
   for (const o of city.plazaObjs || []) city.group.remove(o);
   city.plazaObjs = []; city.noRoad = null;
-  if (city.center) { landmarkCenter(kinds); return; }   // център 5×5: главната на площад 3×3, другите по пояса около него
+  if (city.center) { landmarkCenter(kinds); pruneStreetDetail(); return; }   // център 5×5: главната на площад 3×3, другите по пояса около него
   { const k = kinds[0], key = k + '@plaza', at = (bi, bj) => city.lots.find(l => l.bi === bi && l.bj === bj);
     const free = l => l && l !== city.hq && !l.fresh && (!l.busy || l.busy === 'landmark') && !(est().owned || []).some(o => o.lot === l.id) && !(est().land || []).includes(l.id);
     let g4 = (mem[key] || []).map(id => city.lots[id]);
@@ -4376,6 +4382,7 @@ function refreshLandmarks() {
     o.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
     city.group.add(o.group); city.landmarks.push(o);
   }
+  pruneStreetDetail();
 }
 // държавната поръчка заема 2×2 парцела, големите — t.size (S.tenderLots4[id]; S.tenderLots[id] — горният ляв, за старите записи)
 function tenderGroup(t) {
@@ -4423,10 +4430,12 @@ function refreshMines3D() {
   // големите забележителности (МГУ…) — в собствена зона W×D парцела встрани; пазят парцелите си като площадките за добив
   for (const o of city.bigLm || []) city.group.remove(o.group);
   city.landmarks = (city.landmarks || []).filter(o => !o.big); city.bigLm = [];
-  for (const [kind, W, D, asp = 1, turn = 0] of BIG_LANDMARKS[S.cityId] || []) {
+  for (const [kind, W0, D0, asp = 1, turn = 0, alt] of BIG_LANDMARKS[S.cityId] || []) {
     S.bigLm = S.bigLm || {}; const site = S.bigLm[S.cityId + ':' + kind] = S.bigLm[S.cityId + ':' + kind] || { kind };
     if (!site.near) { site.lots = null; site.near = 1; }   // старите записи (зона в покрайнините) — местят се до центъра
-    const grp = mineGroup(site, W, D, true); if (!grp) continue;
+    let W = W0, D = D0, grp = mineGroup(site, W, D, true);
+    if (!grp && alt) { [W, D] = alt; grp = mineGroup(site, W, D, true); }   // малък град — по-малката зона
+    if (!grp) continue;
     const [l0] = grp, x = tx(3 * l0.bi + 1.5 * W), z = tx(3 * l0.bj + 1.5 * D);
     for (const lot of grp) { if (lot.obj || lot.built) clearLot(lot); for (const tr of lot.trees || []) city.group.remove(tr); lot.trees = []; lot.busy = 'mine'; }
     for (let a = 1; a < W; a++) for (let j = 3 * l0.bj + 1; j <= 3 * (l0.bj + D) - 1; j++) city.noRoadM.add(3 * (l0.bi + a) + ',' + j);
@@ -4451,6 +4460,7 @@ function refreshMines3D() {
     const o = city.mine3D[site.id] = buildSite3D(city.group, { label }, { kind: site.kind, lv: site.lv || 1, x, z, scale: k, sign: `${K.ico || '⛏️'} ${K.nm || ''}`, ext: [((3 * W - 1) * TILE - 2) / k, ((3 * D - 1) * TILE - 2) / k] });
     o.group.userData.mine = true;
   }
+  pruneStreetDetail();
 }
 function refreshTender3D() {
   if (!S || !city.lots) return;
@@ -4476,6 +4486,7 @@ function refreshTender3D() {
       city.tender3D[t.id] = buildPortTerminal(city.group, { A, model, label }, { x: city.sea.port.xMax + 70, z: city.sea.port.z, prog: p });
     }
   }
+  pruneStreetDetail();
 }
 const airUpkeep = () => (S.planes || []).reduce((a, p) => a + PLANES[p.kind].upkeep, 0) + Object.values(S.airports || {}).reduce((a, p) => a + (p.muni ? 0 : (p.lv || 0) * 2500), 0);
 // ---- на картата: летищата, линиите (дъги) и самолетите
