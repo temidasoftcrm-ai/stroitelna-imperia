@@ -69,6 +69,7 @@ let AB = null;
 import('./autobahn.js').then(m => { AB = m; }).catch(() => {});
 import { HIGHWAYS, HW_STAGES, HW_NEED_OLD, HW_FLEET, HW_REP, HW_MODELS, TOLL_PER_KM_DAY, segId, segmentQuote, buildHighwayView } from './highways.js';
 import { createTirs } from './trucks.js';
+import { createHwTrucks } from './hwtrucks.js';
 import { createOrient } from './orient.js';
 import { createRoute66 } from './route66.js';
 import { loadTrainModels, hasTrainModel, trainCar } from './trainmodels.js';
@@ -2170,7 +2171,7 @@ function buyUnit(type, quiet = false) {
 const BUY_PICS = { loader: 'assets/ui/buy-loader.webp', crew: 'assets/ui/buy-crew.webp', crane: 'assets/ui/buy-crane.webp', truck: 'assets/ui/buy-truck.webp', tractor: 'assets/ui/buy-tractor.webp', grader: 'assets/ui/buy-grader.webp', paver: 'assets/ui/buy-paver.webp', roller: 'assets/ui/buy-roller.webp', marker: 'assets/ui/buy-marker.webp', bulldozer: 'assets/ui/buy-bulldozer.webp' };
 let buyPopT = null;
 // снимки за събития: ключ → файл (нови снимки се добавят тук)
-const EVENT_PICS = { 'usa-open': 'assets/ui/usa-open.webp', 'unlock-namerica': 'assets/ui/usa-open.webp', 'balkans-open': 'assets/ui/balkans-open.webp', 'airport-first': 'assets/ui/airport-first.webp', 'bosphorus-done': 'assets/ui/bosphorus-done.webp', 'city-done': 'assets/ui/city-done.webp', 'sea-week': 'assets/ui/sea-week.webp', 'rail-week': 'assets/ui/rail-week.webp', 'empire': 'assets/ui/empire.webp', 'country-won': 'assets/ui/country-won.webp', 'tender-lost': 'assets/ui/tender-lost.webp', 'resort-month': 'assets/ui/resort-month.webp', 'air-week': 'assets/ui/air-week.webp', 'oe-done': 'assets/ui/oe-done.webp', 'r66-done': 'assets/ui/r66-done.webp', 'ab-done': 'assets/ui/ab-done.webp', 'airport-done': 'assets/ui/airport-done.webp', 'port-done': 'assets/ui/port-done.webp', 'ship-cargo': 'assets/ui/ship-cargo-pop.webp', 'ship-cruise': 'assets/ui/ship-cruise-pop.webp', 'lv-1': 'assets/ui/lv-1.webp', 'lv-2': 'assets/ui/lv-2.webp', 'lv-3': 'assets/ui/lv-3.webp', 'lv-4': 'assets/ui/lv-4.webp', 'lv-5': 'assets/ui/lv-5.webp', 'lv-6': 'assets/ui/lv-6.webp', 'lv-7': 'assets/ui/lv-7.webp', 'lv-8': 'assets/ui/lv-8.webp', 'hire-engineer': 'assets/ui/hire-engineer.webp', 'hire-architect': 'assets/ui/hire-architect.webp', 'unlock-balkans': 'assets/ui/unlock-balkans.webp', 'unlock-europe': 'assets/ui/unlock-europe.webp', 'unlock-africa': 'assets/ui/unlock-africa.webp', 'unlock-samerica': 'assets/ui/unlock-samerica.webp', 'unlock-asia': 'assets/ui/unlock-asia.webp', 'unlock-oceania': 'assets/ui/unlock-oceania.webp', 'done-tower': 'assets/ui/done-tower.webp', 'done-reno': 'assets/ui/done-reno.webp', 'done-rent': 'assets/ui/done-rent.webp', 'hw-open': 'assets/ui/hw-open.webp', 'rail-done': 'assets/ui/rail-done.webp', 'first-train': 'assets/ui/first-train.webp', 'office-up': 'assets/ui/office-up.webp', 'new-branch': 'assets/ui/new-branch.webp', 'sold': 'assets/ui/sold.webp', 'resort-unlock': 'assets/ui/resort-unlock.webp', 'done-house': 'assets/ui/done-house.webp', 'done-shop': 'assets/ui/done-shop.webp', 'done-office': 'assets/ui/done-office.webp', 'new-train': 'assets/ui/new-train.webp', 'chunnel-done': 'assets/ui/chunnel-done.webp', 'capecairo-done': 'assets/ui/capecairo-done.webp', 'panama-done': 'assets/ui/panama-done.webp', 'darien-done': 'assets/ui/darien-done.webp', 'transsib-done': 'assets/ui/transsib-done.webp', 'ghan-done': 'assets/ui/ghan-done.webp', 'tender-won': 'assets/ui/tender-won.webp' };
+const EVENT_PICS = { 'tir-bought': 'assets/ui/tir-bought.webp', 'usa-open': 'assets/ui/usa-open.webp', 'unlock-namerica': 'assets/ui/usa-open.webp', 'balkans-open': 'assets/ui/balkans-open.webp', 'airport-first': 'assets/ui/airport-first.webp', 'bosphorus-done': 'assets/ui/bosphorus-done.webp', 'city-done': 'assets/ui/city-done.webp', 'sea-week': 'assets/ui/sea-week.webp', 'rail-week': 'assets/ui/rail-week.webp', 'empire': 'assets/ui/empire.webp', 'country-won': 'assets/ui/country-won.webp', 'tender-lost': 'assets/ui/tender-lost.webp', 'resort-month': 'assets/ui/resort-month.webp', 'air-week': 'assets/ui/air-week.webp', 'oe-done': 'assets/ui/oe-done.webp', 'r66-done': 'assets/ui/r66-done.webp', 'ab-done': 'assets/ui/ab-done.webp', 'airport-done': 'assets/ui/airport-done.webp', 'port-done': 'assets/ui/port-done.webp', 'ship-cargo': 'assets/ui/ship-cargo-pop.webp', 'ship-cruise': 'assets/ui/ship-cruise-pop.webp', 'lv-1': 'assets/ui/lv-1.webp', 'lv-2': 'assets/ui/lv-2.webp', 'lv-3': 'assets/ui/lv-3.webp', 'lv-4': 'assets/ui/lv-4.webp', 'lv-5': 'assets/ui/lv-5.webp', 'lv-6': 'assets/ui/lv-6.webp', 'lv-7': 'assets/ui/lv-7.webp', 'lv-8': 'assets/ui/lv-8.webp', 'hire-engineer': 'assets/ui/hire-engineer.webp', 'hire-architect': 'assets/ui/hire-architect.webp', 'unlock-balkans': 'assets/ui/unlock-balkans.webp', 'unlock-europe': 'assets/ui/unlock-europe.webp', 'unlock-africa': 'assets/ui/unlock-africa.webp', 'unlock-samerica': 'assets/ui/unlock-samerica.webp', 'unlock-asia': 'assets/ui/unlock-asia.webp', 'unlock-oceania': 'assets/ui/unlock-oceania.webp', 'done-tower': 'assets/ui/done-tower.webp', 'done-reno': 'assets/ui/done-reno.webp', 'done-rent': 'assets/ui/done-rent.webp', 'hw-open': 'assets/ui/hw-open.webp', 'rail-done': 'assets/ui/rail-done.webp', 'first-train': 'assets/ui/first-train.webp', 'office-up': 'assets/ui/office-up.webp', 'new-branch': 'assets/ui/new-branch.webp', 'sold': 'assets/ui/sold.webp', 'resort-unlock': 'assets/ui/resort-unlock.webp', 'done-house': 'assets/ui/done-house.webp', 'done-shop': 'assets/ui/done-shop.webp', 'done-office': 'assets/ui/done-office.webp', 'new-train': 'assets/ui/new-train.webp', 'chunnel-done': 'assets/ui/chunnel-done.webp', 'capecairo-done': 'assets/ui/capecairo-done.webp', 'panama-done': 'assets/ui/panama-done.webp', 'darien-done': 'assets/ui/darien-done.webp', 'transsib-done': 'assets/ui/transsib-done.webp', 'ghan-done': 'assets/ui/ghan-done.webp', 'tender-won': 'assets/ui/tender-won.webp' };
 // картинките идват на опашка: ако една още се вижда (напр. седмиците на влаковете, корабите и самолетите в един ден), следващата чака
 let popQ = [], popBusy = false;
 function showEventPop(key, cap, sub) {
@@ -2313,6 +2314,7 @@ function endOfDay() {
     econ.earn(inc, 'филиали', `Ден ${S.day}: печалба от ${away} град${away > 1 ? 'а' : ''} без теб`);
   }
   { const tu = (S.trains || []).reduce((a, t) => a + trainType(t).upkeep, 0); if (tu) econ.spend(tu, 'заплати', `Ден ${S.day}: влакове`); flowDay('rail', tu); }
+  hwTrucks.day();
   if (hwDone().length) econ.earn(hwToll(), 'обект', `Ден ${S.day}: тол такси`);
   if (S.day % 10 === 0 && (S.trains || []).length && (S.trains || []).length >= totalTracks()) {
     const weak = ownedCities().filter(id => (id === S.cityId ? (S.stationLevel || 0) : ((S.cities || {})[id]?.stationLevel || 0)) < 5);
@@ -2455,6 +2457,7 @@ function renderPanel() {
           <button class="btn" data-fill="${m.t}" ${econ.canAfford(T.cost) ? '' : 'disabled'}>Купи ${m.n} · ${fmt(m.n * T.cost)} €</button></div></div>`; }).join('');
       h += `<button class="btn" id="bFillAll" style="width:100%;margin-top:4px" ${econ.canAfford(total) ? '' : 'disabled'}>🛒 Купи всичко липсващо · ${fmt(total)} €</button>`;
     }
+    h += hwTrucks.html();
     h += `<details style="margin-top:10px"><summary class="meta" style="cursor:pointer">👷 Специалисти (инженер, архитект)</summary>` + Object.entries(STAFF).map(([k, t]) => `<div class="card" style="padding:9px 11px"><div class="row" style="margin:0"><b>${t.ico} ${t.nm}</b>${hasStaff(k) ? '<b style="color:var(--ok)">✓ в екипа</b>' : `<b>${fmt(t.cost)} €</b>`}</div>
       <div class="meta">${t.ds} Заплата ${fmt(t.upkeep)} €/ден.</div>${dev.level() < 4 && !hasStaff(k) ? `<div class="meta late">🔒 Ниво 4 на развитие на града (сега ${dev.level()})</div>` : ''}${hasStaff(k) ? '' : `<div class="row" style="justify-content:flex-end;margin-top:4px"><button class="btn" data-staff="${k}" ${econ.canAfford(t.cost) ? '' : 'disabled'}>Назначи</button></div>`}</div>`).join('') + `</details>`;
   } else if (tab === 'estate') {
@@ -2476,6 +2479,7 @@ function renderPanel() {
   el.querySelectorAll('[data-fill]').forEach(b => b.onclick = () => { const m = fleetMissing().find(x => x.t === b.dataset.fill); if (!m) return; const k = fillUnits(m.t, m.n); toast(k ? `${ECON.UNIT_TYPES[m.t].ico} Купи ${k} × ${ECON.UNIT_TYPES[m.t].nm.toLowerCase()}.` : 'Няма място или пари.', k ? 'good' : 'bad'); renderPanel(); });
   if (el.querySelector('#bFillAll')) el.querySelector('#bFillAll').onclick = () => { let k = 0; for (const m of fleetMissing()) k += fillUnits(m.t, m.n); toast(k ? `🛒 Купи ${k} машини и бригади.` : 'Няма място или пари.', k ? 'good' : 'bad'); renderPanel(); };
   el.querySelectorAll('[data-sell]').forEach(b => b.onclick = () => sellUnit(b.dataset.sell));
+  hwTrucks.bind(el);
   el.querySelectorAll('[data-lot]').forEach(c => c.onclick = () => { selProject = c.dataset.proj ? +c.dataset.proj : null; flyTo(city.lots[+c.dataset.lot]); highlightLot(+c.dataset.lot); renderPanel(); });
   if (tab === 'bank') renderBank($('financeBox'));
   if (tab === 'estate') bindEstate(el);
@@ -2805,7 +2809,7 @@ function keyCitiesMine() { const own = new Set(ownedCities()); return new Set(CO
   for (const { c, x, y, hq, here, r } of pts) { const kr = KEY_CITY.has(c.id), lo = kr ? r * 1.3 + 3 : r + 2, ix = kr ? (c.left ? x + r * 0.6 : x - r * 0.4) : x, iy = kr ? y - r * 0.4 : y; h += `${here && !hq ? `<text class="hqico" x="${ix - 7}" y="${iy - 9}">📍</text>` : ''}<g class="city lbl ${hq || here ? 'hq' : ''} ${S && dev.best() < cityLv(c.id) ? 'locked' : ''} ${lblMajor(c, hq || here, KEY_CITY.has(c.id)) ? 'major' : ''}" data-city="${c.id}" data-pr="${lblPr(c, hq, here, KEY_CITY.has(c.id))}"><title>${c.cc ? c.cc + ' ' : ''}${c.nm}${econ && econ.isFinished && econ.isFinished(c.id) ? ' · завършен 🏁' : ''}</title><text x="${c.left ? x - lo : x + lo}" y="${y + 3.5}" text-anchor="${c.left ? 'end' : 'start'}">${c.nm}</text>${hq ? `<text class="hqico" x="${ix - 9}" y="${iy - 9}">🏗️</text>` : (S?.branches || []).includes(c.id) ? `<text class="hqico" x="${ix - 8}" y="${iy - 7}" style="font-size:${(13 * mapLS()).toFixed(1)}px">🏢</text>` : ''}${(ECON.FACTORIES || []).filter(f => f.cityId === c.id).map((f, i) => `<text class="hqico" x="${x - 4 + i * 11}" y="${y + (kr ? Math.max(16, r * 1.3 + 12) : 16)}" style="font-size:${(11 * mapLS()).toFixed(1)}px">${ECON.MATERIALS[f.materialId].ico}</text>`).join('')}</g>`; }
   for (const { c, x, y, hq, r } of pts) h += `<g class="city ${hq ? 'hq' : ''} ${S && S.cityId === c.id ? 'here' : ''} ${S && econ?.isFinished?.(c.id) ? 'done' : ''} ${S && dev.best() < cityLv(c.id) ? 'locked' : ''}" data-city="${c.id}"><circle class="hit" cx="${x}" cy="${y}" r="${(mapEU ? 34 : mapWide ? 11 : 7) * mapK()}"/>${AIR_ONLY.has(c.id) && !(S && ownedCities().includes(c.id)) ? `<text class="aironly" x="${x}" y="${y + r * 0.9}" text-anchor="middle" style="font-size:${(r * 2.6).toFixed(1)}px;pointer-events:none">✈️</text>` : GLOBAL_HUB.has(c.id) ? `<polygon class="gstar" points="${starPts(x, y, r * 2)}" style="stroke-width:${(r * 0.16).toFixed(2)}px"/>` : `<circle ${KEY_CITY.has(c.id) ? 'class="keyc" ' : ''}cx="${x}" cy="${y}" r="${KEY_CITY.has(c.id) ? (r * 1.3).toFixed(2) : r}"/>`}</g>`;   // ★ световните центрове — само звезда на мястото на кръгчето
   h = h.replace('<g class="city lbl', mapLayers.wrap('rail', railSvg() + (mapWorld && (!mapCont || mapCont === 'as') ? silk.svg(id => proj(cityById(id).lon, cityById(id).lat), (mapEU ? 4 : 1) * mapK(), performance.now() / 1000) : '')) + '<g class="city lbl');
-  h = h.replace('<g class="city lbl', mapLayers.wrap('road', hwSvg() + abSvg()) + mapLayers.wrap('air', airSvg()) + mapLayers.wrap('sea', seaSvg()) + '<g class="city lbl');
+  h = h.replace('<g class="city lbl', mapLayers.wrap('road', hwSvg() + abSvg() + '<g id="truckLayer"></g>') + mapLayers.wrap('air', airSvg()) + mapLayers.wrap('sea', seaSvg()) + '<g class="city lbl');
   h = h.replace('<g class="city lbl', superRouteSvg() + oilMapSvg() + mwMapSvg() + '<g class="city lbl');   // трасетата на супер поръчките — над всички мрежи
   h += resorts.svg(mapCont || null);   // Фаза 5: курортите — европейските на картата на Европа, африканските на изгледа „Африка“
   h += '<g class="lay-rail"><g id="trainLayer"></g></g><g class="lay-air"><g id="planeLayer"></g></g><g class="lay-sea"><g id="shipLayer"></g></g>';
@@ -2816,7 +2820,7 @@ function keyCitiesMine() { const own = new Set(ownedCities()); return new Set(CO
     if (!g) { g = document.createElementNS('http://www.w3.org/2000/svg', 'g'); g.id = 'rlfG'; g.dataset.key = key; g.innerHTML = reliefSvg(wonD); }
     slot.replaceWith(g); } }
   mapLayers.apply();
-  updateMapTrains(); updateMapPlanes(); updateMapShips();
+  updateMapTrains(); updateMapPlanes(); updateMapShips(); updateMapTrucks();
   svg.classList.toggle('near', mapNear()); svg.classList.toggle('mid', mapZoom() >= 1.5);
   declutterLabels(svg);
   svg.querySelectorAll('.city').forEach(g => g.onclick = () => { mapSel = g.dataset.city; applySel(); clickCity(g.dataset.city); });
@@ -3027,6 +3031,20 @@ const resorts = createResorts({
   onMonth: (m, mon) => showEventPop('resort-month', `+${fmt(m)} €`, ''),
   onNewResort: (r, t) => { toast(t, 'good', () => resorts.open(r.id)); showEventPop('resort-unlock', `${r.ico} Нов курорт: ${r.nm}`, t); },
 });
+// 🚚 собствени ТИР-ове по магистралите (hwtrucks.js): маршрут само по готови участъци (твои и на партньора — по неговите се плаща тол)
+function hwDonePath(a, b) {
+  const done = new Set(hwAll()), E = [...allSegs(), ...ALL_AB].filter(x => done.has(x.id)), dist = { [a]: 0 }, prev = {}, seen = new Set();
+  for (;;) { let u = null; for (const k in dist) if (!seen.has(k) && (u === null || dist[k] < dist[u])) u = k;
+    if (u === null || u === b) break; seen.add(u);
+    for (const x of E) { if (x.a !== u && x.b !== u) continue; const v = x.a === u ? x.b : x.a, w = kmBetween(x.a, x.b); if (dist[v] == null || dist[u] + w < dist[v]) { dist[v] = dist[u] + w; prev[v] = [u, x]; } } }
+  if (dist[b] == null) return null;
+  const path = [b], segs = []; for (let k = b; k !== a; k = prev[k][0]) { const x = prev[k][1]; segs.unshift({ id: x.id, a: x.a, b: x.b, km: Math.round(kmBetween(x.a, x.b)), own: hwMine(x.id) }); path.unshift(prev[k][0]); }
+  return { path, segs };
+}
+const cityWh = id => ((id === S?.cityId ? S?.whLevel : S?.cities?.[id]?.whLevel) || 0) > 0;
+const hwTrucks = createHwTrucks({ S: () => S, econ: () => econ, toast, modal, fmt, save, cityName: id => cityById(id)?.nm || id, owned: () => ownedCities(), here: () => S.cityId, route: (a, b) => hwDonePath(a, b),
+  hasWh: id => cityWh(id), pop: (k, a, b) => showEventPop(k, a, b), redraw: () => { if (!$('mapScreen').classList.contains('hidden')) drawMap(); }, renderPanel: () => renderPanel() });
+function updateMapTrucks() { hwTrucks.draw(document.getElementById('truckLayer'), { proj, cityLL: id => { const c = cityById(id); return c && [c.lon, c.lat]; }, k: (mapEU ? 4 : mapWide ? 1.6 : 1) * mapK(), near: mapNear(), inView: p => mapIn(...p) }); }
 function clickCity(id) {
   const c = CITIES.find(q => q.id === id);
   if (S && AIR_ONLY.has(id) && !ownedCities().includes(id)) { const of = AIR_ONLY_OF[id]; toast(`✈️ ${c?.nm || id} е само летище${of ? ` — обслужва ${cityById(of)?.nm || of}` : ''}. Тук не се купува филиал.`, ''); return; }
@@ -5573,7 +5591,7 @@ function abNetwork() {
 }
 const wonCityIds = () => econ ? wonCountries(x => econ.isFinished(x)).flatMap(k => k.cities) : [];
 const accessIds = kind => S && S.roadAccess && S.roadAccess[S.cityId] === kind ? (ECON.FACTORIES || []).map(f => f.cityId) : [];   // общинско включване в пътната мрежа
-const supplyOpts = () => ({ roadCityIds: [...hwNetwork().filter(id => id !== S.cityId), ...accessIds('road')], abCityIds: [...new Set([...abNetwork(), ...seaNetwork(), ...accessIds('ab')])], wonCityIds: wonCityIds() });
+const supplyOpts = () => ({ noFee: hwTrucks.noFee(S.cityId), roadCityIds: [...hwNetwork().filter(id => id !== S.cityId), ...accessIds('road')], abCityIds: [...new Set([...abNetwork(), ...seaNetwork(), ...accessIds('ab')])], wonCityIds: wonCityIds() });
 // налични участъци: незапочнати, по-близките до мрежата ти първи
 function hwAvailable() {
   const busy = new Set([...hwAll(), ...(S.hwJobs || []).map(j => j.seg)]);
@@ -7270,7 +7288,7 @@ function frame() {
   const rdt = Math.min(clock.getDelta(), 0.1);
   const dt = (AUTOTEST ? 1 / 30 * 8 : rdt) * speed;
   const onMap = !$('mapScreen').classList.contains('hidden');
-  if (S && city.ready && onMap) { mapT -= rdt; if (mapT <= 0) { mapT = 1; renderMapHud(); drawMapRailsOnly(); } updateMapTrains(); updateMapPlanes(); updateMapShips(); }
+  if (S && city.ready && onMap) { mapT -= rdt; if (mapT <= 0) { mapT = 1; renderMapHud(); drawMapRailsOnly(); } updateMapTrains(); updateMapPlanes(); updateMapShips(); updateMapTrucks(); }
   if (S && city.ready) {
     questT -= rdt; if (questT <= 0) { questT = 1; afCheckOpen(); updFinBtn(); updResBtn(); syncSeaFleet(); autoCollectFinished(); processBuildQ(); if (bigWin) renderBig(); quests.tick(); if (!AUTOTEST) tutorial.tick(); }
     simT += dt;
@@ -7287,6 +7305,7 @@ function frame() {
     updateStationBuild(dt / DAY_SEC);
     updateParked();
     updateTrains(dt / DAY_SEC);
+    hwTrucks.update(dt / DAY_SEC);
     updateHighways(dt / DAY_SEC);
     updateCityHighway(simT);
     if (city.sea) city.sea.update(simT, dayNight.night);
@@ -7404,6 +7423,7 @@ if (AUTOTEST) {
     state: () => S,
     bustTest(debt = 2e6, days = 32) { econ.s.money = -debt; const out = []; for (let d = 0; d < days; d++) { endOfDay(); out.push([S.day, Math.round(econ.s.money), S.bust?.stage || '-', S.bust?.red]); } return { out: out.filter((x, i) => i % 3 === 0 || x[2] !== '-' || i === out.length - 1), units: S.units.length, rep: S.rep, bar: document.getElementById('bustBar')?.innerText || null, modal: !document.getElementById('modal').classList.contains('hidden') && document.getElementById('modal').innerText.slice(0, 300) }; },
     days(n = 1) { for (let d = 0; d < n; d++) endOfDay(); return S.day; },
+    truckRun(days = 1, step = 0.05) { for (let t = 0; t < days; t += step) hwTrucks.update(step); return (S.trucks || []).map(t => ({ trips: t.trips, earned: t.earned, at: t.at, to: t.b })); },
     tenderAudit() { const cn = id => COUNTRIES.find(k => k.cities.includes(id)); return { n: TENDERS.length, list: TENDERS.map(t => ({ id: t.id, city: t.city, kind: t.kind, dev: t.dev, rep: t.rep, b: t.budget, days: t.days, cont: contKeyOf(t.city), cc: cityById(t.city)?.cc || null, country: cn(t.city)?.nm || cn(t.city)?.iso || null, exists: !!cityById(t.city), air: AIR_ONLY.has(t.city), lv: cityLv(t.city), st: t.id.startsWith('st-') })), countries: COUNTRIES.map(k => ({ iso: k.iso, nm: k.nm, n: k.cities.length, first: k.cities[0], cont: k.cities[0] ? contKeyOf(k.cities[0]) : null })) }; },
     tenderSim(days = 3650, lv = 20, rep = 5, all = true) { S.dev.lv = lv; S.dev.xp = 9e6; S.rep = rep; if (all === 'bg') S.branches = ['sofia', 'plovdiv', 'varna', 'burgas', 'ruse']; else if (all) S.branches = [...new Set([...(S.branches || []), ...COUNTRIES.flatMap(k => k.cities)])]; econ.earn(5e10, 'друго', 'тест'); S.tenders = {}; const seen = []; const t0 = S.day; for (let d = 0; d < days; d++) { S.day++; for (const [id, s] of Object.entries(S.tenders)) if (s.st === 'open' && !s._seen) { s._seen = 1; seen.push([S.day - t0, id]); } tenders.dailyTick(); } return { n: seen.length, ids: seen.map(x => x[1]), gaps: seen.map((x, i) => i ? x[0] - seen[i - 1][0] : x[0]) }; },
     lotReload(ext) { if (ext != null) S.cityExt = ext; sessionStorage.setItem('stroiAT', JSON.stringify(S, (k, v) => k === 'vis' ? undefined : v)); setTimeout(() => location.reload(), 50); return 'reload'; },
@@ -7493,7 +7513,8 @@ if (AUTOTEST) {
       for (const v of ['bg', 'balkans', 'eu', 'af', 'am', 'as', 'oc', 'world']) run('view ' + v, () => { showMap(true); try { setMapView(v); } catch (e) { if (!/🔒/.test(e.message)) throw e; } drawMap(); renderMapHud(); });
       showMap(false);
       for (const t of ['offers', 'objects', 'units', 'stock', 'estate', 'hq']) run('tab ' + t, () => { tab = t; renderPanel(); });
-      run('trains', () => { updateMapTrains(); updateMapPlanes?.(); updateMapShips?.(); });
+      run('trains', () => { updateMapTrains(); updateMapPlanes?.(); updateMapShips?.(); updateMapTrucks(); });
+      run('trucks', () => { const a = hwTrucks.audit(); if (a.length) throw new Error(a.join('; ')); hwTrucks.update(0.5); });
       for (let d = 0; d < 5; d++) run('day ' + d, () => endOfDay());
       return errs;
     },

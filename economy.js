@@ -461,7 +461,7 @@ export class Economy {
   // opts (по желание): { roadCityIds } — градове с готова магистрала до централата
   quoteMaterial(matId, qty, connectedCityIds = [], opts = {}) {
     const how = supplyOf(matId, connectedCityIds, opts), unit = materialPrice(matId, connectedCityIds, opts), value = unit * qty;
-    const fee = qty > 0 && how === 'market' ? DELIVERY_FEE.base + value * DELIVERY_FEE.rate : 0;
+    const fee = qty > 0 && how === 'market' && !opts.noFee ? DELIVERY_FEE.base + value * DELIVERY_FEE.rate : 0;   // opts.noFee — свой ТИР до склада (hwtrucks.js)
     return { unit, value: Math.round(value), fee: Math.round(fee), total: Math.round(value + fee), rail: how === 'rail', road: how === 'road' };
   }
   // купува и слага в склада; връща { ok, cost, rail, road } (ok: false, ако няма пари)
