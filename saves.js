@@ -45,6 +45,13 @@ export async function restoreBackup(id) {
   localStorage.setItem(keyOf(b.slot), b.raw);
   return true;
 }
+// ⚙️ „Изтрий данните“: затваря връзката и трие цялата база с копията
+export async function dropBackups() {
+  try { if (dbP) (await within(dbP)).close(); } catch { }
+  dbP = null;
+  if (typeof indexedDB === 'undefined') return;
+  await within(new Promise(res => { const r = indexedDB.deleteDatabase('stroi-backups'); r.onsuccess = r.onerror = r.onblocked = () => res(); })).catch(() => { });
+}
 // ── дневник на грешките (последните 15) — за да се види после какво е станало ──
 export function logError(msg, extra = {}) {
   try { const L = JSON.parse(localStorage.getItem('stroi-errlog') || '[]'); L.unshift({ t: Date.now(), msg: String(msg).slice(0, 300), ...extra }); localStorage.setItem('stroi-errlog', JSON.stringify(L.slice(0, 15))); } catch { }

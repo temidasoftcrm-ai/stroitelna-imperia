@@ -3,7 +3,7 @@
 // сравнява с облака: ако на друго устройство има по-нов запис — сваля го и презарежда.
 // Таблица public.saves (user_id, slot 's1'…'s3', data jsonb, meta jsonb, updated_at); RLS: всеки вижда само своите.
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
-import { backupRaw } from './saves.js';
+import { backupRaw, dropBackups } from './saves.js';
 
 const URL_ = 'https://lpzjscttqieqnqozscpk.supabase.co';
 const KEY = 'sb_publishable_3Gats6iSx7BoyFUh63N1vQ__pHCBrul';   // публичен ключ — достъпът се пази от RLS
@@ -55,6 +55,9 @@ function paint() {
 
 function openPanel() {
   if (!user) return loginEmail();
+  return openSettings();
+}
+function openCloud() {
   const rows = [];
   for (let n = 1; n <= SLOTS; n++) { const raw = localStorage.getItem(keyOf(n)); if (raw) { const m = metaOf(raw), s = getSync(n); rows.push(`💾 Слот ${n}: ден ${m.day} · ${fmt(m.money)} € ${s && s.sig === sig(raw) ? '· ☁️ в облака' : '· ⏳ чака качване'}`); } }
   dlg(`<h2 style="font-size:19px;color:var(--acc)">☁️ Облак</h2><p style="color:var(--mut);font-size:14px;line-height:1.5">Влязъл си като <b style="color:var(--txt)">${user.email}</b>.<br>Играта се пази в облака автоматично — влез със същия имейл на друго устройство и продължаваш оттам.${lastErr ? `<br><span style="color:var(--bad)">Последна грешка: ${lastErr}</span>` : ''}</p>
@@ -96,6 +99,114 @@ function loginCode(email) {
   setTimeout(() => el.querySelector('#cloudCode')?.focus(), 50);
 }
 
+// ── ⚙️ Настройки: вход/изход, хора онлайн, изтриване на данните и на акаунта ──
+// 🆕 версия и какво е новото — при нова версия: вдигни VERSION и добави най-отгоре в CHANGES
+export const VERSION = '1.0.0';
+const CHANGES = [
+  ['1.0.0', '14.10.2026', [
+    '⚙️ Настройки: вход и изход, хора онлайн, изтриване на данните и на акаунта',
+    '🤝 Партньорство: обща карта (магистрали, жп, филиали), обща касичка-холдинг, дивиденти, акции на борсата',
+    '🛣️ Магистрали от град до град (като жп) и ⬆️ ъпгрейд на магистрала в аутобан',
+    '🚛 ТИР-ове по магистралите — сами избират курсовете',
+    '🏖️ Курортите носят повече наем',
+    '🗺️ По-чиста карта: по-малко надписи отдалеч, маркиране на избран град',
+    '💾 Автозаписи на всеки 5 мин и връщане на стар запис („💾 Записи“ → „🕒 Автозаписи“)',
+    '🚆 Поправено: влак без линия вече не спира играта',
+  ]],
+];
+const seenKey = 'stroi-seen-ver';
+function changesHtml() {
+  return CHANGES.map(([v, d, L], i) => `<div style="margin-top:${i ? 10 : 0}px"><b style="color:var(--txt)">v${v}</b> <span style="color:var(--mut)">· ${d}</span>
+    <ul style="margin:4px 0 0;padding-left:18px;font-size:13px;line-height:1.6;color:var(--mut)">${L.map(x => `<li>${x}</li>`).join('')}</ul></div>`).join('');
+}
+// hooks от game.js: credits(), newGame(), lock() — записва и спира записите (преди изтриване)
+let hooks = {};
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const sec = (t, body) => `<div style="border:1px solid var(--line);border-radius:12px;padding:10px 12px"><div style="font-weight:700;margin-bottom:6px">${t}</div>${body}</div>`;
+const sbtn = (id, t, cls = 'btn2', st = '') => `<button class="${cls}" id="${id}" style="padding:7px 12px;${st}">${t}</button>`;
+function openSettings(h) {
+  if (h) hooks = h;
+  try { localStorage.setItem(seenKey, VERSION); } catch { }
+  const ppl = online();
+  const el = dlg(`<h2 style="font-size:19px;color:var(--acc)">⚙️ Настройки</h2>
+    ${sec('☁️ Акаунт', user ? `<div style="font-size:14px;color:var(--mut);line-height:1.5">Влязъл си като <b style="color:var(--txt)">${esc(user.email)}</b> — играта се пази в облака.${lastErr ? `<br><span style="color:var(--bad)">Последна грешка: ${esc(lastErr)}</span>` : ''}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${sbtn('stCloud', '☁️ Записи в облака')}${sbtn('stOut', '🚪 Изход')}</div>`
+      : `<div style="font-size:14px;color:var(--mut);line-height:1.5">Не си влязъл. С вход (имейл + код, без парола) играта се пази в облака и можеш да играеш от няколко устройства.</div><div style="margin-top:8px">${sbtn('stIn', '☁️ Вход', 'btn')}</div>`)}
+    ${sec(`👥 Онлайн сега: <span id="stN">${ppl.length}</span>`, `<div id="stPpl" style="font-size:13px;line-height:1.7;max-height:150px;overflow:auto">${pplHtml(ppl)}</div>`)}
+    ${sec(`🆕 Ъпдейти <span style="font-weight:400;color:var(--mut);font-size:13px">· версия ${VERSION}</span>`, `<div style="max-height:170px;overflow:auto">${changesHtml()}</div>`)}
+    ${sec('🎮 Игра', `<div style="display:flex;gap:6px;flex-wrap:wrap">${hooks.credits ? sbtn('stCred', '📜 Автори') : ''}${hooks.newGame ? sbtn('stNew', '🔄 Нова игра') : ''}</div>`)}
+    ${sec('⚠️ Опасна зона', `<div style="font-size:13px;color:var(--mut);line-height:1.5">„Изтрий данните“ маха всички записи на това устройство${user ? ' и в облака. „Изтрий акаунта“ маха и самия акаунт (имейла) завинаги' : ''}.</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${sbtn('stWipe', '🗑️ Изтрий данните', 'btn2', 'color:var(--bad)')}${user ? sbtn('stDel', '❌ Изтрий акаунта', 'btn2', 'color:var(--bad)') : ''}</div>`)}`,
+    [['Затвори', null, 1]]);
+  el.firstElementChild.style.maxHeight = '92vh'; el.firstElementChild.style.overflow = 'auto';
+  const on = (id, f) => { const b = el.querySelector('#' + id); if (b) b.onclick = () => { el.remove(); f(); }; };
+  on('stIn', () => loginEmail()); on('stCloud', openCloud); on('stCred', () => hooks.credits()); on('stNew', () => hooks.newGame());
+  on('stOut', () => dlg(`<h2 style="font-size:19px;color:var(--acc)">🚪 Изход?</h2><p style="color:var(--mut);font-size:14px;line-height:1.5">Играта на това устройство остава. Влез пак със същия имейл, за да продължи да се пази в облака.</p>`,
+    [['Отказ', null], ['🚪 Изход', () => { syncAll(false).finally(() => sb.auth.signOut().then(() => toast('🚪 Излезе от акаунта.'))); }, 1]]));
+  on('stWipe', () => confirmWipe(false)); on('stDel', () => confirmWipe(true));
+  pplEl = el;
+}
+const pplHtml = L => L.length ? L.map(p => `<div>${p.me ? '🟢' : '🟡'} <b>${esc(p.name || 'Играч')}</b>${p.me ? ' (ти)' : ''} <span style="color:var(--mut)">· ${esc(p.city || '')}${p.day ? ` · ден ${p.day}` : ''}</span></div>`).join('') : '<span style="color:var(--mut)">Свързвам се…</span>';
+// изтриване: пишеш ИЗТРИЙ, за да няма случайно натискане
+function confirmWipe(account) {
+  const el = dlg(`<h2 style="font-size:19px;color:var(--bad)">${account ? '❌ Изтрий акаунта' : '🗑️ Изтрий данните'}</h2>
+    <p style="color:var(--mut);font-size:14px;line-height:1.5">${account ? `Акаунтът <b style="color:var(--txt)">${esc(user?.email)}</b>, записите в облака и партньорството се изтриват <b>завинаги</b>. Играта на това устройство също се изтрива.`
+      : `Всички записи (3-те слота), автозаписите и настройките на това устройство${user ? ' — и записите в облака' : ''} се изтриват <b>завинаги</b>. Играта започва отначало.${user ? ' Акаунтът остава.' : ''}`}<br><br>Напиши <b style="color:var(--txt)">ИЗТРИЙ</b>, за да потвърдиш:</p>
+    <input id="stConf" autocomplete="off" style="width:100%;padding:11px;border-radius:9px;border:1px solid var(--line);background:#0f141c;color:var(--txt);font-size:16px;text-transform:uppercase">
+    <div id="stMsg" style="font-size:13px;color:var(--bad)"></div>`,
+    [['Отказ', null], [account ? '❌ Изтрий акаунта' : '🗑️ Изтрий', () => {
+      const m = el.querySelector('#stMsg');
+      if (el.querySelector('#stConf').value.trim().toUpperCase() !== 'ИЗТРИЙ') { m.textContent = 'Напиши ИЗТРИЙ.'; return false; }
+      m.style.color = 'var(--mut)'; m.textContent = 'Изтривам…';
+      wipeAll(account).catch(e => { m.style.color = 'var(--bad)'; m.textContent = 'Не стана: ' + ((e && e.message) || 'няма връзка') + '. Нищо не е изтрито.'; });
+      return false;
+    }]]);
+  setTimeout(() => el.querySelector('#stConf')?.focus(), 50);
+}
+async function wipeAll(account) {
+  if (user) {   // първо облакът — ако не стане, на устройството нищо не се пипа (иначе облакът би върнал записа)
+    const { data, error } = await sb.rpc('delete_my_data', { p_account: !!account });
+    if (error) throw new Error(/PGRST202|Could not find/i.test(error.message + error.code) ? 'сървърът още не поддържа това' : error.message);
+    if (data && data.ok === false) throw new Error(data.err || 'грешка');
+  }
+  hooks.lock?.(); wiping = true;   // играта спира да записва (и при затваряне на страницата)
+  await dropBackups();
+  for (const k of Object.keys(localStorage)) if (/^stroi|^sb-/.test(k)) localStorage.removeItem(k);
+  if (account || user) await sb.auth.signOut({ scope: 'local' }).catch(() => { });
+  toast(account ? '❌ Акаунтът е изтрит.' : '🗑️ Данните са изтрити.');
+  setTimeout(() => location.reload(), 700);
+}
+
+// 👥 кой играе сега (Supabase Realtime presence — без база; виждат се само име на фирмата, град и ден)
+let pres = null, pplEl = null, presState = {};
+const myKey = (() => { let k = ''; try { k = sessionStorage.getItem('stroi-pres') || ''; if (!k) { k = crypto.randomUUID(); sessionStorage.setItem('stroi-pres', k); } } catch { k = String(Math.random()); } return k; })();
+function online() {
+  const L = [];
+  for (const [k, arr] of Object.entries(presState)) { const p = arr[arr.length - 1]; if (p) L.push({ ...p, me: k === myKey }); }
+  return L.sort((a, b) => (b.me - a.me) || (b.day | 0) - (a.day | 0)).slice(0, 50);
+}
+function presRender() {
+  if (!pplEl || !document.body.contains(pplEl)) return;
+  const L = online(), n = pplEl.querySelector('#stN'), box = pplEl.querySelector('#stPpl');
+  if (n) n.textContent = L.length; if (box) box.innerHTML = pplHtml(L);
+}
+const meInfo = () => { try { return window.__stroiMe?.() || null; } catch { return null; } };
+let lastMe = '';
+function presTrack() {
+  if (!pres) return;
+  const me = meInfo() || { name: 'Нов играч', city: '', day: 0 }, k = JSON.stringify(me);
+  if (k !== lastMe) { lastMe = k; pres.track(me).catch(() => { }); }
+}
+function presStart() {
+  if (pres || AUTOTEST) return;
+  try {
+    pres = sb.channel('stroi-online', { config: { presence: { key: myKey } } });
+    pres.on('presence', { event: 'sync' }, () => { presState = pres.presenceState(); presRender(); })
+      .subscribe(st => { if (st === 'SUBSCRIBED') { lastMe = ''; presTrack(); } });
+    setInterval(presTrack, 30000);
+  } catch { pres = null; }
+}
+
 // ── синхронизация ──
 async function upload(n, raw) {
   const { data, error } = await sb.from('saves').upsert({ user_id: user.id, slot: 's' + n, data: JSON.parse(raw), meta: metaOf(raw), updated_at: new Date().toISOString() }).select('updated_at').single();
@@ -104,7 +215,8 @@ async function upload(n, raw) {
 }
 // записът на текущия слот, свален от облака, не бива да се презапише от играта (тя още държи стария в паметта) преди презареждането
 const setItem0 = Storage.prototype.setItem; let locked = null;
-Storage.prototype.setItem = function (k, v) { if (k === locked) return; return setItem0.call(this, k, v); };
+let wiping = false;
+Storage.prototype.setItem = function (k, v) { if (k === locked || (wiping && /^stroi/.test(k))) return; return setItem0.call(this, k, v); };
 async function take(n, row) {
   await backupRaw(n, localStorage.getItem(keyOf(n)), 'преди облака');   // сегашният запис остава в „🕒 Автозаписи“
   const raw = JSON.stringify(row.data);
@@ -159,9 +271,11 @@ sb.auth.onAuthStateChange((ev, session) => {
   const was = user; user = session?.user || null; paint();
   if (user && (!was || was.id !== user.id)) syncAll(true);
 });
+window.__settings = openSettings;
 if (!AUTOTEST) {
+  presStart();
   setInterval(() => syncAll(false), 20000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') syncAll(false); else syncAll(true); });
   if (document.readyState === 'loading') addEventListener('DOMContentLoaded', mountBtn); else mountBtn();
 }
-export const cloud = { sb, syncAll, user: () => user };
+export const cloud = { sb, syncAll, user: () => user, openSettings };
