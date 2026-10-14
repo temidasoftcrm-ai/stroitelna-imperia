@@ -13,8 +13,10 @@ const sigOf = s => { let h = 2166136261; for (let i = 0; i < s.length; i += 7) {
 let dbP = null;
 const db = () => dbP = dbP || new Promise((res, rej) => { const r = indexedDB.open('stroi-backups', 1);
   r.onupgradeneeded = () => r.result.createObjectStore('bak', { keyPath: 'id', autoIncrement: true }).createIndex('slot', 'slot');
-  r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
-const tx = async (mode, f) => { const d = await db(); return new Promise((res, rej) => { const t = d.transaction('bak', mode), st = t.objectStore('bak'); let out; Promise.resolve(f(st)).then(v => out = v); t.oncomplete = () => res(out); t.onerror = () => rej(t.error); }); };
+  r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); r.onblocked = () => rej(new Error('blocked')); });
+// IndexedDB на някои телефони (Safari, частен режим) понякога не отговаря изобщо — копието никога не бива да спира играта
+const within = (p, ms = 3000) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('idb timeout')), ms))]);
+const tx = async (mode, f) => { const d = await within(db()); return within(new Promise((res, rej) => { const t = d.transaction('bak', mode), st = t.objectStore('bak'); let out; Promise.resolve(f(st)).then(v => out = v); t.oncomplete = () => res(out); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error || new Error('abort')); })); };
 const all = st => new Promise(res => { const r = st.getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => res([]); });
 function metaRaw(raw) { try { const s = JSON.parse(raw); return { city: s.hqCity || s.cityId, day: s.day | 0, money: Math.round(s.econ?.money ?? 0), done: s.done | 0 }; } catch { return null; } }
 export async function listBackups(slot = currentSlot()) {
