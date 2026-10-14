@@ -32,12 +32,15 @@ export function createCityPanel(deps) {
   // ---- нова поръчка за град, в който не си: свободен парцел от запомнения списък
   function newOrder(id, c) {
     const rep = S().rep || 0, tier = deps.cityTier(id);
-    const avail = deps.offerTypes().filter(([k, t]) => rep >= t.rep && !(tier === 's' && (k === 'tower' || (k === 'office' && rep < 4))) && !(k === 'tower' && deps.noTower && deps.noTower(id)));
+    if (!c.freeLots && deps.virtFill) deps.virtFill(id, c);   // не си бил тук — свободните парцели се изчисляват без влизане (game.js)
+    const fl0 = c.freeLots;
+    const avail = deps.offerTypes().filter(([k, t]) => rep >= t.rep && !(tier === 's' && (k === 'tower' || (k === 'office' && rep < 4))) && !(k === 'tower' && deps.noTower && deps.noTower(id)))
+      .filter(([k]) => !fl0 || fl0.some(x => (ZONE_PREF[k] || ['mid']).includes(x[1])));   // само видове, за които има подходящ свободен парцел (иначе денят спираше без поръчки)
     if (!avail.length) return null;
     const w = avail.map((_, i) => avail.length - i * 0.6);
     let r = Math.random() * w.reduce((a, b) => a + b, 0), type = avail[0][0];
     for (let i = 0; i < avail.length; i++) if ((r -= w[i]) <= 0) { type = avail[i][0]; break; }
-    // парцел: от запомнените свободни (ако си бил в града); иначе обектът е „на хартия“ (c.autoJobs) — плаща и дава опит,
+    // парцел: от запомнените/изчислените свободни; иначе (мегаполис, в който не си бил) обектът е „на хартия“ (c.autoJobs) — плаща и дава опит,
     // но сградата не се появява на картата на града
     const pref = ZONE_PREF[type] || ['mid'], fl = c.freeLots;
     let lot = null;
@@ -130,6 +133,7 @@ export function createCityPanel(deps) {
   function cityCard(id) {
     const s = S(), c = rec(id); if (!c) return '';
     const here = id === s.cityId, fin = deps.isFinished(id), d = devOf(c), lv = d.lv;
+    if (!here && !c.freeLots && deps.virtFill) deps.virtFill(id, c);
     const a = deps.THRESH[lv - 1], b = deps.THRESH[lv], k = b == null ? 1 : Math.max(0, Math.min(1, (d.xp - a) / (b - a)));
     const ps = projsOf(id, c), offers = (here ? s.offers : c.offers || []).length, units = unitsOf(id, c).length, C = cap(c);
     const roof = (c.cash || []).reduce((x, y) => x + (y.amount || 0), 0);

@@ -5033,7 +5033,58 @@ const airNeedFin = id => (cityById(id)?.sz || 0) >= 3 && airportMax(id) > 0;
 const airOkFin = id => !airNeedFin(id) || airLv(id) > 0;
 const canFinishCity = () => econ.finishCity && !econ.isFinished(S.cityId) && (S.cityExt || 0) >= extNeed() && freeLotCount() <= freeMax(S.cityId) && rivals.share() >= 0.6 && airOkFin(S.cityId);
 // свободните парцели на град, в който не си: старите записи пазеха freeLots без празните квартали (fresh) — тогава по-голямото от двете (freeAll ги брои)
-const remFree = c => !c.freeLots ? null : c.freeV ? c.freeLots.length : Math.max(c.freeLots.length, c.freeAll ?? 0);
+const remFree = (c, id) => { if (!c.freeLots && id) virtFill(id, c); return !c.freeLots ? null : c.freeV ? c.freeLots.length : Math.max(c.freeLots.length, c.freeAll ?? 0); };
+// 🗺️ свободните парцели на град, в който още не си влизал (или купените отдалеч квартали): същата подредба като buildCity —
+// ядро 9×9 + празните квартали, офисът, центърът 5×5 на забележителностите и „готовият град“ по същия генератор (rng по името),
+// после записът на града (сгради, обекти, имоти…). Без мегаполисите (там кварталите са по спирала) — те още искат едно влизане.
+function virtualLots(cityId, cs) {
+  if (MEGAPOLIS.has(cityId) || cityId === NEOM_ID) return null;
+  const ext = cs.cityExt || 0, c = (NB - 1) / 2, lots = [];
+  const addLot = (bi, bj, fresh) => { const d = Math.max(Math.abs(bi - c), Math.abs(bj - c)); lots.push({ id: lots.length, bi, bj, zone: d <= 1 ? 'center' : d <= 2 ? 'mid' : 'outer', fresh }); };
+  for (let bi = 0; bi < NB; bi++) for (let bj = 0; bj < NB; bj++) addLot(bi, bj, false);
+  for (let bi = NB; bi < NB + ext; bi++) for (let bj = 0; bj < NB; bj++) addLot(bi, bj, true);
+  const LMC = !!CITY_LANDMARKS[cityId], c0 = Math.floor(c), hqAt = [c0, c0 + (LMC ? 3 : 1)];
+  const at = (bi, bj) => lots.find(l => l.bi === bi && l.bj === bj), inC = l => Math.abs(l.bi - c0) <= 2 && Math.abs(l.bj - c0) <= 2;
+  const swap = (a, b) => { const A = lots[a], B = lots[b]; for (const k of ['bi', 'bj', 'zone']) [A[k], B[k]] = [B[k], A[k]]; };
+  const used = new Set(), E = cs.estate || {}, add = v => { if (v != null) used.add(+v); };
+  for (const k of ['built', 'projects', 'offers', 'cash']) for (const o of cs[k] || []) add(o && o.lot);
+  for (const id of [...(cs.cleared || []), ...(cs.parks || []), ...(E.land || [])]) add(id);
+  for (const o of [...(E.owned || []), ...(E.listings || [])]) add(o.lot);
+  add(cs.garageLot); add(cs.whLot);
+  for (const [k, x] of Object.entries(S.bigLm || {})) if (k.startsWith(cityId + ':')) for (const id of x.lots || []) add(id);   // голямата забележителност (Капитолият, МГУ…), ако вече е подредена
+  if (LMC) {   // като applyCenterSwaps: офисът на (4,7), заетите парцели от центъра — навън
+    const rec = (S.lotSwap || {})[cityId];
+    if (rec) for (const [a, b] of rec) { if (lots[a] && lots[b]) swap(a, b); }
+    else {
+      const h0 = at(c0, c0 + 1), h1 = at(hqAt[0], hqAt[1]); if (h0 && h1 && h0 !== h1) swap(h0.id, h1.id);
+      const taken = new Set();
+      for (const L of lots.filter(l => !l.fresh && inC(l) && used.has(l.id))) {
+        const M = lots.filter(m => !m.fresh && !inC(m) && !(m.bi === hqAt[0] && m.bj === hqAt[1]) && !used.has(m.id) && !taken.has(m.id) && m !== h0).sort((p, q) => Math.hypot(p.bi - L.bi, p.bj - L.bj) - Math.hypot(q.bi - L.bi, q.bj - L.bj))[0];
+        if (M) { taken.add(M.id); swap(L.id, M.id); }
+      }
+    }
+  }
+  const hq = at(hqAt[0], hqAt[1]); if (hq) hq.busy = 1;
+  const r = rng(hashStr(cityId));   // „готовият град“: същите извиквания на r() като в buildCity
+  for (const lot of lots) {
+    if (lot.busy || lot.fresh) continue;
+    const chance = lot.zone === 'center' ? 0.75 : lot.zone === 'mid' ? 0.6 : 0.5;
+    if (r() > chance) continue;
+    r(); if (lot.zone !== 'outer') r(); r();
+    lot.built = 1;
+  }
+  if (LMC) for (const l of lots) if (inC(l)) { l.built = 0; l.busy = 1; }
+  for (const id of cs.cleared || []) if (lots[id]) lots[id].built = 0;
+  for (const id of used) if (lots[id] && !(cs.cleared || []).includes(id)) lots[id].busy = 1;
+  for (const id of (cs.cleared || [])) if (lots[id] && (cs.built || []).some(b => b.lot === id)) lots[id].busy = 1;
+  return lots.filter(l => !l.built && !l.busy).map(l => [l.id, l.zone]);
+}
+function virtFill(id, c) {
+  if (!c || c.freeLots || id === S.cityId) return false;
+  const v = virtualLots(id, c); if (!v) return false;
+  c.freeLots = v; c.freeV = 2; c.freeVirt = 1; c.lotTotal = NB * NB + NB * (c.cityExt || 0); c.freeAll = v.length;
+  return true;
+}
 const freeMax = id => CAPITALS.has(id) || MEGAPOLIS.has(id) || (cityById(id)?.sz || 0) >= 3 ? 0 : 1;   // важните градове (жълтата точка, като KEY_CITY в drawMap) се завършват само без нито един свободен парцел
 function finishCityCard() {
   if (!econ.finishCity) return '';
@@ -5054,7 +5105,7 @@ function finishCityCard() {
 function finishCityRemote(id) {
   const c = (S.cities || {})[id]; if (!c || econ.isFinished(id) || id === S.cityId) return;
   const need = MEGAPOLIS.has(id) ? 1 : 4, share = rivals.share();
-  if ((c.cityExt || 0) < need || remFree(c) == null || remFree(c) > freeMax(id) || share < 0.6 || !airOkFin(id)) { toast(`${cityById(id).nm} още не е готов за завършване.`, 'bad'); return; }
+  if ((c.cityExt || 0) < need || remFree(c, id) == null || remFree(c, id) > freeMax(id) || share < 0.6 || !airOkFin(id)) { toast(`${cityById(id).nm} още не е готов за завършване.`, 'bad'); return; }
   const stats = { built: (c.built || []).length, owned: ((c.estate || {}).owned || []).length, day: S.day };
   const r = econ.finishCity(id, share, stats);
   if (econ.setFinishedFleet) econ.setFinishedFleet(id, c.units || []);
@@ -5342,7 +5393,10 @@ function buyDistrictAt(id, all = false) {
   econ.spend(cost, 'покупка', `${cityById(id).nm}: ${all ? `всички квартали (${q.ext + 1}–${q.max})` : `нов квартал №${q.ext + 1}`}`);
   if (MEGAPOLIS.has(id) && c.extBig == null) c.extBig = q.ext;   // новите квартали на мегаполиса са с новия (по-малък) размер
   c.cityExt = all ? q.max : q.ext + 1;   // парцелите се появяват при следващото влизане (градът се строи от записа)
-  delete c.freeLots; delete c.freeAll; delete c.lotTotal;   // новите парцели още ги няма в записа — „? (влез веднъж в града)“, вместо грешно „готов за завършване“
+  if (c.freeLots && !MEGAPOLIS.has(id)) {   // новите квартали са празни парцели след ядрото 9×9 — добавят се към запомнените свободни
+    for (let e = q.ext; e < c.cityExt; e++) for (let k = 0; k < NB; k++) c.freeLots.push([NB * NB + e * NB + k, 'outer']);
+    c.lotTotal = NB * NB + NB * c.cityExt; c.freeAll = c.freeLots.length;
+  } else { delete c.freeLots; delete c.freeAll; delete c.lotTotal; virtFill(id, c); }   // никога не си бил тук — изчислява се без влизане (мегаполисът иска едно влизане)
   toast(`🏘️ ${cityById(id).nm}: купи ${all ? 'всички квартали' : `квартал №${c.cityExt}`} (${c.cityExt}/${q.max})!`, 'good');
   Sound.play('cash'); save();
 }
@@ -6376,7 +6430,7 @@ function saleTip() {
   });
 }
 // ---- „🏙️ Градове“ (citypanel.js): всички градове без влизане, автопилот; „🏢 Подобрения“ — upgHudHtml в прозорец
-const cityPanel = createCityPanel({ S: () => S, regionMul: id => isAm(id) ? AM_K.reward : 1, econ: () => econ, ECON, BTYPES, RATE, workMul, THRESH: DEV_THRESH, unlockText, XP: dev.XP,
+const cityPanel = createCityPanel({ S: () => S, virtFill: (id, c) => virtFill(id, c), regionMul: id => isAm(id) ? AM_K.reward : 1, econ: () => econ, ECON, BTYPES, RATE, workMul, THRESH: DEV_THRESH, unlockText, XP: dev.XP,
   officeLv: lv => OFFICE_LEVELS[Math.max(1, Math.min(OFFICE_LEVELS.length, lv)) - 1], offerTypes: () => offerTypes(), cityTier: id => cityTier(id), towerFloors: id => TOWER_FLOORS[cityTier(id)] || [10], towerMul: f => TOWER_MUL[f] || 1,
   buildingFor, clients: (type, id) => clientName(cityById(id || S.cityId)?.cc, type === 'house'), ownedCities: () => ownedCities(), cityName: id => cityById(id)?.nm || id, cityFlag: id => cityById(id)?.cc || '🇧🇬',
   isFinished: id => !!(econ.isFinished && econ.isFinished(id)), projects: () => projects, unitTypes: () => units.map(u => u.type), nowDays: () => nowDays(), toast, fmt, save, sound: n => Sound.play(n),
@@ -6387,7 +6441,7 @@ const cityPanel = createCityPanel({ S: () => S, regionMul: id => isAm(id) ? AM_K
   gearSend: (t, from, to) => { const n = garMove(t, from, to, 1); if (n) save(); return n; }, gearBuy: (t, id) => garBuy(t, id), unitCount: id => cityUnitTypes(id).length,
   gearShort: () => garShort(), gearBuyAll: () => { if (garPlan().length) garAuto(); garGrow(); garBuyShort(); }, gearBuyNow: () => { garGrow(true); garBuyShort(null, false, true); },   // първо изпраща свободната техника от другите градове, после купува остатъка   // ниво 14+: „🛒 Купи всичко“ в „Градове“
   finishState: id => { const here = id === S.cityId, c = here ? S : (S.cities || {})[id] || {}, need = MEGAPOLIS.has(id) ? 1 : 4;
-    return { ext: c.cityExt || 0, need, free: here ? freeLotCount() : remFree(c), share: rivals.share(), built: here ? builtPct() : c.lotTotal ? Math.round((1 - (c.freeAll ?? c.freeLots?.length ?? 0) / c.lotTotal) * 100) : null, air: airOkFin(id), airNeed: airNeedFin(id), freeMax: freeMax(id) }; }, openWin: () => openBig('cities'), inScope: id => inScope(id),
+    return { ext: c.cityExt || 0, need, free: here ? freeLotCount() : remFree(c, id), share: rivals.share(), built: here ? builtPct() : c.lotTotal ? Math.round((1 - (c.freeAll ?? c.freeLots?.length ?? 0) / c.lotTotal) * 100) : null, air: airOkFin(id), airNeed: airNeedFin(id), freeMax: freeMax(id) }; }, openWin: () => openBig('cities'), inScope: id => inScope(id),
   onComplete: p => { quests.emit('complete', { type: p.type, early: S.day <= p.deadlineDay - 2, demolish: false }); },
   goCity: (id, tb) => { if (id === S.cityId) { closeBig(); showMap(false); if (tb) tab = tb; renderPanel(); return; } try { if (tb) sessionStorage.setItem('stroiTab', tb); } catch {} switchCity(id); } });
 { const mk = (id, html, title, kind) => { const b = document.createElement('button'); b.id = id; b.className = 'btn2'; b.innerHTML = html; b.title = title; b.onclick = () => { if (S) openBig(kind); }; $('btnConquest').parentNode.insertBefore(b, $('btnConquest')); };
@@ -7029,7 +7083,7 @@ function autoTick() {
   if (autoOn2('finish')) for (const id of ownedCities()) {
     const c = (S.cities || {})[id]; if (!c || id === S.cityId || econ.isFinished(id)) continue;
     const need = MEGAPOLIS.has(id) ? 1 : 4;
-    if ((c.cityExt || 0) < need || remFree(c) == null || remFree(c) > freeMax(id) || rivals.share() < 0.6 || !airOkFin(id)) continue;
+    if ((c.cityExt || 0) < need || remFree(c, id) == null || remFree(c, id) > freeMax(id) || rivals.share() < 0.6 || !airOkFin(id)) continue;
     finishCityRemote(id); if (econ.isFinished(id)) autoLog(`🏁 завършен ${cityById(id).nm}`); break;   // по един на ден
   }
   if (autoOn2('offers')) for (const o of [...(supply.state().offers || [])]) {
@@ -7605,6 +7659,9 @@ if (AUTOTEST) {
     landCheck() { return { land: est().land, owned: est().owned.length, inv: projects.filter(p => p.invest).map(p => [p.type, p.lot, p.stage, +p.prog.toFixed(2), city.lots[p.lot].busy]), n: projects.length, q: S.buildQ }; },
     landTest(type = 'tower') { econ.earn(5e7, 'друго', 'тест'); S.rep = 5; S.officeLevel = 10; const fr = q => !q.built && !q.busy && !q.fresh, l = city.lots.find(q => q.zone === 'center' && fr(q)) || city.lots.find(fr); buyLand(l.id); buildOnLand(l.id, type); const p = projects.find(q => q.lot === l.id); tab = 'estate'; renderPanel(); return { lot: l.id, land: est().land.length, proj: p ? [p.type, p.invest, p.stage, l.busy] : null, q: S.buildQ, n: projects.length }; },
     cpGearTest() { __dbg.cpTest(3); for (const id of ['plovdiv', 'varna']) S.cities[id].units = ['crew']; endOfDay(); openBig('cities'); return ['plovdiv', 'varna'].map(id => [...(S.cities[id].projects || []), ...(S.cities[id].autoJobs || [])].map(p => p.waitNeed).join(';')); },
+    virt(id, ext = 0) { return virtualLots(id, { ...newCityState(), cityExt: ext }); },
+    freeNow() { return city.lots.filter(l => !l.built && !l.busy).map(l => [l.id, l.zone]); },
+    go(id) { switchCity(id); },
     cpTest(days = 30) { econ.earn(5e7, 'друго', 'тест'); S.rep = 3.5; S.branches = [...new Set([...(S.branches || []), 'plovdiv', 'varna'])];
       for (const id of ['plovdiv', 'varna']) S.cities[id] = { ...newCityState(), units: ['crew', 'crew', 'loader', 'truck', 'crane', 'tractor'], left: nowDays() };
       S.cities.plovdiv.freeLots = city.lots.filter(l => !l.built && !l.busy && !l.fresh).map(l => [l.id, l.zone]);
