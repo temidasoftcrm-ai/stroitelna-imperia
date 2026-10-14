@@ -139,6 +139,18 @@ export function createCoop(d) {
 
   const partnerName = () => st?.partner?.snap?.name || 'партньора';
 
+  // 🗺️ обща карта: магистралите, жп линиите и градовете на партньора стават част от твоята карта (game.js: hwAll, railEdges, coopCity)
+  let shareSig = '';
+  function shareMap() {
+    const P = st?.pair?.status === 'active' ? st?.partner?.snap : null;
+    if (!P) { if (window.__coopShared) { window.__coopShared = null; shareSig = ''; } return; }
+    const hw = (P.hwDone || []).filter(x => typeof x === 'string' || typeof x === 'number'),
+      rails = (P.rails || []).map(r => String(r).split('|')).filter(x => x.length === 2 && x[0] && x[1]),
+      cities = (P.cities || []).filter(x => typeof x === 'string'), sig = JSON.stringify([P.name, hw, rails, cities]);
+    if (sig === shareSig) return;
+    shareSig = sig;
+    window.__coopShared = { v: (window.__coopShared?.v || 0) + 1, name: P.name || 'партньора', hw, rails, cities };
+  }
   async function tick() {
     if (AUTOTEST) return;
     user = sb && cloud.user && cloud.user();
@@ -147,11 +159,12 @@ export function createCoop(d) {
     try {
       if (d.ready() && Date.now() - lastSnap > SNAP_EVERY) { lastSnap = Date.now(); await rpc('coop_snap', { p_data: snapshot() }, 1); }
       const r = await rpc('coop_status', {}, 1);
-      const before = JSON.stringify([st?.partner?.snap?.cities || [], st2?.joints || []]);
+      const before = JSON.stringify([st?.partner?.snap?.cities || [], st2?.joints || [], window.__coopShared?.v]);
       st = r && r.ok ? r : st;
       const r2 = st?.pair?.status === 'active' ? await rpc('coop_status2', {}, 1) : null;
       st2 = r2 && r2.ok && r2.active ? r2 : null;
-      if (JSON.stringify([st?.partner?.snap?.cities || [], st2?.joints || []]) !== before) d.drawMap();
+      shareMap();
+      if (JSON.stringify([st?.partner?.snap?.cities || [], st2?.joints || [], window.__coopShared?.v]) !== before) d.drawMap();
     } catch { }
     await receive();
     await autoRepay();
@@ -173,7 +186,7 @@ export function createCoop(d) {
     for (const m of st2.messages) if (!m.me && m.id > last) d.toast(`${m.sos ? '🆘' : '💬'} ${partnerName()}: ${m.text}`, m.sos ? 'bad' : 'good', () => { tab = 'chat'; open = true; render(); });
     const mx = Math.max(last, ...st2.messages.map(m => m.id)); if (mx > last) LS('stroi-coop-msg', mx);
     if (!d.ready()) return;
-    // общ участък/линия, завършен и от двамата → еднократен бонус
+    // общ участък/линия, завършен (от единия — картата е обща) → еднократен бонус за всеки
     for (const j of st2.joints) if (j.status === 'active' && j.done && !j.bonus_claimed) {
       const r = await rpc('coop_joint_bonus', { p_id: j.id }, 1).catch(() => null);
       if (r?.ok) { E().earn(r.amount, 'партньор', `🤝 Общ обект: ${r.title}`); d.save(); d.renderPanel(); d.toast(`🤝 ${r.title} е готов и при двама ви! Бонус +${f(r.amount)} €, а всеки ден — още доход.`, 'good'); }
@@ -197,7 +210,7 @@ export function createCoop(d) {
   const activeJoints = kind => (st2?.joints || []).filter(j => j.status === 'active' && j.kind === kind);
   // общ участък: докато и партньорът го строи (или вече го е построил) — твоят върви 30% по-бързо
   window.__coopHwMul = seg => { const P = st?.partner?.snap; return activeJoints('hw').some(j => j.ref === seg) && P && ((P.hwJobs || []).includes(seg) || (P.hwDone || []).includes(seg)) ? 1.3 : 1; };
-  // всеки игрален ден: доход от общите обекти, завършени и от двамата (магистрала 3 €/км, влак 8 €/км)
+  // всеки игрален ден: доход от завършените общи обекти (магистрала 3 €/км, влак 8 €/км)
   window.__coopDay = () => {
     const sum = [...activeJoints('hw'), ...activeJoints('rail')].filter(j => j.done).reduce((a, j) => a + j.km * (j.kind === 'hw' ? 3 : 8), 0);
     if (sum > 0) E().earn(sum, 'партньор', `🤝 Общи магистрали и влакове с ${partnerName()}`);
@@ -327,13 +340,13 @@ export function createCoop(d) {
   // ── раздел „Строим заедно“: общи участъци/линии, наем, изненада, общи поръчки ──
   function buildHtml() {
     const S = d.S(), P = st.partner?.snap || {}, pn = esc(partnerName());
-    let h = `<div class="mut">Изберете участък от магистрала или жп линия и го строите <b>и двамата</b> — всеки в своята игра. Докато и двамата работите по участъка, всеки строи <b>30% по-бързо</b>. Когато е готов и при двама ви — еднократен бонус (магистрала 1 500 €/км, влак 800 €/км) и всеки ден допълнителен доход (3 €/км и 8 €/км). На картата е с розова линия.</div>`;
+    let h = `<div class="mut">Изберете участък от магистрала или жп линия и го строите <b>заедно</b> — картата ви е обща. Докато и двамата работите по участъка, всеки строи <b>30% по-бързо</b>; щом единият го завърши, готов е и при другия. Тогава всеки получава еднократен бонус (магистрала 1 500 €/км, влак 800 €/км) и всеки ден допълнителен доход (3 €/км и 8 €/км). На картата е с розова линия.</div>`;
     const J = st2?.joints || [];
     if (J.length) h += `<div class="card">${J.map(j => { const ico = j.kind === 'hw' ? '🛣️' : '🚆';
       let b = '';
       if (j.status === 'proposed') b = j.mine ? `<button class="btn2" data-c="jact:${j.id}:end">Оттегли</button>` : `<button class="btn" data-c="jact:${j.id}:accept">✅ Приеми</button><button class="btn2" data-c="jact:${j.id}:decline">Откажи</button>`;
       else b = `<button class="btn2" data-c="jact:${j.id}:end">Прекрати</button>`;
-      const st_ = j.status === 'proposed' ? (j.mine ? '⏳ чака партньора' : `📨 ${pn} предлага`) : j.done ? '<b class="ok">✅ готово при двамата</b>' : `ти: ${j.me_done ? '✅' : '🏗️'} · ${pn}: ${j.they_done ? '✅' : '🏗️'}`;
+      const st_ = j.status === 'proposed' ? (j.mine ? '⏳ чака партньора' : `📨 ${pn} предлага`) : j.done ? '<b class="ok">✅ готово — общо за двамата</b>' : `ти: ${j.me_done ? '✅' : '🏗️'} · ${pn}: ${j.they_done ? '✅' : '🏗️'}`;
       return `<div class="led"><span>${ico} <b>${esc(j.title)}</b> · ${j.km} км<br><span class="mut">${st_}</span></span><span class="row" style="margin:0">${b}</span></div>`; }).join('')}</div>`;
     const done = d.hwInfo().done, segs = d.segs().filter(s => !J.some(j => j.kind === 'hw' && j.ref === s.id));
     h += `<div class="row"><select id="cpSeg" style="max-width:100%">${segs.map(s => `<option value="${s.id}">${esc(s.nm)}: ${esc(d.cityName(s.a))} — ${esc(d.cityName(s.b))} · ${s.km} км${done.includes(s.id) ? ' ✅' : ''}${(P.hwDone || []).includes(s.id) ? ' (той ✅)' : ''}</option>`).join('')}</select><button class="btn2" data-c="jhw">🛣️ Предложи обща магистрала</button></div>`;

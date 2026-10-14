@@ -2828,12 +2828,12 @@ const quests = createQuests({ S: () => S, econ: () => econ, toast, fmt, save, so
 const supply = createSupply({ S: () => S, econ: () => econ, MATERIALS: ECON.MATERIALS, FACTORIES: ECON.FACTORIES || [], cityOk: id => cityLv(id) <= 5 || dev.best() >= cityLv(id),
   cityName: id => cityById(id).nm, ownedCities: () => ownedCities(), isForeign: id => isForeign(id),
   rail: (a, b) => { const p = railPath(a, b); return !!p && p.length > 1; },
-  road: (a, b) => { const done = [...allSegs(), ...ALL_AB].filter(x => hwDone().includes(x.id)), seen = new Set([a]), q = [a]; while (q.length) { const c = q.shift(); if (c === b) return true; for (const x of done) { const n = x.a === c ? x.b : x.b === c ? x.a : null; if (n && !seen.has(n)) { seen.add(n); q.push(n); } } } return false; },
+  road: (a, b) => { const done = [...allSegs(), ...ALL_AB].filter(x => hwAll().includes(x.id)), seen = new Set([a]), q = [a]; while (q.length) { const c = q.shift(); if (c === b) return true; for (const x of done) { const n = x.a === c ? x.b : x.b === c ? x.a : null; if (n && !seen.has(n)) { seen.add(n); q.push(n); } } } return false; },
   toast, fmt, save, sound: n => Sound.play(n), canOffer: () => dev.offersOpen(), devLevel: () => dev.best(), balkans: () => true,
   onRailDelivery: txt => { if (!$('mapScreen').classList.contains('hidden')) toast(txt, 'good'); else sendCityTrain(txt); refreshWarehouse(); } });
 // ⛏️ Азия: собствени кариери, мини и заводи (mines.js)
 const railLinked = (a, b) => { const p = railPath(a, b); return !!p && p.length > 1; };
-const roadLinked = (a, b) => { const done = [...allSegs(), ...ALL_AB].filter(x => hwDone().includes(x.id)), seen = new Set([a]), q = [a]; while (q.length) { const c = q.shift(); if (c === b) return true; for (const x of done) { const n = x.a === c ? x.b : x.b === c ? x.a : null; if (n && !seen.has(n)) { seen.add(n); q.push(n); } } } return false; };
+const roadLinked = (a, b) => { const done = [...allSegs(), ...ALL_AB].filter(x => hwAll().includes(x.id)), seen = new Set([a]), q = [a]; while (q.length) { const c = q.shift(); if (c === b) return true; for (const x of done) { const n = x.a === c ? x.b : x.b === c ? x.a : null; if (n && !seen.has(n)) { seen.add(n); q.push(n); } } } return false; };
 // как стига продукцията от азиатски град до Европа: по жп (Пътят на коприната) или по море (пристанище там или в свързан град)
 function mineLinkEU(id) {
   const eu = ownedCities().filter(x => contKeyOf(x) === 'eu');
@@ -2977,22 +2977,37 @@ function clickCity(id) {
   } else if (railPick) railClick(id);
   else if (S.cityId === id) enterCity();
   else if (ownedCities().includes(id)) modal(`${id === S.hqCity ? '🏗️ Централа' : '🏢 Филиал'} в ${c.nm}`, `Влез и играй в ${c.nm}: свои поръчки, обекти, имоти и техника. Парите и репутацията са общи.<br>Докато не си там, градът носи около ${fmt(1400 + 350 * S.rep + 120 * (S.officeLevel || 1))} € на ден, а обектите му продължават.${factoryInfo(id)}`, [['Отказ', null], [`Влез в ${c.nm}`, () => switchCity(id)]]);
+  else if (coopCity(id)) { const pn = window.__coopShared.name || 'партньора';
+    modal(`🤝 ${c.cc ? c.cc + ' ' : ''}${c.nm} — град на ${pn}`, `${pn} вече има филиал тук. Като партньори влизаш <b>безплатно</b> — без покупка и без разрешителни.<br>Градът става и твой: свои поръчки, обекти и техника; виждаш кой къде строи (розово — ${pn}). Поддръжката е като на обикновен филиал.`,
+      [['Отказ', null], [`🤝 Влез ${/^[ВвФф]/.test(c.nm) ? 'във' : 'в'} ${c.nm}`, () => joinCoopCity(id)]]); }
   else if (dev.best() < (isWorld(id) ? 10 : isForeign(id) && !isEurope(id) ? 6 : cityLv(id))) modal(`${c.cc ? c.cc + ' ' : ''}${c.nm}`, `${lockTxt(isForeign(id) && !isEurope(id) ? 6 : cityLv(id))}<br>${isForeign(id) && !isEurope(id) && dev.best() >= 5 ? `Междувременно можеш да построиш жп линия до ${c.nm}.` : ''}${factoryInfo(id)}`, [['Добре', null]]);
   else if (contOf(id) && CONT_GATE[contOf(id).key] && contOf(id).open() && !contLinked(contOf(id).key)) gateModal(contOf(id).key);
   else if (contOf(id) && !contOf(id).open() && contOf(id).locked(id)) modal(`${c.cc} ${c.nm}`, `${contOf(id).lockTxt()}`, [['Добре', null]]);
   else if (isWorld(id) && !airLinked(id) && !contLandLinked(id) && !(contOf(id) && CONT_GATE[contOf(id).key] && contLinked(contOf(id).key))) modal(`${c.cc} ${c.nm}`, contOf(id) ? `${contOf(id).ico} До ${c.nm} още нямаш връзка. Отвори авиолиния от твое летище до ${c.nm} (бутон „✈️ Летища“ горе) или стигни дотук по суша — с жп линия или магистрала от твой град на континента. После ще можеш да отвориш филиал тук.` : `✈️ До ${c.nm} се стига само по въздуха. Отвори авиолиния от твое летище до ${c.nm} (бутон „✈️ Летища“ горе), после ще можеш да отвориш филиал тук.`, [['Затвори', null], ['✈️ Летища', () => openBig('air')]]);
   else {
-    const cost = ECON.BRANCH_COST(id, (S.branches || []).length), disc = (S.branchDiscounts || 0) > 0 ? Math.round(cost * 0.3 / 1000) * 1000 : 0;
+    const cost = ECON.BRANCH_COST(id, brN()), disc = (S.branchDiscounts || 0) > 0 ? Math.round(cost * 0.3 / 1000) * 1000 : 0;
     modal(`🏙️ Филиал в ${c.nm}?`, `Цена: <b>${fmt(cost + branchExtra(id, cost) - disc)} €</b>${disc ? ` (−${fmt(disc)} € за завършен град)` : ''}, поддръжка ${fmt(ECON.BRANCH_UPKEEP)} €/ден. Филиалът носи печалба всеки ден (расте с репутацията и нивото на централата).${factoryInfo(id)}`,
       [['Отказ', null], ['Отвори филиал', () => withLoan(cost + branchExtra(id, cost) - disc, `Филиал в ${c.nm}`, () => openBranchNow(id))]]);
   }
 }
+// 🤝 град, в който партньорът има филиал (coop.js → window.__coopShared): влизаш без да купуваш
+const coopCity = id => !!S && !ownedCities().includes(id) && (window.__coopShared?.cities || []).includes(id);
+function joinCoopCity(id) {
+  if (ownedCities().includes(id) || !coopCity(id)) return;
+  const c = cityById(id), pn = window.__coopShared.name || 'партньора';
+  S.branches = [...(S.branches || []), id];
+  S.coopBr = { ...(S.coopBr || {}), [id]: pn };   // не оскъпява следващия филиал; при продажба — без цена на филиала
+  S.branchPaid = { ...(S.branchPaid || {}), [id]: 0 };
+  S.cities[id] = { ...newCityState(), left: nowDays() };
+  toast(`🤝 Влезе ${/^[ВвФф]/.test(c.nm) ? 'във' : 'в'} ${c.nm} — градът на ${pn}. Безплатно!`, 'good'); Sound.play('branch'); save();
+  switchCity(id);
+}
 // отваря филиала (след плащане/кредит) — от картата, от „Без филиал“ и автоматично при отваряне на континент
 function openBranchNow(id) {
-  const c = cityById(id), cost = ECON.BRANCH_COST(id, (S.branches || []).length), disc = (S.branchDiscounts || 0) > 0 ? Math.round(cost * 0.3 / 1000) * 1000 : 0;
+  const c = cityById(id), cost = ECON.BRANCH_COST(id, brN()), disc = (S.branchDiscounts || 0) > 0 ? Math.round(cost * 0.3 / 1000) * 1000 : 0;
   if (ownedCities().includes(id)) return;
   const extra = branchExtra(id, cost);   // Европа и светът са по-скъпи
-        if (!econ.canAfford(cost + extra) || !econ.openBranch(id, (S.branches || []).length, c.nm)) { toast('Нямаш достатъчно пари за филиал.', 'bad'); return; }
+        if (!econ.canAfford(cost + extra) || !econ.openBranch(id, brN(), c.nm)) { toast('Нямаш достатъчно пари за филиал.', 'bad'); return; }
         if (extra > 0) econ.spend(extra, 'филиали', `Разрешителни в ${c.nm}`); else if (extra < 0) econ.earn(-extra, 'филиали', `${c.nm}: фиксирана цена за столица`);
         if (disc) { econ.earn(disc, 'филиали', 'Отстъпка за завършен град (−30%)'); S.branchDiscounts--; }
         S.branches = [...(S.branches || []), id];
@@ -3150,7 +3165,7 @@ const amL = (L, id, k) => L && isAm(id) ? { ...L, cost: Math.round(L.cost * AM_K
 const railQuote = (a, b) => { const km = kmBetween(a, b), k = [a, b].some(id => NA_IDS.has(id) || SA_IDS.has(id)) ? RAIL_AM_K : 1; return { km, cost: Math.round((RAIL_BASE + km * RAIL_EUR_KM) * k / 1000) * 1000, days: Math.max(2, Math.ceil(km / RAIL_KM_DAY)) }; };
 // граф от готовите линии
 // ребра на мрежата; отклонението (r.c, r.br) свързва града r.a с двата края на основната линия r.b–r.c
-function railEdges(all) { const e = []; for (const r of S.rails || []) if (all || r.built) { e.push([r.a, r.b]); if (r.c) e.push([r.a, r.c]); } return e; }
+function railEdges(all, own) { const e = []; for (const r of S.rails || []) if (all || r.built) { e.push([r.a, r.b]); if (r.c) e.push([r.a, r.c]); } if (!own) for (const [x, y] of window.__coopShared?.rails || []) if (!e.some(([p, q]) => (p === x && q === y) || (p === y && q === x))) e.push([x, y]); return e; }   // + жп линиите на партньора (обща карта)
 // „Стрела“ кара само по модернизирани (скоростни) линии: r.hs = true; r.hsBuild = { prog } докато се обновява
 const HS_EUR_KM = 2500, HS_KM_DAY = 40;
 const hsQuote = r => ({ cost: Math.round((300000 + r.km * HS_EUR_KM) / 10000) * 10000, days: Math.max(5, Math.ceil(r.km / HS_KM_DAY)) });
@@ -3283,7 +3298,7 @@ const curDisc = m => transportDisc(m, connectedCities(), [...hwNetwork().filter(
 // какво ще поевтинее, ако се добави нова жп линия (a–b) или магистрален участък (a–b)
 function discPreview(kind, a, b) {
   const bfs = (start, edges) => { const out = new Set([start]), q = [start]; while (q.length) { const c = q.shift(); for (const [x, y] of edges) { const n = x === c ? y : y === c ? x : null; if (n && !out.has(n)) { out.add(n); q.push(n); } } } return [...out].filter(id => id !== start); };
-  const railE = railEdges(), roadE = [...allSegs(), ...ALL_AB].filter(s => hwDone().includes(s.id)).map(s => [s.a, s.b]);
+  const railE = railEdges(), roadE = [...allSegs(), ...ALL_AB].filter(s => hwAll().includes(s.id)).map(s => [s.a, s.b]);
   if (kind === 'rail') railE.push([a, b]); else roadE.push([a, b]);
   const railN = bfs(S.cityId, railE), roadN = bfs(S.cityId, roadE);
   return Object.keys(ECON.MATERIALS).map(m => ({ m, now: curDisc(m), next: transportDisc(m, railN, roadN, [...abNetwork(), ...seaNetwork()]) })).filter(o => o.next.pct > o.now.pct);
@@ -3614,7 +3629,7 @@ function contLandLinked(id) {
   const k = contOf(id); if (!k || !k.open()) return false;
   const mine = ownedCities().filter(x => k.ids.has(x)); if (!mine.length) return false;
   if (mine.some(o => { const p = railPath(o, id); return p && p.length > 1; })) return true;
-  const done = ALL_AB.filter(x => hwDone().includes(x.id)), seen = new Set(mine), q = [...mine];
+  const done = ALL_AB.filter(x => hwAll().includes(x.id)), seen = new Set(mine), q = [...mine];
   while (q.length) { const c = q.shift(); if (c === id) return true; for (const x of done) { const n = x.a === c ? x.b : x.b === c ? x.a : null; if (n && !seen.has(n)) { seen.add(n); q.push(n); } } }
   return false;
 }
@@ -3650,14 +3665,14 @@ function afCheckOpen() {
   S.gateOpen = S.gateOpen || (S.afGateOpen ? { af: true } : {});
   for (const key of Object.keys(CONT_GATE)) {
     if (S.gateOpen[key] && !(S.gateBr || {})[key] && contLinked(key) && !ownedCities().some(id => inCont(key, id))) {   // стар запис: вратата е отворена, но филиал още няма
-      S.gateBr = { ...(S.gateBr || {}), [key]: true }; const g = CONT_GATE[key], cost = ECON.BRANCH_COST(g, (S.branches || []).length); withLoan(cost + branchExtra(g, cost), `Първи филиал: ${cityById(g).nm}`, () => openBranchNow(g)); continue; }
+      S.gateBr = { ...(S.gateBr || {}), [key]: true }; const g = CONT_GATE[key], cost = ECON.BRANCH_COST(g, brN()); withLoan(cost + branchExtra(g, cost), `Първи филиал: ${cityById(g).nm}`, () => openBranchNow(g)); continue; }
     if (S.gateOpen[key] || !contByKey(key).open() || !contLinked(key)) continue;
     S.gateBr = { ...(S.gateBr || {}), [key]: true };
     S.gateOpen[key] = true; S.contSeen = { ...(S.contSeen || {}) }; delete S.contSeen[key]; if (key === 'af') delete S.afSeen;
     contFirstLook(contByKey(key));
     // първият филиал на континента — във „вратата“, автоматично (входният билет CONT_FIRST; при нужда — от депозита/кредит)
     const g = CONT_GATE[key];
-    if (!ownedCities().some(id => inCont(key, id))) { const cost = ECON.BRANCH_COST(g, (S.branches || []).length), p = cost + branchExtra(g, cost); setTimeout(() => withLoan(p, `Първи филиал: ${cityById(g).nm}`, () => openBranchNow(g)), 7600); }
+    if (!ownedCities().some(id => inCont(key, id))) { const cost = ECON.BRANCH_COST(g, brN()), p = cost + branchExtra(g, cost); setTimeout(() => withLoan(p, `Първи филиал: ${cityById(g).nm}`, () => openBranchNow(g)), 7600); }
     if (!$('mapScreen').classList.contains('hidden')) drawMap();
   }
 }
@@ -3932,7 +3947,7 @@ function r66Hint() {
   const R = ['chicago', 'kansascity', 'dallas', 'elpaso', 'phoenix', 'losangeles'], out = [];
   for (let k = 1; k < R.length; k++) {
     const a = R[k - 1], b = R[k], id = abSegId(a, b), nm = `${cityById(a).nm} — ${cityById(b).nm}`;
-    if (hwDone().includes(id)) continue;
+    if (hwAll().includes(id)) continue;
     const j = (S.hwJobs || []).find(q => q.seg === id);
     if (j) { const lk = hwLackOf(j); out.push(lk.length ? `⏸ <b>${nm}</b>: стои — в <b>${cityById(hwCityOf(j)).nm}</b> липсва ${lackTxt(lk)} → премести от „🚜 Гараж“ или купи` : `🚧 <b>${nm}</b>: строи се, техниката работи`); }
     else { const why = r66Why(id); out.push(why ? `🔒 <b>${nm}</b>: ${why}` : `🛣️ <b>${nm}</b>: свободен — натисни „Строй“`); }
@@ -3950,7 +3965,7 @@ function superRoute(key) {
 }
 function legStat(kind, a, b) {
   if (kind === 'rail') { const r = (S.rails || []).find(r => !r.c && ((r.a === a && r.b === b) || (r.a === b && r.b === a))); return r ? (r.built ? { done: true } : { pct: Math.floor(r.prog * 100) }) : {}; }
-  const id = abSegId(a, b); if (hwDone().includes(id)) return { done: true };
+  const id = abSegId(a, b); if (hwAll().includes(id)) return { done: true };
   const j = (S.hwJobs || []).find(q => q.seg === id); return j ? { pct: Math.floor((j.stage + j.prog) / stagesOf(j).length * 100) } : {};
 }
 function superRouteSvg() {
@@ -4053,7 +4068,7 @@ function updSuperBtn() {
 const r66Why = id => { const sg = segById(id); if (!sg) return 'няма участък'; if (!abUnlocked()) return '🔒 аутобани'; if ((S.hwJobs || []).length >= HW_MAX_JOBS()) return 'няма свободен екип'; if (!abReach(sg) && !sg.spur) return 'първо стигни с магистрала'; return ''; };
 const route66 = createRoute66({ S: () => S, econ: () => econ, toast, modal, fmt, save, sound: n => Sound.play(n), rep: () => S.rep || 0,
   open: () => !!S && !!contByKey('na')?.open?.(), addRep: d => { S.rep = Math.max(0, Math.min(5, S.rep + d)); }, addXp: n => dev.add(n), cityName: id => cityById(id)?.nm || id,
-  segId: (a, b) => abSegId(a, b), segDone: id => hwDone().includes(id),
+  segId: (a, b) => abSegId(a, b), segDone: id => hwAll().includes(id),
   segJob: id => { const j = (S.hwJobs || []).find(j => j.seg === id); return j ? { pct: Math.floor((j.stage + j.prog) / stagesOf(j).length * 100) } : null; },
   segInfo: (a, b) => { const km = kmBetween(a, b); return { km, ...abQuoteSeg({ a, b }, km) }; }, canTake: r66Why,
   pop: (cap, sub) => showEventPop(/открит/.test(cap) ? 'r66-done' : 'ab-done', cap, sub), openWin: () => openBig('super') });
@@ -4063,7 +4078,7 @@ const mega = createMega({ S: () => S, econ: () => econ, toast, modal, fmt, save,
   contOpen: k => !!S && dev.has(['eu', 'af'].includes(k) ? 'MEGA_EU' : 'MEGA_WORLD') && (k === 'eu' ? dev.has('EUROPE') : !!contByKey(k)?.open?.()),   // специалните поръчки: ниво 13 (Европа, Африка), 19 (светът)
   addRep: d => { S.rep = Math.max(0, Math.min(5, S.rep + d)); }, addXp: n => dev.add(n), cityName: id => cityById(id)?.nm || id,
   railLeg: (a, b) => (S.rails || []).find(r => !r.c && ((r.a === a && r.b === b) || (r.a === b && r.b === a))) || null, railQuote: (a, b, mul = 1) => { const q = railQuote(a, b); return { ...q, cost: Math.round(q.cost * mul / 1000) * 1000 }; }, railBuild: (a, b, mul = 1) => orientBuild(a, b, mul),
-  abId: (a, b) => abSegId(a, b), abDone: id => hwDone().includes(id), abWhy: megaAbWhy,
+  abId: (a, b) => abSegId(a, b), abDone: id => hwAll().includes(id), abWhy: megaAbWhy,
   abJob: id => { const j = (S.hwJobs || []).find(j => j.seg === id); return j ? { pct: Math.floor((j.stage + j.prog) / stagesOf(j).length * 100) } : null; },
   abQuote: (a, b) => { const km = kmBetween(a, b); return { km, ...abQuoteSeg({ a, b }, km) }; },
   abTake: id => { const sg = segById(id); if (!sg) return; const was = sg.spur; sg.spur = true; try { takeAutobahn(id); } finally { sg.spur = was; } },   // по договор — и без готова магистрала до там
@@ -4733,6 +4748,12 @@ function railSvg() {
       h += `<text x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2 - 4}" font-size="9" font-weight="800" fill="#7a4b00" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${(2.5 * zs).toFixed(2)}">${RAIL_STAGES[railStageOf(r.prog).stage].ico} ${Math.floor(r.prog * 100)}%</text>`;
     }
   }
+  // 🤝 жп линиите на партньора — същите траверси (обща карта), с тънка розова ивица отстрани
+  for (const [a, b] of window.__coopShared?.rails || []) {
+    if (!cityById(a) || !cityById(b) || !mapIn(a, b) || (S?.rails || []).some(r => r.built && !r.c && ((r.a === a && r.b === b) || (r.a === b && r.b === a)))) continue;
+    const ps = railPts(a, b).map(p => p.map(v => v.toFixed(1)).join(',')).join(' ');
+    h += `<polyline points="${ps}" fill="none" stroke="#ff4fa3" stroke-width="${(4.6 * zs).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round" opacity=".45"/><polyline points="${ps}" fill="none" stroke="#3b2f25" stroke-width="${(3.2 * zs).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/><polyline points="${ps}" fill="none" stroke="#d8cbb0" stroke-width="${(1.6 * zs).toFixed(2)}" stroke-dasharray="${(1.2 * zs).toFixed(2)} ${(2 * zs).toFixed(2)}"/>`;
+  }
   return h;
 }
 function updateMapTrains() {
@@ -5305,13 +5326,13 @@ function offerSpur(id) {
   modal(`🔗 Пътна връзка за ${cityById(id).nm}`, `${cityById(id).nm} не е на коридор — строиш собствен участък (аутобан) до избран град. Най-близкият е най-бърз и евтин; ако е <b>🔗 в мрежата</b>, градът веднага се включва в магистралите. Държавата плаща при предаването, а после можеш да продължиш с още участъци.`,
     [['Отказ', null], ...near.map(n => [`🏗️ ${lbl(n)}`, () => { S.spurs = [...(S.spurs || []).filter(x => abSegId(x.a, x.b) !== abSegId(id, n.x)), { a: id, b: n.x }]; const sid = addSpurSeg(id, n.x); takeSeg(sid); openBig('hw'); }])]);   // при пълен капацитет — на опашката
 }
-const hasAbSeg = (a, b) => ALL_AB.some(x => x.id === abSegId(a, b)) && hwDone().includes(abSegId(a, b));
+const hasAbSeg = (a, b) => ALL_AB.some(x => x.id === abSegId(a, b)) && hwAll().includes(abSegId(a, b));
 const segById = id => allSegs().find(s => s.id === id) || (String(id).startsWith('ab:') ? ALL_AB.find(s => s.id === id) : null);
 // ---- Фаза 9: аутобани (международни коридори) — работят през същите държавни поръчки (S.hwJobs с j.ab)
 const abStages = () => AB?.AB_STAGES || AB_STAGES_DEF;
 const stagesOf = j => j.ab ? abStages() : HW_STAGES;
 const AB_K = () => ({ cost: AB?.AB_COST_MUL ?? 2.5, toll: AB?.AB_TOLL_MUL ?? 3, full: AB?.AB_FULL_BONUS ?? 0.5 });
-const bgFullHighways = () => HIGHWAYS.filter(hw => !hw.intl && hw.segs.every((_, i) => hwDone().includes(segId(hw, i)))).length;
+const bgFullHighways = () => HIGHWAYS.filter(hw => !hw.intl && hw.segs.every((_, i) => hwAll().includes(segId(hw, i)))).length;
 const abUnlocked = () => !!S && dev.best() >= AB_UNLOCK.lv && bgFullHighways() >= AB_UNLOCK.bgFull;
 const abLockTxt = () => `🔒 Аутобаните се отключват на ниво ${AB_UNLOCK.lv} на развитие (сега ${dev.best()}) и с ${AB_UNLOCK.bgFull} изцяло завършени български магистрали (сега ${bgFullHighways()}).`;
 // Африка — тежък терен (пустини, джунгла, планини): аутобаните се строят по-бавно, около 100–180 дни на участък
@@ -5349,14 +5370,14 @@ const abMissingTxt = () => { const m = Object.entries(abFleet()).map(([k, n]) =>
 // аутобанът се строи само като продължение на съществуваща пътна мрежа: единият край трябва да е
 // град с готов участък от магистрала или аутобан (не може участък „в нищото“)
 // „вратите“ на отворените континенти (Александрия, Ню Йорк…) имат местна пътна мрежа по подразбиране — оттам започват магистралите на континента
-const roadHubs = () => new Set([...allSegs(), ...ALL_AB].filter(s => hwDone().includes(s.id)).flatMap(s => [s.a, s.b]).concat(S ? Object.entries(CONT_GATE).filter(([k]) => contLinked(k)).map(([, g]) => g) : []));
+const roadHubs = () => new Set([...allSegs(), ...ALL_AB].filter(s => hwAll().includes(s.id)).flatMap(s => [s.a, s.b]).concat(S ? Object.entries(CONT_GATE).filter(([k]) => contLinked(k)).map(([, g]) => g) : []));
 const abReach = sg => { const h = roadHubs(); return h.has(sg.a) || h.has(sg.b) || (sg.cont && (ownedCities().includes(sg.a) || ownedCities().includes(sg.b))); };
 const abShown = c => !c.cont || contByKey(c.cont).open();
 function takeAutobahn(id) {
   if (!abUnlocked()) { toast(abLockTxt(), 'bad'); return; }
   if (!hwRepOk()) { toast(`Държавните поръчки изискват репутация ${HW_REP} ★ или ниво 5 на развитие (голяма фирма).`, 'bad'); return; }
   if ((S.hwJobs || []).length >= HW_MAX_JOBS()) { toast('Вече строиш максимума участъци. Надгради офиса за повече.', 'bad'); return; }
-  const sg = segById(id); if (!sg || hwDone().includes(id) || (S.hwJobs || []).some(j => j.seg === id)) return;
+  const sg = segById(id); if (!sg || hwAll().includes(id) || (S.hwJobs || []).some(j => j.seg === id)) return;
   if (!abReach(sg) && !sg.spur) { toast(`🛣️ ${cityById(sg.a).nm} — ${cityById(sg.b).nm}: аутобанът продължава съществуваща магистрала — първо стигни с готов участък до ${cityById(sg.a).nm} или ${cityById(sg.b).nm}.`, 'bad'); return; }
   const km = kmBetween(sg.a, sg.b);
   S.hwJobs = [...(S.hwJobs || []), { seg: id, ab: true, km, ...abQuoteSeg(sg, km), stage: 0, prog: 0, mat: {}, start: S.day, v2: true, city: S.cityId }];
@@ -5389,7 +5410,7 @@ function abSvg() {
     if (!mapIn(sg.a, sg.b)) continue;
     if (sg.cont && !contByKey(sg.cont).open()) continue;
     const A1 = cityById(sg.a), B1 = cityById(sg.b); if (!A1 || !B1) continue;
-    const [x1, y1] = proj(A1.lon, A1.lat), [x2, y2] = proj(B1.lon, B1.lat), done = hwDone().includes(sg.id), j = jobs[sg.id], via = viaOf(sg.a, sg.b);
+    const [x1, y1] = proj(A1.lon, A1.lat), [x2, y2] = proj(B1.lon, B1.lat), done = hwAll().includes(sg.id), j = jobs[sg.id], via = viaOf(sg.a, sg.b);
     if (via) {   // начупено трасе (по брега и т.н.)
       const pts = [[x1, y1], ...via.map(([lo, la]) => proj(lo, la)), [x2, y2]], P = a => a.map(p => p.map(v => v.toFixed(1)).join(',')).join(' ');
       const k = j ? (j.stage + j.prog) / abStages().length : 0, [lx, ly] = ptAlong(pts, 0.5);
@@ -5408,16 +5429,22 @@ function abSvg() {
   return h;
 }
 const hwDone = () => (S && S.hwDone) || [];
+// 🤝 партньорски режим: картата е обща — участъците, построени от партньора, са готови и при теб (връзки, карта, строеж),
+// но тол таксите, стойността и статистиките остават само от твоите (coop.js пълни window.__coopShared)
+let _hwOwn = null, _hwV = -1, _hwAll = [];
+const hwAll = () => { const own = hwDone(), sh = window.__coopShared; if (!sh || !sh.hw?.length) return own;
+  if (own !== _hwOwn || sh.v !== _hwV) { _hwOwn = own; _hwV = sh.v; _hwAll = [...new Set([...own, ...sh.hw])]; } return _hwAll; };
+const hwMine = id => hwDone().includes(id);
 // градове, свързани с централата по готови магистрали (за по-евтин превоз с камиони)
 function hwNetwork() {
-  const done = [...allSegs(), ...ALL_AB].filter(s => hwDone().includes(s.id));
+  const done = [...allSegs(), ...ALL_AB].filter(s => hwAll().includes(s.id));
   const out = new Set([S.cityId]), q = [S.cityId];
   while (q.length) { const c = q.shift(); for (const s of done) { const n = s.a === c ? s.b : s.b === c ? s.a : null; if (n && !out.has(n)) { out.add(n); q.push(n); } } }
   return [...out];
 }
 // градове, до които пътят минава поне по един готов участък от аутобан (отстъпка ECON.AB_DISCOUNT)
 function abNetwork() {
-  const edges = [...allSegs(), ...ALL_AB].filter(s => hwDone().includes(s.id));
+  const edges = [...allSegs(), ...ALL_AB].filter(s => hwAll().includes(s.id));
   const seen = new Set([S.cityId + '|0']), q = [[S.cityId, 0]], out = new Set();
   while (q.length) {
     const [c, f] = q.shift();
@@ -5435,7 +5462,7 @@ const accessIds = kind => S && S.roadAccess && S.roadAccess[S.cityId] === kind ?
 const supplyOpts = () => ({ roadCityIds: [...hwNetwork().filter(id => id !== S.cityId), ...accessIds('road')], abCityIds: [...new Set([...abNetwork(), ...seaNetwork(), ...accessIds('ab')])], wonCityIds: wonCityIds() });
 // налични участъци: незапочнати, по-близките до мрежата ти първи
 function hwAvailable() {
-  const busy = new Set([...hwDone(), ...(S.hwJobs || []).map(j => j.seg)]);
+  const busy = new Set([...hwAll(), ...(S.hwJobs || []).map(j => j.seg)]);
   const net = new Set([...network(), ...hwNetwork()]);
   return allSegs().filter(s => !busy.has(s.id) && segOpen(s))
     .map(s => ({ s, d: (net.has(s.a) || net.has(s.b)) ? 0 : Math.min(...[...net].map(c => Math.min(kmBetween(c, s.a), kmBetween(c, s.b)))) }))
@@ -5445,7 +5472,7 @@ function hwAvailable() {
 const hwQueue = () => (S.hwQueue = S.hwQueue || []);
 const hwFull = () => (S.hwJobs || []).length >= HW_MAX_JOBS();
 function takeSeg(id) {   // магистрала или аутобан — с опашка
-  const sg = segById(id); if (!sg || hwDone().includes(id) || (S.hwJobs || []).some(j => j.seg === id)) return;
+  const sg = segById(id); if (!sg || hwAll().includes(id) || (S.hwJobs || []).some(j => j.seg === id)) return;
   if (hwFull()) {
     if (hwQueue().includes(id)) { toast('Участъкът вече чака на опашката.', ''); return; }
     hwQueue().push(id);
@@ -5458,7 +5485,7 @@ function hwQueueTick() {
   if (!S || !S.hwQueue || !S.hwQueue.length) return;
   while (S.hwQueue.length && !hwFull()) {
     const id = S.hwQueue.shift(), sg = segById(id);
-    if (!sg || hwDone().includes(id) || (S.hwJobs || []).some(j => j.seg === id)) continue;
+    if (!sg || hwAll().includes(id) || (S.hwJobs || []).some(j => j.seg === id)) continue;
     toast(`📋➡️ Освободи се екип — започва ${cityById(sg.a).nm} — ${cityById(sg.b).nm} от опашката.`, 'good');
     if (id.startsWith('ab:')) takeAutobahn(id); else takeHighway(id);
   }
@@ -5466,7 +5493,7 @@ function hwQueueTick() {
 // бутонът „Строй участък“ в картата на града: взима най-подходящия участък до града (или го слага на опашка)
 function roadOwn(id) {
   const busy = new Set([...(S.hwJobs || []).map(j => j.seg), ...hwQueue()]);
-  const cands = [...allSegs(), ...ALL_AB].filter(x => (x.a === id || x.b === id) && !hwDone().includes(x.id) && (!x.cont || contByKey(x.cont)?.open()));
+  const cands = [...allSegs(), ...ALL_AB].filter(x => (x.a === id || x.b === id) && !hwAll().includes(x.id) && (!x.cont || contByKey(x.cont)?.open()));
   if (cands.some(x => busy.has(x.id))) { openBig('hw'); return; }
   const hubs = roadHubs(), other = x => x.a === id ? x.b : x.a;
   const ok = cands.filter(x => !x.ab || abReach(x) || x.spur).sort((p, q) => (hubs.has(other(q)) - hubs.has(other(p))) || kmBetween(p.a, p.b) - kmBetween(q.a, q.b));
@@ -5601,7 +5628,7 @@ function hwSvg() {
     const off = 3;   // магистралата е леко изместена от жп линията
     const nx = -(y2 - y1), ny = x2 - x1, l = Math.hypot(nx, ny) || 1, ox = nx / l * off, oy = ny / l * off;
     const X1 = x1 + ox, Y1 = y1 + oy, X2 = x2 + ox, Y2 = y2 + oy;
-    if (hwDone().includes(s.id)) h += `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#1e5fbf" stroke-width="${(4.2 * zs).toFixed(2)}" stroke-linecap="round"/><line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#ffffff" stroke-width="${(0.8 * zs).toFixed(2)}"/>`;
+    if (hwAll().includes(s.id)) h += (hwMine(s.id) ? '' : `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#ff4fa3" stroke-width="${(6.4 * zs).toFixed(2)}" stroke-linecap="round" opacity=".45"/>`) + `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#1e5fbf" stroke-width="${(4.2 * zs).toFixed(2)}" stroke-linecap="round"/><line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#ffffff" stroke-width="${(0.8 * zs).toFixed(2)}"/>`;
     else if (jobs[s.id]) {
       const j = jobs[s.id], k = (j.stage + j.prog) / HW_STAGES.length;
       h += `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#8aa6cf" stroke-width="${(3 * zs).toFixed(2)}" stroke-dasharray="${(3 * zs).toFixed(2)} ${(2 * zs).toFixed(2)}"/><line x1="${X1}" y1="${Y1}" x2="${X1 + (X2 - X1) * k}" y2="${Y1 + (Y2 - Y1) * k}" stroke="#1e5fbf" stroke-width="${(4 * zs).toFixed(2)}"/>`;
@@ -5610,7 +5637,7 @@ function hwSvg() {
   }
   // табелки с името на магистралата върху построените участъци
   for (const hw of HIGHWAYS) {
-    const k = hw.segs.findIndex((_, i) => hwDone().includes(segId(hw, i)));
+    const k = hw.segs.findIndex((_, i) => hwAll().includes(segId(hw, i)));
     if (k < 0) continue;
     const A1 = cityById(hw.segs[k][0]), B1 = cityById(hw.segs[k][1]), [x1, y1] = proj(A1.lon, A1.lat), [x2, y2] = proj(B1.lon, B1.lat);
     { const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2 - 10 * zs; h += `<g><rect x="${cx - 9 * zs}" y="${cy - 5 * zs}" width="${18 * zs}" height="${10 * zs}" rx="${2 * zs}" fill="#1e5fbf" stroke="#fff" stroke-width="${(.8 * zs).toFixed(2)}"/><text x="${cx}" y="${cy + 2.4 * zs}" font-size="${7.5 * zs}" font-weight="900" fill="#fff" text-anchor="middle">${hw.id}</text></g>`; }
@@ -5620,7 +5647,7 @@ function hwSvg() {
 function hwHudHtml() {
   let h = `<div class="sect">🛣️ Магистрали · тол ${fmt(hwToll())} €/ден</div>`;
   for (const hw of HIGHWAYS) {
-    const n = hw.segs.filter((_, i) => hwDone().includes(segId(hw, i))).length;
+    const n = hw.segs.filter((_, i) => hwAll().includes(segId(hw, i))).length;
     if (!n) continue;
     const full = n === hw.segs.length;
     h += `<div class="meta" style="margin:0">🎫 АМ „${hw.nm}“: ${n}/${hw.segs.length} участъка${full ? ' · <b style="color:var(--ok)">цяла ×1.5</b>' : ` · следващият участък вдига тола с +25%`} → <b style="color:var(--ok)">${fmt(hwTollOf(hw))} €/ден</b></div>`;
@@ -5763,7 +5790,7 @@ function renderResortView(rdt) {
 function renderHwView(rdt) {
   if (hwv.seg.startsWith('resort:')) return renderResortView(rdt);
   if (hwv.seg.startsWith('rail:')) return renderRailView(rdt);
-  const j = (S.hwJobs || []).find(q => q.seg === hwv.seg), done = hwDone().includes(hwv.seg), s = segById(hwv.seg);
+  const j = (S.hwJobs || []).find(q => q.seg === hwv.seg), done = hwAll().includes(hwv.seg), s = segById(hwv.seg);
   hwv.t += rdt;
   const STG = s.ab ? abStages() : HW_STAGES, real = s.ab && AB?.buildAutobahnView;
   const stage = done ? STG.length : j ? j.stage : 0, prog = j ? j.prog : 1;
@@ -5799,7 +5826,7 @@ let cityHw = null;
 function buildCityHighway() {
   if (cityHw) { city.group.remove(cityHw.g); cityHw = null; }
   const mine = [...allSegs(), ...ALL_AB].filter(s => s.a === S.cityId || s.b === S.cityId);   // и аутобаните (напр. Прага)
-  const done = mine.find(s => hwDone().includes(s.id)), job = (S.hwJobs || []).find(j => mine.some(s => s.id === j.seg));
+  const done = mine.find(s => hwAll().includes(s.id)), job = (S.hwJobs || []).find(j => mine.some(s => s.id === j.seg));
   if (!done && !job) return;
   const g = new THREE.Group();
   const hx0 = Math.min(tx(0), -(N * TILE) / 2), hx1 = Math.max(tx(NI - 1), (N * TILE) / 2), hLen = hx1 - hx0 + 200, hcx = (hx0 + hx1) / 2;   // по цялата ширина на града
@@ -5820,7 +5847,7 @@ function buildCityHighway() {
 }
 function updateCityHighway(t) {
   if (!cityHw) return;
-  const done = hwDone().includes(cityHw.seg), j = (S.hwJobs || []).find(q => q.seg === cityHw.seg);
+  const done = hwAll().includes(cityHw.seg), j = (S.hwJobs || []).find(q => q.seg === cityHw.seg);
   const stage = done ? 4 : j ? j.stage : 4, prog = j ? j.prog : 1;
   cityHw.v.update(stage, prog, t);
   for (const c of cityHw.conn) c.visible = stage >= 2;
@@ -6440,6 +6467,7 @@ function newCityState() {
     units: [...ECON.START.units], officeLevel: 1, garageLevel: 1, garageLot: null, whLevel: 0, whLot: null, stationLevel: 0, stationBuild: null, cityExt: 0, staff: {}, dev: { xp: 0, lv: 1, v: 3 }, autoFill: undefined };
 }
 const ownedCities = () => [S.hqCity, ...(S.branches || [])];
+const brN = () => (S.branches || []).filter(id => !(S.coopBr || {})[id]).length;   // платените филиали (тези от партньора не оскъпяват следващия)
 const nowDays = () => S.day + S.dayT / DAY_SEC;
 function stashCity() {
   const c = {};
@@ -6654,7 +6682,7 @@ function cpTabsHtml() {
 const wonHide = id => { const cc = cityById(id)?.cc || '🇧🇬'; return wonCountries(x => econ.isFinished(x)).some(k => k.cc === cc); };
 function buyBranchHtml() {
   const hid = CITIES.filter(c => branchOk(c.id) && inScope(c.id) && wonHide(c.id)).length;
-  const n0 = (S.branches || []).length, rows = CITIES.filter(c => branchOk(c.id) && inScope(c.id) && !wonHide(c.id)).map(c => { const cost = ECON.BRANCH_COST(c.id, n0); return { c, price: cost + branchExtra(c.id, cost) - ((S.branchDiscounts || 0) > 0 ? Math.round(cost * 0.3 / 1000) * 1000 : 0) }; });
+  const n0 = brN(), rows = CITIES.filter(c => branchOk(c.id) && inScope(c.id) && !wonHide(c.id)).map(c => { const cost = ECON.BRANCH_COST(c.id, n0); return { c, price: cost + branchExtra(c.id, cost) - ((S.branchDiscounts || 0) > 0 ? Math.round(cost * 0.3 / 1000) * 1000 : 0) }; });
   const hidNote = hid ? `<div class="meta" style="margin:6px 0 0">🏆 Скрити са ${hid} града в завладени държави. Купуваш ги от картата, ако ги искаш.</div>` : '';
   if (!rows.length) return `<div class="card"><div class="meta" style="margin:0">Няма отключени градове без филиал в този обхват — смени филтъра горе или вдигни нивото на фирмата.</div>${hidNote}</div>`;
   const by = new Map(); for (const r of rows) { const cc = r.c.cc || '🇧🇬', k = COUNTRIES.find(x => x.cc === cc); if (!by.has(cc)) by.set(cc, { cc, nm: k ? k.nm : '', rs: [] }); by.get(cc).rs.push(r); }
@@ -6989,8 +7017,8 @@ function progCard(kind, sc0, mini) {
     total += shc.length; // преките връзки също са „оставащо“
   } else if (kind === 'hw') {
     const segs = [...allSegs(), ...ALL_AB.filter(x => !x.spur && (!x.cont || contByKey(x.cont)?.open()))].filter(x => inS.has(x.a) && inS.has(x.b));
-    const uniq = [...new Map(segs.map(x => [x.id, x])).values()]; total = uniq.length; done = uniq.filter(x => hwDone().includes(x.id)).length;
-    const miss = uniq.filter(x => !hwDone().includes(x.id));
+    const uniq = [...new Map(segs.map(x => [x.id, x])).values()]; total = uniq.length; done = uniq.filter(x => hwAll().includes(x.id)).length;
+    const miss = uniq.filter(x => !hwAll().includes(x.id));
     if (miss.length) rest.push(`🛣️ участъци <b>${miss.length}</b>: ${miss.slice(0, 8).map(x => `${cityById(x.a).nm}—${cityById(x.b).nm}`).join(', ')}${miss.length > 8 ? ` и още ${miss.length - 8}` : ''}`);
   } else {
     const has = id => kind === 'sea' ? (portLv(id) > 0 || isMuni('sea', id)) : (airLv(id) > 0 || isMuni('air', id));
@@ -7031,11 +7059,11 @@ function railWinHtml() {
 function hwWinHtml() {
   const lockMsg = !dev.has('LINKS') ? `<div class="meta late">🔒 Магистралите се отключват на ниво 2 на развитие.</div>` : !hwRepOk() ? `<div class="meta late">🔒 Държавните поръчки изискват репутация ${HW_REP} ★.</div>` : '';
   const all = HIGHWAYS.filter(hw => (!hw.intl || dev.has('BALKANS')) && inScope(...hw.segs.flat()));
-  const doneSegs = hw => hw.segs.filter((_, i) => hwDone().includes(segId(hw, i))).length;
+  const doneSegs = hw => hw.segs.filter((_, i) => hwAll().includes(segId(hw, i))).length;
   const jobs = S.hwJobs || [], can = jobs.length < HW_MAX_JOBS();
   const missTxt = hwMissingTxt();
   const scAb = AUTOBAHNS.filter(c => abShown(c) && inScope(...c.cities)), scToll = all.reduce((a, hw) => a + hwTollOf(hw), 0) + scAb.reduce((a, c) => a + abTollOf(c), 0);
-  const scDone = new Set([...all.flatMap(hw => hw.segs.map((_, i) => segId(hw, i))), ...scAb.flatMap(corridorSegIds)].filter(id => hwDone().includes(id))).size;
+  const scDone = new Set([...all.flatMap(hw => hw.segs.map((_, i) => segId(hw, i))), ...scAb.flatMap(corridorSegIds)].filter(id => hwAll().includes(id))).size;
   let h = `<div class="bw-stats"><div><b>${fmt(scToll)} €</b><span>тол на ден</span></div><div><b>${scDone}</b><span>готови участъка</span></div><div><b>${all.filter(hw => doneSegs(hw) === hw.segs.length).length} / ${all.length}</b><span>цели магистрали</span></div><div><b>${jobs.length} / ${HW_MAX_JOBS()}</b><span>строят се</span></div></div>${lockMsg}${missTxt && !lockMsg ? `<div class="row" style="margin:0"><span class="meta late" style="margin:0">🚜 ${missTxt} — без нея участъците чакат.${roadNote(hwMissing())}</span><button class="btn" id="bwBuyRoad" ${econ.canAfford(roadCost(hwMissing())) ? '' : 'disabled'}>🚜 Купи липсващата · ${fmt(roadCost(hwMissing()))} €</button></div>` : ''}`;
   if (['c:am', 'all'].includes(scopeNow())) h += route66.cardHtml();   // 🛣️ Route 66 (специална поръчка) — само в Америка
   const qIn = hwQueue().filter(id => { const g = segById(id); return g && inScope(g.a, g.b); });
@@ -7047,7 +7075,7 @@ function hwWinHtml() {
   for (const hw of order) {
     const n = doneSegs(hw);
     const rows = hw.segs.map((sg, i) => {
-      const id = segId(hw, i), s = segById(id), km = kmBetween(s.a, s.b), done = hwDone().includes(id), job = jobs.find(j => j.seg === id);
+      const id = segId(hw, i), s = segById(id), km = kmBetween(s.a, s.b), done = hwAll().includes(id), job = jobs.find(j => j.seg === id);
       if (done) return `<div class="meta" style="margin:2px 0">✅ ${cityById(s.a).nm} — ${cityById(s.b).nm} · ${km} км</div>`;
       if (job) return `<div class="meta" style="margin:2px 0">🚧 ${cityById(s.a).nm} — ${cityById(s.b).nm} · ${km} км · строи се</div>`;
       const q = segmentQuote(km);
@@ -7061,10 +7089,10 @@ function hwWinHtml() {
   else { const m = abMissingTxt(); if (m) h += `<div class="row" style="margin:0 0 6px"><span class="meta late" style="margin:0">🚜 За аутобан: ${m}${roadNote(abMissing())}</span><button class="btn" data-buyroad="1" ${econ.canAfford(roadCost(abMissing())) ? '' : 'disabled'}>🚜 Купи липсващата · ${fmt(roadCost(abMissing()))} €</button></div>`; }
   for (const c of AUTOBAHNS.filter(c => abShown(c) && inScope(...c.cities))) {
     if (c.cont && c === AUTOBAHNS.find(x => x.cont === c.cont)) h += `<div class="sect" style="margin-top:8px">${contByKey(c.cont).ico} ${CONT_HW_NM[c.cont] || ''} — започват от твой град на континента</div>`;
-    const ids = corridorSegIds(c), n = ids.filter(id => hwDone().includes(id)).length;
+    const ids = corridorSegIds(c), n = ids.filter(id => hwAll().includes(id)).length;
     const rows = ids.map(id => {
       const sg = segById(id), km = kmBetween(sg.a, sg.b), job = jobs.find(j => j.seg === id), nm = `${cityById(sg.a).nm} — ${cityById(sg.b).nm}`;
-      if (hwDone().includes(id)) return `<div class="meta" style="margin:2px 0">✅ ${nm} · ${km} км</div>`;
+      if (hwAll().includes(id)) return `<div class="meta" style="margin:2px 0">✅ ${nm} · ${km} км</div>`;
       if (job) return `<div class="row" style="margin:2px 0"><span class="meta" style="margin:0">🚧 ${nm} · ${km} км · строи се</span><button class="btn2" data-hwview="${id}">👁 Виж</button></div>`;
       const q = abQuoteSeg(sg, km), reach = abReach(sg);
       return `<div class="row" style="margin:3px 0"><span class="meta" style="margin:0">⬜ ${nm} · ${km} км · ${q.days} дни · ${reach ? `тол <b style="color:var(--ok)">+${fmt(abTollGain(sg))} €/ден</b>` : '<span class="late">🔗 няма магистрала до тук</span>'}</span><button class="btn" data-ab="${id}" ${abUnlocked() && hwRepOk() && reach && !hwQueue().includes(id) ? '' : 'disabled'}>${hwQueue().includes(id) ? '📋 на опашка' : can ? `Строй +${fmt(q.reward)} €` : '📋 На опашка'}</button></div>`;

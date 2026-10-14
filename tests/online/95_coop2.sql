@@ -15,9 +15,8 @@ select t.ok((public.coop_joint_act(:j, 'accept') ->> 'err') = 'bad_action', 'п�
 select t.as(:B); select t.ok((public.coop_joint_act(:j, 'accept') ->> 'ok')::boolean, 'Б приема общия участък');
 select t.ok((public.coop_joint_bonus(:j) ->> 'err') = 'not_done', 'без бонус, докато не са готови и двамата');
 select public.coop_snap('{"name":"Б","worth":80000,"stats":{"done":1,"hw":1,"earned":20000,"cities":1},"hwDone":["A1-2"],"rails":[]}') \gset
-select t.ok((public.coop_joint_bonus(:j) ->> 'err') = 'not_done', 'само единият е готов → още няма бонус');
-select t.as(:A); select public.coop_snap('{"name":"А","worth":100000,"stats":{"done":3,"hw":1,"earned":50000,"cities":1},"hwDone":["A1-2"],"rails":[]}') \gset
-select t.ok((public.coop_status2() -> 'joints' -> 0 ->> 'done')::boolean, 'и двамата са готови');
+select t.as(:A); select t.ok((public.coop_status2() -> 'joints' -> 0 ->> 'done')::boolean, 'обща карта: построен от единия → готов и за двамата');
+select t.ok(not (public.coop_status2() -> 'joints' -> 0 ->> 'me_done')::boolean, 'А сам не го е строил');
 select t.ok((public.coop_joint_bonus(:j) ->> 'amount')::int = 144000, 'бонус 1500 €/км × 96');
 select t.ok((public.coop_joint_bonus(:j) ->> 'err') = 'claimed', 'бонусът е веднъж');
 -- наем
