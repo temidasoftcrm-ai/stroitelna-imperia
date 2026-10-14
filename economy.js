@@ -243,6 +243,11 @@ export const CATS = {
   'курорти':  { ico: '🏔️', nm: 'Курорти' },
   'градове':  { ico: '🏁', nm: 'Завършени градове' },
   'филиал±':  { ico: '🏢', nm: 'Продажба на филиал' },
+  'превози':  { ico: '🚚', nm: 'Превози (влакове, ТИР-ове)' },
+  'тол':      { ico: '🛣️', nm: 'Тол такси' },
+  'наеми':    { ico: '🔑', nm: 'Наеми от имоти' },
+  'петрол':   { ico: '🛢️', nm: 'Петрол' },
+  'придобивания': { ico: '🏢', nm: 'Придобити фирми' },
   'друго':    { ico: '📄', nm: 'Друго' },
 };
 // кредитът не е нито приход, нито разход — в отчета за печалбата не влиза
@@ -295,14 +300,15 @@ export class Economy {
     t.cats[cat] = (t.cats[cat] || 0) + amount;
   }
   spend(n, cat = 'друго', note = '') { this.s.money -= n; this._log(-n, cat, note); return true; }
-  earn(n, cat = 'друго', note = '') {
+  // opts.city: истински обект в града — само той влиза в оборота на града и в най-печелившите (тол, наеми, превози и мегапроекти — не)
+  earn(n, cat = 'друго', note = '', opts = {}) {
     this.s.money += n; this._log(n, cat, note);
-    if (cat === 'обект' && n > 0 && this.cityId) {   // оборот по градове (за автоматичния приход след завършване)
+    if (cat === 'обект' && n > 0 && opts.city && this.cityId) {   // оборот по градове (за автоматичния приход след завършване)
       const ce = this.s.cityEarn[this.cityId] || (this.s.cityEarn[this.cityId] = {});
       ce[this.s.day] = (ce[this.s.day] || 0) + Math.round(n);
       for (const d of Object.keys(ce)) if (+d < this.s.day - 60) delete ce[d];
     }
-    if (cat === 'обект' && n > 0) {   // най-печелившите обекти (за статистиката)
+    if (cat === 'обект' && n > 0 && opts.city) {   // най-печелившите обекти (за статистиката)
       const tp = this.s.topProjects; tp.push({ note, amount: Math.round(n), day: this.s.day });
       tp.sort((a, b) => b.amount - a.amount); if (tp.length > 10) tp.length = 10;
     }

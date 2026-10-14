@@ -54,8 +54,8 @@ export function createHwTrucks(d) {
       t.km += TRUCK.speed * dt;
       if (t.km < t.total) continue;
       const pay = legPay(t), toll = legToll(t), S = d.S(), to = t.path[t.path.length - 1];
-      E().earn(pay, 'обект', `${t.nm}: ${t.cargo} ${name(t.path[0])} → ${name(to)}`);
-      if (toll) E().spend(toll, 'гориво', `${t.nm}: тол по чужди участъци`);
+      E().earn(pay, 'превози', `${t.nm}: ${t.cargo} ${name(t.path[0])} → ${name(to)}`);
+      if (toll) E().spend(toll, 'тол', `${t.nm}: тол по чужди участъци`);
       t.trips++; t.earned += pay - toll; t.at = to;
       autoTrip(t);
       if (S && S.day !== t.lastSave) { t.lastSave = S.day; d.save(); }
@@ -112,9 +112,9 @@ export function createHwTrucks(d) {
       const [c, id, x] = b.dataset.trk.split(':'), t = L().find(q => q.id === +id);
       if (c === 'buy') return buy();
       if (!t) return;
-      if (c === 'svc') { if (!E().canAfford(+x)) return; E().spend(+x, 'материали', `${t.nm}: обслужване`); t.cond = 100; d.save(); d.renderPanel(); d.toast(`🔧 ${t.nm} е като нов.`, 'good'); return; }
+      if (c === 'svc') { if (!E().canAfford(+x)) return; E().spend(+x, 'заплати', `${t.nm}: обслужване`); t.cond = 100; d.save(); d.renderPanel(); d.toast(`🔧 ${t.nm} е като нов.`, 'good'); return; }
       if (c === 'sell') d.modal(`Продай ${t.nm}?`, `Получаваш ${f(+x)} €.`, [['Отказ', null], ['Продай', () => {
-        E().earn(+x, 'покупка', `Продаден ${t.nm}`); d.S().trucks = L().filter(q => q !== t); d.save(); d.redraw(); d.renderPanel(); }]]);
+        E().earn(+x, 'продажба', `Продаден ${t.nm}`); d.S().trucks = L().filter(q => q !== t); d.save(); d.redraw(); d.renderPanel(); }]]);
     });
   }
   return { buy, update, day, noFee, draw, html, bind, list: L, TRUCK,

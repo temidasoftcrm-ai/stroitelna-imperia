@@ -1700,7 +1700,7 @@ function collectCash(g) {
   const cash = g.userData.cash;
   if (g.userData.fly != null) return;
   g.userData.fly = 0;
-  econ.earn(cash.amount, 'обект', `${cash.title} — ${cash.note}`);
+  econ.earn(cash.amount, 'обект', `${cash.title} — ${cash.note}`, { city: true });
   try { window.__coopOrder?.(cash.amount, cash.title); } catch (e) { console.warn('coop order', e); }   // 🤝 40% от печалбата → общия холдинг
   S.cash.splice(S.cash.indexOf(cash), 1);
   SFXcash();
@@ -1718,7 +1718,7 @@ function collectAllCash(why = '') {
   let tot = 0, n = 0;
   for (const g of cashObjs) { const c = g.userData.cash; if (!c || g.userData.fly != null) continue; g.userData.fly = 0; tot += c.amount; n++; S.cash.splice(S.cash.indexOf(c), 1); }
   if (!n) return 0;
-  econ.earn(tot, 'обект', `Прибрани пари от ${n} обекта`);
+  econ.earn(tot, 'обект', `Прибрани пари от ${n} обекта`, { city: true });
   SFXcash(); toast(`💶 +${fmt(tot)} € — прибрани автоматично от ${n} ${n === 1 ? 'обект' : 'обекта'}${why}`, 'good');
   save(); renderPanel();
   return tot;
@@ -2315,7 +2315,7 @@ function endOfDay() {
   }
   { const tu = (S.trains || []).reduce((a, t) => a + trainType(t).upkeep, 0); if (tu) econ.spend(tu, 'заплати', `Ден ${S.day}: влакове`); flowDay('rail', tu); }
   hwTrucks.day();
-  if (hwDone().length) econ.earn(hwToll(), 'обект', `Ден ${S.day}: тол такси`);
+  if (hwDone().length) econ.earn(hwToll(), 'тол', `Ден ${S.day}: тол такси`);
   if (S.day % 10 === 0 && (S.trains || []).length && (S.trains || []).length >= totalTracks()) {
     const weak = ownedCities().filter(id => (id === S.cityId ? (S.stationLevel || 0) : ((S.cities || {})[id]?.stationLevel || 0)) < 5);
     if (weak.length) toast(`🚉 Влаковете са на лимита. Развий гарата в ${weak.map(id => cityById(id).nm).join(', ')} до ниво 5 за още влакове.`, '', () => { tab = 'hq'; renderPanel(); });
@@ -3639,18 +3639,18 @@ function updateTrains(dtDays) {
     if (j.empty) { t.job = null; t.path = null; t.leg = 'idle'; continue; }   // пристигна в началото на маршрута
     if (j.shuttle) {   // товарна совалка по маршрут: по-малко от поръчка, но без чакане
       const pay = j.pay ?? Math.round(t.total * trainWagons(t) * rand(8, 11) / 10) * 10;
-      econ.earn(pay, 'обект', `Совалка: ${cityById(j.from).nm} → ${cityById(j.to).nm}`); flowAdd('rail', pay - fuel, `${cityById(j.from).nm} → ${cityById(j.to).nm}`);
+      econ.earn(pay, 'превози', `Совалка: ${cityById(j.from).nm} → ${cityById(j.to).nm}`); flowAdd('rail', pay - fuel, `${cityById(j.from).nm} → ${cityById(j.to).nm}`);
       t.job = null; t.path = null; t.leg = 'idle'; save();
       continue;
     }
     if (j.pax) {   // билетите зависят от разстоянието и вагоните
       const pay = j.pay ?? Math.round(t.total * trainWagons(t) * rand(5, 7) / 10) * 10;
-      econ.earn(pay, 'обект', `Билети: ${cityById(j.from).nm} → ${cityById(j.to).nm}`); flowAdd('rail', pay - fuel, `${cityById(j.from).nm} → ${cityById(j.to).nm}`);
+      econ.earn(pay, 'превози', `Билети: ${cityById(j.from).nm} → ${cityById(j.to).nm}`); flowAdd('rail', pay - fuel, `${cityById(j.from).nm} → ${cityById(j.to).nm}`);
       if (!$('mapScreen').classList.contains('hidden')) toast(`🎫 ${t.nm} пристигна в ${cityById(j.to).nm}: +${fmt(pay)} € от билети`, 'good');
       t.job = null; t.path = null; t.leg = 'idle'; save();
       continue;
     }
-    econ.earn(j.reward, 'обект', `Превоз: ${j.cargo} ${cityById(j.from).nm} → ${cityById(j.to).nm}`); flowAdd('rail', j.reward - fuel, `${cityById(j.from).nm} → ${cityById(j.to).nm}`);
+    econ.earn(j.reward, 'превози', `Превоз: ${j.cargo} ${cityById(j.from).nm} → ${cityById(j.to).nm}`); flowAdd('rail', j.reward - fuel, `${cityById(j.from).nm} → ${cityById(j.to).nm}`);
     toast(`🚆 ${t.nm} достави ${j.cargo} в ${cityById(j.to).nm}: +${fmt(j.reward)} €`, 'good');
     quests.emit('delivery');
     SFXcash();
@@ -4676,7 +4676,7 @@ const upCost = (from, to) => Math.max(0, Math.round((to.cost - from.cost * TRADE
 function sellShip(id) {
   const p = (S.ships || []).find(x => x.id === id); if (!p) return;
   const got = Math.round(SHIPS[p.kind].cost * TRADE_IN / 1000) * 1000;
-  S.ships = S.ships.filter(x => x !== p); econ.earn(got, 'покупка', `Продаден кораб: ${SHIPS[p.kind].nm}`);
+  S.ships = S.ships.filter(x => x !== p); econ.earn(got, 'продажба', `Продаден кораб: ${SHIPS[p.kind].nm}`);
   toast(`💰 Продаде ${SHIPS[p.kind].ico} ${SHIPS[p.kind].nm} за ${fmt(got)} €.`, 'good'); SFXcash(); save();
 }
 function upgradeShip(id) {
@@ -4691,7 +4691,7 @@ function sellTrain(id) {
   const t = (S.trains || []).find(x => x.id === id); if (!t) return;
   const T = trainType(t), got = Math.round(T.cost * TRADE_IN / 1000) * 1000;
   if (t.job && t.job.wagons && !t.job.pax && !t.job.shuttle) S.jobs = [...(S.jobs || []), t.job];   // поетият превоз се връща на таблото
-  S.trains = S.trains.filter(x => x !== t); econ.earn(got, 'покупка', `Продаден влак: ${T.nm}`);
+  S.trains = S.trains.filter(x => x !== t); econ.earn(got, 'продажба', `Продаден влак: ${T.nm}`);
   toast(`💰 Продаде ${T.ico} ${T.nm.toLowerCase()} за ${fmt(got)} €.`, 'good'); SFXcash(); parkedSig = ''; updateParked(); save();
 }
 const stLvOf = id => id === S.cityId ? stationLv() : (S.cities || {})[id]?.stationLevel || 0;   // ниво на гарата в града
@@ -6486,10 +6486,10 @@ function finishPark(p) {
 }
 // ---- продажба на твой имот: купувач се появява след 1–3 дни
 function listForSale(lotId) { const o = ownedAt(lotId); if (!o || o.sale) return; o.sale = { day: S.day + 1 + (Math.random() * 3 | 0), price: null }; toast('🏷️ Имотът е обявен за продан. Купувач ще се появи до няколко дни.'); refreshEstateSigns(); save(); renderPanel(); }
-function sellLand(id) { const price = Math.round(((S.landPrice || {})[id] || lotPrice(city.lots[id])) * rand(1.0, 1.2) / 500) * 500; econ.earn(price, 'обект', 'Продаден парцел'); est().land = est().land.filter(x => x !== id); city.lots[id].busy = null; Sound.play('cash'); toast(`Продаде парцела за ${fmt(price)} €.`, 'good'); refreshEstateSigns(); save(); renderPanel(); }
+function sellLand(id) { const price = Math.round(((S.landPrice || {})[id] || lotPrice(city.lots[id])) * rand(1.0, 1.2) / 500) * 500; econ.earn(price, 'продажба', 'Продаден парцел'); est().land = est().land.filter(x => x !== id); city.lots[id].busy = null; Sound.play('cash'); toast(`Продаде парцела за ${fmt(price)} €.`, 'good'); refreshEstateSigns(); save(); renderPanel(); }
 function acceptSale(lotId) {
   const o = ownedAt(lotId); if (!o?.sale?.price) return;
-  econ.earn(o.sale.price, 'обект', `Продаден имот: ${BTYPES[o.kind].nm}`);
+  econ.earn(o.sale.price, 'продажба', `Продаден имот: ${BTYPES[o.kind].nm}`);
   est().owned.splice(est().owned.indexOf(o), 1);
   city.lots[lotId].busy = null;
   Sound.play('cash'); toast(`💰 Продаде имота за ${fmt(o.sale.price)} €!`, 'good');
@@ -6504,7 +6504,7 @@ function estateDay() {
   const E = est();
   wearOwned(1);
   const rent = E.owned.filter(o => !projects.some(p => p.lot === o.lot)).reduce((a, o) => a + rentNow(o), 0);
-  if (rent) econ.earn(rent, 'обект', `Ден ${S.day}: наеми (${E.owned.length} имота)`);
+  if (rent) econ.earn(rent, 'наеми', `Ден ${S.day}: наеми (${E.owned.length} имота)`);
   for (const o of E.owned) if (o.sale && !o.sale.price && S.day >= o.sale.day) {
     o.sale.price = Math.round(o.value * rand(1.0, 1.25) * (1 + 0.04 * S.rep) * (0.6 + 0.4 * condOf(o) / 100) * (ageOf(o) >= LIFE ? 0.8 : 1) / 500) * 500;
     toast(`💰 Купувач предлага ${fmt(o.sale.price)} € за твоя ${BTYPES[o.kind].nm.toLowerCase()}. Виж „Имоти“.`, 'good');
