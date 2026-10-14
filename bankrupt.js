@@ -34,7 +34,12 @@ export function createBankrupt(deps) {
       document.body.appendChild(bar);
     }
     const left = Math.max(0, b.until - S.day);
-    if (b.over) { bar.innerHTML = `💀 Фирмата фалира · дълг ${f(-money)} € <span style="font-weight:400;opacity:.85">— нова игра или зареди запис</span>`; return; }
+    if (b.over) {   // окончателен фалит: бутоните „Нова игра“ и „Записи“ са винаги на лентата (и след презареждане)
+      bar.innerHTML = `💀 Фирмата фалира · дълг ${f(-money)} € <button data-bn="new" style="margin-left:10px;padding:5px 12px;border-radius:8px;border:0;background:#ffd54a;color:#1a1a1a;font-weight:800;cursor:pointer">🔄 Нова игра</button><button data-bn="saves" style="margin-left:6px;padding:5px 10px;border-radius:8px;border:1px solid #ffcdd2;background:transparent;color:#fff;font-weight:700;cursor:pointer">💾 Записи</button>`;
+      bar.querySelector('[data-bn="new"]').onclick = e => { e.stopPropagation(); deps.newGame(); };
+      bar.querySelector('[data-bn="saves"]').onclick = e => { e.stopPropagation(); deps.openSaves(); };
+      return;
+    }
     bar.innerHTML = `⚠️ Несъстоятелност · ${f(money)} € · ${left ? `фалит след ${left} д.` : 'фалит днес'} <span style="font-weight:400;opacity:.85">— какво да направя?</span>`;
   }
   function explain() {
