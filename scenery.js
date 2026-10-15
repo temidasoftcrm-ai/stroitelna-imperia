@@ -2,7 +2,7 @@
 // скали, малко село; а по трасето — строителни табели, предупредителни знаци, конуси, бариери с мигащи лампи
 // и строителен лагер (фургони, тоалетна, материали). Трасето е по оста z (от −len/2 до len/2), центрирано в x = 0.
 import * as THREE from 'three';
-import { loadMountains, mtnModel, loadBridges, bridgeModel } from './mtn.js';
+import { loadMountains, mtnModel } from './mtn.js';
 
 const flat = (c, r = 1) => new THREE.MeshStandardMaterial({ color: c, roughness: r, flatShading: true });
 const rnd = seed => () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -91,10 +91,6 @@ export function addRouteScenery(group, deps, opts = {}) {
     const cap = new THREE.Mesh(new THREE.ConeGeometry(s * 0.32, s * 0.35, 7), flat(0xf4f6f8)); cap.position.set(x, s * 0.4 + s * 0.3, z); g.add(cap);
     swaps.push([[m, cap], x, z, s * 2.4, s * 1.1, k % 3 ? 'far1' : 'peak', k]);
   }
-  // стари каменни мостове над реката, встрани от трасето (ако в изгледа има река)
-  if (rz < 1e8) loadBridges().then(() => {
-    for (const [k, x, len] of [['stone', -95 - r() * 40, rw * 2 + 24], ['rail', 110 + r() * 50, rw * 2 + 34]]) { const o = bridgeModel(k, len); if (!o) continue; o.position.set(x, 0, rz); g.add(o); }
-  });
   loadMountains().then(() => { for (const [parts, x, z, w, h, k, rot] of swaps) { const o = mtnModel(k, w, h, rot); if (!o) continue; o.position.set(x, 0, z); g.add(o); parts.forEach(p => p.visible = false); } });
   // ниви (жито, разорана земя, слънчоглед, ливада)
   const fields = [0xd9c46a, 0x8a6a46, 0xe8c23a, 0x9cc46e, 0xb5a25a];

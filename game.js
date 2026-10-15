@@ -523,7 +523,9 @@ const city = { group: null, lots: [], hq: null };
 // кои градове са с план: новите игри (S.planAll) и старите тестови (S.plans); малките (Перник, Печ…), мегаполисите,
 // „Твоят град“ и градовете с голяма забележителност (Капитолият, Луксор) остават на мрежата
 const planOn = id => !!(S && (S.planAll || (S.plans && S.plans[id])) && cityTier(id) !== 's' && (!MEGAPOLIS.has(id) || S.planAll >= 2) && id !== NEOM_ID && (!BIG_LANDMARKS[id] || S.planAll >= 3));   // големите забележителности — от planAll 3   // мегаполисите — от planAll 2 (по-старите нови игри ги държат на мрежата)
-const planOf = id => planOn(id) ? gamePlan(id, { landmark: !!CITY_LANDMARKS[id], seaside: SEASIDE.includes(id), mega: MEGAPOLIS.has(id), bigZone: bigZoneOf(id) }) : null;
+// друг шаблон от planAll 4 нататък (по-старите игри пазят своя план): Ню Йорк — квадратна мрежа като Манхатън
+const PLAN_TPL4 = { newyork: 'grid' };
+const planOf = id => planOn(id) ? gamePlan(id, { landmark: !!CITY_LANDMARKS[id], seaside: SEASIDE.includes(id), mega: MEGAPOLIS.has(id), bigZone: bigZoneOf(id), tpl: S.planAll >= 4 ? PLAN_TPL4[id] : undefined }) : null;
 // запазената зона в плана за голямата забележителност: колкото W×D парцела на мрежата ((3W − 1) плочки − 2 м)
 function bigZoneOf(id) { const b = (BIG_LANDMARKS[id] || [])[0]; if (!b) return null; const [kind, W, D, asp = 1, turn = 0] = b; return { kind, W, D, asp, turn, size: [(3 * W - 1) * TILE - 2, (3 * D - 1) * TILE - 2] }; }
 // план: пътища от най-близкия край на булевард до гарата (запад), входа на летището (изток) и магистралата (юг) — само за изгледа
@@ -1876,7 +1878,7 @@ const projects = [];   // активните обекти (огледало на
 function newGame(cityId, brand = null) {
   pruneCities(null);
   S = { v: 1, brand, cityId, hqCity: cityId, cities: {}, day: 1, dayT: 0, rep: 0, cash: [], officeLevel: 1, garageLevel: 1, garageLot: null, whLevel: 0, whLot: null, cityExt: AUTOTEST ? +params.get('ext') || 0 : 0, rails: [], trains: [], jobs: [], econ: ECON.newEconState(), units: [...ECON.START.units], projects: [], offers: [], built: [], done: 0, seq: 1 };
-  if (params.has('plan') ? params.get('plan') === '1' : !AUTOTEST) S.planAll = 3;   // нова игра — средните и големите градове с план (извити улици); старите записи остават на мрежата   // нов град с план (извити улици); старите записи остават на мрежата
+  if (params.has('plan') ? params.get('plan') === '1' : !AUTOTEST) S.planAll = 4;   // нова игра — средните и големите градове с план (извити улици); старите записи остават на мрежата   // нов град с план (извити улици); старите записи остават на мрежата
   enterCity();
   S.projects = projects;
   for (let k = 0; k < 3; k++) makeOffer();
