@@ -7550,9 +7550,11 @@ function frame() {
     // физиката на движението на малки стъпки, за да не „прескачат“ при висока скорост
     let left = dt;
     while (left > 0) { const st = Math.min(left, 0.05); updateUnits(st); left -= st; }
-    updateTraffic(rdt * Math.max(1, speed));
-    if (!onMap) updatePeds(rdt * Math.min(2, Math.max(1, speed)));
-    updateSignals(rdt * Math.max(1, speed));
+    if (!onMap) {   // колите, хората и светофарите са само за гледане — при отворена карта (SVG) не се движат
+      updateTraffic(rdt * Math.max(1, speed));
+      updatePeds(rdt * Math.min(2, Math.max(1, speed)));
+      updateSignals(rdt * Math.max(1, speed));
+    }
     updateProjects(dt / DAY_SEC);
     updateRails(dt / DAY_SEC);
     updateAir(dt / DAY_SEC);
