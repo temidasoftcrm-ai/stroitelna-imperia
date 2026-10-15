@@ -3,6 +3,7 @@
 // game.js ги слага на парцели в центъра на града (вместо обикновени небостъргачи); всяка сграда се побира в ~15×15.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { prepNightFloors } from './nightfloors.js';
 
 export const CITY_LANDMARKS = {
   istanbul: ['hagia', 'galata', 'sapphire', 'twist', 'twin', 'mosque2'],
@@ -487,6 +488,7 @@ const glbCache = {};
 function loadLm(kind) {
   return glbCache[kind] || (glbCache[kind] = new GLTFLoader().loadAsync(`assets/heavy/lm/${kind}.glb`).then(gl => {
     gl.scene.traverse(o => { if (o.isMesh && !o.geometry.attributes.normal) o.geometry.computeVertexNormals(); });
+    prepNightFloors(gl.scene, kind);   // нощем прозорците светват по етажи (само моделите от nightfloors.js — Беладжо)
     return gl.scene;
   }).catch(() => null));
 }
@@ -581,12 +583,12 @@ function eiffelLights(w, g) {
   w.traverse(o => { if (!o.isMesh) return; const pa = o.geometry.attributes.position; for (let i = 0; i < pa.count; i += 37) { v.fromBufferAttribute(pa, i).applyMatrix4(o.matrixWorld).applyMatrix4(inv); pts.push(v.x, v.y, v.z); if (v.y > top.y) top.copy(v); } });
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
   const n = pts.length / 3, ph = new Float32Array(n).map(() => Math.random() * 100), col = new Float32Array(n * 3); geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  const pm = new THREE.PointsMaterial({ size: 0.28, vertexColors: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+  const pm = new THREE.PointsMaterial({ size: 0.42, vertexColors: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
   const sp = new THREE.Points(geo, pm); g.add(sp);
   const beam = add(g, new THREE.CylinderGeometry(0.05, 0.6, 30, 8, 1, true), new THREE.MeshBasicMaterial({ color: 0xfff1c4, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), 0, 0, 0);
   beam.geometry.translate(0, 15, 0); beam.rotation.z = Math.PI / 2 - 0.15; beam.position.copy(top); beam.castShadow = false;
   const pivot = new THREE.Group(); pivot.position.copy(top); g.add(pivot); g.remove(beam); beam.position.set(0, 0, 0); pivot.add(beam);
-  w.traverse(o => { if (o.isMesh && o.material) { const m = o.material; m.emissive = new THREE.Color(0xffb347); if (m.map) m.emissiveMap = m.map; m.emissiveIntensity = 0; m.needsUpdate = true; (g.userData.flood = g.userData.flood || []).includes(m) || g.userData.flood.push(m); } });
+  w.traverse(o => { if (o.isMesh && o.material) { const m = o.material; m.emissive = new THREE.Color(0xffb347); if (m.map) m.emissiveMap = m.map; m.emissiveIntensity = 0; m.userData.floodK = 2.2; m.needsUpdate = true; (g.userData.flood = g.userData.flood || []).includes(m) || g.userData.flood.push(m); } });
   const prev = g.userData.sparkle;
   g.userData.sparkle = (t, night) => {
     prev && prev(t, night);
@@ -663,7 +665,7 @@ export function buildLandmark(kind, deps = {}) {
   const flood = { get length() { return (lit0.flood || []).length; }, [Symbol.iterator]() { return (lit0.flood || [])[Symbol.iterator](); } }, lit = g.userData.lit || [], glass = g.userData.glass || [], blink = g.userData.blink || [];
   function update(t, night = 0) {
     for (const m of lit) m.emissiveIntensity = 0.1 + 1.6 * night;
-    for (const m of flood) m.emissiveIntensity = (m.emissiveMap ? 0.55 : 0.28) * night;
+    for (const m of flood) m.emissiveIntensity = (m.emissiveMap ? 0.55 : 0.28) * (m.userData.floodK || 1) * night;   // floodK — по-силно (Айфеловата кула)
     for (const m of glass) m.emissiveIntensity = 0.02 + 1.1 * night;
     for (const m of blink) m.emissiveIntensity = (Math.sin(t * 3) > 0.5 ? 2 : 0.2) * (0.3 + night);
     if (g.userData.sparkle) g.userData.sparkle(t, night);
