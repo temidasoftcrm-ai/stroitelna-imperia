@@ -38,6 +38,7 @@ const DEMOS = [
   ['Пътищата до гарата, летището и магистралата', 'vienna', d => d.lookTop(700)],
   ['Картата на Европа', 'sofia', d => d.contMap('eu', 12)],
   ['Глобусът', 'sofia', d => d.globeTest && d.globeTest()],
+  ['Саграда Фамилия нощем', 'barcelona', d => { d.time(22.5); const l = d.bigInfo().lm[0]; if (l) d.camAt(l[1] - 20, 75, l[2] + 115, l[1], 18, l[2]); }],
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
