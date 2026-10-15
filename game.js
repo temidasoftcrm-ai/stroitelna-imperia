@@ -3313,6 +3313,16 @@ function globeData() {
   const hq = cityById(S.hqCity || S.cityId), won = wonCountries(done);
   return { won: new Set(won.map(k => k.iso)), partial, cities, stats: { won: won.length, total: COUNTRIES.length }, focus: [hq.lat, hq.lon] };
 }
+// 💾 Записи и ⚙️ Настройки — и в горната лента (до „Карта“), не само на картата
+const openSavesUI = () => openSaves({ modal, toast, fmt, save, cityName: id => cityById(id)?.nm || id, lock: () => { saveLock = true; } });
+const openSettingsUI = () => window.__settings ? window.__settings({ credits: showCredits, newGame: () => modal('Нова игра?', 'Сегашната фирма ще бъде изтрита.', [['Отказ', null], ['Изтрий и започни', wipeSlot]]), lock: () => { save(); saveLock = true; } })
+  : modal('⚙️ Още', 'Авторите на моделите и музиката · или започни нова игра в този слот.', [['Затвори', null], ['📜 Автори', showCredits], ['🗑️ Нова игра', () => modal('Нова игра?', 'Сегашната фирма ще бъде изтрита.', [['Отказ', null], ['Изтрий и започни', wipeSlot]])]]);
+{ let after = $('btnMapToggle');
+  for (const [id, txt, title, fn] of [['btnSaves', '💾 Записи', 'Записи: слотове, автозаписи, сваляне', openSavesUI], ['btnSettings', '⚙️', 'Настройки: вход, изход, данни, хора онлайн, ъпдейти', openSettingsUI]]) {
+    const b = document.createElement('button'); b.id = id; b.className = 'btn2'; b.textContent = txt; b.title = title;
+    b.onclick = () => { if (S) fn(); };
+    after.parentNode.insertBefore(b, after.nextSibling); after = b;
+  } }
 { const b = document.createElement('button'); b.id = 'btnGlobe'; b.className = 'btn2'; b.innerHTML = '🌍 Глобус'; b.title = 'Твоята империя върху глобуса';
   b.onclick = () => { if (!S) return; const ex = document.getElementById('globeView'); if (ex) { ex.querySelector('#globeClose').click(); return; } openGlobe(globeData()); };
   $('btnMapToggle').parentNode.insertBefore(b, $('btnMapToggle')); }
