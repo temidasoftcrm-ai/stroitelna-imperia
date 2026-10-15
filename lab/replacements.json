@@ -1,1 +1,46 @@
-{}
+{
+  "com-a": {
+    "from": "/assets/commercial/building-a.glb",
+    "to": "/assets/commercial/building-a-new.glb"
+  },
+  "com-b": {
+    "from": "/assets/commercial/building-b.glb",
+    "to": "/assets/commercial/building-b-new.glb"
+  },
+  "com-c": {
+    "from": "/assets/commercial/building-c.glb",
+    "to": "/assets/commercial/building-c-new.glb"
+  },
+  "com-d": {
+    "from": "/assets/commercial/building-d.glb",
+    "to": "/assets/commercial/building-d-new.glb"
+  },
+  "com-e": {
+    "from": "/assets/commercial/building-e.glb",
+    "to": "/assets/commercial/building-e-new.glb"
+  },
+  "com-f": {
+    "from": "/assets/commercial/building-f.glb",
+    "to": "/assets/commercial/building-f-new.glb"
+  },
+  "com-g": {
+    "from": "/assets/commercial/building-g.glb",
+    "to": "/assets/commercial/building-g-new.glb"
+  },
+  "com-h": {
+    "from": "/assets/commercial/building-h.glb",
+    "to": "/assets/commercial/building-h-new.glb"
+  },
+  "com-sky-a": {
+    "from": "/assets/commercial/building-skyscraper-a.glb",
+    "to": "/assets/commercial/building-skyscraper-a-new.glb"
+  },
+  "com-sky-b": {
+    "from": "/assets/commercial/building-skyscraper-b.glb",
+    "to": "/assets/commercial/building-skyscraper-b-new.glb"
+  },
+  "com-sky-c": {
+    "from": "/assets/commercial/building-skyscraper-c.glb",
+    "to": "/assets/commercial/building-skyscraper-c-new.glb"
+  }
+}

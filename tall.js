@@ -2,6 +2,7 @@
 // стане с нужния брой етажи. Долните етажи и покривът остават същите, а триъгълниците, които минават
 // през лентата (ъглови колони, ребра), се разтягат. Геометрията се променя веднъж, при зареждане.
 import * as THREE from 'three';
+import { feature } from './lab/feature.js';
 
 // Kenney City Kit (commercial): етажите са през ~0.35 единици; лентата е от долния ръб на един ред прозорци до следващия
 export const SKY_BANDS = {
@@ -9,6 +10,13 @@ export const SKY_BANDS = {
   'building-skyscraper-b': { y1: 1.07, y2: 1.42, floors: 10 },
   'building-skyscraper-c': { y1: 1.62, y2: 1.98, floors: 8 },
 };
+// новите небостъргачи от poly.pizza (Лабораторията → „Ново“): същите имена, своя лента; в играта — след „✓ OK“
+const NEW_BANDS = {
+  'building-skyscraper-a': ['com-sky-a', { y1: 1.099, y2: 1.395, floors: 8 }],    // Distant Building 03: прозорците през 0.296
+  'building-skyscraper-b': ['com-sky-b', { y1: 1.730, y2: 1.870, floors: 12 }],   // ар деко: горната шахта
+  'building-skyscraper-c': ['com-sky-c', { y1: 2.938, y2: 3.114, floors: 8 }],    // бели ребра: разтяга се средата
+};
+for (const [n, [id, band]] of Object.entries(NEW_BANDS)) if (feature(id)) SKY_BANDS[n] = band;
 
 // модерни стъклени небостъргачи от Commercial 2.1 (assets/commercial2) — за най-големите градове
 export const SKY_BANDS_MODERN = {
