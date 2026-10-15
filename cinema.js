@@ -491,13 +491,13 @@ export function createCinema(deps) {
       v.muted = !wantSnd;
       const cv = el.querySelector('canvas'); el.insertBefore(v, cv); cv.style.display = 'none';
       let ok = false;
-      const fail = () => { if (ok) return; ok = true; v.remove(); cv.style.display = ''; res(false); };
+      const fail = () => { if (ok) return; ok = true; try { v.removeAttribute('src'); v.load(); } catch (e) {} v.remove(); cv.style.display = ''; res(false); };
       const unm = el.querySelector('.unm');
       v.addEventListener('error', fail);
       const capChk = () => { if (v.duration && v.currentTime >= v.duration - 2) cap.classList.add('on'); };   // timeupdate идва рядко при натоварване — и по таймер
       v.addEventListener('timeupdate', capChk); const capIv = setInterval(capChk, 200); cleanup.push(() => clearInterval(capIv));
       v.addEventListener('ended', () => setTm(setTimeout(close, 1400)));
-      cleanup.push(() => { try { v.pause(); } catch (e) {} });
+      cleanup.push(() => { try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) {} });   // спира и освобождава декодера и буфера на клипа
       const go = () => v.play().then(() => { if (!ok) { ok = true; res(true); } });
       go().catch(() => {
         if (!v.muted) { v.muted = true; go().then(() => { if (wantSnd) { unm.style.display = 'block'; unm.onclick = e => { e.stopPropagation(); v.muted = false; unm.style.display = 'none'; }; } }).catch(fail); }
