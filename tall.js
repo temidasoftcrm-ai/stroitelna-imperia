@@ -12,9 +12,9 @@ export const SKY_BANDS = {
 };
 // новите небостъргачи от poly.pizza (Лабораторията → „Ново“): същите имена, своя лента; в играта — след „✓ OK“
 const NEW_BANDS = {
-  'building-skyscraper-a': ['com-sky-a', { y1: 1.099, y2: 1.395, floors: 8 }],    // Distant Building 03: прозорците през 0.296
-  'building-skyscraper-b': ['com-sky-b', { y1: 1.730, y2: 1.870, floors: 12 }],   // ар деко: горната шахта
-  'building-skyscraper-c': ['com-sky-c', { y1: 2.938, y2: 3.114, floors: 8 }],    // бели ребра: разтяга се средата
+  'building-skyscraper-a': ['com-sky-a', { y1: 1.476, y2: 1.547, floors: 30 }],   // New York hi-rise: етаж през 0.071
+  'building-skyscraper-b': ['com-sky-b', { y1: 0.617, y2: 0.699, floors: 30 }],   // Hi rise apartment: етаж през 0.082
+  'building-skyscraper-c': ['com-sky-c', { y1: 3.850, y2: 3.974, floors: 20 }],   // US Bank Tower: разтяга се средата на стъклото
 };
 for (const [n, [id, band]] of Object.entries(NEW_BANDS)) if (feature(id)) SKY_BANDS[n] = band;
 

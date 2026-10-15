@@ -1,13 +1,13 @@
-Нови сгради (подмяна на Kenney City Kit Commercial, Лабораторията → „Ново“ → ✓ OK):
-  Building B by Kay Lousberg (CC0) https://poly.pizza/m/5XG9i3QzlT
-  Building by Kay Lousberg (CC0) https://poly.pizza/m/7lMEpT2ICD
-  Building by Kay Lousberg (CC0) https://poly.pizza/m/bbH2Bg73qM
-  Building by Kay Lousberg (CC0) https://poly.pizza/m/EL3ePInr1N
-  Building by Kay Lousberg (CC0) https://poly.pizza/m/g15lpKh4li
-  Building by Kay Lousberg (CC0) https://poly.pizza/m/otRsYa6pan
-  Building by Kay Lousberg (CC0) https://poly.pizza/m/qOhhGLftam
-  Building by Kay Lousberg (CC0) https://poly.pizza/m/T3oyvK6VEU
-  Distant Building 03 by Jarlan Perez (CC BY 3.0) https://poly.pizza/m/7zyZfQrt3ZP
-  Skyscraper by Poly by Google (CC BY 3.0) https://poly.pizza/m/5mOW8KZSHtU
-  Skyscraper by Jarlan Perez (CC BY 3.0) https://poly.pizza/m/7WF09z31G_v
-Моделите са нормализирани (център, основа, мащаб); CC BY 3.0 — https://creativecommons.org/licenses/by/3.0/
+Реалистични сгради (подмяна на Kenney City Kit Commercial, Лабораторията → „Ново“ → ✓ OK), Sketchfab:
+  building-a-new.glb — "Low-poly Old American brick building with shop" by Orzechu (CC-BY 4.0) — https://sketchfab.com/3d-models/3170993b67ee4e58b27d69d5877f71bd
+  building-b-new.glb — "Low rise wall to wall office building" by aitortilla01 (CC-BY 4.0) — https://sketchfab.com/3d-models/be7583ca46f5411d8921ac85d8c33f3f
+  building-c-new.glb — "Low rise wall to wall office building" by aitortilla01 (CC-BY 4.0) — https://sketchfab.com/3d-models/2dd3bdd5e0724eb1b1025a922fa754cf
+  building-d-new.glb — "Low rise wall to wall office building" by aitortilla01 (CC-BY 4.0) — https://sketchfab.com/3d-models/1f341f8261af4fb6a0dc910c2aae37a6
+  building-e-new.glb — "Low rise wall to wall office building" by aitortilla01 (CC-BY 4.0) — https://sketchfab.com/3d-models/dcf171dca9174000a0fa8d44660253d0
+  building-f-new.glb — "Low rise wall to wall office building" by aitortilla01 (CC-BY 4.0) — https://sketchfab.com/3d-models/6488ad5edd1d454884b3fe030f5f04b1
+  building-g-new.glb — "Midwestern Apartment 1" by hamma085 (CC-BY 4.0) — https://sketchfab.com/3d-models/0774fde532ee4b479f5dcca139b31abb
+  building-h-new.glb — "317 Washington Street" by hamma085 (CC-BY 4.0) — https://sketchfab.com/3d-models/1c16cac26e2b484387ac1311e0f5b57e
+  building-skyscraper-a-new.glb — "New York styled hi rise apartment building" by aitortilla01 (CC-BY 4.0) — https://sketchfab.com/3d-models/14e3d5743f7546d5bb7f3befc72c9057
+  building-skyscraper-b-new.glb — "Hi rise apartment building" by aitortilla01 (CC-BY 4.0) — https://sketchfab.com/3d-models/f8c0a550cd1e441f85b46caeba6632f3
+  building-skyscraper-c-new.glb — "US Bank Tower" by mitya-petrov (CC-BY 4.0) — https://sketchfab.com/3d-models/82227908aa5c446395c4b9847284da4a
+Моделите са нормализирани (център, основа, мащаб), текстурите — само основният цвят, до 512 px JPEG. CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
