@@ -1,2 +1,2 @@
 // записва се от Лабораторията (labserver.mjs) при „✓ OK“ — не се пише на ръка
-export const APPROVED = ["cars-real","com-a","com-b","com-c","com-d","com-e","com-f","com-g","com-h","com-sky-a","com-sky-b","com-sky-c","com2-sky-e","house-a","house-b","mine-quarry-real","night-floors","night-sagrada","snd-levelup"];
+export const APPROVED = ["cars-real","com-a","com-b","com-c","com-d","com-e","com-f","com-g","com-h","com-sky-a","com-sky-b","com-sky-c","com2-sky-d","com2-sky-e","house-a","house-b","mine-quarry-real","night-floors","night-sagrada","snd-levelup"];
