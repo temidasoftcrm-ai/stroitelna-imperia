@@ -3197,7 +3197,7 @@ function openBranchNow(id) {
         S.branchPaid = { ...(S.branchPaid || {}), [id]: cost + extra - disc };   // за оценката при продажба
         dev.add(dev.XP.branch);
         S.cities[id] = { ...newCityState(), left: nowDays() };   // начален екип: бригада, багер, самосвал
-        toast(`🏢 Отвори филиал в ${c.nm}!`, 'good'); showEventPop('new-branch', `📍 Нов филиал: ${c.nm}`, 'Влез в града от картата и строй и там.'); if (CITY_STING[id]) setTimeout(() => Sound.file(CITY_STING[id], 0.7), 1200); else Sound.play('branch'); save(); showMap(true);
+        toast(`🏢 Отвори филиал в ${c.nm}!`, 'good'); showEventPop('new-branch', `📍 Нов филиал: ${c.nm}`, 'Влез в града от картата и строй и там.'); if (stingOk(id)) setTimeout(() => Sound.file(CITY_STING[id], 0.7), 1200); else Sound.play('branch'); save(); showMap(true);
 }
 // столиците и големите градове (Рим, Лондон, Барселона…): филиалът е с фиксирана цена CAPITAL_BRANCH, колкото и филиали да имаш
 const CAPITAL_BRANCH = 25000000;
@@ -7555,6 +7555,7 @@ const TOWN_BG = { istanbul: ['assets/sfx/istanbul-prayer.mp3', 0.3] };   // на
 // assets/local/ не се качва в GitHub (.gitignore); на сайта файлът го няма и просто не свири
 const CITY_STING = { lasvegas: 'assets/local/vegas-elvis.mp3', newyork: 'assets/local/newyork-sinatra.mp3', rio: 'assets/local/rio-timmaia.mp3', cairo: 'assets/local/cairo-tune.mp3' };
 let stingDone = false;
+const stingOk = id => !!CITY_STING[id] && /^(localhost|127\.0\.0\.1)$/.test(location.hostname);   // песните са само локално — на сайта не се търсят (без 404)
 function frame() {
   requestAnimationFrame(frame);
   const rdt = Math.min(clock.getDelta(), 0.1);
@@ -7596,7 +7597,7 @@ function frame() {
       const tg = controls.target, near = units.filter(u => u.state === 'working' && Math.hypot(u.x - tg.x, u.z - tg.z) < 60).length;
       const zoom = Math.max(0, 1 - camera.position.distanceTo(tg) / 260);
       // градски шум — в средните и големите градове; по-тих нощем и отдалеч
-      if (!stingDone && Sound.ctx) { stingDone = true; if (CITY_STING[S.cityId]) Sound.file(CITY_STING[S.cityId], 0.7); }
+      if (!stingDone && Sound.ctx) { stingDone = true; if (stingOk(S.cityId)) Sound.file(CITY_STING[S.cityId], 0.7); }
       const townOn = cityTier(S.cityId) !== 's'; Sound.town(townOn ? (TOWN_SND[S.cityId] || 'assets/sfx/town.mp3') : null, ...(TOWN_BG[S.cityId] || []));
       const town = townOn ? 0.32 * (1 - dayNight.night * 0.65) * (0.35 + 0.65 * Math.max(0, 1 - camera.position.distanceTo(tg) / 500)) : 0;
       Sound.update(rdt, { night: dayNight.night, activity: Math.min(1, near / 4) * zoom, speed, traffic: 0.6, town });
