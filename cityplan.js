@@ -2,7 +2,8 @@
 // Само данни и геометрия (без THREE): един и същ град дава един и същ план при всяко зареждане (seed от името + PLAN_V).
 // Записът пази само { v } за града — самият план се изчислява наново. 3D изгледът е в cityplan3d.js.
 // Шаблони: plain (равнина, радиални булеварди и околовръстен) · mountain (същото + планина от едната страна)
-//          coastal (издължен по брега) · river (река със завои и мостове) · island (издължен остров, правоъгълни квартали).
+//          coastal (издължен по брега) · river (река със завои и мостове) · island (издължен остров, правоъгълни квартали)
+//          grid · lenfant · star · canal · eixample · walled — за големите градове (виж CITY_TPL).
 // Твоят град от нулата (NEOM, ниво 19) нарочно няма готов план — там играчът сам чертае улиците.
 export const PLAN_V = 1;
 const TAU = Math.PI * 2;
@@ -13,8 +14,14 @@ function hashStr(str) { let h = 2166136261; for (const c of str) h = Math.imul(h
 export const CITY_TPL = {
   sofia: { tpl: 'mountain' }, varna: { tpl: 'coastal' }, burgas: { tpl: 'coastal' }, paris: { tpl: 'river' }, plovdiv: { tpl: 'river' },
   london: { tpl: 'river' }, budapest: { tpl: 'river' }, newyork: { tpl: 'island' }, rio: { tpl: 'coastal', hills: 4 },
+  // големите градове с характерен план: мрежа (САЩ), мрежа с диагонали (Вашингтон), звезда с пръстени (Москва),
+  // полукръгли канали (Амстердам), блокове с диагонал до морето (Барселона), стар град в крепостен пръстен (Виена)
+  chicago: { tpl: 'grid' }, toronto: { tpl: 'grid' }, philadelphia: { tpl: 'grid' }, losangeles: { tpl: 'grid' }, buenosaires: { tpl: 'grid' },
+  washington: { tpl: 'lenfant' }, moscow: { tpl: 'star' }, beijing: { tpl: 'star' }, kyiv: { tpl: 'star' },
+  amsterdam: { tpl: 'canal' }, stpetersburg: { tpl: 'canal' }, barcelona: { tpl: 'eixample' },
+  vienna: { tpl: 'walled' }, prague: { tpl: 'walled' }, krakow: { tpl: 'walled' },
 };
-export const TEMPLATES = ['plain', 'mountain', 'coastal', 'river', 'island'];
+export const TEMPLATES = ['plain', 'mountain', 'coastal', 'river', 'island', 'grid', 'lenfant', 'star', 'canal', 'eixample', 'walled'];
 export function templateOf(cityId, coastal = false) {
   if (CITY_TPL[cityId]) return CITY_TPL[cityId];
   if (coastal) return { tpl: 'coastal' };
@@ -105,9 +112,10 @@ export function makePlan(cityId, opts = {}) {
   if (cityId === 'neom') return null;   // „Твоят град“ (ниво 19) — улиците ги чертае играчът
   const key = cityId + ':' + JSON.stringify(opts);
   if (cache.has(key)) return cache.get(key);
-  const T = opts.tpl ? { tpl: opts.tpl, hills: opts.hills } : templateOf(cityId, opts.coastal);
+  let T = opts.tpl ? { tpl: opts.tpl, hills: opts.hills } : templateOf(cityId, opts.coastal);
+  if (opts.noCoast && (T.tpl === 'coastal' || T.tpl === 'island')) T = { tpl: 'plain' };   // в играта морето и пристанището са от seaside.js
   const r = rng(hashStr(`plan:${cityId}:${T.tpl}:v${PLAN_V}`)), rr = (a, b) => lerp(a, b, r());
-  const R = opts.R || 165, SQ = 17;   // радиус на града, на площада
+  const R = opts.R || 165, SQ = opts.squareR || 17;   // радиус на града, на площада (по-голям — за главната забележителност)
   const P = { v: PLAN_V, cityId, tpl: T.tpl, R, square: { x: 0, z: 0, r: SQ }, hills: [], streets: [], lots: [] };
 
   // --- вода и релеф (функции; не се записват)
@@ -129,6 +137,20 @@ export function makePlan(cityId, opts = {}) {
     waterAt = (x, z) => { const [u, v] = toUV(x, z); return Math.abs(v - bend(u)) > half(u) + 9; };
     landPad = (x, z) => { const [u, v] = toUV(x, z); return Math.abs(v - bend(u)) < half(u) - 3; };
   }
+  let bridgeOk = () => T.tpl === 'river';   // кои точки във водата са мост (само булевардите над реката)
+  if (T.tpl === 'canal') {   // Амстердам: залив на север, полукръгли канали около стария център
+    const bz = x => -0.42 * R + 6 * Math.sin(x / 70 + ph[0]), C = [0, -0.42 * R], rings = [0.3, 0.45, 0.6].map(f => f * R);
+    const bay = !opts.noCoast;   // в играта морето на север е от seaside.js — тук остават само каналите
+    const canalAt = (x, z) => z > bz(x) + 6 && rings.some(rc => Math.abs(Math.hypot(x - C[0], z - C[1]) - rc) < 4);
+    if (bay) P.coastZ = bz; P.canals = { c: C, rings };
+    waterAt = (x, z) => bay && z < bz(x) || canalAt(x, z);
+    landPad = (x, z) => z > bz(x) + 12 && !rings.some(rc => Math.abs(Math.hypot(x - C[0], z - C[1]) - rc) < 8);
+    bridgeOk = (x, z) => z > bz(x) + 3;   // над каналите — мостове, над залива — не
+    P.square = { x: 0, z: bz(0) + 30, r: SQ };   // Дам — до залива
+  } else if (T.tpl === 'eixample' && !opts.noCoast) {   // Барселона: морето на югоизток (бряг под ъгъл)
+    const cz = x => -0.55 * R + 0.35 * x + 6 * Math.sin(x / 60 + ph[1]);
+    P.coastZ = cz; waterAt = (x, z) => z < cz(x); landPad = (x, z) => z > cz(x) + 12;
+  }
   if (T.tpl === 'mountain') {   // планина от едната страна (извън града)
     const a0 = opts.game ? -Math.PI / 2 + rr(-0.2, 0.2) : rr(0, TAU), spread = opts.game ? 0.35 : 0.8;   // в играта — на север (на запад е гарата, на юг магистралата, на изток летището)
     for (let k = 0; k < 7; k++) { const a = a0 + rr(-spread, spread), d = rr(1.55, 1.95) * R; P.hills.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, s: rr(40, 60), h: rr(35, 75) }); }
@@ -140,12 +162,14 @@ export function makePlan(cityId, opts = {}) {
   const hillH = (x, z) => { let h = 0; for (const q of P.hills) h += q.h * Math.exp(-((x - q.x) ** 2 + (z - q.z) ** 2) / (2 * q.s * q.s)); return h; };
 
   // --- граница: неправилен контур (издължен при брега), прибран там, където почва планина/вода
-  const sx = T.tpl === 'coastal' ? 1.55 : T.tpl === 'river' ? 1.2 : 1, sz = T.tpl === 'coastal' ? 0.85 : 1;
+  const sx = T.tpl === 'coastal' ? 1.55 : T.tpl === 'river' ? 1.2 : T.tpl === 'canal' || T.tpl === 'eixample' ? 1.25 : 1, sz = T.tpl === 'coastal' ? 0.85 : 1;
+  const squarish = T.tpl === 'grid' || T.tpl === 'lenfant' || T.tpl === 'eixample';   // градовете-мрежи са по-ъгловати
   const bph = [rr(0, TAU), rr(0, TAU), rr(0, TAU)], NBd = 72, bnd = [];
   for (let k = 0; k < NBd; k++) {
     const a = k / NBd * TAU;
     let rad = R * (1 + 0.13 * Math.sin(3 * a + bph[0]) + 0.08 * Math.sin(5 * a + bph[1]) + 0.04 * Math.sin(9 * a + bph[2]));
-    const cx = P.square.x * 0, cz0 = T.tpl === 'coastal' ? -0.05 * R : 0;
+    if (squarish) rad *= Math.pow(Math.pow(Math.abs(Math.cos(a)), 6) + Math.pow(Math.abs(Math.sin(a)), 6), -1 / 6) * 0.9;   // супер-елипса
+    const cx = P.square.x * 0, cz0 = T.tpl === 'coastal' ? -0.05 * R : T.tpl === 'canal' ? 0.15 * R : 0;
     let px, pz;
     for (;;) { px = cx + Math.cos(a) * rad * sx; pz = cz0 + Math.sin(a) * rad * sz; if (rad < 30 || hillH(px, pz) < 1.2) break; rad -= 4; }
     if (T.tpl === 'island') { const I = P.island, [u] = I.toUV(Math.cos(a), Math.sin(a)); }
@@ -234,12 +258,70 @@ export function makePlan(cityId, opts = {}) {
     const c0 = I.fromUV(0, I.bend(0)); sq.x = c0[0]; sq.z = c0[1];
   }
 
+  // ---- шаблоните за големите градове (CITY_TPL)
+  const far = (opts.game ? 1.5 : 2.6) * R;   // докъде излизат главните булеварди (шосетата навън)
+  if (T.tpl === 'grid' || T.tpl === 'lenfant' || T.tpl === 'eixample') {
+    // правоъгълна мрежа (леко завъртяна): къси квартали по едната ос, дълги по другата; всяка 3-та линия — булевард
+    const th = T.tpl === 'eixample' ? Math.PI / 4 + rr(-0.05, 0.05) : rr(-0.22, 0.22), c = Math.cos(th), s = Math.sin(th), M = 1.3 * R;
+    const at = (u, v) => [sq.x + u * c - v * s, sq.z + u * s + v * c];
+    const bu = T.tpl === 'eixample' ? 46 : rr(40, 44), bv = T.tpl === 'eixample' ? 46 : rr(60, 66);
+    for (let k = -Math.ceil(M / bu); k <= Math.ceil(M / bu); k++) { const u = k * bu, main = k === 0; add(main || k % 3 === 0 ? 'blvd' : 'street', [at(u, -(main ? far : M)), at(u, main ? far : M)], false, { radial: main, inner: !main }); }
+    for (let k = -Math.ceil(M / bv); k <= Math.ceil(M / bv); k++) { const v = k * bv, main = k === 0; add(main || k % 3 === 0 ? 'blvd' : 'street', [at(-(main ? far : M), v), at(main ? far : M, v)], false, { radial: main, inner: !main }); }
+    if (T.tpl === 'lenfant') {   // Вашингтон: диагонални авенюта от площада и успоредни на тях по-навън
+      for (const [a, off] of [[Math.PI / 4, 0], [-Math.PI / 4, 0], [Math.PI / 4, 0.55 * R], [Math.PI / 4, -0.55 * R], [-Math.PI / 4, 0.55 * R], [-Math.PI / 4, -0.55 * R]]) {
+        const dx = Math.cos(th + a), dz = Math.sin(th + a), nx = -dz * off, nz = dx * off;
+        add(off ? 'street' : 'blvd', [[sq.x + nx - dx * M, sq.z + nz - dz * M], [sq.x + nx + dx * M, sq.z + nz + dz * M]], false, { diag: true, inner: true });
+      }
+    }
+    if (T.tpl === 'eixample') {   // Барселона: „Диагонал“ и „Меридиана“ през мрежата
+      for (const a of [rr(0.45, 0.6), -rr(0.9, 1.1)]) { const dx = Math.cos(th + a), dz = Math.sin(th + a); add('blvd', [[sq.x - dx * M, sq.z - dz * M], [sq.x + dx * M, sq.z + dz * M]], false, { diag: true, inner: true }); }
+      if (P.coastZ) { const cz = P.coastZ, xs = []; for (let x = -2.6 * R; x <= 2.6 * R; x += 30) xs.push(x); add('quay', xs.map(x => [x, cz(x) + 17]), false, { promenade: true }); }
+    }
+    { const ctrl = []; for (let k = 0; k < NBd; k += 4) { const [x, z] = bnd[k]; ctrl.push([x * 0.95, z * 0.95]); } add('ring', ctrl, true, { outer: true }); }
+  } else if (T.tpl === 'star') {
+    // Москва/Пекин: много прави радиални булеварди и три концентрични пръстена (Булевардният, Садовото, МКАД)
+    const nR = 10, a0 = rr(0, TAU);
+    for (let k = 0; k < nR; k++) { const a = a0 + k * TAU / nR + rr(-0.05, 0.05); add('blvd', [[sq.x, sq.z], [sq.x + Math.cos(a) * 0.6 * R, sq.z + Math.sin(a) * 0.6 * R], [sq.x + Math.cos(a) * far, sq.z + Math.sin(a) * far]], false, { radial: true }); }
+    for (const [f, cls] of [[0.27, 'street'], [0.52, 'ring'], [0.78, 'street']]) { const ctrl = []; for (let k = 0; k < 24; k++) { const a = k / 24 * TAU; ctrl.push([sq.x + Math.cos(a) * f * R, sq.z + Math.sin(a) * f * R]); } add(cls, ctrl, true); }
+    { const ctrl = []; for (let k = 0; k < NBd; k += 4) { const [x, z] = bnd[k]; ctrl.push([x * 0.95, z * 0.95]); } add('ring', ctrl, true, { outer: true }); }
+    for (let k = 0; k < nR; k++) { const a = a0 + (k + 0.5) * TAU / nR; add('street', [[sq.x + Math.cos(a) * 0.27 * R, sq.z + Math.sin(a) * 0.27 * R], [sq.x + Math.cos(a) * 0.95 * R, sq.z + Math.sin(a) * 0.95 * R]]); }   // по-малки радиални между булевардите
+  } else if (T.tpl === 'canal') {
+    // Амстердам: пристанищна улица по залива, кейове от двете страни на всеки канал, радиални улици с мостове
+    const { c: C, rings } = P.canals, bz = x => -0.42 * R + 6 * Math.sin(x / 70 + ph[0]), xs = []; for (let x = -2.6 * R; x <= 2.6 * R; x += 30) xs.push(x);
+    if (P.coastZ) add('quay', xs.map(x => [x, bz(x) + 17]), false, { promenade: true });
+    else add('street', xs.filter(x => Math.abs(x) < 1.6 * R).map(x => [x, bz(x) + 17]));   // без залив — улица по северния край
+    for (const rc of rings) for (const d of [-9, 9]) { const ctrl = []; for (let k = 0; k <= 16; k++) { const a = Math.PI * k / 16; ctrl.push([C[0] + Math.cos(a) * (rc + d), C[1] + Math.sin(a) * (rc + d)]); } add('quay', ctrl); }
+    for (const a of [0.2, 0.55, 0.95, 1.35, 1.57, 1.8, 2.2, 2.6, 2.95]) {   // радиални — от залива навън, през каналите
+      const main = Math.abs(a - 1.57) < 0.01 || Math.abs(a - 0.55) < 0.01 || Math.abs(a - 2.6) < 0.01;
+      add(main ? 'blvd' : 'street', [[C[0] + Math.cos(a) * 0.12 * R, C[1] + Math.sin(a) * 0.12 * R], [C[0] + Math.cos(a) * 0.75 * R, C[1] + Math.sin(a) * 0.75 * R], [C[0] + Math.cos(a) * (main ? far : 1.1 * R), C[1] + Math.sin(a) * (main ? far : 1.1 * R)]], false, { bridge: true, radial: main });
+    }
+    for (const [f, cls] of [[0.82, 'ring'], [1.02, 'street'], [1.22, 'street']]) { const ctrl = []; for (let k = 0; k < 14; k++) { const a = Math.PI * (0.03 + 0.94 * k / 13); ctrl.push([C[0] + Math.cos(a) * f * R * 1.25, C[1] + Math.sin(a) * f * R]); } add(cls, ctrl); }
+    for (let k = 0; k < 8; k++) { const a = Math.PI * (k + 0.5) / 8; add('street', [[C[0] + Math.cos(a) * 0.82 * R * 1.25, C[1] + Math.sin(a) * 0.82 * R], [C[0] + Math.cos(a) * 1.4 * R * 1.25, C[1] + Math.sin(a) * 1.4 * R]]); }   // пресечки в новите квартали
+    { const ctrl = []; for (let k = 0; k < NBd; k += 4) { const [x, z] = bnd[k]; ctrl.push([x * 0.95, z * 0.95]); } add('ring', ctrl, true, { outer: true }); }
+  } else if (T.tpl === 'walled') {
+    // стар град (Виена, Прага): гъсти криви улички в бившите крепостни стени, пръстен-булевард на мястото на стените, радиални навън
+    const wallR = 0.36 * R, nR = 7, a0 = rr(0, TAU);
+    { const ctrl = []; for (let k = 0; k < 12; k++) { const a = k / 12 * TAU; ctrl.push([sq.x + Math.cos(a) * wallR * (1 + rr(-0.06, 0.06)), sq.z + Math.sin(a) * wallR * (1 + rr(-0.06, 0.06))]); } add('ring', ctrl, true, { wall: true }); }
+    for (let k = 0; k < nR; k++) { const a = a0 + k * TAU / nR + rr(-0.12, 0.12); add('blvd', [[sq.x + Math.cos(a) * wallR, sq.z + Math.sin(a) * wallR], [sq.x + Math.cos(a + rr(-0.1, 0.1)) * 0.75 * R, sq.z + Math.sin(a) * 0.75 * R], [sq.x + Math.cos(a) * far, sq.z + Math.sin(a) * far]], false, { radial: true }); }
+    for (let k = 0; k < 9; k++) {   // криви улички в стария град: от площада до стената
+      const a = a0 + k * TAU / 9 + rr(-0.2, 0.2), ctrl = [[sq.x, sq.z]];
+      for (const f of [0.35, 0.7, 1.05]) { const b = a + rr(-0.35, 0.35); ctrl.push([sq.x + Math.cos(b) * f * wallR, sq.z + Math.sin(b) * f * wallR]); }
+      add('street', ctrl);
+    }
+    { const ctrl = []; for (let k = 0; k < 12; k++) { const a = k / 12 * TAU; ctrl.push([sq.x + Math.cos(a) * 0.62 * wallR * (1 + rr(-0.1, 0.1)), sq.z + Math.sin(a) * 0.62 * wallR * (1 + rr(-0.1, 0.1))]); } add('street', ctrl, true); }
+    // извън стените: втори пръстен и „гюрлен“ пояс от къси пресечки
+    { const ctrl = []; for (let k = 0; k < 14; k++) { const a = k / 14 * TAU; ctrl.push([sq.x + Math.cos(a) * 0.7 * R, sq.z + Math.sin(a) * 0.7 * R]); } add('street', ctrl, true); }
+    for (let k = 0; k < nR * 2; k++) { const a = a0 + (k + 0.5) * TAU / (nR * 2); add('street', [[sq.x + Math.cos(a) * wallR, sq.z + Math.sin(a) * wallR], [sq.x + Math.cos(a) * 1.0 * R, sq.z + Math.sin(a) * 1.0 * R]]); }
+    { const ctrl = []; for (let k = 0; k < NBd; k += 4) { const [x, z] = bnd[k]; ctrl.push([x * 0.95, z * 0.95]); } add('ring', ctrl, true, { outer: true }); }
+  }
+
   // --- изрязване: улиците спират във водата (булевардите я пресичат с мост), в планината и под площада
   const keep = (p, st) => {
     if (Math.hypot(p[0] - sq.x, p[1] - sq.z) < sq.r - 1) return false;
     if (hillH(p[0], p[1]) > (st.cls === 'blvd' ? 3 : 1)) return false;
-    if (waterAt(p[0], p[1])) return st.cls === 'blvd' && T.tpl === 'river';
+    if (waterAt(p[0], p[1])) return st.cls === 'blvd' && T.tpl === 'river' || T.tpl === 'canal' && st.bridge && bridgeOk(p[0], p[1]);
     if (st.cls !== 'blvd' && st.cls !== 'road' && st.cls !== 'quay' && !inCity(p[0], p[1]) && !(st.outer)) return false;
+    if (st.inner && !inCity(p[0], p[1])) return false;   // булевард само в града (мрежите)
     if (T.tpl === 'island' && !inCity(p[0], p[1]) && st.cls !== 'road') return false;
     if (T.tpl === 'river' && st.cls !== 'blvd' && st.cls !== 'quay' && !landPad(p[0], p[1])) return false;
     return true;
@@ -353,6 +435,7 @@ export function makePlan(cityId, opts = {}) {
   const need = opts.minLots ?? 81;
   if (cand.length < need && R < 300) { const Q = makePlan(cityId, { ...opts, R: Math.round(R * 1.08) }); cache.set(key, Q); return Q; }
   cache.set(key, P);
+  while (cache.size > 12) cache.delete(cache.keys().next().value);   // паметта: само последните планове
   return P;
 }
 
@@ -390,6 +473,7 @@ export function shiftPlan(P, ox, oz) {
     streets: P.streets.map(st => ({ ...st, pts: st.pts.map(mv) })), nodes: P.nodes.map(n => ({ ...n, x: n.x + ox, z: n.z + oz })),
     lots: P.lots.map(L => ({ ...L, x: Math.round((L.x + ox) * 100) / 100, z: Math.round((L.z + oz) * 100) / 100 })),
     heightAt: (x, z) => P.heightAt(x - ox, z - oz), waterAt: (x, z) => P.waterAt(x - ox, z - oz), buildable: (x, z) => P.buildable(x - ox, z - oz) };
+  if (P.canals) Q.canals = { ...P.canals, c: mv(P.canals.c) };
   if (P.coastZ) Q.coastZ = x => P.coastZ(x - ox) + oz;
   if (P.riverZ) Q.riverZ = x => P.riverZ(x - ox) + oz;
   return Q;

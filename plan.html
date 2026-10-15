@@ -44,7 +44,9 @@ import { makePlan, lotAt, validatePlan } from './cityplan.js';
 import { buildPlanView, placeOnLot } from './cityplan3d.js';
 
 const CITIES = [['sofia', 'София — равнина, радиални булеварди, околовръстен, планина'], ['varna', 'Варна — издължен крайбрежен град'], ['paris', 'Париж — река със завои и мостове'],
-  ['newyork', 'Ню Йорк — издължен остров, правоъгълни квартали'], ['rio', 'Рио — между плажове и хълмове'], ['plovdiv', 'Пловдив — речен град'], ['ruse', 'Русе — по хеш на града']];
+  ['newyork', 'Ню Йорк — издължен остров, правоъгълни квартали'], ['rio', 'Рио — между плажове и хълмове'], ['plovdiv', 'Пловдив — речен град'], ['ruse', 'Русе — по хеш на града'],
+  ['chicago', 'Чикаго — правоъгълна мрежа'], ['washington', 'Вашингтон — мрежа с диагонални авенюта'], ['moscow', 'Москва — звезда с три пръстена'],
+  ['amsterdam', 'Амстердам — полукръгли канали до залива'], ['barcelona', 'Барселона — блокове под 45° и „Диагонал“ до морето'], ['vienna', 'Виена — стар град в пръстен-булевард']];
 const params = new URLSearchParams(location.search), $ = id => document.getElementById(id);
 $('city').innerHTML = CITIES.map(([id, nm]) => `<option value="${id}">${nm}</option>`).join('');
 $('city').value = params.get('city') || 'sofia';

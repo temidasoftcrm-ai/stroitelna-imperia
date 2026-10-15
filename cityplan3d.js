@@ -46,8 +46,10 @@ function mesh(pos, idx, mat, col) {
   const o = new THREE.Mesh(g, mat); o.receiveShadow = true; return o;
 }
 
-export function buildPlanView(P, opts = {}) {
+export function buildPlanView(P0, opts = {}) {
   const M = mats(), g = new THREE.Group(), detail = new THREE.Group(); g.add(detail);
+  // opts.seaZ — морето на играта (seaside.js) на север: там теренът слиза под водата
+  const sea = opts.seaZ, P = sea == null ? P0 : { ...P0, waterAt: (x, z) => z < sea || P0.waterAt(x, z), heightAt: (x, z) => z < sea ? -3 : P0.heightAt(x, z) };
   g.userData.plan = P;
   // --- терен: голяма мрежа с релеф и цветове по вершини (без текстури)
   const S = opts.size || 1400, seg = opts.seg || 150;
@@ -69,9 +71,13 @@ export function buildPlanView(P, opts = {}) {
   }
   tg.setAttribute('color', new THREE.BufferAttribute(col, 3)); tg.computeVertexNormals();
   const terrain = new THREE.Mesh(tg, M.terrain); g.userData.groundMat = M.terrain; terrain.receiveShadow = true; terrain.name = 'terrain'; g.add(terrain);
-  if (P.tpl === 'coastal' || P.tpl === 'river' || P.tpl === 'island') {
+  if (P.tpl === 'coastal' || P.tpl === 'river' || P.tpl === 'island' || P.coastZ) {   // coastZ: и заливът на Амстердам, морето на Барселона
     const wg = new THREE.PlaneGeometry(S, S); wg.rotateX(-Math.PI / 2);
     const water = new THREE.Mesh(wg, M.water); water.position.y = -0.6; water.name = 'water'; g.add(water);
+  }
+  if (P.canals) for (const rc of P.canals.rings) {   // каналите (8 м) са по-тесни от клетката на терена — отделни ивици вода (полукръг на юг от центъра)
+    const r = new THREE.Mesh(new THREE.RingGeometry(rc - 4, rc + 4, 72, 1, Math.PI, Math.PI).rotateX(-Math.PI / 2), M.water);
+    r.position.set(P.canals.c[0], -0.3, P.canals.c[1]); r.name = 'canal'; g.add(r);
   }
   // --- улици: тротоар (по-широк) + асфалт; мост над водата; маркировка на булевардите
   const walk = [[], []], asph = [[], []], paint = [[], []], br = [[], []];
@@ -123,7 +129,7 @@ export function buildPlanView(P, opts = {}) {
   // --- площад: павета, фонтан, кръг от дървета
   const sq = P.square, pl = [[], []]; disc(sq.x, sq.z, sq.r + 1, 0.08, ...pl, 32);
   g.add(mesh(...pl, M.plaza));
-  { const f = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.6, 0.8, 24), M.stone); f.position.set(sq.x, 0.4, sq.z); g.add(f);
+  if (!opts.noFountain) { const f = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.6, 0.8, 24), M.stone); f.position.set(sq.x, 0.4, sq.z); g.add(f);
     const w = new THREE.Mesh(new THREE.CylinderGeometry(3.7, 3.7, 0.1, 24), M.fountain); w.position.set(sq.x, 0.82, sq.z); g.add(w);
     const s = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 4, 10), M.stone); s.position.set(sq.x, 2.2, sq.z); g.add(s); }
   // --- парцели: светли площадки (цвят по зона), очертания отблизо
@@ -150,7 +156,7 @@ export function buildPlanView(P, opts = {}) {
   g.userData.lamps = lampAt.filter((_, i) => i % Math.ceil(lampAt.length / 160) === 0).map(([x, z]) => ({ x, y: 6.1, z }));   // светлините нощем (daynight.js) — до 160
   // --- дървета: в града (около площада, празните кътчета) и гори по хълмовете — общи инстанции
   const trees = [], rnd = (() => { let s = 1234567; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
-  for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; trees.push([sq.x + Math.cos(a) * (sq.r - 2.5), sq.z + Math.sin(a) * (sq.r - 2.5), 0.9, 0]); }
+  for (let k = 0; k < (opts.noFountain ? 16 : 10); k++) { const a = k / (opts.noFountain ? 16 : 10) * Math.PI * 2; trees.push([sq.x + Math.cos(a) * (sq.r - 2.5), sq.z + Math.sin(a) * (sq.r - 2.5), 0.9, 0]); }
   const roadNear = (x, z, pad) => P.streets.some(st => st.pts.some((p, i) => i % 2 === 0 && Math.abs(p[0] - x) < st.w / 2 + pad && Math.abs(p[1] - z) < st.w / 2 + pad));
   const lotNear = (x, z) => P.lots.slice(0, opts.lotCount ?? P.lots.length).some(L => Math.abs(L.x - x) < 14 && Math.abs(L.z - z) < 14);
   for (let k = 0; k < (opts.trees || 2200); k++) {
