@@ -17,4 +17,6 @@ export const FEATURES = [
   {"id": "snd-levelup", "title": "По-мек звук за ново ниво", "how": "Вместо тромпетите „та-даа“ и мелодията — четири тихи камбанки нагоре и мек акорд (около секунда). Пусни го от „Звуци“ → levelup. „✓ OK“ — сменя го в играта.", "url": "#tab=sounds&item=s%3Alevelup"},
   // „можеш да свалиш и кариера“
   {"id": "mine-quarry-real", "title": "Реалистична каменна кариера", "how": "„Tudor Stone Quarry“ (novusod, CC BY 4.0, Sketchfab) вместо процедурния терасовиден хълм: скали, навес, ограда, количка. Камионът продължава да обикаля. Отвори „Мисии/демо“ → Кариера (добив). „✓ OK“ — в играта.", "url": "#tab=demos&item=d5"},
+  // „да добавим реалистични коли“ (+ автобус)
+  {"id": "cars-real", "title": "Реалистични коли и автобус в трафика", "how": "VW Polo, Peugeot 206, Jeep Renegade, Toyota Hilux, такси, УАЗ-452, Honda Accord, Toyota Corolla, полицейски Crown Victoria и градски автобус Mercedes Citaro (Sketchfab, CC BY 4.0) вместо нискополигонните коли — в истински размери. Виж трафика в „Сцени“ → София. „✓ OK“ — в играта.", "url": "#tab=scenes&item=sofia"},
 ];

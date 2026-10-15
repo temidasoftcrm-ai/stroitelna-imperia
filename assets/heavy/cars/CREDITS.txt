@@ -1,0 +1,12 @@
+Реалистични коли за трафика (Лабораторията → „Ново“ → cars-real), Sketchfab, CC-BY (https://creativecommons.org/licenses/by/4.0/).
+Нормализирани: дължина 1 по z, предницата към +z, текстури до 512 px JPEG (само основният цвят).
+- car-polo.glb — "2017 Volkswagen Polo Sedan [Low-Poly]" by R1peer — https://sketchfab.com/3d-models/7be5690be54f4ea7a5c9b1bda3d395be
+- car-p206.glb — "2003 Peugeot 206" by ImperialBlue3D — https://sketchfab.com/3d-models/289b123c3be8432aa1dabc97dfafc026
+- car-renegade.glb — "Jeep Renegade 2016" by pinceladas3d — https://sketchfab.com/3d-models/192f7e81dce84c6780434f692a0f96c5
+- car-hilux.glb — "Toyota Hilux Low Poly" by sebodeweb — https://sketchfab.com/3d-models/87dc5e8d45724fe6b4b68b1f432976fc
+- car-taxi.glb — "CARBON MOTORS E7 TAXI (Cities Skylines)" by TSB3DMODELS — https://sketchfab.com/3d-models/210f95a0ea374c4fbdd27849f8c3c7a0
+- car-uaz452.glb — "UAZ-452 Gaz Service" by eightismore — https://sketchfab.com/3d-models/8a49369ec4d2412890bdb3476594cf3b
+- car-accord.glb — "1994 Honda Accord Sedan [Low-Poly]" by R1peer — https://sketchfab.com/3d-models/737402664a4949e4ac41640a56fadc3c
+- car-corolla.glb — "low-poly Toyota Corolla E80 Sedan" by DU1701 — https://sketchfab.com/3d-models/6254cf268d9b46f79dd2a6511e153891
+- car-crownvic.glb — "Ford LTD Crown Victoria" by eightismore — https://sketchfab.com/3d-models/0097d3f7d6844162b38c587d61933c4f
+- bus-citaro.glb — "1997 Mercedes-Benz Citaro C Hybrid Bus" by zairiqzairiqpixarcarsbfdi — https://sketchfab.com/3d-models/0938985b5d254f3f9698ddfa4a3d7ee8

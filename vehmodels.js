@@ -4,6 +4,7 @@
 //     sf-roller (валяк), sf-backhoe (трактор-багер), sf-grader (грейдер), sf-dump (самосвал), sf-excavator (багер), sf-mcrane (автокран)
 //   коли — от „Free Low Poly Vehicles Pack“ (RgsDev): sf-car-<Име>, в мащаба на града (лек автомобил ≈ CAR_LEN)
 import * as THREE from 'three';
+import { feature } from './lab/feature.js';
 
 const CAR_LEN = 3.0;   // дължината на седана в света на играта (другите коли са в същия мащаб)
 const GEAR = {
@@ -41,6 +42,20 @@ export function loadVehModels(load, A, base = 'assets/heavy/gear/') {
       for (const p of parts) { const q = p.clone(true); q.applyMatrix4(p.parent.matrixWorld); grp.add(q); }   // в световни координати на пакета
       A['sf-car-' + nm] = { scene: wrap(grp, 0, k) };
     }
-  }).catch(e => console.warn('vehmodels cars', e)));
+  }).catch(e => console.warn('vehmodels cars', e)).then(() => feature('cars-real') && loadRealCars(load, A)));
   return Promise.all(jobs);
+}
+
+// реалистичните коли (Sketchfab, CC-BY; assets/heavy/cars, нормализирани: дължина 1 по z, предницата към +z, текстури 512 px).
+// Заместват част от „Free Low Poly Vehicles Pack“ под същите имена; дължината — истинската в метри × мащаба на града.
+const REAL_CARS = {   // име: [файл, дължина в м]
+  Sedan: ['car-polo', 4.4], Hatchback: ['car-p206', 3.8], SUV: ['car-renegade', 4.25], Pickup: ['car-hilux', 5.3], Taxi: ['car-taxi', 4.9],
+  Van: ['car-uaz452', 4.4], Muscle: ['car-accord', 4.7], Muscle_2: ['car-corolla', 4.2], Police_Sedan: ['car-crownvic', 5.4], Bus: ['bus-citaro', 12],
+};
+const M_PER = CAR_LEN / 4.5;   // седанът от пакета (≈4,5 м) е CAR_LEN в света на играта
+function loadRealCars(load, A) {
+  return Promise.all(Object.entries(REAL_CARS).map(([nm, [f, len]]) => load('assets/heavy/cars/' + f + '.glb').then(g => {
+    g.scene.traverse(o => { if (o.isMesh) o.castShadow = true; });
+    A['sf-car-' + nm] = { scene: wrap(g.scene, 0, len * M_PER) };
+  }).catch(e => console.warn('real car', nm, e))));
 }
