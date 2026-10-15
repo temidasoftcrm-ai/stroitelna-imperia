@@ -390,7 +390,7 @@ let europe = null;
   // по-хубави дървета за курортите (Sketchfab, CC-BY): пакетите се разделят на отделни дървета A['sf-…-N'] с височина 1
   for (const [file, key, opt] of [['trees/palms', 'palm', {}], ['trees/snowpines', 'pinesnow', { glow: 0x5a6068 }], ['trees/pine', 'pine', {}], ['trees/forest', 'tree', { trunksOnly: true }], ['people/people', 'person', { plain: true }]]) jobs.push(load(`assets/heavy/${file}.glb`).then(g => splitTrees(g.scene, opt).forEach((t, i) => { A[`sf-${key}-${i}`] = { scene: t }; })).catch(() => {}));
   // хотел за ски курортите (resortview.js го ползва вместо кулите на Kenney)
-  for (const k of ['sing', 'rand', 'usb', 'blue', 'night']) jobs.push(load(`assets/heavy/sky/${k}.glb`).then(g => { g.scene.traverse(m => { if (m.isMesh && m.material && m.material.metalness > 0.5) m.material.metalness = 0.35; }); A['sf-sky-' + k] = g; }).catch(() => {}));   // истински небостъргачи (Sketchfab) — за разнообразие в града
+  for (const k of ['sing', 'rand', 'usb', 'blue', 'night']) jobs.push(load(`assets/heavy/sky/${k}.glb`).then(g => { g.scene.traverse(m => { if (m.isMesh && m.material && m.material.metalness > 0.5) m.material.metalness = 0.35; }); A['sf-sky-' + k] = g; prepNightFloors(g.scene, 'sf-sky-' + k); }).catch(() => {}));   // истински небостъргачи (Sketchfab) — за разнообразие в града
   for (const k of ['richmond', 'panel12', 'gamecity', 'soviet', 'oldbld', 'dbrick', 'brick', 'asian', 'modoffice', 'jade']) jobs.push(load(`assets/heavy/blocks/${k}.glb`).then(g => { g.scene.traverse(m => { if (m.isMesh && m.material && m.material.metalness > 0.5) m.material.metalness = 0.3; });
     if (k === 'oldbld') {   // моделът е кух отгоре (само стени) — плосък покрив малко под ръба и няколко кутии на покрива
       g.scene.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(g.scene), sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3()), top = bb.max.y - sz.y * 0.035;
@@ -556,7 +556,9 @@ function planLinks(P) {
 }
 const lotRot = l => (l && l.rot) || 0, lotK = l => l && l.plan ? Math.min(1.2, Math.min(l.w, l.d) / 16) : 1;
 // реалистичните търговски сгради (building-a…h): по-широки в парцела и по-високи, за да не изглеждат малки до блоковете
-const SHOP_FIT = 15.5, SHOP_TALL = 1.3;
+const SHOP_FIT = 15.5;
+// ниските и широки (офис с двор, тухлен блок) растат повече нагоре, високите — по-малко
+const shopTall = n => { const s = sizeOf(n).getSize(new THREE.Vector3()), r = s.y / Math.max(s.x, s.z); return r < 0.5 ? 2 : r < 0.8 ? 1.6 : 1.3; };
 function lotPt(l, x, z) { const r = lotRot(l), c = Math.cos(r), s = Math.sin(r); return { x: l.x + x * c + z * s, z: l.z - x * s + z * c }; }   // точка в координатите на парцела
 function roadRoute(x0, z0, x1, z1) {
   if (city.plan) return planRoute(city.plan, x0, z0, x1, z1).slice(0, -1);
@@ -835,9 +837,9 @@ function buildCity(cityId) {
 }
 function placeBuilding(lot, n, rot = 0) {
   const isQ = n.startsWith('Building_');
-  const s = (isQ ? fitScale(n, 14) : HOUSES.includes(n) ? fitScale(n, 11) : fitScale(n, SHOPS.includes(n) ? SHOP_FIT : 12.5)) * lotK(lot);
+  const s = SHOPS.includes(n) && lot.plan ? fitScale(n, Math.min(lot.w, lot.d) - 1.5) : (isQ ? fitScale(n, 14) : HOUSES.includes(n) ? fitScale(n, 11) : fitScale(n, SHOPS.includes(n) ? SHOP_FIT : 12.5)) * lotK(lot);   // в плана — целият парцел
   const o = model(n, s);
-  if (SHOPS.includes(n)) o.scale.y *= SHOP_TALL;
+  if (SHOPS.includes(n)) o.scale.y *= shopTall(n);
   if (HOUSES.includes(n)) tintRoof(o, lot.id);
   dayNight.registerWindows(o);
   o.rotation.y = lot.plan ? lot.rot : rot;   // в плана — с лицето към улицата
@@ -1591,7 +1593,7 @@ function makeSite(p) {
   const isQ = p.model.startsWith('Building_');
   const s = isQ ? fitScale(p.model, 14) : HOUSES.includes(p.model) ? fitScale(p.model, 11) : fitScale(p.model, SHOPS.includes(p.model) ? SHOP_FIT : 12.5);
   const b = model(p.model, s);
-  if (SHOPS.includes(p.model)) b.scale.y *= SHOP_TALL;
+  if (SHOPS.includes(p.model)) b.scale.y *= shopTall(p.model);
   if (HOUSES.includes(p.model)) tintRoof(b, p.lot);
   const bb = new THREE.Box3().setFromObject(b);
   b.position.set(tmpLot.x - (bb.min.x + bb.max.x) / 2, 0.6, tmpLot.z - (bb.min.z + bb.max.z) / 2);

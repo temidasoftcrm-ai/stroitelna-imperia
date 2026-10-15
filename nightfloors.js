@@ -11,10 +11,16 @@ const MODE = { 'building-a': 'dark', 'building-b': 'cool', 'building-c': 'dark',
   // Kenney Commercial 2 (обща палитра colormap): стъклата са синкавите петна; високите варианти (@20…) делят материала
   'building-i': 'kenney', 'building-j': 'kenney', 'building-k': 'kenney', 'building-l': 'kenney', 'building-m': 'kenney', 'building-n': 'kenney',
   'building-skyscraper-d': 'kenney', 'building-skyscraper-e': 'kenney',
-  bellagio: 'flood' };   // забележителност (landmarks.js) — хотелът в Лас Вегас: цялата фасада в топла светлина (прожектори), етажите леко различни
-const FLOORS = n => ({ bellagio: 28, 'building-skyscraper-d': 8, 'building-skyscraper-e': 8 })[n] || (/skyscraper/.test(n) ? 30 : 9);   // приблизителен брой етажи на модела
+  bellagio: 'flood',
+  // истинските небостъргачи (assets/heavy/sky): режимът може да зависи от материала — [регулярен израз за името, режим|null]
+  'sf-sky-usb': ['cool', [/roof/i, null]], 'sf-sky-rand': ['cool'], 'sf-sky-sing': ['cool', [/Interior/i, 'flood'], [/Red_Beam|Trimsheet|temp/i, null]],
+  'sf-sky-night': ['bright'], 'sf-sky-blue': ['cool', [/glass/i, 'solid'], [/./, null]] };   // забележителност (landmarks.js) — хотелът в Лас Вегас: цялата фасада в топла светлина (прожектори), етажите леко различни
+const FLOORS = n => ({ bellagio: 28, 'building-skyscraper-d': 8, 'building-skyscraper-e': 8 })[n] || (/skyscraper|sf-sky/.test(n) ? 32 : 9);
+// режимът на материала: MODE[name] е низ или [по подразбиране, [/име/, режим|null]…]
+const modeOf = (name, m) => { const e = MODE[name]; if (!e || typeof e === 'string') return e; for (const [re, md] of e.slice(1)) if (re.test(m.name || '')) return md; return e[0]; };
+const WHITE = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1); WHITE.needsUpdate = true;   // приблизителен брой етажи на модела
 export const NF_MATS = new Set();   // материалите с нощни етажи — daynight.js ги пали вечер
-const masks = new Map();   // изображение → маска (CanvasTexture)
+const masks = new Map();   // режим → (изображение → маска CanvasTexture)
 
 function box(a, w, h, r) {   // средно в квадрат (2r+1)² — интегрално изображение
   const W = w + 1, I = new Float32Array(W * (h + 1));
@@ -28,42 +34,43 @@ function box(a, w, h, r) {   // средно в квадрат (2r+1)² — ин
 }
 function maskFor(tex, mode) {
   const img = tex.image; if (!img || !img.width) return null;
-  const key = img; if (masks.has(key)) return masks.get(key);
+  const byMode = masks.get(mode) || masks.set(mode, new WeakMap()).get(mode); if (byMode.has(img)) return byMode.get(img);
   const w = img.width, h = img.height, c = document.createElement('canvas'); c.width = w; c.height = h;
   const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
   const d = g.getImageData(0, 0, w, h), p = d.data, L = new Float32Array(w * h), raw = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) { const r = p[4 * i] / 255, gg = p[4 * i + 1] / 255, b = p[4 * i + 2] / 255; L[i] = 0.3 * r + 0.59 * gg + 0.11 * b; p[4 * i + 3] = Math.max(r, gg, b) - Math.min(r, gg, b); raw[i] = b - r; }
-  if (mode === 'flood') { const t = tex; masks.set(key, t); return t; }   // прожектори: самата текстура свети
+  if (mode === 'flood') return tex;   // прожектори / осветени стаи: самата текстура свети
   const loc = mode === 'dark' ? box(L, w, h, Math.max(4, (Math.min(w, h) / 24) | 0)) : null;
   const win = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) {
     const sat = p[4 * i + 3];
-    win[i] = mode === 'cool' ? +(raw[i] > 0.03 && L[i] > 0.15 && L[i] < 0.85 && sat < 0.35) : mode === 'kenney' ? +(raw[i] > 0.06 && L[i] > 0.1 && L[i] < 0.8) : +(L[i] < loc[i] - 0.08 && L[i] < 0.5 && sat < 0.2);
+    win[i] = mode === 'bright' ? +(L[i] > 0.32) : mode === 'cool' ? +(raw[i] > 0.03 && L[i] > 0.15 && L[i] < 0.85 && sat < 0.35) : mode === 'kenney' ? +(raw[i] > 0.06 && L[i] > 0.1 && L[i] < 0.8) : +(L[i] < loc[i] - 0.08 && L[i] < 0.5 && sat < 0.2);
   }
   const a = mode === 'kenney' ? win : box(win, w, h, 1); if (mode !== 'kenney') for (let i = 0; i < w * h; i++) a[i] = +(a[i] > 0.55);   // без тънките линии (палитрата е от петна — без)
   const m = mode === 'kenney' ? a.map(v => v) : box(a, w, h, 1);
   for (let i = 0; i < w * h; i++) { const v = m[i] > 0.3 ? 255 : 0; p[4 * i] = p[4 * i + 1] = p[4 * i + 2] = v; p[4 * i + 3] = 255; }
   g.putImageData(d, 0, 0);
   const t = new THREE.CanvasTexture(c); t.flipY = tex.flipY; t.colorSpace = THREE.SRGBColorSpace; t.wrapS = tex.wrapS; t.wrapT = tex.wrapT;
-  masks.set(key, t);
+  byMode.set(img, t);
   return t;
 }
 // подготвя моделя веднъж (материалите се делят от всички сгради с този модел)
 export function prepNightFloors(root, name) {
-  const mode = MODE[name]; if (!mode || !feature('night-floors')) return;
+  if (!MODE[name] || !feature('night-floors')) return;
   const bb = new THREE.Box3().setFromObject(root), floorH = Math.max(1e-3, (bb.max.y - bb.min.y) / FLOORS(name)), y0 = bb.min.y;
   root.traverse(o => {
     if (!o.isMesh) return;
     for (const m of [].concat(o.material)) {
-      if (!m || !m.map || m.userData.nightFloors || !('emissive' in m)) continue;
+      if (!m || m.userData.nightFloors || !('emissive' in m)) continue;
       if (name === 'building-skyscraper-c' && /roof|heli|top/i.test(m.name || '')) continue;
-      const mk = maskFor(m.map, mode); if (!mk) continue;
+      const mode = modeOf(name, m); if (!mode || (!m.map && mode !== 'solid')) continue;
+      const mk = mode === 'solid' ? WHITE : maskFor(m.map, mode); if (!mk) continue;
       m.emissiveMap = mk; m.emissive.setRGB(1, 1, 1); m.emissiveIntensity = 0; m.userData.nightFloors = true; m.userData.winK = 1; NF_MATS.add(m);
       m.onBeforeCompile = sh => {
-        sh.uniforms.uFloorH = { value: floorH }; sh.uniforms.uY0 = { value: y0 }; sh.uniforms.uFlood = { value: mode === 'flood' ? 1 : 0 };
+        sh.uniforms.uFloorH = { value: floorH }; sh.uniforms.uY0 = { value: y0 }; sh.uniforms.uFlood = { value: mode === 'flood' ? 1 : 0 }; sh.uniforms.uSolid = { value: mode === 'solid' ? 1 : 0 };
         sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vNfY; varying float vNfSeed;')
           .replace('#include <begin_vertex>', '#include <begin_vertex>\nvNfY = transformed.y; vNfSeed = fract(sin(dot(modelMatrix[3].xz, vec2(12.9898, 78.233))) * 43758.5453);');
-        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vNfY; varying float vNfSeed; uniform float uFloorH; uniform float uY0; uniform float uFlood;')
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vNfY; varying float vNfSeed; uniform float uFloorH; uniform float uY0; uniform float uFlood; uniform float uSolid;')
           .replace('#include <emissivemap_fragment>', `
             #ifdef USE_EMISSIVEMAP
               float nNight = emissive.r;   // нощта 0…1 (daynight.js → emissiveIntensity)
