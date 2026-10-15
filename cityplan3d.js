@@ -3,7 +3,7 @@
 // Паметта: всичко е в няколко слети геометрии с общи материали (без текстури); дървета и лампи — InstancedMesh;
 // подробностите (лампи, зебри, очертания на парцелите) се показват само отблизо.
 import * as THREE from 'three';
-import { pointAt, rectCorners } from './cityplan.js';
+import { pointAt, rectCorners, rectHas } from './cityplan.js';
 
 const MAT = {};   // общи материали за всички градове
 function mats() {
@@ -166,6 +166,7 @@ export function buildPlanView(P0, opts = {}) {
     if (inTown && (rnd() < 0.55 || lotNear(x, z))) continue;
     if (!inTown && h < 4 && rnd() < 0.72) continue;   // равното извън града — ниви, рядко дърво
     if (roadNear(x, z, 3)) continue;
+    if (P.bigZone && rectHas(P.bigZone, [x, z], 4)) continue;   // мястото на голямата забележителност
     trees.push([x, z, 0.7 + rnd() * 0.7, h > 6 ? 1 : 0]);
   }
   const cone = new THREE.ConeGeometry(2.2, 6, 7), ball = new THREE.IcosahedronGeometry(2.6, 0), stem = new THREE.CylinderGeometry(0.28, 0.36, 2.4, 5);

@@ -9,10 +9,11 @@ export const MEGA_CORE = 81 + 162, MEGA_EXT = 81, MEGA_LOTS = MEGA_CORE + 4 * ME
 export const planCount = (mega, ext = 0) => mega ? MEGA_CORE + MEGA_EXT * ext : PLAN_CORE + PLAN_EXT * ext;
 const EDGE = -108;   // западният и северният край на старата мрежа (tx(0)) — там започва градът
 const cache = new Map();
-// o.landmark — по-голям площад за главната забележителност; o.seaside — без морски шаблон (морето е от seaside.js)
+// o.landmark — по-голям площад за главната забележителност; o.seaside — без морски шаблон (морето е от seaside.js);
+// o.bigZone — { kind, W, D, asp, turn, size: [w, d] }: запазено място на север от площада за голямата забележителност (Капитолият…)
 export function gamePlan(cityId, o = {}) {
   if (cache.has(cityId)) return cache.get(cityId);
-  const P0 = makePlan(cityId, { game: true, minLots: o.mega ? MEGA_LOTS : PLAN_LOTS, ...(o.mega ? { mega: true, R: 400 } : {}), ...(o.landmark ? { squareR: 30 } : {}), ...(o.seaside ? { noCoast: true } : {}) });
+  const P0 = makePlan(cityId, { game: true, minLots: o.mega ? MEGA_LOTS : PLAN_LOTS, ...(o.mega ? { mega: true, R: 400 } : {}), ...(o.landmark ? { squareR: 30 } : {}), ...(o.bigZone ? { bigZone: o.bigZone.size } : {}), ...(o.seaside ? { noCoast: true } : {}) });
   if (!P0) return null;
   let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
   for (const [x, z] of P0.boundary) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); }
@@ -20,6 +21,7 @@ export function gamePlan(cityId, o = {}) {
   const P = shiftPlan(P0, EDGE - x0, EDGE - z0);
   P.ext = { x1: x1 + EDGE - x0, z1: z1 + EDGE - z0 };   // източният и южният край (за летището и магистралата)
   P.mega = !!o.mega;
+  if (P.bigZone && o.bigZone) P.bigZone = { ...P.bigZone, ...o.bigZone };   // { kind, W, D, asp, turn } — refreshMines3D слага голямата забележителност тук
   P.hqLot = 0;   // централата — най-близкият парцел до площада (без геометрия: и градовете, в които още не си влизал, го знаят)
   cache.set(cityId, P);
   while (cache.size > 6) cache.delete(cache.keys().next().value);

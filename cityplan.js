@@ -324,8 +324,11 @@ export function makePlan(cityId, opts = {}) {
   }
 
   // --- изрязване: улиците спират във водата (булевардите я пресичат с мост), в планината и под площада
+  // запазена зона за голямата забележителност (opts.bigZone = [w, d] в метри): на север от площада, без улици и парцели
+  const BZ = opts.bigZone ? (P.bigZone = { x: sq.x, z: sq.z - sq.r - 6 - opts.bigZone[1] / 2, w: opts.bigZone[0], d: opts.bigZone[1], rot: 0 }) : null;
   const keep = (p, st) => {
     if (Math.hypot(p[0] - sq.x, p[1] - sq.z) < sq.r - 1) return false;
+    if (BZ && rectHas(BZ, p, st.w / 2 + 2)) return false;
     if (hillH(p[0], p[1]) > (st.cls === 'blvd' ? 3 : 1)) return false;
     if (waterAt(p[0], p[1])) return st.cls === 'blvd' && T.tpl === 'river' || T.tpl === 'canal' && st.bridge && bridgeOk(p[0], p[1]);
     if (st.cls !== 'blvd' && st.cls !== 'road' && st.cls !== 'quay' && !inCity(p[0], p[1]) && !(st.outer)) return false;
@@ -426,6 +429,7 @@ export function makePlan(cityId, opts = {}) {
           if (![...cs, [L.x, L.z]].every(p => buildable(p[0], p[1]))) continue;
           if (Math.hypot(L.x - sq.x, L.z - sq.z) < sq.r + Math.hypot(w, d) / 2 + 2) continue;
           if (roadIn(L) || near(L.x, L.z).some(o => rectsOverlap(o, L, 0.8))) continue;
+          if (BZ && rectsOverlap(BZ, L, 2)) continue;
           (grid.get(gk(L.x, L.z)) || grid.set(gk(L.x, L.z), []).get(gk(L.x, L.z))).push(L);
           // съседните клетки също трябва да го виждат при проверката
           for (const c2 of cs) { const k2 = gk(c2[0], c2[1]); if (k2 !== gk(L.x, L.z)) { const arr = grid.get(k2) || grid.set(k2, []).get(k2); if (!arr.includes(L)) arr.push(L); } }
@@ -487,6 +491,7 @@ export function shiftPlan(P, ox, oz) {
     lots: P.lots.map(L => ({ ...L, x: Math.round((L.x + ox) * 100) / 100, z: Math.round((L.z + oz) * 100) / 100 })),
     heightAt: (x, z) => P.heightAt(x - ox, z - oz), waterAt: (x, z) => P.waterAt(x - ox, z - oz), buildable: (x, z) => P.buildable(x - ox, z - oz) };
   if (P.canals) Q.canals = { ...P.canals, c: mv(P.canals.c) };
+  if (P.bigZone) Q.bigZone = { ...P.bigZone, x: P.bigZone.x + ox, z: P.bigZone.z + oz };
   if (P.coastZ) Q.coastZ = x => P.coastZ(x - ox) + oz;
   if (P.riverZ) Q.riverZ = x => P.riverZ(x - ox) + oz;
   return Q;
