@@ -7544,10 +7544,9 @@ function drawMapRailsOnly() { if (S && (S.rails || []).some(r => !r.built)) draw
 // градски шум по град (записи, на цикъл); останалите средни и големи градове — общият town.mp3
 const TOWN_SND = { newyork: 'assets/sfx/newyork.mp3', chicago: 'assets/sfx/chicago.mp3', istanbul: 'assets/sfx/istanbul.mp3', lasvegas: 'assets/sfx/lasvegas.mp3' };
 const TOWN_BG = { istanbul: ['assets/sfx/istanbul-prayer.mp3', 0.3] };   // на заден план (30%): езанът в Истанбул
-// песен веднъж при влизане в града / купен филиал (щом звукът е включен). Записите са с авторски права — само локално:
+// песен при купуването на филиал в града (щом звукът е включен) — не при всяко влизане. Записите са с авторски права — само локално:
 // assets/local/ не се качва в GitHub (.gitignore); на сайта файлът го няма и просто не свири
-const CITY_STING = { lasvegas: 'assets/local/vegas-elvis.mp3', newyork: 'assets/local/newyork-sinatra.mp3', rio: 'assets/local/rio-timmaia.mp3', cairo: 'assets/local/cairo-tune.mp3' };
-let stingDone = false;
+const CITY_STING = { lasvegas: 'assets/local/vegas-elvis.mp3', newyork: 'assets/local/newyork-sinatra.mp3', rio: 'assets/local/rio-timmaia.mp3', cairo: 'assets/local/cairo-tune.mp3', paris: 'assets/local/paris-vieenrose.mp3' };
 const stingOk = id => !!CITY_STING[id] && /^(localhost|127\.0\.0\.1)$/.test(location.hostname);   // песните са само локално — на сайта не се търсят (без 404)
 function frame() {
   requestAnimationFrame(frame);
@@ -7590,7 +7589,6 @@ function frame() {
       const tg = controls.target, near = units.filter(u => u.state === 'working' && Math.hypot(u.x - tg.x, u.z - tg.z) < 60).length;
       const zoom = Math.max(0, 1 - camera.position.distanceTo(tg) / 260);
       // градски шум — в средните и големите градове; по-тих нощем и отдалеч
-      if (!stingDone && Sound.ctx) { stingDone = true; if (stingOk(S.cityId)) Sound.file(CITY_STING[S.cityId], 0.7); }
       const townOn = cityTier(S.cityId) !== 's'; Sound.town(townOn ? (TOWN_SND[S.cityId] || 'assets/sfx/town.mp3') : null, ...(TOWN_BG[S.cityId] || []));
       const town = townOn ? 0.32 * (1 - dayNight.night * 0.65) * (0.35 + 0.65 * Math.max(0, 1 - camera.position.distanceTo(tg) / 500)) : 0;
       Sound.update(rdt, { night: dayNight.night, activity: Math.min(1, near / 4) * zoom, speed, traffic: 0.6, town });
