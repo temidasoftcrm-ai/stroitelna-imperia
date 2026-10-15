@@ -43,7 +43,7 @@ import { MapControls } from 'three/addons/controls/MapControls.js';
 import { makePlan, lotAt, validatePlan } from './cityplan.js';
 import { buildPlanView, placeOnLot } from './cityplan3d.js';
 
-const CITIES = [['sofia', 'София — равнина, радиални булеварди, околовръстен, планина'], ['varna', 'Варна — издължен крайбрежен град'], ['paris', 'Париж — река със завои и мостове'],
+const CITIES = [['sofia@osm', 'София — истинският център (OpenStreetMap)'], ['sofia', 'София — равнина, радиални булеварди, околовръстен, планина'], ['varna', 'Варна — издължен крайбрежен град'], ['paris', 'Париж — река със завои и мостове'],
   ['newyork', 'Ню Йорк — издължен остров, правоъгълни квартали'], ['rio', 'Рио — между плажове и хълмове'], ['plovdiv', 'Пловдив — речен град'], ['ruse', 'Русе — по хеш на града'],
   ['chicago', 'Чикаго — правоъгълна мрежа'], ['washington', 'Вашингтон — мрежа с диагонални авенюта'], ['moscow', 'Москва — звезда с три пръстена'],
   ['amsterdam', 'Амстердам — полукръгли канали до залива'], ['barcelona', 'Барселона — блокове под 45° и „Диагонал“ до морето'], ['vienna', 'Виена — стар град в пръстен-булевард']];
@@ -81,7 +81,7 @@ function show(id) {
   if (view) scene.remove(view);
   for (const o of built.values()) scene.remove(o); built.clear();
   const t = performance.now();
-  P = makePlan(id);
+  P = id.includes('@') ? makePlan(id.split('@')[0], { tpl: id.split('@')[1] }) : makePlan(id);
   view = buildPlanView(P, { target: controls.target });
   scene.add(view);
   const ms = performance.now() - t, bad = validatePlan(P), x3 = P.nodes.filter(n => n.deg >= 3).length;
@@ -131,7 +131,7 @@ renderer.domElement.addEventListener('pointerup', e => {
 });
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 show($('city').value);
-window.__plan = { get P() { return P; }, build: (id, k) => build(P.lots[id], k), built, camera, controls, show, renderer };
+window.__plan = { get P() { return P; }, build: (id, k) => build(P.lots[id], k), built, camera, controls, show, renderer, scene };
 renderer.setAnimationLoop(() => { controls.update(); view?.userData.lod(camera); renderer.render(scene, camera); });
 </script>
 </body>

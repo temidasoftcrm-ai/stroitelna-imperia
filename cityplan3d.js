@@ -63,7 +63,8 @@ export function buildPlanView(P0, opts = {}) {
     else {
       c.copy(grass);
       const f = Math.sin(x / 61) * Math.cos(z / 47) + Math.sin((x + z) / 29) * 0.5;   // ниви и поляни извън града
-      if (!P.buildable(x, z)) c.lerp(field, Math.max(0, f) * 0.6); else c.lerp(park, 0.4);
+      if (P.parkAt && P.parkAt(x, z)) c.setHex(0x5f9a45);   // парк от картата (Южен парк, Докторска градина…)
+      else if (!P.buildable(x, z)) c.lerp(field, Math.max(0, f) * 0.6); else c.lerp(park, 0.4);
       if (h > 8) c.lerp(rock, Math.min(1, (h - 8) / 25)); if (h > 45) c.lerp(snow, Math.min(1, (h - 45) / 15));
       if (P.waterAt(x + 9, z) || P.waterAt(x - 9, z) || P.waterAt(x, z + 9) || P.waterAt(x, z - 9)) c.copy(sand);   // бряг
     }
@@ -164,10 +165,21 @@ export function buildPlanView(P0, opts = {}) {
     if (P.waterAt(x, z) || h > 55) continue;
     const inTown = P.buildable(x, z);
     if (inTown && (rnd() < 0.55 || lotNear(x, z))) continue;
-    if (!inTown && h < 4 && rnd() < 0.72) continue;   // равното извън града — ниви, рядко дърво
+    const inPark = P.parkAt && P.parkAt(x, z);
+    if (!inTown && !inPark && h < 4 && rnd() < 0.72) continue;   // равното извън града — ниви, рядко дърво
     if (roadNear(x, z, 3)) continue;
     if (P.bigZone && rectHas(P.bigZone, [x, z], 4)) continue;   // мястото на голямата забележителност
     trees.push([x, z, 0.7 + rnd() * 0.7, h > 6 ? 1 : 0]);
+  }
+  // парковете от картата — гъста гора от дървета (до 1600), без да стъпват на улица
+  for (const q of P.parks || []) {
+    let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of q.pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    const n = Math.min(500, ((x1 - x0) * (z1 - z0)) / 70);
+    for (let k = 0; k < n && trees.length < 2600; k++) {
+      const x = x0 + rnd() * (x1 - x0), z = z0 + rnd() * (z1 - z0);
+      if (!P.parkAt(x, z) || roadNear(x, z, 2)) continue;
+      trees.push([x, z, 0.75 + rnd() * 0.6, rnd() < 0.25 ? 1 : 0]);
+    }
   }
   const cone = new THREE.ConeGeometry(2.2, 6, 7), ball = new THREE.IcosahedronGeometry(2.6, 0), stem = new THREE.CylinderGeometry(0.28, 0.36, 2.4, 5);
   const N = [trees.filter(t => !t[3]).length, trees.filter(t => t[3]).length];
