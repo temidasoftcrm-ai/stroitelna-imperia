@@ -15,4 +15,6 @@ export const FEATURES = [
   {"id": "com-sky-c", "title": "Нова сграда вместо building-skyscraper-c (небостъргач)", "how": "„Skyscraper“ (Jarlan Perez, CC BY 3.0, poly.pizza/m/7WF09z31G_v) вместо building-skyscraper-c от Kenney. Небостъргач: в по-големите градове се надстроява до 15–40 етажа — виж и „Сцени“ → Москва или Чикаго. „✓ OK“ сменя файла в играта (старият отива в ~/Downloads/city-builder-unused).", "url": "#tab=models&item=%2Fassets%2Fcommercial%2Fbuilding-skyscraper-c.glb"},
   // обратна връзка: „да сменим този звук, много е изнервящ“
   {"id": "snd-levelup", "title": "По-мек звук за ново ниво", "how": "Вместо тромпетите „та-даа“ и мелодията — четири тихи камбанки нагоре и мек акорд (около секунда). Пусни го от „Звуци“ → levelup. „✓ OK“ — сменя го в играта.", "url": "#tab=sounds&item=s%3Alevelup"},
+  // „можеш да свалиш и кариера“
+  {"id": "mine-quarry-real", "title": "Реалистична каменна кариера", "how": "„Tudor Stone Quarry“ (novusod, CC BY 4.0, Sketchfab) вместо процедурния терасовиден хълм: скали, навес, ограда, количка. Камионът продължава да обикаля. Отвори „Мисии/демо“ → Кариера (добив). „✓ OK“ — в играта.", "url": "#tab=demos&item=d5"},
 ];

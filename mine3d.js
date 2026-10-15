@@ -5,6 +5,7 @@
 // buildSite3D(group, deps, { kind, lv, x, z, scale, ext }) → { group, update(t, night), dispose }
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { feature } from './lab/feature.js';
 
 const mat = (c, r = 0.8, m = 0, e) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m, ...(e ? { emissive: e, emissiveIntensity: 1 } : {}) });
 const box = (w, h, d, m, x, y, z, g) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; g.add(o); return o; };
@@ -152,8 +153,13 @@ const KINDS = {
     if (lv >= 2) U.push(truck(g, [[-10, 9], [10, 9]], 0xe67e22, 4));
     hall(g, -8, 9, 5, 3.5, 3, M.conc, M.roofG);
   },
-  quarry(g, ex, ez, lv, U) {
+  quarry(g, ex, ez, lv, U, alive) {
     box(ex, 0.08, ez, M.gravel, 0, 0.04, 0, g);
+    if (feature('mine-quarry-real')) {   // реалистичната кариера (Tudor Stone Quarry, novusod, CC BY 4.0 — Sketchfab); в играта след „✓ OK“ в Лабораторията
+      placeGlb('assets/heavy/mines/quarry.glb', g, Math.min(ex, ez) * 0.92, 0, 0, alive);
+      U.push(truck(g, [[-11, 11.5], [11, 11.5], [11, -11.5], [-11, -11.5]], 0xf39c12, 3));
+      return;
+    }
     for (let k = 0; k < 4; k++) { const r = 9 - k * 2; const o = cyl(r, r, 0.6, mat([0xa6a39b, 0x948f86, 0x847f76, 0x726d65][k], 1), -2, 0.3 + k * 0.6, -1, g, 20); o.scale.z = 0.8; }   // терасовиден хълм
     for (const [x, z, r] of [[9, 8, 2], [6, 10, 1.6]]) { const c = new THREE.Mesh(new THREE.ConeGeometry(r, r, 8), M.stone); c.position.set(x, r / 2, z); c.castShadow = true; g.add(c); }
     hall(g, 8, -8, 4, 4, 5, M.steel, M.roofG); const cv = box(9, 0.3, 0.8, M.dark, 8, 4, -2, g); cv.rotation.z = 0.5; cv.rotation.y = Math.PI / 2;
