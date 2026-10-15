@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Лаборатория · Строителна империя</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --bg:#16181d; --side:#0e0f12; --line:#2a2e36; --txt:#e8eaee; --mut:#8a919c; --acc:#f5b942; --ok:#2f9e5b; --sky:#2b6fa8; --bad:#b33a3a; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--txt); font:14px/1.4 system-ui, sans-serif; overflow:hidden; }
+  #app { position:fixed; inset:0; display:flex; }
+  aside { width:290px; flex-shrink:0; display:flex; flex-direction:column; background:var(--side); border-right:1px solid var(--line); }
+  .brand { padding:12px 14px; border-bottom:1px solid var(--line); }
+  .brand b { color:var(--acc); font-size:16px; letter-spacing:.3px; } .brand div { color:var(--mut); font-size:12px; }
+  .tabs { display:flex; border-bottom:1px solid var(--line); font-size:13px; }
+  .tabs button { flex:1; padding:8px 2px; background:none; border:0; color:var(--txt); cursor:pointer; font:inherit; }
+  .tabs button:hover { background:#1c1f25; } .tabs button.on { background:var(--acc); color:#000; font-weight:600; }
+  nav { flex:1; overflow-y:auto; padding:6px; }
+  .row { display:block; width:100%; text-align:left; margin:0 0 3px; padding:7px 10px; border-radius:6px; background:none; border:0; color:var(--txt); cursor:pointer; font:inherit; }
+  .row:hover { background:#1c1f25; } .row.on { background:rgba(245,185,66,.18); outline:1px solid var(--acc); }
+  .row small { display:block; color:var(--mut); font-size:12px; }
+  .grp { position:sticky; top:0; background:var(--side); padding:6px 4px 3px; color:var(--acc); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; }
+  .grp i { color:var(--mut); font-style:normal; font-weight:400; }
+  .mrow { display:flex; justify-content:space-between; width:100%; padding:3px 8px; border:0; border-radius:4px; background:none; color:var(--txt); cursor:pointer; font:13px system-ui; text-align:left; }
+  .mrow:hover { background:#1c1f25; } .mrow.on { background:rgba(245,185,66,.25); color:#ffe2a3; }
+  .mrow span:last-child { color:var(--mut); font-size:11px; margin-left:8px; flex-shrink:0; }
+  .mrow.working { background:rgba(250,204,21,.18); color:#fde68a; } .mrow.ready { background:rgba(16,185,129,.14); color:#a7f3d0; outline:1px dashed rgba(52,211,153,.6); } .mrow.reviewed { background:rgba(5,150,105,.32); color:#d1fae5; }
+  input.q { margin:8px 8px 4px; padding:6px 10px; border-radius:6px; border:0; background:#1f2229; color:var(--txt); font:inherit; outline:none; }
+  label.chk { margin:0 12px 6px; color:var(--mut); font-size:12px; display:flex; gap:6px; align-items:center; }
+  main { position:relative; flex:1; min-width:0; }
+  iframe { width:100%; height:100%; border:0; display:block; background:#000; }
+  .empty { height:100%; display:flex; align-items:center; justify-content:center; color:var(--mut); padding:20px; text-align:center; }
+  .bar { position:absolute; right:10px; top:10px; display:flex; gap:6px; z-index:5; flex-wrap:wrap; justify-content:flex-end; }
+  .bar.low { top:auto; bottom:10px; } .bar.low .pop { top:auto; bottom:34px; } .bar.low .note { top:auto; bottom:34px; }
+  .btn { border:0; border-radius:6px; padding:5px 11px; background:rgba(0,0,0,.72); color:var(--txt); cursor:pointer; font:600 13px system-ui; text-decoration:none; }
+  .btn:hover { background:#000; } .btn.sky { background:var(--sky); } .btn.ok { background:var(--ok); } .btn.red { background:var(--bad); } .btn.dim { background:#2b3038; color:#b8f0cf; cursor:default; }
+  .btn:disabled { opacity:.6; cursor:default; }
+  .pop { position:absolute; right:0; top:34px; width:320px; background:rgba(10,11,14,.97); border:1px solid var(--line); border-radius:10px; padding:10px; z-index:20; }
+  .pop .for { color:var(--mut); font-size:12px; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pop .chips button { margin:0 4px 4px 0; padding:4px 8px; border:0; border-radius:5px; background:#262a32; color:var(--txt); cursor:pointer; font:12px system-ui; }
+  .pop .chips button.on { background:var(--acc); color:#000; }
+  .pop textarea { width:100%; height:76px; resize:none; border-radius:6px; border:1px solid var(--line); background:#15171c; color:var(--txt); padding:6px; font:13px system-ui; }
+  .pop .act { display:flex; justify-content:flex-end; gap:6px; margin-top:6px; }
+  .note { position:absolute; right:0; top:34px; white-space:nowrap; background:rgba(0,0,0,.85); color:#86efac; padding:3px 8px; border-radius:5px; font-size:12px; }
+  .feat { position:absolute; bottom:12px; left:50%; transform:translateX(-50%); max-width:640px; display:flex; gap:12px; align-items:center; background:rgba(0,0,0,.86); border:1px solid var(--line); border-radius:10px; padding:10px 14px; z-index:5; }
+  .feat b { color:var(--acc); } .feat div div { color:#cfd3da; font-size:12px; }
+  .info { position:absolute; left:10px; top:10px; max-width:440px; background:rgba(0,0,0,.72); border-radius:8px; padding:9px 11px; pointer-events:none; font-size:13px; }
+  .info b { color:#ffd27a; } .info small { color:var(--mut); display:block; } .info div { font-size:12px; margin-top:4px; }
+  .anims { position:absolute; left:10px; right:10px; bottom:10px; background:rgba(0,0,0,.78); border-radius:8px; padding:7px; }
+  .anims .top { display:flex; gap:12px; align-items:center; color:#cfd3da; font-size:12px; margin-bottom:5px; }
+  .anims .list { display:flex; flex-wrap:wrap; gap:4px; max-height:110px; overflow-y:auto; }
+  .anims .list button { border:0; border-radius:4px; padding:2px 8px; background:#262a32; color:var(--txt); cursor:pointer; font:12px system-ui; }
+  .anims .list button.on { background:var(--acc); color:#000; font-weight:600; }
+  .snd { height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; }
+  .snd h2 { color:var(--acc); margin:0; }
+  @media (max-width:700px) { aside { width:220px; } }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="app">
+  <aside>
+    <div class="brand"><b>🏗️ Строителна империя · Лаборатория</b><div>Ново, сцени, модели и звуци — без играта на :3600</div></div>
+    <div class="tabs" id="tabs"></div>
+    <div id="side" style="display:flex;flex-direction:column;flex:1;min-height:0"></div>
+  </aside>
+  <main id="main"></main>
+</div>
+<script type="module" src="lab/lab.js"></script>
+</body>
+</html>

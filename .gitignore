@@ -4,3 +4,5 @@ node_modules/
 supabase/.temp/
 tt-*.png
 _originali/
+lab-feedback.jsonl
+lab-status.json
