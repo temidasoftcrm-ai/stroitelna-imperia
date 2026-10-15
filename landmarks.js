@@ -471,7 +471,7 @@ const GLB_LM = {
   colosseo: { h: 13, fit: 15, plate: 0xb9ad98 },   // Рим: Колизеумът (Carlos.Maciel)
   sagrada: { h: 17, fit: 15, plate: 0xc9bfa8 },   // Барселона: Саграда Фамилия (vmmaniac)
   whitehouse: { h: 9, fit: 15, plate: 0x6f9a55, matte: 0xf4f1ea, rx: -0.28 },   // Вашингтон: Белият дом с крилата (Void); моделът е наклонен ~16° — rx го изправя (иначе едната страна и крилата висят във въздуха)
-  capitol: { h: 14, fit: 15, plate: 0x6f8f55, sink: 0.1 },     // Вашингтон: Капитолият (ycpan3468, photogrammetry; паркът наоколо е изрязан, хълмът е наклонен); голяма зона 3×3 (BIG_LANDMARKS)
+  capitol: { h: 14, fit: 15, plate: 0x6f8f55, sink: 0.1, ry: -0.89, crop: [-5.9, 6.0, -2.5, 2.9], base: 0xd6d3c9 },     // Вашингтон: Капитолият (ycpan3468, photogrammetry; паркът наоколо е изрязан, хълмът е наклонен); голяма зона 3×3 (BIG_LANDMARKS); ry — по улиците (сканът е по диагонал), crop — изрязва площада/дърветата/съседната сграда, base — каменна основа под назъбените краища
   vegassign: { h: 14, fit: 12, plate: 0xc9b98a },   // Лас Вегас: табелата „Welcome to Fabulous Las Vegas“ (sipulitrade)
   mgu: { h: 16, fit: 15, plate: 0x6f8f55 },   // Москва: МГУ — сталинският небостъргач с крилата и парка (Meshy AI); голяма зона 2×2 (BIG_LANDMARKS)
   eiffel: { h: 26, fit: 15, plate: 0xc9bfa8, onLoad: eiffelLights },   // Париж: Айфеловата кула (Meshy AI); нощем златни светлини и проблясване
@@ -510,6 +510,25 @@ function gridOf(src) {
   }
   return g;
 }
+// изрязва сканирания терен около сградата (фотограметрия): махат се триъгълниците извън правоъгълника [x0, x1, z0, z1]
+// (в координатите на модела, вписан в 15), а стърчащите им върхове се прибират до ръба. Геометрията се клонира — кешът остава цял
+function cropLm(w, m, [x0, x1, z0, z1]) {
+  w.updateMatrixWorld(true);
+  const bb = new THREE.Box3().setFromObject(w, true), s = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3()), k = 15 / Math.max(s.x, s.z);
+  const v = new THREE.Vector3(), cl = (a, lo, hi) => Math.max(lo, Math.min(hi, a));
+  m.traverse(o => {
+    if (!o.isMesh) return;
+    const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(), p = g.attributes.position, M = o.matrixWorld, Mi = M.clone().invert(), keep = [];
+    for (let i = 0; i < p.count; i += 3) {
+      let cx = 0, cz = 0; for (let t = 0; t < 3; t++) { v.fromBufferAttribute(p, i + t).applyMatrix4(M); cx += (v.x - c.x) * k / 3; cz += (v.z - c.z) * k / 3; }
+      if (cx >= x0 && cx <= x1 && cz >= z0 && cz <= z1) keep.push(i);
+    }
+    for (const i of keep) for (let t = 0; t < 3; t++) { v.fromBufferAttribute(p, i + t).applyMatrix4(M); v.x = cl((v.x - c.x) * k, x0, x1) / k + c.x; v.z = cl((v.z - c.z) * k, z0, z1) / k + c.z; v.applyMatrix4(Mi); p.setXYZ(i + t, v.x, v.y, v.z); }
+    const ng = new THREE.BufferGeometry();
+    for (const [n, at] of Object.entries(g.attributes)) { const a = new at.array.constructor(keep.length * 3 * at.itemSize); keep.forEach((i, j) => a.set(at.array.subarray(i * at.itemSize, (i + 3) * at.itemSize), j * 3 * at.itemSize)); ng.setAttribute(n, new THREE.BufferAttribute(a, at.itemSize, at.normalized)); }
+    o.geometry = ng;
+  });
+}
 function glbLm(kind) {
   const C = GLB_LM[kind], g = new THREE.Group(), flood = [];
   box(g, 15, 0.3, 15, mat(C.plate ?? 0x9a9a92, 0.95), 0, 0.15, 0);
@@ -517,8 +536,9 @@ function glbLm(kind) {
   g.userData.flood = flood;
   loadLm(kind).then(src => {
     g.remove(ph); if (!src) return;
-    const m = C.grid ? gridOf(src) : src.clone(true), w = new THREE.Group(); w.add(m); if (C.rx) m.rotation.x = C.rx;
-    const b = new THREE.Box3().setFromObject(w), s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3());
+    const m = C.grid ? gridOf(src) : src.clone(true), w = new THREE.Group(); w.add(m); if (C.rx) m.rotation.x = C.rx; if (C.ry) m.rotation.y = C.ry;
+    if (C.crop) cropLm(w, m, C.crop);
+    const b = new THREE.Box3().setFromObject(w, !!(C.ry || C.crop)), s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3());
     const k = Math.min(C.h / s.y, C.fit / Math.max(s.x, s.z));
     m.position.set(-c.x, -b.min.y, -c.z); w.scale.setScalar(k); w.position.y = 0.3 - (C.sink || 0) * s.y * k; w.position.z = C.dz || 0; if (C.sy) w.scale.y *= C.sy;   // sy — по-стръмно (ниските модели от Meshy)
     w.traverse(o => {
@@ -528,6 +548,7 @@ function glbLm(kind) {
       const mt = o.material; if (mt && mt.metalness > 0.4) { mt.metalness = 0.25; mt.roughness = Math.max(mt.roughness ?? 0.5, 0.45); }   // без огледална среда металът излиза черен
       if (mt && mt.emissive && !mt.emissiveMap && !flood.includes(mt)) { mt.emissive.set(0xffe4b8); if (mt.map) { mt.emissiveMap = mt.map; mt.needsUpdate = true; } mt.emissiveIntensity = 0; flood.push(mt); }   // прожектори: светва текстурата, не плосък бежов цвят
     });
+    if (C.base) box(g, s.x * k + 0.6, 0.35, s.z * k + 0.6, mat(C.base, 0.9), 0, 0.3 + 0.175, C.dz || 0);   // каменна основа — назъбените краища на скана се сливат с нея
     g.add(w);
     if (C.onLoad) C.onLoad(w, g);
     if (g.userData.sign) g.userData.sign.position.y = s.y * k + 4;
