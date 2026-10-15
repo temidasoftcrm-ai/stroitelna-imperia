@@ -14,7 +14,7 @@ export const ROOF_VARIANTS = [
 // по-често червени и сиви, рядко зелени
 const WEIGHTS = [3, 2, 3, 2, 1];
 
-const texCache = new Map();   // оригинална текстура → [текстура за всеки вариант]
+const texCache = new Map();   // източник на оригиналната текстура → [текстура за всеки вариант]
 const matCache = new Map();   // оригинален материал → [материал за всеки вариант]
 
 // копие на текстурата: всеки „зелен“ пиксел (зеленото доминира) получава новия оттенък, яркостта се пази
@@ -43,8 +43,9 @@ function variantMat(mat, v) {
   if (!matCache.has(mat)) matCache.set(mat, []);
   const list = matCache.get(mat);
   if (!list[v]) {
-    if (!texCache.has(mat.map)) texCache.set(mat.map, []);
-    const tl = texCache.get(mat.map);
+    const key = mat.map.source || mat.map;   // по източника: еднаквите картинки от различни GLB (memfix.js) делят едно пребоядисано копие
+    if (!texCache.has(key)) texCache.set(key, []);
+    const tl = texCache.get(key);
     tl[v] = tl[v] || recolor(mat.map, ROOF_VARIANTS[v].hsl);
     list[v] = mat.clone();
     list[v].map = tl[v];

@@ -722,7 +722,7 @@ export class Economy {
   maintOf(f) { const n = (f.fleet || []).length; return n ? Math.min(1.3, 1 + 0.03 * n) : 0.7; }
   // плаща се в dailyTick; active = градът, в който си в момента (там плащането е от обектите)
   payFinished(active) {
-    let tot = 0, upkeep = 0;
+    let tot = 0, upkeep = 0, restN = 0, restSum = 0;
     const parts = [];
     for (const [id, f] of Object.entries(this.s.finished)) {
       if (id === active) continue;
@@ -730,8 +730,11 @@ export class Economy {
       for (const t of f.fleet || []) upkeep += UNIT_TYPES[t] ? UNIT_TYPES[t].upkeep : 0;
       const n = Math.round(f.daily * f.share / (f.share0 || (f.share0 = f.share)) * this.maintOf(f) * (this.hooks.incomeMul ? this.hooks.incomeMul(id) : 1));
       f.earned += n; tot += n;
-      parts.push(`${(this.hooks.cityName && this.hooks.cityName(id)) || id} +${fmt(n)}`);
+      // в известието поименно само столиците; останалите — сбор накрая
+      if (!this.hooks.isCapital || this.hooks.isCapital(id)) parts.push(`${(this.hooks.cityName && this.hooks.cityName(id)) || id} +${fmt(n)}`);
+      else { restN++; restSum += n; }
     }
+    if (restN) parts.push(`още ${restN} ${restN === 1 ? 'град' : 'града'} +${fmt(restSum)}`);
     // известие веднъж на ден: колко донесоха завършените градове
     if (tot && this.hooks.toast) this.hooks.toast(`🏁 Завършени градове: +${fmt(tot - upkeep)} днес (${parts.join(', ')}${upkeep ? `, поддръжка −${fmt(upkeep)}` : ''})`, 'good');
     if (tot) this.earn(tot, 'градове', `Автоматичен приход от ${Object.keys(this.s.finished).filter(i => i !== active).length} завършени града`);

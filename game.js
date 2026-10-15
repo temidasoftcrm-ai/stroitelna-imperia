@@ -1477,7 +1477,7 @@ function makeDemoSite(p) {
 }
 function finishDemo(p) {
   const lot = city.lots[p.lot];
-  if (p.vis && p.vis.demoOnly) { p.vis.demo.dispose(); scene.remove(p.vis.g); p.vis = null; }
+  if (p.vis && p.vis.demoOnly) { p.vis.demo.dispose(); freeWorkers(p.vis), scene.remove(p.vis.g); p.vis = null; }
   clearLot(lot);
   delete p.demo;
   makeSite(p);
@@ -1614,6 +1614,9 @@ function makeWorker(g) {
   m.position.set(w.x, 0.05, w.z);
   return w;
 }
+// скелетите на клонираните работници имат своя текстура на видеокартата — освобождава се, щом работникът изчезне
+const freeSkin = m => m.traverse(o => { if (o.isSkinnedMesh && o.skeleton) o.skeleton.dispose(); });
+const freeWorkers = v => { for (const w of (v && v.workers) || []) { w.m.parent?.remove(w.m); freeSkin(w.m); } if (v) v.workers = []; };
 function updateWorkers(p, dt) {
   const v = p.vis;
   if (!v || v.demoOnly) return;
@@ -1621,7 +1624,7 @@ function updateWorkers(p, dt) {
   const crews = units.filter(u => u.proj === p && u.type === 'crew' && u.state === 'working').length;
   const want = Math.min(9, crews * 3);
   while (v.workers.length < want) v.workers.push(makeWorker(v.g));
-  while (v.workers.length > want) { const w = v.workers.pop(); v.g.remove(w.m); }
+  while (v.workers.length > want) { const w = v.workers.pop(); v.g.remove(w.m); freeSkin(w.m); }
   const top = p.stage === 1 ? 0.05 + p.prog * 0.6 : p.stage >= 2 ? 0.65 : 0.05;
   for (const w of v.workers) {
     w.t -= dt;
@@ -1637,7 +1640,7 @@ function updateWorkers(p, dt) {
 }
 function finishSite(p) {
   const v = p.vis, lot = city.lots[p.lot];
-  scene.remove(v.g);
+  freeWorkers(v); scene.remove(v.g);
   if (p.own) { p.vis = null; return; }
   // сградата остава като част от града
   placeBuilding(lot, p.model, 0);
@@ -1837,7 +1840,7 @@ function setupWorld() {
   city.ready = true;
   S.hqCity = S.hqCity || S.cityId; S.cities = S.cities || {};
   if (!S.tut && (S.done || 0) > 3) S.tut = { step: 99, off: true };   // опитен играч — без урок
-  econ = new ECON.Economy(S.econ, { toast, bustHtml: () => bust.statusHtml(), cityName: id => cityById(id)?.nm, changed: () => { save(); renderPanel(); }, takeover: id => takeoverChoice(id), stockVisible: c => !c.cc || ownedCities().some(id => cityById(id)?.cc === c.cc), liquidated: (c, total, pr) => { showEventPop('sold', `💰 Разпродажба: ${c.nm}`, `+${fmt(total)} € · ${pr >= 0 ? 'печалба' : 'загуба'} ${fmt(Math.abs(pr))} € спрямо цената`); quests.emit('liquidate'); }, incomeMul: id => wonIncomeMul(id, x => econ.isFinished(x)), stocksOpen: () => dev.stocksOpen() });
+  econ = new ECON.Economy(S.econ, { toast, bustHtml: () => bust.statusHtml(), cityName: id => cityById(id)?.nm, isCapital: id => id === 'sofia' || CAPITALS.has(id), changed: () => { save(); renderPanel(); }, takeover: id => takeoverChoice(id), stockVisible: c => !c.cc || ownedCities().some(id => cityById(id)?.cc === c.cc), liquidated: (c, total, pr) => { showEventPop('sold', `💰 Разпродажба: ${c.nm}`, `+${fmt(total)} € · ${pr >= 0 ? 'печалба' : 'загуба'} ${fmt(Math.abs(pr))} € спрямо цената`); quests.emit('liquidate'); }, incomeMul: id => wonIncomeMul(id, x => econ.isFinished(x)), stocksOpen: () => dev.stocksOpen() });
   if (econ.setCity) econ.setCity(S.cityId);   // оборотът от обекти се води по градове
   buildCity(S.cityId);
   for (const u of units) scene.remove(u.obj);
@@ -1865,7 +1868,7 @@ function setupWorld() {
   const elsewhere = new Set(Object.values(S.cities || {}).flatMap(c => (c.projects || []).map(p => p.id)));
   const seen = new Set(), list = S.projects.filter(p => city.lots[p.lot] && !elsewhere.has(p.id) && !seen.has(p.id) && seen.add(p.id));
   S.offers = (S.offers || []).filter(o => city.lots[o.lot]);
-  for (const p of projects) if (p.vis) scene.remove(p.vis.g);
+  for (const p of projects) if (p.vis) freeWorkers(p.vis), scene.remove(p.vis.g);
   projects.length = 0;
   for (const p of list) { projects.push(p); makeSite(p); }
   S.projects = projects;
@@ -6325,7 +6328,7 @@ function makeRenoSite(p) {
   p.vis = { g, reno: true };
 }
 function finishReno(p) {
-  scene.remove(p.vis.g); p.vis = null;
+  freeWorkers(p.vis), scene.remove(p.vis.g); p.vis = null;
   const lot = city.lots[p.lot], o = ownedAt(p.lot);
   clearLot(lot);
   placeBuilding(lot, p.model, 0);
@@ -6549,7 +6552,7 @@ function startOwnedWork(lotId, kind, quiet = false) {
   dispatch(); refreshEstateSigns(); save(); renderPanel();
 }
 function finishOwnedWork(p) {
-  scene.remove(p.vis.g); p.vis = null;
+  freeWorkers(p.vis), scene.remove(p.vis.g); p.vis = null;
   const o = ownedAt(p.lot), lot = city.lots[p.lot];
   lot.busy = 'owned';
   if (!o) return;
@@ -6615,7 +6618,7 @@ function placePark(lot) {
   parkGroups.push(g);
 }
 function finishPark(p) {
-  scene.remove(p.vis.g); p.vis = null;
+  freeWorkers(p.vis), scene.remove(p.vis.g); p.vis = null;
   const lot = city.lots[p.lot];
   for (const t of lot.trees || []) city.group.remove(t); lot.trees = [];
   placePark(lot);

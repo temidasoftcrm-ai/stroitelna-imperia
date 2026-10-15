@@ -60,11 +60,13 @@ export class DayNight {
     const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
     const g = c.getContext('2d'); g.drawImage(img, 0, 0);
     const d = g.getImageData(0, 0, c.width, c.height), p = d.data;
+    let any = false;
     for (let i = 0; i < p.length; i += 4) {
       const r = p[i], gg = p[i + 1], b = p[i + 2];
       const glass = b > 140 && b > r + 35 && b > gg + 5;   // синкаво стъкло
-      p[i] = p[i + 1] = p[i + 2] = glass ? 255 : 0;
+      p[i] = p[i + 1] = p[i + 2] = glass ? 255 : 0; any ||= glass;
     }
+    if (!any) { this.masks.set(img, null); return null; }   // без стъкла — няма какво да свети (и излишна черна текстура в паметта)
     g.putImageData(d, 0, 0);
     const t = new THREE.CanvasTexture(c); t.flipY = tex.flipY; t.colorSpace = THREE.SRGBColorSpace;
     this.masks.set(img, t);
