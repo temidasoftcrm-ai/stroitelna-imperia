@@ -2039,7 +2039,7 @@ function acceptOffer(id) {
   makeSite(p);
   dispatch();
   if (bulkOffer) return;
-  toast(`Поръчката „${p.title}“ е приета. Техниката тръгва към обекта.`, 'good');
+  toast(`Поръчката „${p.title}“ е приета. Техниката тръгва към обекта.`, 'good'); Sound.play('build');
   flyTo(city.lots[p.lot]);
   save();
   renderPanel();
@@ -7548,6 +7548,9 @@ const clock = new THREE.Clock();
 let panelT = 0, simT = 0, mapT = 0, autoT = 3, questT = 0;
 // обновява само линиите (прогрес на строежа), без да прерисува цялата карта
 function drawMapRailsOnly() { if (S && (S.rails || []).some(r => !r.built)) drawMap(); }
+// градски шум по град (записи, на цикъл); останалите средни и големи градове — общият town.mp3
+const TOWN_SND = { newyork: 'assets/sfx/newyork.mp3', chicago: 'assets/sfx/chicago.mp3', istanbul: 'assets/sfx/istanbul.mp3' };
+const TOWN_BG = { istanbul: ['assets/sfx/istanbul-prayer.mp3', 0.3] };   // на заден план (30%): езанът в Истанбул
 function frame() {
   requestAnimationFrame(frame);
   const rdt = Math.min(clock.getDelta(), 0.1);
@@ -7588,8 +7591,11 @@ function frame() {
     if (!onMap) {
       const tg = controls.target, near = units.filter(u => u.state === 'working' && Math.hypot(u.x - tg.x, u.z - tg.z) < 60).length;
       const zoom = Math.max(0, 1 - camera.position.distanceTo(tg) / 260);
-      Sound.update(rdt, { night: dayNight.night, activity: Math.min(1, near / 4) * zoom, speed, traffic: 0.6 });
-    } else Sound.update(rdt, { night: dayNight.night, activity: 0, speed, traffic: 0.2 });
+      // градски шум — в средните и големите градове; по-тих нощем и отдалеч
+      const townOn = cityTier(S.cityId) !== 's'; Sound.town(townOn ? (TOWN_SND[S.cityId] || 'assets/sfx/town.mp3') : null, ...(TOWN_BG[S.cityId] || []));
+      const town = townOn ? 0.32 * (1 - dayNight.night * 0.65) * (0.35 + 0.65 * Math.max(0, 1 - camera.position.distanceTo(tg) / 500)) : 0;
+      Sound.update(rdt, { night: dayNight.night, activity: Math.min(1, near / 4) * zoom, speed, traffic: 0.6, town });
+    } else Sound.update(rdt, { night: dayNight.night, activity: 0, speed, traffic: 0.2, town: 0 });
     for (const p of projects) { updateSite(p, simT); updateWorkers(p, Math.min(dt, 0.1)); }
     updateCash(rdt);
     for (const g of parkGroups) { const j = g.userData.jet; j.scale.y = 0.85 + Math.sin(simT * 6 + g.id) * 0.15; j.rotation.y += rdt; }

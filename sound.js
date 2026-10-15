@@ -96,7 +96,7 @@ export const Sound = {
         B([523, 784, 1047, 1319, 1568], 1.92, 2.4, 0.06); this.drum(1.92, 0.75); this.hit(6000, 1.8, 0.12, 0.7, 1.92);   // финал + чинел
         [2093, 2637, 3136, 4186].forEach((f, i) => this.bell(f, 2.05 + i * 0.12, 0.05)); break; }
       case 'airport': this.tone(220, 1.6, 0.06, 'sawtooth', 880); this.hit(3000, 1.2, 0.05, 0.6, 0.1); this.bell(1319, 1.1, 0.08); this.bell(1760, 1.3, 0.06); break;   // летище — излитане и сигнал
-      case 'plane': this.tone(180, 1.4, 0.05, 'sawtooth', 620); this.hit(2500, 1.1, 0.05, 0.5); break;
+      case 'plane': this.file('assets/sfx/plane.mp3', 0.7); break;   // самолет излита (записан звук, Pixabay)
       case 'ship': [131, 165].forEach(f => this.tone(f, 1.6, 0.08, 'sawtooth')); break;   // корабна сирена
       case 'quest': [1047, 1319, 1568, 2093].forEach((f, i) => T(f, i * 0.06, 0.25, 0.08)); break;
       default: return false;
@@ -119,16 +119,37 @@ export const Sound = {
       case 'buy': this.tone(660, 0.08, 0.12, 'square'); this.tone(990, 0.12, 0.1, 'square', null, 0.08); break;
       case 'click': this.tone(1200, 0.04, 0.06, 'square'); break;
       case 'error': this.tone(220, 0.18, 0.12, 'sawtooth', 160); break;
-      case 'horn': [370, 466].forEach(f => this.tone(f, 1.1, 0.07, 'sawtooth')); break;   // влакова свирка (акорд)
+      case 'horn': this.file('assets/sfx/train.mp3', 0.75); break;   // влак (записан звук, Pixabay)
+      case 'build': this.file('assets/sfx/construction.mp3', 0.6); break;   // нов строеж (записан звук, 10 s)
       case 'upgrade': [392, 523, 659, 784, 1047].forEach((f, i) => this.tone(f, 0.3, 0.13, 'triangle', null, i * 0.09)); break;
     }
   },
 
   // всеки кадър: night 0..1, activity 0..1 (колко строеж/техника има около камерата), speed (0 = пауза)
-  update(dt, { night = 0, activity = 0, speed = 1, traffic = 0.5 } = {}) {
+  // градски шум (записани, на цикъл през WebAudio — без пауза при повтаряне): src — основният, bg — на заден план (bgK от силата);
+  // src = null спира всичко; общата сила идва от update({ town })
+  town(src, bg = null, bgK = 0.3) {
+    const key = src && src + '|' + (bg || '') + '|' + bgK;
+    if (!this.ctx || this.townSrc === key) return;
+    this.townSrc = key;
+    for (const n of this.townNodes || []) { try { n.stop(); } catch { } }
+    this.townNodes = [];
+    if (!src) return;
+    if (!this.townG) { this.townG = this.ctx.createGain(); this.townG.gain.value = 0; this.townG.connect(this.master); }
+    for (const [u, k] of [[src, 1], [bg, bgK]]) {
+      if (!u) continue;
+      fetch(u).then(r => r.arrayBuffer()).then(b => this.ctx.decodeAudioData(b)).then(buf => {
+        if (this.townSrc !== key) return;
+        const g = this.ctx.createGain(); g.gain.value = k; g.connect(this.townG);
+        const n = this.ctx.createBufferSource(); n.buffer = buf; n.loop = true; n.connect(g); n.start(0, Math.random() * buf.duration); this.townNodes.push(n);
+      }).catch(() => { });
+    }
+  },
+  update(dt, { night = 0, activity = 0, speed = 1, traffic = 0.5, town = 0 } = {}) {
     if (!this.ctx || this.muted) return;
     const now = this.ctx.currentTime;
     const paused = speed === 0;
+    if (this.townG) this.townG.gain.setTargetAtTime(town * (paused ? 0.4 : 1), now, 0.8);
     this.hum.g.gain.setTargetAtTime(paused ? 0.02 : 0.05 + traffic * 0.06 * (1 - night * 0.6), now, 0.5);
     this.engine.g.gain.setTargetAtTime(paused ? 0 : activity * 0.12, now, 0.3);
     this.engine.f.frequency.setTargetAtTime(110 + activity * 60 + Math.sin(now * 2) * 10, now, 0.3);
