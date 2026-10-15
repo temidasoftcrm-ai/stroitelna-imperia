@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Градски планове</title>
+<style>
+  :root { --bg:#0f1622; --panel:rgba(20,28,40,.92); --txt:#e8edf3; --mut:#9fb0c4; --acc:#f5b942; --line:#2c3a50; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--txt); font:14px/1.45 system-ui, sans-serif; overflow:hidden; }
+  #ui { position:fixed; left:12px; top:12px; z-index:2; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 12px; max-width:min(340px, calc(100vw - 48px)); }
+  #ui h1 { font-size:16px; margin:0 0 6px; color:var(--acc); }
+  #ui select, #ui button { font:inherit; background:#1d2838; color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:5px 9px; margin:2px 0; cursor:pointer; }
+  #ui button:hover { border-color:var(--acc); }
+  #ui label { color:var(--mut); font-size:13px; user-select:none; }
+  #info { margin-top:8px; font-size:13px; color:var(--mut); }
+  #info b { color:var(--txt); }
+  #lotBox { position:fixed; right:12px; bottom:12px; z-index:2; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 12px; width:min(300px, calc(100vw - 48px)); display:none; font-size:13px; }
+  #lotBox .k { display:inline-block; background:#24324a; border-radius:6px; padding:1px 6px; margin:2px 3px 0 0; }
+  canvas { display:block; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="ui">
+  <h1>🏙️ Градски планове · прототип</h1>
+  <select id="city"></select>
+  <div>
+    <button id="fill">🏗️ Застрой 15</button> <button id="clear">🧹 Изчисти</button>
+  </div>
+  <label><input type="checkbox" id="edges" checked> очертания на парцелите</label>
+  <div id="info"></div>
+</div>
+<div id="lotBox"></div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MapControls } from 'three/addons/controls/MapControls.js';
+import { makePlan, lotAt, validatePlan } from './cityplan.js';
+import { buildPlanView, placeOnLot } from './cityplan3d.js';
+
+const CITIES = [['sofia', 'София — равнина, радиални булеварди, околовръстен, планина'], ['varna', 'Варна — издължен крайбрежен град'], ['paris', 'Париж — река със завои и мостове'],
+  ['newyork', 'Ню Йорк — издължен остров, правоъгълни квартали'], ['rio', 'Рио — между плажове и хълмове'], ['plovdiv', 'Пловдив — речен град'], ['ruse', 'Русе — по хеш на града']];
+const params = new URLSearchParams(location.search), $ = id => document.getElementById(id);
+$('city').innerHTML = CITIES.map(([id, nm]) => `<option value="${id}">${nm}</option>`).join('');
+$('city').value = params.get('city') || 'sofia';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xa9cbe6); scene.fog = new THREE.Fog(0xa9cbe6, 500, 1100);
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 1, 3000);
+camera.position.set(170, 230, 260);
+const controls = new MapControls(camera, renderer.domElement); controls.maxPolarAngle = 1.35; controls.minDistance = 30; controls.maxDistance = 900;
+scene.add(new THREE.HemisphereLight(0xdfefff, 0x5a6a48, 1.1));
+const sun = new THREE.DirectionalLight(0xfff1d6, 1.9); sun.position.set(180, 300, 120); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -320, right: 320, top: 320, bottom: -320, far: 900 }); scene.add(sun);
+
+// модели по вид сграда (общи геометрии и материали — клониране без копиране на данни)
+const KIND_MODELS = {
+  tower: ['commercial/building-skyscraper-a', 'commercial/building-skyscraper-b', 'commercial/building-skyscraper-c'],
+  office: ['commercial/building-e', 'commercial/building-f', 'commercial/building-g', 'commercial/building-h'],
+  shop: ['commercial/building-a', 'commercial/building-b', 'commercial/building-c', 'commercial/building-d'],
+  block: ['commercial/building-e', 'commercial/building-g', 'commercial/building-c'],
+  civic: ['commercial/building-h'],
+  house: 'abcdefghijklmnopqrstu'.split('').map(c => 'suburban/building-type-' + c),
+  factory: 'abcdefghij'.split('').map(c => 'industrial/building-' + c),
+};
+const loader = new GLTFLoader(), cache = {};
+const load = n => cache[n] || (cache[n] = loader.loadAsync(`assets/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); return g.scene; }));
+
+let P = null, view = null, built = new Map(), hl = null;
+function show(id) {
+  if (view) scene.remove(view);
+  for (const o of built.values()) scene.remove(o); built.clear();
+  const t = performance.now();
+  P = makePlan(id);
+  view = buildPlanView(P, { target: controls.target });
+  scene.add(view);
+  const ms = performance.now() - t, bad = validatePlan(P), x3 = P.nodes.filter(n => n.deg >= 3).length;
+  const cnt = z => P.lots.filter(L => L.zone === z).length;
+  $('info').innerHTML = `Шаблон: <b>${P.tpl}</b> · улици <b>${P.streets.length}</b> · кръстовища <b>${x3}</b><br>Парцели <b>${P.lots.length}</b> (център ${cnt('center')}, среден пояс ${cnt('mid')}, покрайнини ${cnt('outer')})<br>Проверка: ${bad.length ? '⚠️ ' + bad.length + ' проблема' : '✅ без застъпване'} · ${Math.round(ms)} ms`;
+  view.getObjectByName('lotEdges').visible = $('edges').checked;
+  hl = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xf5b942, transparent: true, opacity: 0.45, depthWrite: false }));
+  hl.visible = false; view.add(hl);
+  $('lotBox').style.display = 'none';
+  history.replaceState(null, '', '?city=' + id);
+}
+async function build(L, kind) {
+  if (built.has(L.id)) return;
+  kind = kind || L.kinds[(L.id * 7 + built.size) % L.kinds.length];
+  if (kind === 'park') { built.set(L.id, new THREE.Group()); return; }
+  const list = KIND_MODELS[kind] || KIND_MODELS.shop, src = await load(list[(L.id * 31) % list.length]);
+  if (built.has(L.id)) return;
+  const o = placeOnLot(src.clone(), L, { margin: kind === 'house' ? 3 : 2 });
+  if (kind === 'tower') o.scale.y *= 1.6;
+  o.userData.kind = kind; built.set(L.id, o); scene.add(o);
+}
+function lotInfo(L) {
+  const st = P.streets[L.street], b = built.get(L.id);
+  $('lotBox').style.display = 'block';
+  $('lotBox').innerHTML = `<b>Парцел №${L.id}</b> · ${({ center: 'център', mid: 'среден пояс', outer: 'покрайнини' })[L.zone]}<br>
+    Размер ${L.w.toFixed(0)}×${L.d.toFixed(0)} м · завъртян ${Math.round(L.rot * 180 / Math.PI)}°<br>
+    Достъп: ${({ blvd: 'булевард', ring: 'пръстен', street: 'улица', quay: 'кей', road: 'крайбрежен път' })[st.cls]} №${st.id}<br>
+    Допустими: ${L.kinds.map(k => `<span class="k">${k}</span>`).join('')}<br>${b ? '🏢 застроен' + (b.userData.kind ? ' (' + b.userData.kind + ')' : '') : '🟩 свободен — натисни пак за строеж'}`;
+  hl.scale.set(L.w, 1, L.d); hl.rotation.y = L.rot; hl.position.set(L.x, 0.2, L.z); hl.visible = true;
+}
+$('city').onchange = () => show($('city').value);
+$('edges').onchange = () => { view.getObjectByName('lotEdges').visible = $('edges').checked; };
+$('fill').onclick = async () => { const free = P.lots.filter(L => !built.has(L.id)); for (let k = 0; k < 15 && free.length; k++) await build(free.splice((k * 13) % free.length, 1)[0]); };
+$('clear').onclick = () => { for (const o of built.values()) scene.remove(o); built.clear(); };
+// клик: първи — информация за парцела, втори — строеж
+const ray = new THREE.Raycaster(), ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), mp = new THREE.Vector2(), hit = new THREE.Vector3();
+let down = null, sel = null;
+renderer.domElement.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
+  mp.set(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1); ray.setFromCamera(mp, camera);
+  if (!ray.ray.intersectPlane(ground, hit)) return;
+  const L = lotAt(P, hit.x, hit.z);
+  if (!L) { $('lotBox').style.display = 'none'; hl.visible = false; sel = null; return; }
+  if (sel === L.id && !built.has(L.id)) build(L).then(() => lotInfo(L)); else lotInfo(L);
+  sel = L.id;
+});
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+show($('city').value);
+window.__plan = { get P() { return P; }, build: (id, k) => build(P.lots[id], k), built, camera, controls, show, renderer };
+renderer.setAnimationLoop(() => { controls.update(); view?.userData.lod(camera); renderer.render(scene, camera); });
+</script>
+</body>
+</html>
