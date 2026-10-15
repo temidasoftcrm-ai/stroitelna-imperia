@@ -315,6 +315,14 @@ export function makePlan(cityId, opts = {}) {
     { const ctrl = []; for (let k = 0; k < NBd; k += 4) { const [x, z] = bnd[k]; ctrl.push([x * 0.95, z * 0.95]); } add('ring', ctrl, true, { outer: true }); }
   }
 
+  // ---- мегаполис (opts.mega): по-голям град — при радиалните шаблони още пръстени и радиални улици, за да няма празни карета.
+  // Собствен rng: обикновените планове не се променят.
+  if (opts.mega && !['grid', 'lenfant', 'eixample', 'island', 'coastal'].includes(T.tpl)) {
+    const r2 = rng(hashStr(`mega:${cityId}:v${PLAN_V}`)), m = (a, b) => lerp(a, b, r2());
+    for (const f of [0.2, 0.42, 0.67, 0.9]) { const ctrl = [], wp = m(0, TAU); for (let k = 0; k < 18; k++) { const a = k / 18 * TAU, rad = f * R * (1 + 0.05 * Math.sin(3 * a + wp)); ctrl.push([sq.x + Math.cos(a) * rad * sx, sq.z + Math.sin(a) * rad * sz]); } add('street', ctrl, true); }
+    for (let k = 0; k < 22; k++) { const a = k / 22 * TAU + m(-0.05, 0.05), f0 = k % 2 ? 0.45 : 0.22; add('street', [[sq.x + Math.cos(a) * f0 * R * sx, sq.z + Math.sin(a) * f0 * R * sz], [sq.x + Math.cos(a) * 0.98 * R * sx, sq.z + Math.sin(a) * 0.98 * R * sz]]); }
+  }
+
   // --- изрязване: улиците спират във водата (булевардите я пресичат с мост), в планината и под площада
   const keep = (p, st) => {
     if (Math.hypot(p[0] - sq.x, p[1] - sq.z) < sq.r - 1) return false;
@@ -342,14 +350,19 @@ export function makePlan(cityId, opts = {}) {
   const stops = parts.map(() => []);   // [s, възел] по всяка улица
   parts.forEach(st => { st.L = cumLen(st.pts); });
   const bb = parts.map(st => { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of st.pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } return [x0, z0, x1, z1]; });
+  const chunks = parts.map(st => { const o = []; for (let j0 = 1; j0 < st.pts.length; j0 += 8) { const j1 = Math.min(st.pts.length, j0 + 8); let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (let j = j0 - 1; j < j1; j++) { const [x, z] = st.pts[j]; x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } o.push([x0, z0, x1, z1, j0, j1]); } return o; });
   for (let a = 0; a < parts.length; a++) for (let b = a + 1; b < parts.length; b++) {
     const A = parts[a], B = parts[b], ba = bb[a], bq = bb[b];
     if (ba[2] < bq[0] || bq[2] < ba[0] || ba[3] < bq[1] || bq[3] < ba[1]) continue;
-    for (let i = 1; i < A.pts.length; i++) for (let j = 1; j < B.pts.length; j++) {
-      const x = segX(A.pts[i - 1], A.pts[i], B.pts[j - 1], B.pts[j]); if (!x) continue;
+    const CB = chunks[b];
+    for (let i = 1; i < A.pts.length; i++) {
+      const p0 = A.pts[i - 1], p1 = A.pts[i], sx0 = Math.min(p0[0], p1[0]), sx1 = Math.max(p0[0], p1[0]), sz0 = Math.min(p0[1], p1[1]), sz1 = Math.max(p0[1], p1[1]);
+      for (const c of CB) { if (c[2] < sx0 || sx1 < c[0] || c[3] < sz0 || sz1 < c[1]) continue;   // участъци по 8 отсечки: същият ред на j, без изпитване на далечните
+      for (let j = c[4]; j < c[5]; j++) {
+      const x = segX(p0, p1, B.pts[j - 1], B.pts[j]); if (!x) continue;
       const px = lerp(A.pts[i - 1][0], A.pts[i][0], x[0]), pz = lerp(A.pts[i - 1][1], A.pts[i][1], x[0]), n = nodeAt(px, pz);
       stops[a].push([lerp(A.L[i - 1], A.L[i], x[0]), n]); stops[b].push([lerp(B.L[j - 1], B.L[j], x[1]), n]);
-    }
+    } } }
   }
   parts.forEach((st, a) => {   // краищата: до площада, до друга улица (Т-кръстовище) или задънени
     for (const end of [0, st.pts.length - 1]) {
@@ -433,7 +446,7 @@ export function makePlan(cityId, opts = {}) {
   P.lots = cand;
   // градът трябва да побере поне колкото парцела има мрежата 9×9 (+ купените квартали) — иначе по-голям радиус
   const need = opts.minLots ?? 81;
-  if (cand.length < need && R < 300) { const Q = makePlan(cityId, { ...opts, R: Math.round(R * 1.08) }); cache.set(key, Q); return Q; }
+  if (cand.length < need && R < (opts.mega ? 520 : 300)) { const Q = makePlan(cityId, { ...opts, R: Math.round(R * 1.08) }); cache.set(key, Q); return Q; }
   cache.set(key, P);
   while (cache.size > 12) cache.delete(cache.keys().next().value);   // паметта: само последните планове
   return P;

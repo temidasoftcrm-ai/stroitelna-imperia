@@ -80,7 +80,7 @@ import { createConquest } from './conquest.js';
 import { createMapLayers } from './maplayers.js';
 import { applyRoadLook, makeCrosswalks } from './roadlook.js';
 // градски планове: извити улици и парцели покрай тях (cityplan*.js) — само за градовете в S.plans; другите са на мрежата 9×9
-import { gamePlan, planLots, planTiles } from './cityplangame.js';
+import { gamePlan, planLots, planTiles, planCount } from './cityplangame.js';
 import { buildPlanView } from './cityplan3d.js';
 import { sampleCurve } from './cityplan.js';
 import { planRoute, randomRoadPoint } from './cityplanroute.js';
@@ -522,8 +522,8 @@ const city = { group: null, lots: [], hq: null };
 // град с план: парцелите са завъртени към улицата (lot.rot) и с различен размер; пътищата са по улиците на плана
 // кои градове са с план: новите игри (S.planAll) и старите тестови (S.plans); малките (Перник, Печ…), мегаполисите,
 // „Твоят град“ и градовете с голяма забележителност (Капитолият, Луксор) остават на мрежата
-const planOn = id => !!(S && (S.planAll || (S.plans && S.plans[id])) && cityTier(id) !== 's' && !MEGAPOLIS.has(id) && id !== NEOM_ID && !BIG_LANDMARKS[id]);
-const planOf = id => planOn(id) ? gamePlan(id, { landmark: !!CITY_LANDMARKS[id], seaside: SEASIDE.includes(id) }) : null;
+const planOn = id => !!(S && (S.planAll || (S.plans && S.plans[id])) && cityTier(id) !== 's' && (!MEGAPOLIS.has(id) || S.planAll >= 2) && id !== NEOM_ID && !BIG_LANDMARKS[id]);   // мегаполисите — от planAll 2 (по-старите нови игри ги държат на мрежата)
+const planOf = id => planOn(id) ? gamePlan(id, { landmark: !!CITY_LANDMARKS[id], seaside: SEASIDE.includes(id), mega: MEGAPOLIS.has(id) }) : null;
 // план: пътища от най-близкия край на булевард до гарата (запад), входа на летището (изток) и магистралата (юг) — само за изгледа
 // (маршрутите на техниката са по улиците на плана; тези пътища водят до сградите извън града)
 function planLinks(P) {
@@ -707,12 +707,13 @@ function buildCity(cityId) {
   migrateMegaLots(cityId);
   if (MEGAPOLIS.has(cityId) && S.extBig == null) S.extBig = S.cityExt || 0;   // всички вече купени квартали са големите
   setCityExt(S.cityExt || 0, MEGAPOLIS.has(cityId) ? MEGA_BASE : 0);
-  const P = city.plan = MEGAPOLIS.has(cityId) ? null : planOf(cityId);
+  const P = city.plan = planOf(cityId);
+  if (P && megaBase) NI = NJ = 3 * NB + 1;   // мегаполис с план: размерите са от плана, не от спиралата от квартали
   if (P) { const [ti, tj] = planTiles(P, TILE); NI = Math.max(NI, ti); NJ = Math.max(NJ, tj); }   // гарата, магистралата и летището се отдръпват до края на плана
   // земя (при мегаполисите — по-широка на изток)
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(Math.max(1200, 2 * (tx(NI - 1) + 380)), Math.max(1200, 2 * (tx(NJ - 1) + 300))), new THREE.MeshStandardMaterial({ color: isDesert(cityId) ? 0xd9bf86 : 0x8fb36a, roughness: 1 }));   // Африка — пясък
   if (P && !P.links) P.links = planLinks(P);   // и в мрежата на маршрутите (cityplanroute.js) — ТИР-овете и техниката карат по тях
-  const pv = P ? buildPlanView({ ...P, streets: [...P.streets, ...P.links] }, { size: Math.max(1600, 2 * (tx(NI - 1) + 400)), seg: 170, target: controls.target, lotCount: Math.min(P.lots.length, 81 + 9 * (S.cityExt || 0)),
+  const pv = P ? buildPlanView({ ...P, streets: [...P.streets, ...P.links] }, { size: Math.max(1600, 2 * (tx(NI - 1) + 400)), seg: 170, target: controls.target, lotCount: Math.min(P.lots.length, planCount(P.mega, S.cityExt || 0)),
     seaZ: SEASIDE.includes(cityId) ? tx(0) - TILE / 2 - 2 : null, noFountain: !!CITY_LANDMARKS[cityId] }) : null;
   weather.setGround(pv ? pv.userData.groundMat : ground.material);   // снежната покривка оцветява земята
   // крайбрежните градове: море на север с плаж, пристанище, фар и кораби (seaside.js)
@@ -1873,7 +1874,7 @@ const projects = [];   // активните обекти (огледало на
 function newGame(cityId, brand = null) {
   pruneCities(null);
   S = { v: 1, brand, cityId, hqCity: cityId, cities: {}, day: 1, dayT: 0, rep: 0, cash: [], officeLevel: 1, garageLevel: 1, garageLot: null, whLevel: 0, whLot: null, cityExt: AUTOTEST ? +params.get('ext') || 0 : 0, rails: [], trains: [], jobs: [], econ: ECON.newEconState(), units: [...ECON.START.units], projects: [], offers: [], built: [], done: 0, seq: 1 };
-  if (params.has('plan') ? params.get('plan') === '1' : !AUTOTEST) S.planAll = 1;   // нова игра — средните и големите градове с план (извити улици); старите записи остават на мрежата   // нов град с план (извити улици); старите записи остават на мрежата
+  if (params.has('plan') ? params.get('plan') === '1' : !AUTOTEST) S.planAll = 2;   // нова игра — средните и големите градове с план (извити улици); старите записи остават на мрежата   // нов град с план (извити улици); старите записи остават на мрежата
   enterCity();
   S.projects = projects;
   for (let k = 0; k < 3; k++) makeOffer();
