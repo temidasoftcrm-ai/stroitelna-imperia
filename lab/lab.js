@@ -14,6 +14,11 @@ const SCENES = [
   ['vienna', 'Виена', 'стар град в пръстен'], ['amsterdam', 'Амстердам', 'полукръгли канали'], ['barcelona', 'Барселона', 'блокове и „Диагонал“'],
   ['chicago', 'Чикаго', 'правоъгълна мрежа'], ['washington', 'Вашингтон', 'Капитолият + Белият дом'], ['moscow', 'Москва', 'мегаполис · МГУ'],
   ['paris', 'Париж', 'мегаполис · Айфеловата кула'], ['newyork', 'Ню Йорк', 'мегаполис · Манхатън'], ['istanbul', 'Истанбул', 'мегаполис · джамията'],
+  ['rome', 'Рим', 'мегаполис · Колизеума'], ['london', 'Лондон', 'мегаполис · Биг Бен, река'], ['berlin', 'Берлин', 'мегаполис · Бранденбургската врата'],
+  ['madrid', 'Мадрид', 'мегаполис'], ['milan', 'Милано', 'мегаполис'], ['tokyo', 'Токио', 'мегаполис · море'], ['beijing', 'Пекин', 'мегаполис · звезда с пръстени'],
+  ['losangeles', 'Лос Анджелис', 'мегаполис · мрежа'], ['buenosaires', 'Буенос Айрес', 'мегаполис · мрежа'], ['rio', 'Рио де Жанейро', 'мегаполис · Христос Спасителя'],
+  ['cairo', 'Кайро', 'мегаполис · пирамидите'], ['sydney', 'Сидни', 'Операта'], ['toronto', 'Торонто', 'мрежа · Си Ен Тауър'], ['prague', 'Прага', 'стар град в пръстен'],
+  ['budapest', 'Будапеща', 'река'], ['athens', 'Атина', 'море'], ['bucharest', 'Букурещ', ''], ['stpetersburg', 'Санкт Петербург', 'канали'],
   ['lasvegas', 'Лас Вегас', 'Луксор + Беладжо'], ['dubai', 'Дубай', 'Бурж Халифа'], ['pernik', 'Перник', 'малък град — старата мрежа 9×9'],
 ];
 // дебъг входове: адрес + действие след зареждане (__dbg в рамката — същият origin)
@@ -53,7 +58,13 @@ function render() {
   ({ review: renderReview, scenes: renderScenes, models: renderModels, sounds: renderSounds, demos: renderDemos })[state.tab]?.();
 }
 const row = (on, title, sub, attr) => `<button class="row ${on ? 'on' : ''}" ${attr}>${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}</button>`;
-function sideNav(html) { $('side').innerHTML = `<nav>${html}</nav>`; }
+// списъкът вляво пази докъде е превъртян (иначе след клик на 20-ия ред скача пак на 1-ви)
+const navScroll = {};
+function sideNav(html) {
+  const old = $('side').querySelector('nav'); if (old) navScroll[old.dataset.tab] = old.scrollTop;
+  $('side').innerHTML = `<nav data-tab="${state.tab}">${html}</nav>`;
+  const nv = $('side').querySelector('nav'); nv.scrollTop = navScroll[state.tab] || 0; nv.onscroll = () => { navScroll[state.tab] = nv.scrollTop; };
+}
 
 // ---- рамка с играта (+ лентата горе вдясно)
 function frame(src, target, after) {
@@ -163,6 +174,7 @@ async function renderModels() {
 }
 function listModels() {
   const el = $('mlist'); if (!el || !models) return;
+  const st = el.scrollTop || navScroll.models || 0; el.onscroll = () => { navScroll.models = el.scrollTop; };
   $('q').placeholder = `Търси (${models.length} модела)…`;
   const groups = new Map();
   for (const e of models) {
@@ -177,6 +189,7 @@ function listModels() {
     return `<button class="mrow ${state.item === e.path ? 'on' : st}" data-m="${esc(e.path)}"><span>${ico[st] || ''}${esc(e.path.split('/').pop().replace(/\.glb$/, ''))}</span><span>${kb(e.size)}</span></button>`;
   }).join('')).join('');
   el.querySelectorAll('[data-m]').forEach(b => b.onclick = () => pick('models', b.dataset.m));
+  el.scrollTop = st;
 }
 function modelBar(url) {
   const reviewed = mstatus.status[url]?.state === 'reviewed';
