@@ -148,10 +148,10 @@ function openSettings(h) {
 }
 const pplHtml = L => L.length ? L.map(p => `<div>${p.me ? '🟢' : '🟡'} <b>${esc(p.name || 'Играч')}</b>${p.me ? ' (ти)' : ''} <span style="color:var(--mut)">· ${esc(p.city || '')}${p.day ? ` · ден ${p.day}` : ''}</span></div>`).join('') : '<span style="color:var(--mut)">Свързвам се…</span>';
 // изтриване: пишеш ИЗТРИЙ, за да няма случайно натискане
-function confirmWipe(account) {
-  const el = dlg(`<h2 style="font-size:19px;color:var(--bad)">${account ? '❌ Изтрий акаунта' : '🗑️ Изтрий данните'}</h2>
+function confirmWipe(account, fresh = false) {   // fresh — „🆕 Нова игра“ от картата: същото изтриване, друго заглавие
+  const el = dlg(`<h2 style="font-size:19px;color:var(--bad)">${account ? '❌ Изтрий акаунта' : fresh ? '🆕 Нова игра — изтрива всичко' : '🗑️ Изтрий данните'}</h2>
     <p style="color:var(--mut);font-size:14px;line-height:1.5">${account ? `Акаунтът <b style="color:var(--txt)">${esc(user?.email)}</b>, записите в облака и партньорството се изтриват <b>завинаги</b>. Играта на това устройство също се изтрива.`
-      : `Всички записи (3-те слота), автозаписите и настройките на това устройство${user ? ' — и записите в облака' : ''} се изтриват <b>завинаги</b>. Играта започва отначало.${user ? ' Акаунтът остава.' : ''}`}<br><br>Напиши <b style="color:var(--txt)">ИЗТРИЙ</b>, за да потвърдиш:</p>
+      : `Всички записи (3-те слота), автозаписите и настройките на това устройство${user ? ' — и <b style="color:var(--txt)">всичко твое в облака</b>: записите и онлайн империята; от партньорството излизаш (то остава за партньора ти)' : ''} се изтриват <b>завинаги</b>. Играта започва отначало.${user ? ' Акаунтът остава.' : ' (Ако имаш записи в облака, влез в акаунта, за да се изтрият и те.)'}`}<br><br>Напиши <b style="color:var(--txt)">ИЗТРИЙ</b>, за да потвърдиш:</p>
     <input id="stConf" autocomplete="off" style="width:100%;padding:11px;border-radius:9px;border:1px solid var(--line);background:#0f141c;color:var(--txt);font-size:16px;text-transform:uppercase">
     <div id="stMsg" style="font-size:13px;color:var(--bad)"></div>`,
     [['Отказ', null], [account ? '❌ Изтрий акаунта' : '🗑️ Изтрий', () => {
@@ -272,6 +272,7 @@ sb.auth.onAuthStateChange((ev, session) => {
   if (user && (!was || was.id !== user.id)) syncAll(true);
 });
 window.__settings = openSettings;
+window.__wipeAll = () => confirmWipe(false, true);   // „🆕 Нова игра“ на картата (game.js)
 if (!AUTOTEST) {
   presStart();
   setInterval(() => syncAll(false), 20000);

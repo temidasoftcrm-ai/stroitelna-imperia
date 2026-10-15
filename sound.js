@@ -97,7 +97,8 @@ export const Sound = {
         [2093, 2637, 3136, 4186].forEach((f, i) => this.bell(f, 2.05 + i * 0.12, 0.05)); break; }
       case 'airport': this.tone(220, 1.6, 0.06, 'sawtooth', 880); this.hit(3000, 1.2, 0.05, 0.6, 0.1); this.bell(1319, 1.1, 0.08); this.bell(1760, 1.3, 0.06); break;   // летище — излитане и сигнал
       case 'plane': this.file('assets/sfx/plane.mp3', 0.7); break;   // самолет излита (записан звук, Pixabay)
-      case 'ship': [131, 165].forEach(f => this.tone(f, 1.6, 0.08, 'sawtooth')); break;   // корабна сирена
+      case 'ship': this.file('assets/sfx/ship-horn.mp3', 0.7); break;   // купен кораб — корабна сирена (записан звук, 10 s)
+      case 'truckBuy': this.file('assets/sfx/truck-horn.mp3', 0.7); break;   // купен камион/ТИР — клаксон (записан звук)
       case 'quest': [1047, 1319, 1568, 2093].forEach((f, i) => T(f, i * 0.06, 0.25, 0.08)); break;
       default: return false;
     }

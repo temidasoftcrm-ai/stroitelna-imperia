@@ -7,3 +7,5 @@ newyork.mp3 — „Manhattan traffic 2, New York City 1994“ (jonathanslattermu
 istanbul.mp3 — „park Istanbul“ (freesound_community, Pixabay, sound 60643), Pixabay Content License. 30 s цикъл, моно 56 kbps.
 istanbul-prayer.mp3 — „man praying, Istanbul“ (freesound_community, Pixabay, sound 17731), Pixabay Content License. 85 s цикъл, моно 56 kbps, на заден план (30%).
 lasvegas.mp3 — „KLUC montage 1 edit“ (freesound_community, Pixabay, sound 22919), Pixabay Content License. 82 s цикъл, моно 56 kbps.
+truck-horn.mp3 — „truck signal“ (audiopapkin, Pixabay, sound 298077), Pixabay Content License. Моно 80 kbps.
+ship-horn.mp3 — „boat horn“ (freesound_community, Pixabay, sound 6204), Pixabay Content License. Първите 10 s, моно 80 kbps.
