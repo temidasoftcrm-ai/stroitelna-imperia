@@ -531,9 +531,10 @@ function planLinks(P) {
   for (const st of P.streets) { if (st.cls === 'quay') continue; for (const p of st.pts) all.push(p); if (!st.closed && st.cls === 'blvd') for (const k of [0, st.pts.length - 1]) { const q = st.pts[k], r = st.pts[k ? k - 1 : 1]; ends.push({ p: q, dx: q[0] - r[0], dz: q[1] - r[1] }); } }
   const d2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2;
   const link = (t, ax, az, south) => {   // t — целта; (ax, az) — откъде влиза пътят в нея
-    let best = null; for (const e of ends) { const d = d2(e.p, t); if (!best || d < best.d) best = { ...e, d }; }
+    // краят на булевард трябва да гледа към целта (иначе пътят прави примка); оценка = разстояние × (2 − cos)
+    let best = null; for (const e of ends) { const d = d2(e.p, t), D = Math.sqrt(d) || 1, l = Math.hypot(e.dx, e.dz) || 1, cos = (e.dx * (t[0] - e.p[0]) + e.dz * (t[1] - e.p[1])) / (l * D); if (cos < 0.6) continue; const sc = D * (2 - cos); if (!best || sc < best.sc) best = { ...e, d, sc }; }
     let near = all[0]; for (const p of all) if (d2(p, t) < d2(near, t)) near = p;
-    const useEnd = best && Math.sqrt(best.d) < Math.sqrt(d2(near, t)) + 60, a = useEnd ? best.p : near;
+    const useEnd = best && Math.sqrt(best.d) < Math.sqrt(d2(near, t)) + 25, a = useEnd ? best.p : near;
     if (south) t = [a[0], t[1]];
     const D = Math.sqrt(d2(a, t)); if (D < 4) return null;
     const l = Math.hypot(useEnd ? best.dx : t[0] - a[0], useEnd ? best.dz : t[1] - a[1]) || 1, k = Math.min(25, D / 3);
