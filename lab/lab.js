@@ -49,7 +49,7 @@ function render() {
   $('tabs').innerHTML = [['review', `Ново${pending ? ` (${pending})` : ''}`], ['scenes', 'Сцени'], ['models', '3D модели'], ['sounds', 'Звуци'], ['demos', 'Мисии/демо']]
     .map(([t, l]) => `<button data-tab="${t}" class="${state.tab === t ? 'on' : ''}">${l}</button>`).join('');
   $('tabs').querySelectorAll('[data-tab]').forEach(b => b.onclick = () => pick(b.dataset.tab));
-  if (state.tab !== 'models') closeModel();
+  if (state.tab !== 'models' && state.tab !== 'review') closeModel();
   ({ review: renderReview, scenes: renderScenes, models: renderModels, sounds: renderSounds, demos: renderDemos })[state.tab]?.();
 }
 const row = (on, title, sub, attr) => `<button class="row ${on ? 'on' : ''}" ${attr}>${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}</button>`;
@@ -98,14 +98,25 @@ function renderReview() {
   if ($('bDone')) $('bDone').onclick = () => { showDone = !showDone; render(); };
   const f = FEATURES.find(x => x.id === state.item);
   if (!f) { $('main').innerHTML = `<div class="empty">Новото чака проверка: избери отляво, пробвай и натисни „✓ OK“ — тогава влиза в играта.</div>`; return; }
-  if (f.url.startsWith('#')) { location.hash = f.url.slice(1); return; }   // напр. #tab=models&item=… — модел за сравнение
-  frame(f.url, `Ново: ${f.title} (${f.id})`);
+  const fh = f.url.startsWith('#') ? new URLSearchParams(f.url.slice(1)) : null, mUrl = fh && fh.get('tab') === 'models' ? fh.get('item') : null, sUrl = fh && fh.get('tab') === 'sounds' ? fh.get('item') : null;
+  if (sUrl) {   // нов звук: пуска се тук, с „✓ OK“ отдолу
+    closeModel();
+    $('main').innerHTML = `<div class="snd"><h2>${esc(sUrl.replace(/^s:/, ''))}</h2><small style="color:var(--mut)">${sUrl.startsWith('s:') ? 'синтезиран в sound.js — новата версия' : esc(sUrl)}</small><button class="btn ok" id="bPlay">▶ Пусни</button></div><div class="bar" id="bar"></div>`;
+    bar(`Ново: ${f.title} (${f.id})`);
+    $('bPlay').onclick = () => play(sUrl);
+  } else if (mUrl) {   // нов модел: показва се тук, в „Ново“ (с „✓ OK“) — не в „3D модели“, където „Одобри“ е само „прегледан“
+    $('main').innerHTML = `<div id="view" style="position:absolute;inset:0"></div><div class="bar" id="bar"></div>`;
+    bar(`Ново: ${f.title} (${f.id})`, [`<button class="btn" id="bWire">Мрежа</button>`, `<button class="btn" id="bBg">Светъл фон</button>`]);
+    openModel($('view'), mUrl);
+  } else if (!fh) { closeModel(); frame(f.url, `Ново: ${f.title} (${f.id})`); }
+  else { location.hash = f.url.slice(1); return; }   // друг раздел на Лабораторията
   const box = document.createElement('div'); box.className = 'feat';
   const on = approved.includes(f.id);
   box.innerHTML = `<div><b>${esc(f.title)}</b><div>${esc(f.how)}</div></div>${on ? `<button class="btn" id="bApp">↩ Махни от играта</button>` : `<button class="btn ok" id="bApp">✓ OK — в играта</button>`}`;
   $('main').appendChild(box);
   $('bApp').onclick = () => post('/__lab/approved', { id: f.id, ok: !on }).then(j => {
     approved = j.approved;
+    if (!on && mUrl) post('/__lab/feedback', { target: `Модел: ${mUrl}`, kind: 'reviewed', text: '' }).catch(() => { });   // и в „3D модели“ — като одобрен
     if (!on && !showDone) { const nx = FEATURES.find(x => !approved.includes(x.id)); pick('review', nx ? nx.id : ''); } else render();
   });
 }
@@ -129,7 +140,7 @@ function renderDemos() {
 }
 
 // ---- 3D модели
-let models = null, mstatus = { status: {}, hidden: [] }, q = '', hideOk = (() => { try { return localStorage.getItem('lab.hideReviewed') === '1'; } catch { return false; } })(), stTimer = 0;
+let models = null, mstatus = { status: {}, hidden: [] }, q = '', hideOk = (() => { try { return localStorage.getItem('lab.hideReviewed') !== '0'; } catch { return true; } })(), stTimer = 0;
 async function renderModels() {
   $('side').innerHTML = `<input class="q" id="q" placeholder="Търси…" value="${esc(q)}"><label class="chk"><input type="checkbox" id="hideOk" ${hideOk ? 'checked' : ''}> Скрий одобрените</label><nav id="mlist"></nav>`;
   $('q').oninput = e => { q = e.target.value; listModels(); };
@@ -149,7 +160,7 @@ function listModels() {
   const groups = new Map();
   for (const e of models) {
     if (mstatus.hidden.includes(e.path)) continue;
-    if (hideOk && mstatus.status[e.path]?.state === 'reviewed') continue;
+    if (hideOk && ['reviewed', 'done'].includes(mstatus.status[e.path]?.state)) continue;
     if (q && !e.path.toLowerCase().includes(q.toLowerCase())) continue;
     const dir = e.path.split('/').slice(2, -1).join('/') || '·'; if (!groups.has(dir)) groups.set(dir, []); groups.get(dir).push(e);
   }
@@ -167,7 +178,9 @@ function modelBar(url) {
     `<button class="btn red" id="bRep" title="Claude ще намери по-хубав подобен модел (CC0/CC BY), ще го сложи в Лабораторията и ще махне този">🗑 Изтрий и намери нов</button>`,
     `<span style="position:relative" id="delWrap"><button class="btn" id="bDel" style="color:#fca5a5">🗑 Изтрий</button></span>`,
     `<button class="btn" id="bWire">Мрежа</button>`, `<button class="btn" id="bBg">Светъл фон</button>`]);
-  $('bRev').onclick = () => post('/__lab/feedback', { target: `Модел: ${url}`, kind: 'reviewed', text: '' }).then(() => { $('bRev').textContent = '✓ Одобрен'; $('bRev').className = 'btn dim'; $('bRev').disabled = true; });
+  $('bRev').onclick = () => post('/__lab/feedback', { target: `Модел: ${url}`, kind: 'reviewed', text: '' }).then(async () => {
+    // моделът чака подмяна (replacements.json) — „Одобри“ тук = „✓ OK“ в „Ново“: новият файл влиза в играта
+    try { const reps = await (await fetch('/lab/replacements.json?x=' + Date.now())).json(); const id = Object.keys(reps).find(k => reps[k].from === url); if (id) await post('/__lab/approved', { id, ok: true }); } catch (e) {} $('bRev').textContent = '✓ Одобрен'; $('bRev').className = 'btn dim'; $('bRev').disabled = true; });
   $('bRep').onclick = () => post('/__lab/feedback', { target: `Модел: ${url}`, kind: 'replace', text: 'Изтрий и намери нов подобен модел' }).then(() => { $('bRep').textContent = '✓ Claude търси нов'; $('bRep').disabled = true; });
   $('bDel').onclick = () => {
     $('delWrap').innerHTML = `<button class="btn red" id="bYes">Да, изтрий окончателно</button> <button class="btn" id="bNo">Не</button>`;
