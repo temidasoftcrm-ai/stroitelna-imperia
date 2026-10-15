@@ -68,7 +68,7 @@ export function buildPlanView(P, opts = {}) {
     col[3 * i] = c.r; col[3 * i + 1] = c.g; col[3 * i + 2] = c.b;
   }
   tg.setAttribute('color', new THREE.BufferAttribute(col, 3)); tg.computeVertexNormals();
-  const terrain = new THREE.Mesh(tg, M.terrain); terrain.receiveShadow = true; terrain.name = 'terrain'; g.add(terrain);
+  const terrain = new THREE.Mesh(tg, M.terrain); g.userData.groundMat = M.terrain; terrain.receiveShadow = true; terrain.name = 'terrain'; g.add(terrain);
   if (P.tpl === 'coastal' || P.tpl === 'river' || P.tpl === 'island') {
     const wg = new THREE.PlaneGeometry(S, S); wg.rotateX(-Math.PI / 2);
     const water = new THREE.Mesh(wg, M.water); water.position.y = -0.6; water.name = 'water'; g.add(water);
@@ -128,7 +128,7 @@ export function buildPlanView(P, opts = {}) {
     const s = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 4, 10), M.stone); s.position.set(sq.x, 2.2, sq.z); g.add(s); }
   // --- парцели: светли площадки (цвят по зона), очертания отблизо
   const lp = [[], [], []], le = [], zc = { center: new THREE.Color(0xc9c1ad), mid: new THREE.Color(0xb7bd98), outer: new THREE.Color(0xa3b97f) };
-  for (const L of P.lots) {
+  for (const L of P.lots.slice(0, opts.lotCount ?? P.lots.length)) {   // в играта — само купените (ядро + кварталите)
     const cs = rectCorners(L.x, L.z, L.w / 2, L.d / 2, L.rot), b = lp[0].length / 3, cc = zc[L.zone];
     for (const p of cs) { lp[0].push(p[0], 0.04, p[1]); lp[2].push(cc.r, cc.g, cc.b); }
     lp[1].push(b, b + 2, b + 1, b, b + 3, b + 2);
@@ -147,11 +147,12 @@ export function buildPlanView(P, opts = {}) {
   const head = new THREE.InstancedMesh(new THREE.SphereGeometry(0.42, 8, 6), M.lamp, lampAt.length), m4 = new THREE.Matrix4();
   lampAt.forEach(([x, z], i) => { pole.setMatrixAt(i, m4.makeTranslation(x, 3, z)); head.setMatrixAt(i, m4.makeTranslation(x, 6.1, z)); });
   detail.add(pole, head);
+  g.userData.lamps = lampAt.filter((_, i) => i % Math.ceil(lampAt.length / 160) === 0).map(([x, z]) => ({ x, y: 6.1, z }));   // светлините нощем (daynight.js) — до 160
   // --- дървета: в града (около площада, празните кътчета) и гори по хълмовете — общи инстанции
   const trees = [], rnd = (() => { let s = 1234567; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
   for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; trees.push([sq.x + Math.cos(a) * (sq.r - 2.5), sq.z + Math.sin(a) * (sq.r - 2.5), 0.9, 0]); }
   const roadNear = (x, z, pad) => P.streets.some(st => st.pts.some((p, i) => i % 2 === 0 && Math.abs(p[0] - x) < st.w / 2 + pad && Math.abs(p[1] - z) < st.w / 2 + pad));
-  const lotNear = (x, z) => P.lots.some(L => Math.abs(L.x - x) < 14 && Math.abs(L.z - z) < 14);
+  const lotNear = (x, z) => P.lots.slice(0, opts.lotCount ?? P.lots.length).some(L => Math.abs(L.x - x) < 14 && Math.abs(L.z - z) < 14);
   for (let k = 0; k < (opts.trees || 2200); k++) {
     const x = (rnd() - 0.5) * S * 0.8, z = (rnd() - 0.5) * S * 0.8, h = P.heightAt(x, z);
     if (P.waterAt(x, z) || h > 55) continue;

@@ -130,8 +130,8 @@ export function makePlan(cityId, opts = {}) {
     landPad = (x, z) => { const [u, v] = toUV(x, z); return Math.abs(v - bend(u)) < half(u) - 3; };
   }
   if (T.tpl === 'mountain') {   // планина от едната страна (извън града)
-    const a0 = rr(0, TAU);
-    for (let k = 0; k < 7; k++) { const a = a0 + rr(-0.8, 0.8), d = rr(1.55, 1.95) * R; P.hills.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, s: rr(40, 60), h: rr(35, 75) }); }
+    const a0 = opts.game ? -Math.PI / 2 + rr(-0.2, 0.2) : rr(0, TAU), spread = opts.game ? 0.35 : 0.8;   // в играта — на север (на запад е гарата, на юг магистралата, на изток летището)
+    for (let k = 0; k < 7; k++) { const a = a0 + rr(-spread, spread), d = rr(1.55, 1.95) * R; P.hills.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, s: rr(40, 60), h: rr(35, 75) }); }
     P.mountainDir = a0;
   }
   if (T.hills) for (let k = 0; k < T.hills; k++) {   // хълмове между кварталите (Рио)
@@ -163,7 +163,7 @@ export function makePlan(cityId, opts = {}) {
   P.heightAt = (x, z) => {   // релеф: равно в града, хълмове и леки вълни отвън, дъно под водата
     if (waterAt(x, z)) return -3;
     let h = hillH(x, z);
-    if (!inCity(x, z)) { const d = polyDist([x, z], bnd); h += smooth(10, 90, d) * (2.2 + 1.8 * Math.sin(x / 47 + ph[2]) * Math.cos(z / 53 + ph[0])); }
+    if (!inCity(x, z) && !opts.game) { const d = polyDist([x, z], bnd); h += smooth(10, 90, d) * (2.2 + 1.8 * Math.sin(x / 47 + ph[2]) * Math.cos(z / 53 + ph[0])); }
     if (T.tpl === 'coastal' && !waterAt(x, z)) h *= smooth(0, 20, z - P.coastZ(x));
     if (T.tpl === 'river') h *= smooth(10, 26, Math.abs(z - P.riverZ(x)));
     return h;
@@ -178,7 +178,7 @@ export function makePlan(cityId, opts = {}) {
     for (let k = 0; k < nR; k++) ang.push(a0 + k * TAU / nR + rr(-0.18, 0.18));
     for (const a of ang) {   // радиални булеварди — от площада навън, с плавни завои; извън града продължават като шосе
       const ctrl = [[sq.x, sq.z]];
-      for (const [f, b] of [[0.42, rr(-0.14, 0.14)], [0.85, rr(-0.12, 0.12)], [1.35, rr(-0.1, 0.1)], [2.6, 0]]) ctrl.push([sq.x + Math.cos(a + b) * f * R * sx, sq.z + Math.sin(a + b) * f * R]);
+      for (const [f, b] of [[0.42, rr(-0.14, 0.14)], [0.85, rr(-0.12, 0.12)], [1.35, rr(-0.1, 0.1)], [opts.game ? 1.5 : 2.6, 0]]) ctrl.push([sq.x + Math.cos(a + b) * f * R * sx, sq.z + Math.sin(a + b) * f * R]);
       add('blvd', ctrl, false, { radial: true });
     }
     const ring = (f, cls, wob) => {   // пръстен с вълни
@@ -380,4 +380,17 @@ export function validatePlan(P) {
   const used = new Set(P.edges.flatMap(e => [e.a, e.b]));
   if ([...used].some(n => n >= P.nodes.length)) bad.push(['badNode']);
   return bad;
+}
+
+// същият план, преместен с (ox, oz) — за играта (градът започва там, където беше мрежата 9×9)
+export function shiftPlan(P, ox, oz) {
+  const mv = ([x, z]) => [x + ox, z + oz];
+  const Q = { ...P, ox, oz, boundary: P.boundary.map(mv), square: { ...P.square, x: P.square.x + ox, z: P.square.z + oz },
+    hills: P.hills.map(h => ({ ...h, x: h.x + ox, z: h.z + oz })),
+    streets: P.streets.map(st => ({ ...st, pts: st.pts.map(mv) })), nodes: P.nodes.map(n => ({ ...n, x: n.x + ox, z: n.z + oz })),
+    lots: P.lots.map(L => ({ ...L, x: Math.round((L.x + ox) * 100) / 100, z: Math.round((L.z + oz) * 100) / 100 })),
+    heightAt: (x, z) => P.heightAt(x - ox, z - oz), waterAt: (x, z) => P.waterAt(x - ox, z - oz), buildable: (x, z) => P.buildable(x - ox, z - oz) };
+  if (P.coastZ) Q.coastZ = x => P.coastZ(x - ox) + oz;
+  if (P.riverZ) Q.riverZ = x => P.riverZ(x - ox) + oz;
+  return Q;
 }
