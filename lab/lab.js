@@ -109,7 +109,14 @@ function renderReview() {
     bar(`Ново: ${f.title} (${f.id})`, [`<button class="btn" id="bWire">Мрежа</button>`, `<button class="btn" id="bBg">Светъл фон</button>`]);
     openModel($('view'), mUrl);
   } else if (!fh) { closeModel(); frame(f.url, `Ново: ${f.title} (${f.id})`); }
-  else { location.hash = f.url.slice(1); return; }   // друг раздел на Лабораторията
+  else {   // демо или сцена от другите раздели — също тук, за да е до „✓ OK“
+    closeModel();
+    const it = fh.get('item') || '', tb = fh.get('tab');
+    if (tb === 'demos' && /^d\d+$/.test(it) && DEMOS[+it.slice(1)]) { const [, c, fn] = DEMOS[+it.slice(1)]; frame(`${GAME}&plan=1&city=${c}`, `Ново: ${f.title} (${f.id})`, fn); }
+    else if (tb === 'demos' && it) frame(it, `Ново: ${f.title} (${f.id})`);
+    else if (tb === 'scenes' && it) frame(`${GAME}&plan=1&city=${it}`, `Ново: ${f.title} (${f.id})`);
+    else { location.hash = f.url.slice(1); return; }
+  }
   const box = document.createElement('div'); box.className = 'feat';
   const on = approved.includes(f.id);
   box.innerHTML = `<div><b>${esc(f.title)}</b><div>${esc(f.how)}</div></div>${on ? `<button class="btn" id="bApp">↩ Махни от играта</button>` : `<button class="btn ok" id="bApp">✓ OK — в играта</button>`}`;
