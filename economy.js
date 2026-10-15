@@ -731,9 +731,13 @@ export class Economy {
       const n = Math.round(f.daily * f.share / (f.share0 || (f.share0 = f.share)) * this.maintOf(f) * (this.hooks.incomeMul ? this.hooks.incomeMul(id) : 1));
       f.earned += n; tot += n;
       // в известието поименно само столиците; останалите — сбор накрая
-      if (!this.hooks.isCapital || this.hooks.isCapital(id)) parts.push(`${(this.hooks.cityName && this.hooks.cityName(id)) || id} +${fmt(n)}`);
+      if (!this.hooks.isCapital || this.hooks.isCapital(id)) parts.push([n, `${(this.hooks.cityName && this.hooks.cityName(id)) || id} +${fmt(n)}`]);
       else { restN++; restSum += n; }
     }
+    // най-доходните 8 столици; другите столици отиват при „още N града“
+    parts.sort((a, b) => b[0] - a[0]);
+    for (const [n] of parts.splice(8)) { restN++; restSum += n; }
+    parts.forEach((x, k) => parts[k] = x[1]);
     if (restN) parts.push(`още ${restN} ${restN === 1 ? 'град' : 'града'} +${fmt(restSum)}`);
     // известие веднъж на ден: колко донесоха завършените градове
     if (tot && this.hooks.toast) this.hooks.toast(`🏁 Завършени градове: +${fmt(tot - upkeep)} днес (${parts.join(', ')}${upkeep ? `, поддръжка −${fmt(upkeep)}` : ''})`, 'good');
