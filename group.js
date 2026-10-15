@@ -1,6 +1,6 @@
-// group.js — корпоративната група: при старта избираш една от 5 фирми; с всеки нов бизнес се основава дъщерно дружество
-// („Титан Рейл“, „Титан Скай Еър“…). Старите дъщерни продължават да печелят — фирмата расте в цял холдинг.
-// Записът: S.brand = 'titan', S.group = { [sub]: денят на основаването }.
+// group.js — корпоративната група: при старта играчът сам дава името на фирмата (и избира цвят/знак от 5-те стила);
+// с всеки нов бизнес се основава дъщерно дружество („… Толроуд“, „… Рейл“, „… Оушън Експрес“, „… Флайеър“…). Старите продължават да печелят.
+// Записът: S.brand = 'titan' (стилът), S.brandNm = 'Име' (по желание — иначе името на стила), S.group = { [sub]: денят на основаването }.
 export const BRANDS = [
   { k: 'industrial', nm: 'Индустриал', col: '#ff9a2e', ico: '⚙️' },
   { k: 'titan', nm: 'Титан', col: '#4fc3f7', ico: '🗿' },
@@ -13,14 +13,16 @@ export const SUBS = [
   { k: 'con', ico: '🏗️', suf: 'Констръкшън', what: 'строителство', how: 'от началото', open: () => true, inc: c => c.finDaily() },
   { k: 'hw', ico: '🛣️', suf: 'Толроуд', what: 'магистрали и тол', how: 'първата готова магистрала', open: c => c.hwN() > 0, inc: c => c.toll() },
   { k: 'rail', ico: '🚆', suf: 'Рейл', what: 'железници', how: 'първата готова жп линия', open: c => c.railN() > 0, inc: c => c.flow('rail') },
-  { k: 'sea', ico: '🚢', suf: 'Сийлайнс', what: 'кораби и пристанища', how: 'първото пристанище', open: c => c.portN() > 0, inc: c => c.flow('sea') },
-  { k: 'air', ico: '✈️', suf: 'Скай Еър', what: 'авиация', how: 'първото летище', open: c => c.airN() > 0, inc: c => c.flow('air') },
+  { k: 'sea', ico: '🚢', suf: 'Оушън Експрес', what: 'кораби и пристанища', how: 'първото пристанище', open: c => c.portN() > 0, inc: c => c.flow('sea') },
+  { k: 'air', ico: '✈️', suf: 'Флайеър', what: 'авиация', how: 'първото летище', open: c => c.airN() > 0, inc: c => c.flow('air') },
   { k: 'oil', ico: '🛢️', suf: 'Петролиум', what: 'петрол и гориво', how: 'първото петролно находище (Азия)', open: c => c.oilN() > 0, inc: c => c.oilDaily() },
   { k: 'hotel', ico: '🏨', suf: 'Хотелс', what: 'хотели по света', how: 'офис ниво 10 в някой град (ерата на холдинга)', open: c => (c.hotelN ? c.hotelN() : 0) > 0, inc: c => c.hotelDaily ? c.hotelDaily() : 0 },
   { k: 'bank', ico: '🏦', suf: 'Банк', what: 'банка и кредити', how: 'основи банката (ерата на холдинга)', open: c => !!(c.bankOn && c.bankOn()), inc: c => c.bankDaily ? c.bankDaily() : 0 },
   { k: 'glob', ico: '🌍', suf: 'Глобъл Ризортс & Констръкшън', what: 'световна империя', how: 'ниво 20 — Световна империя', open: c => c.empire(), inc: () => 0, final: true },
 ];
-export const brandOf = S => BRANDS.find(b => b.k === S?.brand) || null;
+export const brandOf = S => { const b = BRANDS.find(x => x.k === S?.brand); return b ? (S.brandNm ? { ...b, nm: S.brandNm } : b) : null; };
+// името, което играчът пише: без знаци за HTML, до 24 знака, с главна буква
+export const cleanBrand = s => { const t = String(s || '').replace(/[<>"'&`\\]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24); return t ? t[0].toUpperCase() + t.slice(1) : ''; };
 export const subName = (S, k) => { const b = brandOf(S), s = SUBS.find(x => x.k === k); return b && s ? `${b.nm} ${s.suf}` : ''; };
 // името на групата горе: една фирма — „Титан Констръкшън“; повече — „Титан Груп“; накрая — „Титан Глобъл“
 export function groupName(S) {

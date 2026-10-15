@@ -41,7 +41,7 @@ import { buildUniversity, buildHospital, buildStadium, buildMetro, buildAirTermi
 import { buildGreatWall } from './greatwall3d.js';
 import { buildCivic, CIVIC_KINDS } from './civic3d.js';
 import { createMines, MINE_KINDS } from './mines.js';
-import { createGroup, BRANDS, groupName, brandOf } from './group.js';
+import { createGroup, BRANDS, groupName, brandOf, cleanBrand } from './group.js';
 import { createOil } from './oil.js';
 import { createCorp } from './corp.js';
 import { createMegaWorld } from './megaworld.js';
@@ -1879,9 +1879,10 @@ let S = null;          // записваемото състояние
 let econ = null;
 const projects = [];   // активните обекти (огледало на S.projects с визуализация)
 
-function newGame(cityId, brand = null) {
+function newGame(cityId, brand = null, brandNm = '') {
   pruneCities(null);
   S = { v: 1, brand, cityId, hqCity: cityId, cities: {}, day: 1, dayT: 0, rep: 0, cash: [], officeLevel: 1, garageLevel: 1, garageLot: null, whLevel: 0, whLot: null, cityExt: AUTOTEST ? +params.get('ext') || 0 : 0, rails: [], trains: [], jobs: [], econ: ECON.newEconState(), units: [...ECON.START.units], projects: [], offers: [], built: [], done: 0, seq: 1 };
+  if (brandNm) S.brandNm = brandNm;   // името, което играчът си е дал (group.js: brandOf)
   if (params.has('plan') ? params.get('plan') === '1' : !AUTOTEST) S.planAll = 4;   // нова игра — средните и големите градове с план (извити улици); старите записи остават на мрежата   // нов град с план (извити улици); старите записи остават на мрежата
   enterCity();
   S.projects = projects;
@@ -3064,8 +3065,8 @@ function neomDecor() {
 const oil = createOil({ S: () => S, econ: () => econ, priceMul: () => mw.done('pipeline') ? 1.1 : 1, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), cityName: id => cityById(id)?.nm || id, cityOk: id => !!cityById(id),
   ownedCities: () => ownedCities(), unlinked: () => { const t = mines.state().sites.filter(x => x.kind === 'terminal'); return mines.state().sites.filter(x => ['oilwell', 'refinery'].includes(x.kind) && !t.some(q => q.city === x.city || railLinked(q.city, x.city) || roadLinked(q.city, x.city))).map(x => x.city); }, tankers: () => (S.ships || []).filter(p => p.kind === 'tanker').length, terminalCity: () => mines.state().sites.find(x => x.kind === 'terminal')?.city || null, isAm: id => isAm(id) });
 function brandPick(then) {
-  modal('🏢 Избери своята фирма', 'Името остава през цялата игра. С всеки нов бизнес основаваш дъщерно дружество: магистрали, железници, кораби, авиация, петрол и накрая световна империя.',
-    [...BRANDS.map(b => [`${b.ico} ${b.nm} Констръкшън`, () => { S.brand = b.k; group.check(true); save(); updLogo(); then && then(); }])]);
+  modal('🏢 Дай име на фирмата си', 'Името остава през цялата игра. С всеки нов бизнес основаваш дъщерно дружество: … Толроуд, … Рейл, … Оушън Експрес, … Флайеър, … Петролиум и накрая … Глобъл.' + '<input id="brandNm" maxlength="24" placeholder="Името на фирмата (напр. Петров)" autocomplete="off" style="width:100%;margin:8px 0 4px;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:#0f141c;color:var(--txt);font-size:16px"><span style="font-size:12px;color:var(--mut)">После избери знак и цвят. Празно — името на знака.</span>',
+    [...BRANDS.map(b => [`${b.ico}`, () => { S.brand = b.k; const nm = cleanBrand($('brandNm')?.value); if (nm) S.brandNm = nm; group.check(true); save(); updLogo(); then && then(); }])]);
 }
 const updLogo = () => { const l = document.querySelector('#top .logo'); if (!l || !S) return; const gn = groupName(S); l.textContent = `🏗️ ${gn ? gn.toUpperCase() + ' · ' : ''}${cityName().toUpperCase()}${gn ? '' : ` · ${S.cityId === (S.hqCity || S.cityId) ? 'ЦЕНТРАЛА' : 'ФИЛИАЛ'}`}`; l.style.cursor = gn ? 'pointer' : ''; l.title = gn ? 'Корпоративната група' : ''; l.onclick = gn ? () => openBig('group') : null; updHoldBtn(); neomName(); };
 // конкурентни фирми (rivals.js): вземат поръчки, които не приемеш навреме, и строят на парцела
@@ -3159,8 +3160,9 @@ function clickCity(id) {
   if (S && AIR_ONLY.has(id) && !ownedCities().includes(id)) { const of = AIR_ONLY_OF[id]; toast(`✈️ ${c?.nm || id} е само летище${of ? ` — обслужва ${cityById(of)?.nm || of}` : ''}. Тук не се купува филиал.`, ''); return; }
   if (!S && !START_CITIES.includes(id)) { toast('Започваш в София, Пловдив, Стара Загора или Варна — другите градове се отключват с развитието.', 'bad'); return; }
   if (!S) {
-    modal(`🏗️ Основи фирмата в ${c.nm}`, `Започваш с ${fmt(ECON.START.money)} €, бригада работници, багер и самосвал. Градът е измислен, но се намира в ${c.nm}.<br><br><b>Избери името на фирмата.</b> С всеки нов бизнес ще основаваш дъщерни дружества: Толроуд, Рейл, Сийлайнс, Скай Еър, Петролиум и накрая Глобъл.`,
-      [['Отказ', null], ...BRANDS.map(b => [`${b.ico} ${b.nm}`, () => newGame(id, b.k)])]);
+    modal(`🏗️ Основи фирмата в ${c.nm}`, `Започваш с ${fmt(ECON.START.money)} €, бригада работници, багер и самосвал. Градът е измислен, но се намира в ${c.nm}.<br><br><b>Дай име на фирмата си.</b> С всеки нов бизнес ще основаваш дъщерни дружества: … Толроуд (магистрали), … Рейл (жп), … Оушън Експрес (кораби), … Флайеър (самолети), … Петролиум и накрая … Глобъл.<input id="brandNm" maxlength="24" placeholder="Името на фирмата (напр. Петров)" autocomplete="off" style="width:100%;margin:8px 0 4px;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:#0f141c;color:var(--txt);font-size:16px"><span style="font-size:12px;color:var(--mut)">После избери знак и цвят. Празно — името на знака.</span>`,
+      [['Отказ', null], ...BRANDS.map(b => [`${b.ico}`, () => newGame(id, b.k, cleanBrand($('brandNm')?.value))])]);
+    setTimeout(() => $('brandNm')?.focus(), 50);
   } else if (hwPick) hwClick(id);
   else if (railPick) railClick(id);
   else if (S.cityId === id) enterCity();
