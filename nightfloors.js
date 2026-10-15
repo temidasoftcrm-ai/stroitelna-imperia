@@ -83,7 +83,14 @@ export function prepNightFloors(root, name) {
               vec3 col = r < 0.3 ? vec3(1.0, 0.72, 0.38) : r < 0.55 ? vec3(0.62, 0.48, 0.3) : vec3(0.85, 0.9, 1.0);
               if (uFlood > 0.5) { on = nNight; col = vec3(1.0, 0.78, 0.5) * (0.8 + 0.4 * r); }   // прожектори: всичко, топло, етажите малко различни
               if (uFlood > 1.5) col = vec3(1.0, 0.8, 0.52) * (0.55 + 0.9 * clamp((vNfY - uY0) / uH, 0.0, 1.0));   // нагоре — по-светло (кулите)
-              totalEmissiveRadiance = texture2D(emissiveMap, vEmissiveMapUv).rgb * col * on * (uFlood > 0.5 ? 0.55 : 1.15);
+              vec3 tx = texture2D(emissiveMap, vEmissiveMapUv).rgb;
+              totalEmissiveRadiance = tx * col * on * (uFlood > 0.5 ? 0.55 : 1.15);
+              if (uFlood > 1.5) {   // Саграда: тук-там светнал прозорец — тъмните отвори в камъка, по случайни петна
+                vec2 wc = floor(vEmissiveMapUv * 90.0);
+                float wr = fract(sin(dot(wc, vec2(41.3, 289.1))) * 43758.5453);
+                float dk = 1.0 - smoothstep(0.12, 0.3, dot(tx, vec3(0.3, 0.59, 0.11)));
+                totalEmissiveRadiance += vec3(1.0, 0.7, 0.32) * dk * step(wr, 0.18) * nNight * 1.6;
+              }
             #endif`);
       };
       m.customProgramCacheKey = () => 'nightfloors2';

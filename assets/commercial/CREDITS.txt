@@ -11,3 +11,8 @@
   building-skyscraper-b.glb — "Hi rise apartment building" by aitortilla01 (CC-BY 4.0) — https://sketchfab.com/3d-models/f8c0a550cd1e441f85b46caeba6632f3
   building-skyscraper-c.glb — "US Bank Tower" by mitya-petrov (CC-BY 4.0) — https://sketchfab.com/3d-models/82227908aa5c446395c4b9847284da4a
 Моделите са нормализирани (център, основа, мащаб), текстурите — само основният цвят, до 512 px JPEG. CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+Още (Лабораторията → „Ново“):
+  commercial2/building-skyscraper-d — "4 World Trade Center" by NanoRay (CC-BY 4.0) — https://sketchfab.com/3d-models/2054475d0f1d44bfa955ce399aeac73c
+  commercial2/building-skyscraper-e — "Bank of China Tower" by Raise3D (CC-BY 4.0) — https://sketchfab.com/3d-models/b99aa9bd3f574287bfb3e208705752de
+  houses/building-type-a — "Low-poly Brick House" by Vitalii.Sandula (CC-BY 4.0) — https://sketchfab.com/3d-models/ea82ea891829493aadeea889cd473e89
+  houses/building-type-b — "Low poly House, single texture" by danzl0 (CC-BY 4.0) — https://sketchfab.com/3d-models/45f8ec099315437c870d51f5cadeb457

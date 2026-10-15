@@ -17,12 +17,17 @@ const NEW_BANDS = {
   'building-skyscraper-c': ['com-sky-c', { y1: 3.850, y2: 3.974, floors: 20 }],   // US Bank Tower: разтяга се средата на стъклото
 };
 for (const [n, [id, band]] of Object.entries(NEW_BANDS)) if (feature(id)) SKY_BANDS[n] = band;
-
 // модерни стъклени небостъргачи от Commercial 2.1 (assets/commercial2) — за най-големите градове
 export const SKY_BANDS_MODERN = {
   'building-skyscraper-d': { y1: 1.62, y2: 1.98, floors: 12 },
   'building-skyscraper-e': { y1: 1.54, y2: 1.93, floors: 8 },
 };
+// новите модерни кули (4 World Trade Center, Bank of China) — своя лента, след „✓ OK“
+const NEW_MODERN = {
+  'building-skyscraper-d': ['com2-sky-d', { y1: 1.214, y2: 1.417, floors: 20 }],
+  'building-skyscraper-e': ['com2-sky-e', { y1: 1.148, y2: 1.320, floors: 25 }],
+};
+for (const [n, [id, band]] of Object.entries(NEW_MODERN)) if (feature(id)) SKY_BANDS_MODERN[n] = band;
 
 // geometry: BufferGeometry (може и индексирана); extra: колко етажа да се добавят
 export function stretchFloors(geometry, y1, y2, extra) {

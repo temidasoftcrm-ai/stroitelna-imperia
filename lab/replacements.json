@@ -42,5 +42,21 @@
   "com-sky-c": {
     "from": "/assets/commercial/building-skyscraper-c.glb",
     "to": "/assets/commercial/building-skyscraper-c-new.glb"
+  },
+  "com2-sky-d": {
+    "from": "/assets/commercial2/building-skyscraper-d.glb",
+    "to": "/assets/commercial2/building-skyscraper-d-new.glb"
+  },
+  "com2-sky-e": {
+    "from": "/assets/commercial2/building-skyscraper-e.glb",
+    "to": "/assets/commercial2/building-skyscraper-e-new.glb"
+  },
+  "house-a": {
+    "from": "/assets/houses/building-type-a.glb",
+    "to": "/assets/houses/building-type-a-new.glb"
+  },
+  "house-b": {
+    "from": "/assets/houses/building-type-b.glb",
+    "to": "/assets/houses/building-type-b-new.glb"
   }
 }

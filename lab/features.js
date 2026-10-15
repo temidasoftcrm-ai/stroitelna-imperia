@@ -23,4 +23,9 @@ export const FEATURES = [
   {"id": "night-floors", "title": "Нощем етажите на сградите светват", "how": "11-те реалистични сгради (и небостъргачите): привечер етажите светват един по един, всеки в свой оттенък — топло жълто, бяло-синкаво или приглушено; ~20% остават тъмни. Сутрин гаснат. Отвори „Мисии/демо“ → „Градът нощем“ или превърти часа в играта.", "url": "#tab=demos&item=d10"},
   // „да осветим Саграда Фамилия в Барселона“
   {"id": "night-sagrada", "title": "Саграда Фамилия свети нощем", "how": "Нощем базиликата в Барселона е облята в топла светлина от прожектори — отдолу по-меко, кулите по-светли нагоре. Отваря Барселона нощем пред нея.", "url": "#tab=demos&item=d15"},
+  // „изтрий и намери нов“ за commercial2 небостъргачите и къщите a/b
+  {"id": "com2-sky-d", "title": "Модерен небостъргач D (мегаполисите)", "how": "„4 World Trade Center“ (NanoRay, CC BY 4.0, Sketchfab) вместо стъклената кула на Kenney — в центъра на големите градове, 20–40 етажа. Виж и „Сцени“ → Париж или Москва. „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fcommercial2%2Fbuilding-skyscraper-d.glb"},
+  {"id": "com2-sky-e", "title": "Модерен небостъргач E (мегаполисите)", "how": "„Bank of China Tower“ (Raise3D, CC BY 4.0, Sketchfab) вместо втората стъклена кула на Kenney. „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fcommercial2%2Fbuilding-skyscraper-e.glb"},
+  {"id": "house-a", "title": "Реалистична къща A", "how": "„Low-poly Brick House“ (Vitalii.Sandula, CC BY 4.0) — тухлена къща с остъклена веранда, вместо къщата на Kenney в покрайнините. „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fhouses%2Fbuilding-type-a.glb"},
+  {"id": "house-b", "title": "Реалистична къща B", "how": "„Low poly House, single texture“ (danzl0, CC BY 4.0) — каменна двуетажна къща с бръшлян, вместо къщата на Kenney. „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fhouses%2Fbuilding-type-b.glb"},
 ];
