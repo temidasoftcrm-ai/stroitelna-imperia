@@ -519,7 +519,7 @@ const isRoad = (i, j) => (i % 3 === 0 || j % 3 === 0) && !(city.noRoad && city.n
 const tx = i => (i - (N - 1) / 2) * TILE;
 const city = { group: null, lots: [], hq: null };
 // град с план: парцелите са завъртени към улицата (lot.rot) и с различен размер; пътищата са по улиците на плана
-const planOf = id => S && S.plans && S.plans[id] ? gamePlan(id) : null;
+const planOf = id => S && S.plans && S.plans[id] && cityTier(id) !== 's' ? gamePlan(id) : null;   // малките градове (Перник, Печ…) остават на мрежата
 const lotRot = l => (l && l.rot) || 0, lotK = l => l && l.plan ? Math.min(1, Math.min(l.w, l.d) / 16) : 1;
 function lotPt(l, x, z) { const r = lotRot(l), c = Math.cos(r), s = Math.sin(r); return { x: l.x + x * c + z * s, z: l.z - x * s + z * c }; }   // точка в координатите на парцела
 function roadRoute(x0, z0, x1, z1) {
@@ -625,9 +625,10 @@ function applyCenterSwaps(cityId, c0, hqAt) {
   S.lotSwap = S.lotSwap || {};
   const swap = (a, b) => { const A = city.lots[a], B = city.lots[b]; for (const k of ['bi', 'bj', 'x', 'z', 'zone']) [A[k], B[k]] = [B[k], A[k]]; };
   let rec = S.lotSwap[cityId];
-  if (rec) { for (const [a, b] of rec) swap(a, b); return; }
-  rec = [];
   const at = (bi, bj) => city.lots.find(l => l.bi === bi && l.bj === bj), inC = l => Math.abs(l.bi - c0) <= 2 && Math.abs(l.bj - c0) <= 2, isHq = l => l.bi === hqAt[0] && l.bj === hqAt[1];
+  if (rec) for (const [a, b] of rec) swap(a, b);
+  else {
+  rec = [];
   // офисът запазва своя парцел (id): старият му парцел (4,5) отива на (4,7)
   const h0 = at(c0, c0 + 1), h1 = at(hqAt[0], hqAt[1]);
   if (h0 && h1 && h0 !== h1) { rec.push([h0.id, h1.id]); swap(h0.id, h1.id); }
@@ -639,6 +640,36 @@ function applyCenterSwaps(cityId, c0, hqAt) {
   }
   S.lotSwap[cityId] = rec;
   if (S.landmarks) delete S.landmarks[cityId];   // забележителностите се нареждат наново в новия център
+  }
+  // голямата забележителност (Капитолият, МГУ…) — също в центъра, залепена за площада; заетите парцели в зоната ѝ отиват навън (веднъж за града)
+  const Z = bigZoneSpec(cityId);
+  if (!Z || (S.lotSwapZ || {})[cityId]) return;
+  S.lotSwapZ = S.lotSwapZ || {}; S.lotSwapZ[cityId] = 1;
+  const zone = new Set(city.lots.filter(l => !l.mega && !l.fresh && inBigZone(Z, l)).map(l => l.id));
+  // държавните поръчки и мините, които минават през зоната, се подреждат наново другаде; старото място на забележителността се освобождава
+  for (const [k, v] of Object.entries(S.tenderLots4 || {})) if ((v || []).some(id => zone.has(id))) { delete S.tenderLots4[k]; if (S.tenderLots) delete S.tenderLots[k]; }
+  for (const k of Object.keys(S.tenderLots || {})) if (zone.has(S.tenderLots[k]) && !(S.tenderLots4 || {})[k]) delete S.tenderLots[k];
+  for (const x of (S.mines && S.mines.sites) || []) if (x.city === cityId && (x.lots || []).some(id => zone.has(id))) x.lots = null;
+  for (const [k, x] of Object.entries(S.bigLm || {})) if (k.startsWith(cityId + ':')) x.lots = null;
+  const used = occupiedLots(cityId), taken = new Set();
+  for (const L of city.lots.filter(l => zone.has(l.id) && used.has(l.id))) {
+    const M = city.lots.filter(m => !m.mega && !m.fresh && !inC(m) && !inBigZone(Z, m) && !isHq(m) && !used.has(m.id) && !taken.has(m.id)).sort((p, q) => Math.hypot(p.x - L.x, p.z - L.z) - Math.hypot(q.x - L.x, q.z - L.z))[0];
+    if (!M) continue;
+    taken.add(M.id); rec.push([L.id, M.id]); swap(L.id, M.id);
+  }
+}
+// зоната на голямата забележителност: W×D парцела в центъра, на север от площада (поясът 5×5 + редовете над него); офисът (4,7) е на юг
+function bigZoneSpec(cityId) {
+  const b = (BIG_LANDMARKS[cityId] || [])[0]; if (!b || !CITY_LANDMARKS[cityId]) return null;
+  const [kind, W, D] = b, c0 = Math.floor((NB - 1) / 2);
+  return { kind, W, D, bi0: c0 - Math.floor((W - 1) / 2), bj0: c0 - 1 - D };
+}
+const inBigZone = (Z, l) => !!Z && l.bi >= Z.bi0 && l.bi < Z.bi0 + Z.W && l.bj >= Z.bj0 && l.bj < Z.bj0 + Z.D;
+function bigZoneLots(Z) {
+  const q = city.lots.filter(l => !l.mega && !l.fresh && inBigZone(Z, l)).sort((a, b) => a.bi - b.bi || a.bj - b.bj);
+  if (q.length !== Z.W * Z.D || q.includes(city.hq)) return null;
+  const used = occupiedLots(S.cityId);   // нещо на играча още стои там (нямаше свободен парцел за размяна) — не се пипа
+  return q.some(l => used.has(l.id)) ? null : q;
 }
 function buildCity(cityId) {
   if (city.group) scene.remove(city.group);
@@ -1812,7 +1843,7 @@ const projects = [];   // активните обекти (огледало на
 function newGame(cityId, brand = null) {
   pruneCities(null);
   S = { v: 1, brand, cityId, hqCity: cityId, cities: {}, day: 1, dayT: 0, rep: 0, cash: [], officeLevel: 1, garageLevel: 1, garageLot: null, whLevel: 0, whLot: null, cityExt: AUTOTEST ? +params.get('ext') || 0 : 0, rails: [], trains: [], jobs: [], econ: ECON.newEconState(), units: [...ECON.START.units], projects: [], offers: [], built: [], done: 0, seq: 1 };
-  if (params.has('plan') ? params.get('plan') === '1' : !AUTOTEST && cityId === 'sofia') S.plans = { [cityId]: 1 };   // нов град с план (извити улици); старите записи остават на мрежата
+  if (params.has('plan') ? params.get('plan') === '1' : !AUTOTEST && cityId === 'sofia') { if (cityTier(cityId) !== 's') S.plans = { [cityId]: 1 }; }   // нов град с план (извити улици); старите записи остават на мрежата
   enterCity();
   S.projects = projects;
   for (let k = 0; k < 3; k++) makeOffer();
@@ -4326,7 +4357,8 @@ function amsPlaza(px, pz, add, tm) {
 const LM_MAIN_SCALE = { canal: 1.5, canal2: 1.5 };
 function landmarkCenter(kinds) {
   const c0 = (NB - 1) / 2, mem = S.landmarks[S.cityId];
-  for (const l of city.center) { if (l.obj) city.group.remove(l.obj); for (const t of l.trees || []) city.group.remove(t); l.obj = null; l.built = null; l.trees = []; l.busy = 'landmark'; }
+  const bigIds = new Set((city.bigLm || []).length ? Object.entries(S.bigLm || {}).filter(([k]) => k.startsWith(S.cityId + ':')).flatMap(([, x]) => x.lots || []) : []);   // голямата забележителност в центъра
+  for (const l of city.center) { if (bigIds.has(l.id)) continue; if (l.obj) city.group.remove(l.obj); for (const t of l.trees || []) city.group.remove(t); l.obj = null; l.built = null; l.trees = []; l.busy = 'landmark'; }
   const ci = 3 * c0 + 1.5, px = tx(ci), pz = tx(ci), W = 8 * TILE - 2;
   city.noRoad = new Set();
   for (const a of [3 * c0, 3 * c0 + 3]) for (let d = 3 * (c0 - 1) + 1; d <= 3 * (c0 + 1) + 2; d++) { city.noRoad.add(a + ',' + d); city.noRoad.add(d + ',' + a); }
@@ -4343,7 +4375,7 @@ function landmarkCenter(kinds) {
   city.group.add(main.group); city.landmarks.push(main);
   if (ams) amsPlaza(px, pz, add, tm);
   // поясът: 16 парцела около площада, подредени по ъгъл; другите забележителности — равномерно, останалите — градинки
-  const belt = city.center.filter(l => Math.abs(l.bi - c0) === 2 || Math.abs(l.bj - c0) === 2).sort((a, b) => Math.atan2(a.z - pz, a.x - px) - Math.atan2(b.z - pz, b.x - px));
+  const belt = city.center.filter(l => !bigIds.has(l.id) && (Math.abs(l.bi - c0) === 2 || Math.abs(l.bj - c0) === 2)).sort((a, b) => Math.atan2(a.z - pz, a.x - px) - Math.atan2(b.z - pz, b.x - px));
   const rest = kinds.slice(1), step = rest.length ? belt.length / rest.length : 0, spot = new Map();
   rest.forEach((k, i) => spot.set(belt[Math.floor(i * step + step / 2) % belt.length], k));
   for (const l of belt) {
@@ -4465,8 +4497,10 @@ function refreshMines3D() {
   for (const [kind, W0, D0, asp = 1, turn = 0, alt] of BIG_LANDMARKS[S.cityId] || []) {
     S.bigLm = S.bigLm || {}; const site = S.bigLm[S.cityId + ':' + kind] = S.bigLm[S.cityId + ':' + kind] || { kind };
     if (!site.near) { site.lots = null; site.near = 1; }   // старите записи (зона в покрайнините) — местят се до центъра
-    let W = W0, D = D0, grp = mineGroup(site, W, D, true);
-    if (!grp && alt) { [W, D] = alt; grp = mineGroup(site, W, D, true); }   // малък град — по-малката зона
+    const Z = city.center && bigZoneSpec(S.cityId);
+    let W = W0, D = D0, grp = Z && Z.kind === kind ? bigZoneLots(Z) : null;   // в центъра, на запазеното място до площада
+    if (grp) site.lots = grp.map(l => l.id);
+    else { grp = mineGroup(site, W, D, true); if (!grp && alt) { [W, D] = alt; grp = mineGroup(site, W, D, true); } }   // няма център — най-близо до него
     if (!grp) { city.bigFail.push(kind); continue; }   // никъде няма място — стои на 1 парцел до площада (refreshLandmarks), не изчезва
     const [l0] = grp, x = tx(3 * l0.bi + 1.5 * W), z = tx(3 * l0.bj + 1.5 * D);
     for (const lot of grp) { if (lot.obj || lot.built) clearLot(lot); for (const tr of lot.trees || []) city.group.remove(tr); lot.trees = []; lot.busy = 'mine'; }
@@ -5110,6 +5144,7 @@ function virtualLots(cityId, cs) {
     lot.built = 1;
   }
   if (LMC) for (const l of lots) if (inC(l)) { l.built = 0; l.busy = 1; }
+  { const Z = LMC && bigZoneSpec(cityId); if (Z) for (const l of lots) if (!l.fresh && inBigZone(Z, l)) { l.built = 0; l.busy = 1; } }   // и зоната на голямата забележителност
   for (const id of cs.cleared || []) if (lots[id]) lots[id].built = 0;
   for (const id of used) if (lots[id] && !(cs.cleared || []).includes(id)) lots[id].busy = 1;
   for (const id of (cs.cleared || [])) if (lots[id] && (cs.built || []).some(b => b.lot === id)) lots[id].busy = 1;
@@ -5264,12 +5299,16 @@ function garGrow(quiet = false) {
   if (n) save();
   return n;
 }
-// 🤖 автоматично снабдяване (по желание, в гаража): всеки 2 дни — праща свободната техника, купува липсващото и разширява пълните сгради
+// 🤖 автоматично снабдяване (включено по подразбиране, изключва се от гаража): всеки ден —
+// праща техниката от градовете без работа (до 3 дни път), разширява пълните сгради и купува останалото веднага на място.
+// Не взима от град, който работи (иначе машините обикалят напред-назад и всеки път се плаща транспорт).
+const garAutoOn = () => S.garAutoOn !== false;
 function garAutoTick() {
-  if (!S.garAutoOn || S.day % 2) return;
-  const plan = garPlan(); for (const m of plan) garMove(m.t, m.from, m.to, m.n, true);
+  if (!garAutoOn()) return;
+  const idleCity = id => id !== S.cityId && !garCity(id).projects?.length && !garCity(id).autoJobs?.length;
+  for (const m of garPlan()) if (idleCity(m.from) && garDays(m.from, m.to) <= 3) garMove(m.t, m.from, m.to, m.n, true);
   garGrow(true);
-  const sh = garShort(); if (sh.cost && econ.s.money > sh.cost * 3) garBuyShort(null, true);
+  const sh = garShort(); if (sh.now.length && econ.s.money > sh.costNow * 1.5) garBuyShort(null, true, true);
 }
 // купува липсващото (само това, което не може да дойде от другите градове); only — само за един град
 function garBuyShort(only = null, quiet = false, all = false) {   // all — купува всичко липсващо веднага, без да чака свободната техника от другите градове
@@ -5316,7 +5355,7 @@ function garageWinHtml() {
       ${sh.moveN ? `<button class="btn" id="garFixAll">🚚🛒 Оправи всичко</button>` : sh.buy.length ? `<button class="btn" id="garBuyShort" ${econ.canAfford(sh.cost) ? '' : 'disabled'}>🛒 Купи липсващите · ${fmt(sh.cost)} €</button>` : ''}</div>
       ${sh.full.length ? (() => { const g = sh.full.filter(f => f[1] === 'garage').length, o = sh.full.length - g, cost = sh.full.reduce((a, [id, k]) => a + (upgInfo(id).find(x => x.kind === k)?.cost || 0), 0);
         return `<div class="row" style="align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px"><span class="meta" style="margin:0;flex:1 1 320px">🔒 Няма място: ${g ? `${g} пълни гаража` : ''}${g && o ? ' и ' : ''}${o ? `${o} пълни офиса (бригади)` : ''} — затова там не може да се купи. Разшири ги (строят се сами за няколко дни).</span><button class="btn2" id="garGrow" ${econ.canAfford(Math.min(...sh.full.map(([id, k]) => upgInfo(id).find(x => x.kind === k)?.cost || 1e18))) ? '' : 'disabled'}>⬆️ Разшири · ~${fmt(cost)} €</button></div>`; })() : ''}
-      <label class="meta" style="margin:6px 0 0;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="garAutoOn" ${S.garAutoOn ? 'checked' : ''}> 🤖 Автоматично снабдяване: на всеки 2 дни праща свободната техника, купува липсващата и разширява пълните гаражи</label></div>`
+      <label class="meta" style="margin:6px 0 0;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="garAutoOn" ${garAutoOn() ? 'checked' : ''}> 🤖 Автоматично снабдяване: всеки ден купува липсващата техника на място, праща свободната от градовете без работа и разширява пълните гаражи</label></div>`
       : `<div class="meta" style="margin:0 0 6px;color:var(--ok)">✅ Нищо не липсва — всички обекти имат нужната техника.</div>`; }
   // таблица: градове × видове техника
   const th = types.map(t => `<th title="${ECON.UNIT_TYPES[t].nm}" style="padding:4px 6px">${garIco(t)}<div style="font-size:10px;color:var(--mut);font-weight:400">${ECON.UNIT_TYPES[t].nm.slice(0, 7)}</div></th>`).join('');
