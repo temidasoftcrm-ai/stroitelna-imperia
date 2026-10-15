@@ -1,3 +1,4 @@
+import { feature } from './lab/feature.js';
 // sound.js — звук с WebAudio, без звукови файлове: фон на града (птици/щурци/трафик),
 // строителни шумове около камерата и кратки ефекти за събития.
 // Употреба: Sound.init() при първия клик; Sound.update({ night, activity, speed }) всеки кадър; Sound.play('cash').
@@ -49,6 +50,12 @@ export const Sound = {
 
   // ефекти за събития
   // класическо „та-даа“: кратък акорд и по-дълъг, по-висок акорд (месингов тембър)
+  // ново ниво — меко: камбанки нагоре (до-ми-сол-до) и тих акорд; без тромпети и без файла с мелодията
+  levelSoft() {
+    if (!this.ctx || this.muted) return;
+    [523, 659, 784, 1047].forEach((f, i) => this.bell(f, i * 0.11, 0.07));
+    [523, 784].forEach(f => this.tone(f, 1.2, 0.025, 'sine', null, 0.5));
+  },
   tada() {
     if (!this.ctx || this.muted) return;
     const ctx = this.ctx, t0 = ctx.currentTime + 0.02;
@@ -98,6 +105,7 @@ export const Sound = {
   },
   play(name) {
     if (this.ctx && !this.muted && this.jingle(name)) return;
+    if (name === 'levelup' && feature('snd-levelup')) { this.levelSoft(); return; }   // по-тихото ново ниво (Лабораторията → „Ново“)
     if (name === 'levelup') {   // „та-даа“ + мелодия (Kenney Music Jingles, CC0)
       this.tada();
       setTimeout(() => this.file('assets/sfx/levelup.ogg', 0.8), 650);
