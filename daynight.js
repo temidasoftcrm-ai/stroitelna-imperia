@@ -1,6 +1,7 @@
 // daynight.js — денонощие: слънце, небе, мъгла, светлини и светещи лампи нощем.
 // Един игрови ден = едно денонощие. f = част от деня (0..1); 0 = 06:00 сутринта.
 import * as THREE from 'three';
+import { NF_MATS } from './nightfloors.js';
 
 // ключови моменти (час → цветове/сила)
 const KEYS = [
@@ -47,6 +48,7 @@ export class DayNight {
         if (!m || !m.map || this.winMats.has(m) || !('emissive' in m)) continue;
         const nm = m.name || '';
         if (/FakeInterior_[123]/.test(nm)) { m.emissiveMap = m.map; m.emissive.setRGB(1, 0.78, 0.45); m.userData.winK = 0.7; }
+        else if (m.userData.nightFloors) { /* реалистичните сгради (nightfloors.js): етажите светват по своя график в шейдъра */ }
         else if (/colormap/i.test(nm)) { const mk = this.maskFor(m.map); if (!mk) continue; m.emissiveMap = mk; m.emissive.setRGB(1, 0.72, 0.38); m.userData.winK = 0.55; }
         else continue;
         m.emissiveIntensity = 0; m.needsUpdate = true;
@@ -104,5 +106,6 @@ export class DayNight {
     this.poolMat.opacity = n * 0.35;
     this.lamps.visible = n > 0.01;
     for (const m of this.winMats) m.emissiveIntensity = n * (m.userData.winK || 1);
+    for (const m of NF_MATS) m.emissiveIntensity = n;   // нощните етажи (nightfloors.js) — и на забележителностите, заредени по-късно
   }
 }

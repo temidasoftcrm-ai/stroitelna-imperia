@@ -381,7 +381,7 @@ let europe = null;
 {
   const jobs = [];
   // заводските модели се казват като търговските (building-a…) — пазим ги под 'ind-…'
-  for (const [dir, list] of Object.entries(MODELS)) for (const n of list) jobs.push(load(`assets/${dir}/${n}.glb`).then(g => { A[dir === 'industrial' ? 'ind-' + n : n] = g; if (dir === 'commercial') prepNightFloors(g.scene, n); }));   // нощем етажите светват (nightfloors.js)
+  for (const [dir, list] of Object.entries(MODELS)) for (const n of list) jobs.push(load(`assets/${dir}/${n}.glb`).then(g => { A[dir === 'industrial' ? 'ind-' + n : n] = g; if (dir === 'commercial' || dir === 'commercial2') prepNightFloors(g.scene, n); }));   // нощем етажите светват (nightfloors.js)
   // истинска строителна техника и коли за трафика (vehmodels.js, Sketchfab)
   jobs.push(loadVehModels(load, A));
   jobs.push(loadAirModels(load));   // самолети и контролна кула (airport.js)
