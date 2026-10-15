@@ -82,6 +82,7 @@ import { applyRoadLook, makeCrosswalks } from './roadlook.js';
 // градски планове: извити улици и парцели покрай тях (cityplan*.js) — само за градовете в S.plans; другите са на мрежата 9×9
 import { gamePlan, planLots, planTiles } from './cityplangame.js';
 import { buildPlanView } from './cityplan3d.js';
+import { sampleCurve } from './cityplan.js';
 import { planRoute, randomRoadPoint } from './cityplanroute.js';
 
 const $ = id => document.getElementById(id);
@@ -523,6 +524,28 @@ const city = { group: null, lots: [], hq: null };
 // „Твоят град“ и градовете с голяма забележителност (Капитолият, Луксор) остават на мрежата
 const planOn = id => !!(S && (S.planAll || (S.plans && S.plans[id])) && cityTier(id) !== 's' && !MEGAPOLIS.has(id) && id !== NEOM_ID && !BIG_LANDMARKS[id]);
 const planOf = id => planOn(id) ? gamePlan(id, { landmark: !!CITY_LANDMARKS[id], seaside: SEASIDE.includes(id) }) : null;
+// план: пътища от най-близкия край на булевард до гарата (запад), входа на летището (изток) и магистралата (юг) — само за изгледа
+// (маршрутите на техниката са по улиците на плана; тези пътища водят до сградите извън града)
+function planLinks(P) {
+  const ends = [], all = [];
+  for (const st of P.streets) { if (st.cls === 'quay') continue; for (const p of st.pts) all.push(p); if (!st.closed && st.cls === 'blvd') for (const k of [0, st.pts.length - 1]) { const q = st.pts[k], r = st.pts[k ? k - 1 : 1]; ends.push({ p: q, dx: q[0] - r[0], dz: q[1] - r[1] }); } }
+  const d2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2;
+  const link = (t, ax, az, south) => {   // t — целта; (ax, az) — откъде влиза пътят в нея
+    let best = null; for (const e of ends) { const d = d2(e.p, t); if (!best || d < best.d) best = { ...e, d }; }
+    let near = all[0]; for (const p of all) if (d2(p, t) < d2(near, t)) near = p;
+    const useEnd = best && Math.sqrt(best.d) < Math.sqrt(d2(near, t)) + 60, a = useEnd ? best.p : near;
+    if (south) t = [a[0], t[1]];
+    const D = Math.sqrt(d2(a, t)); if (D < 4) return null;
+    const l = Math.hypot(useEnd ? best.dx : t[0] - a[0], useEnd ? best.dz : t[1] - a[1]) || 1, k = Math.min(25, D / 3);
+    const ux = (useEnd ? best.dx : t[0] - a[0]) / l, uz = (useEnd ? best.dz : t[1] - a[1]) / l;
+    const pts = sampleCurve([a, [a[0] + ux * k, a[1] + uz * k], [t[0] + ax * k, t[1] + az * k], t], 2);
+    const L = [0]; for (let i = 1; i < pts.length; i++) L.push(L[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    return { cls: 'road', w: 8, pts, L, link: true, id: -1 };
+  };
+  const out = [link([STATION_X + 10, 0], 1, 0), link([tx(NI - 1), -12], -1, 0), link([0, tx(NJ - 1) + 22], 0, -1, true)];
+  P.hwX = out[2] ? out[2].pts.at(-1)[0] : null;   // магистралата: връзката към нея
+  return out.filter(Boolean);
+}
 const lotRot = l => (l && l.rot) || 0, lotK = l => l && l.plan ? Math.min(1, Math.min(l.w, l.d) / 16) : 1;
 function lotPt(l, x, z) { const r = lotRot(l), c = Math.cos(r), s = Math.sin(r); return { x: l.x + x * c + z * s, z: l.z - x * s + z * c }; }   // точка в координатите на парцела
 function roadRoute(x0, z0, x1, z1) {
@@ -687,7 +710,8 @@ function buildCity(cityId) {
   if (P) { const [ti, tj] = planTiles(P, TILE); NI = Math.max(NI, ti); NJ = Math.max(NJ, tj); }   // гарата, магистралата и летището се отдръпват до края на плана
   // земя (при мегаполисите — по-широка на изток)
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(Math.max(1200, 2 * (tx(NI - 1) + 380)), Math.max(1200, 2 * (tx(NJ - 1) + 300))), new THREE.MeshStandardMaterial({ color: isDesert(cityId) ? 0xd9bf86 : 0x8fb36a, roughness: 1 }));   // Африка — пясък
-  const pv = P ? buildPlanView(P, { size: Math.max(1600, 2 * (tx(NI - 1) + 400)), seg: 170, target: controls.target, lotCount: Math.min(P.lots.length, 81 + 9 * (S.cityExt || 0)),
+  if (P && !P.links) P.links = planLinks(P);   // и в мрежата на маршрутите (cityplanroute.js) — ТИР-овете и техниката карат по тях
+  const pv = P ? buildPlanView({ ...P, streets: [...P.streets, ...P.links] }, { size: Math.max(1600, 2 * (tx(NI - 1) + 400)), seg: 170, target: controls.target, lotCount: Math.min(P.lots.length, 81 + 9 * (S.cityExt || 0)),
     seaZ: SEASIDE.includes(cityId) ? tx(0) - TILE / 2 - 2 : null, noFountain: !!CITY_LANDMARKS[cityId] }) : null;
   weather.setGround(pv ? pv.userData.groundMat : ground.material);   // снежната покривка оцветява земята
   // крайбрежните градове: море на север с плаж, пристанище, фар и кораби (seaside.js)
@@ -6177,7 +6201,7 @@ function buildCityHighway() {
   // пътна връзка от южната улица към магистралата
   const conn = [];
   for (let z = tx(NJ - 1) + TILE; z < tx(NJ - 1) + 22; z += TILE) {
-    const t = model('road-straight', TILE); t.rotation.y = Math.PI / 2; t.position.set(tx(3 * Math.floor(NB / 2)), 0.01, z); g.add(t); conn.push(t);
+    const t = model('road-straight', TILE); t.rotation.y = Math.PI / 2; t.position.set(city.plan?.hwX ?? tx(3 * Math.floor(NB / 2)), 0.01, z); g.add(t); conn.push(t);
   }
   city.group.add(g);
   cityHw = { g, v, conn, seg: (done || mine.find(s => s.id === job.seg)).id };
@@ -7628,6 +7652,7 @@ if (AUTOTEST) {
   window.__dbg = {
     state: () => S,
     openBig: k => openBig(k), closeBig: () => closeBig(), scene: () => scene,
+    linkRoute() { const P = city.plan; if (!P) return null; const gap = r => r.reduce((m, p, i) => i ? Math.max(m, Math.hypot(p.x - r[i - 1].x, p.z - r[i - 1].z)) : 0, 0), c = city.lots[0]; return { links: (P.links || []).length, tir: gap(roadRoute(tx(NI - 1), -12, c.x, c.z)), st: gap(roadRoute(STATION_X + 10, 0, c.x, c.z)), hw: P.hwX == null ? null : gap(roadRoute(P.hwX, tx(NJ - 1) + 22, c.x, c.z)) }; },
     mem() { const i = renderer.info, tex = new Set(), geo = new Set(), mat = new Set(); let objs = 0; scene.traverse(o => { objs++; if (o.geometry) geo.add(o.geometry); for (const m of [].concat(o.material || [])) { mat.add(m); for (const k in m) if (m[k] && m[k].isTexture) tex.add(m[k]); } });
       let texMB = 0; for (const t of tex) { const im = t.image; if (im && im.width) texMB += im.width * im.height * 4 * (t.generateMipmaps !== false ? 1.33 : 1) / 2 ** 20; }
       return { gGeo: i.memory.geometries, gTex: i.memory.textures, progs: i.programs?.length, calls: i.render.calls, tris: i.render.triangles, objs, sceneGeo: geo.size, sceneMat: mat.size, sceneTex: tex.size, texMB: Math.round(texMB) }; },

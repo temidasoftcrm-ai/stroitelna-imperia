@@ -25,7 +25,15 @@ function net(P) {
       if (best >= 0 && bd < 12) link(v, best);
     }
   });
-  const N = { X, Z, adj, of, hub };
+  // пътищата до гарата, летището и магистралата (game.js: P.links) — свързват се за най-близката точка на улиците
+  const nStreet = X.length;
+  for (const st of P.links || []) {
+    const L = st.L.at(-1), n = Math.max(1, Math.round(L / 4)), ids = [];
+    for (let k = 0; k <= n; k++) { const p = pointAt(st, k / n * L); ids.push(add(p.x, p.z)); if (k) link(ids[k - 1], ids[k]); }
+    let best = -1, bd = 1e18; for (let i = 0; i < nStreet; i++) { const d = (X[i] - X[ids[0]]) ** 2 + (Z[i] - Z[ids[0]]) ** 2; if (d < bd) { bd = d; best = i; } }
+    if (best >= 0) link(ids[0], best);
+  }
+  const N = { X, Z, adj, of, hub, nStreet };
   nets.set(P, N);
   return N;
 }
@@ -56,7 +64,7 @@ export function planRoute(P, x0, z0, x1, z1) {
 }
 // случайна точка по улица (кола/пешеходец се появява или тръгва натам)
 export function randomRoadPoint(P, rnd = Math.random) {
-  const N = net(P), i = (rnd() * N.X.length) | 0;
+  const N = net(P), i = (rnd() * (N.nStreet ?? N.X.length)) | 0;   // само по улиците в града
   return { x: N.X[i], z: N.Z[i] };
 }
 // пътят само по улиците (за колите — без последната точка извън пътя)
