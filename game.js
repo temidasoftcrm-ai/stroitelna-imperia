@@ -83,6 +83,7 @@ import { applyRoadLook, makeCrosswalks } from './roadlook.js';
 import { gamePlan, planLots, planTiles, planCount } from './cityplangame.js';
 import { buildPlanView } from './cityplan3d.js';
 import { prepNightFloors } from './nightfloors.js';
+import { showIntro } from './intro.js';
 import { sampleCurve } from './cityplan.js';
 import { planRoute, randomRoadPoint } from './cityplanroute.js';
 
@@ -1893,7 +1894,9 @@ function newGame(cityId, brand = null, brandNm = '') {
   S.projects = projects;
   for (let k = 0; k < 3; k++) makeOffer();
   renderPanel();   // първите поръчки се появяват след първото рисуване на панела
-  setTimeout(() => { showEventPop('lv-1', '🏅 Ниво 1 — началото!', 'Завършвай обекти, строй линии и магистрали, за да расте фирмата до ниво 10.'); Sound.play('levelup'); }, 900);
+  const lv1 = () => { showEventPop('lv-1', '🏅 Ниво 1 — началото!', 'Завършвай обекти, строй линии и магистрали, за да расте фирмата до ниво 10.'); Sound.play('levelup'); };
+  if (AUTOTEST) setTimeout(lv1, 900);   // „Добре дошли“ (intro.js) — после поп-ъпът за ниво 1
+  else setTimeout(() => showIntro({ brand: brandOf(S)?.nm || 'Твоята фирма', city: cityName(), money: fmt(ECON.START.money), sound: n => Sound.play(n), onDone: () => setTimeout(lv1, 300) }), 700);
   toast(`${brand ? `${brandOf(S).nm} Констръкшън е основана` : 'Фирмата е основана'} в град ${cityName()}! Приеми първата поръчка от таблото.`, 'good');
   if (brand) group.check(true);
   save();
