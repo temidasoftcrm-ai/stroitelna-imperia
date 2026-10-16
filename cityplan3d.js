@@ -85,7 +85,13 @@ export function buildPlanView(P0, opts = {}) {
   }
   // --- улици: тротоар (по-широк) + асфалт; мост над водата; маркировка на булевардите
   const walk = [[], []], asph = [[], []], paint = [[], []], br = [[], []];
-  for (const st of P.streets) {
+  // мрежа от точките на всички улици — „тази точка върху друга улица ли е?“ (пунктирът и зебрите не трябва да минават през чуждо кръстовище)
+  const GC = 24, grid = new Map(), gk = (x, z) => Math.floor(x / GC) + ',' + Math.floor(z / GC);
+  P.streets.forEach((o, oi) => o.pts.forEach(q => { const k = gk(q[0], q[1]); (grid.get(k) || grid.set(k, []).get(k)).push([q[0], q[1], o.w / 2, oi]); }));
+  const onSt = (x, z, si, pad) => { const cx = Math.floor(x / GC), cz = Math.floor(z / GC);
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const L = grid.get((cx + i) + ',' + (cz + j)); if (L) for (const [qx, qz, hw, oi] of L) if (oi !== si && Math.hypot(qx - x, qz - z) < hw + pad) return true; }
+    return false; };
+  for (const [si, st] of P.streets.entries()) {
     const wet = st.pts.map(p => P.waterAt(p[0], p[1]));
     const yb = st.pts.map((p, i) => { let m = 0; for (let k = -8; k <= 8; k++) if (wet[i + k]) m = Math.max(m, 1 - Math.abs(k) / 9); return m * 2.2; });   // рампа към моста
     const gh = st.pts.map((p, i) => wet[i] ? 0 : Math.max(0, P.heightAt(p[0], p[1])));   // извън града пътят следва релефа
@@ -100,7 +106,7 @@ export function buildPlanView(P0, opts = {}) {
       const L = st.L.at(-1), nodes = P.nodes.filter(n => !n.square);
       for (let s = 3; s < L - 3; s += 6) {
         const a = pointAt(st, s), b = pointAt(st, s + 3);
-        if (nodes.some(n => Math.hypot(n.x - a.x, n.z - a.z) < st.w)) continue;
+        if (nodes.some(n => Math.hypot(n.x - a.x, n.z - a.z) < st.w) || onSt(a.x, a.z, si, st.w / 2 + 2) || onSt(b.x, b.z, si, st.w / 2 + 2)) continue;   // и там, където асфалтът на две улици се допира (сливане под малък ъгъл)
         const i0 = Math.round(s / 2);
         ribbon([[a.x, a.z], [b.x, b.z]], 0.25, () => 0.09 + (yb[i0] || 0), ...paint);
       }
@@ -126,14 +132,17 @@ export function buildPlanView(P0, opts = {}) {
     major.push({ n, ni, es });
   });
   const sig = [];   // [x, z, ос (ъгъл на улицата)] — светофар на десния ъгъл на всеки изход
-  const zbr = [], onOther = (x, z, si) => P.streets.some((o, oi) => oi !== si && o.pts.some((q, i) => i % 2 === 0 && Math.hypot(q[0] - x, q[1] - z) < o.w / 2 + 1.2));
+  const zbr = [];
   for (const { n, ni, es } of major) for (const e of es) {
     if (Math.abs(e.s1 - e.s0) < 16) continue;
     const wMax = Math.max(...es.map(q => P.streets[q.st].w));
     const st = P.streets[e.st], s = e.a === ni ? e.s0 : e.s1, dir = e.a === ni ? 1 : -1, rad = wMax / 2 + 3.2;   // извън кръга на кръстовището (по най-широката улица)
     const p = pointAt(st, s + dir * rad);
     // без застъпване: не върху друга улица и не до друга зебра (извитите улици дават близки изходи)
-    if (onOther(p.x, p.z, e.st) || zbr.some(([x, z]) => Math.hypot(x - p.x, z - p.z) < 8)) continue;
+    // цялата зебра (двата края и средата, ± дължината на ивиците) трябва да е само върху своята улица — при диагоналните кръстовища краят ѝ иначе влиза в съседната
+    const zp = [];
+    for (const k of [-st.w / 2, 0, st.w / 2]) for (const t of [-1.6, 1.6]) zp.push([p.x - p.tz * k + p.tx * t, p.z + p.tx * k + p.tz * t]);
+    if (zp.some(([x, z]) => onSt(x, z, e.st, 0.6)) || zbr.some(([x, z]) => Math.hypot(x - p.x, z - p.z) < 8)) continue;
     zbr.push([p.x, p.z]);
     for (let k = -st.w / 2 + 0.8; k < st.w / 2 - 0.5; k += 1.3) {
       const cx = p.x - p.tz * k, cz = p.z + p.tx * k;
@@ -148,7 +157,12 @@ export function buildPlanView(P0, opts = {}) {
   // --- площад: павета, фонтан, кръг от дървета
   const sq = P.square, pl = [[], []]; disc(sq.x, sq.z, sq.r + 1, 0.08, ...pl, 32);
   g.add(mesh(...pl, M.plaza));
-  if (!opts.noFountain && opts.fountainProto) { const f = opts.fountainProto.clone(true); f.scale.setScalar(Math.min(14, sq.r * 0.75)); f.position.set(sq.x, 0.08, sq.z); f.traverse(o => { if (o.isMesh) o.castShadow = true; }); g.add(f); }   // истинският фонтан (plants-real)
+  if (!opts.noFountain && opts.fountainProto) { const f = opts.fountainProto.clone(true); const fr = Math.min(6.5, sq.r * 0.33); f.scale.setScalar(fr); f.position.set(sq.x, 0.08, sq.z); f.traverse(o => { if (o.isMesh) o.castShadow = true; }); g.add(f);
+    if (opts.benchProto) {   // пейки в кръг около фонтана, с лице към него
+      const bp = opts.benchProto, bb = new THREE.Box3().setFromObject(bp), bs = bb.getSize(new THREE.Vector3()), k = 2.2 / Math.max(bs.x, bs.z), R = fr / 2 + 4.5;
+      for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + Math.PI / 8, b = bp.clone(true); b.scale.setScalar(k); b.position.set(sq.x + Math.cos(a) * R, 0.08 - bb.min.y * k, sq.z + Math.sin(a) * R); b.rotation.y = -a - Math.PI / 2; b.traverse(o => { if (o.isMesh) o.castShadow = true; }); detail.add(b); }
+    }
+  }   // истинският фонтан (plants-real)
   else if (!opts.noFountain) { const f = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.6, 0.8, 24), M.stone); f.position.set(sq.x, 0.4, sq.z); g.add(f);
     const w = new THREE.Mesh(new THREE.CylinderGeometry(3.7, 3.7, 0.1, 24), M.fountain); w.position.set(sq.x, 0.82, sq.z); g.add(w);
     const s = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 4, 10), M.stone); s.position.set(sq.x, 2.2, sq.z); g.add(s); }

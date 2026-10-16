@@ -15,14 +15,24 @@ const MODE = { 'building-a': 'dark', 'building-b': 'cool', 'building-c': 'dark',
   bellagio: 'flood', sagrada: 'floodUp', burj: ['coolW', [/material_1/, null]], willis: 'coolW', cntower: 'led',   // Уилис — като Бурж; Си Ен Тауър — цветни LED светлини, които бавно сменят цвета   // Бурж Халифа: студено-бели етажи   // Саграда Фамилия: прожектори отдолу, кулите по-светли нагоре
   // истинските небостъргачи (assets/heavy/sky): режимът може да зависи от материала — [регулярен израз за името, режим|null]
   'sf-sky-usb': ['cool', [/roof/i, null]], 'sf-sky-rand': ['cool'], 'sf-sky-sing': ['cool', [/Interior/i, 'flood'], [/Red_Beam|Trimsheet|temp/i, null]],
+  // истинските къщи и блокове (feature 'night-houses'): house-a — стъклата са отделни материали (светят целите); house-b — една текстура,
+  // прозорецът е правоъгълник в нея ('houseB' — свети целият, без тъмната рамка); бръшлянът (phong1) — не. Блоковете: прозорците по-тъмни от фасадата ('dark') или отделен материал.
+  'building-type-a': [null, [/^Material\.(001|006|008|009|010|011|012)$/, 'flood']], 'building-type-b': [null, [/lambert1/, 'houseB']],
+  'sf-blk-brick': [null, [/^Window/i, 'flood']], 'sf-blk-oldbld': [null, [/^Windows/i, 'flood']], 'sf-blk-modoffice': [null, [/Glass/i, 'solid'], [/Light/i, 'flood']],
+  'sf-blk-richmond': 'darkC', 'sf-blk-dbrick': 'darkC', 'sf-blk-jade': 'darkC', 'sf-blk-soviet': 'darkC', 'sf-blk-panel12': ['aux', [/antenna/i, null]], 'sf-blk-gamecity': 'aux', 'sf-blk-asian': 'aux',
+  // 'aux': маската е от друга карта в модела (game.js я слага в m.userData.nfAux = { tex, kind }) — panel12: белите прозорци на черно, gamecity/asian: розовите
+  // 'darkC': като 'dark', но с по-силно изчистване — снимковите текстури иначе дават шум от светли точки
+  // новите къщи (houses2): стъклото — цялото; lodge има интериор — светят подът и таванът зад прозорците; с една текстура — 'darkC'
+  'h2-greyporch': [null, [/Glass|^material_0$/i, 'solid']], 'h2-swedish': [null, [/^Glass$/, 'solid']], 'h2-lodge': [null, [/Floor|CEILING/i, 'solid']],
+  'h2-pink': [null, [/WindowsAndDoors/i, 'darkC']], 'h2-townhouse': 'darkC',   // h2-porch, h2-blue, h2-brickcabin — маската хваща покрива (петна), засега без
   'sf-sky-night': ['bright'], 'sf-sky-blue': ['cool', [/glass/i, 'solid'], [/./, null]] };   // забележителност (landmarks.js) — хотелът в Лас Вегас: цялата фасада в топла светлина (прожектори), етажите леко различни
-const FLOORS = n => ({ burj: 90, bellagio: 28, 'building-skyscraper-d': 8, 'building-skyscraper-e': 8 })[n] || (/skyscraper|sf-sky/.test(n) ? 32 : 9);
+const FLOORS = n => (n.startsWith('h2-') ? 2 : 0) || ({ 'building-type-a': 1, 'building-type-b': 2, burj: 90, bellagio: 28, 'building-skyscraper-d': 8, 'building-skyscraper-e': 8 })[n] || (/skyscraper|sf-sky/.test(n) ? 32 : 9);
 // режимът на материала: MODE[name] е низ или [по подразбиране, [/име/, режим|null]…]
 const modeOf = (name, m) => { const e = MODE[name]; if (!e || typeof e === 'string') return e; for (const [re, md] of e.slice(1)) if (re.test(m.name || '')) return md; return e[0]; };
 const WHITE = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1); WHITE.needsUpdate = true;   // приблизителен брой етажи на модела
 export const NF_MATS = new Set();
 export const NF_T = { value: 0 };   // време (s) — daynight.js го върти; през нощта етажи угасват и светват
-const FEAT = { sagrada: 'night-sagrada', burj: 'night-burj', willis: 'night-towers', cntower: 'night-towers', 'building-skyscraper-d': 'night-towers', 'building-skyscraper-e': 'night-towers' };
+const FEAT = { ...Object.fromEntries(['greyporch', 'brickcabin', 'pink', 'townhouse', 'blue', 'swedish', 'lodge', 'porch'].map(k => ['h2-' + k, 'night-houses'])), 'building-type-a': 'night-houses', 'building-type-b': 'night-houses', ...Object.fromEntries(['brick', 'oldbld', 'modoffice', 'richmond', 'dbrick', 'jade', 'soviet', 'panel12', 'gamecity', 'asian'].map(k => ['sf-blk-' + k, 'night-houses'])), sagrada: 'night-sagrada', burj: 'night-burj', willis: 'night-towers', cntower: 'night-towers', 'building-skyscraper-d': 'night-towers', 'building-skyscraper-e': 'night-towers' };
 const WORLD_H = { burj: 70, willis: 46, cntower: 58 };   // височина в света (landmarks.js GLB_LM.h) — моделът е от много части с различни оси   // отделно „✓ OK“ в Лабораторията (иначе — night-floors)   // материалите с нощни етажи — daynight.js ги пали вечер
 const masks = new Map();   // режим → (изображение → маска CanvasTexture)
 
@@ -44,15 +54,26 @@ function maskFor(tex, mode) {
   const d = g.getImageData(0, 0, w, h), p = d.data, L = new Float32Array(w * h), raw = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) { const r = p[4 * i] / 255, gg = p[4 * i + 1] / 255, b = p[4 * i + 2] / 255; L[i] = 0.3 * r + 0.59 * gg + 0.11 * b; p[4 * i + 3] = Math.max(r, gg, b) - Math.min(r, gg, b); raw[i] = b - r; }
   if (mode === 'flood' || mode === 'floodUp') return tex;
+  if (mode === 'white' || mode === 'magenta') {   // готова карта на прозорците (вж. 'aux')
+    for (let i = 0; i < w * h; i++) { const r = p[4 * i], gg = p[4 * i + 1], b = p[4 * i + 2], on = mode === 'white' ? L[i] > 0.5 : r > 150 && b > 150 && gg < 110; p[4 * i] = p[4 * i + 1] = p[4 * i + 2] = on ? 255 : 0; p[4 * i + 3] = 255; }
+    g.putImageData(d, 0, 0);
+    const t = new THREE.CanvasTexture(c); t.flipY = tex.flipY; t.colorSpace = THREE.SRGBColorSpace; t.wrapS = tex.wrapS; t.wrapT = tex.wrapT; byMode.set(img, t); return t;
+  }
+  if (mode === 'houseB') {   // каменната къща: прозорецът (u 0.77–0.93, v 0.01–0.28 в текстурата) без най-тъмните пиксели на рамката
+    for (let i = 0; i < w * h; i++) { const u = (i % w) / w, v = ((i / w) | 0) / h, on = u > 0.775 && u < 0.925 && v > 0.01 && v < 0.275 && L[i] > 0.25; p[4 * i] = p[4 * i + 1] = p[4 * i + 2] = on ? 255 : 0; p[4 * i + 3] = 255; }
+    g.putImageData(d, 0, 0);
+    const t = new THREE.CanvasTexture(c); t.flipY = tex.flipY; t.colorSpace = THREE.SRGBColorSpace; t.wrapS = tex.wrapS; t.wrapT = tex.wrapT; byMode.set(img, t); return t;
+  }
   if (mode === 'coolW' || mode === 'led') return tex;   // Бурж: самата текстура, меко сребристо (без петна)   // прожектори / осветени стаи: самата текстура свети
-  const loc = mode === 'dark' ? box(L, w, h, Math.max(4, (Math.min(w, h) / 24) | 0)) : null;
+  const dk = mode === 'dark' || mode === 'darkC', R = mode === 'darkC' ? Math.max(2, (Math.min(w, h) / 160) | 0) : 1;
+  const loc = dk ? box(L, w, h, Math.max(4, (Math.min(w, h) / 24) | 0)) : null;
   const win = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) {
     const sat = p[4 * i + 3];
     win[i] = mode === 'bright' ? +(L[i] > 0.32) : mode === 'cool' ? +(raw[i] > 0.03 && L[i] > 0.15 && L[i] < 0.85 && sat < 0.35) : mode === 'kenney' ? +(raw[i] > 0.06 && L[i] > 0.1 && L[i] < 0.8) : +(L[i] < loc[i] - 0.08 && L[i] < 0.5 && sat < 0.2);
   }
-  const a = mode === 'kenney' ? win : box(win, w, h, 1); if (mode !== 'kenney') for (let i = 0; i < w * h; i++) a[i] = +(a[i] > 0.55);   // без тънките линии (палитрата е от петна — без)
-  const m = mode === 'kenney' ? a.map(v => v) : box(a, w, h, 1);
+  const a = mode === 'kenney' ? win : box(win, w, h, R); if (mode !== 'kenney') for (let i = 0; i < w * h; i++) a[i] = +(a[i] > (mode === 'darkC' ? 0.7 : 0.55));   // без тънките линии (палитрата е от петна — без)
+  const m = mode === 'kenney' ? a.map(v => v) : box(a, w, h, R);
   for (let i = 0; i < w * h; i++) { const v = m[i] > 0.3 ? 255 : 0; p[4 * i] = p[4 * i + 1] = p[4 * i + 2] = v; p[4 * i + 3] = 255; }
   g.putImageData(d, 0, 0);
   const t = new THREE.CanvasTexture(c); t.flipY = tex.flipY; t.colorSpace = THREE.SRGBColorSpace; t.wrapS = tex.wrapS; t.wrapT = tex.wrapT;
@@ -68,8 +89,8 @@ export function prepNightFloors(root, name) {
     for (const m of [].concat(o.material)) {
       if (!m || m.userData.nightFloors || !('emissive' in m)) continue;
       if (name === 'building-skyscraper-c' && /roof|heli|top/i.test(m.name || '')) continue;
-      const mode = modeOf(name, m); if (!mode || (!m.map && mode !== 'solid')) continue;
-      const mk = mode === 'solid' ? WHITE : maskFor(m.map, mode); if (!mk) continue;
+      const mode = modeOf(name, m); if (!mode || (!m.map && mode !== 'solid') || (mode === 'aux' && !m.userData.nfAux)) continue;
+      const mk = mode === 'solid' ? WHITE : mode === 'aux' ? maskFor(m.userData.nfAux.tex, m.userData.nfAux.kind) : maskFor(m.map, mode); if (!mk) continue;
       m.emissiveMap = mk; m.emissive.setRGB(1, 1, 1); m.emissiveIntensity = 0; m.userData.nightFloors = true; m.userData.winK = 1; NF_MATS.add(m);
       const ax = new THREE.Vector3(0, 1, 0);   // оста „нагоре“ в координатите на меша
       m.onBeforeCompile = sh => {

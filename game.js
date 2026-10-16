@@ -358,6 +358,8 @@ addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; cam
 // ============================================================ assets
 const loader = new GLTFLoader();
 const load = url => new Promise((res, rej) => loader.load(url, res, undefined, rej));
+// истинските цветни къщи (assets/heavy/houses2, Sketchfab CC-BY) — всяка с отделно „✓ OK“ в Лабораторията (feature = името ѝ); добавят се към HOUSES
+const H2 = ['h2-greyporch', 'h2-brickcabin', 'h2-pink', 'h2-townhouse', 'h2-blue', 'h2-swedish', 'h2-lodge', 'h2-porch'].filter(n => feature(n));
 const MODELS = {
   roads: ['traffic-light', 'road-straight', 'road-crossroad', 'road-intersection', 'road-bend', 'construction-cone', 'construction-barrier', 'light-square'],
   houses: ['building-type-a', 'building-type-b', 'building-type-c', 'building-type-d', 'building-type-e', 'building-type-f', 'building-type-g', 'building-type-h', 'building-type-i', 'building-type-j', 'building-type-k', 'building-type-l', 'building-type-m', 'building-type-n', 'building-type-o', 'building-type-p', 'building-type-q', 'building-type-r', 'building-type-s', 'building-type-t', 'building-type-u', 'tree-large', 'tree-small'],   // всичките 21 къщи от пакета (Kenney, CC0)
@@ -386,8 +388,10 @@ let europe = null;
   const jobs = [];
   // заводските модели се казват като търговските (building-a…) — пазим ги под 'ind-…'
   // истински храсти, цветя и фонтан (assets/heavy/plants, нормализирани: най-широката страна 1, основа 0) — зад feature('plants-real')
+  for (const n of H2) jobs.push(load(`assets/heavy/houses2/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => HOUSES.splice(HOUSES.indexOf(n), 1)));   // не се зареди → не се строи
   if (feature('plants-real')) for (const k of ['bush-0', 'bush-1', 'bush-2', 'flowers', 'fountain']) jobs.push(load(`assets/heavy/plants/${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['pl-' + k] = g; }).catch(() => {}));
-  for (const [dir, list] of Object.entries(MODELS)) for (const n of list) jobs.push(load(`assets/${dir}/${n}.glb`).then(g => { A[dir === 'industrial' ? 'ind-' + n : n] = g; if (dir === 'commercial' || dir === 'commercial2') prepNightFloors(g.scene, n); }));   // нощем етажите светват (nightfloors.js)
+  for (const [dir, list] of Object.entries(MODELS)) for (const n of list) jobs.push(load(`assets/${dir}/${n}.glb`).then(g => { A[dir === 'industrial' ? 'ind-' + n : n] = g; if (dir === 'commercial' || dir === 'commercial2' || n === 'building-type-a' || n === 'building-type-b') prepNightFloors(g.scene, n);
+    if (n === 'building-type-b') g.scene.traverse(o => { if (o.isMesh && o.material?.name === 'phong1') o.visible = false; }); }));   // бръшлянът на house-b е JPEG без прозрачност → черни петна   // нощем етажите светват (nightfloors.js)
   // истинска строителна техника и коли за трафика (vehmodels.js, Sketchfab)
   jobs.push(loadVehModels(load, A));
   jobs.push(loadAirModels(load));   // самолети и контролна кула (airport.js)
@@ -403,7 +407,9 @@ let europe = null;
       const roof = new THREE.Mesh(new THREE.BoxGeometry(sz.x * 0.97, sz.y * 0.01, sz.z * 0.97), new THREE.MeshStandardMaterial({ color: 0x55585c, roughness: 0.95 })); roof.position.set(c.x, top, c.z); roof.receiveShadow = true; g.scene.add(roof);
       for (const [dx, dz, w] of [[-0.2, -0.15, 0.14], [0.22, 0.18, 0.1], [0.05, 0.25, 0.08]]) { const u = new THREE.Mesh(new THREE.BoxGeometry(sz.x * w, sz.y * 0.035, sz.z * w), new THREE.MeshStandardMaterial({ color: 0x9a9ea3, roughness: 0.7 })); u.position.set(c.x + dx * sz.x, top + sz.y * 0.018, c.z + dz * sz.z); u.castShadow = true; g.scene.add(u); }
     }
-    A['sf-blk-' + k] = g; }).catch(() => {}));   // истински блокове (Sketchfab)
+    A['sf-blk-' + k] = g;
+    const aux = { panel12: [3, 'white'], gamecity: [1, 'magenta'], asian: [1, 'magenta'] }[k];   // [№ на картинката, вид] — картата с прозорците (nightfloors.js, 'aux')
+    return (aux ? g.parser.getDependency('texture', g.parser.json.textures.findIndex(t => (t.extensions?.EXT_texture_webp?.source ?? t.source) === aux[0])).then(t => g.scene.traverse(o => { if (o.isMesh && o.material?.map) o.material.userData.nfAux = { tex: t, kind: aux[1] }; })).catch(() => {}) : Promise.resolve()).then(() => prepNightFloors(g.scene, 'sf-blk-' + k)); }).catch(() => {}));   // истински блокове (Sketchfab)
   // хотелите и A-frame хижите на курортите (~7 MB) се зареждат чак при влизане в курорт — loadResortModels()
   // кораби и контейнери за крайбрежните градове (seaside.js)
   for (const n of SEA_MODELS) if (!A[n]) jobs.push(load(`assets/watercraft/${n}.glb`).then(g => { A[n] = g; }).catch(() => {}));
@@ -472,7 +478,7 @@ const plazaTree = h => { const sz = sizeOf('tree-large'); return model('tree-lar
 function model(n, scale = 1, shadow = true) {
   let rot = null;
   if (n === 'tree-large' || n === 'tree-small') { const t = niceTree(n, scale); if (t) { n = t[0]; scale = t[1]; rot = treeN * 2.39; } }
-  const o = A[n].scene.clone(true);
+  const V = A[n].variants, o = (V ? V[(model.k = (model.k || 0) + 1) % V.length] : A[n].scene).clone(true);   // одобрените варианти (полиция, пожарни, линейки) се редуват
   if (rot != null) o.rotation.y = rot;
   o.scale.setScalar(scale); o.userData.src = n;
   o.traverse(m => { if (m.isMesh) { m.castShadow = shadow; m.receiveShadow = true; } });
@@ -617,6 +623,10 @@ function instanced(name, mats) {
   return g;
 }
 const HOUSES = MODELS.houses.filter(n => n.startsWith('building'));
+HOUSES.push(...H2);   // истинските цветни къщи (H2 — при MODELS)
+// истинските къщи (house-a тухлената с веранда, house-b каменната) — с 40% по-големи от Kenney къщите
+// (истинските не минават през tintRoof — копията на материалите губят нощното светене)
+function houseFit(n) { return n === 'building-type-a' || n === 'building-type-b' ? 15 : n.startsWith('h2-') ? 14 : 11; }
 const SHOPS = ['building-a', 'building-b', 'building-c', 'building-d', 'building-e', 'building-f', 'building-g', 'building-h'];
 const SKY = ['building-skyscraper-a', 'building-skyscraper-b', 'building-skyscraper-c'];
 // ---- градовете по големина: малките без небостъргачи, средните до 10 етажа, мегаполисите с модерен център
@@ -731,7 +741,7 @@ function buildCity(cityId) {
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(Math.max(1200, 2 * (tx(NI - 1) + 380)), Math.max(1200, 2 * (tx(NJ - 1) + 300))), new THREE.MeshStandardMaterial({ color: isDesert(cityId) ? 0xd9bf86 : 0x8fb36a, roughness: 1 }));   // Африка — пясък
   if (P && !P.links) P.links = planLinks(P);   // и в мрежата на маршрутите (cityplanroute.js) — ТИР-овете и техниката карат по тях
   const pv = P ? buildPlanView({ ...P, streets: [...P.streets, ...P.links] }, { size: Math.max(1600, 2 * (tx(NI - 1) + 400)), seg: 170, target: controls.target, lotCount: Math.min(P.lots.length, planCount(P.mega, S.cityExt || 0)),
-    seaZ: SEASIDE.includes(cityId) ? tx(0) - TILE / 2 - 2 : null, noFountain: !!CITY_LANDMARKS[cityId], plantProtos: ['pl-bush-0', 'pl-bush-1', 'pl-bush-2', 'pl-flowers'].filter(k => A[k]).map(k => A[k].scene), fountainProto: A['pl-fountain']?.scene, treeProtos: Object.keys(A).filter(k => k.startsWith('sf-tree-') || k.startsWith('sf-pine-')).map(k => { const o = A[k].scene; o.userData.pine = k.startsWith('sf-pine-'); return o; }) }) : null;
+    seaZ: SEASIDE.includes(cityId) ? tx(0) - TILE / 2 - 2 : null, noFountain: !!CITY_LANDMARKS[cityId], plantProtos: ['pl-bush-0', 'pl-bush-1', 'pl-bush-2', 'pl-flowers'].filter(k => A[k]).map(k => A[k].scene), fountainProto: A['pl-fountain']?.scene, benchProto: A.bench?.scene, treeProtos: Object.keys(A).filter(k => k.startsWith('sf-tree-') || k.startsWith('sf-pine-')).map(k => { const o = A[k].scene; o.userData.pine = k.startsWith('sf-pine-'); return o; }) }) : null;
   weather.setGround(pv ? pv.userData.groundMat : ground.material);   // снежната покривка оцветява земята
   // крайбрежните градове: море на север с плаж, пристанище, фар и кораби (seaside.js)
   city.airport = null; city.airportNI = 0; city.airSite = null; refreshAirport3D(cityId);
@@ -885,10 +895,10 @@ function decorLot(g, lot, cityId) {
 }
 function placeBuilding(lot, n, rot = 0) {
   const isQ = n.startsWith('Building_');
-  const s = SHOPS.includes(n) && lot.plan ? fitScale(n, Math.min(lot.w, lot.d) - 1.5) : (isQ ? fitScale(n, 14) : HOUSES.includes(n) ? fitScale(n, 11) : fitScale(n, SHOPS.includes(n) ? SHOP_FIT : 12.5)) * lotK(lot);   // в плана — целият парцел
+  const s = SHOPS.includes(n) && lot.plan ? fitScale(n, Math.min(lot.w, lot.d) - 1.5) : (isQ ? fitScale(n, 14) : HOUSES.includes(n) ? fitScale(n, houseFit(n)) : fitScale(n, SHOPS.includes(n) ? SHOP_FIT : 12.5)) * lotK(lot);   // в плана — целият парцел
   const o = model(n, s);
   if (SHOPS.includes(n)) o.scale.y *= shopTall(n);
-  if (HOUSES.includes(n)) tintRoof(o, lot.id);
+  if (HOUSES.includes(n) && houseFit(n) === 11) tintRoof(o, lot.id);
   dayNight.registerWindows(o);
   o.rotation.y = lot.plan ? lot.rot : rot;   // в плана — с лицето към улицата
   o.position.set(lot.x, 0, lot.z);
@@ -1666,10 +1676,10 @@ function makeSite(p) {
   v.clip = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
   const tmpLot = { x: 0, z: 0 };
   const isQ = p.model.startsWith('Building_');
-  const s = isQ ? fitScale(p.model, 14) : HOUSES.includes(p.model) ? fitScale(p.model, 11) : fitScale(p.model, SHOPS.includes(p.model) ? SHOP_FIT : 12.5);
+  const s = isQ ? fitScale(p.model, 14) : HOUSES.includes(p.model) ? fitScale(p.model, houseFit(p.model)) : fitScale(p.model, SHOPS.includes(p.model) ? SHOP_FIT : 12.5);
   const b = model(p.model, s);
   if (SHOPS.includes(p.model)) b.scale.y *= shopTall(p.model);
-  if (HOUSES.includes(p.model)) tintRoof(b, p.lot);
+  if (HOUSES.includes(p.model) && houseFit(p.model) === 11) tintRoof(b, p.lot);
   const bb = new THREE.Box3().setFromObject(b);
   b.position.set(tmpLot.x - (bb.min.x + bb.max.x) / 2, 0.6, tmpLot.z - (bb.min.z + bb.max.z) / 2);
   b.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.clippingPlanes = [v.clip]; o.material.clipShadows = true; } });
@@ -7904,6 +7914,12 @@ if (AUTOTEST) {
       return { boston: bc('boston'), chicago: bc('chicago'), paris: bc('paris'), air: [amL(AIRPORT_LEVELS[0], 'boston', 'air').cost, AIRPORT_LEVELS[0].cost], port: [amL(PORT_LEVELS[0], 'miami', 'port').cost, PORT_LEVELS[0].cost], ab: [sg && q(sg), q(eu)] }; },
     balkTest() { S.balkansPop = 0; S.dev.xp = 15000; S.dev.lv = 4; dev.add(6000); return { lv: S.dev.lv, pop: S.balkansPop, img: document.querySelector('#buyPop img')?.getAttribute('src') }; },
     trainLook(kinds = ['loco', 'hopper', 'flat', 'ave', 'hsw', 'aveTail', 'oeLoco', 'oeCar']) { const g = new THREE.Group(); kinds.forEach((k, i) => { if (!hasTrainModel(k)) return; const c = trainCar(k, i); c.position.set(i * 10, 0, 0); g.add(c); }); g.position.set(0, 0.3, 300); scene.add(g); showMap(false); controls.target.set(35, 2, 300); camera.position.set(35, 30, 345); controls.update(); fly = null; return kinds.filter(hasTrainModel); },
+    nightRow(only) {   // Лабораторията: истинските къщи и блоковете един до друг (нощно светене)
+      const ns = only === 'h2' ? ['building-type-a', 'building-type-b', ...H2].filter(n => A[n]) : ['building-type-a', 'building-type-b', ...['brick', 'richmond', 'dbrick', 'oldbld', 'soviet', 'panel12', 'jade', 'modoffice', 'gamecity', 'asian'].map(k => 'sf-blk-' + k)].filter(n => A[n]);
+      const ls = city.lots.filter(x => !x.built && !x.busy).sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z)).slice(0, ns.length);
+      ns.forEach((n, i) => { const l = ls[i]; if (!l) return; const o = model(n, fitScale(n, HOUSES.includes(n) ? houseFit(n) : 14)); o.position.set(l.x, 0, l.z); city.group.add(o); dayNight.registerWindows(o); });
+      const u = ls.slice(0, ns.length), cx = u.reduce((a, l) => a + l.x, 0) / u.length, cz = u.reduce((a, l) => a + l.z, 0) / u.length, r = Math.max(30, ...u.map(l => Math.hypot(l.x - cx, l.z - cz)));
+      __dbg.camAt(cx + r * 0.9, r * 1.1, cz + r * 1.2, cx, 4, cz); return u.map((l, i) => [ns[i], Math.round(l.x), Math.round(l.z)]); },
     blkLook(k = 'oldbld') { const l = city.lots.find(x => !x.built && !x.busy && x.zone === 'mid'); if (!l || !A['sf-blk-' + k]) return null; const o = model('sf-blk-' + k, fitScale('sf-blk-' + k, 14)); o.position.set(l.x, 0, l.z); city.group.add(o); __dbg.camAt(l.x + 22, 30, l.z + 26, l.x, 6, l.z); return { x: l.x, z: l.z }; },
     berthTest() { S.dev.xp = 260000; S.dev.lv = 10; econ.earn(2e8, 'друго', 'тест'); S.ports = { varna: { lv: 1, build: null }, burgas: { lv: 2, build: null } }; S.ships = [];
       S.seaRoutes = [['varna', 'istanbul'], ['varna', 'constanta'], ['burgas', 'thessaloniki'], ['burgas', 'athens'], ['varna', 'izmir'], ['burgas', 'patras']].map(([a, b]) => ({ a, b, km: seaRouteKm(a, b) }));
