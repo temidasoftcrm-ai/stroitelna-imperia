@@ -13,3 +13,7 @@
 - car-limo.glb — "Mercury Grand-Marquis Limo 1983" by fishermans — https://sketchfab.com/3d-models/f86491b9439a40cd8059ef101e0ac8ba
 - car-polsuv.glb — "Lowpoly Generic SUV Police" by mk2design — https://sketchfab.com/3d-models/259fc16c23d548ba8d5802c563d8ebdc
 - car-truck.glb — "Hyundai Mighty" by nguyenhoanglam20100609 — https://sketchfab.com/3d-models/e1e2309aad024531b4d41184f5edc898
+- pol-charger.glb — "Dodge Charger LX Police Car" by zairiqzairiqpixarcarsbfdi — https://sketchfab.com/3d-models/e89ceff10b4f45749164f006f2ff0e69
+- pol-crownvic.glb — "Ford Crown Victoria Police" by aeroux — https://sketchfab.com/3d-models/f713d0e7b1984da3a961d93bbffce959
+- pol-interceptor.glb — "Police Interceptor - NFS Hot Pursuit 2" by vj32621 — https://sketchfab.com/3d-models/8cdde07c700c43bfba944d0186d563ac
+- pol-volga.glb — "GAZ 24 Volga Traffic Police" by eightismore — https://sketchfab.com/3d-models/1288e193785c484a9c005f9264e95036

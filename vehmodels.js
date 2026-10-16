@@ -43,7 +43,7 @@ export function loadVehModels(load, A, base = 'assets/heavy/gear/') {
       for (const p of parts) { const q = p.clone(true); q.applyMatrix4(p.parent.matrixWorld); grp.add(q); }   // в световни координати на пакета
       A['sf-car-' + nm] = { scene: wrap(grp, 0, k) };
     }
-  }).catch(e => console.warn('vehmodels cars', e)).then(() => feature('cars-real') && loadRealCars(load, A)).then(() => feature('trucks-real') && loadRealTrucks(load, A)));
+  }).catch(e => console.warn('vehmodels cars', e)).then(() => feature('cars-real') && loadRealCars(load, A)).then(() => feature('trucks-real') && loadRealTrucks(load, A)).then(() => loadPoliceCars(load, A)));
   return Promise.all(jobs);
 }
 
@@ -61,6 +61,13 @@ function loadRealCars(load, A) {
     if (/^Police/.test(nm)) addBeacons(sc, len * M_PER);
     A['sf-car-' + nm] = { scene: sc };
   }).catch(e => console.warn('real car', nm, e))));
+}
+// полицейските коли за одобрение (Лабораторията → pol-*): одобрените заместват Police_Sedan; ако са няколко — редуват се
+const POLICE = [['pol-charger', 5.1], ['pol-crownvic', 5.4], ['pol-interceptor', 5.3], ['pol-volga', 4.8]];
+export function loadPoliceCars(load, A) {
+  const ok = POLICE.filter(([f]) => feature(f)); if (!ok.length) return Promise.resolve();
+  return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + f + '.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = true; }); const sc = wrap(g.scene, 0, len * M_PER); addBeacons(sc, len * M_PER); return sc; }).catch(() => null)))
+    .then(list => { list = list.filter(Boolean); if (!list.length) return; const root = new THREE.Group(); root.userData.variants = list; A['sf-car-Police_Sedan'] = { scene: list[0], variants: list }; });
 }
 
 // модерни ТИР-ове (Лабораторията → trucks-real): влекачи Scania S и Volvo FH (Sketchfab, CC-BY; assets/heavy/trucks, дължина 1 по z).

@@ -48,4 +48,9 @@ export const FEATURES = [
   {"id": "green-fill", "title": "Зеленина в празните площи (градове с план)", "how": "Празните зелени петна между парцелите и улиците се запълват: горички от 2–4 дървета, храсти с цветни лехи, пейки. В новите игри центърът е по-чист: само всеки втори булевард стига до площада и няма вътрешна дъга (по-малко асфалтови триъгълници). Отваря Пловдив отгоре.", "url": "#tab=demos&item=d41"},
   // „на мястото на тези да сложим истински храсти“ + фонтан
   {"id": "plants-real", "title": "Истински храсти и фонтан", "how": "Нарисуваните храсти и цветните топчета стават истински храсти (буксус, цъфтящ, нисък цветен), а на площада и в част от градинките — каменен фонтан на 3 нива. Отваря Пловдив отблизо.", "url": "#tab=demos&item=d42"},
+  // полицейските коли — избираш кои влизат в трафика
+  {"id": "pol-charger", "title": "Полиция: Dodge Charger", "how": "„Dodge Charger LX Police Car“ (zairiqzairiqpixarcarsbfdi, CC BY 4.0) — черно-бял, с „POLICE“, предна решетка и буркани; в трафика буркани мигат от време на време. „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fheavy%2Fcars%2Fpol-charger.glb"},
+  {"id": "pol-crownvic", "title": "Полиция: Ford Crown Victoria", "how": "„Ford Crown Victoria Police“ (aeroux, CC BY 4.0) — черно-сребрист с буркани. „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fheavy%2Fcars%2Fpol-crownvic.glb"},
+  {"id": "pol-interceptor", "title": "Полиция: Police Interceptor", "how": "„Police Interceptor“ (vj32621, CC BY 4.0) — класическа черно-бяла американска патрулка. „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fheavy%2Fcars%2Fpol-interceptor.glb"},
+  {"id": "pol-volga", "title": "Полиция: Волга на КАТ", "how": "„GAZ 24 Volga Traffic Police“ (eightismore, CC BY 4.0) — жълто-синя съветска „Волга“ с буркани (ГАИ). „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fheavy%2Fcars%2Fpol-volga.glb"},
 ];
