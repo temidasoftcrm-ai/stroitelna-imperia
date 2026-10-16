@@ -5,7 +5,8 @@
 //   коли — от „Free Low Poly Vehicles Pack“ (RgsDev): sf-car-<Име>, в мащаба на града (лек автомобил ≈ CAR_LEN)
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';
-import { NF_MATS } from './nightfloors.js';   // нощем daynight.js вдига emissiveIntensity — фаровете на ТИР-овете
+import { NF_MATS } from './nightfloors.js';
+import { Sound } from './sound.js';   // сирените на спешните коли (Лабораторията → sirens)   // нощем daynight.js вдига emissiveIntensity — фаровете на ТИР-овете
 
 const CAR_LEN = 3.8;   // дължината на седана в света на играта (другите коли са в същия мащаб); беше 3.0 — изглеждаха малки до сградите
 const GEAR = {
@@ -58,16 +59,23 @@ function loadRealCars(load, A) {
   return Promise.all(Object.entries(REAL_CARS).map(([nm, [f, len]]) => load('assets/heavy/cars/' + f + '.glb').then(g => {
     g.scene.traverse(o => { if (o.isMesh) o.castShadow = true; });
     const sc = wrap(g.scene, 0, len * M_PER);
-    if (/^Police/.test(nm)) addBeacons(sc, len * M_PER);
+    if (/^Police/.test(nm)) addBeacons(sc, len * M_PER, 'police');
     A['sf-car-' + nm] = { scene: sc };
   }).catch(e => console.warn('real car', nm, e))));
 }
-// полицейските коли за одобрение (Лабораторията → pol-*): одобрените заместват Police_Sedan; ако са няколко — редуват се
-const POLICE = [['pol-charger', 5.1], ['pol-crownvic', 5.4], ['pol-interceptor', 5.3], ['pol-volga', 4.8]];
+// спешните коли за одобрение (Лабораторията → pol-*, fire-*, amb-*): одобрените заместват Police_Sedan / Firetruck / Ambulance,
+// всички с мигащи буркани; при няколко одобрени — A[...].variants (game.js model() може да ги редува)
+const EMERG = {
+  Police_Sedan: [['pol-charger', 5.1], ['pol-crownvic', 5.4], ['pol-interceptor', 5.3], ['pol-volga', 4.8]],
+  Firetruck: [['fire-red', 9], ['fire-us', 10]],
+  Ambulance: [['amb-gaz', 5.5], ['amb-us', 6.5], ['amb-eu', 5.8]],
+};
 export function loadPoliceCars(load, A) {
-  const ok = POLICE.filter(([f]) => feature(f)); if (!ok.length) return Promise.resolve();
-  return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + f + '.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = true; }); const sc = wrap(g.scene, 0, len * M_PER); addBeacons(sc, len * M_PER); return sc; }).catch(() => null)))
-    .then(list => { list = list.filter(Boolean); if (!list.length) return; const root = new THREE.Group(); root.userData.variants = list; A['sf-car-Police_Sedan'] = { scene: list[0], variants: list }; });
+  return Promise.all(Object.entries(EMERG).map(([nm, opts]) => {
+    const ok = opts.filter(([f]) => feature(f)); if (!ok.length) return null;
+    return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + f + '.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = true; }); const sc = wrap(g.scene, 0, len * M_PER); addBeacons(sc, len * M_PER, nm === 'Firetruck' ? 'fire' : nm === 'Ambulance' ? 'ambulance' : 'police'); return sc; }).catch(() => null)))
+      .then(list => { list = list.filter(Boolean); if (list.length) A['sf-car-' + nm] = { scene: list[0], variants: list }; });
+  }));
 }
 
 // модерни ТИР-ове (Лабораторията → trucks-real): влекачи Scania S и Volvo FH (Sketchfab, CC-BY; assets/heavy/trucks, дължина 1 по z).
@@ -104,20 +112,32 @@ function loadRealTrucks(load, A) {
   }).catch(e => console.warn('real truck', f, e))));
 }
 
-// буркани на полицейските коли: синьо/червено, мигат; около половината коли ги включват „от време на време“ (по ~20 s)
+// сирена: когато бурканите светнат на кола близо до камерата — веднъж на включване, не по-често от 14 s за всички
+const SIREN = { police: 'assets/sfx/siren-police.mp3', fire: 'assets/sfx/siren-fire.mp3', ambulance: 'assets/sfx/siren-ambulance.mp3' };
+let sirenAt = -1e9;
+// буркан: свой клас, за да оцелее анимацията при clone() (методите са в прототипа); всяко копие си прави свой материал
+class Beacon extends THREE.Mesh {
+  onBeforeRender(renderer, scene, camera) {
+    if (!this.userData.own) { this.material = this.material.clone(); this.userData.own = 1; }
+    const car = this.parent && this.parent.parent; if (!car) return;
+    const t = performance.now() / 1000, h = (car.id * 2.39) % 6.28;
+    const on = Math.sin(t / 20 * Math.PI * 2 + h) > 0.1;   // включени ~45% от времето
+    const blink = (Math.floor(t * 6) + (this.userData.red ? 0 : 1)) % 2 === 0;
+    this.material.emissiveIntensity = on && blink ? 3 : 0;
+    if (this.userData.red) {
+      if (on && !car.userData.sirenOn && feature('sirens') && t - sirenAt > 14) {
+        const d = this.getWorldPosition(new THREE.Vector3()).distanceTo(camera.position);
+        if (d < 160) { sirenAt = t; Sound.file(SIREN[this.userData.kind] || SIREN.police, Math.max(0.15, 0.7 - d / 260)); }
+      }
+      car.userData.sirenOn = on;
+    }
+  }
+}
 const BEACON = { r: new THREE.MeshStandardMaterial({ color: 0x400000, emissive: 0xff2020, emissiveIntensity: 0 }), b: new THREE.MeshStandardMaterial({ color: 0x000a40, emissive: 0x2050ff, emissiveIntensity: 0 }) };
-function addBeacons(car, len) {
+function addBeacons(car, len, kind = 'police') {
   car.updateMatrixWorld(true);
   const bb = new THREE.Box3().setFromObject(car), y = bb.max.y + 0.02, w = (bb.max.x - bb.min.x) * 0.22, z = (bb.min.z + bb.max.z) / 2 + len * 0.05;
   const bar = new THREE.Group(); bar.position.set(0, y, z); car.add(bar);
   const geo = new THREE.BoxGeometry(w, 0.09, 0.14);
-  for (const [k, sx] of [['r', -1], ['b', 1]]) {
-    const m = new THREE.Mesh(geo, BEACON[k]); m.position.x = sx * w * 0.55; bar.add(m);
-    m.onBeforeRender = function () {   // всяко копие (clone) има свой uuid → своя фаза; мигат на смени
-      const t = performance.now() / 1000, h = (this.parent.parent ? this.parent.parent.uuid.charCodeAt(0) + this.parent.parent.uuid.charCodeAt(3) : 0);
-      const on = Math.sin(t / 20 * Math.PI * 2 + h) > 0.1;   // включени ~45% от времето
-      const blink = (Math.floor(t * 6) + (k === 'r' ? 0 : 1)) % 2 === 0;
-      this.material.emissiveIntensity = on && blink ? 3 : 0;
-    };
-  }
+  for (const [k, sx] of [['r', -1], ['b', 1]]) { const m = new Beacon(geo, BEACON[k]); m.position.x = sx * w * 0.55; m.userData.red = k === 'r'; m.userData.kind = kind; bar.add(m); }
 }

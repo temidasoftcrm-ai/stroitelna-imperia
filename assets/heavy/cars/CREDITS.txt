@@ -17,3 +17,8 @@
 - pol-crownvic.glb — "Ford Crown Victoria Police" by aeroux — https://sketchfab.com/3d-models/f713d0e7b1984da3a961d93bbffce959
 - pol-interceptor.glb — "Police Interceptor - NFS Hot Pursuit 2" by vj32621 — https://sketchfab.com/3d-models/8cdde07c700c43bfba944d0186d563ac
 - pol-volga.glb — "GAZ 24 Volga Traffic Police" by eightismore — https://sketchfab.com/3d-models/1288e193785c484a9c005f9264e95036
+- fire-red.glb — "Low Poly Fire Truck" by jg-3d — https://sketchfab.com/3d-models/688b7c17a0e54a05b0b2d51a8aee061b
+- fire-us.glb — "Stw FireTruck" by ramonaflowers — https://sketchfab.com/3d-models/e2c3432500ef44afbd8d9226e6740fdf
+- amb-gaz.glb — "ГАЗ-3221 Скорая помощь / GAZ-3221 Ambulance R.2" by grox777 — https://sketchfab.com/3d-models/f3daf79ea4e843c8a159e8ead7af6e74
+- amb-us.glb — "Ambulance Van" by axi0m — https://sketchfab.com/3d-models/3b1c46b48d1e4fbca113916774126899
+- amb-eu.glb — "Ambulance" by rccdesign — https://sketchfab.com/3d-models/1061168f9ec345db81cffb81c17f3649

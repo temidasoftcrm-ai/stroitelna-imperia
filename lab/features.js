@@ -53,4 +53,13 @@ export const FEATURES = [
   {"id": "pol-crownvic", "title": "Полиция: Ford Crown Victoria", "how": "„Ford Crown Victoria Police“ (aeroux, CC BY 4.0) — черно-сребрист с буркани. „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fheavy%2Fcars%2Fpol-crownvic.glb"},
   {"id": "pol-interceptor", "title": "Полиция: Police Interceptor", "how": "„Police Interceptor“ (vj32621, CC BY 4.0) — класическа черно-бяла американска патрулка. „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fheavy%2Fcars%2Fpol-interceptor.glb"},
   {"id": "pol-volga", "title": "Полиция: Волга на КАТ", "how": "„GAZ 24 Volga Traffic Police“ (eightismore, CC BY 4.0) — жълто-синя съветска „Волга“ с буркани (ГАИ). „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fheavy%2Fcars%2Fpol-volga.glb"},
+  // пожарни и линейки
+  {"id": "fire-red", "title": "Пожарна: червена европейска", "how": "„Low Poly Fire Truck“ (jg-3d, CC BY 4.0) — модерна червена пожарна с жълта ивица и сини буркани (мигат). „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fheavy%2Fcars%2Ffire-red.glb"},
+  {"id": "fire-us", "title": "Пожарна: американска", "how": "„Stw FireTruck“ (ramonaflowers, CC BY 4.0) — класическа американска пожарна с хром. „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fheavy%2Fcars%2Ffire-us.glb"},
+  {"id": "amb-gaz", "title": "Линейка: ГАЗ „Газела“ (03)", "how": "„ГАЗ-3221 Скорая помощь“ (grox777, CC BY 4.0) — бяла с червен кръст и сини буркани, като у нас. „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fheavy%2Fcars%2Famb-gaz.glb"},
+  {"id": "amb-us", "title": "Линейка: американска", "how": "„Ambulance Van“ (axi0m, CC BY 4.0) — бяла, със синьо-червени ивици. „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fheavy%2Fcars%2Famb-us.glb"},
+  {"id": "amb-eu", "title": "Линейка: жълта европейска", "how": "„Ambulance“ (rccdesign, CC BY 4.0) — жълт бус със светлоотразителни ивици. „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fheavy%2Fcars%2Famb-eu.glb"},
+  {"id": "sirens", "title": "Сирени на полицията, пожарните и линейките", "how": "Когато спешна кола близо до камерата пусне бурканите, се чува сирена (полиция, пожарна или линейка — Pixabay), не по-често от веднъж на 14 s. Бурканите мигат синьо-червено от време на време. „✓ OK“ — в играта.", "url": "#tab=scenes&item=sofia"},
+  // „и да осветим“ — истинските къщи (тухлената с веранда, каменната) и блоковете
+  {"id": "night-houses", "title": "Къщите и блоковете светят нощем", "how": "Вечер прозорците на истинските къщи и на 10-те блока светват — по етажи, всеки в свой момент. Каменната къща е без черните петна (бръшлянът без прозрачност). Отваря София нощем — къщите и блоковете са наредени около центъра.", "url": "#tab=demos&item=d43"},
 ];

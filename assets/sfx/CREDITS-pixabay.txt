@@ -9,3 +9,6 @@ istanbul-prayer.mp3 — „man praying, Istanbul“ (freesound_community, Pixaba
 lasvegas.mp3 — „KLUC montage 1 edit“ (freesound_community, Pixabay, sound 22919), Pixabay Content License. 82 s цикъл, моно 56 kbps.
 truck-horn.mp3 — „truck signal“ (audiopapkin, Pixabay, sound 298077), Pixabay Content License. Моно 80 kbps.
 ship-horn.mp3 — „boat horn“ (freesound_community, Pixabay, sound 6204), Pixabay Content License. Първите 10 s, моно 80 kbps.
+siren-police.mp3 — „police siren one loop“ (freesound_community, Pixabay, sound 104019), Pixabay Content License. Повторен до 4,7 s, моно 64 kbps.
+siren-fire.mp3 — „fire truck siren“ (freesound_community, Pixabay, sound 6946), Pixabay Content License. 8 s откъс, моно 64 kbps, плавно начало и край.
+siren-ambulance.mp3 — „sound effect UK ambulance siren“ (scottishperson, Pixabay, sound 164354), Pixabay Content License. 8 s откъс, моно 64 kbps.

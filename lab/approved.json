@@ -1,5 +1,8 @@
 {
   "approved": [
+    "amb-eu",
+    "amb-gaz",
+    "amb-us",
     "cars-real",
     "com-a",
     "com-b",
@@ -30,6 +33,9 @@
     "night-towers",
     "peds-real",
     "plants-real",
+    "pol-charger",
+    "pol-crownvic",
+    "pol-interceptor",
     "snd-levelup",
     "trains-real",
     "trees-real",
