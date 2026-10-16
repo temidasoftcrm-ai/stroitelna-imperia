@@ -65,6 +65,7 @@ function loadRealCars(load, A) {
 }
 // спешните коли за одобрение (Лабораторията → pol-*, fire-*, amb-*): одобрените заместват Police_Sedan / Firetruck / Ambulance,
 // всички с мигащи буркани; при няколко одобрени — A[...].variants (game.js model() може да ги редува)
+const EMERG_K = { Police_Sedan: 2, Ambulance: 2, Firetruck: 1.6 };   // спешните коли — по-едри (до хората изглеждаха малки)
 const EMERG = {
   Police_Sedan: [['pol-charger', 5.1], ['pol-crownvic', 5.4], ['pol-interceptor', 5.3], ['pol-volga', 4.8], ['pol-nypd', 5.1]],
   Firetruck: [['fire-red', 9], ['fire-us', 10], ['fire-man', 10.5]],
@@ -73,7 +74,7 @@ const EMERG = {
 export function loadPoliceCars(load, A) {
   return Promise.all(Object.entries(EMERG).map(([nm, opts]) => {
     const ok = opts.filter(([f]) => feature(f)); if (!ok.length) return null;
-    return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + f + '.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = true; }); const sc = wrap(g.scene, 0, len * M_PER); addBeacons(sc, len * M_PER, nm === 'Firetruck' ? 'fire' : nm === 'Ambulance' ? 'ambulance' : 'police'); return sc; }).catch(() => null)))
+    return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + f + '.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = true; }); const K = EMERG_K[nm] * len * M_PER, sc = wrap(g.scene, 0, K); addBeacons(sc, K, nm === 'Firetruck' ? 'fire' : nm === 'Ambulance' ? 'ambulance' : 'police'); return sc; }).catch(() => null)))
       .then(list => { list = list.filter(Boolean); if (list.length) A['sf-car-' + nm] = { scene: list[0], variants: list }; });
   }));
 }
@@ -115,15 +116,16 @@ function loadRealTrucks(load, A) {
 // сирена: когато бурканите светнат на кола близо до камерата — веднъж на включване, не по-често от 14 s за всички
 const SIREN = { police: 'assets/sfx/siren-police.mp3', fire: 'assets/sfx/siren-fire.mp3', ambulance: 'assets/sfx/siren-ambulance.mp3' };
 let sirenAt = -1e9;
-// буркан: свой клас, за да оцелее анимацията при clone() (методите са в прототипа); всяко копие си прави свой материал
+// буркан: свой клас, за да оцелее анимацията при clone() (методите са в прототипа); всяко копие си прави свой материал.
+// Леща (емисивна сфера) + ореол (спрайт): ляво червено, дясно синьо, редуват се ~2,5 Hz; включват се „от време на време“.
+const beaconState = (car, t) => car.userData.forceBeacons || Math.sin(t / 20 * Math.PI * 2 + (car.id * 2.39) % 6.28) > 0.1;
+const carOf = o => { let c = o.parent; while (c && !c.userData.isCar) c = c.parent; return c; };
 class Beacon extends THREE.Mesh {
   onBeforeRender(renderer, scene, camera) {
     if (!this.userData.own) { this.material = this.material.clone(); this.userData.own = 1; }
-    const car = this.parent && this.parent.parent; if (!car) return;
-    const t = performance.now() / 1000, h = (car.id * 2.39) % 6.28;
-    const on = car.userData.forceBeacons || Math.sin(t / 20 * Math.PI * 2 + h) > 0.1;   // включени ~45% от времето (демото — винаги)
-    const blink = (Math.floor(t * 6) + (this.userData.red ? 0 : 1)) % 2 === 0;
-    this.material.emissiveIntensity = on && blink ? 3 : 0;
+    const car = carOf(this); if (!car) return;
+    const t = performance.now() / 1000, on = beaconState(car, t), lit = on && (Math.floor(t * 5) + (this.userData.red ? 0 : 1)) % 2 === 0;
+    this.material.emissiveIntensity = lit ? 4 : 0.15;
     if (this.userData.red) {
       if (on && (!car.userData.sirenOn || car.userData.forceBeacons) && feature('sirens2') && t - sirenAt > (car.userData.forceBeacons ? 6 : 14)) {
         const d = this.getWorldPosition(new THREE.Vector3()).distanceTo(camera.position);
@@ -133,11 +135,23 @@ class Beacon extends THREE.Mesh {
     }
   }
 }
-const BEACON = { r: new THREE.MeshStandardMaterial({ color: 0x400000, emissive: 0xff2020, emissiveIntensity: 0 }), b: new THREE.MeshStandardMaterial({ color: 0x000a40, emissive: 0x2050ff, emissiveIntensity: 0 }) };
+class BeaconGlow extends THREE.Sprite {
+  onBeforeRender() {
+    if (!this.userData.own) { this.material = this.material.clone(); this.userData.own = 1; }
+    const car = carOf(this); if (!car) return;
+    const t = performance.now() / 1000, on = beaconState(car, t), lit = on && (Math.floor(t * 5) + (this.userData.red ? 0 : 1)) % 2 === 0;
+    this.material.opacity = lit ? 1 : 0;
+  }
+}
+let glowTex = null;
+const BEACON = { r: new THREE.MeshStandardMaterial({ color: 0x501010, emissive: 0xff2020, emissiveIntensity: 0.15, roughness: 0.3 }), b: new THREE.MeshStandardMaterial({ color: 0x101850, emissive: 0x2060ff, emissiveIntensity: 0.15, roughness: 0.3 }) };
 function addBeacons(car, len, kind = 'police') {
-  car.updateMatrixWorld(true);
-  const bb = new THREE.Box3().setFromObject(car), y = bb.max.y + 0.02, w = (bb.max.x - bb.min.x) * 0.22, z = (bb.min.z + bb.max.z) / 2 + len * 0.05;
-  const bar = new THREE.Group(); bar.position.set(0, y, z); car.add(bar);
-  const geo = new THREE.BoxGeometry(w, 0.09, 0.14);
-  for (const [k, sx] of [['r', -1], ['b', 1]]) { const m = new Beacon(geo, BEACON[k]); m.position.x = sx * w * 0.55; m.userData.red = k === 'r'; m.userData.kind = kind; bar.add(m); }
+  if (!glowTex) { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 1, 32, 32, 31); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.12, 'rgba(255,255,255,0.7)'); gr.addColorStop(0.4, 'rgba(255,255,255,0.18)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); glowTex = new THREE.CanvasTexture(c); }
+  car.userData.isCar = true; car.updateMatrixWorld(true);
+  const bb = new THREE.Box3().setFromObject(car), W = bb.max.x - bb.min.x, y = bb.max.y + 0.06, z = (bb.min.z + bb.max.z) / 2 + len * 0.08, r = Math.max(0.07, W * 0.04);
+  const geo = new THREE.SphereGeometry(r, 12, 8);
+  for (const [k, sx, col] of [['r', -1, 0xff3030], ['b', 1, 0x3070ff]]) {
+    const m = new Beacon(geo, BEACON[k]); m.position.set(sx * W * 0.18, y, z); m.scale.y = 0.7; m.userData.red = k === 'r'; m.userData.kind = kind; car.add(m);
+    const g = new BeaconGlow(new THREE.SpriteMaterial({ map: glowTex, color: col, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 })); g.position.copy(m.position); g.position.y += r; g.material.depthTest = true; g.renderOrder = 2; g.scale.setScalar(W * 0.6); g.userData.red = k === 'r'; car.add(g);
+  }
 }
