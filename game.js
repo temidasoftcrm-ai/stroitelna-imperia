@@ -540,7 +540,9 @@ const planOn = id => !!(S && (S.planAll || (S.plans && S.plans[id])) && cityTier
 const PLAN_TPL4 = { newyork: 'grid' };
 // от planAll 5: София с истинските улици и паркове на центъра (OpenStreetMap, cityplan-osm.js)
 const PLAN_TPL5 = { sofia: 'osm' };
-const planOf = id => planOn(id) ? gamePlan(id, { landmark: !!CITY_LANDMARKS[id], seaside: SEASIDE.includes(id), mega: MEGAPOLIS.has(id), bigZone: bigZoneOf(id), clean: S.planAll >= 6, tpl: (S.planAll >= 5 && PLAN_TPL5[id]) || (S.planAll >= 4 ? PLAN_TPL4[id] : undefined) }) : null;
+// от planAll 7: Лос Анджелис — Даунтаун по картата (OpenStreetMap) и надписът HOLLYWOOD на хълмовете на север
+const PLAN_TPL7 = { losangeles: 'osm' };
+const planOf = id => planOn(id) ? gamePlan(id, { landmark: !!CITY_LANDMARKS[id], seaside: SEASIDE.includes(id), mega: MEGAPOLIS.has(id), bigZone: bigZoneOf(id), clean: S.planAll >= 6, tpl: (S.planAll >= 7 && PLAN_TPL7[id]) || (S.planAll >= 5 && PLAN_TPL5[id]) || (S.planAll >= 4 ? PLAN_TPL4[id] : undefined) }) : null;
 // запазената зона в плана за голямата забележителност: колкото W×D парцела на мрежата ((3W − 1) плочки − 2 м)
 function bigZoneOf(id) { const b = (BIG_LANDMARKS[id] || [])[0]; if (!b) return null; const [kind, W, D, asp = 1, turn = 0] = b; return { kind, W, D, asp, turn, size: [(3 * W - 1) * TILE - 2, (3 * D - 1) * TILE - 2] }; }
 // план: пътища от най-близкия край на булевард до гарата (запад), входа на летището (изток) и магистралата (юг) — само за изгледа
@@ -1974,7 +1976,7 @@ function newGame(cityId, brand = null, brandNm = '') {
   S = { v: 1, brand, cityId, hqCity: cityId, cities: {}, day: 1, dayT: 0, rep: 0, cash: [], officeLevel: 1, garageLevel: 1, garageLot: null, whLevel: 0, whLot: null, cityExt: AUTOTEST ? +params.get('ext') || 0 : 0, rails: [], trains: [], jobs: [], econ: ECON.newEconState(), units: [...ECON.START.units], projects: [], offers: [], built: [], done: 0, seq: 1 };
   if (brandNm) S.brandNm = brandNm;   // името, което играчът си е дал (group.js: brandOf)
   S.foundFirst = 1;   // дъщерните фирми (пътна, жп, морска, авиация) — с ръчно основаване и стартов пакет
-  if (params.has('plan') ? params.get('plan') === '1' : !AUTOTEST) S.planAll = 6;   // 6: по-чист център (cityplan opts.clean)   // нова игра — средните и големите градове с план (извити улици); старите записи остават на мрежата   // нов град с план (извити улици); старите записи остават на мрежата
+  if (params.has('plan') ? params.get('plan') === '1' : !AUTOTEST) S.planAll = feature('la-osm') ? 7 : 6;   // 7: Лос Анджелис по картата (PLAN_TPL7); 6: по-чист център (cityplan opts.clean)   // нова игра — средните и големите градове с план (извити улици); старите записи остават на мрежата   // нов град с план (извити улици); старите записи остават на мрежата
   enterCity();
   S.projects = projects;
   for (let k = 0; k < 3; k++) makeOffer();
@@ -7915,6 +7917,11 @@ if (AUTOTEST) {
     balkTest() { S.balkansPop = 0; S.dev.xp = 15000; S.dev.lv = 4; dev.add(6000); return { lv: S.dev.lv, pop: S.balkansPop, img: document.querySelector('#buyPop img')?.getAttribute('src') }; },
     emergLook() { __dbg.time && __dbg.time(20.5); showMap(false); const h = city.hq, ks = ['sf-car-Police_Sedan', 'sf-car-Police_SUV', 'sf-car-Ambulance', 'sf-car-Firetruck', 'sf-car-Police_Sedan', 'sf-car-Ambulance'].filter(k => A[k]); const g = new THREE.Group(); ks.forEach((k, i) => { const o = model(k, 1); o.position.set((i % 3) * 7 - 7, 0, Math.floor(i / 3) * 9); o.rotation.y = Math.PI / 2; o.userData.forceBeacons = 1; g.add(o); }); g.position.set(h.x - 4, 0, h.z + 14); scene.add(g); controls.target.set(h.x - 4, 1, h.z + 18); camera.position.set(h.x + 10, 12, h.z + 34); fly = null; $('panel').classList.add('hidden'); return ks; },
     trainLook(kinds = ['loco', 'hopper', 'flat', 'ave', 'hsw', 'aveTail', 'oeLoco', 'oeCar']) { const g = new THREE.Group(); kinds.forEach((k, i) => { if (!hasTrainModel(k)) return; const c = trainCar(k, i); c.position.set(i * 10, 0, 0); g.add(c); }); g.position.set(0, 0.3, 300); scene.add(g); showMap(false); controls.target.set(35, 2, 300); camera.position.set(35, 30, 345); controls.update(); fly = null; return kinds.filter(hasTrainModel); },
+    signLook(far) {   // Лабораторията: надписът HOLLYWOOD (Лос Анджелис по картата) — отблизо или градът с хълмовете отдалече
+      const P = city.plan, g = P?.sign; if (!g) return null; const dx = Math.cos(g.a), dz = Math.sin(g.a), y = Math.max(0, P.heightAt(g.x, g.z));
+      if (far) __dbg.camAt(g.x - dx * 210 + dz * 70, y + 70, g.z - dz * 210 - dx * 70, g.x, y * 0.6, g.z);   // от края на града към хълмовете (мъглата е до ~420 м)
+      else __dbg.camAt(g.x - dx * 85, y + 45, g.z - dz * 85, g.x, y + 6, g.z);   // не по-полегато от maxPolarAngle (1.25)
+      return [Math.round(g.x), Math.round(g.z), Math.round(y)]; },
     nightRow(only) {   // Лабораторията: истинските къщи и блоковете един до друг (нощно светене)
       const ns = only === 'h2' ? ['building-type-a', 'building-type-b', ...H2].filter(n => A[n]) : ['building-type-a', 'building-type-b', ...['brick', 'richmond', 'dbrick', 'oldbld', 'soviet', 'panel12', 'jade', 'modoffice', 'gamecity', 'asian'].map(k => 'sf-blk-' + k)].filter(n => A[n]);
       const ls = city.lots.filter(x => !x.built && !x.busy).sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z)).slice(0, ns.length);

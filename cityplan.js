@@ -115,10 +115,12 @@ export function makePlan(cityId, opts = {}) {
   if (cache.has(key)) return cache.get(key);
   let T = opts.tpl ? { tpl: opts.tpl, hills: opts.hills } : templateOf(cityId, opts.coastal);
   if (opts.noCoast && (T.tpl === 'coastal' || T.tpl === 'island')) T = { tpl: 'plain' };   // в играта морето и пристанището са от seaside.js
+  // площадът на картата: Pershing Square е ~150 м — улиците около него трябва да опират в площада, иначе нищо не е свързано с центъра
+  const OSM_SQ = { losangeles: 27 };
   const OSM = T.tpl === 'osm' ? OSM_CITIES[cityId] : null;   // „osm“: улиците и парковете са от истинската карта (cityplan-osm.js)
   if (T.tpl === 'osm' && !OSM) T = { tpl: 'mountain' };
   const r = rng(hashStr(`plan:${cityId}:${T.tpl}:v${PLAN_V}`)), rr = (a, b) => lerp(a, b, r());
-  const R = OSM ? Math.max(opts.R || 0, OSM.r) : opts.R || 165, SQ = opts.squareR || 17;   // радиус на града, на площада (по-голям — за главната забележителност)
+  const R = OSM ? Math.max(opts.R || 0, OSM.r) : opts.R || 165, SQ = opts.squareR || (OSM && OSM_SQ[cityId]) || 17;   // радиус на града, на площада (по-голям — за главната забележителност)
   const P = { v: PLAN_V, cityId, tpl: T.tpl, R, square: { x: 0, z: 0, r: SQ }, hills: [], streets: [], lots: [] };
 
   // --- вода и релеф (функции; не се записват)
@@ -161,6 +163,12 @@ export function makePlan(cityId, opts = {}) {
   }
   if (T.hills) for (let k = 0; k < T.hills; k++) {   // хълмове между кварталите (Рио)
     const a = rr(0, TAU), d = rr(0.45, 0.95) * R; P.hills.push({ x: Math.cos(a) * d * 1.3, z: Math.abs(Math.sin(a)) * d * 0.7 + 10, s: rr(16, 26), h: rr(18, 32) });
+  }
+  if (OSM && cityId === 'losangeles') {   // Холивудските хълмове — на запад (в играта морето на крайморските градове е на север); на най-близкия — надписът HOLLYWOOD, обърнат към града
+    for (let k = 0; k < 7; k++) { const a = Math.PI + rr(-0.5, 0.5), d = R + rr(400, 540); P.hills.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, s: rr(70, 110), h: rr(12, 20) }); }   // ниски, сухи — без сняг (над 45 м теренът е бял; хълмовете се събират)
+    const a = Math.PI + 0.12, d = R + 300; P.hills.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, s: 100, h: 24 });
+    P.sign = { x: Math.cos(a) * (d - 55), z: Math.sin(a) * (d - 55), a };   // на склона към града
+    P.mountainDir = a;
   }
   if (OSM && cityId === 'sofia') {   // Витоша — на юг, зад магистралата (истинската посока)
     for (let k = 0; k < 6; k++) { const a = Math.PI / 2 + rr(-0.45, 0.45), d = rr(1.85, 2.1) * R; P.hills.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, s: rr(90, 130), h: rr(90, 170) }); }
@@ -508,6 +516,7 @@ export function shiftPlan(P, ox, oz) {
     heightAt: (x, z) => P.heightAt(x - ox, z - oz), waterAt: (x, z) => P.waterAt(x - ox, z - oz), buildable: (x, z) => P.buildable(x - ox, z - oz) };
   if (P.canals) Q.canals = { ...P.canals, c: mv(P.canals.c) };
   if (P.bigZone) Q.bigZone = { ...P.bigZone, x: P.bigZone.x + ox, z: P.bigZone.z + oz };
+  if (P.sign) Q.sign = { ...P.sign, x: P.sign.x + ox, z: P.sign.z + oz };
   if (P.coastZ) Q.coastZ = x => P.coastZ(x - ox) + oz;
   if (P.riverZ) Q.riverZ = x => P.riverZ(x - ox) + oz;
   return Q;

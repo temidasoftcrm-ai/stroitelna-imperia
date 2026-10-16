@@ -154,6 +154,25 @@ export function buildPlanView(P0, opts = {}) {
   g.add(mesh(...walk, M.walk), mesh(...asph, M.asph), mesh(...paint, M.paint));
   if (br[0].length) g.add(mesh(...br, M.bridge));
   const zm = mesh(...zebra, M.paint); detail.add(zm);
+  // --- надписът HOLLYWOOD (Лос Анджелис по картата): бели букви от греди на склона на хълма, обърнати към града
+  if (P.sign) {
+    const SEG = { H: [[0, 0, 0, 5], [3, 0, 3, 5], [0, 2.5, 3, 2.5]], O: [[0, 0, 0, 5], [3, 0, 3, 5], [0, 0, 3, 0], [0, 5, 3, 5]], L: [[0, 0, 0, 5], [0, 0, 3, 0]],
+      Y: [[0, 5, 1.5, 2.4], [3, 5, 1.5, 2.4], [1.5, 0, 1.5, 2.4]], W: [[0, 5, 0.75, 0], [0.75, 0, 1.5, 3], [1.5, 3, 2.25, 0], [2.25, 0, 3, 5]],
+      D: [[0, 0, 0, 5], [0, 5, 2, 5], [0, 0, 2, 0], [2, 5, 3, 4], [3, 4, 3, 1], [3, 1, 2, 0]] };
+    const U = 1.9, T = 0.75, word = 'HOLLYWOOD', dx = Math.cos(P.sign.a), dz = Math.sin(P.sign.a);
+    const right = new THREE.Vector3(-dz, 0, dx), up = new THREE.Vector3(0, 1, 0), qP = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up, new THREE.Vector3(-dx, 0, -dz)));
+    const strokes = []; [...word].forEach((ch, i) => SEG[ch].forEach(sg => strokes.push([i, ...sg])));
+    const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xf4f4ef, roughness: 0.6, emissive: 0xfff6e0, emissiveIntensity: 0.12 }), strokes.length);
+    const m4 = new THREE.Matrix4(), qS = new THREE.Quaternion(), pos = new THREE.Vector3(), sc = new THREE.Vector3(), z1 = new THREE.Vector3(0, 0, 1), W0 = (word.length * 4.4 - 1.4) * U / 2;
+    strokes.forEach(([i, u0, v0, u1, v1], k) => {
+      const lx = i * 4.4 * U - W0, cx = lx + (u0 + u1) / 2 * U, px = P.sign.x + right.x * cx, pz = P.sign.z + right.z * cx;
+      const base = Math.max(0, P.heightAt(P.sign.x + right.x * (lx + 1.5 * U), P.sign.z + right.z * (lx + 1.5 * U))) - 0.6;   // всяка буква стъпва на склона
+      pos.set(px, base + (v0 + v1) / 2 * U, pz);
+      qS.setFromAxisAngle(z1, Math.atan2(v1 - v0, u1 - u0)); sc.set(Math.hypot(u1 - u0, v1 - v0) * U + T * U, T * U, 0.5);
+      im.setMatrixAt(k, m4.compose(pos, qP.clone().multiply(qS), sc));
+    });
+    im.castShadow = true; im.name = 'hollywood'; g.add(im);
+  }
   // --- площад: павета, фонтан, кръг от дървета
   const sq = P.square, pl = [[], []]; disc(sq.x, sq.z, sq.r + 1, 0.08, ...pl, 32);
   g.add(mesh(...pl, M.plaza));
