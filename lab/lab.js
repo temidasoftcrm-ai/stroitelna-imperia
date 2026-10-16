@@ -71,6 +71,7 @@ const DEMOS = [
   ['🌙 Новите цветни къщи нощем', 'sofia', d => { d.nightRow('h2'); d.time(22.5); }],
   ['🚨 Спешните коли и сирените (вечер)', 'sofia', d => d.emergLook()],
   ['🌴 Лос Анджелис по картата', 'losangeles', d => { d.signLook(true); }],
+  ['🎬 HOLLYWOOD отблизо', 'losangeles', d => { for (const ms of [0, 3500, 8000]) setTimeout(() => d.signLook(), ms); }],   // повторно — камерата отлита към първата поръчка
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
