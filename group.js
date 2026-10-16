@@ -20,6 +20,14 @@ export const SUBS = [
   { k: 'bank', ico: '🏦', suf: 'Банк', what: 'банка и кредити', how: 'основи банката (ерата на холдинга)', open: c => !!(c.bankOn && c.bankOn()), inc: c => c.bankDaily ? c.bankDaily() : 0 },
   { k: 'glob', ico: '🌍', suf: 'Глобъл Ризортс & Констръкшън', what: 'световна империя', how: 'ниво 20 — Световна империя', open: c => c.empire(), inc: () => 0, final: true },
 ];
+// фаза „основаване“ (нови игри — S.foundFirst): дъщерната фирма се основава ръчно ПРЕДИ първия обект в бранша и дава стартов пакет;
+// останалото се купува, за да започнеш (магистрала: асфалтополагач + валяк подарък, грейдер/булдозер/маркировъчна — купуваш сам)
+export const FOUND = {
+  hw: { cost: 150000, lv: 2, gift: '🛣️ асфалтополагач и 🛞 валяк (подарък)', next: 'Купи грейдер, булдозер и маркировъчна машина — и строй първата магистрала.' },
+  rail: { cost: 300000, lv: 2, gift: '🚂 първия товарен влак (подарък, след като построиш гара)', next: 'Построй гара в града и първата жп линия.' },
+  sea: { cost: 500000, lv: 6, gift: '⚓ −50% за първото пристанище и 🚢 първия кораб (подарък)', next: 'Построй пристанище в крайморски град.' },
+  air: { cost: 800000, lv: 9, gift: '✈️ −50% за първото летище и първия самолет (подарък)', next: 'Построй летище.' },
+};
 export const brandOf = S => { const b = BRANDS.find(x => x.k === S?.brand); return b ? (S.brandNm ? { ...b, nm: S.brandNm } : b) : null; };
 // името, което играчът пише: без знаци за HTML, до 24 знака, с главна буква
 export const cleanBrand = s => { const t = String(s || '').replace(/[<>"'&`\\]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24); return t ? t[0].toUpperCase() + t.slice(1) : ''; };
@@ -66,6 +74,7 @@ export function createGroup(deps) {
     const g = S.group = S.group || {}, b = brandOf(S);
     for (const s of SUBS) {
       if (g[s.k] || !s.open(deps)) continue;
+      if (S.foundFirst && FOUND[s.k]) continue;   // нова игра: тези се основават ръчно (found)
       g[s.k] = S.day || 1;
       if (quiet || s.k === 'con') continue;
       if (s.final) deps.pop('empire', `👑 ${b.nm} Глобъл`, `От първия строеж до световна империя. Добре дошли в ${b.nm} Глобъл!`);
@@ -73,6 +82,19 @@ export function createGroup(deps) {
       deps.sound && deps.sound('levelup');
     }
     deps.save();
+  }
+  // ръчно основаване (бутон в „Холдинг“ или от прозореца за магистрали/жп…): пари → дружеството → стартовият пакет (deps.gift)
+  const canFound = k => { const S = deps.S(); return !!(S && S.foundFirst && FOUND[k] && !(S.group || {})[k] && (deps.lv ? deps.lv() >= FOUND[k].lv : true)); };
+  function found(k) {
+    const S = deps.S(), F = FOUND[k], s = SUBS.find(x => x.k === k), b = brandOf(S), e = deps.econ();
+    if (!canFound(k)) return false;
+    if (!e.canAfford(F.cost)) { deps.toast(`Нужни са ${deps.fmt(F.cost)} €, за да основеш ${b.nm} ${s.suf}.`, 'bad'); return false; }
+    e.spend(F.cost, 'покупка', `Основаване на ${b.nm} ${s.suf}`);
+    (S.group = S.group || {})[k] = S.day || 1;
+    deps.gift && deps.gift(k);
+    deps.pop('new-branch', `${s.ico} Основа ${b.nm} ${s.suf}!`, `Стартов пакет: ${F.gift}. ${F.next}`);
+    deps.sound && deps.sound('levelup'); deps.save();
+    return true;
   }
   function winHtml(extra = '') {
     const S = deps.S(), b = brandOf(S), g = S.group || {}, f = deps.fmt, H = S.holding;
@@ -85,13 +107,15 @@ export function createGroup(deps) {
     h += SUBS.map(s => {
       const on = g[s.k], inc = on ? s.inc(deps) || 0 : 0, L = hold().lv[s.k] || 0, dir = hold().dir[s.k], man = H && on && !s.final && inc > 0;   // без приход — няма какво да се умножава
       const ctl = man ? `<div class="row" style="margin:6px 0 0;gap:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0;flex:1">${'★'.repeat(L)}${'☆'.repeat(HOLD_LV_MAX - L)} ниво ${L}${dir ? ` · 👔 ${dir}` : ''}${bonusK(s.k) ? ` · <b style="color:#ffd54a">+${f(bonusOf(s.k))} €/ден</b> (+${Math.round(bonusK(s.k) * 100)}%)` : ''}</span>${L < HOLD_LV_MAX ? `<button class="btn2" data-hup="${s.k}" ${deps.econ().canAfford(upCost(s.k)) ? '' : 'disabled'}>⬆️ Развий · ${f(upCost(s.k))} €</button>` : ''}${dir ? '' : `<button class="btn2" data-hdir="${s.k}" ${deps.econ().canAfford(dirCost(s.k)) ? '' : 'disabled'}>👔 Директор · ${f(dirCost(s.k))} €</button>`}</div>` : '';
-      return `<div class="card" style="${on ? `border-left:4px solid ${b.col}` : 'opacity:.5'}"><div class="row" style="margin:0;align-items:center;gap:10px"><span style="font-size:24px">${s.ico}</span><span class="meta" style="margin:0;flex:1"><b style="color:var(--txt);font-size:15px">${b.nm} ${s.suf}</b><br>${s.what}${on ? ` · основана на ден ${on}` : ` · 🔒 ${s.how}`}</span>${on && !s.final ? `<b style="color:${inc ? 'var(--ok)' : 'var(--mut, #9aa)'}">${inc ? `+${f(inc)} €/ден` : '—'}</b>` : ''}</div>${ctl}${s.k === 'oil' && on ? '<div class="row" style="justify-content:flex-end;margin:6px 0 0"><button class="btn" data-hoil="1">🛢️ Петролната империя →</button></div>' : ''}</div>`;
+      const fb = !on && canFound(s.k) ? `<div class="row" style="margin:6px 0 0;gap:6px;align-items:center"><span class="meta" style="margin:0;flex:1">🎁 ${FOUND[s.k].gift}</span><button class="btn" data-hfound="${s.k}">Основи · ${f(FOUND[s.k].cost)} €</button></div>` : '';
+      return `<div class="card" style="${on ? `border-left:4px solid ${b.col}` : fb ? '' : 'opacity:.5'}"><div class="row" style="margin:0;align-items:center;gap:10px"><span style="font-size:24px">${s.ico}</span><span class="meta" style="margin:0;flex:1"><b style="color:var(--txt);font-size:15px">${b.nm} ${s.suf}</b><br>${s.what}${on ? ` · основана на ден ${on}` : ` · 🔒 ${s.how}`}</span>${on && !s.final ? `<b style="color:${inc ? 'var(--ok)' : 'var(--mut, #9aa)'}">${inc ? `+${f(inc)} €/ден` : '—'}</b>` : ''}</div>${ctl}${s.k === 'oil' && on ? '<div class="row" style="justify-content:flex-end;margin:6px 0 0"><button class="btn" data-hoil="1">🛢️ Петролната империя →</button></div>' : ''}${fb}</div>`;
     }).join('');
     return h;
   }
   function bind(box, rerender) {
     box.querySelectorAll('[data-hup]').forEach(b => b.onclick = () => { upgrade(b.dataset.hup); rerender(); });
     box.querySelectorAll('[data-hdir]').forEach(b => b.onclick = () => { hire(b.dataset.hdir); rerender(); });
+    box.querySelectorAll('[data-hfound]').forEach(b => b.onclick = () => { found(b.dataset.hfound); rerender(); });
   }
-  return { check, winHtml, bind, dailyTick, dailyBonus, upgrade, hire };
+  return { check, winHtml, bind, dailyTick, dailyBonus, upgrade, hire, found, canFound };
 }

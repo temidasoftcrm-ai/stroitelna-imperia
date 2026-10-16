@@ -34,6 +34,15 @@ export function createPassingTrains(deps) {
       g.add(trainCar('ave')); if (hasTrainModel('hsw')) for (let i = 0; i < 2 + (Math.random() * 3 | 0); i++) g.add(trainCar('hsw')); g.add(trainCar('aveTail'));
       return { g, len: lenOf(), express: true };
     }
+    if (passenger && hasTrainModel('paxLoco') && hasTrainModel('paxCar')) {   // пътнически: ЧС200 + сини вагони (trains-real)
+      g.add(trainCar('paxLoco')); for (let i = 0, k = 3 + (Math.random() * 4 | 0); i < k; i++) g.add(trainCar('paxCar'));
+      return { g, len: lenOf() };
+    }
+    if (!passenger && hasTrainModel('vl82')) {   // товарен: ВЛ82 + покрити, въглищни и платформи с контейнери (trains-real)
+      g.add(trainCar('vl82'));
+      for (let i = 0, k = 5 + (Math.random() * 6 | 0); i < k; i++) { const r = Math.random(); g.add(trainCar(r < 0.35 ? 'boxcar' : r < 0.7 ? 'hopper2' : 'flat', (Math.random() * 99) | 0)); }
+      return { g, len: lenOf() };
+    }
     if (!passenger && hasTrainModel('loco')) {   // товарен: дизелов локомотив + бункери и платформи с контейнери
       n = 4 + (Math.random() * 6 | 0);
       g.add(trainCar('loco'));

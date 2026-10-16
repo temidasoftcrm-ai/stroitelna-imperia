@@ -178,7 +178,9 @@ export function createStation(deps) {
       const parts = t.pax ? ['train-electric-city-a', ...Array(Math.max(0, n - 2)).fill('train-electric-city-b'), 'train-electric-city-a']
         : ['train-locomotive-a', ...Array.from({ length: n }, (_, j) => FREIGHT[(j + t.id) % FREIGHT.length])];
       // истински модели (trainmodels.js): „Стрела“ — скоростният влак, товарните — дизелов локомотив с бункери и платформи
-      const real = t.express && hasTrainModel('ave') ? ['ave', ...Array(hasTrainModel('hsw') ? Math.min(4, Math.max(1, n - 2)) : 0).fill('hsw'), 'aveTail'] : !t.pax && !t.express && hasTrainModel('loco') ? ['loco', ...Array.from({ length: n }, (_, j) => (j + t.id) % 3 === 1 ? 'hopper' : 'flat')] : null;
+      const real = t.pax && !t.express && hasTrainModel('paxLoco') ? ['paxLoco', ...Array(Math.max(1, n - 1)).fill('paxCar')]
+        : !t.pax && !t.express && hasTrainModel('vl82') ? ['vl82', ...Array.from({ length: n }, (_, j) => ['boxcar', 'hopper2', 'flat'][(j + t.id) % 3])]
+        : t.express && hasTrainModel('ave') ? ['ave', ...Array(hasTrainModel('hsw') ? Math.min(4, Math.max(1, n - 2)) : 0).fill('hsw'), 'aveTail'] : !t.pax && !t.express && hasTrainModel('loco') ? ['loco', ...Array.from({ length: n }, (_, j) => (j + t.id) % 3 === 1 ? 'hopper' : 'flat')] : null;
       if (real) {
         let z = 0;
         real.forEach((kd, j) => { const m = trainCar(kd, t.id * 7 + j); z -= m.userData.len / 2; m.position.z = z; z -= m.userData.len / 2 + 0.5; o.add(m); });

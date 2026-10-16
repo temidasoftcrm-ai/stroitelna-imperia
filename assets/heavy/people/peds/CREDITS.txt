@@ -1,1 +1,2 @@
 Минувачи (ped-*.glb) — герои от Mixamo (Adobe), безплатни за игри; от „Бригада“ (олекотени, само Walk + Idle).
+peds-anims.glb — анимации от Mixamo (Adobe, безплатни за игри): Phone_Talk_M/F, Talk_General, Talk_Arguing, Smoking, Look_Around, Waving; изпечени върху скелета mixamorig (tools/add_mixamo_clips.py от „Бригада“), олекотени (без пръсти, през кадър).

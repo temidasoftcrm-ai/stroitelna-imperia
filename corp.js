@@ -134,7 +134,13 @@ export function createCorp(deps) {
       return `<div class="card" style="padding:8px 12px;${r.merged ? 'opacity:.75;border-left:4px solid #ffd54a' : ''}"><div class="row" style="margin:0;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:20px">${g.ico}</span><span class="meta" style="margin:0;flex:1"><b style="color:var(--txt)">${g.flag} ${g.nm}</b> · ${g.sec} · ${B(r.w)}<br>${r.merged ? `👑 погълната на ден ${r.merged} · носи ~${f(Math.round(r.w * MERGED_INC))} €/ден` : r.stake ? `твои <b style="color:var(--ok)">${Math.round(r.stake * 100)}%</b> · дивидент ~${f(Math.round(r.w * r.stake * STAKE_DIV))} €/ден` : 'нямаш дял'}</span>${r.merged ? '' : `<button class="${r.stake >= 0.4 ? 'btn' : 'btn2'}" data-cstake="${g.id}" ${e.canAfford(cost) ? '' : 'disabled'}>${r.stake >= 0.4 ? '👑 Погълни' : '🤝 +10%'} · ${B(cost)}</button>`}</div></div>`; }).join('');
     const L = deps.localFirms();
     h += `<div class="sect" style="margin:12px 0 4px">🏢 Местни конкуренти в държавите, където си — изкупената фирма спира да ти взема поръчки</div>`;
-    h += L.length ? L.map(x => { const own = c.loc[x.f.id], cost = locValue(x); return `<div class="row" style="margin:4px 0;align-items:center;gap:8px"><span class="meta" style="margin:0;flex:1">${x.f.ico} <b style="color:var(--txt)">${x.f.nm}</b> · ${x.cc} ${x.cnm}${own ? ` · <span style="color:var(--ok)">твоя от ден ${own}</span>` : ''}</span>${own ? '' : `<button class="btn2" data-cloc="${x.f.id}" ${e.canAfford(cost) ? '' : 'disabled'}>🤝 ${B(cost)}</button>`}</div>`; }).join('') : '<div class="meta">Няма конкуренти.</div>';
+    { const own = L.filter(x => c.loc[x.f.id]).sort((a, b) => c.loc[b.f.id] - c.loc[a.f.id]), rest = L.filter(x => !c.loc[x.f.id]);
+      const L0 = L; const show = [...rest, ...own.slice(0, 10)];   // изкупените — само последните 10 (иначе прозорецът става огромен)
+      { const L = show;
+        h += L.length ? L.map(x => { const own = c.loc[x.f.id], cost = locValue(x); return `<div class="row" style="margin:4px 0;align-items:center;gap:8px"><span class="meta" style="margin:0;flex:1">${x.f.ico} <b style="color:var(--txt)">${x.f.nm}</b> · ${x.cc} ${x.cnm}${own ? ` · <span style="color:var(--ok)">твоя от ден ${own}</span>` : ''}</span>${own ? '' : `<button class="btn2" data-cloc="${x.f.id}" ${e.canAfford(cost) ? '' : 'disabled'}>🤝 ${B(cost)}</button>`}</div>`; }).join('') : '<div class="meta">Няма конкуренти.</div>';
+      }
+      if (own.length > 10) h += `<details style="margin:4px 0"><summary class="meta" style="cursor:pointer">▾ още ${own.length - 10} изкупени по-рано (общо ${own.length} от ${L0.length})</summary>${own.slice(10).map(x => `<div class="meta" style="margin:2px 0 2px 10px">${x.f.ico} ${x.f.nm} · ${x.cc} ${x.cnm} · от ден ${c.loc[x.f.id]}</div>`).join('')}</details>`;
+    }
     return h;
   }
   function ipoHtml() {

@@ -6,6 +6,8 @@
 // Всеки вагон е THREE.Group с предница към +z, център в началото, колела на y = 0 и userData.len — дължината му.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { feature } from './lab/feature.js';
+import { NF_MATS } from './nightfloors.js';   // нощем daynight.js вдига emissiveIntensity на тези материали
 
 const W = 2.8;
 const OE_BLUE = 0x27407a, OE_YAW = { loco: Math.PI, car: 0 };   // цветът на вагоните на Ориент Експрес; завъртане на моделите (предницата към +z)   // ширина на вагона в света на играта (колкото коловоза на Kenney)
@@ -79,12 +81,20 @@ export function loadTrainModels(base = 'assets/heavy/trains/') {
     // „Ориент Експрес“: парен локомотив BR 01 (без релсите и земята от модела) и тъмносини луксозни вагони
     get('oe-loco.glb').then(sc => { const drop = []; sc.traverse(m => { if (m.isMesh && /holzschiene|eisen|boden/.test(m.material?.name || '')) drop.push(m); }); drop.forEach(m => m.parent.remove(m)); tame(sc); P.oeLoco = normalize(sc, OE_YAW.loco); }).catch(() => {}),
     get('oe-car.glb').then(sc => { sc.traverse(m => { if (m.isMesh) { m.material = m.material.clone(); m.material.color.setHex(OE_BLUE); m.material.roughness = 0.45; } }); P.oeCar = normalize(sc, OE_YAW.car); }).catch(() => {}),
+    // истинските влакове (Лабораторията → trains-real): ЧС200 + сини пътнически вагони, ВЛ82 + покрити и въглищни вагони
+    ...(feature('trains-real') ? [
+      get('chs200.glb').then(sc => { P.paxLoco = normalize(sc, 0); }),
+      get('paxcar.glb').then(sc => { tame(sc); sc.traverse(m => { if (m.isMesh && /glass/i.test(m.material?.name || '')) { m.material = m.material.clone(); m.material.emissive = new THREE.Color(0xffd890); m.material.emissiveIntensity = 0; NF_MATS.add(m.material); } }); P.paxCar = normalize(sc, 0); }),
+      get('vl82.glb').then(sc => { sc.traverse(m => { if (m.isMesh && !m.material.isMeshStandardMaterial) m.material = new THREE.MeshStandardMaterial({ map: m.material.map, color: m.material.color, roughness: 0.6, metalness: 0.2 }); }); tame(sc); P.vl82 = normalize(sc, 0); }),   // моделът е „unlit“ — нощем светеше бял
+      get('boxcar.glb').then(sc => { P.boxcar = normalize(sc, 0); }),
+      get('hopper2.glb').then(sc => { P.hopper2 = normalize(sc, 0); }),
+    ].map(p => p.catch(e => console.warn('trains-real', e))) : []),
   ]).then(() => { ready = true; }).catch(e => { console.warn('trainmodels', e); ready = false; });
   return loading;
 }
 export const trainModelsReady = () => ready;
 export const hasTrainModel = k => ready && !!P[k];
-// нов вагон: 'loco' | 'hopper' | 'flat' | 'ave' | 'hsw' (среден) | 'aveTail' | 'oeLoco' | 'oeCar' (Ориент Експрес) (обърнат челен вагон); seed — за цвета на контейнера
+// нов вагон: 'loco' | 'hopper' | 'flat' | 'ave' | 'hsw' (среден) | 'aveTail' | 'oeLoco' | 'oeCar' (Ориент Експрес) | 'paxLoco' | 'paxCar' | 'vl82' | 'boxcar' | 'hopper2' (trains-real) (обърнат челен вагон); seed — за цвета на контейнера
 export function trainCar(kind, seed = 0) {
   const src = P[kind === 'aveTail' ? 'ave' : kind]; if (!src) return null;
   let o = src.clone(true);
@@ -93,6 +103,21 @@ export function trainCar(kind, seed = 0) {
     const col = CONT_COLS[Math.abs(seed) % CONT_COLS.length];
     o.traverse(m => { if (m.isMesh && /red/i.test(m.material.name)) { m.material = m.material.clone(); m.material.color.setHex(col); } });
   }
+  if (kind === 'paxLoco' || kind === 'vl82') addHeadlights(o, src.userData.len);
   o.userData.len = src.userData.len;
   return o;
+}
+// фаровете на локомотива: светещи петна на челото (нощем — daynight.js през NF_MATS) и сноп напред
+let lightMat = null, beamMat = null;
+function addHeadlights(o, len) {
+  if (!lightMat) {
+    const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 1, 32, 32, 31);
+    gr.addColorStop(0, 'rgba(255,250,225,1)'); gr.addColorStop(0.3, 'rgba(255,235,180,0.6)'); gr.addColorStop(1, 'rgba(255,220,150,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64);
+    const tex = new THREE.CanvasTexture(c);
+    lightMat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xc8bc98, emissiveMap: tex, emissiveIntensity: 0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+    beamMat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0x4a4434, emissiveMap: tex, emissiveIntensity: 0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+    NF_MATS.add(lightMat); NF_MATS.add(beamMat);
+  }
+  for (const x of [-0.7, 0.7]) { const q = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.1), lightMat); q.position.set(x, 1.3, len / 2 + 0.05); o.add(q); }
+  const beam = new THREE.Mesh(new THREE.PlaneGeometry(4.5, 16).rotateX(-Math.PI / 2), beamMat); beam.position.set(0, 0.25, len / 2 + 8); o.add(beam);
 }

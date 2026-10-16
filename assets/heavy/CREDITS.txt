@@ -128,3 +128,8 @@ cinema/newyork.mp4, cinema/vegas.mp4, cinema/paris.mp4, cinema/dubai.mp4, cinema
 - gear/mcrane.glb — "Mobile Hydraulic Truck Crane (Telescopic)" by doty_aecom (CC-BY 4.0) — https://sketchfab.com/3d-models/8c343b1ce4724631b4623e9ef7778163
 - lm/redeemer.glb — "Christ The Redeemer" by naveenhimal (CC-BY 4.0) — https://sketchfab.com/3d-models/d6f51d0fad7142a08ed26455f84f72ca
 - lm/colosseo.glb — "Colosseum" by alexanderleth (CC-BY 4.0) — https://sketchfab.com/3d-models/c3c5157559344c74b2c0bacc89036692
+- trains/chs200.glb — "CHS200 | электровоз ЧС200" by gildermanvladimir089 (CC-BY 4.0) — https://sketchfab.com/3d-models/8be2bbdd7e7c4f7d89113aab340965fa
+- trains/paxcar.glb — "Passenger wagon | low-poly model" by nikcore76 (CC-BY 4.0) — https://sketchfab.com/3d-models/31c0e3e63ae84771869c8ac7d89c9018
+- trains/vl82.glb — "VL 82 Electric Locomotive" by eightismore (CC-BY 4.0) — https://sketchfab.com/3d-models/ec138d48868a4633bbd014947f344130 (без релсите)
+- trains/boxcar.glb — "Railway Boxcar Freight Wagon" by saadthedesigner314 (CC-BY 4.0) — https://sketchfab.com/3d-models/6cede42e50cc4042addfbedac1311551
+- trains/hopper2.glb — "Coal Hopper Railway Wagon" by saadthedesigner314 (CC-BY 4.0) — https://sketchfab.com/3d-models/287266d5edf749318cb9869fe583e0ae
