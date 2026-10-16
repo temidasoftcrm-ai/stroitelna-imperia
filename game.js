@@ -385,6 +385,8 @@ let europe = null;
 {
   const jobs = [];
   // заводските модели се казват като търговските (building-a…) — пазим ги под 'ind-…'
+  // истински храсти, цветя и фонтан (assets/heavy/plants, нормализирани: най-широката страна 1, основа 0) — зад feature('plants-real')
+  if (feature('plants-real')) for (const k of ['bush-0', 'bush-1', 'bush-2', 'flowers', 'fountain']) jobs.push(load(`assets/heavy/plants/${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['pl-' + k] = g; }).catch(() => {}));
   for (const [dir, list] of Object.entries(MODELS)) for (const n of list) jobs.push(load(`assets/${dir}/${n}.glb`).then(g => { A[dir === 'industrial' ? 'ind-' + n : n] = g; if (dir === 'commercial' || dir === 'commercial2') prepNightFloors(g.scene, n); }));   // нощем етажите светват (nightfloors.js)
   // истинска строителна техника и коли за трафика (vehmodels.js, Sketchfab)
   jobs.push(loadVehModels(load, A));
@@ -729,7 +731,7 @@ function buildCity(cityId) {
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(Math.max(1200, 2 * (tx(NI - 1) + 380)), Math.max(1200, 2 * (tx(NJ - 1) + 300))), new THREE.MeshStandardMaterial({ color: isDesert(cityId) ? 0xd9bf86 : 0x8fb36a, roughness: 1 }));   // Африка — пясък
   if (P && !P.links) P.links = planLinks(P);   // и в мрежата на маршрутите (cityplanroute.js) — ТИР-овете и техниката карат по тях
   const pv = P ? buildPlanView({ ...P, streets: [...P.streets, ...P.links] }, { size: Math.max(1600, 2 * (tx(NI - 1) + 400)), seg: 170, target: controls.target, lotCount: Math.min(P.lots.length, planCount(P.mega, S.cityExt || 0)),
-    seaZ: SEASIDE.includes(cityId) ? tx(0) - TILE / 2 - 2 : null, noFountain: !!CITY_LANDMARKS[cityId], treeProtos: Object.keys(A).filter(k => k.startsWith('sf-tree-') || k.startsWith('sf-pine-')).map(k => { const o = A[k].scene; o.userData.pine = k.startsWith('sf-pine-'); return o; }) }) : null;
+    seaZ: SEASIDE.includes(cityId) ? tx(0) - TILE / 2 - 2 : null, noFountain: !!CITY_LANDMARKS[cityId], plantProtos: ['pl-bush-0', 'pl-bush-1', 'pl-bush-2', 'pl-flowers'].filter(k => A[k]).map(k => A[k].scene), fountainProto: A['pl-fountain']?.scene, treeProtos: Object.keys(A).filter(k => k.startsWith('sf-tree-') || k.startsWith('sf-pine-')).map(k => { const o = A[k].scene; o.userData.pine = k.startsWith('sf-pine-'); return o; }) }) : null;
   weather.setGround(pv ? pv.userData.groundMat : ground.material);   // снежната покривка оцветява земята
   // крайбрежните градове: море на север с плаж, пристанище, фар и кораби (seaside.js)
   city.airport = null; city.airportNI = 0; city.airSite = null; refreshAirport3D(cityId);
@@ -850,7 +852,8 @@ function decorLot(g, lot, cityId) {
   const at = (o, u, v, y = 0) => { o.position.set(lot.x + u * c + v * sn, y, lot.z - u * sn + v * c); o.userData.detail = true; g.add(o); (lot.trees = lot.trees || []).push(o); return o; };
   const flat = (w, d, col, u = 0, v = 0, y = 0.14) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: col, roughness: 1 })); m.rotation.y = rot; m.receiveShadow = true; return at(m, u, v, y); };   // y — над плочата на парцела (в плана е на 0.04)
   const box = (w, hh, d, col, u, v, y) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, hh, d), new THREE.MeshStandardMaterial({ color: col, roughness: 0.8 })); m.rotation.y = rot; m.castShadow = true; return at(m, u, v, y + hh / 2); };
-  const P = n => A[n] ? model(n, 1) : null, put = (n, k, u, v) => { const o = A[n] && model(n, 1); if (!o) return; o.scale.setScalar(k); o.rotation.y = rr() * 6.28; at(o, u, v); };
+  const REAL = { plant_bush: ['pl-bush-0', 2.2], plant_bushLarge: ['pl-bush-1', 2.8], plant_bushDetailed: ['pl-bush-0', 2.6], flower_redA: ['pl-bush-2', 1.6], flower_yellowA: ['pl-bush-2', 1.6], flower_purpleA: ['pl-bush-1', 1.3] };   // истинските растения (plants-real)
+  const P = n => A[n] ? model(n, 1) : null, put = (n, k, u, v) => { const rl = REAL[n]; if (rl && A[rl[0]]) { n = rl[0]; k = rl[1] * (0.85 + rr() * 0.3); } const o = A[n] && model(n, 1); if (!o) return; o.scale.setScalar(k); o.rotation.y = rr() * 6.28; at(o, u, v); };
   if (kind === 2) {   // градинка: алеи на кръст, лехи с цветя, храсти, пейки, дърво в средата
     flat(L * 2, 1.6, 0xcdbf9e); flat(1.6, L * 2, 0xcdbf9e);
     for (const [su, sv] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
@@ -859,6 +862,7 @@ function decorLot(g, lot, cityId) {
     }
     for (const sv of [-1.5, 1.5]) { box(2.2, 0.12, 0.6, 0x8a5a33, 0, sv, 0.45); box(0.12, 0.45, 0.5, 0x333333, -0.9, sv, 0); box(0.12, 0.45, 0.5, 0x333333, 0.9, sv, 0); }
     const t = model('tree-large', rand(6, 8)); at(t, L * 0.55, -L * 0.55);
+    if (A['pl-fountain'] && h % 2) { const f = model('pl-fountain', 3.2); at(f, 0, 0); }   // фонтан на кръстопътя на алеите
   } else if (kind === 3) {   // паркинг: асфалт, маркировка, 2–4 коли
     flat(L * 2, L * 1.6, 0x4a4d52, 0, 0, 0.13);
     for (let k = -2; k <= 2; k++) flat(0.15, L * 0.6, 0xf2f2f2, k * 2.8, -L * 0.45, 0.15), flat(0.15, L * 0.6, 0xf2f2f2, k * 2.8, L * 0.45, 0.15);

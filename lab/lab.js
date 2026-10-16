@@ -66,9 +66,11 @@ const DEMOS = [
   ['🌙 Модерните небостъргачи (D, E)', 'tokyo', d => { d.time(22.5); d.look(0, 230); }],
   ['🚶 Хората по улиците', 'sofia', d => { d.time(13); d.look(0, 26); }],
   ['🌳 Зелените площи и центърът', 'plovdiv', d => { d.time(13); d.look(0, 160); }],
+  ['🌿 Истинските храсти и фонтанът', 'plovdiv', d => { d.time(13); d.look(0, 45); }],
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
+const rejected = new Set((() => { try { return JSON.parse(localStorage.getItem('lab.rejected') || '[]'); } catch { return []; } })());   // „✖ Не е ОК“ — скрити, докато Claude не направи друго
 let state = readHash(), approved = [], showDone = false, frameKey = 0;
 function readHash() { const h = new URLSearchParams(location.hash.slice(1)); return { tab: h.get('tab') || 'review', item: h.get('item') || '' }; }
 function pick(tab, item = '') { state = { tab, item }; const h = new URLSearchParams(state).toString(); if (location.hash.slice(1) !== h) location.hash = h; render(); }
@@ -78,7 +80,7 @@ const post = (u, o) => fetch(u, { method: 'POST', body: JSON.stringify(o) }).the
 async function loadApproved() { try { approved = (await (await fetch('/__lab/approved')).json()).approved; } catch { approved = []; } }
 
 function render() {
-  const pending = FEATURES.filter(f => !approved.includes(f.id)).length;
+  const pending = FEATURES.filter(f => !approved.includes(f.id) && !rejected.has(f.id)).length;
   $('tabs').innerHTML = [['review', `Ново${pending ? ` (${pending})` : ''}`], ['scenes', 'Сцени'], ['models', '3D модели'], ['sounds', 'Звуци'], ['demos', 'Мисии/демо']]
     .map(([t, l]) => `<button data-tab="${t}" class="${state.tab === t ? 'on' : ''}">${l}</button>`).join('');
   $('tabs').querySelectorAll('[data-tab]').forEach(b => b.onclick = () => pick(b.dataset.tab));
@@ -129,7 +131,7 @@ export function feedback(wrap, target) {
 
 // ---- Ново
 function renderReview() {
-  const list = FEATURES.filter(f => showDone || !approved.includes(f.id)), pending = FEATURES.filter(f => !approved.includes(f.id)).length;
+  const list = FEATURES.filter(f => (showDone || !approved.includes(f.id)) && !rejected.has(f.id)), pending = FEATURES.filter(f => !approved.includes(f.id)).length;
   sideNav(list.map(f => row(state.item === f.id, `${approved.includes(f.id) ? '✅' : '🧪'} ${f.title}`, approved.includes(f.id) ? 'В играта' : 'Чака OK', `data-f="${f.id}"`)).join('')
     + (!pending && !showDone ? `<div class="empty" style="height:auto;padding:24px 8px">${FEATURES.length ? 'Всичко ново е одобрено ✓' : 'Още няма нищо ново за проверка.<br><br>Новото от Claude се появява тук и влиза в играта само след „✓ OK“.'}</div>` : '')
     + (FEATURES.length > pending ? `<button class="row" id="bDone"><small>${showDone ? '▴ Скрий одобрените' : `▾ Одобрени (${FEATURES.length - pending}) — покажи`}</small></button>` : ''));
@@ -158,7 +160,7 @@ function renderReview() {
   }
   const box = document.createElement('div'); box.className = 'feat';
   const on = approved.includes(f.id);
-  box.innerHTML = `<div><b>${esc(f.title)}</b><div>${esc(f.how)}</div></div>${on ? `<button class="btn" id="bApp">↩ Махни от играта</button>` : `<button class="btn ok" id="bApp">✓ OK — в играта</button>`}`;
+  box.innerHTML = `<div><b>${esc(f.title)}</b><div>${esc(f.how)}</div></div><div style="display:flex;flex-direction:column;gap:6px">${on ? `<button class="btn" id="bApp">↩ Махни от играта</button>` : `<button class="btn ok" id="bApp">✓ OK — в играта</button><button class="btn red" id="bRej">✖ Не е ОК — намери друго</button>`}</div>`;
   $('main').appendChild(box);
   if (f.views && f.views.length > 1) {   // няколко неща за гледане (напр. 3 кули) — бутони в кутията
     const vb = document.createElement('div'); vb.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;margin-top:6px';
@@ -169,6 +171,12 @@ function renderReview() {
       const [, c, fn] = DEMOS[+b.dataset.view.slice(1)]; const keep = $('main').querySelector('.feat'); frame(`${GAME}&plan=1&city=${c}`, `Ново: ${f.title} (${f.id})`, fn); $('main').appendChild(keep);
     });
   }
+  if ($('bRej')) $('bRej').onclick = () => {   // отхвърлено: задача за Claude (lab-feedback.jsonl) и изчезва от „Ново“
+    const why = prompt('Какво не е наред? (по желание)') || '';
+    post('/__lab/feedback', { target: `Ново: ${f.title} (${f.id})`, kind: 'reject', text: 'Не е ОК — намери друго' + (why ? ': ' + why : '') }).catch(() => { });
+    rejected.add(f.id); try { localStorage.setItem('lab.rejected', JSON.stringify([...rejected])); } catch { }
+    const nx = FEATURES.find(x => !approved.includes(x.id) && !rejected.has(x.id)); pick('review', nx ? nx.id : '');
+  };
   $('bApp').onclick = () => post('/__lab/approved', { id: f.id, ok: !on }).then(j => {
     approved = j.approved;
     if (!on && mUrl) post('/__lab/feedback', { target: `Модел: ${mUrl}`, kind: 'reviewed', text: '' }).catch(() => { });   // и в „3D модели“ — като одобрен

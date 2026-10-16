@@ -148,7 +148,8 @@ export function buildPlanView(P0, opts = {}) {
   // --- площад: павета, фонтан, кръг от дървета
   const sq = P.square, pl = [[], []]; disc(sq.x, sq.z, sq.r + 1, 0.08, ...pl, 32);
   g.add(mesh(...pl, M.plaza));
-  if (!opts.noFountain) { const f = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.6, 0.8, 24), M.stone); f.position.set(sq.x, 0.4, sq.z); g.add(f);
+  if (!opts.noFountain && opts.fountainProto) { const f = opts.fountainProto.clone(true); f.scale.setScalar(Math.min(14, sq.r * 0.75)); f.position.set(sq.x, 0.08, sq.z); f.traverse(o => { if (o.isMesh) o.castShadow = true; }); g.add(f); }   // истинският фонтан (plants-real)
+  else if (!opts.noFountain) { const f = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.6, 0.8, 24), M.stone); f.position.set(sq.x, 0.4, sq.z); g.add(f);
     const w = new THREE.Mesh(new THREE.CylinderGeometry(3.7, 3.7, 0.1, 24), M.fountain); w.position.set(sq.x, 0.82, sq.z); g.add(w);
     const s = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 4, 10), M.stone); s.position.set(sq.x, 2.2, sq.z); g.add(s); }
   // --- парцели: светли площадки (цвят по зона), очертания отблизо
@@ -248,8 +249,16 @@ export function buildPlanView(P0, opts = {}) {
     }
     const put = (geo, mat, list, f) => { if (!list.length) return; const im = new THREE.InstancedMesh(geo, mat, list.length); list.forEach((p, i) => im.setMatrixAt(i, f(p))); im.castShadow = true; detail.add(im); };
     const q2 = new THREE.Quaternion(), e2 = new THREE.Euler(), v2 = new THREE.Vector3(), s2 = new THREE.Vector3();
+    const PP = opts.plantProtos || [];
+    if (PP.length) {   // истински храсти и цветя (plants-real): всеки меш на прототипа — една InstancedMesh
+      const inst = (pr, list, f) => { if (!list.length) return; pr.updateMatrixWorld(true); pr.traverse(o => { if (!o.isMesh) return; const geo = o.geometry.clone().applyMatrix4(o.matrixWorld), im = new THREE.InstancedMesh(geo, o.material, list.length); list.forEach((p, i) => im.setMatrixAt(i, f(p, i))); im.castShadow = true; detail.add(im); }); };
+      const bushes = PP.slice(0, 2), low = PP[2] || PP[0];
+      bushes.forEach((pr, bi) => inst(pr, bush.filter((_, i) => i % bushes.length === bi), ([x, z, k], i) => m4.compose(v2.set(x, 0, z), q2.setFromEuler(e2.set(0, i * 2.39, 0)), s2.setScalar(2.4 * k))));
+      inst(low, flow.filter((_, i) => i % 3 === 0), ([x, z], i) => m4.compose(v2.set(x, 0, z), q2.setFromEuler(e2.set(0, i * 1.7, 0)), s2.setScalar(1.5)));
+    } else {
     put(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: 0x3f7a3a, roughness: 0.9 }), bush, ([x, z, k]) => m4.compose(v2.set(x, 0.55 * k, z), q2.identity(), s2.set(1.2 * k, 0.8 * k, 1.2 * k)));
     for (const [c, ci] of [[0xe0443a, 0], [0xf5c542, 1], [0x9b59d0, 2]]) put(new THREE.SphereGeometry(0.28, 6, 4), new THREE.MeshStandardMaterial({ color: c, roughness: 0.7 }), flow.filter(f => f[2] === ci), ([x, z]) => m4.compose(v2.set(x, 0.3, z), q2.identity(), s2.set(1, 1, 1)));
+    }
     put(new THREE.BoxGeometry(10.4, 0.06, 1.8), new THREE.MeshStandardMaterial({ color: 0xd8c9a6, roughness: 1 }), alley, ([x, z, a]) => m4.compose(v2.set(x, 0.07, z), q2.setFromEuler(e2.set(0, a, 0)), s2.set(1, 1, 1)));
     put(new THREE.BoxGeometry(2.2, 0.5, 0.6), new THREE.MeshStandardMaterial({ color: 0x8a5a33, roughness: 0.8 }), bench, ([x, z, a]) => m4.compose(v2.set(x, 0.45, z), q2.setFromEuler(e2.set(0, a, 0)), s2.set(1, 1, 1)));
   }
