@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';
 
-const CAR_LEN = 3.0;   // дължината на седана в света на играта (другите коли са в същия мащаб)
+const CAR_LEN = 3.8;   // дължината на седана в света на играта (другите коли са в същия мащаб); беше 3.0 — изглеждаха малки до сградите
 const GEAR = {
   roller: { f: 'roller', yaw: 0 }, backhoe: { f: 'backhoe', yaw: 0 }, dump: { f: 'dump', yaw: 0 },
   grader: { f: 'grader', yaw: -Math.PI / 2 },   // ножът и предните колела са към +x
