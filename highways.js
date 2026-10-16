@@ -200,8 +200,10 @@ export function buildHighwayView(A, opts = {}) {
   const fresh = new THREE.Mesh(new THREE.PlaneGeometry(CW - 0.6, 16), new THREE.MeshStandardMaterial({ color: 0x1c1c1e, roughness: 0.55, transparent: true, opacity: 0.85 }));
   fresh.rotation.x = -Math.PI / 2; g.add(fresh);
   const trucks = [];
-  if (A.truck) for (let k = 0; k < 2; k++) { const t = clone(A, 'truck', 2.2); g.add(t); trucks.push(t); }
-  if (A['tractor-shovel']) { const l = clone(A, 'tractor-shovel', 2.2); g.add(l); trucks.push(l); }
+  // истинската техника на играта (vehmodels.js), иначе Kenney
+  for (let k = 0; k < 2; k++) { const t = A['sf-dump'] ? clone(A, 'sf-dump', 7.5) : A.truck ? clone(A, 'truck', 2.2) : null; if (t) { g.add(t); trucks.push(t); } }
+  { const l = A['sf-excavator'] ? clone(A, 'sf-excavator', 8.5) : A['tractor-shovel'] ? clone(A, 'tractor-shovel', 2.2) : null; if (l) { g.add(l); trucks.push(l); } }
+  if (A['sf-backhoe']) { const b = clone(A, 'sf-backhoe', 6.5); g.add(b); trucks.push(b); }
 
   // stage: 0..3, prog: 0..1 в рамките на етапа, t: секунди (за анимация)
   function update(stage, prog, t = 0) {

@@ -2,6 +2,8 @@
 // Етапите се извеждат от прогреса на линията (0..1): 4 равни етапа.
 // game.js ползва: RAIL_STAGES, railStageOf(prog), buildRailView(A, opts) → { group, update(stage, prog, t) }.
 import * as THREE from 'three';
+import { makeWater } from './water.js';
+import { hasTrainModel, trainCar } from './trainmodels.js';
 
 export const RAIL_STAGES = [
   { nm: 'Земни работи', ico: '🚜' },
@@ -45,7 +47,8 @@ export function buildRailView(A, opts = {}) {
   const g = new THREE.Group(), z0 = -LEN / 2;
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), mat(0x8fb36a, 1));
   ground.rotation.x = -Math.PI / 2; ground.position.y = -0.02; ground.receiveShadow = true; g.add(ground);
-  const river = new THREE.Mesh(new THREE.PlaneGeometry(600, RIVER_W), new THREE.MeshStandardMaterial({ color: 0x3f86c9, roughness: 0.3, metalness: 0.1 }));
+  const water = makeWater({ color: 0x3f86c9, repeat: 24 });   // реката с вълни (като при магистралите)
+  const river = new THREE.Mesh(new THREE.PlaneGeometry(600, RIVER_W), water.material);
   river.rotation.x = -Math.PI / 2; river.position.set(0, 0.01, RIVER_Z); g.add(river);
   const onBridge = z => Math.abs(z - RIVER_Z) < RIVER_W / 2 + 4;
   const Y = 1.2;   // височина на баластрата
@@ -106,13 +109,18 @@ export function buildRailView(A, opts = {}) {
   }
   // машини: багер и самосвали (Kenney), машина за полагане на релси (процедурна)
   const clone = (n, s) => { const o = A[n].scene.clone(true); o.scale.setScalar(s); o.traverse(m => { if (m.isMesh) m.castShadow = true; }); g.add(o); return o; };
+  // истинската техника на играта (vehmodels.js: дължина 1, предницата към +z), иначе Kenney
   const trucks = [];
-  if (A.truck) for (let k = 0; k < 2; k++) trucks.push(clone('truck', 2.2));
-  if (A['tractor-shovel']) trucks.push(clone('tractor-shovel', 2.2));
+  for (let k = 0; k < 2; k++) { if (A['sf-dump']) trucks.push(clone('sf-dump', 7.5)); else if (A.truck) trucks.push(clone('truck', 2.2)); }
+  if (A['sf-excavator']) trucks.push(clone('sf-excavator', 8.5)); else if (A['tractor-shovel']) trucks.push(clone('tractor-shovel', 2.2));
+  if (A['sf-backhoe']) trucks.push(clone('sf-backhoe', 6.5));
   const layer = makeLayer(); g.add(layer);
   // влак на готовата линия
   const train = new THREE.Group();
-  if (A['train-locomotive-a']) {
+  const realTrain = (grp, kinds) => { let z = 0; for (const kd of kinds) { const m = trainCar(kd, z | 0); if (!m) return false; const k = 2.4 * 6.6 / 6.6; z -= m.userData.len / 2; m.position.z = z; z -= m.userData.len / 2 + 0.5; grp.add(m); } return true; };
+  if (hasTrainModel('vl82')) realTrain(train, ['vl82', 'boxcar', 'hopper2', 'flat', 'boxcar']);
+  else if (hasTrainModel('loco')) realTrain(train, ['loco', 'hopper', 'flat', 'hopper', 'flat']);
+  else if (A['train-locomotive-a']) {
     ['train-locomotive-a', 'train-carriage-container-red', 'train-carriage-box', 'train-carriage-coal', 'train-carriage-flatbed-wood'].forEach((n, i) => {
       if (!A[n]) return; const o = A[n].scene.clone(true); o.scale.setScalar(2.4); o.position.z = -i * 6.6; train.add(o);
     });
@@ -120,13 +128,15 @@ export function buildRailView(A, opts = {}) {
   g.add(train);
   // втори влак в обратна посока по другия коловоз: пътнически (електрически мотриси)
   const train2 = new THREE.Group();
-  ['train-electric-city-a', 'train-electric-city-b', 'train-electric-city-b', 'train-electric-city-a'].forEach((n, i) => {
+  if (hasTrainModel('paxLoco') && hasTrainModel('paxCar')) realTrain(train2, ['paxLoco', 'paxCar', 'paxCar', 'paxCar']);
+  else ['train-electric-city-a', 'train-electric-city-b', 'train-electric-city-b', 'train-electric-city-a'].forEach((n, i) => {
     if (!A[n]) return; const o = A[n].scene.clone(true); o.scale.setScalar(2.4); o.position.z = -i * 6.6; if (i === 3) o.rotation.y = Math.PI; train2.add(o);
   });
   train2.rotation.y = Math.PI;
   g.add(train2);
 
   function update(stage, prog, t = 0) {
+    water.update(t);
     const fz = z0 + LEN * prog, done = stage > 3;
     reveal(earth, stage > 0 ? 1e9 : fz);
     reveal(ballast, stage > 1 ? 1e9 : stage === 1 ? fz : -1e9);
