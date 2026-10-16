@@ -158,6 +158,15 @@ function renderReview() {
   const on = approved.includes(f.id);
   box.innerHTML = `<div><b>${esc(f.title)}</b><div>${esc(f.how)}</div></div>${on ? `<button class="btn" id="bApp">↩ Махни от играта</button>` : `<button class="btn ok" id="bApp">✓ OK — в играта</button>`}`;
   $('main').appendChild(box);
+  if (f.views && f.views.length > 1) {   // няколко неща за гледане (напр. 3 кули) — бутони в кутията
+    const vb = document.createElement('div'); vb.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;margin-top:6px';
+    vb.innerHTML = f.views.map(([nm, d], i) => `<button class="btn${i === 0 ? ' ok' : ''}" data-view="${d}">${esc(nm)}</button>`).join('');
+    box.querySelector('div').appendChild(vb);
+    vb.querySelectorAll('[data-view]').forEach(b => b.onclick = () => {
+      vb.querySelectorAll('[data-view]').forEach(x => x.classList.toggle('ok', x === b));
+      const [, c, fn] = DEMOS[+b.dataset.view.slice(1)]; const keep = $('main').querySelector('.feat'); frame(`${GAME}&plan=1&city=${c}`, `Ново: ${f.title} (${f.id})`, fn); $('main').appendChild(keep);
+    });
+  }
   $('bApp').onclick = () => post('/__lab/approved', { id: f.id, ok: !on }).then(j => {
     approved = j.approved;
     if (!on && mUrl) post('/__lab/feedback', { target: `Модел: ${mUrl}`, kind: 'reviewed', text: '' }).catch(() => { });   // и в „3D модели“ — като одобрен
