@@ -22,3 +22,5 @@
 - amb-gaz.glb — "ГАЗ-3221 Скорая помощь / GAZ-3221 Ambulance R.2" by grox777 — https://sketchfab.com/3d-models/f3daf79ea4e843c8a159e8ead7af6e74
 - amb-us.glb — "Ambulance Van" by axi0m — https://sketchfab.com/3d-models/3b1c46b48d1e4fbca113916774126899
 - amb-eu.glb — "Ambulance" by rccdesign — https://sketchfab.com/3d-models/1061168f9ec345db81cffb81c17f3649
+- fire-man.glb — "German Ladder Fire Truck(MAN TGA truck)" by cm_dp — https://sketchfab.com/3d-models/403fbe45460041c2a97031d0635634cf
+- pol-nypd.glb — "Dodge Charger Police NYPD" by David_Holiday — https://sketchfab.com/3d-models/578e2bfb9c8f415d932527a938e2fc64

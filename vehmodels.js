@@ -66,8 +66,8 @@ function loadRealCars(load, A) {
 // спешните коли за одобрение (Лабораторията → pol-*, fire-*, amb-*): одобрените заместват Police_Sedan / Firetruck / Ambulance,
 // всички с мигащи буркани; при няколко одобрени — A[...].variants (game.js model() може да ги редува)
 const EMERG = {
-  Police_Sedan: [['pol-charger', 5.1], ['pol-crownvic', 5.4], ['pol-interceptor', 5.3], ['pol-volga', 4.8]],
-  Firetruck: [['fire-red', 9], ['fire-us', 10]],
+  Police_Sedan: [['pol-charger', 5.1], ['pol-crownvic', 5.4], ['pol-interceptor', 5.3], ['pol-volga', 4.8], ['pol-nypd', 5.1]],
+  Firetruck: [['fire-red', 9], ['fire-us', 10], ['fire-man', 10.5]],
   Ambulance: [['amb-gaz', 5.5], ['amb-us', 6.5], ['amb-eu', 5.8]],
 };
 export function loadPoliceCars(load, A) {
@@ -121,11 +121,11 @@ class Beacon extends THREE.Mesh {
     if (!this.userData.own) { this.material = this.material.clone(); this.userData.own = 1; }
     const car = this.parent && this.parent.parent; if (!car) return;
     const t = performance.now() / 1000, h = (car.id * 2.39) % 6.28;
-    const on = Math.sin(t / 20 * Math.PI * 2 + h) > 0.1;   // включени ~45% от времето
+    const on = car.userData.forceBeacons || Math.sin(t / 20 * Math.PI * 2 + h) > 0.1;   // включени ~45% от времето (демото — винаги)
     const blink = (Math.floor(t * 6) + (this.userData.red ? 0 : 1)) % 2 === 0;
     this.material.emissiveIntensity = on && blink ? 3 : 0;
     if (this.userData.red) {
-      if (on && !car.userData.sirenOn && feature('sirens') && t - sirenAt > 14) {
+      if (on && (!car.userData.sirenOn || car.userData.forceBeacons) && feature('sirens2') && t - sirenAt > (car.userData.forceBeacons ? 6 : 14)) {
         const d = this.getWorldPosition(new THREE.Vector3()).distanceTo(camera.position);
         if (d < 160) { sirenAt = t; Sound.file(SIREN[this.userData.kind] || SIREN.police, Math.max(0.15, 0.7 - d / 260)); }
       }
