@@ -10,7 +10,7 @@ const CAR_LEN = 3.0;   // дължината на седана в света н�
 const GEAR = {
   roller: { f: 'roller', yaw: 0 }, backhoe: { f: 'backhoe', yaw: 0 }, dump: { f: 'dump', yaw: 0 },
   grader: { f: 'grader', yaw: -Math.PI / 2 },   // ножът и предните колела са към +x
-  excavator: { f: 'excavator', yaw: Math.PI / 2 },   // стрелата е към −x → завърта се напред
+  excavator: { f: 'excavator', yaw: feature('gear-exc') ? 0 : Math.PI / 2 },   // старият: стрелата е към −x → завърта се напред; новият (Лабораторията) вече гледа напред
   mcrane: { f: 'mcrane', yaw: 0 },
 };
 export const CAR_NAMES = ['Sedan', 'Hatchback', 'SUV', 'Pickup', 'Van', 'Taxi', 'Muscle', 'Muscle_2', 'Sports', 'Roadster', 'Limousine', 'Truck', 'Truck_with_trailer', 'Bus', 'Ambulance', 'Firetruck', 'Police_Sedan', 'Police_SUV', 'Police_Muscle', 'Police_Sports'];

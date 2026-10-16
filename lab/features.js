@@ -28,4 +28,12 @@ export const FEATURES = [
   {"id": "com2-sky-e", "title": "Модерен небостъргач E (мегаполисите)", "how": "„Bank of China Tower“ (Raise3D, CC BY 4.0, Sketchfab) вместо втората стъклена кула на Kenney. „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fcommercial2%2Fbuilding-skyscraper-e.glb"},
   {"id": "house-a", "title": "Реалистична къща A", "how": "„Low-poly Brick House“ (Vitalii.Sandula, CC BY 4.0) — тухлена къща с остъклена веранда, вместо къщата на Kenney в покрайнините. „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fhouses%2Fbuilding-type-a.glb"},
   {"id": "house-b", "title": "Реалистична къща B", "how": "„Low poly House, single texture“ (danzl0, CC BY 4.0) — каменна двуетажна къща с бръшлян, вместо къщата на Kenney. „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fhouses%2Fbuilding-type-b.glb"},
+  // „свети ли?“ — Бурж Халифа: етажите в студено бяло, като истинската нощем
+  {"id": "night-burj", "title": "Бурж Халифа свети нощем", "how": "Нощем етажите на Бурж Халифа светват един по един в студено бяло (не равномерно бежово, както досега). Отваря Дубай нощем пред кулата. Всички забележителности нощем — „Мисии/демо“ → 🌙.", "url": "#tab=demos&item=d16"},
+  // „изтрий и намери нов“: техника и забележителности
+  {"id": "gear-dump", "title": "Нов самосвал", "how": "„Shacman F3000 Dump Truck“ (benjamintang2012, CC BY 4.0, Sketchfab) — червен тривосов самосвал вместо японския. Виж и „Сцени“ → София (техниката на обектите). „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fheavy%2Fgear%2Fdump.glb"},
+  {"id": "gear-exc", "title": "Нов багер", "how": "„Excavator“ (rhymone, CC BY 4.0, Sketchfab) — жълт верижен багер тип CAT. „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fheavy%2Fgear%2Fexcavator.glb"},
+  {"id": "gear-mcrane", "title": "Нов автокран", "how": "„Mobile Hydraulic Truck Crane (Telescopic)“ (doty_aecom, CC BY 4.0, Sketchfab) — жълт петосов кран с телескопична стрела. „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fheavy%2Fgear%2Fmcrane.glb"},
+  {"id": "lm-redeemer", "title": "Нова статуя на Христос Спасителя (Рио)", "how": "„Christ The Redeemer“ (naveenhimal, CC BY 4.0, Sketchfab) — по-реалистична, с каменен постамент. „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fheavy%2Flm%2Fredeemer.glb"},
+  {"id": "lm-colosseo", "title": "Нов Колизеум (Рим)", "how": "„Colosseum“ (alexanderleth, CC BY 4.0, Sketchfab) — пълен овал с арките на всички етажи. „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fheavy%2Flm%2Fcolosseo.glb"},
 ];

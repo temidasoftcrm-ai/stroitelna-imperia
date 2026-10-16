@@ -58,5 +58,25 @@
   "house-b": {
     "from": "/assets/houses/building-type-b.glb",
     "to": "/assets/houses/building-type-b-new.glb"
+  },
+  "gear-dump": {
+    "from": "/assets/heavy/gear/dump.glb",
+    "to": "/assets/heavy/gear/dump-new.glb"
+  },
+  "gear-exc": {
+    "from": "/assets/heavy/gear/excavator.glb",
+    "to": "/assets/heavy/gear/excavator-new.glb"
+  },
+  "gear-mcrane": {
+    "from": "/assets/heavy/gear/mcrane.glb",
+    "to": "/assets/heavy/gear/mcrane-new.glb"
+  },
+  "lm-redeemer": {
+    "from": "/assets/heavy/lm/redeemer.glb",
+    "to": "/assets/heavy/lm/redeemer-new.glb"
+  },
+  "lm-colosseo": {
+    "from": "/assets/heavy/lm/colosseo.glb",
+    "to": "/assets/heavy/lm/colosseo-new.glb"
   }
 }
