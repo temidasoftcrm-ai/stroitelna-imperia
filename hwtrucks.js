@@ -94,13 +94,17 @@ export function createHwTrucks(d) {
       return `<image href="assets/ui/tir-top.webp" x="${(-l / 2).toFixed(2)}" y="${(-w / 2).toFixed(2)}" width="${l.toFixed(2)}" height="${w.toFixed(2)}" transform="translate(${x.toFixed(1)},${y.toFixed(1)}) rotate(${ang.toFixed(1)})" style="pointer-events:none;filter:drop-shadow(0 0 ${(1.2 * k).toFixed(1)}px rgba(0,0,0,.5))"/>`; }).join('');
   }
   // карта в таб „Техника“
+  const svcOf = t => Math.round(TRUCK.cost * TRUCK.service * (100 - (t.cond ?? 100)) / 70 / 100) * 100;
   function html() {
     const T = L();
     let h = `<div class="sect">🚚 ТИР-ове по магистралите${T.length ? ` (${T.length})` : ''}</div><div class="card" style="padding:9px 11px">
       <div class="row" style="margin:0;align-items:center;gap:10px"><img src="assets/ui/tir-top.webp" alt="" style="width:110px;height:auto"><span class="meta" style="margin:0">Собствен ТИР за ${f(TRUCK.cost)} € сам кара товари между твоите градове по готовите магистрали и аутобани — по-евтин от влака и върви навсякъде, където има магистрала. Поддръжка ${f(TRUCK.upkeep)} €/ден. По участъците на партньора плаща тол. Ако в крайния град имаш склад, носи и твоите материали без такса за доставка.</span></div>
       <button class="btn" data-trk="buy" style="width:100%;margin-top:6px" ${E().canAfford(TRUCK.cost) ? '' : 'disabled'}>🚚 Купи ТИР · ${f(TRUCK.cost)} €</button></div>`;
+    { const need = T.map(t => [t, svcOf(t)]).filter(([, c]) => c > 0), sum = need.reduce((a, [, c]) => a + c, 0);   // „Обслужи всички“ — от ниво 6 (d.svcAll)
+      if (need.length > 1 && (!d.svcAll || d.svcAll())) h += `<button class="btn2" data-trk="svcall:0:${sum}" style="width:100%;margin:4px 0" ${E().canAfford(sum) ? '' : 'disabled'}>🔧 Обслужи всички (${need.length}) · ${f(sum)} €</button>`;
+      else if (need.length > 1) h += `<div class="meta" style="margin:4px 0">🔒 „Обслужи всички“ — от ниво 6 на развитие.</div>`; }
     for (const t of T) {
-      const svc = Math.round(TRUCK.cost * TRUCK.service * (100 - (t.cond ?? 100)) / 70 / 100) * 100, j = t.path ? jam(t) : 1, sell = Math.round(TRUCK.cost * TRUCK.sell * (t.cond ?? 100) / 100);
+      const svc = svcOf(t), j = t.path ? jam(t) : 1, sell = Math.round(TRUCK.cost * TRUCK.sell * (t.cond ?? 100) / 100);
       h += `<div class="card" style="padding:9px 11px"><b>${t.nm}</b> <span class="meta" style="margin:0">${t.path ? `${cargoOf(t)[1]} ${name(t.path[0])} → ${name(t.path[t.path.length - 1])} · ${Math.round(t.km)}/${Math.round(t.total)} км · ~${f(legPay(t))} €${legToll(t) ? ` − тол ${f(legToll(t))} €` : ''}` : `⏸ чака в ${name(t.at)} — няма готова магистрала до друг твой град`}</span><br>
         <span class="meta" style="margin:0">курсове ${t.trips} · спечелил ${f(t.earned)} € · 🔧 ${Math.round(t.cond ?? 100)}%${j < 1 ? ` · <span class="late">🚦 задръстване −${Math.round((1 - j) * 100)}%</span>` : ''}</span>
         <div class="row" style="justify-content:flex-end;gap:6px;margin-top:4px;flex-wrap:wrap">${svc > 0 ? `<button class="btn2" data-trk="svc:${t.id}:${svc}" ${E().canAfford(svc) ? '' : 'disabled'}>🔧 Обслужи · ${f(svc)} €</button>` : ''}<button class="btn2" data-trk="sell:${t.id}:${sell}">Продай · ${f(sell)} €</button></div></div>`;
@@ -111,6 +115,8 @@ export function createHwTrucks(d) {
     el.querySelectorAll('[data-trk]').forEach(b => b.onclick = () => {
       const [c, id, x] = b.dataset.trk.split(':'), t = L().find(q => q.id === +id);
       if (c === 'buy') return buy();
+      if (c === 'svcall') { const need = L().filter(q => svcOf(q) > 0), sum = need.reduce((a, q) => a + svcOf(q), 0); if (!E().canAfford(sum)) return;
+        E().spend(sum, 'заплати', `ТИР-ове: обслужване на ${need.length}`); for (const q of need) q.cond = 100; d.save(); d.renderPanel(); d.toast(`🔧 ${need.length} ТИР-а са като нови.`, 'good'); return; }
       if (!t) return;
       if (c === 'svc') { if (!E().canAfford(+x)) return; E().spend(+x, 'заплати', `${t.nm}: обслужване`); t.cond = 100; d.save(); d.renderPanel(); d.toast(`🔧 ${t.nm} е като нов.`, 'good'); return; }
       if (c === 'sell') d.modal(`Продай ${t.nm}?`, `Получаваш ${f(+x)} €.`, [['Отказ', null], ['Продай', () => {

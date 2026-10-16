@@ -84,6 +84,7 @@ import { gamePlan, planLots, planTiles, planCount } from './cityplangame.js';
 import { buildPlanView } from './cityplan3d.js';
 import { prepNightFloors } from './nightfloors.js';
 import { showIntro } from './intro.js';
+import { feature } from './lab/feature.js';
 import { sampleCurve } from './cityplan.js';
 import { planRoute, randomRoadPoint } from './cityplanroute.js';
 
@@ -1375,10 +1376,23 @@ function canEnter(i, j, axis) {
 // ---- пешеходци: разхождат се по тротоарите (и през парковете); броят расте с града
 const peds = [];
 const PED_SIDE = 3.3;   // разстояние от оста на улицата до тротоара
+// истински минувачи (Mixamo, от „Бригада“ — assets/heavy/people/peds): зареждат се при нужда, зад feature('peds-real')
+const PED_REAL = ['adam', 'brian', 'steve', 'elizabeth', 'kate', 'louise'], pedReal = [];
+let pedLoad = null;
+function loadPeds() {
+  if (pedLoad || !feature('peds-real')) return;
+  pedLoad = Promise.all(PED_REAL.map(k => load(`assets/heavy/people/peds/ped-${k}.glb`).then(g => {
+    g.scene.updateMatrixWorld(true); g.scene.traverse(o => { if (o.isSkinnedMesh) o.skeleton.update(); });
+    const b = new THREE.Box3().setFromObject(g.scene, true), h = b.max.y - b.min.y || 1;   // точно (костите на Mixamo са ×0.01)
+    g.k = 1.9 / h;   // като досегашните минувачи (~1.9 м в играта)
+    pedReal.push(g);
+  }).catch(() => {})));
+}
 function makePed() {
-  const src = A.farmer || A.worker_male_alt;
+  loadPeds();
+  const real = pedReal.length && Math.random() < 0.85, src = real ? pick(pedReal) : (A.farmer || A.worker_male_alt);
   const m = cloneSkinned(src.scene);
-  m.scale.setScalar(rand(1.05, 1.2));
+  m.scale.setScalar(real ? src.k * rand(0.94, 1.06) : rand(1.05, 1.2));
   // различни дрехи: оцветяваме наситените (нетелесни) материали
   const hsl = { h: 0, s: 0, l: 0 }, hue = Math.random();
   m.traverse(o => {
@@ -1387,11 +1401,11 @@ function makePed() {
     o.material = o.material.clone();
     o.material.color.getHSL(hsl);
     const skin = hsl.h > 0.02 && hsl.h < 0.12 && hsl.l > 0.45;
-    if (hsl.s > 0.25 && !skin) o.material.color.setHSL((hue + hsl.h * 0.3) % 1, Math.min(0.8, hsl.s + 0.1), hsl.l);
+    if (!real && hsl.s > 0.25 && !skin) o.material.color.setHSL((hue + hsl.h * 0.3) % 1, Math.min(0.8, hsl.s + 0.1), hsl.l);   // истинските — с дрехите си
   });
   scene.add(m);
   const mixer = new THREE.AnimationMixer(m);
-  const walk = src.animations.find(c => c.name === 'Walk');
+  const walk = src.animations.find(c => c.name === 'Walk') || src.animations.find(c => /Walk/.test(c.name));
   if (walk) mixer.clipAction(walk).play();
   mixer.update(Math.random() * 2);
   const i = 3 * ((Math.random() * NBI) | 0), j = (Math.random() * NJ) | 0;
@@ -1895,8 +1909,7 @@ function newGame(cityId, brand = null, brandNm = '') {
   for (let k = 0; k < 3; k++) makeOffer();
   renderPanel();   // първите поръчки се появяват след първото рисуване на панела
   const lv1 = () => { showEventPop('lv-1', '🏅 Ниво 1 — началото!', 'Завършвай обекти, строй линии и магистрали, за да расте фирмата до ниво 10.'); Sound.play('levelup'); };
-  if (AUTOTEST) setTimeout(lv1, 900);   // „Добре дошли“ (intro.js) — после поп-ъпът за ниво 1
-  else setTimeout(() => showIntro({ brand: brandOf(S)?.nm || 'Твоята фирма', city: cityName(), money: fmt(ECON.START.money), sound: n => Sound.play(n), onDone: () => setTimeout(lv1, 300) }), 700);
+  setTimeout(lv1, 900);   // интрото „Добре дошли“ е преди картата (при първото отваряне без запис)
   toast(`${brand ? `${brandOf(S).nm} Констръкшън е основана` : 'Фирмата е основана'} в град ${cityName()}! Приеми първата поръчка от таблото.`, 'good');
   if (brand) group.check(true);
   save();
@@ -2574,7 +2587,7 @@ function renderPanel() {
           <button class="btn" data-fill="${m.t}" ${econ.canAfford(T.cost) ? '' : 'disabled'}>Купи ${m.n} · ${fmt(m.n * T.cost)} €</button></div></div>`; }).join('');
       h += `<button class="btn" id="bFillAll" style="width:100%;margin-top:4px" ${econ.canAfford(total) ? '' : 'disabled'}>🛒 Купи всичко липсващо · ${fmt(total)} €</button>`;
     }
-    h += hwTrucks.html();
+    if ((S.trucks || []).length) h += `<div class="meta" style="margin-top:8px">🚚 ТИР-овете по магистралите (${S.trucks.length}) са в прозореца <b>„🛣️ Магистрали“</b> горе.</div>`;
     h += `<details style="margin-top:10px"><summary class="meta" style="cursor:pointer">👷 Специалисти (инженер, архитект)</summary>` + Object.entries(STAFF).map(([k, t]) => `<div class="card" style="padding:9px 11px"><div class="row" style="margin:0"><b>${t.ico} ${t.nm}</b>${hasStaff(k) ? '<b style="color:var(--ok)">✓ в екипа</b>' : `<b>${fmt(t.cost)} €</b>`}</div>
       <div class="meta">${t.ds} Заплата ${fmt(t.upkeep)} €/ден.</div>${dev.level() < 4 && !hasStaff(k) ? `<div class="meta late">🔒 Ниво 4 на развитие на града (сега ${dev.level()})</div>` : ''}${hasStaff(k) ? '' : `<div class="row" style="justify-content:flex-end;margin-top:4px"><button class="btn" data-staff="${k}" ${econ.canAfford(t.cost) ? '' : 'disabled'}>Назначи</button></div>`}</div>`).join('') + `</details>`;
   } else if (tab === 'estate') {
@@ -2596,7 +2609,6 @@ function renderPanel() {
   el.querySelectorAll('[data-fill]').forEach(b => b.onclick = () => { const m = fleetMissing().find(x => x.t === b.dataset.fill); if (!m) return; const k = fillUnits(m.t, m.n); toast(k ? `${ECON.UNIT_TYPES[m.t].ico} Купи ${k} × ${ECON.UNIT_TYPES[m.t].nm.toLowerCase()}.` : 'Няма място или пари.', k ? 'good' : 'bad'); renderPanel(); });
   if (el.querySelector('#bFillAll')) el.querySelector('#bFillAll').onclick = () => { let k = 0; for (const m of fleetMissing()) k += fillUnits(m.t, m.n); toast(k ? `🛒 Купи ${k} машини и бригади.` : 'Няма място или пари.', k ? 'good' : 'bad'); renderPanel(); };
   el.querySelectorAll('[data-sell]').forEach(b => b.onclick = () => sellUnit(b.dataset.sell));
-  hwTrucks.bind(el);
   el.querySelectorAll('[data-lot]').forEach(c => c.onclick = () => { selProject = c.dataset.proj ? +c.dataset.proj : null; flyTo(city.lots[+c.dataset.lot]); highlightLot(+c.dataset.lot); renderPanel(); });
   if (tab === 'bank') renderBank($('financeBox'));
   if (tab === 'estate') bindEstate(el);
@@ -3072,9 +3084,21 @@ function neomDecor() {
 // 🛢️ петролната империя (oil.js): танкова ферма, световна цена, договори с танкери, бензиностанции
 const oil = createOil({ S: () => S, econ: () => econ, priceMul: () => mw.done('pipeline') ? 1.1 : 1, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), cityName: id => cityById(id)?.nm || id, cityOk: id => !!cityById(id),
   ownedCities: () => ownedCities(), unlinked: () => { const t = mines.state().sites.filter(x => x.kind === 'terminal'); return mines.state().sites.filter(x => ['oilwell', 'refinery'].includes(x.kind) && !t.some(q => q.city === x.city || railLinked(q.city, x.city) || roadLinked(q.city, x.city))).map(x => x.city); }, tankers: () => (S.ships || []).filter(p => p.kind === 'tanker').length, terminalCity: () => mines.state().sites.find(x => x.kind === 'terminal')?.city || null, isAm: id => isAm(id) });
+// полето за името на фирмата: пишеш → „✓ Запази“ (или Enter) → отметка с името; после избираш знак и цвят
+const brandField = () => `<div style="display:flex;gap:6px;margin:8px 0 4px"><input id="brandNm" maxlength="24" placeholder="Името на фирмата (напр. Петров)" autocomplete="off" style="flex:1;min-width:0;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:#0f141c;color:var(--txt);font-size:16px"><button type="button" class="btn" id="brandOk" style="flex:0 0 auto">✓ Запази</button></div><div id="brandMsg" style="font-size:13px;color:var(--mut);min-height:18px">Напиши името и натисни „✓ Запази“, после избери знак и цвят.</div>`;
+function wireBrandField() {
+  setTimeout(() => {
+    const inp = $('brandNm'), ok = $('brandOk'), msg = $('brandMsg'); if (!inp || !ok) return;
+    const saveNm = () => { const nm = cleanBrand(inp.value); if (!nm) { msg.style.color = 'var(--bad)'; msg.textContent = 'Напиши име (до 24 знака).'; return; } inp.value = nm; msg.style.color = 'var(--ok)'; msg.innerHTML = `✓ Запазено: <b>${nm} Констръкшън</b> — сега избери знак и цвят ↓`; ok.textContent = '✓'; Sound.play('click'); };
+    ok.onclick = saveNm; inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); saveNm(); } };
+    inp.oninput = () => { ok.textContent = '✓ Запази'; msg.style.color = 'var(--mut)'; msg.textContent = 'Натисни „✓ Запази“.'; };
+    inp.focus();
+  }, 50);
+}
 function brandPick(then) {
-  modal('🏢 Дай име на фирмата си', 'Името остава през цялата игра. С всеки нов бизнес основаваш дъщерно дружество: … Толроуд, … Рейл, … Оушън Експрес, … Флайеър, … Петролиум и накрая … Глобъл.' + '<input id="brandNm" maxlength="24" placeholder="Името на фирмата (напр. Петров)" autocomplete="off" style="width:100%;margin:8px 0 4px;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:#0f141c;color:var(--txt);font-size:16px"><br><span style="font-size:12px;color:var(--mut)">После избери знак и цвят. Празно — името на знака.</span>',
+  modal('🏢 Дай име на фирмата си', 'Името остава през цялата игра. С всеки нов бизнес основаваш дъщерно дружество: … Толроуд, … Рейл, … Оушън Експрес, … Флайеър, … Петролиум и накрая … Глобъл.' + brandField(),
     [...BRANDS.map(b => [`${b.ico}`, () => { S.brand = b.k; const nm = cleanBrand($('brandNm')?.value); if (nm) S.brandNm = nm; group.check(true); save(); updLogo(); then && then(); }])]);
+  wireBrandField();
 }
 const updLogo = () => { const l = document.querySelector('#top .logo'); if (!l || !S) return; const gn = groupName(S); l.textContent = `🏗️ ${gn ? gn.toUpperCase() + ' · ' : ''}${cityName().toUpperCase()}${gn ? '' : ` · ${S.cityId === (S.hqCity || S.cityId) ? 'ЦЕНТРАЛА' : 'ФИЛИАЛ'}`}`; l.style.cursor = gn ? 'pointer' : ''; l.title = gn ? 'Корпоративната група' : ''; l.onclick = gn ? () => openBig('group') : null; updHoldBtn(); neomName(); };
 // конкурентни фирми (rivals.js): вземат поръчки, които не приемеш навреме, и строят на парцела
@@ -3160,17 +3184,17 @@ function hwDonePath(a, b) {
   return { path, segs };
 }
 const cityWh = id => ((id === S?.cityId ? S?.whLevel : S?.cities?.[id]?.whLevel) || 0) > 0;
-const hwTrucks = createHwTrucks({ S: () => S, econ: () => econ, sound: n => Sound.play(n), toast, modal, fmt, save, cityName: id => cityById(id)?.nm || id, owned: () => ownedCities(), here: () => S.cityId, route: (a, b) => hwDonePath(a, b),
-  hasWh: id => cityWh(id), pop: (k, a, b) => showEventPop(k, a, b), redraw: () => { if (!$('mapScreen').classList.contains('hidden')) drawMap(); }, renderPanel: () => renderPanel() });
+const hwTrucks = createHwTrucks({ S: () => S, econ: () => econ, sound: n => Sound.play(n), svcAll: () => dev.best() >= 6, toast, modal, fmt, save, cityName: id => cityById(id)?.nm || id, owned: () => ownedCities(), here: () => S.cityId, route: (a, b) => hwDonePath(a, b),
+  hasWh: id => cityWh(id), pop: (k, a, b) => showEventPop(k, a, b), redraw: () => { if (!$('mapScreen').classList.contains('hidden')) drawMap(); }, renderPanel: () => { renderPanel(); if (bigWin) renderBig(); } });
 function updateMapTrucks() { hwTrucks.draw(document.getElementById('truckLayer'), { proj, cityLL: id => { const c = cityById(id); return c && [c.lon, c.lat]; }, k: (mapEU ? 4 : mapWide ? 1.6 : 1) * mapK(), near: mapNear(), inView: p => mapIn(...p) }); }
 function clickCity(id) {
   const c = CITIES.find(q => q.id === id);
   if (S && AIR_ONLY.has(id) && !ownedCities().includes(id)) { const of = AIR_ONLY_OF[id]; toast(`✈️ ${c?.nm || id} е само летище${of ? ` — обслужва ${cityById(of)?.nm || of}` : ''}. Тук не се купува филиал.`, ''); return; }
   if (!S && !START_CITIES.includes(id)) { toast('Започваш в София, Пловдив, Стара Загора или Варна — другите градове се отключват с развитието.', 'bad'); return; }
   if (!S) {
-    modal(`🏗️ Основи фирмата в ${c.nm}`, `Започваш с ${fmt(ECON.START.money)} €, бригада работници, багер и самосвал. Градът е измислен, но се намира в ${c.nm}.<br><br><b>Дай име на фирмата си.</b> С всеки нов бизнес ще основаваш дъщерни дружества: … Толроуд (магистрали), … Рейл (жп), … Оушън Експрес (кораби), … Флайеър (самолети), … Петролиум и накрая … Глобъл.<input id="brandNm" maxlength="24" placeholder="Името на фирмата (напр. Петров)" autocomplete="off" style="width:100%;margin:8px 0 4px;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:#0f141c;color:var(--txt);font-size:16px"><br><span style="font-size:12px;color:var(--mut)">После избери знак и цвят. Празно — името на знака.</span>`,
+    modal(`🏗️ Основи фирмата в ${c.nm}`, `Започваш с ${fmt(ECON.START.money)} €, бригада работници, багер и самосвал. Градът е измислен, но се намира в ${c.nm}.<br><br><b>Дай име на фирмата си.</b> С всеки нов бизнес ще основаваш дъщерни дружества: … Толроуд (магистрали), … Рейл (жп), … Оушън Експрес (кораби), … Флайеър (самолети), … Петролиум и накрая … Глобъл.${brandField()}`,
       [['Отказ', null], ...BRANDS.map(b => [`${b.ico}`, () => newGame(id, b.k, cleanBrand($('brandNm')?.value))])]);
-    setTimeout(() => $('brandNm')?.focus(), 50);
+    wireBrandField();
   } else if (hwPick) hwClick(id);
   else if (railPick) railClick(id);
   else if (S.cityId === id) enterCity();
@@ -7314,6 +7338,7 @@ function renderBig() {
   on('[data-uptrain]', b => { upgradeTrain(+b.dataset.uptrain); renderBig(); });
   on('#bwNewRail', () => { closeBig(); startRailMode(); });
   on('#bwNewHw', () => { closeBig(); startHwMode(); });
+  if (bigWin === 'hw') hwTrucks.bind($('bwBody'));
   on('[data-airport]', b => { buildAirport(b.dataset.airport); renderBig(); });
   on('[data-plane]', b => { buyPlane(b.dataset.plane); renderBig(); });
   on('[data-upplane]', b => { upgradePlane(+b.dataset.upplane); renderBig(); });
@@ -7461,6 +7486,7 @@ function hwWinHtml() {
   const scDone = new Set([...all.flatMap(hw => hw.segs.map((_, i) => segId(hw, i))), ...scAb.flatMap(corridorSegIds)].filter(id => hwAll().includes(id))).size;
   let h = `<div class="bw-stats"><div><b>${fmt(scToll)} €</b><span>тол на ден</span></div><div><b>${scDone}</b><span>готови участъка</span></div><div><b>${all.filter(hw => doneSegs(hw) === hw.segs.length).length} / ${all.length}</b><span>цели магистрали</span></div><div><b>${jobs.length} / ${HW_MAX_JOBS()}</b><span>строят се</span></div></div>${lockMsg}${missTxt && !lockMsg ? `<div class="row" style="margin:0"><span class="meta late" style="margin:0">🚜 ${missTxt} — без нея участъците чакат.${roadNote(hwMissing())}</span><button class="btn" id="bwBuyRoad" ${econ.canAfford(roadCost(hwMissing())) ? '' : 'disabled'}>🚜 Купи липсващата · ${fmt(roadCost(hwMissing()))} €</button></div>` : ''}`;
   if (dev.has('LINKS')) h += `<div class="row" style="justify-content:flex-end"><button class="btn" id="bwNewHw">🛣️ Строй нова магистрала</button></div>`;
+  if (dev.has('LINKS')) h += hwTrucks.html();   // 🚚 ТИР-овете — тук, при магистралите (не в „Техника“)
   h += abUpCard();
   if (['c:am', 'all'].includes(scopeNow())) h += route66.cardHtml();   // 🛣️ Route 66 (специална поръчка) — само в Америка
   const qIn = hwQueue().filter(id => { const g = segById(id); return g && inScope(g.a, g.b); });
@@ -7616,6 +7642,7 @@ function frame() {
     camera.position.copy(controls.target).add(fly.off);
     if (fly.t >= 1) fly = null;
   }
+  if (city.planView && city.planView.userData.update && !onMap) city.planView.userData.update(simT);   // светофарите в плана
   if (hwv) return renderHwView(rdt);
   if (onMap) return;   // картата е SVG — 3D сцената не се рисува отдолу
   controls.update();
@@ -8060,5 +8087,5 @@ if (AUTOTEST) {
   };
 }
 else if (saved) { S = saved; pruneCities(S); setTimeout(() => { if (S && !S.brand) brandPick(); }, 2500); if (sessionStorage.getItem('stroiEnter')) { sessionStorage.removeItem('stroiEnter'); enterCity(); const tb = sessionStorage.getItem('stroiTab'); if (tb) { sessionStorage.removeItem('stroiTab'); setTimeout(() => { tab = tb; renderPanel(); }, 600); }  } else { setupWorld(); fastForward(); showMap(true); } }
-else showMap(true);
+else { showMap(true); if (!AUTOTEST) setTimeout(() => showIntro({ start: true, sound: n => Sound.play(n) }), 1700); }   // без запис: картинката „Зареждане“ → интро → картата
 frame();

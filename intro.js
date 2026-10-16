@@ -19,7 +19,7 @@ const css = `
 #intro .go { background:#f5b942; color:#111; }
 #intro .skip { background:rgba(255,255,255,.1); color:#dfe5ee; }
 `;
-export function showIntro({ brand = 'Твоята фирма', city = 'София', money = '20 000', sound, onDone } = {}) {
+export function showIntro({ brand = 'Твоята фирма', city = 'София', money = '20 000', sound, onDone, start = false } = {}) {
   if (document.getElementById('intro')) return;
   if (!document.getElementById('introCss')) { const st = document.createElement('style'); st.id = 'introCss'; st.textContent = css; document.head.appendChild(st); }
   const slides = [
@@ -27,6 +27,10 @@ export function showIntro({ brand = 'Твоята фирма', city = 'Софи�
     { ico: '🌍', h: 'Строй, расти, завладявай', p: 'Приемай поръчки и строй къщи, магазини и небостъргачи. После — жп линии, магистрали, пристанища и летища: от България през Балканите и Европа до целия свят.' },
     { ico: '👑', h: `${brand} Констръкшън е основана!`, p: 'Целта: от малка строителна фирма до световна империя — ниво 20. Първите поръчки вече те чакат на таблото вдясно.' },
   ];
+  if (start) slides.splice(0, 3,   // в началото (още няма фирма): картинка → това интро → картата
+    { ico: '🏗️', h: 'Добре дошли в „Строителна империя“!', p: 'Ти си собственик на малка строителна фирма с голяма мечта. Започваш с <b>20 000 €</b>, бригада работници, багер и самосвал.' },
+    slides[1],
+    { ico: '🗺️', h: 'Избери къде да започнеш', p: 'На картата натисни <b>София, Пловдив, Стара Загора или Варна</b>, дай име на фирмата си — и първите поръчки ще те чакат.' });
   let k = 0;
   const el = document.createElement('div'); el.id = 'intro';
   el.innerHTML = `<div class="bg"></div><div class="box"><div id="introSlide"></div><div class="dots">${slides.map(() => '<i></i>').join('')}</div>
@@ -36,7 +40,7 @@ export function showIntro({ brand = 'Твоята фирма', city = 'Софи�
     const s = slides[k];
     el.querySelector('#introSlide').innerHTML = `<div class="slide"><div class="ico">${s.ico}</div><h1>${s.h}</h1><p>${s.p}</p></div>`;
     el.querySelectorAll('.dots i').forEach((d, i) => d.classList.toggle('on', i === k));
-    el.querySelector('#introNext').textContent = k < slides.length - 1 ? 'Напред →' : '🚀 Да започваме!';
+    el.querySelector('#introNext').textContent = k < slides.length - 1 ? 'Напред →' : (start ? '🗺️ Към картата' : '🚀 Да започваме!');
     el.querySelector('#introSkip').style.visibility = k < slides.length - 1 ? 'visible' : 'hidden';
   };
   const close = () => {

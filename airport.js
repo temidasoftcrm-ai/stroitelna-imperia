@@ -249,6 +249,23 @@ export function buildAirport(group, deps, opts = {}) {
     for (let k = 0; k < big - 5; k++) { const p = makePlane('wide', 7 + k); p.position.set(TW.x - 4, p.userData.gearY, 140 + k * 40); p.rotation.y = -Math.PI / 2; lvG.add(p); parked.push(p); }
     if (sign) { sign.position.set(TERM.x - 6, 16, tz); }
   }
+  // нощно осветление: прожекторни мачти на перона (сияние + светло петно), стробове на подхода, фарове на самолетите
+  const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 1, 32, 32, 31); gr.addColorStop(0, 'rgba(255,240,200,1)'); gr.addColorStop(0.25, 'rgba(255,220,150,0.55)'); gr.addColorStop(1, 'rgba(255,200,120,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
+  const glowM = new THREE.SpriteMaterial({ map: glowTex, color: 0xffe2a8, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 });
+  const poolM = new THREE.MeshBasicMaterial({ color: 0xffd890, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 });
+  const strobeM = new THREE.SpriteMaterial({ map: glowTex, color: 0xffffff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 });
+  const nightG = new THREE.Group(); g.add(nightG);
+  for (const z of [-80, -40, 0, 40, 80]) {   // мачти между терминала и рулежката
+    const x = TERM.x + 20;
+    box(0.5, 18, 0.5, mat(0x666a70, 0.6, 0.4), x, 9, z, nightG); box(3, 0.6, 1, mat(0xdddddd, 0.4, 0, 0xfff0c0), x, 18, z, nightG);
+    const s = new THREE.Sprite(glowM); s.position.set(x, 18.2, z); s.scale.set(9, 9, 1); nightG.add(s);
+    const pool = new THREE.Mesh(new THREE.CircleGeometry(16, 24).rotateX(-Math.PI / 2), poolM); pool.position.set(x + 4, 0.08, z); nightG.add(pool);
+  }
+  const strobes = [];
+  for (let k = 0; k < 8; k++) for (const end of [-1, 1]) {   // подходните светлини пред двата края на пистата
+    const z = end < 0 ? RW.z0 - 12 - k * 10 : RW.z1 + 12 + k * 10, s = new THREE.Sprite(strobeM.clone()); s.position.set(RW.x, 0.8, z); s.scale.set(4, 4, 1); s.userData.k = k; nightG.add(s); strobes.push(s);
+  }
+  const lamp = () => { const s = new THREE.Sprite(glowM.clone()); s.scale.set(7, 7, 1); return s; };
   const sign = deps.label ? deps.label('✈️ ЛЕТИЩЕ', '#ffffff', 12) : null;
   if (sign) g.add(sign);
   setLevel(opts.lv || 1);
@@ -256,19 +273,22 @@ export function buildAirport(group, deps, opts = {}) {
   // движещи се самолети: кацащ и излитащ, по график с период T секунди
   const T = 70, gy = k => PLANE_KINDS[k].r + PLANE_KINDS[k].r * 0.8;
   const land = makePlane('a320', 2), take = makePlane('wide', 4); g.add(land, take);
+  const fars = [land, take].map(p => { const s = lamp(); s.position.set(0, -0.2, (p.userData.len || 26) * 0.55); p.add(s); return s; });   // фарът на носа
   const LAND = [   // [t, x, y, z, yaw, pitch]
     [0, RW.x, 90, RW.z1 + 700, Math.PI, -0.06], [16, RW.x, gy('a320'), RW.z1 - 6, Math.PI, -0.03], [17, RW.x, gy('a320'), RW.z1 - 14, Math.PI, 0],
     [27, RW.x, gy('a320'), RW.z0 + 20, Math.PI, 0], [31, (RW.x + TW.x) / 2, gy('a320'), RW.z0 + 14, Math.PI * 1.5, 0], [34, TW.x, gy('a320'), RW.z0 + 14, 0, 0],
-    [52, TW.x, gy('a320'), RW.z1 - 20, 0, 0], [53, TW.x, -20, RW.z1 - 20, 0, 0], [T, TW.x, -20, RW.z1 - 20, 0, 0],
+    [52, TW.x, gy('a320'), RW.z1 - 20, 0, 0], [56, TERM.x + 15, gy('a320'), RW.z1 - 20, -Math.PI / 2, 0], [57, TERM.x + 15, gy('a320'), RW.z1 - 20, -Math.PI / 2, 0, 1], [T, TERM.x + 15, gy('a320'), RW.z1 - 20, -Math.PI / 2, 0, 1],
   ];
   const TAKE = [
-    [0, TW.x, -20, RW.z1 - 14, Math.PI, 0], [30, TW.x, -20, RW.z1 - 14, Math.PI, 0], [31, TW.x, gy('wide'), RW.z1 - 14, Math.PI, 0],
+    [0, TERM.x + 15, gy('wide'), RW.z1 - 14, Math.PI / 2, 0, 1], [27, TERM.x + 15, gy('wide'), RW.z1 - 14, Math.PI / 2, 0, 1], [27.01, TERM.x + 15, gy('wide'), RW.z1 - 14, Math.PI / 2, 0], [31, TW.x, gy('wide'), RW.z1 - 14, Math.PI / 2, 0],
     [35, RW.x, gy('wide'), RW.z1 - 14, Math.PI * 0.5, 0], [38, RW.x, gy('wide'), RW.z1 - 18, Math.PI, 0],
     [50, RW.x, gy('wide'), RW.z0 + 40, Math.PI, 0], [54, RW.x, 10, RW.z0 - 20, Math.PI, 0.16], [T, RW.x, 160, RW.z0 - 800, Math.PI, 0.12],
   ];
   const fly = (p, keys, t) => {
-    const [, x, y, z, yaw, pitch] = sample(keys, t % T);
-    p.visible = y > -5; p.position.set(x, y, z); p.rotation.set(0, 0, 0); p.rotateY(yaw); p.rotateX(-pitch);
+    const [, x, y, z, yaw, pitch] = sample(keys, t % T), tt = t % T;
+    let k = 0; while (k < keys.length - 1 && keys[k + 1][0] <= tt) k++;
+    p.visible = !keys[k][6];   // скрит (в хангара/зад терминала) — без да потъва под земята
+    p.position.set(x, y, z); p.rotation.set(0, 0, 0); p.rotateY(yaw); p.rotateX(-pitch);
   };
 
   function update(t, night = 0) {
@@ -279,6 +299,10 @@ export function buildAirport(group, deps, opts = {}) {
     const blink = Math.sin(t * 4) > 0.6 ? 1 : 0;
     for (const m of beacons) m.emissiveIntensity = 0.3 + 2 * blink;
     for (const p of [land, take, ...parked]) for (const n of p.userData.nav) n.material.emissiveIntensity = night * (0.5 + blink);
+    glowM.opacity = night * 0.95; poolM.opacity = night * 0.16;
+    for (const f of fars) f.material.opacity = night;
+    const seq = (t * 8) % 12;   // „бягащата“ светлина към пистата
+    for (const s of strobes) s.material.opacity = night * (Math.abs(seq - (7 - s.userData.k)) < 0.6 ? 1 : 0.15);
   }
   function setPos(x, z) { g.position.set(x, 0, z); }
   function dispose() { group.remove(g); }

@@ -112,18 +112,28 @@ export function buildPlanView(P0, opts = {}) {
     const rad = Math.max(...ws, 7) / 2 + 0.6;
     disc(n.x, n.z, rad + 1.7, 0.035 + ny, ...walk); disc(n.x, n.z, rad, 0.07 + ny, ...asph);
   }
+  // зебри и светофари — само на истинските кръстовища: поне един булевард/пръстен, без съседно кръстовище по-близо от 22 м
+  // (извитите улици дават много близки възли — там зебрите се застъпваха); зебра само на изход, по-дълъг от 16 м
+  const major = [];
   P.nodes.forEach((n, ni) => {
     if (n.square || n.deg < 3 || P.heightAt(n.x, n.z) > 0.3) return;
-    for (const e of P.edges) {
-      if (e.a !== ni && e.b !== ni) continue;
-      const st = P.streets[e.st], s = e.a === ni ? e.s0 : e.s1, dir = e.a === ni ? 1 : -1, rad = st.w / 2 + 4.5;
-      const p = pointAt(st, s + dir * rad);
-      for (let k = -st.w / 2 + 0.8; k < st.w / 2 - 0.5; k += 1.3) {
-        const cx = p.x - p.tz * k, cz = p.z + p.tx * k;
-        ribbon([[cx - p.tx * 1.4, cz - p.tz * 1.4], [cx + p.tx * 1.4, cz + p.tz * 1.4]], 0.6, () => 0.1, ...zebra);
-      }
-    }
+    const es = P.edges.filter(e => e.a === ni || e.b === ni);
+    if (!es.some(e => P.streets[e.st].w >= 10)) return;
+    if (major.some(m => Math.hypot(m.n.x - n.x, m.n.z - n.z) < 22)) return;
+    major.push({ n, ni, es });
   });
+  const sig = [];   // [x, z, ос (ъгъл на улицата)] — светофар на десния ъгъл на всеки изход
+  for (const { ni, es } of major) for (const e of es) {
+    if (Math.abs(e.s1 - e.s0) < 16) continue;
+    const st = P.streets[e.st], s = e.a === ni ? e.s0 : e.s1, dir = e.a === ni ? 1 : -1, rad = st.w / 2 + 4.5;
+    const p = pointAt(st, s + dir * rad);
+    for (let k = -st.w / 2 + 0.8; k < st.w / 2 - 0.5; k += 1.3) {
+      const cx = p.x - p.tz * k, cz = p.z + p.tx * k;
+      ribbon([[cx - p.tx * 1.4, cz - p.tz * 1.4], [cx + p.tx * 1.4, cz + p.tz * 1.4]], 0.6, () => 0.1, ...zebra);
+    }
+    const o = st.w / 2 + 1.0, q = pointAt(st, s + dir * (rad + 2.2));
+    sig.push([q.x - q.tz * o * dir, q.z + q.tx * o * dir, Math.atan2(q.tx, q.tz), Math.abs(q.tx) > Math.abs(q.tz) ? 0 : 1]);
+  }
   g.add(mesh(...walk, M.walk), mesh(...asph, M.asph), mesh(...paint, M.paint));
   if (br[0].length) g.add(mesh(...br, M.bridge));
   const zm = mesh(...zebra, M.paint); detail.add(zm);
@@ -154,6 +164,26 @@ export function buildPlanView(P0, opts = {}) {
   const head = new THREE.InstancedMesh(new THREE.SphereGeometry(0.42, 8, 6), M.lamp, lampAt.length), m4 = new THREE.Matrix4();
   lampAt.forEach(([x, z], i) => { pole.setMatrixAt(i, m4.makeTranslation(x, 3, z)); head.setMatrixAt(i, m4.makeTranslation(x, 6.1, z)); });
   detail.add(pole, head);
+  // --- светофари на големите кръстовища: стълб + кутия + червена/зелена светлина; двете оси се редуват (g.userData.update)
+  if (sig.length) {
+    const sp = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.1, 0.12, 4.2, 6), M.pole, sig.length);
+    const bx = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 1.3, 0.45), new THREE.MeshStandardMaterial({ color: 0x1d2126, roughness: 0.6 }), sig.length);
+    const red = new THREE.InstancedMesh(new THREE.SphereGeometry(0.17, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff3b30 }), sig.length);
+    const grn = new THREE.InstancedMesh(new THREE.SphereGeometry(0.17, 8, 6), new THREE.MeshBasicMaterial({ color: 0x34e05a }), sig.length);
+    const q = new THREE.Quaternion(), e3 = new THREE.Euler(), v = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1), off = new THREE.Vector3();
+    const put = (im, i, x, y, z, a, fwd) => { off.set(0, 0, fwd).applyEuler(e3.set(0, a, 0)); im.setMatrixAt(i, m4.compose(v.set(x + off.x, y, z + off.z), q.setFromEuler(e3.set(0, a, 0)), one)); };
+    sig.forEach(([x, z, a], i) => { put(sp, i, x, 0, z, a, 0); sp.setMatrixAt(i, m4.makeTranslation(x, 2.1, z)); put(bx, i, x, 4.3, z, a, 0); put(red, i, x, 4.7, z, a, -0.24); put(grn, i, x, 3.9, z, a, -0.24); });
+    detail.add(sp, bx, red, grn);
+    const zero = new THREE.Matrix4().makeScale(0, 0, 0), mR = [], mG = [];
+    for (let i = 0; i < sig.length; i++) { red.getMatrixAt(i, m4); mR.push(m4.clone()); grn.getMatrixAt(i, m4); mG.push(m4.clone()); }
+    let ph = -1;
+    g.userData.update = t => {   // 8 s зелено за едната ос, 8 s за другата (жълтото — пропуснато, за простота)
+      const p2 = Math.floor(t / 8) % 2; if (p2 === ph) return; ph = p2;
+      sig.forEach((s0, i) => { const go = s0[3] === p2; red.setMatrixAt(i, go ? zero : mR[i]); grn.setMatrixAt(i, go ? mG[i] : zero); });
+      red.instanceMatrix.needsUpdate = grn.instanceMatrix.needsUpdate = true;
+    };
+    g.userData.update(0);
+  }
   g.userData.lamps = lampAt.filter((_, i) => i % Math.ceil(lampAt.length / 160) === 0).map(([x, z]) => ({ x, y: 6.1, z }));   // светлините нощем (daynight.js) — до 160
   // --- дървета: в града (около площада, празните кътчета) и гори по хълмовете — общи инстанции
   const trees = [], rnd = (() => { let s = 1234567; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
