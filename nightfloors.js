@@ -11,16 +11,16 @@ const MODE = { 'building-a': 'dark', 'building-b': 'cool', 'building-c': 'dark',
   // Kenney Commercial 2 (обща палитра colormap): стъклата са синкавите петна; високите варианти (@20…) делят материала
   'building-i': 'kenney', 'building-j': 'kenney', 'building-k': 'kenney', 'building-l': 'kenney', 'building-m': 'kenney', 'building-n': 'kenney',
   'building-skyscraper-d': 'kenney', 'building-skyscraper-e': 'kenney',
-  bellagio: 'flood', sagrada: 'floodUp',   // Саграда Фамилия: прожектори отдолу, кулите по-светли нагоре
+  bellagio: 'flood', sagrada: 'floodUp', burj: ['coolW', [/material_1/, null]],   // Бурж Халифа: студено-бели етажи   // Саграда Фамилия: прожектори отдолу, кулите по-светли нагоре
   // истинските небостъргачи (assets/heavy/sky): режимът може да зависи от материала — [регулярен израз за името, режим|null]
   'sf-sky-usb': ['cool', [/roof/i, null]], 'sf-sky-rand': ['cool'], 'sf-sky-sing': ['cool', [/Interior/i, 'flood'], [/Red_Beam|Trimsheet|temp/i, null]],
   'sf-sky-night': ['bright'], 'sf-sky-blue': ['cool', [/glass/i, 'solid'], [/./, null]] };   // забележителност (landmarks.js) — хотелът в Лас Вегас: цялата фасада в топла светлина (прожектори), етажите леко различни
-const FLOORS = n => ({ bellagio: 28, 'building-skyscraper-d': 8, 'building-skyscraper-e': 8 })[n] || (/skyscraper|sf-sky/.test(n) ? 32 : 9);
+const FLOORS = n => ({ burj: 90, bellagio: 28, 'building-skyscraper-d': 8, 'building-skyscraper-e': 8 })[n] || (/skyscraper|sf-sky/.test(n) ? 32 : 9);
 // режимът на материала: MODE[name] е низ или [по подразбиране, [/име/, режим|null]…]
 const modeOf = (name, m) => { const e = MODE[name]; if (!e || typeof e === 'string') return e; for (const [re, md] of e.slice(1)) if (re.test(m.name || '')) return md; return e[0]; };
 const WHITE = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1); WHITE.needsUpdate = true;   // приблизителен брой етажи на модела
 export const NF_MATS = new Set();
-const FEAT = { sagrada: 'night-sagrada' };   // отделно „✓ OK“ в Лабораторията (иначе — night-floors)   // материалите с нощни етажи — daynight.js ги пали вечер
+const FEAT = { sagrada: 'night-sagrada', burj: 'night-burj' };   // отделно „✓ OK“ в Лабораторията (иначе — night-floors)   // материалите с нощни етажи — daynight.js ги пали вечер
 const masks = new Map();   // режим → (изображение → маска CanvasTexture)
 
 function box(a, w, h, r) {   // средно в квадрат (2r+1)² — интегрално изображение
@@ -40,7 +40,8 @@ function maskFor(tex, mode) {
   const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
   const d = g.getImageData(0, 0, w, h), p = d.data, L = new Float32Array(w * h), raw = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) { const r = p[4 * i] / 255, gg = p[4 * i + 1] / 255, b = p[4 * i + 2] / 255; L[i] = 0.3 * r + 0.59 * gg + 0.11 * b; p[4 * i + 3] = Math.max(r, gg, b) - Math.min(r, gg, b); raw[i] = b - r; }
-  if (mode === 'flood' || mode === 'floodUp') return tex;   // прожектори / осветени стаи: самата текстура свети
+  if (mode === 'flood' || mode === 'floodUp') return tex;
+  if (mode === 'coolW') mode = 'cool';   // прожектори / осветени стаи: самата текстура свети
   const loc = mode === 'dark' ? box(L, w, h, Math.max(4, (Math.min(w, h) / 24) | 0)) : null;
   const win = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) {
@@ -68,10 +69,10 @@ export function prepNightFloors(root, name) {
       const mk = mode === 'solid' ? WHITE : maskFor(m.map, mode); if (!mk) continue;
       m.emissiveMap = mk; m.emissive.setRGB(1, 1, 1); m.emissiveIntensity = 0; m.userData.nightFloors = true; m.userData.winK = 1; NF_MATS.add(m);
       m.onBeforeCompile = sh => {
-        sh.uniforms.uFloorH = { value: floorH }; sh.uniforms.uY0 = { value: y0 }; sh.uniforms.uFlood = { value: mode === 'flood' ? 1 : mode === 'floodUp' ? 2 : 0 }; sh.uniforms.uH = { value: bb.max.y - bb.min.y }; sh.uniforms.uSolid = { value: mode === 'solid' ? 1 : 0 };
+        sh.uniforms.uFloorH = { value: floorH }; sh.uniforms.uY0 = { value: y0 }; sh.uniforms.uFlood = { value: mode === 'flood' ? 1 : mode === 'floodUp' ? 2 : 0 }; sh.uniforms.uCoolW = { value: mode === 'coolW' ? 1 : 0 }; sh.uniforms.uH = { value: bb.max.y - bb.min.y }; sh.uniforms.uSolid = { value: mode === 'solid' ? 1 : 0 };
         sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vNfY; varying float vNfSeed;')
           .replace('#include <begin_vertex>', '#include <begin_vertex>\nvNfY = transformed.y; vNfSeed = fract(sin(dot(modelMatrix[3].xz, vec2(12.9898, 78.233))) * 43758.5453);');
-        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vNfY; varying float vNfSeed; uniform float uFloorH; uniform float uY0; uniform float uFlood; uniform float uSolid; uniform float uH;')
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vNfY; varying float vNfSeed; uniform float uFloorH; uniform float uY0; uniform float uFlood; uniform float uSolid; uniform float uH; uniform float uCoolW;')
           .replace('#include <emissivemap_fragment>', `
             #ifdef USE_EMISSIVEMAP
               float nNight = emissive.r;   // нощта 0…1 (daynight.js → emissiveIntensity)
@@ -81,6 +82,7 @@ export function prepNightFloors(root, name) {
               vec2 cell = floor(vEmissiveMapUv * 48.0);   // и отделните прозорци: ~60% светят (иначе стъклената фасада е цялата бяла)
               on *= step(fract(sin(dot(cell, vec2(127.1, 311.7)) + fl * 17.3 + vNfSeed * 91.3) * 43758.5453), 0.6);
               vec3 col = r < 0.3 ? vec3(1.0, 0.72, 0.38) : r < 0.55 ? vec3(0.62, 0.48, 0.3) : vec3(0.85, 0.9, 1.0);
+              if (uCoolW > 0.5) col = vec3(0.82, 0.9, 1.0) * (0.75 + 0.5 * r);   // студено бяло (Бурж Халифа)
               if (uFlood > 0.5) { on = nNight; col = vec3(1.0, 0.78, 0.5) * (0.8 + 0.4 * r); }   // прожектори: всичко, топло, етажите малко различни
               if (uFlood > 1.5) col = vec3(1.0, 0.8, 0.52) * (0.55 + 0.9 * clamp((vNfY - uY0) / uH, 0.0, 1.0));   // нагоре — по-светло (кулите)
               vec3 tx = texture2D(emissiveMap, vEmissiveMapUv).rgb;
