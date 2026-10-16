@@ -1,0 +1,10 @@
+Къщи — кандидати вместо Kenney building-type-c…u (Лабораторията → „Ново“ → h2-*), Sketchfab CC-BY 4.0.
+Нормализирани: център по x/z, основа y = 0, най-широката страна = 1, предницата горе-долу към +z; текстури до 512 px.
+- h2-greyporch.glb — "2 Story House" by designedbyjonathan — https://sketchfab.com/3d-models/faa69249ddb84765921401fa9438861f
+- h2-brickcabin.glb — "Modern Brick Cabin" by Everex.agency — https://sketchfab.com/3d-models/c77dd1988cb6403da4477aecadcc89d6
+- h2-pink.glb — "European House #3" by Satik64 — https://sketchfab.com/3d-models/ebdc29841f4d4b1fbc3d63c841a0a48a
+- h2-townhouse.glb — "Nivelles House 9" by Lost_Gecko — https://sketchfab.com/3d-models/9a6bbcb6da704592b368e29b87cac11d
+- h2-blue.glb — "Stylistic Suburban House" by NienkeSt — https://sketchfab.com/3d-models/db5d2cc306e84411945b2528dec37cd4
+- h2-swedish.glb — "Low Poly Swedish Cottage" by michaelmiz92 — https://sketchfab.com/3d-models/1744964a82f04f8485fc68acfc8e540e
+- h2-lodge.glb — "House with Interior... and Porch" by lodgelus — https://sketchfab.com/3d-models/51aa0e8c9b224262af9df8942761e5c7
+- h2-porch.glb — "Porch House" by jessicabrooke — https://sketchfab.com/3d-models/6b77f40b35fd46d49419ffd23acb8ed5
