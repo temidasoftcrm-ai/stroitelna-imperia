@@ -10,8 +10,9 @@ const MODE = { 'building-a': 'dark', 'building-b': 'cool', 'building-c': 'dark',
   'building-g': 'dark', 'building-h': 'dark', 'building-skyscraper-a': 'dark', 'building-skyscraper-b': 'cool', 'building-skyscraper-c': 'cool',
   // Kenney Commercial 2 (обща палитра colormap): стъклата са синкавите петна; високите варианти (@20…) делят материала
   'building-i': 'kenney', 'building-j': 'kenney', 'building-k': 'kenney', 'building-l': 'kenney', 'building-m': 'kenney', 'building-n': 'kenney',
-  'building-skyscraper-d': 'kenney', 'building-skyscraper-e': 'kenney',
-  bellagio: 'flood', sagrada: 'floodUp', burj: ['coolW', [/material_1/, null]],   // Бурж Халифа: студено-бели етажи   // Саграда Фамилия: прожектори отдолу, кулите по-светли нагоре
+  // новите модели D (Singapore Office — като sf-sky-sing) и E (Bank of China): стъклата по етажи, рамките/лъчите — не
+  'building-skyscraper-d': ['cool', [/Interior/i, 'flood'], [/Red_Beam|Trimsheet|temp/i, null]], 'building-skyscraper-e': ['cool', [/Lisanne|Color_A06/i, null]],
+  bellagio: 'flood', sagrada: 'floodUp', burj: ['coolW', [/material_1/, null]], willis: 'coolW', cntower: 'led',   // Уилис — като Бурж; Си Ен Тауър — цветни LED светлини, които бавно сменят цвета   // Бурж Халифа: студено-бели етажи   // Саграда Фамилия: прожектори отдолу, кулите по-светли нагоре
   // истинските небостъргачи (assets/heavy/sky): режимът може да зависи от материала — [регулярен израз за името, режим|null]
   'sf-sky-usb': ['cool', [/roof/i, null]], 'sf-sky-rand': ['cool'], 'sf-sky-sing': ['cool', [/Interior/i, 'flood'], [/Red_Beam|Trimsheet|temp/i, null]],
   'sf-sky-night': ['bright'], 'sf-sky-blue': ['cool', [/glass/i, 'solid'], [/./, null]] };   // забележителност (landmarks.js) — хотелът в Лас Вегас: цялата фасада в топла светлина (прожектори), етажите леко различни
@@ -21,8 +22,8 @@ const modeOf = (name, m) => { const e = MODE[name]; if (!e || typeof e === 'stri
 const WHITE = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1); WHITE.needsUpdate = true;   // приблизителен брой етажи на модела
 export const NF_MATS = new Set();
 export const NF_T = { value: 0 };   // време (s) — daynight.js го върти; през нощта етажи угасват и светват
-const FEAT = { sagrada: 'night-sagrada', burj: 'night-burj' };
-const WORLD_H = { burj: 70 };   // височина в света (landmarks.js GLB_LM.h) — моделът е от много части с различни оси   // отделно „✓ OK“ в Лабораторията (иначе — night-floors)   // материалите с нощни етажи — daynight.js ги пали вечер
+const FEAT = { sagrada: 'night-sagrada', burj: 'night-burj', willis: 'night-towers', cntower: 'night-towers', 'building-skyscraper-d': 'night-towers', 'building-skyscraper-e': 'night-towers' };
+const WORLD_H = { burj: 70, willis: 46, cntower: 58 };   // височина в света (landmarks.js GLB_LM.h) — моделът е от много части с различни оси   // отделно „✓ OK“ в Лабораторията (иначе — night-floors)   // материалите с нощни етажи — daynight.js ги пали вечер
 const masks = new Map();   // режим → (изображение → маска CanvasTexture)
 
 function box(a, w, h, r) {   // средно в квадрат (2r+1)² — интегрално изображение
@@ -43,7 +44,7 @@ function maskFor(tex, mode) {
   const d = g.getImageData(0, 0, w, h), p = d.data, L = new Float32Array(w * h), raw = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) { const r = p[4 * i] / 255, gg = p[4 * i + 1] / 255, b = p[4 * i + 2] / 255; L[i] = 0.3 * r + 0.59 * gg + 0.11 * b; p[4 * i + 3] = Math.max(r, gg, b) - Math.min(r, gg, b); raw[i] = b - r; }
   if (mode === 'flood' || mode === 'floodUp') return tex;
-  if (mode === 'coolW') return tex;   // Бурж: самата текстура, меко сребристо (без петна)   // прожектори / осветени стаи: самата текстура свети
+  if (mode === 'coolW' || mode === 'led') return tex;   // Бурж: самата текстура, меко сребристо (без петна)   // прожектори / осветени стаи: самата текстура свети
   const loc = mode === 'dark' ? box(L, w, h, Math.max(4, (Math.min(w, h) / 24) | 0)) : null;
   const win = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) {
@@ -73,7 +74,7 @@ export function prepNightFloors(root, name) {
       const ax = new THREE.Vector3(0, 1, 0);   // оста „нагоре“ в координатите на меша
       m.onBeforeCompile = sh => {
         let fH = floorH, fY0 = y0, fHt = bb.max.y - bb.min.y;
-        if (mode === 'coolW') {   // Бурж: височината по оста на меша, която в модела сочи нагоре (възлите на модела са завъртени/мащабирани)
+        if (mode === 'coolW' || mode === 'led') {   // Бурж: височината по оста на меша, която в модела сочи нагоре (възлите на модела са завъртени/мащабирани)
           root.updateMatrixWorld(true); const M = new THREE.Matrix4().copy(root.matrixWorld).invert().multiply(o.matrixWorld), e = M.elements;
           const ys = [e[1], e[5], e[9]], k = ys.map(Math.abs).indexOf(Math.max(...ys.map(Math.abs))), sg = Math.sign(ys[k]) || 1;
           ax.set(k === 0 ? sg : 0, k === 1 ? sg : 0, k === 2 ? sg : 0);
@@ -83,7 +84,7 @@ export function prepNightFloors(root, name) {
         }
         sh.uniforms.uAx = { value: ax }; sh.uniforms.uWH = { value: WORLD_H[name] || 0 };
         if (WORLD_H[name]) { fY0 = 0; fHt = WORLD_H[name]; fH = fHt / FLOORS(name); }   // в света: от земята до върха
-        sh.uniforms.uFloorH = { value: fH }; sh.uniforms.uY0 = { value: fY0 }; sh.uniforms.uFlood = { value: mode === 'flood' ? 1 : mode === 'floodUp' ? 2 : 0 }; sh.uniforms.uCoolW = { value: mode === 'coolW' ? 1 : 0 }; sh.uniforms.uT = NF_T; sh.uniforms.uH = { value: fHt }; sh.uniforms.uSolid = { value: mode === 'solid' ? 1 : 0 };
+        sh.uniforms.uFloorH = { value: fH }; sh.uniforms.uY0 = { value: fY0 }; sh.uniforms.uFlood = { value: mode === 'flood' ? 1 : mode === 'floodUp' ? 2 : 0 }; sh.uniforms.uCoolW = { value: mode === 'coolW' ? 1 : mode === 'led' ? 2 : 0 }; sh.uniforms.uT = NF_T; sh.uniforms.uH = { value: fHt }; sh.uniforms.uSolid = { value: mode === 'solid' ? 1 : 0 };
         sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vNfY; varying float vNfSeed; uniform vec3 uAx; uniform float uWH;')
           .replace('#include <begin_vertex>', '#include <begin_vertex>\nvNfY = uWH > 0.0 ? (modelMatrix * vec4(transformed, 1.0)).y : dot(transformed, uAx); vNfSeed = fract(sin(dot(modelMatrix[3].xz, vec2(12.9898, 78.233))) * 43758.5453);');
         sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vNfY; varying float vNfSeed; uniform float uFloorH; uniform float uY0; uniform float uFlood; uniform float uSolid; uniform float uH; uniform float uCoolW; uniform float uT;')
@@ -105,11 +106,16 @@ export function prepNightFloors(root, name) {
               if (uFlood > 1.5) col = vec3(1.0, 0.8, 0.52) * (0.55 + 0.9 * clamp((vNfY - uY0) / uH, 0.0, 1.0));   // нагоре — по-светло (кулите)
               vec3 tx = texture2D(emissiveMap, vEmissiveMapUv).rgb;
               totalEmissiveRadiance = tx * col * on * (uFlood > 0.5 ? 0.55 : 1.15);
-              if (uCoolW > 0.5) {   // Бурж: сребристо, нагоре по-светло + тук-там цял светнал етаж (той също се сменя с времето)
+              if (uCoolW > 1.5) {   // Си Ен Тауър: цветни LED по височината, бавно преливат (като истинската нощем)
+                float hl = clamp((vNfY - uY0) / uH, 0.0, 1.0);
+                vec3 led = 0.5 + 0.5 * cos(6.2832 * (uT * 0.03 + hl * 0.6 + vec3(0.0, 0.33, 0.67)));
+                totalEmissiveRadiance = (tx * 0.6 + 0.25) * led * nNight * 0.9;
+              } else if (uCoolW > 0.5) {   // Бурж: сребристо, нагоре по-светло + тук-там цял светнал етаж (той също се сменя с времето)
                 float hb = clamp((vNfY - uY0) / uH, 0.0, 1.0), fb = floor(hb * 60.0);   // 60 етажа
                 float rb = fract(sin(fb * 12.9898 + floor(uT / 14.0 + fract(fb * 0.618) * 4.0) * 78.233) * 43758.5453);
                 float band = step(rb, 0.16) * step(0.06, hb) * step(hb, 0.9) * nNight;   // ~5 светнали етажа; сменят се с времето
-                totalEmissiveRadiance = tx * vec3(0.72, 0.84, 1.0) * nNight * (0.12 + 0.55 * pow(hb, 1.6)) + tx * vec3(1.0, 0.93, 0.8) * band * 1.6;   // светнал етаж — прозорците от текстурата, топло
+                vec3 tl = max(tx, vec3(0.22));   // тъмно стъкло (Уилис) — все пак да се вижда
+                totalEmissiveRadiance = tl * vec3(0.72, 0.84, 1.0) * nNight * (0.12 + 0.55 * pow(hb, 1.6)) + tl * vec3(1.0, 0.93, 0.8) * band * 1.6;   // светнал етаж — прозорците от текстурата, топло
               }
               if (uFlood > 1.5) {   // Саграда: тук-там светнал прозорец — тъмните отвори в камъка, по случайни петна
                 vec2 wc = floor(vEmissiveMapUv * 90.0);

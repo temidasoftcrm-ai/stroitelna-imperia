@@ -36,4 +36,6 @@ export const FEATURES = [
   {"id": "gear-mcrane", "title": "Нов автокран", "how": "„Mobile Hydraulic Truck Crane (Telescopic)“ (doty_aecom, CC BY 4.0, Sketchfab) — жълт петосов кран с телескопична стрела. „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fheavy%2Fgear%2Fmcrane.glb"},
   {"id": "lm-redeemer", "title": "Нова статуя на Христос Спасителя (Рио)", "how": "„Christ The Redeemer“ (naveenhimal, CC BY 4.0, Sketchfab) — по-реалистична, с каменен постамент. „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fheavy%2Flm%2Fredeemer.glb"},
   {"id": "lm-colosseo", "title": "Нов Колизеум (Рим)", "how": "„Colosseum“ (alexanderleth, CC BY 4.0, Sketchfab) — пълен овал с арките на всички етажи. „✓ OK“ — в играта.", "url": "#tab=models&item=%2Fassets%2Fheavy%2Flm%2Fcolosseo.glb"},
+  // „да всички“ — още кули нощем
+  {"id": "night-towers", "title": "Си Ен Тауър, Уилис Тауър и новите небостъргачи светят нощем", "how": "Си Ен Тауър (Торонто) — цветни LED светлини, които бавно преливат по височината. Уилис Тауър (Чикаго) — сребристо сияние със светнали етажи, като Бурж. Новите небостъргачи D и E в мегаполисите — етажите светват привечер. Виж „Мисии/демо“: 🌙 Си Ен Тауър (d20), 🌙 Уилис Тауър (d38), 🌙 Модерните небостъргачи (d39).", "url": "#tab=demos&item=d20"},
 ];
