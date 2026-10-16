@@ -41,7 +41,7 @@ function maskFor(tex, mode) {
   const d = g.getImageData(0, 0, w, h), p = d.data, L = new Float32Array(w * h), raw = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) { const r = p[4 * i] / 255, gg = p[4 * i + 1] / 255, b = p[4 * i + 2] / 255; L[i] = 0.3 * r + 0.59 * gg + 0.11 * b; p[4 * i + 3] = Math.max(r, gg, b) - Math.min(r, gg, b); raw[i] = b - r; }
   if (mode === 'flood' || mode === 'floodUp') return tex;
-  if (mode === 'coolW') mode = 'cool';   // прожектори / осветени стаи: самата текстура свети
+  if (mode === 'coolW') return tex;   // Бурж: самата текстура, меко сребристо (без петна)   // прожектори / осветени стаи: самата текстура свети
   const loc = mode === 'dark' ? box(L, w, h, Math.max(4, (Math.min(w, h) / 24) | 0)) : null;
   const win = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) {
@@ -79,14 +79,17 @@ export function prepNightFloors(root, name) {
               float fl = floor((vNfY - uY0) / uFloorH);
               float r = fract(sin(fl * 91.17 + vNfSeed * 311.7) * 43758.5453);
               float on = step(r, nNight * 1.05) * step(r, 0.8);   // всеки етаж в свой момент; >0.8 — тъмен
-              vec2 cell = floor(vEmissiveMapUv * 48.0);   // и отделните прозорци: ~60% светят (иначе стъклената фасада е цялата бяла)
-              on *= step(fract(sin(dot(cell, vec2(127.1, 311.7)) + fl * 17.3 + vNfSeed * 91.3) * 43758.5453), 0.6);
+              vec2 cell = floor(vEmissiveMapUv * (uCoolW > 0.5 ? 12.0 : 48.0));   // Бурж — едри петна (стаи), не шум   // и отделните прозорци: ~60% светят (иначе стъклената фасада е цялата бяла)
+              float wf = fract(sin(dot(cell, vec2(127.1, 311.7)) + fl * 17.3 + vNfSeed * 91.3) * 43758.5453);
+              on *= step(wf, uCoolW > 0.5 ? 0.3 : 0.6);   // Бурж Халифа — по-рядко
+              if (uCoolW > 0.5) on *= step(r, 0.35);        // и само ~1/3 от етажите
               vec3 col = r < 0.3 ? vec3(1.0, 0.72, 0.38) : r < 0.55 ? vec3(0.62, 0.48, 0.3) : vec3(0.85, 0.9, 1.0);
-              if (uCoolW > 0.5) col = vec3(0.82, 0.9, 1.0) * (0.75 + 0.5 * r);   // студено бяло (Бурж Халифа)
+              if (uCoolW > 0.5) col = vec3(0.82, 0.9, 1.0) * (0.45 + 0.3 * r);   // студено бяло, по-меко (Бурж Халифа)
               if (uFlood > 0.5) { on = nNight; col = vec3(1.0, 0.78, 0.5) * (0.8 + 0.4 * r); }   // прожектори: всичко, топло, етажите малко различни
               if (uFlood > 1.5) col = vec3(1.0, 0.8, 0.52) * (0.55 + 0.9 * clamp((vNfY - uY0) / uH, 0.0, 1.0));   // нагоре — по-светло (кулите)
               vec3 tx = texture2D(emissiveMap, vEmissiveMapUv).rgb;
               totalEmissiveRadiance = tx * col * on * (uFlood > 0.5 ? 0.55 : 1.15);
+              if (uCoolW > 0.5) totalEmissiveRadiance = tx * vec3(0.72, 0.84, 1.0) * nNight * (0.12 + 0.55 * pow(clamp((vNfY - uY0) / uH, 0.0, 1.0), 1.6));   // Бурж: сребристо, нагоре по-светло
               if (uFlood > 1.5) {   // Саграда: тук-там светнал прозорец — тъмните отвори в камъка, по случайни петна
                 vec2 wc = floor(vEmissiveMapUv * 90.0);
                 float wr = fract(sin(dot(wc, vec2(41.3, 289.1))) * 43758.5453);
