@@ -372,7 +372,7 @@ const MODELS = {
   holiday: ['tree', 'tree-snow-a', 'tree-snow-b', 'tree-snow-c', 'bench', 'lantern', ...CHALET_PIECES],
   construction: ['crane-tower', 'container-office-green', 'container-office-red', 'toilet-portable', 'planks-wood-a', 'box-stack-brown', 'container-rubble-red', 'barrel', 'truck-dump-red', 'truck-dump-green', 'truck-concrete-red'],
   // poly.pizza (CC-BY 3.0 / CC0, виж assets/heavy/CREDITS.txt): булдозери, минен самосвал, кулокран — за аутобаните
-  heavy: ['bulldozer-a', 'bulldozer-b', 'bulldozer-c', 'dump-truck', 'crane-c', 'crane-a'],
+  heavy: ['bulldozer-a', 'bulldozer-b', 'bulldozer-c', 'dump-truck', 'crane-c'],
   city: ['Building_Small_1', 'Building_Medium_2_001', 'Building_Large_2'],
   people: ['worker_male', 'worker_male_alt', 'farmer'],
 };
