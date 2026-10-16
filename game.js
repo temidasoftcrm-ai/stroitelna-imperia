@@ -532,7 +532,7 @@ const planOn = id => !!(S && (S.planAll || (S.plans && S.plans[id])) && cityTier
 const PLAN_TPL4 = { newyork: 'grid' };
 // от planAll 5: София с истинските улици и паркове на центъра (OpenStreetMap, cityplan-osm.js)
 const PLAN_TPL5 = { sofia: 'osm' };
-const planOf = id => planOn(id) ? gamePlan(id, { landmark: !!CITY_LANDMARKS[id], seaside: SEASIDE.includes(id), mega: MEGAPOLIS.has(id), bigZone: bigZoneOf(id), tpl: (S.planAll >= 5 && PLAN_TPL5[id]) || (S.planAll >= 4 ? PLAN_TPL4[id] : undefined) }) : null;
+const planOf = id => planOn(id) ? gamePlan(id, { landmark: !!CITY_LANDMARKS[id], seaside: SEASIDE.includes(id), mega: MEGAPOLIS.has(id), bigZone: bigZoneOf(id), clean: S.planAll >= 6, tpl: (S.planAll >= 5 && PLAN_TPL5[id]) || (S.planAll >= 4 ? PLAN_TPL4[id] : undefined) }) : null;
 // запазената зона в плана за голямата забележителност: колкото W×D парцела на мрежата ((3W − 1) плочки − 2 м)
 function bigZoneOf(id) { const b = (BIG_LANDMARKS[id] || [])[0]; if (!b) return null; const [kind, W, D, asp = 1, turn = 0] = b; return { kind, W, D, asp, turn, size: [(3 * W - 1) * TILE - 2, (3 * D - 1) * TILE - 2] }; }
 // план: пътища от най-близкия край на булевард до гарата (запад), входа на летището (изток) и магистралата (юг) — само за изгледа
@@ -848,7 +848,7 @@ function decorLot(g, lot, cityId) {
   const rr = (k => () => ((k = Math.imul(k ^ (k >>> 15), 2246822507) >>> 0) % 1000) / 1000)(h || 1);
   const L = lot.plan ? Math.min(lot.w, lot.d) / 2 - 1.5 : 7, rot = lot.plan ? lot.rot || 0 : 0, c = Math.cos(rot), sn = Math.sin(rot);
   const at = (o, u, v, y = 0) => { o.position.set(lot.x + u * c + v * sn, y, lot.z - u * sn + v * c); o.userData.detail = true; g.add(o); (lot.trees = lot.trees || []).push(o); return o; };
-  const flat = (w, d, col, u = 0, v = 0, y = 0.06) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: col, roughness: 1 })); m.rotation.y = rot; m.receiveShadow = true; return at(m, u, v, y); };
+  const flat = (w, d, col, u = 0, v = 0, y = 0.14) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: col, roughness: 1 })); m.rotation.y = rot; m.receiveShadow = true; return at(m, u, v, y); };   // y — над плочата на парцела (в плана е на 0.04)
   const box = (w, hh, d, col, u, v, y) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, hh, d), new THREE.MeshStandardMaterial({ color: col, roughness: 0.8 })); m.rotation.y = rot; m.castShadow = true; return at(m, u, v, y + hh / 2); };
   const P = n => A[n] ? model(n, 1) : null, put = (n, k, u, v) => { const o = A[n] && model(n, 1); if (!o) return; o.scale.setScalar(k); o.rotation.y = rr() * 6.28; at(o, u, v); };
   if (kind === 2) {   // градинка: алеи на кръст, лехи с цветя, храсти, пейки, дърво в средата
@@ -860,13 +860,14 @@ function decorLot(g, lot, cityId) {
     for (const sv of [-1.5, 1.5]) { box(2.2, 0.12, 0.6, 0x8a5a33, 0, sv, 0.45); box(0.12, 0.45, 0.5, 0x333333, -0.9, sv, 0); box(0.12, 0.45, 0.5, 0x333333, 0.9, sv, 0); }
     const t = model('tree-large', rand(6, 8)); at(t, L * 0.55, -L * 0.55);
   } else if (kind === 3) {   // паркинг: асфалт, маркировка, 2–4 коли
-    flat(L * 2, L * 1.6, 0x4a4d52, 0, 0, 0.05);
-    for (let k = -2; k <= 2; k++) flat(0.15, L * 0.6, 0xf2f2f2, k * 2.8, -L * 0.45, 0.07), flat(0.15, L * 0.6, 0xf2f2f2, k * 2.8, L * 0.45, 0.07);
-    const cars = ['sedan', 'suv', 'hatchback-sports', 'van', 'taxi'].filter(n => A[n]), n = 2 + (h >>> 4) % 3;
-    for (let k = 0; k < n && cars.length; k++) { const o = model(cars[(h >>> (k * 3)) % cars.length], 1.15); o.rotation.y = rot + (k % 2 ? Math.PI : 0); at(o, (-1.5 + (k % 4)) * 2.8 + 1.4, (k % 2 ? 1 : -1) * L * 0.45); }
+    flat(L * 2, L * 1.6, 0x4a4d52, 0, 0, 0.13);
+    for (let k = -2; k <= 2; k++) flat(0.15, L * 0.6, 0xf2f2f2, k * 2.8, -L * 0.45, 0.15), flat(0.15, L * 0.6, 0xf2f2f2, k * 2.8, L * 0.45, 0.15);
+    const real = Object.keys(A).filter(n => n.startsWith('sf-car-') && !/Bus|Truck|Firetruck|Ambulance|Police|Limousine/.test(n));   // истинските коли (трафика), ако са заредени
+    const cars = real.length ? real : ['sedan', 'suv', 'hatchback-sports', 'van', 'taxi'].filter(n => A[n]), n = 2 + (h >>> 4) % 3;
+    for (let k = 0; k < n && cars.length; k++) { const o = model(cars[(h >>> (k * 3)) % cars.length], real.length ? 1 : 1.15); o.rotation.y = rot + (k % 2 ? Math.PI : 0); at(o, (-1.5 + (k % 4)) * 2.8 + 1.4, (k % 2 ? 1 : -1) * L * 0.45); }
     put('plant_bush', 2.5, -L + 0.8, L - 0.8); put('plant_bush', 2.5, L - 0.8, -L + 0.8);
   } else if (kind === 4) {   // детска площадка: пясък, люлка, пързалка, пейка, храсти
-    flat(L * 1.4, L * 1.4, 0xe0cc95, 0, 0, 0.05);
+    flat(L * 1.4, L * 1.4, 0xe0cc95, 0, 0, 0.13);
     box(0.15, 2.4, 0.15, 0xd23c3c, -1.6, 0, 0); box(0.15, 2.4, 0.15, 0xd23c3c, 1.6, 0, 0); box(3.4, 0.15, 0.15, 0xd23c3c, 0, 0, 2.35); box(0.7, 0.1, 0.4, 0x2b6fd1, -0.6, 0, 0.6); box(0.7, 0.1, 0.4, 0x2b6fd1, 0.6, 0, 0.6);
     const sl = box(0.8, 0.12, 3.2, 0xffc93c, 2.6, 2.4, 0.9); sl.rotation.x = -0.45; box(0.8, 1.8, 0.8, 0x34a853, 2.6, 0.9, 0);
     box(2.2, 0.12, 0.6, 0x8a5a33, -2.2, -3, 0.45);
@@ -1959,7 +1960,7 @@ function newGame(cityId, brand = null, brandNm = '') {
   S = { v: 1, brand, cityId, hqCity: cityId, cities: {}, day: 1, dayT: 0, rep: 0, cash: [], officeLevel: 1, garageLevel: 1, garageLot: null, whLevel: 0, whLot: null, cityExt: AUTOTEST ? +params.get('ext') || 0 : 0, rails: [], trains: [], jobs: [], econ: ECON.newEconState(), units: [...ECON.START.units], projects: [], offers: [], built: [], done: 0, seq: 1 };
   if (brandNm) S.brandNm = brandNm;   // името, което играчът си е дал (group.js: brandOf)
   S.foundFirst = 1;   // дъщерните фирми (пътна, жп, морска, авиация) — с ръчно основаване и стартов пакет
-  if (params.has('plan') ? params.get('plan') === '1' : !AUTOTEST) S.planAll = 5;   // нова игра — средните и големите градове с план (извити улици); старите записи остават на мрежата   // нов град с план (извити улици); старите записи остават на мрежата
+  if (params.has('plan') ? params.get('plan') === '1' : !AUTOTEST) S.planAll = 6;   // 6: по-чист център (cityplan opts.clean)   // нова игра — средните и големите градове с план (извити улици); старите записи остават на мрежата   // нов град с план (извити улици); старите записи остават на мрежата
   enterCity();
   S.projects = projects;
   for (let k = 0; k < 3; k++) makeOffer();

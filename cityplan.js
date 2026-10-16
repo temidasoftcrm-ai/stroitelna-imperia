@@ -212,11 +212,13 @@ export function makePlan(cityId, opts = {}) {
   else if (T.tpl === 'plain' || T.tpl === 'mountain' || T.tpl === 'river') {
     const nR = T.tpl === 'river' ? 6 : 5 + (r() < 0.5 ? 1 : 0), a0 = rr(0, TAU), ang = [];
     for (let k = 0; k < nR; k++) ang.push(a0 + k * TAU / nR + rr(-0.18, 0.18));
-    for (const a of ang) {   // радиални булеварди — от площада навън, с плавни завои; извън града продължават като шосе
+    ang.forEach((a, ai) => {   // радиални булеварди — от площада навън, с плавни завои; извън града продължават като шосе
       const ctrl = [[sq.x, sq.z]];
       for (const [f, b] of [[0.42, rr(-0.14, 0.14)], [0.85, rr(-0.12, 0.12)], [1.35, rr(-0.1, 0.1)], [opts.game ? 1.5 : 2.6, 0]]) ctrl.push([sq.x + Math.cos(a + b) * f * R * sx, sq.z + Math.sin(a + b) * f * R]);
+      // opts.clean (нови игри): само всеки втори булевард стига до площада — другите тръгват от пръстена (по-малко асфалт в центъра)
+      if (opts.clean && ai % 2) ctrl[0] = [sq.x + Math.cos(a) * 0.55 * R * sx, sq.z + Math.sin(a) * 0.55 * R * sz];
       add('blvd', ctrl, false, { radial: true });
-    }
+    });
     const ring = (f, cls, wob) => {   // пръстен с вълни
       const ctrl = [], n = 14, wp = rr(0, TAU);
       for (let k = 0; k < n; k++) { const a = k / n * TAU, rad = f * R * (1 + wob * Math.sin(3 * a + wp)); ctrl.push([sq.x + Math.cos(a) * rad * sx, sq.z + Math.sin(a) * rad * sz]); }
@@ -231,6 +233,7 @@ export function makePlan(cityId, opts = {}) {
       const a1 = As[k], a2 = As[(k + 1) % As.length] + (k === As.length - 1 ? TAU : 0), da = a2 - a1;
       for (const f of [0.3, 0.8]) {
         const ctrl = []; for (const t of [-0.08, 0.3, 0.7, 1.08]) { const a = a1 + da * t, rad = f * R * (1 + rr(-0.07, 0.07)); ctrl.push([sq.x + Math.cos(a) * rad * sx, sq.z + Math.sin(a) * rad * sz]); }
+        if (opts.clean && f < 0.5) continue;   // без вътрешната дъга до площада (там ставаха триъгълни островчета)
         add('street', ctrl);
       }
       const am = a1 + da * rr(0.4, 0.6), ctrl = [];

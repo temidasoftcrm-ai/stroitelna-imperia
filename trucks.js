@@ -2,6 +2,8 @@
 // (самосвал за пясък/чакъл, бетоновоз, платформа за тухли/стомана/дърво, стойка за стъкло).
 // game.js подава зависимостите (сцена, модели, път по улиците), за да няма кръгови импорти.
 import * as THREE from 'three';
+import { feature } from './lab/feature.js';
+import { addTruckLamps } from './vehmodels.js';
 
 const SPEED = 12, UNLOAD = 2.2, LANE = 1.9;
 const COL = { sand: 0xd9c08a, gravel: 0x9a9a9a, concrete: 0xb8b8b0, bricks: 0xb5523b, steel: 0x6d7a88, wood: 0xa8743f, glass: 0x9fd8ff, furniture: 0x7a5236, marble: 0xf1efe8 };
@@ -93,7 +95,9 @@ export function createTirs(deps) {
   const list = [];
   function build(order) {
     const root = new THREE.Group();
-    const cab = tractorUnit(CAB_COLS[order.id % CAB_COLS.length]);
+    let cab = null;
+    if (feature('trucks-real') && deps.model) try { const m = deps.model('sf-trk-' + (order.id % 2), 4.6); cab = new THREE.Group(); cab.add(m); addTruckLamps(cab, 4.6, 2.5, 1.1); } catch (e) { cab = null; }   // модерният влекач (trucks-real); фаровете — на немащабираната група
+    if (!cab) cab = tractorUnit(CAB_COLS[order.id % CAB_COLS.length]);
     cab.position.z = 3.6;   // влекачът отпред (+z е посоката на движение)
     root.add(cab);
     const tr = trailer(order.matId);

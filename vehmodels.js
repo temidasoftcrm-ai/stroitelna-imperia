@@ -5,6 +5,7 @@
 //   коли — от „Free Low Poly Vehicles Pack“ (RgsDev): sf-car-<Име>, в мащаба на града (лек автомобил ≈ CAR_LEN)
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';
+import { NF_MATS } from './nightfloors.js';   // нощем daynight.js вдига emissiveIntensity — фаровете на ТИР-овете
 
 const CAR_LEN = 3.8;   // дължината на седана в света на играта (другите коли са в същия мащаб); беше 3.0 — изглеждаха малки до сградите
 const GEAR = {
@@ -42,7 +43,7 @@ export function loadVehModels(load, A, base = 'assets/heavy/gear/') {
       for (const p of parts) { const q = p.clone(true); q.applyMatrix4(p.parent.matrixWorld); grp.add(q); }   // в световни координати на пакета
       A['sf-car-' + nm] = { scene: wrap(grp, 0, k) };
     }
-  }).catch(e => console.warn('vehmodels cars', e)).then(() => feature('cars-real') && loadRealCars(load, A)));
+  }).catch(e => console.warn('vehmodels cars', e)).then(() => feature('cars-real') && loadRealCars(load, A)).then(() => feature('trucks-real') && loadRealTrucks(load, A)));
   return Promise.all(jobs);
 }
 
@@ -58,4 +59,38 @@ function loadRealCars(load, A) {
     g.scene.traverse(o => { if (o.isMesh) o.castShadow = true; });
     A['sf-car-' + nm] = { scene: wrap(g.scene, 0, len * M_PER) };
   }).catch(e => console.warn('real car', nm, e))));
+}
+
+// модерни ТИР-ове (Лабораторията → trucks-real): влекачи Scania S и Volvo FH (Sketchfab, CC-BY; assets/heavy/trucks, дължина 1 по z).
+//   A['sf-trk-0|1'] — само влекачът (дължина 1; trucks.js го мащабира и закача своето ремарке с товара)
+//   A['sf-semi-0|1'] — влекач + бяло полуремарке с цветна ивица, в мащаба на града (магистралите, hwtraffic.js)
+const TRK = ['scania', 'volvo'], SEMI_COL = [0xd62828, 0x1f5fbf];
+export const truckLamps = (() => { let m = null; return () => m || (m = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 1, 32, 32, 31);
+  gr.addColorStop(0, 'rgba(255,250,225,1)'); gr.addColorStop(0.35, 'rgba(255,235,180,0.55)'); gr.addColorStop(1, 'rgba(255,220,150,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(c), mk = col => { const mm = new THREE.MeshStandardMaterial({ color: 0, emissive: col, emissiveMap: t, emissiveIntensity: 0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }); NF_MATS.add(mm); return mm; };
+  return { front: mk(0xd8ceb0), rear: mk(0xa01010) };
+})()); })();
+// фарове (отпред) и стопове (отзад) на обект с предница към +z и дължина len; w — ширина, y — височина на фаровете
+export function addTruckLamps(o, len, w = 2.4, y = 1.1, rearZ = null) {
+  const L = truckLamps();
+  for (const sx of [-1, 1]) {
+    const f = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), L.front); f.position.set(sx * w * 0.36, y, len / 2 + 0.05); o.add(f);
+    const r = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), L.rear); r.rotation.y = Math.PI; r.position.set(sx * w * 0.42, y, (rearZ ?? -len / 2) - 0.05); o.add(r);
+  }
+}
+function loadRealTrucks(load, A) {
+  return Promise.all(TRK.map((f, i) => load('assets/heavy/trucks/' + f + '.glb').then(g => {
+    g.scene.traverse(m => { if (m.isMesh) { m.castShadow = true; if (f === 'volvo') { m.material = m.material.clone(); m.material.color.multiplyScalar(2.2); } } });   // черният Volvo — малко по-светъл
+    A['sf-trk-' + i] = { scene: wrap(g.scene, 0, null) };
+    // полуремарке за магистралата: влекач 6 м + ремарке 13,6 м
+    const semi = new THREE.Group(), cab = wrap(g.scene.clone(true), 0, null), cabL = 6 * M_PER, trL = 13.6 * M_PER, W = 2.5 * M_PER;
+    cab.scale.setScalar(cabL); cab.position.z = trL / 2 + cabL / 2 - 1.2 * M_PER; semi.add(cab);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(W, 2.9 * M_PER, trL), new THREE.MeshStandardMaterial({ color: 0xeeeeea, roughness: 0.6 })); box.position.y = 2.65 * M_PER; box.castShadow = true; semi.add(box);
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(W + 0.02, 0.5 * M_PER, trL * 0.9), new THREE.MeshStandardMaterial({ color: SEMI_COL[i], roughness: 0.5 })); stripe.position.y = 2.2 * M_PER; semi.add(stripe);
+    for (const z of [-trL / 2 + 1.2 * M_PER, -trL / 2 + 2.5 * M_PER]) for (const x of [-1, 1]) { const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.5 * M_PER, 0.5 * M_PER, 0.35 * M_PER, 12).rotateZ(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x15171a })); wh.position.set(x * W * 0.42, 0.5 * M_PER, z); semi.add(wh); }
+    addTruckLamps(semi, 0, W, 0.9 * M_PER, -trL / 2);
+    for (const c of semi.children) if (c.geometry?.type === 'PlaneGeometry' && c.position.z > 0) c.position.z = trL / 2 + cabL - 1.2 * M_PER + 0.05;   // фаровете — на челото на влекача
+    A['sf-semi-' + i] = { scene: semi };
+  }).catch(e => console.warn('real truck', f, e))));
 }

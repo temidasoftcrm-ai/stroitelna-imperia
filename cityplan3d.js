@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { pointAt, rectCorners, rectHas } from './cityplan.js';
 import { feature } from './lab/feature.js';
+import { makeWater } from './water.js';
 
 const MAT = {};   // общи материали за всички градове
 function mats() {
@@ -54,6 +55,7 @@ export function buildPlanView(P0, opts = {}) {
   g.userData.plan = P;
   // --- терен: голяма мрежа с релеф и цветове по вершини (без текстури)
   const S = opts.size || 1400, seg = opts.seg || 150;
+  const WV = makeWater({ repeat: S / 40, color: 0x2a6e9e, strength: 0.6 });   // вълни (свалените нормали waternormals.jpg)
   const tg = new THREE.PlaneGeometry(S, S, seg, seg); tg.rotateX(-Math.PI / 2);
   const pa = tg.attributes.position, col = new Float32Array(pa.count * 3), c = new THREE.Color();
   const grass = new THREE.Color(0x86ad62), park = new THREE.Color(0x93b86b), sand = new THREE.Color(0xdcc994), rock = new THREE.Color(0x8d8576), snow = new THREE.Color(0xf1f1ee), bed = new THREE.Color(0x6f8f86), field = new THREE.Color(0xa6b46a);
@@ -75,10 +77,10 @@ export function buildPlanView(P0, opts = {}) {
   const terrain = new THREE.Mesh(tg, M.terrain); g.userData.groundMat = M.terrain; terrain.receiveShadow = true; terrain.name = 'terrain'; g.add(terrain);
   if (P.tpl === 'coastal' || P.tpl === 'river' || P.tpl === 'island' || P.coastZ) {   // coastZ: и заливът на Амстердам, морето на Барселона
     const wg = new THREE.PlaneGeometry(S, S); wg.rotateX(-Math.PI / 2);
-    const water = new THREE.Mesh(wg, M.water); water.position.y = -0.6; water.name = 'water'; g.add(water);
+    const water = new THREE.Mesh(wg, WV.material); water.position.y = -0.6; water.name = 'water'; g.add(water);   // реката/морето — с движещи се вълни (water.js)
   }
   if (P.canals) for (const rc of P.canals.rings) {   // каналите (8 м) са по-тесни от клетката на терена — отделни ивици вода (полукръг на юг от центъра)
-    const r = new THREE.Mesh(new THREE.RingGeometry(rc - 4, rc + 4, 72, 1, Math.PI, Math.PI).rotateX(-Math.PI / 2), M.water);
+    const r = new THREE.Mesh(new THREE.RingGeometry(rc - 4, rc + 4, 72, 1, Math.PI, Math.PI).rotateX(-Math.PI / 2), WV.material);
     r.position.set(P.canals.c[0], -0.3, P.canals.c[1]); r.name = 'canal'; g.add(r);
   }
   // --- улици: тротоар (по-широк) + асфалт; мост над водата; маркировка на булевардите
@@ -124,10 +126,15 @@ export function buildPlanView(P0, opts = {}) {
     major.push({ n, ni, es });
   });
   const sig = [];   // [x, z, ос (ъгъл на улицата)] — светофар на десния ъгъл на всеки изход
-  for (const { ni, es } of major) for (const e of es) {
+  const zbr = [], onOther = (x, z, si) => P.streets.some((o, oi) => oi !== si && o.pts.some((q, i) => i % 2 === 0 && Math.hypot(q[0] - x, q[1] - z) < o.w / 2 + 1.2));
+  for (const { n, ni, es } of major) for (const e of es) {
     if (Math.abs(e.s1 - e.s0) < 16) continue;
-    const st = P.streets[e.st], s = e.a === ni ? e.s0 : e.s1, dir = e.a === ni ? 1 : -1, rad = st.w / 2 + 4.5;
+    const wMax = Math.max(...es.map(q => P.streets[q.st].w));
+    const st = P.streets[e.st], s = e.a === ni ? e.s0 : e.s1, dir = e.a === ni ? 1 : -1, rad = wMax / 2 + 3.2;   // извън кръга на кръстовището (по най-широката улица)
     const p = pointAt(st, s + dir * rad);
+    // без застъпване: не върху друга улица и не до друга зебра (извитите улици дават близки изходи)
+    if (onOther(p.x, p.z, e.st) || zbr.some(([x, z]) => Math.hypot(x - p.x, z - p.z) < 8)) continue;
+    zbr.push([p.x, p.z]);
     for (let k = -st.w / 2 + 0.8; k < st.w / 2 - 0.5; k += 1.3) {
       const cx = p.x - p.tz * k, cz = p.z + p.tx * k;
       ribbon([[cx - p.tx * 1.4, cz - p.tz * 1.4], [cx + p.tx * 1.4, cz + p.tz * 1.4]], 0.6, () => 0.1, ...zebra);
@@ -185,6 +192,7 @@ export function buildPlanView(P0, opts = {}) {
     };
     g.userData.update(0);
   }
+  { const sigUpd = g.userData.update; g.userData.update = t => { WV.update(t); if (sigUpd) sigUpd(t); }; }   // вълните се движат всеки кадър
   g.userData.lamps = lampAt.filter((_, i) => i % Math.ceil(lampAt.length / 160) === 0).map(([x, z]) => ({ x, y: 6.1, z }));   // светлините нощем (daynight.js) — до 160
   // --- дървета: в града (около площада, празните кътчета) и гори по хълмовете — общи инстанции
   const trees = [], rnd = (() => { let s = 1234567; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
@@ -212,6 +220,33 @@ export function buildPlanView(P0, opts = {}) {
       if (!P.parkAt(x, z) || roadNear(x, z, 2)) continue;
       trees.push([x, z, 0.75 + rnd() * 0.6, rnd() < 0.25 ? 1 : 0]);
     }
+  }
+  // празните зелени площи в града (между парцелите и улиците): горички, храсти, цветни лехи, пейки — зад feature('green-fill').
+  // Решетка 10 м, по хеш на клетката (един и същ изглед при всяко влизане); не до парцел (и бъдещите квартали), улица или площад.
+  if (feature('green-fill')) {
+    const allLot = (x, z) => P.lots.some(L => Math.abs(L.x - x) < L.w / 2 + 3 && Math.abs(L.z - z) < L.d / 2 + 3 && rectHas(L, [x, z], 3));
+    const hh = (x, z) => { let k = Math.imul(Math.round(x * 3) ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(Math.round(z * 3), 0xc2b2ae35); k ^= k >>> 13; k = Math.imul(k, 0x27d4eb2d); return ((k ^ (k >>> 15)) >>> 0) / 4294967296; };
+    const bush = [], flow = [], bench = [], alley = [];
+    let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of P.boundary) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    for (let x = x0; x < x1; x += 10) for (let z = z0; z < z1; z += 10) {
+      if (!P.buildable(x, z) || P.heightAt(x, z) > 2 || Math.hypot(x - sq.x, z - sq.z) < sq.r + 6) continue;
+      if (P.bigZone && rectHas(P.bigZone, [x, z], 4)) continue;
+      if (allLot(x, z) || roadNear(x, z, 3)) continue;
+      const r1 = hh(x, z), r2 = hh(z + 7.1, x - 3.3), cx = x + (r2 - 0.5) * 5, cz = z + (r1 - 0.5) * 5;
+      if (r1 < 0.5 && trees.length < 2400) { const n = 2 + ((r2 * 3) | 0); for (let k = 0; k < n; k++) trees.push([cx + Math.cos(k * 2.3 + r2 * 6) * 2.6, cz + Math.sin(k * 2.3 + r2 * 6) * 2.6, 0.75 + hh(cx + k, cz) * 0.5, 0]); }
+      else if (r1 < 0.72) { for (let k = 0; k < 3; k++) bush.push([cx + Math.cos(k * 2.1) * 1.8, cz + Math.sin(k * 2.1) * 1.8, 0.8 + 0.4 * hh(cx, cz + k)]); for (let k = 0; k < 9; k++) flow.push([cx + (hh(cx + k, cz) - 0.5) * 6, cz + (hh(cz, cx + k) - 0.5) * 6, k % 3]); }
+      else if (r1 < 0.8) { bench.push([cx, cz, r2 * Math.PI]); bush.push([cx + 2.4, cz + 1.2, 0.8]); }
+      if (r2 < 0.45) {   // алеи: светла пътека към съседната зелена клетка (по-малките пространства стават парк с пътеки)
+        for (const [dx, dz] of [[10, 0], [0, 10]]) { const nx = x + dx, nz = z + dz;
+          if (P.buildable(nx, nz) && !allLot(nx, nz) && !roadNear(nx, nz, 3)) alley.push([x + dx / 2, z + dz / 2, dx ? 0 : Math.PI / 2]); }
+      }
+    }
+    const put = (geo, mat, list, f) => { if (!list.length) return; const im = new THREE.InstancedMesh(geo, mat, list.length); list.forEach((p, i) => im.setMatrixAt(i, f(p))); im.castShadow = true; detail.add(im); };
+    const q2 = new THREE.Quaternion(), e2 = new THREE.Euler(), v2 = new THREE.Vector3(), s2 = new THREE.Vector3();
+    put(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: 0x3f7a3a, roughness: 0.9 }), bush, ([x, z, k]) => m4.compose(v2.set(x, 0.55 * k, z), q2.identity(), s2.set(1.2 * k, 0.8 * k, 1.2 * k)));
+    for (const [c, ci] of [[0xe0443a, 0], [0xf5c542, 1], [0x9b59d0, 2]]) put(new THREE.SphereGeometry(0.28, 6, 4), new THREE.MeshStandardMaterial({ color: c, roughness: 0.7 }), flow.filter(f => f[2] === ci), ([x, z]) => m4.compose(v2.set(x, 0.3, z), q2.identity(), s2.set(1, 1, 1)));
+    put(new THREE.BoxGeometry(10.4, 0.06, 1.8), new THREE.MeshStandardMaterial({ color: 0xd8c9a6, roughness: 1 }), alley, ([x, z, a]) => m4.compose(v2.set(x, 0.07, z), q2.setFromEuler(e2.set(0, a, 0)), s2.set(1, 1, 1)));
+    put(new THREE.BoxGeometry(2.2, 0.5, 0.6), new THREE.MeshStandardMaterial({ color: 0x8a5a33, roughness: 0.8 }), bench, ([x, z, a]) => m4.compose(v2.set(x, 0.45, z), q2.setFromEuler(e2.set(0, a, 0)), s2.set(1, 1, 1)));
   }
   // истински дървета (Лабораторията → trees-real): прототипите от горския пакет на играта (основа в 0, височина 1),
   // всеки меш на прототипа — една InstancedMesh; широколистните в града, боровете по хълмовете

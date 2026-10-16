@@ -133,3 +133,5 @@ cinema/newyork.mp4, cinema/vegas.mp4, cinema/paris.mp4, cinema/dubai.mp4, cinema
 - trains/vl82.glb — "VL 82 Electric Locomotive" by eightismore (CC-BY 4.0) — https://sketchfab.com/3d-models/ec138d48868a4633bbd014947f344130 (без релсите)
 - trains/boxcar.glb — "Railway Boxcar Freight Wagon" by saadthedesigner314 (CC-BY 4.0) — https://sketchfab.com/3d-models/6cede42e50cc4042addfbedac1311551
 - trains/hopper2.glb — "Coal Hopper Railway Wagon" by saadthedesigner314 (CC-BY 4.0) — https://sketchfab.com/3d-models/287266d5edf749318cb9869fe583e0ae
+- trucks/scania.glb — "2022 Scania S-Series 730" by mcvehiclessketchfab (CC-BY 4.0) — https://sketchfab.com/3d-models/da65da889d6940d39cac1eec38cb925c
+- trucks/volvo.glb — "Volvo FH" by zairiqzairiqpixarcarsbfdi (CC-BY 4.0) — https://sketchfab.com/3d-models/b6f1ed55be14417bb146071063b613ef
