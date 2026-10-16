@@ -78,5 +78,9 @@
   "lm-colosseo": {
     "from": "/assets/heavy/lm/colosseo.glb",
     "to": "/assets/heavy/lm/colosseo-new.glb"
+  },
+  "com2-sky-e2": {
+    "from": "/assets/commercial2/building-skyscraper-e.glb",
+    "to": "/assets/commercial2/building-skyscraper-e-new.glb"
   }
 }

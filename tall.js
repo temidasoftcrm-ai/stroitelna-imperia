@@ -26,8 +26,9 @@ export const SKY_BANDS_MODERN = {
 const NEW_MODERN = {
   'building-skyscraper-d': ['com2-sky-d', { y1: 1.104, y2: 1.140, floors: 30 }],   // Singapore Office: етаж през 0.037
   'building-skyscraper-e': ['com2-sky-e', { y1: 1.148, y2: 1.320, floors: 25 }],
+  'building-skyscraper-e@2': ['com2-sky-e2', { y1: 1.152, y2: 1.280, floors: 20 }],   // Northwestern Mutual: гладко стъкло — разтяга се средата
 };
-for (const [n, [id, band]] of Object.entries(NEW_MODERN)) if (feature(id)) SKY_BANDS_MODERN[n] = band;
+for (const [n, [id, band]] of Object.entries(NEW_MODERN)) if (feature(id)) SKY_BANDS_MODERN[n.split('@')[0]] = band;   // по-късните записи (…@2) печелят
 
 // geometry: BufferGeometry (може и индексирана); extra: колко етажа да се добавят
 export function stretchFloors(geometry, y1, y2, extra) {
