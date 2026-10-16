@@ -10,3 +10,4 @@
 - car-corolla.glb — "low-poly Toyota Corolla E80 Sedan" by DU1701 — https://sketchfab.com/3d-models/6254cf268d9b46f79dd2a6511e153891
 - car-crownvic.glb — "Ford LTD Crown Victoria" by eightismore — https://sketchfab.com/3d-models/0097d3f7d6844162b38c587d61933c4f
 - bus-citaro.glb — "1997 Mercedes-Benz Citaro C Hybrid Bus" by zairiqzairiqpixarcarsbfdi — https://sketchfab.com/3d-models/0938985b5d254f3f9698ddfa4a3d7ee8
+- car-limo.glb — "Mercury Grand-Marquis Limo 1983" by fishermans — https://sketchfab.com/3d-models/f86491b9439a40cd8059ef101e0ac8ba

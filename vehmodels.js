@@ -51,7 +51,7 @@ export function loadVehModels(load, A, base = 'assets/heavy/gear/') {
 // Заместват част от „Free Low Poly Vehicles Pack“ под същите имена; дължината — истинската в метри × мащаба на града.
 const REAL_CARS = {   // име: [файл, дължина в м]
   Sedan: ['car-polo', 4.4], Hatchback: ['car-p206', 3.8], SUV: ['car-renegade', 4.25], Pickup: ['car-hilux', 5.3], Taxi: ['car-taxi', 4.9],
-  Van: ['car-uaz452', 4.4], Muscle: ['car-accord', 4.7], Muscle_2: ['car-corolla', 4.2], Police_Sedan: ['car-crownvic', 5.4], Bus: ['bus-citaro', 12],
+  Van: ['car-uaz452', 4.4], Muscle: ['car-accord', 4.7], Muscle_2: ['car-corolla', 4.2], Police_Sedan: ['car-crownvic', 5.4], Bus: ['bus-citaro', 12], Limousine: ['car-limo', 7.6],
 };
 const M_PER = CAR_LEN / 4.5;   // седанът от пакета (≈4,5 м) е CAR_LEN в света на играта
 function loadRealCars(load, A) {
