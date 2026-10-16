@@ -172,6 +172,7 @@ export function buildPlanView(P0, opts = {}) {
       im.setMatrixAt(k, m4.compose(pos, qP.clone().multiply(qS), sc));
     });
     im.castShadow = true; im.name = 'hollywood'; g.add(im);
+    im.material.userData.winK = 0.85; (g.userData.nightMats = g.userData.nightMats || []).push(im.material);   // нощем — осветен от прожекторите (game.js → dayNight)
   }
   // --- площад: павета, фонтан, кръг от дървета
   const sq = P.square, pl = [[], []]; disc(sq.x, sq.z, sq.r + 1, 0.08, ...pl, 32);

@@ -753,7 +753,7 @@ function buildCity(cityId) {
   seaFleetSig = ''; if (city.sea) city.sea.setPortLevel?.(portLv(cityId));
   ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; ground.receiveShadow = true;
   if (pv) { pv.position.y = 0; g.add(pv); city.planView = pv; } else g.add(ground);
-  if (P) { dayNight.setLamps(pv.userData.lamps); signals.length = 0; }
+  if (P) { dayNight.setLamps(pv.userData.lamps); signals.length = 0; if (feature('hollywood-night')) for (const m of pv.userData.nightMats || []) dayNight.winMats.add(m); }   // надписът HOLLYWOOD свети нощем
   if (!P) {
   // улици: инстанцирани по вид плочка
   const kinds = { 'road-straight': [], 'road-crossroad': [], 'road-intersection': [], 'road-bend': [] };
@@ -3188,6 +3188,18 @@ function brandPick(then) {
     [...BRANDS.map(b => [`${b.ico}`, () => { S.brand = b.k; const nm = cleanBrand($('brandNm')?.value); if (nm) S.brandNm = nm; group.check(true); save(); updLogo(); then && then(); }])]);
   wireBrandField();
 }
+// ⚙️ → „✏️ Име на фирмата“: смяна на името по време на игра (дъщерните дружества го следват — group.js subName)
+function renameBrand() {
+  modal('✏️ Име на фирмата', `Сега: <b>${(brandOf(S) || {}).nm || '—'} Констръкшън</b>. Дъщерните дружества (… Толроуд, … Рейл…) сменят името заедно с нея.` + brandField(), [['Затвори', null]]);
+  setTimeout(() => {
+    const inp = $('brandNm'), ok = $('brandOk'), msg = $('brandMsg'); if (!inp || !ok) return;
+    inp.value = S.brandNm || ''; inp.focus();
+    const saveNm = () => { const nm = cleanBrand(inp.value); if (!nm) { msg.style.color = 'var(--bad)'; msg.textContent = 'Напиши име (до 24 знака).'; return; }
+      inp.value = nm; S.brandNm = nm; group.check(true); save(); updLogo(); renderPanel(); ok.textContent = '✓'; msg.style.color = 'var(--ok)'; msg.innerHTML = `✓ Запазено: <b>${nm} Констръкшън</b>`; Sound.play('click'); };
+    ok.onclick = saveNm; inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); saveNm(); } };
+    inp.oninput = () => { ok.textContent = '✓ Запази'; msg.style.color = 'var(--mut)'; msg.textContent = 'Натисни „✓ Запази“.'; };
+  }, 50);
+}
 const updLogo = () => { const l = document.querySelector('#top .logo'); if (!l || !S) return; const gn = groupName(S); l.textContent = `🏗️ ${gn ? gn.toUpperCase() + ' · ' : ''}${cityName().toUpperCase()}${gn ? '' : ` · ${S.cityId === (S.hqCity || S.cityId) ? 'ЦЕНТРАЛА' : 'ФИЛИАЛ'}`}`; l.style.cursor = gn ? 'pointer' : ''; l.title = gn ? 'Корпоративната група' : ''; l.onclick = gn ? () => openBig('group') : null; updHoldBtn(); neomName(); };
 // конкурентни фирми (rivals.js): вземат поръчки, които не приемеш навреме, и строят на парцела
 const rivals = createRivals({ S: () => S, acquired: id => corp.acquired(id), toast, fmt, cc: () => S && cityById(S.cityId)?.cc,
@@ -3471,7 +3483,7 @@ function globeData() {
 }
 // 💾 Записи и ⚙️ Настройки — и в горната лента (до „Карта“), не само на картата
 const openSavesUI = () => openSaves({ modal, toast, fmt, save, cityName: id => cityById(id)?.nm || id, lock: () => { saveLock = true; } });
-const openSettingsUI = () => window.__settings ? window.__settings({ credits: showCredits, newGame: () => modal('Нова игра?', 'Сегашната фирма ще бъде изтрита.', [['Отказ', null], ['Изтрий и започни', wipeSlot]]), lock: () => { save(); saveLock = true; } })
+const openSettingsUI = () => window.__settings ? window.__settings({ credits: showCredits, rename: S && S.brand ? renameBrand : null, newGame: () => modal('Нова игра?', 'Сегашната фирма ще бъде изтрита.', [['Отказ', null], ['Изтрий и започни', wipeSlot]]), lock: () => { save(); saveLock = true; } })
   : modal('⚙️ Още', 'Авторите на моделите и музиката · или започни нова игра в този слот.', [['Затвори', null], ['📜 Автори', showCredits], ['🗑️ Нова игра', () => modal('Нова игра?', 'Сегашната фирма ще бъде изтрита.', [['Отказ', null], ['Изтрий и започни', wipeSlot]])]]);
 { let after = $('btnMapToggle');
   for (const [id, txt, title, fn] of [['btnSaves', '💾 Записи', 'Записи: слотове, автозаписи, сваляне', openSavesUI], ['btnSettings', '⚙️', 'Настройки: вход, изход, данни, хора онлайн, ъпдейти', openSettingsUI]]) {
@@ -7917,6 +7929,7 @@ if (AUTOTEST) {
     balkTest() { S.balkansPop = 0; S.dev.xp = 15000; S.dev.lv = 4; dev.add(6000); return { lv: S.dev.lv, pop: S.balkansPop, img: document.querySelector('#buyPop img')?.getAttribute('src') }; },
     emergLook() { __dbg.time && __dbg.time(20.5); showMap(false); const h = city.hq, ks = ['sf-car-Police_Sedan', 'sf-car-Police_SUV', 'sf-car-Ambulance', 'sf-car-Firetruck', 'sf-car-Police_Sedan', 'sf-car-Ambulance'].filter(k => A[k]); const g = new THREE.Group(); ks.forEach((k, i) => { const o = model(k, 1); o.position.set((i % 3) * 7 - 7, 0, Math.floor(i / 3) * 9); o.rotation.y = Math.PI / 2; o.userData.forceBeacons = 1; g.add(o); }); g.position.set(h.x - 4, 0, h.z + 14); scene.add(g); controls.target.set(h.x - 4, 1, h.z + 18); camera.position.set(h.x + 10, 12, h.z + 34); fly = null; $('panel').classList.add('hidden'); return ks; },
     trainLook(kinds = ['loco', 'hopper', 'flat', 'ave', 'hsw', 'aveTail', 'oeLoco', 'oeCar']) { const g = new THREE.Group(); kinds.forEach((k, i) => { if (!hasTrainModel(k)) return; const c = trainCar(k, i); c.position.set(i * 10, 0, 0); g.add(c); }); g.position.set(0, 0.3, 300); scene.add(g); showMap(false); controls.target.set(35, 2, 300); camera.position.set(35, 30, 345); controls.update(); fly = null; return kinds.filter(hasTrainModel); },
+    stingTest(id) { econ.earn(5e8, 'друго', 'тест'); openBranchNow(id); return (S.branches || []).includes(id); },   // тест: песента на града при нов филиал
     signLook(far) {   // Лабораторията: надписът HOLLYWOOD (Лос Анджелис по картата) — отблизо или градът с хълмовете отдалече
       const P = city.plan, g = P?.sign; if (!g) return null; const dx = Math.cos(g.a), dz = Math.sin(g.a), y = Math.max(0, P.heightAt(g.x, g.z));
       if (far) __dbg.camAt(g.x - dx * 210 + dz * 70, y + 70, g.z - dz * 210 - dx * 70, g.x, y * 0.6, g.z);   // от края на града към хълмовете (мъглата е до ~420 м)
