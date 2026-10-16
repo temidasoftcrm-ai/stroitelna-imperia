@@ -1346,7 +1346,7 @@ const traffic = [];
 function addCar() {
   const i = 3 * ((Math.random() * NBI) | 0), j = (Math.random() * NJ) | 0;
   const r = Math.random(), sf = A['sf-car-Sedan'];
-  const o = sf ? model('sf-car-' + (r < 0.04 ? pick(['Ambulance', 'Police_Sedan', 'Police_SUV', 'Firetruck']) : r < 0.1 ? pick(['Bus', 'Truck', 'Van']) : pick(['Sedan', 'Hatchback', 'SUV', 'Pickup', 'Taxi', 'Sedan', 'Hatchback', 'SUV', 'Muscle', 'Muscle_2', 'Sports', 'Roadster', 'Taxi', 'Limousine'])), 1)
+  const o = sf ? model('sf-car-' + (r < 0.04 ? pick(['Ambulance', 'Police_Sedan', 'Police_SUV', 'Firetruck']) : r < 0.1 ? pick(['Bus', 'Truck', 'Van']) : pick(['Sedan', 'Hatchback', 'SUV', 'Pickup', 'Taxi', 'Sedan', 'Hatchback', 'SUV', 'Muscle', 'Muscle_2', 'Sports', 'Roadster', 'Taxi', 'Taxi', 'Taxi', 'Limousine'])), 1)
     : model(r < 0.04 ? pick(['ambulance', 'police', 'firetruck']) : pick(['sedan', 'taxi', 'suv', 'van', 'sedan', 'suv', 'sedan-sports', 'suv-luxury', 'hatchback-sports']), 1.15);
   scene.add(o);
   const rp = roadPoint();
@@ -3376,11 +3376,14 @@ function showMap(on) {
     if (S) {
       $('mapTitle').textContent = `${S.cityId === S.hqCity ? 'Централа' : 'Филиал'}: ${cityName()}`;
       $('mapText').innerHTML = `Ден ${S.day} · ${fmt(econ.money)} € · завършени обекти: ${S.done}<br>Натисни града с 🏗️, за да влезеш.`;
-      $('mapBtns').innerHTML = `<button class="btn" id="mbEnter">Към ${cityName()}</button><button class="btn2" id="mbNew" title="Нова игра: изтрива всички данни — и в облака">🆕 Нова игра</button>`;   // 💾 и ⚙️ са в горната лента
+      $('mapBtns').innerHTML = `<button class="btn" id="mbEnter">Към ${cityName()}</button><button class="btn2" id="mbNew" title="Нова игра: изтрива всички данни — и в облака">🆕 Нова игра</button>`
+        + (dev.has('LINKS') ? `<div style="display:flex;gap:6px;width:100%"><button class="btn" id="mbQHw" style="flex:1">🛣️ Строй магистрала</button><button class="btn" id="mbQRail" style="flex:1">🛤️ Строй жп линия</button></div>` : '');   // бърз достъп: от точка до точка на картата   // 💾 и ⚙️ са в горната лента
       $('mapBtns').insertAdjacentHTML('beforeend', viewBarHtml());
       $('mapBtns').querySelectorAll('[data-mview]').forEach(b => b.onclick = () => setMapView(b.dataset.mview));
       $('mbEnter').onclick = enterCity;
       $('mbNew').onclick = newGameAll;
+      if ($('mbQHw')) $('mbQHw').onclick = () => startHwMode();
+      if ($('mbQRail')) $('mbQRail').onclick = () => startRailMode();
       if (!$('mapRail')) $('mapHud').insertAdjacentHTML('beforeend', '<div id="mapRail" style="display:flex;flex-direction:column;gap:8px"></div>');
       renderMapHud();
     } else {
