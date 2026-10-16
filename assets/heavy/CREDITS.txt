@@ -123,8 +123,8 @@ lm/mosque.glb — „Blue Mosque (Sultan Ahmed)“, генериран с Meshy 
 lm/notredame.glb — „Notre-Dame de Paris“, генериран с Meshy AI (meshy.ai) от автора на играта
 cinema/newyork.mp4, cinema/vegas.mp4, cinema/paris.mp4, cinema/dubai.mp4, cinema/plane.mp4, cinema/oil.mp4, cinema/sofia.mp4, cinema/tokyo.mp4, cinema/lv20.mp4, cinema/sydney.mp4, cinema/cairo.mp4, cinema/rio.mp4, cinema/orient.mp4, cinema/route66.mp4, cinema/silk.mp4, cinema/chunnel.mp4, cinema/transsib.mp4, cinema/capecairo.mp4, cinema/darien.mp4, cinema/ghan.mp4, cinema/panama.mp4 — видео, генерирано с Kling AI от автора на играта
 - mines/quarry.glb — "Tudor Stone Quarry" by novusod (CC-BY 4.0) — https://sketchfab.com/3d-models/00e48528e4394e5fa6ebdc2a9cb35898 (текстури 512 jpeg, само основният цвят)
-- gear/dump.glb (нов, след ✓ OK) — "Shacman F3000 Dump Truck" by benjamintang2012 (CC-BY 4.0) — https://sketchfab.com/3d-models/010b0518d3f946b98e2ae3bddf52fbd8
-- gear/excavator.glb (нов, след ✓ OK) — "Excavator" by rhymone (CC-BY 4.0) — https://sketchfab.com/3d-models/84cd8adb9d104010b10f3fa89e5f6a70
-- gear/mcrane.glb (нов, след ✓ OK) — "Mobile Hydraulic Truck Crane (Telescopic)" by doty_aecom (CC-BY 4.0) — https://sketchfab.com/3d-models/8c343b1ce4724631b4623e9ef7778163
-- lm/redeemer.glb (нов, след ✓ OK) — "Christ The Redeemer" by naveenhimal (CC-BY 4.0) — https://sketchfab.com/3d-models/d6f51d0fad7142a08ed26455f84f72ca
-- lm/colosseo.glb (нов, след ✓ OK) — "Colosseum" by alexanderleth (CC-BY 4.0) — https://sketchfab.com/3d-models/c3c5157559344c74b2c0bacc89036692
+- gear/dump.glb — "Shacman F3000 Dump Truck" by benjamintang2012 (CC-BY 4.0) — https://sketchfab.com/3d-models/010b0518d3f946b98e2ae3bddf52fbd8
+- gear/excavator.glb — "Excavator" by rhymone (CC-BY 4.0) — https://sketchfab.com/3d-models/84cd8adb9d104010b10f3fa89e5f6a70
+- gear/mcrane.glb — "Mobile Hydraulic Truck Crane (Telescopic)" by doty_aecom (CC-BY 4.0) — https://sketchfab.com/3d-models/8c343b1ce4724631b4623e9ef7778163
+- lm/redeemer.glb — "Christ The Redeemer" by naveenhimal (CC-BY 4.0) — https://sketchfab.com/3d-models/d6f51d0fad7142a08ed26455f84f72ca
+- lm/colosseo.glb — "Colosseum" by alexanderleth (CC-BY 4.0) — https://sketchfab.com/3d-models/c3c5157559344c74b2c0bacc89036692
