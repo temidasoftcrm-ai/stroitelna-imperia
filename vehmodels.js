@@ -51,13 +51,15 @@ export function loadVehModels(load, A, base = 'assets/heavy/gear/') {
 // Заместват част от „Free Low Poly Vehicles Pack“ под същите имена; дължината — истинската в метри × мащаба на града.
 const REAL_CARS = {   // име: [файл, дължина в м]
   Sedan: ['car-polo', 4.4], Hatchback: ['car-p206', 3.8], SUV: ['car-renegade', 4.25], Pickup: ['car-hilux', 5.3], Taxi: ['car-taxi', 4.9],
-  Van: ['car-uaz452', 4.4], Muscle: ['car-accord', 4.7], Muscle_2: ['car-corolla', 4.2], Police_Sedan: ['car-crownvic', 5.4], Bus: ['bus-citaro', 12], Limousine: ['car-limo', 7.6],
+  Van: ['car-uaz452', 4.4], Muscle: ['car-accord', 4.7], Muscle_2: ['car-corolla', 4.2], Police_Sedan: ['car-crownvic', 5.4], Bus: ['bus-citaro', 12], Limousine: ['car-limo', 7.6], Police_SUV: ['car-polsuv', 4.9], Truck: ['car-truck', 6.5],
 };
 const M_PER = CAR_LEN / 4.5;   // седанът от пакета (≈4,5 м) е CAR_LEN в света на играта
 function loadRealCars(load, A) {
   return Promise.all(Object.entries(REAL_CARS).map(([nm, [f, len]]) => load('assets/heavy/cars/' + f + '.glb').then(g => {
     g.scene.traverse(o => { if (o.isMesh) o.castShadow = true; });
-    A['sf-car-' + nm] = { scene: wrap(g.scene, 0, len * M_PER) };
+    const sc = wrap(g.scene, 0, len * M_PER);
+    if (/^Police/.test(nm)) addBeacons(sc, len * M_PER);
+    A['sf-car-' + nm] = { scene: sc };
   }).catch(e => console.warn('real car', nm, e))));
 }
 
@@ -93,4 +95,22 @@ function loadRealTrucks(load, A) {
     for (const c of semi.children) if (c.geometry?.type === 'PlaneGeometry' && c.position.z > 0) c.position.z = trL / 2 + cabL - 1.2 * M_PER + 0.05;   // фаровете — на челото на влекача
     A['sf-semi-' + i] = { scene: semi };
   }).catch(e => console.warn('real truck', f, e))));
+}
+
+// буркани на полицейските коли: синьо/червено, мигат; около половината коли ги включват „от време на време“ (по ~20 s)
+const BEACON = { r: new THREE.MeshStandardMaterial({ color: 0x400000, emissive: 0xff2020, emissiveIntensity: 0 }), b: new THREE.MeshStandardMaterial({ color: 0x000a40, emissive: 0x2050ff, emissiveIntensity: 0 }) };
+function addBeacons(car, len) {
+  car.updateMatrixWorld(true);
+  const bb = new THREE.Box3().setFromObject(car), y = bb.max.y + 0.02, w = (bb.max.x - bb.min.x) * 0.22, z = (bb.min.z + bb.max.z) / 2 + len * 0.05;
+  const bar = new THREE.Group(); bar.position.set(0, y, z); car.add(bar);
+  const geo = new THREE.BoxGeometry(w, 0.09, 0.14);
+  for (const [k, sx] of [['r', -1], ['b', 1]]) {
+    const m = new THREE.Mesh(geo, BEACON[k]); m.position.x = sx * w * 0.55; bar.add(m);
+    m.onBeforeRender = function () {   // всяко копие (clone) има свой uuid → своя фаза; мигат на смени
+      const t = performance.now() / 1000, h = (this.parent.parent ? this.parent.parent.uuid.charCodeAt(0) + this.parent.parent.uuid.charCodeAt(3) : 0);
+      const on = Math.sin(t / 20 * Math.PI * 2 + h) > 0.1;   // включени ~45% от времето
+      const blink = (Math.floor(t * 6) + (k === 'r' ? 0 : 1)) % 2 === 0;
+      this.material.emissiveIntensity = on && blink ? 3 : 0;
+    };
+  }
 }

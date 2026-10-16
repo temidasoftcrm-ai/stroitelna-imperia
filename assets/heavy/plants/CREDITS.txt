@@ -1,0 +1,6 @@
+Растения и фонтан (Sketchfab, CC-BY 4.0 — https://creativecommons.org/licenses/by/4.0/). Нормализирани: център по x/z, основа y = 0, най-широката страна = 1; мешовете — слети по материал; текстури до 256/512 px.
+- bush-0.glb — "Low poly Bush (Buxus)" by arekusandoru.kurobe — https://sketchfab.com/3d-models/d3383bb111bc49d6a9d6cfe810e3058b (височина 0.86)
+- bush-1.glb — "Round Bush" by scadl — https://sketchfab.com/3d-models/f3270315074346549abe21f207685441 (височина 0.94, цъфтящ)
+- bush-2.glb — "Lowpoly Flower Bushes" by krauchankavarvara — https://sketchfab.com/3d-models/4b47abf072604a71aaf1bda30847a1af (височина 0.34, два ниски цветни храста)
+- flowers.glb — "Street Shrubs A2" by kj3dx — https://sketchfab.com/3d-models/906b460c708142c0848bcd58924a3a5d (височина 1.57, храст с цветя в каменна саксия)
+- fountain.glb — "Simple Fountain" by Seth7Santos — https://sketchfab.com/3d-models/186392ecd7964bc7b00a6f824a3e2441 (височина 1.02, каменен фонтан на 3 нива)

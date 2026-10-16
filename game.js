@@ -385,7 +385,6 @@ let europe = null;
 {
   const jobs = [];
   // заводските модели се казват като търговските (building-a…) — пазим ги под 'ind-…'
-  if (feature('houses-real')) jobs.push(Promise.resolve().then(() => loadHouses()));   // истинските къщи — преди строежа на града
   for (const [dir, list] of Object.entries(MODELS)) for (const n of list) jobs.push(load(`assets/${dir}/${n}.glb`).then(g => { A[dir === 'industrial' ? 'ind-' + n : n] = g; if (dir === 'commercial' || dir === 'commercial2') prepNightFloors(g.scene, n); }));   // нощем етажите светват (nightfloors.js)
   // истинска строителна техника и коли за трафика (vehmodels.js, Sketchfab)
   jobs.push(loadVehModels(load, A));
@@ -880,27 +879,9 @@ function decorLot(g, lot, cityId) {
   }
   return true;
 }
-// истински къщи (Sketchfab CC-BY, assets/heavy/houses) — зад feature('houses-real'); зареждат се при първата нужда
-// (function, не const/let — вика се и от зареждането на моделите, което е по-горе във файла)
-function houseReal() { return ['american', 'brick', 'single', 'twostory', 'villa', 'wooden']; }
-function loadHouses() {
-  if (loadHouses.p || !feature('houses-real')) return loadHouses.p;
-  return loadHouses.p = Promise.all(houseReal().map(k => load(`assets/heavy/houses/house-${k}.glb`).then(g => {
-    g.scene.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; if (o.material && o.material.metalness > 0.5) o.material.metalness = 0.2; } });
-    A['sf-house-' + k] = g;
-  }).catch(() => {})));
-}
-// Kenney къща → истинска (по хеш на парцела; ~3/4 от къщите — останалите остават, за разнообразие)
-function realHouse(n, lot) {
-  if (!HOUSES.includes(n) || !feature('houses-real')) return n;
-  loadHouses();
-  const k = hashStr('hs:' + lot.id), H = houseReal(), nm = 'sf-house-' + H[k % H.length];
-  return k % 4 && A[nm] ? nm : n;
-}
 function placeBuilding(lot, n, rot = 0) {
-  const n0 = n; n = realHouse(n, lot);
   const isQ = n.startsWith('Building_');
-  const s = SHOPS.includes(n) && lot.plan ? fitScale(n, Math.min(lot.w, lot.d) - 1.5) : (isQ ? fitScale(n, 14) : HOUSES.includes(n) || n !== n0 ? fitScale(n, 11) : fitScale(n, SHOPS.includes(n) ? SHOP_FIT : 12.5)) * lotK(lot);   // в плана — целият парцел
+  const s = SHOPS.includes(n) && lot.plan ? fitScale(n, Math.min(lot.w, lot.d) - 1.5) : (isQ ? fitScale(n, 14) : HOUSES.includes(n) ? fitScale(n, 11) : fitScale(n, SHOPS.includes(n) ? SHOP_FIT : 12.5)) * lotK(lot);   // в плана — целият парцел
   const o = model(n, s);
   if (SHOPS.includes(n)) o.scale.y *= shopTall(n);
   if (HOUSES.includes(n)) tintRoof(o, lot.id);

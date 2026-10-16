@@ -136,10 +136,3 @@ cinema/newyork.mp4, cinema/vegas.mp4, cinema/paris.mp4, cinema/dubai.mp4, cinema
 - trucks/scania.glb — "2022 Scania S-Series 730" by mcvehiclessketchfab (CC-BY 4.0) — https://sketchfab.com/3d-models/da65da889d6940d39cac1eec38cb925c
 - trucks/volvo.glb — "Volvo FH" by zairiqzairiqpixarcarsbfdi (CC-BY 4.0) — https://sketchfab.com/3d-models/b6f1ed55be14417bb146071063b613ef
 
-# Истински къщи (assets/heavy/houses, Sketchfab, CC-BY 4.0; текстурите смалени до 512)
-- house-american — Ashkod (https://sketchfab.com/askod192)
-- house-brick — Vitalii.Sandula (https://sketchfab.com/Vitalii.Sandula)
-- house-single — Danylo Tyupa (https://sketchfab.com/danzl0)
-- house-twostory — marishka1611 (https://sketchfab.com/marishka1611)
-- house-villa — bralunit (https://sketchfab.com/bral_unit)
-- house-wooden — archputintsev (https://sketchfab.com/archputintsev)

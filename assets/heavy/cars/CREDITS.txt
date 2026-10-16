@@ -11,3 +11,5 @@
 - car-crownvic.glb — "Ford LTD Crown Victoria" by eightismore — https://sketchfab.com/3d-models/0097d3f7d6844162b38c587d61933c4f
 - bus-citaro.glb — "1997 Mercedes-Benz Citaro C Hybrid Bus" by zairiqzairiqpixarcarsbfdi — https://sketchfab.com/3d-models/0938985b5d254f3f9698ddfa4a3d7ee8
 - car-limo.glb — "Mercury Grand-Marquis Limo 1983" by fishermans — https://sketchfab.com/3d-models/f86491b9439a40cd8059ef101e0ac8ba
+- car-polsuv.glb — "Lowpoly Generic SUV Police" by mk2design — https://sketchfab.com/3d-models/259fc16c23d548ba8d5802c563d8ebdc
+- car-truck.glb — "Hyundai Mighty" by nguyenhoanglam20100609 — https://sketchfab.com/3d-models/e1e2309aad024531b4d41184f5edc898
