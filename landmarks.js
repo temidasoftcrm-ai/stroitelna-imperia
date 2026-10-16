@@ -480,7 +480,7 @@ const GLB_LM = {
   ststephen: { h: 16, fit: 15, plate: 0xc9bfa8 },   // Будапеща: базиликата „Св. Стефан“ (Meshy AI)
   mosque: { h: 12, fit: 15, plate: 0xc9c0ae },   // Истанбул: Синята джамия (Meshy AI) — голяма зона 2×2 до центъра
   hagia: { h: 14, fit: 15, plate: 0xc9b99a },   // Истанбул: Света София (Meshy AI)
-  notredame: { h: 13, fit: 15, plate: 0xc9bfa8 },   // Париж: Нотр Дам (Meshy AI)
+  notredame: { h: 20, fit: 23, plate: 0xc9bfa8 },   // Париж: Нотр Дам (Meshy AI) — по-голям: катедралата е дълга сграда, иначе изглеждаше като къща
   bellagio: { h: 9, fit: 15, plate: 0xb9b09a, dz: -3.6 },
   luxor: { h: 9, fit: 15, sy: 1.9, plate: 0xd9c08a, onLoad: luxorBeam },   // Лас Вегас: „Луксор“ — черната пирамида със сфинкса (Meshy AI); нощем лъч от върха   // Лас Вегас: хотел „Беладжо“ (Meshy AI) — отпред езерото с фонтаните (bellagio() по-долу)
 };
