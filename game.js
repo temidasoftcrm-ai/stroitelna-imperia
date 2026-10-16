@@ -2155,6 +2155,7 @@ function declineOffer(id) {
 
 // разпределя свободната техника към обектите (по реда на приемане)
 function dispatch() {
+  if (S && (S.hwJobs || []).length) hwDispatch();   // магистралата първа: освободената бригада/камион иначе веднага поема нов обект в града
   for (const p of projects) {
     const st = BTYPES[p.type].stages[p.stage];
     if (!st) continue;
@@ -6111,16 +6112,19 @@ function hwMoveGear(seg, id) {
 }
 const lackTxt = l => l.map(([k, d]) => `${ECON.UNIT_TYPES[k]?.ico || ''} ${ECON.UNIT_TYPES[k]?.nm || k}${d > 1 ? ' ×' + d : ''}`).join(', ');
 const hwExit = () => ({ x: tx(3 * Math.floor(NB / 2)), z: tx(NJ - 1) + 16 });
+const HW_SHARED = new Set(['crew', 'truck', 'crane', 'loader']);   // техниката, която строи и в града
 function hwDispatch() {
   for (const j of S.hwJobs || []) {
     const st = stagesOf(j)[j.stage]; if (!st) continue;
     if (hwCityOf(j) !== S.cityId) continue;   // строи го техниката на друг град
     const need = hwNeed(j);
-    // екипът тръгва само наведнъж: ако не стига дори една роля, нищо не се изпраща (иначе блокира обектите в града)
+    // пътната техника (булдозер, грейдер, валяци…) тръгва, когато я има цялата; общите (бригада, камион, кран) не чакат да са свободни
+    // едновременно — запазват се за участъка една по една, щом се освободят от обектите в града (иначе участъкът чакаше с дни)
     const freeOf = role => units.filter(u => u.type === role && !u.proj && (u.state === 'idle' || u.state === 'returning')).length;
-    const lack = Object.entries(need).some(([role, cnt]) => units.filter(u => u.proj === j && u.type === role).length + freeOf(role) < cnt);
-    if (lack) { j.lack = true; continue; }
-    j.lack = false;
+    const lackOf = role => units.filter(u => u.proj === j && u.type === role).length + freeOf(role) < need[role];
+    const roles = Object.keys(need);
+    j.lack = roles.some(lackOf);
+    if (roles.some(r => !HW_SHARED.has(r) && lackOf(r))) continue;
     for (const [role, cnt] of Object.entries(need)) {
       let have = units.filter(u => u.proj === j && u.type === role).length;
       while (have < cnt) {
@@ -6152,8 +6156,14 @@ function hwMaterials(j) {
 }
 function updateHighways(dtDays) {
   for (const j of [...(S.hwJobs || [])]) {
-    if (!hwRoles(j).every(r => r.away >= r.cnt) || !hwMaterials(j)) continue;
-    j.prog += dtDays * stagesOf(j).length / j.days * (window.__coopHwMul ? window.__coopHwMul(j.seg) : 1);   // общ участък с партньора (coop.js) — по-бързо
+    // към трасето: в големите градове с план пътят до изхода е дълъг — след половин ден път техниката е „на трасето“ (иначе пътуваше седмици)
+    for (const u of units) if (u.proj === j && u.state === 'driving') { u.hwDrive = (u.hwDrive || 0) + dtDays; if (u.hwDrive > 0.5) { u.state = 'away'; u.obj.visible = false; u.hwDrive = 0; } } else if (u.hwDrive) u.hwDrive = 0;
+    // пътната техника (булдозер, грейдер, валяци…) е задължителна; общите (бригада, камиони, кран) — докато дойдат от обектите в града,
+    // участъкът върви по-бавно (дела им, но поне наполовина), вместо да стои с дни (бригадите са заети с къщите)
+    const rs = hwRoles(j), shared = rs.filter(r => HW_SHARED.has(r.role)), sh = shared.reduce((a, r) => a + r.cnt, 0);
+    if (!rs.every(r => HW_SHARED.has(r.role) || r.away >= r.cnt) || !hwMaterials(j)) continue;
+    const mul = sh ? Math.max(0.5, shared.reduce((a, r) => a + Math.min(r.away, r.cnt), 0) / sh) : 1;
+    j.prog += dtDays * stagesOf(j).length / j.days * mul * (window.__coopHwMul ? window.__coopHwMul(j.seg) : 1);   // общ участък с партньора (coop.js) — по-бързо
     if (j.prog < 1) continue;
     j.stage++; j.prog = 0;
     if (j.stage >= stagesOf(j).length) { j.ab ? finishAutobahn(j) : finishHighway(j); continue; }
@@ -7778,7 +7788,7 @@ function frame() {
     S.dayT += dt;
     if (S.dayT >= DAY_SEC) { S.dayT -= DAY_SEC; endOfDay(); autoFillTick(true); }
     autoT -= dt; if (autoT <= 0) { autoT = 3; autoFillTick(false); }
-    if (dt > 0 && Math.random() < dt * 2) { dispatch(); hwDispatch(); }
+    if (dt > 0 && Math.random() < dt * 2) { hwDispatch(); dispatch(); }   // магистралата първа — иначе освободената бригада винаги отива на обект в града
     panelT -= rdt;
     if (panelT <= 0) { panelT = 0.5; if (!onMap && tab === 'projects') renderPanel(); else renderTop(); }
     if (hlT > 0) { hlT -= rdt; hl.material.opacity = Math.min(1, hlT); if (hlT <= 0) hl.visible = false; }
@@ -8111,6 +8121,11 @@ if (AUTOTEST) {
     fin: () => ({ city: S.cityId, finished: JSON.parse(JSON.stringify(econ.s.finished)), money: Math.round(econ.money), branches: S.branches }),
     sellPrice: () => econ.branchSalePrice({ assets: cityAssets(), dailyProfit: econ.isFinished(S.cityId) ? econ.s.finished[S.cityId].daily : econ.cityAvgDaily(S.cityId) }),
     branchTest(to = 'ruse') { econ.earn(3e6, 'друго', 'тест'); S.dev.xp = 80000; S.dev.lv = 7; S.stationLevel = 5; const h = S.cityId; S.rails = [{ a: h, b: 'bucharest', km: kmBetween(h, 'bucharest'), days: 9, prog: 1, built: true }]; const o = branchFor(to); if (!o) return { none: branchCands().map(c => c.id) }; S.rails.push({ a: to, b: o.host.a, c: o.host.b, br: o.t, km: o.km, days: o.days, prog: 1, built: true }); return { km: o.km, cost: o.cost, t: o.t, path: railPath(h, to), cands: branchCands().map(c => c.id + ':' + c.km) }; },
+    hwSim() {   // тест: пълна пътна техника + един участък — колко дни реално отнема
+      econ.earn(5e8, 'друго', 'тест'); S.rep = 4; S.dev.xp = 200000; S.dev.lv = 9; S.officeLevel = 10; S.garageLevel = 10;
+      for (const [k, n] of Object.entries(HW_FLEET)) for (let i = units.filter(u => u.type === k).length; i < n; i++) buyUnit(k);
+      const sg = allSegs().filter(x => (x.a === S.cityId || x.b === S.cityId) && !hwDone().includes(x.id))[0]; const km = kmBetween(sg.a, sg.b); S.hwJobs = [{ seg: sg.id, km, ...segmentQuote(km), stage: 0, prog: 0, mat: {}, start: S.day, v2: true, city: S.cityId }]; hwDispatch(); const j = S.hwJobs[0]; setSpeed(3);
+      return { seg: sg.id, km: j.km, days: j.days, day: S.day }; },
     hwState() { return { jobs: (S.hwJobs || []).map(j => ({ seg: j.seg, stage: j.stage, prog: +j.prog.toFixed(2), v2: !!j.v2, roles: hwRoles(j) })), miss: hwMissingTxt(), units: units.map(u => u.type + ':' + u.state) }; },
     abTest() { econ.earn(9e7, 'друго', 'тест'); S.rep = 4; S.dev.xp = 170000; S.dev.lv = 9; S.officeLevel = 10; S.garageLevel = 10;
       S.hwDone = [...new Set([...hwDone(), ...HIGHWAYS.filter(hw => !hw.intl).flatMap(hw => hw.segs.map((_, i) => segId(hw, i)))])];
