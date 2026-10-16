@@ -742,6 +742,7 @@ export class Economy {
     // известие веднъж на ден: колко донесоха завършените градове
     if (tot && this.hooks.toast) this.hooks.toast(`🏁 Завършени градове: +${fmt(tot - upkeep)} днес (${parts.join(', ')}${upkeep ? `, поддръжка −${fmt(upkeep)}` : ''})`, 'good');
     if (tot) this.earn(tot, 'градове', `Автоматичен приход от ${Object.keys(this.s.finished).filter(i => i !== active).length} завършени града`);
+    if (tot) try { globalThis.__coopFinished?.(tot - upkeep); } catch (e) { }   // 🤝 партньорство: 40% → общия холдинг (coop.js)
     if (upkeep) this.spend(upkeep, 'заплати', 'Поддръжка на техниката в завършените градове');
     return tot;
   }

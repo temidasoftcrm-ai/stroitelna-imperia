@@ -729,7 +729,7 @@ function buildCity(cityId) {
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(Math.max(1200, 2 * (tx(NI - 1) + 380)), Math.max(1200, 2 * (tx(NJ - 1) + 300))), new THREE.MeshStandardMaterial({ color: isDesert(cityId) ? 0xd9bf86 : 0x8fb36a, roughness: 1 }));   // Африка — пясък
   if (P && !P.links) P.links = planLinks(P);   // и в мрежата на маршрутите (cityplanroute.js) — ТИР-овете и техниката карат по тях
   const pv = P ? buildPlanView({ ...P, streets: [...P.streets, ...P.links] }, { size: Math.max(1600, 2 * (tx(NI - 1) + 400)), seg: 170, target: controls.target, lotCount: Math.min(P.lots.length, planCount(P.mega, S.cityExt || 0)),
-    seaZ: SEASIDE.includes(cityId) ? tx(0) - TILE / 2 - 2 : null, noFountain: !!CITY_LANDMARKS[cityId] }) : null;
+    seaZ: SEASIDE.includes(cityId) ? tx(0) - TILE / 2 - 2 : null, noFountain: !!CITY_LANDMARKS[cityId], treeProtos: Object.keys(A).filter(k => k.startsWith('sf-tree-') || k.startsWith('sf-pine-')).map(k => { const o = A[k].scene; o.userData.pine = k.startsWith('sf-pine-'); return o; }) }) : null;
   weather.setGround(pv ? pv.userData.groundMat : ground.material);   // снежната покривка оцветява земята
   // крайбрежните градове: море на север с плаж, пристанище, фар и кораби (seaside.js)
   city.airport = null; city.airportNI = 0; city.airSite = null; refreshAirport3D(cityId);
@@ -1192,10 +1192,12 @@ function startUpgrade(kind) {
   const cost = upgradeCost(kind);
   if (!econ.canAfford(cost)) { toast('Нямаш достатъчно пари за този строеж.', 'bad'); return; }
   if (needsLot(kind)) {
-    // нужен е свой парцел: играчът го посочва с мишката
-    pickKind = kind; showPickRings(true);
-    toast(`${KIND_NM[kind]}: посочи с мишката свободен парцел (зелените рамки). Esc — отказ.`);
-    renderPanel();
+    // нужен е свой парцел — избира се сам: най-близкият свободен до централата (без търсене с мишката)
+    const free = city.lots.filter(l => !l.built && !l.busy && l !== city.hq), hq = city.hq;
+    const lot = free.sort((a, b) => (a.fresh - b.fresh) || Math.hypot(a.x - hq.x, a.z - hq.z) - Math.hypot(b.x - hq.x, b.z - hq.z))[0];
+    if (!lot) { toast('Няма свободен парцел — купи нов квартал (таб „Офис“).', 'bad'); return; }
+    pickKind = kind; pickLot(lot);
+    toast(`${KIND_NM[kind]}: строежът започна на свободен парцел до централата.`, 'good'); flyTo(lot);
     return;
   }
   const key = lotKey[kind];
@@ -2733,9 +2735,9 @@ function hqCard(kind) {
     const cost = upgradeCost(kind), move = needsLot(kind);
     h += `<div class="sect" style="margin-top:10px">⬆️ Ниво ${lv + 1}: ${nx.nm}</div>
       <div class="meta">${stats(L, nx)}<br>💸 Поддръжка: ${fmt(nx.upkeep)} €/ден
-        ${move ? `<br><span style="color:var(--acc)">📍 Иска свой парцел — ще го посочиш на картата (+${fmt(LAND)} € за земята).</span>` : ''}
+        ${move ? `<br><span style="color:var(--acc)">📍 Иска свой парцел — избира се сам, до централата (+${fmt(LAND)} € за земята).</span>` : ''}
         <br>🔨 Строи го твоята бригада${move ? ' с багер и самосвал' : ''}.</div>
-      <div class="row"><span class="money" style="color:var(--txt)">${fmt(cost)} €</span><button class="btn" data-upg="${kind}" ${econ.canAfford(cost) && !pickKind ? '' : 'disabled'}>${move ? '📍 Избери място' : 'Строй'}</button></div>`;
+      <div class="row"><span class="money" style="color:var(--txt)">${fmt(cost)} €</span><button class="btn" data-upg="${kind}" ${econ.canAfford(cost) && !pickKind ? '' : 'disabled'}>${move ? '🔨 Строй' : 'Строй'}</button></div>`;
   } else h += `<div class="meta" style="color:var(--acc)">👑 Максимално ниво!</div>`;
   if (kind === 'office') h += officeStyleHtml();
   return h + `</div>`;
@@ -3191,7 +3193,7 @@ const bust = createBankrupt({ S: () => S, econ: () => econ, toast, modal, fmt, s
 setTimeout(() => { try { if (S) bust.banner(); } catch {} }, 3000);
 window.__stroiMe = () => { if (!S || !S.hqCity) return null; const b = brandOf(S); return { name: b ? `${b.ico} ${b.nm}` : 'Фирма', city: cityById(S.cityId)?.nm || S.cityId, day: S.day | 0 }; };   // за „👥 Онлайн сега“ в ⚙️ Настройки (cloud.js)
 // 🤝 партньорство в самостоятелната игра (coop.js): пари, техника, материали, общи поръчки, партньорът на картата
-const coop = createCoop({ S: () => S, econ: () => econ, toast, modal, fmt, save, renderPanel, stocksOpen: () => !!S && dev.has('STOCKS'), drawMap: () => { try { if (!$('mapScreen').classList.contains('hidden')) drawMap(); } catch {} },
+const coop = createCoop({ S: () => S, econ: () => econ, infra: () => coopInfra(), infraSync: (I, pn) => coopInfraSync(I, pn), toast, modal, fmt, save, renderPanel, stocksOpen: () => !!S && dev.has('STOCKS'), drawMap: () => { try { if (!$('mapScreen').classList.contains('hidden')) drawMap(); } catch {} },
   ready: () => !!(S && econ && city.ready), cityName: id => cityById(id)?.nm || id, ownedCities: () => ownedCities(), brand: () => brandOf(S),
   netWorth: () => econ.netWorth(units.map(u => u.type)), unitsHere: () => units.filter(u => !u.proj).map(u => u.type),
   takeUnit: type => { const u = units.find(q => q.type === type && !q.proj); if (!u) return false; scene.remove(u.obj); units.splice(units.indexOf(u), 1); S.units.splice(S.units.indexOf(type), 1); refreshGarageLabel(); save(); renderPanel(); return true; },
@@ -3282,6 +3284,24 @@ function clickCity(id) {
   }
 }
 // 🤝 град, в който партньорът има филиал (coop.js → window.__coopShared): влизаш без да купуваш
+// 🤝 партньорство: гарите, летищата и пристанищата в общите градове вървят заедно — всеки вижда нивото на другия и се изравнява нагоре
+function coopInfra() {
+  const o = {};
+  for (const id of ownedCities()) { const a = [stLvOf(id), airLv(id), portLv(id)]; if (a.some(Boolean)) o[id] = a; }
+  return o;
+}
+function coopInfraSync(I, pn) {
+  if (!S || !econ) return;
+  const got = [];
+  for (const [id, a] of Object.entries(I || {})) {
+    if (!ownedCities().includes(id) || !Array.isArray(a)) continue;
+    const nm = cityById(id)?.nm || id, [st, air, port] = a.map(v => Math.max(0, Math.min(10, +v || 0)));
+    if (st > stLvOf(id)) { if (id === S.cityId) { S.stationLevel = st; S.stationBuild = null; try { buildStation(); } catch (e) { } } else if (S.cities[id]) S.cities[id].stationLevel = st; got.push(`🚉 гарата в ${nm} → ниво ${st}`); }
+    if (air > airLv(id) && air <= AIRPORT_LEVELS.length) { S.airports = { ...(S.airports || {}), [id]: { ...(S.airports || {})[id], lv: air, build: null } }; if (id === S.cityId) { if (city.airport) { city.airport.dispose(); city.airport = null; } refreshAirport3D(id); } got.push(`✈️ летището в ${nm} → ниво ${air}`); }
+    if (port > portLv(id) && port <= PORT_LEVELS.length) { S.ports = { ...(S.ports || {}), [id]: { ...(S.ports || {})[id], lv: port, build: null } }; if (id === S.cityId) city.sea?.setPortLevel?.(port); got.push(`⚓ пристанището в ${nm} → ниво ${port}`); }
+  }
+  if (got.length) { toast(`🤝 Общо развитие с ${pn}: ${got.join(', ')}.`, 'good'); save(); renderPanel(); }
+}
 const coopCity = id => !!S && !ownedCities().includes(id) && (window.__coopShared?.cities || []).includes(id);
 function joinCoopCity(id) {
   if (ownedCities().includes(id) || !coopCity(id)) return;
@@ -7819,6 +7839,7 @@ if (AUTOTEST) {
   window.__dbg = {
     state: () => S,
     openBig: k => openBig(k), closeBig: () => closeBig(), scene: () => scene,
+    coopInfraTest(I) { coopInfraSync(I, 'Тест'); return { here: [stLvOf(S.cityId), airLv(S.cityId), portLv(S.cityId)], infra: coopInfra() }; },
     linkRoute() { const P = city.plan; if (!P) return null; const gap = r => r.reduce((m, p, i) => i ? Math.max(m, Math.hypot(p.x - r[i - 1].x, p.z - r[i - 1].z)) : 0, 0), c = city.lots[0]; return { links: (P.links || []).length, tir: gap(roadRoute(tx(NI - 1), -12, c.x, c.z)), st: gap(roadRoute(STATION_X + 10, 0, c.x, c.z)), hw: P.hwX == null ? null : gap(roadRoute(P.hwX, tx(NJ - 1) + 22, c.x, c.z)) }; },
     mem() { const i = renderer.info, tex = new Set(), geo = new Set(), mat = new Set(); let objs = 0; scene.traverse(o => { objs++; if (o.geometry) geo.add(o.geometry); for (const m of [].concat(o.material || [])) { mat.add(m); for (const k in m) if (m[k] && m[k].isTexture) tex.add(m[k]); } });
       let texMB = 0; for (const t of tex) { const im = t.image; if (im && im.width) texMB += im.width * im.height * 4 * (t.generateMipmaps !== false ? 1.33 : 1) / 2 ** 20; }

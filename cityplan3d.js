@@ -4,6 +4,7 @@
 // подробностите (лампи, зебри, очертания на парцелите) се показват само отблизо.
 import * as THREE from 'three';
 import { pointAt, rectCorners, rectHas } from './cityplan.js';
+import { feature } from './lab/feature.js';
 
 const MAT = {};   // общи материали за всички градове
 function mats() {
@@ -190,7 +191,8 @@ export function buildPlanView(P0, opts = {}) {
   for (let k = 0; k < (opts.noFountain ? 16 : 10); k++) { const a = k / (opts.noFountain ? 16 : 10) * Math.PI * 2; trees.push([sq.x + Math.cos(a) * (sq.r - 2.5), sq.z + Math.sin(a) * (sq.r - 2.5), 0.9, 0]); }
   const roadNear = (x, z, pad) => P.streets.some(st => st.pts.some((p, i) => i % 2 === 0 && Math.abs(p[0] - x) < st.w / 2 + pad && Math.abs(p[1] - z) < st.w / 2 + pad));
   const lotNear = (x, z) => P.lots.slice(0, opts.lotCount ?? P.lots.length).some(L => Math.abs(L.x - x) < 14 && Math.abs(L.z - z) < 14);
-  for (let k = 0; k < (opts.trees || 2200); k++) {
+  const realTrees = feature('trees-real') && (opts.treeProtos || []).length;   // истинските са по-тежки — по-рядко
+  for (let k = 0; k < (opts.trees || (realTrees ? 1000 : 2200)); k++) {
     const x = (rnd() - 0.5) * S * 0.8, z = (rnd() - 0.5) * S * 0.8, h = P.heightAt(x, z);
     if (P.waterAt(x, z) || h > 55) continue;
     const inTown = P.buildable(x, z);
@@ -204,12 +206,34 @@ export function buildPlanView(P0, opts = {}) {
   // парковете от картата — гъста гора от дървета (до 1600), без да стъпват на улица
   for (const q of P.parks || []) {
     let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of q.pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
-    const n = Math.min(500, ((x1 - x0) * (z1 - z0)) / 70);
+    const n = Math.min(realTrees ? 260 : 500, ((x1 - x0) * (z1 - z0)) / (realTrees ? 130 : 70));
     for (let k = 0; k < n && trees.length < 2600; k++) {
       const x = x0 + rnd() * (x1 - x0), z = z0 + rnd() * (z1 - z0);
       if (!P.parkAt(x, z) || roadNear(x, z, 2)) continue;
       trees.push([x, z, 0.75 + rnd() * 0.6, rnd() < 0.25 ? 1 : 0]);
     }
+  }
+  // истински дървета (Лабораторията → trees-real): прототипите от горския пакет на играта (основа в 0, височина 1),
+  // всеки меш на прототипа — една InstancedMesh; широколистните в града, боровете по хълмовете
+  const protos = feature('trees-real') ? (opts.treeProtos || []) : [];
+  if (protos.length) {
+    const broad = protos.filter(p => !p.userData.pine), pines = protos.filter(p => p.userData.pine);
+    const groups = new Map();   // прототип → [матрици]
+    const q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3(), e = new THREE.Euler();
+    trees.forEach(([x, z, s, pine], i) => {
+      const list = pine && pines.length ? pines : broad.length ? broad : pines, pr = list[(i * 7 + 3) % list.length], H = (pine ? 9 : 7.5) * s;
+      (groups.get(pr) || groups.set(pr, []).get(pr)).push(new THREE.Matrix4().compose(v.set(x, P.heightAt(x, z), z), q.setFromEuler(e.set(0, i * 2.39, 0)), sc.set(H, H, H)));
+    });
+    for (const [pr, mats] of groups) {
+      pr.updateMatrixWorld(true);
+      pr.traverse(o => {
+        if (!o.isMesh || o.visible === false) return;
+        const geo = o.geometry.clone().applyMatrix4(o.matrixWorld), im = new THREE.InstancedMesh(geo, o.material, mats.length);
+        mats.forEach((m, k) => im.setMatrixAt(k, m)); im.castShadow = true; im.receiveShadow = true; g.add(im);
+      });
+    }
+    g.userData.lod = cam => { const d = cam.position.distanceTo(opts.target || new THREE.Vector3()); detail.visible = d < (opts.detailDist || 420); };
+    return g;
   }
   const cone = new THREE.ConeGeometry(2.2, 6, 7), ball = new THREE.IcosahedronGeometry(2.6, 0), stem = new THREE.CylinderGeometry(0.28, 0.36, 2.4, 5);
   const N = [trees.filter(t => !t[3]).length, trees.filter(t => t[3]).length];

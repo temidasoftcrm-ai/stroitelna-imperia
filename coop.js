@@ -54,7 +54,8 @@ export function createCoop(d) {
       loan: Math.round(e.s.loan || 0), day: S.day, rep: Math.round((S.rep || 0) * 10) / 10, office: S.officeLevel || 1, hq: S.hqCity || S.cityId, here: S.cityId,
       cities: d.ownedCities().filter(Boolean).slice(0, 80), sites: sites(), stats: d.stats(),
       hwDone: d.hwInfo().done.slice(0, 200), hwJobs: d.hwInfo().jobs.map(j => j.seg), rails: d.rails().map(r => r.ref).slice(0, 200),
-      railKm: Object.fromEntries(d.rails().slice(0, 200).map(r => [r.ref, r.km])) };
+      railKm: Object.fromEntries(d.rails().slice(0, 200).map(r => [r.ref, r.km])),
+      infra: d.infra ? d.infra() : {} };   // { град: [гара, летище, пристанище] } — партньорът ги развива заедно с теб
   }
   // къде строя по градове: текущият град се чете от играта, другите — от последното посещение (localStorage)
   const SITES = 'stroi-coop-sites';
@@ -124,7 +125,8 @@ export function createCoop(d) {
           d.toast(`🤝 ${pn} ти прати ${m.ico} ${D.qty} ${m.unit} ${m.nm.toLowerCase()}.`, 'good');
         } else if (+D.amount > 0) {
           const amt = Math.round(+D.amount);
-          const why = { gift: `🎁 Подарък от ${pn}`, loan: `💸 Заем от ${pn} — върни ${f(D.owed)} € до ${D.hours} ч`, repay: `💸 ${pn} върна по заема`, refund: r.note || 'Върнати пари', mega: 'Обща поръчка', rent: `🏢 ${pn} плати наем за ${UNIT_TYPES[D.type]?.nm.toLowerCase() || 'техника'}`, vault: r.note || '🏦 От общата касичка' }[r.kind] || 'Партньор';
+          if (r.kind === 'vault' && /Дивидент/i.test(r.note || '') && +D.amount > 0) d.modal('🏦 Холдингът разпредели печалбата', `Твоят дял от месечния дивидент: <b>+${f(Math.round(+D.amount))} €</b>.<br>${esc(r.note || '')}`, [['Супер! 💰', null]]);
+        const why = { gift: `🎁 Подарък от ${pn}`, loan: `💸 Заем от ${pn} — върни ${f(D.owed)} € до ${D.hours} ч`, repay: `💸 ${pn} върна по заема`, refund: r.note || 'Върнати пари', mega: 'Обща поръчка', rent: `🏢 ${pn} плати наем за ${UNIT_TYPES[D.type]?.nm.toLowerCase() || 'техника'}`, vault: r.note || '🏦 От общата касичка' }[r.kind] || 'Партньор';
           E().earn(amt, 'партньор', why.replace(/^[^\wА-я]+\s*/, ''));
           d.toast(`${why}: +${f(amt)} €`, 'good');
         }
@@ -155,10 +157,11 @@ export function createCoop(d) {
     if (!P) { if (window.__coopShared) { window.__coopShared = null; shareSig = ''; } return; }
     const hw = (P.hwDone || []).filter(x => typeof x === 'string' || typeof x === 'number'),
       rails = (P.rails || []).map(r => String(r).split('|')).filter(x => x.length === 2 && x[0] && x[1]),
-      cities = (P.cities || []).filter(x => typeof x === 'string'), sig = JSON.stringify([P.name, hw, rails, cities]);
+      cities = (P.cities || []).filter(x => typeof x === 'string'), infra = P.infra && typeof P.infra === 'object' ? P.infra : {}, sig = JSON.stringify([P.name, hw, rails, cities, infra]);
     if (sig === shareSig) return;
     shareSig = sig;
-    window.__coopShared = { v: (window.__coopShared?.v || 0) + 1, name: P.name || 'партньора', hw, rails, cities };
+    window.__coopShared = { v: (window.__coopShared?.v || 0) + 1, name: P.name || 'партньора', hw, rails, cities, infra };
+    try { d.infraSync && d.infraSync(infra, P.name || 'партньора'); } catch (e) { console.warn('coop infra', e); }
   }
   async function tick() {
     if (AUTOTEST) return;
@@ -243,8 +246,17 @@ export function createCoop(d) {
     }
     if (S.day % 30 === 0) rpc('coop_dividend', {}, 1).then(r => {
       if (r?.ok && r.paid > 0) d.toast(`🏦 Месечен дивидент: холдингът раздаде ${f(r.paid)} € (30% от печалбата) — по ${f(r.each)} € на двамата${r.investors ? `, ${f(r.investors)} € на акционерите` : ''}.`, 'good');
+      if (r?.ok && r.paid > 0) d.modal('🏦 Холдингът разпредели печалбата', `Месечен дивидент: <b>${f(r.paid)} €</b> (30% от печалбата) — по <b>${f(r.each)} €</b> за теб и за ${esc(partnerName())}.`, [['Супер! 💰', null]]);
     }).catch(() => {});
   }
+  // 🏁 завършените градове (economy.js payFinished): 40% от дневния им приход → общия холдинг
+  window.__coopFinished = amount => {
+    if (!st2 || !(amount > 0)) return;
+    const share = Math.round(amount * ORDER_SHARE);
+    if (share <= 0) return;
+    E().spend(share, 'партньор', `🏦 40% от завършените градове → холдинга`);
+    queue({ fn: 'coop_vault2', args: { p_req: uid(), p_amount: share, p_kind: 'order' }, refund: { money: share } });
+  };
   // 💼 поръчка, платена в моята игра → 40% от печалбата отиват в общия холдинг (вика го game.js при прибирането на парите)
   window.__coopOrder = (amount, title) => {
     if (!st2 || !(amount > 0)) return;
