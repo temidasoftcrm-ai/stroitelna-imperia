@@ -164,10 +164,15 @@ export function buildPlanView(P0, opts = {}) {
   const edges = new THREE.LineSegments(eg, M.edge); edges.name = 'lotEdges'; detail.add(edges);
   // --- лампи по булевардите (InstancedMesh: стълб + глава)
   const lampAt = [];
-  for (const st of P.streets) if (st.w >= 10) for (let s = 8; s < st.L.at(-1) - 4; s += 22) for (const side of [1, -1]) {
-    const p = pointAt(st, s), o = st.w / 2 + 1.1; if (P.waterAt(p.x, p.z) || !P.buildable(p.x, p.z) && P.heightAt(p.x, p.z) > 0.3) continue;
-    lampAt.push([p.x - p.tz * o * side, p.z + p.tx * o * side]);
-  }
+  // по булевардите — през 34 м, редуват се ляво/дясно; не върху асфалт (кръстовища, пресечни улици) и не до друга лампа
+  const onAsph = (x, z) => P.streets.some(o => o.pts.some((q, i) => i % 2 === 0 && Math.hypot(q[0] - x, q[1] - z) < o.w / 2 + 0.9));
+  P.streets.forEach((st, si) => { if (st.w < 10) return; let k = si;
+    for (let s = 10; s < st.L.at(-1) - 6; s += 34) {
+      const side = k++ % 2 ? 1 : -1, p = pointAt(st, s), o = st.w / 2 + 1.1; if (P.waterAt(p.x, p.z) || !P.buildable(p.x, p.z) && P.heightAt(p.x, p.z) > 0.3) continue;
+      const x = p.x - p.tz * o * side, z = p.z + p.tx * o * side;
+      if (onAsph(x, z) || lampAt.some(([a, b]) => Math.hypot(a - x, b - z) < 14)) continue;
+      lampAt.push([x, z]);
+    } });
   const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.12, 0.16, 6, 6), M.pole, lampAt.length);
   const head = new THREE.InstancedMesh(new THREE.SphereGeometry(0.42, 8, 6), M.lamp, lampAt.length), m4 = new THREE.Matrix4();
   lampAt.forEach(([x, z], i) => { pole.setMatrixAt(i, m4.makeTranslation(x, 3, z)); head.setMatrixAt(i, m4.makeTranslation(x, 6.1, z)); });
