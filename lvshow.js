@@ -1,6 +1,11 @@
 // lvshow.js — ново ниво на фирмата: черен екран, в средата картинката на нивото (assets/ui/levels/lvN.webp) за ~5 s със звук.
 // Клик или Esc — затваря по-рано. Няколко нива наведнъж — една след друга. Зад feature('lv-pics') (вика го devlevel.js).
-export const LV_PICS = new Set([1, 2, 3, 4]);   // нивата, за които има картинка (останалите — както досега)
+export const LV_PICS = new Set(Array.from({ length: 20 }, (_, i) => i + 1));   // картинки за всички 20 нива
+// заглавията на нивата (от потребителя) — над текста с отключванията
+export const LV_TITLE = { 1: 'Малко начало', 2: 'Свързваме България', 3: 'Първият държавен договор', 4: 'От чертежа до големия строеж', 5: 'Към Балканите!',
+  6: 'Първото пристанище', 7: 'Търговия и курорти', 8: 'Европа свети пред теб', 9: 'На земята и в небето', 10: 'Добре дошъл в Африка!',
+  11: 'Световен транспортен център', 12: 'Манхатън', 13: 'Великите железници', 14: 'Добре дошъл в Южна Америка!', 15: 'Ерата на холдинга',
+  16: 'Петролна империя', 17: 'Банка и борсов дебют', 18: 'Австралия — енергията на бъдещето', 19: 'Твоят град и световните мегапроекти', 20: 'Световна империя' };
 const css = `
 #lvShow { position:fixed; inset:0; z-index:9800; background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center; opacity:0; transition:opacity .45s; cursor:pointer; }
 #lvShow.on { opacity:1; }
@@ -12,6 +17,8 @@ const css = `
 #lvShow.on .rays { opacity:1; }
 #lvShow .tx { position:relative; margin-top:14px; color:#ffd54a; font:700 clamp(15px, 2.4vmin, 22px) system-ui, sans-serif; text-align:center; max-width:min(90vw, 760px); opacity:0; transition:opacity .6s .9s; text-shadow:0 2px 8px #000; }
 #lvShow.on .tx { opacity:1; }
+#lvShow .tt { position:relative; margin-top:6px; color:#fff; font:800 clamp(20px, 3.6vmin, 34px) system-ui, sans-serif; text-align:center; opacity:0; transition:opacity .6s .6s; text-shadow:0 2px 10px #000; }
+#lvShow.on .tt { opacity:1; }
 @keyframes lvSpin { to { transform:rotate(360deg); } }
 `;
 const queue = [];
@@ -24,8 +31,8 @@ function next() {
   busy = true; const [lv, text, done] = it;
   if (!document.getElementById('lvShowCss')) { const s = document.createElement('style'); s.id = 'lvShowCss'; s.textContent = css; document.head.appendChild(s); }
   const el = document.createElement('div'); el.id = 'lvShow';
-  el.innerHTML = `<div class="rays"></div><img alt="Ниво ${lv}" src="assets/ui/levels/lv${lv}.webp"><div class="tx"></div>`;
-  el.querySelector('.tx').textContent = text;
+  el.innerHTML = `<div class="rays"></div><img alt="Ниво ${lv}" src="assets/ui/levels/lv${lv}.webp"><div class="tt"></div><div class="tx"></div>`;
+  el.querySelector('.tt').textContent = LV_TITLE[lv] ? `„${LV_TITLE[lv]}“` : ''; el.querySelector('.tx').textContent = text;
   document.body.appendChild(el);
   try { const a = new Audio('assets/sfx/level-up.mp3'); a.volume = 0.8; a.play().catch(() => { }); } catch { }
   const img = el.querySelector('img');
