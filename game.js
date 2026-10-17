@@ -6177,10 +6177,11 @@ function finishAutobahn(j) {
 function hwQueueSvg() {
   if (!S || !(S.hwQueue || []).length) return '';
   const w = (mapEU ? 4 : mapWide ? 1.6 : 1) * mapK(); let h = '';
+  const sv = $('mapSvg'), fs = 12 * (mapView ? mapView.vb[2] : 1000) / Math.max(300, sv?.clientWidth || 1000);   // надписът — винаги ~12 px на екрана (и при силно приближаване)
   S.hwQueue.forEach((id, i) => { const sg = segById(id); if (!sg) return; const A1 = cityById(sg.a), B1 = cityById(sg.b); if (!A1 || !B1 || !mapIn(sg.a, sg.b)) return;
     const pts = [proj(A1.lon, A1.lat), ...(viaOf(sg.a, sg.b) || []).map(([lo, la]) => proj(lo, la)), proj(B1.lon, B1.lat)], P = pts.map(p => p.map(v => v.toFixed(1)).join(',')).join(' '), [lx, ly] = ptAlong(pts, 0.5);
     h += `<polyline points="${P}" fill="none" stroke="#ffb300" stroke-width="${3.4 * w}" stroke-dasharray="${5 * w} ${3 * w}" stroke-linecap="round" opacity=".95"><title>На опашка №${i + 1}: ${A1.nm} — ${B1.nm}</title></polyline>
-      <text x="${lx}" y="${ly - 4 * w}" text-anchor="middle" font-size="${7 * w * mapLS()}" font-weight="800" fill="#ffd54a" stroke="#000" stroke-width="${1.6 * w * mapLS()}" paint-order="stroke">🚧 на опашка №${i + 1}</text>`; });
+      <text x="${lx}" y="${ly - fs * 0.8}" text-anchor="middle" font-size="${fs}" font-weight="800" fill="#ffd54a" stroke="#000" stroke-width="${fs * 0.22}" paint-order="stroke">🚧 на опашка №${i + 1}</text>`; });
   return h;
 }
 // аутобаните на картата: червени и по-дебели от магистралите
