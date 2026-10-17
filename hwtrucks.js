@@ -98,11 +98,13 @@ export function createHwTrucks(d) {
   function html() {
     const T = L();
     let h = `<div class="sect">🚚 ТИР-ове по магистралите${T.length ? ` (${T.length})` : ''}</div><div class="card" style="padding:9px 11px">
-      <div class="row" style="margin:0;align-items:center;gap:10px"><img src="assets/ui/tir-top.webp" alt="" style="width:110px;height:auto"><span class="meta" style="margin:0">Собствен ТИР за ${f(TRUCK.cost)} € сам кара товари между твоите градове по готовите магистрали и аутобани — по-евтин от влака и върви навсякъде, където има магистрала. Поддръжка ${f(TRUCK.upkeep)} €/ден. По участъците на партньора плаща тол. Ако в крайния град имаш склад, носи и твоите материали без такса за доставка.</span></div>
-      <button class="btn" data-trk="buy" style="width:100%;margin-top:6px" ${E().canAfford(TRUCK.cost) ? '' : 'disabled'}>🚚 Купи ТИР · ${f(TRUCK.cost)} €</button></div>`;
-    { const need = T.map(t => [t, svcOf(t)]).filter(([, c]) => c > 0), sum = need.reduce((a, [, c]) => a + c, 0);   // „Обслужи всички“ — от ниво 6 (d.svcAll)
-      if (need.length > 1 && (!d.svcAll || d.svcAll())) h += `<button class="btn2" data-trk="svcall:0:${sum}" style="width:100%;margin:4px 0" ${E().canAfford(sum) ? '' : 'disabled'}>🔧 Обслужи всички (${need.length}) · ${f(sum)} €</button>`;
-      else if (need.length > 1) h += `<div class="meta" style="margin:4px 0">🔒 „Обслужи всички“ — от ниво 6 на развитие.</div>`; }
+      <div class="row" style="margin:0;align-items:center;gap:10px"><img src="assets/ui/tir-top.webp" alt="" style="width:110px;height:auto"><span class="meta" style="margin:0">Собствен ТИР за ${f(TRUCK.cost)} € сам кара товари между твоите градове по готовите магистрали и аутобани — по-евтин от влака и върви навсякъде, където има магистрала. Поддръжка ${f(TRUCK.upkeep)} €/ден. По участъците на партньора плаща тол. Ако в крайния град имаш склад, носи и твоите материали без такса за доставка.</span></div>`;
+    { const need = T.map(t => [t, svcOf(t)]).filter(([, c]) => c > 0), sum = need.reduce((a, [, c]) => a + c, 0), lock = d.svcAll && !d.svcAll();   // „Обслужи всички“ — от ниво 6 (d.svcAll)
+      // два бутона един до друг: „Купи ТИР“ и „Обслужи всички“
+      const svc = lock ? `<button class="btn2" style="flex:1" disabled title="От ниво 6 на развитие">🔒 Обслужи всички · ниво 6</button>`
+        : need.length ? `<button class="btn2" data-trk="svcall:0:${sum}" style="flex:1" ${E().canAfford(sum) ? '' : 'disabled'}>🔧 Обслужи всички (${need.length}) · ${f(sum)} €</button>`
+        : `<button class="btn2" style="flex:1" disabled>🔧 Обслужи всички · няма нужда</button>`;
+      h += `<div style="display:flex;gap:6px;margin-top:6px"><button class="btn" data-trk="buy" style="flex:1" ${E().canAfford(TRUCK.cost) ? '' : 'disabled'}>🚚 Купи ТИР · ${f(TRUCK.cost)} €</button>${svc}</div></div>`; }
     for (const t of T) {
       const svc = svcOf(t), j = t.path ? jam(t) : 1, sell = Math.round(TRUCK.cost * TRUCK.sell * (t.cond ?? 100) / 100);
       h += `<div class="card" style="padding:9px 11px"><b>${t.nm}</b> <span class="meta" style="margin:0">${t.path ? `${cargoOf(t)[1]} ${name(t.path[0])} → ${name(t.path[t.path.length - 1])} · ${Math.round(t.km)}/${Math.round(t.total)} км · ~${f(legPay(t))} €${legToll(t) ? ` − тол ${f(legToll(t))} €` : ''}` : `⏸ чака в ${name(t.at)} — няма готова магистрала до друг твой град`}</span><br>

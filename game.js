@@ -31,6 +31,7 @@ import { createWeather, rollWeather } from './weather.js';
 import { bidHtml, resolveBid } from './bidding.js';
 import { addSiteLights, setSiteLightsNight } from './sitelights.js';
 import { createHwTraffic } from './hwtraffic.js';
+import { createIncidents } from './incidents.js';
 import { addRouteScenery } from './scenery.js';
 import { addSeaside, SEASIDE, SEA_MODELS } from './seaside.js';
 import { monthOf } from './resorts.js';
@@ -49,7 +50,7 @@ import { createHotels } from './hotels.js';
 import { createBank } from './bank.js';
 import { createNeom, NEOM_CITY, NEOM_ID } from './neom.js';
 import { buildSite3D } from './mine3d.js';
-import { CITY_LANDMARKS, LANDMARK_CENTER, BIG_LANDMARKS, SEA_LANDMARKS, buildLandmark, buildSeaLandmark } from './landmarks.js';
+import { CITY_LANDMARKS, LANDMARK_CENTER, BIG_LANDMARKS, SEA_LANDMARKS, buildLandmark, buildSeaLandmark, manhattanTowers } from './landmarks.js';
 import { OFFICE_STYLES, STYLE_LV, STYLE_COST, buildOfficeTower } from './officestyle.js';
 import { shipRange, PORT_LEVELS, portMax, SHIPS, seaKm, seaPath, SEA_ROUTE_COST, voyagePay, shipDaily, SEA_LV } from './seaways.js';
 import { makeTrackMap, placeCars } from './trackpath.js';
@@ -661,6 +662,21 @@ function tierModel(cityId, lot, n) {
 const INDUSTRIAL = MODELS.industrial.filter(n => n.startsWith('building')).map(n => 'ind-' + n);
 const FACTORY_CITIES = new Set(ECON.FACTORIES.map(f => f.cityId));
 // мащаб, с който сградата се вписва в парцела 16×16 м
+// истинските височини (feature 'real-heights'): къща на 2 етажа ~8 м, блок на 5 етажа ~16 м, 10 етажа ~30 м, небостъргач — по етажите (~2.8 м),
+// за да не стои къща колкото половин небостъргач. Ширината се сбива само ако иначе не се побира на парцела (maxW).
+const H10 = { 'sf-blk-soviet': 29, 'sf-blk-panel12': 36, 'sf-blk-richmond': 24, 'sf-blk-dbrick': 26, 'sf-blk-asian': 30, 'Building_Medium_2_001': 30 };
+const SKY_H = { 'sf-sky-sing': 50, 'sf-sky-rand': 55, 'sf-sky-usb': 70, 'sf-sky-blue': 50, 'sf-sky-night': 60 };
+function realH(n) {
+  const [base, fl] = n.split('@');
+  if (HOUSES.includes(n)) return n === 'h2-lodge' ? 5 : 8;
+  if (SKY.includes(base) || MODERN_SKY.includes(base)) return Math.min(90, Math.max(30, (+fl || 15) * 2.8));
+  return SKY_H[n] || H10[n] || 16;   // магазини, офиси, блокове на ~5 етажа
+}
+function realHeight(o, n, maxW) {
+  if (!feature('real-heights')) return false;
+  const sz = sizeOf(n).getSize(new THREE.Vector3()), fy = realH(n) / Math.max(0.01, sz.y), w = Math.max(sz.x, sz.z), fx = Math.min(fy, maxW / Math.max(0.01, w));
+  o.scale.set(fx, fy, fx); return true;
+}
 // панелните блокове: височината по броя етажи (~3.2 м), а не по най-широката страна — иначе 9-етажният блок беше колкото къща на 2 етажа.
 // Ширината расте най-много ×1.4 (за да се събере на парцела); останалото е по височина. Зад feature('blk-height').
 const BLK_H = { 'sf-blk-soviet': 29, 'sf-blk-panel12': 38, 'sf-blk-richmond': 22 };
@@ -902,8 +918,8 @@ function decorLot(g, lot, cityId) {
 function placeBuilding(lot, n, rot = 0) {
   const isQ = n.startsWith('Building_');
   const s = SHOPS.includes(n) && lot.plan ? fitScale(n, Math.min(lot.w, lot.d) - 1.5) : (isQ ? fitScale(n, 14) : HOUSES.includes(n) ? fitScale(n, houseFit(n)) : fitScale(n, SHOPS.includes(n) ? SHOP_FIT : 12.5)) * lotK(lot);   // в плана — целият парцел
-  const o = blkHeight(model(n, s), n, s, lotK(lot));
-  if (SHOPS.includes(n)) o.scale.y *= shopTall(n);
+  const o = model(n, s);
+  if (!realHeight(o, n, lot.plan ? Math.min(lot.w, lot.d) - 1.5 : 15 * lotK(lot))) { blkHeight(o, n, s, lotK(lot)); if (SHOPS.includes(n)) o.scale.y *= shopTall(n); }
   if (HOUSES.includes(n) && houseFit(n) === 11) tintRoof(o, lot.id);
   dayNight.registerWindows(o);
   o.rotation.y = lot.plan ? lot.rot : rot;   // в плана — с лицето към улицата
@@ -1363,6 +1379,9 @@ function releaseUnit(u) {
 
 // ============================================================ градски трафик (декорация)
 const traffic = [];
+// инцидент от време на време: 2 полицейски, пожарна и линейка идват по улиците, стоят ~1 мин и се разотиват (incidents.js, Лабораторията → incidents)
+const incidents = createIncidents({ scene, model, has: n => !!A[n], route: roadRoute, point: () => roadPoint() || { x: tx(3 * ((Math.random() * (NBI + 1)) | 0)), z: tx((Math.random() * NJ) | 0) },
+  focus: () => controls.target, ready: () => S && city.ready && !AUTOTEST });
 function addCar() {
   const i = 3 * ((Math.random() * NBI) | 0), j = (Math.random() * NJ) | 0;
   const r = Math.random(), sf = A['sf-car-Sedan'];
@@ -1373,6 +1392,7 @@ function addCar() {
   traffic.push({ obj: o, x: rp ? rp.x : tx(i), z: rp ? rp.z : tx(j), yaw: 0, path: null, pi: 0, wait: 0 });
 }
 function spawnTraffic(n) {
+  incidents.clear();
   for (const t of traffic) scene.remove(t.obj);
   traffic.length = 0;
   for (let k = 0; k < n; k++) addCar();
@@ -1683,8 +1703,9 @@ function makeSite(p) {
   const tmpLot = { x: 0, z: 0 };
   const isQ = p.model.startsWith('Building_');
   const s = isQ ? fitScale(p.model, 14) : HOUSES.includes(p.model) ? fitScale(p.model, houseFit(p.model)) : fitScale(p.model, SHOPS.includes(p.model) ? SHOP_FIT : 12.5);
-  const b = blkHeight(model(p.model, s), p.model, s);
-  if (SHOPS.includes(p.model)) b.scale.y *= shopTall(p.model);
+  const b = model(p.model, s);
+  { const sl = city.lots[p.lot], k = lotK(sl); if (realHeight(b, p.model, (sl.plan ? Math.min(sl.w, sl.d) - 1.5 : 15 * k) / k)) b.scale.y /= k; }   // площадката е мащабирана с lotK — височината в метри
+  if (!feature('real-heights')) { blkHeight(b, p.model, s); if (SHOPS.includes(p.model)) b.scale.y *= shopTall(p.model); }
   if (HOUSES.includes(p.model) && houseFit(p.model) === 11) tintRoof(b, p.lot);
   const bb = new THREE.Box3().setFromObject(b);
   b.position.set(tmpLot.x - (bb.min.x + bb.max.x) / 2, 0.6, tmpLot.z - (bb.min.z + bb.max.z) / 2);
@@ -4631,10 +4652,37 @@ function landmarkCenter(kinds) {
   }
 }
 // град с план: главната забележителност е в средата на площада (по-голям площад, без фонтан), другите — на най-близките парцели (1…8), запазени
+// Ню Йорк: небостъргачите на Манхатън — по един на парцел (най-високият — на площада), а не струпани на една площадка.
+// Парцелите се помнят (S.landmarks[id]['manhattan#']); не се взимат парцели на играча, строежи, централата. Височина: най-високият ~95 м.
+const NY_TALL = 95;
+function nySpread() {
+  const sq = city.plan.square, mem = S.landmarks[S.cityId], gen = city.nyGen = (city.nyGen || 0) + 1, cid = S.cityId;
+  manhattanTowers().then(parts => {
+    if (city.nyGen !== gen || S.cityId !== cid || !parts.length) return;
+    const mine = new Set([...(est().owned || []).map(o => o.lot), ...(est().land || []), ...projects.map(p => p.lot)]);
+    const free = l => l && l !== city.hq && !l.fresh && !mine.has(l.id) && (!l.busy || l.busy === 'landmark');
+    let ids = (mem['manhattan#'] || []).filter(id => free(city.lots[id]));
+    if (ids.length < parts.length - 1) {
+      const cand = city.lots.filter(l => free(l) && !ids.includes(l.id)).sort((a, b) => Math.hypot(a.x - sq.x, a.z - sq.z) - Math.hypot(b.x - sq.x, b.z - sq.z));
+      for (const l of cand) { if (ids.length >= parts.length - 1) break; if (ids.every(id => Math.hypot(city.lots[id].x - l.x, city.lots[id].z - l.z) > 18)) ids.push(l.id); }   // не на съседни парцели — по един на квадрат
+      mem['manhattan#'] = ids;
+    }
+    parts.forEach((pt, i) => {
+      const l = i ? city.lots[ids[i - 1]] : null; if (i && !l) return;
+      const at = l || { x: sq.x, z: sq.z }, room = l ? Math.min(l.w || 20, l.d || 20) * 0.85 : sq.r * 1.3;
+      const k = Math.min(NY_TALL, room / Math.max(0.01, pt.userData.w));   // по-нисък, ако иначе не се побира на парцела
+      if (l) { if (l.obj) city.group.remove(l.obj); for (const t of l.trees || []) city.group.remove(t); l.obj = null; l.built = null; l.trees = []; l.busy = 'landmark'; }
+      pt.scale.multiplyScalar(k); pt.position.set(at.x, l ? 0 : 0.1, at.z); pt.rotation.y = l ? lotRot(l) : 0;
+      city.group.add(pt); city.landmarks.push({ group: pt, update() { } });
+    });
+    pruneStreetDetail();
+  });
+}
 function landmarkPlan(kinds) {
   const sq = city.plan.square, mem = S.landmarks[S.cityId], shade = o => o.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
-  const main = buildLandmark(kinds[0], { label }); main.group.position.set(sq.x, 0.1, sq.z); main.group.scale.setScalar(LM_MAIN_SCALE[kinds[0]] || 3.2); main.group.rotation.y = (hashStr(kinds[0]) % 4) * Math.PI / 2;
-  shade(main); city.group.add(main.group); city.landmarks.push(main);
+  if (kinds[0] === 'manhattan' && feature('ny-spread')) { nySpread(); kinds = kinds.slice(1); if (!kinds.length) return; kinds = ['__none', ...kinds]; }
+  if (kinds[0] !== '__none') { const main = buildLandmark(kinds[0], { label }); main.group.position.set(sq.x, 0.1, sq.z); main.group.scale.setScalar(LM_MAIN_SCALE[kinds[0]] || 3.2); main.group.rotation.y = (hashStr(kinds[0]) % 4) * Math.PI / 2;
+  shade(main); city.group.add(main.group); city.landmarks.push(main); }
   kinds.slice(1).forEach((k, i) => {
     const l = city.lots[1 + i]; if (!l || l === city.hq) return;
     mem[k] = l.id;
@@ -7761,6 +7809,7 @@ function frame() {
       updateTraffic(rdt * Math.max(1, speed));
       updatePeds(rdt * Math.min(2, Math.max(1, speed)));
       updateSignals(rdt * Math.max(1, speed));
+      incidents.update(rdt * Math.max(1, speed), rdt);
     }
     updateProjects(dt / DAY_SEC);
     updateRails(dt / DAY_SEC);
@@ -7946,9 +7995,20 @@ if (AUTOTEST) {
       const sg = ALL_AB.find(x => isAm(x.a) || isAm(x.b)), eu = ALL_AB.find(x => !isAm(x.a) && !isAm(x.b)), q = s => { const km = kmBetween(s.a, s.b), r = abQuoteSeg(s, km); return [s.id, km, r.reward, JSON.stringify(r.mats[1])]; };
       return { boston: bc('boston'), chicago: bc('chicago'), paris: bc('paris'), air: [amL(AIRPORT_LEVELS[0], 'boston', 'air').cost, AIRPORT_LEVELS[0].cost], port: [amL(PORT_LEVELS[0], 'miami', 'port').cost, PORT_LEVELS[0].cost], ab: [sg && q(sg), q(eu)] }; },
     balkTest() { S.balkansPop = 0; S.dev.xp = 15000; S.dev.lv = 4; dev.add(6000); return { lv: S.dev.lv, pop: S.balkansPop, img: document.querySelector('#buyPop img')?.getAttribute('src') }; },
+    incidentLook(camOnly) { const r = camOnly && incidents.active ? null : incidents.start(); const a = incidents.spot(); if (a) __dbg.camAt(a.x + 28, 30, a.z + 40, a.x, 0, a.z); fly = null; $('panel').classList.add('hidden'); return r; },
     emergLook() { __dbg.time && __dbg.time(20.5); showMap(false); const h = city.hq, ks = ['sf-car-Police_Sedan', 'sf-car-Police_SUV', 'sf-car-Ambulance', 'sf-car-Firetruck', 'sf-car-Police_Sedan', 'sf-car-Ambulance'].filter(k => A[k]); const g = new THREE.Group(); ks.forEach((k, i) => { const o = model(k, 1); o.position.set((i % 3) * 7 - 7, 0, Math.floor(i / 3) * 9); o.rotation.y = Math.PI / 2; o.userData.forceBeacons = 1; g.add(o); }); g.position.set(h.x - 4, 0, h.z + 14); scene.add(g); controls.target.set(h.x - 4, 1, h.z + 18); camera.position.set(h.x + 10, 12, h.z + 34); fly = null; $('panel').classList.add('hidden'); return ks; },
     trainLook(kinds = ['loco', 'hopper', 'flat', 'ave', 'hsw', 'aveTail', 'oeLoco', 'oeCar']) { const g = new THREE.Group(); kinds.forEach((k, i) => { if (!hasTrainModel(k)) return; const c = trainCar(k, i); c.position.set(i * 10, 0, 0); g.add(c); }); g.position.set(0, 0.3, 300); scene.add(g); showMap(false); controls.target.set(35, 2, 300); camera.position.set(35, 30, 345); controls.update(); fly = null; return kinds.filter(hasTrainModel); },
     stingTest(id) { econ.earn(5e8, 'друго', 'тест'); openBranchNow(id); return (S.branches || []).includes(id); },   // тест: песента на града при нов филиал
+    heightRow() {   // Лабораторията: къща, блок на 5 етажа, на 10 етажа, небостъргачи на 15/20/30 етажа — един до друг по улицата
+      const ns = ['building-type-c', 'h2-pink', 'building-a', 'sf-blk-jade', 'sf-blk-soviet', 'Building_Medium_2_001', 'building-skyscraper-a@15', 'building-skyscraper-b@20', 'sf-sky-night', 'building-skyscraper-d@30'].filter(n => A[n]);
+      const q = city.plan?.square || city.hq, ls = city.lots.filter(l => !l.built && !l.busy && l !== city.hq).sort((a, b) => Math.hypot(a.x - q.x, a.z - q.z) - Math.hypot(b.x - q.x, b.z - q.z)).slice(0, ns.length);
+      ns.forEach((n, i) => { const l = ls[i]; if (!l) return; if (l.obj) city.group.remove(l.obj); placeBuilding(l, n); l.busy = 'landmark'; });
+      const cx = ls.reduce((a, l) => a + l.x, 0) / ls.length, cz = ls.reduce((a, l) => a + l.z, 0) / ls.length; showMap(false); __dbg.camAt(cx + 110, 75, cz + 140, cx, 15, cz); return ns.length; },
+    heights(w = 26) {   // тест: височината (м) на всяка сграда, поставена на парцел w×w (както placeBuilding)
+      const names = [...HOUSES, ...SHOPS, ...MODERN, ...SF_BLK(), 'Building_Small_1', 'Building_Medium_2_001', ...SKY.flatMap(n => [10, 15, 20].map(f => `${n}@${f}`)), ...MODERN_SKY.flatMap(n => [20, 30, 40].map(f => `${n}@${f}`)), ...SF_SKY()].filter(n => A[n]);
+      const out = {}; for (const n of names) { const lot = { id: 0, x: 9e3, z: 9e3, plan: true, w, d: w, rot: 0 }; const o = placeBuilding(lot, n) || lot.obj || city.group.children.at(-1); const b = new THREE.Box3().setFromObject(o); out[n] = [Math.round(b.max.y - b.min.y), Math.round(Math.max(b.max.x - b.min.x, b.max.z - b.min.z))]; city.group.remove(o); }
+      return out; },
+    sqLook(d = 200) { const q = city.plan?.square || city.hq; showMap(false); __dbg.camAt(q.x + d * 0.8, d * 0.75, q.z + d, q.x, 20, q.z); return (city.landmarks || []).length; },   // Лабораторията: центърът на града с план
     signLook(far) {   // Лабораторията: надписът HOLLYWOOD (Лос Анджелис по картата) — отблизо или градът с хълмовете отдалече
       const P = city.plan, g = P?.sign; if (!g) return null; const dx = Math.cos(g.a), dz = Math.sin(g.a), y = Math.max(0, P.heightAt(g.x, g.z));
       if (far) __dbg.camAt(g.x - dx * 210 + dz * 70, y + 70, g.z - dz * 210 - dx * 70, g.x, y * 0.6, g.z);   // от края на града към хълмовете (мъглата е до ~420 м)

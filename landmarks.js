@@ -494,6 +494,27 @@ function loadLm(kind) {
 }
 // пакет от сгради в редица → плътен квартал: възлите, които се застъпват (кула + шпил), са една сграда.
 // Ниските с широка основа отпадат, останалите се нареждат на редове (най-високите отзад), за да е колкото може по-висок в 15 м
+// Манхатън по един небостъргач на парцел (game.js, feature 'ny-spread'): отделните кули от модела, всяка с основа на y = 0 и център (0, 0);
+// мащабът е общ — най-високата е висока 1 (game.js ги вдига до истинския ръст). Подредени от най-високата.
+export function manhattanTowers() {
+  return loadLm('manhattan').then(src => {
+    if (!src) return [];
+    src.updateMatrixWorld(true);
+    let items = [];
+    src.traverse(o => { if (!o.isMesh) return; const b = new THREE.Box3().setFromObject(o); const c = b.getCenter(new THREE.Vector3()), it = items.find(x => c.x > x.b0.min.x && c.x < x.b0.max.x && c.z > x.b0.min.z && c.z < x.b0.max.z); if (it) { it.b.union(b); it.m.push(o); } else items.push({ b, b0: b.clone(), m: [o] }); });
+    for (const it of items) { it.w = it.b.max.x - it.b.min.x; it.d = it.b.max.z - it.b.min.z; it.h = it.b.max.y - it.b.min.y; }
+    const med = [...items].map(x => x.w * x.d).sort((a, b) => a - b)[items.length >> 1];
+    items = items.filter(x => (x.w * x.d < med * 2.5 || x.h > 4) && x.h > 0).sort((a, b) => b.h - a.h);
+    const H = items[0]?.h || 1;
+    return items.map(it => {
+      const part = new THREE.Group(), inner = new THREE.Group(); part.add(inner);
+      for (const m of it.m) { const c = m.clone(); c.matrixAutoUpdate = false; c.matrix.copy(m.matrixWorld); c.castShadow = c.receiveShadow = true; const mt = c.material; if (mt && mt.metalness > 0.4) { mt.metalness = 0.25; mt.roughness = Math.max(mt.roughness ?? 0.5, 0.45); } inner.add(c); }   // без огледална среда металът излиза черен (като glbLm)
+      const c = it.b.getCenter(new THREE.Vector3()); inner.position.set(-c.x, -it.b.min.y, -c.z); part.scale.setScalar(1 / H);
+      part.userData = { h: it.h / H, w: Math.max(it.w, it.d) / H };
+      return part;
+    });
+  });
+}
 function gridOf(src) {
   src.updateMatrixWorld(true);
   let items = [];

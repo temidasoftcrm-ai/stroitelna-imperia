@@ -118,7 +118,7 @@ const SIREN = { police: 'assets/sfx/siren-police.mp3', fire: 'assets/sfx/siren-f
 let sirenAt = -1e9;
 // буркан: свой клас, за да оцелее анимацията при clone() (методите са в прототипа); всяко копие си прави свой материал.
 // Леща (емисивна сфера) + ореол (спрайт): ляво червено, дясно синьо, редуват се ~2,5 Hz; включват се „от време на време“.
-const beaconState = (car, t) => car.userData.forceBeacons || Math.sin(t / 20 * Math.PI * 2 + (car.id * 2.39) % 6.28) > 0.1;
+const beaconState = (car, t) => car.userData.forceBeacons || car.userData.beaconsOn || Math.sin(t / 20 * Math.PI * 2 + (car.id * 2.39) % 6.28) > 0.1;
 const carOf = o => { let c = o.parent; while (c && !c.userData.isCar) c = c.parent; return c; };
 class Beacon extends THREE.Mesh {
   onBeforeRender(renderer, scene, camera) {
