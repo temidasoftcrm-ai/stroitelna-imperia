@@ -4,6 +4,7 @@
 // point() → случайна точка по улица, focus() → накъде гледа камерата. update(dt движение, rdt истинско време) — в кадъра.
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';
+import { playSiren, sirenKind } from './vehmodels.js';
 
 const HOLD = 60;                      // колко стоят на място (истински секунди)
 const EVERY = [240, 420];             // на колко време идва нов инцидент (истински секунди, само докато гледаш града)
@@ -55,8 +56,8 @@ export function createIncidents(ctx) {
     [['Police_Sedan', 0], ['Police_SUV', 7], ['Firetruck', 15], ['Ambulance', 26]].forEach(([k, back], n) => {
       const [nm, sc] = vehName(k), st = pickStart(at); if (!nm || !st) return;
       const path = pathTo(st.x, st.z, at, back + 6); if (!path) return;
-      const o = ctx.model(nm, sc); o.userData.beaconsOn = 1; o.position.set(st.x, 0, st.z); ctx.scene.add(o);
-      cars.push({ o, x: st.x, z: st.z, yaw: 0, path, pi: 0, stage: 'go', delay: n * rnd(1.5, 4), sirenT: 0 });
+      const o = ctx.model(nm, sc); o.userData.beaconsOn = 1; o.userData.noSiren = 1;   // сирените ги пуска update() — според разстоянието до камерата o.position.set(st.x, 0, st.z); ctx.scene.add(o);
+      cars.push({ o, x: st.x, z: st.z, yaw: 0, path, pi: 0, stage: 'go', delay: n * rnd(1.5, 4), kind: sirenKind(o) || { Firetruck: 'fire', Ambulance: 'ambulance' }[k] || 'police' });
     });
     inc = { at, g, cars, puffs, wrecks, t: 0, force: !!force };
     return { x: Math.round(at.x), z: Math.round(at.z), cars: cars.length };
@@ -84,12 +85,17 @@ export function createIncidents(ctx) {
     inc.t += rdt;
     // дим над ударените коли, докато има някой на място
     inc.puffs.forEach(s => { const ph = (inc.t * 0.25 + s.userData.ph) % 1; s.position.set(inc.at.x + Math.sin(ph * 9) * 0.6, 1 + ph * 9, inc.at.z + ph * 2); s.scale.setScalar(1.5 + ph * 5); s.material.opacity = inc.leave ? 0 : 0.55 * (1 - ph); });
+    // сирените: докато колите идват и стоят на място — щом камерата е близо (до ~200 м), на ~7 s свири една от тях (редуват се: линейка, пожарна, полиция)
+    if (!inc.leave && ctx.cam && (inc.sT = (inc.sT ?? 0) - rdt) <= 0) {
+      const cam = ctx.cam(), on = inc.cars.filter(c => c.o.visible && (c.stage === 'go' || c.stage === 'hold'));
+      if (on.length) { const c = on[(inc.sI = (inc.sI ?? -1) + 1) % on.length], d = Math.hypot(c.x - cam.x, c.z - cam.z, cam.y);
+        inc.sT = playSiren(c.kind, c.o, d, 5) ? 7 : 1; }
+    }
     let gone = 0;
     for (const c of inc.cars) {
       if (c.delay > 0) { c.delay -= rdt; c.o.visible = c.delay <= 0; continue; }
       if (c.stage === 'go') {
-        if ((c.sirenT -= rdt) <= 0) { c.sirenT = 8; c.o.userData.sirenOn = false; }   // сирената — щом стигне близо до камерата (vehmodels.js)
-        if (c.path) move(c, dt); else { c.stage = 'hold'; c.o.userData.sirenOn = true; }
+        if (c.path) move(c, dt); else c.stage = 'hold';
       } else if (c.stage === 'hold') {
         if (inc.cars.every(o => o.stage !== 'go') && inc.hold === undefined) inc.hold = HOLD;
       } else if (c.stage === 'leave') {

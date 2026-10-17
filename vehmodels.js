@@ -69,12 +69,21 @@ const EMERG_K = { Police_Sedan: 1, Ambulance: 1, Firetruck: 1 };   // всичк
 const EMERG = {
   Police_Sedan: [['pol-charger', 5.1], ['pol-crownvic', 5.4], ['pol-interceptor', 5.3], ['pol-volga', 4.8], ['pol-nypd', 5.1]],
   Firetruck: [['fire-red', 9], ['fire-us', 10], ['fire-man', 10.5]],
-  Ambulance: [['amb-gaz', 5.5], ['amb-us', 6.5], ['amb-eu', 5.8]],
+  Ambulance: [['amb-gaz', 5.5], ['amb-us', 6.5], ['amb-eu', 6]],
 };
+// почиства модел на кола: маха плоските мешове (сянка/земя под колата — от тях amb-eu беше квадрат 5,8×5,8 и наполовина висок);
+// връща завъртането, ако колата лежи по x (дължината трябва да е по z)
+function tidyCar(sc) {
+  sc.updateMatrixWorld(true); const all = new THREE.Box3().setFromObject(sc), S = all.getSize(new THREE.Vector3()), big = Math.max(S.x, S.y, S.z), drop = [];
+  sc.traverse(m => { if (m.isMesh) { const b = new THREE.Box3().setFromObject(m), s = b.getSize(new THREE.Vector3()); if (s.y < big * 0.01 && Math.max(s.x, s.z) > big * 0.5) drop.push(m); } });
+  for (const m of drop) m.parent.remove(m);
+  sc.updateMatrixWorld(true); const s2 = new THREE.Box3().setFromObject(sc).getSize(new THREE.Vector3());
+  return s2.x > s2.z * 1.15 ? Math.PI / 2 : 0;
+}
 export function loadPoliceCars(load, A) {
   return Promise.all(Object.entries(EMERG).map(([nm, opts]) => {
     const ok = opts.filter(([f]) => feature(f)); if (!ok.length) return null;
-    return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + f + '.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = true; }); const K = EMERG_K[nm] * len * M_PER, sc = wrap(g.scene, 0, K); addBeacons(sc, K, nm === 'Firetruck' ? 'fire' : nm === 'Ambulance' ? 'ambulance' : 'police'); return sc; }).catch(() => null)))
+    return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + f + '.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = true; }); const yaw = tidyCar(g.scene), K = EMERG_K[nm] * len * M_PER, sc = wrap(g.scene, yaw, null); sc.scale.setScalar(K); addBeacons(sc, K, nm === 'Firetruck' ? 'fire' : nm === 'Ambulance' ? 'ambulance' : 'police'); return sc; }).catch(() => null)))
       .then(list => { list = list.filter(Boolean); if (list.length) A['sf-car-' + nm] = { scene: list[0], variants: list }; });
   }));
 }
@@ -117,6 +126,13 @@ function loadRealTrucks(load, A) {
 // няколко записа на вид (Pixabay, CREDITS-pixabay.txt) — всяка кола си избира един и го пази
 const SIREN = { police: ['', '-2', '-3', '-4', '-5'].map(k => `assets/sfx/siren-police${k}.mp3`), fire: ['', '-2', '-3', '-4'].map(k => `assets/sfx/siren-fire${k}.mp3`), ambulance: ['assets/sfx/siren-ambulance.mp3'] };
 let sirenAt = -1e9;
+// сирена от кола (вид police/fire/ambulance) на разстояние d от камерата — общото ограничение (не една върху друга) важи и за incidents.js
+export function playSiren(kind, car, d, gap = 6) {
+  const t = performance.now() / 1000; if (!feature('sirens2') || t - sirenAt < gap || d > 220) return false;
+  sirenAt = t; const L = SIREN[kind] || SIREN.police; car.userData.sirenN ??= (Math.random() * L.length) | 0;
+  Sound.file(L[car.userData.sirenN % L.length], Math.max(0.12, 0.8 - d / 260)); return true;
+}
+export const sirenKind = car => { let k = null; car.traverse(o => { if (!k && o.userData?.kind && o.userData.red) k = o.userData.kind; }); return k; };
 // буркан: свой клас, за да оцелее анимацията при clone() (методите са в прототипа); всяко копие си прави свой материал.
 // Леща (емисивна сфера) + ореол (спрайт): ляво червено, дясно синьо, редуват се ~2,5 Hz; включват се „от време на време“.
 const beaconState = (car, t) => car.userData.forceBeacons || car.userData.beaconsOn || Math.sin(t / 20 * Math.PI * 2 + (car.id * 2.39) % 6.28) > 0.1;
@@ -128,7 +144,7 @@ class Beacon extends THREE.Mesh {
     const t = performance.now() / 1000, on = beaconState(car, t), lit = on && (Math.floor(t * 5) + (this.userData.red ? 0 : 1)) % 2 === 0;
     this.material.emissiveIntensity = lit ? 4 : 0.15;
     if (this.userData.red) {
-      if (on && (!car.userData.sirenOn || car.userData.forceBeacons) && feature('sirens2') && t - sirenAt > (car.userData.forceBeacons ? 6 : 14) && (!car.userData.forceBeacons || Math.random() < 0.05)) {   // в демото — всеки път друга кола
+      if (!car.userData.noSiren && on && (!car.userData.sirenOn || car.userData.forceBeacons) && feature('sirens2') && t - sirenAt > (car.userData.forceBeacons ? 6 : 14) && (!car.userData.forceBeacons || Math.random() < 0.05)) {   // в демото — всеки път друга кола
         const d = this.getWorldPosition(new THREE.Vector3()).distanceTo(camera.position);
         if (d < 160) { sirenAt = t; const L = SIREN[this.userData.kind] || SIREN.police; car.userData.sirenN ??= (Math.random() * L.length) | 0; Sound.file(L[car.userData.sirenN % L.length], Math.max(0.15, 0.7 - d / 260)); }
       }

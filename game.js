@@ -1385,7 +1385,7 @@ function releaseUnit(u) {
 const traffic = [];
 // инцидент от време на време: 2 полицейски, пожарна и линейка идват по улиците, стоят ~1 мин и се разотиват (incidents.js, Лабораторията → incidents)
 const incidents = createIncidents({ scene, model, has: n => !!A[n], route: roadRoute, point: () => roadPoint() || { x: tx(3 * ((Math.random() * (NBI + 1)) | 0)), z: tx((Math.random() * NJ) | 0) },
-  focus: () => controls.target, ready: () => S && city.ready && !AUTOTEST });
+  focus: () => controls.target, cam: () => camera.position, ready: () => S && city.ready && !AUTOTEST });
 function addCar() {
   const i = 3 * ((Math.random() * NBI) | 0), j = (Math.random() * NJ) | 0;
   const r = Math.random(), sf = A['sf-car-Sedan'];
