@@ -42,7 +42,7 @@ import { buildUniversity, buildHospital, buildStadium, buildMetro, buildAirTermi
 import { buildGreatWall } from './greatwall3d.js';
 import { buildCivic, CIVIC_KINDS } from './civic3d.js';
 import { createMines, MINE_KINDS } from './mines.js';
-import { createGroup, BRANDS, groupName, brandOf, cleanBrand, subName, FOUND, SUBS } from './group.js';
+import { createGroup, BRANDS, groupName, brandOf, cleanBrand, subName, subLogo, FOUND, SUBS } from './group.js';
 import { createOil } from './oil.js';
 import { createCorp } from './corp.js';
 import { createMegaWorld } from './megaworld.js';
@@ -395,6 +395,8 @@ const loader = new GLTFLoader();
 const load = url => new Promise((res, rej) => loader.load(url, res, undefined, rej));
 // истинските цветни къщи (assets/heavy/houses2, Sketchfab CC-BY) — всяка с отделно „✓ OK“ в Лабораторията (feature = името ѝ); добавят се към HOUSES
 const H2 = ['h2-greyporch', 'h2-brickcabin', 'h2-pink', 'h2-townhouse', 'h2-blue', 'h2-swedish', 'h2-lodge', 'h2-porch'].filter(n => feature(n));
+// бензиностанциите (decorLot) — тук, преди зареждането
+const GAS_KINDS = ['gas-modern', 'gas-big', 'gas-green', 'gas-lowpoly'].filter(n => feature(n)), GAS_W = { 'gas-modern': 24, 'gas-big': 26, 'gas-green': 26, 'gas-lowpoly': 9 };
 const MODELS = {
   roads: ['traffic-light', 'road-straight', 'road-crossroad', 'road-intersection', 'road-bend', 'construction-cone', 'construction-barrier', 'light-square'],
   houses: ['building-type-a', 'building-type-b', 'building-type-c', 'building-type-d', 'building-type-e', 'building-type-f', 'building-type-g', 'building-type-h', 'building-type-i', 'building-type-j', 'building-type-k', 'building-type-l', 'building-type-m', 'building-type-n', 'building-type-o', 'building-type-p', 'building-type-q', 'building-type-r', 'building-type-s', 'building-type-t', 'building-type-u', 'tree-large', 'tree-small'],   // всичките 21 къщи от пакета (Kenney, CC0)
@@ -424,6 +426,7 @@ let europe = null;
   // заводските модели се казват като търговските (building-a…) — пазим ги под 'ind-…'
   // истински храсти, цветя и фонтан (assets/heavy/plants, нормализирани: най-широката страна 1, основа 0) — зад feature('plants-real')
   for (const n of H2) jobs.push(load(`assets/heavy/houses2/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => HOUSES.splice(HOUSES.indexOf(n), 1)));   // не се зареди → не се строи
+  for (const n of GAS_KINDS) jobs.push(load(`assets/heavy/gas/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; }).catch(() => {}));   // бензиностанции (всяка — свое „✓ OK“)
   if (feature('plants-real')) for (const k of ['bush-0', 'bush-1', 'bush-2', 'flowers', 'fountain']) jobs.push(load(`assets/heavy/plants/${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['pl-' + k] = g; }).catch(() => {}));
   for (const [dir, list] of Object.entries(MODELS)) for (const n of list) jobs.push(load(`assets/${dir}/${n}.glb`).then(g => { A[dir === 'industrial' ? 'ind-' + n : n] = g; if (dir === 'commercial' || dir === 'commercial2' || n === 'building-type-a' || n === 'building-type-b') prepNightFloors(g.scene, n);
     if (n === 'building-type-b') g.scene.traverse(o => { if (o.isMesh && o.material?.name === 'phong1') o.visible = false; }); }));   // бръшлянът на house-b е JPEG без прозрачност → черни петна   // нощем етажите светват (nightfloors.js)
@@ -910,8 +913,21 @@ function buildCity(cityId) {
 }
 // празен парцел — не само две дървета: градинка с храсти и цветя, паркинг с коли, детска площадка или ливада с камъни.
 // Всичко отива в lot.trees — маха се само, щом на парцела започне строеж. Изборът е по хеш (един и същ при всяко влизане).
+// бензиностанции на празните парцели в града (feature = името на модела): до 2 на град, по хеш на парцела (не се разместват);
+// ширина в метри — Low Poly е „играчкова“ (огромни колонки), затова по-малка
+let gasCount = { city: null, n: 0 };
+const gasLogoTex = GAS_KINDS.length ? new THREE.TextureLoader().load('assets/ui/subs/oil.webp', t => { t.colorSpace = THREE.SRGBColorSpace; }) : null;   // логото на Петролиум
 function decorLot(g, lot, cityId) {
   const h = hashStr('dec:' + cityId + ':' + lot.id), kind = h % 6;   // 0–1: досегашните дървета; 2 градинка; 3 паркинг; 4 площадка; 5 ливада
+  if (gasCount.city !== cityId) gasCount = { city: cityId, n: 0 };
+  { const gk = GAS_KINDS.filter(n => A[n]);   // бензиностанция: всеки ~6-и празен парцел, достатъчно голям, до 2 на град
+    if (gk.length && gasCount.n < 2 && (h >>> 7) % 6 === 0 && (!lot.plan || Math.min(lot.w, lot.d) >= 14)) {   // парцелите в плана са 11–17 м
+      const n = gk[(h >>> 11) % gk.length], o = model(n, 1), sz = sizeOf(n).getSize(new THREE.Vector3()), room = lot.plan ? Math.min(lot.w, lot.d) + 3 : 16;   // навесът може леко да излиза над тротоара
+      o.scale.setScalar(Math.min(GAS_W[n], room) / Math.max(sz.x, sz.z)); o.rotation.y = lot.plan ? lot.rot || 0 : 0; o.position.set(lot.x, 0, lot.z); o.userData.detail = true;
+      g.add(o); (lot.trees = lot.trees || []).push(o); gasCount.n++;
+      if (gasLogoTex) { o.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(o), sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: gasLogoTex, depthWrite: false }));   // логото на … Петролиум над станцията
+        sp.scale.setScalar(4.2); const bc = bb.getCenter(new THREE.Vector3()); sp.position.set(bc.x, bb.max.y + 3, bc.z); sp.userData.detail = true; g.add(sp); lot.trees.push(sp); }
+      return true; } }
   if (kind < 2 || isDesert(cityId) || !A.plant_bush) return false;
   const rr = (k => () => ((k = Math.imul(k ^ (k >>> 15), 2246822507) >>> 0) % 1000) / 1000)(h || 1);
   const L = lot.plan ? Math.min(lot.w, lot.d) / 2 - 1.5 : 7, rot = lot.plan ? lot.rot || 0 : 0, c = Math.cos(rot), sn = Math.sin(rot);
@@ -7666,8 +7682,8 @@ function renderBig() {
   }
   body.dataset.bank = '';
   $('bwTitle').innerHTML = bigWin === 'mw' ? '🌍 Световни мегапроекти' : bigWin === 'oil' ? `🛢️ ${brandOf(S) ? brandOf(S).nm + ' Петролиум' : 'Петролна империя'}` : bigWin === 'group' ? `${S.holding ? '🏛️ Холдинг' : '🏢'} ${groupName(S) || 'Корпоративна група'}` : bigWin === 'mines' ? (mnTab() === 'oc' ? '⚡ Енергийна империя' : mnTab() === 'auto' ? '🤖 Автоматизация' : '⛏️ Добив и производство') : bigWin === 'offers' ? '📜 Оферти' : bigWin === 'cities' ? '🏙️ Градове' : bigWin === 'upg' ? '🏢 Подобрения на фирмата' : bigWin === 'rail' ? `${trainImg('mid', 26)} Железопътна мрежа` : bigWin === 'fin' ? '🏁 Завършени градове' : bigWin === 'resort' ? '🏔️ Курорти' : bigWin === 'garage' ? '🚜 Гараж — цялата техника' : bigWin === 'super' ? '⭐ Супер поръчки' : bigWin === 'air' ? '✈️ Летища и авиолинии' : bigWin === 'sea' ? '⚓ Пристанища и морски линии' : '🛣️ Магистрали и тол системи';
-  { const sk = { hw: 'hw', rail: 'rail', sea: 'sea', air: 'air' }[bigWin], nm = sk && (S.group || {})[sk] && subName(S, sk);   // под заглавието — дъщерната фирма (… Толроуд, … Рейл…)
-    if (nm) $('bwTitle').innerHTML += `<div style="font-size:13px;font-weight:600;color:var(--mut);margin-top:2px">${nm}</div>`; }
+  { const sk = { hw: 'hw', rail: 'rail', sea: 'sea', air: 'air', oil: 'oil', resort: 'hotel' }[bigWin], nm = sk && (S.group || {})[sk] && subName(S, sk);   // под заглавието — дъщерната фирма (… Толроуд, … Рейл…)
+    if (nm) $('bwTitle').innerHTML += `<div style="font-size:13px;font-weight:600;color:var(--mut);margin-top:2px;display:flex;align-items:center;gap:6px">${subLogo(sk, 22)}${nm}</div>`; }   // с логото на дружеството
   const stick = x => `<div class="bw-stick">${x}</div>`;   // табовете и обхватът стоят горе при превъртане
   body.innerHTML = (['rail', 'hw', 'sea', 'air'].includes(bigWin || 'hw') ? stick(trTabsHtml() + scopeBar() + progCard(bigWin || 'hw')) + hintsHtml(bigWin || 'hw') : bigWin === 'cities' ? stick(cpTabsHtml() + scopeBar()) : bigWin === 'resort' ? stick(scopeBar()) : bigWin === 'mines' ? stick(mnTabsHtml()) : '') + (bigWin === 'oil' ? stick(trTabsHtml()) + oil.winHtml() : bigWin === 'mw' ? stick(trTabsHtml()) + mw.winHtml() : bigWin === 'group' && S.holding && (S.hTab || 'subs') !== 'subs' ? stick(holdTabsHtml()) + (holdLocked(S.hTab) ? holdLockHtml(S.hTab) : S.hTab === 'rank' ? corp.rankHtml() : S.hTab === 'conc' ? corp.concHtml() : S.hTab === 'acq' ? corp.acqHtml() : S.hTab === 'mega' ? mw.winHtml() : S.hTab === 'hotel' ? hotels.winHtml() : S.hTab === 'bank' ? bank.winHtml() : S.hTab === 'neom' ? neom.winHtml() : corp.ipoHtml()) : bigWin === 'group' ? (S.holding ? stick(holdTabsHtml()) : '') + group.winHtml(S.holding ? bwCard('🤖 Автопилот', `<div class="meta" style="margin:0">🏙️ ${ownedCities().filter(id => (S.autoCity || {})[id]).length} града на автопилот · 🏁 ${Object.keys(econ.s.finished || {}).length} завършени · ${AUTO_KINDS.filter(a => autoOn2(a.k)).map(a => a.ico).join(' ')}</div>${(S.autoLog || []).slice(0, 4).map(x => `<div class="meta" style="margin:2px 0">${x}</div>`).join('')}<div class="row" style="justify-content:flex-end;margin:6px 0 0"><button class="btn2" data-hauto="1">⚙️ Какво да върви само</button></div>`) : '') : bigWin === 'mines' ? (mnTab() === 'oc' ? energyWinHtml() : mnTab() === 'auto' ? autoWinHtml() : minesWinHtml()) : bigWin === 'offers' ? offersWinHtml() : bigWin === 'cities' ? (S.cpTab === 'buy' ? buyBranchHtml() : S.cpTab === 'tend' ? tendersWinHtml() : S.cpTab === 'upg' ? (upgHudHtml() || '<div class="card"><div class="meta" style="margin:0;color:var(--ok)">✅ Всичко е на максимално ниво.</div></div>') : cityPanel.winHtml()) : bigWin === 'upg' ? (upgHudHtml() || '<div class="card"><div class="meta" style="margin:0;color:var(--ok)">✅ Всичко е на максимално ниво.</div></div>') : bigWin === 'rail' ? railWinHtml() : bigWin === 'fin' ? finWinHtml() : bigWin === 'resort' ? resorts.winHtml(r => { const cc = r.cc || '🇧🇬', id = cc === '🇧🇬' ? 'sofia' : CITIES.find(x => x.cc === cc)?.id || 'paris'; return inScope(id); }) : bigWin === 'garage' ? garageWinHtml() : bigWin === 'super' ? superWinHtml() : bigWin === 'air' ? airWinHtml() : bigWin === 'sea' ? seaWinHtml() : hwWinHtml());
   { const st = body.querySelector('.bw-stick'), stats = st && body.querySelector(':scope > .bw-stats'); if (st && stats && ['rail', 'hw', 'sea', 'air'].includes(bigWin)) { const pc = st.querySelector(':scope > .card'); st.insertBefore(stats, pc || null); } }   // числата и прогресът — в статичната горна част

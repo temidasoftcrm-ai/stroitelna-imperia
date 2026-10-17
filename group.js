@@ -9,6 +9,8 @@ export const BRANDS = [
   { k: 'imperial', nm: 'Империал', col: '#e57cff', ico: '👑' },
 ];
 // дъщерните дружества по реда на отключване; open(c) → кога се основава, inc(c) → приход на ден, how — какво трябва
+// логата на дружествата (assets/ui/subs/<k>.webp, от потребителя); незаснованото — сиво
+export const subLogo = (k, px = 32, on = true) => `<img src="assets/ui/subs/${k}.webp" alt="" style="width:${px}px;height:${px}px;object-fit:contain;flex-shrink:0;${on ? '' : 'filter:grayscale(1);opacity:.55'}">`;
 export const SUBS = [
   { k: 'con', ico: '🏗️', suf: 'Констръкшън', what: 'строителство', how: 'от началото', open: () => true, inc: c => c.finDaily() },
   { k: 'hw', ico: '🛣️', suf: 'Толроуд', what: 'магистрали и тол', how: 'първата готова магистрала', open: c => c.hwN() > 0, inc: c => c.toll() },
@@ -108,7 +110,7 @@ export function createGroup(deps) {
       const on = g[s.k], inc = on ? s.inc(deps) || 0 : 0, L = hold().lv[s.k] || 0, dir = hold().dir[s.k], man = H && on && !s.final && inc > 0;   // без приход — няма какво да се умножава
       const ctl = man ? `<div class="row" style="margin:6px 0 0;gap:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0;flex:1">${'★'.repeat(L)}${'☆'.repeat(HOLD_LV_MAX - L)} ниво ${L}${dir ? ` · 👔 ${dir}` : ''}${bonusK(s.k) ? ` · <b style="color:#ffd54a">+${f(bonusOf(s.k))} €/ден</b> (+${Math.round(bonusK(s.k) * 100)}%)` : ''}</span>${L < HOLD_LV_MAX ? `<button class="btn2" data-hup="${s.k}" ${deps.econ().canAfford(upCost(s.k)) ? '' : 'disabled'}>⬆️ Развий · ${f(upCost(s.k))} €</button>` : ''}${dir ? '' : `<button class="btn2" data-hdir="${s.k}" ${deps.econ().canAfford(dirCost(s.k)) ? '' : 'disabled'}>👔 Директор · ${f(dirCost(s.k))} €</button>`}</div>` : '';
       const fb = !on && canFound(s.k) ? `<div class="row" style="margin:6px 0 0;gap:6px;align-items:center"><span class="meta" style="margin:0;flex:1">🎁 ${FOUND[s.k].gift}</span><button class="btn" data-hfound="${s.k}">Основи · ${f(FOUND[s.k].cost)} €</button></div>` : '';
-      return `<div class="card" style="${on ? `border-left:4px solid ${b.col}` : fb ? '' : 'opacity:.5'}"><div class="row" style="margin:0;align-items:center;gap:10px"><span style="font-size:24px">${s.ico}</span><span class="meta" style="margin:0;flex:1"><b style="color:var(--txt);font-size:15px">${b.nm} ${s.suf}</b><br>${s.what}${on ? ` · основана на ден ${on}` : ` · 🔒 ${s.how}`}</span>${on && !s.final ? `<b style="color:${inc ? 'var(--ok)' : 'var(--mut, #9aa)'}">${inc ? `+${f(inc)} €/ден` : '—'}</b>` : ''}</div>${ctl}${s.k === 'oil' && on ? '<div class="row" style="justify-content:flex-end;margin:6px 0 0"><button class="btn" data-hoil="1">🛢️ Петролната империя →</button></div>' : ''}${fb}</div>`;
+      return `<div class="card" style="${on ? `border-left:4px solid ${b.col}` : fb ? '' : 'opacity:.5'}"><div class="row" style="margin:0;align-items:center;gap:10px">${subLogo(s.k, 44, on)}<span class="meta" style="margin:0;flex:1"><b style="color:var(--txt);font-size:15px">${b.nm} ${s.suf}</b><br>${s.what}${on ? ` · основана на ден ${on}` : ` · 🔒 ${s.how}`}</span>${on && !s.final ? `<b style="color:${inc ? 'var(--ok)' : 'var(--mut, #9aa)'}">${inc ? `+${f(inc)} €/ден` : '—'}</b>` : ''}</div>${ctl}${s.k === 'oil' && on ? '<div class="row" style="justify-content:flex-end;margin:6px 0 0"><button class="btn" data-hoil="1">🛢️ Петролната империя →</button></div>' : ''}${fb}</div>`;
     }).join('');
     return h;
   }
