@@ -1386,7 +1386,8 @@ function releaseUnit(u) {
 const traffic = [];
 // инцидент от време на време: 2 полицейски, пожарна и линейка идват по улиците, стоят ~1 мин и се разотиват (incidents.js, Лабораторията → incidents)
 const incidents = createIncidents({ scene, model, has: n => !!A[n], route: roadRoute, point: () => roadPoint() || { x: tx(3 * ((Math.random() * (NBI + 1)) | 0)), z: tx((Math.random() * NJ) | 0) },
-  focus: () => controls.target, cam: () => camera.position, ready: () => S && city.ready && !AUTOTEST });
+  focus: () => controls.target, cam: () => camera.position, ready: () => S && city.ready && !AUTOTEST,
+  building: (x, z) => { let best = null, bd = 70 * 70; for (const l of city.lots || []) if (l.obj && l.built) { const d = (l.obj.position.x - x) ** 2 + (l.obj.position.z - z) ** 2; if (d < bd) { bd = d; best = l.obj; } } if (!best) return null; const b = new THREE.Box3().setFromObject(best); return { x0: b.min.x, x1: b.max.x, z0: b.min.z, z1: b.max.z, h: b.max.y }; } });
 function addCar() {
   const i = 3 * ((Math.random() * NBI) | 0), j = (Math.random() * NJ) | 0;
   const r = Math.random(), sf = A['sf-car-Sedan'];
@@ -8111,7 +8112,7 @@ if (AUTOTEST) {
       const sg = ALL_AB.find(x => isAm(x.a) || isAm(x.b)), eu = ALL_AB.find(x => !isAm(x.a) && !isAm(x.b)), q = s => { const km = kmBetween(s.a, s.b), r = abQuoteSeg(s, km); return [s.id, km, r.reward, JSON.stringify(r.mats[1])]; };
       return { boston: bc('boston'), chicago: bc('chicago'), paris: bc('paris'), air: [amL(AIRPORT_LEVELS[0], 'boston', 'air').cost, AIRPORT_LEVELS[0].cost], port: [amL(PORT_LEVELS[0], 'miami', 'port').cost, PORT_LEVELS[0].cost], ab: [sg && q(sg), q(eu)] }; },
     balkTest() { S.balkansPop = 0; S.dev.xp = 15000; S.dev.lv = 4; dev.add(6000); return { lv: S.dev.lv, pop: S.balkansPop, img: document.querySelector('#buyPop img')?.getAttribute('src') }; },
-    incidentLook(camOnly) { const r = camOnly && incidents.active ? null : incidents.start(); const a = incidents.spot(); if (a) __dbg.camAt(a.x + 28, 30, a.z + 40, a.x, 0, a.z); fly = null; $('panel').classList.add('hidden'); return r; },
+    incidentLook(camOnly, type) { const r = camOnly && incidents.active ? null : incidents.start(type); const a = incidents.spot(); if (a) __dbg.camAt(a.x + 28, 30, a.z + 40, a.x, 0, a.z); fly = null; $('panel').classList.add('hidden'); return r; },
     emergLook() { __dbg.time && __dbg.time(20.5); showMap(false); const h = city.hq, ks = ['sf-car-Police_Sedan', 'sf-car-Police_SUV', 'sf-car-Ambulance', 'sf-car-Firetruck', 'sf-car-Police_Sedan', 'sf-car-Ambulance'].filter(k => A[k]); const g = new THREE.Group(); ks.forEach((k, i) => { const o = model(k, 1); o.position.set((i % 3) * 7 - 7, 0, Math.floor(i / 3) * 9); o.rotation.y = Math.PI / 2; o.userData.forceBeacons = 1; g.add(o); }); g.position.set(h.x - 4, 0, h.z + 14); scene.add(g); controls.target.set(h.x - 4, 1, h.z + 18); camera.position.set(h.x + 10, 12, h.z + 34); fly = null; $('panel').classList.add('hidden'); return ks; },
     trainLook(kinds = ['loco', 'hopper', 'flat', 'ave', 'hsw', 'aveTail', 'oeLoco', 'oeCar']) { const g = new THREE.Group(); kinds.forEach((k, i) => { if (!hasTrainModel(k)) return; const c = trainCar(k, i); c.position.set(i * 10, 0, 0); g.add(c); }); g.position.set(0, 0.3, 300); scene.add(g); showMap(false); controls.target.set(35, 2, 300); camera.position.set(35, 30, 345); controls.update(); fly = null; return kinds.filter(hasTrainModel); },
     stingTest(id) { econ.earn(5e8, 'друго', 'тест'); openBranchNow(id); return (S.branches || []).includes(id); },   // тест: песента на града при нов филиал
