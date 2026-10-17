@@ -73,6 +73,7 @@ const DEMOS = [
   ['🌴 Лос Анджелис по картата', 'losangeles', d => { d.signLook(true); }],
   ['🎬 HOLLYWOOD отблизо', 'losangeles', d => { for (const ms of [0, 3500, 8000]) setTimeout(() => d.signLook(), ms); }],   // повторно — камерата отлита към първата поръчка
   ['🌙 HOLLYWOOD нощем', 'losangeles', d => { d.time(22); for (const ms of [0, 3500, 8000]) setTimeout(() => d.signLook(), ms); }],
+  ['🏢 Панелните блокове в истински ръст', 'sofia', d => { d.nightRow(); }],
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

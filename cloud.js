@@ -134,13 +134,13 @@ function openSettings(h) {
       : `<div style="font-size:14px;color:var(--mut);line-height:1.5">Не си влязъл. С вход (имейл + код, без парола) играта се пази в облака и можеш да играеш от няколко устройства.</div><div style="margin-top:8px">${sbtn('stIn', '☁️ Вход', 'btn')}</div>`)}
     ${sec(`👥 Онлайн сега: <span id="stN">${ppl.length}</span>`, `<div id="stPpl" style="font-size:13px;line-height:1.7;max-height:150px;overflow:auto">${pplHtml(ppl)}</div>`)}
     ${sec(`🆕 Ъпдейти <span style="font-weight:400;color:var(--mut);font-size:13px">· версия ${VERSION}</span>`, `<div style="max-height:170px;overflow:auto">${changesHtml()}</div>`)}
-    ${sec('🎮 Игра', `<div style="display:flex;gap:6px;flex-wrap:wrap">${hooks.rename ? sbtn('stRen', '✏️ Име на фирмата') : ''}${hooks.credits ? sbtn('stCred', '📜 Автори') : ''}${hooks.newGame ? sbtn('stNew', '🔄 Нова игра') : ''}</div>`)}
+    ${sec('🎮 Игра', `<div style="display:flex;gap:6px;flex-wrap:wrap">${hooks.saves ? sbtn('stSaves', '💾 Записи') : ''}${hooks.rename ? sbtn('stRen', '✏️ Име на фирмата') : ''}${hooks.credits ? sbtn('stCred', '📜 Автори') : ''}${hooks.newGame ? sbtn('stNew', '🔄 Нова игра') : ''}</div>`)}
     ${sec('⚠️ Опасна зона', `<div style="font-size:13px;color:var(--mut);line-height:1.5">„Изтрий данните“ маха всички записи на това устройство${user ? ' и в облака. „Изтрий акаунта“ маха и самия акаунт (имейла) завинаги' : ''}.</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${sbtn('stWipe', '🗑️ Изтрий данните', 'btn2', 'color:var(--bad)')}${user ? sbtn('stDel', '❌ Изтрий акаунта', 'btn2', 'color:var(--bad)') : ''}</div>`)}`,
     [['Затвори', null, 1]]);
   el.firstElementChild.style.maxHeight = '92vh'; el.firstElementChild.style.overflow = 'auto';
   const on = (id, f) => { const b = el.querySelector('#' + id); if (b) b.onclick = () => { el.remove(); f(); }; };
-  on('stIn', () => loginEmail()); on('stCloud', openCloud); on('stCred', () => hooks.credits()); on('stRen', () => hooks.rename()); on('stNew', () => hooks.newGame());
+  on('stIn', () => loginEmail()); on('stCloud', openCloud); on('stCred', () => hooks.credits()); on('stRen', () => hooks.rename()); on('stSaves', () => hooks.saves()); on('stNew', () => hooks.newGame());
   on('stOut', () => dlg(`<h2 style="font-size:19px;color:var(--acc)">🚪 Изход?</h2><p style="color:var(--mut);font-size:14px;line-height:1.5">Играта на това устройство остава. Влез пак със същия имейл, за да продължи да се пази в облака.</p>`,
     [['Отказ', null], ['🚪 Изход', () => { syncAll(false).finally(() => sb.auth.signOut().then(() => toast('🚪 Излезе от акаунта.'))); }, 1]]));
   on('stWipe', () => confirmWipe(false)); on('stDel', () => confirmWipe(true));

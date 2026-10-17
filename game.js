@@ -661,6 +661,10 @@ function tierModel(cityId, lot, n) {
 const INDUSTRIAL = MODELS.industrial.filter(n => n.startsWith('building')).map(n => 'ind-' + n);
 const FACTORY_CITIES = new Set(ECON.FACTORIES.map(f => f.cityId));
 // мащаб, с който сградата се вписва в парцела 16×16 м
+// панелните блокове: височината по броя етажи (~3.2 м), а не по най-широката страна — иначе 9-етажният блок беше колкото къща на 2 етажа.
+// Ширината расте най-много ×1.4 (за да се събере на парцела); останалото е по височина. Зад feature('blk-height').
+const BLK_H = { 'sf-blk-soviet': 29, 'sf-blk-panel12': 38, 'sf-blk-richmond': 22 };
+function blkHeight(o, n, s, k = 1) { if (!BLK_H[n] || !feature('blk-height')) return o; const h = sizeOf(n).getSize(new THREE.Vector3()).y, sy = BLK_H[n] * k / h; o.scale.set(Math.min(sy, s * 1.4), sy, Math.min(sy, s * 1.4)); return o; }
 function fitScale(n, target = 12.5) { const s = sizeOf(n).getSize(new THREE.Vector3()); return target / Math.max(s.x, s.z); }
 
 const dayNight = new DayNight(scene, hemi, sun);
@@ -898,7 +902,7 @@ function decorLot(g, lot, cityId) {
 function placeBuilding(lot, n, rot = 0) {
   const isQ = n.startsWith('Building_');
   const s = SHOPS.includes(n) && lot.plan ? fitScale(n, Math.min(lot.w, lot.d) - 1.5) : (isQ ? fitScale(n, 14) : HOUSES.includes(n) ? fitScale(n, houseFit(n)) : fitScale(n, SHOPS.includes(n) ? SHOP_FIT : 12.5)) * lotK(lot);   // в плана — целият парцел
-  const o = model(n, s);
+  const o = blkHeight(model(n, s), n, s, lotK(lot));
   if (SHOPS.includes(n)) o.scale.y *= shopTall(n);
   if (HOUSES.includes(n) && houseFit(n) === 11) tintRoof(o, lot.id);
   dayNight.registerWindows(o);
@@ -1679,7 +1683,7 @@ function makeSite(p) {
   const tmpLot = { x: 0, z: 0 };
   const isQ = p.model.startsWith('Building_');
   const s = isQ ? fitScale(p.model, 14) : HOUSES.includes(p.model) ? fitScale(p.model, houseFit(p.model)) : fitScale(p.model, SHOPS.includes(p.model) ? SHOP_FIT : 12.5);
-  const b = model(p.model, s);
+  const b = blkHeight(model(p.model, s), p.model, s);
   if (SHOPS.includes(p.model)) b.scale.y *= shopTall(p.model);
   if (HOUSES.includes(p.model) && houseFit(p.model) === 11) tintRoof(b, p.lot);
   const bb = new THREE.Box3().setFromObject(b);
@@ -3484,10 +3488,10 @@ function globeData() {
 }
 // 💾 Записи и ⚙️ Настройки — и в горната лента (до „Карта“), не само на картата
 const openSavesUI = () => openSaves({ modal, toast, fmt, save, cityName: id => cityById(id)?.nm || id, lock: () => { saveLock = true; } });
-const openSettingsUI = () => window.__settings ? window.__settings({ credits: showCredits, rename: S && S.brand ? renameBrand : null, newGame: () => modal('Нова игра?', 'Сегашната фирма ще бъде изтрита.', [['Отказ', null], ['Изтрий и започни', wipeSlot]]), lock: () => { save(); saveLock = true; } })
+const openSettingsUI = () => window.__settings ? window.__settings({ credits: showCredits, saves: openSavesUI, rename: S && S.brand ? renameBrand : null, newGame: () => modal('Нова игра?', 'Сегашната фирма ще бъде изтрита.', [['Отказ', null], ['Изтрий и започни', wipeSlot]]), lock: () => { save(); saveLock = true; } })
   : modal('⚙️ Още', 'Авторите на моделите и музиката · или започни нова игра в този слот.', [['Затвори', null], ['📜 Автори', showCredits], ['🗑️ Нова игра', () => modal('Нова игра?', 'Сегашната фирма ще бъде изтрита.', [['Отказ', null], ['Изтрий и започни', wipeSlot]])]]);
 { let after = $('btnMapToggle');
-  for (const [id, txt, title, fn] of [['btnSaves', '💾 Записи', 'Записи: слотове, автозаписи, сваляне', openSavesUI], ['btnSettings', '⚙️', 'Настройки: вход, изход, данни, хора онлайн, ъпдейти', openSettingsUI]]) {
+  for (const [id, txt, title, fn] of [['btnSettings', '⚙️', 'Настройки: вход, изход, данни, хора онлайн, ъпдейти', openSettingsUI]]) {
     const b = document.createElement('button'); b.id = id; b.className = 'btn2'; b.textContent = txt; b.title = title;
     b.onclick = () => { if (S) fn(); };
     after.parentNode.insertBefore(b, after.nextSibling); after = b;
@@ -7496,6 +7500,7 @@ function renderBig() {
   on('[data-selltrain]', b => { sellTrain(+b.dataset.selltrain); renderBig(); });
   on('[data-uptrain]', b => { upgradeTrain(+b.dataset.uptrain); renderBig(); });
   on('#bwNewRail', () => { closeBig(); startRailMode(); });
+  on('#bwRailDone', () => { railShowDone = !railShowDone; renderBig(); });
   on('#bwNewHw', () => { closeBig(); startHwMode(); });
   if (bigWin === 'hw') hwTrucks.bind($('bwBody'));
   on('[data-airport]', b => { buildAirport(b.dataset.airport); renderBig(); });
@@ -7615,6 +7620,7 @@ function progCard(kind, sc0, mini) {
   const all = conts.length > 1 ? `<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--line)">${conts.map(({ k, r }) => `<div class="row" style="margin:3px 0;align-items:center;gap:8px"><span class="meta" style="margin:0;min-width:110px;${'c:' + k === sc ? 'color:var(--txt);font-weight:800' : ''}">${CONT_ICO[k]} ${CONT_NM[k]}</span><div class="bar" style="flex:1;height:6px;margin:0"><i style="width:${r.pct}%;background:linear-gradient(90deg,#3fae5a,#7dffa8)"></i></div><b style="min-width:42px;text-align:right;color:${r.pct >= 100 ? 'var(--ok)' : 'var(--txt)'}">${r.pct}%</b></div>`).join('')}</div>` : '';
   return `<div class="card"><div class="row" style="margin:0 0 4px;align-items:center"><b style="color:var(--txt)">📈 ${ico} ${where} — ${what}</b><b style="margin-left:auto;color:${pct >= 100 ? 'var(--ok)' : 'var(--acc)'}">${pct}%</b></div><div class="bar" style="height:8px;margin:0 0 6px"><i style="width:${pct}%;background:linear-gradient(90deg,#3fae5a,#7dffa8)"></i></div>${pct >= 100 ? '<div class="meta" style="margin:0;color:var(--ok)">✅ Всичко възможно е построено.</div>' : `<div class="meta" style="margin:0">Остават: ${rest.join(' · ')}</div>`}${all}</div>`;
 }
+let railShowDone = false;   // „▸ Покажи готовите“ в прозореца „Железопътна мрежа“
 function railWinHtml() {
   const rails = (S.rails || []).filter(r => inScope(r.a, r.b, r.c)), built = rails.filter(r => r.built), building = rails.filter(r => !r.built), trains = (S.trains || []).filter(t => ['all', 'intl'].includes(scopeNow()) || inScope(t.at));
   const km = built.reduce((a, r) => a + (r.km || 0), 0);
@@ -7622,10 +7628,13 @@ function railWinHtml() {
   h += `<div class="row" style="justify-content:flex-end"><button class="btn" id="bwNewRail">🛤️ Строй нова линия</button></div>`;
   if (['c:eu', 'all'].includes(scopeNow())) h += orient.cardHtml();   // Ориент Експрес — само в Европа
   h += totalTracks() > (S.trains || []).length ? bwCard(`${trainImg('mid', 20)} Купи влак`, trainShopHtml()) : `<div class="meta">${trainShopHtml()}</div>`;   // магазинът — над линиите
-  h += bwCard('🛤️ Линии', (rails.length ? rails.map(r => {
+  const railRow = r => {
     const st = r.built ? { stage: 4, prog: 1 } : railStageOf(r.prog);
     return `<div class="row" style="margin:4px 0"><span class="meta" style="margin:0">${r.built ? '✅' : RAIL_STAGES[st.stage].ico} <b style="color:var(--txt)">${r.c ? `🔀 ${cityById(r.a).nm} ⤳ линия ${cityById(r.b).nm} — ${cityById(r.c).nm}` : `${cityById(r.a).nm} — ${cityById(r.b).nm}`}</b> · ${r.km} км${r.built ? '' : ` · ${RAIL_STAGES[st.stage].nm} ${Math.floor(r.prog * 100)}%`}</span><button class="btn2" data-railview="rail:${r.a}-${r.b}">👁 Виж</button></div>${r.built ? '' : `<div class="bar"><i style="width:${(r.prog * 100).toFixed(1)}%"></i></div>`}${!r.built || r.c ? '' : r.hs ? '<div class="meta" style="margin:0 0 4px;color:#3fa7ff">⚡ Скоростна линия — за „Стрела“</div>' : r.hsBuild ? `<div class="meta" style="margin:0">⚡ Модернизира се ${Math.floor(r.hsBuild.prog * 100)}%</div><div class="bar"><i style="width:${(r.hsBuild.prog * 100).toFixed(1)}%;background:#3fa7ff"></i></div>` : `<div class="row" style="justify-content:flex-end;margin:0 0 4px"><button class="btn2" data-hsup="${(S.rails || []).indexOf(r)}" ${econ.canAfford(hsQuote(r).cost) ? '' : 'disabled'} title="${hsQuote(r).days} дни">⚡ Модернизирай за „Стрела“ · ${fmt(hsQuote(r).cost)} €</button></div>`}`;
-  }).join('') : '<div class="meta">Още нямаш жп линии.</div>'));
+  };
+  // готовите линии — скрити зад бутон (и не се рисуват), за да не тежи прозорецът; видими са тези в строеж и с модернизация в ход
+  const live = rails.filter(r => !r.built || r.hsBuild), done = rails.filter(r => r.built && !r.hsBuild);
+  h += bwCard('🛤️ Линии', rails.length ? live.map(railRow).join('') + (done.length ? `<div class="row" style="margin:6px 0"><span class="meta" style="margin:0">${live.length ? '' : '✅ Всички линии тук са готови. '}${done.length} готови линии</span><button class="btn" id="bwRailDone" style="margin-left:auto">${railShowDone ? '▾ Скрий' : '▸ Покажи'} готовите</button></div>` + (railShowDone ? done.map(railRow).join('') : '') : '') : '<div class="meta">Още нямаш жп линии.</div>');
   if (dev.has('EUROPE')) { const bc = branchCands().filter(o => inScope(o.id, o.host.a, o.host.b)); h += bwCard('🔀 Отклонения от готовите линии', bc.length ? bc.map(o => `<div class="row" style="margin:4px 0"><span class="meta" style="margin:0">🔀 <b style="color:var(--txt)">${cityById(o.id).nm}</b> ⤳ линия ${cityById(o.host.a).nm} — ${cityById(o.host.b).nm} · ${o.km} км · ${o.days} дни</span><button class="btn" data-branch="${o.id}">Строй ${fmt(o.cost)} €</button></div>`).join('') : '<div class="meta">Няма градове близо до готовите ти линии. Построй още линии — после ще можеш да отклониш близките градове към тях.</div>'); }
   if (dev.has('EUROPE')) { const sc = shortcutCands().filter(o => inScope(o.a, o.b)).slice(0, 8); if (sc.length) h += bwCard('⚡ Преки връзки <span class="meta" style="margin:0 0 0 auto">близки градове, до които влакът заобикаля</span>', sc.map(o => `<div class="row" style="margin:4px 0"><span class="meta" style="margin:0">⚡ <b style="color:var(--txt)">${cityById(o.a).nm} — ${cityById(o.b).nm}</b> · ${o.km} км вместо ${fmt(o.now)} км по мрежата · <span style="color:var(--ok)">−${fmt(o.save)} км</span> · ${o.days} дни</span><button class="btn" data-shortcut="${o.a}:${o.b}" ${econ.canAfford(o.cost) ? '' : 'disabled'}>Строй ${fmt(o.cost)} €</button></div>`).join('')); }
   const tripTxt = t => { const j = t.job; if (!j) return 'чака курс в ' + cityById(t.at).nm;
@@ -7948,7 +7957,7 @@ if (AUTOTEST) {
     nightRow(only) {   // Лабораторията: истинските къщи и блоковете един до друг (нощно светене)
       const ns = only === 'h2' ? ['building-type-a', 'building-type-b', ...H2].filter(n => A[n]) : ['building-type-a', 'building-type-b', ...['brick', 'richmond', 'dbrick', 'oldbld', 'soviet', 'panel12', 'jade', 'modoffice', 'gamecity', 'asian'].map(k => 'sf-blk-' + k)].filter(n => A[n]);
       const ls = city.lots.filter(x => !x.built && !x.busy).sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z)).slice(0, ns.length);
-      ns.forEach((n, i) => { const l = ls[i]; if (!l) return; const o = model(n, fitScale(n, HOUSES.includes(n) ? houseFit(n) : 14)); o.position.set(l.x, 0, l.z); city.group.add(o); dayNight.registerWindows(o); });
+      ns.forEach((n, i) => { const l = ls[i]; if (!l) return; const fs = fitScale(n, HOUSES.includes(n) ? houseFit(n) : 14), o = blkHeight(model(n, fs), n, fs); o.position.set(l.x, 0, l.z); city.group.add(o); dayNight.registerWindows(o); });
       const u = ls.slice(0, ns.length), cx = u.reduce((a, l) => a + l.x, 0) / u.length, cz = u.reduce((a, l) => a + l.z, 0) / u.length, r = Math.max(30, ...u.map(l => Math.hypot(l.x - cx, l.z - cz)));
       __dbg.camAt(cx + r * 0.9, r * 1.1, cz + r * 1.2, cx, 4, cz); return u.map((l, i) => [ns[i], Math.round(l.x), Math.round(l.z)]); },
     blkLook(k = 'oldbld') { const l = city.lots.find(x => !x.built && !x.busy && x.zone === 'mid'); if (!l || !A['sf-blk-' + k]) return null; const o = model('sf-blk-' + k, fitScale('sf-blk-' + k, 14)); o.position.set(l.x, 0, l.z); city.group.add(o); __dbg.camAt(l.x + 22, 30, l.z + 26, l.x, 6, l.z); return { x: l.x, z: l.z }; },

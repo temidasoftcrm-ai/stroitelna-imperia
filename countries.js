@@ -72,7 +72,7 @@ export const COUNTRIES = [
   { cc: '🇪🇸', nm: 'Испания', iso: 'ESP', cities: ['madrid', 'barcelona', 'valencia', 'seville', 'bilbao'] },
   { cc: '🇨🇭', nm: 'Швейцария', iso: 'CHE', cities: ['zurich', 'geneva', 'basel', 'bern', 'lausanne'] },
   { cc: '🇺🇸', nm: 'САЩ', iso: 'USA', cities: ['newyork', 'losangeles', 'chicago', 'sanfrancisco', 'miami'] },
-  { cc: '🇨🇦', nm: 'Канада', iso: 'CAN', cities: ['toronto', 'montreal', 'vancouver', 'calgary', 'ottawa'] },
+  { cc: '🇨🇦', nm: 'Канада', iso: 'CAN', cities: ['toronto', 'montreal', 'vancouver', 'calgary', 'ottawa'], ll: [-102, 55.5] },   // ll: знамето на картата — средата на градовете е на границата (изглежда в САЩ)
   { cc: '🇲🇽', nm: 'Мексико', iso: 'MEX', cities: ['mexicocity', 'guadalajara', 'monterrey', 'cancun', 'puebla'] },
   { cc: '🇧🇷', nm: 'Бразилия', iso: 'BRA', cities: ['saopaulo', 'rio', 'brasilia', 'salvador', 'fortaleza'] },
   { cc: '🇦🇷', nm: 'Аржентина', iso: 'ARG', cities: ['buenosaires', 'cordoba', 'rosario', 'mendoza', 'mardelplata'] },
@@ -93,4 +93,4 @@ export const wonCountries = isDone => COUNTRIES.filter(k => countryProgress(k, i
 // бонус към дневния приход на завършен град (1.1, ако държавата му е завладяна)
 export const wonIncomeMul = (cityId, isDone) => { const k = countryOfCity(cityId); return k && countryProgress(k, isDone).won ? 1 + WON_INCOME : 1; };
 // етикет на държавата на картата: средата на ключовите градове
-export function countryLabelLL(k, cityById) { const cs = k.cities.map(cityById).filter(Boolean); return [cs.reduce((a, x) => a + x.lon, 0) / cs.length, cs.reduce((a, x) => a + x.lat, 0) / cs.length]; }
+export function countryLabelLL(k, cityById) { if (k.ll) return k.ll; const cs = k.cities.map(cityById).filter(Boolean); return [cs.reduce((a, x) => a + x.lon, 0) / cs.length, cs.reduce((a, x) => a + x.lat, 0) / cs.length]; }
