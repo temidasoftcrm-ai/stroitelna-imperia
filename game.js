@@ -4608,9 +4608,9 @@ function oilMapSvg() {
   let h = '';
   for (const c of o.contracts) {
     if (!mapIn(from, c.to)) continue; const P = seaPolys(from, c.to); if (P.length !== 1 || P[0].length < 2) continue;
-    const pt = p => p.map(v => v.toFixed(1)).join(','), d = 'M' + P[0].map(pt).join('L'), L = 34 * upx, Ht = L * 0.223, dur = 40, beg = -(((performance.now() / 1000) + c.id * 7) % dur).toFixed(2);
+    const pt = p => p.map(v => v.toFixed(1)).join(','), d = 'M' + P[0].map(pt).join('L'), rt = 'M' + [...P[0], ...P[0].slice(0, -1).reverse()].map(pt).join('L'), L = 34 * upx, Ht = L * 0.223, dur = 40, beg = -(((performance.now() / 1000) + c.id * 7) % dur).toFixed(2);
     h += `<path d="${d}" fill="none" stroke="#ff9a2e" stroke-width="${1.6 * upx}" stroke-dasharray="${5 * upx} ${5 * upx}" opacity=".6"/>`;
-    h += `<g><image href="assets/ui/ship-top-tanker.webp" x="${-L / 2}" y="${-Ht / 2}" width="${L}" height="${Ht}"/><animateMotion dur="${dur}s" begin="${beg}s" repeatCount="indefinite" rotate="auto" keyPoints="0;1;1;0;0" keyTimes="0;.45;.5;.95;1" calcMode="linear" path="${d}"/></g>`;
+    h += `<g><image href="assets/ui/ship-top-tanker.webp" x="${-L / 2}" y="${-Ht / 2}" width="${L}" height="${Ht}"/><animateMotion dur="${dur}s" begin="${beg}s" repeatCount="indefinite" rotate="auto" keyPoints="0;.5;.5;1;1" keyTimes="0;.45;.5;.95;1" calcMode="linear" path="${rt}"/></g>`;   // пътят е „там и обратно“ (rt) — на връщане танкерът се обръща с носа напред
   }
   return h ? `<g class="oilRoutes" style="pointer-events:none">${h}</g>` : '';
 }
