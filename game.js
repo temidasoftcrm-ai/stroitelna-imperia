@@ -224,7 +224,37 @@ const mapZoom = () => mapView ? mapView.base[2] / mapView.vb[2] : 1;
 const zShrink = () => Math.pow(Math.max(1, mapZoom()), -0.8);
 const mapLS = () => zShrink() * 0.85;   // мащаб на надписите (и малко по-малки по принцип)
 const mapK = () => (mapCont ? (viewOf(mapCont).k || 2.4) : mapWorld ? 6 : 1) * zShrink();   // допълнителен мащаб на знаците (световният изглед и приближаването)
-let worldGeo = null;   // assets/data/world.json — зарежда се при първия световен изглед
+let worldGeo = null;
+// държавите на световната карта без нито един град в играта (Гренландия, Исландия, Монголия…) — няма какво да се строи там, затова са оцветени
+// (ледените на север — бели, другите — тихо зелени), а не като „незапочнати“. Map iso → лед (средна ширина > 58°). Смята се веднъж.
+let emptyIsoC = null;
+// „дивите“ области по сушата — на повече от WILD_KM от всеки град (Патагония, Сибир, Амазония…): там също няма какво да се строи,
+// затова се оцветяват като празните държави. Мрежа 0.5° (само клетки на суша), слети по редове. Смята се веднъж.
+const WILD_KM = 600; let wildC = null;
+function wildSvg(won) {
+  const wk = [...won].sort().join(',');   // в завладяните (златни) държави — без „дивото“
+  if (!wildC || wildC.k !== wk) { const st = 0.5, rows = [], R = 6371, rad = Math.PI / 180, cs = CITIES.map(c => [c.lat * rad, c.lon * rad, Math.cos(c.lat * rad)]);
+    const far = (la, lo) => { const a = la * rad, b = lo * rad, ca = Math.cos(a); for (const [cl, co, cc] of cs) { const d = Math.sin((cl - a) / 2) ** 2 + ca * cc * Math.sin((co - b) / 2) ** 2; if (2 * R * Math.asin(Math.sqrt(d)) < WILD_KM) return false; } return true; };
+    const inR = (x, y, r) => { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const [xi, yi] = r[i], [xj, yj] = r[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi || 1e-12) + xi) c = !c; } return c; };
+    const polys = []; for (const g of worldGeo || []) if (!won.has(g.iso)) for (const poly of g.poly) { let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (const [x, y] of poly[0]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } polys.push([x0, x1, y0, y1, poly]); }
+    const land = (lo, la) => polys.some(([x0, x1, y0, y1, poly]) => lo >= x0 && lo <= x1 && la >= y0 && la <= y1 && inR(lo, la, poly[0]) && !poly.slice(1).some(h => inR(lo, la, h)));
+    for (let la = 84; la > -60; la -= st) { let run = null; for (let lo = -180; lo <= 180; lo += st) { const cx = lo + st / 2, cy = la - st / 2, f = lo + st <= 180 && land(cx, cy) && far(cy, cx); if (f && run == null) run = lo; if (!f && run != null) { rows.push([la, run, lo, la - st]); run = null; } } }
+    wildC = rows; wildC.k = wk; }
+  const k = (la, lo) => proj(lo, la).map(v => v.toFixed(1)).join(','), d = wildC.map(([la1, lo1, lo2, la2]) => `M${k(la1, lo1)}L${k(la1, lo2)}L${k(la2, lo2)}L${k(la2, lo1)}Z`).join('');
+  return `<path class="country empty" d="${d}" style="stroke:none;pointer-events:none"/>`;   // само сушата, далеч от всички градове (мрежа 0.5°)
+}
+function emptyIso() {
+  if (emptyIsoC || !worldGeo || !worldGeo.length) return emptyIsoC || new Map();
+  const inR = (x, y, r) => { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const [xi, yi] = r[i], [xj, yj] = r[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi || 1e-12) + xi) c = !c; } return c; };
+  emptyIsoC = new Map();
+  for (const g of worldGeo) {
+    const has = g.poly.some(poly => CITIES.some(c => inR(c.lon, c.lat, poly[0]) && !poly.slice(1).some(h => inR(c.lon, c.lat, h))));
+    if (has) continue;
+    let sy = 0, n = 0; for (const poly of g.poly) for (const [, la] of poly[0]) { sy += la; n++; }
+    emptyIsoC.set(g.iso, n && sy / n > 58);
+  }
+  return emptyIsoC;
+}   // assets/data/world.json — зарежда се при първия световен изглед
 // подвижна карта: viewBox се мести (влачене) и мащабира (колелце / щипване / бутони)
 let mapView = null;
 // точка на екрана → координати в картата
@@ -3054,11 +3084,13 @@ function drawMap() {
   // започнатите държави (твой град или завършен ключов град) — бледо златисто; завладените — златни
   const partIso = new Set(S && econ ? COUNTRIES.filter(k => !wonIso.has(k.iso) && (countryProgress(k, x => econ.isFinished(x)).done || k.cities.some(id => ownedCities().includes(id)))).map(k => k.iso) : []);
   const wonD = [];
+  const emp = mapWorld && feature('map-empty') ? emptyIso() : null;
   for (const c of mapWorld ? (worldGeo || []) : europe) {
     const d = c.poly.map(poly => poly.map(ring => 'M' + ring.map(([lo, la]) => proj(lo, la).map(v => v.toFixed(1)).join(',')).join('L') + 'Z').join('')).join('');
     if (wonIso.has(c.iso)) wonD.push([c.iso, d]);
-    h += `<path class="country ${c.iso === 'BGR' ? 'bg' : ''} ${wonIso.has(c.iso) ? 'won' : partIso.has(c.iso) && c.iso !== 'BGR' ? 'part' : ''} ${mapCont && CONT_ISO[mapCont] && !CONT_ISO[mapCont].has(c.iso) ? 'dim' : ''}" d="${d}" fill-rule="evenodd"/>`;
+    h += `<path class="country ${c.iso === 'BGR' ? 'bg' : ''} ${wonIso.has(c.iso) ? 'won' : partIso.has(c.iso) && c.iso !== 'BGR' ? 'part' : ''} ${mapCont && CONT_ISO[mapCont] && !CONT_ISO[mapCont].has(c.iso) ? 'dim' : ''} ${emp && emp.has(c.iso) ? (emp.get(c.iso) ? 'empty ice' : 'empty') : ''}" d="${d}" fill-rule="evenodd"/>`;
   }
+  if (emp && worldGeo && worldGeo.length) h += wildSvg(wonIso);
   h += saharaSvg();
   if (wonD.length && !(mapCont && mapCont !== 'eu')) h += '<g id="rlfSlot"></g>';
   // ключовите градове на държавите, където имаш град — винаги на картата (и малките, напр. В. Търново), за да се вижда какво остава до 🇧🇬 6/6
@@ -3098,7 +3130,7 @@ function keyCitiesMine() { const own = new Set(ownedCities()); return new Set(CO
   h = h.replace('<g class="city lbl', mapLayers.wrap('rail', railSvg() + (mapWorld && (!mapCont || mapCont === 'as') ? silk.svg(id => proj(cityById(id).lon, cityById(id).lat), (mapEU ? 4 : 1) * mapK(), performance.now() / 1000) : '')) + '<g class="city lbl');
   h = h.replace('<g class="city lbl', mapLayers.wrap('road', hwSvg() + abSvg() + hwQueueSvg() + '<g id="truckLayer"></g>') + mapLayers.wrap('air', airSvg()) + mapLayers.wrap('sea', seaSvg()) + '<g class="city lbl');
   h = h.replace('<g class="city lbl', superRouteSvg() + oilMapSvg() + mwMapSvg() + '<g class="city lbl');   // трасетата на супер поръчките — над всички мрежи
-  h += resorts.svg(mapCont || null);   // Фаза 5: курортите — европейските на картата на Европа, африканските на изгледа „Африка“
+  if (!(feature('map-key-only') && (mapEU || mapWorld) && mapZoom() < 1.5)) h += resorts.svg(mapCont || null);   // отдалечено — без курортите (излизат при приближаване)   // Фаза 5: курортите — европейските на картата на Европа, африканските на изгледа „Африка“
   h += '<g class="lay-rail"><g id="trainLayer"></g></g><g class="lay-air"><g id="planeLayer"></g></g><g class="lay-sea"><g id="shipLayer"></g></g>';
   if (window.__coopMap) h += window.__coopMap((lo, la) => proj(lo, la), (mapEU ? 4.5 : mapWide ? 1.6 : 1) * mapK(), id => cityById(id));   // партньорът (coop.js) — в друг цвят
   const rlfOld = svg.querySelector('#rlfG');   // релефът не се пресъздава при зуум — иначе картината се декодира наново („мъгла“)
@@ -8198,6 +8230,7 @@ if (AUTOTEST) {
     rollDemo() { econ.earn(5e6, 'друго', 'тест'); S.rep = 5; const ls = city.lots.filter(x => !x.built && !x.busy && x !== city.hq).slice(0, 3); for (const l of ls) { est().land.push(l.id); l.busy = 'land'; } showMap(false); tab = 'estate'; renderPanel(); return ls.length; },
     lvPicTest(cityLv, otherLv) { const id = 'plovdiv'; S.branches = [...new Set([...(S.branches || []), id])]; S.cities[id] = { ...(S.cities[id] || {}), dev: { xp: DEV_THRESH[otherLv - 1], lv: otherLv, v: 3 } }; S.dev = { xp: DEV_THRESH[cityLv - 1], lv: cityLv, v: 3 }; const b0 = dev.best(); dev.add(DEV_THRESH[cityLv] - DEV_THRESH[cityLv - 1] + 1); return { firmBefore: b0, cityNow: S.dev.lv, firmNow: dev.best(), pic: !!document.getElementById('lvShow') }; },
     lvShow(n = 2) { showLevel(n, 'Тест: ниво ' + n); return n; },
+    routeData() { return { cities: Object.fromEntries(CITIES.map(c => [c.id, [c.lon, c.lat]])), segs: [...allSegs(), ...ALL_AB].map(x => [x.a, x.b]) }; },   // тест: трасетата по морето (scratchpad sea.cjs)
     sqLook(d = 200) { const q = city.plan?.square || city.hq; showMap(false); __dbg.camAt(q.x + d * 0.8, d * 0.75, q.z + d, q.x, 20, q.z); return (city.landmarks || []).length; },   // Лабораторията: центърът на града с план
     signLook(far) {   // Лабораторията: надписът HOLLYWOOD (Лос Анджелис по картата) — отблизо или градът с хълмовете отдалече
       const P = city.plan, g = P?.sign; if (!g) return null; const dx = Math.cos(g.a), dz = Math.sin(g.a), y = Math.max(0, P.heightAt(g.x, g.z));
