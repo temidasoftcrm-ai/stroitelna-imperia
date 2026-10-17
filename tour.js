@@ -47,7 +47,9 @@ const CSS = `
 `;
 let i = 0, list = [], wasSpeed = null, onKey = null;
 const vis = e => e && e.offsetParent !== null && e.getClientRects().length;
-const elOf = s => !s.el ? null : typeof s.el === 'function' ? s.el() : document.querySelector(s.el);
+const elOf0 = s => !s.el ? null : typeof s.el === 'function' ? s.el() : document.querySelector(s.el);
+// бутоните в затворения панел „📊 Империя ▾“ (hub.js) — стъпката сочи самия бутон „Империя“
+const elOf = s => { const e = elOf0(s), hub = document.getElementById('hub'); return e && hub && hub.contains(e) && !hub.classList.contains('on') ? document.getElementById('btnHub') : e; };
 
 function speedBtns() { return [...document.querySelectorAll('#speed button')]; }
 function pause() { const b = speedBtns(); wasSpeed = b.findIndex(x => x.classList.contains('on')); if (b[0] && wasSpeed > 0) b[0].click(); }

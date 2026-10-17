@@ -86,6 +86,7 @@ import { buildPlanView } from './cityplan3d.js';
 import { prepNightFloors } from './nightfloors.js';
 import { showIntro } from './intro.js';
 import { feature } from './lab/feature.js';
+import { mountHub } from './hub.js';   // „📊 Империя ▾“ — бутоните от втория ред на лентата в падащ панел (feature 'top-hub')
 import { sampleCurve } from './cityplan.js';
 import { planRoute, randomRoadPoint } from './cityplanroute.js';
 
@@ -6844,6 +6845,7 @@ const cityPanel = createCityPanel({ S: () => S, virtFill: (id, c) => virtFill(id
   mk('btnOffers', '📜 Оферти', 'Оферти от доставчици и търгове', 'offers');
   mk('btnMines', '⛏️ Добив', 'Кариери, мини и заводи в Азия · енергия в Австралия · автоматизация', 'mines');
   mk('btnUpg', '🏢 Подобрения', 'Офис, склад, гараж и гара във всеки град', 'upg'); $('btnUpg').style.display = 'none'; }   // подобренията са подтаб в „🏙️ Градове“
+if (feature('top-hub')) setTimeout(() => mountHub($('top'), $('devBtn')), 0);   // лентата на един ред: останалото — в „📊 Империя ▾“
 // всеки ден: готовите строежи от картата (в другите градове, и в текущия, ако си влязъл там междувременно)
 function rbuildTick() {
   const done = (c, id) => {
@@ -8022,6 +8024,7 @@ if (AUTOTEST) {
       const out = {}; for (const n of names) { const lot = { id: 0, x: 9e3, z: 9e3, plan: true, w, d: w, rot: 0 }; const o = placeBuilding(lot, n) || lot.obj || city.group.children.at(-1); const b = new THREE.Box3().setFromObject(o); out[n] = [Math.round(b.max.y - b.min.y), Math.round(Math.max(b.max.x - b.min.x, b.max.z - b.min.z))]; city.group.remove(o); }
       return out; },
     trafficOverlap() { let n = 0; for (let a = 0; a < traffic.length; a++) for (let b = a + 1; b < traffic.length; b++) if (Math.hypot(traffic[a].x - traffic[b].x, traffic[a].z - traffic[b].z) < 2.5) n++; return { cars: traffic.length, overlap: n, waiting: traffic.filter(t => t.block > 0).length, overtaking: traffic.filter(t => t.ov > 0).length }; },   // тест: застъпени коли
+    hubOpen() { const S = __dbg.state(); S.dev.lv = 14; S.dev.xp = 3e6; S.branches = [...new Set([...(S.branches || []), 'plovdiv', 'varna'])]; updFlowBtns(); setTimeout(() => $('btnHub')?.click(), 1500); return !!$('btnHub'); },
     sqLook(d = 200) { const q = city.plan?.square || city.hq; showMap(false); __dbg.camAt(q.x + d * 0.8, d * 0.75, q.z + d, q.x, 20, q.z); return (city.landmarks || []).length; },   // Лабораторията: центърът на града с план
     signLook(far) {   // Лабораторията: надписът HOLLYWOOD (Лос Анджелис по картата) — отблизо или градът с хълмовете отдалече
       const P = city.plan, g = P?.sign; if (!g) return null; const dx = Math.cos(g.a), dz = Math.sin(g.a), y = Math.max(0, P.heightAt(g.x, g.z));
