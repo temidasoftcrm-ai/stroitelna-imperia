@@ -188,6 +188,11 @@ export function createCityPanel(deps) {
       ${canFin ? `<button class="btn" data-cpfin="${id}" title="Завършва града направо оттук">🏁 Завърши града</button>` : ''}</div></div>`;
     return h;
   }
+  // завършените градове (🏁) не се показват — само ред с броя им и бутон да се покажат
+  function finNote(order) {
+    const s = S(), n = order.filter(id => (!deps.inScope || deps.inScope(id)) && deps.isFinished(id) && id !== s.cityId).length;
+    return n ? `<div class="card"><div class="row" style="align-items:center;gap:8px"><span class="meta" style="margin:0;flex:1">🏁 ${n} завършени града ${s.cpShowFin ? 'са показани' : 'са скрити — работят сами и носят пари'}.</span><button class="btn2" data-cpfinshow="1">${s.cpShowFin ? 'Скрий ги' : 'Покажи ги'}</button></div></div>` : '';
+  }
   function winHtml() {
     const s = S(), own = deps.ownedCities();
     const order = [...own].sort((a, b) => (b === s.cityId) - (a === s.cityId) || deps.isFinished(a) - deps.isFinished(b) || devOf(rec(b) || {}).lv - devOf(rec(a) || {}).lv);
@@ -201,8 +206,9 @@ export function createCityPanel(deps) {
           ${g.total ? `${g.moveN ? `<button class="btn2" data-cpbuyall="1" title="Евтино, но техниката пътува няколко дни">🚚 Изпрати ${g.moveN}${g.cost ? ` + купи · ${f(g.cost)} €` : ''}</button>` : ''}<button class="btn" data-cpbuynow="1" ${deps.econ().canAfford(Math.min(...g.now.map(([, t]) => deps.ECON.UNIT_TYPES[t].cost))) ? '' : 'disabled'} title="Купува всичко липсващо веднага във всеки град">🛒 Купи всичко необходимо · ${f(g.costNow)} €</button>` : '<span class="meta" style="margin:0;color:var(--ok)">✅ Нищо не липсва</span>'}</div>
         <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0 auto 0 0">📦 Складове с автоматично пълнене: <b style="color:var(--txt)">${own.length - afOff - own.filter(id => deps.isFinished(id)).length}</b> от ${own.filter(id => !deps.isFinished(id)).length}</span>
           ${afOff ? '<button class="btn" data-cpafall="1">📦 Включи всички</button>' : '<span class="meta" style="margin:0;color:var(--ok)">✅ Всички са включени</span>'}</div></div>`;
-      const shown = order.filter(id => !deps.inScope || deps.inScope(id));
+      const shown = order.filter(id => (!deps.inScope || deps.inScope(id)) && (s.cpShowFin || !deps.isFinished(id) || id === s.cityId));
       for (const id of shown) h += cityCard(id);
+      h += finNote(order);
       if (!shown.length) h += '<div class="card"><div class="meta" style="margin:0">Нямаш градове в този обхват.</div></div>';
       return h;
     }
@@ -210,12 +216,14 @@ export function createCityPanel(deps) {
       Нивото на всеки град расте от обектите в него; летищата се отключват, щом <b>един</b> град стигне ниво 9.</div>
       <div class="row" style="justify-content:flex-end;gap:6px;margin-top:6px"><span class="meta" style="margin:0 auto 0 0">🤖 включен в ${on} от ${open.length} града</span>
       <button class="btn2" data-cpall="1">🤖 Включи всички</button><button class="btn2" data-cpall="0">Изключи всички</button></div></div>`;
-    const shown = order.filter(id => !deps.inScope || deps.inScope(id));   // обхватът горе: България · Балкани · Европа · …
+    const shown = order.filter(id => (!deps.inScope || deps.inScope(id)) && (s.cpShowFin || !deps.isFinished(id) || id === s.cityId));   // обхватът горе: България · Балкани · Европа · …; завършените — скрити
     for (const id of shown) h += cityCard(id);
+    h += finNote(order);
     if (!shown.length) h += '<div class="card"><div class="meta" style="margin:0">Нямаш градове в този обхват.</div></div>';
     return h;
   }
   function bind(body, redraw) {
+    body.querySelectorAll('[data-cpfinshow]').forEach(b => b.onclick = () => { const s = S(); s.cpShowFin = !s.cpShowFin; redraw(); });
     const mark = (id, t) => { const c = S().cities[id]; if (c) { c.gearAdded = c.gearAdded || {}; c.gearAdded[t] = (c.gearAdded[t] || 0) + 1; } };
     body.querySelectorAll('[data-cpauto]').forEach(b => b.onchange = () => { const s = S(); s.autoCity = { ...(s.autoCity || {}), [b.dataset.cpauto]: b.checked }; deps.save(); redraw(); });
     body.querySelectorAll('[data-cpall]').forEach(b => b.onclick = () => { const s = S(), v = b.dataset.cpall === '1'; s.autoCity = Object.fromEntries(deps.ownedCities().filter(id => id !== s.cityId).map(id => [id, v])); deps.save(); redraw(); });
