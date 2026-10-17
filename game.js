@@ -3112,12 +3112,14 @@ function drawMap() {
   const partIso = new Set(S && econ ? COUNTRIES.filter(k => !wonIso.has(k.iso) && (countryProgress(k, x => econ.isFinished(x)).done || k.cities.some(id => ownedCities().includes(id)))).map(k => k.iso) : []);
   const wonD = [];
   const emp = mapWorld && feature('map-empty') ? emptyIso() : null;
+  const bordD = [];   // границите — пак отгоре на „дивото“ (wildSvg го рисува над държавите)
   for (const c of mapWorld ? (worldGeo || []) : europe) {
     const d = c.poly.map(poly => poly.map(ring => 'M' + ring.map(([lo, la]) => proj(lo, la).map(v => v.toFixed(1)).join(',')).join('L') + 'Z').join('')).join('');
     if (wonIso.has(c.iso)) wonD.push([c.iso, d]);
+    if (emp) bordD.push(d);
     h += `<path class="country ${c.iso === 'BGR' ? 'bg' : ''} ${wonIso.has(c.iso) ? 'won' : partIso.has(c.iso) && c.iso !== 'BGR' ? 'part' : ''} ${mapCont && CONT_ISO[mapCont] && !CONT_ISO[mapCont].has(c.iso) ? 'dim' : ''} ${emp && emp.has(c.iso) ? (emp.get(c.iso) ? 'empty ice' : 'empty') : ''}" d="${d}" fill-rule="evenodd"/>`;
   }
-  if (emp && worldGeo && worldGeo.length) h += wildSvg(wonIso);
+  if (emp && worldGeo && worldGeo.length) h += wildSvg(wonIso) + `<path d="${bordD.join('')}" fill="none" stroke="#a99e86" stroke-width=".8" vector-effect="non-scaling-stroke" style="pointer-events:none"/>`;
   h += saharaSvg();
   if (wonD.length && !(mapCont && mapCont !== 'eu')) h += '<g id="rlfSlot"></g>';
   // ключовите градове на държавите, където имаш град — винаги на картата (и малките, напр. В. Търново), за да се вижда какво остава до 🇧🇬 6/6
@@ -8250,6 +8252,15 @@ if (AUTOTEST) {
       return { boston: bc('boston'), chicago: bc('chicago'), paris: bc('paris'), air: [amL(AIRPORT_LEVELS[0], 'boston', 'air').cost, AIRPORT_LEVELS[0].cost], port: [amL(PORT_LEVELS[0], 'miami', 'port').cost, PORT_LEVELS[0].cost], ab: [sg && q(sg), q(eu)] }; },
     balkTest() { S.balkansPop = 0; S.dev.xp = 15000; S.dev.lv = 4; dev.add(6000); return { lv: S.dev.lv, pop: S.balkansPop, img: document.querySelector('#buyPop img')?.getAttribute('src') }; },
     incidentLook(camOnly, type) { const r = camOnly && incidents.active ? null : incidents.start(type); const a = incidents.spot(); if (a) __dbg.camAt(a.x + 28, 30, a.z + 40, a.x, 0, a.z); fly = null; $('panel').classList.add('hidden'); return r; },
+    hotel5Look() {   // Лабораторията: кандидатите за 5★/Гранд хотел (assets/heavy/hotels5) един до друг извън града; височина ~60 м (широките — до ~110 м), кола и човек за мащаб
+      showMap(false); const h = { x: tx(NI - 1) + 120, z: tx(NJ - 1) + 120 }, g = new THREE.Group(); g.position.set(h.x, 0, h.z); scene.add(g);
+      const L = [['burj', 'Бурж ал Араб'], ['mbs', 'Марина Бей'], ['marriott', 'Мариот'], ['ostriv', 'Острив'], ['rosa', 'Роза Хутор']];
+      L.forEach(([n, nm], i) => loader.load(`assets/heavy/hotels5/hotel5-${n}.glb`, gl => { const o = gl.scene, sz = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3()), k = Math.min(60 / sz.y, 90 / Math.max(sz.x, sz.z)), x = [-75, 0, 75, -38, 38][i], zz = i < 3 ? 0 : 90;   // два реда — да се съберат в мъглата
+        o.scale.setScalar(k); o.position.set(x, 0, zz); o.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; } }); g.add(o);
+        const lb = label(`${i + 1} · ${nm}`, '#ffd54a', 14); lb.position.set(x, sz.y * k + 12, zz); g.add(lb);
+        const c = A['sf-car-Sedan'] ? model('sf-car-Sedan', 1) : model('sedan', 1.15); c.position.set(x - 4, 0, zz + Math.max(sz.z * k / 2, 10) + 8); c.rotation.y = Math.PI / 2; g.add(c);
+        const pp = new THREE.Group(), tb = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.55, 4, 8), new THREE.MeshStandardMaterial({ color: 0x2f6fd6 })); tb.position.y = 1.15; pp.add(tb); const hd = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), new THREE.MeshStandardMaterial({ color: 0xe0b090 })); hd.position.y = 1.68; pp.add(hd); pp.position.set(x + 2, 0, zz + Math.max(sz.z * k / 2, 10) + 8); g.add(pp); }));
+      controls.target.set(h.x, 15, h.z + 45); camera.position.set(h.x, 120, h.z + 245); const f0 = scene.fog && [scene.fog.near, scene.fog.far]; if (f0) { scene.fog.near = 400; scene.fog.far = 1400; } fly = null; $('panel').classList.add('hidden'); return true; },
     gasLook() {   // Лабораторията: трите кандидата за бензиностанция (assets/heavy/gas) един до друг пред централата — 1 = 30 м
       showMap(false); const h = { x: tx(NI - 1) + 75, z: tx(NJ - 1) + 90 }, g = new THREE.Group(); g.position.set(h.x - 10, 0, h.z + 30); scene.add(g);   // на празното поле югоизточно от града
       ['gas-lowpoly', 'gas-modern', 'gas-big', 'gas-green'].forEach((n, i) => loader.load(`assets/heavy/gas/${n}.glb`, gl => { const o = gl.scene; o.scale.setScalar(25); o.position.set((i - 1.5) * 40, 0, 0);   // ~25 м широки; кола и човек отпред за мащаб

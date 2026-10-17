@@ -140,3 +140,8 @@ cinema/newyork.mp4, cinema/vegas.mp4, cinema/paris.mp4, cinema/dubai.mp4, cinema
 - gas/gas-modern.glb — "Gas Station" by zekeyspaceylizard (CC-BY 4.0) — https://sketchfab.com/3d-models/7c34f15435764ad9a7ef51f609dc5190 (махнато небето около модела)
 - gas/gas-big.glb — "Gas & Fuel Station 3D model" by Meet_Savani (CC-BY 4.0) — https://sketchfab.com/3d-models/e99f2da3f005494e8ba263e38547ad8a
 - gas/gas-green.glb — "Low poly gas station" by assetfactory (лиценз Sketchfab Free Standard, НЕ CC — по изричното решение на собственика) — https://sketchfab.com/3d-models/0c1a2170865a409287fe42fb93970529
+- hotels5/hotel5-burj.glb — "Burj Al Arab" by DespairArc7708 (CC-BY 4.0) — https://sketchfab.com/3d-models/31fe8830913b47b5b975105c7516d897
+- hotels5/hotel5-mbs.glb — "Marina Bay Sands 298" by hencui (CC-BY 4.0) — https://sketchfab.com/3d-models/8f36faf12e904f8bb66bf694ae78d850
+- hotels5/hotel5-marriott.glb — "Marriott Hotel, 3 WTC" by brunoraafael (CC-BY 4.0) — https://sketchfab.com/3d-models/45833dfdb42f48ee939bb2490f8e55ab
+- hotels5/hotel5-ostriv.glb — "Hotel Ostriv" by Randonavt (CC-BY 4.0) — https://sketchfab.com/3d-models/cdace64eb8fa46a4ac70acbb5c44bc98
+- hotels5/hotel5-rosa.glb — "Rosa Khutor Radisson" by furious93rus (CC-BY 4.0) — https://sketchfab.com/3d-models/156806661f7845d88db63d87c70bbb1f
