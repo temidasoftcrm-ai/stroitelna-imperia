@@ -12,3 +12,10 @@ ship-horn.mp3 — „boat horn“ (freesound_community, Pixabay, sound 6204), Pi
 siren-police.mp3 — „police siren one loop“ (freesound_community, Pixabay, sound 104019), Pixabay Content License. Повторен до 4,7 s, моно 64 kbps.
 siren-fire.mp3 — „fire truck siren“ (freesound_community, Pixabay, sound 6946), Pixabay Content License. 8 s откъс, моно 64 kbps, плавно начало и край.
 siren-ambulance.mp3 — „sound effect UK ambulance siren“ (scottishperson, Pixabay, sound 164354), Pixabay Content License. 8 s откъс, моно 64 kbps.
+siren-police-2.mp3 — „Police Siren“ (DRAGON-STUDIO, Pixabay, sound 397963), Pixabay Content License. Моно 64 kbps, изравнена сила.
+siren-police-3.mp3 — „Police car“ (AudioPapkin, Pixabay, sound 298078), Pixabay Content License. 8 s откъс, моно 64 kbps.
+siren-police-4.mp3 — „Police siren“ (freesound_community, Pixabay, sound 6441), Pixabay Content License. 8 s откъс, моно 64 kbps.
+siren-police-5.mp3 — „Police Operation Siren“ (SoundReality, Pixabay, sound 144229), Pixabay Content License. 8 s откъс, моно 64 kbps.
+siren-fire-2.mp3 — „Fire Truck Siren Sound Effect“ (PWLPL, Pixabay, sound 521118), Pixabay Content License. 8 s откъс, моно 64 kbps.
+siren-fire-3.mp3 — „Fire Truck Siren 2“ (49053354, Pixabay, sound 307511), Pixabay Content License. 8 s откъс, моно 64 kbps.
+siren-fire-4.mp3 — „Parisian fire truck siren“ (freesound_community, Pixabay, sound 106986), Pixabay Content License. Моно 64 kbps.

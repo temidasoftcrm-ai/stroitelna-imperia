@@ -8,7 +8,7 @@ import { feature } from './lab/feature.js';
 import { NF_MATS } from './nightfloors.js';
 import { Sound } from './sound.js';   // сирените на спешните коли (Лабораторията → sirens)   // нощем daynight.js вдига emissiveIntensity — фаровете на ТИР-овете
 
-const CAR_LEN = 3.8;   // дължината на седана в света на играта (другите коли са в същия мащаб); беше 3.0 — изглеждаха малки до сградите
+const CAR_LEN = 4.5;   // дължината на седана в света на играта (другите коли са в същия мащаб); 1 единица ≈ 1 м (хората са ~1,9), всички коли — в истинските си метри
 const GEAR = {
   roller: { f: 'roller', yaw: 0 }, backhoe: { f: 'backhoe', yaw: 0 }, dump: { f: 'dump', yaw: 0 },
   grader: { f: 'grader', yaw: -Math.PI / 2 },   // ножът и предните колела са към +x
@@ -65,7 +65,7 @@ function loadRealCars(load, A) {
 }
 // спешните коли за одобрение (Лабораторията → pol-*, fire-*, amb-*): одобрените заместват Police_Sedan / Firetruck / Ambulance,
 // всички с мигащи буркани; при няколко одобрени — A[...].variants (game.js model() може да ги редува)
-const EMERG_K = { Police_Sedan: 2, Ambulance: 2, Firetruck: 1.6 };   // спешните коли — по-едри (до хората изглеждаха малки)
+const EMERG_K = { Police_Sedan: 1, Ambulance: 1, Firetruck: 1 };   // всички коли са в истински метри (1 м ≈ 1 единица, хората ~1,9) — спешните вече не се уголемяват
 const EMERG = {
   Police_Sedan: [['pol-charger', 5.1], ['pol-crownvic', 5.4], ['pol-interceptor', 5.3], ['pol-volga', 4.8], ['pol-nypd', 5.1]],
   Firetruck: [['fire-red', 9], ['fire-us', 10], ['fire-man', 10.5]],
@@ -114,7 +114,8 @@ function loadRealTrucks(load, A) {
 }
 
 // сирена: когато бурканите светнат на кола близо до камерата — веднъж на включване, не по-често от 14 s за всички
-const SIREN = { police: 'assets/sfx/siren-police.mp3', fire: 'assets/sfx/siren-fire.mp3', ambulance: 'assets/sfx/siren-ambulance.mp3' };
+// няколко записа на вид (Pixabay, CREDITS-pixabay.txt) — всяка кола си избира един и го пази
+const SIREN = { police: ['', '-2', '-3', '-4', '-5'].map(k => `assets/sfx/siren-police${k}.mp3`), fire: ['', '-2', '-3', '-4'].map(k => `assets/sfx/siren-fire${k}.mp3`), ambulance: ['assets/sfx/siren-ambulance.mp3'] };
 let sirenAt = -1e9;
 // буркан: свой клас, за да оцелее анимацията при clone() (методите са в прототипа); всяко копие си прави свой материал.
 // Леща (емисивна сфера) + ореол (спрайт): ляво червено, дясно синьо, редуват се ~2,5 Hz; включват се „от време на време“.
@@ -127,9 +128,9 @@ class Beacon extends THREE.Mesh {
     const t = performance.now() / 1000, on = beaconState(car, t), lit = on && (Math.floor(t * 5) + (this.userData.red ? 0 : 1)) % 2 === 0;
     this.material.emissiveIntensity = lit ? 4 : 0.15;
     if (this.userData.red) {
-      if (on && (!car.userData.sirenOn || car.userData.forceBeacons) && feature('sirens2') && t - sirenAt > (car.userData.forceBeacons ? 6 : 14)) {
+      if (on && (!car.userData.sirenOn || car.userData.forceBeacons) && feature('sirens2') && t - sirenAt > (car.userData.forceBeacons ? 6 : 14) && (!car.userData.forceBeacons || Math.random() < 0.05)) {   // в демото — всеки път друга кола
         const d = this.getWorldPosition(new THREE.Vector3()).distanceTo(camera.position);
-        if (d < 160) { sirenAt = t; Sound.file(SIREN[this.userData.kind] || SIREN.police, Math.max(0.15, 0.7 - d / 260)); }
+        if (d < 160) { sirenAt = t; const L = SIREN[this.userData.kind] || SIREN.police; car.userData.sirenN ??= (Math.random() * L.length) | 0; Sound.file(L[car.userData.sirenN % L.length], Math.max(0.15, 0.7 - d / 260)); }
       }
       car.userData.sirenOn = on;
     }

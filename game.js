@@ -1389,7 +1389,7 @@ function addCar() {
     : model(r < 0.04 ? pick(['ambulance', 'police', 'firetruck']) : pick(['sedan', 'taxi', 'suv', 'van', 'sedan', 'suv', 'sedan-sports', 'suv-luxury', 'hatchback-sports']), 1.15);
   scene.add(o);
   const rp = roadPoint();
-  traffic.push({ obj: o, x: rp ? rp.x : tx(i), z: rp ? rp.z : tx(j), yaw: 0, path: null, pi: 0, wait: 0 });
+  { const b = new THREE.Box3().setFromObject(o), sz = b.getSize(new THREE.Vector3()); traffic.push({ obj: o, x: rp ? rp.x : tx(i), z: rp ? rp.z : tx(j), yaw: 0, path: null, pi: 0, wait: 0, len: Math.max(sz.x, sz.z) }); }   // len — дистанцията до колата отпред
 }
 function spawnTraffic(n) {
   incidents.clear();
@@ -1553,6 +1553,7 @@ function updatePeds(dt) {
 }
 function updateTraffic(dt) {
   if (S && traffic.length < wantedTraffic() && Math.random() < dt * 0.5) addCar();   // градът расте → идват още коли
+  const obst = window.__noAvoid ? [] : [...traffic, ...(incidents.obstacles?.() || [])];   // колите и спешните на инцидента — за спиране и заобикаляне
   for (const t of traffic) {
     if (!t.path) {
       if (city.plan) { const q = roadPoint(); t.path = roadRoute(t.x, t.z, q.x, q.z); }
@@ -1564,10 +1565,22 @@ function updateTraffic(dt) {
     }
     const wp = t.path[t.pi];
     let x2 = wp.x, z2 = wp.z, axis = null;
-    if (t.pi > 0) { const pv = t.path[t.pi - 1], dx = wp.x - pv.x, dz = wp.z - pv.z, l = Math.hypot(dx, dz) || 1; x2 += -dz / l * 1.9; z2 += dx / l * 1.9; axis = Math.abs(dz) > Math.abs(dx) ? 'ns' : 'ew'; }
+    const lane = t.ov > 0 ? -1.9 : 1.9;   // заобикаляне — през лявото платно
+    if (t.pi > 0) { const pv = t.path[t.pi - 1], dx = wp.x - pv.x, dz = wp.z - pv.z, l = Math.hypot(dx, dz) || 1; x2 += -dz / l * lane; z2 += dx / l * lane; axis = Math.abs(dz) > Math.abs(dx) ? 'ns' : 'ew'; }
     const dx = x2 - t.x, dz = z2 - t.z, d = Math.hypot(dx, dz), st = 11 * dt;
+    // не минава през другите: спира зад колата/спешната кола отпред (същата посока, до ~7 м), чака; след 3 с я заобикаля за ~3 с
+    if (t.ov > 0) t.ov -= dt;
+    else if (d > 0.01) {
+      const fx = dx / d, fz = dz / d, gap = 4.2 + (t.len || 4.5) / 2;
+      const ahead = o => { const ox = o.x - t.x, oz = o.z - t.z, al = ox * fx + oz * fz; return al > 0.5 && al < gap + 3 && Math.abs(ox * fz - oz * fx) < 2.2; };
+      const b = obst.find(o => o !== t && ahead(o));
+      // заобикаля само спряла кола (инцидент, задръстване), не опашката пред червен светофар; при взаимно блокиране — след 8 с
+      if (b) { t.block = (t.block || 0) + dt; if (t.block > 3 && !b.red && (!(b.block > 0) || t.block > 8)) { t.ov = 3; t.block = 0; } else { t.obj.position.set(t.x, 0, t.z); continue; } }
+      else t.block = 0;
+    }
     // спира пред стоп-линията на червено (ако още не е влязла в кръстовището)
-    if (axis && d < TILE * 0.95 && d > TILE * 0.55 && !canEnter(wp.i, wp.j, axis)) { t.obj.position.set(t.x, 0, t.z); continue; }
+    t.red = false;
+    if (axis && d < TILE * 0.95 && d > TILE * 0.55 && !canEnter(wp.i, wp.j, axis)) { t.red = true; t.obj.position.set(t.x, 0, t.z); continue; }
     if (d <= st) { t.x = x2; t.z = z2; if (++t.pi >= t.path.length) t.path = null; }
     else { t.x += dx / d * st; t.z += dz / d * st; const w = Math.atan2(dx, dz); let dy = w - t.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); t.yaw += dy * Math.min(1, dt * 8); }
     t.obj.position.set(t.x, 0, t.z); t.obj.rotation.y = t.yaw;
@@ -8008,6 +8021,7 @@ if (AUTOTEST) {
       const names = [...HOUSES, ...SHOPS, ...MODERN, ...SF_BLK(), 'Building_Small_1', 'Building_Medium_2_001', ...SKY.flatMap(n => [10, 15, 20].map(f => `${n}@${f}`)), ...MODERN_SKY.flatMap(n => [20, 30, 40].map(f => `${n}@${f}`)), ...SF_SKY()].filter(n => A[n]);
       const out = {}; for (const n of names) { const lot = { id: 0, x: 9e3, z: 9e3, plan: true, w, d: w, rot: 0 }; const o = placeBuilding(lot, n) || lot.obj || city.group.children.at(-1); const b = new THREE.Box3().setFromObject(o); out[n] = [Math.round(b.max.y - b.min.y), Math.round(Math.max(b.max.x - b.min.x, b.max.z - b.min.z))]; city.group.remove(o); }
       return out; },
+    trafficOverlap() { let n = 0; for (let a = 0; a < traffic.length; a++) for (let b = a + 1; b < traffic.length; b++) if (Math.hypot(traffic[a].x - traffic[b].x, traffic[a].z - traffic[b].z) < 2.5) n++; return { cars: traffic.length, overlap: n, waiting: traffic.filter(t => t.block > 0).length, overtaking: traffic.filter(t => t.ov > 0).length }; },   // тест: застъпени коли
     sqLook(d = 200) { const q = city.plan?.square || city.hq; showMap(false); __dbg.camAt(q.x + d * 0.8, d * 0.75, q.z + d, q.x, 20, q.z); return (city.landmarks || []).length; },   // Лабораторията: центърът на града с план
     signLook(far) {   // Лабораторията: надписът HOLLYWOOD (Лос Анджелис по картата) — отблизо или градът с хълмовете отдалече
       const P = city.plan, g = P?.sign; if (!g) return null; const dx = Math.cos(g.a), dz = Math.sin(g.a), y = Math.max(0, P.heightAt(g.x, g.z));
