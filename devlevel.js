@@ -90,10 +90,11 @@ export function createDevLevel(deps) {
   function render() {
     const d = st(); if (!d) { btn.style.display = 'none'; return; }
     btn.style.display = '';
-    const a = THRESH[d.lv - 1], b = THRESH[d.lv] ?? a, k = d.lv >= THRESH.length ? 1 : (d.xp - a) / (b - a);
-    const bst = best();   // градът е на своето ниво; фирмата — на нивото на най-развития град (от него идват отключванията)
-    btn.innerHTML = `🏅 ${deps.cityName ? deps.cityName() : 'Град'} ${d.lv}${bst > d.lv ? ` · 🏢 фирма ${bst}` : ''}<span class="dbar"><i style="width:${(k * 100).toFixed(0)}%"></i></span>`;
-    btn.title = `Ниво на ${deps.cityName ? deps.cityName() : 'града'}: ${d.lv}${bst > d.lv ? ` · ниво на фирмата (най-развитият град): ${bst} — отключванията идват от него` : ''}`;
+    const bst = best();   // в лентата — само нивото на фирмата (= най-развитият град, от него идват отключванията); лентата — неговият напредък
+    const bd = bst > d.lv ? (Object.values(deps.S().cities || {}).map(c => c.dev).find(x => x && x.lv === bst) || { lv: bst, xp: THRESH[bst - 1] }) : d;
+    const a = THRESH[bd.lv - 1], b = THRESH[bd.lv] ?? a, k = bd.lv >= THRESH.length ? 1 : Math.max(0, Math.min(1, (bd.xp - a) / (b - a)));
+    btn.innerHTML = `🏢 Фирма ${bst}<span class="dbar"><i style="width:${(k * 100).toFixed(0)}%"></i></span>`;
+    btn.title = `Ниво на развитие на фирмата: ${bst} (по най-развития град — оттам идват отключванията)${bst > d.lv ? ` · ${deps.cityName ? deps.cityName() : 'този град'}: ниво ${d.lv}` : ''}`;
   }
   function open() {
     const d = st(); if (!d) return;
