@@ -93,7 +93,7 @@ import { planRoute, randomRoadPoint } from './cityplanroute.js';
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 const AUTOTEST = params.has('autotest');
-window.__stroiLv = () => (S && typeof dev !== 'undefined' ? dev.best() : 0);   // нивото на фирмата — за tips.js (съветите сами — до ниво 10)
+window.__stroiLv = () => { try { return S ? dev.best() : 0; } catch { return 0; } };   // нивото на фирмата — за tips.js (съветите сами — до ниво 10)
 const SAVE_KEY = saveKey();   // зависи от текущия слот (saves.js)
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[(Math.random() * a.length) | 0];

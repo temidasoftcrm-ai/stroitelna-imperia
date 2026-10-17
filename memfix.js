@@ -4,6 +4,7 @@
 // се свеждат до една обща (texture.source): three.js качва общия източник веднъж, а копията се освобождават.
 // Обектите Texture остават отделни (свои offset/repeat), сменя се само източникът. Зарежда се преди game.js.
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { feature } from './lab/feature.js';
 
 const N = 128, cv = document.createElement('canvas'); cv.width = cv.height = N;
 const g2 = cv.getContext('2d', { willReadFrequently: true });
@@ -34,7 +35,24 @@ function share(tex) {
   tex.source = s; tex.needsUpdate = true;
   stat.shared++; stat.savedMB += img.width * img.height * 4 / 2 ** 20;
 }
-export function shareTextures(root) {
+// по-малки текстури (feature 'tex512'): картинка над 512 px се смалява до 512 по по-дългата страна — камерата никога не стига толкова близо,
+// а 1024² е 4× паметта (и в браузъра, и във видеокартата). Забележителностите (assets/heavy/lm) остават с пълната си разделителна способност.
+const MAXT = 512, small = new WeakSet(), shrunk = { n: 0, savedMB: 0 };
+function shrink(tex) {
+  if (!tex || !tex.isTexture || !tex.source || small.has(tex.source)) return; small.add(tex.source);
+  const img = tex.source.data; if (!img || tex.isDataTexture || tex.isCompressedTexture) return;
+  const w = img.width, h = img.height; if (!(w > MAXT || h > MAXT)) return;
+  const k = MAXT / Math.max(w, h), c = document.createElement('canvas'); c.getContext('2d', { willReadFrequently: true }); c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));
+  try { c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); } catch { return; }
+  tex.source.data = c; tex.needsUpdate = true; if (img.close) img.close();   // ImageBitmap — освобождава декодираната картинка
+  shrunk.n++; shrunk.savedMB += (w * h - c.width * c.height) * 4 / 2 ** 20;
+}
+export function shareTextures(root, path = '') {
+  shareTextures0(root);   // първо общите картинки (подписът се смята от оригинала — бързо), после смаляване веднъж на източник
+  if (SHRINK && !/\/lm\//.test(path)) root.traverse(o => { for (const m of [].concat(o.material || [])) for (const key in m) { const v = m[key]; if (v && v.isTexture) shrink(v); } });
+}
+const SHRINK = feature('tex512') && !/[?&]notex512/.test(location.search);   // ?notex512 — за сравнение в тестовете
+function shareTextures0(root) {
   root.traverse(o => {
     for (const m of [].concat(o.material || [])) for (const key in m) { const v = m[key]; if (v && v.isTexture) share(v); }
   });
@@ -42,6 +60,6 @@ export function shareTextures(root) {
 // всички GLTFLoader (game.js и модулите) минават оттук: сцената се обработва, преди да стигне до кода на играта
 const parse = GLTFLoader.prototype.parse;
 if (!/[?&]nomemfix/.test(location.search)) GLTFLoader.prototype.parse = function (data, path, onLoad, onError) {
-  return parse.call(this, data, path, gltf => { try { for (const sc of gltf.scenes || [gltf.scene]) shareTextures(sc); } catch (e) { } onLoad(gltf); }, onError);
+  return parse.call(this, data, path, gltf => { try { for (const sc of gltf.scenes || [gltf.scene]) shareTextures(sc, path || ''); } catch (e) { } onLoad(gltf); }, onError);
 };
-window.__texShare = () => ({ ...stat, savedMB: Math.round(stat.savedMB), ms: Math.round(stat.ms), distinct: bySig.size });
+window.__texShare = () => ({ shrunk: shrunk.n, shrunkMB: Math.round(shrunk.savedMB), ...stat, savedMB: Math.round(stat.savedMB), ms: Math.round(stat.ms), distinct: bySig.size });

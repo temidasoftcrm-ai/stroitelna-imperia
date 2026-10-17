@@ -65,12 +65,13 @@ function mount() {
   const after = document.getElementById('btnTour') || document.getElementById('btnNotif');
   if (after && after.parentNode === top) top.insertBefore(b, after.nextSibling); else top.appendChild(b);
 }
-// сами: по един съвет на 3 игрови дни (първият — на 2-ри ден), когато няма видео, прозорец, обиколка или карта
+// сами (до ниво 10 на развитие): по един съвет на 3 игрови дни (първият — на 2-ри ден), когато няма видео, прозорец, обиколка или карта
 const vis = e => e && e.offsetParent !== null;
 setInterval(() => {
   mount();
   const params = new URLSearchParams(location.search);
   if (st.off || params.has('autotest') && !params.has('tips')) return;
+  if ((window.__stroiLv ? window.__stroiLv() : 0) > 10) return;   // сами — само до ниво 10 на фирмата (после се отварят само с 💡)
   const d = day(); if (!d || d === st.last) return;
   const modal = document.getElementById('modal');
   if (document.getElementById('cine') || document.getElementById('tourCard') || document.getElementById('tipCard') || (modal && !modal.classList.contains('hidden')) || vis(document.getElementById('mapScreen')) || !vis(document.getElementById('tabs'))) return;
