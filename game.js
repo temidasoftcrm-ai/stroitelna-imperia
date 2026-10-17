@@ -87,7 +87,8 @@ import { prepNightFloors } from './nightfloors.js';
 import { showIntro } from './intro.js';
 import { feature } from './lab/feature.js';
 import { mountHub } from './hub.js';
-import { showLevel } from './lvshow.js';   // картинката на ниво 1 — при основаването на фирмата (feature 'lv-pics')   // „📊 Империя ▾“ — бутоните от втория ред на лентата в падащ панел (feature 'top-hub')
+import { showLevel } from './lvshow.js';
+import { showSub } from './subshow.js';   // дъщерните дружества — екран с логото (feature 'sub-screen')   // картинката на ниво 1 — при основаването на фирмата (feature 'lv-pics')   // „📊 Империя ▾“ — бутоните от втория ред на лентата в падащ панел (feature 'top-hub')
 import { sampleCurve } from './cityplan.js';
 import { planRoute, randomRoadPoint } from './cityplanroute.js';
 
@@ -3247,7 +3248,7 @@ const mines = createMines({ S: () => S, econ: () => econ, MATERIALS: ECON.MATERI
   toast, fmt, save, sound: n => Sound.play(n), onChange: id => { if (typeof refreshMines3D === 'function' && id === S.cityId) refreshMines3D(); if (bigWin) renderBig(); } });
 
 // 🏢 корпоративната група (group.js): избраната фирма и дъщерните ѝ дружества по бизнеси
-const group = createGroup({ S: () => S, econ: () => econ, lv: () => dev.best(), gift: k => giftSub(k), toast, fmt, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b),
+const group = createGroup({ subShow: (k, mode, text) => subScreen(k, mode, text), askFound: (k, re) => subScreen(k, 'ask', '', re), S: () => S, econ: () => econ, lv: () => dev.best(), gift: k => giftSub(k), toast, fmt, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b),
   hwN: () => hwDone().length, railN: () => (S.rails || []).filter(r => r.built).length, portN: () => Object.values(S.ports || {}).filter(p => p.lv).length, airN: () => Object.values(S.airports || {}).filter(a => a.lv).length,
   oilN: () => mines.state().sites.filter(x => x.kind === 'oilwell').length, empire: () => dev.has('EMPIRE'), toll: () => hwToll(), flow: k => flowAvg(k),
   finDaily: () => Object.values(econ?.s?.finished || {}).reduce((a, f) => a + (f.daily || 0), 0), bankOn: () => !!S.bank, bankDaily: () => bank.daily(), hotelN: () => Object.keys(S.hotels || {}).length, hotelDaily: () => hotels.daily(), oilDaily: () => oil.dailyAvg() || mines.dailyValue(x => MINE_KINDS[x.kind]?.oil) });
@@ -3828,8 +3829,18 @@ let railPick = null;   // избран начален град при строе
 // (готовите и започнатите се ползват наготово) и взима всички липсващи като държавни поръчки — над капацитета на офиса отиват на опашка
 let hwPick = null;
 // нова игра (S.foundFirst): преди първия обект в бранша се основава дъщерната фирма — иначе прозорец с „Основи“
+// екранът с логото: ask — преди основаването (цена, пакет, бутони); done — след него
+function subScreen(k, mode, text, after) {
+  if (!feature('sub-screen')) return false;
+  const sb = SUBS.find(x => x.k === k), F = FOUND[k], nm = `${brandOf(S)?.nm || 'Фирмата'} ${sb.suf}`;
+  showSub({ k, mode, name: nm, what: sb.what[0].toUpperCase() + sb.what.slice(1),
+    text: mode === 'ask' ? `Основаването струва <b>${fmt(F.cost)} €</b>. Стартов пакет: <b>${F.gift}</b>.<br>${F.next}` : text,
+    cost: F ? fmt(F.cost) + ' €' : '', canPay: F ? econ.canAfford(F.cost) : true, onFound: () => { if (group.found(k)) { renderPanel(); if (bigWin) renderBig(); after && after(); } } });
+  return true;
+}
 function foundGate(k) {
   if (!S.foundFirst || (S.group || {})[k] || !FOUND[k]) return true;
+  if (subScreen(k, 'ask')) return false;
   const F = FOUND[k], sb = SUBS.find(x => x.k === k), nm = `${brandOf(S)?.nm || 'Фирмата'} ${sb.suf}`;
   modal(`${sb.ico} Първо основи ${nm}`, `За ${sb.what} ти трябва дъщерна фирма. Основаването струва <b>${fmt(F.cost)} €</b> и дава стартов пакет: <b>${F.gift}</b>.<br><br>${F.next}`,
     [['По-късно', null], [`Основи · ${fmt(F.cost)} €`, () => { if (group.found(k)) { renderPanel(); if (bigWin) renderBig(); } }]]);
@@ -8206,7 +8217,7 @@ if (AUTOTEST) {
       const keys = ['res', 'res2', 'mall', 'biz', 'marina', 'uni', 'line'].slice(0, k); for (const key of keys) { neom.start(key); for (let d = 0; d < 400 && !S.neom.d[key]?.done; d++) endOfDay(); document.getElementById('modal')?.classList.add('hidden'); }
       return { nm: cityById(NEOM_ID).nm, d: S.neom.d, used: S.neom.used.length, built: (S.cities[NEOM_ID]?.built || []).length, inc: S.neom._inc, own: ownedCities().includes(NEOM_ID) }; },
     neomEnter() { switchCity(NEOM_ID); return { city: S.cityId, built: S.built.length, lots: city.lots.filter(l => l.built).length, line: !!city.lineObj }; },
-    bankTest2() { this.holdTest(); document.getElementById('modal')?.classList.add('hidden'); econ.earn(1e10, 'друго', 'тест'); bank.found(); document.getElementById('modal')?.classList.add('hidden'); const b = S.bank; const ids = b.offers.map(o => o.id); for (const id of ids) bank.accept(id);
+    bankTest2() { this.holdTest(); document.getElementById('modal')?.classList.add('hidden'); econ.earn(2e10, 'друго', 'тест'); bank.found(); document.getElementById('modal')?.classList.add('hidden'); const b = S.bank; const ids = b.offers.map(o => o.id); for (const id of ids) bank.accept(id);
       for (let d = 0; d < 60; d++) endOfDay(); S.hTab = 'bank'; openBig('group'); return { cap: b.cap, lv: b.lv, loans: b.loans.length, earned: Math.round(b.earned), lost: b.lost, sub: S.group.bank, win: document.getElementById('bwBody').innerText.slice(0, 900) }; },
     hotelTest() { this.holdTest(); document.getElementById('modal')?.classList.add('hidden'); econ.earn(5e9, 'друго', 'тест'); S.officeLevel = 10; S.cities.plovdiv = { ...(S.cities.plovdiv || {}), officeLevel: 10 }; S.cities.varna = { ...(S.cities.varna || {}), officeLevel: 7 };
       for (let d = 0; d < 3; d++) endOfDay(); hotels.convert('sofia'); hotels.convert('plovdiv'); hotels.build('sofia'); hotels.build('sofia'); for (let d = 0; d < 2; d++) endOfDay();
@@ -8252,6 +8263,7 @@ if (AUTOTEST) {
     parkState() { return projects.filter(q => q.park).map(p => ({ lot: p.lot, stage: p.stage, prog: +(p.prog || 0).toFixed(2), units: units.filter(u => u.proj === p).map(u => u.type + ':' + u.state) })).concat((S.parks || []).map(id => ({ done: id }))); },
     rollDemo() { econ.earn(5e6, 'друго', 'тест'); S.rep = 5; const ls = city.lots.filter(x => !x.built && !x.busy && x !== city.hq).slice(0, 3); for (const l of ls) { est().land.push(l.id); l.busy = 'land'; } showMap(false); tab = 'estate'; renderPanel(); return ls.length; },
     lvPicTest(cityLv, otherLv) { const id = 'plovdiv'; S.branches = [...new Set([...(S.branches || []), id])]; S.cities[id] = { ...(S.cities[id] || {}), dev: { xp: DEV_THRESH[otherLv - 1], lv: otherLv, v: 3 } }; S.dev = { xp: DEV_THRESH[cityLv - 1], lv: cityLv, v: 3 }; const b0 = dev.best(); dev.add(DEV_THRESH[cityLv] - DEV_THRESH[cityLv - 1] + 1); return { firmBefore: b0, cityNow: S.dev.lv, firmNow: dev.best(), pic: !!document.getElementById('lvShow') }; },
+    subShowTest(k = 'rail', mode = 'ask') { return subScreen(k, mode, 'Тест: поема <b>железниците</b>.'); },
     lvShow(n = 2) { showLevel(n, 'Тест: ниво ' + n); return n; },
     routeData() { return { cities: Object.fromEntries(CITIES.map(c => [c.id, [c.lon, c.lat]])), segs: [...allSegs(), ...ALL_AB].map(x => [x.a, x.b]) }; },   // тест: трасетата по морето (scratchpad sea.cjs)
     sqLook(d = 200) { const q = city.plan?.square || city.hq; showMap(false); __dbg.camAt(q.x + d * 0.8, d * 0.75, q.z + d, q.x, 20, q.z); return (city.landmarks || []).length; },   // Лабораторията: центърът на града с план

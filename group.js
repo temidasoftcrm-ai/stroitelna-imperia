@@ -80,7 +80,7 @@ export function createGroup(deps) {
       g[s.k] = S.day || 1;
       if (quiet || s.k === 'con') continue;
       if (s.final) deps.pop('empire', `👑 ${b.nm} Глобъл`, `От първия строеж до световна империя. Добре дошли в ${b.nm} Глобъл!`);
-      else deps.pop('new-branch', `${s.ico} Нова дъщерна фирма: ${b.nm} ${s.suf}`, `${b.nm} ${s.suf} поема ${s.what}. Старите дружества в групата продължават да печелят.`);
+      else if (!(deps.subShow && deps.subShow(s.k, 'done', `Поема <b>${s.what}</b>. Старите дружества в групата продължават да печелят.`))) deps.pop('new-branch', `${s.ico} Нова дъщерна фирма: ${b.nm} ${s.suf}`, `${b.nm} ${s.suf} поема ${s.what}. Старите дружества в групата продължават да печелят.`);
       deps.sound && deps.sound('levelup');
     }
     deps.save();
@@ -94,7 +94,7 @@ export function createGroup(deps) {
     e.spend(F.cost, 'покупка', `Основаване на ${b.nm} ${s.suf}`);
     (S.group = S.group || {})[k] = S.day || 1;
     deps.gift && deps.gift(k);
-    deps.pop('new-branch', `${s.ico} Основа ${b.nm} ${s.suf}!`, `Стартов пакет: ${F.gift}. ${F.next}`);
+    if (!(deps.subShow && deps.subShow(k, 'done', `Стартов пакет: <b>${F.gift}</b>.<br>${F.next}`))) deps.pop('new-branch', `${s.ico} Основа ${b.nm} ${s.suf}!`, `Стартов пакет: ${F.gift}. ${F.next}`);
     deps.sound && deps.sound('levelup'); deps.save();
     return true;
   }
@@ -117,7 +117,7 @@ export function createGroup(deps) {
   function bind(box, rerender) {
     box.querySelectorAll('[data-hup]').forEach(b => b.onclick = () => { upgrade(b.dataset.hup); rerender(); });
     box.querySelectorAll('[data-hdir]').forEach(b => b.onclick = () => { hire(b.dataset.hdir); rerender(); });
-    box.querySelectorAll('[data-hfound]').forEach(b => b.onclick = () => { found(b.dataset.hfound); rerender(); });
+    box.querySelectorAll('[data-hfound]').forEach(b => b.onclick = () => { if (deps.askFound && deps.askFound(b.dataset.hfound, rerender)) return; found(b.dataset.hfound); rerender(); });   // екранът с логото (game.js)
   }
   return { check, winHtml, bind, dailyTick, dailyBonus, upgrade, hire, found, canFound };
 }
