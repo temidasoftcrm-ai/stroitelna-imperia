@@ -98,9 +98,10 @@ export function createDevLevel(deps) {
   }
   function open() {
     const d = st(); if (!d) return;
-    const rows = THRESH.map((t, i) => `<div class="dvrow ${i + 1 <= d.lv ? 'on' : ''} ${i + 1 === d.lv ? 'cur' : ''}"><b>${i + 1 <= d.lv ? '✅' : '🔒'} Ниво ${i + 1}</b><span class="meta" style="margin:0;flex:1">${UNLOCKS[i + 1] || 'Начало'}</span><span class="meta" style="margin:0">${t} XP${deps.lvTime && deps.lvTime(i + 1) ? `<br><span style="color:#7dd3ff">⏱️ ${deps.lvTime(i + 1)}</span>` : ''}</span></div>`).join('');
+    const L = best();   // по нивото на фирмата (както в лентата горе); заключените — замъглени, за да е изненада
+    const rows = THRESH.map((t, i) => `<div class="dvrow ${i + 1 <= L ? 'on' : ''} ${i + 1 === L ? 'cur' : ''}"><b>${i + 1 <= L ? '✅' : '🔒'} Ниво ${i + 1}</b><span class="meta" style="margin:0;flex:1;${i + 1 > L ? 'filter:blur(6px);user-select:none;pointer-events:none' : ''}" ${i + 1 > L ? 'aria-hidden="true"' : ''}>${UNLOCKS[i + 1] || 'Начало'}</span><span class="meta" style="margin:0">${t} XP${deps.lvTime && deps.lvTime(i + 1) ? `<br><span style="color:#7dd3ff">⏱️ ${deps.lvTime(i + 1)}</span>` : ''}</span></div>`).join('');
     const nxt = THRESH[d.lv];
-    deps.modal(`🏅 Ниво на развитие · ${deps.cityName ? deps.cityName() : ''}`, `Всеки твой град се развива отделно. Отключванията (градове, линии, Балканите, Европа, борса) идват от най-развития ти град; специалистите — от нивото на текущия град.<br>Опит: <b>${Math.round(d.xp)} XP</b>${nxt != null ? ` · до ниво ${d.lv + 1}: ${Math.round(nxt - d.xp)} XP` : ' · максимално ниво'}<br>
+    deps.modal(`🏢 Ниво на развитие на фирмата · ${L}`, `Всеки твой град се развива отделно. Отключванията (градове, линии, Балканите, Европа, борса) идват от най-развития ти град; специалистите — от нивото на текущия град.<br>Опит: <b>${Math.round(d.xp)} XP</b>${nxt != null ? ` · до ниво ${d.lv + 1}: ${Math.round(nxt - d.xp)} XP` : ' · максимално ниво'}<br>
       <span style="color:var(--mut)">XP: къща ${XP.house}, магазин ${XP.shop}, офис ${XP.office}, небостъргач ${XP.tower}, жп линия ${XP.rail}, участък магистрала ${XP.highway}, филиал ${XP.branch}, куест ${XP.quest}.</span><br><br>${deps.playSummary ? deps.playSummary() + '<br>' : ''}${rows}`, [['Затвори', null]]);
   }
   return { add, level, best, has, offerMul, offersOpen, stocksOpen, render, open, XP };
