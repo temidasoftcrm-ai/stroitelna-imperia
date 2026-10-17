@@ -2240,6 +2240,20 @@ function missingRoles(p) {
 const connected = () => connectedCities();
 // материалите за етапа се осигуряват веднъж: от склада, а липсващите се купуват (ако е включено)
 // opts.instant: купува и влага веднага (за fastForward); иначе липсващото идва с ТИР до строежа
+// поръчка отрано: материалите за етап k (следващия) се поръчват, докато текущият етап още върви — пристигат в наличността
+function orderAhead(p, k) {
+  if (S.autoBuy === false || !BTYPES[p.type]?.stages[k] || !econ.missing || !econ.orderMaterial) return;
+  p.pre = p.pre || {}; if (p.pre[k] || (p.mat || {})[k]) return; p.pre[k] = true;
+  let n = 0, rail = false;
+  for (const [m, q] of Object.entries(econ.missing(p.type, k))) {
+    const coming = econ.s.transit.reduce((a, o) => a + (o.lot === p.lot && o.city === S.cityId && o.matId === m ? o.qty : 0), 0);
+    if (q - coming <= 0) continue;
+    const r = econ.orderMaterial(m, q - coming, connected(), supplyOpts());
+    if (!r.ok) { p.pre[k] = false; continue; }   // няма пари — пак ще опита
+    if (r.rail) { econ.receive(r.order.id); rail = true; } else { Object.assign(r.order, { lot: p.lot, city: S.cityId }); sendSiteTir(r.order, n++ * 1.5); }
+  }
+  if (rail) refreshWarehouse();
+}
 function ensureMaterials(p, opts = {}) {
   p.mat = p.mat || {};
   if (p.mat[p.stage]) return true;
@@ -2303,6 +2317,7 @@ function updateProjects(dtDays) {
       for (const u of ws) { const lv = unitLv(u); u.xp = (u.xp || 0) + dtDays; if (unitLv(u) > lv) toast(`⭐ ${ECON.UNIT_TYPES[u.type].ico} ${ECON.UNIT_TYPES[u.type].nm} стана ниво ${unitLv(u)} — работи с ${(unitLv(u) - 1) * 10}% по-бързо.`, 'good'); }
       const n = ws.reduce((a, u) => a + 1 + 0.1 * (unitLv(u) - 1), 0) * (hasStaff('engineer') ? 1.15 : 1);
       p.prog += dtDays * RATE * n * events.workMul() / (st.work * workMul(p));   // събития: буря (0), стачка, жега…
+      if (p.prog > 0.35 && !p.reno) orderAhead(p, p.stage + 1);   // материалите за следващия етап тръгват отрано — етапите не чакат ТИР-а
       if (p.prog >= 1) nextStage(p);
     }
   }
@@ -4942,8 +4957,8 @@ function updateMapPlanes() {
   g.innerHTML = (S.planes || []).filter(p => p.path && mapIn(p.path[0], p.path[1])).map(p => {
     const q = arcOf(p.path[0], p.path[1]), t = Math.min(1, p.km / Math.max(1, p.total)), [x, y] = bez(q, t), [x2, y2] = bez(q, Math.min(1, t + 0.01));
     const ang = Math.atan2(y2 - y, x2 - x) * 180 / Math.PI;
-    // иконата на самолета отгоре (assets/ui/plane-top-747.webp; носът е надясно), завъртяна по посоката на полета; по-големите самолети — по-едри; товарният — старата стрелка
-    if (PLANE_PIC[p.kind]) { const sz = 24 + PLANE_PIC[p.kind] * 3; return `<g transform="translate(${x},${y}) rotate(${ang.toFixed(1)}) scale(${k * 0.9})" style="pointer-events:none;filter:drop-shadow(0 1.5px 1.5px rgba(0,0,0,.35))"><image href="assets/ui/plane-top-747.webp" x="${-sz / 2}" y="${-sz / 2}" width="${sz}" height="${sz}"/></g>`; }
+    // иконата на самолета отгоре (assets/ui/plane-top-jet.webp — белият джет с тъмносиня опашка; носът е надясно), завъртяна по посоката на полета; по-големите самолети — по-едри; товарният — старата стрелка
+    if (PLANE_PIC[p.kind]) { const sz = 24 + PLANE_PIC[p.kind] * 3; return `<g transform="translate(${x},${y}) rotate(${ang.toFixed(1)}) scale(${k * 0.9})" style="pointer-events:none;filter:drop-shadow(0 1.5px 1.5px rgba(0,0,0,.35))"><image href="assets/ui/plane-top-jet.webp" x="${-sz / 2}" y="${-sz / 2}" width="${sz}" height="${sz}"/></g>`; }
     return `<g transform="translate(${x},${y}) rotate(${ang}) scale(${k * 0.9})" style="pointer-events:none"><path d="M9,0 L-7,-2 L-3,-9 L-6,-9 L-11,-2 L-14,-2 L-12,0 L-14,2 L-11,2 L-6,9 L-3,9 L-7,2 Z" fill="${PLANES[p.kind].cargo ? '#ff9800' : '#fff'}" stroke="#123" stroke-width="1"/></g>`;
   }).join('');
 }
@@ -5740,7 +5755,7 @@ function garageWinHtml() {
       const n = hv[t] || 0, need = nd[t] || 0, free = Math.min(idl[t] || 0, n - need), coming = inc.filter(m => m.t === t).length, cb = garCanBuy(id, t), T = ECON.UNIT_TYPES[t];
       // 🔴 липсва (натисни → +1) · 🟡 празно, но може да се купи (натисни → +1; пътната техника — само в градове с магистрала в строеж) · обикновено — може +1 при натискане · сиво — няма място/лимит
       const lack = n + coming < need, st = lack ? 'background:rgba(255,90,90,.28);box-shadow:inset 0 0 0 1px rgba(255,90,90,.6)' : !n && cb.ok && (!isRoadGear(t) || (S.hwJobs || []).some(j => hwCityOf(j) === id)) ? 'background:rgba(255,213,74,.22);box-shadow:inset 0 0 0 1px rgba(255,213,74,.55)' : !cb.ok ? 'opacity:.55' : '';
-      const fix = lack && !cb.ok, src = fix ? gearSrcOf(t, id)[0] : null;   // липсва, но не може да се купи (пълен гараж/офис) → натисни: прати от друг град или разшири
+      const fix = lack && !cb.ok, src = fix ? gearSrcOf(t, id) : null;   // липсва, но не може да се купи (пълен гараж/офис) → натисни: прати от друг град или разшири
       return `<td ${cb.ok ? `data-garcell="${id}|${t}"` : fix ? `data-garfix="${id}|${t}"` : ''} class="garCell${cb.ok || fix ? ' can' : ''}" title="${T.nm} в ${cityById(id).nm}: ${n} бр.${need ? `, нужни ${need}` : ''}${cb.ok ? ` — натисни: купи +1 за ${fmt(T.cost)} €` : fix ? ` — ${cb.why}; натисни: ${src ? `прати от ${cityById(src).nm}` : 'разшири гаража/офиса'}` : ` — ${cb.why}`}" style="text-align:center;padding:4px;border-radius:6px;${st}"><b>${n}</b>${need ? `<span style="color:var(--mut)">/${need}</span>` : ''}${cb.ok ? '<span class="plus">+</span>' : ''}${free > 0 ? `<div style="font-size:10px;color:#9fd0ff">${free} своб.</div>` : ''}${coming ? `<div style="font-size:10px;color:#7dd3ff">+${coming} на път</div>` : ''}</td>`;
     }).join('');
     return `<tr style="border-top:1px solid var(--line)"><td style="padding:6px 4px;white-space:nowrap"><b>${cityById(id).nm}</b>${id === S.cityId ? ' 📍' : ''}<div style="font-size:11px;color:var(--mut)">👷 ${crews}/${cap.crews} · 🔧 ${mach}/${cap.mach}</div></td>${cells}<td><button class="btn2" data-garcity="${id}" style="padding:4px 8px">⋯</button></td></tr>`;
@@ -6922,7 +6937,7 @@ const cityPanel = createCityPanel({ S: () => S, firmLv: () => dev.best(), firmUp
   mk('btnOffers', '📜 Оферти', 'Оферти от доставчици и търгове', 'offers');
   mk('btnMines', '⛏️ Добив', 'Кариери, мини и заводи в Азия · енергия в Австралия · автоматизация', 'mines');
   mk('btnUpg', '🏢 Подобрения', 'Офис, склад, гараж и гара във всеки град', 'upg'); $('btnUpg').style.display = 'none'; }   // подобренията са подтаб в „🏙️ Градове“
-if (feature('top-hub')) setTimeout(() => mountHub($('top'), $('devBtn')), 0);   // лентата на един ред: останалото — в „📊 Империя ▾“
+if (feature('top-hub')) setTimeout(() => mountHub($('top'), $('devBtn'), { extra: hubProgHtml }), 0);   // лентата на един ред: останалото — в „📊 Империя ▾“
 // всеки ден: готовите строежи от картата (в другите градове, и в текущия, ако си влязъл там междувременно)
 function rbuildTick() {
   const done = (c, id) => {
@@ -7661,7 +7676,7 @@ function renderBig() {
     for (const [k, d] of hwLackOf(j)) for (let i = 0; i < d; i++) { const r = garCanBuy(id, k); if (!r.ok) { toast(`🔒 ${ECON.UNIT_TYPES[k].nm}: ${r.why}`, 'bad'); break; } if (garBuy(k, id, true) !== false) n++; }
     if (n) { toast(`🛒 Купени ${n} машини за магистралата в ${cityById(id).nm}.`, 'good'); hwDispatch(); save(); } renderBig(); renderPanel(); });
   on('[data-garcell]', b => { const [id, t] = b.dataset.garcell.split('|'); garBuy(t, id); renderBig(); renderPanel(); });
-  on('[data-garfix]', b => { const [id, t] = b.dataset.garfix.split('|'), src = gearSrcOf(t, id)[0];   // липсва, а сградата е пълна
+  on('[data-garfix]', b => { const [id, t] = b.dataset.garfix.split('|'), src = gearSrcOf(t, id);   // липсва, а сградата е пълна
     if (src && garMove(t, src, id, 1)) { toast(`🚚 ${ECON.UNIT_TYPES[t].nm} пътува от ${cityById(src).nm} към ${cityById(id).nm}.`, 'good'); save(); }
     else { const kind = isMachine(t) ? 'garage' : 'office', u = upgInfo(id).find(x => x.kind === kind);
       if (id === S.cityId) toast(`🔒 ${garCanBuy(id, t).why} — разшири ${kind === 'garage' ? 'гаража' : 'офиса'} от таб „Офис“.`, 'bad');
@@ -7773,6 +7788,14 @@ const RAIL_NO = new Set(['heraklion']);   // острови — жп не мож
 function scopeCities(sc0) {
   const sc = sc0 || scopeNow(), ok = id => sc === 'bg' ? isBGc(id) : sc === 'balkans' ? isBalkc(id) : sc.startsWith('c:') ? contKeyOf(id) === sc.slice(2) : true;
   return CITIES.filter(c => ok(c.id) && dev.best() >= cityLv(c.id) && !gateHidden(c.id) && !(contOf(c.id) && !contOf(c.id).open()));
+}
+// „📊 Империя“: прогресът на мрежите (всички отключени) — по ред за ЖП, магистрали, пристанища, летища, с континентите под всеки
+function hubProgHtml() {
+  if (!S || !dev.has('WORLD')) return '';
+  const rows = [['rail', '🚆 ЖП'], ['hw', '🛣️ Магистрали'], ['sea', '⚓ Пристанища'], ['air', '✈️ Летища']].map(([k, nm]) => { const r = progCard(k, 'all', true); if (!r) return '';
+    const cs = contScopes().map(c => ({ c, x: progCard(k, 'c:' + c, true) })).filter(o => o.x && o.x.total).map(o => `${CONT_ICO[o.c] || ''} ${o.x.pct}%`).join(' · ');
+    return `<div class="pr"><b>${nm}</b><div class="bar"><i style="width:${r.pct}%"></i></div><b style="text-align:right;color:${r.pct >= 100 ? 'var(--ok)' : 'var(--acc)'}">${r.pct}%</b>${cs ? `<div class="cs">${cs}</div>` : ''}</div>`; }).join('');
+  return rows ? `<div class="prog"><h4 style="margin:0 4px 2px">📈 Прогрес на мрежите — всички отключени</h4>${rows}</div>` : '';
 }
 function progCard(kind, sc0, mini) {
   if (!dev.has('WORLD')) return mini ? null : '';   // 📈 прогресът се отключва на ниво 10

@@ -6,6 +6,9 @@ import { feature } from './lab/feature.js';
 import { addTruckLamps } from './vehmodels.js';
 
 const SPEED = 12, UNLOAD = 2.2, LANE = 1.9;
+// в големите градове (плановете по истинска карта, ~1,3 км) пътят от входа до обекта беше 4–5 игрови дни на етап → къщите закъсняваха.
+// Сега ТИР-ът се появява най-много MAX_RUN м преди целта (по същия път) и кара толкова бързо, че да стигне за ≤ MAX_T секунди (~0,75 ден)
+const MAX_RUN = 450, MAX_T = 18;
 const COL = { sand: 0xd9c08a, gravel: 0x9a9a9a, concrete: 0xb8b8b0, bricks: 0xb5523b, steel: 0x6d7a88, wood: 0xa8743f, glass: 0x9fd8ff, furniture: 0x7a5236, marble: 0xf1efe8 };
 const KIND = { sand: 'tipper', gravel: 'tipper', concrete: 'mixer', bricks: 'flat', steel: 'flat', wood: 'flat', glass: 'glass', furniture: 'box', marble: 'flat' };
 const mat = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.75 });
@@ -113,7 +116,10 @@ export function createTirs(deps) {
   // ТИР-ът спира на улицата пред склада (най-близката плочка път), разтоварва и се връща празен откъдето е дошъл.
   function send(order, target, onArrive, delay = 0) {
     const e = deps.entry();
-    const t = { order, target, onArrive, ...build(order), x: e.x, z: e.z, yaw: 0, path: deps.roadPath(e.x, e.z, target.x, target.z), pi: 0, state: 'go', t: -delay };
+    let path = deps.roadPath(e.x, e.z, target.x, target.z), x = e.x, z = e.z;
+    { let rem = 0; for (let i = path.length - 1; i > 0; i--) { rem += Math.hypot(path[i].x - path[i - 1].x, path[i].z - path[i - 1].z); if (rem > MAX_RUN) { x = path[i - 1].x; z = path[i - 1].z; path = path.slice(i); break; } } }
+    let len = Math.hypot(path[0]?.x - x || 0, path[0]?.z - z || 0); for (let i = 1; i < path.length; i++) len += Math.hypot(path[i].x - path[i - 1].x, path[i].z - path[i - 1].z);
+    const t = { order, target, onArrive, ...build(order), x, z, yaw: 0, path, pi: 0, state: 'go', t: -delay, v: Math.max(SPEED, len / MAX_T) };
     t.root.position.set(t.x, 0, t.z);
     t.root.visible = delay <= 0;
     list.push(t);
@@ -126,7 +132,7 @@ export function createTirs(deps) {
       const pv = t.path[t.pi - 1], dx = wp.x - pv.x, dz = wp.z - pv.z, l = Math.hypot(dx, dz) || 1;
       tx += -dz / l * LANE; tz += dx / l * LANE;
     }
-    const dx = tx - t.x, dz = tz - t.z, d = Math.hypot(dx, dz), step = SPEED * dt;
+    const dx = tx - t.x, dz = tz - t.z, d = Math.hypot(dx, dz), step = (t.v || SPEED) * dt;
     if (d <= step) { t.x = tx; t.z = tz; t.pi++; }
     else {
       t.x += dx / d * step; t.z += dz / d * step;
