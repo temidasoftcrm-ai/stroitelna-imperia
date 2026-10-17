@@ -220,6 +220,7 @@ let mapWorld = false;  // 🌐 изглед със света (включва ma
 let mapPicked = false;   // изгледът е избран с бутоните — не го сменяме автоматично
 let mapCont = null;    // 🌍/🗽 изглед с континент (включва mapWorld): ключ от CONTS — 'af', 'na'
 // при приближаване знаците и надписите на картата не растат заедно с нея (иначе картата се задръства)
+const KEY_ZOOM = 2.5;   // map-key-only: под този зуум — само ключовите градове, без курортите (по-рядко, по-малко памет)
 const mapZoom = () => mapView ? mapView.base[2] / mapView.vb[2] : 1;
 const zShrink = () => Math.pow(Math.max(1, mapZoom()), -0.8);
 const mapLS = () => zShrink() * 0.85;   // мащаб на надписите (и малко по-малки по принцип)
@@ -3121,7 +3122,7 @@ function keyCitiesMine() { const own = new Set(ownedCities()); return new Set(CO
   for (let i = pts.length - 1; i >= 0; i--) if (gateHidden(pts[i].c.id)) pts.splice(i, 1);
   // отдалечено (Европа/свят, зуум < 1.5): само основните градове (ключовите, със звездите), централата, текущият и твоите незавършени —
   // по-малко точки и надписи; при приближаване излизат всички градове на държавата (filter-а горе: keyCitiesMine)
-  if ((mapEU || mapWorld) && mapZoom() < 1.5 && feature('map-key-only')) for (let i = pts.length - 1; i >= 0; i--) { const o = pts[i], id = o.c.id;
+  if ((mapEU || mapWorld) && mapZoom() < KEY_ZOOM && feature('map-key-only')) for (let i = pts.length - 1; i >= 0; i--) { const o = pts[i], id = o.c.id;
     if (!(KEY_CITY.has(id) || o.hq || o.here || mapSel === id || (ownedCities().includes(id) && !econ?.isFinished?.(id)))) pts.splice(i, 1); }
   if (S && !dev.has('BALKANS')) for (let i = pts.length - 1; i >= 0; i--) if (isForeign(pts[i].c.id) && !ownedCities().includes(pts[i].c.id)) pts.splice(i, 1);   // в началото — само българските градове   // континентите — само „вратата“, докато нямаш връзка
   // ключовите градове са с по-голяма плътна жълта точка (1.3r) — надписът и иконите (🏗️🏢📍) отиват извън него
@@ -3130,7 +3131,7 @@ function keyCitiesMine() { const own = new Set(ownedCities()); return new Set(CO
   h = h.replace('<g class="city lbl', mapLayers.wrap('rail', railSvg() + (mapWorld && (!mapCont || mapCont === 'as') ? silk.svg(id => proj(cityById(id).lon, cityById(id).lat), (mapEU ? 4 : 1) * mapK(), performance.now() / 1000) : '')) + '<g class="city lbl');
   h = h.replace('<g class="city lbl', mapLayers.wrap('road', hwSvg() + abSvg() + hwQueueSvg() + '<g id="truckLayer"></g>') + mapLayers.wrap('air', airSvg()) + mapLayers.wrap('sea', seaSvg()) + '<g class="city lbl');
   h = h.replace('<g class="city lbl', superRouteSvg() + oilMapSvg() + mwMapSvg() + '<g class="city lbl');   // трасетата на супер поръчките — над всички мрежи
-  if (!(feature('map-key-only') && (mapEU || mapWorld) && mapZoom() < 1.5)) h += resorts.svg(mapCont || null);   // отдалечено — без курортите (излизат при приближаване)   // Фаза 5: курортите — европейските на картата на Европа, африканските на изгледа „Африка“
+  if (!(feature('map-key-only') && (mapEU || mapWorld) && mapZoom() < KEY_ZOOM)) h += resorts.svg(mapCont || null);   // отдалечено — без курортите (излизат при приближаване)   // Фаза 5: курортите — европейските на картата на Европа, африканските на изгледа „Африка“
   h += '<g class="lay-rail"><g id="trainLayer"></g></g><g class="lay-air"><g id="planeLayer"></g></g><g class="lay-sea"><g id="shipLayer"></g></g>';
   if (window.__coopMap) h += window.__coopMap((lo, la) => proj(lo, la), (mapEU ? 4.5 : mapWide ? 1.6 : 1) * mapK(), id => cityById(id));   // партньорът (coop.js) — в друг цвят
   const rlfOld = svg.querySelector('#rlfG');   // релефът не се пресъздава при зуум — иначе картината се декодира наново („мъгла“)
