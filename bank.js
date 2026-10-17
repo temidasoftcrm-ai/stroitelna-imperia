@@ -3,7 +3,7 @@
 // толкова по-висока лихва и по-голям риск. При банкова криза неплащанията скачат. Бонус: твоите кредити в чуждите банки
 // ти излизат наполовина по-евтино (банката ти връща половината лихва).
 // Записът: S.bank = { day, lv, cap, loans: [], offers: [], seq, earned, lost, crisis }.
-const FOUND = 500e6, LV_MAX = 5;
+const FOUND = 10e9, LV_MAX = 5, UP_BASE = 500e6;   // основаване — 10 млрд. € (по желание на потребителя); надграждането — по старата скала
 const LEV = lv => 1.5 + lv * 0.5;   // колко пъти капитала може да е в кредити (депозитите на клиентите): 2× … 4×
 const RATINGS = [
   { r: 'AAA', rate: [0.03, 0.05], pd: 0.002, col: '#7dffa8' },
@@ -25,7 +25,7 @@ export function createBank(deps) {
   const B = n => n >= 1e9 ? `${(n / 1e9).toLocaleString('bg-BG', { maximumFractionDigits: 2 })} млрд. €` : `${deps.fmt(Math.round(n / 1e5) / 10)} млн. €`;
   const lent = () => (st()?.loans || []).reduce((a, l) => a + l.left, 0);
   const room = () => { const b = st(); return b ? Math.max(0, b.cap * LEV(b.lv) - lent()) : 0; };
-  const upCost = () => Math.round(FOUND * (st().lv + 1) / 1e6) * 1e6;
+  const upCost = () => Math.round(UP_BASE * (st().lv + 1) / 1e6) * 1e6;
   function found() {
     const S = deps.S(); if (!S.holding || st()) return; const e = deps.econ(); if (!e.canAfford(FOUND)) { deps.toast(`Нямаш ${B(FOUND)} за основаването на банката.`, 'bad'); return; }
     e.spend(FOUND, 'банка', 'Основаване на банката (начален капитал)');
