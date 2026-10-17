@@ -5558,6 +5558,22 @@ function garCanBuy(id, t) {
   if (!econ.canAfford(T.cost)) return { why: `нямаш ${fmt(T.cost)} €` };
   return { ok: true };
 }
+// излишната пътна техника (над лимита 2 комплекта на град и над нуждата на магистралите в строеж) — за продажба
+function garRoadExtra() {
+  const out = [];
+  for (const id of ownedCities()) { const hv = garHave(id), nd = garNeed(id), idl = garIdle(id);
+    for (const t of GAR_TYPES().filter(isRoadGear)) { const n = Math.min((hv[t] || 0) - Math.max(roadCap(t), nd[t] || 0), id === S.cityId ? idl[t] || 0 : Infinity); if (n > 0) out.push([id, t, n]); } }
+  return out;
+}
+function garSellExtra() {
+  let n = 0, got = 0;
+  for (const [id, t, k] of garRoadExtra()) for (let i = 0; i < k; i++) {
+    if (id === S.cityId) { const g = sellUnit(t, true); if (!g) break; got += g; n++; continue; }
+    const c = garCity(id), j = (c.units || []).indexOf(t); if (j < 0) break;
+    c.units.splice(j, 1); (c.unitXp || []).splice(j, 1); got += econ.sellUnit(t); n++;
+  }
+  if (n) { toast(`💰 Продаде ${n} излишни пътни машини за ${fmt(got)} €.`, 'good'); Sound.play('cash'); save(); }
+}
 const garTransit = to => (S.fleetTransit || []).filter(m => !to || m.to === to);
 const garDays = (a, b) => Math.max(1, Math.ceil(kmBetween(a, b) / 450));
 // мести n машини от тип t: from → to (от текущия град — само свободните, с опита им)
@@ -5695,7 +5711,7 @@ function garageWinHtml() {
   const all = ids.reduce((a, id) => a + cityUnitTypes(id).length, 0), tr = garTransit(), plan = garPlan();
   const lackCities = ids.filter(id => { const inc = garTransit(id); return Object.entries(garNeed(id)).some(([t, n]) => (garHave(id)[t] || 0) + inc.filter(m => m.t === t).length < n); }).length;   // без пътуващите
   let h = `<div class="bw-stats"><div><b>${all}</b><span>машини и бригади</span></div><div><b>${ids.length}</b><span>града</span></div><div><b style="color:${lackCities ? 'var(--bad)' : 'var(--ok)'}">${lackCities}</b><span>града с липси</span></div><div><b>${tr.length}</b><span>на път</span></div></div>`;
-  h += `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0;flex-shrink:0"><span class="meta" style="margin:0;flex:1 1 300px">🔴 липсва за обектите · 🟡 няма, но можеш да купиш · натисни клетка → <b>+1</b> · „своб.“ — свободна и ненужна (⚖️ отива където липсва) · транспорт 10%, ~1 ден на 450 км</span><button class="btn" id="garAuto" style="flex:0 0 auto" ${plan.length ? '' : 'disabled'}>⚖️ Разпредели автоматично${plan.length ? ` (${plan.reduce((a, m) => a + m.n, 0)})` : ''}</button></div>`;
+  h += `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0;flex-shrink:0"><span class="meta" style="margin:0;flex:1 1 300px">🔴 липсва за обектите · 🟡 няма, но можеш да купиш · натисни клетка → <b>+1</b> · „своб.“ — свободна и ненужна (⚖️ отива където липсва) · транспорт 10%, ~1 ден на 450 км</span>${(() => { const x = garRoadExtra(), n = x.reduce((a, r) => a + r[2], 0), v = x.reduce((a, [, t, k]) => a + k * econ.sellPrice(t), 0); return n ? `<button class="btn2" id="garSellX" style="flex:0 0 auto" title="Пътната техника над 2 комплекта на град (и над нуждата на магистралите в строеж)">💰 Продай излишната пътна техника · ${n} бр. · +${fmt(v)} €</button>` : ''; })()}<button class="btn" id="garAuto" style="flex:0 0 auto" ${plan.length ? '' : 'disabled'}>⚖️ Разпредели автоматично${plan.length ? ` (${plan.reduce((a, m) => a + m.n, 0)})` : ''}</button></div>`;
   { const sh = garShort();
     h += sh.total ? `<div class="card" style="border:1px solid rgba(255,90,90,.45);flex-shrink:0"><div class="row" style="align-items:center;gap:8px;flex-wrap:wrap"><span class="meta" style="margin:0;flex:1 1 320px">🔴 <b style="color:var(--bad)">Липсват ${sh.total}</b>: ${Object.entries(sh.lack).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${garIco(t)} ${ECON.UNIT_TYPES[t].nm} ×${n}`).join(' · ')}${sh.moveN ? `<br>⚖️ ${sh.moveN} ще дойдат от свободните в другите градове („Разпредели автоматично“)` : ''}${sh.buy.length ? `<br>🛒 За купуване: ${sh.buy.reduce((a, [, , n]) => a + n, 0)} бр. в ${new Set(sh.buy.map(b => b[0])).size} града` : ''}</span>
       ${sh.moveN ? `<button class="btn" id="garFixAll">🚚🛒 Оправи всичко</button>` : sh.buy.length ? `<button class="btn" id="garBuyShort" ${econ.canAfford(sh.cost) ? '' : 'disabled'}>🛒 Купи липсващите · ${fmt(sh.cost)} €</button>` : ''}</div>
@@ -7608,6 +7624,7 @@ function renderBig() {
   on('[data-railview]', b => { closeBig(); openHwView(b.dataset.railview); });
   on('[data-hwview]', b => { closeBig(); openHwView(b.dataset.hwview); });
   on('#garAuto', () => { garAuto(); renderBig(); });
+  on('#garSellX', () => { garSellExtra(); renderBig(); renderPanel(); });
   on('#garBuyShort', () => { garBuyShort(); renderBig(); });
   on('#garFixAll', () => { garAuto(); garGrow(); garBuyShort(); renderBig(); });
   on('#garGrow', () => { garGrow(); renderBig(); });
@@ -8028,6 +8045,14 @@ if (AUTOTEST) {
     openBig: k => openBig(k), closeBig: () => closeBig(), scene: () => scene,
     coopInfraTest(I) { coopInfraSync(I, 'Тест'); return { here: [stLvOf(S.cityId), airLv(S.cityId), portLv(S.cityId)], infra: coopInfra() }; },
     linkRoute() { const P = city.plan; if (!P) return null; const gap = r => r.reduce((m, p, i) => i ? Math.max(m, Math.hypot(p.x - r[i - 1].x, p.z - r[i - 1].z)) : 0, 0), c = city.lots[0]; return { links: (P.links || []).length, tir: gap(roadRoute(tx(NI - 1), -12, c.x, c.z)), st: gap(roadRoute(STATION_X + 10, 0, c.x, c.z)), hw: P.hwX == null ? null : gap(roadRoute(P.hwX, tx(NJ - 1) + 22, c.x, c.z)) }; },
+    assetMem() {   // тест: какво държат заредените модели (A) — текстури (декодирани МБ) и геометрия, по модел
+      const seenT = new Set(), seenG = new Set(), rows = [];
+      for (const [k, g] of Object.entries(A)) { const sc = g && (g.scene || g); if (!sc || !sc.traverse) continue; let t = 0, gm = 0;
+        sc.traverse(o => { if (o.geometry && !seenG.has(o.geometry)) { seenG.add(o.geometry); for (const at of Object.values(o.geometry.attributes)) gm += at.array.byteLength; if (o.geometry.index) gm += o.geometry.index.array.byteLength; }
+          for (const m of [].concat(o.material || [])) for (const q in m) { const x = m[q]; if (x && x.isTexture && x.image && x.image.width && !seenT.has(x.source || x)) { seenT.add(x.source || x); t += x.image.width * x.image.height * 4; } } });
+        rows.push([k, Math.round(t / 2 ** 20), Math.round(gm / 2 ** 20)]); }
+      const tot = rows.reduce((a, r) => [a[0] + r[1], a[1] + r[2]], [0, 0]);
+      return { models: rows.length, texMB: tot[0], geoMB: tot[1], top: rows.sort((a, b) => (b[1] + b[2]) - (a[1] + a[2])).slice(0, 25).map(r => `${r[0]} t${r[1]} g${r[2]}`) }; },
     mem() { const i = renderer.info, tex = new Set(), geo = new Set(), mat = new Set(); let objs = 0; scene.traverse(o => { objs++; if (o.geometry) geo.add(o.geometry); for (const m of [].concat(o.material || [])) { mat.add(m); for (const k in m) if (m[k] && m[k].isTexture) tex.add(m[k]); } });
       let texMB = 0; for (const t of tex) { const im = t.image; if (im && im.width) texMB += im.width * im.height * 4 * (t.generateMipmaps !== false ? 1.33 : 1) / 2 ** 20; }
       return { gGeo: i.memory.geometries, gTex: i.memory.textures, progs: i.programs?.length, calls: i.render.calls, tris: i.render.triangles, objs, sceneGeo: geo.size, sceneMat: mat.size, sceneTex: tex.size, texMB: Math.round(texMB) }; },
