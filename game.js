@@ -86,7 +86,8 @@ import { buildPlanView } from './cityplan3d.js';
 import { prepNightFloors } from './nightfloors.js';
 import { showIntro } from './intro.js';
 import { feature } from './lab/feature.js';
-import { mountHub } from './hub.js';   // „📊 Империя ▾“ — бутоните от втория ред на лентата в падащ панел (feature 'top-hub')
+import { mountHub } from './hub.js';
+import { showLevel } from './lvshow.js';   // картинката на ниво 1 — при основаването на фирмата (feature 'lv-pics')   // „📊 Империя ▾“ — бутоните от втория ред на лентата в падащ панел (feature 'top-hub')
 import { sampleCurve } from './cityplan.js';
 import { planRoute, randomRoadPoint } from './cityplanroute.js';
 
@@ -3231,7 +3232,7 @@ function wireBrandField() {
 }
 function brandPick(then) {
   modal('🏢 Дай име на фирмата си', 'Името остава през цялата игра. С всеки нов бизнес основаваш дъщерно дружество: … Толроуд, … Рейл, … Оушън Експрес, … Флайеър, … Петролиум и накрая … Глобъл.' + brandField(),
-    [...BRANDS.map(b => [`${b.ico}`, () => { S.brand = b.k; const nm = cleanBrand($('brandNm')?.value); if (nm) S.brandNm = nm; group.check(true); save(); updLogo(); then && then(); }])]);
+    [...BRANDS.map(b => [`${b.ico}`, () => { S.brand = b.k; const nm = cleanBrand($('brandNm')?.value); if (nm) S.brandNm = nm; group.check(true); save(); updLogo(); if (feature('lv-pics')) showLevel(1, `${nm || 'Твоята'} Констръкшън е основана!`); then && then(); }])]);
   wireBrandField();
 }
 // ⚙️ → „✏️ Име на фирмата“: смяна на името по време на игра (дъщерните дружества го следват — group.js subName)
@@ -8128,6 +8129,7 @@ if (AUTOTEST) {
     parkTest2() { econ.earn(5e6, 'друго', 'тест'); const l = city.lots.find(x => !x.built && !x.busy && x !== city.hq); est().land.push(l.id); l.busy = 'land'; buildPark(l.id); const p = projects.find(q => q.park && q.lot === l.id); return { lot: l.id, started: !!p, stage: p?.stage, prog: p?.prog }; },
     parkState() { return projects.filter(q => q.park).map(p => ({ lot: p.lot, stage: p.stage, prog: +(p.prog || 0).toFixed(2), units: units.filter(u => u.proj === p).map(u => u.type + ':' + u.state) })).concat((S.parks || []).map(id => ({ done: id }))); },
     rollDemo() { econ.earn(5e6, 'друго', 'тест'); S.rep = 5; const ls = city.lots.filter(x => !x.built && !x.busy && x !== city.hq).slice(0, 3); for (const l of ls) { est().land.push(l.id); l.busy = 'land'; } showMap(false); tab = 'estate'; renderPanel(); return ls.length; },
+    lvShow(n = 2) { showLevel(n, 'Тест: ниво ' + n); return n; },
     sqLook(d = 200) { const q = city.plan?.square || city.hq; showMap(false); __dbg.camAt(q.x + d * 0.8, d * 0.75, q.z + d, q.x, 20, q.z); return (city.landmarks || []).length; },   // Лабораторията: центърът на града с план
     signLook(far) {   // Лабораторията: надписът HOLLYWOOD (Лос Анджелис по картата) — отблизо или градът с хълмовете отдалече
       const P = city.plan, g = P?.sign; if (!g) return null; const dx = Math.cos(g.a), dz = Math.sin(g.a), y = Math.max(0, P.heightAt(g.x, g.z));

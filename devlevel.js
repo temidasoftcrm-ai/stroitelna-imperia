@@ -2,6 +2,8 @@
 // Опит (XP) от обекти, жп линии, магистрали, филиали и куести. Всяко ниво: +2% към цената на поръчките.
 // Отключвания: ниво 5 (+ Балканите) — оферти от доставчици; ниво 8 — стокова борса.
 // Записът е в S.dev = { xp, lv }. deps: S(), toast, sound, save, pop(key, cap, sub), balkansOpen()
+import { feature } from './lab/feature.js';
+import { showLevel, LV_PICS } from './lvshow.js';   // ново ниво — картинка на черен екран (feature 'lv-pics')
 export const THRESH = [0, 1000, 4000, 10000, 20000, 40000, 70000, 110000, 170000, 250000, 350000, 480000, 640000, 840000, 1100000, 1400000, 1800000, 2300000, 2900000, 3600000];
 export const XP = { house: 50, shop: 200, office: 600, tower: 2000, rail: 1000, highway: 1500, branch: 3000, quest: 100 };
 // стари скали (по версия на записа) — за преизчисляване на опита
@@ -66,8 +68,9 @@ export function createDevLevel(deps) {
     const nl = lvOf(d.xp);
     while (d.lv < nl) {
       d.lv++;
-      deps.sound('levelup');
       deps.toast(`🏅 Фирмата е ниво ${d.lv}! ${UNLOCKS[d.lv] || ''}`, 'good', open);
+      if (feature('lv-pics') && LV_PICS.has(d.lv)) { showLevel(d.lv, UNLOCKS[d.lv] || ''); continue; }   // картинката на нивото (звукът е в lvshow.js)
+      deps.sound('levelup');
       if (deps.pop && !deps.pop(`lv-${d.lv}`, `🏅 Ниво на развитие ${d.lv}`, UNLOCKS[d.lv] || '')) deps.pop('office-up', `🏅 Ниво на развитие ${d.lv}`, UNLOCKS[d.lv] || '');
     }
     render();
