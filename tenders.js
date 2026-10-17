@@ -209,10 +209,12 @@ export function createTenders(deps) {
   }
 
   // ---- UI: карти за таба „Поръчки“ и прозорец за офертата
-  function cardsHtml() {
+  // only: 'open' — само отворените търгове (таб „Поръчки“); 'mine' — взетите (строят се / предадени; прозорецът „📜 Оферти“)
+  function cardsHtml(only) {
     const out = [];
     for (const t of TENDERS) {
       const s = st()[t.id]; if (!s || s.st === 'lost' && day() - s.lostDay > 3) continue;
+      if (only === 'open' && s.st !== 'open' || only === 'mine' && !['building', 'done'].includes(s.st)) continue;
       if (s.st === 'done' && day() - s.doneDay > 3) continue;
       const own = deps.owns(t.city);
       let body = '';

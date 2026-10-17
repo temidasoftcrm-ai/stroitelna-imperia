@@ -2672,7 +2672,7 @@ function renderPanel() {
       ? `<div class="row" style="margin:0 0 8px;flex-wrap:wrap;gap:6px"><span class="meta" style="margin:0;flex:1 1 160px">📨 Всички ${S.offers.length} оферти наведнъж — с избраните цени · място в офиса: <b>${Math.max(0, officeLv().proj - busyCount())}</b></span><button class="btn" id="bOfferAll" style="touch-action:manipulation">📨 Предложи всички</button></div>`
       : `<div class="meta" style="margin:0 0 8px;opacity:.7">🔒 „📨 Предложи всички“ се отключва при репутация 3 ★ (сега ${S.rep.toFixed(1)} ★).</div>`;
     h += rivals.marketHtml();
-    h += tenders.cardsHtml();
+    h += tenders.cardsHtml('open');   // взетите (в строеж) — в „📜 Оферти“
     if (freeLotCount() < 3) h += `<div class="meta" style="text-align:center;color:var(--acc)">🏙️ Градът е почти застроен — купи нов квартал от таб „Офис“.</div>`;
     for (const o of [...S.offers].sort((a, b) => (b.demolish ? 1 : 0) - (a.demolish ? 1 : 0))) {
       const bt = BTYPES[o.type];
@@ -6982,9 +6982,40 @@ function rebuildBigger(lotId) {
 }
 // ---- паркове: строят се на твой парцел; вдигат наемите (+15%) и цените в радиус ~2 карета
 const PARK_COST = 25000, PARK_R = 34;
-BTYPES.park = { nm: 'Парк', ico: '🌳', est: true, rep: Infinity, repGain: 0, stages: [{ nm: 'Озеленяване', need: { crew: 1, tractor: 1 }, work: 25 }] };
+BTYPES.park = { nm: 'Парк', ico: '🌳', est: true, rep: Infinity, repGain: 0, stages: [{ nm: 'Озеленяване', need: { tractor: 1 }, work: 25 }] };   // само трактор: с бригада паркът чакаше вечно (бригадите са все по къщите)
 const parksNear = lot => (S.parks || []).filter(id => id !== lot.id && Math.hypot(city.lots[id].x - lot.x, city.lots[id].z - lot.z) <= PARK_R).length;
 const parkMul = lot => 1 + Math.min(2, parksNear(lot)) * 0.15;
+// „🎲 Строй“ (feature 'estate-random'): на твоя парцел се строи случайна сграда — иначе всички винаги избират небостъргача.
+// Тегла: къща 30, магазин 20, офис 30, небостъргач 20, парк 10 (паркът — само ако имаш пари за него). Барабан с иконите се върти ~2 с.
+const EST_ROLL = [['house', 30], ['shop', 20], ['office', 30], ['tower', 20], ['park', 10]];
+const estRolling = new Map();   // парцел → резултат, докато се върти барабанът
+const estIco = k => k === 'park' ? '🌳' : BTYPES[k].ico, estNm = k => k === 'park' ? 'Парк' : BTYPES[k].nm;
+function estRollHtml(id) {
+  const tot = EST_ROLL.reduce((a, [, w]) => a + w, 0), odds = EST_ROLL.map(([k, w]) => `${estIco(k)} ${Math.round(w / tot * 100)}%`).join(' · ');
+  const r = estRolling.get(id), q = (S.buildQ || []).find(x => x.lot === id);   // изтеглено и на опашка — не се върти повторно
+  if (q) return `<div class="row" style="gap:8px;align-items:center"><button class="btn2" disabled style="flex:1;font-size:16px">🎲 Изтеглено: ${estIco(q.type)} ${estNm(q.type)}</button></div>`;
+  return `<div class="row" style="flex-wrap:wrap;gap:8px;align-items:center"><button class="btn" data-roll="${id}" style="flex:1;font-size:16px" ${r ? 'disabled' : ''}>🎲 Строй — изненада!</button>
+    <div class="reel" id="reel${id}" style="min-width:64px;height:44px;border-radius:10px;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;font-size:30px">${r ? '🎰' : '❔'}</div></div>
+    <div class="meta" style="margin:4px 0 0">Шанс: ${odds}. Наем: 🏠 ${fmt(RENT.house)} · 🏪 ${fmt(RENT.shop)} · 🏢 ${fmt(RENT.office)} · 🌆 ${fmt(RENT.tower)} €/ден · 🌳 парк — +15% наем наоколо.</div>`;
+}
+function estRoll(id) {
+  if (estRolling.has(id)) return;
+  const pool = EST_ROLL.filter(([k]) => k !== 'park' || econ.canAfford(PARK_COST)), tot = pool.reduce((a, [, w]) => a + w, 0);
+  let x = Math.random() * tot, res = pool[0][0]; for (const [k, w] of pool) { if ((x -= w) < 0) { res = k; break; } }
+  estRolling.set(id, res); Sound.play('click');
+  const icons = EST_ROLL.map(([k]) => estIco(k)), t0 = performance.now(), D = 2000;
+  let last = 0;
+  const spin = now => {
+    const el = document.getElementById('reel' + id), t = Math.min(1, (now - t0) / D);
+    if (t < 1) { const gap = 50 + 450 * t * t; if (now - last > gap) { last = now; if (el) { el.textContent = icons[(Math.random() * icons.length) | 0]; el.style.transform = 'scale(1.15)'; setTimeout(() => el.style.transform = '', 60); } } requestAnimationFrame(spin); return; }
+    if (el) { el.textContent = estIco(res); el.style.transform = 'scale(1.35)'; el.style.transition = 'transform .3s'; }
+    estRolling.delete(id);
+    toast(`🎲 ${estIco(res)} ${estNm(res)}!${res === 'park' ? ' Паркът вдига наема на имотите наоколо.' : ` Ще носи ~${fmt(RENT[res])} €/ден.`}`, res === 'tower' ? 'good' : '');
+    if (res === 'park') buildPark(id); else buildOnLand(id, res);
+    save(); setTimeout(renderPanel, 900);
+  };
+  requestAnimationFrame(spin); renderPanel();
+}
 function buildPark(id) {
   const lot = city.lots[id];
   if (!econ.canAfford(PARK_COST)) { toast('Нямаш достатъчно пари за парка.', 'bad'); return; }
@@ -7097,12 +7128,12 @@ function estateHtml() {
   if (E.land.length) h += `<div class="sect">Твоите парцели</div>`;
   for (const id of E.land) {
     const lot = city.lots[id];
-    h += `<div class="card" data-lot="${id}"><h3><span class="ico">🟩</span>Парцел · ${lot.zone === 'center' ? 'център' : lot.zone === 'mid' ? 'среден пояс' : 'покрайнини'}</h3><div class="meta">Какво да построиш (за наем):</div>
-      <div class="row" style="flex-wrap:wrap;justify-content:flex-start;gap:6px">${Object.entries(RENT).map(([k, r]) => {
+    h += `<div class="card" data-lot="${id}"><h3><span class="ico">🟩</span>Парцел · ${lot.zone === 'center' ? 'център' : lot.zone === 'mid' ? 'среден пояс' : 'покрайнини'}</h3><div class="meta">${feature('estate-random') ? 'Какво ще излезе? Натисни и виж:' : 'Какво да построиш (за наем):'}</div>
+      ${feature('estate-random') ? estRollHtml(id) : `      <div class="row" style="flex-wrap:wrap;justify-content:flex-start;gap:6px">${Object.entries(RENT).map(([k, r]) => {
         const bt = BTYPES[k], ok = S.rep >= bt.rep, qd = (S.buildQ || []).find(q => q.lot === id && q.type === k);
-        return `<button class="btn${qd ? '' : '2'}" data-build="${id}:${k}" title="${ok ? `Наем ~${fmt(r)} €/ден` : `Нужна репутация ${bt.rep} ★ — маркирай го и ще се построи сам, щом я стигнеш`}">${bt.ico} ${bt.nm} · ${fmt(r)}€/ден${ok ? '' : ` · 🔒${bt.rep}★`}</button>`; }).join('')}</div>
-      ${(S.buildQ || []).some(q => q.lot === id) ? `<div class="row" style="margin:4px 0"><span class="meta" style="margin:0;color:var(--acc)">⏳ На опашка: ${BTYPES[S.buildQ.find(q => q.lot === id).type].nm} (№${S.buildQ.findIndex(q => q.lot === id) + 1}) — ${S.rep < BTYPES[S.buildQ.find(q => q.lot === id).type].rep ? `чака ${BTYPES[S.buildQ.find(q => q.lot === id).type].rep} ★` : 'започва сам'}</span><button class="btn2" data-unq="${id}">Махни</button></div>` : ''}
-      <div class="row" style="justify-content:space-between"><button class="btn2" data-park="${id}" title="+15% наем за твоите имоти наоколо и по-скъпи парцели">🌳 Парк · ${fmt(PARK_COST)} €</button><button class="btn2" data-sellland="${id}">Продай парцела</button></div></div>`;
+        return `<button class="btn${qd ? '' : '2'}" data-build="${id}:${k}" title="${ok ? `Наем ~${fmt(r)} €/ден` : `Нужна репутация ${bt.rep} ★ — маркирай го и ще се построи сам, щом я стигнеш`}">${bt.ico} ${bt.nm} · ${fmt(r)}€/ден${ok ? '' : ` · 🔒${bt.rep}★`}</button>`; }).join('')}</div>`}
+      ${(S.buildQ || []).some(q => q.lot === id) ? `<div class="row" style="margin:4px 0"><span class="meta" style="margin:0;color:var(--acc)">⏳ На опашка: ${BTYPES[S.buildQ.find(q => q.lot === id).type].nm} (№${S.buildQ.findIndex(q => q.lot === id) + 1}) — ${S.rep < BTYPES[S.buildQ.find(q => q.lot === id).type].rep ? `чака ${BTYPES[S.buildQ.find(q => q.lot === id).type].rep} ★` : 'започва сам'}</span>${feature('estate-random') ? '' : `<button class="btn2" data-unq="${id}">Махни</button>`}</div>` : ''}
+      <div class="row" style="justify-content:space-between">${feature('estate-random') ? '' : `<button class="btn2" data-park="${id}" title="+15% наем за твоите имоти наоколо и по-скъпи парцели">🌳 Парк · ${fmt(PARK_COST)} €</button>`}<button class="btn2" data-sellland="${id}">Продай парцела</button></div></div>`;
   }
   h += `<div class="sect">Къщи за продан</div>`;
   if (!E.listings.length) h += `<div class="meta">Няма обяви в момента. Нови идват почти всеки ден.</div>`;
@@ -7134,6 +7165,7 @@ function bindEstate(el) {
   on('[data-cancel]', b => cancelSale(+b.dataset.cancel));
   on('[data-sellland]', b => sellLand(+b.dataset.sellland));
   on('[data-park]', b => buildPark(+b.dataset.park));
+  on('[data-roll]', b => estRoll(+b.dataset.roll));
 }
 
 // ============================================================ много градове: централа + филиали, всеки е пълен град
@@ -7371,10 +7403,11 @@ function buyBranchHtml() {
 // 📜 Оферти: доставчиците (материали на заводска цена) и отворените държавни търгове — на едно място
 function offersWinHtml() {
   const sp = supply.state(), n = sp.offers.length, sup = supply.hudHtml().replace('<div class="sect">📜 Оферти от доставчици</div>', '');
-  let h = `<div class="bw-stats"><div><b>${n}</b><span>оферти от доставчици</span></div><div><b>${sp.deals.length}</b><span>сключени договора</span></div><div><b>${TENDERS.filter(t => tenders.state(t.id)?.st === 'open').length}</b><span>отворени търгове</span></div></div>`;
+  let h = `<div class="bw-stats"><div><b>${n}</b><span>оферти от доставчици</span></div><div><b>${sp.deals.length}</b><span>сключени договора</span></div><div><b>${TENDERS.filter(t => tenders.state(t.id)?.st === 'building').length}</b><span>държавни поръчки в строеж</span></div><div><b>${TENDERS.filter(t => tenders.state(t.id)?.st === 'open').length}</b><span>отворени търгове</span></div></div>`;
   h += bwCard(`🏭 Доставчици${n > 1 ? `<span style="margin-left:auto"><button class="btn2" data-saccall="1">✅ Приеми всички</button></span>` : ''}`, sup || '<div class="meta" style="margin:0">Няма нови оферти — доставчиците пращат по някоя на всеки няколко дни.</div>');
   const open = TENDERS.filter(t => tenders.state(t.id)?.st === 'open');
   if (open.length) h += `<div class="sect" style="margin-top:8px">🏛️ Отворени държавни търгове</div>` + tenders.cardsHtml().split('<div class="card tender-card">').filter((x, i) => i && /оферти до ден/.test(x)).map(x => '<div class="card tender-card">' + x).join('');
+  { const mine = tenders.cardsHtml('mine'); if (mine) h += `<div class="sect" style="margin-top:8px">🏗️ Взети държавни поръчки</div>` + mine; }
   return h;
 }
 function updOffersBtn() { const b = $('btnOffers'); if (!b || !S) return; const n = supply.state().offers.length + TENDERS.filter(t => tenders.state(t.id)?.st === 'open').length; b.innerHTML = `📜 Оферти${n ? ` <b style="color:#ffd54a">${n}</b>` : ''}`; b.style.display = n || supply.state().deals.length || dev.has('BALKANS') ? '' : 'none'; }
@@ -8066,6 +8099,7 @@ if (AUTOTEST) {
     hubOpen() { const S = __dbg.state(); S.dev.lv = 14; S.dev.xp = 3e6; S.branches = [...new Set([...(S.branches || []), 'plovdiv', 'varna'])]; updFlowBtns(); setTimeout(() => $('btnHub')?.click(), 1500); return !!$('btnHub'); },
     parkTest2() { econ.earn(5e6, 'друго', 'тест'); const l = city.lots.find(x => !x.built && !x.busy && x !== city.hq); est().land.push(l.id); l.busy = 'land'; buildPark(l.id); const p = projects.find(q => q.park && q.lot === l.id); return { lot: l.id, started: !!p, stage: p?.stage, prog: p?.prog }; },
     parkState() { return projects.filter(q => q.park).map(p => ({ lot: p.lot, stage: p.stage, prog: +(p.prog || 0).toFixed(2), units: units.filter(u => u.proj === p).map(u => u.type + ':' + u.state) })).concat((S.parks || []).map(id => ({ done: id }))); },
+    rollDemo() { econ.earn(5e6, 'друго', 'тест'); S.rep = 5; const ls = city.lots.filter(x => !x.built && !x.busy && x !== city.hq).slice(0, 3); for (const l of ls) { est().land.push(l.id); l.busy = 'land'; } showMap(false); tab = 'estate'; renderPanel(); return ls.length; },
     sqLook(d = 200) { const q = city.plan?.square || city.hq; showMap(false); __dbg.camAt(q.x + d * 0.8, d * 0.75, q.z + d, q.x, 20, q.z); return (city.landmarks || []).length; },   // Лабораторията: центърът на града с план
     signLook(far) {   // Лабораторията: надписът HOLLYWOOD (Лос Анджелис по картата) — отблизо или градът с хълмовете отдалече
       const P = city.plan, g = P?.sign; if (!g) return null; const dx = Math.cos(g.a), dz = Math.sin(g.a), y = Math.max(0, P.heightAt(g.x, g.z));

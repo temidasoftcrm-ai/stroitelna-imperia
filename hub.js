@@ -3,7 +3,7 @@
 // надписи (+X €/ден, „Оферти 3“) си остават; кодът, който ги показва/скрива (style.display), продължава да работи.
 // Късно създадените (Партньор, Онлайн, Вход — coop.js, online-btn.js, cloud.js) се хващат с MutationObserver. Зад feature('top-hub').
 const IDS = ['garBtn', 'trBtn', 'railBtn', 'hwBtn', 'seaBtn', 'airBtn', 'resBtn', 'finBtn', 'holdBtn', 'superBtn', 'btnCities', 'btnOffers', 'btnMines',
-  'btnConquest', 'qBtn', 'bankBtn', 'btnCine', 'coopBtn', 'onlineBtn', 'cloudBtn'];
+  'btnConquest', 'qBtn', 'bankBtn', 'btnCine', 'coopBtn', 'onlineBtn', 'cloudBtn', 'oilBtn'];
 const css = `
 /* лентата на един ред (компютър): без втория ред на index.html (#top::after, order:2); телефонът (body.mob) си остава както е */
 body.hub1:not(.mob) { --topH:56px; }
@@ -24,6 +24,10 @@ body.hub1:not(.mob) #top::after { display:none; }
 `;
 export function mountHub(top, after) {
   if (document.getElementById('btnHub')) return;
+  if (document.body.classList.contains('mob')) return;   // телефонът има свой плъзгащ се ред (mobile.js)
+  // много модули вмъкват бутон „преди“ друг бутон от лентата (напр. $('finBtn')), който вече е в панела — тогава просто в лентата (оттам го взима take)
+  const ins = top.insertBefore;
+  top.insertBefore = function (n, ref) { return ins.call(top, n, ref && ref.parentNode === top ? ref : null); };
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
   const btn = document.createElement('button'); btn.id = 'btnHub'; btn.className = 'btn2'; btn.textContent = '📊 Империя ▾'; btn.title = 'Гараж, транспорт, курорти, градове, оферти, завладяване…';
   (after && after.parentNode === top ? after.nextSibling : top.firstChild) ? top.insertBefore(btn, after && after.parentNode === top ? after.nextSibling : null) : top.appendChild(btn);
