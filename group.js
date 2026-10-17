@@ -12,14 +12,16 @@ export const BRANDS = [
 // логата на дружествата (assets/ui/subs/<k>.webp, от потребителя); незаснованото — сиво
 // неоснованите в холдинга — замъглени цели (winHtml); готовите за основаване — ясни
 export const subLogo = (k, px = 32, on = true) => `<img src="assets/ui/subs/${k}.webp" alt="" style="width:${px}px;height:${px}px;object-fit:contain;flex-shrink:0;${on ? '' : 'filter:grayscale(1);opacity:.55'}">`;
+// нивото на фирмата, от което дружеството може да се отвори (за „🔒 ниво N“ в холдинга)
+export const SUB_LV = { con: 1, hw: 2, rail: 2, sea: 6, air: 9, hotel: 15, oil: 16, bank: 17, glob: 20 };
 export const SUBS = [
   { k: 'con', ico: '🏗️', suf: 'Констръкшън', what: 'строителство', how: 'от началото', open: () => true, inc: c => c.finDaily() },
   { k: 'hw', ico: '🛣️', suf: 'Толроуд', what: 'магистрали и тол', how: 'първата готова магистрала', open: c => c.hwN() > 0, inc: c => c.toll() },
   { k: 'rail', ico: '🚆', suf: 'Рейл', what: 'железници', how: 'първата готова жп линия', open: c => c.railN() > 0, inc: c => c.flow('rail') },
   { k: 'sea', ico: '🚢', suf: 'Оушън Експрес', what: 'кораби и пристанища', how: 'първото пристанище', open: c => c.portN() > 0, inc: c => c.flow('sea') },
   { k: 'air', ico: '✈️', suf: 'Флайеър', what: 'авиация', how: 'първото летище', open: c => c.airN() > 0, inc: c => c.flow('air') },
-  { k: 'oil', ico: '🛢️', suf: 'Петролиум', what: 'петрол и гориво', how: 'първото петролно находище (Азия)', open: c => c.oilN() > 0, inc: c => c.oilDaily() },
   { k: 'hotel', ico: '🏨', suf: 'Хотелс', what: 'хотели по света', how: 'офис ниво 10 в някой град (ерата на холдинга)', open: c => (c.hotelN ? c.hotelN() : 0) > 0, inc: c => c.hotelDaily ? c.hotelDaily() : 0 },
+  { k: 'oil', ico: '🛢️', suf: 'Петролиум', what: 'петрол и гориво', how: 'първото петролно находище (Азия)', open: c => c.oilN() > 0, inc: c => c.oilDaily() },
   { k: 'bank', ico: '🏦', suf: 'Банк', what: 'банка и кредити', how: 'основи банката (ерата на холдинга)', open: c => !!(c.bankOn && c.bankOn()), inc: c => c.bankDaily ? c.bankDaily() : 0 },
   { k: 'glob', ico: '🌍', suf: 'Глобъл Ризортс & Констръкшън', what: 'световна империя', how: 'ниво 20 — Световна империя', open: c => c.empire(), inc: () => 0, final: true },
 ];
@@ -107,11 +109,12 @@ export function createGroup(deps) {
     h += H ? `<div class="meta" style="margin:8px 0">🏛️ <b>Ерата на холдинга</b> (от ден ${H}): градовете, поръчките, линиите и флотите вървят сами. Ти управляваш дружествата: <b>⬆️ развитие</b> дава +${Math.round(HOLD_LV_K * 100)}% от прихода им на ниво (до ${HOLD_LV_MAX}), а <b>👔 директорът</b> още +${Math.round(HOLD_DIR_K * 100)}%.</div>`
       : `<div class="meta" style="margin:8px 0">🔒 От <b>ниво 15</b> идва <b>🏛️ Ерата на холдинга</b>: всичко досегашно минава на автопилот, а ти управляваш дружествата.</div>`;
     h += extra;
+    h += '<style>.subLock > *:not(.subLv){filter:blur(2.5px);opacity:.55;pointer-events:none;user-select:none}.subLv{position:absolute;right:12px;top:50%;transform:translateY(-50%);z-index:2;padding:5px 12px;border-radius:999px;background:rgba(0,0,0,.65);border:1px solid var(--line);font-weight:800;color:#ffd54a}</style>';   // заключените — замъглени, с ясна значка „🔒 ниво N“
     h += SUBS.map(s => {
       const on = g[s.k], inc = on ? s.inc(deps) || 0 : 0, L = hold().lv[s.k] || 0, dir = hold().dir[s.k], man = H && on && !s.final && inc > 0;   // без приход — няма какво да се умножава
       const ctl = man ? `<div class="row" style="margin:6px 0 0;gap:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0;flex:1">${'★'.repeat(L)}${'☆'.repeat(HOLD_LV_MAX - L)} ниво ${L}${dir ? ` · 👔 ${dir}` : ''}${bonusK(s.k) ? ` · <b style="color:#ffd54a">+${f(bonusOf(s.k))} €/ден</b> (+${Math.round(bonusK(s.k) * 100)}%)` : ''}</span>${L < HOLD_LV_MAX ? `<button class="btn2" data-hup="${s.k}" ${deps.econ().canAfford(upCost(s.k)) ? '' : 'disabled'}>⬆️ Развий · ${f(upCost(s.k))} €</button>` : ''}${dir ? '' : `<button class="btn2" data-hdir="${s.k}" ${deps.econ().canAfford(dirCost(s.k)) ? '' : 'disabled'}>👔 Директор · ${f(dirCost(s.k))} €</button>`}</div>` : '';
       const fb = !on && canFound(s.k) ? `<div class="row" style="margin:6px 0 0;gap:6px;align-items:center"><span class="meta" style="margin:0;flex:1">🎁 ${FOUND[s.k].gift}</span><button class="btn" data-hfound="${s.k}">Основи · ${f(FOUND[s.k].cost)} €</button></div>` : '';
-      return `<div class="card" style="${on ? `border-left:4px solid ${b.col}` : fb ? '' : 'opacity:.55;filter:blur(2.5px);pointer-events:none;user-select:none'}"><div class="row" style="margin:0;align-items:center;gap:10px">${subLogo(s.k, 44, on)}<span class="meta" style="margin:0;flex:1"><b style="color:var(--txt);font-size:15px">${b.nm} ${s.suf}</b><br>${s.what}${on ? ` · основана на ден ${on}` : ` · 🔒 ${s.how}`}</span>${on && !s.final ? `<b style="color:${inc ? 'var(--ok)' : 'var(--mut, #9aa)'}">${inc ? `+${f(inc)} €/ден` : '—'}</b>` : ''}</div>${ctl}${s.k === 'oil' && on ? '<div class="row" style="justify-content:flex-end;margin:6px 0 0"><button class="btn" data-hoil="1">🛢️ Петролната империя →</button></div>' : ''}${fb}</div>`;
+      return `<div class="card${!on && !fb ? ' subLock' : ''}" style="position:relative;${on ? `border-left:4px solid ${b.col}` : ''}">${!on && !fb ? `<span class="subLv">🔒 ниво ${SUB_LV[s.k] || '?'}</span>` : ''}<div class="row" style="margin:0;align-items:center;gap:10px">${subLogo(s.k, 44, on)}<span class="meta" style="margin:0;flex:1"><b style="color:var(--txt);font-size:15px">${b.nm} ${s.suf}</b><br>${s.what}${on ? ` · основана на ден ${on}` : ` · 🔒 ${s.how}`}</span>${on && !s.final ? `<b style="color:${inc ? 'var(--ok)' : 'var(--mut, #9aa)'}">${inc ? `+${f(inc)} €/ден` : '—'}</b>` : ''}</div>${ctl}${s.k === 'oil' && on ? '<div class="row" style="justify-content:flex-end;margin:6px 0 0"><button class="btn" data-hoil="1">🛢️ Петролната империя →</button></div>' : ''}${fb}</div>`;
     }).join('');
     return h;
   }
