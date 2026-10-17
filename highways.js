@@ -110,6 +110,58 @@ function makeRoller() {
 // ---------------------------------------------------------------- 3D изглед на участък
 // Права отсечка с дължина LEN по оста Z: насип → чакъл → асфалт → оборудване. По средата — мост над река.
 const CW = 9, MED = 3;     // ширина на платно и на разделителя (м)
+const AB_CW = 14.4, AB_MED = 4;   // аутобан: 4 ленти × 3,6 м на посока, разделител 4 м
+// асфалтът на аутобана: платно 14,4 × 10 м с бели ръбове и 3 прекъснати линии между лентите
+let abLaneM = null;
+const abLaneMat = () => abLaneM || (abLaneM = (() => {
+  const c = document.createElement('canvas'); c.width = 288; c.height = 200; const x = c.getContext('2d');
+  x.fillStyle = '#3a3c40'; x.fillRect(0, 0, 288, 200);
+  for (let k = 0; k < 900; k++) { x.fillStyle = `rgba(${Math.random() < 0.5 ? '0,0,0' : '255,255,255'},0.05)`; x.fillRect(Math.random() * 288, Math.random() * 200, 2, 2); }
+  x.fillStyle = '#f2f2f2'; x.fillRect(4, 0, 5, 200); x.fillRect(279, 0, 5, 200);   // ръбовете (плътни)
+  for (let l = 1; l < 4; l++) for (let y = 0; y < 200; y += 100) x.fillRect(l * 72 - 2, y + 20, 4, 60);   // между лентите (прекъснати)
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  return new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 });
+})());
+const abRailMat = new THREE.MeshStandardMaterial({ color: 0xb8bcc2, roughness: 0.4, metalness: 0.6 });
+// синя табела (аутобан) с текст
+function abBoard(lines, w = 12, h = 3.6) {
+  const c = document.createElement('canvas'); c.width = 640; c.height = Math.round(640 * h / w); const x = c.getContext('2d');
+  x.fillStyle = '#1d4fa8'; x.fillRect(0, 0, c.width, c.height); x.strokeStyle = '#fff'; x.lineWidth = 8; x.strokeRect(10, 10, c.width - 20, c.height - 20);
+  x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  lines.forEach((ln, i) => { x.font = `bold ${i ? 46 : 64}px system-ui`; x.fillText(ln, c.width / 2, c.height * (lines.length === 1 ? 0.5 : 0.3 + i * 0.42), c.width - 40); });
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.MeshBasicMaterial({ map: t });
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ color: 0x8a9096, metalness: 0.4 })); back.rotation.y = Math.PI; back.position.z = -0.02;
+  const o = new THREE.Mesh(new THREE.PlaneGeometry(w, h), m); o.add(back); return o;
+}
+// пътен възел встрани от града (−x): друг аутобан тръгва настрани, с две криви отбивки (изход/вход) и портални табели преди него
+function abExit(g, gear, { W, cw, med, z0, LEN, H, zE, name, exitTo }) {
+  const y = H() + 0.03, SW = cw * 2 + med, R = 38, x0 = -W / 2, STUB = 220, add = (o, z) => { o.userData.z = z; g.add(o); gear.push(o); };
+  // другият аутобан: две платна по −x
+  for (let d = 0; d < STUB; d += 10) for (const sd of [-1, 1]) {
+    const a = new THREE.Mesh(new THREE.PlaneGeometry(cw, 10), abLaneMat()); a.rotation.x = -Math.PI / 2; a.rotation.z = Math.PI / 2 + (sd > 0 ? Math.PI : 0); a.position.set(x0 - R * 0.6 - d - 5, y - 0.005, zE + sd * (cw + med) / 2); add(a, zE);
+  }
+  { const m = new THREE.Mesh(new THREE.BoxGeometry(STUB, 0.9, 0.6), new THREE.MeshStandardMaterial({ color: 0xd8d8d0, roughness: 0.8 })); m.position.set(x0 - R * 0.6 - STUB / 2, y + 0.45, zE); add(m, zE); }
+  // криви отбивки (четвърт кръг, 7 м широки): от външния ръб на платното към другия аутобан
+  const rampM = new THREE.MeshStandardMaterial({ color: 0x3a3c40, roughness: 0.9 });
+  for (const sd of [-1, 1]) {
+    const cz = zE + sd * (SW / 2 + R), rg = new THREE.RingGeometry(R - 3.5, R + 3.5, 28, 1, sd < 0 ? -Math.PI / 2 : 0, Math.PI / 2);
+    const r = new THREE.Mesh(rg, rampM); r.rotation.x = -Math.PI / 2; r.position.set(x0 - R, y - 0.01, cz); add(r, cz);
+    const edge = new THREE.Mesh(new THREE.RingGeometry(R + 3.3, R + 3.6, 28, 1, sd < 0 ? -Math.PI / 2 : 0, Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xf2f2f2 }));
+    edge.rotation.x = -Math.PI / 2; edge.position.set(x0 - R, y + 0.005, cz); add(edge, cz);
+  }
+  // портални табели над платното откъм възела: 1000 м и при самия изход; отстрани — „Изход“
+  const gantry = (z, lines) => {
+    const post = new THREE.MeshStandardMaterial({ color: 0x8a9096, metalness: 0.5, roughness: 0.5 });
+    for (const xx of [-W / 2 - 1, -med / 2 - 0.5]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.5, 8.5, 0.5), post); p.position.set(xx, y + 4.25, z); add(p, z); }
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(cw + 2, 0.5, 0.5), post); beam.position.set(-(cw + med) / 2, y + 8.3, z); add(beam, z);
+    const b = abBoard(lines, cw - 1, 3.2); b.rotation.y = Math.PI; b.position.set(-(cw + med) / 2, y + 6.4, z - 0.3); add(b, z);   // към идващите коли (карат към +z)
+  };
+  gantry(zE - SW / 2 - R - 110, [`${name} ⬋ ${exitTo || 'Възел'}`, 'Изход 1000 м']);
+  gantry(zE - SW / 2 - R - 20, [`⬋ ${name}`, exitTo || 'Изход']);
+  const ex = abBoard(['⬋ Изход'], 4, 1.4); ex.position.set(x0 - 3, y + 2.6, zE - SW / 2 - R + 4); ex.rotation.y = Math.PI; add(ex, zE);
+  const exP = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.4, 0.2), new THREE.MeshStandardMaterial({ color: 0x8a9096 })); exP.position.set(x0 - 3, y + 1.2, zE - SW / 2 - R + 4); add(exP, zE);
+}
 const RIVER_W = 26;
 
 function clone(A, n, s) {
@@ -137,7 +189,9 @@ export function buildHighwayView(A, opts = {}) {
   const onBridge = z => Math.abs(z - RIVER_Z) < RIVER_W / 2 + 6;
   const H = () => 0.9;     // платното е на една височина, мостът е продължение на насипа
 
-  const W = CW * 2 + MED;
+  // opts.ab — аутобан: по 4 ленти във всяка посока (3,6 м), по-широк разделител, асфалт с маркировка вместо плочките на магистралата
+  const AB = !!opts.ab, cw = AB ? AB_CW : CW, med = AB ? AB_MED : MED;
+  const W = cw * 2 + med;
   // 1) насип (пръст) — сегменти по 10 м
   const earth = [], gravel = [], asphalt = [], gear = [];
   const earthMat = new THREE.MeshStandardMaterial({ color: 0x7a5a3a, roughness: 1 });
@@ -157,7 +211,14 @@ export function buildHighwayView(A, opts = {}) {
     }
   }
   // 2) асфалт: две платна от плочки road-straight-barrier (по 9 м) — на моста отгоре
-  for (let z = z0; z < z0 + LEN; z += CW) {
+  if (AB) for (let z = z0; z < z0 + LEN; z += 10) {   // аутобан: две широки платна с 4 ленти и мантинели отстрани
+    const zc = z + 5;
+    for (const sd of [-1, 1]) {
+      const a = new THREE.Mesh(new THREE.PlaneGeometry(cw, 10), abLaneMat()); a.rotation.x = -Math.PI / 2; if (sd > 0) a.rotation.z = Math.PI; a.position.set(sd * (cw + med) / 2, H(zc) + 0.03, zc); a.receiveShadow = true; a.userData.z = zc; g.add(a); asphalt.push(a);
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.7, 10), abRailMat); rail.position.set(sd * (W / 2 + 0.1), H(zc) + 0.4, zc); rail.userData.z = zc; g.add(rail); asphalt.push(rail);
+    }
+  }
+  for (let z = z0; z < (AB ? z0 : z0 + LEN); z += CW) {
     const zc = z + CW / 2;
     for (const x of [-(CW + MED) / 2, (CW + MED) / 2]) {
       const t = clone(A, 'road-straight-barrier', CW);
@@ -176,6 +237,7 @@ export function buildHighwayView(A, opts = {}) {
   for (let z = z0 + 10; z < z0 + LEN; z += 30) {
     const l = clone(A, 'light-curved-double', 14); l.position.set(0, H(z) + 0.9, z); l.rotation.y = Math.PI / 2; l.userData.z = z; g.add(l); gear.push(l);
   }
+  if (AB && opts.exit !== false) abExit(g, gear, { W, cw, med, z0, LEN, H, zE: opts.exitZ ?? z0 + LEN * 0.22, name: opts.abName || 'A', exitTo: opts.exitTo || '' });
   for (const z of [z0 + 30, z0 + LEN - 40]) {
     const sgn = clone(A, 'sign-highway-wide', 11); sgn.position.set(W / 2 + 1.5, 0, z); sgn.rotation.y = Math.PI / 2; sgn.userData.z = z; g.add(sgn); gear.push(sgn);
   }
@@ -216,7 +278,7 @@ export function buildHighwayView(A, opts = {}) {
     const done = stage > 3;
     front.visible = !done;
     front.position.z = fz;
-    const asph = stage === 2, lx = -(CW + MED) / 2;
+    const asph = stage === 2, lx = -(cw + med) / 2;
     paver.visible = fresh.visible = asph;
     rollers.forEach(r => r.visible = asph);
     // полагачът върви напред по фронта; плочата му е точно на ръба на асфалта
@@ -238,5 +300,5 @@ export function buildHighwayView(A, opts = {}) {
     });
   }
   update(opts.stage ?? 0, opts.prog ?? 0);
-  return { group: g, update, length: LEN, width: CW * 2 + MED };
+  return { group: g, update, length: LEN, width: W };
 }

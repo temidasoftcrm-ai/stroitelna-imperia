@@ -93,6 +93,7 @@ import { planRoute, randomRoadPoint } from './cityplanroute.js';
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 const AUTOTEST = params.has('autotest');
+window.__stroiLv = () => (S && typeof dev !== 'undefined' ? dev.best() : 0);   // нивото на фирмата — за tips.js (съветите сами — до ниво 10)
 const SAVE_KEY = saveKey();   // зависи от текущия слот (saves.js)
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[(Math.random() * a.length) | 0];
@@ -6524,20 +6525,22 @@ function buildCityHighway() {
   if (!done && !job) return;
   const g = new THREE.Group();
   const hx0 = Math.min(tx(0), -(N * TILE) / 2), hx1 = Math.max(tx(NI - 1), (N * TILE) / 2), hLen = hx1 - hx0 + 200, hcx = (hx0 + hx1) / 2;   // по цялата ширина на града
-  const v = buildHighwayView(A, { len: hLen, river: false, ground: false });
+  const seg0 = done || mine.find(s => s.id === job.seg), isAb = ALL_AB.some(x => x.id === seg0.id), far = isAb ? cityById(seg0.a === S.cityId ? seg0.b : seg0.a) : null;
+  const hz = tx(NJ - 1) + (isAb ? 42 : 34);   // аутобанът е по-широк (4 ленти на посока) — малко по-далеч от града
+  const v = buildHighwayView(A, { len: hLen, river: false, ground: false, ab: isAb, abName: isAb ? 'A' + (1 + (hashStr(seg0.id) % 9)) : '', exitTo: far ? far.nm : '' });
   v.group.rotation.y = Math.PI / 2;
-  v.group.position.set(hcx, 0, tx(NJ - 1) + 34);
+  v.group.position.set(hcx, 0, hz);
   g.add(v.group);
   // пътна връзка от южната улица към магистралата
   const conn = [];
-  for (let z = tx(NJ - 1) + TILE; z < tx(NJ - 1) + 22; z += TILE) {
+  for (let z = tx(NJ - 1) + TILE; z < hz - (isAb ? 18 : 12); z += TILE) {
     const t = model('road-straight', TILE); t.rotation.y = Math.PI / 2; t.position.set(city.plan?.hwX ?? tx(3 * Math.floor(NB / 2)), 0.01, z); g.add(t); conn.push(t);
   }
   city.group.add(g);
   cityHw = { g, v, conn, seg: (done || mine.find(s => s.id === job.seg)).id };
   // коли и камиони по готовата магистрала (hwtraffic.js); платната са по x, около z = tx(N−1)+34
   const tg = new THREE.Group(); tg.position.x = hcx; g.add(tg);
-  cityHw.traffic = createHwTraffic(tg, model, A, tx(NJ - 1) + 34, hLen);
+  cityHw.traffic = createHwTraffic(tg, model, A, hz, hLen, 0.92, isAb);
 }
 function updateCityHighway(t) {
   if (!cityHw) return;

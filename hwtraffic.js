@@ -9,13 +9,13 @@ const SCALE = new Proxy({ 'truck-dump-red': 0.62, 'truck-concrete-red': 0.62, 's
 
 // parent: групата на магистралата в града; model(name, scale); A: заредените модели
 // zc: оста на магистралата (z в света); len: дължина по x; y: височина на платното
-export function createHwTraffic(parent, model, A, zc, len, y = 0.92) {
+export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false) {   // ab — аутобан: 4 ленти на посока, повече коли
   const g = new THREE.Group(); parent.add(g);
   const list = [], half = len / 2;
   // посока +x (на изток) е откъм +z (дясно движение), −x е откъм −z; лента 0 = бърза (към разделителната ивица)
-  const laneZ = (dir, lane) => zc + dir * (6 + (lane ? 2.2 : -2.2));
-  for (let k = 0; k < 28; k++) {
-    const truck = k % 3 === 0, dir = k % 2 ? 1 : -1, lane = truck ? 1 : (k % 4 < 2 ? 0 : 1);
+  const laneZ = (dir, lane) => ab ? zc + dir * (2 + 1.8 + lane * 3.6) : zc + dir * (6 + (lane ? 2.2 : -2.2));
+  for (let k = 0; k < (ab ? 44 : 28); k++) {
+    const truck = k % 3 === 0, dir = k % 2 ? 1 : -1, lane = ab ? (truck ? 3 - (k % 2) : (k >> 1) % 3) : truck ? 1 : (k % 4 < 2 ? 0 : 1);
     const realCars = ['Sedan', 'Hatchback', 'SUV', 'Pickup', 'Taxi', 'Muscle', 'Muscle_2', 'Van', 'Police_SUV'].map(n => 'sf-car-' + n).filter(n => A[n]);
     const names = (truck ? (feature('trucks-real') && A['sf-semi-0'] ? ['sf-semi-0', 'sf-semi-1'] : TRUCKS) : (feature('cars-real') && realCars.length ? realCars : CARS)).filter(n => A[n]);   // модерните ТИР-ове (trucks-real)
     if (!names.length) continue;
