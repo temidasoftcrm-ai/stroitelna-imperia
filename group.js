@@ -86,7 +86,7 @@ export function createGroup(deps) {
   // ръчно основаване (бутон в „Холдинг“ или от прозореца за магистрали/жп…): пари → дружеството → стартовият пакет (deps.gift)
   const canFound = k => { const S = deps.S(); return !!(S && S.foundFirst && FOUND[k] && !(S.group || {})[k] && (deps.lv ? deps.lv() >= FOUND[k].lv : true)); };
   function found(k) {
-    const S = deps.S(), F = FOUND[k], s = SUBS.find(x => x.k === k), b = brandOf(S), e = deps.econ();
+    const S = deps.S(), F = FOUND[k], s = SUBS.find(x => x.k === k), b = brandOf(S) || { nm: S?.brandNm || 'Фирмата' }, e = deps.econ();   // стари записи без марка — не гърми
     if (!canFound(k)) return false;
     if (!e.canAfford(F.cost)) { deps.toast(`Нужни са ${deps.fmt(F.cost)} €, за да основеш ${b.nm} ${s.suf}.`, 'bad'); return false; }
     e.spend(F.cost, 'покупка', `Основаване на ${b.nm} ${s.suf}`);
