@@ -3004,6 +3004,15 @@ function buyForProjects() {
   if (n) toast('🚚 Материалите пътуват към склада. Обектите продължават, щом ТИР-овете разтоварят.', 'good');
 }
 // гаранциите по държавните поръчки (tenders.js S.tenders[id].bond) — за лентата „Блокирани пари“ в банката
+// своята банка (bank.js) — отгоре в „Банка и финанси“; кредитът от чуждата банка се скрива (вече нямаш нужда), освен ако имаш дълг за връщане
+function mergeOwnBank(box) {
+  if (!box || !S.bank) return;
+  const own = document.createElement('div'); own.innerHTML = bank.winHtml(); box.prepend(own);
+  bank.bind(own, () => { $('bwBody').dataset.bank = ''; renderBig(); renderPanel(); });
+  for (const c of box.querySelectorAll('.card')) { const t = c.textContent.replace(/\s+/g, ' ').trim().slice(0, 14);   // чуждата банка: кредит и депозит — само ако имаш дълг/депозит там
+    if (/^🏦 ?Кредит/.test(t) && !(econ.s.loan > 0)) c.style.display = 'none';
+    if (/^🏦 ?Депозит/.test(t) && !(econ.s.deposit > 0)) c.style.display = 'none'; }
+}
 function blockedMoney() {
   return Object.entries(S.tenders || {}).filter(([, s]) => s.bond > 0).map(([id, s]) => { const t = TENDERS.find(x => x.id === id);
     return { nm: `${t?.ico || '🏛️'} ${t?.nm || id}`, amount: s.bond, why: s.st === 'open' ? `търгът е отворен до ден ${s.closes}` : s.st === 'building' ? `строи се · връща се при предаването (срок ден ${s.due})` : '' }; });
@@ -7686,9 +7695,10 @@ function renderBig() {
   const body = $('bwBody'); if (!body || !bigWin) return;
   if (body.contains(document.activeElement) && (document.activeElement.tagName === 'SELECT' || document.activeElement.type === 'range')) return;   // не пречи на отворен падащ списък
   const sc = body.scrollTop;
+  if (bigWin === 'bank' && S.bank) $('bwTitle').innerHTML = `🏦 ${brandOf(S)?.nm || ''} Банк и финанси`;
   if (bigWin === 'bank') {   // банката в прозорец (без прехвърляне в града); не се пречертава всяка секунда — само при действие
-    $('bwTitle').innerHTML = '🏦 Банка и финанси';
-    if (!body.dataset.bank || body.dataset.bankT !== String(econ.s.day)) { body.dataset.bank = '1'; body.dataset.bankT = String(econ.s.day); body.innerHTML = '<div id="bwBank" style="display:flex;flex-direction:column;gap:10px"></div>'; ECON.renderFinance ? ECON.renderFinance($('bwBank'), econ, S.rep, () => { save(); body.dataset.bank = ''; renderBig(); renderPanel(); }, units.map(u => u.type), { connectedCityIds: connected(), roadCityIds: supplyOpts().roadCityIds, stocksOpen: dev.stocksOpen(), devLevel: dev.best(), blocked: blockedMoney() }) : renderBank($('bwBank')); body.scrollTop = sc; }
+    if (!S.bank) $('bwTitle').innerHTML = '🏦 Банка и финанси';
+    if (!body.dataset.bank || body.dataset.bankT !== String(econ.s.day)) { body.dataset.bank = '1'; body.dataset.bankT = String(econ.s.day); body.innerHTML = '<div id="bwBank" style="display:flex;flex-direction:column;gap:10px"></div>'; ECON.renderFinance ? ECON.renderFinance($('bwBank'), econ, S.rep, () => { save(); body.dataset.bank = ''; renderBig(); renderPanel(); }, units.map(u => u.type), { connectedCityIds: connected(), roadCityIds: supplyOpts().roadCityIds, stocksOpen: dev.stocksOpen(), devLevel: dev.best(), blocked: blockedMoney() }) : renderBank($('bwBank')); mergeOwnBank($('bwBank')); body.scrollTop = sc; }
     return;
   }
   body.dataset.bank = '';
