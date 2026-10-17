@@ -3324,7 +3324,7 @@ function hwDonePath(a, b) {
   return { path, segs };
 }
 const cityWh = id => ((id === S?.cityId ? S?.whLevel : S?.cities?.[id]?.whLevel) || 0) > 0;
-const hwTrucks = createHwTrucks({ S: () => S, econ: () => econ, sound: n => Sound.play(n), svcAll: () => dev.best() >= 6, toast, modal, fmt, save, cityName: id => cityById(id)?.nm || id, owned: () => ownedCities(), here: () => S.cityId, route: (a, b) => hwDonePath(a, b),
+const hwTrucks = createHwTrucks({ cap: () => fleetCap.truck(), S: () => S, econ: () => econ, sound: n => Sound.play(n), svcAll: () => dev.best() >= 6, toast, modal, fmt, save, cityName: id => cityById(id)?.nm || id, owned: () => ownedCities(), here: () => S.cityId, route: (a, b) => hwDonePath(a, b),
   hasWh: id => cityWh(id), pop: (k, a, b) => showEventPop(k, a, b), redraw: () => { if (!$('mapScreen').classList.contains('hidden')) drawMap(); }, renderPanel: () => { renderPanel(); if (bigWin) renderBig(); } });
 function updateMapTrucks() { hwTrucks.draw(document.getElementById('truckLayer'), { proj, cityLL: id => { const c = cityById(id); return c && [c.lon, c.lat]; }, k: (mapEU ? 4 : mapWide ? 1.6 : 1) * mapK(), near: mapNear(), inView: p => mapIn(...p) }); }
 function clickCity(id) {
@@ -3842,6 +3842,19 @@ function updateRails(dtDays) {
   }
 }
 // влаковете са общи за фирмата: лимитът е сборът от коловозите на гарите във всички твои градове
+// лимити на превозните средства — да не се купува безразборно (и играта да не забива при отворен свят):
+// 🚚 2 ТИР-а на готов участък магистрала, 4 на аутобан · 🚆 2 влака на жп линия, 4 на модернизирана за „Стрела“ ·
+// ⚓ 2 кораба на пристанище, 4 на пристанище на максимално ниво · ✈️ 2 самолета на летище, 4 на летище на максимално ниво.
+// Отгоре — общ таван FLEET_TOP за всеки вид; коловозите, кеите и гейтовете също ограничават (min). Старите записи с повече не губят нищо.
+const FLEET_TOP = 60;
+const fleetCap = {
+  truck: () => { const ab = new Set(ALL_AB.map(x => x.id)); return Math.min(FLEET_TOP, hwDone().reduce((a, id) => a + (ab.has(id) ? 4 : 2), 0)); },
+  train: () => Math.min(FLEET_TOP, totalTracks(), (S.rails || []).filter(r => r.built).reduce((a, r) => a + (r.hs ? 4 : 2), 0)),
+  ship: () => Math.min(FLEET_TOP, portBerths(), Object.keys(S.ports || {}).filter(id => portLv(id) > 0).reduce((a, id) => a + (portLv(id) >= portMax(id) ? 4 : 2), 0)),
+  plane: () => Math.min(FLEET_TOP, airGates(), Object.keys(S.airports || {}).filter(id => airLv(id) > 0).reduce((a, id) => a + (airLv(id) >= airportMax(id) ? 4 : 2), 0)),
+};
+const fleetN = { truck: () => (S.trucks || []).length, train: () => (S.trains || []).length, ship: () => (S.ships || []).length, plane: () => (S.planes || []).length };
+const fleetTxt = k => `${fleetN[k]()}/${fleetCap[k]()}`;
 function totalTracks() {
   return ownedCities().reduce((a, id) => a + (id === S.cityId ? (S.stationLevel || 0) : ((S.cities || {})[id]?.stationLevel || 0)), 0);
 }
@@ -3889,6 +3902,7 @@ function buyTrain(kind = 'small', at = null) {
   if (T.express && !dev.has('AIR')) { toast('🚄 Експрес „Стрела“ се отключва на ниво 9 на развитие.', 'bad'); return; }
   if (T.express && stLvOf(at) < 5) { toast(`🚄 Експрес „Стрела“ иска гара ниво 5 в ${cityById(at).nm} (сега ${stLvOf(at)}).`, 'bad'); return; }
   if (!totalTracks()) { toast('🚉 Първо построй гара в града — таб „Офис“ → Гара.', 'bad'); return; }
+  if ((S.trains || []).length >= fleetCap.train() && (S.trains || []).length < totalTracks()) { toast(`🚉 Имаш ${fleetTxt('train')} влака — всяка готова жп линия дава място за 2, модернизираната за „Стрела“ — за 4. Построй още линии.`, 'bad'); return; }
   if ((S.trains || []).length >= totalTracks()) { toast(`🚉 Гарите ти имат общо ${totalTracks()} ${totalTracks() === 1 ? 'коловоз' : 'коловоза'} — надгради гара (таб „Офис“), за да купиш още влак.`, 'bad'); return; }
   if (!(S.vouchers || {}).rail && !econ.canAfford(T.cost)) { if (T.cost >= 1000000) withLoan(T.cost, `Влак: ${T.nm}`, () => buyTrain(kind, at)); else toast('Нямаш достатъчно пари за влак.', 'bad'); return; }   // скъпите (Стрела, гигант) — и на кредит
   useVoucher('rail', T.cost, `първия влак — подарък от ${subName(S, 'rail')}`);
@@ -4203,6 +4217,7 @@ function buyPlane(kind) {
   const home = Object.keys(S.airports || {}).find(id => airLv(id) > 0);
   if (!home) { toast('Първо построй летище.', 'bad'); return; }
   if ((S.planes || []).length >= airGates()) { toast('Няма свободен гейт — надгради летището.', 'bad'); return; }
+  if ((S.planes || []).length >= fleetCap.plane()) { toast(`✈️ Имаш ${fleetTxt('plane')} самолета — всяко летище дава място за 2, летище на максимално ниво — за 4.`, 'bad'); return; }
   const P = PLANES[kind];
   if (!(S.vouchers || {}).air && !econ.canAfford(P.cost)) { withLoan(P.cost, `Самолет: ${P.nm}`, () => buyPlane(kind)); return; }
   useVoucher('air', P.cost, `първия самолет — подарък от ${subName(S, 'air')}`);
@@ -4922,7 +4937,7 @@ let airSelA = null, airSelB = null;
 function airWinHtml() {
   if (!dev.has('AIR')) return `<div class="meta late">${airLockTxt()}</div><div class="meta">На ниво 9 строиш летища в твоите градове, купуваш самолети и отваряш авиолинии. На ниво 10 линиите стигат до Ню Йорк, Токио, Сингапур, Рио и още 15 града по света — там можеш да отвориш филиал, щом имаш линия дотам.</div>`;
   const aps = Object.keys(S.airports || {}).filter(id => airLv(id)), planes = (S.planes || []).filter(p => inScope(...(p.path || [p.at]))), routes = (S.airRoutes || []).filter(r => inScope(r.a, r.b));
-  let h = `<div class="bw-stats"><div><b>${aps.length}</b><span>летища</span></div><div><b>${airGates()}</b><span>гейта</span></div><div><b>${planes.length} / ${airGates()}</b><span>самолети / гейтове</span></div><div><b>${routes.length} / ${maxRoutes()}</b><span>авиолинии</span></div><div><b>${fmt(S.airEarned || 0)} €</b><span>спечелено от полети</span></div></div>
+  let h = `<div class="bw-stats"><div><b>${aps.length}</b><span>летища</span></div><div><b>${airGates()}</b><span>гейта</span></div><div title="2 самолета на летище, 4 на летище на максимално ниво; и не повече от гейтовете (${airGates()})"><b>${planes.length} / ${fleetCap.plane()}</b><span>самолети / лимит</span></div><div><b>${routes.length} / ${maxRoutes()}</b><span>авиолинии</span></div><div><b>${fmt(S.airEarned || 0)} €</b><span>спечелено от полети</span></div></div>
     <div class="meta">Поддръжка на летищата и самолетите: <span class="late">−${fmt(airUpkeep())} €/ден</span>. Самолетите летят сами по случайни линии в обсега си.${dev.has('WORLD') ? '' : ' 🔒 Градовете по света идват на ниво 10.'}</div>`;
   // летищата в твоите градове
   h += bwCard('🛫 Летища', ownedCities().filter(id => scopeNow() === 'intl' || inScope(id)).map(id => {
@@ -4987,7 +5002,7 @@ function buildPort(id, free = 0) {
 // като при корабите: свободните гейтове сами получават самолет (най-евтиният с обсег за най-дългата линия; всеки 4-ти — товарен), с резерв 2× цената
 function airAutoPlanes() {
   if (!S || !dev.has('AIR') || !autoOn('air')) return;
-  let free = airGates() - (S.planes || []).length; const routes = S.airRoutes || [];
+  let free = Math.min(airGates(), fleetCap.plane()) - (S.planes || []).length; const routes = S.airRoutes || [];   // лимитът (fleetCap) — и за автоматичните
   if (free <= 0 || !routes.length || (S.planes || []).length >= routes.length) return;
   const home = Object.keys(S.airports || {}).find(id => airLv(id) > 0); if (!home) return;
   const maxKm = Math.max(...routes.map(r => r.km || routeKm(r.a, r.b))), got = [];
@@ -5055,6 +5070,7 @@ function addRouteShip(r, quiet = false) {
   if (routeShip(r)) return true;
   const kind = firstShipFor(r.km); if (!kind) return false;
   if ((S.ships || []).length >= portBerths()) { if (!quiet) toast('Няма свободен кей за кораба на линията — надгради пристанището.', 'bad'); return false; }
+  if ((S.ships || []).length >= fleetCap.ship()) { if (!quiet) toast(`⚓ Имаш ${fleetTxt('ship')} кораба — всяко пристанище дава място за 2, пристанище на максимално ниво — за 4.`, 'bad'); return false; }
   const P = SHIPS[kind]; if (!econ.canAfford(P.cost)) { if (!quiet) toast(`Нямаш ${fmt(P.cost)} € за кораба на линията.`, 'bad'); return false; }
   econ.spend(P.cost, 'покупка', `Кораб за линия ${cityById(r.a).nm} — ${cityById(r.b).nm}: ${P.nm}`);
   S.shipSeq = (S.shipSeq || 0) + 1;
@@ -5081,6 +5097,7 @@ function buyShip(kind) {
   const home = Object.keys(S.ports || {}).find(id => portLv(id) > 0);
   if (!home) { toast('Първо построй пристанище.', 'bad'); return; }
   if ((S.ships || []).length >= portBerths()) { toast('Няма свободен кей — надгради пристанището.', 'bad'); return; }
+  if ((S.ships || []).length >= fleetCap.ship()) { toast(`⚓ Имаш ${fleetTxt('ship')} кораба — всяко пристанище дава място за 2, пристанище на максимално ниво — за 4.`, 'bad'); return; }
   const P = SHIPS[kind];
   if (!(S.vouchers || {}).sea && !econ.canAfford(P.cost)) { withLoan(P.cost, `Кораб: ${P.nm}`, () => buyShip(kind)); return; }
   useVoucher('sea', P.cost, `първия кораб — подарък от ${subName(S, 'sea')}`);
@@ -5224,7 +5241,7 @@ let seaSelA = null, seaSelB = null;
 function seaWinHtml() {
   if (!seaOn()) return `<div class="meta late">${seaLockTxt()}</div><div class="meta">Строиш пристанища в крайморските си градове, купуваш кораби (насипни, танкери, контейнеровози, круизни) и отваряш морски линии до пристанищата по света. Корабите плават сами и носят много, а материалите от заводите в свързаните по море градове ти излизат по-евтино.</div>`;
   const pts = Object.keys(S.ports || {}).filter(id => portLv(id)), ships = (S.ships || []).filter(p => inScope(...(p.path || [p.at]))), routes = (S.seaRoutes || []).filter(r => inScope(r.a, r.b));
-  let h = `<div class="bw-stats"><div><b>${pts.length}</b><span>пристанища</span></div><div><b>${ships.length} / ${portBerths()}</b><span>кораби / кейове</span></div><div><b>${routes.length} / ${maxSeaRoutes()}</b><span>морски линии</span></div><div><b>${fmt(S.seaEarned || 0)} €</b><span>спечелено от курсове</span></div></div>
+  let h = `<div class="bw-stats"><div><b>${pts.length}</b><span>пристанища</span></div><div title="2 кораба на пристанище, 4 на пристанище на максимално ниво; и не повече от кейовете (${portBerths()})"><b>${ships.length} / ${fleetCap.ship()}</b><span>кораби / лимит</span></div><div><b>${routes.length} / ${maxSeaRoutes()}</b><span>морски линии</span></div><div><b>${fmt(S.seaEarned || 0)} €</b><span>спечелено от курсове</span></div></div>
     <div class="meta">Поддръжка на пристанищата и корабите: <span class="late">−${fmt(seaUpkeep())} €/ден</span>. Корабите плават сами по случайни линии. Материалите от заводи в градове с морска линия до ${cityName()} са −${Math.round((ECON.AB_DISCOUNT ?? 0.3) * 100)}%.</div>`;
   { const idle = (S.seaRoutes || []).filter(r => !routeShip(r)).length, free = portBerths() - (S.ships || []).length;
     if (idle > free) h += `<div class="card" style="border:1px solid #ffb300"><div class="meta" style="margin:0">⚓ <b style="color:var(--txt)">${idle} линии чакат кораб</b>, а свободните кейове са ${Math.max(0, free)}. Всеки кораб иска кей в пристанищата ти. Щом се освободи кей, линията сама си купува кораб.</div>${(() => { const pl = berthPlan(); if (!pl) return '';
@@ -7687,7 +7704,7 @@ let railShowDone = false;   // „▸ Покажи готовите“ в про
 function railWinHtml() {
   const rails = (S.rails || []).filter(r => inScope(r.a, r.b, r.c)), built = rails.filter(r => r.built), building = rails.filter(r => !r.built), trains = (S.trains || []).filter(t => ['all', 'intl'].includes(scopeNow()) || inScope(t.at));
   const km = built.reduce((a, r) => a + (r.km || 0), 0);
-  let h = `<div class="bw-stats"><div><b>${built.length}</b><span>готови линии</span></div><div><b>${fmt(km)} км</b><span>релси</span></div><div><b>${building.length}</b><span>в строеж</span></div><div><b>${trains.length} / ${totalTracks()}</b><span>влакове / коловози</span></div><div><b>${connectedCities().length}</b><span>свързани града</span></div></div>`;
+  let h = `<div class="bw-stats"><div><b>${built.length}</b><span>готови линии</span></div><div><b>${fmt(km)} км</b><span>релси</span></div><div><b>${building.length}</b><span>в строеж</span></div><div title="2 влака на жп линия, 4 на линия за „Стрела“; и не повече от коловозите (${totalTracks()})"><b>${trains.length} / ${fleetCap.train()}</b><span>влакове / лимит</span></div><div><b>${connectedCities().length}</b><span>свързани града</span></div></div>`;
   h += `<div class="row" style="justify-content:flex-end"><button class="btn" id="bwNewRail">🛤️ Строй нова линия</button></div>`;
   if (['c:eu', 'all'].includes(scopeNow())) h += orient.cardHtml();   // Ориент Експрес — само в Европа
   h += totalTracks() > (S.trains || []).length ? bwCard(`${trainImg('mid', 20)} Купи влак`, trainShopHtml()) : `<div class="meta">${trainShopHtml()}</div>`;   // магазинът — над линиите

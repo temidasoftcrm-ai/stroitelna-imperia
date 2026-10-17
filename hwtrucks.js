@@ -39,6 +39,8 @@ export function createHwTrucks(d) {
     return true;
   }
   function buy() {
+    const cap = d.cap ? d.cap() : Infinity;   // лимит: 2 на участък магистрала, 4 на участък аутобан (game.js fleetCap)
+    if (L().length >= cap) { d.toast(`🚚 Имаш ${L().length}/${cap} ТИР-а — всеки готов участък магистрала дава място за 2, аутобанът — за 4. Построй още пътища.`, 'bad'); return; }
     if (!E().canAfford(TRUCK.cost)) { d.toast(`ТИР струва ${f(TRUCK.cost)} € — нямаш достатъчно.`, 'bad'); return; }
     E().spend(TRUCK.cost, 'покупка', 'ТИР');
     const S = d.S(), t = { id: (S.seq = (S.seq || 1) + 1), nm: `🚚 ТИР №${L().length + 1}`, at: d.here(), path: null, segs: [], km: 0, total: 0, cond: 100, since: S.day, cargo: 'цимент', trips: 0, earned: 0 };
@@ -104,7 +106,7 @@ export function createHwTrucks(d) {
       const svc = lock ? `<button class="btn2" style="flex:1" disabled title="От ниво 6 на развитие">🔒 Обслужи всички · ниво 6</button>`
         : need.length ? `<button class="btn2" data-trk="svcall:0:${sum}" style="flex:1" ${E().canAfford(sum) ? '' : 'disabled'}>🔧 Обслужи всички (${need.length}) · ${f(sum)} €</button>`
         : `<button class="btn2" style="flex:1" disabled>🔧 Обслужи всички · няма нужда</button>`;
-      h += `<div style="display:flex;gap:6px;margin-top:6px"><button class="btn" data-trk="buy" style="flex:1" ${E().canAfford(TRUCK.cost) ? '' : 'disabled'}>🚚 Купи ТИР · ${f(TRUCK.cost)} €</button>${svc}</div></div>`; }
+      h += `<div style="display:flex;gap:6px;margin-top:6px"><button class="btn" data-trk="buy" style="flex:1" ${E().canAfford(TRUCK.cost) && L().length < (d.cap ? d.cap() : Infinity) ? '' : 'disabled'} title="Лимит: 2 ТИР-а на участък магистрала, 4 на аутобан">🚚 Купи ТИР · ${f(TRUCK.cost)} €${d.cap ? ` · ${L().length}/${d.cap()}` : ''}</button>${svc}</div></div>`; }
     for (const t of T) {
       const svc = svcOf(t), j = t.path ? jam(t) : 1, sell = Math.round(TRUCK.cost * TRUCK.sell * (t.cond ?? 100) / 100);
       h += `<div class="card" style="padding:9px 11px"><b>${t.nm}</b> <span class="meta" style="margin:0">${t.path ? `${cargoOf(t)[1]} ${name(t.path[0])} → ${name(t.path[t.path.length - 1])} · ${Math.round(t.km)}/${Math.round(t.total)} км · ~${f(legPay(t))} €${legToll(t) ? ` − тол ${f(legToll(t))} €` : ''}` : `⏸ чака в ${name(t.at)} — няма готова магистрала до друг твой град`}</span><br>
