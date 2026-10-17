@@ -1309,10 +1309,12 @@ function homeSlot(u) {
 }
 // истинските модели (vehmodels.js) — дължина в света на играта
 const SF_VEH = { loader: 'sf-excavator', truck: 'sf-dump', crane: 'sf-mcrane', tractor: 'sf-backhoe', roller: 'sf-roller', grader: 'sf-grader' };
-const SF_LEN = { loader: 8.2, truck: 5.0, crane: 6.6, tractor: 4.6, roller: 3.4, grader: 6.2 };
+const SF_LEN = { loader: 6.5, truck: 7.5, crane: 9, tractor: 4.6, roller: 4.5, grader: 7 };   // м по дължина — в мащаба на колите (седан 4,5 м, vehmodels.js)
+const VEH_LEN = { bulldozer: 6 };   // м — моделите от пакетите, които не са в метри: мащаб по най-дългата хоризонтална страна (булдозерът беше колкото сграда; другите Kenney са с процедурни добавки, нагласени за VSCALE)
 function spawnUnit(type, at) {
   const sf = A[SF_VEH[type]] ? SF_VEH[type] : null;
-  const obj = sf ? model(sf, SF_LEN[type]) : model(A[VEH_MODEL[type]] ? VEH_MODEL[type] : 'truck', A[VEH_MODEL[type]] ? VEH_SCALE[type] || VSCALE : VSCALE);
+  const nm = A[VEH_MODEL[type]] ? VEH_MODEL[type] : 'truck', bs = VEH_LEN[type] && A[nm] ? sizeOf(nm).getSize(new THREE.Vector3()) : null;
+  const obj = sf ? model(sf, SF_LEN[type]) : model(nm, bs ? VEH_LEN[type] / Math.max(bs.x, bs.z, 1e-3) : A[VEH_MODEL[type]] ? VEH_SCALE[type] || VSCALE : VSCALE);
   if (type === 'crane' && !sf) {
     // жълта стрела отзад на платформата, за да личи, че е кран
     const arm = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 3.2), new THREE.MeshStandardMaterial({ color: 0xffc400 }));
