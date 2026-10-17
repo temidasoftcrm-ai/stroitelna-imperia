@@ -47,6 +47,7 @@ export function groupName(S) {
 // 🏛️ Ерата на холдинга (ниво 15): всяко дружество има ниво на развитие (+10% от прихода му на ниво, до 5) и директор (+15%).
 // Бонусът се изплаща всеки ден като приход на холдинга. Записът: S.hold = { lv: { [sub]: n }, dir: { [sub]: 'име' } }.
 export const HOLD_LV_MAX = 5, HOLD_LV_K = 0.10, HOLD_DIR_K = 0.15;
+export const DIR_LV = Math.ceil(HOLD_LV_MAX * 0.9);   // директор — само когато дружеството е развито поне 90% (ниво 5 от 5)
 const DIRECTORS = ['Ивайло Петров', 'Мария Стоянова', 'Георги Николов', 'Елена Димитрова', 'Стефан Колев', 'Надя Иванова', 'Борис Тодоров', 'Вера Ангелова', 'Калин Маринов', 'Десислава Илиева'];
 
 // deps: { S, econ, fmt, pop(key, cap, sub), toast, save, sound, …броячите от SUBS (hwN, railN, portN, airN, oilN, empire, toll, flow, finDaily, oilDaily) }
@@ -64,7 +65,7 @@ export function createGroup(deps) {
     deps.toast(`🏛️ ${subName(deps.S(), k)} — ниво ${hold().lv[k]}: +${Math.round(bonusK(k) * 100)}% от прихода ѝ всеки ден.`, 'good'); deps.sound && deps.sound('upgrade'); deps.save();
   }
   function hire(k) {
-    if (!canManage(k) || hold().dir[k]) return; const c = dirCost(k), e = deps.econ();
+    if (!canManage(k) || hold().dir[k]) return; if ((hold().lv[k] || 0) < DIR_LV) { deps.toast(`👔 Директор — когато дружеството е развито поне 90% (ниво ${DIR_LV}).`, 'bad'); return; } const c = dirCost(k), e = deps.econ();
     if (!e.canAfford(c)) { deps.toast(`Нямаш ${deps.fmt(c)} €.`, 'bad'); return; }
     const used = new Set(Object.values(hold().dir)), nm = DIRECTORS.find(n => !used.has(n)) || DIRECTORS[0];
     e.spend(c, 'заплати', `Холдинг: директор на ${subName(deps.S(), k)}`); hold().dir[k] = nm;
@@ -112,7 +113,7 @@ export function createGroup(deps) {
     h += '<style>.subLock > *:not(.subLv){filter:blur(2.5px);opacity:.55;pointer-events:none;user-select:none}.subLv{position:absolute;right:12px;top:50%;transform:translateY(-50%);z-index:2;padding:5px 12px;border-radius:999px;background:rgba(0,0,0,.65);border:1px solid var(--line);font-weight:800;color:#ffd54a}</style>';   // заключените — замъглени, с ясна значка „🔒 ниво N“
     h += SUBS.map(s => {
       const on = g[s.k], inc = on ? s.inc(deps) || 0 : 0, L = hold().lv[s.k] || 0, dir = hold().dir[s.k], man = H && on && !s.final && inc > 0;   // без приход — няма какво да се умножава
-      const ctl = man ? `<div class="row" style="margin:6px 0 0;gap:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0;flex:1">${'★'.repeat(L)}${'☆'.repeat(HOLD_LV_MAX - L)} ниво ${L}${dir ? ` · 👔 ${dir}` : ''}${bonusK(s.k) ? ` · <b style="color:#ffd54a">+${f(bonusOf(s.k))} €/ден</b> (+${Math.round(bonusK(s.k) * 100)}%)` : ''}</span>${L < HOLD_LV_MAX ? `<button class="btn2" data-hup="${s.k}" ${deps.econ().canAfford(upCost(s.k)) ? '' : 'disabled'}>⬆️ Развий · ${f(upCost(s.k))} €</button>` : ''}${dir ? '' : `<button class="btn2" data-hdir="${s.k}" ${deps.econ().canAfford(dirCost(s.k)) ? '' : 'disabled'}>👔 Директор · ${f(dirCost(s.k))} €</button>`}</div>` : '';
+      const ctl = man ? `<div class="row" style="margin:6px 0 0;gap:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0;flex:1">${'★'.repeat(L)}${'☆'.repeat(HOLD_LV_MAX - L)} ниво ${L}${dir ? ` · 👔 ${dir}` : ''}${bonusK(s.k) ? ` · <b style="color:#ffd54a">+${f(bonusOf(s.k))} €/ден</b> (+${Math.round(bonusK(s.k) * 100)}%)` : ''}</span>${L < HOLD_LV_MAX ? `<button class="btn2" data-hup="${s.k}" ${deps.econ().canAfford(upCost(s.k)) ? '' : 'disabled'}>⬆️ Развий · ${f(upCost(s.k))} €</button>` : ''}${dir ? '' : L < DIR_LV ? `<button class="btn2" disabled title="Директор се назначава, когато дружеството е развито поне 90%">👔 Директор · 🔒 ниво ${DIR_LV}</button>` : `<button class="btn2" data-hdir="${s.k}" ${deps.econ().canAfford(dirCost(s.k)) ? '' : 'disabled'}>👔 Директор · ${f(dirCost(s.k))} €</button>`}</div>` : '';
       const fb = !on && canFound(s.k) ? `<div class="row" style="margin:6px 0 0;gap:6px;align-items:center"><span class="meta" style="margin:0;flex:1">🎁 ${FOUND[s.k].gift}</span><button class="btn" data-hfound="${s.k}">Основи · ${f(FOUND[s.k].cost)} €</button></div>` : '';
       return `<div class="card${!on && !fb ? ' subLock' : ''}" style="position:relative;${on ? `border-left:4px solid ${b.col}` : ''}">${!on && !fb ? `<span class="subLv">🔒 ниво ${SUB_LV[s.k] || '?'}</span>` : ''}<div class="row" style="margin:0;align-items:center;gap:10px">${subLogo(s.k, 44, on)}<span class="meta" style="margin:0;flex:1"><b style="color:var(--txt);font-size:15px">${b.nm} ${s.suf}</b><br>${s.what}${on ? ` · основана на ден ${on}` : ` · 🔒 ${s.how}`}</span>${on && !s.final ? `<b style="color:${inc ? 'var(--ok)' : 'var(--mut, #9aa)'}">${inc ? `+${f(inc)} €/ден` : '—'}</b>` : ''}</div>${ctl}${s.k === 'oil' && on ? '<div class="row" style="justify-content:flex-end;margin:6px 0 0"><button class="btn" data-hoil="1">🛢️ Петролната империя →</button></div>' : ''}${fb}</div>`;
     }).join('');
