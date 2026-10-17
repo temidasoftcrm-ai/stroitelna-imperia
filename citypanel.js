@@ -20,13 +20,13 @@ export function createCityPanel(deps) {
 
   // ---- XP и ниво на града (като devlevel.add, но за запис, в който не си)
   function addXp(id, c, n) {
-    const d = c.dev = c.dev || { xp: 0, lv: 1, v: 3 };
+    const d = c.dev = c.dev || { xp: 0, lv: 1, v: 3 }, f0 = deps.firmLv ? deps.firmLv() : Infinity;   // нивото на фирмата преди опита
     d.xp += n;
     const nl = lvOf(d.xp);
     while (d.lv < nl) {
       d.lv++;
       deps.toast(`🏅 ${deps.cityName(id)} стана ниво ${d.lv}! ${deps.unlockText(d.lv)}`, 'good', () => deps.openWin());
-      deps.sound && deps.sound('levelup');
+      if (d.lv > f0 && deps.firmUp) deps.firmUp(d.lv); else deps.sound && deps.sound('levelup');   // този град вдигна фирмата → картинката на нивото
     }
   }
   // ---- нова поръчка за град, в който не си: свободен парцел от запомнения списък
@@ -189,6 +189,16 @@ export function createCityPanel(deps) {
     return h;
   }
   // завършените градове (🏁) не се показват — само ред с броя им и бутон да се покажат
+  // целият обхват (България, Европа…) е завършен — вместо дългия списък: едно обобщение с приход, поддръжка и печалба на ден
+  function doneSummary(order) {
+    const s = S(), ids = order.filter(id => !deps.inScope || deps.inScope(id)); if (!ids.length || !ids.every(id => deps.isFinished(id)) || !deps.finStat) return '';
+    const st = ids.map(id => deps.finStat(id)), inc = st.reduce((a, x) => a + x.daily, 0), up = st.reduce((a, x) => a + x.upkeep, 0), nm = deps.scopeLabel ? deps.scopeLabel() : '';
+    return `<div class="card" style="text-align:center;padding:18px 14px"><div style="font-size:38px;line-height:1">🏁</div>
+      <h3 style="margin:8px 0 4px;color:var(--ok)">${nm ? `${nm} е завършена!` : 'Всичко тук е завършено!'}</h3>
+      <div class="meta" style="margin:0 0 10px">${ids.length} ${ids.length === 1 ? 'град работи' : 'града работят'} сами и носят пари всеки ден.</div>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">${[[f(inc) + ' €', 'приход на ден', 'var(--acc)'], ['−' + f(up) + ' €', 'поддръжка на ден', 'var(--bad)'], ['+' + f(inc - up) + ' €', 'печелиш на ден', 'var(--ok)']].map(([v, t, c]) => `<div style="flex:1 1 140px;padding:10px;border-radius:10px;background:rgba(255,255,255,.05)"><b style="font-size:20px;color:${c}">${v}</b><div class="meta" style="margin:2px 0 0">${t}</div></div>`).join('')}</div>
+      <button class="btn2" data-cpfinshow="1" style="margin-top:10px">${s.cpShowFin ? '▾ Скрий градовете' : `▸ Покажи градовете (${ids.length})`}</button></div>`;
+  }
   function finNote(order) {
     const s = S(), n = order.filter(id => (!deps.inScope || deps.inScope(id)) && deps.isFinished(id) && id !== s.cityId).length;
     return n ? `<div class="card"><div class="row" style="align-items:center;gap:8px"><span class="meta" style="margin:0;flex:1">🏁 ${n} завършени града ${s.cpShowFin ? 'са показани' : 'са скрити — работят сами и носят пари'}.</span><button class="btn2" data-cpfinshow="1">${s.cpShowFin ? 'Скрий ги' : 'Покажи ги'}</button></div></div>` : '';
@@ -196,6 +206,7 @@ export function createCityPanel(deps) {
   function winHtml() {
     const s = S(), own = deps.ownedCities();
     const order = [...own].sort((a, b) => (b === s.cityId) - (a === s.cityId) || deps.isFinished(a) - deps.isFinished(b) || devOf(rec(b) || {}).lv - devOf(rec(a) || {}).lv);
+    { const sum = doneSummary(order); if (sum) return sum + (s.cpShowFin ? order.filter(id => !deps.inScope || deps.inScope(id)).map(cityCard).join('') : ''); }   // целият обхват е завършен — само обобщението
     const on = own.filter(id => id !== s.cityId && auto(id) && !deps.isFinished(id)).length, open = own.filter(id => !deps.isFinished(id) && id !== s.cityId);
     const lv14 = deps.devBest && deps.devBest() >= 14 && deps.gearShort;
     // от ниво 14: вместо автопилота (той е включен навсякъде с холдинга) — „купи всичко липсващо“ и „включи всички складове“
