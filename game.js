@@ -3079,7 +3079,7 @@ function keyCitiesMine() { const own = new Set(ownedCities()); return new Set(CO
   for (const { c, x, y, hq, here, r } of pts) { const kr = KEY_CITY.has(c.id), lo = kr ? r * 1.3 + 3 : r + 2, ix = kr ? (c.left ? x + r * 0.6 : x - r * 0.4) : x, iy = kr ? y - r * 0.4 : y; h += `${here && !hq ? `<text class="hqico" x="${ix - 7}" y="${iy - 9}">📍</text>` : ''}<g class="city lbl ${hq || here ? 'hq' : ''} ${S && dev.best() < cityLv(c.id) ? 'locked' : ''} ${lblMajor(c, hq || here, KEY_CITY.has(c.id)) ? 'major' : ''}" data-city="${c.id}" data-pr="${lblPr(c, hq, here, KEY_CITY.has(c.id))}"><title>${c.cc ? c.cc + ' ' : ''}${c.nm}${econ && econ.isFinished && econ.isFinished(c.id) ? ' · завършен 🏁' : ''}</title><text x="${c.left ? x - lo : x + lo}" y="${y + 3.5}" text-anchor="${c.left ? 'end' : 'start'}">${c.nm}</text>${hq ? `<text class="hqico" x="${ix - 9}" y="${iy - 9}">🏗️</text>` : (S?.branches || []).includes(c.id) ? `<text class="hqico" x="${ix - 8}" y="${iy - 7}" style="font-size:${(13 * mapLS()).toFixed(1)}px">🏢</text>` : ''}${(ECON.FACTORIES || []).filter(f => f.cityId === c.id).map((f, i) => `<text class="hqico" x="${x - 4 + i * 11}" y="${y + (kr ? Math.max(16, r * 1.3 + 12) : 16)}" style="font-size:${(11 * mapLS()).toFixed(1)}px">${ECON.MATERIALS[f.materialId].ico}</text>`).join('')}</g>`; }
   for (const { c, x, y, hq, r } of pts) h += `<g class="city ${hq ? 'hq' : ''} ${S && S.cityId === c.id ? 'here' : ''} ${S && econ?.isFinished?.(c.id) ? 'done' : ''} ${S && dev.best() < cityLv(c.id) ? 'locked' : ''}" data-city="${c.id}"><circle class="hit" cx="${x}" cy="${y}" r="${(mapEU ? 34 : mapWide ? 11 : 7) * mapK()}"/>${AIR_ONLY.has(c.id) && !(S && ownedCities().includes(c.id)) ? `<text class="aironly" x="${x}" y="${y + r * 0.9}" text-anchor="middle" style="font-size:${(r * 2.6).toFixed(1)}px;pointer-events:none">✈️</text>` : GLOBAL_HUB.has(c.id) ? `<polygon class="gstar" points="${starPts(x, y, r * 2)}" style="stroke-width:${(r * 0.16).toFixed(2)}px"/>` : `<circle ${KEY_CITY.has(c.id) ? 'class="keyc" ' : ''}cx="${x}" cy="${y}" r="${KEY_CITY.has(c.id) ? (r * 1.3).toFixed(2) : r}"/>`}</g>`;   // ★ световните центрове — само звезда на мястото на кръгчето
   h = h.replace('<g class="city lbl', mapLayers.wrap('rail', railSvg() + (mapWorld && (!mapCont || mapCont === 'as') ? silk.svg(id => proj(cityById(id).lon, cityById(id).lat), (mapEU ? 4 : 1) * mapK(), performance.now() / 1000) : '')) + '<g class="city lbl');
-  h = h.replace('<g class="city lbl', mapLayers.wrap('road', hwSvg() + abSvg() + '<g id="truckLayer"></g>') + mapLayers.wrap('air', airSvg()) + mapLayers.wrap('sea', seaSvg()) + '<g class="city lbl');
+  h = h.replace('<g class="city lbl', mapLayers.wrap('road', hwSvg() + abSvg() + hwQueueSvg() + '<g id="truckLayer"></g>') + mapLayers.wrap('air', airSvg()) + mapLayers.wrap('sea', seaSvg()) + '<g class="city lbl');
   h = h.replace('<g class="city lbl', superRouteSvg() + oilMapSvg() + mwMapSvg() + '<g class="city lbl');   // трасетата на супер поръчките — над всички мрежи
   h += resorts.svg(mapCont || null);   // Фаза 5: курортите — европейските на картата на Европа, африканските на изгледа „Африка“
   h += '<g class="lay-rail"><g id="trainLayer"></g></g><g class="lay-air"><g id="planeLayer"></g></g><g class="lay-sea"><g id="shipLayer"></g></g>';
@@ -6086,6 +6086,16 @@ function finishAutobahn(j) {
   showEventPop('ab-done', `🔴 Аутобан ${names}: ${cityById(sg.a).nm} — ${cityById(sg.b).nm}`, `+${fmt(j.reward)} € · тол +${fmt(gain)} €/ден.`);
   toast(`🔴 Участъкът ${cityById(sg.a).nm} — ${cityById(sg.b).nm} от аутобан ${names} е открит! +${fmt(j.reward)} € · тол +${fmt(gain)} €/ден.`, 'good');
   save(); drawMap();
+}
+// участъците на опашка (магистрали и аутобани, S.hwQueue): жълто-оранжев пунктир и „🚧 на опашка №N“ — да се види, че вече са зададени
+function hwQueueSvg() {
+  if (!S || !(S.hwQueue || []).length) return '';
+  const w = (mapEU ? 4 : mapWide ? 1.6 : 1) * mapK(); let h = '';
+  S.hwQueue.forEach((id, i) => { const sg = segById(id); if (!sg) return; const A1 = cityById(sg.a), B1 = cityById(sg.b); if (!A1 || !B1 || !mapIn(sg.a, sg.b)) return;
+    const pts = [proj(A1.lon, A1.lat), ...(viaOf(sg.a, sg.b) || []).map(([lo, la]) => proj(lo, la)), proj(B1.lon, B1.lat)], P = pts.map(p => p.map(v => v.toFixed(1)).join(',')).join(' '), [lx, ly] = ptAlong(pts, 0.5);
+    h += `<polyline points="${P}" fill="none" stroke="#ffb300" stroke-width="${3.4 * w}" stroke-dasharray="${5 * w} ${3 * w}" stroke-linecap="round" opacity=".95"><title>На опашка №${i + 1}: ${A1.nm} — ${B1.nm}</title></polyline>
+      <text x="${lx}" y="${ly - 4 * w}" text-anchor="middle" font-size="${7 * w * mapLS()}" font-weight="800" fill="#ffd54a" stroke="#000" stroke-width="${1.6 * w * mapLS()}" paint-order="stroke">🚧 на опашка №${i + 1}</text>`; });
+  return h;
 }
 // аутобаните на картата: червени и по-дебели от магистралите
 function abSvg() {
