@@ -61,7 +61,7 @@ export function createCorp(deps) {
     const c = st(); c.ipo = c.ipo || { out: 0, mood: 1, div: 0.3, hist: [], day: deps.S().day };
     if (c.ipo.out + TRANCHE > IPO_MAX + 1e-9) { deps.toast('Над 49% не продаваш — ще изгубиш контрола над холдинга.', 'bad'); return; }
     const cash = Math.round(myValue() * c.ipo.mood * TRANCHE * 0.95 / 1e6) * 1e6, first = !c.ipo.out;
-    c.ipo.out = Math.round((c.ipo.out + TRANCHE) * 100) / 100; deps.econ().earn(cash, 'борса', `Холдинг: продадени 10% на световната борса`);
+    c.ipo.out = Math.round((c.ipo.out + TRANCHE) * 100) / 100; c.ipo.raised = (c.ipo.raised || 0) + cash; deps.econ().earn(cash, 'борса', `Холдинг: продадени 10% на световната борса`);
     if (first) deps.pop && deps.pop('empire', `🔔 ${deps.brandName()} на световната борса!`, `Продаде първите 10% за ${B(cash)}. Дивидентите държат акционерите доволни — тогава цената на акцията расте.`);
     else deps.toast(`📈 Продаде още 10% за ${B(cash)} — външните акционери имат ${Math.round(c.ipo.out * 100)}%.`, 'good');
     deps.sound && deps.sound('cash'); deps.save();
@@ -69,7 +69,7 @@ export function createCorp(deps) {
   function buyBack() {
     const c = st(); if (!c.ipo || c.ipo.out < TRANCHE - 1e-9) return;
     const cost = Math.round(myValue() * c.ipo.mood * TRANCHE * 1.05 / 1e6) * 1e6, e = deps.econ(); if (!e.canAfford(cost)) { deps.toast(`Нямаш ${B(cost)}.`, 'bad'); return; }
-    e.spend(cost, 'борса', 'Холдинг: обратно изкупуване на 10%'); c.ipo.out = Math.round((c.ipo.out - TRANCHE) * 100) / 100; deps.toast(`🔁 Изкупи обратно 10% — външните имат ${Math.round(c.ipo.out * 100)}%.`, 'good'); deps.save();
+    e.spend(cost, 'борса', 'Холдинг: обратно изкупуване на 10%'); c.ipo.out = Math.round((c.ipo.out - TRANCHE) * 100) / 100; c.ipo.spent = (c.ipo.spent || 0) + cost; deps.toast(`🔁 Изкупи обратно 10% — външните имат ${Math.round(c.ipo.out * 100)}%.`, 'good'); deps.save();
   }
   const setDiv = d => { const c = st(); if (c.ipo) { c.ipo.div = d; deps.save(); } };
 
@@ -104,7 +104,7 @@ export function createCorp(deps) {
     c.incDay = Math.round(inc);
     if (c.ipo && c.ipo.out > 0) {   // дивидентите към външните акционери и тяхното настроение
       const pay = Math.round(Math.max(0, deps.dailyNet()) * Math.max(0.3, c.ipo.div) * c.ipo.out);   // акционерите имат право поне на 30% от печалбата си
-      if (pay > 0) e.spend(pay, 'борса', `Дивидент към акционерите (${Math.round(c.ipo.div * 100)}%)`);
+      if (pay > 0) { e.spend(pay, 'борса', `Дивидент към акционерите (${Math.round(c.ipo.div * 100)}%)`); c.ipo.paid = (c.ipo.paid || 0) + pay; }
       const tgt = 0.6 + c.ipo.div * 0.8 + (deps.dailyNet() > 0 ? 0.1 : -0.2);
       c.ipo.mood = Math.max(0.5, Math.min(1.8, c.ipo.mood + (tgt - c.ipo.mood) * 0.03 + (Math.random() - 0.5) * 0.02)); c.ipo.divDay = pay;
     }
@@ -143,14 +143,31 @@ export function createCorp(deps) {
     }
     return h;
   }
+  // борсата — нагледно: лента 0–100% (твои / чужди акции), какво печелиш и какво губиш на ден, какво носи всеки бутон и за колко се изплаща
   function ipoHtml() {
-    const c = st(), I = c.ipo, v = myValue();
-    let h = `<div class="bw-stats"><div><b>${f(sharePrice())} €</b><span>акция (${f(SHARES)} акции)</span></div><div><b>${B(v * (I ? I.mood : 1))}</b><span>пазарна капитализация</span></div><div><b>${I ? Math.round(I.out * 100) : 0}%</b><span>външни акционери</span></div>${I ? `<div><b style="color:${I.mood >= 1 ? 'var(--ok)' : 'var(--bad)'}">${I.mood >= 1.1 ? '😀' : I.mood >= 0.9 ? '🙂' : '😟'} ${Math.round(I.mood * 100)}%</b><span>настроение на пазара</span></div>` : ''}</div>`;
-    h += `<div class="meta" style="margin:8px 0">📈 Продаваш дялове от холдинга на транши по 10% (до ${Math.round(IPO_MAX * 100)}% — контролът остава твой) и получаваш огромен капитал за придобивания. Акционерите искат <b>дивидент</b>: колкото по-голям, толкова по-добро настроение и по-висока цена на следващите транши.</div>`;
-    if (I && I.hist && I.hist.length > 1) h += `<div class="card"><b>📈 Цена на акцията</b>${spark(I.hist)}</div>`;
-    const tr = Math.round(v * (I ? I.mood : 1) * TRANCHE * 0.95 / 1e6) * 1e6;
-    h += `<div class="card"><div class="row" style="margin:0;gap:8px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0;flex:1">${I && I.out ? `Дивидент: <b>${f(I.divDay || 0)} €/ден</b> към акционерите` : 'Холдингът още не е на борсата.'}</span>${(!I || I.out < IPO_MAX - 1e-9) ? `<button class="btn" data-cipo="1">🔔 Продай 10% · ${B(tr)}</button>` : ''}${I && I.out >= TRANCHE - 1e-9 ? `<button class="btn2" data-cbuyb="1">🔁 Изкупи 10%</button>` : ''}</div>
-      ${I && I.out ? `<div class="row" style="margin:8px 0 0;gap:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0">Дивидентна политика (дял от печалбата):</span>${[0.3, 0.4, 0.5, 0.6].map(d => `<button class="${I.div === d ? 'btn' : 'btn2'}" data-cdiv="${d}">${Math.round(d * 100)}%</button>`).join('')}</div>` : ''}</div>`;
+    const c = st(), I = c.ipo, v = myValue(), mood = I ? I.mood : 1, cap = v * mood, out = I ? I.out : 0, mine = 1 - out, net = Math.max(0, deps.dailyNet());
+    const divK = I ? Math.max(0.3, I.div) : 0.3, divDay = Math.round(net * divK * out), keep = net - divDay;
+    const trSell = Math.round(cap * TRANCHE * 0.95 / 1e6) * 1e6, trBuy = Math.round(cap * TRANCHE * 1.05 / 1e6) * 1e6, perTr = Math.round(net * divK * TRANCHE);
+    const pct = x => `${Math.round(x * 100)}%`, sh = x => f(Math.round(SHARES * x)), dur = d => d > 3650 ? 'никога (над 10 г.)' : d > 730 ? `~${Math.round(d / 365)} г.` : `~${f(d)} дни`;
+    let h = `<div class="bw-stats"><div><b>${f(sharePrice())} €</b><span>цена на 1 акция</span></div><div><b>${B(cap)}</b><span>стойност на целия холдинг</span></div><div><b style="color:var(--ok)">${B(cap * mine)}</b><span>стойност на твоите акции</span></div>${I ? `<div><b style="color:${mood >= 1 ? 'var(--ok)' : 'var(--bad)'}">${mood >= 1.1 ? '😀' : mood >= 0.9 ? '🙂' : '😟'} ${Math.round(mood * 100)}%</b><span>настроение на пазара</span></div>` : ''}</div>`;
+    // лентата: 100 акции = целият холдинг
+    h += `<div class="card"><b>🥧 Кой притежава холдинга (от ${f(SHARES)} акции)</b>
+      <div style="display:flex;height:30px;border-radius:8px;overflow:hidden;margin:8px 0 4px;border:1px solid var(--line)">
+        <div style="width:${mine * 100}%;background:linear-gradient(90deg,#2e7d32,#43a047);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px">ТИ · ${pct(mine)}</div>
+        ${out > 0 ? `<div style="width:${out * 100}%;background:linear-gradient(90deg,#c62828,#e53935);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px">ЧУЖДИ · ${pct(out)}</div>` : ''}</div>
+      <div style="position:relative;height:14px;font-size:11px;color:var(--mut)">${[0, 25, 51, 75, 100].map(x => `<span style="position:absolute;left:${x}%;transform:translateX(-${x === 100 ? 100 : x ? 50 : 0}%)">${x === 51 ? '51% · контрол' : x + '%'}</span>`).join('')}</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+        <div style="flex:1 1 220px;padding:8px 10px;border-radius:10px;background:rgba(67,160,71,.12)"><b style="color:var(--ok)">🟩 Твоите ${sh(mine)} акции</b><div class="meta" style="margin:4px 0 0">Стойност <b style="color:var(--txt)">${B(cap * mine)}</b><br>Печалба за теб: <b style="color:var(--ok)">+${f(keep)} €/ден</b>${out ? `<br>Получени от продажби: <b style="color:var(--txt)">${B(I.raised || 0)}</b>` : ''}</div></div>
+        <div style="flex:1 1 220px;padding:8px 10px;border-radius:10px;background:rgba(229,57,53,.12)"><b style="color:var(--bad)">🟥 Чуждите ${sh(out)} акции</b><div class="meta" style="margin:4px 0 0">${out ? `Стойност <b style="color:var(--txt)">${B(cap * out)}</b><br>Губиш (дивидент): <b style="color:var(--bad)">−${f(divDay)} €/ден</b><br>Изплатено досега: <b style="color:var(--txt)">${(I.paid || 0) >= 1e6 ? B(I.paid) : f(I.paid || 0) + ' €'}</b>` : 'Още няма — холдингът е изцяло твой.'}</div></div>
+      </div></div>`;
+    if (I && I.hist && I.hist.length > 1) { const mx = Math.max(...I.hist), mn = Math.min(...I.hist), last = I.hist[I.hist.length - 1], first = I.hist[0];
+      h += `<div class="card"><div class="row" style="margin:0;align-items:center"><b style="flex:1">📈 Цена на акцията · последните ${I.hist.length} дни</b><span class="meta" style="margin:0;color:${last >= first ? 'var(--ok)' : 'var(--bad)'}">${last >= first ? '▲' : '▼'} ${Math.round((last / first - 1) * 100)}%</span></div>${spark(I.hist)}<div class="meta" style="margin:2px 0 0;display:flex;justify-content:space-between"><span>мин ${f(mn)} €</span><span>сега <b style="color:var(--txt)">${f(last)} €</b></span><span>макс ${f(mx)} €</span></div></div>`; }
+    // какво прави всеки бутон — с числата
+    h += `<div class="card"><b>🧮 Какво става, ако…</b>
+      ${out < IPO_MAX - 1e-9 ? `<div class="row" style="margin:8px 0 0;gap:8px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0;flex:1 1 300px">🔔 <b style="color:var(--txt)">Продадеш още 10%</b>: получаваш <b style="color:var(--ok)">${B(trSell)}</b> веднага, но всеки ден даваш още ~<b style="color:var(--bad)">${f(perTr)} €</b> дивидент${perTr ? ` (изплаща се за ${dur(Math.round(trSell / perTr))})` : ''}. Стоиш ${pct(mine - TRANCHE)} собственик.</span><button class="btn" data-cipo="1">🔔 Продай 10% · ${B(trSell)}</button></div>` : `<div class="meta" style="margin:8px 0 0">🔒 Продал си максимума (${pct(IPO_MAX)}) — над него губиш контрола.</div>`}
+      ${out >= TRANCHE - 1e-9 ? `<div class="row" style="margin:8px 0 0;gap:8px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0;flex:1 1 300px">🔁 <b style="color:var(--txt)">Изкупиш 10%</b>: плащаш <b style="color:var(--bad)">${B(trBuy)}</b>, а всеки ден спестяваш ~<b style="color:var(--ok)">${f(perTr)} €</b> дивидент${perTr ? ` (изплаща се за ${dur(Math.round(trBuy / perTr))})` : ''}.</span><button class="btn2" data-cbuyb="1">🔁 Изкупи 10% · ${B(trBuy)}</button></div>` : ''}
+      ${I && out ? `<div class="row" style="margin:10px 0 0;gap:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0;flex:1 1 300px">💸 <b style="color:var(--txt)">Дивидент</b> — колко от печалбата на чуждите акции им плащаш. По-голям = по-доволни акционери → по-висока цена на акцията (и на следващата продажба), но по-малко пари за теб.</span>${[0.3, 0.4, 0.5, 0.6].map(d => `<button class="${I.div === d ? 'btn' : 'btn2'}" data-cdiv="${d}" title="~${f(Math.round(net * d * out))} €/ден">${Math.round(d * 100)}%</button>`).join('')}</div>` : ''}
+      ${!I ? `<div class="meta" style="margin:8px 0 0">Холдингът още не е на борсата. Първата продажба го листва — получаваш капитал за придобивания и мегапроекти, а контролът (над 51%) остава твой.</div>` : ''}</div>`;
     return h;
   }
   function concHtml() {
