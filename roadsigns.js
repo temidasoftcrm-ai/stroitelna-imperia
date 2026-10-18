@@ -17,11 +17,36 @@ function prep(k) {
   w.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
   return w;
 }
-export const loadSigns = () => P || (P = new Promise(res => new GLTFLoader().load('assets/heavy/signs/signs.glb', g => {
+export const loadSigns = () => P || (P = Promise.all([new Promise(res => new GLTFLoader().load('assets/heavy/signs/signs.glb', g => {
   const root = g.scene.getObjectByName('signs') || g.scene; SRC = {};
   for (const k of [...root.children]) SRC[k.name] = prep(k);
   res(SRC);
-}, undefined, () => res(null))));
+}, undefined, () => res(null))), loadTL()]).then(r => r[0]));
+
+// истински светофар („Traffic light“, Ronata-Venya, CC-BY; assets/heavy/signs/tlight.glb): стълб 6,5 м с глава встрани и пешеходен сигнал.
+// Началото е оста на стълба. Лещите на модела са тъмни — светят кръгчетата на game.js (buildSignals), поставени върху тях.
+const TL_H = 6.5, TL_LENS = [[1.312, 8.468, -0.104], [1.312, 7.931, -0.104], [1.312, 7.384, -0.104]];   // червена, жълта, зелена — в оригиналния модел (10 м)
+let TL = null;
+function loadTL() {
+  return new Promise(res => new GLTFLoader().load('assets/heavy/signs/tlight.glb', g => {
+    const o = g.scene; o.updateMatrixWorld(true);
+    const b = new THREE.Box3().setFromObject(o), k = TL_H / (b.max.y - b.min.y);
+    const w = new THREE.Group(); w.add(o); o.scale.multiplyScalar(k); o.position.y -= b.min.y * k;
+    o.traverse(m => { if (!m.isMesh) return; m.castShadow = true; if (/Emissive/.test(m.material?.name || '')) { m.material = m.material.clone(); m.material.emissiveIntensity = 0.05; m.material.color.multiplyScalar(0.25); } });
+    TL = { src: w, k }; res(TL);
+  }, undefined, () => res(null)));
+}
+export const hasTrafficLight = () => !!TL;
+// нов светофар: { obj, lens: { ns: [[x,y,z]×3], ew: [[x,y,z]×3] } } — ew е втората глава (копие, завъртяно на 90° около стълба)
+export function trafficLight() {
+  if (!TL) return null;
+  const o = TL.src.clone(true), head = o.getObjectByName('Trafic_Light_Up');
+  if (head) { o.updateMatrixWorld(true); const h2 = head.clone(true); head.parent.add(h2); const piv = new THREE.Group(); o.add(piv); o.updateMatrixWorld(true); piv.attach(h2); piv.rotation.y = Math.PI / 2; }   // в координатите на стълба (моделът от FBX има завъртени възли)
+  o.traverse(m => { if (m.isMesh) m.castShadow = true; });
+  const k = TL.k, ns = TL_LENS.map(([x, y, z]) => [x * k, y * k, z * k]), ew = ns.map(([x, y, z]) => [z, y, -x]);
+  o.userData.detail = true;
+  return { obj: o, lens: { ns, ew } };
+}
 // един знак: x, z — мястото, yaw — накъде гледа лицето (0 = към +z)
 export function sign(kind, x, z, yaw = 0, k = 1) {
   if (!SRC || !SRC[kind]) return null;
