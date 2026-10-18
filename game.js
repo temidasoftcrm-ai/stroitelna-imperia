@@ -52,6 +52,7 @@ import { createMegaWorld } from './megaworld.js';
 import { createHotels, TIERS as HOTEL_TIERS } from './hotels.js';
 import { createBank, WORLD_ISO } from './bank.js';
 import { createImperial, IMP_CC } from './imperial.js';
+import { syncImpCivic, updateImpCivic } from './impcivic.js';   // обществените сгради на Империал Сити в 3D
 import { pickModel as impPick, decor as impDecor, IMP_MODELS, IMP_H } from './impstyle.js';
 import { createNeom, NEOM_CITY, NEOM_ID, DISTRICTS as NEOM_DISTRICTS, FOUND_COST as NEOM_FOUND } from './neom.js';
 import { buildSite3D } from './mine3d.js';
@@ -803,6 +804,7 @@ function bigZoneLots(Z) {
   return q.some(l => used.has(l.id)) ? null : q;
 }
 function buildCity(cityId) {
+  city.impCiv = null;   // сградите на Империал Сити (impcivic.js) — заедно със старата група
   if (cityId === NEOM_ID) impPlace();   // 🏙️ Империал Сити: държавата (🇺🇸/🇷🇺) — преди земята и дърветата, иначе остава пустинята на 🇸🇦 (пясък и палми)
   if (city.group) scene.remove(city.group);
   if (city.planView) { city.planView.traverse(o => { if (o.geometry) o.geometry.dispose(); }); city.planView = null; }   // геометрията на стария план (материалите са общи)
@@ -2697,7 +2699,7 @@ function endOfDay() {
   tenderAutoFix();
   mines.dailyTick();
   oil.dailyTick(); updOilBtn();
-  gridCheck(); holdingCheck(); autoTick(); group.check(); group.dailyTick(); corp.dailyTick(); mw.dailyTick(); hotels.dailyTick(); bank.dailyTick(); neom.dailyTick(); imperial.dailyTick(); neomDecor(); if (imperial.needChoice() && !S.impAsked && $('modal').classList.contains('hidden')) { S.impAsked = S.day; imperial.choose(() => renderBig()); } holdMilestones(); if (S.holding) holdXP(Math.max(0, regNet()) / 10000);
+  gridCheck(); holdingCheck(); autoTick(); group.check(); group.dailyTick(); corp.dailyTick(); mw.dailyTick(); hotels.dailyTick(); bank.dailyTick(); neom.dailyTick(); imperial.dailyTick(); impCiv3D(); neomDecor(); if (imperial.needChoice() && !S.impAsked && $('modal').classList.contains('hidden')) { S.impAsked = S.day; imperial.choose(() => renderBig()); } holdMilestones(); if (S.holding) holdXP(Math.max(0, regNet()) / 10000);
   airAutoPlanes();
   tenders.dailyTick();
   orient.dailyTick();
@@ -3453,7 +3455,7 @@ const bank = createBank({ S: () => S, econ: () => econ, fmt, toast, save, sound:
 const neomName = () => { const c = cityById(NEOM_ID); if (c) c.nm = `${brandOf(S)?.nm || 'Титан'} Сити`; };
 const neom = createNeom({ S: () => S, econ: () => econ, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), brand: () => brandOf(S)?.nm || 'Титан', holding: () => !!S.holding,
   pickModel: (k, r) => { if (S.imp?.cc) return impPick(S.imp.cc, k, r, n => !!A[n.split('@')[0]]); const L = k === 'sky' ? SKY : k === 'shop' ? SHOPS : HOUSES; return L[Math.floor(r() * L.length)]; },
-  needCountry: () => !S.imp?.cc, chooseCountry: then => imperial.choose(then), where: () => { const C = IMP_CC[S.imp?.cc]; return C ? `${C.cc} ${C.nm}` : ''; },
+  occ: () => imperial.occ(), needCountry: () => !S.imp?.cc, chooseCountry: then => imperial.choose(then), where: () => { const C = IMP_CC[S.imp?.cc]; return C ? `${C.cc} ${C.nm}` : ''; },
   cityBuilt: () => { const c = S.cityId === NEOM_ID ? S : S.cities?.[NEOM_ID] || {}; return [...(c.built || []).map(b => b.lot), c.garageLot, c.whLot, ...(S.cityId === NEOM_ID && city.lots ? city.lots.filter(l => l.busy || l.built).map(l => l.id) : [])].filter(x => x != null); },
   place: (id, m, rot) => { if (S.cityId === NEOM_ID && city.lots?.[id]) { placeBuilding(city.lots[id], m, rot); S.built.push({ lot: id, model: m, rot }); if (neom.lineDone()) neomDecor(); } else { const c = S.cities[NEOM_ID] = S.cities[NEOM_ID] || newCityState(); c.built = [...(c.built || []), { lot: id, model: m, rot }]; } },
   found: id => { neomName(); S.branches = [...new Set([...(S.branches || []), id])]; S.autoCity = { ...(S.autoCity || {}), [id]: false }; S.cities[id] = { ...newCityState(), left: nowDays() }; } });
@@ -3472,7 +3474,9 @@ const imperial = createImperial({ S: () => S, econ: () => econ, fmt, toast, save
   winter: d => seasonOf(d) === 'winter', relocate: () => { impPlace(); if (S.cityId === NEOM_ID) impLook(); }, lvUp: (lv, text) => dev.cityUp(lv, text) });
 // градът стои в избраната държава (координати и флаг; без флага на Саудитска Арабия няма пустиня)
 function impPlace() { const C = IMP_CC[S?.imp?.cc], c = C && cityById(NEOM_ID); if (!c || (c.lat === C.lat && c.cc === C.cc)) return; Object.assign(c, { lat: C.lat, lon: C.lon, cc: C.cc }); isoCitiesC.clear(); }
-function impLook() { if (S.cityId !== NEOM_ID || !city.group || !S.imp?.cc) return; impPlace(); impDecor(city.group, S.imp.cc, city, { winter: seasonOf(S.day) === 'winter' }); }
+function impLook() { if (S.cityId !== NEOM_ID || !city.group || !S.imp?.cc) return; impPlace(); impDecor(city.group, S.imp.cc, city, { winter: seasonOf(S.day) === 'winter' }); impCiv3D(); }
+// 🏥 обществените сгради (imperial.js S.imp.b) на свободни парцели във външния пояс — при влизане и всеки ден (строежът расте)
+function impCiv3D() { if (S.cityId !== NEOM_ID || !city.group || !S.imp?.cc) return; syncImpCivic(city, { imp: S.imp, cc: S.imp.cc, side: 2 * TILE - 2, builders: { civic: buildCivic, hospital: buildHospital, metro: buildMetro }, deps: { label, model: (n, k) => A[n] ? model(n, k) : null } }); }
 // 🛢️ петролната империя (oil.js): танкова ферма, световна цена, договори с танкери, бензиностанции
 const oil = createOil({ S: () => S, econ: () => econ, priceMul: () => mw.done('pipeline') ? 1.1 : 1, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), cityName: id => cityById(id)?.nm || id, cityOk: id => !!cityById(id),
   ownedCities: () => ownedCities(), unlinked: () => { const t = mines.state().sites.filter(x => x.kind === 'terminal'); return mines.state().sites.filter(x => ['oilwell', 'refinery'].includes(x.kind) && !t.some(q => q.city === x.city || railLinked(q.city, x.city) || roadLinked(q.city, x.city))).map(x => x.city); }, tankers: () => (S.ships || []).filter(p => p.kind === 'tanker').length, terminalCity: () => mines.state().sites.find(x => x.kind === 'terminal')?.city || null, isAm: id => isAm(id) });
@@ -8645,6 +8649,7 @@ function frame() {
     updateCityHighway(simT);
     if (city.sea) city.sea.update(simT, dayNight.night);
     for (const o of Object.values(city.tender3D || {})) o.update(simT, dayNight.night);
+    updateImpCivic(city, simT, dayNight.night);
     for (const o of Object.values(city.mine3D || {})) o.update(simT, dayNight.night);
     for (const o of city.landmarks || []) o.update(simT, dayNight.night);
     if (station && station.setNight) station.setNight(dayNight.night);
