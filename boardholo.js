@@ -282,5 +282,5 @@ export function createHolo(scene, { fmt = n => Math.round(n).toLocaleString('bg-
     if (flashT > 0) flashT = Math.max(0, flashT - dt * 0.6);
   }
   function dispose() { token++; clear(); scene.remove(root); scene.remove(beam); beam.geometry.dispose(); beam.material.dispose(); }
-  return { show, flash, update, dispose };
+  return { show, flash, update, dispose, root };
 }

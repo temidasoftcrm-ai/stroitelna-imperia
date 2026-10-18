@@ -295,7 +295,7 @@ function buildRoom(scene) {
 }
 // пред всяко място: кожена папка с името, чаша вода на златна подложка
 // без transmission: той рисува цялата сцена още веднъж на всеки кадър (20 чаши = отделен пълен проход); отражението идва от envMap
-const glassM = new THREE.MeshStandardMaterial({ color: 0xeaf4ff, metalness: 0.1, roughness: 0.04, envMapIntensity: 2.4, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide });
+const glassM = new THREE.MeshStandardMaterial({ color: 0xcfe2f0, metalness: 0.1, roughness: 0.04, envMapIntensity: 1.6, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide });
 const waterM = new THREE.MeshStandardMaterial({ color: 0xbfe2f5, metalness: 0, roughness: 0.03, envMapIntensity: 1.8, transparent: true, opacity: 0.45, depthWrite: false });
 // профилът на чашата (радиус, височина в m): дебело дъно, леко разширена нагоре, ръбът — двойна стена
 const GLASS = new THREE.LatheGeometry([[0, 0], [0.028, 0], [0.031, 0.004], [0.032, 0.014], [0.037, 0.115], [0.0385, 0.118], [0.0365, 0.118], [0.0345, 0.016], [0, 0.014]].map(([r, y]) => new THREE.Vector2(r, y)), 28);

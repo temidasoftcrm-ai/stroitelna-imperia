@@ -126,7 +126,7 @@ export function buildPresRoom(scene, cc, H) {
   else { const fp = new THREE.Group(); scene.add(fp); addBox(fp, 1.6, 1.1, 0.25, std(0xf4efe4, 0.5), -3.6, 0.55, ROOM_BACK + 0.13); addBox(fp, 0.9, 0.7, 0.1, std(0x1a1210, 0.9), -3.6, 0.4, ROOM_BACK + 0.21); addBox(fp, 1.6, 1.1, 0.25, std(0xf4efe4, 0.5), 3.6, 0.55, ROOM_BACK + 0.13); }
   // таван и полилеи (светят)
   const ceil = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W * 2, D), std(RU ? 0xf6f1e4 : 0xf4efe4, 1, 0, { emissive: 0x6b6458 })); ceil.rotation.x = Math.PI / 2; ceil.position.set(0, RH, cz); scene.add(ceil);
-  const bulb = std(0xfff3d6, 0.3, 0, { emissive: 0xffe2a8, emissiveIntensity: 1.6 }), crystal = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.05, transmission: 0.6, transparent: true, opacity: 0.8 });
+  const bulb = std(0xfff3d6, 0.3, 0, { emissive: 0xffe2a8, emissiveIntensity: 1.6 }), crystal = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.7 });   // без transmission — отделен проход на сцената
   for (const z of RU ? [-2.6, 0, 2.6] : [-1.6, 1.6]) {
     const ch = new THREE.Group(); ch.position.set(0, RH - 0.9, z); scene.add(ch);
     addCyl(ch, 0.01, 0.01, 0.7, gold, 0, 0.55, 0, 6);
