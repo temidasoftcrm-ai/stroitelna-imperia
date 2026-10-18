@@ -80,6 +80,7 @@
   /* снимките при събития: малка карта долу вляво, под съобщенията (не закриват играта и десния панел) */
   #buyPop { position:fixed; bottom:16px; left:16px; width:min(340px, calc(100vw - 32px)); z-index:11; cursor:pointer; animation:bpIn .35s ease-out; }
   #buyPop.hidden { display:none; }
+  body:not(.mob):has(#mapScreen:not(.hidden)) #buyPop { bottom:72px; left:72px; }   /* на картата — над бутоните на слоевете и вдясно от зума */
   #buyPop.out { opacity:0; transition:opacity .5s; }
   #buyPop .bp-card { width:100%; border-radius:18px; overflow:hidden; background:#111; border:2px solid var(--acc); box-shadow:0 20px 60px rgba(0,0,0,.6), 0 0 40px rgba(255,179,0,.35); transform-origin:center; animation:bpPop .45s cubic-bezier(.2,1.4,.4,1); }
   #buyPop img { display:block; width:100%; max-height:30vh; object-fit:contain; background:#0e0e12; }
@@ -305,7 +306,7 @@
   "./bankrupt.js": "./bankrupt.js?v=0b4869fe",
   "./bidding.js": "./bidding.js?v=8bfcb691",
   "./boardholo.js": "./boardholo.js?v=0db1d641",
-  "./boardlogic.js": "./boardlogic.js?v=622e6fc5",
+  "./boardlogic.js": "./boardlogic.js?v=7b20367c",
   "./cinema.js": "./cinema.js?v=7823e2b5",
   "./citypanel.js": "./citypanel.js?v=7b7b8cc1",
   "./cityplan-osm.js": "./cityplan-osm.js?v=f768f29e",
@@ -326,11 +327,11 @@
   "./directors3d.js": "./directors3d.js?v=accd362c",
   "./economy.js": "./economy.js?v=2a2d9dc4",
   "./events.js": "./events.js?v=a1fc7ecf",
-  "./game.js": "./game.js?v=0907ab06",
-  "./globdir.js": "./globdir.js?v=87cd99eb",
+  "./game.js": "./game.js?v=36db569a",
+  "./globdir.js": "./globdir.js?v=cde9d65d",
   "./globe.js": "./globe.js?v=86842abe",
   "./greatwall3d.js": "./greatwall3d.js?v=99001275",
-  "./group.js": "./group.js?v=079b5f4a",
+  "./group.js": "./group.js?v=6ac17756",
   "./highways.js": "./highways.js?v=0773c775",
   "./hotels.js": "./hotels.js?v=af4ae183",
   "./hub.js": "./hub.js?v=803fc401",
@@ -543,7 +544,7 @@
 
 <script src="mobile.js?v=7d605a2f"></script>
 <script type="module" src="memfix.js?v=391cec42"></script>
-<script type="module" src="game.js?v=0907ab06"></script>
+<script type="module" src="game.js?v=36db569a"></script>
 <script type="module" src="tips.js?v=f58d6ac2"></script>
 <script type="module" src="panelintro.js?v=5968e433"></script>
 <script type="module" src="cloud.js?v=9770a6c9"></script>

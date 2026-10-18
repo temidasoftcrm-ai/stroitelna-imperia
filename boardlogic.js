@@ -96,30 +96,37 @@ export function createBoardLogic(deps) {
   // ---- 📋 одобрението създава ангажимент
   function commit(p, via) {
     if (p.cost && !deps.econ().canAfford(p.cost)) { deps.toast(`Нямаш ${B(p.cost)}.`, 'bad'); return { done: false }; }
-    const h = hold(), before = deps.econ().money;
-    spentOf(p.dir); h.spent[p.dir] = (h.spent[p.dir] || 0) + (p.cost || 0);
-    if (p.isSmall) p.apply(); else deps.decide(p.id, 'yes');   // пълното — през group.js decide (пази историята); по-малкият вариант — направо тук
+    const h = hold(), before = deps.econ().money, tr0 = p.track && deps.trackStatus ? JSON.stringify(deps.trackStatus(p.track)) : null, sig0 = deps.sig ? deps.sig() : '';
+    try { p.apply(); } catch (e) { console.warn('board apply', e); }
     const spent0 = Math.max(0, Math.round(before - deps.econ().money));
+    // сработи ли? — похарчени пари, мръднал ангажимент или промяна в записа (кредити, договори, дялове)
+    const ok = spent0 > 0 || (tr0 != null && JSON.stringify(deps.trackStatus(p.track)) !== tr0) || (deps.sig && deps.sig() !== sig0) || (!p.cost && !p.track);
+    if (!ok) { deps.toast(`⚠️ ${nm(p.dir)}: „${p.text.split(/[.?!]/)[0].slice(0, 70)}“ не се получи${p.needsGear ? ` — първо ${p.needsGear}` : ''}.`, 'bad'); deps.save(); return { done: false, failed: true }; }
+    spentOf(p.dir); h.spent[p.dir] = (h.spent[p.dir] || 0) + spent0;
+    (h.skip = h.skip || {})[String(p.id).split(':').slice(0, 2).join(':')] = day() + 30;   // одобреното не се предлага пак до следващия борд (като group.decide)
+    if (via !== 'автопилот') { deps.toast(`✓ Бордът одобри: ${p.text}`, 'good'); deps.sound && deps.sound('buy'); }
     if (p.track) {
       const c = { cid: (h.cseq = (h.cseq || 0) + 1), dir: p.dir, text: p.goal || p.text, cost: p.cost || 0, spent0, reserved: Math.max(0, (p.cost || 0) - spent0), start: day(), days: p.days || 30, due: day() + (p.days || 30), gain: p.gain || 0, track: p.track, st: 'active', via };
-      h.commits = [c, ...h.commits].slice(0, MAX_COMMITS);
+      h.commits = [c, ...h.commits]; trim(h);
     }
     h.month = h.month || { m: month(), n: 0, sum: 0 }; if (h.month.m !== month()) h.month = { m: month(), n: 0, sum: 0 };
-    h.month.n++; h.month.sum += p.cost || 0;
+    if (p.kind === 'loan') h.month.loans = (h.month.loans || 0) + 1; else if (spent0 > 0) { h.month.n++; h.month.sum += spent0; } else h.month.free = (h.month.free || 0) + 1;   // кредитът на банката не е инвестиция от касата
     if (via !== 'собственик') h.mood = Math.min(1, h.mood + 0.02);
     deps.save();
     return { done: true, via };
   }
 
+  const trim = h => { const act = h.commits.filter(c => c.st === 'active'), rest = h.commits.filter(c => c.st !== 'active').slice(0, Math.max(10, MAX_COMMITS - act.length)); h.commits = h.commits.filter(c => c.st === 'active' || rest.includes(c)); };
   // ---- 📊 месечен контрол: статусите на ангажиментите от игровите данни
   function review() {
     const h = hold(), out = [];
     for (const c of h.commits) {
       if (c.st !== 'active') continue;
       const s = deps.trackStatus ? deps.trackStatus(c.track) : { done: 1, total: 1 };
-      c.prog = s.total ? s.done / s.total : 1; c.reason = s.reason || '';
+      c.prog = s.total ? s.done / s.total : 1; c.reason = s.reason || ''; c.blocked = !!s.blocked;
+      c.reserved = Math.max(0, Math.round((c.cost - (c.spent0 || 0)) * (1 - c.prog)));   // похарченото по пътя (магистрали, линии) излиза от резерва
       if (s.total && s.done >= s.total) {   // изпълнено: резервът се освобождава, доверието расте (или пада, ако е много късно)
-        c.st = 'done'; c.end = day(); c.reserved = 0; c.late = day() > c.due;
+        c.st = 'done'; c.end = day(); c.reserved = 0; c.late = day() > c.due; c.toasted = false;   // group.js показва „✅ …“ и слага toasted = true
         h.trust[c.dir] = Math.max(0.5, Math.min(1.3, trustOf(c.dir) + (c.late ? (day() > c.due + c.days ? -0.05 : 0) : 0.04)));
         out.push({ c, status: 'изпълнено' });
       } else {
@@ -135,7 +142,7 @@ export function createBoardLogic(deps) {
     const h = hold(), c = h.commits.find(x => x.cid === +cid); if (!c || c.st !== 'active') return;
     if (how === 'extend') { c.due = Math.max(c.due, day()) + Math.ceil(c.days * 0.5); c.flag = null; deps.toast(`📅 Срокът е удължен до ден ${c.due}.`, ''); }
     else if (how === 'fix') { const ok = deps.fixTrack && deps.fixTrack(c.track); deps.toast(ok ? '🔧 Ресурсите са пренасочени — проектът продължава.' : 'Няма какво да се пренасочи — купи липсващото или удължи срока.', ok ? 'good' : 'bad'); }
-    else if (how === 'stop') { c.st = 'stop'; c.end = day(); c.reserved = 0; deps.toast(`✖ Проектът е прекратен, резервираните ${B(0)} са освободени.`, ''); }
+    else if (how === 'stop') { const fr = c.reserved || 0; c.st = 'stop'; c.end = day(); c.reserved = 0; deps.toast(`✖ Проектът е прекратен${fr ? `, резервираните ${B(fr)} са освободени` : ''}.`, ''); }
     deps.save();
   }
   const STAT = { 'изпълнено': ['✅', 'var(--ok)'], 'в процес': ['⏳', 'var(--txt)'], 'забавено': ['⚠️', 'var(--acc)'], 'блокирано': ['⛔', 'var(--bad)'] };
@@ -143,7 +150,7 @@ export function createBoardLogic(deps) {
   function reportHtml() {
     const R = review(), h = hold(), recent = h.commits.filter(c => c.st === 'done' && c.end >= day() - 30);
     if (!R.length && !recent.length) return '';
-    const by = {}; for (const r of R) (by[r.c.dir] = by[r.c.dir] || []).push(r);
+    const by = {}; for (const r of [...R, ...recent.filter(c => !R.some(r => r.c === c)).map(c => ({ c, status: 'изпълнено' }))]) (by[r.c.dir] = by[r.c.dir] || []).push(r);
     const lines = Object.entries(by).map(([d, rs]) => { const ok = rs.filter(r => r.status === 'изпълнено').length, bad = rs.filter(r => r.status === 'забавено' || r.status === 'блокирано');
       const sum = `${nm(d)}: „${ok ? `${ok} от ${rs.length} одобрени проекта са изпълнени.` : `${rs.length} проекта в работа.`}${bad.length ? ` ${bad[0].c.reason || 'Има забавяне'}.` : ''}“`;
       return `<div style="margin:6px 0"><div class="meta" style="margin:0 0 3px">${DIR_ICO[d] || ''} <b style="color:var(--txt)">${sum}</b></div>${rs.map(({ c, status }) => `<div class="row" style="margin:2px 0 2px 18px;gap:6px;align-items:center;flex-wrap:wrap"><span class="meta" style="margin:0;flex:1 1 260px">${STAT[status][0]} <b style="color:${STAT[status][1]}">${status}</b> · ${c.text.slice(0, 90)}${c.text.length > 90 ? '…' : ''} · ${Math.round((c.prog || 0) * 100)}% · срок ден ${c.due}${c.reason && status !== 'изпълнено' ? ` · <i>${c.reason}</i>` : ''}</span>${status === 'забавено' || status === 'блокирано' ? `<button class="btn2" data-bc="${c.cid}|extend">📅 Удължи</button><button class="btn2" data-bc="${c.cid}|fix">🔧 Пренасочи ресурси</button><button class="btn2" data-bc="${c.cid}|stop">✖ Прекрати</button>` : ''}</div>`).join('')}</div>`; }).join('');
@@ -152,14 +159,15 @@ export function createBoardLogic(deps) {
   // обобщението на Борис в края на заседанието
   function summary() {
     const h = hold(), m = h.month && h.month.m === month() ? h.month : { n: 0, sum: 0 }, F = frame(), soon = active().filter(c => c.due <= day() + 30);
-    return `Одобрихме ${m.n} ${m.n === 1 ? 'инвестиция' : 'инвестиции'} за ${B(m.sum)}. Остават ${B(F.free)} за нови решения.${soon.length ? ` Следващия месец очакваме: ${soon.slice(0, 3).map(c => c.text.split(/[.?—]/)[0].slice(0, 50)).join('; ')}.` : ''}`;
+    const parts = [m.n ? `${m.n} ${m.n === 1 ? 'инвестиция' : 'инвестиции'} за ${B(m.sum)}` : '', m.loans ? `${m.loans} ${m.loans === 1 ? 'кредит' : 'кредита'} от банката (от капитала ѝ, не от касата)` : '', m.free ? `${m.free} ${m.free === 1 ? 'решение' : 'решения'} без разход` : ''].filter(Boolean);
+    return `${parts.length ? `Одобрихме ${parts.join(', ')}.` : 'Днес не одобрихме нищо ново.'} Остават ${B(F.free)} за нови решения.${soon.length ? ` Следващия месец очакваме: ${soon.slice(0, 3).map(c => c.text.split(/[.?—]/)[0].slice(0, 50)).join('; ')}.` : ''}`;
   }
 
   // ---- 🤖 автопилот (веднъж на ден): одобрява сам предложенията до тавана — в бюджета и ако банката е спокойна
   function autoTick() {
     const h = hold(), done = [];
     for (const p of deps.proposals()) {
-      if (p.info) continue;
+      if (p.info || p.noAuto || p.needsGear) continue;   // кредити, акции, дивиденти и договори — само собственикът; липсва техника — чака
       const cap = h.auto[p.dir] || 0; if (!cap || (p.cost || 0) > cap) continue;
       if (budgetOf(p.dir) && (p.cost || 0) > budgetLeft(p.dir)) continue;
       if (!bankCheck(p).ok) continue;
@@ -195,7 +203,7 @@ export function createBoardLogic(deps) {
     return `${!v.bank.ok ? `<div class="meta" style="margin:0 0 6px">🏦 Банката възразява: ${v.bank.why}.</div>` : ''}<div class="meta" style="margin:0 0 6px">Съвещателен вот за „${p.text.slice(0, 90)}${p.text.length > 90 ? '…' : ''}“ (${B(p.cost)}):</div>
       ${v.votes.map(x => `<div class="meta" style="margin:2px 0"><b style="color:${x.cond ? 'var(--acc)' : x.yes ? '#43d17a' : '#ff4d4d'};font-weight:900">${x.cond ? '◐ за, с условие' : x.yes ? '✔ за' : '✖ против'}</b> · <b style="color:var(--txt)">${x.name}</b> ${DIR_ICO[x.dir] || ''} — ${x.why}</div>`).join('')}
       <div style="margin:8px 0 4px;font-weight:800;font-size:15px;color:${v.passed ? 'var(--ok)' : 'var(--bad)'}">${v.yes} за : ${v.no} против — решението е твое</div>
-      <div class="row" style="margin:6px 0 0;gap:6px;flex-wrap:wrap"><button class="btn" data-bv="${p.id}|pass">✓ Одобри</button>${p.small ? `<button class="btn2" data-bv="${p.id}|small">½ По-малък вариант · ${B(p.small.cost)}</button>` : ''}${deps.loan && !v.bank.ok ? `<button class="btn2" data-bv="${p.id}|loan">🏦 С кредит</button>` : ''}<button class="btn2" data-bv="${p.id}|drop">⏳ Отложи</button></div>`;
+      <div class="row" style="margin:6px 0 0;gap:6px;flex-wrap:wrap"><button class="btn" data-bv="${p.id}|${p.isSmall ? 'small' : 'pass'}">✓ Одобри${p.isSmall ? ' (½)' : ''}</button>${p.small && !p.isSmall ? `<button class="btn2" data-bv="${p.id}|small">½ По-малък вариант · ${B(p.small.cost)}</button>` : ''}${deps.loan && !v.bank.ok ? `<button class="btn2" data-bv="${p.id}|loan">🏦 С кредит</button>` : ''}<button class="btn2" data-bv="${p.id}|drop">⏳ Отложи</button></div>`;
   }
   return { frame, frameHtml, bankSpeech, bankCheck, vote, request, resolve, review, act, reportHtml, summary, propHtml, autoTick, setBudget, setAuto, budgetLeft, budgetOf, spentOf, trustOf, settingsHtml, bindSettings, voteHtml, mood: () => hold().mood, commits: () => hold().commits };
 }

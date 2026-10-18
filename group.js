@@ -49,7 +49,8 @@ export function groupName(S) {
 // 🏛️ Ерата на холдинга (ниво 15): всяко дружество има ниво на развитие (+10% от прихода му на ниво, до 5) и директор (+15%).
 // Бонусът се изплаща всеки ден като приход на холдинга. Записът: S.hold = { lv: { [sub]: n }, dir: { [sub]: 'име' } }.
 export const HOLD_LV_MAX = 5, HOLD_LV_K = 0.10, HOLD_DIR_K = 0.15;
-export const DIR_LV = Math.ceil(HOLD_LV_MAX * 0.9);   // директор — само когато дружеството е развито поне 90% (ниво 5 от 5)
+export const DIR_LV = Math.ceil(HOLD_LV_MAX * 0.9);
+const GLOB_DIR_COST = 1e9;   // директорът на Глобъл (мегапроекти, концесии, придобивания) — Глобъл няма собствен приход за процент   // директор — само когато дружеството е развито поне 90% (ниво 5 от 5)
 // всяко дружество има свой директор (портретите и 3D моделите в directors3d.js са по тези имена)
 export const DIR_OF = { con: 'Ивайло Петров', hw: 'Надя Иванова', rail: 'Мария Стоянова', sea: 'Стефан Колев', air: 'Елена Димитрова', hotel: 'Георги Николов', oil: 'Вера Ангелова', bank: 'Борис Тодоров' , glob: 'Александър Владимиров'};
 
@@ -71,8 +72,11 @@ export function createGroup(deps) {
     e.spend(c, 'покупка', `Холдинг: развитие на ${subName(deps.S(), k)}`); hold().lv[k] = (hold().lv[k] || 0) + 1;
     deps.toast(`🏛️ ${subName(deps.S(), k)} — ниво ${hold().lv[k]}: +${Math.round(bonusK(k) * 100)}% от прихода ѝ всеки ден.`, 'good'); deps.sound && deps.sound('upgrade'); deps.save();
   }
+  const canHireGlob = () => { const S = deps.S(); return !!(S.holding && (S.group || {}).glob && !hold().dir.glob); };
   function hire(k) {
-    if (!canManage(k) || hold().dir[k]) return; if ((hold().lv[k] || 0) < DIR_LV) { deps.toast(`👔 Директор — когато дружеството е развито поне 90% (ниво ${DIR_LV}).`, 'bad'); return; } const c = dirCost(k), e = deps.econ();
+    const isG = k === 'glob';
+    if (hold().dir[k] || (isG ? !canHireGlob() : !canManage(k))) return;
+    if (!isG && (hold().lv[k] || 0) < DIR_LV) { deps.toast(`👔 Директор — когато дружеството е развито поне 90% (ниво ${DIR_LV}).`, 'bad'); return; } const c = isG ? GLOB_DIR_COST : dirCost(k), e = deps.econ();
     if (!e.canAfford(c)) { deps.toast(`Нямаш ${deps.fmt(c)} €.`, 'bad'); return; }
     const nm = DIR_OF[k];
     e.spend(c, 'заплати', `Холдинг: директор на ${subName(deps.S(), k)}`); hold().dir[k] = nm;
@@ -89,9 +93,38 @@ export function createGroup(deps) {
       deps.toast(`🏛️ Холдингът разпредели +${deps.fmt(Math.round(h.mAcc))} € за месеца — бонус от развитието${Object.keys(h.dir).length ? ' и директорите' : ''} на дружествата.`, 'good');
       deps.sound && deps.sound('cash'); h.mAcc = 0;
     }
+    const B2 = deps.board2 && deps.board2();
+    if (B2 && B2.commits && deps.S().holding) {
+      // ✅ завършен проект — кратко известие от директора (boardlogic слага c.toasted = false при завършване)
+      for (const c of B2.commits()) if (c.st === 'done' && c.toasted === false) {
+        c.toasted = true; const who = (c.dir === 'mayor' ? deps.mayorName && deps.mayorName() : DIR_OF[c.dir]) || c.dir;
+        deps.toast(`✅ ${who.split(' ')[0]}: ${c.text.split(/[.?—]/)[0].slice(0, 70)} — изпълнено${c.late ? ' (със закъснение)' : ' навреме'}.`, c.late ? '' : 'good'); deps.save();
+      }
+      if (day > 0 && day % 360 === 0) yearReview(B2);
+    }
     // веднъж месечно бордът на директорите се събира сам, ако има какво да предложи
     if (day % 30 === 0 && deps.S().holding && feature('boardroom') && proposals().filter(p => !p.info).length) { deps.toast(`🏛️ Бордът на директорите се събра — ${proposals().filter(p => !p.info).length} предложения.`, 'good'); board(); }   // докладът на банката (info) не е предложение
     return b;
+  }
+  // 📊 годишната оценка на директорите: изпълнени навреме / със закъснение / забавени и блокирани → директор на годината (+доверие) и предупреждение (−доверие)
+  function yearReview(B2) {
+    const h = hold(), day = deps.S().day || 0, from = day - 360, rows = [];
+    for (const k of Object.keys(h.dir || {}).concat(deps.mayorName && deps.mayorName() ? ['mayor'] : [])) {
+      const cs = B2.commits().filter(c => c.dir === k && c.start >= from);
+      const ok = cs.filter(c => c.st === 'done' && !c.late).length, late = cs.filter(c => c.st === 'done' && c.late).length, bad = cs.filter(c => c.st === 'active' && c.flag).length;
+      if (!cs.length) continue;
+      rows.push({ k, nm: k === 'mayor' ? deps.mayorName() : DIR_OF[k] || h.dir[k], ok, late, bad, n: cs.length, score: ok * 2 + late - bad * 2 });
+    }
+    if (!rows.length) return;
+    rows.sort((a, b) => b.score - a.score);
+    h.trust = h.trust || {};
+    const best = rows[0], worst = rows[rows.length - 1];
+    if (best.score > 0) h.trust[best.k] = Math.min(1.3, (h.trust[best.k] ?? 1) + 0.05);
+    if (worst !== best && worst.score < 0) h.trust[worst.k] = Math.max(0.5, (h.trust[worst.k] ?? 1) - 0.05);
+    h.reviews = [{ day, rows: rows.map(r => ({ k: r.k, ok: r.ok, late: r.late, bad: r.bad })) }, ...(h.reviews || [])].slice(0, 10);
+    const line = r => `${r.nm}: ${r.ok} навреме, ${r.late} със закъснение${r.bad ? `, ${r.bad} забавени` : ''}`;
+    deps.pop && deps.pop('dir-review', '📊 Годишна оценка на директорите', `${best.score > 0 ? `⭐ Директор на годината: ${best.nm} (+доверие). ` : ''}${worst !== best && worst.score < 0 ? `⚠️ Предупреждение: ${worst.nm} (−доверие). ` : ''}${rows.map(line).join(' · ')}`);
+    deps.sound && deps.sound('levelup'); deps.save();
   }
   function check(quiet = false) {
     const S = deps.S(); if (!S || !S.brand) return;
@@ -134,11 +167,41 @@ export function createGroup(deps) {
       const on = g[s.k], inc = on ? s.inc(deps) || 0 : 0, L = hold().lv[s.k] || 0, dir = hold().dir[s.k], man = H && on && !s.final && inc > 0;   // без приход — няма какво да се умножава
       const ctl = man ? `<div class="row" style="margin:6px 0 0;gap:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0;flex:1">${'★'.repeat(L)}${'☆'.repeat(HOLD_LV_MAX - L)} ниво ${L}${dir ? ` · 👔 ${dir}` : ''}${bonusK(s.k) ? ` · <b style="color:#ffd54a">+${f(bonusOf(s.k))} €/ден</b> (+${Math.round(bonusK(s.k) * 100)}%)` : ''}</span>${L < HOLD_LV_MAX ? `<button class="btn2" data-hup="${s.k}" ${deps.econ().canAfford(upCost(s.k)) ? '' : 'disabled'}>⬆️ Развий · ${f(upCost(s.k))} €</button>` : ''}${dir ? '' : L < DIR_LV ? `<button class="btn2" disabled title="Директор се назначава, когато дружеството е развито поне 90%">👔 Директор · 🔒 ниво ${DIR_LV}</button>` : `<button class="btn2" data-hdir="${s.k}" ${deps.econ().canAfford(dirCost(s.k)) ? '' : 'disabled'}>👔 Директор · ${f(dirCost(s.k))} €</button>`}</div>` : '';
       const fb = !on && canFound(s.k) ? `<div class="row" style="margin:6px 0 0;gap:6px;align-items:center"><span class="meta" style="margin:0;flex:1">🎁 ${FOUND[s.k].gift}</span><button class="btn" data-hfound="${s.k}">Основи · ${f(FOUND[s.k].cost)} €</button></div>` : '';
-      return `<div class="card${!on && !fb ? ' subLock' : ''}" style="position:relative;${on ? `border-left:4px solid ${b.col}` : ''}">${!on && !fb ? `<span class="subLv">🔒 ниво ${SUB_LV[s.k] || '?'}</span>` : ''}<div class="row" style="margin:0;align-items:center;gap:10px">${subLogo(s.k, 44, on)}<span class="meta" style="margin:0;flex:1"><b style="color:var(--txt);font-size:15px">${b.nm} ${s.suf}</b><br>${s.what}${on ? ` · основана на ден ${on}` : ` · 🔒 ${s.how}`}</span>${on && !s.final ? `<b style="color:${inc ? 'var(--ok)' : 'var(--mut, #9aa)'}">${inc ? `+${f(inc)} €/ден` : '—'}</b>` : ''}</div>${ctl}${s.k === 'oil' && on ? '<div class="row" style="justify-content:flex-end;margin:6px 0 0"><button class="btn" data-hoil="1">🛢️ Петролната империя →</button></div>' : ''}${fb}</div>`;
+      return `<div class="card${!on && !fb ? ' subLock' : ''}" style="position:relative;${on ? `border-left:4px solid ${b.col}` : ''}">${!on && !fb ? `<span class="subLv">🔒 ниво ${SUB_LV[s.k] || '?'}</span>` : ''}<div class="row" style="margin:0;align-items:center;gap:10px">${subLogo(s.k, 44, on)}<span class="meta" style="margin:0;flex:1"><b style="color:var(--txt);font-size:15px">${b.nm} ${s.suf}</b><br>${s.what}${on ? ` · основана на ден ${on}` : ` · 🔒 ${s.how}`}</span>${on && !s.final ? `<b style="color:${inc ? 'var(--ok)' : 'var(--mut, #9aa)'}">${inc ? `+${f(inc)} €/ден` : '—'}</b>` : ''}</div>${s.k === 'glob' && H && on ? (dir ? `<div class="meta" style="margin:6px 0 0">👔 ${DIR_OF.glob}</div>` : `<div class="row" style="margin:6px 0 0;justify-content:flex-end"><button class="btn2" data-hdir="glob" ${deps.econ().canAfford(GLOB_DIR_COST) ? '' : 'disabled'}>👔 Директор · ${f(GLOB_DIR_COST)} €</button></div>`) : ''}${ctl}${H && on && dir ? dirPanel(s.k) : ''}${s.k === 'oil' && on ? '<div class="row" style="justify-content:flex-end;margin:6px 0 0"><button class="btn" data-hoil="1">🛢️ Петролната империя →</button></div>' : ''}${fb}</div>`;
     }).join('');
+    if (H && deps.mayorName && deps.mayorName()) h += `<div class="card" style="border-left:4px solid #9fdfff"><div class="row" style="margin:0;align-items:center;gap:10px"><span style="font-size:30px">🏙️</span><span class="meta" style="margin:0;flex:1"><b style="color:var(--txt);font-size:15px">Империал Сити</b><br>👩‍💼 ${deps.mayorName()} · градоначалник</span></div>${dirPanel('mayor')}</div>`;
     return h;
   }
+  // 📋 панелът на директора в „Холдинг“: неговите предложения (Да / ½ / По-късно / Не, съвещателен вот при нужда) и ангажиментите му с напредъка
+  const openPanels = new Set();
+  function dirPanel(k) {
+    const B2 = deps.board2 && deps.board2(); if (!B2) return '';
+    const ps = proposals().filter(p => p.dir === k && !p.info), cs = (B2.commits ? B2.commits() : []).filter(c => c.dir === k && (c.st === 'active' || (c.st === 'done' && c.end >= (deps.S().day || 0) - 30)));
+    if (!ps.length && !cs.length) return '';
+    const Bf = n => n >= 1e9 ? `${(n / 1e9).toLocaleString('bg-BG', { maximumFractionDigits: 1 })} млрд. €` : n >= 1e6 ? `${(n / 1e6).toLocaleString('bg-BG', { maximumFractionDigits: 1 })} млн. €` : `${deps.fmt(Math.round(n))} €`;
+    const prop = p => `<div style="margin:6px 0;padding:8px 10px;border:1px solid var(--line);border-radius:10px">${B2.propHtml(p)}<div class="row" style="margin:6px 0 0;gap:6px;flex-wrap:wrap"><button class="btn" data-gp="${p.id}|yes" ${p.can === false ? 'disabled' : ''}>✓ Да</button>${p.small ? `<button class="btn2" data-gp="${p.id}|small">½ ${Bf(p.small.cost)}</button>` : ''}<button class="btn2" data-gp="${p.id}|later">⏳ По-късно</button><button class="btn2" data-gp="${p.id}|no">✖ Не</button></div><div data-gpv="${p.id}"></div></div>`;
+    const com = c => `<div class="meta" style="margin:3px 0">${c.st === 'done' ? '✅' : c.flag === 'блокирано' ? '⛔' : c.flag === 'забавено' ? '⚠️' : '⏳'} ${c.text.slice(0, 90)}${c.text.length > 90 ? '…' : ''} · ${c.st === 'done' ? `изпълнено на ден ${c.end}` : `${Math.round((c.prog || 0) * 100)}% · срок ден ${c.due}`}</div>`;
+    return `<details data-gpd="${k}" ${openPanels.has(k) ? 'open' : ''} style="margin:8px 0 0"><summary class="meta" style="margin:0;cursor:pointer;color:var(--txt)">📋 Директорът: ${ps.length ? `<b>${ps.length}</b> ${ps.length === 1 ? 'предложение' : 'предложения'}` : 'без нови предложения'}${cs.length ? ` · ${cs.length} ${cs.length === 1 ? 'проект' : 'проекта'}` : ''}</summary>${ps.map(prop).join('')}${cs.length ? `<div style="margin:6px 0 0"><div class="meta" style="margin:0 0 2px;color:var(--mut)">Проектите:</div>${cs.map(com).join('')}</div>` : ''}</details>`;
+  }
+  function bindPanels(box, rerender) {
+    const B2 = deps.board2 && deps.board2(); if (!B2) return;
+    box.querySelectorAll('[data-gpd]').forEach(d => d.ontoggle = () => { d.open ? openPanels.add(d.dataset.gpd) : openPanels.delete(d.dataset.gpd); });
+    box.querySelectorAll('[data-gp]').forEach(b => b.onclick = () => {
+      const [id, a] = b.dataset.gp.split('|');
+      if (a === 'yes' || a === 'small') {
+        const r = B2.request(id, { small: a === 'small' });
+        if (r && r.need === 'vote') {   // съвещателният вот — направо в картата
+          const v = box.querySelector(`[data-gpv="${CSS.escape(id)}"]`); if (!v) return;
+          v.innerHTML = `<div style="margin:8px 0 0;padding:8px;border-radius:8px;background:rgba(255,255,255,.04)">${B2.voteHtml(r)}</div>`;
+          v.querySelectorAll('[data-bv]').forEach(x => x.onclick = () => { const [i2, how] = x.dataset.bv.split('|'); B2.resolve(i2, how === 'pass' && r.p && r.p.isSmall ? 'small' : how); rerender(); });
+          return;
+        }
+      } else decide(id, a);
+      rerender();
+    });
+  }
   function bind(box, rerender) {
+    bindPanels(box, rerender);
     box.querySelectorAll('[data-hup]').forEach(b => b.onclick = () => { upgrade(b.dataset.hup); rerender(); });
     box.querySelectorAll('[data-hdir]').forEach(b => b.onclick = () => { hire(b.dataset.hdir); rerender(); });
     box.querySelectorAll('[data-hboard]').forEach(b => b.onclick = () => board(rerender));
@@ -152,7 +215,7 @@ export function createGroup(deps) {
       const on = !!g[s.k], inc = on ? s.inc(deps) || 0 : 0, L = hold().lv[s.k] || 0, dir = hold().dir[s.k], man = canManage(s.k) && inc > 0, e = deps.econ();
       return { k: s.k, ico: s.ico, company: subName(S, s.k) || s.suf, what: s.what, open: on, director: dir ? DIR_OF[s.k] || dir : null, lv: L, lvMax: HOLD_LV_MAX, inc, bonus: bonusOf(s.k), bonusPct: Math.round(bonusK(s.k) * 100),
         up: man && L < HOLD_LV_MAX ? { cost: upCost(s.k), can: e.canAfford(upCost(s.k)) } : null,
-        hire: man && !dir && L >= DIR_LV ? { cost: dirCost(s.k), can: e.canAfford(dirCost(s.k)) } : null };
+        hire: s.k === 'glob' ? (canHireGlob() ? { cost: GLOB_DIR_COST, can: e.canAfford(GLOB_DIR_COST) } : null) : man && !dir && L >= DIR_LV ? { cost: dirCost(s.k), can: e.canAfford(dirCost(s.k)) } : null };
     }).concat(deps.mayorName && deps.mayorName() ? [{ k: 'mayor', ico: '🏙️', company: 'Империал Сити', what: 'градоначалник', open: true, director: deps.mayorName(), lv: 0, lvMax: HOLD_LV_MAX, inc: 0, bonus: 0, bonusPct: 0, up: null, hire: null }] : []);   // 10-ото място — градоначалникът
   }
   // 📋 предложенията към борда (deps.proposals от game.js: [{ id: 'dir:вид:брой', dir, ico, text, cost, apply() }]);
@@ -184,5 +247,5 @@ export function createGroup(deps) {
       onResolve: (id, how) => { const r = deps.board2().resolve(id, how); re(); return r; },
       settings: deps.board2 ? () => deps.board2().settingsHtml() : null, bindSettings: (box, rr) => deps.board2().bindSettings(box, () => { rr(); re(); }) }));
   }
-  return { check, winHtml, bind, board, proposals, decide, dailyTick, dailyBonus, upgrade, hire, found, canFound };
+  return { dirPanel, bindPanels, check, winHtml, bind, board, proposals, decide, dailyTick, dailyBonus, upgrade, hire, found, canFound };
 }
