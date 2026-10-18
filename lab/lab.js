@@ -148,10 +148,14 @@ export function feedback(wrap, target) {
 
 // ---- Ново
 function renderReview() {
-  const list = FEATURES.filter(f => (showDone || !approved.includes(f.id)) && !rejected.has(f.id)), pending = FEATURES.filter(f => !approved.includes(f.id)).length;
-  sideNav(list.map(f => row(state.item === f.id, `${approved.includes(f.id) ? '✅' : '🧪'} ${f.title}`, approved.includes(f.id) ? 'В играта' : 'Чака OK', `data-f="${f.id}"`)).join('')
-    + (!pending && !showDone ? `<div class="empty" style="height:auto;padding:24px 8px">${FEATURES.length ? 'Всичко ново е одобрено ✓' : 'Още няма нищо ново за проверка.<br><br>Новото от Claude се появява тук и влиза в играта само след „✓ OK“.'}</div>` : '')
-    + (FEATURES.length > pending ? `<button class="row" id="bDone"><small>${showDone ? '▴ Скрий одобрените' : `▾ Одобрени (${FEATURES.length - pending}) — покажи`}</small></button>` : ''));
+  // отстрани: първо чакащите проверка, отдолу — списъкът на одобрените (✅) и на отхвърлените (✖), винаги видими (по искане на играча)
+  const wait = FEATURES.filter(f => !approved.includes(f.id) && !rejected.has(f.id)), ok = FEATURES.filter(f => approved.includes(f.id)), no = FEATURES.filter(f => rejected.has(f.id) && !approved.includes(f.id)), pending = wait.length;
+  const head = (t, n, col) => `<div style="margin:12px 6px 4px;font-size:12px;font-weight:800;color:${col};text-transform:uppercase;letter-spacing:.04em">${t} (${n})</div>`;
+  const mini = (f, ico, sub) => `<button class="row ${state.item === f.id ? 'on' : ''}" data-f="${f.id}" style="padding:5px 10px;min-height:0">${ico} ${esc(f.title)}${sub ? `<small>${esc(sub)}</small>` : ''}</button>`;
+  sideNav(wait.map(f => row(state.item === f.id, `🧪 ${f.title}`, 'Чака OK', `data-f="${f.id}"`)).join('')
+    + (!pending ? `<div class="empty" style="height:auto;padding:16px 8px">${FEATURES.length ? 'Всичко ново е проверено ✓' : 'Още няма нищо ново за проверка.'}</div>` : '')
+    + (ok.length ? head('✅ Одобрени', ok.length, 'var(--ok, #4caf50)') + `<div id="labOk" style="${showDone ? '' : 'max-height:260px;overflow:auto'}">${ok.slice().reverse().map(f => mini(f, '✅', '')).join('')}</div>` + (ok.length > 8 ? `<button class="row" id="bDone"><small>${showDone ? '▴ По-кратко' : '▾ Целия списък'}</small></button>` : '') : '')
+    + (no.length ? head('✖ Не са ОК', no.length, 'var(--bad, #e57373)') + no.map(f => mini(f, '✖', 'отхвърлено — чака друго')).join('') : ''));
   $('side').querySelectorAll('[data-f]').forEach(b => b.onclick = () => pick('review', b.dataset.f));
   if ($('bDone')) $('bDone').onclick = () => { showDone = !showDone; render(); };
   const f = FEATURES.find(x => x.id === state.item);
