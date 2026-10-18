@@ -3548,7 +3548,7 @@ const campRU = createCampaign({ cc: 'RU', S: () => S, econ: () => econ, fmt, toa
   onLose: ev => { S.campLost = { day: S.day, ev }; save(); toast('😞 Изборите са загубени. Следващият шанс — след 4 години; градът и империята остават твои.', 'bad'); } });
 const campOf = () => S?.imp?.cc === 'RU' ? campRU : camp;
 // 🏛️ президентството (president.js): държавен бюджет, кабинет, нива 27–35, световната политика
-const pres = createPresidency({ S: () => S, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), brand: () => brandOf(S)?.nm || 'Титан' });
+const pres = createPresidency({ pause: () => setSpeed(0), S: () => S, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), brand: () => brandOf(S)?.nm || 'Титан' });
 function campCard() {
   const C = IMP_CC[S.imp?.cc]; if (!C || (S.imp?.lv || 0) < 25) return '';
   const won = !!S.president, act = campOf().active(), ru = S.imp.cc === 'RU';
@@ -9081,6 +9081,11 @@ if (AUTOTEST) {
     boardReview() { return boardL.review().map(r => `${r.status} · ${r.c.dir} · ${r.c.text.slice(0, 60)} · ${Math.round((r.c.prog || 0) * 100)}% · ${r.c.reason || ''}`); },
     boardReq(id, how) { const r = how ? boardL.resolve(id, how) : boardL.request(id); return r.need ? { need: r.need, votes: r.v.votes.map(x => `${x.cond ? '◐' : x.yes ? '✔' : '✖'} ${x.name}: ${x.why}`), bank: r.v.bank.why || 'ok' } : r; },
     boardFrame() { return boardL.frame(); },
+    hzTest() { S.president = { cc: 'US', day: S.day, ev: 300 }; S.pres = null; pres.start('US'); const out = {}; const p = () => pres.proposals().filter(x => x.kind === 'hz').map(x => x.id);
+      for (let i = 0; i < 42; i++) endOfDay(); out.st = S.pres.hz.st; out.oil = S.oil?.ev?.k; out.p1 = p(); document.querySelectorAll('#boardRoom').forEach(x => x.remove());
+      const D = id => pres.decide(pres.proposals().find(x => x.id.includes(id))?.id, 'yes');
+      D('hz-res'); S.pres.deals.SAU = S.day; S.pres.deals.IND = S.day; D('hz-dip'); out.talk1 = S.pres.hz.talk; S.pres.skip = {}; D('hz-dip'); out.talk2 = S.pres.hz.talk; S.pres.skip = {}; D('hz-deal'); out.after1 = S.pres.hz.st;
+      D('hz-esc'); S.pres.deals.SAU = S.day; S.pres.deals.IND = S.day; S.pres.skip = {}; D('hz-deal'); out.after2 = S.pres.hz.st; out.oil2 = S.oil?.ev?.until <= S.day; out.ind = S.pres.ind; return out; },
     presFinale() { if (!S.pres) { S.president = { cc: 'US', day: S.day, ev: 300 }; pres.start('US'); } pres.finale(); return !!document.getElementById('presEnd'); },
     presTest(cc = 'US') { S.president = { cc, day: S.day, ev: 300 }; S.pres = null; pres.start(cc); pres.cabinet(); return pres.proposals().length; },   // за city-builder-f9: Министерският съвет с истинските данни
     imp() { const st = imperial.stats(); return { cc: S.imp?.cc, lv: S.imp?.lv, best: dev.best(), pop: Math.round(st?.pop || 0), house: st?.house, jobs: st?.jobs, vac: st?.vac, unemp: st?.unemp, k: st?.k, sat: st?.sat, bal: Math.round(st?.bal || 0), up: Math.round(st?.up || 0), why: (st?.why || []).map(w => w.txt), streak: S.imp?.streak, city: (({ lat, lon, cc }) => ({ lat, lon, cc }))(cityById(NEOM_ID)) }; },
@@ -9464,6 +9469,50 @@ if (params.has('profile')) {
   window.__camNow = () => [camera.position.toArray(), controls.target.toArray()];
   window.__open = kind => openBig(kind);
   window.__cityCount = () => CITIES.filter(c => !gateHidden(c.id)).length;
+  // ⚓ симулация на пристанищата и корабите за ниво lv (нова тестова игра): пристанища на макс. ниво във всички крайморски достъпни градове,
+  // проверка на морския път за всяка двойка, линии до kNear най-близки (през openSeaRoute — истинските правила), корабите — seaAutoShips, days дни
+  window.__seaSim = (lv, days = 120, kNear = 3) => {
+    const bad = [], err = (m, x) => { if (bad.length < 60) bad.push(m + (x != null ? ' ' + JSON.stringify(x) : '')); };
+    const keep = { save, toast, SFXcash, showEventPop }; save = () => {}; toast = () => {}; SFXcash = () => {}; showEventPop = () => {};
+    try {
+      S.dev.lv = lv; S.contOpen = { af: lv >= DEV_LV.WORLD, na: lv >= DEV_LV.NA, sa: lv >= DEV_LV.SA, as: lv >= DEV_LV.AS, oc: lv >= DEV_LV.OC };
+      const pick0 = () => CITIES.map(c => c.id).filter(id => !AIR_ONLY.has(id) && id !== NEOM_ID && !gateHidden(id) && dev.best() >= cityLv(id) && (!contOf(id) || contOf(id).open()) && (dev.has('BALKANS') || !isForeign(id)));
+      S.branches = pick0().filter(id => id !== S.cityId); const ids = pick0(); S.branches = ids.filter(id => id !== S.cityId);   // втори път — след „вратите“ на континентите
+      for (const id of S.branches) S.cities[id] = S.cities[id] || { ...newCityState() };
+      econ.earn(5e11, 'друго', 'тест');
+      const ports = ids.filter(id => portMax(id) > 0);
+      if (!seaOn()) return { lv, locked: true, coastal: ports.length };
+      S.ports = Object.fromEntries(ports.map(id => [id, { lv: portMax(id), build: null }]));
+      // морските пътища за всяка двойка: краен, не по-къс от правата, през възлите (иначе — права през сушата)
+      let pairs = 0, straight = 0;
+      for (let i = 0; i < ports.length; i++) for (let j = i + 1; j < ports.length; j++) { pairs++; const A = cityById(ports[i]), B = cityById(ports[j]), P = seaPath(A, B), air = airKm(A, B);
+        if (!(P.km > 0) || !Number.isFinite(P.km) || P.pts.some(p => !Number.isFinite(p[0]) || !Number.isFinite(p[1]))) err('лош морски път', [ports[i], ports[j], P.km]);
+        else if (P.km < air * 0.95) err('морският път е по-къс от правата', [ports[i], ports[j], P.km, Math.round(air)]);
+        if (P.pts.length <= 2 && air > 300) { straight++; if (straight <= 8) err('права линия (без морски възли)', [ports[i], ports[j], Math.round(air)]); } }
+      S.seaRoutes = []; S.ships = [];
+      for (const a of ports) for (const b of ports.filter(b => b !== a).sort((x, y) => seaRouteKm(a, x) - seaRouteKm(a, y)).slice(0, kNear)) if (!hasSeaRoute(a, b) && (S.seaRoutes || []).length < maxSeaRoutes()) openSeaRoute(a, b);
+      const noShip = (S.seaRoutes || []).filter(r => !firstShipFor(r.km)).length;
+      for (let k = 0; k < 5; k++) seaAutoShips();
+      const m0 = econ.s.money, st = {}, last = new Map();
+      for (let d = 0; d < days; d++) {
+        for (let s = 0; s < 24; s++) updateSea(1 / 24);
+        econ.spend(seaUpkeep(), 'заплати', 'тест: поддръжка'); seaAutoShips(); S.day++;
+        for (const p of S.ships || []) {
+          const o = st[p.kind] = st[p.kind] || { n: 0, idle: 0, ferry: 0, trips: 0 }, L = last.get(p.id) || { at: p.at, still: 0 };
+          if (!Number.isFinite(p.km) || !Number.isFinite(p.total)) err('NaN', { id: p.id, kind: p.kind });
+          if (p.path) { const q = seaPos(p.path[0], p.path[1], Math.min(1, p.km / Math.max(1, p.total))); if (q && (!Number.isFinite(q.x) || !Number.isFinite(q.y))) err('NaN на картата', { kind: p.kind, path: p.path }); if (p.total > shipRange(p.kind) * 1.01 && !p.ferry) err('курс над обсега', { kind: p.kind, km: p.total, range: shipRange(p.kind) }); }
+          if (!p.path) o.idle++; if (p.ferry) o.ferry++;
+          if (p.at !== L.at) { o.trips++; L.still = 0; } else L.still++; if (L.still === 20) err('стои 20 дни', { kind: p.kind, at: p.at, route: p.route, path: p.path });
+          L.at = p.at; last.set(p.id, L);
+        }
+      }
+      for (const p of S.ships || []) st[p.kind].n++;
+      for (const o of Object.values(st)) { o.idlePct = Math.round(100 * o.idle / Math.max(1, o.n * days)); o.ferryPct = Math.round(100 * o.ferry / Math.max(1, o.n * days)); delete o.idle; delete o.ferry; }
+      const routesNoShip = (S.seaRoutes || []).filter(r => !routeShip(r)).length;
+      return { lv, cities: ids.length, ports: ports.length, pairs, straightPairs: straight, routes: (S.seaRoutes || []).length, maxRoutes: maxSeaRoutes(), berths: portBerths(), cap: fleetCap.ship(), ships: (S.ships || []).length,
+        routesNoShip, noShipByRange: noShip, netPerShipDay: Math.round((econ.s.money - m0) / Math.max(1, (S.ships || []).length) / days), stat: st, errors: bad };
+    } finally { save = keep.save; toast = keep.toast; SFXcash = keep.SFXcash; showEventPop = keep.showEventPop; }
+  };
   // 🚜 симулация на гаража и техниката за ниво lv (нова тестова игра): филиали във всички достъпни градове; на всеки 10 дни — случайни
   // строежи в част от градовете (на различни етапи) и участъци магистрали; всеки ден — garArrive, garAutoTick (пращане, купуване, разширяване), rbuildTick.
   // Проверки: машините не изчезват/не се появяват, градовете не надхвърлят офиса/гаража, без пращане напред-назад, за колко дни се покрива липсата.
