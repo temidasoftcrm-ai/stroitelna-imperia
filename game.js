@@ -2560,9 +2560,10 @@ function fleetMissing() {
 }
 function fillUnits(t, n) { let k = 0; for (; k < n; k++) { const before = units.length; buyUnit(t, true); if (units.length === before) break; } return k; }
 function buyUnit(type, quiet = false) {
-  if (!isMachine(type) && crewCount() >= officeLv().crews) { toast(`👷 Офисът поема до ${officeLv().crews} бригади. Надгради офиса от таб „Офис“.`, 'bad'); tab = 'hq'; renderPanel(); return; }
-  if (isRoadGear(type) && units.filter(u => u.type === type).length >= roadCap(type)) { if (!quiet) toast(`${ECON.UNIT_TYPES[type].ico} ${ECON.UNIT_TYPES[type].nm}: имаш ${roadCap(type)} — колкото трябват за 2 магистрали наведнъж (лимит).`, 'bad'); return; }
-  if (isMachine(type) && !isRoadGear(type) && machineCount() >= garageLv().cap) { toast(`🔧 Гаражът е пълен (${garageLv().cap} места). Надгради гаража от таб „Техника“.`, 'bad'); tab = 'hq'; renderPanel(); return; }
+  const inc = garTransit(S.cityId).map(m => m.t), incCrew = inc.filter(t => !isMachine(t)).length, incMach = inc.filter(t => isMachine(t) && !isRoadGear(t)).length;   // и техниката на път насам
+  if (!isMachine(type) && crewCount() + incCrew >= officeLv().crews) { toast(`👷 Офисът поема до ${officeLv().crews} бригади. Надгради офиса от таб „Офис“.`, 'bad'); tab = 'hq'; renderPanel(); return; }
+  if (isRoadGear(type) && units.filter(u => u.type === type).length + inc.filter(t => t === type).length >= roadCap(type)) { if (!quiet) toast(`${ECON.UNIT_TYPES[type].ico} ${ECON.UNIT_TYPES[type].nm}: имаш ${roadCap(type)} — колкото трябват за 2 магистрали наведнъж (лимит).`, 'bad'); return; }
+  if (isMachine(type) && !isRoadGear(type) && machineCount() + incMach >= garageLv().cap) { toast(`🔧 Гаражът е пълен (${garageLv().cap} места). Надгради гаража от таб „Техника“.`, 'bad'); tab = 'hq'; renderPanel(); return; }
   if (!econ.buyUnit(type)) { toast('Нямаш достатъчно пари. Вземи кредит от банката.', 'bad'); return; }
   S.units.push(type);
   const u = spawnUnit(type);
@@ -6039,8 +6040,10 @@ const garCaps = id => { const c = garCity(id); return { crews: OFFICE_LEVELS[(c.
 // лимит на пътната техника: 2 комплекта (HW_FLEET) на град — достатъчно за 2 участъка наведнъж; вече купеното над него не се губи
 const roadCap = t => (HW_FLEET[t] || 1) * 2;
 // може ли да се купи още 1 от вида t в града id (и защо не)
+// техниката в града + тази на път към него (иначе покупка в същия ден като пращането препълваше офиса/гаража)
+const garWithTransit = id => [...cityUnitTypes(id), ...garTransit(id).map(m => m.t)];
 function garCanBuy(id, t) {
-  const T = ECON.UNIT_TYPES[t], cap = garCaps(id), have = cityUnitTypes(id);
+  const T = ECON.UNIT_TYPES[t], cap = garCaps(id), have = garWithTransit(id);
   if (!isMachine(t) && have.filter(x => !isMachine(x)).length >= cap.crews) return { why: `офисът е пълен (${cap.crews} бригади)` };
   if (isMachine(t) && !isRoadGear(t) && have.filter(x => isMachine(x) && !isRoadGear(x)).length >= cap.mach) return { why: `гаражът е пълен (${cap.mach})` };
   if (isRoadGear(t) && have.filter(x => x === t).length >= roadCap(t)) return { why: `лимит ${roadCap(t)} на град` };
@@ -6102,7 +6105,7 @@ function garArrive() {
 // купува направо за друг град (без да влизаш в него)
 function garBuy(t, id, quiet = false) {
   if (id === S.cityId) return buyUnit(t, quiet);
-  const T = ECON.UNIT_TYPES[t], cap = garCaps(id), have = cityUnitTypes(id);
+  const T = ECON.UNIT_TYPES[t], cap = garCaps(id), have = garWithTransit(id);
   if (!isMachine(t) && have.filter(x => !isMachine(x)).length >= cap.crews) { toast(`👷 Офисът в ${cityById(id).nm} поема до ${cap.crews} бригади.`, 'bad'); return; }
   if (isMachine(t) && !isRoadGear(t) && have.filter(x => isMachine(x) && !isRoadGear(x)).length >= cap.mach) { toast(`🔧 Гаражът в ${cityById(id).nm} е пълен (${cap.mach}).`, 'bad'); return; }
   if (isRoadGear(t) && have.filter(x => x === t).length >= roadCap(t)) { toast(`${T.ico} ${T.nm}: в ${cityById(id).nm} има ${roadCap(t)} — колкото трябват за 2 магистрали наведнъж (лимит).`, 'bad'); return; }
@@ -6128,8 +6131,8 @@ function garShort() {
   const total = Object.values(lack).reduce((a, n) => a + n, 0), cost = buy.reduce((a, [, t, n]) => a + n * ECON.UNIT_TYPES[t].cost, 0);
   // пълни сгради: за купуването няма място (бригадите — в офиса, машините без пътната техника — в гаража)
   const full = [];
-  for (const id of [...new Set(buy.map(b => b[0]))]) {
-    const cap = garCaps(id), have = cityUnitTypes(id), its = buy.filter(b => b[0] === id);
+  for (const id of [...new Set(now.map(b => b[0]))]) {   // по цялата липса (now), не само купуваното — иначе „ще дойде отнякъде“ скриваше пълния офис/гараж и той не се разширяваше
+    const cap = garCaps(id), have = cityUnitTypes(id), its = now.filter(b => b[0] === id);
     const crews = have.filter(x => !isMachine(x)).length + its.filter(([, t]) => !isMachine(t)).reduce((a, b) => a + b[2], 0);
     const mach = have.filter(x => isMachine(x) && !isRoadGear(x)).length + its.filter(([, t]) => isMachine(t) && !isRoadGear(t)).reduce((a, b) => a + b[2], 0);
     if (crews > cap.crews) full.push([id, 'office']);
@@ -6168,7 +6171,7 @@ function garBuyShort(only = null, quiet = false, all = false) {   // all — к�
   for (const [id, t, k] of list) for (let i = 0; i < k; i++) {
     const T = ECON.UNIT_TYPES[t];
     if (!econ.canAfford(T.cost)) { stop = 'пари'; break; }
-    const cap = garCaps(id), hv = cityUnitTypes(id); if (!isMachine(t) ? hv.filter(x => !isMachine(x)).length >= cap.crews : !isRoadGear(t) && hv.filter(x => isMachine(x) && !isRoadGear(x)).length >= cap.mach) break;   // пълно — чака разширение
+    const cap = garCaps(id), hv = garWithTransit(id); if (!isMachine(t) ? hv.filter(x => !isMachine(x)).length >= cap.crews : !isRoadGear(t) && hv.filter(x => isMachine(x) && !isRoadGear(x)).length >= cap.mach) break;   // пълно — чака разширение
     const n0 = cityUnitTypes(id).length; garBuy(t, id, true);
     if (cityUnitTypes(id).length === n0) break;   // пълен офис/гараж — съобщението вече е излязло
     n++; spent += T.cost;
@@ -6182,10 +6185,14 @@ function garPlan() {
   const ids = ownedCities(), plan = [];
   const need = Object.fromEntries(ids.map(id => [id, garNeed(id)])), have = Object.fromEntries(ids.map(id => [id, garHave(id)])), idle = Object.fromEntries(ids.map(id => [id, garIdle(id)]));
   for (const m of garTransit()) have[m.to] && (have[m.to][m.t] = (have[m.to][m.t] || 0) + 1);
+  // свободното място в града получател (с пътуващите към него) — иначе автоматът препълваше офиса/гаража
+  const room = Object.fromEntries(ids.map(id => { const cap = garCaps(id), h = Object.entries(have[id]); return [id, { crews: cap.crews - h.filter(([t]) => !isMachine(t)).reduce((a, [, n]) => a + n, 0), mach: cap.mach - h.filter(([t]) => isMachine(t) && !isRoadGear(t)).reduce((a, [, n]) => a + n, 0) }]; }));
+  const roomOf = (id, t) => !isMachine(t) ? room[id].crews : isRoadGear(t) ? roadCap(t) - (have[id][t] || 0) : room[id].mach;
+  const take = (id, t, n) => { if (!isMachine(t)) room[id].crews -= n; else if (!isRoadGear(t)) room[id].mach -= n; else have[id][t] = (have[id][t] || 0) + n; };
   for (const t of GAR_TYPES()) {
     const def = ids.map(id => [id, (need[id][t] || 0) - (have[id][t] || 0)]).filter(([, d]) => d > 0);
     const sur = ids.map(id => [id, Math.min(idle[id][t] || 0, (have[id][t] || 0) - (need[id][t] || 0))]).filter(([, d]) => d > 0);
-    for (const dd of def) for (const ss of sur) { if (dd[1] <= 0) break; const n = Math.min(dd[1], ss[1]); if (n > 0) { plan.push({ t, from: ss[0], to: dd[0], n }); dd[1] -= n; ss[1] -= n; } }
+    for (const dd of def) for (const ss of sur) { if (dd[1] <= 0) break; const n = Math.min(dd[1], ss[1], Math.max(0, roomOf(dd[0], t))); if (n > 0) { plan.push({ t, from: ss[0], to: dd[0], n }); take(dd[0], t, n); dd[1] -= n; ss[1] -= n; } }
   }
   return plan;
 }
