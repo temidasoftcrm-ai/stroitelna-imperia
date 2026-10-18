@@ -102,11 +102,11 @@ async function loadApproved() { try { approved = (await (await fetch('/__lab/app
 
 function render() {
   const pending = FEATURES.filter(f => !approved.includes(f.id) && !rejected.has(f.id)).length;
-  $('tabs').innerHTML = [['review', `Ново${pending ? ` (${pending})` : ''}`], ['scenes', 'Сцени'], ['models', '3D модели'], ['sounds', 'Звуци'], ['demos', 'Мисии/демо']]
+  $('tabs').innerHTML = [['review', `Ново${pending ? ` (${pending})` : ''}`], ['scenes', 'Сцени'], ['models', '3D модели'], ['sounds', 'Звуци'], ['demos', 'Мисии/демо'], ['done', 'Проверени']]
     .map(([t, l]) => `<button data-tab="${t}" class="${state.tab === t ? 'on' : ''}">${l}</button>`).join('');
   $('tabs').querySelectorAll('[data-tab]').forEach(b => b.onclick = () => pick(b.dataset.tab));
-  if (state.tab !== 'models' && state.tab !== 'review') closeModel();
-  ({ review: renderReview, scenes: renderScenes, models: renderModels, sounds: renderSounds, demos: renderDemos })[state.tab]?.();
+  if (state.tab !== 'models' && state.tab !== 'review' && state.tab !== 'done') closeModel();
+  ({ review: () => renderReview('review'), done: () => renderReview('done'), scenes: renderScenes, models: renderModels, sounds: renderSounds, demos: renderDemos })[state.tab]?.();
 }
 const row = (on, title, sub, attr) => `<button class="row ${on ? 'on' : ''}" ${attr}>${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}</button>`;
 // списъкът вляво пази докъде е превъртян (иначе след клик на 20-ия ред скача пак на 1-ви)
@@ -151,19 +151,19 @@ export function feedback(wrap, target) {
 }
 
 // ---- Ново
-function renderReview() {
-  // отстрани: първо чакащите проверка, отдолу — списъкът на одобрените (✅) и на отхвърлените (✖), винаги видими (по искане на играча)
+// „Ново“ — само чакащите одобрение; „Проверени“ (след „Мисии/демо“) — одобрените (✅) и отхвърлените (✖), по искане на играча
+function renderReview(tab = 'review') {
   const wait = FEATURES.filter(f => !approved.includes(f.id) && !rejected.has(f.id)), ok = FEATURES.filter(f => approved.includes(f.id)), no = FEATURES.filter(f => rejected.has(f.id) && !approved.includes(f.id)), pending = wait.length;
   const head = (t, n, col) => `<div style="margin:12px 6px 4px;font-size:12px;font-weight:800;color:${col};text-transform:uppercase;letter-spacing:.04em">${t} (${n})</div>`;
   const mini = (f, ico, sub) => `<button class="row ${state.item === f.id ? 'on' : ''}" data-f="${f.id}" style="padding:5px 10px;min-height:0">${ico} ${esc(f.title)}${sub ? `<small>${esc(sub)}</small>` : ''}</button>`;
-  sideNav(wait.map(f => row(state.item === f.id, `🧪 ${f.title}`, 'Чака OK', `data-f="${f.id}"`)).join('')
-    + (!pending ? `<div class="empty" style="height:auto;padding:16px 8px">${FEATURES.length ? 'Всичко ново е проверено ✓' : 'Още няма нищо ново за проверка.'}</div>` : '')
-    + (ok.length ? head('✅ Одобрени', ok.length, 'var(--ok, #4caf50)') + `<div id="labOk" style="${showDone ? '' : 'max-height:260px;overflow:auto'}">${ok.slice().reverse().map(f => mini(f, '✅', '')).join('')}</div>` + (ok.length > 8 ? `<button class="row" id="bDone"><small>${showDone ? '▴ По-кратко' : '▾ Целия списък'}</small></button>` : '') : '')
-    + (no.length ? head('✖ Не са ОК', no.length, 'var(--bad, #e57373)') + no.map(f => mini(f, '✖', 'отхвърлено — чака друго')).join('') : ''));
-  $('side').querySelectorAll('[data-f]').forEach(b => b.onclick = () => pick('review', b.dataset.f));
+  if (tab === 'review') sideNav(wait.map(f => row(state.item === f.id, `🧪 ${f.title}`, 'Чака OK', `data-f="${f.id}"`)).join('')
+    + (!pending ? `<div class="empty" style="height:auto;padding:16px 8px">${FEATURES.length ? 'Всичко ново е проверено ✓ (одобрените и отхвърлените са в „Проверени“)' : 'Още няма нищо ново за проверка.'}</div>` : ''));
+  else sideNav((ok.length ? head('✅ Одобрени', ok.length, 'var(--ok, #4caf50)') + `<div id="labOk" style="${showDone ? '' : 'max-height:260px;overflow:auto'}">${ok.slice().reverse().map(f => mini(f, '✅', '')).join('')}</div>` + (ok.length > 8 ? `<button class="row" id="bDone"><small>${showDone ? '▴ По-кратко' : '▾ Целия списък'}</small></button>` : '') : '')
+    + (no.length ? head('✖ Не са ОК', no.length, 'var(--bad, #e57373)') + no.map(f => mini(f, '✖', 'отхвърлено — чака друго')).join('') : '') + (!ok.length && !no.length ? '<div class="empty" style="height:auto;padding:16px 8px">Още няма проверени.</div>' : ''));
+  $('side').querySelectorAll('[data-f]').forEach(b => b.onclick = () => pick(tab, b.dataset.f));
   if ($('bDone')) $('bDone').onclick = () => { showDone = !showDone; render(); };
   const f = FEATURES.find(x => x.id === state.item);
-  if (!f) { $('main').innerHTML = `<div class="empty">Новото чака проверка: избери отляво, пробвай и натисни „✓ OK“ — тогава влиза в играта.</div>`; return; }
+  if (!f) { $('main').innerHTML = tab === 'done' ? `<div class="empty">Тук са проверените: избери отляво, за да го видиш пак или да го махнеш от играта.</div>` : `<div class="empty">Новото чака проверка: избери отляво, пробвай и натисни „✓ OK“ — тогава влиза в играта.</div>`; return; }
   const fh = f.url.startsWith('#') ? new URLSearchParams(f.url.slice(1)) : null, mUrl = fh && fh.get('tab') === 'models' ? fh.get('item') : null, sUrl = fh && fh.get('tab') === 'sounds' ? fh.get('item') : null;
   if (sUrl) {   // нов звук: пуска се тук, с „✓ OK“ отдолу
     closeModel();
@@ -200,12 +200,12 @@ function renderReview() {
     const why = prompt('Какво не е наред? (по желание)') || '';
     post('/__lab/feedback', { target: `Ново: ${f.title} (${f.id})`, kind: 'reject', text: 'Не е ОК — намери друго' + (why ? ': ' + why : '') }).catch(() => { });
     rejected.add(f.id); try { localStorage.setItem('lab.rejected', JSON.stringify([...rejected])); } catch { }
-    const nx = FEATURES.find(x => !approved.includes(x.id) && !rejected.has(x.id)); pick('review', nx ? nx.id : '');
+    const nx = tab === 'review' ? FEATURES.find(x => !approved.includes(x.id) && !rejected.has(x.id)) : f; pick(tab, nx ? nx.id : '');
   };
   $('bApp').onclick = () => post('/__lab/approved', { id: f.id, ok: !on }).then(j => {
     approved = j.approved;
     if (!on && mUrl) post('/__lab/feedback', { target: `Модел: ${mUrl}`, kind: 'reviewed', text: '' }).catch(() => { });   // и в „3D модели“ — като одобрен
-    if (!on && !showDone) { const nx = FEATURES.find(x => !approved.includes(x.id)); pick('review', nx ? nx.id : ''); } else render();
+    if (!on && tab === 'review') { const nx = FEATURES.find(x => !approved.includes(x.id) && !rejected.has(x.id)); pick('review', nx ? nx.id : ''); } else render();
   });
 }
 
