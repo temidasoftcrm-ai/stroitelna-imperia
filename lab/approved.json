@@ -1,5 +1,6 @@
 {
   "approved": [
+    "air-big-only",
     "amb-eu",
     "amb-gaz",
     "amb-us",
@@ -76,6 +77,7 @@
     "night-floors",
     "night-grid",
     "night-houses",
+    "night-petronas2",
     "night-sagrada",
     "night-towers",
     "ny-spread",
