@@ -45,6 +45,10 @@ const RECTS = {
   richmond: [[0.525, 0.24, 0.675, 0.54], [0.525, 0.56, 0.675, 0.99]],
 };
 const WHOLE = md => md === 'houseB' || md === 'whiteS' || md === 'solidW' || md.startsWith('rects:');   // маркираните прозорци светят целите, топло (като 'flood', само по маската)
+// 'grid' (Лабораторията → night-grid; направено в Blender): истински прозорци по света — 0,8 широки, етаж 1,6 (мащабът на града), с плоча и колони между тях;
+// ~40% светят, всеки със своя яркост и оттенък; ~20% от етажите — тъмни. Без маската на текстурата — само по-светлите стъкла малко по-ярко
+const GRID = ['building-skyscraper-c', 'building-skyscraper-d', 'sf-sky-usb', 'sf-sky-blue', 'sf-sky-sing'];
+const isGrid = name => GRID.includes(name) && feature('night-grid');
 const masks = new Map();   // режим → (изображение → маска CanvasTexture)
 
 function box(a, w, h, r) {   // средно в квадрат (2r+1)² — интегрално изображение
@@ -101,8 +105,9 @@ export function prepNightFloors(root, name) {
     for (const m of [].concat(o.material)) {
       if (!m || m.userData.nightFloors || !('emissive' in m)) continue;
       if (name === 'building-skyscraper-c' && /roof|heli|top/i.test(m.name || '')) continue;
-      const mode = modeOf(name, m); if (!mode || (!m.map && mode !== 'solid' && mode !== 'solidW') || (mode === 'aux' && !m.userData.nfAux)) continue;
-      const mk = mode === 'solid' || mode === 'solidW' ? WHITE : mode === 'aux' ? maskFor(m.userData.nfAux.tex, m.userData.nfAux.kind) : maskFor(m.map, mode); if (!mk) continue;
+      let mode = modeOf(name, m); if (mode && isGrid(name)) mode = 'grid';
+      if (!mode || (!m.map && mode !== 'solid' && mode !== 'solidW' && mode !== 'grid') || (mode === 'aux' && !m.userData.nfAux)) continue;
+      const mk = mode === 'solid' || mode === 'solidW' || mode === 'grid' ? WHITE : mode === 'aux' ? maskFor(m.userData.nfAux.tex, m.userData.nfAux.kind) : maskFor(m.map, mode); if (!mk) continue;
       m.emissiveMap = mk; m.emissive.setRGB(1, 1, 1); m.emissiveIntensity = 0; m.userData.nightFloors = true; m.userData.winK = 1; m.userData.nfK = NF_K[name] || 1; NF_MATS.add(m);
       const ax = new THREE.Vector3(0, 1, 0);   // оста „нагоре“ в координатите на меша
       m.onBeforeCompile = sh => {
@@ -117,10 +122,10 @@ export function prepNightFloors(root, name) {
         }
         sh.uniforms.uAx = { value: ax }; sh.uniforms.uWH = { value: WORLD_H[name] || 0 };
         if (WORLD_H[name]) { fY0 = 0; fHt = WORLD_H[name]; fH = fHt / FLOORS(name); }   // в света: от земята до върха
-        sh.uniforms.uFloorH = { value: fH }; sh.uniforms.uY0 = { value: fY0 }; sh.uniforms.uFlood = { value: mode === 'flood' || WHOLE(mode) ? 1 : mode === 'floodUp' ? 2 : 0 }; sh.uniforms.uCoolW = { value: mode === 'coolW' ? 1 : mode === 'led' ? 2 : 0 }; sh.uniforms.uT = NF_T; sh.uniforms.uH = { value: fHt }; sh.uniforms.uSolid = { value: mode === 'solid' ? 1 : 0 };
-        sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vNfY; varying float vNfSeed; uniform vec3 uAx; uniform float uWH;')
-          .replace('#include <begin_vertex>', '#include <begin_vertex>\nvNfY = uWH > 0.0 ? (modelMatrix * vec4(transformed, 1.0)).y : dot(transformed, uAx); vNfSeed = fract(sin(dot(modelMatrix[3].xz, vec2(12.9898, 78.233))) * 43758.5453);');
-        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vNfY; varying float vNfSeed; uniform float uFloorH; uniform float uY0; uniform float uFlood; uniform float uSolid; uniform float uH; uniform float uCoolW; uniform float uT;')
+        sh.uniforms.uFloorH = { value: fH }; sh.uniforms.uY0 = { value: fY0 }; sh.uniforms.uFlood = { value: mode === 'flood' || WHOLE(mode) ? 1 : mode === 'floodUp' ? 2 : 0 }; sh.uniforms.uCoolW = { value: mode === 'coolW' ? 1 : mode === 'led' ? 2 : 0 }; sh.uniforms.uT = NF_T; sh.uniforms.uH = { value: fHt }; sh.uniforms.uSolid = { value: mode === 'solid' ? 1 : 0 }; sh.uniforms.uGrid = { value: mode === 'grid' ? 1 : 0 };
+        sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vNfY; varying float vNfSeed; varying vec3 vNfW; uniform vec3 uAx; uniform float uWH;')
+          .replace('#include <begin_vertex>', '#include <begin_vertex>\nvNfY = uWH > 0.0 ? (modelMatrix * vec4(transformed, 1.0)).y : dot(transformed, uAx); vNfSeed = fract(sin(dot(modelMatrix[3].xz, vec2(12.9898, 78.233))) * 43758.5453); vNfW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vNfY; varying float vNfSeed; uniform float uFloorH; uniform float uY0; uniform float uFlood; uniform float uSolid; uniform float uH; uniform float uCoolW; uniform float uT; uniform float uGrid; varying vec3 vNfW;')
           .replace('#include <emissivemap_fragment>', `
             #ifdef USE_EMISSIVEMAP
               float nNight = emissive.r;   // нощта 0…1 (daynight.js → emissiveIntensity)
@@ -139,7 +144,16 @@ export function prepNightFloors(root, name) {
               if (uFlood > 1.5) col = vec3(1.0, 0.8, 0.52) * (0.55 + 0.9 * clamp((vNfY - uY0) / uH, 0.0, 1.0));   // нагоре — по-светло (кулите)
               vec3 tx = texture2D(emissiveMap, vEmissiveMapUv).rgb;
               totalEmissiveRadiance = tx * col * on * (uFlood > 0.5 ? 0.55 : 1.15);
-              if (uCoolW > 1.5) {   // Си Ен Тауър: цветни LED по височината, бавно преливат (като истинската нощем)
+              if (uGrid > 0.5) {   // прозорците по света (вж. 'grid')
+                float gz = vNfW.y / 1.6, gf = floor(gz), fz = fract(gz), gh = (vNfW.x + vNfW.z) / 0.8, gc = floor(gh), fh = fract(gh);
+                float gap = step(0.28, fz) * step(fz, 0.92) * step(0.1, fh) * step(fh, 0.9) * step(1e-4, fwidth(vNfW.y));   // хоризонталните (покриви, плочи) — не
+                float rf = fract(sin(gf * 91.17 + vNfSeed * 311.7) * 43758.5453);
+                float fOn = step(rf, nNight * 1.05) * step(0.22, rf);   // етажът — в свой момент; ~20% тъмни
+                float wv = fract(sin(dot(vec2(gc, gf), vec2(127.1, 311.7)) + vNfSeed * 91.3) * 43758.5453), wd = fract(sin(dot(vec2(gc, gf), vec2(269.5, 183.3)) + vNfSeed * 17.1) * 43758.5453);
+                float lit = step(0.6, wv);   // ~40% от прозорците
+                vec3 gcol = wv < 0.75 ? vec3(1.0, 0.72, 0.38) : wv < 0.9 ? vec3(1.0, 0.9, 0.7) : vec3(0.75, 0.85, 1.0);
+                totalEmissiveRadiance = gcol * gap * fOn * lit * (0.25 + 0.75 * wd) * (0.6 + 0.4 * dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * 0.9;
+              } else if (uCoolW > 1.5) {   // Си Ен Тауър: цветни LED по височината, бавно преливат (като истинската нощем)
                 float hl = clamp((vNfY - uY0) / uH, 0.0, 1.0);
                 vec3 led = 0.5 + 0.5 * cos(6.2832 * (uT * 0.03 + hl * 0.6 + vec3(0.0, 0.33, 0.67)));
                 totalEmissiveRadiance = (tx * 0.6 + 0.25) * led * nNight * 0.9;
@@ -158,7 +172,7 @@ export function prepNightFloors(root, name) {
               }
             #endif`);
       };
-      m.customProgramCacheKey = () => 'nightfloors3';
+      m.customProgramCacheKey = () => 'nightfloors4';
       m.needsUpdate = true;
     }
   });
