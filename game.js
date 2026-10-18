@@ -705,6 +705,12 @@ function instanced(name, mats) {
 }
 const HOUSES = MODELS.houses.filter(n => n.startsWith('building'));
 HOUSES.push(...H2);   // истинските цветни къщи (H2 — при MODELS)
+// 🏠 детските къщи на Kenney (building-type-c…u) → истински (feature 'houses-real'): при рисуване всяка става една от истинските
+// (A/B и одобрените h2-*), винаги същата за парцела — записите не се пипат; новите къщи се избират само от истинските
+const KID_HOUSES = new Set(HOUSES.filter(n => /^building-type-[c-u]$/.test(n))), REAL_HOUSES = ['building-type-a', 'building-type-b', ...H2];
+const realHouses = feature('houses-real') && REAL_HOUSES.length >= 4;
+const houseOf = (n, seed) => realHouses && KID_HOUSES.has(n) ? REAL_HOUSES[hashStr(n + ':' + seed) % REAL_HOUSES.length] : n;
+const HOUSE_POOL = realHouses ? REAL_HOUSES : HOUSES;
 // истинските къщи (house-a тухлената с веранда, house-b каменната) — с 40% по-големи от Kenney къщите
 // (истинските не минават през tintRoof — копията на материалите губят нощното светене)
 function houseFit(n) { return n === 'building-type-a' || n === 'building-type-b' ? 15 : n.startsWith('h2-') ? 14 : 11; }
@@ -1011,6 +1017,7 @@ function decorLot(g, lot, cityId) {
   return true;
 }
 function placeBuilding(lot, n, rot = 0) {
+  n = houseOf(n, lot.id);
   const isQ = n.startsWith('Building_');
   const s = SHOPS.includes(n) && lot.plan ? fitScale(n, Math.min(lot.w, lot.d) - 1.5) : (isQ ? fitScale(n, 14) : HOUSES.includes(n) ? fitScale(n, houseFit(n)) : fitScale(n, SHOPS.includes(n) ? SHOP_FIT : 12.5)) * lotK(lot);   // в плана — целият парцел
   const o = model(n, s);
@@ -1058,7 +1065,7 @@ function label(text, color = '#fff', w = 10, bg = 'rgba(15,20,28,.85)') {
 // Надграждането се плаща веднага, но го строи самата фирма (свой обект със своя бригада) — новото ниво важи, щом е готово.
 const OFFICE_LEVELS = [
   { nm: 'Фургон', model: null, crews: 2, proj: 2, offers: 3 },
-  { nm: 'Малък офис', model: 'building-type-c', crews: 3, proj: 2, offers: 4 },
+  { nm: 'Малък офис', model: feature('houses-real') && feature('h2-townhouse') ? 'h2-townhouse' : 'building-type-c', crews: 3, proj: 2, offers: 4 },   // при истинските къщи — тухлената градска къща
   { nm: 'Офис', model: 'building-a', crews: 4, proj: 3, offers: 4 },
   { nm: 'Голям офис', model: 'building-c', crews: 5, proj: 3, offers: 5 },
   { nm: 'Бизнес център', model: 'building-e', crews: 6, proj: 4, offers: 5 },
@@ -1710,7 +1717,7 @@ const concreteMat = new THREE.MeshStandardMaterial({ color: 0xb0b0aa, roughness:
 const scaffoldMat = new THREE.LineBasicMaterial({ color: 0xd9a53a });
 
 function buildingFor(type, floors = 20) {
-  if (type === 'house') return pick(HOUSES);
+  if (type === 'house') return pick(HOUSE_POOL);
   if (type === 'shop') return 'Building_Small_1';
   if (type === 'office') return SF_BLK().length && Math.random() < 0.5 ? pick(SF_BLK()) : 'Building_Medium_2_001';
   if (floors >= 15 && SF_SKY().length && Math.random() < 0.4) return pick(SF_SKY());   // разнообразие: истински небостъргачи
@@ -1798,6 +1805,7 @@ function makeSite(p) {
   if (p.demo && city.lots[p.lot].obj) return makeDemoSite(p);
   if (p.maint || p.remodel || p.park) return makeRenoSite(p);
   if (p.own) return makeOwnSite(p);
+  if (p.model) p.model = houseOf(p.model, p.lot);   // детска къща в започнат строеж — истинска (feature 'houses-real')
   if (p.reno) return makeRenoSite(p);
   const lot = city.lots[p.lot];
   for (const t of lot.trees || []) city.group.remove(t);
@@ -3501,7 +3509,7 @@ const bank = createBank({ S: () => S, econ: () => econ, fmt, toast, save, sound:
 // 🏙️ градът от нулата (neom.js): „<марка> Сити“ на Червено море
 const neomName = () => { const c = cityById(NEOM_ID); if (c) c.nm = `${brandOf(S)?.nm || 'Титан'} Сити`; };
 const neom = createNeom({ S: () => S, econ: () => econ, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), brand: () => brandOf(S)?.nm || 'Титан', holding: () => !!S.holding,
-  pickModel: (k, r) => { if (S.imp?.cc) return impPick(S.imp.cc, k, r, n => !!A[n.split('@')[0]]); const L = k === 'sky' ? SKY : k === 'shop' ? SHOPS : HOUSES; return L[Math.floor(r() * L.length)]; },
+  pickModel: (k, r) => { if (S.imp?.cc) return impPick(S.imp.cc, k, r, n => !!A[n.split('@')[0]]); const L = k === 'sky' ? SKY : k === 'shop' ? SHOPS : HOUSE_POOL; return L[Math.floor(r() * L.length)]; },
   occ: () => imperial.occ(), needCountry: () => !S.imp?.cc, chooseCountry: then => imperial.choose(then), where: () => { const C = IMP_CC[S.imp?.cc]; return C ? `${C.cc} ${C.nm}` : ''; },
   cityBuilt: () => { const c = S.cityId === NEOM_ID ? S : S.cities?.[NEOM_ID] || {}; return [...(c.built || []).map(b => b.lot), c.garageLot, c.whLot, ...(S.cityId === NEOM_ID && city.lots ? city.lots.filter(l => l.busy || l.built).map(l => l.id) : [])].filter(x => x != null); },
   place: (id, m, rot) => { if (S.cityId === NEOM_ID && city.lots?.[id]) { placeBuilding(city.lots[id], m, rot); S.built.push({ lot: id, model: m, rot }); if (neom.lineDone()) neomDecor(); } else { const c = S.cities[NEOM_ID] = S.cities[NEOM_ID] || newCityState(); c.built = [...(c.built || []), { lot: id, model: m, rot }]; } },
@@ -6928,7 +6936,7 @@ function openHwView(segIdStr) {
   const resort = segIdStr.startsWith('resort:') ? RESORTS.find(r => 'resort:' + r.id === segIdStr) : null;
   const v = resort ? resortScene(resort) : rail ? buildRailView(A) : (s.ab && AB?.buildAutobahnView ? AB.buildAutobahnView(A, { title: `${s.hw.id} ${s.hw.nm.toUpperCase()}` }) : buildHighwayView(A, { title: `${s.hw.id} ${s.hw.nm.toUpperCase()}` })); sc.add(v.group);
   // околност и строителни табели (scenery.js) за жп линиите и магистралите
-  const scn = resort ? null : addRouteScenery(v.group, { model, A, houses: HOUSES }, rail
+  const scn = resort ? null : addRouteScenery(v.group, { model, A, houses: HOUSE_POOL }, rail
     ? { half: 10, kind: 'rail', title: `Жп линия ${cityById(rail.a).nm} — ${cityById(rail.b).nm}`, seed: hashStr(segIdStr) % 100000 + 7 }
     : { half: 22, kind: 'road', title: `АМ „${s.hw.nm}“: ${cityById(s.a).nm} — ${cityById(s.b).nm}`, seed: hashStr(segIdStr) % 100000 + 7, ...(s.ab ? { riverZ: -10, riverW: 30 } : {}) });   // аутобанът е с река при z = −10
   if (resort) { const vw = v.view || {}, c = vw.horizon ?? 0xcfe0e8; sc.background.setHex(c); sc.fog.color.setHex(c); [sc.fog.near, sc.fog.far] = vw.fog || [220, 620]; }
@@ -6966,7 +6974,7 @@ function loadResortModels() {
 // ---- курорт отвътре (Фаза 5): същият изглед като магистралите, но със сцена от resortview.js
 function resortScene(r) {
   loadResortModels();
-  return buildResortView(A, r, (S.resorts || {})[r.id], seasonOf(S.day), { model, houses: HOUSES, tintRoof, fitScale, label });
+  return buildResortView(A, r, (S.resorts || {})[r.id], seasonOf(S.day), { model, houses: HOUSE_POOL, realHouses, tintRoof, fitScale, label });
 }
 function refreshResortView() {
   if (!hwv || !hwv.seg.startsWith('resort:')) return;
@@ -7239,7 +7247,7 @@ function startReno(lotId) {
   if (active >= officeLv().proj) { toast('Нямаш свободен капацитет за още обект. Надгради офиса.', 'bad'); return; }
   econ.spend(RENO_COST, 'материали', 'Материали за ремонт');
   const lot = city.lots[lotId];
-  const better = HOUSES[(HOUSES.indexOf(lot.built) + 3 + (Math.random() * 4 | 0)) % HOUSES.length];
+  const better = HOUSE_POOL[(Math.max(0, HOUSE_POOL.indexOf(lot.built)) + 3 + (Math.random() * 4 | 0)) % HOUSE_POOL.length];
   const p = { id: S.seq++, type: 'reno', reno: true, lot: lotId, client: 'твой имот', title: 'Ремонт — твоя къща', reward: 0, repGain: 0,
     startDay: S.day, deadlineDay: S.day + 999, stage: 0, prog: 0, model: better };
   lot.busy = 'project';
@@ -9060,6 +9068,7 @@ if (AUTOTEST) {
     boardReview() { return boardL.review().map(r => `${r.status} · ${r.c.dir} · ${r.c.text.slice(0, 60)} · ${Math.round((r.c.prog || 0) * 100)}% · ${r.c.reason || ''}`); },
     boardReq(id, how) { const r = how ? boardL.resolve(id, how) : boardL.request(id); return r.need ? { need: r.need, votes: r.v.votes.map(x => `${x.cond ? '◐' : x.yes ? '✔' : '✖'} ${x.name}: ${x.why}`), bank: r.v.bank.why || 'ok' } : r; },
     boardFrame() { return boardL.frame(); },
+    presTest(cc = 'US') { S.president = { cc, day: S.day, ev: 300 }; pres.start(cc); pres.cabinet(); return pres.proposals().length; },   // за city-builder-f9: Министерският съвет с истинските данни
     imp() { const st = imperial.stats(); return { cc: S.imp?.cc, lv: S.imp?.lv, best: dev.best(), pop: Math.round(st?.pop || 0), house: st?.house, jobs: st?.jobs, vac: st?.vac, unemp: st?.unemp, k: st?.k, sat: st?.sat, bal: Math.round(st?.bal || 0), up: Math.round(st?.up || 0), why: (st?.why || []).map(w => w.txt), streak: S.imp?.streak, city: (({ lat, lon, cc }) => ({ lat, lon, cc }))(cityById(NEOM_ID)) }; },
     impWin() { return imperial.winHtml().replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 900); },
     boardGeo() { return boardProposals().filter(p => p.dir === 'bank' && p.geo).map(p => p.geo); },

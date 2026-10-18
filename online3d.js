@@ -5,17 +5,24 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { feature } from './lab/feature.js';
 
 const TILE = 8, NB = 9, N = NB * 3 + 1, C = (NB - 1) / 2, HQ = [4, 5];
 const tx = i => (i - (N - 1) / 2) * TILE;
 const isRoad = (i, j) => i % 3 === 0 || j % 3 === 0;
-const HOUSES = 'abcdefghijklmnopqrstu'.split('').map(c => 'building-type-' + c);
+const KENNEY = 'abcdefghijklmnopqrstu'.split('').map(c => 'building-type-' + c);
+// истинските къщи вместо детските Kenney (feature 'houses-real'): A/B (assets/houses) и одобрените h2-* (assets/heavy/houses2)
+const H2 = ['h2-greyporch', 'h2-brickcabin', 'h2-pink', 'h2-townhouse', 'h2-blue', 'h2-swedish', 'h2-lodge', 'h2-porch'].filter(n => feature(n));
+const REAL = feature('houses-real') && H2.length >= 2 ? ['building-type-a', 'building-type-b', ...H2] : null;
+const HOUSES = REAL || KENNEY;
+const hFit = n => n.startsWith('h2-') ? 14 : n === 'building-type-a' || n === 'building-type-b' ? 15 : 11;
 const SHOPS = 'abcdefgh'.split('').map(c => 'building-' + c);
 const SKY = ['building-skyscraper-a', 'building-skyscraper-b', 'building-skyscraper-c'];
 const OFFICES = ['building-skyscraper-d', 'building-skyscraper-e', 'building-l', 'building-m'];
 const LIST = {
   roads: ['road-straight', 'road-crossroad', 'road-intersection', 'road-bend', 'construction-cone', 'light-square'],
-  houses: [...HOUSES, 'tree-large', 'tree-small'],
+  houses: [...(REAL ? ['building-type-a', 'building-type-b'] : KENNEY), 'tree-large', 'tree-small'],
+  'heavy/houses2': REAL ? H2 : [],
   commercial: [...SHOPS, ...SKY],
   commercial2: ['building-l', 'building-m', 'building-skyscraper-d', 'building-skyscraper-e'],
   construction: ['crane-tower', 'container-office-green', 'planks-wood-a', 'container-rubble-red', 'truck-concrete-red'],
@@ -108,7 +115,7 @@ export async function createCity3D(el, { onProgress } = {}) {
       const ch = l.zone === 'center' ? 0.8 : l.zone === 'mid' ? 0.65 : 0.5;
       if (r() > ch) { for (let k = 0; k < 2; k++) { const t = model(r() < 0.5 ? 'tree-large' : 'tree-small', 6 + r() * 3); t.position.set(l.x + (r() - 0.5) * 12, 0, l.z + (r() - 0.5) * 12); filler.add(t); } continue; }
       const n = l.zone === 'center' ? (r() < 0.6 ? SKY : SHOPS) : l.zone === 'mid' ? (r() < 0.7 ? SHOPS : HOUSES) : HOUSES;
-      const nm = n[(r() * n.length) | 0], o = model(nm, n === HOUSES ? 11 : 12.5); o.rotation.y = Math.floor(r() * 4) * Math.PI / 2; centerOn(o, l.x, l.z); filler.add(o);
+      const nm = n[(r() * n.length) | 0], o = model(nm, n === HOUSES ? hFit(nm) : 12.5); o.rotation.y = Math.floor(r() * 4) * Math.PI / 2; centerOn(o, l.x, l.z); filler.add(o);
     }
     for (const l of own) for (let k = 0; k < 2; k++) { const t = model('tree-small', 5 + r() * 2); t.position.set(l.x + (r() - 0.5) * 12, 0, l.z + (r() - 0.5) * 12); t.userData.ownTree = l; filler.add(t); }
     // централата
@@ -120,7 +127,7 @@ export async function createCity3D(el, { onProgress } = {}) {
 
   // ── строежите на фирмата ──
   const sites = new Map();   // build id → { obj, b, site, lab, top }
-  const modelFor = b => { const h = hash('b' + b.id); return b.kind === 'house' ? [HOUSES[h % HOUSES.length], 11] : b.kind === 'shop' ? [SHOPS[h % SHOPS.length], 12.5] : b.kind === 'office' ? [OFFICES[h % OFFICES.length], 12.5] : [SKY[h % SKY.length], 12.5]; };
+  const modelFor = b => { const h = hash('b' + b.id); return b.kind === 'house' ? [HOUSES[h % HOUSES.length], hFit(HOUSES[h % HOUSES.length])] : b.kind === 'shop' ? [SHOPS[h % SHOPS.length], 12.5] : b.kind === 'office' ? [OFFICES[h % OFFICES.length], 12.5] : [SKY[h % SKY.length], 12.5]; };
   const lotOf = b => own[(b.lot - 1) % OWN_LOTS];
   function syncBuilds(builds) {
     const want = new Map();

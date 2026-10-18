@@ -106,7 +106,7 @@ export const RESORT_MODELS = {
   suburban: ['building-type-k', 'building-type-n', 'building-type-o', 'building-type-s', 'building-type-t', 'building-type-u'],
 };
 
-// deps: { model(name, scale), houses: [имена], tintRoof(obj, seed), fitScale(name, size), label(text, color, w) }
+// deps: { model(name, scale), houses: [имена], realHouses (без Kenney), tintRoof(obj, seed), fitScale(name, size), label(text, color, w) }
 // r: курортът от RESORTS; st: състоянието му ({ stage, prog } или undefined); season: 'summer' | 'winter' | 'off'
 // скиор: наведен напред, с каска и очила, ски и щеки; предницата към +z (надолу по пистата)
 function skierMesh(jacket, helmet, seed) {
@@ -381,8 +381,9 @@ export function buildResortView(A, r, st, season, deps) {
       if (!summer && A['sf-aframe'] && k % 2 === 0) { o = deps.model('sf-aframe', deps.fitScale('sf-aframe', 13)); o.rotation.y = 0; }   // A-frame хижи (Sketchfab), редувани с дървените
       else if (!summer && A['cabin-wall']) o = buildChalet(A, deps.model, 3.4, k);   // зимните курорти: дървени хижи
       else {
-        const sub = RESORT_MODELS.suburban.filter(n => A[n]), pool = sub.length ? sub : deps.houses, n = pool[(k * 3 + r.id.length) % pool.length];
-        o = deps.model(n, deps.fitScale(n, 11)); deps.tintRoof(o, k * 7 + r.id.length);
+        const sub = deps.realHouses ? [] : RESORT_MODELS.suburban.filter(n => A[n]), pool = sub.length ? sub : deps.houses, n = pool[(k * 3 + r.id.length) % pool.length];   // истинските къщи (feature 'houses-real') — вместо Kenney
+        const fit = n.startsWith('h2-') ? 14 : n === 'building-type-a' || n === 'building-type-b' ? 15 : 11;
+        o = deps.model(n, deps.fitScale(n, fit)); if (fit === 11) deps.tintRoof(o, k * 7 + r.id.length);
       }
       const bb = new THREE.Box3().setFromObject(o);
       o.position.set(plot.x + ix * 20 - (bb.min.x + bb.max.x) / 2, 0, plot.z + iz * 18 - (bb.min.z + bb.max.z) / 2);
