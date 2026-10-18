@@ -48,6 +48,48 @@ function miniModel(kind) {
   return g;
 }
 
+// 🚆✈️🚢🚚 превозните средства над картата: покупка — голям модел и брой; ъпгрейд — малкият → стрелка → големият (big — по-дълъг, повече вагони/двигатели)
+function vehicleModel(kind, big) {
+  const g = new THREE.Group(), fill = new THREE.MeshBasicMaterial({ color: CYAN, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }), edge = lineMat(CYAN);
+  const add = (geo, x, y, z, rx = 0, ry = 0, rz = 0) => { const m = new THREE.Mesh(geo, fill); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); g.add(m); const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 20), edge); e.position.copy(m.position); e.rotation.copy(m.rotation); g.add(e); };
+  const B = (w, h, d, x, y, z, rz = 0) => add(new THREE.BoxGeometry(w, h, d), x, y + h / 2, z, 0, 0, rz);
+  if (kind === 'train') {   // локомотив с наклонен нос + вагони
+    const n = big ? 5 : 2, L = 0.075; B(0.09, 0.05, 0.042, 0, 0.008, 0); add(new THREE.ConeGeometry(0.03, 0.05, 4), 0.068, 0.033, 0, 0, Math.PI / 4, -Math.PI / 2);
+    for (let i = 0; i < n; i++) B(L, 0.044, 0.04, -0.09 - i * (L + 0.008), 0.008, 0);
+    B(0.12 + n * (L + 0.008), 0.004, 0.05, -(n * (L + 0.008)) / 2 + 0.02, 0, 0);
+  } else if (kind === 'plane') {   // фюзелаж, криле, опашка, двигатели (голям — широкофюзелажен с 4)
+    const len = big ? 0.34 : 0.22, r = big ? 0.026 : 0.018, span = big ? 0.32 : 0.21;
+    add(new THREE.CylinderGeometry(r, r * 0.8, len, 12), 0, 0.05, 0, 0, 0, Math.PI / 2); add(new THREE.ConeGeometry(r, 0.04, 12), len / 2 + 0.02, 0.05, 0, 0, 0, -Math.PI / 2);
+    B(0.06, 0.004, span, 0.01, 0.045, 0); B(0.03, 0.004, span * 0.35, -len / 2 + 0.02, 0.055, 0); B(0.03, 0.05, 0.004, -len / 2 + 0.02, 0.055, 0);
+    for (const z of big ? [-span * 0.38, -span * 0.2, span * 0.2, span * 0.38] : [-span * 0.28, span * 0.28]) add(new THREE.CylinderGeometry(0.009, 0.009, 0.035, 8), 0.025, 0.036, z, 0, 0, Math.PI / 2);
+  } else if (kind === 'ship') {   // корпус с нос, мостик на кърмата, контейнери на редове
+    const len = big ? 0.36 : 0.22, w = big ? 0.07 : 0.05; B(len, 0.03, w, 0, 0, 0); add(new THREE.ConeGeometry(w / 2, 0.05, 4), len / 2 + 0.024, 0.015, 0, 0, Math.PI / 4, -Math.PI / 2);
+    B(0.035, 0.05, w * 0.8, -len / 2 + 0.03, 0.03, 0);
+    const rows = big ? 3 : 1, cols = Math.floor((len - 0.08) / 0.03); for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) B(0.026, 0.014, w * 0.8, -len / 2 + 0.075 + c * 0.03, 0.03 + r * 0.015, 0);
+  } else {   // 🚚 ТИР: кабина + ремарке (голям — по-дълго ремарке и двойни оси)
+    B(0.05, 0.05, 0.045, 0.1, 0, 0); B(0.03, 0.02, 0.046, 0.13, 0.03, 0); B(big ? 0.22 : 0.14, 0.055, 0.046, big ? -0.04 : 0.0, 0.004, 0);
+  }
+  return g;
+}
+const VEH = { trucks: 'truck', trains: 'train', planes: 'plane', ships: 'ship' }, VEH_UP = { trainup: 'train', planeup: 'plane', shipup: 'ship', truckup: 'truck' };
+const VEH_NM = { train: ['малък влак', 'голям влак'], plane: ['малък самолет', 'голям самолет'], ship: ['малък кораб', 'голям кораб'], truck: ['камион', 'ТИР'] };
+function vehicleBanner(g, p, y) {
+  const key = String(p.id || '').split(':')[1] || '', buy = p.veh?.kind || VEH[key], up = p.veh?.up || VEH_UP[key]; if (!buy && !up) return;
+  const ban = new THREE.Group(); ban.position.set(0, y, 0.05); g.add(ban); const n = p.count || 1;
+  if (up) {
+    const a = vehicleModel(up, false); a.position.x = -0.32; a.userData.spinM = true; ban.add(a);
+    const b = vehicleModel(up, true); b.position.x = 0.34; b.scale.setScalar(1.15); b.userData.spinM = true; ban.add(b);
+    const am = new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+    const arrow = new THREE.Group(); arrow.userData.pulse = true; ban.add(arrow);
+    const sh = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.09, 8), am); sh.rotation.z = Math.PI / 2; sh.position.set(-0.01, 0.05, 0); arrow.add(sh);
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.04, 12), am); tip.rotation.z = -Math.PI / 2; tip.position.set(0.055, 0.05, 0); arrow.add(tip);
+    const [s0, s1] = VEH_NM[up]; const l0 = textSprite([s0], { h: 0.04, bg: false }); l0.position.set(-0.32, -0.03, 0.02); ban.add(l0); const l1 = textSprite([`${s1}${n > 1 ? ` ×${n}` : ''}`], { h: 0.045, bg: false, col: '#ffe08a' }); l1.position.set(0.34, -0.03, 0.02); ban.add(l1);
+  } else {
+    const m = vehicleModel(buy, true); m.scale.setScalar(1.25); m.userData.spinM = true; ban.add(m);
+    const l = textSprite([`×${n}`], { h: 0.08, bg: false, col: '#ffe08a' }); l.position.set(0.32, 0.05, 0.02); ban.add(l);
+  }
+}
+
 function textSprite(lines, opt = {}) {
   const fs = opt.size || 34, pad = 14, c = document.createElement('canvas'), g = c.getContext('2d');
   g.font = `700 ${fs}px system-ui, sans-serif`;
@@ -142,6 +184,7 @@ export function createHolo(scene, { fmt = n => Math.round(n).toLocaleString('bg-
       const big = textSprite([G.rating, G.amt ? `${fmt(G.amt)} €` : ''].filter(Boolean), { h: 0.15, col: G.ratingCol || '#ffd54a' });
       big.position.set(0, H / 2 + 0.05, 0.06); big.renderOrder = 6; g.add(big);
     }
+    vehicleBanner(g, p, H + 0.16);
   }
 
   function show(p) {
@@ -150,7 +193,7 @@ export function createHolo(scene, { fmt = n => Math.round(n).toLocaleString('bg-
     if (p.info) globe(p);
     else if (p.geo && p.geo.country) country(p);
     else {   // без география — символът на дружеството и сумата
-      const g = begin(), lab = textSprite([`${p.ico || '📋'} ${p.cost ? fmt(p.cost) + ' €' : ''}`.trim()], { h: 0.09 }); lab.position.set(0, 0.45, 0); g.add(lab);
+      const g = begin(), lab = textSprite([`${p.ico || '📋'} ${p.cost ? fmt(p.cost) + ' €' : ''}`.trim()], { h: 0.09 }); lab.position.set(0, 0.45, 0); g.add(lab); vehicleBanner(g, p, 0.6);
     }
   }
   // 'ok' → зелено + „Бюджетът е резервиран“; 'later' → кехлибарено + „За следващо заседание“; 'no' → червено за миг
@@ -172,6 +215,7 @@ export function createHolo(scene, { fmt = n => Math.round(n).toLocaleString('bg-
       if (o.userData.full && t > 0.35 + o.userData.grow) o.scale.lerp(o.userData.full, Math.min(1, dt * 8));   // символите израстват един след друг
       if (o.userData.marker) o.scale.setScalar(1 + Math.sin(t * 4) * 0.25);
       if (o.userData.spinM) o.rotation.y += dt * 0.6;
+      if (o.userData.pulse) { const k = 1 + Math.sin(t * 5) * 0.15; o.scale.set(k, k, k); }
     });
     if (flashT > 0) flashT = Math.max(0, flashT - dt * 0.6);
   }
