@@ -40,7 +40,7 @@ import { SKY_BANDS, SKY_BANDS_MODERN, makeTall, makeTallCopy } from './tall.js';
 import { buildAirport as makeAirport3D, loadAirModels, loadTerminals } from './airport.js';
 import { createTenders, TENDERS, BID_MS } from './tenders.js';
 import { createTasks } from './tasks.js';
-import { loadSigns, citySigns } from './roadsigns.js';
+import { loadSigns, citySigns, trafficLight, hasTrafficLight } from './roadsigns.js';
 import { buildUniversity, buildHospital, buildStadium, buildMetro, buildAirTerminal, buildCanal, buildPortTerminal } from './tender3d.js';
 import { buildGreatWall } from './greatwall3d.js';
 import { buildCivic, CIVIC_KINDS } from './civic3d.js';
@@ -1504,6 +1504,7 @@ function wantedTraffic() {
 // ---- светофари на централните кръстовища: зелено по оста ns или ew, с жълто между тях
 const signals = [];
 const SIG_GREEN = 7, SIG_YELLOW = 1.6;
+if (feature('real-tlights')) loadSigns().then(() => realSignals());   // истинските светофари: ако градът е построен преди модела — стълбовете се сменят на място
 function buildSignals(g) {
   signals.length = 0;
   const lampGeo = new THREE.SphereGeometry(0.28, 10, 8);
@@ -1512,20 +1513,29 @@ function buildSignals(g) {
   for (let bi = 1; bi < NB; bi++) for (let bj = 1; bj < NB; bj++) {
     if (Math.max(Math.abs(bi - 0.5 - c), Math.abs(bj - 0.5 - c)) > 2.6) continue;   // само в центъра и средната зона
     const i = 3 * bi, j = 3 * bj, x = tx(i), z = tx(j);
-    const sig = { i, j, x, z, t: Math.random() * (SIG_GREEN + SIG_YELLOW) * 2, heads: [] };
+    const sig = { i, j, x, z, t: Math.random() * (SIG_GREEN + SIG_YELLOW) * 2, heads: [], poles: [] };
     // два стълба по диагонал; всеки има светлини за двете посоки
     for (const [sx, sz, ry] of [[1, 1, 0], [-1, -1, Math.PI]]) {
-      const pole = model('traffic-light', 9, false); pole.userData.detail = true; pole.userData.tile = [i, j];
+      const RT = feature('real-tlights') && hasTrafficLight() ? trafficLight() : null, pole = RT ? RT.obj : model('traffic-light', 9, false); pole.userData.detail = true; pole.userData.tile = [i, j];
       pole.position.set(x + sx * TILE * 0.55, 0, z + sz * TILE * 0.55); pole.rotation.y = ry;
-      g.add(pole);
+      g.add(pole); sig.poles.push({ pole, ry, real: !!RT, heads: [] });
       for (const axis of ['ns', 'ew']) {
         const head = { axis, r: new THREE.Mesh(lampGeo, mk(0xff3030)), y: new THREE.Mesh(lampGeo, mk(0xffc400)), gr: new THREE.Mesh(lampGeo, mk(0x30ff60)) };
         const off = axis === 'ns' ? [0, 0.5] : [0.5, 0];
-        [head.r, head.y, head.gr].forEach((m, k) => { m.position.set(pole.position.x + off[0] * sx, 4.1 - k * 0.6, pole.position.z + off[1] * sz); m.userData.tile = [i, j]; g.add(m); });
-        sig.heads.push(head);
+        [head.r, head.y, head.gr].forEach((m, k) => { if (RT) { const L = RT.lens[axis][k], v = new THREE.Vector3(L[0], L[1], L[2]).applyAxisAngle(new THREE.Vector3(0, 1, 0), ry); m.position.set(pole.position.x + v.x, v.y, pole.position.z + v.z); m.scale.setScalar(0.5); } else m.position.set(pole.position.x + off[0] * sx, 4.1 - k * 0.6, pole.position.z + off[1] * sz); m.userData.tile = [i, j]; g.add(m); });
+        sig.heads.push(head); (sig.poles[sig.poles.length - 1] || {}).heads?.push(head);
       }
     }
     signals.push(sig);
+  }
+}
+// истинските светофари: сменя стълбовете на Kenney (построени преди модела) и мести кръгчетата на фазите върху лещите
+function realSignals() {
+  if (!hasTrafficLight()) return;
+  for (const s of signals) for (const P of s.poles || []) {
+    if (P.real || !P.pole.parent) continue;
+    const RT = trafficLight(), g = P.pole.parent; RT.obj.position.copy(P.pole.position); RT.obj.rotation.y = P.ry; RT.obj.userData.tile = P.pole.userData.tile; g.remove(P.pole); g.add(RT.obj); P.pole = RT.obj; P.real = true;
+    P.heads.forEach(h => [h.r, h.y, h.gr].forEach((m, k) => { const L = RT.lens[h.axis][k], v = new THREE.Vector3(L[0], L[1], L[2]).applyAxisAngle(new THREE.Vector3(0, 1, 0), P.ry); m.position.set(RT.obj.position.x + v.x, v.y, RT.obj.position.z + v.z); m.scale.setScalar(0.5); }));
   }
 }
 // лампите и светофарите върху улици, които после станаха площад (забележителност, голяма зона, държавна поръчка) — махат се
