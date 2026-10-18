@@ -136,7 +136,7 @@ function sample(keys, t) {
 export function buildAirport(group, deps, opts = {}) {
   const g = new THREE.Group(); group.add(g);
   g.position.set(opts.x || 0, 0, opts.z || 0);
-  const lights = [], beacons = [], windows = [], towerGlows = [];
+  const lights = [], beacons = [], windows = [], towerGlows = [], smalls = [];
   // земя, писта, рулежка, перон
   flat(AIRPORT_SIZE.w + 20, AIRPORT_SIZE.d + 20, mat(0x6f8f4e, 1), 15, 0.015, 5, g);
   flat(RW.w, RW.z1 - RW.z0, mat(0x2b2d31, 0.95), RW.x, 0.04, (RW.z0 + RW.z1) / 2, g);
@@ -199,7 +199,7 @@ export function buildAirport(group, deps, opts = {}) {
   function setLevel(n) {
     n = Math.max(1, Math.min(7, n | 0)); if (n === lv) return; lv = n;
     const big = n; n = Math.min(5, n);   // ниво 6–7 (мега/световен хъб): терминалът е като на 5, плюс още хангари и самолети
-    lvG.clear(); parked.length = 0; windows.length = 0; towerGlows.length = 0;
+    lvG.clear(); parked.length = 0; windows.length = 0; towerGlows.length = 0; smalls.length = 0;
     const tLen = Math.min(40 + n * 22, 112), tz = -tLen / 2 + 20;   // до 112 — кулата в северния край остава на сушата (не над морето)
     // писти колкото е нивото: ниво 3 — 3 писти, ниво 7 — 7 (успоредни на изток, през 26 м)
     { const extra = big - 1, wm = new THREE.MeshBasicMaterial({ color: 0xf2f2f2 }), asph = mat(0x2b2d31, 0.95), tw = mat(0x3a3d42, 0.95), em = mat(0xfff4c0, 0.4, 0, 0xffe080);
@@ -215,6 +215,8 @@ export function buildAirport(group, deps, opts = {}) {
         for (const z of [z0 + 14, -10, z1 - 14]) flat(26, 8, tw, x - 13, 0.036, z, lvG);   // връзки към предишната писта
         // номер на пистата (09L/09R…) — бяла табела в края
         box(4, 0.06, 2.4, wm, x, 0.07, z1 - 10, lvG);
+        // по-малък самолет (регионален) каца и излита по тази писта — с отместване във времето (до 4 писти, за да не тежи)
+        if (k <= 4) { const sp = makePlane(k % 2 ? 'regional' : 'a320', 10 + k); sp.userData.rw = { x, z0, z1, ph: k * 0.23 }; lvG.add(sp); smalls.push(sp); }
       }
     }
     const wall = mat(0xd9dde2, 0.6, 0.1), glassM = mat(0x5f8fb8, 0.2, 0.3, 0xffd890), roof = mat(0x9aa3ad, 0.5, 0.5);
@@ -326,6 +328,14 @@ export function buildAirport(group, deps, opts = {}) {
   function update(t, night = 0) {
     { const dt = lastT == null ? 0 : Math.min(0.2, Math.max(0, t - lastT)); lastT = t; moveTraffic(dt); }
     fly(land, LAND, t); fly(take, TAKE, t + T * 0.5);
+    // малките самолети по другите писти: подход от юг → пробег → излитане на север (цикъл T2 s)
+    for (const sp of smalls) { const { x, z0, z1, ph } = sp.userData.rw, T2 = 46, u = ((t / T2 + ph) % 1), gy = sp.userData.gearY;
+      let y, z, pitch;
+      if (u < 0.3) { const k = u / 0.3; z = z1 + 520 * (1 - k); y = gy + 70 * (1 - k) ** 1.6; pitch = -0.07; }
+      else if (u < 0.65) { const k = (u - 0.3) / 0.35; z = z1 - (z1 - z0 - 30) * k; y = gy; pitch = 0; }
+      else { const k = (u - 0.65) / 0.35; z = z0 + 30 - 600 * k; y = gy + 110 * k ** 1.5; pitch = 0.13 * Math.min(1, k * 4); }
+      sp.position.set(x, y, z); sp.rotation.set(0, 0, 0); sp.rotateY(Math.PI); sp.rotateX(-pitch); sp.visible = u < 0.98;
+      for (const n of sp.userData.nav) n.material.emissiveIntensity = night * (Math.sin(t * 4) > 0.6 ? 1.5 : 0.5); }
     for (const m of lights) m.emissiveIntensity = 0.2 + 2.2 * night;
     for (const m of windows) m.emissiveIntensity = 0.05 + 1.8 * night;
     winM.emissiveIntensity = 1.6 * night;

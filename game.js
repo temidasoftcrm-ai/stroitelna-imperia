@@ -2647,6 +2647,7 @@ function endOfDay() {
   }
   { const tu = (S.trains || []).reduce((a, t) => a + trainType(t).upkeep, 0); if (tu) econ.spend(tu, 'заплати', `Ден ${S.day}: влакове`); flowDay('rail', tu); }
   hwTrucks.day();
+  hwQueueTick();   // нови екипи (пълна техника в още градове) поемат от опашката
   const doneHighways = hwDone();
   if (doneHighways.length) econ.earn(hwToll(doneHighways), 'тол', `Ден ${S.day}: тол такси`);
   if (S.day % 10 === 0 && (S.trains || []).length && (S.trains || []).length >= totalTracks()) {
@@ -4728,7 +4729,7 @@ function updSuperBtn() {
   }
 }
 // 🛣️ Route 66 — рядка специална поръчка в Америка (route66.js): участъците са аутобан „US-66“ от corridors.js
-const r66Why = id => { const sg = segById(id); if (!sg) return 'няма участък'; if (!abUnlocked()) return '🔒 аутобани'; if ((S.hwJobs || []).length >= HW_MAX_JOBS()) return 'няма свободен екип'; if (!abReach(sg) && !sg.spur) return 'първо стигни с магистрала'; return ''; };
+const r66Why = id => { const sg = segById(id); if (!sg) return 'няма участък'; if (!abUnlocked()) return '🔒 аутобани'; if ((S.hwJobs || []).length >= HW_MAX_JOBS() + HW_PRIO) return 'няма свободен екип'; if (!abReach(sg) && !sg.spur) return 'първо стигни с магистрала'; return ''; };
 const route66 = createRoute66({ S: () => S, econ: () => econ, toast, modal, fmt, save, sound: n => Sound.play(n), rep: () => S.rep || 0,
   open: () => !!S && !!contByKey('na')?.open?.(), addRep: d => { S.rep = Math.max(0, Math.min(5, S.rep + d)); }, addXp: n => dev.add(n), cityName: id => cityById(id)?.nm || id,
   segId: (a, b) => abSegId(a, b), segDone: id => hwAll().includes(id),
@@ -4736,7 +4737,7 @@ const route66 = createRoute66({ S: () => S, econ: () => econ, toast, modal, fmt,
   segInfo: (a, b) => { const km = kmBetween(a, b); return { km, ...abQuoteSeg({ a, b }, km) }; }, canTake: r66Why,
   pop: (cap, sub) => showEventPop(/открит/.test(cap) ? 'r66-done' : 'ab-done', cap, sub), openWin: () => openBig('super') });
 // ⭐ супер поръчки по континентите (megaorders.js): Ламанша, Кейп — Кайро, Панамският канал, Дариен, Транссибирската, „Гън“
-const megaAbWhy = id => { const sg = segById(id); if (!sg) return 'няма участък'; if (!abUnlocked()) return '🔒 аутобани'; if ((S.hwJobs || []).length >= HW_MAX_JOBS()) return 'няма свободен екип'; return ''; };
+const megaAbWhy = id => { const sg = segById(id); if (!sg) return 'няма участък'; if (!abUnlocked()) return '🔒 аутобани'; if ((S.hwJobs || []).length >= HW_MAX_JOBS() + HW_PRIO) return 'няма свободен екип'; return ''; };
 const mega = createMega({ S: () => S, econ: () => econ, toast, modal, fmt, save, sound: n => Sound.play(n), rep: () => S.rep || 0,
   contOpen: k => !!S && dev.has(['eu', 'af'].includes(k) ? 'MEGA_EU' : 'MEGA_WORLD') && (k === 'eu' ? dev.has('EUROPE') : !!contByKey(k)?.open?.()),   // специалните поръчки: ниво 13 (Европа, Африка), 19 (светът)
   addRep: d => { S.rep = Math.max(0, Math.min(5, S.rep + d)); }, addXp: n => dev.add(n), cityName: id => cityById(id)?.nm || id,
@@ -5701,6 +5702,7 @@ function finishCity() {
   const share = rivals.share(), stats = { built: S.built.length, owned: est().owned.length, day: S.day };
   const r = econ.finishCity(S.cityId, share, stats);
   S.finishedCount = (S.finishedCount || 0) + 1; S.branchDiscounts = (S.branchDiscounts || 0) + 1;
+  clampFinished();
   showEventPop('city-done', `🏁 ${cityName()} е завършен!`, `${stats.built} сгради · дял ${Math.round(share * 100)}% · носи ~${fmt(r.daily)} €/ден, докато си другаде. Следващият филиал е −30%.`);
   Sound.play('cityDone');
   quests.emit('cityDone');
@@ -6090,7 +6092,15 @@ function updateCityTrain(dt) {
 }
 
 // ============================================================ Фаза 4: магистрали (държавни поръчки)
-const HW_MAX_JOBS = () => 1 + Math.floor((S.officeLevel || 1) / 5);   // едновременни участъци
+// едновременни участъци: офисът (1 + ниво/5) + по един екип за всеки твой град с пълна пътна техника (до 40) — в късната игра строиш десетки наведнъж
+const hwCrewCities = () => ownedCities().filter(id => { const have = cityUnitTypes(id); return Object.entries(HW_FLEET).every(([k, n]) => have.filter(t => t === k).length >= n); });
+const HW_MAX_JOBS = () => Math.min(40, 1 + Math.floor((S.officeLevel || 1) / 5) + hwCrewCities().filter(id => id !== S.cityId).length);
+const HW_PRIO = 3;   // супер поръчките (Route 66, Ламанша…) имат запазени екипи — не чакат опашката
+// по-бърз строеж с развитието на фирмата: до ниво 8 — както е, после +12% на ниво (ниво 20 ≈ ×2.4) — участък от 667 км вече не е 90 дни
+const hwSpeedMul = () => 1 + 0.12 * Math.max(0, dev.best() - 8);
+// градът, чиято техника поема нов участък: най-близкият до трасето с цялата свободна техника за първия етап (иначе текущият)
+function hwPickCity(j) { const sg = segById(j.seg); if (!sg) return S.cityId; const d = id => Math.min(kmBetween(id, sg.a), kmBetween(id, sg.b));
+  const c = ownedCities().filter(id => cityById(id) && !hwFreeLack(j, id).length).sort((a, b) => d(a) - d(b))[0]; return c || S.cityId; }   // едновременни участъци
 const allSegs = () => HIGHWAYS.flatMap(hw => hw.segs.map((s, i) => ({ id: segId(hw, i), hw, a: s[0], b: s[1] })));
 const segOpen = sg => !sg.hw.intl || (S && dev.has('BALKANS'));
 const ALL_AB = abSegs();
@@ -6229,13 +6239,13 @@ function takeAutobahn(id) {
   const up = !!(S.abUp || {})[id];   // ⬆️ ъпгрейд на готова магистрала: без земните работи и мостовете — от „Пътна основа“, половин срок и половин плащане
   if (!abUnlocked() && !(up && dev.best() >= AB_UNLOCK.lv)) { toast(abLockTxt(), 'bad'); return; }
   if (!hwRepOk()) { toast(`Държавните поръчки изискват репутация ${HW_REP} ★ или ниво 5 на развитие (голяма фирма).`, 'bad'); return; }
-  if ((S.hwJobs || []).length >= HW_MAX_JOBS()) { toast('Вече строиш максимума участъци. Надгради офиса за повече.', 'bad'); return; }
   const sg = segById(id); if (!sg || hwAll().includes(id) || (S.hwJobs || []).some(j => j.seg === id)) return;
+  if ((S.hwJobs || []).length >= HW_MAX_JOBS() + (sg.spur ? HW_PRIO : 0)) { toast('Всички екипи са заети — участъкът е на опашката. Още екипи: пълна пътна техника в още градове (🚜 Гараж).', 'bad'); if (!hwQueue().includes(id)) hwQueue().push(id); return; }   // spur — по договор (супер поръчка): запазени екипи
   if (!up && !abReach(sg) && !sg.spur) { toast(`🛣️ ${cityById(sg.a).nm} — ${cityById(sg.b).nm}: аутобанът продължава съществуваща магистрала — първо стигни с готов участък до ${cityById(sg.a).nm} или ${cityById(sg.b).nm}.`, 'bad'); return; }
   const km = kmBetween(sg.a, sg.b);
   const q = abQuoteSeg(sg, km);
   if (up) { q.reward = Math.round(q.reward * AB_UP.pay / 5000) * 5000; q.days = Math.max(4, Math.round(q.days * AB_UP.days)); delete S.abUp[id]; }
-  S.hwJobs = [...(S.hwJobs || []), { seg: id, ab: true, km, ...q, stage: up ? AB_UP.stage : 0, prog: 0, mat: {}, start: S.day, v2: true, city: S.cityId, ...(up ? { up: true } : {}) }];
+  const nj = { seg: id, ab: true, km, ...q, stage: up ? AB_UP.stage : 0, prog: 0, mat: {}, start: S.day, v2: true, city: S.cityId, ...(up ? { up: true } : {}) }; nj.city = hwPickCity(nj); S.hwJobs = [...(S.hwJobs || []), nj];   // техниката на най-близкия град с всичко свободно
   toast(`${up ? '⬆️ Ъпгрейд в аутобан' : '🔴 Взе участък от аутобан'} „${sg.hw.nm}“: ${cityById(sg.a).nm} — ${cityById(sg.b).nm} (${km} км).`, 'good');
   const miss = abMissingTxt(); if (miss) toast(`🚜 ${miss} — участъкът ще чака пътната техника (таб „Техника“).`, 'bad');
   Sound.play('buy');
@@ -6355,7 +6365,7 @@ function hwQueueTick() {
   while (S.hwQueue.length && !hwFull()) {
     const id = S.hwQueue.shift(), sg = segById(id);
     if (!sg || hwAll().includes(id) || (S.hwJobs || []).some(j => j.seg === id)) continue;
-    toast(`📋➡️ Освободи се екип — започва ${cityById(sg.a).nm} — ${cityById(sg.b).nm} от опашката.`, 'good');
+    if (S.hwQueue.length < 30) toast(`📋➡️ Освободи се екип — започва ${cityById(sg.a).nm} — ${cityById(sg.b).nm} от опашката.`, 'good');
     if (id.startsWith('ab:')) takeAutobahn(id); else takeHighway(id);
   }
 }
@@ -6375,7 +6385,7 @@ function takeHighway(id) {
   if (!hwRepOk()) { toast(`Държавните поръчки изискват репутация ${HW_REP} ★ или ниво 5 на развитие (голяма фирма).`, 'bad'); return; }
   if ((S.hwJobs || []).length >= HW_MAX_JOBS()) { toast('Вече строиш максимума участъци. Надгради офиса за повече.', 'bad'); return; }
   const s = segById(id), km = kmBetween(s.a, s.b), q = segmentQuote(km);
-  S.hwJobs = [...(S.hwJobs || []), { seg: id, km, ...q, stage: 0, prog: 0, mat: {}, start: S.day, v2: true, city: S.cityId }];
+  const nj = { seg: id, km, ...q, stage: 0, prog: 0, mat: {}, start: S.day, v2: true, city: S.cityId }; nj.city = hwPickCity(nj); S.hwJobs = [...(S.hwJobs || []), nj];
   toast(`🛣️ Взе държавна поръчка: АМ „${s.hw.nm}“, ${cityById(s.a).nm} — ${cityById(s.b).nm} (${km} км). Техниката тръгва към трасето.`, 'good');
   if (hwMissing().length) toast(`🚜 ${hwMissingTxt()} — участъкът ще чака пътната техника (таб „Техника“).`, 'bad');
   Sound.play('buy');
@@ -6472,7 +6482,7 @@ function updateHighways(dtDays) {
     const rs = hwRoles(j), shared = rs.filter(r => HW_SHARED.has(r.role)), sh = shared.reduce((a, r) => a + r.cnt, 0);
     if (!rs.every(r => HW_SHARED.has(r.role) || r.away >= r.cnt) || !hwMaterials(j)) continue;
     const mul = sh ? Math.max(0.5, shared.reduce((a, r) => a + Math.min(r.away, r.cnt), 0) / sh) : 1;
-    j.prog += dtDays * stagesOf(j).length / j.days * mul * (window.__coopHwMul ? window.__coopHwMul(j.seg) : 1);   // общ участък с партньора (coop.js) — по-бързо
+    j.prog += dtDays * stagesOf(j).length / j.days * mul * hwSpeedMul() * (window.__coopHwMul ? window.__coopHwMul(j.seg) : 1);   // общ участък с партньора (coop.js) — по-бързо
     if (j.prog < 1) continue;
     j.stage++; j.prog = 0;
     if (j.stage >= stagesOf(j).length) { j.ab ? finishAutobahn(j) : finishHighway(j); continue; }
@@ -7890,7 +7900,7 @@ function renderBig() {
   on('[data-oe-build]', b => { const [x, y] = b.dataset.oeBuild.split(':'); orientBuild(x, y); renderBig(); });
   on('[data-oe-up]', b => { startHsUpgrade(+b.dataset.oeUp); renderBig(); });
   on('[data-oe-ask]', () => orient.ask());
-  on('[data-r66]', b => { takeAutobahn(b.dataset.r66); renderBig(); });
+  on('[data-r66]', b => { const sg = segById(b.dataset.r66), was = sg && sg.spur; if (sg) sg.spur = true; try { takeAutobahn(b.dataset.r66); } finally { if (sg) sg.spur = was; } renderBig(); });   // Route 66 — супер поръчка: запазени екипи (HW_PRIO)
   on('[data-mega]', b => { const [k, i] = b.dataset.mega.split('|'); mega.build(k, +i); renderBig(); });
   on('[data-mega-ask]', b => mega.ask(b.dataset.megaAsk));
   on('[data-mega-works]', b => { mega.startWorks(b.dataset.megaWorks); renderBig(); });
@@ -7910,8 +7920,11 @@ function finInfo(id) {
 }
 const finIds = () => Object.keys((econ && econ.s.finished) || {});
 // таван на дневния приход на завършен град по размер — стари записи броят като „оборот на града“ и пари от поръчки в други градове (напр. Монтана +2.9 млн/ден)
-const FIN_CAP = [0, 40000, 90000, 180000, 300000];
-function clampFinished() { for (const [id, f] of Object.entries((econ && econ.s.finished) || {})) { const c = FIN_CAP[Math.min(4, (cityById(id)?.sz || 1) + (MEGAPOLIS.has(id) ? 1 : 0))]; if (f.daily > c) f.daily = c; } }
+// приход на завършен град по размер (по искане на играча — реалистично за империя с милиарди): малък 500 000, среден 700 000, голям 1 000 000, мегаполис 2 000 000 €/ден
+// (държава от 5 града ≈ 4–5 млн. на ден); делът на пазара (share) и поддръжката на техниката го коригират, наемите от имотите си идват отделно
+const FIN_CAP = [0, 500000, 700000, 1000000, 2000000];
+const finTarget = id => FIN_CAP[MEGAPOLIS.has(id) ? 4 : Math.min(3, cityById(id)?.sz || 1)];
+function clampFinished() { for (const [id, f] of Object.entries((econ && econ.s.finished) || {})) { const c = finTarget(id); if (f.daily !== c) f.daily = c; } }
 function updFinBtn() {
   const b = $('finBtn'); if (!b) return;
   if (S && econ) clampFinished();
