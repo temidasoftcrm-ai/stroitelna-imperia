@@ -12,7 +12,7 @@ const MODE = { 'building-a': 'dark', 'building-b': 'cool', 'building-c': 'dark',
   'building-i': 'kenney', 'building-j': 'kenney', 'building-k': 'kenney', 'building-l': 'kenney', 'building-m': 'kenney', 'building-n': 'kenney',
   // новите модели D (Singapore Office — като sf-sky-sing) и E (Bank of China): стъклата по етажи, рамките/лъчите — не
   'building-skyscraper-d': ['cool', [/Interior/i, 'flood'], [/Red_Beam|Trimsheet|temp/i, null]], 'building-skyscraper-e': ['cool', [/Lisanne|Color_A06/i, null], [/^Material(\.\d+)?$/, 'coolW']],   // E: Bank of China (cool) или новата синя стъклена кула (com2-sky-e2 — „Material“: сребристо + етажи, без точки)
-  bellagio: 'flood', sagrada: 'floodUp', petronas: 'darkC', burj: ['coolW', [/material_1/, null]], willis: 'coolW', cntower: 'led',   // Уилис — като Бурж; Си Ен Тауър — цветни LED светлини, които бавно сменят цвета   // Бурж Халифа: студено-бели етажи   // Саграда Фамилия: прожектори отдолу, кулите по-светли нагоре
+  bellagio: 'flood', sagrada: 'floodUp', petronas: 'solid', burj: ['coolW', [/material_1/, null]], willis: 'coolW', cntower: 'led',   // Уилис — като Бурж; Си Ен Тауър — цветни LED светлини, които бавно сменят цвета   // Бурж Халифа: студено-бели етажи   // Саграда Фамилия: прожектори отдолу, кулите по-светли нагоре
   // истинските небостъргачи (assets/heavy/sky): режимът може да зависи от материала — [регулярен израз за името, режим|null]
   'sf-sky-usb': ['cool', [/roof/i, null]], 'sf-sky-rand': ['cool'], 'sf-sky-sing': ['cool', [/Interior/i, 'flood'], [/Red_Beam|Trimsheet|temp/i, null]],
   // истинските къщи и блокове (feature 'night-houses'): house-a — стъклата са отделни материали (светят целите); house-b — една текстура,
@@ -30,7 +30,7 @@ const FLOORS = n => (n.startsWith('h2-') ? 2 : 0) || ({ 'building-type-a': 1, 'b
 // режимът на материала: MODE[name] е низ или [по подразбиране, [/име/, режим|null]…]
 const modeOf = (name, m) => { const e = MODE[name]; if (!e || typeof e === 'string') return e; for (const [re, md] of e.slice(1)) if (re.test(m.name || '')) return md; return e[0]; };
 const WHITE = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1); WHITE.needsUpdate = true;   // приблизителен брой етажи на модела
-const NF_K = { petronas: 2.8 };   // по-ярки етажи (снимковата текстура дава тесни прозорци)
+const NF_K = { petronas: 0.9 };   // по-ярки етажи (снимковата текстура дава тесни прозорци)
 export const NF_MATS = new Set();
 export const NF_T = { value: 0 };   // време (s) — daynight.js го върти; през нощта етажи угасват и светват
 const FEAT = { ...Object.fromEntries(['greyporch', 'brickcabin', 'pink', 'townhouse', 'blue', 'swedish', 'lodge', 'porch'].map(k => ['h2-' + k, 'night-houses'])), 'building-type-a': 'night-houses', 'building-type-b': 'night-houses', ...Object.fromEntries(['brick', 'oldbld', 'modoffice', 'richmond', 'dbrick', 'jade', 'soviet', 'panel12', 'gamecity', 'asian'].map(k => ['sf-blk-' + k, 'night-houses'])), sagrada: 'night-sagrada', burj: 'night-burj', petronas: 'night-towers', willis: 'night-towers', cntower: 'night-towers', 'building-skyscraper-d': 'night-towers', 'building-skyscraper-e': 'night-towers' };
