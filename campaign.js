@@ -228,6 +228,7 @@ export function createCampaign(deps) {
       const skip = document.createElement('button'); skip.textContent = 'Продължи →'; skip.className = 'go'; Object.assign(skip.style, { position: 'absolute', right: '20px', bottom: '20px', width: 'auto', zIndex: 4 });
       const end = () => { v.remove(); skip.remove(); victoryCard(ev); };
       v.onended = end; v.onerror = end; skip.onclick = end; el.appendChild(v); el.appendChild(skip);
+      v.play().catch(() => { v.muted = true; v.play().catch(end); });   // без скорошен клик браузърът не пуска звук — тогава без звук, иначе направо картата
       deps.sound && deps.sound('levelup');
     } else { log(`Загуба: ${ev} от 270 нужни.`); render(); const w = document.createElement('div'); w.className = 'modal'; w.innerHTML = `<div><h3>😞 Изборите са загубени</h3><div class="m" style="margin-bottom:10px">${ev} електорални гласа — нужни са 270. ${RIVAL[0].toUpperCase() + RIVAL.slice(1)} печели. Можеш да опиташ пак след 4 години.</div><button class="go" data-ok>Затвори</button></div>`; el.appendChild(w); w.querySelector('[data-ok]').onclick = () => { close(); deps.onLose && deps.onLose(ev); }; }
   }

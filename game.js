@@ -2743,6 +2743,7 @@ function renderTop() {
   if (!S) return;
   dev.render();
   impPlace();
+  try { updDirTiles(); } catch {}
   updLogo();
   updateQuickBuy();
   { const v = econ.money, a = Math.abs(v);   // от 1 милиард нагоре — съкратено (1,22 млрд. €), точната сума е в подсказката
@@ -8312,12 +8313,37 @@ const tasks = createTasks({ S: () => S, fmt, ready: () => !!S && !!city && city.
   airUps: () => dev.has('AIR') ? ownedCities().map(id => { const ap = airportOf(id), lv = ap?.lv || 0; return ap && !ap.muni && !ap.build && lv && lv < airportMax(id) && lv < AIRPORT_LEVELS.length && (lv < 5 || dev.has('MEGAHUB')) ? { id, lv, cost: amL(AIRPORT_LEVELS[lv], id, 'air').cost } : null; }).filter(Boolean) : [],
   portUps: () => seaOn() ? ownedCities().map(id => { const p = portOf(id), lv = p?.lv || 0; return p && !p.muni && !p.build && lv && lv < portMax(id) ? { id, lv, cost: amL(PORT_LEVELS[lv], id, 'port').cost } : null; }).filter(Boolean) : [],
   finished: () => Object.entries(econ.s.finished || {}).map(([id, x]) => ({ id, day: x.day, daily: x.daily })) });
+// 👔 кой директор поема кой прозорец (след назначаване; „Ръчно управление“ връща стария екран до затваряне на играта)
+const DIR_WIN = { garage: 'con', offers: 'con', cities: 'con', mines: 'oil', bank: 'bank' };
+const manualWin = new Set();
+const dirWinOf = w => { const k = DIR_WIN[w]; return k && !manualWin.has(w) && feature('boardroom') && S?.holding && (S.hold?.dir || {})[k] && (w !== 'bank' || S.bank) ? k : null; };
+function dirStats(w) {
+  const f = n => fmt(Math.round(n)), B = n => n >= 1e9 ? `${(n / 1e9).toLocaleString('bg-BG', { maximumFractionDigits: 1 })} млрд. €` : `${f(n)} €`;
+  if (w === 'garage') { const ids = ownedCities(), all = ids.reduce((a, id) => a + (id === S.cityId ? units.length : (S.cities?.[id]?.units || []).length), 0), sh = garShort(), ex = garRoadExtra().reduce((a, [, , k]) => a + k, 0);
+    return [[f(all), 'машини и бригади'], [f(ids.length), 'града'], [sh.total ? `<span style="color:var(--bad)">${f(sh.total)}</span>` : '0', 'липсват'], [f(ex), 'излишни']]; }
+  if (w === 'offers') { const sp = supply.state(); return [[f(sp.deals.length), 'договора с доставчици'], [f(TENDERS.filter(t => tenders.state(t.id)?.st === 'open').length), 'отворени търга'], [f(TENDERS.filter(t => tenders.state(t.id)?.st === 'building').length), 'в строеж'], [S.auto2?.offers ? '🤖 вкл.' : 'изкл.', 'автопилот за поръчките']]; }
+  if (w === 'cities') { const ids = [...new Set(ownedCities())], fin = ids.filter(id => econ.isFinished(id)).length; return [[f(ids.length), 'града'], [f(fin), 'завършени'], [f(ids.length - fin), 'в развитие'], [f((S.branches || []).length), 'филиала']]; }
+  if (w === 'mines') { const ss = mines.state().sites; return [[f(ss.length), 'обекта'], [`${f(mines.dailyValue())} €`, 'добив на ден'], [`${f(mines.totalUpkeep())} €`, 'издръжка на ден'], [mines.nationalGrid() ? '✅' : `${mines.gridCities().length}/${GRID_NEED.cities}`, 'национална мрежа']]; }
+  if (w === 'bank') { const b = S.bank, lent = (b.loans || []).reduce((a, l) => a + l.left, 0); return [[B(b.cap), 'капитал'], [B(lent), `отпуснати (${b.loans.length})`], [f((b.offers || []).length), 'искания чакат'], [`${Math.round((b.div ?? 0.2) * 100)}%`, 'дивидент годишно']]; }
+  return [];
+}
+// плочките в „📊 Империя“: кой отговаря и колко предложения чакат (пресмята се веднъж на ден — boardProposals е тежък)
+let dirTagDay = -1, dirTagN = {};
+function updDirTiles() {
+  if (!S?.holding || !feature('boardroom')) return;
+  if (dirTagDay !== S.day) { dirTagDay = S.day; dirTagN = {}; try { for (const p of group.proposals()) if (!p.info) dirTagN[p.dir] = (dirTagN[p.dir] || 0) + 1; } catch {} }
+  for (const [id, w] of [['garBtn', 'garage'], ['btnOffers', 'offers'], ['btnCities', 'cities'], ['btnMines', 'mines'], ['bankBtn', 'bank']]) {
+    const b = $(id), k = b && dirWinOf(w); if (!b) continue; const old = b.querySelector('.dirtag'); if (!k || b.style.display === 'none' || !(b.textContent || '').replace(old ? old.textContent : '', '').trim()) { old && old.remove(); continue; }
+    const n = dirTagN[k] || 0, html = ` · ${String((S.hold.dir || {})[k]).split(' ')[0]}${n ? ` <b style="background:#ffd54a;color:#111;border-radius:9px;padding:0 6px;font-size:11px">${n}</b>` : ''}`;
+    if (old) { if (old.innerHTML !== html) old.innerHTML = html; } else { const t = document.createElement('span'); t.className = 'dirtag'; t.innerHTML = html; b.appendChild(t); }
+  }
+}
 function renderBig() {
   const body = $('bwBody'); if (!body || !bigWin) return;
   if (body.contains(document.activeElement) && (document.activeElement.tagName === 'SELECT' || document.activeElement.type === 'range')) return;   // не пречи на отворен падащ списък
   const sc = body.scrollTop;
   if (bigWin === 'bank' && S.bank) $('bwTitle').innerHTML = `🏦 ${brandOf(S)?.nm || ''} Банк и финанси`;
-  if (bigWin === 'bank') {   // банката в прозорец (без прехвърляне в града); не се пречертава всяка секунда — само при действие
+  if (bigWin === 'bank' && !dirWinOf('bank')) {   // банката в прозорец (без прехвърляне в града); не се пречертава всяка секунда — само при действие
     if (!S.bank) $('bwTitle').innerHTML = '🏦 Банка и финанси';
     if (!body.dataset.bank || body.dataset.bankT !== String(econ.s.day)) { body.dataset.bank = '1'; body.dataset.bankT = String(econ.s.day); body.innerHTML = '<div id="bwBank" style="display:flex;flex-direction:column;gap:10px"></div>'; ECON.renderFinance ? ECON.renderFinance($('bwBank'), econ, S.rep, () => { save(); body.dataset.bank = ''; renderBig(); renderPanel(); }, units.map(u => u.type), { connectedCityIds: connected(), roadCityIds: supplyOpts().roadCityIds, stocksOpen: dev.stocksOpen(), devLevel: dev.best(), blocked: blockedMoney() }) : renderBank($('bwBank')); mergeOwnBank($('bwBank')); body.scrollTop = sc; }
     return;
@@ -8327,6 +8353,21 @@ function renderBig() {
   { const sk = { hw: 'hw', rail: 'rail', sea: 'sea', air: 'air', oil: 'oil', resort: 'hotel' }[bigWin], nm = sk && (S.group || {})[sk] && subName(S, sk);   // под заглавието — дъщерната фирма (… Толроуд, … Рейл…)
     if (nm) $('bwTitle').innerHTML += `<div style="font-size:13px;font-weight:600;color:var(--mut);margin-top:2px;display:flex;align-items:center;gap:6px">${subLogo(sk, 22)}${nm}</div>`; }   // с логото на дружеството
   const stick = x => `<div class="bw-stick">${x}</div>`;   // табовете и обхватът стоят горе при превъртане
+  // 👔 с назначен директор Гараж, Оферти, Градове, Добив и Банка стават негов екран: статистика + предложенията и проектите му (group.dirPanel); „🔧 Ръчно управление“ — старият екран срещу малко доверие
+  { const dk = dirWinOf(bigWin);
+    if (dk) {
+      const nm = (S.hold.dir || {})[dk] || mayorName(), st = dirStats(bigWin), first = String(nm).split(' ')[0];
+      body.innerHTML = `<div class="card" style="border:1px solid #ffd54a"><div class="row" style="margin:0;gap:10px;align-items:center;flex-wrap:wrap"><span style="font-size:30px">👔</span><span class="meta" style="margin:0;flex:1 1 260px"><b style="color:var(--txt);font-size:15px">${nm}</b> отговаря за това. Покупките и строежите идват като <b>негови предложения</b> — тук или на борда.</span><button class="btn" data-dboard="1">🏛️ Директорската зала →</button></div></div>`
+        + `<div class="bw-stats">${st.map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join('')}</div>`
+        + group.dirPanel(dk) + (bigWin === 'cities' && mayorName() ? group.dirPanel('mayor') : '')
+        + `<div class="row" style="justify-content:flex-end;margin:10px 0 0"><button class="btn2" data-manual="1" title="Старият екран — ${first} ще го приеме като намеса">🔧 Ръчно управление</button></div>`;
+      body.scrollTop = sc;
+      group.bindPanels(body, () => { renderBig(); renderMapHud(); });
+      body.querySelectorAll('[data-dboard]').forEach(b => b.onclick = () => group.board(() => renderBig()));
+      body.querySelectorAll('[data-manual]').forEach(b => b.onclick = () => { S.hold.trust = S.hold.trust || {}; S.hold.trust[dk] = Math.max(0.5, (S.hold.trust[dk] ?? 1) - 0.02); manualWin.add(bigWin); toast(`👔 ${first}: намесихте се в работата ми.`, ''); save(); renderBig(); });
+      return;
+    }
+  }
   // 👔 с назначен директор прозорците жп / магистрали / пристанища / летища стават негов отчет: прогресът и предложенията му (решенията са на борда)
   { const dk = ['rail', 'hw', 'sea', 'air'].includes(bigWin) && feature('boardroom') && S.holding && (S.hold?.dir || {})[bigWin];
     if (dk) {
