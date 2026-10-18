@@ -49,6 +49,18 @@ const WHOLE = md => md === 'houseB' || md === 'whiteS' || md === 'solidW' || md.
 // ~40% светят, всеки със своя яркост и оттенък; ~20% от етажите — тъмни. Без маската на текстурата — само по-светлите стъкла малко по-ярко
 const GRID = ['building-skyscraper-c', 'building-skyscraper-d', 'sf-sky-usb', 'sf-sky-blue', 'sf-sky-sing'];
 const isGrid = name => GRID.includes(name) && feature('night-grid');
+// 'petro' (Лабораторията → night-petronas2; направено в Blender по снимки): Петронас — тъмна стомана с вертикални сребристи линии около
+// всяка кула, ярки ръбове на стесненията, светла корона, топли приглушени прозорци; подиумът — топло жълт отстрани, тъмен покрив.
+// Кулите се намират от самия меш: центровете — по върховете в средата на височината, подиумът — долните 12,8%
+function petroGeo(geo) {
+  const P = geo.attributes.position, n = P.count; let y0 = Infinity, y1 = -Infinity;
+  for (let i = 0; i < n; i++) { const y = P.getY(i); if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  const lo = y0 + (y1 - y0) * 0.35, hi = y0 + (y1 - y0) * 0.55, xs = [];
+  for (let i = 0; i < n; i++) { const y = P.getY(i); if (y > lo && y < hi) xs.push(i); }
+  let mx = 0; for (const i of xs) mx += P.getX(i); mx /= xs.length || 1;
+  const box = side => { let a = Infinity, b = -Infinity, c = Infinity, d = -Infinity; for (const i of xs) { const x = P.getX(i); if ((x > mx) !== side) continue; const z = P.getZ(i); a = Math.min(a, x); b = Math.max(b, x); c = Math.min(c, z); d = Math.max(d, z); } return new THREE.Vector2((a + b) / 2, (c + d) / 2); };
+  return { y0, y1, tl: box(false), tr: box(true), mx };
+}
 const masks = new Map();   // режим → (изображение → маска CanvasTexture)
 
 function box(a, w, h, r) {   // средно в квадрат (2r+1)² — интегрално изображение
@@ -105,9 +117,9 @@ export function prepNightFloors(root, name) {
     for (const m of [].concat(o.material)) {
       if (!m || m.userData.nightFloors || !('emissive' in m)) continue;
       if (name === 'building-skyscraper-c' && /roof|heli|top/i.test(m.name || '')) continue;
-      let mode = modeOf(name, m); if (mode && isGrid(name)) mode = 'grid';
-      if (!mode || (!m.map && mode !== 'solid' && mode !== 'solidW' && mode !== 'grid') || (mode === 'aux' && !m.userData.nfAux)) continue;
-      const mk = mode === 'solid' || mode === 'solidW' || mode === 'grid' ? WHITE : mode === 'aux' ? maskFor(m.userData.nfAux.tex, m.userData.nfAux.kind) : maskFor(m.map, mode); if (!mk) continue;
+      let mode = modeOf(name, m); if (mode && isGrid(name)) mode = 'grid'; if (name === 'petronas' && feature('night-petronas2')) mode = 'petro';
+      if (!mode || (!m.map && mode !== 'solid' && mode !== 'solidW' && mode !== 'grid' && mode !== 'petro') || (mode === 'aux' && !m.userData.nfAux)) continue;
+      const mk = mode === 'solid' || mode === 'solidW' || mode === 'grid' || mode === 'petro' ? WHITE : mode === 'aux' ? maskFor(m.userData.nfAux.tex, m.userData.nfAux.kind) : maskFor(m.map, mode); if (!mk) continue;
       m.emissiveMap = mk; m.emissive.setRGB(1, 1, 1); m.emissiveIntensity = 0; m.userData.nightFloors = true; m.userData.winK = 1; m.userData.nfK = NF_K[name] || 1; NF_MATS.add(m);
       const ax = new THREE.Vector3(0, 1, 0);   // оста „нагоре“ в координатите на меша
       m.onBeforeCompile = sh => {
@@ -122,10 +134,12 @@ export function prepNightFloors(root, name) {
         }
         sh.uniforms.uAx = { value: ax }; sh.uniforms.uWH = { value: WORLD_H[name] || 0 };
         if (WORLD_H[name]) { fY0 = 0; fHt = WORLD_H[name]; fH = fHt / FLOORS(name); }   // в света: от земята до върха
-        sh.uniforms.uFloorH = { value: fH }; sh.uniforms.uY0 = { value: fY0 }; sh.uniforms.uFlood = { value: mode === 'flood' || WHOLE(mode) ? 1 : mode === 'floodUp' ? 2 : 0 }; sh.uniforms.uCoolW = { value: mode === 'coolW' ? 1 : mode === 'led' ? 2 : 0 }; sh.uniforms.uT = NF_T; sh.uniforms.uH = { value: fHt }; sh.uniforms.uSolid = { value: mode === 'solid' ? 1 : 0 }; sh.uniforms.uGrid = { value: mode === 'grid' ? 1 : 0 };
-        sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vNfY; varying float vNfSeed; varying vec3 vNfW; uniform vec3 uAx; uniform float uWH;')
-          .replace('#include <begin_vertex>', '#include <begin_vertex>\nvNfY = uWH > 0.0 ? (modelMatrix * vec4(transformed, 1.0)).y : dot(transformed, uAx); vNfSeed = fract(sin(dot(modelMatrix[3].xz, vec2(12.9898, 78.233))) * 43758.5453); vNfW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vNfY; varying float vNfSeed; uniform float uFloorH; uniform float uY0; uniform float uFlood; uniform float uSolid; uniform float uH; uniform float uCoolW; uniform float uT; uniform float uGrid; varying vec3 vNfW;')
+        sh.uniforms.uFloorH = { value: fH }; sh.uniforms.uY0 = { value: fY0 }; sh.uniforms.uFlood = { value: mode === 'flood' || WHOLE(mode) ? 1 : mode === 'floodUp' ? 2 : 0 }; sh.uniforms.uCoolW = { value: mode === 'coolW' ? 1 : mode === 'led' ? 2 : 0 }; sh.uniforms.uT = NF_T; sh.uniforms.uH = { value: fHt }; sh.uniforms.uSolid = { value: mode === 'solid' ? 1 : 0 }; sh.uniforms.uGrid = { value: mode === 'grid' ? 1 : mode === 'petro' ? 2 : 0 };
+        const pg = mode === 'petro' ? petroGeo(o.geometry) : null;
+        sh.uniforms.uPetro = { value: pg ? new THREE.Vector4(pg.y0, pg.y1, pg.mx, 0) : new THREE.Vector4() }; sh.uniforms.uPTL = { value: pg ? pg.tl : new THREE.Vector2() }; sh.uniforms.uPTR = { value: pg ? pg.tr : new THREE.Vector2() };
+        sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vNfY; varying float vNfSeed; varying vec3 vNfW; varying vec3 vNfL; varying vec3 vNfN; uniform vec3 uAx; uniform float uWH;')
+          .replace('#include <begin_vertex>', '#include <begin_vertex>\nvNfY = uWH > 0.0 ? (modelMatrix * vec4(transformed, 1.0)).y : dot(transformed, uAx); vNfSeed = fract(sin(dot(modelMatrix[3].xz, vec2(12.9898, 78.233))) * 43758.5453); vNfW = (modelMatrix * vec4(transformed, 1.0)).xyz; vNfL = transformed; vNfN = objectNormal;');
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vNfY; varying float vNfSeed; uniform float uFloorH; uniform float uY0; uniform float uFlood; uniform float uSolid; uniform float uH; uniform float uCoolW; uniform float uT; uniform float uGrid; varying vec3 vNfW; varying vec3 vNfL; varying vec3 vNfN; uniform vec4 uPetro; uniform vec2 uPTL; uniform vec2 uPTR;')
           .replace('#include <emissivemap_fragment>', `
             #ifdef USE_EMISSIVEMAP
               float nNight = emissive.r;   // нощта 0…1 (daynight.js → emissiveIntensity)
@@ -144,7 +158,23 @@ export function prepNightFloors(root, name) {
               if (uFlood > 1.5) col = vec3(1.0, 0.8, 0.52) * (0.55 + 0.9 * clamp((vNfY - uY0) / uH, 0.0, 1.0));   // нагоре — по-светло (кулите)
               vec3 tx = texture2D(emissiveMap, vEmissiveMapUv).rgb;
               totalEmissiveRadiance = tx * col * on * (uFlood > 0.5 ? 0.55 : 1.15);
-              if (uGrid > 0.5) {   // прозорците по света (вж. 'grid')
+              if (uGrid > 1.5) {   // Петронас (вж. 'petro'): всичко в координатите на меша
+                float ph = (vNfL.y - uPetro.x) / (uPetro.y - uPetro.x), tw = step(0.128, ph), pd = 1.0 - tw;
+                vec2 pc = vNfL.x > uPetro.z ? uPTR : uPTL, dv = vNfL.xz - pc;
+                float an = atan(dv.y, dv.x), st = fract(an * 64.0 / 6.2832), vl = step(st, 0.16);
+                vec3 nn = normalize(vNfN); float vert = step(abs(nn.y), 0.35), ledge = step(0.6, nn.y);
+                float up = pow(max((ph - 0.128) / 0.872, 0.0), 1.4);
+                float fz = fract(ph * 103.0), band = step(0.3, fz) * step(fz, 0.85), wr = fract(sin(floor(ph * 103.0) * 91.17) * 43758.5453);
+                float crown = smoothstep(0.8, 0.9, ph), tip = step(0.9, ph);
+                float pz = fract(ph * 90.0), pb = 0.2 + 0.8 * step(0.25, pz);
+                vec3 e = vec3(0.55, 0.62, 0.8) * 0.04 * tw
+                  + vec3(0.85, 0.9, 1.0) * tw * vert * vl * (0.25 + up)
+                  + vec3(1.0, 0.78, 0.5) * tw * band * wr * 0.22
+                  + vec3(1.0, 0.93, 0.8) * tw * ledge * 1.6
+                  + vec3(1.0, 0.95, 0.85) * tw * crown * 1.2 + vec3(1.0) * tip * 2.0
+                  + vec3(1.0, 0.72, 0.38) * pd * vert * pb * 1.0;
+                totalEmissiveRadiance = e * nNight;
+              } else if (uGrid > 0.5) {   // прозорците по света (вж. 'grid')
                 float gz = vNfW.y / 1.6, gf = floor(gz), fz = fract(gz), gh = (vNfW.x + vNfW.z) / 0.8, gc = floor(gh), fh = fract(gh);
                 float gap = step(0.28, fz) * step(fz, 0.92) * step(0.1, fh) * step(fh, 0.9) * step(1e-4, fwidth(vNfW.y));   // хоризонталните (покриви, плочи) — не
                 float rf = fract(sin(gf * 91.17 + vNfSeed * 311.7) * 43758.5453);
@@ -172,7 +202,7 @@ export function prepNightFloors(root, name) {
               }
             #endif`);
       };
-      m.customProgramCacheKey = () => 'nightfloors4';
+      m.customProgramCacheKey = () => 'nightfloors5' + (mode === 'petro' ? 'p' : '');
       m.needsUpdate = true;
     }
   });

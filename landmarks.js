@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { prepNightFloors } from './nightfloors.js';
+import { feature } from './lab/feature.js';
 
 export const CITY_LANDMARKS = {
   istanbul: ['hagia', 'galata', 'sapphire', 'twist', 'twin', 'mosque2'],
@@ -632,11 +633,29 @@ function pyramids() {   // Гиза: Хеопс, Хефрен (с бялата �
 
 // Айфеловата кула нощем: златно осветление + хиляди проблясващи светлинки (като всеки час в Париж) и прожектор на върха
 // Петронас нощем: кулите светят сребристо-бели (прожекторите — floodK), а на двата шпила мигат червени светлини за самолетите
+const _ws = new THREE.Vector3();
 function petronasLights(w, g) {
-  const b = new THREE.Box3().setFromObject(w), red = mat(0x400000, 0.4, 0, { emissive: 0xff2020, emissiveIntensity: 0 }), dx = (b.max.x - b.min.x) * 0.27;
-  for (const x of [-dx, dx]) add(g, new THREE.SphereGeometry(0.35, 8, 6), red, (b.min.x + b.max.x) / 2 + x, b.max.y + 0.2, (b.min.z + b.max.z) / 2);
+  // върховете — от самия меш (кутията на групата включва и други неща): върховете над 90% от височината, разделени на две по дългата ос
+  w.updateMatrixWorld(true); let big = null; w.traverse(o => { if (o.isMesh && (!big || o.geometry.attributes.position.count > big.geometry.attributes.position.count)) big = o; });
+  const b = new THREE.Box3().setFromObject(big || w), red = mat(0x400000, 0.4, 0, { emissive: 0xff2020, emissiveIntensity: 0 }), v = new THREE.Vector3(), top = [];
+  if (big) { const P = big.geometry.attributes.position; for (let i = 0; i < P.count; i += 3) { v.fromBufferAttribute(P, i).applyMatrix4(big.matrixWorld); if (v.y > b.min.y + (b.max.y - b.min.y) * 0.9) top.push(v.clone()); } }
+  const tb = new THREE.Box3().setFromPoints(top.length ? top : [b.min, b.max]), alongX = tb.max.x - tb.min.x >= tb.max.z - tb.min.z, mid = tb.getCenter(new THREE.Vector3());
+  const half = s => top.filter(p => ((alongX ? p.x - mid.x : p.z - mid.z) > 0) === s), tips = [false, true].map(s => { const h = half(s); return h.length ? new THREE.Box3().setFromPoints(h).getCenter(new THREE.Vector3()) : mid.clone(); });
+  // всичко се закача за модела (w) — в града моделът после се мащабира още, а светлините трябва да го следват
+  const ws = w.getWorldScale(new THREE.Vector3()).x || 1, loc = (x, y, z) => w.worldToLocal(new THREE.Vector3(x, y, z));
+  for (const t of tips) { const r = new THREE.Mesh(new THREE.SphereGeometry(0.35 / ws, 8, 6), red); r.position.copy(loc(t.x, b.max.y + 0.2, t.z)); w.add(r); }
   const prev = g.userData.sparkle;
-  g.userData.sparkle = (t, night) => { if (prev) prev(t, night); red.emissiveIntensity = (Math.sin(t * 2.2) > 0.2 ? 2.4 : 0.15) * (0.25 + night); };
+  // Лабораторията → night-petronas2: нощем иглите блестят — бял ореол с четири лъча (като на снимките), леко трепти
+  let glints = null;
+  if (feature('night-petronas2')) {
+    const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'), gr = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.15, 'rgba(255,248,230,0.7)'); gr.addColorStop(0.5, 'rgba(255,240,210,0.12)'); gr.addColorStop(1, 'rgba(255,240,210,0)');
+    x.fillStyle = gr; x.fillRect(0, 0, 128, 128); x.fillStyle = 'rgba(255,250,240,0.55)'; x.fillRect(0, 62, 128, 4); x.fillRect(62, 0, 4, 128);
+    const sm = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 });
+    glints = tips.map(t => { const s = new THREE.Sprite(sm); s.position.copy(loc(t.x, b.max.y - (b.max.y - b.min.y) * 0.06, t.z)); w.add(s); return s; });
+  }
+  g.userData.sparkle = (t, night) => { if (prev) prev(t, night); red.emissiveIntensity = (Math.sin(t * 2.2) > 0.2 ? 2.4 : 0.15) * (0.25 + night);
+    if (glints) { const sw = w.getWorldScale(_ws).x || 1, H = (b.max.y - b.min.y) / ws * sw; glints.forEach((s, k) => { s.material.opacity = night * (0.85 + 0.15 * Math.sin(t * 3.1 + k * 2)); s.scale.setScalar(H * (0.12 + Math.sin(t * 1.7 + k) * 0.008) / sw); }); } };   // ореолът ~12% от височината на кулите
 }
 // Вашингтон: паметникът на Вашингтон (обелискът) на южната поляна пред Белия дом — бял мрамор, пирамидка на върха,
 // червени светлини за самолетите и кръг от знамена около основата; нощем е осветен с прожектори като Белия дом
