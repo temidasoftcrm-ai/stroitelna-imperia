@@ -232,6 +232,11 @@ let mapCont = null;    // 🌍/🗽 изглед с континент (вклю
 const KEY_ZOOM = 2.5;   // map-key-only: под този зуум — само ключовите градове, без курортите (по-рядко, по-малко памет)
 const mapZoom = () => mapView ? mapView.base[2] / mapView.vb[2] : 1;
 // точката е в показаната част на картата (с 15% поле) — подвижните знаци извън екрана не се рисуват
+// отсечка (по кутията ѝ, с 40% поле за чупката над морето) застъпва ли показаната част
+const mapBoxVis = (xa, ya, xb, yb) => { const mx = Math.abs(xb - xa) * 0.4 + Math.abs(yb - ya) * 0.3, my = Math.abs(yb - ya) * 0.4 + Math.abs(xb - xa) * 0.3;
+  return mapBoxHit(Math.min(xa, xb) - mx, Math.min(ya, yb) - my, Math.max(xa, xb) + mx, Math.max(ya, yb) + my); };
+const mapBoxHit = (x0, y0, x1, y1) => { if (!mapView) return true; const [vx, vy, vw, vh] = mapView.vb, el = $('mapSvg'), cw = el.clientWidth || 1, ch = el.clientHeight || 1, sc = Math.max(vw / cw, vh / ch);
+  const mx = cw * sc - vw + vw * 0.15, my = ch * sc - vh + vh * 0.15; return x1 >= vx - mx && x0 <= vx + vw + mx && y1 >= vy - my && y0 <= vy + vh + my; };
 // при „meet“ екранът показва повече от viewBox по едната ос — полето покрива и това
 const mapVis = (x, y) => { if (!mapView) return true; const [vx, vy, vw, vh] = mapView.vb, el = $('mapSvg'), cw = el.clientWidth || 1, ch = el.clientHeight || 1, sc = Math.max(vw / cw, vh / ch);
   const mx = cw * sc - vw + vw * 0.15, my = ch * sc - vh + vh * 0.15; return x >= vx - mx && x <= vx + vw + mx && y >= vy - my && y <= vy + vh + my; };
@@ -3944,7 +3949,13 @@ function branchPts(r, to) {
 // позиция по ребро p→q (k = 0..1); по отклонение минава през разклона
 // ---- жп линии през сушата: ако правата между два града минава над море, линията чупи в точка навътре в сушата
 function inRing(ring, x, y) { let ins = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [xi, yi] = ring[i], [xj, yj] = ring[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) ins = !ins; } return ins; }
-const landAt = (lo, la) => (europe || []).some(c => c.poly.some(poly => inRing(poly[0], lo, la)));
+// кутиите на полигоните — точка извън кутията не се проверява (иначе първото отваряне отблизо замръзваше)
+let landBox = null;
+const landAt = (lo, la) => {
+  if (!europe) return false;
+  if (!landBox || landBox.src !== europe) { landBox = europe.flatMap(c => c.poly.map(poly => { let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const [x, y] of poly[0]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } return [x0, x1, y0, y1, poly[0]]; })); landBox.src = europe; }
+  return landBox.some(([x0, x1, y0, y1, r]) => lo >= x0 && lo <= x1 && la >= y0 && la <= y1 && inRing(r, lo, la));
+};
 const segLand = (a, b, n = 16) => { for (let k = 1; k < n; k++) { const t = k / n; if (!landAt(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)) return false; } return true; };
 const bendCache = {};
 // точка на чупката (lon, lat) или null, ако правата е по суша
@@ -5675,6 +5686,7 @@ function railSvg() {
   for (const r of S?.rails || []) {
     if (!mapIn(r.a, r.b)) continue;
     const A = cityById(r.a), B = cityById(r.b), [x1, y1] = proj(A.lon, A.lat), [x2, y2] = r.c ? junXY(r) : proj(B.lon, B.lat);
+    if (lodOn() && !mapBoxVis(x1, y1, x2, y2)) continue;   // при lod — без линиите извън екрана (и без сметките за чупките им)
     if (r.c && r.built) h += `<circle cx="${x2}" cy="${y2}" r="2.6" fill="#d8cbb0" stroke="#3b2f25" stroke-width="${(1.2 * zs).toFixed(2)}"/>`;
     const pts = r.c ? [[x1, y1], [x2, y2]] : railPts(r.a, r.b), ps = pts.map(p => p.map(v => v.toFixed(1)).join(',')).join(' ');
     if (!r.c && coopJoint('rail', [r.a, r.b].sort().join('|'))) h += `<polyline points="${ps}" fill="none" stroke="${JCOL}" stroke-width="${(6 * zs).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round" opacity=".5"><title>🤝 Обща линия с партньора</title></polyline>`;   // строите заедно — лилаво

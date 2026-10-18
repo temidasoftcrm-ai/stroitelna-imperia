@@ -234,19 +234,25 @@ export const PORT_NODE = {
 const hav = ([lo1, la1], [lo2, la2]) => { const r = Math.PI / 180, h = Math.sin((la2 - la1) * r / 2) ** 2 + Math.cos(la1 * r) * Math.cos(la2 * r) * Math.sin((lo2 - lo1) * r / 2) ** 2; return 6371 * 2 * Math.asin(Math.sqrt(h)); };
 const ADJ = {};
 for (const [a, b] of E) { const d = hav(SEA_NODES[a], SEA_NODES[b]); (ADJ[a] = ADJ[a] || []).push([b, d]); (ADJ[b] = ADJ[b] || []).push([a, d]); }
-const cache = {};
+const cache = {}, trees = {};
+// всички най-къси пътища от възел s (Дейкстра веднъж на пристанище, а не на всяка линия — картата с хиляди морски линии замръзваше)
+function treeFrom(s) {
+  if (trees[s]) return trees[s];
+  const dist = { [s]: 0 }, prev = {}, todo = new Set(Object.keys(SEA_NODES));
+  while (todo.size) {
+    let u = null; for (const n of todo) if (dist[n] != null && (u == null || dist[n] < dist[u])) u = n;
+    if (u == null) break; todo.delete(u);
+    for (const [v, d] of ADJ[u] || []) if (dist[u] + d < (dist[v] ?? Infinity)) { dist[v] = dist[u] + d; prev[v] = u; }
+  }
+  return (trees[s] = prev);
+}
 // морският път между два пристанищни града: { pts: [[lon, lat]…], km } (Дейкстра по графа)
 export function seaPath(A, B) {
   const key = A.id + '>' + B.id; if (cache[key]) return cache[key];
   const s = PORT_NODE[A.id], t = PORT_NODE[B.id];
   let nodes = [];
   if (s && t && s !== t) {
-    const dist = { [s]: 0 }, prev = {}, todo = new Set(Object.keys(SEA_NODES));
-    while (todo.size) {
-      let u = null; for (const n of todo) if (dist[n] != null && (u == null || dist[n] < dist[u])) u = n;
-      if (u == null || u === t) break; todo.delete(u);
-      for (const [v, d] of ADJ[u] || []) if (dist[u] + d < (dist[v] ?? Infinity)) { dist[v] = dist[u] + d; prev[v] = u; }
-    }
+    const prev = treeFrom(s);
     for (let n = t; n; n = prev[n]) { nodes.unshift(n); if (n === s) break; }
     if (nodes[0] !== s) nodes = [];
   } else if (s) nodes = [s];
