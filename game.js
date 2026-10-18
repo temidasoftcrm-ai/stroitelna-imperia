@@ -32,6 +32,7 @@ import { bidHtml, resolveBid } from './bidding.js';
 import { addSiteLights, setSiteLightsNight } from './sitelights.js';
 import { createHwTraffic } from './hwtraffic.js';
 import { createIncidents } from './incidents.js';
+import { createBoardLogic } from './boardlogic.js';
 import { addRouteScenery } from './scenery.js';
 import { addSeaside, SEASIDE, SEA_MODELS } from './seaside.js';
 import { monthOf } from './resorts.js';
@@ -2664,6 +2665,7 @@ function endOfDay() {
   { const tu = (S.trains || []).reduce((a, t) => a + trainType(t).upkeep, 0); if (tu) econ.spend(tu, 'заплати', `Ден ${S.day}: влакове`); flowDay('rail', tu); }
   hwTrucks.day();
   hwQueueTick();   // нови екипи (пълна техника в още градове) поемат от опашката
+  if (S.holding && feature('boardroom')) boardL.autoTick();   // 🤖 автопилотът на директорите
   const doneHighways = hwDone();
   if (doneHighways.length) econ.earn(hwToll(doneHighways), 'тол', `Ден ${S.day}: тол такси`);
   if (S.day % 10 === 0 && (S.trains || []).length && (S.trains || []).length >= totalTracks()) {
@@ -3290,7 +3292,10 @@ const mines = createMines({ S: () => S, econ: () => econ, MATERIALS: ECON.MATERI
   toast, fmt, save, sound: n => Sound.play(n), onChange: id => { if (typeof refreshMines3D === 'function' && id === S.cityId) refreshMines3D(); if (bigWin) renderBig(); } });
 
 // 🏢 корпоративната група (group.js): избраната фирма и дъщерните ѝ дружества по бизнеси
-const group = createGroup({ proposals: () => boardProposals(), subShow: (k, mode, text) => subScreen(k, mode, text), askFound: (k, re) => subScreen(k, 'ask', '', re), S: () => S, econ: () => econ, lv: () => dev.best(), gift: k => giftSub(k), toast, fmt, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b),
+const boardL = createBoardLogic({ S: () => S, econ: () => econ, fmt, toast, save, sound: n => Sound.play(n), proposals: () => group.proposals(), decide: (id, a) => group.decide(id, a),
+  dirName: d => (S && S.hold && S.hold.dir || {})[d] || '', subName: d => subName(S, d), dailyCost: () => { const h = (econ && econ.s.history) || []; const L = h.slice(-7); return L.length ? L.reduce((a, x) => a + (x.out || 0), 0) / L.length : 0; },
+  loan: amt => { if (!econ.canTakeLoan(S.rep)) { toast('🏦 Банката няма свободен кредит за теб.', 'bad'); return false; } const step = econ.loanStep(S.rep), a = Math.min(econ.loanRoom(S.rep), Math.ceil(amt / step) * step); return econ.takeLoan(S.rep, a); } });
+const group = createGroup({ board2: () => boardL, proposals: () => boardProposals(), subShow: (k, mode, text) => subScreen(k, mode, text), askFound: (k, re) => subScreen(k, 'ask', '', re), S: () => S, econ: () => econ, lv: () => dev.best(), gift: k => giftSub(k), toast, fmt, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b),
   hwN: () => hwDone().length, railN: () => (S.rails || []).filter(r => r.built).length, portN: () => Object.values(S.ports || {}).filter(p => p.lv).length, airN: () => Object.values(S.airports || {}).filter(a => a.lv).length,
   oilN: () => mines.state().sites.filter(x => x.kind === 'oilwell').length, empire: () => dev.has('EMPIRE'), toll: () => hwToll(), flow: k => flowAvg(k),
   finDaily: () => Object.values(econ?.s?.finished || {}).reduce((a, f) => a + (f.daily || 0), 0), bankOn: () => !!S.bank, bankDaily: () => bank.daily(), hotelN: () => Object.keys(S.hotels || {}).length, hotelDaily: () => hotels.daily(), oilDaily: () => oil.dailyAvg() || mines.dailyValue(x => MINE_KINDS[x.kind]?.oil) });
@@ -7870,11 +7875,12 @@ function renderBig() {
     if (dk) {
       const ps = group.proposals().filter(p => p.dir === bigWin);
       body.innerHTML = stick(trTabsHtml() + progCard(bigWin, 'all')) + `<div class="card" style="border:1px solid #ffd54a"><div class="row" style="margin:0;gap:10px;align-items:center;flex-wrap:wrap"><span style="font-size:34px">👔</span><span class="meta" style="margin:0;flex:1 1 260px"><b style="color:var(--txt);font-size:15px">${dk}</b> управлява ${subName(S, bigWin) || 'дружеството'}. Строежите и покупките идват като <b>предложения</b> — тук или на месечния борд в 🏛️ Директорската зала.</span><button class="btn" data-dboard="1">🏛️ Директорската зала →</button></div></div>`
-        + (ps.length ? ps.map(p => `<div class="card"><div class="row" style="margin:0;gap:8px;align-items:center;flex-wrap:wrap"><span class="meta" style="margin:0;flex:1 1 300px">${p.ico} ${p.text}${p.cost ? `<br><b style="color:${p.can ? 'var(--acc)' : 'var(--bad)'}">💶 ${fmt(p.cost)} €</b>` : ''}</span><button class="btn" data-dprop="${p.id}|yes" ${p.can ? '' : 'disabled'}>✓ Да</button><button class="btn2" data-dprop="${p.id}|later">⏳ По-късно</button><button class="btn2" data-dprop="${p.id}|no">✖ Не</button></div></div>`).join('')
+        + boardL.settingsHtml() + (ps.length ? ps.map(p => `<div class="card"><div class="row" style="margin:0;gap:8px;align-items:center;flex-wrap:wrap"><span class="meta" style="margin:0;flex:1 1 300px">${p.ico} ${p.text}${p.cost ? `<br><b style="color:${p.can ? 'var(--acc)' : 'var(--bad)'}">💶 ${fmt(p.cost)} €</b>` : ''}</span><button class="btn" data-dprop="${p.id}|yes" ${p.can ? '' : 'disabled'}>✓ Да</button><button class="btn2" data-dprop="${p.id}|later">⏳ По-късно</button><button class="btn2" data-dprop="${p.id}|no">✖ Не</button></div></div>`).join('')
           : `<div class="card"><div class="meta" style="margin:0;color:var(--ok)">✅ ${dk} няма нови предложения — всичко е построено и купено, колкото позволяват мрежата и лимитите.</div></div>`);
       body.scrollTop = sc;
-      body.querySelectorAll('[data-dprop]').forEach(b => b.onclick = () => { const [id, act] = b.dataset.dprop.split('|'); group.decide(id, act); renderBig(); renderMapHud(); });
+      body.querySelectorAll('[data-dprop]').forEach(b => b.onclick = () => { const [id, act] = b.dataset.dprop.split('|'); if (act !== 'yes') { group.decide(id, act); renderBig(); return; } const r = boardL.request(id); if (r.need === 'vote') { modal('🗳️ Бордът гласува', boardL.voteHtml(r), [['Затвори', null]]); setTimeout(() => document.querySelectorAll('#modalBox [data-bv]').forEach(x => x.onclick = () => { const [pid, how] = x.dataset.bv.split('|'); $('modal').classList.add('hidden'); boardL.resolve(pid, how); renderBig(); }), 0); return; } renderBig(); renderMapHud(); });
       body.querySelectorAll('[data-dboard]').forEach(b => b.onclick = () => group.board(() => renderBig()));
+      boardL.bindSettings(body, () => renderBig());
       body.querySelectorAll('[data-trtab]').forEach(b => b.onclick = () => { S.trTab = b.dataset.trtab; bigWin = b.dataset.trtab; body.scrollTop = 0; renderBig(); });
       return;
     }
@@ -8434,6 +8440,7 @@ if (AUTOTEST) {
         const c = A['sf-car-Sedan'] ? model('sf-car-Sedan', 1) : model('sedan', 1.15); c.position.set(x - 4, 0, zz + Math.max(sz.z * k / 2, 10) + 8); c.rotation.y = Math.PI / 2; g.add(c);
         const pp = new THREE.Group(), tb = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.55, 4, 8), new THREE.MeshStandardMaterial({ color: 0x2f6fd6 })); tb.position.y = 1.15; pp.add(tb); const hd = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), new THREE.MeshStandardMaterial({ color: 0xe0b090 })); hd.position.y = 1.68; pp.add(hd); pp.position.set(x + 2, 0, zz + Math.max(sz.z * k / 2, 10) + 8); g.add(pp); }));
       controls.target.set(h.x, 15, h.z + 45); camera.position.set(h.x, 120, h.z + 245); const f0 = scene.fog && [scene.fog.near, scene.fog.far]; if (f0) { scene.fog.near = 400; scene.fog.far = 1400; } fly = null; $('panel').classList.add('hidden'); return true; },
+    boardAuto() { return boardL.autoTick(); },
     boardTest(apply) { const P = boardProposals(); const r = P.map(p => `${p.id} · ${fmt(p.cost)} € · ${p.text.slice(0, 90)}`); if (apply) for (const p of P.filter(x => x.dir === apply)) p.apply(); return r; },
     gasLook() {   // Лабораторията: трите кандидата за бензиностанция (assets/heavy/gas) един до друг пред централата — 1 = 30 м
       showMap(false); const h = { x: tx(NI - 1) + 75, z: tx(NJ - 1) + 90 }, g = new THREE.Group(); g.position.set(h.x - 10, 0, h.z + 30); scene.add(g);   // на празното поле югоизточно от града

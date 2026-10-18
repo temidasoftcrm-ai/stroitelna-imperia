@@ -4,3 +4,4 @@
 - bush-2.glb — "Lowpoly Flower Bushes" by krauchankavarvara — https://sketchfab.com/3d-models/4b47abf072604a71aaf1bda30847a1af (височина 0.34, два ниски цветни храста)
 - flowers.glb — "Street Shrubs A2" by kj3dx — https://sketchfab.com/3d-models/906b460c708142c0848bcd58924a3a5d (височина 1.57, храст с цветя в каменна саксия)
 - fountain.glb — "Simple Fountain" by Seth7Santos — https://sketchfab.com/3d-models/186392ecd7964bc7b00a6f824a3e2441 (височина 1.02, каменен фонтан на 3 нива)
+- paradise.glb — "bird of paradise plant (Potted Indoor Plant)" by ouadierifi — https://sketchfab.com/3d-models/63355803f8ec4f4e84ebae2fb7d7265a (височина 1, саксия в Директорската зала; текстури до 1024 px)

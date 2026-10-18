@@ -7,6 +7,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 const DIR = 'assets/heavy/directors/';
+const SIT_HIP = [0, -1, -57];   // ханшът в седнала поза (единиците на скелета, см) — по „Sit_Meeting“ / „Sit_Breathing“
 // дружество → модел; хотелите (Георги Николов) още нямат модел — столът стои празен с табелката
 export const DIR_MODEL = { con: 'ivaylo', hw: 'nadya', rail: 'maria', sea: 'stefan', air: 'elena', oil: 'vera', bank: 'boris' };
 const FEMALE = new Set(['nadya', 'maria', 'elena', 'vera']);
@@ -61,6 +62,13 @@ const loadClips = () => clipsP || (clipsP = loadGlb('clips').then(g => {
   const out = {};
   for (const c of g.animations) {
     c.tracks = c.tracks.filter(t => t.name.endsWith('.quaternion') || t.name === 'mixamorigHips.position');
+    // седналите клипове от Mixamo са записани с различен стол: „Pointing While Seated“ е 21 см по-високо, „Asking Question“ — 55 см напред
+    // → ханшът на първия кадър се изравнява с общата седнала поза, иначе директорът подскача или влиза в масата
+    const hip = c.tracks.find(t => t.name === 'mixamorigHips.position');
+    if (hip && /^Sit_/.test(c.name) && c.name !== 'Sit_To_Stand') {
+      const v = hip.values, d = [SIT_HIP[0] - v[0], SIT_HIP[1] - v[1], SIT_HIP[2] - v[2]];
+      for (let k = 0; k < v.length; k += 3) { v[k] += d[0]; v[k + 1] += d[1]; v[k + 2] += d[2]; }
+    }
     out[c.name] = c;
   }
   return out;
@@ -202,7 +210,13 @@ function buildRoom(scene) {
   const bowl = new THREE.Mesh(new THREE.SphereGeometry(0.3, 32, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), gold); bowl.scale.y = 0.3; bowl.position.set(0, 0.86, ROOM_BACK + 0.32); scene.add(bowl);
   const ring = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.03, 12, 40), gold); ring.position.set(-1.1, 1.0, ROOM_BACK + 0.32); scene.add(ring);
   const leafM = new THREE.MeshStandardMaterial({ color: 0x3d5e2c, roughness: 0.8 }), potM = new THREE.MeshStandardMaterial({ color: 0x2a2a2c, roughness: 0.5 });
-  plant(scene, -2.2, ROOM_BACK + 0.5, leafM, potM); plant(scene, 2.2, ROOM_BACK + 0.5, leafM, potM);
+  // истински саксии — райска птица (Sketchfab, CC BY — assets/heavy/plants/CREDITS.txt): до скрина и в ъглите до прозорците
+  for (const [n, x, z, h] of [['paradise', -2.2, ROOM_BACK + 0.55, 1.85], ['paradise', 2.2, ROOM_BACK + 0.55, 1.85], ['paradise', -ROOM_W + 0.7, ROOM_BACK + 1.3, 1.55], ['paradise', ROOM_W - 0.7, ROOM_BACK + 1.3, 1.55]]) {
+    loader.loadAsync(`assets/heavy/plants/${n}.glb`).then(g => {
+      const m = g.scene; m.scale.setScalar(h); m.position.set(x, 0, z); m.rotation.y = x * 1.7;
+      m.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } }); scene.add(m);
+    }).catch(() => plant(scene, x, z, leafM, potM));
+  }
   // таванът: светещ корниз над масата
   const ceil = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W * 2, D), new THREE.MeshStandardMaterial({ color: 0xe9e2d6, roughness: 1, emissive: 0x6b6458 }));
   ceil.rotation.x = Math.PI / 2; ceil.position.set(0, H, cz); scene.add(ceil);
@@ -239,14 +253,18 @@ function buildRoom(scene) {
   return { leather, metal, gold };
 }
 // пред всяко място: кожена папка с името, чаша вода на златна подложка
-const glassM = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.05, transmission: 1, thickness: 0.02, ior: 1.45, transparent: true, opacity: 0.6 });
+const glassM = new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0.03, transmission: 1, thickness: 0.006, ior: 1.5, clearcoat: 1, envMapIntensity: 2.2, transparent: true, opacity: 0.55, side: THREE.DoubleSide });
+const waterM = new THREE.MeshPhysicalMaterial({ color: 0xcfe9f7, metalness: 0, roughness: 0.02, transmission: 0.9, thickness: 0.05, ior: 1.33, envMapIntensity: 1.6, transparent: true, opacity: 0.7 });
+// профилът на чашата (радиус, височина в m): дебело дъно, леко разширена нагоре, ръбът — двойна стена
+const GLASS = new THREE.LatheGeometry([[0, 0], [0.028, 0], [0.031, 0.004], [0.032, 0.014], [0.037, 0.115], [0.0385, 0.118], [0.0365, 0.118], [0.0345, 0.016], [0, 0.014]].map(([r, y]) => new THREE.Vector2(r, y)), 28);
+const WATER = new THREE.LatheGeometry([[0, 0.014], [0.034, 0.016], [0.0355, 0.082], [0, 0.082]].map(([r, y]) => new THREE.Vector2(r, y)), 28);
 function seatProps(scene, side, z, name, sub, gold) {
   const fold = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.014, 0.46), [null, null, new THREE.MeshStandardMaterial({ map: folderTex(name, sub), roughness: 0.55 }), null, null, null].map(m => m || new THREE.MeshStandardMaterial({ color: 0x17181b, roughness: 0.6 })));
   fold.position.set(side * (TABLE_W / 2 - 0.32), TABLE_H + 0.03, z); fold.rotation.y = side < 0 ? -Math.PI / 2 : Math.PI / 2; fold.castShadow = true; scene.add(fold);
   const cz = z + 0.42, cx = side * (TABLE_W / 2 - 0.62);
   const coaster = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.008, 24), gold); coaster.position.set(cx, TABLE_H + 0.027, cz); scene.add(coaster);
-  const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.032, 0.12, 20, 1, true), glassM); glass.position.set(cx, TABLE_H + 0.09, cz); scene.add(glass);
-  const water = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.03, 0.08, 20), new THREE.MeshPhysicalMaterial({ color: 0xdff1ff, transmission: 0.9, roughness: 0.05, transparent: true, opacity: 0.5 })); water.position.set(cx, TABLE_H + 0.07, cz); scene.add(water);
+  const glass = new THREE.Mesh(GLASS, glassM); glass.position.set(cx, TABLE_H + 0.031, cz); glass.renderOrder = 2; scene.add(glass);
+  const water = new THREE.Mesh(WATER, waterM); water.position.copy(glass.position); water.renderOrder = 1; scene.add(water);
 }
 
 // ---- залата
