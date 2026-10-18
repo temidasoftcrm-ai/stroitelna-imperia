@@ -103,7 +103,8 @@ export function createTenders(deps) {
       const price = Math.round(t.budget * s.my / 10000) * 10000, adv = Math.round(price * ADVANCE);
       Object.assign(s, { st: 'building', price, prog: 0, start: day(), due: day() + t.days, paidAdv: adv, spent: 0, result: all.map(x => [x.nm, x.m]) });
       deps.econ().earn(adv, 'обект', `Аванс: ${t.nm}`);
-      deps.toast(`🏆 Спечели търга „${t.nm}“ за ${deps.fmt(price)} €! Аванс ${deps.fmt(adv)} €. Срок: ${t.days} дни.`, 'good');
+      const vo = deps.voice ? deps.voice() : '';   // с директор (ниво 15+) — той съобщава
+      deps.toast(vo ? `✅ ${vo}: Спечелихме „${t.nm}“ за ${deps.fmt(price)} €! Аванс ${deps.fmt(adv)} €, срок ${t.days} дни.` : `🏆 Спечели търга „${t.nm}“ за ${deps.fmt(price)} €! Аванс ${deps.fmt(adv)} €. Срок: ${t.days} дни.`, 'good');
       if (deps.sound) deps.sound('done');
       if (deps.pop) deps.pop('tender-won', `🏆 ${t.ico || '🏛️'} ${t.nm}`, `Спечели държавната поръчка за ${deps.fmt(price)} € · аванс ${deps.fmt(adv)} €`);
       if (deps.emit) deps.emit('tenderWon');
@@ -111,7 +112,8 @@ export function createTenders(deps) {
       Object.assign(s, { st: 'lost', lostDay: day(), winner: w.nm, winM: w.m, result: all.map(x => [x.nm, x.m]) });
       refund(t, s);
       if (s.my && deps.pop) deps.pop('tender-lost', `${t.ico} ${t.nm}`, `Спечели ${w.nm} с ${Math.round(w.m * 100)}% (ти: ${Math.round(s.my * 100)}%) · гаранцията се връща`);
-      if (s.my) deps.toast(`🏛️ Търгът „${t.nm}“ го спечели ${w.nm} с ${Math.round(w.m * 100)}% от бюджета (ти: ${Math.round(s.my * 100)}%). Гаранцията ти се връща.`, 'bad');
+      const vo = deps.voice ? deps.voice() : '';
+      if (s.my) deps.toast(vo ? `🏛️ ${vo}: Загубихме търга „${t.nm}“ — ${w.nm} даде ${Math.round(w.m * 100)}% (ние: ${Math.round(s.my * 100)}%). Гаранцията се връща.` : `🏛️ Търгът „${t.nm}“ го спечели ${w.nm} с ${Math.round(w.m * 100)}% от бюджета (ти: ${Math.round(s.my * 100)}%). Гаранцията ти се връща.`, 'bad');
     }
   }
   // колко от нужната техника има в града: 0…1 (най-слабото звено)

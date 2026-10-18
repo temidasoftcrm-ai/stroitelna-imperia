@@ -2791,7 +2791,8 @@ function renderPanel() {
       ? `<div class="row" style="margin:0 0 8px;flex-wrap:wrap;gap:6px"><span class="meta" style="margin:0;flex:1 1 160px">📨 Всички ${S.offers.length} оферти наведнъж — с избраните цени · място в офиса: <b>${Math.max(0, officeLv().proj - busyCount())}</b></span><button class="btn" id="bOfferAll" style="touch-action:manipulation">📨 Предложи всички</button></div>`
       : `<div class="meta" style="margin:0 0 8px;opacity:.7">🔒 „📨 Предложи всички“ се отключва при репутация 3 ★ (сега ${S.rep.toFixed(1)} ★).</div>`;
     h += rivals.marketHtml();
-    h += tenders.cardsHtml('open');   // взетите (в строеж) — в „📜 Оферти“
+    if (tenderDir()) { const n = TENDERS.filter(t => tenders.state(t.id)?.st === 'open').length; if (n) h += `<div class="card"><div class="row" style="margin:0;align-items:center;gap:8px"><span class="meta" style="margin:0;flex:1">🏛️ <b style="color:var(--txt)">${tenderDir()}</b> подготвя оферти за ${n} ${n === 1 ? 'търг' : 'търга'}.</span><button class="btn2" data-dtend="1">Предложенията му →</button></div></div>`; }
+    else h += tenders.cardsHtml('open');   // взетите (в строеж) — в „📜 Оферти“; от ниво 15 с директор — търговете са негови предложения
     if (freeLotCount() < 3) h += `<div class="meta" style="text-align:center;color:var(--acc)">🏙️ Градът е почти застроен — купи нов квартал от таб „Офис“.</div>`;
     for (const o of [...S.offers].sort((a, b) => (b.demolish ? 1 : 0) - (a.demolish ? 1 : 0))) {
       const bt = BTYPES[o.type];
@@ -2851,7 +2852,7 @@ function renderPanel() {
     h += storeHtml();
   }
   el.innerHTML = h;
-  if (tab === 'offers') tenders.bind(el);
+  if (tab === 'offers') { tenders.bind(el); el.querySelectorAll('[data-dtend]').forEach(b => b.onclick = () => openBig('offers')); }
   if ($('bOfferAll')) $('bOfferAll').onclick = offerAll;
   el.querySelectorAll('[data-acc]').forEach(b => b.onclick = e => { e.stopPropagation(); acceptOffer(+b.dataset.acc); });
   el.querySelectorAll('[data-dec]').forEach(b => b.onclick = e => { e.stopPropagation(); declineOffer(+b.dataset.dec); });
@@ -4995,7 +4996,7 @@ function tenderLevelUp(t) {
 // българските градове нямат cc (знамето по подразбиране е 🇧🇬) — затова българските „st-“ поръчки никога не излизаха; сега cc || 🇧🇬
 const ccOrBg = id => cityById(id) ? cityById(id).cc || '🇧🇬' : null;
 const tenderCountryOk = t => !t.id.startsWith('st-') || ownedCities().some(id => ccOrBg(id) && ccOrBg(id) === ccOrBg(t.city));
-const tenders = createTenders({ canTender: t => !!S && dev.best() >= 3 && tenderCountryOk(t), pop: (k, c, s) => showEventPop(k, c, s), onComplete: (id, t) => { if (t) tenderLevelUp(t); if (t && t.kind === 'port') { portBonus(t.city); showEventPop(id === 'port-istanbul' ? 'bosphorus-done' : 'port-done', `🏛️ ${t.ico} ${t.nm} е предаден!`, `${cityById(t.city)?.nm || ''} · +0.5 ★ · пристанището поема повече кораби`); } }, S: () => S, econ: () => econ, toast, modal, fmt, save, sound: n => Sound.play(n === 'done' ? 'tenderDone' : n), rep: () => S.rep || 0, devBest: () => dev.best(),
+const tenders = createTenders({ voice: () => tenderDir(), canTender: t => !!S && dev.best() >= 3 && tenderCountryOk(t), pop: (k, c, s) => showEventPop(k, c, s), onComplete: (id, t) => { if (t) tenderLevelUp(t); if (t && t.kind === 'port') { portBonus(t.city); showEventPop(id === 'port-istanbul' ? 'bosphorus-done' : 'port-done', `🏛️ ${t.ico} ${t.nm} е предаден!`, `${cityById(t.city)?.nm || ''} · +0.5 ★ · пристанището поема повече кораби`); } }, S: () => S, econ: () => econ, toast, modal, fmt, save, sound: n => Sound.play(n === 'done' ? 'tenderDone' : n), rep: () => S.rep || 0, devBest: () => dev.best(),
   owns: id => ownedCities().includes(id), cityName: id => cityById(id)?.nm || id, ccOf: id => cityById(id)?.cc, groupOf: id => { const k = contKeyOf(id); return k === 'eu' && !isEurope(id) && !isWorld(id) ? 'balkan' : k; }, showCity: id => showCityOnMap(id),
   unitLabel: k => ECON.UNIT_TYPES[k] ? ECON.UNIT_TYPES[k].ico + ' ' + ECON.UNIT_TYPES[k].nm : k,
   fleetIn: id => cityUnitTypes(id).reduce((a, t) => (a[t] = (a[t] || 0) + 1, a), {}),
@@ -8007,7 +8008,7 @@ function boardProposals() {
     const s = tenders.state(t.id); if (!s || s.st !== 'open' || s.my != null || !own.includes(t.city) || !s.bids?.length) continue;
     const lo = Math.min(...s.bids.map(b => b.m)), m = [...BID_MS].reverse().find(x => x < lo - 0.02 && tenders.profitAt(t.id, x) > 0); if (!m) continue;
     const bond = tenders.bondOf(t.id);
-    if (hasSub('con')) out.push({ id: `con:tender-${t.id}:1`, dir: 'con', ico: t.ico || '🏛️', text: `Търг „${t.nm}“ в ${cityNm(t.city)}: бюджет ${M(t.budget)} €. Конкурентите дават около ${Math.round(lo * 100)}%. Предлагам оферта ${Math.round(m * 100)}% (${M(t.budget * m)} €).`, noAuto: true,
+    if (hasSub('con')) out.push({ id: `con:tender-${t.id}:1`, dir: 'con', ico: t.ico || '🏛️', text: `Търг „${t.nm}“ в ${cityNm(t.city)}: бюджет ${M(t.budget)} €. Конкурентите дават около ${Math.round(lo * 100)}%. Предлагам оферта ${Math.round(m * 100)}% (${M(t.budget * m)} €).`,
       why: `гаранцията ${M(bond)} € се връща; материалите са ~${Math.round(t.matShare * 100)}% от бюджета`, cost: bond, count: 1, days: t.days, gainTxt: `~${M(tenders.profitAt(t.id, m))} € печалба`, needsGear: tenderLack(t).length ? `техника в ${cityNm(t.city)}` : '',
       geo: geoOf('district', [t.city]), apply: () => { tenders.bid(t.id, m); save(); } });
   }
@@ -8314,6 +8315,8 @@ const tasks = createTasks({ S: () => S, fmt, ready: () => !!S && !!city && city.
   portUps: () => seaOn() ? ownedCities().map(id => { const p = portOf(id), lv = p?.lv || 0; return p && !p.muni && !p.build && lv && lv < portMax(id) ? { id, lv, cost: amL(PORT_LEVELS[lv], id, 'port').cost } : null; }).filter(Boolean) : [],
   finished: () => Object.entries(econ.s.finished || {}).map(([id, x]) => ({ id, day: x.day, daily: x.daily })) });
 // 👔 кой директор поема кой прозорец (след назначаване; „Ръчно управление“ връща стария екран до затваряне на играта)
+// държавните търгове от ниво 15 с назначен директор на Констръкшън: той подава офертите (предложения / автопилот) и съобщава резултата
+const tenderDir = () => { const n = S?.holding && dev.best() >= 15 && feature('boardroom') && (S.hold?.dir || {}).con; return n ? String(n).split(' ')[0] : ''; };
 const DIR_WIN = { garage: 'con', offers: 'con', cities: 'con', mines: 'oil', bank: 'bank' };
 const manualWin = new Set();
 const dirWinOf = w => { const k = DIR_WIN[w]; return k && !manualWin.has(w) && feature('boardroom') && S?.holding && (S.hold?.dir || {})[k] && (w !== 'bank' || S.bank) ? k : null; };
