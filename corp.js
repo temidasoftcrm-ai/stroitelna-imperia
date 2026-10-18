@@ -50,6 +50,7 @@ export function createCorp(deps) {
   }
   // 🏢 местни конкуренти
   function buyLocal(id) {
+    if (!deps.empire()) return;   // придобиванията се отварят на ниво 20
     const c = st(), x = deps.localFirms().find(q => q.f.id === id); if (!x || c.loc[id]) return;
     const cost = locValue(x), e = deps.econ(); if (!e.canAfford(cost)) { deps.toast(`Нямаш ${B(cost)}.`, 'bad'); return; }
     e.spend(cost, 'придобивания', `Изкупуване на ${x.f.nm}`); c.loc[id] = deps.S().day;
@@ -74,21 +75,22 @@ export function createCorp(deps) {
   const setDiv = d => { const c = st(); if (c.ipo) { c.ipo.div = d; deps.save(); } };
 
   // 🌐 световни концесии (ниво 20): отваря се търг, ти и 2 конгломерата наддавате тайно; печелиш ли — приход за десетилетия
+  // [икона, име, цена, приход на ден, картинка при победа (EVENT_PICS в game.js; без нея — 'empire')]
   const CONC = [
     ['🛫', 'Летище „Хийтроу“ — Лондон', 18e9, 9e6], ['⚓', 'Пристанище Ротердам', 12e9, 6e6], ['🚄', 'Скоростна линия Мадрид — Барселона', 9e9, 4.5e6], ['🛣️', 'Аутобан А7 — Германия', 7e9, 3.5e6],
     ['🛢️', 'Находище в Северно море', 20e9, 10e6], ['🌉', 'Трети мост над Босфора', 6e9, 3e6], ['🚇', 'Метрото на Рияд', 11e9, 5.4e6], ['⚡', 'Офшорен вятърен парк — Балтика', 8e9, 4e6],
-    ['🛳️', 'Канал „Истанбул“', 25e9, 12e6], ['🏟️', 'Олимпийският парк — Лос Анджелис', 5e9, 2.4e6], ['🛫', 'Летище Джуел — Сингапур', 15e9, 7.5e6], ['🚆', 'Жп коридор Лагос — Абиджан', 6e9, 3e6]];
+    ['🛳️', 'Канал „Истанбул“', 25e9, 12e6], ['🏟️', 'Олимпийският парк — Лос Анджелис', 5e9, 2.4e6, 'conc-sport'], ['🛫', 'Летище Джуел — Сингапур', 15e9, 7.5e6], ['🚆', 'Жп коридор Лагос — Абиджан', 6e9, 3e6]];
   function concOpen(day) {
     const c = st(); if (c.tender || !deps.empire()) return; const free = CONC.filter(x => !(c.conc || []).some(o => o.nm === x[1]));
     if (!free.length) return; const t = free[Math.floor(Math.random() * free.length)], riv = GLOBAL.filter(g => !c.gl[g.id].merged).sort(() => Math.random() - 0.5).slice(0, 2);
-    c.tender = { ico: t[0], nm: t[1], price: t[2], inc: t[3], due: day + 7, my: 0, riv: riv.map(g => ({ id: g.id, bid: Math.round(t[2] * (0.95 + Math.random() * 0.4) / 1e8) * 1e8 })) };
+    c.tender = { ico: t[0], nm: t[1], price: t[2], inc: t[3], pic: t[4], due: day + 7, my: 0, riv: riv.map(g => ({ id: g.id, bid: Math.round(t[2] * (0.95 + Math.random() * 0.4) / 1e8) * 1e8 })) };
     deps.toast(`🌐 Нов световен търг: ${t[0]} ${t[1]} — наддаването трае 7 дни (Холдинг → Концесии).`, 'good');
   }
   function concBid(k) { const c = st(); if (!c.tender) return; c.tender.my = Math.round(c.tender.price * k / 1e8) * 1e8; deps.toast(`🌐 Твоята оферта: ${B(c.tender.my)}.`, ''); deps.save(); }
   function concResolve() {
     const c = st(), t = c.tender; c.tender = null; const best = [...t.riv].sort((a, b) => b.bid - a.bid)[0], e = deps.econ();
     if (t.my && t.my > best.bid && e.canAfford(t.my)) { e.spend(t.my, 'придобивания', `Концесия: ${t.nm}`); c.conc = [...(c.conc || []), { ico: t.ico, nm: t.nm, price: t.my, inc: t.inc, day: deps.S().day }];
-      deps.pop && deps.pop('empire', `🌐 Спечели концесията!`, `${t.ico} ${t.nm} е твоя за ${B(t.my)} — ~${deps.fmt(t.inc)} €/ден за десетилетия.`); deps.sound && deps.sound('levelup'); }
+      deps.pop && deps.pop(t.pic || CONC.find(x => x[1] === t.nm)?.[4] || 'empire', `🌐 Спечели концесията!`, `${t.ico} ${t.nm} е твоя за ${B(t.my)} — ~${deps.fmt(t.inc)} €/ден за десетилетия.`); deps.sound && deps.sound('levelup'); }
     else { const g = GLOBAL.find(x => x.id === best.id); c.gl[best.id].w += t.price * 1.2;
       deps.toast(`🌐 ${g.flag} ${g.nm} спечели „${t.nm}“ с ${B(best.bid)}${t.my ? ` (твоята оферта: ${B(t.my)}${t.my > best.bid ? ' — но нямаше пари' : ''})` : ''} — тя расте в класацията.`, 'bad'); }
   }
@@ -124,10 +126,16 @@ export function createCorp(deps) {
     h += R.map((x, i) => `<div class="card" style="padding:8px 12px;${x.me ? 'border:1px solid #ffd54a;background:rgba(255,213,74,.08)' : ''}"><div class="row" style="margin:0;align-items:center;gap:10px"><b style="width:30px;color:${i < 3 ? '#ffd54a' : 'var(--mut,#9aa)'}">${i + 1}.</b><span style="font-size:20px">${x.ico}</span><span class="meta" style="margin:0;flex:1"><b style="color:var(--txt)">${x.flag} ${x.nm}</b>${x.me ? ' · ти' : ` · ${x.sec}${x.stake ? ` · <span style="color:var(--ok)">твои ${Math.round(x.stake * 100)}%</span>` : ''}`}</span><b>${B(x.w)}</b></div><div class="bar" style="height:4px;margin:6px 0 0"><i style="width:${Math.round(x.w / mx * 100)}%;${x.me ? 'background:#ffd54a' : ''}"></i></div></div>`).join('');
     return h;
   }
+  // до ниво 20 придобиванията се виждат само замъглени (80%) — като изненада, какво идва
   function acqHtml() {
+    if (deps.empire()) return acqBody();
+    return `<div style="position:relative"><div style="filter:blur(6px) saturate(.6);opacity:.2;pointer-events:none;user-select:none" aria-hidden="true">${acqBody(true)}</div>
+      <div style="position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:center;padding-top:40px"><div class="card" style="max-width:440px;text-align:center;border:1px solid #ffd54a"><div style="font-size:34px">🔒</div><b>🤝 Придобиванията се отварят на ниво 20 — Световна империя</b><div class="meta" style="margin:6px 0 0">Тогава изкупуваш местните конкуренти (спират да ти вземат поръчките), купуваш дялове от световните конгломерати и ги поглъщаш.</div></div></div></div>`;
+  }
+  function acqBody(preview = false) {
     const c = st(), e = deps.econ();
     let h = `<div class="bw-stats"><div><b style="color:var(--ok)">+${f(c.incDay || 0)} €</b><span>дивиденти и печалба на ден</span></div><div><b>${GLOBAL.filter(g => c.gl[g.id].merged).length}</b><span>погълнати конгломерата</span></div><div><b>${Object.keys(c.loc).length}</b><span>изкупени местни фирми</span></div></div>`;
-    const gl = deps.empire();
+    const gl = deps.empire() || preview;
     h += `<div class="sect" style="margin:10px 0 4px">🌍 Световни конгломерати — по 10% (+${Math.round((PREMIUM - 1) * 100)}% премия); от 50% нагоре ги поглъщаш${gl ? '' : ' · 🔒 ниво 20'}</div>`;
     if (!gl) h += `<div class="card"><div class="meta" style="margin:0">🔒 На <b>ниво 20 — Световна империя</b> купуваш дялове от световните конгломерати и ги поглъщаш, и наддаваш за световни концесии. Дотогава — изкупувай местните конкуренти.</div></div>`;
     else h += GLOBAL.map(g => { const r = c.gl[g.id], cost = trancheCost(g.id);

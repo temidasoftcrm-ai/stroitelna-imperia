@@ -663,6 +663,8 @@ export class Economy {
   // събитие: материалът е mul пъти по-скъп/евтин за days дни
   setPriceMod(matId, mul, days) { this.s.priceMods[matId] = { mul, until: this.s.day + days }; }
   buyShares(id, qty) {
+    const co = COMPANIES.find(c => c.id === id), mine = (this.s.shares[id] || {}).qty || 0;
+    if (co && co.shares) qty = Math.min(qty, co.shares - mine);   // не можеш да купиш повече акции, отколкото има фирмата
     const cost = Math.round(this.price(id) * qty);
     if (qty <= 0 || !this.canAfford(cost)) return 0;
     this.s.money -= cost; this._log(-cost, 'акции', `Купи ${qty} акции ${COMPANIES.find(c => c.id === id).nm}`);
@@ -835,6 +837,7 @@ function depSlider(kind, max, cur) {
   </div>`;
 }
 export const fmt = n => `${Math.round(n).toLocaleString('bg-BG')} €`;
+const fmtN = n => Math.round(n).toLocaleString('bg-BG');   // брой (акции), без €
 const sign = n => (n > 0 ? '+' : n < 0 ? '−' : '') + fmt(Math.abs(n));
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
@@ -1005,14 +1008,19 @@ export function renderFinance(el, econ, rep = 0, rerender = () => {}, unitTypes 
         <span class="a" style="text-align:right">${q.price.toFixed(2)} €</span>
         <div class="meta" style="width:100%">Изкупи цялата фирма и вземи: <b style="color:var(--txt)">${c.gets}</b>. После носи <b class="fin-pos">+${fmt(c.subDaily)}/ден</b>.${h ? ` Твоите ${h.qty} акции се приспадат.` : ''}</div>
         <div class="fin-btns" style="width:100%"><button class="btn" data-stk="take:${c.id}" ${econ.canAfford(tp) ? '' : 'disabled'}>🏢 Изкупи цялата · ${fmt(tp)}</button></div></div>`; }
-      return `<div class="fin-row" style="flex-wrap:wrap"><span>${c.ico}</span><span class="n">${esc(c.nm)}<br><span style="color:var(--mut)">${c.sector}${c.div ? ` · дивидент ${(c.div * 100).toFixed(1)}%/мес.` : ''}${h ? ` · имаш <b style="color:var(--txt)">${h.qty}</b>` : ''}</span></span>
+      const mine = h ? h.qty : 0, free = Math.max(0, c.shares - mine), canBuy = Math.min(free, Math.floor(Math.max(0, s.money) / q.price)), val = Math.round(mine * q.price), pl = h ? val - Math.round(h.cost) : 0;
+      return `<div class="fin-row" style="flex-wrap:wrap"><span>${c.ico}</span><span class="n">${esc(c.nm)}<br><span style="color:var(--mut)">${c.sector}${c.div ? ` · дивидент ${(c.div * 100).toFixed(1)}%/мес.` : ''}${h ? ` · имаш <b style="color:var(--txt)">${fmtN(mine)}</b>` : ''}</span></span>
         ${spark(q.hist.slice(-30), 70, 24, ch >= 0 ? 'var(--ok)' : 'var(--bad)')}
         <span class="a" style="text-align:right">${q.price.toFixed(2)} €<br><span class="${ch >= 0 ? 'fin-pos' : 'fin-neg'}" style="font-size:11px">${ch >= 0 ? '▲' : '▼'} ${Math.abs(ch).toFixed(1)}%</span></span>
         ${(() => { const a = tradeAdvice(econ, c.id); return `<div class="meta" style="width:100%;margin:3px 0 0;color:${a.sig === 'buy' ? 'var(--ok)' : a.sig === 'sell' || a.sig === 'risk' ? 'var(--bad)' : a.sig === 'wait' ? 'var(--acc)' : 'var(--mut)'}">${a.ico} ${a.txt}</div>`; })()}
+        <div class="meta" style="width:100%;margin:4px 0 0">📊 Акции на фирмата: <b style="color:var(--txt)">${fmtN(c.shares)}</b> · твои <b style="color:var(--txt)">${fmtN(mine)}</b> (${(mine / c.shares * 100).toFixed(1)}%) · на пазара ${fmtN(free)}${h ? `<br>💼 Твоите струват <b style="color:var(--txt)">${fmt(val)}</b> (платил си ${fmt(Math.round(h.cost))}) · <b class="${pl >= 0 ? 'fin-pos' : 'fin-neg'}">${pl >= 0 ? '+' : '−'}${fmt(Math.abs(pl))}</b> ако продадеш сега` : ''}<br>🛒 С парите си можеш да купиш до <b style="color:var(--txt)">${fmtN(canBuy)}</b> акции${h ? ` · можеш да продадеш до <b style="color:var(--txt)">${fmtN(mine)}</b>` : ''}</div>
         <div class="fin-btns" style="width:100%;margin-top:4px">
-          <button class="btn2" data-stk="buy:${c.id}:100" ${econ.canAfford(q.price * 100) ? '' : 'disabled'}>Купи 100 · ${fmt(q.price * 100)}</button>
-          <button class="btn2" data-stk="buy:${c.id}:1000" ${econ.canAfford(q.price * 1000) ? '' : 'disabled'}>Купи 1000</button>
-          <button class="btn2" data-stk="sell:${c.id}" ${h ? '' : 'disabled'}>Продай всички</button>
+          <button class="btn2" data-stk="buy:${c.id}:100" ${econ.canAfford(q.price * 100) && free >= 100 ? '' : 'disabled'}>Купи 100 · ${fmt(q.price * 100)}</button>
+          <button class="btn2" data-stk="buy:${c.id}:1000" ${econ.canAfford(q.price * 1000) && free >= 1000 ? '' : 'disabled'}>Купи 1000</button>
+          ${canBuy > 1000 ? `<button class="btn2" data-stk="buy:${c.id}:${canBuy}">Купи макс. ${fmtN(canBuy)} · ${fmt(canBuy * q.price)}</button>` : ''}
+          ${mine > 100 ? `<button class="btn2" data-stk="sell:${c.id}:100">Продай 100 · +${fmt(q.price * 100)}</button>` : ''}
+          ${mine > 200 ? `<button class="btn2" data-stk="sell:${c.id}:${Math.floor(mine / 2)}">Продай половината · +${fmt(Math.floor(mine / 2) * q.price)}</button>` : ''}
+          <button class="btn2" data-stk="sell:${c.id}" ${h ? '' : 'disabled'}>Продай всички${h ? ` · +${fmt(val)}` : ''}</button>
         </div></div>`;
     }).join('');
   // твоята фирма на борсата
@@ -1084,7 +1092,7 @@ export function renderFinance(el, econ, rep = 0, rerender = () => {}, unitTypes 
   el.querySelectorAll('[data-stk]').forEach(b => b.onclick = () => {
     const [act, id, q] = b.dataset.stk.split(':'), t = econ.hooks.toast || (() => {});
     if (act === 'buy') { const c = econ.buyShares(id, +q); if (c) t(`📈 Купи ${q} акции за ${fmt(c)}`, 'good'); }
-    else if (act === 'sell') { const g = econ.sellShares(id); if (g) t(`📉 Продаде акциите за ${fmt(g)}`, 'good'); }
+    else if (act === 'sell') { const g = econ.sellShares(id, q ? +q : Infinity); if (g) t(`📉 Продаде ${q ? fmtN(+q) + ' ' : ''}акции за ${fmt(g)}`, 'good'); }
     else if (act === 'ipo') { const g = econ.doIPO(unitTypes || []); if (g) t(`🔔 Фирмата е на борсата! Получи ${fmt(g)} за ${(IPO.share * 100).toFixed(0)}% от акциите.`, 'good'); }
     else if (act === 'subsell') { const c = COMPANIES.find(x => x.id === id); econ.liquidate(id, subSellPrice(c)); }
     else if (act === 'take') { const c = econ.takeover(id); if (c) t(`🏢 Изкупи ${COMPANIES.find(x => x.id === id).nm} за ${fmt(c)} — сградите и имуществото ѝ са твои!`, 'good'); }

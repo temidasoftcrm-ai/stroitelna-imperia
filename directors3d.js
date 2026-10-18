@@ -47,6 +47,14 @@ const css = `
 #boardRoom .scr button { font:700 13px system-ui, sans-serif; border:0; border-radius:9px; padding:8px 12px; cursor:pointer; background:rgba(255,255,255,.14); color:#e6e9ee; }
 #boardRoom .scr button.y { background:#f5b942; color:#111; }
 #boardRoom .scr button:disabled { opacity:.45; cursor:default; }
+#boardRoom .scr .votes { margin:4px 0 6px; font-size:13px; }
+#boardRoom .scr .votes div { margin:2px 0; }
+#boardRoom .scr .res { font:800 16px system-ui, sans-serif; margin:6px 0 8px; }
+#boardRoom .vb { position:absolute; transform:translate(-50%, -100%); padding:3px 9px; border-radius:999px; background:rgba(0,0,0,.72); color:#fff; font:800 15px system-ui, sans-serif; pointer-events:none; white-space:nowrap; }
+#boardRoom .vb.y { border:2px solid #5fd38a; } #boardRoom .vb.n { border:2px solid #ff6b6b; }
+#boardRoom .top .cfg { pointer-events:auto; font:700 14px system-ui, sans-serif; border:0; border-radius:10px; padding:8px 12px; background:rgba(255,255,255,.14); color:#fff; cursor:pointer; }
+#boardRoom .set { position:absolute; left:16px; top:64px; width:min(560px, calc(100vw - 32px)); max-height:calc(100vh - 120px); overflow:auto; display:none; background:rgba(12,16,24,.94); border:1px solid rgba(255,255,255,.14); border-radius:14px; padding:8px; color:#d6dbe3; }
+#boardRoom .set.on { display:block; }
 #boardRoom .bnav { position:absolute; left:50%; top:12px; transform:translateX(-50%); display:none; align-items:center; gap:8px; padding:5px 8px; border-radius:999px; background:rgba(0,0,0,.6); border:1px solid rgba(95,184,255,.5); color:#fff; font:700 14px system-ui, sans-serif; }
 #boardRoom .bnav button { border:0; border-radius:999px; width:30px; height:30px; background:rgba(255,255,255,.14); color:#fff; font:800 16px system-ui, sans-serif; cursor:pointer; }
 @media (max-width:640px) { #boardRoom .hint { display:none; } #boardRoom .bnav { top:56px; } }
@@ -153,13 +161,20 @@ function worldMap() {
   }).catch(() => {});
   return t;
 }
-function folderTex(name, sub) {
-  return canvasTex(512, 360, (g, w, h) => {
+// логото на дружеството (assets/ui/subs/<k>.webp, прозрачно) — на папките и облегалките
+const logoUrl = k => `assets/ui/subs/${k}.webp`;
+const logoTexCache = {};
+const logoTex = k => logoTexCache[k] || (logoTexCache[k] = new THREE.TextureLoader().load(logoUrl(k), t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; }));
+// кожената папка: логото отгоре, името и дружеството под него
+function folderTex(name, sub, k) {
+  const t = canvasTex(512, 360, (g, w, h) => {
     g.fillStyle = '#17181b'; g.fillRect(0, 0, w, h);
     g.strokeStyle = 'rgba(201,162,74,.8)'; g.lineWidth = 4; g.strokeRect(14, 14, w - 28, h - 28);
-    g.textAlign = 'center'; g.fillStyle = '#e2c27a'; g.font = '700 40px system-ui, sans-serif'; g.fillText(name, w / 2, h / 2 - 6);
-    g.fillStyle = '#9aa1ab'; g.font = '500 26px system-ui, sans-serif'; g.fillText(sub, w / 2, h / 2 + 36);
+    g.textAlign = 'center'; g.fillStyle = '#e2c27a'; g.font = '700 38px system-ui, sans-serif'; g.fillText(name, w / 2, 262);
+    g.fillStyle = '#9aa1ab'; g.font = '500 24px system-ui, sans-serif'; g.fillText(sub, w / 2, 302);
   });
+  if (k) { const im = new Image(); im.onload = () => { t.image.getContext('2d').drawImage(im, 256 - 80, 44, 160, 160); t.needsUpdate = true; }; im.src = logoUrl(k); }
+  return t;
 }
 function roundedRect(w, l, r) {
   const s = new THREE.Shape(), x = -w / 2, y = -l / 2;
@@ -168,10 +183,14 @@ function roundedRect(w, l, r) {
   return s;
 }
 // висок кожен стол в тъмносиньо
-function chair(mat, metal) {
+function chair(mat, metal, k) {
   const g = new THREE.Group();
   const seat = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.12, 0.54), mat); seat.position.y = 0.47; g.add(seat);
   const back = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.92, 0.12), mat); back.position.set(0, 1.0, -0.28); back.rotation.x = -0.1; g.add(back);
+  if (k) {   // бродираната емблема горе на облегалката — над главата на директора, вижда се отсреща
+    const em = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.24), new THREE.MeshStandardMaterial({ map: logoTex(k), transparent: true, alphaTest: 0.1, roughness: 0.6 }));
+    em.position.set(0, 0.3, 0.062); back.add(em);
+  }
   for (const sx of [-1, 1]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.05, 0.44), metal); arm.position.set(sx * 0.31, 0.7, -0.02); g.add(arm); const st = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.2, 0.04), metal); st.position.set(sx * 0.31, 0.6, 0.05); g.add(st); }
   const post = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.38, 10), metal); post.position.y = 0.22; g.add(post);
   const base = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.04, 5), metal); base.position.y = 0.03; g.add(base);
@@ -258,8 +277,8 @@ const waterM = new THREE.MeshPhysicalMaterial({ color: 0xcfe9f7, metalness: 0, r
 // профилът на чашата (радиус, височина в m): дебело дъно, леко разширена нагоре, ръбът — двойна стена
 const GLASS = new THREE.LatheGeometry([[0, 0], [0.028, 0], [0.031, 0.004], [0.032, 0.014], [0.037, 0.115], [0.0385, 0.118], [0.0365, 0.118], [0.0345, 0.016], [0, 0.014]].map(([r, y]) => new THREE.Vector2(r, y)), 28);
 const WATER = new THREE.LatheGeometry([[0, 0.014], [0.034, 0.016], [0.0355, 0.082], [0, 0.082]].map(([r, y]) => new THREE.Vector2(r, y)), 28);
-function seatProps(scene, side, z, name, sub, gold) {
-  const fold = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.014, 0.46), [null, null, new THREE.MeshStandardMaterial({ map: folderTex(name, sub), roughness: 0.55 }), null, null, null].map(m => m || new THREE.MeshStandardMaterial({ color: 0x17181b, roughness: 0.6 })));
+function seatProps(scene, side, z, name, sub, gold, k) {
+  const fold = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.014, 0.46), [null, null, new THREE.MeshStandardMaterial({ map: folderTex(name, sub, k), roughness: 0.55 }), null, null, null].map(m => m || new THREE.MeshStandardMaterial({ color: 0x17181b, roughness: 0.6 })));
   fold.position.set(side * (TABLE_W / 2 - 0.32), TABLE_H + 0.03, z); fold.rotation.y = side < 0 ? -Math.PI / 2 : Math.PI / 2; fold.castShadow = true; scene.add(fold);
   const cz = z + 0.42, cx = side * (TABLE_W / 2 - 0.62);
   const coaster = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.008, 24), gold); coaster.position.set(cx, TABLE_H + 0.027, cz); scene.add(coaster);
@@ -273,7 +292,7 @@ export function openBoardroom(o) {
   document.getElementById('boardRoom')?.remove();
   if (!document.getElementById('boardRoomCss')) { const s = document.createElement('style'); s.id = 'boardRoomCss'; s.textContent = css; document.head.appendChild(s); }
   const el = document.createElement('div'); el.id = 'boardRoom';
-  el.innerHTML = `<div class="top"><span>🏛️ Директорската зала<small></small></span><button class="x" title="Затвори (Esc)">✕</button></div><div class="load">👔 Директорите влизат…</div><div class="tip"></div><div class="bnav"><button class="pv" title="Предишното">‹</button><span>📋 Предложение <b></b></span><button class="nx" title="Следващото">›</button></div><div class="scr"></div><div class="card"></div><div class="hint">🖱️ Клик на директор — доклад · влачи — обиколи масата</div>`;
+  el.innerHTML = `<div class="top"><span>🏛️ Директорската зала<small></small></span><button class="cfg" style="display:none">⚙️ Бюджети и автопилот</button><button class="x" title="Затвори (Esc)">✕</button></div><div class="set"></div><div class="load">👔 Директорите влизат…</div><div class="tip"></div><div class="bnav"><button class="pv" title="Предишното">‹</button><span>📋 Предложение <b></b></span><button class="nx" title="Следващото">›</button></div><div class="scr"></div><div class="card"></div><div class="hint">🖱️ Клик на директор — доклад · влачи — обиколи масата</div>`;
   el.querySelector('.top small').textContent = o.title || '';
   document.body.appendChild(el);
   requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
@@ -304,10 +323,10 @@ export function openBoardroom(o) {
   const list = seatsNow();
   list.forEach((s, i) => {
     const [side, z] = SEATS[i] || SEATS[SEATS.length - 1], x = side * SIT_X;
-    const ch = chair(leather, metal); ch.position.set(x, 0, z); ch.rotation.y = side < 0 ? Math.PI / 2 - TURN : -Math.PI / 2 + TURN; scene.add(ch);
+    const ch = chair(leather, metal, s.open ? s.k : null); ch.position.set(x, 0, z); ch.rotation.y = side < 0 ? Math.PI / 2 - TURN : -Math.PI / 2 + TURN; scene.add(ch);
     s.chair = ch;
     const sub = !s.open ? '🔒 още не е основано' : s.director ? s.company : '👔 свободно място';
-    seatProps(scene, side, z, s.director || s.company, sub, gold);
+    seatProps(scene, side, z, s.director || s.company, sub, gold, s.open ? s.k : null);
     const hit = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.6, 0.9), new THREE.MeshBasicMaterial()); hit.visible = false;
     hit.position.set(x, 0.85, z); hit.userData.seat = i; scene.add(hit); hits.push(hit);
   });
@@ -382,6 +401,7 @@ export function openBoardroom(o) {
   const scr = el.querySelector('.scr'), nav = el.querySelector('.bnav'), aim = new THREE.Vector3(0, 1.15, -3), hp = new THREE.Vector3();
   let props = [], qi = 0, scrSeat = -1;
   function board(go = qi) {
+    clearBadges();
     props = o.proposals ? o.proposals() : [];
     nav.style.display = props.length ? 'flex' : 'none';
     if (!props.length) { scr.classList.remove('on'); setTimeout(() => { if (!props.length) scr.style.display = 'none'; }, 350); scrSeat = -1; aim.set(0, 1.15, -3); return; }
@@ -392,11 +412,44 @@ export function openBoardroom(o) {
     scr.querySelector('.who').textContent = `${p.ico || s?.ico || ''} ${s?.director || s?.company || ''}`;
     scr.querySelector('.tx').textContent = p.text;
     const y = scr.querySelector('.y'); y.disabled = p.can === false; if (y.disabled) y.title = 'Нямаш достатъчно пари';
-    for (const [c, a] of [['y', 'yes'], ['n', 'no'], ['l', 'later']]) scr.querySelector('.' + c).onclick = () => { o.onDecide && o.onDecide(p.id, a); board(qi); };   // решеното изчезва — на същото място идва следващото
+    for (const [c, a] of [['y', 'yes'], ['n', 'no'], ['l', 'later']]) scr.querySelector('.' + c).onclick = () => { const r = o.onDecide && o.onDecide(p.id, a); if (r && r.need === 'vote') showVote(r); else board(qi); };   // решеното изчезва — на същото място идва следващото
     scrSeat = i; card.classList.remove('on'); sel = i;
     scr.style.display = 'block'; scr.classList.remove('on'); requestAnimationFrame(() => requestAnimationFrame(() => scr.classList.add('on')));
     if (i >= 0) present(i);
   }
+  // 🗳️ гласуването (банката възрази — boardlogic.js): над всеки директор ✋✅ / ✋❌, „за“ вдигат ръка; на екрана — резултатът и решението ти
+  const badges = [];
+  function clearBadges() { badges.forEach(b => b.el.remove()); badges.length = 0; }
+  function showVote(r) {
+    const { v, p } = r; clearBadges();
+    const res = v.passed ? ['приема се', '#5fd38a'] : v.tie ? ['равен глас — решаваш ти', '#ffd54a'] : ['отхвърля се', '#ff6b6b'];
+    scr.innerHTML = `<div class="hd"><span>🗳️ Гласуване на борда</span><span>${v.yes} : ${v.no}</span></div><div class="tx"></div><div class="votes"></div><div class="res" style="color:${res[1]}">${v.yes} : ${v.no} — ${res[0]}</div><div class="row"></div>`;
+    scr.querySelector('.tx').textContent = `🏦 Банката възрази: ${v.bank.why}. „${p.text}“${p.cost ? ` (${f(p.cost)} €)` : ''}`;
+    const vs = scr.querySelector('.votes');
+    for (const x of v.votes) { const d = document.createElement('div'); d.textContent = `${x.yes ? '✋✅' : '✋❌'} ${x.name} — ${x.why}`; vs.appendChild(d); }
+    const row = scr.querySelector('.row');
+    const btn = (t, how, y) => { const b = document.createElement('button'); b.textContent = t; if (y) b.className = 'y'; b.onclick = () => { o.onResolve && o.onResolve(p.id, how); board(qi); }; row.appendChild(b); };
+    if (v.passed || v.tie) btn(v.tie ? '✓ Решавам „за“' : '✓ Изпълни', 'pass', true); else btn('⚖️ Наложи (вето)', 'veto', true);
+    btn('🏦 С кредит', 'loan'); btn('⏳ Отложи', 'drop');
+    for (const x of v.votes) {
+      const i = list.findIndex(s => s.k === x.dir); if (i < 0) continue;
+      const el2 = document.createElement('div'); el2.className = 'vb ' + (x.yes ? 'y' : 'n'); el2.textContent = x.yes ? '✋ за' : '✖ против'; el.insertBefore(el2, scr); badges.push({ el: el2, i });   // под екрана, да не го закриват
+      const q = people.find(z => z.i === i); if (q && x.yes) { q.busy = 0; play(q, q.point[0], true); }   // „за“ — вдигат ръка
+    }
+    o.sound && o.sound('click');
+  }
+  const headOf = (i, out) => { const q = people.find(z => z.i === i), h = q && q.m.getObjectByName('mixamorigHead'); if (h) h.getWorldPosition(out); else { const [side, z] = SEATS[i]; out.set(side * SIT_X, 1.25, z); } return out; };
+  const bp = new THREE.Vector3();
+  function placeBadges() {
+    for (const b of badges) {
+      headOf(b.i, bp); bp.y += 0.22; bp.project(cam);
+      b.el.style.display = bp.z > 1 ? 'none' : ''; b.el.style.left = (bp.x + 1) / 2 * innerWidth + 'px'; b.el.style.top = (1 - bp.y) / 2 * innerHeight + 'px';
+    }
+  }
+  // ⚙️ бюджети и автопилот (boardlogic.js) — панел в залата
+  const cfg = el.querySelector('.cfg'), setEl = el.querySelector('.set');
+  const fillSet = () => { setEl.innerHTML = o.settings(); o.bindSettings && o.bindSettings(setEl, fillSet); };
+  if (o.settings && o.settings()) { cfg.style.display = ''; cfg.onclick = () => { setEl.classList.toggle('on'); if (setEl.classList.contains('on')) fillSet(); }; }
   nav.querySelector('.pv').onclick = () => board(qi - 1);
   nav.querySelector('.nx').onclick = () => board(qi + 1);
   // екранът следва главата на директора (или стола, ако няма модел); камерата бавно се обръща към него
@@ -447,7 +500,7 @@ export function openBoardroom(o) {
       if (p) play(p, p.talk[(Math.random() * p.talk.length) | 0], true);
     }
     for (const p of people) { p.mixer.update(dt); if (p.busy > 0 && (p.busy -= dt) <= 0) back(p); }
-    placeScreen(dt); ctl.update(); renderer.render(scene, cam);
+    placeScreen(dt); placeBadges(); ctl.update(); renderer.render(scene, cam);
   }
   loop();
 
@@ -479,7 +532,15 @@ export function demoBoardroom() {
   return openBoardroom({
     title: 'Титан Груп — демо',
     proposals: () => DEMO_PROPS.filter(p => !p.done),
-    onDecide: (id, a) => { const p = DEMO_PROPS.find(q => q.id === id); if (p) p.done = a; },
+    onDecide: (id, a) => {
+      const p = DEMO_PROPS.find(q => q.id === id); if (!p) return null;
+      if (a === 'yes' && id === 'demo-air') return { need: 'vote', p, v: { bank: { why: 'изяжда 72% от касата (над 40%)' }, yes: 3, no: 3, tie: true, passed: false, votes: [
+        { dir: 'air', name: 'Елена Димитрова', yes: true, why: 'моето предложение' }, { dir: 'bank', name: 'Борис Тодоров', yes: false, why: 'рисково: изяжда 72% от касата' },
+        { dir: 'rail', name: 'Мария Стоянова', yes: false, why: 'чакат 32 млн. € за Титан Рейл' }, { dir: 'con', name: 'Ивайло Петров', yes: true, why: 'полезно за холдинга' },
+        { dir: 'sea', name: 'Стефан Колев', yes: true, why: 'полезно за холдинга' }, { dir: 'oil', name: 'Вера Ангелова', yes: false, why: 'не сега' }] } };
+      p.done = a; return null;
+    },
+    onResolve: (id, how) => { const p = DEMO_PROPS.find(q => q.id === id); if (p) p.done = how; },
     seats: () => C.map(([k, ico, suf, d, lv, inc]) => ({ k, ico, company: 'Титан ' + suf, what: '', open: true, director: d, lv, lvMax: 5, inc, bonus: inc * (lv * 0.1 + (d ? 0.15 : 0)), bonusPct: Math.round((lv * 0.1 + (d ? 0.15 : 0)) * 100), up: lv < 5 ? { cost: 5e6, can: true } : null, hire: !d && lv >= 5 ? { cost: 4e6, can: true } : null })),
   });
 }

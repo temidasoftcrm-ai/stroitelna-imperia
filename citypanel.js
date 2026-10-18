@@ -130,6 +130,9 @@ export function createCityPanel(deps) {
   function stash(c, lots) { c.freeLots = lots.filter(l => !l.built && !l.busy).map(l => [l.id, l.zone]); c.freeV = 2; }
 
   // ---- прозорецът
+  // „👋 Остави града“: завършеният град изчезва от списъка (продължава да носи пари); S.cpHide = { [id]: денят }
+  const hid = id => !!(S().cpHide || {})[id];
+  const visible = id => { const s = S(); return (!deps.inScope || deps.inScope(id)) && (s.cpShowFin || (!deps.isFinished(id) || id === s.cityId) && !hid(id)); };
   function cityCard(id) {
     const s = S(), c = rec(id); if (!c) return '';
     const here = id === s.cityId, fin = deps.isFinished(id), d = devOf(c), lv = d.lv;
@@ -142,7 +145,7 @@ export function createCityPanel(deps) {
       <span style="margin-left:auto;display:flex;gap:6px;align-items:center">${fin ? '<span class="meta" style="margin:0;color:var(--ok)">🏁 завършен</span>' : ''}<b>🏅 Ниво ${lv}</b></span></h3>
       <div class="bar" style="margin:4px 0"><i style="width:${(k * 100).toFixed(0)}%;background:linear-gradient(90deg,#c9a14a,#ffd54a)"></i></div>
       <div class="meta" style="margin:0 0 6px">${next}</div>`;
-    if (fin) return h + `<div class="meta">Градът е завършен и носи приход всеки ден.</div></div>`;
+    if (fin) return h + `<div class="row" style="gap:8px;align-items:center;margin:0"><span class="meta" style="margin:0;flex:1">Градът е завършен и носи приход всеки ден.</span>${hid(id) ? '<span class="meta" style="margin:0">👋 оставен</span>' : `<button class="btn2" data-cphide="${id}" title="Градът продължава да носи пари, но изчезва от списъка">👋 Остави града</button>`}</div></div>`;
     h += `<div class="meta" style="margin:0">🏗️ Строят се <b style="color:var(--txt)">${ps.length}/${C.proj}</b> · 📨 оферти ${offers} · 🚜 техника ${units}${roof ? ` · 💶 по покривите ${f(roof)} €` : ''}${!here && c.freeLots ? ` · 🟩 свободни парцели ${c.freeLots.length}` : ''}</div>${!here && !c.freeLots && auto(id) ? '<div class="meta" style="margin:2px 0 0">ℹ️ Още не си влизал тук — новите обекти се строят „на хартия“ (плащат и дават опит). Влез веднъж, за да се появяват и в града.</div>' : ''}`;
     { // 🔑 имотите в града с икони (без влизане): 🏠×2 🏪 🌆 · 🟩 земя
       const E = c.estate || {}, own = E.owned || [], land = (E.land || []).length, by = {};
@@ -200,8 +203,20 @@ export function createCityPanel(deps) {
       <button class="btn2" data-cpfinshow="1" style="margin-top:10px">${s.cpShowFin ? '▾ Скрий градовете' : `▸ Покажи градовете (${ids.length})`}</button></div>`;
   }
   function finNote(order) {
-    const s = S(), n = order.filter(id => (!deps.inScope || deps.inScope(id)) && deps.isFinished(id) && id !== s.cityId).length;
+    const s = S(), n = order.filter(id => (!deps.inScope || deps.inScope(id)) && deps.isFinished(id) && (id !== s.cityId || hid(id))).length;
     return n ? `<div class="card"><div class="row" style="align-items:center;gap:8px"><span class="meta" style="margin:0;flex:1">🏁 ${n} завършени града ${s.cpShowFin ? 'са показани' : 'са скрити — работят сами и носят пари'}.</span><button class="btn2" data-cpfinshow="1">${s.cpShowFin ? 'Скрий ги' : 'Покажи ги'}</button></div></div>` : '';
+  }
+  // 🏘️ от ниво 14: всички квартали на всичките ти градове наведнъж (до максимума)
+  function distAll() {
+    const out = []; if (!deps.district) return out;
+    for (const id of deps.ownedCities()) { if (deps.isFinished(id)) continue; const q = deps.district(id); if (q && q.ext < q.max) out.push([id, q]); }
+    return out;
+  }
+  function distRow() {
+    const L = distAll(); if (!L.length) return `<div class="row" style="gap:6px;margin-top:6px;align-items:center"><span class="meta" style="margin:0;color:var(--ok)">🏘️ Всички градове са с максимум квартали</span></div>`;
+    const n = L.reduce((a, [, q]) => a + q.max - q.ext, 0), cost = L.reduce((a, [, q]) => a + q.all, 0), e = deps.econ();
+    return `<div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0 auto 0 0">🏘️ Липсват <b style="color:var(--txt)">${n}</b> квартала в ${L.length} града · всички за <b style="color:var(--txt)">${f(cost)} €</b></span>
+      <button class="btn" data-cpdistall="1" ${e.canAfford(Math.min(...L.map(([, q]) => q.all))) ? '' : 'disabled'} title="Купува всички квартали до максимума във всеки град (докъдето стигнат парите — първо най-евтините)">🏘️ Купи всички квартали · ${f(cost)} €</button></div>`;
   }
   function winHtml() {
     const s = S(), own = deps.ownedCities();
@@ -216,8 +231,8 @@ export function createCityPanel(deps) {
         <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0 auto 0 0">🚜 Липсват <b style="color:${g.total ? 'var(--bad)' : 'var(--ok)'}">${g.total}</b>${g.moveN ? ` · ${g.moveN} идват от другите градове` : ''}${g.buy.length ? ` · за купуване ${g.buy.reduce((a, b) => a + b[2], 0)}` : ''}</span>
           ${g.total ? `${g.moveN ? `<button class="btn2" data-cpbuyall="1" title="Евтино, но техниката пътува няколко дни">🚚 Изпрати ${g.moveN}${g.cost ? ` + купи · ${f(g.cost)} €` : ''}</button>` : ''}<button class="btn" data-cpbuynow="1" ${deps.econ().canAfford(Math.min(...g.now.map(([, t]) => deps.ECON.UNIT_TYPES[t].cost))) ? '' : 'disabled'} title="Купува всичко липсващо веднага във всеки град">🛒 Купи всичко необходимо · ${f(g.costNow)} €</button>` : '<span class="meta" style="margin:0;color:var(--ok)">✅ Нищо не липсва</span>'}</div>
         <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0 auto 0 0">📦 Складове с автоматично пълнене: <b style="color:var(--txt)">${own.length - afOff - own.filter(id => deps.isFinished(id)).length}</b> от ${own.filter(id => !deps.isFinished(id)).length}</span>
-          ${afOff ? '<button class="btn" data-cpafall="1">📦 Включи всички</button>' : '<span class="meta" style="margin:0;color:var(--ok)">✅ Всички са включени</span>'}</div></div>`;
-      const shown = order.filter(id => (!deps.inScope || deps.inScope(id)) && (s.cpShowFin || !deps.isFinished(id) || id === s.cityId));
+          ${afOff ? '<button class="btn" data-cpafall="1">📦 Включи всички</button>' : '<span class="meta" style="margin:0;color:var(--ok)">✅ Всички са включени</span>'}</div>${distRow()}</div>`;
+      const shown = order.filter(visible);
       for (const id of shown) h += cityCard(id);
       h += finNote(order);
       if (!shown.length) h += '<div class="card"><div class="meta" style="margin:0">Нямаш градове в този обхват.</div></div>';
@@ -227,7 +242,7 @@ export function createCityPanel(deps) {
       Нивото на всеки град расте от обектите в него; летищата се отключват, щом <b>един</b> град стигне ниво 9.</div>
       <div class="row" style="justify-content:flex-end;gap:6px;margin-top:6px"><span class="meta" style="margin:0 auto 0 0">🤖 включен в ${on} от ${open.length} града</span>
       <button class="btn2" data-cpall="1">🤖 Включи всички</button><button class="btn2" data-cpall="0">Изключи всички</button></div></div>`;
-    const shown = order.filter(id => (!deps.inScope || deps.inScope(id)) && (s.cpShowFin || !deps.isFinished(id) || id === s.cityId));   // обхватът горе: България · Балкани · Европа · …; завършените — скрити
+    const shown = order.filter(visible);   // обхватът горе: България · Балкани · Европа · …; завършените и оставените — скрити
     for (const id of shown) h += cityCard(id);
     h += finNote(order);
     if (!shown.length) h += '<div class="card"><div class="meta" style="margin:0">Нямаш градове в този обхват.</div></div>';
@@ -241,6 +256,10 @@ export function createCityPanel(deps) {
     body.querySelectorAll('[data-cpsend]').forEach(b => b.onclick = () => { const [t, id, from] = b.dataset.cpsend.split('|'); if (deps.gearSend(t, from, id)) mark(id, t); redraw(); });
     body.querySelectorAll('[data-cpbuy]').forEach(b => b.onclick = () => { const [t, id] = b.dataset.cpbuy.split('|'); const n0 = deps.unitCount(id); deps.gearBuy(t, id); if (deps.unitCount(id) > n0) mark(id, t); redraw(); });
     body.querySelectorAll('[data-cpdist]').forEach(b => b.onclick = () => { const [id, all] = b.dataset.cpdist.split('|'); deps.buyDistrict(id, all === '1'); redraw(); });
+    body.querySelectorAll('[data-cphide]').forEach(b => b.onclick = () => { const s = S(); s.cpHide = { ...(s.cpHide || {}), [b.dataset.cphide]: s.day }; deps.toast(`👋 ${deps.cityName(b.dataset.cphide)} е оставен — продължава да носи пари, но вече не е в списъка (виж „Покажи ги“).`, 'good'); deps.save(); redraw(); });
+    body.querySelectorAll('[data-cpdistall]').forEach(b => b.onclick = () => { let n = 0, sum = 0; const e = deps.econ();
+      for (const [id, q] of distAll().sort((a, b) => a[1].all - b[1].all)) { if (!e.canAfford(q.all)) continue; const m0 = e.s.money; deps.buyDistrict(id, true); if (e.s.money < m0) { n += q.max - q.ext; sum += m0 - e.s.money; } }
+      deps.toast(n ? `🏘️ Купи ${n} квартала за ${f(Math.round(sum))} €.` : 'Нямаш достатъчно пари за кварталите на нито един град.', n ? 'good' : 'bad'); deps.save(); redraw(); });
     body.querySelectorAll('[data-cpbuyall]').forEach(b => b.onclick = () => { deps.gearBuyAll(); deps.save(); redraw(); });
     body.querySelectorAll('[data-cpbuynow]').forEach(b => b.onclick = () => { deps.gearBuyNow(); deps.save(); redraw(); });
     body.querySelectorAll('[data-cpafall]').forEach(b => b.onclick = () => { let n = 0; for (const id of deps.ownedCities()) { const c = rec(id); if (!c || deps.isFinished(id) || c.autoFill?.on) continue; c.autoFill = { budget: 50000, spent: 0, day: S().day, ...(c.autoFill || {}), on: true }; n++; } if (n) deps.toast(`📦 Включи автоматичното пълнене на складовете в ${n} града.`, 'good'); deps.save(); redraw(); });

@@ -8,6 +8,10 @@ export const CRUDE_P = 55, FUEL_P = 1300;   // базовите цени (€/б
 export const TANK_CAP = { crude: 400000, fuel: 40000 };   // танкова ферма: максимум на склад
 export const TANKER_CAP = { crude: 9000, fuel: 1100 };    // един танкер за седмица
 const STATION = { cost: 3e6, perDay: 6, retail: 1.45, upCost: 2e6, lvMax: 3 };   // хил. л на ден на ниво; цена на дребно ×1.45 от пазарната
+// твоите цени: retail — цената на дребно в бензиностанциите (× пазарната; по-скъпо → по-малко клиенти), minPx — под каква пазарна цена
+// автоматичната продажба чака (0 = продава на всяка цена; 1.15 = само ако барелът е поне 15% над нормалното)
+const RETAIL_OPTS = [1.2, 1.35, 1.45, 1.6, 1.8], MINPX_OPTS = [0, 1, 1.15, 1.3];
+const demandOf = r => Math.min(1.6, Math.pow(STATION.retail / r, 2));   // ×1.2 → ~1.46 пъти повече клиенти, ×1.8 → ~0.65
 const EVENTS = [
   { k: 'opec', nm: 'ОПЕК намали добива', ico: '🛢️', mul: 1.35, days: 45 },
   { k: 'crisis', nm: 'Световна икономическа криза', ico: '📉', mul: 0.7, days: 50 },
@@ -92,7 +96,8 @@ export function createOil(deps) {
   }
   function stationsDay() {
     const o = st(); let sold = 0, got = 0;
-    for (const [id, L] of Object.entries(o.stations || {})) { const q = Math.min(STATION.perDay * L, Math.floor(o.stock.fuel || 0)); if (q <= 0) continue; o.stock.fuel -= q; sold += q; got += Math.round(q * fuelP() * STATION.retail); }
+    const r = o.retail || STATION.retail, dem = demandOf(r);
+    for (const [id, L] of Object.entries(o.stations || {})) { const q = Math.min(Math.round(STATION.perDay * L * dem), Math.floor(o.stock.fuel || 0)); if (q <= 0) continue; o.stock.fuel -= q; sold += q; got += Math.round(q * fuelP() * r); }
     if (got) { deps.econ().earn(got, 'петрол', `⛽ Бензиностанции: ${deps.fmt(sold)} хил. л`); o.earned += got; o.dayIn = (o.dayIn || 0) + got; }
     o.stSold = sold; return got;
   }
@@ -103,11 +108,11 @@ export function createOil(deps) {
     if (day % 4 === 0) makeOffer(day);
     o.offers = o.offers.filter(f => f.exp >= day);
     stationsDay();
-    if (day % 7 === 0) { deliver(day); if (o.auto && !(o.ev && o.ev.mul < 1)) { sell('crude', Math.max(0, o.stock.crude - reserved('crude'))); sell('fuel', Math.max(0, o.stock.fuel - reserved('fuel') - stationsNeed() * 7)); } }   // договорите и бензиностанциите — с предимство
+    if (day % 7 === 0) { deliver(day); if (o.auto && !(o.ev && o.ev.mul < 1) && o.px >= (o.minPx || 0)) { sell('crude', Math.max(0, o.stock.crude - reserved('crude'))); sell('fuel', Math.max(0, o.stock.fuel - reserved('fuel') - stationsNeed() * 7)); } }   // договорите и бензиностанциите — с предимство
     o.inRate = [...(o.inRate || []), o.inToday || { crude: 0, fuel: 0 }].slice(-14); o.inToday = { crude: 0, fuel: 0 };
     o.inHist = [...(o.inHist || []), o.dayIn].slice(-14);
   }
-  const stationsNeed = () => Object.values(st().stations || {}).reduce((a, L) => a + STATION.perDay * L, 0);
+  const stationsNeed = () => Object.values(st().stations || {}).reduce((a, L) => a + STATION.perDay * L, 0) * demandOf(st().retail || STATION.retail);
   const dailyAvg = () => { const h = st().inHist || []; return h.length ? Math.round(h.reduce((a, v) => a + v, 0) / h.length) : 0; };
 
   // 📈 графика на цената (последните 90 дни)
@@ -125,7 +130,13 @@ export function createOil(deps) {
     let h = `<div class="bw-stats"><div><b style="color:${dp >= 0 ? 'var(--ok)' : 'var(--bad)'}">${f(crudeP())} €</b><span>🛢️ барел (${dp >= 0 ? '+' : ''}${dp}%)</span></div><div><b>${f(fuelP())} €</b><span>⛽ хил. л гориво</span></div><div><b>${f(Math.floor(o.stock.crude))} / ${f(TANK_CAP.crude)}</b><span>бар. в танковете</span></div><div><b>${f(Math.floor(o.stock.fuel))} / ${f(TANK_CAP.fuel)}</b><span>хил. л гориво</span></div><div><b style="color:var(--ok)">+${f(dailyAvg())} €</b><span>приход на ден</span></div></div>`;
     h += `<div class="card"><div class="row" style="margin:0 0 4px;align-items:center"><b style="flex:1">📈 Цена на петрола — 90 дни</b>${o.ev ? `<span class="meta" style="margin:0;color:#ffd54a">${o.ev.ico} ${o.ev.nm} · още ${o.ev.until - S.day} д.</span>` : '<span class="meta" style="margin:0">пазарът е спокоен</span>'}</div>${chart() || '<div class="meta">Графиката се появява след няколко дни.</div>'}
       <div class="row" style="margin:8px 0 0;gap:6px;flex-wrap:wrap;align-items:center"><label class="meta" style="margin:0;flex:1;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" data-oilauto ${o.auto ? 'checked' : ''}> Продавай сам всяка седмица (без кризите)</label>
+      </div>
+      <div class="row" style="margin:8px 0 0;gap:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0;flex:1 1 220px">🎯 <b style="color:var(--txt)">Автоматично продавай само над</b> — иначе петролът чака в танковете за по-добра цена</span>${MINPX_OPTS.map(k => `<button class="${(o.minPx || 0) === k ? 'btn' : 'btn2'}" data-oilmin="${k}">${k ? `${f(Math.round(CRUDE_P * k))} €/бар.` : 'всяка цена'}</button>`).join('')}</div>
+      ${o.auto && o.px < (o.minPx || 0) ? `<div class="meta" style="margin:4px 0 0;color:#ffd54a">⏳ Барелът е ${f(crudeP())} € — под твоите ${f(Math.round(CRUDE_P * o.minPx))} €; автоматичната продажба чака.</div>` : ''}
+      <div class="row" style="margin:8px 0 0;gap:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0 auto 0 0">Продай сега на пазарната цена:</span>
       <button class="btn2" data-oilsell="crude" ${o.stock.crude >= 1 ? '' : 'disabled'}>💰 Продай петрола · ${f(priceOf('crude', Math.floor(o.stock.crude)))} €</button><button class="btn2" data-oilsell="fuel" ${o.stock.fuel >= 1 ? '' : 'disabled'}>💰 Продай горивото · ${f(priceOf('fuel', Math.floor(o.stock.fuel)))} €</button></div></div>`;
+    { const P = S.mw && S.mw.pipeline; if (P && !P.done) { const n = Object.values(P.tr || {}).filter(x => x.signed).length;   // 🛢️ петролопроводът (megaworld.js)
+      h += `<div class="card"><div class="meta" style="margin:0">🛢️ <b style="color:var(--txt)">Петролопровод „Залив — Европа“</b>: ${P.ph || P.run ? `строи се — етап ${(P.ph || 0) + (P.run ? 1 : 0)} от 4` : `държавни договори ${n}/4 — подпиши с Саудитска Арабия, Ирак, Турция и България (Холдинг → 🌍 Мегапроекти)`}. Готовият носи +10% към цената на петрола и горивото.</div></div>`; } }
     // договори
     const un = deps.unlinked ? [...new Set(deps.unlinked())] : [];
     if (un.length) h = `<div class="card" style="border:1px solid #ffb300"><div class="meta" style="margin:0">⚠️ <b style="color:var(--txt)">${un.map(deps.cityName).join(', ')}</b> не е свързан с терминала в ${deps.cityName(term)} — петролът оттам не стига до танковете. Прокарай жп линия или магистрала.</div></div>` + h;
@@ -136,7 +147,9 @@ export function createOil(deps) {
     h += `<div class="card"><h3 style="margin:0 0 6px">🤝 Договори за доставка${o.done ? ` <span class="meta" style="margin:0 0 0 auto">изпълнени: ${o.done}</span>` : ''}</h3>${c}</div>`;
     // бензиностанции
     const own = deps.ownedCities();
-    let s = `<div class="meta" style="margin:0 0 6px">Всяка верига продава до ${STATION.perDay} хил. л гориво на ден на ниво от танковете, на цена ×${STATION.retail} от пазарната. Нужни сега: ${f(stationsNeed())} хил. л/ден${o.stSold != null ? ` · вчера продадени ${f(o.stSold)}` : ''}.</div>`;
+    const rt = o.retail || STATION.retail;
+    let s = `<div class="row" style="margin:0 0 6px;gap:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0;flex:1 1 240px">🏷️ <b style="color:var(--txt)">Твоята цена на дребно</b>: ${f(Math.round(fuelP() * rt))} €/хил. л (×${rt} от пазарната) · клиенти ${Math.round(demandOf(rt) * 100)}% — по-евтино = повече продажби, по-скъпо = повече печалба на литър</span>${RETAIL_OPTS.map(r => `<button class="${rt === r ? 'btn' : 'btn2'}" data-oilret="${r}" title="${Math.round(demandOf(r) * 100)}% клиенти">×${r}</button>`).join('')}</div>
+      <div class="meta" style="margin:0 0 6px">Всяка верига продава до ${STATION.perDay} хил. л гориво на ден на ниво (при ×${STATION.retail}) от танковете. Нужни сега: ${f(stationsNeed())} хил. л/ден${o.stSold != null ? ` · вчера продадени ${f(o.stSold)}` : ''}.</div>`;
     s += Object.entries(o.stations).map(([id, L]) => `<div class="row" style="margin:4px 0;align-items:center;gap:6px"><span class="meta" style="margin:0;flex:1">⛽ <b style="color:var(--txt)">${deps.cityName(id)}</b> · ниво ${L} · ${STATION.perDay * L} хил. л/ден</span>${L < STATION.lvMax ? `<button class="btn2" data-oilsup="${id}">⬆️ ${f(STATION.upCost * L * (deps.isAm(id) ? 2 : 1))} €</button>` : ''}</div>`).join('');
     const can = own.filter(id => !o.stations[id]).slice(0, 12);
     if (can.length) s += `<div class="row" style="margin:6px 0 0;gap:6px;flex-wrap:wrap">${can.map(id => `<button class="btn2" data-oilst="${id}" ${deps.econ().canAfford(stationCost(id)) ? '' : 'disabled'}>⛽ ${deps.cityName(id)} · ${f(stationCost(id))} €</button>`).join('')}</div>`;
@@ -148,6 +161,7 @@ export function createOil(deps) {
     on('[data-oilsell]', b => { const m = b.dataset.oilsell, got = sell(m); if (got) { deps.toast(`💰 Продаде ${nm(m)} за ${deps.fmt(got)} €.`, 'good'); deps.sound && deps.sound('cash'); } });
     on('[data-oilacc]', b => accept(+b.dataset.oilacc)); on('[data-oildec]', b => decline(+b.dataset.oildec));
     on('[data-oilst]', b => buyStation(b.dataset.oilst)); on('[data-oilsup]', b => upStation(b.dataset.oilsup));
+    on('[data-oilmin]', b => { st().minPx = +b.dataset.oilmin; }); on('[data-oilret]', b => { st().retail = +b.dataset.oilret; });
     box.querySelectorAll('[data-oilauto]').forEach(b => b.onchange = () => { st().auto = b.checked; deps.save(); });
   }
   return { state: st, active, intake, sell, dailyTick, dailyAvg, winHtml, bind, accept, crudeP, fuelP, market, makeOffer, deliver };

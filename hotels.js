@@ -64,5 +64,5 @@ export function createHotels(deps) {
     return h;
   }
   const bind = (box, rerender) => { box.querySelectorAll('[data-hotel]').forEach(b => b.onclick = () => { build(b.dataset.hotel); rerender(); }); box.querySelectorAll('[data-hconv]').forEach(b => b.onclick = () => { convert(b.dataset.hconv); rerender(); }); };
-  return { state: st, build, convert, daily, dailyTick, value, winHtml, bind, occ, revOf };
+  return { state: st, build, convert, daily, dailyTick, value, winHtml, bind, occ, revOf, canConvert, nextT, costOf, CONVERT };   // canConvert/nextT/costOf — за директора на хотелите (борда)
 }

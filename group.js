@@ -127,7 +127,7 @@ export function createGroup(deps) {
     let h = `<div class="bw-stats"><div><b style="color:${b.col}">${b.ico} ${groupName(S)}</b><span>${H ? 'холдинг' : 'корпоративна група'}</span></div><div><b>${open.length} / ${SUBS.length}</b><span>дружества</span></div><div><b style="color:var(--ok)">+${f(tot)} €</b><span>приход на ден от дружествата</span></div>${H ? `<div><b style="color:#ffd54a">+${f(bon)} €</b><span>бонус на холдинга на ден</span></div>` : ''}</div>`;
     h += H ? `<div class="meta" style="margin:8px 0">🏛️ <b>Ерата на холдинга</b> (от ден ${H}): градовете, поръчките, линиите и флотите вървят сами. Ти управляваш дружествата: <b>⬆️ развитие</b> дава +${Math.round(HOLD_LV_K * 100)}% от прихода им на ниво (до ${HOLD_LV_MAX}), а <b>👔 директорът</b> още +${Math.round(HOLD_DIR_K * 100)}%.</div>`
       : `<div class="meta" style="margin:8px 0">🔒 От <b>ниво 15</b> идва <b>🏛️ Ерата на холдинга</b>: всичко досегашно минава на автопилот, а ти управляваш дружествата.</div>`;
-    if (H && feature('boardroom')) h += '<div class="row" style="justify-content:flex-end;margin:0 0 8px"><button class="btn" data-hboard="1">🏛️ Директорската зала →</button></div>';
+    if (H && feature('boardroom')) h += '<div class="row" style="justify-content:flex-end;margin:0 0 8px"><button class="btn" data-hboard="1">🏛️ Директорската зала →</button></div>' + (deps.board2 ? deps.board2().settingsHtml() : '');   // бюджети и автопилот (boardlogic.js)
     h += extra;
     h += '<style>.subLock > *:not(.subLv){filter:blur(2.5px);opacity:.55;pointer-events:none;user-select:none}.subLv{position:absolute;right:12px;top:50%;transform:translateY(-50%);z-index:2;padding:5px 12px;border-radius:999px;background:rgba(0,0,0,.65);border:1px solid var(--line);font-weight:800;color:#ffd54a}</style>';   // заключените — замъглени, с ясна значка „🔒 ниво N“
     h += SUBS.map(s => {
@@ -142,6 +142,7 @@ export function createGroup(deps) {
     box.querySelectorAll('[data-hup]').forEach(b => b.onclick = () => { upgrade(b.dataset.hup); rerender(); });
     box.querySelectorAll('[data-hdir]').forEach(b => b.onclick = () => { hire(b.dataset.hdir); rerender(); });
     box.querySelectorAll('[data-hboard]').forEach(b => b.onclick = () => board(rerender));
+    if (deps.board2) deps.board2().bindSettings(box, rerender);
     box.querySelectorAll('[data-hfound]').forEach(b => b.onclick = () => { if (deps.askFound && deps.askFound(b.dataset.hfound, rerender)) return; found(b.dataset.hfound); rerender(); });   // екранът с логото (game.js)
   }
   // 🏛️ Директорската зала (directors3d.js): всяко дружество е стол на масата; клик на директор — доклад и одобряване на развитие
@@ -173,7 +174,11 @@ export function createGroup(deps) {
   function board(rerender) {
     const re = () => rerender && rerender();
     import('./directors3d.js').then(m => m.openBoardroom({ title: groupName(deps.S()), seats: boardSeats, fmt: deps.fmt, sound: deps.sound,
-      proposals, onDecide: (id, a) => { decide(id, a); re(); }, onUp: k => { upgrade(k); re(); }, onHire: k => { hire(k); re(); } }));
+      proposals, onUp: k => { upgrade(k); re(); }, onHire: k => { hire(k); re(); },
+      // „Да“ минава през boardlogic.js (бюджет → банка → гласуване); връща { need: 'vote', v, p }, ако бордът трябва да гласува
+      onDecide: (id, a) => { const B = deps.board2 && deps.board2(), r = a === 'yes' && B ? B.request(id) : (decide(id, a), null); re(); return r; },
+      onResolve: (id, how) => { const r = deps.board2().resolve(id, how); re(); return r; },
+      settings: deps.board2 ? () => deps.board2().settingsHtml() : null, bindSettings: (box, rr) => deps.board2().bindSettings(box, () => { rr(); re(); }) }));
   }
   return { check, winHtml, bind, board, proposals, decide, dailyTick, dailyBonus, upgrade, hire, found, canFound };
 }
