@@ -512,7 +512,7 @@ export function openBoardroom(o) {
     for (const x of v.votes) { const d = document.createElement('div'), m = document.createElement('b'); m.textContent = x.cond ? '◐ ' : x.yes ? '✔ ' : '✖ '; m.style.color = x.cond ? '#ffb347' : x.yes ? '#43d17a' : '#ff4d4d'; m.style.fontWeight = '900'; d.appendChild(m); d.appendChild(document.createTextNode(`${x.name} — ${x.why}`)); vs.appendChild(d); }   // ✖ против — червено, ✔ за — зелено, ◐ — за, с условие
     const row = scr.querySelector('.row');
     const btn = (t, how, y) => { const b = document.createElement('button'); b.textContent = t; if (y) b.className = 'y'; b.onclick = () => { const rr = o.onResolve && o.onResolve(p.id, how); after(how === 'drop' ? 'later' : rr && rr.done === false ? 'no' : 'ok'); }; row.appendChild(b); };
-    btn('✓ Одобри', 'pass', true);
+    btn('✓ Одобри', p.isSmall ? 'small' : 'pass', true);   // гласуваше се за по-малкия вариант — одобрява се той, не пълният
     if (p.small) btn(`½ По-малък вариант · ${B(p.small.cost)}`, 'small');
     if (v.bank && !v.bank.ok) btn('🏦 С кредит', 'loan');
     btn('⏳ Отложи', 'drop');

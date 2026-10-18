@@ -90,7 +90,7 @@ export function createGroup(deps) {
       deps.sound && deps.sound('cash'); h.mAcc = 0;
     }
     // веднъж месечно бордът на директорите се събира сам, ако има какво да предложи
-    if (day % 30 === 0 && deps.S().holding && feature('boardroom') && proposals().length) { deps.toast(`🏛️ Бордът на директорите се събра — ${proposals().length} предложения.`, 'good'); board(); }
+    if (day % 30 === 0 && deps.S().holding && feature('boardroom') && proposals().filter(p => !p.info).length) { deps.toast(`🏛️ Бордът на директорите се събра — ${proposals().filter(p => !p.info).length} предложения.`, 'good'); board(); }   // докладът на банката (info) не е предложение
     return b;
   }
   function check(quiet = false) {
@@ -168,6 +168,7 @@ export function createGroup(deps) {
     if (a === 'yes') {
       if (p.cost && !deps.econ().canAfford(p.cost)) { deps.toast(`Нямаш ${deps.fmt(p.cost)} €.`, 'bad'); return; }
       p.apply(); deps.toast(`✓ Бордът одобри: ${p.text}`, 'good'); deps.sound && deps.sound('buy');
+      (h.skip = h.skip || {})[propKey(id)] = (deps.S().day || 0) + 30;   // одобреното не се предлага пак веднага (до следващия борд) — иначе се одобряваше многократно
     } else (h.skip = h.skip || {})[propKey(id)] = (deps.S().day || 0) + (a === 'no' ? 90 : 30);
     deps.save();
   }
