@@ -6,6 +6,7 @@
 // Записът е в S.tenders = { [id]: { st, closes, my, bids, price, prog, start, due, paidAdv, spent } }.
 //   st: 'open' (приема оферти) | 'building' | 'done' | 'lost'
 import { FIRMS, firmsFor } from './rivals.js';
+import { evTender, dueEditions, pickHost } from './worldevents.js';
 
 export const TENDERS = [
   { id: 'su-sofia', city: 'sofia', kind: 'university', ico: '🎓', nm: 'Нов корпус на Софийския университет', budget: 14000000, days: 45, rep: 3, dev: 3,
@@ -73,7 +74,10 @@ const T = id => TENDERS.find(t => t.id === id);
 // deps: { S(), econ(), toast, modal(title, html, buttons), fmt, save, sound(n), rep(), devBest(), owns(cityId), cityName(id),
 //         fleetIn(cityId) → { type: count } (техниката в този град), emit?(ev), onProgress?(id, prog) — 3D, onDone?(id), pop?(key, cap, sub) — снимка }
 export function createTenders(deps) {
-  const st = () => { const S = deps.S(); S.tenders = S.tenders || {}; return S.tenders; };
+  const evSeen = new WeakSet();
+  // търговете на световните събития (worldevents.js) не са в списъка — при зареждане на запис се връщат по ида
+  const evRestore = all => { for (const id of Object.keys(all)) if (id.startsWith('ev-') && !T(id)) { const t = evTender(id, deps.cityName); if (t) TENDERS.push(t); } };
+  const st = () => { const S = deps.S(); S.tenders = S.tenders || {}; if (!evSeen.has(S.tenders)) { evSeen.add(S.tenders); evRestore(S.tenders); } return S.tenders; };
   const day = () => deps.S().day;
   const ul = k => deps.unitLabel ? deps.unitLabel(k) : k;
   const refund = (t, s, why) => { if (!s.bond) return; deps.econ().earn(s.bond, 'гаранция', `Върната гаранция: ${t.nm}`); if (why) deps.toast(`🔐 ${why}: върнаха ти гаранцията ${deps.fmt(s.bond)} €.`, 'good'); s.bond = 0; };
@@ -156,15 +160,25 @@ export function createTenders(deps) {
     // (преди: един за целия свят → средно на 27 дни, понякога 4–5 месеца нищо). Градовете, в които имаш филиал, излизат 3× по-често (там можеш да участваш).
     const grp = t => deps.groupOf ? deps.groupOf(t.city) : 'all';
     const busy = new Set(TENDERS.filter(t => all[t.id]?.st === 'open').map(grp));
-    const cand = TENDERS.filter(t => !busy.has(grp(t)) && eligible(t) && (!all[t.id] || (all[t.id].st === 'lost' && day() - all[t.id].lostDay > 120)));
+    const cand = TENDERS.filter(t => !t.ev && !busy.has(grp(t)) && eligible(t) && (!all[t.id] || (all[t.id].st === 'lost' && day() - all[t.id].lostDay > 120)));
     for (const g of new Set(cand.map(grp))) {
       if (Math.random() >= 0.08) continue;
       const cg = cand.filter(t => grp(t) === g), w = cg.map(t => deps.owns(t.city) ? 3 : 1);
       let r = Math.random() * w.reduce((a, b) => a + b, 0), i = 0; while ((r -= w[i]) > 0 && i < cg.length - 1) i++;
       announce(cg[i]);
     }
+    // световните събития: ново издание → търг в града домакин (ако фирмата е достатъчно развита — иначе го строят други)
+    for (const { E, ed } of dueEditions(S)) {
+      const city = pickHost(E, deps.owns, id => !!(deps.ccOf ? deps.ccOf(id) : deps.cityName(id) !== id)); if (!city) continue;
+      const t = evTender(`ev-${E.key}-${ed}-${city}`, deps.cityName);
+      if (!eligible(t) || t.evDay - day() < t.days + OPEN_DAYS) continue;   // закъсняло издание (стар запис) — няма време за строеж
+      if (!T(t.id)) TENDERS.push(t);
+      announce(t);
+      if (!deps.owns(city)) deps.toast(`${t.ico} За да участваш в търга за ${t.nm}, ти трябва филиал в ${deps.cityName(city)}.`, '');
+    }
     for (const t of TENDERS) {
       const s = all[t.id]; if (!s) continue;
+      if (t.ev && !s.evOver && day() >= t.evDay) evOpen(t, s);
       if (s.st === 'open' && day() >= s.closes) close(t);
       else if (s.st === 'building') {
         if (day() > s.due) {
@@ -192,6 +206,18 @@ export function createTenders(deps) {
         }
       }
     }
+  }
+
+  // откриването на събитието: готов твой обект → дял от билетите и репутация; недовършен → само съобщение (неустойките текат)
+  function evOpen(t, s) {
+    s.evOver = true;
+    if (s.st === 'done') {
+      const n = Math.round(t.budget * t.share / 1e5) * 1e5; deps.econ().earn(n, 'обект', `${t.nm}: дял от билетите`);
+      deps.S().rep = Math.min(5, (deps.S().rep || 0) + 0.5);
+      deps.toast(`${t.ico} ${t.nm} започна на твоя обект! Дял от билетите +${deps.fmt(n)} € · +0.5 ★`, 'good');
+      if (deps.pop) deps.pop('tender-won', `${t.ico} ${t.nm} е открито!`, `Светът гледа ${deps.cityName(t.city)} — дял от билетите +${deps.fmt(n)} € · +0.5 ★`);
+      if (deps.sound) deps.sound('done');
+    } else if (s.st === 'building') deps.toast(`⚠️ ${t.ico} ${t.nm} започна, а обектът ти още не е готов (${Math.round(s.prog * 100)}%) — няма дял от билетите, а неустойката тече.`, 'bad');
   }
 
   function bid(id, m) {
@@ -233,7 +259,8 @@ export function createTenders(deps) {
             <button class="btn2" data-tquit="${t.id}" title="Губиш гаранцията и 0.3 ★">✋ Откажи се</button></div>`; })() : ''}`; }
       else if (s.st === 'done') body = `<div class="meta" style="color:var(--ok)">✅ Предаден · печалба ${deps.fmt(s.profit)} €</div>`;
       else body = `<div class="meta late">Спечели ${s.winner} (${Math.round(s.winM * 100)}%).</div>`;
-      out.push(`<div class="card tender-card"><h3><span class="ico">🏛️</span>${t.ico} ${t.nm}</h3><div class="meta">Държавна поръчка · ${deps.cityName(t.city)} · ${t.ds}</div>${body}</div>`);
+      if (t.ev && s.st !== 'done') body += `<div class="meta">${t.ico} Откриване: <b style="color:var(--txt)">ден ${t.evDay}</b> (${Math.max(0, t.evDay - day())} д.) · готов навреме → +${deps.fmt(Math.round(t.budget * t.share / 1e5) * 1e5)} € от билетите</div>`;
+      out.push(`<div class="card tender-card"><h3><span class="ico">${t.ev ? '🌍' : '🏛️'}</span>${t.ico} ${t.nm}</h3><div class="meta">Държавна поръчка · ${deps.cityName(t.city)} · ${t.ds}</div>${body}</div>`);
     }
     return out.join('');
   }

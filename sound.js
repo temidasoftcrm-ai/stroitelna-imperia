@@ -46,6 +46,42 @@ export const Sound = {
   // птица: бърза поредица от плъзгащи се тонове
   bird() { const b = rand(2200, 3800), n = 2 + (Math.random() * 4 | 0); for (let i = 0; i < n; i++) this.tone(b * rand(0.9, 1.1), 0.09, 0.05, 'sine', b * rand(1.2, 1.5), i * 0.11); },
   cricket() { const f = rand(4200, 4800); for (let i = 0; i < 3; i++) this.tone(f, 0.04, 0.025, 'square', null, i * 0.07); },
+  // ---- живата улица в средните и големите градове (над записания фон): клаксони, коли и мотори, които минават от ляво
+  // надясно, въздушните спирачки на автобуса, далечна сирена — на случаен ред и от случайна страна (стерео)
+  pan(p) { const n = this.ctx.createStereoPanner ? this.ctx.createStereoPanner() : null; if (!n) return this.master; n.pan.value = p; n.connect(this.master); return n; },
+  horn(vol = 0.05) {   // клаксон на кола: два близки тона през филтър, понякога двойно „бип-бип“
+    const ctx = this.ctx, out = this.pan(rand(-0.9, 0.9)), f0 = rand(380, 520), n = Math.random() < 0.4 ? 2 : 1;
+    for (let i = 0; i < n; i++) {
+      const t = ctx.currentTime + i * 0.22, d = n > 1 ? 0.14 : rand(0.25, 0.6), lp = ctx.createBiquadFilter(), g = ctx.createGain();
+      lp.type = 'lowpass'; lp.frequency.value = 1800; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.02); g.gain.setValueAtTime(vol, t + d); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.06);
+      for (const f of [f0, f0 * 1.26]) { const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = f; o.connect(lp); o.start(t); o.stop(t + d + 0.1); }
+      lp.connect(g); g.connect(out);
+    }
+  },
+  passBy(moto = false, vol = 0.06) {   // кола (шум) или мотор (трион) минава: звукът расте, после заглъхва, панорамата се мести, тонът пада (Доплер)
+    const ctx = this.ctx, t = ctx.currentTime, d = moto ? rand(1.6, 2.4) : rand(2, 3.2), dir = Math.random() < 0.5 ? -1 : 1;
+    const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null, g = ctx.createGain(), f = ctx.createBiquadFilter();
+    if (p) { p.pan.setValueAtTime(-0.9 * dir, t); p.pan.linearRampToValueAtTime(0.9 * dir, t + d); p.connect(this.master); }
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + d * 0.45); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    f.type = 'bandpass'; f.Q.value = moto ? 3 : 0.8; f.frequency.setValueAtTime(moto ? 900 : 700, t); f.frequency.exponentialRampToValueAtTime(moto ? 500 : 380, t + d);
+    f.connect(g); g.connect(p || this.master);
+    if (moto) { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(rand(120, 160), t); o.frequency.exponentialRampToValueAtTime(rand(80, 100), t + d); o.connect(f); o.start(t); o.stop(t + d + 0.1); }
+    else { const s = ctx.createBufferSource(); s.buffer = this.noise; s.connect(f); s.start(t, Math.random(), d + 0.1); }
+  },
+  busBrake(vol = 0.05) {   // „пшшш“ на въздушните спирачки
+    const ctx = this.ctx, t = ctx.currentTime, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    s.buffer = this.noise; f.type = 'highpass'; f.frequency.value = 3000;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+    s.connect(f); f.connect(g); g.connect(this.pan(rand(-0.7, 0.7))); s.start(t, Math.random(), 1);
+  },
+  street(k, night) {   // k — колко е жив градът 0…1
+    const r = Math.random();
+    if (r < 0.32) this.passBy(false, 0.04 + 0.04 * k);
+    else if (r < 0.5) this.passBy(true, 0.035 + 0.03 * k);
+    else if (r < 0.72) this.horn(0.03 + 0.03 * k);
+    else if (r < 0.86) { if (!night) this.busBrake(0.03 + 0.03 * k); }
+    else if (r < 0.93 && k > 0.5) this.file(`assets/sfx/${['siren-ambulance', 'siren-police', 'siren-fire'][(Math.random() * 3) | 0]}.mp3`, 0.08 * k);   // далечна сирена
+  },
   hammer() { this.hit(rand(1800, 2600), 0.08, 0.22, 6); if (Math.random() < 0.5) this.hit(rand(1800, 2600), 0.08, 0.18, 6, 0.32); },
 
   // ефекти за събития
@@ -158,6 +194,8 @@ export const Sound = {
     this.t += dt;
     if (this.t > this.nextBird && night < 0.3) { this.bird(); this.nextBird = this.t + rand(2.5, 7); }
     if (this.t > this.nextCricket && night > 0.6) { this.cricket(); this.nextCricket = this.t + rand(0.6, 2); }
+    const k = Math.min(1, town / 0.32);   // градът е по-жив отблизо и денем (силата идва от game.js)
+    if (k > 0.05 && this.t > (this.nextStreet || 0)) { this.street(k, night > 0.6); this.nextStreet = this.t + rand(1.5, 5) / Math.max(0.25, k) * (night > 0.6 ? 2.5 : 1); }
     if (this.t > this.nextHammer && activity > 0.15) { this.hammer(); this.nextHammer = this.t + rand(0.5, 1.6) / Math.max(0.3, activity); }
   },
 };
