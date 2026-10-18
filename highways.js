@@ -2,6 +2,8 @@
 // Данни за истинските български магистрали + 3D модел на участък, който се „строи“ по етапи.
 // game.js ползва: HIGHWAYS, HW_STAGES, segmentQuote(km), HW_MODELS, buildHighwayView(A, opts).
 import * as THREE from 'three';
+import { feature } from './lab/feature.js';
+import { loadSigns, sign } from './roadsigns.js';
 import { makeWater } from './water.js';
 
 // Истинските магистрали, разделени на участъци между градовете от картата
@@ -289,6 +291,8 @@ export function buildHighwayView(A, opts = {}) {
   const front = new THREE.Group(); g.add(front);
   for (const x of [-W / 2 - 2, W / 2 + 2]) { const b = clone(A, 'construction-barrier', 5); b.position.set(x, 0, 0); front.add(b); }
   const fl = clone(A, 'construction-light', 6); fl.position.set(W / 2 + 3, 0, -3); front.add(fl);
+  // Лабораторията → road-signs: истински пластмасови бариери (оранжево-бели) напреки на платното пред строежа
+  if (feature('road-signs')) loadSigns().then(() => { for (let x = -W / 2 + 0.8, k = 0; x < W / 2; x += 1.3, k++) { const b = sign(k % 2 ? 'barrier' : 'barrier2', x, 1.2, 0); if (b) { b.position.y = 0.9; front.add(b); } } });
   // машини: асфалтополагач и валяк (процедурни), плюс самосвали от Kenney, ако са заредени
   const paver = makePaver(CW), rollers = [makeRoller(), makeRoller()];
   g.add(paver, ...rollers);

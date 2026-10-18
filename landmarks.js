@@ -472,7 +472,7 @@ const GLB_LM = {
   colosseo: { h: 13, fit: 15, plate: 0xb9ad98 },   // Рим: Колизеумът (Carlos.Maciel)
   sagrada: { h: 17, fit: 15, plate: 0xc9bfa8 },   // Барселона: Саграда Фамилия (vmmaniac)
   whitehouse: { h: 9, fit: 15, plate: 0x6f9a55, matte: 0xf4f1ea, rx: -0.28, cut: [[-0.35, 0.95, 0.8, 1.6]], floodK: 2.2, onLoad: whMonument },   // cut — колата от модела, останала на тревата пред южната фасада; floodK — по-силни прожектори нощем   // Вашингтон: Белият дом с крилата (Void); моделът е наклонен ~16° — rx го изправя (иначе едната страна и крилата висят във въздуха)
-  capitol: { h: 14, fit: 15, plate: 0x6f8f55, sink: 0.1, ry: -0.89, crop: [-5.9, 6.0, -2.5, 2.9], base: 0xd6d3c9, floodK: 2.4 },     // Вашингтон: Капитолият (ycpan3468, photogrammetry; паркът наоколо е изрязан, хълмът е наклонен); голяма зона 3×3 (BIG_LANDMARKS); ry — по улиците (сканът е по диагонал), crop — изрязва площада/дърветата/съседната сграда, base — каменна основа под назъбените краища
+  capitol: { h: 11, fit: 15, plate: 0x6f8f55, floodK: 2.4 },   // Вашингтон: Капитолият (Meshy AI, от потребителя — 18.10; преди: фотоскан на ycpan3468)
   vegassign: { h: 14, fit: 12, plate: 0xc9b98a },   // Лас Вегас: табелата „Welcome to Fabulous Las Vegas“ (sipulitrade)
   mgu: { h: 16, fit: 15, plate: 0x6f8f55 },   // Москва: МГУ — сталинският небостъргач с крилата и парка (Meshy AI); голяма зона 2×2 (BIG_LANDMARKS)
   eiffel: { h: 26, fit: 15, plate: 0xc9bfa8, onLoad: eiffelLights },   // Париж: Айфеловата кула (Meshy AI); нощем златни светлини и проблясване

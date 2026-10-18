@@ -162,3 +162,6 @@ cinema/newyork.mp4, cinema/vegas.mp4, cinema/paris.mp4, cinema/dubai.mp4, cinema
 - civic2/hosp-m2.glb — "Hospital" by iagoDev (CC-BY 4.0) — https://sketchfab.com/3d-models/f91637b01dde4749aafd56ea37fa3b21
 - civic2/hosp-l1.glb — "Building of the polyclinic in russia" by narcozisne1 (CC-BY 4.0) — https://sketchfab.com/3d-models/18ea30a7d33a427da66b3f82ade3dbf6
 - civic2/hosp-l2.glb — "Aster M.C Building , in TCA -AUH" by amerkhafagi (CC-BY 4.0) — https://sketchfab.com/3d-models/86e9d2fd1ee34054a971fc5e7983d1f6
+
+- signs/signs.glb — извадени 12 модела (стоп, пропусни, двупосочно, забранено влизането, 50 км/ч и край, кръгово, стрелки, пластмасови бариери, мантинела) от "Road pack (not including the road)" by drcrazzie (CC-BY 4.0) — https://sketchfab.com/3d-models/021707f910d04907ab576c856a749628 (текстурите смалени до 1024 px, WebP)
+- lm/capitol.glb — Капитолият, направен в Meshy AI от потребителя (18.10.2026), опростен до ~61 хил. триъгълника

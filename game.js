@@ -40,6 +40,7 @@ import { SKY_BANDS, SKY_BANDS_MODERN, makeTall, makeTallCopy } from './tall.js';
 import { buildAirport as makeAirport3D, loadAirModels, loadTerminals } from './airport.js';
 import { createTenders, TENDERS, BID_MS } from './tenders.js';
 import { createTasks } from './tasks.js';
+import { loadSigns, citySigns } from './roadsigns.js';
 import { buildUniversity, buildHospital, buildStadium, buildMetro, buildAirTerminal, buildCanal, buildPortTerminal } from './tender3d.js';
 import { buildGreatWall } from './greatwall3d.js';
 import { buildCivic, CIVIC_KINDS } from './civic3d.js';
@@ -877,6 +878,7 @@ function buildCity(cityId) {
   }
   dayNight.setLamps(lampPos);
   buildSignals(g);
+  if (feature('road-signs')) loadSigns().then(() => { if (g.parent) citySigns(g, { tx, TILE, NBI, NBJ, isRoad, hasSignal: (i, j) => signals.some(q => q.i === i && q.j === j) }); });   // пътните знаци — след площадите (isRoad вече ги знае)
   }
   // парцели
   city.lots = [];
