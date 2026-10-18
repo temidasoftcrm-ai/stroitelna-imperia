@@ -107,6 +107,6 @@ export class DayNight {
     this.lamps.visible = n > 0.01;
     for (const m of this.winMats) m.emissiveIntensity = n * (m.userData.winK || 1);
     NF_T.value = performance.now() / 1000;
-    for (const m of NF_MATS) m.emissiveIntensity = n;   // нощните етажи (nightfloors.js) — и на забележителностите, заредени по-късно
+    for (const m of NF_MATS) m.emissiveIntensity = n * (m.userData.nfK || 1);   // nfK — по-ярко (Петронас)   // нощните етажи (nightfloors.js) — и на забележителностите, заредени по-късно
   }
 }

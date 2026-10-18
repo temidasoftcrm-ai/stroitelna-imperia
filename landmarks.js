@@ -471,7 +471,7 @@ const GLB_LM = {
   opera: { h: 30, fit: 40, plate: 0x4f86b8 }, manhattan: { h: 34, fit: 15, grid: true },
   colosseo: { h: 13, fit: 15, plate: 0xb9ad98 },   // Рим: Колизеумът (Carlos.Maciel)
   sagrada: { h: 17, fit: 15, plate: 0xc9bfa8 },   // Барселона: Саграда Фамилия (vmmaniac)
-  petronas: { h: 60, fit: 15, plate: 0xb9b2a5, floodK: 2.4, onLoad: petronasLights },   // Куала Лумпур: кулите Петронас (Meshy AI, от потребителя — 18.10); нощем сребристо осветени, червени светлини на шпиловете
+  petronas: { h: 60, fit: 15, plate: 0xb9b2a5, floodK: 2.4, silver: 1.3, onLoad: petronasLights },   // silver — стомана и стъкло; нощем — етажите (nightfloors.js)   // Куала Лумпур: кулите Петронас (Meshy AI, от потребителя — 18.10); нощем сребристо осветени, червени светлини на шпиловете
   whitehouse: { h: 9, fit: 15, plate: 0x6f9a55, matte: 0xf4f1ea, rx: -0.28, cut: [[-0.35, 0.95, 0.8, 1.6]], floodK: 2.2, onLoad: whMonument },   // cut — колата от модела, останала на тревата пред южната фасада; floodK — по-силни прожектори нощем   // Вашингтон: Белият дом с крилата (Void); моделът е наклонен ~16° — rx го изправя (иначе едната страна и крилата висят във въздуха)
   capitol: { h: 11, fit: 15, plate: 0x6f8f55, floodK: 3 },   // Вашингтон: Капитолият (Meshy AI, от потребителя — 18.10; преди: фотоскан на ycpan3468)
   vegassign: { h: 14, fit: 12, plate: 0xc9b98a },   // Лас Вегас: табелата „Welcome to Fabulous Las Vegas“ (sipulitrade)
@@ -486,9 +486,24 @@ const GLB_LM = {
   luxor: { h: 9, fit: 15, sy: 1.9, plate: 0xd9c08a, onLoad: luxorBeam },   // Лас Вегас: „Луксор“ — черната пирамида със сфинкса (Meshy AI); нощем лъч от върха   // Лас Вегас: хотел „Беладжо“ (Meshy AI) — отпред езерото с фонтаните (bellagio() по-долу)
 };
 const glbCache = {};
+// стомана и стъкло: текстурата се обезцветява и изсветлява (Meshy дава кафеникав камък), металът блести малко
+function silverize(root, k = 1.25) {
+  const done = new Set();
+  root.traverse(o => { if (!o.isMesh) return; for (const m of [].concat(o.material)) {
+    if (!m || done.has(m)) continue; done.add(m);
+    const img = m.map && m.map.image; if (img && img.width) {
+      const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.drawImage(img, 0, 0);
+      const d = x.getImageData(0, 0, c.width, c.height), a = d.data;
+      for (let i = 0; i < a.length; i += 4) { const l = Math.min(255, (a[i] * 0.3 + a[i + 1] * 0.59 + a[i + 2] * 0.11) * k + 18); a[i] = l * 0.97; a[i + 1] = l * 0.99; a[i + 2] = Math.min(255, l * 1.04); }
+      x.putImageData(d, 0, 0); const t = new THREE.CanvasTexture(c); t.colorSpace = m.map.colorSpace; t.flipY = m.map.flipY; t.wrapS = m.map.wrapS; t.wrapT = m.map.wrapT; m.map = t;
+    }
+    m.metalness = 0.45; m.roughness = 0.35; m.needsUpdate = true;
+  } });
+}
 function loadLm(kind) {
   return glbCache[kind] || (glbCache[kind] = new GLTFLoader().loadAsync(`assets/heavy/lm/${kind}.glb`).then(gl => {
     gl.scene.traverse(o => { if (o.isMesh && !o.geometry.attributes.normal) o.geometry.computeVertexNormals(); });
+    if (GLB_LM[kind]?.silver) silverize(gl.scene, GLB_LM[kind].silver);   // преди етажите — маската на прозорците е от вече сребристата текстура
     prepNightFloors(gl.scene, kind);   // нощем прозорците светват по етажи (само моделите от nightfloors.js — Беладжо)
     return gl.scene;
   }).catch(() => null));

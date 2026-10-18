@@ -12,7 +12,7 @@ const MODE = { 'building-a': 'dark', 'building-b': 'cool', 'building-c': 'dark',
   'building-i': 'kenney', 'building-j': 'kenney', 'building-k': 'kenney', 'building-l': 'kenney', 'building-m': 'kenney', 'building-n': 'kenney',
   // новите модели D (Singapore Office — като sf-sky-sing) и E (Bank of China): стъклата по етажи, рамките/лъчите — не
   'building-skyscraper-d': ['cool', [/Interior/i, 'flood'], [/Red_Beam|Trimsheet|temp/i, null]], 'building-skyscraper-e': ['cool', [/Lisanne|Color_A06/i, null], [/^Material(\.\d+)?$/, 'coolW']],   // E: Bank of China (cool) или новата синя стъклена кула (com2-sky-e2 — „Material“: сребристо + етажи, без точки)
-  bellagio: 'flood', sagrada: 'floodUp', burj: ['coolW', [/material_1/, null]], willis: 'coolW', cntower: 'led',   // Уилис — като Бурж; Си Ен Тауър — цветни LED светлини, които бавно сменят цвета   // Бурж Халифа: студено-бели етажи   // Саграда Фамилия: прожектори отдолу, кулите по-светли нагоре
+  bellagio: 'flood', sagrada: 'floodUp', petronas: 'darkC', burj: ['coolW', [/material_1/, null]], willis: 'coolW', cntower: 'led',   // Уилис — като Бурж; Си Ен Тауър — цветни LED светлини, които бавно сменят цвета   // Бурж Халифа: студено-бели етажи   // Саграда Фамилия: прожектори отдолу, кулите по-светли нагоре
   // истинските небостъргачи (assets/heavy/sky): режимът може да зависи от материала — [регулярен израз за името, режим|null]
   'sf-sky-usb': ['cool', [/roof/i, null]], 'sf-sky-rand': ['cool'], 'sf-sky-sing': ['cool', [/Interior/i, 'flood'], [/Red_Beam|Trimsheet|temp/i, null]],
   // истинските къщи и блокове (feature 'night-houses'): house-a — стъклата са отделни материали (светят целите); house-b — една текстура,
@@ -26,13 +26,14 @@ const MODE = { 'building-a': 'dark', 'building-b': 'cool', 'building-c': 'dark',
   'h2-greyporch': [null, [/Glass|^material_0$/i, 'solidW']], 'h2-swedish': [null, [/^Glass$/, 'solidW']], 'h2-lodge': [null, [/Floor|CEILING/i, 'solidW']],   // solidW — цялото стъкло, топло
   'h2-pink': [null, [/WindowsAndDoors/i, 'darkC']], 'h2-townhouse': 'darkC', 'h2-porch': [null, [/^lambert9SG$/, 'solidW']], 'h2-brickcabin': 'whiteS',   // porch: стъклото е lambert9SG; h2-blue — засега без
   'sf-sky-night': ['bright'], 'sf-sky-blue': ['cool', [/glass/i, 'solid'], [/./, null]] };   // забележителност (landmarks.js) — хотелът в Лас Вегас: цялата фасада в топла светлина (прожектори), етажите леко различни
-const FLOORS = n => (n.startsWith('h2-') ? 2 : 0) || ({ 'building-type-a': 1, 'building-type-b': 2, burj: 90, bellagio: 28, 'building-skyscraper-d': 8, 'building-skyscraper-e': 8 })[n] || (/skyscraper|sf-sky/.test(n) ? 32 : 9);
+const FLOORS = n => (n.startsWith('h2-') ? 2 : 0) || ({ 'building-type-a': 1, 'building-type-b': 2, burj: 90, petronas: 88, bellagio: 28, 'building-skyscraper-d': 8, 'building-skyscraper-e': 8 })[n] || (/skyscraper|sf-sky/.test(n) ? 32 : 9);
 // режимът на материала: MODE[name] е низ или [по подразбиране, [/име/, режим|null]…]
 const modeOf = (name, m) => { const e = MODE[name]; if (!e || typeof e === 'string') return e; for (const [re, md] of e.slice(1)) if (re.test(m.name || '')) return md; return e[0]; };
 const WHITE = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1); WHITE.needsUpdate = true;   // приблизителен брой етажи на модела
+const NF_K = { petronas: 2.8 };   // по-ярки етажи (снимковата текстура дава тесни прозорци)
 export const NF_MATS = new Set();
 export const NF_T = { value: 0 };   // време (s) — daynight.js го върти; през нощта етажи угасват и светват
-const FEAT = { ...Object.fromEntries(['greyporch', 'brickcabin', 'pink', 'townhouse', 'blue', 'swedish', 'lodge', 'porch'].map(k => ['h2-' + k, 'night-houses'])), 'building-type-a': 'night-houses', 'building-type-b': 'night-houses', ...Object.fromEntries(['brick', 'oldbld', 'modoffice', 'richmond', 'dbrick', 'jade', 'soviet', 'panel12', 'gamecity', 'asian'].map(k => ['sf-blk-' + k, 'night-houses'])), sagrada: 'night-sagrada', burj: 'night-burj', willis: 'night-towers', cntower: 'night-towers', 'building-skyscraper-d': 'night-towers', 'building-skyscraper-e': 'night-towers' };
+const FEAT = { ...Object.fromEntries(['greyporch', 'brickcabin', 'pink', 'townhouse', 'blue', 'swedish', 'lodge', 'porch'].map(k => ['h2-' + k, 'night-houses'])), 'building-type-a': 'night-houses', 'building-type-b': 'night-houses', ...Object.fromEntries(['brick', 'oldbld', 'modoffice', 'richmond', 'dbrick', 'jade', 'soviet', 'panel12', 'gamecity', 'asian'].map(k => ['sf-blk-' + k, 'night-houses'])), sagrada: 'night-sagrada', burj: 'night-burj', petronas: 'night-towers', willis: 'night-towers', cntower: 'night-towers', 'building-skyscraper-d': 'night-towers', 'building-skyscraper-e': 'night-towers' };
 const WORLD_H = { burj: 70, willis: 46, cntower: 58, 'building-type-b': 12 };   // каменната къща: мешовете са с вътрешен мащаб — етажите по височината в света   // височина в света (landmarks.js GLB_LM.h) — моделът е от много части с различни оси   // отделно „✓ OK“ в Лабораторията (иначе — night-floors)   // материалите с нощни етажи — daynight.js ги пали вечер
 // прозорците, маркирани на ръка (u0, v0, u1, v1 в текстурата, v отгоре) — снимковите фасади, където маската по яркост дава петна
 const RECTS = {
@@ -102,7 +103,7 @@ export function prepNightFloors(root, name) {
       if (name === 'building-skyscraper-c' && /roof|heli|top/i.test(m.name || '')) continue;
       const mode = modeOf(name, m); if (!mode || (!m.map && mode !== 'solid' && mode !== 'solidW') || (mode === 'aux' && !m.userData.nfAux)) continue;
       const mk = mode === 'solid' || mode === 'solidW' ? WHITE : mode === 'aux' ? maskFor(m.userData.nfAux.tex, m.userData.nfAux.kind) : maskFor(m.map, mode); if (!mk) continue;
-      m.emissiveMap = mk; m.emissive.setRGB(1, 1, 1); m.emissiveIntensity = 0; m.userData.nightFloors = true; m.userData.winK = 1; NF_MATS.add(m);
+      m.emissiveMap = mk; m.emissive.setRGB(1, 1, 1); m.emissiveIntensity = 0; m.userData.nightFloors = true; m.userData.winK = 1; m.userData.nfK = NF_K[name] || 1; NF_MATS.add(m);
       const ax = new THREE.Vector3(0, 1, 0);   // оста „нагоре“ в координатите на меша
       m.onBeforeCompile = sh => {
         let fH = floorH, fY0 = y0, fHt = bb.max.y - bb.min.y;
