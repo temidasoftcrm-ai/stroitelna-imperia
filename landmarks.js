@@ -471,8 +471,8 @@ const GLB_LM = {
   opera: { h: 30, fit: 40, plate: 0x4f86b8 }, manhattan: { h: 34, fit: 15, grid: true },
   colosseo: { h: 13, fit: 15, plate: 0xb9ad98 },   // Рим: Колизеумът (Carlos.Maciel)
   sagrada: { h: 17, fit: 15, plate: 0xc9bfa8 },   // Барселона: Саграда Фамилия (vmmaniac)
-  whitehouse: { h: 9, fit: 15, plate: 0x6f9a55, matte: 0xf4f1ea, rx: -0.28 },   // Вашингтон: Белият дом с крилата (Void); моделът е наклонен ~16° — rx го изправя (иначе едната страна и крилата висят във въздуха)
-  capitol: { h: 14, fit: 15, plate: 0x6f8f55, sink: 0.1, ry: -0.89, crop: [-5.9, 6.0, -2.5, 2.9], base: 0xd6d3c9 },     // Вашингтон: Капитолият (ycpan3468, photogrammetry; паркът наоколо е изрязан, хълмът е наклонен); голяма зона 3×3 (BIG_LANDMARKS); ry — по улиците (сканът е по диагонал), crop — изрязва площада/дърветата/съседната сграда, base — каменна основа под назъбените краища
+  whitehouse: { h: 9, fit: 15, plate: 0x6f9a55, matte: 0xf4f1ea, rx: -0.28, cut: [[-0.35, 0.95, 0.8, 1.6]], floodK: 2.2, onLoad: whMonument },   // cut — колата от модела, останала на тревата пред южната фасада; floodK — по-силни прожектори нощем   // Вашингтон: Белият дом с крилата (Void); моделът е наклонен ~16° — rx го изправя (иначе едната страна и крилата висят във въздуха)
+  capitol: { h: 14, fit: 15, plate: 0x6f8f55, sink: 0.1, ry: -0.89, crop: [-5.9, 6.0, -2.5, 2.9], base: 0xd6d3c9, floodK: 2.4 },     // Вашингтон: Капитолият (ycpan3468, photogrammetry; паркът наоколо е изрязан, хълмът е наклонен); голяма зона 3×3 (BIG_LANDMARKS); ry — по улиците (сканът е по диагонал), crop — изрязва площада/дърветата/съседната сграда, base — каменна основа под назъбените краища
   vegassign: { h: 14, fit: 12, plate: 0xc9b98a },   // Лас Вегас: табелата „Welcome to Fabulous Las Vegas“ (sipulitrade)
   mgu: { h: 16, fit: 15, plate: 0x6f8f55 },   // Москва: МГУ — сталинският небостъргач с крилата и парка (Meshy AI); голяма зона 2×2 (BIG_LANDMARKS)
   eiffel: { h: 26, fit: 15, plate: 0xc9bfa8, onLoad: eiffelLights },   // Париж: Айфеловата кула (Meshy AI); нощем златни светлини и проблясване
@@ -535,6 +535,22 @@ function gridOf(src) {
 }
 // изрязва сканирания терен около сградата (фотограметрия): махат се триъгълниците извън правоъгълника [x0, x1, z0, z1]
 // (в координатите на модела, вписан в 15), а стърчащите им върхове се прибират до ръба. Геометрията се клонира — кешът остава цял
+// обратното на cropLm: маха триъгълниците в правоъгълниците (в същите координати — моделът, сведен до 15 по по-дългата страна)
+function cutLm(w, m, boxes) {
+  w.updateMatrixWorld(true);
+  const bb = new THREE.Box3().setFromObject(w, true), s = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3()), k = 15 / Math.max(s.x, s.z), v = new THREE.Vector3();
+  m.traverse(o => {
+    if (!o.isMesh) return;
+    const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(), p = g.attributes.position, M = o.matrixWorld, keep = [];
+    for (let i = 0; i < p.count; i += 3) {
+      let cx = 0, cz = 0; for (let t = 0; t < 3; t++) { v.fromBufferAttribute(p, i + t).applyMatrix4(M); cx += (v.x - c.x) * k / 3; cz += (v.z - c.z) * k / 3; }
+      if (!boxes.some(([x0, x1, z0, z1]) => cx >= x0 && cx <= x1 && cz >= z0 && cz <= z1)) keep.push(i);
+    }
+    const ng = new THREE.BufferGeometry();
+    for (const [n, at] of Object.entries(g.attributes)) { const a = new at.array.constructor(keep.length * 3 * at.itemSize); keep.forEach((i, j) => a.set(at.array.subarray(i * at.itemSize, (i + 3) * at.itemSize), j * 3 * at.itemSize)); ng.setAttribute(n, new THREE.BufferAttribute(a, at.itemSize, at.normalized)); }
+    o.geometry = ng;
+  });
+}
 function cropLm(w, m, [x0, x1, z0, z1]) {
   w.updateMatrixWorld(true);
   const bb = new THREE.Box3().setFromObject(w, true), s = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3()), k = 15 / Math.max(s.x, s.z);
@@ -561,6 +577,7 @@ function glbLm(kind) {
     g.remove(ph); if (!src) return;
     const m = C.grid ? gridOf(src) : src.clone(true), w = new THREE.Group(); w.add(m); if (C.rx) m.rotation.x = C.rx; if (C.ry) m.rotation.y = C.ry;
     if (C.crop) cropLm(w, m, C.crop);
+    if (C.cut) cutLm(w, m, C.cut);
     const b = new THREE.Box3().setFromObject(w, !!(C.ry || C.crop)), s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3());
     const k = Math.min(C.h / s.y, C.fit / Math.max(s.x, s.z));
     m.position.set(-c.x, -b.min.y, -c.z); w.scale.setScalar(k); w.position.y = 0.3 - (C.sink || 0) * s.y * k; w.position.z = C.dz || 0; if (C.sy) w.scale.y *= C.sy;   // sy — по-стръмно (ниските модели от Meshy)
@@ -569,7 +586,7 @@ function glbLm(kind) {
       if (C.matte && o.material) { o.material = o.material.clone(); o.material.color.set(C.matte); o.material.metalness = 0; o.material.roughness = 0.8; o.material.metalnessMap = o.material.roughnessMap = o.material.map = null; o.material.needsUpdate = true; }   // светла фасада (Белият дом): текстурата е тъмна — само бял цвят + релефът (normalMap)
       if (C.flat && o.material) { o.material = o.material.clone(); o.material.flatShading = true; o.material.vertexColors = !!o.geometry.attributes.color; o.material.needsUpdate = true; }   // плоско осветени стени (без нормали от модела)
       const mt = o.material; if (mt && mt.metalness > 0.4) { mt.metalness = 0.25; mt.roughness = Math.max(mt.roughness ?? 0.5, 0.45); }   // без огледална среда металът излиза черен
-      if (mt && mt.emissive && !mt.emissiveMap && !flood.includes(mt)) { mt.emissive.set(0xffe4b8); if (mt.map) { mt.emissiveMap = mt.map; mt.needsUpdate = true; } mt.emissiveIntensity = 0; flood.push(mt); }   // прожектори: светва текстурата, не плосък бежов цвят
+      if (mt && mt.emissive && !mt.emissiveMap && !flood.includes(mt)) { mt.emissive.set(0xffe4b8); if (mt.map) { mt.emissiveMap = mt.map; mt.needsUpdate = true; } mt.emissiveIntensity = 0; if (C.floodK) mt.userData.floodK = C.floodK; flood.push(mt); }   // прожектори: светва текстурата, не плосък бежов цвят
     });
     if (C.base) box(g, s.x * k + 0.6, 0.35, s.z * k + 0.6, mat(C.base, 0.9), 0, 0.3 + 0.175, C.dz || 0);   // каменна основа — назъбените краища на скана се сливат с нея
     g.add(w);
@@ -598,6 +615,23 @@ function pyramids() {   // Гиза: Хеопс, Хефрен (с бялата �
 }
 
 // Айфеловата кула нощем: златно осветление + хиляди проблясващи светлинки (като всеки час в Париж) и прожектор на върха
+// Вашингтон: паметникът на Вашингтон (обелискът) на южната поляна пред Белия дом — бял мрамор, пирамидка на върха,
+// червени светлини за самолетите и кръг от знамена около основата; нощем е осветен с прожектори като Белия дом
+function whMonument(w, g) {
+  const o = new THREE.Group(); o.position.set(0, 0.3, -6); g.add(o);   // южната поляна (моделът е обърнат — фасадата с колоните е към −z)
+  const marble = mat(0xf1ede4, 0.75, 0, { emissive: 0xffe4b8, emissiveIntensity: 0 }); marble.userData.floodK = 2.6;
+  cyl(o, 2.4, 2.6, 0.25, mat(0xcfc8b8, 0.9), 0, 0.12, 0, 24);   // кръглата площадка
+  box(o, 1.5, 0.3, 1.5, marble, 0, 0.4, 0);
+  const H = 9.5, shaft = add(o, new THREE.CylinderGeometry(0.36 * Math.SQRT2, 0.5 * Math.SQRT2, H, 4, 1), marble, 0, 0.55 + H / 2, 0); shaft.rotation.y = Math.PI / 4;
+  const tip = add(o, new THREE.ConeGeometry(0.36 * Math.SQRT2, 1, 4, 1), marble, 0, 0.55 + H + 0.5, 0); tip.rotation.y = Math.PI / 4;
+  const red = mat(0x400000, 0.4, 0, { emissive: 0xff2020, emissiveIntensity: 0 }), lights = [];
+  for (const [x, z] of [[0.28, 0], [-0.28, 0], [0, 0.28], [0, -0.28]]) lights.push(add(o, new THREE.SphereGeometry(0.06, 6, 4), red, x, 0.55 + H - 0.35, z));
+  const pole = mat(0xdddddd, 0.4, 0.4), stars = new THREE.MeshStandardMaterial({ color: 0x2b3a8a, side: THREE.DoubleSide }), stripes = new THREE.MeshStandardMaterial({ color: 0xc8102e, side: THREE.DoubleSide });
+  for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2, x = Math.cos(a) * 2.1, z = Math.sin(a) * 2.1; cyl(o, 0.03, 0.03, 1.8, pole, x, 1.1, z, 5); const f = add(o, new THREE.PlaneGeometry(0.5, 0.3), k % 2 ? stars : stripes, x + 0.25, 1.8, z); f.rotation.y = -a; }
+  (g.userData.flood = g.userData.flood || []).push(marble);
+  const prev = g.userData.sparkle;
+  g.userData.sparkle = (t, night) => { if (prev) prev(t, night); red.emissiveIntensity = (Math.sin(t * 2.4) > 0.3 ? 2.2 : 0.15) * (0.25 + night); };
+}
 function eiffelLights(w, g) {
   g.updateMatrixWorld(true);
   const inv = new THREE.Matrix4().copy(g.matrixWorld).invert(), v = new THREE.Vector3(), pts = [], top = new THREE.Vector3(0, -1e9, 0);

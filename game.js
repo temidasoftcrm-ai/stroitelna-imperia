@@ -690,6 +690,7 @@ const SHOPS = ['building-a', 'building-b', 'building-c', 'building-d', 'building
 const SKY = ['building-skyscraper-a', 'building-skyscraper-b', 'building-skyscraper-c'];
 // ---- градовете по големина: малките без небостъргачи, средните до 10 етажа, мегаполисите с модерен център
 const MEGA = ['moscow', 'stpetersburg', 'kyiv', 'london', 'paris', 'berlin', 'madrid', 'rome', 'milan', 'amsterdam', 'vienna', 'barcelona', 'munich', ...WORLD.map(c => c.id)];
+const LOWRISE = new Set(['washington']);   // ниски градове: без небостъргачи в поръчките (Вашингтон — ограничение за височина)
 const cityTier = id => MEGA.includes(id) || MEGAPOLIS.has(id) ? 'xl' : (CITIES.find(c => c.id === id)?.sz || 1) >= 3 ? 'l' : (CITIES.find(c => c.id === id)?.sz || 1) === 2 ? 'm' : 's';
 const SF_BLK = () => ['richmond', 'panel12', 'gamecity', 'soviet', 'oldbld', 'dbrick', 'brick', 'asian', 'modoffice', 'jade'].map(k => 'sf-blk-' + k).filter(n => A[n]);   // истински блокове
 const SF_SKY = () => ['sing', 'rand', 'usb', 'blue', 'night'].map(k => 'sf-sky-' + k).filter(n => A[n]);   // истинските небостъргачи (ако са заредени)
@@ -1457,7 +1458,8 @@ const incidents = createIncidents({ scene, model, has: n => !!A[n], route: roadR
   focus: () => controls.target, cam: () => camera.position, ready: () => S && city.ready && !AUTOTEST,
   building: (x, z) => { let best = null, bd = 70 * 70; for (const l of city.lots || []) if (l.obj && l.built) { const d = (l.obj.position.x - x) ** 2 + (l.obj.position.z - z) ** 2; if (d < bd) { bd = d; best = l.obj; } } if (!best) return null; const b = new THREE.Box3().setFromObject(best); return { x0: b.min.x, x1: b.max.x, z0: b.min.z, z1: b.max.z, h: b.max.y }; } });
 function addCar() {
-  const i = 3 * ((Math.random() * NBI) | 0), j = (Math.random() * NJ) | 0;
+  let i = 3 * ((Math.random() * NBI) | 0), j = (Math.random() * NJ) | 0;
+  for (let k = 0; k < 40 && !isRoad(i, j); k++) { i = 3 * ((Math.random() * NBI) | 0); j = (Math.random() * NJ) | 0; }   // не по улица под площад/парк (Белия дом, поръчките) — иначе стои на тревата
   const r = Math.random(), sf = A['sf-car-Sedan'];
   const o = sf ? model('sf-car-' + (r < 0.04 ? pick(['Ambulance', 'Police_Sedan', 'Police_SUV', 'Firetruck']) : r < 0.1 ? pick(['Bus', 'Truck', 'Van']) : pick(['Sedan', 'Hatchback', 'SUV', 'Pickup', 'Taxi', 'Sedan', 'Hatchback', 'SUV', 'Muscle', 'Muscle_2', 'Sports', 'Roadster', 'Taxi', 'Taxi', 'Taxi', 'Limousine'])), 1)
     : model(r < 0.04 ? pick(['ambulance', 'police', 'firetruck']) : pick(['sedan', 'taxi', 'suv', 'van', 'sedan', 'suv', 'sedan-sports', 'suv-luxury', 'hatchback-sports']), 1.15);
@@ -1545,11 +1547,11 @@ function loadPeds() {
     const b = new THREE.Box3().setFromObject(g.scene, true), h = b.max.y - b.min.y || 1;   // точно (костите на Mixamo са ×0.01)
     g.k = 1.9 / h;   // като досегашните минувачи (~1.9 м в играта)
     pedReal.push(g);
-  }).catch(() => {})));
+  }).catch(() => {}))).then(() => { if (!pedReal.length) return; for (const p of [...peds]) if (!p.real) { scene.remove(p.m); peds.splice(peds.indexOf(p), 1); } for (const m of [...standers]) if (!m.userData.mixer) { scene.remove(m); standers.splice(standers.indexOf(m), 1); } });   // старите (от кубчета) — сменят се с истински
 }
 function makePed() {
   loadPeds();
-  const real = pedReal.length && Math.random() < 0.85, src = real ? pick(pedReal) : (A.farmer || A.worker_male_alt);
+  const real = pedReal.length > 0, src = real ? pick(pedReal) : (A.farmer || A.worker_male_alt);   // само истински хора (старите — докато се заредят)
   const m = cloneSkinned(src.scene);
   m.scale.setScalar(real ? src.k * rand(0.94, 1.06) : rand(1.05, 1.2));
   // различни дрехи: оцветяваме наситените (нетелесни) материали
@@ -1567,9 +1569,10 @@ function makePed() {
   const walk = src.animations.find(c => c.name === 'Walk') || src.animations.find(c => /Walk/.test(c.name));
   if (walk) mixer.clipAction(walk).play();
   mixer.update(Math.random() * 2);
-  const i = 3 * ((Math.random() * NBI) | 0), j = (Math.random() * NJ) | 0;
+  let i = 3 * ((Math.random() * NBI) | 0), j = (Math.random() * NJ) | 0;
+  for (let k = 0; k < 40 && !isRoad(i, j); k++) { i = 3 * ((Math.random() * NBI) | 0); j = (Math.random() * NJ) | 0; }   // не по улица под площад/парк (Белия дом, поръчките) — иначе стои на тревата
   const rp = roadPoint();
-  const pd = { m, mixer, x: rp ? rp.x : tx(i), z: rp ? rp.z : tx(j), path: null, pi: 0, side: Math.random() < 0.5 ? 1 : -1, sp: rand(1.2, 1.8), yaw: 0 };
+  const pd = { m, mixer, real, x: rp ? rp.x : tx(i), z: rp ? rp.z : tx(j), path: null, pi: 0, side: Math.random() < 0.5 ? 1 : -1, sp: rand(1.2, 1.8), yaw: 0 };
   peds.push(pd);
 }
 const wantedPeds = () => Math.min(26, 6 + Math.round(city.lots.filter(l => l.built).length * 0.18) + (S?.parks || []).length * 3);
@@ -1586,7 +1589,7 @@ function addStanders() {
   for (let k = 0; k < n; k++) {
     const a = k / n * Math.PI * 2 + Math.random(), r = n > 1 ? 0.8 : 0;
     let m;
-    if (live && Math.random() < 0.8) {
+    if (live) {
       const src = pick(pedReal); m = cloneSkinned(src.scene); m.scale.setScalar(src.k * rand(0.94, 1.06));
       m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
       const fem = src.animations.some(c => /Female/.test(c.name)), want = n > 1 ? ['Talk_General', 'Talk_Arguing', 'Waving', 'Talk_General'] : [fem ? 'Phone_Talk_F' : 'Phone_Talk_M', 'Smoking', 'Look_Around'];
@@ -2181,7 +2184,7 @@ function freeLots(type) {
 }
 function makeOffer() {
   const tier = cityTier(S.cityId);
-  const avail = offerTypes().filter(([k, t]) => S.rep >= t.rep && !(tier === 's' && (k === 'tower' || (k === 'office' && S.rep < 4))) && !(tier === 'm' && k === 'tower' && Math.random() < 0.5) && !(k === 'tower' && isAfrica(S.cityId)));
+  const avail = offerTypes().filter(([k, t]) => S.rep >= t.rep && !(tier === 's' && (k === 'tower' || (k === 'office' && S.rep < 4))) && !(tier === 'm' && k === 'tower' && Math.random() < 0.5) && !(k === 'tower' && (isAfrica(S.cityId) || LOWRISE.has(S.cityId))));
   // по-малките поръчки са по-чести
   const w = avail.map(([k], i) => avail.length - i * 0.6);
   let r = Math.random() * w.reduce((a, b) => a + b, 0), type = avail[0][0];
@@ -7289,7 +7292,7 @@ const cityPanel = createCityPanel({ S: () => S, firmLv: () => dev.best(), firmUp
   officeLv: lv => OFFICE_LEVELS[Math.max(1, Math.min(OFFICE_LEVELS.length, lv)) - 1], offerTypes: () => offerTypes(), cityTier: id => cityTier(id), towerFloors: id => TOWER_FLOORS[cityTier(id)] || [10], towerMul: f => TOWER_MUL[f] || 1,
   buildingFor, clients: (type, id) => clientName(cityById(id || S.cityId)?.cc, type === 'house'), ownedCities: () => ownedCities(), cityName: id => cityById(id)?.nm || id, cityFlag: id => cityById(id)?.cc || '🇧🇬',
   isFinished: id => !!(econ.isFinished && econ.isFinished(id)), projects: () => projects, unitTypes: () => units.map(u => u.type), nowDays: () => nowDays(), toast, fmt, save, sound: n => Sound.play(n),
-  canFinishHere: () => canFinishCity(), noTower: id => isAfrica(id), finishRemote: id => finishCityRemote(id), devBest: () => dev.best(),
+  canFinishHere: () => canFinishCity(), noTower: id => isAfrica(id) || LOWRISE.has(id), finishRemote: id => finishCityRemote(id), devBest: () => dev.best(),
   gearSrc: (t, to) => gearSrcOf(t, to),
   gearComing: (t, to) => garTransit(to).find(m => m.t === t)?.arrive || 0,
   district: id => districtInfo(id), buyDistrict: (id, all) => buyDistrictAt(id, all),
