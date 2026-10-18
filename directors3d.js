@@ -11,7 +11,7 @@ const SIT_HIP = [0, -1, -57];   // ханшът в седнала поза (ед
 // дружество → модел; хотелите (Георги Николов) още нямат модел — столът стои празен с табелката
 export const DIR_MODEL = { con: 'ivaylo', hw: 'nadya', rail: 'maria', sea: 'stefan', air: 'elena', hotel: 'georgi', oil: 'vera', bank: 'boris', glob: 'glob' };   // georgi/glob — от потребителя (Meshy); докато ги няма — празен стол
 const FEMALE = new Set(['nadya', 'maria', 'elena', 'vera']);
-const HAVE = new Set(['ivaylo', 'nadya', 'maria', 'stefan', 'elena', 'vera', 'boris']);   // моделите, които вече са в assets/heavy/directors (без 404 за останалите)
+const HAVE = new Set(['ivaylo', 'nadya', 'maria', 'stefan', 'elena', 'vera', 'boris', 'georgi']);   // моделите, които вече са в assets/heavy/directors (без 404 за останалите)
 // столовете: по 4 от двете страни на масата (x = ±), от прозореца към председателя
 // …и девето — начело откъм картата (side 0): директорът на Глобъл, срещу председателя
 const SEATS = [[-1, -2.7], [1, -2.7], [-1, -0.9], [1, -0.9], [-1, 0.9], [1, 0.9], [-1, 2.7], [1, 2.7], [0, -4.25]];
@@ -298,7 +298,7 @@ function groupMedal(scene, b, gold) {
   });
   const R = 0.72;
   const m = new THREE.Mesh(new THREE.CircleGeometry(R, 64), new THREE.MeshPhysicalMaterial({ map: t, roughness: 0.25, clearcoat: 1, clearcoatRoughness: 0.08 }));
-  m.rotation.x = -Math.PI / 2; m.rotation.z = Math.PI; m.position.set(0, TABLE_H + 0.031, 0); scene.add(m);   // буквите — правилно откъм председателя
+  m.rotation.x = -Math.PI / 2; m.position.set(0, TABLE_H + 0.031, 0); scene.add(m);   // горният ръб на картинката — към картата: името се чете от председателя
   const rim = new THREE.Mesh(new THREE.TorusGeometry(R, 0.018, 12, 80), gold); rim.rotation.x = -Math.PI / 2; rim.position.set(0, TABLE_H + 0.03, 0); scene.add(rim);
 }
 function seatProps(scene, side, z, name, sub, gold, k) {
@@ -435,11 +435,17 @@ export function openBoardroom(o) {
     qi = (go + props.length) % props.length;
     const p = props[qi], i = list.findIndex(s => s.k === p.dir), s = list[i];
     nav.querySelector('b').textContent = `${qi + 1} / ${props.length}`;
-    scr.innerHTML = `<div class="hd"><span>📋 Предложение към борда</span><span>${qi + 1} / ${props.length}</span></div><div class="who"></div><div class="tx"></div>${p.cost ? `<div class="cost">💶 ${f(p.cost)} €</div>` : ''}<div class="row"><button class="y">✓ Да</button><button class="n">✖ Не</button><button class="l">⏳ По-късно</button></div>`;
+    if (p.info) {   // 🏦 докладът на банката — винаги първи: какво имаме и какво може да се отпусне; само „Продължи →“
+      scr.innerHTML = `<div class="hd"><span>🏦 Докладът на банката</span><span>${qi + 1} / ${props.length}</span></div><div class="who"></div><div class="tx"></div>${p.avail != null ? `<div class="cost">💶 за инвестиции: ${f(p.avail)} €${p.reserve ? ` · резерв ${f(p.reserve)} €` : ''}</div>` : ''}<div class="row"><button class="y">Продължи →</button></div>`;
+      scr.querySelector('.y').onclick = () => board(qi + 1);
+    } else {
+      const fit = p.inBudget == null ? '' : p.inBudget ? '<div class="fit" style="color:#5fd38a;font-weight:700;margin:-4px 0 8px">✅ в рамките на бюджета за инвестиции</div>' : '<div class="fit" style="color:#ffb347;font-weight:700;margin:-4px 0 8px">⚠️ над бюджета за инвестиции</div>';
+      scr.innerHTML = `<div class="hd"><span>📋 Предложение към борда</span><span>${qi + 1} / ${props.length}</span></div><div class="who"></div><div class="tx"></div>${p.cost ? `<div class="cost">💶 ${f(p.cost)} €</div>` : ''}${fit}<div class="row"><button class="y">✓ Да</button><button class="n">✖ Не</button><button class="l">⏳ По-късно</button></div>`;
+      const y = scr.querySelector('.y'); y.disabled = p.can === false; if (y.disabled) y.title = 'Нямаш достатъчно пари';
+      for (const [c, a] of [['y', 'yes'], ['n', 'no'], ['l', 'later']]) scr.querySelector('.' + c).onclick = () => { const r = o.onDecide && o.onDecide(p.id, a); if (r && r.need === 'vote') showVote(r); else board(qi); };   // решеното изчезва — на същото място идва следващото
+    }
     scr.querySelector('.who').textContent = `${p.ico || s?.ico || ''} ${s?.director || s?.company || ''}`;
     scr.querySelector('.tx').textContent = p.text;
-    const y = scr.querySelector('.y'); y.disabled = p.can === false; if (y.disabled) y.title = 'Нямаш достатъчно пари';
-    for (const [c, a] of [['y', 'yes'], ['n', 'no'], ['l', 'later']]) scr.querySelector('.' + c).onclick = () => { const r = o.onDecide && o.onDecide(p.id, a); if (r && r.need === 'vote') showVote(r); else board(qi); };   // решеното изчезва — на същото място идва следващото
     scrSeat = i; card.classList.remove('on'); sel = i;
     scr.style.display = 'block'; scr.classList.remove('on'); requestAnimationFrame(() => requestAnimationFrame(() => scr.classList.add('on')));
     if (i >= 0) present(i);
@@ -453,7 +459,7 @@ export function openBoardroom(o) {
     scr.innerHTML = `<div class="hd"><span>🗳️ Гласуване на борда</span><span>${v.yes} : ${v.no}</span></div><div class="tx"></div><div class="votes"></div><div class="res" style="color:${res[1]}">${v.yes} : ${v.no} — ${res[0]}</div><div class="row"></div>`;
     scr.querySelector('.tx').textContent = `🏦 Банката възрази: ${v.bank.why}. „${p.text}“${p.cost ? ` (${f(p.cost)} €)` : ''}`;
     const vs = scr.querySelector('.votes');
-    for (const x of v.votes) { const d = document.createElement('div'); d.textContent = `${x.yes ? '✋✅' : '✋❌'} ${x.name} — ${x.why}`; vs.appendChild(d); }
+    for (const x of v.votes) { const d = document.createElement('div'), m = document.createElement('b'); m.textContent = x.yes ? '✔ ' : '✖ '; m.style.color = x.yes ? '#43d17a' : '#ff4d4d'; m.style.fontWeight = '900'; d.appendChild(m); d.appendChild(document.createTextNode(`${x.name} — ${x.why}`)); vs.appendChild(d); }   // ✖ против — червено, ✔ за — зелено (емоджито ❌ излизаше сиво „×“)
     const row = scr.querySelector('.row');
     const btn = (t, how, y) => { const b = document.createElement('button'); b.textContent = t; if (y) b.className = 'y'; b.onclick = () => { o.onResolve && o.onResolve(p.id, how); board(qi); }; row.appendChild(b); };
     if (v.passed || v.tie) btn(v.tie ? '✓ Решавам „за“' : '✓ Изпълни', 'pass', true); else btn('⚖️ Наложи (вето)', 'veto', true);
@@ -549,15 +555,16 @@ export function openBoardroom(o) {
 
 // демо за Лабораторията: всички 7 директора на масата (+ хотелите — свободно място) и примерни предложения към борда
 const DEMO_PROPS = [
-  { id: 'demo-air', dir: 'air', ico: '✈️', text: 'Имаме 10 гейта за ъпдейт в 4 летища — общо 720 млн. €. Да ги направим ли?', cost: 7.2e8 },
-  { id: 'demo-rail', dir: 'rail', ico: '🚆', text: 'Да построим 24 нови линии и да купим 22 влака?', cost: 3.2e7 },
+  { id: 'bank:brief:1', dir: 'bank', ico: '🏦', info: true, avail: 7.4e8, reserve: 1.8e8, text: 'В касата има 920 млн. €. След месечния резерв от 180 млн. € можем да отпуснем до 740 млн. € за инвестиции този месец.' },
+  { id: 'demo-air', dir: 'air', ico: '✈️', text: 'Имаме 10 гейта за ъпдейт в 4 летища — общо 720 млн. €. Да ги направим ли?', cost: 7.2e8, inBudget: true },
+  { id: 'demo-rail', dir: 'rail', ico: '🚆', text: 'Да построим 24 нови линии и да купим 22 влака?', cost: 3.2e7, inBudget: false },
   { id: 'demo-oil', dir: 'oil', ico: '🛢️', text: 'Договор за доставка на гориво: Шанхай — 2 млн. барела, +18 млн. € за 60 дни. Приемаме ли?', cost: 0 },
-  { id: 'demo-hw', dir: 'hw', ico: '🛣️', text: 'За 5-те нови филиала няма мрежа — да строим аутобани за 3 млн. € и да купим 52 ТИР-а?', cost: 3e6 },
+  { id: 'demo-hw', dir: 'hw', ico: '🛣️', text: 'За 5-те нови филиала няма мрежа — да строим аутобани за 3 млн. € и да купим 52 ТИР-а?', cost: 3e6, inBudget: true },
   { id: 'demo-bank', dir: 'bank', ico: '🏦', text: 'Дали сме 22 млрд. € заеми; има искания за още 12 млрд. Да ги одобрим ли?', cost: 0 },
 ];
 export function demoBoardroom() {
   const C = [['con', '🏗️', 'Констръкшън', 'Ивайло Петров', 5, 2.1e6], ['hw', '🛣️', 'Толроуд', 'Надя Иванова', 5, 1.4e6], ['rail', '🚆', 'Рейл', 'Мария Стоянова', 5, 9.8e5], ['sea', '🚢', 'Оушън Експрес', 'Стефан Колев', 5, 1.1e6],
-    ['air', '✈️', 'Флайеър', 'Елена Димитрова', 5, 1.6e6], ['hotel', '🏨', 'Хотелс', null, 3, 7.2e5], ['oil', '🛢️', 'Петролиум', 'Вера Ангелова', 5, 3.4e6], ['bank', '🏦', 'Банк', 'Борис Тодоров', 5, 2.7e6], ['glob', '🌍', 'Глобъл Ризортс & Констръкшън', null, 0, 0]];
+    ['air', '✈️', 'Флайеър', 'Елена Димитрова', 5, 1.6e6], ['hotel', '🏨', 'Хотелс', 'Георги Николов', 5, 7.2e5], ['oil', '🛢️', 'Петролиум', 'Вера Ангелова', 5, 3.4e6], ['bank', '🏦', 'Банк', 'Борис Тодоров', 5, 2.7e6], ['glob', '🌍', 'Глобъл Ризортс & Констръкшън', null, 0, 0]];
   return openBoardroom({
     title: 'Титан Груп — демо', brand: { nm: 'Титан', col: '#4fc3f7', ico: '🗿', group: 'Титан Груп' },
     proposals: () => DEMO_PROPS.filter(p => !p.done),

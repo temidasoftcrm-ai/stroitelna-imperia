@@ -76,6 +76,7 @@ export function createBoardLogic(deps) {
   function autoTick() {
     const h = hold(), done = [];
     for (const p of deps.proposals()) {
+      if (p.info) continue;   // докладът на банката — не е решение
       const cap = h.auto[p.dir] || 0; if (!cap || (p.cost || 0) > cap) continue;
       if (budgetOf(p.dir) && (p.cost || 0) > budgetLeft(p.dir)) continue;
       if (!bankCheck(p).ok) continue;

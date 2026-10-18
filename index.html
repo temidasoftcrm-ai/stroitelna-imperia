@@ -184,6 +184,52 @@
   #mapSvg .clabel { font-size:calc(11px * var(--ls, 1)); }
   #mapSvg.wide .clabel { font-size:calc(18px * var(--ls, 1)); }
   #mapSvg .sea { font-size:calc(13px * var(--ls, 1)); }
+  /* 🗺️ степени на детайлност (maplod.js, feature 'map-lod'): „Завладяна“/4/5 и имената на мегапроектите — само при посочване или избор */
+  #mapSvg.lod text.cwon { display:none; }
+  #mapSvg.lod text.cwon.on, #mapSvg.lod text.cwon.pin { display:inline; }
+  #mapSvg.lod .mpl { display:none; }
+  #mapSvg.lod .mpl.show { display:inline; }
+  #mapSvg .mpb text { pointer-events:none; }
+  #mapSvg .mpb:hover circle { stroke:#fff; }
+  #mapSvg .contsum text { font-weight:800; fill:#3a3020; paint-order:stroke; stroke:#fff8e6; stroke-width:.2em; letter-spacing:.04em; }
+  #mapSvg .contsum text.pct { font-weight:700; fill:#7a5a00; }
+  #mapSvg.lod path.country { cursor:pointer; }
+  #mapSvg.lod path.country.selc { stroke:#ffcc33; stroke-width:2.2; }
+  #mapFind { position:absolute; top:10px; left:12px; z-index:4; display:flex; gap:6px; flex-wrap:wrap; width:min(320px, calc(100vw - 24px)); }
+  #mapFind input { flex:1; min-width:0; padding:7px 10px; border-radius:10px; border:1px solid #ffffff33; background:#18202cee; color:var(--txt); font-size:14px; }
+  #mapFind .mf-r { flex-basis:100%; display:flex; flex-direction:column; background:#18202cf2; border-radius:10px; overflow:hidden; }
+  #mapFind .mf-r:empty { display:none; }
+  #mapFind .mf-r button { text-align:left; padding:7px 10px; background:none; border:0; border-bottom:1px solid #ffffff14; color:var(--txt); cursor:pointer; font-size:14px; }
+  #mapFind .mf-r button:hover { background:#ffffff14; }
+  #mapCountryPanel { position:absolute; top:56px; left:12px; z-index:4; width:min(300px, calc(100vw - 24px)); max-height:calc(100% - 150px); overflow:auto; background:#18202cf2; border:1px solid #ffcc3366; border-radius:12px; padding:8px 10px; color:var(--txt); font-size:13px; }
+  #mapCountryPanel .mcp-h { display:flex; gap:8px; align-items:center; }
+  #mapCountryPanel .mcp-h span { color:var(--mut); }
+  #mapCountryPanel .mcp-h button { margin-left:auto; border:0; background:none; color:var(--txt); font-size:15px; cursor:pointer; }
+  #mapCountryPanel .mcp-l { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+  #mapCountryPanel .mcp-l button { padding:4px 8px; border-radius:8px; border:1px solid #ffffff22; background:#ffffff0d; color:var(--txt); cursor:pointer; font-size:12px; }
+  #mapCountryPanel .mcp-l button.top { border-color:#ffcc33aa; }
+  /* изчистен вид (feature 'map-look'): тъмносин океан, приглушена сиво-зелена суша, тънки граници; злато — само за избраното */
+  #mapScreen:has(#mapSvg.look) { background:#0d2236; }
+  #mapSvg.look .ocean { fill:#10304d; }
+  #mapSvg.look .country { fill:#6f7d6c; stroke:#3f4a3d; stroke-width:.5; }
+  #mapSvg.look .country.part, #mapSvg.look .country.bg { fill:#7d8b73; stroke:#4a5545; stroke-width:.6; }
+  #mapSvg.look .country.won { fill:#5e8f7b; stroke:#3d6857; stroke-width:.7; }   /* завладяна — дискретен оттенък (надписът — при посочване) */
+  #mapSvg.look .country.empty { fill:#5f6b5d; stroke:none; }
+  #mapSvg.look .country.empty.ice { fill:#a9b8c2; }
+  #mapSvg.look .country.dim { fill:#3c463c; stroke:#2f372f; opacity:.85; }
+  #mapSvg.look .country.selc { fill:#a88f45; stroke:#ffcc33; stroke-width:1.6; }
+  #mapSvg.look #rlfG { display:none; }
+  #mapSvg.look .city circle:not(.hit) { fill:#dfe7ef; stroke:#0d2236; stroke-width:1; }
+  #mapSvg.look .city.done circle:not(.hit) { fill:#57c98a; stroke:#0d2236; }
+  #mapSvg.look .city.hq circle:not(.hit), #mapSvg.look .city.here circle:not(.hit) { fill:#ffcc33; stroke:#fff; }
+  #mapSvg.look .hqico { display:none; }
+  #mapSvg.look .city text { fill:#e8eef5; stroke:#0b1622d9; font-weight:600; }
+  #mapSvg.look .cwon { fill:#e8eef5; stroke:#0b1622d9; }
+  #mapSvg.look .cwon.ok { fill:#7fe0a5; }
+  #mapSvg.look .clabel { fill:#9fb0a0; }
+  #mapSvg.look .sea { fill:#5a86ad; }
+  #mapSvg.look .contsum text { fill:#f2f5f8; stroke:#0b1622; }
+  #mapSvg.look .contsum text.pct { fill:#ffcc33; }
   #mapHud { position:absolute; right:16px; bottom:16px; max-height:calc(100% - 32px); overflow-y:auto; background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 16px; max-width:360px; display:flex; flex-direction:column; gap:10px; }
   #mapHud h2 { font-size:20px; color:var(--acc); }
   #mapHudX { position:absolute; top:8px; right:8px; padding:2px 9px; font-size:14px; line-height:1.4; z-index:2; }   /* ✕ — скрива картата с информацията */
