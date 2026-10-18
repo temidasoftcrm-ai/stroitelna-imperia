@@ -9,7 +9,7 @@ import { loadShipModels, hasShipModel, shipModel, setShipNight } from './shipmod
 import { EXTRA_COASTAL } from './countries.js';
 export const SEASIDE = ['varna', 'burgas', 'constanta', 'istanbul', 'thessaloniki', 'athens', 'barcelona', 'amsterdam', 'rotterdam', 'newyork', 'losangeles', 'rio', 'buenosaires', 'capetown', 'dubai', 'mumbai', 'singapore', 'hongkong', 'shanghai', 'tokyo', 'sydney'];
 SEASIDE.push(...EXTRA_COASTAL);
-export const SEA_MODELS = ['ship-cargo-a', 'ship-cargo-b', 'ship-ocean-liner', 'ship-small', 'boat-sail-a', 'boat-sail-b', 'boat-speed-a', 'boat-fishing-small', 'buoy', 'cargo-container-a', 'cargo-container-b', 'cargo-container-c'];
+export const SEA_MODELS = ['ship-cargo-a', 'ship-cargo-b', 'ship-small', 'boat-sail-a', 'boat-sail-b', 'boat-speed-a', 'boat-fishing-small', 'buoy', 'cargo-container-a', 'cargo-container-b', 'cargo-container-c'];
 
 const mat = (c, r = 0.9, m = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
 const box = (w, h, d, m, x, y, z, g) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; g.add(o); return o; };
@@ -88,7 +88,8 @@ export function addSeaside(group, deps, opts) {
   tower.position.set(lx, 0.8, lz); g.add(tower);
   // кораби на котва и лодки
   const ships = [];
-  for (const [n, s, x, z] of [['ship-ocean-liner', 3.2, -120, -260], ['ship-cargo-b', 6, 60, -320], ['ship-small', 2.4, 160, -200]]) {
+  const linerRot = r() * 6;   // на котва: круизният кораб е истинският (shipmodels.js) — слага се, щом се зареди
+  for (const [n, s, x, z] of [['ship-cargo-b', 6, 60, -320], ['ship-small', 2.4, 160, -200]]) {
     const o = useModel(A, model, n, s); if (!o) continue;
     o.position.set((opts.xMin + opts.xMax) / 2 + x, 0, seaZ + z); o.rotation.y = r() * 6; g.add(o); ships.push({ o, ph: r() * 6 });
   }
@@ -105,7 +106,7 @@ export function addSeaside(group, deps, opts) {
 
   // ---- твоите кораби (Фаза „Пристанища“): на кей до старото пристанище, а един влиза/излиза от морето
   // list = [{ kind: 'container'|'bulk'|'tanker'|'cruise', state: 'docked'|'arriving'|'leaving' }]
-  const SHIP = { container: ['ship-cargo-a', 6], bulk: ['ship-cargo-b', 6], tanker: ['ship-cargo-a', 6, 0x7a1f1f], cruise: ['ship-ocean-liner', 3.2], coaster: ['ship-small', 3], boat: ['boat-fishing-small', 2.6, null, 'boat-speed-a'] };
+  const SHIP = { container: ['ship-cargo-a', 6], bulk: ['ship-cargo-b', 6], tanker: ['ship-cargo-a', 6, 0x7a1f1f], cruise: ['ship-cargo-b', 6] /* докато истинският круизен не е зареден */, coaster: ['ship-small', 3], boat: ['boat-fishing-small', 2.6, null, 'boat-speed-a'] };
   const fleetG = new THREE.Group(); g.add(fleetG);
   const berthZ = seaZ - 69 - 9;
   let movers = [], portLv = 0, lastFleet = [];
@@ -154,6 +155,7 @@ export function addSeaside(group, deps, opts) {
   // щом истинските кораби се заредят: пречертай флота и смени декоративния кораб на кея с танкер (до ръба на кея)
   loadShipModels().then(() => {
     if (cargo && hasShipModel('tanker')) { const o = shipModel('tanker'), p0 = cargo.position.clone(), hb0 = halfBeam(cargo); cargo.position.copy(p0); o.rotation.y = cargo.rotation.y; const hb = halfBeam(o); o.position.set(p0.x, 0, seaZ - 69 - hb - 2); o.visible = cargo.visible; g.remove(cargo); g.add(o); cargo = o; }
+    if (hasShipModel('cruise')) { const o = shipModel('cruise'); o.position.set((opts.xMin + opts.xMax) / 2 - 120, 0, seaZ - 260); o.rotation.y = linerRot; g.add(o); ships.push({ o, ph: r() * 6 }); }   // на котва
     setFleet(lastFleet);
   });
   function setPortLevel(lv = 0) { const was = portLv; portLv = lv; lvG.forEach((q, i) => { q.visible = lv >= i + 1; }); if ((was >= 4) !== (lv >= 4)) setFleet(lastFleet); }

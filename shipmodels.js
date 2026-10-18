@@ -4,6 +4,8 @@
 // Всеки кораб: носът е към +z, център в началото, ватерлинията на y = 0 (корпусът е малко под водата).
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { prepNightFloors } from './nightfloors.js';
+import { feature } from './lab/feature.js';
 
 // дължина в света на играта, накъде гледа носът в модела (завъртане около y) и газене (част от височината под водата)
 const CFG = {
@@ -25,7 +27,8 @@ function normalize(obj, c) {
   bb = new THREE.Box3().setFromObject(g); s = bb.getSize(new THREE.Vector3());
   const ctr = bb.getCenter(new THREE.Vector3());
   inner.position.set(-ctr.x, -bb.min.y - s.y * c.draft, -ctr.z);
-  g.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; for (const mt of [].concat(m.material)) { if (mt && mt.metalness > 0.5) mt.metalness = 0.4; if (c.lights && mt && mt.emissive && !NIGHT.includes(mt)) { mt.emissive.set(0xfff0c8); if (mt.map && !mt.emissiveMap) mt.emissiveMap = mt.map; mt.emissiveIntensity = 0; mt.needsUpdate = true; NIGHT.push(mt); } } } });
+  g.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; for (const mt of [].concat(m.material)) { if (mt && mt.metalness > 0.5) mt.metalness = 0.4; if (c.lights && !feature('night-nyextra') && mt && mt.emissive && !NIGHT.includes(mt)) { mt.emissive.set(0xfff0c8); if (mt.map && !mt.emissiveMap) mt.emissiveMap = mt.map; mt.emissiveIntensity = 0; mt.needsUpdate = true; NIGHT.push(mt); } } } });
+  if (c.lights) prepNightFloors(g, 'cruise');   // Лабораторията → night-nyextra: кабините светят по палуби (вместо цялата текстура)
   return g;
 }
 export function loadShipModels(base = 'assets/heavy/ships/') {
