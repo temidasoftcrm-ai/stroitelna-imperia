@@ -118,5 +118,5 @@ export function createMegaWorld(deps) {
     box.querySelectorAll('[data-mwsign]').forEach(b => b.onclick = () => { sign(b.dataset.mwsign); rerender(); });
     box.querySelectorAll('[data-mwful]').forEach(b => b.onclick = () => { const [k, i] = b.dataset.mwful.split('|'); fulfil(k, +i); rerender(); });
   };
-  return { MW, state: st, done, pct, fund, dailyTick, value, winHtml, bind, pipeSigned: () => signedAll(), pipeDeals: () => PIPE_DEALS.filter(d => tr()[d.k].signed).length };
+  return { phaseCost: k => byKey(k) ? phaseCost(byKey(k)) : 0, MW, state: st, done, pct, fund, dailyTick, value, winHtml, bind, pipeSigned: () => signedAll(), pipeDeals: () => PIPE_DEALS.filter(d => tr()[d.k].signed).length };
 }

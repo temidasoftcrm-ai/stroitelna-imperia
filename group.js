@@ -51,7 +51,7 @@ export function groupName(S) {
 export const HOLD_LV_MAX = 5, HOLD_LV_K = 0.10, HOLD_DIR_K = 0.15;
 export const DIR_LV = Math.ceil(HOLD_LV_MAX * 0.9);   // директор — само когато дружеството е развито поне 90% (ниво 5 от 5)
 // всяко дружество има свой директор (портретите и 3D моделите в directors3d.js са по тези имена)
-export const DIR_OF = { con: 'Ивайло Петров', hw: 'Надя Иванова', rail: 'Мария Стоянова', sea: 'Стефан Колев', air: 'Елена Димитрова', hotel: 'Георги Николов', oil: 'Вера Ангелова', bank: 'Борис Тодоров' };
+export const DIR_OF = { con: 'Ивайло Петров', hw: 'Надя Иванова', rail: 'Мария Стоянова', sea: 'Стефан Колев', air: 'Елена Димитрова', hotel: 'Георги Николов', oil: 'Вера Ангелова', bank: 'Борис Тодоров' , glob: 'Александър Владимиров'};
 
 // deps: { S, econ, fmt, pop(key, cap, sub), toast, save, sound, …броячите от SUBS (hwN, railN, portN, airN, oilN, empire, toll, flow, finDaily, oilDaily) }
 export function createGroup(deps) {
@@ -148,7 +148,7 @@ export function createGroup(deps) {
   // 🏛️ Директорската зала (directors3d.js): всяко дружество е стол на масата; клик на директор — доклад и одобряване на развитие
   function boardSeats() {
     const S = deps.S(), g = S.group || {};
-    return SUBS.filter(s => !s.final).map(s => {
+    return SUBS.map(s => {   // и Глобъл — начело на масата (directors3d.js, деветото място)
       const on = !!g[s.k], inc = on ? s.inc(deps) || 0 : 0, L = hold().lv[s.k] || 0, dir = hold().dir[s.k], man = canManage(s.k) && inc > 0, e = deps.econ();
       return { k: s.k, ico: s.ico, company: subName(S, s.k) || s.suf, what: s.what, open: on, director: dir ? DIR_OF[s.k] || dir : null, lv: L, lvMax: HOLD_LV_MAX, inc, bonus: bonusOf(s.k), bonusPct: Math.round(bonusK(s.k) * 100),
         up: man && L < HOLD_LV_MAX ? { cost: upCost(s.k), can: e.canAfford(upCost(s.k)) } : null,
@@ -173,7 +173,7 @@ export function createGroup(deps) {
   }
   function board(rerender) {
     const re = () => rerender && rerender();
-    import('./directors3d.js').then(m => m.openBoardroom({ title: groupName(deps.S()), seats: boardSeats, fmt: deps.fmt, sound: deps.sound,
+    import('./directors3d.js').then(m => m.openBoardroom({ title: groupName(deps.S()), brand: brandOf(deps.S()) && { ...brandOf(deps.S()), group: groupName(deps.S()) }, seats: boardSeats, fmt: deps.fmt, sound: deps.sound,
       proposals, onUp: k => { upgrade(k); re(); }, onHire: k => { hire(k); re(); },
       // „Да“ минава през boardlogic.js (бюджет → банка → гласуване); връща { need: 'vote', v, p }, ако бордът трябва да гласува
       onDecide: (id, a) => { const B = deps.board2 && deps.board2(), r = a === 'yes' && B ? B.request(id) : (decide(id, a), null); re(); return r; },

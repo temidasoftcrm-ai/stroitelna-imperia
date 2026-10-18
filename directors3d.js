@@ -9,11 +9,14 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 const DIR = 'assets/heavy/directors/';
 const SIT_HIP = [0, -1, -57];   // ханшът в седнала поза (единиците на скелета, см) — по „Sit_Meeting“ / „Sit_Breathing“
 // дружество → модел; хотелите (Георги Николов) още нямат модел — столът стои празен с табелката
-export const DIR_MODEL = { con: 'ivaylo', hw: 'nadya', rail: 'maria', sea: 'stefan', air: 'elena', oil: 'vera', bank: 'boris' };
+export const DIR_MODEL = { con: 'ivaylo', hw: 'nadya', rail: 'maria', sea: 'stefan', air: 'elena', hotel: 'georgi', oil: 'vera', bank: 'boris', glob: 'glob' };   // georgi/glob — от потребителя (Meshy); докато ги няма — празен стол
 const FEMALE = new Set(['nadya', 'maria', 'elena', 'vera']);
+const HAVE = new Set(['ivaylo', 'nadya', 'maria', 'stefan', 'elena', 'vera', 'boris']);   // моделите, които вече са в assets/heavy/directors (без 404 за останалите)
 // столовете: по 4 от двете страни на масата (x = ±), от прозореца към председателя
-const SEATS = [[-1, -2.7], [1, -2.7], [-1, -0.9], [1, -0.9], [-1, 0.9], [1, 0.9], [-1, 2.7], [1, 2.7]];
+// …и девето — начело откъм картата (side 0): директорът на Глобъл, срещу председателя
+const SEATS = [[-1, -2.7], [1, -2.7], [-1, -0.9], [1, -0.9], [-1, 0.9], [1, 0.9], [-1, 2.7], [1, 2.7], [0, -4.25]];
 const SIT_X = 1.55, TABLE_W = 2.4, TABLE_L = 7.4, TABLE_H = 0.74, SCALE = 0.9, TURN = 0.3;   // TURN — директорите са леко обърнати към председателя
+const seatRy = side => side < 0 ? Math.PI / 2 - TURN : side > 0 ? -Math.PI / 2 + TURN : 0;   // накъде гледа столът (начело — към председателя)
 
 const css = `
 #boardRoom { position:fixed; inset:0; z-index:9780; background:#07090d; opacity:0; transition:opacity .45s; }
@@ -277,17 +280,40 @@ const waterM = new THREE.MeshPhysicalMaterial({ color: 0xcfe9f7, metalness: 0, r
 // профилът на чашата (радиус, височина в m): дебело дъно, леко разширена нагоре, ръбът — двойна стена
 const GLASS = new THREE.LatheGeometry([[0, 0], [0.028, 0], [0.031, 0.004], [0.032, 0.014], [0.037, 0.115], [0.0385, 0.118], [0.0365, 0.118], [0.0345, 0.016], [0, 0.014]].map(([r, y]) => new THREE.Vector2(r, y)), 28);
 const WATER = new THREE.LatheGeometry([[0, 0.014], [0.034, 0.016], [0.0355, 0.082], [0, 0.082]].map(([r, y]) => new THREE.Vector2(r, y)), 28);
+// 🏛️ медальонът на групата в средата на масата: знакът в цвета ѝ и името по ръба (o.brand = { nm, col, ico, group })
+function groupMedal(scene, b, gold) {
+  const t = canvasTex(1024, 1024, (g, w, h) => {
+    const c = w / 2, bg = g.createRadialGradient(c, c, 40, c, c, c);
+    bg.addColorStop(0, '#1b2f57'); bg.addColorStop(1, '#0c1730'); g.fillStyle = bg; g.beginPath(); g.arc(c, c, c, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = b.col || '#c9a24a'; g.lineWidth = 14; g.beginPath(); g.arc(c, c, c - 120, 0, Math.PI * 2); g.stroke();
+    g.strokeStyle = '#d9b45e'; g.lineWidth = 6; g.beginPath(); g.arc(c, c, c - 22, 0, Math.PI * 2); g.stroke();
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = '300px system-ui, "Noto Color Emoji", sans-serif'; g.fillText(b.ico || '🏛️', c, c + 10);
+    // името — по горния ръб, „· ХОЛДИНГ ·“ — по долния
+    const arc = (txt, r, top) => {
+      g.font = '800 64px system-ui, sans-serif'; g.fillStyle = '#e8c878';
+      const chars = [...txt], step = 0.105, a0 = (top ? -Math.PI / 2 : Math.PI / 2) - (top ? 1 : -1) * step * (chars.length - 1) / 2;
+      chars.forEach((ch, i) => { const a = a0 + (top ? 1 : -1) * step * i; g.save(); g.translate(c + Math.cos(a) * r, c + Math.sin(a) * r); g.rotate(a + (top ? Math.PI / 2 : -Math.PI / 2)); g.fillText(ch, 0, 0); g.restore(); });
+    };
+    arc((b.group || b.nm || '').toUpperCase(), c - 70, true); arc('· ХОЛДИНГ ·', c - 70, false);
+  });
+  const R = 0.72;
+  const m = new THREE.Mesh(new THREE.CircleGeometry(R, 64), new THREE.MeshPhysicalMaterial({ map: t, roughness: 0.25, clearcoat: 1, clearcoatRoughness: 0.08 }));
+  m.rotation.x = -Math.PI / 2; m.rotation.z = Math.PI; m.position.set(0, TABLE_H + 0.031, 0); scene.add(m);   // буквите — правилно откъм председателя
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(R, 0.018, 12, 80), gold); rim.rotation.x = -Math.PI / 2; rim.position.set(0, TABLE_H + 0.03, 0); scene.add(rim);
+}
 function seatProps(scene, side, z, name, sub, gold, k) {
   const fold = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.014, 0.46), [null, null, new THREE.MeshStandardMaterial({ map: folderTex(name, sub, k), roughness: 0.55 }), null, null, null].map(m => m || new THREE.MeshStandardMaterial({ color: 0x17181b, roughness: 0.6 })));
-  fold.position.set(side * (TABLE_W / 2 - 0.32), TABLE_H + 0.03, z); fold.rotation.y = side < 0 ? -Math.PI / 2 : Math.PI / 2; fold.castShadow = true; scene.add(fold);
-  const cz = z + 0.42, cx = side * (TABLE_W / 2 - 0.62);
+  if (side) { fold.position.set(side * (TABLE_W / 2 - 0.32), TABLE_H + 0.03, z); fold.rotation.y = side < 0 ? -Math.PI / 2 : Math.PI / 2; }
+  else fold.position.set(0, TABLE_H + 0.03, -TABLE_L / 2 + 0.34);   // начело
+  fold.castShadow = true; scene.add(fold);
+  const cz = side ? z + 0.42 : -TABLE_L / 2 + 0.3, cx = side ? side * (TABLE_W / 2 - 0.62) : 0.42;
   const coaster = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.008, 24), gold); coaster.position.set(cx, TABLE_H + 0.027, cz); scene.add(coaster);
   const glass = new THREE.Mesh(GLASS, glassM); glass.position.set(cx, TABLE_H + 0.031, cz); glass.renderOrder = 2; scene.add(glass);
   const water = new THREE.Mesh(WATER, waterM); water.position.copy(glass.position); water.renderOrder = 1; scene.add(water);
 }
 
 // ---- залата
-// o: { title, proposals(): [{ id, dir, ico, text, cost, can }], onDecide(id, 'yes'|'no'|'later'), seats(): [{ k, ico, company, what, open, director, lv, lvMax, inc, bonus, bonusPct, up: {cost, can}|null, hire: {cost, can}|null }], fmt, onUp(k), onHire(k), sound(n) }
+// o: { title, brand: { nm, col, ico, group }, proposals(): [{ id, dir, ico, text, cost, can }], onDecide(id, 'yes'|'no'|'later'), seats(): [{ k, ico, company, what, open, director, lv, lvMax, inc, bonus, bonusPct, up: {cost, can}|null, hire: {cost, can}|null }], fmt, onUp(k), onHire(k), sound(n) }
 export function openBoardroom(o) {
   document.getElementById('boardRoom')?.remove();
   if (!document.getElementById('boardRoomCss')) { const s = document.createElement('style'); s.id = 'boardRoomCss'; s.textContent = css; document.head.appendChild(s); }
@@ -307,13 +333,14 @@ export function openBoardroom(o) {
   const cam = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.05, 60);
   cam.position.set(0, 1.75, TABLE_L / 2 + 2.6);   // от мястото на председателя, към картата
   const ctl = new OrbitControls(cam, renderer.domElement);
-  ctl.target.set(0, 1.15, -3); ctl.enableDamping = true; ctl.enablePan = false; ctl.minDistance = 2.5; ctl.maxDistance = 10; ctl.maxPolarAngle = 1.55; ctl.minPolarAngle = 0.6; ctl.update();
+  ctl.target.set(0, 1.15, -3); ctl.enableDamping = true; ctl.enablePan = false; ctl.minDistance = 2.5; ctl.maxDistance = 8; ctl.maxPolarAngle = 1.55; ctl.minPolarAngle = 0.6; ctl.update();
   scene.add(new THREE.HemisphereLight(0xf4f8ff, 0x6d5c48, 0.8));
   const sun = new THREE.DirectionalLight(0xfff2de, 1.6); sun.position.set(9, 6, 2);   // дневна светлина откъм десните прозорци sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, near: 1, far: 25 }); sun.shadow.bias = -0.0004; scene.add(sun);
   const fill = new THREE.DirectionalLight(0xe6efff, 0.6); fill.position.set(-9, 5, 3); scene.add(fill);
   for (const z of [-2.4, 0, 2.4]) { const p = new THREE.PointLight(0xfff0d8, 1.6, 6, 1.6); p.position.set(0, 3.3, z); scene.add(p); }
   const { leather, metal, gold } = buildRoom(scene);
+  if (o.brand) groupMedal(scene, o.brand, gold);
 
   const tip = el.querySelector('.tip'), card = el.querySelector('.card'), hits = [], people = [];
   let sel = null, shut = false, raf = 0, nextChat = 4;
@@ -323,7 +350,7 @@ export function openBoardroom(o) {
   const list = seatsNow();
   list.forEach((s, i) => {
     const [side, z] = SEATS[i] || SEATS[SEATS.length - 1], x = side * SIT_X;
-    const ch = chair(leather, metal, s.open ? s.k : null); ch.position.set(x, 0, z); ch.rotation.y = side < 0 ? Math.PI / 2 - TURN : -Math.PI / 2 + TURN; scene.add(ch);
+    const ch = chair(leather, metal, s.open ? s.k : null); ch.position.set(x, 0, z); ch.rotation.y = seatRy(side); scene.add(ch);
     s.chair = ch;
     const sub = !s.open ? '🔒 още не е основано' : s.director ? s.company : '👔 свободно място';
     seatProps(scene, side, z, s.director || s.company, sub, gold, s.open ? s.k : null);
@@ -335,7 +362,7 @@ export function openBoardroom(o) {
   loadClips().then(async clips => {
     const pick = (...n) => n.map(x => clips[x]).filter(Boolean);
     await Promise.all(list.map(async (s, i) => {
-      const mk = s.director && DIR_MODEL[s.k]; if (!mk) return;
+      const mk = s.director && DIR_MODEL[s.k]; if (!mk || !HAVE.has(mk)) return;
       let g; try { g = await loadGlb(mk); } catch { return; }
       if (shut) return;
       const m = g.scene; m.scale.setScalar(SCALE); m.position.set(0, 0, 0); m.rotation.set(0, 0, 0);
@@ -350,7 +377,7 @@ export function openBoardroom(o) {
       p.base.play(); p.cur = p.base; mixer.update(Math.random() * base.duration);
       // столът — под ханша от позата; тялото — обърнато към масата, ханшът на SIT_X от средата
       const wrap = new THREE.Group(); wrap.add(m); scene.add(wrap);
-      wrap.rotation.y = side < 0 ? Math.PI / 2 - TURN : -Math.PI / 2 + TURN; wrap.position.set(side * SIT_X, 0, z); wrap.updateMatrixWorld(true);
+      wrap.rotation.y = seatRy(side); wrap.position.set(side * SIT_X, 0, z); wrap.updateMatrixWorld(true);
       const hips = m.getObjectByName('mixamorigHips'), hp = new THREE.Vector3();
       if (hips) {
         hips.getWorldPosition(hp);
@@ -500,7 +527,9 @@ export function openBoardroom(o) {
       if (p) play(p, p.talk[(Math.random() * p.talk.length) | 0], true);
     }
     for (const p of people) { p.mixer.update(dt); if (p.busy > 0 && (p.busy -= dt) <= 0) back(p); }
-    placeScreen(dt); placeBadges(); ctl.update(); renderer.render(scene, cam);
+    placeScreen(dt); placeBadges(); ctl.update();
+    if (cam.position.y > ROOM_H - 0.3) cam.position.y = ROOM_H - 0.3;   // камерата — под тавана
+    renderer.render(scene, cam);
   }
   loop();
 
@@ -528,9 +557,9 @@ const DEMO_PROPS = [
 ];
 export function demoBoardroom() {
   const C = [['con', '🏗️', 'Констръкшън', 'Ивайло Петров', 5, 2.1e6], ['hw', '🛣️', 'Толроуд', 'Надя Иванова', 5, 1.4e6], ['rail', '🚆', 'Рейл', 'Мария Стоянова', 5, 9.8e5], ['sea', '🚢', 'Оушън Експрес', 'Стефан Колев', 5, 1.1e6],
-    ['air', '✈️', 'Флайеър', 'Елена Димитрова', 5, 1.6e6], ['hotel', '🏨', 'Хотелс', null, 3, 7.2e5], ['oil', '🛢️', 'Петролиум', 'Вера Ангелова', 5, 3.4e6], ['bank', '🏦', 'Банк', 'Борис Тодоров', 5, 2.7e6]];
+    ['air', '✈️', 'Флайеър', 'Елена Димитрова', 5, 1.6e6], ['hotel', '🏨', 'Хотелс', null, 3, 7.2e5], ['oil', '🛢️', 'Петролиум', 'Вера Ангелова', 5, 3.4e6], ['bank', '🏦', 'Банк', 'Борис Тодоров', 5, 2.7e6], ['glob', '🌍', 'Глобъл Ризортс & Констръкшън', null, 0, 0]];
   return openBoardroom({
-    title: 'Титан Груп — демо',
+    title: 'Титан Груп — демо', brand: { nm: 'Титан', col: '#4fc3f7', ico: '🗿', group: 'Титан Груп' },
     proposals: () => DEMO_PROPS.filter(p => !p.done),
     onDecide: (id, a) => {
       const p = DEMO_PROPS.find(q => q.id === id); if (!p) return null;
