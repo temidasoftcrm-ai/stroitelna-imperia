@@ -244,6 +244,7 @@ export function createGroup(deps) {
       // заседанието (boardlogic.js): отчет → речта и рамката на банката → предложенията → обобщение
       report: deps.board2 ? () => deps.board2().reportHtml() : null, bindReport: (box, rr) => deps.board2().bindSettings(box, () => { rr(); re(); }),
       speech: deps.board2 ? () => deps.board2().bankSpeech() : null, frame: deps.board2 ? () => deps.board2().frame() : null, summary: deps.board2 ? () => deps.board2().summary() : null,
+      voteOn: deps.board2 ? id => { const p = proposals().find(q => q.id === id), B2 = deps.board2(); return p && B2.vote ? { v: B2.vote(p), p } : null; } : null,   // 🗳️ собственикът сам подлага предложение на гласуване
       onResolve: (id, how) => { const r = deps.board2().resolve(id, how); re(); return r; },
       settings: deps.board2 ? () => deps.board2().settingsHtml() : null, bindSettings: (box, rr) => deps.board2().bindSettings(box, () => { rr(); re(); }) }));
   }

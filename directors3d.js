@@ -22,7 +22,7 @@ const HAVE = new Set(['ivaylo', 'nadya', 'maria', 'stefan', 'elena', 'vera', 'bo
 // …и девето — начело откъм картата (side 0): директорът на Глобъл, срещу председателя
 const SEATS = [[-1, -2.7], [1, -2.7], [-1, -0.9], [1, -0.9], [-1, 0.9], [1, 0.9], [-1, 2.7], [1, 2.7], [0, -4.25, -0.5], [0, -4.25, 0.5], [0, -4.25]];   // [10] — начело в средата (министър-председателят)   // начело — Глобъл и градоначалникът на Империал Сити (10-ото място)
 const seatX = i => { const [side, , dx] = SEATS[i] || SEATS[SEATS.length - 1]; return side * SIT_X + (dx || 0); };
-const SIT_X = 1.55, TABLE_W = 2.4, TABLE_L = 7.4, TABLE_H = 0.74, SCALE = 0.9, TURN = 0.3;   // TURN — директорите са леко обърнати към председателя
+const SIT_X = 1.66, TABLE_W = 2.4, TABLE_L = 7.4, TABLE_H = 0.7, SCALE = 0.9, TURN = 0.3;   // TURN — директорите са леко обърнати към председателя
 const seatRy = side => side < 0 ? Math.PI / 2 - TURN : side > 0 ? -Math.PI / 2 + TURN : 0;   // накъде гледа столът (начело — към председателя)
 
 const css = `
@@ -75,6 +75,7 @@ const css = `
 #boardRoom .scr .fit { font-weight:700; margin:6px 0 8px; }
 #boardRoom .scr .fin { margin:6px 0 10px; font-size:13px; } #boardRoom .scr .fin div { display:flex; justify-content:space-between; gap:12px; padding:2px 0; border-bottom:1px solid rgba(255,255,255,.07); }
 #boardRoom .vb.c { border:2px solid #ffb347; }
+#boardRoom .scr button.vt { background:rgba(95,184,255,.18); color:#cfeaff; } #boardRoom .scr button.vt.imp { background:#5fb8ff; color:#08131f; flex-basis:100%; }
 #boardRoom .bnav { position:absolute; left:50%; top:12px; transform:translateX(-50%); display:none; align-items:center; gap:8px; padding:5px 8px; border-radius:999px; background:rgba(0,0,0,.6); border:1px solid rgba(95,184,255,.5); color:#fff; font:700 14px system-ui, sans-serif; }
 #boardRoom .bnav button { border:0; border-radius:999px; width:30px; height:30px; background:rgba(255,255,255,.14); color:#fff; font:800 16px system-ui, sans-serif; cursor:pointer; }
 @media (max-width:640px) { #boardRoom .hint { display:none; } #boardRoom .bnav { top:56px; } }
@@ -211,7 +212,7 @@ function chair(mat, metal, k) {
     const em = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.24), new THREE.MeshStandardMaterial({ map: logoTex(k), transparent: true, alphaTest: 0.1, roughness: 0.6 }));
     em.position.set(0, 0.3, 0.062); back.add(em);
   }
-  for (const sx of [-1, 1]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.05, 0.44), metal); arm.position.set(sx * 0.31, 0.7, -0.02); g.add(arm); const st = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.2, 0.04), metal); st.position.set(sx * 0.31, 0.6, 0.05); g.add(st); }
+  for (const sx of [-1, 1]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.04, 0.4), metal); arm.position.set(sx * 0.36, 0.6, -0.04); g.add(arm); const st = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.2, 0.04), metal); st.position.set(sx * 0.36, 0.52, 0.05); g.add(st); }   // подлакътниците — по-ниско и по-навън, лактите не влизат в тях
   const post = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.38, 10), metal); post.position.y = 0.22; g.add(post);
   const base = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.04, 5), metal); base.position.y = 0.03; g.add(base);
   g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
@@ -486,8 +487,10 @@ export function openBoardroom(o) {
     } else {   // 📋 предложение: петте въпроса — какво, защо, колко, кога, какво ще донесе
       const q = (k, v) => v ? `<div class="q"><b>${k}:</b> ${esc(v)}</div>` : '';
       const gain = p.gainTxt || (p.gain ? `+${B(p.gain)}/месец` : p.income ? `+${f(p.income)} €/ден` : '');
+      const Fr = o.frame ? o.frame() : null, imp = !!(p.important || (p.cost && Fr && p.cost >= Math.max(1, Fr.free) * 0.25) || (p.geo && p.geo.kind === 'loan'));   // важен: ≥ 25% от свободните пари, кредит или маркиран
       const fit = p.inBudget == null ? '' : p.inBudget ? '<div class="fit" style="color:#5fd38a">✅ в рамките на бюджета за инвестиции</div>' : '<div class="fit" style="color:#ffb347">⚠️ над бюджета за инвестиции</div>';
-      scr.innerHTML = `${hd('📋 Предложение към борда')}<div class="tx"></div>${q('Защо', p.why)}${q('Колко', p.cost ? B(p.cost) : 'без разход')}${q('Кога', p.days ? `~${p.days} дни` : '')}${q('Очакваме', gain)}${p.needsGear ? q('Условие', p.needsGear) : ''}${fit}<div class="row"><button class="y">✓ Да</button>${p.small ? `<button class="sm">½ По-малък вариант · ${B(p.small.cost)}</button>` : ''}<button class="n">✖ Не</button><button class="l">⏳ По-късно</button></div>`;
+      scr.innerHTML = `${hd('📋 Предложение към борда')}<div class="tx"></div>${q('Защо', p.why)}${q('Колко', p.cost ? B(p.cost) : 'без разход')}${q('Кога', p.days ? `~${p.days} дни` : '')}${q('Очакваме', gain)}${p.needsGear ? q('Условие', p.needsGear) : ''}${fit}<div class="row"><button class="y">✓ Да</button>${p.small ? `<button class="sm">½ По-малък вариант · ${B(p.small.cost)}</button>` : ''}<button class="n">✖ Не</button><button class="l">⏳ По-късно</button>${o.voteOn ? `<button class="vt${imp ? ' imp' : ''}">${imp ? '⭐ Важен проект — 🗳️ на гласуване' : '🗳️ Подложи на гласуване'}</button>` : ''}</div>`;
+      const vt = scr.querySelector('.vt'); if (vt) vt.onclick = () => { const r = o.voteOn(p.id); if (r) showVote(r, true); };
       const y = scr.querySelector('.y'); y.disabled = p.can === false; if (y.disabled) y.title = 'Нямаш достатъчно пари';
       for (const [c, a] of [['y', 'yes'], ['sm', 'small'], ['n', 'no'], ['l', 'later']]) { const b = scr.querySelector('.' + c); if (b) b.onclick = () => { const r = o.onDecide && o.onDecide(p.id, a); if (r && r.need === 'vote') showVote(r); else after(a === 'yes' || a === 'small' ? (r && r.done === false ? 'no' : 'ok') : a); }; }   // решеното изчезва — на същото място идва следващото
       scr.querySelector('.tx').textContent = `${p.ico || ''} ${p.text}`;
@@ -504,24 +507,38 @@ export function openBoardroom(o) {
   // 🗳️ съвещателният вот (boardlogic.js): над всеки директор ✔ за / ◐ условно / ✖ против; решението е винаги твое
   const badges = [];
   function clearBadges() { badges.forEach(b => b.el.remove()); badges.length = 0; }
-  function showVote(r) {
-    const { v, p } = r; clearBadges();
-    scr.innerHTML = `<div class="hd"><span>🗳️ Съвещателен вот</span><span>${v.yes} : ${v.no}</span></div><div class="tx"></div><div class="votes"></div><div class="res" style="color:${v.passed ? '#5fd38a' : '#ff6b6b'}">${v.yes} за : ${v.no} против — решението е твое</div><div class="row"></div>`;
+  // гласуването: директорите гласуват един по един — „за“ вдигат ръка, над всеки ✋ за / ◐ условно / ✖ против, броячът расте; накрая — резултатът и решението ти
+  let voteTok = 0;
+  function showVote(r, mine) {
+    const { v, p } = r, tok = ++voteTok; clearBadges();
+    scr.innerHTML = `<div class="hd"><span>🗳️ ${mine ? 'Гласуване на борда' : 'Съвещателен вот'}</span><span class="cnt">0 : 0</span></div><div class="tx"></div><div class="votes"></div><div class="res"></div><div class="row"></div>`;
     scr.querySelector('.tx').textContent = `${v.bank && !v.bank.ok ? `🏦 Банката възразява: ${v.bank.why}. ` : ''}„${p.text}“${p.cost ? ` (${B(p.cost)})` : ''}`;
-    const vs = scr.querySelector('.votes');
-    for (const x of v.votes) { const d = document.createElement('div'), m = document.createElement('b'); m.textContent = x.cond ? '◐ ' : x.yes ? '✔ ' : '✖ '; m.style.color = x.cond ? '#ffb347' : x.yes ? '#43d17a' : '#ff4d4d'; m.style.fontWeight = '900'; d.appendChild(m); d.appendChild(document.createTextNode(`${x.name} — ${x.why}`)); vs.appendChild(d); }   // ✖ против — червено, ✔ за — зелено, ◐ — за, с условие
-    const row = scr.querySelector('.row');
-    const btn = (t, how, y) => { const b = document.createElement('button'); b.textContent = t; if (y) b.className = 'y'; b.onclick = () => { const rr = o.onResolve && o.onResolve(p.id, how); after(how === 'drop' ? 'later' : rr && rr.done === false ? 'no' : 'ok'); }; row.appendChild(b); };
-    btn('✓ Одобри', p.isSmall ? 'small' : 'pass', true);   // гласуваше се за по-малкия вариант — одобрява се той, не пълният
-    if (p.small) btn(`½ По-малък вариант · ${B(p.small.cost)}`, 'small');
-    if (v.bank && !v.bank.ok) btn('🏦 С кредит', 'loan');
-    btn('⏳ Отложи', 'drop');
-    for (const x of v.votes) {
-      const i = list.findIndex(s => s.k === x.dir); if (i < 0) continue;
-      const el2 = document.createElement('div'); el2.className = 'vb ' + (x.cond ? 'c' : x.yes ? 'y' : 'n'); el2.textContent = x.cond ? '◐ условно' : x.yes ? '✋ за' : '✖ против'; el.insertBefore(el2, scr); badges.push({ el: el2, i });   // под екрана, да не го закриват
-      const q = people.find(z => z.i === i); if (q && x.yes) { q.busy = 0; play(q, q.point[0], true); }   // „за“ — вдигат ръка
-    }
-    o.sound && o.sound('click');
+    const vs = scr.querySelector('.votes'), cnt = scr.querySelector('.cnt'); let y = 0, n = 0, k = 0;
+    const step = () => {
+      if (shut || tok !== voteTok) return;
+      const x = v.votes[k++];
+      if (x) {
+        x.yes ? y++ : n++; cnt.textContent = `${y} : ${n}`;
+        const d = document.createElement('div'), m = document.createElement('b'); m.textContent = x.cond ? '◐ ' : x.yes ? '✔ ' : '✖ '; m.style.color = x.cond ? '#ffb347' : x.yes ? '#43d17a' : '#ff4d4d'; m.style.fontWeight = '900'; d.appendChild(m); d.appendChild(document.createTextNode(`${x.name} — ${x.why}`)); vs.appendChild(d);
+        const i = list.findIndex(s => s.k === x.dir);
+        if (i >= 0) {
+          const el2 = document.createElement('div'); el2.className = 'vb ' + (x.cond ? 'c' : x.yes ? 'y' : 'n'); el2.textContent = x.cond ? '◐ условно' : x.yes ? '✋ за' : '✖ против'; el.insertBefore(el2, scr); badges.push({ el: el2, i });
+          const q = people.find(z => z.i === i); if (q && x.yes) { q.busy = 0; play(q, q.point[0], true); }   // „за“ — вдига ръка
+        }
+        o.sound && o.sound('click');
+        setTimeout(step, 650); return;
+      }
+      const ok = y > n;
+      scr.querySelector('.res').innerHTML = `<span style="color:${ok ? '#5fd38a' : y === n ? '#ffd54a' : '#ff6b6b'}">${y} за : ${n} против — ${ok ? 'бордът подкрепя' : y === n ? 'равен глас' : 'бордът е против'}. Решението е твое.</span>`;
+      if (ok && mine) snd.applause(1.4);
+      const row = scr.querySelector('.row');
+      const btn = (t, how, cls) => { const b = document.createElement('button'); b.textContent = t; if (cls) b.className = cls; b.onclick = () => { if (how === 'no') { o.onDecide && o.onDecide(p.id, 'no'); after('no'); return; } const rr = o.onResolve && o.onResolve(p.id, how); after(how === 'drop' ? 'later' : rr && rr.done === false ? 'no' : 'ok'); }; row.appendChild(b); };
+      btn(ok ? '✓ Одобри (както реши бордът)' : '✓ Одобри въпреки това', p.isSmall ? 'small' : 'pass', 'y');
+      if (p.small) btn(`½ По-малък вариант · ${B(p.small.cost)}`, 'small');
+      if (v.bank && !v.bank.ok) btn('🏦 С кредит', 'loan');
+      btn(ok ? '✖ Отхвърли' : '✖ Отхвърли (както реши бордът)', 'no', 'n'); btn('⏳ Отложи', 'drop', 'l');
+    };
+    setTimeout(step, 500);
   }
   const headOf = (i, out) => { const q = people.find(z => z.i === i), h = q && q.m.getObjectByName('mixamorigHead'); if (h) h.getWorldPosition(out); else { const si = list[i]?.si ?? i, [, z] = SEATS[si]; out.set(seatX(si), 1.25, z); } return out; };
   const bp = new THREE.Vector3();
@@ -698,6 +715,9 @@ let DEMO_REPORT = true;
 const DEMO_PROPS = [
   { id: 'bank:brief:1', dir: 'bank', ico: '🏦', info: true, avail: 7.4e8, reserve: 1.8e8, text: 'В касата има 920 млн. €. След месечния резерв от 180 млн. € можем да отпуснем до 740 млн. € за инвестиции този месец.' },
   { id: 'demo-air', dir: 'air', ico: '✈️', text: 'Имаме 10 гейта за ъпдейт в 4 летища — общо 720 млн. €. Да ги направим ли?', cost: 7.2e8, inBudget: true, days: 90, geo: { country: 'BGR', kind: 'airport', cities: [{ nm: 'София', lat: 42.7, lon: 23.32 }, { nm: 'Пловдив', lat: 42.15, lon: 24.75 }, { nm: 'Варна', lat: 43.21, lon: 27.91 }, { nm: 'Бургас', lat: 42.5, lon: 27.47 }] } },
+  { id: 'con:gear:3', dir: 'con', ico: '🚜', text: 'Липсват 3 машини за обектите. Предлагам да ги купя.', cost: 4.2e5, count: 3, inBudget: true, days: 2 },
+  { id: 'rail:hs:2', dir: 'rail', ico: '⚡', text: 'Предлагам да надградя 2 дълги линии за влака „Стрела“ — 300 км/ч.', cost: 8.884e7, count: 2, inBudget: true, days: 180 },
+  { id: 'bank:sdiv40:1', dir: 'bank', ico: '🤝', text: 'Акционерите са недоволни и акцията пада. Предлагам да вдигнем дивидента на 40% от печалбата.', cost: 0, inBudget: true },
   { id: 'rail:trains:3', dir: 'rail', ico: '🚆', text: 'Линиите поемат още 3 влака. Предлагам да купя 3 средни товарни влака.', cost: 3.6e7, count: 3, inBudget: true, days: 10, geo: { country: 'BGR', kind: 'rail', cities: [{ nm: 'София', lat: 42.7, lon: 23.32 }, { nm: 'Варна', lat: 43.21, lon: 27.91 }], route: [[0, 1]] } },
   { id: 'rail:trainup:4', dir: 'rail', ico: '⬆️', text: 'Предлагам да надградя 4 малки влака до големи — повече вагони, повече товар.', cost: 2.4e7, count: 4, inBudget: true, days: 5 },
   { id: 'demo-hotel', dir: 'hotel', ico: '🏨', text: 'Предлагам два нови хотела в Испания — в Мадрид и Барселона.', why: 'туристите в Испания растат с 8% годишно, нямаме хотел там', gainTxt: '+72 млн. €/месец след откриването', small: { text: 'Само хотел в Барселона', cost: 9e7 }, cost: 1.8e8, inBudget: true, days: 120, income: 2.4e6, geo: { country: 'ESP', kind: 'hotel', cities: [{ nm: 'Мадрид', lat: 40.42, lon: -3.7 }, { nm: 'Барселона', lat: 41.39, lon: 2.17 }] } },
@@ -727,6 +747,9 @@ export function demoBoardroom() {
       p.done = a; return null;
     },
     onResolve: (id, how) => { const p = DEMO_PROPS.find(q => q.id === id); if (p) p.done = how; },
+    voteOn: id => { const p = DEMO_PROPS.find(q => q.id === id); if (!p) return null; const D = [['con', 'Ивайло Петров'], ['hw', 'Надя Иванова'], ['rail', 'Мария Стоянова'], ['sea', 'Стефан Колев'], ['air', 'Елена Димитрова'], ['oil', 'Вера Ангелова'], ['bank', 'Борис Тодоров']];
+      const votes = D.map(([dir, name], i) => ({ dir, name, yes: dir === p.dir || (i + p.id.length) % 3 !== 0, cond: dir === 'con' && i % 2 === 0, why: dir === p.dir ? 'моето предложение' : (i + p.id.length) % 3 ? 'полезно за холдинга' : 'чакат пари за моето дружество' }));
+      const yes = votes.filter(v => v.yes).length; return { p, v: { votes, yes, no: votes.length - yes, passed: yes > votes.length / 2, bank: { ok: true } } }; },
     seats: () => C.map(([k, ico, suf, d, lv, inc]) => ({ k, ico, company: 'Титан ' + suf, what: '', open: true, director: d, lv, lvMax: 5, inc, bonus: inc * (lv * 0.1 + (d ? 0.15 : 0)), bonusPct: Math.round((lv * 0.1 + (d ? 0.15 : 0)) * 100), up: lv < 5 ? { cost: 5e6, can: true } : null, hire: !d && lv >= 5 ? { cost: 4e6, can: true } : null })),
   });
 }

@@ -2274,6 +2274,7 @@ function acceptOffer(id) {
   }
   city.lots[o.lot].busy = 'project';
   projects.push(p);
+  { const m = Math.floor(S.day / 30); S.accM = S.accM && S.accM.m === m ? { m, n: S.accM.n + 1, sum: S.accM.sum + (p.reward || 0) } : { m, n: 1, sum: p.reward || 0 }; }   // за обобщението на директора в страничния панел
   makeSite(p);
   dispatch();
   if (bulkOffer) return;
@@ -2792,7 +2793,10 @@ function renderPanel() {
   updFinBtn();
   if (!S) return;
   renderTop();
+  const pd = panelDir(); panelCol(pd);
+  if (pd && ['offers', 'fleet', 'store'].includes(tab)) tab = 'projects';   // с директор: поръчките, техниката и складът са негови
   document.querySelectorAll('#tabs button').forEach(b => {
+    b.style.display = pd && ['offers', 'fleet', 'store'].includes(b.dataset.t) ? 'none' : '';
     b.classList.toggle('on', b.dataset.t === tab);
     const n = b.dataset.t === 'offers' ? S.offers.length : b.dataset.t === 'projects' ? projects.length : 0;
     b.innerHTML = b.textContent.replace(/\d+$/, '').trim() + (n ? ` <span class="badge">${n}</span>` : '');
@@ -2865,7 +2869,11 @@ function renderPanel() {
   } else if (tab === 'store') {
     h += storeHtml();
   }
+  if (pd) h = panelDirHtml(pd) + h + `<div class="row" style="justify-content:center;margin:12px 0 4px"><button class="btn2" data-pmanual="1">🔧 Ръчно управление</button></div>`;
   el.innerHTML = h;
+  if (pd) el.querySelectorAll('[data-cancelp]').forEach(b => b.remove());   // „Обекти“ — само за гледане
+  if (pd) { el.querySelectorAll('[data-pboard]').forEach(b => b.onclick = () => group.board(() => renderPanel())); el.querySelectorAll('[data-pgar]').forEach(b => b.onclick = () => openBig('garage')); el.querySelectorAll('[data-poff]').forEach(b => b.onclick = () => openBig('offers'));
+    el.querySelectorAll('[data-pmanual]').forEach(b => b.onclick = () => { S.hold.trust = S.hold.trust || {}; S.hold.trust.con = Math.max(0.5, (S.hold.trust.con ?? 1) - 0.02); manualWin.add('panel'); toast(`👔 ${pd}: намесихте се в работата ми.`, ''); save(); renderPanel(); }); }
   if (tab === 'offers') { tenders.bind(el); el.querySelectorAll('[data-dtend]').forEach(b => b.onclick = () => openBig('offers')); }
   if ($('bOfferAll')) $('bOfferAll').onclick = offerAll;
   el.querySelectorAll('[data-acc]').forEach(b => b.onclick = e => { e.stopPropagation(); acceptOffer(+b.dataset.acc); });
@@ -8334,6 +8342,25 @@ const tasks = createTasks({ S: () => S, fmt, ready: () => !!S && !!city && city.
 // 👔 кой директор поема кой прозорец (след назначаване; „Ръчно управление“ връща стария екран до затваряне на играта)
 // държавните търгове от ниво 15 с назначен директор на Констръкшън: той подава офертите (предложения / автопилот) и съобщава резултата
 const tenderDir = () => { const n = S?.holding && dev.best() >= 15 && feature('boardroom') && (S.hold?.dir || {}).con; return n ? String(n).split(' ')[0] : ''; };
+// 👔 страничният панел с директор на Констръкшън (ниво 15+): без Поръчки, Техника и Склад — обобщение горе, прибран по подразбиране
+const panelDir = () => { try { return !manualWin.has('panel') ? tenderDir() : ''; } catch { return ''; } };
+function panelDirHtml(nm) {
+  const m = Math.floor(S.day / 30), acc = S.accM && S.accM.m === m ? S.accM : { n: 0, sum: 0 }, sh = garShort(), np = (() => { try { return group.proposals().filter(p => !p.info && p.dir === 'con').length; } catch { return 0; } })();
+  const row = (ico, txt, btn) => `<div class="row" style="margin:4px 0;align-items:center;gap:6px"><span class="meta" style="margin:0;flex:1">${ico} ${txt}</span>${btn || ''}</div>`;
+  return `<div class="card" style="border:1px solid #ffd54a"><div class="meta" style="margin:0 0 4px">👔 <b style="color:var(--txt)">${nm}</b> води поръчките, техниката и склада.</div>`
+    + row('📜', acc.n ? `${nm} прие ${acc.n} ${acc.n === 1 ? 'поръчка' : 'поръчки'} този месец · <b style="color:var(--ok)">+${fmt(acc.sum)} €</b>` : `${nm} още не е приел поръчки този месец`, `<button class="btn2" data-poff="1" style="padding:3px 8px">→</button>`)
+    + row('🚜', `Гараж ниво ${S.garageLevel || 1}/10 · ${sh.total ? `<b style="color:var(--bad)">липсва техника</b> → предложението на ${nm}` : 'всичко нужно е налице'}`, `<button class="btn2" data-pgar="1" style="padding:3px 8px">→</button>`)
+    + row('📋', np ? `<b>${np}</b> ${np === 1 ? 'предложение чака' : 'предложения чакат'}` : 'няма чакащи предложения', `<button class="btn" data-pboard="1" style="padding:3px 8px">🏛️ Залата</button>`) + `</div>`;
+}
+// прибран панел (помни се); бутонът стои в горния край на панела
+function panelCol(on) {
+  const P = $('panel'); if (!P) return;
+  if (!$('pcolCss')) { const c = document.createElement('style'); c.id = 'pcolCss'; c.textContent = `#pcolBtn { display:none; margin:6px 8px 0; } #panel.pdir #pcolBtn { display:block; } body:not(.mob) #panel.pcol { width:46px; } body.mob #panel.pcol { height:48px; } #panel.pcol #tabs, #panel.pcol #panelBody { display:none; } #panel.pcol #pcolBtn { margin:6px 4px; padding:6px 0; width:38px; }`; document.head.appendChild(c); }
+  let b = $('pcolBtn'); if (!b) { b = document.createElement('button'); b.id = 'pcolBtn'; b.className = 'btn2'; b.onclick = () => { const c = !P.classList.contains('pcol'); try { localStorage.setItem('stroi-pcol', c ? '1' : '0'); } catch {} P.classList.toggle('pcol', c); b.textContent = c ? '◀' : '▶ Прибери'; }; P.insertBefore(b, P.firstChild); }
+  P.classList.toggle('pdir', !!on);
+  const col = !!on && (() => { try { return localStorage.getItem('stroi-pcol') !== '0'; } catch { return true; } })();
+  P.classList.toggle('pcol', col); b.textContent = col ? '◀' : '▶ Прибери'; b.title = col ? 'Отвори панела' : 'Прибери панела';
+}
 const DIR_WIN = { garage: 'con', offers: 'con', cities: 'con', mines: 'oil', bank: 'bank' };
 const manualWin = new Set();
 const dirWinOf = w => { const k = DIR_WIN[w]; return k && !manualWin.has(w) && feature('boardroom') && S?.holding && (S.hold?.dir || {})[k] && (w !== 'bank' || S.bank) ? k : null; };

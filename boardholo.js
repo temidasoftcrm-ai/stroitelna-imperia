@@ -3,6 +3,7 @@
 // p.geo = { country: 'ESP' (a3 от assets/globe/countries.json), kind: 'hotel'|'branch'|'route'|'airport'|'port'|'oil'|'rail'|'district', cities: [{ nm, lat, lon }], route: [[i, j]] }
 // Одобрено → за кратко зелено и „Бюджетът е резервиран“; отложено → кехлибарено „За следващо заседание“. Само линии и надписи — без тежки ефекти.
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const CYAN = 0x5fd0ff, GREEN = 0x5fe39a, AMBER = 0xffb347, RED = 0xff6b6b;
 const W = 1.15, H = 0.72;   // рамката на картата (m)
@@ -66,28 +67,88 @@ function vehicleModel(kind, big) {
     const len = big ? 0.36 : 0.22, w = big ? 0.07 : 0.05; B(len, 0.03, w, 0, 0, 0); add(new THREE.ConeGeometry(w / 2, 0.05, 4), len / 2 + 0.024, 0.015, 0, 0, Math.PI / 4, -Math.PI / 2);
     B(0.035, 0.05, w * 0.8, -len / 2 + 0.03, 0.03, 0);
     const rows = big ? 3 : 1, cols = Math.floor((len - 0.08) / 0.03); for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) B(0.026, 0.014, w * 0.8, -len / 2 + 0.075 + c * 0.03, 0.03 + r * 0.015, 0);
+  } else if (kind === 'gear') {   // 🚜 багер: вериги, кабина, стрела и кофа
+    B(0.16, 0.035, 0.09, 0, 0, 0); B(0.11, 0.05, 0.08, 0, 0.035, 0); B(0.05, 0.05, 0.05, 0.03, 0.085, 0.01);
+    add(new THREE.BoxGeometry(0.15, 0.018, 0.022), 0.1, 0.12, 0, 0, 0, 0.55); add(new THREE.BoxGeometry(0.1, 0.016, 0.02), 0.2, 0.12, 0, 0, 0, -0.9); B(0.04, 0.035, 0.05, 0.235, 0.03, 0);
+  } else if (kind === 'bullet') {   // ⚡ „Стрела“: дълъг заострен нос, гладки вагони, пантограф
+    add(new THREE.CylinderGeometry(0.024, 0.024, 0.1, 12), 0, 0.03, 0, 0, 0, Math.PI / 2); add(new THREE.ConeGeometry(0.024, 0.11, 12), 0.105, 0.03, 0, 0, 0, -Math.PI / 2);
+    for (let i = 0; i < 4; i++) add(new THREE.CylinderGeometry(0.024, 0.024, 0.085, 12), -0.095 - i * 0.09, 0.03, 0, 0, 0, Math.PI / 2);
+    add(new THREE.BoxGeometry(0.03, 0.003, 0.03), -0.02, 0.058, 0, 0, 0, 0.6); B(0.5, 0.004, 0.05, -0.1, 0, 0);
   } else {   // 🚚 ТИР: кабина + ремарке (голям — по-дълго ремарке и двойни оси)
     B(0.05, 0.05, 0.045, 0.1, 0, 0); B(0.03, 0.02, 0.046, 0.13, 0.03, 0); B(big ? 0.22 : 0.14, 0.055, 0.046, big ? -0.04 : 0.0, 0.004, 0);
   }
   return g;
 }
-const VEH = { trucks: 'truck', trains: 'train', planes: 'plane', ships: 'ship' }, VEH_UP = { trainup: 'train', planeup: 'plane', shipup: 'ship', truckup: 'truck' };
-const VEH_NM = { train: ['малък влак', 'голям влак'], plane: ['малък самолет', 'голям самолет'], ship: ['малък кораб', 'голям кораб'], truck: ['камион', 'ТИР'] };
-function vehicleBanner(g, p, y) {
-  const key = String(p.id || '').split(':')[1] || '', buy = p.veh?.kind || VEH[key], up = p.veh?.up || VEH_UP[key]; if (!buy && !up) return;
-  const ban = new THREE.Group(); ban.position.set(0, y, 0.05); g.add(ban); const n = p.count || 1;
+const VEH = { trucks: 'truck', trains: 'train', planes: 'plane', ships: 'ship', gear: 'gear' }, VEH_UP = { trainup: 'train', planeup: 'plane', shipup: 'ship', truckup: 'truck', hs: 'bullet' };
+const VEH_NM = { bullet: ['влак', 'влак „Стрела“'], gear: ['машина', 'машини'], train: ['малък влак', 'голям влак'], plane: ['малък самолет', 'голям самолет'], ship: ['малък кораб', 'голям кораб'], truck: ['камион', 'ТИР'] };
+// истински 3D модел (glb) като холограма: полупрозрачна плът + светещи ръбове; кеш по файл; size — най-дългата страна
+// истинските 3D модели (glb) като холограма: полупрозрачна плът + светещи ръбове; композиция — локомотив и вагони в редица по X
+const HV = 'assets/heavy/';
+const HOLO_GLB = {
+  gear: { parts: [HV + 'gear/excavator.glb'], size: 0.34 },
+  'train-s': { parts: [HV + 'trains/gp38.glb', HV + 'trains/boxcar.glb', HV + 'trains/boxcar.glb'], size: 0.42 },
+  'train-b': { parts: [HV + 'trains/vl82.glb', HV + 'trains/boxcar.glb', HV + 'trains/hopper2.glb', HV + 'trains/boxcar.glb', HV + 'trains/hopper2.glb'], size: 0.6 },
+  bullet: { parts: [HV + 'trains/ave.glb'], size: 0.6 },
+  'plane-s': { parts: [HV + 'air/regional.glb'], size: 0.3 }, 'plane-b': { parts: [HV + 'air/wide.glb'], size: 0.42 }, plane: { parts: [HV + 'air/a320.glb'], size: 0.38 },
+  'ship-s': { parts: [HV + 'ships/tanker.glb'], size: 0.32 }, 'ship-b': { parts: [HV + 'ships/container.glb'], size: 0.46 },
+  'truck-s': { parts: [HV + 'trucks/volvo.glb'], size: 0.26 }, 'truck-b': { parts: [HV + 'trucks/scania.glb'], size: 0.34 },
+};
+const holoKey = (kind, big) => HOLO_GLB[kind] && kind !== 'train' && kind !== 'ship' && kind !== 'truck' ? kind : HOLO_GLB[`${kind}-${big ? 'b' : 's'}`] ? `${kind}-${big ? 'b' : 's'}` : null;
+const glbCache = {};
+const loadG = url => glbCache[url] = glbCache[url] || new GLTFLoader().loadAsync(url);
+// всяка част — нормализирана: дългата хоризонтална ос по X, основа на y = 0; частите — една след друга, общата дължина = size
+function holoGlb(key, fallback) {
+  const { parts, size } = HOLO_GLB[key], g = new THREE.Group();
+  Promise.all(parts.map(loadG)).then(gls => {
+    const fill = new THREE.MeshBasicMaterial({ color: CYAN, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }), edge = lineMat(CYAN);
+    const geos = gls.map(gl => {
+      const src = gl.scene; src.updateMatrixWorld(true); const list = [];
+      src.traverse(o => { if (o.isMesh) { const ge = o.geometry.clone(); ge.applyMatrix4(o.matrixWorld); list.push(ge); } });
+      const bb = new THREE.Box3(); list.forEach(ge => { ge.computeBoundingBox(); bb.union(ge.boundingBox); });
+      const sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3()), rot = sz.z > sz.x;
+      list.forEach(ge => { ge.translate(-c.x, -bb.min.y, -c.z); if (rot) ge.rotateY(Math.PI / 2); });
+      return { list, len: rot ? sz.z : sz.x, h: sz.y };
+    });
+    // мащабът: локомотивът е мярката — всички части в един мащаб, общо size
+    const gap = 0.02 * geos[0].len, total = geos.reduce((a, q) => a + q.len, 0) + gap * (geos.length - 1), k = size / total;
+    let x = total / 2;
+    geos.forEach(q => { const cx = x - q.len / 2; x -= q.len + gap; for (const ge of q.list) { ge.translate(cx, 0, 0); ge.scale(k, k, k); g.add(new THREE.Mesh(ge, fill)); g.add(new THREE.LineSegments(new THREE.EdgesGeometry(ge, 35), edge)); } });
+  }).catch(() => fallback && g.add(fallback()));
+  return g;
+}
+function vehicleBanner(g, p, y, k = 1) {
+  const key = (String(p.id || '').split(':')[1] || '').replace(/[0-9.-]+$/, ''), buy = p.veh?.kind || VEH[key], up = p.veh?.up || VEH_UP[key]; if (!buy && !up) return;
+  const ban = new THREE.Group(); ban.position.set(0, y, 0.05); ban.scale.setScalar(k); g.add(ban); const n = p.count || 1;
   if (up) {
-    const a = vehicleModel(up, false); a.position.x = -0.32; a.userData.spinM = true; ban.add(a);
-    const b = vehicleModel(up, true); b.position.x = 0.34; b.scale.setScalar(1.15); b.userData.spinM = true; ban.add(b);
+    const sk = up === 'bullet' ? 'train' : up, a = holoKey(sk, false) ? holoGlb(holoKey(sk, false), () => vehicleModel(sk, false)) : vehicleModel(sk, false); a.position.x = -0.36; a.userData.spinM = true; ban.add(a);
+    const bk = up === 'bullet' ? 'bullet' : holoKey(up, true), b = bk ? holoGlb(bk, () => vehicleModel(up, true)) : vehicleModel(up, true); b.position.x = 0.36; b.userData.spinM = true; ban.add(b);
     const am = new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
     const arrow = new THREE.Group(); arrow.userData.pulse = true; ban.add(arrow);
     const sh = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.09, 8), am); sh.rotation.z = Math.PI / 2; sh.position.set(-0.01, 0.05, 0); arrow.add(sh);
     const tip = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.04, 12), am); tip.rotation.z = -Math.PI / 2; tip.position.set(0.055, 0.05, 0); arrow.add(tip);
     const [s0, s1] = VEH_NM[up]; const l0 = textSprite([s0], { h: 0.04, bg: false }); l0.position.set(-0.32, -0.03, 0.02); ban.add(l0); const l1 = textSprite([`${s1}${n > 1 ? ` ×${n}` : ''}`], { h: 0.045, bg: false, col: '#ffe08a' }); l1.position.set(0.34, -0.03, 0.02); ban.add(l1);
   } else {
-    const m = vehicleModel(buy, true); m.scale.setScalar(1.25); m.userData.spinM = true; ban.add(m);
+    const hk = buy === 'plane' ? 'plane' : holoKey(buy, true), m = hk ? holoGlb(hk, () => vehicleModel(buy, true)) : vehicleModel(buy, true); if (!hk) m.scale.setScalar(1.25); m.userData.spinM = true; ban.add(m);
     const l = textSprite([`×${n}`], { h: 0.08, bg: false, col: '#ffe08a' }); l.position.set(0.32, 0.05, 0.02); ban.add(l);
   }
+}
+
+// 📈 графиката на акцията: досегашният ход и пунктир — какво очакваме след решението (p.chart — истинските цени, ако ги има)
+function stockChart(g, p, y, k = 1) {
+  const key = (String(p.id || '').split(':')[1] || '').replace(/[0-9.-]+$/, ''); if (!['sdiv', 'ipo', 'buyback'].includes(key) && !p.chart) return;
+  const hist = p.chart || (key === 'ipo' ? [1, 1.03, 1.02, 1.06, 1.08, 1.07, 1.1, 1.12] : [1, 0.96, 0.97, 0.9, 0.86, 0.84, 0.78, 0.74]), up = key === 'ipo' ? 0.92 : 1.25;   // IPO — малко разводняване
+  const W2 = 0.9, H2 = 0.32, n = hist.length, all = [...hist, hist[n - 1] * up], lo = Math.min(...all) * 0.97, hi = Math.max(...all) * 1.03;
+  const P = (i, v) => new THREE.Vector3(-W2 / 2 + i / n * W2, (v - lo) / (hi - lo) * H2, 0);
+  const box = new THREE.Group(); box.position.set(-0.15 * k, y, 0.05); box.scale.setScalar(k); g.add(box);
+  const axis = lineMat(CYAN); axis.opacity = 0.35;
+  for (let k = 0; k < 4; k++) box.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([P(0, lo + (hi - lo) * k / 4), P(n, lo + (hi - lo) * k / 4)]), axis));
+  const down = hist[n - 1] < hist[0];
+  box.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(hist.map((v, i) => P(i, v))), lineMat(down ? RED : GREEN)));
+  const f = new THREE.Line(new THREE.BufferGeometry().setFromPoints([P(n - 1, hist[n - 1]), P(n, hist[n - 1] * up)]), new THREE.LineDashedMaterial({ color: up >= 1 ? GREEN : AMBER, dashSize: 0.02, gapSize: 0.012, transparent: true, depthWrite: false, toneMapped: false }));
+  f.computeLineDistances(); f.userData.dash = true; box.add(f);
+  const pct = Math.round((hist[n - 1] / hist[0] - 1) * 100), lab = textSprite([`📈 ${p.chartNm || 'Акцията'}: ${pct >= 0 ? '+' : ''}${pct}%`, `след решението: ${up >= 1 ? '↗ нагоре' : '↘ леко надолу'}`], { h: 0.05, col: down ? '#ff8f86' : '#8fe8b0' });
+  lab.position.set(W2 / 2 + 0.25, H2 * 0.7, 0.02); box.add(lab);
+  return box;
 }
 
 function textSprite(lines, opt = {}) {
@@ -182,9 +243,9 @@ export function createHolo(scene, { fmt = n => Math.round(n).toLocaleString('bg-
     // 🏦 кредит на държава: голям надпис с рейтинга (в неговия цвят) и сумата над картата
     if (G.kind === 'loan' && G.rating) {
       const big = textSprite([G.rating, G.amt ? `${fmt(G.amt)} €` : ''].filter(Boolean), { h: 0.15, col: G.ratingCol || '#ffd54a' });
-      big.position.set(0, H / 2 + 0.05, 0.06); big.renderOrder = 6; g.add(big);
+      big.position.set(-W / 2 - 0.05, H + 0.18, 0.06);   // над картата вляво — не закрива държавата big.renderOrder = 6; g.add(big);
     }
-    vehicleBanner(g, p, H + 0.16);
+    vehicleBanner(g, p, H + 0.16); stockChart(g, p, H + 0.12);
   }
 
   function show(p) {
@@ -193,7 +254,7 @@ export function createHolo(scene, { fmt = n => Math.round(n).toLocaleString('bg-
     if (p.info) globe(p);
     else if (p.geo && p.geo.country) country(p);
     else {   // без география — символът на дружеството и сумата
-      const g = begin(), lab = textSprite([`${p.ico || '📋'} ${p.cost ? fmt(p.cost) + ' €' : ''}`.trim()], { h: 0.09 }); lab.position.set(0, 0.45, 0); g.add(lab); vehicleBanner(g, p, 0.6);
+      const g = begin(), lab = textSprite([`${p.ico || '📋'} ${p.cost ? fmt(p.cost) + ' €' : ''}`.trim()], { h: 0.09 }); g.add(lab); vehicleBanner(g, p, 0.62, 1.9); const ch = stockChart(g, p, 0.12, 1.8); lab.position.set(0, ch ? 0.82 : 0.32, 0);   // без карта — моделът е едър, в центъра
     }
   }
   // 'ok' → зелено + „Бюджетът е резервиран“; 'later' → кехлибарено + „За следващо заседание“; 'no' → червено за миг
