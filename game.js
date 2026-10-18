@@ -5469,7 +5469,9 @@ function addXBerths(id) {
 }
 const seaRouteKm = (a, b) => seaKm(cityById(a), cityById(b));
 const hasSeaRoute = (a, b) => (S.seaRoutes || []).some(r => (r.a === a && r.b === b) || (r.a === b && r.b === a));
-const maxSeaRoutes = () => portBerths() * 2;
+// всяка линия има собствен кораб — линиите не повече от корабите, които може да имаш (fleetCap: 2/4 на пристанище, общо до FLEET_TOP);
+// иначе след ниво 10 се отваряха линии, които никога не получават кораб. Вече отворените в старите записи остават.
+const maxSeaRoutes = () => Math.min(portBerths() * 2, fleetCap.ship());
 const seaLockTxt = () => `🔒 Пристанищата се отключват на <b>ниво ${SEA_LV} на развитие</b> (сега ${dev.best()}).`;
 function buildPort(id, free = 0) {
   if (!seaOn()) { toast(`🔒 Пристанищата се отключват на ниво ${SEA_LV} на развитие.`, 'bad'); return; }
@@ -5573,7 +5575,7 @@ function openSeaRoute(a, b) {
   if (!b || a === b || hasSeaRoute(a, b)) { toast('Тази морска линия вече съществува.', 'bad'); return; }
   if (!portMax(b)) { toast(`⚓ ${cityById(b).nm} няма пристанище.`, 'bad'); return; }
   if (dev.best() < cityLv(b)) { toast(`🔒 ${cityById(b).nm} се отключва на ниво ${cityLv(b)} на развитие.`, 'bad'); return; }
-  if ((S.seaRoutes || []).length >= maxSeaRoutes()) { toast(`Пристанищата ти поемат до ${maxSeaRoutes()} морски линии — надгради ги за още кейове.`, 'bad'); return; }
+  if ((S.seaRoutes || []).length >= maxSeaRoutes()) { toast(maxSeaRoutes() < portBerths() * 2 ? `Всяка линия има свой кораб, а корабите ти са до ${fleetCap.ship()} (2 на пристанище, 4 на пристанище на максимално ниво, общо до ${FLEET_TOP}) — нова линия няма да получи кораб.` : `Пристанищата ти поемат до ${maxSeaRoutes()} морски линии — надгради ги за още кейове.`, 'bad'); return; }
   const km = seaRouteKm(a, b), cost = SEA_ROUTE_COST(km);
   if (!econ.canAfford(cost)) { toast('Нямаш достатъчно пари за линията.', 'bad'); return; }
   econ.spend(cost, 'покупка', `Морска линия ${cityById(a).nm} — ${cityById(b).nm}`);
@@ -9081,6 +9083,11 @@ if (AUTOTEST) {
     boardReview() { return boardL.review().map(r => `${r.status} · ${r.c.dir} · ${r.c.text.slice(0, 60)} · ${Math.round((r.c.prog || 0) * 100)}% · ${r.c.reason || ''}`); },
     boardReq(id, how) { const r = how ? boardL.resolve(id, how) : boardL.request(id); return r.need ? { need: r.need, votes: r.v.votes.map(x => `${x.cond ? '◐' : x.yes ? '✔' : '✖'} ${x.name}: ${x.why}`), bank: r.v.bank.why || 'ok' } : r; },
     boardFrame() { return boardL.frame(); },
+    pkgTest(cc = 'US') { S.president = { cc, day: S.day, ev: 300 }; S.pres = null; pres.start(cc); const P = S.pres, k = P.conf.east; k.step = 2; const out = {};
+      out.weak = pres.evalPkg('east', {}).resp.map(r => `${r.iso}:${r.ok}:${r.score}/${r.need}:${r.why[0]}`);
+      const strong = { now: 1, obl: 1, ver: 2, gua: 1, rec: 1, next: 2 }; out.strong = pres.evalPkg('east', strong).resp.map(r => `${r.iso}:${r.ok}:${r.score}/${r.need}:${r.why[0]}`);
+      for (const i of ['GBR', 'FRA', 'DEU', 'POL', 'TUR']) P.coal[i] = S.day; P.tr.RUS = 55; P.tr.UKR = 70;
+      out.strong2 = pres.evalPkg('east', strong).resp.map(r => `${r.iso}:${r.ok}:${r.score}/${r.need}:${r.why[0]}`); const E = pres.proposePkg('east', strong); out.step = k.step; out.fund = k.fund; return out; },
     hzTest() { S.president = { cc: 'US', day: S.day, ev: 300 }; S.pres = null; pres.start('US'); const out = {}; const p = () => pres.proposals().filter(x => x.kind === 'hz').map(x => x.id);
       for (let i = 0; i < 42; i++) endOfDay(); out.st = S.pres.hz.st; out.oil = S.oil?.ev?.k; out.p1 = p(); document.querySelectorAll('#boardRoom').forEach(x => x.remove());
       const D = id => pres.decide(pres.proposals().find(x => x.id.includes(id))?.id, 'yes');
@@ -9469,6 +9476,47 @@ if (params.has('profile')) {
   window.__camNow = () => [camera.position.toArray(), controls.target.toArray()];
   window.__open = kind => openBig(kind);
   window.__cityCount = () => CITIES.filter(c => !gateHidden(c.id)).length;
+  // ✈️ симулация на летищата и самолетите за ниво lv (нова тестова игра): летища на позволеното макс. ниво в достъпните градове,
+  // линии до kNear най-близки (през openAirRoute — хъбовете, междуконтиненталните правила), самолети — airAutoPlanes + по един от всеки вид, days дни
+  window.__airSim = (lv, days = 120, kNear = 3) => {
+    const bad = [], err = (m, x) => { if (bad.length < 60) bad.push(m + (x != null ? ' ' + JSON.stringify(x) : '')); };
+    const keep = { save, toast, SFXcash, showEventPop }; save = () => {}; toast = () => {}; SFXcash = () => {}; showEventPop = () => {};
+    try {
+      S.dev.lv = lv; S.contOpen = { af: lv >= DEV_LV.WORLD, na: lv >= DEV_LV.NA, sa: lv >= DEV_LV.SA, as: lv >= DEV_LV.AS, oc: lv >= DEV_LV.OC };
+      const pick0 = () => CITIES.map(c => c.id).filter(id => !AIR_ONLY.has(id) && id !== NEOM_ID && !gateHidden(id) && dev.best() >= cityLv(id) && (!contOf(id) || contOf(id).open()) && (dev.has('BALKANS') || !isForeign(id)));
+      S.branches = pick0().filter(id => id !== S.cityId); const ids = pick0(); S.branches = ids.filter(id => id !== S.cityId);
+      for (const id of S.branches) S.cities[id] = { ...(S.cities[id] || newCityState()), dev: { xp: 0, lv, v: 3 } };
+      econ.earn(5e11, 'друго', 'тест');
+      const aps = ids.filter(id => airportMax(id) > 0);
+      if (!dev.has('AIR')) return { lv, locked: true, withAirport: aps.length };
+      S.airports = Object.fromEntries(aps.map(id => [id, { lv: Math.min(airportMax(id), dev.has('MEGAHUB') ? 7 : 5), build: null }]));
+      S.airRoutes = []; S.planes = [];
+      let blocked = 0;
+      for (const a of aps) for (const b of aps.filter(b => b !== a).sort((x, y) => routeKm(a, x) - routeKm(a, y)).slice(0, kNear)) if (!hasRoute(a, b) && (S.airRoutes || []).length < maxRoutes()) { if (interWhy(a, b)) { blocked++; continue; } openAirRoute(a, b); }
+      for (const a of AIR_HUBS.filter(h => aps.includes(h))) for (const b of aps.filter(b => contKey(b) !== 'eu').slice(0, 2)) if (!hasRoute(a, b) && (S.airRoutes || []).length < maxRoutes()) openAirRoute(a, b);   // и междуконтинентални от хъбовете
+      for (const k of Object.keys(PLANES)) buyPlane(k);
+      for (let k = 0; k < 40; k++) airAutoPlanes();
+      const unserved = (S.airRoutes || []).filter(r => !Object.values(PLANES).some(P => P.range >= r.km)).length;
+      const m0 = econ.s.money, st = {}, last = new Map();
+      for (let d = 0; d < days; d++) {
+        for (let s = 0; s < 24; s++) updateAir(1 / 24);
+        econ.spend(airUpkeep(), 'заплати', 'тест: поддръжка'); airAutoPlanes(); S.day++;
+        for (const p of S.planes || []) {
+          const o = st[p.kind] = st[p.kind] || { n: 0, idle: 0, ferry: 0 }, L = last.get(p.id) || { at: p.at, still: 0 };
+          if (!Number.isFinite(p.km) || !Number.isFinite(p.total)) err('NaN', { id: p.id, kind: p.kind });
+          if (p.path && p.total > PLANES[p.kind].range * 1.01) err('полет над обсега', { kind: p.kind, km: p.total, range: PLANES[p.kind].range, ferry: p.ferry });
+          if (p.path) { const q = arcOf(p.path[0], p.path[1]), [x, y] = bez(q, Math.min(1, p.km / Math.max(1, p.total))); if (!Number.isFinite(x) || !Number.isFinite(y)) err('NaN на картата', { kind: p.kind, path: p.path }); }
+          if (!p.path) o.idle++; if (p.ferry) o.ferry++;
+          if (p.at !== L.at) L.still = 0; else L.still++; if (L.still === 20) err('стои 20 дни', { kind: p.kind, at: p.at, range: PLANES[p.kind].range, routesHere: (S.airRoutes || []).filter(r => r.a === p.at || r.b === p.at).map(r => r.km) });
+          L.at = p.at; last.set(p.id, L);
+        }
+      }
+      for (const p of S.planes || []) st[p.kind].n++;
+      for (const o of Object.values(st)) { o.idlePct = Math.round(100 * o.idle / Math.max(1, o.n * days)); o.ferryPct = Math.round(100 * o.ferry / Math.max(1, o.n * days)); delete o.idle; delete o.ferry; }
+      return { lv, cities: ids.length, airports: aps.length, routes: (S.airRoutes || []).length, maxRoutes: maxRoutes(), blockedByHub: blocked, gates: airGates(), cap: fleetCap.plane(), planes: (S.planes || []).length,
+        unservedByRange: unserved, netPerPlaneDay: Math.round((econ.s.money - m0) / Math.max(1, (S.planes || []).length) / days), stat: st, errors: bad };
+    } finally { save = keep.save; toast = keep.toast; SFXcash = keep.SFXcash; showEventPop = keep.showEventPop; }
+  };
   // ⚓ симулация на пристанищата и корабите за ниво lv (нова тестова игра): пристанища на макс. ниво във всички крайморски достъпни градове,
   // проверка на морския път за всяка двойка, линии до kNear най-близки (през openSeaRoute — истинските правила), корабите — seaAutoShips, days дни
   window.__seaSim = (lv, days = 120, kNear = 3) => {

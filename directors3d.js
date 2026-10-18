@@ -362,6 +362,7 @@ export function openBoardroom(o) {
   el.innerHTML = `<div class="top"><span><i class="hn"></i><small></small></span><button class="tg cine" title="Камерата следва говорещия">🎥</button><button class="tg voice" title="Говор на глас (български глас на браузъра)" style="display:none">🗣️</button><button class="tg snd" title="Звук на залата">🔊</button><button class="cfg" style="display:none">⚙️ Бюджети и автопилот</button><button class="x" title="Затвори (Esc)">✕</button></div><div class="set"></div><div class="load"></div><div class="tip"></div><div class="bnav"><button class="pv" title="Предишното">‹</button><span>📋 Предложение <b></b></span><button class="nx" title="Следващото">›</button></div><div class="scr"></div><div class="card"></div><div class="hint">🖱️ Клик на директор — доклад · влачи — обиколи масата · ⌨️ Enter — Да · N — Не · L — По-късно · ← →</div>`;
   const ROOM = o.room || 'corp';   // 'corp' — Директорската зала; 'us' / 'ru' — Министерският съвет в президентската зала
   el.querySelector('.top .hn').textContent = o.hallTitle || '🏛️ Директорската зала';
+  if (/^⛔/.test(o.hallTitle || '')) el.querySelector('.top').style.background = 'linear-gradient(#7a0f0fcc, #0000)';   // извънредно заседание
   el.querySelector('.load').textContent = o.loadText || '👔 Директорите влизат…';
   el.querySelector('.top small').textContent = o.title || '';
   document.body.appendChild(el);
@@ -503,7 +504,7 @@ export function openBoardroom(o) {
     scr.classList.toggle('wide', p.step === 'report');
     const hd = (t) => `<div class="hd"><span>${t}</span><span>${n}</span></div><div class="who"></div>`;
     if (p.step === 'report') {   // 📊 отчетът (boardlogic.reportHtml) — с бутоните удължи / пренасочи / прекрати
-      scr.innerHTML = `${hd('📊 Отчет за предишните решения')}<div class="rep"></div><div class="row"><button class="y">Продължи →</button></div>`;
+      scr.innerHTML = `${hd(o.reportTitle || '📊 Отчет за предишните решения')}<div class="rep"></div><div class="row"><button class="y">Продължи →</button></div>`;
       scr.querySelector('.rep').innerHTML = p.html; o.bindReport && o.bindReport(scr.querySelector('.rep'), () => board(qi));
       scr.querySelector('.y').onclick = () => board(qi + 1);
     } else if (p.info || p.step === 'summary') {   // 🏦 Борис: парите в началото, обобщението накрая
@@ -522,9 +523,9 @@ export function openBoardroom(o) {
       for (const [c, a] of [['y', 'yes'], ['sm', 'small'], ['n', 'no'], ['l', 'later']]) { const b = scr.querySelector('.' + c); if (b) b.onclick = () => { const r = o.onDecide && o.onDecide(p.id, a); if (r && r.need === 'vote') showVote(r); else after(a === 'yes' || a === 'small' ? (r && r.done === false ? 'no' : 'ok') : a); }; }   // решеното изчезва — на същото място идва следващото
       scr.querySelector('.tx').textContent = `${p.ico || ''} ${p.text}`;
     }
-    const bi = p.step === 'summary' || p.info ? list.findIndex(z => z.k === (o.bankKey || 'bank')) : i, bs = list[bi];   // парите докладва банката (в кабинета — финансовият министър)
-    scr.querySelector('.who').textContent = p.step === 'report' ? '👔 Директорите докладват' : `${bs?.ico || p.ico || ''} ${bs?.director || bs?.company || ''}`;
-    scrSeat = p.step === 'report' ? -2 : bi; card.classList.remove('on'); sel = bi;
+    const bi = p.step === 'summary' || p.info ? list.findIndex(z => z.k === (o.bankKey || 'bank')) : p.step === 'report' && o.reportDir ? list.findIndex(z => z.k === o.reportDir) : i, bs = list[bi];   // отчета го чете o.reportDir (в кабинета — министър-председателят)   // парите докладва банката (в кабинета — финансовият министър)
+    scr.querySelector('.who').textContent = p.step === 'report' && !(o.reportDir && bs) ? '👔 Директорите докладват' : `${bs?.ico || p.ico || ''} ${bs?.director || bs?.company || ''}`;
+    scrSeat = p.step === 'report' && !(o.reportDir && bi >= 0) ? -2 : bi; card.classList.remove('on'); sel = bi;
     scr.style.display = 'block'; scr.classList.remove('on'); requestAnimationFrame(() => requestAnimationFrame(() => scr.classList.add('on')));
     if (bi >= 0) present(bi);
     snd.paper(); shot(p.step === 'report' ? -1 : bi);
@@ -713,7 +714,7 @@ export function openCabinet(o) {
   const ru = o.cc === 'RU';
   return openBoardroom({
     ...o, room: ru ? 'ru' : 'us', bankKey: 'fin', bankTitle: '💰 Финансите: с какво разполагаме',
-    hallTitle: ru ? '🇷🇺 Кремъл — Министерски съвет' : '🇺🇸 Белият дом — Министерски съвет', loadText: '🎩 Министрите влизат…',
+    hallTitle: (o.title && /извънредно/i.test(o.title) ? '⛔ ' : '') + (ru ? '🇷🇺 Кремъл — Министерски съвет' : '🇺🇸 Белият дом — Министерски съвет'), reportDir: 'pm', reportTitle: o.title && /извънредно/i.test(o.title) ? '⛔ Извънредно заседание — най-важното' : '🏛️ Министър-председателят: най-важното този месец', loadText: '🎩 Министрите влизат…',
     seats: () => MINISTERS.map(m => ({ k: m.k, ico: m.ico, company: m.title, what: m.what, director: m.name, model: m.model, seat: m.seat, open: true, logo: false, minister: true, brief: o.brief ? o.brief(m.k) : '' })),
   });
 }
