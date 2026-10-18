@@ -103,7 +103,7 @@ export function createGroup(deps) {
       if (day > 0 && day % 360 === 0) yearReview(B2);
     }
     // веднъж месечно бордът на директорите се събира сам, ако има какво да предложи
-    if (day % 30 === 0 && deps.S().holding && feature('boardroom') && proposals().filter(p => !p.info).length) { deps.toast(`🏛️ Бордът на директорите се събра — ${proposals().filter(p => !p.info).length} предложения.`, 'good'); board(); }   // докладът на банката (info) не е предложение
+    if (day % 30 === 0 && deps.S().holding && !deps.S().pres && feature('boardroom') && proposals().filter(p => !p.info).length) { deps.toast(`🏛️ Бордът на директорите се събра — ${proposals().filter(p => !p.info).length} предложения.`, 'good'); board(); }   // докладът на банката (info) не е предложение
     return b;
   }
   // 📊 годишната оценка на директорите: изпълнени навреме / със закъснение / забавени и блокирани → директор на годината (+доверие) и предупреждение (−доверие)

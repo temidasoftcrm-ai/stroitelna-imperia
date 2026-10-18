@@ -54,6 +54,7 @@ import { createHotels, TIERS as HOTEL_TIERS } from './hotels.js';
 import { createBank, WORLD_ISO } from './bank.js';
 import { createImperial, IMP_CC } from './imperial.js';
 import { createCampaign } from './campaign.js';
+import { createPresidency } from './president.js';
 import { syncImpCivic, updateImpCivic } from './impcivic.js';   // обществените сгради на Империал Сити в 3D
 import { pickModel as impPick, decor as impDecor, IMP_MODELS, IMP_H } from './impstyle.js';
 import { createNeom, NEOM_CITY, NEOM_ID, DISTRICTS as NEOM_DISTRICTS, FOUND_COST as NEOM_FOUND } from './neom.js';
@@ -2735,7 +2736,7 @@ function endOfDay() {
   tenderAutoFix();
   mines.dailyTick();
   oil.dailyTick(); updOilBtn();
-  gridCheck(); holdingCheck(); autoTick(); group.check(); group.dailyTick(); corp.dailyTick(); mw.dailyTick(); hotels.dailyTick(); bank.dailyTick(); neom.dailyTick(); imperial.dailyTick(); impCiv3D(); neomDecor(); if (imperial.needChoice() && !S.impAsked && $('modal').classList.contains('hidden')) { S.impAsked = S.day; imperial.choose(() => renderBig()); } holdMilestones(); if (S.holding) holdXP(Math.max(0, regNet()) / 10000);
+  gridCheck(); holdingCheck(); autoTick(); group.check(); group.dailyTick(); corp.dailyTick(); mw.dailyTick(); hotels.dailyTick(); bank.dailyTick(); neom.dailyTick(); imperial.dailyTick(); if (S.president && !S.pres) pres.start(S.president.cc); pres.dailyTick(); impCiv3D(); neomDecor(); if (imperial.needChoice() && !S.impAsked && $('modal').classList.contains('hidden')) { S.impAsked = S.day; imperial.choose(() => renderBig()); } holdMilestones(); if (S.holding) holdXP(Math.max(0, regNet()) / 10000);
   airAutoPlanes();
   tenders.dailyTick();
   orient.dailyTick();
@@ -2768,6 +2769,7 @@ function renderTop() {
   if (!S) return;
   dev.render();
   impPlace();
+  polMode();
   try { updDirTiles(); } catch {}
   updLogo();
   updateQuickBuy();
@@ -3516,18 +3518,32 @@ function neomDecor() {
 }
 // 🏙️ Империал Сити като жив град (imperial.js): държавата (САЩ/Русия), шестте показателя, обществените сгради, Десислава, нивата 21–25
 const imperial = createImperial({ S: () => S, econ: () => econ, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), modal, neom, brand: () => brandOf(S)?.nm || 'Титан',
-  winter: d => seasonOf(d) === 'winter', relocate: () => { impPlace(); if (S.cityId === NEOM_ID) impLook(); }, lvUp: (lv, text) => dev.cityUp(lv, text) });
+  presLv: () => { try { return pres.level(); } catch { return 0; } }, winter: d => seasonOf(d) === 'winter', relocate: () => { impPlace(); if (S.cityId === NEOM_ID) impLook(); }, lvUp: (lv, text) => dev.cityUp(lv, text) });
+// 🏛️ режим политика: в „Империя ▾“ остават президентът, холдингът, куестите, албумът и онлайн; фирмата (гараж, оферти, добив…) я водят заместниците
+function polMode() {
+  const on = !!S?.pres; document.body.classList.toggle('polmode', on); if (!on) return;
+  if (!$('polCss')) { const c = document.createElement('style'); c.id = 'polCss'; c.textContent = ['trBtn', 'garBtn', 'resBtn', 'finBtn', 'superBtn', 'btnCities', 'btnOffers', 'btnMines', 'btnConquest', 'bankBtn', 'oilBtn', 'railBtn', 'hwBtn', 'seaBtn', 'airBtn'].map(id => `body.polmode #${id}`).join(',') + ' { display:none !important; }'; document.head.appendChild(c); }
+  let b = $('presBtn'); if (!b) { const top = $('top'); if (!top) return; b = document.createElement('button'); b.id = 'presBtn'; b.className = 'btn2'; b.style.cssText = 'font-weight:800;color:#ffd54a'; b.onclick = () => pres.open(); top.insertBefore(b, top.querySelector('.sp')); }
+  const n = pres.proposals().length, t = `🏛️ Президент · ниво ${pres.level()}${n ? ` <b style="background:#ffd54a;color:#111;border-radius:9px;padding:0 6px;font-size:11px">${n}</b>` : ''}`; if (b.dataset.t !== t) { b.dataset.t = t; b.innerHTML = t; }
+}
 // 🗳️ президентската кампания (campaign.js, city-builder-f9): след ниво 25 в САЩ; твоите градове дават подкрепа в щата си
 const US_ST = { newyork: 'NY', chicago: 'IL', losangeles: 'CA', sanfrancisco: 'CA', sandiego: 'CA', miami: 'FL', orlando: 'FL', jacksonville: 'FL', washington: 'DC', boston: 'MA', philadelphia: 'PA', atlanta: 'GA', houston: 'TX', dallas: 'TX', sanantonio: 'TX', elpaso: 'TX', austin: 'TX', denver: 'CO', seattle: 'WA', portland: 'OR', lasvegas: 'NV', phoenix: 'AZ', neworleans: 'LA', saltlake: 'UT', kansascity: 'MO', detroit: 'MI', minneapolis: 'MN', nashville: 'TN', honolulu: 'HI', anchorage: 'AK', [NEOM_ID]: 'TX' };
 const camp = createCampaign({ S: () => S, econ: () => econ, fmt, toast, save, sound: n => Sound.play(n), name: () => brandOf(S)?.nm || 'Титан', brandCol: (BRANDS.find(b => b.k === S?.brand) || {}).col,
   cities: () => [...new Set(ownedCities())].filter(id => US_ST[id] && (id !== NEOM_ID || S.imp?.cc === 'US')).map(id => ({ st: US_ST[id], nm: cityById(id)?.nm || id })),
-  onWin: ev => { S.president = { cc: 'US', day: S.day, ev }; save(); showEventPop('empire', '🇺🇸 Господин президент!', `${ev} електорални гласа. Десислава Илиева: „Господин президент, кабинетът очаква първите Ви решения.“ Министерският съвет идва в следващата глава.`); renderBig(); },
+  onWin: ev => { S.president = { cc: 'US', day: S.day, ev }; pres.start('US'); save(); showEventPop('empire', '🇺🇸 Господин президент!', `${ev} електорални гласа. Десислава Илиева: „Господин президент, кабинетът очаква първите Ви решения.“ Министерският съвет идва в следващата глава.`); renderBig(); },
   onLose: ev => { S.campLost = { day: S.day, ev }; save(); toast(`😞 Изборите са загубени (${ev} от 270 гласа). Следващият шанс — след 4 години; градът и империята остават твои.`, 'bad'); } });
+const RU_ST = { moscow: 'RU-MOS', stpetersburg: 'RU-SPE', spb: 'RU-SPE', saintpetersburg: 'RU-SPE', kazan: 'RU-TA', yekaterinburg: 'RU-SVE', novosibirsk: 'RU-NVS', irkutsk: 'RU-IRK', khabarovsk: 'RU-KHA', vladivostok: 'RU-PRI', sochi: 'RU-KDA', krasnodar: 'RU-KDA', kaliningrad: 'RU-KGD', nizhny: 'RU-NIZ', samara: 'RU-SAM', volgograd: 'RU-VGG', rostov: 'RU-ROS', murmansk: 'RU-MUR', omsk: 'RU-OMS', [NEOM_ID]: 'RU-NIZ' };   // в Natural Earth RU-MOS е град Москва
+const campRU = createCampaign({ cc: 'RU', S: () => S, econ: () => econ, fmt, toast, save, sound: n => Sound.play(n), name: () => brandOf(S)?.nm || 'Титан', brandCol: '#d52b1e',
+  cities: () => [...new Set(ownedCities())].filter(id => RU_ST[id] && (id !== NEOM_ID || S.imp?.cc === 'RU')).map(id => ({ st: RU_ST[id], nm: cityById(id)?.nm || id })),
+  onWin: ev => { S.president = { cc: 'RU', day: S.day, ev }; pres.start('RU'); save(); showEventPop('empire', '🇷🇺 Господин президент!', 'Десислава Илиева: „Господин президент, кабинетът очаква първите Ви решения.“'); renderBig(); },
+  onLose: ev => { S.campLost = { day: S.day, ev }; save(); toast('😞 Изборите са загубени. Следващият шанс — след 4 години; градът и империята остават твои.', 'bad'); } });
+const campOf = () => S?.imp?.cc === 'RU' ? campRU : camp;
+// 🏛️ президентството (president.js): държавен бюджет, кабинет, нива 27–35, световната политика
+const pres = createPresidency({ S: () => S, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), brand: () => brandOf(S)?.nm || 'Титан' });
 function campCard() {
   const C = IMP_CC[S.imp?.cc]; if (!C || (S.imp?.lv || 0) < 25) return '';
-  if (S.imp.cc !== 'US') return `<div class="card" style="border:1px solid #ffd54a"><div class="meta" style="margin:0">🗳️ ${C.next} — идва скоро. Империята и градът остават твои.</div></div>`;
-  const won = S.president?.cc === 'US', act = camp.active();
-  return `<div class="card" style="border:1px solid #ffd54a;box-shadow:0 0 18px rgba(255,213,74,.25)"><div class="row" style="margin:0;align-items:center;gap:10px"><span class="meta" style="margin:0;flex:1">${won ? '🇺🇸 <b style="color:var(--txt)">Ти си президент на САЩ.</b> Министерският съвет идва в следващата глава.' : act ? '🗳️ Кампанията тече — 16 седмици митинги, дебати и подкрепа по щатите.' : '🏅 „Град за пример“ — Десислава те кани да се кандидатираш за президент на САЩ. Ти решаваш кога.'}</span>${won ? '' : `<button class="btn" data-camp="1">🇺🇸 ${act ? 'Продължи кампанията' : 'Президентска кампания'}</button>`}</div></div>`;
+  const won = !!S.president, act = campOf().active(), ru = S.imp.cc === 'RU';
+  return `<div class="card" style="border:1px solid #ffd54a;box-shadow:0 0 18px rgba(255,213,74,.25)"><div class="row" style="margin:0;align-items:center;gap:10px"><span class="meta" style="margin:0;flex:1">${won ? `${C.cc} <b style="color:var(--txt)">Ти си президент ${ru ? 'на Русия' : 'на САЩ'}.</b> Държавата, светът и Министерският съвет те чакат.` : act ? `🗳️ Кампанията тече — митинги, дебати и подкрепа по ${ru ? 'регионите' : 'щатите'}.` : `🏅 „Град за пример“ — Десислава те кани да се кандидатираш за президент ${ru ? 'на Русия' : 'на САЩ'}. Ти решаваш кога.`}</span>${won ? '<button class="btn" data-pres="1">🏛️ Президентството →</button>' : `<button class="btn" data-camp="1">${C.cc} ${act ? 'Продължи кампанията' : 'Президентска кампания'}</button>`}</div></div>`;
 }
 // градът стои в избраната държава (координати и флаг; без флага на Саудитска Арабия няма пустиня)
 function impPlace() { const C = IMP_CC[S?.imp?.cc], c = C && cityById(NEOM_ID); if (!c || (c.lat === C.lat && c.cc === C.cc)) return; Object.assign(c, { lat: C.lat, lon: C.lon, cc: C.cc }); isoCitiesC.clear(); fixSeaSpurs(true); }   // пътната му връзка към старото място (напр. Гиза) — пренасочена в новата държава
@@ -3578,7 +3594,7 @@ const rivals = createRivals({ S: () => S, acquired: id => corp.acquired(id), toa
 // Фаза 7: ниво на развитие (devlevel.js)
 // maxLevel минава през всички градове — пази се до края на текущата задача (картата пита dev.has() стотици пъти на рисуване)
 let maxLevelC = null;
-const dev = createDevLevel({ impLv: () => S?.imp?.lv || 0, impNeed: n => n === 21 ? 'Основи Империал Сити и избери държавата (ниво 19)' : imperial.NEED[n] || '', S: () => S, lvTime: l => playtime.levelTxt(l), playSummary: () => playtime.summaryHtml(), cityName: () => S ? cityName() : '', maxLevel: () => maxLevelC ?? (queueMicrotask(() => { maxLevelC = null; }), maxLevelC = Math.max(S?.dev?.lv || 1, ...Object.values(S?.cities || {}).map(c => c.dev?.lv || 1), holdLv())), toast, sound: n => Sound.play(n), save, modal, pop: (k, a, b) => { if (k === 'lv-5' && !S.balkansPop) { S.balkansPop = S.day; return showEventPop('balkans-open', '👑 Балканите са твои!', 'Ниво 5: жп линии и магистрали до Сърбия, Румъния, Гърция, Турция и С. Македония.'); } return showEventPop(k, a, b); }, balkansOpen: () => true });   // първото ниво 5 — „Балканите са твои“
+const dev = createDevLevel({ impRatio: n => imperial.ratio(n), impLv: () => S?.imp?.lv || 0, impNeed: n => n === 21 ? 'Основи Империал Сити и избери държавата (ниво 19)' : imperial.NEED[n] || '', S: () => S, lvTime: l => playtime.levelTxt(l), playSummary: () => playtime.summaryHtml(), cityName: () => S ? cityName() : '', maxLevel: () => maxLevelC ?? (queueMicrotask(() => { maxLevelC = null; }), maxLevelC = Math.max(S?.dev?.lv || 1, ...Object.values(S?.cities || {}).map(c => c.dev?.lv || 1), holdLv())), toast, sound: n => Sound.play(n), save, modal, pop: (k, a, b) => { if (k === 'lv-5' && !S.balkansPop) { S.balkansPop = S.day; return showEventPop('balkans-open', '👑 Балканите са твои!', 'Ниво 5: жп линии и магистрали до Сърбия, Румъния, Гърция, Турция и С. Македония.'); } return showEventPop(k, a, b); }, balkansOpen: () => true });   // първото ниво 5 — „Балканите са твои“
 // ⏱️ изиграно време и кога е достигнато всяко ниво (playtime.js)
 const playtime = createPlaytime({ S: () => S, level: () => dev.best(), speed: () => (AUTOTEST ? 0 : speed) });
 // 💥 фалит: дълъг минус → несъстоятелност (15 дни) → синдикът продава активите; ако не стигнат — край на играта
@@ -7027,7 +7043,7 @@ function buildCityHighway() {
   const OVER = [{ c: STATION_X - 15 - hcx, w: 48 }];   // надлез над коловозите на гарата: от X+8 до X−40 — петте гарови и коловоза на минаващите влакове (outerX = X−32,5)
   const seg0 = done || mine.find(s => s.id === job.seg), isAb = ALL_AB.some(x => x.id === seg0.id), far = isAb ? cityById(seg0.a === S.cityId ? seg0.b : seg0.a) : null;
   const hz = tx(NJ - 1) + (isAb ? 42 : 34);   // аутобанът е по-широк (4 ленти на посока) — малко по-далеч от града
-  const v = buildHighwayView(A, { len: hLen, river: false, ground: false, ab: isAb, abName: isAb ? 'A' + (1 + (hashStr(seg0.id) % 9)) : '', exitTo: far ? far.nm : '', over: OVER, exitZ: hLen * 0.28 });   // изходът на аутобана — откъм другия край, далеч от гарата
+  const v = buildHighwayView(A, { len: hLen, river: false, ground: false, ab: isAb, abName: isAb ? 'A' + (1 + (hashStr(seg0.id) % 9)) : '', exitTo: far ? far.nm : '', over: OVER, exitZ: hLen * 0.28, service: feature('hw-service') ? 70 : null });   // крайпътният комплекс — между надлеза над гарата и изхода на аутобана   // изходът на аутобана — откъм другия край, далеч от гарата
   v.group.rotation.y = Math.PI / 2;
   v.group.position.set(hcx, 0, hz);
   g.add(v.group);
@@ -7040,7 +7056,7 @@ function buildCityHighway() {
   cityHw = { g, v, conn, seg: (done || mine.find(s => s.id === job.seg)).id };
   // коли и камиони по готовата магистрала (hwtraffic.js); платната са по x, около z = tx(N−1)+34
   const tg = new THREE.Group(); tg.position.x = hcx; g.add(tg);
-  cityHw.traffic = createHwTraffic(tg, model, A, hz, hLen, 0.92, isAb, x => overLift(OVER, x));
+  cityHw.traffic = createHwTraffic(tg, model, A, hz, hLen, 0.92, isAb, x => overLift(OVER, x), v.service);
 }
 function updateCityHighway(t) {
   if (!cityHw) return;
@@ -8483,7 +8499,7 @@ function renderBig() {
   if (bigWin === 'mw') mw.bind(body, () => renderBig());
   if (bigWin === 'tasks') tasks.bind(body, () => renderBig());
   if (bigWin === 'oil') oil.bind(body, () => { renderBig(); updOilBtn(); });
-  if (bigWin === 'group') { on('[data-htab]', b => { S.hTab = b.dataset.htab; body.scrollTop = 0; renderBig(); }); corp.bind(body, () => { renderBig(); updHoldBtn(); }); mw.bind(body, () => renderBig()); hotels.bind(body, () => renderBig()); bank.bind(body, () => renderBig()); neom.bind(body, () => renderBig()); imperial.bind(body, () => renderBig()); body.querySelectorAll('[data-camp]').forEach(b => b.onclick = () => camp.open()); }
+  if (bigWin === 'group') { on('[data-htab]', b => { S.hTab = b.dataset.htab; body.scrollTop = 0; renderBig(); }); corp.bind(body, () => { renderBig(); updHoldBtn(); }); mw.bind(body, () => renderBig()); hotels.bind(body, () => renderBig()); bank.bind(body, () => renderBig()); neom.bind(body, () => renderBig()); imperial.bind(body, () => renderBig()); body.querySelectorAll('[data-camp]').forEach(b => b.onclick = () => campOf().open()); body.querySelectorAll('[data-pres]').forEach(b => b.onclick = () => pres.open()); }
   if (bigWin === 'group') { body.querySelectorAll('[data-hiremayor]').forEach(b => b.onclick = () => { hireMayor(); renderBig(); }); body.querySelectorAll('[data-hoil]').forEach(b => b.onclick = () => openBig('oil')); group.bind(body, () => { renderBig(); updHoldBtn(); }); on('[data-hauto]', () => { S.mnTab = 'auto'; openBig('mines'); }); }
   on('[data-suproute]', b => showSuperRoute(b.dataset.suproute));
   on('[data-mntab]', b => { S.mnTab = b.dataset.mntab; body.scrollTop = 0; renderBig(); });

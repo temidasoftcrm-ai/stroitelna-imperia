@@ -186,6 +186,15 @@ export function createImperial(deps) {
   function invite() {
     deps.pop && deps.pop('empire', '🏅 „Град за пример“', `${cityNm()} е завършен и устойчив. Десислава Илиева: „Господин председател, доказахте, че можете да управлявате град. Готов ли сте да управлявате държава?“ Президентската кампания в ${C()?.nm} се отключва — ти избираш кога.`);
   }
+  // напредъкът към ниво lv (0…1) — за лентата на „Фирма“ над 20 (devlevel.js): средното от условията, всяко до 1
+  const ratio = lv => {
+    const m = st(); if (!m) return 0; if ((m.lv || 0) >= lv) return 1; if (lv === 21) return m.cc ? 1 : 0;
+    const s = stats(); if (!s) return 0;
+    const avg = a => a.reduce((x, y) => x + Math.max(0, Math.min(1, y)), 0) / a.length, vacR = s.vac / 0.02, unR = s.unemp <= 0.08 ? 1 : 0.08 / s.unemp, str = (m.streak || 0) / 6;
+    const r23 = [s.pop / 150000, s.svc / 0.9, s.k.transport / 0.9, s.infra];
+    return lv === 22 ? avg([s.pop / 100000, vacR, unR]) : lv === 23 ? avg(r23) : lv === 24 ? avg([str]) : lv === 25 ? avg([s.pop / TARGET_POP, ...r23, vacR, unR, str, units('landmark').some(u => !u.run) ? 1 : 0])
+      : meets[lv] && meets[lv](s) ? 1 : 0;   // 26–35 — президентът (president.js): засега готово/не
+  };
   const progress = lv => { const m = st(); if (!m) return ''; const s = stats(); if ((m.lv || 0) >= lv) return '✅'; return NEED[lv] ? `${NEED[lv]}${s ? ` · сега: ${f(s.pop)} души, жилища ${(s.vac * 100).toFixed(0)}%, безработица ${(s.unemp * 100).toFixed(0)}%, услуги ${Math.round(s.svc * 100)}%, транспорт ${Math.round(s.k.transport * 100)}%, ${m.streak || 0}/6 месеца` : ''}` : ''; };
 
   // ---- 🗳️ изборът на държава (веднъж, при основаването; старите записи — веднъж след зареждане)
@@ -255,5 +264,5 @@ export function createImperial(deps) {
     box.querySelectorAll('[data-impchoose]').forEach(b => b.onclick = () => choose(rerender));
   }
   const geo = () => { const c = C(); return c ? { country: c.iso, kind: 'district', cities: [{ nm: cityNm(), lat: c.lat, lon: c.lon }] } : null; };
-  return { occ, state: st, stats, build, expand, zone, dailyTick, proposals, choose, pick, needChoice, winHtml, bind, geo, holdHousing, progress, level: () => st()?.lv || 0, country: () => C(), NEED, IMP_UNLOCKS };
+  return { occ, state: st, stats, build, expand, zone, dailyTick, proposals, choose, pick, needChoice, winHtml, bind, geo, holdHousing, progress, ratio, level: () => st()?.lv || 0, country: () => C(), NEED, IMP_UNLOCKS };
 }

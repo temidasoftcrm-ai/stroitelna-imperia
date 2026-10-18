@@ -2,7 +2,7 @@
 // се местят в падащ панел с плочки, за да е лентата на един ред. Бутоните се преместват (не се копират) — техните onclick и живите
 // надписи (+X €/ден, „Оферти 3“) си остават; кодът, който ги показва/скрива (style.display), продължава да работи.
 // Късно създадените (Партньор, Онлайн, Вход — coop.js, online-btn.js, cloud.js) се хващат с MutationObserver. Зад feature('top-hub').
-const IDS = ['trBtn', 'garBtn', 'railBtn', 'hwBtn', 'seaBtn', 'airBtn', 'resBtn', 'finBtn', 'holdBtn', 'superBtn', 'btnCities', 'btnOffers', 'btnMines',
+const IDS = ['presBtn', 'trBtn', 'garBtn', 'railBtn', 'hwBtn', 'seaBtn', 'airBtn', 'resBtn', 'finBtn', 'holdBtn', 'superBtn', 'btnCities', 'btnOffers', 'btnMines',
   'btnConquest', 'qBtn', 'bankBtn', 'btnCine', 'coopBtn', 'onlineBtn', 'cloudBtn', 'oilBtn'];   // 1. Транспорт, 2. Гараж, после останалите
 // неотключените (скрити) — показват се замъглени със 🔒, за да се вижда какво предстои (ЖП/магистрали/… са в „Транспорт“ — те не)
 const LOCKED_LBL = { garBtn: '🚜 Гараж', resBtn: '🏔️ Курорти', finBtn: '🏁 На ден', holdBtn: '🏛️ Холдинг', superBtn: '🏗️ Супер поръчки', btnMines: '⛏️ Добив', oilBtn: '🛢️ Петрол',
