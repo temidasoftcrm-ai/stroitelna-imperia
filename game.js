@@ -6958,7 +6958,7 @@ function buildCityHighway() {
   if (!done && !job) return;
   const g = new THREE.Group();
   const hLen = Math.max(1200, 2 * (tx(NI - 1) + 380)) - 10, hcx = 0;   // от край до край на земята (като релсите) — не свършва рязко
-  const OVER = [{ c: STATION_X - 11 - hcx, w: 38 }];   // надлез над коловозите на гарата (място за всичките 5): влаковете минават отдолу
+  const OVER = [{ c: STATION_X - 15 - hcx, w: 48 }];   // надлез над коловозите на гарата: от X+8 до X−40 — петте гарови и коловоза на минаващите влакове (outerX = X−32,5)
   const seg0 = done || mine.find(s => s.id === job.seg), isAb = ALL_AB.some(x => x.id === seg0.id), far = isAb ? cityById(seg0.a === S.cityId ? seg0.b : seg0.a) : null;
   const hz = tx(NJ - 1) + (isAb ? 42 : 34);   // аутобанът е по-широк (4 ленти на посока) — малко по-далеч от града
   const v = buildHighwayView(A, { len: hLen, river: false, ground: false, ab: isAb, abName: isAb ? 'A' + (1 + (hashStr(seg0.id) % 9)) : '', exitTo: far ? far.nm : '', over: OVER, exitZ: hLen * 0.28 });   // изходът на аутобана — откъм другия край, далеч от гарата
