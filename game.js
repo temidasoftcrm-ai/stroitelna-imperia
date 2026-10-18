@@ -4626,7 +4626,8 @@ const airGates = () => Object.values(S.airports || {}).reduce((a, p) => a + (p.l
 const routeKm = (a, b) => airKm(cityById(a), cityById(b));
 const hasRoute = (a, b) => (S.airRoutes || []).some(r => (r.a === a && r.b === b) || (r.a === b && r.b === a));
 const airLinked = id => (S.airRoutes || []).some(r => r.a === id || r.b === id);
-const maxRoutes = () => airGates() * 2;
+// най-много 2 авиолинии на самолет от тавана (fleetCap) — иначе стотици платени линии почти не виждаха самолет
+const maxRoutes = () => Math.min(airGates() * 2, fleetCap.plane() * 2);
 const airLockTxt = () => `🔒 Летищата се отключват на <b>ниво 9 на развитие</b> (сега ${dev.best()}), а градовете по света — на ниво 10.`;
 function buildAirport(id) {
   if (!dev.has('AIR')) { toast('🔒 Летищата се отключват на ниво 9 на развитие.', 'bad'); return; }
@@ -4663,7 +4664,7 @@ function openAirRoute(a, b) {
   if (dev.best() < cityLv(b)) { toast(`🔒 ${cityById(b).nm} се отключва на ниво ${cityLv(b)} на развитие.`, 'bad'); return; }
   { const w = interWhy(a, b); if (w) { toast(w, 'bad'); return; } }
   if (!airportMax(b)) { toast(`✈️ ${cityById(b).nm} няма пътническо летище — ползвай жп и магистрали.`, 'bad'); return; }
-  if ((S.airRoutes || []).length >= maxRoutes()) { toast(`Летищата ти поемат до ${maxRoutes()} авиолинии — надгради ги за още гейтове.`, 'bad'); return; }
+  if ((S.airRoutes || []).length >= maxRoutes()) { toast(maxRoutes() < airGates() * 2 ? `Авиолиниите са до 2 на самолет — самолетите ти са до ${fleetCap.plane()} (общо до ${FLEET_TOP}), значи до ${maxRoutes()} линии.` : `Летищата ти поемат до ${maxRoutes()} авиолинии — надгради ги за още гейтове.`, 'bad'); return; }
   const km = routeKm(a, b), cost = ROUTE_COST(km);
   if (!econ.canAfford(cost)) { toast('Нямаш достатъчно пари за правата на линията.', 'bad'); return; }
   econ.spend(cost, 'покупка', `Авиолиния ${cityById(a).nm} — ${cityById(b).nm}`);
@@ -5399,7 +5400,9 @@ function refreshTender3D() {
   }
   pruneStreetDetail();
 }
-const airUpkeep = () => (S.planes || []).reduce((a, p) => a + PLANES[p.kind].upkeep, 0) + Object.values(S.airports || {}).reduce((a, p) => a + (p.muni ? 0 : (p.lv || 0) * 2500), 0);
+// летище без нито една авиолиния плаща 25% от поддръжката (празните летища не източват парите)
+const airUsed = id => (S.airRoutes || []).some(r => r.a === id || r.b === id);
+const airUpkeep = () => (S.planes || []).reduce((a, p) => a + PLANES[p.kind].upkeep, 0) + Object.entries(S.airports || {}).reduce((a, [id, p]) => a + (p.muni ? 0 : (p.lv || 0) * 2500 * (airUsed(id) ? 1 : 0.25)), 0);
 // ---- на картата: летищата, линиите (дъги) и самолетите
 function arcOf(a, b) {
   const A = cityById(a), B = cityById(b), [x1, y1] = proj(A.lon, A.lat), [x2, y2] = proj(B.lon, B.lat);
@@ -5501,11 +5504,15 @@ function airAutoPlanes() {
   let free = Math.min(airGates(), fleetCap.plane()) - (S.planes || []).length; const routes = S.airRoutes || [];   // лимитът (fleetCap) — и за автоматичните
   if (free <= 0 || !routes.length || (S.planes || []).length >= routes.length) return;
   const home = Object.keys(S.airports || {}).find(id => airLv(id) > 0); if (!home) return;
-  const maxKm = Math.max(...routes.map(r => r.km || routeKm(r.a, r.b))), got = [];
+  const kms = routes.map(r => r.km || routeKm(r.a, r.b)).sort((a, b) => a - b), maxKm = kms[kms.length - 1], got = [];
+  // обсегът — по 90% от линиите; най-дългата — само ако никой самолет още не я стига
+  const p90 = kms[Math.floor((kms.length - 1) * 0.9)], longOk = () => (S.planes || []).some(p => PLANES[p.kind].range >= maxKm);
   while (free > 0 && (S.planes || []).length < routes.length) {
     const n = (S.planes || []).length, cargo = n % 4 === 3 && PLANES.cargo.range >= Math.min(maxKm, 8000);
-    const kind = cargo ? 'cargo' : (typeof PLANE_LADDER !== 'undefined' ? PLANE_LADDER : ['regional', 'narrow', 'wide']).find(k => PLANES[k] && PLANES[k].range >= maxKm) || 'wide', P = PLANES[kind];
-    if (econ.s.money < P.cost * 2) break;
+    // най-печелившият самолет (planeDaily), който стига 90% от линиите (най-дългата — ако никой още не я стига) и е по джоба (резерв 2× цената)
+    const need = longOk() ? p90 : maxKm, fits = (typeof PLANE_LADDER !== 'undefined' ? PLANE_LADDER : ['regional', 'narrow', 'wide']).filter(k => PLANES[k] && PLANES[k].range >= need && econ.s.money >= PLANES[k].cost * 2);
+    const kind = cargo ? 'cargo' : fits.sort((a, b) => planeDaily(b) - planeDaily(a))[0], P = PLANES[kind];
+    if (!kind || econ.s.money < P.cost * 2) break;
     econ.spend(P.cost, 'покупка', `Самолет (автоматично): ${P.nm}`);
     S.planeSeq = (S.planeSeq || 0) + 1;
     S.planes = [...(S.planes || []), { id: S.planeSeq, kind, nm: `${P.ico} №${S.planeSeq}`, at: home, path: null, km: 0, total: 0 }];
@@ -9088,6 +9095,11 @@ if (AUTOTEST) {
     boardReview() { return boardL.review().map(r => `${r.status} · ${r.c.dir} · ${r.c.text.slice(0, 60)} · ${Math.round((r.c.prog || 0) * 100)}% · ${r.c.reason || ''}`); },
     boardReq(id, how) { const r = how ? boardL.resolve(id, how) : boardL.request(id); return r.need ? { need: r.need, votes: r.v.votes.map(x => `${x.cond ? '◐' : x.yes ? '✔' : '✖'} ${x.name}: ${x.why}`), bank: r.v.bank.why || 'ok' } : r; },
     boardFrame() { return boardL.frame(); },
+    scenTest() { S.president = { cc: 'US', day: S.day, ev: 300 }; S.pres = null; pres.start('US'); const P = S.pres; P.res = 1e13; P.start -= 160; P.disNext = S.day + 1; P.hz.st = 'safe'; const out = {};
+      endOfDay(); endOfDay(); document.querySelectorAll('#boardRoom').forEach(x => x.remove()); out.evs = (P.evs || []).map(e => `${e.kind}:${e.iso || ''}`);
+      out.props = pres.proposals().filter(p => p.kind === 'ev').map(p => p.id); for (const p of pres.proposals().filter(p => p.kind === 'ev' && !p.id.includes('-ban'))) pres.decide(p.id, 'yes');
+      out.done = P.evs.map(e => !!e.done); P.deals.ZAF = S.day; out.part = pres.proposals().filter(p => p.kind === 'part').map(p => p.id + ' ' + p.cost); for (const p of pres.proposals().filter(p => p.kind === 'part')) pres.decide(p.id, 'yes');
+      for (let i = 0; i < 210; i++) endOfDay(); out.partDone = Object.values(P.part || {}).map(v => !!v.done); out.lv = P.lv; out.conds = pres.state().world; return out; },
     aidTest() { S.president = { cc: 'US', day: S.day, ev: 300 }; S.pres = null; pres.start('US'); const P = S.pres; P.res = 1e12; const log = [];
       const go = (iso, need) => { const p = pres.proposals().find(x => x.kind === 'aid' && x.iso === iso && x.need === need); if (p) pres.decide(p.id, 'yes'); return !!p; };
       const p0 = pres.proposals().find(x => x.kind === 'aid'); log.push('aid:' + (p0 && p0.iso + '/' + p0.need)); if (p0) pres.decide(p0.id, 'yes'); const a = P.aid[0]; if (!a) return log;
