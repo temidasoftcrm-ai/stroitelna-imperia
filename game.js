@@ -4352,6 +4352,7 @@ function buyTrain(kind = 'small', at = null) {
   if ((S.trains || []).length >= fleetCap.train() && (S.trains || []).length < totalTracks()) { toast(`🚉 Имаш ${fleetTxt('train')} влака — всяка готова жп линия дава място за 2, модернизираната за „Стрела“ — за 4. Построй още линии.`, 'bad'); return; }
   if ((S.trains || []).length >= totalTracks()) { toast(`🚉 Гарите ти имат общо ${totalTracks()} ${totalTracks() === 1 ? 'коловоз' : 'коловоза'} — надгради гара (таб „Офис“), за да купиш още влак.`, 'bad'); return; }
   if (!(S.vouchers || {}).rail && !econ.canAfford(T.cost)) { if (T.cost >= 1000000) withLoan(T.cost, `Влак: ${T.nm}`, () => buyTrain(kind, at)); else toast('Нямаш достатъчно пари за влак.', 'bad'); return; }   // скъпите (Стрела, гигант) — и на кредит
+  if (T.express && !hsNeighbors(at).length) toast(`🚄 В ${cityById(at).nm} няма модернизирана линия — „Стрела“ ще отиде сама до най-близкия град със скоростна линия.`, '');
   useVoucher('rail', T.cost, `първия влак — подарък от ${subName(S, 'rail')}`);
   econ.spend(T.cost, 'покупка', `Влак: ${T.nm}`);
   S.trains = S.trains || [];
@@ -4412,7 +4413,12 @@ function autoTrip(t) {
   }
   const T = trainType(t);
   let cand = net.filter(c => c !== t.at);
-  if (T.express && !hsNeighbors(t.at).length) return;   // „Стрела“ чака модернизирана линия
+  if (T.express && !hsNeighbors(t.at).length) {   // „Стрела“ е в град без модернизирана линия — отива празна по обикновените до най-близкия град със скоростна (иначе стоеше вечно)
+    if (t.hsTry === S.day) return; t.hsTry = S.day;   // търси най-много веднъж на ден (може още да няма скоростна линия)
+    const to = cand.filter(c => hsNeighbors(c).length).map(c => ({ c, p: railPath(t.at, c) })).filter(o => o.p).sort((x, y) => pathKm(x.p) - pathKm(y.p))[0];
+    if (to) { t.job = { empty: true, from: t.at, to: to.c }; startLeg(t, to.p, 'loaded'); }
+    return;
+  }
   if (T.express) cand = cand.filter(c => hsPath(t.at, c));
   if (T.express || T.long) {   // експресът и товарният гигант карат само директни дълги линии; ако няма такава — до най-далечния град
     const far = cand.map(c => ({ c, p: T.express ? hsPath(t.at, c) : railPath(t.at, c) })).filter(o => o.p).map(o => ({ ...o, km: pathKm(o.p) }));
