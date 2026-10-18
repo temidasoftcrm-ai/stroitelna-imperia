@@ -803,6 +803,7 @@ function bigZoneLots(Z) {
   return q.some(l => used.has(l.id)) ? null : q;
 }
 function buildCity(cityId) {
+  if (cityId === NEOM_ID) impPlace();   // 🏙️ Империал Сити: държавата (🇺🇸/🇷🇺) — преди земята и дърветата, иначе остава пустинята на 🇸🇦 (пясък и палми)
   if (city.group) scene.remove(city.group);
   if (city.planView) { city.planView.traverse(o => { if (o.geometry) o.geometry.dispose(); }); city.planView = null; }   // геометрията на стария план (материалите са общи)
   const g = city.group = new THREE.Group();
