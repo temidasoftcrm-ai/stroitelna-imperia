@@ -145,3 +145,20 @@ cinema/newyork.mp4, cinema/vegas.mp4, cinema/paris.mp4, cinema/dubai.mp4, cinema
 - hotels5/hotel5-marriott.glb — "Marriott Hotel, 3 WTC" by brunoraafael (CC-BY 4.0) — https://sketchfab.com/3d-models/45833dfdb42f48ee939bb2490f8e55ab
 - hotels5/hotel5-ostriv.glb — "Hotel Ostriv" by Randonavt (CC-BY 4.0) — https://sketchfab.com/3d-models/cdace64eb8fa46a4ac70acbb5c44bc98
 - hotels5/hotel5-rosa.glb — "Rosa Khutor Radisson" by furious93rus (CC-BY 4.0) — https://sketchfab.com/3d-models/156806661f7845d88db63d87c70bbb1f
+
+Обществени сгради в assets/heavy/civic2/ (полиция, пожарна, болница — по 2 за малък, среден и голям град; кандидати в Лабораторията) — Sketchfab, CC-BY 4.0, текстурите смалени до 1024 px и конвертирани в WebP:
+- civic2/police-s1.glb — "Hawkins Police Station" by sealandair (CC-BY 4.0) — https://sketchfab.com/3d-models/a2d23ac1a8f34d9a8312995e78944d39
+- civic2/police-s2.glb — "Cook Ville Police Head Quarters" by wirmagnus (CC-BY 4.0) — https://sketchfab.com/3d-models/ff54c015b7f14b2ba0df9bd757061ffe
+- civic2/police-m1.glb — "Police station" by kirsel91 (CC-BY 4.0) — https://sketchfab.com/3d-models/38dc09c022a744acaf30306fa1eb8c24
+- civic2/police-l1.glb — "police station" by tnikita (CC-BY 4.0) — https://sketchfab.com/3d-models/5a18fc9d626843b3a2e2de64fa9d57ca
+- civic2/police-l2.glb — "HK Police Force - Central District Headquarters" by patrick.young (CC-BY 4.0) — https://sketchfab.com/3d-models/9ff5a10d4b804f0882d0eaa709ef5995
+- civic2/fire-s1.glb — "Fire Department Building" by jimbogies (CC-BY 4.0) — https://sketchfab.com/3d-models/6f95f738a4ed4ad1853b4185629b403b
+- civic2/fire-s2.glb — "Hook & Ladder Firehouse (Simplified)" by KevinTheLonewolf (CC-BY 4.0) — https://sketchfab.com/3d-models/96d014ad5fd64828ba14fc4640222f7c
+- civic2/fire-m1.glb — "Minneapolis Former 1902 Station 10b F01" by eatc7402 (CC-BY 4.0) — https://sketchfab.com/3d-models/256655a3aa6b42e4a5d7668f617fcdce
+- civic2/fire-l1.glb — "St Paul Former 1883 Fire Station 8" by eatc7402 (CC-BY 4.0) — https://sketchfab.com/3d-models/c16bae93344a485fb04f6ec206faaef7
+- civic2/hosp-s1.glb — "Hospital Building" by silentsheri (CC-BY 4.0) — https://sketchfab.com/3d-models/19c25185c9324eada28878e69f9665bd
+- civic2/hosp-s2.glb — "Jejungwon Hospital" by gwangju_inmunstory (CC-BY 4.0) — https://sketchfab.com/3d-models/0a2e305f66154fe2bb7e075e82ed3cf0
+- civic2/hosp-m1.glb — "Hospital" by prankscare99 (CC-BY 4.0) — https://sketchfab.com/3d-models/06ef9c5578aa4fd4814986b31d2165f1
+- civic2/hosp-m2.glb — "Hospital" by iagoDev (CC-BY 4.0) — https://sketchfab.com/3d-models/f91637b01dde4749aafd56ea37fa3b21
+- civic2/hosp-l1.glb — "Building of the polyclinic in russia" by narcozisne1 (CC-BY 4.0) — https://sketchfab.com/3d-models/18ea30a7d33a427da66b3f82ade3dbf6
+- civic2/hosp-l2.glb — "Aster M.C Building , in TCA -AUH" by amerkhafagi (CC-BY 4.0) — https://sketchfab.com/3d-models/86e9d2fd1ee34054a971fc5e7983d1f6
