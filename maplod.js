@@ -35,8 +35,8 @@ export function topPerGroup(ids, groupOf, n, d) {
   return out;
 }
 // обобщени връзки: links [{ a, b }] → по една линия между групите (континенти или държави) с броя на връзките;
-// pos(id) → [x, y]; групата е в средата на своите свързани градове
-export function corridors(links, groupOf, pos) {
+// pos(id) → [x, y]; групата е в средата на своите свързани градове; max — само най-натоварените двойки (иначе отдалеч е „паяжина“)
+export function corridors(links, groupOf, pos, max = Infinity) {
   const pairs = new Map(), pts = new Map();
   const add = (g, p) => { const q = pts.get(g) || pts.set(g, [0, 0, 0]).get(g); q[0] += p[0]; q[1] += p[1]; q[2]++; };
   for (const { a, b } of links) {
@@ -46,7 +46,7 @@ export function corridors(links, groupOf, pos) {
     const k = ga < gb ? ga + '|' + gb : gb + '|' + ga; pairs.set(k, (pairs.get(k) || 0) + 1);
   }
   const ctr = g => { const q = pts.get(g); return [q[0] / q[2], q[1] / q[2]]; };
-  return [...pairs].map(([k, n]) => { const [ga, gb] = k.split('|'); return { ga, gb, n, a: ctr(ga), b: ctr(gb) }; });
+  return [...pairs].sort((p, q) => q[1] - p[1]).slice(0, max).map(([k, n]) => { const [ga, gb] = k.split('|'); return { ga, gb, n, a: ctr(ga), b: ctr(gb) }; });
 }
 // търсене на град по име (без значение от главни/малки букви; първо тези, които започват с текста)
 export function searchCities(list, q, n = 8) {

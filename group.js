@@ -176,7 +176,10 @@ export function createGroup(deps) {
     import('./directors3d.js').then(m => m.openBoardroom({ title: groupName(deps.S()), brand: brandOf(deps.S()) && { ...brandOf(deps.S()), group: groupName(deps.S()) }, seats: boardSeats, fmt: deps.fmt, sound: deps.sound,
       proposals, onUp: k => { upgrade(k); re(); }, onHire: k => { hire(k); re(); },
       // „Да“ минава през boardlogic.js (бюджет → банка → гласуване); връща { need: 'vote', v, p }, ако бордът трябва да гласува
-      onDecide: (id, a) => { const B = deps.board2 && deps.board2(), r = a === 'yes' && B ? B.request(id) : (decide(id, a), null); re(); return r; },
+      onDecide: (id, a) => { const B = deps.board2 && deps.board2(), r = (a === 'yes' || a === 'small') && B ? B.request(id, { small: a === 'small' }) : (decide(id, a), null); re(); return r; },
+      // заседанието (boardlogic.js): отчет → речта и рамката на банката → предложенията → обобщение
+      report: deps.board2 ? () => deps.board2().reportHtml() : null, bindReport: (box, rr) => deps.board2().bindSettings(box, () => { rr(); re(); }),
+      speech: deps.board2 ? () => deps.board2().bankSpeech() : null, frame: deps.board2 ? () => deps.board2().frame() : null, summary: deps.board2 ? () => deps.board2().summary() : null,
       onResolve: (id, how) => { const r = deps.board2().resolve(id, how); re(); return r; },
       settings: deps.board2 ? () => deps.board2().settingsHtml() : null, bindSettings: (box, rr) => deps.board2().bindSettings(box, () => { rr(); re(); }) }));
   }
