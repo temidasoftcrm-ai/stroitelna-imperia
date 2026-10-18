@@ -6,9 +6,37 @@ import * as THREE from 'three';
 
 const CYAN = 0x5fd0ff, GREEN = 0x5fe39a, AMBER = 0xffb347, RED = 0xff6b6b;
 const W = 1.15, H = 0.72;   // рамката на картата (m)
-const KIND_ICO = { hotel: '🏨', branch: '🏢', district: '🏘️', airport: '✈️', port: '⚓', oil: '🛢️', rail: '🚆', route: '🛣️', bank: '🏦', glob: '🌍' };
+const KIND_ICO = { bridge: '🌉', hotel: '🏨', branch: '🏢', district: '🏘️', airport: '✈️', port: '⚓', oil: '🛢️', rail: '🚆', route: '🛣️', bank: '🏦', glob: '🌍' };
 let geoP = null;
 const geo = () => geoP || (geoP = fetch('assets/globe/countries.json').then(r => r.json()).catch(() => null));
+
+// 🧊 малките холограмни модели над градовете: полупрозрачна плът + светещи ръбове (само кутии, цилиндри и конуси — без текстури)
+function miniModel(kind) {
+  const g = new THREE.Group();
+  const fill = new THREE.MeshBasicMaterial({ color: CYAN, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+  const edge = lineMat(CYAN);
+  const add = (geo, x, y, z, ry = 0, rz = 0) => {
+    const m = new THREE.Mesh(geo, fill); m.position.set(x, y, z); m.rotation.set(0, ry, rz); g.add(m);
+    const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 20), edge); e.position.copy(m.position); e.rotation.copy(m.rotation); g.add(e);
+  };
+  const B = (w, h, d, x = 0, y = 0, z = 0, ry = 0, rz = 0) => add(new THREE.BoxGeometry(w, h, d), x, y + h / 2, z, ry, rz);
+  const C = (r, h, x = 0, y = 0, z = 0, seg = 10) => add(new THREE.CylinderGeometry(r, r, h, seg), x, y + h / 2, z);
+  const K = (r, h, x = 0, y = 0, z = 0, seg = 4) => add(new THREE.ConeGeometry(r, h, seg), x, y + h / 2, z, Math.PI / 4);
+  switch (kind) {
+    case 'hotel': B(0.034, 0.11, 0.03); B(0.06, 0.045, 0.026, 0, 0, -0.002); K(0.022, 0.018, 0, 0.11, 0); break;   // кула с крила
+    case 'airport': C(0.006, 0.07, -0.03); B(0.02, 0.012, 0.02, -0.03, 0.07); B(0.07, 0.01, 0.012, 0.02, 0.03, 0); B(0.014, 0.004, 0.075, 0.02, 0.033, 0); B(0.01, 0.018, 0.004, 0.05, 0.035, 0); break;   // кула + самолет
+    case 'port': B(0.08, 0.016, 0.026, 0.01); B(0.03, 0.014, 0.018, 0.02, 0.016); B(0.008, 0.09, 0.008, -0.04); B(0.07, 0.006, 0.006, -0.015, 0.088); break;   // кораб + кран
+    case 'oil': for (const [x, z] of [[-0.022, -0.022], [0.022, -0.022], [-0.022, 0.022], [0.022, 0.022]]) C(0.003, 0.04, x, 0, z, 6); B(0.06, 0.008, 0.06, 0, 0.04); add(new THREE.ConeGeometry(0.016, 0.07, 4, 3, true), 0, 0.083, 0, Math.PI / 4); break;   // платформа + сондажна кула
+    case 'bridge': B(0.12, 0.006, 0.02, 0, 0.03); for (const x of [-0.035, 0.035]) B(0.008, 0.075, 0.022, x); { const pts = []; for (const sx of [-1, 1]) for (let k = 0; k < 4; k++) { pts.push(new THREE.Vector3(sx * 0.035, 0.075, 0), new THREE.Vector3(sx * (0.035 + 0.012 * (k + 1)) * (k % 2 ? 1 : 1), 0.034, 0)); pts.push(new THREE.Vector3(sx * 0.035, 0.075, 0), new THREE.Vector3(sx * (0.035 - 0.009 * (k + 1)), 0.034, 0)); } g.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), edge)); } break;   // пилони с въжета
+    case 'rail': for (let k = 0; k < 3; k++) B(0.034, 0.022, 0.016, -0.04 + k * 0.038, 0.004); B(0.12, 0.003, 0.024, 0, 0); break;   // влак на релси
+    case 'route': B(0.026, 0.026, 0.022, -0.035); B(0.065, 0.03, 0.024, 0.012); B(0.12, 0.002, 0.04, 0, -0.002); break;   // камион на пътя
+    case 'district': for (const [x, z] of [[-0.03, -0.02], [0.02, -0.025], [-0.02, 0.025], [0.03, 0.02]]) { B(0.026, 0.022, 0.024, x, 0, z); K(0.022, 0.016, x, 0.022, z); } break;   // къщички
+    case 'bank': B(0.08, 0.008, 0.04); for (let k = 0; k < 4; k++) C(0.004, 0.04, -0.027 + k * 0.018, 0.008, 0, 6); B(0.084, 0.008, 0.044, 0, 0.048); add(new THREE.ConeGeometry(0.05, 0.02, 3), 0, 0.066, 0, 0, 0); break;   // колони и фронтон
+    case 'glob': add(new THREE.SphereGeometry(0.04, 12, 8), 0, 0.045, 0); C(0.003, 0.006, 0, 0, 0); break;
+    default: B(0.036, 0.075, 0.03); B(0.024, 0.03, 0.022, 0.03); break;   // филиал — офис сграда
+  }
+  return g;
+}
 
 function textSprite(lines, opt = {}) {
   const fs = opt.size || 34, pad = 14, c = document.createElement('canvas'), g = c.getContext('2d');
@@ -27,7 +55,7 @@ const lineMat = col => new THREE.LineBasicMaterial({ color: col, transparent: tr
 
 // fmt — за сумите; base — точката над медальона
 export function createHolo(scene, { fmt = n => Math.round(n).toLocaleString('bg-BG'), base = new THREE.Vector3(0, 1.2, 0) } = {}) {
-  const root = new THREE.Group(); root.position.copy(base); root.rotation.x = -0.45;   // наклонена назад — „носи се“ над масата, не пред картата на стената scene.add(root);
+  const root = new THREE.Group(); root.position.copy(base); root.rotation.x = -0.45; scene.add(root);   // наклонена назад — „носи се“ над масата, не пред картата на стената
   // лъчът от медальона нагоре — едва видим
   const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.7, base.y - 0.76, 40, 1, true), new THREE.MeshBasicMaterial({ color: CYAN, transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
   beam.position.set(base.x, (base.y + 0.76) / 2 - 0.05, base.z); scene.add(beam);
@@ -93,7 +121,7 @@ export function createHolo(scene, { fmt = n => Math.round(n).toLocaleString('bg-
       const v = P(c.lon, c.lat);
       const dot = new THREE.Mesh(new THREE.CircleGeometry(0.014, 16), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false })); dot.position.copy(v); dot.position.z = 0.002; dot.userData.marker = true; g.add(dot);
       const nm = textSprite([c.nm], { h: 0.05, bg: false }); nm.position.set(v.x, v.y - 0.04, 0.01); g.add(nm);
-      const ic = textSprite([ico], { h: 0.09, bg: false }); ic.position.set(v.x, v.y + 0.06, 0.02); ic.userData.grow = 0.12 * i; ic.userData.full = ic.scale.clone(); ic.scale.multiplyScalar(0.01); g.add(ic);
+      const ic = miniModel(G.kind); ic.position.set(v.x, v.y + 0.012, 0.03); ic.userData.grow = 0.12 * i; ic.userData.full = new THREE.Vector3(1.7, 1.7, 1.7); ic.userData.spinM = true; ic.scale.setScalar(0.01); g.add(ic);
     });
     const info = [`${ico} ${p.cost ? fmt(p.cost) + ' €' : 'без разход'}`];
     if (p.days) info.push(`срок ${p.days} дни`);
@@ -128,6 +156,7 @@ export function createHolo(scene, { fmt = n => Math.round(n).toLocaleString('bg-
       if (o.userData.dash) o.material.dashOffset = (o.material.dashOffset || 0) - dt * 0.05;
       if (o.userData.full && t > 0.35 + o.userData.grow) o.scale.lerp(o.userData.full, Math.min(1, dt * 8));   // символите израстват един след друг
       if (o.userData.marker) o.scale.setScalar(1 + Math.sin(t * 4) * 0.25);
+      if (o.userData.spinM) o.rotation.y += dt * 0.6;
     });
     if (flashT > 0) flashT = Math.max(0, flashT - dt * 0.6);
   }
