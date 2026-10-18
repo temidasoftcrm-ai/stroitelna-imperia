@@ -48,7 +48,7 @@ const RECTS = {
 const WHOLE = md => md === 'houseB' || md === 'whiteS' || md === 'solidW' || md.startsWith('rects:');   // маркираните прозорци светят целите, топло (като 'flood', само по маската)
 // 'grid' (Лабораторията → night-grid; направено в Blender): истински прозорци по света — 0,8 широки, етаж 1,6 (мащабът на града), с плоча и колони между тях;
 // ~40% светят, всеки със своя яркост и оттенък; ~20% от етажите — тъмни. Без маската на текстурата — само по-светлите стъкла малко по-ярко
-const GRID = ['building-skyscraper-c', 'building-skyscraper-d', 'sf-sky-usb', 'sf-sky-blue', 'sf-sky-sing'];
+const GRID = ['building-skyscraper-c', 'building-skyscraper-d', 'building-skyscraper-e', 'sf-sky-usb', 'sf-sky-blue', 'sf-sky-sing'];   // e — Northwestern Mutual (com2-sky-e2): вместо белите ивици на Бурж
 const isGrid = name => GRID.includes(name) && feature('night-grid');
 // 'petro' (Лабораторията → night-petronas2; направено в Blender по снимки): Петронас — тъмна стомана с вертикални сребристи линии около
 // всяка кула, ярки ръбове на стесненията, светла корона, топли приглушени прозорци; подиумът — топло жълт отстрани, тъмен покрив.
@@ -118,7 +118,7 @@ export function prepNightFloors(root, name) {
     for (const m of [].concat(o.material)) {
       if (!m || m.userData.nightFloors || !('emissive' in m)) continue;
       if (name === 'building-skyscraper-c' && /roof|heli|top/i.test(m.name || '')) continue;
-      let mode = modeOf(name, m); if (mode && isGrid(name)) mode = 'grid'; if (name === 'petronas' && feature('night-petronas2')) mode = 'petro';
+      let mode = modeOf(name, m); if (isGrid(name) && (mode || name === 'sf-sky-blue')) mode = 'grid';   /* синият — и стъклото (vraymm) */ if (name === 'petronas' && feature('night-petronas2')) mode = 'petro';
       if (!mode || (!m.map && mode !== 'solid' && mode !== 'solidW' && mode !== 'grid' && mode !== 'petro' && mode !== 'empire') || (mode === 'aux' && !m.userData.nfAux)) continue;
       const mk = mode === 'solid' || mode === 'solidW' || mode === 'grid' || mode === 'petro' || mode === 'empire' ? WHITE : mode === 'aux' ? maskFor(m.userData.nfAux.tex, m.userData.nfAux.kind) : maskFor(m.map, mode); if (!mk) continue;
       m.emissiveMap = mk; m.emissive.setRGB(1, 1, 1); m.emissiveIntensity = 0; m.userData.nightFloors = true; m.userData.winK = 1; m.userData.nfK = NF_K[name] || 1; NF_MATS.add(m);
