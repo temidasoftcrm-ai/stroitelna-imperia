@@ -86,9 +86,9 @@ const VEH_NM = { bullet: ['влак', 'влак „Стрела“'], gear: ['м
 const HV = 'assets/heavy/';
 const HOLO_GLB = {
   gear: { parts: [HV + 'gear/excavator.glb'], size: 0.34 },
-  'train-s': { parts: [HV + 'trains/gp38.glb', HV + 'trains/boxcar.glb', HV + 'trains/boxcar.glb'], size: 0.42 },
-  'train-b': { parts: [HV + 'trains/vl82.glb', HV + 'trains/boxcar.glb', HV + 'trains/hopper2.glb', HV + 'trains/boxcar.glb', HV + 'trains/hopper2.glb'], size: 0.6 },
-  bullet: { parts: [HV + 'trains/ave.glb'], size: 0.6 },
+  'train-s': { parts: [HV + 'trains/gp38.glb', HV + 'trains/boxcar.glb'], size: 0.4 },
+  'train-b': { parts: [HV + 'trains/vl82.glb', HV + 'trains/boxcar.glb', HV + 'trains/hopper2.glb'], size: 0.56 },
+  bullet: { parts: [HV + 'trains/hsw.glb'], size: 0.56 },
   'plane-s': { parts: [HV + 'air/regional.glb'], size: 0.3 }, 'plane-b': { parts: [HV + 'air/wide.glb'], size: 0.42 }, plane: { parts: [HV + 'air/a320.glb'], size: 0.38 },
   'ship-s': { parts: [HV + 'ships/tanker.glb'], size: 0.32 }, 'ship-b': { parts: [HV + 'ships/container.glb'], size: 0.46 },
   'truck-s': { parts: [HV + 'trucks/volvo.glb'], size: 0.26 }, 'truck-b': { parts: [HV + 'trucks/scania.glb'], size: 0.34 },
@@ -120,15 +120,15 @@ function vehicleBanner(g, p, y, k = 1) {
   const key = (String(p.id || '').split(':')[1] || '').replace(/[0-9.-]+$/, ''), buy = p.veh?.kind || VEH[key], up = p.veh?.up || VEH_UP[key]; if (!buy && !up) return;
   const ban = new THREE.Group(); ban.position.set(0, y, 0.05); ban.scale.setScalar(k); g.add(ban); const n = p.count || 1;
   if (up) {
-    const sk = up === 'bullet' ? 'train' : up, a = holoKey(sk, false) ? holoGlb(holoKey(sk, false), () => vehicleModel(sk, false)) : vehicleModel(sk, false); a.position.x = -0.36; a.userData.spinM = true; ban.add(a);
-    const bk = up === 'bullet' ? 'bullet' : holoKey(up, true), b = bk ? holoGlb(bk, () => vehicleModel(up, true)) : vehicleModel(up, true); b.position.x = 0.36; b.userData.spinM = true; ban.add(b);
+    const sk = up === 'bullet' ? 'train' : up, a = holoKey(sk, false) ? holoGlb(holoKey(sk, false), () => vehicleModel(sk, false)) : vehicleModel(sk, false); a.position.x = -0.36; a.userData.sway = 0; ban.add(a);
+    const bk = up === 'bullet' ? 'bullet' : holoKey(up, true), b = bk ? holoGlb(bk, () => vehicleModel(up, true)) : vehicleModel(up, true); b.position.x = 0.36; b.userData.sway = 1; ban.add(b);
     const am = new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
     const arrow = new THREE.Group(); arrow.userData.pulse = true; ban.add(arrow);
     const sh = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.09, 8), am); sh.rotation.z = Math.PI / 2; sh.position.set(-0.01, 0.05, 0); arrow.add(sh);
     const tip = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.04, 12), am); tip.rotation.z = -Math.PI / 2; tip.position.set(0.055, 0.05, 0); arrow.add(tip);
     const [s0, s1] = VEH_NM[up]; const l0 = textSprite([s0], { h: 0.04, bg: false }); l0.position.set(-0.32, -0.03, 0.02); ban.add(l0); const l1 = textSprite([`${s1}${n > 1 ? ` ×${n}` : ''}`], { h: 0.045, bg: false, col: '#ffe08a' }); l1.position.set(0.34, -0.03, 0.02); ban.add(l1);
   } else {
-    const hk = buy === 'plane' ? 'plane' : holoKey(buy, true), m = hk ? holoGlb(hk, () => vehicleModel(buy, true)) : vehicleModel(buy, true); if (!hk) m.scale.setScalar(1.25); m.userData.spinM = true; ban.add(m);
+    const hk = buy === 'plane' ? 'plane' : holoKey(buy, true), m = hk ? holoGlb(hk, () => vehicleModel(buy, true)) : vehicleModel(buy, true); if (!hk) m.scale.setScalar(1.25); m.userData.sway = 0; ban.add(m);
     const l = textSprite([`×${n}`], { h: 0.08, bg: false, col: '#ffe08a' }); l.position.set(0.32, 0.05, 0.02); ban.add(l);
   }
 }
@@ -245,7 +245,7 @@ export function createHolo(scene, { fmt = n => Math.round(n).toLocaleString('bg-
       const big = textSprite([G.rating, G.amt ? `${fmt(G.amt)} €` : ''].filter(Boolean), { h: 0.15, col: G.ratingCol || '#ffd54a' });
       big.position.set(-W / 2 - 0.05, H + 0.18, 0.06);   // над картата вляво — не закрива държавата big.renderOrder = 6; g.add(big);
     }
-    vehicleBanner(g, p, H + 0.16); stockChart(g, p, H + 0.12);
+    vehicleBanner(g, p, H + 0.2, 1.35); stockChart(g, p, H + 0.12);
   }
 
   function show(p) {
@@ -276,6 +276,7 @@ export function createHolo(scene, { fmt = n => Math.round(n).toLocaleString('bg-
       if (o.userData.full && t > 0.35 + o.userData.grow) o.scale.lerp(o.userData.full, Math.min(1, dt * 8));   // символите израстват един след друг
       if (o.userData.marker) o.scale.setScalar(1 + Math.sin(t * 4) * 0.25);
       if (o.userData.spinM) o.rotation.y += dt * 0.6;
+      if (o.userData.sway != null) o.rotation.y = -0.55 + Math.sin(t * 0.8 + o.userData.sway) * 0.25;   // три четвърти отстрани, леко полюшване
       if (o.userData.pulse) { const k = 1 + Math.sin(t * 5) * 0.15; o.scale.set(k, k, k); }
     });
     if (flashT > 0) flashT = Math.max(0, flashT - dt * 0.6);
