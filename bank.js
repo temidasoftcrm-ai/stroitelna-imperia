@@ -35,6 +35,7 @@ const CRISES = [
   { k: 'sanctions', ico: '🚫', nm: c => `Международни санкции срещу ${c}`, days: 200, txt: 'Плащанията са блокирани от санкциите — лихви не идват, срокът се отлага.', hit: () => ({ frz: 200, ext: 200, pd: 2 }) },
 ];
 // правителства извън Европа, които също искат кредити (рискови пазари — там кризите са по-чести)
+export const WORLD_ISO = { 'Монголия': 'MNG', 'Украйна': 'UKR', 'Аржентина': 'ARG', 'Венецуела': 'VEN', 'Пакистан': 'PAK', 'Египет': 'EGY', 'Нигерия': 'NGA', 'Шри Ланка': 'LKA', 'Ливан': 'LBN', 'Казахстан': 'KAZ', 'Бразилия': 'BRA', 'Мексико': 'MEX', 'Индонезия': 'IDN', 'Кения': 'KEN', 'Етиопия': 'ETH', 'Гана': 'GHA', 'Еквадор': 'ECU', 'Боливия': 'BOL', 'Тайланд': 'THA', 'Виетнам': 'VNM' };   // за холограмата в залата
 const WORLD_GOV = ['Монголия', 'Украйна', 'Аржентина', 'Венецуела', 'Пакистан', 'Египет', 'Нигерия', 'Шри Ланка', 'Ливан', 'Казахстан', 'Бразилия', 'Мексико', 'Индонезия', 'Кения', 'Етиопия', 'Гана', 'Еквадор', 'Боливия', 'Тайланд', 'Виетнам'];
 // колко се събира от залога при фалит на длъжника (по рейтинга); CCC — често нищо
 const recOf = ri => ri <= 1 ? R(0.4, 0.7) : ri <= 3 ? R(0.1, 0.5) : Math.random() < 0.35 ? 0 : R(0, 0.3);
@@ -152,5 +153,5 @@ export function createBank(deps) {
     on('[data-bkfound]', () => found()); on('[data-bkup]', () => upgrade()); on('[data-bkcap]', x => addCap(+x.dataset.bkcap));
     on('[data-bkdiv]', x => setDiv(+x.dataset.bkdiv)); on('[data-bkacc]', x => accept(+x.dataset.bkacc)); on('[data-bkdec]', x => decline(+x.dataset.bkdec));
   }
-  return { state: st, found, accept, dailyTick, value, winHtml, bind, daily: () => (st()?.incDay || 0) + (st()?.refund || 0) };
+  return { room, lent, upCost, addCap, upgrade, setDiv, divRate, DIV_OPTS, LV_MAX, RATINGS, decline, state: st, found, accept, dailyTick, value, winHtml, bind, daily: () => (st()?.incDay || 0) + (st()?.refund || 0) };
 }

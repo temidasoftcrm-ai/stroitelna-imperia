@@ -12,7 +12,7 @@ const DIR = 'assets/heavy/directors/';
 const SIT_HIP = [0, -1, -57];   // ханшът в седнала поза (единиците на скелета, см) — по „Sit_Meeting“ / „Sit_Breathing“
 // дружество → модел; хотелите (Георги Николов) още нямат модел — столът стои празен с табелката
 export const DIR_MODEL = { con: 'ivaylo', hw: 'nadya', rail: 'maria', sea: 'stefan', air: 'elena', hotel: 'georgi', oil: 'vera', bank: 'boris', glob: 'glob', mayor: 'mayor' };
-const TEMP_MODEL = { mayor: 'stefan', glob: 'ivaylo' };   // временен аватар, докато потребителят направи истинския в Meshy
+const TEMP_MODEL = { mayor: 'maria', glob: 'ivaylo' };   // временен аватар, докато потребителят направи истинския в Meshy
 const LOGOS = new Set(['con', 'hw', 'rail', 'sea', 'air', 'hotel', 'oil', 'bank', 'glob']);   // assets/ui/subs/<k>.webp   // georgi/glob — от потребителя (Meshy); докато ги няма — празен стол
 const FEMALE = new Set(['nadya', 'maria', 'elena', 'vera']);
 const HAVE = new Set(['ivaylo', 'nadya', 'maria', 'stefan', 'elena', 'vera', 'boris', 'georgi']);   // моделите, които вече са в assets/heavy/directors (без 404 за останалите)
@@ -609,7 +609,7 @@ const DEMO_PROPS = [
 ];
 export function demoBoardroom() {
   const C = [['con', '🏗️', 'Констръкшън', 'Ивайло Петров', 5, 2.1e6], ['hw', '🛣️', 'Толроуд', 'Надя Иванова', 5, 1.4e6], ['rail', '🚆', 'Рейл', 'Мария Стоянова', 5, 9.8e5], ['sea', '🚢', 'Оушън Експрес', 'Стефан Колев', 5, 1.1e6],
-    ['air', '✈️', 'Флайеър', 'Елена Димитрова', 5, 1.6e6], ['hotel', '🏨', 'Хотелс', 'Георги Николов', 5, 7.2e5], ['oil', '🛢️', 'Петролиум', 'Вера Ангелова', 5, 3.4e6], ['bank', '🏦', 'Банк', 'Борис Тодоров', 5, 2.7e6], ['glob', '🌍', 'Глобъл Ризортс & Констръкшън', null, 0, 0], ['mayor', '🏙️', 'Империал Сити', 'Градоначалникът', 0, 0]];
+    ['air', '✈️', 'Флайеър', 'Елена Димитрова', 5, 1.6e6], ['hotel', '🏨', 'Хотелс', 'Георги Николов', 5, 7.2e5], ['oil', '🛢️', 'Петролиум', 'Вера Ангелова', 5, 3.4e6], ['bank', '🏦', 'Банк', 'Борис Тодоров', 5, 2.7e6], ['glob', '🌍', 'Глобъл Ризортс & Констръкшън', null, 0, 0], ['mayor', '🏙️', 'Империал Сити', 'Десислава Илиева', 0, 0]];
   return openBoardroom({
     title: 'Титан Груп — демо', brand: { nm: 'Титан', col: '#4fc3f7', ico: '🗿', group: 'Титан Груп' },
     proposals: () => DEMO_PROPS.filter(p => !p.done),

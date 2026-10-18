@@ -8,8 +8,8 @@
 //   commits [{ cid, dir, text, cost, spent0, reserved, start, due, days, gain, track, st: 'active'|'done'|'stop', end, late }], votes [...]
 // deps: { S(), econ(), fmt, toast, save, sound?, proposals(), decide(id, a), dirName(dir), subName(dir), dailyCost?() → разходи/ден,
 //         loan?(amt), trackStatus?(track) → { done, total, reason, blocked }, fixTrack?(track) → bool (пренасочва/купува липсващото) }
-export const DIRS = ['con', 'rail', 'hw', 'air', 'sea', 'oil', 'bank', 'hotel', 'glob'];
-export const DIR_ICO = { con: '🏗️', rail: '🚆', hw: '🛣️', air: '✈️', sea: '⚓', oil: '🛢️', bank: '🏦', hotel: '🏨', glob: '🌍' };
+export const DIRS = ['con', 'rail', 'hw', 'air', 'sea', 'oil', 'bank', 'hotel', 'glob', 'mayor'];
+export const DIR_ICO = { con: '🏗️', rail: '🚆', hw: '🛣️', air: '✈️', sea: '⚓', oil: '🛢️', bank: '🏦', hotel: '🏨', glob: '🌍', mayor: '🏙️' };
 const CASH_SHARE = 0.3;    // банката възразява, ако едно решение изяжда над 30% от свободните пари…
 const RESERVE_DAYS = 30;   // …или оставя оперативен резерв под месец разходи
 const MAX_COMMITS = 60;

@@ -75,5 +75,5 @@ export function createNeom(deps) {
     box.querySelectorAll('[data-nmfound]').forEach(b => b.onclick = () => { found(); rerender(); });
     box.querySelectorAll('[data-nmstart]').forEach(b => b.onclick = () => { start(b.dataset.nmstart); rerender(); });
   }
-  return { state: st, found, start, dailyTick, value, winHtml, bind, lineDone };
+  return { can: k => !!byKey(k) && !!st() && can(byKey(k)), state: st, found, start, dailyTick, value, winHtml, bind, lineDone };
 }

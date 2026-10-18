@@ -285,5 +285,5 @@ export function createTenders(deps) {
   }
   const state = id => st()[id] || null;
   const progOf = id => { const s = st()[id]; return !s ? null : s.st === 'done' ? 1 : s.st === 'building' ? s.prog : null; };
-  return { dailyTick, cardsHtml, bind, openBid, state, progOf, missing: id => missing(T(id)), announce: id => announce(T(id)), close: id => close(T(id)) };
+  return { bid, profitAt: (id, m) => profitAt(T(id), m), bondOf: id => bondOf(T(id)), dailyTick, cardsHtml, bind, openBid, state, progOf, missing: id => missing(T(id)), announce: id => announce(T(id)), close: id => close(T(id)) };
 }

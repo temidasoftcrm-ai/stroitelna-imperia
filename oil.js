@@ -164,5 +164,5 @@ export function createOil(deps) {
     on('[data-oilmin]', b => { st().minPx = +b.dataset.oilmin; }); on('[data-oilret]', b => { st().retail = +b.dataset.oilret; });
     box.querySelectorAll('[data-oilauto]').forEach(b => b.onchange = () => { st().auto = b.checked; deps.save(); });
   }
-  return { state: st, active, intake, sell, dailyTick, dailyAvg, winHtml, bind, accept, crudeP, fuelP, market, makeOffer, deliver };
+  return { buyStation, upStation, stationCost, STATION, state: st, active, intake, sell, dailyTick, dailyAvg, winHtml, bind, accept, crudeP, fuelP, market, makeOffer, deliver };
 }

@@ -197,5 +197,5 @@ export function createCorp(deps) {
     on('[data-cipo]', () => sellTranche()); on('[data-cbuyb]', () => buyBack()); on('[data-cdiv]', b => setDiv(+b.dataset.cdiv));
   }
   const acquired = id => !!(deps.S()?.corp?.loc || {})[id];
-  return { localFirms: () => deps.localFirms(), trancheCost, locValue, concBid, tender: () => st().tender, state: st, concHtml, concOpen, concResolve, myValue, ranking, myRank, dailyTick, rankHtml, acqHtml, ipoHtml, bind, acquired, buyStake, buyLocal, sellTranche };
+  return { buyBack, setDiv, sharePrice, TRANCHE, IPO_MAX, localFirms: () => deps.localFirms(), trancheCost, locValue, concBid, tender: () => st().tender, state: st, concHtml, concOpen, concResolve, myValue, ranking, myRank, dailyTick, rankHtml, acqHtml, ipoHtml, bind, acquired, buyStake, buyLocal, sellTranche };
 }

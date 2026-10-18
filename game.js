@@ -38,20 +38,20 @@ import { addSeaside, SEASIDE, SEA_MODELS } from './seaside.js';
 import { monthOf } from './resorts.js';
 import { SKY_BANDS, SKY_BANDS_MODERN, makeTall, makeTallCopy } from './tall.js';
 import { buildAirport as makeAirport3D, loadAirModels, loadTerminals } from './airport.js';
-import { createTenders, TENDERS } from './tenders.js';
+import { createTenders, TENDERS, BID_MS } from './tenders.js';
 import { createTasks } from './tasks.js';
 import { buildUniversity, buildHospital, buildStadium, buildMetro, buildAirTerminal, buildCanal, buildPortTerminal } from './tender3d.js';
 import { buildGreatWall } from './greatwall3d.js';
 import { buildCivic, CIVIC_KINDS } from './civic3d.js';
-import { createMines, MINE_KINDS } from './mines.js';
+import { createMines, MINE_KINDS, GRID_NEED } from './mines.js';
 import { createGroup, BRANDS, groupName, brandOf, cleanBrand, subName, subLogo, FOUND, SUBS } from './group.js';
 import { createOil } from './oil.js';
 import { createCorp, GLOBAL } from './corp.js';
 import { globProposals } from './globdir.js';
 import { createMegaWorld } from './megaworld.js';
 import { createHotels, TIERS as HOTEL_TIERS } from './hotels.js';
-import { createBank } from './bank.js';
-import { createNeom, NEOM_CITY, NEOM_ID } from './neom.js';
+import { createBank, WORLD_ISO } from './bank.js';
+import { createNeom, NEOM_CITY, NEOM_ID, DISTRICTS as NEOM_DISTRICTS, FOUND_COST as NEOM_FOUND } from './neom.js';
 import { buildSite3D } from './mine3d.js';
 import { CITY_LANDMARKS, LANDMARK_CENTER, BIG_LANDMARKS, SEA_LANDMARKS, buildLandmark, buildSeaLandmark, manhattanTowers } from './landmarks.js';
 import { OFFICE_STYLES, STYLE_LV, STYLE_COST, buildOfficeTower } from './officestyle.js';
@@ -75,7 +75,7 @@ import { HIGHWAYS, HW_STAGES, HW_NEED_OLD, HW_FLEET, HW_REP, HW_MODELS, TOLL_PER
 import { createTirs } from './trucks.js';
 import { createHwTrucks } from './hwtrucks.js';
 import { createOrient } from './orient.js';
-import { createRoute66 } from './route66.js';
+import { createRoute66, R66_ROUTE } from './route66.js';
 import { loadTrainModels, hasTrainModel, trainCar } from './trainmodels.js';
 import { loadVehModels } from './vehmodels.js';
 import { openGlobe } from './globe.js';
@@ -3415,9 +3415,9 @@ const mines = createMines({ S: () => S, econ: () => econ, MATERIALS: ECON.MATERI
 
 // 🏢 корпоративната група (group.js): избраната фирма и дъщерните ѝ дружества по бизнеси
 const boardL = createBoardLogic({ trackStatus: t => boardTrack(t), fixTrack: t => boardFix(t), S: () => S, econ: () => econ, fmt, toast, save, sound: n => Sound.play(n), proposals: () => group.proposals(), decide: (id, a) => group.decide(id, a),
-  dirName: d => (S && S.hold && S.hold.dir || {})[d] || '', subName: d => subName(S, d), dailyCost: () => { const h = (econ && econ.s.history) || []; const L = h.slice(-7); return L.length ? L.reduce((a, x) => a + (x.out || 0), 0) / L.length : 0; },
+  dirName: d => d === 'mayor' ? mayorName() : (S && S.hold && S.hold.dir || {})[d] || '', subName: d => subName(S, d), dailyCost: () => { const h = (econ && econ.s.history) || []; const L = h.slice(-7); return L.length ? L.reduce((a, x) => a + (x.out || 0), 0) / L.length : 0; },
   loan: amt => { if (!econ.canTakeLoan(S.rep)) { toast('🏦 Банката няма свободен кредит за теб.', 'bad'); return false; } const step = econ.loanStep(S.rep), a = Math.min(econ.loanRoom(S.rep), Math.ceil(amt / step) * step); return econ.takeLoan(S.rep, a); } });
-const group = createGroup({ board2: () => boardL, proposals: () => boardProposals(), subShow: (k, mode, text) => subScreen(k, mode, text), askFound: (k, re) => subScreen(k, 'ask', '', re), S: () => S, econ: () => econ, lv: () => dev.best(), gift: k => giftSub(k), toast, fmt, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b),
+const group = createGroup({ mayorName: () => mayorName() || null, board2: () => boardL, proposals: () => boardProposals(), subShow: (k, mode, text) => subScreen(k, mode, text), askFound: (k, re) => subScreen(k, 'ask', '', re), S: () => S, econ: () => econ, lv: () => dev.best(), gift: k => giftSub(k), toast, fmt, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b),
   hwN: () => hwDone().length, railN: () => (S.rails || []).filter(r => r.built).length, portN: () => Object.values(S.ports || {}).filter(p => p.lv).length, airN: () => Object.values(S.airports || {}).filter(a => a.lv).length,
   oilN: () => mines.state().sites.filter(x => x.kind === 'oilwell').length, empire: () => dev.has('EMPIRE'), toll: () => hwToll(), flow: k => flowAvg(k),
   finDaily: () => Object.values(econ?.s?.finished || {}).reduce((a, f) => a + (f.daily || 0), 0), bankOn: () => !!S.bank, bankDaily: () => bank.daily(), hotelN: () => Object.keys(S.hotels || {}).length, hotelDaily: () => hotels.daily(), oilDaily: () => oil.dailyAvg() || mines.dailyValue(x => MINE_KINDS[x.kind]?.oil) });
@@ -5226,6 +5226,12 @@ function refreshTender3D() {
   for (const t of TENDERS) {
     if (t.city !== S.cityId) continue;
     const p = tenders.progOf(t.id); if (p == null) continue;
+    if (t.kind === 'airterm' && !city.plan) {   // терминалът на летището — до пистата (летището е на източния край), не насред града; парцелите остават за сгради
+      if (S.tenderLots4) delete S.tenderLots4[t.id]; if (S.tenderLots) delete S.tenderLots[t.id];   // стар запис: площадката беше в града
+      const side = 8 * TILE - 2, k = side / 26;
+      const o = city.tender3D[t.id] = buildAirTerminal(city.group, { label, model: (n, k2) => A[n] ? model(n, k2) : null }, { x: tx(NI - 1) + 70 + 64 + 4 * TILE, z: 0, scale: k, prog: p, sign: t.sign, kind: t.kind, ext: [side / k, (11 * TILE - 2) / k] });
+      o.group.position.y = 0.06; o.group.userData.tender = true; continue;
+    }
     if (t.kind !== 'port') {
       const grp = tenderGroup(t); if (!grp) continue;
       if (city.plan) { planSite3D(grp[0], 'tender', (k, ext) => { const B = CIVIC_KINDS.has(t.kind) ? buildCivic : { hospital: buildHospital, stadium: buildStadium, metro: buildMetro, airterm: buildAirTerminal, canal: buildCanal, greatwall: buildGreatWall }[t.kind] || buildUniversity;
@@ -7777,9 +7783,20 @@ const branchOk = id => !ownedCities().includes(id) && !AIR_ONLY.has(id) && id !=
 // ============================================================ 🏛️ Борд на директорите: предложенията (city-builder-f9 ги показва в залата)
 // boardProposals() → [{ id, dir, ico, text, cost, count, apply() }] — какво предлага всеки директор, колко струва и какво става при „Да“ (купува и строи наведнъж).
 // id е стабилно (вид + брой), за да се помни „Не“ / „По-късно“ до следващия месец.
+// 🏙️ кметът на Империал Сити — от ниво 19 (градът от нулата)
+const MAYOR = 'Десислава Илиева';
+const mayorName = () => { try { return S && S.holding && dev.best() >= 19 ? MAYOR : ''; } catch { return ''; } };   // ниво 19 = HOLD_LV.neom (dev може да е още неинициализиран)
+// кредит от банката → държавата и градът за холограмата (правителство, община или местна фирма)
+function loanGeo(o) {
+  const ll = id => { const c = cityById(id); return c ? { nm: c.nm, lat: c.lat, lon: c.lon } : null; }, isoCc = cc => COUNTRIES.find(k => k.cc === cc)?.iso || (cc === '🇧🇬' ? 'BGR' : '');
+  if (o.cty) { const k = COUNTRIES.find(x => x.nm === o.cty); return { country: k ? k.iso : WORLD_ISO[o.cty] || '', cities: k ? k.cities.slice(0, 1).map(ll).filter(Boolean) : [] }; }
+  if (o.nm.startsWith('Община ')) { const c = CITIES.find(x => x.nm === o.nm.slice(7)); return c ? { country: isoCc(c.cc || '🇧🇬'), cities: [ll(c.id)] } : null; }
+  for (const [cc, fs] of Object.entries(LOCAL_FIRMS)) if (fs.some(x => x.nm === o.nm)) return { country: isoCc(cc), cities: [] };
+  return { country: 'BGR', cities: [] };
+}
 function boardProposals() {
   if (!S || !econ) return [];
-  const hasSub = dir => dir === 'bank' ? !!S.bank : !S.foundFirst || !!(S.group || {})[dir];   // директор има само основаното дружество
+  const hasSub = dir => dir === 'bank' ? !!S.bank : dir === 'mayor' ? !!mayorName() : !S.foundFirst || !!(S.group || {})[dir];   // директор има само основаното дружество
   const out = [], M = n => fmt(Math.round(n)), own = [...new Set(ownedCities())], cityNm = id => cityById(id)?.nm || id;
   const list = ids => ids.slice(0, 4).map(cityNm).join(', ') + (ids.length > 4 ? ` и още ${ids.length - 4}` : '');
   const isoOf = id => { const cc = cityById(id)?.cc || '🇧🇬'; return COUNTRIES.find(k => k.cc === cc)?.iso || (cc === '🇧🇬' ? 'BGR' : ''); };
@@ -7882,11 +7899,110 @@ function boardProposals() {
       why: 'повече стаи и по-скъпа нощувка', days: () => 0, income: a => a.reduce((s, o) => s + revAt(o.id, o.t) - cur(o.id), 0), goal: a => `${a.length} хотела с повече звезди`, track: a => ({ k: 'hotel', ids: a.map(o => o.id), base: Object.fromEntries(a.map(o => [o.id, o.t0])) }), geo: a => geoOf('hotel', a.map(o => o.id)) }); }
   // ━━ 🛢️ Петрол: договорите за доставка (всеки отделно)
   if (hasSub('oil')) for (const f of (S.oil && S.oil.offers) || []) out.push({ id: `oil:offer${f.id}:1`, dir: 'oil', ico: '🛢️', text: `${cityNm(f.to)} иска ${M(f.q)} ${f.m === 'crude' ? 'барела суров петрол' : 'хил. л гориво'} за ${f.days} дни — плащат ${M(f.price)} €. Да приемем ли?`, why: 'над пазарната цена', cost: 0, count: 1, days: f.days, gainTxt: `${M(f.price)} € при доставка`, geo: geoOf('oil', [f.to]), apply: () => oil.accept(f.id) });
-  // ━━ 🌍 Глобъл (ниво 20): мегапроекти, концесии, придобивания (globdir.js)
-  for (const p of globProposals({ S: () => S, econ: () => econ, fmt, mw, corp, GLOBAL, localFirms: () => corp.localFirms(), empire: () => dev.best() >= 20 })) if (hasSub('glob')) out.push(p);
-  // ━━ 🏦 Банка: исканията за кредити
-  { const of = (S.bank && S.bank.offers) || []; if (of.length && hasSub('bank')) out.push({ id: `bank:loans:${of.length}`, dir: 'bank', ico: '🏦', text: `${of.length} искания за кредити общо за ${M(of.reduce((a, o) => a + o.amt, 0))} € (${of.slice(0, 3).map(o => o.nm).join(', ')}${of.length > 3 ? '…' : ''}). Да ги отпуснем?`,
-    why: 'лихвите са приходът на банката', cost: of.reduce((a, o) => a + o.amt, 0), count: of.length, days: 0, income: Math.round(of.reduce((a, o) => a + o.amt * (o.rate || 0.05) / 365, 0)), apply: () => { for (const o of [...of]) bank.accept(o.id); } }); }
+  // ━━ ⛏️ добив и енергия (mines.js): нови обекти там, където може (първо „богатите“ на този добив) и разширения до ниво 3
+  const sum = (a, fn) => a.reduce((s, o) => s + fn(o), 0), MK = MINE_KINDS;
+  const siteCands = (kinds, max = 6) => { const r = []; for (const id of own) for (const k of kinds) if (mines.canBuild(id, k) && !r.some(o => o.id === id)) r.push({ id, k, rich: mines.rich({ city: id, kind: k }) ? 1 : 0 }); return r.sort((a, b) => b.rich - a.rich || MK[a.k].cost - MK[b.k].cost).slice(0, max); };
+  const siteInc = (k, id, lv = 1) => MK[k].out ? mines.rate({ kind: k, city: id, lv }) * (mines.mat(MK[k].out)?.buyPrice || 0) - MK[k].upkeep * (1 + 0.4 * (lv - 1)) : 0;
+  const siteTxt = a => a.slice(0, 4).map(o => `${MK[o.k].ico} ${MK[o.k].nm.toLowerCase()} в ${cityNm(o.id)}${o.rich ? ' (богат регион, +50%)' : ''}`).join(', ') + (a.length > 4 ? ` и още ${a.length - 4}` : '');
+  const siteUps = kinds => mines.state().sites.filter(s => kinds.includes(s.kind) && (s.lv || 1) < mines.LV_MAX).map(s => ({ s, c: mines.upCost(s) })).sort((a, b) => a.c - b.c).slice(0, 8);
+  const SITES = (dir, ico, key, kinds, why, gk) => {
+    P({ dir, ico, key, items: siteCands(kinds), cost: o => MK[o.k].cost, run: o => mines.buy(o.id, o.k), text: a => `Да построим ${siteTxt(a)}.`, why, days: () => 0,
+      income: a => sum(a, o => siteInc(o.k, o.id)), goal: a => `${a.length} нови обекта работят`, track: a => ({ k: 'site', items: a.map(o => [o.id, o.k]) }), geo: a => geoOf(gk, a.map(o => o.id)) });
+    P({ dir, ico: '⬆️', key: key + 'up', items: siteUps(kinds), cost: o => o.c, run: o => mines.upgrade(o.s.id), text: a => `${a.length} обекта могат да се разширят: ${a.slice(0, 4).map(o => `${MK[o.s.kind].ico} ${cityNm(o.s.city)} → ниво ${(o.s.lv || 1) + 1}`).join(', ')}${a.length > 4 ? '…' : ''}.`,
+      why: '+50% добив на ниво', days: () => 0, income: a => sum(a, o => siteInc(o.s.kind, o.s.city, (o.s.lv || 1) + 1) - siteInc(o.s.kind, o.s.city, o.s.lv || 1)), goal: a => `${a.length} разширени обекта`,
+      track: a => ({ k: 'siteup', ids: a.map(o => o.s.id), base: Object.fromEntries(a.map(o => [o.s.id, o.s.lv || 1])) }), geo: a => geoOf(gk, a.map(o => o.s.city)) });
+  };
+  if (S.holding) {
+    SITES('oil', '🛢️', 'sites', ['oilwell', 'refinery', 'terminal'], 'находищата пълнят танковете, рафинерията прави гориво, терминалът изнася', 'oil');
+    SITES('oil', '⚡', 'energy', ['solar', 'wind', 'grid', 'battery'], `токът захранва мините (+25%), а с подстанции в ${GRID_NEED.cities} града става национална мрежа`, 'energy');
+  }
+  SITES('con', '⛏️', 'mines', ['sandpit', 'quarry', 'ironmine', 'sawmill', 'steelmill', 'cement', 'glass'], 'свои материали — по-евтино от доставчиците', 'mine');
+  // ━━ ⛽ Петролиум: бензиностанции в нашите градове и продажба, когато цената е висока
+  if (S.holding && oil.active()) {
+    const o = oil.state(), fuelDay = oil.fuelP() * (o.retail || oil.STATION.retail) * oil.STATION.perDay;
+    if (mines.state().sites.some(s => s.kind === 'refinery')) P({ dir: 'oil', ico: '⛽', key: 'stations', items: own.filter(id => !o.stations[id]).slice(0, 8), cost: id => oil.stationCost(id), run: id => oil.buyStation(id),
+      text: a => `Да отворим вериги бензиностанции в ${a.length} града (${list(a)}).`, why: 'горивото на дребно е ~45% по-скъпо от пазара', days: () => 0, income: a => a.length * fuelDay, goal: a => `${a.length} нови вериги`,
+      track: a => ({ k: 'oilst', ids: a }), geo: a => geoOf('oil', a) });
+    const val = oil.crudeP() * (o.stock.crude || 0) + oil.fuelP() * (o.stock.fuel || 0);
+    if (o.px >= 1.15 && val >= 1e6 && hasSub('oil')) out.push({ id: `oil:sell${Math.round(o.px * 100)}:1`, dir: 'oil', ico: '💹', text: `Барелът е ${Math.round((o.px - 1) * 100)}% над нормалното. В танковете има за ~${M(val)} €. Да продадем всичко сега?`,
+      why: 'цената скоро се връща надолу', cost: 0, count: 1, days: 0, gainTxt: `~${M(val)} € веднага`, geo: geoOf('oil', [mines.state().sites.find(s => s.kind === 'terminal')?.city].filter(Boolean)), apply: () => { oil.sell('crude'); oil.sell('fuel'); save(); } });
+  }
+  // ━━ 🏛️ Констръкшън: държавните търгове — оферта малко под слуховете за конкурентите, само ако носи печалба
+  for (const t of TENDERS) {
+    const s = tenders.state(t.id); if (!s || s.st !== 'open' || s.my != null || !own.includes(t.city) || !s.bids?.length) continue;
+    const lo = Math.min(...s.bids.map(b => b.m)), m = [...BID_MS].reverse().find(x => x < lo - 0.02 && tenders.profitAt(t.id, x) > 0); if (!m) continue;
+    const bond = tenders.bondOf(t.id);
+    if (hasSub('con')) out.push({ id: `con:tender-${t.id}:1`, dir: 'con', ico: t.ico || '🏛️', text: `Търг „${t.nm}“ в ${cityNm(t.city)}: бюджет ${M(t.budget)} €. Конкурентите дават около ${Math.round(lo * 100)}%. Да предложим ${Math.round(m * 100)}% (${M(t.budget * m)} €)?`,
+      why: `гаранцията ${M(bond)} € се връща; материалите са ~${Math.round(t.matShare * 100)}% от бюджета`, cost: bond, count: 1, days: t.days, gainTxt: `~${M(tenders.profitAt(t.id, m))} € печалба`, needsGear: tenderLack(t).length ? `техника в ${cityNm(t.city)}` : '',
+      geo: geoOf('district', [t.city]), apply: () => { tenders.bid(t.id, m); save(); } });
+  }
+  // ━━ ⭐ Мегапоръчките (Ламанша, Кейп — Кайро, Панама, Дариен, Транссибирската, „Гън“) и Route 66: договорът и участъците — на директора по вида
+  const megaDir = kind => kind === 'rail' ? 'rail' : kind === 'ab' ? 'hw' : 'con';
+  for (const m of mega.list) {
+    const s = mega.state(m.key), d = megaDir(m.kind);
+    if (s.st === 'offer' && hasSub(d)) out.push({ id: `${d}:mega-${m.key}:1`, dir: d, ico: m.ico, text: `${m.who} ни предлагат „${m.nm}“: ${m.what}. Награда ${M(m.fee)} €, срок ${m.days} дни. Да подпишем ли?`,
+      why: m.after || 'голяма поръчка', cost: 0, count: 1, days: m.days, gainTxt: `${M(m.fee)} € + ${M(m.daily)} €/ден след това`, geo: geoOf(m.kind === 'rail' ? 'rail' : 'route', m.kind === 'works' ? [m.city] : m.route), apply: () => mega.accept(m.key, true) });
+    if (s.st !== 'active') continue;
+    const L = mega.legs(m.key).map((l, i) => ({ ...l, i })).filter(l => !l.done && !l.started && l.prog == null);
+    if (m.kind === 'works') { if (L.length) P({ dir: 'con', ico: m.ico, key: `mega-${m.key}`, items: L, cost: () => m.cost, run: () => mega.startWorks(m.key), text: () => `„${m.nm}“: да започнем големия строеж?`, why: `срокът е ден ${s.due}`, days: () => m.buildDays, goal: () => m.nm, geo: () => geoOf('district', [m.city]) }); continue; }
+    const legs = m.kind === 'ab' ? L.filter(l => !megaAbWhy(l.id)) : L;
+    P({ dir: d, ico: m.ico, key: `mega-${m.key}`, items: legs, cost: l => m.kind === 'rail' ? Math.round(railQuote(l.a, l.b).cost * m.mul / 1000) * 1000 : 0, run: l => mega.build(m.key, l.i, true),
+      text: a => `„${m.nm}“: да започнем ${a.length} участъка (${a.slice(0, 3).map(l => `${cityNm(l.a)} — ${cityNm(l.b)}`).join(', ')}${a.length > 3 ? '…' : ''}).`, why: `срокът е ден ${s.due}, иначе връщаме аванса`,
+      days: a => Math.max(...a.map(l => m.kind === 'rail' ? railQuote(l.a, l.b).days : 30)), gainTxt: () => `${M(m.fee)} € при предаване`, goal: a => `${a.length} участъка от „${m.nm}“`,
+      track: a => ({ k: 'mega', key: m.key, legs: a.map(l => l.i) }), geo: a => geoOf(m.kind === 'rail' ? 'rail' : 'route', a.flatMap(l => [l.a, l.b]), a.slice(0, 2).map((l, i) => [i * 2, i * 2 + 1])) });
+  }
+  { const s = route66.state(), R = R66_ROUTE;
+    if (s.st === 'offer' && hasSub('hw')) out.push({ id: 'hw:r66:1', dir: 'hw', ico: '🛣️', text: 'САЩ ни възлагат „Route 66“ — аутобан Чикаго — Лос Анджелис. Да подпишем ли?', why: 'аванс веднага, а след това мотели и бензиностанции по пътя', cost: 0, count: 1, days: 0, gainTxt: 'награда + приход всеки ден', geo: geoOf('route', R), apply: () => route66.accept(true) });
+    if (s.st === 'active') P({ dir: 'hw', ico: '🛣️', key: 'r66', items: R.slice(1).map((b, i) => ({ a: R[i], b, id: abSegId(R[i], b) })).filter(o => !hwAll().includes(o.id) && !(S.hwJobs || []).some(j => j.seg === o.id) && !r66Why(o.id)),
+      run: o => { const sg = segById(o.id), was = sg && sg.spur; if (sg) sg.spur = true; try { takeAutobahn(o.id); } finally { if (sg) sg.spur = was; } }, text: a => `Route 66: да започнем ${a.length} свободни участъка (${a.slice(0, 3).map(o => `${cityNm(o.a)} — ${cityNm(o.b)}`).join(', ')}).`,
+      why: 'всички участъци трябва да са готови до срока', days: () => 0, goal: a => `${a.length} участъка от Route 66`, track: a => ({ k: 'seg', ids: a.map(o => o.id) }), geo: a => geoOf('route', a.flatMap(o => [o.a, o.b]), a.slice(0, 2).map((o, i) => [i * 2, i * 2 + 1])) }); }
+  // ━━ 🏖️ Хотелс: курортите — земя + вилно селище наведнъж, после разширенията
+  if (S.holding && resorts.unlocked()) {
+    const rs = S.resorts || {}, rOf = id => RESORTS.find(r => r.id === id), resGeo = a => { const cs = a.map(rOf).filter(Boolean).slice(0, 5); return cs.length ? { country: 'BGR', kind: 'hotel', cities: cs.map(r => ({ nm: r.nm, lat: r.lat, lon: r.lon })) } : null; };
+    P({ dir: 'hotel', ico: '🏖️', key: 'resorts', items: RESORTS.filter(r => !rs[r.id] && resorts.avail(r.id)).sort((a, b) => (a.land + a.build) - (b.land + b.build)).slice(0, 4).map(r => r.id).concat(Object.keys(rs).filter(id => rs[id].stage === 'land')).slice(0, 5),
+      cost: id => (rs[id] ? 0 : rOf(id).land) + rOf(id).build, run: id => { if (!rs[id]) resorts.buyLand(id); resorts.buildVillage(id); }, text: a => `Да построим вилни селища в ${a.length} курорта (${a.map(id => rOf(id).nm).join(', ')}).`,
+      why: 'изплащат се за ~1,25 г. от наема, после носят чиста печалба', days: a => Math.max(...a.map(id => rOf(id).days)), income: a => sum(a, id => resorts.rentOf(id) / 30 * 0.6), goal: a => `${a.length} нови курорта`,
+      track: a => ({ k: 'resort', ids: a }), geo: resGeo });
+    P({ dir: 'hotel', ico: '🎢', key: 'resext', items: Object.keys(rs).map(id => ({ id, o: resorts.extOpts(id).sort((a, b) => a.cost - b.cost)[0] })).filter(x => x.o).slice(0, 6), cost: x => x.o.cost, run: x => resorts.startExt(x.id, x.o.k),
+      text: a => `Разширения в ${a.length} курорта: ${a.slice(0, 4).map(x => `${x.o.x.ico} ${x.o.x.nm} в ${rOf(x.id).nm}`).join(', ')}.`, why: 'всяко разширение вдига наема и цената на курорта', days: a => Math.max(...a.map(x => x.o.x.days)), goal: a => `${a.length} разширения`, geo: a => resGeo(a.map(x => x.id)) });
+  }
+  // ━━ 🏙️ Кметът на Империал Сити (ниво 19): основаването и кварталите един след друг
+  if (mayorName()) {
+    const N = { country: 'SAU', kind: 'district', cities: [{ nm: cityNm(NEOM_ID), lat: NEOM_CITY.lat, lon: NEOM_CITY.lon }] };
+    if (!neom.state()) out.push({ id: 'mayor:found:1', dir: 'mayor', ico: '🏙️', text: `Пустинята на Червено море ни чака. Да основем ${brandOf(S)?.nm || 'Титан'} Сити — земя, вода и пътища?`, why: 'градът от нулата е финалът на империята', cost: NEOM_FOUND, count: 1, days: 0, gainTxt: 'после квартал по квартал', geo: N, apply: () => neom.found() });
+    else P({ dir: 'mayor', ico: '🏗️', key: 'districts', items: NEOM_DISTRICTS.filter(d => neom.can(d.key)), cost: d => d.cost, run: d => neom.start(d.key), text: a => `Следващите квартали: ${a.map(d => `${d.ico} ${d.nm}`).join(', ')}.`,
+      why: 'всеки квартал носи наеми, данъци и туризъм всеки ден', days: a => Math.max(...a.map(d => d.days)), income: a => sum(a, d => d.inc), goal: a => `${a.length} нови квартала`, track: a => ({ k: 'neom', keys: a.map(d => d.key) }), geo: () => N });
+  }
+  // ━━ 🌍 Глобъл (ниво 20): мегапроекти, концесии, придобивания (globdir.js); на нива 18–19 мегапроектите ги предлага Констръкшън
+  for (const p of globProposals({ S: () => S, econ: () => econ, fmt, mw, corp, GLOBAL, localFirms: () => corp.localFirms(), empire: () => dev.best() >= 20 })) if (hasSub('glob')) out.push(p); else if (p.id.startsWith('glob:mw-') && dev.best() >= HOLD_LV.mega && hasSub('con')) out.push({ ...p, id: p.id.replace('glob:', 'con:'), dir: 'con' });
+  // ━━ 🏦 Банка: всяко искане за кредит поотделно (холограмата: държавата, рейтингът и сумата), капиталът, дивидентът; 📈 борсата
+  if (S.bank && hasSub('bank')) {
+    const b = S.bank, room = bank.room(), RT = bank.RATINGS, B9 = n => n >= 1e9 ? `${(n / 1e9).toLocaleString('bg-BG', { maximumFractionDigits: 2 })} млрд. €` : `${M(n / 1e6)} млн. €`;
+    for (const o of b.offers || []) {
+      const R = RT[o.ri] || RT[2], gi = loanGeo(o), risk = (R.pd * 100).toLocaleString('bg-BG', { maximumFractionDigits: 1 }), interest = o.amt * o.rate * o.days / 365;
+      out.push({ id: `bank:loan${o.id}:1`, dir: 'bank', ico: o.ico, text: `${o.nm} иска ${B9(o.amt)} за ${o.days} дни при ${(o.rate * 100).toFixed(1)}% годишно — рейтинг ${R.r}. Да отпуснем ли?`,
+        why: `рискът от неплащане е ~${risk}% годишно${R.r === 'CCC' ? ' — при фалит често не се връща нищо' : ''}; парите са от капитала на банката, не от касата`, cost: 0, count: 1, days: o.days,
+        income: Math.round(o.amt * o.rate / 365), gainTxt: `~${B9(interest)} лихва за срока`, needsGear: o.amt > room ? `свободен капитал в банката (има ${B9(room)})` : '',
+        geo: gi && { ...gi, kind: 'loan', rating: R.r, ratingCol: R.col, amt: o.amt, amtTxt: B9(o.amt) }, apply: () => bank.accept(o.id) });
+    }
+    const big = Math.max(0, ...(b.offers || []).map(o => o.amt));
+    if (big > room) { const up = b.lv < bank.LV_MAX, c = up ? bank.upCost() : Math.ceil((big - room) / (1.5 + b.lv * 0.5) / 1e8) * 1e8;
+      out.push({ id: `bank:cap${b.lv}-${Math.round(b.cap / 1e8)}:1`, dir: 'bank', ico: '🏦', text: up ? `Банката не стига за искането от ${B9(big)} (свободни ${B9(room)}). Да отворим нови клонове (ниво ${b.lv + 1})? Тогава кредитира до ${1.5 + (b.lv + 1) * 0.5}× капитала.` : `Банката не стига за искането от ${B9(big)}. Да увеличим капитала с ${B9(c)}?`,
+        why: 'без капитал отказваме доходни кредити', cost: c, count: 1, days: 0, gainTxt: 'по-големи кредити и лихви', apply: () => { up ? bank.upgrade() : bank.addCap(c); } }); }
+    const F0 = boardL.frame();
+    if (F0.free < F0.op && bank.divRate() < bank.DIV_OPTS[bank.DIV_OPTS.length - 1]) { const r = bank.DIV_OPTS[bank.DIV_OPTS.length - 1];
+      out.push({ id: `bank:div${r}:1`, dir: 'bank', ico: '💶', text: `Касата е под месечния резерв. Да вдигнем дивидента на банката към холдинга на ${Math.round(r * 100)}% от капитала годишно?`, why: 'парите остават в групата, банката има печалба', cost: 0, count: 1, days: 0,
+        gainTxt: `~${B9(b.cap * (r - bank.divRate()) / 12)} повече на месец`, apply: () => bank.setDiv(r) }); }
+  }
+  if (S.holding && dev.best() >= HOLD_LV.ipo && hasSub('bank')) {
+    const c = corp.state(), ipo = c.ipo, F0 = boardL.frame(), ask = out.reduce((a, p) => a + (p.cost || 0), 0), tr = Math.round(corp.sharePrice() * 1e9 * corp.TRANCHE * 0.95 / 1e6) * 1e6;
+    if ((!ipo || ipo.out + corp.TRANCHE <= corp.IPO_MAX + 1e-9) && ask > F0.free * 1.5 && tr > 0) out.push({ id: `bank:ipo${Math.round((ipo?.out || 0) * 100)}:1`, dir: 'bank', ico: '📈', text: `Предложенията искат ${M(ask)} €, а свободни са ${M(F0.free)} €. Да продадем още 10% от холдинга на борсата (външните ще имат ${Math.round(((ipo?.out || 0) + corp.TRANCHE) * 100)}%)?`,
+      why: 'капитал без лихва; контролът остава наш до 49%', cost: 0, count: 1, days: 0, gainTxt: `~${M(tr)} € веднага`, apply: () => corp.sellTranche() });
+    if (ipo && ipo.out >= corp.TRANCHE - 1e-9) { const bb = Math.round(corp.sharePrice() * 1e9 * corp.TRANCHE * 1.05 / 1e6) * 1e6;
+      if (F0.free > bb * 3) out.push({ id: `bank:buyback${Math.round(ipo.out * 100)}:1`, dir: 'bank', ico: '🔁', text: `Имаме много свободни пари. Да изкупим обратно 10% от акциите (външните остават ${Math.round((ipo.out - corp.TRANCHE) * 100)}%)?`, why: 'по-малко дивидент навън, повече печалба за нас', cost: bb, count: 1, days: 0, gainTxt: 'по-малко дивидент към акционерите', apply: () => corp.buyBack() });
+      if (ipo.mood < 0.9 && ipo.div < 0.5) { const d = Math.round((ipo.div + 0.1) * 10) / 10;
+        out.push({ id: `bank:sdiv${d}:1`, dir: 'bank', ico: '🤝', text: `Акционерите са недоволни (настроение ${Math.round(ipo.mood * 100)}%) и акцията пада. Да вдигнем дивидента им на ${Math.round(d * 100)}% от печалбата?`, why: 'доволните акционери вдигат цената на акцията', cost: 0, count: 1, days: 0, gainTxt: 'по-висока цена на акцията', apply: () => corp.setDiv(d) }); } }
+  }
   // 🏦 банката винаги започва: финансовата рамка (налични · резервирани · резерв · достъпни), после директорите — по ред, докато парите стигат
   { const F = boardL.frame(); let left = F.free; for (const p of out) { p.inBudget = !p.cost || p.cost <= left; if (p.inBudget) left -= p.cost || 0; if (p.income && !p.gainTxt) p.gainTxt = `~${M(p.income * 30)} €/месец`; }
     const ask = out.reduce((a, p) => a + (p.cost || 0), 0);
@@ -7911,6 +8027,12 @@ function boardTrack(t) {
     case 'air': return cnt(t.ids.map(id => airLv(id) > (t.base[id] || 0)));
     case 'port': return cnt(t.ids.map(id => portLv(id) > (t.base[id] || 0)));
     case 'hotel': return cnt(t.ids.map(id => (S0.hotels?.[id]?.t ?? -1) > (t.base[id] ?? -1)));
+    case 'site': return cnt(t.items.map(([id, k]) => mines.sitesIn(id).some(x => x.kind === k)));
+    case 'siteup': return cnt(t.ids.map(id => (mines.state().sites.find(x => x.id === id)?.lv || 1) > (t.base[id] || 1)));
+    case 'oilst': return cnt(t.ids.map(id => !!oil.state().stations[id]));
+    case 'resort': { const rs = S0.resorts || {}, r = cnt(t.ids.map(id => rs[id]?.stage === 'built')), b = t.ids.filter(id => rs[id]?.stage === 'building'); return { ...r, reason: b.length ? `строят се ${b.length}` : '' }; }
+    case 'neom': { const d = neom.state()?.d || {}, r = cnt(t.keys.map(k => !!d[k]?.done)), run = t.keys.filter(k => d[k]?.run); return { ...r, reason: run.length ? `строят се ${run.map(k => Math.round((d[k].prog || 0) * 100) + '%').join(', ')}` : '' }; }
+    case 'mega': { const L = mega.legs(t.key), r = cnt(t.legs.map(i => !!L[i]?.done)), p = t.legs.map(i => L[i]).filter(l => l && !l.done && l.pct != null); return { ...r, reason: p.length ? `строят се ${p.map(l => l.pct + '%').join(', ')}` : '' }; }
     case 'count': { const n = fleetN[t.what] ? fleetN[t.what]() : 0; return { done: Math.min(n, t.target), total: t.target, reason: n < t.target ? `има ${n} от ${t.target}` : '' }; }
   }
   return { done: 1, total: 1 };
@@ -8704,6 +8826,7 @@ if (AUTOTEST) {
     boardReview() { return boardL.review().map(r => `${r.status} · ${r.c.dir} · ${r.c.text.slice(0, 60)} · ${Math.round((r.c.prog || 0) * 100)}% · ${r.c.reason || ''}`); },
     boardReq(id, how) { const r = how ? boardL.resolve(id, how) : boardL.request(id); return r.need ? { need: r.need, votes: r.v.votes.map(x => `${x.cond ? '◐' : x.yes ? '✔' : '✖'} ${x.name}: ${x.why}`), bank: r.v.bank.why || 'ok' } : r; },
     boardFrame() { return boardL.frame(); },
+    boardGeo() { return boardProposals().filter(p => p.dir === 'bank' && p.geo).map(p => p.geo); },
     boardTest(apply) { const P = boardProposals(); const r = P.map(p => `${p.id} · ${fmt(p.cost)} € · ${p.text.slice(0, 90)}`); if (apply) for (const p of P.filter(x => x.dir === apply)) p.apply(); return r; },
     gasLook() {   // Лабораторията: трите кандидата за бензиностанция (assets/heavy/gas) един до друг пред централата — 1 = 30 м
       showMap(false); const h = { x: tx(NI - 1) + 75, z: tx(NJ - 1) + 90 }, g = new THREE.Group(); g.position.set(h.x - 10, 0, h.z + 30); scene.add(g);   // на празното поле югоизточно от града

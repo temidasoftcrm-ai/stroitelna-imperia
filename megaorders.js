@@ -50,12 +50,12 @@ export function createMega(deps) {
       ⭐ След предаването ${m.after}: <b style="color:var(--ok)">+${f(m.daily)} €/ден</b> завинаги и +0.5 ★.<br>⚠️ Ако не успееш в срока — връщаш аванса и губиш 0.3 ★.<br><br>Всичко се строи от прозореца „⭐ Супер поръчки“.`,
       [['Откажи', () => decline(k)], ['По-късно', null], ['✍️ Подпиши договора', () => accept(k)]]);
   }
-  function accept(k) {
+  function accept(k, quiet) {
     const m = byKey(k), s = st(k); if (s.st !== 'offer') return;
     s.st = 'active'; s.due = day() + m.days; s.adv = Math.round(m.fee * P.adv);
     deps.econ().earn(s.adv, 'обект', `Аванс: ${m.nm}`);
     deps.toast(`✍️ Подписа договора за „${m.nm}“! Аванс +${f(s.adv)} €. Срок до ден ${s.due}.`, 'good', () => deps.openWin());
-    deps.sound && deps.sound('cash'); deps.save(); deps.openWin();
+    deps.sound && deps.sound('cash'); deps.save(); if (!quiet) deps.openWin();
   }
   function decline(k) { const m = byKey(k), s = st(k); s.st = 'declined'; s.retry = day() + P.retry; deps.toast(`Отказа „${m.nm}“. Кой знае дали ще дойде пак…`, ''); deps.save(); }
   function complete(m) {
@@ -80,10 +80,10 @@ export function createMega(deps) {
     deps.econ().spend(m.cost, 'покупка', `${m.nm}: строеж`);
     s.build = { prog: 0 }; deps.toast(`🏗️ Започна строежът: ${m.nm} (${m.buildDays} дни).`, 'good'); deps.sound && deps.sound('buy'); deps.save(); deps.openWin();
   }
-  function build(k, i) {
+  function build(k, i, quiet) {
     const m = byKey(k), s = st(k), l = legs(m)[i]; if (s.st !== 'active' || !l || l.done || l.started) return;
     if (m.kind === 'rail') deps.railBuild(l.a, l.b, m.mul); else deps.abTake(l.id);
-    deps.openWin();
+    if (!quiet) deps.openWin();
   }
   function dailyTick() {
     const d = day(), offering = MEGA.some(m => st(m.key).st === 'offer');
@@ -139,5 +139,5 @@ export function createMega(deps) {
     return legs(m).filter(l => !l.done).map(l => l.works ? (l.prog == null ? `🏗️ <b>Шлюзовете</b>: натисни „Започни“ (${f(m.cost)} €)` : `🏗️ <b>Шлюзовете</b>: строят се ${Math.floor(l.prog * 100)}% — сами вървят`)
       : l.pct != null ? `🚧 <b>${deps.cityName(l.a)} — ${deps.cityName(l.b)}</b>: строи се ${l.pct}%` : `${m.kind === 'rail' ? '🛤️' : '🛣️'} <b>${deps.cityName(l.a)} — ${deps.cityName(l.b)}</b>: свободен — натисни „Строй“`);
   }
-  return { dailyTick, cardHtml, hint, ask, accept, offer: k => offer(byKey(k)), build, startWorks, state: st, progress, list: MEGA };
+  return { legs: k => legs(byKey(k)), dailyTick, cardHtml, hint, ask, accept, offer: k => offer(byKey(k)), build, startWorks, state: st, progress, list: MEGA };
 }

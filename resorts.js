@@ -271,6 +271,21 @@ export function createResorts(deps) {
     }
     return h;
   }
+  // земя → вилно селище (и от прозореца, и от директора на Хотелс в борда)
+  function buyLand(id) {
+    const S = deps.S(), r = R(id), econ = deps.econ(); if (!r || st()[id] || !unlocked() || !avail(r)) return false;
+    if (!econ.canAfford(r.land)) { deps.toast('Нямаш достатъчно пари за земята. Вземи кредит или продай имот.', 'bad'); return false; }
+    econ.spend(r.land, 'покупка', `${r.nm}: земя за курорт`);
+    st()[id] = { stage: 'land', since: S.day };
+    deps.sound('buy'); deps.toast(`🟩 Купи земя в ${r.nm}. Сега построй вилно селище.`, 'good'); deps.save(); deps.redraw(); return true;
+  }
+  function buildVillage(id) {
+    const S = deps.S(), r = R(id), s = st()[id], econ = deps.econ(); if (!r || !s || s.stage !== 'land') return false;
+    if (!econ.canAfford(r.build)) { deps.toast('Нямаш достатъчно пари за вилното селище.', 'bad'); return false; }
+    econ.spend(r.build, 'покупка', `${r.nm}: вилно селище`);
+    Object.assign(s, { stage: 'building', prog: 0, start: S.day });
+    deps.sound('buy'); deps.toast(`🔨 Започна строежът на вилното селище в ${r.nm} (${r.days} дни).`, 'good'); deps.save(); deps.redraw(); return true;
+  }
   // прозорецът на курорта
   function open(id) {
     const S = deps.S(), r = R(id), s = st()[id], econ = deps.econ(), enter = deps.enter ? () => deps.enter(id) : null;
@@ -280,18 +295,12 @@ export function createResorts(deps) {
     if (!unlocked()) return deps.modal(`🔒 ${r.nm}`, `Курортите са Фаза 5. Отключват се при репутация ${UNLOCK.rep} ★ или ${UNLOCK.done} завършени обекта.<br><br>${season}`, [['Добре', null]]);
     const plan = `Земя <b>${deps.fmt(r.land)} €</b> → вилно селище <b>${deps.fmt(r.build)} €</b> (${r.days} дни) → продажба за <b>${deps.fmt(r.sell)} €</b> или наем ~<b>${deps.fmt(rentOf(r))} €/месец</b> в сезона — <b>~${deps.fmt(yearOf(r))} €/година</b>.`;
     if (!s) return deps.modal(`${r.ico} ${r.nm}`, `${season}<br><br>${plan}`, [['👁 Влез', enter], ['Затвори', null], [`Купи земята · ${deps.fmt(r.land)} €`, () => {
-      if (!econ.canAfford(r.land)) { deps.toast('Нямаш достатъчно пари за земята. Вземи кредит или продай имот.', 'bad'); return; }
-      econ.spend(r.land, 'покупка', `${r.nm}: земя за курорт`);
-      st()[id] = { stage: 'land', since: S.day };
-      deps.sound('buy'); deps.toast(`🟩 Купи земя в ${r.nm}. Сега построй вилно селище.`, 'good'); deps.save(); deps.redraw();
+      buyLand(id);
     }]]);
     if (s.stage === 'land') return deps.modal(`${r.ico} ${r.nm} · твоя земя`, `${season}<br><br>Вилното селище струва <b>${deps.fmt(r.build)} €</b> и се строи ${r.days} дни.`, [['👁 Влез', enter], ['Затвори', null], [`Продай земята · ${deps.fmt(Math.round(r.land * 0.9))} €`, () => {
       econ.earn(Math.round(r.land * 0.9), 'продажба', `${r.nm}: земя`); delete st()[id]; deps.save(); deps.redraw();
     }], [`Строй селището · ${deps.fmt(r.build)} €`, () => {
-      if (!econ.canAfford(r.build)) { deps.toast('Нямаш достатъчно пари за вилното селище.', 'bad'); return; }
-      econ.spend(r.build, 'покупка', `${r.nm}: вилно селище`);
-      Object.assign(s, { stage: 'building', prog: 0, start: S.day });
-      deps.sound('buy'); deps.toast(`🔨 Започна строежът на вилното селище в ${r.nm} (${r.days} дни).`, 'good'); deps.save(); deps.redraw();
+      buildVillage(id);
     }]]);
     if (s.stage === 'building') return deps.modal(`${r.ico} ${r.nm} · строи се`, `Вилното селище е готово на ${Math.round(s.prog * 100)}%. Остават ~${Math.ceil((1 - s.prog) * r.days)} дни.<br><br>${season}`, [['👁 Влез', enter], ['Добре', null]]);
     if (s.stage === 'built') {
@@ -396,5 +405,5 @@ export function createResorts(deps) {
     if (deps.redraw) deps.redraw();
     return r ? r.nm : null;
   }
-  return { svg, hudHtml, winHtml, startExt, book, open, dailyTick, value, unlocked, grant, dailyNow, yearOf: id => { const r = R(id); return yearOf(r, st()[id]); } };
+  return { buyLand, buildVillage, avail: id => !!R(id) && avail(R(id)), extOpts: id => { const r = R(id), s = st()[id]; return r && s && s.stage === 'built' && !s.extBuild ? Object.entries(EXTRAS).filter(([k, x]) => extOk(r, x) && !Object.keys(s.ext || {}).includes(k)).map(([k, x]) => ({ k, x, cost: extCost(r, x) })) : []; }, rentOf: id => rentOf(R(id)), state: st, svg, hudHtml, winHtml, startExt, book, open, dailyTick, value, unlocked, grant, dailyNow, yearOf: id => { const r = R(id); return yearOf(r, st()[id]); } };
 }

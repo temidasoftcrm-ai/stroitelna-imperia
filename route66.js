@@ -31,12 +31,12 @@ export function createRoute66(deps) {
       ⚠️ Ако не успееш в срока — връщаш аванса и губиш 0.3 ★.<br><br>Участъците се строят от прозореца „🛣️ Магистрали“ (там е и списъкът) с пътна техника.`,
       [['Откажи', () => decline()], ['По-късно', null], ['✍️ Подпиши договора', () => accept()]]);
   }
-  function accept() {
+  function accept(quiet) {
     const s = st(); if (s.st !== 'offer') return;
     s.st = 'active'; s.due = day() + R66.days; s.adv = Math.round(R66.fee * R66.adv);
     deps.econ().earn(s.adv, 'обект', 'Аванс: Route 66');
     deps.toast(`✍️ Подписа договора за „Route 66“! Аванс +${f(s.adv)} €. Срок до ден ${s.due}.`, 'good', () => deps.openWin());
-    deps.sound && deps.sound('cash'); deps.save(); deps.openWin();
+    deps.sound && deps.sound('cash'); deps.save(); if (!quiet) deps.openWin();
   }
   function decline() { const s = st(); s.st = 'declined'; s.retry = day() + R66.retry; deps.toast('Отказа „Route 66“. Кой знае дали ще дойде пак…', ''); deps.save(); }
   function complete() {
