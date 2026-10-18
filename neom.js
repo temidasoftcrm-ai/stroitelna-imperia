@@ -1,4 +1,4 @@
-// neom.js — 🏙️ градът от нулата (финалът на холдинга): в пустинята на Червено море основаваш свой мегаполис — „<марка> Сити“.
+// neom.js — 🏙️ градът от нулата (финалът на холдинга): в избраната държава (imperial.js: САЩ или Русия) основаваш свой мегаполис — „<марка> Сити“.
 // Градът започва като празен пясък. Строиш го на квартали, които финансираш; всеки квартал се появява в 3D (сгради по парцелите)
 // и носи приход всеки ден. Накрая — мегаструктурата „Линията“: огледален град-стена през цялата пустиня.
 // Записът: S.neom = { founded, d: { [key]: { run, prog, done } }, used: [lotId] }; сградите отиват в built на града (като всички други).
@@ -28,10 +28,11 @@ export function createNeom(deps) {
   const can = d => !ds(d.key).done && !ds(d.key).run && (!d.need || ds(d.need).done) && (!d.final || DISTRICTS.filter(x => !x.final).every(x => ds(x.key).done));
   function found() {
     const S = deps.S(); if (!deps.holding() || st()) return; const e = deps.econ();
+    if (deps.needCountry && deps.needCountry()) { deps.chooseCountry(() => found()); return; }   // първо държавата (imperial.js) — тя определя и президентската кампания
     if (!e.canAfford(FOUND_COST)) { deps.toast(`Нямаш ${B(FOUND_COST)} за основаването на града.`, 'bad'); return; }
     e.spend(FOUND_COST, 'град', `Основаване на ${deps.brand()} Сити: земя, вода, пътища`);
     S.neom = { founded: S.day, d: {}, used: [] }; deps.found(NEOM_ID);
-    deps.pop && deps.pop('empire', `🏙️ ${deps.brand()} Сити е основан!`, `В пустинята на Червено море има само пясък, пътища и твоят офис. Строй квартал по квартал — накрая издигни „Линията“.`);
+    deps.pop && deps.pop('empire', `🏙️ ${deps.brand()} Сити е основан!`, `${deps.where ? deps.where() : ''} Тук има само празна земя, пътища и твоят офис. Строй квартал по квартал — кметът Десислава Илиева ще следи как живеят хората.`);
     deps.sound && deps.sound('levelup'); deps.save();
   }
   function start(k) {
@@ -49,7 +50,7 @@ export function createNeom(deps) {
     const r = st().d[d.key]; r.run = false; r.done = deps.S().day;
     if (d.n) { let seed = d.key.length * 977; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
       for (const id of lotsFor(d)) { const kind = d.kind === 'mix' ? (rnd() < 0.5 ? 'sky' : 'shop') : d.kind; st().used.push(id); deps.place(id, deps.pickModel(kind, rnd), Math.floor(rnd() * 4) * Math.PI / 2); } }
-    if (d.final) deps.pop && deps.pop('empire', `🪞 „Линията“ е готова!`, `${deps.brand()} Сити има своята мегаструктура — огледален град-стена през пустинята. Градът на бъдещето е твой.`);
+    if (d.final) deps.pop && deps.pop('empire', `🪞 „Линията“ е готова!`, `${deps.brand()} Сити има своята мегаструктура — огледален град-стена. Градът на бъдещето е твой.`);
     else deps.pop && deps.pop('city-done', `${d.ico} ${d.nm} е готов!`, `${deps.brand()} Сити расте — +${deps.fmt(d.inc)} €/ден.`);
     deps.sound && deps.sound('levelup');
   }
@@ -63,10 +64,10 @@ export function createNeom(deps) {
   function winHtml() {
     const S = deps.S(), n = st(), e = deps.econ();
     if (!deps.holding()) return `<div class="card"><div class="meta" style="margin:0">🔒 Градът от нулата идва с <b>🏛️ Ерата на холдинга</b>.</div></div>`;
-    if (!n) return `<div class="card"><h3 style="margin:0 0 6px">🏙️ ${deps.brand()} Сити</h3><div class="meta">Финалът на империята: на брега на Червено море, в пустинята, основаваш <b>свой мегаполис от нулата</b>. Започва като пясък, пътища и твоят офис; строиш го на квартали — жилищни, търговски, бизнес район, марина, университет — и накрая издигаш <b>„Линията“</b>, огледален град-стена през пустинята. Всеки квартал носи приход всеки ден и вдига холдинга в класацията.</div><div class="row" style="justify-content:flex-end;margin:6px 0 0"><button class="btn" data-nmfound="1" ${e.canAfford(FOUND_COST) ? '' : 'disabled'}>🏙️ Основи града · ${B(FOUND_COST)}</button></div></div>`;
+    if (!n) return `<div class="card"><h3 style="margin:0 0 6px">🏙️ ${deps.brand()} Сити</h3><div class="meta">Финалът на империята: основаваш <b>свой мегаполис от нулата</b> — в 🇺🇸 САЩ или в 🇷🇺 Русия (изборът определя и бъдещата ти президентска кампания). Започва като празна земя, пътища и твоят офис; строиш го на квартали — жилищни, търговски, бизнес район, марина, университет — и накрая издигаш <b>„Линията“</b>, огледален град-стена. Всеки квартал носи приход всеки ден и вдига холдинга в класацията.</div><div class="row" style="justify-content:flex-end;margin:6px 0 0"><button class="btn" data-nmfound="1" ${e.canAfford(FOUND_COST) ? '' : 'disabled'}>🏙️ Основи града · ${B(FOUND_COST)}</button></div></div>`;
     const done = DISTRICTS.filter(d => ds(d.key).done).length;
     let h = `<div class="bw-stats"><div><b>${done} / ${DISTRICTS.length}</b><span>квартала</span></div><div><b style="color:var(--ok)">+${deps.fmt(n._inc || 0)} €</b><span>приход на ден</span></div><div><b>${B(value())}</b><span>стойност в класацията</span></div></div>`;
-    h += `<div class="meta" style="margin:8px 0">🏙️ Основан на ден ${n.founded}. Влез в града от картата (🇸🇦 Червено море), за да го видиш как расте. Кварталите се отключват един след друг.</div>`;
+    h += `<div class="meta" style="margin:8px 0">🏙️ Основан на ден ${n.founded}. Влез в града от картата (${deps.where ? deps.where() : ''}), за да го видиш как расте. Кварталите се отключват един след друг.</div>`;
     h += DISTRICTS.map(d => { const r = ds(d.key), ok = can(d), p = r.done ? 100 : r.run ? Math.round(r.prog * 100) : 0;
       return `<div class="card" style="${d.final ? 'border:1px solid #9fdfff' : ''}${!r.done && !r.run && !ok ? ';opacity:.55' : ''}"><div class="row" style="margin:0;align-items:center;gap:10px"><span style="font-size:24px">${d.ico}</span><span class="meta" style="margin:0;flex:1"><b style="color:var(--txt)">${d.nm}</b><br>${d.n ? `${d.n} парцела · ` : ''}${B(d.cost)} · ${d.days} дни · 🎁 +${deps.fmt(d.inc)} €/ден${d.need && !ds(d.need).done ? ` · 🔒 след „${byKey(d.need).nm}“` : ''}${d.final && !ok && !r.done && !r.run ? ' · 🔒 след всички квартали' : ''}</span><b>${r.done ? '✅' : r.run ? p + '%' : ''}</b></div>${r.run ? `<div class="bar" style="height:5px;margin:6px 0 0"><i style="width:${p}%"></i></div>` : ''}${ok ? `<div class="row" style="justify-content:flex-end;margin:6px 0 0"><button class="btn" data-nmstart="${d.key}" ${e.canAfford(d.cost) ? '' : 'disabled'}>🏗️ Строй · ${B(d.cost)}</button></div>` : ''}</div>`; }).join('');
     return h;

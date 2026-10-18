@@ -3,7 +3,8 @@
 // Отключвания: ниво 5 (+ Балканите) — оферти от доставчици; ниво 8 — стокова борса.
 // Записът е в S.dev = { xp, lv }. deps: S(), toast, sound, save, pop(key, cap, sub), balkansOpen()
 import { feature } from './lab/feature.js';
-import { showLevel, LV_PICS } from './lvshow.js';   // ново ниво — картинка на черен екран (feature 'lv-pics')
+import { showLevel, LV_PICS } from './lvshow.js';
+import { IMP_UNLOCKS } from './imperial.js';   // нивата 21–25 идват от Империал Сити (не от опит)   // ново ниво — картинка на черен екран (feature 'lv-pics')
 export const THRESH = [0, 1000, 4000, 10000, 20000, 40000, 70000, 110000, 170000, 250000, 350000, 480000, 640000, 840000, 1100000, 1400000, 1800000, 2300000, 2900000, 3600000];
 export const XP = { house: 50, shop: 200, office: 600, tower: 2000, rail: 1000, highway: 1500, branch: 3000, quest: 100 };
 // стари скали (по версия на записа) — за преизчисляване на опита
@@ -38,6 +39,7 @@ const UNLOCKS = {
   19: '🏙️ Твоят град от нулата · 🛰️ мегапоръчки (Панама, Дариен, Транссибирска, „Гън“)',
   20: '👑 Световна империя: поглъщане на конгломерати · 🌐 световни концесии · надпревара за №1',
 };
+Object.assign(UNLOCKS, IMP_UNLOCKS);
 export const unlockText = lv => UNLOCKS[lv] || '';
 export const LV = { BG_ALL: 2, LINKS: 2, STAFF: 4, BALKANS: 5, FOREIGN: 6, OFFERS: 6, STOCKS: 7, EUROPE: 8, AIR: 9, WORLD: 10, MEGAHUB: 11, NA: 12, MEGA_EU: 13, SA: 14, SKY40: 15, AS: 16, FAST: 17, OC: 18, MEGA_WORLD: 19, EMPIRE: 20 };
 export const OFFERS_LV = LV.OFFERS, STOCKS_LV = LV.STOCKS;
@@ -57,11 +59,18 @@ export function createDevLevel(deps) {
   const level = () => (st() || { lv: 1 }).lv;
   const offerMul = () => 1 + 0.02 * (level() - 1);
   // общите за фирмата неща (оферти, борса) се отключват от най-развития ти град
-  const best = () => Math.max(level(), deps.maxLevel ? deps.maxLevel() : 1);
+  const best = () => Math.max(level(), deps.maxLevel ? deps.maxLevel() : 1, deps.impLv ? deps.impLv() : 0);
   const offersOpen = () => best() >= OFFERS_LV;
   const has = k => best() >= LV[k];
   const stocksOpen = () => best() >= STOCKS_LV;
 
+  // 🏙️ нивата 21–25: градът изпълни условията (imperial.js) — картинка или известие, както при 1–20
+  function cityUp(lv, text) {
+    deps.toast(`🏅 Фирмата е ниво ${lv}! ${text || UNLOCKS[lv] || ''}`, 'good', open);
+    if (feature('lv-pics') && LV_PICS.has(lv)) showLevel(lv, text || UNLOCKS[lv] || '');
+    else { deps.sound('levelup'); if (deps.pop && !deps.pop(`lv-${lv}`, `🏅 Ниво на развитие ${lv}`, text || UNLOCKS[lv] || '')) deps.pop('empire', `🏅 Ниво на развитие ${lv}`, text || UNLOCKS[lv] || ''); }
+    render(); deps.save();
+  }
   function add(n, why) {
     const d = st(); if (!d || !n) return;
     const firm0 = best();   // нивото на фирмата (най-развитият град) преди опита — картинката е само когато то се вдигне, не при всеки град
@@ -108,17 +117,19 @@ export function createDevLevel(deps) {
     btn.style.display = '';
     const bst = best();   // в лентата — само нивото на фирмата (= най-развитият град, от него идват отключванията); лентата — неговият напредък
     const bd = bst > d.lv ? (Object.values(deps.S().cities || {}).map(c => c.dev).find(x => x && x.lv === bst) || { lv: bst, xp: THRESH[bst - 1] }) : d;
-    const a = THRESH[bd.lv - 1], b = THRESH[bd.lv] ?? a, k = bd.lv >= THRESH.length ? 1 : Math.max(0, Math.min(1, (bd.xp - a) / (b - a)));
+    const a = THRESH[bd.lv - 1], b = THRESH[bd.lv] ?? a, k = bd.lv >= THRESH.length ? 1 : Math.max(0, Math.min(1, (bd.xp - a) / (b - a)));   // над 20 — пълна лента (нивата идват от града)
     btn.innerHTML = `🏢 Фирма ${bst}<span class="dbar"><i style="width:${(k * 100).toFixed(0)}%"></i></span>`;
     btn.title = `Ниво на развитие на фирмата: ${bst} (по най-развития град — оттам идват отключванията)${bst > d.lv ? ` · ${deps.cityName ? deps.cityName() : 'този град'}: ниво ${d.lv}` : ''}`;
   }
   function open() {
     const d = st(); if (!d) return;
     const L = best();   // по нивото на фирмата (както в лентата горе); заключените — замъглени, за да е изненада
-    const rows = THRESH.map((t, i) => `<div class="dvrow ${i + 1 <= L ? 'on' : ''} ${i + 1 === L ? 'cur' : ''}"><b>${i + 1 <= L ? '✅' : '🔒'} Ниво ${i + 1}</b><span class="meta" style="margin:0;flex:1;${i + 1 > L ? 'filter:blur(6px);user-select:none;pointer-events:none' : ''}" ${i + 1 > L ? 'aria-hidden="true"' : ''}>${UNLOCKS[i + 1] || 'Начало'}</span><span class="meta" style="margin:0">${t} XP${deps.lvTime && deps.lvTime(i + 1) ? `<br><span style="color:#7dd3ff">⏱️ ${deps.lvTime(i + 1)}</span>` : ''}</span></div>`).join('');
+    const rows = THRESH.map((t, i) => `<div class="dvrow ${i + 1 <= L ? 'on' : ''} ${i + 1 === L ? 'cur' : ''}"><b>${i + 1 <= L ? '✅' : '🔒'} Ниво ${i + 1}</b><span class="meta" style="margin:0;flex:1;${i + 1 > L ? 'filter:blur(6px);user-select:none;pointer-events:none' : ''}" ${i + 1 > L ? 'aria-hidden="true"' : ''}>${UNLOCKS[i + 1] || 'Начало'}</span><span class="meta" style="margin:0">${t} XP${deps.lvTime && deps.lvTime(i + 1) ? `<br><span style="color:#7dd3ff">⏱️ ${deps.lvTime(i + 1)}</span>` : ''}</span></div>`).join('')
+      + `<div class="meta" style="margin:10px 0 4px;color:#ffd54a">🏙️ Нива 21–25 — Империал Сити (по състоянието на града, не по опит)</div>` + [21, 22, 23, 24, 25].map(n => `<div class="dvrow ${n <= L ? 'on' : ''} ${n === L ? 'cur' : ''}"><b>${n <= L ? '✅' : '🔒'} Ниво ${n}</b><span class="meta" style="margin:0;flex:1;${n > L ? 'filter:blur(6px);user-select:none;pointer-events:none' : ''}" ${n > L ? 'aria-hidden="true"' : ''}>${UNLOCKS[n]}</span></div>`).join('')
+      + (L >= 19 && L < 25 && deps.impNeed ? `<div class="meta" style="margin:6px 0 0;color:#7dd3ff">🎯 Към ниво ${Math.max(21, L + 1)}: ${deps.impNeed(Math.max(21, L + 1))}</div>` : '');
     const nxt = THRESH[d.lv];
     deps.modal(`🏢 Ниво на развитие на фирмата · ${L}`, `Всеки твой град се развива отделно. Отключванията (градове, линии, Балканите, Европа, борса) идват от най-развития ти град; специалистите — от нивото на текущия град.<br>Опит: <b>${Math.round(d.xp)} XP</b>${nxt != null ? ` · до ниво ${d.lv + 1}: ${Math.round(nxt - d.xp)} XP` : ' · максимално ниво'}<br>
       <span style="color:var(--mut)">XP: къща ${XP.house}, магазин ${XP.shop}, офис ${XP.office}, небостъргач ${XP.tower}, жп линия ${XP.rail}, участък магистрала ${XP.highway}, филиал ${XP.branch}, куест ${XP.quest}.</span><br><br>${deps.playSummary ? deps.playSummary() + '<br>' : ''}${rows}`, [['Затвори', null]]);
   }
-  return { add, level, best, has, offerMul, offersOpen, stocksOpen, render, open, XP };
+  return { cityUp, add, level, best, has, offerMul, offersOpen, stocksOpen, render, open, XP };
 }
