@@ -212,7 +212,7 @@ function buildRoom(scene) {
   const frameM = new THREE.MeshStandardMaterial({ color: 0x2a2620, metalness: 0.7, roughness: 0.35 });
   for (const side of [-1, 1]) {
     const mat = new THREE.MeshBasicMaterial({ map: skyline(side < 0 ? 7 : 19), toneMapped: false });
-    new THREE.TextureLoader().load(`assets/ui/boardroom/window-${side < 0 ? 'l' : 'r'}.webp`, t => { t.colorSpace = THREE.SRGBColorSpace; mat.map = t; mat.needsUpdate = true; }, undefined, () => {});
+    new THREE.TextureLoader().load(`assets/ui/boardroom/window-${side < 0 ? 'l' : 'r'}.webp`, t => { t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; t.repeat.x = 2; t.anisotropy = 4; mat.map = t; mat.needsUpdate = true; }, undefined, () => {});   // снимката е ~1,8:1, стената — 3,6:1 → два пъти (шевът е под средната рамка)
     const win = new THREE.Mesh(new THREE.PlaneGeometry(D, H), mat); win.position.set(side * ROOM_W, H / 2, cz); win.rotation.y = -side * Math.PI / 2; scene.add(win);
     for (let z = ROOM_BACK; z <= ROOM_FRONT + 0.01; z += D / 8) { const m = new THREE.Mesh(new THREE.BoxGeometry(0.12, H, 0.1), frameM); m.position.set(side * (ROOM_W - 0.06), H / 2, z); scene.add(m); }
     for (const y of [0.05, H - 0.05]) { const m = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, D), frameM); m.position.set(side * (ROOM_W - 0.07), y, cz); scene.add(m); }
