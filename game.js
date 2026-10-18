@@ -9088,6 +9088,11 @@ if (AUTOTEST) {
     boardReview() { return boardL.review().map(r => `${r.status} · ${r.c.dir} · ${r.c.text.slice(0, 60)} · ${Math.round((r.c.prog || 0) * 100)}% · ${r.c.reason || ''}`); },
     boardReq(id, how) { const r = how ? boardL.resolve(id, how) : boardL.request(id); return r.need ? { need: r.need, votes: r.v.votes.map(x => `${x.cond ? '◐' : x.yes ? '✔' : '✖'} ${x.name}: ${x.why}`), bank: r.v.bank.why || 'ok' } : r; },
     boardFrame() { return boardL.frame(); },
+    aidTest() { S.president = { cc: 'US', day: S.day, ev: 300 }; S.pres = null; pres.start('US'); const P = S.pres; P.res = 1e12; const log = [];
+      const go = (iso, need) => { const p = pres.proposals().find(x => x.kind === 'aid' && x.iso === iso && x.need === need); if (p) pres.decide(p.id, 'yes'); return !!p; };
+      const p0 = pres.proposals().find(x => x.kind === 'aid'); log.push('aid:' + (p0 && p0.iso + '/' + p0.need)); if (p0) pres.decide(p0.id, 'yes'); const a = P.aid[0]; if (!a) return log;
+      for (let i = 0; i < 200 && !a.done; i++) { endOfDay(); if (a.wait) { log.push(`d${i}:wait ${a.wait} (${a.stuck}) st${a.stage}`); const f = pres.proposals().find(x => x.kind === 'aidfix' && x.aid === a.id); if (f) pres.decide(f.id, 'yes'); } }
+      log.push(`done:${!!a.done} works:${a.works}`); P.res = -1e12; for (let i = 0; i < 70; i++) endOfDay(); log.push(`unpaid → works:${a.works} wait:${a.wait}`); return log; },
     pkgTest(cc = 'US') { S.president = { cc, day: S.day, ev: 300 }; S.pres = null; pres.start(cc); const P = S.pres, k = P.conf.east; k.step = 2; const out = {};
       out.weak = pres.evalPkg('east', {}).resp.map(r => `${r.iso}:${r.ok}:${r.score}/${r.need}:${r.why[0]}`);
       const strong = { now: 1, obl: 1, ver: 2, gua: 1, rec: 1, next: 2 }; out.strong = pres.evalPkg('east', strong).resp.map(r => `${r.iso}:${r.ok}:${r.score}/${r.need}:${r.why[0]}`);
