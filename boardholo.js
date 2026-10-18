@@ -6,7 +6,7 @@ import * as THREE from 'three';
 
 const CYAN = 0x5fd0ff, GREEN = 0x5fe39a, AMBER = 0xffb347, RED = 0xff6b6b;
 const W = 1.15, H = 0.72;   // рамката на картата (m)
-const KIND_ICO = { bridge: '🌉', hotel: '🏨', branch: '🏢', district: '🏘️', airport: '✈️', port: '⚓', oil: '🛢️', rail: '🚆', route: '🛣️', bank: '🏦', glob: '🌍' };
+const KIND_ICO = { loan: '🏦', energy: '⚡', mine: '⛏️', bridge: '🌉', hotel: '🏨', branch: '🏢', district: '🏘️', airport: '✈️', port: '⚓', oil: '🛢️', rail: '🚆', route: '🛣️', bank: '🏦', glob: '🌍' };
 let geoP = null;
 const geo = () => geoP || (geoP = fetch('assets/globe/countries.json').then(r => r.json()).catch(() => null));
 
@@ -32,6 +32,16 @@ function miniModel(kind) {
     case 'route': B(0.026, 0.026, 0.022, -0.035); B(0.065, 0.03, 0.024, 0.012); B(0.12, 0.002, 0.04, 0, -0.002); break;   // камион на пътя
     case 'district': for (const [x, z] of [[-0.03, -0.02], [0.02, -0.025], [-0.02, 0.025], [0.03, 0.02]]) { B(0.026, 0.022, 0.024, x, 0, z); K(0.022, 0.016, x, 0.022, z); } break;   // къщички
     case 'bank': B(0.08, 0.008, 0.04); for (let k = 0; k < 4; k++) C(0.004, 0.04, -0.027 + k * 0.018, 0.008, 0, 6); B(0.084, 0.008, 0.044, 0, 0.048); add(new THREE.ConeGeometry(0.05, 0.02, 3), 0, 0.066, 0, 0, 0); break;   // колони и фронтон
+    case 'energy': {   // вятърна перка + соларен панел
+      C(0.003, 0.1, 0.02, 0, 0, 6); B(0.012, 0.012, 0.012, 0.02, 0.1, 0);
+      for (let k = 0; k < 3; k++) { const a = k * Math.PI * 2 / 3; add(new THREE.BoxGeometry(0.004, 0.05, 0.003), 0.02 + Math.sin(a) * 0.025, 0.106 + Math.cos(a) * 0.025, 0.008, 0, -a); }
+      add(new THREE.BoxGeometry(0.05, 0.003, 0.034), -0.03, 0.022, 0, 0, 0.5); C(0.002, 0.02, -0.03, 0, 0, 5); break;
+    }
+    case 'mine': {   // шахтова кула с колело, сграда и купчина руда
+      add(new THREE.BoxGeometry(0.004, 0.09, 0.004), -0.012, 0.045, 0, 0, 0.18); add(new THREE.BoxGeometry(0.004, 0.09, 0.004), 0.012, 0.045, 0, 0, -0.18);
+      add(new THREE.TorusGeometry(0.012, 0.0025, 6, 16), 0, 0.09, 0); B(0.04, 0.022, 0.03, 0.035); K(0.028, 0.024, -0.04, 0, 0.01, 8); break;
+    }
+    case 'loan':
     case 'glob': add(new THREE.SphereGeometry(0.04, 12, 8), 0, 0.045, 0); C(0.003, 0.006, 0, 0, 0); break;
     default: B(0.036, 0.075, 0.03); B(0.024, 0.03, 0.022, 0.03); break;   // филиал — офис сграда
   }
@@ -127,6 +137,11 @@ export function createHolo(scene, { fmt = n => Math.round(n).toLocaleString('bg-
     if (p.days) info.push(`срок ${p.days} дни`);
     if (p.income) info.push(`+${fmt(p.income)} €/ден`);
     const lab = textSprite(info, { h: 0.055 }); lab.position.set(W / 2 + 0.12, H - 0.05, 0.02); g.add(lab);
+    // 🏦 кредит на държава: голям надпис с рейтинга (в неговия цвят) и сумата над картата
+    if (G.kind === 'loan' && G.rating) {
+      const big = textSprite([G.rating, G.amt ? `${fmt(G.amt)} €` : ''].filter(Boolean), { h: 0.15, col: G.ratingCol || '#ffd54a' });
+      big.position.set(0, H / 2 + 0.05, 0.06); big.renderOrder = 6; g.add(big);
+    }
   }
 
   function show(p) {

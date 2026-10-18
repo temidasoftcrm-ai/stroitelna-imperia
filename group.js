@@ -153,7 +153,7 @@ export function createGroup(deps) {
       return { k: s.k, ico: s.ico, company: subName(S, s.k) || s.suf, what: s.what, open: on, director: dir ? DIR_OF[s.k] || dir : null, lv: L, lvMax: HOLD_LV_MAX, inc, bonus: bonusOf(s.k), bonusPct: Math.round(bonusK(s.k) * 100),
         up: man && L < HOLD_LV_MAX ? { cost: upCost(s.k), can: e.canAfford(upCost(s.k)) } : null,
         hire: man && !dir && L >= DIR_LV ? { cost: dirCost(s.k), can: e.canAfford(dirCost(s.k)) } : null };
-    });
+    }).concat(deps.mayorName && deps.mayorName() ? [{ k: 'mayor', ico: '🏙️', company: 'Империал Сити', what: 'градоначалник', open: true, director: deps.mayorName(), lv: 0, lvMax: HOLD_LV_MAX, inc: 0, bonus: 0, bonusPct: 0, up: null, hire: null }] : []);   // 10-ото място — градоначалникът
   }
   // 📋 предложенията към борда (deps.proposals от game.js: [{ id: 'dir:вид:брой', dir, ico, text, cost, apply() }]);
   // „Не“ — 90 дни тишина за този вид, „По-късно“ — до следващия борд (30 дни). Записът: S.hold.skip = { 'dir:вид': денят до който мълчи }

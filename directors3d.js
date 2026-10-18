@@ -6,16 +6,20 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createHolo } from './boardholo.js';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
 const DIR = 'assets/heavy/directors/';
 const SIT_HIP = [0, -1, -57];   // ханшът в седнала поза (единиците на скелета, см) — по „Sit_Meeting“ / „Sit_Breathing“
 // дружество → модел; хотелите (Георги Николов) още нямат модел — столът стои празен с табелката
-export const DIR_MODEL = { con: 'ivaylo', hw: 'nadya', rail: 'maria', sea: 'stefan', air: 'elena', hotel: 'georgi', oil: 'vera', bank: 'boris', glob: 'glob' };   // georgi/glob — от потребителя (Meshy); докато ги няма — празен стол
+export const DIR_MODEL = { con: 'ivaylo', hw: 'nadya', rail: 'maria', sea: 'stefan', air: 'elena', hotel: 'georgi', oil: 'vera', bank: 'boris', glob: 'glob', mayor: 'mayor' };
+const TEMP_MODEL = { mayor: 'stefan', glob: 'ivaylo' };   // временен аватар, докато потребителят направи истинския в Meshy
+const LOGOS = new Set(['con', 'hw', 'rail', 'sea', 'air', 'hotel', 'oil', 'bank', 'glob']);   // assets/ui/subs/<k>.webp   // georgi/glob — от потребителя (Meshy); докато ги няма — празен стол
 const FEMALE = new Set(['nadya', 'maria', 'elena', 'vera']);
 const HAVE = new Set(['ivaylo', 'nadya', 'maria', 'stefan', 'elena', 'vera', 'boris', 'georgi']);   // моделите, които вече са в assets/heavy/directors (без 404 за останалите)
 // столовете: по 4 от двете страни на масата (x = ±), от прозореца към председателя
 // …и девето — начело откъм картата (side 0): директорът на Глобъл, срещу председателя
-const SEATS = [[-1, -2.7], [1, -2.7], [-1, -0.9], [1, -0.9], [-1, 0.9], [1, 0.9], [-1, 2.7], [1, 2.7], [0, -4.25]];
+const SEATS = [[-1, -2.7], [1, -2.7], [-1, -0.9], [1, -0.9], [-1, 0.9], [1, 0.9], [-1, 2.7], [1, 2.7], [0, -4.25, -0.5], [0, -4.25, 0.5]];   // начело — Глобъл и градоначалникът на Империал Сити (10-ото място)
+const seatX = i => { const [side, , dx] = SEATS[i] || SEATS[SEATS.length - 1]; return side * SIT_X + (dx || 0); };
 const SIT_X = 1.55, TABLE_W = 2.4, TABLE_L = 7.4, TABLE_H = 0.74, SCALE = 0.9, TURN = 0.3;   // TURN — директорите са леко обърнати към председателя
 const seatRy = side => side < 0 ? Math.PI / 2 - TURN : side > 0 ? -Math.PI / 2 + TURN : 0;   // накъде гледа столът (начело — към председателя)
 
@@ -309,12 +313,12 @@ function groupMedal(scene, b, gold) {
   m.rotation.x = -Math.PI / 2; m.position.set(0, TABLE_H + 0.031, 0); scene.add(m);   // горният ръб на картинката — към картата: името се чете от председателя
   const rim = new THREE.Mesh(new THREE.TorusGeometry(R, 0.018, 12, 80), gold); rim.rotation.x = -Math.PI / 2; rim.position.set(0, TABLE_H + 0.03, 0); scene.add(rim);
 }
-function seatProps(scene, side, z, name, sub, gold, k) {
+function seatProps(scene, side, z, name, sub, gold, k, dx = 0) {
   const fold = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.014, 0.46), [null, null, new THREE.MeshStandardMaterial({ map: folderTex(name, sub, k), roughness: 0.55 }), null, null, null].map(m => m || new THREE.MeshStandardMaterial({ color: 0x17181b, roughness: 0.6 })));
   if (side) { fold.position.set(side * (TABLE_W / 2 - 0.32), TABLE_H + 0.03, z); fold.rotation.y = side < 0 ? -Math.PI / 2 : Math.PI / 2; }
-  else fold.position.set(0, TABLE_H + 0.03, -TABLE_L / 2 + 0.34);   // начело
+  else fold.position.set(dx, TABLE_H + 0.03, -TABLE_L / 2 + 0.34);   // начело
   fold.castShadow = true; scene.add(fold);
-  const cz = side ? z + 0.42 : -TABLE_L / 2 + 0.3, cx = side ? side * (TABLE_W / 2 - 0.62) : 0.42;
+  const cz = side ? z + 0.42 : -TABLE_L / 2 + 0.3, cx = side ? side * (TABLE_W / 2 - 0.62) : dx + 0.3;
   const coaster = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.008, 24), gold); coaster.position.set(cx, TABLE_H + 0.027, cz); scene.add(coaster);
   const glass = new THREE.Mesh(GLASS, glassM); glass.position.set(cx, TABLE_H + 0.031, cz); glass.renderOrder = 2; scene.add(glass);
   const water = new THREE.Mesh(WATER, waterM); water.position.copy(glass.position); water.renderOrder = 1; scene.add(water);
@@ -359,11 +363,11 @@ export function openBoardroom(o) {
   // столове и табелки за всички дружества; директорите — където има назначен
   const list = seatsNow();
   list.forEach((s, i) => {
-    const [side, z] = SEATS[i] || SEATS[SEATS.length - 1], x = side * SIT_X;
-    const ch = chair(leather, metal, s.open ? s.k : null); ch.position.set(x, 0, z); ch.rotation.y = seatRy(side); scene.add(ch);
+    const [side, z] = SEATS[i] || SEATS[SEATS.length - 1], x = seatX(i);
+    const ch = chair(leather, metal, s.open && LOGOS.has(s.k) ? s.k : null); ch.position.set(x, 0, z); ch.rotation.y = seatRy(side); scene.add(ch);
     s.chair = ch;
     const sub = !s.open ? '🔒 още не е основано' : s.director ? s.company : '👔 свободно място';
-    seatProps(scene, side, z, s.director || s.company, sub, gold, s.open ? s.k : null);
+    seatProps(scene, side, z, s.director || s.company, sub, gold, s.open && LOGOS.has(s.k) ? s.k : null, (SEATS[i] || [])[2] || 0);
     const hit = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.6, 0.9), new THREE.MeshBasicMaterial()); hit.visible = false;
     hit.position.set(x, 0.85, z); hit.userData.seat = i; scene.add(hit); hits.push(hit);
   });
@@ -372,10 +376,10 @@ export function openBoardroom(o) {
   loadClips().then(async clips => {
     const pick = (...n) => n.map(x => clips[x]).filter(Boolean);
     await Promise.all(list.map(async (s, i) => {
-      const mk = s.director && DIR_MODEL[s.k]; if (!mk || !HAVE.has(mk)) return;
+      let mk = s.director && DIR_MODEL[s.k]; if (mk && !HAVE.has(mk)) mk = TEMP_MODEL[s.k]; if (!mk || !HAVE.has(mk)) return;
       let g; try { g = await loadGlb(mk); } catch { return; }
       if (shut) return;
-      const m = g.scene; m.scale.setScalar(SCALE); m.position.set(0, 0, 0); m.rotation.set(0, 0, 0);
+      const m = cloneSkinned(g.scene); m.scale.setScalar(SCALE);   // клонинг — един модел може да седи и като временен аватар m.position.set(0, 0, 0); m.rotation.set(0, 0, 0);
       m.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; c.frustumCulled = false; } });
       const [side, z] = SEATS[i];
       const fem = FEMALE.has(mk);
@@ -387,11 +391,11 @@ export function openBoardroom(o) {
       p.base.play(); p.cur = p.base; mixer.update(Math.random() * base.duration);
       // столът — под ханша от позата; тялото — обърнато към масата, ханшът на SIT_X от средата
       const wrap = new THREE.Group(); wrap.add(m); scene.add(wrap);
-      wrap.rotation.y = seatRy(side); wrap.position.set(side * SIT_X, 0, z); wrap.updateMatrixWorld(true);
+      wrap.rotation.y = seatRy(side); wrap.position.set(seatX(i), 0, z); wrap.updateMatrixWorld(true);
       const hips = m.getObjectByName('mixamorigHips'), hp = new THREE.Vector3();
       if (hips) {
         hips.getWorldPosition(hp);
-        wrap.position.x += side * SIT_X - hp.x; wrap.position.z += z - hp.z; wrap.updateMatrixWorld(true);
+        wrap.position.x += seatX(i) - hp.x; wrap.position.z += z - hp.z; wrap.updateMatrixWorld(true);
         hips.getWorldPosition(hp); s.chair.position.set(hp.x + side * 0.06, THREE.MathUtils.clamp(hp.y - 0.58, -0.15, 0.15), hp.z);
       }
       p.wrap = wrap; people.push(p);
@@ -505,7 +509,7 @@ export function openBoardroom(o) {
     }
     o.sound && o.sound('click');
   }
-  const headOf = (i, out) => { const q = people.find(z => z.i === i), h = q && q.m.getObjectByName('mixamorigHead'); if (h) h.getWorldPosition(out); else { const [side, z] = SEATS[i]; out.set(side * SIT_X, 1.25, z); } return out; };
+  const headOf = (i, out) => { const q = people.find(z => z.i === i), h = q && q.m.getObjectByName('mixamorigHead'); if (h) h.getWorldPosition(out); else { const [, z] = SEATS[i]; out.set(seatX(i), 1.25, z); } return out; };
   const bp = new THREE.Vector3();
   function placeBadges() {
     for (const b of badges) {
@@ -527,7 +531,7 @@ export function openBoardroom(o) {
     if (scrSeat === -2) { aim.set(0, 1.15, -3); ctl.target.lerp(aim, 1 - Math.exp(-dt * 1.5)); scr.style.visibility = ''; scr.style.left = innerWidth / 2 + 'px'; scr.style.top = (scr.offsetHeight + 70) + 'px'; return; }   // отчетът — горе в средата
     if (scrSeat < 0) { ctl.target.lerp(aim, 1 - Math.exp(-dt * 1.5)); return; }
     const p = people.find(q => q.i === scrSeat), h = p && p.m.getObjectByName('mixamorigHead');
-    if (h) h.getWorldPosition(hp); else { const [side, z] = SEATS[scrSeat]; hp.set(side * SIT_X, 1.25, z); }
+    if (h) h.getWorldPosition(hp); else { const [, z] = SEATS[scrSeat]; hp.set(seatX(scrSeat), 1.25, z); }
     aim.set(hp.x * 0.25, 1.15, -3 + (hp.z + 3) * 0.4); ctl.target.lerp(aim, 1 - Math.exp(-dt * 1.5));
     hp.y += 0.3; hp.project(cam);
     if (hp.z > 1) { scr.style.visibility = 'hidden'; return; }
@@ -600,11 +604,12 @@ const DEMO_PROPS = [
   { id: 'demo-rail', dir: 'rail', ico: '🚆', text: 'Да построим 24 нови линии и да купим 22 влака?', cost: 3.2e7, inBudget: false },
   { id: 'demo-oil', dir: 'oil', ico: '🛢️', text: 'Договор за доставка на гориво: Шанхай — 2 млн. барела, +18 млн. € за 60 дни. Приемаме ли?', cost: 0, days: 60, income: 3e5, geo: { country: 'CHN', kind: 'oil', cities: [{ nm: 'Шанхай', lat: 31.23, lon: 121.47 }, { nm: 'Нинбо', lat: 29.87, lon: 121.55 }] } },
   { id: 'demo-hw', dir: 'hw', ico: '🛣️', text: 'За 5-те нови филиала няма мрежа — да строим аутобани за 3 млн. € и да купим 52 ТИР-а?', cost: 3e6, inBudget: true, days: 60, geo: { country: 'DEU', kind: 'route', cities: [{ nm: 'Берлин', lat: 52.52, lon: 13.4 }, { nm: 'Хамбург', lat: 53.55, lon: 9.99 }, { nm: 'Мюнхен', lat: 48.14, lon: 11.58 }, { nm: 'Кьолн', lat: 50.94, lon: 6.96 }, { nm: 'Франкфурт', lat: 50.11, lon: 8.68 }], route: [[0, 1], [0, 2], [3, 4], [4, 2]] } },
-  { id: 'demo-bank', dir: 'bank', ico: '🏦', text: 'Дали сме 22 млрд. € заеми; има искания за още 12 млрд. Да ги одобрим ли?', cost: 0 },
+  { id: 'demo-energy', dir: 'con', ico: '⚡', text: 'Соларен и вятърен парк край Бургас и Варна — 120 MW.', cost: 9e7, inBudget: true, days: 150, gainTxt: '+3,1 млн. €/месец', geo: { country: 'BGR', kind: 'energy', cities: [{ nm: 'Бургас', lat: 42.5, lon: 27.47 }, { nm: 'Варна', lat: 43.21, lon: 27.91 }] } },
+  { id: 'demo-bank', dir: 'bank', ico: '🏦', text: 'Аржентина иска кредит от 1,2 млрд. € за 5 години при 7,5% годишно. Рейтинг BBB. Да го отпуснем ли?', why: 'държавата плаща редовно, лихвата е над пазарната', cost: 1.2e9, inBudget: false, days: 1825, gainTxt: '+7,5 млн. €/месец лихва', geo: { country: 'ARG', kind: 'loan', rating: 'BBB', ratingCol: '#ffd54a', amt: 1.2e9, cities: [{ nm: 'Буенос Айрес', lat: -34.6, lon: -58.38 }] } },
 ];
 export function demoBoardroom() {
   const C = [['con', '🏗️', 'Констръкшън', 'Ивайло Петров', 5, 2.1e6], ['hw', '🛣️', 'Толроуд', 'Надя Иванова', 5, 1.4e6], ['rail', '🚆', 'Рейл', 'Мария Стоянова', 5, 9.8e5], ['sea', '🚢', 'Оушън Експрес', 'Стефан Колев', 5, 1.1e6],
-    ['air', '✈️', 'Флайеър', 'Елена Димитрова', 5, 1.6e6], ['hotel', '🏨', 'Хотелс', 'Георги Николов', 5, 7.2e5], ['oil', '🛢️', 'Петролиум', 'Вера Ангелова', 5, 3.4e6], ['bank', '🏦', 'Банк', 'Борис Тодоров', 5, 2.7e6], ['glob', '🌍', 'Глобъл Ризортс & Констръкшън', null, 0, 0]];
+    ['air', '✈️', 'Флайеър', 'Елена Димитрова', 5, 1.6e6], ['hotel', '🏨', 'Хотелс', 'Георги Николов', 5, 7.2e5], ['oil', '🛢️', 'Петролиум', 'Вера Ангелова', 5, 3.4e6], ['bank', '🏦', 'Банк', 'Борис Тодоров', 5, 2.7e6], ['glob', '🌍', 'Глобъл Ризортс & Констръкшън', null, 0, 0], ['mayor', '🏙️', 'Империал Сити', 'Градоначалникът', 0, 0]];
   return openBoardroom({
     title: 'Титан Груп — демо', brand: { nm: 'Титан', col: '#4fc3f7', ico: '🗿', group: 'Титан Груп' },
     proposals: () => DEMO_PROPS.filter(p => !p.done),
