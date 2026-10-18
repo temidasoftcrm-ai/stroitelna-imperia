@@ -7,6 +7,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createHolo } from './boardholo.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { buildPresRoom } from './presrooms.js';   // 🇺🇸/🇷🇺 президентските зали (Министерският съвет)
+import { createRoomSound } from './roomsound.js';   // шум на залата, хартия, чукче, аплодисменти, говор на глас
 
 const DIR = 'assets/heavy/directors/';
 const SIT_HIP = [0, -1, -57];   // ханшът в седнала поза (единиците на скелета, см) — по „Sit_Meeting“ / „Sit_Breathing“
@@ -18,7 +20,7 @@ const FEMALE = new Set(['nadya', 'maria', 'elena', 'vera', 'mayor']);
 const HAVE = new Set(['ivaylo', 'nadya', 'maria', 'stefan', 'elena', 'vera', 'boris', 'georgi', 'mayor']);   // моделите, които вече са в assets/heavy/directors (без 404 за останалите)
 // столовете: по 4 от двете страни на масата (x = ±), от прозореца към председателя
 // …и девето — начело откъм картата (side 0): директорът на Глобъл, срещу председателя
-const SEATS = [[-1, -2.7], [1, -2.7], [-1, -0.9], [1, -0.9], [-1, 0.9], [1, 0.9], [-1, 2.7], [1, 2.7], [0, -4.25, -0.5], [0, -4.25, 0.5]];   // начело — Глобъл и градоначалникът на Империал Сити (10-ото място)
+const SEATS = [[-1, -2.7], [1, -2.7], [-1, -0.9], [1, -0.9], [-1, 0.9], [1, 0.9], [-1, 2.7], [1, 2.7], [0, -4.25, -0.5], [0, -4.25, 0.5], [0, -4.25]];   // [10] — начело в средата (министър-председателят)   // начело — Глобъл и градоначалникът на Империал Сити (10-ото място)
 const seatX = i => { const [side, , dx] = SEATS[i] || SEATS[SEATS.length - 1]; return side * SIT_X + (dx || 0); };
 const SIT_X = 1.55, TABLE_W = 2.4, TABLE_L = 7.4, TABLE_H = 0.74, SCALE = 0.9, TURN = 0.3;   // TURN — директорите са леко обърнати към председателя
 const seatRy = side => side < 0 ? Math.PI / 2 - TURN : side > 0 ? -Math.PI / 2 + TURN : 0;   // накъде гледа столът (начело — към председателя)
@@ -60,6 +62,9 @@ const css = `
 #boardRoom .scr .res { font:800 16px system-ui, sans-serif; margin:6px 0 8px; }
 #boardRoom .vb { position:absolute; transform:translate(-50%, -100%); padding:3px 9px; border-radius:999px; background:rgba(0,0,0,.72); color:#fff; font:800 15px system-ui, sans-serif; pointer-events:none; white-space:nowrap; }
 #boardRoom .vb.y { border:2px solid #5fd38a; } #boardRoom .vb.n { border:2px solid #ff6b6b; }
+#boardRoom .top .tg { pointer-events:auto; font:16px system-ui, sans-serif; border:0; border-radius:10px; padding:7px 10px; background:rgba(255,255,255,.14); color:#fff; cursor:pointer; }
+#boardRoom .top .tg.off { opacity:.4; text-decoration:line-through; }
+#boardRoom .top .hn { font-style:normal; }
 #boardRoom .top .cfg { pointer-events:auto; font:700 14px system-ui, sans-serif; border:0; border-radius:10px; padding:8px 12px; background:rgba(255,255,255,.14); color:#fff; cursor:pointer; }
 #boardRoom .set { position:absolute; left:16px; top:64px; width:min(560px, calc(100vw - 32px)); max-height:calc(100vh - 120px); overflow:auto; display:none; background:rgba(12,16,24,.94); border:1px solid rgba(255,255,255,.14); border-radius:14px; padding:8px; color:#d6dbe3; }
 #boardRoom .set.on { display:block; }
@@ -306,7 +311,7 @@ function groupMedal(scene, b, gold) {
       const chars = [...txt], step = 0.105, a0 = (top ? -Math.PI / 2 : Math.PI / 2) - (top ? 1 : -1) * step * (chars.length - 1) / 2;
       chars.forEach((ch, i) => { const a = a0 + (top ? 1 : -1) * step * i; g.save(); g.translate(c + Math.cos(a) * r, c + Math.sin(a) * r); g.rotate(a + (top ? Math.PI / 2 : -Math.PI / 2)); g.fillText(ch, 0, 0); g.restore(); });
     };
-    arc((b.group || b.nm || '').toUpperCase(), c - 70, true); arc('· ХОЛДИНГ ·', c - 70, false);
+    arc((b.group || b.nm || '').toUpperCase(), c - 70, true); arc(b.sub || '· ХОЛДИНГ ·', c - 70, false);
   });
   const R = 0.72;
   const m = new THREE.Mesh(new THREE.CircleGeometry(R, 64), new THREE.MeshPhysicalMaterial({ map: t, roughness: 0.25, clearcoat: 1, clearcoatRoughness: 0.08 }));
@@ -330,7 +335,10 @@ export function openBoardroom(o) {
   document.getElementById('boardRoom')?.remove();
   if (!document.getElementById('boardRoomCss')) { const s = document.createElement('style'); s.id = 'boardRoomCss'; s.textContent = css; document.head.appendChild(s); }
   const el = document.createElement('div'); el.id = 'boardRoom';
-  el.innerHTML = `<div class="top"><span>🏛️ Директорската зала<small></small></span><button class="cfg" style="display:none">⚙️ Бюджети и автопилот</button><button class="x" title="Затвори (Esc)">✕</button></div><div class="set"></div><div class="load">👔 Директорите влизат…</div><div class="tip"></div><div class="bnav"><button class="pv" title="Предишното">‹</button><span>📋 Предложение <b></b></span><button class="nx" title="Следващото">›</button></div><div class="scr"></div><div class="card"></div><div class="hint">🖱️ Клик на директор — доклад · влачи — обиколи масата</div>`;
+  el.innerHTML = `<div class="top"><span><i class="hn"></i><small></small></span><button class="tg cine" title="Камерата следва говорещия">🎥</button><button class="tg voice" title="Говор на глас (български глас на браузъра)" style="display:none">🗣️</button><button class="tg snd" title="Звук на залата">🔊</button><button class="cfg" style="display:none">⚙️ Бюджети и автопилот</button><button class="x" title="Затвори (Esc)">✕</button></div><div class="set"></div><div class="load"></div><div class="tip"></div><div class="bnav"><button class="pv" title="Предишното">‹</button><span>📋 Предложение <b></b></span><button class="nx" title="Следващото">›</button></div><div class="scr"></div><div class="card"></div><div class="hint">🖱️ Клик на директор — доклад · влачи — обиколи масата · ⌨️ Enter — Да · N — Не · L — По-късно · ← →</div>`;
+  const ROOM = o.room || 'corp';   // 'corp' — Директорската зала; 'us' / 'ru' — Министерският съвет в президентската зала
+  el.querySelector('.top .hn').textContent = o.hallTitle || '🏛️ Директорската зала';
+  el.querySelector('.load').textContent = o.loadText || '👔 Директорите влизат…';
   el.querySelector('.top small').textContent = o.title || '';
   document.body.appendChild(el);
   requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
@@ -347,11 +355,12 @@ export function openBoardroom(o) {
   const ctl = new OrbitControls(cam, renderer.domElement);
   ctl.target.set(0, 1.15, -3); ctl.enableDamping = true; ctl.enablePan = false; ctl.minDistance = 2.5; ctl.maxDistance = 8; ctl.maxPolarAngle = 1.55; ctl.minPolarAngle = 0.6; ctl.update();
   scene.add(new THREE.HemisphereLight(0xf4f8ff, 0x6d5c48, 0.8));
-  const sun = new THREE.DirectionalLight(0xfff2de, 1.6); sun.position.set(9, 6, 2);   // дневна светлина откъм десните прозорци sun.castShadow = true;
+  const sun = new THREE.DirectionalLight(0xfff2de, 1.6); sun.position.set(9, 6, 2); sun.castShadow = true;   // дневна светлина откъм десните прозорци
   sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, near: 1, far: 25 }); sun.shadow.bias = -0.0004; scene.add(sun);
   const fill = new THREE.DirectionalLight(0xe6efff, 0.6); fill.position.set(-9, 5, 3); scene.add(fill);
   for (const z of [-2.4, 0, 2.4]) { const p = new THREE.PointLight(0xfff0d8, 1.6, 6, 1.6); p.position.set(0, 3.3, z); scene.add(p); }
-  const { leather, metal, gold } = buildRoom(scene);
+  const R = ROOM === 'corp' ? buildRoom(scene) : buildPresRoom(scene, ROOM, { ROOM_W, ROOM_BACK, ROOM_FRONT, ROOM_H, TABLE_W, TABLE_L, TABLE_H, roundedRect });
+  const { leather, metal, gold } = R;
   if (o.brand) groupMedal(scene, o.brand, gold);
   // холограмата над медальона (boardholo.js): държавата, градовете и бюджетът на текущото предложение
   const holo = createHolo(scene, { fmt: n => (o.fmt ? o.fmt(Math.round(n)) : Math.round(n).toLocaleString('bg-BG')), base: new THREE.Vector3(0, TABLE_H + 0.14, 0) });
@@ -363,11 +372,11 @@ export function openBoardroom(o) {
   // столове и табелки за всички дружества; директорите — където има назначен
   const list = seatsNow();
   list.forEach((s, i) => {
-    const [side, z] = SEATS[i] || SEATS[SEATS.length - 1], x = seatX(i);
-    const ch = chair(leather, metal, s.open && LOGOS.has(s.k) ? s.k : null); ch.position.set(x, 0, z); ch.rotation.y = seatRy(side); scene.add(ch);
+    s.si = s.seat ?? i; const [side, z] = SEATS[s.si] || SEATS[SEATS.length - 1], x = seatX(s.si);
+    const ch = chair(leather, metal, s.logo !== false && s.open && LOGOS.has(s.k) ? s.k : null); ch.position.set(x, 0, z); ch.rotation.y = seatRy(side); scene.add(ch);
     s.chair = ch;
     const sub = !s.open ? '🔒 още не е основано' : s.director ? s.company : '👔 свободно място';
-    seatProps(scene, side, z, s.director || s.company, sub, gold, s.open && LOGOS.has(s.k) ? s.k : null, (SEATS[i] || [])[2] || 0);
+    seatProps(scene, side, z, s.director || s.company, sub, gold, s.logo !== false && s.open && LOGOS.has(s.k) ? s.k : null, (SEATS[s.si] || [])[2] || 0);
     const hit = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.6, 0.9), new THREE.MeshBasicMaterial()); hit.visible = false;
     hit.position.set(x, 0.85, z); hit.userData.seat = i; scene.add(hit); hits.push(hit);
   });
@@ -376,12 +385,12 @@ export function openBoardroom(o) {
   loadClips().then(async clips => {
     const pick = (...n) => n.map(x => clips[x]).filter(Boolean);
     await Promise.all(list.map(async (s, i) => {
-      let mk = s.director && DIR_MODEL[s.k]; if (mk && !HAVE.has(mk)) mk = TEMP_MODEL[s.k]; if (!mk || !HAVE.has(mk)) return;
+      let mk = s.director && (s.model || DIR_MODEL[s.k]); if (mk && !HAVE.has(mk)) mk = TEMP_MODEL[s.k]; if (!mk || !HAVE.has(mk)) return;
       let g; try { g = await loadGlb(mk); } catch { return; }
       if (shut) return;
-      const m = cloneSkinned(g.scene); m.scale.setScalar(SCALE);   // клонинг — един модел може да седи и като временен аватар m.position.set(0, 0, 0); m.rotation.set(0, 0, 0);
+      const m = cloneSkinned(g.scene); m.scale.setScalar(SCALE); m.position.set(0, 0, 0); m.rotation.set(0, 0, 0);   // клонинг — един модел може да седи и като временен аватар
       m.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; c.frustumCulled = false; } });
-      const [side, z] = SEATS[i];
+      const [side, z] = SEATS[s.si];
       const fem = FEMALE.has(mk);
       const mixer = new THREE.AnimationMixer(m);
       const base = pick(fem ? 'Sit_Meeting_F' : 'Sit_Meeting_M', 'Sit_Table_Idle')[0];
@@ -391,16 +400,16 @@ export function openBoardroom(o) {
       p.base.play(); p.cur = p.base; mixer.update(Math.random() * base.duration);
       // столът — под ханша от позата; тялото — обърнато към масата, ханшът на SIT_X от средата
       const wrap = new THREE.Group(); wrap.add(m); scene.add(wrap);
-      wrap.rotation.y = seatRy(side); wrap.position.set(seatX(i), 0, z); wrap.updateMatrixWorld(true);
+      wrap.rotation.y = seatRy(side); wrap.position.set(seatX(s.si), 0, z); wrap.updateMatrixWorld(true);
       const hips = m.getObjectByName('mixamorigHips'), hp = new THREE.Vector3();
       if (hips) {
         hips.getWorldPosition(hp);
-        wrap.position.x += seatX(i) - hp.x; wrap.position.z += z - hp.z; wrap.updateMatrixWorld(true);
+        wrap.position.x += seatX(s.si) - hp.x; wrap.position.z += z - hp.z; wrap.updateMatrixWorld(true);
         hips.getWorldPosition(hp); s.chair.position.set(hp.x + side * 0.06, THREE.MathUtils.clamp(hp.y - 0.58, -0.15, 0.15), hp.z);
       }
       p.wrap = wrap; people.push(p);
     }));
-    el.querySelector('.load').style.opacity = 0;
+    el.querySelector('.load').style.opacity = 0; snd.ambience(true);
     board(0);   // бордът започва с първото предложение
   }).catch(e => { console.warn('boardroom', e); el.querySelector('.load').textContent = 'Моделите не се заредиха.'; });
 
@@ -416,6 +425,7 @@ export function openBoardroom(o) {
   // картата с доклада
   const f = n => (o.fmt ? o.fmt(Math.round(n)) : Math.round(n).toLocaleString('bg-BG'));
   function say(s) {
+    if (s.minister) return s.brief || 'Министерството работи по програмата на кабинета.';
     if (!s.open) return `${s.company} още не е основано. Когато стане, тук ще седне директорът му.`;
     if (!s.director) return `Мястото е свободно. Назначи директор на ${s.company} — носи още +15% от прихода всеки ден.`;
     if (s.up) return `Приходът ни е +${f(s.inc)} €/ден. Предлагам развитие до ниво ${s.lv + 1} — още +${f(s.inc * 0.1)} €/ден за холдинга.`;
@@ -424,6 +434,7 @@ export function openBoardroom(o) {
   function showCard(i, quiet) {
     const s = seatsNow()[i]; if (!s) return;
     sel = i;
+    if (s.minister) { card.innerHTML = '<h3></h3><div class="co"></div><div class="say"></div>'; card.querySelector('h3').textContent = s.director; card.querySelector('.co').textContent = `${s.ico} ${s.company}`; card.querySelector('.say').textContent = '„' + say(s) + '“'; card.classList.add('on'); if (!quiet) present(i); return; }
     const stars = s.open ? `${'★'.repeat(s.lv)}${'☆'.repeat(s.lvMax - s.lv)} ниво ${s.lv}` : '';
     card.innerHTML = `<h3></h3><div class="co"></div><div class="say"></div><div class="st">${s.open ? `<span>${stars}</span><span>приход <b>+${f(s.inc)} €/ден</b></span>${s.bonus ? `<span>бонус <b style="color:#ffd54a">+${f(s.bonus)} €</b> (+${s.bonusPct}%)</span>` : ''}` : ''}</div><div class="row"></div>`;
     card.querySelector('h3').textContent = s.director || (s.open ? '👔 Свободно място' : '🔒 Неосновано');
@@ -469,7 +480,7 @@ export function openBoardroom(o) {
       scr.querySelector('.y').onclick = () => board(qi + 1);
     } else if (p.info || p.step === 'summary') {   // 🏦 Борис: парите в началото, обобщението накрая
       const rows = F && p.info ? [['Налични пари', F.cash], ['Резервирани за одобрени проекти', -F.reserved], ['Оперативен резерв', -F.op], ['Достъпни за нови решения', F.free]] : [];
-      scr.innerHTML = `${hd(p.info ? '🏦 Банката: с какво разполагаме' : '🏦 Обобщение на заседанието')}<div class="tx"></div>${rows.length ? `<div class="fin">${rows.map(([k, v], j) => `<div><span>${k}</span><b style="color:${j === 3 ? '#5fd38a' : v < 0 ? '#ffb347' : '#fff'}">${B(v)}</b></div>`).join('')}${F.loan ? `<div><span>+ свободен кредит</span><b>${B(F.loan)}</b></div>` : ''}</div>` : p.avail != null ? `<div class="cost">💶 за инвестиции: ${f(p.avail)} €${p.reserve ? ` · резерв ${f(p.reserve)} €` : ''}</div>` : ''}<div class="row"><button class="y">${p.info ? 'Продължи →' : '✓ Закрий заседанието'}</button></div>`;
+      scr.innerHTML = `${hd(p.info ? (o.bankTitle || '🏦 Банката: с какво разполагаме') : '🏦 Обобщение на заседанието')}<div class="tx"></div>${rows.length ? `<div class="fin">${rows.map(([k, v], j) => `<div><span>${k}</span><b style="color:${j === 3 ? '#5fd38a' : v < 0 ? '#ffb347' : '#fff'}">${B(v)}</b></div>`).join('')}${F.loan ? `<div><span>+ свободен кредит</span><b>${B(F.loan)}</b></div>` : ''}</div>` : p.avail != null ? `<div class="cost">💶 за инвестиции: ${f(p.avail)} €${p.reserve ? ` · резерв ${f(p.reserve)} €` : ''}</div>` : ''}<div class="row"><button class="y">${p.info ? 'Продължи →' : '✓ Закрий заседанието'}</button></div>`;
       scr.querySelector('.tx').textContent = p.info ? (o.speech ? o.speech() : p.text) : o.summary();
       scr.querySelector('.y').onclick = () => p.info ? board(qi + 1) : close();
     } else {   // 📋 предложение: петте въпроса — какво, защо, колко, кога, какво ще донесе
@@ -481,11 +492,14 @@ export function openBoardroom(o) {
       for (const [c, a] of [['y', 'yes'], ['sm', 'small'], ['n', 'no'], ['l', 'later']]) { const b = scr.querySelector('.' + c); if (b) b.onclick = () => { const r = o.onDecide && o.onDecide(p.id, a); if (r && r.need === 'vote') showVote(r); else after(a === 'yes' || a === 'small' ? (r && r.done === false ? 'no' : 'ok') : a); }; }   // решеното изчезва — на същото място идва следващото
       scr.querySelector('.tx').textContent = `${p.ico || ''} ${p.text}`;
     }
-    const bi = p.step === 'summary' || p.info ? list.findIndex(z => z.k === 'bank') : i, bs = list[bi];
+    const bi = p.step === 'summary' || p.info ? list.findIndex(z => z.k === (o.bankKey || 'bank')) : i, bs = list[bi];   // парите докладва банката (в кабинета — финансовият министър)
     scr.querySelector('.who').textContent = p.step === 'report' ? '👔 Директорите докладват' : `${bs?.ico || p.ico || ''} ${bs?.director || bs?.company || ''}`;
     scrSeat = p.step === 'report' ? -2 : bi; card.classList.remove('on'); sel = bi;
     scr.style.display = 'block'; scr.classList.remove('on'); requestAnimationFrame(() => requestAnimationFrame(() => scr.classList.add('on')));
     if (bi >= 0) present(bi);
+    snd.paper(); shot(p.step === 'report' ? -1 : bi);
+    const spoken = p.step === 'report' ? '' : p.info ? (o.speech ? o.speech() : p.text) : p.step === 'summary' ? o.summary() : p.text;
+    if (spoken) snd.speak(spoken, { voiceOn, female: !!(bs && people.find(q => q.i === bi)?.fem) });
   }
   // 🗳️ съвещателният вот (boardlogic.js): над всеки директор ✔ за / ◐ условно / ✖ против; решението е винаги твое
   const badges = [];
@@ -509,7 +523,7 @@ export function openBoardroom(o) {
     }
     o.sound && o.sound('click');
   }
-  const headOf = (i, out) => { const q = people.find(z => z.i === i), h = q && q.m.getObjectByName('mixamorigHead'); if (h) h.getWorldPosition(out); else { const [, z] = SEATS[i]; out.set(seatX(i), 1.25, z); } return out; };
+  const headOf = (i, out) => { const q = people.find(z => z.i === i), h = q && q.m.getObjectByName('mixamorigHead'); if (h) h.getWorldPosition(out); else { const si = list[i]?.si ?? i, [, z] = SEATS[si]; out.set(seatX(si), 1.25, z); } return out; };
   const bp = new THREE.Vector3();
   function placeBadges() {
     for (const b of badges) {
@@ -517,27 +531,62 @@ export function openBoardroom(o) {
       b.el.style.display = bp.z > 1 ? 'none' : ''; b.el.style.left = (bp.x + 1) / 2 * innerWidth + 'px'; b.el.style.top = (1 - bp.y) / 2 * innerHeight + 'px';
     }
   }
+  // 🔊 звукът, 🗣️ говорът и 🎥 камерата — бутони горе; изборът се помни в браузъра
+  const pref = (k, d) => { try { const v = localStorage.getItem('room.' + k); return v == null ? d : v === '1'; } catch { return d; } };
+  const savePref = (k, v) => { try { localStorage.setItem('room.' + k, v ? '1' : '0'); } catch { } };
+  const snd = createRoomSound(); snd.setOn(o.sfx !== false && pref('snd', true));
+  let voiceOn = pref('voice', true), cine = pref('cine', true);
+  const tgl = (c, v) => el.querySelector('.top .' + c).classList.toggle('off', !v);
+  tgl('snd', snd.isOn()); tgl('voice', voiceOn); tgl('cine', cine);
+  el.querySelector('.top .snd').onclick = () => { snd.setOn(!snd.isOn()); savePref('snd', snd.isOn()); tgl('snd', snd.isOn()); if (snd.isOn()) snd.ambience(true); };
+  el.querySelector('.top .voice').onclick = () => { voiceOn = !voiceOn; savePref('voice', voiceOn); tgl('voice', voiceOn); if (!voiceOn) snd.hush(); };
+  el.querySelector('.top .cine').onclick = () => { cine = !cine; savePref('cine', cine); tgl('cine', cine); shot(cine ? sel ?? -1 : -1); };
+  const showVoice = () => { if (snd.canSpeak()) el.querySelector('.top .voice').style.display = ''; };
+  showVoice(); setTimeout(showVoice, 1200);
+  // 🎥 кинематографичната камера: плавно отива при говорещия (през масата, малко отгоре), а при отчета/края — общ план; влаченето я спира
+  const OVER = { pos: new THREE.Vector3(0, 1.75, TABLE_L / 2 + 2.6), tgt: new THREE.Vector3(0, 1.15, -3) };
+  let tw = null; const sp = new THREE.Vector3();
+  function shot(bi) {
+    if (!cine) return;
+    let pos = OVER.pos.clone(), tgt = OVER.tgt.clone();
+    if (bi != null && bi >= 0) {
+      // среден план откъм председателя: говорещият и холограмата над масата са в кадър заедно (холограмата не застава пред лицето)
+      headOf(bi, sp); tgt = sp.clone().lerp(new THREE.Vector3(0, 1.15, 0), 0.35);
+      pos = new THREE.Vector3(sp.x * 0.3, 1.95, Math.min(sp.z + 3.4, TABLE_L / 2 + 2.4));
+    }
+    tw = { p0: cam.position.clone(), t0: ctl.target.clone(), p1: pos, t1: tgt, k: 0 };
+  }
+  function camStep(dt) {
+    if (!tw) return; tw.k = Math.min(1, tw.k + dt / 1.4); const e = tw.k < 0.5 ? 2 * tw.k * tw.k : 1 - Math.pow(-2 * tw.k + 2, 2) / 2;
+    cam.position.lerpVectors(tw.p0, tw.p1, e); ctl.target.lerpVectors(tw.t0, tw.t1, e); if (tw.k >= 1) tw = null;
+  }
+  ctl.addEventListener('start', () => { tw = null; });
   // ⚙️ бюджети и автопилот (boardlogic.js) — панел в залата
   const cfg = el.querySelector('.cfg'), setEl = el.querySelector('.set');
   const fillSet = () => { setEl.innerHTML = o.settings(); o.bindSettings && o.bindSettings(setEl, fillSet); };
   if (o.settings && o.settings()) { cfg.style.display = ''; cfg.onclick = () => { setEl.classList.toggle('on'); if (setEl.classList.contains('on')) fillSet(); }; }
   // решението: холограмата светва (зелено / кехлибарено / червено) и след миг идва следващото
   let afterT = 0;
-  function after(kind) { holo.flash(kind); scr.querySelectorAll('button').forEach(b => b.disabled = true); clearTimeout(afterT); afterT = setTimeout(() => !shut && board(qi), 1100); }
+  function after(kind) { if (kind === 'ok') { snd.gavel(); const p = props[qi]; if ((p?.cost || 0) >= 1e9) setTimeout(() => snd.applause(), 450); } holo.flash(kind); scr.querySelectorAll('button').forEach(b => b.disabled = true); clearTimeout(afterT); const done = props[qi]?.id; decided.add(done); afterT = setTimeout(() => !shut && board(nextStep()), 1100); }
+  // след решение — следващото нерешено предложение (отчетът и речта на банката не се повтарят); ако няма — обобщението
+  const decided = new Set();
+  function nextStep() { const st = stepsNow(); let k = st.findIndex(p => p.step !== 'report' && !p.info && p.step !== 'summary' && !decided.has(p.id)); if (k < 0) k = st.findIndex(p => p.step === 'summary'); return k < 0 ? 0 : k; }
   nav.querySelector('.pv').onclick = () => board(qi - 1);
   nav.querySelector('.nx').onclick = () => board(qi + 1);
   // екранът следва главата на директора (или стола, ако няма модел); камерата бавно се обръща към него
   function placeScreen(dt) {
-    if (scrSeat === -2) { aim.set(0, 1.15, -3); ctl.target.lerp(aim, 1 - Math.exp(-dt * 1.5)); scr.style.visibility = ''; scr.style.left = innerWidth / 2 + 'px'; scr.style.top = (scr.offsetHeight + 70) + 'px'; return; }   // отчетът — горе в средата
-    if (scrSeat < 0) { ctl.target.lerp(aim, 1 - Math.exp(-dt * 1.5)); return; }
+    if (scrSeat === -2) { aim.set(0, 1.15, -3); if (!cine) ctl.target.lerp(aim, 1 - Math.exp(-dt * 1.5)); scr.style.visibility = ''; scr.style.left = innerWidth / 2 + 'px'; scr.style.top = (scr.offsetHeight + 70) + 'px'; return; }   // отчетът — горе в средата
+    if (scrSeat < 0) { if (!cine) ctl.target.lerp(aim, 1 - Math.exp(-dt * 1.5)); return; }
     const p = people.find(q => q.i === scrSeat), h = p && p.m.getObjectByName('mixamorigHead');
-    if (h) h.getWorldPosition(hp); else { const [, z] = SEATS[scrSeat]; hp.set(seatX(scrSeat), 1.25, z); }
-    aim.set(hp.x * 0.25, 1.15, -3 + (hp.z + 3) * 0.4); ctl.target.lerp(aim, 1 - Math.exp(-dt * 1.5));
+    if (h) h.getWorldPosition(hp); else { const si = list[scrSeat]?.si ?? scrSeat, [, z] = SEATS[si]; hp.set(seatX(si), 1.25, z); }
+    aim.set(hp.x * 0.25, 1.15, -3 + (hp.z + 3) * 0.4); if (!cine) ctl.target.lerp(aim, 1 - Math.exp(-dt * 1.5));
     hp.y += 0.3; hp.project(cam);
     if (hp.z > 1) { scr.style.visibility = 'hidden'; return; }
     scr.style.visibility = '';
     const w = scr.offsetWidth, H = scr.offsetHeight;
-    const x = THREE.MathUtils.clamp((hp.x + 1) / 2 * innerWidth, w / 2 + 8, innerWidth - w / 2 - 8), y = Math.max((1 - hp.y) / 2 * innerHeight, H + 96);
+    let px = (hp.x + 1) / 2 * innerWidth, py = (1 - hp.y) / 2 * innerHeight;
+    if (cine && innerWidth > 700) { px += px < innerWidth / 2 ? -(w / 2 + 70) : w / 2 + 70; py += H / 2 + 60; if (px - w / 2 < 8 || px + w / 2 > innerWidth - 8) px = px < innerWidth / 2 ? innerWidth - w / 2 - 16 : w / 2 + 16; }   // близък план — екранът до главата, не върху лицето
+    const x = THREE.MathUtils.clamp(px, w / 2 + 8, innerWidth - w / 2 - 8), y = THREE.MathUtils.clamp(py, H + 96, innerHeight - 20);
     scr.style.left = x + 'px'; scr.style.top = y + 'px';
   }
 
@@ -560,7 +609,14 @@ export function openBoardroom(o) {
   });
   const onResize = () => { renderer.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); };
   addEventListener('resize', onResize);
-  const key = e => { if (e.key === 'Escape') close(); };
+  // ⌨️ Enter/интервал — Да (или Продължи), N — Не, L — По-късно, ← → — предишното/следващото, Esc — затвори
+  const key = e => {
+    if (e.key === 'Escape') return close();
+    if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '')) return;
+    const btn = c => { const b = scr.querySelector(c); if (b && !b.disabled && scr.style.display !== 'none') { b.click(); e.preventDefault(); } };
+    if (e.key === 'Enter' || e.key === ' ') btn('.row button.y'); else if (/^[nн]$/i.test(e.key)) btn('.row button.n'); else if (/^[lл]$/i.test(e.key)) btn('.row button.l');
+    else if (e.key === 'ArrowRight') { board(qi + 1); e.preventDefault(); } else if (e.key === 'ArrowLeft') { board(qi - 1); e.preventDefault(); }
+  };
   addEventListener('keydown', key);
   el.querySelector('.x').onclick = () => close();
 
@@ -575,7 +631,7 @@ export function openBoardroom(o) {
       if (p) play(p, p.talk[(Math.random() * p.talk.length) | 0], true);
     }
     for (const p of people) { p.mixer.update(dt); if (p.busy > 0 && (p.busy -= dt) <= 0) back(p); }
-    placeScreen(dt); placeBadges(); holo.update(dt); ctl.update();
+    placeScreen(dt); placeBadges(); holo.update(dt); camStep(dt); R.update && R.update(clock.elapsedTime); ctl.update();
     if (cam.position.y > ROOM_H - 0.3) cam.position.y = ROOM_H - 0.3;   // камерата — под тавана
     renderer.render(scene, cam);
   }
@@ -589,10 +645,52 @@ export function openBoardroom(o) {
       cancelAnimationFrame(raf); ctl.dispose();
       for (const p of people) { p.mixer.stopAllAction(); p.wrap.remove(p.m); }   // моделите остават в кеша за следващия път
       scene.traverse(c => { if (c.isMesh && !c.isSkinnedMesh) { c.geometry.dispose(); const ms = [].concat(c.material); ms.forEach(mm => { mm.map && mm.map.dispose(); mm.dispose(); }); } });
-      holo.dispose(); scene.environment && scene.environment.dispose(); pmrem.dispose(); renderer.dispose(); el.remove();
+      snd.ambience(false); snd.hush(); holo.dispose(); scene.environment && scene.environment.dispose(); pmrem.dispose(); renderer.dispose(); el.remove();
     }, 450);
   }
   return { close };
+}
+
+// 🏛️ Министерският съвет (етап 3): същите герои с нови роли. k — ключът на министерството (dir на предложенията), seat — мястото на масата
+export const MINISTERS = [
+  { k: 'fin', ico: '💰', name: 'Борис Тодоров', model: 'boris', title: 'Министър на финансите и държавния резерв', what: 'бюджет, данъци, дълг, резерв и извънредно финансиране', seat: 0 },
+  { k: 'reg', ico: '🏘️', name: 'Георги Николов', model: 'georgi', title: 'Министър на регионалното развитие и благоустройството', what: 'жилища, развитие на градовете, обществени сгради и туризъм', seat: 1 },
+  { k: 'def', ico: '🛡️', name: 'Ивайло Петров', model: 'ivaylo', title: 'Министър на отбраната', what: 'военна инфраструктура, снабдяване, оборудване и готовност', seat: 2 },
+  { k: 'roads', ico: '🛣️', name: 'Надя Иванова', model: 'nadya', title: 'Министър на пътната инфраструктура', what: 'национални пътища, мостове, ремонти и достъп до регионите', seat: 3 },
+  { k: 'rail', ico: '🚆', name: 'Мария Стоянова', model: 'maria', title: 'Министър на железниците и обществения транспорт', what: 'жп мрежата, товарните коридори и градския транспорт', seat: 4 },
+  { k: 'sea', ico: '⚓', name: 'Стефан Колев', model: 'stefan', title: 'Министър на морското дело и външната търговия', what: 'пристанища, търговски маршрути и доставки', seat: 5 },
+  { k: 'air', ico: '✈️', name: 'Елена Димитрова', model: 'elena', title: 'Министър на авиацията и международните връзки', what: 'летища, въздушни връзки и международни споразумения', seat: 6 },
+  { k: 'energy', ico: '⚡', name: 'Вера Ангелова', model: 'vera', title: 'Министър на енергетиката', what: 'горива, електроцентрали, енергийна сигурност и нови източници', seat: 7 },
+  { k: 'pm', ico: '🏛️', name: 'Десислава Илиева', model: 'mayor', title: 'Министър-председател', what: 'координация на министрите, програмата на кабинета и регионите', seat: 10 },
+];
+// o: като openBoardroom + cc: 'US' | 'RU'; o.brief(k) → какво казва министърът при клик (по желание). Парите докладва финансовият министър (bankKey 'fin').
+export function openCabinet(o) {
+  const ru = o.cc === 'RU';
+  return openBoardroom({
+    ...o, room: ru ? 'ru' : 'us', bankKey: 'fin', bankTitle: '💰 Финансите: с какво разполагаме',
+    hallTitle: ru ? '🇷🇺 Кремъл — Министерски съвет' : '🇺🇸 Белият дом — Министерски съвет', loadText: '🎩 Министрите влизат…',
+    seats: () => MINISTERS.map(m => ({ k: m.k, ico: m.ico, company: m.title, what: m.what, director: m.name, model: m.model, seat: m.seat, open: true, logo: false, minister: true, brief: o.brief ? o.brief(m.k) : '' })),
+  });
+}
+// демо за Лабораторията: Министерският съвет в 🇺🇸 / 🇷🇺 залата
+export function demoCabinet(cc = 'US') {
+  const ru = cc === 'RU', C = ru ? 'RUS' : 'USA', city = ru ? [{ nm: 'Москва', lat: 55.75, lon: 37.62 }, { nm: 'Казан', lat: 55.79, lon: 49.12 }, { nm: 'Екатеринбург', lat: 56.84, lon: 60.6 }] : [{ nm: 'Хюстън', lat: 29.76, lon: -95.37 }, { nm: 'Далас', lat: 32.78, lon: -96.8 }, { nm: 'Денвър', lat: 39.74, lon: -104.99 }];
+  const P = [
+    { id: 'fin:brief:1', dir: 'fin', ico: '💰', info: true, text: '' },
+    { id: 'roads:hw', dir: 'roads', ico: '🛣️', text: `Национална магистрала ${city[0].nm} — ${city[2].nm}: 1400 км, 6 ленти.`, why: 'регионите на запад са откъснати', cost: 1.4e10, days: 720, gainTxt: '+2% растеж в регионите', inBudget: true, geo: { country: C, kind: 'route', cities: city, route: [[0, 1], [1, 2]] } },
+    { id: 'energy:plant', dir: 'energy', ico: '⚡', text: 'Нова АЕЦ и два вятърни парка — 4 GW.', why: 'зимата идва, резервът е 6%', cost: 2.2e10, days: 1460, gainTxt: 'енергийна независимост', inBudget: false, small: { cost: 6e9 }, geo: { country: C, kind: 'energy', cities: city.slice(1, 3) } },
+    { id: 'def:base', dir: 'def', ico: '🛡️', text: 'Модернизация на две бази и нови радари по границата.', why: 'готовността е под 70%', cost: 8e9, days: 540, gainTxt: 'готовност 90%', inBudget: true },
+    { id: 'air:deal', dir: 'air', ico: '✈️', text: 'Споразумение „Открито небе“ с 12 държави.', why: 'туризъм и бизнес полети', cost: 0, days: 90, gainTxt: '+18 нови линии', inBudget: true },
+  ];
+  return openCabinet({
+    cc, title: ru ? 'Държавата — демо' : 'The State — demo', brand: { nm: ru ? 'Россия' : 'USA', col: ru ? '#d52b1e' : '#3c3b6e', ico: '🦅', group: ru ? 'Правителство' : 'Белият дом', sub: '· МИНИСТЕРСКИ СЪВЕТ ·' },
+    proposals: () => P.filter(p => !p.done),
+    onDecide: (id, a) => { const p = P.find(q => q.id === id); if (p) p.done = a; return null; },
+    speech: () => `Държавната хазна има ${ru ? '4,1' : '6,8'} трилиона. Резервът е 8%. За нови програми тази година можем да отделим ${ru ? '120' : '310'} милиарда.`,
+    frame: () => ({ cash: ru ? 4.1e12 : 6.8e12, reserved: 9e11, op: 2.9e12, free: ru ? 1.2e11 : 3.1e11, loan: 5e11 }),
+    summary: () => `Одобрихме ${P.filter(p => p.done === 'yes' || p.done === 'small').length} програми. Кабинетът продължава.`,
+    brief: k => ({ pm: 'Координирам министрите. Тази седмица — пътищата и зимата.', fin: 'Дефицитът е 2,4%. Има място за две големи програми.' })[k] || '',
+  });
 }
 
 // демо за Лабораторията: всички 7 директора на масата (+ хотелите — свободно място) и примерни предложения към борда
