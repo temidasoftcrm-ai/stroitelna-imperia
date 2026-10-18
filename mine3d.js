@@ -60,14 +60,25 @@ function pumpjack(g, x, z, rot = 0, ph = 0) {
   for (const s of [-0.7, 0.7]) { const pit = box(0.12, 2, 0.12, M.dark, -2.2, 2.5, s, p); pit.rotation.z = 0.15; }   // мотовилки
   return (dt, t) => { const a = t * 1.8 + ph; beam.rotation.z = Math.sin(a) * 0.32; crank.rotation.z = -a; rod.position.y = -1.7 - Math.sin(a) * 0.05; };
 }
-// камион, който обикаля по правоъгълник
+// камион, който обикаля по правоъгълник — истинският самосвал (assets/heavy/gear/dump.glb, като на строежите);
+// докато се зареди — процедурният; гледа накъдето кара
+let DUMP = null, dumpP = null;
+const loadDump = () => dumpP || (dumpP = new GLTFLoader().loadAsync('assets/heavy/gear/dump.glb').then(gl => {
+  const g = new THREE.Group(), inner = new THREE.Group(); inner.add(gl.scene); g.add(inner); g.updateMatrixWorld(true);
+  let bb = new THREE.Box3().setFromObject(g), sz = bb.getSize(new THREE.Vector3()); inner.scale.setScalar(1 / sz.z); g.updateMatrixWorld(true);
+  bb = new THREE.Box3().setFromObject(g); const c = bb.getCenter(new THREE.Vector3()); inner.position.set(-c.x, -bb.min.y, -c.z);
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  DUMP = g; return g;
+}).catch(() => null));
 function truck(g, pts, col = 0xd35400, speed = 4, y = 0) {
   const t = new THREE.Group(); g.add(t);
-  box(1.4, 1.2, 1.5, mat(col, 0.6), 1.3, 0.9, 0, t); box(2.4, 1.1, 1.6, M.dark, -0.6, 0.85, 0, t);
-  for (const [a, b] of [[-1.2, 0.8], [-1.2, -0.8], [1.3, 0.8], [1.3, -0.8]]) { const w = cyl(0.35, 0.35, 0.3, M.dark, a, 0.35, b, t, 10); w.rotation.x = Math.PI / 2; }
+  const body = new THREE.Group(); t.add(body);   // процедурният — носът към +z (като истинския)
+  const proc = () => { box(1.5, 1.2, 1.4, mat(col, 0.6), 0, 0.9, 1.3, body); box(1.6, 1.1, 2.4, M.dark, 0, 0.85, -0.6, body); for (const [a, b] of [[0.8, -1.2], [-0.8, -1.2], [0.8, 1.3], [-0.8, 1.3]]) { const w = cyl(0.35, 0.35, 0.3, M.dark, a, 0.35, b, body, 10); w.rotation.z = Math.PI / 2; } };
+  const real = () => { body.clear(); const m = DUMP.clone(true); m.scale.setScalar(3.8); m.userData.mineDump = true; body.add(m); };
+  if (DUMP) real(); else { proc(); loadDump().then(d => { if (d) real(); }); }
   let L = 0; const seg = pts.map((p, i) => { const q = pts[(i + 1) % pts.length], l = Math.hypot(q[0] - p[0], q[1] - p[1]); const s0 = L; L += l; return { p, q, l, s0 }; });
   let s = Math.random() * L;
-  return dt => { s = (s + dt * speed) % L; const sg = seg.find(q => s >= q.s0 && s < q.s0 + q.l) || seg[0], f = (s - sg.s0) / sg.l; t.position.set(sg.p[0] + (sg.q[0] - sg.p[0]) * f, y, sg.p[1] + (sg.q[1] - sg.p[1]) * f); t.rotation.y = -Math.atan2(sg.q[1] - sg.p[1], sg.q[0] - sg.p[0]); };
+  return dt => { s = (s + dt * speed) % L; const sg = seg.find(q => s >= q.s0 && s < q.s0 + q.l) || seg[0], f = (s - sg.s0) / sg.l; t.position.set(sg.p[0] + (sg.q[0] - sg.p[0]) * f, y, sg.p[1] + (sg.q[1] - sg.p[1]) * f); t.rotation.y = Math.atan2(sg.q[0] - sg.p[0], sg.q[1] - sg.p[1]); };
 }
 // процедурен петролен танкер (за терминала)
 function tanker(g, x, z, L = 20) {
