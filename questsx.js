@@ -13,6 +13,31 @@ const ab = (c, a, b) => (c.S().hwDone || []).includes(`ab:${[a, b].sort().join('
 const resortsAt = (c, stage) => Object.values(c.S().resorts || {}).filter(r => r && (Array.isArray(stage) ? stage.includes(r.stage) : r.stage === stage)).length;
 const resortExt = c => Object.values(c.S().resorts || {}).reduce((a, r) => a + Object.keys((r && r.ext) || {}).length, 0);
 
+// 🏛️ бордът на директорите (ерата на холдинга, ниво 15): дружествата (S.group), нивата им и директорите (S.hold.lv / dir),
+// решенията на борда (S.hold.commits — изпълнени, навреме), гласуванията, автопилотът и доверието (boardlogic.js)
+const BOARD_SUBS = ['con', 'hw', 'rail', 'sea', 'air', 'hotel', 'oil', 'bank'];
+const hold = c => c.S().hold || {};
+const subsN = c => BOARD_SUBS.filter(k => (c.S().group || {})[k]).length;
+const dirN = c => BOARD_SUBS.filter(k => (hold(c).dir || {})[k]).length;
+const lvN = (c, lv) => Object.values(hold(c).lv || {}).filter(n => n >= lv).length;
+const doneN = (c, onTime = false) => (hold(c).commits || []).filter(x => x.st === 'done' && (!onTime || !x.late)).length;
+export const BOARD_CHAPTER = { id: 'c13', nm: 'Бордът на директорите', ico: '🏛️', openIf: c => c.devBest() >= 15, lockTxt: 'Отключва се на ниво 15 — ерата на холдинга.', quests: [
+  { id: 'b_board', ico: '🏛️', nm: 'Бордът на директорите', ds: 'Основи всички 8 дъщерни дружества: Констръкшън, Толроуд, Рейл, Оушън Експрес, Флайеър, Хотелс, Петролиум и Банк.', goal: c => [subsN(c), 8], money: M(50000000) },
+  { id: 'b_dir1', ico: '👔', nm: 'Първият директор', ds: 'Назначи директор на дъщерно дружество.', goal: c => [dirN(c), 1], money: M(20000000) },
+  { id: 'b_vote', ico: '🗳️', nm: 'Бордът гласува', ds: 'Проведи гласуване на борда за предложение, срещу което банката възразява.', goal: c => [(hold(c).votes || []).length, 1], money: M(20000000) },
+  { id: 'b_dec1', ico: '✅', nm: 'Първото решение', ds: 'Одобри предложение на директор и го доведи до изпълнение.', goal: c => [doneN(c), 1], money: M(25000000) },
+  { id: 'b_dir4', ico: '🤝', nm: 'Управителен съвет', ds: 'Имай 4 назначени директори.', goal: c => [dirN(c), 4], money: M(60000000) },
+  { id: 'b_lv3', ico: '⬆️', nm: 'Развито дружество', ds: 'Развий дъщерно дружество до ниво 3.', goal: c => [lvN(c, 3), 1], money: M(30000000) },
+  { id: 'b_auto', ico: '🤖', nm: 'Автопилот', ds: 'Включи автопилот за поне един директор (таван за решения без теб).', goal: c => [Object.values(hold(c).auto || {}).filter(v => v > 0).length, 1], money: M(30000000) },
+  { id: 'b_ontime5', ico: '📈', nm: 'Навреме', ds: 'Изпълни 5 решения на борда без закъснение.', goal: c => [doneN(c, true), 5], money: M(80000000) },
+  { id: 'b_lv5', ico: '🏅', nm: 'Водещо дружество', ds: 'Развий дъщерно дружество до ниво 5 (най-високото).', goal: c => [lvN(c, 5), 1], money: M(80000000) },
+  { id: 'b_trust', ico: '💼', nm: 'Доверен директор', ds: 'Доверието към някой директор да стигне 120% (решения, изпълнени навреме).', goal: c => [Math.round(100 * Math.max(1, ...Object.values(hold(c).trust || {}))), 120], money: M(60000000) },
+  { id: 'b_dec10', ico: '📋', nm: 'Десет изпълнени решения', ds: 'Доведи до изпълнение 10 решения на борда.', goal: c => [doneN(c), 10], money: M(100000000) },
+  { id: 'b_dirall', ico: '👥', nm: 'Пълен борд', ds: 'Назначи директор на всички 8 дъщерни дружества.', goal: c => [dirN(c), 8], money: M(150000000) },
+  { id: 'b_lv5x4', ico: '🏆', nm: 'Холдинг от първа класа', ds: 'Развий 4 дъщерни дружества до ниво 5.', goal: c => [lvN(c, 5), 4], money: M(200000000) },
+  { id: 'b_glob', ico: '🌍', nm: 'Глобъл', ds: 'Основи Глобъл Ризортс & Констръкшън (ниво 20 — Световна империя).', goal: c => [(c.S().group || {}).glob ? 1 : 0, 1], money: M(200000000) },
+  { id: 'b_globdir', ico: '🌐', nm: 'Директор на Глобъл', ds: 'Назначи директор на Глобъл — мегапроекти, концесии и придобивания.', goal: c => [(hold(c).dir || {}).glob ? 1 : 0, 1], money: M(250000000) },
+] };
 export const EXTRA_CHAPTERS = [
   { id: 'c8', nm: 'Европа', ico: '🇪🇺', pic: 'unlock-europe', picTxt: 'Европейските столици чакат „Строителна империя“.', quests: [
     { id: 'e_br1', ico: '✈️', nm: 'Към Европа', ds: 'Отвори филиал в европейски град.', goal: c => [owned(c).filter(id => EU_CAPS.includes(id) || ['hague', 'rotterdam', 'luxembourg', 'milan', 'barcelona', 'zurich', 'munich'].includes(id)).length, 1], money: M(2000000) },
@@ -83,4 +108,5 @@ export const EXTRA_CHAPTERS = [
     { id: 't_done4', ico: '🏛️', nm: 'Държавен партньор', ds: 'Предай 4 държавни поръчки.', goal: ['tenderDone', 4], money: M(25000000) },
     { id: 'w_legend', ico: '👑', nm: 'Световна строителна империя', ds: 'Завърши 20 града.', goal: c => [finished(c).length, 20], money: M(100000000) },
   ] },
+  BOARD_CHAPTER,
 ];
