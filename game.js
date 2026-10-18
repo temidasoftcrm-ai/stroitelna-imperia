@@ -5077,6 +5077,7 @@ function landmarkCenter(kinds) {
   const c0 = (NB - 1) / 2, mem = S.landmarks[S.cityId];
   const bigIds = new Set((city.bigLm || []).length ? Object.entries(S.bigLm || {}).filter(([k]) => k.startsWith(S.cityId + ':')).flatMap(([, x]) => x.lots || []) : []);   // голямата забележителност в центъра
   for (const l of city.center) { if (bigIds.has(l.id)) continue; if (l.obj) city.group.remove(l.obj); for (const t of l.trees || []) city.group.remove(t); l.obj = null; l.built = null; l.trees = []; l.busy = 'landmark'; }
+  if (kinds[0] === 'manhattan' && feature('ny-spread')) { nyCenter(city.center.filter(l => !bigIds.has(l.id))); return; }   // Ню Йорк — даунтаун: по един небостъргач на парцел
   const ci = 3 * c0 + 1.5, px = tx(ci), pz = tx(ci), W = 8 * TILE - 2;
   city.noRoad = new Set();
   for (const a of [3 * c0, 3 * c0 + 3]) for (let d = 3 * (c0 - 1) + 1; d <= 3 * (c0 + 1) + 2; d++) { city.noRoad.add(a + ',' + d); city.noRoad.add(d + ',' + a); }
@@ -5134,6 +5135,27 @@ function nySpread() {
       pt.scale.multiplyScalar(k); pt.position.set(at.x, l ? 0 : 0.1, at.z); pt.rotation.y = l ? lotRot(l) : 0;
       city.group.add(pt); city.landmarks.push({ group: pt, update() { } });
     });
+    pruneStreetDetail();
+  });
+}
+// Ню Йорк на мрежата (центърът 5×5): небостъргачите на Манхатън — всеки на свой парцел, най-високите в средата, между тях — улиците (даунтаун).
+// Разпределението се помни (S.landmarks.newyork['manhattan#c']) — сградите остават на местата си; свободните парцели на центъра — градинки.
+function nyCenter(lots) {
+  const mem = S.landmarks[S.cityId], gen = city.nyGen = (city.nyGen || 0) + 1, cid = S.cityId, cx = tx(3 * (NB - 1) / 2 + 1.5);
+  const lawn = new THREE.MeshStandardMaterial({ color: 0x7fb35a, roughness: 1 }), add = o => { city.group.add(o); city.plazaObjs.push(o); return o; };
+  manhattanTowers().then(parts => {
+    if (city.nyGen !== gen || S.cityId !== cid || !parts.length) return;
+    const n = Math.min(parts.length, lots.length);
+    let ids = (mem['manhattan#c'] || []).filter(id => lots.some(l => l.id === id));
+    if (ids.length < n) { ids = [...lots].sort((a, b) => Math.hypot(a.x - cx, a.z - cx) - Math.hypot(b.x - cx, b.z - cx) || a.id - b.id).slice(0, n).map(l => l.id); mem['manhattan#c'] = ids; }
+    parts.slice(0, n).forEach((pt, i) => {
+      const l = city.lots[ids[i]], k = Math.min(NY_TALL, 2 * TILE * 0.8 / Math.max(0.01, pt.userData.w));   // по-нисък, ако иначе не се побира на парцела
+      pt.scale.multiplyScalar(k); pt.position.set(l.x, 0, l.z); city.group.add(pt); city.landmarks.push({ group: pt, update() { } });
+    });
+    for (const l of lots) if (!ids.includes(l.id)) {
+      const lw = add(new THREE.Mesh(new THREE.BoxGeometry(2 * TILE - 1, 0.12, 2 * TILE - 1), lawn)); lw.position.set(l.x, 0.06, l.z); lw.receiveShadow = true;
+      for (let t = 0; t < 3; t++) { const h = hashStr(l.id + ':' + t), tr = add(plazaTree(5)); tr.position.set(l.x + ((h % 9) - 4) * 1.4, 0, l.z + (((h >> 4) % 9) - 4) * 1.4); }
+    }
     pruneStreetDetail();
   });
 }
@@ -8775,6 +8797,10 @@ function drawMapRailsOnly() { if (S && (S.rails || []).some(r => !r.built)) draw
 // градски шум по град (записи, на цикъл); останалите средни и големи градове — общият town.mp3
 const TOWN_SND = { newyork: 'assets/sfx/newyork.mp3', chicago: 'assets/sfx/chicago.mp3', istanbul: 'assets/sfx/istanbul.mp3', lasvegas: 'assets/sfx/lasvegas.mp3' };
 const TOWN_BG = { istanbul: ['assets/sfx/istanbul-prayer.mp3', 0.3] };   // на заден план (30%): езанът в Истанбул
+// 🌆 мегаполисите (feature 'mega-sound'): трафикът — през цялото време (при градовете със свой запис — на заден план);
+// на всеки 3–5 минути (случайно) — пожарна, полиция или автобус. По-тихо отдалеч и нощем (силата на града).
+const MEGA_TRAFFIC = 'assets/sfx/mega-traffic.mp3', MEGA_EVENTS = ['assets/sfx/mega-fire.mp3', 'assets/sfx/mega-police.mp3', 'assets/sfx/mega-bus.mp3'];
+let megaSndT = 180 + Math.random() * 120;
 // песен при купуването на филиал в града (щом звукът е включен) — не при всяко влизане. Записите са с авторски права — само локално:
 // assets/local/ не се качва в GitHub (.gitignore); на сайта файлът го няма и просто не свири
 const CITY_STING = { lasvegas: 'assets/local/vegas-elvis.mp3', newyork: 'assets/local/newyork-sinatra.mp3', rio: 'assets/local/rio-timmaia.mp3', cairo: 'assets/local/cairo-tune.mp3', paris: 'assets/local/paris-vieenrose.mp3' };
@@ -8822,8 +8848,10 @@ function frame() {
       const tg = controls.target, near = units.filter(u => u.state === 'working' && Math.hypot(u.x - tg.x, u.z - tg.z) < 60).length;
       const zoom = Math.max(0, 1 - camera.position.distanceTo(tg) / 260);
       // градски шум — в средните и големите градове; по-тих нощем и отдалеч
-      const townOn = cityTier(S.cityId) !== 's'; Sound.town(townOn ? (TOWN_SND[S.cityId] || 'assets/sfx/town.mp3') : null, ...(TOWN_BG[S.cityId] || []));
+      const townOn = cityTier(S.cityId) !== 's', mega = MEGAPOLIS.has(S.cityId) && feature('mega-sound');
+      Sound.town(townOn ? (TOWN_SND[S.cityId] || (mega ? MEGA_TRAFFIC : 'assets/sfx/town.mp3')) : null, ...(TOWN_BG[S.cityId] || (mega && TOWN_SND[S.cityId] ? [MEGA_TRAFFIC, 0.6] : [])));
       const town = townOn ? 0.32 * (1 - dayNight.night * 0.65) * (0.35 + 0.65 * Math.max(0, 1 - camera.position.distanceTo(tg) / 500)) : 0;
+      if (mega && speed && town > 0.03 && (megaSndT -= rdt) <= 0) { megaSndT = 180 + Math.random() * 120; Sound.file(pick(MEGA_EVENTS), Math.min(0.9, 0.2 + 1.8 * town)); }
       Sound.update(rdt, { night: dayNight.night, activity: Math.min(1, near / 4) * zoom, speed, traffic: 0.6, town });
     } else Sound.update(rdt, { night: dayNight.night, activity: 0, speed, traffic: 0.2, town: 0 });
     for (const p of projects) { updateSite(p, simT); updateWorkers(p, Math.min(dt, 0.1)); }
