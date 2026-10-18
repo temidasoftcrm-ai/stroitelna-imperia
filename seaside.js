@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { createPortLights } from './portlights.js';
 import { makeWater } from './water.js';
-import { loadShipModels, hasShipModel, shipModel } from './shipmodels.js';
+import { loadShipModels, hasShipModel, shipModel, setShipNight } from './shipmodels.js';
 
 import { EXTRA_COASTAL } from './countries.js';
 export const SEASIDE = ['varna', 'burgas', 'constanta', 'istanbul', 'thessaloniki', 'athens', 'barcelona', 'amsterdam', 'rotterdam', 'newyork', 'losangeles', 'rio', 'buenosaires', 'capetown', 'dubai', 'mumbai', 'singapore', 'hongkong', 'shanghai', 'tokyo', 'sydney'];
@@ -174,7 +174,7 @@ export function addSeaside(group, deps, opts) {
     for (const s of ships) { s.o.position.y = Math.sin(t * 0.8 + s.ph) * 0.25; s.o.rotation.z = Math.sin(t * 0.6 + s.ph) * 0.02; }
     for (const q of boats) { q.o.position.x = q.x0 + Math.sin(t * 0.04 * q.sp + q.ph) * 80; q.o.rotation.y = Math.cos(t * 0.04 * q.sp + q.ph) > 0 ? Math.PI / 2 : -Math.PI / 2; q.o.position.y = Math.sin(t * 1.3 + q.ph) * 0.2; }
     cranes.forEach((c, k) => { c.position.x += Math.sin(t * 0.2 + k) * 0.01; });
-    PL.setNight(night, t); water.update(t);
+    PL.setNight(night, t); water.update(t); setShipNight(night);
     beam.rotation.y = t * 0.8; beam.material.opacity = 0.04 + 0.16 * night; lamp.material.emissiveIntensity = 0.5 + 2 * night;
   }
   return { group: g, update, setFleet, setPortLevel, port: { x: px, z: seaZ, xMax: opts.xMax } };

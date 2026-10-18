@@ -9,9 +9,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const CFG = {
   container: { f: 'container.glb', len: 64, yaw: 0, draft: 0.18 },
   tanker: { f: 'tanker.glb', len: 66, yaw: 0, draft: 0.3 },
-  cruise: { f: 'cruise.glb', len: 74, yaw: 0, draft: 0.12 },
+  cruise: { f: 'cruise.glb', len: 74, yaw: 0, draft: 0.12, lights: true },   // нощем светят прозорците и палубите
 };
-const P = {};
+const P = {}, NIGHT = [];   // NIGHT — материалите, които светят нощем (круизният кораб); копията ги споделят
 let loading = null;
 
 function normalize(obj, c) {
@@ -25,7 +25,7 @@ function normalize(obj, c) {
   bb = new THREE.Box3().setFromObject(g); s = bb.getSize(new THREE.Vector3());
   const ctr = bb.getCenter(new THREE.Vector3());
   inner.position.set(-ctr.x, -bb.min.y - s.y * c.draft, -ctr.z);
-  g.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; for (const mt of [].concat(m.material)) if (mt && mt.metalness > 0.5) mt.metalness = 0.4; } });
+  g.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; for (const mt of [].concat(m.material)) { if (mt && mt.metalness > 0.5) mt.metalness = 0.4; if (c.lights && mt && mt.emissive && !NIGHT.includes(mt)) { mt.emissive.set(0xfff0c8); if (mt.map && !mt.emissiveMap) mt.emissiveMap = mt.map; mt.emissiveIntensity = 0; mt.needsUpdate = true; NIGHT.push(mt); } } } });
   return g;
 }
 export function loadShipModels(base = 'assets/heavy/ships/') {
@@ -35,4 +35,6 @@ export function loadShipModels(base = 'assets/heavy/ships/') {
   return loading;
 }
 export const hasShipModel = k => !!P[k];
+// нощем: 0…1 — круизният кораб светва като град по вода
+export function setShipNight(n) { for (const m of NIGHT) m.emissiveIntensity = 0.85 * n; }
 export const shipModel = k => (P[k] ? P[k].clone(true) : null);

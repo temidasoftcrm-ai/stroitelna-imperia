@@ -18,10 +18,10 @@ export const CITY_LANDMARKS = {
   amsterdam: ['canal', 'rijks', 'centraal', 'adam', 'windmill', 'canal2'],
   // истински модели от Sketchfab (GLB_LM по-долу)
   cairo: ['pyramids'], giza: ['pyramids'],
-  dubai: ['burj'], newyork: ['manhattan'], sydney: ['opera'], moscow: ['stbasil'], toronto: ['cntower'], chicago: ['willis'], shanghai: ['shtower'], rio: ['redeemer'], washington: ['whitehouse'], lasvegas: ['bellagio', 'vegassign'],
+  dubai: ['burj'], newyork: ['manhattan'], kualalumpur: ['petronas'], moscow: ['stbasil'], toronto: ['cntower'], chicago: ['willis'], shanghai: ['shtower'], rio: ['redeemer'], washington: ['whitehouse'], lasvegas: ['bellagio', 'vegassign'],
 };
 // забележителности в морето пред града (game.js: refreshLandmarks, само при крайморските градове)
-export const SEA_LANDMARKS = { newyork: ['liberty'] };
+export const SEA_LANDMARKS = { newyork: ['liberty'], sydney: ['opera'] };   // Сидни: операта на нос в залива (не на площада в центъра)
 // големите забележителности в отделна зона W×D парцела встрани от центъра (game.js: refreshMines3D → bigLandmarks)
 export const BIG_LANDMARKS = { moscow: [['mgu', 4, 2, 0.52]], lasvegas: [['luxor', 2, 2]], istanbul: [['mosque', 3, 2, 0.59, 1]], washington: [['capitol', 3, 3, 1, 0, [3, 2]]] };   // [вид, W, D, дълбочина/ширина на модела, завъртян на 90° (дългата страна на модела е по z), [W, D] ако няма място (малък град) — щом градът порасне, се мести в голямата]
 export const LANDMARK_NM = { whitehouse: 'Белият дом', capitol: 'Капитолият', vegassign: '„Welcome to Fabulous Las Vegas“', bellagio: 'Беладжо', luxor: 'Луксор', cityhall: 'Кметството на Филаделфия', ststephen: 'Базилика „Св. Стефан“', mgu: 'Московският университет (МГУ)', pyramids: 'Пирамидите в Гиза', burj: 'Бурж Халифа', manhattan: 'Манхатън', liberty: 'Статуята на свободата', opera: 'Операта в Сидни', stbasil: 'Храмът „Св. Василий Блажени“', cntower: 'Си Ен Тауър', willis: 'Уилис Тауър', shtower: 'Шанхайската кула', redeemer: 'Христос Спасителя', mosque: 'Синята джамия', mosque2: 'Сюлейманийе', galata: 'Галатска кула', sapphire: 'Истанбул Сапфир', twist: 'Левент Туист', twin: 'Левент Туинс', colosseum: 'Колизеума', hagia: 'Света София', colosseo: 'Колизеума', sagrada: 'Саграда Фамилия', vatican: 'Ватикана и „Св. Петър“', stpeter: 'Базилика „Св. Петър“', pantheon: 'Пантеона', vittoriano: 'Витториано', erasmus: 'Мостът Еразъм', cubes: 'Кубичните къщи', markthal: 'Маркетхал', derotterdam: 'Де Ротердам', euromast: 'Евромаст', canal: 'Канал с къщи', canal2: 'Канал с къщи', rijks: 'Райксмузеум', centraal: 'Централна гара', adam: 'A’DAM Лукаут', windmill: 'Вятърна мелница', eiffel: 'Айфеловата кула', arc: 'Триумфалната арка', notredame: 'Нотр Дам', ladefense: 'Ла Дефанс', bigben: 'Биг Бен', londoneye: 'Лондонското око', towerbridge: 'Тауър Бридж', shard: 'Шард', brandenburg: 'Бранденбургската врата', fernsehturm: 'Телевизионната кула', reichstag: 'Райхстагът' };
@@ -471,8 +471,9 @@ const GLB_LM = {
   opera: { h: 30, fit: 40, plate: 0x4f86b8 }, manhattan: { h: 34, fit: 15, grid: true },
   colosseo: { h: 13, fit: 15, plate: 0xb9ad98 },   // Рим: Колизеумът (Carlos.Maciel)
   sagrada: { h: 17, fit: 15, plate: 0xc9bfa8 },   // Барселона: Саграда Фамилия (vmmaniac)
+  petronas: { h: 60, fit: 15, plate: 0xb9b2a5, floodK: 2.4, onLoad: petronasLights },   // Куала Лумпур: кулите Петронас (Meshy AI, от потребителя — 18.10); нощем сребристо осветени, червени светлини на шпиловете
   whitehouse: { h: 9, fit: 15, plate: 0x6f9a55, matte: 0xf4f1ea, rx: -0.28, cut: [[-0.35, 0.95, 0.8, 1.6]], floodK: 2.2, onLoad: whMonument },   // cut — колата от модела, останала на тревата пред южната фасада; floodK — по-силни прожектори нощем   // Вашингтон: Белият дом с крилата (Void); моделът е наклонен ~16° — rx го изправя (иначе едната страна и крилата висят във въздуха)
-  capitol: { h: 11, fit: 15, plate: 0x6f8f55, floodK: 2.4 },   // Вашингтон: Капитолият (Meshy AI, от потребителя — 18.10; преди: фотоскан на ycpan3468)
+  capitol: { h: 11, fit: 15, plate: 0x6f8f55, floodK: 3 },   // Вашингтон: Капитолият (Meshy AI, от потребителя — 18.10; преди: фотоскан на ycpan3468)
   vegassign: { h: 14, fit: 12, plate: 0xc9b98a },   // Лас Вегас: табелата „Welcome to Fabulous Las Vegas“ (sipulitrade)
   mgu: { h: 16, fit: 15, plate: 0x6f8f55 },   // Москва: МГУ — сталинският небостъргач с крилата и парка (Meshy AI); голяма зона 2×2 (BIG_LANDMARKS)
   eiffel: { h: 26, fit: 15, plate: 0xc9bfa8, onLoad: eiffelLights },   // Париж: Айфеловата кула (Meshy AI); нощем златни светлини и проблясване
@@ -615,6 +616,13 @@ function pyramids() {   // Гиза: Хеопс, Хефрен (с бялата �
 }
 
 // Айфеловата кула нощем: златно осветление + хиляди проблясващи светлинки (като всеки час в Париж) и прожектор на върха
+// Петронас нощем: кулите светят сребристо-бели (прожекторите — floodK), а на двата шпила мигат червени светлини за самолетите
+function petronasLights(w, g) {
+  const b = new THREE.Box3().setFromObject(w), red = mat(0x400000, 0.4, 0, { emissive: 0xff2020, emissiveIntensity: 0 }), dx = (b.max.x - b.min.x) * 0.27;
+  for (const x of [-dx, dx]) add(g, new THREE.SphereGeometry(0.35, 8, 6), red, (b.min.x + b.max.x) / 2 + x, b.max.y + 0.2, (b.min.z + b.max.z) / 2);
+  const prev = g.userData.sparkle;
+  g.userData.sparkle = (t, night) => { if (prev) prev(t, night); red.emissiveIntensity = (Math.sin(t * 2.2) > 0.2 ? 2.4 : 0.15) * (0.25 + night); };
+}
 // Вашингтон: паметникът на Вашингтон (обелискът) на южната поляна пред Белия дом — бял мрамор, пирамидка на върха,
 // червени светлини за самолетите и кръг от знамена около основата; нощем е осветен с прожектори като Белия дом
 function whMonument(w, g) {
@@ -696,6 +704,7 @@ const BUILD = { pyramids, ...Object.fromEntries(Object.keys(GLB_LM).map(k => [k,
 
 // остров в морето за забележителност (Статуята на свободата — на звездовидния Форт Ууд на остров Либърти)
 export function buildSeaLandmark(kind, deps = {}) {
+  if (kind === 'opera') return operaPoint(deps);
   const o = buildLandmark(kind, deps), g = new THREE.Group();
   const star = new THREE.Shape(), N = 11, R1 = 15, R0 = 10.5;
   for (let i = 0; i <= N * 2; i++) { const a = i / (N * 2) * Math.PI * 2, r = i % 2 ? R0 : R1, x = Math.cos(a) * r, y = Math.sin(a) * r; i ? star.lineTo(x, y) : star.moveTo(x, y); }
@@ -707,6 +716,24 @@ export function buildSeaLandmark(kind, deps = {}) {
   if (o.group.children[0]) o.group.children[0].visible = false;   // без квадратната плоча
   o.group.position.y = 3.4; o.group.scale.setScalar(1.9); g.add(o.group);
   return { group: g, update: o.update };
+}
+
+// Сидни: операта на нос Бенелонг — гранитна площадка в залива, свързана с брега с широка крайбрежна алея; платната гледат към морето.
+// Групата е обърната (rotation.y = π в game.js): локално −z е към брега, +z — към морето.
+function operaPoint(deps) {
+  const o = buildLandmark('opera', deps), g = new THREE.Group();
+  const granite = mat(0xcbb79a, 0.95), wall = mat(0x9a8c78, 1), walk = mat(0xd8cdb8, 0.9);
+  const plat = box(g, 70, 2.4, 58, granite, 0, 0.0, 6); plat.castShadow = false;   // площадката (~1 м над водата)
+  box(g, 72, 1.6, 60, wall, 0, -0.9, 6);   // каменният бряг около нея
+  box(g, 34, 2.3, 70, walk, 0, -0.05, -55).castShadow = false;   // алеята към брега (Circular Quay)
+  box(g, 36, 1.6, 72, wall, 0, -0.9, -55);
+  const stairs = box(g, 44, 0.8, 10, mat(0xe2d8c4, 0.9), 0, 1.4, -19); stairs.castShadow = false;   // монументалното стълбище пред входа (откъм града)
+  for (let k = 0; k < 14; k++) { const t = new THREE.Mesh(new THREE.ConeGeometry(1.4, 4.2, 7), mat(0x3f7f3a, 1)); t.position.set(k % 2 ? 15 : -15, 3.3, -30 - k * 3.4); t.castShadow = true; g.add(t); }   // дървета по алеята
+  const lampM = mat(0xfff2c0, 0.4, 0, { emissive: 0xffd890, emissiveIntensity: 0 }), lamps = [];
+  for (let k = 0; k < 8; k++) for (const x of [-34, 34]) { cyl(g, 0.12, 0.12, 3, mat(0x444444), x, 2.7, -18 + k * 7, 6); lamps.push(add(g, new THREE.SphereGeometry(0.35, 8, 6), lampM, x, 4.3, -18 + k * 7)); }
+  if (o.group.children[0]) o.group.children[0].visible = false;   // без квадратната плоча
+  o.group.position.set(0, 1.2, 8); o.group.scale.setScalar(3.4); o.group.rotation.y = Math.PI; g.add(o.group);   // платната — към морето
+  return { group: g, update: (t, night) => { o.update(t, night); lampM.emissiveIntensity = 0.1 + 1.6 * night; } };
 }
 
 // kind → { group, update(t, night) }
