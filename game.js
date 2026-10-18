@@ -3503,7 +3503,7 @@ const corp = createCorp({ S: () => S, econ: () => econ, empire: () => dev.best()
     const cnm = cc === '🇧🇬' ? 'България' : COUNTRIES.find(k => k.cc === cc)?.nm || '', tier = cc === '🇧🇬' ? 1 : isEurope(id) || !isWorld(id) ? 3 : 6;
     for (const f of (LOCAL_FIRMS[cc] || (cc === '🇧🇬' ? FIRMS : []))) out.push({ f, cc, cnm, tier }); } return out; } });
 // 🌍 световните мегапроекти на холдинга (megaworld.js)
-const mw = createMegaWorld({ S: () => S, econ: () => econ, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), seaDaily: () => flowAvg('sea') });
+const mw = createMegaWorld({ viaBoard: () => { if (!S?.holding || !feature('boardroom') || !Object.keys(S.hold?.dir || {}).length) return false; toast('🗳️ Мегапроектите решава бордът с гласуване — отварям залата.', ''); group.board(() => renderBig()); return true; }, S: () => S, econ: () => econ, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), seaDaily: () => flowAvg('sea') });
 // 🏨 хотелската верига (hotels.js): офисите на ниво 10 стават хотели
 const hotels = createHotels({ S: () => S, econ: () => econ, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), brand: () => brandOf(S)?.nm || 'Титан',
   cities: () => [...new Set(ownedCities())], city: id => cityById(id), big: id => MEGAPOLIS.has(id) || CAPITALS.has(id), airLv: id => airLv(id), isAm: id => isAm(id), day: () => S.day,

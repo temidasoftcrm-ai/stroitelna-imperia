@@ -75,6 +75,7 @@ export function createBoardLogic(deps) {
   function request(id, opt = {}) {
     const p = find(id, opt.small); if (!p) return { done: false };
     if (p.info) return { done: true };
+    if (p.mustVote) { const v = vote(p); return { done: false, need: 'vote', v, p }; }   // мегапроектите — винаги гласуване
     if (p.cost && p.cost <= budgetLeft(p.dir)) return commit(p, 'бюджет');
     const v = vote(p);
     if (v.no === 0 && v.bank.ok) return commit(p, 'борд');
@@ -86,6 +87,7 @@ export function createBoardLogic(deps) {
     if (how === 'drop') { deps.decide(id.replace(/\|small$/, ''), 'later'); return { done: false }; }
     const small = how === 'small' || /\|small$/.test(id), p = find(id.replace(/\|small$/, ''), small); if (!p) return { done: false };
     const v = vote(p);
+    if (p.mustVote && !v.passed) { deps.toast('🗳️ Бордът не подкрепи проекта — без мнозинство не се одобрява.', 'bad'); return { done: false }; }
     if (how === 'loan' && deps.loan) { const need = Math.max(0, (p.cost || 0) - frame().free); if (need > 0 && !deps.loan(need)) return { done: false }; }
     if (v.no > v.yes) { const h = hold(); h.mood = Math.max(0, h.mood - 0.05); }   // одобрено въпреки мнозинството — малко недоволство
     return commit(p, how === 'loan' ? 'кредит' : small ? 'по-малък вариант' : 'собственик');

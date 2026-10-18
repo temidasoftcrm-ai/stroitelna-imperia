@@ -179,7 +179,7 @@ export function createGroup(deps) {
     const ps = proposals().filter(p => p.dir === k && !p.info), cs = (B2.commits ? B2.commits() : []).filter(c => c.dir === k && (c.st === 'active' || (c.st === 'done' && c.end >= (deps.S().day || 0) - 30)));
     if (!ps.length && !cs.length) return '';
     const Bf = n => n >= 1e9 ? `${(n / 1e9).toLocaleString('bg-BG', { maximumFractionDigits: 1 })} млрд. €` : n >= 1e6 ? `${(n / 1e6).toLocaleString('bg-BG', { maximumFractionDigits: 1 })} млн. €` : `${deps.fmt(Math.round(n))} €`;
-    const prop = p => `<div style="margin:6px 0;padding:8px 10px;border:1px solid var(--line);border-radius:10px">${B2.propHtml(p)}<div class="row" style="margin:6px 0 0;gap:6px;flex-wrap:wrap"><button class="btn" data-gp="${p.id}|yes" ${p.can === false ? 'disabled' : ''}>✓ Да</button>${p.small ? `<button class="btn2" data-gp="${p.id}|small">½ ${Bf(p.small.cost)}</button>` : ''}<button class="btn2" data-gp="${p.id}|later">⏳ По-късно</button><button class="btn2" data-gp="${p.id}|no">✖ Не</button></div><div data-gpv="${p.id}"></div></div>`;
+    const prop = p => `<div style="margin:6px 0;padding:8px 10px;border:1px solid var(--line);border-radius:10px">${B2.propHtml(p)}<div class="row" style="margin:6px 0 0;gap:6px;flex-wrap:wrap">${p.mustVote ? `<button class="btn" data-gp="${p.id}|vote">🗳️ Решава бордът — гласуване</button>` : `<button class="btn" data-gp="${p.id}|yes" ${p.can === false ? 'disabled' : ''}>✓ Да</button>`}${p.small ? `<button class="btn2" data-gp="${p.id}|small">½ ${Bf(p.small.cost)}</button>` : ''}<button class="btn2" data-gp="${p.id}|later">⏳ По-късно</button><button class="btn2" data-gp="${p.id}|no">✖ Не</button></div><div data-gpv="${p.id}"></div></div>`;
     const com = c => `<div class="meta" style="margin:3px 0">${c.st === 'done' ? '✅' : c.flag === 'блокирано' ? '⛔' : c.flag === 'забавено' ? '⚠️' : '⏳'} ${c.text.slice(0, 90)}${c.text.length > 90 ? '…' : ''} · ${c.st === 'done' ? `изпълнено на ден ${c.end}` : `${Math.round((c.prog || 0) * 100)}% · срок ден ${c.due}`}</div>`;
     return `<details data-gpd="${k}" ${openPanels.has(k) ? 'open' : ''} style="margin:8px 0 0"><summary class="meta" style="margin:0;cursor:pointer;color:var(--txt)">📋 Директорът: ${ps.length ? `<b>${ps.length}</b> ${ps.length === 1 ? 'предложение' : 'предложения'}` : 'без нови предложения'}${cs.length ? ` · ${cs.length} ${cs.length === 1 ? 'проект' : 'проекта'}` : ''}</summary>${ps.map(prop).join('')}${cs.length ? `<div style="margin:6px 0 0"><div class="meta" style="margin:0 0 2px;color:var(--mut)">Проектите:</div>${cs.map(com).join('')}</div>` : ''}</details>`;
   }
@@ -188,11 +188,12 @@ export function createGroup(deps) {
     box.querySelectorAll('[data-gpd]').forEach(d => d.ontoggle = () => { d.open ? openPanels.add(d.dataset.gpd) : openPanels.delete(d.dataset.gpd); });
     box.querySelectorAll('[data-gp]').forEach(b => b.onclick = () => {
       const [id, a] = b.dataset.gp.split('|');
-      if (a === 'yes' || a === 'small') {
-        const r = B2.request(id, { small: a === 'small' });
+      if (a === 'yes' || a === 'small' || a === 'vote') {
+        const pp = a === 'vote' && proposals().find(q => q.id === id), r = pp ? { v: B2.vote(pp), p: pp } : B2.request(id, { small: a === 'small' });   // мегапроект — винаги на гласуване
         if (r && r.need === 'vote') {   // съвещателният вот — направо в картата
           const v = box.querySelector(`[data-gpv="${CSS.escape(id)}"]`); if (!v) return;
           v.innerHTML = `<div style="margin:8px 0 0;padding:8px;border-radius:8px;background:rgba(255,255,255,.04)">${B2.voteHtml(r)}</div>`;
+          if (r.p && r.p.mustVote && !(r.v.yes > r.v.no)) v.querySelectorAll('[data-bv$="|pass"], [data-bv$="|small"], [data-bv$="|loan"]').forEach(b => b.remove());   // мегапроект без мнозинство — не минава
           v.querySelectorAll('[data-bv]').forEach(x => x.onclick = () => { const [i2, how] = x.dataset.bv.split('|'); B2.resolve(i2, how === 'pass' && r.p && r.p.isSmall ? 'small' : how); rerender(); });
           return;
         }

@@ -132,7 +132,7 @@ export function createMegaWorld(deps) {
     return h;
   }
   const bind = (box, rerender) => {
-    box.querySelectorAll('[data-mwfund]').forEach(b => b.onclick = () => { fund(b.dataset.mwfund); rerender(); });
+    box.querySelectorAll('[data-mwfund]').forEach(b => b.onclick = () => { if (deps.viaBoard && deps.viaBoard(b.dataset.mwfund)) return; fund(b.dataset.mwfund); rerender(); });   // с борд — решава бордът (гласуване)
     box.querySelectorAll('[data-mwsign]').forEach(b => b.onclick = () => { const [key, k] = b.dataset.mwsign.split('|'); sign(key, k); rerender(); });
     box.querySelectorAll('[data-mwful]').forEach(b => b.onclick = () => { const [key, k, i] = b.dataset.mwful.split('|'); fulfil(key, k, +i); rerender(); });
   };

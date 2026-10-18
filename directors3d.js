@@ -515,11 +515,11 @@ export function openBoardroom(o) {
     } else {   // 📋 предложение: петте въпроса — какво, защо, колко, кога, какво ще донесе
       const q = (k, v) => v ? `<div class="q"><b>${k}:</b> ${esc(v)}</div>` : '';
       const gain = p.gainTxt || (p.gain ? `+${B(p.gain)}/месец` : p.income ? `+${f(p.income)} €/ден` : '');
-      const Fr = o.frame ? o.frame() : null, imp = !!(p.important || (p.cost && Fr && p.cost >= Math.max(1, Fr.free) * 0.25) || (p.geo && p.geo.kind === 'loan'));   // важен: ≥ 25% от свободните пари, кредит или маркиран
+      const must = !!(p.mustVote && o.voteOn), Fr = o.frame ? o.frame() : null, imp = !!(p.important || (p.cost && Fr && p.cost >= Math.max(1, Fr.free) * 0.25) || (p.geo && p.geo.kind === 'loan'));   // важен: ≥ 25% от свободните пари, кредит или маркиран
       const fit = p.inBudget == null ? '' : p.inBudget ? '<div class="fit" style="color:#5fd38a">✅ в рамките на бюджета за инвестиции</div>' : '<div class="fit" style="color:#ffb347">⚠️ над бюджета за инвестиции</div>';
-      scr.innerHTML = `${hd('📋 Предложение към борда')}<div class="tx"></div>${q('Защо', p.why)}${q('Колко', p.cost ? B(p.cost) : 'без разход')}${q('Кога', p.days ? `~${p.days} дни` : '')}${q('Очакваме', gain)}${p.needsGear ? q('Условие', p.needsGear) : ''}${fit}<div class="row"><button class="y">✓ Да</button>${p.small ? `<button class="sm">½ По-малък вариант · ${B(p.small.cost)}</button>` : ''}<button class="n">✖ Не</button><button class="l">⏳ По-късно</button>${o.voteOn ? `<button class="vt${imp ? ' imp' : ''}">${imp ? '⭐ Важен проект — 🗳️ на гласуване' : '🗳️ Подложи на гласуване'}</button>` : ''}</div>`;
+      scr.innerHTML = `${hd('📋 Предложение към борда')}<div class="tx"></div>${q('Защо', p.why)}${q('Колко', p.cost ? B(p.cost) : 'без разход')}${q('Кога', p.days ? `~${p.days} дни` : '')}${q('Очакваме', gain)}${p.needsGear ? q('Условие', p.needsGear) : ''}${fit}<div class="row">${must ? `<button class="vt imp">🗳️ Решава бордът — гласуване</button>` : `<button class="y">✓ Да</button>${p.small ? `<button class="sm">½ По-малък вариант · ${B(p.small.cost)}</button>` : ''}`}<button class="n">✖ Не</button><button class="l">⏳ По-късно</button>${o.voteOn && !must ? `<button class="vt${imp ? ' imp' : ''}">${imp ? '⭐ Важен проект — 🗳️ на гласуване' : '🗳️ Подложи на гласуване'}</button>` : ''}</div>${must ? '<div class="q" style="margin-top:6px;color:#8fd0ff">🏛️ Мегапроект: само с мнозинство в борда.</div>' : ''}`;
       const vt = scr.querySelector('.vt'); if (vt) vt.onclick = () => { const r = o.voteOn(p.id); if (r) showVote(r, true); };
-      const y = scr.querySelector('.y'); y.disabled = p.can === false; if (y.disabled) y.title = 'Нямаш достатъчно пари';
+      const y = scr.querySelector('.y') || {}; y.disabled = p.can === false; if (y.disabled) y.title = 'Нямаш достатъчно пари';
       for (const [c, a] of [['y', 'yes'], ['sm', 'small'], ['n', 'no'], ['l', 'later']]) { const b = scr.querySelector('.' + c); if (b) b.onclick = () => { const r = o.onDecide && o.onDecide(p.id, a); if (r && r.need === 'vote') showVote(r); else after(a === 'yes' || a === 'small' ? (r && r.done === false ? 'no' : 'ok') : a); }; }   // решеното изчезва — на същото място идва следващото
       scr.querySelector('.tx').textContent = `${p.ico || ''} ${p.text}`;
     }
@@ -561,7 +561,7 @@ export function openBoardroom(o) {
       if (ok && mine) { snd.applause(1.4); for (const q of people) if (q.clap) { q.busy = 0; play(q, q.clap, true); } }   // подкрепено — всички ръкопляскат
       const row = scr.querySelector('.row');
       const btn = (t, how, cls) => { const b = document.createElement('button'); b.textContent = t; if (cls) b.className = cls; b.onclick = () => { if (how === 'no') { o.onDecide && o.onDecide(p.id, 'no'); after('no'); return; } const rr = o.onResolve && o.onResolve(p.id, how); after(how === 'drop' ? 'later' : rr && rr.done === false ? 'no' : 'ok'); }; row.appendChild(b); };
-      btn(ok ? '✓ Одобри (както реши бордът)' : '✓ Одобри въпреки това', p.isSmall ? 'small' : 'pass', 'y');
+      if (ok || !p.mustVote) btn(ok ? '✓ Одобри (както реши бордът)' : '✓ Одобри въпреки това', p.isSmall ? 'small' : 'pass', 'y');   // мегапроект — без мнозинство не минава
       if (p.small) btn(`½ По-малък вариант · ${B(p.small.cost)}`, 'small');
       if (v.bank && !v.bank.ok) btn('🏦 С кредит', 'loan');
       btn(ok ? '✖ Отхвърли' : '✖ Отхвърли (както реши бордът)', 'no', 'n'); btn('⏳ Отложи', 'drop', 'l');
