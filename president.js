@@ -220,16 +220,31 @@ export function createPresidency(deps) {
         ${s.aid.filter(a => a.iso === sel).map(a => `<div class="m">📦 ${AID[a.need].nm}: ${a.done ? '✅ работи' : a.stuck ? `⛔ ${a.stuck}` : `${AID_STAGES[a.stage][1]} ${Math.round(a.prog * 100)}%`}</div>`).join('')}${ps.filter(p => p.iso === sel).map(btns).join('')}`; }
     return `<b>🌍 Светът</b><div class="m">Избери държава или конфликт на картата.</div>${CONFLICTS.map(c => { const k = conf(c.k); return `<div class="m">${k.step >= 3 ? '🕊️' : c.ico} ${c.nm}: ${k.step ? PEACE[k.step - 1].nm : 'боеве'}</div>`; }).join('')}<div class="m" style="margin-top:6px">🌐 Коалиция: ${Object.keys(s.coal).length} държави · 🤝 споразумения: ${Object.keys(s.deals).length}</div>`;
   }
+  // 🗳️ съвещателният вот на министрите: всеки гласува по своя ресор и казва защо (последната дума е на президента)
+  const WHY = { fin: 'финансирането е в рамката', reg: 'регионите ще усетят разликата', def: 'сигурността не страда', roads: 'пътищата ще го обслужат', rail: 'жп мрежата ще помогне', sea: 'доставките са осигурени', air: 'партньорите ще го оценят', energy: 'енергията стига', pm: 'вписва се в програмата на кабинета' };
+  function vote(id) {
+    const s = st(), p = proposals().find(q => q.id === id); if (!p) return null; const votes = [];
+    for (const d of Object.keys(NAMES)) { let yes = true, cond = false, why = d === p.dir ? (p.why || 'моето предложение') : WHY[d];
+      if (d === 'fin' && (p.cost || 0) > s.res * 0.5) { yes = false; why = `изяжда ${Math.round((p.cost || 0) / Math.max(1, s.res) * 100)}% от резерва — предлагам по-малък етап`; }
+      else if (d === 'reg' && p.kind === 'aid' && s.ind.services < 50) { yes = false; why = 'нашите болници и жилища още изостават'; }
+      else if (d === 'def' && p.kind === 'peace' && s.ind.security < 45) { cond = true; why = 'за, ако първо укрепим собствената си сигурност'; }
+      else if (d === 'pm' && p.kind === 'peace') why = 'мирът е целта на кабинета';
+      else if (d === 'air' && p.kind === 'aid') why = 'партньорите са готови да поемат част от помощта';
+      votes.push({ dir: d, name: NAMES[d], yes, cond, why }); }
+    const yes = votes.filter(v => v.yes).length, no = votes.length - yes;
+    return { p, v: { votes, yes, no, passed: yes >= no, bank: { ok: (p.cost || 0) <= s.res * 0.5, why: 'резервът ще падне под половината' } } };
+  }
   // 📋 Министерският съвет в 3D (directors3d.js openCabinet) — бюджетът от Борис, после министрите
   function cabinet() {
     const s = st(); import('./directors3d.js').then(m => { if (!m.openCabinet) return;
       const brief = { id: `fin:brief:${day()}`, dir: 'fin', ico: '💰', info: true, text: '' };
       m.openCabinet({ cc: s.cc, title: s.cc === 'RU' ? 'Правителството' : 'The Cabinet', brand: { nm: s.cc === 'RU' ? 'Россия' : 'USA', col: s.cc === 'RU' ? '#d52b1e' : '#3c3b6e', ico: '🦅', group: s.cc === 'RU' ? 'Правителство' : 'Белият дом', sub: '· МИНИСТЕРСКИ СЪВЕТ ·' },
         proposals: () => [brief, ...proposals().map(p => ({ ...p, inBudget: (p.cost || 0) <= s.res }))], onDecide: (id, a) => { decide(id, a); render(); return null; },
+        voteOn: id => vote(id), onResolve: (id, how) => { decide(id.replace(/\|small$/, ''), how === 'drop' ? 'later' : how === 'small' ? 'small' : 'yes'); render(); return null; },
         speech: () => `Резервът е ${B(s.res)}. За нови програми имаме по ${B(free())} на месец. ${s.res < free() ? 'Предлагам по-малки първи етапи.' : 'Можем да започнем една голяма и няколко малки програми.'}`,
         frame: () => ({ cash: Math.max(0, s.res), reserved: 0, op: REV[s.cc] * (1 - FREE_K), free: Math.max(0, s.res), loan: 0 }),
         summary: () => `Кабинетът продължава. Стабилност ${Math.round(Object.values(s.ind).reduce((a, v) => a + v, 0) / 5)}/100, резерв ${B(s.res)}.`,
         brief: k => ({ fin: `Резервът е ${B(s.res)}.`, pm: `Обещания: ${s.prom.filter(p => p.done).length}/${s.prom.length}. Ниво ${s.lv}.`, def: `Сигурност ${Math.round(s.ind.security)}/100.`, energy: `Енергия ${Math.round(s.ind.energy)}/100.`, reg: `Услуги ${Math.round(s.ind.services)}/100.` })[k] || '' });
     }); }
-  return { start, state: st, proposals, decide, dailyTick, level, open, close, cabinet, active: () => !!st() };
+  return { vote, start, state: st, proposals, decide, dailyTick, level, open, close, cabinet, active: () => !!st() };
 }
