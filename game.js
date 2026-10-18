@@ -56,7 +56,7 @@ import { shipRange, PORT_LEVELS, portMax, SHIPS, seaKm, seaPath, SEA_ROUTE_COST,
 import { makeTrackMap, placeCars } from './trackpath.js';
 import { airportMax as airportMax0, AIRPORT_LEVELS, PLANES, PLANE_LADDER, PLANE_PIC, ROUTE_COST, airKm, flightPay, planeDaily, WORLD, WORLD_IDS } from './airways.js';
 import { MUNI_SHARE, linkPrices, buyoutPrice } from './linkoffers.js';
-import { EXTRA_BALKAN, EXTRA_EUROPE, EXTRA_WORLD, COUNTRIES, countryProgress, wonCountries, wonIncomeMul, countryLabelLL } from './countries.js';
+import { EXTRA_BALKAN, EXTRA_EUROPE, EXTRA_WORLD, COUNTRIES, countryProgress, wonCountries, wonIncomeMul, countryLabelLL, setCountryCities } from './countries.js';
 import { AFRICA, AFRICA_COUNTRIES, AFRICA_COASTAL, AFRICA_IDS, isAfrica, AFRICA_CHAPTER } from './africa.js';
 import { RUSSIA, RUSSIA_COUNTRY, RUSSIA_COASTAL } from './russia.js';
 import { UKRAINE, UKRAINE_COUNTRY, UKRAINE_COASTAL } from './ukraine.js';
@@ -201,6 +201,7 @@ const AIR_ONLY_OF = { incheon: 'seoul', yokohama: 'tokyo', manila: null };
 for (const k of COUNTRIES) for (let i = k.cities.length - 1; i >= 0; i--) if (AIR_ONLY.has(k.cities[i])) k.cities.splice(i, 1);
 for (const id of OC_COASTAL) if (!SEASIDE.includes(id)) SEASIDE.push(id);
 CITIES.push(...FOREIGN, ...EUROPE, ...WORLD);
+{ const byCc = new Map(); setCountryCities(cc => { if (!byCc.size) for (const c of CITIES) { const k = c.cc || '🇧🇬'; byCc.set(k, [...(byCc.get(k) || []), c.id]); } return byCc.get(cc) || []; }); }   // завладяване: всеки 5 завършени града на държавата
 // чуждите фирми конкуренти (rivals.js) са и на борсата: виждаш тези от държавите, където имаш филиал (economy.js hooks.stockVisible)
 const LEGAL = { '🇩🇪': 'AG', '🇦🇹': 'AG', '🇨🇭': 'AG', '🇫🇷': 'SA', '🇧🇪': 'SA', '🇱🇺': 'SA', '🇬🇧': 'plc', '🇮🇹': 'S.p.A.', '🇪🇸': 'S.A.', '🇺🇸': 'Inc.', '🇨🇦': 'Inc.', '🇯🇵': 'K.K.', '🇳🇱': 'N.V.', '🇵🇱': 'S.A.', '🇨🇿': 'a.s.', '🇹🇷': 'A.Ş.' };
 for (const [cc, list] of [['🇧🇬', FIRMS], ...Object.entries(LOCAL_FIRMS)]) for (const f of list) if (!ECON.COMPANIES.some(c => c.id === 'f-' + f.id))
@@ -349,7 +350,7 @@ function perfTune(rdt) {
   const high = camera.position.distanceTo(controls.target) > 230;
   renderer.shadowMap.autoUpdate = false;
   perfFr++;
-  if (!high && perfFr % (megaBase ? 4 : 2) === 0) renderer.shadowMap.needsUpdate = true;   // в мегаполиса — по-рядко
+  if (!high && perfFr % (megaBase ? 8 : 4) === 0) renderer.shadowMap.needsUpdate = true;   // статичният град се променя рядко; обновяваме сенките през 4/8 кадъра
   if (high !== perfHigh) {
     perfHigh = high;
     if (city.group) for (const o of city.group.children) if (o.userData.detail) o.visible = !high;
@@ -457,6 +458,10 @@ let europe = null;
   const ldT0 = performance.now();
   jobs.forEach(j => j.then(() => { const k = Math.round(++done / jobs.length * 100); $('ldBar').style.width = Math.max(3, k) + '%'; $('ldTxt').textContent = `Зареждане… ${k}%`; }));
   await Promise.all(jobs);
+  // GLTFLoader оставя parser-а (вкл. JSON и кешовете на dependency-тата) в резултата.
+  // След зареждането вече е нужен само за допълнителната текстура на блоковете (горе).
+  // Освобождаваме го, докато запазваме сцените, геометриите, материалите и текстурите.
+  for (const g of Object.values(A)) if (g?.parser) g.parser = null;
 }
 // небостъргачи: варианти на 10 и 15 етажа (за поръчките, ключ 'име@етажи'), а самите модели стават 20 етажа
 for (const [n, band] of Object.entries(SKY_BANDS)) {
@@ -2633,15 +2638,17 @@ function endOfDay() {
   garArrive();
   dayWeatherAndEvents();
   econ.spend(officeLv().upkeep + garageLv().upkeep + whLv().upkeep + [S.staff, ...Object.values(S.cities || {}).map(c => c.staff)].reduce((a, st) => a + Object.keys(st || {}).reduce((b, k) => b + STAFF[k].upkeep, 0), 0), 'заплати', `Ден ${S.day}: офис, гараж и склад`);
-  const nb = (S.branches || []).length, away = ownedCities().filter(c => c !== S.cityId).length;
+  const owned = ownedCities(), awayCities = owned.filter(c => c !== S.cityId);
+  const nb = (S.branches || []).length, away = awayCities.length;
   if (away) {   // градовете, в които не си в момента, работят сами и носят печалба според репутацията
-    const awayF = ownedCities().filter(c => c !== S.cityId && isForeign(c)).length;
+    const awayF = awayCities.filter(isForeign).length;
     const inc = Math.round((away + awayF * 0.8) * (1400 + 350 * S.rep + 120 * (S.officeLevel || 1)) * rand(0.8, 1.2));
     econ.earn(inc, 'филиали', `Ден ${S.day}: печалба от ${away} град${away > 1 ? 'а' : ''} без теб`);
   }
   { const tu = (S.trains || []).reduce((a, t) => a + trainType(t).upkeep, 0); if (tu) econ.spend(tu, 'заплати', `Ден ${S.day}: влакове`); flowDay('rail', tu); }
   hwTrucks.day();
-  if (hwDone().length) econ.earn(hwToll(), 'тол', `Ден ${S.day}: тол такси`);
+  const doneHighways = hwDone();
+  if (doneHighways.length) econ.earn(hwToll(doneHighways), 'тол', `Ден ${S.day}: тол такси`);
   if (S.day % 10 === 0 && (S.trains || []).length && (S.trains || []).length >= totalTracks()) {
     const weak = ownedCities().filter(id => (id === S.cityId ? (S.stationLevel || 0) : ((S.cities || {})[id]?.stationLevel || 0)) < 5);
     if (weak.length) toast(`🚉 Влаковете са на лимита. Развий гарата в ${weak.map(id => cityById(id).nm).join(', ')} до ниво 5 за още влакове.`, '', () => { tab = 'hq'; renderPanel(); });
@@ -3246,13 +3253,20 @@ const supply = createSupply({ S: () => S, econ: () => econ, MATERIALS: ECON.MATE
 // ⛏️ Азия: собствени кариери, мини и заводи (mines.js)
 const railLinked = (a, b) => { const p = railPath(a, b); return !!p && p.length > 1; };
 const roadLinked = (a, b) => { const done = [...allSegs(), ...ALL_AB].filter(x => hwAll().includes(x.id)), seen = new Set([a]), q = [a]; while (q.length) { const c = q.shift(); if (c === b) return true; for (const x of done) { const n = x.a === c ? x.b : x.b === c ? x.a : null; if (n && !seen.has(n)) { seen.add(n); q.push(n); } } } return false; };
+let _mineLinkRail = null, _mineLinkRoad = null, _mineLinkBranches = null, _mineLinkSea = null, _mineLinkSeaN = -1, _mineLinkAbN = -1, _mineLinkHQ = null;
+const _mineLinkCache = new Map();
 // как стига продукцията от азиатски град до Европа: по жп (Пътят на коприната) или по море (пристанище там или в свързан град)
 function mineLinkEU(id) {
+  const rails = railEdges(), roads = hwAll(), branches = S.branches || [], seaRoutes = S.seaRoutes || [];
+  if (rails !== _mineLinkRail || roads !== _mineLinkRoad || branches !== _mineLinkBranches || seaRoutes !== _mineLinkSea || seaRoutes.length !== _mineLinkSeaN || ALL_AB.length !== _mineLinkAbN || S.hqCity !== _mineLinkHQ) {
+    _mineLinkRail = rails; _mineLinkRoad = roads; _mineLinkBranches = branches; _mineLinkSea = seaRoutes; _mineLinkSeaN = seaRoutes.length; _mineLinkAbN = ALL_AB.length; _mineLinkHQ = S.hqCity; _mineLinkCache.clear();
+  }
+  if (_mineLinkCache.has(id)) return _mineLinkCache.get(id);
   const eu = ownedCities().filter(x => contKeyOf(x) === 'eu');
-  if (eu.some(c => railLinked(id, c))) return 'rail';
+  if (eu.some(c => railLinked(id, c))) { _mineLinkCache.set(id, 'rail'); return 'rail'; }
   const near = x => x === id || railLinked(id, x) || roadLinked(id, x);
-  if ((S.seaRoutes || []).some(r => (near(r.a) && contKeyOf(r.b) === 'eu') || (near(r.b) && contKeyOf(r.a) === 'eu'))) return 'sea';
-  return null;
+  const via = seaRoutes.some(r => (near(r.a) && contKeyOf(r.b) === 'eu') || (near(r.b) && contKeyOf(r.a) === 'eu')) ? 'sea' : null;
+  _mineLinkCache.set(id, via); return via;
 }
 const mines = createMines({ S: () => S, econ: () => econ, MATERIALS: ECON.MATERIALS, cityName: id => cityById(id)?.nm || id, cityCc: id => cityById(id)?.cc || '',
   oilIntake: (m, q) => oil.intake(m, q), isAsia: id => contKeyOf(id) === 'as', isOceania: id => contKeyOf(id) === 'oc', ownedCities: () => ownedCities(), linkEU: mineLinkEU, coastal: id => SEASIDE.includes(id) || portMax(id) > 0, fuelBill: () => { const h = econ.s.history[econ.s.history.length - 1]; return h ? -Math.min(0, h.cats['гориво'] || 0) : 0; }, linked: (a, b) => railLinked(a, b) || roadLinked(a, b),
@@ -3405,14 +3419,45 @@ const resorts = createResorts({
   onNewResort: (r, t) => { toast(t, 'good', () => resorts.open(r.id)); showEventPop('resort-unlock', `${r.ico} Нов курорт: ${r.nm}`, t); },
 });
 // 🚚 собствени ТИР-ове по магистралите (hwtrucks.js): маршрут само по готови участъци (твои и на партньора — по неговите се плаща тол)
+let _hwPathDone = null, _hwPathOwn = null, _hwPathN = -1, _hwPathAdj = null, _hwPathRoutes = new Map();
+function hwRoadGraph() {
+  const done = hwAll(), own = hwDone(), n = ALL_AB.length;
+  if (done !== _hwPathDone || own !== _hwPathOwn || n !== _hwPathN || !_hwPathAdj) {
+    _hwPathDone = done; _hwPathOwn = own; _hwPathN = n; _hwPathRoutes.clear();
+    const doneSet = new Set(done), ownSet = new Set(own), adj = new Map();
+    for (const x of [...allSegs(), ...ALL_AB]) if (doneSet.has(x.id)) {
+      const edge = { id: x.id, a: x.a, b: x.b, km: kmBetween(x.a, x.b), own: ownSet.has(x.id) };
+      if (!adj.has(x.a)) adj.set(x.a, []); if (!adj.has(x.b)) adj.set(x.b, []);
+      adj.get(x.a).push(edge); adj.get(x.b).push(edge);
+    }
+    _hwPathAdj = adj;
+  }
+  return _hwPathAdj;
+}
 function hwDonePath(a, b) {
-  const done = new Set(hwAll()), E = [...allSegs(), ...ALL_AB].filter(x => done.has(x.id)), dist = { [a]: 0 }, prev = {}, seen = new Set();
-  for (;;) { let u = null; for (const k in dist) if (!seen.has(k) && (u === null || dist[k] < dist[u])) u = k;
-    if (u === null || u === b) break; seen.add(u);
-    for (const x of E) { if (x.a !== u && x.b !== u) continue; const v = x.a === u ? x.b : x.a, w = kmBetween(x.a, x.b); if (dist[v] == null || dist[u] + w < dist[v]) { dist[v] = dist[u] + w; prev[v] = [u, x]; } } }
-  if (dist[b] == null) return null;
-  const path = [b], segs = []; for (let k = b; k !== a; k = prev[k][0]) { const x = prev[k][1]; segs.unshift({ id: x.id, a: x.a, b: x.b, km: Math.round(kmBetween(x.a, x.b)), own: hwMine(x.id) }); path.unshift(prev[k][0]); }
-  return { path, segs };
+  if (a === b) return { path: [a], segs: [] };
+  const adj = hwRoadGraph(), key = `${a}\0${b}`;
+  if (_hwPathRoutes.has(key)) return _hwPathRoutes.get(key);
+  const dist = new Map([[a, 0]]), prev = new Map(), seen = new Set();
+  for (;;) {
+    let u = null;
+    for (const [k, d] of dist) if (!seen.has(k) && (u === null || d < dist.get(u))) u = k;
+    if (u === null || u === b) break;
+    seen.add(u);
+    for (const x of adj.get(u) || []) {
+      const v = x.a === u ? x.b : x.a, nd = dist.get(u) + x.km;
+      if (!dist.has(v) || nd < dist.get(v)) { dist.set(v, nd); prev.set(v, [u, x]); }
+    }
+  }
+  let result = null;
+  if (dist.has(b)) {
+    const path = [b], segs = [];
+    for (let k = b; k !== a;) { const [from, x] = prev.get(k); segs.unshift({ id: x.id, a: x.a, b: x.b, km: Math.round(x.km), own: x.own }); k = from; path.unshift(k); }
+    result = { path, segs };
+  }
+  if (_hwPathRoutes.size >= 4096) _hwPathRoutes.delete(_hwPathRoutes.keys().next().value);
+  _hwPathRoutes.set(key, result);
+  return result;
 }
 const cityWh = id => ((id === S?.cityId ? S?.whLevel : S?.cities?.[id]?.whLevel) || 0) > 0;
 const hwTrucks = createHwTrucks({ cap: () => fleetCap.truck(), S: () => S, econ: () => econ, sound: n => Sound.play(n), svcAll: () => dev.best() >= 6, toast, modal, fmt, save, cityName: id => cityById(id)?.nm || id, owned: () => ownedCities(), here: () => S.cityId, route: (a, b) => hwDonePath(a, b),
@@ -3660,7 +3705,22 @@ const amL = (L, id, k) => L && isAm(id) ? { ...L, cost: Math.round(L.cost * AM_K
 const railQuote = (a, b) => { const km = kmBetween(a, b), k = [a, b].some(id => NA_IDS.has(id) || SA_IDS.has(id)) ? RAIL_AM_K : 1; return { km, cost: Math.round((RAIL_BASE + km * RAIL_EUR_KM) * k / 1000) * 1000, days: Math.max(2, Math.ceil(km / RAIL_KM_DAY)) }; };
 // граф от готовите линии
 // ребра на мрежата; отклонението (r.c, r.br) свързва града r.a с двата края на основната линия r.b–r.c
-function railEdges(all, own) { const e = []; for (const r of S.rails || []) if (all || r.built) { e.push([r.a, r.b]); if (r.c) e.push([r.a, r.c]); } if (!own) for (const [x, y] of window.__coopShared?.rails || []) if (!e.some(([p, q]) => (p === x && q === y) || (p === y && q === x))) e.push([x, y]); return e; }   // + жп линиите на партньора (обща карта)
+const EMPTY_RAIL_EDGES = [];
+let _railCacheRails = null, _railCacheRailN = -1, _railCacheShared = null, _railCacheSharedN = -1, _railCacheCoopV = -1, _railEdgeCache = new Map();
+let _railAdjEdges = null, _railAdj = null, _railPathCache = new Map();
+function invalidateRailGraph() { _railCacheRails = null; _railEdgeCache.clear(); _railAdjEdges = null; _railAdj = null; _railPathCache.clear(); }
+function railEdges(all, own) {
+  const rails = S.rails || [], sh = window.__coopShared, shared = sh?.rails || EMPTY_RAIL_EDGES, cv = sh?.v || 0;
+  if (rails !== _railCacheRails || rails.length !== _railCacheRailN || shared !== _railCacheShared || shared.length !== _railCacheSharedN || cv !== _railCacheCoopV) {
+    _railCacheRails = rails; _railCacheRailN = rails.length; _railCacheShared = shared; _railCacheSharedN = shared.length; _railCacheCoopV = cv; _railEdgeCache.clear(); _railAdjEdges = null; _railAdj = null; _railPathCache.clear();
+  }
+  const key = `${all ? 1 : 0}:${own ? 1 : 0}`;
+  if (_railEdgeCache.has(key)) return _railEdgeCache.get(key);
+  const e = [];
+  for (const r of rails) if (all || r.built) { e.push([r.a, r.b]); if (r.c) e.push([r.a, r.c]); }
+  if (!own) for (const [x, y] of shared) if (!e.some(([a, b]) => (a === x && b === y) || (a === y && b === x))) e.push([x, y]);
+  _railEdgeCache.set(key, e); return e;
+}   // + жп линиите на партньора (обща карта)
 // „Стрела“ кара само по модернизирани (скоростни) линии: r.hs = true; r.hsBuild = { prog } докато се обновява
 const HS_EUR_KM = 2500, HS_KM_DAY = 40;
 const hsQuote = r => ({ cost: Math.round((300000 + r.km * HS_EUR_KM) / 10000) * 10000, days: Math.max(5, Math.ceil(r.km / HS_KM_DAY)) });
@@ -3678,7 +3738,16 @@ function startHsUpgrade(i) {
   r.hsBuild = { prog: 0, days: q.days };
   toast(`⚡ Започна модернизацията ${cityById(r.a).nm} — ${cityById(r.b).nm} за скоростни влакове (${q.days} дни). Обикновените влакове продължават да минават.`, 'good'); Sound.play('buy'); save();
 }
-function railNeighbors(id) { const out = []; for (const [x, y] of railEdges()) { if (x === id) out.push(y); else if (y === id) out.push(x); } return out; }
+function railAdjacency() {
+  const edges = railEdges();
+  if (edges !== _railAdjEdges) {
+    const adj = new Map();
+    for (const [a, b] of edges) { if (!adj.has(a)) adj.set(a, []); if (!adj.has(b)) adj.set(b, []); adj.get(a).push(b); adj.get(b).push(a); }
+    _railAdjEdges = edges; _railAdj = adj; _railPathCache.clear();
+  }
+  return _railAdj;
+}
+function railNeighbors(id) { return railAdjacency().get(id) || []; }
 // точката на разклона върху основната линия (в координатите на картата)
 // разклонът е най-близката до града точка върху истинската (може и начупена) основна линия b→c
 function junOn(r) {
@@ -3771,9 +3840,19 @@ function offerBranch(o, after) {
 }
 function railPath(from, to) {
   if (from === to) return [from];
-  const prev = { [from]: null }, q = [from];
-  while (q.length) { const c = q.shift(); for (const n of railNeighbors(c)) if (!(n in prev)) { prev[n] = c; if (n === to) { const p = [to]; let k = to; while (prev[k]) { k = prev[k]; p.unshift(k); } return p; } q.push(n); } }
-  return null;
+  const adj = railAdjacency(), key = `${from}\0${to}`;
+  if (_railPathCache.has(key)) return _railPathCache.get(key);
+  const prev = new Map([[from, null]]), q = [from]; let qi = 0, result = null;
+  while (qi < q.length) {
+    const c = q[qi++];
+    for (const n of adj.get(c) || []) if (!prev.has(n)) {
+      prev.set(n, c);
+      if (n === to) { const p = [to]; let k = to; while (prev.get(k) != null) { k = prev.get(k); p.unshift(k); } result = p; qi = q.length; break; }
+      q.push(n);
+    }
+  }
+  if (_railPathCache.size >= 4096) _railPathCache.delete(_railPathCache.keys().next().value);
+  _railPathCache.set(key, result); return result;
 }
 function network() { const out = new Set([S.cityId]), q = [S.cityId]; while (q.length) for (const n of railNeighbors(q.shift())) if (!out.has(n)) { out.add(n); q.push(n); } return [...out]; }
 // градове със заводска цена: нужни са поне един влак и готова линия
@@ -3934,6 +4013,7 @@ function updateRails(dtDays) {
     r.prog += dtDays / r.days;
     if (r.prog >= 1) {
       r.built = true; r.prog = 1;
+      invalidateRailGraph();
       dev.add(dev.XP.rail);
       setTimeout(() => supply.tryDeliver(), 0);
       showEventPop('rail-done', `🛤️ ${cityById(r.a).nm} — ${cityById(r.b).nm}`, `${r.km} км жп линия е готова.`);
@@ -5127,7 +5207,8 @@ function gatePlan() {
 function seaAutoShips() {
   if (!S || !seaOn()) return;
   let free = portBerths() - (S.ships || []).length; if (free <= 0) return;
-  const idle = (S.seaRoutes || []).filter(r => !routeShip(r) && firstShipFor(r.km)).sort((a, b) => a.km - b.km);
+  const shipRoutes = new Set((S.ships || []).map(p => p.route));
+  const idle = (S.seaRoutes || []).filter(r => !shipRoutes.has(routeKey(r)) && firstShipFor(r.km)).sort((a, b) => a.km - b.km);
   const got = [];
   for (const r of idle) {
     if (free <= 0) break;
@@ -6472,14 +6553,21 @@ function hwHudHtml() {
 }
 // тол: малка основа на км, но всяка магистрала носи повече, колкото повече от нея е готова:
 // +25% за всеки следващ участък и още +50%, когато цялата магистрала е завършена
-function hwTollOf(hw, extra = null) {
-  const done = hw.segs.map((_, i) => segId(hw, i)).filter(id => hwDone().includes(id) || id === extra);
-  if (!done.length) return 0;
-  const km = done.reduce((a, id) => { const s = segById(id); return a + kmBetween(s.a, s.b); }, 0);
-  const mul = (1 + 0.25 * (done.length - 1)) * (done.length === hw.segs.length ? 1.5 : 1);
+function hwTollOf(hw, extra = null, doneSet = null) {
+  const owned = doneSet || new Set(hwDone());
+  let count = 0, km = 0;
+  for (let i = 0; i < hw.segs.length; i++) {
+    const id = segId(hw, i);
+    if (!owned.has(id) && id !== extra) continue;
+    count++;
+    const [a, b] = hw.segs[i];
+    km += kmBetween(a, b);
+  }
+  if (!count) return 0;
+  const mul = (1 + 0.25 * (count - 1)) * (count === hw.segs.length ? 1.5 : 1);
   return Math.round(km * TOLL_PER_KM_DAY * mul);
 }
-const hwToll = () => HIGHWAYS.reduce((a, hw) => a + hwTollOf(hw), 0) + abToll();
+const hwToll = (done = hwDone()) => { const set = new Set(done); return HIGHWAYS.reduce((a, hw) => a + hwTollOf(hw, null, set), 0) + abToll(); };
 // с колко ще се вдигне тол таксата, ако се завърши този участък
 const tollGain = sg => hwTollOf(sg.hw, sg.id) - hwTollOf(sg.hw);
 
@@ -8615,4 +8703,24 @@ if (AUTOTEST) {
 }
 else if (saved) { S = saved; pruneCities(S); setTimeout(() => { if (S && !S.brand) brandPick(); }, 2500); if (sessionStorage.getItem('stroiEnter')) { sessionStorage.removeItem('stroiEnter'); enterCity(); const tb = sessionStorage.getItem('stroiTab'); if (tb) { sessionStorage.removeItem('stroiTab'); setTimeout(() => { tab = tb; renderPanel(); }, 600); }  } else { setupWorld(); fastForward(); showMap(true); } }
 else { showMap(true); if (!AUTOTEST) setTimeout(() => showIntro({ start: true, sound: n => Sound.play(n) }), 1700); }   // без запис: картинката „Зареждане“ → интро → картата
+if (params.has('profile')) {
+  window.__benchReady = () => !!(S && city.ready);
+  window.__benchInstall = () => {
+    const stats = {}, dayStats = {}, days = [], frameMs = [], longTasks = []; let drawInfo = null;
+    let inDay = false, frameLast = performance.now(), alive = true;
+    const add = (bag, n, ms) => { const x = bag[n] || (bag[n] = { n: 0, sum: 0, max: 0, samples: [] }); x.n++; x.sum += ms; x.max = Math.max(x.max, ms); if (x.samples.length < 12000) x.samples.push(ms); };
+    const wrap = (n, f, bag = stats, filter = () => true) => function (...a) { const t = performance.now(); try { return f.apply(this, a); } finally { if (filter()) add(bag, n, performance.now() - t); } };
+    for (const n of ['rbuildTick','garAutoTick','saleTip','hwQueueTick','contTick','garArrive','dayWeatherAndEvents','estateDay','autoLines','seaAutoShips','tenderAutoFix','autoTick','gridCheck','holdingCheck']) try { eval(`${n} = wrap(n, ${n}, dayStats, () => inDay)`); } catch {}
+    for (const [n, o, k] of [['cityPanel.dailyTick',cityPanel,'dailyTick'],['supply.dailyTick',supply,'dailyTick'],['resorts.dailyTick',resorts,'dailyTick'],['mines.dailyTick',mines,'dailyTick'],['oil.dailyTick',oil,'dailyTick'],['group.check',group,'check'],['group.dailyTick',group,'dailyTick'],['corp.dailyTick',corp,'dailyTick'],['mw.dailyTick',mw,'dailyTick'],['hotels.dailyTick',hotels,'dailyTick'],['bank.dailyTick',bank,'dailyTick'],['tenders.dailyTick',tenders,'dailyTick'],['orient.dailyTick',orient,'dailyTick'],['route66.dailyTick',route66,'dailyTick'],['mega.dailyTick',mega,'dailyTick'],['silk.dailyTick',silk,'dailyTick'],['econ.dailyTick',econ,'dailyTick'],['hwTrucks.day',hwTrucks,'day']]) try { o[k] = wrap(n, o[k], dayStats, () => inDay); } catch {}
+    for (const n of ['save','renderPanel']) try { eval(`${n} = wrap(n, ${n}, dayStats, () => inDay)`); } catch {}
+    const oldEnd = endOfDay;
+    endOfDay = function (...a) { const t = performance.now(); inDay = true; try { return oldEnd.apply(this, a); } finally { inDay = false; days.push({ day: S.day, ms: performance.now() - t, t: performance.now() }); } };
+    const oldRender = renderer.render.bind(renderer);
+    renderer.render = function (...a) { const t = performance.now(); try { return oldRender(...a); } finally { add(stats, 'renderer.render', performance.now() - t); const i = renderer.info; drawInfo = { calls: i.render.calls, triangles: i.render.triangles, geometries: i.memory.geometries, textures: i.memory.textures }; } };
+    const visible = { meshes: 0, castsShadow: 0, lights: 0 }; scene.traverse(o => { if (o.visible && o.isMesh) { visible.meshes++; if (o.castShadow) visible.castsShadow++; } if (o.isLight) visible.lights++; });
+    try { new PerformanceObserver(l => longTasks.push(...l.getEntries().map(x => ({ start: x.startTime, duration: x.duration })))).observe({ type: 'longtask', buffered: true }); } catch {}
+    const raf = () => { if (!alive) return; const t = performance.now(); frameMs.push(t - frameLast); frameLast = t; requestAnimationFrame(raf); }; requestAnimationFrame(raf);
+    window.__bench = { setSpeed, stop() { alive = false; }, dump() { const finish = b => Object.fromEntries(Object.entries(b).map(([k,x]) => { const a = [...x.samples].sort((p,q) => p-q); return [k,{n:x.n,mean:+(x.sum/x.n).toFixed(3),p95:+(a[Math.floor(a.length*.95)]||0).toFixed(3),max:+x.max.toFixed(3)}]; })); const sorted = [...frameMs].sort((a,b)=>a-b); const gl=renderer.getContext(), ext=gl.getExtension('WEBGL_debug_renderer_info'); return { day:S.day, cities:Object.keys(S.cities||{}).length, built:(S.built||[]).length+Object.values(S.cities||{}).reduce((n,c)=>n+(c.built||[]).length,0), frames:frameMs.length, frameMean:+(frameMs.reduce((a,b)=>a+b,0)/frameMs.length).toFixed(3), frameP95:+(sorted[Math.floor(sorted.length*.95)]||0).toFixed(3), frameMax:+Math.max(...frameMs).toFixed(3), days, dayStats:finish(dayStats), totals:finish(stats), longTasks:longTasks.length, longTaskMax:+Math.max(0,...longTasks.map(x=>x.duration)).toFixed(3), visible, gpu:drawInfo, pixelRatio:renderer.getPixelRatio(), shadows:{enabled:renderer.shadowMap.enabled,autoUpdate:renderer.shadowMap.autoUpdate,casters:visible.castsShadow}, gl:ext?[gl.getParameter(ext.UNMASKED_VENDOR_WEBGL),gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)]:[gl.getParameter(7936),gl.getParameter(7937)], heap:performance.memory?.usedJSHeapSize||0, cam:[camera.position.x,camera.position.y,camera.position.z,controls.target.x,controls.target.y,controls.target.z] }; } };
+  };
+}
 frame();

@@ -66,6 +66,7 @@ export function createDevLevel(deps) {
     const d = st(); if (!d || !n) return;
     const firm0 = best();   // нивото на фирмата (най-развитият град) преди опита — картинката е само когато то се вдигне, не при всеки град
     d.xp += n;
+    if (n > 0) xpFloat(n);
     const nl = lvOf(d.xp);
     while (d.lv < nl) {
       d.lv++;
@@ -79,10 +80,23 @@ export function createDevLevel(deps) {
     deps.save();
   }
 
+  // „+120 XP“ — жълт надпис на случайно място по екрана, който се издига и изчезва (при 🔕 известия — не излиза)
+  function xpFloat(n) {
+    if (typeof document === 'undefined' || document.body.classList.contains('ntf-off')) return;
+    const el = document.createElement('div');
+    el.className = 'xpfloat';
+    el.textContent = `+${Math.round(n).toLocaleString('bg-BG')} XP`;
+    el.style.left = `${15 + Math.random() * 70}vw`; el.style.top = `${25 + Math.random() * 45}vh`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 1700);
+  }
+
   // значка в горната лента
   const css = document.createElement('style');
   css.textContent = `#devBtn { display:flex; align-items:center; gap:6px; } #devBtn .dbar { width:46px; height:6px; border-radius:3px; background:rgba(255,255,255,.15); overflow:hidden; } #devBtn .dbar i { display:block; height:100%; background:linear-gradient(90deg,#c9a14a,#ffd54a); }
-  .dvrow { display:flex; gap:10px; align-items:center; padding:6px 8px; border-radius:9px; } .dvrow.on { background:rgba(255,213,74,.12); } .dvrow.cur { box-shadow:0 0 0 1px var(--acc) inset; } .dvrow b { min-width:64px; }`;
+  .dvrow { display:flex; gap:10px; align-items:center; padding:6px 8px; border-radius:9px; } .dvrow.on { background:rgba(255,213,74,.12); } .dvrow.cur { box-shadow:0 0 0 1px var(--acc) inset; } .dvrow b { min-width:64px; }
+  .xpfloat { position:fixed; z-index:70; pointer-events:none; color:#ffd54a; font:800 22px/1 system-ui,sans-serif; text-shadow:0 2px 6px rgba(0,0,0,.75), 0 0 2px #000; transform:translate(-50%,0); animation:xpUp 1.7s ease-out forwards; }
+  @keyframes xpUp { 0% { opacity:0; transform:translate(-50%,10px) scale(.8); } 15% { opacity:1; transform:translate(-50%,0) scale(1.08); } 100% { opacity:0; transform:translate(-50%,-60px) scale(1); } }`;
   document.head.appendChild(css);
   const btn = document.createElement('button');
   btn.id = 'devBtn'; btn.className = 'btn2'; btn.title = 'Ниво на развитие';

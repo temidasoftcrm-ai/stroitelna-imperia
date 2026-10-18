@@ -965,9 +965,10 @@ export function renderFinance(el, econ, rep = 0, rerender = () => {}, unitTypes 
   if (blk.length) html += `<div class="card" style="border-color:#ffb46b"><h3><span class="ico">🔐</span>Блокирани пари · ${fmt(blk.reduce((a, b) => a + b.amount, 0))}</h3>
     ${blk.map(b => `<div class="fin-kv"><span>${esc(b.nm)}<br><span style="color:var(--mut);font-size:12px">${esc(b.why || '')}</span></span><b>${fmt(b.amount)}</b></div>`).join('')}
     <div class="meta">Гаранциите за участие в търгове не са твои пари, докато не ги върнат: загубилите търга си ги получават при отварянето на офертите, спечелилият — при предаването на обекта.</div></div>`;
-  // депозит
+  // депозит (със своя банка — не трябва: печелиш от дивидентите ѝ)
   const dep = econ.depositInfo(), canIn = n => s.money >= n;
-  html += `<div class="card">
+  if (s.ownBank) html += `<div class="card"><h3><span class="ico">🏦</span>Депозит</h3><div class="meta">Имаш своя банка — депозит вече не ти трябва. Печалбата на банката идва като <b>месечен дивидент</b> (процентът се избира в 🏦 банката).</div></div>`;
+  else html += `<div class="card">
     <h3><span class="ico">🏦</span>Депозит · до ${(DEP_TIERS[0][1] * 100).toFixed(0)}% на месец</h3>
     <div class="fin-big" style="font-size:22px">${fmt(dep.amount)}</div>
     <div class="fin-kv">Лихва на месец <b class="fin-pos">${fmt(dep.monthly)}${dep.amount ? ` <span style="color:var(--mut);font-weight:400">(${(dep.monthly / dep.amount * 100).toFixed(1)}%)</span>` : ''}</b></div>

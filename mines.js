@@ -85,8 +85,8 @@ export function createMines(deps) {
   function demolish(sid) { const m = st(); const s = m.sites.find(x => x.id === sid); if (!s) return; m.sites.splice(m.sites.indexOf(s), 1); deps.econ().earn(Math.round(MINE_KINDS[s.kind].cost * 0.4), 'покупка', `Продаден обект: ${MINE_KINDS[s.kind].nm}`); deps.save(); deps.onChange && deps.onChange(s.city); }
 
   // суровините за заводите: от мините, свързани със завода (същият град или по жп/път)
-  function pull(s, need) {
-    const src = st().sites.filter(x => MINE_KINDS[x.kind].out === need && x.store > 0 && (x.city === s.city || deps.linked(x.city, s.city)));
+  function pull(s, need, linked = deps.linked) {
+    const src = st().sites.filter(x => MINE_KINDS[x.kind].out === need && x.store > 0 && (x.city === s.city || linked(x.city, s.city)));
     return src;
   }
   // ⚡ ток: производство (времето мени слънцето и вятъра; батерията изглажда), първо захранва мините и заводите ти, остатъкът се продава
@@ -95,29 +95,48 @@ export function createMines(deps) {
   const onGrid = id => hasIn(id, 'grid');
   const gridCities = () => [...new Set(st().sites.filter(s => s.kind === 'grid').map(s => s.city))];
   const cable = () => onGrid(CABLE_CITY);   // Sun Cable: Дарвин — Сингапур, токът стига до Азия
-  const wx = (s, day) => { const r = Math.abs(Math.sin((day + 1) * 12.9898 + s.id * 78.233) * 43758.5453) % 1, bat = hasIn(s.city, 'battery');
+  const wx = (s, day, bat = hasIn(s.city, 'battery')) => { const r = Math.abs(Math.sin((day + 1) * 12.9898 + s.id * 78.233) * 43758.5453) % 1;
     const f = s.kind === 'solar' ? 0.7 + 0.45 * r : 0.5 + 0.9 * r; return bat ? Math.max(0.9, f) : f; };
   const gridMax = () => plants().filter(s => onGrid(s.city)).reduce((a, s) => a + rate(s), 0);
   const nationalGrid = () => gridCities().length >= GRID_NEED.cities && gridMax() >= GRID_NEED.mwh;
   function power(day) {
-    const P = plants(); let mwh = 0, local = 0, cash = 0, sold = 0;
-    for (const s of P) { const q = Math.round(rate(s) * wx(s, day)); s.store = q;
-      if (onGrid(s.city)) mwh += q; else { local += q; const c = Math.round(q * POWER.buyPrice * LOCAL_K); cash += c; sold += q; } }
+    const sites = st().sites, grid = new Set(), batteries = new Set(), P = [];
+    for (const s of sites) {
+      if (s.kind === 'grid') grid.add(s.city);
+      if (s.kind === 'battery') batteries.add(s.city);
+      if (MINE_KINDS[s.kind].out === 'power') P.push(s);
+    }
+    const cableOn = grid.has(CABLE_CITY);
+    let mwh = 0, local = 0, cash = 0, sold = 0;
+    for (const s of P) { const q = Math.round(rate(s) * wx(s, day, batteries.has(s.city))); s.store = q;
+      if (grid.has(s.city)) mwh += q; else { local += q; const c = Math.round(q * POWER.buyPrice * LOCAL_K); cash += c; sold += q; } }
     // захранване на мините и заводите (в Океания — веднага; в Азия — само по Sun Cable от Дарвин)
-    const users = st().sites.filter(s => !MINE_KINDS[s.kind].energy && (deps.isOceania?.(s.city) || cable()));
+    const users = sites.filter(s => !MINE_KINDS[s.kind].energy && (deps.isOceania?.(s.city) || cableOn));
     let left = mwh, used = 0;
-    for (const s of st().sites) if (!MINE_KINDS[s.kind].energy) s.pw = false;
+    for (const s of sites) if (!MINE_KINDS[s.kind].energy) s.pw = false;
     for (const s of users) { const n = (PW_NEED[s.kind] || 100) * (s.lv || 1); if (left >= n) { left -= n; used += n; s.pw = true; } }
     // остатъкът — в мрежата; с батерия в някой свързан град — вечерен пик (+30%)
-    const bat = gridCities().some(id => hasIn(id, 'battery'));
+    const bat = [...grid].some(id => batteries.has(id));
     if (left > 0) { cash += Math.round(left * POWER.buyPrice * (bat ? BATT_K : 1)); sold += left; }
-    return { mwh, local, used, sold, cash, bat, grid: gridCities().length };
+    return { mwh, local, used, sold, cash, bat, grid: grid.size };
   }
   const powerNeed = () => st().sites.filter(s => !MINE_KINDS[s.kind].energy).reduce((a, s) => a + (PW_NEED[s.kind] || 100) * (s.lv || 1), 0);
   let lastReport = { day: 0, made: {}, sent: {}, sold: 0 }, lastFuel = 0;
   function dailyTick() {
     const S = deps.S(); if (!S) return; const m = st(); if (!m.sites.length) return;
     const e = deps.econ(), day = S.day, made = {}, sent = {};
+    const linkMemo = new Map(), linkedDay = (a, b) => {
+      if (a === b) return true;
+      let row = linkMemo.get(a); if (row?.has(b)) return row.get(b);
+      const linked = deps.linked(a, b);
+      if (!row) linkMemo.set(a, row = new Map()); row.set(b, linked);
+      let reverse = linkMemo.get(b); if (!reverse) linkMemo.set(b, reverse = new Map()); reverse.set(a, linked);
+      return linked;
+    };
+    const viaByCity = new Map(), linkEU = id => {
+      if (!viaByCity.has(id)) viaByCity.set(id, deps.linkEU(id));
+      return viaByCity.get(id);
+    };
     let upk = 0;
     // 1) мините и кариерите
     const pw = power(day);
@@ -126,16 +145,16 @@ export function createMines(deps) {
     for (const s of m.sites) {
       const K = MINE_KINDS[s.kind]; if (!K.needs) continue;
       let can = rate(s);
-      for (const [r, k] of Object.entries(K.needs)) { const have = pull(s, r).reduce((a, x) => a + x.store, 0); can = Math.min(can, Math.floor(have / k)); }
+      for (const [r, k] of Object.entries(K.needs)) { const have = pull(s, r, linkedDay).reduce((a, x) => a + x.store, 0); can = Math.min(can, Math.floor(have / k)); }
       s.starved = can < rate(s) * 0.5;
       if (can <= 0) continue;
-      for (const [r, k] of Object.entries(K.needs)) { let need = can * k; for (const x of pull(s, r)) { const t = Math.min(x.store, need); x.store -= t; need -= t; if (need <= 0) break; } }
+      for (const [r, k] of Object.entries(K.needs)) { let need = can * k; for (const x of pull(s, r, linkedDay)) { const t = Math.min(x.store, need); x.store -= t; need -= t; if (need <= 0) break; } }
       s.store = Math.min(cap(s), (s.store || 0) + can); made[K.out] = (made[K.out] || 0) + can;
     }
     // 3) доставка до склада на фирмата (Европа): жп — всеки ден, море — веднъж седмично
     for (const s of m.sites) {
       const K = MINE_KINDS[s.kind]; if (!K.out || ['ore', 'crude', 'fuel', 'power'].includes(K.out) || !s.store) continue;   // петролът и горивото — за износ или за собствените машини
-      const via = deps.linkEU(s.city); s.via = via;
+      const via = linkEU(s.city); s.via = via;
       if (!via || (via === 'sea' && day % SEA_EVERY)) continue;
       const q = Math.floor(s.store); e.s.stock[K.out] = (e.s.stock[K.out] || 0) + q; s.store -= q; sent[K.out] = (sent[K.out] || 0) + q;
     }
@@ -145,13 +164,13 @@ export function createMines(deps) {
     // 🛢️ петролната империя (oil.js): терминалът не продава сам — всеки ден петролът и горивото отиват в танковата ферма
     if (terms.length && deps.oilIntake) for (const s of m.sites) {
       const K = MINE_KINDS[s.kind]; if (!['crude', 'fuel'].includes(K.out) || !s.store || (K.out === 'fuel' && s.keep)) continue;
-      if (!terms.some(t => t.city === s.city || deps.linked(t.city, s.city))) continue;
+      if (!terms.some(t => t.city === s.city || linkedDay(t.city, s.city))) continue;
       deps.oilIntake(K.out, Math.floor(s.store)); s.store -= Math.floor(s.store);
     }
     else if (terms.length && day % 7 === 0) for (const s of m.sites) {
       const K = MINE_KINDS[s.kind]; if (!['crude', 'fuel'].includes(K.out) || !s.store) continue;
       if (K.out === 'fuel' && s.keep) continue;   // „запази за собствените машини“
-      if (!terms.some(t => t.city === s.city || deps.linked(t.city, s.city))) continue;
+      if (!terms.some(t => t.city === s.city || linkedDay(t.city, s.city))) continue;
       exp += Math.round(s.store * mat(K.out).buyPrice * 1.25); s.store = 0;
     }
     if (exp) { e.earn(exp, 'обект', 'Износ на петрол и гориво (терминал)'); deps.toast(`🛳️ Танкерите отплаваха: износ на петрол и гориво +${deps.fmt(exp)} €.`, 'good'); }

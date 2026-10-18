@@ -88,7 +88,14 @@ export const COUNTRIES = [
 ];
 export const countryOfCity = id => COUNTRIES.find(k => k.cities.includes(id)) || null;
 // isDone(cityId) → завършен ли е; връща { done, total, won }
-export function countryProgress(k, isDone) { const done = k.cities.filter(isDone).length; return { done, total: k.cities.length, won: done >= k.cities.length }; }
+// всички градове на държавата в играта (game.js: setCountryCities) — завършени други 5 града (напр. Сиан, Чънду, Ухан…) също завладяват държавата
+let ccCities = null;
+export const setCountryCities = f => { ccCities = f; };
+export function countryProgress(k, isDone) {
+  const key = k.cities.filter(isDone).length, any = ccCities ? (ccCities(k.cc) || []).filter(isDone).length : 0, total = k.cities.length;
+  const done = Math.min(total, Math.max(key, any));
+  return { done, total, won: done >= total };
+}
 export const wonCountries = isDone => COUNTRIES.filter(k => countryProgress(k, isDone).won);
 // бонус към дневния приход на завършен град (1.1, ако държавата му е завладяна)
 export const wonIncomeMul = (cityId, isDone) => { const k = countryOfCity(cityId); return k && countryProgress(k, isDone).won ? 1 + WON_INCOME : 1; };

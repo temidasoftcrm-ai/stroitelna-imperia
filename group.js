@@ -74,7 +74,16 @@ export function createGroup(deps) {
   // дневният бонус на холдинга от развитието и директорите
   const bonusOf = k => Math.round((subBy(k).inc(deps) || 0) * bonusK(k));
   const dailyBonus = () => { const S = deps.S(); if (!S?.holding) return 0; return SUBS.filter(s => (S.group || {})[s.k] && !s.final).reduce((a, s) => a + bonusOf(s.k), 0); };
-  function dailyTick() { const b = dailyBonus(); if (b > 0) deps.econ().earn(b, 'холдинг', 'Холдинг: бонус от развитието и директорите'); return b; }
+  // бонусът идва всеки ден; веднъж на 30 дни — известие колко е разпределил холдингът за месеца
+  function dailyTick() {
+    const b = dailyBonus(), h = hold(), day = deps.S().day || 0;
+    if (b > 0) { deps.econ().earn(b, 'холдинг', 'Холдинг: бонус от развитието и директорите'); h.mAcc = (h.mAcc || 0) + b; }
+    if (day % 30 === 0 && h.mAcc > 0) {
+      deps.toast(`🏛️ Холдингът разпредели +${deps.fmt(Math.round(h.mAcc))} € за месеца — бонус от развитието${Object.keys(h.dir).length ? ' и директорите' : ''} на дружествата.`, 'good');
+      deps.sound && deps.sound('cash'); h.mAcc = 0;
+    }
+    return b;
+  }
   function check(quiet = false) {
     const S = deps.S(); if (!S || !S.brand) return;
     const g = S.group = S.group || {}, b = brandOf(S);
