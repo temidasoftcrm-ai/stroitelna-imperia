@@ -29,7 +29,7 @@ export const STATION_LEVELS = [
   { nm: 'Централна гара', cost: 230000, days: 6 },
 ];
 export const TRACK_GAP = 6.5;   // разстояние между коловозите
-const LEN = 600, SCALE = 2.2, CAR = 6.2;   // коловозите минават от край до край на земята (1200 м)
+const LEN = 1600, SCALE = 2.2, CAR = 6.2;   // коловозите минават от край до край на земята (до 3200 м — и в мегаполисите, където теренът е по-голям)
 
 const mat = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, ...o });
 // нощно осветление: светещи лампи (emissive) и светли петна по земята (адитивен кръг с плавен ръб)
@@ -115,6 +115,7 @@ export function createStation(deps) {
       if (lv >= 2 && !real && !stLoad) loadStationModels().then(() => { if (level === lv) build(lv, buildingNow); });
       if (real) {   // истинската сграда — до перона, в северния му край
         real.position.set(X + 5.5 + (lv >= 5 ? 6 : 3), 0, lv >= 5 ? plen + 24.5 : -plen - (hl + 4) / 2 - 1); if (lv >= 5) real.rotation.y = Math.PI; g.add(real);
+        { const seen = new Set(); real.traverse(o => { if (!o.isMesh) return; for (const m of [].concat(o.material)) { if (!m || seen.has(m) || !('emissive' in m)) continue; seen.add(m); m.emissive.set(0xffd9a0); if (m.map) m.emissiveMap = m.map; m.needsUpdate = true; glows.push([m, 0.55]); } }); }   // нощем сградата е осветена
         const lab = deps.label(`🚉 ${STATION_LEVELS[lv - 1].nm.toUpperCase()} · ${lv} ${lv === 1 ? 'коловоз' : 'коловоза'}`, '#ffffff', 9);
         lab.position.set(real.position.x, real.userData.h + 4, real.position.z); g.add(lab);
       } else {
@@ -203,6 +204,20 @@ export function createStation(deps) {
     const t = performance.now() / 1000, on = t % 30 < 9, ph = Math.floor(t * 2.2) % 2;   // минава влак: лампите мигат на смени
     for (const [m, k] of blink) m.emissiveIntensity = on && ph === k ? 3 : 0.05;
   }
+  // празни вагони (без локомотив) на свободните гарови коловози — като оставени за товарене; не на главния и не на този на минаващите
+  function stabledCars(busy) {
+    stabled = new THREE.Group(); g.add(stabled);
+    for (let k = 1; k < level; k++) {
+      if (busy.includes(k)) continue;
+      const n = 3 + ((k * 7 + level) % 4), kinds = ['boxcar', 'hopper2', 'flat', 'boxcar'];
+      let z = 30 + (k % 2) * 25;
+      for (let j = 0; j < n; j++) {
+        const kd = kinds[(k + j) % kinds.length], real = hasTrainModel(kd) ? trainCar(kd, k * 11 + j) : null;
+        const m = real || deps.model(['train-carriage-box', 'train-carriage-coal', 'train-carriage-flatbed-wood'][(k + j) % 3], SCALE);
+        const L = real ? real.userData.len : CAR; z += L / 2; m.position.set(trackX(k), 0.3, z); z += L / 2 + 0.6; stabled.add(m);
+      }
+    }
+  }
   // нощ 0…1: лампите светят, по пероните и коловозите падат светли петна
   function setNight(n, force = false) {
     blinkTick();   // вика се всеки кадър — сигналите на прелеза мигат
@@ -214,10 +229,13 @@ export function createStation(deps) {
   }
   // trains: [{ id, nm }] — влаковете у дома; всеки стои на свой коловоз (отвън навътре)
   const ROOF_Y = new THREE.MeshStandardMaterial({ color: 0xffd000, emissive: 0x6a5200, emissiveIntensity: 0.35, roughness: 0.5 });
+  let stabled = null;
   function setParked(trains) {
     for (const p of parked) g.remove(p.obj);
     parked = [];
+    if (stabled) { g.remove(stabled); stabled = null; }
     if (!level) return;
+    stabledCars(trains.slice(0, level).map((_, i) => level - 1 - i));
     trains.slice(0, level).forEach((t, i) => {
       const k = level - 1 - i, o = new THREE.Group();
       const FREIGHT = ['train-carriage-box', 'train-carriage-container-red', 'train-carriage-flatbed-wood', 'train-carriage-coal', 'train-carriage-container-blue', 'train-carriage-tank', 'train-carriage-lumber'];

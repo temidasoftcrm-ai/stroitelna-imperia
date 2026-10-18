@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';
 import { loadSigns, sign } from './roadsigns.js';
+import { NF_MATS } from './nightfloors.js';   // daynight.js пали тези материали вечер (emissiveIntensity = нощта)
 import { makeWater } from './water.js';
 
 // Истинските магистрали, разделени на участъци между градовете от картата
@@ -184,6 +185,18 @@ export function overLift(over, z) {
   for (const o of over || []) { const d = Math.abs(z - o.c) - o.w / 2; h = Math.max(h, d <= 0 ? OVER_H : d < OVER_RAMP ? OVER_H * (1 - d / OVER_RAMP) * (1 - d / OVER_RAMP) * (3 - 2 * (1 - d / OVER_RAMP)) : 0); }
   return h;
 }
+// лампите на магистралата: глава (свети) и петно на асфалта (адитивно, денем черно — не се вижда); общи материали за всички участъци
+let HW_LAMP = null, HW_POOL = null;
+function hwLampMat() { if (!HW_LAMP) { HW_LAMP = new THREE.MeshStandardMaterial({ color: 0x3a3a30, emissive: 0xffe0a0, emissiveIntensity: 0 }); NF_MATS.add(HW_LAMP); HW_LAMP.userData.nfK = 2.4; } return HW_LAMP; }
+function hwPoolMat() {
+  if (!HW_POOL) {
+    const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'), gr = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+    gr.addColorStop(0, 'rgb(255,225,170)'); gr.addColorStop(0.3, 'rgb(120,104,78)'); gr.addColorStop(0.65, 'rgb(30,26,19)'); gr.addColorStop(1, 'rgb(0,0,0)'); x.fillStyle = '#000'; x.fillRect(0, 0, 128, 128); x.fillStyle = gr; x.fillRect(0, 0, 128, 128);   // адитивно — важи само цветът: избледнява към черно
+    HW_POOL = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffd8a0, emissiveMap: new THREE.CanvasTexture(c), emissiveIntensity: 0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+    NF_MATS.add(HW_POOL); HW_POOL.userData.nfK = 0.8;
+  }
+  return HW_POOL;
+}
 export function buildHighwayView(A, opts = {}) {
   const g = new THREE.Group();
   const LEN = opts.len || 240, z0 = -LEN / 2, RIVER_Z = opts.river === false ? 1e9 : 20;
@@ -254,6 +267,12 @@ export function buildHighwayView(A, opts = {}) {
   }
   for (let z = z0 + 10; z < z0 + LEN; z += 30) {
     const l = clone(A, 'light-curved-double', 14); l.position.set(0, H(z) + 0.9, z); l.rotation.y = Math.PI / 2; l.userData.z = z; g.add(l); gear.push(l);
+    // нощем: светещите глави на двете рамена и топли петна светлина по платната
+    l.updateMatrixWorld(true); const lb = new THREE.Box3().setFromObject(l);
+    for (const sd of [-1, 1]) {
+      const hx = sd < 0 ? lb.min.x + 0.7 : lb.max.x - 0.7, head = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.25, 0.6), hwLampMat()); head.position.set(hx, lb.max.y - 0.35, z); head.userData.z = z; g.add(head); gear.push(head);
+      const pl = new THREE.Mesh(new THREE.PlaneGeometry(14, 18), hwPoolMat()); pl.rotation.x = -Math.PI / 2; pl.position.set(sd * (cw + med) / 2, H(z) + 0.07, z); pl.userData.z = z; pl.renderOrder = 2; g.add(pl); gear.push(pl);
+    }
   }
   if (AB && opts.exit !== false) abExit(g, gear, { W, cw, med, z0, LEN, H, zE: opts.exitZ ?? z0 + LEN * 0.22, name: opts.abName || 'A', exitTo: opts.exitTo || '' });
   for (const z of [z0 + 30, z0 + LEN - 40]) {
