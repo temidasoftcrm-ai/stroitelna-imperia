@@ -174,6 +174,14 @@ function clone(A, n, s) {
 function reveal(list, front) { for (const o of list) o.visible = o.userData.z <= front; }
 
 // opts: { len = 240, river = true, ground = true, title } — без река/терен може да се сложи покрай град
+// надлез над релсите в града (opts.over = [{ c, w }] — център и ширина по оста на магистралата): платното се качва по рампи
+// до OVER_H, минава върху колони и плоча над коловозите и слиза; всичко с userData.z се вдига с overLift(over, z)
+export const OVER_H = 7.5, OVER_RAMP = 80;
+export function overLift(over, z) {
+  let h = 0;
+  for (const o of over || []) { const d = Math.abs(z - o.c) - o.w / 2; h = Math.max(h, d <= 0 ? OVER_H : d < OVER_RAMP ? OVER_H * (1 - d / OVER_RAMP) * (1 - d / OVER_RAMP) * (3 - 2 * (1 - d / OVER_RAMP)) : 0); }
+  return h;
+}
 export function buildHighwayView(A, opts = {}) {
   const g = new THREE.Group();
   const LEN = opts.len || 240, z0 = -LEN / 2, RIVER_Z = opts.river === false ? 1e9 : 20;
@@ -187,6 +195,7 @@ export function buildHighwayView(A, opts = {}) {
     river.rotation.x = -Math.PI / 2; river.position.set(0, 0.01, RIVER_Z); g.add(river);
   }
   const onBridge = z => Math.abs(z - RIVER_Z) < RIVER_W / 2 + 6;
+  const OV = opts.over || [], onOver = z => OV.some(o => Math.abs(z - o.c) < o.w / 2 + 4);   // над коловозите — плоча на колони вместо насип
   const H = () => 0.9;     // платното е на една височина, мостът е продължение на насипа
 
   // opts.ab — аутобан: по 4 ленти във всяка посока (3,6 м), по-широк разделител, асфалт с маркировка вместо плочките на магистралата
@@ -198,7 +207,7 @@ export function buildHighwayView(A, opts = {}) {
   const gravelMat = new THREE.MeshStandardMaterial({ color: 0x9c968c, roughness: 1 });
   for (let z = z0; z < z0 + LEN; z += 10) {
     const zc = z + 5;
-    if (onBridge(zc)) continue;
+    if (onBridge(zc) || onOver(zc)) continue;
     const e = new THREE.Mesh(new THREE.BoxGeometry(W + 6, 0.6, 10), earthMat);
     e.position.set(0, 0.3, zc); e.receiveShadow = true; e.userData.z = zc; g.add(e); earth.push(e);
     const gr = new THREE.Mesh(new THREE.BoxGeometry(W + 1, 0.3, 10), gravelMat);
@@ -209,6 +218,13 @@ export function buildHighwayView(A, opts = {}) {
     for (const x of [-W / 2 + 2, 0, W / 2 - 2]) {
       const p = clone(A, 'bridge-pillar-wide', 3); p.scale.y = 1.6; p.position.set(x, 0, z); p.userData.z = z; g.add(p); gravel.push(p);
     }
+  }
+  // надлез: колони по три в ред и бетонна плоча под двете платна (с етапа на насипа/чакъла)
+  for (const o of OV) {
+    for (let z = o.c - o.w / 2 - 4; z <= o.c + o.w / 2 + 4.01; z += (o.w + 8) / 3) for (const x of [-W / 2 + 2, 0, W / 2 - 2]) {
+      const p = new THREE.Mesh(new THREE.BoxGeometry(1.4, OVER_H + 0.3, 1.4), new THREE.MeshStandardMaterial({ color: 0xbdbab2, roughness: 0.9 })); p.position.set(x, (OVER_H + 0.3) / 2 - OVER_H, z); p.castShadow = true; p.userData.z = z; p.userData.over = 1; g.add(p); earth.push(p);
+    }
+    for (let z = o.c - o.w / 2 - 4; z < o.c + o.w / 2 + 4; z += 10) { const zc = Math.min(z + 5, o.c + o.w / 2 + 4 - 0.01), d = new THREE.Mesh(new THREE.BoxGeometry(W + 2, 1, 10), new THREE.MeshStandardMaterial({ color: 0xa8a59d, roughness: 0.9 })); d.position.set(0, 0.4, zc); d.castShadow = d.receiveShadow = true; d.userData.z = zc; g.add(d); gravel.push(d); }
   }
   // 2) асфалт: две платна от плочки road-straight-barrier (по 9 м) — на моста отгоре
   if (AB) for (let z = z0; z < z0 + LEN; z += 10) {   // аутобан: две широки платна с 4 ленти и мантинели отстрани
@@ -251,6 +267,24 @@ export function buildHighwayView(A, opts = {}) {
     const post = new THREE.Mesh(new THREE.BoxGeometry(W + 2, 0.4, 0.4), new THREE.MeshStandardMaterial({ color: 0x888888 }));
     post.position.set(0, 10, z0 + LEN - 15); post.userData.z = z0 + LEN - 15; g.add(post); gear.push(post);
   }
+  // надлезът: всичко по оста се вдига по профила. Плочите (насип, чакъл, асфалт, разделител) се огъват по рампата връх по връх —
+  // гладко, без стъпала (насипът — само горната страна, основата остава на земята); моделите (лампи, табели) — само се вдигат
+  if (OV.length) {
+    const v = new THREE.Vector3();
+    const bend = (o, topOnly) => {
+      o.updateMatrix(); const m = o.matrix, inv = m.clone().invert(), geo = o.geometry.clone(), pos = geo.attributes.position;
+      for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i).applyMatrix4(m); if (!topOnly || v.y > 0.35) v.y += overLift(OV, v.z); v.applyMatrix4(inv); pos.setXYZ(i, v.x, v.y, v.z); }
+      geo.computeVertexNormals(); geo.computeBoundingSphere(); o.geometry = geo;
+    };
+    for (const o of [...g.children]) {
+      const z = o.userData.z; if (z == null) continue;
+      if (o.userData.over) { o.position.y += OVER_H; continue; }   // колоните под плочата
+      if (Math.max(overLift(OV, z - 6), overLift(OV, z), overLift(OV, z + 6)) <= 0) continue;
+      if (o.isMesh && (o.geometry.type === 'BoxGeometry' || o.geometry.type === 'PlaneGeometry')) bend(o, earth.includes(o));
+      else { o.position.y += overLift(OV, z); if (asphalt.includes(o)) o.rotation.x -= Math.atan(overLift(OV, z + 0.5) - overLift(OV, z - 0.5)); }   // плочките на обикновената магистрала — с наклона
+    }
+  }
+  const Hf = z => H(z) + overLift(OV, z);   // за техниката по фронта
   // строителна площадка на фронта: конуси, бариери, лампи
   const front = new THREE.Group(); g.add(front);
   for (const x of [-W / 2 - 2, W / 2 + 2]) { const b = clone(A, 'construction-barrier', 5); b.position.set(x, 0, 0); front.add(b); }
@@ -277,17 +311,17 @@ export function buildHighwayView(A, opts = {}) {
     reveal(gear, stage > 3 ? 1e9 : stage === 3 ? fz : -1e9);
     const done = stage > 3;
     front.visible = !done;
-    front.position.z = fz;
+    front.position.z = fz; front.position.y = overLift(OV, fz);
     const asph = stage === 2, lx = -(cw + med) / 2;
     paver.visible = fresh.visible = asph;
     rollers.forEach(r => r.visible = asph);
     // полагачът върви напред по фронта; плочата му е точно на ръба на асфалта
-    paver.position.set(lx, H(fz) - 0.1, fz + 1.2);
-    fresh.position.set(lx, H(fz) + 0.06, fz - 7);
+    paver.position.set(lx, Hf(fz) - 0.1, fz + 1.2);
+    fresh.position.set(lx, Hf(fz) + 0.06, fz - 7);
     // два валяка ходят напред-назад по пресния асфалт, в двете половини на платното
     rollers.forEach((r, k) => {
       const zz = fz - 6 - k * 7 + Math.sin(t * 0.9 + k * 1.7) * 4;
-      r.position.set(lx + (k ? 2.2 : -2.2), H(zz) - 0.1, zz);
+      r.position.set(lx + (k ? 2.2 : -2.2), Hf(zz) - 0.1, zz);
       const dir = Math.cos(t * 0.9 + k * 1.7);
       r.rotation.y = dir >= 0 ? 0 : Math.PI;
       r.userData.drums.forEach(d => d.rotation.x += 0.05 * Math.sign(dir || 1));

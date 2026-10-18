@@ -11,7 +11,7 @@ const SCALE = new Proxy({ 'truck-dump-red': 0.62, 'truck-concrete-red': 0.62, 's
 
 // parent: групата на магистралата в града; model(name, scale); A: заредените модели
 // zc: оста на магистралата (z в света); len: дължина по x; y: височина на платното
-export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false) {   // ab — аутобан: 4 ленти на посока, повече коли
+export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false, lift = null) {   // lift(x) — надлезът над релсите (highways.js overLift)   // ab — аутобан: 4 ленти на посока, повече коли
   const g = new THREE.Group(); parent.add(g);
   const list = [], half = len / 2;
   // посока +x (на изток) е откъм +z (дясно движение), −x е откъм −z; лента 0 = бърза (към разделителната ивица)
@@ -43,11 +43,12 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false)
       c.x += c.dir * c.v * dt;
       if (c.x > half) c.x -= len; else if (c.x < -half) c.x += len;
       c.o.position.x = c.x;
+      if (lift) c.o.position.y = y + lift(c.x);
     }
     if (!em.length) return;
     if ((emT -= dt) <= 0) { emSend(); emT = 25 + Math.random() * 45; }
     for (const e of em) if (e.on) {
-      e.x += e.dir * e.v * dt; e.o.position.x = e.x;
+      e.x += e.dir * e.v * dt; e.o.position.x = e.x; if (lift) e.o.position.y = y + lift(e.x);
       for (const c of list) if (c.dir === e.dir && Math.abs(c.o.position.z - e.o.position.z) < 1.5 && (c.x - e.x) * e.dir > 0 && (c.x - e.x) * e.dir < 12) c.x += e.dir * 30 * dt;   // колите отпред се отдръпват напред
       if (e.x * e.dir > half + 6) { e.on = false; e.o.visible = false; }
     }

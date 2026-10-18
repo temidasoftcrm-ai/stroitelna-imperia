@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { createHolo } from './boardholo.js';
 
 const DIR = 'assets/heavy/directors/';
 const SIT_HIP = [0, -1, -57];   // ханшът в седнала поза (единиците на скелета, см) — по „Sit_Meeting“ / „Sit_Breathing“
@@ -341,6 +342,8 @@ export function openBoardroom(o) {
   for (const z of [-2.4, 0, 2.4]) { const p = new THREE.PointLight(0xfff0d8, 1.6, 6, 1.6); p.position.set(0, 3.3, z); scene.add(p); }
   const { leather, metal, gold } = buildRoom(scene);
   if (o.brand) groupMedal(scene, o.brand, gold);
+  // холограмата над медальона (boardholo.js): държавата, градовете и бюджетът на текущото предложение
+  const holo = createHolo(scene, { fmt: n => (o.fmt ? o.fmt(Math.round(n)) : Math.round(n).toLocaleString('bg-BG')), base: new THREE.Vector3(0, TABLE_H + 0.14, 0) });
 
   const tip = el.querySelector('.tip'), card = el.querySelector('.card'), hits = [], people = [];
   let sel = null, shut = false, raf = 0, nextChat = 4;
@@ -431,6 +434,7 @@ export function openBoardroom(o) {
     clearBadges();
     props = o.proposals ? o.proposals() : [];
     nav.style.display = props.length ? 'flex' : 'none';
+    holo.show(props.length ? props[(go + props.length) % props.length] : null);
     if (!props.length) { scr.classList.remove('on'); setTimeout(() => { if (!props.length) scr.style.display = 'none'; }, 350); scrSeat = -1; aim.set(0, 1.15, -3); return; }
     qi = (go + props.length) % props.length;
     const p = props[qi], i = list.findIndex(s => s.k === p.dir), s = list[i];
@@ -442,7 +446,7 @@ export function openBoardroom(o) {
       const fit = p.inBudget == null ? '' : p.inBudget ? '<div class="fit" style="color:#5fd38a;font-weight:700;margin:-4px 0 8px">✅ в рамките на бюджета за инвестиции</div>' : '<div class="fit" style="color:#ffb347;font-weight:700;margin:-4px 0 8px">⚠️ над бюджета за инвестиции</div>';
       scr.innerHTML = `<div class="hd"><span>📋 Предложение към борда</span><span>${qi + 1} / ${props.length}</span></div><div class="who"></div><div class="tx"></div>${p.cost ? `<div class="cost">💶 ${f(p.cost)} €</div>` : ''}${fit}<div class="row"><button class="y">✓ Да</button><button class="n">✖ Не</button><button class="l">⏳ По-късно</button></div>`;
       const y = scr.querySelector('.y'); y.disabled = p.can === false; if (y.disabled) y.title = 'Нямаш достатъчно пари';
-      for (const [c, a] of [['y', 'yes'], ['n', 'no'], ['l', 'later']]) scr.querySelector('.' + c).onclick = () => { const r = o.onDecide && o.onDecide(p.id, a); if (r && r.need === 'vote') showVote(r); else board(qi); };   // решеното изчезва — на същото място идва следващото
+      for (const [c, a] of [['y', 'yes'], ['n', 'no'], ['l', 'later']]) scr.querySelector('.' + c).onclick = () => { const r = o.onDecide && o.onDecide(p.id, a); if (r && r.need === 'vote') showVote(r); else after(a === 'yes' ? 'ok' : a); };   // решеното изчезва — на същото място идва следващото
     }
     scr.querySelector('.who').textContent = `${p.ico || s?.ico || ''} ${s?.director || s?.company || ''}`;
     scr.querySelector('.tx').textContent = p.text;
@@ -461,7 +465,7 @@ export function openBoardroom(o) {
     const vs = scr.querySelector('.votes');
     for (const x of v.votes) { const d = document.createElement('div'), m = document.createElement('b'); m.textContent = x.yes ? '✔ ' : '✖ '; m.style.color = x.yes ? '#43d17a' : '#ff4d4d'; m.style.fontWeight = '900'; d.appendChild(m); d.appendChild(document.createTextNode(`${x.name} — ${x.why}`)); vs.appendChild(d); }   // ✖ против — червено, ✔ за — зелено (емоджито ❌ излизаше сиво „×“)
     const row = scr.querySelector('.row');
-    const btn = (t, how, y) => { const b = document.createElement('button'); b.textContent = t; if (y) b.className = 'y'; b.onclick = () => { o.onResolve && o.onResolve(p.id, how); board(qi); }; row.appendChild(b); };
+    const btn = (t, how, y) => { const b = document.createElement('button'); b.textContent = t; if (y) b.className = 'y'; b.onclick = () => { o.onResolve && o.onResolve(p.id, how); after(how === 'drop' ? 'later' : 'ok'); }; row.appendChild(b); };
     if (v.passed || v.tie) btn(v.tie ? '✓ Решавам „за“' : '✓ Изпълни', 'pass', true); else btn('⚖️ Наложи (вето)', 'veto', true);
     btn('🏦 С кредит', 'loan'); btn('⏳ Отложи', 'drop');
     for (const x of v.votes) {
@@ -483,6 +487,9 @@ export function openBoardroom(o) {
   const cfg = el.querySelector('.cfg'), setEl = el.querySelector('.set');
   const fillSet = () => { setEl.innerHTML = o.settings(); o.bindSettings && o.bindSettings(setEl, fillSet); };
   if (o.settings && o.settings()) { cfg.style.display = ''; cfg.onclick = () => { setEl.classList.toggle('on'); if (setEl.classList.contains('on')) fillSet(); }; }
+  // решението: холограмата светва (зелено / кехлибарено / червено) и след миг идва следващото
+  let afterT = 0;
+  function after(kind) { holo.flash(kind); scr.querySelectorAll('button').forEach(b => b.disabled = true); clearTimeout(afterT); afterT = setTimeout(() => !shut && board(qi), 1100); }
   nav.querySelector('.pv').onclick = () => board(qi - 1);
   nav.querySelector('.nx').onclick = () => board(qi + 1);
   // екранът следва главата на директора (или стола, ако няма модел); камерата бавно се обръща към него
@@ -533,7 +540,7 @@ export function openBoardroom(o) {
       if (p) play(p, p.talk[(Math.random() * p.talk.length) | 0], true);
     }
     for (const p of people) { p.mixer.update(dt); if (p.busy > 0 && (p.busy -= dt) <= 0) back(p); }
-    placeScreen(dt); placeBadges(); ctl.update();
+    placeScreen(dt); placeBadges(); holo.update(dt); ctl.update();
     if (cam.position.y > ROOM_H - 0.3) cam.position.y = ROOM_H - 0.3;   // камерата — под тавана
     renderer.render(scene, cam);
   }
@@ -547,7 +554,7 @@ export function openBoardroom(o) {
       cancelAnimationFrame(raf); ctl.dispose();
       for (const p of people) { p.mixer.stopAllAction(); p.wrap.remove(p.m); }   // моделите остават в кеша за следващия път
       scene.traverse(c => { if (c.isMesh && !c.isSkinnedMesh) { c.geometry.dispose(); const ms = [].concat(c.material); ms.forEach(mm => { mm.map && mm.map.dispose(); mm.dispose(); }); } });
-      scene.environment && scene.environment.dispose(); pmrem.dispose(); renderer.dispose(); el.remove();
+      holo.dispose(); scene.environment && scene.environment.dispose(); pmrem.dispose(); renderer.dispose(); el.remove();
     }, 450);
   }
   return { close };
@@ -556,10 +563,11 @@ export function openBoardroom(o) {
 // демо за Лабораторията: всички 7 директора на масата (+ хотелите — свободно място) и примерни предложения към борда
 const DEMO_PROPS = [
   { id: 'bank:brief:1', dir: 'bank', ico: '🏦', info: true, avail: 7.4e8, reserve: 1.8e8, text: 'В касата има 920 млн. €. След месечния резерв от 180 млн. € можем да отпуснем до 740 млн. € за инвестиции този месец.' },
-  { id: 'demo-air', dir: 'air', ico: '✈️', text: 'Имаме 10 гейта за ъпдейт в 4 летища — общо 720 млн. €. Да ги направим ли?', cost: 7.2e8, inBudget: true },
+  { id: 'demo-air', dir: 'air', ico: '✈️', text: 'Имаме 10 гейта за ъпдейт в 4 летища — общо 720 млн. €. Да ги направим ли?', cost: 7.2e8, inBudget: true, days: 90, geo: { country: 'BGR', kind: 'airport', cities: [{ nm: 'София', lat: 42.7, lon: 23.32 }, { nm: 'Пловдив', lat: 42.15, lon: 24.75 }, { nm: 'Варна', lat: 43.21, lon: 27.91 }, { nm: 'Бургас', lat: 42.5, lon: 27.47 }] } },
+  { id: 'demo-hotel', dir: 'hotel', ico: '🏨', text: 'Предлагам два нови хотела в Испания — в Мадрид и Барселона.', cost: 1.8e8, inBudget: true, days: 120, income: 2.4e6, geo: { country: 'ESP', kind: 'hotel', cities: [{ nm: 'Мадрид', lat: 40.42, lon: -3.7 }, { nm: 'Барселона', lat: 41.39, lon: 2.17 }] } },
   { id: 'demo-rail', dir: 'rail', ico: '🚆', text: 'Да построим 24 нови линии и да купим 22 влака?', cost: 3.2e7, inBudget: false },
   { id: 'demo-oil', dir: 'oil', ico: '🛢️', text: 'Договор за доставка на гориво: Шанхай — 2 млн. барела, +18 млн. € за 60 дни. Приемаме ли?', cost: 0 },
-  { id: 'demo-hw', dir: 'hw', ico: '🛣️', text: 'За 5-те нови филиала няма мрежа — да строим аутобани за 3 млн. € и да купим 52 ТИР-а?', cost: 3e6, inBudget: true },
+  { id: 'demo-hw', dir: 'hw', ico: '🛣️', text: 'За 5-те нови филиала няма мрежа — да строим аутобани за 3 млн. € и да купим 52 ТИР-а?', cost: 3e6, inBudget: true, days: 60, geo: { country: 'DEU', kind: 'route', cities: [{ nm: 'Берлин', lat: 52.52, lon: 13.4 }, { nm: 'Хамбург', lat: 53.55, lon: 9.99 }, { nm: 'Мюнхен', lat: 48.14, lon: 11.58 }, { nm: 'Кьолн', lat: 50.94, lon: 6.96 }, { nm: 'Франкфурт', lat: 50.11, lon: 8.68 }], route: [[0, 1], [0, 2], [3, 4], [4, 2]] } },
   { id: 'demo-bank', dir: 'bank', ico: '🏦', text: 'Дали сме 22 млрд. € заеми; има искания за още 12 млрд. Да ги одобрим ли?', cost: 0 },
 ];
 export function demoBoardroom() {
