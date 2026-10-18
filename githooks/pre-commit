@@ -1,0 +1,3 @@
+#!/bin/sh
+# версия към скриптовете при всеки commit (stamp.mjs): хешовете — от staged версиите; index.html се обновява и в commit-а
+node "$(git rev-parse --show-toplevel)/stamp.mjs" --staged || { echo "stamp.mjs се провали — commit-ът е спрян" >&2; exit 1; }

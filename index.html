@@ -292,10 +292,129 @@
   @media (min-width:761px) { #panel { top:var(--topH); } #top .stars { display:block; } }
 </style>
 <script type="importmap">
-{ "imports": {
+{
+ "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-} }
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+  "./africa.js": "./africa.js?v=f669f0b4",
+  "./airport.js": "./airport.js?v=7727b983",
+  "./airways.js": "./airways.js?v=476639c7",
+  "./asia.js": "./asia.js?v=cb19211a",
+  "./autobahn.js": "./autobahn.js?v=3b2af29b",
+  "./bank.js": "./bank.js?v=95927ef2",
+  "./bankrupt.js": "./bankrupt.js?v=0b4869fe",
+  "./bidding.js": "./bidding.js?v=8bfcb691",
+  "./boardholo.js": "./boardholo.js?v=0db1d641",
+  "./boardlogic.js": "./boardlogic.js?v=622e6fc5",
+  "./cinema.js": "./cinema.js?v=7823e2b5",
+  "./citypanel.js": "./citypanel.js?v=351a3216",
+  "./cityplan-osm.js": "./cityplan-osm.js?v=f768f29e",
+  "./cityplan.js": "./cityplan.js?v=a071dcff",
+  "./cityplan3d.js": "./cityplan3d.js?v=1e37c7e7",
+  "./cityplangame.js": "./cityplangame.js?v=98dbfa95",
+  "./cityplanroute.js": "./cityplanroute.js?v=c1ef65b7",
+  "./civic3d.js": "./civic3d.js?v=a935db03",
+  "./cloud.js": "./cloud.js?v=9770a6c9",
+  "./conquest.js": "./conquest.js?v=bb27b556",
+  "./coop.js": "./coop.js?v=8e50c468",
+  "./corp.js": "./corp.js?v=730c5008",
+  "./corridors.js": "./corridors.js?v=c6a6fef8",
+  "./countries.js": "./countries.js?v=40672467",
+  "./daynight.js": "./daynight.js?v=2de5d2a6",
+  "./demolish.js": "./demolish.js?v=18057ece",
+  "./devlevel.js": "./devlevel.js?v=2f237477",
+  "./directors3d.js": "./directors3d.js?v=6325a520",
+  "./economy.js": "./economy.js?v=2a2d9dc4",
+  "./events.js": "./events.js?v=a1fc7ecf",
+  "./game.js": "./game.js?v=7851b4df",
+  "./globdir.js": "./globdir.js?v=0b35a1fd",
+  "./globe.js": "./globe.js?v=86842abe",
+  "./greatwall3d.js": "./greatwall3d.js?v=99001275",
+  "./group.js": "./group.js?v=a33dc3ca",
+  "./highways.js": "./highways.js?v=0773c775",
+  "./hotels.js": "./hotels.js?v=af4ae183",
+  "./hub.js": "./hub.js?v=d8f04be2",
+  "./hwtraffic.js": "./hwtraffic.js?v=54bf0551",
+  "./hwtrucks.js": "./hwtrucks.js?v=9bedc425",
+  "./imperial.js": "./imperial.js?v=2f7b2fd4",
+  "./impstyle.js": "./impstyle.js?v=5f45526b",
+  "./incidents.js": "./incidents.js?v=e60a6a1b",
+  "./intro.js": "./intro.js?v=2f432dac",
+  "./lab/approved.js": "./lab/approved.js?v=1e836a85",
+  "./lab/feature.js": "./lab/feature.js?v=9473fa25",
+  "./lab/features.js": "./lab/features.js?v=18bcebc3",
+  "./lab/lab.js": "./lab/lab.js?v=1a9027e7",
+  "./lab/viewer.js": "./lab/viewer.js?v=6f5878d9",
+  "./landmarks.js": "./landmarks.js?v=39bd72fe",
+  "./liftmodel.js": "./liftmodel.js?v=c993c5e1",
+  "./linkoffers.js": "./linkoffers.js?v=fc0c7d15",
+  "./lvshow.js": "./lvshow.js?v=a540071d",
+  "./maplayers.js": "./maplayers.js?v=c506354d",
+  "./maplod.js": "./maplod.js?v=85605f34",
+  "./megaorders.js": "./megaorders.js?v=37d385e6",
+  "./megaworld.js": "./megaworld.js?v=e0f1816a",
+  "./memfix.js": "./memfix.js?v=391cec42",
+  "./mine3d.js": "./mine3d.js?v=c94c0d1c",
+  "./mines.js": "./mines.js?v=299a9607",
+  "./mobile.js": "./mobile.js?v=7d605a2f",
+  "./mtn.js": "./mtn.js?v=e3e5784d",
+  "./namerica.js": "./namerica.js?v=8d0adef7",
+  "./names.js": "./names.js?v=6e08f568",
+  "./neom.js": "./neom.js?v=ce9f6f99",
+  "./nightfloors.js": "./nightfloors.js?v=54685d9c",
+  "./notif.js": "./notif.js?v=d4a6fbe0",
+  "./oceania.js": "./oceania.js?v=b2557de3",
+  "./officestyle.js": "./officestyle.js?v=1d385dd6",
+  "./oil.js": "./oil.js?v=fc5bb96c",
+  "./online-api.js": "./online-api.js?v=2e8ec1ca",
+  "./online-btn.js": "./online-btn.js?v=9a77fd8b",
+  "./online.js": "./online.js?v=fe4eebc4",
+  "./online3d.js": "./online3d.js?v=1ef240b4",
+  "./orient.js": "./orient.js?v=3f4ce70d",
+  "./panelintro.js": "./panelintro.js?v=5968e433",
+  "./passtrains.js": "./passtrains.js?v=09bb6748",
+  "./playtime.js": "./playtime.js?v=d24ad3b3",
+  "./portlights.js": "./portlights.js?v=a6d3c490",
+  "./quests.js": "./quests.js?v=4787475b",
+  "./questsx.js": "./questsx.js?v=1ccf0e2d",
+  "./railbuild.js": "./railbuild.js?v=268413de",
+  "./resorts.js": "./resorts.js?v=94b5455d",
+  "./resortview.js": "./resortview.js?v=c28222c4",
+  "./rivals.js": "./rivals.js?v=1bc6e27e",
+  "./roadlook.js": "./roadlook.js?v=2b96e288",
+  "./roofs.js": "./roofs.js?v=82197c30",
+  "./route66.js": "./route66.js?v=6614b827",
+  "./russia.js": "./russia.js?v=da14fe00",
+  "./samerica.js": "./samerica.js?v=9bf115c2",
+  "./saves.js": "./saves.js?v=f73103ff",
+  "./scenery.js": "./scenery.js?v=8f9fc3ac",
+  "./seaside.js": "./seaside.js?v=ae17b057",
+  "./seaways.js": "./seaways.js?v=9140b9b8",
+  "./shipmodels.js": "./shipmodels.js?v=420577f4",
+  "./silkroad.js": "./silkroad.js?v=96332829",
+  "./sitelights.js": "./sitelights.js?v=245fd0af",
+  "./sound.js": "./sound.js?v=805aa142",
+  "./statetenders.js": "./statetenders.js?v=f53a6376",
+  "./station.js": "./station.js?v=684712de",
+  "./subshow.js": "./subshow.js?v=02dcbd49",
+  "./supply.js": "./supply.js?v=25a8a07c",
+  "./tall.js": "./tall.js?v=2fd89737",
+  "./tasks.js": "./tasks.js?v=8a28665d",
+  "./tender3d.js": "./tender3d.js?v=6bfaa3b3",
+  "./tenders.js": "./tenders.js?v=e2777b4b",
+  "./tips.js": "./tips.js?v=f58d6ac2",
+  "./tour.js": "./tour.js?v=74982a85",
+  "./trackpath.js": "./trackpath.js?v=6c27555a",
+  "./trainmodels.js": "./trainmodels.js?v=c276d086",
+  "./trucks.js": "./trucks.js?v=9e4b7f85",
+  "./tutorial.js": "./tutorial.js?v=5528143c",
+  "./ukraine.js": "./ukraine.js?v=cdd1018c",
+  "./vehmodels.js": "./vehmodels.js?v=b0e639a8",
+  "./water.js": "./water.js?v=b9a260b3",
+  "./weather.js": "./weather.js?v=b9344a63",
+  "./worldevents.js": "./worldevents.js?v=e86b0a34"
+ }
+}
 </script>
 <style id="mob">
   /* ===== телефон (mobile.js слага body.mob; .land — хоризонтално) ===== */
@@ -419,12 +538,12 @@
 <div id="modal" class="hidden"><div class="box" id="modalBox"></div></div>
 <div id="loading"><div class="ld-bg"></div><div class="ld-box"><div class="ld-txt" id="ldTxt">Зареждане… 0%</div><div class="ld-bar"><i id="ldBar"></i></div></div></div>
 
-<script src="mobile.js"></script>
-<script type="module" src="memfix.js"></script>
-<script type="module" src="game.js"></script>
-<script type="module" src="tips.js"></script>
-<script type="module" src="panelintro.js"></script>
-<script type="module" src="cloud.js"></script>
-<script type="module" src="online-btn.js"></script>
+<script src="mobile.js?v=7d605a2f"></script>
+<script type="module" src="memfix.js?v=391cec42"></script>
+<script type="module" src="game.js?v=7851b4df"></script>
+<script type="module" src="tips.js?v=f58d6ac2"></script>
+<script type="module" src="panelintro.js?v=5968e433"></script>
+<script type="module" src="cloud.js?v=9770a6c9"></script>
+<script type="module" src="online-btn.js?v=9a77fd8b"></script>
 </body>
 </html>
