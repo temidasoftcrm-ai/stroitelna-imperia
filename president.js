@@ -82,7 +82,7 @@ export function createPresidency(deps) {
     for (const c of CONFLICTS) { const k = conf(c.k); if (k.step >= 6 || k.wait > d) continue; const st6 = PEACE[k.step], party = c.parties.includes(me());
       const dir = party ? 'def' : k.step >= 3 ? 'pm' : 'air', p = Math.round(chance(c) * 100);
       P({ id: `${dir}:peace-${c.k}-${k.step}:1`, dir, ico: st6.ico, text: party ? `${NAMES[dir]}: ${c.nm} — ние сме страна. Предлагам „${st6.nm}“: решението е наше, но струва доверие у дома.` : `${NAMES[dir]}: ${c.nm} — предлагам следващата стъпка: „${st6.nm}“.`,
-        why: `шанс другите да приемат ~${p}%${c.note ? ` · ${c.note}` : ''}${k.step === 2 ? ' · след примирието то трябва да се поддържа' : ''}`, cost: Math.round((k.step >= 3 ? 2e9 : 5e8) * K()), days: 30, gainTxt: k.step === 2 ? '🕊️ прекратяване на огъня' : `стъпка ${k.step + 1} от 6`, kind: 'peace', ck: c.k, geo: geoOf(c.region) }); }
+        why: `шанс другите да приемат ~${p}%${k.step === 2 ? ' · след примирието то трябва да се поддържа' : ''}`, cost: Math.round((k.step >= 3 ? 2e9 : 5e8) * K()), days: 30, gainTxt: k.step === 2 ? '🕊️ прекратяване на огъня' : `стъпка ${k.step + 1} от 6`, kind: 'peace', ck: c.k, geo: geoOf(c.region) }); }
     // 🔧 примирие в опасност — ранно предупреждение
     for (const c of CONFLICTS) { const k = conf(c.k); if (k.step >= 3 && k.step < 6 && k.stab < 45)
       P({ id: `def:hold-${c.k}:1`, dir: 'def', ico: '🔍', text: `Ивайло: примирието в „${c.nm}“ се клати (${Math.round(k.stab)}/100). Предлагам наблюдатели и доставки, за да не рухне.`, why: 'без доставки, възстановяване и доверие договореността става нестабилна', cost: Math.round(3e9 * K()), days: 20, gainTxt: '+30 стабилност на примирието', kind: 'hold', ck: c.k, geo: geoOf(c.region) }); }
@@ -104,7 +104,7 @@ export function createPresidency(deps) {
 
   // ---- ✅ решение по предложение: 'yes' | 'small' | 'no' | 'later'
   function decide(id, a) {
-    const s = st(); if (!s) return null; const p = proposals().find(q => q.id === id); if (!p) return null; const key = id.split(':').slice(0, 2).join(':'), d = day();
+    const s = st(); if (!s) return null; id = String(id).replace(/\|small$/, ''); const p = proposals().find(q => q.id === id); if (!p) return null; const key = id.split(':').slice(0, 2).join(':'), d = day();
     if (a === 'no' || a === 'later') { s.skip[key] = d + (a === 'no' ? 90 : 30); if (a === 'no' && p.kind === 'aid') { s.stab[p.iso] = cl(stab(p.iso) - 3); log(`Отказана помощ за ${nm(p.iso)} — изпусната възможност.`); } deps.save(); return null; }
     const small = a === 'small' && p.small, cost = small ? p.small.cost : p.cost || 0;
     if (cost > s.res) { deps.toast(`💰 Борис: в резерва има ${B(s.res)} — програмата струва ${B(cost)}. Да започнем по-малък етап или да изчакаме.`, 'bad'); return null; }
@@ -239,10 +239,10 @@ export function createPresidency(deps) {
     const s = st(); import('./directors3d.js').then(m => { if (!m.openCabinet) return;
       const brief = { id: `fin:brief:${day()}`, dir: 'fin', ico: '💰', info: true, text: '' };
       m.openCabinet({ cc: s.cc, title: s.cc === 'RU' ? 'Правителството' : 'The Cabinet', brand: { nm: s.cc === 'RU' ? 'Россия' : 'USA', col: s.cc === 'RU' ? '#d52b1e' : '#3c3b6e', ico: '🦅', group: s.cc === 'RU' ? 'Правителство' : 'Белият дом', sub: '· МИНИСТЕРСКИ СЪВЕТ ·' },
-        proposals: () => [brief, ...proposals().map(p => ({ ...p, inBudget: (p.cost || 0) <= s.res }))], onDecide: (id, a) => { decide(id, a); render(); return null; },
+        proposals: () => [brief, ...proposals().map(p => ({ ...p, text: p.text.replace(/^[А-ЯЁ][а-яё]+: /, ''), inBudget: (p.cost || 0) <= s.res }))],   // името на министъра вече е горе на екрана onDecide: (id, a) => { decide(id, a); render(); return null; },
         voteOn: id => vote(id), onResolve: (id, how) => { decide(id.replace(/\|small$/, ''), how === 'drop' ? 'later' : how === 'small' ? 'small' : 'yes'); render(); return null; },
         speech: () => `Резервът е ${B(s.res)}. За нови програми имаме по ${B(free())} на месец. ${s.res < free() ? 'Предлагам по-малки първи етапи.' : 'Можем да започнем една голяма и няколко малки програми.'}`,
-        frame: () => ({ cash: Math.max(0, s.res), reserved: 0, op: REV[s.cc] * (1 - FREE_K), free: Math.max(0, s.res), loan: 0 }),
+        frame: () => ({ cash: Math.max(0, s.res), reserved: 0, op: 0, free: Math.max(0, s.res), loan: 0 }),
         summary: () => `Кабинетът продължава. Стабилност ${Math.round(Object.values(s.ind).reduce((a, v) => a + v, 0) / 5)}/100, резерв ${B(s.res)}.`,
         brief: k => ({ fin: `Резервът е ${B(s.res)}.`, pm: `Обещания: ${s.prom.filter(p => p.done).length}/${s.prom.length}. Ниво ${s.lv}.`, def: `Сигурност ${Math.round(s.ind.security)}/100.`, energy: `Енергия ${Math.round(s.ind.energy)}/100.`, reg: `Услуги ${Math.round(s.ind.services)}/100.` })[k] || '' });
     }); }

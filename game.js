@@ -9068,7 +9068,7 @@ if (AUTOTEST) {
     boardReview() { return boardL.review().map(r => `${r.status} · ${r.c.dir} · ${r.c.text.slice(0, 60)} · ${Math.round((r.c.prog || 0) * 100)}% · ${r.c.reason || ''}`); },
     boardReq(id, how) { const r = how ? boardL.resolve(id, how) : boardL.request(id); return r.need ? { need: r.need, votes: r.v.votes.map(x => `${x.cond ? '◐' : x.yes ? '✔' : '✖'} ${x.name}: ${x.why}`), bank: r.v.bank.why || 'ok' } : r; },
     boardFrame() { return boardL.frame(); },
-    presTest(cc = 'US') { S.president = { cc, day: S.day, ev: 300 }; pres.start(cc); pres.cabinet(); return pres.proposals().length; },   // за city-builder-f9: Министерският съвет с истинските данни
+    presTest(cc = 'US') { S.president = { cc, day: S.day, ev: 300 }; S.pres = null; pres.start(cc); pres.cabinet(); return pres.proposals().length; },   // за city-builder-f9: Министерският съвет с истинските данни
     imp() { const st = imperial.stats(); return { cc: S.imp?.cc, lv: S.imp?.lv, best: dev.best(), pop: Math.round(st?.pop || 0), house: st?.house, jobs: st?.jobs, vac: st?.vac, unemp: st?.unemp, k: st?.k, sat: st?.sat, bal: Math.round(st?.bal || 0), up: Math.round(st?.up || 0), why: (st?.why || []).map(w => w.txt), streak: S.imp?.streak, city: (({ lat, lon, cc }) => ({ lat, lon, cc }))(cityById(NEOM_ID)) }; },
     impWin() { return imperial.winHtml().replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 900); },
     boardGeo() { return boardProposals().filter(p => p.dir === 'bank' && p.geo).map(p => p.geo); },
@@ -9450,6 +9450,54 @@ if (params.has('profile')) {
   window.__camNow = () => [camera.position.toArray(), controls.target.toArray()];
   window.__open = kind => openBig(kind);
   window.__cityCount = () => CITIES.filter(c => !gateHidden(c.id)).length;
+  // 🚆 симулация на жп за ниво lv (нова тестова игра): всички достъпни градове с гари 5, проверка на цената за всяка допустима двойка,
+  // мрежа от kNear най-близки линии (над 1000 км — модернизирани), влакове от всички видове до лимита, days дни само на влаковете
+  window.__railSim = (lv, days = 120, kNear = 3) => {
+    const bad = [], err = (m, x) => { if (bad.length < 60) bad.push(m + (x != null ? ' ' + JSON.stringify(x) : '')); };
+    const keep = { save, toast, SFXcash, showEventPop }; save = () => {}; toast = () => {}; SFXcash = () => {}; showEventPop = () => {};
+    try {
+      S.dev.lv = lv; S.contOpen = { af: lv >= DEV_LV.WORLD, na: lv >= DEV_LV.NA, sa: lv >= DEV_LV.SA, as: lv >= DEV_LV.AS, oc: lv >= DEV_LV.OC };
+      const ids = CITIES.map(c => c.id).filter(id => !AIR_ONLY.has(id) && id !== NEOM_ID && !gateHidden(id) && dev.best() >= cityLv(id) && (!contOf(id) || contOf(id).open()) && (dev.has('BALKANS') || !isForeign(id)));
+      S.branches = ids.filter(id => id !== S.cityId); S.stationLevel = 5;
+      for (const id of S.branches) S.cities[id] = { ...newCityState(), stationLevel: 5 };
+      // допустима ли е линията — същите правила като railClick
+      const ok = (a, id) => { const gib = mw.done('gibraltar') && [a, id].some(x => cityById(x)?.cc === '🇪🇸') && [a, id].some(x => cityById(x)?.cc === '🇲🇦');
+        if (!gib && (contOf(a) || contOf(id)) && contOf(a) !== contOf(id) && !((contOf(a) || contOf(id)).land && !(contOf(a) && contOf(id)))) return false; return !crossesSahara(a, id); };
+      let pairs = 0, okN = 0;
+      for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) { pairs++; if (!ok(ids[i], ids[j])) continue; okN++; const q = railQuote(ids[i], ids[j]);
+        if (!(q.km > 0) || !Number.isFinite(q.cost) || !(q.cost > 0) || !(q.days >= 1) || !Number.isFinite(q.days)) err('лоша цена', [ids[i], ids[j], q]); }
+      const seen = new Set(); S.rails = [];
+      for (const a of ids) for (const b of ids.filter(b => b !== a && ok(a, b)).sort((x, y) => kmBetween(a, x) - kmBetween(a, y)).slice(0, kNear)) {
+        const key = [a, b].sort().join('|'); if (seen.has(key)) continue; seen.add(key); const q = railQuote(a, b);
+        S.rails.push({ a, b, km: q.km, days: q.days, prog: 1, built: true, hs: q.km >= 1000 }); }
+      invalidateRailGraph();
+      // свързаност: колко компонента има мрежата
+      const comp = []; { const left = new Set(ids); while (left.size) { const s0 = left.values().next().value, q = [s0], c = new Set([s0]); left.delete(s0); while (q.length) for (const n of railNeighbors(q.shift())) if (left.has(n)) { left.delete(n); c.add(n); q.push(n); } comp.push(c.size); } }
+      econ.earn(5e10, 'друго', 'тест'); S.trains = [];
+      const kinds = Object.keys(TRAIN_TYPES).filter(k => !TRAIN_TYPES[k].express || dev.has('AIR')), cap = fleetCap.train(), withRail = ids.filter(id => railNeighbors(id).length);
+      for (let n = 0; n < cap; n++) { const at = withRail[(n * 7) % withRail.length], k = kinds[n % kinds.length]; const before = S.trains.length; buyTrain(k, at); if (S.trains.length === before) err('не купи влак', { k, at }); }
+      const m0 = econ.s.money, stat = {}, last = new Map(S.trains.map(t => [t.id, { km: -1, at: t.at, still: 0 }]));
+      for (let d = 0; d < days; d++) {
+        for (let s = 0; s < 24; s++) updateTrains(1 / 24);
+        S.day++; S.jobs = (S.jobs || []).filter(j => j.expires >= S.day); while (S.jobs.length < 3 && network().length > 1) { const n = S.jobs.length; makeJob(); if (S.jobs.length === n) break; }
+        for (const t of S.trains) {
+          const T = trainType(t), L = last.get(t.id), st = stat[t.kind] = stat[t.kind] || { n: 0, trips: 0, idleDays: 0, km: 0 };
+          if (!Number.isFinite(t.km) || !Number.isFinite(t.total)) err('NaN', { id: t.id, kind: t.kind, km: t.km, total: t.total });
+          if (!cityById(t.at)) err('непознат град', { id: t.id, at: t.at });
+          if (t.path) for (let i = 1; i < t.path.length; i++) if (!railNeighbors(t.path[i - 1]).includes(t.path[i])) { err('скок без линия', { kind: t.kind, from: t.path[i - 1], to: t.path[i] }); break; }
+          if (t.job && t.total <= 0 && t.path && t.path.length > 1) err('курс с 0 км', { kind: t.kind, path: t.path });
+          if (t.job) { const [x, y] = trainXY(t); if (!Number.isFinite(x) || !Number.isFinite(y)) err('NaN на картата', { kind: t.kind, at: t.at }); }
+          if (!t.job) st.idleDays++; if (t.at !== L.at || (t.job && t.km !== L.km)) L.still = 0; else L.still++;
+          if (L.still === 20) err('стои 20 дни', { kind: t.kind, at: t.at, net: railNeighbors(t.at).length, job: !!t.job, hs: hsNeighbors(t.at).length });
+          if (t.at !== L.at) st.trips++; L.at = t.at; L.km = t.km;
+        }
+      }
+      for (const t of S.trains) { const st = stat[t.kind]; st.n++; }
+      for (const st of Object.values(stat)) st.idlePct = Math.round(100 * st.idleDays / Math.max(1, st.n * days));
+      return { lv, cities: ids.length, pairs, okPairs: okN, rails: S.rails.length, hs: S.rails.filter(r => r.hs).length, components: comp.sort((a, b) => b - a).slice(0, 6), tracks: totalTracks(), cap, trains: S.trains.length,
+        moneyDelta: Math.round(econ.s.money - m0), perTrainDay: Math.round((econ.s.money - m0) / Math.max(1, S.trains.length) / days), stat, errors: bad };
+    } finally { Object.assign(window, {}); save = keep.save; toast = keep.toast; SFXcash = keep.SFXcash; showEventPop = keep.showEventPop; }
+  };
   window.__spurs = () => ({ fix: S.spurFix, spurs: (S.spurs || []).map(s => s.a + '—' + s.b), done: (S.hwDone || []).filter(x => /neom|tokyo|seoul/.test(x)) });
   window.__impTest = cc => { S.imp = { ...(S.imp || {}), cc }; impPlace(); return { neom: [cityById(NEOM_ID).lat, cityById(NEOM_ID).lon] }; };
   window.__ext = ids => Object.fromEntries(ids.map(id => [id, { tier: cityTier(id), rule: extRule(id), max: extMaxOf(id), need: extNeedOf(id), now: extNow(id), info: districtInfo(id) }]));
