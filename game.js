@@ -9074,6 +9074,7 @@ if (AUTOTEST) {
     boardReview() { return boardL.review().map(r => `${r.status} · ${r.c.dir} · ${r.c.text.slice(0, 60)} · ${Math.round((r.c.prog || 0) * 100)}% · ${r.c.reason || ''}`); },
     boardReq(id, how) { const r = how ? boardL.resolve(id, how) : boardL.request(id); return r.need ? { need: r.need, votes: r.v.votes.map(x => `${x.cond ? '◐' : x.yes ? '✔' : '✖'} ${x.name}: ${x.why}`), bank: r.v.bank.why || 'ok' } : r; },
     boardFrame() { return boardL.frame(); },
+    presFinale() { if (!S.pres) { S.president = { cc: 'US', day: S.day, ev: 300 }; pres.start('US'); } pres.finale(); return !!document.getElementById('presEnd'); },
     presTest(cc = 'US') { S.president = { cc, day: S.day, ev: 300 }; S.pres = null; pres.start(cc); pres.cabinet(); return pres.proposals().length; },   // за city-builder-f9: Министерският съвет с истинските данни
     imp() { const st = imperial.stats(); return { cc: S.imp?.cc, lv: S.imp?.lv, best: dev.best(), pop: Math.round(st?.pop || 0), house: st?.house, jobs: st?.jobs, vac: st?.vac, unemp: st?.unemp, k: st?.k, sat: st?.sat, bal: Math.round(st?.bal || 0), up: Math.round(st?.up || 0), why: (st?.why || []).map(w => w.txt), streak: S.imp?.streak, city: (({ lat, lon, cc }) => ({ lat, lon, cc }))(cityById(NEOM_ID)) }; },
     impWin() { return imperial.winHtml().replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 900); },
@@ -9456,6 +9457,49 @@ if (params.has('profile')) {
   window.__camNow = () => [camera.position.toArray(), controls.target.toArray()];
   window.__open = kind => openBig(kind);
   window.__cityCount = () => CITIES.filter(c => !gateHidden(c.id)).length;
+  // 🚜 симулация на гаража и техниката за ниво lv (нова тестова игра): филиали във всички достъпни градове; на всеки 10 дни — случайни
+  // строежи в част от градовете (на различни етапи) и участъци магистрали; всеки ден — garArrive, garAutoTick (пращане, купуване, разширяване), rbuildTick.
+  // Проверки: машините не изчезват/не се появяват, градовете не надхвърлят офиса/гаража, без пращане напред-назад, за колко дни се покрива липсата.
+  window.__garSim = (lv, days = 120, money = 5e10) => {
+    const bad = [], err = (m, x) => { if (bad.length < 60) bad.push(m + (x != null ? ' ' + JSON.stringify(x) : '')); };
+    const keep = { save, toast, SFXcash, showEventPop }; save = () => {}; toast = () => {}; SFXcash = () => {}; showEventPop = () => {};
+    const eb = econ.buyUnit.bind(econ); let bought = 0; econ.buyUnit = t => { const r = eb(t); if (r) bought++; return r; };
+    try {
+      S.dev.lv = lv; S.contOpen = { af: lv >= DEV_LV.WORLD, na: lv >= DEV_LV.NA, sa: lv >= DEV_LV.SA, as: lv >= DEV_LV.AS, oc: lv >= DEV_LV.OC };
+      const ids = CITIES.map(c => c.id).filter(id => !AIR_ONLY.has(id) && id !== NEOM_ID && !gateHidden(id) && dev.best() >= cityLv(id) && (!contOf(id) || contOf(id).open()) && (dev.has('BALKANS') || !isForeign(id)));
+      S.branches = ids.filter(id => id !== S.cityId);
+      for (const id of S.branches) S.cities[id] = { ...newCityState(), units: [...ECON.START.units], unitXp: ECON.START.units.map(() => 0) };
+      S.garAutoOn = true; econ.earn(money - econ.s.money, 'друго', 'тест');
+      const all = () => ownedCities().reduce((a, id) => a + cityUnitTypes(id).length, 0) + garTransit().length;
+      const n0 = all(), moves = [], open = new Map(), res = []; let fees0 = econ.s.money;
+      const types = ['house', 'shop', 'office', 'tower'], rnd = rng(lv * 7919 + 1);
+      const demand = () => {
+        for (const id of S.branches) { const c = S.cities[id]; c.projects = rnd() < 0.4 ? Array.from({ length: 1 + (rnd() * 3 | 0) }, () => ({ type: types[rnd() * (lv >= 8 ? 4 : lv >= 3 ? 3 : 2) | 0], stage: rnd() * 4 | 0 })) : []; }
+        S.hwJobs = dev.has('LINKS') ? S.branches.filter(() => rnd() < 0.08).map((id, i) => ({ seg: 'sim' + i, city: id, stage: rnd() * 4 | 0, prog: 0, v2: true, ab: rnd() < 0.3 })) : [];
+      };
+      for (let d = 0; d < days; d++) {
+        if (d % 10 === 0) { demand(); for (const id of ownedCities()) if (Object.keys(garNeed(id)).length) open.set(id, open.get(id) ?? S.day); }
+        const before = all(), b0 = bought, tr0 = garTransit().length;
+        const mv = garMove; garMove = (t, from, to, n, silent) => { const k = mv(t, from, to, n, silent); if (k) moves.push({ t, from, to, n: k, day: S.day }); return k; };
+        try { garArrive(); garAutoTick(); rbuildTick(); } finally { garMove = mv; }
+        S.day++;
+        const after = all(); if (after !== before + (bought - b0)) err('техниката не се пази', { day: S.day, before, after, bought: bought - b0, transit: [tr0, garTransit().length] });
+        if (!Number.isFinite(econ.s.money)) err('NaN пари', { day: S.day });
+        for (const m of garTransit()) if (!(m.arrive > S.day - 1) || !S.cities[m.to] && m.to !== S.cityId) err('лош транзит', m);
+        for (const id of ownedCities()) { const cap = garCaps(id), have = cityUnitTypes(id), cr = have.filter(x => !isMachine(x)).length, ma = have.filter(x => isMachine(x) && !isRoadGear(x)).length;
+          if (cr > cap.crews) err('офисът е препълнен', { id, cr, cap: cap.crews }); if (ma > cap.mach) err('гаражът е препълнен', { id, ma, cap: cap.mach });
+          for (const t of GAR_TYPES().filter(isRoadGear)) { const n = have.filter(x => x === t).length; if (n > roadCap(t)) err('пътна техника над лимита', { id, t, n }); }
+          const lack = Object.entries(garNeed(id)).some(([t, n]) => (garHave(id)[t] || 0) < n);
+          if (lack && !open.has(id)) open.set(id, S.day); if (!lack && open.has(id)) { res.push(S.day - open.get(id)); open.delete(id); } }
+      }
+      // напред-назад: същата машина обратно до 10 дни след като е пристигнала
+      let ping = 0; for (const a of moves) if (moves.some(b => b.t === a.t && b.from === a.to && b.to === a.from && b.day > a.day && b.day - a.day <= 10)) ping++;
+      const stuck = [...open.entries()].map(([id, d0]) => ({ id, days: S.day - d0, need: garNeed(id), have: garHave(id), cap: garCaps(id), lv: upgInfo(id).filter(u => u.kind === 'office' || u.kind === 'garage').map(u => `${u.kind}:${u.lv}${u.busy ? '*' : ''}`).join(',') })).filter(x => x.days > 15);
+      res.sort((a, b) => a - b);
+      return { lv, cities: ids.length, units0: n0, unitsEnd: all(), bought, moves: moves.reduce((a, m) => a + m.n, 0), ping, spent: Math.round(fees0 - econ.s.money),
+        fixDays: res.length ? { n: res.length, med: res[res.length >> 1], p90: res[Math.floor(res.length * 0.9)], max: res[res.length - 1] } : null, stuckOver15: stuck.length, stuck: stuck.slice(0, 5), errors: bad };
+    } finally { econ.buyUnit = eb; save = keep.save; toast = keep.toast; SFXcash = keep.SFXcash; showEventPop = keep.showEventPop; }
+  };
   // 🚆 симулация на жп за ниво lv (нова тестова игра): всички достъпни градове с гари 5, проверка на цената за всяка допустима двойка,
   // мрежа от kNear най-близки линии (над 1000 км — модернизирани), влакове от всички видове до лимита, days дни само на влаковете
   window.__railSim = (lv, days = 120, kNear = 3) => {

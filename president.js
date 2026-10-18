@@ -171,9 +171,24 @@ export function createPresidency(deps) {
     34: s => CONFLICTS.every(c => s.conf[c.k].step >= 5),
     35: s => s.world >= 360,
   };
-  function levels() { const s = st(); if (!s) return; for (let l = (s.lv || 26) + 1; l <= 35; l++) { if (!MEETS[l](s)) break; s.lv = l; log(`Ниво ${l}.`); } }
+  function levels() { const s = st(); if (!s) return; for (let l = (s.lv || 26) + 1; l <= 35; l++) { if (!MEETS[l](s)) break; s.lv = l; log(`Ниво ${l}.`); } if (s.lv >= 35 && !s.finale) { s.finale = day(); deps.save(); setTimeout(finale, 6500); } }   // 🏁 ниво 35 — краят на играта (след картинката на нивото)
   const level = () => st()?.lv || 0;
 
+  // ---- 🏁 финалът: ниво 35 „Световен мир“ — играта е завършена (може да продължиш да играеш)
+  function finale() {
+    const s = st(); if (!s) return; const S = deps.S(), ended = CONFLICTS.filter(c => s.conf[c.k].step >= 5).length, aid = s.aid.filter(a => a.done).length;
+    const who = [['🏛️', 'Десислава Илиева', 'министър-председател'], ['💰', 'Борис Тодоров', 'финанси'], ['🏘️', 'Георги Николов', 'регионално развитие'], ['🛡️', 'Ивайло Петров', 'отбрана'], ['🛣️', 'Надя Иванова', 'пътища'], ['🚆', 'Мария Стоянова', 'железници'], ['⚓', 'Стефан Колев', 'морско дело'], ['✈️', 'Елена Димитрова', 'международни връзки'], ['⚡', 'Вера Ангелова', 'енергетика']];
+    const el2 = document.createElement('div'); el2.id = 'presEnd';
+    el2.style.cssText = 'position:fixed;inset:0;z-index:9800;background:radial-gradient(circle at 50% 30%,#1b2b4a,#05080f);color:#f3e7c4;font:500 15px/1.5 system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow:auto;padding:24px 16px;text-align:center';
+    el2.innerHTML = `<img src="assets/ui/levels/lv35.webp" alt="" onerror="this.remove()" style="width:min(340px,70vw);margin:0 0 8px"><div style="font-size:15px;letter-spacing:.3em;color:#ffd54a">🏁 КРАЙ НА ИГРАТА</div><h1 style="margin:6px 0 4px;font-size:34px;color:#ffd54a">🌍 Световен мир</h1>
+      <div style="max-width:620px;margin:0 0 14px">От малка строителна фирма в ${S.cityId ? 'България' : 'града си'} до световна империя, твой град от нулата и президентството на ${s.cc === 'RU' ? 'Русия' : 'САЩ'}. Конфликтите са прекратени, засегнатите региони имат основни услуги, а коалицията пази мира. <b>${deps.brand()}</b> влиза в историята.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:0 0 16px">${[[`${S.day}`, 'игрови дни'], [`${S.day - s.start}`, 'дни като президент'], [`${ended}/${CONFLICTS.length}`, 'прекратени конфликта'], [`${aid}`, 'проекта за помощ'], [`${Object.keys(s.coal).length}`, 'държави в коалицията'], [`${Object.keys(s.deals).length}`, 'споразумения']].map(([v, l]) => `<div style="background:rgba(255,213,74,.08);border:1px solid rgba(255,213,74,.35);border-radius:12px;padding:8px 14px"><b style="font-size:22px;color:#fff">${v}</b><div style="font-size:12px;opacity:.8">${l}</div></div>`).join('')}</div>
+      <div style="opacity:.85;margin:0 0 6px">Кабинетът, който го постигна:</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:4px 16px;max-width:680px;width:100%;margin:0 0 18px">${who.map(([i, n, r]) => `<div>${i} <b>${n}</b> · <span style="opacity:.75">${r}</span></div>`).join('')}</div>
+      <div style="opacity:.7;font-size:13px;margin:0 0 16px">Благодарим, че игра „Строителна империя“!</div>
+      <button data-endok="1" style="background:#ffd54a;color:#111;border:0;border-radius:10px;padding:10px 20px;font:700 15px system-ui;cursor:pointer">▶ Продължи да играеш</button>`;
+    document.body.appendChild(el2); window.__overlay3d = (window.__overlay3d || 0) + 1; deps.sound && deps.sound('levelup');
+    el2.querySelector('[data-endok]').onclick = () => { el2.remove(); window.__overlay3d = Math.max(0, (window.__overlay3d || 1) - 1); };
+  }
   // ---- 🪟 екранът на президента: Държава · Свят · Министерски съвет
   let el = null, tab = 'state', sel = null;
   const css = `#pres { position:fixed; inset:0; z-index:9780; background:#0b1220; color:#e6edf6; font:500 14px/1.45 system-ui, sans-serif; display:flex; flex-direction:column; }
@@ -190,7 +205,7 @@ export function createPresidency(deps) {
   const bar = (v, col) => `<div class="bar"><i style="width:${Math.round(v)}%;background:${col || (v >= 60 ? '#3fae6b' : v >= 40 ? '#ffd54a' : '#ff6b6b')}"></i></div>`;
   async function render() {
     if (!el) return; const s = st(), flag = s.cc === 'RU' ? '🇷🇺' : '🇺🇸', ps = proposals();
-    let h = `<div class="tb"><h2>${flag} Президентът · ${s.cc === 'RU' ? 'Кремъл' : 'Белият дом'} <span class="m">ниво ${s.lv}</span></h2>${[['state', '🏛️ Държава'], ['world', '🌍 Свят']].map(([k, t]) => `<button data-pt="${k}" class="${tab === k ? 'on' : ''}">${t}</button>`).join('')}<button data-pcab="1" class="y">📋 Министерски съвет (${ps.length})</button><button data-px="1">✕</button></div><div class="bd">`;
+    let h = `<div class="tb"><h2>${flag} Президентът · ${s.cc === 'RU' ? 'Кремъл' : 'Белият дом'} <span class="m">ниво ${s.lv}</span></h2>${[['state', '🏛️ Държава'], ['world', '🌍 Свят']].map(([k, t]) => `<button data-pt="${k}" class="${tab === k ? 'on' : ''}">${t}</button>`).join('')}<button data-pcab="1" class="y">📋 Министерски съвет (${ps.length})</button>${s.finale ? '<button data-pend="1">🏁 Финалът</button>' : ''}<button data-px="1">✕</button></div><div class="bd">`;
     if (tab === 'state') {
       h += `<div class="cd"><b>📊 Държавата</b>${Object.entries(IND).map(([k, [i, n]]) => `<div class="m">${i} ${n}: <b style="color:#e6edf6">${Math.round(s.ind[k])}</b></div>${bar(s.ind[k])}`).join('')}<div class="m">⚖️ Стабилна държава: всичко ≥ 60 и резерв ≥ 0 — ${s.streak}/90 дни</div></div>`;
       h += `<div class="cd"><b>💰 Държавният бюджет</b> <span class="m">(отделен от холдинга)</span><div class="m" style="margin-top:6px">Резерв: <b style="color:${s.res >= 0 ? '#7dffa8' : '#ff8a8a'}">${B(s.res)}</b></div><div class="m">Свободни за нови програми на месец: <b style="color:#e6edf6">${B(free())}</b></div><div class="m">Издръжка на помощта: ${B(s.aid.filter(a => a.done).reduce((x, a) => x + a.up, 0))}/месец</div></div>`;
@@ -204,7 +219,7 @@ export function createPresidency(deps) {
     el.innerHTML = h + '</div>';
     el.querySelector('[data-px]').onclick = close;
     el.querySelectorAll('[data-pt]').forEach(b => b.onclick = () => { tab = b.dataset.pt; render(); });
-    el.querySelector('[data-pcab]').onclick = cabinet;
+    el.querySelector('[data-pcab]').onclick = cabinet; el.querySelectorAll('[data-pend]').forEach(b => b.onclick = finale);
     el.querySelectorAll('[data-pol]').forEach(g => g.onclick = () => { sel = g.dataset.pol; render(); });
     el.querySelectorAll('[data-conf]').forEach(g => g.onclick = () => { sel = 'c:' + g.dataset.conf; render(); });
     el.querySelectorAll('[data-pd]').forEach(b => b.onclick = () => { const [id, a] = b.dataset.pd.split('|'); decide(id, a); render(); });
@@ -246,5 +261,5 @@ export function createPresidency(deps) {
         summary: () => `Кабинетът продължава. Стабилност ${Math.round(Object.values(s.ind).reduce((a, v) => a + v, 0) / 5)}/100, резерв ${B(s.res)}.`,
         brief: k => ({ fin: `Резервът е ${B(s.res)}.`, pm: `Обещания: ${s.prom.filter(p => p.done).length}/${s.prom.length}. Ниво ${s.lv}.`, def: `Сигурност ${Math.round(s.ind.security)}/100.`, energy: `Енергия ${Math.round(s.ind.energy)}/100.`, reg: `Услуги ${Math.round(s.ind.services)}/100.` })[k] || '' });
     }); }
-  return { vote, start, state: st, proposals, decide, dailyTick, level, open, close, cabinet, active: () => !!st() };
+  return { finale, vote, start, state: st, proposals, decide, dailyTick, level, open, close, cabinet, active: () => !!st() };
 }
