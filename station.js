@@ -139,6 +139,7 @@ export function createStation(deps) {
       lab.position.set(X + 5.5, hh + 3 + (lv >= 3 ? 4 + lv : 0), hall.position.z); g.add(lab);
       }
     }
+    if (lv >= 1) yard(lv);
     site = null;
     if (building) {   // строеж на следващото ниво: оранжева ограда и скеле около новия коловоз
       site = new THREE.Group();
@@ -157,8 +158,54 @@ export function createStation(deps) {
     setParked(parked.map(p => p.info));
     setNight(night, true);
   }
+  // гаровият двор като на истинска гара: стрелки (диагонални коловози) между съседните коловози в двата края на пероните —
+  // „стълба“, по която влаковете минават от един коловоз на друг; пешеходен прелез през всички коловози със сигнали
+  // (жълто-черен кръст, две червени лампи, които мигат на смени, когато минава влак — на всеки ~30 s за ~9 s)
+  let blink = [];
+  function yard(lv) {
+    blink = [];
+    const plen = 30 + lv * 8, outer = trackX(Math.max(1, lv)), tracks = [X, ...Array.from({ length: Math.max(1, lv) }, (_, k) => trackX(k + 1))];
+    const diag = (x0, z0, x1, z1) => {   // коловоз по права от (x0, z0) до (x1, z1): парчета по 4 м, обърнати по посоката
+      const dx = x1 - x0, dz = z1 - z0, L = Math.hypot(dx, dz), yaw = Math.atan2(dx, dz), q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw), s = new THREE.Vector3(4, 4, 4), mats = [];
+      for (let d = 2; d < L - 1; d += 4) mats.push(new THREE.Matrix4().compose(new THREE.Vector3(x0 + dx * d / L, 0.01, z0 + dz * d / L), q, s));
+      return deps.instanced('track', mats);
+    };
+    const end = lv >= 5 ? -1 : 1;   // прелезът — откъм края без гаровата сграда
+    for (const sgn of [1, -1]) {
+      const z0 = sgn * (plen + 18);
+      for (let k = 0; k + 1 < tracks.length; k++) {   // всяка двойка съседни коловози — стрелка; посоката се редува (кръстосване)
+        const zA = z0 + sgn * (k % 2 ? 0 : 30), zB = zA + sgn * 26;
+        g.add(k % 2 ? diag(tracks[k], zA, tracks[k + 1], zB) : diag(tracks[k + 1], zA, tracks[k], zB));
+        const pt = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.35, 0.8), mat(0xd8d8d0)); pt.position.set((tracks[k] + tracks[k + 1]) / 2 + 1.6, 0.18, zA); g.add(pt);   // стрелочен механизъм
+      }
+    }
+    // пешеходният прелез: дървени плочи през коловозите + сигнали от двете страни
+    const zc = end * (plen + 6), x0 = X + 8, x1 = outer - 4;
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(x0 - x1, 0.12, 3), mat(0x6b5136)); deck.position.set((x0 + x1) / 2, 0.08, zc); deck.receiveShadow = true; g.add(deck);
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(x0 - x1, 0.13, 0.25), mat(0xf2d230)); for (const dz of [-1.6, 1.6]) { const st = stripe.clone(); st.position.set((x0 + x1) / 2, 0.09, zc + dz); g.add(st); }
+    const yellow = mat(0xf2c200), black = mat(0x1a1a1a);
+    const signal = (x, face) => {
+      const o = new THREE.Group(); o.position.set(x, 0, zc + 2.6 * face); o.rotation.y = face > 0 ? 0 : Math.PI; g.add(o);
+      for (let i = 0; i < 8; i++) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.55, 10), i % 2 ? black : yellow); b.position.y = 0.28 + i * 0.55; o.add(b); }
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 0.2, 12), black); base.position.y = 0.1; o.add(base);
+      for (const r of [Math.PI / 4, -Math.PI / 4]) { const arm = new THREE.Group(); arm.position.set(0, 4.6, 0.15); arm.rotation.z = r; o.add(arm); for (let i = -2; i <= 2; i++) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.28, 0.05), (i + 2) % 2 ? black : yellow); p.position.x = i * 0.42; arm.add(p); } }
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.12, 0.12), black); bar.position.set(0, 3.5, 0.12); o.add(bar);
+      for (const sx of [-0.7, 0.7]) {
+        const hood = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.12, 16), black); hood.rotation.x = Math.PI / 2; hood.position.set(sx, 3.5, 0.2); o.add(hood);
+        const lm = new THREE.MeshStandardMaterial({ color: 0x3a0606, emissive: 0xff1a1a, emissiveIntensity: 0, roughness: 0.4 }); const lamp = new THREE.Mesh(new THREE.CircleGeometry(0.22, 16), lm); lamp.position.set(sx, 3.5, 0.27); o.add(lamp); blink.push([lm, sx < 0 ? 0 : 1]);
+      }
+      const box = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.8, 0.3), mat(0x2a2a2a)); box.position.set(0, 1.9, 0.12); o.add(box);
+    };
+    signal(x0 + 0.8, 1); signal(x0 + 0.8, -1); signal(x1 - 0.8, 1); signal(x1 - 0.8, -1);
+  }
+  function blinkTick() {
+    if (!blink.length) return;
+    const t = performance.now() / 1000, on = t % 30 < 9, ph = Math.floor(t * 2.2) % 2;   // минава влак: лампите мигат на смени
+    for (const [m, k] of blink) m.emissiveIntensity = on && ph === k ? 3 : 0.05;
+  }
   // нощ 0…1: лампите светят, по пероните и коловозите падат светли петна
   function setNight(n, force = false) {
+    blinkTick();   // вика се всеки кадър — сигналите на прелеза мигат
     if (!force && Math.abs(n - night) < 0.01) return;
     night = n;
     for (const m of lamps) m.emissiveIntensity = 0.2 + 2.4 * n;
