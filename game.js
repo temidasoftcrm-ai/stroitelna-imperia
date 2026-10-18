@@ -3186,7 +3186,12 @@ function proj(lon, lat) { return [(lon - 25.4) * Math.cos(42.7 * Math.PI / 180) 
 // градовете с малко летище (Новоросийск…) остават на своето ниво от airways.js (напр. 1)
 const AIR_GIANT = new Set(['newyork', 'london', 'paris', 'tokyo', 'dubai', 'shanghai', 'singapore', 'hongkong', 'losangeles', 'moscow', 'istanbul', 'beijing', 'saopaulo', 'mumbai', 'sydney', 'frankfurt', 'chicago', 'seoul', 'cairo', 'johannesburg', 'lagos', 'mexicocity', 'toronto', 'buenosaires', 'kualalumpur', 'bangkok', 'amsterdam']);
 const AIR_SZ_MAX = [2, 2, 3, 5];   // по големината на града (sz 1–3)
-const airportMax = id => { const b = airportMax0(id); if (!b) return 0; if (AIR_GIANT.has(id)) return 7; return Math.max(Math.min(b, MEGAPOLIS.has(id) ? 6 : AIR_SZ_MAX[Math.min(3, cityById(id)?.sz || 1)]), S?.airports?.[id]?.lv || 0); };
+// ✈️ летища само в големите градове и мегаполисите (feature 'air-big-only'); от малките и средните — само острови и курорти,
+// където летището е единственият удобен път. Вече построените летища в записите остават (нивото им)
+const AIR_KEEP = new Set(['heraklion', 'zanzibar', 'varadero', 'holguin', 'puntacana', 'puertoplata', 'laromana', 'denpasar', 'cebu', 'kotakinabalu', 'penang', 'phuket', 'hobart', 'wellington', 'christchurch', 'queenstown', 'suva', 'portmoresby',
+  'burgas', 'nice', 'cancun', 'luxor', 'aswan', 'nhatrang', 'danang', 'goldcoast', 'cairns', 'alicesprings', 'darwin', 'innsbruck', 'cusco', 'flores']);
+const airSmallOff = id => feature('air-big-only') && !MEGAPOLIS.has(id) && (cityById(id)?.sz || 1) < 3 && !AIR_KEEP.has(id);
+const airportMax = id => { const b = airportMax0(id); if (!b) return 0; if (airSmallOff(id)) return S?.airports?.[id]?.lv || 0; if (AIR_GIANT.has(id)) return 7; return Math.max(Math.min(b, MEGAPOLIS.has(id) ? 6 : AIR_SZ_MAX[Math.min(3, cityById(id)?.sz || 1)]), S?.airports?.[id]?.lv || 0); };
 const countryD = new WeakMap();   // очертанията на държавите (SVG path) — проекцията им не зависи от зуума (само от projX)
 function drawMap() {
   if (S) restoreSpurs();   // и без влизане в град (картата е първият екран)
