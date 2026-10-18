@@ -21,7 +21,7 @@ Landmarks in assets/heavy/lm/ — from Sketchfab, licensed under Creative Common
 - trains/hsw.glb — "High Speed_ Wagon" by dannzjs (CC-BY 4.0) — https://sketchfab.com/3d-models/73f203c89f0c4da0b58f412c7ce52429
 - ships/container.glb — "Small Cargo Ship" by Styx (CC-BY 4.0) — https://sketchfab.com/3d-models/6362d3e9b11e4396aaafa854c3aa6f06 (текстурите са смалени до 1024 px)
 - ships/tanker.glb — "Tanker" by 3DDomino (CC-BY 4.0) — https://sketchfab.com/3d-models/52f55201f76143d4b080c644bf15a61c
-- ships/cruise.glb — "Viking Cruise Ship" by jfactory (CC-BY 4.0) — https://sketchfab.com/3d-models/c82a7e2bbf4c44e3ac1d1e7bac42e2b7 (текстурите са смалени до 1024 px)
+- ships/cruise.glb — "Caribbean Legend" — генериран с Meshy AI (опростен до ~51 хил. триъгълника, текстурите са смалени до 1024 px)
 
 Resort trees in assets/heavy/trees/ — from Sketchfab, Creative Commons Attribution (https://creativecommons.org/licenses/by/4.0/); textures resized and converted to WebP, packs split into single trees in the game:
 - palms.glb — "Palm Trees" by YadroGames

@@ -1,6 +1,8 @@
 // group.js — корпоративната група: при старта играчът сам дава името на фирмата (и избира цвят/знак от 5-те стила);
 // с всеки нов бизнес се основава дъщерно дружество („… Толроуд“, „… Рейл“, „… Оушън Експрес“, „… Флайеър“…). Старите продължават да печелят.
 // Записът: S.brand = 'titan' (стилът), S.brandNm = 'Име' (по желание — иначе името на стила), S.group = { [sub]: денят на основаването }.
+import { feature } from './lab/feature.js';
+
 export const BRANDS = [
   { k: 'industrial', nm: 'Индустриал', col: '#ff9a2e', ico: '⚙️' },
   { k: 'titan', nm: 'Титан', col: '#4fc3f7', ico: '🗿' },
@@ -48,11 +50,16 @@ export function groupName(S) {
 // Бонусът се изплаща всеки ден като приход на холдинга. Записът: S.hold = { lv: { [sub]: n }, dir: { [sub]: 'име' } }.
 export const HOLD_LV_MAX = 5, HOLD_LV_K = 0.10, HOLD_DIR_K = 0.15;
 export const DIR_LV = Math.ceil(HOLD_LV_MAX * 0.9);   // директор — само когато дружеството е развито поне 90% (ниво 5 от 5)
-const DIRECTORS = ['Ивайло Петров', 'Мария Стоянова', 'Георги Николов', 'Елена Димитрова', 'Стефан Колев', 'Надя Иванова', 'Борис Тодоров', 'Вера Ангелова', 'Калин Маринов', 'Десислава Илиева'];
+// всяко дружество има свой директор (портретите и 3D моделите в directors3d.js са по тези имена)
+export const DIR_OF = { con: 'Ивайло Петров', hw: 'Надя Иванова', rail: 'Мария Стоянова', sea: 'Стефан Колев', air: 'Елена Димитрова', hotel: 'Георги Николов', oil: 'Вера Ангелова', bank: 'Борис Тодоров' };
 
 // deps: { S, econ, fmt, pop(key, cap, sub), toast, save, sound, …броячите от SUBS (hwN, railN, portN, airN, oilN, empire, toll, flow, finDaily, oilDaily) }
 export function createGroup(deps) {
-  const hold = () => { const S = deps.S(); S.hold = S.hold || { lv: {}, dir: {} }; return S.hold; };
+  const hold = () => {
+    const S = deps.S(); S.hold = S.hold || { lv: {}, dir: {} };
+    for (const k in S.hold.dir) if (DIR_OF[k]) S.hold.dir[k] = DIR_OF[k];   // стари записи: директорите бяха по реда на назначаване
+    return S.hold;
+  };
   const subBy = k => SUBS.find(x => x.k === k);
   const bonusK = k => (hold().lv[k] || 0) * HOLD_LV_K + (hold().dir[k] ? HOLD_DIR_K : 0);
   const upCost = k => { const inc = subBy(k).inc(deps) || 0, L = hold().lv[k] || 0; return Math.round(Math.max(5e6, inc * 40) * (L + 1) / 1e5) * 1e5; };
@@ -67,7 +74,7 @@ export function createGroup(deps) {
   function hire(k) {
     if (!canManage(k) || hold().dir[k]) return; if ((hold().lv[k] || 0) < DIR_LV) { deps.toast(`👔 Директор — когато дружеството е развито поне 90% (ниво ${DIR_LV}).`, 'bad'); return; } const c = dirCost(k), e = deps.econ();
     if (!e.canAfford(c)) { deps.toast(`Нямаш ${deps.fmt(c)} €.`, 'bad'); return; }
-    const used = new Set(Object.values(hold().dir)), nm = DIRECTORS.find(n => !used.has(n)) || DIRECTORS[0];
+    const nm = DIR_OF[k];
     e.spend(c, 'заплати', `Холдинг: директор на ${subName(deps.S(), k)}`); hold().dir[k] = nm;
     deps.toast(`👔 ${nm} е новият директор на ${subName(deps.S(), k)} (+${Math.round(HOLD_DIR_K * 100)}%).`, 'good'); deps.sound && deps.sound('buy'); deps.save();
   }
@@ -82,6 +89,8 @@ export function createGroup(deps) {
       deps.toast(`🏛️ Холдингът разпредели +${deps.fmt(Math.round(h.mAcc))} € за месеца — бонус от развитието${Object.keys(h.dir).length ? ' и директорите' : ''} на дружествата.`, 'good');
       deps.sound && deps.sound('cash'); h.mAcc = 0;
     }
+    // веднъж месечно бордът на директорите се събира сам, ако има какво да предложи
+    if (day % 30 === 0 && deps.S().holding && feature('boardroom') && proposals().length) { deps.toast(`🏛️ Бордът на директорите се събра — ${proposals().length} предложения.`, 'good'); board(); }
     return b;
   }
   function check(quiet = false) {
@@ -118,6 +127,7 @@ export function createGroup(deps) {
     let h = `<div class="bw-stats"><div><b style="color:${b.col}">${b.ico} ${groupName(S)}</b><span>${H ? 'холдинг' : 'корпоративна група'}</span></div><div><b>${open.length} / ${SUBS.length}</b><span>дружества</span></div><div><b style="color:var(--ok)">+${f(tot)} €</b><span>приход на ден от дружествата</span></div>${H ? `<div><b style="color:#ffd54a">+${f(bon)} €</b><span>бонус на холдинга на ден</span></div>` : ''}</div>`;
     h += H ? `<div class="meta" style="margin:8px 0">🏛️ <b>Ерата на холдинга</b> (от ден ${H}): градовете, поръчките, линиите и флотите вървят сами. Ти управляваш дружествата: <b>⬆️ развитие</b> дава +${Math.round(HOLD_LV_K * 100)}% от прихода им на ниво (до ${HOLD_LV_MAX}), а <b>👔 директорът</b> още +${Math.round(HOLD_DIR_K * 100)}%.</div>`
       : `<div class="meta" style="margin:8px 0">🔒 От <b>ниво 15</b> идва <b>🏛️ Ерата на холдинга</b>: всичко досегашно минава на автопилот, а ти управляваш дружествата.</div>`;
+    if (H && feature('boardroom')) h += '<div class="row" style="justify-content:flex-end;margin:0 0 8px"><button class="btn" data-hboard="1">🏛️ Директорската зала →</button></div>';
     h += extra;
     h += '<style>.subLock > *:not(.subLv){filter:blur(2.5px);opacity:.55;pointer-events:none;user-select:none}.subLv{position:absolute;right:12px;top:50%;transform:translateY(-50%);z-index:2;padding:5px 12px;border-radius:999px;background:rgba(0,0,0,.65);border:1px solid var(--line);font-weight:800;color:#ffd54a}</style>';   // заключените — замъглени, с ясна значка „🔒 ниво N“
     h += SUBS.map(s => {
@@ -131,7 +141,39 @@ export function createGroup(deps) {
   function bind(box, rerender) {
     box.querySelectorAll('[data-hup]').forEach(b => b.onclick = () => { upgrade(b.dataset.hup); rerender(); });
     box.querySelectorAll('[data-hdir]').forEach(b => b.onclick = () => { hire(b.dataset.hdir); rerender(); });
+    box.querySelectorAll('[data-hboard]').forEach(b => b.onclick = () => board(rerender));
     box.querySelectorAll('[data-hfound]').forEach(b => b.onclick = () => { if (deps.askFound && deps.askFound(b.dataset.hfound, rerender)) return; found(b.dataset.hfound); rerender(); });   // екранът с логото (game.js)
   }
-  return { check, winHtml, bind, dailyTick, dailyBonus, upgrade, hire, found, canFound };
+  // 🏛️ Директорската зала (directors3d.js): всяко дружество е стол на масата; клик на директор — доклад и одобряване на развитие
+  function boardSeats() {
+    const S = deps.S(), g = S.group || {};
+    return SUBS.filter(s => !s.final).map(s => {
+      const on = !!g[s.k], inc = on ? s.inc(deps) || 0 : 0, L = hold().lv[s.k] || 0, dir = hold().dir[s.k], man = canManage(s.k) && inc > 0, e = deps.econ();
+      return { k: s.k, ico: s.ico, company: subName(S, s.k) || s.suf, what: s.what, open: on, director: dir ? DIR_OF[s.k] || dir : null, lv: L, lvMax: HOLD_LV_MAX, inc, bonus: bonusOf(s.k), bonusPct: Math.round(bonusK(s.k) * 100),
+        up: man && L < HOLD_LV_MAX ? { cost: upCost(s.k), can: e.canAfford(upCost(s.k)) } : null,
+        hire: man && !dir && L >= DIR_LV ? { cost: dirCost(s.k), can: e.canAfford(dirCost(s.k)) } : null };
+    });
+  }
+  // 📋 предложенията към борда (deps.proposals от game.js: [{ id: 'dir:вид:брой', dir, ico, text, cost, apply() }]);
+  // „Не“ — 90 дни тишина за този вид, „По-късно“ — до следващия борд (30 дни). Записът: S.hold.skip = { 'dir:вид': денят до който мълчи }
+  const propKey = id => String(id).split(':').slice(0, 2).join(':');
+  const allProps = () => (deps.proposals && deps.proposals()) || [];
+  function proposals() {
+    const day = deps.S().day || 0, sk = hold().skip || {}, e = deps.econ();
+    return allProps().filter(p => !(sk[propKey(p.id)] > day)).map(p => ({ ...p, can: !p.cost || e.canAfford(p.cost) }));
+  }
+  function decide(id, a) {
+    const p = allProps().find(q => q.id === id), h = hold(); if (!p) return;
+    if (a === 'yes') {
+      if (p.cost && !deps.econ().canAfford(p.cost)) { deps.toast(`Нямаш ${deps.fmt(p.cost)} €.`, 'bad'); return; }
+      p.apply(); deps.toast(`✓ Бордът одобри: ${p.text}`, 'good'); deps.sound && deps.sound('buy');
+    } else (h.skip = h.skip || {})[propKey(id)] = (deps.S().day || 0) + (a === 'no' ? 90 : 30);
+    deps.save();
+  }
+  function board(rerender) {
+    const re = () => rerender && rerender();
+    import('./directors3d.js').then(m => m.openBoardroom({ title: groupName(deps.S()), seats: boardSeats, fmt: deps.fmt, sound: deps.sound,
+      proposals, onDecide: (id, a) => { decide(id, a); re(); }, onUp: k => { upgrade(k); re(); }, onHire: k => { hire(k); re(); } }));
+  }
+  return { check, winHtml, bind, board, proposals, decide, dailyTick, dailyBonus, upgrade, hire, found, canFound };
 }

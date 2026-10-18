@@ -1,5 +1,5 @@
 // shipmodels.js — истински 3D кораби от Sketchfab (CC-BY, авторите са в CREDITS.txt и „📜 Автори“):
-//   container — „Small Cargo Ship“ (Styx) · tanker — „Tanker“ (3DDomino) · cruise — „Viking Cruise Ship“ (jfactory)
+//   container — „Small Cargo Ship“ (Styx) · tanker — „Tanker“ (3DDomino) · cruise — „Caribbean Legend“ (Meshy AI; олекотен: ~51 хил. триъгълника, текстури 1024 webp)
 // Зареждат се асинхронно; докато не са готови (или ако не се заредят), seaside.js ползва корабите на Kenney.
 // Всеки кораб: носът е към +z, център в началото, ватерлинията на y = 0 (корпусът е малко под водата).
 import * as THREE from 'three';

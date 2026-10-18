@@ -7,7 +7,7 @@
 // Записът: S.bust = { red, stage: 'ins' | null, until, n (колко фалита) }
 // deps: { S(), econ(), toast, modal(title, html, buttons), fmt, save, sound?(n), pop?(key, cap, sub),
 //         sellHere(type) → продава единица от града, в който си (без съобщение), unitsHere() → [type],
-//         cityName(id), newGame(), openSaves(), playDays?() }
+//         cityName(id), newGame(), openSaves(), playDays?(), loan?(why, need, force) → прозорец „вземи кредит“ }
 export const RED_DAYS = 14, GRACE = 15, LIMIT_MIN = 50000, LIMIT_SHARE = 0.1, REP_LOSS = 1.5;
 
 export function createBankrupt(deps) {
@@ -47,8 +47,11 @@ export function createBankrupt(deps) {
     deps.modal('⚠️ Фирмата е в несъстоятелност', `Сметката е на <b style="color:var(--bad)">${f(E().s.money)} €</b>. Ако след <b>${left} дни</b> все още си на минус, фирмата фалира:
       синдикът продава депозита, акциите и техниката ти (на половин цена), докато покрие дълга, и губиш ${REP_LOSS} ★. Ако и това не стига — играта свършва.<br><br>
       <b>Как да се спасиш:</b><br>🏦 вземи кредит от банката · 📈 продай акции · 🚜 продай излишна техника · 🏠 продай имоти · 🏝️ продай курорт ·
-      ⏸ спри скъпите строежи и надграждания · 📦 изключи автоматичното пълнене на складовете.`, [['Разбрах', null]]);
+      ⏸ спри скъпите строежи и надграждания · 📦 изключи автоматичното пълнене на складовете.`, [['Разбрах', null], ...(deps.loan ? [['🏦 Вземи кредит', () => askLoan(true)]] : [])]);
   }
+
+  // 🏦 прозорецът с кредита (game.js): колкото да излезеш на плюс; force — по клик на играча (без изчакване)
+  const askLoan = (force = false) => deps.loan && deps.loan(`Сметката е на <b style="color:var(--bad)">${f(E().s.money)} €</b> — на минус плащаш 1% лихва на ден${st().stage === 'ins' ? `, а фалитът е след ${Math.max(0, st().until - deps.S().day)} дни` : `, а след ${RED_DAYS} дни идва несъстоятелност`}. Кредитът ще те изкара на плюс.`, -E().s.money, force);
 
   // ---- синдикът: продава, докато сметката излезе на нула
   function liquidate() {
@@ -112,7 +115,10 @@ export function createBankrupt(deps) {
       explain(); deps.save();
     } else if (b.stage === 'ins' && S.day >= b.until) { bankrupt(); return; }
     else if (b.stage === 'ins') { const left = b.until - S.day; if (left <= 5 || left % 5 === 0) deps.toast(`⚠️ Несъстоятелност: ${left} дни до фалита — сметката е ${f(money)} €.`, 'bad'); }
-    else if (b.red === 1 || b.red % 4 === 0) deps.toast(`💸 Сметката е на минус (${f(money)} €) от ${b.red} д. След ${RED_DAYS} дни на минус или под −${f(limit())} € започва несъстоятелност.`, 'bad');
+    else if (b.red === 1 || b.red % 4 === 0) {
+      deps.toast(`💸 Сметката е на минус (${f(money)} €) от ${b.red} д. След ${RED_DAYS} дни на минус или под −${f(limit())} € започва несъстоятелност.${deps.loan ? ' Натисни за кредит.' : ''}`, 'bad', deps.loan ? () => askLoan(true) : null);
+      if (b.red >= 4) askLoan();   // минус от няколко дни — предлагаме кредит (game.js пази да не е по-често от веднъж на няколко дни)
+    }
     banner();
   }
   // за финансите: кратко състояние
