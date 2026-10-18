@@ -3,7 +3,7 @@
 // Старите записи нямат S.plans и остават на мрежата 9×9 — нищо не се мести.
 import { makePlan, shiftPlan, LOT_KINDS } from './cityplan.js';
 
-export const PLAN_CORE = 81, PLAN_EXT = 9, PLAN_LOTS = 81 + 4 * 9;   // ядро 9×9, всеки купен квартал +9, до 4 квартала (MAX_EXT)
+export const PLAN_CORE = 81, PLAN_EXT = 9, PLAN_LOTS = 81 + 4 * 9;   // ядро 9×9, всеки купен квартал +9, до 4 квартала (MAX_EXT); o.exts — повече (световните центрове: 6, feature 'city-size')
 // мегаполис: ядро 81 + 162 застроени (както MEGA_BASE колони в мрежата) + всеки купен квартал 81 (MEGA_EXT_COLS × 9)
 export const MEGA_CORE = 81 + 162, MEGA_EXT = 81, MEGA_LOTS = MEGA_CORE + 4 * MEGA_EXT;
 export const planCount = (mega, ext = 0) => mega ? MEGA_CORE + MEGA_EXT * ext : PLAN_CORE + PLAN_EXT * ext;
@@ -13,7 +13,7 @@ const cache = new Map();
 // o.bigZone — { kind, W, D, asp, turn, size: [w, d] }: запазено място на север от площада за голямата забележителност (Капитолият…)
 export function gamePlan(cityId, o = {}) {
   if (cache.has(cityId)) return cache.get(cityId);
-  const P0 = makePlan(cityId, { game: true, minLots: o.mega ? MEGA_LOTS : PLAN_LOTS, ...(o.mega ? { mega: true, R: 400 } : {}), ...(o.landmark ? { squareR: 30 } : {}), ...(o.bigZone ? { bigZone: o.bigZone.size } : {}), ...(o.tpl ? { tpl: o.tpl } : {}), ...(o.clean ? { clean: true } : {}), ...(o.seaside ? { noCoast: true } : {}) });
+  const P0 = makePlan(cityId, { game: true, minLots: o.mega ? MEGA_LOTS : PLAN_CORE + PLAN_EXT * (o.exts || 4), ...(o.mega ? { mega: true, R: 400 } : {}), ...(o.landmark ? { squareR: 30 } : {}), ...(o.bigZone ? { bigZone: o.bigZone.size } : {}), ...(o.tpl ? { tpl: o.tpl } : {}), ...(o.clean ? { clean: true } : {}), ...(o.seaside ? { noCoast: true } : {}) });
   if (!P0) return null;
   let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
   for (const [x, z] of P0.boundary) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); }
