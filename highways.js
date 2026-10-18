@@ -166,6 +166,43 @@ function abExit(g, gear, { W, cw, med, z0, LEN, H, zE, name, exitTo }) {
   const exP = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.4, 0.2), new THREE.MeshStandardMaterial({ color: 0x8a9096 })); exP.position.set(x0 - 3, y + 1.2, zE - SW / 2 - R + 4); add(exP, zE);
 }
 const RIVER_W = 26;
+// крайпътен комплекс (Лабораторията → hw-service): откъм −x (посоката към +z) — забавителна лента, отбивка към паркинг
+// с бензиностанция (истинските модели на играта), тревен остров и обратно включване. Връща пътя за колите (hwtraffic.js):
+// { z0, z1, zs, xE, lotX } — в координатите на изгледа (z по оста, x напреки)
+const SVC_L = 160, SVC_GAS = ['gas-big', 'gas-modern', 'gas-green', 'gas-lowpoly'];
+function serviceArea(g, gear, A, { W, H, zs }) {
+  const y = H() + 0.04, xE = -W / 2, z0 = zs - SVC_L / 2, z1 = zs + SVC_L / 2, lotX = xE - 20, add = (o, z = zs) => { o.userData.z = z; g.add(o); gear.push(o); return o; };
+  const poly = (pts, mat, yy) => { const sh = new THREE.Shape(pts.map(([x, z]) => new THREE.Vector2(x, -z))), m = new THREE.Mesh(new THREE.ShapeGeometry(sh), mat); m.rotation.x = -Math.PI / 2; m.position.y = yy; m.receiveShadow = true; return m; };
+  // асфалтът: лента, отбивка, паркинг, отбивка, лента — един многоъгълник; островът е отгоре
+  add(poly([[xE, z0], [xE - 4.5, z0 + 32], [xE - 16, z0 + 52], [xE - 54, z0 + 52], [xE - 54, z1 - 52], [xE - 16, z1 - 52], [xE - 4.5, z1 - 32], [xE, z1]], new THREE.MeshStandardMaterial({ color: 0x6a6d72, roughness: 0.9 }), y));   // като плочките на магистралата
+  add(poly([[xE - 5.6, z0 + 38], [xE - 14, z0 + 54], [xE - 14, z1 - 54], [xE - 5.6, z1 - 38]], new THREE.MeshStandardMaterial({ color: 0x6f9a4e, roughness: 1 }), y + 0.04));
+  add(poly([[xE - 0.2, z0 + 6], [xE - 0.5, z0 + 30], [xE - 0.8, z0 + 30]], new THREE.MeshBasicMaterial({ color: 0xf2f2f2 }), y + 0.02));   // клинът на отбивката
+  // местата на паркинга: бели черти покрай далечния ръб
+  const lineM = new THREE.MeshBasicMaterial({ color: 0xeeeeee });
+  for (let z = z0 + 56; z <= z1 - 56; z += 4) { const l = new THREE.Mesh(new THREE.PlaneGeometry(5.5, 0.15), lineM); l.rotation.x = -Math.PI / 2; l.position.set(xE - 51, y + 0.02, z); add(l); }
+  // бензиностанцията: първият одобрен модел, ~26 м, с навеса към паркинга
+  const gk = SVC_GAS.find(n => A[n]);
+  if (gk) {
+    const o = clone(A, gk, 1); o.updateMatrixWorld(true); const sz = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3());
+    o.scale.setScalar(26 / Math.max(sz.x, sz.z)); o.rotation.y = -Math.PI / 2; o.position.set(xE - 38, y - 0.04, zs); add(o);
+  }
+  // пилон с цените и табела 500 м преди отбивката
+  const cv = document.createElement('canvas'); cv.width = 160; cv.height = 400; const x = cv.getContext('2d');
+  x.fillStyle = '#123'; x.fillRect(0, 0, 160, 400); x.fillStyle = '#f5b400'; x.fillRect(0, 0, 160, 110); x.fillStyle = '#123'; x.font = 'bold 74px system-ui'; x.textAlign = 'center'; x.fillText('⛽', 80, 82);
+  x.fillStyle = '#fff'; x.font = 'bold 30px system-ui'; [['A95', '2.65'], ['A100', '2.95'], ['Дизел', '2.55'], ['LPG', '1.29']].forEach(([a, b], k) => { x.textAlign = 'left'; x.fillText(a, 10, 160 + k * 66); x.textAlign = 'right'; x.fillStyle = '#ffd54a'; x.fillText(b, 152, 160 + k * 66); x.fillStyle = '#fff'; });
+  const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace;
+  const py = new THREE.Mesh(new THREE.BoxGeometry(4, 10, 0.6), [0, 0, 0, 0, 1, 1].map(k => k ? new THREE.MeshBasicMaterial({ map: tx }) : new THREE.MeshStandardMaterial({ color: 0x223344 })));
+  py.position.set(xE - 9, y + 5, z0 + 26); py.castShadow = true; add(py, z0 + 26);
+  const b = abBoard(['⛽ 🍴 P', '500 м'], 5, 2.6); b.rotation.y = Math.PI; b.position.set(xE - 2.5, y + 3.4, z0 - 200); add(b, z0 - 200);
+  const bp = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3.4, 0.2), new THREE.MeshStandardMaterial({ color: 0x8a9096 })); bp.position.set(xE - 2.5, y + 1.7, z0 - 200); add(bp, z0 - 200);
+  // нощем: две лампи над паркинга
+  for (const z of [zs - 22, zs + 22]) {
+    const p = new THREE.Mesh(new THREE.BoxGeometry(0.3, 9, 0.3), new THREE.MeshStandardMaterial({ color: 0x777777 })); p.position.set(lotX + 4, y + 4.5, z); add(p);
+    const h = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.3, 0.8), hwLampMat()); h.position.set(lotX + 3, y + 9, z); add(h);
+    const pl = new THREE.Mesh(new THREE.PlaneGeometry(22, 22), hwPoolMat()); pl.rotation.x = -Math.PI / 2; pl.position.set(lotX + 2, y + 0.08, z); pl.renderOrder = 2; add(pl);
+  }
+  return { z0, z1, zs, xE, lotX };
+}
 
 function clone(A, n, s) {
   const o = A[n].scene.clone(true);
@@ -176,7 +213,7 @@ function clone(A, n, s) {
 // прави нещо видимо само до текущия фронт на строежа
 function reveal(list, front) { for (const o of list) o.visible = o.userData.z <= front; }
 
-// opts: { len = 240, river = true, ground = true, title } — без река/терен може да се сложи покрай град
+// opts: { len = 240, river = true, ground = true, title, service } — без река/терен може да се сложи покрай град; service — z на крайпътния комплекс
 // надлез над релсите в града (opts.over = [{ c, w }] — център и ширина по оста на магистралата): платното се качва по рампи
 // до OVER_H, минава върху колони и плоча над коловозите и слиза; всичко с userData.z се вдига с overLift(over, z)
 export const OVER_H = 7.5, OVER_RAMP = 80;
@@ -274,6 +311,7 @@ export function buildHighwayView(A, opts = {}) {
       const pl = new THREE.Mesh(new THREE.PlaneGeometry(14, 18), hwPoolMat()); pl.rotation.x = -Math.PI / 2; pl.position.set(sd * (cw + med) / 2, H(z) + 0.07, z); pl.userData.z = z; pl.renderOrder = 2; g.add(pl); gear.push(pl);
     }
   }
+  const service = opts.service != null ? serviceArea(g, gear, A, { W, H, zs: opts.service }) : null;
   if (AB && opts.exit !== false) abExit(g, gear, { W, cw, med, z0, LEN, H, zE: opts.exitZ ?? z0 + LEN * 0.22, name: opts.abName || 'A', exitTo: opts.exitTo || '' });
   for (const z of [z0 + 30, z0 + LEN - 40]) {
     const sgn = clone(A, 'sign-highway-wide', 11); sgn.position.set(W / 2 + 1.5, 0, z); sgn.rotation.y = Math.PI / 2; sgn.userData.z = z; g.add(sgn); gear.push(sgn);
@@ -357,5 +395,5 @@ export function buildHighwayView(A, opts = {}) {
     });
   }
   update(opts.stage ?? 0, opts.prog ?? 0);
-  return { group: g, update, length: LEN, width: W };
+  return { group: g, update, length: LEN, width: W, service };
 }

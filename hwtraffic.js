@@ -2,6 +2,7 @@
 // камионите са в дясната (бавна) лента. Колите излизат от единия край и се връщат отначало от другия.
 // От време на време (на 25–70 s) по бързата лента профучава спешна кола с включени буркани — линейка, полиция или пожарна,
 // понякога на колона (пожарна + полиция); сирената я пуска самият буркан (vehmodels.js), когато е близо до камерата.
+// svc — крайпътният комплекс (highways.js serviceArea): някои коли в посока +x отбиват, спират за малко на колонките и се връщат.
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';
 
@@ -11,7 +12,7 @@ const SCALE = new Proxy({ 'truck-dump-red': 0.62, 'truck-concrete-red': 0.62, 's
 
 // parent: групата на магистралата в града; model(name, scale); A: заредените модели
 // zc: оста на магистралата (z в света); len: дължина по x; y: височина на платното
-export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false, lift = null) {   // lift(x) — надлезът над релсите (highways.js overLift)   // ab — аутобан: 4 ленти на посока, повече коли
+export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false, lift = null, svc = null) {   // lift(x) — надлезът над релсите (highways.js overLift)   // ab — аутобан: 4 ленти на посока, повече коли
   const g = new THREE.Group(); parent.add(g);
   const list = [], half = len / 2;
   // посока +x (на изток) е откъм +z (дясно движение), −x е откъм −z; лента 0 = бърза (към разделителната ивица)
@@ -38,9 +39,25 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
     const group = [first]; if (first.kind === 'fire' && Math.random() < 0.6) { const p = free.find(e => e.kind === 'police'); if (p) group.push(p); }   // пожарната — с полицейски ескорт
     group.forEach((e, i) => { e.on = true; e.dir = dir; e.x = -dir * (half + 6 + i * 14); e.v = 34 + Math.random() * 6; e.o.position.set(e.x, y, laneZ(dir, 0)); e.o.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2; e.o.visible = true; e.o.userData.sirenOn = false; });
   }
+  // отбивката: напречното отместване по x (в изгледа на магистралата z = x тук, x = zc − z) — плавно към паркинга и обратно
+  const ss = t => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
+  const svcZ = (c, x) => { const lot = zc - svc.lotX - c.s.lane, k = ss((x - svc.z0) / 55) * (1 - ss((x - (svc.z1 - 55)) / 55)); return c.z + (lot - c.z) * k; };
+  function svcStep(c, dt) {
+    const S = c.s;
+    if (S.stop > 0 && c.x >= S.zp) { c.v = 0; S.stop -= dt; }
+    else { const tv = c.x < svc.z1 - 55 ? 8 : S.v0; c.v += Math.sign(tv - c.v) * Math.min(Math.abs(tv - c.v), (c.x < S.zp ? 6 : 3) * dt); }
+    c.x += c.v * dt;
+    if (c.x > svc.z1) { c.s = null; c.o.position.z = c.z; c.o.rotation.y = Math.PI / 2; return; }
+    const z = svcZ(c, c.x); c.o.position.set(c.x, y, z); c.o.rotation.y = Math.atan2(1, svcZ(c, c.x + 1) - z);
+  }
   function update(dt) {
     for (const c of list) {
+      if (c.s) { svcStep(c, dt); continue; }
+      const px = c.x;
       c.x += c.dir * c.v * dt;
+      if (svc && c.dir > 0 && px < svc.z0 && c.x >= svc.z0 && Math.random() < 0.3 && list.filter(q => q.s).length < 5) {   // отбива
+        c.s = { v0: c.v, stop: 5 + Math.random() * 9, zp: svc.zs - 20 + Math.random() * 40, lane: Math.random() < 0.5 ? 0 : -6 }; continue;
+      }
       if (c.x > half) c.x -= len; else if (c.x < -half) c.x += len;
       c.o.position.x = c.x;
       if (lift) c.o.position.y = y + lift(c.x);
