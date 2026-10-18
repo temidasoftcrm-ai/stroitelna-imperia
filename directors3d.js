@@ -14,8 +14,8 @@ const SIT_HIP = [0, -1, -57];   // ханшът в седнала поза (ед
 export const DIR_MODEL = { con: 'ivaylo', hw: 'nadya', rail: 'maria', sea: 'stefan', air: 'elena', hotel: 'georgi', oil: 'vera', bank: 'boris', glob: 'glob', mayor: 'mayor' };
 const TEMP_MODEL = { mayor: 'maria', glob: 'ivaylo' };   // временен аватар, докато потребителят направи истинския в Meshy
 const LOGOS = new Set(['con', 'hw', 'rail', 'sea', 'air', 'hotel', 'oil', 'bank', 'glob']);   // assets/ui/subs/<k>.webp   // georgi/glob — от потребителя (Meshy); докато ги няма — празен стол
-const FEMALE = new Set(['nadya', 'maria', 'elena', 'vera']);
-const HAVE = new Set(['ivaylo', 'nadya', 'maria', 'stefan', 'elena', 'vera', 'boris', 'georgi']);   // моделите, които вече са в assets/heavy/directors (без 404 за останалите)
+const FEMALE = new Set(['nadya', 'maria', 'elena', 'vera', 'mayor']);
+const HAVE = new Set(['ivaylo', 'nadya', 'maria', 'stefan', 'elena', 'vera', 'boris', 'georgi', 'mayor']);   // моделите, които вече са в assets/heavy/directors (без 404 за останалите)
 // столовете: по 4 от двете страни на масата (x = ±), от прозореца към председателя
 // …и девето — начело откъм картата (side 0): директорът на Глобъл, срещу председателя
 const SEATS = [[-1, -2.7], [1, -2.7], [-1, -0.9], [1, -0.9], [-1, 0.9], [1, 0.9], [-1, 2.7], [1, 2.7], [0, -4.25, -0.5], [0, -4.25, 0.5]];   // начело — Глобъл и градоначалникът на Империал Сити (10-ото място)

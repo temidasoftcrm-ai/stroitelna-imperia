@@ -3117,10 +3117,12 @@ function showCityOnMap(id) {
 // изгледът „Африка“ е разтегнат хоризонтално ×1.3 (около екватора меридианите са по-раздалечени) — само визуално, всичко се чертае през proj
 const projX = () => mapCont === 'af' ? 1.3 : 1;
 function proj(lon, lat) { return [(lon - 25.4) * Math.cos(42.7 * Math.PI / 180) * 100 * projX(), -(lat - 42.75) * 100]; }
-// ✈️ максимално ниво на летището: най-големите световни градове — 7; средните и големите — до 5; малките — до 3;
+// ✈️ максимално ниво на летището според града: малък — 2 (летище с 2 гейта), среден — 3 (регионално), голям — 5 (международен хъб),
+// мегаполис — 6 (мега хъб), най-големите световни градове — 7; вече построеното над тавана си остава (стари записи);
 // градовете с малко летище (Новоросийск…) остават на своето ниво от airways.js (напр. 1)
 const AIR_GIANT = new Set(['newyork', 'london', 'paris', 'tokyo', 'dubai', 'shanghai', 'singapore', 'hongkong', 'losangeles', 'moscow', 'istanbul', 'beijing', 'saopaulo', 'mumbai', 'sydney', 'frankfurt', 'chicago', 'seoul', 'cairo', 'johannesburg', 'lagos', 'mexicocity', 'toronto', 'buenosaires', 'kualalumpur', 'bangkok', 'amsterdam']);
-const airportMax = id => { const b = airportMax0(id); if (!b) return 0; if (AIR_GIANT.has(id)) return 7; return Math.min(b, (cityById(id)?.sz || 1) >= 2 ? 5 : 3); };
+const AIR_SZ_MAX = [2, 2, 3, 5];   // по големината на града (sz 1–3)
+const airportMax = id => { const b = airportMax0(id); if (!b) return 0; if (AIR_GIANT.has(id)) return 7; return Math.max(Math.min(b, MEGAPOLIS.has(id) ? 6 : AIR_SZ_MAX[Math.min(3, cityById(id)?.sz || 1)]), S?.airports?.[id]?.lv || 0); };
 const countryD = new WeakMap();   // очертанията на държавите (SVG path) — проекцията им не зависи от зуума (само от projX)
 function drawMap() {
   if (S) restoreSpurs();   // и без влизане в град (картата е първият екран)
