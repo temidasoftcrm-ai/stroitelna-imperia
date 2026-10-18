@@ -236,6 +236,7 @@ const mapVis = (x, y) => { if (!mapView) return true; const [vx, vy, vw, vh] = m
   const mx = cw * sc - vw + vw * 0.15, my = ch * sc - vh + vh * 0.15; return x >= vx - mx && x <= vx + vw + mx && y >= vy - my && y <= vy + vh + my; };
 const zShrink = () => Math.pow(Math.max(1, mapZoom()), -0.8);
 const mapLS = () => zShrink() * 0.85;   // мащаб на надписите (и малко по-малки по принцип)
+const mapPx = px => px * (mapView ? mapView.vb[2] : 1000) / Math.max(300, document.getElementById('mapSvg')?.clientWidth || 1000);   // px на екрана → единици на картата (надписите със строежа са еднакво големи при всеки зуум)
 const mapK = () => (mapCont ? (viewOf(mapCont).k || 2.4) : mapWorld ? 6 : 1) * zShrink();   // допълнителен мащаб на знаците (световният изглед и приближаването)
 let worldGeo = null;
 // държавите на световната карта без нито един град в играта (Гренландия, Исландия, Монголия…) — няма какво да се строи там, затова са оцветени
@@ -5674,9 +5675,9 @@ function railSvg() {
     if (r.built) h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#3b2f25" stroke-width="${(3.2 * zs).toFixed(2)}" stroke-linecap="round"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#d8cbb0" stroke-width="${(1.6 * zs).toFixed(2)}" stroke-dasharray="${(1.2 * zs).toFixed(2)} ${(2 * zs).toFixed(2)}"/>`;
     else {
       const [mx, my] = ptAlong(pts, r.prog);
-      if (pts.length > 2) { const done = donePts(pts, r.prog).map(p => p.map(v => v.toFixed(1)).join(',')).join(' '), [lx, ly] = ptAlong(pts, 0.5); h += `<polyline points="${ps}" fill="none" stroke="#ff9800" stroke-width="${(2 * zs).toFixed(2)}" stroke-dasharray="${(4 * zs).toFixed(2)} ${(3 * zs).toFixed(2)}" opacity=".8"/><polyline points="${done}" fill="none" stroke="#3b2f25" stroke-width="${(3 * zs).toFixed(2)}"/><text x="${lx}" y="${ly - 4}" font-size="${9 * zs}" font-weight="800" fill="#7a4b00" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${(2.5 * zs).toFixed(2)}">${RAIL_STAGES[railStageOf(r.prog).stage].ico} ${Math.floor(r.prog * 100)}%</text>`; continue; }
+      if (pts.length > 2) { const done = donePts(pts, r.prog).map(p => p.map(v => v.toFixed(1)).join(',')).join(' '), [lx, ly] = ptAlong(pts, 0.5); h += `<polyline points="${ps}" fill="none" stroke="#ff9800" stroke-width="${(2 * zs).toFixed(2)}" stroke-dasharray="${(4 * zs).toFixed(2)} ${(3 * zs).toFixed(2)}" opacity=".8"/><polyline points="${done}" fill="none" stroke="#3b2f25" stroke-width="${(3 * zs).toFixed(2)}"/><text x="${lx}" y="${ly - mapPx(9)}" font-size="${mapPx(13)}" font-weight="800" fill="#7a4b00" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${mapPx(3)}">${RAIL_STAGES[railStageOf(r.prog).stage].ico} ${Math.floor(r.prog * 100)}%</text>`; continue; }
       h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#ff9800" stroke-width="${(2 * zs).toFixed(2)}" stroke-dasharray="${(4 * zs).toFixed(2)} ${(3 * zs).toFixed(2)}" opacity=".8"/><line x1="${x1}" y1="${y1}" x2="${mx}" y2="${my}" stroke="#3b2f25" stroke-width="${(3 * zs).toFixed(2)}"/>`;
-      h += `<text x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2 - 4}" font-size="9" font-weight="800" fill="#7a4b00" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${(2.5 * zs).toFixed(2)}">${RAIL_STAGES[railStageOf(r.prog).stage].ico} ${Math.floor(r.prog * 100)}%</text>`;
+      h += `<text x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2 - mapPx(9)}" font-size="${mapPx(13)}" font-weight="800" fill="#7a4b00" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${mapPx(3)}">${RAIL_STAGES[railStageOf(r.prog).stage].ico} ${Math.floor(r.prog * 100)}%</text>`;
     }
   }
   // 🤝 жп линиите на партньора — същите траверси (обща карта), с тънка розова ивица отстрани
@@ -6479,7 +6480,7 @@ function abSvg() {
       const pts = [[x1, y1], ...via.map(([lo, la]) => proj(lo, la)), [x2, y2]], P = a => a.map(p => p.map(v => v.toFixed(1)).join(',')).join(' ');
       const k = j ? (j.stage + j.prog) / abStages().length : 0, [lx, ly] = ptAlong(pts, 0.5);
       if (done) h += `<polyline points="${P(pts)}" fill="none" stroke="#c62828" stroke-width="${5.5 * w}" stroke-linecap="round" stroke-linejoin="round"/><polyline points="${P(pts)}" fill="none" stroke="#fff" stroke-width="${1 * w}" stroke-dasharray="${3 * w} ${3 * w}"/>`;
-      else if (j) h += `<polyline points="${P(pts)}" fill="none" stroke="#ef9a9a" stroke-width="${4 * w}" stroke-dasharray="${4 * w} ${3 * w}"/><polyline points="${P(donePts(pts, k))}" fill="none" stroke="#c62828" stroke-width="${5.5 * w}" stroke-linecap="round" stroke-linejoin="round"/><text x="${lx}" y="${ly - 6 * w}" font-size="${9 * w}" font-weight="800" fill="#8e0000" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${2.5 * w}">🔴 ${Math.floor(k * 100)}%</text>`;
+      else if (j) h += `<polyline points="${P(pts)}" fill="none" stroke="#ef9a9a" stroke-width="${4 * w}" stroke-dasharray="${4 * w} ${3 * w}"/><polyline points="${P(donePts(pts, k))}" fill="none" stroke="#c62828" stroke-width="${5.5 * w}" stroke-linecap="round" stroke-linejoin="round"/><text x="${lx}" y="${ly - mapPx(9)}" font-size="${mapPx(13)}" font-weight="800" fill="#8e0000" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${mapPx(3)}">🔴 ${Math.floor(k * 100)}%</text>`;
       else if (on) h += `<polyline points="${P(pts)}" fill="none" stroke="#e53935" stroke-width="${2.2 * w}" stroke-dasharray="${2 * w} ${3 * w}" opacity=".7"/>`;
       continue;
     }
@@ -6487,7 +6488,7 @@ function abSvg() {
     else if (j) {
       const k = (j.stage + j.prog) / abStages().length;
       h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#ef9a9a" stroke-width="${4 * w}" stroke-dasharray="${4 * w} ${3 * w}"/><line x1="${x1}" y1="${y1}" x2="${x1 + (x2 - x1) * k}" y2="${y1 + (y2 - y1) * k}" stroke="#c62828" stroke-width="${5.5 * w}"/>`;
-      h += `<text x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2 - 6 * w}" font-size="${9 * w}" font-weight="800" fill="#8e0000" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${2.5 * w}">🔴 ${Math.floor(k * 100)}%</text>`;
+      h += `<text x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2 - mapPx(9)}" font-size="${mapPx(13)}" font-weight="800" fill="#8e0000" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${mapPx(3)}">🔴 ${Math.floor(k * 100)}%</text>`;
     } else if (on) h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#e53935" stroke-width="${2.2 * w}" stroke-dasharray="${2 * w} ${3 * w}" opacity=".7"/>`;
   }
   return h;
@@ -6713,7 +6714,7 @@ function hwSvg() {
     else if (jobs[s.id]) {
       const j = jobs[s.id], k = (j.stage + j.prog) / HW_STAGES.length;
       h += `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#8aa6cf" stroke-width="${(3 * zs).toFixed(2)}" stroke-dasharray="${(3 * zs).toFixed(2)} ${(2 * zs).toFixed(2)}"/><line x1="${X1}" y1="${Y1}" x2="${X1 + (X2 - X1) * k}" y2="${Y1 + (Y2 - Y1) * k}" stroke="#1e5fbf" stroke-width="${(4 * zs).toFixed(2)}"/>`;
-      h += `<text x="${(X1 + X2) / 2}" y="${(Y1 + Y2) / 2 + 12}" font-size="9" font-weight="800" fill="#123f80" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${(2.5 * zs).toFixed(2)}">🛣️ ${Math.floor(k * 100)}%</text>`;
+      h += `<text x="${(X1 + X2) / 2}" y="${(Y1 + Y2) / 2 + mapPx(16)}" font-size="${mapPx(13)}" font-weight="800" fill="#123f80" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${mapPx(3)}">🛣️ ${Math.floor(k * 100)}%</text>`;
     } else if (avail.has(s.id)) h += `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#4f86d6" stroke-width="${(2 * zs).toFixed(2)}" stroke-dasharray="${(1.5 * zs).toFixed(2)} ${(3 * zs).toFixed(2)}" opacity=".75"/>`;
   }
   // табелки с името на магистралата върху построените участъци
