@@ -88,6 +88,12 @@ export function createGroup(deps) {
   // бонусът идва всеки ден; веднъж на 30 дни — известие колко е разпределил холдингът за месеца
   function dailyTick() {
     const b = dailyBonus(), h = hold(), day = deps.S().day || 0;
+    // ерата на холдинга: ти ставаш председател, а Ивайло Петров поема майката фирма (Констръкшън) — без развитие и без плащане
+    if (deps.S().holding && (deps.S().group || {}).con && !h.dir.con) {
+      h.dir.con = DIR_OF.con;
+      deps.pop && deps.pop('new-branch', `👔 ${DIR_OF.con} поема ${subName(deps.S(), 'con')}`, `Ти ставаш председател на холдинга. Ивайло води майката фирма: офертите, търговете, гаража, кварталите и филиалите — като предложения към борда (+${Math.round(HOLD_DIR_K * 100)}% от прихода ѝ).`);
+      deps.save();
+    }
     if (b > 0) { deps.econ().earn(b, 'холдинг', 'Холдинг: бонус от развитието и директорите'); h.mAcc = (h.mAcc || 0) + b; }
     if (day % 30 === 0 && h.mAcc > 0) {
       deps.toast(`🏛️ Холдингът разпредели +${deps.fmt(Math.round(h.mAcc))} € за месеца — бонус от развитието${Object.keys(h.dir).length ? ' и директорите' : ''} на дружествата.`, 'good');

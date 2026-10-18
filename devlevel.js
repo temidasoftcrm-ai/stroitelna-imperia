@@ -71,8 +71,19 @@ export function createDevLevel(deps) {
     else { deps.sound('levelup'); if (deps.pop && !deps.pop(`lv-${lv}`, `🏅 Ниво на развитие ${lv}`, text || UNLOCKS[lv] || '')) deps.pop('empire', `🏅 Ниво на развитие ${lv}`, text || UNLOCKS[lv] || ''); }
     render(); deps.save();
   }
+  // докато е отворена 3D зала (window.__overlay3d — Директорската зала, кабинетът): опитът се трупа тихо — без „+XP“, без преначертаване и
+  // без запис на всеки квартал/филиал (одобрение на 248 квартала = 248 записа на цялата игра → забиване); всичко се показва веднъж, щом излезеш
+  let held = 0, heldT = 0;
+  const inRoom = () => typeof window !== 'undefined' && (window.__overlay3d || 0) > 0;
+  function flushHeld() {
+    if (inRoom()) { heldT = setTimeout(flushHeld, 700); return; }
+    heldT = 0; const n = held; held = 0; if (!n) return;
+    const d = st(), lv0 = d.lv; d.xp -= n; add(n);   // сега — с надписа, нивата и записа
+    if (d.lv === lv0) deps.toast && deps.toast(`⭐ +${Math.round(n).toLocaleString('bg-BG')} XP от решенията на борда`, 'good');
+  }
   function add(n, why) {
     const d = st(); if (!d || !n) return;
+    if (n > 0 && inRoom()) { d.xp += n; held += n; if (!heldT) heldT = setTimeout(flushHeld, 700); return; }
     const firm0 = best();   // нивото на фирмата (най-развитият град) преди опита — картинката е само когато то се вдигне, не при всеки град
     d.xp += n;
     if (n > 0) xpFloat(n);

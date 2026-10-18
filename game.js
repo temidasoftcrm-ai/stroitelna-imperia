@@ -450,7 +450,7 @@ let europe = null;
   for (const n of H2) jobs.push(load(`assets/heavy/houses2/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => HOUSES.splice(HOUSES.indexOf(n), 1)));   // не се зареди → не се строи
   for (const n of GAS_KINDS) jobs.push(load(`assets/heavy/gas/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; }).catch(() => {}));   // бензиностанции (всяка — свое „✓ OK“)
   if (feature('plants-real')) for (const k of ['bush-0', 'bush-1', 'bush-2', 'flowers', 'fountain']) jobs.push(load(`assets/heavy/plants/${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['pl-' + k] = g; }).catch(() => {}));
-  for (const [dir, list] of Object.entries(MODELS)) for (const n of list) jobs.push(load(`assets/${dir}/${n}.glb`).then(g => { A[dir === 'industrial' ? 'ind-' + n : n] = g; if (dir === 'commercial' || dir === 'commercial2' || n === 'building-type-a' || n === 'building-type-b') prepNightFloors(g.scene, n);
+  for (const [dir, list] of Object.entries(MODELS)) for (const n of list) jobs.push(load(`assets/${dir}/${n}.glb`).then(g => { A[dir === 'industrial' ? 'ind-' + n : n] = g; if (dir === 'commercial' || dir === 'commercial2' || n === 'building-type-a' || n === 'building-type-b' || n === 'Building_Medium_2_001') prepNightFloors(g.scene, n);   // Building_Medium_2_001 — Лабораторията → night-nyextra
     if (n === 'building-type-b') g.scene.traverse(o => { if (o.isMesh && o.material?.name === 'phong1') o.visible = false; }); }));   // бръшлянът на house-b е JPEG без прозрачност → черни петна   // нощем етажите светват (nightfloors.js)
   // истинска строителна техника и коли за трафика (vehmodels.js, Sketchfab)
   jobs.push(loadVehModels(load, A));
@@ -3126,7 +3126,9 @@ function renderBank(el) {
   $('bLoan').onclick = () => { if (econ.takeLoan(S.rep)) { toast('🏦 Взе кредит.', 'good'); save(); } else toast('Достигнат е лимитът за кредит.', 'bad'); renderPanel(); };
   $('bRepay').onclick = () => { if (econ.repayLoan(econ.loanStep(S.rep))) { toast('Погаси част от кредита.', 'good'); save(); } else toast('Нямаш достатъчно пари.', 'bad'); renderPanel(); };
 }
+let batchN = 0, batchToasts = 0, batchDirty = false;   // пакетно изпълнение (P() в boardProposals): toast и save само се броят
 function toast(text, kind = '', onClick = null) {
+  if (batchN > 0) { batchToasts++; return; }
   const t = document.createElement('div');
   t.className = 'toast ' + kind; t.textContent = text;
   if (onClick) { t.style.pointerEvents = 'auto'; t.style.cursor = 'pointer'; t.onclick = () => { onClick(); t.remove(); }; }
@@ -8003,7 +8005,7 @@ function boardProposals() {
     const its = o.items; if (!its.length || !hasSub(o.dir)) return;
     const mk = arr => ({ cost: Math.round(arr.reduce((a, it, i) => a + (o.cost ? o.cost(it, i) : 0), 0)), count: arr.length, text: o.text(arr), days: o.days ? Math.round(o.days(arr)) : 0,
       income: o.income ? Math.round(o.income(arr)) : 0, gainTxt: o.gainTxt ? o.gainTxt(arr) : '', goal: o.goal ? o.goal(arr) : '', track: o.track ? o.track(arr) : null, geo: o.geo ? o.geo(arr) : null,
-      apply: () => { for (const it of arr) o.run(it); save(); } });
+      apply: () => { batchN++; batchToasts = 0; let ok = 0; try { for (const it of arr) { try { o.run(it); ok++; } catch (e) { console.warn('board run', e); } } } finally { batchN--; } if (batchN === 0) { batchDirty = false; save(); if (arr.length > 1) toast(`${o.ico} ${o.goal ? o.goal(arr) : `Изпълнено: ${ok} от ${arr.length}`}`, 'good'); } } });
     const full = mk(its), half = its.length >= 2 ? mk(its.slice(0, Math.ceil(its.length / 2))) : null;
     out.push({ id: `${o.dir}:${o.key}:${its.length}`, dir: o.dir, ico: o.ico, why: o.why, needsGear: o.needsGear, noAuto: o.noAuto, ...full, gain: full.income * 30, small: half ? { ...half, gain: half.income * 30, text: `½ ${half.text}` } : null });
   };
@@ -8805,7 +8807,7 @@ function hwWinHtml() {
 // техниката в завършения град остава за поддръжка — economy.js плаща нейната издръжка и вдига прихода
 function syncFinishedFleet() { if (S && city.ready && econ.setFinishedFleet && econ.isFinished(S.cityId)) econ.setFinishedFleet(S.cityId, units.map(u => u.type)); }
 var saveLock = false, saveWarned = false;   // saveLock: друг раздел/връщане на автозапис — този раздел вече не записва
-function save() { syncFinishedFleet(); if (AUTOTEST || !S || saveLock) return; try { S.projects = projects; if (city.ready) syncUnits(); localStorage.setItem(SAVE_KEY, JSON.stringify(S, (k, v) => k === 'vis' ? undefined : v)); saveWarned = false; }
+function save() { if (batchN > 0) { batchDirty = true; return; } syncFinishedFleet(); if (AUTOTEST || !S || saveLock) return; try { S.projects = projects; if (city.ready) syncUnits(); localStorage.setItem(SAVE_KEY, JSON.stringify(S, (k, v) => k === 'vis' ? undefined : v)); saveWarned = false; }
   catch (e) { logError('запис: ' + (e?.message || e), { day: S?.day }); if (!saveWarned) { saveWarned = true; toast('⚠️ Играта не успя да се запише в браузъра (няма място?). Автозаписите в „💾 Записи“ са запазени.', 'bad'); } } }
 // „Нова игра“: първо пази копие (може да се върне от „💾 Записи“ → „🕒 Автозаписи“), после трие слота
 function wipeSlot() { save(); saveLock = true; backupNow('преди нова игра').finally(() => { localStorage.removeItem(SAVE_KEY); location.reload(); }); }
