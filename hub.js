@@ -17,6 +17,9 @@ body.hub1:not(.mob) #top::after { display:none; }
 @media (max-width:1250px) { body.hub1:not(.mob) #top > .logo { display:none; } }
 #btnHub { font-weight:700; }
 #btnHub.on { background:var(--acc); color:#111; }
+#btnHub.new { box-shadow:0 0 0 2px #ffd54a, 0 0 14px rgba(255,213,74,.7); animation:hubPulse 1.4s ease-in-out infinite; }
+@keyframes hubPulse { 50% { box-shadow:0 0 0 2px #ffd54a, 0 0 4px rgba(255,213,74,.2); } }
+#hub .grid > button.new { box-shadow:0 0 0 2px #ffd54a inset; }
 #hub { position:fixed; z-index:40; top:calc(var(--topH, 52px) + 6px); width:min(640px, calc(100vw - 24px)); max-height:calc(100vh - 90px); overflow:auto;
   background:var(--panel); border:1px solid var(--line); border-radius:14px; box-shadow:0 16px 40px rgba(0,0,0,.5); padding:10px; display:none; }
 #hub.on { display:block; }
@@ -51,7 +54,13 @@ export function mountHub(top, after, opts = {}) {
   const sort = () => { for (const id of IDS) { const b = document.getElementById(id); if (b && b.parentNode === grid) grid.appendChild(b); } };   // по реда в IDS
   const place = () => { const r = btn.getBoundingClientRect(); hub.style.left = Math.max(12, Math.min(r.left, innerWidth - hub.offsetWidth - 12)) + 'px'; };
   const extra = document.createElement('div'); hub.appendChild(extra);
-  const open = v => { if (v && opts.extra) { try { extra.innerHTML = opts.extra() || ''; } catch { extra.innerHTML = ''; } } if (v) locks(); hub.classList.toggle('on', v); btn.classList.toggle('on', v); btn.textContent = v ? '📊 Империя ▴' : '📊 Империя ▾'; if (v) place(); };
+  // ново вътре: плочка с жълто число („Оферти 2“, „Куести 1“…), което още не си видял → бутонът свети, докато не отвориш панела
+  let seen = '';
+  const badges = () => [...grid.querySelectorAll(':scope > button')].filter(b => b.style.display !== 'none' && b.querySelector('b[style*="ffd54a"]'));
+  const sigOf = L => L.map(b => b.id + ':' + b.querySelector('b[style*="ffd54a"]').textContent.trim()).join('|');
+  const mark = () => { if (hub.classList.contains('on')) return; const L = badges(), isNew = !!L.length && sigOf(L) !== seen; btn.classList.toggle('new', isNew); };
+  setInterval(mark, 2000);
+  const open = v => { if (v) { const L = badges(), sig = sigOf(L); grid.querySelectorAll(':scope > button.new').forEach(b => b.classList.remove('new')); if (sig !== seen) L.forEach(b => b.classList.add('new')); seen = sig; btn.classList.remove('new'); } if (v && opts.extra) { try { extra.innerHTML = opts.extra() || ''; } catch { extra.innerHTML = ''; } } if (v) locks(); hub.classList.toggle('on', v); btn.classList.toggle('on', v); btn.textContent = v ? '📊 Империя ▴' : '📊 Империя ▾'; if (v) place(); };
   btn.onclick = e => { e.stopPropagation(); open(!hub.classList.contains('on')); };
   grid.addEventListener('click', () => setTimeout(() => open(false), 0));   // избор на плочка → прозорецът ѝ се отваря, панелът се затваря
   addEventListener('click', e => { if (hub.classList.contains('on') && !hub.contains(e.target) && e.target !== btn) open(false); });

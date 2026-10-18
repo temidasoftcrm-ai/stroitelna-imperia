@@ -120,7 +120,7 @@ export function createSilkRoad(deps) {
       : `<span class="meta" style="margin:0 0 0 auto;color:var(--ok)">открит · +${f(m.daily)} €/ден</span>`;
     let h = `<div class="card" style="border:1px solid #ffb300;box-shadow:0 0 18px rgba(255,179,0,.2)"><h3>${m.ico}${m.flag} ${m.nm} ${head}</h3>
       <div class="meta">${routeTxt()} · награда <b style="color:var(--ok)">${f(m.fee)} €</b>${s.adv ? ` (аванс ${f(s.adv)} € получен)` : ''}</div>`;
-    if (s.st === 'done') return h + `<img src="assets/ui/silk-done.webp" alt="" onerror="this.remove()" style="width:100%;max-height:260px;object-fit:contain;border-radius:10px;margin:6px 0"><div class="meta">Предаден на ден ${s.doneAt}. Спечелено: <b style="color:var(--ok)">${f(s.earned || 0)} €</b>.</div></div>`;
+    if (s.st === 'done') return h + `<div style="display:flex;gap:12px;align-items:center;margin:6px 0"><img src="assets/ui/silk-done.webp" alt="" onerror="this.remove()" style="width:120px;height:90px;object-fit:cover;border-radius:10px;flex:none"><div class="meta" style="margin:0">Предаден на ден ${s.doneAt}. Спечелено: <b style="color:var(--ok)">${f(s.earned || 0)} €</b>.</div></div></div>`;   // снимката — малка, текстът до нея
     h += `<div class="bar" style="margin:6px 0"><i style="width:${(p.done / p.all * 100).toFixed(0)}%;background:#ffb300"></i></div>`;
     const act = s.st === 'active', paid = s.paid || [], tick = n => paid.includes(n) ? ' ✅' : '';
     h += `<div class="meta" style="margin:8px 0 2px"><b style="color:var(--txt)">1. ${STAGES[0]}${tick(1)}</b> · +${f(m.fee * m.share[0])} €</div>`;

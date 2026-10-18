@@ -80,7 +80,7 @@ export function createRoute66(deps) {
       : `<span class="meta" style="margin:0 0 0 auto;color:var(--ok)">открит · +${f(R66.daily)} €/ден</span>`;
     let h = `<div class="card" style="border:1px solid #c0392b;box-shadow:0 0 18px rgba(192,57,43,.25)"><h3>🛣️🇺🇸 Route 66 ${head}</h3>
       <div class="meta">${routeTxt()} · награда <b style="color:var(--ok)">${f(R66.fee)} €</b>${s.adv ? ` (аванс ${f(s.adv)} € получен)` : ''}</div>`;
-    if (s.st === 'done') return h + `<img src="assets/ui/r66-done.webp" alt="" style="width:100%;max-height:260px;object-fit:contain;border-radius:10px;margin:6px 0"><div class="meta">Предаден на ден ${s.doneAt}. Спечелено от туристи: <b style="color:var(--ok)">${f(s.earned || 0)} €</b>.</div></div>`;
+    if (s.st === 'done') return h + `<div style="display:flex;gap:12px;align-items:center;margin:6px 0"><img src="assets/ui/r66-done.webp" alt="" style="width:120px;height:90px;object-fit:cover;border-radius:10px;flex:none"><div class="meta" style="margin:0">Предаден на ден ${s.doneAt}. Спечелено от туристи: <b style="color:var(--ok)">${f(s.earned || 0)} €</b>.</div></div></div>`;   // снимката — малка, текстът до нея
     h += `<div class="bar" style="margin:6px 0"><i style="width:${(p.done / p.all * 100).toFixed(0)}%;background:#c0392b"></i></div>`;
     for (const l of legs()) {
       const nm = `${deps.cityName(l.a)} — ${deps.cityName(l.b)}`, q = deps.segInfo(l.a, l.b);

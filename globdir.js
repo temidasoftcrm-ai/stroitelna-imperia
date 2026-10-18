@@ -8,8 +8,16 @@ export function globProposals(ctx) {
   const add = (key, ico, text, cost, count, apply) => { if (count > 0) out.push({ id: `glob:${key}:${count}`, dir: 'glob', ico, text, cost: Math.round(cost), count, apply }); };
   // — мегапроекти: най-евтиният следващ етап (не започнат или чакащ финансиране), без петролопровода преди договорите
   const mw = ctx.mw, st = mw.state();
-  const next = mw.MW.filter(m => { const r = st[m.key]; return r && !r.done && !r.run && !(m.key === 'pipeline' && !r.ph && !mw.pipeSigned()); })
+  const next = mw.MW.filter(m => { const r = st[m.key]; return r && !r.done && !r.run && !(mw.hasDeals ? mw.hasDeals(m.key) && !r.ph && !mw.signed(m.key) : m.key === 'pipeline' && !r.ph && !mw.pipeSigned()); })
     .map(m => ({ m, r: st[m.key], c: mw.phaseCost(m.key) })).sort((a, b) => a.c - b.c);
+  // — държавните договори: най-евтиният проект, който чака подписи; по едно предложение на държава (плащанията и кредитът от нашата банка — наведнъж, после подпис)
+  const wait = mw.MW.filter(m => { const r = st[m.key]; return r && !r.done && !r.ph && mw.hasDeals && mw.hasDeals(m.key) && !mw.signed(m.key); }).sort((a, b) => mw.phaseCost(a.key) - mw.phaseCost(b.key))[0];
+  if (wait) for (const d of mw.deals(wait.key).filter(x => !x.signed)) {
+    const left = d.cond.map((c, i) => ({ c, i })).filter(o => !d.ok[o.i]), pay = left.filter(o => o.c.t === 'pay').reduce((a, o) => a + o.c.amt, 0), bank = left.filter(o => o.c.t === 'bank'), block = left.filter(o => !['pay', 'bank', 'transit'].includes(o.c.t));
+    add(`deal-${wait.key}-${d.k}`, d.flag, `${wait.nm}: ${d.flag} ${d.nm} подписва, ако ${left.length ? left.map(o => ctx.strip(mw.condTxt(wait.key, o.c))).join('; ') : 'просто подпишем'}. ${block.length ? 'Първо трябва да изпълним условието.' : 'Да изпълним условията и да подпишем?'}`, pay, 1,
+      () => { for (const o of left) if (o.c.t === 'pay' || o.c.t === 'bank') mw.fulfil(wait.key, d.k, o.i); mw.sign(wait.key, d.k); });
+    const p = out[out.length - 1]; if (p && p.id.startsWith(`glob:deal-${wait.key}-${d.k}`)) { p.why = `без договорите ${wait.nm} не може да тръгне`; if (block.length) p.needsGear = ctx.strip(mw.condTxt(wait.key, block[0].c)); if (bank.length) p.gainTxt = `кредитът (${bank.map(o => B(o.c.amt)).join(' + ')}) е от нашата банка при 2%`; }
+  }
   for (const o of next.slice(0, 2)) add('mw-' + o.m.key + '-' + o.r.ph, o.m.ico, `${o.m.nm}: ${o.r.ph ? `етап ${o.r.ph} е готов — да финансираме етап ${o.r.ph + 1}?` : 'да направим първа копка?'} Готовият проект носи ~${f(o.m.inc)} €/ден.`, o.c, 1, () => mw.fund(o.m.key));
   if (!ctx.empire()) return out;   // концесиите и придобиванията — от ниво 20
   // — концесия: оферта с 15% над началната цена в отворения търг (печели често, без да надплаща много)
