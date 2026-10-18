@@ -3520,7 +3520,7 @@ function campCard() {
   return `<div class="card" style="border:1px solid #ffd54a;box-shadow:0 0 18px rgba(255,213,74,.25)"><div class="row" style="margin:0;align-items:center;gap:10px"><span class="meta" style="margin:0;flex:1">${won ? '🇺🇸 <b style="color:var(--txt)">Ти си президент на САЩ.</b> Министерският съвет идва в следващата глава.' : act ? '🗳️ Кампанията тече — 16 седмици митинги, дебати и подкрепа по щатите.' : '🏅 „Град за пример“ — Десислава те кани да се кандидатираш за президент на САЩ. Ти решаваш кога.'}</span>${won ? '' : `<button class="btn" data-camp="1">🇺🇸 ${act ? 'Продължи кампанията' : 'Президентска кампания'}</button>`}</div></div>`;
 }
 // градът стои в избраната държава (координати и флаг; без флага на Саудитска Арабия няма пустиня)
-function impPlace() { const C = IMP_CC[S?.imp?.cc], c = C && cityById(NEOM_ID); if (!c || (c.lat === C.lat && c.cc === C.cc)) return; Object.assign(c, { lat: C.lat, lon: C.lon, cc: C.cc }); isoCitiesC.clear(); }
+function impPlace() { const C = IMP_CC[S?.imp?.cc], c = C && cityById(NEOM_ID); if (!c || (c.lat === C.lat && c.cc === C.cc)) return; Object.assign(c, { lat: C.lat, lon: C.lon, cc: C.cc }); isoCitiesC.clear(); fixSeaSpurs(true); }   // пътната му връзка към старото място (напр. Гиза) — пренасочена в новата държава
 function impLook() { if (S.cityId !== NEOM_ID || !city.group || !S.imp?.cc) return; impPlace(); impDecor(city.group, S.imp.cc, city, { winter: seasonOf(S.day) === 'winter' }); impCiv3D(); }
 // 🏥 обществените сгради (imperial.js S.imp.b) на свободни парцели във външния пояс — при влизане и всеки ден (строежът расте)
 function impCiv3D() { if (S.cityId !== NEOM_ID || !city.group || !S.imp?.cc) return; syncImpCivic(city, { imp: S.imp, cc: S.imp.cc, side: 2 * TILE - 2, builders: { civic: buildCivic, hospital: buildHospital, metro: buildMetro }, deps: { label, model: (n, k) => A[n] ? model(n, k) : null } }); }
@@ -6360,24 +6360,36 @@ function addSpurSeg(a, b) { const id = abSegId(a, b); if (!ALL_AB.some(x => x.id
 function restoreSpurs() { fixSeaSpurs(); for (const sp of (S && S.spurs) || []) addSpurSeg(sp.a, sp.b); }
 // собствен участък само по суша: направо или с една чупка навътре (не през морето — напр. Неапол — Охрид)
 function spurLand(a, b) {
-  if (!europe || !europe.length) return true;
   const A = cityById(a), B = cityById(b); if (!A || !B) return true;
+  if ((A.lon < -30) !== (B.lon < -30)) return false;   // 🌊 Америките и Старият свят — по суша няма път (напр. Империал Сити в САЩ — Гиза)
+  if (!europe || !europe.length) return true;
   const pa = [A.lon, A.lat], pb = [B.lon, B.lat];
   if (crossesSahara(a, b)) return false;   // 🏜️ не през пустинята
-  if (!landAt(...pa) || !landAt(...pb)) return true;   // извън картата на Европа — не проверяваме
+  if (!landAt(...pa) || !landAt(...pb)) return worldLandSeg(pa, pb);   // извън картата на Европа — по световната карта (Токио — Шанхай е през морето)
   if (segLand(pa, pb, 24)) return true;
   const mx = (pa[0] + pb[0]) / 2, my = (pa[1] + pb[1]) / 2, dx = pb[0] - pa[0], dy = pb[1] - pa[1], len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
   for (const off of [0.15, -0.15, 0.25, -0.25, 0.35, -0.35, 0.5, -0.5]) for (const along of [0, -0.2, 0.2]) { const P = [mx + nx * off * len + dx * along, my + ny * off * len + dy * along]; if (landAt(...P) && segLand(pa, P, 16) && segLand(P, pb, 16)) return true; }
   return false;
 }
-// стари записи: участък през морето → пренасочва се към най-близкия град по суша (в мрежата, ако има), без нова цена
-function fixSeaSpurs() {
-  if (!S || !(S.spurs || []).length || !europe || !europe.length || S.spurFix === 2) return;
+// по световната карта (world.json): правата между градовете е по суша, ако най-много 2 от 24 точки са в морето (бреговите градове)
+let worldBox = null;
+const worldLandAt = (lo, la) => { if (!worldBox || worldBox.src !== worldGeo) { worldBox = (worldGeo || []).flatMap(c => c.poly.map(poly => { let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const [x, y] of poly[0]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } return [x0, x1, y0, y1, poly[0]]; })); worldBox.src = worldGeo; }
+  return worldBox.some(([x0, x1, y0, y1, r]) => lo >= x0 && lo <= x1 && la >= y0 && la <= y1 && inRing(r, lo, la)); };
+function worldLandSeg(pa, pb, n = 24) {
+  if (!worldGeo || !worldGeo.length) return true;   // световната карта още не е заредена — не проверяваме
+  let sea = 0; for (let k = 1; k < n; k++) { const t = k / n; if (!worldLandAt(pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t) && ++sea > 2) return false; }
+  return true;
+}
+// стари записи: участък през морето → пренасочва се към най-близкия град по суша (в мрежата, ако има), без нова цена.
+// v3: и извън Европа (по световната карта) и между Америките и Стария свят; force — след преместване на Империал Сити (impPlace)
+function fixSeaSpurs(force = false) {
+  if (!S || !(S.spurs || []).length || !europe || !europe.length || (S.spurFix === 3 && !force)) return;
+  if (!worldGeo || !worldGeo.length) { if (!worldGeo) { worldGeo = []; fetch('assets/data/world.json').then(r => r.json()).then(j => { worldGeo = j; fixSeaSpurs(force); }).catch(() => {}); } return; }   // без световната карта — после
   const hubs = roadHubs();
   for (const sp of S.spurs) {
     if (spurLand(sp.a, sp.b)) continue;
     const old = abSegId(sp.a, sp.b), own = ownedCities().includes(sp.b) && !ownedCities().includes(sp.a) ? sp.b : sp.a;
-    const cand = CITIES.filter(c => c.id !== own && spurLand(own, c.id)).map(c => ({ x: c.id, km: kmBetween(own, c.id) + (hubs.has(c.id) ? 0 : 150) })).sort((p, q) => p.km - q.km)[0]; if (!cand) continue;
+    const cand = CITIES.filter(c => c.id !== own && !AIR_ONLY.has(c.id) && c.id !== NEOM_ID && !gateHidden(c.id) && spurLand(own, c.id)).map(c => ({ x: c.id, km: kmBetween(own, c.id) + (hubs.has(c.id) ? 0 : 150) })).sort((p, q) => p.km - q.km)[0]; if (!cand) continue;
     const nid = abSegId(own, cand.x); sp.a = own; sp.b = cand.x;
     S.hwDone = (S.hwDone || []).map(x => x === old ? nid : x);
     for (const j of S.hwJobs || []) if (j.seg === old) { j.seg = nid; j.km = kmBetween(own, cand.x); }
@@ -6385,7 +6397,7 @@ function fixSeaSpurs() {
     const k = ALL_AB.findIndex(x => x.id === old && x.spur); if (k >= 0) ALL_AB.splice(k, 1);
     toast(`🛣️ Участъкът ${cityById(own).nm} — ${cityById(old.slice(3).split('-').find(x => x !== own))?.nm || ''} минаваше през морето — пренасочен към ${cityById(cand.x).nm} (без доплащане).`, 'good');
   }
-  S.spurFix = 2;
+  S.spurFix = 3;
 }
 const onAnySeg = id => [...allSegs(), ...ALL_AB].some(x => x.a === id || x.b === id);
 // най-близкият град, към който има смисъл да се свърже: първо готов възел на мрежата, иначе град от коридор
@@ -8827,6 +8839,7 @@ function frame() {
   if (city.planView && city.planView.userData.update && !onMap) city.planView.userData.update(simT);   // светофарите в плана
   if (hwv) return renderHwView(rdt);
   if (onMap) return;   // картата е SVG — 3D сцената не се рисува отдолу
+  if (window.__overlay3d > 0) return;   // директорската зала (directors3d.js) е втори WebGL на цял екран — градът под нея не се рисува (иначе две сцени на кадър)
   controls.update();
   if (S) { dayNight.update(todF(), controls.target); weather.update(rdt, controls.target); setSiteLightsNight(dayNight.night); }
   perfTune(rdt);
@@ -9374,6 +9387,8 @@ if (params.has('profile')) {
   window.__camNow = () => [camera.position.toArray(), controls.target.toArray()];
   window.__open = kind => openBig(kind);
   window.__cityCount = () => CITIES.filter(c => !gateHidden(c.id)).length;
+  window.__spurs = () => ({ fix: S.spurFix, spurs: (S.spurs || []).map(s => s.a + '—' + s.b), done: (S.hwDone || []).filter(x => /neom|tokyo|seoul/.test(x)) });
+  window.__impTest = cc => { S.imp = { ...(S.imp || {}), cc }; impPlace(); return { neom: [cityById(NEOM_ID).lat, cityById(NEOM_ID).lon] }; };
   window.__ext = ids => Object.fromEntries(ids.map(id => [id, { tier: cityTier(id), rule: extRule(id), max: extMaxOf(id), need: extNeedOf(id), now: extNow(id), info: districtInfo(id) }]));
   // за снимки: световен изглед, центриран в at, с дадения зуум; iso — натисната държава (панелът ѝ)
   window.__mapShot = (z, at = [24.75, 42.15], iso = null) => { setMapView('world'); mapIso = null; mapSel = null; const [x, y] = proj(...at), [, , bw, bh] = mapView.base;

@@ -7,6 +7,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createHolo } from './boardholo.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { buildPresRoom } from './presrooms.js';   // 🇺🇸/🇷🇺 президентските зали (Министерският съвет)
 import { createRoomSound } from './roomsound.js';   // шум на залата, хартия, чукче, аплодисменти, говор на глас
 
@@ -206,13 +207,13 @@ function roundedRect(w, l, r) {
 // висок кожен стол в тъмносиньо
 function chair(mat, metal, k) {
   const g = new THREE.Group();
-  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.12, 0.54), mat); seat.position.y = 0.47; g.add(seat);
-  const back = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.92, 0.12), mat); back.position.set(0, 1.0, -0.28); back.rotation.x = -0.1; g.add(back);
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.12, 0.54), mat); seat.position.y = 0.47; g.add(seat);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.92, 0.12), mat); back.position.set(0, 1.0, -0.28); back.rotation.x = -0.1; g.add(back);
   if (k) {   // бродираната емблема горе на облегалката — над главата на директора, вижда се отсреща
     const em = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.24), new THREE.MeshStandardMaterial({ map: logoTex(k), transparent: true, alphaTest: 0.1, roughness: 0.6 }));
     em.position.set(0, 0.3, 0.062); back.add(em);
   }
-  for (const sx of [-1, 1]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.04, 0.4), metal); arm.position.set(sx * 0.36, 0.6, -0.04); g.add(arm); const st = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.2, 0.04), metal); st.position.set(sx * 0.36, 0.52, 0.05); g.add(st); }   // подлакътниците — по-ниско и по-навън, лактите не влизат в тях
+  for (const sx of [-1, 1]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.04, 0.4), metal); arm.position.set(sx * 0.43, 0.56, -0.04); g.add(arm); const st = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.2, 0.04), metal); st.position.set(sx * 0.43, 0.5, 0.05); g.add(st); }   // подлакътниците — по-ниско и по-навън, лактите не влизат в тях
   const post = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.38, 10), metal); post.position.y = 0.22; g.add(post);
   const base = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.04, 5), metal); base.position.y = 0.03; g.add(base);
   g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
@@ -293,8 +294,9 @@ function buildRoom(scene) {
   return { leather, metal, gold };
 }
 // пред всяко място: кожена папка с името, чаша вода на златна подложка
-const glassM = new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0.03, transmission: 1, thickness: 0.006, ior: 1.5, clearcoat: 1, envMapIntensity: 2.2, transparent: true, opacity: 0.55, side: THREE.DoubleSide });
-const waterM = new THREE.MeshPhysicalMaterial({ color: 0xcfe9f7, metalness: 0, roughness: 0.02, transmission: 0.9, thickness: 0.05, ior: 1.33, envMapIntensity: 1.6, transparent: true, opacity: 0.7 });
+// без transmission: той рисува цялата сцена още веднъж на всеки кадър (20 чаши = отделен пълен проход); отражението идва от envMap
+const glassM = new THREE.MeshStandardMaterial({ color: 0xeaf4ff, metalness: 0.1, roughness: 0.04, envMapIntensity: 2.4, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide });
+const waterM = new THREE.MeshStandardMaterial({ color: 0xbfe2f5, metalness: 0, roughness: 0.03, envMapIntensity: 1.8, transparent: true, opacity: 0.45, depthWrite: false });
 // профилът на чашата (радиус, височина в m): дебело дъно, леко разширена нагоре, ръбът — двойна стена
 const GLASS = new THREE.LatheGeometry([[0, 0], [0.028, 0], [0.031, 0.004], [0.032, 0.014], [0.037, 0.115], [0.0385, 0.118], [0.0365, 0.118], [0.0345, 0.016], [0, 0.014]].map(([r, y]) => new THREE.Vector2(r, y)), 28);
 const WATER = new THREE.LatheGeometry([[0, 0.014], [0.034, 0.016], [0.0355, 0.082], [0, 0.082]].map(([r, y]) => new THREE.Vector2(r, y)), 28);
@@ -318,6 +320,27 @@ function groupMedal(scene, b, gold) {
   const m = new THREE.Mesh(new THREE.CircleGeometry(R, 64), new THREE.MeshPhysicalMaterial({ map: t, roughness: 0.25, clearcoat: 1, clearcoatRoughness: 0.08 }));
   m.rotation.x = -Math.PI / 2; m.position.set(0, TABLE_H + 0.031, 0); scene.add(m);   // горният ръб на картинката — към картата: името се чете от председателя
   const rim = new THREE.Mesh(new THREE.TorusGeometry(R, 0.018, 12, 80), gold); rim.rotation.x = -Math.PI / 2; rim.position.set(0, TABLE_H + 0.03, 0); scene.add(rim);
+}
+// неподвижните мешове с еднакъв материал → един меш (световни координати); пропуска хората, холограмата, невидимите и по-сложните
+function mergeStatic(scene, skip) {
+  scene.updateMatrixWorld(true);
+  const by = new Map(), drop = [];
+  scene.traverse(o => {
+    if (!o.isMesh || o.isSkinnedMesh || o.isInstancedMesh || !o.visible || Array.isArray(o.material) || o.material.transparent || o.userData.keep) return;
+    for (let p = o.parent; p; p = p.parent) if (skip.has(p) || !p.visible) return;
+    const g = o.geometry, at = Object.keys(g.attributes).sort().join(','); if (g.morphAttributes && Object.keys(g.morphAttributes).length) return;
+    const k = o.material.uuid + '|' + at + '|' + (g.index ? 1 : 0) + '|' + o.castShadow + o.receiveShadow;
+    (by.get(k) || by.set(k, []).get(k)).push(o);
+  });
+  for (const list of by.values()) {
+    if (list.length < 2) continue;
+    const geos = list.map(o => o.geometry.clone().applyMatrix4(o.matrixWorld)); let m = null;
+    try { m = mergeGeometries(geos, false); } catch { m = null; }
+    geos.forEach(g => g.dispose()); if (!m) continue;
+    const mesh = new THREE.Mesh(m, list[0].material); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow; mesh.matrixAutoUpdate = false; scene.add(mesh);
+    for (const o of list) { o.parent && o.parent.remove(o); drop.push(o.geometry); }
+  }
+  drop.forEach(g => g.dispose());
 }
 function seatProps(scene, side, z, name, sub, gold, k, dx = 0) {
   const fold = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.014, 0.46), [null, null, new THREE.MeshStandardMaterial({ map: folderTex(name, sub, k), roughness: 0.55 }), null, null, null].map(m => m || new THREE.MeshStandardMaterial({ color: 0x17181b, roughness: 0.6 })));
@@ -345,6 +368,8 @@ export function openBoardroom(o) {
   requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
+  window.__overlay3d = (window.__overlay3d || 0) + 1;
+  window.__room = { renderer, get scene() { return scene; } };   // за измерване от конзолата (кадри, draw calls, триъгълници)   // game.js спира да рисува 3D града, докато залата е отворена
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -357,7 +382,7 @@ export function openBoardroom(o) {
   ctl.target.set(0, 1.15, -3); ctl.enableDamping = true; ctl.enablePan = false; ctl.minDistance = 2.5; ctl.maxDistance = 8; ctl.maxPolarAngle = 1.55; ctl.minPolarAngle = 0.6; ctl.update();
   scene.add(new THREE.HemisphereLight(0xf4f8ff, 0x6d5c48, 0.8));
   const sun = new THREE.DirectionalLight(0xfff2de, 1.6); sun.position.set(9, 6, 2); sun.castShadow = true;   // дневна светлина откъм десните прозорци
-  sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, near: 1, far: 25 }); sun.shadow.bias = -0.0004; scene.add(sun);
+  sun.shadow.mapSize.set(1024, 1024); Object.assign(sun.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, near: 1, far: 25 }); sun.shadow.bias = -0.0004; scene.add(sun);
   const fill = new THREE.DirectionalLight(0xe6efff, 0.6); fill.position.set(-9, 5, 3); scene.add(fill);
   for (const z of [-2.4, 0, 2.4]) { const p = new THREE.PointLight(0xfff0d8, 1.6, 6, 1.6); p.position.set(0, 3.3, z); scene.add(p); }
   const R = ROOM === 'corp' ? buildRoom(scene) : buildPresRoom(scene, ROOM, { ROOM_W, ROOM_BACK, ROOM_FRONT, ROOM_H, TABLE_W, TABLE_L, TABLE_H, roundedRect });
@@ -398,6 +423,7 @@ export function openBoardroom(o) {
       const p = { s, i, m, mixer, side, z, fem, base: mixer.clipAction(base), cur: null, busy: 0 };
       p.talk = pick('Sit_Talk_M', 'Sit_Table_Ask', fem ? 'Sit_Meeting_F' : 'Sit_Talk_2').map(c => mixer.clipAction(c));
       p.point = pick('Sit_Point_Forward', 'Sit_Point').map(c => mixer.clipAction(c));
+      [p.raise, p.nay, p.clap] = ['Sit_Raise_Hand', 'Sit_Disapprove', 'Sit_Clap'].map(n => clips[n] ? mixer.clipAction(clips[n]) : null);   // гласуването (Mixamo): вдигната ръка, клатене на пръст, ръкопляскане
       p.base.play(); p.cur = p.base; mixer.update(Math.random() * base.duration);
       // столът — под ханша от позата; тялото — обърнато към масата, ханшът на SIT_X от средата
       const wrap = new THREE.Group(); wrap.add(m); scene.add(wrap);
@@ -411,6 +437,7 @@ export function openBoardroom(o) {
       p.wrap = wrap; people.push(p);
     }));
     el.querySelector('.load').style.opacity = 0; snd.ambience(true);
+    mergeStatic(scene, new Set([holo.root, ...people.map(p => p.wrap)].filter(Boolean)));   // ~500 draw calls → под 150
     board(0);   // бордът започва с първото предложение
   }).catch(e => { console.warn('boardroom', e); el.querySelector('.load').textContent = 'Моделите не се заредиха.'; });
 
@@ -523,14 +550,14 @@ export function openBoardroom(o) {
         const i = list.findIndex(s => s.k === x.dir);
         if (i >= 0) {
           const el2 = document.createElement('div'); el2.className = 'vb ' + (x.cond ? 'c' : x.yes ? 'y' : 'n'); el2.textContent = x.cond ? '◐ условно' : x.yes ? '✋ за' : '✖ против'; el.insertBefore(el2, scr); badges.push({ el: el2, i });
-          const q = people.find(z => z.i === i); if (q && x.yes) { q.busy = 0; play(q, q.point[0], true); }   // „за“ — вдига ръка
+          const q = people.find(z => z.i === i); if (q) { q.busy = 0; play(q, x.yes ? q.raise || q.point[0] : q.nay || q.talk[0], true); }   // „за“ — вдига ръка, „против“ — клати пръст
         }
         o.sound && o.sound('click');
         setTimeout(step, 650); return;
       }
       const ok = y > n;
       scr.querySelector('.res').innerHTML = `<span style="color:${ok ? '#5fd38a' : y === n ? '#ffd54a' : '#ff6b6b'}">${y} за : ${n} против — ${ok ? 'бордът подкрепя' : y === n ? 'равен глас' : 'бордът е против'}. Решението е твое.</span>`;
-      if (ok && mine) snd.applause(1.4);
+      if (ok && mine) { snd.applause(1.4); for (const q of people) if (q.clap) { q.busy = 0; play(q, q.clap, true); } }   // подкрепено — всички ръкопляскат
       const row = scr.querySelector('.row');
       const btn = (t, how, cls) => { const b = document.createElement('button'); b.textContent = t; if (cls) b.className = cls; b.onclick = () => { if (how === 'no') { o.onDecide && o.onDecide(p.id, 'no'); after('no'); return; } const rr = o.onResolve && o.onResolve(p.id, how); after(how === 'drop' ? 'later' : rr && rr.done === false ? 'no' : 'ok'); }; row.appendChild(b); };
       btn(ok ? '✓ Одобри (както реши бордът)' : '✓ Одобри въпреки това', p.isSmall ? 'small' : 'pass', 'y');
@@ -656,6 +683,7 @@ export function openBoardroom(o) {
 
   function close() {
     if (shut) return; shut = true;
+    window.__overlay3d = Math.max(0, (window.__overlay3d || 1) - 1);
     removeEventListener('keydown', key); removeEventListener('resize', onResize);
     el.classList.remove('on');
     setTimeout(() => {
