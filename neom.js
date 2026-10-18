@@ -57,6 +57,7 @@ export function createNeom(deps) {
   function dailyTick() {
     const S = deps.S(), n = st(); if (!S || !n) return; let inc = 0;
     for (const d of DISTRICTS) { const r = n.d[d.key]; if (!r) continue; if (r.run) { r.prog += 1 / d.days; if (r.prog >= 1) complete(d); } if (r.done) inc += d.inc; }
+    inc *= deps.occ ? deps.occ() : 1;   // празни жилища и недоволни хора не плащат наеми и данъци (imperial.js)
     if (inc) deps.econ().earn(Math.round(inc), 'град', `${deps.brand()} Сити: наеми, данъци и туризъм`); n._inc = Math.round(inc);
   }
   const value = () => { const n = st(); if (!n) return 0; return FOUND_COST + DISTRICTS.reduce((a, d) => a + (n.d[d.key]?.done ? d.cost * 1.4 : n.d[d.key]?.run ? d.cost : 0), 0); };
