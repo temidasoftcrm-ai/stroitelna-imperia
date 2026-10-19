@@ -3381,7 +3381,7 @@ function contSummarySvg() {
   const u = mapUpx(), fs = 20 * u, tot = {}, done = {};
   for (const c of CITIES) { if (gateHidden(c.id)) continue; const k = lodContOf(c.id); tot[k] = (tot[k] || 0) + 1; if (econ?.isFinished?.(c.id)) done[k] = (done[k] || 0) + 1; }
   return Object.entries(CONT_AT).filter(([k]) => tot[k] && (k === 'eu' || contByKey(k)?.open())).map(([k, [lo, la]]) => { const [x, y] = proj(lo, la), p = Math.floor(100 * (done[k] || 0) / tot[k]);
-    return `<g class="contsum" style="pointer-events:none"><text x="${x}" y="${y}" font-size="${fs}" text-anchor="middle">${LOD_CONT_NM[k]}</text><text class="pct" x="${x}" y="${y + fs * 1.15}" font-size="${fs * 0.8}" text-anchor="middle">${p}% · ${done[k] || 0}/${tot[k]} града</text></g>`; }).join('');
+    return `<g class="contsum" style="pointer-events:none"><text x="${x}" y="${y}" font-size="${fs}" text-anchor="middle">${LOD_CONT_NM[k]}</text><text class="pct" x="${x}" y="${y + fs * 1.15}" font-size="${fs * 0.8}" text-anchor="middle">${p}%</text></g>`; }).join('');
 }
 // отдалеч — обобщени коридори: една линия между два континента (свят) или две държави (континент), дебела според броя връзки
 function corridorSvg(L) {
