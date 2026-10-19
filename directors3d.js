@@ -86,7 +86,8 @@ const css = `
 const loader = new GLTFLoader();
 const cache = {};
 const CLIPS_V = 3;   // вдигни, когато clips.glb се смени (иначе браузърът пази стария)
-const loadGlb = n => cache[n] || (cache[n] = loader.loadAsync(DIR + n + '.glb' + (n === 'clips' ? `?v=${CLIPS_V}` : '')));
+const MODEL_V = { elena: 2 };   // вдигни за директор, чийто .glb е сменен (поправените модели — иначе браузърът пази стария)
+const loadGlb = n => cache[n] || (cache[n] = loader.loadAsync(DIR + n + '.glb' + (n === 'clips' ? `?v=${CLIPS_V}` : MODEL_V[n] ? `?v=${MODEL_V[n]}` : '')));
 // от клиповете остават само ротациите + позицията на ханша (останалото е от скелета на Вера и би изкривило другите)
 let clipsP = null;
 const loadClips = () => clipsP || (clipsP = loadGlb('clips').then(g => {
