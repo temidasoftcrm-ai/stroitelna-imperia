@@ -167,3 +167,5 @@ cinema/newyork.mp4, cinema/vegas.mp4, cinema/paris.mp4, cinema/dubai.mp4, cinema
 - signs/tlight.glb — "Traffic light" by Ronata-Venya (CC-BY 4.0) — https://sketchfab.com/3d-models/8a9e4ed8ab794b10835fb01c3714f6dc (текстурите WebP)
 - lm/capitol.glb — Капитолият, направен в Meshy AI от потребителя (18.10.2026), опростен до ~61 хил. триъгълника
 - lm/petronas.glb — кулите Петронас, направени в Meshy AI от потребителя (18.10.2026), опростени до ~92 хил. триъгълника
+- lm/bigben2.glb — "BigBen" by Daqian Dong (CC-BY 3.0, Poly Pizza) — https://poly.pizza/m/8PaQZ_nLFIQ (текстурите в webp)
+- lm/londoneye2.glb — "Ferris Wheel" by CreativeTrio (CC0, Poly Pizza) — https://poly.pizza/m/6CepsZjXBw — London Eye

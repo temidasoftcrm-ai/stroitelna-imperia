@@ -99,6 +99,7 @@ import { mountHub } from './hub.js';
 import { showLevel } from './lvshow.js';
 import { showSub } from './subshow.js';   // дъщерните дружества — екран с логото (feature 'sub-screen')   // картинката на ниво 1 — при основаването на фирмата (feature 'lv-pics')   // „📊 Империя ▾“ — бутоните от втория ред на лентата в падащ панел (feature 'top-hub')
 import { sampleCurve } from './cityplan.js';
+import { makeWater } from './water.js';   // 🌊 Темза в Лондон (feature 'thames')
 import { LOD, LOD_NM, lodOf, CONT_AT, CONT_NM as LOD_CONT_NM, cityScore, topPerGroup, corridors, searchCities } from './maplod.js';   // степени на детайлност на картата (feature 'map-lod')
 import { planRoute, randomRoadPoint } from './cityplanroute.js';
 
@@ -608,7 +609,7 @@ function migrateMegaLots(cityId) {
   for (const o of (econ && econ.s.transit) || []) if (o.city === cityId && o.lot != null) o.lot = m(o.lot);
   for (const o of (S.rivals && S.rivals.sites) || []) if (o.city === cityId) o.lot = m(o.lot);
 }
-const isRoad = (i, j) => (i % 3 === 0 || j % 3 === 0) && !(city.noRoad && city.noRoad.has(i + ',' + j)) && !(city.noRoadT && city.noRoadT.has(i + ',' + j)) && !(city.noRoadM && city.noRoadM.has(i + ',' + j));   // noRoad — плочките под площада на главната забележителност
+const isRoad = (i, j) => (i % 3 === 0 || j % 3 === 0) && !(city.noRoadR && city.noRoadR.has(i + ',' + j)) && !(city.noRoad && city.noRoad.has(i + ',' + j)) && !(city.noRoadT && city.noRoadT.has(i + ',' + j)) && !(city.noRoadM && city.noRoadM.has(i + ',' + j));   // noRoad — плочките под площада на главната забележителност
 const tx = i => (i - (N - 1) / 2) * TILE;
 const city = { group: null, lots: [], hq: null };
 // град с план: парцелите са завъртени към улицата (lot.rot) и с различен размер; пътищата са по улиците на плана
@@ -832,6 +833,37 @@ function bigZoneLots(Z) {
   const used = occupiedLots(S.cityId);   // нещо на играча още стои там (нямаше свободен парцел за размяна) — не се пипа
   return q.some(l => used.has(l.id)) ? null : q;
 }
+// 🌊 река Темза в Лондон (feature 'thames'): на мрежата — по ред 8 (най-южния ред на ядрото, между центъра и южния квартал на мегаполиса).
+// Улиците север–юг остават и минават като мостове; парцелите във водата не се строят — сградите от записа отиват на свободни (thamesRelocate).
+const RIVER_BJ = 8, RIVER_BRIDGE = 9;   // мост на всяка 9-а плочка (всяка трета улица север–юг)
+const riverOn = (cityId, P) => cityId === 'london' && feature('thames') && !P;
+function thamesWater(g) {
+  const z0 = tx(3 * RIVER_BJ) + TILE / 2, z1 = tx(3 * RIVER_BJ + 3) - TILE / 2, x0 = tx(0) - 700, x1 = tx(NI - 1) + 700;
+  const w = makeWater({ color: 0x3a6f8f, repeat: 60 }), m = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0).rotateX(-Math.PI / 2), w.material);
+  m.position.set((x0 + x1) / 2, -0.02, (z0 + z1) / 2); m.receiveShadow = true; g.add(m); city.riverWater = w;
+  const st = new THREE.MeshStandardMaterial({ color: 0x9a948a, roughness: 0.9 }), seg = (a, b, z) => { const q = new THREE.Mesh(new THREE.BoxGeometry(b - a, 0.6, 0.8), st); q.position.set((a + b) / 2, 0.2, z); q.receiveShadow = true; g.add(q); };
+  for (const z of [z0, z1]) {   // каменните кейове — между мостовете (и извън града)
+    seg(x0, tx(0) - TILE / 2, z); seg(tx(NI - 1) + TILE / 2, x1, z);
+    for (let i = 0; i + RIVER_BRIDGE < NI; i += RIVER_BRIDGE) seg(tx(i) + TILE / 2, tx(i + RIVER_BRIDGE) - TILE / 2, z);
+    { const last = Math.floor((NI - 1) / RIVER_BRIDGE) * RIVER_BRIDGE; if (last < NI - 1) seg(tx(last) + TILE / 2, tx(NI - 1) + TILE / 2, z); }
+  }
+  for (let i = 0; i < NI; i += RIVER_BRIDGE) for (const sx of [-1, 1]) { const r = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.9, z1 - z0), st); r.position.set(tx(i) + sx * (TILE / 2 - 0.3), 0.45, (z0 + z1) / 2); g.add(r); }   // парапетите на мостовете
+}
+// сградите, имотите, гаражът, складът и строежите на парцели в реката → на свободни парцели (веднъж, при влизане; без доплащане)
+function thamesRelocate() {
+  const wet = new Set(city.lots.filter(l => l.river).map(l => l.id)); if (!wet.size) return;
+  const est0 = S.estate || {}, used = new Set([...(S.built || []).map(b => b.lot), ...(est0.owned || []).map(o => o.lot), ...(est0.land || []), S.garageLot, S.whLot, ...(S.projects || []).map(p => p.lot), city.hq?.id]);
+  const free = city.lots.filter(l => !l.river && !l.busy && !l.fresh && !used.has(l.id)).concat(city.lots.filter(l => !l.river && !l.busy && l.fresh && !used.has(l.id)));
+  const map = new Map(), to = id => { if (!wet.has(id)) return id; if (!map.has(id)) { const l = free.shift(); if (!l) return id; map.set(id, l.id); } return map.get(id); };
+  for (const b of S.built || []) b.lot = to(b.lot);
+  for (const o of est0.owned || []) o.lot = to(o.lot);
+  if (est0.land) est0.land = est0.land.map(to);
+  if (S.garageLot != null) S.garageLot = to(S.garageLot); if (S.whLot != null) S.whLot = to(S.whLot);
+  for (const p of S.projects || []) p.lot = to(p.lot);
+  for (const c of S.cash || []) c.lot = to(c.lot);
+  S.offers = (S.offers || []).filter(o => !wet.has(o.lot));
+  if (map.size) toast(`🌊 Темза: ${map.size} ${map.size === 1 ? 'обект е преместен' : 'обекта са преместени'} от брега на реката на свободни парцели.`, 'good');
+}
 function buildCity(cityId) {
   city.impCiv = null;   // сградите на Империал Сити (impcivic.js) — заедно със старата група
   if (cityId === NEOM_ID) impPlace();   // 🏙️ Империал Сити: държавата (🇺🇸/🇷🇺) — преди земята и дърветата, иначе остава пустинята на 🇸🇦 (пясък и палми)
@@ -862,6 +894,9 @@ function buildCity(cityId) {
   if (pv) { pv.position.y = 0; g.add(pv); city.planView = pv; } else g.add(ground);
   if (P) { dayNight.setLamps(pv.userData.lamps); signals.length = 0; if (feature('hollywood-night')) for (const m of pv.userData.nightMats || []) dayNight.winMats.add(m); }   // надписът HOLLYWOOD свети нощем
   if (!P) {
+  // 🌊 Темза: улиците север–юг пресичат реката само на мостовете (през 9 плочки) — между тях водата е непрекъсната
+  city.noRoadR = null;
+  if (riverOn(cityId, P)) { city.noRoadR = new Set(); for (let i = 0; i < NI; i++) if (i % RIVER_BRIDGE) for (const j of [3 * RIVER_BJ + 1, 3 * RIVER_BJ + 2]) city.noRoadR.add(i + ',' + j); }
   // улици: инстанцирани по вид плочка
   const kinds = { 'road-straight': [], 'road-crossroad': [], 'road-intersection': [], 'road-bend': [] };
   const e = new THREE.Euler(), s3 = new THREE.Vector3(TILE, TILE, TILE), q = new THREE.Quaternion(), p = new THREE.Vector3();
@@ -917,6 +952,8 @@ function buildCity(cityId) {
     const [sx, sy] = megaSlots[(e / (NB * NB)) | 0], w = e % (NB * NB);
     addLot(NB * sx + ((w / NB) | 0), NB * sy + w % NB, NB * sx + c, NB * sy + c, e < megaBase * NB, e >= megaBase * NB);
   } else for (let bi = NB; bi < NBI; bi++) for (let bj = 0; bj < NB; bj++) addLot(bi, bj, c, c, false, true);
+  // 🌊 Темза (feature 'thames'): ред 8 на мрежата е река — парцелите там не се строят, улиците север–юг са мостове
+  if (riverOn(cityId, P)) { for (const l of city.lots) if (l.bj === RIVER_BJ) { l.busy = 'river'; l.river = true; } thamesWater(g); }
   // градовете със забележителности: център 5×5 за тях; офисът е на (4,7) — заетите парцели в центъра се разменят с празни отвън
   const LMC = !!CITY_LANDMARKS[cityId] && !P, hqAt = [Math.floor(c), Math.floor(c) + (LMC ? 3 : 1)];
   if (LMC) applyCenterSwaps(cityId, Math.floor(c), hqAt);
@@ -2164,6 +2201,7 @@ function setupWorld() {
   econ = new ECON.Economy(S.econ, { toast, bustHtml: () => bust.statusHtml(), cityName: id => cityById(id)?.nm, isCapital: id => id === 'sofia' || CAPITALS.has(id), changed: () => { save(); renderPanel(); }, takeover: id => takeoverChoice(id), stockVisible: c => !c.cc || ownedCities().some(id => cityById(id)?.cc === c.cc), liquidated: (c, total, pr) => { showEventPop('sold', `💰 Разпродажба: ${c.nm}`, `+${fmt(total)} € · ${pr >= 0 ? 'печалба' : 'загуба'} ${fmt(Math.abs(pr))} € спрямо цената`); quests.emit('liquidate'); }, incomeMul: id => wonIncomeMul(id, x => econ.isFinished(x)), stocksOpen: () => dev.stocksOpen() });
   if (econ.setCity) econ.setCity(S.cityId);   // оборотът от обекти се води по градове
   buildCity(S.cityId);
+  thamesRelocate();   // 🌊 нищо не остава на парцелите в реката
   for (const u of units) scene.remove(u.obj);
   units.length = 0;
   // стари записи: общото ниво на централата става ниво и на офиса, и на гаража (гаражът остава в централата)
@@ -5134,7 +5172,15 @@ function landmarkCenter(kinds) {
   if (ams) amsPlaza(px, pz, add, tm);
   // поясът: 16 парцела около площада, подредени по ъгъл; другите забележителности — равномерно, останалите — градинки
   const belt = city.center.filter(l => !bigIds.has(l.id) && (Math.abs(l.bi - c0) === 2 || Math.abs(l.bj - c0) === 2)).sort((a, b) => Math.atan2(a.z - pz, a.x - px) - Math.atan2(b.z - pz, b.x - px));
-  const rest = kinds.slice(1), step = rest.length ? belt.length / rest.length : 0, spot = new Map();
+  let rest = kinds.slice(1);
+  // 🌊 Лондон с Темза: London Eye — на южния бряг, срещу центъра (парцелът точно под реката), а не в пояса
+  const eyeK = riverOn(S.cityId, null) && rest.find(k => k === 'londoneye' || k === 'londoneye2');
+  if (eyeK) { const bank = city.lots.filter(l => l.bj === RIVER_BJ + 1 && !l.river && l !== city.hq && (!l.busy || l.busy === 'landmark') && !(est().owned || []).some(o => o.lot === l.id) && !projects.some(p => p.lot === l.id) && !(S.built || []).some(b => b.lot === l.id)).sort((a, b) => Math.abs(a.bi - c0) - Math.abs(b.bi - c0))[0];
+    if (bank) { rest = rest.filter(k => k !== eyeK); mem[eyeK] = bank.id;
+      if (bank.obj) city.group.remove(bank.obj); for (const t of bank.trees || []) city.group.remove(t); bank.obj = null; bank.built = null; bank.trees = []; bank.busy = 'landmark';
+      const o = buildLandmark(eyeK, { label }); o.group.position.set(bank.x, 0, bank.z); o.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+      city.group.add(o.group); city.landmarks.push(o); } }
+  const step = rest.length ? belt.length / rest.length : 0, spot = new Map();
   rest.forEach((k, i) => spot.set(belt[Math.floor(i * step + step / 2) % belt.length], k));
   for (const l of belt) {
     const k = spot.get(l);
@@ -5426,8 +5472,9 @@ function updateMapPlanes() {
   g.innerHTML = (S.planes || []).filter(p => p.path && mapIn(p.path[0], p.path[1])).map(p => {
     const q = arcOf(p.path[0], p.path[1]), t = Math.min(1, p.km / Math.max(1, p.total)), [x, y] = bez(q, t); if (!mapVis(x, y)) return ''; const [x2, y2] = bez(q, Math.min(1, t + 0.01));
     const ang = Math.atan2(y2 - y, x2 - x) * 180 / Math.PI;
+    // и товарният е със същата картинка (беше оранжева звезда)
     // иконата на самолета отгоре (assets/ui/plane-top-jet.webp — белият джет с тъмносиня опашка; носът е надясно), завъртяна по посоката на полета; по-големите самолети — по-едри; товарният — старата стрелка
-    if (PLANE_PIC[p.kind]) { const sz = 24 + PLANE_PIC[p.kind] * 3; return `<g transform="translate(${x},${y}) rotate(${ang.toFixed(1)}) scale(${k * 0.9})" style="pointer-events:none;filter:drop-shadow(0 1.5px 1.5px rgba(0,0,0,.35))"><image href="assets/ui/plane-top-jet.webp" x="${-sz / 2}" y="${-sz / 2}" width="${sz}" height="${sz}"/></g>`; }
+    if (PLANE_PIC[p.kind] || p.kind === 'cargo') { const sz = 24 + (PLANE_PIC[p.kind] || 3) * 3; return `<g transform="translate(${x},${y}) rotate(${ang.toFixed(1)}) scale(${k * 0.9})" style="pointer-events:none;filter:drop-shadow(0 1.5px 1.5px rgba(0,0,0,.35))"><image href="assets/ui/plane-top-jet.webp" x="${-sz / 2}" y="${-sz / 2}" width="${sz}" height="${sz}"/></g>`; }
     return `<g transform="translate(${x},${y}) rotate(${ang}) scale(${k * 0.9})" style="pointer-events:none"><path d="M9,0 L-7,-2 L-3,-9 L-6,-9 L-11,-2 L-14,-2 L-12,0 L-14,2 L-11,2 L-6,9 L-3,9 L-7,2 Z" fill="${PLANES[p.kind].cargo ? '#ff9800' : '#fff'}" stroke="#123" stroke-width="1"/></g>`;
   }).join('');
 }
