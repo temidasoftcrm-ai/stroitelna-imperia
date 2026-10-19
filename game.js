@@ -425,7 +425,7 @@ const H2 = ['h2-greyporch', 'h2-brickcabin', 'h2-pink', 'h2-townhouse', 'h2-blue
 // бензиностанциите (decorLot) — тук, преди зареждането
 const GAS_KINDS = ['gas-modern', 'gas-big', 'gas-green', 'gas-lowpoly'].filter(n => feature(n)), GAS_W = { 'gas-modern': 24, 'gas-big': 26, 'gas-green': 26, 'gas-lowpoly': 9 };
 const MODELS = {
-  roads: ['traffic-light', 'road-straight', 'road-crossroad', 'road-intersection', 'road-bend', 'construction-cone', 'construction-barrier', 'light-square'],
+  roads: ['road-straight', 'road-crossroad', 'road-intersection', 'road-bend', 'construction-cone', 'construction-barrier', 'light-square'],
   houses: ['building-type-a', 'building-type-b', 'building-type-c', 'building-type-d', 'building-type-e', 'building-type-f', 'building-type-g', 'building-type-h', 'building-type-i', 'building-type-j', 'building-type-k', 'building-type-l', 'building-type-m', 'building-type-n', 'building-type-o', 'building-type-p', 'building-type-q', 'building-type-r', 'building-type-s', 'building-type-t', 'building-type-u', 'tree-large', 'tree-small'],   // всичките 21 къщи от пакета (Kenney, CC0)
   commercial: ['building-a', 'building-b', 'building-c', 'building-d', 'building-e', 'building-f', 'building-g', 'building-h', 'building-skyscraper-a', 'building-skyscraper-b', 'building-skyscraper-c'],
   // Commercial 2.1: модерни сгради и стъклени небостъргачи — за центъра на мегаполисите
@@ -443,7 +443,7 @@ const MODELS = {
   heavy: ['bulldozer-a', 'bulldozer-b', 'bulldozer-c', 'dump-truck', 'crane-c'],
   city: ['Building_Small_1', 'Building_Medium_2_001', 'Building_Large_2'],
   // Kenney Nature Kit (CC0): храсти, цветя и камъни — украса на празните парцели (decorLot)
-  nature: ['plant_bush', 'plant_bushLarge', 'plant_bushDetailed', 'flower_redA', 'flower_yellowA', 'flower_purpleA', 'rock_smallA', 'rock_largeA'],
+  nature: ['rock_smallA', 'rock_largeA'],   // детските храсти и цветя са изтрити — истинските (plants-real, assets/heavy/plants)
   people: ['worker_male', 'worker_male_alt', 'farmer'],
 };
 const A = {};
@@ -1029,7 +1029,7 @@ function decorLot(g, lot, cityId) {
       if (gasLogoTex) { o.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(o), sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: gasLogoTex, depthWrite: false }));   // логото на … Петролиум над станцията
         sp.scale.setScalar(4.2); const bc = bb.getCenter(new THREE.Vector3()); sp.position.set(bc.x, bb.max.y + 3, bc.z); sp.userData.detail = true; g.add(sp); lot.trees.push(sp); }
       return true; } }
-  if (kind < 2 || isDesert(cityId) || !A.plant_bush) return false;
+  if (kind < 2 || isDesert(cityId) || !A['pl-bush-0']) return false;   // градинките — с истинските растения
   const rr = (k => () => ((k = Math.imul(k ^ (k >>> 15), 2246822507) >>> 0) % 1000) / 1000)(h || 1);
   const L = lot.plan ? Math.min(lot.w, lot.d) / 2 - 1.5 : 7, rot = lot.plan ? lot.rot || 0 : 0, c = Math.cos(rot), sn = Math.sin(rot);
   const at = (o, u, v, y = 0) => { o.position.set(lot.x + u * c + v * sn, y, lot.z - u * sn + v * c); o.userData.detail = true; g.add(o); (lot.trees = lot.trees || []).push(o); return o; };
@@ -1575,7 +1575,7 @@ function buildSignals(g) {
     const sig = { i, j, x, z, t: Math.random() * (SIG_GREEN + SIG_YELLOW) * 2, heads: [], poles: [] };
     // два стълба по диагонал; всеки има светлини за двете посоки
     for (const [sx, sz, ry] of [[1, 1, 0], [-1, -1, Math.PI]]) {
-      const RT = feature('real-tlights') && hasTrafficLight() ? trafficLight() : null, pole = RT ? RT.obj : model('traffic-light', 9, false); pole.userData.detail = true; pole.userData.tile = [i, j];
+      const RT = feature('real-tlights') && hasTrafficLight() ? trafficLight() : null, pole = RT ? RT.obj : A['traffic-light'] ? model('traffic-light', 9, false) : new THREE.Group();   /* детският е изтрит — до зареждането празно място, realSignals() го сменя с истинския */ pole.userData.detail = true; pole.userData.tile = [i, j];
       pole.position.set(x + sx * TILE * 0.55, 0, z + sz * TILE * 0.55); pole.rotation.y = ry;
       g.add(pole); sig.poles.push({ pole, ry, real: !!RT, heads: [] });
       for (const axis of ['ns', 'ew']) {
