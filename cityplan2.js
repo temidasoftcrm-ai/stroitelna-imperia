@@ -334,7 +334,7 @@ export function plan2(cityId, o = {}) {
   // възли с 2 клона от един и същи път → чупка: пътищата се сливат в едно ребро между кръстовищата
   const inc = G.nodes.map(() => []); E.forEach(e => { inc[e.a].push(e); inc[e.b].push(e); });
   const used = new Set(), roads = [];
-  const isJ = n => inc[n].length !== 2 || inc[n][0].cls !== inc[n][1].cls || inc[n][0].noCars !== inc[n][1].noCars || !!inc[n][0].oneway !== !!inc[n][1].oneway;
+  const isJ = n => inc[n].length !== 2 || inc[n][0].cls !== inc[n][1].cls || inc[n][0].noCars !== inc[n][1].noCars || !!inc[n][0].oneway !== !!inc[n][1].oneway || !!inc[n][0].bridge !== !!inc[n][1].bridge;
   for (const e0 of E) {
     if (used.has(e0)) continue;
     // тръгни от края, който е кръстовище
@@ -356,9 +356,9 @@ export function plan2(cityId, o = {}) {
   roads.forEach(rd => {
     const k = CLS[rd.cls], pts = resample(rd.pts, P.osm ? 5 : 2), id = P.roads.length, a = nid(rd.from), b = nid(rd.to);
     const n1 = rd.oneway ? Math.min(2, k.lanes[0]) || 1 : 0, lanes = rd.oneway ? (rd.oneway > 0 ? [n1, 0] : [0, n1]) : k.lanes.slice();   // еднопосочен — всички ленти в една посока, без разделителна ивица
-    P.roads.push({ id, cls: rd.cls, noCars: !!rd.noCars, nm: rd.nm || '', oneway: !!rd.oneway, pts, L: cumLen(pts), lanes, laneW: k.laneW, median: rd.oneway ? 0 : k.median, walk: k.walk, w: rd.oneway ? n1 * k.laneW : widthOf(rd.cls), from: a, to: b, bridge: [] });
+    P.roads.push({ id, cls: rd.cls, osmBridge: !!rd.bridge, noCars: !!rd.noCars, nm: rd.nm || '', oneway: !!rd.oneway, pts, L: cumLen(pts), lanes, laneW: k.laneW, median: rd.oneway ? 0 : k.median, walk: k.walk, w: rd.oneway ? n1 * k.laneW : widthOf(rd.cls), from: a, to: b, bridge: [] });
   });
-  for (const rd of P.roads) { let on = -1; rd.pts.forEach((p, i) => { const w = sk.waterAt(p[0], p[1]); if (w && on < 0) on = rd.L[i]; if ((!w || i === rd.pts.length - 1) && on >= 0) { rd.bridge.push([Math.max(0, on - 4), Math.min(rd.L[rd.L.length - 1], rd.L[i] + 4)]); on = -1; } }); }   // мостовете — участъците над вода (+ рампа)
+  for (const rd of P.roads) { if (P.osm && !rd.osmBridge) continue; let on = -1; rd.pts.forEach((p, i) => { const w = sk.waterAt(p[0], p[1]); if (w && on < 0) on = rd.L[i]; if ((!w || i === rd.pts.length - 1) && on >= 0) { rd.bridge.push([Math.max(0, on - 4), Math.min(rd.L[rd.L.length - 1], rd.L[i] + 4)]); on = -1; } }); }   // мостовете — участъците над вода (+ рампа)
   for (const rd of P.roads) for (const [n, end] of [[rd.from, 0], [rd.to, 1]]) {
     const pts = end ? rd.pts.slice().reverse() : rd.pts, p0 = pts[0]; let qq = pts[pts.length - 1]; for (const p of pts) if (dist(p, p0) >= 10) { qq = p; break; }
     P.nodes[n].arms.push({ road: rd.id, end, angle: Math.atan2(qq[1] - p0[1], qq[0] - p0[0]) });
@@ -438,6 +438,12 @@ export function plan2(cityId, o = {}) {
   const nodeR = (n, roadId, end, inbound) => { if (n.kind === 'round') return P.rounds.find(r2 => r2.node === n.id).outer + 1; const a = n.arms.length >= 3 && armOf(n, roadId, end); return a && a.t != null ? a.t + (inbound ? P.STOP : 1) : n.r || 0; };
   const trim = (pts, s0, s1) => { const L = cumLen(pts), T = L[L.length - 1], out = []; if (T - s0 - s1 < 1) { const m = Math.max(0.5, Math.min(T - 0.5, T * s0 / ((s0 + s1) || 1))); s0 = m - 0.5; s1 = T - m - 0.5; }   /* срезовете се застъпват (къс път между две кръстовища) — къса отсечка между тях, не целият път */ let j = 1; const at = s => { while (j < L.length - 1 && L[j] < s) j++; const t = (s - L[j - 1]) / ((L[j] - L[j - 1]) || 1); return [lerp(pts[j - 1][0], pts[j][0], t), lerp(pts[j - 1][1], pts[j][1], t)]; };
     out.push(at(s0)); for (let k = 0; k < L.length; k++) if (L[k] > s0 + 0.3 && L[k] < T - s1 - 0.3) out.push(pts[k]); j = 1; out.push(at(T - s1)); return out; };   // без отсечки под 0,3 м на краищата
+  // мостовете: платното над водата е на DECK_Y м; рампите — линейно до DECK_R м от двата бряга (по-къси, ако пътят свършва преди това)
+  const DECK_Y = 0, DECK_R = 16;   // Рим: улиците (и кейовете Лунготевере) са високо над реката — мостовете са на нивото на улицата, водата е долу между стените
+  for (const rd of P.roads) { const T = rd.L[rd.L.length - 1]; rd.deck = rd.bridge.map(([b0, b1]) => [Math.max(0, b0 + 4), Math.min(T, b1 - 4), DECK_Y]).filter(([a, b]) => b - a > 2); }
+  P.roadY = (roadId, s) => { const rd = P.roads[roadId]; if (!rd || !rd.deck.length) return 0; const T = rd.L[rd.L.length - 1]; let y = 0;
+    for (const [a, b, h] of rd.deck) { const ri = Math.min(DECK_R, a), ro = Math.min(DECK_R, T - b); const f = s >= a && s <= b ? 1 : s < a ? (ri > 0.5 ? (s - (a - ri)) / ri : 0) : (ro > 0.5 ? ((b + ro) - s) / ro : 0); y = Math.max(y, h * Math.max(0, Math.min(1, f))); }
+    return y; };
   P.lanePath = (roadId, dir, i) => { const rd = P.roads[roadId], pts = dir > 0 ? rd.pts : rd.pts.slice().reverse(), off = rd.oneway ? (i + 0.5) * rd.laneW - rd.w / 2 : (rd.median / 2 + (i + 0.5) * rd.laneW) * (P.drive === 'R' ? 1 : -1);   // еднопосочен: ленти от левия ръб надясно
     const o = pts.map((p, k) => { const a = pts[Math.max(0, k - 1)], b = pts[Math.min(pts.length - 1, k + 1)], l = dist(a, b) || 1, tx = (b[0] - a[0]) / l, tz = (b[1] - a[1]) / l; return [p[0] - tz * off, p[1] + tx * off]; });
     const nA = P.nodes[dir > 0 ? rd.from : rd.to], nB = P.nodes[dir > 0 ? rd.to : rd.from];

@@ -59,7 +59,7 @@ await Promise.all([...HOUSES.map(k => load(k, `../assets/heavy/houses2/${k}.glb`
   load('hospital', '../assets/heavy/hospital/hospital.glb'),
   ...['townhouse-terracotta', 'palazzo-small', 'palazzo-big', 'corner-shop'].map(k => load('it-' + k, `../assets/heavy/rome/it-${k}.glb`).then(() => itTints('it-' + k))),
   ...['hotel', 'store', 'palazzo3', 'medkit'].map(k => load('it-sf-' + k, `../assets/heavy/rome/it-sf-${k}.glb`).then(() => A['it-sf-' + k]?.traverse(m => { const c = m.isMesh && !m.material.map && m.material.color; if (c && c.r > 0.8 && c.g < 0.25 && c.b < 0.25) m.material.color.setHex(0xd9a066); }))),   /* червеният „заместител“ без текстура → охра */   /* истински италиански (Sketchfab, CC-BY) */
-  load('colosseo', '../assets/heavy/lm/colosseo.glb'), load('station', '../assets/heavy/station/small.glb'), load('stadium', '../assets/heavy/stadium/stadium.glb'), load('cityhall', '../assets/heavy/civic/cityhall.glb'),
+  load('colosseo', '../assets/heavy/lm/colosseo.glb'), load('vittoriano2', '../assets/heavy/lm/vittoriano2.glb'), load('station', '../assets/heavy/station/small.glb'), load('stadium', '../assets/heavy/stadium/stadium.glb'), load('cityhall', '../assets/heavy/civic/cityhall.glb'),
   ...CARS.map(k => load(k, `../assets/heavy/cars/${k}.glb`))]);
 // ---- инстанции: всяка част на модела — един InstancedMesh за всичките му копия (вместо клонинги: малко draw calls)
 const PARTS = {}, BOX = {};
@@ -145,6 +145,7 @@ function lodUpdate(force) {
 function romeLm(L) {
   const plaza = disc(L.x, L.z, Math.max(L.w, L.d) / 2 + (L.guard || 4), 0.055); city.add(merge([plaza], MAT.walk));   // площад / защитен периметър
   if (L.lm === 'termini') { put('station', L, 2); return; }
+  if (L.lm === 'vittoriano' && A.vittoriano2) { const n0 = BLD.length; put('vittoriano2', { ...L, rot: VIT_ROT }, 0); if (BLD.length > n0) BLD[BLD.length - 1].always = 1; return; }   // Витториано — моделът на потребителя (Meshy AI)
   if (L.lm === 'colosseo') { const n0 = BLD.length; put('colosseo', L, 0); if (BLD.length > n0) BLD[BLD.length - 1].always = 1; return; }   // забележителността — винаги пълният модел
   if (!['stpeter', 'pantheon', 'vittoriano'].includes(L.lm)) return;   // Треви, Кастел Сант'Анджело, Circus Maximus… — запазено място (моделите — по-късно)
   const o = buildLandmark(L.lm, {}), g = o.group; city.add(g);
@@ -152,6 +153,53 @@ function romeLm(L) {
   if (!fit()) { const t = setInterval(() => { if (fit()) clearInterval(t); }, 500); setTimeout(() => clearInterval(t), 30000); }
 }
 let put = () => {};
+let VIT_ROT = Math.PI / 2;   // стълбите — на север, към Пиаца Венеция (колонадата отзад)
+// Тибърът: коритото е 7 м под улиците — земята е с дупка по реката, отвесни каменни стени (травертин), водата долу; мостовете — на нивото на улицата, с арки до водата
+const RIV_D = 7, TRAV = 0xd8cdb4;
+// оста на реката — изгладена (през ~12 м, Чайкин), иначе отместените брегове се самопресичат в завоите и триангулацията се проваля
+const smoothRiver = rv => { let p = []; for (let i = 0; i < rv.length; i++) { if (!p.length || Math.hypot(rv[i][0] - p[p.length - 1][0], rv[i][1] - p[p.length - 1][1]) >= 12 || i === rv.length - 1) p.push(rv[i]); }
+  for (let it = 0; it < 2; it++) { const q = [p[0]]; for (let i = 0; i < p.length - 1; i++) { const a = p[i], b = p[i + 1]; q.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25], [a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]); } q.push(p[p.length - 1]); p = q; } return p; };
+const RIV = new Map(), rivOf = rv => RIV.get(rv) || RIV.set(rv, smoothRiver(rv)).get(rv);
+const riverPoly = (rv, hw) => [...offLine(rivOf(rv), hw), ...offLine(rivOf(rv), -hw).reverse()];
+function romeGround(RR) {
+  const D = OSM2.rome, S2 = RR * 1.2, sh = new THREE.Shape([new THREE.Vector2(-S2, -S2), new THREE.Vector2(S2, -S2), new THREE.Vector2(S2, S2), new THREE.Vector2(-S2, S2)]);
+  for (const rv of D.river.slice(0, 1)) { const lim = S2 - D.riverHW - 6, cl = rivOf(rv).filter(([x, z]) => Math.abs(x) < lim && Math.abs(z) < lim); if (cl.length < 2) continue; RIV.set(rv, cl);   /* дупката не бива да излиза от квадрата */
+    sh.holes.push(new THREE.Path(riverPoly(rv, D.riverHW).map(([x, z]) => new THREE.Vector2(x, -z)))); }
+  const g = new THREE.ShapeGeometry(sh); g.rotateX(-Math.PI / 2); return g;   // (x, −z) и завъртане −90° → z като в света, лицето нагоре
+}
+function wallRibbon(pts, y0, y1) { const pos = [], idx = []; pts.forEach((p, i) => { pos.push(p[0], y0, p[1], p[0], y1, p[1]); if (i) { const k = 2 * i; idx.push(k - 2, k - 1, k, k - 1, k + 1, k); } }); return { pos, idx }; }
+function romeRiver(D) {
+  const Wt = [], Wl = []; for (const rv of D.river.slice(0, 1)) {   /* второто парче на Тибъра в картата е застъпване на първото — две дупки една в друга чупят триангулацията */ Wt.push(ribbon(rivOf(rv), D.riverHW * 2 + 2, -RIV_D + 1)); for (const sg of [1, -1]) Wl.push(wallRibbon(offLine(rivOf(rv), sg * D.riverHW), -RIV_D, 0.02)); }
+  city.add(merge(Wt, MAT.water)); const wm = merge(Wl, new THREE.MeshStandardMaterial({ color: TRAV, roughness: 0.95, side: THREE.DoubleSide })); city.add(wm);
+  // остров Тиберина: каменни стени до водата и плато на нивото на улицата
+  const I = D.island, isl = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, RIV_D, 40), new THREE.MeshStandardMaterial({ color: TRAV, roughness: 0.95 })); isl.scale.set(I.w / 2, 1, I.d / 2); isl.rotation.y = I.rot; isl.position.set(I.x, -RIV_D / 2 + 0.05, I.z); isl.receiveShadow = true; city.add(isl);
+  romeBridges(D);
+}
+// мостовете от картата (всички „Ponte …“, и пешеходните): фасада с арки (екструдиран профил), платно, парапети; Сант'Анджело — статуи по парапетите, Систо — „окото“
+function romeBridges(D) {
+  const K = D.k, at = (la, lo) => [(lo - D.center[1]) * Math.cos(D.center[0] * Math.PI / 180) * 111320 * K, -(la - D.center[0]) * 110540 * K];
+  const SISTO = at(41.8925, 12.4706), lmSA = (D.landmarks || []).find(l => l.k === 'castelsantangelo');
+  const stone = new THREE.MeshStandardMaterial({ color: TRAV, roughness: 0.9 }), pave = MAT.walk, statues = [];
+  for (const r of D.roads) { if (!r.bridge || !(r.nm || '').startsWith('Ponte')) continue;
+    const a = r.pts[0], b = r.pts[r.pts.length - 1], dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz); if (L < 8) continue;
+    const ux = dx / L, uz = dz / L, W = r.cls === 'blvd' ? 17 : r.noCars ? 9 : 11, H = RIV_D;
+    // профил (u по моста, v нагоре): правоъгълник с арки; Систо — кръгъл отвор над средния стълб
+    const sh = new THREE.Shape(); sh.moveTo(0, -H); sh.lineTo(L, -H); sh.lineTo(L, -0.05); sh.lineTo(0, -0.05); sh.closePath();
+    const n = Math.max(1, Math.round(L / 16)), pier = Math.min(4, L / n * 0.2), span = (L - pier * (n + 1)) / n;
+    for (let k = 0; k < n; k++) { const x0 = pier + k * (span + pier), rr = span / 2, top = Math.min(-1.4, -H + 0.6 + rr); const h = new THREE.Path(); h.moveTo(x0, -H - 0.1); h.lineTo(x0 + span, -H - 0.1); h.lineTo(x0 + span, top - rr); h.absarc(x0 + rr, top - rr, rr, 0, Math.PI, false); h.lineTo(x0, -H - 0.1); sh.holes.push(h); }
+    if (Math.hypot((a[0] + b[0]) / 2 - SISTO[0], (a[1] + b[1]) / 2 - SISTO[1]) < 40 && n >= 2) { const e = new THREE.Path(); e.absarc(pier + Math.floor(n / 2) * (span + pier) - pier / 2, -2.3, 1.1, 0, Math.PI * 2, true); sh.holes.push(e); }   // „окото“ на Понте Систо
+    const g = new THREE.ExtrudeGeometry(sh, { depth: W, bevelEnabled: false, curveSegments: 10 }); g.translate(0, 0, -W / 2);
+    const m = new THREE.Mesh(g, stone); m.castShadow = m.receiveShadow = true; m.position.set(a[0], 0, a[1]); m.rotation.y = -Math.atan2(uz, ux); city.add(m);
+    // платното (паваж за пешеходните, асфалт за другите) и парапетите
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(L, 0.2, W - 2.4), r.noCars ? pave : MAT.asph); deck.position.set((a[0] + b[0]) / 2, -0.06, (a[1] + b[1]) / 2); deck.rotation.y = -Math.atan2(uz, ux); deck.receiveShadow = true; city.add(deck);
+    for (const sg of [1, -1]) { const pr = new THREE.Mesh(new THREE.BoxGeometry(L, 1.1, 0.5), stone); pr.position.set((a[0] + b[0]) / 2 - uz * sg * (W / 2 - 0.25), 0.55, (a[1] + b[1]) / 2 + ux * sg * (W / 2 - 0.25)); pr.rotation.y = -Math.atan2(uz, ux); pr.castShadow = true; city.add(pr);
+      if (lmSA && r.nm === "Ponte Sant'Angelo") for (let k = 1; k <= 5; k++) { const t = k / 6; statues.push([a[0] + dx * t - uz * sg * (W / 2 - 0.25), a[1] + dz * t + ux * sg * (W / 2 - 0.25)]); } }
+  }
+  if (statues.length) {   // ангелите на Бернини: постамент + фигура (инстанции)
+    const base = new THREE.InstancedMesh(new THREE.BoxGeometry(0.9, 1.2, 0.9), stone, statues.length), fig = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.25, 0.4, 2.2, 8), new THREE.MeshStandardMaterial({ color: 0xf0ece2, roughness: 0.6 }), statues.length), wing = new THREE.InstancedMesh(new THREE.BoxGeometry(1.4, 0.8, 0.12), new THREE.MeshStandardMaterial({ color: 0xf0ece2, roughness: 0.6 }), statues.length), M3 = new THREE.Matrix4();
+    statues.forEach(([x, z], i) => { base.setMatrixAt(i, M3.makeTranslation(x, 2.1, z)); fig.setMatrixAt(i, M3.makeTranslation(x, 3.8, z)); wing.setMatrixAt(i, M3.makeTranslation(x, 4.3, z)); }); [base, fig, wing].forEach(o => { o.castShadow = true; city.add(o); });
+  }
+}
 // Рим: затворено застрояване — по двете страни на всяка улица непрекъсната редица от сгради (8 м по фасадата, 11 м дълбочина),
 // 4–6 етажа, в цветовете на Рим (охра, теракота, жълто); не върху друга улица, вода, парк/археологическа зона или забележителност
 // италианските сгради (assets/heavy/rome, Quaternius CC0 и J-Toastie CC-BY) — по 3 оцветявания: светлите стени → охра, теракота, жълто
@@ -185,7 +233,7 @@ function build() {
   if (city) { scene.remove(city); city.traverse(o => { if (o.isInstancedMesh) o.dispose(); if (o.geometry && !o.userData.shared) o.geometry.dispose(); }); }   // InstancedMesh.dispose — буферите на инстанциите
   city = new THREE.Group(); scene.add(city);
   P = fam.value === 'rome' ? plan2('rome', { osm: OSM2.rome, size: 'xl' }) : plan2('demo', { fam: fam.value, size: size.value, seed: +seed.value || 0 });
-  const RR = P.R * 1.6, g0 = new THREE.Mesh(new THREE.PlaneGeometry(RR * 2.4, RR * 2.4).rotateX(-Math.PI / 2), P.osm ? MAT.urban : MAT.grass); g0.receiveShadow = true; city.add(g0);   // Рим: дворовете и площадите — светъл камък, тревата — само в парковете
+  const RR = P.R * 1.6, g0 = new THREE.Mesh(new THREE.PlaneGeometry(RR * 2.4, RR * 2.4).rotateX(-Math.PI / 2), P.osm ? MAT.urban : MAT.grass); g0.receiveShadow = true; if (P.osm) g0.geometry = romeGround(RR); city.add(g0);   // Рим: дворовете и площадите — светъл камък, тревата — само в парковете
   if (P.coastZ) { const sh = new THREE.Shape(); sh.moveTo(-RR * 1.2, -RR * 1.2); for (let i = 0; i <= 80; i++) { const x = -RR * 1.2 + i * RR * 2.4 / 80; sh.lineTo(x, P.coastZ(x)); } sh.lineTo(RR * 1.2, -RR * 1.2); const wg = new THREE.ShapeGeometry(sh); wg.rotateX(Math.PI / 2); const wm = new THREE.Mesh(wg, MAT.water); wm.position.y = 0.02; city.add(wm);
     // бряг: пясъчна ивица по водата и крайбрежна алея до кея; пристанището — кей навътре във водата пред мястото му
     const cl = []; for (let x = -RR * 1.2; x <= RR * 1.2; x += 4) cl.push(x);
@@ -200,7 +248,7 @@ function build() {
   }
   const W = [], As = [], Md = [], Pt = [], Is = [], trees = [], Cb = [];
   if (P.osm) {   // истинската карта: Тибърът (ивица около оста), остров Тиберина, паркове и археологически зони, жп линиите към Термини
-    const D = OSM2.rome, Wt = []; for (const rv of D.river) Wt.push(ribbon(rv, D.riverHW * 2, 0.09)); city.add(merge(Wt, MAT.water));
+    const D = OSM2.rome; romeRiver(D);
     const I = D.island, isl = new THREE.Mesh(new THREE.CircleGeometry(1, 32).rotateX(-Math.PI / 2), M(0xb9ad96)); isl.scale.set(I.w / 2, 1, I.d / 2); isl.rotation.y = I.rot; isl.position.set(I.x, 0.06, I.z); city.add(isl);
     const gm = { park: M(0x6f9e4f), archaeo: M(0xb7b08a) };
     for (const g of P.greensSrc) { const sh = new THREE.Shape(g.poly.map(([x, z]) => new THREE.Vector2(x, z))); const ge = new THREE.ShapeGeometry(sh); ge.rotateX(Math.PI / 2); const m = new THREE.Mesh(ge, gm[g.kind] || gm.park); m.material.side = THREE.DoubleSide; m.position.y = 0.025; m.receiveShadow = true; city.add(m); }
@@ -401,5 +449,5 @@ let last = performance.now();
 R.setAnimationLoop(() => { const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now;
   const t0 = performance.now(); moveCars(dt); const t1 = performance.now(); ctl.update(); lodUpdate(); R.render(scene, cam); const t2 = performance.now();
   T.tr += t1 - t0; T.rn += t2 - t1; T.n++; fr++; if (bench) benchTick(now); if (now - ft > 1000) { fps = fr; fr = 0; ft = now; stats(); } });
-window.__p2 = { city: () => city, camTop: (x, z, h = 70) => { ctl.target.set(x, 0, z); cam.position.set(x, h, z + 0.01); ctl.update(); lodUpdate(true); }, camAt: (x, z, d = 40) => { ctl.target.set(x, 0, z); cam.position.set(x + d * 0.55, d * 0.85, z + d * 0.75); ctl.update(); lodUpdate(true); }, P: () => P, view, setNight, cars: () => cars, tr: () => tr && tr.stats(), bench: benchStart, lod: () => ({ near: Object.values(lodIM).reduce((a, ims) => a + (ims[0]?.count || 0), 0), far: lodBox?.count }) };
+window.__p2 = { vitRot: r => { VIT_ROT = r; }, city: () => city, camTop: (x, z, h = 70) => { ctl.target.set(x, 0, z); cam.position.set(x, h, z + 0.01); ctl.update(); lodUpdate(true); }, camAt: (x, z, d = 40) => { ctl.target.set(x, 0, z); cam.position.set(x + d * 0.55, d * 0.85, z + d * 0.75); ctl.update(); lodUpdate(true); }, P: () => P, view, setNight, cars: () => cars, tr: () => tr && tr.stats(), bench: benchStart, lod: () => ({ near: Object.values(lodIM).reduce((a, ims) => a + (ims[0]?.count || 0), 0), far: lodBox?.count }) };
 </script></body></html>
