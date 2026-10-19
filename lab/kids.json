@@ -295,74 +295,7 @@
   "key": "constr",
   "title": "🏗️ Строежите",
   "where": "Строителните площадки (кулокран, фургони, тоалетни, материали)",
-  "items": [
-   {
-    "n": "crane-tower",
-    "f": "assets/construction/crane-tower.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "container-office-green",
-    "f": "assets/construction/container-office-green.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "container-office-red",
-    "f": "assets/construction/container-office-red.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "toilet-portable",
-    "f": "assets/construction/toilet-portable.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "planks-wood-a",
-    "f": "assets/construction/planks-wood-a.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "box-stack-brown",
-    "f": "assets/construction/box-stack-brown.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "container-rubble-red",
-    "f": "assets/construction/container-rubble-red.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "barrel",
-    "f": "assets/construction/barrel.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "truck-dump-red",
-    "f": "assets/construction/truck-dump-red.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "truck-dump-green",
-    "f": "assets/construction/truck-dump-green.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "truck-concrete-red",
-    "f": "assets/construction/truck-concrete-red.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   }
-  ]
+  "items": []
  },
  {
   "key": "heavy",
@@ -577,12 +510,6 @@
   "where": "Улиците на всички градове",
   "items": [
    {
-    "n": "traffic-light",
-    "f": "assets/roads/traffic-light.glb",
-    "st": "заменен в центъра (истински светофар)",
-    "ok": true
-   },
-   {
     "n": "road-straight",
     "f": "assets/roads/road-straight.glb",
     "st": "детски — ползва се",
@@ -680,42 +607,6 @@
   "title": "🌿 Храсти, цветя, камъни",
   "where": "Празните парцели",
   "items": [
-   {
-    "n": "plant_bush",
-    "f": "assets/nature/plant_bush.glb",
-    "st": "заменен (истински храсти)",
-    "ok": true
-   },
-   {
-    "n": "plant_bushLarge",
-    "f": "assets/nature/plant_bushLarge.glb",
-    "st": "заменен (истински храсти)",
-    "ok": true
-   },
-   {
-    "n": "plant_bushDetailed",
-    "f": "assets/nature/plant_bushDetailed.glb",
-    "st": "заменен (истински храсти)",
-    "ok": true
-   },
-   {
-    "n": "flower_redA",
-    "f": "assets/nature/flower_redA.glb",
-    "st": "заменен (истински храсти)",
-    "ok": true
-   },
-   {
-    "n": "flower_yellowA",
-    "f": "assets/nature/flower_yellowA.glb",
-    "st": "заменен (истински храсти)",
-    "ok": true
-   },
-   {
-    "n": "flower_purpleA",
-    "f": "assets/nature/flower_purpleA.glb",
-    "st": "заменен (истински храсти)",
-    "ok": true
-   },
    {
     "n": "rock_smallA",
     "f": "assets/nature/rock_smallA.glb",
