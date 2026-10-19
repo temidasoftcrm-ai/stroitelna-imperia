@@ -353,6 +353,19 @@ function seatProps(scene, side, z, name, sub, gold, k, dx = 0) {
   const water = new THREE.Mesh(WATER, waterM); water.position.copy(glass.position); water.renderOrder = 1; scene.add(water);
 }
 
+// ⭐ „важен проект“ (подчертан бутон за гласуване): стратегическите решения — държавни/общински търгове, нови филиали, линии, летища и пристанища,
+// „Стрела“, мегапроекти, кредити на държави, акции и дивиденти, придобивания и концесии — и всичко над 1 млрд. € или над половината от свободните пари.
+// Рутинното (техника, ТИР-ове, влакове, самолети, кораби, надграждане, квартали, гари, линии на корабите/самолетите, петролни сделки) — не.
+const KEY_IMP = /^(tender|branches|lines|short|hs|new|r66|abup|loan|cap|ipo|buyback|sdiv|div|mw|conc|acq|deal|aid|peace|crisis|hz)/;
+const KEY_ROUTINE = /^(gear|trucks|trains|trainup|planes|planeup|ships|shipup|upg|districts|stations|routes|stars|resext|sell|offer|brief)/;
+function isImportant(p, F) {
+  if (p.important || p.mustVote || (p.geo && p.geo.kind === 'loan')) return true;
+  const key = (String(p.id || '').split(':')[1] || '').replace(/[0-9.-]+$/, ''), cost = p.cost || 0, free = F ? Math.max(0, F.free) : Infinity;
+  if (cost >= 1e9 || (free > 0 && cost >= free * 0.5 && cost >= 5e7)) return true;   // много пари — винаги
+  if (KEY_ROUTINE.test(key)) return false;
+  return KEY_IMP.test(key) || /tender/.test(key);
+}
+
 // ---- залата
 // o: { title, brand: { nm, col, ico, group }, proposals(): [{ id, dir, ico, text, cost, can }], onDecide(id, 'yes'|'no'|'later'), seats(): [{ k, ico, company, what, open, director, lv, lvMax, inc, bonus, bonusPct, up: {cost, can}|null, hire: {cost, can}|null }], fmt, onUp(k), onHire(k), sound(n) }
 export function openBoardroom(o) {
@@ -515,12 +528,12 @@ export function openBoardroom(o) {
     } else {   // 📋 предложение: петте въпроса — какво, защо, колко, кога, какво ще донесе
       const q = (k, v) => v ? `<div class="q"><b>${k}:</b> ${esc(v)}</div>` : '';
       const gain = p.gainTxt || (p.gain ? `+${B(p.gain)}/месец` : p.income ? `+${f(p.income)} €/ден` : '');
-      const must = !!(p.mustVote && o.voteOn), Fr = o.frame ? o.frame() : null, imp = !!(p.important || (p.cost && Fr && p.cost >= Math.max(1, Fr.free) * 0.25) || (p.geo && p.geo.kind === 'loan'));   // важен: ≥ 25% от свободните пари, кредит или маркиран
+      const must = !!(p.mustVote && o.voteOn), Fr = o.frame ? o.frame() : null, imp = isImportant(p, Fr);
       const fit = p.inBudget == null ? '' : p.inBudget ? '<div class="fit" style="color:#5fd38a">✅ в рамките на бюджета за инвестиции</div>' : '<div class="fit" style="color:#ffb347">⚠️ над бюджета за инвестиции</div>';
       scr.innerHTML = `${hd('📋 Предложение към борда')}<div class="tx"></div>${q('Защо', p.why)}${q('Колко', p.cost ? B(p.cost) : 'без разход')}${q('Кога', p.days ? `~${p.days} дни` : '')}${q('Очакваме', gain)}${p.needsGear ? q('Условие', p.needsGear) : ''}${fit}<div class="row">${must ? `<button class="vt imp">🗳️ Решава бордът — гласуване</button>` : `<button class="y">✓ Да</button>${p.small ? `<button class="sm">½ По-малък вариант · ${B(p.small.cost)}</button>` : ''}`}<button class="n">✖ Не</button><button class="l">⏳ По-късно</button>${o.voteOn && !must ? `<button class="vt${imp ? ' imp' : ''}">${imp ? '⭐ Важен проект — 🗳️ на гласуване' : '🗳️ Подложи на гласуване'}</button>` : ''}</div>${must ? '<div class="q" style="margin-top:6px;color:#8fd0ff">🏛️ Мегапроект: само с мнозинство в борда.</div>' : ''}`;
       const vt = scr.querySelector('.vt'); if (vt) vt.onclick = () => { const r = o.voteOn(p.id); if (r) showVote(r, true); };
       const y = scr.querySelector('.y') || {}; y.disabled = p.can === false; if (y.disabled) y.title = 'Нямаш достатъчно пари';
-      for (const [c, a] of [['y', 'yes'], ['sm', 'small'], ['n', 'no'], ['l', 'later']]) { const b = scr.querySelector('.' + c); if (b) b.onclick = () => { const r = o.onDecide && o.onDecide(p.id, a); if (r && r.need === 'vote') showVote(r); else after(a === 'yes' || a === 'small' ? (r && r.done === false ? 'no' : 'ok') : a); }; }   // решеното изчезва — на същото място идва следващото
+      for (const [c, a] of [['y', 'yes'], ['sm', 'small'], ['n', 'no'], ['l', 'later']]) { const b = scr.querySelector('.' + c); if (b) b.onclick = () => { const r = o.onDecide && o.onDecide(p.id, a); if (r && r.need === 'vote') showVote(r); else { const ok = (a === 'yes' || a === 'small') && !(r && r.done === false); if (ok && imp) cheer(); after(ok ? 'ok' : a === 'yes' || a === 'small' ? 'no' : a); } }; }   // решеното изчезва — на същото място идва следващото
       scr.querySelector('.tx').textContent = `${p.ico || ''} ${p.text}`;
     }
     const bi = p.step === 'summary' || p.info ? list.findIndex(z => z.k === (o.bankKey || 'bank')) : p.step === 'report' && o.reportDir ? list.findIndex(z => z.k === o.reportDir) : i, bs = list[bi];   // отчета го чете o.reportDir (в кабинета — министър-председателят)   // парите докладва банката (в кабинета — финансовият министър)
@@ -537,6 +550,8 @@ export function openBoardroom(o) {
   function clearBadges() { badges.forEach(b => b.el.remove()); badges.length = 0; }
   // гласуването: директорите гласуват един по един — „за“ вдигат ръка, над всеки ✋ за / ◐ условно / ✖ против, броячът расте; накрая — резултатът и решението ти
   let voteTok = 0;
+  // 👏 прието — всички ръкопляскат (и звукът на аплодисментите)
+  function cheer() { snd.applause(1.6); for (const q of people) if (q.clap) { q.busy = 0; play(q, q.clap, true); } }
   function showVote(r, mine) {
     const { v, p } = r, tok = ++voteTok; clearBadges();
     scr.innerHTML = `<div class="hd"><span>🗳️ ${mine ? 'Гласуване на борда' : 'Съвещателен вот'}</span><span class="cnt">0 : 0</span></div><div class="tx"></div><div class="votes"></div><div class="res"></div><div class="row"></div>`;
@@ -558,9 +573,8 @@ export function openBoardroom(o) {
       }
       const ok = y > n;
       scr.querySelector('.res').innerHTML = `<span style="color:${ok ? '#5fd38a' : y === n ? '#ffd54a' : '#ff6b6b'}">${y} за : ${n} против — ${ok ? 'бордът подкрепя' : y === n ? 'равен глас' : 'бордът е против'}. Решението е твое.</span>`;
-      if (ok && mine) { snd.applause(1.4); for (const q of people) if (q.clap) { q.busy = 0; play(q, q.clap, true); } }   // подкрепено — всички ръкопляскат
       const row = scr.querySelector('.row');
-      const btn = (t, how, cls) => { const b = document.createElement('button'); b.textContent = t; if (cls) b.className = cls; b.onclick = () => { if (how === 'no') { o.onDecide && o.onDecide(p.id, 'no'); after('no'); return; } const rr = o.onResolve && o.onResolve(p.id, how); after(how === 'drop' ? 'later' : rr && rr.done === false ? 'no' : 'ok'); }; row.appendChild(b); };
+      const btn = (t, how, cls) => { const b = document.createElement('button'); b.textContent = t; if (cls) b.className = cls; b.onclick = () => { if (how === 'no') { o.onDecide && o.onDecide(p.id, 'no'); after('no'); return; } const rr = o.onResolve && o.onResolve(p.id, how), done = how !== 'drop' && !(rr && rr.done === false); if (done) cheer(); after(how === 'drop' ? 'later' : done ? 'ok' : 'no'); }; row.appendChild(b); };
       if (ok || !p.mustVote) btn(ok ? '✓ Одобри (както реши бордът)' : '✓ Одобри въпреки това', p.isSmall ? 'small' : 'pass', 'y');   // мегапроект — без мнозинство не минава
       if (p.small) btn(`½ По-малък вариант · ${B(p.small.cost)}`, 'small');
       if (v.bank && !v.bank.ok) btn('🏦 С кредит', 'loan');
@@ -612,7 +626,7 @@ export function openBoardroom(o) {
   if (o.settings && o.settings()) { cfg.style.display = ''; cfg.onclick = () => { setEl.classList.toggle('on'); if (setEl.classList.contains('on')) fillSet(); }; }
   // решението: холограмата светва (зелено / кехлибарено / червено) и след миг идва следващото
   let afterT = 0;
-  function after(kind) { if (kind === 'ok') { snd.gavel(); const p = props[qi]; if ((p?.cost || 0) >= 1e9) setTimeout(() => snd.applause(), 450); } holo.flash(kind); scr.querySelectorAll('button').forEach(b => b.disabled = true); clearTimeout(afterT); const done = props[qi]?.id; decided.add(done); afterT = setTimeout(() => !shut && board(nextStep()), 1100); }
+  function after(kind) { if (kind === 'ok') snd.gavel();   // аплодисментите — в cheer() holo.flash(kind); scr.querySelectorAll('button').forEach(b => b.disabled = true); clearTimeout(afterT); const done = props[qi]?.id; decided.add(done); afterT = setTimeout(() => !shut && board(nextStep()), 1100); }
   // след решение — следващото нерешено предложение (отчетът и речта на банката не се повтарят); ако няма — обобщението
   const decided = new Set();
   function nextStep() { const st = stepsNow(); let k = st.findIndex(p => p.step !== 'report' && !p.info && p.step !== 'summary' && !decided.has(p.id)); if (k < 0) k = st.findIndex(p => p.step === 'summary'); return k < 0 ? 0 : k; }

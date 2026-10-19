@@ -9144,6 +9144,16 @@ if (AUTOTEST) {
     boardReview() { return boardL.review().map(r => `${r.status} · ${r.c.dir} · ${r.c.text.slice(0, 60)} · ${Math.round((r.c.prog || 0) * 100)}% · ${r.c.reason || ''}`); },
     boardReq(id, how) { const r = how ? boardL.resolve(id, how) : boardL.request(id); return r.need ? { need: r.need, votes: r.v.votes.map(x => `${x.cond ? '◐' : x.yes ? '✔' : '✖'} ${x.name}: ${x.why}`), bank: r.v.bank.why || 'ok' } : r; },
     boardFrame() { return boardL.frame(); },
+    // 🤖 симулация на президентския етап: бот-президент, който всеки месец решава като разумен играч; връща кога е стигнал всяко ниво и как е държавата
+    presSim(cc = 'US', days = 1440) { S.president = { cc, day: S.day, ev: 300 }; S.pres = null; pres.start(cc); const P = S.pres, d0 = S.day, lv = {}, log = [], snap = [];
+      const pkgFor = ck => { const base = { now: 1, obl: 1, ver: 1, gua: 1, rec: 1, next: 1 }; const E = pres.evalPkg(ck, base); return E.merged ? E.merged.pkg : base; };
+      for (let d = 0; d < days; d++) { endOfDay(); document.querySelectorAll('#boardRoom,#presEnd').forEach(x => x.remove());
+        if (d % 30 === 3 || P.hz?.st === 'closed' && d % 10 === 0 || (P.evs || []).some(e => !e.done && S.day - e.start < 5)) {
+          for (const p of pres.pick(false)) { const lim = p.emergency || ['ev', 'crisis', 'hold', 'aidfix', 'hz'].includes(p.kind) ? 0.9 : 0.45; if (p.kind === 'pkgHint') { const k = p.ck, E = pres.evalPkg(k, pkgFor(k)); if (E.resp.every(r => r.ok === 'yes')) pres.proposePkg(k, pkgFor(k)); else pres.decide(p.id, 'later'); continue; }
+            if (p.id.includes('-ban') || (p.kind === 'aid' && P.res < 8e10)) continue; const c = p.cost || 0; if (c <= P.res * lim || (lim > 0.5 && c <= P.res + 4e10)) pres.decide(p.id, 'yes'); else if (p.small && p.small.cost <= P.res * lim) pres.decide(p.id, 'small'); else pres.decide(p.id, 'later'); } }
+        if (P.lv && !lv[P.lv]) { lv[P.lv] = d; log.push(`ден ${d}: ниво ${P.lv}`); }
+        if (d % 180 === 179) snap.push(`г${((d + 1) / 360).toFixed(1)}: резерв ${Math.round(P.res / 1e9)} млрд · показатели ${Object.values(P.ind).map(v => Math.round(v)).join('/')} · конфликти ${Object.values(P.conf).map(k => k.step).join('')} · Ормуз ${P.hz?.st} · коалиция ${Object.keys(P.coal).length} · споразумения ${Object.keys(P.deals).length} · помощ работи ${P.aid.filter(a => a.done && a.works !== false).length}/${P.aid.length} · кризи ${(P.evs || []).filter(e => e.failed).length} провалени`); }
+      return { lv, log, snap, prom: P.prom.map(p => !!p.done), streak: P.streak, world: P.world }; },
     scenTest() { S.president = { cc: 'US', day: S.day, ev: 300 }; S.pres = null; pres.start('US'); const P = S.pres; P.res = 1e13; P.start -= 160; P.disNext = S.day + 1; P.hz.st = 'safe'; const out = {};
       endOfDay(); endOfDay(); document.querySelectorAll('#boardRoom').forEach(x => x.remove()); out.evs = (P.evs || []).map(e => `${e.kind}:${e.iso || ''}`);
       out.props = pres.proposals().filter(p => p.kind === 'ev').map(p => p.id); for (const p of pres.proposals().filter(p => p.kind === 'ev' && !p.id.includes('-ban'))) pres.decide(p.id, 'yes');
