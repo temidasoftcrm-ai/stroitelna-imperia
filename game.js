@@ -12,7 +12,7 @@ import { createSupply } from './supply.js';
 import { saveKey, openSaves, currentSlot, backupNow, backupRaw, logError } from './saves.js';
 import { createTutorial } from './tutorial.js';
 import { createMega } from './megaorders.js';
-import { createSilkRoad } from './silkroad.js';
+import { createSilkRoad, SILK } from './silkroad.js';
 import { createCinema } from './cinema.js';
 import { makeStateTenders } from './statetenders.js';
 import { createRivals, LOCAL_FIRMS, FIRMS } from './rivals.js';
@@ -83,7 +83,7 @@ import('./autobahn.js').then(m => { AB = m; }).catch(() => {});
 import { HIGHWAYS, HW_STAGES, HW_NEED_OLD, HW_FLEET, HW_REP, HW_MODELS, TOLL_PER_KM_DAY, segId, segmentQuote, buildHighwayView, overLift } from './highways.js';
 import { createTirs } from './trucks.js';
 import { createHwTrucks } from './hwtrucks.js';
-import { createOrient } from './orient.js';
+import { createOrient, OE_ROUTE } from './orient.js';
 import { createRoute66, R66_ROUTE } from './route66.js';
 import { loadTrainModels, hasTrainModel, trainCar } from './trainmodels.js';
 import { loadVehModels } from './vehmodels.js';
@@ -8291,6 +8291,21 @@ function boardProposals() {
     if (s.st === 'active') P({ dir: 'hw', ico: '🛣️', key: 'r66', items: R.slice(1).map((b, i) => ({ a: R[i], b, id: abSegId(R[i], b) })).filter(o => !hwAll().includes(o.id) && !(S.hwJobs || []).some(j => j.seg === o.id) && !r66Why(o.id)),
       run: o => { const sg = segById(o.id), was = sg && sg.spur; if (sg) sg.spur = true; try { takeAutobahn(o.id); } finally { if (sg) sg.spur = was; } }, text: a => `Route 66: предлагам да започнем ${pl(a.length, 'свободен участък', 'свободни участъка')} (${a.slice(0, 3).map(o => `${cityNm(o.a)} — ${cityNm(o.b)}`).join(', ')}).`,
       why: 'всички участъци трябва да са готови до срока', days: () => 0, goal: a => `${pl(a.length, 'участък', 'участъка')} от Route 66`, track: a => ({ k: 'seg', ids: a.map(o => o.id) }), geo: a => geoOf('route', a.flatMap(o => [o.a, o.b]), a.slice(0, 2).map((o, i) => [i * 2, i * 2 + 1])) }); }
+  // ━━ 🚆 Рейлуейс: специалните поръчки Ориент Експрес и Пътят на коприната — подписване (само собственикът) и после участъците
+  if (hasSub('rail')) {
+    const rIdx = (a, b) => (S.rails || []).findIndex(r => !r.c && ((r.a === a && r.b === b) || (r.a === b && r.b === a)));
+    const oe = orient.state();
+    if (oe.st === 'offer') out.push({ id: 'rail:oe:1', dir: 'rail', ico: '🚂', text: `Консорциум от седем държави ни възлага „Ориент Експрес“ (${OE_ROUTE.map(cityNm).join(' — ')}). Предлагам да подпишем.`, noAuto: true, why: 'аванс веднага, а след предаването луксозният влак носи приход всеки ден', cost: 0, count: 1, days: 0, gainTxt: 'награда + приход всеки ден', geo: geoOf('route', OE_ROUTE), apply: () => orient.accept() });
+    if (oe.st === 'active') P({ dir: 'rail', ico: '🚂', key: 'oe', items: OE_ROUTE.slice(1).map((b, k) => { const a = OE_ROUTE[k], i = rIdx(a, b), r = S.rails[i]; return !r ? { a, b, k: 'build', cost: railQuote(a, b).cost } : r.built && !r.hs && !r.hsBuild ? { a, b, i, k: 'hs', cost: hsQuote(r).cost } : null; }).filter(Boolean),
+      cost: o => o.cost, run: o => o.k === 'build' ? orientBuild(o.a, o.b) : startHsUpgrade(o.i), text: a => `Ориент Експрес: предлагам ${a.map(o => `${o.k === 'build' ? 'линия' : '⚡ модернизация'} ${cityNm(o.a)} — ${cityNm(o.b)}`).join(', ')}.`,
+      why: `всички участъци трябва да са построени и скоростни до ден ${oe.due}`, days: () => 0, goal: a => `${pl(a.length, 'участък', 'участъка')} от Ориент Експрес`, geo: a => geoOf('route', a.flatMap(o => [o.a, o.b]), a.slice(0, 3).map((o, i) => [i * 2, i * 2 + 1])) });
+    const sk = silk.state();
+    if (sk.st === 'offer') out.push({ id: 'rail:silk:1', dir: 'rail', ico: '🐫', text: `${SILK.who} ни възлагат „${SILK.nm}“ (${SILK.route.map(cityNm).join(' — ')}). Предлагам да подпишем.`, noAuto: true, why: 'три етапа с награда за всеки, после контейнерните влакове носят приход всеки ден', cost: 0, count: 1, days: 0, gainTxt: 'награда + приход всеки ден', geo: geoOf('route', SILK.route), apply: () => silk.accept() });
+    if (sk.st === 'active') P({ dir: 'rail', ico: '🐫', key: 'silk', items: [...SILK.hubs.filter(id => !(sk.hubs || {})[id]).map(id => ({ k: 'hub', id, cost: SILK.hubCost })),
+        ...SILK.route.slice(1).map((b, i) => ({ k: 'leg', i, a: SILK.route[i], b })).filter(o => rIdx(o.a, o.b) < 0).map(o => ({ ...o, cost: Math.round(railQuote(o.a, o.b).cost * SILK.mul / 1000) * 1000 }))],
+      cost: o => o.cost, run: o => o.k === 'hub' ? silk.startHub(o.id) : silk.build(o.i), text: a => `Пътят на коприната: предлагам ${a.map(o => o.k === 'hub' ? `🏭 логистичен център в ${cityNm(o.id)}` : `линия ${cityNm(o.a)} — ${cityNm(o.b)}`).join(', ')}.`,
+      why: `етапите трябва да са готови до ден ${sk.due}; всеки етап носи своята награда`, days: () => 0, goal: a => `${pl(a.length, 'стъпка', 'стъпки')} по Пътя на коприната`, geo: a => geoOf('route', SILK.route) });
+  }
   // ━━ 🏖️ Хотелс: курортите — земя + вилно селище наведнъж, после разширенията
   if (S.holding && resorts.unlocked()) {
     const rs = S.resorts || {}, rOf = id => RESORTS.find(r => r.id === id), resGeo = a => { const cs = a.map(rOf).filter(Boolean).slice(0, 5); return cs.length ? { country: 'BGR', kind: 'hotel', cities: cs.map(r => ({ nm: r.nm, lat: r.lat, lon: r.lon })) } : null; };
