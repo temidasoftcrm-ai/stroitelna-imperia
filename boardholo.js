@@ -251,10 +251,10 @@ export function createHolo(scene, { fmt = n => Math.round(n).toLocaleString('bg-
   // 🏦 кредит: рейтингът се чете и от текста („— рейтинг A“), ако geo няма rating
   const RCOL = r => /^AA?A?$/.test(r) ? '#5fe39a' : /^BBB$/.test(r) ? '#ffd54a' : /^BB?$/.test(r) ? '#ffb347' : '#ff6b6b';
   // 🏙️ предложенията на кмета — въртящ се печат на Империал Сити над масата
-  let sealTex = null;
-  function sealDisc(g) {
-    sealTex = sealTex || new THREE.TextureLoader().load('assets/ui/seal-imperial.webp', t => { t.colorSpace = THREE.SRGBColorSpace; });
-    const m = new THREE.Mesh(new THREE.CircleGeometry(0.24, 48), new THREE.MeshBasicMaterial({ map: sealTex, transparent: true, opacity: 0.92, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }));
+  const sealTex = {};
+  function sealDisc(g, src = 'assets/ui/seal-imperial.webp') {   // в Русия — seal-imperial-ru.webp (p.seal от imperial.js)
+    const tx = sealTex[src] || (sealTex[src] = new THREE.TextureLoader().load(src, t => { t.colorSpace = THREE.SRGBColorSpace; }));
+    const m = new THREE.Mesh(new THREE.CircleGeometry(0.24, 48), new THREE.MeshBasicMaterial({ map: tx, transparent: true, opacity: 0.92, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }));
     m.position.set(0, 0.62, 0); m.userData.spinM = true; g.add(m); return m;
   }
   function show(p) {
@@ -264,7 +264,7 @@ export function createHolo(scene, { fmt = n => Math.round(n).toLocaleString('bg-
     if (p.info) globe(p);
     else if (p.geo && p.geo.country) country(p);
     else {   // без география — символът на дружеството и сумата
-      const g = begin(), lab = textSprite([`${p.ico || '📋'} ${p.cost ? fmt(p.cost) + ' €' : ''}`.trim()], { h: 0.09 }); g.add(lab); if (p.dir === 'mayor') sealDisc(g); vehicleBanner(g, p, 0.62, 1.9); const ch = stockChart(g, p, 0.12, 1.8); lab.position.set(0, ch ? 0.82 : 0.32, 0);   // без карта — моделът е едър, в центъра
+      const g = begin(), lab = textSprite([`${p.ico || '📋'} ${p.cost ? fmt(p.cost) + ' €' : ''}`.trim()], { h: 0.09 }); g.add(lab); if (p.dir === 'mayor') sealDisc(g, p.seal); vehicleBanner(g, p, 0.62, 1.9); const ch = stockChart(g, p, 0.12, 1.8); lab.position.set(0, ch ? 0.82 : 0.32, 0);   // без карта — моделът е едър, в центъра
     }
   }
   // 'ok' → зелено + „Бюджетът е резервиран“; 'later' → кехлибарено + „За следващо заседание“; 'no' → червено за миг

@@ -213,7 +213,7 @@ export function createImperial(deps) {
   // ---- 👩‍💼 предложенията на Десислава: до 3 приоритетни, по тежестта на проблема (форматът е като boardProposals: id, dir, ico, text, why, cost, days, small, apply)
   function proposals() {
     const m = st(); if (!m || !m.cc) return []; const s = stats(), out = [], d = day();
-    const prop = (key, ico, text, why, full, small) => out.push({ id: `mayor:${key}:${Math.floor(d / 30)}`, dir: 'mayor', ico, text, why, cost: full.cost, count: 1, days: full.days, gainTxt: full.gain || '', apply: full.run,
+    const prop = (key, ico, text, why, full, small) => out.push({ id: `mayor:${key}:${Math.floor(d / 30)}`, dir: 'mayor', seal: `assets/ui/seal-imperial${m.cc === 'RU' ? '-ru' : ''}.webp`, ico, text, why, cost: full.cost, count: 1, days: full.days, gainTxt: full.gain || '', apply: full.run,
       small: small ? { cost: small.cost, count: 1, days: small.days, text: `½ ${small.text}`, gainTxt: small.gain || '', apply: small.run } : null, prio: 0 });
     const opt = k => ({ cost: costOf(k), days: BUILD[k].days, run: () => build(k), gain: BUILD[k].cap ? `+${f(BUILD[k].cap)} ${BUILD[k].cat === 'transport' ? 'пътувания/ден' : 'души'}` : '' });
     const ex = k => { const u = units(k).filter(x => !x.run && (x.lv || 1) < LV_MAX)[0]; return u ? { cost: upCost(k, u), days: Math.max(5, Math.round(BUILD[k].days * UP_DAYS)), run: () => expand(k), text: `Разшири: ${BUILD[k].nm.toLowerCase()} (по-бързо, +50% капацитет)`, gain: `+${f(BUILD[k].cap * UP_K)} души` } : null; };

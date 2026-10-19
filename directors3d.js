@@ -316,7 +316,7 @@ function groupMedal(scene, b, gold) {
     bg.addColorStop(0, '#1b2f57'); bg.addColorStop(1, '#0c1730'); g.fillStyle = bg; g.beginPath(); g.arc(c, c, c, 0, Math.PI * 2); g.fill();
     g.strokeStyle = b.col || '#c9a24a'; g.lineWidth = 14; g.beginPath(); g.arc(c, c, c - 120, 0, Math.PI * 2); g.stroke();
     g.strokeStyle = '#d9b45e'; g.lineWidth = 6; g.beginPath(); g.arc(c, c, c - 22, 0, Math.PI * 2); g.stroke();
-    g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = '300px system-ui, "Noto Color Emoji", sans-serif'; g.fillText(b.ico || '🏛️', c, c + 10);
+    g.textAlign = 'center'; g.textBaseline = 'middle'; if (!b.img) { g.font = '300px system-ui, "Noto Color Emoji", sans-serif'; g.fillText(b.ico || '🏛️', c, c + 10); }
     // името — по горния ръб, „· ХОЛДИНГ ·“ — по долния
     const arc = (txt, r, top) => {
       g.font = '800 64px system-ui, sans-serif'; g.fillStyle = '#e8c878';
@@ -325,6 +325,7 @@ function groupMedal(scene, b, gold) {
     };
     arc((b.group || b.nm || '').toUpperCase(), c - 70, true); arc(b.sub || '· ХОЛДИНГ ·', c - 70, false);
   });
+  if (b.img) { const im = new Image(); im.onload = () => { const g = t.image.getContext('2d'), c = t.image.width / 2, r = c - 135, k = Math.min(2 * r / im.width, 2 * r / im.height); g.drawImage(im, c - im.width * k / 2, c - im.height * k / 2, im.width * k, im.height * k); t.needsUpdate = true; }; im.src = b.img; }   // гербът — в средата, щом се зареди
   const R = 0.72;
   const m = new THREE.Mesh(new THREE.CircleGeometry(R, 64), new THREE.MeshPhysicalMaterial({ map: t, roughness: 0.25, clearcoat: 1, clearcoatRoughness: 0.08 }));
   m.rotation.x = -Math.PI / 2; m.position.set(0, TABLE_H + 0.031, 0); scene.add(m);   // горният ръб на картинката — към картата: името се чете от председателя
@@ -410,7 +411,7 @@ export function openBoardroom(o) {
   for (const z of [-2.4, 0, 2.4]) { const p = new THREE.PointLight(0xfff0d8, 1.6, 6, 1.6); p.position.set(0, 3.3, z); scene.add(p); }
   const R = ROOM === 'corp' ? buildRoom(scene) : buildPresRoom(scene, ROOM, { ROOM_W, ROOM_BACK, ROOM_FRONT, ROOM_H, TABLE_W, TABLE_L, TABLE_H, roundedRect });
   const { leather, metal, gold } = R;
-  if (o.brand) groupMedal(scene, o.brand, gold);
+  if (o.brand) groupMedal(scene, ROOM === 'corp' ? o.brand : { ...o.brand, img: `assets/heavy/presroom/${ROOM === 'ru' ? 'arms-ru' : 'seal-us'}.webp` }, gold);   // в президентските зали — гербът на Империал Сити вместо знака
   // холограмата над медальона (boardholo.js): държавата, градовете и бюджетът на текущото предложение
   const short = n => { const a = Math.abs(n), r = (v, u) => `${(n / v).toLocaleString('bg-BG', { maximumFractionDigits: a / v >= 100 ? 0 : 1 })} ${u}`; return a >= 1e12 ? r(1e12, 'трлн.') : a >= 1e9 ? r(1e9, 'млрд.') : a >= 1e6 ? r(1e6, 'млн.') : Math.round(n).toLocaleString('bg-BG'); };   // холограмата — съкратено (310 млрд., 2,9 трлн.)
   const holo = createHolo(scene, { fmt: short, base: new THREE.Vector3(0, TABLE_H + 0.14, 0) });
