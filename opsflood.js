@@ -63,10 +63,10 @@ function build(K) {
   const genLight = new THREE.PointLight(0xffd27a, 0, 18, 1.6); genLight.position.set(EVAC[0], NB + 4, EVAC[1]); scene.add(genLight);
   // ---- пясъчната дига: появява се постепенно около подстанцията и по брега
   const bagG = own(new THREE.BoxGeometry(0.62, 0.24, 0.38)), bagM = mat(0xb59a6b), bagSpots = [];
-  for (let x = SUB[0] - 6.5; x <= SUB[0] + 6.5; x += 0.64) for (const z of [SUB[1] - 4.6, SUB[1] + 4.6]) bagSpots.push([x, z, 0]);
-  for (let z = SUB[1] - 4.2; z <= SUB[1] + 4.2; z += 0.64) for (const x of [SUB[0] - 6.6, SUB[0] + 6.6]) bagSpots.push([x, z, Math.PI / 2]);
-  for (let x = -14; x <= 44; x += 0.64) bagSpots.push([x, 12.6, 0]);
-  const bags = new THREE.InstancedMesh(bagG, bagM, bagSpots.length * 3); bags.castShadow = bags.receiveShadow = true; bags.count = 0; scene.add(bags);
+  for (let x = SUB[0] - 6.5; x <= SUB[0] + 6.5; x += 0.64) for (const z of [SUB[1] - 4.6, SUB[1] + 4.6]) bagSpots.push([x, z, 0, 'sub']);
+  for (let z = SUB[1] - 4.2; z <= SUB[1] + 4.2; z += 0.64) for (const x of [SUB[0] - 6.6, SUB[0] + 6.6]) bagSpots.push([x, z, Math.PI / 2, 'sub']);
+  for (let x = -52; x <= 52; x += 0.64) if (Math.abs(x + 25) > 4) bagSpots.push([x, 12.6, 0, 'bank']);   // брегът — без моста
+  let bagDk = null, spots = bagSpots; const bags = new THREE.InstancedMesh(bagG, bagM, bagSpots.length * 3); bags.castShadow = bags.receiveShadow = true; bags.count = 0; scene.add(bags);
   const dm = new THREE.Object3D(); let bagN = 0;
   // ---- водата: равнина с движещи се вълни (нормали) и дъжд
   const nT = new THREE.TextureLoader().load('assets/heavy/water/waternormals.jpg'); nT.wrapS = nT.wrapT = THREE.RepeatWrapping; nT.repeat.set(18, 12); own(nT);
@@ -154,9 +154,13 @@ function build(K) {
       sparks.update(tt, m.sub === 'flooded' && Math.sin(tt * 9) > 0.6 ? 0.6 : 0);
       const gOn = m.teams.power.st === 'onsite'; genM.emissiveIntensity = gOn ? 0.6 + Math.sin(tt * 20) * 0.1 : 0; genLight.intensity = gOn ? 4 : 0;
       // пясъчната дига: расте, докато екипът е на място
-      if (m.teams.sand.st === 'onsite' && bagN < bagSpots.length * 3) { bagN = Math.min(bagSpots.length * 3, bagN + Math.ceil(dt * 160));
-        for (let i = bags.count; i < bagN; i++) { const s = bagSpots[i % bagSpots.length], row = Math.floor(i / bagSpots.length); dm.position.set(s[0] + (row % 2) * 0.3, 0.12 + row * 0.24, s[1]); dm.rotation.set(0, s[2] + (Math.random() - 0.5) * 0.1, 0); dm.updateMatrix(); bags.setMatrixAt(i, dm.matrix); }
+      // дигата — където е избрано (около подстанцията / по брега / и двете); при „и двете“ — по-бавно
+      const dk = (m.dec && m.dec.dike) || 'sub'; if (dk !== bagDk) { bagDk = dk; bagN = 0; bags.count = 0; spots = bagSpots.filter(q => dk === 'both' || q[3] === dk); }
+      if (m.teams.sand.st === 'onsite' && bagN < spots.length * 3) { bagN = Math.min(spots.length * 3, bagN + Math.ceil(dt * (dk === 'both' ? 110 : 160)));
+        for (let i = bags.count; i < bagN; i++) { const s = spots[i % spots.length], row = Math.floor(i / spots.length); dm.position.set(s[0] + (row % 2) * 0.3, 0.12 + row * 0.24, s[1]); dm.rotation.set(0, s[2] + (Math.random() - 0.5) * 0.1, 0); dm.updateMatrix(); bags.setMatrixAt(i, dm.matrix); }
         bags.count = bagN; bags.instanceMatrix.needsUpdate = true; }
+      // дигата прелива — пръски над чувалите по брега
+      if (m.event && m.event.id === 'levee') for (let k = 0; k < 3; k++) { const x = -40 + Math.random() * 80; K.spray([x, y + 0.2, 11.6], [x + (Math.random() - 0.5), 0.2, 14.5], 0.6, 1); }
       // 🚤 лодките: пристигат по реката до пристана; после — до покрив и обратно
       const bOn = m.teams.boat.st === 'onsite', bGo = m.teams.boat.st === 'enroute'; boatLb = null;
       for (const [i, B0] of boats.entries()) { if (!B0.crew.length && K.peds().length) for (let j = 0; j < 2; j++) { const P = person(K.ff() || K.peds()[0]); P.body.position.y = 0.45; B0.crew.push(P); P.anim(j ? 'Sit_Breathing' : 'Sit_Table_Idle'); }   /* спасителите — седнали */

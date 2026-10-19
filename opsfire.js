@@ -95,7 +95,11 @@ function build(K) {
       const fOn = m.teams.fire.st === 'onsite';
       if (fOn && crew.length < 6) { const P = person(K.ff() || P0[0]); const k = crew.length, tx = [-24, 8, 22][k >> 1] + (k % 2 ? 2 : -2); P.at(tx, FRONT + 3.2 + (k % 2), Math.PI, 0.15); P.anim('Idle'); crew.push(P); }
       if (!fOn) while (crew.length) drop(crew.pop());
-      if (fOn) { const hot = [0, 1, 2, 3].filter(i => m.b[i] > 0).sort((a, b) => m.b[b] - m.b[a]); for (const [k, P] of crew.entries()) { const J = jets[k]; if (!hot.length) { J.update(dt, false); continue; } P.tgt = P.tgt && m.b[P.tgtI] > 0 && Math.random() > dt * 0.3 ? P.tgt : (P.tgtI = hot[k % Math.min(2, hot.length)], target(P.tgtI)); const t = P.tgt;
+      const D = m.dec || {}, shield = D.tactic === 'shield', weak = m.weakTill > m.t || (m.event && m.event.id === 'hydrant');
+      for (const J of jets) J.mesh.scale.setScalar(weak ? 0.55 : 1);
+      if (m.event && m.event.id === 'gas' && Math.random() < dt * 6) { const i = m.b.indexOf(Math.max(...m.b)); puff(BX[i] + (Math.random() - 0.5) * 6, 1, FRONT + 1, 0.8, 0.18); }   /* газ — бели струйки при входа */
+      if (m.blast) { m.blast = 0; const i = m.b.indexOf(Math.max(...m.b)); for (let k = 0; k < 14; k++) puff(BX[i] + (Math.random() - 0.5) * 8, blds[i] ? blds[i].top * 0.5 : 6, FRONT - 2, 2.5, 0.8); }
+      if (fOn) { const hot = [0, 1, 2, 3].filter(i => m.b[i] > 0).sort((a, b) => m.b[b] - m.b[a]); for (const [k, P] of crew.entries()) { const J = jets[k]; if (!hot.length) { J.update(dt, false); continue; } P.tgt = P.tgt && m.b[P.tgtI] > 0 && Math.random() > dt * 0.3 ? P.tgt : (P.tgtI = shield ? (k < 2 || hot.length < 2 ? hot[0] : hot[1 + k % (hot.length - 1)]) : hot[k % Math.min(2, hot.length)], target(P.tgtI)); const t = P.tgt;
           P.p.rotation.y = Math.atan2(t[0] - P.x, t[2] - P.z); J.set([P.x + Math.sin(P.p.rotation.y) * 0.5, 1.3, P.z + Math.cos(P.p.rotation.y) * 0.5], [t[0], t[1], t[2] + 0.3], 1.5 + t[1] * 0.12); J.update(dt, true); } }
       for (let k = crew.length; k < jets.length; k++) jets[k].update(dt, false);
       // 🚁 хеликоптерът: долита, виси над най-силния огън и хвърля вода

@@ -25,20 +25,41 @@ export const KINDS = {
       repair: { ico: '🔧', nm: 'Ремонт на моста и подстанцията', k: 0.15, trust: 3, sec: 1, services: 1, out: 'deal' },
       aid: { ico: '💶', nm: 'Само обезщетения за семействата', k: 0.08, trust: 1, sec: 0, services: 0, out: 'partial' },
     },
-    start(m) { Object.assign(m, { level: 34, stranded: 42, rescued: 0, cared: 0, cold: 0, critical: 0, sub: 'ok', peakT: 1.6, damage: 0 }); return '🌊 Реката прелива в крайречния квартал. Хора чакат помощ по покривите.'; },
+    decisions: [
+      { id: 'warn', ico: '📢', title: 'Да предупредим ли хората?', when: m => m.t > 0.05 && m.t < m.peakT,
+        opts: [{ k: 'sms', ico: '📲', nm: 'Сирени и SMS за евакуация', cost: 1e5, txt: 'по-малко хора остават по покривите' }, { k: 'none', ico: '🤐', nm: 'Без паника', txt: 'нищо не струва, но хората остават в къщите' }] },
+      { id: 'dike', ico: '🧱', title: 'Къде да е дигата?', when: m => m.teams.sand.st !== 'ready',
+        opts: [{ k: 'sub', ico: '⚡', nm: 'Около подстанцията', txt: 'токът остава; водата в квартала расте почти както досега' },
+          { k: 'bank', ico: '🏞️', nm: 'По брега на реката', txt: 'водата расте бавно навсякъде, но подстанцията може да прелее' },
+          { k: 'both', ico: '🧱', nm: 'И двете — още хора и чували', cost: 2e5, txt: 'пази всичко, но дигата се строи по-бавно' }] },
+      { id: 'order', ico: '🚤', title: 'Кого да спасяваме първо?', when: m => m.teams.boat.st === 'onsite' || m.teams.heli.st === 'onsite',
+        opts: [{ k: 'near', ico: '📍', nm: 'Най-близките', txt: 'най-бързо — повече хора за час' }, { k: 'weak', ico: '👵', nm: 'Деца, възрастни и болни', txt: 'по-бавно, но никой не е в критично положение' },
+          { k: 'deep', ico: '🌊', nm: 'Където водата е най-висока', txt: 'средно бързо, по-малко критични' }] },
+      { id: 'levee', ev: true, ico: '⚠️', title: 'Дигата прелива!', when: m => m.event && m.event.id === 'levee', txt: () => 'Водата минава над чувалите.',
+        opts: [{ k: 'reinforce', ico: '🧱', nm: 'Подсили дигата', cost: 1.5e5, txt: 'дигата издържа', apply: m => { m.leveeOk = true; } }, { k: 'retreat', ico: '🏃', nm: 'Изтегли хората от дигата', txt: 'безопасно, но водата се качва бързо за малко', apply: m => { m.surgeTill = m.t + 0.3; } }] },
+      { id: 'engine', ev: true, ico: '🔧', title: 'Лодка с повреден двигател', when: m => m.event && m.event.id === 'engine',
+        opts: [{ k: 'spare', ico: '🛠️', nm: 'Резервна лодка', cost: 1e5, txt: 'спасяването продължава' }, { k: 'wait', ico: '⏳', nm: 'Ремонт на място', txt: 'лодките спасяват наполовина за кратко', apply: m => { m.slowTill = m.t + 0.4; } }] },
+    ],
+    start(m) { Object.assign(m, { dec: {}, event: null, level: 34, stranded: 42, rescued: 0, cared: 0, cold: 0, critical: 0, sub: 'ok', peakT: 1.6, damage: 0 }); return '🌊 Реката прелива в крайречния квартал. Хора чакат помощ по покривите.'; },
     step(m, dt, h) {
       const on = k => h.on(m, k), sand = on('sand'), boat = on('boat'), heli = on('heli'), power = on('power'), med = on('med');
       if (m.phase === 'calm' && (sand || boat || heli || power || med)) m.phase = 'active';
-      const rise = m.t < m.peakT; m.level = Math.max(0, Math.min(95, m.level + (rise ? (sand ? 14 : 30) : -24) * dt));
-      if (rise && m.level > 60 && m.stranded < 70 && Math.random() < dt * 2) { m.stranded += 4; }
-      if (m.sub === 'ok' && m.level > 60 && !sand) { m.sub = 'flooded'; h.log(m, '⚡ Подстанцията е под вода — кварталът е без ток.'); }
+      const D = m.dec || (m.dec = {}), dk = sand ? (D.dike || 'sub') : null, built = !sand ? 0 : Math.min(1, (m.t - (m.teams.sand.t0 + m.teams.sand.eta)) / (dk === 'both' ? 0.35 : 0.15));
+      const rise = m.t < m.peakT, surge = m.surgeTill > m.t, rate0 = !dk ? 30 : dk === 'sub' ? 26 : 30 - 16 * built;
+      m.level = Math.max(0, Math.min(95, m.level + (rise ? rate0 + (surge ? 16 : 0) : -24) * dt));
+      if (rise && m.level > 60 && m.stranded < 70 && Math.random() < dt * (D.warn === 'sms' ? 0.6 : 2)) { m.stranded += 4; }
+      const subSafe = dk === 'sub' || (dk === 'both' && built > 0.5) || (dk === 'bank' && m.level < 75);
+      if (m.sub === 'ok' && m.level > 60 && !subSafe) { m.sub = 'flooded'; h.log(m, '⚡ Подстанцията е под вода — кварталът е без ток.'); }
+      if (!m.event && dk && dk !== 'sub' && rise && m.level > 66 && !m.leveeOk && !m.leveeAsked) { m.leveeAsked = true; m.event = { id: 'levee' }; h.log(m, '⚠️ Дигата прелива.'); }
+      if (!m.event && (boat) && !m.engineAsked && m.t - m.teams.boat.t0 > 0.6 && Math.random() < dt * 0.8) { m.engineAsked = true; m.event = { id: 'engine' }; h.log(m, '🔧 Лодка с повреден двигател.'); }
       if (m.sub === 'flooded' && power) { m.sub = 'gen'; h.log(m, '⚡ Генераторите дават ток на пункта и болницата.'); }
       if (m.sub === 'gen' && power && m.level < 30) { m.sub = 'fixed'; h.log(m, '🔧 Енергетиците ремонтираха подстанцията — токът е върнат.'); }
-      const can = m.level > 12 ? 1 : 0, rate = ((boat ? 14 : 0) + (heli ? 11 : 0)) * dt * can, got = Math.min(m.stranded, rate);
+      const ord = D.order || 'near', om = { near: 1.25, weak: 0.8, deep: 1 }[ord], bm = m.slowTill > m.t || (m.event && m.event.id === 'engine') ? 0.5 : 1;
+      const can = m.level > 12 ? 1 : 0, rate = ((boat ? 14 * bm : 0) + (heli ? 11 : 0)) * om * dt * can, got = Math.min(m.stranded, rate);
       if (got > 0) { m.stranded -= got; m.rescued += got; if (med) m.cared += got; else m.cold += got * 0.3; }
-      if (m.level > 75 && m.stranded > 0 && !boat && !heli) m.critical += dt * m.stranded * 0.1;
+      const cm = (boat || heli) ? { near: 0.04, weak: 0, deep: 0.015 }[ord] : 0.1; if (m.level > 75 && m.stranded > 0) m.critical += dt * m.stranded * cm;   /* реда на спасяване решава колко стигат до критично */
       if (m.level < 10 && m.stranded > 0) { m.rescued += m.stranded; m.stranded = 0; }   // водата се оттегли — излизат сами
-      m.damage += m.level / 100 * (sand ? 1.2e7 : 2.2e7) * dt;
+      m.damage += m.level / 100 * (dk === 'bank' || dk === 'both' ? 1.2e7 : 2.2e7) * dt;
       if (!rise && m.level < 20 && !m.recov) { m.recov = true; h.log(m, '🌤️ Водата се оттегля. Твоят ход — как да се възстанови кварталът.'); }
       if (m.t >= this.fade) h.resolve(m, 'faded', { trust: -5 - Math.round(m.critical / 3), security: -1, services: -2 }, '🌧️ Без решение за възстановяването хората остават сами с щетите.');
     },
@@ -64,30 +85,50 @@ export const KINDS = {
       rules: { ico: '🔍', nm: 'Разследване и нови правила за безопасност', k: 0.06, trust: 3, sec: 2, services: 1, out: 'deal' },
       aid: { ico: '💶', nm: 'Само обезщетения', k: 0.1, trust: 1, sec: 0, services: 0, out: 'partial' },
     },
-    start(m) { Object.assign(m, { b: [0, 58, 0, 0], trapped: [0, 16, 0, 0], rescued: 0, smoke: 0, burnt: [0, 0, 0, 0], damage: 0 }); return '🔥 Пожар в жилищен блок — пламъците са на горните етажи, хора чакат на прозорците.'; },
+    decisions: [
+      { id: 'tactic', ico: '🚒', title: 'Как да гасим?', when: m => m.teams.fire.st === 'onsite', pick: true,
+        opts: [{ k: 'attack', ico: '🎯', nm: 'Първо основното огнище', txt: 'най-силният огън пада бързо, но може да прескочи' },
+          { k: 'shield', ico: '🛡️', nm: 'Пазим съседните сгради', txt: 'огънят не се разпростира, огнището гасне по-бавно' }] },
+      { id: 'rescue', ico: '🪜', title: 'Кого спасява стълбата?', when: m => m.teams.ladder.st === 'onsite',
+        opts: [{ k: 'top', ico: '⬆️', nm: 'Горните етажи първо', txt: 'там димът е най-гъст — по-малко нагълтали дим' }, { k: 'near', ico: '📍', nm: 'Най-близките прозорци', txt: 'повече хора за час' }] },
+      { id: 'gas', ev: true, ico: '💨', title: 'Изтичане на газ в сградата!', when: m => m.event && m.event.id === 'gas',
+        opts: [{ k: 'cut', ico: '🔧', nm: 'Спри газа за целия квартал', cost: 1e5, txt: 'безопасно; съседите са без газ за ден' },
+          { k: 'risk', ico: '🎲', nm: 'Продължи без спиране', txt: 'може да избухне — огънят се разгаря', apply: m => { if (Math.random() < 0.5) { const i = m.b.indexOf(Math.max(...m.b)); m.b[i] = Math.min(100, m.b[i] + 30); m.blast = 1; } } }] },
+      { id: 'hydrant', ev: true, ico: '💧', title: 'Ниско налягане в хидрантите', when: m => m.event && m.event.id === 'hydrant',
+        opts: [{ k: 'tanker', ico: '🚛', nm: 'Водоноски', cost: 1.5e5, txt: 'гасенето продължава с пълна сила' }, { k: 'relay', ico: '🔁', nm: 'Помпа от реката', txt: 'по-евтино, но за малко струите са слаби', apply: m => { m.weakTill = m.t + 0.5; } }] },
+      { id: 'collapse', ev: true, ico: '🏚️', title: 'Опасност от срутване', when: m => m.event && m.event.id === 'collapse', txt: m => `Сграда № ${m.event.i + 1} гори твърде дълго.`,
+        opts: [{ k: 'pull', ico: '🏃', nm: 'Изтегли пожарникарите отвън', txt: 'безопасно, но тази сграда гасне по-бавно', apply: m => { m.pulled = m.event.i; } }, { k: 'stay', ico: '💪', nm: 'Продължи вътре', txt: 'по-бързо, но има риск за екипа', apply: m => { if (Math.random() < 0.4) m.injured = (m.injured || 0) + 2; } }] },
+    ],
+    start(m) { Object.assign(m, { dec: { tactic: 'attack' }, event: null, b: [0, 58, 0, 0], trapped: [0, 16, 0, 0], rescued: 0, smoke: 0, burnt: [0, 0, 0, 0], damage: 0 }); return '🔥 Пожар в жилищен блок — пламъците са на горните етажи, хора чакат на прозорците.'; },
     step(m, dt, h) {
       const on = k => h.on(m, k), fire = on('fire'), ladder = on('ladder'), heli = on('heli'), pol = on('pol'), med = on('med');
       if (m.phase === 'calm' && (fire || ladder || heli || pol || med)) m.phase = 'active';
-      const B = m.b, N = [[1], [0, 2], [1, 3], [2]];
+      const B = m.b, N = [[1], [0, 2], [1, 3], [2]], D = m.dec || (m.dec = { tactic: 'attack' });
+      if (!m.event && fire && !m.gasAsked && m.t - m.teams.fire.t0 > 0.35 && Math.random() < dt * 1.2) { m.gasAsked = true; m.event = { id: 'gas' }; h.log(m, '💨 Изтичане на газ в горящата сграда.'); }
+      if (!m.event && fire && !m.hydAsked && m.t - m.teams.fire.t0 > 0.5 && Math.random() < dt * 0.9) { m.hydAsked = true; m.event = { id: 'hydrant' }; h.log(m, '💧 Налягането в хидрантите пада.'); }
+      { const i = B.findIndex((v, k) => v >= 95 && m.burnt[k] > 0.3); if (!m.event && i >= 0 && !m.colAsked) { m.colAsked = true; m.event = { id: 'collapse', i }; h.log(m, `🏚️ Сграда № ${i + 1} — опасност от срутване.`); } }
       for (let i = 0; i < 4; i++) { if (B[i] <= 0) continue; B[i] = Math.min(100, B[i] + 9 * dt);
-        if (B[i] > 60) for (const j of N[i]) if (B[j] <= 0 && Math.random() < dt * (fire ? 0.4 : 1.4)) { B[j] = 18; if (!pol) m.trapped[j] += 6 + ((Math.random() * 5) | 0); h.log(m, `🔥 Огънят се прехвърли на съседна сграда (№ ${j + 1}).${pol ? ' Полицията вече я евакуира.' : ' Там също има хора.'}`); }
+        if (B[i] > 60) for (const j of N[i]) if (B[j] <= 0 && Math.random() < dt * (fire ? (D.tactic === 'shield' ? 0.06 : 0.45) : 1.4)) { B[j] = 18; if (!pol) m.trapped[j] += 6 + ((Math.random() * 5) | 0); h.log(m, `🔥 Огънят се прехвърли на съседна сграда (№ ${j + 1}).${pol ? ' Полицията вече я евакуира.' : ' Там също има хора.'}`); }
         if (B[i] >= 100) m.burnt[i] = Math.min(1, m.burnt[i] + dt * 0.8); }
-      const cool = (k, amt) => { const order = [0, 1, 2, 3].filter(i => B[i] > 0).sort((a, b) => B[b] - B[a]); for (const i of order.slice(0, k)) B[i] = Math.max(0, B[i] - amt / k * dt); };
-      if (fire) cool(2, 52); if (heli) cool(1, 34);
+      const cool = (k, amt) => { const order = [0, 1, 2, 3].filter(i => B[i] > 0).sort((a, b) => B[b] - B[a]); const n = Math.max(1, Math.min(k, order.length)); for (const i of order.slice(0, n)) B[i] = Math.max(0, B[i] - amt / n * dt); };
+      const wk = m.weakTill > m.t || (m.event && m.event.id === 'hydrant') ? 0.5 : 1;
+      if (fire) { if (D.tactic === 'shield') { const hot = [0, 1, 2, 3].filter(i => B[i] > 0).sort((a, b) => B[b] - B[a]); const side = hot.slice(1); cool(1, 26 * wk); for (const i of side) B[i] = Math.max(0, B[i] - 30 * wk * dt); } else cool(2, 52 * wk); }
+      if (m.pulled != null && B[m.pulled] > 0) B[m.pulled] = Math.min(100, B[m.pulled] + 6 * dt);   /* изтеглени отвън — гасне по-бавно */
+      if (heli) cool(1, 34);
       for (let i = 0; i < 4; i++) if (B[i] > 0 && B[i] < 2 && (fire || heli)) { B[i] = 0; h.log(m, `🧯 Сграда № ${i + 1} — огънят е изгасен.`); }
-      const save = ((ladder ? 14 : 0) + (heli ? 4 : 0) + (fire ? 4 : 0)) * dt; let left = save;
+      const save = ((ladder ? (D.rescue === 'near' ? 18 : 12) : 0) + (heli ? 4 : 0) + (fire ? 4 : 0)) * dt; let left = save;
       for (let i = 0; i < 4 && left > 0; i++) { const g = Math.min(m.trapped[i], left); m.trapped[i] -= g; left -= g; m.rescued += g; if (!med) m.smoke += g * 0.25; }
-      const trapped = m.trapped.reduce((a, b) => a + b, 0); if (trapped > 0 && B.some(v => v > 70)) m.smoke += dt * trapped * 0.08;
+      const trapped = m.trapped.reduce((a, b) => a + b, 0); if (trapped > 0 && B.some(v => v > 70)) m.smoke += dt * trapped * (D.rescue === 'top' ? 0.035 : 0.08);
       m.damage += B.reduce((a, b) => a + b, 0) * 1.2e5 * dt;
       if (!m.recov && B.every(v => v <= 0)) { m.recov = true; m.rescued += trapped; m.trapped = [0, 0, 0, 0]; h.log(m, '🧯 Пожарът е изгасен навсякъде. Твоят ход — как да се възстанови блокът.'); }
       if (m.t >= this.fade && !m.recov) h.resolve(m, 'faded', { trust: -6 - Math.round(m.smoke / 4), security: -2 }, '🔥 Пожарът изгоря сам — блокът е загубен, доверието пада.');
     },
     ready: m => !!m.recov,
-    effect: (m, C) => ({ trust: C.trust - Math.round(m.smoke / 5) + (m.rescued >= 20 ? 2 : 0), security: C.sec, services: C.services - Math.round(m.burnt.reduce((a, b) => a + b, 0)) }),
+    effect: (m, C) => ({ trust: C.trust - Math.round(m.smoke / 5) + (m.rescued >= 20 ? 2 : 0) - (m.injured ? 2 : 0), security: C.sec, services: C.services - Math.round(m.burnt.reduce((a, b) => a + b, 0)) }),
     resultTxt: c => c === 'rebuild' ? '🏗️ Блокът ще бъде възстановен, семействата — обезщетени.' : c === 'rules' ? '🔍 Разследване и нови правила — следващият пожар ще бъде спрян по-рано.' : '💶 Семействата получават обезщетения.',
     stats(m, B) { const tr = m.trapped.reduce((a, b) => a + b, 0), mx = Math.max(...m.b);
       return [['🔥 Най-силният огън', mx, mx >= 70 ? '#ff6b6b' : mx >= 35 ? '#ffd54a' : '#5fe39a'], `🏢 Горят: ${m.b.filter(v => v > 0).length} от 4 сгради · ${m.b.map((v, i) => `№${i + 1} ${v > 0 ? Math.round(v) + '%' : m.burnt[i] > 0.5 ? '⬛' : '✔'}`).join(' · ')}`,
-        `🪟 Чакат на прозорците: <b>${Math.round(tr)}</b> · ✅ спасени: ${Math.round(m.rescued)}${m.smoke >= 1 ? ` · 😷 нагълтали дим: ${Math.round(m.smoke)}` : ''}`, `💥 Щети: ${B(m.damage)}`]; },
+        `🪟 Чакат на прозорците: <b>${Math.round(tr)}</b> · ✅ спасени: ${Math.round(m.rescued)}${m.smoke >= 1 ? ` · 😷 нагълтали дим: ${Math.round(m.smoke)}` : ''}`, `💥 Щети: ${B(m.damage)}${m.injured ? ` · 🚑 пострадали пожарникари: ${m.injured}` : ''}`]; },
     phases: { calm: '🔥 Пожарът се разраства', active: '🚒 Гасене и спасяване', resolved: '✅ Пожарът е изгасен' },
   },
   // 🤝 Хуманитарен достъп (алтернативен игрови сценарий, измислен квартал): кварталът е без достатъчно храна, вода и лекарства.
