@@ -8300,6 +8300,12 @@ function boardProposals() {
       track: a => ({ k: 'resort', ids: a }), geo: resGeo });
     P({ dir: 'hotel', ico: '🎢', key: 'resext', items: Object.keys(rs).map(id => ({ id, o: resorts.extOpts(id).sort((a, b) => a.cost - b.cost)[0] })).filter(x => x.o).slice(0, 6), cost: x => x.o.cost, run: x => resorts.startExt(x.id, x.o.k),
       text: a => `Предлагам разширения в ${pl(a.length, 'курорт', 'курорта')}: ${a.slice(0, 4).map(x => `${x.o.x.ico} ${x.o.x.nm} в ${rOf(x.id).nm}`).join(', ')}.`, why: 'всяко разширение вдига наема и цената на курорта', days: a => Math.max(...a.map(x => x.o.x.days)), income: a => sum(a, x => resorts.rentOf(x.id) / 30 * 0.6 * (x.o.x.mul || 0)), goal: a => `${pl(a.length, 'разширение', 'разширения')}`, geo: a => resGeo(a.map(x => x.id)) });
+    // събитията в курортите (CES, концерти…): стаите и транспортът — колкото по-рано, толкова по-евтино
+    { const ev = resorts.evOpen ? resorts.evOpen() : [];
+      P({ dir: 'hotel', ico: '🎪', key: 'resev', items: ev.slice(0, 4), cost: x => x.cost, run: x => x.what.forEach(w => resorts.book(x.id, w)),
+        text: a => `Предлагам да осигурим ${a.some(x => x.what.length > 1) ? 'стаите и транспорта' : a[0].what[0] === 'rooms' ? 'стаите' : 'транспорта'} за ${a.length === 1 ? `„${a[0].ev}“ в ${a[0].nm} (след ${a[0].dl} дни)` : `${pl(a.length, 'събитие', 'събития')}: ${a.map(x => `${x.ico} ${x.ev} (${x.nm})`).join(', ')}`}.`,
+        why: 'по-късно цените растат (последните дни +70%), а без стаи и транспорт приходът от събитието го няма', days: a => Math.min(...a.map(x => x.dl)),
+        gainTxt: a => `до ${fmt(sum(a, x => x.rev))} € приход от ${a.length === 1 ? 'събитието' : 'събитията'}`, goal: a => `${pl(a.length, 'събитие е осигурено', 'събития са осигурени')}` }); }
   }
   // ━━ 🏙️ Кметът на Империал Сити (ниво 19): основаването и кварталите един след друг
   if (mayorName()) {

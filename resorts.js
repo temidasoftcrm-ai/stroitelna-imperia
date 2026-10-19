@@ -180,7 +180,7 @@ export function createResorts(deps) {
   const evRevOf = (r, s, ev) => Math.round(r.month * ev.rev * evMulOf(s) / 1000) * 1000;
   function book(id, what) {
     const r = R(id), s = st()[id], ev = s?.ev, S = deps.S(), econ = deps.econ();
-    if (!r || !ev || ev[what] === true || ev.day - S.day < EV.close) return false;
+    if (!r || !ev || (what === 'rooms' ? ev.bRooms : ev.bTrans) || ev.day - S.day < EV.close) return false;
     const c = evCost(r, s, ev, what, S.day);
     if (!econ.canAfford(c)) { deps.toast(`Нямаш достатъчно пари (${deps.fmt(c)} €).`, 'bad'); return false; }
     econ.spend(c, 'покупка', `${r.nm}: ${what === 'rooms' ? 'стаи' : 'транспорт'} за „${ev.nm}“`);
@@ -405,5 +405,13 @@ export function createResorts(deps) {
     if (deps.redraw) deps.redraw();
     return r ? r.nm : null;
   }
-  return { buyLand, buildVillage, avail: id => !!R(id) && avail(R(id)), extOpts: id => { const r = R(id), s = st()[id]; return r && s && s.stage === 'built' && !s.extBuild ? Object.entries(EXTRAS).filter(([k, x]) => extOk(r, x) && !Object.keys(s.ext || {}).includes(k)).map(([k, x]) => ({ k, x, cost: extCost(r, x) })) : []; }, rentOf: id => rentOf(R(id)), state: st, svg, hudHtml, winHtml, startExt, book, open, dailyTick, value, unlocked, grant, dailyNow, yearOf: id => { const r = R(id); return yearOf(r, st()[id]); } };
+  // събитията, за които още може да се резервира — за директора на Хотелс (борда): какво липсва, колко струва днес, колко носи
+  function evOpen() {
+    const S = deps.S(), out = [];
+    for (const [id, s] of Object.entries(st())) { const r = R(id), ev = s?.ev; if (!r || !ev || s.stage !== 'built' || r.kind !== 'events' || ev.day - S.day < EV.close) continue;
+      const what = ['rooms', 'trans'].filter(w => !(w === 'rooms' ? ev.bRooms : ev.bTrans)); if (!what.length) continue;
+      out.push({ id, nm: r.nm, ev: ev.nm, ico: ev.ico, dl: ev.day - S.day, what, cost: what.reduce((a, w) => a + evCost(r, s, ev, w, S.day), 0), rev: evRevOf(r, s, ev) }); }
+    return out.sort((a, b) => a.dl - b.dl);
+  }
+  return { evOpen, buyLand, buildVillage, avail: id => !!R(id) && avail(R(id)), extOpts: id => { const r = R(id), s = st()[id]; return r && s && s.stage === 'built' && !s.extBuild ? Object.entries(EXTRAS).filter(([k, x]) => extOk(r, x) && !Object.keys(s.ext || {}).includes(k)).map(([k, x]) => ({ k, x, cost: extCost(r, x) })) : []; }, rentOf: id => rentOf(R(id)), state: st, svg, hudHtml, winHtml, startExt, book, open, dailyTick, value, unlocked, grant, dailyNow, yearOf: id => { const r = R(id); return yearOf(r, st()[id]); } };
 }
