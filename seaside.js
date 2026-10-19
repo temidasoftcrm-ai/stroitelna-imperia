@@ -6,6 +6,8 @@ import { createPortLights } from './portlights.js';
 import { makeWater } from './water.js';
 import { loadShipModels, hasShipModel, shipModel, setShipNight } from './shipmodels.js';
 import { isRealBoat, isRealShip, realBoat, pendingShip, swapPendingShips } from './boatsreal.js';
+import { portReal } from './portreal.js';
+import { feature } from './lab/feature.js';
 
 import { EXTRA_COASTAL } from './countries.js';
 export const SEASIDE = ['varna', 'burgas', 'constanta', 'istanbul', 'thessaloniki', 'athens', 'barcelona', 'amsterdam', 'rotterdam', 'newyork', 'losangeles', 'rio', 'buenosaires', 'capetown', 'dubai', 'mumbai', 'singapore', 'hongkong', 'shanghai', 'tokyo', 'sydney'];
@@ -164,6 +166,8 @@ export function addSeaside(group, deps, opts) {
       else box(4.4, 3.5, 8.8, mat([0x7b2cbf, 0x0a9396, 0xe8e2d4, 0xd62828][k % 4], 0.7), px - 115 + (k % 8) * 7, 3 + Math.floor(k / 16) * 3.5, seaZ - 14 - Math.floor((k % 16) / 8) * 11, lvG[4]).rotation.y = Math.PI / 2;
     }
     const silo = mat(0xdcdcdc, 0.5, 0.3); for (let k = 0; k < 3; k++) { const c = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 18, 16), silo); c.position.set(px - 70 + k * 9, 9, seaZ + 14); c.castShadow = true; lvG[4].add(c); } }
+  // истинските кранове, фар, склад, зърнен терминал, страдъл карите и яхтите (portreal.js)
+  const portUp = feature('port-real') ? portReal({ g, lvG, cranes, tower, lamp, beam, px, seaZ, pierZ, x0: opts.xMin - 150, x1: opts.xMax + 150 }) : null;
   // щом истинските кораби се заредят: пречертай флота и смени декоративния кораб на кея с танкер (до ръба на кея)
   loadShipModels().then(() => {
     if (cargo && hasShipModel('tanker')) { const o = shipModel('tanker'), p0 = cargo.position.clone(), hb0 = halfBeam(cargo); cargo.position.copy(p0); o.rotation.y = cargo.rotation.y; const hb = halfBeam(o); o.position.set(p0.x, 0, seaZ - 69 - hb - 2); o.visible = cargo.visible; g.remove(cargo); g.add(o); cargo = o; }
@@ -190,7 +194,10 @@ export function addSeaside(group, deps, opts) {
     for (const q of boats) { q.o.position.x = q.x0 + Math.sin(t * 0.04 * q.sp + q.ph) * 80; q.o.rotation.y = Math.cos(t * 0.04 * q.sp + q.ph) > 0 ? Math.PI / 2 : -Math.PI / 2; q.o.position.y = Math.sin(t * 1.3 + q.ph) * 0.2; }
     cranes.forEach((c, k) => { c.position.x += Math.sin(t * 0.2 + k) * 0.01; });
     PL.setNight(night, t); water.update(t); setShipNight(night);
+    if (portUp) portUp(t);
     beam.rotation.y = t * 0.8; beam.material.opacity = 0.04 + 0.16 * night; lamp.material.emissiveIntensity = 0.5 + 2 * night;
   }
-  return { group: g, update, setFleet, setPortLevel, port: { x: px, z: seaZ, xMax: opts.xMax } };
+  const api = { group: g, update, setFleet, setPortLevel, port: { x: px, z: seaZ, xMax: opts.xMax } };
+  g.name = 'seaside'; g.userData.sea = api;   // за тестовете
+  return api;
 }
