@@ -55,6 +55,7 @@ import { createBank, WORLD_ISO } from './bank.js';
 import { createImperial, IMP_CC } from './imperial.js';
 import { createCampaign } from './campaign.js';
 import { createPresidency } from './president.js';
+import { createGeoMap } from './geomap.js';
 import { syncImpCivic, updateImpCivic } from './impcivic.js';   // обществените сгради на Империал Сити в 3D
 import { pickModel as impPick, decor as impDecor, IMP_MODELS, IMP_H } from './impstyle.js';
 import { createNeom, NEOM_CITY, NEOM_ID, DISTRICTS as NEOM_DISTRICTS, FOUND_COST as NEOM_FOUND } from './neom.js';
@@ -623,7 +624,7 @@ const PLAN_TPL4 = { newyork: 'grid' };
 const PLAN_TPL5 = { sofia: 'osm' };
 // от planAll 7: Лос Анджелис — Даунтаун по картата (OpenStreetMap) и надписът HOLLYWOOD на хълмовете на север
 const PLAN_TPL7 = { losangeles: 'osm' };
-const planOf = id => planOn(id) ? gamePlan(id, { exts: Math.max(MAX_EXT, extRule(id)), landmark: !!CITY_LANDMARKS[id], seaside: SEASIDE.includes(id), mega: MEGAPOLIS.has(id), bigZone: bigZoneOf(id), clean: S.planAll >= 6, tpl: (S.planAll >= 7 && PLAN_TPL7[id]) || (S.planAll >= 5 && PLAN_TPL5[id]) || (S.planAll >= 4 ? PLAN_TPL4[id] : undefined) }) : null;
+const planOf = id => planOn(id) ? gamePlan(id, { exts: Math.max(MAX_EXT, extRule(id)), landmark: !!CITY_LANDMARKS[id], seaside: SEASIDE.includes(id), mega: MEGAPOLIS.has(id), bigZone: bigZoneOf(id), clean: S.planAll >= 6, clean2: S.planAll >= 9, tpl: (S.planAll >= 7 && PLAN_TPL7[id]) || (S.planAll >= 5 && PLAN_TPL5[id]) || (S.planAll >= 4 ? PLAN_TPL4[id] : undefined) }) : null;
 // запазената зона в плана за голямата забележителност: колкото W×D парцела на мрежата ((3W − 1) плочки − 2 м)
 function bigZoneOf(id) { const b = (BIG_LANDMARKS[id] || [])[0]; if (!b) return null; const [kind, W, D, asp = 1, turn = 0] = b; return { kind, W, D, asp, turn, size: [(3 * W - 1) * TILE - 2, (3 * D - 1) * TILE - 2] }; }
 // план: пътища от най-близкия край на булевард до гарата (запад), входа на летището (изток) и магистралата (юг) — само за изгледа
@@ -1501,6 +1502,7 @@ function updateUnits(dt) {
     const dx = tx2 - u.x, dz = tz2 - u.z, d = Math.hypot(dx, dz);
     const step = SPEED * dt;
     if (d <= step) {
+      if (d > 0.05) u.yaw = Math.atan2(dx, dz);   // при бързо време прескача точките — иначе остава обърната накриво
       u.x = tx2; u.z = tz2; u.pi++;
       if (u.pi >= u.path.length) { u.path = null; const cb = u.onArrive; u.onArrive = null; if (cb) cb(); }
     } else {
@@ -1705,7 +1707,7 @@ function updatePeds(dt) {
     let x2 = wp.x, z2 = wp.z;
     if (p.pi > 0 && !wp.park) { const pv = p.path[p.pi - 1], dx = wp.x - pv.x, dz = wp.z - pv.z, l = Math.hypot(dx, dz) || 1; x2 += -dz / l * PED_SIDE * p.side; z2 += dx / l * PED_SIDE * p.side; }
     const dx = x2 - p.x, dz = z2 - p.z, d = Math.hypot(dx, dz), st = p.sp * dt;
-    if (d <= st) { p.x = x2; p.z = z2; if (++p.pi >= p.path.length) p.path = null; }
+    if (d <= st) { if (d > 0.05) p.yaw = Math.atan2(dx, dz); p.x = x2; p.z = z2; if (++p.pi >= p.path.length) p.path = null; }
     else { p.x += dx / d * st; p.z += dz / d * st; const w = Math.atan2(dx, dz); let dy = w - p.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); p.yaw += dy * Math.min(1, dt * 6); }
     p.m.position.set(p.x, 0.05, p.z); p.m.rotation.y = p.yaw;
     p.mixer.update(dt * p.sp / 1.5);
@@ -1741,7 +1743,7 @@ function updateTraffic(dt) {
     // спира пред стоп-линията на червено (ако още не е влязла в кръстовището)
     t.red = false;
     if (axis && d < TILE * 0.95 && d > TILE * 0.55 && !canEnter(wp.i, wp.j, axis)) { t.red = true; t.obj.position.set(t.x, 0, t.z); continue; }
-    if (d <= st) { t.x = x2; t.z = z2; if (++t.pi >= t.path.length) t.path = null; }
+    if (d <= st) { if (d > 0.05) t.yaw = Math.atan2(dx, dz); t.x = x2; t.z = z2; if (++t.pi >= t.path.length) t.path = null; }
     else { t.x += dx / d * st; t.z += dz / d * st; const w = Math.atan2(dx, dz); let dy = w - t.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); t.yaw += dy * Math.min(1, dt * 8); }
     t.obj.position.set(t.x, 0, t.z); t.obj.rotation.y = t.yaw;
   }
@@ -2175,7 +2177,7 @@ function newGame(cityId, brand = null, brandNm = '') {
   S = { v: 1, brand, cityId, hqCity: cityId, cities: {}, day: 1, dayT: 0, rep: 0, cash: [], officeLevel: 1, garageLevel: 1, garageLot: null, whLevel: 0, whLot: null, cityExt: AUTOTEST ? +params.get('ext') || 0 : 0, rails: [], trains: [], jobs: [], econ: ECON.newEconState(), units: [...ECON.START.units], projects: [], offers: [], built: [], done: 0, seq: 1 };
   if (brandNm) S.brandNm = brandNm;   // името, което играчът си е дал (group.js: brandOf)
   S.foundFirst = 1;   // дъщерните фирми (пътна, жп, морска, авиация) — с ръчно основаване и стартов пакет
-  if (params.has('plan') ? params.get('plan') === '1' : !AUTOTEST) S.planAll = feature('city-size') ? 8 : feature('la-osm') ? 7 : 6;   // 7: Лос Анджелис по картата (PLAN_TPL7); 6: по-чист център (cityplan opts.clean)   // нова игра — средните и големите градове с план (извити улици); старите записи остават на мрежата   // нов град с план (извити улици); старите записи остават на мрежата
+  if (params.has('plan') ? params.get('plan') === '1' : !AUTOTEST) S.planAll = feature('road-clean') ? 9 : feature('city-size') ? 8 : feature('la-osm') ? 7 : 6;   // 7: Лос Анджелис по картата (PLAN_TPL7); 6: по-чист център (cityplan opts.clean)   // нова игра — средните и големите градове с план (извити улици); старите записи остават на мрежата   // нов град с план (извити улици); старите записи остават на мрежата
   enterCity();
   S.projects = projects;
   for (let k = 0; k < 3; k++) makeOffer();
@@ -2789,7 +2791,7 @@ function endOfDay() {
   tenderAutoFix();
   mines.dailyTick();
   oil.dailyTick(); updOilBtn();
-  gridCheck(); holdingCheck(); autoTick(); group.check(); group.dailyTick(); corp.dailyTick(); mw.dailyTick(); hotels.dailyTick(); bank.dailyTick(); neom.dailyTick(); imperial.dailyTick(); if (S.president && !S.pres) pres.start(S.president.cc); pres.dailyTick(); impCiv3D(); neomDecor(); if (imperial.needChoice() && !S.impAsked && $('modal').classList.contains('hidden')) { S.impAsked = S.day; imperial.choose(() => renderBig()); } holdMilestones(); if (S.holding) holdXP(Math.max(0, regNet()) / 10000);
+  gridCheck(); holdingCheck(); autoTick(); group.check(); group.dailyTick(); corp.dailyTick(); mw.dailyTick(); hotels.dailyTick(); bank.dailyTick(); neom.dailyTick(); imperial.dailyTick(); if (S.president && !S.pres) pres.start(S.president.cc); pres.dailyTick(); if (geoMap.on() && $('mapScreen')?.offsetParent) drawMap(); impCiv3D(); neomDecor(); if (imperial.needChoice() && !S.impAsked && $('modal').classList.contains('hidden')) { S.impAsked = S.day; imperial.choose(() => renderBig()); } holdMilestones(); if (S.holding) holdXP(Math.max(0, regNet()) / 10000);
   airAutoPlanes();
   tenders.dailyTick();
   orient.dailyTick();
@@ -3260,6 +3262,7 @@ function drawMap() {
   // 🗺️ степени на детайлност (maplod.js, feature 'map-lod') и изчистеният вид (feature 'map-look')
   const lod = lodOn(), L = lod ? (mapLod = lodOf(mapVisW(), mapLod)) : LOD.REGION, look = !!S && feature('map-look');
   svg.classList.toggle('lod', lod); svg.classList.toggle('look', look); svg.dataset.lod = lod ? LOD_NM[L] : '';
+  try { if (geoMap.on()) { svg.innerHTML = geoMap.svg(); geoMap.bind(svg); geoMap.overlay(); return; } } catch (e) { if (!(e instanceof ReferenceError)) console.warn('geo', e); }   // 🌍 геополитика (до инициализацията — икономическият изглед)
   let h = mapWorld ? '<rect class="ocean" x="-20000" y="-10000" width="40000" height="25000" fill="#5f9fd6"/>' : '<rect class="ocean" x="-6000" y="-4000" width="12000" height="8000" fill="#5f9fd6"/>';
   const wonIso = new Set(S && econ ? wonCountries(x => econ.isFinished(x)).map(k => k.iso) : []);
   // започнатите държави (твой град или завършен ключов град) — бледо златисто; завладените — златни
@@ -3583,6 +3586,8 @@ const imperial = createImperial({ S: () => S, econ: () => econ, fmt, toast, save
 function polMode() {
   const on = !!S?.pres; document.body.classList.toggle('polmode', on); if (!on) return;
   if (!$('polCss')) { const c = document.createElement('style'); c.id = 'polCss'; c.textContent = ['trBtn', 'garBtn', 'resBtn', 'finBtn', 'superBtn', 'btnCities', 'btnOffers', 'btnMines', 'btnConquest', 'bankBtn', 'oilBtn', 'railBtn', 'hwBtn', 'seaBtn', 'airBtn'].map(id => `body.polmode #${id}`).join(',') + ' { display:none !important; }'; document.head.appendChild(c); }
+  if (!$('geoBtn') && $('mapScreen')) { const g = document.createElement('button'); g.id = 'geoBtn'; g.className = 'btn'; g.textContent = '🌍 Геополитика'; g.style.cssText = 'position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:6'; g.onclick = () => geoToggle(true); $('mapScreen').appendChild(g); }
+  if ($('geoBtn')) $('geoBtn').style.display = geoMap.on() ? 'none' : '';
   let b = $('presBtn'); if (!b) { const top = $('top'); if (!top) return; b = document.createElement('button'); b.id = 'presBtn'; b.className = 'btn2'; b.style.cssText = 'font-weight:800;color:#ffd54a'; b.onclick = () => pres.open(); top.insertBefore(b, top.querySelector('.sp')); }
   const n = pres.proposals().length, t = `🏛️ Президент · ниво ${pres.level()}${n ? ` <b style="background:#ffd54a;color:#111;border-radius:9px;padding:0 6px;font-size:11px">${n}</b>` : ''}`; if (b.dataset.t !== t) { b.dataset.t = t; b.innerHTML = t; }
 }
@@ -3600,6 +3605,11 @@ const campRU = createCampaign({ cc: 'RU', S: () => S, econ: () => econ, fmt, toa
 const campOf = () => S?.imp?.cc === 'RU' ? campRU : camp;
 // 🏛️ президентството (president.js): държавен бюджет, кабинет, нива 27–35, световната политика
 const pres = createPresidency({ pause: () => setSpeed(0), S: () => S, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), brand: () => brandOf(S)?.nm || 'Титан' });
+// 🌍 режимът „Геополитика“ върху картата (geomap.js): същите география и проекция, отделен слой за държави, кризи и договорености
+const countryPath = c => { let d = countryD.get(c); if (!d || d.px !== projX()) countryD.set(c, d = { px: projX(), d: c.poly.map(poly => poly.map(ring => 'M' + ring.map(([lo, la]) => proj(lo, la).map(v => v.toFixed(1)).join(',')).join('L') + 'Z').join('')).join('') }); return d.d; };
+function mapPanTo(lon, lat, z) { if (!mapView) return drawMap(); const [x, y] = proj(lon, lat), [, , bw, bh] = mapView.base; mapView.vb = [x - bw / z / 2, y - bh / z / 2, bw / z, bh / z]; $('mapSvg').setAttribute('viewBox', mapView.vb.join(' ')); drawMap(); }
+const geoMap = createGeoMap({ pres, proj: (lo, la) => proj(lo, la), geo: () => worldGeo || [], pathOf: countryPath, visW: () => mapVisW(), panTo: mapPanTo, fmt, holding: () => econ ? econ.money : 0, redraw: () => drawMap(), day: () => S?.day || 0 });
+function geoToggle(v) { if (v) { mapWorld = true; mapEU = true; mapWide = true; mapCont = null; mapView = null; mapPicked = true; } geoMap.setOn(v); }
 function campCard() {
   const C = IMP_CC[S.imp?.cc]; if (!C || (S.imp?.lv || 0) < 25) return '';
   const won = !!S.president, act = campOf().active(), ru = S.imp.cc === 'RU';
@@ -5250,12 +5260,40 @@ function nyCenter(lots) {
     pruneStreetDetail();
   });
 }
+// Нотр Дам в Париж (Лабораторията → paris-spread): не до площада с Айфеловата кула, а на три съседни свободни парцела
+// покрай една улица край реката (като остров Сите). Изборът се помни в S.landmarks (mem[k + '@']) — не скача при зареждане.
+function lmRiverSpot(k, mem) {
+  const P = city.plan, sq = P && P.square; if (!P || !P.waterAt || !P.lots) return null;
+  const own = new Set([...(est().owned || []).map(o => o.lot), ...projects.map(p => p.lot), ...(S.built || []).map(b => b.lot)]), was = new Set(mem[k + '@'] || []);
+  const free = l => l && l !== city.hq && !l.fresh && !own.has(l.id) && (!l.busy || was.has(l.id));
+  const old = (mem[k + '@'] || []).map(id => city.lots[id]);
+  let best = old.length === 3 && old.every(free) ? old : null;
+  if (!best) {
+    const wet = l => { for (let a = 0; a < 8; a++) for (const r of [18, 32]) if (P.waterAt(l.x + Math.cos(a * Math.PI / 4) * r, l.z + Math.sin(a * Math.PI / 4) * r)) return true; return false; };
+    const by = new Map();
+    for (const l of city.lots) { const L = P.lots[l.id]; if (!L || !free(l)) continue; const key = L.street + ':' + L.side; (by.get(key) || by.set(key, []).get(key)).push([L, l]); }
+    let bd = 1e9;
+    for (const arr of by.values()) { arr.sort((a, b) => a[0].s - b[0].s);
+      for (let i = 0; i + 2 < arr.length; i++) { const g = arr.slice(i, i + 3);
+        if (g.some((x, j) => j && x[0].s - x[0].w / 2 - (g[j - 1][0].s + g[j - 1][0].w / 2) > 4)) continue;   // съседни, без празнина
+        const m = g[1][1], d = Math.hypot(m.x - sq.x, m.z - sq.z);
+        if (d < sq.r + 150 || d >= bd || !wet(m)) continue;
+        bd = d; best = g.map(x => x[1]); } }
+  }
+  if (!best) return null;
+  mem[k + '@'] = best.map(l => l.id); mem[k] = best[1].id;
+  for (const l of best) { if (l.obj) city.group.remove(l.obj); for (const t of l.trees || []) city.group.remove(t); l.obj = null; l.built = null; l.trees = []; l.busy = 'landmark'; }
+  const m = best[1], o = buildLandmark(k, { label });
+  o.group.position.set((best[0].x + best[2].x) / 2, 0, (best[0].z + best[2].z) / 2); o.group.rotation.y = lotRot(m) + Math.PI / 2; o.group.scale.multiplyScalar(lotK(m));
+  return o;
+}
 function landmarkPlan(kinds) {
   const sq = city.plan.square, mem = S.landmarks[S.cityId], shade = o => o.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
   if (kinds[0] === 'manhattan' && feature('ny-spread')) { nySpread(); kinds = kinds.slice(1); if (!kinds.length) return; kinds = ['__none', ...kinds]; }
   if (kinds[0] !== '__none') { const main = buildLandmark(kinds[0], { label }); main.group.position.set(sq.x, 0.1, sq.z); main.group.scale.setScalar(LM_MAIN_SCALE[kinds[0]] || 3.2); main.group.rotation.y = (hashStr(kinds[0]) % 4) * Math.PI / 2;
   shade(main); city.group.add(main.group); city.landmarks.push(main); }
   kinds.slice(1).forEach((k, i) => {
+    if (k === 'notredame' && feature('paris-spread')) { const o = lmRiverSpot(k, mem); if (o) { shade(o); city.group.add(o.group); city.landmarks.push(o); return; } }
     const l = city.lots[1 + i]; if (!l || l === city.hq) return;
     mem[k] = l.id;
     if (l.obj) city.group.remove(l.obj); for (const t of l.trees || []) city.group.remove(t);
