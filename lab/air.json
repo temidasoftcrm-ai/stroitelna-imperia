@@ -1,0 +1,200 @@
+{
+ "have": [
+  {
+   "f": "assets/heavy/air/a320.glb",
+   "img": "have-a320.webp",
+   "n": "A320"
+  },
+  {
+   "f": "assets/heavy/air/regional.glb",
+   "img": "have-regional.webp",
+   "n": "Регионален самолет"
+  },
+  {
+   "f": "assets/heavy/air/wide.glb",
+   "img": "have-wide.webp",
+   "n": "Широкофюзелажен"
+  },
+  {
+   "f": "assets/heavy/air/cargo.glb",
+   "img": "have-cargo.webp",
+   "n": "Товарен самолет"
+  },
+  {
+   "f": "assets/heavy/air/tower.glb",
+   "img": "have-tower.webp",
+   "n": "Контролна кула"
+  },
+  {
+   "f": "assets/heavy/air/term-s.glb",
+   "img": "have-term-s.webp",
+   "n": "Терминал — малък (ниво 1–2)"
+  },
+  {
+   "f": "assets/heavy/air/term-m.glb",
+   "img": "have-term-m.webp",
+   "n": "Терминал — регионален (ниво 3)"
+  },
+  {
+   "f": "assets/heavy/air/term-l.glb",
+   "img": "have-term-l.webp",
+   "n": "Терминал — международен (ниво 4–5)"
+  }
+ ],
+ "now": [
+  {
+   "img": "now-hangars.webp",
+   "n": "Хангарите (сиви полуцилиндри), ръкавите и колите на паркинга (цветни кубчета)"
+  },
+  {
+   "img": "now-cargo.webp",
+   "n": "Карго зоната (оранжева кутия) и контейнерите"
+  }
+ ],
+ "reuse": [
+  {
+   "n": "Колите на паркинга",
+   "how": "истинските коли на играта (sf-car-*: седан, SUV, хечбек, такси, ван) — без сваляне"
+  },
+  {
+   "n": "Карго склад",
+   "how": "логистичният терминал от индустрията (LogisticTerminal_1) или складът от пристанището — без сваляне"
+  },
+  {
+   "n": "Контейнерите на карго зоната",
+   "how": "контейнерите от пристанището (sf-container), по-малки — без сваляне"
+  }
+ ],
+ "cand": [
+  {
+   "cat": "hangar",
+   "title": "Хангар (вместо сивите полуцилиндри)",
+   "uid": "a5b17ba2e3494873abd313f720097614",
+   "name": "Aircraft Hangar",
+   "user": "jimbogies",
+   "tri": 120828,
+   "url": "https://sketchfab.com/3d-models/aircraft-hangar-a5b17ba2e3494873abd313f720097614",
+   "img": "cand-a5b17ba2.webp"
+  },
+  {
+   "cat": "hangar",
+   "title": "Хангар (вместо сивите полуцилиндри)",
+   "uid": "bad8c6349749480d85ee58f8d1a9355b",
+   "name": "Hangar",
+   "user": "Matvis",
+   "tri": 4310,
+   "url": "https://sketchfab.com/3d-models/hangar-bad8c6349749480d85ee58f8d1a9355b",
+   "img": "cand-bad8c634.webp"
+  },
+  {
+   "cat": "jetway",
+   "title": "Ръкав (към самолетите)",
+   "uid": "4c5dba38480449f8982e21734d133bc9",
+   "name": "Jetway",
+   "user": "vishnevsky.yaroslav",
+   "tri": 18237,
+   "url": "https://sketchfab.com/3d-models/jetway-4c5dba38480449f8982e21734d133bc9",
+   "img": "cand-4c5dba38.webp"
+  },
+  {
+   "cat": "gse",
+   "title": "Наземна техника на перона",
+   "uid": "7ae8444bb5044376a04ee7bb0664ff39",
+   "name": "Airport baggage equipment (cart) lowpoly",
+   "user": "menX1151",
+   "tri": 1974,
+   "url": "https://sketchfab.com/3d-models/airport-baggage-equipment-cart-lowpoly-7ae8444bb5044376a04ee7bb0664ff39",
+   "img": "cand-7ae8444b.webp"
+  },
+  {
+   "cat": "gse",
+   "title": "Наземна техника на перона",
+   "uid": "ac1c0a974a734864a27fe84dbbcb0de8",
+   "name": "Aircraft_Tug",
+   "user": "Chukk007",
+   "tri": 2269,
+   "url": "https://sketchfab.com/3d-models/aircraft-tug-ac1c0a974a734864a27fe84dbbcb0de8",
+   "img": "cand-ac1c0a97.webp"
+  },
+  {
+   "cat": "gse",
+   "title": "Наземна техника на перона",
+   "uid": "613826c7a684416ab3649cf6fbf8c459",
+   "name": "Unmotorised airstairs(less detailed)",
+   "user": "ilikechesburgers131",
+   "tri": 2660,
+   "url": "https://sketchfab.com/3d-models/unmotorised-airstairsless-detailed-613826c7a684416ab3649cf6fbf8c459",
+   "img": "cand-613826c7.webp"
+  },
+  {
+   "cat": "gse",
+   "title": "Наземна техника на перона",
+   "uid": "e00484568f4245cdb824e4d4e0cc95e5",
+   "name": "Low poly belt loader",
+   "user": "beli.estefano",
+   "tri": 1194,
+   "url": "https://sketchfab.com/3d-models/low-poly-belt-loader-e00484568f4245cdb824e4d4e0cc95e5",
+   "img": "cand-e0048456.webp"
+  },
+  {
+   "cat": "gse",
+   "title": "Наземна техника на перона",
+   "uid": "15a96ac34ece464480a9b8620dc3a3d3",
+   "name": "Airport Fuel Truck",
+   "user": "nguyentuannghia17a",
+   "tri": 8108,
+   "url": "https://sketchfab.com/3d-models/airport-fuel-truck-15a96ac34ece464480a9b8620dc3a3d3",
+   "img": "cand-15a96ac3.webp"
+  },
+  {
+   "cat": "gse",
+   "title": "Наземна техника на перона",
+   "uid": "289f4e2cfa3f4722b0476b1fc37681d8",
+   "name": "Airport Catering Truck",
+   "user": "rwy00",
+   "tri": 58251,
+   "url": "https://sketchfab.com/3d-models/airport-catering-truck-289f4e2cfa3f4722b0476b1fc37681d8",
+   "img": "cand-289f4e2c.webp"
+  },
+  {
+   "cat": "gse",
+   "title": "Наземна техника на перона",
+   "uid": "e028428b4e6f48a9a91134e9fb9e7458",
+   "name": "Airport City Bus",
+   "user": "CoolGuywhodosevehicles",
+   "tri": 20000,
+   "url": "https://sketchfab.com/3d-models/airport-city-bus-e028428b4e6f48a9a91134e9fb9e7458",
+   "img": "cand-e028428b.webp"
+  },
+  {
+   "cat": "fire",
+   "title": "Пожарна на летището",
+   "uid": "e237edb6eeda4e2da7f490a4c8805675",
+   "name": "Airport Fire Truck 1",
+   "user": "Firechu_2011",
+   "tri": 121881,
+   "url": "https://sketchfab.com/3d-models/airport-fire-truck-1-e237edb6eeda4e2da7f490a4c8805675",
+   "img": "cand-e237edb6.webp"
+  },
+  {
+   "cat": "fire",
+   "title": "Пожарна на летището",
+   "uid": "b44fc10cd59a40d49bc11b2f9b89eb1e",
+   "name": "Airport Fire Truck 2",
+   "user": "Firechu_2011",
+   "tri": 102902,
+   "url": "https://sketchfab.com/3d-models/airport-fire-truck-2-b44fc10cd59a40d49bc11b2f9b89eb1e",
+   "img": "cand-b44fc10c.webp"
+  },
+  {
+   "cat": "misc",
+   "title": "Дребни",
+   "uid": "3b99ba8bd6c6481687dcc95f2f861e42",
+   "name": "Wind sleeve",
+   "user": "mira9",
+   "tri": 548,
+   "url": "https://sketchfab.com/3d-models/wind-sleeve-3b99ba8bd6c6481687dcc95f2f861e42",
+   "img": "cand-3b99ba8b.webp"
+  }
+ ]
+}
