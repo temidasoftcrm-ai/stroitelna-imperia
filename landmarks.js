@@ -29,6 +29,7 @@ export const LANDMARK_NM = { bigben2: 'Биг Бен', londoneye2: 'Лондон
 // кои стоят в центъра на града (останалите — в стария град извън центъра)
 export const LANDMARK_CENTER = new Set(['pyramids', 'burj', 'manhattan', 'cntower', 'willis', 'shtower', 'eiffel', 'arc', 'bigben', 'shard', 'brandenburg', 'reichstag', 'ladefense', 'sapphire', 'twist', 'twin', 'colosseum', 'colosseo', 'vatican', 'vittoriano', 'derotterdam', 'markthal', 'cubes', 'canal', 'rijks', 'centraal']);
 // 🇬🇧 Лондон с истински модели (feature 'london-real'): Биг Бен и London Eye от Poly Pizza вместо процедурните
+if (feature('lm-vittoriano')) { CITY_LANDMARKS.rome = CITY_LANDMARKS.rome.map(k => k === 'vittoriano' ? 'vittoriano2' : k); LANDMARK_NM.vittoriano2 = LANDMARK_NM.vittoriano || 'Витториано'; if (LANDMARK_CENTER.has('vittoriano')) LANDMARK_CENTER.add('vittoriano2'); }   // процедурният остава, ако флагът е изключен
 if (feature('london-real')) { CITY_LANDMARKS.london = ['bigben2', 'londoneye2', 'towerbridge', 'shard']; LANDMARK_CENTER.add('bigben2'); }
 
 const mat = (c, r = 0.8, m = 0, extra = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m, ...extra });
@@ -475,7 +476,8 @@ const GLB_LM = {
   colosseo: { h: 13, fit: 15, plate: 0xb9ad98 },   // Рим: Колизеумът (Carlos.Maciel)
   sagrada: { h: 17, fit: 15, plate: 0xc9bfa8 },   // Барселона: Саграда Фамилия (vmmaniac)
   bigben2: { h: 30, fit: 8, plate: 0xb8b0a0 },   // Лондон: Биг Бен (Daqian Dong, Poly Pizza; feature 'london-real')
-  londoneye2: { h: 42, fit: 22, plate: 0xb8b0a0 },   // Лондон: London Eye (Ferris Wheel, CreativeTrio, CC0)
+  londoneye2: { h: 42, fit: 22, plate: 0xb8b0a0 },
+  vittoriano2: { h: 12, fit: 22, plate: 0xd8d2c4, ry: Math.PI / 2 },   // Рим: Витториано (модел на потребителя, Meshy AI) — стълбите напред, колонадата отзад (feature 'lm-vittoriano')   // Лондон: London Eye (Ferris Wheel, CreativeTrio, CC0)
   petronas: { h: 60, fit: 15, plate: 0xb9b2a5, floodK: 2.4, silver: 1.3, onLoad: petronasLights },   // silver — стомана и стъкло; нощем — етажите (nightfloors.js)   // Куала Лумпур: кулите Петронас (Meshy AI, от потребителя — 18.10); нощем сребристо осветени, червени светлини на шпиловете
   whitehouse: { h: 9, fit: 15, plate: 0x6f9a55, matte: 0xf4f1ea, rx: -0.28, cut: [[-0.35, 0.95, 0.8, 1.6]], floodK: 2.2, onLoad: whMonument },   // cut — колата от модела, останала на тревата пред южната фасада; floodK — по-силни прожектори нощем   // Вашингтон: Белият дом с крилата (Void); моделът е наклонен ~16° — rx го изправя (иначе едната страна и крилата висят във въздуха)
   capitol: { h: 11, fit: 15, plate: 0x6f8f55, floodK: 3 },   // Вашингтон: Капитолият (Meshy AI, от потребителя — 18.10; преди: фотоскан на ycpan3468)
