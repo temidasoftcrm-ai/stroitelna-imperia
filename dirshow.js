@@ -15,14 +15,14 @@ const css = `
 #dirShow.on .t { opacity:1; transform:none; } #dirShow.on .s { opacity:1; }
 #dirShow .hint { position:absolute; bottom:18px; color:#7d8796; font:500 12px system-ui, sans-serif; }
 `;
-// o: { model: 'ivaylo', name: 'Ивайло Петров', company: 'Империал Констръкшън', text?: 'какво поема', sound? }
+// o: { role?: 'директор' | 'градоначалник', model: 'ivaylo', name: 'Ивайло Петров', company: 'Империал Констръкшън', text?: 'какво поема', sound? }
 export function showDirector(o) {
   document.getElementById('dirShow')?.remove();
   if (!document.getElementById('dirShowCss')) { const s = document.createElement('style'); s.id = 'dirShowCss'; s.textContent = css; document.head.appendChild(s); }
   const el = document.createElement('div'); el.id = 'dirShow';
   el.innerHTML = `<div class="ph"><img alt=""></div><div class="line"></div><div class="t"></div><div class="s"></div><div class="hint">клик — продължи</div>`;
   const img = el.querySelector('img'); img.src = `assets/ui/directors/${o.model}.webp`; img.onerror = () => img.remove();
-  const t = el.querySelector('.t'); t.append('Назначихте ', Object.assign(document.createElement('b'), { textContent: o.name }), ` за директор на ${o.company}`);
+  const t = el.querySelector('.t'); t.append('Назначихте ', Object.assign(document.createElement('b'), { textContent: o.name }), ` за ${o.role || 'директор'} на ${o.company}`);
   el.querySelector('.s').textContent = o.text || '';
   document.body.appendChild(el);
   requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));

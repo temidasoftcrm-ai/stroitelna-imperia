@@ -55,7 +55,7 @@ const GLOB_DIR_COST = 1e9;   // директорът на Глобъл (мега
 // всяко дружество има свой директор (портретите и 3D моделите в directors3d.js са по тези имена)
 // снимките (assets/ui/directors/<модел>.webp, dirshow.js) — моделите както в directors3d.js
 export const DIR_PIC = { con: 'ivaylo', hw: 'nadya', rail: 'maria', sea: 'stefan', air: 'elena', hotel: 'georgi', oil: 'vera', bank: 'boris', glob: 'glob', mayor: 'mayor' };
-export const showDirectorOf = (k, name, company, text, sound) => import('./dirshow.js').then(m => m.showDirector({ model: DIR_PIC[k] || 'ivaylo', name, company, text, sound })).catch(() => {});
+export const showDirectorOf = (k, name, company, text, sound) => import('./dirshow.js').then(m => m.showDirector({ model: DIR_PIC[k] || 'ivaylo', role: k === 'mayor' ? 'градоначалник' : 'директор', name, company, text, sound })).catch(() => {});
 export const DIR_OF = { con: 'Ивайло Петров', hw: 'Надя Иванова', rail: 'Мария Стоянова', sea: 'Стефан Колев', air: 'Елена Димитрова', hotel: 'Георги Николов', oil: 'Вера Ангелова', bank: 'Борис Тодоров' , glob: 'Александър Владимиров'};
 
 // deps: { S, econ, fmt, pop(key, cap, sub), toast, save, sound, …броячите от SUBS (hwN, railN, portN, airN, oilN, empire, toll, flow, finDaily, oilDaily) }
