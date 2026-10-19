@@ -3,9 +3,9 @@
 const css = `
 #dirShow { position:fixed; inset:0; z-index:9792; background:radial-gradient(ellipse at 50% 40%, #1a2233 0%, #05070b 70%); display:flex; flex-direction:column; align-items:center; justify-content:center; opacity:0; transition:opacity .5s; padding:16px; cursor:pointer; }
 #dirShow.on { opacity:1; }
-#dirShow .ph { position:relative; height:min(58vh, 520px); aspect-ratio:4/5; display:flex; align-items:flex-end; justify-content:center; }
+#dirShow .ph { position:relative; height:min(56vh, 500px); display:flex; align-items:center; justify-content:center; }
 #dirShow .ph::before { content:''; position:absolute; inset:8% 6% 0; background:radial-gradient(circle at 50% 35%, rgba(255,213,74,.28), transparent 65%); filter:blur(8px); }
-#dirShow img { position:relative; max-height:100%; max-width:100%; object-fit:contain; transform:translateY(24px) scale(.94); opacity:0; transition:transform 1.1s cubic-bezier(.2,1,.3,1), opacity .9s; filter:drop-shadow(0 18px 30px rgba(0,0,0,.6)); }
+#dirShow img { position:relative; max-height:100%; max-width:min(560px, 86vw); object-fit:contain; border-radius:14px; border:3px solid #d9b45e; box-shadow:0 0 0 6px rgba(217,180,94,.18), 0 20px 50px rgba(0,0,0,.7); transform:translateY(24px) scale(.94); opacity:0; transition:transform 1.1s cubic-bezier(.2,1,.3,1), opacity .9s; filter:drop-shadow(0 18px 30px rgba(0,0,0,.6)); }
 #dirShow.on img { transform:none; opacity:1; }
 #dirShow .line { width:min(560px, 80vw); height:2px; margin:10px 0 14px; background:linear-gradient(90deg, transparent, #d9b45e, transparent); transform:scaleX(0); transition:transform .9s .5s; }
 #dirShow.on .line { transform:scaleX(1); }
