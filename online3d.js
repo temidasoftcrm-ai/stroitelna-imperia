@@ -22,7 +22,6 @@ const SKY = ['building-skyscraper-a', 'building-skyscraper-b', 'building-skyscra
 const OFFICES = ['building-skyscraper-d', 'building-skyscraper-e', 'office3', 'hirise'];   // office3, hirise — истинските от heavy/blocks2
 const LIST = {
   roads: ['road-straight', 'road-crossroad', 'road-intersection', 'road-bend', 'construction-cone', 'light-square'],
-  construction: ['crane-tower', 'container-office-green', 'planks-wood-a', 'container-rubble-red', 'truck-concrete-red'],
   houses: [...(REAL ? ['building-type-a', 'building-type-b'] : KENNEY), 'tree-large', 'tree-small'],
   'heavy/houses2': REAL ? H2 : [],
   commercial: [...SHOPS, ...SKY],
@@ -59,7 +58,7 @@ export async function createCity3D(el, { onProgress } = {}) {
   for (const [dir, list] of Object.entries(LIST)) for (const n of list) jobs.push(new Promise(res => loader.load(`assets/${dir}/${n}.glb`, g => { A[n] = g.scene; res(); }, undefined, () => res())));
   let done = 0; jobs.forEach(j => j.then(() => onProgress && onProgress(++done / jobs.length)));
   await Promise.all(jobs);
-  await loadConstruct(url => new Promise((res, rej) => loader.load(url, res, undefined, rej)), A, true);   // строежите — истинските (construct.js, Лабораторията → cs-real)
+  await loadConstruct(url => new Promise((res, rej) => loader.load(url, res, undefined, rej)), A, true);   // строежите — истинските (construct.js); детските са изтрити
   const size = n => new THREE.Box3().setFromObject(A[n]).getSize(new THREE.Vector3());
   const model = (n, target) => {
     const o = A[n].clone(true), s = size(n); o.scale.setScalar(target / Math.max(s.x, s.z));

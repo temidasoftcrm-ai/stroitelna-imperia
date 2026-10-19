@@ -5,7 +5,6 @@
 // Всеки застава под старото име в кутията на детския модел при мащаб 1 (KID) — кодът навсякъде остава model('crane-tower', k) и т.н.
 // Кулокранът: мачтата му — там, където беше мачтата на детския (game.js го върти около нея).
 import * as THREE from 'three';
-import { feature } from './lab/feature.js';
 
 // детският модел при мащаб 1: [ширина x, височина y, дължина z, център x, основа y, център z]
 const KID = {
@@ -48,7 +47,6 @@ function fitTo(obj, kid, byHeight, tint) {
 }
 // load(url) → Promise<gltf>; A — моделите. asScene: online3d.js пази A[n] = сцена (не gltf)
 export function loadConstruct(load, A, asScene = false) {
-  if (!feature('cs-real')) return Promise.resolve();   // Лабораторията → cs-real (докато не е одобрено — детските)
   const files = [...new Set(Object.values(SRC).map(s => s[0]))], G = {};
   return Promise.all(files.map(f => load(`assets/${f}.glb`).then(g => { G[f] = g.scene || g; }).catch(e => console.warn('construct', f, e)))).then(() => {
     for (const [n, [f, re, byH, tint]] of Object.entries(SRC)) {
