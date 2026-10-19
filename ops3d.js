@@ -15,7 +15,7 @@ import { OPS_TEAMS, OPS_CHOICES, opsPhaseName, RIOT_AT } from './ops.js';
 const SHARED = new WeakSet(), cache = {};
 const loader = new GLTFLoader();
 const load = p => cache[p] || (cache[p] = loader.loadAsync(p).then(g => { g.scene.traverse(o => { if (o.geometry) SHARED.add(o.geometry); const ms = o.material ? [].concat(o.material) : []; for (const m of ms) { SHARED.add(m); for (const v of Object.values(m)) if (v && v.isTexture) SHARED.add(v); } }); return g; }).catch(() => null));
-const PEDS = ['adam', 'brian', 'elizabeth', 'kate', 'louise'].map(k => `assets/heavy/people/peds/ped-${k}.glb`);
+const PEDS = ['adam', 'brian', 'steve', 'elizabeth', 'kate', 'louise'].map(k => `assets/heavy/people/peds/ped-${k}.glb`);
 const ANIMS = 'assets/heavy/people/peds/peds-anims.glb';
 const BLD = ['brick', 'richmond', 'dbrick', 'modoffice', 'asian', 'jade'].map(k => `assets/heavy/blocks/${k}.glb`);   // реалистичните сгради от града (Sketchfab, CC BY)
 const TLIGHT = 'assets/heavy/signs/tlight.glb', FOREST = 'assets/heavy/trees/forest.glb';
@@ -162,7 +162,7 @@ export function openOpsSquare(ops, o = {}) {
       if (opt.tint) { o.material = own(o.material.clone()); const hsl = {}; o.material.color.getHSL(hsl); if (!(hsl.h > 0.02 && hsl.h < 0.12 && hsl.l > 0.45)) o.material.color.lerp(new THREE.Color(opt.tint), 0.75); } });
     scene.add(p);
     const mixer = new THREE.AnimationMixer(p), acts = {};
-    const play = n => { const c = clips[n] || src.animations.find(a => a.name === n); if (!c) return; if (!acts[n]) acts[n] = mixer.clipAction(c); for (const [k, a] of Object.entries(acts)) if (k !== n && a.isRunning()) a.fadeOut(0.3); acts[n].reset().fadeIn(0.3).play(); };
+    const play = n => { const c = clips[n] || src.animations.find(a => a.name === n) || src.animations.find(a => a.name.includes(n)) || src.animations.find(a => /Idle/.test(a.name)); /* своите са Ped_Walk_* / Ped_Idle */ if (!c) return; if (!acts[n]) acts[n] = mixer.clipAction(c); for (const [k, a] of Object.entries(acts)) if (k !== n && a.isRunning()) a.fadeOut(0.3); acts[n].reset().fadeIn(0.3).play(); };
     const P = { p, mixer, play, src, sign: null, x: 0, z: 0, ry: 0, goal: null, sp: 1.3, cur: '' };
     return P;
   }
