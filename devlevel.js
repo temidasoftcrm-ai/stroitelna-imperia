@@ -101,6 +101,7 @@ export function createDevLevel(deps) {
   }
 
   // „+120 XP“ — жълт надпис на случайно място по екрана, който се издига и изчезва (при 🔕 известия — не излиза)
+  let xpSndAt = -1e9;
   function xpFloat(n) {
     if (typeof document === 'undefined' || document.body.classList.contains('ntf-off')) return;
     const el = document.createElement('div');
@@ -109,6 +110,7 @@ export function createDevLevel(deps) {
     el.style.left = `${15 + Math.random() * 70}vw`; el.style.top = `${25 + Math.random() * 45}vh`;
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 1700);
+    const t = performance.now(); if (t - xpSndAt > 1500) { xpSndAt = t; deps.sound && deps.sound('xp'); }   // звукът — не по-често от 1,5 s
   }
 
   // значка в горната лента

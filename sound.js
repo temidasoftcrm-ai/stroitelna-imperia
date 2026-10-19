@@ -132,6 +132,7 @@ export const Sound = {
         B([523, 784, 1047, 1319, 1568], 1.92, 2.4, 0.06); this.drum(1.92, 0.75); this.hit(6000, 1.8, 0.12, 0.7, 1.92);   // финал + чинел
         [2093, 2637, 3136, 4186].forEach((f, i) => this.bell(f, 2.05 + i * 0.12, 0.05)); break; }
       case 'airport': this.tone(220, 1.6, 0.06, 'sawtooth', 880); this.hit(3000, 1.2, 0.05, 0.6, 0.1); this.bell(1319, 1.1, 0.08); this.bell(1760, 1.3, 0.06); break;   // летище — излитане и сигнал
+      case 'xp': this.file('assets/sfx/xp.mp3', 0.45); break;   // „+XP“ — кратък магически тон (записан звук, Pixabay)
       case 'plane': this.file('assets/sfx/plane.mp3', 0.7); break;   // самолет излита (записан звук, Pixabay)
       case 'ship': this.file('assets/sfx/ship-horn.mp3', 0.7); break;   // купен кораб — корабна сирена (записан звук, 10 s)
       case 'truckBuy': this.file('assets/sfx/truck-horn.mp3', 0.7); break;   // купен камион/ТИР — клаксон (записан звук)
