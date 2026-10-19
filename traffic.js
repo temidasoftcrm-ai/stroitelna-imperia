@@ -118,15 +118,16 @@ export function createTraffic(opts) {
   // таван: ~30% от местата по лентите (иначе на късите улици между кръстовищата решетката се задръства)
   const capacity = Math.floor(lanes.reduce((t, l) => t + l.len, 0) / (4.5 + S0 + 2) * 0.3);
   let acc = 0, steps = 0;
+  const drop = v => { if (v.remove) v.remove(); else if (v.obj) opts.scene.remove(v.obj); };   // колата: обект (obj) или инстанция (set/remove)
   const free = (p, s, L) => p.cars.every(c => Math.abs(c.s - s) > (c.L + L) / 2 + S0 * 2);
   function spawn() {
     for (let k = 0; k < 12; k++) {
       const p = lanes[(rnd() * lanes.length) | 0]; if (p.len < 10) continue;
       const v = opts.makeCar(); if (!v) return null;
       const s = 2 + rnd() * (p.len - 4);
-      if (!free(p, s, v.len)) { opts.scene.remove(v.obj); continue; }   // без нова кола на заето място
-      const c = { obj: v.obj, L: v.len, kind: v.kind, p, s, v: 0, next: null, px: 0, pz: 0, pyaw: 0, x: 0, z: 0, yaw: 0, wait: 0, a: 0 };
-      c.rear = []; c.blinkL = []; c.blinkR = []; v.obj.traverse(m => { const l = m.userData.lamp; if (l === 'rear') c.rear.push(m); else if (l === 'blink') (m.userData.side === 'L' ? c.blinkL : c.blinkR).push(m); });
+      if (!free(p, s, v.len)) { drop(v); continue; }   // без нова кола на заето място
+      const c = { obj: v.obj, set: v.set, rm: v.remove, w: v.w || 1.9, h: v.h || 1.45, L: v.len, kind: v.kind, p, s, v: 0, next: null, px: 0, pz: 0, pyaw: 0, x: 0, z: 0, yaw: 0, wait: 0, a: 0 };
+      c.rear = []; c.blinkL = []; c.blinkR = []; if (v.obj) v.obj.traverse(m => { const l = m.userData.lamp; if (l === 'rear') c.rear.push(m); else if (l === 'blink') (m.userData.side === 'L' ? c.blinkL : c.blinkR).push(m); });
       c.rearMat = c.rear[0]?.material; c.brake = false;
       insert(p, c); pickNext(c); at(p, s, tmp); c.x = c.px = tmp.x; c.z = c.pz = tmp.z; c.yaw = c.pyaw = tmp.yaw; cars.push(c); return c;
     }
@@ -196,27 +197,34 @@ export function createTraffic(opts) {
       at(c.p, c.s, tmp); c.x = tmp.x; c.z = tmp.z; c.yaw = tmp.yaw;
     }
     // блокирана дълго (вечно задръстване на затворен кръг) — изчезва и се появява на свободно място (трафикът е само за гледане)
-    for (let k = cars.length - 1; k >= 0; k--) { const c = cars[k]; if (c.v < 0.05) c.stuck = (c.stuck || 0) + H; else c.stuck = 0; if (c.stuck > 40) { remove(c.p, c); opts.scene.remove(c.obj); cars.splice(k, 1); } }
+    for (let k = cars.length - 1; k >= 0; k--) { const c = cars[k]; if (c.v < 0.05) c.stuck = (c.stuck || 0) + H; else c.stuck = 0; if (c.stuck > 40) { remove(c.p, c); drop({ obj: c.obj, remove: c.rm }); cars.splice(k, 1); } }
     steps++;
   }
   // стопове, мигачи и истинските прожектори
-  const spots = []; let nightOn = false;
+  const spots = []; let nightOn = false, LI = null;
   function lights() {
     const blinkOn = (performance.now() % 800) < 400, B = lampMats();
+    if (!LI && cars.some(c => c.set)) LI = lampInstances(opts.scene, Math.max(64, (opts.maxCars || 40) * 2));
+    if (LI) LI.begin(truckLamps().front.emissiveIntensity);
     for (const c of cars) {
+      if (c.set) {   // инстанция: фаровете, стоповете и мигачите — в общите InstancedMesh
+        const br = c.a < -0.8 || c.v < 0.3, turn = c.p.kind === 'conn' ? c.p.turn : c.next && c.next.kind === 'conn' && c.p.len - c.s < 28 ? c.next.turn : null;
+        LI.car(c.rx, c.rz, c.ryaw, c.L, c.w, c.h, br, blinkOn && (turn === 'left' || turn === 'uturn'), blinkOn && turn === 'right'); continue;
+      }
       const br = c.a < -0.8 || c.v < 0.3;
       if (br !== c.brake && c.rear.length) { c.brake = br; for (const m of c.rear) m.material = br ? B.brake : c.rearMat; }
       const turn = c.p.kind === 'conn' ? c.p.turn : c.next && c.next.kind === 'conn' && c.p.len - c.s < 28 ? c.next.turn : null;
       const L = blinkOn && (turn === 'left' || turn === 'uturn'), R = blinkOn && turn === 'right';
       for (const m of c.blinkL) m.visible = L; for (const m of c.blinkR) m.visible = R;
     }
+    if (LI) LI.end();
     const n = truckLamps().front.emissiveIntensity;   // нощта (0…1) — от общия материал на фаровете; хистерезис около здрача
     if (!nightOn && n > 0.35) nightOn = true; else if (nightOn && n < 0.2) nightOn = false;
     if (!opts.camera) return;
     if (!spots.length) for (let k = 0; k < 4; k++) { const sp = new THREE.SpotLight(0xfff0d0, 0, 38, 0.55, 0.6, 1.4); sp.castShadow = false; opts.scene.add(sp); opts.scene.add(sp.target); spots.push(sp); }
-    const cp = opts.camera.position, near = nightOn ? [...cars].sort((a, b) => ((a.obj.position.x - cp.x) ** 2 + (a.obj.position.z - cp.z) ** 2) - ((b.obj.position.x - cp.x) ** 2 + (b.obj.position.z - cp.z) ** 2)).slice(0, 4) : [];
-    spots.forEach((sp, k) => { const c = near[k]; sp.intensity = c ? 40 * Math.min(1, n) : 0; if (!c) return; const o = c.obj, fx = Math.sin(o.rotation.y), fz = Math.cos(o.rotation.y);
-      sp.position.set(o.position.x + fx * c.L * 0.5, 1.1, o.position.z + fz * c.L * 0.5); sp.target.position.set(o.position.x + fx * 14, 0, o.position.z + fz * 14); });
+    const cp = opts.camera.position, near = nightOn ? [...cars].sort((a, b) => ((a.rx - cp.x) ** 2 + (a.rz - cp.z) ** 2) - ((b.rx - cp.x) ** 2 + (b.rz - cp.z) ** 2)).slice(0, 4) : [];
+    spots.forEach((sp, k) => { const c = near[k]; sp.intensity = c ? 40 * Math.min(1, n) : 0; if (!c) return; const fx = Math.sin(c.ryaw), fz = Math.cos(c.ryaw);
+      sp.position.set(c.rx + fx * c.L * 0.5, 1.1, c.rz + fz * c.L * 0.5); sp.target.position.set(c.rx + fx * 14, 0, c.rz + fz * 14); });
   }
   const lerpA = (a, b, t) => { let d = b - a; d = Math.atan2(Math.sin(d), Math.cos(d)); return a + d * t; };
   return {
@@ -226,12 +234,36 @@ export function createTraffic(opts) {
       acc += dt; let n = 0; while (acc >= H && n < maxSteps) { step(); acc -= H; n++; }
       if (acc > H * maxSteps) acc = 0;   // прекалено бавен кадър — без натрупване (колите не прескачат — стъпките са същите)
       const t = acc / H;
-      for (const c of cars) { c.obj.position.set(c.px + (c.x - c.px) * t, 0.05, c.pz + (c.z - c.pz) * t); c.obj.rotation.y = lerpA(c.pyaw, c.yaw, t); }
+      for (const c of cars) { c.rx = c.px + (c.x - c.px) * t; c.rz = c.pz + (c.z - c.pz) * t; c.ryaw = lerpA(c.pyaw, c.yaw, t); if (c.set) c.set(c.rx, 0.05, c.rz, c.ryaw); else { c.obj.position.set(c.rx, 0.05, c.rz); c.obj.rotation.y = c.ryaw; } }
       if (opts.onSignal) for (const nd of nodes.values()) if (nd.sig) opts.onSignal(nd, sigView(nd.sig));
       lights();
     },
-    clear() { for (const sp of spots) { opts.scene.remove(sp); opts.scene.remove(sp.target); } spots.length = 0; for (const c of cars) opts.scene.remove(c.obj); cars.length = 0; for (const l of lanes) l.cars.length = 0; for (const n of nodes.values()) for (const c of n.conns) c.cars.length = 0; },
+    clear() { for (const sp of spots) { opts.scene.remove(sp); opts.scene.remove(sp.target); } spots.length = 0; for (const c of cars) drop({ obj: c.obj, remove: c.rm }); cars.length = 0; if (LI) { LI.clear(); LI = null; } for (const l of lanes) l.cars.length = 0; for (const n of nodes.values()) for (const c of n.conns) c.cars.length = 0; },
     stats: () => ({ cars: cars.length, cap: capacity, steps, waiting: cars.filter(c => c.wait > 0).length }),
+  };
+}
+
+// ---- светлините на колите-инстанции: три общи InstancedMesh (фарове, стопове, мигачи) — 3 draw calls за всички коли.
+// begin(нощ 0…1) → car(x, z, yaw, дължина, ширина, височина, спира, ляв, десен) за всяка кола → end()
+export function lampInstances(scene, max) {
+  const t = truckLamps().front.emissiveMap, mk = col => new THREE.MeshBasicMaterial({ color: col, map: t, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
+  const geo = new THREE.PlaneGeometry(0.9, 0.9), F = new THREE.InstancedMesh(geo, mk(0xfff0d0), max), R = new THREE.InstancedMesh(geo, mk(0xffffff), max), K = new THREE.InstancedMesh(geo, mk(0xffa21a), max * 2);
+  for (const m of [F, R, K]) { m.frustumCulled = false; m.renderOrder = 3; scene.add(m); }
+  const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), P = new THREE.Vector3(), S = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0), dim = new THREE.Color(0x5a0808), hot = new THREE.Color(0xff2020);
+  let nf = 0, nr = 0, nk = 0, night = 0;
+  const put = (im, k, x, y, z, yaw, s) => { Q.setFromAxisAngle(Y, yaw); P.set(x, y, z); S.set(s, s, s); M.compose(P, Q, S); im.setMatrixAt(k, M); };
+  return {
+    begin(n) { night = Math.max(0, Math.min(1, n)); nf = nr = nk = 0; F.material.color.setRGB(night, night * 0.94, night * 0.82); },
+    car(x, z, yaw, L, w, h, brake, bl, br) {
+      const fx = Math.sin(yaw), fz = Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw), y = h * 0.42;   // напред (fx, fz), вляво (rx, rz)
+      for (const sx of [-1, 1]) {
+        if (night > 0.02 && nf < max) put(F, nf++, x + fx * (L / 2 + 0.05) + rx * sx * w * 0.36, y, z + fz * (L / 2 + 0.05) + rz * sx * w * 0.36, yaw, 1);
+        if (nr < max && (brake || night > 0.02)) { put(R, nr, x - fx * (L / 2 + 0.05) + rx * sx * w * 0.42, y, z - fz * (L / 2 + 0.05) + rz * sx * w * 0.42, yaw + Math.PI, brake ? 0.62 : 0.5); R.setColorAt(nr++, brake ? hot : dim); }
+        if ((sx > 0 ? bl : br) && nk < max * 2) for (const e of [1, -1]) put(K, nk++, x + fx * e * (L / 2 + 0.06) + rx * sx * w * 0.47, y + 0.05, z + fz * e * (L / 2 + 0.06) + rz * sx * w * 0.47, e > 0 ? yaw : yaw + Math.PI, 0.47);
+      }
+    },
+    end() { F.count = nf; R.count = nr; K.count = nk; for (const m of [F, R, K]) m.instanceMatrix.needsUpdate = true; if (R.instanceColor) R.instanceColor.needsUpdate = true; },
+    clear() { for (const m of [F, R, K]) scene.remove(m); },
   };
 }
 
