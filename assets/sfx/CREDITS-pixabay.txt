@@ -28,3 +28,4 @@ protest.mp3 — „taxi protest distant XY“ (freesound_community, Pixabay, Pix
 levelup-skill.mp3 — „level up skill upgrade 4“ (yodguard, Pixabay, sound 387909), Pixabay Content License — новото ниво на фирмата (Лабораторията → snd-lvup2). 128 kbps, −16 LUFS.
 flood.mp3 — „water stream“ (26327991, Pixabay, sound 108384), Pixabay Content License — оперативната карта „Наводнение“ (opsflood.js)
 fire-crackle.mp3 — „fogo“ (magiaz, Pixabay, sound 383784), Pixabay Content License — оперативната карта „Пожар“ (opsfire.js)
+applause.mp3 — „applause“ (driken5482, Pixabay, sound 236785), Pixabay Content License — ръкоплясканията в залите (roomsound.js), първите 5,5 s

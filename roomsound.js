@@ -1,5 +1,5 @@
 // roomsound.js — звукът на залите (directors3d.js): тих шум на залата, шумолене на хартия, удар с чукче при одобрение, аплодисменти,
-// и 🗣️ говор на глас (speechSynthesis, само ако браузърът има български глас). Всичко е синтезирано (Web Audio) — без файлове.
+// и 🗣️ говор на глас (speechSynthesis, само ако браузърът има български глас). Всичко е синтезирано (Web Audio), освен ръкоплясканията (applause.mp3) — без файлове.
 let ac = null;
 const ctx = () => ac || (ac = new (window.AudioContext || window.webkitAudioContext)());
 function noise(sec) { const a = ctx(), b = a.createBuffer(1, Math.ceil(a.sampleRate * sec), a.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return b; }
@@ -29,8 +29,15 @@ export function createRoomSound() {
       burst(0.05, 1800, 1400, 1.5, 0.25, 'bandpass', at);
     }
   }
-  function applause(sec = 2.6) {   // много кратки пляскания, които се сгъстяват и затихват
+  // 👏 ръкопляскането: записът (assets/sfx/applause.mp3, Pixabay) — затихва за sec; ако файлът не тръгне — синтезираното
+  let clapA = null;
+  function applause(sec = 2.6) {
     if (!on) return;
+    try { if (!clapA) clapA = new Audio('assets/sfx/applause.mp3'); clapA.pause(); clapA.currentTime = 0; clapA.volume = 0.55; clapA.play().then(() => {
+      const t0 = performance.now(), L = Math.max(1.5, sec + 1.2) * 1000, f = () => { const u = (performance.now() - t0) / L; if (u >= 1) { clapA.pause(); return; } if (u > 0.6) clapA.volume = 0.55 * (1 - (u - 0.6) / 0.4); requestAnimationFrame(f); }; f(); }).catch(() => synthClap(sec)); return; } catch { }
+    synthClap(sec);
+  }
+  function synthClap(sec) {   // много кратки пляскания, които се сгъстяват и затихват
     for (let i = 0; i < 70; i++) { const at = Math.random() * sec * (0.4 + 0.6 * Math.random()); burst(0.04, 1200 + Math.random() * 1500, 900, 1.2, 0.05 * (1 - at / sec * 0.7), 'bandpass', at); }
   }
   // 🗣️ говор: само с български глас (иначе мълчи — не чете кирилица с чужд акцент)
@@ -43,6 +50,6 @@ export function createRoomSound() {
     const u = new SpeechSynthesisUtterance(String(text).replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '').replace(/„|“/g, '')); u.voice = v; u.lang = v.lang; u.rate = 1.02; u.pitch = opt.female ? 1.15 : 0.9;
     window.speechSynthesis.speak(u);
   }
-  const hush = () => { try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch { } };
+  const hush = () => { try { window.speechSynthesis && window.speechSynthesis.cancel(); clapA && clapA.pause(); } catch { } };
   return { ambience, paper, gavel, applause, speak, hush, canSpeak, setOn: v => { on = v; if (!v) { ambience(false); hush(); } }, isOn: () => on };
 }

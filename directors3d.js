@@ -535,7 +535,7 @@ export function openBoardroom(o) {
       const rows = F && p.info ? [['Налични пари', F.cash], ['Резервирани за одобрени проекти', -F.reserved], ['Оперативен резерв', -F.op], ['Достъпни за нови решения', F.free]].filter(([, v], j) => j === 0 || j === 3 || v) : [];   // без „−0 €“
       scr.innerHTML = `${hd(p.info ? (o.bankTitle || '🏦 Банката: с какво разполагаме') : '🏦 Обобщение на заседанието')}<div class="tx"></div>${rows.length ? `<div class="fin">${rows.map(([k, v], j) => `<div><span>${k}</span><b style="color:${k.startsWith('Достъпни') ? '#5fd38a' : v < 0 ? '#ffb347' : '#fff'}">${B(v)}</b></div>`).join('')}${F.loan ? `<div><span>+ свободен кредит</span><b>${B(F.loan)}</b></div>` : ''}</div>` : p.avail != null ? `<div class="cost">💶 за инвестиции: ${f(p.avail)} €${p.reserve ? ` · резерв ${f(p.reserve)} €` : ''}</div>` : ''}<div class="row"><button class="y">${p.info ? 'Продължи →' : '✓ Закрий заседанието'}</button></div>`;
       scr.querySelector('.tx').textContent = p.info ? (o.speech ? o.speech() : p.text) : o.summary();
-      scr.querySelector('.y').onclick = () => p.info ? board(qi + 1) : close();
+      scr.querySelector('.y').onclick = () => { if (p.info) return board(qi + 1); cheer(); setTimeout(close, 2200); };   // 👏 закриване — с аплодисменти
     } else {   // 📋 предложение: петте въпроса — какво, защо, колко, кога, какво ще донесе
       const q = (k, v) => v ? `<div class="q"><b>${k}:</b> ${esc(v)}</div>` : '';
       const gain = p.gainTxt || (p.gain ? `+${B(p.gain)}/месец` : p.income ? `+${f(p.income)} €/ден` : '');
@@ -562,7 +562,7 @@ export function openBoardroom(o) {
   // гласуването: директорите гласуват един по един — „за“ вдигат ръка, над всеки ✋ за / ◐ условно / ✖ против, броячът расте; накрая — резултатът и решението ти
   let voteTok = 0;
   // 👏 прието — всички ръкопляскат (и звукът на аплодисментите)
-  function cheer() { snd.applause(1.6); for (const q of people) if (q.clap) { q.busy = 0; play(q, q.clap, true); } }
+  function cheer() { snd.applause(2.2); for (const q of people) if (q.clap) { q.busy = 0; play(q, q.clap, true); } }
   function showVote(r, mine) {
     const { v, p } = r, tok = ++voteTok; clearBadges();
     scr.innerHTML = `<div class="hd"><span>🗳️ ${mine ? 'Гласуване на борда' : 'Съвещателен вот'}</span><span class="cnt">0 : 0</span></div><div class="tx"></div><div class="votes"></div><div class="res"></div><div class="row"></div>`;
