@@ -204,7 +204,7 @@ export function createGroup(deps) {
     box.querySelectorAll('[data-gp]').forEach(b => b.onclick = () => {
       const [id, a] = b.dataset.gp.split('|');
       if (a === 'yes' || a === 'small' || a === 'vote') {
-        const pp = a === 'vote' && proposals().find(q => q.id === id), r = pp ? { v: B2.vote(pp), p: pp } : B2.request(id, { small: a === 'small' });   // мегапроект — винаги на гласуване
+        const pp = a === 'vote' && proposals().find(q => q.id === id), r = shake(pp ? { v: B2.vote(pp), p: pp } : B2.request(id, { small: a === 'small' }));   // мегапроект — винаги на гласуване
         if (r && r.need === 'vote') {   // съвещателният вот — направо в картата
           const v = box.querySelector(`[data-gpv="${CSS.escape(id)}"]`); if (!v) return;
           v.innerHTML = `<div style="margin:8px 0 0;padding:8px;border-radius:8px;background:rgba(255,255,255,.04)">${B2.voteHtml(r)}</div>`;
@@ -234,6 +234,16 @@ export function createGroup(deps) {
         hire: s.k === 'glob' ? (canHireGlob() ? { cost: GLOB_DIR_COST, can: e.canAfford(GLOB_DIR_COST) } : null) : man && !dir && L >= DIR_LV ? { cost: dirCost(s.k), can: e.canAfford(dirCost(s.k)) } : null };
     }).concat(deps.mayorName && deps.mayorName() ? [{ k: 'mayor', ico: '🏙️', company: 'Империал Сити', what: 'градоначалник', open: true, director: deps.mayorName(), lv: 0, lvMax: HOLD_LV_MAX, inc: 0, bonus: 0, bonusPct: 0, up: null, hire: null }] : []);   // 10-ото място — градоначалникът
   }
+  // 🎲 над бюджета: вотът е непредсказуем — всеки директор (без предложилия) може да е против; колкото по-голямо е превишението, толкова по-вероятно
+  const OVER_WHY = ['над бюджета е — рискът е голям', 'парите ще ни трябват другаде', 'не сега, касата е опъната', 'искам по-малък първи етап', 'ще изпаднат моите проекти'];
+  function shake(r) {
+    if (!r || !r.v || !r.p || r.p.inBudget !== false || !Array.isArray(r.v.votes)) return r;
+    const B2 = deps.board2 && deps.board2(), F = B2 && B2.frame ? B2.frame() : null, over = F && F.free > 0 ? Math.min(3, (r.p.cost || 0) / F.free) : 2;
+    const pNo = Math.min(0.75, 0.3 + 0.15 * over);
+    const votes = r.v.votes.map(x => x.dir === r.p.dir || Math.random() >= pNo ? x : { ...x, yes: false, cond: false, why: OVER_WHY[Math.floor(Math.random() * OVER_WHY.length)] });
+    const yes = votes.filter(x => x.yes).length, no = votes.length - yes;
+    return { ...r, v: { ...r.v, votes, yes, no, tie: yes === no, passed: yes > no } };
+  }
   // 📋 предложенията към борда (deps.proposals от game.js: [{ id: 'dir:вид:брой', dir, ico, text, cost, apply() }]);
   // „Не“ — 90 дни тишина за този вид, „По-късно“ — до следващия борд (30 дни). Записът: S.hold.skip = { 'dir:вид': денят до който мълчи }
   const propKey = id => String(id).split(':').slice(0, 2).join(':');
@@ -257,11 +267,11 @@ export function createGroup(deps) {
     import('./directors3d.js').then(m => m.openBoardroom({ title: groupName(deps.S()), brand: brandOf(deps.S()) && { ...brandOf(deps.S()), group: groupName(deps.S()) }, seats: boardSeats, fmt: deps.fmt, sound: deps.sound,
       proposals, onUp: k => { upgrade(k); re(); }, onHire: k => { hire(k); re(); },
       // „Да“ минава през boardlogic.js (бюджет → банка → гласуване); връща { need: 'vote', v, p }, ако бордът трябва да гласува
-      onDecide: (id, a) => { const B = deps.board2 && deps.board2(), r = (a === 'yes' || a === 'small') && B ? B.request(id, { small: a === 'small' }) : (decide(id, a), null); re(); return r; },
+      onDecide: (id, a) => { const B = deps.board2 && deps.board2(), r = (a === 'yes' || a === 'small') && B ? shake(B.request(id, { small: a === 'small' })) : (decide(id, a), null); re(); return r; },
       // заседанието (boardlogic.js): отчет → речта и рамката на банката → предложенията → обобщение
       report: deps.board2 ? () => deps.board2().reportHtml() : null, bindReport: (box, rr) => deps.board2().bindSettings(box, () => { rr(); re(); }),
       speech: deps.board2 ? () => deps.board2().bankSpeech() : null, frame: deps.board2 ? () => deps.board2().frame() : null, summary: deps.board2 ? () => deps.board2().summary() : null,
-      voteOn: deps.board2 ? id => { const p = proposals().find(q => q.id === id), B2 = deps.board2(); return p && B2.vote ? { v: B2.vote(p), p } : null; } : null,   // 🗳️ собственикът сам подлага предложение на гласуване
+      voteOn: deps.board2 ? id => { const p = proposals().find(q => q.id === id), B2 = deps.board2(); return p && B2.vote ? shake({ v: B2.vote(p), p }) : null; } : null,   // 🗳️ собственикът сам подлага предложение на гласуване
       onResolve: (id, how) => { const r = deps.board2().resolve(id, how); re(); return r; },
       settings: deps.board2 ? () => deps.board2().settingsHtml() : null, bindSettings: (box, rr) => deps.board2().bindSettings(box, () => { rr(); re(); }) }));
   }
