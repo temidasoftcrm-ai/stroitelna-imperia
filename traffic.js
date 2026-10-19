@@ -117,14 +117,14 @@ export function createTraffic(opts) {
   const cars = [], tmp = {};
   // таван: ~30% от местата по лентите (иначе на късите улици между кръстовищата решетката се задръства)
   const capacity = Math.floor(lanes.reduce((t, l) => t + l.len, 0) / (4.5 + S0 + 2) * 0.3);
-  let acc = 0, steps = 0;
+  let acc = 0, steps = 0, left = 0;
   const drop = v => { if (v.remove) v.remove(); else if (v.obj) opts.scene.remove(v.obj); };   // колата: обект (obj) или инстанция (set/remove)
   const free = (p, s, L) => p.cars.every(c => Math.abs(c.s - s) > (c.L + L) / 2 + S0 * 2);
   function spawn() {
     for (let k = 0; k < 12; k++) {
-      const p = lanes[(rnd() * lanes.length) | 0]; if (p.len < 10) continue;
+      const ins = lanes.filter(l => l.enter), fromEdge = ins.length && rnd() < 0.35, p = fromEdge ? ins[(rnd() * ins.length) | 0] : lanes[(rnd() * lanes.length) | 0]; if (p.len < 10) continue;
       const v = opts.makeCar(); if (!v) return null;
-      const s = 2 + rnd() * (p.len - 4);
+      const s = fromEdge ? 3 : 2 + rnd() * (p.len - 4);   // от входа на града — в началото на лентата
       if (!free(p, s, v.len)) { drop(v); continue; }   // без нова кола на заето място
       const c = { obj: v.obj, set: v.set, rm: v.remove, w: v.w || 1.9, h: v.h || 1.45, L: v.len, kind: v.kind, p, s, v: 0, next: null, px: 0, pz: 0, pyaw: 0, x: 0, z: 0, yaw: 0, wait: 0, a: 0 };
       c.rear = []; c.blinkL = []; c.blinkR = []; if (v.obj) v.obj.traverse(m => { const l = m.userData.lamp; if (l === 'rear') c.rear.push(m); else if (l === 'blink') (m.userData.side === 'L' ? c.blinkL : c.blinkR).push(m); });
@@ -189,6 +189,7 @@ export function createTraffic(opts) {
       let v = Math.max(0, c.v + a * H), ds = v * H;
       if (gap < 1e8) { const lim = Math.max(0, gap - 0.4); if (ds > lim) { ds = lim; v = Math.min(v, lim / H); } }   // твърдото ограничение за стъпката
       c.v = v; c.s += ds;
+      if (c.s >= c.p.len && c.p.leave) { c.gone = true; continue; }   // напуска града
       while (c.s >= c.p.len && c.next) {   // към следващата пътека
         if (c.p.kind === 'lane' && !mayEnter(c) && c.next.kind === 'conn') { c.s = c.p.len; c.v = 0; break; }
         const old = c.p; c.s -= old.len; remove(old, c); c.p = c.next; insert(c.p, c); pickNext(c);
@@ -196,6 +197,7 @@ export function createTraffic(opts) {
       if (c.s > c.p.len) c.s = c.p.len;
       at(c.p, c.s, tmp); c.x = tmp.x; c.z = tmp.z; c.yaw = tmp.yaw;
     }
+    for (let k = cars.length - 1; k >= 0; k--) { const c = cars[k]; if (c.gone) { remove(c.p, c); drop({ obj: c.obj, remove: c.rm }); cars.splice(k, 1); left++; } }
     // блокирана дълго (вечно задръстване на затворен кръг) — изчезва и се появява на свободно място (трафикът е само за гледане)
     for (let k = cars.length - 1; k >= 0; k--) { const c = cars[k]; if (c.v < 0.05) c.stuck = (c.stuck || 0) + H; else c.stuck = 0; if (c.stuck > 40) { remove(c.p, c); drop({ obj: c.obj, remove: c.rm }); cars.splice(k, 1); } }
     steps++;
@@ -239,7 +241,7 @@ export function createTraffic(opts) {
       lights();
     },
     clear() { for (const sp of spots) { opts.scene.remove(sp); opts.scene.remove(sp.target); } spots.length = 0; for (const c of cars) drop({ obj: c.obj, remove: c.rm }); cars.length = 0; if (LI) { LI.clear(); LI = null; } for (const l of lanes) l.cars.length = 0; for (const n of nodes.values()) for (const c of n.conns) c.cars.length = 0; },
-    stats: () => ({ cars: cars.length, cap: capacity, steps, waiting: cars.filter(c => c.wait > 0).length }),
+    stats: () => ({ cars: cars.length, cap: capacity, steps, left, waiting: cars.filter(c => c.wait > 0).length }),
   };
 }
 
@@ -287,7 +289,7 @@ export function gridNetwork(g) {
 const RANK_V = { blvd: 14, ring: 11, quay: 12, hw: 22, street: 11, access: 8 };
 export function planNetwork(P) {
   const nodes = new Map(), lanes = [], NV = id => nodes.get(id);
-  for (const n of P.nodes) nodes.set(n.id, { id: n.id, x: n.x, z: n.z, kind: n.kind, ctrl: n.ctrl, inL: [], outL: [], conns: [], deg: n.arms.length });
+  for (const n of P.nodes) nodes.set(n.id, { id: n.id, x: n.x, z: n.z, kind: n.kind, ctrl: n.ctrl, exit: n.endKind === 'exit', inL: [], outL: [], conns: [], deg: n.arms.length });
   // ленти: по всяко ребро, във всяка посока; armIn — клонът на крайния възел, armOut — на началния
   const armOf = (nodeId, roadId, end) => P.nodes[nodeId].arms.findIndex(a => a.road === roadId && a.end === end);
   for (const rd of P.roads) for (const dir of [1, -1]) {
@@ -301,6 +303,7 @@ export function planNetwork(P) {
   for (const n of P.nodes) {
     const N = NV(n.id);
     if (n.kind === 'round') { roundNet(P, n, N, nodes, lanes); continue; }
+    if (N.exit) { for (const l of N.inL) l.leave = true; for (const l of N.outL) l.enter = true; continue; }   // изход от града: идват и си отиват оттук
     for (const a of N.inL) {
       // задънен край — обратен завой; иначе — към всеки друг клон
       const outs = N.deg === 1 ? N.outL.filter(b => b.edge === a.edge) : N.outL.filter(b => b.armOut !== a.armIn);
