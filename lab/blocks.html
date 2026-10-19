@@ -63,7 +63,9 @@ const shot = f => shots[f] ??= (q = q.then(() => loader.loadAsync('../' + f).the
   cam.position.set(c.x + d * 0.62, c.y + d * 0.38, c.z + d * 0.68); cam.near = d / 100; cam.far = d * 10; cam.updateProjectionMatrix(); cam.lookAt(c);
   R.render(scene, cam); const url = R.domElement.toDataURL('image/webp', 0.85); scene.remove(o); return url;
 }).catch(() => '')));
-const img = (f, el) => shot(f).then(u => { el.src = u; });
+const thumbOf = f => 'blocks2/' + f.split('/').slice(-2).join('__').replace(/\.glb$/, '.webp');   // готовите снимки; ако липсват — рисува на място
+const img = (f, el) => { el.onerror = () => { el.onerror = null; shot(f).then(u => { el.src = u; }); }; el.src = thumbOf(f); };
+window.__blkShot = shot; window.__blkThumbOf = thumbOf;
 
 const usedBy = k => KIDS.filter(x => (pick[pk(x)] || []).includes(k)).map(pk);
 const curKid = () => KIDS.find(x => x.key + x.dir === cur);

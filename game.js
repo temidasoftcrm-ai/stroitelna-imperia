@@ -463,6 +463,7 @@ let europe = null;
   // хотел за ски курортите (resortview.js го ползва вместо кулите на Kenney)
   for (const k of ['sing', 'rand', 'usb', 'blue', 'night']) jobs.push(load(`assets/heavy/sky/${k}.glb`).then(g => { g.scene.traverse(m => { if (m.isMesh && m.material && m.material.metalness > 0.5) m.material.metalness = 0.35; }); A['sf-sky-' + k] = g; prepNightFloors(g.scene, 'sf-sky-' + k); }).catch(() => {}));   // истински небостъргачи (Sketchfab) — за разнообразие в града
   for (const [n, path] of Object.entries(IMP_MODELS)) jobs.push(load(path).then(g => { A[n] = g; prepNightFloors(g.scene, n); }).catch(() => {}));   // Империал Сити: сталинската кула (impstyle.js)
+  for (const k of new Set(Object.values(blk2Pick()).flat())) jobs.push(load(`assets/heavy/blocks2/${k}.glb`).then(g => { g.scene.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; if (m.material && m.material.metalness > 0.5) m.material.metalness = 0.3; } }); A['b2-' + k] = g; prepNightFloors(g.scene, 'b2-' + k); }).catch(() => {}));   // истинските блокове вместо стъклените (Лабораторията → blocks-real)
   for (const k of ['richmond', 'panel12', 'gamecity', 'soviet', 'oldbld', 'dbrick', 'brick', 'asian', 'modoffice', 'jade']) jobs.push(load(`assets/heavy/blocks/${k}.glb`).then(g => { g.scene.traverse(m => { if (m.isMesh && m.material && m.material.metalness > 0.5) m.material.metalness = 0.3; });
     if (k === 'oldbld') {   // моделът е кух отгоре (само стени) — плосък покрив малко под ръба и няколко кутии на покрива
       g.scene.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(g.scene), sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3()), top = bb.max.y - sz.y * 0.035;
@@ -712,6 +713,10 @@ const KID_HOUSES = new Set(HOUSES.filter(n => /^building-type-[c-u]$/.test(n))),
 const realHouses = feature('houses-real') && REAL_HOUSES.length >= 4;
 const houseOf = (n, seed) => realHouses && KID_HOUSES.has(n) ? REAL_HOUSES[hashStr(n + ':' + seed) % REAL_HOUSES.length] : n;
 const HOUSE_POOL = realHouses ? REAL_HOUSES : HOUSES;
+// истинските блокове вместо стъклените building-i…n — изборът от Лабораторията (lab/blocks.html); всеки парцел — един от избраните за тази сграда
+function blk2Pick() { return feature('blocks-real') ? { 'building-i': ['pp-townhouse', 'midwest'], 'building-j': ['office4', 'office5'], 'building-k': ['office2'], 'building-l': ['office3'], 'building-m': ['hirise'], 'building-n': ['office6'] } : {}; }
+const BLK2_PICK = blk2Pick();
+const blockOf = (n, seed) => { const L = (BLK2_PICK[n] || []).filter(k => A['b2-' + k]); return L.length ? 'b2-' + L[hashStr(n + ':' + seed) % L.length] : n; };
 // истинските къщи (house-a тухлената с веранда, house-b каменната) — с 40% по-големи от Kenney къщите
 // (истинските не минават през tintRoof — копията на материалите губят нощното светене)
 function houseFit(n) { return n === 'building-type-a' || n === 'building-type-b' ? 15 : n === 'h2-blue' || n === 'h2-porch' ? 10.5 : n.startsWith('h2-') ? 14 : 11; }   // синята и бялата с верандата — тесни и високи, при 14 излизаха огромни
@@ -750,7 +755,7 @@ const FACTORY_CITIES = new Set(ECON.FACTORIES.map(f => f.cityId));
 // мащаб, с който сградата се вписва в парцела 16×16 м
 // истинските височини (feature 'real-heights'): къща на 2 етажа ~8 м, блок на 5 етажа ~16 м, 10 етажа ~30 м, небостъргач — по етажите (~2.8 м),
 // за да не стои къща колкото половин небостъргач. Ширината се сбива само ако иначе не се побира на парцела (maxW).
-const H10 = { 'sf-blk-soviet': 29, 'sf-blk-panel12': 36, 'sf-blk-richmond': 24, 'sf-blk-dbrick': 26, 'sf-blk-asian': 30, 'Building_Medium_2_001': 30 };
+const H10 = { 'b2-pp-townhouse': 14, 'b2-midwest': 14, 'b2-office4': 30, 'b2-office5': 20, 'b2-office2': 20, 'b2-office3': 22, 'b2-hirise': 70, 'b2-office6': 22, 'sf-blk-soviet': 29, 'sf-blk-panel12': 36, 'sf-blk-richmond': 24, 'sf-blk-dbrick': 26, 'sf-blk-asian': 30, 'Building_Medium_2_001': 30 };
 const SKY_H = { 'sf-sky-sing': 50, 'sf-sky-rand': 55, 'sf-sky-usb': 70, 'sf-sky-blue': 50, 'sf-sky-night': 60, ...IMP_H };
 function realH(n) {
   const [base, fl] = n.split('@');
@@ -1054,7 +1059,7 @@ function decorLot(g, lot, cityId) {
   return true;
 }
 function placeBuilding(lot, n, rot = 0) {
-  n = houseOf(n, lot.id);
+  n = blockOf(houseOf(n, lot.id), lot.id);
   const isQ = n.startsWith('Building_');
   const s = SHOPS.includes(n) && lot.plan ? fitScale(n, Math.min(lot.w, lot.d) - 1.5) : (isQ ? fitScale(n, 14) : HOUSES.includes(n) ? fitScale(n, houseFit(n)) : fitScale(n, SHOPS.includes(n) ? SHOP_FIT : 12.5)) * lotK(lot);   // в плана — целият парцел
   const o = model(n, s);
