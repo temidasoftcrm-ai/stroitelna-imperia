@@ -18,13 +18,14 @@ const HOUSES = REAL || KENNEY;
 const hFit = n => n.startsWith('h2-') ? 14 : n === 'building-type-a' || n === 'building-type-b' ? 15 : 11;
 const SHOPS = 'abcdefgh'.split('').map(c => 'building-' + c);
 const SKY = ['building-skyscraper-a', 'building-skyscraper-b', 'building-skyscraper-c'];
-const OFFICES = ['building-skyscraper-d', 'building-skyscraper-e', 'building-l', 'building-m'];
+const OFFICES = ['building-skyscraper-d', 'building-skyscraper-e', 'office3', 'hirise'];   // office3, hirise — истинските от heavy/blocks2
 const LIST = {
   roads: ['road-straight', 'road-crossroad', 'road-intersection', 'road-bend', 'construction-cone', 'light-square'],
   houses: [...(REAL ? ['building-type-a', 'building-type-b'] : KENNEY), 'tree-large', 'tree-small'],
   'heavy/houses2': REAL ? H2 : [],
   commercial: [...SHOPS, ...SKY],
-  commercial2: ['building-l', 'building-m', 'building-skyscraper-d', 'building-skyscraper-e'],
+  commercial2: ['building-skyscraper-d', 'building-skyscraper-e'],
+  'heavy/blocks2': ['office3', 'hirise'],
   construction: ['crane-tower', 'container-office-green', 'planks-wood-a', 'container-rubble-red', 'truck-concrete-red'],
   city: ['Building_Medium_2_001', 'Building_Large_2'],
 };

@@ -425,7 +425,7 @@ const MODELS = {
   houses: ['building-type-a', 'building-type-b', 'building-type-c', 'building-type-d', 'building-type-e', 'building-type-f', 'building-type-g', 'building-type-h', 'building-type-i', 'building-type-j', 'building-type-k', 'building-type-l', 'building-type-m', 'building-type-n', 'building-type-o', 'building-type-p', 'building-type-q', 'building-type-r', 'building-type-s', 'building-type-t', 'building-type-u', 'tree-large', 'tree-small'],   // всичките 21 къщи от пакета (Kenney, CC0)
   commercial: ['building-a', 'building-b', 'building-c', 'building-d', 'building-e', 'building-f', 'building-g', 'building-h', 'building-skyscraper-a', 'building-skyscraper-b', 'building-skyscraper-c'],
   // Commercial 2.1: модерни сгради и стъклени небостъргачи — за центъра на мегаполисите
-  commercial2: ['building-i', 'building-j', 'building-k', 'building-l', 'building-m', 'building-n', 'building-skyscraper-d', 'building-skyscraper-e'],
+  commercial2: ['building-skyscraper-d', 'building-skyscraper-e'],   // building-i…n (детските) са изтрити — вместо тях истинските от heavy/blocks2 (blk2Pick)
   trains: ['track', 'train-locomotive-a', 'train-carriage-box', 'train-carriage-flatbed-wood', 'train-carriage-coal', 'train-carriage-container-red', 'train-carriage-container-blue', 'train-carriage-tank', 'train-carriage-lumber', 'train-electric-city-a', 'train-electric-city-b'],
   highway: HW_MODELS.highway,
   vehicles: ['tractor', 'tractor-shovel', 'truck', 'truck-flat', 'delivery', 'sedan', 'taxi', 'suv', 'van', 'ambulance', 'police', 'firetruck', 'sedan-sports', 'suv-luxury', 'hatchback-sports'],
@@ -714,9 +714,10 @@ const realHouses = feature('houses-real') && REAL_HOUSES.length >= 4;
 const houseOf = (n, seed) => realHouses && KID_HOUSES.has(n) ? REAL_HOUSES[hashStr(n + ':' + seed) % REAL_HOUSES.length] : n;
 const HOUSE_POOL = realHouses ? REAL_HOUSES : HOUSES;
 // истинските блокове вместо стъклените building-i…n — изборът от Лабораторията (lab/blocks.html); всеки парцел — един от избраните за тази сграда
-function blk2Pick() { return feature('blocks-real') ? { 'building-i': ['pp-townhouse', 'midwest'], 'building-j': ['office4', 'office5'], 'building-k': ['office2'], 'building-l': ['office3'], 'building-m': ['hirise'], 'building-n': ['office6'] } : {}; }
+function blk2Pick() { return { 'building-i': ['pp-townhouse', 'midwest'], 'building-j': ['office4', 'office5'], 'building-k': ['office2'], 'building-l': ['office3'], 'building-m': ['hirise'], 'building-n': ['office6'] }; }
 const BLK2_PICK = blk2Pick();
-const blockOf = (n, seed) => { const L = (BLK2_PICK[n] || []).filter(k => A['b2-' + k]); return L.length ? 'b2-' + L[hashStr(n + ':' + seed) % L.length] : n; };
+const blk2Loaded = () => [...new Set(Object.values(BLK2_PICK).flat())].filter(k => A['b2-' + k]);
+const blockOf = (n, seed) => { if (!BLK2_PICK[n]) return n; let L = BLK2_PICK[n].filter(k => A['b2-' + k]); if (!L.length) L = blk2Loaded(); return L.length ? 'b2-' + L[hashStr(n + ':' + seed) % L.length] : 'building-a'; };   // не се зареди нищо → обикновен магазин
 // истинските къщи (house-a тухлената с веранда, house-b каменната) — с 40% по-големи от Kenney къщите
 // (истинските не минават през tintRoof — копията на материалите губят нощното светене)
 function houseFit(n) { return n === 'building-type-a' || n === 'building-type-b' ? 15 : n === 'h2-blue' || n === 'h2-porch' ? 10.5 : n.startsWith('h2-') ? 14 : 11; }   // синята и бялата с верандата — тесни и високи, при 14 излизаха огромни
@@ -747,7 +748,7 @@ function tierModel(cityId, lot, n) {
   if (t === 'l') return SKY.includes(n) ? `${n}@${h % 3 ? 20 : 15}` : n;
   // мегаполис: стъклени небостъргачи в центъра, модерни сгради в средния пояс
   if (SKY.includes(n) && A['building-skyscraper-d@20']) return `${MODERN_SKY[h % 2]}@${[20, 25, 30][(h >>> 2) % 3]}`;
-  if (SHOPS.includes(n) && A['building-i'] && (lot.zone === 'center' || h % 2)) return MODERN[h % MODERN.length];
+  if (SHOPS.includes(n) && blk2Loaded().length && (lot.zone === 'center' || h % 2)) return MODERN[h % MODERN.length];
   return n;
 }
 const INDUSTRIAL = MODELS.industrial.filter(n => n.startsWith('building')).map(n => 'ind-' + n);

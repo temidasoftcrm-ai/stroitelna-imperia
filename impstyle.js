@@ -17,7 +17,7 @@ const POOL = {
   },
   RU: {
     house: ['sf-blk-soviet', 'sf-blk-panel12', 'sf-blk-soviet', 'sf-blk-panel12', 'h2-lodge', 'h2-swedish'],   // панелни блокове (+ няколко къщи — вили)
-    shop: ['sf-blk-oldbld', 'sf-blk-dbrick', 'sf-blk-soviet', 'building-i', 'building-k', 'building-m'],
+    shop: ['sf-blk-oldbld', 'sf-blk-dbrick', 'sf-blk-soviet', 'b2-pp-townhouse', 'b2-office2', 'b2-hirise'],
     sky: ['imp-stalin', 'sf-sky-rand', 'sf-sky-sing', 'building-skyscraper-d@30', 'imp-stalin', 'building-skyscraper-e@40'],   // сталински + модерни кули
   },
 };
