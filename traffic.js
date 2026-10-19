@@ -47,6 +47,11 @@ function trim(pts, a, b) {   // маха a метра отначало и b от
   for (let k = 1; k < pts.length - 1; k++) if (p.cum[k] > s0 && p.cum[k] < s1) out.push(pts[k]);
   at(p, s1, o); out.push([o.x, o.z]); return out;
 }
+// най-малкият радиус на кривата → скорост в завоя (странично ускорение ≤ 2,5 m/s²), поне 2 m/s
+function curveV(pts, vmax) {
+  let r = 1e9; for (let k = 1; k < pts.length - 1; k++) { const a = pts[k - 1], b = pts[k], q = pts[k + 1], A = Math.hypot(b[0] - a[0], b[1] - a[1]), B = Math.hypot(q[0] - b[0], q[1] - b[1]), C = Math.hypot(q[0] - a[0], q[1] - a[1]), ar = Math.abs((b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0])) / 2; if (ar > 1e-6) r = Math.min(r, A * B * C / (4 * ar)); }
+  return Math.max(2, Math.min(vmax, Math.sqrt(2.5 * r)));
+}
 function bezier(p0, p1, p2, n = 10) { const out = []; for (let k = 0; k <= n; k++) { const t = k / n, u = 1 - t; out.push([u * u * p0[0] + 2 * u * t * p1[0] + t * t * p2[0], u * u * p0[1] + 2 * u * t * p1[1] + t * t * p2[1]]); } return out; }
 const segX = (a, b, c, d) => { const r = (b[0] - a[0]) * (d[1] - c[1]) - (b[1] - a[1]) * (d[0] - c[0]); if (Math.abs(r) < 1e-9) return false; const t = ((c[0] - a[0]) * (d[1] - c[1]) - (c[1] - a[1]) * (d[0] - c[0])) / r, u = ((c[0] - a[0]) * (b[1] - a[1]) - (c[1] - a[1]) * (b[0] - a[0])) / r; return t > 0.02 && t < 0.98 && u > 0.02 && u < 0.98; };
 function crosses(p, q) { for (let i = 1; i < p.pts.length; i++) for (let j = 1; j < q.pts.length; j++) if (segX(p.pts[i - 1], p.pts[i], q.pts[j - 1], q.pts[j])) return true; return false; }
@@ -315,7 +320,7 @@ export function planNetwork(P) {
         const ok = kind === 'left' ? a.laneI === 0 && b.laneI === 0 : kind === 'right' ? a.laneI === a.nLanes - 1 && b.laneI === b.nLanes - 1 : kind === 'uturn' ? a.laneI === 0 && b.laneI === 0 : b.laneI === Math.min(a.laneI, b.nLanes - 1);
         if (!ok) continue;
         const pts = kind === 'uturn' ? uturnPath(P, n, a, b) : P.turnPath(n.id, a.armIn, a.laneI, b.armOut, b.laneI);
-        N.conns.push(mkPath(pts, 'conn', { node: n.id, inL: a, outL: b, turn: kind, vmax: kind === 'straight' ? (a.vmax || V_LANE) * 0.8 : V_TURN, conf: [] }));
+        N.conns.push(mkPath(pts, 'conn', { node: n.id, inL: a, outL: b, turn: kind, vmax: curveV(pts, kind === 'straight' ? (a.vmax || V_LANE) * 0.8 : V_TURN), conf: [] }));
       }
     }
     for (const c of N.conns) for (const d of N.conns) if (c !== d && c.inL !== d.inL && (c.outL === d.outL || crosses(c, d))) c.conf.push(d);
