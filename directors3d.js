@@ -453,7 +453,7 @@ export function openBoardroom(o) {
       const base = rest[0];
       const p = { s, i, m, mixer, side, z, fem, base: mixer.clipAction(base), cur: null, busy: 0 };
       p.base.timeScale = 0.85 + ((i * 37) % 10) / 33;
-      p.talk = pick('Sit_Talk_M', 'Sit_Table_Ask', fem ? 'Sit_Meeting_F' : 'Sit_Meeting_M', fem ? 'Sit_Talk_2' : 'Sit_Talk_M').map(c => mixer.clipAction(c));
+      p.talk = pick(...(fem ? ['Sit_Meeting_F', 'Sit_Table_Ask'] : ['Sit_Table_Ask', 'Sit_Point_Forward'])).map(c => mixer.clipAction(c));   // без „Sit_Talk_M/2“ и „Sit_Meeting_M“ — там ръцете се кръстосват и влизат една в друга пред гърдите
       p.point = pick('Sit_Point_Forward', 'Sit_Point').map(c => mixer.clipAction(c));
       [p.raise, p.nay, p.clap] = ['Sit_Raise_Hand', 'Sit_Disapprove', 'Sit_Clap'].map(n => clips[n] ? mixer.clipAction(clips[n]) : null);   // гласуването (Mixamo): вдигната ръка, клатене на пръст, ръкопляскане
       p.base.play(); p.cur = p.base; mixer.update(Math.random() * base.duration);
