@@ -105,11 +105,19 @@ export const truckLamps = (() => { let m = null; return () => m || (m = (() => {
   return { front: mk(0xd8ceb0), rear: mk(0xa01010) };
 })()); })();
 // фарове (отпред) и стопове (отзад) на обект с предница към +z и дължина len; w — ширина, y — височина на фаровете
+// стоповете при спиране (и денем) и мигачите — общи материали; traffic.js сменя материала на стоповете и пали мигачите
+export const lampMats = (() => { let m = null; return () => m || (m = (() => {
+  const t = truckLamps().front.emissiveMap, mk = (col, k) => new THREE.MeshStandardMaterial({ color: 0, emissive: col, emissiveMap: t, emissiveIntensity: k, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  return { brake: mk(0xff1a1a, 2.2), blink: mk(0xffa21a, 2.4) };
+})()); })();
 export function addTruckLamps(o, len, w = 2.4, y = 1.1, rearZ = null) {
-  const L = truckLamps();
+  const L = truckLamps(), B = lampMats();
   for (const sx of [-1, 1]) {
-    const f = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), L.front); f.position.set(sx * w * 0.36, y, len / 2 + 0.05); o.add(f);
-    const r = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), L.rear); r.rotation.y = Math.PI; r.position.set(sx * w * 0.42, y, (rearZ ?? -len / 2) - 0.05); o.add(r);
+    const f = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), L.front); f.position.set(sx * w * 0.36, y, len / 2 + 0.05); f.userData.lamp = 'front'; o.add(f);
+    const r = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), L.rear); r.rotation.y = Math.PI; r.position.set(sx * w * 0.42, y, (rearZ ?? -len / 2) - 0.05); r.userData.lamp = 'rear'; o.add(r);
+    for (const [z, ry] of [[len / 2 + 0.06, 0], [(rearZ ?? -len / 2) - 0.06, Math.PI]]) {   // мигачите: отпред и отзад, в ъглите; лявата страна е +x (колата гледа към +z)
+      const b = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.42), B.blink); b.rotation.y = ry; b.position.set(sx * w * 0.47, y + 0.05, z); b.visible = false; b.userData.lamp = 'blink'; b.userData.side = sx > 0 ? 'L' : 'R'; o.add(b);
+    }
   }
 }
 // фаровете на колите (Лабораторията → car-lights): двата фара и стоповете (addTruckLamps) + светло петно на асфалта пред колата —
@@ -187,7 +195,7 @@ let glowTex = null;
 const BEACON = { r: new THREE.MeshStandardMaterial({ color: 0x501010, emissive: 0xff2020, emissiveIntensity: 0.15, roughness: 0.3 }), b: new THREE.MeshStandardMaterial({ color: 0x101850, emissive: 0x2060ff, emissiveIntensity: 0.15, roughness: 0.3 }) };
 // светлинна лента на покрива (Лабораторията → beacons2): по 3 сегмента на страна, тройни проблясъци — лявата, после
 // дясната страна (~1,4 Hz), вътрешните сегменти закъсняват малко (пробягване); ореол над всяка страна и цветно петно на пътя.
-const BAR_COL = { police: [0xff2a2a, 0x2a6bff], ambulance: [0xff2a2a, 0x2a6bff], fire: [0xff2a2a, 0xff7a1a] };
+const BAR_COL = { police: [0xff2a2a, 0x2a6bff], ambulance: [0xff2a2a, 0x2a6bff], fire: [0xff2a2a, 0xff7a1a], utility: [0xffa000, 0xffc400] };   // utility — аварийните (енергетици, пътна помощ)
 const BAR_T = 0.7, BAR_ON = [[0, 0.07], [0.12, 0.19], [0.24, 0.31]];
 const barLit = (car, side, j, t) => { if (!beaconState(car, t)) return false; const u = (((t + (car.id || 0) * 0.37 - j * 0.025) / BAR_T) % 1 + 1) % 1 - side * 0.5; return BAR_ON.some(([a, b]) => u >= a && u < b); };
 class BarSeg extends Beacon {
