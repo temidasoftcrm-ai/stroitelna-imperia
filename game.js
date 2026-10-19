@@ -3632,7 +3632,7 @@ function mapPanTo(lon, lat, z) { if (!mapView) return drawMap(); const [x, y] = 
 const ops = createOps({ S: () => S, toast, save, sound: n => Sound.play(n), muted: () => Sound.muted, cc: () => pres.state()?.cc || 'US', canStart: k => pres.active() && feature('ops-' + k), onClose: () => drawMap(),
   effect: e => { const ind = pres.state()?.ind; if (!ind) return; for (const [k, v] of Object.entries(e)) if (v && ind[k] != null) ind[k] = Math.max(0, Math.min(100, ind[k] + v)); } });
 window.__ops = ops;   // Лаб / конзолата: __ops.start(); __ops.open()
-const geoMap = createGeoMap({ pres, ops, proj: (lo, la) => proj(lo, la), geo: () => worldGeo || [], pathOf: countryPath, visW: () => mapVisW(), panTo: mapPanTo, fmt, holding: () => econ ? econ.money : 0, redraw: () => drawMap(), day: () => S?.day || 0 });
+const geoMap = createGeoMap({ citiesOf: iso => { const k = COUNTRIES.find(x => x.iso === iso), cc = k?.cc || ({ USA: '🇺🇸', RUS: '🇷🇺', CHN: '🇨🇳', IND: '🇮🇳', BRA: '🇧🇷', JPN: '🇯🇵' })[iso]; return cc ? CITIES.filter(c => c.cc === cc).sort((a, b) => (b.sz || 0) + (MEGAPOLIS.has(b.id) ? 2 : 0) - (a.sz || 0) - (MEGAPOLIS.has(a.id) ? 2 : 0)).slice(0, 5) : []; }, pres, ops, proj: (lo, la) => proj(lo, la), geo: () => worldGeo || [], pathOf: countryPath, visW: () => mapVisW(), panTo: mapPanTo, fmt, holding: () => econ ? econ.money : 0, redraw: () => drawMap(), day: () => S?.day || 0 });
 function geoToggle(v) { if (v) { mapWorld = true; mapEU = true; mapWide = true; mapCont = null; mapView = null; mapPicked = true; } geoMap.setOn(v); }
 function campCard() {
   const C = IMP_CC[S.imp?.cc]; if (!C || (S.imp?.lv || 0) < 25) return '';

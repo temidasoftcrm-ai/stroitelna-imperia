@@ -43,7 +43,7 @@ export const PKG = [
   { k: 'next', nm: 'Следващи преговори', opt: ['Без график', 'Кръгла маса до 90 дни', 'Пътна карта за спорните въпроси'] },
 ];
 // интересите на страните: тежест на всяка част, червени линии и колко им трябва (алтернативна игрова хронология — не реални позиции)
-const PREF = {
+export const PREF = {
   east: { UKR: { w: { now: 2, obl: 2, ver: 3, gua: 3, rec: 2, next: 1 }, need: 30, red: [['gua', 0, 'Недостатъчни гаранции'], ['ver', 0, 'Липсва проверка']] },
           RUS: { w: { now: 2, obl: 1, ver: 1, gua: 1, rec: 1, next: 3 }, need: 22, red: [['obl', 2, 'Неприемливи срокове'], ['next', 0, 'Няма график за спорните въпроси']] } },
   mideast: { ISR: { w: { now: 2, obl: 2, ver: 3, gua: 3, rec: 1, next: 1 }, need: 28, red: [['ver', 0, 'Липсва проверка'], ['gua', 0, 'Недостатъчни гаранции за сигурност']] },
@@ -217,6 +217,7 @@ export function createPresidency(deps) {
   }
   function proposePkg(ck, pkg) {
     const s = st(), k = s.conf[ck], c = CONFLICTS.find(x => x.k === ck), d = day(), E = evalPkg(ck, pkg);
+    k.last = { d, resp: E.resp.map(r => ({ iso: r.iso, ok: r.ok, why: r.why[0] })) };   // последната реакция на страните (за картата)
     if (E.cost > s.res) { deps.toast(`💰 Борис: проверката и фондът струват ${B(E.cost)}, а в резерва има ${B(s.res)}.`, 'bad'); return E; }
     if (E.resp.every(r => r.ok === 'yes')) { s.res -= E.cost; const was = k.step;
       if (k.step < 3 && (pkg.now || 0) >= 1) { k.step = 3; k.stab = 55; k.held = 0; } if (k.step >= 3 && (pkg.ver || 0) >= 1) k.step = Math.max(k.step, 4);
@@ -479,10 +480,10 @@ export function createPresidency(deps) {
     return { p, v: { votes, yes, no, passed: yes >= no, bank: { ok: (p.cost || 0) <= s.res * 0.5, why: 'резервът ще падне под половината' } } };
   }
   // 📋 Министерският съвет в 3D (directors3d.js openCabinet) — бюджетът от Борис, после министрите
-  function cabinet(emergency, focus) {
+  function cabinet(emergency, focus, onClose) {
     const s = st(); import('./directors3d.js').then(m => { if (!m.openCabinet) return;
       const brief = { id: `fin:brief:${day()}`, dir: 'fin', ico: '💰', info: true, text: '' };
-      m.openCabinet({ cc: s.cc, title: s.cc === 'RU' ? 'Правителството' : 'The Cabinet', brand: { nm: s.cc === 'RU' ? 'Россия' : 'USA', col: s.cc === 'RU' ? '#d52b1e' : '#3c3b6e', ico: '🦅', group: s.cc === 'RU' ? 'Правителство' : 'Белият дом', sub: s.cc === 'RU' ? '· МИНИСТЕРСКИ СЪВЕТ ·' : '· КАБИНЕТ НА САЩ ·' },
+      m.openCabinet({ onClose, cc: s.cc, title: s.cc === 'RU' ? 'Правителството' : 'The Cabinet', brand: { nm: s.cc === 'RU' ? 'Россия' : 'USA', col: s.cc === 'RU' ? '#d52b1e' : '#3c3b6e', ico: '🦅', group: s.cc === 'RU' ? 'Правителство' : 'Белият дом', sub: s.cc === 'RU' ? '· МИНИСТЕРСКИ СЪВЕТ ·' : '· КАБИНЕТ НА САЩ ·' },
         title: emergency ? '⛔ Извънредно заседание' : undefined, report: () => briefing(), proposals: () => [brief, ...(focus ? [...proposals().filter(focus), ...pick(emergency).filter(p => !focus(p))].slice(0, 6) : pick(emergency)).map(p => ({ ...p, text: p.text.replace(/^[А-ЯЁ][а-яё]+: /, ''), inBudget: (p.cost || 0) <= s.res }))],   // името на министъра вече е горе на екрана onDecide: (id, a) => { decide(id, a); render(); return null; },
         voteOn: id => vote(id), onResolve: (id, how) => { decide(id.replace(/\|small$/, ''), how === 'drop' ? 'later' : how === 'small' ? 'small' : 'yes'); render(); return null; },
         speech: () => `Резервът е ${B(s.res)}. За нови програми имаме по ${B(free())} на месец. ${s.res < free() ? 'Предлагам по-малки първи етапи.' : 'Можем да започнем една голяма и няколко малки програми.'}`,

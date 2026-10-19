@@ -709,7 +709,7 @@ export function openBoardroom(o) {
   loop();
 
   function close() {
-    if (shut) return; shut = true;
+    if (shut) return; shut = true; try { o.onClose && o.onClose(); } catch {}
     window.__overlay3d = Math.max(0, (window.__overlay3d || 1) - 1);
     removeEventListener('keydown', key); removeEventListener('resize', onResize);
     el.classList.remove('on');
