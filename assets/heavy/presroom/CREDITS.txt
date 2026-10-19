@@ -2,4 +2,4 @@
 - curtain-tied.glb — "Curtain" by milaink — https://sketchfab.com/3d-models/6f0e27c3b4734b99ae6ed051899a1453 (само вързаната половина)
 - flag-ru.glb — "Russian Flag" by ognuogaan135 — https://sketchfab.com/3d-models/15423ff53ce6416686a82c84de6fdb8b (и за САЩ — с американското платно)
 - fireplace.glb — "Fireplace" by Mark Bai — https://sketchfab.com/3d-models/e9854400c0c1410db01c8db897ef5359
-view-south.webp, view-north.webp — снимки от потребителя (гледки от Белия дом)
+view-south.webp, view-north.webp, seal-us.webp — снимки от потребителя (гледки от Белия дом, печатът на президента)
