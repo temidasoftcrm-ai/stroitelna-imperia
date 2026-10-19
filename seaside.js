@@ -15,6 +15,7 @@ SEASIDE.push(...EXTRA_COASTAL);
 // с морските модели от assets/watercraft/ — затова името е относителен път ('../heavy/boats/…').
 const REAL_BOATS = { 'boat-sail-a': 'sailboat', 'boat-sail-b': 'sailboat', 'boat-speed-a': 'yacht', 'boat-fishing-small': 'fisherboat', 'ship-small': 'fishship', buoy: 'buoy',
   'cargo-container-a': 'container', 'cargo-container-b': 'container', 'cargo-container-c': 'container' };
+const REAL_SHIPS = { 'ship-cargo-a': 'container', 'ship-cargo-b': 'tanker' };   // товарните кораби на котва/до кея — истинските контейнеровоз и танкер
 const BOAT_TINT = { 'cargo-container-a': 0xd8584a, 'cargo-container-b': 0x5a86d8, 'cargo-container-c': 0x5fae6e };
 const RB = n => '../heavy/boats/' + n;
 export const SEA_MODELS = ['ship-cargo-a', 'ship-cargo-b', 'ship-small', 'boat-sail-a', 'boat-sail-b', 'boat-speed-a', 'boat-fishing-small', 'buoy', 'cargo-container-a', 'cargo-container-b', 'cargo-container-c',
@@ -25,7 +26,14 @@ const box = (w, h, d, m, x, y, z, g) => { const o = new THREE.Mesh(new THREE.Box
 const rnd = seed => () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 function useModel(A, model, n, s) {
   if (!A[n]) return null; const o = model(n, s); o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
-  const rn = feature('boats-real') && REAL_BOATS[n]; return rn && A[RB(rn)] ? fitReal(o, model(RB(rn), 1), n) : o;
+  if (!feature('boats-real')) return o;
+  const sk = REAL_SHIPS[n]; if (sk) { if (hasShipModel(sk)) return fitReal(o, shipModel(sk), n); o.userData.kidShip = n; return o; }   // товарните — истинските от флота (shipmodels.js); ако още не са заредени — сменят се после (swapKidShips)
+  const rn = REAL_BOATS[n]; return rn && A[RB(rn)] ? fitReal(o, model(RB(rn), 1), n) : o;
+}
+// детските товарни кораби, построени преди истинските да се заредят — на тяхно място (същото положение и завъртане)
+function swapKidShips(root, ships = []) {
+  const kids = []; root.traverse(o => { if (o.userData.kidShip && hasShipModel(REAL_SHIPS[o.userData.kidShip])) kids.push(o); });
+  for (const o of kids) { const p = o.parent, n = o.userData.kidShip, w = fitReal(o, shipModel(REAL_SHIPS[n]), n); w.position.copy(o.position); w.rotation.copy(o.rotation); w.visible = o.visible; p.add(w); p.remove(o); for (const sh of ships) if (sh.o === o) sh.o = w; }   /* и люлеенето на вълните — за новия */
 }
 // истинският модел в кутията на детския: същата дължина (шамандурата — същата височина), дългата ос по същата посока, основата на същото ниво
 function fitReal(kid, real, n) {
@@ -191,6 +199,7 @@ export function addSeaside(group, deps, opts) {
   // щом истинските кораби се заредят: пречертай флота и смени декоративния кораб на кея с танкер (до ръба на кея)
   loadShipModels().then(() => {
     if (cargo && hasShipModel('tanker')) { const o = shipModel('tanker'), p0 = cargo.position.clone(), hb0 = halfBeam(cargo); cargo.position.copy(p0); o.rotation.y = cargo.rotation.y; const hb = halfBeam(o); o.position.set(p0.x, 0, seaZ - 69 - hb - 2); o.visible = cargo.visible; g.remove(cargo); g.add(o); cargo = o; }
+    swapKidShips(g, ships);
     if (hasShipModel('cruise')) { const o = shipModel('cruise'); o.position.set((opts.xMin + opts.xMax) / 2 - 120, 0, seaZ - 260); o.rotation.y = linerRot; g.add(o); ships.push({ o, ph: r() * 6 }); }   // на котва
     setFleet(lastFleet);
   });

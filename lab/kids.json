@@ -7,68 +7,68 @@
    {
     "n": "ship-cargo-a",
     "f": "assets/watercraft/ship-cargo-a.glb",
-    "st": "флотът ти — истински; декорът — детски",
-    "ok": false
+    "st": "заменен (истински — boats-real)",
+    "ok": true
    },
    {
     "n": "ship-cargo-b",
     "f": "assets/watercraft/ship-cargo-b.glb",
-    "st": "детски — ползва се",
-    "ok": false
+    "st": "заменен (истински — boats-real)",
+    "ok": true
    },
    {
     "n": "ship-small",
     "f": "assets/watercraft/ship-small.glb",
-    "st": "детски — ползва се",
-    "ok": false
+    "st": "заменен (истински — boats-real)",
+    "ok": true
    },
    {
     "n": "boat-sail-a",
     "f": "assets/watercraft/boat-sail-a.glb",
-    "st": "детски — ползва се",
-    "ok": false
+    "st": "заменен (истински — boats-real)",
+    "ok": true
    },
    {
     "n": "boat-sail-b",
     "f": "assets/watercraft/boat-sail-b.glb",
-    "st": "детски — ползва се",
-    "ok": false
+    "st": "заменен (истински — boats-real)",
+    "ok": true
    },
    {
     "n": "boat-speed-a",
     "f": "assets/watercraft/boat-speed-a.glb",
-    "st": "детски — ползва се",
-    "ok": false
+    "st": "заменен (истински — boats-real)",
+    "ok": true
    },
    {
     "n": "boat-fishing-small",
     "f": "assets/watercraft/boat-fishing-small.glb",
-    "st": "детски — ползва се",
-    "ok": false
+    "st": "заменен (истински — boats-real)",
+    "ok": true
    },
    {
     "n": "buoy",
     "f": "assets/watercraft/buoy.glb",
-    "st": "детски — ползва се",
-    "ok": false
+    "st": "заменен (истински — boats-real)",
+    "ok": true
    },
    {
     "n": "cargo-container-a",
     "f": "assets/watercraft/cargo-container-a.glb",
-    "st": "детски — ползва се",
-    "ok": false
+    "st": "заменен (истински — boats-real)",
+    "ok": true
    },
    {
     "n": "cargo-container-b",
     "f": "assets/watercraft/cargo-container-b.glb",
-    "st": "детски — ползва се",
-    "ok": false
+    "st": "заменен (истински — boats-real)",
+    "ok": true
    },
    {
     "n": "cargo-container-c",
     "f": "assets/watercraft/cargo-container-c.glb",
-    "st": "детски — ползва се",
-    "ok": false
+    "st": "заменен (истински — boats-real)",
+    "ok": true
    }
   ]
  },
