@@ -1,6 +1,7 @@
 {
   "approved": [
     "air-big-only",
+    "air-models",
     "amb-eu",
     "amb-gaz",
     "amb-us",
@@ -73,6 +74,7 @@
     "la-osm",
     "lm-colosseo",
     "lm-redeemer",
+    "lm-vittoriano",
     "london-real",
     "lv-pics",
     "map-empty",
