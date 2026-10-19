@@ -10,9 +10,13 @@
 //    зона (без пресичаща се заета крива) и място на изходящата лента след кръстовището.
 //  • Фиксирана стъпка (1/30 s), отделена от рисуването: при 4× се правят повече стъпки, без прескачане; колите се рисуват
 //    между последните две стъпки (плавно). Таванът на колите (maxCars) е само визуален — доставките са другаде.
+//  • Светлините: фаровете светят с нощта (общият материал — новата кола веднага е в текущото състояние); стоповете — по-ярки при
+//    спиране и денем; мигачите — преди и в завоя, независимо от часа; истински прожектори — само за 4-те най-близки до камерата
+//    коли нощем (без сенки), с хистерезис около здрача.
 // Мрежата: { nodes: [{ id, x, z, signal }], edges: [{ a, b, pts?: [[x,z]…], lanes: 1, w, rank }] } — сега от решетката
 // на града (gridNetwork), после — от плана на улиците (част A).
 import * as THREE from 'three';
+import { lampMats, truckLamps } from './vehmodels.js';
 
 const H = 1 / 30;                 // фиксираната стъпка, s
 const V_LANE = 12, V_TURN = 6.5;  // желана скорост по улица / в завой, m/s
@@ -107,7 +111,10 @@ export const sigView = s => s ? { axis: s.ph[s.i][0], yellow: s.stage === 'yello
 // opts: { scene, net, drive, makeCar() → { obj, len, kind }, maxCars, onSignal(node, view) }
 export function createTraffic(opts) {
   const { lanes, nodes } = opts.built || buildLanes(opts.net, opts.drive);   // built — готова мрежа (planNetwork)
-  const cars = [], tmp = {}, rnd = Math.random;
+  // собствен генератор (seed) — симулацията не зависи от чуждите Math.random (three.js, интерфейса): еднаква при 1× и 4×
+  let seed = (opts.seed || 1) >>> 0;
+  const rnd = () => { seed = (seed + 0x6D2B79F5) >>> 0; let t = seed; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const cars = [], tmp = {};
   // таван: ~30% от местата по лентите (иначе на късите улици между кръстовищата решетката се задръства)
   const capacity = Math.floor(lanes.reduce((t, l) => t + l.len, 0) / (4.5 + S0 + 2) * 0.3);
   let acc = 0, steps = 0;
@@ -119,6 +126,8 @@ export function createTraffic(opts) {
       const s = 2 + rnd() * (p.len - 4);
       if (!free(p, s, v.len)) { opts.scene.remove(v.obj); continue; }   // без нова кола на заето място
       const c = { obj: v.obj, L: v.len, kind: v.kind, p, s, v: 0, next: null, px: 0, pz: 0, pyaw: 0, x: 0, z: 0, yaw: 0, wait: 0, a: 0 };
+      c.rear = []; c.blinkL = []; c.blinkR = []; v.obj.traverse(m => { const l = m.userData.lamp; if (l === 'rear') c.rear.push(m); else if (l === 'blink') (m.userData.side === 'L' ? c.blinkL : c.blinkR).push(m); });
+      c.rearMat = c.rear[0]?.material; c.brake = false;
       insert(p, c); pickNext(c); at(p, s, tmp); c.x = c.px = tmp.x; c.z = c.pz = tmp.z; c.yaw = c.pyaw = tmp.yaw; cars.push(c); return c;
     }
     return null;
@@ -190,6 +199,25 @@ export function createTraffic(opts) {
     for (let k = cars.length - 1; k >= 0; k--) { const c = cars[k]; if (c.v < 0.05) c.stuck = (c.stuck || 0) + H; else c.stuck = 0; if (c.stuck > 40) { remove(c.p, c); opts.scene.remove(c.obj); cars.splice(k, 1); } }
     steps++;
   }
+  // стопове, мигачи и истинските прожектори
+  const spots = []; let nightOn = false;
+  function lights() {
+    const blinkOn = (performance.now() % 800) < 400, B = lampMats();
+    for (const c of cars) {
+      const br = c.a < -0.8 || c.v < 0.3;
+      if (br !== c.brake && c.rear.length) { c.brake = br; for (const m of c.rear) m.material = br ? B.brake : c.rearMat; }
+      const turn = c.p.kind === 'conn' ? c.p.turn : c.next && c.next.kind === 'conn' && c.p.len - c.s < 28 ? c.next.turn : null;
+      const L = blinkOn && (turn === 'left' || turn === 'uturn'), R = blinkOn && turn === 'right';
+      for (const m of c.blinkL) m.visible = L; for (const m of c.blinkR) m.visible = R;
+    }
+    const n = truckLamps().front.emissiveIntensity;   // нощта (0…1) — от общия материал на фаровете; хистерезис около здрача
+    if (!nightOn && n > 0.35) nightOn = true; else if (nightOn && n < 0.2) nightOn = false;
+    if (!opts.camera) return;
+    if (!spots.length) for (let k = 0; k < 4; k++) { const sp = new THREE.SpotLight(0xfff0d0, 0, 38, 0.55, 0.6, 1.4); sp.castShadow = false; opts.scene.add(sp); opts.scene.add(sp.target); spots.push(sp); }
+    const cp = opts.camera.position, near = nightOn ? [...cars].sort((a, b) => ((a.obj.position.x - cp.x) ** 2 + (a.obj.position.z - cp.z) ** 2) - ((b.obj.position.x - cp.x) ** 2 + (b.obj.position.z - cp.z) ** 2)).slice(0, 4) : [];
+    spots.forEach((sp, k) => { const c = near[k]; sp.intensity = c ? 40 * Math.min(1, n) : 0; if (!c) return; const o = c.obj, fx = Math.sin(o.rotation.y), fz = Math.cos(o.rotation.y);
+      sp.position.set(o.position.x + fx * c.L * 0.5, 1.1, o.position.z + fz * c.L * 0.5); sp.target.position.set(o.position.x + fx * 14, 0, o.position.z + fz * 14); });
+  }
   const lerpA = (a, b, t) => { let d = b - a; d = Math.atan2(Math.sin(d), Math.cos(d)); return a + d * t; };
   return {
     lanes, nodes, cars, opts,
@@ -200,8 +228,9 @@ export function createTraffic(opts) {
       const t = acc / H;
       for (const c of cars) { c.obj.position.set(c.px + (c.x - c.px) * t, 0.05, c.pz + (c.z - c.pz) * t); c.obj.rotation.y = lerpA(c.pyaw, c.yaw, t); }
       if (opts.onSignal) for (const nd of nodes.values()) if (nd.sig) opts.onSignal(nd, sigView(nd.sig));
+      lights();
     },
-    clear() { for (const c of cars) opts.scene.remove(c.obj); cars.length = 0; for (const l of lanes) l.cars.length = 0; for (const n of nodes.values()) for (const c of n.conns) c.cars.length = 0; },
+    clear() { for (const sp of spots) { opts.scene.remove(sp); opts.scene.remove(sp.target); } spots.length = 0; for (const c of cars) opts.scene.remove(c.obj); cars.length = 0; for (const l of lanes) l.cars.length = 0; for (const n of nodes.values()) for (const c of n.conns) c.cars.length = 0; },
     stats: () => ({ cars: cars.length, cap: capacity, steps, waiting: cars.filter(c => c.wait > 0).length }),
   };
 }
