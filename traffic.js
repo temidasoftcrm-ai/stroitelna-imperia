@@ -250,27 +250,34 @@ export function createTraffic(opts) {
   };
 }
 
-// ---- светлините на колите-инстанции: три общи InstancedMesh (фарове, стопове, мигачи) — 3 draw calls за всички коли.
+// ---- светлините на колите-инстанции: четири общи InstancedMesh (фарове, стопове, мигачи, светлото петно на асфалта пред колата) —
+// 4 draw calls за всички коли.
 // begin(нощ 0…1) → car(x, z, yaw, дължина, ширина, височина, спира, ляв, десен) за всяка кола → end()
 export function lampInstances(scene, max) {
   const t = truckLamps().front.emissiveMap, mk = col => new THREE.MeshBasicMaterial({ color: col, map: t, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
   const geo = new THREE.PlaneGeometry(0.9, 0.9), F = new THREE.InstancedMesh(geo, mk(0xfff0d0), max), R = new THREE.InstancedMesh(geo, mk(0xffffff), max), K = new THREE.InstancedMesh(geo, mk(0xffa21a), max * 2);
-  for (const m of [F, R, K]) { m.frustumCulled = false; m.renderOrder = 3; scene.add(m); }
+  // петното пред колата: конус, който избледнява напред (адитивно — избледнява към черно); лежи на асфалта, нощем
+  const bc = document.createElement('canvas'); bc.width = 64; bc.height = 128; const bx = bc.getContext('2d'); bx.fillStyle = '#000'; bx.fillRect(0, 0, 64, 128);
+  for (let y = 0; y < 128; y++) { const q = y / 127, w = 10 + q * 26, a = Math.pow(1 - q, 1.6) * (q < 0.06 ? q / 0.06 : 1), g = bx.createLinearGradient(32 - w, 0, 32 + w, 0); g.addColorStop(0, '#000'); g.addColorStop(0.5, `rgb(${Math.round(255 * a)},${Math.round(236 * a)},${Math.round(190 * a)})`); g.addColorStop(1, '#000'); bx.fillStyle = g; bx.fillRect(32 - w, y, 2 * w, 1); }
+  const beamGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);   // единичен квадрат на земята; горният край на текстурата (тясното) — към колата (−z), петното е напред (+z)
+  const BM = new THREE.InstancedMesh(beamGeo, new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(bc), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2 }), max);
+  for (const m of [F, R, K, BM]) { m.frustumCulled = false; m.renderOrder = 3; scene.add(m); }
   const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), P = new THREE.Vector3(), S = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0), dim = new THREE.Color(0x5a0808), hot = new THREE.Color(0xff2020);
-  let nf = 0, nr = 0, nk = 0, night = 0;
+  let nf = 0, nr = 0, nk = 0, nb = 0, night = 0; const SB = new THREE.Vector3();
   const put = (im, k, x, y, z, yaw, s) => { Q.setFromAxisAngle(Y, yaw); P.set(x, y, z); S.set(s, s, s); M.compose(P, Q, S); im.setMatrixAt(k, M); };
   return {
-    begin(n) { night = Math.max(0, Math.min(1, n)); nf = nr = nk = 0; F.material.color.setRGB(night, night * 0.94, night * 0.82); },
+    begin(n) { night = Math.max(0, Math.min(1, n)); nf = nr = nk = nb = 0; F.material.color.setRGB(night, night * 0.94, night * 0.82); BM.material.color.setScalar(night * 0.9); },
     car(x, z, yaw, L, w, h, brake, bl, br) {
       const fx = Math.sin(yaw), fz = Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw), y = h * 0.42;   // напред (fx, fz), вляво (rx, rz)
+      if (night > 0.02 && nb < max) { const bl2 = Math.max(8, L * 1.7); Q.setFromAxisAngle(Y, yaw); P.set(x + fx * (L / 2 + bl2 / 2), 0.07, z + fz * (L / 2 + bl2 / 2)); SB.set(w * 2.2, 1, bl2); M.compose(P, Q, SB); BM.setMatrixAt(nb++, M); }   // петното на асфалта
       for (const sx of [-1, 1]) {
         if (night > 0.02 && nf < max) put(F, nf++, x + fx * (L / 2 + 0.05) + rx * sx * w * 0.36, y, z + fz * (L / 2 + 0.05) + rz * sx * w * 0.36, yaw, 1);
         if (nr < max && (brake || night > 0.02)) { put(R, nr, x - fx * (L / 2 + 0.05) + rx * sx * w * 0.42, y, z - fz * (L / 2 + 0.05) + rz * sx * w * 0.42, yaw + Math.PI, brake ? 0.62 : 0.5); R.setColorAt(nr++, brake ? hot : dim); }
         if ((sx > 0 ? bl : br) && nk < max * 2) for (const e of [1, -1]) put(K, nk++, x + fx * e * (L / 2 + 0.06) + rx * sx * w * 0.47, y + 0.05, z + fz * e * (L / 2 + 0.06) + rz * sx * w * 0.47, e > 0 ? yaw : yaw + Math.PI, 0.47);
       }
     },
-    end() { F.count = nf; R.count = nr; K.count = nk; for (const m of [F, R, K]) m.instanceMatrix.needsUpdate = true; if (R.instanceColor) R.instanceColor.needsUpdate = true; },
-    clear() { for (const m of [F, R, K]) { scene.remove(m); m.material.dispose(); m.dispose(); } geo.dispose(); },   // и паметта (текстурата е общата на фаровете — остава)
+    end() { F.count = nf; R.count = nr; K.count = nk; BM.count = nb; for (const m of [F, R, K, BM]) m.instanceMatrix.needsUpdate = true; if (R.instanceColor) R.instanceColor.needsUpdate = true; },
+    clear() { for (const m of [F, R, K, BM]) { scene.remove(m); m.material.dispose(); m.dispose(); } BM.material.map.dispose(); geo.dispose(); beamGeo.dispose(); },   // и паметта (текстурата е общата на фаровете — остава)
   };
 }
 
