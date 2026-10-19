@@ -121,6 +121,34 @@ export function buildPlanView(P0, opts = {}) {
     const rad = Math.max(...ws, 7) / 2 + 0.6;
     disc(n.x, n.z, rad + 1.7, 0.035 + ny, ...walk); disc(n.x, n.z, rad, 0.07 + ny, ...asph);
   }
+  // задънените улици в града (Лабораторията → road-ends): краят се доизтегля до близка улица, ако пътят е свободен
+  // (без парцел, вода и площад по пътя); иначе — обърнат кръг накрая, както на истинска задънена улица. Само изгледът —
+  // планът, парцелите и записът не се променят.
+  if (feature('road-ends')) for (const [ni, n] of P.nodes.entries()) {
+    if (n.square || n.deg !== 1) continue;
+    const e = P.edges.find(q => q.a === ni || q.b === ni), st = e && P.streets[e.st];
+    if (!st || st.cls !== 'street' || !P.buildable(n.x, n.z)) continue;   // булевардите и кейовете излизат от града
+    const s = e.a === ni ? e.s0 : e.s1, at = pointAt(st, s), sgn = s < st.L.at(-1) / 2 ? -1 : 1, ux = at.tx * sgn, uz = at.tz * sgn;   // посоката навън
+    const ny = Math.max(0, P.heightAt(n.x, n.z));
+    let best = null;
+    P.streets.forEach((o, oi) => { if (oi === e.st) return; for (const q of o.pts) {
+      const dx = q[0] - n.x, dz = q[1] - n.z, d = Math.hypot(dx, dz);
+      if (d < 3 || d > 45 || (dx * ux + dz * uz) / d < 0.55) continue;   // напред, не встрани
+      if (!best || d < best.d) best = { d, q, w: o.w };
+    } });
+    const clear = b => { const L = b.d, k = Math.ceil(L / 2);
+      for (let i = 0; i <= k; i++) { const t = i / k, x = n.x + (b.q[0] - n.x) * t, z = n.z + (b.q[1] - n.z) * t;
+        if (P.waterAt(x, z) || Math.hypot(x - P.square.x, z - P.square.z) < P.square.r + 2) return false;
+        if (t < 0.98 && P.lots.some(L2 => Math.abs(L2.x - x) < 30 && Math.abs(L2.z - z) < 30 && rectHas(L2, [x, z], st.w / 2 + 0.6))) return false; }
+      return true; };
+    if (best && clear(best)) {
+      const pts = [[n.x, n.z], best.q];
+      ribbon(pts, st.w + 3.4, () => 0.03 + ny, ...walk); ribbon(pts, st.w, () => 0.06 + ny, ...asph);
+      const rad = Math.max(st.w, best.w) / 2 + 0.6; disc(best.q[0], best.q[1], rad + 1.7, 0.035 + ny, ...walk); disc(best.q[0], best.q[1], rad, 0.07 + ny, ...asph);   // новото Т-кръстовище
+    } else {
+      const r = st.w / 2 + 1.8; disc(n.x, n.z, r + 1.6, 0.035 + ny, ...walk, 24); disc(n.x, n.z, r, 0.07 + ny, ...asph, 24);
+    }
+  }
   // зебри и светофари — само на истинските кръстовища: поне един булевард/пръстен, без съседно кръстовище по-близо от 22 м
   // (извитите улици дават много близки възли — там зебрите се застъпваха); зебра само на изход, по-дълъг от 16 м
   const major = [];

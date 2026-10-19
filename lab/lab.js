@@ -88,6 +88,7 @@ const DEMOS = [
   ['🇷🇺 Министерски съвет — Кремъл', 'sofia', () => $('fr').contentWindow.eval("import('/directors3d.js').then(m => m.demoCabinet('RU'))")],
   ['🇺🇸 Президентска кампания — 51 щата', 'sofia', () => $('fr').contentWindow.eval("import('/campaign.js').then(m => m.demoCampaign())")],
   ['🇷🇺 Президентски избори — 83 региона', 'sofia', () => $('fr').contentWindow.eval("import('/campaign.js').then(m => m.demoCampaign('RU'))")],   // directors3d.js — без game.js
+  ['🚨 Оперативна карта: Градски площад (протест)', 'sofia', () => $('fr').contentWindow.eval("import('/ops.js').then(m => m.demoOps())")],   // ops.js + ops3d.js — без game.js
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

@@ -133,7 +133,7 @@ export function createTirs(deps) {
       tx += -dz / l * LANE; tz += dx / l * LANE;
     }
     const dx = tx - t.x, dz = tz - t.z, d = Math.hypot(dx, dz), step = (t.v || SPEED) * dt;
-    if (d <= step) { t.x = tx; t.z = tz; t.pi++; }
+    if (d <= step) { t.x = tx; t.z = tz; t.pi++; if (d > 0.05) t.yaw = Math.atan2(dx, dz); }   // при бързо време прескача точките — иначе остава обърнат накриво
     else {
       t.x += dx / d * step; t.z += dz / d * step;
       let dy = Math.atan2(dx, dz) - t.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));

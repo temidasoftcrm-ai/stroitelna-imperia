@@ -56,6 +56,7 @@ import { createImperial, IMP_CC } from './imperial.js';
 import { createCampaign } from './campaign.js';
 import { createPresidency } from './president.js';
 import { createGeoMap } from './geomap.js';
+import { createOps } from './ops.js';   // 🚨 оперативните кризи — 3D карти от геополитическата карта (feature 'ops-square')
 import { syncImpCivic, updateImpCivic } from './impcivic.js';   // обществените сгради на Империал Сити в 3D
 import { pickModel as impPick, decor as impDecor, IMP_MODELS, IMP_H } from './impstyle.js';
 import { createNeom, NEOM_CITY, NEOM_ID, DISTRICTS as NEOM_DISTRICTS, FOUND_COST as NEOM_FOUND } from './neom.js';
@@ -94,12 +95,13 @@ import { applyRoadLook, makeCrosswalks } from './roadlook.js';
 import { gamePlan, planLots, planTiles, planCount } from './cityplangame.js';
 import { buildPlanView } from './cityplan3d.js';
 import { prepNightFloors } from './nightfloors.js';
+import { loadIndustry } from './industry.js';
 import { showIntro } from './intro.js';
 import { feature } from './lab/feature.js';
 import { mountHub } from './hub.js';
 import { showLevel } from './lvshow.js';
 import { showSub } from './subshow.js';   // дъщерните дружества — екран с логото (feature 'sub-screen')   // картинката на ниво 1 — при основаването на фирмата (feature 'lv-pics')   // „📊 Империя ▾“ — бутоните от втория ред на лентата в падащ панел (feature 'top-hub')
-import { sampleCurve } from './cityplan.js';
+import { sampleCurve, rectCorners } from './cityplan.js';
 import { makeWater } from './water.js';   // 🌊 Темза в Лондон (feature 'thames')
 import { LOD, LOD_NM, lodOf, CONT_AT, CONT_NM as LOD_CONT_NM, cityScore, topPerGroup, corridors, searchCities } from './maplod.js';   // степени на детайлност на картата (feature 'map-lod')
 import { planRoute, randomRoadPoint } from './cityplanroute.js';
@@ -482,6 +484,7 @@ let europe = null;
   const ldT0 = performance.now();
   jobs.forEach(j => j.then(() => { const k = Math.round(++done / jobs.length * 100); $('ldBar').style.width = Math.max(3, k) + '%'; $('ldTxt').textContent = `Зареждане… ${k}%`; }));
   await Promise.all(jobs);
+  await loadIndustry(load, A);   // истинските заводи, водни кули, турбини и соларни панели (industry.js) — заместват детските 'ind-*' (Лабораторията → ind-real)
   // GLTFLoader оставя parser-а (вкл. JSON и кешовете на dependency-тата) в резултата.
   // След зареждането вече е нужен само за допълнителната текстура на блоковете (горе).
   // Освобождаваме го, докато запазваме сцените, геометриите, материалите и текстурите.
@@ -767,6 +770,7 @@ function realH(n) {
 }
 function realHeight(o, n, maxW) {
   if (!feature('real-heights')) return false;
+  if (n.startsWith('ind-') && feature('ind-real')) return false;   // истинските заводи (industry.js) — със своите пропорции, не до 16 м
   const sz = sizeOf(n).getSize(new THREE.Vector3()), fy = realH(n) / Math.max(0.01, sz.y), w = Math.max(sz.x, sz.z), fx = Math.min(fy, maxW / Math.max(0.01, w));
   o.scale.set(fx, fy, fx); return true;
 }
@@ -2791,7 +2795,7 @@ function endOfDay() {
   tenderAutoFix();
   mines.dailyTick();
   oil.dailyTick(); updOilBtn();
-  gridCheck(); holdingCheck(); autoTick(); group.check(); group.dailyTick(); corp.dailyTick(); mw.dailyTick(); hotels.dailyTick(); bank.dailyTick(); neom.dailyTick(); imperial.dailyTick(); if (S.president && !S.pres) pres.start(S.president.cc); pres.dailyTick(); if (geoMap.on() && $('mapScreen')?.offsetParent) drawMap(); impCiv3D(); neomDecor(); if (imperial.needChoice() && !S.impAsked && $('modal').classList.contains('hidden')) { S.impAsked = S.day; imperial.choose(() => renderBig()); } holdMilestones(); if (S.holding) holdXP(Math.max(0, regNet()) / 10000);
+  gridCheck(); holdingCheck(); autoTick(); group.check(); group.dailyTick(); corp.dailyTick(); mw.dailyTick(); hotels.dailyTick(); bank.dailyTick(); neom.dailyTick(); imperial.dailyTick(); if (S.president && !S.pres) pres.start(S.president.cc); pres.dailyTick(); ops.tick(1); if (geoMap.on() && $('mapScreen')?.offsetParent) drawMap(); impCiv3D(); neomDecor(); if (imperial.needChoice() && !S.impAsked && $('modal').classList.contains('hidden')) { S.impAsked = S.day; imperial.choose(() => renderBig()); } holdMilestones(); if (S.holding) holdXP(Math.max(0, regNet()) / 10000);
   airAutoPlanes();
   tenders.dailyTick();
   orient.dailyTick();
@@ -3608,7 +3612,10 @@ const pres = createPresidency({ pause: () => setSpeed(0), S: () => S, fmt, toast
 // 🌍 режимът „Геополитика“ върху картата (geomap.js): същите география и проекция, отделен слой за държави, кризи и договорености
 const countryPath = c => { let d = countryD.get(c); if (!d || d.px !== projX()) countryD.set(c, d = { px: projX(), d: c.poly.map(poly => poly.map(ring => 'M' + ring.map(([lo, la]) => proj(lo, la).map(v => v.toFixed(1)).join(',')).join('L') + 'Z').join('')).join('') }); return d.d; };
 function mapPanTo(lon, lat, z) { if (!mapView) return drawMap(); const [x, y] = proj(lon, lat), [, , bw, bh] = mapView.base; mapView.vb = [x - bw / z / 2, y - bh / z / 2, bw / z, bh / z]; $('mapSvg').setAttribute('viewBox', mapView.vb.join(' ')); drawMap(); }
-const geoMap = createGeoMap({ pres, proj: (lo, la) => proj(lo, la), geo: () => worldGeo || [], pathOf: countryPath, visW: () => mapVisW(), panTo: mapPanTo, fmt, holding: () => econ ? econ.money : 0, redraw: () => drawMap(), day: () => S?.day || 0 });
+const ops = createOps({ S: () => S, toast, save, sound: n => Sound.play(n), cc: () => pres.state()?.cc || 'US', canStart: () => pres.active() && feature('ops-square'), onClose: () => drawMap(),
+  effect: e => { const ind = pres.state()?.ind; if (!ind) return; for (const [k, v] of Object.entries(e)) if (v && ind[k] != null) ind[k] = Math.max(0, Math.min(100, ind[k] + v)); } });
+window.__ops = ops;   // Лаб / конзолата: __ops.start(); __ops.open()
+const geoMap = createGeoMap({ pres, ops, proj: (lo, la) => proj(lo, la), geo: () => worldGeo || [], pathOf: countryPath, visW: () => mapVisW(), panTo: mapPanTo, fmt, holding: () => econ ? econ.money : 0, redraw: () => drawMap(), day: () => S?.day || 0 });
 function geoToggle(v) { if (v) { mapWorld = true; mapEU = true; mapWide = true; mapCont = null; mapView = null; mapPicked = true; } geoMap.setOn(v); }
 function campCard() {
   const C = IMP_CC[S.imp?.cc]; if (!C || (S.imp?.lv || 0) < 25) return '';
@@ -5260,31 +5267,39 @@ function nyCenter(lots) {
     pruneStreetDetail();
   });
 }
-// Нотр Дам в Париж (Лабораторията → paris-spread): не до площада с Айфеловата кула, а на три съседни свободни парцела
-// покрай една улица край реката (като остров Сите). Изборът се помни в S.landmarks (mem[k + '@']) — не скача при зареждане.
+// Нотр Дам в Париж (Лабораторията → paris-spread): не до площада с Айфеловата кула, а край реката (като остров Сите) —
+// правоъгълник FP с лице към улицата, без улица и вода в него; парцелите под него (само свободни) стават място на катедралата.
+// Изборът се помни в S.landmarks (mem[k + '@'] = [x, z, rot, ...id]) — не скача при следващо зареждане.
+const LM_FP = { notredame: [72, 30] };   // мястото при мащаб 1 (катедралата е ~69 м); ако няма — по-малко (×0.83, ×0.7) и катедралата се смалява
 function lmRiverSpot(k, mem) {
   const P = city.plan, sq = P && P.square; if (!P || !P.waterAt || !P.lots) return null;
-  const own = new Set([...(est().owned || []).map(o => o.lot), ...projects.map(p => p.lot), ...(S.built || []).map(b => b.lot)]), was = new Set(mem[k + '@'] || []);
+  const own = new Set([...(est().owned || []).map(o => o.lot), ...projects.map(p => p.lot), ...(S.built || []).map(b => b.lot)]), was = new Set((mem[k + '@'] || []).slice(4));
   const free = l => l && l !== city.hq && !l.fresh && !own.has(l.id) && (!l.busy || was.has(l.id));
-  const old = (mem[k + '@'] || []).map(id => city.lots[id]);
-  let best = old.length === 3 && old.every(free) ? old : null;
-  if (!best) {
-    const wet = l => { for (let a = 0; a < 8; a++) for (const r of [18, 32]) if (P.waterAt(l.x + Math.cos(a * Math.PI / 4) * r, l.z + Math.sin(a * Math.PI / 4) * r)) return true; return false; };
-    const by = new Map();
-    for (const l of city.lots) { const L = P.lots[l.id]; if (!L || !free(l)) continue; const key = L.street + ':' + L.side; (by.get(key) || by.set(key, []).get(key)).push([L, l]); }
-    let bd = 1e9;
-    for (const arr of by.values()) { arr.sort((a, b) => a[0].s - b[0].s);
-      for (let i = 0; i + 2 < arr.length; i++) { const g = arr.slice(i, i + 3);
-        if (g.some((x, j) => j && x[0].s - x[0].w / 2 - (g[j - 1][0].s + g[j - 1][0].w / 2) > 4)) continue;   // съседни, без празнина
-        const m = g[1][1], d = Math.hypot(m.x - sq.x, m.z - sq.z);
-        if (d < sq.r + 150 || d >= bd || !wet(m)) continue;
-        bd = d; best = g.map(x => x[1]); } }
+  let FW = 0, FD = 0;
+  const inFp = (x, z, rot, px, pz, pad = 0) => { const c = Math.cos(rot), s2 = Math.sin(rot), dx = px - x, dz = pz - z; return Math.abs(dx * c - dz * s2) <= FW / 2 + pad && Math.abs(dx * s2 + dz * c) <= FD / 2 + pad; };   // ос u — по улицата, v — към нея
+  const under = (x, z, rot) => city.lots.filter(l => Math.hypot(l.x - x, l.z - z) < FW && (inFp(x, z, rot, l.x, l.z, 2) || rectCorners(l.x, l.z, l.w / 2, l.d / 2, l.rot).some(q => inFp(x, z, rot, q[0], q[1], -1))));
+  const ok = (x, z, rot) => {
+    for (let i = -3; i <= 3; i++) for (let j = -2; j <= 2; j++) { const u = i / 3 * FW / 2, v = j / 2 * FD / 2, c = Math.cos(rot), s2 = Math.sin(rot); if (P.waterAt(x + u * c + v * s2, z - u * s2 + v * c)) return null; }
+    for (const st of P.streets) for (const q of st.pts) if (Math.abs(q[0] - x) < FW && Math.abs(q[1] - z) < FW && inFp(x, z, rot, q[0], q[1], st.w / 2 + 0.5)) return null;
+    const L = under(x, z, rot); return L.length && L.every(free) ? L : null; };
+  const m0 = mem[k + '@'], [W0, D0] = LM_FP[k] || [40, 30];
+  let best = null;
+  if (m0 && m0.length > 4) { FW = W0 * m0[3]; FD = D0 * m0[3]; const L = ok(m0[0], m0[1], m0[2]); if (L) best = { x: m0[0], z: m0[1], rot: m0[2], sc: m0[3], L }; }
+  const wet = (x, z) => { for (let a = 0; a < 8; a++) if (P.waterAt(x + Math.cos(a * Math.PI / 4) * 40, z + Math.sin(a * Math.PI / 4) * 40)) return true; return false; };
+  for (const sc of [1, 0.83, 0.7]) {
+    if (best) break;
+    FW = W0 * sc; FD = D0 * sc; let bd = 1e9;
+    for (const l of city.lots) {
+      const d = Math.hypot(l.x - sq.x, l.z - sq.z); if (d < sq.r + 90 || d >= bd || !free(l)) continue;
+      const fx = Math.sin(l.rot), fz = Math.cos(l.rot), back = (FD - l.d) / 2, x = l.x - fx * back, z = l.z - fz * back;   // лицето — на линията на парцела
+      if (!wet(x, z)) continue;
+      const L = ok(x, z, l.rot); if (L) { bd = d; best = { x, z, rot: l.rot, sc, L }; }
+    }
   }
   if (!best) return null;
-  mem[k + '@'] = best.map(l => l.id); mem[k] = best[1].id;
-  for (const l of best) { if (l.obj) city.group.remove(l.obj); for (const t of l.trees || []) city.group.remove(t); l.obj = null; l.built = null; l.trees = []; l.busy = 'landmark'; }
-  const m = best[1], o = buildLandmark(k, { label });
-  o.group.position.set((best[0].x + best[2].x) / 2, 0, (best[0].z + best[2].z) / 2); o.group.rotation.y = lotRot(m) + Math.PI / 2; o.group.scale.multiplyScalar(lotK(m));
+  mem[k + '@'] = [Math.round(best.x * 100) / 100, Math.round(best.z * 100) / 100, Math.round(best.rot * 1000) / 1000, best.sc, ...best.L.map(l => l.id)]; mem[k] = best.L[0].id;
+  for (const l of best.L) { if (l.obj) city.group.remove(l.obj); for (const t of l.trees || []) city.group.remove(t); l.obj = null; l.built = null; l.trees = []; l.busy = 'landmark'; }
+  const o = buildLandmark(k, { label }); o.group.position.set(best.x, 0, best.z); o.group.rotation.y = best.rot; o.group.scale.multiplyScalar(best.sc);
   return o;
 }
 function landmarkPlan(kinds) {

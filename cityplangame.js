@@ -13,7 +13,7 @@ const cache = new Map();
 // o.bigZone — { kind, W, D, asp, turn, size: [w, d] }: запазено място на север от площада за голямата забележителност (Капитолият…)
 export function gamePlan(cityId, o = {}) {
   if (cache.has(cityId)) return cache.get(cityId);
-  const P0 = makePlan(cityId, { game: true, minLots: o.mega ? MEGA_LOTS : PLAN_CORE + PLAN_EXT * (o.exts || 4), ...(o.mega ? { mega: true, R: 400 } : {}), ...(o.landmark ? { squareR: 30 } : {}), ...(o.bigZone ? { bigZone: o.bigZone.size } : {}), ...(o.tpl ? { tpl: o.tpl } : {}), ...(o.clean ? { clean: true } : {}), ...(o.seaside ? { noCoast: true } : {}) });
+  const P0 = makePlan(cityId, { game: true, minLots: o.mega ? MEGA_LOTS : PLAN_CORE + PLAN_EXT * (o.exts || 4), ...(o.mega ? { mega: true, R: 400 } : {}), ...(o.landmark ? { squareR: 30 } : {}), ...(o.bigZone ? { bigZone: o.bigZone.size } : {}), ...(o.tpl ? { tpl: o.tpl } : {}), ...(o.clean ? { clean: true } : {}), ...(o.clean2 ? { clean2: true } : {}), ...(o.seaside ? { noCoast: true } : {}) });
   if (!P0) return null;
   let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
   for (const [x, z] of P0.boundary) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); }

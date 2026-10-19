@@ -368,6 +368,25 @@ export function makePlan(cityId, opts = {}) {
     for (const p of st.pts) { if (keep(p, st) && Math.abs(p[0]) < LIM && Math.abs(p[1]) < LIM) run.push(p); else flush(); }
     flush();
   }
+  // opts.clean2 (нови игри, Лабораторията → road-clean): улица, която дълго върви почти успоредно на друга (по-близо от 12 м),
+  // се реже там — парчетата се свързват с нея по-долу (Т-кръстовище). Иначе се получаваха двойни платна и тесни клинове асфалт.
+  // Първо остават по-широките (булеварди, пръстени), после улиците по реда на създаване; кратко доближаване (пресичане) не се реже.
+  if (opts.clean2) {
+    const NEAR = 12, RUN = 24, cg = new Map(), ck = (x, z) => Math.floor(x / NEAR) + ',' + Math.floor(z / NEAR), kept = [];
+    const nearOk = (x, z) => { const i = Math.floor(x / NEAR), j = Math.floor(z / NEAR);
+      for (let a = i - 1; a <= i + 1; a++) for (let b = j - 1; b <= j + 1; b++) for (const q of cg.get(a + ',' + b) || []) if (Math.hypot(q[0] - x, q[1] - z) < NEAR) return true;
+      return false; };
+    const order = parts.map((st, i) => [st, i]).sort((a, b) => (b[0].w - a[0].w) || a[1] - b[1]).map(x => x[0]);
+    for (const st of order) {
+      const near = st.pts.map(p => nearOk(p[0], p[1])), drop = near.map(() => false);
+      for (let i = 0; i < near.length;) { if (!near[i]) { i++; continue; } let j = i; while (j < near.length && near[j]) j++; if (cumLen(st.pts.slice(i, j)).at(-1) > RUN) for (let k = i; k < j; k++) drop[k] = true; i = j; }
+      let run = [];
+      const flush = () => { if (run.length > 1 && cumLen(run).at(-1) > 16) kept.push({ ...st, pts: run, closed: st.closed && run.length === st.pts.length }); run = []; };
+      st.pts.forEach((p, i) => { if (drop[i]) flush(); else run.push(p); }); flush();
+      st.pts.forEach((p, i) => { if (!drop[i]) (cg.get(ck(p[0], p[1])) || cg.set(ck(p[0], p[1]), []).get(ck(p[0], p[1]))).push(p); });
+    }
+    parts = kept;
+  }
   // --- кръстовища и свързаност: възли там, където улиците се пресичат или краят опира в друга улица/площада
   const nodes = [{ x: sq.x, z: sq.z, square: true, deg: 0 }], nodeAt = (x, z) => {
     for (let i = 1; i < nodes.length; i++) if (Math.hypot(nodes[i].x - x, nodes[i].z - z) < 4) return i;
@@ -398,12 +417,20 @@ export function makePlan(cityId, opts = {}) {
       if (stops[a].some(([q]) => Math.abs(q - s) < 6)) continue;
       let best = null;
       parts.forEach((o, b) => { if (b === a) return; const d = polyDist(p, o.pts); if (d < (o.w + st.w) / 2 + 6 && (!best || d < best.d)) best = { b, d }; });
+      if (!best && opts.clean2) {   // нови игри: задънената улица се доизтегля напред до улица на ≤ 40 м (без вода по пътя)
+        const q0 = st.pts[end === 0 ? 1 : st.pts.length - 2], ux = p[0] - q0[0], uz = p[1] - q0[1], ul = Math.hypot(ux, uz) || 1;
+        parts.forEach((o, b) => { if (b === a) return; for (const [k, q] of o.pts.entries()) { const dx = q[0] - p[0], dz = q[1] - p[1], d = Math.hypot(dx, dz);
+          if (d > 40 || d < 1 || (dx * ux + dz * uz) / (d * ul) < 0.6 || (best && d >= best.d)) continue;
+          let wet = false; for (let k = 1; k < 8; k++) if (waterAt(p[0] + dx * k / 8, p[1] + dz * k / 8) || Math.hypot(p[0] + dx * k / 8 - sq.x, p[1] + dz * k / 8 - sq.z) < sq.r + 2) wet = true;
+          if (!wet) best = { b, d, k: Math.max(1, k) }; } });
+      }
       if (best) {   // доведи края до оста на другата улица
         const o = parts[best.b]; let bi = 1, bd = 1e9, bt = 0;
-        for (let i = 1; i < o.pts.length; i++) { const [d, t] = segDist(p, o.pts[i - 1], o.pts[i]); if (d < bd) { bd = d; bi = i; bt = t; } }
+        if (best.k) { bi = best.k; bt = 1; } else for (let i = 1; i < o.pts.length; i++) { const [d, t] = segDist(p, o.pts[i - 1], o.pts[i]); if (d < bd) { bd = d; bi = i; bt = t; } }
         const q = [lerp(o.pts[bi - 1][0], o.pts[bi][0], bt), lerp(o.pts[bi - 1][1], o.pts[bi][1], bt)], n = nodeAt(q[0], q[1]);
-        if (end === 0) st.pts.unshift(q); else st.pts.push(q);
-        st.L = cumLen(st.pts); if (end === 0) for (const t of stops[a]) t[0] += st.L[1];
+        const nf = best.k ? Math.max(0, Math.ceil(best.d / 2) - 1) : 0, fill = Array.from({ length: nf }, (_, i) => [lerp(p[0], q[0], (i + 1) / (nf + 1)), lerp(p[1], q[1], (i + 1) / (nf + 1))]);   // през 2 м, както останалата улица
+        if (end === 0) st.pts.unshift(q, ...fill.reverse()); else st.pts.push(...fill, q);
+        st.L = cumLen(st.pts); if (end === 0) for (const t of stops[a]) t[0] += st.L[1 + fill.length];
         stops[a].push([end === 0 ? 0 : st.L.at(-1), n]); stops[best.b].push([lerp(o.L[bi - 1], o.L[bi], bt), n]);
       } else stops[a].push([s, nodeAt(p[0], p[1])]);   // задънена (или шосе извън града)
     }
