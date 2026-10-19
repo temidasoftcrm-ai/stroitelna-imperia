@@ -19,7 +19,8 @@ const PEDS = ['adam', 'brian', 'steve', 'elizabeth', 'kate', 'louise'].map(k => 
 const ANIMS = 'assets/heavy/people/peds/peds-anims.glb';
 const BLD = ['brick', 'richmond', 'dbrick', 'modoffice', 'asian', 'jade'].map(k => `assets/heavy/blocks/${k}.glb`);   // реалистичните сгради от града (Sketchfab, CC BY)
 const TLIGHT = 'assets/heavy/signs/tlight.glb', FOREST = 'assets/heavy/trees/forest.glb';
-const VEH = { neg: 'assets/heavy/cars/car-accord.glb', med: 'assets/heavy/cars/amb-eu.glb', pol: 'assets/heavy/cars/pol-crownvic.glb', riot: 'assets/heavy/cars/pol-interceptor.glb' };
+const RIOT = 'assets/heavy/riot/';   // изгорели коли, контейнер, боклук, бусът и полицаят на силите на реда (Sketchfab, CC BY — CREDITS.txt)
+const VEH = { neg: 'assets/heavy/cars/car-accord.glb', med: 'assets/heavy/cars/amb-eu.glb', pol: 'assets/heavy/cars/pol-crownvic.glb', riot: RIOT + 'riot-van.glb' };
 const TRAFFIC = ['polo', 'corolla', 'taxi', 'renegade', 'p206', 'hilux', 'accord', 'polo', 'taxi', 'corolla', 'uaz452', 'p206'].map(k => `assets/heavy/cars/car-${k}.glb`), BUS = 'assets/heavy/cars/bus-citaro.glb';
 const HALL = 'assets/heavy/civic/cityhall.glb';
 // истинските дървета: пакетът „Tree Pack“ (Sketchfab, CC BY) — стволът и короната са отделни възли; събираме ги по двойки (най-близкия по X)
@@ -33,7 +34,7 @@ const treeTpl = () => treeP || (treeP = load(FOREST).then(g => { if (!g) return 
 // ---- разположението (метри; площадът е около началото, общината — към −z)
 const ST_A = 22, ST_B = 30, ROAD_W = 9;   // улица А: z = 22 (по X); улица Б: x = 30 (по Z)
 const SPOT = { neg: [-9, ST_A - 2.2, -Math.PI / 2], pol: [12, ST_A - 2.2, -Math.PI / 2], med: [ST_B - 2.2, 2, Math.PI] };   // [x, z, посока при спиране]
-const ENTRY = { neg: [[-70, ST_A - 2.2], [-9, ST_A - 2.2]], pol: [[-70, ST_A - 2.2], [12, ST_A - 2.2]], med: [[ST_B - 2.2, 70], [ST_B - 2.2, 2]], riot: [[ST_B - 2.2, -70], [ST_B - 2.2, -6]] };
+const ENTRY = { neg: [[-70, ST_A - 2.2], [-13, ST_A - 2.2]], pol: [[-70, ST_A - 2.2], [12, ST_A - 2.2]], med: [[ST_B - 2.2, 70], [ST_B - 2.2, 2]], riot: [[ST_B - 2.2, -70], [ST_B - 2.2, -6]] };
 const RIOT_Z = [13, 10];   // къде се събират провокаторите (до улицата, далеч от масата)
 const ZONE = { crowd: [-3, 3, 10, 7], talk: [0, -13], med: [19, -3], cordon: ST_A - 5.2 };
 const BACK_DAYS = 0.18;
@@ -154,16 +155,20 @@ export function openOpsSquare(ops, o = {}) {
   const SIGN_TXT = ['ЧУЙТЕ НИ!', 'ДИАЛОГ', 'ЗА НАС', (m0.demand.split(' ').slice(0, 2).join(' ') || 'ПРОМЯНА').toUpperCase()];
   const signM = SIGN_TXT.map(t => own(new THREE.MeshStandardMaterial({ map: ctex(256, 160, (g, w, h) => { g.fillStyle = '#fbf8ef'; g.fillRect(0, 0, w, h); g.strokeStyle = '#c62828'; g.lineWidth = 10; g.strokeRect(5, 5, w - 10, h - 10); g.fillStyle = '#1a1a1a'; g.textAlign = 'center'; g.textBaseline = 'middle'; let fs = 46; g.font = `900 ${fs}px system-ui`; while (g.measureText(t).width > w - 30 && fs > 20) g.font = `900 ${fs -= 3}px system-ui`; g.fillText(t, w / 2, h / 2); }), side: THREE.DoubleSide, roughness: 0.8 })));
   const signG = own(new THREE.PlaneGeometry(0.9, 0.56)), stickG = own(new THREE.CylinderGeometry(0.025, 0.025, 1.3, 6)), stickM = mat(0x8d6e4c);
-  const crowd = [], staff = [], rioters = [];
+  const crowd = [], staff = [], rioters = []; let copSrc = null, shieldSrc = null; const COP_HIP = 0.98;
+  // полицаят е в метри, клиповете на минувачите — в сантиметри: само завъртанията (без преместване на таза)
+  const rotCache = new Map(), rotOnly = c => rotCache.get(c) || (rotCache.set(c, new THREE.AnimationClip(c.name, c.duration, c.tracks.filter(t => /\.quaternion$/.test(t.name)))), rotCache.get(c));
   const shieldG = own(new THREE.BoxGeometry(0.62, 1.05, 0.05)), shieldM = own(new THREE.MeshPhysicalMaterial({ color: 0xbcd4ff, transparent: true, opacity: 0.55, roughness: 0.2 }));
   function person(src, opt = {}) {
-    const p = cloneSkinned(src.scene); p.scale.setScalar(src.k * (0.95 + Math.random() * 0.1));
+    const body = cloneSkinned(src.scene), p = src === copSrc ? new THREE.Group() : body; if (p !== body) { body.position.y = COP_HIP; p.add(body); }   /* полицаят: центърът му е в таза — повдигаме тялото */
+    p.scale.setScalar(src.k * (0.95 + Math.random() * 0.1));
     p.traverse(o => { if (!o.isMesh) return; o.castShadow = true; o.frustumCulled = false;
       if (opt.tint) { o.material = own(o.material.clone()); const hsl = {}; o.material.color.getHSL(hsl); if (!(hsl.h > 0.02 && hsl.h < 0.12 && hsl.l > 0.45)) o.material.color.lerp(new THREE.Color(opt.tint), 0.75); } });
     scene.add(p);
-    const mixer = new THREE.AnimationMixer(p), acts = {};
-    const play = n => { const c = clips[n] || src.animations.find(a => a.name === n) || src.animations.find(a => a.name.includes(n)) || src.animations.find(a => /Idle/.test(a.name)); /* своите са Ped_Walk_* / Ped_Idle */ if (!c) return; if (!acts[n]) acts[n] = mixer.clipAction(c); for (const [k, a] of Object.entries(acts)) if (k !== n && a.isRunning()) a.fadeOut(0.3); acts[n].reset().fadeIn(0.3).play(); };
-    const P = { p, mixer, play, src, sign: null, x: 0, z: 0, ry: 0, goal: null, sp: 1.3, cur: '' };
+    const mixer = new THREE.AnimationMixer(body), acts = {};
+    const anims = src.animations.length ? src.animations : (pedSrc[0] ? pedSrc[0].animations : []);   /* полицаят (riot-cop) е без свои клипове — взима Walk/Idle от минувачите */
+    const play = n => { let c = clips[n] || anims.find(a => a.name === n) || anims.find(a => a.name.includes(n)) || anims.find(a => /Idle/.test(a.name)); if (c && src === copSrc) c = rotOnly(c); /* своите са Ped_Walk_* / Ped_Idle */ if (!c) return; if (!acts[n]) acts[n] = mixer.clipAction(c); for (const [k, a] of Object.entries(acts)) if (k !== n && a.isRunning()) a.fadeOut(0.3); acts[n].reset().fadeIn(0.3).play(); };
+    const P = { p, body, mixer, play, src, sign: null, x: 0, z: 0, ry: 0, goal: null, sp: 1.3, cur: '' };
     return P;
   }
   const setAnim = (P, n) => { if (P.cur === n) return; P.cur = n; P.play(n); };
@@ -176,7 +181,7 @@ export function openOpsSquare(ops, o = {}) {
     setAnim(P, Math.random() < 0.5 ? 'Waving' : Math.random() < 0.5 ? 'Talk_Arguing' : 'Idle'); P.mixer.update(Math.random() * 3);
     crowd.push(P); return P;
   }
-  function dropPerson(P, list) { scene.remove(P.p); if (P.sign) scene.remove(P.sign); P.mixer.stopAllAction(); P.mixer.uncacheRoot(P.p); list.splice(list.indexOf(P), 1); }
+  function dropPerson(P, list) { scene.remove(P.p); if (P.sign) scene.remove(P.sign); P.mixer.stopAllAction(); P.mixer.uncacheRoot(P.body || P.p); list.splice(list.indexOf(P), 1); }
   // екипите на място: [кой, позиции, анимация, оцветяване]
   const STAFF = {
     neg: { at: [[-0.8, ZONE.talk[1] - 1.1, 0], [0.8, ZONE.talk[1] - 1.1, 0]], org: [[-0.8, ZONE.talk[1] + 1.1, Math.PI], [0.8, ZONE.talk[1] + 1.1, Math.PI]], anim: 'Talk_General', tint: 0x2b2f3a },
@@ -189,20 +194,34 @@ export function openOpsSquare(ops, o = {}) {
     if (staffOn[k] === on || !pedSrc.length) return; staffOn[k] = on;
     if (!on) { for (const P of staff.filter(q => q.team === k)) dropPerson(P, staff); return; }
     const S0 = STAFF[k];
-    const put = (list, tint) => list.forEach(([x, z, ry], i) => { const P = person(pedSrc[(i + (k === 'pol' ? 1 : 0)) % pedSrc.length], { tint }); P.team = k; P.x = x; P.z = z; P.ry = ry; P.p.position.set(x, 0, z); P.p.rotation.y = ry; setAnim(P, S0.anim); P.mixer.update(Math.random() * 2); staff.push(P); });
+    const cop = (k === 'pol' || k === 'riot') && copSrc;
+    const put = (list, tint) => list.forEach(([x, z, ry], i) => { const P = person(cop || pedSrc[(i + (k === 'pol' ? 1 : 0)) % pedSrc.length], { tint: cop ? null : tint }); P.team = k; P.x = x; P.z = z; P.ry = ry; P.p.position.set(x, 0, z); P.p.rotation.y = ry; setAnim(P, S0.anim); P.mixer.update(Math.random() * 2); staff.push(P); });
     put(S0.at, S0.tint); if (S0.org) put(S0.org, null);
-    if (S0.shield) for (const P of staff.filter(q => q.team === k)) { const sh = new THREE.Mesh(shieldG, shieldM); sh.position.set(0, 1.0 / P.p.scale.x, 0.45 / P.p.scale.x); sh.scale.setScalar(1 / P.p.scale.x); P.p.add(sh); }
+    if (S0.shield) for (const P of staff.filter(q => q.team === k)) { const sh = shieldSrc ? fitTo(shieldSrc.scene.clone(true), { h: 1.15 }) : new THREE.Mesh(shieldG, shieldM); if (shieldSrc) { sh.rotation.y = Math.PI / 2; shadows(sh); } sh.position.set(0.1 / P.p.scale.x, (shieldSrc ? 0.35 : 1.0) / P.p.scale.x, 0.45 / P.p.scale.x); sh.scale.setScalar(1 / P.p.scale.x); P.p.add(sh); }
   }
 
   // ---- 🔥 безредиците: подпалени кофи (пламък, който трепти, и оранжева светлина) и група провокатори
-  const fires = [];
-  for (const [x, z] of [[9, 13], [14, 9.5], [17, 14]]) { const g = new THREE.Group(); g.position.set(x, 0, z); scene.add(g);
-    const bin = new THREE.Mesh(own(new THREE.CylinderGeometry(0.4, 0.34, 0.9, 12)), mat(0x2f3b2f, { metalness: 0.4 })); bin.position.y = 0.45; bin.castShadow = true; g.add(bin);
-    const fl = new THREE.Mesh(own(new THREE.ConeGeometry(0.42, 1.3, 10)), own(new THREE.MeshBasicMaterial({ color: 0xff7a1a, transparent: true, opacity: 0.85 }))); fl.position.y = 1.4; g.add(fl);
-    const L = new THREE.PointLight(0xff8a3a, 0, 9, 1.6); L.position.y = 1.8; g.add(L); g.visible = false; fires.push({ g, fl, L, bin }); }
+  // огнищата: кофите горят веднага; с растящите щети пламват контейнер, боклук и коли (остават изгорели и след безредиците)
+  const flameT = ctex(64, 128, (g, w, h) => { const r = g.createRadialGradient(w / 2, h * 0.7, 2, w / 2, h * 0.6, h * 0.5); r.addColorStop(0, 'rgba(255,240,180,1)'); r.addColorStop(0.35, 'rgba(255,150,40,.9)'); r.addColorStop(0.75, 'rgba(220,60,10,.35)'); r.addColorStop(1, 'rgba(120,20,0,0)'); g.fillStyle = r; g.fillRect(0, 0, w, h); });
+  const flameM = own(new THREE.SpriteMaterial({ map: flameT, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  const SPOTS = [
+    { x: 9, z: 13, bin: true, at: 0, fl: 0.9 }, { x: 14, z: 9.5, bin: true, at: 0, fl: 0.9 }, { x: 17, z: 14, bin: true, at: 0, fl: 0.9 },
+    { x: 5, z: 15.2, prop: 'dumpster', len: 2.6, ry: 0.3, at: 4e6, fl: 1.6, light: true },
+    { x: 11, z: 15.6, prop: 'trash-pile', len: 1.8, ry: 1.2, at: 9e6, fl: 1.0 }, { x: 21, z: 7, prop: 'trash-pile', len: 1.6, ry: -0.4, at: 14e6, fl: 1.0 },
+    { x: 20, z: 15.4, prop: 'burnt-car-a', len: 4.5, ry: 1.75, at: 18e6, fl: 2.2, light: true },
+    { x: -3, z: 15.4, prop: 'burnt-car-b', len: 4.6, ry: 1.4, at: 30e6, fl: 2.2, light: true },
+    { x: 24.5, z: -4, prop: 'burnt-police', len: 4.8, ry: 0.1, at: 42e6, fl: 2.0 },
+    { x: 2, z: 11, prop: 'trash-pile', len: 1.5, ry: 2.4, at: 24e6, fl: 0.9 },
+  ];
+  const fires = SPOTS.map((S1, i) => { const g = new THREE.Group(); g.position.set(S1.x, 0, S1.z); g.rotation.y = S1.ry || 0; g.visible = false; scene.add(g); let bin = null;
+    if (S1.bin) { bin = new THREE.Mesh(own(new THREE.CylinderGeometry(0.4, 0.34, 0.9, 12)), mat(0x2f3b2f, { metalness: 0.4 })); bin.position.y = 0.45; bin.castShadow = true; g.add(bin); }
+    const fl = Array.from({ length: S1.prop ? 7 : 4 }, () => { const sp = new THREE.Sprite(flameM); sp.userData.o = [(Math.random() - 0.5) * S1.fl * 0.8, (Math.random() - 0.5) * S1.fl * 0.5, Math.random() * 6]; g.add(sp); return sp; });
+    const L = S1.light || i === 0 ? new THREE.PointLight(0xff8a3a, 0, 11, 1.6) : null; if (L) { L.position.y = 1.8; g.add(L); }
+    return { S1, g, fl, L, bin, loaded: false }; });
+  const showSpot = F => { if (F.loaded || !F.S1.prop) return; F.loaded = true; load(RIOT + F.S1.prop + '.glb').then(gl => { if (!gl || shut) return; const o = fitTo(gl.scene.clone(true), { len: F.S1.len }); shadows(o); F.g.add(o); }); };
   // 🌫️ димът от кофите — общ пул от спрайтове (растат, издигат се и избледняват)
   const smokeT = ctex(64, 64, (g, w) => { const r = g.createRadialGradient(w / 2, w / 2, 2, w / 2, w / 2, w / 2); r.addColorStop(0, 'rgba(70,70,70,.85)'); r.addColorStop(1, 'rgba(70,70,70,0)'); g.fillStyle = r; g.fillRect(0, 0, w, w); });
-  const smoke = Array.from({ length: 30 }, () => { const sp = new THREE.Sprite(own(new THREE.SpriteMaterial({ map: smokeT, transparent: true, depthWrite: false, opacity: 0 }))); sp.visible = false; scene.add(sp); return { sp, life: 0 }; });
+  const smoke = Array.from({ length: 48 }, () => { const sp = new THREE.Sprite(own(new THREE.SpriteMaterial({ map: smokeT, transparent: true, depthWrite: false, opacity: 0 }))); sp.visible = false; scene.add(sp); return { sp, life: 0 }; });
   let smokeT0 = 0;
   // 🍾 хвърлени предмети (бутилки и камъни) — по дъга, после изчезват
   const bottleG = own(new THREE.CylinderGeometry(0.05, 0.07, 0.3, 6)), stoneG = own(new THREE.DodecahedronGeometry(0.1)), bottleM = mat(0x2e6b3a, { roughness: 0.3 }), stoneM = mat(0x777370);
@@ -214,9 +233,12 @@ export function openOpsSquare(ops, o = {}) {
   const walkTo = (P, x, z, sp, dt) => { const dx = x - P.x, dz = z - P.z, d = Math.hypot(dx, dz); if (d < 0.3) return true; const st = Math.min(d, sp * dt); P.x += dx / d * st; P.z += dz / d * st; P.ry = Math.atan2(dx, dz); return false; };
   function riotScene(m, tt, dt) {
     const on = !!m.riot && !m.out, burnt = m.damage > 0, force = m.teams.riot && m.teams.riot.st === 'onsite';
-    for (const [i, F] of fires.entries()) { F.g.visible = on || burnt; F.fl.visible = on; F.L.intensity = on ? 6 + Math.sin(tt * 13 + i) * 2 : 0; if (on) { const k = 1 + Math.sin(tt * 11 + i * 2) * 0.18; F.fl.scale.set(k, 1.1 + Math.sin(tt * 7 + i) * 0.25, k); } else if (burnt) F.bin.rotation.z = 1.4; }
+    for (const [i, F] of fires.entries()) { const lit = (m.riot || m.damage > 0) && m.damage >= F.S1.at; F.g.visible = lit; if (!lit) continue; showSpot(F);
+      const burning = on; for (const [j, sp] of F.fl.entries()) { sp.visible = burning; if (!burning) continue; const [ox, oz, ph] = sp.userData.o, u = (tt * 1.6 + ph + j * 0.37) % 1, s0 = F.S1.fl;
+        sp.position.set(ox, (F.S1.bin ? 0.9 : 0.4) + u * s0 * 1.3, oz); sp.scale.set(s0 * (0.9 - u * 0.5), s0 * (1.3 - u * 0.4), 1); sp.material.opacity = 1; }
+      if (F.L) F.L.intensity = burning ? 7 + Math.sin(tt * 13 + i) * 2.5 : 0; if (!burning && F.bin) F.bin.rotation.z = 1.4; }
     // дим: докато гори — по-гъст; след угасяване — още малко
-    smokeT0 -= dt; if ((on || (burnt && Math.random() < 0.15)) && smokeT0 <= 0) { smokeT0 = on ? 0.12 : 0.6; const F = fires[(Math.random() * fires.length) | 0], S0 = smoke.find(q => q.life <= 0); if (S0) { S0.life = 1; S0.sp.visible = true; S0.sp.position.set(F.g.position.x + (Math.random() - 0.5) * 0.4, 2, F.g.position.z + (Math.random() - 0.5) * 0.4); S0.dx = 0.4 + Math.random() * 0.4; } }
+    smokeT0 -= dt; if ((on || (burnt && Math.random() < 0.15)) && smokeT0 <= 0) { smokeT0 = on ? 0.12 : 0.6; const vis = fires.filter(q => q.g.visible), F = vis[(Math.random() * vis.length) | 0] || fires[0], S0 = smoke.find(q => q.life <= 0); if (S0) { S0.life = 1; S0.sp.visible = true; S0.sp.position.set(F.g.position.x + (Math.random() - 0.5) * 0.4, 2, F.g.position.z + (Math.random() - 0.5) * 0.4); S0.dx = 0.4 + Math.random() * 0.4; } }
     for (const S0 of smoke) if (S0.life > 0) { S0.life -= dt / 4; const a = 1 - S0.life; S0.sp.position.y += dt * 1.4; S0.sp.position.x += dt * S0.dx; S0.sp.scale.setScalar(1 + a * 5); S0.sp.material.opacity = Math.max(0, S0.life) * 0.55; if (S0.life <= 0) S0.sp.visible = false; }
     // провокаторите: допълват се, докато силите на реда ги няма
     if (on && !force && pedSrc.length) while (rioters.filter(P => !P.goal && !P.held).length < 10) { const P = person(pedSrc[(rioters.length + 2) % pedSrc.length], { tint: 0x26282c }); P.x = RIOT_Z[0] + (Math.random() - 0.5) * 10; P.z = RIOT_Z[1] + (Math.random() - 0.5) * 4; P.ry = Math.random() * 6.28; P.p.position.set(P.x, 0, P.z); P.next = 0; setAnim(P, 'Talk_Arguing'); rioters.push(P); }
@@ -260,12 +282,22 @@ export function openOpsSquare(ops, o = {}) {
   // ---- колите на екипите: позицията — от времето на мисията
   const veh = {}, labels = {};
   for (const k of Object.keys(OPS_TEAMS)) {
-    load(VEH[k]).then(g => { if (!g || shut) return; const v = fitTo(g.scene.clone(true), { len: k === 'med' ? 6 : 4.8 }); shadows(v); const hold = new THREE.Group(); hold.add(v); hold.visible = false; scene.add(hold); veh[k] = hold;
+    load(VEH[k]).then(g => { if (!g || shut) return; const v = fitTo(g.scene.clone(true), { len: k === 'med' || k === 'riot' ? 6 : 4.8 }); shadows(v); const hold = new THREE.Group(); hold.add(v); hold.visible = false; scene.add(hold); veh[k] = hold;
       if (k !== 'neg') { const L = []; for (const [c, dx] of [[0xff2020, -0.35], [0x2060ff, 0.35]]) { const b = new THREE.Mesh(own(new THREE.SphereGeometry(0.16, 10, 8)), own(new THREE.MeshBasicMaterial({ color: c }))); b.position.set(dx, k === 'med' ? 2.9 : 1.6, 0.2); hold.add(b); L.push(b); } hold.userData.beacons = L; } });
     const lb = document.createElement('div'); lb.className = 'lb'; lb.style.display = 'none'; el.querySelector('.lbs').appendChild(lb); labels[k] = lb;
   }
   const lerp2 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  // 🚓 колоната: след първата кола идват още (спират в редица зад нея, с малко закъснение)
+  const CONVOY = { pol: [['pol-charger', 5.6, 0.02], ['pol-interceptor', 11.2, 0.04], ['pol-nypd', 16.8, 0.06]], riot: [['car-polsuv', 7, 0.03], ['pol-volga', 12.5, 0.05]] }, conv = [];
+  for (const [k, list] of Object.entries(CONVOY)) for (const [nm, back, delay] of list) load(`assets/heavy/cars/${nm}.glb`).then(g => { if (!g || shut) return; const v = fitTo(g.scene.clone(true), { len: 4.8 }); shadows(v); const h = new THREE.Group(); h.add(v); h.visible = false; scene.add(h);
+    const L = []; for (const [c, dx] of [[0xff2020, -0.35], [0x2060ff, 0.35]]) { const b = new THREE.Mesh(own(new THREE.SphereGeometry(0.16, 10, 8)), own(new THREE.MeshBasicMaterial({ color: c }))); b.position.set(dx, 1.6, 0.2); h.add(b); L.push(b); } conv.push({ k, h, back, delay, L }); });
+  function placeConvoy(m, tt) { for (const c of conv) { const tm = m.teams[c.k]; if (!tm) continue; const [a, b0] = ENTRY[c.k], dir = Math.atan2(b0[0] - a[0], b0[1] - a[1]), ux = Math.sin(dir), uz = Math.cos(dir), b = [b0[0] - ux * c.back, b0[1] - uz * c.back]; let pos = null;
+    if (tm.st === 'enroute') { const p = Math.max(0, Math.min(1, (m.t - tm.t0 - c.delay) / tm.eta)); pos = p > 0 ? lerp2(a, b, 1 - Math.pow(1 - p, 2)) : null; }
+    else if (tm.st === 'onsite') pos = b;
+    else if (tm.st === 'back') { const p = Math.min(1, (m.t - tm.t0) / BACK_DAYS); if (p < 1) pos = lerp2(b, [b[0] + (b[0] - a[0]) * 0.8, b[1] + (b[1] - a[1]) * 0.8], p * p); }
+    c.h.visible = !!pos; if (pos) { c.h.position.set(pos[0], 0, pos[1]); c.h.rotation.y = dir; } const on = tm.st === 'enroute' || tm.st === 'onsite'; c.L.forEach((s0, i) => { s0.visible = on && ((tt * 3 + i + c.back) | 0) % 2 === 0; }); } }
   function placeVehicles(m, tt) {
+    placeConvoy(m, tt);
     for (const [k, tm] of Object.entries(m.teams)) {
       const h = veh[k], lb = labels[k], T = OPS_TEAMS[k]; if (!lb) continue; let pos = null, ry = 0, txt = '';
       const [a, b] = ENTRY[k], dir = Math.atan2(b[0] - a[0], b[1] - a[1]);
@@ -279,6 +311,11 @@ export function openOpsSquare(ops, o = {}) {
     medT.visible = m.teams.med.st === 'onsite'; cordon.visible = m.teams.pol.st === 'onsite';
   }
   const tmp = new THREE.Vector3();
+  // 🚨 сирените: докато колата на екипа е на път — по-силно с приближаването, спира на място
+  const SIREN = { pol: 'siren-police', riot: 'siren-police-3', med: 'siren-ambulance' }, sirens = {};
+  function sirenStep(m) { for (const [k, f] of Object.entries(SIREN)) { const tm = m.teams[k]; const on = tm && tm.st === 'enroute' && !(o.muted && o.muted());
+    let a = sirens[k]; if (on && !a) { a = sirens[k] = new Audio(`assets/sfx/${f}.mp3`); a.loop = true; a.volume = 0; a.play().catch(() => {}); }
+    if (!a) continue; if (on) a.volume = Math.min(0.75, 0.15 + 0.6 * Math.min(1, (m.t - tm.t0) / tm.eta)); else { a.volume = Math.max(0, a.volume - 0.03); if (a.volume <= 0.01) { a.pause(); a.src = ''; delete sirens[k]; } } } }
   // ---- трафикът: коли и автобус по двете улици, светофар на кръстовището (фази по 7 s), дистанция и спирка за автобуса.
   // Докато полицията държи кордона, улица А е затворена — колите минават само по Б.
   const cars = []; let carsLoaded = false;
@@ -365,7 +402,7 @@ export function openOpsSquare(ops, o = {}) {
         P.mixer.update(dt * Math.min(speed, 2));
       }
       for (const P of staff) P.mixer.update(dt);
-      placeVehicles(m, tt); riotScene(m, tt, dt * Math.min(speed, 2)); noiseStep(m, dt);
+      placeVehicles(m, tt); riotScene(m, tt, dt * Math.min(speed, 2)); noiseStep(m, dt); sirenStep(m);
       loadTraffic(); moveCars(dt * Math.min(speed, 2), tt, m.teams.pol.st === 'onsite' && !m.out); moveWalkers(dt * Math.min(speed, 2));
       // светлината: при напрежение — по-сиво и студено, след решението — слънце
       const k = m.out === 'deal' ? 1 : 1 - m.tension / 140; sun.intensity = 1.2 + k * 1.4; sky.setRGB(0.55 + k * 0.12, 0.62 + k * 0.14, 0.7 + k * 0.16); scene.fog.color.copy(sky);
@@ -374,8 +411,8 @@ export function openOpsSquare(ops, o = {}) {
     ctl.update(); clampCam(); renderer.render(scene, cam);
   }
   function clampCam() { const t = ctl.target, c = cam.position; t.x = Math.max(-24, Math.min(30, t.x)); t.z = Math.max(-20, Math.min(26, t.z)); t.y = 2; c.x = Math.max(-28, Math.min(36, c.x)); c.z = Math.max(-24, Math.min(34, c.z)); if (c.y < 6) c.y = 6; }   // камерата — над площада и улиците, не в сградите
-  Promise.all([...PEDS.map(load), load(ANIMS)]).then(gs => {
-    if (shut) return; const an = gs.pop(); if (an) for (const c of an.animations) clips[c.name] = c;
+  Promise.all([...PEDS.map(load), load(ANIMS), load(RIOT + 'riot-cop.glb'), load(RIOT + 'shield.glb')]).then(gs => {
+    if (shut) return; shieldSrc = gs.pop(); copSrc = gs.pop(); if (copSrc) copSrc.k = 0.97;   /* в поза ~1,9 м */ const an = gs.pop(); if (an) for (const c of an.animations) clips[c.name] = c;
     pedSrc = gs.filter(Boolean).map(g => { if (!g.k) { g.scene.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(g.scene, true); g.k = 1.8 / ((b.max.y - b.min.y) || 1); } return g; });
     ready = true; el.querySelector('.ld').remove(); addWalkers();
   });
@@ -387,7 +424,7 @@ export function openOpsSquare(ops, o = {}) {
   el.querySelector('[data-x]').onclick = () => close();
 
   function close() {
-    if (shut) return; shut = true; cancelAnimationFrame(raf); noise.pause(); noise.src = '';
+    if (shut) return; shut = true; cancelAnimationFrame(raf); noise.pause(); noise.src = ''; for (const a of Object.values(sirens)) { a.pause(); a.src = ''; }
     removeEventListener('resize', onResize); removeEventListener('keydown', key);
     for (const L of [crowd, staff, walkers, rioters]) for (const P of [...L]) dropPerson(P, L);
     ctl.dispose();

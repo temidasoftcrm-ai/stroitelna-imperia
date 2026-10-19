@@ -1,0 +1,9 @@
+Безредиците на оперативната карта (ops3d.js) — Sketchfab, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Олекотени в Blender, текстури до 1024 px.
+- burnt-car-a.glb — "Burned Car" by gamgo — https://sketchfab.com/3d-models/3c5ee424326c44b497534c8721dfef6f
+- burnt-car-b.glb — "Burned-out Cars" by kryik1023 — https://sketchfab.com/3d-models/701066df6b914fd08318524c7ccd96a7
+- burnt-police.glb — "Free Burned Police Cars" by kryik1023 — https://sketchfab.com/3d-models/ad16f7085cb047b494997cf9efed5059
+- dumpster.glb — "dumpster" by YJ_ — https://sketchfab.com/3d-models/989ea7f01b924859b3484ee27103e8d9
+- trash-pile.glb — "Trash / Garbage 002 3D Scan" by albentan2012 — https://sketchfab.com/3d-models/bf25a01bf66b4e2bbf2772397a67c588
+- riot-van.glb — "SWAT Police Van" by Zack_Hawley — https://sketchfab.com/3d-models/5b9076973cda47e98609640d745bb8ce
+- shield.glb — "Riot Shield" by lilBernier — https://sketchfab.com/3d-models/9ea46239df6b4afba5037837cdb9b108
+- riot-cop.glb — "Police Man from the U.S.A. (T-pose rig mixamo)" by ustoopia — https://sketchfab.com/3d-models/c6d330c59f6c41eea41c71e00e39334b (костите — без суфиксите _N, за общите Mixamo клипове)
