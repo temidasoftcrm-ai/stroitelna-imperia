@@ -70,7 +70,7 @@ const EMERG_K = { Police_Sedan: 1, Ambulance: 1, Firetruck: 1 };   // всичк
 const EMERG = {
   Police_Sedan: [['pol-charger', 5.1], ['pol-crownvic', 5.4], ['pol-interceptor', 5.3], ['pol-volga', 4.8], ['pol-nypd', 5.1]],
   Firetruck: [['fire-red', 9], ['fire-us', 10], ['fire-man', 10.5]],
-  Ambulance: [['amb-gaz', 5.5], ['amb-us', 6.5], ['amb-eu', 6]],
+  Ambulance: [['amb-gaz', 7], ['amb-us', 7.5], ['amb-eu', 7.2]],
 };
 // почиства модел на кола: маха плоските мешове (сянка/земя под колата — от тях amb-eu беше квадрат 5,8×5,8 и наполовина висок);
 // връща завъртането, ако колата лежи по x (дължината трябва да е по z)
@@ -180,9 +180,43 @@ class BeaconGlow extends THREE.Sprite {
 }
 let glowTex = null;
 const BEACON = { r: new THREE.MeshStandardMaterial({ color: 0x501010, emissive: 0xff2020, emissiveIntensity: 0.15, roughness: 0.3 }), b: new THREE.MeshStandardMaterial({ color: 0x101850, emissive: 0x2060ff, emissiveIntensity: 0.15, roughness: 0.3 }) };
+// светлинна лента на покрива (Лабораторията → beacons2): по 3 сегмента на страна, тройни проблясъци — лявата, после
+// дясната страна (~1,4 Hz), вътрешните сегменти закъсняват малко (пробягване); ореол над всяка страна и цветно петно на пътя.
+const BAR_COL = { police: [0xff2a2a, 0x2a6bff], ambulance: [0xff2a2a, 0x2a6bff], fire: [0xff2a2a, 0xff7a1a] };
+const BAR_T = 0.7, BAR_ON = [[0, 0.07], [0.12, 0.19], [0.24, 0.31]];
+const barLit = (car, side, j, t) => { if (!beaconState(car, t)) return false; const u = (((t + (car.id || 0) * 0.37 - j * 0.025) / BAR_T) % 1 + 1) % 1 - side * 0.5; return BAR_ON.some(([a, b]) => u >= a && u < b); };
+class BarSeg extends Beacon {
+  onBeforeRender(renderer, scene, camera) { super.onBeforeRender(renderer, scene, camera); const car = carOf(this); if (car) this.material.emissiveIntensity = barLit(car, this.userData.side, this.userData.j, performance.now() / 1000) ? 2.6 : 0.08; }
+}
+class BarGlow extends THREE.Sprite {
+  onBeforeRender() { if (!this.userData.own) { this.material = this.material.clone(); this.userData.own = 1; } const car = carOf(this); if (car) this.material.opacity = barLit(car, this.userData.side, 0, performance.now() / 1000) ? 1 : 0; }
+}
+class BarPool extends THREE.Mesh {   // петното светлина на пътя: цветът на страната, която свети
+  onBeforeRender() { if (!this.userData.own) { this.material = this.material.clone(); this.userData.own = 1; } const car = carOf(this); if (!car) return; const t = performance.now() / 1000, L = barLit(car, 0, 0, t), R = barLit(car, 1, 0, t);
+    this.material.opacity = L || R ? 0.8 : 0; if (L || R) this.material.color.setHex(this.userData.cols[L ? 0 : 1]); }
+}
+function addLightBar(car, kind) {
+  const bb = new THREE.Box3().setFromObject(car), W = bb.max.x - bb.min.x, Lc = bb.max.z - bb.min.z, y = bb.max.y + 0.02, z = (bb.min.z + bb.max.z) / 2 + Lc * 0.04;
+  const bw = W * 0.66, bd = Math.max(0.12, W * 0.13), bh = Math.max(0.06, W * 0.055), cols = BAR_COL[kind] || BAR_COL.police;
+  const base = new THREE.Mesh(new THREE.BoxGeometry(bw, bh * 0.6, bd), new THREE.MeshStandardMaterial({ color: 0x1a1c20, roughness: 0.5, metalness: 0.4 })); base.position.set(0, y + bh * 0.3, z); car.add(base);
+  const sw = bw / 7, geo = new THREE.BoxGeometry(sw * 0.92, bh, bd * 0.9);
+  for (const side of [0, 1]) for (let j = 0; j < 3; j++) {
+    const k = side ? 'b' : 'r', mat = BEACON[k].clone(); mat.emissive.setHex(cols[side]); mat.color.setHex(cols[side]).multiplyScalar(0.25); mat.transparent = true; mat.opacity = 0.92;
+    const m = new BarSeg(geo, mat), x = (side ? 1 : -1) * (bw / 2 - sw * (j + 0.5));
+    m.position.set(x, y + bh * 0.6 + bh / 2, z); m.userData = { red: side === 0 && j === 0, kind, side, j }; car.add(m);
+  }
+  { const mid = new THREE.Mesh(new THREE.BoxGeometry(sw * 0.9, bh * 0.8, bd * 0.85), new THREE.MeshStandardMaterial({ color: 0xdddddd, emissive: 0xffffff, emissiveIntensity: 0.3 })); mid.position.set(0, y + bh * 0.6 + bh * 0.4, z); car.add(mid); }
+  for (const side of [0, 1]) {
+    const g = new BarGlow(new THREE.SpriteMaterial({ map: glowTex, color: cols[side], transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
+    g.position.set((side ? 1 : -1) * bw * 0.32, y + bh * 1.2, z); g.renderOrder = 2; g.scale.setScalar(W * 1.6); g.userData.side = side; car.add(g);
+  }
+  const pool = new BarPool(new THREE.PlaneGeometry(W * 3.2, Lc * 1.5).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: glowTex, color: cols[0], transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0, polygonOffset: true, polygonOffsetFactor: -4 }));
+  pool.position.set(0, bb.min.y + 0.06, (bb.min.z + bb.max.z) / 2); pool.userData.cols = cols; pool.renderOrder = 1; car.add(pool);
+}
 function addBeacons(car, len, kind = 'police') {
   if (!glowTex) { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 1, 32, 32, 31); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.12, 'rgba(255,255,255,0.7)'); gr.addColorStop(0.4, 'rgba(255,255,255,0.18)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); glowTex = new THREE.CanvasTexture(c); }
   car.userData.isCar = true; car.updateMatrixWorld(true);
+  if (feature('beacons2')) return addLightBar(car, kind);
   const bb = new THREE.Box3().setFromObject(car), W = bb.max.x - bb.min.x, y = bb.max.y + 0.06, z = (bb.min.z + bb.max.z) / 2 + len * 0.08, r = Math.max(0.07, W * 0.04);
   const geo = new THREE.SphereGeometry(r, 12, 8);
   for (const [k, sx, col] of [['r', -1, 0xff3030], ['b', 1, 0x3070ff]]) {
