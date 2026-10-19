@@ -90,4 +90,45 @@ export const KINDS = {
         `🪟 Чакат на прозорците: <b>${Math.round(tr)}</b> · ✅ спасени: ${Math.round(m.rescued)}${m.smoke >= 1 ? ` · 😷 нагълтали дим: ${Math.round(m.smoke)}` : ''}`, `💥 Щети: ${B(m.damage)}`]; },
     phases: { calm: '🔥 Пожарът се разраства', active: '🚒 Гасене и спасяване', resolved: '✅ Пожарът е изгасен' },
   },
+  // 🤝 Хуманитарен достъп (алтернативен игрови сценарий, измислен квартал): кварталът е без достатъчно храна, вода и лекарства.
+  // Посредниците договарят коридор на контролния пункт (затворен → преговори → отворен); наблюдателите ускоряват проверката на конвоите.
+  // Конвоите карат помощи до склада, а оттам те се раздават; медицинският транспорт извозва болните; водоснабдяването и генераторите
+  // връщат услугите. Когато нуждата спадне и услугите тръгнат — решаваш как да продължи помощта.
+  aid: {
+    nm: 'Хуманитарен достъп', ico: '🤝', area: 'Кварталът Ал-Нур', fade: 9, place: { city: 'Ал-Нур', lon: 34.45, lat: 31.45 },
+    teams: {
+      neg: { ico: '🤝', nm: 'Посредници', job: 'договарят хуманитарен коридор на контролния пункт', cost: 3e5, eta: 0.25 },
+      obs: { ico: '🔍', nm: 'Наблюдатели', job: 'проверяват конвоите на място — пунктът ги пропуска по-бързо', cost: 2.5e5, eta: 0.3 },
+      convoy: { ico: '🚚', nm: 'Конвой с помощи', job: 'храна, вода и лекарства до склада в квартала', cost: 6e5, eta: 0.3 },
+      med: { ico: '🚑', nm: 'Медицински транспорт', job: 'извозва болните през коридора до болницата', cost: 3e5, eta: 0.25 },
+      water: { ico: '💧', nm: 'Водоснабдяване', job: 'цистерни и ремонт на помпената станция', cost: 3.5e5, eta: 0.3 },
+      power: { ico: '⚡', nm: 'Генератори', job: 'ток за медицинския пункт и помпите', cost: 2e5, eta: 0.25 },
+    },
+    choices: {
+      rebuild: { ico: '🏗️', nm: 'Възстанови водата, тока и клиниката', k: 0.35, trust: 5, sec: 1, services: 3, out: 'deal' },
+      corridor: { ico: '🕊️', nm: 'Постоянен коридор с наблюдатели', k: 0.12, trust: 4, sec: 2, services: 1, out: 'deal' },
+      once: { ico: '📦', nm: 'Само еднократна помощ', k: 0.05, trust: 1, sec: 0, services: 0, out: 'partial' },
+    },
+    start(m) { Object.assign(m, { access: 'closed', talks: 0, need: 72, sick: 18, water: 25, stock: 0, delivered: 0, crit: 0, chk: 0 }); return '🤝 Кварталът Ал-Нур е без достатъчно храна, вода и лекарства. Контролният пункт е затворен. (Алтернативен игрови сценарий.)'; },
+    step(m, dt, h) {
+      const on = k => h.on(m, k), neg = on('neg'), obs = on('obs'), conv = on('convoy'), med = on('med'), water = on('water'), power = on('power');
+      if (m.phase === 'calm' && (neg || obs || conv || med || water || power)) m.phase = 'active';
+      if (neg && m.access !== 'open') { if (m.access === 'closed') { m.access = 'talks'; h.log(m, '🤝 Посредниците започнаха разговор на пункта.'); } m.talks = Math.min(1, m.talks + dt / (obs ? 0.6 : 0.9)); if (m.talks >= 1) { m.access = 'open'; h.log(m, `🚧 Коридорът е отворен${obs ? ' — наблюдателите проверяват конвоите на място' : ' — всеки конвой минава подробна проверка'}.`); } }
+      const open = m.access === 'open';
+      if (conv && open) { const got = 46 * dt / (obs ? 1 : 1.8); m.stock += got; m.delivered += got; }
+      const give = Math.min(m.stock, 34 * dt); m.stock -= give; m.need = Math.max(0, Math.min(100, m.need + (6 + (m.water < 40 ? 4 : 0)) * dt - give * 0.9));
+      if (water) m.water = Math.min(100, m.water + (power ? 34 : 18) * dt); else m.water = Math.max(0, m.water - 3 * dt);
+      const care = (med ? (open ? 12 : 4) : 0) + (power && med ? 3 : 0); m.sick = Math.max(0, m.sick + (m.water < 40 ? 4 : 1.5) * dt - care * dt);
+      if (m.need > 88) m.crit += dt * 3; if (m.sick > 25) m.crit += dt * 2;
+      if (!m.recov && m.need < 25 && m.sick < 5 && m.water >= 70) { m.recov = true; h.log(m, '🌤️ Помощта стига до всички, водата и токът работят. Твоят ход — как да продължи.'); }
+      if (m.t >= this.fade && !m.recov) h.resolve(m, 'faded', { trust: -5 - Math.round(m.crit / 2), security: -1, services: -1 }, '⏳ Помощта не стигна навреме — кварталът остава в тежко положение.');
+    },
+    ready: m => !!m.recov,
+    effect: (m, C) => ({ trust: C.trust - Math.round(m.crit / 3) + (m.delivered > 150 ? 1 : 0), security: C.sec, services: C.services }),
+    resultTxt: c => c === 'rebuild' ? '🏗️ Водата, токът и клиниката ще бъдат възстановени.' : c === 'corridor' ? '🕊️ Коридорът остава отворен с наблюдатели — помощта ще стига редовно.' : '📦 Еднократна помощ — нуждите ще се върнат.',
+    stats(m) { const acc = { closed: '🔴 затворен', talks: `🟡 преговори ${Math.round(m.talks * 100)}%`, open: '🟢 отворен' }[m.access];
+      return [['🍞 Нужда от храна и вода', m.need, m.need >= 70 ? '#ff6b6b' : m.need >= 40 ? '#ffd54a' : '#5fe39a'], `🚧 Контролният пункт: ${acc}`,
+        `📦 Доставено: <b>${Math.round(m.delivered)} т</b> · на склад: ${Math.round(m.stock)} т`, `🏥 Чакат лечение: <b>${Math.round(m.sick)}</b> · 💧 вода: ${Math.round(m.water)}%${m.crit >= 1 ? ` · ⚠️ критично: ${Math.round(m.crit)}` : ''}`]; },
+    phases: { calm: '🚧 Пунктът е затворен', active: '🚚 Хуманитарна операция', resolved: '✅ Помощта стига до всички' },
+  },
 };

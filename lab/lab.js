@@ -92,6 +92,7 @@ const DEMOS = [
   ['🔥 Оперативна карта: симулация на безредици', 'sofia', () => $('fr').contentWindow.eval("import('/ops.js').then(m => m.demoOps('US', true))")],
   ['🌊 Оперативна карта: наводнение', 'sofia', () => $('fr').contentWindow.eval("import('/ops.js').then(m => m.demoOps('US', false, 'flood'))")],
   ['🔥 Оперативна карта: пожар в жилищен блок', 'sofia', () => $('fr').contentWindow.eval("import('/ops.js').then(m => m.demoOps('US', false, 'fire'))")],
+  ['🤝 Оперативна карта: хуманитарен достъп', 'sofia', () => $('fr').contentWindow.eval("import('/ops.js').then(m => m.demoOps('US', false, 'aid'))")],
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
@@ -189,7 +190,7 @@ function renderReview(tab = 'review') {
   }
   const box = document.createElement('div'); box.className = 'feat';
   const on = approved.includes(f.id);
-  box.innerHTML = `<div><b>${esc(f.title)}</b><div>${esc(f.how)}</div></div><div style="display:flex;flex-direction:column;gap:6px">${on ? `<button class="btn" id="bApp">↩ Махни от играта</button>` : `<button class="btn ok" id="bApp">✓ OK — в играта</button><button class="btn red" id="bRej">✖ Не е ОК — намери друго</button>`}</div>`;
+  box.innerHTML = `<div><b>${esc(f.title)}</b><div>${esc(f.how)}</div></div><div style="display:flex;flex-direction:column;gap:6px">${on ? `<button class="btn" id="bApp">↩ Махни от играта</button>` : `<button class="btn ok" id="bApp">✓ OK — в играта</button><button class="btn red" id="bRej">✖ Не е ОК — намери друго</button>`}<button class="btn sky" id="bChg">✏️ Промени / добави</button></div>`;
   $('main').appendChild(box);
   if (f.views && f.views.length > 1) {   // няколко неща за гледане (напр. 3 кули) — бутони в кутията
     const vb = document.createElement('div'); vb.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;margin-top:6px';
@@ -200,6 +201,17 @@ function renderReview(tab = 'review') {
       const [, c, fn] = DEMOS[+b.dataset.view.slice(1)]; const keep = $('main').querySelector('.feat'); frame(`${GAME}&plan=1&city=${c}`, `Ново: ${f.title} (${f.id})`, fn); $('main').appendChild(keep);
     });
   }
+  // „✏️ Промени / добави“: какво да се промени или добави към това — задача за Claude (lab-feedback.jsonl); нещото остава в „Ново“
+  $('bChg').onclick = () => {
+    if (box.querySelector('.chg')) return;
+    const w = document.createElement('div'); w.className = 'chg'; w.style.cssText = 'display:flex;flex-direction:column;gap:6px;margin-top:8px;width:100%';
+    w.innerHTML = `<textarea rows="3" placeholder="Какво да се промени или добави? Напр. „по-малко коли“, „и автобуси“, „мигачите по-ярки“…" style="width:100%;box-sizing:border-box;background:#11151b;color:#e8e8ea;border:1px solid #39404b;border-radius:6px;padding:6px;font:inherit"></textarea><div style="display:flex;gap:6px;align-items:center"><button class="btn sky">📨 Изпрати на Claude</button><button class="btn dim">Отказ</button><span class="meta"></span></div>`;
+    box.querySelector('div').appendChild(w);
+    const ta = w.querySelector('textarea'), [send, cancel] = w.querySelectorAll('button'), note = w.querySelector('.meta'); ta.focus();
+    cancel.onclick = () => w.remove();
+    send.onclick = () => { if (!ta.value.trim()) { ta.focus(); return; } send.disabled = true;
+      post('/__lab/feedback', { target: `Ново: ${f.title} (${f.id})`, kind: 'change', text: ta.value.trim() }).then(() => { note.textContent = '✓ Изпратено на Claude'; ta.disabled = true; setTimeout(() => w.remove(), 1600); }, () => { note.textContent = '⚠ Не стигна — пиши в терминала'; send.disabled = false; }); };
+  };
   if ($('bRej')) $('bRej').onclick = () => {   // отхвърлено: задача за Claude (lab-feedback.jsonl) и изчезва от „Ново“
     const why = prompt('Какво не е наред? (по желание)') || '';
     post('/__lab/feedback', { target: `Ново: ${f.title} (${f.id})`, kind: 'reject', text: 'Не е ОК — намери друго' + (why ? ': ' + why : '') }).catch(() => { });
