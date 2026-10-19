@@ -69,8 +69,21 @@ function build(K) {
   const dm = new THREE.Object3D(); let bagN = 0;
   // ---- водата: равнина с движещи се вълни (нормали) и дъжд
   const nT = new THREE.TextureLoader().load('assets/heavy/water/waternormals.jpg'); nT.wrapS = nT.wrapT = THREE.RepeatWrapping; nT.repeat.set(18, 12); own(nT);
-  const water = new THREE.Mesh(own(new THREE.PlaneGeometry(260, 160)), own(new THREE.MeshStandardMaterial({ color: 0x5b6f6a, roughness: 0.25, metalness: 0.1, normalMap: nT, normalScale: new THREE.Vector2(0.6, 0.6), transparent: true, opacity: 0.88 })));
-  water.rotation.x = -Math.PI / 2; water.position.set(0, wy(30), 60); water.receiveShadow = true; scene.add(water);
+  // водата: вълни на видеокартата (няколко синусоиди в различни посоки — Герстнер-подобни), пяна по гребените, кална кафеникава
+  const wU = { uT: { value: 0 }, uAmp: { value: 0.35 } };
+  const wM = own(new THREE.MeshStandardMaterial({ color: 0x6e5f44, roughness: 0.16, metalness: 0.2, normalMap: nT, normalScale: new THREE.Vector2(0.8, 0.8), transparent: true, opacity: 0.96 }));
+  wM.onBeforeCompile = sh => { Object.assign(sh.uniforms, wU);
+    sh.vertexShader = 'uniform float uT; uniform float uAmp; varying float vCrest;\n' + sh.vertexShader
+      .replace('#include <beginnormal_vertex>', `vec2 P = position.xy; float t = uT;
+        vec3 W[4]; W[0] = vec3(0.05, 0.02, 1.0); W[1] = vec3(-0.03, 0.045, 0.7); W[2] = vec3(0.09, -0.04, 0.4); W[3] = vec3(-0.12, -0.08, 0.25);
+        float h = 0.0; vec2 g = vec2(0.0);
+        for (int i = 0; i < 4; i++) { vec2 k = W[i].xy; float a = W[i].z * uAmp, ph = dot(k, P) + t * (1.2 + float(i) * 0.35); h += a * sin(ph); g += a * cos(ph) * k; }
+        vCrest = clamp(h / (uAmp * 1.6) * 0.5 + 0.5, 0.0, 1.0);
+        vec3 objectNormal = normalize(vec3(-g.x, -g.y, 1.0));`)
+      .replace('#include <begin_vertex>', 'vec3 transformed = vec3(position.xy, position.z + h);');
+    sh.fragmentShader = 'varying float vCrest;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.78, 0.76, 0.68), smoothstep(0.78, 0.98, vCrest) * 0.55);'); };
+  const water = new THREE.Mesh(own(new THREE.PlaneGeometry(260, 160, 220, 130)), wM);
+  water.rotation.x = -Math.PI / 2; water.position.set(0, wy(30) + 0.15, 60); water.receiveShadow = true; scene.add(water);
   const rainG = own(new THREE.BoxGeometry(0.02, 0.9, 0.02)), rain = new THREE.InstancedMesh(rainG, own(new THREE.MeshBasicMaterial({ color: 0xc8d4e0, transparent: true, opacity: 0.45 })), 700); scene.add(rain);
   const rd = Array.from({ length: 700 }, () => [(Math.random() - 0.5) * 90, Math.random() * 30, (Math.random() - 0.5) * 80]);
   // ---- лодките и хеликоптерът (своя траектория), хората
@@ -83,7 +96,7 @@ function build(K) {
   let rainOn = true;
   return {
     update(m, tt, dt) {
-      const y = wy(m.level); water.position.y = y; nT.offset.x = (tt * 0.02) % 1; nT.offset.y = (tt * 0.035) % 1;
+      const y = wy(m.level); water.position.y = y + 0.15; nT.offset.x = (tt * 0.02) % 1; nT.offset.y = (tt * 0.035) % 1; wU.uT.value = tt; wU.uAmp.value = m.t < m.peakT ? 0.16 : 0.07;   /* докато прииждa — по-бурна */
       // дъжд — докато водата расте
       rainOn = m.t < m.peakT && !m.out; rain.visible = rainOn;
       if (rainOn) { const c = K.ctl.target; for (const [i, d] of rd.entries()) { d[1] -= dt * 22; if (d[1] < y) d[1] += 30; dm.position.set(c.x + d[0], d[1], c.z + d[2]); dm.rotation.set(0.15, 0, 0); dm.scale.set(1, 1, 1); dm.updateMatrix(); rain.setMatrixAt(i, dm.matrix); } rain.instanceMatrix.needsUpdate = true; }
