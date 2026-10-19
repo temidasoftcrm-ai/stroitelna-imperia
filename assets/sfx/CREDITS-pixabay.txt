@@ -26,3 +26,5 @@ mega-police.mp3 — „police car“ (audiopapkin, Pixabay, sound 298078), Pixab
 mega-bus.mp3 — „bus sound“ (diyorbek0022007, Pixabay, sound 244103), Pixabay Content License. Моно 96 kbps, −19 LUFS.
 protest.mp3 — „taxi protest distant XY“ (freesound_community, Pixabay, Pixabay Content License) — оперативната карта „Градски площад“ (ops3d.js)
 levelup-skill.mp3 — „level up skill upgrade 4“ (yodguard, Pixabay, sound 387909), Pixabay Content License — новото ниво на фирмата (Лабораторията → snd-lvup2). 128 kbps, −16 LUFS.
+flood.mp3 — „water stream“ (26327991, Pixabay, sound 108384), Pixabay Content License — оперативната карта „Наводнение“ (opsflood.js)
+fire-crackle.mp3 — „fogo“ (magiaz, Pixabay, sound 383784), Pixabay Content License — оперативната карта „Пожар“ (opsfire.js)

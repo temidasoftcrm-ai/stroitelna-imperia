@@ -60,7 +60,7 @@ export function createGeoMap(deps) {
     for (const c of CONFLICTS) { const k = P().conf(c.k); if (k.step >= 3 && k.step < 6 && k.stab < 45) out.push({ ico: '🔍', t: `Примирието се клати — ${c.nm}`, go: { k: 'ck', id: c.k }, at: [c.lon, c.lat], w: 8 }); }
     for (const a of s.aid.filter(x => x.wait)) out.push({ ico: '📦', t: `Забавена помощ — ${nm(a.iso)} (${a.stuck})`, go: { k: 'iso', id: a.iso }, at: [POL[a.iso].lon, POL[a.iso].lat], w: 7 });
     for (const p of P().proposals().filter(x => x.kind === 'pkgHint')) { const c = CONFLICTS.find(x => x.k === p.ck); out.push({ ico: '📝', t: `Предложение за преговори — ${c.nm}`, go: { k: 'ck', id: c.k }, at: [c.lon, c.lat], w: 6 }); }
-    for (const o of deps.ops?.markers() || []) if (!o.m.out) out.push({ ico: '📢', t: o.nm, go: { k: 'op', id: o.id }, at: [o.lon, o.lat], w: 9.5 });
+    for (const o of deps.ops?.markers() || []) if (!o.m.out) out.push({ ico: o.ico, t: o.nm, go: { k: 'op', id: o.id }, at: [o.lon, o.lat], w: 9.5 });
     return out.sort((a, b) => b.w - a.w).slice(0, 5);
   }
 
@@ -71,8 +71,8 @@ export function createGeoMap(deps) {
     const s = S(); if (!s || !sel) return `<div class="gh">🌍 Геополитика</div><div class="gm">Избери държава или криза на картата — или точка от „Изисква решение“.</div>`;
     const ps = P().proposals();
     if (sel.k === 'hz') return hzPanel(s, ps);
-    if (sel.k === 'op') { const o = (deps.ops?.markers() || []).find(x => x.id === sel.id); if (!o) return `<div class="gm">Кризата приключи.</div>`; const m = o.m, on = Object.values(m.teams).filter(t => t.st === 'onsite').length;
-      return `<div class="gh">${o.ico} ${o.nm}</div><div class="gm">„${m.demand}“</div><div class="gm">${m.out ? (m.out === 'deal' ? '✅ Споразумение' : m.out === 'partial' ? '📋 Частично решение' : '🌧️ Разотидоха се недоволни') : `🌡️ Напрежение ${Math.round(m.tension)} · 👥 ~${Math.round(m.crowd)} души · екипи на място: ${on}/3`}</div><div class="grow"><button class="gbtn y" data-gopen="${o.id}">🗺️ Отвори 3D картата</button></div>`; }
+    if (sel.k === 'op') { const o = (deps.ops?.markers() || []).find(x => x.id === sel.id); if (!o) return `<div class="gm">Кризата приключи.</div>`;
+      return `<div class="gh">${o.ico} ${o.nm}</div><div class="gm">${deps.ops.summary(o.m)}</div><div class="grow"><button class="gbtn y" data-gopen="${o.id}">🗺️ Отвори 3D картата</button></div>`; }
     if (sel.k === 'ev') { const e = (s.evs || []).find(x => x.id === sel.id); if (!e) return ''; return `<div class="gh">${e.ico} ${e.nm}${e.iso ? ` — ${nm(e.iso)}` : ''}</div><div class="gm">Остават ${Math.max(0, e.until - (deps.day()))} дни. ${e.kind === 'disaster' ? 'Спешна помощ до 14 дни, после възстановяване без изчерпване на резервите.' : 'Нужни са поне два от отговорите: доставки, транспорт, местно производство.'}</div>${ps.filter(p => p.ev === e.id).map(propRow).join('')}<button class="gbtn" data-gcab="ev">🏛️ Обсъди с кабинета</button>`; }
     if (sel.k === 'ck') { const c = CONFLICTS.find(x => x.k === sel.id), k = P().conf(c.k);
       return `<div class="gh">${c.ico} ${c.nm}</div><div class="gm">ℹ️ алтернативна игрова хронология · страни: ${c.parties.map(nm).join(', ')} · интензитет ${Math.round(k.int)}</div>${PEACE.map((p, i) => `<div class="gm">${i < k.step ? '✅' : i === k.step ? '➡️' : '⬜'} ${p.ico} ${p.nm}</div>`).join('')}${k.step >= 3 ? `<div class="gm">Стабилност на примирието: <b>${Math.round(k.stab)}</b>${k.ver ? ' · 🔍 наблюдение' : ''}${k.gua ? ' · 🛡️ гаранции' : ''}${k.fund ? ` · 💶 фонд ${12 - k.fund.m}/12` : ''}${k.broken ? ' · 💔 нарушено обещание' : ''}</div>` : ''}

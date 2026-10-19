@@ -10,6 +10,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { OPS_TEAMS, OPS_CHOICES, opsPhaseName, RIOT_AT } from './ops.js';
+import { emergCar } from './vehmodels.js';   // линейката и полицейските коли — като в играта (посока, светлинна лента)
+const EMC = { med: ['ambulance', 7.2], pol: ['police', 5.4] };
 
 // ---- общият кеш на моделите (зарежда се веднъж; геометриите и материалите му не се освобождават при затваряне)
 const SHARED = new WeakSet(), cache = {};
@@ -282,20 +284,20 @@ export function openOpsSquare(ops, o = {}) {
   // ---- колите на екипите: позицията — от времето на мисията
   const veh = {}, labels = {};
   for (const k of Object.keys(OPS_TEAMS)) {
-    load(VEH[k]).then(g => { if (!g || shut) return; const v = fitTo(g.scene.clone(true), { len: k === 'med' || k === 'riot' ? 6 : 4.8 }); shadows(v); const hold = new THREE.Group(); hold.add(v); hold.visible = false; scene.add(hold); veh[k] = hold;
-      if (k !== 'neg') { const L = []; for (const [c, dx] of [[0xff2020, -0.35], [0x2060ff, 0.35]]) { const b = new THREE.Mesh(own(new THREE.SphereGeometry(0.16, 10, 8)), own(new THREE.MeshBasicMaterial({ color: c }))); b.position.set(dx, k === 'med' ? 2.9 : 1.6, 0.2); hold.add(b); L.push(b); } hold.userData.beacons = L; } });
+    load(VEH[k]).then(g => { if (!g || shut) return; const v = EMC[k] ? emergCar(g.scene, EMC[k][1], EMC[k][0]) : fitTo(g.scene.clone(true), { len: k === 'med' || k === 'riot' ? 6 : 4.8 }); shadows(v); const hold = new THREE.Group(); hold.add(v); hold.visible = false; scene.add(hold); veh[k] = hold; if (EMC[k]) hold.userData.car = v;
+      if (k !== 'neg' && !EMC[k]) { const L = []; for (const [c, dx] of [[0xff2020, -0.35], [0x2060ff, 0.35]]) { const b = new THREE.Mesh(own(new THREE.SphereGeometry(0.16, 10, 8)), own(new THREE.MeshBasicMaterial({ color: c }))); b.position.set(dx, k === 'med' ? 2.9 : 1.6, 0.2); hold.add(b); L.push(b); } hold.userData.beacons = L; } });
     const lb = document.createElement('div'); lb.className = 'lb'; lb.style.display = 'none'; el.querySelector('.lbs').appendChild(lb); labels[k] = lb;
   }
   const lerp2 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
   // 🚓 колоната: след първата кола идват още (спират в редица зад нея, с малко закъснение)
   const CONVOY = { pol: [['pol-charger', 5.6, 0.02], ['pol-interceptor', 11.2, 0.04], ['pol-nypd', 16.8, 0.06]], riot: [['car-polsuv', 7, 0.03], ['pol-volga', 12.5, 0.05]] }, conv = [];
-  for (const [k, list] of Object.entries(CONVOY)) for (const [nm, back, delay] of list) load(`assets/heavy/cars/${nm}.glb`).then(g => { if (!g || shut) return; const v = fitTo(g.scene.clone(true), { len: 4.8 }); shadows(v); const h = new THREE.Group(); h.add(v); h.visible = false; scene.add(h);
-    const L = []; for (const [c, dx] of [[0xff2020, -0.35], [0x2060ff, 0.35]]) { const b = new THREE.Mesh(own(new THREE.SphereGeometry(0.16, 10, 8)), own(new THREE.MeshBasicMaterial({ color: c }))); b.position.set(dx, 1.6, 0.2); h.add(b); L.push(b); } conv.push({ k, h, back, delay, L }); });
+  for (const [k, list] of Object.entries(CONVOY)) for (const [nm, back, delay] of list) load(`assets/heavy/cars/${nm}.glb`).then(g => { if (!g || shut) return; const v = emergCar(g.scene, 5.2, 'police'); const h = new THREE.Group(); h.add(v); h.visible = false; scene.add(h); h.userData.car = v;
+    const L = []; if (false) for (const [c, dx] of [[0xff2020, -0.35], [0x2060ff, 0.35]]) { const b = new THREE.Mesh(own(new THREE.SphereGeometry(0.16, 10, 8)), own(new THREE.MeshBasicMaterial({ color: c }))); b.position.set(dx, 1.6, 0.2); h.add(b); L.push(b); } conv.push({ k, h, back, delay, L }); });
   function placeConvoy(m, tt) { for (const c of conv) { const tm = m.teams[c.k]; if (!tm) continue; const [a, b0] = ENTRY[c.k], dir = Math.atan2(b0[0] - a[0], b0[1] - a[1]), ux = Math.sin(dir), uz = Math.cos(dir), b = [b0[0] - ux * c.back, b0[1] - uz * c.back]; let pos = null;
     if (tm.st === 'enroute') { const p = Math.max(0, Math.min(1, (m.t - tm.t0 - c.delay) / tm.eta)); pos = p > 0 ? lerp2(a, b, 1 - Math.pow(1 - p, 2)) : null; }
     else if (tm.st === 'onsite') pos = b;
     else if (tm.st === 'back') { const p = Math.min(1, (m.t - tm.t0) / BACK_DAYS); if (p < 1) pos = lerp2(b, [b[0] + (b[0] - a[0]) * 0.8, b[1] + (b[1] - a[1]) * 0.8], p * p); }
-    c.h.visible = !!pos; if (pos) { c.h.position.set(pos[0], 0, pos[1]); c.h.rotation.y = dir; } const on = tm.st === 'enroute' || tm.st === 'onsite'; c.L.forEach((s0, i) => { s0.visible = on && ((tt * 3 + i + c.back) | 0) % 2 === 0; }); } }
+    c.h.visible = !!pos; if (pos) { c.h.position.set(pos[0], 0, pos[1]); c.h.rotation.y = dir; } const on = tm.st === 'enroute' || tm.st === 'onsite'; c.h.userData.car.userData.beaconsOn = on; c.L.forEach((s0, i) => { s0.visible = on && ((tt * 3 + i + c.back) | 0) % 2 === 0; }); } }
   function placeVehicles(m, tt) {
     placeConvoy(m, tt);
     for (const [k, tm] of Object.entries(m.teams)) {
@@ -304,7 +306,7 @@ export function openOpsSquare(ops, o = {}) {
       if (tm.st === 'enroute') { const p = Math.min(1, (m.t - tm.t0) / tm.eta), e = 1 - Math.pow(1 - p, 2); pos = lerp2(a, b, e); ry = dir; txt = `${T.ico} ${T.nm} · на път ${Math.round(p * 100)}%`; }
       else if (tm.st === 'onsite') { pos = b; ry = dir; txt = `${T.ico} ${T.nm} · на място`; }
       else if (tm.st === 'back') { const p = Math.min(1, (m.t - tm.t0) / BACK_DAYS); if (p < 1) { pos = lerp2(b, [b[0] + (b[0] - a[0]) * 0.8, b[1] + (b[1] - a[1]) * 0.8], p * p); ry = dir; txt = `${T.ico} прибира се`; } }
-      if (h) { h.visible = !!pos; if (pos) { h.position.set(pos[0], 0, pos[1]); h.rotation.y = ry; } const B = h.userData.beacons; if (B) { const on = tm.st === 'enroute' || tm.st === 'onsite'; B.forEach((s, i) => { s.visible = on && ((tt * 3 + i) | 0) % 2 === 0; }); } }
+      if (h) { h.visible = !!pos; if (pos) { h.position.set(pos[0], 0, pos[1]); h.rotation.y = ry; } if (h.userData.car) h.userData.car.userData.beaconsOn = tm.st === 'enroute' || tm.st === 'onsite'; const B = h.userData.beacons; if (B) { const on = tm.st === 'enroute' || tm.st === 'onsite'; B.forEach((s, i) => { s.visible = on && ((tt * 3 + i) | 0) % 2 === 0; }); } }
       lb.style.display = pos ? '' : 'none'; if (pos) { lb.textContent = txt; tmp.set(pos[0], k === 'med' ? 3.8 : 2.6, pos[1]).project(cam); lb.style.left = `${(tmp.x + 1) / 2 * innerWidth}px`; lb.style.top = `${(1 - tmp.y) / 2 * innerHeight}px`; if (tmp.z > 1) lb.style.display = 'none'; }
       setStaff(k, tm.st === 'onsite');
     }

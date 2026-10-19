@@ -1,0 +1,5 @@
+Оперативните карти „Наводнение“ и „Пожар“ (opsflood.js, opsfire.js) — Sketchfab, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Олекотени в Blender, текстури до 1024 px.
+- rescue-boat.glb — "Dinghy" by a3flife — https://sketchfab.com/3d-models/92b24c2f8b874360ab84bf0e881883fe
+- heli.glb — "AS350 B2" by Archeopteryxfr — https://sketchfab.com/3d-models/76cf31c232bf4514ab1794d28a2b0ee1
+- ladder-truck.glb — "German Ladder Fire Truck (MAN TGA truck)" by cm_dp — https://sketchfab.com/3d-models/403fbe45460041c2a97031d0635634cf
+- firefighter.glb — "Fire Fighter - 3D Generated Model" by ArtIsInFormation — https://sketchfab.com/3d-models/99a77e6d862844608ccf9decbdeb97b2 (костите — без суфиксите _N, за общите Mixamo клипове)

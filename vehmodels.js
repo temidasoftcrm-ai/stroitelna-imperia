@@ -81,6 +81,9 @@ function tidyCar(sc) {
   sc.updateMatrixWorld(true); const s2 = new THREE.Box3().setFromObject(sc).getSize(new THREE.Vector3());
   return s2.x > s2.z * 1.15 ? [Math.PI / 2, s2.x] : [0, s2.z];   // [завъртане, дължина]
 }
+// спешна кола за оперативните карти (ops3d.js, opskit.js): копие на модела, почистено и обърнато като в играта, дължина len (м),
+// светлинната лента/бурканите (kind: police | fire | ambulance); светят, докато car.userData.beaconsOn е истина (сирените — от картата)
+export function emergCar(src, len, kind = 'police') { const sc0 = src.clone(true); sc0.traverse(m => { if (m.isMesh) m.castShadow = true; }); const [yaw, L0] = tidyCar(sc0), sc = wrap(sc0, yaw, len / L0); addBeacons(sc, len, kind); sc.userData.noSiren = 1; return sc; }
 export function loadPoliceCars(load, A) {
   return Promise.all(Object.entries(EMERG).map(([nm, opts]) => {
     const ok = opts.filter(([f]) => feature(f)); if (!ok.length) return null;
