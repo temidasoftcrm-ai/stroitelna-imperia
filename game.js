@@ -6228,6 +6228,19 @@ function garAutoTick() {
   const sh = garShort(); if (sh.now.length && econ.s.money > sh.costNow * 1.5) garBuyShort(null, true, true);
 }
 // купува липсващото (само това, което не може да дойде от другите градове); only — само за един град
+// колко от липсващото може да се купи сега (има място в офиса за бригадите и в гаража за машините) — за предложението на Ивайло
+function garBuyable() {
+  const sh = garShort(), used = {}; let n = 0, cost = 0, full = 0;
+  for (const [id, t, k] of sh.now) {
+    const cap = garCaps(id), hv = garWithTransit(id), u = used[id] = used[id] || { c: hv.filter(x => !isMachine(x)).length, m: hv.filter(x => isMachine(x) && !isRoadGear(x)).length };
+    for (let i = 0; i < k; i++) {
+      if (!isMachine(t) ? u.c >= cap.crews : !isRoadGear(t) && u.m >= cap.mach) { full++; continue; }
+      if (!isMachine(t)) u.c++; else if (!isRoadGear(t)) u.m++;
+      n++; cost += ECON.UNIT_TYPES[t].cost;
+    }
+  }
+  return { n, cost, full };
+}
 function garBuyShort(only = null, quiet = false, all = false) {   // all — купува всичко липсващо веднага, без да чака свободната техника от другите градове
   const sh = garShort(), list = (all ? sh.now : sh.buy).filter(([id]) => !only || id === only);
   let n = 0, spent = 0, stop = '';
@@ -8066,7 +8079,8 @@ function boardProposals() {
     cost: (o, i) => { const c = ECON.BRANCH_COST(o.id, brN() + i); return c + branchExtra(o.id, c); }, run: o => openBranchNow(o.id), text: a => `Предлагам да открием ${pl(a.length, 'нов филиал', 'нови филиала')}: ${list(a.map(o => o.id))}.`,   // цената расте след всяко отваряне
     why: 'нови пазари — всеки град носи поръчки и после пари, докато не си там', days: () => 1, income: a => a.length * brIncome(),
     goal: a => `${pl(a.length, 'нов филиал работи', 'нови филиала работят')}`, track: a => ({ k: 'branch', ids: a.map(o => o.id) }), geo: a => geoOf('branch', a.map(o => o.id)) });
-  { const sh = garShort(); if (sh.total && hasSub('con')) out.push({ id: `con:gear:${sh.total}`, dir: 'con', ico: '🚜', text: `${sh.total === 1 ? 'Липсва' : 'Липсват'} ${pl(sh.total, 'машина или бригада', 'машини и бригади')} за обектите. Предлагам да ${sh.total === 1 ? 'я' : 'ги'} купя.`, why: 'обектите стоят и срокът тече', cost: sh.costNow, count: sh.total, days: 2, income: 0, gainTxt: 'обектите тръгват отново',
+  { const sh0 = garShort(), gb = garBuyable(), sh = { ...sh0, total: gb.n, costNow: gb.cost }; if (gb.full && hasSub('con') && !gb.n) out.push({ id: `con:garfull:${gb.full}`, dir: 'con', ico: '🏢', text: `Липсват ${pl(gb.full, 'машина или бригада', 'машини и бригади')}, но офисът или гаражът са пълни. Предлагам първо да ги разширим.`, why: 'без място не може да се купи нова техника', cost: 0, count: 1, days: 0, gainTxt: 'после купувам липсващото', noAuto: true, apply: () => openBig('garage') });
+    if (sh.total && hasSub('con')) out.push({ id: `con:gear:${sh.total}`, dir: 'con', ico: '🚜', text: `${sh.total === 1 ? 'Липсва' : 'Липсват'} ${pl(sh.total, 'машина или бригада', 'машини и бригади')} за обектите. Предлагам да ${sh.total === 1 ? 'я' : 'ги'} купя.`, why: 'обектите стоят и срокът тече', cost: sh.costNow, count: sh.total, days: 2, income: 0, gainTxt: 'обектите тръгват отново',
     goal: 'Обектите имат нужната техника', track: { k: 'gear' }, apply: () => garBuyShort(null, true, true) }); }
   // ━━ 🛣️ Магистрали: участъци до градовете без мрежа, надграждане в аутобан, ТИР-ове
   { const net = new Set(hwAll().flatMap(id => { const x = segById(id); return x ? [x.a, x.b] : []; })), busy = new Set([...(S.hwJobs || []).map(j => j.seg), ...hwQueue()]);
