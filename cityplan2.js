@@ -157,6 +157,26 @@ function skeleton(fam, size, r) {
   return { R, bnd, lines, hubs, waterAt, coastZ };
 }
 
+// ---- истинска карта (OpenStreetMap, cityplan2-osm.js — подава се от извикващия: plan2('rome', { osm: OSM2.rome })):
+// без измислен скелет — улиците са от картата (тесните улички вече са опростени при генерирането на данните), а графът,
+// правилата за възлите и парцелите — същите. Двойните еднопосочни платна на булевардите стават един път с ленти в двете посоки.
+function osmSkeleton(D) {
+  const lines = [], g = pointGrid(10), mains = D.roads.filter(r => r.cls !== 'street').concat(D.roads.filter(r => r.cls === 'street'));
+  for (const r of mains) {
+    const pts = resample(r.pts, 4);
+    if (r.oneway && r.cls !== 'street') { let near = 0; for (const p of pts) { let hit = false; g.near(p, 9, () => { hit = true; }); if (hit) near++; } if (near > pts.length * 0.6) continue; }   // второто платно на двойния булевард
+    if (r.cls !== 'street') pts.forEach(p => g.add(p, 1));
+    lines.push({ cls: r.cls, pts, noCars: !!r.noCars, bridge: !!r.bridge, nm: r.nm || '' });
+  }
+  let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const L of lines) for (const [x, z] of L.pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+  const bnd = [[x0 - 4, z0 - 4], [x1 + 4, z0 - 4], [x1 + 4, z1 + 4], [x0 - 4, z1 + 4]];
+  const riv = D.river || [], hw = D.riverHW || 12, isl = D.island;
+  const inIsl = (x, z) => { if (!isl) return false; const c = Math.cos(isl.rot), s2 = Math.sin(isl.rot), dx = x - isl.x, dz = z - isl.z, u = dx * c - dz * s2, v = dx * s2 + dz * c; return (u / (isl.w / 2)) ** 2 + (v / (isl.d / 2)) ** 2 < 1; };
+  const rg = pointGrid(16); riv.forEach(R2 => resample(R2, 3).forEach(p => rg.add(p, 1)));
+  const waterAt = (x, z) => { let w = false; rg.near([x, z], hw, () => { w = true; }); return w && !inIsl(x, z); };
+  return { R: Math.max(x1 - x0, z1 - z0) / 2, bnd, lines, hubs: [{ x: 0, z: 0, main: true }], waterAt, coastZ: null, greens: D.greens || [], osm: D };
+}
+
 // ---- квартални улици: решетка в рамка (ъгъл), изрязана до района, далеч от главните пътища; краищата — до главния път (Т)
 function localStreets(sk, fam, size, r, majorNear) {
   const Z = SIZE[size], R = sk.R, out = [], rr = (a, b) => lerp(a, b, r());
@@ -215,7 +235,7 @@ function buildGraph(lines, opts) {
     for (let k = 1; k < c.length; k++) {
       const [f0, a] = c[k - 1], [f1, b] = c[k]; if (a === b) continue;
       const pts = [[nodes[a].x, nodes[a].z]]; for (let f = Math.floor(f0) + 1; f < f1; f++) pts.push(at(f)); pts.push([nodes[b].x, nodes[b].z]);
-      edges.push({ a, b, cls: L.cls, pts, src: li });
+      edges.push({ a, b, cls: L.cls, pts, src: li, noCars: !!L.noCars, bridge: !!L.bridge, nm: L.nm || '' });
     }
   });
   return { nodes, edges };
@@ -264,11 +284,11 @@ export function plan2(cityId, o = {}) {
   const fam = o.fam || 'eu', size = o.size || 'm', seed = o.seed ?? hashStr(cityId), ext = o.ext || 0, key = [cityId, fam, size, seed, ext].join(':');
   if (cache.has(key)) return cache.get(key);
   const t0 = Date.now(), r = rng(hashStr(`plan2:${cityId}:${fam}:${size}:${seed}`));
-  const sk = skeleton(fam, size, r);
+  const sk = o.osm ? osmSkeleton(o.osm) : skeleton(fam, size, r);
   // главните пътища: мрежа от точки (за отстоянието на кварталните)
   const mg = pointGrid(24); sk.lines.forEach((L, li) => L.pts.forEach(p => mg.add(p, li)));
   const majorNear = (p, rad) => { let hit = null; mg.near(p, rad + widthOf('blvd') / 2, (q, li) => { if (hit === null && dist(p, q) < rad + widthOf(sk.lines[li].cls) / 2) hit = li; }); return hit; };
-  const locals = localStreets(sk, fam, size, r, majorNear);
+  const locals = o.osm ? [] : localStreets(sk, fam, size, r, majorNear);
   // краищата на кварталните — доизтеглени напред до главен път (най-много 40 м); там, където вече има кръстовище на ≤ 26 м — към него
   const junc = pointGrid(16), majors = sk.lines;
   const snapEnd = (run, end) => {
@@ -301,39 +321,44 @@ export function plan2(cityId, o = {}) {
   locals.forEach((L, li) => { snapLocal(L, li, 0); snapLocal(L, li, 1); });
   const lines = [...sk.lines, ...locals].map(L => ({ ...L, pts: L.pts }));
   // граф и правила
-  const G = buildGraph(lines, { merge: 7 });
-  let E = applyRules(G, { minAngle: 55 * Math.PI / 180, minLen: 30, minStub: 46 });
+  const G = o.osm && o.osm.nodes ? { nodes: o.osm.nodes.map(([x, z]) => ({ x, z, rank: 0 })), edges: o.osm.roads.map((r, i) => { const pts = resample(r.pts, 4); pts[0] = o.osm.nodes[r.a].slice(); pts[pts.length - 1] = o.osm.nodes[r.b].slice();
+      return { a: r.a, b: r.b, cls: r.cls, pts, src: i, noCars: !!r.noCars, bridge: !!r.bridge, nm: r.nm || '', oneway: !!r.oneway }; }) }   // истинската карта: възлите са общите точки на улиците в OSM
+    : buildGraph(lines, { merge: 7 });
+  let E = applyRules(G, o.osm ? { minAngle: 20 * Math.PI / 180, minLen: 4, minStub: 10 } : { minAngle: 55 * Math.PI / 180, minLen: 30, minStub: 46 });   // истинската карта — по-меки правила (Рим има остри ъгли и къси пресечки)
   // свързаност: само компонентът на центъра
   const adj = G.nodes.map(() => []); E.forEach(e => { adj[e.a].push(e.b); adj[e.b].push(e.a); });
   let c0 = 0, cd = 1e9; G.nodes.forEach((n, i) => { const d = Math.hypot(n.x - sk.hubs[0].x, n.z - sk.hubs[0].z); if (adj[i].length && d < cd) { cd = d; c0 = i; } });
-  const seen = new Set([c0]), q = [c0]; for (let h = 0; h < q.length; h++) for (const n of adj[q[h]]) if (!seen.has(n)) { seen.add(n); q.push(n); }
+  let seen = new Set([c0]); { const q = [c0]; for (let h = 0; h < q.length; h++) for (const n of adj[q[h]]) if (!seen.has(n)) { seen.add(n); q.push(n); } }
+  if (o.osm) { const done = new Set(); G.nodes.forEach((_, i) => { if (done.has(i) || !adj[i].length) return; const c = new Set([i]), q = [i]; for (let h = 0; h < q.length; h++) for (const n of adj[q[h]]) if (!c.has(n)) { c.add(n); q.push(n); } c.forEach(n => done.add(n)); if (c.size > seen.size) seen = c; }); }   // истинската карта — най-големият свързан компонент
   E = E.filter(e => seen.has(e.a));
   // възли с 2 клона от един и същи път → чупка: пътищата се сливат в едно ребро между кръстовищата
   const inc = G.nodes.map(() => []); E.forEach(e => { inc[e.a].push(e); inc[e.b].push(e); });
   const used = new Set(), roads = [];
-  const isJ = n => inc[n].length !== 2 || inc[n][0].cls !== inc[n][1].cls;
+  const isJ = n => inc[n].length !== 2 || inc[n][0].cls !== inc[n][1].cls || inc[n][0].noCars !== inc[n][1].noCars || !!inc[n][0].oneway !== !!inc[n][1].oneway;
   for (const e0 of E) {
     if (used.has(e0)) continue;
     // тръгни от края, който е кръстовище
     let e = e0, a = e.a; let guard = 0;
     while (!isJ(a) && guard++ < 500) { const o = inc[a].find(x => x !== e); if (!o || o === e0 && guard > 1) break; a = o.a === a ? o.b : o.a; e = o; }
     // e е ребро, a — кръстовище в единия му край; върви натам
-    const pts = []; let cur = a, ce = e, first = true; guard = 0;
+    const pts = []; let cur = a, ce = e, first = true; guard = 0; const fwd = e.a === a;   // еднопосочен: върви ли pts по посоката на движение
     while (ce && !used.has(ce) && guard++ < 500) {
       used.add(ce); const P = ce.a === cur ? ce.pts : ce.pts.slice().reverse(); pts.push(...(first ? P : P.slice(1))); first = false;
       cur = ce.a === cur ? ce.b : ce.a; if (isJ(cur)) break; ce = inc[cur].find(x => x !== ce && !used.has(x));
     }
-    roads.push({ cls: e.cls, from: a, to: cur, pts });
+    roads.push({ cls: e.cls, from: a, to: cur, pts, noCars: e.noCars, bridge: e.bridge, nm: e.nm, oneway: e.oneway ? (fwd ? 1 : -1) : 0 });
   }
   // изход: възли (само използваните), пътища с параметри
   const live = new Map(); const nodeOut = [];
   const nid = i => { if (!live.has(i)) { live.set(i, nodeOut.length); nodeOut.push({ id: nodeOut.length, x: G.nodes[i].x, z: G.nodes[i].z, arms: [] }); } return live.get(i); };
-  const P = { v: PLAN2_V, cityId, fam, size, seed, ext, drive: o.drive || 'R', center: { x: sk.hubs[0].x, z: sk.hubs[0].z }, R: sk.R, boundary: sk.bnd, waterAt: sk.waterAt, coastZ: sk.coastZ, hubs: sk.hubs,
+  const P = { osm: !!o.osm, greensSrc: sk.greens || [], v: PLAN2_V, cityId, fam, size, seed, ext, drive: o.drive || 'R', center: { x: sk.hubs[0].x, z: sk.hubs[0].z }, R: sk.R, boundary: sk.bnd, waterAt: sk.waterAt, coastZ: sk.coastZ, hubs: sk.hubs,
     roads: [], nodes: nodeOut, rounds: [], lots: [], blocks: [], greens: [], landmarks: [] };
   roads.forEach(rd => {
     const k = CLS[rd.cls], pts = resample(rd.pts, 2), id = P.roads.length, a = nid(rd.from), b = nid(rd.to);
-    P.roads.push({ id, cls: rd.cls, pts, L: cumLen(pts), lanes: k.lanes.slice(), laneW: k.laneW, median: k.median, walk: k.walk, w: widthOf(rd.cls), from: a, to: b, bridge: [] });
+    const n1 = rd.oneway ? Math.min(2, k.lanes[0]) || 1 : 0, lanes = rd.oneway ? (rd.oneway > 0 ? [n1, 0] : [0, n1]) : k.lanes.slice();   // еднопосочен — всички ленти в една посока, без разделителна ивица
+    P.roads.push({ id, cls: rd.cls, noCars: !!rd.noCars, nm: rd.nm || '', oneway: !!rd.oneway, pts, L: cumLen(pts), lanes, laneW: k.laneW, median: rd.oneway ? 0 : k.median, walk: k.walk, w: rd.oneway ? n1 * k.laneW : widthOf(rd.cls), from: a, to: b, bridge: [] });
   });
+  for (const rd of P.roads) { let on = -1; rd.pts.forEach((p, i) => { const w = sk.waterAt(p[0], p[1]); if (w && on < 0) on = rd.L[i]; if ((!w || i === rd.pts.length - 1) && on >= 0) { rd.bridge.push([Math.max(0, on - 4), Math.min(rd.L[rd.L.length - 1], rd.L[i] + 4)]); on = -1; } }); }   // мостовете — участъците над вода (+ рампа)
   for (const rd of P.roads) for (const [n, end] of [[rd.from, 0], [rd.to, 1]]) {
     const pts = end ? rd.pts.slice().reverse() : rd.pts, p0 = pts[0]; let qq = pts[pts.length - 1]; for (const p of pts) if (dist(p, p0) >= 10) { qq = p; break; }
     P.nodes[n].arms.push({ road: rd.id, end, angle: Math.atan2(qq[1] - p0[1], qq[0] - p0[0]) });
@@ -354,10 +379,10 @@ export function plan2(cityId, o = {}) {
     if (n.arms.length !== 1) continue;
     const rd = P.roads[n.arms[0].road], bd = bDist(n.x, n.z);
     n.endKind = isMain(rd.cls) && bd < 30 ? 'exit' : bd < 40 ? 'grow' : 'dead';
-    if (n.endKind === 'dead') { n.r = rd.w / 2 + 5; P.turns.push({ node: n.id, x: n.x, z: n.z, r: n.r }); }
+    if (n.endKind === 'dead' && !P.osm) { n.r = rd.w / 2 + 5; P.turns.push({ node: n.id, x: n.x, z: n.z, r: n.r }); }
   }
   // кръгови: центърът (ако е кръстовище на главни) + важни 4-клонни на булевардите, раздалечени ≥ 0,45R
-  const want = SIZE[size].rounds + (fam === 'eu' || fam === 'radial' ? 1 : 0);
+  const want = o.osm ? 0 : SIZE[size].rounds + (fam === 'eu' || fam === 'radial' ? 1 : 0);   // истинската карта — без измислени кръгови
   const cand = P.nodes.filter(n => n.arms.length >= 3 && n.arms.length <= 4 && n.arms.filter(a => isMain(P.roads[a.road].cls)).length >= 2)
     .sort((p, q2) => Math.hypot(p.x - P.center.x, p.z - P.center.z) - Math.hypot(q2.x - P.center.x, q2.z - P.center.z));
   if (fam === 'us') cand.length = Math.min(cand.length, 0);   // американската мрежа — светофари
@@ -402,8 +427,8 @@ export function plan2(cityId, o = {}) {
     n.outline = []; for (const c of n.corners) { const x = ord.find(q => q.i === c.a); n.outline.push(edge(x, -1)); n.outline.push(...(c.c ? bez(c.p0, c.c, c.p1) : [c.p0, c.p1])); }   // устието: косата линия от десния до левия срез
     n.conflict = n.outline; n.r = Math.max(...ord.map(x => Math.max(x.tL, x.tR) + x.hw * 0.3)) + 2;
     for (const a of n.arms) { const rd = P.roads[a.road], ux = Math.cos(a.angle), uz = Math.sin(a.angle), d0 = a.t + P.STOP, sx = n.x + ux * d0, sz = n.z + uz * d0, rx = uz, rz = -ux;   // влизащите ленти: вдясно спрямо посоката към възела
-      const w0 = rd.median / 2, w1 = rd.median / 2 + rd.lanes[a.end ? 0 : 1] * rd.laneW, sgn = P.drive === 'R' ? 1 : -1;
-      a.stop = [[sx + rx * w0 * sgn, sz + rz * w0 * sgn], [sx + rx * w1 * sgn, sz + rz * w1 * sgn]]; }
+      const nIn = rd.lanes[a.end ? 0 : 1], w0 = rd.oneway ? -rd.w / 2 : rd.median / 2, w1 = rd.oneway ? rd.w / 2 : rd.median / 2 + nIn * rd.laneW, sgn = P.drive === 'R' || rd.oneway ? 1 : -1;
+      a.stop = nIn ? [[sx + rx * w0 * sgn, sz + rz * w0 * sgn], [sx + rx * w1 * sgn, sz + rz * w1 * sgn]] : null; }   // еднопосочен, който излиза оттук — без стоп линия
   }
   placeLots(P, sk, r);
   // помощни
@@ -412,7 +437,7 @@ export function plan2(cityId, o = {}) {
   const nodeR = (n, roadId, end, inbound) => { if (n.kind === 'round') return P.rounds.find(r2 => r2.node === n.id).outer + 1; const a = n.arms.length >= 3 && armOf(n, roadId, end); return a && a.t != null ? a.t + (inbound ? P.STOP : 1) : n.r || 0; };
   const trim = (pts, s0, s1) => { const L = cumLen(pts), T = L[L.length - 1], out = []; if (T - s0 - s1 < 1) { const m = Math.max(0.5, Math.min(T - 0.5, T * s0 / ((s0 + s1) || 1))); s0 = m - 0.5; s1 = T - m - 0.5; }   /* срезовете се застъпват (къс път между две кръстовища) — къса отсечка между тях, не целият път */ let j = 1; const at = s => { while (j < L.length - 1 && L[j] < s) j++; const t = (s - L[j - 1]) / ((L[j] - L[j - 1]) || 1); return [lerp(pts[j - 1][0], pts[j][0], t), lerp(pts[j - 1][1], pts[j][1], t)]; };
     out.push(at(s0)); for (let k = 0; k < L.length; k++) if (L[k] > s0 + 0.3 && L[k] < T - s1 - 0.3) out.push(pts[k]); j = 1; out.push(at(T - s1)); return out; };   // без отсечки под 0,3 м на краищата
-  P.lanePath = (roadId, dir, i) => { const rd = P.roads[roadId], pts = dir > 0 ? rd.pts : rd.pts.slice().reverse(), off = (rd.median / 2 + (i + 0.5) * rd.laneW) * (P.drive === 'R' ? 1 : -1);
+  P.lanePath = (roadId, dir, i) => { const rd = P.roads[roadId], pts = dir > 0 ? rd.pts : rd.pts.slice().reverse(), off = rd.oneway ? (i + 0.5) * rd.laneW - rd.w / 2 : (rd.median / 2 + (i + 0.5) * rd.laneW) * (P.drive === 'R' ? 1 : -1);   // еднопосочен: ленти от левия ръб надясно
     const o = pts.map((p, k) => { const a = pts[Math.max(0, k - 1)], b = pts[Math.min(pts.length - 1, k + 1)], l = dist(a, b) || 1, tx = (b[0] - a[0]) / l, tz = (b[1] - a[1]) / l; return [p[0] - tz * off, p[1] + tx * off]; });
     const nA = P.nodes[dir > 0 ? rd.from : rd.to], nB = P.nodes[dir > 0 ? rd.to : rd.from];
     return trim(o, nodeR(nA, roadId, dir > 0 ? 0 : 1, false), nodeR(nB, roadId, dir > 0 ? 1 : 0, true)); };
@@ -449,6 +474,8 @@ export function plan2(cityId, o = {}) {
 
 // ---- парцели: по двете страни на всеки път, с лице към улицата; без застъпване на пътища, тротоари, вода и други парцели
 function placeLots(P, sk, r) {
+  const B0 = P.boundary, isRect = B0.length === 4, bx0 = Math.min(...B0.map(p => p[0])), bx1 = Math.max(...B0.map(p => p[0])), bz0 = Math.min(...B0.map(p => p[1])), bz1 = Math.max(...B0.map(p => p[1]));
+  const inB = p => isRect ? p[0] >= bx0 && p[0] <= bx1 && p[1] >= bz0 && p[1] <= bz1 : inPoly(p, B0);
   const rg = pointGrid(20); P.roads.forEach(rd => rd.pts.forEach(p => rg.add(p, rd.id)));
   const roadIn = (L, pad) => { const cs = rectCorners(L.x, L.z, L.w / 2, L.d / 2, L.rot), probe = [...cs, [L.x, L.z], ...cs.map((c, i) => [(c[0] + cs[(i + 1) % 4][0]) / 2, (c[1] + cs[(i + 1) % 4][1]) / 2])];
     let hit = false; for (const p of probe) rg.near(p, 16, (q, id) => { const rd = P.roads[id]; if (!hit && dist(p, q) < rd.w / 2 + rd.walk + pad) hit = true; });
@@ -462,19 +489,29 @@ function placeLots(P, sk, r) {
   // 1) големите места първи (болница, гара, парк, стадион, забележителност) — по главните пътища, всяко в своя пояс
   // [вид, ширина по улицата, дълбочина, желано разстояние от центъра / R]
   const BM = [['special', 56, 46, 0.12], ['park', 64, 44, 0.3], ['hospital', 52, 38, 0.45], ['station', 72, 32, 0.72]];
-  const BIG = { s: [['park', 44, 36, 0.25], ['hospital', 40, 32, 0.5]], m: BM, l: [...BM, ['stadium', 96, 64, 0.78], ['special', 56, 46, 0.3], ['park', 72, 46, 0.6]],
+  const GB = P.greensSrc.map(g => { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of g.poly) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } return [x0, z0, x1, z1, g.poly]; });
+  // растер 8 м: „в зелена площ ли е“ — веднъж за плана (иначе хиляди проверки на многоъгълници)
+  const GR = new Map(), gc = 8; for (const [x0, z0, x1, z1, poly] of GB) for (let i = Math.floor(x0 / gc); i <= Math.floor(x1 / gc); i++) for (let j = Math.floor(z0 / gc); j <= Math.floor(z1 / gc); j++) { const k2 = i + ',' + j; if (!GR.has(k2) && inPoly([(i + 0.5) * gc, (j + 0.5) * gc], poly)) GR.set(k2, 1); }
+  const greenIn = (x, z) => GR.has(Math.floor(x / gc) + ',' + Math.floor(z / gc));
+  const BIG = P.osm ? [] : { s: [['park', 44, 36, 0.25], ['hospital', 40, 32, 0.5]], m: BM, l: [...BM, ['stadium', 96, 64, 0.78], ['special', 56, 46, 0.3], ['park', 72, 46, 0.6]],
     xl: [...BM, ['stadium', 96, 64, 0.78], ['special', 56, 46, 0.3], ['park', 72, 46, 0.6], ['hospital', 52, 38, 0.7], ['station', 72, 32, 0.85], ['special', 56, 46, 0.5], ['park', 72, 46, 0.8]] }[P.size];
   if (P.fam === 'coast') BIG.unshift(['port', 80, 40, 0.55]);   // пристанище: място на сушата до кея (кейът навътре във водата — в 3D)
   const ANY = { park: 1, special: 1 }, ONLY = { port: 'quay' };   // паркът и забележителността могат и към квартална улица; болницата, гарата и стадионът — само към главна
   const atOn = (rd, ss) => { let i = 1; while (i < rd.L.length - 1 && rd.L[i] < ss) i++; const a = rd.pts[i - 1], b = rd.pts[i], t = (ss - rd.L[i - 1]) / ((rd.L[i] - rd.L[i - 1]) || 1), l = dist(a, b) || 1; return { x: lerp(a[0], b[0], t), z: lerp(a[1], b[1], t), tx: (b[0] - a[0]) / l, tz: (b[1] - a[1]) / l }; };
   const lotAt = (rd, s, side, w, d) => { const m = atOn(rd, s + w / 2), nx = -m.tz * side, nz = m.tx * side, off = rd.w / 2 + rd.walk + 1.5 + d / 2; return { x: m.x + nx * off, z: m.z + nz * off, w, d, rot: Math.atan2(-nx, -nz), front: { road: rd.id, s: s + w / 2, side, cls: rd.cls } }; };
   const okLot = (L, pad) => { const cs = rectCorners(L.x, L.z, L.w / 2, L.d / 2, L.rot);
-    if (!cs.every(p => inPoly(p, P.boundary) && !P.waterAt(p[0], p[1]))) return false;
+    if (!cs.every(p => inB(p) && !P.waterAt(p[0], p[1]))) return false;
     if (P.rounds.some(rr2 => Math.hypot(L.x - rr2.x, L.z - rr2.z) < rr2.outer + Math.hypot(L.w, L.d) / 2 + 3)) return false;
     if (P.turns.some(t => Math.hypot(L.x - t.x, L.z - t.z) < t.r + 3 + Math.hypot(L.w, L.d) / 2 * 0.8)) return false;
     if (roadIn(L, 0.5)) return false;
-    let clash = false; lg.near([L.x, L.z], 80, (q, o) => { if (!clash && rectsOverlap(o, L, pad)) clash = true; }); return !clash; };
+    let clash = false; lg.near([L.x, L.z], 80, (q, o) => { if (!clash && rectsOverlap(o, L, o.guard ?? pad)) clash = true; }); return !clash; };
   const bigs = [];
+  // истинската карта: забележителностите на реалните си места (основа fp, защитен периметър guard) — парцел със запазено място
+  if (P.osm) for (const lm of sk.osm.landmarks || []) {
+    let best = null, bd = 1e9; for (const rd of P.roads) for (const q of rd.pts) { const d = dist(q, [lm.x, lm.z]); if (d < bd) { bd = d; best = rd; } }
+    const L = { x: lm.x, z: lm.z, w: lm.fp[0], d: lm.fp[1], rot: 0, zone: 'center', big: 'lm', lm: lm.k, reserved: 'lm:' + lm.k, guard: lm.guard, front: { road: best ? best.id : 0, s: 0, side: 1, cls: best ? best.cls : 'street' } };
+    lg.add([L.x, L.z], L); lots.push(L); bigs.push(L);
+  }
   for (const [kind, w0, d0, want] of BIG || []) for (const f of [1, 0.85, 0.7]) {   // ако не се събере — по-малко
     if (bigs.some(b => b._k === kind + w0 + want)) break;
     const w = w0 * f, d = d0 * f;
@@ -496,15 +533,16 @@ function placeLots(P, sk, r) {
         const m0 = at(s), zone = zoneOf(m0.x, m0.z, isMain(rd.cls));
         let placed = false;
         for (const f of [1, 0.8]) {
-          const [w, d] = LOT[zone].map(v => v * f); if (s + w > s1) break;
+          const [w, d] = LOT[zone].map(v => v * f * (P.osm ? 0.65 : 1)); if (s + w > s1) break;   // истинската карта — по-малки (кратки квартали)
           const m = at(s + w / 2), nx = -m.tz * side, nz = m.tx * side, off = rd.w / 2 + rd.walk + 1.5 + d / 2;
           const L = { x: m.x + nx * off, z: m.z + nz * off, w, d, rot: Math.atan2(-nx, -nz), zone, front: { road: rd.id, s: s + w / 2, side, cls: rd.cls } };
           const cs = rectCorners(L.x, L.z, w / 2, d / 2, L.rot);
-          if (!cs.every(p => inPoly(p, P.boundary) && !P.waterAt(p[0], p[1]))) continue;
+          if (!cs.every(p => inB(p) && !P.waterAt(p[0], p[1]))) continue;
+          if (P.osm && [...cs, [L.x, L.z]].some(p => greenIn(p[0], p[1]))) continue;   // паркове и археологически зони — без сгради
           if (P.rounds.some(rr2 => Math.hypot(L.x - rr2.x, L.z - rr2.z) < rr2.outer + Math.hypot(w, d) / 2 + 3)) continue;
           if (P.turns.some(t => Math.hypot(L.x - t.x, L.z - t.z) < t.r + 3 + Math.hypot(w, d) / 2 * 0.8)) continue;
           if (roadIn(L, 0.5)) continue;
-          let clash = false; lg.near([L.x, L.z], 80, (q, o) => { if (!clash && rectsOverlap(o, L, o.big ? 3 : 0.6)) clash = true; }); if (clash) continue;
+          let clash = false; lg.near([L.x, L.z], 80, (q, o) => { if (!clash && rectsOverlap(o, L, o.guard ?? (o.big ? 3 : 0.6))) clash = true; }); if (clash) continue;
           lg.add([L.x, L.z], L); lots.push(L); s += w + 1; placed = true; break;
         }
         if (!placed) s += 4;
@@ -521,6 +559,7 @@ function placeLots(P, sk, r) {
   const nearHub = L => Math.min(...hubs.map(q => Math.hypot(L.x - q.x, L.z - q.z))) / R0;
   for (const L of lots) {
     if (L.big) { L.build = L.big; continue; }
+    if (P.osm) { const r2 = h(L.id); L.build = L.zone === 'periphery' ? (r2 < 0.5 ? 'low' : 'mid') : (r2 < 0.75 ? 'mid' : 'low'); continue; }
     const r = h(L.id), hb = nearHub(L), z = L.zone;
     L.build = P.size === 's' ? (z === 'center' || z === 'business' ? 'low' : 'house')
       : P.size === 'm' ? (z === 'center' ? 'mid' : z === 'business' ? (r < 0.6 ? 'mid' : 'low') : z === 'residential' ? (hb < 0.45 && r < 0.35 ? 'mid' : 'house') : 'house')

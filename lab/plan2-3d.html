@@ -12,7 +12,7 @@
 </style></head><body>
 <canvas id="c"></canvas>
 <div class="ui"><h1>🏙️ Град v2 — 3D демо</h1>
-  <div class="row"><select id="fam"><option value="eu">Европейски</option><option value="us">Американски</option><option value="coast">Крайбрежен</option><option value="radial">Радиален</option></select>
+  <div class="row"><select id="fam"><option value="eu">Европейски</option><option value="us">Американски</option><option value="coast">Крайбрежен</option><option value="radial">Радиален</option><option value="rome">🇮🇹 Рим (истинска карта)</option></select>
     <select id="size"><option value="s">малък</option><option value="m" selected>среден</option><option value="l">голям</option><option value="xl">мегаполис</option></select>
     seed <input id="seed" type="number" value="7"><button id="go">↻</button></div>
   <div class="row"><button id="top">⬆ Отгоре</button><button id="game" class="on">🎮 Игрова камера</button><button id="round">⭕ Кръгово</button><button id="night">🌙 Нощ</button></div>
@@ -29,6 +29,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { plan2 } from '../cityplan2.js';
+import { OSM2 } from '../cityplan2-osm.js';   // Рим — истинските улици, Тибърът, парковете (OpenStreetMap, ODbL)
+import { buildLandmark } from '../landmarks.js';
 import { createTraffic, planNetwork } from '../traffic.js';   // трафикът (част C, 2a): ленти, дистанция, кръстовища, кръгови, светлини; ?tr2=0 — старите пробни коли
 import { truckLamps } from '../vehmodels.js';
 
@@ -52,7 +54,7 @@ const OFFICE = [...BUILD.low[0], ...BUILD.mid[0].filter(k => !/^[bs]-/.test(k))]
 const CARS = ['car-polo', 'car-p206', 'car-renegade', 'car-accord', 'car-corolla', 'car-taxi', 'car-hilux', 'bus-citaro'];
 await Promise.all([...HOUSES.map(k => load(k, `../assets/heavy/houses2/${k}.glb`)), ...[...OFFICE, ...TOWER].map(k => load(k, `../assets/heavy/blocks2/${k}.glb`)),
   ...['panel12', 'soviet', 'richmond', 'dbrick'].map(k => load('b-' + k, `../assets/heavy/blocks/${k}.glb`)), ...['sing', 'rand', 'blue'].map(k => load('s-' + k, `../assets/heavy/sky/${k}.glb`)),
-  load('hospital', '../assets/heavy/hospital/hospital.glb'), load('station', '../assets/heavy/station/small.glb'), load('stadium', '../assets/heavy/stadium/stadium.glb'), load('cityhall', '../assets/heavy/civic/cityhall.glb'),
+  load('hospital', '../assets/heavy/hospital/hospital.glb'), load('colosseo', '../assets/heavy/lm/colosseo.glb'), load('station', '../assets/heavy/station/small.glb'), load('stadium', '../assets/heavy/stadium/stadium.glb'), load('cityhall', '../assets/heavy/civic/cityhall.glb'),
   ...CARS.map(k => load(k, `../assets/heavy/cars/${k}.glb`))]);
 // ---- инстанции: всяка част на модела — един InstancedMesh за всичките му копия (вместо клонинги: малко draw calls)
 const PARTS = {}, BOX = {};
@@ -92,7 +94,7 @@ const ASPH_T = ctex(256, (g, n) => { g.fillStyle = '#4a4d52'; g.fillRect(0, 0, n
 const PAVE_T = ctex(256, (g, n) => { g.fillStyle = '#cbc6ba'; g.fillRect(0, 0, n, n); g.strokeStyle = 'rgba(120,112,100,0.55)'; g.lineWidth = 2; for (let i = 0; i <= 4; i++) { g.beginPath(); g.moveTo(i * n / 4, 0); g.lineTo(i * n / 4, n); g.moveTo(0, i * n / 4); g.lineTo(n, i * n / 4); g.stroke(); } for (let i = 0; i < 2500; i++) { g.fillStyle = `rgba(90,85,75,${Math.random() * 0.15})`; g.fillRect(Math.random() * n, Math.random() * n, 2, 2); } });
 const COB_T = ctex(256, (g, n) => { g.fillStyle = '#9d8f7c'; g.fillRect(0, 0, n, n); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const v = 130 + Math.random() * 40 | 0; g.fillStyle = `rgb(${v},${v - 12},${v - 28})`; g.fillRect(x * 16 + (y % 2) * 8 + 1, y * 16 + 1, 14, 14); } }, 3);
 MAT.asph.map = ASPH_T; MAT.asph.color.setHex(0xffffff); MAT.walk.map = PAVE_T; MAT.walk.color.setHex(0xffffff);
-Object.assign(MAT, { curb: M(0xe2ded5), apron: new THREE.MeshStandardMaterial({ map: COB_T, roughness: 0.95 }), flower: [M(0xd8434b), M(0xf2c230), M(0x9b59c9)], stone: M(0xb9b2a4), wet: new THREE.MeshStandardMaterial({ color: 0x5aa6d6, roughness: 0.1, metalness: 0.2 }) });
+Object.assign(MAT, { urban: M(0xcdbf9f), curb: M(0xe2ded5), apron: new THREE.MeshStandardMaterial({ map: COB_T, roughness: 0.95 }), flower: [M(0xd8434b), M(0xf2c230), M(0x9b59c9)], stone: M(0xb9b2a4), wet: new THREE.MeshStandardMaterial({ color: 0x5aa6d6, roughness: 0.1, metalness: 0.2 }) });
 for (const k of ['curb', 'apron']) Object.assign(MAT[k], { polygonOffset: true, polygonOffsetFactor: -5, polygonOffsetUnits: -5 });
 
 let city = null, P = null, cars = [], night = false;
@@ -110,18 +112,55 @@ function lodUpdate(force) {
   if (!lodBox || (!force && lodAt && lodAt.distanceTo(cam.position) < 12)) return; lodAt = cam.position.clone();
   const cnt = {}, m = new THREE.Matrix4(); let nb = 0;
   for (const b of BLD) {
-    if (b.p.distanceTo(cam.position) < NEAR) { const j = cnt[b.k] = (cnt[b.k] || 0) + 1; for (const im of lodIM[b.k]) im.setMatrixAt(j - 1, m.multiplyMatrices(b.M, im.userData.local)); }
+    if (b.always || b.p.distanceTo(cam.position) < NEAR) { const j = cnt[b.k] = (cnt[b.k] || 0) + 1; for (const im of lodIM[b.k]) im.setMatrixAt(j - 1, m.multiplyMatrices(b.M, im.userData.local)); }
     else { lodBox.setMatrixAt(nb, b.box); lodBox.setColorAt(nb++, LC.setHex(LOD_COL[b.cls] || 0x9a9690)); }
   }
   for (const k in lodIM) for (const im of lodIM[k]) { im.count = cnt[k] || 0; im.instanceMatrix.needsUpdate = true; }
   lodBox.count = nb; lodBox.instanceMatrix.needsUpdate = true; if (lodBox.instanceColor) lodBox.instanceColor.needsUpdate = true;
 }
+// забележителност на реалното ѝ място: моделът се побира в основата fp (GLB-тата се зареждат по-късно — тогава се нагласят)
+function romeLm(L) {
+  const plaza = disc(L.x, L.z, Math.max(L.w, L.d) / 2 + (L.guard || 4), 0.055); city.add(merge([plaza], MAT.walk));   // площад / защитен периметър
+  if (L.lm === 'termini') { put('station', L, 2); return; }
+  if (L.lm === 'colosseo') { put('colosseo', L, 0); BLD[BLD.length - 1].always = 1; return; }   // забележителността — винаги пълният модел
+  if (!['stpeter', 'pantheon', 'vittoriano'].includes(L.lm)) return;   // Треви, Кастел Сант'Анджело, Circus Maximus… — запазено място (моделите — по-късно)
+  const o = buildLandmark(L.lm, {}), g = o.group; city.add(g);
+  const fit = () => { const b = new THREE.Box3().setFromObject(g); if (b.isEmpty()) return false; const sz = b.getSize(new THREE.Vector3()), k = Math.min(L.w / sz.x, L.d / sz.z); g.scale.multiplyScalar(k); const b2 = new THREE.Box3().setFromObject(g), c = b2.getCenter(new THREE.Vector3()); g.position.x += L.x - c.x; g.position.z += L.z - c.z; g.position.y -= b2.min.y; g.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; } }); return true; };
+  if (!fit()) { const t = setInterval(() => { if (fit()) clearInterval(t); }, 500); setTimeout(() => clearInterval(t), 30000); }
+}
+let put = () => {};
+// Рим: затворено застрояване — по двете страни на всяка улица непрекъсната редица от сгради (8 м по фасадата, 11 м дълбочина),
+// 4–6 етажа, в цветовете на Рим (охра, теракота, жълто); не върху друга улица, вода, парк/археологическа зона или забележителност
+const ROMA = [0xd9a066, 0xc8794e, 0xe2c27a, 0xb5654a, 0xd8b48a, 0xe7d3a8, 0xc98f5b, 0xa9583f];
+function romeBlocks() {
+  const D = OSM2.rome, rg = new Map(), gc = 12, key = (x, z) => Math.floor(x / gc) + ',' + Math.floor(z / gc);
+  P.roads.forEach(rd => rd.pts.forEach(p => { const k = key(p[0], p[1]); (rg.get(k) || rg.set(k, []).get(k)).push([p[0], p[1], rd.w / 2 + rd.walk + 0.8, rd.id]); }));
+  const nearRoad = (x, z, own) => { const i = Math.floor(x / gc), j = Math.floor(z / gc); for (let a = i - 2; a <= i + 2; a++) for (let b = j - 2; b <= j + 2; b++) for (const [px, pz, r, id] of rg.get(a + ',' + b) || []) if (id !== own && Math.hypot(px - x, pz - z) < r) return true; return false; };
+  const GB = P.greensSrc.map(g => { const xs = g.poly.map(p => p[0]), zs = g.poly.map(p => p[1]); return [Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs), g.poly]; }), green = (x, z) => GB.some(([x0, z0, x1, z1, poly]) => x >= x0 && x <= x1 && z >= z0 && z <= z1 && inPoly2([x, z], poly)), lms = P.lots.filter(L => L.lm), inLm = (x, z) => lms.some(L => Math.hypot(L.x - x, L.z - z) < Math.max(L.w, L.d) / 2 + (L.guard || 4) + 4);
+  const used = new Map(), mats = [], cols = [], m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), c = new THREE.Color();
+  const DEP = 15, STEP = 8;
+  for (const rd of P.roads) { if (rd.w > 14) continue;   // по булевардите на обходите — отстояние (паркове, кейове)
+    const T = rd.L[rd.L.length - 1];
+    for (let s = 6; s < T - 6; s += STEP) { let i = 1; while (i < rd.L.length - 1 && rd.L[i] < s) i++; const a = rd.pts[i - 1], b = rd.pts[i], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, t = (s - rd.L[i - 1]) / ((rd.L[i] - rd.L[i - 1]) || 1), ux = (b[0] - a[0]) / l, uz = (b[1] - a[1]) / l;
+      for (const sg of [1, -1]) { const off = rd.w / 2 + rd.walk + 0.4 + DEP / 2, x = a[0] + (b[0] - a[0]) * t - uz * off * sg, z = a[1] + (b[1] - a[1]) * t + ux * off * sg;
+        const k = Math.round(x / 6) + ',' + Math.round(z / 6); if (used.has(k)) continue;
+        let bad = false; for (const [dx, dz] of [[0, 0], [-uz * sg * DEP / 2, ux * sg * DEP / 2], [ux * STEP / 2, uz * STEP / 2], [-ux * STEP / 2, -uz * STEP / 2]]) { const px = x + dx, pz = z + dz; if (nearRoad(px, pz, rd.id) || P.waterAt(px, pz) || green(px, pz) || inLm(px, pz)) { bad = true; break; } }
+        if (bad) continue; used.set(k, 1);
+        const h = ((rd.id * 7919 + Math.round(s) * 31 + (sg > 0 ? 17 : 0)) >>> 0) % 1000 / 1000, H = 13 + h * 8;
+        q.setFromAxisAngle(up, Math.atan2(ux, uz)); mats.push(m.compose(new THREE.Vector3(x, H / 2, z), q, new THREE.Vector3(DEP, H, STEP + 0.3)).clone()); cols.push(ROMA[Math.floor(h * ROMA.length)]); } } }
+  const box = new THREE.BoxGeometry(1, 1, 1), im = new THREE.InstancedMesh(box, new THREE.MeshStandardMaterial({ roughness: 0.92 }), Math.max(1, mats.length));
+  mats.forEach((M2, i) => { im.setMatrixAt(i, M2); im.setColorAt(i, c.setHex(cols[i])); }); im.castShadow = im.receiveShadow = true; im.frustumCulled = false; city.add(im);
+  const roof = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0x9e4a32, roughness: 0.85 }), Math.max(1, mats.length)), v = new THREE.Vector3(), sc = new THREE.Vector3();   // керемидени покриви (ниска плоча отгоре)
+  mats.forEach((M2, i) => { M2.decompose(v, q, sc); roof.setMatrixAt(i, m.compose(new THREE.Vector3(v.x, sc.y + 0.4, v.z), q, new THREE.Vector3(sc.x * 0.96, 0.8, sc.z))); }); roof.frustumCulled = false; roof.castShadow = true; city.add(roof);
+  window.__romeBlocks = mats.length;
+}
+function inPoly2(p, poly) { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > p[1]) !== (zj > p[1]) && p[0] < (xj - xi) * (p[1] - zi) / (zj - zi) + xi) c = !c; } return c; }
 function build() {
   if (tr) { tr.clear(); tr = null; }
   if (city) { scene.remove(city); city.traverse(o => { if (o.isInstancedMesh) o.dispose(); if (o.geometry && !o.userData.shared) o.geometry.dispose(); }); }   // InstancedMesh.dispose — буферите на инстанциите
   city = new THREE.Group(); scene.add(city);
-  P = plan2('demo', { fam: fam.value, size: size.value, seed: +seed.value || 0 });
-  const RR = P.R * 1.6, g0 = new THREE.Mesh(new THREE.PlaneGeometry(RR * 2.4, RR * 2.4).rotateX(-Math.PI / 2), MAT.grass); g0.receiveShadow = true; city.add(g0);
+  P = fam.value === 'rome' ? plan2('rome', { osm: OSM2.rome, size: 'xl' }) : plan2('demo', { fam: fam.value, size: size.value, seed: +seed.value || 0 });
+  const RR = P.R * 1.6, g0 = new THREE.Mesh(new THREE.PlaneGeometry(RR * 2.4, RR * 2.4).rotateX(-Math.PI / 2), P.osm ? MAT.urban : MAT.grass); g0.receiveShadow = true; city.add(g0);   // Рим: дворовете и площадите — светъл камък, тревата — само в парковете
   if (P.coastZ) { const sh = new THREE.Shape(); sh.moveTo(-RR * 1.2, -RR * 1.2); for (let i = 0; i <= 80; i++) { const x = -RR * 1.2 + i * RR * 2.4 / 80; sh.lineTo(x, P.coastZ(x)); } sh.lineTo(RR * 1.2, -RR * 1.2); const wg = new THREE.ShapeGeometry(sh); wg.rotateX(Math.PI / 2); const wm = new THREE.Mesh(wg, MAT.water); wm.position.y = 0.02; city.add(wm);
     // бряг: пясъчна ивица по водата и крайбрежна алея до кея; пристанището — кей навътре във водата пред мястото му
     const cl = []; for (let x = -RR * 1.2; x <= RR * 1.2; x += 4) cl.push(x);
@@ -135,6 +174,13 @@ function build() {
       const sh = new THREE.Mesh(new THREE.BoxGeometry(port.w * 0.9, 9, port.d * 0.7), M(0x6f7f8f)); sh.position.set(port.x, 4.5, port.z); sh.rotation.y = port.rot; sh.castShadow = true; city.add(sh); }   // склад на пристанището
   }
   const W = [], As = [], Md = [], Pt = [], Is = [], trees = [], Cb = [];
+  if (P.osm) {   // истинската карта: Тибърът (ивица около оста), остров Тиберина, паркове и археологически зони, жп линиите към Термини
+    const D = OSM2.rome, Wt = []; for (const rv of D.river) Wt.push(ribbon(rv, D.riverHW * 2, 0.09)); city.add(merge(Wt, MAT.water));
+    const I = D.island, isl = new THREE.Mesh(new THREE.CircleGeometry(1, 32).rotateX(-Math.PI / 2), M(0xb9ad96)); isl.scale.set(I.w / 2, 1, I.d / 2); isl.rotation.y = I.rot; isl.position.set(I.x, 0.06, I.z); city.add(isl);
+    const gm = { park: M(0x6f9e4f), archaeo: M(0xb7b08a) };
+    for (const g of P.greensSrc) { const sh = new THREE.Shape(g.poly.map(([x, z]) => new THREE.Vector2(x, z))); const ge = new THREE.ShapeGeometry(sh); ge.rotateX(Math.PI / 2); const m = new THREE.Mesh(ge, gm[g.kind] || gm.park); m.material.side = THREE.DoubleSide; m.position.y = 0.025; m.receiveShadow = true; city.add(m); }
+    const Rl = []; for (const r of D.rail) Rl.push(ribbon(r, 3.2, 0.05)); city.add(merge(Rl, M(0x8c8578)));
+  }
   // пътят спира на ръба на кръговото; разделителната ивица — на ръба на всяко кръстовище
   const cut = (pts, n0, r0, n1, r1) => pts.filter(p => Math.hypot(p[0] - n0.x, p[1] - n0.z) >= r0 && Math.hypot(p[0] - n1.x, p[1] - n1.z) >= r1);
   // срезовете по дължината на пътя: кръгово — до пръстена; кръстовище — до очертанието му (arm.t от плана, + отместване)
@@ -148,7 +194,7 @@ function build() {
   const sideCut = (n, rd, end, sg) => { if (n.kind === 'round') return P.rounds.find(r => r.node === n.id).outer + 0.2; const a = n.arms.length >= 3 && n.arms.find(q => q.road === rd.id && q.end === end); if (!a || a.tL == null) return 0; return sAt(n, rd, end, (end === 0) === (sg > 0) ? a.tL : a.tR); };
   const trimS = (rd, s0, s1) => { const L = rd.L, T = L[L.length - 1]; if (T - s0 - s1 < 0.5) return []; const out = [atS(rd, s0).p]; for (let k = 0; k < L.length; k++) if (L[k] > s0 + 0.05 && L[k] < T - s1 - 0.05) out.push(rd.pts[k]); out.push(atS(rd, T - s1).p); return out; };
   for (const rd of P.roads) { const nA = P.nodes[rd.from], nB = P.nodes[rd.to], T = rd.L[rd.L.length - 1], ov = n => n.arms.length >= 3 && n.kind !== 'round' ? 2 : 0, c0 = Math.max(0, endCut(nA, rd, 0) - ov(nA)), c1 = Math.max(0, endCut(nB, rd, 1) - ov(nB)), pr = trimS(rd, c0, c1); if (pr.length < 2) continue;   // асфалтът влиза 2 м под кръстовището — без процеп при извит път
-    As.push(ribbon(pr, rd.w, 0.07));
+    (rd.noCars ? W : As).push(ribbon(pr, rd.w, rd.noCars ? 0.05 : 0.07));   // пешеходна — паваж
     for (const sg of [1, -1]) { const ps = trimS(rd, sideCut(nA, rd, 0, sg), sideCut(nB, rd, 1, sg)); if (ps.length > 1) { W.push(ribbon(offLine(ps, sg * (rd.w / 2 + rd.walk / 2)), rd.walk, 0.04)); Cb.push(ribbon(offLine(ps, sg * (rd.w / 2 + 0.15)), 0.3, 0.09)); } }   // тротоар и бордюр — до среза на своята страна
     if (rd.median) {   // разделителната ивица свършва зад стоп линията с нос (стеснява се до 0,4 м)
       const m0 = endCut(nA, rd, 0, ST + 3.2), m1 = endCut(nB, rd, 1, ST + 3.2), pm = trimS(rd, m0, m1); if (pm.length < 2 || T - m0 - m1 < 4) continue; Md.push(ribbon(pm, rd.median, 0.1));   // късият път между две близки кръстовища — без ивица
@@ -202,15 +248,18 @@ function build() {
   const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3)); city.add(new THREE.LineSegments(lg, MAT.lot));
   const pick = (arr, id) => arr[(id * 2654435761 >>> 0) % arr.length];
   BLD = [];
-  const put = (k, L, fit, hMax) => { const M2 = lotMatrix(k, L, fit, hMax); if (!M2) return; const b = boxOf(k), c = b.getCenter(new THREE.Vector3()), sz = b.getSize(new THREE.Vector3());
+  put = (k, L, fit, hMax) => { const M2 = lotMatrix(k, L, fit, hMax); if (!M2) return; const b = boxOf(k), c = b.getCenter(new THREE.Vector3()), sz = b.getSize(new THREE.Vector3());
     BLD.push({ k, M: M2, lot: L.id, cls: L.build, box: M2.clone().multiply(new THREE.Matrix4().makeTranslation(c.x, c.y, c.z)).multiply(new THREE.Matrix4().makeScale(sz.x, sz.y, sz.z)), p: new THREE.Vector3().setFromMatrixPosition(M2) }); };
   for (const L of P.lots) {
     if (L.big === 'port') continue;   // пристанището — кей във водата (по-долу)
     if (L.big === 'park') { for (let k = 0; k < Math.floor(L.w * L.d / 70); k++) { const h = 4 + (k * 7 % 5), u = ((k * 0.7548776662 + 0.5) % 1 - 0.5) * (L.w - 6), v = ((k * 0.5698402910 + 0.5) % 1 - 0.5) * (L.d - 6), c = Math.cos(L.rot), s = Math.sin(L.rot); trees.push([L.x + u * c + v * s, L.z - u * s + v * c, h]); } continue; }
+    if (L.lm) { romeLm(L); continue; }
+    if (P.osm) continue;   // Рим: сградите — затворени квартали по улиците (romeBlocks), не отделни модели
     if (L.big) { const k = { hospital: 'hospital', station: 'station', stadium: 'stadium', special: 'cityhall' }[L.big]; put(k, L, 6); continue; }
     const [list, hMax] = BUILD[L.build] || BUILD.house, have = list.filter(k => A[k]); put(pick(have, L.id), L, L.build === 'house' ? 5 : 4, hMax);
   }
   lodSetup();
+  if (P.osm) romeBlocks();
   if (trees.length) {   // дърветата на парковете: два InstancedMesh (стъбла и корони)
     const tg = new THREE.CylinderGeometry(0.2, 0.3, 1, 6).translate(0, 0.5, 0), cg = new THREE.SphereGeometry(1, 8, 6), T1 = new THREE.InstancedMesh(tg, TREE_M[0], trees.length), T2 = new THREE.InstancedMesh(cg, TREE_M[1], trees.length), m = new THREE.Matrix4();
     trees.forEach(([x, z, h], i) => { T1.setMatrixAt(i, m.compose(new THREE.Vector3(x, 0, z), new THREE.Quaternion(), new THREE.Vector3(1, h * 0.45, 1))); T2.setMatrixAt(i, m.compose(new THREE.Vector3(x, h * 0.55, z), new THREE.Quaternion(), new THREE.Vector3(h * 0.3, h * 0.3, h * 0.3))); });
@@ -327,5 +376,5 @@ let last = performance.now();
 R.setAnimationLoop(() => { const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now;
   const t0 = performance.now(); moveCars(dt); const t1 = performance.now(); ctl.update(); lodUpdate(); R.render(scene, cam); const t2 = performance.now();
   T.tr += t1 - t0; T.rn += t2 - t1; T.n++; fr++; if (bench) benchTick(now); if (now - ft > 1000) { fps = fr; fr = 0; ft = now; stats(); } });
-window.__p2 = { camTop: (x, z, h = 70) => { ctl.target.set(x, 0, z); cam.position.set(x, h, z + 0.01); ctl.update(); lodUpdate(true); }, camAt: (x, z, d = 40) => { ctl.target.set(x, 0, z); cam.position.set(x + d * 0.55, d * 0.85, z + d * 0.75); ctl.update(); lodUpdate(true); }, P: () => P, view, setNight, cars: () => cars, tr: () => tr && tr.stats(), bench: benchStart, lod: () => ({ near: Object.values(lodIM).reduce((a, ims) => a + (ims[0]?.count || 0), 0), far: lodBox?.count }) };
+window.__p2 = { city: () => city, camTop: (x, z, h = 70) => { ctl.target.set(x, 0, z); cam.position.set(x, h, z + 0.01); ctl.update(); lodUpdate(true); }, camAt: (x, z, d = 40) => { ctl.target.set(x, 0, z); cam.position.set(x + d * 0.55, d * 0.85, z + d * 0.75); ctl.update(); lodUpdate(true); }, P: () => P, view, setNight, cars: () => cars, tr: () => tr && tr.stats(), bench: benchStart, lod: () => ({ near: Object.values(lodIM).reduce((a, ims) => a + (ims[0]?.count || 0), 0), far: lodBox?.count }) };
 </script></body></html>
