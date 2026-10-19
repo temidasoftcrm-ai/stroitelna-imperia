@@ -3,9 +3,10 @@
 import * as THREE from 'three';
 import { buildLandmark } from './landmarks.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { prepNightFloors } from './nightfloors.js';
 // истински небостъргачи от Sketchfab (CC-BY, авторите са в CREDITS.txt и „📜 Автори“) — зареждат се при първо ползване
 const SKY = {}, skyLoad = {};
-const loadSky = k => skyLoad[k] || (skyLoad[k] = new Promise(res => new GLTFLoader().load(`assets/heavy/sky/${k}.glb`, g => { SKY[k] = g.scene; res(g.scene); }, undefined, () => res(null))));
+const loadSky = k => skyLoad[k] || (skyLoad[k] = new Promise(res => new GLTFLoader().load(`assets/heavy/sky/${k}.glb`, g => { prepNightFloors(g.scene, 'sf-sky-' + k); SKY[k] = g.scene; res(g.scene); }, undefined, () => res(null))));   // нощем — като същите небостъргачи в града (nightfloors.js)
 
 export const STYLE_LV = 7, STYLE_COST = 50000;
 export const OFFICE_STYLES = [
