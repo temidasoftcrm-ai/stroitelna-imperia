@@ -4,6 +4,7 @@
 // Таблица public.saves (user_id, slot 's1'…'s3', data jsonb, meta jsonb, updated_at); RLS: всеки вижда само своите.
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
 import { backupRaw, dropBackups } from './saves.js';
+import { feature } from './lab/feature.js';
 
 const URL_ = 'https://lpzjscttqieqnqozscpk.supabase.co';
 const KEY = 'sb_publishable_3Gats6iSx7BoyFUh63N1vQ__pHCBrul';   // публичен ключ — достъпът се пази от RLS
@@ -313,6 +314,68 @@ sb.auth.onAuthStateChange((ev, session) => {
   const was = user; user = session?.user || null; paint();
   if (user && (!was || was.id !== user.id)) syncAll(true);
 });
+// ── 📧 екранът при отваряне (feature 'reg-gate'): първо „Регистрирай имейл“ (код по пощата), после „▶ Влез в играта“.
+// Регистрираните не го виждат. „Играй без регистрация“ — само за това отваряне. В Лаб (iframe) — само с ?gate.
+function regGate() {
+  if (document.getElementById('regGate')) return;
+  const el = document.createElement('div'); el.id = 'regGate';
+  el.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;background:linear-gradient(rgba(5,7,11,.55),rgba(5,7,11,.75)),url(assets/ui/splash.webp) center/cover #05070b;font-family:system-ui,sans-serif';
+  const inp = 'width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:1px solid #3a4560;background:#0f141c;color:#fff;font:600 16px system-ui,sans-serif;margin:6px 0';
+  const go = 'width:100%;padding:13px;border:0;border-radius:12px;background:#f5b942;color:#111;font:800 17px system-ui,sans-serif;cursor:pointer;margin-top:8px';
+  el.innerHTML = `<div style="width:min(420px,100%);background:#0c1018;border:1px solid #c9a14a;border-radius:16px;padding:20px 20px 14px;color:#e6edf6;box-shadow:0 20px 60px #000">
+    <div style="font:900 24px system-ui,sans-serif;color:#ffd54a;text-align:center">🏗️ Строителна империя</div>
+    <div id="rgBody"></div>
+    <div style="text-align:center;margin-top:12px"><a href="#" id="rgSkip" style="color:#8b96a8;font-size:13px">Играй без регистрация</a></div></div>`;
+  document.body.appendChild(el);
+  const body = el.querySelector('#rgBody'), close = () => { el.remove(); };
+  el.querySelector('#rgSkip').onclick = e => { e.preventDefault(); close(); };
+  const msg = (t, bad) => { const m = body.querySelector('.rgMsg'); m.style.color = bad ? '#ff6b6b' : '#8b96a8'; m.textContent = t; };
+  const stepEmail = (pre = '') => {
+    body.innerHTML = `<p style="color:#a9b6c8;font-size:14px;line-height:1.5;margin:10px 0 4px">1️⃣ <b style="color:#fff">Регистрирай имейл</b> — ще ти пратим код. Без парола. Играта ти се пази в облака и можеш да играеш от всяко устройство.</p>
+      <input id="rgEmail" type="email" autocomplete="email" inputmode="email" placeholder="ime@primer.com" style="${inp}"><div class="rgMsg" style="font-size:13px;min-height:18px"></div>
+      <button id="rgSend" style="${go}">📧 Регистрирай</button>`;
+    const e = body.querySelector('#rgEmail'); e.value = pre; setTimeout(() => e.focus(), 50);
+    const send = () => {
+      const email = e.value.trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return msg('Невалиден имейл.', true);
+      msg('Изпращам…'); body.querySelector('#rgSend').disabled = true;
+      sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } }).then(({ error }) => {
+        body.querySelector('#rgSend').disabled = false;
+        if (error) return msg(/rate|seconds/i.test(error.message) ? 'Твърде много опити — изчакай малко.' : error.message, true);
+        stepCode(email);
+      });
+    };
+    body.querySelector('#rgSend').onclick = send; e.onkeydown = ev => { if (ev.key === 'Enter') send(); };
+  };
+  const stepCode = email => {
+    body.innerHTML = `<p style="color:#a9b6c8;font-size:14px;line-height:1.5;margin:10px 0 4px">2️⃣ Пратихме код на <b style="color:#fff"></b>. Въведи го тук (ако го няма — виж „Спам“).</p>
+      <input id="rgCode" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456" style="${inp};letter-spacing:4px;text-align:center"><div class="rgMsg" style="font-size:13px;min-height:18px"></div>
+      <button id="rgOk" style="${go}">✅ Потвърди</button><div style="text-align:center;margin-top:8px"><a href="#" id="rgBack" style="color:#8b96a8;font-size:13px">← друг имейл</a></div>`;
+    body.querySelector('b').textContent = email;
+    const c = body.querySelector('#rgCode'); setTimeout(() => c.focus(), 50);
+    body.querySelector('#rgBack').onclick = ev => { ev.preventDefault(); stepEmail(email); };
+    const ok = () => {
+      const token = c.value.replace(/\D/g, ''); if (token.length < 6) return msg('Кодът е от 6 цифри.', true);
+      msg('Проверявам…');
+      sb.auth.verifyOtp({ email, token, type: 'email' }).then(({ error }) => {
+        if (error) return msg(/expired|invalid/i.test(error.message) ? 'Грешен или изтекъл код.' : error.message, true);
+        stepEnter(email);
+      });
+    };
+    body.querySelector('#rgOk').onclick = ok; c.onkeydown = ev => { if (ev.key === 'Enter') ok(); };
+  };
+  const stepEnter = email => {
+    el.querySelector('#rgSkip').parentElement.remove();
+    body.innerHTML = `<p style="color:#5fe39a;font-size:15px;text-align:center;margin:14px 0 6px">✅ Регистриран си като <b style="color:#fff"></b></p>
+      <button id="rgIn" style="${go};font-size:20px;padding:15px">▶ Влез в играта</button>`;
+    body.querySelector('b').textContent = email;
+    body.querySelector('#rgIn').onclick = close;
+  };
+  stepEmail();
+}
+if (!AUTOTEST && feature('reg-gate') && (window.top === window || /[?&]gate/.test(location.search)))
+  sb.auth.getSession().then(({ data }) => { if (!data?.session) { if (document.body) regGate(); else addEventListener('DOMContentLoaded', regGate); } });
+window.__regGate = regGate;
 window.__settings = openSettings;
 window.__wipeAll = () => confirmWipe(false, true);   // „🆕 Нова игра“ на картата (game.js)
 if (!AUTOTEST) {
