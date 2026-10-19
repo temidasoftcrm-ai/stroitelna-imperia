@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Планове v2</title>
+<style>
+  :root { --bg:#14161b; --card:#1d2027; --txt:#e8e8ea; --mut:#9aa0aa; --ok:#5fc27a; --bad:#e06a5a; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:14px/1.45 system-ui,sans-serif; padding:16px; }
+  h1 { font-size:20px; margin:0 0 4px; } .lead { color:var(--mut); margin:0 0 12px; max-width:980px; }
+  .bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0 0 12px; }
+  button, input { background:var(--card); color:var(--txt); border:1px solid #333a45; border-radius:8px; padding:6px 12px; font:inherit; }
+  button { cursor:pointer; } input { width:90px; }
+  .grid { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:10px; }
+  @media (max-width:800px) { .grid { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+  .it { background:var(--card); border-radius:10px; padding:6px; cursor:pointer; border:2px solid transparent; }
+  .it:hover { border-color:#4ea1ff; } canvas { width:100%; aspect-ratio:1; display:block; border-radius:6px; }
+  .n { font-weight:600; font-size:13px; margin-top:4px; } .m { font-size:11px; color:var(--mut); }
+  .m b { color:var(--ok); font-weight:600; } .m i { color:var(--bad); font-style:normal; }
+  #big { display:none; } #big canvas { max-width:min(100%, 900px); }
+  .key span { display:inline-block; width:12px; height:12px; border-radius:3px; vertical-align:-2px; margin:0 4px 0 10px; }
+</style></head><body>
+<h1>🗺️ Планове на градовете v2 — 4 семейства × 4 размера</h1>
+<p class="lead">Новият генератор (cityplan2.js): входове → булеварди → квартали → улици → кръстовища и кръгови → парцели с лице към улицата. Само Т и 4-клонни кръстовища, без 5+, без остри ъгли и двойни платна. Цъкни град за голям изглед. Seed сменя вариацията (всеки град има свой постоянен).</p>
+<div class="bar">seed <input id="seed" type="number" value="7"><button id="go">↻ Генерирай</button><button id="rnd">🎲 Друг seed</button>
+  <span class="key"><span style="background:#ebc878"></span>център<span style="background:#96aae6"></span>делови<span style="background:#e1e1d7"></span>жилищни<span style="background:#bec9aa"></span>периферия<span style="background:#5a9646"></span>кръгово<span style="background:#ff5050"></span>задънен край</span></div>
+<div id="big"><div class="bar"><button id="back">← Всички 16</button><span id="bigT"></span></div><canvas id="bc" width="1200" height="1200"></canvas></div>
+<div class="grid" id="grid"></div>
+<script type="module">
+import { plan2, FAMILIES, SIZES } from '../cityplan2.js';
+const FN = { eu: 'Европейска', us: 'Американска', coast: 'Крайбрежна', radial: 'Радиална' }, SN = { s: 'малък', m: 'среден', l: 'голям', xl: 'мегаполис' };
+const ZC = { center: '#ebc878', business: '#96aae6', residential: '#e1e1d7', periphery: '#bec9aa' };
+function draw(cv, P) {
+  const g = cv.getContext('2d'), W = cv.width, S = W / (2.5 * P.R), T = (x, z) => [W / 2 + (x - P.center.x * 0) * S, W / 2 + z * S];
+  g.fillStyle = '#80a569'; g.fillRect(0, 0, W, W);
+  if (P.coastZ) { g.fillStyle = '#4678aa'; g.beginPath(); g.moveTo(0, 0); for (let i = 0; i <= 80; i++) { const x = -P.R * 1.25 + i * P.R * 2.5 / 80; g.lineTo(...T(x, P.coastZ(x))); } g.lineTo(W, 0); g.fill(); }
+  for (const L of P.lots) { g.fillStyle = L.reserved ? '#d070d0' : ZC[L.zone]; g.beginPath(); L.poly.forEach((p, i) => g[i ? 'lineTo' : 'moveTo'](...T(...p))); g.fill(); }
+  const line = (rd, w, col) => { g.strokeStyle = col; g.lineWidth = Math.max(1, w * S); g.lineJoin = g.lineCap = 'round'; g.beginPath(); rd.pts.forEach((p, i) => g[i ? 'lineTo' : 'moveTo'](...T(...p))); g.stroke(); };
+  for (const rd of P.roads) line(rd, rd.w + 2 * rd.walk, '#cdc8be');
+  for (const rd of P.roads) line(rd, rd.w, rd.cls === 'street' ? '#3c3e44' : '#28282c');
+  for (const rd of P.roads) if (rd.median) line(rd, rd.median, '#5a9646');
+  for (const r of P.rounds) { const [x, z] = T(r.x, r.z); g.fillStyle = '#28282c'; g.beginPath(); g.arc(x, z, r.outer * S, 0, 7); g.fill(); g.fillStyle = '#5a9646'; g.beginPath(); g.arc(x, z, r.island * S, 0, 7); g.fill(); }
+  for (const n of P.nodes) { if (n.arms.length === 1) { g.fillStyle = '#ff5050'; g.beginPath(); g.arc(...T(n.x, n.z), Math.max(2, 2.5 * S), 0, 7); g.fill(); } if (n.arms.length >= 5) { g.strokeStyle = '#f00'; g.lineWidth = 3; g.beginPath(); g.arc(...T(n.x, n.z), 10, 0, 7); g.stroke(); } }
+}
+const meta = P => `${P.roads.length} пътя · ${P.nodes.filter(n => n.arms.length >= 3).length} кръстовища · ${P.rounds.length} кръгови · <b>${P.lots.length} парцела</b> · ${P.stats.ms} ms${P.stats.bad5 ? ` · <i>${P.stats.bad5} възела с 5+</i>` : ''}`;
+function all() {
+  const seed = +document.getElementById('seed').value || 0;
+  document.getElementById('grid').innerHTML = FAMILIES.flatMap(f => SIZES.map(s => `<div class="it" data-f="${f}" data-s="${s}"><canvas width="420" height="420"></canvas><div class="n">${FN[f]} · ${SN[s]}</div><div class="m"></div></div>`)).join('');
+  document.querySelectorAll('.it').forEach(el => { const P = plan2('demo', { fam: el.dataset.f, size: el.dataset.s, seed }); draw(el.querySelector('canvas'), P); el.querySelector('.m').innerHTML = meta(P);
+    el.onclick = () => { document.getElementById('grid').style.display = 'none'; document.getElementById('big').style.display = 'block'; draw(document.getElementById('bc'), P); document.getElementById('bigT').innerHTML = `<b>${FN[P.fam]} · ${SN[P.size]}</b> — ${meta(P)}`; }; });
+}
+document.getElementById('go').onclick = all;
+document.getElementById('rnd').onclick = () => { document.getElementById('seed').value = (Math.random() * 1e6) | 0; all(); };
+document.getElementById('back').onclick = () => { document.getElementById('big').style.display = 'none'; document.getElementById('grid').style.display = 'grid'; };
+all();
+</script></body></html>
