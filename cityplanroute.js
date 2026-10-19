@@ -17,8 +17,9 @@ function net(P) {
   }
   // кръстовищата: всяка улица, минаваща през възела, се свързва с него през най-близката си точка
   const sq = P.square, hub = add(sq.x, sq.z);
+  const byNode = P.nodes.map(() => new Set()); for (const e of P.edges) { byNode[e.a]?.add(e.st); byNode[e.b]?.add(e.st); }   // веднъж (Рим — хиляди възли)
   P.nodes.forEach((nd, ni) => {
-    const v = ni === 0 ? hub : add(nd.x, nd.z), sts = new Set(P.edges.filter(e => e.a === ni || e.b === ni).map(e => e.st));
+    const v = ni === 0 ? hub : add(nd.x, nd.z), sts = byNode[ni];
     for (const s of sts) {
       let best = -1, bd = 1e9;
       for (const i of of[s]) { const d = Math.hypot(X[i] - nd.x, Z[i] - nd.z); if (d < bd) { bd = d; best = i; } }
@@ -44,12 +45,14 @@ function nearest(N, x, z) {
 }
 function astar(N, a, b) {
   const g = new Float64Array(N.X.length).fill(Infinity), prev = new Int32Array(N.X.length).fill(-1), h = i => Math.hypot(N.X[i] - N.X[b], N.Z[i] - N.Z[b]);
-  const open = [[h(a), a]]; g[a] = 0;
-  while (open.length) {
-    let bi = 0; for (let k = 1; k < open.length; k++) if (open[k][0] < open[bi][0]) bi = k;   // мрежата е малка (~1000 точки)
-    const [, u] = open.splice(bi, 1)[0];
+  // двоична купчина (Рим по картата — десетки хиляди точки; списъкът с линейно търсене беше O(n²))
+  const hp = [], push = (f, i) => { hp.push([f, i]); let k = hp.length - 1; while (k) { const q = (k - 1) >> 1; if (hp[q][0] <= hp[k][0]) break; [hp[q], hp[k]] = [hp[k], hp[q]]; k = q; } };
+  const pop = () => { const top = hp[0], last = hp.pop(); if (hp.length) { hp[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < hp.length && hp[l][0] < hp[m][0]) m = l; if (r < hp.length && hp[r][0] < hp[m][0]) m = r; if (m === k) break; [hp[m], hp[k]] = [hp[k], hp[m]]; k = m; } } return top; };
+  push(h(a), a); g[a] = 0;
+  while (hp.length) {
+    const [f, u] = pop(); if (f > g[u] + h(u) + 1e-9) continue;   // остаряло
     if (u === b) break;
-    for (const [v, d] of N.adj[u]) { const ng = g[u] + d; if (ng < g[v]) { g[v] = ng; prev[v] = u; open.push([ng + h(v), v]); } }
+    for (const [v, d] of N.adj[u]) { const ng = g[u] + d; if (ng < g[v]) { g[v] = ng; prev[v] = u; push(ng + h(v), v); } }
   }
   if (a !== b && prev[b] < 0) return [a];
   const out = []; for (let k = b; k !== a; k = prev[k]) out.push(k); out.push(a);
