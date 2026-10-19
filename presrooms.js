@@ -3,6 +3,24 @@
 // портрети, печат с орел и знамена, овална махагонова маса, кожени столове. 🇷🇺 Кремълска зала: бяло и злато, пиластри, полилеи, червена пътека,
 // двуглав орел и трикольори, дълга маса от светло дърво. Всичко е процедурно (канвас текстури, кутии) — без външни модели.
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+// истинските модели (Sketchfab, CC BY — assets/heavy/presroom/CREDITS.txt): завеси, знамена и камина; докато се заредят — процедурните
+const PR = 'assets/heavy/presroom/', prCache = {};
+const loadPR = n => prCache[n] || (prCache[n] = new GLTFLoader().loadAsync(PR + n + '.glb'));
+// клонинг, нормализиран: размер по X×Y×Z (Y — височина; null — пропорционално), долу на y = 0, центриран по X/Z; tint — оцветява материалите
+function realModel(scene, n, { w = null, h = null, d = null, x = 0, z = 0, ry = 0, tint = null, hide = [], mod = null }) {
+  loadPR(n).then(g => {
+    const o = g.scene.clone(true); o.updateMatrixWorld(true);
+    const bb = new THREE.Box3().setFromObject(o), sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3());
+    const k = h ? h / sz.y : w ? w / sz.x : 1, sx = w ? w / sz.x : k, sy = h ? h / sz.y : k, sz2 = d ? d / sz.z : k;
+    const wrap = new THREE.Group(); o.position.set(-c.x, -bb.min.y, -c.z); wrap.add(o); wrap.scale.set(sx, sy, sz2);
+    const holder = new THREE.Group(); holder.add(wrap); holder.position.set(x, 0, z); holder.rotation.y = ry; scene.add(holder);
+    o.traverse(m => { if (!m.isMesh) return; m.castShadow = m.receiveShadow = true; if (tint) { m.material = m.material.clone(); m.material.color.lerp(new THREE.Color(tint), 0.7); } });
+    mod && mod(o);
+    for (const x2 of hide) x2.visible = false;
+  }).catch(() => {});
+}
 
 const std = (c, r = 0.8, m = 0, extra = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m, ...extra });
 function tex(w, h, draw, rep) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; if (rep) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(...rep); } return t; }
@@ -21,9 +39,10 @@ function ruFlag(g, w, h) { g.fillStyle = '#fff'; g.fillRect(0, 0, w, h / 3); g.f
 function flag(scene, x, z, draw, pole) {
   const t = tex(512, 320, draw), geo = new THREE.PlaneGeometry(1.0, 0.62, 16, 6), base = geo.attributes.position.array.slice();
   const cloth = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: t, side: THREE.DoubleSide, roughness: 0.9 })); cloth.position.set(x + 0.52, 2.35, z); cloth.castShadow = true; scene.add(cloth);
-  addCyl(scene, 0.02, 0.025, 2.75, pole, x, 1.375, z, 8); addCyl(scene, 0.16, 0.2, 0.06, pole, x, 0.03, z, 12);
+  const p1 = addCyl(scene, 0.02, 0.025, 2.75, pole, x, 1.375, z, 8), p2 = addCyl(scene, 0.16, 0.2, 0.06, pole, x, 0.03, z, 12);
   const top = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), pole); top.position.set(x, 2.78, z); scene.add(top);
-  return { update: t => { const p = geo.attributes.position.array; for (let i = 0; i < p.length; i += 3) { const u = base[i] + 0.5; p[i + 2] = base[i + 2] + Math.sin(u * 5 - t * 2.2) * 0.05 * u; } geo.attributes.position.needsUpdate = true; } };
+  const hideAll = () => [cloth, p1, p2, top];
+  return { hideAll, update: t => { const p = geo.attributes.position.array; for (let i = 0; i < p.length; i += 3) { const u = base[i] + 0.5; p[i + 2] = base[i + 2] + Math.sin(u * 5 - t * 2.2) * 0.05 * u; } geo.attributes.position.needsUpdate = true; } };
 }
 // ---- гледката през прозореца
 const viewUS = () => tex(1024, 768, (g, w, h) => {   // градината: небе, морава, дървета, оградата и Вашингтонският монумент в далечината
@@ -104,7 +123,8 @@ export function buildPresRoom(scene, cc, H) {
       if (RU) { const arch = new THREE.Mesh(new THREE.CircleGeometry(ww / 2, 24, 0, Math.PI), new THREE.MeshBasicMaterial({ map: view, toneMapped: false })); arch.position.set(x - side * 0.02, y0 + wh, z); arch.rotation.y = -side * Math.PI / 2; scene.add(arch); }
       for (const dz of [-ww / 2, 0, ww / 2]) addBox(scene, 0.06, wh, 0.06, trimM, x - side * 0.04, y0 + wh / 2, z + dz);
       addBox(scene, 0.06, 0.06, ww, trimM, x - side * 0.04, y0 + wh * 0.62, z);
-      for (const s of [-1, 1]) { const c = addBox(scene, 0.1, RH - 0.25, 0.42, drape, x - side * 0.12, (RH - 0.25) / 2, z + s * (ww / 2 + 0.24)); c.scale.z = 1; addBox(scene, 0.12, 0.08, 0.46, drapeTie, x - side * 0.13, 1.2, z + s * (ww / 2 + 0.24)); }
+      const dr = []; for (const s of [-1, 1]) { const c = addBox(scene, 0.1, RH - 0.25, 0.42, drape, x - side * 0.12, (RH - 0.25) / 2, z + s * (ww / 2 + 0.24)); dr.push(c, addBox(scene, 0.12, 0.08, 0.46, drapeTie, x - side * 0.13, 1.2, z + s * (ww / 2 + 0.24))); }
+      realModel(scene, 'curtain', { w: ww + 1.1, h: RH - 0.2, d: 0.35, x: x - side * 0.25, z, ry: -side * Math.PI / 2, tint: RU ? 0xe8d8a8 : null, hide: dr });
     }
     // между прозорците — портрети (САЩ) или златни пиластри (Русия)
     for (let k = 0; k < 2; k++) {
@@ -122,8 +142,12 @@ export function buildPresRoom(scene, cc, H) {
   if (!RU) { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.97, 0.035, 10, 80), gold); ring.position.set(0, 2.2, ROOM_BACK + 0.06); scene.add(ring); }
   const pole = std(RU ? 0xd9a53a : 0xc9a24a, 0.3, 1);
   flags.push(flag(scene, -1.85, ROOM_BACK + 0.45, RU ? ruFlag : usFlag, pole), flag(scene, 1.25, ROOM_BACK + 0.45, RU ? ruFlag : usFlag, pole));
+  for (const [i, x] of [[0, -1.75], [1, 1.75]]) realModel(scene, 'flag-ru', { h: 2.45, x, z: ROOM_BACK + 0.45, ry: x < 0 ? 0.5 : Math.PI - 0.5, hide: flags[i].hideAll(), mod: RU ? null : o => o.traverse(m => {   // пилон със стойка; за САЩ — същият, с американското платно
+    if (m.isMesh && /^Plane/.test(m.name)) { m.material = m.material.clone(); m.material.map = tex(512, 320, usFlag); m.material.needsUpdate = true; } }) });
   if (RU) for (const x of [-3.6, -2.6, 2.6, 3.6]) { addBox(scene, 0.36, RH, 0.12, std(0xffffff, 0.6), x, RH / 2, ROOM_BACK + 0.06); addBox(scene, 0.05, RH, 0.14, gold, x, RH / 2, ROOM_BACK + 0.07); }
-  else { const fp = new THREE.Group(); scene.add(fp); addBox(fp, 1.6, 1.1, 0.25, std(0xf4efe4, 0.5), -3.6, 0.55, ROOM_BACK + 0.13); addBox(fp, 0.9, 0.7, 0.1, std(0x1a1210, 0.9), -3.6, 0.4, ROOM_BACK + 0.21); addBox(fp, 1.6, 1.1, 0.25, std(0xf4efe4, 0.5), 3.6, 0.55, ROOM_BACK + 0.13); }
+  let fp = null;
+  if (!RU) { fp = new THREE.Group(); scene.add(fp); addBox(fp, 1.6, 1.1, 0.25, std(0xf4efe4, 0.5), -3.6, 0.55, ROOM_BACK + 0.13); addBox(fp, 0.9, 0.7, 0.1, std(0x1a1210, 0.9), -3.6, 0.4, ROOM_BACK + 0.21); addBox(fp, 1.6, 1.1, 0.25, std(0xf4efe4, 0.5), 3.6, 0.55, ROOM_BACK + 0.13); }
+  if (!RU) for (const x of [-3.6, 3.6]) realModel(scene, 'fireplace', { w: 1.7, x, z: ROOM_BACK + 0.3, hide: [fp] });   // камината на Белия дом (истинският модел)
   // таван и полилеи (светят)
   const ceil = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W * 2, D), std(RU ? 0xf6f1e4 : 0xf4efe4, 1, 0, { emissive: 0x6b6458 })); ceil.rotation.x = Math.PI / 2; ceil.position.set(0, RH, cz); scene.add(ceil);
   const bulb = std(0xfff3d6, 0.3, 0, { emissive: 0xffe2a8, emissiveIntensity: 1.6 }), crystal = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.7 });   // без transmission — отделен проход на сцената

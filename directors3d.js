@@ -412,7 +412,8 @@ export function openBoardroom(o) {
   const { leather, metal, gold } = R;
   if (o.brand) groupMedal(scene, o.brand, gold);
   // холограмата над медальона (boardholo.js): държавата, градовете и бюджетът на текущото предложение
-  const holo = createHolo(scene, { fmt: n => (o.fmt ? o.fmt(Math.round(n)) : Math.round(n).toLocaleString('bg-BG')), base: new THREE.Vector3(0, TABLE_H + 0.14, 0) });
+  const short = n => { const a = Math.abs(n), r = (v, u) => `${(n / v).toLocaleString('bg-BG', { maximumFractionDigits: a / v >= 100 ? 0 : 1 })} ${u}`; return a >= 1e12 ? r(1e12, 'трлн.') : a >= 1e9 ? r(1e9, 'млрд.') : a >= 1e6 ? r(1e6, 'млн.') : Math.round(n).toLocaleString('bg-BG'); };   // холограмата — съкратено (310 млрд., 2,9 трлн.)
+  const holo = createHolo(scene, { fmt: short, base: new THREE.Vector3(0, TABLE_H + 0.14, 0) });
 
   const tip = el.querySelector('.tip'), card = el.querySelector('.card'), hits = [], people = [];
   let sel = null, shut = false, raf = 0, nextChat = 4;
