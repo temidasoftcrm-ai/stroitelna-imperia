@@ -714,7 +714,7 @@ const houseOf = (n, seed) => realHouses && KID_HOUSES.has(n) ? REAL_HOUSES[hashS
 const HOUSE_POOL = realHouses ? REAL_HOUSES : HOUSES;
 // истинските къщи (house-a тухлената с веранда, house-b каменната) — с 40% по-големи от Kenney къщите
 // (истинските не минават през tintRoof — копията на материалите губят нощното светене)
-function houseFit(n) { return n === 'building-type-a' || n === 'building-type-b' ? 15 : n.startsWith('h2-') ? 14 : 11; }
+function houseFit(n) { return n === 'building-type-a' || n === 'building-type-b' ? 15 : n === 'h2-blue' || n === 'h2-porch' ? 10.5 : n.startsWith('h2-') ? 14 : 11; }   // синята и бялата с верандата — тесни и високи, при 14 излизаха огромни
 const SHOPS = ['building-a', 'building-b', 'building-c', 'building-d', 'building-e', 'building-f', 'building-g', 'building-h'];
 const SKY = ['building-skyscraper-a', 'building-skyscraper-b', 'building-skyscraper-c'];
 // ---- градовете по големина: малките без небостъргачи, средните до 10 етажа, мегаполисите с модерен център
