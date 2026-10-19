@@ -96,6 +96,7 @@ import { gamePlan, planLots, planTiles, planCount } from './cityplangame.js';
 import { buildPlanView } from './cityplan3d.js';
 import { prepNightFloors } from './nightfloors.js';
 import { loadIndustry } from './industry.js';
+import { loadConstruct } from './construct.js';
 import { showIntro } from './intro.js';
 import { feature } from './lab/feature.js';
 import { mountHub } from './hub.js';
@@ -454,7 +455,7 @@ let europe = null;
   for (const n of H2) jobs.push(load(`assets/heavy/houses2/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => HOUSES.splice(HOUSES.indexOf(n), 1)));   // не се зареди → не се строи
   for (const n of GAS_KINDS) jobs.push(load(`assets/heavy/gas/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; }).catch(() => {}));   // бензиностанции (всяка — свое „✓ OK“)
   if (feature('plants-real')) for (const k of ['bush-0', 'bush-1', 'bush-2', 'flowers', 'fountain']) jobs.push(load(`assets/heavy/plants/${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['pl-' + k] = g; }).catch(() => {}));
-  for (const [dir, list] of Object.entries(MODELS)) if (dir !== 'industrial') for (const n of list) jobs.push(load(`assets/${dir}/${n}.glb`).then(g => { A[dir === 'industrial' ? 'ind-' + n : n] = g; if (dir === 'commercial' || dir === 'commercial2' || n === 'building-type-a' || n === 'building-type-b' || n === 'Building_Medium_2_001') prepNightFloors(g.scene, n);   // Building_Medium_2_001 — Лабораторията → night-nyextra
+  for (const [dir, list] of Object.entries(MODELS)) if (dir !== 'industrial' && !(dir === 'construction' && feature('cs-real'))) for (const n of list) jobs.push(load(`assets/${dir}/${n}.glb`).then(g => { A[dir === 'industrial' ? 'ind-' + n : n] = g; if (dir === 'commercial' || dir === 'commercial2' || n === 'building-type-a' || n === 'building-type-b' || n === 'Building_Medium_2_001') prepNightFloors(g.scene, n);   // Building_Medium_2_001 — Лабораторията → night-nyextra
     if (n === 'building-type-b') g.scene.traverse(o => { if (o.isMesh && o.material?.name === 'phong1') o.visible = false; }); }));   // бръшлянът на house-b е JPEG без прозрачност → черни петна   // нощем етажите светват (nightfloors.js)
   // истинска строителна техника и коли за трафика (vehmodels.js, Sketchfab)
   jobs.push(loadVehModels(load, A));
@@ -484,6 +485,7 @@ let europe = null;
   const ldT0 = performance.now();
   jobs.forEach(j => j.then(() => { const k = Math.round(++done / jobs.length * 100); $('ldBar').style.width = Math.max(3, k) + '%'; $('ldTxt').textContent = `Зареждане… ${k}%`; }));
   await Promise.all(jobs);
+  await loadConstruct(load, A);   // строежите: кулокран, контейнери, тоалетна, материали, самосвали, бетоновоз — истинските (construct.js) под старите имена
   await loadIndustry(load, A);   // истинските заводи, водни кули, турбини и соларни панели (industry.js) — заместват детските 'ind-*' (Лабораторията → ind-real)
   // GLTFLoader оставя parser-а (вкл. JSON и кешовете на dependency-тата) в резултата.
   // След зареждането вече е нужен само за допълнителната текстура на блоковете (горе).
