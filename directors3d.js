@@ -703,7 +703,7 @@ export function openBoardroom(o) {
     for (const p of people) { p.mixer.update(dt); if (p.busy > 0 && (p.busy -= dt) <= 0) back(p); }
     placeScreen(dt); placeBadges(); holo.update(dt); camStep(dt); R.update && R.update(clock.elapsedTime); ctl.update();
     if (cam.position.y > ROOM_H - 0.3) cam.position.y = ROOM_H - 0.3;   // камерата — под тавана
-    cam.position.x = Math.max(-ROOM_W + 0.9, Math.min(ROOM_W - 0.9, cam.position.x)); cam.position.z = Math.max(ROOM_BACK + 0.8, Math.min(ROOM_FRONT - 0.5, cam.position.z));   // и в залата — пред завесите, не в стените
+    cam.position.x = Math.max(-ROOM_W + 1.4, Math.min(ROOM_W - 1.4, cam.position.x)); cam.position.z = Math.max(ROOM_BACK + 1.2, Math.min(ROOM_FRONT - 0.8, cam.position.z));   // и в залата — пред завесите, не в стените
     renderer.render(scene, cam);
   }
   loop();
