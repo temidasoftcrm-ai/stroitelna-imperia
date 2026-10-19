@@ -240,7 +240,7 @@ export function createTraffic(opts) {
       if (opts.onSignal) for (const nd of nodes.values()) if (nd.sig) opts.onSignal(nd, sigView(nd.sig));
       lights();
     },
-    clear() { for (const sp of spots) { opts.scene.remove(sp); opts.scene.remove(sp.target); } spots.length = 0; for (const c of cars) drop({ obj: c.obj, remove: c.rm }); cars.length = 0; if (LI) { LI.clear(); LI = null; } for (const l of lanes) l.cars.length = 0; for (const n of nodes.values()) for (const c of n.conns) c.cars.length = 0; },
+    clear() { for (const sp of spots) { opts.scene.remove(sp); opts.scene.remove(sp.target); sp.dispose(); } spots.length = 0; for (const c of cars) drop({ obj: c.obj, remove: c.rm }); cars.length = 0; if (LI) { LI.clear(); LI = null; } for (const l of lanes) l.cars.length = 0; for (const n of nodes.values()) for (const c of n.conns) c.cars.length = 0; },
     stats: () => ({ cars: cars.length, cap: capacity, steps, left, waiting: cars.filter(c => c.wait > 0).length }),
   };
 }
@@ -265,7 +265,7 @@ export function lampInstances(scene, max) {
       }
     },
     end() { F.count = nf; R.count = nr; K.count = nk; for (const m of [F, R, K]) m.instanceMatrix.needsUpdate = true; if (R.instanceColor) R.instanceColor.needsUpdate = true; },
-    clear() { for (const m of [F, R, K]) scene.remove(m); },
+    clear() { for (const m of [F, R, K]) { scene.remove(m); m.material.dispose(); m.dispose(); } geo.dispose(); },   // и паметта (текстурата е общата на фаровете — остава)
   };
 }
 
@@ -289,11 +289,12 @@ export function gridNetwork(g) {
 const RANK_V = { blvd: 14, ring: 11, quay: 12, hw: 22, street: 11, access: 8 };
 export function planNetwork(P) {
   const nodes = new Map(), lanes = [], NV = id => nodes.get(id);
-  for (const n of P.nodes) nodes.set(n.id, { id: n.id, x: n.x, z: n.z, kind: n.kind, ctrl: n.ctrl, exit: n.endKind === 'exit', inL: [], outL: [], conns: [], deg: n.arms.length });
+  const carArms = n => n.arms.filter(a => !P.roads[a.road].noCars).length;   // пешеходните зони (roads[].noCars, напр. Рим) — без коли
+  for (const n of P.nodes) nodes.set(n.id, { id: n.id, x: n.x, z: n.z, kind: n.kind, ctrl: n.ctrl, exit: n.endKind === 'exit', inL: [], outL: [], conns: [], deg: carArms(n) });
   // ленти: по всяко ребро, във всяка посока; armIn — клонът на крайния възел, armOut — на началния
   const armOf = (nodeId, roadId, end) => P.nodes[nodeId].arms.findIndex(a => a.road === roadId && a.end === end);
   for (const rd of P.roads) for (const dir of [1, -1]) {
-    const n = rd.lanes[dir > 0 ? 0 : 1] || 0, from = dir > 0 ? rd.from : rd.to, to = dir > 0 ? rd.to : rd.from;
+    const n = rd.noCars ? 0 : rd.lanes[dir > 0 ? 0 : 1] || 0, from = dir > 0 ? rd.from : rd.to, to = dir > 0 ? rd.to : rd.from;
     const rank = P.nodes[to].arms[armOf(to, rd.id, dir > 0 ? 1 : 0)]?.rank ?? (rd.cls === 'blvd' ? 4 : 1);
     for (let i = 0; i < n; i++) {
       const L = mkPath(P.lanePath(rd.id, dir, i), 'lane', { from, to, edge: rd, rank, vmax: RANK_V[rd.cls] || V_LANE, laneI: i, nLanes: n, armIn: armOf(to, rd.id, dir > 0 ? 1 : 0), armOut: armOf(from, rd.id, dir > 0 ? 0 : 1) });
