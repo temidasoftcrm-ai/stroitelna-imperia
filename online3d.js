@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { feature } from './lab/feature.js';
+import { loadConstruct } from './construct.js';
 
 const TILE = 8, NB = 9, N = NB * 3 + 1, C = (NB - 1) / 2, HQ = [4, 5];
 const tx = i => (i - (N - 1) / 2) * TILE;
@@ -21,12 +22,12 @@ const SKY = ['building-skyscraper-a', 'building-skyscraper-b', 'building-skyscra
 const OFFICES = ['building-skyscraper-d', 'building-skyscraper-e', 'office3', 'hirise'];   // office3, hirise — истинските от heavy/blocks2
 const LIST = {
   roads: ['road-straight', 'road-crossroad', 'road-intersection', 'road-bend', 'construction-cone', 'light-square'],
+  construction: ['crane-tower', 'container-office-green', 'planks-wood-a', 'container-rubble-red', 'truck-concrete-red'],
   houses: [...(REAL ? ['building-type-a', 'building-type-b'] : KENNEY), 'tree-large', 'tree-small'],
   'heavy/houses2': REAL ? H2 : [],
   commercial: [...SHOPS, ...SKY],
   commercial2: ['building-skyscraper-d', 'building-skyscraper-e'],
   'heavy/blocks2': ['office3', 'hirise'],
-  construction: ['crane-tower', 'container-office-green', 'planks-wood-a', 'container-rubble-red', 'truck-concrete-red'],
   city: ['Building_Medium_2_001', 'Building_Large_2'],
 };
 const OWN_LOTS = 30;   // най-близките до офиса парцели са за строежите на фирмата; останалите — съседите
@@ -58,6 +59,7 @@ export async function createCity3D(el, { onProgress } = {}) {
   for (const [dir, list] of Object.entries(LIST)) for (const n of list) jobs.push(new Promise(res => loader.load(`assets/${dir}/${n}.glb`, g => { A[n] = g.scene; res(); }, undefined, () => res())));
   let done = 0; jobs.forEach(j => j.then(() => onProgress && onProgress(++done / jobs.length)));
   await Promise.all(jobs);
+  await loadConstruct(url => new Promise((res, rej) => loader.load(url, res, undefined, rej)), A, true);   // строежите — истинските (construct.js, Лабораторията → cs-real)
   const size = n => new THREE.Box3().setFromObject(A[n]).getSize(new THREE.Vector3());
   const model = (n, target) => {
     const o = A[n].clone(true), s = size(n); o.scale.setScalar(target / Math.max(s.x, s.z));

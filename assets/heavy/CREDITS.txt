@@ -212,3 +212,10 @@ blocks2/pp-sky.glb — "Skyscraper" by Jarlan Perez, CC-BY — https://poly.pizz
 - industry/sf-watertower.glb — "Generic Water Tower [Free Asset Pack]" by LunarEclips3 (CC-BY 4.0) — https://sketchfab.com/3d-models/2a3963db4c1a41b2be7efccccdb0e597
 - industry/sf-windturbine.glb — "Animated Wind Turbine" by glowbox3d (CC-BY 4.0) — https://sketchfab.com/3d-models/e0678e6615a74ed29c1376a591262159
 - industry/sf-solar.glb — "Solar Panel" by rivetech (CC-BY 4.0) — https://sketchfab.com/3d-models/83483a66f8974d7e8f2e7bbde518d606
+- construct/sf-towercrane.glb — "Tower Crane" by Chamodp (CC-BY 4.0) — https://sketchfab.com/3d-models/49851dc7a51b43bda6aea06856c26a85 (текстурите 1024 px, WebP)
+- construct/sf-sitepack.glb — "Construction Site Asset Pack" by vmatthew (CC-BY 4.0) — https://sketchfab.com/3d-models/a6cccf5af6514f2f9289beeead38fe1b
+- construct/sf-toilet.glb — "Porta Potty" by foon. (CC-BY 4.0) — https://sketchfab.com/3d-models/b970702ea74a456e89673e73cfb6d873
+- construct/sf-bricks.glb — "Bricks On Pallet Set" by nermin (CC-BY 4.0) — https://sketchfab.com/3d-models/1802a2aae346409eb9bdb87c028a8d8a
+- construct/sf-skip.glb — "Old rubbish Skip" by sousinho (CC-BY 4.0) — https://sketchfab.com/3d-models/2f9aa03ede3a46a0888e76fed382667f
+- construct/sf-drums.glb — "Oil Drums" by OliverTriplet (CC-BY 4.0) — https://sketchfab.com/3d-models/f98003d19cd247f8aa4daad50c28512a
+- construct/sf-mixer.glb — "Concrete Mixer Truck" by doty_aecom (CC-BY 4.0) — https://sketchfab.com/3d-models/8d1d88a5955f4e7da13562bb7bec146f
