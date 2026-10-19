@@ -181,19 +181,39 @@ export function createPresidency(deps) {
 
   // ---- 📝 оценка на пакета: за всяка страна — приема / насрещно предложение / отказва, с причината (без произволни откази)
   const pkgCost = pkg => Math.round(free() * PKG.reduce((a, P0) => a + (P0.cost ? P0.cost[pkg[P0.k] || 0] : 0), 0) * (st()?.cc === 'RU' ? 1 : 1));
+  // една страна срещу пакет: приема / насрещно / отказва, с причината
+  function judge(ck, iso, pkg) {
+    const s = st(), k = conf(ck), coal = Object.keys(s.coal).length, pr = (PREF[ck] || {})[iso] || PREF_DEF;
+    const score = PKG.reduce((a, P0) => a + (pr.w[P0.k] || 1) * (pkg[P0.k] || 0) * 2, 0) + (trust(iso) - 50) / 3 + (rel(iso) - 50) / 6 + coal * 1.5 - k.int / 10 - (k.broken ? 8 : 0);
+    const why = []; for (const [part, bad, txt] of pr.red) if ((pkg[part] || 0) === bad) why.push(txt);
+    if ((pkg.gua || 0) === 2 && coal < 3) why.push('Липсва подкрепа от партньор — коалицията е твърде малка за такива гаранции');
+    if (k.broken) why.push('Нарушено предишно обещание');
+    if (k.step >= 4 && ((pkg.gua || 0) < 1 || (pkg.next || 0) < 1)) why.push('Широкото споразумение иска механизъм при нарушения и график за преговорите');
+    const ok = !why.length && score >= pr.need ? 'yes' : score >= pr.need - 10 && why.length <= 1 ? 'counter' : 'no';
+    return { ok, score: Math.round(score), need: pr.need, why, pr };
+  }
+  // ↩ насрещното предложение на страната: най-малките конкретни промени, с които би приела (без да минава червените линии на другите)
+  function counterOf(ck, iso, pkg) {
+    const c = CONFLICTS.find(x => x.k === ck), others = c.parties.filter(i => i !== me() && i !== iso), k = conf(ck), coal = Object.keys(st().coal).length;
+    const redOf = i => ((PREF[ck] || {})[i] || PREF_DEF).red, banned = (part, v) => others.some(i => redOf(i).some(([p, bad]) => p === part && bad === v)) || (part === 'gua' && v === 2 && coal < 3);
+    const cp = { ...pkg }, mine = redOf(iso);
+    for (const [part, bad] of mine) if ((cp[part] || 0) === bad) cp[part] = bad === 0 ? 1 : bad - 1;   // червените им линии — първо
+    if (k.step >= 4) { cp.gua = Math.max(cp.gua || 0, 1); cp.next = Math.max(cp.next || 0, 1); }
+    const pr = judge(ck, iso, cp).pr;
+    for (let n = 0; n < 8; n++) { const J = judge(ck, iso, cp); if (J.ok === 'yes' || (J.score >= J.need && !J.why.filter(w => !w.startsWith('Нарушено')).length)) break;
+      const part = PKG.map(P0 => P0.k).filter(p => (cp[p] || 0) < 2 && !banned(p, (cp[p] || 0) + 1) && !mine.some(([q, bad]) => q === p && bad === (cp[p] || 0) + 1)).sort((a, b) => (pr.w[b] || 1) - (pr.w[a] || 1))[0];
+      if (!part) return null; cp[part] = (cp[part] || 0) + 1; }
+    const ch = PKG.filter(P0 => (cp[P0.k] || 0) !== (pkg[P0.k] || 0)).map(P0 => ({ k: P0.k, nm: P0.nm, to: ((PKG_LBL[ck] || {})[P0.k] || P0.opt)[cp[P0.k] || 0] }));
+    return ch.length ? { pkg: cp, ch } : null;
+  }
   function evalPkg(ck, pkg) {
-    const s = st(), c = CONFLICTS.find(x => x.k === ck), parties = c.parties.filter(i => i !== me()), coal = Object.keys(s.coal).length, k = conf(ck), resp = [];
-    for (const iso of parties) { const pr = (PREF[ck] || {})[iso] || PREF_DEF;
-      let score = PKG.reduce((a, P0) => a + (pr.w[P0.k] || 1) * (pkg[P0.k] || 0) * 2, 0) + (trust(iso) - 50) / 3 + (rel(iso) - 50) / 6 + coal * 1.5 - k.int / 10;
-      const why = []; for (const [part, bad, txt] of pr.red) if ((pkg[part] || 0) === bad) why.push(txt);
-      if ((pkg.gua || 0) === 2 && coal < 3) why.push('Липсва подкрепа от партньор — коалицията е твърде малка за такива гаранции');
-      if (k.broken) { score -= 8; why.push('Нарушено предишно обещание'); }
-      if (k.step >= 4 && ((pkg.gua || 0) < 1 || (pkg.next || 0) < 1)) why.push('Широкото споразумение иска механизъм при нарушения и график за преговорите');
-      const ok = !why.length && score >= pr.need ? 'yes' : score >= pr.need - 10 && why.length <= 1 ? 'counter' : 'no';
-      const weakest = PKG.filter(P0 => (pkg[P0.k] || 0) < 2).sort((a, b) => (pr.w[b.k] || 1) - (pr.w[a.k] || 1))[0];
-      resp.push({ iso, ok, score: Math.round(score), need: pr.need, why: why.length ? why : ok === 'yes' ? ['пакетът отговаря на интересите им'] : [`искат повече в „${weakest ? weakest.nm : 'гаранциите'}“`] });
-    }
-    return { cost: pkgCost(pkg), resp, party: c.parties.includes(me()) };
+    const c = CONFLICTS.find(x => x.k === ck), parties = c.parties.filter(i => i !== me()), resp = [];
+    for (const iso of parties) { const J = judge(ck, iso, pkg), co = J.ok === 'yes' ? null : counterOf(ck, iso, pkg);
+      resp.push({ iso, ok: J.ok === 'no' && co ? 'counter' : J.ok, score: J.score, need: J.need, why: J.why.length ? J.why : J.ok === 'yes' ? ['пакетът отговаря на интересите им'] : co ? ['искат промени'] : ['и с най-силния пакет не стига — нужни са повече доверие към теб, по-добри отношения или по-голяма коалиция'], counter: co }); }
+    // общото насрещно: исканията на всички страни заедно (по-силното от двете), ако така приемат всички
+    let merged = null; if (resp.some(r => r.counter)) { const m = { ...pkg }; for (const r of resp) if (r.counter) for (const P0 of PKG) m[P0.k] = Math.max(m[P0.k] || 0, r.counter.pkg[P0.k] || 0);
+      if (parties.every(iso => judge(ck, iso, m).ok === 'yes')) merged = { pkg: m, cost: pkgCost(m) }; }
+    return { cost: pkgCost(pkg), resp, merged, party: c.parties.includes(me()) };
   }
   function proposePkg(ck, pkg) {
     const s = st(), k = s.conf[ck], c = CONFLICTS.find(x => x.k === ck), d = day(), E = evalPkg(ck, pkg);
@@ -402,13 +422,14 @@ export function createPresidency(deps) {
     el.querySelectorAll('[data-pkgo]').forEach(b => b.onclick = () => { pkgOpen = b.dataset.pkgo; pkgSel = {}; render(); });
     el.querySelectorAll('[data-pk]').forEach(x => x.onchange = () => { pkgSel[x.dataset.pk] = +x.value; render(); });
     el.querySelectorAll('[data-pkx]').forEach(b => b.onclick = () => { pkgOpen = null; render(); });
-    el.querySelectorAll('[data-pksend]').forEach(b => b.onclick = () => { const E = proposePkg(b.dataset.pksend, pkgSel); if (E.resp.every(r => r.ok === 'yes')) pkgOpen = null; else deps.toast(E.resp.map(r => `${nm(r.iso)}: ${r.ok === 'counter' ? 'насрещно предложение' : 'отказ'} — ${r.why[0]}`).join(' · '), 'bad'); render(); });
+    el.querySelectorAll('[data-pkmerge]').forEach(b => b.onclick = () => { const E = evalPkg(b.dataset.pkmerge, pkgSel); if (E.merged) pkgSel = { ...E.merged.pkg }; render(); });
+    el.querySelectorAll('[data-pksend]').forEach(b => b.onclick = () => { const E = proposePkg(b.dataset.pksend, pkgSel); if (E.resp.every(r => r.ok === 'yes')) pkgOpen = null; else deps.toast(E.resp.filter(r => r.ok !== 'yes').map(r => `${nm(r.iso)}: ${r.counter ? `насрещно — ${r.counter.ch.map(x => `${x.nm} → ${x.to}`).join(', ')}` : `отказ — ${r.why[0]}`}`).join(' · '), 'bad'); render(); });
   }
   function pkgHtml(ck) {
     const E = evalPkg(ck, pkgSel), col = { yes: '#7dffa8', counter: '#ffd54a', no: '#ff8a8a' }, lbl = { yes: '✔ приема', counter: '↩ насрещно предложение', no: '✖ отказва' };
     return `<div style="margin-top:8px;border-top:1px solid #22304a;padding-top:8px"><b>📝 Мирен пакет</b>${PKG.map(P0 => `<div class="m" style="margin:6px 0 2px">${P0.nm}</div><select data-pk="${P0.k}" style="width:100%;background:#1d2a42;color:#e6edf6;border:1px solid #2d3f60;border-radius:8px;padding:4px">${((PKG_LBL[ck] || {})[P0.k] || P0.opt).map((o, i) => `<option value="${i}" ${(pkgSel[P0.k] || 0) === i ? 'selected' : ''}>${o}${P0.cost && P0.cost[i] ? ` · ${B(free() * P0.cost[i])}${P0.k === 'rec' ? '/месец' : ''}` : ''}</option>`).join('')}</select>`).join('')}
-      <div class="m" style="margin-top:8px">Цена сега: <b style="color:#e6edf6">${B(E.cost)}</b>${E.party ? ' · отстъпките струват доверие у дома' : ''}</div>${E.resp.map(r => `<div class="m" style="margin:3px 0"><b style="color:${col[r.ok]}">${nm(r.iso)}: ${lbl[r.ok]}</b> — ${r.why.join('; ')}</div>`).join('')}
-      <div style="display:flex;gap:6px;margin-top:8px"><button class="y" data-pksend="${ck}">📨 Предложи пакета</button><button data-pkx="1">Затвори</button></div></div>`;
+      <div class="m" style="margin-top:8px">Цена сега: <b style="color:#e6edf6">${B(E.cost)}</b>${E.party ? ' · отстъпките струват доверие у дома' : ''}</div>${E.resp.map(r => `<div class="m" style="margin:3px 0"><b style="color:${col[r.ok]}">${nm(r.iso)}: ${lbl[r.ok]}</b> — ${r.why.join('; ')}</div>${r.counter ? `<div class="m" style="margin:0 0 4px 14px;color:#ffd54a">↩ предлагат: ${r.counter.ch.map(x => `<b>${x.nm}</b> → ${x.to}`).join('; ')}</div>` : ''}`).join('')}${E.merged ? `<div class="m" style="margin-top:6px">🤝 С тези промени приемат всички · цена ${B(E.merged.cost)}</div>` : ''}
+      <div style="display:flex;gap:6px;margin-top:8px"><button class="y" data-pksend="${ck}">📨 Предложи пакета</button>${E.merged ? `<button data-pkmerge="${ck}">✍️ Вземи насрещното</button>` : ''}<button data-pkx="1">Затвори</button></div></div>`;
   }
   function sideHtml() {
     const s = st(), ps = proposals();

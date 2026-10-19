@@ -2,6 +2,7 @@
 // с всеки нов бизнес се основава дъщерно дружество („… Толроуд“, „… Рейл“, „… Оушън Експрес“, „… Флайеър“…). Старите продължават да печелят.
 // Записът: S.brand = 'titan' (стилът), S.brandNm = 'Име' (по желание — иначе името на стила), S.group = { [sub]: денят на основаването }.
 import { feature } from './lab/feature.js';
+import { createDirEvents } from './direvents.js';   // настроение, последици от „Не“, събития (стачка, примамване, скандал, награда)
 
 export const BRANDS = [
   { k: 'industrial', nm: 'Индустриал', col: '#ff9a2e', ico: '⚙️' },
@@ -62,7 +63,10 @@ export function createGroup(deps) {
     return S.hold;
   };
   const subBy = k => SUBS.find(x => x.k === k);
-  const bonusK = k => (hold().lv[k] || 0) * HOLD_LV_K + (hold().dir[k] ? HOLD_DIR_K : 0);
+  const dirEv = createDirEvents({ S: deps.S, econ: deps.econ, fmt: deps.fmt, toast: deps.toast, save: deps.save, sound: deps.sound,
+    name: k => (k === 'mayor' ? deps.mayorName && deps.mayorName() : hold().dir[k] ? DIR_OF[k] || hold().dir[k] : null), sub: k => subName(deps.S(), k), inc: k => { const s = subBy(k); return s ? s.inc(deps) || 0 : 0; },
+    hired: () => Object.keys(hold().dir || {}).filter(k => hold().dir[k]), trust: (k, d) => { const t = hold().trust = hold().trust || {}; t[k] = Math.max(0.5, Math.min(1.3, (t[k] ?? 1) + d)); } });
+  const bonusK = k => (hold().lv[k] || 0) * HOLD_LV_K + (hold().dir[k] && !dirEv.bonusOff(k) ? HOLD_DIR_K : 0);   // стачка или отстранен директор — без неговия бонус
   const upCost = k => { const inc = subBy(k).inc(deps) || 0, L = hold().lv[k] || 0; return Math.round(Math.max(5e6, inc * 40) * (L + 1) / 1e5) * 1e5; };
   const dirCost = k => Math.round(Math.max(4e6, (subBy(k).inc(deps) || 0) * 45) / 1e5) * 1e5;
   const canManage = k => { const S = deps.S(); return !!(S.holding && (S.group || {})[k] && !subBy(k).final); };
@@ -89,8 +93,8 @@ export function createGroup(deps) {
   function dailyTick() {
     const b = dailyBonus(), h = hold(), day = deps.S().day || 0;
     // ерата на холдинга: ти ставаш председател, а Ивайло Петров поема майката фирма (Констръкшън) — без развитие и без плащане
-    if (deps.S().holding && (deps.S().group || {}).con && !h.dir.con) {
-      h.dir.con = DIR_OF.con;
+    if (deps.S().holding && (deps.S().group || {}).con && !h.dir.con && !h.conAuto) {   // само веднъж — ако после напусне, се назначава нов от „Холдинг“
+      h.dir.con = DIR_OF.con; h.conAuto = 1;
       deps.pop && deps.pop('new-branch', `👔 ${DIR_OF.con} поема ${subName(deps.S(), 'con')}`, `Ти ставаш председател на холдинга. Ивайло води майката фирма: офертите, търговете, гаража, кварталите и филиалите — като предложения към борда (+${Math.round(HOLD_DIR_K * 100)}% от прихода ѝ).`);
       deps.save();
     }
@@ -99,6 +103,7 @@ export function createGroup(deps) {
       deps.toast(`🏛️ Холдингът разпредели +${deps.fmt(Math.round(h.mAcc))} € за месеца — бонус от развитието${Object.keys(h.dir).length ? ' и директорите' : ''} на дружествата.`, 'good');
       deps.sound && deps.sound('cash'); h.mAcc = 0;
     }
+    dirEv.dailyTick();
     const B2 = deps.board2 && deps.board2();
     if (B2 && B2.commits && deps.S().holding) {
       // ✅ завършен проект — кратко известие от директора (boardlogic слага c.toasted = false при завършване)
@@ -180,6 +185,7 @@ export function createGroup(deps) {
   }
   // 📋 панелът на директора в „Холдинг“: неговите предложения (Да / ½ / По-късно / Не, съвещателен вот при нужда) и ангажиментите му с напредъка
   const openPanels = new Set();
+  const moodTag = k => { const m = dirEv.mood(k); return `<span title="Настроение на директора">${dirEv.away(k) ? '⏸️ отстранен · ' : dirEv.struck(k) ? '✊ стачка · ' : ''}${m >= 0.7 ? '😊' : m >= 0.45 ? '😐' : '😤'} ${Math.round(m * 100)}%</span> · `; };
   function dirPanel(k) {
     const B2 = deps.board2 && deps.board2(); if (!B2) return '';
     const ps = proposals().filter(p => p.dir === k && !p.info), cs = (B2.commits ? B2.commits() : []).filter(c => c.dir === k && (c.st === 'active' || (c.st === 'done' && c.end >= (deps.S().day || 0) - 30)));
@@ -187,7 +193,7 @@ export function createGroup(deps) {
     const Bf = n => n >= 1e9 ? `${(n / 1e9).toLocaleString('bg-BG', { maximumFractionDigits: 1 })} млрд. €` : n >= 1e6 ? `${(n / 1e6).toLocaleString('bg-BG', { maximumFractionDigits: 1 })} млн. €` : `${deps.fmt(Math.round(n))} €`;
     const prop = p => `<div style="margin:6px 0;padding:8px 10px;border:1px solid var(--line);border-radius:10px">${B2.propHtml(p)}<div class="row" style="margin:6px 0 0;gap:6px;flex-wrap:wrap">${p.mustVote ? `<button class="btn" data-gp="${p.id}|vote">🗳️ Решава бордът — гласуване</button>` : `<button class="btn" data-gp="${p.id}|yes" ${p.can === false ? 'disabled' : ''}>✓ Да</button>`}${p.small ? `<button class="btn2" data-gp="${p.id}|small">½ ${Bf(p.small.cost)}</button>` : ''}<button class="btn2" data-gp="${p.id}|later">⏳ По-късно</button><button class="btn2" data-gp="${p.id}|no">✖ Не</button></div><div data-gpv="${p.id}"></div></div>`;
     const com = c => `<div class="meta" style="margin:3px 0">${c.st === 'done' ? '✅' : c.flag === 'блокирано' ? '⛔' : c.flag === 'забавено' ? '⚠️' : '⏳'} ${c.text.slice(0, 90)}${c.text.length > 90 ? '…' : ''} · ${c.st === 'done' ? `изпълнено на ден ${c.end}` : `${Math.round((c.prog || 0) * 100)}% · срок ден ${c.due}`}</div>`;
-    return `<details data-gpd="${k}" ${openPanels.has(k) ? 'open' : ''} style="margin:8px 0 0"><summary class="meta" style="margin:0;cursor:pointer;color:var(--txt)">📋 Директорът: ${ps.length ? `<b>${ps.length}</b> ${ps.length === 1 ? 'предложение' : 'предложения'}` : 'без нови предложения'}${cs.length ? ` · ${cs.length} ${cs.length === 1 ? 'проект' : 'проекта'}` : ''}</summary>${ps.map(prop).join('')}${cs.length ? `<div style="margin:6px 0 0"><div class="meta" style="margin:0 0 2px;color:var(--mut)">Проектите:</div>${cs.map(com).join('')}</div>` : ''}</details>`;
+    return `<details data-gpd="${k}" ${openPanels.has(k) ? 'open' : ''} style="margin:8px 0 0"><summary class="meta" style="margin:0;cursor:pointer;color:var(--txt)">${moodTag(k)}📋 Директорът: ${ps.length ? `<b>${ps.length}</b> ${ps.length === 1 ? 'предложение' : 'предложения'}` : 'без нови предложения'}${cs.length ? ` · ${cs.length} ${cs.length === 1 ? 'проект' : 'проекта'}` : ''}</summary>${ps.map(prop).join('')}${cs.length ? `<div style="margin:6px 0 0"><div class="meta" style="margin:0 0 2px;color:var(--mut)">Проектите:</div>${cs.map(com).join('')}</div>` : ''}</details>`;
   }
   function bindPanels(box, rerender) {
     const B2 = deps.board2 && deps.board2(); if (!B2) return;
@@ -234,6 +240,7 @@ export function createGroup(deps) {
     return allProps().filter(p => !(sk[propKey(p.id)] > day)).map(p => ({ ...p, can: !p.cost || e.canAfford(p.cost) }));
   }
   function decide(id, a) {
+    if (a === 'no') { const p0 = allProps().find(q => q.id === id); if (p0) dirEv.onNo(p0.dir, p0); }   // отказът сваля настроението на директора
     const p = allProps().find(q => q.id === id), h = hold(); if (!p) return;
     if (a === 'yes') {
       if (p.cost && !deps.econ().canAfford(p.cost)) { deps.toast(`Нямаш ${deps.fmt(p.cost)} €.`, 'bad'); return; }
@@ -255,5 +262,5 @@ export function createGroup(deps) {
       onResolve: (id, how) => { const r = deps.board2().resolve(id, how); re(); return r; },
       settings: deps.board2 ? () => deps.board2().settingsHtml() : null, bindSettings: (box, rr) => deps.board2().bindSettings(box, () => { rr(); re(); }) }));
   }
-  return { dirPanel, bindPanels, check, winHtml, bind, board, proposals, decide, dailyTick, dailyBonus, upgrade, hire, found, canFound };
+  return { dirEv, dirPanel, bindPanels, check, winHtml, bind, board, proposals, decide, dailyTick, dailyBonus, upgrade, hire, found, canFound };
 }

@@ -9108,7 +9108,7 @@ if (AUTOTEST) {
       for (let i = 0; i < 200 && !a.done; i++) { endOfDay(); if (a.wait) { log.push(`d${i}:wait ${a.wait} (${a.stuck}) st${a.stage}`); const f = pres.proposals().find(x => x.kind === 'aidfix' && x.aid === a.id); if (f) pres.decide(f.id, 'yes'); } }
       log.push(`done:${!!a.done} works:${a.works}`); P.res = -1e12; for (let i = 0; i < 70; i++) endOfDay(); log.push(`unpaid → works:${a.works} wait:${a.wait}`); return log; },
     pkgTest(cc = 'US') { S.president = { cc, day: S.day, ev: 300 }; S.pres = null; pres.start(cc); const P = S.pres, k = P.conf.east; k.step = 2; const out = {};
-      out.weak = pres.evalPkg('east', {}).resp.map(r => `${r.iso}:${r.ok}:${r.score}/${r.need}:${r.why[0]}`);
+      { const E = pres.evalPkg('east', {}); out.weak = E.resp.map(r => `${r.iso}:${r.ok}:${r.score}/${r.need}:${r.why[0]} ↩ ${(r.counter?.ch || []).map(x => x.nm + '→' + x.to).join(', ')}`); out.merged = E.merged && JSON.stringify(E.merged.pkg); }
       const strong = { now: 1, obl: 1, ver: 2, gua: 1, rec: 1, next: 2 }; out.strong = pres.evalPkg('east', strong).resp.map(r => `${r.iso}:${r.ok}:${r.score}/${r.need}:${r.why[0]}`);
       for (const i of ['GBR', 'FRA', 'DEU', 'POL', 'TUR']) P.coal[i] = S.day; P.tr.RUS = 55; P.tr.UKR = 70;
       out.strong2 = pres.evalPkg('east', strong).resp.map(r => `${r.iso}:${r.ok}:${r.score}/${r.need}:${r.why[0]}`); const E = pres.proposePkg('east', strong); out.step = k.step; out.fund = k.fund; return out; },
