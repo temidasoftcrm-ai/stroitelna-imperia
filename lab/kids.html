@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Детските модели</title>
+<style>
+  :root { --bg:#14161b; --card:#1d2027; --txt:#e8e8ea; --mut:#9aa0aa; --ok:#5fc27a; --kid:#f5b942; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:14px/1.45 system-ui,sans-serif; padding:16px; }
+  h1 { font-size:20px; margin:0 0 4px; } .lead { color:var(--mut); margin:0 0 14px; }
+  .bar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; } .bar button { background:var(--card); color:var(--txt); border:1px solid #333a45; border-radius:8px; padding:6px 10px; cursor:pointer; } .bar button.on { border-color:var(--kid); color:var(--kid); }
+  h2 { font-size:16px; margin:18px 0 2px; } .where { color:var(--mut); margin:0 0 8px; font-size:13px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
+  .it { background:var(--card); border-radius:10px; padding:6px; border:1px solid #2a2f38; } .it img { width:100%; aspect-ratio:1; object-fit:contain; border-radius:6px; background:#eef0f4; display:block; }
+  .n { font-weight:600; margin-top:4px; word-break:break-all; font-size:12px; } .st { font-size:12px; color:var(--kid); } .it.ok .st { color:var(--ok); } .it.ok { opacity:.55; }
+  a { color:inherit; text-decoration:none; }
+</style></head><body>
+<h1>🧸 Детските модели в играта</h1>
+<p class="lead">Нискополигоналните модели (Kenney, poly.pizza…), които играта още ползва — по видове, с това къде се виждат. Жълто — още детски; зелено (бледо) — вече има истински заместител. Кликни снимка — моделът се отваря в 3D. Кажи кои да заменим първо.</p>
+<div class="bar" id="bar"></div>
+<div id="out"></div>
+<script type="module">
+const data = await (await fetch('kids.json')).json();
+let only = 'kid';
+function render() {
+  document.getElementById('bar').innerHTML = [['kid', 'Само детските'], ['all', 'Всички']].map(([k, l]) => `<button data-k="${k}" class="${only === k ? 'on' : ''}">${l}</button>`).join('') +
+    data.map(c => `<button data-j="${c.key}">${c.title.split(' ')[0]} ${c.items.filter(i => !i.ok).length}</button>`).join('');
+  document.getElementById('out').innerHTML = data.map(c => { const L = c.items.filter(i => only === 'all' || !i.ok); if (!L.length) return '';
+    return `<h2 id="c-${c.key}">${c.title} <span style="color:var(--mut);font-weight:400">· ${c.items.filter(i => !i.ok).length} детски от ${c.items.length}</span></h2><p class="where">Къде: ${c.where}</p><div class="grid">` +
+      L.map(i => `<a class="it ${i.ok ? 'ok' : ''}" href="/lab.html#tab=models&item=${encodeURIComponent('/' + i.f)}" target="_top"><img loading="lazy" src="kids/${i.f.split('/')[1]}__${i.n}.webp" alt=""><div class="n">${i.n}</div><div class="st">${i.st}</div></a>`).join('') + '</div>'; }).join('');
+  document.querySelectorAll('[data-k]').forEach(b => b.onclick = () => { only = b.dataset.k; render(); });
+  document.querySelectorAll('[data-j]').forEach(b => b.onclick = () => document.getElementById('c-' + b.dataset.j)?.scrollIntoView({ behavior: 'smooth' }));
+}
+render();
+</script></body></html>
