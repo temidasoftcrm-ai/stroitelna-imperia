@@ -94,6 +94,7 @@ const DEMOS = [
   ['🔥 Оперативна карта: пожар в жилищен блок', 'sofia', () => $('fr').contentWindow.eval("import('/ops.js').then(m => m.demoOps('US', false, 'fire'))")],
   ['🤝 Оперативна карта: хуманитарен достъп', 'sofia', () => $('fr').contentWindow.eval("import('/ops.js').then(m => m.demoOps('US', false, 'aid'))")],
   ['🌊 Оперативна карта: Ормузкият проток', 'sofia', () => $('fr').contentWindow.eval("import('/ops.js').then(m => m.demoOps('US', false, 'strait'))")],
+  ['🏗️ Оперативна карта: възстановяване на район (Украйна)', 'sofia', () => $('fr').contentWindow.eval("import('/ops.js').then(m => m.demoOps('US', false, 'rebuild'))")],
   ['🌍 Геополитическата карта (САЩ)', 'sofia', d => d.geoDemo('US')],
   ['🌍 Геополитическата карта (Русия)', 'sofia', d => d.geoDemo('RU')],
 ];

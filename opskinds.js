@@ -274,4 +274,68 @@ export const KINDS = {
       `📃 Договор: ${m.agree ? '✅ има' : m.talks > 0 ? `🟡 преговори ${Math.round(m.talks * 100)}%` : '—'} · ⚡ енергия: ${Math.round(m.energy)}%${m.reserveUsed ? ` · 🏦 резерви: −${Math.round(m.reserveUsed)}%` : ''}`]; },
     phases: { calm: '⛔ Протокът е затворен', active: '🚢 Морска операция', resolved: '✅ Корабоплаването е възстановено' },
   },
+  // 🏗️ Украйна — възстановяване на район (алтернативна игрова хронология, измислен район „Новоград“): блоковете са повредени, мостът
+  // към гарата е срутен, болницата и токът не работят, хората са извън района. Сапьорите проверяват улиците (без тях работа не започва);
+  // инженерите ремонтират моста; енергетиците връщат тока и парното; строителите — жилищата; медиците — болницата; автобусите и
+  // камионите връщат хората и доставките. Наближава зима — без парно хората не могат да се върнат.
+  rebuild: {
+    nm: 'Възстановяване на район', ico: '🏗️', area: 'Новоград', fade: 12, place: { city: 'Новоград', lon: 36.2, lat: 49.4, iso: 'UKR' },
+    teams: {
+      sapper: { ico: '🦺', nm: 'Сапьори', job: 'проверяват улиците и сградите — без тях работа не започва', cost: 4e5, eta: 0.3 },
+      bridge: { ico: '🌉', nm: 'Инженери — мостът', job: 'временен мост, после ремонт — пътят към гарата и доставките', cost: 9e5, eta: 0.4 },
+      power: { ico: '⚡', nm: 'Ток и парно', job: 'подстанция, генератори, отоплителна централа', cost: 7e5, eta: 0.35 },
+      build: { ico: '🏗️', nm: 'Строители', job: 'ремонт на блоковете — покриви, прозорци, стълбища', cost: 1.2e6, eta: 0.35 },
+      med: { ico: '🏥', nm: 'Болница', job: 'медици и оборудване — спешно отделение', cost: 5e5, eta: 0.3 },
+      bus: { ico: '🚌', nm: 'Автобуси и доставки', job: 'връщат жителите и карат храна, вода, материали', cost: 4e5, eta: 0.3 },
+    },
+    choices: {
+      full: { ico: '🏙️', nm: 'Пълно възстановяване на района', k: 0.35, trust: 5, sec: 2, services: 4, out: 'deal' },
+      core: { ico: '🏥', nm: 'Основните услуги и жилищата', k: 0.15, trust: 3, sec: 1, services: 2, out: 'deal' },
+      temp: { ico: '🏕️', nm: 'Временни модулни жилища', k: 0.06, trust: 1, sec: 0, services: 1, out: 'partial' },
+    },
+    decisions: [
+      { id: 'prio', ico: '📋', title: 'Какво първо?', pick: true, when: m => m.teams.build.st !== 'ready' || m.teams.power.st !== 'ready',
+        opts: [{ k: 'hosp', ico: '🏥', nm: 'Болницата и училището', txt: 'по-малко пострадали, жилищата — по-бавно' }, { k: 'homes', ico: '🏠', nm: 'Жилищата', txt: 'хората се връщат по-бързо' }, { k: 'heat', ico: '🔥', nm: 'Парното преди зимата', txt: 'топлина за всички, ремонтите — по-бавни' }] },
+      { id: 'homesHow', ico: '🏠', title: 'Как да ремонтираме блоковете?', when: m => m.teams.build.st === 'onsite',
+        opts: [{ k: 'repair', ico: '🔧', nm: 'Ремонт на място', txt: 'по-евтино; хората остават в квартала' }, { k: 'modules', ico: '📦', nm: 'Модулни жилища, докато трае ремонтът', cost: 3e5, txt: 'хората се връщат веднага в модулите' }] },
+      { id: 'jobs', ico: '👷', title: 'Кой строи?', when: m => m.teams.build.st === 'onsite',
+        opts: [{ k: 'local', ico: '🏘️', nm: 'Местни фирми и жители', txt: 'по-бавно, но доверието и работните места растат' }, { k: 'firm', ico: '🏢', nm: 'Голяма външна фирма', cost: 2e5, txt: 'по-бързо' }] },
+      { id: 'uxo', ev: true, ico: '⚠️', title: 'Невзривен боеприпас в двор', when: m => m.event && m.event.id === 'uxo', txt: () => 'Строителите спряха — сапьорите трябва да го обезвредят.',
+        opts: [{ k: 'wait', ico: '🦺', nm: 'Евакуирай улицата и чакай сапьорите', txt: 'безопасно, около половин ден', apply: m => { m.stopTill = m.t + 0.5; } }, { k: 'extra', ico: '🚐', nm: 'Още един екип сапьори', cost: 1.5e5, txt: 'бързо', apply: m => { m.stopTill = m.t + 0.12; } }] },
+      { id: 'frost', ev: true, ico: '❄️', title: 'Първите студове', when: m => m.event && m.event.id === 'frost', txt: m => `Парното работи за ${Math.round(m.heat)}% от жилищата.`,
+        opts: [{ k: 'heaters', ico: '🔌', nm: 'Отоплителни пунктове и печки', cost: 2e5, txt: 'хората издържат до пускането на парното', apply: m => { m.heatAid = true; } }, { k: 'evac', ico: '🚌', nm: 'Временно настаняване извън района', txt: 'безопасно, но част от хората си тръгват', apply: m => { m.home = Math.max(0, m.home - 120); } }] },
+      { id: 'late', ev: true, ico: '🚛', title: 'Материалите закъсняват', when: m => m.event && m.event.id === 'late',
+        opts: [{ k: 'rail', ico: '🚆', nm: 'По жп през гарата', txt: 'нужен е мостът', apply: m => { m.slowTill = m.bridge >= 100 ? 0 : m.t + 0.6; } }, { k: 'buy', ico: '💶', nm: 'Купи на място по-скъпо', cost: 2e5, txt: 'работата продължава' }] },
+    ],
+    start(m) { Object.assign(m, { dec: {}, event: null, safe: 0, bridge: 0, power: 8, heat: 5, homes: 20, hosp: 15, home: 0, pop: 600, hurt: 0, stopTill: 0, slowTill: 0 }); return '🏗️ Районът Новоград е разрушен: мостът към гарата е срутен, няма ток и парно, хората са извън района. (Алтернативна игрова хронология.)'; },
+    step(m, dt, h) {
+      const on = k => h.on(m, k), D = m.dec || (m.dec = {}), sap = on('sapper');
+      if (m.phase === 'calm' && Object.keys(m.teams).some(on)) m.phase = 'active';
+      if (sap) m.safe = Math.min(100, m.safe + 45 * dt);
+      const stop = m.stopTill > m.t || (m.event && m.event.id === 'uxo'), ok = m.safe >= 30 && !stop, slow = m.slowTill > m.t || (m.event && m.event.id === 'late') ? 0.5 : 1;
+      const pr = D.prio || 'homes', jobs = D.jobs === 'firm' ? 1.3 : D.jobs === 'local' ? 0.85 : 1;
+      if (ok && on('bridge')) { const b0 = m.bridge; m.bridge = Math.min(100, m.bridge + 40 * dt * slow); if (b0 < 40 && m.bridge >= 40) h.log(m, '🌉 Временният мост е готов — камионите минават.'); if (b0 < 100 && m.bridge >= 100) h.log(m, '🌉 Мостът е ремонтиран — гарата отново работи.'); }
+      const sup = m.bridge >= 40 ? 1 : 0.55;
+      if (ok && on('power')) { m.power = Math.min(100, m.power + 30 * dt * sup * slow); m.heat = Math.min(100, m.heat + (pr === 'heat' ? 34 : 20) * dt * sup * slow * (m.power > 30 ? 1 : 0.3)); }
+      if (ok && on('build')) m.homes = Math.min(100, m.homes + (pr === 'homes' ? 24 : pr === 'heat' ? 12 : 15) * dt * sup * slow * jobs);
+      if (ok && on('med')) m.hosp = Math.min(100, m.hosp + (pr === 'hosp' ? 40 : 22) * dt * sup * slow);
+      // жителите се връщат с автобусите — ако има къде да живеят и е топло
+      const cap = m.pop * Math.min(1, (D.homesHow === 'modules' && on('build') ? Math.max(m.homes, 70) : m.homes) / 100) * (m.heat > 50 || m.heatAid || m.t < 3 ? 1 : 0.4);
+      if (on('bus') && ok) m.home = Math.min(cap, m.home + (D.homesHow === 'modules' ? 150 : 100) * (pr === 'homes' ? 1.15 : 1) * dt * sup);
+      m.hurt += (m.hosp < 40 ? 1 : 0) * (m.home / 300) * dt * (pr === 'hosp' ? 0.5 : 1);
+      // събития
+      if (!m.event && ok && (on('build') || on('bridge')) && !m.uxoAsked && m.t > 0.6 && Math.random() < dt * 1.1) { m.uxoAsked = true; m.event = { id: 'uxo' }; h.log(m, '⚠️ Невзривен боеприпас в двор — работата спира.'); }
+      if (!m.event && m.t > 3 && !m.frostAsked && m.heat < 70) { m.frostAsked = true; m.event = { id: 'frost' }; h.log(m, '❄️ Първите студове — парното още не стига.'); }
+      if (!m.event && ok && on('build') && !m.lateAsked && m.t > 1.2 && Math.random() < dt * 0.7) { m.lateAsked = true; m.event = { id: 'late' }; h.log(m, '🚛 Материалите закъсняват на границата на района.'); }
+      if (!m.recov && m.homes >= 80 && m.heat >= 70 && m.hosp >= 70 && m.home >= m.pop * 0.7) { m.recov = true; h.log(m, '🏘️ Хората се връщат по домовете си. Твоят ход — как да продължи възстановяването.'); }
+      if (m.t >= this.fade && !m.recov) h.resolve(m, 'faded', { trust: -4, services: -2 }, '⏳ Районът остава полупразен — хората не се връщат.');
+    },
+    ready: m => !!m.recov,
+    effect: (m, C) => ({ trust: C.trust + ((m.dec || {}).jobs === 'local' ? 2 : 0) - Math.round(m.hurt / 4), security: C.sec, services: C.services, econ: (m.dec || {}).jobs === 'local' ? 1 : 0 }),
+    resultTxt: c => c === 'full' ? '🏙️ Районът ще бъде възстановен изцяло — с нови училища и паркове.' : c === 'core' ? '🏥 Основните услуги и жилищата са готови, останалото — постепенно.' : '🏕️ Модулни жилища — временно решение.',
+    stats(m) { return [['🏠 Жилища', m.homes, m.homes >= 70 ? '#5fe39a' : m.homes >= 40 ? '#ffd54a' : '#ff6b6b'], ['🔥 Парно', m.heat, m.heat >= 70 ? '#5fe39a' : m.heat >= 35 ? '#ffd54a' : '#ff6b6b'],
+      `👨‍👩‍👧 Върнали се: <b>${Math.round(m.home)}</b> от ${m.pop} · 🏥 болница ${Math.round(m.hosp)}% · ⚡ ток ${Math.round(m.power)}%`,
+      `🌉 Мостът: ${m.bridge >= 100 ? '✅ ремонтиран' : m.bridge >= 40 ? '🟡 временен' : m.bridge > 0 ? `🔧 ${Math.round(m.bridge)}%` : '⛔ срутен'} · 🦺 проверени улици: ${Math.round(m.safe)}%${m.hurt >= 1 ? ` · 🤕 без лечение: ${Math.round(m.hurt)}` : ''}`]; },
+    phases: { calm: '🏚️ Районът е разрушен', active: '🏗️ Възстановяване', resolved: '✅ Хората се върнаха' },
+  },
 };
