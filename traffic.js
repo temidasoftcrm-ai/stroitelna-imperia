@@ -106,7 +106,7 @@ export const sigView = s => s ? { axis: s.ph[s.i][0], yellow: s.stage === 'yello
 // ---- симулацията
 // opts: { scene, net, drive, makeCar() → { obj, len, kind }, maxCars, onSignal(node, view) }
 export function createTraffic(opts) {
-  const { lanes, nodes } = buildLanes(opts.net, opts.drive);
+  const { lanes, nodes } = opts.built || buildLanes(opts.net, opts.drive);   // built — готова мрежа (planNetwork)
   const cars = [], tmp = {}, rnd = Math.random;
   // таван: ~30% от местата по лентите (иначе на късите улици между кръстовищата решетката се задръства)
   const capacity = Math.floor(lanes.reduce((t, l) => t + l.len, 0) / (4.5 + S0 + 2) * 0.3);
@@ -129,7 +129,9 @@ export function createTraffic(opts) {
   function pickNext(c) {
     if (c.p.kind === 'conn') { c.next = c.p.outL; return; }
     const n = nodes.get(c.p.to), L = n.conns.filter(x => x.inL === c.p);
+    if (n.ring) { c.next = L.find(x => x.exitArm != null && x.exitArm === c.ringExit) || L.find(x => x.cont) || L[0] || null; return; }   // в пръстена: изходът или напред
     c.next = L.length ? L[(rnd() * L.length) | 0] : null;
+    if (c.next && c.next.ringIn) c.ringExit = c.next.pickExit(rnd);   // влиза в кръгово — избира изход (не обратно)
   }
   // предната кола: в същата пътека (следващата по s) или в следващата (последната в нея) — разстояние между броните
   function leader(c) {
@@ -147,7 +149,9 @@ export function createTraffic(opts) {
     if (n.sig && !sigAllows(n.sig, C)) return false;
     if (C.conf.some(d => d.cars.length)) return false;                       // пресичаща се крива — заета
     const tail = C.outL.cars[0];                                             // място след кръстовището
-    return !(tail && tail.s - tail.L / 2 < c.L + S0 + 1);
+    if (tail && tail.s - tail.L / 2 < c.L + S0 + 1) return false;
+    if (C.yieldTo && C.yieldTo.some(([seg, d]) => seg.cars.some(w => seg.len - w.s < d))) return false;   // кръгово: влизащият изчаква тези в пръстена
+    return true;
   }
   function mayEnter(c) {
     const C = c.next; if (!C || C.kind !== 'conn') return true;
@@ -159,6 +163,7 @@ export function createTraffic(opts) {
   // d (кола w) има предимство пред C (кола c): главната улица; при равни — който чака по-дълго (без вечно блокиране)
   const priority = (d, C, w, c) => d.inL.rank !== C.inL.rank ? d.inL.rank > C.inL.rank && c.wait < 6 : w.wait > c.wait + 0.3;
   function step() {
+    while (cars.length < Math.min(opts.maxCars || 40, capacity)) if (!spawn()) break;   // и новите коли — на стъпка (еднакво при 1× и 4×)
     for (const n of nodes.values()) if (n.sig) sigStep(n.sig, H);
     for (const c of cars) { c.px = c.x; c.pz = c.z; c.pyaw = c.yaw; }
     for (const c of cars) {
@@ -190,7 +195,6 @@ export function createTraffic(opts) {
     lanes, nodes, cars, opts,
     // dt — време на играта (с ускорението); maxSteps пази кадъра при голямо ускорение
     update(dt, maxSteps = 16) {
-      while (cars.length < Math.min(opts.maxCars || 40, capacity)) if (!spawn()) break;
       acc += dt; let n = 0; while (acc >= H && n < maxSteps) { step(); acc -= H; n++; }
       if (acc > H * maxSteps) acc = 0;   // прекалено бавен кадър — без натрупване (колите не прескачат — стъпките са същите)
       const t = acc / H;
@@ -217,3 +221,76 @@ export function gridNetwork(g) {
   }
   return { nodes, edges };
 }
+
+// ---- мрежата от плана на улиците v2 (cityplan2.js, част A): ленти — plan.lanePath, завои — plan.turnPath, кръгови — plan.roundPath
+const RANK_V = { blvd: 14, ring: 11, quay: 12, hw: 22, street: 11, access: 8 };
+export function planNetwork(P) {
+  const nodes = new Map(), lanes = [], NV = id => nodes.get(id);
+  for (const n of P.nodes) nodes.set(n.id, { id: n.id, x: n.x, z: n.z, kind: n.kind, ctrl: n.ctrl, inL: [], outL: [], conns: [], deg: n.arms.length });
+  // ленти: по всяко ребро, във всяка посока; armIn — клонът на крайния възел, armOut — на началния
+  const armOf = (nodeId, roadId, end) => P.nodes[nodeId].arms.findIndex(a => a.road === roadId && a.end === end);
+  for (const rd of P.roads) for (const dir of [1, -1]) {
+    const n = rd.lanes[dir > 0 ? 0 : 1] || 0, from = dir > 0 ? rd.from : rd.to, to = dir > 0 ? rd.to : rd.from;
+    const rank = P.nodes[to].arms[armOf(to, rd.id, dir > 0 ? 1 : 0)]?.rank ?? (rd.cls === 'blvd' ? 4 : 1);
+    for (let i = 0; i < n; i++) {
+      const L = mkPath(P.lanePath(rd.id, dir, i), 'lane', { from, to, edge: rd, rank, vmax: RANK_V[rd.cls] || V_LANE, laneI: i, nLanes: n, armIn: armOf(to, rd.id, dir > 0 ? 1 : 0), armOut: armOf(from, rd.id, dir > 0 ? 0 : 1) });
+      lanes.push(L); NV(from).outL.push(L); NV(to).inL.push(L);
+    }
+  }
+  for (const n of P.nodes) {
+    const N = NV(n.id);
+    if (n.kind === 'round') { roundNet(P, n, N, nodes, lanes); continue; }
+    for (const a of N.inL) {
+      // задънен край — обратен завой; иначе — към всеки друг клон
+      const outs = N.deg === 1 ? N.outL.filter(b => b.edge === a.edge) : N.outL.filter(b => b.armOut !== a.armIn);
+      for (const b of outs) {
+        const ang = (P.nodes[n.id].arms[b.armOut].angle - P.nodes[n.id].arms[a.armIn].angle + Math.PI * 3) % (Math.PI * 2) - Math.PI;   // ъгъл между клоновете
+        const kind = N.deg === 1 ? 'uturn' : Math.abs(Math.abs(ang) - Math.PI) < 0.6 ? 'straight' : ((ang > 0) === (P.drive === 'R') ? 'right' : 'left');
+        // коя лента към коя: наляво — от вътрешната към вътрешната, надясно — от външната към външната, направо — същата
+        const ok = kind === 'left' ? a.laneI === 0 && b.laneI === 0 : kind === 'right' ? a.laneI === a.nLanes - 1 && b.laneI === b.nLanes - 1 : kind === 'uturn' ? a.laneI === 0 && b.laneI === 0 : b.laneI === Math.min(a.laneI, b.nLanes - 1);
+        if (!ok) continue;
+        const pts = kind === 'uturn' ? bezier(a.pts[a.pts.length - 1], [n.x, n.z], b.pts[0], 10) : P.turnPath(n.id, a.armIn, a.laneI, b.armOut, b.laneI);
+        N.conns.push(mkPath(pts, 'conn', { node: n.id, inL: a, outL: b, turn: kind, vmax: kind === 'straight' ? (a.vmax || V_LANE) * 0.8 : V_TURN, conf: [] }));
+      }
+    }
+    for (const c of N.conns) for (const d of N.conns) if (c !== d && c.inL !== d.inL && (c.outL === d.outL || crosses(c, d))) c.conf.push(d);
+    for (const l of N.inL) l.rank = l.rank || 1;
+    N.sig = n.ctrl === 'signal' && N.deg >= 3 ? makeSignal(N) : null;
+  }
+  return { lanes, nodes };
+}
+// кръгово: пръстенът се реже на отсечки при всеки вход и изход; във всяка точка — възел с връзка „напред“ и (при изход) „навън“
+function roundNet(P, n, N, nodes, lanes) {
+  const ri = P.rounds.findIndex(r => r.node === n.id), R = P.rounds[ri], ring = R.ring, rp = mkPath(ring, 'tmp'), T = rp.len;
+  const pts = []; R.entries.forEach((e, k) => { pts.push({ s: e.inS, in: k }); pts.push({ s: e.outS, out: k }); });
+  pts.sort((a, b) => a.s - b.s);
+  const segs = [], o = {};
+  for (let k = 0; k < pts.length; k++) {   // отсечка от точка k до k+1 (по пръстена, затворено)
+    const s0 = pts[k].s, s1 = k + 1 < pts.length ? pts[k + 1].s : pts[0].s + T, P2 = [];
+    for (let s = s0; s < s1 - 0.01; s += 2) { at(rp, s % T, o); P2.push([o.x, o.z]); }
+    at(rp, s1 % T, o); P2.push([o.x, o.z]);
+    const id = `r${ri}:${k}`, idN = `r${ri}:${(k + 1) % pts.length}`;
+    if (!nodes.has(id)) nodes.set(id, { id, ring: true, inL: [], outL: [], conns: [], deg: 2 });
+    if (!nodes.has(idN)) nodes.set(idN, { id: idN, ring: true, inL: [], outL: [], conns: [], deg: 2 });
+    const L = mkPath(P2.length > 1 ? P2 : [P2[0], P2[0]], 'lane', { from: id, to: idN, ring: ri, rank: 3, vmax: 7.5 });
+    lanes.push(L); nodes.get(id).outL.push(L); nodes.get(idN).inL.push(L); segs.push(L);
+  }
+  pts.forEach((q, k) => {
+    const V = nodes.get(`r${ri}:${k}`), inSeg = segs[(k - 1 + segs.length) % segs.length], outSeg = segs[k];
+    const cont = mkPath([inSeg.pts[inSeg.pts.length - 1], outSeg.pts[0]], 'conn', { node: V.id, inL: inSeg, outL: outSeg, turn: 'straight', vmax: 7.5, conf: [], cont: true });
+    V.conns.push(cont);
+    if (q.out != null) {   // изход: от пръстена към излизащата лента на клона
+      const arm = R.entries[q.out].arm, outL = N.outL.find(l => l.armOut === arm && l.laneI === 0);
+      if (outL) { const c = mkPath(P.roundPath(ri, q.out, 'out'), 'conn', { node: V.id, inL: inSeg, outL, turn: 'right', vmax: 6, conf: [], exitArm: arm }); V.conns.push(c); }
+    }
+    if (q.in != null) {    // вход: от влизащата лента на клона към пръстена — изчаква колите в пръстена отпреди тази точка
+      const arm = R.entries[q.in].arm, inL = N.inL.find(l => l.armIn === arm && l.laneI === 0);
+      if (inL) {
+        const c = mkPath(P.roundPath(ri, q.in, 'in'), 'conn', { node: n.id, inL, outL: outSeg, turn: 'right', vmax: 6, conf: [cont], ringIn: true, yieldTo: [[inSeg, 16]] });
+        const exits = R.entries.map(e => e.arm).filter(a => a !== arm); c.pickExit = r => exits[(r() * exits.length) | 0];
+        N.conns.push(c); cont.conf.push(c);
+      }
+    }
+  });
+}
+
