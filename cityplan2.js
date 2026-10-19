@@ -354,7 +354,7 @@ export function plan2(cityId, o = {}) {
   const P = { osm: !!o.osm, greensSrc: sk.greens || [], v: PLAN2_V, cityId, fam, size, seed, ext, drive: o.drive || 'R', center: { x: sk.hubs[0].x, z: sk.hubs[0].z }, R: sk.R, boundary: sk.bnd, waterAt: sk.waterAt, coastZ: sk.coastZ, hubs: sk.hubs,
     roads: [], nodes: nodeOut, rounds: [], lots: [], blocks: [], greens: [], landmarks: [] };
   roads.forEach(rd => {
-    const k = CLS[rd.cls], pts = resample(rd.pts, 2), id = P.roads.length, a = nid(rd.from), b = nid(rd.to);
+    const k = CLS[rd.cls], pts = resample(rd.pts, P.osm ? 5 : 2), id = P.roads.length, a = nid(rd.from), b = nid(rd.to);
     const n1 = rd.oneway ? Math.min(2, k.lanes[0]) || 1 : 0, lanes = rd.oneway ? (rd.oneway > 0 ? [n1, 0] : [0, n1]) : k.lanes.slice();   // еднопосочен — всички ленти в една посока, без разделителна ивица
     P.roads.push({ id, cls: rd.cls, noCars: !!rd.noCars, nm: rd.nm || '', oneway: !!rd.oneway, pts, L: cumLen(pts), lanes, laneW: k.laneW, median: rd.oneway ? 0 : k.median, walk: k.walk, w: rd.oneway ? n1 * k.laneW : widthOf(rd.cls), from: a, to: b, bridge: [] });
   });
@@ -412,6 +412,7 @@ export function plan2(cityId, o = {}) {
     for (let k = 0; k < ord.length; k++) {
       const A = ord[k], B = ord[(k + 1) % ord.length]; let gap = B.ang - A.ang; if (k === ord.length - 1) gap += TAU;
       const uA = [Math.cos(A.ang), Math.sin(A.ang)], uB = [Math.cos(B.ang), Math.sin(B.ang)], nA = [-uA[1], uA[0]], mB = [uB[1], -uB[0]];
+      if (gap < 0.05) { corners.push({ A, B, c: null }); continue; }   // два клона в една посока (истинска карта) — без ъгъл
       if (gap < Math.PI - 0.1) {
         const d = [mB[0] * B.hw - nA[0] * A.hw, mB[1] * B.hw - nA[1] * A.hw], det = -uA[0] * uB[1] + uB[0] * uA[1];
         const sA = (d[0] * -uB[1] + uB[0] * d[1]) / det, sB = (uA[0] * d[1] - uA[1] * d[0]) / det, rc = A.main || B.main ? 7 : 5, L = rc / Math.tan(gap / 2);
