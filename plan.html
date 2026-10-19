@@ -71,7 +71,7 @@ const KIND_MODELS = {
   block: ['commercial/building-e', 'commercial/building-g', 'commercial/building-c'],
   civic: ['commercial/building-h'],
   house: 'abcdefghijklmnopqrstu'.split('').map(c => 'suburban/building-type-' + c),
-  factory: 'abcdefghij'.split('').map(c => 'industrial/building-' + c),
+  factory: ['heavy/industry/sf-warehouses', 'heavy/industry/sf-oldwarehouse', 'heavy/industry/sf-indbuilding'],   // детските заводи са изтрити — истинските (industry.js)
 };
 const loader = new GLTFLoader(), cache = {};
 const load = n => cache[n] || (cache[n] = loader.loadAsync(`assets/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); return g.scene; }));
