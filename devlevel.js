@@ -133,15 +133,27 @@ export function createDevLevel(deps) {
     btn.innerHTML = `🏢 Фирма ${bst}<span class="dbar"><i style="width:${(k * 100).toFixed(0)}%"></i></span>`;
     btn.title = `Ниво на развитие на фирмата: ${bst} (по най-развития град — оттам идват отключванията)${bst > d.lv ? ` · ${deps.cityName ? deps.cityName() : 'този град'}: ниво ${d.lv}` : ''}${nx != null ? ` · към ниво ${bst + 1}: ${Math.round(nx * 100)}%${deps.impNeed ? ` — ${deps.impNeed(bst + 1)}` : ''}` : ''}`;
   }
+  const firmXP = () => { const S = deps.S(), d = st(); return Math.max(d ? d.xp : 0, ...Object.values(S?.cities || {}).map(c => c.dev?.xp || 0)) + (S?.holding ? S.hxp || 0 : 0); };
+  function prog(n) {
+    const L = best(); if (n <= L) return { k: 1, t: '✅ изпълнено' };
+    if (n > 20) { const k = deps.impRatio ? Math.max(0, Math.min(1, deps.impRatio(n) || 0)) : 0; return { k, t: `${Math.round(k * 100)}% от условията` }; }
+    const xp = firmXP(), a = THRESH[n - 2] ?? 0, b = THRESH[n - 1], k = Math.max(0, Math.min(1, (xp - a) / Math.max(1, b - a)));
+    return { k, t: `${Math.round(k * 100)}% · остават ${Math.max(0, Math.round(b - xp)).toLocaleString('bg-BG')} XP` };
+  }
+  const barHtml = n => { const p = prog(n); return `<div style="display:flex;align-items:center;gap:8px;margin:-2px 8px 6px 8px"><div style="flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden"><i data-dvn="${n}" style="display:block;height:100%;width:${(p.k * 100).toFixed(1)}%;background:${p.k >= 1 ? '#43d17a' : 'linear-gradient(90deg,#c9a14a,#ffd54a)'}"></i></div><span class="meta" data-dvt="${n}" style="margin:0;font-size:11px;min-width:150px;text-align:right">${p.t}</span></div>`; };
+  let dvTimer = null;
   function open() {
     const d = st(); if (!d) return;
     const L = best();   // по нивото на фирмата (както в лентата горе); заключените — замъглени, за да е изненада
-    const rows = THRESH.map((t, i) => `<div class="dvrow ${i + 1 <= L ? 'on' : ''} ${i + 1 === L ? 'cur' : ''}"><b>${i + 1 <= L ? '✅' : '🔒'} Ниво ${i + 1}</b><span class="meta" style="margin:0;flex:1;${i + 1 > L ? 'filter:blur(6px);user-select:none;pointer-events:none' : ''}" ${i + 1 > L ? 'aria-hidden="true"' : ''}>${UNLOCKS[i + 1] || 'Начало'}</span><span class="meta" style="margin:0">${t} XP${deps.lvTime && deps.lvTime(i + 1) ? `<br><span style="color:#7dd3ff">⏱️ ${deps.lvTime(i + 1)}</span>` : ''}</span></div>`).join('')
-      + `<div class="meta" style="margin:10px 0 4px;color:#ffd54a">🏙️ Нива 21–25 — Империал Сити, 26–35 — президентът (по постижения, не по опит)</div>` + [21, 22, 23, 24, 25, ...(L >= 25 ? [26, 27, 28, 29, 30, 31, 32, 33, 34, 35] : [])].map(n => `<div class="dvrow ${n <= L ? 'on' : ''} ${n === L ? 'cur' : ''}"><b>${n <= L ? '✅' : '🔒'} Ниво ${n}</b><span class="meta" style="margin:0;flex:1;${n > L ? 'filter:blur(6px);user-select:none;pointer-events:none' : ''}" ${n > L ? 'aria-hidden="true"' : ''}>${UNLOCKS[n]}</span></div>`).join('')
+    const rows = THRESH.map((t, i) => `<div class="dvrow ${i + 1 <= L ? 'on' : ''} ${i + 1 === L ? 'cur' : ''}"><b>${i + 1 <= L ? '✅' : '🔒'} Ниво ${i + 1}</b><span class="meta" style="margin:0;flex:1;${i + 1 > L ? 'filter:blur(6px);user-select:none;pointer-events:none' : ''}" ${i + 1 > L ? 'aria-hidden="true"' : ''}>${UNLOCKS[i + 1] || 'Начало'}</span><span class="meta" style="margin:0">${t} XP${deps.lvTime && deps.lvTime(i + 1) ? `<br><span style="color:#7dd3ff">⏱️ ${deps.lvTime(i + 1)}</span>` : ''}</span></div>${barHtml(i + 1)}`).join('')
+      + `<div class="meta" style="margin:10px 0 4px;color:#ffd54a">🏙️ Нива 21–25 — Империал Сити, 26–35 — президентът (по постижения, не по опит)</div>` + [21, 22, 23, 24, 25, ...(L >= 25 ? [26, 27, 28, 29, 30, 31, 32, 33, 34, 35] : [])].map(n => `<div class="dvrow ${n <= L ? 'on' : ''} ${n === L ? 'cur' : ''}"><b>${n <= L ? '✅' : '🔒'} Ниво ${n}</b><span class="meta" style="margin:0;flex:1;${n > L ? 'filter:blur(6px);user-select:none;pointer-events:none' : ''}" ${n > L ? 'aria-hidden="true"' : ''}>${UNLOCKS[n]}</span></div>${barHtml(n)}`).join('')
       + (L >= 19 && L < 35 && deps.impNeed ? `<div class="meta" style="margin:6px 0 0;color:#7dd3ff">🎯 Към ниво ${Math.max(21, L + 1)}: ${deps.impNeed(Math.max(21, L + 1))}</div>` : '');
     const nxt = THRESH[d.lv];
     deps.modal(`🏢 Ниво на развитие на фирмата · ${L}`, `Всеки твой град се развива отделно. Отключванията (градове, линии, Балканите, Европа, борса) идват от най-развития ти град; специалистите — от нивото на текущия град.<br>Опит: <b>${Math.round(d.xp)} XP</b>${nxt != null ? ` · до ниво ${d.lv + 1}: ${Math.round(nxt - d.xp)} XP` : ' · максимално ниво'}<br>
       <span style="color:var(--mut)">XP: къща ${XP.house}, магазин ${XP.shop}, офис ${XP.office}, небостъргач ${XP.tower}, жп линия ${XP.rail}, участък магистрала ${XP.highway}, филиал ${XP.branch}, куест ${XP.quest}.</span><br><br>${deps.playSummary ? deps.playSummary() + '<br>' : ''}${rows}`, [['Затвори', null]]);
+    // на живо: лентите се обновяват всяка секунда, докато прозорецът е отворен
+    clearInterval(dvTimer); dvTimer = setInterval(() => { const els = document.querySelectorAll('[data-dvn]'); if (!els.length) { clearInterval(dvTimer); return; }
+      for (const e of els) { const n = +e.dataset.dvn, p = prog(n); e.style.width = (p.k * 100).toFixed(1) + '%'; e.style.background = p.k >= 1 ? '#43d17a' : 'linear-gradient(90deg,#c9a14a,#ffd54a)'; const t = document.querySelector(`[data-dvt="${n}"]`); if (t && t.textContent !== p.t) t.textContent = p.t; } }, 1000);
   }
   return { cityUp, add, level, best, has, offerMul, offersOpen, stocksOpen, render, open, XP };
 }
