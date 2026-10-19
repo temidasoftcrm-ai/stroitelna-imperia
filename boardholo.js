@@ -248,9 +248,12 @@ export function createHolo(scene, { fmt = n => Math.round(n).toLocaleString('bg-
     vehicleBanner(g, p, H + 0.2, 1.35); stockChart(g, p, H + 0.12);
   }
 
+  // 🏦 кредит: рейтингът се чете и от текста („— рейтинг A“), ако geo няма rating
+  const RCOL = r => /^AA?A?$/.test(r) ? '#5fe39a' : /^BBB$/.test(r) ? '#ffd54a' : /^BB?$/.test(r) ? '#ffb347' : '#ff6b6b';
   function show(p) {
     token++; flashT = 0;
     if (!p) { clear(); return; }
+    if (p.geo && !p.geo.rating && /^bank:loan/.test(p.id || '')) { const m = String(p.text || '').match(/рейтинг\s+([A-D]{1,3}[+-]?)/); if (m) p = { ...p, geo: { ...p.geo, kind: 'loan', rating: m[1], ratingCol: RCOL(m[1]), amt: p.geo.amt || (String(p.text).match(/иска\s+([\d\s,.]+)\s*(млн|млрд)/) ? null : null) } }; }
     if (p.info) globe(p);
     else if (p.geo && p.geo.country) country(p);
     else {   // без география — символът на дружеството и сумата

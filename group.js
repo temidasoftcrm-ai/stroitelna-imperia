@@ -209,7 +209,7 @@ export function createGroup(deps) {
           const v = box.querySelector(`[data-gpv="${CSS.escape(id)}"]`); if (!v) return;
           v.innerHTML = `<div style="margin:8px 0 0;padding:8px;border-radius:8px;background:rgba(255,255,255,.04)">${B2.voteHtml(r)}</div>`;
           if (r.p && r.p.mustVote && !(r.v.yes > r.v.no)) v.querySelectorAll('[data-bv$="|pass"], [data-bv$="|small"], [data-bv$="|loan"]').forEach(b => b.remove());   // мегапроект без мнозинство — не минава
-          v.querySelectorAll('[data-bv]').forEach(x => x.onclick = () => { const [i2, how] = x.dataset.bv.split('|'); B2.resolve(i2, how === 'pass' && r.p && r.p.isSmall ? 'small' : how); rerender(); });
+          v.querySelectorAll('[data-bv]').forEach(x => x.onclick = () => { const [i2, how] = x.dataset.bv.split('|'); B2.resolve(i2, how === 'pass' && r.p && r.p.isSmall ? 'small' : how, r.v); rerender(); });
           return;
         }
       } else decide(id, a);
@@ -272,7 +272,7 @@ export function createGroup(deps) {
       report: deps.board2 ? () => deps.board2().reportHtml() : null, bindReport: (box, rr) => deps.board2().bindSettings(box, () => { rr(); re(); }),
       speech: deps.board2 ? () => deps.board2().bankSpeech() : null, frame: deps.board2 ? () => deps.board2().frame() : null, summary: deps.board2 ? () => deps.board2().summary() : null,
       voteOn: deps.board2 ? id => { const p = proposals().find(q => q.id === id), B2 = deps.board2(); return p && B2.vote ? shake({ v: B2.vote(p), p }) : null; } : null,   // 🗳️ собственикът сам подлага предложение на гласуване
-      onResolve: (id, how) => { const r = deps.board2().resolve(id, how); re(); return r; },
+      onResolve: (id, how, shown) => { const r = deps.board2().resolve(id, how, shown); re(); return r; },   // shown — показаният вот (без преизчисляване)
       settings: deps.board2 ? () => deps.board2().settingsHtml() : null, bindSettings: (box, rr) => deps.board2().bindSettings(box, () => { rr(); re(); }) }));
   }
   return { dirEv, dirPanel, bindPanels, check, winHtml, bind, board, proposals, decide, dailyTick, dailyBonus, upgrade, hire, found, canFound };
