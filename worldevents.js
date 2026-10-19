@@ -3,6 +3,7 @@
 // (по-често град, в който имаш филиал) и държавата обявява търг за обекта: стадион, олимпийски стадион, изложбен център, басейн, зала.
 // Строи се като обикновена държавна поръчка (tenders.js), но срокът е до откриването — а ако обектът е твой и е готов навреме,
 // при откриването получаваш дял от билетите и репутация. Ид на търга: ev-<ключ>-<издание>-<град>; записът — S.wev = { [ключ]: издание }.
+import { wcStadium } from './stadiums.js';   // световното по футбол — известният стадион на домакина (Лабораторията → st-*)
 const Y = 365;
 export const WORLD_EVENTS = [
   { key: 'wc', ico: '⚽', nm: 'Световно първенство по футбол', every: 4 * Y, off: 3 * Y, kind: 'stadium', size: [3, 4], budget: 160e6, days: 130, dev: 12, rep: 4.5, share: 0.18,
@@ -28,7 +29,7 @@ export function evTender(id, cityName = c => c) {
   const E = byKey(m[1]); if (!E) return null;
   const ed = +m[2], city = m[3], at = E.off + ed * E.every, open = at + EV_OPEN + E.days + EV_GAP;   // at — денят на обявяването
   const mul = 0.85 + (city.length % 5) * 0.08;
-  return { id, city, kind: E.kind, variant: E.variant, size: E.size, ico: E.ico, ev: E.key, evDay: open, share: E.share,
+  return { id, city, kind: E.kind, variant: E.variant || (E.key === 'wc' ? wcStadium(city) : undefined), size: E.size, ico: E.ico, ev: E.key, evDay: open, share: E.share,
     nm: `${E.nm} ${yearOf(open)} — ${cityName(city)}`, budget: Math.round(E.budget * mul / 1e6) * 1e6, days: E.days, rep: E.rep, dev: E.dev, need: E.need, matShare: 0.55, sign: E.sign,
     ds: `${E.ico} ${cityName(city)} е домакин на ${E.nm.replace(/^./, c => c.toLowerCase())} ${yearOf(open)}! Трябва ${E.what} — откриването е на ден ${open} и не може да се отложи. Ако обектът е твой и е готов навреме, получаваш ${Math.round(E.share * 100)}% от бюджета от билетите и +0.5 ★.` };
 }

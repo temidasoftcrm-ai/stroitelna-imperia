@@ -219,3 +219,9 @@ blocks2/pp-sky.glb — "Skyscraper" by Jarlan Perez, CC-BY — https://poly.pizz
 - construct/sf-skip.glb — "Old rubbish Skip" by sousinho (CC-BY 4.0) — https://sketchfab.com/3d-models/2f9aa03ede3a46a0888e76fed382667f
 - construct/sf-drums.glb — "Oil Drums" by OliverTriplet (CC-BY 4.0) — https://sketchfab.com/3d-models/f98003d19cd247f8aa4daad50c28512a
 - construct/sf-mixer.glb — "Concrete Mixer Truck" by doty_aecom (CC-BY 4.0) — https://sketchfab.com/3d-models/8d1d88a5955f4e7da13562bb7bec146f
+- stadium2/sf-bernabeu.glb — "santiago bernabeu" by mikmikoni (CC-BY 4.0) — https://sketchfab.com/3d-models/efb96fe1eb004570b5bde1cad0e3272f (олекотен, текстурите 1024 px, WebP)
+- stadium2/sf-stadefrance.glb — "Stade De France_SA" by sfikhoza (CC-BY 4.0) — https://sketchfab.com/3d-models/14ffaa3b75a0401fa4b37884d08335ff (олекотен, текстурите 1024 px, WebP)
+- stadium2/sf-maracana.glb — "Maracanã" by rodskvk (CC-BY 4.0) — https://sketchfab.com/3d-models/b7576c1cdb574cd9bf5fe0bc3de141d5 (олекотен, текстурите 1024 px, WebP)
+- stadium2/sf-bombonera.glb — "La Bombonera (Boca Juniors)" by al1905 (CC-BY 4.0) — https://sketchfab.com/3d-models/82204c5963b84ac593c26127ac36fbfa (олекотен, текстурите 1024 px, WebP)
+- stadium2/sf-azteca.glb — "Estadio-Azteca low-poly stadium" by journeyk (CC-BY 4.0) — https://sketchfab.com/3d-models/3cb9d042e5374e2f96e4ffea703084b7 (олекотен, текстурите 1024 px, WebP)
+- stadium2/sf-alwakrah.glb — "Al Wakrah Stadium" by yu.gi_oh201 (CC-BY 4.0) — https://sketchfab.com/3d-models/d7452e247d55493e8e6a9c086a4eafe6 (олекотен, текстурите 1024 px, WebP)
