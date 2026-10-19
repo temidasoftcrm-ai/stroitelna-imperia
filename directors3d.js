@@ -12,7 +12,9 @@ import { buildPresRoom } from './presrooms.js';   // 🇺🇸/🇷🇺 през�
 import { createRoomSound } from './roomsound.js';   // шум на залата, хартия, чукче, аплодисменти, говор на глас
 
 const DIR = 'assets/heavy/directors/';
-const SIT_HIP = [0, -1, -57];   // ханшът в седнала поза (единиците на скелета, см) — по „Sit_Meeting“ / „Sit_Breathing“
+const SIT_HIP = [0, -1, -57];
+// поза в покой по директор (иначе — редуване по място): ръцете на масата или в скута
+const REST = { boris: ['Sit_Table_Idle'], elena: ['Sit_Table_Idle'], vera: ['Sit_Breathing'], georgi: ['Sit_Breathing'], maria: ['Sit_Table_Idle'], stefan: ['Sit_Breathing'], nadya: ['Sit_Table_Idle'], ivaylo: ['Sit_Table_Idle'], mayor: ['Sit_Breathing'], glob: ['Sit_Table_Idle'] };   // ханшът в седнала поза (единиците на скелета, см) — по „Sit_Meeting“ / „Sit_Breathing“
 // дружество → модел; хотелите (Георги Николов) още нямат модел — столът стои празен с табелката
 export const DIR_MODEL = { con: 'ivaylo', hw: 'nadya', rail: 'maria', sea: 'stefan', air: 'elena', hotel: 'georgi', oil: 'vera', bank: 'boris', glob: 'glob', mayor: 'mayor' };
 const TEMP_MODEL = { mayor: 'maria', glob: 'ivaylo' };   // временен аватар, докато потребителят направи истинския в Meshy
@@ -86,7 +88,7 @@ const css = `
 const loader = new GLTFLoader();
 const cache = {};
 const CLIPS_V = 3;   // вдигни, когато clips.glb се смени (иначе браузърът пази стария)
-const MODEL_V = { elena: 2 };   // вдигни за директор, чийто .glb е сменен (поправените модели — иначе браузърът пази стария)
+const MODEL_V = { elena: 3, maria: 2, mayor: 2, nadya: 2, vera: 2, boris: 2, georgi: 2, glob: 2, ivaylo: 2, stefan: 2 };   // вдигни за директор, чийто .glb е сменен (поправените модели — иначе браузърът пази стария)
 const loadGlb = n => cache[n] || (cache[n] = loader.loadAsync(DIR + n + '.glb' + (n === 'clips' ? `?v=${CLIPS_V}` : MODEL_V[n] ? `?v=${MODEL_V[n]}` : '')));
 // от клиповете остават само ротациите + позицията на ханша (останалото е от скелета на Вера и би изкривило другите)
 let clipsP = null;
@@ -445,9 +447,13 @@ export function openBoardroom(o) {
       const [side, z] = SEATS[s.si];
       const fem = FEMALE.has(mk);
       const mixer = new THREE.AnimationMixer(m);
-      const base = pick(fem ? 'Sit_Meeting_F' : 'Sit_Meeting_M', 'Sit_Table_Idle')[0];
+      // покой: ръцете почиват — на масата („Sit_Table_Idle“) или в скута / на облегалката („Sit_Breathing“); различно за всеки директор
+      // (вид, темпо, начален кадър). Жестовете („Sit_Meeting_*“, „Sit_Talk_*“) — само докато директорът говори, после обратно в покой.
+      const rest = pick(...(REST[mk] || (i % 3 === 1 ? ['Sit_Breathing', 'Sit_Table_Idle'] : ['Sit_Table_Idle', 'Sit_Breathing'])));
+      const base = rest[0];
       const p = { s, i, m, mixer, side, z, fem, base: mixer.clipAction(base), cur: null, busy: 0 };
-      p.talk = pick('Sit_Talk_M', 'Sit_Table_Ask', fem ? 'Sit_Meeting_F' : 'Sit_Talk_2').map(c => mixer.clipAction(c));
+      p.base.timeScale = 0.85 + ((i * 37) % 10) / 33;
+      p.talk = pick('Sit_Talk_M', 'Sit_Table_Ask', fem ? 'Sit_Meeting_F' : 'Sit_Meeting_M', fem ? 'Sit_Talk_2' : 'Sit_Talk_M').map(c => mixer.clipAction(c));
       p.point = pick('Sit_Point_Forward', 'Sit_Point').map(c => mixer.clipAction(c));
       [p.raise, p.nay, p.clap] = ['Sit_Raise_Hand', 'Sit_Disapprove', 'Sit_Clap'].map(n => clips[n] ? mixer.clipAction(clips[n]) : null);   // гласуването (Mixamo): вдигната ръка, клатене на пръст, ръкопляскане
       p.base.play(); p.cur = p.base; mixer.update(Math.random() * base.duration);
@@ -460,7 +466,13 @@ export function openBoardroom(o) {
         wrap.position.x += seatX(s.si) - hp.x; wrap.position.z += z - hp.z; wrap.updateMatrixWorld(true);
         hips.getWorldPosition(hp); s.chair.position.set(hp.x + side * 0.06, THREE.MathUtils.clamp(hp.y - 0.58, -0.15, 0.15), hp.z);
       }
-      p.wrap = wrap; people.push(p);
+      p.wrap = wrap; p.restTable = base.name === 'Sit_Table_Idle'; p.ikW = p.restTable ? 1 : 0;
+      // ръцете на масата: в покой директорът се придърпва към масата (раменете ~18 см от ръба), столът — с него
+      if (p.restTable) { m.updateMatrixWorld(true); const la = m.getObjectByName('mixamorigLeftArm'), ra = m.getObjectByName('mixamorigRightArm');
+        if (la && ra) { const a = new THREE.Vector3(), b = new THREE.Vector3(); la.getWorldPosition(a); ra.getWorldPosition(b); a.add(b).multiplyScalar(0.5);
+          const hx = TABLE_W / 2, hz = TABLE_L / 2, P = new THREE.Vector3(THREE.MathUtils.clamp(a.x, -hx, hx), 0, THREE.MathUtils.clamp(a.z, -hz, hz)), d = new THREE.Vector3(P.x - a.x, 0, P.z - a.z), L = d.length();
+          if (L > 0.2) { d.multiplyScalar((L - 0.18) / L); wrap.position.add(d); s.chair.position.add(d); wrap.updateMatrixWorld(true); } } }
+      people.push(p);
     }));
     el.querySelector('.load').style.opacity = 0; snd.ambience(true);
     mergeStatic(scene, new Set([holo.root, ...people.map(p => p.wrap)].filter(Boolean)));   // ~500 draw calls → под 150
@@ -475,6 +487,26 @@ export function openBoardroom(o) {
     if (once) p.busy = a.getClip().duration - 0.5;
   }
   const back = p => { p.busy = 0; play(p, p.base); };
+  // ✋ ръцете в покой — върху масата: малко IK (CCD, мишница + предмишница) към точка над плота под китката; плавно се изключва,
+  // докато директорът жестикулира (говори, гласува, ръкопляска) и се включва, когато се върне в покой
+  const ikA = new THREE.Vector3(), ikB = new THREE.Vector3(), ikT = new THREE.Vector3(), ikQ = new THREE.Quaternion(), ikP = new THREE.Quaternion(), ikW0 = new THREE.Quaternion();
+  function restIK(p, dt) {
+    if (!p.restTable) return; p.ikW += ((p.cur === p.base ? 1 : 0) - p.ikW) * Math.min(1, dt * 3); if (p.ikW < 0.02) return;
+    p.m.updateMatrixWorld(true);
+    for (const S0 of ['Left', 'Right']) {
+      const arm = p.m.getObjectByName(`mixamorig${S0}Arm`), fore = p.m.getObjectByName(`mixamorig${S0}ForeArm`), hand = p.m.getObjectByName(`mixamorig${S0}Hand`); if (!arm || !fore || !hand) continue;
+      hand.getWorldPosition(ikT); ikT.x = THREE.MathUtils.clamp(ikT.x, -TABLE_W / 2 + 0.1, TABLE_W / 2 - 0.1); ikT.z = THREE.MathUtils.clamp(ikT.z, -TABLE_L / 2 + 0.1, TABLE_L / 2 - 0.1); ikT.y = TABLE_H + 0.035;
+      for (let it = 0; it < 3; it++) for (const b of [fore, arm]) {
+        b.getWorldPosition(ikA); hand.getWorldPosition(ikB); const v1 = ikB.sub(ikA).normalize(), v2 = ikT.clone().sub(ikA).normalize();
+        ikQ.setFromUnitVectors(v1, v2); ikQ.slerp(ikW0.identity(), 1 - Math.min(1, p.ikW)); b.getWorldQuaternion(ikP); ikP.premultiply(ikQ);
+        b.parent.getWorldQuaternion(ikQ); b.quaternion.copy(ikQ.invert().multiply(ikP)); b.updateMatrixWorld(true);
+      }
+      // дланта — легнала на плота: пръстите напред (по посоката на предмишницата), не нагоре
+      const fin = p.m.getObjectByName(`mixamorig${S0}HandMiddle1`); if (fin) { hand.getWorldPosition(ikA); fin.getWorldPosition(ikB); fore.getWorldPosition(ikT);
+        const cur = ikB.sub(ikA).normalize(), want = ikA.clone().sub(ikT); want.y = Math.min(want.y, 0) * 0.15 - 0.08 * want.length(); want.normalize();
+        ikQ.setFromUnitVectors(cur, want); ikQ.slerp(ikW0.identity(), 1 - Math.min(1, p.ikW)); hand.getWorldQuaternion(ikP); ikP.premultiply(ikQ); hand.parent.getWorldQuaternion(ikQ); hand.quaternion.copy(ikQ.invert().multiply(ikP)); hand.updateMatrixWorld(true); }
+    }
+  }
 
   // картата с доклада
   const f = n => (o.fmt ? o.fmt(Math.round(n)) : Math.round(n).toLocaleString('bg-BG'));
@@ -697,11 +729,11 @@ export function openBoardroom(o) {
     // от време на време някой взима думата
     nextChat -= dt;
     if (nextChat <= 0 && people.length) {
-      nextChat = 5 + Math.random() * 7;
+      nextChat = 9 + Math.random() * 9;   // по-рядко: жестовете — само на говорещия
       const free = people.filter(p => p.busy <= 0 && p.i !== sel); const p = free[(Math.random() * free.length) | 0];
       if (p) play(p, p.talk[(Math.random() * p.talk.length) | 0], true);
     }
-    for (const p of people) { p.mixer.update(dt); if (p.busy > 0 && (p.busy -= dt) <= 0) back(p); }
+    for (const p of people) { p.mixer.update(dt); if (p.busy > 0 && (p.busy -= dt) <= 0) back(p); restIK(p, dt); }
     placeScreen(dt); placeBadges(); holo.update(dt); camStep(dt); R.update && R.update(clock.elapsedTime); ctl.update();
     if (cam.position.y > ROOM_H - 0.3) cam.position.y = ROOM_H - 0.3;   // камерата — под тавана
     cam.position.x = Math.max(-ROOM_W + 1.4, Math.min(ROOM_W - 1.4, cam.position.x)); cam.position.z = Math.max(ROOM_BACK + 1.2, Math.min(ROOM_FRONT - 0.8, cam.position.z));   // и в залата — пред завесите, не в стените
