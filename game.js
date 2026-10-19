@@ -31,6 +31,7 @@ import { createWeather, rollWeather } from './weather.js';
 import { bidHtml, resolveBid } from './bidding.js';
 import { addSiteLights, setSiteLightsNight } from './sitelights.js';
 import { createHwTraffic } from './hwtraffic.js';
+import { createTraffic, gridNetwork } from './traffic.js';
 import { createIncidents } from './incidents.js';
 import { createBoardLogic } from './boardlogic.js';
 import { addRouteScenery } from './scenery.js';
@@ -1548,7 +1549,19 @@ function addCar() {
   const rp = roadPoint();
   { const b = new THREE.Box3().setFromObject(o), sz = b.getSize(new THREE.Vector3()); traffic.push({ obj: o, x: rp ? rp.x : tx(i), z: rp ? rp.z : tx(j), yaw: 0, path: null, pi: 0, wait: 0, len: Math.max(sz.x, sz.z) }); }   // len — дистанцията до колата отпред
 }
+// Лабораторията → traffic2: новият трафик (traffic.js) — ленти, дистанция, кръстовища с фази; засега по решетката (не в градовете с план)
+let tr2 = null;
+const tr2On = () => feature('traffic2') && !city.plan;
+function traffic2Make() {
+  if (tr2) tr2.clear();
+  tr2 = createTraffic({ scene, drive: 'right', maxCars: wantedTraffic(),
+    net: gridNetwork({ NBI, NBJ, tx, isRoad, TILE, signal: (i, j) => signals.some(s => s.i === i && s.j === j) }),
+    makeCar: () => { addCar(); const t = traffic.pop(); return t ? { obj: t.obj, len: t.len || 4.5, kind: 'car' } : null; },
+    onSignal: (n, v) => { const s = sigMap.get(n.id); if (!s || !v) return; for (const h of s.heads) { const mine = h.axis === v.axis && !v.red; h.gr.visible = mine && !v.yellow; h.y.visible = mine && v.yellow; h.r.visible = !mine; } } });
+}
 function spawnTraffic(n) {
+  if (tr2On()) { incidents.clear(); for (const t of traffic) scene.remove(t.obj); traffic.length = 0; if (sigMap.size !== signals.length) sigMap = new Map(signals.map(s => [sigKey(s.i, s.j), s])); traffic2Make(); return; }
+  if (tr2) { tr2.clear(); tr2 = null; }
   incidents.clear();
   for (const t of traffic) scene.remove(t.obj);
   traffic.length = 0;
@@ -1608,6 +1621,7 @@ let sigMap = new Map();
 // фаза: 0 = зелено ns, 1 = жълто ns, 2 = зелено ew, 3 = жълто ew
 const sigPhase = s => { const T = (SIG_GREEN + SIG_YELLOW) * 2, t = s.t % T; return t < SIG_GREEN ? 0 : t < SIG_GREEN + SIG_YELLOW ? 1 : t < 2 * SIG_GREEN + SIG_YELLOW ? 2 : 3; };
 function updateSignals(dt) {
+  if (tr2 && tr2On()) return;   // traffic2 — фазите са в traffic.js
   if (sigMap.size !== signals.length) sigMap = new Map(signals.map(s => [sigKey(s.i, s.j), s]));
   for (const s of signals) {
     s.t += dt;
@@ -1720,6 +1734,7 @@ function updatePeds(dt) {
   }
 }
 function updateTraffic(dt) {
+  if (tr2 && tr2On()) { tr2.opts.maxCars = wantedTraffic(); const t0 = performance.now(); tr2.update(dt); tr2.ms = (tr2.ms || 0) * 0.95 + (performance.now() - t0) * 0.05; return; }   // traffic2: светофарите се управляват оттам
   if (S && traffic.length < wantedTraffic() && Math.random() < dt * 0.5) addCar();   // градът расте → идват още коли
   const obst = window.__noAvoid ? [] : [...traffic, ...(incidents.obstacles?.() || [])];   // колите и спешните на инцидента — за спиране и заобикаляне
   for (const t of traffic) {
@@ -9273,6 +9288,7 @@ if (AUTOTEST) {
       const names = [...HOUSES, ...SHOPS, ...MODERN, ...SF_BLK(), 'Building_Small_1', 'Building_Medium_2_001', ...SKY.flatMap(n => [10, 15, 20].map(f => `${n}@${f}`)), ...MODERN_SKY.flatMap(n => [20, 30, 40].map(f => `${n}@${f}`)), ...SF_SKY()].filter(n => A[n]);
       const out = {}; for (const n of names) { const lot = { id: 0, x: 9e3, z: 9e3, plan: true, w, d: w, rot: 0 }; const o = placeBuilding(lot, n) || lot.obj || city.group.children.at(-1); const b = new THREE.Box3().setFromObject(o); out[n] = [Math.round(b.max.y - b.min.y), Math.round(Math.max(b.max.x - b.min.x, b.max.z - b.min.z))]; city.group.remove(o); }
       return out; },
+    tr2: () => tr2 && { ...tr2.stats(), ms: tr2.ms },
     trafficOverlap() { let n = 0; for (let a = 0; a < traffic.length; a++) for (let b = a + 1; b < traffic.length; b++) if (Math.hypot(traffic[a].x - traffic[b].x, traffic[a].z - traffic[b].z) < 2.5) n++; return { cars: traffic.length, overlap: n, waiting: traffic.filter(t => t.block > 0).length, overtaking: traffic.filter(t => t.ov > 0).length }; },   // тест: застъпени коли
     hubOpen() { const S = __dbg.state(); S.dev.lv = 14; S.dev.xp = 3e6; S.branches = [...new Set([...(S.branches || []), 'plovdiv', 'varna'])]; updFlowBtns(); setTimeout(() => $('btnHub')?.click(), 1500); return !!$('btnHub'); },
     parkTest2() { econ.earn(5e6, 'друго', 'тест'); const l = city.lots.find(x => !x.built && !x.busy && x !== city.hq); est().land.push(l.id); l.busy = 'land'; buildPark(l.id); const p = projects.find(q => q.park && q.lot === l.id); return { lot: l.id, started: !!p, stage: p?.stage, prog: p?.prog }; },
