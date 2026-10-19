@@ -153,6 +153,61 @@ function romeLm(L) {
   if (!fit()) { const t = setInterval(() => { if (fit()) clearInterval(t); }, 500); setTimeout(() => clearInterval(t), 30000); }
 }
 let put = () => {};
+// ---- градска среда (инстанции; дребното се крие отдалеч): улични лампи (римски фенери), платани по кейовете, светофари по фазите
+// на трафика (traffic.js → tr.signals), знаци „Стоп“ на второстепенните, пейки и кошчета по площадите, фонтани, спирки
+let FURN = null, SIG = [];
+function furniture() {
+  FURN = new THREE.Group(); city.add(FURN); SIG = [];
+  const stone = M(0x8a8478), iron = M(0x2a2c2e), lampG = new THREE.MeshStandardMaterial({ color: 0xfff1c8, emissive: 0xffd88a, emissiveIntensity: 0.2 });
+  const lamps = [], trees = [], benches = [], bins = [], stops = [], signs = [], fountains = [], at = (rd, s) => { const L = rd.L; let i = 1; while (i < L.length - 1 && L[i] < s) i++; const a = rd.pts[i - 1], b = rd.pts[i], t = (s - L[i - 1]) / ((L[i] - L[i - 1]) || 1), l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, (b[0] - a[0]) / l, (b[1] - a[1]) / l]; };
+  const nearNode = (x, z) => P.nodes.some(n => n.arms.length >= 3 && Math.abs(n.x - x) < 30 && Math.abs(n.z - z) < 30 && Math.hypot(n.x - x, n.z - z) < (n.r || 6) + 4);
+  for (const rd of P.roads) {
+    const T = rd.L[rd.L.length - 1], main = rd.cls !== 'street', step = rd.cls === 'quay' ? 24 : main ? 28 : 40, sides = main ? [1, -1] : [1];
+    for (let s = 10; s < T - 6; s += step) { const [x, z, ux, uz] = at(rd, s); for (const sg of sides) { const o = rd.w / 2 + rd.walk - 0.5, px = x - uz * o * sg, pz = z + ux * o * sg; if (!nearNode(px, pz)) lamps.push([px, pz]); } }
+    if (rd.median) for (let s = 14; s < T - 10; s += 30) { const [x, z] = at(rd, s); if (!nearNode(x, z)) trees.push([x, z, 7]); }   // дървета по разделителната ивица
+    if (rd.cls === 'quay' || (P.osm && rd.cls === 'blvd')) for (let s = 6; s < T - 6; s += 11) { const [x, z, ux, uz] = at(rd, s); for (const sg of [1, -1]) { const o = rd.w / 2 + rd.walk * 0.55, px = x - uz * o * sg, pz = z + ux * o * sg; if (!nearNode(px, pz) && !(P.waterAt && P.waterAt(px, pz))) trees.push([px, pz, 11]); } }   // платаните по Лунготевере
+    if (main && T > 120) for (let s = 60; s < T - 40; s += 260) { const [x, z, ux, uz] = at(rd, s), o = rd.w / 2 + rd.walk - 1.2; stops.push([x - uz * o, z + ux * o, Math.atan2(ux, uz)]); }   // спирки (с навес)
+  }
+  // площадите на забележителностите: пейки, кошчета, фонтан
+  for (const L of P.lots.filter(q => q.lm || q.big === 'park')) { const R0 = Math.max(L.w, L.d) / 2 + (L.guard || 4) - 2;
+    for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2, x = L.x + Math.cos(a) * R0, z = L.z + Math.sin(a) * R0; (k % 3 ? benches : bins).push([x, z, a + Math.PI / 2]); }
+    if (['navona', 'popolo', 'trevi', 'spanishsteps'].includes(L.lm) || L.big === 'park') fountains.push([L.x, L.z]); }
+  // знаци „Стоп“ на второстепенните клонове без светофар
+  for (const n of P.nodes) { if (n.ctrl !== 'yield' || n.kind === 'round') continue; for (const a of n.arms) if (!a.prio && a.stop) { const rd = P.roads[a.road], p = a.stop[1]; signs.push([p[0] + Math.sin(a.angle) * 0.8, p[1] - Math.cos(a.angle) * 0.8, -a.angle + Math.PI / 2]); } }
+  const inst = (geo, mat, list, f, shadow = false) => { if (!list.length) return null; const im = new THREE.InstancedMesh(geo, mat, list.length), m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), v = new THREE.Vector3(), sc = new THREE.Vector3();
+    list.forEach((it, i) => { f(it, v, q, sc, up); im.setMatrixAt(i, m.compose(v, q, sc)); }); im.castShadow = shadow; im.frustumCulled = false; FURN.add(im); return im; };
+  const P1 = (x, y, z) => (it, v, q, sc, up) => { v.set(it[0], y, it[1]); q.setFromAxisAngle(up, it[2] || 0); sc.set(1, 1, 1); };
+  inst(new THREE.CylinderGeometry(0.09, 0.14, 4.6, 6).translate(0, 2.3, 0), iron, lamps, P1(0, 0, 0), true);   // стълб
+  inst(new THREE.CylinderGeometry(0.32, 0.18, 0.7, 6).translate(0, 4.75, 0), lampG, lamps, P1(0, 0, 0)).userData.lamp = 1;   // фенерът (свети нощем)
+  inst(new THREE.CylinderGeometry(0.22, 0.32, 1, 6).translate(0, 0.5, 0), M(0x6b5a44), trees, (it, v, q, sc) => { v.set(it[0], 0, it[1]); q.identity(); sc.set(1, it[2] * 0.4, 1); }, true);
+  inst(new THREE.IcosahedronGeometry(1, 1), M(0x5d8a3e), trees, (it, v, q, sc) => { v.set(it[0], it[2] * 0.62, it[1]); q.identity(); sc.set(it[2] * 0.33, it[2] * 0.28, it[2] * 0.33); }, true);
+  inst(new THREE.BoxGeometry(1.8, 0.45, 0.55).translate(0, 0.45, 0), M(0x6d4c33), benches, P1(0, 0, 0), true);
+  inst(new THREE.CylinderGeometry(0.28, 0.24, 0.9, 8).translate(0, 0.45, 0), iron, bins, P1(0, 0, 0));
+  inst(new THREE.BoxGeometry(3.2, 0.12, 1.4).translate(0, 2.6, 0), new THREE.MeshStandardMaterial({ color: 0x9fc0d8, transparent: true, opacity: 0.55 }), stops, P1(0, 0, 0));   // навесът на спирката
+  inst(new THREE.BoxGeometry(3.2, 2.5, 0.06).translate(0, 1.3, -0.65), new THREE.MeshStandardMaterial({ color: 0xcfe0ea, transparent: true, opacity: 0.35 }), stops, P1(0, 0, 0));
+  inst(new THREE.CylinderGeometry(0.05, 0.05, 2.4, 5).translate(0, 1.2, 0), iron, signs, P1(0, 0, 0));
+  inst(new THREE.CylinderGeometry(0.42, 0.42, 0.06, 8).rotateX(Math.PI / 2).translate(0, 2.35, 0), M(0xc8202a), signs, P1(0, 0, 0));   // „Стоп“
+  for (const [x, z] of fountains) { const f = new THREE.Group(), b = new THREE.Mesh(new THREE.CylinderGeometry(4, 4.4, 0.8, 24), M(0xd8cdb4)), w = new THREE.Mesh(new THREE.CircleGeometry(3.6, 24).rotateX(-Math.PI / 2), MAT.wet), c = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 3, 10), M(0xd8cdb4)), t = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 0.5, 0.5, 14), M(0xd8cdb4));
+    b.position.y = 0.4; w.position.y = 0.75; c.position.y = 2; t.position.y = 3.4; f.add(b, w, c, t); f.position.set(x, 0, z); f.traverse(o => { if (o.isMesh) o.castShadow = true; }); FURN.add(f); }
+  // светофари: стълб вдясно преди стоп линията и глава с 3 лампи; лампите — по фазата на клона (lightsUpdate)
+  const heads = []; for (const n of P.nodes) { if (n.ctrl !== 'signal') continue; n.arms.forEach((a, ai) => { if (!a.stop) return; const p = a.stop[1], ox = Math.cos(a.angle), oz = Math.sin(a.angle); heads.push({ node: n.id, arm: ai, x: p[0] + ox * 0.6 - oz * 0.9, z: p[1] + oz * 0.6 + ox * 0.9, rot: Math.atan2(ox, oz) }); }); }
+  if (heads.length) {
+    inst(new THREE.CylinderGeometry(0.07, 0.09, 3.4, 6).translate(0, 1.7, 0), iron, heads.map(h => [h.x, h.z]), P1(0, 0, 0), true);
+    inst(new THREE.BoxGeometry(0.42, 1.1, 0.32).translate(0, 3.5, 0), M(0x1e2022), heads.map(h => [h.x, h.z, h.rot]), P1(0, 0, 0));
+    const bulbs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.12, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }), heads.length * 3), m = new THREE.Matrix4(), c = new THREE.Color(0x333333);
+    heads.forEach((h, i) => [3.85, 3.5, 3.15].forEach((y, k) => { bulbs.setMatrixAt(i * 3 + k, m.makeTranslation(h.x + Math.sin(h.rot) * 0.17, y, h.z + Math.cos(h.rot) * 0.17)); bulbs.setColorAt(i * 3 + k, c); }));
+    bulbs.frustumCulled = false; FURN.add(bulbs); SIG = { heads, bulbs };
+  }
+}
+const SIG_C = { red: [0xff2a20, 0x2a1210, 0x0f2010], yellow: [0x2a1210, 0xffc020, 0x0f2010], green: [0x2a1210, 0x2a2410, 0x30ff60] }, SC = new THREE.Color();
+let sigT = 0;
+function lightsUpdate() {
+  if (FURN) FURN.visible = cam.position.y < 420;   // дребното — само отблизо
+  if (!SIG.heads || !tr || !tr.signals) return; if ((sigT = (sigT + 1) % 6)) return;   // фазите — на всеки 6 кадъра
+  const byNode = new Map(); for (const s2 of tr.signals()) byNode.set(s2.node, s2.arms || {});
+  SIG.heads.forEach((h, i) => { const st = (byNode.get(h.node) || {})[h.arm], go = st ? st.go : 'red', cols = SIG_C[go] || SIG_C.red; for (let k = 0; k < 3; k++) SIG.bulbs.setColorAt(i * 3 + k, SC.setHex(cols[k])); });
+  SIG.bulbs.instanceColor.needsUpdate = true;
+}
 let VIT_ROT = Math.PI / 2;   // стълбите — на север, към Пиаца Венеция (колонадата отзад)
 // Тибърът: коритото е 7 м под улиците — земята е с дупка по реката, отвесни каменни стени (травертин), водата долу; мостовете — на нивото на улицата, с арки до водата
 const RIV_D = 7, TRAV = 0xd8cdb4;
@@ -338,7 +393,7 @@ function build() {
     trees.forEach(([x, z, h], i) => { T1.setMatrixAt(i, m.compose(new THREE.Vector3(x, 0, z), new THREE.Quaternion(), new THREE.Vector3(1, h * 0.45, 1))); T2.setMatrixAt(i, m.compose(new THREE.Vector3(x, h * 0.55, z), new THREE.Quaternion(), new THREE.Vector3(h * 0.3, h * 0.3, h * 0.3))); });
     T2.castShadow = true; T1.frustumCulled = T2.frustumCulled = false; city.add(T1, T2);
   }
-  spawnCars(); stats(); view(viewMode);
+  spawnCars(); furniture(); stats(); view(viewMode);
 }
 
 // ---- движение: всяка кола върви по лента до стоп линията, после завой (или кръговото) към друг клон; без сблъсъци (те са част C — 2a)
@@ -380,7 +435,7 @@ function spawnCars() {   // колите — трафикът на 2a (traffic.j
   hlIM = new THREE.InstancedMesh(new THREE.BoxGeometry(1.4, 0.25, 0.1), new THREE.MeshBasicMaterial({ color: 0xfff6d0 }), cars.length); hlIM.frustumCulled = false; hlIM.visible = night; city.add(hlIM);
 }
 function moveCars(dt) {
-  if (tr) { tr.update(dt); for (const nm in carPools) for (const im of carPools[nm].ims) im.instanceMatrix.needsUpdate = true; return; }
+  if (tr) { tr.update(dt); lightsUpdate(); for (const nm in carPools) for (const im of carPools[nm].ims) im.instanceMatrix.needsUpdate = true; return; }
   for (const c of cars) {
     let left = c.sp * dt;
     while (left > 0) {
@@ -410,7 +465,7 @@ function view(m) {
   if (m === 'round') { ctl.target.set(r0.x, 0, r0.z); cam.position.set(r0.x + 45, 38, r0.z + 55); }
   ctl.update();
 }
-function setNight(on) { night = on; truckLamps().front.emissiveIntensity = truckLamps().rear.emissiveIntensity = on ? 1 : 0; document.getElementById('night').classList.toggle('on', on); hemi.intensity = on ? 0.18 : 1.2; sun.intensity = on ? 0.12 : 2.3; scene.background = new THREE.Color(on ? 0x0b1020 : 0x9fc9ee); if (hlIM) hlIM.visible = on; }
+function setNight(on) { night = on; if (FURN) FURN.traverse(o => { if (o.userData.lamp) o.material.emissiveIntensity = on ? 2.2 : 0.2; }); truckLamps().front.emissiveIntensity = truckLamps().rear.emissiveIntensity = on ? 1 : 0; document.getElementById('night').classList.toggle('on', on); hemi.intensity = on ? 0.18 : 1.2; sun.intensity = on ? 0.12 : 2.3; scene.background = new THREE.Color(on ? 0x0b1020 : 0x9fc9ee); if (hlIM) hlIM.visible = on; }
 let fps = 0, fr = 0, ft = performance.now();
 const T = { tr: 0, rn: 0, n: 0 };   // натрупано време: трафик, рисуване (CPU, ms)
 function stats() { const i = R.info; if (bench) return; document.getElementById('st').textContent = `${P.fam} · ${P.size} · ${P.stats.build} парцела + ${P.stats.big} големи · ${P.roads.length} пътя · ${P.rounds.length} кръгови\nплан: ${P.stats.ms} ms · ${tr ? (tr.stats().cars ?? '?') : cars.length} коли\nкадър: ${fps} fps · ${i.render.calls} draw calls · ${(i.render.triangles / 1000).toFixed(0)}k триъгълника · ${i.memory.geometries} геометрии · ${i.memory.textures} текстури\nтрафик ${(T.tr / Math.max(1, T.n)).toFixed(2)} ms · рисуване ${(T.rn / Math.max(1, T.n)).toFixed(2)} ms на кадър (CPU)`; T.tr = T.rn = T.n = 0; }
