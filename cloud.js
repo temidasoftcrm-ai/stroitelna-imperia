@@ -379,7 +379,8 @@ function regGate() {
   };
   stepEmail();
 }
-if (!AUTOTEST && feature('reg-gate') && (window.top === window || /[?&]gate/.test(location.search)))
+const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);   // на localhost (разработка) — без екрана, освен с ?gate
+if (!AUTOTEST && feature('reg-gate') && ((window.top === window && !LOCAL) || /[?&]gate/.test(location.search)))
   sb.auth.getSession().then(({ data }) => { if (!data?.session) { if (document.body) regGate(); else addEventListener('DOMContentLoaded', regGate); } });
 window.__regGate = regGate;
 window.__settings = openSettings;
