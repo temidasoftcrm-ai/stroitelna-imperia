@@ -45,7 +45,7 @@ import { buildUniversity, buildHospital, buildStadium, buildMetro, buildAirTermi
 import { buildGreatWall } from './greatwall3d.js';
 import { buildCivic, CIVIC_KINDS } from './civic3d.js';
 import { createMines, MINE_KINDS, GRID_NEED } from './mines.js';
-import { createGroup, BRANDS, groupName, brandOf, cleanBrand, subName, subLogo, FOUND, SUBS } from './group.js';
+import { createGroup, BRANDS, groupName, brandOf, cleanBrand, subName, subLogo, FOUND, SUBS, showDirectorOf } from './group.js';
 import { createOil } from './oil.js';
 import { createCorp, GLOBAL } from './corp.js';
 import { globProposals } from './globdir.js';
@@ -8013,7 +8013,7 @@ const branchOk = id => !ownedCities().includes(id) && !AIR_ONLY.has(id) && id !=
 const MAYOR = 'Десислава Илиева';
 const mayorName = () => { try { return S && S.holding && dev.best() >= 19 && (S.hold?.mayor || S.neom) ? MAYOR : ''; } catch { return ''; } };   // назначава се (S.hold.mayor); стар запис с основан град — вече е назначена
 const MAYOR_COST = 1e9;
-function hireMayor() { if (!S?.holding || dev.best() < 19 || mayorName()) return; if (!econ.canAfford(MAYOR_COST)) { toast(`Нямаш ${fmt(MAYOR_COST)} €.`, 'bad'); return; } econ.spend(MAYOR_COST, 'заплати', 'Холдинг: градоначалник на Империал Сити'); S.hold = S.hold || {}; S.hold.mayor = S.day; toast(`👩‍💼 ${MAYOR} е градоначалник на Империал Сити. Първата ѝ работа: да изберем държавата и да основем града, после — кварталите.`, 'good'); Sound.play('buy'); save(); }
+function hireMayor() { if (!S?.holding || dev.best() < 19 || mayorName()) return; if (!econ.canAfford(MAYOR_COST)) { toast(`Нямаш ${fmt(MAYOR_COST)} €.`, 'bad'); return; } econ.spend(MAYOR_COST, 'заплати', 'Холдинг: градоначалник на Империал Сити'); S.hold = S.hold || {}; S.hold.mayor = S.day; try { showDirectorOf('mayor', MAYOR, 'Империал Сити', 'Градоначалник: кварталите, услугите и транспортът на града.', n => Sound.play(n)); } catch {} toast(`👩‍💼 ${MAYOR} е градоначалник на Империал Сити. Първата ѝ работа: да изберем държавата и да основем града, после — кварталите.`, 'good'); Sound.play('buy'); save(); }
 const mayorHireCard = () => S?.holding && dev.best() >= 19 && !mayorName() ? `<div class="card" style="border:1px solid #9fdfff;box-shadow:0 0 16px rgba(159,223,255,.2)"><div class="row" style="margin:0;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:30px">🏙️</span><span class="meta" style="margin:0;flex:1 1 260px"><b style="color:var(--txt);font-size:15px">Империал Сити — твоят град от нулата</b><br>Назначи градоначалник <b>${MAYOR}</b>. Тя избира с теб държавата (🇺🇸 САЩ или 🇷🇺 Русия), основава града и води кварталите, услугите и транспорта.</span><button class="btn" data-hiremayor="1" ${econ.canAfford(MAYOR_COST) ? '' : 'disabled'}>👩‍💼 Назначи · ${fmt(MAYOR_COST)} €</button></div></div>` : '';   // ниво 19 = HOLD_LV.neom (dev може да е още неинициализиран)
 // кредит от банката → държавата и градът за холограмата (правителство, община или местна фирма)
 function loanGeo(o) {

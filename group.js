@@ -53,6 +53,9 @@ export const HOLD_LV_MAX = 5, HOLD_LV_K = 0.10, HOLD_DIR_K = 0.15;
 export const DIR_LV = Math.ceil(HOLD_LV_MAX * 0.9);
 const GLOB_DIR_COST = 1e9;   // директорът на Глобъл (мегапроекти, концесии, придобивания) — Глобъл няма собствен приход за процент   // директор — само когато дружеството е развито поне 90% (ниво 5 от 5)
 // всяко дружество има свой директор (портретите и 3D моделите в directors3d.js са по тези имена)
+// снимките (assets/ui/directors/<модел>.webp, dirshow.js) — моделите както в directors3d.js
+export const DIR_PIC = { con: 'ivaylo', hw: 'nadya', rail: 'maria', sea: 'stefan', air: 'elena', hotel: 'georgi', oil: 'vera', bank: 'boris', glob: 'glob', mayor: 'mayor' };
+export const showDirectorOf = (k, name, company, text, sound) => import('./dirshow.js').then(m => m.showDirector({ model: DIR_PIC[k] || 'ivaylo', name, company, text, sound })).catch(() => {});
 export const DIR_OF = { con: 'Ивайло Петров', hw: 'Надя Иванова', rail: 'Мария Стоянова', sea: 'Стефан Колев', air: 'Елена Димитрова', hotel: 'Георги Николов', oil: 'Вера Ангелова', bank: 'Борис Тодоров' , glob: 'Александър Владимиров'};
 
 // deps: { S, econ, fmt, pop(key, cap, sub), toast, save, sound, …броячите от SUBS (hwN, railN, portN, airN, oilN, empire, toll, flow, finDaily, oilDaily) }
@@ -84,7 +87,7 @@ export function createGroup(deps) {
     if (!e.canAfford(c)) { deps.toast(`Нямаш ${deps.fmt(c)} €.`, 'bad'); return; }
     const nm = DIR_OF[k];
     e.spend(c, 'заплати', `Холдинг: директор на ${subName(deps.S(), k)}`); hold().dir[k] = nm;
-    deps.toast(`👔 ${nm} е новият директор на ${subName(deps.S(), k)} (+${Math.round(HOLD_DIR_K * 100)}%).`, 'good'); deps.sound && deps.sound('buy'); deps.save();
+    showDirectorOf(k, nm, subName(deps.S(), k), `Поема ${subBy(k)?.what || 'дружеството'} · +${Math.round(HOLD_DIR_K * 100)}% от прихода всеки ден · предложенията идват в борда.`, deps.sound); deps.save();   // тъмен екран със снимката
   }
   // дневният бонус на холдинга от развитието и директорите
   const bonusOf = k => Math.round((subBy(k).inc(deps) || 0) * bonusK(k));
@@ -95,7 +98,7 @@ export function createGroup(deps) {
     // ерата на холдинга: ти ставаш председател, а Ивайло Петров поема майката фирма (Констръкшън) — без развитие и без плащане
     if (deps.S().holding && (deps.S().group || {}).con && !h.dir.con && !h.conAuto) {   // само веднъж — ако после напусне, се назначава нов от „Холдинг“
       h.dir.con = DIR_OF.con; h.conAuto = 1;
-      deps.pop && deps.pop('new-branch', `👔 ${DIR_OF.con} поема ${subName(deps.S(), 'con')}`, `Ти ставаш председател на холдинга. Ивайло води майката фирма: офертите, търговете, гаража, кварталите и филиалите — като предложения към борда (+${Math.round(HOLD_DIR_K * 100)}% от прихода ѝ).`);
+      showDirectorOf('con', DIR_OF.con, subName(deps.S(), 'con'), `Ти ставаш председател на холдинга. Ивайло води майката фирма: офертите, търговете, гаража, кварталите и филиалите — като предложения към борда (+${Math.round(HOLD_DIR_K * 100)}% от прихода ѝ).`, deps.sound);
       deps.save();
     }
     if (b > 0) { deps.econ().earn(b, 'холдинг', 'Холдинг: бонус от развитието и директорите'); h.mAcc = (h.mAcc || 0) + b; }
