@@ -136,7 +136,7 @@ export const KINDS = {
   // Конвоите карат помощи до склада, а оттам те се раздават; медицинският транспорт извозва болните; водоснабдяването и генераторите
   // връщат услугите. Когато нуждата спадне и услугите тръгнат — решаваш как да продължи помощта.
   aid: {
-    nm: 'Хуманитарен достъп', ico: '🤝', area: 'Кварталът Ал-Нур', fade: 9, place: { city: 'Ал-Нур', lon: 34.45, lat: 31.45 },
+    nm: 'Хуманитарен достъп', ico: '🤝', area: 'Кварталът Ал-Нур', fade: 9, place: { city: 'Ал-Нур', lon: 34.45, lat: 31.45, iso: 'PSX' },
     teams: {
       neg: { ico: '🤝', nm: 'Посредници', job: 'договарят хуманитарен коридор на контролния пункт', cost: 3e5, eta: 0.25 },
       obs: { ico: '🔍', nm: 'Наблюдатели', job: 'проверяват конвоите на място — пунктът ги пропуска по-бързо', cost: 2.5e5, eta: 0.3 },
@@ -207,5 +207,71 @@ export const KINDS = {
       return [['🍞 Нужда от храна и вода', m.need, m.need >= 70 ? '#ff6b6b' : m.need >= 40 ? '#ffd54a' : '#5fe39a'], `🚧 Контролният пункт: ${acc}`,
         `📦 Доставено: <b>${Math.round(m.delivered)} т</b> (${cg}) · на склад: ${Math.round(m.stock)} т`, `🏥 Чакат лечение: <b>${Math.round(m.sick)}</b> · 💧 вода: ${Math.round(m.water)}%${m.crit >= 1 ? ` · ⚠️ критично: ${Math.round(m.crit)}` : ''}`]; },
     phases: { calm: '🚧 Пунктът е затворен', active: '🚚 Хуманитарна операция', resolved: '✅ Помощта стига до всички' },
+  },
+  // 🌊 Ормузкият проток (алтернативна игрова хронология): корабоплаването е спряно, танкерите чакат на опашка, в коридора има мини.
+  // Дипломатите договарят безопасно преминаване; миночистачите разчистват коридора; наблюдателите (горещ телефон, дронове) намаляват
+  // риска от инцидент; ескортът придружава конвоите; алтернативните доставки (тръба до терминала на брега и маршрут около Африка)
+  // и резервите крепят енергията, докато протокът е затворен. Когато корабоплаването е над 90% и напрежението е ниско — решение.
+  strait: {
+    nm: 'Морска криза', ico: '🌊', area: 'Ормузкият проток', fade: 10, place: { city: 'Ормузкият проток', lon: 56.6, lat: 26.2 },
+    teams: {
+      dip: { ico: '🤝', nm: 'Дипломати', job: 'договарят безопасно преминаване с крайбрежните държави', cost: 4e5, eta: 0.3 },
+      mines: { ico: '⚓', nm: 'Миночистачи', job: 'разчистват коридора за корабите', cost: 6e5, eta: 0.35 },
+      watch: { ico: '📡', nm: 'Наблюдатели', job: 'горещ телефон, дронове и общ доклад — по-малко инциденти', cost: 3e5, eta: 0.25 },
+      escort: { ico: '🚢', nm: 'Ескорт на конвоите', job: 'придружава танкерите през коридора', cost: 9e5, eta: 0.4 },
+      alt: { ico: '🛢️', nm: 'Алтернативни доставки', job: 'тръба до терминала на брега и танкери около Африка', cost: 7e5, eta: 0.45 },
+      reserve: { ico: '🏦', nm: 'Държавни резерви', job: 'освобождава част от резервите — цените се успокояват веднага', cost: 5e5, eta: 0.1 },
+    },
+    choices: {
+      deal: { ico: '📃', nm: 'Споразумение за преминаване с проверка', k: 0.2, trust: 4, sec: 3, services: 1, out: 'deal' },
+      divers: { ico: '🛢️', nm: 'Дългосрочно разнообразяване на доставките', k: 0.35, trust: 3, sec: 2, services: 2, out: 'deal' },
+      temp: { ico: '⏳', nm: 'Само временно примирие по море', k: 0.05, trust: 1, sec: 0, services: 0, out: 'partial' },
+    },
+    decisions: [
+      { id: 'route', ico: '🧭', title: 'Как да минават танкерите?', pick: true, when: m => m.teams.escort.st !== 'ready' || m.teams.alt.st !== 'ready',
+        opts: [{ k: 'convoy', ico: '🚢', nm: 'На конвои през протока', txt: 'най-бързо, но всеки инцидент спира всички' },
+          { k: 'alt', ico: '🛢️', nm: 'По алтернативния маршрут', txt: 'безопасно, но по-скъпо и бавно' }, { k: 'mixed', ico: '⚖️', nm: 'Смесено', txt: 'част през протока, част по тръбата' }] },
+      { id: 'rules', ico: '📜', title: 'Правила за ескорта', when: m => m.teams.escort.st === 'onsite',
+        opts: [{ k: 'calm', ico: '🕊️', nm: 'Строго отбранителни — без провокации', txt: 'напрежението пада, конвоите са по-бавни' },
+          { k: 'close', ico: '🛡️', nm: 'Близко прикритие на всеки танкер', cost: 2e5, txt: 'по-бързо, но напрежението расте малко' }] },
+      { id: 'insure', ico: '📄', title: 'Застраховка за корабите', when: m => m.t > 0.3,
+        opts: [{ k: 'state', ico: '🏛️', nm: 'Държавна гаранция', cost: 3e5, txt: 'повече собственици пускат танкерите си' }, { k: 'none', ico: '✖️', nm: 'Без гаранция', txt: 'част от танкерите остават да чакат' }] },
+      { id: 'incident', ev: true, ico: '⚠️', title: 'Инцидент в протока', when: m => m.event && m.event.id === 'incident', txt: () => 'Непознат дрон кръжи над танкер в коридора.',
+        opts: [{ k: 'call', ico: '📞', nm: 'Горещ телефон — изясни веднага', cost: 5e4, txt: 'напрежението пада', apply: m => { m.tension = Math.max(0, m.tension - 8); } },
+          { k: 'stop', ico: '⏸️', nm: 'Спри конвоите до изясняване', txt: 'безопасно, но корабите чакат', apply: m => { m.pauseTill = m.t + 0.5; } }] },
+      { id: 'mine', ev: true, ico: '💣', title: 'Мина в коридора', when: m => m.event && m.event.id === 'mine',
+        opts: [{ k: 'clear', ico: '⚓', nm: 'Спри движението, разчисти', txt: 'полдин закъснение', apply: m => { m.pauseTill = m.t + 0.4; m.mines = Math.max(0, m.mines - 1); } },
+          { k: 'bypass', ico: '↪️', nm: 'Заобиколи по маркиран коридор', cost: 1e5, txt: 'движението продължава, по-бавно', apply: m => { m.slowTill = m.t + 0.6; } }] },
+    ],
+    start(m) { Object.assign(m, { dec: {}, event: null, ship: 8, tension: 62, mines: 6, queue: 18, passed: 0, talks: 0, agree: false, energy: 0, reserveUsed: 0, pauseTill: 0, slowTill: 0 }); return '🌊 Корабоплаването през Ормузкия проток е спряно — 18 танкера чакат, в коридора има мини. (Алтернативна игрова хронология.)'; },
+    step(m, dt, h) {
+      const on = k => h.on(m, k), dip = on('dip'), mn = on('mines'), w = on('watch'), esc = on('escort'), alt = on('alt'), res = on('reserve'), D = m.dec || (m.dec = {});
+      if (m.phase === 'calm' && (dip || mn || w || esc || alt || res)) m.phase = 'active';
+      if (dip && !m.agree) { m.talks = Math.min(1, m.talks + dt / (w ? 1.1 : 1.6)); if (m.talks >= 1) { m.agree = true; h.log(m, '📃 Договорено безопасно преминаване — с проверка на място.'); } }
+      if (mn && m.mines > 0) { m.mines = Math.max(0, m.mines - dt * 3.2); if (m.mines === 0) h.log(m, '⚓ Коридорът е разчистен от мини.'); }
+      m.tension = Math.max(5, Math.min(95, m.tension + (dip ? -6 : 1.5) * dt + (w ? -3 : 0) * dt + (esc ? (D.rules === 'close' ? 1.5 : D.rules === 'calm' ? -2 : 0.5) : 0) * dt));
+      const route = D.route || (esc ? 'convoy' : alt ? 'alt' : 'convoy'), paused = m.pauseTill > m.t || (m.event && ['incident', 'mine'].includes(m.event.id));
+      // преминаване през протока: нужен е ескорт или договор; мините бавят (и пораждат събития); застраховката пуска повече собственици
+      const canGo = (esc || m.agree) && !paused, sea = route === 'alt' ? 0 : route === 'mixed' ? 0.55 : 1, slow = m.slowTill > m.t ? 0.5 : 1;
+      const flow = canGo ? sea * slow * (m.agree ? 1 : 0.7) * (D.rules === 'close' ? 1.25 : D.rules === 'calm' ? 0.85 : 1) * (m.mines > 0.5 ? 0.45 : 1) * (D.insure === 'state' ? 1.2 : D.insure === 'none' ? 0.75 : 1) : 0;
+      const pass = Math.min(m.queue, flow * 9 * dt); m.queue -= pass; m.passed += pass; m.queue = Math.min(40, m.queue + 2.5 * dt);   // нови танкери идват
+      const altF = alt ? (route === 'alt' ? 1 : route === 'mixed' ? 0.6 : 0.35) : 0;
+      m.ship = Math.max(0, Math.min(100, m.ship + (flow * 26 + altF * 9 - (canGo || altF ? 0 : 4)) * dt - (paused ? 6 * dt : 0)));
+      m.energy = Math.max(0, Math.min(100, (m.ship * 0.7) + (alt ? 15 : 0) + (res ? 15 : 0)));
+      if (res) m.reserveUsed = Math.min(100, m.reserveUsed + 18 * dt);
+      // събития
+      if (!m.event && canGo && m.tension > 30 && !w && Math.random() < dt * 0.9) { m.event = { id: 'incident' }; h.log(m, '⚠️ Инцидент: дрон над танкер в коридора.'); }
+      else if (!m.event && canGo && w && m.tension > 45 && Math.random() < dt * 0.25) { m.event = { id: 'incident' }; h.log(m, '⚠️ Инцидент: дрон над танкер в коридора.'); }
+      if (!m.event && canGo && m.mines > 0.5 && Math.random() < dt * 0.9) { m.event = { id: 'mine' }; h.log(m, '💣 Забелязана мина в коридора.'); }
+      if (!m.recov && m.ship >= 90 && m.tension < 40) { m.recov = true; h.log(m, '🌊 Корабоплаването е почти нормално. Твоят ход — как да се запази.'); }
+      if (m.t >= this.fade && !m.recov) h.resolve(m, 'faded', { trust: -4, security: -2, energy: -6, econ: -4 }, '⏳ Протокът остава почти затворен — енергията и икономиката страдат.');
+    },
+    ready: m => !!m.recov,
+    effect: (m, C) => ({ trust: C.trust, security: C.sec, services: C.services, energy: 4 + (C.out === 'deal' ? 3 : 0), econ: 3 - Math.round(m.reserveUsed / 50) }),
+    resultTxt: c => c === 'deal' ? '📃 Споразумение с проверка — танкерите минават свободно.' : c === 'divers' ? '🛢️ Доставките се разнообразяват — следващата криза ще боли по-малко.' : '⏳ Временно примирие — протокът е отворен, но крехко.',
+    stats(m) { return [['🚢 Корабоплаване', m.ship, m.ship >= 70 ? '#5fe39a' : m.ship >= 35 ? '#ffd54a' : '#ff6b6b'], ['🌡️ Напрежение', m.tension, m.tension >= 60 ? '#ff6b6b' : m.tension >= 35 ? '#ffd54a' : '#5fe39a'],
+      `⛽ Чакат: <b>${Math.round(m.queue)}</b> танкера · ✅ минали: ${Math.round(m.passed)} · ⚓ мини: ${m.mines > 0.05 ? Math.ceil(m.mines) : 'няма'}`,
+      `📃 Договор: ${m.agree ? '✅ има' : m.talks > 0 ? `🟡 преговори ${Math.round(m.talks * 100)}%` : '—'} · ⚡ енергия: ${Math.round(m.energy)}%${m.reserveUsed ? ` · 🏦 резерви: −${Math.round(m.reserveUsed)}%` : ''}`]; },
+    phases: { calm: '⛔ Протокът е затворен', active: '🚢 Морска операция', resolved: '✅ Корабоплаването е възстановено' },
   },
 };

@@ -44,7 +44,7 @@ export function createOps(deps) {
     const O = st(); if (!O || O.act) return O?.act || null;
     const iso = deps.cc() === 'RU' ? 'RUS' : 'USA', C = POL[iso], cap = o.capital || { iso, city: C.cap, lon: C.lon, lat: C.lat };
     if (o.k && o.k !== 'square') { const K = KINDS[o.k];
-      const PL = K.place, m = O.act = { id: ++O.seq, k: o.k, iso: PL ? 'PSX' : cap.iso, city: PL ? PL.city : cap.city, lon: PL ? PL.lon : cap.lon + (o.k === 'flood' ? 0.6 : -0.5), lat: PL ? PL.lat : cap.lat + (o.k === 'flood' ? -0.4 : 0.35), t: 0, phase: 'calm', budget: o.budget ?? 2e9, spent: 0, out: null, outT: 0, log: [],
+      const PL = K.place, m = O.act = { id: ++O.seq, k: o.k, iso: PL ? (PL.iso || null) : cap.iso, city: PL ? PL.city : cap.city, lon: PL ? PL.lon : cap.lon + (o.k === 'flood' ? 0.6 : -0.5), lat: PL ? PL.lat : cap.lat + (o.k === 'flood' ? -0.4 : 0.35), t: 0, phase: 'calm', budget: o.budget ?? 2e9, spent: 0, out: null, outT: 0, log: [],
         teams: Object.fromEntries(Object.keys(K.teams).map(k => [k, { st: 'ready' }])) };
       const txt = K.start(m); log(m, txt);
       deps.toast && deps.toast(`${K.ico} ${K.nm} — ${PL ? K.area : `${K.area.toLowerCase()} в ${m.city}`}. Отвори го от геополитическата карта (⚠️ Кризи).`, 'bad');
@@ -123,14 +123,15 @@ export function createOps(deps) {
   function tick(dt) {
     const O = st(); if (!O) return;
     if (!viewing) step(dt);
-    if (!O.act && (S().day || 0) >= O.next && Math.random() < dt / 20) { const ks = ['square', 'flood', 'fire', 'aid'].filter(k => deps.canStart && deps.canStart(k)); if (ks.length) start({ k: ks[(Math.random() * ks.length) | 0] }); }
+    if (!O.act && (S().day || 0) >= O.next && Math.random() < dt / 20) { const ks = ['square', 'flood', 'fire', 'aid', 'strait'].filter(k => deps.canStart && deps.canStart(k)); if (ks.length) start({ k: ks[(Math.random() * ks.length) | 0] }); }
   }
   const markers = () => { const m = act(); if (!m) return []; const K = KINDS[m.k]; return [{ id: m.id, ico: m.out ? '✅' : K ? K.ico : '📢', nm: K ? (K.place ? `${K.nm} — ${K.area}` : `${K.nm} — ${K.area.toLowerCase()}, ${m.city}`) : `Протест на площада — ${m.city}`, lon: m.lon, lat: m.lat, m }]; };
-  const open = () => { const m = act(), o = { onClose: deps.onClose, muted: deps.muted }; if (m && m.k === 'flood') return import('./opsflood.js').then(M => M.openOpsFlood(api, o)); if (m && m.k === 'fire') return import('./opsfire.js').then(M => M.openOpsFire(api, o)); if (m && m.k === 'aid') return import('./opsaid.js').then(M => M.openOpsAid(api, o)); return import('./ops3d.js').then(M => M.openOpsSquare(api, o)); };
+  const open = () => { const m = act(), o = { onClose: deps.onClose, muted: deps.muted }; if (m && m.k === 'flood') return import('./opsflood.js').then(M => M.openOpsFlood(api, o)); if (m && m.k === 'fire') return import('./opsfire.js').then(M => M.openOpsFire(api, o)); if (m && m.k === 'aid') return import('./opsaid.js').then(M => M.openOpsAid(api, o)); if (m && m.k === 'strait') return import('./opshormuz.js').then(M => M.openOpsHormuz(api, o)); return import('./ops3d.js').then(M => M.openOpsSquare(api, o)); };
   // кратко за панела на картата
   const summary = m => { const on = Object.values(m.teams).filter(t => t.st === 'onsite').length, n = Object.keys(m.teams).length - (m.k === 'square' ? 1 : 0), O = m.out;
     const res = O ? (O === 'deal' ? '✅ Решено' : O === 'partial' ? '📋 Частично решение' : '🌧️ Без решение') : '';
     if (m.k === 'flood') return res || `🌊 Ниво ${Math.round(m.level)} · 🏠 на покривите: ${Math.round(m.stranded)} · екипи на място: ${on}/${n}`;
+    if (m.k === 'strait') return res || `🚢 Корабоплаване ${Math.round(m.ship)}% · ⛽ чакат ${Math.round(m.queue)} · 🌡️ ${Math.round(m.tension)} · екипи на място: ${on}/${n}`;
     if (m.k === 'aid') return res || `🍞 Нужда ${Math.round(m.need)} · 🚧 пункт: ${{ closed: 'затворен', talks: 'преговори', open: 'отворен' }[m.access]} · екипи на място: ${on}/${n}`;
     if (m.k === 'fire') return res || `🔥 Горят ${m.b.filter(v => v > 0).length}/4 сгради · 🪟 чакат: ${Math.round(m.trapped.reduce((a, b) => a + b, 0))} · екипи на място: ${on}/${n}`;
     return res || `„${m.demand}“ · 🌡️ ${Math.round(m.tension)} · 👥 ~${Math.round(m.crowd)} · екипи на място: ${on}/${n}`; };
