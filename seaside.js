@@ -2,6 +2,7 @@
 // морето е на север от града, с плаж и крайбрежна алея с палми, пристанище с кей, портални кранове и контейнери,
 // фар на вълнолома, кораби на котва и лодки, които плават. Жп линията минава по насип през морето.
 import * as THREE from 'three';
+import { feature } from './lab/feature.js';
 import { createPortLights } from './portlights.js';
 import { makeWater } from './water.js';
 import { loadShipModels, hasShipModel, shipModel, setShipNight } from './shipmodels.js';
@@ -9,12 +10,39 @@ import { loadShipModels, hasShipModel, shipModel, setShipNight } from './shipmod
 import { EXTRA_COASTAL } from './countries.js';
 export const SEASIDE = ['varna', 'burgas', 'constanta', 'istanbul', 'thessaloniki', 'athens', 'barcelona', 'amsterdam', 'rotterdam', 'newyork', 'losangeles', 'rio', 'buenosaires', 'capetown', 'dubai', 'mumbai', 'singapore', 'hongkong', 'shanghai', 'tokyo', 'sydney'];
 SEASIDE.push(...EXTRA_COASTAL);
-export const SEA_MODELS = ['ship-cargo-a', 'ship-cargo-b', 'ship-small', 'boat-sail-a', 'boat-sail-b', 'boat-speed-a', 'boat-fishing-small', 'buoy', 'cargo-container-a', 'cargo-container-b', 'cargo-container-c'];
+// Лабораторията → boats-real: истинските лодки, шамандури и контейнери (Sketchfab, CC-BY; assets/heavy/boats) вместо детските —
+// застават на мястото и в размера на детския модел (useModel), контейнерите — оцветени като детските. game.js ги зарежда заедно
+// с морските модели от assets/watercraft/ — затова името е относителен път ('../heavy/boats/…').
+const REAL_BOATS = { 'boat-sail-a': 'sailboat', 'boat-sail-b': 'sailboat', 'boat-speed-a': 'yacht', 'boat-fishing-small': 'fisherboat', 'ship-small': 'fishship', buoy: 'buoy',
+  'cargo-container-a': 'container', 'cargo-container-b': 'container', 'cargo-container-c': 'container' };
+const BOAT_TINT = { 'cargo-container-a': 0xd8584a, 'cargo-container-b': 0x5a86d8, 'cargo-container-c': 0x5fae6e };
+const RB = n => '../heavy/boats/' + n;
+export const SEA_MODELS = ['ship-cargo-a', 'ship-cargo-b', 'ship-small', 'boat-sail-a', 'boat-sail-b', 'boat-speed-a', 'boat-fishing-small', 'buoy', 'cargo-container-a', 'cargo-container-b', 'cargo-container-c',
+  ...(feature('boats-real') ? [...new Set(Object.values(REAL_BOATS))].map(RB) : [])];
 
 const mat = (c, r = 0.9, m = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
 const box = (w, h, d, m, x, y, z, g) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; g.add(o); return o; };
 const rnd = seed => () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-function useModel(A, model, n, s) { if (!A[n]) return null; const o = model(n, s); o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); return o; }
+function useModel(A, model, n, s) {
+  if (!A[n]) return null; const o = model(n, s); o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+  const rn = feature('boats-real') && REAL_BOATS[n]; return rn && A[RB(rn)] ? fitReal(o, model(RB(rn), 1), n) : o;
+}
+// истинският модел в кутията на детския: същата дължина (шамандурата — същата височина), дългата ос по същата посока, основата на същото ниво
+function fitReal(kid, real, n) {
+  const box = o => { o.updateMatrixWorld(true); return new THREE.Box3().setFromObject(o); };
+  { const all = box(real), S = all.getSize(new THREE.Vector3()), big = Math.max(S.x, S.y, S.z), drop = [];   // плоските мешове (вградена вода/земя около модела — шамандурата) — вън
+    real.traverse(m => { if (m.isMesh) { const s = box(m).getSize(new THREE.Vector3()); if (s.y < big * 0.02 && Math.max(s.x, s.z) > big * 0.3) drop.push(m); } }); for (const m of drop) m.parent.remove(m); }
+  const kb = box(kid), ks = kb.getSize(new THREE.Vector3()), w = new THREE.Group(), inner = new THREE.Group(); inner.add(real); w.add(inner);
+  let rs = box(inner).getSize(new THREE.Vector3());
+  if ((ks.x > ks.z) !== (rs.x > rs.z)) { inner.rotation.y = Math.PI / 2; rs = box(inner).getSize(new THREE.Vector3()); }
+  inner.scale.multiplyScalar(n === 'buoy' ? ks.y / rs.y : Math.max(ks.x, ks.z) / Math.max(rs.x, rs.z));
+  const rb = box(inner), kc = kb.getCenter(new THREE.Vector3()), rc = rb.getCenter(new THREE.Vector3());
+  const draft = /^(boat-|ship-)/.test(n) ? (rb.max.y - rb.min.y) * 0.16 : n === 'buoy' ? (rb.max.y - rb.min.y) * 0.12 : 0;   // лодките газят във водата
+  inner.position.add(new THREE.Vector3(kc.x - rc.x, kb.min.y - rb.min.y - draft, kc.z - rc.z));
+  real.traverse(m => { if (!m.isMesh) return; m.castShadow = true; m.receiveShadow = true; const mt = m.material; if (BOAT_TINT[n] || (mt && mt.metalness > 0.5)) { m.material = mt.clone(); m.material.metalness = Math.min(mt.metalness, 0.3); m.material.roughness = Math.max(mt.roughness ?? 0.5, 0.6); }   /* без огледална среда металът излиза черен */
+    if (BOAT_TINT[n]) { m.material.map = null; m.material.metalnessMap = null; m.material.metalness = 0.15; m.material.roughness = 0.75; m.material.color.set(BOAT_TINT[n]); }   /* контейнерът: текстурата е ръждясала и тъмна — боядисан в цвета, релефът (ребрата) остава */ });
+  return w;
+}
 
 // group: групата на града; deps: { A, model(name, scale), label(text, color, w) }
 // opts: { zEdge (северният ръб на града), xMin, xMax (ширина на града), railX: [x1, x2] (коридор на жп линията), seed }
@@ -147,10 +175,18 @@ export function addSeaside(group, deps, opts) {
   { const blue = mat(0x1f5fbf, 0.6), red = mat(0xd62828, 0.6), shed = mat(0xb8bec6, 0.5, 0.4);
     const crane = (q, x, m) => { const c = new THREE.Group(); for (const [sx, sz] of [[-4, -3], [4, -3], [-4, 3], [4, 3]]) box(0.8, 22, 0.8, m, sx, 12, sz, c); box(10, 1.6, 8, m, 0, 23, 0, c); box(1.2, 1.2, 46, m, 0, 24.5, -14, c); PL.beaconAt(c, 0, 24.4, 0); PL.beaconAt(c, 0, 25.6, -36.5, 0.5); c.position.set(x, 1.2, pierZ + 8); q.add(c); cranes.push(c); };
     crane(lvG[0], px + 44, blue);
-    for (let k = 0; k < 20; k++) box(4.4, 3.5, 8.8, mat([0xd62828, 0x1f5fbf, 0x2d8f4e, 0xffb300][k % 4], 0.7), px - 40 + (k % 10) * 8, 1.2 + 1.75 + 7, seaZ - 10 - Math.floor(k / 10) * 10, lvG[1]).rotation.y = Math.PI / 2;
+    for (let k = 0; k < 20; k++) {   // третият ред контейнери: истинските (boats-real), иначе цветни кутии
+      const o = feature('boats-real') && useModel(A, model, ['cargo-container-a', 'cargo-container-b', 'cargo-container-c'][k % 3], 3.2);
+      if (o) { o.position.set(px - 40 + (k % 10) * 8, 1.2 + 7, seaZ - 10 - Math.floor(k / 10) * 10); o.rotation.y = Math.PI / 2; lvG[1].add(o); }
+      else box(4.4, 3.5, 8.8, mat([0xd62828, 0x1f5fbf, 0x2d8f4e, 0xffb300][k % 4], 0.7), px - 40 + (k % 10) * 8, 1.2 + 1.75 + 7, seaZ - 10 - Math.floor(k / 10) * 10, lvG[1]).rotation.y = Math.PI / 2;
+    }
     for (let k = 0; k < 2; k++) { box(26, 9, 14, shed, px - 30 + k * 32, 5.7, seaZ - 2 + 12, lvG[2]); box(26.6, 0.8, 14.6, mat(0x8a3b2b, 0.7), px - 30 + k * 32, 10.5, seaZ + 10, lvG[2]); }
     box(70, 1.4, 50, mat(0xb8b4aa, 0.9), px - 90, 0.5, seaZ - 30, lvG[3]); PL.mast(lvG[3], px - 118, seaZ - 8, { h: 18, r: 24 }); PL.mast(lvG[3], px - 62, seaZ - 52, { h: 18, r: 24 }); crane(lvG[3], px - 100, red); crane(lvG[3], px - 76, red);
-    for (let k = 0; k < 24; k++) box(4.4, 3.5, 8.8, mat([0x7b2cbf, 0x0a9396, 0xe8e2d4, 0xd62828][k % 4], 0.7), px - 115 + (k % 8) * 7, 3 + Math.floor(k / 16) * 3.5, seaZ - 14 - Math.floor((k % 16) / 8) * 11, lvG[4]).rotation.y = Math.PI / 2;
+    for (let k = 0; k < 24; k++) {   // контейнерите на разширението: истинските (boats-real), иначе цветни кутии
+      const o = feature('boats-real') && useModel(A, model, ['cargo-container-a', 'cargo-container-b', 'cargo-container-c'][k % 3], 3.2);
+      if (o) { o.position.set(px - 115 + (k % 8) * 7, 1.25 + Math.floor(k / 16) * 3.5, seaZ - 14 - Math.floor((k % 16) / 8) * 11); o.rotation.y = Math.PI / 2; lvG[4].add(o); }
+      else box(4.4, 3.5, 8.8, mat([0x7b2cbf, 0x0a9396, 0xe8e2d4, 0xd62828][k % 4], 0.7), px - 115 + (k % 8) * 7, 3 + Math.floor(k / 16) * 3.5, seaZ - 14 - Math.floor((k % 16) / 8) * 11, lvG[4]).rotation.y = Math.PI / 2;
+    }
     const silo = mat(0xdcdcdc, 0.5, 0.3); for (let k = 0; k < 3; k++) { const c = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 18, 16), silo); c.position.set(px - 70 + k * 9, 9, seaZ + 14); c.castShadow = true; lvG[4].add(c); } }
   // щом истинските кораби се заредят: пречертай флота и смени декоративния кораб на кея с танкер (до ръба на кея)
   loadShipModels().then(() => {

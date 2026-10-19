@@ -169,3 +169,9 @@ cinema/newyork.mp4, cinema/vegas.mp4, cinema/paris.mp4, cinema/dubai.mp4, cinema
 - lm/petronas.glb — кулите Петронас, направени в Meshy AI от потребителя (18.10.2026), опростени до ~92 хил. триъгълника
 - lm/bigben2.glb — "BigBen" by Daqian Dong (CC-BY 3.0, Poly Pizza) — https://poly.pizza/m/8PaQZ_nLFIQ (текстурите в webp)
 - lm/londoneye2.glb — "Ferris Wheel" by CreativeTrio (CC0, Poly Pizza) — https://poly.pizza/m/6CepsZjXBw — London Eye
+- boats/sailboat.glb — "Sailboat" by sergeif (CC-BY 4.0) — https://sketchfab.com/3d-models/76d0b1e24be14d2f9a524bfce3001aeb (текстурите 1024 px, WebP)
+- boats/yacht.glb — "Yatch I (second edition)" by dannzjs (CC-BY 4.0) — https://sketchfab.com/3d-models/b826e1c52d604c599b893967bed8a254
+- boats/fisherboat.glb — "Fisher boat" by Batuhan13 (CC-BY 4.0) — https://sketchfab.com/3d-models/385b039e95754dca8d8c045ed0c515cf
+- boats/fishship.glb — "Fishing Ship game-ready asset" by crazyyuan (CC-BY 4.0) — https://sketchfab.com/3d-models/f791868a8b5f4996a49a3c8cd99336f6
+- boats/buoy.glb — "Harbor Navigation Buoy" by TGVMisterH (CC-BY 4.0) — https://sketchfab.com/3d-models/62f7c151f4c048508b8cf5526f8588f9
+- boats/container.glb — "Freight shipping container - Rusted" by sousinho (CC-BY 4.0) — https://sketchfab.com/3d-models/2b787d1a02174d0bbca9eac34eb3a486
