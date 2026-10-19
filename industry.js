@@ -1,11 +1,10 @@
 // industry.js — истинските заводи, складове, водни кули, вятърни турбини и соларни панели вместо детските на Kenney
-// (Лабораторията → ind-real). Моделите са от Sketchfab (CC-BY, авторите в CREDITS.txt), в assets/heavy/industry:
+// (одобрени в Лабораторията — ind-real; детските са изтрити). Моделите са от Sketchfab (CC-BY, авторите в CREDITS.txt), в assets/heavy/industry:
 //   sf-indset — „Industrial Buildings Set“ (30 сгради в един файл — разделят се по имената на мешовете: Industrial_<Сграда>_<N>_…),
 //   sf-warehouses, sf-oldwarehouse, sf-indbuilding — складове и тухлена промишлена сграда, sf-watertower — 4 водни кули,
 //   sf-windturbine — турбина (перките се въртят), sf-solar — соларен панел (нарежда се на редици).
 // Всяка истинска застава в кутията на детския модел при мащаб 1 (KID) — game.js ги слага като досега: model('ind-…', мащаб).
 import * as THREE from 'three';
-import { feature } from './lab/feature.js';
 
 const BASE = 'assets/heavy/industry/';
 // детският модел при мащаб 1: [ширина x, височина y, дължина z, център x, основа y, център z]
@@ -37,9 +36,8 @@ function fitTo(obj, kid, byHeight = false) {
 // мешовете на сцена → отделни групи (в световните координати на файла)
 function partOf(meshes) { const g = new THREE.Group(); for (const m of meshes) { const c = m.clone(); c.matrixAutoUpdate = false; c.matrix.copy(m.matrixWorld); g.add(c); } return g; }
 
-// load(url) → Promise<gltf>; A — моделите на играта. Без ✓ OK в Лабораторията — нищо (остават детските)
+// load(url) → Promise<gltf>; A — моделите на играта (детските заводи са изтрити — тези са единствените)
 export function loadIndustry(load, A) {
-  if (!feature('ind-real')) return Promise.resolve();
   const F = ['sf-indset', 'sf-warehouses', 'sf-oldwarehouse', 'sf-indbuilding', 'sf-watertower', 'sf-windturbine', 'sf-solar'], G = {};
   return Promise.all(F.map(f => load(BASE + f + '.glb').then(g => { g.scene.updateMatrixWorld(true); G[f] = g.scene; }).catch(e => console.warn('industry', f, e)))).then(() => {
     // комплектът — по сгради
