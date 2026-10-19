@@ -205,3 +205,10 @@ blocks2/pp-brown.glb — "Brown Building" by J-Toastie, CC-BY — https://poly.p
 blocks2/pp-green.glb — "Building Green" by J-Toastie, CC-BY — https://poly.pizza/m/FmjsfA1eHY
 blocks2/pp-sfhouse.glb — "Sf House" by burunduk, CC-BY — https://poly.pizza/m/AP79CnmFDv
 blocks2/pp-sky.glb — "Skyscraper" by Jarlan Perez, CC-BY — https://poly.pizza/m/7WF09z31G_v
+- industry/sf-indset.glb — "Industrial Buildings Set - Low Poly" by DanielZhabotinsky (CC-BY 4.0) — https://sketchfab.com/3d-models/e0b0d0342be24e6c923319991a2a4d3d (текстурите 1024 px, WebP)
+- industry/sf-warehouses.glb — "Warehouses" by 99.Miles (CC-BY 4.0) — https://sketchfab.com/3d-models/e6e105d35b3f486292c42ffa52f363c0
+- industry/sf-oldwarehouse.glb — "Warehouse Building" by rajibkc (CC-BY 4.0) — https://sketchfab.com/3d-models/08a4f422bc634033b8023d53beaf8242
+- industry/sf-indbuilding.glb — "industrial building" by spicybamer (CC-BY 4.0) — https://sketchfab.com/3d-models/770acf6b0da74af397f748d95141f8be
+- industry/sf-watertower.glb — "Generic Water Tower [Free Asset Pack]" by LunarEclips3 (CC-BY 4.0) — https://sketchfab.com/3d-models/2a3963db4c1a41b2be7efccccdb0e597
+- industry/sf-windturbine.glb — "Animated Wind Turbine" by glowbox3d (CC-BY 4.0) — https://sketchfab.com/3d-models/e0678e6615a74ed29c1376a591262159
+- industry/sf-solar.glb — "Solar Panel" by rivetech (CC-BY 4.0) — https://sketchfab.com/3d-models/83483a66f8974d7e8f2e7bbde518d606
