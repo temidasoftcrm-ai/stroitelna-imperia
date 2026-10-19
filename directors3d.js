@@ -88,7 +88,7 @@ const css = `
 const loader = new GLTFLoader();
 const cache = {};
 const CLIPS_V = 3;   // вдигни, когато clips.glb се смени (иначе браузърът пази стария)
-const MODEL_V = { elena: 3, maria: 2, mayor: 2, nadya: 2, vera: 2, boris: 2, georgi: 2, glob: 2, ivaylo: 2, stefan: 2 };   // вдигни за директор, чийто .glb е сменен (поправените модели — иначе браузърът пази стария)
+const MODEL_V = { elena: 4, maria: 3, mayor: 3, nadya: 3, vera: 3, boris: 2, georgi: 2, glob: 2, ivaylo: 2, stefan: 2 };   // вдигни за директор, чийто .glb е сменен (поправените модели — иначе браузърът пази стария)
 const loadGlb = n => cache[n] || (cache[n] = loader.loadAsync(DIR + n + '.glb' + (n === 'clips' ? `?v=${CLIPS_V}` : MODEL_V[n] ? `?v=${MODEL_V[n]}` : '')));
 // от клиповете остават само ротациите + позицията на ханша (останалото е от скелета на Вера и би изкривило другите)
 let clipsP = null;
@@ -490,6 +490,18 @@ export function openBoardroom(o) {
   // ✋ ръцете в покой — върху масата: малко IK (CCD, мишница + предмишница) към точка над плота под китката; плавно се изключва,
   // докато директорът жестикулира (говори, гласува, ръкопляска) и се включва, когато се върне в покой
   const ikA = new THREE.Vector3(), ikB = new THREE.Vector3(), ikT = new THREE.Vector3(), ikQ = new THREE.Quaternion(), ikP = new THREE.Quaternion(), ikW0 = new THREE.Quaternion();
+  // глава и шия — леко вдигнати и обърнати към целта (до ~45° встрани, без да се навеждат към плота); плавно
+  const lookAt = new THREE.Vector3(), hlA = new THREE.Vector3(), hlQ = new THREE.Quaternion(), hlP = new THREE.Quaternion(), hlF = new THREE.Vector3();
+  function headLook(p, tgt, dt) {
+    p.lookW = (p.lookW || 0) + (((tgt ? 1 : 0) * (p.cur === p.base ? 1 : 0.35)) - (p.lookW || 0)) * Math.min(1, dt * 2.5); if (p.lookW < 0.02 || !tgt) return;
+    for (const [nm, k] of [['mixamorigNeck', 0.4], ['mixamorigHead', 0.6]]) {
+      const b = p.m.getObjectByName(nm); if (!b) continue; b.updateMatrixWorld(true); b.getWorldPosition(hlA); b.getWorldQuaternion(hlP);
+      hlF.set(0, 0, 1).applyQuaternion(hlP); hlF.y = Math.max(hlF.y, -0.25);   // напред от главата (Mixamo: +Z), без да гледа в масата
+      const want = tgt.clone().sub(hlA).normalize(); want.y = THREE.MathUtils.clamp(want.y, -0.3, 0.35);
+      hlQ.setFromUnitVectors(hlF.normalize(), want.normalize()); const ang = 2 * Math.acos(Math.min(1, Math.abs(hlQ.w))); if (ang > 0.8) hlQ.slerp(new THREE.Quaternion(), 1 - 0.8 / ang);
+      hlQ.slerp(new THREE.Quaternion(), 1 - k * p.lookW); hlP.premultiply(hlQ); b.parent.getWorldQuaternion(hlQ); b.quaternion.copy(hlQ.invert().multiply(hlP)); b.updateMatrixWorld(true);
+    }
+  }
   function restIK(p, dt) {
     if (!p.restTable) return; p.ikW += ((p.cur === p.base ? 1 : 0) - p.ikW) * Math.min(1, dt * 3); if (p.ikW < 0.02) return;
     p.m.updateMatrixWorld(true);
@@ -733,7 +745,10 @@ export function openBoardroom(o) {
       const free = people.filter(p => p.busy <= 0 && p.i !== sel); const p = free[(Math.random() * free.length) | 0];
       if (p) play(p, p.talk[(Math.random() * p.talk.length) | 0], true);
     }
-    for (const p of people) { p.mixer.update(dt); if (p.busy > 0 && (p.busy -= dt) <= 0) back(p); restIK(p, dt); }
+    // 👀 към кого гледат: говорещия (избрания / жестикулиращия), иначе — холограмата над масата
+    const talker = people.find(q => q.i === sel) || people.find(q => q.busy > 0);
+    if (talker) talker.m.getObjectByName('mixamorigHead')?.getWorldPosition(lookAt); else lookAt.set(0, TABLE_H + 0.45, 0);
+    for (const p of people) { p.mixer.update(dt); if (p.busy > 0 && (p.busy -= dt) <= 0) back(p); restIK(p, dt); headLook(p, p === talker ? null : lookAt, dt); }
     placeScreen(dt); placeBadges(); holo.update(dt); camStep(dt); R.update && R.update(clock.elapsedTime); ctl.update();
     if (cam.position.y > ROOM_H - 0.3) cam.position.y = ROOM_H - 0.3;   // камерата — под тавана
     cam.position.x = Math.max(-ROOM_W + 1.4, Math.min(ROOM_W - 1.4, cam.position.x)); cam.position.z = Math.max(ROOM_BACK + 1.2, Math.min(ROOM_FRONT - 0.8, cam.position.z));   // и в залата — пред завесите, не в стените
