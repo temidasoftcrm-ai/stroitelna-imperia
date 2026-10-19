@@ -284,7 +284,7 @@ export function openOpsSquare(ops, o = {}) {
   // ---- колите на екипите: позицията — от времето на мисията
   const veh = {}, labels = {};
   for (const k of Object.keys(OPS_TEAMS)) {
-    load(VEH[k]).then(g => { if (!g || shut) return; const v = EMC[k] ? emergCar(g.scene, EMC[k][1], EMC[k][0]) : fitTo(g.scene.clone(true), { len: k === 'med' || k === 'riot' ? 6 : 4.8 }); shadows(v); const hold = new THREE.Group(); hold.add(v); hold.visible = false; scene.add(hold); veh[k] = hold; if (EMC[k]) hold.userData.car = v;
+    load(VEH[k]).then(g => { if (!g || shut) return; const v = EMC[k] ? emergCar(g.scene, EMC[k][1], EMC[k][0], k === 'med' ? 'amb-eu' : '') : fitTo(g.scene.clone(true), { len: k === 'med' || k === 'riot' ? 6 : 4.8 }); shadows(v); const hold = new THREE.Group(); hold.add(v); hold.visible = false; scene.add(hold); veh[k] = hold; if (EMC[k]) hold.userData.car = v;
       if (k !== 'neg' && !EMC[k]) { const L = []; for (const [c, dx] of [[0xff2020, -0.35], [0x2060ff, 0.35]]) { const b = new THREE.Mesh(own(new THREE.SphereGeometry(0.16, 10, 8)), own(new THREE.MeshBasicMaterial({ color: c }))); b.position.set(dx, k === 'med' ? 2.9 : 1.6, 0.2); hold.add(b); L.push(b); } hold.userData.beacons = L; } });
     const lb = document.createElement('div'); lb.className = 'lb'; lb.style.display = 'none'; el.querySelector('.lbs').appendChild(lb); labels[k] = lb;
   }

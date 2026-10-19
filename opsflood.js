@@ -4,6 +4,7 @@
 // Водата: една равнина на височина по нивото (0 → само реката; 100 → 2,3 м над квартала). Дъжд, докато водата расте.
 // Хората чакат по покривите; лодките ги возят до пристана, хеликоптерът ги вдига с въже; спасените стоят на пункта.
 import { openOpsScene, THREE } from './opskit.js';
+import { Reflector } from 'three/addons/objects/Reflector.js';
 
 const H2 = ['h2-blue', 'h2-greyporch', 'h2-pink', 'h2-porch', 'h2-swedish', 'h2-townhouse', 'h2-brickcabin', 'h2-lodge'].map(k => `assets/heavy/houses2/${k}.glb`);
 const OPS = 'assets/heavy/ops/', CARS = 'assets/heavy/cars/';
@@ -40,12 +41,12 @@ function build(K) {
   plane(7, 17, asph, -25, NB + 0.03, -20.5);   // от моста до улицата на северния бряг (кварталната улица по x = −25 стига до моста от юг)
   box(6, 0.4, 4, mat(0x9a958c), DOCK[0], NB - 0.2, DOCK[1] + 1.5);
   // мостът: каменен модел по оста Z
-  place('assets/heavy/bridge/stone.glb', { len: 30 }, b => { b.position.set(-25, -0.4, 0); b.rotation.y = Math.PI / 2; scene.add(b); });   // през реката (от юг на север)
+  place('assets/heavy/bridge/stone.glb', { len: 30 }, b => { b.position.set(-25, -0.4, 0); b.rotation.y = Math.PI / 2; scene.add(b); addRect(-25, 0, b.userData.sz.z / 2, b.userData.sz.x / 2); });   // през реката (от юг на север)
   // ---- къщите: три реда; покривите — точките, където чакат хората
   const roofs = [];
   Promise.all(H2.map(K.load)).then(gs => { gs = gs.filter(Boolean); if (!gs.length || K.shut()) return; let n = 0;
     for (const [z, ry] of [[19.5, Math.PI], [34, 0], [48.5, Math.PI]]) for (let x = -52; x <= 52; x += 13) { if (Math.abs(x + 25) < 6 || (z < 25 && Math.abs(x - SUB[0]) < 8)) continue;
-      const g = gs[n++ % gs.length], h = K.fitTo(g.scene.clone(true), { w: 9 + (n % 3), maxH: 9 }); K.shadows(h); h.position.set(x, 0, z); h.rotation.y = ry; scene.add(h); roofs.push([x, h.userData.sz.y * 0.82, z]); } });
+      const g = gs[n++ % gs.length], h = K.fitTo(g.scene.clone(true), { w: 9 + (n % 3), maxH: 9 }); K.shadows(h); h.position.set(x, 0, z); h.rotation.y = ry; scene.add(h); roofs.push([x, h.userData.sz.y * 0.82, z]); addRect(x, z, h.userData.sz.x / 2, h.userData.sz.z / 2); } });
   // паркирани коли (водата ги залива)
   ['car-polo', 'car-corolla', 'car-p206', 'car-renegade', 'car-taxi', 'car-accord'].forEach((c, i) => place(CARS + c + '.glb', { len: 4.4 }, v => { v.position.set(-40 + i * 15, 0, i % 2 ? 29.5 : 38.5); v.rotation.y = Math.PI / 2; scene.add(v); }));
   // ---- подстанцията: ограда, трансформатори, изолатори; искри, когато е под вода
@@ -69,21 +70,61 @@ function build(K) {
   const dm = new THREE.Object3D(); let bagN = 0;
   // ---- водата: равнина с движещи се вълни (нормали) и дъжд
   const nT = new THREE.TextureLoader().load('assets/heavy/water/waternormals.jpg'); nT.wrapS = nT.wrapT = THREE.RepeatWrapping; nT.repeat.set(18, 12); own(nT);
-  // водата: вълни на видеокартата (няколко синусоиди в различни посоки — Герстнер-подобни), пяна по гребените, кална кафеникава
-  const wU = { uT: { value: 0 }, uAmp: { value: 0.35 } };
-  const wM = own(new THREE.MeshStandardMaterial({ color: 0x6e5f44, roughness: 0.16, metalness: 0.2, normalMap: nT, normalScale: new THREE.Vector2(0.8, 0.8), transparent: true, opacity: 0.96 }));
+  // водата (всичко на видеокартата, без тежки модели):
+  //   вълни — няколко синусоиди в различни посоки; пяна по гребените; кална кафеникава вода;
+  //   🪞 отражение — огледален кадър (Reflector, половин резолюция), изкривен от вълните, по-силен под нисък ъгъл (Френел);
+  //   🌧️ кръгчета от дъжда — разширяващи се пръстени в клетки, докато вали;
+  //   🚤 следа зад лодките — V-образна пяна и бяла пяна около носа;
+  //   🏠 пяна около стените — около къщите, моста, подстанцията и брега (правоъгълници в униформи).
+  const RMAX = 40, rects = Array.from({ length: RMAX }, () => new THREE.Vector4(0, 0, 0, 0));
+  const wU = { uT: { value: 0 }, uAmp: { value: 0.35 }, uRain: { value: 1 }, tRefl: { value: null }, uTexMat: { value: new THREE.Matrix4() }, uBoat: { value: [new THREE.Vector4(), new THREE.Vector4()] }, uRect: { value: rects }, uRectN: { value: 0 } };
+  const reflector = new Reflector(own(new THREE.PlaneGeometry(260, 160)), { textureWidth: Math.round(innerWidth * 0.5), textureHeight: Math.round(innerHeight * 0.5), clipBias: 0.02, color: 0x888888 });
+  reflector.rotation.x = -Math.PI / 2; reflector.position.set(0, 0, 60); reflector.material.colorWrite = false; reflector.material.depthWrite = false; reflector.renderOrder = -1; scene.add(reflector);
+  own(reflector.getRenderTarget()); own(reflector.material);
+  wU.tRefl.value = reflector.getRenderTarget().texture; wU.uTexMat.value = reflector.material.uniforms.textureMatrix.value;
+  const wM = own(new THREE.MeshStandardMaterial({ color: 0x6e5f44, roughness: 0.16, metalness: 0.15, normalMap: nT, normalScale: new THREE.Vector2(0.8, 0.8), transparent: true, opacity: 0.96 }));
   wM.onBeforeCompile = sh => { Object.assign(sh.uniforms, wU);
-    sh.vertexShader = 'uniform float uT; uniform float uAmp; varying float vCrest;\n' + sh.vertexShader
+    sh.vertexShader = 'uniform float uT; uniform float uAmp; varying float vCrest; varying vec3 vWPos;\n' + sh.vertexShader
       .replace('#include <beginnormal_vertex>', `vec2 P = position.xy; float t = uT;
         vec3 W[4]; W[0] = vec3(0.05, 0.02, 1.0); W[1] = vec3(-0.03, 0.045, 0.7); W[2] = vec3(0.09, -0.04, 0.4); W[3] = vec3(-0.12, -0.08, 0.25);
         float h = 0.0; vec2 g = vec2(0.0);
         for (int i = 0; i < 4; i++) { vec2 k = W[i].xy; float a = W[i].z * uAmp, ph = dot(k, P) + t * (1.2 + float(i) * 0.35); h += a * sin(ph); g += a * cos(ph) * k; }
         vCrest = clamp(h / (uAmp * 1.6) * 0.5 + 0.5, 0.0, 1.0);
         vec3 objectNormal = normalize(vec3(-g.x, -g.y, 1.0));`)
-      .replace('#include <begin_vertex>', 'vec3 transformed = vec3(position.xy, position.z + h);');
-    sh.fragmentShader = 'varying float vCrest;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.78, 0.76, 0.68), smoothstep(0.78, 0.98, vCrest) * 0.55);'); };
+      .replace('#include <begin_vertex>', 'vec3 transformed = vec3(position.xy, position.z + h);')
+      .replace('#include <project_vertex>', '#include <project_vertex>\n  vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = `varying float vCrest; varying vec3 vWPos; uniform float uT; uniform float uRain; uniform sampler2D tRefl; uniform mat4 uTexMat;
+      uniform vec4 uBoat[2]; uniform vec4 uRect[${RMAX}]; uniform int uRectN;
+      float hsh(vec2 c) { return fract(sin(dot(c, vec2(127.1, 311.7))) * 43758.5453); }
+      // кръгчета от дъжда: във всяка клетка 2,2 м — пръстен, който се разширява и изчезва
+      float rip(vec2 p) { vec2 c = floor(p / 1.6); float acc = 0.0;
+        for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) { vec2 cl = c + vec2(float(i), float(j)); float hh = hsh(cl), ph = fract(uT * 0.8 + hh);
+          vec2 ctr = (cl + 0.2 + 0.6 * vec2(hh, fract(hh * 7.31))) * 1.6; float d = length(p - ctr), r = ph * 0.8;
+          acc += sin(clamp((d - r) * 16.0, -3.1416, 3.1416)) * (1.0 - ph) * smoothstep(0.3, 0.0, abs(d - r)); } return acc; }
+      // пяна: следа зад лодките + около стените
+      float foamAt(vec2 p) { float f = 0.0;
+        for (int b = 0; b < 2; b++) { vec4 B = uBoat[b]; if (B.w <= 0.01) continue; vec2 d = p - B.xy, fw = vec2(sin(B.z), cos(B.z)); float al = -dot(d, fw), sd = abs(d.x * fw.y - d.y * fw.x);
+          if (al > 0.0 && al < 22.0) { f += smoothstep(0.7, 0.0, abs(sd - al * 0.36)) * (1.0 - al / 22.0) * B.w; f += smoothstep(0.9, 0.0, sd) * (1.0 - al / 9.0) * 0.8 * B.w; }
+          f += smoothstep(2.6, 1.4, length(d)) * 0.6 * B.w; }
+        for (int i = 0; i < ${RMAX}; i++) { if (i >= uRectN) break; vec4 R = uRect[i]; vec2 q = abs(p - R.xy) - R.zw; float sdr = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
+          if (sdr > -0.1 && sdr < 1.4) f += smoothstep(1.4, 0.0, sdr) * (0.55 + 0.45 * sin(uT * 2.3 + p.x * 2.1 + p.y * 1.7)); }
+        return clamp(f, 0.0, 1.0); }
+      ` + sh.fragmentShader
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        float fo = foamAt(vWPos.xz) * (0.7 + 0.3 * texture2D(normalMap, vWPos.xz * 0.3 + uT * 0.05).r);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.78, 0.76, 0.68), smoothstep(0.78, 0.98, vCrest) * 0.55);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.9, 0.86), fo * 0.85);`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+        if (uRain > 0.01) { float e = 0.06, r0 = rip(vWPos.xz), rx = rip(vWPos.xz + vec2(e, 0.0)) - r0, rz = rip(vWPos.xz + vec2(0.0, e)) - r0;
+          normal = normalize(normal + (viewMatrix * vec4(-rx * 1.6, 0.0, -rz * 1.6, 0.0)).xyz * uRain); }`)
+      .replace('#include <opaque_fragment>', `vec4 rc = uTexMat * vec4(vWPos, 1.0); vec2 ruv = rc.xy / rc.w + normal.xy * 0.035;
+        vec3 refl = texture2D(tRefl, ruv).rgb; vec3 Vv = normalize(cameraPosition - vWPos); float fres = 0.1 + 0.9 * pow(1.0 - max(Vv.y, 0.0), 4.0);
+        outgoingLight = mix(outgoingLight, refl, clamp(fres * 0.5, 0.0, 0.55) * (1.0 - fo * 0.8));
+        #include <opaque_fragment>`); };
   const water = new THREE.Mesh(own(new THREE.PlaneGeometry(260, 160, 220, 130)), wM);
   water.rotation.x = -Math.PI / 2; water.position.set(0, wy(30) + 0.15, 60); water.receiveShadow = true; scene.add(water);
+  const addRect = (x, z, hx, hz) => { const n = wU.uRectN.value; if (n >= RMAX) return; rects[n].set(x, z, hx, hz); wU.uRectN.value = n + 1; };
+  addRect(SUB[0], SUB[1], 6.6, 4.6); addRect(0, -12, 130, 0.6);   // подстанцията и стената на северния бряг
   const rainG = own(new THREE.BoxGeometry(0.02, 0.9, 0.02)), rain = new THREE.InstancedMesh(rainG, own(new THREE.MeshBasicMaterial({ color: 0xc8d4e0, transparent: true, opacity: 0.45 })), 700); scene.add(rain);
   const rd = Array.from({ length: 700 }, () => [(Math.random() - 0.5) * 90, Math.random() * 30, (Math.random() - 0.5) * 80]);
   // ---- лодките и хеликоптерът (своя траектория), хората
@@ -96,7 +137,7 @@ function build(K) {
   let rainOn = true;
   return {
     update(m, tt, dt) {
-      const y = wy(m.level); water.position.y = y + 0.15; nT.offset.x = (tt * 0.02) % 1; nT.offset.y = (tt * 0.035) % 1; wU.uT.value = tt; wU.uAmp.value = m.t < m.peakT ? 0.16 : 0.07;   /* докато прииждa — по-бурна */
+      const y = wy(m.level); water.position.y = y + 0.15; nT.offset.x = (tt * 0.02) % 1; nT.offset.y = (tt * 0.035) % 1; wU.uT.value = tt; wU.uAmp.value = m.t < m.peakT ? 0.16 : 0.07; reflector.position.y = y + 0.15; wU.uRain.value += ((m.t < m.peakT && !m.out ? 1 : 0) - wU.uRain.value) * Math.min(1, dt);   /* докато прииждa — по-бурна */
       // дъжд — докато водата расте
       rainOn = m.t < m.peakT && !m.out; rain.visible = rainOn;
       if (rainOn) { const c = K.ctl.target; for (const [i, d] of rd.entries()) { d[1] -= dt * 22; if (d[1] < y) d[1] += 30; dm.position.set(c.x + d[0], d[1], c.z + d[2]); dm.rotation.set(0.15, 0, 0); dm.scale.set(1, 1, 1); dm.updateMatrix(); rain.setMatrixAt(i, dm.matrix); } rain.instanceMatrix.needsUpdate = true; }
@@ -125,9 +166,9 @@ function build(K) {
         else { if (!B0.tgt) { const w = waiting[(i * 5 + (tt | 0)) % Math.max(1, waiting.length)]; B0.tgt = w && y > 0.4 ? [w.x, w.z + 3.5] : [DOCK[0] + i * 3, DOCK[1] + 1.5]; }
           const dx = B0.tgt[0] - B0.x, dz = B0.tgt[1] - B0.z, d = Math.hypot(dx, dz); if (d > 0.6) { const s0 = Math.min(d, 7 * dt); B0.x += dx / d * s0; B0.z += dz / d * s0; } else B0.tgt = Math.abs(B0.z - DOCK[1] - 1.5) < 1 ? null : [DOCK[0] + i * 3, DOCK[1] + 1.5]; }
         const vx = B0.x - (B0.px ?? B0.x), vz = B0.z - (B0.pz ?? B0.z); if (Math.hypot(vx, vz) > 0.002) B0.hdg = Math.atan2(vx, vz); B0.px = B0.x; B0.pz = B0.z; const hdg = B0.hdg ?? Math.PI / 2;
-        B0.h.position.set(B0.x, Math.max(y, -0.7) + Math.sin(tt * 2 + i) * 0.05, B0.z); B0.h.rotation.y = hdg;   /* носът — по посоката на движение */
+        B0.h.position.set(B0.x, Math.max(y, -0.7) + Math.sin(tt * 2 + i) * 0.05, B0.z); B0.h.rotation.y = hdg; wU.uBoat.value[i].set(B0.x, B0.z, hdg, Math.min(1, Math.hypot(vx, vz) / Math.max(dt, 1e-3) / 5));   /* носът — по посоката на движение */
         B0.crew.forEach((P, j) => P.at(B0.x + Math.sin(hdg) * (j ? -0.8 : 0.6), B0.z + Math.cos(hdg) * (j ? -0.8 : 0.6), hdg, Math.max(y, -0.7) + 0.25)); if (i === 0) boatLb = [B0.x, Math.max(y, 0) + 2.5, B0.z]; }
-      for (const B0 of boats) for (const P of B0.crew) P.p.visible = B0.h.visible;
+      for (const [i, B0] of boats.entries()) { for (const P of B0.crew) P.p.visible = B0.h.visible; if (!B0.h.visible) wU.uBoat.value[i].w = 0; }
       // 🚁 хеликоптерът: долита от запад, после виси над покривите (въже до покрива)
       const hOn = m.teams.heli.st === 'onsite', hGo = m.teams.heli.st === 'enroute'; heliLb = null;
       if (heli.h) { heli.h.visible = hOn || hGo; rope.visible = false;

@@ -83,11 +83,13 @@ function tidyCar(sc) {
 }
 // спешна кола за оперативните карти (ops3d.js, opskit.js): копие на модела, почистено и обърнато като в играта, дължина len (м),
 // светлинната лента/бурканите (kind: police | fire | ambulance); светят, докато car.userData.beaconsOn е истина (сирените — от картата)
-export function emergCar(src, len, kind = 'police') { const sc0 = src.clone(true); sc0.traverse(m => { if (m.isMesh) m.castShadow = true; }); const [yaw, L0] = tidyCar(sc0), sc = wrap(sc0, yaw, len / L0); addBeacons(sc, len, kind); sc.userData.noSiren = 1; return sc; }
+// модели с предница към −Z (вървят на заден ход, ако не се обърнат)
+export const CAR_FLIP = new Set(['amb-eu']);
+export function emergCar(src, len, kind = 'police', name = '') { const sc0 = src.clone(true); sc0.traverse(m => { if (m.isMesh) m.castShadow = true; }); const [yaw, L0] = tidyCar(sc0), sc = wrap(sc0, yaw + (CAR_FLIP.has(name) ? Math.PI : 0), len / L0); addBeacons(sc, len, kind); sc.userData.noSiren = 1; return sc; }
 export function loadPoliceCars(load, A) {
   return Promise.all(Object.entries(EMERG).map(([nm, opts]) => {
     const ok = opts.filter(([f]) => feature(f)); if (!ok.length) return null;
-    return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + f + '.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = true; }); const [yaw, L0] = tidyCar(g.scene), K = EMERG_K[nm] * len * M_PER, sc = wrap(g.scene, yaw, K / L0); /* мащабът е във вътрешната група — model() пипа само външния */ addBeacons(sc, K, nm === 'Firetruck' ? 'fire' : nm === 'Ambulance' ? 'ambulance' : 'police'); return sc; }).catch(() => null)))
+    return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + f + '.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = true; }); const [yaw, L0] = tidyCar(g.scene), K = EMERG_K[nm] * len * M_PER, sc = wrap(g.scene, yaw + (CAR_FLIP.has(f) ? Math.PI : 0), K / L0); /* мащабът е във вътрешната група — model() пипа само външния */ addBeacons(sc, K, nm === 'Firetruck' ? 'fire' : nm === 'Ambulance' ? 'ambulance' : 'police'); return sc; }).catch(() => null)))
       .then(list => { list = list.filter(Boolean); if (list.length) A['sf-car-' + nm] = { scene: list[0], variants: list }; });
   }));
 }

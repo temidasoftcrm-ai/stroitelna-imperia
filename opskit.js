@@ -135,8 +135,8 @@ export function openOpsScene(ops, o, cfg) {
     const L = []; if (c.beacons && !car) for (const [col, dx] of [[0xff2020, -0.35], [0x2060ff, 0.35]]) { const b = new THREE.Mesh(own(new THREE.SphereGeometry(0.16, 10, 8)), own(new THREE.MeshBasicMaterial({ color: col }))); b.position.set(dx, c.beaconY || 1.7, 0.2); h.add(b); L.push(b); }
     vehicles.push({ k, i, c, h, L, car }); };
   for (const [k, list] of Object.entries(cfg.cars || {})) for (const [i, c] of list.entries())
-    if (c.kind) load(c.model).then(g => { if (!g || shut) return; const car = emergCar(g.scene, c.len || 5, c.kind); addCar(k, i, c, car, car); });   // c.kind: police | fire | ambulance
-    else place(c.model, { len: c.len || 4.8 }, v => addCar(k, i, c, v, null));
+    if (c.kind) load(c.model).then(g => { if (!g || shut) return; const car = emergCar(g.scene, c.len || 5, c.kind, (c.model.match(/([\w-]+)\.glb$/) || [])[1]); addCar(k, i, c, car, car); });   // c.kind: police | fire | ambulance
+    else place(c.model, { len: c.len || 4.8 }, v => { if (/ladder-truck|dump-truck/.test(c.model)) v.rotation.y = Math.PI; addCar(k, i, c, v, null); });   // тези модели са с кабината назад
   for (const k of Object.keys(TT)) { const lb = document.createElement('div'); lb.className = 'lb'; lb.style.display = 'none'; el.querySelector('.lbs').appendChild(lb); labels[k] = lb; }
   const along = (path, u) => { let tot = 0; const seg = []; for (let i = 1; i < path.length; i++) { const d = Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]); seg.push(d); tot += d; } let s = u * tot;
     for (let i = 0; i < seg.length; i++) { if (s <= seg[i] || i === seg.length - 1) { const t = Math.min(1, s / (seg[i] || 1)), a = path[i], b = path[i + 1]; return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, Math.atan2(b[0] - a[0], b[1] - a[1])]; } s -= seg[i]; } return [...path[path.length - 1], 0]; };
