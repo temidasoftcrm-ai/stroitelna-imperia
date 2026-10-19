@@ -23,8 +23,8 @@ export const AB_MODELS = { vehicles: ['sedan', 'suv', 'taxi', 'van', 'truck', 't
 // [модел, дължина в м, завъртане до „напред = +z“, оцветяване]
 const HEAVY = {
   dozerA: ['bulldozer-a', 6.5, Math.PI / 2], dozerB: ['bulldozer-b', 6.5, 0], dozerC: ['bulldozer-c', 6.5, -Math.PI / 2, 0xf2b705],
-  mine: ['dump-truck', 8, Math.PI], dumpR: ['truck-dump-red', 8, 0], dumpG: ['truck-dump-green', 8, 0], mixer: ['truck-concrete-red', 8.2, 0],
-  loader: ['tractor-shovel', 5.5, 0], tower: ['crane-c', 34, 0],
+  mine: ['sf-dump', 8, 0], dumpR: ['truck-dump-red', 8, 0], dumpG: ['truck-dump-green', 8, 0], mixer: ['truck-concrete-red', 8.2, 0],   // минният — истинският самосвал (vehmodels.js); червеният/зеленият и бетоновозът — истинските от construct.js
+  loader: ['sf-backhoe', 5.5, 0], tower: ['crane-tower', 34, 0],   // багер-товарачът и кулокранът — истинските
 };
 
 const LANES = 6, LW = 3.6, CW = LANES * LW, MED = 4, SH = 2.5;   // платна, ширина на платно, разделител, банкет

@@ -1457,8 +1457,8 @@ function homeSlot(u) {
   return away ? { ...lotPt(h, -3.6, -3.6), inGarage: true } : { ...lotPt(h, 3.8, -4.3), inGarage: true };
 }
 // истинските модели (vehmodels.js) — дължина в света на играта
-const SF_VEH = { loader: 'sf-excavator', truck: 'sf-dump', crane: 'sf-mcrane', tractor: 'sf-backhoe', roller: 'sf-roller', grader: 'sf-grader' };
-const SF_LEN = { loader: 6.5, truck: 7.5, crane: 9, tractor: 4.6, roller: 4.5, grader: 7 };   // м по дължина — в мащаба на колите (седан 4,5 м, vehmodels.js)
+const SF_VEH = { loader: 'sf-excavator', truck: 'sf-dump', crane: 'sf-mcrane', tractor: 'sf-backhoe', roller: 'sf-roller', grader: 'sf-grader', crew: 'sf-car-Van', marker: 'sf-car-Van' };   // бусът на бригадата и маркировката — истинският бус (УАЗ, vehmodels.js) вместо детския delivery/van
+const SF_LEN = { loader: 6.5, truck: 7.5, crane: 9, tractor: 4.6, roller: 4.5, grader: 7, crew: 1, marker: 1 };   // колите (sf-car-*) вече са в мащаба на града — 1   // м по дължина — в мащаба на колите (седан 4,5 м, vehmodels.js)
 const VEH_LEN = { bulldozer: 6 };   // м — моделите от пакетите, които не са в метри: мащаб по най-дългата хоризонтална страна (булдозерът беше колкото сграда; другите Kenney са с процедурни добавки, нагласени за VSCALE)
 function spawnUnit(type, at) {
   const sf = A[SF_VEH[type]] ? SF_VEH[type] : null;
@@ -3612,7 +3612,7 @@ const pres = createPresidency({ pause: () => setSpeed(0), S: () => S, fmt, toast
 // 🌍 режимът „Геополитика“ върху картата (geomap.js): същите география и проекция, отделен слой за държави, кризи и договорености
 const countryPath = c => { let d = countryD.get(c); if (!d || d.px !== projX()) countryD.set(c, d = { px: projX(), d: c.poly.map(poly => poly.map(ring => 'M' + ring.map(([lo, la]) => proj(lo, la).map(v => v.toFixed(1)).join(',')).join('L') + 'Z').join('')).join('') }); return d.d; };
 function mapPanTo(lon, lat, z) { if (!mapView) return drawMap(); const [x, y] = proj(lon, lat), [, , bw, bh] = mapView.base; mapView.vb = [x - bw / z / 2, y - bh / z / 2, bw / z, bh / z]; $('mapSvg').setAttribute('viewBox', mapView.vb.join(' ')); drawMap(); }
-const ops = createOps({ S: () => S, toast, save, sound: n => Sound.play(n), muted: () => Sound.muted, cc: () => pres.state()?.cc || 'US', canStart: () => pres.active() && feature('ops-square'), onClose: () => drawMap(),
+const ops = createOps({ S: () => S, toast, save, sound: n => Sound.play(n), muted: () => Sound.muted, cc: () => pres.state()?.cc || 'US', canStart: k => pres.active() && feature('ops-' + k), onClose: () => drawMap(),
   effect: e => { const ind = pres.state()?.ind; if (!ind) return; for (const [k, v] of Object.entries(e)) if (v && ind[k] != null) ind[k] = Math.max(0, Math.min(100, ind[k] + v)); } });
 window.__ops = ops;   // Лаб / конзолата: __ops.start(); __ops.open()
 const geoMap = createGeoMap({ pres, ops, proj: (lo, la) => proj(lo, la), geo: () => worldGeo || [], pathOf: countryPath, visW: () => mapVisW(), panTo: mapPanTo, fmt, holding: () => econ ? econ.money : 0, redraw: () => drawMap(), day: () => S?.day || 0 });
