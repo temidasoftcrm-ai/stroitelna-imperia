@@ -42,7 +42,7 @@ export function loadVehModels(load, A, base = 'assets/heavy/gear/') {
       if (!parts.length) continue;
       const grp = new THREE.Group();
       for (const p of parts) { const q = p.clone(true); q.applyMatrix4(p.parent.matrixWorld); grp.add(q); }   // в световни координати на пакета
-      A['sf-car-' + nm] = { scene: wrap(grp, 0, k) };
+      A['sf-car-' + nm] = { scene: wrap(grp, 0, k) }; addCarLights(A['sf-car-' + nm].scene);
     }
   }).catch(e => console.warn('vehmodels cars', e)).then(() => feature('cars-real') && loadRealCars(load, A)).then(() => feature('trucks-real') && loadRealTrucks(load, A)).then(() => loadPoliceCars(load, A)));
   return Promise.all(jobs);
@@ -60,6 +60,7 @@ function loadRealCars(load, A) {
     g.scene.traverse(o => { if (o.isMesh) o.castShadow = true; });
     const sc = wrap(g.scene, 0, len * M_PER);
     if (/^Police/.test(nm)) addBeacons(sc, len * M_PER, 'police');
+    addCarLights(sc);
     A['sf-car-' + nm] = { scene: sc };
   }).catch(e => console.warn('real car', nm, e))));
 }
@@ -105,6 +106,23 @@ export function addTruckLamps(o, len, w = 2.4, y = 1.1, rearZ = null) {
     const f = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), L.front); f.position.set(sx * w * 0.36, y, len / 2 + 0.05); o.add(f);
     const r = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), L.rear); r.rotation.y = Math.PI; r.position.set(sx * w * 0.42, y, (rearZ ?? -len / 2) - 0.05); o.add(r);
   }
+}
+// фаровете на колите (Лабораторията → car-lights): двата фара и стоповете (addTruckLamps) + светло петно на асфалта пред колата —
+// конус, който избледнява напред (адитивно, нощем; денем е черно — не се вижда)
+let beamM = null;
+const carBeam = () => beamM || (beamM = (() => {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 128; const x = c.getContext('2d');
+  x.fillStyle = '#000'; x.fillRect(0, 0, 64, 128);
+  for (let y = 0; y < 128; y++) { const t = y / 127, w = 10 + t * 26, a = Math.pow(1 - t, 1.6) * (t < 0.06 ? t / 0.06 : 1); const g = x.createLinearGradient(32 - w, 0, 32 + w, 0); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.5, `rgb(${Math.round(255 * a)},${Math.round(236 * a)},${Math.round(190 * a)})`); g.addColorStop(1, 'rgba(0,0,0,1)'); x.fillStyle = g; x.fillRect(32 - w, y, 2 * w, 1); }
+  const m = new THREE.MeshStandardMaterial({ color: 0, emissive: 0xfff0d0, emissiveMap: new THREE.CanvasTexture(c), emissiveIntensity: 0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  NF_MATS.add(m); m.userData.nfK = 0.9; return m;
+})());
+export function addCarLights(sc) {
+  if (!feature('car-lights')) return;
+  sc.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(sc), s = b.getSize(new THREE.Vector3()), len = s.z;
+  const g = new THREE.Group(); g.position.z = (b.min.z + b.max.z) / 2; sc.add(g);
+  addTruckLamps(g, len, s.x, s.y * 0.42);
+  const pl = new THREE.Mesh(new THREE.PlaneGeometry(s.x * 2.2, len * 2.2), carBeam()); pl.rotation.x = -Math.PI / 2; pl.position.set(0, 0.06, len / 2 + len * 1.1); pl.renderOrder = 2; g.add(pl);
 }
 function loadRealTrucks(load, A) {
   return Promise.all(TRK.map((f, i) => load('assets/heavy/trucks/' + f + '.glb').then(g => {
