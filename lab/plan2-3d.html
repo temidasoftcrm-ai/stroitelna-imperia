@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Град v2 в 3D</title>
+<style>
+  :root { --bg:#14161b; --card:#1d2027ee; --txt:#e8e8ea; --mut:#9aa0aa; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--txt); font:13px/1.4 system-ui,sans-serif; overflow:hidden; }
+  #c { position:fixed; inset:0; }
+  .ui { position:fixed; left:12px; top:12px; background:var(--card); border-radius:10px; padding:10px 12px; max-width:min(420px, calc(100vw - 24px)); }
+  .ui h1 { font-size:15px; margin:0 0 6px; } .row { display:flex; gap:6px; flex-wrap:wrap; margin:6px 0; }
+  button, select, input { background:#2a2f38; color:var(--txt); border:1px solid #3a414d; border-radius:7px; padding:5px 9px; font:inherit; cursor:pointer; } input { width:70px; }
+  button.on { background:#2a6b3e; border-color:#2a6b3e; } #st { color:var(--mut); white-space:pre-line; }
+</style></head><body>
+<canvas id="c"></canvas>
+<div class="ui"><h1>🏙️ Град v2 — 3D демо</h1>
+  <div class="row"><select id="fam"><option value="eu">Европейски</option><option value="us">Американски</option><option value="coast">Крайбрежен</option><option value="radial">Радиален</option></select>
+    <select id="size"><option value="s">малък</option><option value="m" selected>среден</option><option value="l">голям</option><option value="xl">мегаполис</option></select>
+    seed <input id="seed" type="number" value="7"><button id="go">↻</button></div>
+  <div class="row"><button id="top">⬆ Отгоре</button><button id="game" class="on">🎮 Игрова камера</button><button id="round">⭕ Кръгово</button><button id="night">🌙 Нощ</button></div>
+  <div id="st">зарежда…</div></div>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { plan2 } from '../cityplan2.js';
+
+const R = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true }); R.setPixelRatio(Math.min(2, devicePixelRatio)); R.shadowMap.enabled = true; R.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(45, 1, 1, 4000), ctl = new OrbitControls(cam, R.domElement); ctl.maxPolarAngle = Math.PI * 0.47; ctl.enableDamping = true;
+const hemi = new THREE.HemisphereLight(0xdfefff, 0x5d6b45, 1.2), sun = new THREE.DirectionalLight(0xfff1d6, 2.3); sun.position.set(200, 320, 140); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -420, right: 420, top: 420, bottom: -420, near: 10, far: 1000 }); scene.add(hemi, sun, sun.target);
+const resize = () => { R.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); }; addEventListener('resize', resize); resize();
+const M = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.92 });
+const MAT = { grass: M(0x7fa462), walk: M(0xc9c4b8), asph: M(0x3a3d42), median: M(0x5f9a45), island: M(0x6aa84f), water: new THREE.MeshStandardMaterial({ color: 0x3f7fb0, roughness: 0.2, metalness: 0.1 }), paint: M(0xf2f2ea), lot: new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 }) };
+for (const k of ['walk', 'asph', 'median', 'paint']) Object.assign(MAT[k], { polygonOffset: true, polygonOffsetFactor: { walk: -1, asph: -2, median: -3, paint: -4 }[k], polygonOffsetUnits: { walk: -1, asph: -2, median: -3, paint: -4 }[k] });
+
+// ---- модели
+const loader = new GLTFLoader(), A = {};
+const load = (k, url) => loader.loadAsync(url).then(g => { g.scene.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; if (o.material?.metalness > 0.5) o.material.metalness = 0.3; } }); A[k] = g.scene; }).catch(() => {});
+const HOUSES = ['h2-blue', 'h2-brickcabin', 'h2-greyporch', 'h2-pink', 'h2-porch', 'h2-swedish', 'h2-townhouse'], OFFICE = ['office1', 'office2', 'office3', 'office4', 'office5', 'office6', 'midwest', 'brickshop', 'pp-apart', 'pp-redcorner', 'pp-green', 'pp-brown'], TOWER = ['hirise', 'nyhirise', 'usbank'];
+const CARS = ['car-polo', 'car-p206', 'car-renegade', 'car-accord', 'car-corolla', 'car-taxi', 'car-hilux', 'bus-citaro'];
+await Promise.all([...HOUSES.map(k => load(k, `../assets/heavy/houses2/${k}.glb`)), ...[...OFFICE, ...TOWER].map(k => load(k, `../assets/heavy/blocks2/${k}.glb`)),
+  load('hospital', '../assets/heavy/hospital/hospital.glb'), load('station', '../assets/heavy/station/small.glb'), load('stadium', '../assets/heavy/stadium/stadium.glb'), load('cityhall', '../assets/heavy/civic/cityhall.glb'),
+  ...CARS.map(k => load(k, `../assets/heavy/cars/${k}.glb`))]);
+const size3 = o => new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3());
+function placeModel(k, L, fit, hMax = 1e9) {   // модел в парцела: лицето към улицата, побран в (w, d) с отстояние
+  if (!A[k]) return null; const o = A[k].clone(true), w = new THREE.Group(), inner = new THREE.Group(); inner.add(o); w.add(inner);
+  let s = size3(inner); if ((s.x > s.z) !== (L.w > L.d)) { inner.rotation.y = Math.PI / 2; s = size3(inner); }
+  const k2 = Math.min((L.w - fit) / s.x, (L.d - fit) / s.z, hMax / s.y); inner.scale.setScalar(k2);
+  const b = new THREE.Box3().setFromObject(inner), c = b.getCenter(new THREE.Vector3()); inner.position.set(-c.x, -b.min.y, -c.z);
+  w.position.set(L.x, 0, L.z); w.rotation.y = L.rot; return w;
+}
+
+// ---- геометрия
+function ribbon(pts, w, y, closed = false) {
+  const pos = [], idx = [];
+  for (let i = 0; i < pts.length; i++) { const a = pts[closed ? (i - 1 + pts.length) % pts.length : Math.max(0, i - 1)], b = pts[closed ? (i + 1) % pts.length : Math.min(pts.length - 1, i + 1)]; let dx = b[0] - a[0], dz = b[1] - a[1]; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
+    pos.push(pts[i][0] - dz * w / 2, y, pts[i][1] + dx * w / 2, pts[i][0] + dz * w / 2, y, pts[i][1] - dx * w / 2); if (i) { const k = 2 * i; idx.push(k - 2, k, k - 1, k - 1, k, k + 1); } }
+  return { pos, idx };
+}
+function disc(x, z, r, y, r0 = 0, seg = 40) { const pos = [], idx = []; for (let k = 0; k <= seg; k++) { const a = k / seg * Math.PI * 2; pos.push(x + Math.cos(a) * r0, y, z + Math.sin(a) * r0, x + Math.cos(a) * r, y, z + Math.sin(a) * r); if (k) { const i = 2 * k; idx.push(i - 2, i, i - 1, i - 1, i, i + 1); } } return { pos, idx }; }
+function merge(parts, mat) { const pos = [], idx = []; for (const p of parts) { const b = pos.length / 3; pos.push(...p.pos); for (const i of p.idx) idx.push(i + b); } const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); const m = new THREE.Mesh(g, mat); m.receiveShadow = true; return m; }
+
+let city = null, P = null, cars = [], night = false;
+function build() {
+  if (city) { scene.remove(city); city.traverse(o => { if (o.geometry && !o.userData.shared) o.geometry.dispose(); }); }
+  city = new THREE.Group(); scene.add(city);
+  P = plan2('demo', { fam: fam.value, size: size.value, seed: +seed.value || 0 });
+  const RR = P.R * 1.6, g0 = new THREE.Mesh(new THREE.PlaneGeometry(RR * 2.4, RR * 2.4).rotateX(-Math.PI / 2), MAT.grass); g0.receiveShadow = true; city.add(g0);
+  if (P.coastZ) { const sh = new THREE.Shape(); sh.moveTo(-RR * 1.2, -RR * 1.2); for (let i = 0; i <= 80; i++) { const x = -RR * 1.2 + i * RR * 2.4 / 80; sh.lineTo(x, P.coastZ(x)); } sh.lineTo(RR * 1.2, -RR * 1.2); const wg = new THREE.ShapeGeometry(sh); wg.rotateX(Math.PI / 2); const wm = new THREE.Mesh(wg, MAT.water); wm.position.y = 0.02; city.add(wm); }
+  const W = [], As = [], Md = [], Pt = [], Is = [];
+  // пътят спира на ръба на кръговото; разделителната ивица — на ръба на всяко кръстовище
+  const cut = (pts, n0, r0, n1, r1) => pts.filter(p => Math.hypot(p[0] - n0.x, p[1] - n0.z) >= r0 && Math.hypot(p[0] - n1.x, p[1] - n1.z) >= r1);
+  const rOf = (n, med) => n.kind === 'round' ? P.rounds.find(r => r.node === n.id).outer - 0.5 : med && n.arms.length >= 3 ? n.r : 0;
+  for (const rd of P.roads) { const nA = P.nodes[rd.from], nB = P.nodes[rd.to], pr = cut(rd.pts, nA, rOf(nA), nB, rOf(nB)), pm = cut(rd.pts, nA, rOf(nA, 1), nB, rOf(nB, 1)); if (pr.length < 2) continue;
+    W.push(ribbon(pr, rd.w + 2 * rd.walk, 0.04)); As.push(ribbon(pr, rd.w, 0.07)); if (rd.median && pm.length > 1) Md.push(ribbon(pm, rd.median, 0.1));
+    else if (rd.cls === 'street') for (let s = 4; s < rd.L[rd.L.length - 1] - 4; s += 7) { let i = 1; while (i < rd.L.length - 1 && rd.L[i] < s) i++; const j = Math.min(rd.pts.length - 1, i + 1), q = rd.pts[i]; if ([nA, nB].some(n => Math.hypot(q[0] - n.x, q[1] - n.z) < Math.max(rOf(n), n.r || 0) + 3)) continue; Pt.push(ribbon([rd.pts[i - 1], rd.pts[j]], 0.18, 0.12)); } }
+  for (const n of P.nodes) { if (n.arms.length >= 3 && n.kind !== 'round') { W.push(disc(n.x, n.z, n.r + 2.5, 0.045)); As.push(disc(n.x, n.z, n.r, 0.075)); } }
+  for (const t of P.turns) { W.push(disc(t.x, t.z, t.r + 2.5, 0.045)); As.push(disc(t.x, t.z, t.r, 0.075)); }
+  for (const r of P.rounds) { W.push(disc(r.x, r.z, r.outer + 2.5, 0.045)); As.push(disc(r.x, r.z, r.outer, 0.075, r.island)); Is.push(disc(r.x, r.z, r.island, 0.2));
+    const st = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.4, 6, 10), M(0x9a8f7a)); st.position.set(r.x, 3, r.z); st.castShadow = true; city.add(st); }   // скулптура в средата
+  city.add(merge(W, MAT.walk), merge(As, MAT.asph), merge(Md, MAT.median), merge(Is, MAT.island)); if (Pt.length) city.add(merge(Pt, MAT.paint));
+  // парцели: очертания + сгради по зона; големите места — свой модел (паркът — дървета)
+  const lp = []; for (const L of P.lots) for (let i = 0; i < 4; i++) { const a = L.poly[i], b = L.poly[(i + 1) % 4]; lp.push(a[0], 0.15, a[1], b[0], 0.15, b[1]); }
+  const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3)); city.add(new THREE.LineSegments(lg, MAT.lot));
+  const pick = (arr, id) => arr[(id * 2654435761 >>> 0) % arr.length];
+  const trunk = M(0x6b4a2e), leaf = M(0x4f8a3a);
+  for (const L of P.lots) {
+    let o = null;
+    if (L.big === 'park') { for (let k = 0; k < Math.floor(L.w * L.d / 70); k++) { const t = new THREE.Group(), h = 4 + (k * 7 % 5); const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, h * 0.45, 6), trunk); tr.position.y = h * 0.22; const cr = new THREE.Mesh(new THREE.SphereGeometry(h * 0.3, 8, 6), leaf); cr.position.y = h * 0.55; cr.castShadow = true; t.add(tr, cr);
+      const u = ((k * 0.7548776662 + 0.5) % 1 - 0.5) * (L.w - 6), v = ((k * 0.5698402910 + 0.5) % 1 - 0.5) * (L.d - 6), c = Math.cos(L.rot), s = Math.sin(L.rot); t.position.set(L.x + u * c + v * s, 0, L.z - u * s + v * c); city.add(t); } continue; }
+    if (L.big) o = placeModel({ hospital: 'hospital', station: 'station', stadium: 'stadium', special: 'cityhall' }[L.big], L, 6);
+    else if (L.zone === 'residential' || L.zone === 'periphery') o = placeModel(pick(HOUSES, L.id), L, 5, 9);
+    else if (L.zone === 'center' && L.id % 3 === 0) o = placeModel(pick(TOWER, L.id), L, 4);
+    else o = placeModel(pick(OFFICE, L.id), L, 4, 26);
+    if (o) city.add(o);
+  }
+  spawnCars(); stats(); view(viewMode);
+}
+
+// ---- движение: всяка кола върви по лента до стоп линията, после завой (или кръговото) към друг клон; без сблъсъци (те са част C — 2a)
+function nextLeg(c) {
+  const n = P.nodes[c.dir > 0 ? P.roads[c.road].to : P.roads[c.road].from], arrive = n.arms.findIndex(a => a.road === c.road && a.end === (c.dir > 0 ? 1 : 0));
+  const opts = n.arms.map((a, i) => i).filter(i => i !== arrive || n.arms.length === 1);
+  const to = opts[(Math.random() * opts.length) | 0], a2 = n.arms[to], dir2 = a2.end === 0 ? 1 : -1;
+  let path = [];
+  if (n.kind === 'round') { const ri = P.rounds.findIndex(r => r.node === n.id), Rr = P.rounds[ri], e0 = Rr.entries[arrive], e1 = Rr.entries[to], ring = Rr.ring, L = [0]; for (let i = 1; i < ring.length; i++) L.push(L[i - 1] + Math.hypot(ring[i][0] - ring[i - 1][0], ring[i][1] - ring[i - 1][1]));
+    const C = L[L.length - 1], seg = []; let s = e0.inS, end = e1.outS <= s ? e1.outS + C : e1.outS; for (; s <= end; s += 2) { const ss = s % C; let i = 1; while (i < L.length - 1 && L[i] < ss) i++; seg.push(ring[i]); }
+    path = [...P.roundPath(ri, arrive, 'in'), ...seg, ...P.roundPath(ri, to, 'out')]; }
+  else if (n.arms.length >= 2 && arrive >= 0 && n.kind !== 'end') path = P.turnPath(n.id, arrive, 0, to, 0);
+  c.road = a2.road; c.dir = dir2; c.pts = [...path, ...P.lanePath(a2.road, dir2, 0)]; c.i = 0;
+}
+function spawnCars() {
+  for (const c of cars) scene.remove(c.o); cars = [];
+  const N = Math.min(140, P.roads.length * 2);
+  for (let k = 0; k < N; k++) {
+    const rd = P.roads[(Math.random() * P.roads.length) | 0], dir = Math.random() < 0.5 ? 1 : -1, nm = CARS[k % CARS.length]; if (!A[nm]) continue;
+    const o = new THREE.Group(), body = A[nm].clone(true); body.scale.setScalar(nm === 'bus-citaro' ? 12 : 4.4); o.add(body);
+    const hl = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.25, 0.1), new THREE.MeshBasicMaterial({ color: 0xfff6d0 })); hl.position.set(0, 0.7, 2.25 * (nm === 'bus-citaro' ? 2.7 : 1)); hl.visible = night; o.add(hl); o.userData.hl = hl;
+    scene.add(o);
+    const pts = P.lanePath(rd.id, dir, 0), c = { o, road: rd.id, dir, pts, i: (Math.random() * pts.length) | 0, sp: 9 + Math.random() * 5 }; cars.push(c);
+  }
+}
+function moveCars(dt) {
+  for (const c of cars) {
+    let left = c.sp * dt;
+    while (left > 0) {
+      if (c.i >= c.pts.length - 1) { nextLeg(c); if (c.pts.length < 2) break; }
+      const a = c.pts[c.i], b = c.pts[c.i + 1], d = Math.hypot(b[0] - a[0], b[1] - a[1]), t = (c.t || 0);
+      if (t * d + left < d) { c.t = t + left / (d || 1); left = 0; } else { left -= d * (1 - t); c.t = 0; c.i++; }
+    }
+    const a = c.pts[Math.min(c.i, c.pts.length - 1)], b = c.pts[Math.min(c.i + 1, c.pts.length - 1)], t = c.t || 0;
+    c.o.position.set(a[0] + (b[0] - a[0]) * t, 0.05, a[1] + (b[1] - a[1]) * t); if (b !== a) c.o.rotation.y = Math.atan2(b[0] - a[0], b[1] - a[1]);
+  }
+}
+
+// ---- камера, ден/нощ, статистика
+let viewMode = 'game';
+function view(m) {
+  viewMode = m; for (const b of ['top', 'game', 'round']) document.getElementById(b).classList.toggle('on', b === m);
+  const c = P.center, r0 = P.rounds[0] || { x: c.x, z: c.z };
+  if (m === 'top') { ctl.target.set(c.x, 0, c.z); cam.position.set(c.x, P.R * 2.3, c.z + 1); }
+  if (m === 'game') { ctl.target.set(c.x, 0, c.z); cam.position.set(c.x + 120, 130, c.z + 170); }
+  if (m === 'round') { ctl.target.set(r0.x, 0, r0.z); cam.position.set(r0.x + 45, 38, r0.z + 55); }
+  ctl.update();
+}
+function setNight(on) { night = on; document.getElementById('night').classList.toggle('on', on); hemi.intensity = on ? 0.18 : 1.2; sun.intensity = on ? 0.12 : 2.3; scene.background = new THREE.Color(on ? 0x0b1020 : 0x9fc9ee); for (const c of cars) c.o.userData.hl.visible = on; }
+let fps = 0, fr = 0, ft = performance.now();
+function stats() { const i = R.info; document.getElementById('st').textContent = `${P.fam} · ${P.size} · ${P.stats.build} парцела + ${P.stats.big} големи · ${P.roads.length} пътя · ${P.rounds.length} кръгови\nплан: ${P.stats.ms} ms · ${cars.length} коли\nкадър: ${fps} fps · ${i.render.calls} draw calls · ${(i.render.triangles / 1000).toFixed(0)}k триъгълника · ${i.memory.geometries} геометрии · ${i.memory.textures} текстури`; }
+const fam = document.getElementById('fam'), size = document.getElementById('size'), seed = document.getElementById('seed');
+document.getElementById('go').onclick = build; fam.onchange = build; size.onchange = build;
+for (const b of ['top', 'game', 'round']) document.getElementById(b).onclick = () => view(b);
+document.getElementById('night').onclick = () => setNight(!night);
+scene.background = new THREE.Color(0x9fc9ee); build();
+let last = performance.now();
+R.setAnimationLoop(() => { const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now; moveCars(dt); ctl.update(); R.render(scene, cam); fr++; if (now - ft > 1000) { fps = fr; fr = 0; ft = now; stats(); } });
+window.__p2 = { P: () => P, view, setNight, cars: () => cars };
+</script></body></html>

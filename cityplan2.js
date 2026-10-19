@@ -100,7 +100,7 @@ function pointGrid(cell) {
 
 // ---- скелет по семейство: граница, вода, главни пътища (линии с клас), центрове на квартали
 function skeleton(fam, size, r) {
-  const Z = SIZE[size], R = Z.R, rr = (a, b) => lerp(a, b, r()), lines = [], hubs = [{ x: 0, z: 0, main: true }];
+  const Z = SIZE[size], R = Z.R * (fam === 'coast' ? 1.3 : 1) /* крайбрежният — по-голям радиус: половината кръг е вода */, rr = (a, b) => lerp(a, b, r()), lines = [], hubs = [{ x: 0, z: 0, main: true }];
   const big = size === 'l' || size === 'xl';
   let bnd = [], waterAt = () => false, coastZ = null;
   const ring = (rad, cls, n = 18, wob = 0.05) => { const ph = rr(0, TAU), c = []; for (let k = 0; k < n; k++) { const a = k / n * TAU; c.push([Math.cos(a) * rad * (1 + wob * Math.sin(3 * a + ph)), Math.sin(a) * rad * (1 + wob * Math.sin(3 * a + ph))]); } lines.push({ cls, pts: closedCurve(c), closed: true }); };
@@ -114,7 +114,10 @@ function skeleton(fam, size, r) {
     if (size === 's') { const a = angs[0]; lines.push({ cls: 'blvd', pts: catmull([[Math.cos(a) * R * 1.1, Math.sin(a) * R * 1.1], [Math.cos(a) * R * 0.4 + rr(-15, 15), Math.sin(a) * R * 0.4 + rr(-15, 15)], [rr(-8, 8), rr(-8, 8)], [-Math.cos(a) * R * 0.45, -Math.sin(a) * R * 0.45], [-Math.cos(a) * R * 1.1, -Math.sin(a) * R * 1.1]]) }); }
     else angs.forEach((a, i) => radial(a, i >= 4 ? R * 0.3 : 0, R * 1.1, 'blvd', 0.09));   // до центъра — най-много 4 направления; останалите тръгват от вътрешния пръстен
     if (size === 'm') ring(R * 0.55, 'ring', 16, 0.08);
-    if (big) { ring(R * 0.3, 'street', 12, 0.06); ring(R * 0.9, 'ring', 22, 0.05); }
+    // големите европейски — не пълни кръгове (иначе приличат на радиалните): непълни дъги между булевардите и отделни квартали
+    const arc = (rad, a0, a1, cls, wob = 0.05) => { const n = Math.max(3, Math.ceil((a1 - a0) / 0.3)), ph = rr(0, TAU), c = []; for (let k = 0; k <= n; k++) { const a = lerp(a0, a1, k / n); c.push([Math.cos(a) * rad * (1 + wob * Math.sin(2 * a + ph)), Math.sin(a) * rad * (1 + wob * Math.sin(2 * a + ph))]); } lines.push({ cls, pts: catmull(c) }); };
+    if (size === 'l') { arc(R * 0.3, angs[0] - 0.08, angs[3] + 0.08, 'street'); arc(R * 0.86, angs[1] - 0.1, angs[3] + 0.1, 'ring'); }   // стар център (¾ дъга) и обход от едната страна
+    if (size === 'xl') { arc(R * 0.3, angs[1] - 0.08, angs[4] + 0.08, 'street'); arc(R * 0.9, angs[2] - 0.1, angs[4] + 0.1, 'ring'); arc(R * 0.62, angs[0] - 0.08, angs[1] + 0.08, 'ring', 0.08); }
     if (size === 'xl') for (let i = 0; i < 3; i++) { const a = ang0 + (i + 0.5) * TAU / 3, h = { x: Math.cos(a) * R * 0.6, z: Math.sin(a) * R * 0.6 }; hubs.push(h); radial(a + 0.6, R * 0.62, R * 0.6, 'blvd'); }
   } else if (fam === 'radial') {
     const nR = { s: 3, m: 4, l: 6, xl: 8 }[size];
@@ -142,7 +145,11 @@ function skeleton(fam, size, r) {
     if (size !== 's') off(R * 0.42, 'blvd');
     if (big) off(R * 0.82, 'ring');
     const nE = { s: 1, m: 2, l: 3, xl: 4 }[size];
-    for (let i = 0; i < nE; i++) { const x = lerp(-R * 0.6, R * 0.6, nE === 1 ? 0.5 : i / (nE - 1)) + rr(-20, 20); lines.push({ cls: size === 's' ? 'street' : 'blvd', pts: catmull([[x, coastZ(x) + 14], [x + rr(-25, 25), coastZ(x) + R * 0.5], [x + rr(-30, 30), R * 1.1]]) }); }
+    const entX = [];
+    for (let i = 0; i < nE; i++) { const x = lerp(-R * 0.6, R * 0.6, nE === 1 ? 0.5 : i / (nE - 1)) + rr(-20, 20); entX.push(x); lines.push({ cls: size === 's' ? 'street' : 'blvd', pts: catmull([[x, coastZ(x) + 14], [x + rr(-25, 25), coastZ(x) + R * 0.5], [x + rr(-30, 30), R * 1.1]]) }); }
+    // напречни улици по границите на кварталните ивици (localStreets) — там ивиците се срещат; без тях улиците им свършваха една срещу друга
+    const nS = { s: 2, m: 3, l: 4, xl: 6 }[size];
+    for (let i = 1; i < nS; i++) { const x = lerp(-R * 1.1, R * 1.1, i / nS); if (entX.some(e => Math.abs(e - x) < 45)) continue; lines.push({ cls: 'street', pts: catmull([[x, coastZ(x) + 14], [x + rr(-8, 8), coastZ(x) + R * 0.6], [x + rr(-10, 10), R * 1.1]]) }); }
     bnd = bnd.map(([x, z]) => [x, Math.max(z, coastZ(x) - 2)]);
     hubs[0] = { x: 0, z: coastZ(0) + R * 0.22, main: true };
     if (size === 'xl') hubs.push({ x: -R * 0.55, z: coastZ(-R * 0.55) + R * 0.2 }, { x: R * 0.55, z: coastZ(R * 0.55) + R * 0.2 });
@@ -279,6 +286,19 @@ export function plan2(cityId, o = {}) {
     }
   };
   for (const L of locals) { snapEnd(L, 0); snapEnd(L, 1); }
+  // втори опит: краят, който не стигна до главен път — до друга квартална улица напред (≤ 34 м), напр. на границата на два квартала
+  const lgr = pointGrid(16); locals.forEach((L, li) => L.pts.forEach(p => lgr.add(p, li)));
+  const snapLocal = (L, li, end) => {
+    const P = L.pts, p = end ? P[P.length - 1] : P[0], q = end ? P[P.length - 2] : P[1], l = dist(p, q) || 1, d = [(p[0] - q[0]) / l, (p[1] - q[1]) / l];
+    if (majorNear(p, 3) !== null) return;   // вече е на главен път
+    for (let s = 2; s <= 34; s += 2) {
+      const x = [p[0] + d[0] * s, p[1] + d[1] * s]; if (sk.waterAt(x[0], x[1]) || !inPoly(x, sk.bnd)) return;
+      let hit = null; lgr.near(x, 2.5, (q2, lj) => { if (!hit && lj !== li) hit = q2; }); if (!hit) continue;
+      const n = Math.max(1, Math.ceil(dist(p, hit) / 4)), ext2 = []; for (let k = 1; k <= n; k++) ext2.push([lerp(p[0], hit[0], k / n), lerp(p[1], hit[1], k / n)]);
+      if (end) P.push(...ext2); else P.unshift(...ext2.reverse()); return;
+    }
+  };
+  locals.forEach((L, li) => { snapLocal(L, li, 0); snapLocal(L, li, 1); });
   const lines = [...sk.lines, ...locals].map(L => ({ ...L, pts: L.pts }));
   // граф и правила
   const G = buildGraph(lines, { merge: 7 });
@@ -324,7 +344,17 @@ export function plan2(cityId, o = {}) {
     n.kind = deg === 1 ? 'end' : deg === 2 ? 'bend' : deg === 3 ? 'T' : 'X';
     n.r = deg >= 3 ? Math.max(...ws.map(r2 => r2.w)) / 2 + 3 : 0;
     n.ctrl = deg < 3 ? 'none' : main >= 2 && deg === 4 ? 'signal' : main ? 'yield' : 'none';
-    for (const a of n.arms) a.prio = isMain(P.roads[a.road].cls) ? 1 : 0;
+    for (const a of n.arms) { a.cls = P.roads[a.road].cls; a.rank = CLS[a.cls].rank; a.prio = isMain(a.cls) ? 1 : 0; }   // главният поток при Т без светофар — по-високият rank
+  }
+  // краищата: изход към други градове (главен път до границата), връзка за бъдещо разширение (квартална до границата),
+  // истински задънен край навътре — с кръг за обръщане (парцелите го заобикалят)
+  const bDist = (x, z) => { let d = 1e9; for (let i = 0; i < sk.bnd.length; i++) d = Math.min(d, segDist([x, z], sk.bnd[i], sk.bnd[(i + 1) % sk.bnd.length])); return inPoly([x, z], sk.bnd) ? d : -d; };
+  P.turns = [];
+  for (const n of P.nodes) {
+    if (n.arms.length !== 1) continue;
+    const rd = P.roads[n.arms[0].road], bd = bDist(n.x, n.z);
+    n.endKind = isMain(rd.cls) && bd < 30 ? 'exit' : bd < 40 ? 'grow' : 'dead';
+    if (n.endKind === 'dead') { n.r = rd.w / 2 + 5; P.turns.push({ node: n.id, x: n.x, z: n.z, r: n.r }); }
   }
   // кръгови: центърът (ако е кръстовище на главни) + важни 4-клонни на булевардите, раздалечени ≥ 0,45R
   const want = SIZE[size].rounds + (fam === 'eu' || fam === 'radial' ? 1 : 0);
@@ -337,9 +367,12 @@ export function plan2(cityId, o = {}) {
     // ъглите между входовете — поне 60°
     const as = n.arms.map(a => a.angle).sort((p, q2) => p - q2); if (as.some((a, i) => (i ? a - as[i - 1] : a + TAU - as[as.length - 1]) < 1.0)) continue;
     const island = n === cand[0] && (fam === 'eu' || fam === 'radial') ? 14 : 9, outer = island + 7;
+    if (P.nodes.some(m => m !== n && m.arms.length && Math.hypot(m.x - n.x, m.z - n.z) < outer + 14)) continue;   // друг възел в кръговото → не става (улица през острова)
     n.kind = 'round'; n.ctrl = 'round'; n.r = outer + 2;
     const ring = []; for (let k = 0; k <= 48; k++) { const a = -k / 48 * TAU; ring.push([n.x + Math.cos(a) * (island + 3.5), n.z + Math.sin(a) * (island + 3.5)]); }   // обратно на часовника отгоре (дясно движение)
-    P.rounds.push({ node: n.id, x: n.x, z: n.z, island, outer, lanes: 1, ring, entries: n.arms.map(a => ({ road: a.road, angle: a.angle })) });
+    const rr0 = island + 3.5, circ = TAU * rr0, sOf = ang => { const t = P.drive === 'R' ? -ang : ang; return ((t % TAU) + TAU) % TAU / TAU * circ; }, dl = Math.asin(Math.min(0.9, 3.3 / rr0));
+    if (P.drive !== 'R') ring.reverse();
+    P.rounds.push({ node: n.id, x: n.x, z: n.z, island, outer, lanes: 1, ring, entries: n.arms.map((a, i) => ({ arm: i, road: a.road, angle: a.angle, inS: sOf(a.angle + (P.drive === 'R' ? -dl : dl)), outS: sOf(a.angle + (P.drive === 'R' ? dl : -dl)) })) });
     P.greens.push({ kind: 'island', poly: ring.map(([x, z]) => [n.x + (x - n.x) * island / (island + 3.5), n.z + (z - n.z) * island / (island + 3.5)]) });
   }
   // стоп линии и конфликтна зона
@@ -352,12 +385,34 @@ export function plan2(cityId, o = {}) {
   }
   placeLots(P, sk, r);
   // помощни
+  // лента: от изхода на началния възел до стоп линията на крайния (dir 1 — по pts, −1 — обратно; i — от средата навън)
+  const nodeR = n => (n.kind === 'round' ? P.rounds.find(r2 => r2.node === n.id).outer + 1 : n.r || 0);
+  const trim = (pts, s0, s1) => { const L = cumLen(pts), T = L[L.length - 1], out = []; if (T - s0 - s1 < 1) return [pts[0], pts[pts.length - 1]]; let j = 1; const at = s => { while (j < L.length - 1 && L[j] < s) j++; const t = (s - L[j - 1]) / ((L[j] - L[j - 1]) || 1); return [lerp(pts[j - 1][0], pts[j][0], t), lerp(pts[j - 1][1], pts[j][1], t)]; };
+    out.push(at(s0)); for (let k = 0; k < L.length; k++) if (L[k] > s0 && L[k] < T - s1) out.push(pts[k]); j = 1; out.push(at(T - s1)); return out; };
   P.lanePath = (roadId, dir, i) => { const rd = P.roads[roadId], pts = dir > 0 ? rd.pts : rd.pts.slice().reverse(), off = (rd.median / 2 + (i + 0.5) * rd.laneW) * (P.drive === 'R' ? 1 : -1);
-    return pts.map((p, k) => { const a = pts[Math.max(0, k - 1)], b = pts[Math.min(pts.length - 1, k + 1)], l = dist(a, b) || 1, tx = (b[0] - a[0]) / l, tz = (b[1] - a[1]) / l; return [p[0] - tz * off, p[1] + tx * off]; }); };
+    const o = pts.map((p, k) => { const a = pts[Math.max(0, k - 1)], b = pts[Math.min(pts.length - 1, k + 1)], l = dist(a, b) || 1, tx = (b[0] - a[0]) / l, tz = (b[1] - a[1]) / l; return [p[0] - tz * off, p[1] + tx * off]; });
+    const nA = P.nodes[dir > 0 ? rd.from : rd.to], nB = P.nodes[dir > 0 ? rd.to : rd.from];
+    return trim(o, nodeR(nA), nodeR(nB)); };
+  const bez = (a, c, b, n = 12) => Array.from({ length: n + 1 }, (_, k) => { const t = k / n, u = 1 - t; return [u * u * a[0] + 2 * u * t * c[0] + t * t * b[0], u * u * a[1] + 2 * u * t * c[1] + t * t * b[1]]; });
+  const xLines = (p, d, q, e) => { const den = d[0] * e[1] - d[1] * e[0]; if (Math.abs(den) < 1e-3) return [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]; const t = ((q[0] - p[0]) * e[1] - (q[1] - p[1]) * e[0]) / den; return [p[0] + d[0] * t, p[1] + d[1] * t]; };
+  const armLane = (nodeId, armI, laneI, inbound) => { const n = P.nodes[nodeId], a = n.arms[armI], rd = P.roads[a.road], dirIn = a.end === 1 ? 1 : -1, dir = inbound ? dirIn : -dirIn, L = P.lanePath(a.road, dir, laneI); return inbound ? [L[L.length - 1], L[L.length - 2] || L[0]] : [L[0], L[1] || L[L.length - 1]]; };
+  // завой през кръстовище: от края на влизащата лента (стоп линията) до началото на излизащата; плавна крива (Безие)
+  P.turnPath = (nodeId, fromArm, laneI, toArm, laneJ) => { const [a, a0] = armLane(nodeId, fromArm, laneI, true), [b, b1] = armLane(nodeId, toArm, laneJ, false), da = [a[0] - a0[0], a[1] - a0[1]], db = [b1[0] - b[0], b1[1] - b[1]];
+    return bez(a, xLines(a, da, b, [-db[0], -db[1]]), b); };
+  // кръгово: ring — s расте по посоката на движение; вход/изход — криви от лентата до пръстена (и обратно)
+  P.roundPath = (ri, armI, kind) => { const R0 = P.rounds[ri], n = P.nodes[R0.node], e = R0.entries[armI], ring = R0.ring, Lr = cumLen(ring), S = kind === 'in' ? e.inS : e.outS;
+    let j = 1; while (j < Lr.length - 1 && Lr[j] < S) j++; const q = ring[j], q2 = ring[Math.min(ring.length - 1, j + 1)], tq = [q2[0] - q[0], q2[1] - q[1]];
+    if (kind === 'in') { const [a, a0] = armLane(n.id, armI, 0, true); return bez(a, xLines(a, [a[0] - a0[0], a[1] - a0[1]], q, [-tq[0], -tq[1]]), q); }
+    const [b, b1] = armLane(n.id, armI, 0, false); return bez(q, xLines(q, tq, b, [b[0] - b1[0], b[1] - b1[1]]), b); };
   P.pick = (q2 = {}) => { let best = null, bd = 1e18; for (const L of P.lots) { if (L.reserved || (q2.zone && L.zone !== q2.zone) || (q2.minW && L.w < q2.minW) || (q2.minD && L.d < q2.minD)) continue; if (q2.road === 'main' && !isMain(L.front.cls)) continue; if (q2.road === 'street' && isMain(L.front.cls)) continue; if (q2.free && !q2.free(L)) continue; const d = q2.near ? Math.hypot(L.x - q2.near[0], L.z - q2.near[1]) : L.id; if (d < bd) { bd = d; best = L; } } return best; };
   P.reserve = (id, tag) => { if (P.lots[id]) P.lots[id].reserved = tag; };
   P.unreserve = id => { if (P.lots[id]) P.lots[id].reserved = null; };
-  P.stats = { ms: Date.now() - t0, roads: P.roads.length, nodes: P.nodes.length, lots: P.lots.length, rounds: P.rounds.length, bad5: P.nodes.filter(n => n.arms.length >= 5).length, ends: P.nodes.filter(n => n.arms.length === 1).length };
+  const small = P.lots.filter(L => !L.big);
+  P.stats = { ms: Date.now() - t0, roads: P.roads.length, nodes: P.nodes.length, lots: P.lots.length, rounds: P.rounds.length, bad5: P.nodes.filter(n => n.arms.length >= 5).length,
+    exits: P.nodes.filter(n => n.endKind === 'exit').length, grow: P.nodes.filter(n => n.endKind === 'grow').length, dead: P.turns.length,
+    build: small.length, big: P.lots.length - small.length, area: Math.round(small.reduce((a, L) => a + L.area, 0) / 100) / 100 };   // area — хектари за застрояване (без големите места)
+  // целите на града — в дял от застроимото (парцели и площ), не в брой: семействата имат различен брой парцели
+  P.goal = { lots: small.length, area: P.stats.area };
   cache.set(key, P); while (cache.size > 24) cache.delete(cache.keys().next().value);
   return P;
 }
@@ -374,6 +429,32 @@ function placeLots(P, sk, r) {
   const lg = pointGrid(32), lots = [];
   const zoneOf = (x, z, main) => { const d = Math.hypot(x - P.center.x, z - P.center.z) / P.R; const hub = P.hubs.some((h, i) => i && Math.hypot(x - h.x, z - h.z) < P.R * 0.12);
     return d < 0.22 || hub ? 'center' : main && d < 0.6 ? 'business' : d > 0.82 ? 'periphery' : 'residential'; };
+  // 1) големите места първи (болница, гара, парк, стадион, забележителност) — по главните пътища, всяко в своя пояс
+  // [вид, ширина по улицата, дълбочина, желано разстояние от центъра / R]
+  const BM = [['special', 56, 46, 0.12], ['park', 64, 44, 0.3], ['hospital', 52, 38, 0.45], ['station', 72, 32, 0.72]];
+  const BIG = { s: [['park', 44, 36, 0.25], ['hospital', 40, 32, 0.5]], m: BM, l: [...BM, ['stadium', 96, 64, 0.78], ['special', 56, 46, 0.3], ['park', 72, 46, 0.6]],
+    xl: [...BM, ['stadium', 96, 64, 0.78], ['special', 56, 46, 0.3], ['park', 72, 46, 0.6], ['hospital', 52, 38, 0.7], ['station', 72, 32, 0.85], ['special', 56, 46, 0.5], ['park', 72, 46, 0.8]] }[P.size];
+  const ANY = { park: 1, special: 1 };   // паркът и забележителността могат и към квартална улица; болницата, гарата и стадионът — само към главна
+  const atOn = (rd, ss) => { let i = 1; while (i < rd.L.length - 1 && rd.L[i] < ss) i++; const a = rd.pts[i - 1], b = rd.pts[i], t = (ss - rd.L[i - 1]) / ((rd.L[i] - rd.L[i - 1]) || 1), l = dist(a, b) || 1; return { x: lerp(a[0], b[0], t), z: lerp(a[1], b[1], t), tx: (b[0] - a[0]) / l, tz: (b[1] - a[1]) / l }; };
+  const lotAt = (rd, s, side, w, d) => { const m = atOn(rd, s + w / 2), nx = -m.tz * side, nz = m.tx * side, off = rd.w / 2 + rd.walk + 1.5 + d / 2; return { x: m.x + nx * off, z: m.z + nz * off, w, d, rot: Math.atan2(-nx, -nz), front: { road: rd.id, s: s + w / 2, side, cls: rd.cls } }; };
+  const okLot = (L, pad) => { const cs = rectCorners(L.x, L.z, L.w / 2, L.d / 2, L.rot);
+    if (!cs.every(p => inPoly(p, P.boundary) && !P.waterAt(p[0], p[1]))) return false;
+    if (P.rounds.some(rr2 => Math.hypot(L.x - rr2.x, L.z - rr2.z) < rr2.outer + Math.hypot(L.w, L.d) / 2 + 3)) return false;
+    if (P.turns.some(t => Math.hypot(L.x - t.x, L.z - t.z) < t.r + 3 + Math.hypot(L.w, L.d) / 2 * 0.8)) return false;
+    if (roadIn(L, 0.5)) return false;
+    let clash = false; lg.near([L.x, L.z], 80, (q, o) => { if (!clash && rectsOverlap(o, L, pad)) clash = true; }); return !clash; };
+  const bigs = [];
+  for (const [kind, w0, d0, want] of BIG || []) for (const f of [1, 0.85, 0.7]) {   // ако не се събере — по-малко
+    if (bigs.some(b => b._k === kind + w0 + want)) break;
+    const w = w0 * f, d = d0 * f;
+    let best = null, bs = 1e9;
+    for (const rd of P.roads) { if (!isMain(rd.cls) && P.size !== 's' && !ANY[kind]) continue; const len = rd.L[rd.L.length - 1], s0 = (P.nodes[rd.from].r || 0) + 6, s1 = len - (P.nodes[rd.to].r || 0) - 6;
+      for (let s = s0; s + w < s1; s += 8) for (const side of [1, -1]) {
+        const L = lotAt(rd, s, side, w, d), dc = Math.hypot(L.x - P.center.x, L.z - P.center.z) / P.R;
+        let sc = Math.abs(dc - want); for (const b of bigs) sc += Math.max(0, 0.35 - Math.hypot(L.x - b.x, L.z - b.z) / P.R) * 2;   // раздалечени
+        if (sc >= bs || !okLot(L, 4)) continue; bs = sc; best = L; } }
+    if (best) { best.zone = zoneOf(best.x, best.z, true); best.big = kind; best.reserved = 'big:' + kind; best._k = kind + w0 + want; lg.add([best.x, best.z], best); lots.push(best); bigs.push(best); }
+  }
   const order = [...P.roads].sort((a, b) => b.w - a.w || a.id - b.id);
   for (const rd of order) {
     const len = rd.L[rd.L.length - 1], nA = P.nodes[rd.from], nB = P.nodes[rd.to];
@@ -390,8 +471,9 @@ function placeLots(P, sk, r) {
           const cs = rectCorners(L.x, L.z, w / 2, d / 2, L.rot);
           if (!cs.every(p => inPoly(p, P.boundary) && !P.waterAt(p[0], p[1]))) continue;
           if (P.rounds.some(rr2 => Math.hypot(L.x - rr2.x, L.z - rr2.z) < rr2.outer + Math.hypot(w, d) / 2 + 3)) continue;
+          if (P.turns.some(t => Math.hypot(L.x - t.x, L.z - t.z) < t.r + 3 + Math.hypot(w, d) / 2 * 0.8)) continue;
           if (roadIn(L, 0.5)) continue;
-          let clash = false; lg.near([L.x, L.z], 40, (q, o) => { if (!clash && rectsOverlap(o, L, 0.6)) clash = true; }); if (clash) continue;
+          let clash = false; lg.near([L.x, L.z], 80, (q, o) => { if (!clash && rectsOverlap(o, L, o.big ? 3 : 0.6)) clash = true; }); if (clash) continue;
           lg.add([L.x, L.z], L); lots.push(L); s += w + 1; placed = true; break;
         }
         if (!placed) s += 4;
@@ -400,7 +482,7 @@ function placeLots(P, sk, r) {
   }
   const C = P.center;
   lots.sort((a, b) => Math.round(Math.hypot(a.x - C.x, a.z - C.z)) - Math.round(Math.hypot(b.x - C.x, b.z - C.z)) || Math.atan2(a.z - C.z, a.x - C.x) - Math.atan2(b.z - C.z, b.x - C.x));
-  lots.forEach((L, i) => { L.id = i; L.poly = rectCorners(L.x, L.z, L.w / 2, L.d / 2, L.rot); L.area = Math.round(L.w * L.d); L.block = null; L.reserved = null; for (const k of ['x', 'z', 'w', 'd', 'rot']) L[k] = Math.round(L[k] * 100) / 100; });
+  lots.forEach((L, i) => { L.id = i; L.poly = rectCorners(L.x, L.z, L.w / 2, L.d / 2, L.rot); L.area = Math.round(L.w * L.d); L.block = null; L.reserved = L.reserved || null; L.big = L.big || null; delete L._k; for (const k of ['x', 'z', 'w', 'd', 'rot']) L[k] = Math.round(L[k] * 100) / 100; });
   P.lots = lots;
 }
 
