@@ -104,12 +104,28 @@ let city = null, P = null, cars = [], night = false;
 // ---- LOD: отблизо — моделът (инстанции по части), отдалеч — кутия с размера на сградата (един InstancedMesh); пресмята се, когато камерата се премести
 const TREE_M = [M(0x6b4a2e), M(0x4f8a3a)], LOD_COL = { house: 0xb59b85, low: 0xa89a8a, mid: 0x9a9690, tower: 0x8c97a3, hospital: 0xeeeeee, station: 0xc9a46a, stadium: 0xb0b0b0, special: 0xb08a6a };
 let BLD = [], lodIM = {}, lodBox = null, lodAt = null, NEAR = 240;
+const RV = new THREE.Vector3(), RQ = new THREE.Quaternion(), RS = new THREE.Vector3();
 const nearR = () => P && P.osm ? 220 : NEAR;   // Рим — много сгради: подробните само по-близо
 const LOD_MAT = new THREE.MeshStandardMaterial({ roughness: 0.9 }), LC = new THREE.Color();
+// Рим отдалеч: сградата — кутия с фасада (прозорци със зелени капаци, партер с арки; цветът — от инстанцията) и керемиден покрив на две води
+let FAC_MAT = null, lodRoof = null;
+function facadeMat() {
+  if (FAC_MAT) return FAC_MAT;
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  g.fillStyle = '#f4ece0'; g.fillRect(0, 0, 128, 128);
+  for (let r = 0; r < 4; r++) for (let k = 0; k < 3; k++) { const x = 14 + k * 38, y = 8 + r * 24; g.fillStyle = '#3d3a36'; g.fillRect(x + 5, y, 12, 16); g.fillStyle = '#5f7a4a'; g.fillRect(x, y, 5, 16); g.fillRect(x + 17, y, 5, 16); g.fillStyle = '#e8e0d2'; g.fillRect(x + 3, y + 16, 16, 2); }
+  g.fillStyle = '#d9cfbf'; g.fillRect(0, 104, 128, 24); for (let k = 0; k < 3; k++) { g.fillStyle = '#4a4540'; g.beginPath(); g.moveTo(16 + k * 38, 128); g.lineTo(16 + k * 38, 112); g.arc(27 + k * 38, 112, 11, Math.PI, 0); g.lineTo(38 + k * 38, 128); g.fill(); }
+  g.fillStyle = '#cfc5b4'; g.fillRect(0, 0, 128, 4);   // корниз
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  return FAC_MAT = new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 });
+}
+function roofGeo() { const g = new THREE.BufferGeometry(), v = [-0.5, 0, -0.5, 0.5, 0, -0.5, 0.5, 0, 0.5, -0.5, 0, 0.5, 0, 1, -0.5, 0, 1, 0.5];   // покрив на две води (било по z)
+  g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); g.setIndex([0, 4, 5, 0, 5, 3, 1, 2, 5, 1, 5, 4, 0, 1, 4, 3, 5, 2]); g.computeVertexNormals(); return g; }
 function lodSetup() {
   lodIM = {}; lodAt = null; const n = {}; for (const b of BLD) n[b.k] = (n[b.k] || 0) + 1;
   const Z0 = new THREE.Matrix4().makeScale(0, 0, 0); for (const k in n) lodIM[k] = instance(city, k, Array(n[k]).fill(Z0));
-  lodBox = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), LOD_MAT, Math.max(1, BLD.length)); lodBox.frustumCulled = false; lodBox.receiveShadow = true;
+  lodBox = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), P.osm ? facadeMat() : LOD_MAT, Math.max(1, BLD.length)); lodBox.frustumCulled = false; lodBox.receiveShadow = true;
+  lodRoof = null; if (P.osm) { lodRoof = new THREE.InstancedMesh(roofGeo(), new THREE.MeshStandardMaterial({ color: 0xa8553a, roughness: 0.85, side: THREE.DoubleSide }), Math.max(1, BLD.length)); lodRoof.frustumCulled = false; city.add(lodRoof); }
   const c = new THREE.Color(); BLD.forEach((b, i) => lodBox.setColorAt(i, c.setHex(b.col || LOD_COL[b.cls] || 0x9a9690))); city.add(lodBox); lodUpdate(true);
 }
 function lodUpdate(force) {
@@ -117,9 +133,10 @@ function lodUpdate(force) {
   const cnt = {}, m = new THREE.Matrix4(); let nb = 0;
   for (const b of BLD) {
     if (b.always || b.p.distanceTo(cam.position) < nearR()) { const j = cnt[b.k] = (cnt[b.k] || 0) + 1; for (const im of lodIM[b.k]) im.setMatrixAt(j - 1, m.multiplyMatrices(b.M, im.userData.local)); }
-    else { lodBox.setMatrixAt(nb, b.box); lodBox.setColorAt(nb++, LC.setHex(b.col || LOD_COL[b.cls] || 0x9a9690)); }
+    else { lodBox.setMatrixAt(nb, b.box); if (lodRoof) { b.box.decompose(RV, RQ, RS); lodRoof.setMatrixAt(nb, m.compose(RV.set(RV.x, RV.y + RS.y / 2, RV.z), RQ, RS.set(RS.x, Math.min(4, RS.x * 0.3), RS.z))); } lodBox.setColorAt(nb++, LC.setHex(b.col || LOD_COL[b.cls] || 0x9a9690)); }
   }
   for (const k in lodIM) for (const im of lodIM[k]) { im.count = cnt[k] || 0; im.instanceMatrix.needsUpdate = true; }
+  if (lodRoof) { lodRoof.count = nb; lodRoof.instanceMatrix.needsUpdate = true; }
   lodBox.count = nb; lodBox.instanceMatrix.needsUpdate = true; if (lodBox.instanceColor) lodBox.instanceColor.needsUpdate = true;
 }
 // забележителност на реалното ѝ място: моделът се побира в основата fp (GLB-тата се зареждат по-късно — тогава се нагласят)
