@@ -57,7 +57,9 @@ const CARS = ['car-polo', 'car-p206', 'car-renegade', 'car-accord', 'car-corolla
 await Promise.all([...HOUSES.map(k => load(k, `../assets/heavy/houses2/${k}.glb`)), ...[...new Set([...OFFICE, ...TOWER, 'brooklyn'])].map(k => load(k, `../assets/heavy/blocks2/${k}.glb`)),
   ...['panel12', 'soviet', 'richmond', 'dbrick', 'oldbld', 'stalin', 'asian'].map(k => load('b-' + k, `../assets/heavy/blocks/${k}.glb`)), ...['sing', 'rand', 'blue'].map(k => load('s-' + k, `../assets/heavy/sky/${k}.glb`)),
   load('hospital', '../assets/heavy/hospital/hospital.glb'),
-  ...['townhouse-terracotta', 'palazzo-small', 'palazzo-big', 'corner-shop'].map(k => load('it-' + k, `../assets/heavy/rome/it-${k}.glb`).then(() => itTints('it-' + k))), load('colosseo', '../assets/heavy/lm/colosseo.glb'), load('station', '../assets/heavy/station/small.glb'), load('stadium', '../assets/heavy/stadium/stadium.glb'), load('cityhall', '../assets/heavy/civic/cityhall.glb'),
+  ...['townhouse-terracotta', 'palazzo-small', 'palazzo-big', 'corner-shop'].map(k => load('it-' + k, `../assets/heavy/rome/it-${k}.glb`).then(() => itTints('it-' + k))),
+  ...['hotel', 'store', 'palazzo3', 'medkit'].map(k => load('it-sf-' + k, `../assets/heavy/rome/it-sf-${k}.glb`).then(() => A['it-sf-' + k]?.traverse(m => { const c = m.isMesh && !m.material.map && m.material.color; if (c && c.r > 0.8 && c.g < 0.25 && c.b < 0.25) m.material.color.setHex(0xd9a066); }))),   /* червеният „заместител“ без текстура → охра */   /* истински италиански (Sketchfab, CC-BY) */
+  load('colosseo', '../assets/heavy/lm/colosseo.glb'), load('station', '../assets/heavy/station/small.glb'), load('stadium', '../assets/heavy/stadium/stadium.glb'), load('cityhall', '../assets/heavy/civic/cityhall.glb'),
   ...CARS.map(k => load(k, `../assets/heavy/cars/${k}.glb`))]);
 // ---- инстанции: всяка част на модела — един InstancedMesh за всичките му копия (вместо клонинги: малко draw calls)
 const PARTS = {}, BOX = {};
@@ -105,7 +107,7 @@ let city = null, P = null, cars = [], night = false;
 const TREE_M = [M(0x6b4a2e), M(0x4f8a3a)], LOD_COL = { house: 0xb59b85, low: 0xa89a8a, mid: 0x9a9690, tower: 0x8c97a3, hospital: 0xeeeeee, station: 0xc9a46a, stadium: 0xb0b0b0, special: 0xb08a6a };
 let BLD = [], lodIM = {}, lodBox = null, lodAt = null, NEAR = 240;
 const RV = new THREE.Vector3(), RQ = new THREE.Quaternion(), RS = new THREE.Vector3();
-const nearR = () => P && P.osm ? 220 : NEAR;   // Рим — много сгради: подробните само по-близо
+const nearR = () => P && P.osm ? 160 : NEAR;   // Рим — много сгради: подробните само по-близо
 const LOD_MAT = new THREE.MeshStandardMaterial({ roughness: 0.9 }), LC = new THREE.Color();
 // Рим отдалеч: сградата — кутия с фасада (прозорци със зелени капаци, партер с арки; цветът — от инстанцията) и керемиден покрив на две води
 let FAC_MAT = null, lodRoof = null;
@@ -143,7 +145,7 @@ function lodUpdate(force) {
 function romeLm(L) {
   const plaza = disc(L.x, L.z, Math.max(L.w, L.d) / 2 + (L.guard || 4), 0.055); city.add(merge([plaza], MAT.walk));   // площад / защитен периметър
   if (L.lm === 'termini') { put('station', L, 2); return; }
-  if (L.lm === 'colosseo') { put('colosseo', L, 0); BLD[BLD.length - 1].always = 1; return; }   // забележителността — винаги пълният модел
+  if (L.lm === 'colosseo') { const n0 = BLD.length; put('colosseo', L, 0); if (BLD.length > n0) BLD[BLD.length - 1].always = 1; return; }   // забележителността — винаги пълният модел
   if (!['stpeter', 'pantheon', 'vittoriano'].includes(L.lm)) return;   // Треви, Кастел Сант'Анджело, Circus Maximus… — запазено място (моделите — по-късно)
   const o = buildLandmark(L.lm, {}), g = o.group; city.add(g);
   const fit = () => { const b = new THREE.Box3().setFromObject(g); if (b.isEmpty()) return false; const sz = b.getSize(new THREE.Vector3()), k = Math.min(L.w / sz.x, L.d / sz.z); g.scale.multiplyScalar(k); const b2 = new THREE.Box3().setFromObject(g), c = b2.getCenter(new THREE.Vector3()); g.position.x += L.x - c.x; g.position.z += L.z - c.z; g.position.y -= b2.min.y; g.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; } }); return true; };
@@ -153,7 +155,7 @@ let put = () => {};
 // Рим: затворено застрояване — по двете страни на всяка улица непрекъсната редица от сгради (8 м по фасадата, 11 м дълбочина),
 // 4–6 етажа, в цветовете на Рим (охра, теракота, жълто); не върху друга улица, вода, парк/археологическа зона или забележителност
 // италианските сгради (assets/heavy/rome, Quaternius CC0 и J-Toastie CC-BY) — по 3 оцветявания: светлите стени → охра, теракота, жълто
-const ROME_BLD = ['townhouse-terracotta', 'palazzo-small', 'palazzo-big', 'corner-shop'].flatMap(k => [0, 1, 2].map(i => 'it-' + k + '#' + i));
+const ROME_BLD = ['it-sf-hotel', 'it-sf-store', 'it-sf-medkit', 'it-sf-hotel', ...['townhouse-terracotta', 'palazzo-small'].flatMap(k => [0, 2].map(i => 'it-' + k + '#' + i))];   // най-вече истинските италиански; малко от Quaternius за разнообразие
 const ROMA = [0xd9a066, 0xc8794e, 0xe2c27a, 0xb5654a, 0xd8b48a, 0xe7d3a8, 0xc98f5b, 0xa9583f];
 function romeBlocks() {
   const D = OSM2.rome, rg = new Map(), gc = 12, key = (x, z) => Math.floor(x / gc) + ',' + Math.floor(z / gc);

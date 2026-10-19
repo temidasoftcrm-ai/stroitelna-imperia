@@ -3,3 +3,7 @@ it-townhouse-terracotta.glb      – "Town House" by Quaternius – CC0 1.0 – 
 it-palazzo-small.glb             – "Town House" by Quaternius – CC0 1.0 – https://poly.pizza/m/dtVrmnnCZn  (4 802 tris; тухла+бял камък, плосък покрив)
 it-palazzo-big.glb               – "Big Building" by Quaternius – CC0 1.0 – https://poly.pizza/m/AVCS8jUd2l (6 976 tris)
 it-corner-shop.glb               – "Building Red Corner" by J-Toastie – CC-BY 3.0 – https://poly.pizza/m/9JuFwnivP0 (1 983 tris; магазин на партера) – изисква атрибуция: "Building Red Corner by J-Toastie (poly.pizza), CC-BY 3.0"
+it-sf-hotel.glb    – "House #1 : Hotel v2" by louismortier – CC-BY 4.0 – https://sketchfab.com/3d-models/house-1-hotel-v2-b9fb299496f8468da3bc6d25956133c4
+it-sf-store.glb    – "House #2: Store" by louismortier – CC-BY 4.0 – https://sketchfab.com/3d-models/house-2-store-1e1b96e093874806874eb9e203c9794c
+it-sf-palazzo3.glb – "Palazzo 3 Piani" by marco.episcopo – CC-BY 4.0 – https://sketchfab.com/3d-models/palazzo-3-piani-453f7a30ba3b43dfb8b5a0ef94a3e044
+it-sf-medkit.glb   – "Modular modernist mediterranean buildings kit" by ChristosRami.studio – CC-BY 4.0 – https://sketchfab.com/3d-models/modular-modernist-mediterranean-buildings-kit-77d55a1a3d144af2975b22b4b439d854
