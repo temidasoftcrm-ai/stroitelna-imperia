@@ -109,6 +109,17 @@ function sigAllows(s, c) {
   if (c.inL.axis !== ax) return false;
   return k === 'left' ? c.turn === 'left' : c.turn !== 'left' || !s.ph.some(p => p[0] === ax && p[1] === 'left');
 }
+// светофарът по подходи (за лампите в 3D): { [arm]: { go: 'red'|'yellow'|'green', left: … | null } } — go: направо и надясно,
+// left: лявата стрелка (само ако оста има своя лява фаза; иначе null — лявото върви с go)
+export function sigArms(n) {
+  const s = n.sig; if (!s) return null;
+  const [ax, k] = s.ph[s.i], st = s.stage === 'red' ? 'red' : s.stage, out = {};
+  for (const l of n.inL) {
+    const arm = l.armIn ?? l.axis, hasLeft = s.ph.some(p => p[0] === l.axis && p[1] === 'left'), mine = l.axis === ax;
+    out[arm] = { go: mine && k === 'go' ? st : 'red', left: hasLeft ? (mine && k === 'left' ? st : 'red') : null, axis: l.axis };
+  }
+  return out;
+}
 // фазата за изгледа (кръгчетата на светофарите в game.js): оста със зелено и дали е жълто
 export const sigView = s => s ? { axis: s.ph[s.i][0], yellow: s.stage === 'yellow', red: s.stage === 'red', left: s.ph[s.i][1] === 'left' } : null;
 
@@ -246,6 +257,8 @@ export function createTraffic(opts) {
       lights();
     },
     clear() { for (const sp of spots) { opts.scene.remove(sp); opts.scene.remove(sp.target); sp.dispose(); } spots.length = 0; for (const c of cars) drop({ obj: c.obj, remove: c.rm }); cars.length = 0; if (LI) { LI.clear(); LI = null; } for (const l of lanes) l.cars.length = 0; for (const n of nodes.values()) for (const c of n.conns) c.cars.length = 0; },
+    // светофарите: [{ node, x, z, arms: sigArms }] — за всички кръстовища със светофар (или само nodeId)
+    signals: nodeId => [...nodes.values()].filter(n => n.sig && (nodeId == null || n.id === nodeId)).map(n => ({ node: n.id, x: n.x, z: n.z, arms: sigArms(n) })),
     stats: () => ({ cars: cars.length, cap: capacity, steps, left, waiting: cars.filter(c => c.wait > 0).length }),
   };
 }
