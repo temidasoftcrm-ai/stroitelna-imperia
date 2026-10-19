@@ -169,9 +169,39 @@ cinema/newyork.mp4, cinema/vegas.mp4, cinema/paris.mp4, cinema/dubai.mp4, cinema
 - lm/petronas.glb — кулите Петронас, направени в Meshy AI от потребителя (18.10.2026), опростени до ~92 хил. триъгълника
 - lm/bigben2.glb — "BigBen" by Daqian Dong (CC-BY 3.0, Poly Pizza) — https://poly.pizza/m/8PaQZ_nLFIQ (текстурите в webp)
 - lm/londoneye2.glb — "Ferris Wheel" by CreativeTrio (CC0, Poly Pizza) — https://poly.pizza/m/6CepsZjXBw — London Eye
-- boats/sailboat.glb — "Sailboat" by sergeif (CC-BY 4.0) — https://sketchfab.com/3d-models/76d0b1e24be14d2f9a524bfce3001aeb (текстурите 1024 px, WebP)
-- boats/yacht.glb — "Yatch I (second edition)" by dannzjs (CC-BY 4.0) — https://sketchfab.com/3d-models/b826e1c52d604c599b893967bed8a254
-- boats/fisherboat.glb — "Fisher boat" by Batuhan13 (CC-BY 4.0) — https://sketchfab.com/3d-models/385b039e95754dca8d8c045ed0c515cf
-- boats/fishship.glb — "Fishing Ship game-ready asset" by crazyyuan (CC-BY 4.0) — https://sketchfab.com/3d-models/f791868a8b5f4996a49a3c8cd99336f6
-- boats/buoy.glb — "Harbor Navigation Buoy" by TGVMisterH (CC-BY 4.0) — https://sketchfab.com/3d-models/62f7c151f4c048508b8cf5526f8588f9
-- boats/container.glb — "Freight shipping container - Rusted" by sousinho (CC-BY 4.0) — https://sketchfab.com/3d-models/2b787d1a02174d0bbca9eac34eb3a486
+- boats/sf-sailboat.glb — "Sailboat" by sergeif (CC-BY 4.0) — https://sketchfab.com/3d-models/76d0b1e24be14d2f9a524bfce3001aeb (текстурите 1024 px, WebP)
+- boats/sf-yacht.glb — "Yatch I (second edition)" by dannzjs (CC-BY 4.0) — https://sketchfab.com/3d-models/b826e1c52d604c599b893967bed8a254
+- boats/sf-fisherboat.glb — "Fisher boat" by Batuhan13 (CC-BY 4.0) — https://sketchfab.com/3d-models/385b039e95754dca8d8c045ed0c515cf
+- boats/sf-fishship.glb — "Fishing Ship game-ready asset" by crazyyuan (CC-BY 4.0) — https://sketchfab.com/3d-models/f791868a8b5f4996a49a3c8cd99336f6
+- boats/sf-buoy.glb — "Harbor Navigation Buoy" by TGVMisterH (CC-BY 4.0) — https://sketchfab.com/3d-models/62f7c151f4c048508b8cf5526f8588f9
+- boats/sf-container.glb — "Freight shipping container - Rusted" by sousinho (CC-BY 4.0) — https://sketchfab.com/3d-models/2b787d1a02174d0bbca9eac34eb3a486
+
+# blocks2/ — кандидати за истински блокове (избор в Лабораторията → lab/blocks.html)
+blocks2/brickshop.glb — "Low-poly Old American brick building with shop." by Orzechu, CC-BY-4.0 — https://sketchfab.com/3d-models/low-poly-old-american-brick-building-with-shop-3170993b67ee4e58b27d69d5877f71bd
+blocks2/brooklyn.glb — "Brooklyn Street Row Buildings Low Poly" by B0rn2D13, CC-BY-4.0 — https://sketchfab.com/3d-models/brooklyn-street-row-buildings-low-poly-370ca970f4cd4c638f95fe17617d0bc1
+blocks2/hirise.glb — "Hi rise apartment building" by aitortilla01, CC-BY-4.0 — https://sketchfab.com/3d-models/hi-rise-apartment-building-f8c0a550cd1e441f85b46caeba6632f3
+blocks2/midwest.glb — "Midwestern Apartment 1" by hamma085, CC-BY-4.0 — https://sketchfab.com/3d-models/midwestern-apartment-1-0774fde532ee4b479f5dcca139b31abb
+blocks2/montgomery.glb — "Montgomery Ward Tower Building" by hamma085, CC-BY-4.0 — https://sketchfab.com/3d-models/montgomery-ward-tower-building-8c753bdec75e41aeb1af609148735305
+blocks2/nyhirise.glb — "New York styled hi rise apartment building" by aitortilla01, CC-BY-4.0 — https://sketchfab.com/3d-models/new-york-styled-hi-rise-apartment-building-14e3d5743f7546d5bb7f3befc72c9057
+blocks2/office1.glb — "Low rise wall to wall office building" by aitortilla01, CC-BY-4.0 — https://sketchfab.com/3d-models/low-rise-wall-to-wall-office-building-1f341f8261af4fb6a0dc910c2aae37a6
+blocks2/office2.glb — "Low rise wall to wall office building" by aitortilla01, CC-BY-4.0 — https://sketchfab.com/3d-models/low-rise-wall-to-wall-office-building-dcf171dca9174000a0fa8d44660253d0
+blocks2/office3.glb — "Low rise wall to wall office building" by aitortilla01, CC-BY-4.0 — https://sketchfab.com/3d-models/low-rise-wall-to-wall-office-building-2dd3bdd5e0724eb1b1025a922fa754cf
+blocks2/office4.glb — "Mid rise wall to wall office building" by aitortilla01, CC-BY-4.0 — https://sketchfab.com/3d-models/mid-rise-wall-to-wall-office-building-4d2c3f3450ef4e849056b88b49873ce2
+blocks2/office5.glb — "Low rise wall to wall office building" by aitortilla01, CC-BY-4.0 — https://sketchfab.com/3d-models/low-rise-wall-to-wall-office-building-be7583ca46f5411d8921ac85d8c33f3f
+blocks2/office6.glb — "Low rise wall to wall office building" by aitortilla01, CC-BY-4.0 — https://sketchfab.com/3d-models/low-rise-wall-to-wall-office-building-6488ad5edd1d454884b3fe030f5f04b1
+blocks2/oldbank.glb — "Old Bank" by 23ThomasStreet, CC-BY-NC-4.0 — https://sketchfab.com/3d-models/old-bank-2ffb569b9aab4d0eb0fe2fe703126d4e
+blocks2/townhouse.glb — "Town House A" by 23ThomasStreet, CC-BY-NC-4.0 — https://sketchfab.com/3d-models/town-house-a-11dac814b2cf4ae8bc733f55b5ca88e5
+blocks2/usbank.glb — "US Bank Tower" by Mitya Petrov, CC-BY-4.0 — https://sketchfab.com/3d-models/us-bank-tower-82227908aa5c446395c4b9847284da4a
+blocks2/washst.glb — "317 Washington Street" by hamma085, CC-BY-4.0 — https://sketchfab.com/3d-models/317-washington-street-1c16cac26e2b484387ac1311e0f5b57e
+blocks2/pp-apart.glb — "Apartment building" by Poly by Google, CC-BY — https://poly.pizza/m/01lqee-dZAr
+blocks2/pp-bigbld.glb — "Big Building" by Quaternius, CC0 — https://poly.pizza/m/AVCS8jUd2l
+blocks2/pp-townhouse.glb — "Town House" by Quaternius, CC0 — https://poly.pizza/m/imVkxz7oZD
+blocks2/pp-burhouse.glb — "House" by burunduk, CC-BY — https://poly.pizza/m/xa9HeFAahI
+blocks2/pp-redcorner.glb — "Building Red Corner" by J-Toastie, CC-BY — https://poly.pizza/m/9JuFwnivP0
+blocks2/pp-roofgarden.glb — "City Building with Roof Garden" by Anonymous, CC-BY — https://poly.pizza/m/8ywGTrLRgBE
+blocks2/pp-office.glb — "Office" by SoyMaria, CC-BY — https://poly.pizza/m/KRT3e3kgEb
+blocks2/pp-smallbld.glb — "Small Building" by Quaternius, CC0 — https://poly.pizza/m/6q5cwgep0I
+blocks2/pp-brown.glb — "Brown Building" by J-Toastie, CC-BY — https://poly.pizza/m/fGKIlWGDNH
+blocks2/pp-green.glb — "Building Green" by J-Toastie, CC-BY — https://poly.pizza/m/FmjsfA1eHY
+blocks2/pp-sfhouse.glb — "Sf House" by burunduk, CC-BY — https://poly.pizza/m/AP79CnmFDv
+blocks2/pp-sky.glb — "Skyscraper" by Jarlan Perez, CC-BY — https://poly.pizza/m/7WF09z31G_v

@@ -5,68 +5,8 @@
   "where": "Морските градове: кораби на котва, лодки в залива, шамандури, контейнери на кея",
   "items": [
    {
-    "n": "ship-cargo-a",
-    "f": "assets/watercraft/ship-cargo-a.glb",
-    "st": "заменен (истински — boats-real)",
-    "ok": true
-   },
-   {
-    "n": "ship-cargo-b",
-    "f": "assets/watercraft/ship-cargo-b.glb",
-    "st": "заменен (истински — boats-real)",
-    "ok": true
-   },
-   {
-    "n": "ship-small",
-    "f": "assets/watercraft/ship-small.glb",
-    "st": "заменен (истински — boats-real)",
-    "ok": true
-   },
-   {
-    "n": "boat-sail-a",
-    "f": "assets/watercraft/boat-sail-a.glb",
-    "st": "заменен (истински — boats-real)",
-    "ok": true
-   },
-   {
-    "n": "boat-sail-b",
-    "f": "assets/watercraft/boat-sail-b.glb",
-    "st": "заменен (истински — boats-real)",
-    "ok": true
-   },
-   {
-    "n": "boat-speed-a",
-    "f": "assets/watercraft/boat-speed-a.glb",
-    "st": "заменен (истински — boats-real)",
-    "ok": true
-   },
-   {
-    "n": "boat-fishing-small",
-    "f": "assets/watercraft/boat-fishing-small.glb",
-    "st": "заменен (истински — boats-real)",
-    "ok": true
-   },
-   {
-    "n": "buoy",
-    "f": "assets/watercraft/buoy.glb",
-    "st": "заменен (истински — boats-real)",
-    "ok": true
-   },
-   {
-    "n": "cargo-container-a",
-    "f": "assets/watercraft/cargo-container-a.glb",
-    "st": "заменен (истински — boats-real)",
-    "ok": true
-   },
-   {
-    "n": "cargo-container-b",
-    "f": "assets/watercraft/cargo-container-b.glb",
-    "st": "заменен (истински — boats-real)",
-    "ok": true
-   },
-   {
-    "n": "cargo-container-c",
-    "f": "assets/watercraft/cargo-container-c.glb",
+    "n": "boat-row-small",
+    "f": "assets/watercraft/boat-row-small.glb",
     "st": "заменен (истински — boats-real)",
     "ok": true
    }

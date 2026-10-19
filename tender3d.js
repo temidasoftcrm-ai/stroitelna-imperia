@@ -414,8 +414,8 @@ export function buildPortTerminal(group, deps, opts = {}) {
   box(16, 8, 10, mat(0xdfe5ea, 0.5, 0.2), W / 2 - 12, 4, -8, s9); box(14, 2.2, 10.2, PL.glow(mat(0x9fd3ff, 0.3, 0.2, 0xffd890), 1.6), W / 2 - 12, 5, -8, s9); box(16.4, 0.6, 10.4, mat(0x1f5fbf, 0.6), W / 2 - 12, 8.3, -8, s9);
   // контейнеровоз на кея, когато е готово
   let ship = null;
-  if (deps.A && deps.model && deps.A['ship-cargo-b']) { ship = deps.model('ship-cargo-b', 7.5); ship.rotation.y = Math.PI / 2; ship.position.set(0, 0, -D - 16); g.add(ship); }
-  else { ship = new THREE.Group(); box(90, 7, 16, mat(0x1f3a5f, 0.6), 0, 1, 0, ship); box(14, 10, 14, white, 36, 9, 0, ship); for (let c = 0; c < 8; c++) box(8, 5, 12, mat(cols[c % cols.length], 0.7), -34 + c * 9, 7, 0, ship); ship.position.set(0, 0, -D - 16); g.add(ship); }
+  { ship = new THREE.Group();   // временният (докато истинският се зареди — по-долу); детският ship-cargo-b е изтрит
+    box(90, 7, 16, mat(0x1f3a5f, 0.6), 0, 1, 0, ship); box(14, 10, 14, white, 36, 9, 0, ship); for (let c = 0; c < 8; c++) box(8, 5, 12, mat(cols[c % cols.length], 0.7), -34 + c * 9, 7, 0, ship); ship.position.set(0, 0, -D - 16); g.add(ship); }
   // истински контейнеровоз (shipmodels.js), щом се зареди
   loadShipModels().then(() => { if (!hasShipModel('container')) return; const o = shipModel('container'); o.rotation.y = Math.PI / 2; o.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(o); o.position.set(ship.position.x, ship.position.y, -D - (bb.max.z - bb.min.z) / 2 - 3); o.visible = ship.visible; g.remove(ship); g.add(o); ship = o; });
   // строителна техника в морето: шлеп с пилоботна установка и плаващ кран

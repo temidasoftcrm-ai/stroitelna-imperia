@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { EXTRAS, hotelStylesOf, rentOf, SEASON_M, OFF_SEASON } from './resorts.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { makeWater } from './water.js';
+import { BOAT_FILES, isRealBoat, realBoat } from './boatsreal.js';
 import { loadLift, liftPart } from './liftmodel.js';
 
 import { loadMountains, mtnModel } from './mtn.js';
@@ -92,14 +93,16 @@ function boatMesh(col, sail) {
 
 // модел от заредените (A), ако го има; Nature Kit е „unlit“ — сменяме с осветени материали
 function useModel(A, model, n, s) {
+  if (isRealBoat(n)) return realBoat(A, model, n, s);   // лодките и шамандурите — истинските (boatsreal.js)
   if (!A[n]) return null;
   const o = model(n, s);
   o.traverse(m => { if (m.isMesh && m.material && m.material.isMeshBasicMaterial) { m.material = new THREE.MeshStandardMaterial({ color: m.material.color, map: m.material.map, roughness: 0.9 }); m.castShadow = true; } });
   return o;
 }
-// модели за курортите (зарежда ги game.js); всички са CC0 от Kenney
+// модели за курортите (зарежда ги game.js); от Kenney (CC0), лодките — истинските (boatsreal.js, CC-BY)
 export const RESORT_MODELS = {
-  watercraft: ['boat-sail-a', 'boat-sail-b', 'boat-speed-a', 'boat-speed-c', 'boat-fishing-small', 'buoy', 'boat-row-small'],
+  watercraft: ['boat-row-small'],   // другите детски лодки са изтрити — истинските (boatsreal.js), заредени оттук
+  'heavy/boats': BOAT_FILES,
   commercial2: ['detail-parasol-a', 'detail-parasol-b'],
   nature: ['tree_palm', 'tree_palmBend', 'tree_palmTall', 'tree_palmDetailedTall', 'plant_bushLarge', 'rock_largeA', 'tree_pineTallA', 'tree_default_fall'],
   modular: ['building-sample-tower-a', 'building-sample-tower-c', 'building-sample-tower-d', 'building-sample-house-c'],
