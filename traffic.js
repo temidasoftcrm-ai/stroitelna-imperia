@@ -278,7 +278,7 @@ export function planNetwork(P) {
         // коя лента към коя: наляво — от вътрешната към вътрешната, надясно — от външната към външната, направо — същата
         const ok = kind === 'left' ? a.laneI === 0 && b.laneI === 0 : kind === 'right' ? a.laneI === a.nLanes - 1 && b.laneI === b.nLanes - 1 : kind === 'uturn' ? a.laneI === 0 && b.laneI === 0 : b.laneI === Math.min(a.laneI, b.nLanes - 1);
         if (!ok) continue;
-        const pts = kind === 'uturn' ? bezier(a.pts[a.pts.length - 1], [n.x, n.z], b.pts[0], 10) : P.turnPath(n.id, a.armIn, a.laneI, b.armOut, b.laneI);
+        const pts = kind === 'uturn' ? uturnPath(P, n, a, b) : P.turnPath(n.id, a.armIn, a.laneI, b.armOut, b.laneI);
         N.conns.push(mkPath(pts, 'conn', { node: n.id, inL: a, outL: b, turn: kind, vmax: kind === 'straight' ? (a.vmax || V_LANE) * 0.8 : V_TURN, conf: [] }));
       }
     }
@@ -287,6 +287,14 @@ export function planNetwork(P) {
     N.sig = n.ctrl === 'signal' && N.deg >= 3 ? makeSignal(N) : null;
   }
   return { lanes, nodes };
+}
+// обратен завой в задънен край: по кръга за обръщане от плана (P.turns), иначе — крива през възела
+function uturnPath(P, n, a, b) {
+  const A = a.pts[a.pts.length - 1], B = b.pts[0], t = (P.turns || []).find(q => q.node === n.id);
+  if (!t) return bezier(A, [n.x, n.z], B, 10);
+  const r = Math.max(3, t.r - 2), a0 = Math.atan2(A[1] - t.z, A[0] - t.x), a1 = Math.atan2(B[1] - t.z, B[0] - t.x), dir = P.drive === 'L' ? 1 : -1;   // дясно движение — обратно на часовника отгоре (x — изток, z — юг)
+  let d = (a1 - a0) * dir; while (d <= 0.3) d += Math.PI * 2;
+  const out = [A]; for (let k = 1; k < 16; k++) { const ang = a0 + dir * d * k / 16; out.push([t.x + Math.cos(ang) * r, t.z + Math.sin(ang) * r]); } out.push(B); return out;
 }
 // кръгово: пръстенът се реже на отсечки при всеки вход и изход; във всяка точка — възел с връзка „напред“ и (при изход) „навън“
 function roundNet(P, n, N, nodes, lanes) {
