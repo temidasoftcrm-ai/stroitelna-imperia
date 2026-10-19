@@ -1,5 +1,5 @@
 Президентските зали (presrooms.js) — Sketchfab, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Олекотени в Blender, текстури до 1024 px.
-- curtain.glb — "Curtain" by milaink — https://sketchfab.com/3d-models/6f0e27c3b4734b99ae6ed051899a1453
-- flag-us.glb — "The American Flag" by ognuogaan135 — https://sketchfab.com/3d-models/34ce3deaa5da482893f546307e5a223a
-- flag-ru.glb — "Russian Flag" by ognuogaan135 — https://sketchfab.com/3d-models/15423ff53ce6416686a82c84de6fdb8b
+- curtain-tied.glb — "Curtain" by milaink — https://sketchfab.com/3d-models/6f0e27c3b4734b99ae6ed051899a1453 (само вързаната половина)
+- flag-ru.glb — "Russian Flag" by ognuogaan135 — https://sketchfab.com/3d-models/15423ff53ce6416686a82c84de6fdb8b (и за САЩ — с американското платно)
 - fireplace.glb — "Fireplace" by Mark Bai — https://sketchfab.com/3d-models/e9854400c0c1410db01c8db897ef5359
+view-south.webp, view-north.webp — снимки от потребителя (гледки от Белия дом)

@@ -9,14 +9,14 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const PR = 'assets/heavy/presroom/', prCache = {};
 const loadPR = n => prCache[n] || (prCache[n] = new GLTFLoader().loadAsync(PR + n + '.glb'));
 // клонинг, нормализиран: размер по X×Y×Z (Y — височина; null — пропорционално), долу на y = 0, центриран по X/Z; tint — оцветява материалите
-function realModel(scene, n, { w = null, h = null, d = null, x = 0, z = 0, ry = 0, tint = null, hide = [], mod = null }) {
+function realModel(scene, n, { w = null, h = null, d = null, x = 0, z = 0, ry = 0, tint = null, hide = [], mod = null, flip = false }) {
   loadPR(n).then(g => {
     const o = g.scene.clone(true); o.updateMatrixWorld(true);
     const bb = new THREE.Box3().setFromObject(o), sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3());
     const k = h ? h / sz.y : w ? w / sz.x : 1, sx = w ? w / sz.x : k, sy = h ? h / sz.y : k, sz2 = d ? d / sz.z : k;
-    const wrap = new THREE.Group(); o.position.set(-c.x, -bb.min.y, -c.z); wrap.add(o); wrap.scale.set(sx, sy, sz2);
+    const wrap = new THREE.Group(); o.position.set(-c.x, -bb.min.y, -c.z); wrap.add(o); wrap.scale.set(flip ? -sx : sx, sy, sz2);
     const holder = new THREE.Group(); holder.add(wrap); holder.position.set(x, 0, z); holder.rotation.y = ry; scene.add(holder);
-    o.traverse(m => { if (!m.isMesh) return; m.castShadow = m.receiveShadow = true; if (tint) { m.material = m.material.clone(); m.material.color.lerp(new THREE.Color(tint), 0.7); } });
+    o.traverse(m => { if (!m.isMesh) return; m.castShadow = m.receiveShadow = true; if (flip) { m.material = m.material.clone(); m.material.side = THREE.DoubleSide; } if (tint) { m.material = m.material.clone(); m.material.color.lerp(new THREE.Color(tint), 0.7); } });
     mod && mod(o);
     for (const x2 of hide) x2.visible = false;
   }).catch(() => {});
@@ -114,17 +114,16 @@ export function buildPresRoom(scene, cc, H) {
   if (RU) { const run = new THREE.Mesh(new THREE.PlaneGeometry(TABLE_W + 2.6, TABLE_L + 3), std(0xa3191d, 0.95)); run.rotation.x = -Math.PI / 2; run.position.set(0, 0.004, 0); run.receiveShadow = true; scene.add(run); }
   // стени: задна (печат/герб и знамена), предна, странични с прозорци
   for (const [z, ry] of [[ROOM_BACK, 0], [ROOM_FRONT, Math.PI]]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W * 2, RH), wallM); w.position.set(0, RH / 2, z); w.rotation.y = ry; w.receiveShadow = true; scene.add(w); }
-  const view = RU ? viewRU() : viewUS(), drape = std(RU ? 0xe8d8a8 : 0x9b1c22, 0.9), drapeTie = gold;
+  const view = RU ? viewRU() : viewUS(), photo = RU ? null : ['view-south', 'view-north'].map(n => { const t = new THREE.TextureLoader().load(PR + n + '.webp'); t.colorSpace = THREE.SRGBColorSpace; return t; }), drape = std(RU ? 0xe8d8a8 : 0x9b1c22, 0.9), drapeTie = gold;
   for (const side of [-1, 1]) {
     const x = side * ROOM_W, wall = new THREE.Mesh(new THREE.PlaneGeometry(D, RH), wallM); wall.position.set(x, RH / 2, cz); wall.rotation.y = -side * Math.PI / 2; scene.add(wall);
     for (let k = 0; k < 3; k++) {   // три високи прозореца на страна, с рамки, завеси и (в Русия) арка
-      const z = ROOM_BACK + D * (0.22 + k * 0.28), ww = 1.5, wh = RU ? 2.3 : 2.4, y0 = 0.75;
-      const pane = new THREE.Mesh(new THREE.PlaneGeometry(ww, wh), new THREE.MeshBasicMaterial({ map: view, toneMapped: false })); pane.position.set(x - side * 0.02, y0 + wh / 2, z); pane.rotation.y = -side * Math.PI / 2; scene.add(pane);
+      const z = ROOM_BACK + D * (0.22 + k * 0.28), ww = RU ? 1.5 : 2.1, wh = RU ? 2.3 : 1.18, y0 = RU ? 0.75 : 1.0;   /* в Белия дом — снимката (с рамката си) */
+      const pane = new THREE.Mesh(new THREE.PlaneGeometry(ww, wh), new THREE.MeshBasicMaterial({ map: RU ? view : photo[side < 0 ? 0 : 1], toneMapped: false })); pane.position.set(x - side * 0.02, y0 + wh / 2, z); pane.rotation.y = -side * Math.PI / 2; scene.add(pane);
       if (RU) { const arch = new THREE.Mesh(new THREE.CircleGeometry(ww / 2, 24, 0, Math.PI), new THREE.MeshBasicMaterial({ map: view, toneMapped: false })); arch.position.set(x - side * 0.02, y0 + wh, z); arch.rotation.y = -side * Math.PI / 2; scene.add(arch); }
-      for (const dz of [-ww / 2, 0, ww / 2]) addBox(scene, 0.06, wh, 0.06, trimM, x - side * 0.04, y0 + wh / 2, z + dz);
-      addBox(scene, 0.06, 0.06, ww, trimM, x - side * 0.04, y0 + wh * 0.62, z);
+      if (RU) { for (const dz of [-ww / 2, 0, ww / 2]) addBox(scene, 0.06, wh, 0.06, trimM, x - side * 0.04, y0 + wh / 2, z + dz); addBox(scene, 0.06, 0.06, ww, trimM, x - side * 0.04, y0 + wh * 0.62, z); }
       const dr = []; for (const s of [-1, 1]) { const c = addBox(scene, 0.1, RH - 0.25, 0.42, drape, x - side * 0.12, (RH - 0.25) / 2, z + s * (ww / 2 + 0.24)); dr.push(c, addBox(scene, 0.12, 0.08, 0.46, drapeTie, x - side * 0.13, 1.2, z + s * (ww / 2 + 0.24))); }
-      realModel(scene, 'curtain', { w: ww + 1.1, h: RH - 0.2, d: 0.35, x: x - side * 0.25, z, ry: -side * Math.PI / 2, tint: RU ? 0xe8d8a8 : null, hide: dr });
+      for (const s of [-1, 1]) realModel(scene, 'curtain-tied', { w: 0.6, h: RH - 0.2, d: 0.3, x: x - side * 0.2, z: z + s * (ww / 2 + 0.05), ry: -side * Math.PI / 2, flip: s * side < 0, tint: RU ? 0xe8d8a8 : null, hide: dr });   // две вързани (отворени) завеси
     }
     // между прозорците — портрети (САЩ) или златни пиластри (Русия)
     for (let k = 0; k < 2; k++) {
