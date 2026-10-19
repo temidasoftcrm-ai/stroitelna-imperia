@@ -85,7 +85,8 @@ const css = `
 // ---- моделите и клиповете се зареждат веднъж (после само се добавят в новата сцена)
 const loader = new GLTFLoader();
 const cache = {};
-const loadGlb = n => cache[n] || (cache[n] = loader.loadAsync(DIR + n + '.glb'));
+const CLIPS_V = 3;   // вдигни, когато clips.glb се смени (иначе браузърът пази стария)
+const loadGlb = n => cache[n] || (cache[n] = loader.loadAsync(DIR + n + '.glb' + (n === 'clips' ? `?v=${CLIPS_V}` : '')));
 // от клиповете остават само ротациите + позицията на ханша (останалото е от скелета на Вера и би изкривило другите)
 let clipsP = null;
 const loadClips = () => clipsP || (clipsP = loadGlb('clips').then(g => {
@@ -100,6 +101,14 @@ const loadClips = () => clipsP || (clipsP = loadGlb('clips').then(g => {
       for (let k = 0; k < v.length; k += 3) { v[k] += d[0]; v[k + 1] += d[1]; v[k + 2] += d[2]; }
     }
     out[c.name] = c;
+  }
+  // гласуването (вдигната ръка, клатене на пръст) е записано прав — от тях взимаме само горната част на тялото, а ханшът и краката
+  // идват от седналото дишане; иначе директорът се изправя и потъва в пода
+  const UPPER = /Spine|Neck|Head|Shoulder|Arm|Hand/, seat = out.Sit_Breathing;
+  for (const n of ['Sit_Raise_Hand', 'Sit_Disapprove']) {
+    const c = out[n]; if (!c || !seat) continue;
+    c.tracks = [...c.tracks.filter(t => UPPER.test(t.name)), ...seat.tracks.filter(t => !UPPER.test(t.name)).map(t => t.clone())];
+    c.resetDuration();
   }
   return out;
 }));
@@ -574,7 +583,7 @@ export function openBoardroom(o) {
       const ok = y > n;
       scr.querySelector('.res').innerHTML = `<span style="color:${ok ? '#5fd38a' : y === n ? '#ffd54a' : '#ff6b6b'}">${y} за : ${n} против — ${ok ? 'бордът подкрепя' : y === n ? 'равен глас' : 'бордът е против'}. Решението е твое.</span>`;
       const row = scr.querySelector('.row');
-      const btn = (t, how, cls) => { const b = document.createElement('button'); b.textContent = t; if (cls) b.className = cls; b.onclick = () => { if (how === 'no') { o.onDecide && o.onDecide(p.id, 'no'); after('no'); return; } const rr = o.onResolve && o.onResolve(p.id, how), done = how !== 'drop' && !(rr && rr.done === false); if (done) cheer(); after(how === 'drop' ? 'later' : done ? 'ok' : 'no'); }; row.appendChild(b); };
+      const btn = (t, how, cls) => { const b = document.createElement('button'); b.textContent = t; if (cls) b.className = cls; b.onclick = () => { if (how === 'no') { o.onDecide && o.onDecide(p.id, 'no'); after('no'); return; } const rr = o.onResolve && o.onResolve(p.id, how, v), done = how !== 'drop' && !(rr && rr.done === false); if (done) cheer(); after(how === 'drop' ? 'later' : done ? 'ok' : 'no'); }; row.appendChild(b); };
       if (ok || !p.mustVote) btn(ok ? '✓ Одобри (както реши бордът)' : '✓ Одобри въпреки това', p.isSmall ? 'small' : 'pass', 'y');   // мегапроект — без мнозинство не минава
       if (p.small) btn(`½ По-малък вариант · ${B(p.small.cost)}`, 'small');
       if (v.bank && !v.bank.ok) btn('🏦 С кредит', 'loan');
@@ -626,7 +635,7 @@ export function openBoardroom(o) {
   if (o.settings && o.settings()) { cfg.style.display = ''; cfg.onclick = () => { setEl.classList.toggle('on'); if (setEl.classList.contains('on')) fillSet(); }; }
   // решението: холограмата светва (зелено / кехлибарено / червено) и след миг идва следващото
   let afterT = 0;
-  function after(kind) { if (kind === 'ok') snd.gavel();   // аплодисментите — в cheer() holo.flash(kind); scr.querySelectorAll('button').forEach(b => b.disabled = true); clearTimeout(afterT); const done = props[qi]?.id; decided.add(done); afterT = setTimeout(() => !shut && board(nextStep()), 1100); }
+  function after(kind) { if (kind === 'ok') snd.gavel(); holo.flash(kind); scr.querySelectorAll('button').forEach(b => b.disabled = true); clearTimeout(afterT); const done = props[qi]?.id; decided.add(done); afterT = setTimeout(() => !shut && board(nextStep()), 1100); }   // аплодисментите — в cheer()
   // след решение — следващото нерешено предложение (отчетът и речта на банката не се повтарят); ако няма — обобщението
   const decided = new Set();
   function nextStep() { const st = stepsNow(); let k = st.findIndex(p => p.step !== 'report' && !p.info && p.step !== 'summary' && !decided.has(p.id)); if (k < 0) k = st.findIndex(p => p.step === 'summary'); return k < 0 ? 0 : k; }
