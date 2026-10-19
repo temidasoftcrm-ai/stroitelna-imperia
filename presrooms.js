@@ -114,16 +114,16 @@ export function buildPresRoom(scene, cc, H) {
   if (RU) { const run = new THREE.Mesh(new THREE.PlaneGeometry(TABLE_W + 2.6, TABLE_L + 3), std(0xa3191d, 0.95)); run.rotation.x = -Math.PI / 2; run.position.set(0, 0.004, 0); run.receiveShadow = true; scene.add(run); }
   // стени: задна (печат/герб и знамена), предна, странични с прозорци
   for (const [z, ry] of [[ROOM_BACK, 0], [ROOM_FRONT, Math.PI]]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W * 2, RH), wallM); w.position.set(0, RH / 2, z); w.rotation.y = ry; w.receiveShadow = true; scene.add(w); }
-  const view = RU ? viewRU() : viewUS(), photo = RU ? null : ['view-south', 'view-north'].map(n => { const t = new THREE.TextureLoader().load(PR + n + '.webp'); t.colorSpace = THREE.SRGBColorSpace; return t; }), drape = std(RU ? 0xe8d8a8 : 0x9b1c22, 0.9), drapeTie = gold;
+  const view = RU ? viewRU() : viewUS(), photo = ['view-south', 'view-north'], third = (n, i) => { const t = new THREE.TextureLoader().load(PR + n + '.webp'); t.colorSpace = THREE.SRGBColorSpace; t.repeat.set(1 / 3, 1); t.offset.set(i / 3, 0); return t; }, drape = std(RU ? 0xe8d8a8 : 0x9b1c22, 0.9), drapeTie = gold;
   for (const side of [-1, 1]) {
     const x = side * ROOM_W, wall = new THREE.Mesh(new THREE.PlaneGeometry(D, RH), wallM); wall.position.set(x, RH / 2, cz); wall.rotation.y = -side * Math.PI / 2; scene.add(wall);
     for (let k = 0; k < 3; k++) {   // три високи прозореца на страна, с рамки, завеси и (в Русия) арка
-      const z = ROOM_BACK + D * (0.22 + k * 0.28), ww = RU ? 1.5 : 2.1, wh = RU ? 2.3 : 1.18, y0 = RU ? 0.75 : 1.0;   /* в Белия дом — снимката (с рамката си) */
-      const pane = new THREE.Mesh(new THREE.PlaneGeometry(ww, wh), new THREE.MeshBasicMaterial({ map: RU ? view : photo[side < 0 ? 0 : 1], toneMapped: false })); pane.position.set(x - side * 0.02, y0 + wh / 2, z); pane.rotation.y = -side * Math.PI / 2; scene.add(pane);
+      const z = ROOM_BACK + D * (0.22 + k * 0.28), ww = 1.5, wh = RU ? 2.3 : 2.45, y0 = 0.75;   /* в Белия дом — трите прозореца заедно показват цялата снимка */
+      const pane = new THREE.Mesh(new THREE.PlaneGeometry(ww, wh), new THREE.MeshBasicMaterial({ map: RU ? view : third(photo[side < 0 ? 0 : 1], side < 0 ? 2 - k : k), toneMapped: false })); pane.position.set(x - side * 0.02, y0 + wh / 2, z); pane.rotation.y = -side * Math.PI / 2; scene.add(pane);
       if (RU) { const arch = new THREE.Mesh(new THREE.CircleGeometry(ww / 2, 24, 0, Math.PI), new THREE.MeshBasicMaterial({ map: view, toneMapped: false })); arch.position.set(x - side * 0.02, y0 + wh, z); arch.rotation.y = -side * Math.PI / 2; scene.add(arch); }
       if (RU) { for (const dz of [-ww / 2, 0, ww / 2]) addBox(scene, 0.06, wh, 0.06, trimM, x - side * 0.04, y0 + wh / 2, z + dz); addBox(scene, 0.06, 0.06, ww, trimM, x - side * 0.04, y0 + wh * 0.62, z); }
       const dr = []; for (const s of [-1, 1]) { const c = addBox(scene, 0.1, RH - 0.25, 0.42, drape, x - side * 0.12, (RH - 0.25) / 2, z + s * (ww / 2 + 0.24)); dr.push(c, addBox(scene, 0.12, 0.08, 0.46, drapeTie, x - side * 0.13, 1.2, z + s * (ww / 2 + 0.24))); }
-      for (const s of [-1, 1]) realModel(scene, 'curtain-tied', { w: 0.6, h: RH - 0.2, d: 0.3, x: x - side * 0.2, z: z + s * (ww / 2 + 0.05), ry: -side * Math.PI / 2, flip: s * side < 0, tint: RU ? 0xe8d8a8 : null, hide: dr });   // две вързани (отворени) завеси
+      for (const s of [-1, 1]) realModel(scene, 'curtain-tied', { w: 0.7, h: RH - 0.2, d: 0.3, x: x - side * 0.2, z: z + s * (ww / 2 + 0.15), ry: -side * Math.PI / 2, flip: s * side < 0, tint: RU ? 0xe8d8a8 : null, hide: dr });   // две вързани (отворени) завеси
     }
     // между прозорците — портрети (САЩ) или златни пиластри (Русия)
     for (let k = 0; k < 2; k++) {
