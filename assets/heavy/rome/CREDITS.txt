@@ -1,0 +1,5 @@
+Рим — сгради (оптимизирани, пребоядисани в цветовете на Рим в играта):
+it-townhouse-terracotta.glb      – "Town House" by Quaternius – CC0 1.0 – https://poly.pizza/m/sDQJBImZuw  (11 552 tris; керемиден покрив, светла мазилка)
+it-palazzo-small.glb             – "Town House" by Quaternius – CC0 1.0 – https://poly.pizza/m/dtVrmnnCZn  (4 802 tris; тухла+бял камък, плосък покрив)
+it-palazzo-big.glb               – "Big Building" by Quaternius – CC0 1.0 – https://poly.pizza/m/AVCS8jUd2l (6 976 tris)
+it-corner-shop.glb               – "Building Red Corner" by J-Toastie – CC-BY 3.0 – https://poly.pizza/m/9JuFwnivP0 (1 983 tris; магазин на партера) – изисква атрибуция: "Building Red Corner by J-Toastie (poly.pizza), CC-BY 3.0"

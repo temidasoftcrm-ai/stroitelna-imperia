@@ -44,6 +44,8 @@ const MAT = { grass: M(0x7fa462), walk: M(0xc9c4b8), asph: M(0x3a3d42), median: 
 for (const k of ['walk', 'asph', 'median', 'paint']) Object.assign(MAT[k], { polygonOffset: true, polygonOffsetFactor: { walk: -1, asph: -2, median: -3, paint: -4 }[k], polygonOffsetUnits: { walk: -1, asph: -2, median: -3, paint: -4 }[k] });
 
 // ---- модели
+const IT_COL = [0xd9a066, 0xc8794e, 0xe7c77e];
+function itTints(k) { if (!A[k]) return; IT_COL.forEach((c, i) => { const o = A[k].clone(true); o.traverse(m => { if (!m.isMesh) return; m.material = m.material.clone(); const col = m.material.color, l = col.r * 0.3 + col.g * 0.59 + col.b * 0.11; if (l > 0.55 && !(col.r > col.g * 1.4)) col.lerp(new THREE.Color(c), 0.75); }); A[k + '#' + i] = o; }); }
 const loader = new GLTFLoader(), A = {};
 const load = (k, url) => loader.loadAsync(url).then(g => { g.scene.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; if (o.material?.metalness > 0.5) o.material.metalness = 0.3; } }); A[k] = g.scene; }).catch(() => {});
 const HOUSES = ['h2-blue', 'h2-brickcabin', 'h2-greyporch', 'h2-pink', 'h2-porch', 'h2-swedish', 'h2-townhouse'];
@@ -54,7 +56,8 @@ const OFFICE = [...BUILD.low[0], ...BUILD.mid[0].filter(k => !/^[bs]-/.test(k))]
 const CARS = ['car-polo', 'car-p206', 'car-renegade', 'car-accord', 'car-corolla', 'car-taxi', 'car-hilux', 'bus-citaro'];
 await Promise.all([...HOUSES.map(k => load(k, `../assets/heavy/houses2/${k}.glb`)), ...[...new Set([...OFFICE, ...TOWER, 'brooklyn'])].map(k => load(k, `../assets/heavy/blocks2/${k}.glb`)),
   ...['panel12', 'soviet', 'richmond', 'dbrick', 'oldbld', 'stalin', 'asian'].map(k => load('b-' + k, `../assets/heavy/blocks/${k}.glb`)), ...['sing', 'rand', 'blue'].map(k => load('s-' + k, `../assets/heavy/sky/${k}.glb`)),
-  load('hospital', '../assets/heavy/hospital/hospital.glb'), load('colosseo', '../assets/heavy/lm/colosseo.glb'), load('station', '../assets/heavy/station/small.glb'), load('stadium', '../assets/heavy/stadium/stadium.glb'), load('cityhall', '../assets/heavy/civic/cityhall.glb'),
+  load('hospital', '../assets/heavy/hospital/hospital.glb'),
+  ...['townhouse-terracotta', 'palazzo-small', 'palazzo-big', 'corner-shop'].map(k => load('it-' + k, `../assets/heavy/rome/it-${k}.glb`).then(() => itTints('it-' + k))), load('colosseo', '../assets/heavy/lm/colosseo.glb'), load('station', '../assets/heavy/station/small.glb'), load('stadium', '../assets/heavy/stadium/stadium.glb'), load('cityhall', '../assets/heavy/civic/cityhall.glb'),
   ...CARS.map(k => load(k, `../assets/heavy/cars/${k}.glb`))]);
 // ---- инстанции: всяка част на модела — един InstancedMesh за всичките му копия (вместо клонинги: малко draw calls)
 const PARTS = {}, BOX = {};
@@ -132,7 +135,8 @@ function romeLm(L) {
 let put = () => {};
 // Рим: затворено застрояване — по двете страни на всяка улица непрекъсната редица от сгради (8 м по фасадата, 11 м дълбочина),
 // 4–6 етажа, в цветовете на Рим (охра, теракота, жълто); не върху друга улица, вода, парк/археологическа зона или забележителност
-const ROME_BLD = ['brickshop', 'midwest', 'pp-apart', 'b-oldbld', 'b-dbrick', 'office5', 'brooklyn'];   // по-европейските от нашите (тухла, мазилка, ниски)
+// италианските сгради (assets/heavy/rome, Quaternius CC0 и J-Toastie CC-BY) — по 3 оцветявания: светлите стени → охра, теракота, жълто
+const ROME_BLD = ['townhouse-terracotta', 'palazzo-small', 'palazzo-big', 'corner-shop'].flatMap(k => [0, 1, 2].map(i => 'it-' + k + '#' + i));
 const ROMA = [0xd9a066, 0xc8794e, 0xe2c27a, 0xb5654a, 0xd8b48a, 0xe7d3a8, 0xc98f5b, 0xa9583f];
 function romeBlocks() {
   const D = OSM2.rome, rg = new Map(), gc = 12, key = (x, z) => Math.floor(x / gc) + ',' + Math.floor(z / gc);
