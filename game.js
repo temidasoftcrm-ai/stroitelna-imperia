@@ -454,7 +454,7 @@ let europe = null;
   for (const n of H2) jobs.push(load(`assets/heavy/houses2/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => HOUSES.splice(HOUSES.indexOf(n), 1)));   // не се зареди → не се строи
   for (const n of GAS_KINDS) jobs.push(load(`assets/heavy/gas/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; }).catch(() => {}));   // бензиностанции (всяка — свое „✓ OK“)
   if (feature('plants-real')) for (const k of ['bush-0', 'bush-1', 'bush-2', 'flowers', 'fountain']) jobs.push(load(`assets/heavy/plants/${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['pl-' + k] = g; }).catch(() => {}));
-  for (const [dir, list] of Object.entries(MODELS)) for (const n of list) jobs.push(load(`assets/${dir}/${n}.glb`).then(g => { A[dir === 'industrial' ? 'ind-' + n : n] = g; if (dir === 'commercial' || dir === 'commercial2' || n === 'building-type-a' || n === 'building-type-b' || n === 'Building_Medium_2_001') prepNightFloors(g.scene, n);   // Building_Medium_2_001 — Лабораторията → night-nyextra
+  for (const [dir, list] of Object.entries(MODELS)) if (dir !== 'industrial') for (const n of list) jobs.push(load(`assets/${dir}/${n}.glb`).then(g => { A[dir === 'industrial' ? 'ind-' + n : n] = g; if (dir === 'commercial' || dir === 'commercial2' || n === 'building-type-a' || n === 'building-type-b' || n === 'Building_Medium_2_001') prepNightFloors(g.scene, n);   // Building_Medium_2_001 — Лабораторията → night-nyextra
     if (n === 'building-type-b') g.scene.traverse(o => { if (o.isMesh && o.material?.name === 'phong1') o.visible = false; }); }));   // бръшлянът на house-b е JPEG без прозрачност → черни петна   // нощем етажите светват (nightfloors.js)
   // истинска строителна техника и коли за трафика (vehmodels.js, Sketchfab)
   jobs.push(loadVehModels(load, A));
@@ -755,7 +755,7 @@ function tierModel(cityId, lot, n) {
   if (SHOPS.includes(n) && blk2Loaded().length && (lot.zone === 'center' || h % 2)) return MODERN[h % MODERN.length];
   return n;
 }
-const INDUSTRIAL = MODELS.industrial.filter(n => n.startsWith('building')).map(n => 'ind-' + n);
+const INDUSTRIAL = MODELS.industrial.filter(n => n.startsWith('building')).map(n => 'ind-' + n);   // само имената: моделите (истинските) — industry.js; детските файлове са изтрити
 const FACTORY_CITIES = new Set(ECON.FACTORIES.map(f => f.cityId));
 // мащаб, с който сградата се вписва в парцела 16×16 м
 // истинските височини (feature 'real-heights'): къща на 2 етажа ~8 м, блок на 5 етажа ~16 м, 10 етажа ~30 м, небостъргач — по етажите (~2.8 м),
@@ -770,7 +770,7 @@ function realH(n) {
 }
 function realHeight(o, n, maxW) {
   if (!feature('real-heights')) return false;
-  if (n.startsWith('ind-') && feature('ind-real')) return false;   // истинските заводи (industry.js) — със своите пропорции, не до 16 м
+  if (n.startsWith('ind-')) return false;   // истинските заводи (industry.js) — със своите пропорции, не до 16 м
   const sz = sizeOf(n).getSize(new THREE.Vector3()), fy = realH(n) / Math.max(0.01, sz.y), w = Math.max(sz.x, sz.z), fx = Math.min(fy, maxW / Math.max(0.01, w));
   o.scale.set(fx, fy, fx); return true;
 }
