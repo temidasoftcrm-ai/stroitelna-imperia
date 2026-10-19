@@ -28,6 +28,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { plan2 } from '../cityplan2.js';
+import { createTraffic, planNetwork } from '../traffic.js';   // трафикът (част C, 2a): ленти, дистанция, кръстовища, кръгови, светлини; ?tr2=0 — старите пробни коли
+import { truckLamps } from '../vehmodels.js';
 
 const R = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true }); R.setPixelRatio(Math.min(2, devicePixelRatio)); R.shadowMap.enabled = true; R.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(45, 1, 1, 4000), ctl = new OrbitControls(cam, R.domElement); ctl.maxPolarAngle = Math.PI * 0.47; ctl.enableDamping = true;
@@ -46,13 +48,20 @@ const CARS = ['car-polo', 'car-p206', 'car-renegade', 'car-accord', 'car-corolla
 await Promise.all([...HOUSES.map(k => load(k, `../assets/heavy/houses2/${k}.glb`)), ...[...OFFICE, ...TOWER].map(k => load(k, `../assets/heavy/blocks2/${k}.glb`)),
   load('hospital', '../assets/heavy/hospital/hospital.glb'), load('station', '../assets/heavy/station/small.glb'), load('stadium', '../assets/heavy/stadium/stadium.glb'), load('cityhall', '../assets/heavy/civic/cityhall.glb'),
   ...CARS.map(k => load(k, `../assets/heavy/cars/${k}.glb`))]);
-const size3 = o => new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3());
-function placeModel(k, L, fit, hMax = 1e9) {   // модел в парцела: лицето към улицата, побран в (w, d) с отстояние
-  if (!A[k]) return null; const o = A[k].clone(true), w = new THREE.Group(), inner = new THREE.Group(); inner.add(o); w.add(inner);
-  let s = size3(inner); if ((s.x > s.z) !== (L.w > L.d)) { inner.rotation.y = Math.PI / 2; s = size3(inner); }
-  const k2 = Math.min((L.w - fit) / s.x, (L.d - fit) / s.z, hMax / s.y); inner.scale.setScalar(k2);
-  const b = new THREE.Box3().setFromObject(inner), c = b.getCenter(new THREE.Vector3()); inner.position.set(-c.x, -b.min.y, -c.z);
-  w.position.set(L.x, 0, L.z); w.rotation.y = L.rot; return w;
+// ---- инстанции: всяка част на модела — един InstancedMesh за всичките му копия (вместо клонинги: малко draw calls)
+const PARTS = {}, BOX = {};
+const partsOf = k => PARTS[k] ??= (() => { const T = A[k]; T.updateMatrixWorld(true); const out = []; T.traverse(m => { if (m.isMesh) out.push({ geo: m.geometry, mat: m.material, local: m.matrixWorld.clone() }); }); return out; })();
+const boxOf = k => BOX[k] ??= new THREE.Box3().setFromObject(A[k]);
+function lotMatrix(k, L, fit, hMax = 1e9) {   // модел в парцела: лицето към улицата, побран в (w, d) с отстояние → матрица
+  if (!A[k]) return null;
+  const b0 = boxOf(k), s0 = b0.getSize(new THREE.Vector3()), rot = (s0.x > s0.z) !== (L.w > L.d) ? Math.PI / 2 : 0, s = rot ? new THREE.Vector3(s0.z, s0.y, s0.x) : s0;
+  const k2 = Math.min((L.w - fit) / s.x, (L.d - fit) / s.z, hMax / s.y), Mrs = new THREE.Matrix4().makeRotationY(rot).multiply(new THREE.Matrix4().makeScale(k2, k2, k2));
+  const b = b0.clone().applyMatrix4(Mrs), c = b.getCenter(new THREE.Vector3());
+  return new THREE.Matrix4().makeTranslation(L.x, 0, L.z).multiply(new THREE.Matrix4().makeRotationY(L.rot)).multiply(new THREE.Matrix4().makeTranslation(-c.x, -b.min.y, -c.z)).multiply(Mrs);
+}
+function instance(group, k, mats, shadow = true) {   // mats — матриците на копията на модела k
+  if (!mats.length) return [];
+  return partsOf(k).map(pt => { const im = new THREE.InstancedMesh(pt.geo, pt.mat, mats.length), m = new THREE.Matrix4(); mats.forEach((M2, i) => im.setMatrixAt(i, m.multiplyMatrices(M2, pt.local))); im.castShadow = shadow; im.receiveShadow = true; im.frustumCulled = false; im.userData.shared = 1; im.userData.local = pt.local; group.add(im); return im; });
 }
 
 // ---- геометрия
@@ -88,16 +97,19 @@ function build() {
   const lp = []; for (const L of P.lots) for (let i = 0; i < 4; i++) { const a = L.poly[i], b = L.poly[(i + 1) % 4]; lp.push(a[0], 0.15, a[1], b[0], 0.15, b[1]); }
   const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3)); city.add(new THREE.LineSegments(lg, MAT.lot));
   const pick = (arr, id) => arr[(id * 2654435761 >>> 0) % arr.length];
-  const trunk = M(0x6b4a2e), leaf = M(0x4f8a3a);
+  const byKey = new Map(), trees = [], put = (k, M2) => { if (M2) (byKey.get(k) || byKey.set(k, []).get(k)).push(M2); };
   for (const L of P.lots) {
-    let o = null;
-    if (L.big === 'park') { for (let k = 0; k < Math.floor(L.w * L.d / 70); k++) { const t = new THREE.Group(), h = 4 + (k * 7 % 5); const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, h * 0.45, 6), trunk); tr.position.y = h * 0.22; const cr = new THREE.Mesh(new THREE.SphereGeometry(h * 0.3, 8, 6), leaf); cr.position.y = h * 0.55; cr.castShadow = true; t.add(tr, cr);
-      const u = ((k * 0.7548776662 + 0.5) % 1 - 0.5) * (L.w - 6), v = ((k * 0.5698402910 + 0.5) % 1 - 0.5) * (L.d - 6), c = Math.cos(L.rot), s = Math.sin(L.rot); t.position.set(L.x + u * c + v * s, 0, L.z - u * s + v * c); city.add(t); } continue; }
-    if (L.big) o = placeModel({ hospital: 'hospital', station: 'station', stadium: 'stadium', special: 'cityhall' }[L.big], L, 6);
-    else if (L.zone === 'residential' || L.zone === 'periphery') o = placeModel(pick(HOUSES, L.id), L, 5, 9);
-    else if (L.zone === 'center' && L.id % 3 === 0) o = placeModel(pick(TOWER, L.id), L, 4);
-    else o = placeModel(pick(OFFICE, L.id), L, 4, 26);
-    if (o) city.add(o);
+    if (L.big === 'park') { for (let k = 0; k < Math.floor(L.w * L.d / 70); k++) { const h = 4 + (k * 7 % 5), u = ((k * 0.7548776662 + 0.5) % 1 - 0.5) * (L.w - 6), v = ((k * 0.5698402910 + 0.5) % 1 - 0.5) * (L.d - 6), c = Math.cos(L.rot), s = Math.sin(L.rot); trees.push([L.x + u * c + v * s, L.z - u * s + v * c, h]); } continue; }
+    if (L.big) { const k = { hospital: 'hospital', station: 'station', stadium: 'stadium', special: 'cityhall' }[L.big]; put(k, lotMatrix(k, L, 6)); }
+    else if (L.zone === 'residential' || L.zone === 'periphery') { const k = pick(HOUSES, L.id); put(k, lotMatrix(k, L, 5, 9)); }
+    else if (L.zone === 'center' && L.id % 3 === 0) { const k = pick(TOWER, L.id); put(k, lotMatrix(k, L, 4)); }
+    else { const k = pick(OFFICE, L.id); put(k, lotMatrix(k, L, 4, 26)); }
+  }
+  for (const [k, mats] of byKey) instance(city, k, mats);
+  if (trees.length) {   // дърветата на парковете: два InstancedMesh (стъбла и корони)
+    const tg = new THREE.CylinderGeometry(0.2, 0.3, 1, 6).translate(0, 0.5, 0), cg = new THREE.SphereGeometry(1, 8, 6), T1 = new THREE.InstancedMesh(tg, M(0x6b4a2e), trees.length), T2 = new THREE.InstancedMesh(cg, M(0x4f8a3a), trees.length), m = new THREE.Matrix4();
+    trees.forEach(([x, z, h], i) => { T1.setMatrixAt(i, m.compose(new THREE.Vector3(x, 0, z), new THREE.Quaternion(), new THREE.Vector3(1, h * 0.45, 1))); T2.setMatrixAt(i, m.compose(new THREE.Vector3(x, h * 0.55, z), new THREE.Quaternion(), new THREE.Vector3(h * 0.3, h * 0.3, h * 0.3))); });
+    T2.castShadow = true; T1.frustumCulled = T2.frustumCulled = false; city.add(T1, T2);
   }
   spawnCars(); stats(); view(viewMode);
 }
@@ -114,18 +126,34 @@ function nextLeg(c) {
   else if (n.arms.length >= 2 && arrive >= 0 && n.kind !== 'end') path = P.turnPath(n.id, arrive, 0, to, 0);
   c.road = a2.road; c.dir = dir2; c.pts = [...path, ...P.lanePath(a2.road, dir2, 0)]; c.i = 0;
 }
-function spawnCars() {
-  for (const c of cars) scene.remove(c.o); cars = [];
-  const N = Math.min(140, P.roads.length * 2);
+let carIM = {}, hlIM = null, carPools = {};
+const TR2 = !/[?&]tr2=0/.test(location.search); let tr = null;
+function spawnCars() {   // колите — трафикът на 2a (traffic.js); с ?tr2=0 — пробните коли: инстанции по модел, фаровете — един InstancedMesh
+  cars = []; carIM = {}; hlIM = null;
+  if (TR2) {
+    if (tr) tr.clear(); let k = 0;
+    // колите — инстанции: по един InstancedMesh на част на модел за всички коли от него; светлините ги прави traffic.js (3 общи InstancedMesh)
+    const cap = Math.min(140, P.roads.length * 2), Z0 = new THREE.Matrix4().makeScale(0, 0, 0), M0 = new THREE.Matrix4(), M1 = new THREE.Matrix4(), q = new THREE.Quaternion(), V = new THREE.Vector3(), S3 = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+    const per = Math.ceil(cap / CARS.length) + 3;   // места на модел: колкото колите от него + малко резерв (празните места също се рисуват)
+    carPools = {}; for (const nm of CARS) if (A[nm]) carPools[nm] = { ims: instance(city, nm, Array(per).fill(Z0)), free: [...Array(per).keys()].reverse() };
+    tr = createTraffic({ scene, camera: cam, built: planNetwork(P), seed: 7, maxCars: cap, drive: P.drive === 'L' ? 'left' : 'right',
+      makeCar: () => { let nm = null; for (let t = 0; t < CARS.length && !nm; t++) { const c = CARS[k++ % CARS.length]; if (carPools[c]?.free.length) nm = c; } const pool = carPools[nm]; if (!pool) return null; const slot = pool.free.pop(), kk = nm === 'bus-citaro' ? 12 : 4.4, b = boxOf(nm).getSize(new THREE.Vector3());
+        return { len: kk, w: b.x * kk, h: b.y * kk, kind: nm === 'bus-citaro' ? 'bus' : 'car',
+          set(x, y, z, yaw) { M0.compose(V.set(x, y, z), q.setFromAxisAngle(up, yaw), S3.set(kk, kk, kk)); for (const im of pool.ims) im.setMatrixAt(slot, M1.multiplyMatrices(M0, im.userData.local)); },
+          remove() { for (const im of pool.ims) im.setMatrixAt(slot, Z0); pool.free.push(slot); } }; } });
+    return;
+  }
+  const N = Math.min(140, P.roads.length * 2), cnt = {};
   for (let k = 0; k < N; k++) {
     const rd = P.roads[(Math.random() * P.roads.length) | 0], dir = Math.random() < 0.5 ? 1 : -1, nm = CARS[k % CARS.length]; if (!A[nm]) continue;
-    const o = new THREE.Group(), body = A[nm].clone(true); body.scale.setScalar(nm === 'bus-citaro' ? 12 : 4.4); o.add(body);
-    const hl = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.25, 0.1), new THREE.MeshBasicMaterial({ color: 0xfff6d0 })); hl.position.set(0, 0.7, 2.25 * (nm === 'bus-citaro' ? 2.7 : 1)); hl.visible = night; o.add(hl); o.userData.hl = hl;
-    scene.add(o);
-    const pts = P.lanePath(rd.id, dir, 0), c = { o, road: rd.id, dir, pts, i: (Math.random() * pts.length) | 0, sp: 9 + Math.random() * 5 }; cars.push(c);
+    const pts = P.lanePath(rd.id, dir, 0); cars.push({ nm, slot: (cnt[nm] = (cnt[nm] || 0) + 1) - 1, k: nm === 'bus-citaro' ? 12 : 4.4, road: rd.id, dir, pts, i: (Math.random() * pts.length) | 0, sp: 9 + Math.random() * 5, x: 0, z: 0, yaw: 0 });
   }
+  const I = new THREE.Matrix4();
+  for (const nm in cnt) carIM[nm] = instance(city, nm, Array(cnt[nm]).fill(I));
+  hlIM = new THREE.InstancedMesh(new THREE.BoxGeometry(1.4, 0.25, 0.1), new THREE.MeshBasicMaterial({ color: 0xfff6d0 }), cars.length); hlIM.frustumCulled = false; hlIM.visible = night; city.add(hlIM);
 }
 function moveCars(dt) {
+  if (tr) { tr.update(dt); for (const nm in carPools) for (const im of carPools[nm].ims) im.instanceMatrix.needsUpdate = true; return; }
   for (const c of cars) {
     let left = c.sp * dt;
     while (left > 0) {
@@ -134,8 +162,15 @@ function moveCars(dt) {
       if (t * d + left < d) { c.t = t + left / (d || 1); left = 0; } else { left -= d * (1 - t); c.t = 0; c.i++; }
     }
     const a = c.pts[Math.min(c.i, c.pts.length - 1)], b = c.pts[Math.min(c.i + 1, c.pts.length - 1)], t = c.t || 0;
-    c.o.position.set(a[0] + (b[0] - a[0]) * t, 0.05, a[1] + (b[1] - a[1]) * t); if (b !== a) c.o.rotation.y = Math.atan2(b[0] - a[0], b[1] - a[1]);
+    c.x = a[0] + (b[0] - a[0]) * t; c.z = a[1] + (b[1] - a[1]) * t; if (b !== a) c.yaw = Math.atan2(b[0] - a[0], b[1] - a[1]);
   }
+  // матриците на инстанциите
+  const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), M0 = new THREE.Matrix4(), M1 = new THREE.Matrix4(), M2 = new THREE.Matrix4(), V = new THREE.Vector3(), S = new THREE.Vector3();
+  cars.forEach((c, n) => { q.setFromAxisAngle(up, c.yaw); V.set(c.x, 0.05, c.z); M0.compose(V, q, S.set(c.k, c.k, c.k));
+    for (const im of carIM[c.nm] || []) im.setMatrixAt(c.slot, M1.multiplyMatrices(M0, im.userData.local));
+    if (hlIM && night) { M2.compose(V, q, S.set(1, 1, 1)).multiply(M1.makeTranslation(0, 0.7, 2.25 * (c.nm === 'bus-citaro' ? 2.7 : 1))); hlIM.setMatrixAt(n, M2); } });
+  for (const nm in carIM) for (const im of carIM[nm]) im.instanceMatrix.needsUpdate = true;
+  if (hlIM && night) hlIM.instanceMatrix.needsUpdate = true;
 }
 
 // ---- камера, ден/нощ, статистика
@@ -148,9 +183,9 @@ function view(m) {
   if (m === 'round') { ctl.target.set(r0.x, 0, r0.z); cam.position.set(r0.x + 45, 38, r0.z + 55); }
   ctl.update();
 }
-function setNight(on) { night = on; document.getElementById('night').classList.toggle('on', on); hemi.intensity = on ? 0.18 : 1.2; sun.intensity = on ? 0.12 : 2.3; scene.background = new THREE.Color(on ? 0x0b1020 : 0x9fc9ee); for (const c of cars) c.o.userData.hl.visible = on; }
+function setNight(on) { night = on; truckLamps().front.emissiveIntensity = truckLamps().rear.emissiveIntensity = on ? 1 : 0; document.getElementById('night').classList.toggle('on', on); hemi.intensity = on ? 0.18 : 1.2; sun.intensity = on ? 0.12 : 2.3; scene.background = new THREE.Color(on ? 0x0b1020 : 0x9fc9ee); if (hlIM) hlIM.visible = on; }
 let fps = 0, fr = 0, ft = performance.now();
-function stats() { const i = R.info; document.getElementById('st').textContent = `${P.fam} · ${P.size} · ${P.stats.build} парцела + ${P.stats.big} големи · ${P.roads.length} пътя · ${P.rounds.length} кръгови\nплан: ${P.stats.ms} ms · ${cars.length} коли\nкадър: ${fps} fps · ${i.render.calls} draw calls · ${(i.render.triangles / 1000).toFixed(0)}k триъгълника · ${i.memory.geometries} геометрии · ${i.memory.textures} текстури`; }
+function stats() { const i = R.info; document.getElementById('st').textContent = `${P.fam} · ${P.size} · ${P.stats.build} парцела + ${P.stats.big} големи · ${P.roads.length} пътя · ${P.rounds.length} кръгови\nплан: ${P.stats.ms} ms · ${tr ? (tr.stats().cars ?? '?') : cars.length} коли\nкадър: ${fps} fps · ${i.render.calls} draw calls · ${(i.render.triangles / 1000).toFixed(0)}k триъгълника · ${i.memory.geometries} геометрии · ${i.memory.textures} текстури`; }
 const fam = document.getElementById('fam'), size = document.getElementById('size'), seed = document.getElementById('seed');
 document.getElementById('go').onclick = build; fam.onchange = build; size.onchange = build;
 for (const b of ['top', 'game', 'round']) document.getElementById(b).onclick = () => view(b);
@@ -158,5 +193,5 @@ document.getElementById('night').onclick = () => setNight(!night);
 scene.background = new THREE.Color(0x9fc9ee); build();
 let last = performance.now();
 R.setAnimationLoop(() => { const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now; moveCars(dt); ctl.update(); R.render(scene, cam); fr++; if (now - ft > 1000) { fps = fr; fr = 0; ft = now; stats(); } });
-window.__p2 = { P: () => P, view, setNight, cars: () => cars };
+window.__p2 = { P: () => P, view, setNight, cars: () => cars, tr: () => tr && tr.stats() };
 </script></body></html>

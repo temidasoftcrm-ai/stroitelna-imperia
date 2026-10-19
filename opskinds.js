@@ -99,36 +99,72 @@ export const KINDS = {
     teams: {
       neg: { ico: '🤝', nm: 'Посредници', job: 'договарят хуманитарен коридор на контролния пункт', cost: 3e5, eta: 0.25 },
       obs: { ico: '🔍', nm: 'Наблюдатели', job: 'проверяват конвоите на място — пунктът ги пропуска по-бързо', cost: 2.5e5, eta: 0.3 },
-      convoy: { ico: '🚚', nm: 'Конвой с помощи', job: 'храна, вода и лекарства до склада в квартала', cost: 6e5, eta: 0.3 },
+      convoy: { ico: '🚚', nm: 'Конвой с помощи', job: 'товарът по твой избор — до склада в квартала', cost: 6e5, eta: 0.3 },
       med: { ico: '🚑', nm: 'Медицински транспорт', job: 'извозва болните през коридора до болницата', cost: 3e5, eta: 0.25 },
       water: { ico: '💧', nm: 'Водоснабдяване', job: 'цистерни и ремонт на помпената станция', cost: 3.5e5, eta: 0.3 },
       power: { ico: '⚡', nm: 'Генератори', job: 'ток за медицинския пункт и помпите', cost: 2e5, eta: 0.25 },
     },
-    choices: {
-      rebuild: { ico: '🏗️', nm: 'Възстанови водата, тока и клиниката', k: 0.35, trust: 5, sec: 1, services: 3, out: 'deal' },
-      corridor: { ico: '🕊️', nm: 'Постоянен коридор с наблюдатели', k: 0.12, trust: 4, sec: 2, services: 1, out: 'deal' },
-      once: { ico: '📦', nm: 'Само еднократна помощ', k: 0.05, trust: 1, sec: 0, services: 0, out: 'partial' },
-    },
-    start(m) { Object.assign(m, { access: 'closed', talks: 0, need: 72, sick: 18, water: 25, stock: 0, delivered: 0, crit: 0, chk: 0 }); return '🤝 Кварталът Ал-Нур е без достатъчно храна, вода и лекарства. Контролният пункт е затворен. (Алтернативен игрови сценарий.)'; },
+    // 🧭 решенията по време на операцията (ops.js → decide): еднократни, „товарът“ — сменя се по всяко време; събития (ev) — с отговор
+    decisions: [
+      { id: 'check', ico: '🚧', title: 'Как да се проверяват конвоите?', when: m => m.talks >= 0.5, txt: () => 'Пунктът чака отговор, преди да отвори коридора.',
+        opts: [{ k: 'full', ico: '🔎', nm: 'Пълна проверка на всеки камион', txt: 'безопасно, но конвоите минават бавно' },
+          { k: 'seal', ico: '🔒', nm: 'Пломбирани камиони + наблюдатели', cost: 2.5e5, txt: 'по-бързо; пунктът е спокоен' },
+          { k: 'fast', ico: '⚡', nm: 'Ускорено преминаване', txt: 'най-бързо, но рискът от задържане на пункта расте' }] },
+      { id: 'cargo', ico: '📦', title: 'Какво кара конвоят', pick: true, when: m => m.teams.convoy.st !== 'ready',
+        opts: [{ k: 'food', ico: '🍞', nm: 'Храна', txt: 'нуждата пада бързо' }, { k: 'water', ico: '💧', nm: 'Вода', txt: 'докато помпите не работят' }, { k: 'meds', ico: '💊', nm: 'Лекарства', txt: 'болните оздравяват на място' }] },
+      { id: 'dist', ico: '🏘️', title: 'Как да се раздава помощта?', when: m => m.delivered > 8, txt: m => `На склад: ${Math.round(m.stock)} т — опашката е дълга.`,
+        opts: [{ k: 'wh', ico: '🏬', nm: 'Само от склада', txt: 'евтино, но бавно; риск от блъсканица' },
+          { k: 'mobile', ico: '🚐', nm: 'Мобилни пунктове по улиците', cost: 3e5, txt: 'стига до всички, опашката изчезва' },
+          { k: 'local', ico: '🏛️', nm: 'Чрез местните общински служби', cost: 1e5, txt: 'по-бавно, но доверието расте' }] },
+      { id: 'care', ico: '🏥', title: 'Болните — къде да се лекуват?', when: m => m.t > 0.4 && m.sick > 6,
+        opts: [{ k: 'evac', ico: '🚑', nm: 'Евакуация през коридора', txt: 'нужен е отворен пункт и медицински транспорт' },
+          { k: 'field', ico: '⛺', nm: 'Полева болница на място', cost: 4e5, txt: 'не зависи от пункта' }] },
+      // ⚠️ събития (m.event)
+      { id: 'held', ev: true, ico: '⛔', title: 'Конвоят е задържан на пункта', when: m => m.event && m.event.id === 'held', txt: () => 'Камионите стоят — проверяващите искат още документи.',
+        opts: [{ k: 'talk', ico: '🤝', nm: 'Разговор на място', cost: 1e5, txt: 'пускат го до няколко часа', apply: m => { m.heldTill = m.t + 0.15; } },
+          { k: 'wait', ico: '⏳', nm: 'Изчакай', txt: 'около ден', apply: m => { m.heldTill = m.t + 0.8; } }] },
+      { id: 'crush', ev: true, ico: '⚠️', title: 'Блъсканица пред склада', when: m => m.event && m.event.id === 'crush', txt: () => 'Слух, че храната свършва — хората се натискат пред вратата.',
+        opts: [{ k: 'mobile', ico: '🚐', nm: 'Отвори мобилни пунктове', cost: 3e5, txt: 'опашката се разпределя по улиците', apply: m => { m.dec.dist = 'mobile'; } },
+          { k: 'order', ico: '🚓', nm: 'Местна полиция за реда', cost: 1.5e5, txt: 'спокойно, но доверието пада', apply: m => { m.orderKept = true; m.trustHit = (m.trustHit || 0) + 1; } }] },
+      { id: 'fuel', ev: true, ico: '⛽', title: 'Генераторите остават без гориво', when: m => m.event && m.event.id === 'fuel',
+        opts: [{ k: 'deliver', ico: '🛢️', nm: 'Спешна доставка на гориво', cost: 1.5e5, txt: 'всичко продължава', apply: m => { m.fuel = 1; } },
+          { k: 'hosp', ico: '🏥', nm: 'Ток само за медицинския пункт', txt: 'помпите спират — водата намалява', apply: m => { m.fuel = 0.5; } }] },
+    ],
+    start(m) { Object.assign(m, { access: 'closed', talks: 0, need: 72, sick: 18, water: 25, stock: 0, delivered: 0, crit: 0, dec: { cargo: 'food' }, event: null, fuel: 1, powT: 0, heldTill: 0 }); return '🤝 Кварталът Ал-Нур е без достатъчно храна, вода и лекарства. Контролният пункт е затворен. (Алтернативен игрови сценарий.)'; },
     step(m, dt, h) {
-      const on = k => h.on(m, k), neg = on('neg'), obs = on('obs'), conv = on('convoy'), med = on('med'), water = on('water'), power = on('power');
+      const on = k => h.on(m, k), neg = on('neg'), obs = on('obs'), conv = on('convoy'), med = on('med'), water = on('water'), power = on('power'), D = m.dec || (m.dec = { cargo: 'food' });
       if (m.phase === 'calm' && (neg || obs || conv || med || water || power)) m.phase = 'active';
-      if (neg && m.access !== 'open') { if (m.access === 'closed') { m.access = 'talks'; h.log(m, '🤝 Посредниците започнаха разговор на пункта.'); } m.talks = Math.min(1, m.talks + dt / (obs ? 0.6 : 0.9)); if (m.talks >= 1) { m.access = 'open'; h.log(m, `🚧 Коридорът е отворен${obs ? ' — наблюдателите проверяват конвоите на място' : ' — всеки конвой минава подробна проверка'}.`); } }
-      const open = m.access === 'open';
-      if (conv && open) { const got = 46 * dt / (obs ? 1 : 1.8); m.stock += got; m.delivered += got; }
-      const give = Math.min(m.stock, 34 * dt); m.stock -= give; m.need = Math.max(0, Math.min(100, m.need + (6 + (m.water < 40 ? 4 : 0)) * dt - give * 0.9));
-      if (water) m.water = Math.min(100, m.water + (power ? 34 : 18) * dt); else m.water = Math.max(0, m.water - 3 * dt);
-      const care = (med ? (open ? 12 : 4) : 0) + (power && med ? 3 : 0); m.sick = Math.max(0, m.sick + (m.water < 40 ? 4 : 1.5) * dt - care * dt);
+      // преговорите спират на 50%, докато не избереш как да се проверяват конвоите
+      if (neg && m.access !== 'open') { if (m.access === 'closed') { m.access = 'talks'; h.log(m, '🤝 Посредниците започнаха разговор на пункта.'); }
+        const cap = D.check ? 1 : 0.5; m.talks = Math.min(cap, m.talks + dt / (obs ? 0.6 : 0.9)); if (m.talks >= 1) { m.access = 'open'; h.log(m, '🚧 Коридорът е отворен.'); } }
+      const open = m.access === 'open', held = m.heldTill > m.t || (m.event && m.event.id === 'held');
+      // събития
+      if (!m.event && open && conv && D.check === 'fast' && Math.random() < dt * 0.9) { m.event = { id: 'held' }; h.log(m, '⛔ Конвоят е задържан на пункта.'); }
+      else if (!m.event && open && conv && D.check === 'full' && Math.random() < dt * 0.15) { m.event = { id: 'held' }; h.log(m, '⛔ Конвоят е задържан на пункта.'); }
+      if (!m.event && (D.dist || 'wh') === 'wh' && m.need > 55 && m.delivered > 8 && !m.orderKept && Math.random() < dt * 0.8) { m.event = { id: 'crush' }; h.log(m, '⚠️ Блъсканица пред склада.'); }
+      if (power && m.fuel === 1) { m.powT += dt; if (m.powT > 1.3 && !m.fuelAsked) { m.fuelAsked = true; m.event = m.event || { id: 'fuel' }; if (m.event.id === 'fuel') h.log(m, '⛽ Горивото за генераторите свършва.'); } }
+      // конвоят: скорост по начина на проверка; задържан — стои
+      const speed = { full: 0.5, seal: 1.1, fast: 1.4 }[D.check] || 0.5;
+      if (conv && open && !held) { const got = 42 * dt * speed * (obs ? 1.15 : 1); m.stock += got; m.delivered += got; }
+      // раздаване: склад / мобилни пунктове / общината; товарът решава какво помага
+      const rate = { wh: 22, mobile: 40, local: 28 }[D.dist || 'wh'] * (m.event && m.event.id === 'crush' ? 0.3 : 1), give = Math.min(m.stock, rate * dt); m.stock -= give;
+      const c = D.cargo || 'food';
+      m.need = Math.max(0, Math.min(100, m.need + (6 + (m.water < 40 ? 4 : 0)) * dt - give * (c === 'food' ? 0.95 : c === 'water' ? 0.35 : 0.25)));
+      const pumps = water && (!power || m.fuel === 1 || !m.fuelAsked);
+      m.water = Math.max(0, Math.min(100, m.water + (pumps ? (power ? 34 : 18) : -3) * dt + (c === 'water' ? give * 0.8 : 0)));
+      const field = D.care === 'field', care = (med ? (open && D.care !== 'field' ? 12 : 4) : 0) + (field ? 9 : 0) + (power ? 2 : 0) + (c === 'meds' ? give * 0.4 / Math.max(dt, 1e-6) * dt : 0);
+      m.sick = Math.max(0, m.sick + (m.water < 40 ? 4 : 1.5) * dt - care * dt - (c === 'meds' ? give * 0.4 : 0));
       if (m.need > 88) m.crit += dt * 3; if (m.sick > 25) m.crit += dt * 2;
       if (!m.recov && m.need < 25 && m.sick < 5 && m.water >= 70) { m.recov = true; h.log(m, '🌤️ Помощта стига до всички, водата и токът работят. Твоят ход — как да продължи.'); }
       if (m.t >= this.fade && !m.recov) h.resolve(m, 'faded', { trust: -5 - Math.round(m.crit / 2), security: -1, services: -1 }, '⏳ Помощта не стигна навреме — кварталът остава в тежко положение.');
     },
     ready: m => !!m.recov,
-    effect: (m, C) => ({ trust: C.trust - Math.round(m.crit / 3) + (m.delivered > 150 ? 1 : 0), security: C.sec, services: C.services }),
+    effect: (m, C) => ({ trust: C.trust - Math.round(m.crit / 3) + (m.delivered > 150 ? 1 : 0) + ((m.dec || {}).dist === 'local' ? 2 : 0) - (m.trustHit || 0), security: C.sec + ((m.dec || {}).check === 'seal' ? 1 : 0), services: C.services }),
     resultTxt: c => c === 'rebuild' ? '🏗️ Водата, токът и клиниката ще бъдат възстановени.' : c === 'corridor' ? '🕊️ Коридорът остава отворен с наблюдатели — помощта ще стига редовно.' : '📦 Еднократна помощ — нуждите ще се върнат.',
-    stats(m) { const acc = { closed: '🔴 затворен', talks: `🟡 преговори ${Math.round(m.talks * 100)}%`, open: '🟢 отворен' }[m.access];
+    stats(m) { const acc = { closed: '🔴 затворен', talks: `🟡 преговори ${Math.round(m.talks * 100)}%${m.talks >= 0.5 && !(m.dec || {}).check ? ' — чака твоя отговор' : ''}`, open: m.heldTill > m.t || (m.event && m.event.id === 'held') ? '⛔ конвоят е задържан' : '🟢 отворен' }[m.access];
+      const cg = { food: '🍞 храна', water: '💧 вода', meds: '💊 лекарства' }[(m.dec || {}).cargo || 'food'];
       return [['🍞 Нужда от храна и вода', m.need, m.need >= 70 ? '#ff6b6b' : m.need >= 40 ? '#ffd54a' : '#5fe39a'], `🚧 Контролният пункт: ${acc}`,
-        `📦 Доставено: <b>${Math.round(m.delivered)} т</b> · на склад: ${Math.round(m.stock)} т`, `🏥 Чакат лечение: <b>${Math.round(m.sick)}</b> · 💧 вода: ${Math.round(m.water)}%${m.crit >= 1 ? ` · ⚠️ критично: ${Math.round(m.crit)}` : ''}`]; },
+        `📦 Доставено: <b>${Math.round(m.delivered)} т</b> (${cg}) · на склад: ${Math.round(m.stock)} т`, `🏥 Чакат лечение: <b>${Math.round(m.sick)}</b> · 💧 вода: ${Math.round(m.water)}%${m.crit >= 1 ? ` · ⚠️ критично: ${Math.round(m.crit)}` : ''}`]; },
     phases: { calm: '🚧 Пунктът е затворен', active: '🚚 Хуманитарна операция', resolved: '✅ Помощта стига до всички' },
   },
 };

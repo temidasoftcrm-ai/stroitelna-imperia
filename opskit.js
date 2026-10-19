@@ -165,19 +165,23 @@ export function openOpsScene(ops, o, cfg) {
 
   // ---- панелът
   const pn = el.querySelector('.pn'), phEl = el.querySelector('.ph'); let pnSig = '';
-  pn.addEventListener('pointerdown', e => { const b = e.target.closest('[data-go],[data-ch]'); if (!b) return; e.preventDefault(); if (b.dataset.go) ops.dispatch(b.dataset.go); else ops.choose(b.dataset.ch); pnSig = ''; });
+  pn.addEventListener('pointerdown', e => { const b = e.target.closest('[data-go],[data-ch],[data-dc]'); if (!b) return; e.preventDefault(); if (b.dataset.dc) { const [id, k] = b.dataset.dc.split('|'); ops.decide(id, k); } else if (b.dataset.go) ops.dispatch(b.dataset.go); else ops.choose(b.dataset.ch); pnSig = ''; });
   const B = n => n >= 1e9 ? `${(n / 1e9).toLocaleString('bg-BG', { maximumFractionDigits: 2 })} млрд. €` : n >= 1e6 ? `${(n / 1e6).toLocaleString('bg-BG', { maximumFractionDigits: 1 })} млн. €` : `${Math.round(n / 1e3)} хил. €`;
   const bar = (v, col) => `<div class="bar"><i style="width:${Math.max(0, Math.min(100, Math.round(v)))}%;background:${col}"></i></div>`;
   function panel(m) {
     const rows = K.stats(m, B), left = m.budget - m.spent, ready = ops.ready();
-    const sig = JSON.stringify([rows, m.phase, m.out, m.log.length, left, ready, Object.values(m.teams).map(t => t.st)]);
+    const decs = (K.decisions || []).filter(D => !m.out && (D.when ? D.when(m) : true) && (D.pick || D.ev || !(m.dec && m.dec[D.id])));
+    const sig = JSON.stringify([rows, m.phase, m.out, m.log.length, left, ready, Object.values(m.teams).map(t => t.st), decs.map(D => D.id), m.dec, m.event && m.event.id]);
     if (sig === pnSig) return; pnSig = sig; phEl.textContent = K.phases[m.phase] || m.phase;
     const st = tm => ({ ready: '⚪ в готовност', enroute: '🟡 на път', onsite: '🟢 на място', back: '✔️ приключи' }[tm.st]);
     let h = rows.map(r => Array.isArray(r) ? `<div class="m">${r[0]}: <b style="color:${r[2]}">${Math.round(r[1])}</b></div>${bar(r[1], r[2])}` : `<div class="m">${r}</div>`).join('');
     h += `<div class="m" style="margin:4px 0 6px">💶 Бюджет на мисията: <b style="color:#e6edf6">${B(left)}</b> от ${B(m.budget)}</div>`;
     h += `<b>🚗 Екипи</b>${Object.entries(TT).map(([k, T]) => `<div class="tm"><span class="i">${T.ico}</span><div style="flex:1"><b>${T.nm}</b><div class="m">${T.job}</div><div class="m">${st(m.teams[k])} · ${B(T.cost)}</div></div>${m.teams[k].st === 'ready' && !m.out ? `<button class="y" data-go="${k}">Изпрати</button>` : ''}</div>`).join('')}`;
     if (m.out) h += `<div style="margin:8px 0;padding:8px;border-radius:10px;background:${m.out === 'deal' ? '#123d27' : '#3a2f12'}">${m.out === 'deal' ? '✅ Решено' : m.out === 'partial' ? '📋 Частично решение' : '🌧️ Без решение'}</div>`;
-    else if (ready) h += `<b>🏗️ Решението</b>${Object.entries(K.choices).map(([c, C]) => `<button style="display:block;width:100%;text-align:left;margin:4px 0" data-ch="${c}">${C.ico} ${C.nm}${C.k ? ` · ${B(m.budget * C.k)}` : ''}</button>`).join('')}`;
+    const decH = decs.map(D => `<div style="margin:8px 0;padding:8px;border-radius:10px;border:1px solid ${D.ev ? '#ff8a65' : '#ffd54a'};background:${D.ev ? '#3a1d14' : '#2a2412'}"><b>${D.ico} ${D.title}</b>${D.txt ? `<div class="m">${D.txt(m)}</div>` : ''}${D.opts.map(O => { const cur = D.pick && m.dec && m.dec[D.id] === O.k;
+      return `<button style="display:block;width:100%;text-align:left;margin:4px 0;${cur ? 'background:#ffd54a;color:#111;border-color:#ffd54a;font-weight:700' : ''}" data-dc="${D.id}|${O.k}">${O.ico} ${O.nm}${O.cost ? ` · ${B(O.cost)}` : ''}<div class="m" style="${cur ? 'color:#333' : ''}">${O.txt || ''}</div></button>`; }).join('')}</div>`).join('');
+    h = h.replace('<b>🚗 Екипи</b>', decH + '<b>🚗 Екипи</b>');   /* решенията — над екипите, за да се виждат */
+    if (!m.out && ready && !decs.some(D => !D.pick)) h += `<b>🏗️ Решението</b>${Object.entries(K.choices).map(([c, C]) => `<button style="display:block;width:100%;text-align:left;margin:4px 0" data-ch="${c}">${C.ico} ${C.nm}${C.k ? ` · ${B(m.budget * C.k)}` : ''}</button>`).join('')}`;
     h += `<b>📰 Хроника</b>${m.log.map(x => `<div class="m">${x.txt}</div>`).join('')}`;
     pn.innerHTML = h;
   }

@@ -66,6 +66,16 @@ export function createOps(deps) {
     log(m, `${T.ico} ${T.nm} — на път (~${Math.round(T.eta * 24)} ч).`); deps.save && deps.save(); return true;
   }
   const ready = () => { const m = act(); if (!m || m.out) return false; return m.k === 'square' ? m.teams.neg.st === 'onsite' && m.talks >= 1 : KINDS[m.k].ready(m); };
+  // 🧭 решенията по време на мисията (opskinds.js → decisions): еднократни (m.dec[id]), смяна по всяко време (pick) и събития (m.event)
+  // — всяко с цена; apply(m, H) променя мисията. Връща false, ако не може (няма пари / не е моментът).
+  function decide(id, k) {
+    const m = act(), K = m && KINDS[m.k]; if (!K || !K.decisions || m.out) return false; const D = K.decisions.find(x => x.id === id); if (!D) return false;
+    const O = D.opts.find(x => x.k === k); if (!O || !(D.when ? D.when(m) : true)) return false; m.dec = m.dec || {};
+    if (D.pick && m.dec[id] === k) return false; if (!D.pick && !D.ev && m.dec[id]) return false;
+    const cost = O.cost || 0; if (m.budget - m.spent < cost) { deps.toast && deps.toast('Бюджетът на мисията не стига.', 'bad'); return false; }
+    m.spent += cost; if (!D.ev) m.dec[id] = k; O.apply && O.apply(m, H); if (D.ev) m.event = null;
+    log(m, `${D.ico} ${D.title}: ${O.ico} ${O.nm}${cost ? ` (${Math.round(cost / 1e3)} хил. €)` : ''}.`); deps.save && deps.save(); return true;
+  }
   function choose(c) {
     const m0 = act(); if (m0 && m0.k !== 'square') { const K = KINDS[m0.k], C = K.choices[c]; if (!C || !ready()) return false; const cost = Math.round(m0.budget * C.k);
       if (m0.budget - m0.spent < cost) { deps.toast && deps.toast('Бюджетът на мисията не стига за това.', 'bad'); return false; }
@@ -124,7 +134,7 @@ export function createOps(deps) {
     if (m.k === 'aid') return res || `🍞 Нужда ${Math.round(m.need)} · 🚧 пункт: ${{ closed: 'затворен', talks: 'преговори', open: 'отворен' }[m.access]} · екипи на място: ${on}/${n}`;
     if (m.k === 'fire') return res || `🔥 Горят ${m.b.filter(v => v > 0).length}/4 сгради · 🪟 чакат: ${Math.round(m.trapped.reduce((a, b) => a + b, 0))} · екипи на място: ${on}/${n}`;
     return res || `„${m.demand}“ · 🌡️ ${Math.round(m.tension)} · 👥 ~${Math.round(m.crowd)} · екипи на място: ${on}/${n}`; };
-  const api = { summary, teamsOf, open, start, dispatch, choose, ready, step, tick, markers, archive, state: st, active: act, setViewing: v => { viewing = !!v; }, viewing: () => viewing };
+  const api = { decide, summary, teamsOf, open, start, dispatch, choose, ready, step, tick, markers, archive, state: st, active: act, setViewing: v => { viewing = !!v; }, viewing: () => viewing };
   return api;
 }
 

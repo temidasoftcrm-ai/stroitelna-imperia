@@ -73,9 +73,9 @@ function build(K) {
   const levelM = mat(0x4a90c8), level = box(4.5, 0.2, 0.05, levelM, PUMP[0] + 6, 4.8, PUMP[1] + 2.25); level.position.y = 4.8;
   const tap = [PUMP[0] + 3, PUMP[1] + 5]; box(0.3, 1, 0.3, mat(0x777777), tap[0], 0, tap[1]); const jet = K.stream(0.05);
   // ---- конвоят (3 бели камиона с надпис) и линейките — своя траектория
-  const aidT = ctex(256, 96, (g, w, h) => { g.fillStyle = '#f4f4f0'; g.fillRect(0, 0, w, h); g.fillStyle = '#2f6fb0'; g.font = '900 44px system-ui'; g.textAlign = 'center'; g.fillText('ПОМОЩ', w / 2, 62); });
+  const cargoT = Object.fromEntries([['food', 'ХРАНА', '#2f6fb0'], ['water', 'ВОДА', '#1e88e5'], ['meds', 'ЛЕКАРСТВА', '#c62828']].map(([k, t, c]) => [k, ctex(256, 96, (g, w, h) => { g.fillStyle = '#f4f4f0'; g.fillRect(0, 0, w, h); g.fillStyle = c; g.font = `900 ${t.length > 6 ? 30 : 44}px system-ui`; g.textAlign = 'center'; g.fillText(t, w / 2, 62); })])), aidT = cargoT.food, signs = [];
   const trucks = [], ambs = [];
-  for (let i = 0; i < 3; i++) place(CARS + 'car-truck.glb', { len: 7.5 }, v => { v.traverse(q => { if (q.isMesh && q.material) { q.material = q.material.clone(); own(q.material); q.material.color.lerp(new THREE.Color(0xf2f2ee), 0.7); } }); const h = new THREE.Group(); h.add(v); const sg = new THREE.Mesh(own(new THREE.PlaneGeometry(4, 1.5)), own(new THREE.MeshBasicMaterial({ map: aidT, side: THREE.DoubleSide }))); sg.position.set(1.26, 2.4, -1); sg.rotation.y = Math.PI / 2; h.add(sg); h.visible = false; scene.add(h); trucks.push({ h, i, u: -i * 0.12 }); });
+  for (let i = 0; i < 3; i++) place(CARS + 'car-truck.glb', { len: 7.5 }, v => { v.traverse(q => { if (q.isMesh && q.material) { q.material = q.material.clone(); own(q.material); q.material.color.lerp(new THREE.Color(0xf2f2ee), 0.7); } }); const h = new THREE.Group(); h.add(v); const sg = new THREE.Mesh(own(new THREE.PlaneGeometry(4, 1.5)), own(new THREE.MeshBasicMaterial({ map: aidT, side: THREE.DoubleSide }))); signs.push(sg.material); const seal = box(0.5, 0.5, 0.06, mat(0x1565c0, { emissive: 0x1565c0, emissiveIntensity: 0.6 }), 0, 1.2, -3.8, h); seal.visible = false; h.userData.seal = seal; sg.position.set(1.26, 2.4, -1); sg.rotation.y = Math.PI / 2; h.add(sg); h.visible = false; scene.add(h); trucks.push({ h, i, u: -i * 0.12 }); });
   for (let i = 0; i < 2; i++) K.load(CARS + 'amb-us.glb').then(g => { if (!g || K.shut()) return; import('./vehmodels.js').then(V => { const c = V.emergCar(g.scene, 7.5, 'ambulance', 'amb-us'); const h = new THREE.Group(); h.add(c); h.visible = false; scene.add(h); ambs.push({ h, c, i, u: i * 0.5 }); }); });
   // траектории: конвоят — от изток до склада и обратно; линейките — от пункта на изток и обратно
   const CONV = [[112, -2.2], [CP + 8, -2.2], [CP - 6, -2.2], [WH[0] + 14, -2.2], [WH[0] + 14, WH[1] + 9], [WH[0] - 6, WH[1] + 9]];
@@ -84,7 +84,13 @@ function build(K) {
   const at = (P, s) => { for (let i = 1; i < P.length; i++) { const d = Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]); if (s <= d || i === P.length - 1) { const t = Math.max(0, Math.min(1, s / d)); return [P[i - 1][0] + (P[i][0] - P[i - 1][0]) * t, P[i - 1][1] + (P[i][1] - P[i - 1][1]) * t, Math.atan2(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1])]; } s -= d; } return [...P[P.length - 1], 0]; };
   const LC = len(CONV), LA = len(AMB), GATE = len(CONV.slice(0, 2));
   // ---- хора: опашката пред склада, чакащите пред медицинския пункт, охраната на пункта, минувачи
-  const queue = [], patients = [], guards = [], walkers = [];
+  const queue = [], patients = [], guards = [], walkers = [], stands = [], standQ = [], order = [], inspectors = [];
+  // мобилните пунктове (сенник, маса, табела) — по улиците на квартала; при „чрез общината“ — зелени
+  const STANDS = [[-30, -30], [-14, 30], [2, -30], [-46, 14]];
+  for (const [x, z] of STANDS) { const g = new THREE.Group(); g.position.set(x, 0, z); g.visible = false; scene.add(g); const cm = mat(0x2f6fb0); box(3.6, 0.08, 2.6, cm, 0, 2.5, 0, g); for (const [a, b] of [[-1.7, -1.2], [1.7, -1.2], [-1.7, 1.2], [1.7, 1.2]]) box(0.06, 2.5, 0.06, mat(0xdddddd), a, 0, b, g); box(2.4, 0.8, 0.8, mat(0x8d6e4c), 0, 0, 0, g); stands.push({ g, cm }); }
+  // полевата болница — още палатки до медицинския пункт
+  const field = new THREE.Group(); field.visible = false; scene.add(field);
+  for (const [dx, dz] of [[-16, 6], [-16, 12], [-22, 9]]) { const g = new THREE.Group(); g.position.set(MED[0] + dx, 0, MED[1] + dz); field.add(g); box(5, 0.1, 4.4, tentM, 0, 2.8, 0, g); for (const [x, z] of [[-2.4, -2.1], [2.4, -2.1], [-2.4, 2.1], [2.4, 2.1]]) box(0.08, 2.8, 0.08, tentM, x, 0, z, g); box(1.2, 0.02, 0.36, red, 0, 2.86, 0, g); box(0.36, 0.02, 1.2, red, 0, 2.86, 0, g); }
   let armA = 0, dust = 0;
   convLb = null; medLb = null;
   return {
@@ -96,8 +102,19 @@ function build(K) {
       while (walkers.length < 10) { const P = person(P0[walkers.length % P0.length]); const sx = [-46, -30, -14, 2, 18][walkers.length % 5]; P.at(sx + (rnd() - 0.5) * 2, -40 + rnd() * 80, 0, 0); P.d = rnd() < 0.5 ? 1 : -1; P.anim('Walk'); walkers.push(P); }
       for (const P of walkers) { P.z += P.d * 1.3 * dt; if (Math.abs(P.z) > 42) P.d *= -1; P.at(P.x, P.z, P.d > 0 ? 0 : Math.PI, 0); }
       // опашката (до 28) — по-дълга при голяма нужда
-      const qn = Math.round(Math.min(28, 6 + m.need / 3.5));
+      const D = m.dec || {}, crush = m.event && m.event.id === 'crush', mob = D.dist === 'mobile' || D.dist === 'local';
+      for (const [i, S0] of stands.entries()) { S0.g.visible = mob; S0.cm.color.setHex(D.dist === 'local' ? 0x2e7d32 : 0x2f6fb0); }
+      const sq = mob ? Math.min(24, Math.round(m.need / 3)) : 0;
+      while (standQ.length < sq) { const k = standQ.length, [x, z] = STANDS[k % 4], P = person(P0[(k + 5) % P0.length]); P.at(x + (Math.floor(k / 4) % 3 - 1) * 0.9, z + 2 + Math.floor(k / 12) * 1.1, Math.PI, 0); P.anim('Idle'); standQ.push(P); }
+      while (standQ.length > sq) drop(standQ.pop());
+      field.visible = D.care === 'field';
+      if ((D.check === 'full') !== !!inspectors.length) { if (D.check === 'full') for (const z of [-4, -1]) { const P = person(K.cop() || P0[1]); P.at(CP + 9, z, Math.PI / 2, 0); P.anim('Look_Around'); inspectors.push(P); } else while (inspectors.length) drop(inspectors.pop()); }
+      const wantOrder = !!m.orderKept && !mob; if (wantOrder !== !!order.length) { if (wantOrder) for (const x of [-6, 0, 6]) { const P = person(K.cop() || P0[0]); P.at(WH[0] + x, WH[1] + 10.6, 0, 0); P.anim('Idle'); order.push(P); } else while (order.length) drop(order.pop()); }
+      for (const S0 of signs) { const t = cargoT[D.cargo || 'food']; if (S0.map !== t) { S0.map = t; S0.needsUpdate = true; } }
+      for (const T of trucks) T.h.userData.seal && (T.h.userData.seal.visible = D.check === 'seal');
+      const qn = mob ? 6 : Math.round(Math.min(28, 6 + m.need / 3.5));
       while (queue.length < qn) { const k = queue.length, P = person(P0[(k + 2) % P0.length]); P.at(WH[0] - 9 + (k % 14) * 1.3, WH[1] + 12 + Math.floor(k / 14) * 1.4, Math.PI, 0); P.anim(k % 4 ? 'Idle' : 'Talk_General'); queue.push(P); }
+      for (const [k, P] of queue.entries()) { if (crush) { P.anim(k % 2 ? 'Talk_Arguing' : 'Waving'); P.at(WH[0] - 5 + (k % 8) * 1.2 + Math.sin(tt * 3 + k) * 0.2, WH[1] + 9.8 + Math.floor(k / 8) * 0.8, Math.PI, 0); } else if (P.cur === 'Talk_Arguing' || P.cur === 'Waving') { P.anim('Idle'); P.at(WH[0] - 9 + (k % 14) * 1.3, WH[1] + 12 + Math.floor(k / 14) * 1.4, Math.PI, 0); } }
       while (queue.length > qn) drop(queue.pop());
       // чакащите за лечение (до 14) — седят/стоят пред палатките
       const pn = Math.round(Math.min(14, m.sick * 0.8));
@@ -108,7 +125,7 @@ function build(K) {
       // склад: палетите следват наличността
       const pc = Math.min(48, Math.round(m.stock / 2.5)); if (pc !== pallets.count) { for (let k = 0; k < pc; k++) { dm.position.set(WH[0] - 7 + (k % 8) * 2, 0.55 + Math.floor(k / 24) * 1.1, WH[1] + 4 - (Math.floor(k / 8) % 3) * 1.6); dm.updateMatrix(); pallets.setMatrixAt(k, dm.matrix); } pallets.count = pc; pallets.instanceMatrix.needsUpdate = true; }
       // ток: генераторите и светлината на пункта
-      const pOn = m.teams.power.st === 'onsite'; genM.emissiveIntensity = pOn ? 0.6 + Math.sin(tt * 20) * 0.1 : 0; medLight.intensity = pOn ? 5 : 0;
+      const pOn = m.teams.power.st === 'onsite' && !(m.event && m.event.id === 'fuel'); genM.emissiveIntensity = pOn ? 0.6 + Math.sin(tt * 20) * 0.1 : 0; medLight.intensity = pOn ? 5 : 0;
       // вода: нивото в резервоара и чешмата
       level.position.y = 4.8 + (m.water / 100) * 3.2; const flow = m.water > 45; jet.set([tap[0], 1, tap[1]], [tap[0] + 0.6, 0.05, tap[1] + 0.2], 0.25); jet.update(dt, flow);
       // 🚚 конвоят: чака пред пункта, докато е затворен; после — до склада и обратно в кръг
@@ -116,7 +133,7 @@ function build(K) {
       for (const T of trucks) { T.h.visible = cOn || cGo; if (!T.h.visible) continue;
         const gap = T.i * 11; let s;
         if (cGo) { const p = Math.min(1, (m.t - m.teams.convoy.t0) / m.teams.convoy.eta); s = Math.max(0, p * (GATE - gap)); T.u = 0; }
-        else if (!open) s = GATE - gap - 2;
+        else if (!open || m.heldTill > m.t || (m.event && m.event.id === 'held')) s = GATE - gap - 2;
         else { T.u = (T.u + dt * (m.teams.obs.st === 'onsite' ? 0.045 : 0.03)) % 2; const f = T.u < 1 ? T.u : 2 - T.u; s = Math.max(0, GATE - gap - 2 + f * (LC - GATE + gap)); }
         const [x, z, r] = at(CONV, s), back = !cGo && open && T.u >= 1; T.h.position.set(x, 0, z); T.h.rotation.y = back ? r + Math.PI : r;   /* обратно — по същия път, с предницата напред */
         if (open && Math.random() < dt * 6) puff(x, 0.6, z, 0.9, 0.25); if (T.i === 0) convLb = [x, 4, z]; }
