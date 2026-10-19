@@ -739,7 +739,7 @@ export function openCabinet(o) {
   const ru = o.cc === 'RU';
   return openBoardroom({
     ...o, room: ru ? 'ru' : 'us', bankKey: 'fin', bankTitle: '💰 Финансите: с какво разполагаме',
-    hallTitle: (o.title && /извънредно/i.test(o.title) ? '⛔ ' : '') + (ru ? '🇷🇺 Кремъл — Министерски съвет' : '🇺🇸 Белият дом — Министерски съвет'), reportDir: 'pm', reportTitle: o.title && /извънредно/i.test(o.title) ? '⛔ Извънредно заседание — най-важното' : '🏛️ Министър-председателят: най-важното този месец', loadText: '🎩 Министрите влизат…',
+    hallTitle: (o.title && /извънредно/i.test(o.title) ? '⛔ ' : '') + (ru ? '🇷🇺 Кремъл — Министерски съвет' : '🇺🇸 Белият дом — Кабинет на САЩ'), reportDir: 'pm', reportTitle: o.title && /извънредно/i.test(o.title) ? '⛔ Извънредно заседание — най-важното' : '🏛️ Министър-председателят: най-важното този месец', loadText: '🎩 Министрите влизат…',
     seats: () => MINISTERS.map(m => ({ k: m.k, ico: m.ico, company: m.title, what: m.what, director: m.name, model: m.model, seat: m.seat, open: true, logo: false, minister: true, brief: o.brief ? o.brief(m.k) : '' })),
   });
 }
@@ -754,7 +754,7 @@ export function demoCabinet(cc = 'US') {
     { id: 'air:deal', dir: 'air', ico: '✈️', text: 'Споразумение „Открито небе“ с 12 държави.', why: 'туризъм и бизнес полети', cost: 0, days: 90, gainTxt: '+18 нови линии', inBudget: true },
   ];
   return openCabinet({
-    cc, title: ru ? 'Държавата — демо' : 'The State — demo', brand: { nm: ru ? 'Россия' : 'USA', col: ru ? '#d52b1e' : '#3c3b6e', ico: '🦅', group: ru ? 'Правителство' : 'Белият дом', sub: '· МИНИСТЕРСКИ СЪВЕТ ·' },
+    cc, title: ru ? 'Държавата — демо' : 'The State — demo', brand: { nm: ru ? 'Россия' : 'USA', col: ru ? '#d52b1e' : '#3c3b6e', ico: '🦅', group: ru ? 'Правителство' : 'Белият дом', sub: ru ? '· МИНИСТЕРСКИ СЪВЕТ ·' : '· КАБИНЕТ НА САЩ ·' },
     proposals: () => P.filter(p => !p.done),
     onDecide: (id, a) => { const p = P.find(q => q.id === id); if (p) p.done = a; return null; },
     speech: () => `Държавната хазна има ${ru ? '4,1' : '6,8'} трилиона. Резервът е 8%. За нови програми тази година можем да отделим ${ru ? '120' : '310'} милиарда.`,

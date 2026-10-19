@@ -62,8 +62,8 @@ const viewRU = () => tex(1024, 768, (g, w, h) => {   // зимна Москва:
   }
   g.fillStyle = '#f4f6f8'; g.fillRect(0, h * 0.68, w, h);
 });
-// печатът / гербът на стената; в Белия дом — снимката на истинския печат (seal-us.webp), процедурният sealUS — резервен
-const sealPhoto = () => { const t = new THREE.TextureLoader().load(PR + 'seal-us.webp'); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; };
+// печатът / гербът на стената; снимките на истинския печат (seal-us.webp) и герба (arms-ru.webp); процедурните sealUS/sealRU — резервни
+const sealPhoto = n => { const t = new THREE.TextureLoader().load(PR + n + '.webp'); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; };
 const sealUS = () => tex(1024, 1024, (g, w) => {
   const c = w / 2; g.fillStyle = '#1b2b5c'; g.beginPath(); g.arc(c, c, c - 4, 0, 7); g.fill();
   g.strokeStyle = '#d9b45e'; g.lineWidth = 26; g.beginPath(); g.arc(c, c, c - 30, 0, 7); g.stroke();
@@ -137,7 +137,7 @@ export function buildPresRoom(scene, cc, H) {
   for (const [w, x, z, ry] of [[ROOM_W * 2, 0, ROOM_BACK + 0.04, 0], [ROOM_W * 2, 0, ROOM_FRONT - 0.04, 0]]) { addBox(scene, w, RU ? 0.9 : 1.0, 0.05, trimM, x, RU ? 0.45 : 0.5, z); addBox(scene, w, 0.14, 0.14, RU ? gold : trimM, x, RH - 0.07, z); }
   for (const side of [-1, 1]) addBox(scene, 0.14, 0.14, D, RU ? gold : trimM, side * (ROOM_W - 0.07), RH - 0.07, cz);
   // задната стена: печат с орел (САЩ) или герб (Русия) между две знамена; в Русия — и златни пиластри
-  const seal = new THREE.Mesh(RU ? new THREE.PlaneGeometry(1.5, 1.76) : new THREE.CircleGeometry(0.95, 64), std(0xffffff, 0.5, 0.1, { map: RU ? sealRU() : sealPhoto(), transparent: RU, alphaTest: RU ? 0.1 : 0 }));
+  const seal = new THREE.Mesh(RU ? new THREE.PlaneGeometry(1.6, 1.65) : new THREE.CircleGeometry(0.95, 64), std(0xffffff, 0.5, 0.1, { map: sealPhoto(RU ? 'arms-ru' : 'seal-us'), transparent: RU, alphaTest: RU ? 0.1 : 0 }));
   seal.position.set(0, 2.2, ROOM_BACK + 0.05); scene.add(seal);
   if (!RU) { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.97, 0.035, 10, 80), gold); ring.position.set(0, 2.2, ROOM_BACK + 0.06); scene.add(ring); }
   const pole = std(RU ? 0xd9a53a : 0xc9a24a, 0.3, 1);

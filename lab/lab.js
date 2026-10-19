@@ -84,7 +84,7 @@ const DEMOS = [
   ['🏛️ Дъщерна фирма: екран с логото', 'sofia', d => { d.subShowTest('rail', 'ask'); }],
   ['🏨 5★ хотели — 5 кандидата', 'sofia', d => d.hotel5Look()],
   ['🏛️ Директорската зала', 'sofia', () => $('fr').contentWindow.eval("import('/directors3d.js').then(m => m.demoBoardroom())")],
-  ['🇺🇸 Министерски съвет — Белият дом', 'sofia', () => $('fr').contentWindow.eval("import('/directors3d.js').then(m => m.demoCabinet('US'))")],
+  ['🇺🇸 Кабинет на САЩ — Белият дом', 'sofia', () => $('fr').contentWindow.eval("import('/directors3d.js').then(m => m.demoCabinet('US'))")],
   ['🇷🇺 Министерски съвет — Кремъл', 'sofia', () => $('fr').contentWindow.eval("import('/directors3d.js').then(m => m.demoCabinet('RU'))")],
   ['🇺🇸 Президентска кампания — 51 щата', 'sofia', () => $('fr').contentWindow.eval("import('/campaign.js').then(m => m.demoCampaign())")],
   ['🇷🇺 Президентски избори — 83 региона', 'sofia', () => $('fr').contentWindow.eval("import('/campaign.js').then(m => m.demoCampaign('RU'))")],   // directors3d.js — без game.js
