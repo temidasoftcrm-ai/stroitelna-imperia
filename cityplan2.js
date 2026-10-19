@@ -375,35 +375,65 @@ export function plan2(cityId, o = {}) {
     P.rounds.push({ node: n.id, x: n.x, z: n.z, island, outer, lanes: 1, ring, entries: n.arms.map((a, i) => ({ arm: i, road: a.road, angle: a.angle, inS: sOf(a.angle + (P.drive === 'R' ? -dl : dl)), outS: sOf(a.angle + (P.drive === 'R' ? dl : -dl)) })) });
     P.greens.push({ kind: 'island', poly: ring.map(([x, z]) => [n.x + (x - n.x) * island / (island + 3.5), n.z + (z - n.z) * island / (island + 3.5)]) });
   }
-  // стоп линии и конфликтна зона
+  // обикновените кръстовища: очертанието е от истинските ръбове на платната (не кръг около възела). За всеки два съседни клона
+  // ръбовете им се пресичат в ъгъла; клонът се реже там, където започва заобленият бордюр (радиус rc — за завиващи коли).
+  // Почти прав път през възела (Т: главният път) — ръбът продължава прав, без издутина. arm.t — откъде започва кръстовището по клона.
+  // Стоп линията е на t + STOP (зад зебрата); лентите (lanePath) свършват там, а излизащите започват от t + 1.
+  P.STOP = 4.6;
   for (const n of P.nodes) {
-    if (n.arms.length < 3) continue;
-    n.conflict = []; for (let k = 0; k < 16; k++) { const a = k / 16 * TAU; n.conflict.push([n.x + Math.cos(a) * n.r, n.z + Math.sin(a) * n.r]); }
-    for (const a of n.arms) { const rd = P.roads[a.road], ux = Math.cos(a.angle), uz = Math.sin(a.angle), sx = n.x + ux * n.r, sz = n.z + uz * n.r, rx = uz, rz = -ux;   // влизащите ленти: вдясно спрямо посоката към възела
+    if (n.arms.length < 3 || n.kind === 'round') continue;
+    const ord = n.arms.map((a, i) => ({ a, i, ang: a.angle, hw: P.roads[a.road].w / 2, main: isMain(P.roads[a.road].cls), tL: 1, tR: 1 })).sort((p, q) => p.ang - q.ang);   // tL/tR — срезът на левия/десния ръб (всеки ръб — свой: при кос ъгъл острият ъгъл не раздува целия клон)
+    const corners = [];
+    for (let k = 0; k < ord.length; k++) {
+      const A = ord[k], B = ord[(k + 1) % ord.length]; let gap = B.ang - A.ang; if (k === ord.length - 1) gap += TAU;
+      const uA = [Math.cos(A.ang), Math.sin(A.ang)], uB = [Math.cos(B.ang), Math.sin(B.ang)], nA = [-uA[1], uA[0]], mB = [uB[1], -uB[0]];
+      if (gap < Math.PI - 0.1) {
+        const d = [mB[0] * B.hw - nA[0] * A.hw, mB[1] * B.hw - nA[1] * A.hw], det = -uA[0] * uB[1] + uB[0] * uA[1];
+        const sA = (d[0] * -uB[1] + uB[0] * d[1]) / det, sB = (uA[0] * d[1] - uA[1] * d[0]) / det, rc = A.main || B.main ? 7 : 5, L = rc / Math.tan(gap / 2);
+        A.tL = Math.max(A.tL, sA + L); B.tR = Math.max(B.tR, sB + L);
+        corners.push({ A, B, c: [n.x + nA[0] * A.hw + uA[0] * sA, n.z + nA[1] * A.hw + uA[1] * sA] });
+      } else corners.push({ A, B, c: null });
+    }
+    for (const x of ord) { const rd = P.roads[x.a.road], cap = Math.max(1, rd.L[rd.L.length - 1] / 2 - P.STOP - 1); x.tL = Math.min(x.tL, cap); x.tR = Math.min(x.tR, cap); x.a.t = Math.round(Math.max(x.tL, x.tR) * 100) / 100; x.a.t0 = Math.round(Math.min(x.tL, x.tR) * 100) / 100; x.a.tL = x.tL; x.a.tR = x.tR; }   // t — стоп линия/ленти; t0 — докъде е пътят
+    // очертанието (обратно на часовника): за всеки клон — десният и левият ъгъл на среза, после бордюрът до следващия клон
+    const edge = (x, side, tt) => { const u = [Math.cos(x.ang), Math.sin(x.ang)], v = side > 0 ? [-u[1], u[0]] : [u[1], -u[0]], t = tt ?? (side > 0 ? x.tL : x.tR); return [n.x + v[0] * x.hw + u[0] * t, n.z + v[1] * x.hw + u[1] * t]; };
+    n.corners = corners.map(c => ({ a: c.A.i, b: c.B.i, p0: edge(c.A, 1), p1: edge(c.B, -1), c: c.c }));
+    const bez = (p0, c, p1, m = 8) => Array.from({ length: m + 1 }, (_, k) => { const t = k / m, u = 1 - t; return [u * u * p0[0] + 2 * u * t * c[0] + t * t * p1[0], u * u * p0[1] + 2 * u * t * c[1] + t * t * p1[1]]; });
+    n.outline = []; for (const c of n.corners) { const x = ord.find(q => q.i === c.a); n.outline.push(edge(x, -1)); n.outline.push(...(c.c ? bez(c.p0, c.c, c.p1) : [c.p0, c.p1])); }   // устието: косата линия от десния до левия срез
+    n.conflict = n.outline; n.r = Math.max(...ord.map(x => Math.max(x.tL, x.tR) + x.hw * 0.3)) + 2;
+    for (const a of n.arms) { const rd = P.roads[a.road], ux = Math.cos(a.angle), uz = Math.sin(a.angle), d0 = a.t + P.STOP, sx = n.x + ux * d0, sz = n.z + uz * d0, rx = uz, rz = -ux;   // влизащите ленти: вдясно спрямо посоката към възела
       const w0 = rd.median / 2, w1 = rd.median / 2 + rd.lanes[a.end ? 0 : 1] * rd.laneW, sgn = P.drive === 'R' ? 1 : -1;
       a.stop = [[sx + rx * w0 * sgn, sz + rz * w0 * sgn], [sx + rx * w1 * sgn, sz + rz * w1 * sgn]]; }
   }
   placeLots(P, sk, r);
   // помощни
   // лента: от изхода на началния възел до стоп линията на крайния (dir 1 — по pts, −1 — обратно; i — от средата навън)
-  const nodeR = n => (n.kind === 'round' ? P.rounds.find(r2 => r2.node === n.id).outer + 1 : n.r || 0);
-  const trim = (pts, s0, s1) => { const L = cumLen(pts), T = L[L.length - 1], out = []; if (T - s0 - s1 < 1) return [pts[0], pts[pts.length - 1]]; let j = 1; const at = s => { while (j < L.length - 1 && L[j] < s) j++; const t = (s - L[j - 1]) / ((L[j] - L[j - 1]) || 1); return [lerp(pts[j - 1][0], pts[j][0], t), lerp(pts[j - 1][1], pts[j][1], t)]; };
-    out.push(at(s0)); for (let k = 0; k < L.length; k++) if (L[k] > s0 && L[k] < T - s1) out.push(pts[k]); j = 1; out.push(at(T - s1)); return out; };
+  const armOf = (n, roadId, end) => n.arms.find(a => a.road === roadId && a.end === end);
+  const nodeR = (n, roadId, end, inbound) => { if (n.kind === 'round') return P.rounds.find(r2 => r2.node === n.id).outer + 1; const a = n.arms.length >= 3 && armOf(n, roadId, end); return a && a.t != null ? a.t + (inbound ? P.STOP : 1) : n.r || 0; };
+  const trim = (pts, s0, s1) => { const L = cumLen(pts), T = L[L.length - 1], out = []; if (T - s0 - s1 < 1) { const m = Math.max(0.5, Math.min(T - 0.5, T * s0 / ((s0 + s1) || 1))); s0 = m - 0.5; s1 = T - m - 0.5; }   /* срезовете се застъпват (къс път между две кръстовища) — къса отсечка между тях, не целият път */ let j = 1; const at = s => { while (j < L.length - 1 && L[j] < s) j++; const t = (s - L[j - 1]) / ((L[j] - L[j - 1]) || 1); return [lerp(pts[j - 1][0], pts[j][0], t), lerp(pts[j - 1][1], pts[j][1], t)]; };
+    out.push(at(s0)); for (let k = 0; k < L.length; k++) if (L[k] > s0 + 0.3 && L[k] < T - s1 - 0.3) out.push(pts[k]); j = 1; out.push(at(T - s1)); return out; };   // без отсечки под 0,3 м на краищата
   P.lanePath = (roadId, dir, i) => { const rd = P.roads[roadId], pts = dir > 0 ? rd.pts : rd.pts.slice().reverse(), off = (rd.median / 2 + (i + 0.5) * rd.laneW) * (P.drive === 'R' ? 1 : -1);
     const o = pts.map((p, k) => { const a = pts[Math.max(0, k - 1)], b = pts[Math.min(pts.length - 1, k + 1)], l = dist(a, b) || 1, tx = (b[0] - a[0]) / l, tz = (b[1] - a[1]) / l; return [p[0] - tz * off, p[1] + tx * off]; });
     const nA = P.nodes[dir > 0 ? rd.from : rd.to], nB = P.nodes[dir > 0 ? rd.to : rd.from];
-    return trim(o, nodeR(nA), nodeR(nB)); };
+    return trim(o, nodeR(nA, roadId, dir > 0 ? 0 : 1, false), nodeR(nB, roadId, dir > 0 ? 1 : 0, true)); };
   const bez = (a, c, b, n = 12) => Array.from({ length: n + 1 }, (_, k) => { const t = k / n, u = 1 - t; return [u * u * a[0] + 2 * u * t * c[0] + t * t * b[0], u * u * a[1] + 2 * u * t * c[1] + t * t * b[1]]; });
   const xLines = (p, d, q, e) => { const den = d[0] * e[1] - d[1] * e[0]; if (Math.abs(den) < 1e-3) return [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]; const t = ((q[0] - p[0]) * e[1] - (q[1] - p[1]) * e[0]) / den; return [p[0] + d[0] * t, p[1] + d[1] * t]; };
-  const armLane = (nodeId, armI, laneI, inbound) => { const n = P.nodes[nodeId], a = n.arms[armI], rd = P.roads[a.road], dirIn = a.end === 1 ? 1 : -1, dir = inbound ? dirIn : -dirIn, L = P.lanePath(a.road, dir, laneI); return inbound ? [L[L.length - 1], L[L.length - 2] || L[0]] : [L[0], L[1] || L[L.length - 1]]; };
+  // кубична крива по посоките на лентите (без пресечна точка, която при остър ъгъл пада зад стоп линията и чупи завоя):
+  // ръчките са по допирателните, с дължина като при дъга от окръжност за този завой — k = 2/3·tg(θ/4)/sin(θ/2) от хордата
+  const nrm = v => { const l = Math.hypot(v[0], v[1]) || 1; return [v[0] / l, v[1] / l]; };
+  const cubic = (a, da, b, db, n = 16) => { da = nrm(da); db = nrm(db); const ch = Math.hypot(b[0] - a[0], b[1] - a[1]), th = Math.max(0.17, Math.acos(Math.max(-1, Math.min(1, da[0] * db[0] + da[1] * db[1])))), h = ch * (2 / 3) * Math.tan(th / 4) / Math.sin(th / 2);
+    const c1 = [a[0] + da[0] * h, a[1] + da[1] * h], c2 = [b[0] - db[0] * h, b[1] - db[1] * h];
+    return Array.from({ length: n + 1 }, (_, k) => { const t = k / n, u = 1 - t, A = u * u * u, B = 3 * u * u * t, C = 3 * u * t * t, D = t * t * t; return [A * a[0] + B * c1[0] + C * c2[0] + D * b[0], A * a[1] + B * c1[1] + C * c2[1] + D * b[1]]; }); };
+  const armLane = (nodeId, armI, laneI, inbound) => { const n = P.nodes[nodeId], a = n.arms[armI], rd = P.roads[a.road], dirIn = a.end === 1 ? 1 : -1, dir = inbound ? dirIn : -dirIn, L = P.lanePath(a.road, dir, laneI); const far = (e, step) => { const q = L[e]; for (let k = e + step; k >= 0 && k < L.length; k += step) if (Math.hypot(L[k][0] - q[0], L[k][1] - q[1]) >= 2) return L[k]; return L[e + step] || L[e - step] || q; };   // посоката — от точка ≥ 2 м назад (при срез до точка последната отсечка е почти нулева)
+    return inbound ? [L[L.length - 1], far(L.length - 1, -1)] : [L[0], far(0, 1)]; };
   // завой през кръстовище: от края на влизащата лента (стоп линията) до началото на излизащата; плавна крива (Безие)
   P.turnPath = (nodeId, fromArm, laneI, toArm, laneJ) => { const [a, a0] = armLane(nodeId, fromArm, laneI, true), [b, b1] = armLane(nodeId, toArm, laneJ, false), da = [a[0] - a0[0], a[1] - a0[1]], db = [b1[0] - b[0], b1[1] - b[1]];
-    return bez(a, xLines(a, da, b, [-db[0], -db[1]]), b); };
+    return cubic(a, da, b, db); };
   // кръгово: ring — s расте по посоката на движение; вход/изход — криви от лентата до пръстена (и обратно)
   P.roundPath = (ri, armI, kind) => { const R0 = P.rounds[ri], n = P.nodes[R0.node], e = R0.entries[armI], ring = R0.ring, Lr = cumLen(ring), S = kind === 'in' ? e.inS : e.outS;
     let j = 1; while (j < Lr.length - 1 && Lr[j] < S) j++; const q = ring[j], q2 = ring[Math.min(ring.length - 1, j + 1)], tq = [q2[0] - q[0], q2[1] - q[1]];
-    if (kind === 'in') { const [a, a0] = armLane(n.id, armI, 0, true); return bez(a, xLines(a, [a[0] - a0[0], a[1] - a0[1]], q, [-tq[0], -tq[1]]), q); }
-    const [b, b1] = armLane(n.id, armI, 0, false); return bez(q, xLines(q, tq, b, [b[0] - b1[0], b[1] - b1[1]]), b); };
+    if (kind === 'in') { const [a, a0] = armLane(n.id, armI, 0, true); return cubic(a, [a[0] - a0[0], a[1] - a0[1]], q, tq); }
+    const [b, b1] = armLane(n.id, armI, 0, false); return cubic(q, tq, b, [b1[0] - b[0], b1[1] - b[1]]); };
   P.pick = (q2 = {}) => { let best = null, bd = 1e18; for (const L of P.lots) { if (L.reserved || (q2.zone && L.zone !== q2.zone) || (q2.minW && L.w < q2.minW) || (q2.minD && L.d < q2.minD)) continue; if (q2.road === 'main' && !isMain(L.front.cls)) continue; if (q2.road === 'street' && isMain(L.front.cls)) continue; if (q2.free && !q2.free(L)) continue; const d = q2.near ? Math.hypot(L.x - q2.near[0], L.z - q2.near[1]) : L.id; if (d < bd) { bd = d; best = L; } } return best; };
   P.reserve = (id, tag) => { if (P.lots[id]) P.lots[id].reserved = tag; };
   P.unreserve = id => { if (P.lots[id]) P.lots[id].reserved = null; };

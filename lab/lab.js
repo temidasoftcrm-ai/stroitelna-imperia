@@ -93,6 +93,8 @@ const DEMOS = [
   ['🌊 Оперативна карта: наводнение', 'sofia', () => $('fr').contentWindow.eval("import('/ops.js').then(m => m.demoOps('US', false, 'flood'))")],
   ['🔥 Оперативна карта: пожар в жилищен блок', 'sofia', () => $('fr').contentWindow.eval("import('/ops.js').then(m => m.demoOps('US', false, 'fire'))")],
   ['🤝 Оперативна карта: хуманитарен достъп', 'sofia', () => $('fr').contentWindow.eval("import('/ops.js').then(m => m.demoOps('US', false, 'aid'))")],
+  ['🌍 Геополитическата карта (САЩ)', 'sofia', d => d.geoDemo('US')],
+  ['🌍 Геополитическата карта (Русия)', 'sofia', d => d.geoDemo('RU')],
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
