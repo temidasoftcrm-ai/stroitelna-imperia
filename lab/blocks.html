@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Истински блокове</title>
+<style>
+  :root { --bg:#14161b; --card:#1d2027; --txt:#e8e8ea; --mut:#9aa0aa; --ok:#5fc27a; --kid:#f5b942; --sel:#4ea1ff; --bad:#e06a5a; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:14px/1.45 system-ui,sans-serif; padding:16px; }
+  h1 { font-size:20px; margin:0 0 4px; } .lead { color:var(--mut); margin:0 0 12px; max-width:900px; }
+  .wrap { display:grid; grid-template-columns:260px 1fr; gap:16px; align-items:start; }
+  @media (max-width:700px) { .wrap { grid-template-columns:1fr; } }
+  .kids { position:sticky; top:8px; display:flex; flex-direction:column; gap:6px; max-height:calc(100vh - 24px); overflow:auto; }
+  .kh { color:var(--mut); font-size:12px; margin:8px 0 0; }
+  .kid { display:flex; gap:8px; align-items:center; background:var(--card); border:2px solid #2a2f38; border-radius:10px; padding:4px; cursor:pointer; }
+  .kid.on { border-color:var(--sel); } .kid img { width:56px; height:56px; border-radius:6px; background:#0e1014; }
+  .kid .n { font-weight:600; font-size:12px; } .kid .p { font-size:11px; color:var(--mut); }
+  .kid .p b { color:var(--ok); font-weight:600; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:10px; }
+  .it { background:var(--card); border-radius:10px; padding:6px; border:2px solid #2a2f38; cursor:pointer; position:relative; }
+  .it.on { border-color:var(--sel); background:#1d2a3a; } .it img { width:100%; aspect-ratio:1; border-radius:6px; background:#0e1014; display:block; }
+  .it .n { font-weight:600; margin-top:4px; font-size:12px; } .it .m { font-size:11px; color:var(--mut); }
+  .it .use { font-size:11px; color:var(--ok); } .it .nc { color:var(--bad); font-weight:600; }
+  .it a { position:absolute; top:10px; right:10px; background:#000a; border-radius:6px; padding:2px 6px; text-decoration:none; color:#fff; font-size:12px; }
+  .it .ck { position:absolute; top:10px; left:10px; background:var(--sel); color:#fff; border-radius:50%; width:22px; height:22px; text-align:center; line-height:22px; display:none; font-weight:700; }
+  .it.on .ck { display:block; }
+  .bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0 0 12px; }
+  button { background:var(--card); color:var(--txt); border:1px solid #333a45; border-radius:8px; padding:6px 12px; cursor:pointer; font:inherit; }
+  button.go { background:#2a6b3e; border-color:#2a6b3e; } #msg { color:var(--ok); }
+  .cur { display:flex; gap:12px; align-items:center; margin:0 0 10px; } .cur img { width:96px; height:96px; border-radius:8px; background:#0e1014; }
+</style></head><body>
+<h1>🏢 Истински блокове вместо детските</h1>
+<p class="lead">Вляво — детските сгради, които играта още ползва. Избери една, после цъкни истинските модели вдясно, които да я заменят (може няколко — играта ще редува). 🔍 отваря модела в 3D. <span class="nc">NC</span> = лиценз само за некомерсиално ползване. Накрая — „Запази“.</p>
+<div class="bar"><button class="go" id="save">💾 Запази избора</button><button id="clear">Изчисти за тази</button><span id="msg"></span></div>
+<div class="wrap"><div class="kids" id="kids"></div><div><div class="cur" id="cur"></div><div class="grid" id="grid"></div></div></div>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const KIDS = [
+  ['Центровете на мегаполисите (стъклени)', 'commercial2', ['building-i', 'building-j', 'building-k', 'building-l', 'building-m', 'building-n']],
+  ['Кварталите, Ню Йорк', 'city', ['Building_Small_1', 'Building_Medium_2_001', 'Building_Large_2']],
+  ['Магазините в центъра (всеки 3-ти вече е истински)', 'commercial', ['building-a', 'building-b', 'building-c', 'building-d', 'building-e', 'building-f', 'building-g', 'building-h']],
+].flatMap(([where, dir, list]) => list.map(n => ({ key: n, dir, where, f: `assets/${dir}/${n}.glb` })));
+const REAL = (await (await fetch('blocks2.json')).json()).map(o => ({ ...o, f: `assets/heavy/blocks2/${o.k}.glb` }));
+const LS = 'blocks-pick';
+let pick = {}; try { pick = JSON.parse(localStorage.getItem(LS) || '{}'); } catch {}
+let cur;
+
+// снимки: един скрит рендер, модел по модел
+const R = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); R.setSize(256, 256); R.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0e1014);
+scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x3a3328, 1.6)); const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(3, 5, 4); scene.add(sun);
+const cam = new THREE.PerspectiveCamera(30, 1, 0.01, 1000), loader = new GLTFLoader(), shots = {}, sizes = {};
+let q = Promise.resolve();
+const shot = f => shots[f] ??= (q = q.then(() => loader.loadAsync('../' + f).then(g => {
+  const o = g.scene; scene.add(o); o.updateMatrixWorld(true);
+  const bb = new THREE.Box3().setFromObject(o), sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3()), r = sz.length() / 2;
+  sizes[f] = sz; const d = r / Math.sin(THREE.MathUtils.degToRad(15)) * 1.05;
+  cam.position.set(c.x + d * 0.62, c.y + d * 0.38, c.z + d * 0.68); cam.near = d / 100; cam.far = d * 10; cam.updateProjectionMatrix(); cam.lookAt(c);
+  R.render(scene, cam); const url = R.domElement.toDataURL('image/webp', 0.85); scene.remove(o); return url;
+}).catch(() => '')));
+const img = (f, el) => shot(f).then(u => { el.src = u; });
+
+const usedBy = k => KIDS.filter(x => (pick[pk(x)] || []).includes(k)).map(pk);
+const curKid = () => KIDS.find(x => x.key + x.dir === cur);
+const pk = x => x.dir === 'commercial2' || x.dir === 'city' ? x.key : x.dir + ':' + x.key;   // building-i… се срещат и в commercial2, и в industrial
+function renderGrid() {
+  const x = curKid(), sel = pick[pk(x)] || [];
+  document.getElementById('cur').innerHTML = `<img id="curimg"><div><div style="font-weight:600;font-size:16px">${x.key}</div><div style="color:var(--mut)">${x.where}</div><div>${sel.length ? 'Заменя се с: <b style="color:var(--ok)">' + sel.join(', ') + '</b>' : 'Няма избран заместител'}</div></div>`;
+  img(x.f, document.getElementById('curimg'));
+  document.getElementById('grid').innerHTML = REAL.map(o => { const u = usedBy(o.k).filter(k => k !== pk(x)), nc = /NC/.test(o.lic);
+    return `<div class="it ${sel.includes(o.k) ? 'on' : ''}" data-k="${o.k}"><span class="ck">✓</span><a href="/lab.html#tab=models&item=${encodeURIComponent('/' + o.f)}" target="_top" title="3D">🔍</a><img data-f="${o.f}">
+      <div class="n">${o.k}</div><div class="m">${o.title}</div><div class="m">${o.by} · <span class="${nc ? 'nc' : ''}">${o.lic}</span></div><div class="m">${(o.verts / 1000).toFixed(1)}k върха · ${o.kb} KB${o.verts > 30000 ? ' · <span class="nc">тежък</span>' : ''}</div>${u.length ? `<div class="use">вече за: ${u.join(', ')}</div>` : ''}</div>`; }).join('');
+  document.querySelectorAll('.it').forEach(el => { el.onclick = e => { if (e.target.tagName === 'A') return; const L = pick[pk(x)] ||= [], k = el.dataset.k, i = L.indexOf(k); i < 0 ? L.push(k) : L.splice(i, 1); if (!L.length) delete pick[pk(x)]; store(); kidsView(); renderGrid(); }; });
+  document.querySelectorAll('.it img').forEach(el => img(el.dataset.f, el));
+}
+function store() { try { localStorage.setItem(LS, JSON.stringify(pick)); } catch {} }
+cur = KIDS[0].key + KIDS[0].dir;
+function kidsView() { let last = '';
+  document.getElementById('kids').innerHTML = KIDS.map(x => { const h = x.where !== last ? `<div class="kh">${x.where}</div>` : ''; last = x.where; const p = pick[pk(x)] || [];
+    return `${h}<div class="kid ${x.key + x.dir === cur ? 'on' : ''}" data-k="${x.key}|${x.dir}"><img data-f="${x.f}"><div><div class="n">${x.key}</div><div class="p">${p.length ? `<b>→ ${p.join(', ')}</b>` : 'още детска'}</div></div></div>`; }).join('');
+  document.querySelectorAll('.kid').forEach(el => { el.onclick = () => { const [k, d] = el.dataset.k.split('|'); cur = k + d; kidsView(); renderGrid(); }; });
+  document.querySelectorAll('.kid img').forEach(el => img(el.dataset.f, el));
+}
+document.getElementById('save').onclick = async () => {
+  const m = document.getElementById('msg');
+  try { await fetch('/__lab/feedback', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ target: 'blocks-pick', kind: 'pick', text: JSON.stringify(pick) }) }); m.textContent = '✓ Запазено — кажи на Claude „готово“'; }
+  catch { m.textContent = 'Не успях да запиша (лаб сървърът работи ли?)'; }
+};
+document.getElementById('clear').onclick = () => { delete pick[pk(curKid())]; store(); kidsView(); renderGrid(); };
+kidsView(); renderGrid();
+</script></body></html>
