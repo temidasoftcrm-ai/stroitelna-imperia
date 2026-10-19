@@ -79,10 +79,10 @@ export function createOps(deps) {
     m.teams.riot = m.teams.riot || { st: 'ready' };
     const on = k => m.teams[k].st === 'onsite', neg = on('neg'), pol = on('pol'), med = on('med'), force = on('riot');
     if (m.phase === 'calm' && (neg || pol || med || force)) m.phase = 'active';
-    // 🔥 безредиците: над 70 избухват; щети всеки ден (по-малко с полиция); силите на реда ги прекратяват за ~0,35 дни
+    // 🔥 безредиците: над 70 избухват; щети всеки ден (по-малко с полиция); силите на реда ги прекратяват за ~0,6 дни
     if (!m.riot && m.tension >= RIOT_AT) { m.riot = true; m.riotT = 0; log(m, '🔥 Безредици: група провокатори пали кофи за боклук и чупи витрини. Мирните протестиращи се отдръпват.'); deps.toast && deps.toast(`🔥 Безредици на площада в ${m.city} — можеш да изпратиш силите на реда.`, 'bad'); }
     if (m.riot) { m.riotT += dt; m.damage += (pol ? 1.5e7 : 4e7) * dt;
-      if (force && m.t - m.teams.riot.t0 - m.teams.riot.eta > 0.35) { m.riot = false; const n = 8 + ((m.crowd / 20) | 0); m.arrests += n; m.tension = Math.max(20, m.tension - 22); log(m, `🛡️ Силите на реда отделиха провокаторите: ${n} задържани. Огньовете са угасени.`); deps.effect && deps.effect({ security: 2, trust: -1 }); }
+      if (force && m.t - m.teams.riot.t0 - m.teams.riot.eta > 0.6) { m.riot = false; const n = 8 + ((m.crowd / 20) | 0); m.arrests += n; m.tension = Math.max(20, m.tension - 22); log(m, `🛡️ Силите на реда отделиха провокаторите: ${n} задържани. Огньовете са угасени.`); deps.effect && deps.effect({ security: 2, trust: -1 }); }
       else if (m.tension < RIOT_END) { m.riot = false; log(m, '🕊️ Провокаторите се разпръснаха сами — разговорът свали напрежението.'); } }
     let dT = neg ? -11 : 3; if (m.riot) dT += force ? -10 : 2;   // без разговор напрежението расте, но протестът остава мирен
     if (pol) dT += neg ? -2 : 3;   // полицията пази, но без преговорите хората се чувстват притиснати
@@ -101,14 +101,14 @@ export function createOps(deps) {
     if (!O.act && deps.canStart && deps.canStart() && (S().day || 0) >= O.next && Math.random() < dt / 20) start();
   }
   const markers = () => { const m = act(); return m ? [{ id: m.id, ico: m.out ? '✅' : '📢', nm: `Протест на площада — ${m.city}`, lon: m.lon, lat: m.lat, m }] : []; };
-  const open = () => import('./ops3d.js').then(M => M.openOpsSquare(api, { onClose: deps.onClose }));
+  const open = () => import('./ops3d.js').then(M => M.openOpsSquare(api, { onClose: deps.onClose, muted: deps.muted }));
   const api = { open, start, dispatch, choose, ready, step, tick, markers, archive, state: st, active: act, setViewing: v => { viewing = !!v; }, viewing: () => viewing };
   return api;
 }
 
 // демо за Лабораторията: отделен запис в паметта (без game.js) — протест в столицата, веднага на 3D картата
 let demo = null;
-export function demoOps(cc = 'US') {
+export function demoOps(cc = 'US', riot = false) {
   const D = { day: 1 }; demo = demo || createOps({ S: () => D, cc: () => cc, toast: t => console.log('[ops]', t), effect: e => console.log('[ops] ефект', e) });
-  if (!demo.active()) demo.start(); window.__ops = demo; return demo.open();
+  if (!demo.active()) demo.start(); if (riot) { const m = demo.active(); m.tension = Math.max(m.tension, 76); } window.__ops = demo; return demo.open();
 }

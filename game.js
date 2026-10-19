@@ -3612,7 +3612,7 @@ const pres = createPresidency({ pause: () => setSpeed(0), S: () => S, fmt, toast
 // 🌍 режимът „Геополитика“ върху картата (geomap.js): същите география и проекция, отделен слой за държави, кризи и договорености
 const countryPath = c => { let d = countryD.get(c); if (!d || d.px !== projX()) countryD.set(c, d = { px: projX(), d: c.poly.map(poly => poly.map(ring => 'M' + ring.map(([lo, la]) => proj(lo, la).map(v => v.toFixed(1)).join(',')).join('L') + 'Z').join('')).join('') }); return d.d; };
 function mapPanTo(lon, lat, z) { if (!mapView) return drawMap(); const [x, y] = proj(lon, lat), [, , bw, bh] = mapView.base; mapView.vb = [x - bw / z / 2, y - bh / z / 2, bw / z, bh / z]; $('mapSvg').setAttribute('viewBox', mapView.vb.join(' ')); drawMap(); }
-const ops = createOps({ S: () => S, toast, save, sound: n => Sound.play(n), cc: () => pres.state()?.cc || 'US', canStart: () => pres.active() && feature('ops-square'), onClose: () => drawMap(),
+const ops = createOps({ S: () => S, toast, save, sound: n => Sound.play(n), muted: () => Sound.muted, cc: () => pres.state()?.cc || 'US', canStart: () => pres.active() && feature('ops-square'), onClose: () => drawMap(),
   effect: e => { const ind = pres.state()?.ind; if (!ind) return; for (const [k, v] of Object.entries(e)) if (v && ind[k] != null) ind[k] = Math.max(0, Math.min(100, ind[k] + v)); } });
 window.__ops = ops;   // Лаб / конзолата: __ops.start(); __ops.open()
 const geoMap = createGeoMap({ pres, ops, proj: (lo, la) => proj(lo, la), geo: () => worldGeo || [], pathOf: countryPath, visW: () => mapVisW(), panTo: mapPanTo, fmt, holding: () => econ ? econ.money : 0, redraw: () => drawMap(), day: () => S?.day || 0 });

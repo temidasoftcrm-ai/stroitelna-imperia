@@ -200,17 +200,63 @@ export function openOpsSquare(ops, o = {}) {
     const bin = new THREE.Mesh(own(new THREE.CylinderGeometry(0.4, 0.34, 0.9, 12)), mat(0x2f3b2f, { metalness: 0.4 })); bin.position.y = 0.45; bin.castShadow = true; g.add(bin);
     const fl = new THREE.Mesh(own(new THREE.ConeGeometry(0.42, 1.3, 10)), own(new THREE.MeshBasicMaterial({ color: 0xff7a1a, transparent: true, opacity: 0.85 }))); fl.position.y = 1.4; g.add(fl);
     const L = new THREE.PointLight(0xff8a3a, 0, 9, 1.6); L.position.y = 1.8; g.add(L); g.visible = false; fires.push({ g, fl, L, bin }); }
+  // 🌫️ димът от кофите — общ пул от спрайтове (растат, издигат се и избледняват)
+  const smokeT = ctex(64, 64, (g, w) => { const r = g.createRadialGradient(w / 2, w / 2, 2, w / 2, w / 2, w / 2); r.addColorStop(0, 'rgba(70,70,70,.85)'); r.addColorStop(1, 'rgba(70,70,70,0)'); g.fillStyle = r; g.fillRect(0, 0, w, w); });
+  const smoke = Array.from({ length: 30 }, () => { const sp = new THREE.Sprite(own(new THREE.SpriteMaterial({ map: smokeT, transparent: true, depthWrite: false, opacity: 0 }))); sp.visible = false; scene.add(sp); return { sp, life: 0 }; });
+  let smokeT0 = 0;
+  // 🍾 хвърлени предмети (бутилки и камъни) — по дъга, после изчезват
+  const bottleG = own(new THREE.CylinderGeometry(0.05, 0.07, 0.3, 6)), stoneG = own(new THREE.DodecahedronGeometry(0.1)), bottleM = mat(0x2e6b3a, { roughness: 0.3 }), stoneM = mat(0x777370);
+  const flying = [];
+  const throwAt = (P, tx, tz) => { const b = new THREE.Mesh(Math.random() < 0.5 ? bottleG : stoneG, Math.random() < 0.5 ? bottleM : stoneM); scene.add(b); flying.push({ b, x0: P.x, z0: P.z, x1: tx + (Math.random() - 0.5) * 2, z1: tz + (Math.random() - 0.5) * 1.5, t: 0, T: 0.8 + Math.random() * 0.4 }); };
+  // 🛡️ редицата на силите на реда настъпва; задържаните — по двойки до колата
+  let lineZ = RIOT_Z[1] - 5, arrestT = 0, shown = 0; const pairs = [];
+  const van = () => [ENTRY.riot[1][0] - 2.4, ENTRY.riot[1][1] + 1];
+  const walkTo = (P, x, z, sp, dt) => { const dx = x - P.x, dz = z - P.z, d = Math.hypot(dx, dz); if (d < 0.3) return true; const st = Math.min(d, sp * dt); P.x += dx / d * st; P.z += dz / d * st; P.ry = Math.atan2(dx, dz); return false; };
   function riotScene(m, tt, dt) {
-    const on = !!m.riot && !m.out, burnt = m.damage > 0;
+    const on = !!m.riot && !m.out, burnt = m.damage > 0, force = m.teams.riot && m.teams.riot.st === 'onsite';
     for (const [i, F] of fires.entries()) { F.g.visible = on || burnt; F.fl.visible = on; F.L.intensity = on ? 6 + Math.sin(tt * 13 + i) * 2 : 0; if (on) { const k = 1 + Math.sin(tt * 11 + i * 2) * 0.18; F.fl.scale.set(k, 1.1 + Math.sin(tt * 7 + i) * 0.25, k); } else if (burnt) F.bin.rotation.z = 1.4; }
-    if (on && pedSrc.length) while (rioters.filter(P => !P.goal).length < 9) { const P = person(pedSrc[(rioters.length + 2) % pedSrc.length], { tint: 0x26282c }); P.x = RIOT_Z[0] + (Math.random() - 0.5) * 9; P.z = RIOT_Z[1] + (Math.random() - 0.5) * 4; P.ry = Math.random() * 6.28; P.p.position.set(P.x, 0, P.z); setAnim(P, Math.random() < 0.5 ? 'Talk_Arguing' : 'Waving'); rioters.push(P); }
-    if (!on) for (const P of rioters) if (!P.goal) { P.goal = m.teams.riot.st === 'onsite' || m.arrests ? [ENTRY.riot[1][0] - 2, ENTRY.riot[1][1]] : [ST_B + 8, 60]; setAnim(P, 'Walk'); }
+    // дим: докато гори — по-гъст; след угасяване — още малко
+    smokeT0 -= dt; if ((on || (burnt && Math.random() < 0.15)) && smokeT0 <= 0) { smokeT0 = on ? 0.12 : 0.6; const F = fires[(Math.random() * fires.length) | 0], S0 = smoke.find(q => q.life <= 0); if (S0) { S0.life = 1; S0.sp.visible = true; S0.sp.position.set(F.g.position.x + (Math.random() - 0.5) * 0.4, 2, F.g.position.z + (Math.random() - 0.5) * 0.4); S0.dx = 0.4 + Math.random() * 0.4; } }
+    for (const S0 of smoke) if (S0.life > 0) { S0.life -= dt / 4; const a = 1 - S0.life; S0.sp.position.y += dt * 1.4; S0.sp.position.x += dt * S0.dx; S0.sp.scale.setScalar(1 + a * 5); S0.sp.material.opacity = Math.max(0, S0.life) * 0.55; if (S0.life <= 0) S0.sp.visible = false; }
+    // провокаторите: допълват се, докато силите на реда ги няма
+    if (on && !force && pedSrc.length) while (rioters.filter(P => !P.goal && !P.held).length < 10) { const P = person(pedSrc[(rioters.length + 2) % pedSrc.length], { tint: 0x26282c }); P.x = RIOT_Z[0] + (Math.random() - 0.5) * 10; P.z = RIOT_Z[1] + (Math.random() - 0.5) * 4; P.ry = Math.random() * 6.28; P.p.position.set(P.x, 0, P.z); P.next = 0; setAnim(P, 'Talk_Arguing'); rioters.push(P); }
+    if (!on) for (const P of rioters) if (!P.goal && !P.held) { P.goal = [ST_B + 8, 60]; setAnim(P, 'Walk'); }
+    // редицата: настъпва, докато има провокатори пред нея
+    const officers = staff.filter(q => q.team === 'riot');
+    if (force && on) lineZ = Math.min(RIOT_Z[1] + 2, lineZ + 0.5 * dt);
+    for (const O of officers) if (!O.busy) { const moving = force && on && lineZ < RIOT_Z[1] + 2; O.z = lineZ; O.ry = 0; O.p.position.set(O.x, 0, O.z); O.p.rotation.y = 0; setAnim(O, moving ? 'Walk' : 'Idle'); }
+    // задържане: свободен полицай + най-близкият провокатор → заедно до колата
+    if (force && on) { arrestT -= dt; if (arrestT <= 0) { arrestT = 1.4; const O = officers.find(q => !q.busy), cand = rioters.filter(P => !P.goal && !P.held).sort((a, b) => a.z - b.z)[0];
+      if (O && cand) { O.busy = true; cand.held = true; O.hx = O.x; setAnim(O, 'Walk'); setAnim(cand, 'Walk'); pairs.push({ O, P: cand, st: 'grab' }); } } }
+    for (const pr of [...pairs]) { const { O, P } = pr;
+      if (pr.st === 'grab') { if (walkTo(O, P.x, P.z - 0.8, 2.2, dt)) pr.st = 'lead'; }
+      else if (pr.st === 'lead') { const [vx, vz] = van(); walkTo(P, vx, vz, 1.6, dt); O.x = P.x - Math.sin(P.ry) * 0.7; O.z = P.z - Math.cos(P.ry) * 0.7; O.ry = P.ry; if (Math.hypot(P.x - vx, P.z - vz) < 0.5) { dropPerson(P, rioters); shown++; pr.st = 'back'; } }
+      else if (walkTo(O, O.hx, lineZ, 2.2, dt)) { O.busy = false; pairs.splice(pairs.indexOf(pr), 1); continue; }
+      O.p.position.set(O.x, 0, O.z); O.p.rotation.y = O.ry; }
+    // провокаторите: тичат, викат и хвърлят по полицията (или по колите и витрините, ако няма полиция)
+    const tgt = force ? [RIOT_Z[0], lineZ] : m.teams.pol.st === 'onsite' ? [9, ZONE.cordon - 1] : [ST_B, ST_A];
     for (const P of [...rioters]) {
-      if (P.goal) { const dx = P.goal[0] - P.x, dz = P.goal[1] - P.z, d = Math.hypot(dx, dz); if (d < 1) { dropPerson(P, rioters); continue; } P.x += dx / d * 1.6 * dt; P.z += dz / d * 1.6 * dt; P.ry = Math.atan2(dx, dz); }
-      else { P.ry += Math.sin(tt * 2 + P.x) * dt; if (Math.random() < 0.01) setAnim(P, Math.random() < 0.5 ? 'Talk_Arguing' : 'Waving'); }
-      P.p.position.set(P.x, 0, P.z); P.p.rotation.y = P.ry; P.mixer.update(dt);
+      if (P.held) { P.p.position.set(P.x, 0, P.z); P.p.rotation.y = P.ry; P.mixer.update(dt); continue; }
+      if (P.goal) { if (walkTo(P, P.goal[0], P.goal[1], 2.4, dt)) { dropPerson(P, rioters); continue; } }
+      else {
+        const minZ = force ? lineZ + 2.5 : RIOT_Z[1] - 3;
+        if (P.z < minZ) { walkTo(P, P.x, minZ + 0.5, 3, dt); setAnim(P, 'Walk'); }   // отстъпват пред щитовете
+        else if ((P.next -= dt) <= 0) { P.next = 1.5 + Math.random() * 2.5; const r = Math.random();
+          if (r < 0.35) { P.tx = Math.max(3, Math.min(22, P.x + (Math.random() - 0.5) * 6)); P.tz = Math.max(minZ, Math.min(16, P.z + (Math.random() - 0.5) * 4)); setAnim(P, 'Walk'); }
+          else if (r < 0.7) { P.tx = null; P.ry = Math.atan2(tgt[0] - P.x, tgt[1] - P.z); setAnim(P, 'Waving'); throwAt(P, tgt[0], tgt[1]); }
+          else { P.tx = null; setAnim(P, 'Talk_Arguing'); } }
+        if (P.tx != null && walkTo(P, P.tx, P.tz, 2.6, dt)) { P.tx = null; setAnim(P, 'Talk_Arguing'); }
+      }
+      P.p.position.set(P.x, 0, P.z); P.p.rotation.y = P.ry; P.mixer.update(dt * (P.tx != null ? 1.5 : 1));
     }
+    for (const f of [...flying]) { f.t += dt / f.T; const u = Math.min(1, f.t); f.b.position.set(f.x0 + (f.x1 - f.x0) * u, 1.8 + Math.sin(u * Math.PI) * 3 - u * 1.7, f.z0 + (f.z1 - f.z0) * u); f.b.rotation.x += dt * 9; if (u >= 1) { scene.remove(f.b); flying.splice(flying.indexOf(f), 1); } }
+    hud.textContent = on ? `🔥 Безредици · 🛡️ задържани: ${Math.max(shown, 0)}` : ''; hud.style.display = on ? '' : 'none';
   }
+  // 🔊 шумът на протеста (Pixabay): по-силен с напрежението, най-силен при безредици; заглъхва след решението; спира при затваряне
+  const noise = new Audio('assets/sfx/protest.mp3'); noise.loop = true; noise.volume = 0; let noiseV = 0;
+  const muted = () => !!(o.muted && o.muted());
+  function noiseStep(m, dt) { const want = muted() ? 0 : m.out ? 0 : Math.min(0.9, 0.18 + m.tension / 160 + (m.riot ? 0.3 : 0)); noiseV += (want - noiseV) * Math.min(1, dt * 1.5); noise.volume = Math.max(0, Math.min(1, noiseV)); if (noiseV > 0.01 && noise.paused) noise.play().catch(() => {}); else if (noiseV <= 0.01 && !noise.paused) noise.pause(); }
+  const hud = document.createElement('div'); hud.style.cssText = 'position:absolute;left:50%;top:58px;transform:translateX(-50%);padding:5px 14px;border-radius:999px;background:#8a1c1ccc;color:#fff;font:800 14px system-ui;display:none;pointer-events:none'; el.appendChild(hud);
   // ---- колите на екипите: позицията — от времето на мисията
   const veh = {}, labels = {};
   for (const k of Object.keys(OPS_TEAMS)) {
@@ -319,7 +365,7 @@ export function openOpsSquare(ops, o = {}) {
         P.mixer.update(dt * Math.min(speed, 2));
       }
       for (const P of staff) P.mixer.update(dt);
-      placeVehicles(m, tt); riotScene(m, tt, dt * Math.min(speed, 2));
+      placeVehicles(m, tt); riotScene(m, tt, dt * Math.min(speed, 2)); noiseStep(m, dt);
       loadTraffic(); moveCars(dt * Math.min(speed, 2), tt, m.teams.pol.st === 'onsite' && !m.out); moveWalkers(dt * Math.min(speed, 2));
       // светлината: при напрежение — по-сиво и студено, след решението — слънце
       const k = m.out === 'deal' ? 1 : 1 - m.tension / 140; sun.intensity = 1.2 + k * 1.4; sky.setRGB(0.55 + k * 0.12, 0.62 + k * 0.14, 0.7 + k * 0.16); scene.fog.color.copy(sky);
@@ -341,7 +387,7 @@ export function openOpsSquare(ops, o = {}) {
   el.querySelector('[data-x]').onclick = () => close();
 
   function close() {
-    if (shut) return; shut = true; cancelAnimationFrame(raf);
+    if (shut) return; shut = true; cancelAnimationFrame(raf); noise.pause(); noise.src = '';
     removeEventListener('resize', onResize); removeEventListener('keydown', key);
     for (const L of [crowd, staff, walkers, rioters]) for (const P of [...L]) dropPerson(P, L);
     ctl.dispose();
