@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';
 import { playSiren, sirenKind } from './vehmodels.js';
+import { flameSprite, flameSize } from './fireflip.js';   // истинските пламъци (Блендър) — Лабораторията → fire-real
 
 const HOLD = 60;                      // колко стоят на място (истински секунди) — по подразбиране; всеки вид има свое
 const HEAVY_GAP = 600;                // тежките (кола по таван, верижна, изсипан товар, пожар в сграда) — не по-често от веднъж на 10 мин
@@ -129,7 +130,7 @@ export function createIncidents(ctx) {
     const W = v => new THREE.Vector3(...v).applyMatrix4(g.matrixWorld);
     const puffs = [], flames = [];
     if (fx.smoke || fx.smokeW) { const o = fx.smokeW ? new THREE.Vector3(...fx.smokeW) : W(fx.smoke); for (let k = 0; k < 8; k++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, color: fx.gas ? 0xcfe0c0 : fx.fire || fx.fireW ? 0x333333 : 0x777777, transparent: true, depthWrite: false, opacity: 0 })); s.userData.ph = k / 8; s.userData.o = o; s.userData.big = fx.fire || fx.fireW ? 1.8 : fx.gas ? 0.6 : 1; ctx.scene.add(s); puffs.push(s); } }
-    for (const f of [...(fx.fire || []).map(f => [W(f.slice(0, 3)), f[3]]), ...(fx.fireW || []).map(f => [new THREE.Vector3(...f.slice(0, 3)), f[3]])]) { const o = f[0]; for (let k = 0; k < 3; k++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: fireTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); s.userData.o = o; s.userData.sz = f[1]; s.userData.ph = k * 2.1; ctx.scene.add(s); flames.push(s); } }
+    for (const f of [...(fx.fire || []).map(f => [W(f.slice(0, 3)), f[3]]), ...(fx.fireW || []).map(f => [new THREE.Vector3(...f.slice(0, 3)), f[3]])]) { const o = f[0]; for (let k = 0; k < 3; k++) { const s = feature('fire-real') ? flameSprite() : new THREE.Sprite(new THREE.SpriteMaterial({ map: fireTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); s.userData.flip = feature('fire-real'); s.userData.o = o; s.userData.sz = f[1]; s.userData.ph = k * 2.1; ctx.scene.add(s); flames.push(s); } }
     const cars = [];
     T.cars.forEach(([k, back], n) => {
       const [nm, sc] = vehName(k), st = pickStart(at); if (!nm || !st || !ctx.has(nm) && nm.startsWith('sf-')) return;
@@ -166,7 +167,7 @@ export function createIncidents(ctx) {
     // дим и пламъци (пожарната ги гаси: след като пристигне, пламъците намаляват)
     const fireOn = !inc.cars.some(c => c.kind === 'fire') ? 1 : Math.max(0, 1 - (inc.hold0 - (inc.hold ?? inc.hold0)) / (inc.hold0 * 0.7));
     inc.puffs.forEach(s => { const ph = (inc.t * 0.25 + s.userData.ph) % 1, o = s.userData.o, b = s.userData.big; s.position.set(o.x + Math.sin(ph * 9) * 0.6 * b, o.y + ph * 9 * b, o.z + ph * 2); s.scale.setScalar((1.5 + ph * 5) * b); s.material.opacity = inc.leave ? 0 : 0.55 * (1 - ph) * (inc.flames.length ? 0.4 + 0.6 * fireOn : 1); });
-    inc.flames.forEach(s => { const o = s.userData.o, f = 0.75 + 0.25 * Math.sin(inc.t * 11 + s.userData.ph) * Math.sin(inc.t * 7.3 + s.userData.ph * 2); s.position.set(o.x + Math.sin(inc.t * 3 + s.userData.ph) * 0.2, o.y + (s.userData.ph % 2) * 0.3, o.z); s.scale.set(s.userData.sz * f * 0.8, s.userData.sz * f * 1.25, 1); s.material.opacity = inc.leave ? 0 : fireOn; });
+    inc.flames.forEach(s => { const o = s.userData.o, f = 0.75 + 0.25 * Math.sin(inc.t * 11 + s.userData.ph) * Math.sin(inc.t * 7.3 + s.userData.ph * 2); s.position.set(o.x + Math.sin(inc.t * 3 + s.userData.ph) * 0.2, o.y + (s.userData.ph % 2) * 0.3, o.z); if (s.userData.flip) { s.position.y -= s.userData.sz * 0.45; flameSize(s, s.userData.sz * (1.3 + 0.2 * f)); } else s.scale.set(s.userData.sz * f * 0.8, s.userData.sz * f * 1.25, 1); s.material.opacity = inc.leave ? 0 : fireOn; });
     // сирените: докато колите идват и стоят на място — щом камерата е близо (до ~200 м), на ~7 s свири една от тях (редуват се: линейка, пожарна, полиция)
     if (!inc.leave && ctx.cam && (inc.sT = (inc.sT ?? 0) - rdt) <= 0) {
       const cam = ctx.cam(), on = inc.cars.filter(c => c.kind && c.o.visible && (c.stage === 'go' || c.stage === 'hold'));

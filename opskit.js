@@ -8,6 +8,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { KINDS } from './opskinds.js';
+import { feature } from './lab/feature.js';
+import { flameSprite, flameSize } from './fireflip.js';   // истинските пламъци (Блендър) — Лабораторията → fire-real
 import { emergCar } from './vehmodels.js';   // спешните коли — като в играта: правилна посока и светлинна лента
 export { THREE };
 
@@ -94,9 +96,11 @@ export function openOpsScene(ops, o, cfg) {
   // огнище: { g, update(tt, power 0–1) } — power мащабира пламъците и светлината
   function fire(x, y, z, size = 1, n = 6, light = false) {
     const g = new THREE.Group(); g.position.set(x, y, z); scene.add(g);
-    const fl = Array.from({ length: n }, (_, j) => { const sp = new THREE.Sprite(flameM); sp.userData.o = [(Math.random() - 0.5) * size * 0.9, (Math.random() - 0.5) * size * 0.5, Math.random() * 6 + j]; g.add(sp); return sp; });
+    const flip = feature('fire-real');
+    const fl = Array.from({ length: flip ? Math.max(2, Math.ceil(n * 0.6)) : n }, (_, j) => { const sp = flip ? flameSprite() : new THREE.Sprite(flameM); sp.userData.o = [(Math.random() - 0.5) * size * 0.9, (Math.random() - 0.5) * size * 0.5, Math.random() * 6 + j]; g.add(sp); return sp; });
     const L = light ? new THREE.PointLight(0xff8a3a, 0, 14, 1.6) : null; if (L) { L.position.y = size; g.add(L); }
     return { g, update(tt, pw) { for (const [j, sp] of fl.entries()) { sp.visible = pw > 0.02; if (!sp.visible) continue; const [ox, oz, ph] = sp.userData.o, u = (tt * 1.5 + ph * 0.37) % 1, s0 = size * (0.4 + pw * 0.8);
+      if (flip) { sp.position.set(ox, -size * 0.15, oz); flameSize(sp, s0 * (2.4 + 0.3 * Math.sin(tt * 2.3 + ph))); continue; }   // кадрите на симулацията се движат сами — само ръстът диша
       sp.position.set(ox, u * s0 * 1.4, oz); sp.scale.set(s0 * (0.9 - u * 0.5), s0 * (1.3 - u * 0.4), 1); } if (L) L.intensity = pw > 0.02 ? (5 + Math.sin(tt * 13 + x) * 2) * pw * 1.6 : 0; } };
   }
   const smoke = Array.from({ length: 70 }, () => { const sp = new THREE.Sprite(own(new THREE.SpriteMaterial({ map: smokeT, transparent: true, depthWrite: false, opacity: 0 }))); sp.visible = false; scene.add(sp); return { sp, life: 0 }; });
