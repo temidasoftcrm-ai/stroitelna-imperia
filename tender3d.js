@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { createPortLights } from './portlights.js';
 import { loadShipModels, hasShipModel, shipModel } from './shipmodels.js';
-import { STADIUMS } from './stadiums.js';   // известните стадиони на световното
+import { STADIUMS, STADIUM_MAX_M } from './stadiums.js';   // известните стадиони на световното
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { makePlane, airTowerModel } from './airport.js';
 
@@ -154,7 +154,8 @@ export function buildStadium(group, deps, opts = {}) {
     for (let f = 0; f < 6; f++) { const fx = -w / 2 + 2 + f * (w - 4) / 5, fz = sd * 13.6; box(0.15, 4, 0.15, mat(0xdddddd, 0.4, 0.6), fx, 2, fz, done); box(1.6, 1, 0.05, mat([0xd62828, 0xffffff, 0x1f4fbf][f % 3], 0.6), fx + 0.8, 3.4, fz, done); }
   }
   // модели: обикновеният национален стадион и известните (opts.variant)
-  const V = { ...STADIUMS, ekana: { url: 'assets/heavy/stadium/stadium.glb', side: 25.5 }, campnou: { url: 'assets/heavy/stadium/campnou.glb', side: 25 }, olympia: { url: 'assets/heavy/stadium/olympia.glb', side: Math.min(ext[0], ext[1]) - 0.6 } }[opts.variant || 'ekana'];
+  const SV = Object.fromEntries(Object.entries(STADIUMS).map(([k, st]) => [k, { url: st.url, side: (Math.min(ext[0], ext[1]) - 0.6) * st.m[0] / STADIUM_MAX_M }]));   // известните: в истинските пропорции един спрямо друг
+  const V = { ...SV, ekana: { url: 'assets/heavy/stadium/stadium.glb', side: 25.5 }, campnou: { url: 'assets/heavy/stadium/campnou.glb', side: 25 }, olympia: { url: 'assets/heavy/stadium/olympia.glb', side: Math.min(ext[0], ext[1]) - 0.6 } }[opts.variant || 'ekana'];
   const lamps = [], lampM = mat(0xffffff, 0.4, 0, 0xfff4d0);
   if (!opts.variant) for (const [x, z] of [[-12, -12], [12, -12], [-12, 12], [12, 12]]) { const q = box(1.4, 0.5, 0.4, lampM, x, 8.2, z, done); q.lookAt(0, 0, 0); lamps.push(q); }
   const body = new THREE.Group(); g.add(body);

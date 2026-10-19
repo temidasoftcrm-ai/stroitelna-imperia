@@ -4,15 +4,17 @@
 import { feature } from './lab/feature.js';
 
 export const STADIUMS = {
-  bernabeu: { city: 'madrid', url: 'assets/heavy/stadium2/sf-bernabeu.glb', side: 25 },
-  stadefrance: { city: 'paris', url: 'assets/heavy/stadium2/sf-stadefrance.glb', side: 25 },
-  maracana: { city: 'rio', url: 'assets/heavy/stadium2/sf-maracana.glb', side: 25 },
-  bombonera: { city: 'buenosaires', url: 'assets/heavy/stadium2/sf-bombonera.glb', side: 25 },
-  azteca: { city: 'mexicocity', url: 'assets/heavy/stadium2/sf-azteca.glb', side: 25 },
-  alwakrah: { city: null, url: 'assets/heavy/stadium2/sf-alwakrah.glb', side: 25 },   // общият за световното
+  // m — истинската дължина (м) и ширина: стадионите са в реалните си пропорции един спрямо друг (tender3d.js — най-големият запълва площадката)
+  bernabeu: { city: 'madrid', url: 'assets/heavy/stadium2/sf-bernabeu.glb', m: [250, 210] },
+  stadefrance: { city: 'paris', url: 'assets/heavy/stadium2/sf-stadefrance.glb', m: [270, 230] },
+  maracana: { city: 'rio', url: 'assets/heavy/stadium2/sf-maracana.glb', m: [317, 279] },
+  bombonera: { city: 'buenosaires', url: 'assets/heavy/stadium2/sf-bombonera.glb', m: [200, 160] },
+  azteca: { city: 'mexicocity', url: 'assets/heavy/stadium2/sf-azteca.glb', m: [290, 250] },
+  alwakrah: { city: null, url: 'assets/heavy/stadium2/sf-alwakrah.glb', m: [270, 240] },   // общият за световното
 };
 // стадионът на световното в града city (ключ за tender3d opts.variant) или undefined — обикновеният
 export function wcStadium(city) {
   for (const [k, s] of Object.entries(STADIUMS)) if (s.city === city && feature('st-' + k)) return k;
   return feature('st-alwakrah') ? 'alwakrah' : undefined;
 }
+export const STADIUM_MAX_M = 320;   // най-големият (Маракана) — запълва площадката на търга
