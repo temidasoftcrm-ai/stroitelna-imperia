@@ -2706,7 +2706,7 @@ function showSplash(key, cap, sub, force = false) {
   document.body.appendChild(el);
   const close = () => { if (!el.isConnected) return; el.classList.add('out'); setTimeout(() => el.remove(), 550); };
   el.onclick = close; requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
-  setTimeout(close, 7000); if (!splashFanfare()) Sound.play('levelup');
+  setTimeout(close, 7000); if (feature('snd-lvup2')) Sound.play('lvup'); else if (!splashFanfare()) Sound.play('levelup');
   return true;
 }
 function showBuyPop(type) {
@@ -7555,7 +7555,7 @@ function saleTip() {
   });
 }
 // ---- „🏙️ Градове“ (citypanel.js): всички градове без влизане, автопилот; „🏢 Подобрения“ — upgHudHtml в прозорец
-const cityPanel = createCityPanel({ S: () => S, firmLv: () => dev.best(), firmUp: lv => { if (feature('lv-pics')) showLevel(lv, unlockText(lv)); else Sound.play('levelup'); }, finStat: id => { try { const i = finInfo(id); return { daily: i.daily, upkeep: i.upkeep }; } catch { return { daily: 0, upkeep: 0 }; } }, scopeLabel: () => scopeLabel(), virtFill: (id, c) => virtFill(id, c), regionMul: id => isAm(id) ? AM_K.reward : 1, econ: () => econ, ECON, BTYPES, RATE, workMul, THRESH: DEV_THRESH, unlockText, XP: dev.XP,
+const cityPanel = createCityPanel({ S: () => S, firmLv: () => dev.best(), firmUp: lv => { if (feature('lv-pics')) showLevel(lv, unlockText(lv)); else Sound.play('lvup'); }, finStat: id => { try { const i = finInfo(id); return { daily: i.daily, upkeep: i.upkeep }; } catch { return { daily: 0, upkeep: 0 }; } }, scopeLabel: () => scopeLabel(), virtFill: (id, c) => virtFill(id, c), regionMul: id => isAm(id) ? AM_K.reward : 1, econ: () => econ, ECON, BTYPES, RATE, workMul, THRESH: DEV_THRESH, unlockText, XP: dev.XP,
   officeLv: lv => OFFICE_LEVELS[Math.max(1, Math.min(OFFICE_LEVELS.length, lv)) - 1], offerTypes: () => offerTypes(), cityTier: id => cityTier(id), towerFloors: id => TOWER_FLOORS[cityTier(id)] || [10], towerMul: f => TOWER_MUL[f] || 1,
   buildingFor, clients: (type, id) => clientName(cityById(id || S.cityId)?.cc, type === 'house'), ownedCities: () => ownedCities(), cityName: id => cityById(id)?.nm || id, cityFlag: id => cityById(id)?.cc || '🇧🇬',
   isFinished: id => !!(econ.isFinished && econ.isFinished(id)), projects: () => projects, unitTypes: () => units.map(u => u.type), nowDays: () => nowDays(), toast, fmt, save, sound: n => Sound.play(n),
@@ -8476,7 +8476,7 @@ function holdLv() {
 }
 function holdXP(n) {
   if (!S?.holding || !(n > 0)) return; const before = Math.max(S.hLv || 0, dev.best()); S.hxp = (S.hxp || 0) + Math.round(n); const after = dev.best();
-  if (after > before) { S.hLv = after; showEventPop('empire', `🏅 Ниво на развитие ${after}`, unlockText(after)); Sound.play('levelup'); } else S.hLv = Math.max(S.hLv || 0, after);
+  if (after > before) { S.hLv = after; showEventPop('empire', `🏅 Ниво на развитие ${after}`, unlockText(after)); Sound.play('lvup'); } else S.hLv = Math.max(S.hLv || 0, after);
 }
 function holdingCheck(force = false) {
   if (!S || S.holding || (!force && dev.best() < HOLDING_LV)) return;

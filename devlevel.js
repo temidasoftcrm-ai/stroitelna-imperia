@@ -68,7 +68,7 @@ export function createDevLevel(deps) {
   function cityUp(lv, text) {
     deps.toast(`🏅 Фирмата е ниво ${lv}! ${text || UNLOCKS[lv] || ''}`, 'good', open);
     if (feature('lv-pics') && LV_PICS.has(lv)) showLevel(lv, text || UNLOCKS[lv] || '');
-    else { deps.sound('levelup'); if (deps.pop && !deps.pop(`lv-${lv}`, `🏅 Ниво на развитие ${lv}`, text || UNLOCKS[lv] || '')) deps.pop('empire', `🏅 Ниво на развитие ${lv}`, text || UNLOCKS[lv] || ''); }
+    else { deps.sound('lvup'); if (deps.pop && !deps.pop(`lv-${lv}`, `🏅 Ниво на развитие ${lv}`, text || UNLOCKS[lv] || '')) deps.pop('empire', `🏅 Ниво на развитие ${lv}`, text || UNLOCKS[lv] || ''); }
     render(); deps.save();
   }
   // докато е отворена 3D зала (window.__overlay3d — Директорската зала, кабинетът): опитът се трупа тихо — без „+XP“, без преначертаване и
@@ -93,7 +93,7 @@ export function createDevLevel(deps) {
       if (d.lv <= firm0) { deps.toast(`🏙️ ${deps.cityName ? deps.cityName() : 'Градът'} стигна ниво ${d.lv}`, 'good'); continue; }   // градът догонва фирмата (друг град вече е бил на това ниво) — само съобщение, без картинка
       deps.toast(`🏅 Фирмата е ниво ${d.lv}! ${UNLOCKS[d.lv] || ''}`, 'good', open);
       if (feature('lv-pics') && LV_PICS.has(d.lv)) { showLevel(d.lv, UNLOCKS[d.lv] || ''); continue; }   // градът е задминал фирмата → нова фирмена степен
-      deps.sound('levelup');
+      deps.sound('lvup');
       if (deps.pop && !deps.pop(`lv-${d.lv}`, `🏅 Ниво на развитие ${d.lv}`, UNLOCKS[d.lv] || '')) deps.pop('office-up', `🏅 Ниво на развитие ${d.lv}`, UNLOCKS[d.lv] || '');
     }
     render();

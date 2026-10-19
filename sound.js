@@ -142,6 +142,7 @@ export const Sound = {
   },
   play(name) {
     if (this.ctx && !this.muted && this.jingle(name)) return;
+    if (name === 'lvup') { if (feature('snd-lvup2')) { this.file('assets/sfx/levelup-skill.mp3', 0.85); return; } name = 'levelup'; }   // новото ниво на фирмата (Лабораторията → snd-lvup2); иначе — обичайният звук
     if (name === 'levelup' && feature('snd-levelup')) { this.levelSoft(); return; }   // по-тихото ново ниво (Лабораторията → „Ново“)
     if (name === 'levelup') {   // „та-даа“ + мелодия (Kenney Music Jingles, CC0)
       this.tada();
