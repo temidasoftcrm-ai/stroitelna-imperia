@@ -1554,7 +1554,7 @@ let tr2 = null;
 const tr2On = () => feature('traffic2') && !city.plan;
 function traffic2Make() {
   if (tr2) tr2.clear();
-  tr2 = createTraffic({ scene, drive: 'right', maxCars: wantedTraffic(),
+  tr2 = createTraffic({ scene, camera, drive: 'right', maxCars: wantedTraffic(),   // camera — истинските фарове само за най-близките коли
     net: gridNetwork({ NBI, NBJ, tx, isRoad, TILE, signal: (i, j) => signals.some(s => s.i === i && s.j === j) }),
     makeCar: () => { addCar(); const t = traffic.pop(); return t ? { obj: t.obj, len: t.len || 4.5, kind: 'car' } : null; },
     onSignal: (n, v) => { const s = sigMap.get(n.id); if (!s || !v) return; for (const h of s.heads) { const mine = h.axis === v.axis && !v.red; h.gr.visible = mine && !v.yellow; h.y.visible = mine && v.yellow; h.r.visible = !mine; } } });
