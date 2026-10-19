@@ -630,7 +630,19 @@ const PLAN_TPL4 = { newyork: 'grid' };
 const PLAN_TPL5 = { sofia: 'osm' };
 // от planAll 7: Лос Анджелис — Даунтаун по картата (OpenStreetMap) и надписът HOLLYWOOD на хълмовете на север
 const PLAN_TPL7 = { losangeles: 'osm' };
-const planOf = id => planOn(id) ? gamePlan(id, { exts: Math.max(MAX_EXT, extRule(id)), landmark: !!CITY_LANDMARKS[id], seaside: SEASIDE.includes(id), mega: MEGAPOLIS.has(id), bigZone: bigZoneOf(id), clean: S.planAll >= 6, clean2: S.planAll >= 9, tpl: (S.planAll >= 7 && PLAN_TPL7[id]) || (S.planAll >= 5 && PLAN_TPL5[id]) || (S.planAll >= 4 ? PLAN_TPL4[id] : undefined) }) : null;
+// 🇮🇹 планът v2 по истинската карта (cityplan2game.js + cityplan2-3d.js): Рим в НОВИТЕ игри (флаг rome-osm → S.plan2.rome);
+// старите записи остават на стария план. Данните (~5 MB) се зареждат само когато градът е такъв — plan2Preload преди влизането.
+const PLAN2_CITIES = new Set(['rome']);
+const plan2 = { mod: null, view: null, data: {}, cache: null };
+const plan2On = id => !!(S && S.plan2 && S.plan2[id] && plan2.data[id]);
+const plan2Tier = () => 1 + Math.min(4, S.cityExt || 0);   // всеки купен квартал отключва следващото ниво рионе (1…5)
+async function plan2Preload(s) {
+  const id = s && s.cityId; if (!id || !(s.plan2 && s.plan2[id]) || plan2.data[id]) return;
+  try { const [m, v] = await Promise.all([import('./cityplan2game.js'), import('./cityplan2-3d.js')]); plan2.mod = m; plan2.view = v; const d = await m.loadPlan2(id); if (d) plan2.data[id] = d; }
+  catch (e) { console.warn('plan2', e); }
+}
+const plan2Plan = id => { const t = plan2Tier(), c = plan2.cache; if (c && c.id === id && c.t === t) return c.P; const P = plan2.mod.gamePlan2(plan2.data[id], { tier: t }); plan2.cache = { id, t, P }; return P; };
+const planOf = id => plan2On(id) ? plan2Plan(id) : planOn(id) ? gamePlan(id, { exts: Math.max(MAX_EXT, extRule(id)), landmark: !!CITY_LANDMARKS[id], seaside: SEASIDE.includes(id), mega: MEGAPOLIS.has(id), bigZone: bigZoneOf(id), clean: S.planAll >= 6, clean2: S.planAll >= 9, tpl: (S.planAll >= 7 && PLAN_TPL7[id]) || (S.planAll >= 5 && PLAN_TPL5[id]) || (S.planAll >= 4 ? PLAN_TPL4[id] : undefined) }) : null;
 // запазената зона в плана за голямата забележителност: колкото W×D парцела на мрежата ((3W − 1) плочки − 2 м)
 function bigZoneOf(id) { const b = (BIG_LANDMARKS[id] || [])[0]; if (!b) return null; const [kind, W, D, asp = 1, turn = 0] = b; return { kind, W, D, asp, turn, size: [(3 * W - 1) * TILE - 2, (3 * D - 1) * TILE - 2] }; }
 // план: пътища от най-близкия край на булевард до гарата (запад), входа на летището (изток) и магистралата (юг) — само за изгледа
@@ -887,15 +899,17 @@ function buildCity(cityId) {
   scene.add(g); city.lineObj = null;
   const r = rng(hashStr(cityId));
   migrateMegaLots(cityId);
-  if (MEGAPOLIS.has(cityId) && S.extBig == null) S.extBig = S.cityExt || 0;   // всички вече купени квартали са големите
-  setCityExt(S.cityExt || 0, MEGAPOLIS.has(cityId) ? MEGA_BASE : 0);
+  const megaLay = MEGAPOLIS.has(cityId) && !plan2On(cityId);   // Рим по истинската карта — без спиралата от квартали на мегаполиса
+  if (megaLay && S.extBig == null) S.extBig = S.cityExt || 0;   // всички вече купени квартали са големите
+  setCityExt(S.cityExt || 0, megaLay ? MEGA_BASE : 0);
   const P = city.plan = planOf(cityId);
   if (P && megaBase) NI = NJ = 3 * NB + 1;   // мегаполис с план: размерите са от плана, не от спиралата от квартали
   if (P) { const [ti, tj] = planTiles(P, TILE); NI = Math.max(NI, ti); NJ = Math.max(NJ, tj); }   // гарата, магистралата и летището се отдръпват до края на плана
   // земя (при мегаполисите — по-широка на изток)
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(Math.max(1200, 2 * (tx(NI - 1) + 380)), Math.max(1200, 2 * (tx(NJ - 1) + 300))), new THREE.MeshStandardMaterial({ color: isDesert(cityId) ? 0xd9bf86 : 0x8fb36a, roughness: 1 }));   // Африка — пясък
   if (P && !P.links) P.links = planLinks(P);   // и в мрежата на маршрутите (cityplanroute.js) — ТИР-овете и техниката карат по тях
-  const pv = P ? buildPlanView({ ...P, streets: [...P.streets, ...P.links] }, { size: Math.max(1600, 2 * (tx(NI - 1) + 400)), seg: 170, target: controls.target, lotCount: Math.min(P.lots.length, planCount(P.mega, S.cityExt || 0)),
+  const pv = P && P.p2 ? plan2.view.buildPlan2View(P.p2, { osm: P.p2.osmData, offset: P.offset, fillLot: L2 => { const l = city.p2Map && city.p2Map.get(L2.id); return !l || l.busy === 'bg'; } })   // Рим: фоновите квартали — върху парцелите, които играта не ползва
+    : P ? buildPlanView({ ...P, streets: [...P.streets, ...P.links] }, { size: Math.max(1600, 2 * (tx(NI - 1) + 400)), seg: 170, target: controls.target, lotCount: Math.min(P.lots.length, planCount(P.mega, S.cityExt || 0)),
     seaZ: SEASIDE.includes(cityId) ? tx(0) - TILE / 2 - 2 : null, noFountain: !!CITY_LANDMARKS[cityId], plantProtos: ['pl-bush-0', 'pl-bush-1', 'pl-bush-2', 'pl-flowers'].filter(k => A[k]).map(k => A[k].scene), fountainProto: A['pl-fountain']?.scene, benchProto: A.bench?.scene, treeProtos: Object.keys(A).filter(k => k.startsWith('sf-tree-') || k.startsWith('sf-pine-')).map(k => { const o = A[k].scene; o.userData.pine = k.startsWith('sf-pine-'); return o; }) }) : null;
   weather.setGround(pv ? pv.userData.groundMat : ground.material);   // снежната покривка оцветява земята
   // крайбрежните градове: море на север с плаж, пристанище, фар и кораби (seaside.js)
@@ -960,7 +974,7 @@ function buildCity(cityId) {
     const zone = d <= 1 ? 'center' : d <= (mega ? 3 : 2) ? 'mid' : 'outer';   // мегаполисът е по-гъст: широк среден пояс
     city.lots.push({ id: city.lots.length, bi, bj, x, z, zone, built: null, obj: null, busy: null, fresh, mega });
   };
-  if (P) city.lots = planLots(P, S.cityExt || 0);
+  if (P) city.lots = P.p2 ? P.lots.map(l => ({ ...l })) : planLots(P, S.cityExt || 0);   // Рим по истинската карта: всички отключени рионе (tier)
   else for (let bi = 0; bi < NB; bi++) for (let bj = 0; bj < NB; bj++) addLot(bi, bj, c, c, false, false);
   if (P) {} else if (megaBase) for (let e = 0, n = megaExtra(S.cityExt || 0); e < n; e++) {   // всеки квартал 9×9 има свой център
     const [sx, sy] = megaSlots[(e / (NB * NB)) | 0], w = e % (NB * NB);
@@ -974,9 +988,11 @@ function buildCity(cityId) {
   city.hq = P ? city.lots[P.hqLot] : city.lots.find(l => l.bi === hqAt[0] && l.bj === hqAt[1]);
   city.center = LMC ? city.lots.filter(l => Math.abs(l.bi - c) <= 2 && Math.abs(l.bj - c) <= 2) : null;
   city.hq.busy = 'hq';
+  // Рим по истинската карта: ~60% от парцелите (и всички за реставрация) са чужди — там са римските фонови квартали на 3D изгледа
+  if (P && P.p2) { for (const lot of city.lots) if (!lot.busy && (lot.reno || r() < 0.6)) lot.busy = 'bg'; city.p2Map = new Map(city.lots.map(l => [l.p2, l])); pv.userData.refill(); }
   // готов град: ~60% от парцелите са застроени (според зоната)
   for (const lot of city.lots) {
-    if (lot.busy || lot.fresh || cityId === NEOM_ID) continue;   // градът от нулата започва като празна пустиня
+    if (lot.busy || lot.fresh || cityId === NEOM_ID || (P && P.p2)) continue;   // градът от нулата започва като празна пустиня
     const chance = lot.mega ? (lot.zone === 'center' ? 0.92 : lot.zone === 'mid' ? 0.82 : 0.7) : lot.zone === 'center' ? 0.75 : lot.zone === 'mid' ? 0.6 : 0.5;
     if (r() > chance) continue;
     let n;
@@ -2199,6 +2215,11 @@ function newGame(cityId, brand = null, brandNm = '') {
   if (brandNm) S.brandNm = brandNm;   // името, което играчът си е дал (group.js: brandOf)
   S.foundFirst = 1;   // дъщерните фирми (пътна, жп, морска, авиация) — с ръчно основаване и стартов пакет
   if (params.has('plan') ? params.get('plan') === '1' : !AUTOTEST) S.planAll = feature('road-clean') ? 9 : feature('city-size') ? 8 : feature('la-osm') ? 7 : 6;   // 7: Лос Анджелис по картата (PLAN_TPL7); 6: по-чист център (cityplan opts.clean)   // нова игра — средните и големите градове с план (извити улици); старите записи остават на мрежата   // нов град с план (извити улици); старите записи остават на мрежата
+  if (S.planAll && feature('rome-osm') && feature('rome-game')) S.plan2 = Object.fromEntries([...PLAN2_CITIES].map(id => [id, 1]));   // и градовете, в които ще отвориш филиал по-късно (switchCity презарежда → plan2Preload)
+  if (S.plan2 && S.plan2[cityId]) { if (!plan2.data[cityId]) { const s0 = S; plan2Preload(S).then(() => { if (S !== s0) return; if (!plan2.data[cityId]) delete S.plan2; newGameEnter(brand); }); return; } }   // 🇮🇹 Рим по истинската карта — данните първо
+  newGameEnter(brand);
+}
+function newGameEnter(brand) {
   enterCity();
   S.projects = projects;
   for (let k = 0; k < 3; k++) makeOffer();
@@ -5319,7 +5340,20 @@ function lmRiverSpot(k, mem) {
   const o = buildLandmark(k, { label }); o.group.position.set(best.x, 0, best.z); o.group.rotation.y = best.rot; o.group.scale.multiplyScalar(best.sc);
   return o;
 }
+// Рим по истинската карта: забележителностите — на реалните им места (P.landmarks), вписани в основата си
+function landmarkPlan2(kinds) {
+  const P = city.plan, box = new THREE.Box3(), sz = new THREE.Vector3();
+  for (const k of kinds) {
+    const at = P.landmarks.find(L => L.k === k) || P.landmarks.find(L => L.k === k.replace(/\d+$/, '')); if (!at) continue;
+    const o = buildLandmark(k, { label }); if (!o) continue;
+    box.setFromObject(o.group).getSize(sz); const s0 = Math.max(sz.x, sz.z) || 1;
+    o.group.scale.multiplyScalar(Math.max(at.w, at.d) * 0.95 / s0); o.group.position.set(at.x, 0.1, at.z);
+    o.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+    city.group.add(o.group); city.landmarks.push(o);
+  }
+}
 function landmarkPlan(kinds) {
+  if (city.plan.p2) return landmarkPlan2(kinds);
   const sq = city.plan.square, mem = S.landmarks[S.cityId], shade = o => o.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
   if (kinds[0] === 'manhattan' && feature('ny-spread')) { nySpread(); kinds = kinds.slice(1); if (!kinds.length) return; kinds = ['__none', ...kinds]; }
   if (kinds[0] !== '__none') { const main = buildLandmark(kinds[0], { label }); main.group.position.set(sq.x, 0.1, sq.z); main.group.scale.setScalar(LM_MAIN_SCALE[kinds[0]] || 3.2); main.group.rotation.y = (hashStr(kinds[0]) % 4) * Math.PI / 2;
@@ -9097,7 +9131,7 @@ function frame() {
     camera.position.copy(controls.target).add(fly.off);
     if (fly.t >= 1) fly = null;
   }
-  if (city.planView && city.planView.userData.update && !onMap) city.planView.userData.update(simT);   // светофарите в плана
+  if (city.planView && city.planView.userData.update && !onMap) { if (city.plan && city.plan.p2) { city.planView.userData.update(rdt, { camera }); const nt = dayNight.night > 0.5; if (nt !== city.p2Night) { city.p2Night = nt; city.planView.userData.setNight?.(nt); } } else city.planView.userData.update(simT); }   // светофарите в плана
   if (hwv) return renderHwView(rdt);
   if (onMap) return;   // картата е SVG — 3D сцената не се рисува отдолу
   if (window.__overlay3d > 0) return;   // директорската зала (directors3d.js) е втори WebGL на цял екран — градът под нея не се рисува (иначе две сцени на кадър)
@@ -9170,6 +9204,8 @@ if (!AUTOTEST) {
     ch.postMessage({ hello: SAVE_KEY });
   } catch { }
 }
+// 🇮🇹 Рим по истинската карта: данните на плана v2 — преди влизането в града (само ако записът е такъв)
+await plan2Preload(AUTOTEST ? (() => { try { return JSON.parse(sessionStorage.getItem('stroiAT')); } catch { return null; } })() : saved);
 if (AUTOTEST) {
   const at = sessionStorage.getItem('stroiAT');
   if (at) { sessionStorage.removeItem('stroiAT'); sessionStorage.removeItem('stroiEnter'); S = JSON.parse(at); enterCity(); } else newGame(params.get('city') || 'sofia');
