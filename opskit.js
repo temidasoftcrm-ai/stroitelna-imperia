@@ -83,8 +83,8 @@ export function openOpsScene(ops, o, cfg) {
   }
   function drop(P) { scene.remove(P.p); P.mixer.stopAllAction(); P.mixer.uncacheRoot(P.body); const i = people.indexOf(P); if (i >= 0) people.splice(i, 1); }
   const walkTo = (P, x, z, sp, dt) => { const dx = x - P.x, dz = z - P.z, d = Math.hypot(dx, dz); if (d < 0.3) return true; const s0 = Math.min(d, sp * dt); P.at(P.x + dx / d * s0, P.z + dz / d * s0, Math.atan2(dx, dz), P.y); return false; };
-  const pedsReady = Promise.all([...PEDS.map(load), load(ANIMS), load(COP), load(FF)]).then(gs => {
-    if (shut) return; ffSrc = gs.pop(); copSrc = gs.pop(); const an = gs.pop(); if (an) for (const c of an.animations) clips[c.name] = c;
+  const pedsReady = Promise.all([...PEDS.map(load), load(ANIMS), load(COP), load(FF), load('assets/heavy/directors/clips.glb')]).then(gs => {
+    if (shut) return; const dc = gs.pop(); if (dc) for (const c of dc.animations) if (/^Sit_/.test(c.name)) clips[c.name] = c;   /* седнали пози (Mixamo, от директорите) */ ffSrc = gs.pop(); copSrc = gs.pop(); const an = gs.pop(); if (an) for (const c of an.animations) clips[c.name] = c;
     pedSrc = gs.filter(Boolean).map(g => { if (!g.k) { g.scene.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(g.scene, true); g.k = 1.8 / ((b.max.y - b.min.y) || 1); } return g; });
   });
 

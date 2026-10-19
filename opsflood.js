@@ -159,15 +159,19 @@ function build(K) {
         bags.count = bagN; bags.instanceMatrix.needsUpdate = true; }
       // 🚤 лодките: пристигат по реката до пристана; после — до покрив и обратно
       const bOn = m.teams.boat.st === 'onsite', bGo = m.teams.boat.st === 'enroute'; boatLb = null;
-      for (const [i, B0] of boats.entries()) { if (!B0.crew.length && K.peds().length) for (let j = 0; j < 2; j++) { const P = person(K.ff() || K.peds()[0]); B0.crew.push(P); P.anim('Idle'); }   /* спасителите в лодката */
+      for (const [i, B0] of boats.entries()) { if (!B0.crew.length && K.peds().length) for (let j = 0; j < 2; j++) { const P = person(K.ff() || K.peds()[0]); P.body.position.y = 0.45; B0.crew.push(P); P.anim(j ? 'Sit_Breathing' : 'Sit_Table_Idle'); }   /* спасителите — седнали */
         B0.h.visible = bOn || bGo; if (!B0.h.visible) continue;
-        let tx, tz;
-        if (bGo) { const p = Math.min(1, (m.t - m.teams.boat.t0) / m.teams.boat.eta); tx = -90 + (DOCK[0] - 2 + i * 4 + 90) * p; tz = -4 + i * 3; B0.x = tx; B0.z = tz; }
-        else { if (!B0.tgt) { const w = waiting[(i * 5 + (tt | 0)) % Math.max(1, waiting.length)]; B0.tgt = w && y > 0.4 ? [w.x, w.z + 3.5] : [DOCK[0] + i * 3, DOCK[1] + 1.5]; }
-          const dx = B0.tgt[0] - B0.x, dz = B0.tgt[1] - B0.z, d = Math.hypot(dx, dz); if (d > 0.6) { const s0 = Math.min(d, 7 * dt); B0.x += dx / d * s0; B0.z += dz / d * s0; } else B0.tgt = Math.abs(B0.z - DOCK[1] - 1.5) < 1 ? null : [DOCK[0] + i * 3, DOCK[1] + 1.5]; }
+        if (bGo) { const p = Math.min(1, (m.t - m.teams.boat.t0) / m.teams.boat.eta); B0.x = -90 + (DOCK[0] - 2 + i * 4 + 90) * p; B0.z = 2 + i * 3; B0.path = null; }
+        else { // само по реката и улиците: река (z ≈ 3) → улицата на моста (x = −25) → улица z = 27 / 41 → до къщата; обратно по същия път
+          if (B0.wait > 0) B0.wait -= dt; else if (!B0.path || !B0.path.length) { const w = waiting[(i * 5 + (tt | 0)) % Math.max(1, waiting.length)], rz = 3 + i * 2.5;
+            const lane = z => z < 27 ? 27 : z < 41 ? (z - 27 < 41 - z ? 27 : 41) : 41;
+            if (B0.home !== false && w && y > 0.4) { const sz = lane(w.z) + (i ? 1.2 : -1.2); B0.path = [[B0.x, rz], [-25 + i * 1.5, rz], [-25 + i * 1.5, sz], [w.x, sz]]; B0.home = false; }
+            else { const sz = B0.z; B0.path = B0.z > 13 ? [[-25 + i * 1.5, sz], [-25 + i * 1.5, rz], [DOCK[0] + i * 3, rz], [DOCK[0] + i * 3, DOCK[1] + 1.5]] : [[DOCK[0] + i * 3, rz], [DOCK[0] + i * 3, DOCK[1] + 1.5]]; B0.home = true; } }
+          if (B0.path && B0.path.length) { const [tx, tz] = B0.path[0], dx = tx - B0.x, dz = tz - B0.z, d = Math.hypot(dx, dz);
+          if (d > 0.4) { const s0 = Math.min(d, 7 * dt); B0.x += dx / d * s0; B0.z += dz / d * s0; } else { B0.path.shift(); if (!B0.path.length) B0.wait = 1.5; } } }   /* спира за малко при къщата и на пристана */
         const vx = B0.x - (B0.px ?? B0.x), vz = B0.z - (B0.pz ?? B0.z); if (Math.hypot(vx, vz) > 0.002) B0.hdg = Math.atan2(vx, vz); B0.px = B0.x; B0.pz = B0.z; const hdg = B0.hdg ?? Math.PI / 2;
-        B0.h.position.set(B0.x, Math.max(y, -0.7) + Math.sin(tt * 2 + i) * 0.05, B0.z); B0.h.rotation.y = hdg; wU.uBoat.value[i].set(B0.x, B0.z, hdg, Math.min(1, Math.hypot(vx, vz) / Math.max(dt, 1e-3) / 5));   /* носът — по посоката на движение */
-        B0.crew.forEach((P, j) => P.at(B0.x + Math.sin(hdg) * (j ? -0.8 : 0.6), B0.z + Math.cos(hdg) * (j ? -0.8 : 0.6), hdg, Math.max(y, -0.7) + 0.25)); if (i === 0) boatLb = [B0.x, Math.max(y, 0) + 2.5, B0.z]; }
+        B0.h.position.set(B0.x, Math.max(y, -0.7) + Math.sin(tt * 2 + i) * 0.05, B0.z); B0.h.rotation.y = hdg + Math.PI; wU.uBoat.value[i].set(B0.x, B0.z, hdg, Math.min(1, Math.hypot(vx, vz) / Math.max(dt, 1e-3) / 5));   /* моделът е с носа към −Z */
+        B0.crew.forEach((P, j) => P.at(B0.x + Math.sin(hdg) * (j ? -0.9 : 0.5), B0.z + Math.cos(hdg) * (j ? -0.9 : 0.5), hdg, Math.max(y, -0.7) + 0.05)); if (i === 0) boatLb = [B0.x, Math.max(y, 0) + 2.5, B0.z]; }
       for (const [i, B0] of boats.entries()) { for (const P of B0.crew) P.p.visible = B0.h.visible; if (!B0.h.visible) wU.uBoat.value[i].w = 0; }
       // 🚁 хеликоптерът: долита от запад, после виси над покривите (въже до покрива)
       const hOn = m.teams.heli.st === 'onsite', hGo = m.teams.heli.st === 'enroute'; heliLb = null;
