@@ -434,7 +434,8 @@ function placeLots(P, sk, r) {
   const BM = [['special', 56, 46, 0.12], ['park', 64, 44, 0.3], ['hospital', 52, 38, 0.45], ['station', 72, 32, 0.72]];
   const BIG = { s: [['park', 44, 36, 0.25], ['hospital', 40, 32, 0.5]], m: BM, l: [...BM, ['stadium', 96, 64, 0.78], ['special', 56, 46, 0.3], ['park', 72, 46, 0.6]],
     xl: [...BM, ['stadium', 96, 64, 0.78], ['special', 56, 46, 0.3], ['park', 72, 46, 0.6], ['hospital', 52, 38, 0.7], ['station', 72, 32, 0.85], ['special', 56, 46, 0.5], ['park', 72, 46, 0.8]] }[P.size];
-  const ANY = { park: 1, special: 1 };   // паркът и забележителността могат и към квартална улица; болницата, гарата и стадионът — само към главна
+  if (P.fam === 'coast') BIG.unshift(['port', 80, 40, 0.55]);   // пристанище: място на сушата до кея (кейът навътре във водата — в 3D)
+  const ANY = { park: 1, special: 1 }, ONLY = { port: 'quay' };   // паркът и забележителността могат и към квартална улица; болницата, гарата и стадионът — само към главна
   const atOn = (rd, ss) => { let i = 1; while (i < rd.L.length - 1 && rd.L[i] < ss) i++; const a = rd.pts[i - 1], b = rd.pts[i], t = (ss - rd.L[i - 1]) / ((rd.L[i] - rd.L[i - 1]) || 1), l = dist(a, b) || 1; return { x: lerp(a[0], b[0], t), z: lerp(a[1], b[1], t), tx: (b[0] - a[0]) / l, tz: (b[1] - a[1]) / l }; };
   const lotAt = (rd, s, side, w, d) => { const m = atOn(rd, s + w / 2), nx = -m.tz * side, nz = m.tx * side, off = rd.w / 2 + rd.walk + 1.5 + d / 2; return { x: m.x + nx * off, z: m.z + nz * off, w, d, rot: Math.atan2(-nx, -nz), front: { road: rd.id, s: s + w / 2, side, cls: rd.cls } }; };
   const okLot = (L, pad) => { const cs = rectCorners(L.x, L.z, L.w / 2, L.d / 2, L.rot);
@@ -448,7 +449,7 @@ function placeLots(P, sk, r) {
     if (bigs.some(b => b._k === kind + w0 + want)) break;
     const w = w0 * f, d = d0 * f;
     let best = null, bs = 1e9;
-    for (const rd of P.roads) { if (!isMain(rd.cls) && P.size !== 's' && !ANY[kind]) continue; const len = rd.L[rd.L.length - 1], s0 = (P.nodes[rd.from].r || 0) + 6, s1 = len - (P.nodes[rd.to].r || 0) - 6;
+    for (const rd of P.roads) { if (!isMain(rd.cls) && P.size !== 's' && !ANY[kind]) continue; if (ONLY[kind] && rd.cls !== ONLY[kind]) continue; const len = rd.L[rd.L.length - 1], s0 = (P.nodes[rd.from].r || 0) + 6, s1 = len - (P.nodes[rd.to].r || 0) - 6;
       for (let s = s0; s + w < s1; s += 8) for (const side of [1, -1]) {
         const L = lotAt(rd, s, side, w, d), dc = Math.hypot(L.x - P.center.x, L.z - P.center.z) / P.R;
         let sc = Math.abs(dc - want); for (const b of bigs) sc += Math.max(0, 0.35 - Math.hypot(L.x - b.x, L.z - b.z) / P.R) * 2;   // раздалечени
@@ -483,6 +484,19 @@ function placeLots(P, sk, r) {
   const C = P.center;
   lots.sort((a, b) => Math.round(Math.hypot(a.x - C.x, a.z - C.z)) - Math.round(Math.hypot(b.x - C.x, b.z - C.z)) || Math.atan2(a.z - C.z, a.x - C.x) - Math.atan2(b.z - C.z, b.x - C.x));
   lots.forEach((L, i) => { L.id = i; L.poly = rectCorners(L.x, L.z, L.w / 2, L.d / 2, L.rot); L.area = Math.round(L.w * L.d); L.block = null; L.reserved = L.reserved || null; L.big = L.big || null; delete L._k; for (const k of ['x', 'z', 'w', 'd', 'rot']) L[k] = Math.round(L[k] * 100) / 100; });
+  // застрояване по размер на града и зона (какви модели стават за парцела — не прескача прогреса на играча):
+  // малък — къщи и ниски; среден — къщи, блокове и компактен офисен център; голям — плътни квартали и група високи в центъра;
+  // мегаполис — няколко плътни центъра (около всеки — високи), жилищни райони със средна височина, ниска периферия
+  const hubs = P.hubs, R0 = P.R, h = id => ((id * 2654435761) >>> 0) / 4294967296;
+  const nearHub = L => Math.min(...hubs.map(q => Math.hypot(L.x - q.x, L.z - q.z))) / R0;
+  for (const L of lots) {
+    if (L.big) { L.build = L.big; continue; }
+    const r = h(L.id), hb = nearHub(L), z = L.zone;
+    L.build = P.size === 's' ? (z === 'center' || z === 'business' ? 'low' : 'house')
+      : P.size === 'm' ? (z === 'center' ? 'mid' : z === 'business' ? (r < 0.6 ? 'mid' : 'low') : z === 'residential' ? (hb < 0.45 && r < 0.35 ? 'mid' : 'house') : 'house')
+      : P.size === 'l' ? (z === 'center' ? (hb < 0.13 ? 'tower' : 'mid') : z === 'business' ? 'mid' : z === 'residential' ? (r < 0.7 ? 'mid' : 'low') : 'house')
+      : (z === 'center' ? (hb < (hubs.length > 1 ? 0.1 : 0.16) ? 'tower' : 'mid') : z === 'business' ? (hb < 0.16 && r < 0.4 ? 'tower' : 'mid') : z === 'residential' ? (r < 0.75 ? 'mid' : 'low') : (r < 0.7 ? 'house' : 'low'));
+  }
   P.lots = lots;
 }
 
