@@ -149,44 +149,7 @@
   "key": "com2",
   "title": "🏢 Стъклени сгради (Kenney Commercial 2)",
   "where": "Центровете на мегаполисите",
-  "items": [
-   {
-    "n": "building-i",
-    "f": "assets/commercial2/building-i.glb",
-    "st": "заменен (изтрит)",
-    "ok": true
-   },
-   {
-    "n": "building-j",
-    "f": "assets/commercial2/building-j.glb",
-    "st": "заменен (изтрит)",
-    "ok": true
-   },
-   {
-    "n": "building-k",
-    "f": "assets/commercial2/building-k.glb",
-    "st": "заменен (изтрит)",
-    "ok": true
-   },
-   {
-    "n": "building-l",
-    "f": "assets/commercial2/building-l.glb",
-    "st": "заменен (изтрит)",
-    "ok": true
-   },
-   {
-    "n": "building-m",
-    "f": "assets/commercial2/building-m.glb",
-    "st": "заменен (изтрит)",
-    "ok": true
-   },
-   {
-    "n": "building-n",
-    "f": "assets/commercial2/building-n.glb",
-    "st": "заменен (изтрит)",
-    "ok": true
-   }
-  ]
+  "items": []
  },
  {
   "key": "city",
@@ -217,104 +180,7 @@
   "key": "ind",
   "title": "🏭 Заводи и промишленост",
   "where": "Градовете с доставчици (заводи, водна кула, вятърна мелница, соларни панели)",
-  "items": [
-   {
-    "n": "building-a",
-    "f": "assets/industrial/building-a.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "building-b",
-    "f": "assets/industrial/building-b.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "building-c",
-    "f": "assets/industrial/building-c.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "building-d",
-    "f": "assets/industrial/building-d.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "building-e",
-    "f": "assets/industrial/building-e.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "building-f",
-    "f": "assets/industrial/building-f.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "building-g",
-    "f": "assets/industrial/building-g.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "building-h",
-    "f": "assets/industrial/building-h.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "building-i",
-    "f": "assets/industrial/building-i.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "building-j",
-    "f": "assets/industrial/building-j.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "building-k",
-    "f": "assets/industrial/building-k.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "building-l",
-    "f": "assets/industrial/building-l.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "water-tower",
-    "f": "assets/industrial/water-tower.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "windmill",
-    "f": "assets/industrial/windmill.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "solar-panel-landscape-group",
-    "f": "assets/industrial/solar-panel-landscape-group.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "solar-panel-portrait-group",
-    "f": "assets/industrial/solar-panel-portrait-group.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   }
-  ]
+  "items": []
  },
  {
   "key": "holiday",
