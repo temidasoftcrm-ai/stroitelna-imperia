@@ -2922,7 +2922,8 @@ function matHtml(p) {
   if (!Object.keys(need).length) return '';
   if (p.mat && p.mat[p.stage]) return `<span class="ok">📦 Материали ✓</span>`;
   const miss = econ.missing(p.type, p.stage);
-  const txt = Object.entries(miss).map(([m, q]) => `${ECON.MATERIALS[m].ico} ${q} ${ECON.MATERIALS[m].unit}`).join(', ');
+  const txt = Object.entries(miss).filter(([, q]) => q > 0).map(([m, q]) => `${ECON.MATERIALS[m].ico} ${q} ${ECON.MATERIALS[m].unit}`).join(', ');
+  if (!txt) return `<span class="ok" title="Материалите са в склада — взимат се, щом етапът започне">📦 Материали в склада ✓</span>`;   // нищо не липсва — само още не са взети за етапа
   return `<span class="miss" title="${txt}">📦 Липсват: ${txt} → „Склад“</span>`;
 }
 function needHtml(p) {
