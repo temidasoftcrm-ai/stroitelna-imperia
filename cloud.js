@@ -188,7 +188,7 @@ function openSettings(h) {
   if (h) hooks = h;
   try { localStorage.setItem(seenKey, VERSION); } catch { }
   const ppl = online();
-  const el = dlg(`<h2 style="font-size:19px;color:var(--acc)">⚙️ Настройки</h2>
+  const el = dlg(`<button id="stX" title="Затвори" aria-label="Затвори" style="position:sticky;top:0;float:right;z-index:2;width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:#1b2433;color:var(--txt);font-size:18px;line-height:1;cursor:pointer">✕</button><h2 style="font-size:19px;color:var(--acc)">⚙️ Настройки</h2>
     ${sec('☁️ Акаунт', user ? `<div style="font-size:14px;color:var(--mut);line-height:1.5">Влязъл си като <b style="color:var(--txt)">${esc(user.email)}</b> — играта се пази в облака.${lastErr ? `<br><span style="color:var(--bad)">Последна грешка: ${esc(lastErr)}</span>` : ''}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${sbtn('stCloud', '☁️ Записи в облака')}${sbtn('stOut', '🚪 Изход')}</div>`
       : `<div style="font-size:14px;color:var(--mut);line-height:1.5">Не си влязъл. С вход (имейл + код, без парола) играта се пази в облака и можеш да играеш от няколко устройства.</div><div style="margin-top:8px">${sbtn('stIn', '☁️ Вход', 'btn')}</div>`)}
@@ -200,6 +200,7 @@ function openSettings(h) {
     [['Затвори', null, 1]]);
   el.firstElementChild.style.maxHeight = '92vh'; el.firstElementChild.style.overflow = 'auto';
   const on = (id, f) => { const b = el.querySelector('#' + id); if (b) b.onclick = () => { el.remove(); f(); }; };
+  { const x = el.querySelector('#stX'); if (x) x.onclick = () => el.remove(); }   // ✕ горе — без да скролваш до „Затвори“
   on('stIn', () => loginEmail()); on('stCloud', openCloud); on('stCred', () => hooks.credits()); on('stRen', () => hooks.rename()); on('stSaves', () => hooks.saves()); on('stNew', () => hooks.newGame());
   on('stOut', () => dlg(`<h2 style="font-size:19px;color:var(--acc)">🚪 Изход?</h2><p style="color:var(--mut);font-size:14px;line-height:1.5">Играта на това устройство остава. Влез пак със същия имейл, за да продължи да се пази в облака.</p>`,
     [['Отказ', null], ['🚪 Изход', () => { syncAll(false).finally(() => sb.auth.signOut().then(() => toast('🚪 Излезе от акаунта.'))); }, 1]]));
