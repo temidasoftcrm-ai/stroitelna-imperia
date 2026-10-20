@@ -635,7 +635,7 @@ const PLAN_TPL5 = { sofia: 'osm' };
 const PLAN_TPL7 = { losangeles: 'osm' };
 // 🇮🇹 планът v2 по истинската карта (cityplan2game.js + cityplan2-3d.js): Рим в НОВИТЕ игри (флаг rome-osm → S.plan2.rome);
 // старите записи остават на стария план. Данните (~5 MB) се зареждат само когато градът е такъв — plan2Preload преди влизането.
-const PLAN2_CITIES = new Set(['rome', 'paris', 'istanbul', 'london', 'newyork']);   // градовете по истинската карта (флагове <id>-osm + <id>-game)
+const PLAN2_CITIES = new Set(['rome', 'paris', 'istanbul', 'london', 'newyork', 'moscow']);   // градовете по истинската карта (флагове <id>-osm + <id>-game)
 const plan2 = { mod: null, view: null, data: {}, cache: null, models: {} };
 // моделите за изгледа на града (Истанбул: висящият мост, фериботите и корабите) — зареждат се с плана, само за този град
 const PLAN2_MODELS = { paris: { 'lm-lazare2': 'lm/lazare2.glb' }, istanbul: { 'lm-bosphorus': 'lm/bosphorus.glb', 'sh-ferry': 'ships/ferry-bandirma.glb', 'sh-cruise': 'ships/cruise.glb', 'sh-tanker': 'ships/tanker.glb', 'sh-container': 'ships/container.glb', 'bt-fish': 'boats/sf-fisherboat.glb', 'bt-sail': 'boats/sf-sailboat.glb', 'bt-motor': 'marina/motoryacht.glb', 'bt-yacht': 'boats/sf-yacht.glb' } };
@@ -1193,7 +1193,7 @@ const lmBox = new THREE.Box3(), lmTmp = new THREE.Box3(); let lmLabT = 0;
 function updLmLabels() {   // всяка секунда: нов надпис за новата забележителност, височината — по модела (GLB-тата се зареждат после), махане на старите
   if (!city.group) return;
   for (const o of city.landmarks || []) {
-    const nm = o.kind && LANDMARK_NM[o.kind]; if (!nm || !o.group.parent) continue;
+    const nm = o.labelNm || (o.kind && LANDMARK_NM[o.kind]); if (!nm || !o.group.parent) continue;
     if (!o.gold) { o.gold = goldLabel(nm); o.gold.userData.lm = o; city.group.add(o.gold); }
     if (o.group.userData.sign) o.group.userData.sign.visible = false;
     lmBox.makeEmpty(); o.group.updateMatrixWorld(true); o.group.traverse(m => { if (m.isMesh && m.visible && m.geometry) { if (!m.geometry.boundingBox) m.geometry.computeBoundingBox(); lmBox.union(lmTmp.copy(m.geometry.boundingBox).applyMatrix4(m.matrixWorld)); } }); if (lmBox.isEmpty()) continue;   // само по моделите (без спрайтовете)
@@ -2938,7 +2938,7 @@ function endOfDay() {
   tenderAutoFix();
   mines.dailyTick();
   oil.dailyTick(); updOilBtn();
-  gridCheck(); holdingCheck(); autoTick(); group.check(); group.dailyTick(); corp.dailyTick(); mw.dailyTick(); hotels.dailyTick(); bank.dailyTick(); neom.dailyTick(); imperial.dailyTick(); muni.dailyTick(); if (S.holding) rescue.dailyCheck(); if (S.president && !S.pres) pres.start(S.president.cc); pres.dailyTick(); ops.tick(1); if (geoMap.on() && $('mapScreen')?.offsetParent) drawMap(); impCiv3D(); neomDecor(); if (imperial.needChoice() && !S.impAsked && $('modal').classList.contains('hidden')) { S.impAsked = S.day; imperial.choose(() => renderBig()); } holdMilestones(); if (S.holding) holdXP(Math.max(0, regNet()) / 10000);
+  gridCheck(); holdingCheck(); autoTick(); abUpInvite(); group.check(); group.dailyTick(); corp.dailyTick(); mw.dailyTick(); hotels.dailyTick(); bank.dailyTick(); neom.dailyTick(); imperial.dailyTick(); muni.dailyTick(); if (S.holding) rescue.dailyCheck(); if (S.president && !S.pres) pres.start(S.president.cc); pres.dailyTick(); ops.tick(1); if (geoMap.on() && $('mapScreen')?.offsetParent) drawMap(); impCiv3D(); neomDecor(); if (imperial.needChoice() && !S.impAsked && $('modal').classList.contains('hidden')) { S.impAsked = S.day; imperial.choose(() => renderBig()); } holdMilestones(); if (S.holding) holdXP(Math.max(0, regNet()) / 10000);
   airAutoPlanes();
   tenders.dailyTick();
   orient.dailyTick();
@@ -5473,11 +5473,12 @@ function lmRiverSpot(k, mem) {
 }
 // Рим по истинската карта: забележителностите — на реалните им места (P.landmarks), вписани в основата си
 // от плана се добавят само тези с правилен модел за града (иначе 'opera' в Париж става операта в Сидни, 'pantheon' — римският)
-const LM_EXTRA = { newyork: new Set(['liberty', 'stpatrick']), istanbul: new Set(['topkapi', 'bluemosque', 'maiden', 'grandbazaar', 'galata', 'suleymaniye', 'haydarpasa']) };
+const LM_EXTRA = { moscow: new Set(['kotelnicheskaya']), newyork: new Set(['liberty', 'stpatrick']), istanbul: new Set(['topkapi', 'bluemosque', 'maiden', 'grandbazaar', 'galata', 'suleymaniye', 'haydarpasa']) };
 // истинската височина (м) на високите забележителности — мащабът е по-малкият от основата и височината
 LANDMARK_NM.empire = LANDMARK_NM.empire || 'Емпайър Стейт Билдинг'; LANDMARK_NM.stpatrick2 = LANDMARK_NM.stpatrick2 || 'Катедралата „Св. Патрик“'; LANDMARK_NM.chrysler = LANDMARK_NM.chrysler || 'Крайслер Билдинг';
-const LM_REAL_H = { bigben: 96, londoneye: 135, shard: 310, eiffel: 330, galata: 67, maiden: 23, towerbridge: 65, stpeter: 136, liberty: 93, stpatrick: 100 };
-const LM_ALIAS = { suleymaniye: 'mosque2', stpatrick: 'stpatrick2' }, LM_NOT = new Set(['termini', 'sirkeci', 'saintlazare', 'haydarpasa_st']);   // гарите ги рисува изгледът на града
+const LM_REAL_H = { bigben: 96, londoneye: 135, shard: 310, eiffel: 330, galata: 67, maiden: 23, towerbridge: 65, stpeter: 136, liberty: 93, stpatrick: 100, mgu: 176, stbasil: 65 };   // mgu — тук е Котелническа (сталинската висотка)
+const LM_LABEL = { kotelnicheskaya: 'Котелническа висотка' };   // надписът, когато моделът е назаем (mgu → Котелническа)
+const LM_ALIAS = { suleymaniye: 'mosque2', stpatrick: 'stpatrick2', kotelnicheskaya: 'mgu' }, LM_NOT = new Set(['termini', 'sirkeci', 'saintlazare', 'haydarpasa_st']);   // гарите ги рисува изгледът на града
 function landmarkPlan2(kinds) {
   const P = city.plan, box = new THREE.Box3(), sz = new THREE.Vector3();
   // всички забележителности на реалните им места: от списъка на града (вариантите с модел — colosseo3, vittoriano2…) и от плана (Синята джамия, Топкапъ…), ако има модел
@@ -5489,7 +5490,8 @@ function landmarkPlan2(kinds) {
       pt.scale.multiplyScalar(sl.h * (P.p2.osmData?.k || 0.45) / (pt.userData.h || 1)); sl.g.add(pt); } }); }
   for (const k of all) {
     const at = P.landmarks.find(L => L.k === k) || P.landmarks.find(L => L.k === base(k)) || P.landmarks.find(L => LM_ALIAS[L.k] === k); if (!at) continue;
-    const o = buildLandmark(k, { label }); if (!o) continue;
+    const labelNm = LM_LABEL[at.k] || null;
+    const o = buildLandmark(k, { label }); if (!o) continue; if (labelNm) o.labelNm = labelNm;
     let s0 = lmFit(k); if (!s0) { const sg = o.group.userData.sign; if (sg) sg.removeFromParent(); box.setFromObject(o.group).getSize(sz); s0 = Math.max(sz.x, sz.z) || 1; if (sg) o.group.add(sg); }   // моделите (GLB) се зареждат после — по основата им, не по временната плоча
     let k0 = Math.max(at.w, at.d) * 0.95 / s0; const hr = LM_REAL_H[k] || LM_REAL_H[k.replace(/\d+$/, '')];
     if (hr) { let h0 = lmH(k); if (!h0) { box.setFromObject(o.group).getSize(sz); h0 = sz.y || 1; } k0 = Math.min(k0, hr * (P.p2.osmData?.k || 0.45) / h0); }   // кулите — и по истинската височина (парцелът на Парламента е 225 м, а моделът е само Биг Бен)
@@ -6921,6 +6923,7 @@ function takeAutobahn(id) {
   hwDispatch(); save(); renderMapHud(); drawMap();
 }
 function finishAutobahn(j) {
+  if (feature('ab-up-fx')) abOpenFx = { seg: j.seg, t0: performance.now() };   // 🔴 вълната по линията при откриването (abSvg)
   for (const u of units) if (u.proj === j) { u.obj.visible = true; releaseUnit(u); }
   S.hwJobs.splice(S.hwJobs.indexOf(j), 1);
   const gain = abTollGain(segById(j.seg));
@@ -6946,16 +6949,57 @@ function hwQueueSvg() {
       <text x="${lx}" y="${ly - fs * 0.8}" text-anchor="middle" font-size="${fs}" font-weight="800" fill="#ffd54a" stroke="#000" stroke-width="${fs * 0.22}" paint-order="stroke">🚧 на опашка №${i + 1}</text>`; });
   return h;
 }
+// ab-up-fx (потребителят: „магистралите, които се превръщат в аутобан — от синьо към червено, по-ефектно“):
+// 1) участъците, които могат да станат аутобан — синята линия пулсира с червен отблясък и значка „⬆️“; еднократна покана с бутон
+// 2) ъпгрейдът в строеж — синята магистрала се прелива в червено по дължината си според напредъка (с ярък „фронт“)
+// 3) откриването — червена вълна минава по линията от единия град до другия (≈2,5 s)
+let abOpenFx = null;
+const abUpSegSet = () => { if (!feature('ab-up-fx')) return null; const st = new Set(); for (const o of abUpList()) for (const x of o.segs) st.add(x.id); return st; };
+function abUpInvite() {
+  if (!S || !feature('ab-up-fx') || !$('modal').classList.contains('hidden')) return;
+  const L = abUpList(); S.abUpSeen = S.abUpSeen || {}; const o = L.find(x => !S.abUpSeen[x.c.id]); if (!o) return;
+  S.abUpSeen[o.c.id] = S.day;
+  const km = o.segs.reduce((a, x) => a + kmBetween(x.a, x.b), 0), pay = o.segs.reduce((a, x) => a + Math.round(abQuoteSeg(x, kmBetween(x.a, x.b)).reward * AB_UP.pay / 5000) * 5000, 0);
+  const route = o.segs.map(x => `${cityById(x.a).nm} — ${cityById(x.b).nm}`).join(', ');
+  Sound.play('offer');
+  modal(`⬆️ Магистралата може да стане аутобан ${o.c.id}`, `Готовата ти магистрала минава по трасето на аутобан <b>${o.c.id} „${o.c.nm}“</b>: ${route} (${fmt(km)} км).<br><br>
+    🔴 Надграждане без земни работи и мостове — от „Пътна основа“, за половин срок · държавата плаща <b style="color:var(--ok)">${fmt(pay)} €</b><br>
+    🛣️ После: по-висок тол и −30% на материалите, докарани по аутобана.<br><br><span class="meta">На картата участъкът пулсира в червено, докато решиш.</span>`,
+    [['По-късно', null], ['⬆️ Направи аутобан', () => abUpgrade(o.c.id)]]);
+}
+// линия/начупена линия по точките — частта от 0 до k (за преливането)
+const abFxPath = (pts, w, col, extra = '') => `<polyline points="${pts.map(p => p.map(v => v.toFixed(1)).join(',')).join(' ')}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" ${extra}/>`;
 // аутобаните на картата: червени и по-дебели от магистралите
 function abSvg() {
   if (!S) return '';
   const on = abUnlocked(), jobs = Object.fromEntries((S.hwJobs || []).filter(j => j.ab).map(j => [j.seg, j])), w = (mapEU ? 4 : mapWide ? 1.6 : 1) * mapK();
   let h = '';
+  const upSet = abUpSegSet(), fxNow = performance.now(); let wave = '';   // вълната — най-отгоре
+  if (abOpenFx && fxNow - abOpenFx.t0 > 4000) abOpenFx = null;
   for (const sg of ALL_AB) {
     if (!mapIn(sg.a, sg.b)) continue;
     if (sg.cont && !contByKey(sg.cont).open()) continue;
     const A1 = cityById(sg.a), B1 = cityById(sg.b); if (!A1 || !B1) continue;
     const [x1, y1] = proj(A1.lon, A1.lat), [x2, y2] = proj(B1.lon, B1.lat), done = hwAll().includes(sg.id), j = jobs[sg.id], via = viaOf(sg.a, sg.b);
+    if (upSet) {   // ab-up-fx: покана · преливане · вълна
+      const pts = [[x1, y1], ...(via || []).map(([lo, la]) => proj(lo, la)), [x2, y2]], [lx, ly] = ptAlong(pts, 0.5);
+      if (!done && !j && upSet.has(sg.id)) {   // 1) може да стане аутобан: пулсиращ червен отблясък над синята магистрала + значка
+        h += `<polyline points="${pts.map(p => p.map(v => v.toFixed(1)).join(',')).join(' ')}" fill="none" stroke="#ff2a1f" stroke-width="${14 * w}" stroke-linecap="round" stroke-linejoin="round" opacity="0"><animate attributeName="opacity" values="0;.5;0" dur="1.6s" repeatCount="indefinite"/><title>Може да стане аутобан — виж „⬆️ Ъпгрейд в аутобан“</title></polyline>`;
+        h += `<text x="${lx}" y="${ly - mapPx(10)}" font-size="${mapPx(13)}" font-weight="900" fill="#ff5a4f" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${mapPx(3)}">⬆️ аутобан</text>`;
+        continue;
+      }
+      if (j && j.up) {   // 2) ъпгрейд в строеж: синьо → червено по дължината, с ярък фронт
+        const k = Math.min(1, (j.stage + j.prog) / abStages().length), dp = donePts(pts, k), [fx, fy] = dp[dp.length - 1];
+        h += abFxPath(pts, 5.5 * w, '#1e6fd9') + abFxPath(dp, 16 * w, '#ff2a1f', 'opacity=".28"') + abFxPath(dp, 5.5 * w, '#c62828');
+        h += `<circle cx="${fx}" cy="${fy}" r="${4.5 * w}" fill="#ffd54a" stroke="#ff2a1f" stroke-width="${1.5 * w}"><animate attributeName="r" values="${3.5 * w};${6 * w};${3.5 * w}" dur="1s" repeatCount="indefinite"/></circle>`;
+        h += `<text x="${lx}" y="${ly - mapPx(9)}" font-size="${mapPx(13)}" font-weight="800" fill="#8e0000" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${mapPx(3)}">🔵→🔴 ${Math.floor(k * 100)}%</text>`;
+        continue;
+      }
+      if (done && abOpenFx && abOpenFx.seg === sg.id) {   // 3) откриването: червена вълна по линията (рисува се над готовия аутобан по-долу)
+        const el = ((fxNow - abOpenFx.t0) / 1000).toFixed(2);
+        wave += `<polyline pathLength="100" points="${pts.map(p => p.map(v => v.toFixed(1)).join(',')).join(' ')}" fill="none" stroke="#ffe08a" stroke-width="${9 * w}" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="18 120" opacity=".95"><animate attributeName="stroke-dashoffset" from="18" to="-102" dur="2.4s" begin="-${el}s" fill="freeze"/><animate attributeName="opacity" values=".95;.95;0" keyTimes="0;.85;1" dur="2.4s" begin="-${el}s" fill="freeze"/></polyline>`;
+      }
+    }
     if (via) {   // начупено трасе (по брега и т.н.)
       const pts = [[x1, y1], ...via.map(([lo, la]) => proj(lo, la)), [x2, y2]], P = a => a.map(p => p.map(v => v.toFixed(1)).join(',')).join(' ');
       const k = j ? (j.stage + j.prog) / abStages().length : 0, [lx, ly] = ptAlong(pts, 0.5);
@@ -6971,7 +7015,7 @@ function abSvg() {
       h += `<text x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2 - mapPx(9)}" font-size="${mapPx(13)}" font-weight="800" fill="#8e0000" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${mapPx(3)}">🔴 ${Math.floor(k * 100)}%</text>`;
     } else if (on) h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#e53935" stroke-width="${2.2 * w}" stroke-dasharray="${2 * w} ${3 * w}" opacity=".7"/>`;
   }
-  return h;
+  return h + wave;
 }
 const hwDone = () => (S && S.hwDone) || [];
 // 🤝 партньорски режим: картата е обща — участъците, построени от партньора, са готови и при теб (връзки, карта, строеж),
