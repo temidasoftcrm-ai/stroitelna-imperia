@@ -12,7 +12,7 @@
 </style></head><body>
 <canvas id="c"></canvas>
 <div class="ui"><h1>🏙️ Град v2 — 3D демо</h1>
-  <div class="row"><select id="fam"><option value="eu">Европейски</option><option value="us">Американски</option><option value="coast">Крайбрежен</option><option value="radial">Радиален</option><option value="rome">🇮🇹 Рим (истинска карта)</option></select>
+  <div class="row"><select id="fam"><option value="eu">Европейски</option><option value="us">Американски</option><option value="coast">Крайбрежен</option><option value="radial">Радиален</option><option value="istanbul">🇹🇷 Истанбул (истинска карта)</option><option value="rome">🇮🇹 Рим (истинска карта)</option></select>
     <select id="size"><option value="s">малък</option><option value="m" selected>среден</option><option value="l">голям</option><option value="xl">мегаполис</option></select>
     seed <input id="seed" type="number" value="7"><button id="go">↻</button></div>
   <div class="row"><button id="top">⬆ Отгоре</button><button id="game" class="on">🎮 Игрова камера</button><button id="round">⭕ Кръгово</button><button id="night">🌙 Нощ</button></div>
@@ -29,6 +29,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { plan2, plan2Load } from '../cityplan2.js';
+import { feature } from './feature.js';
 import { buildPlan2View, mats, ribbon, disc, merge } from '../cityplan2-3d.js';   // улиците, Тибърът, мостовете, средата, фоновите квартали — общият модул (и за играта)
 import { OSM2 } from '../cityplan2-osm.js';   // Рим — истинските улици, Тибърът, парковете (OpenStreetMap, ODbL)
 import { buildLandmark } from '../landmarks.js';
@@ -59,7 +60,7 @@ await Promise.all([...HOUSES.map(k => load(k, `../assets/heavy/houses2/${k}.glb`
   load('hospital', '../assets/heavy/hospital/hospital.glb'),
   ...['townhouse-terracotta', 'palazzo-small', 'palazzo-big', 'corner-shop'].map(k => load('it-' + k, `../assets/heavy/rome/it-${k}.glb`).then(() => itTints('it-' + k))),
   ...['hotel', 'store', 'palazzo3', 'medkit'].map(k => load('it-sf-' + k, `../assets/heavy/rome/it-sf-${k}.glb`).then(() => A['it-sf-' + k]?.traverse(m => { const c = m.isMesh && !m.material.map && m.material.color; if (c && c.r > 0.8 && c.g < 0.25 && c.b < 0.25) m.material.color.setHex(0xd9a066); }))),   /* червеният „заместител“ без текстура → охра */   /* истински италиански (Sketchfab, CC-BY) */
-  load('colosseo', '../assets/heavy/lm/colosseo.glb'), load('vittoriano2', '../assets/heavy/lm/vittoriano2.glb'), load('station', '../assets/heavy/station/small.glb'), load('stadium', '../assets/heavy/stadium/stadium.glb'), load('cityhall', '../assets/heavy/civic/cityhall.glb'),
+  load('colosseo', `../assets/heavy/lm/${feature('lm-colosseo3') ? 'colosseo3' : 'colosseo'}.glb`), load('vittoriano2', '../assets/heavy/lm/vittoriano2.glb'), load('station', '../assets/heavy/station/small.glb'), load('stadium', '../assets/heavy/stadium/stadium.glb'), load('cityhall', '../assets/heavy/civic/cityhall.glb'),
   ...CARS.map(k => load(k, `../assets/heavy/cars/${k}.glb`))]);
 // ---- инстанции: всяка част на модела — един InstancedMesh за всичките му копия (вместо клонинги: малко draw calls)
 const PARTS = {}, BOX = {};
@@ -77,7 +78,7 @@ function instance(group, k, mats, shadow = true) {   // mats — матрици�
   return partsOf(k).map(pt => { const im = new THREE.InstancedMesh(pt.geo, pt.mat, mats.length), m = new THREE.Matrix4(); mats.forEach((M2, i) => im.setMatrixAt(i, m.multiplyMatrices(M2, pt.local))); im.castShadow = shadow; im.receiveShadow = true; im.frustumCulled = false; im.userData.shared = 1; im.userData.local = pt.local; group.add(im); return im; });
 }
 
-let VIEW = null, city = null, P = null, cars = [], night = false;
+let OSMD = null, VIEW = null, city = null, P = null, cars = [], night = false;
 // ---- LOD: отблизо — моделът (инстанции по части), отдалеч — кутия с размера на сградата (един InstancedMesh); пресмята се, когато камерата се премести
 const TREE_M = [M(0x6b4a2e), M(0x4f8a3a)], LOD_COL = { house: 0xb59b85, low: 0xa89a8a, mid: 0x9a9690, tower: 0x8c97a3, hospital: 0xeeeeee, station: 0xc9a46a, stadium: 0xb0b0b0, special: 0xb08a6a };
 let BLD = [], lodIM = {}, lodBox = null, lodAt = null, NEAR = 240;
@@ -108,8 +109,8 @@ function romeLm(L) {
   if (L.lm === 'termini') { put('station', L, 2); return; }
   if (L.lm === 'vittoriano' && A.vittoriano2) { const n0 = BLD.length; put('vittoriano2', { ...L, rot: VIT_ROT }, 0); if (BLD.length > n0) BLD[BLD.length - 1].always = 1; return; }   // Витториано — моделът на потребителя (Meshy AI)
   if (L.lm === 'colosseo') { const n0 = BLD.length; put('colosseo', L, 0); if (BLD.length > n0) BLD[BLD.length - 1].always = 1; return; }   // забележителността — винаги пълният модел
-  if (!['stpeter', 'pantheon', 'vittoriano'].includes(L.lm)) return;   // Треви, Кастел Сант'Анджело, Circus Maximus… — запазено място (моделите — по-късно)
-  const o = buildLandmark(L.lm, {}), g = o.group; city.add(g);
+  const LMK = { stpeter: 'stpeter', pantheon: 'pantheon', vittoriano: 'vittoriano', hagia: 'hagia', galata: 'galata', bluemosque: 'mosque2' }[L.lm]; if (!LMK) return;   // Истанбул: Ая София, Галата, Синята джамия (mosque2)   // Треви, Кастел Сант'Анджело, Circus Maximus… — запазено място (моделите — по-късно)
+  const o = buildLandmark(LMK, {}), g = o.group; city.add(g);
   const fit = () => { const b = new THREE.Box3().setFromObject(g); if (b.isEmpty()) return false; const sz = b.getSize(new THREE.Vector3()), k = Math.min(L.w / sz.x, L.d / sz.z); g.scale.multiplyScalar(k); const b2 = new THREE.Box3().setFromObject(g), c = b2.getCenter(new THREE.Vector3()); g.position.x += L.x - c.x; g.position.z += L.z - c.z; g.position.y -= b2.min.y; g.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; } }); return true; };
   if (!fit()) { const t = setInterval(() => { if (fit()) clearInterval(t); }, 500); setTimeout(() => clearInterval(t), 30000); }
 }
@@ -127,7 +128,7 @@ function distView(on) {
   DIST = new THREE.Group(); city.add(DIST); const pos = [], col = [], c = new THREE.Color();
   for (const L of P.lots) { c.setHex(L.reserved === 'reno' ? 0xff7a2a : L.big ? 0xffffff : TIER_C[L.tier] || 0x888888); for (let i = 0; i < 4; i++) { const a = L.poly[i], b = L.poly[(i + 1) % 4]; pos.push(a[0], 0.6, a[1], b[0], 0.6, b[1]); col.push(c.r, c.g, c.b, c.r, c.g, c.b); } }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); DIST.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true })));
-  for (const d of OSM2.rome.districts) { const xs = d.poly.map(p => p[0]), zs = d.poly.map(p => p[1]), cx = xs.reduce((a, b) => a + b) / xs.length, cz = zs.reduce((a, b) => a + b) / zs.length, st = P.districts[d.nm]; if (!st) continue;
+  for (const d of (OSMD || {}).districts || []) { const xs = d.poly.map(p => p[0]), zs = d.poly.map(p => p[1]), cx = xs.reduce((a, b) => a + b) / xs.length, cz = zs.reduce((a, b) => a + b) / zs.length, st = P.districts[d.nm]; if (!st) continue;
     const sp = tag(`${d.nm} · ниво ${d.tier} · ${st.build}🏗 ${st.reno}🛠`, '#' + new THREE.Color(TIER_C[d.tier]).getHexString(), 22); sp.position.set(cx, 60, cz); DIST.add(sp); }
 }
 // котвите: Термини (гарата), летището (Фиумичино, на ръба в истинската посока) и магистралата
@@ -151,8 +152,9 @@ function build() {
   if (tr) { tr.clear(); tr = null; }
   if (city) { scene.remove(city); city.traverse(o => { if (o.isInstancedMesh) o.dispose(); if (o.geometry && !o.userData.shared) o.geometry.dispose(); }); }   // InstancedMesh.dispose — буферите на инстанциите
   city = new THREE.Group(); scene.add(city);
-  P = fam.value === 'rome' ? (ROME_SAVED ? plan2Load(ROME_SAVED, OSM2.rome) : plan2('rome', { osm: OSM2.rome, size: 'xl' })) : plan2('demo', { fam: fam.value, size: size.value, seed: +seed.value || 0 });
-  VIEW = buildPlan2View(P, { osm: P.osm ? OSM2.rome : null }); city.add(VIEW);
+  OSMD = OSM2[fam.value] || null;
+  P = fam.value === 'rome' ? (ROME_SAVED ? plan2Load(ROME_SAVED, OSM2.rome) : plan2('rome', { osm: OSM2.rome, size: 'xl' })) : fam.value === 'istanbul' ? plan2('istanbul', { osm: OSM2.istanbul, size: 'xl' }) : plan2('demo', { fam: fam.value, size: size.value, seed: +seed.value || 0 });
+  VIEW = buildPlan2View(P, { osm: OSMD }); city.add(VIEW);
   const trees = [];
   // парцели: очертания + сгради по зона; големите места — свой модел (паркът — дървета)
   const lp = []; for (const L of P.lots) for (let i = 0; i < 4; i++) { const a = L.poly[i], b = L.poly[(i + 1) % 4]; lp.push(a[0], 0.15, a[1], b[0], 0.15, b[1]); }

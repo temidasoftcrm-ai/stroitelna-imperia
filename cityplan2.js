@@ -160,6 +160,13 @@ function skeleton(fam, size, r) {
 // ---- истинска карта (OpenStreetMap, cityplan2-osm.js — подава се от извикващия: plan2('rome', { osm: OSM2.rome })):
 // без измислен скелет — улиците са от картата (тесните улички вече са опростени при генерирането на данните), а графът,
 // правилата за възлите и парцелите — същите. Двойните еднопосочни платна на булевардите стават един път с ленти в двете посоки.
+// морето (Истанбул): растер от серии суша/вода (cityplan2-osm.js, sea.runs) → waterAt по клетка
+export function seaMask(sea) {
+  if (!sea) return null; if (sea.mask) return sea.mask;
+  const m = new Uint8Array(sea.nx * sea.nz); let k = 0, v = 0; for (const n of sea.runs) { if (v) m.fill(1, k, k + n); k += n; v ^= 1; }
+  sea.mask = (x, z) => { const i = Math.floor((x - sea.x0) / sea.cell), j = Math.floor((z - sea.z0) / sea.cell); return i >= 0 && j >= 0 && i < sea.nx && j < sea.nz && m[j * sea.nx + i] === 1; };
+  return sea.mask;
+}
 function osmSkeleton(D) {
   const lines = [], g = pointGrid(10), mains = D.roads.filter(r => r.cls !== 'street').concat(D.roads.filter(r => r.cls === 'street'));
   for (const r of mains) {
@@ -173,7 +180,7 @@ function osmSkeleton(D) {
   const riv = D.river || [], hw = D.riverHW || 12, isl = D.island;
   const inIsl = (x, z) => { if (!isl) return false; const c = Math.cos(isl.rot), s2 = Math.sin(isl.rot), dx = x - isl.x, dz = z - isl.z, u = dx * c - dz * s2, v = dx * s2 + dz * c; return (u / (isl.w / 2)) ** 2 + (v / (isl.d / 2)) ** 2 < 1; };
   const rg = pointGrid(16); riv.forEach(R2 => resample(R2, 3).forEach(p => rg.add(p, 1)));
-  const waterAt = (x, z) => { let w = false; rg.near([x, z], hw, () => { w = true; }); return w && !inIsl(x, z); };
+  const sea = seaMask(D.sea), waterAt = (x, z) => { if (sea && sea(x, z)) return true; let w = false; if (riv.length) rg.near([x, z], hw, () => { w = true; }); return w && !inIsl(x, z); };
   return { R: Math.max(x1 - x0, z1 - z0) / 2, bnd, lines, hubs: [{ x: 0, z: 0, main: true }], waterAt, coastZ: null, greens: D.greens || [], osm: D };
 }
 
@@ -330,7 +337,7 @@ export function plan2Load(data, osm) {
   for (const n of P.nodes) if (n.outline) n.conflict = n.outline;
   if (osm) { const hw = osm.riverHW || 12, rg = pointGrid(16); (osm.river || []).forEach(R2 => resample(R2, 3).forEach(p => rg.add(p, 1)));
     const isl = osm.island, inIsl = (x, z) => { if (!isl) return false; const c = Math.cos(isl.rot), s2 = Math.sin(isl.rot), dx = x - isl.x, dz = z - isl.z, u = dx * c - dz * s2, v = dx * s2 + dz * c; return (u / (isl.w / 2)) ** 2 + (v / (isl.d / 2)) ** 2 < 1; };
-    P.waterAt = (x, z) => { let w = false; rg.near([x, z], hw, () => { w = true; }); return w && !inIsl(x, z); }; }
+    const sea = seaMask(osm.sea); P.waterAt = (x, z) => { if (sea && sea(x, z)) return true; let w = false; rg.near([x, z], hw, () => { w = true; }); return w && !inIsl(x, z); }; }
   else P.waterAt = () => false;
   return attachPlan2(P);
 }
@@ -385,7 +392,7 @@ export function plan2(cityId, o = {}) {
   const adj = G.nodes.map(() => []); E.forEach(e => { adj[e.a].push(e.b); adj[e.b].push(e.a); });
   let c0 = 0, cd = 1e9; G.nodes.forEach((n, i) => { const d = Math.hypot(n.x - sk.hubs[0].x, n.z - sk.hubs[0].z); if (adj[i].length && d < cd) { cd = d; c0 = i; } });
   let seen = new Set([c0]); { const q = [c0]; for (let h = 0; h < q.length; h++) for (const n of adj[q[h]]) if (!seen.has(n)) { seen.add(n); q.push(n); } }
-  if (o.osm) { const done = new Set(); G.nodes.forEach((_, i) => { if (done.has(i) || !adj[i].length) return; const c = new Set([i]), q = [i]; for (let h = 0; h < q.length; h++) for (const n of adj[q[h]]) if (!c.has(n)) { c.add(n); q.push(n); } c.forEach(n => done.add(n)); if (c.size > seen.size) seen = c; }); }   // истинската карта — най-големият свързан компонент
+  if (o.osm) { const done = new Set(), comps = []; G.nodes.forEach((_, i) => { if (done.has(i) || !adj[i].length) return; const c = new Set([i]), q = [i]; for (let h = 0; h < q.length; h++) for (const n of adj[q[h]]) if (!c.has(n)) { c.add(n); q.push(n); } c.forEach(n => done.add(n)); if (c.size >= 60) comps.push(c); }); if (comps.length) seen = new Set(comps.flatMap(c => [...c])); }   // истинската карта — всички големи компоненти (Истанбул: бреговете са свързани само с фериботи)
   E = E.filter(e => seen.has(e.a));
   // възли с 2 клона от един и същи път → чупка: пътищата се сливат в едно ребро между кръстовищата
   const inc = G.nodes.map(() => []); E.forEach(e => { inc[e.a].push(e); inc[e.b].push(e); });

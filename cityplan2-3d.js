@@ -60,6 +60,23 @@ const smoothRiver = rv => { let p = []; for (let i = 0; i < rv.length; i++) { if
 const RIV = new Map();
 let rivOf = rv => RIV.get(rv) || RIV.set(rv, smoothRiver(rv)).get(rv);
 const riverPoly = (rv, hw) => [...offLine(rivOf(rv), hw), ...offLine(rivOf(rv), -hw).reverse()];
+// море (Истанбул): сушата — слети серии от растера (ред по ред), водата — равнина под нея; кейовете, фериботните линии
+function seaGround(sea) {
+  const pos = [], idx = [];   // серии по редове: runs са по целия растер — тук се режат на редове
+  const NX = sea.nx; let at = 0, v = 0;
+  for (const n of sea.runs) { let a = at, left = n; while (left > 0) { const j = Math.floor(a / NX), i = a % NX, len = Math.min(left, NX - i);
+      if (!v) { const x0 = sea.x0 + i * sea.cell, x1 = x0 + len * sea.cell, z0 = sea.z0 + j * sea.cell, z1 = z0 + sea.cell, b = pos.length / 3; pos.push(x0, 0, z0, x1, 0, z0, x1, 0, z1, x0, 0, z1); idx.push(b, b + 2, b + 1, b, b + 3, b + 2); }
+      a += len; left -= len; }
+    at += n; v ^= 1; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
+}
+function seaView(G, D, RR) {
+  const S2 = D.sea, w = new THREE.Mesh(new THREE.PlaneGeometry(S2.nx * S2.cell * 1.6, S2.nz * S2.cell * 1.6).rotateX(-Math.PI / 2), MAT.water); w.position.set(S2.x0 + S2.nx * S2.cell / 2, -1.2, S2.z0 + S2.nz * S2.cell / 2); G.add(w);
+  const Pi = []; for (const p of D.piers || []) if (p.length > 1) Pi.push(ribbon(p, 4, -0.2)); if (Pi.length) G.add(merge(Pi, MAT.pier));
+  const Fe = [], seenF = new Set(); for (const f of D.ferries || []) { const key = f.pts.length > 1 ? [f.pts[0], f.pts[f.pts.length - 1]].map(p => Math.round(p[0] / 40) + ',' + Math.round(p[1] / 40)).sort().join('|') : ''; if (seenF.has(key)) continue; seenF.add(key); dashed(f.pts, 5, 22, 0.7, -1.1, Fe); }   // еднаквите линии (двете посоки) — веднъж if (Fe.length) G.add(merge(Fe, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 })));   // фериботните линии по водата
+  const Mt = []; for (const r of D.metro || []) if (r.kind !== 'rail') Mt.push(ribbon(r.pts, r.kind === 'tram' ? 2.2 : 2.6, 0.085)); if (Mt.length) G.add(merge(Mt, M(0x9a9184)));   // метро/трамвай на повърхността
+  romeBridges(G, D);
+}
 function romeGround(RR, D) {
   const S2 = RR * 1.2, sh = new THREE.Shape([new THREE.Vector2(-S2, -S2), new THREE.Vector2(S2, -S2), new THREE.Vector2(S2, S2), new THREE.Vector2(-S2, S2)]);
   for (const rv of D.river.slice(0, 1)) { const lim = S2 - D.riverHW - 6, cl = rivOf(rv).filter(([x, z]) => Math.abs(x) < lim && Math.abs(z) < lim); if (cl.length < 2) continue; RIV.set(rv, cl);   /* дупката не бива да излиза от квадрата */
@@ -79,7 +96,7 @@ function romeBridges(G, D) {
   const K = D.k, at = (la, lo) => [(lo - D.center[1]) * Math.cos(D.center[0] * Math.PI / 180) * 111320 * K, -(la - D.center[0]) * 110540 * K];
   const SISTO = at(41.8925, 12.4706), lmSA = (D.landmarks || []).find(l => l.k === 'castelsantangelo');
   const stone = new THREE.MeshStandardMaterial({ color: TRAV, roughness: 0.9 }), pave = MAT.walk, statues = [];
-  for (const r of D.roads) { if (!r.bridge || !(r.nm || '').startsWith('Ponte')) continue;
+  for (const r of D.roads) { if (!r.bridge || !/^Ponte|Köprüsü/.test(r.nm || '')) continue;
     const a = r.pts[0], b = r.pts[r.pts.length - 1], dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz); if (L < 8) continue;
     const ux = dx / L, uz = dz / L, W = r.cls === 'blvd' ? 17 : r.noCars ? 9 : 11, H = RIV_D;
     // профил (u по моста, v нагоре): правоъгълник с арки; Систо — кръгъл отвор над средния стълб
@@ -139,7 +156,7 @@ function furniture(G, P) {
   if (heads.length) {
     inst(new THREE.CylinderGeometry(0.07, 0.09, 3.4, 6).translate(0, 1.7, 0), iron, heads.map(h => [h.x, h.z]), P1(0, 0, 0), true);
     inst(new THREE.BoxGeometry(0.42, 1.1, 0.32).translate(0, 3.5, 0), M(0x1e2022), heads.map(h => [h.x, h.z, h.rot]), P1(0, 0, 0));
-    const bulbs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.12, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }), heads.length * 3), m = new THREE.Matrix4(), c = new THREE.Color(0x333333);
+    const bulbs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.12, 5, 3), new THREE.MeshBasicMaterial({ color: 0xffffff }), heads.length * 3), m = new THREE.Matrix4(), c = new THREE.Color(0x333333);
     heads.forEach((h, i) => [3.85, 3.5, 3.15].forEach((y, k) => { bulbs.setMatrixAt(i * 3 + k, m.makeTranslation(h.x + Math.sin(h.rot) * 0.17, y, h.z + Math.cos(h.rot) * 0.17)); bulbs.setColorAt(i * 3 + k, c); }));
     bulbs.frustumCulled = false; FURN.add(bulbs); SIG = { heads, bulbs };
   }
@@ -152,7 +169,7 @@ export function buildPlan2View(P, opts = {}) {
   mats();
   const G = new THREE.Group(), D = opts.osm || null; G.userData.plan = P;
   if (opts.offset) G.position.set(opts.offset[0], 0, opts.offset[1]);
-  const RR = P.R * 1.6, g0 = new THREE.Mesh(new THREE.PlaneGeometry(RR * 2.4, RR * 2.4).rotateX(-Math.PI / 2), D ? MAT.urban : MAT.grass); g0.receiveShadow = true; if (D) g0.geometry = romeGround(RR, D); G.add(g0); G.userData.groundMat = g0.material;   // Рим: дворовете и площадите — светъл камък, тревата — само в парковете
+  const RR = P.R * 1.6, g0 = new THREE.Mesh(new THREE.PlaneGeometry(RR * 2.4, RR * 2.4).rotateX(-Math.PI / 2), D ? MAT.urban : MAT.grass); g0.receiveShadow = true; if (D && D.sea) g0.geometry = seaGround(D.sea); else if (D) g0.geometry = romeGround(RR, D); G.add(g0); G.userData.groundMat = g0.material;   // Рим: дворовете и площадите — светъл камък, тревата — само в парковете
   if (P.coastZ) { const sh = new THREE.Shape(); sh.moveTo(-RR * 1.2, -RR * 1.2); for (let i = 0; i <= 80; i++) { const x = -RR * 1.2 + i * RR * 2.4 / 80; sh.lineTo(x, P.coastZ(x)); } sh.lineTo(RR * 1.2, -RR * 1.2); const wg = new THREE.ShapeGeometry(sh); wg.rotateX(Math.PI / 2); const wm = new THREE.Mesh(wg, MAT.water); wm.position.y = 0.02; G.add(wm);
     // бряг: пясъчна ивица по водата и крайбрежна алея до кея; пристанището — кей навътре във водата пред мястото му
     const cl = []; for (let x = -RR * 1.2; x <= RR * 1.2; x += 4) cl.push(x);
@@ -167,9 +184,9 @@ export function buildPlan2View(P, opts = {}) {
   }
   const W = [], As = [], Md = [], Pt = [], Is = [], trees = [], Cb = [];
   if (D) {   // истинската карта: Тибърът (ивица около оста), остров Тиберина, паркове и археологически зони, жп линиите към Термини
-    romeRiver(G, D);
-    const I = D.island, isl = new THREE.Mesh(new THREE.CircleGeometry(1, 32).rotateX(-Math.PI / 2), M(0xb9ad96)); isl.scale.set(I.w / 2, 1, I.d / 2); isl.rotation.y = I.rot; isl.position.set(I.x, 0.06, I.z); G.add(isl);
-    const gm = { park: M(0x6f9e4f), archaeo: M(0xb7b08a) };
+    if (D.sea) seaView(G, D, RR); else romeRiver(G, D);
+    const I = D.island; if (I) { const isl = new THREE.Mesh(new THREE.CircleGeometry(1, 32).rotateX(-Math.PI / 2), M(0xb9ad96)); isl.scale.set(I.w / 2, 1, I.d / 2); isl.rotation.y = I.rot; isl.position.set(I.x, 0.06, I.z); G.add(isl); }
+    const gm = { park: M(0x6f9e4f), archaeo: M(0xb7b08a), cemetery: M(0x7d9468) };
     for (const g of P.greensSrc) { const sh = new THREE.Shape(g.poly.map(([x, z]) => new THREE.Vector2(x, z))); const ge = new THREE.ShapeGeometry(sh); ge.rotateX(Math.PI / 2); const m = new THREE.Mesh(ge, gm[g.kind] || gm.park); m.material.side = THREE.DoubleSide; m.position.y = 0.025; m.receiveShadow = true; G.add(m); }
     const Rl = []; for (const r of D.rail) Rl.push(ribbon(r, 3.2, 0.05)); G.add(merge(Rl, M(0x8c8578)));
   }
