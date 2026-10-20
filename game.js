@@ -941,11 +941,12 @@ function thamesRelocate() {
   S.offers = (S.offers || []).filter(o => !wet.has(o.lot));
   if (map.size) toast(`🌊 Темза: ${map.size} ${map.size === 1 ? 'обект е преместен' : 'обекта са преместени'} от брега на реката на свободни парцели.`, 'good');
 }
+function planViewDone(pv, P) { dayNight.setLamps(pv.userData.lamps); if (feature('hollywood-night') || P.p2) for (const m of pv.userData.nightMats || []) dayNight.winMats.add(m); if (pv.userData.refill) pv.userData.refill(); }
 function buildCity(cityId) {
   city.impCiv = null;   // сградите на Империал Сити (impcivic.js) — заедно със старата група
   if (cityId === NEOM_ID) impPlace();   // 🏙️ Империал Сити: държавата (🇺🇸/🇷🇺) — преди земята и дърветата, иначе остава пустинята на 🇸🇦 (пясък и палми)
   if (city.group) scene.remove(city.group);
-  if (city.planView) { city.planView.traverse(o => { if (o.geometry) o.geometry.dispose(); }); city.planView = null; }   // геометрията на стария план (материалите са общи)
+  if (city.planView) { if (city.planView.userData.dispose) city.planView.userData.dispose(); else city.planView.traverse(o => { if (o.geometry) o.geometry.dispose(); }); city.planView = null; }   // геометрията на стария план (материалите са общи)
   const g = city.group = new THREE.Group();
   scene.add(g); city.lineObj = null;
   const r = rng(hashStr(cityId));
@@ -959,7 +960,7 @@ function buildCity(cityId) {
   // земя (при мегаполисите — по-широка на изток)
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(Math.max(1200, 2 * (tx(NI - 1) + 380)), Math.max(1200, 2 * (tx(NJ - 1) + 300))), new THREE.MeshStandardMaterial({ color: isDesert(cityId) ? 0xd9bf86 : 0x8fb36a, roughness: 1 }));   // Африка — пясък
   if (P && !P.links) P.links = planLinks(P);   // и в мрежата на маршрутите (cityplanroute.js) — ТИР-овете и техниката карат по тях
-  const pv = P && P.p2 ? plan2.view.buildPlan2View(P.p2, { osm: P.p2.osmData, offset: P.offset, termini: !!P.osm, blocks: !!P.osm, ...(P.osm ? plan2Opts(cityId) : {}), stationModel: plan2.models[{ paris: 'lm-lazare2', newyork: 'lm-gc2' }[cityId]] || A['station-big']?.scene, ...(cityId === 'newyork' && plan2.models['lm-gc2'] ? { stationFacing: { face: '-z', depth: 0.8, maxW: 48 } } : {}), fillLot: L2 => { if (!P.osm) return false; const l = city.p2Map && city.p2Map.get(L2.id); return !l || l.busy === 'bg'; },
+  const pv = P && P.p2 ? plan2.view.buildPlan2View(P.p2, { osm: P.p2.osmData, offset: P.offset, termini: !!P.osm, blocks: !!P.osm, ...(P.osm && feature('city-prog') && P.square && P.toPlan ? { progressive: true, focus: P.toPlan(P.square.x, P.square.z) } : {}),   /* поетапно: първо терен и улици около централата */ ...(P.osm ? plan2Opts(cityId) : {}), stationModel: plan2.models[{ paris: 'lm-lazare2', newyork: 'lm-gc2' }[cityId]] || A['station-big']?.scene, ...(cityId === 'newyork' && plan2.models['lm-gc2'] ? { stationFacing: { face: '-z', depth: 0.8, maxW: 48 } } : {}), fillLot: L2 => { if (!P.osm) return false; const l = city.p2Map && city.p2Map.get(L2.id); return !l || l.busy === 'bg'; },
       ...(feature('free-plots') ? { freeLot: L2 => { const l = city.p2Map && city.p2Map.get(L2.id); return !!l && !l.busy && !l.built && !l.reno && !l.under && !l.obj; } } : {}) })   // свободните парцели — празни места с ограда и табела   // Рим: фоновите квартали — върху парцелите, които играта не ползва
     : P ? buildPlanView({ ...P, streets: [...P.streets, ...P.links] }, { size: Math.max(1600, 2 * (tx(NI - 1) + 400)), seg: 170, target: controls.target, lotCount: Math.min(P.lots.length, planCount(P.mega, S.cityExt || 0)),
     seaZ: SEASIDE.includes(cityId) ? tx(0) - TILE / 2 - 2 : null, noFountain: !!CITY_LANDMARKS[cityId], plantProtos: ['pl-bush-0', 'pl-bush-1', 'pl-bush-2', 'pl-flowers'].filter(k => A[k]).map(k => A[k].scene), fountainProto: A['pl-fountain']?.scene, benchProto: A.bench?.scene, treeProtos: Object.keys(A).filter(k => k.startsWith('sf-tree-') || k.startsWith('sf-pine-')).map(k => { const o = A[k].scene; o.userData.pine = k.startsWith('sf-pine-'); return o; }) }) : null;
@@ -980,7 +981,8 @@ function buildCity(cityId) {
   city.osmView = !!(P && P.p2 && P.osm); controls.maxDistance = city.osmView ? 900 : 320; camera.far = city.osmView ? 3200 : 900; camera.updateProjectionMatrix();
   if (!city.osmView && scene.fog) { scene.fog.near = 180; scene.fog.far = 420; }
   osmFog.on = city.osmView;
-  if (P) { dayNight.setLamps(pv.userData.lamps); signals.length = 0; if (feature('hollywood-night') || P.p2) for (const m of pv.userData.nightMats || []) dayNight.winMats.add(m); }   // и планът v2: прозорците на фоновите сгради и светлината на улиците нощем   // надписът HOLLYWOOD свети нощем
+  city.p2Pending = !!(pv && pv.userData.pump && !pv.userData.done);   // поетапният изглед: лампите и нощните материали — когато е готов (frame → planViewDone)
+  if (P) { signals.length = 0; if (!city.p2Pending) planViewDone(pv, P); }   // и планът v2: прозорците на фоновите сгради и светлината на улиците нощем   // надписът HOLLYWOOD свети нощем
   if (!P) {
   // 🌊 Темза: улиците север–юг пресичат реката само на мостовете (през 9 плочки) — между тях водата е непрекъсната
   city.noRoadR = null;
@@ -4559,8 +4561,8 @@ const FLEET_TOP = 60;
 const fleetCap = {
   truck: () => { const ab = new Set(ALL_AB.map(x => x.id)); return Math.min(FLEET_TOP, hwDone().reduce((a, id) => a + (ab.has(id) ? 4 : 2), 0)); },
   train: () => (S.rails || []).filter(r => r.built).reduce((a, r) => a + (r.hs ? 4 : 2), 0),   // потребителят: „за всяка линия по 2 влака: 10 линии → 20, 100 → 200“ — без FLEET_TOP и без коловозите
-  ship: () => Math.min(FLEET_TOP, portBerths(), Object.keys(S.ports || {}).filter(id => portLv(id) > 0).reduce((a, id) => a + (portLv(id) >= portMax(id) ? 4 : 2), 0)),
-  plane: () => Math.min(FLEET_TOP, airGates(), Object.keys(S.airports || {}).filter(id => airLv(id) > 0).reduce((a, id) => a + (airLv(id) >= airportMax(id) ? 4 : 2), 0)),
+  ship: () => portBerths(),   // потребителят: корабите растат с кейовете (нивото на пристанищата + допълнителните кейове), без таван 60
+  plane: () => airGates(),   // самолетите — колкото гейтовете на летищата, без таван 60
 };
 const fleetN = { truck: () => (S.trucks || []).length, train: () => (S.trains || []).length, ship: () => (S.ships || []).length, plane: () => (S.planes || []).length };
 const fleetTxt = k => `${fleetN[k]()}/${fleetCap[k]()}`;
@@ -4936,7 +4938,7 @@ function buyPlane(kind) {
   const home = Object.keys(S.airports || {}).find(id => airLv(id) > 0);
   if (!home) { toast('Първо построй летище.', 'bad'); return; }
   if ((S.planes || []).length >= airGates()) { toast('Няма свободен гейт — надгради летището.', 'bad'); return; }
-  if ((S.planes || []).length >= fleetCap.plane()) { toast(`✈️ Имаш ${fleetTxt('plane')} самолета — всяко летище дава място за 2, летище на максимално ниво — за 4.`, 'bad'); return; }
+  if ((S.planes || []).length >= fleetCap.plane()) { toast(`✈️ Имаш ${fleetTxt('plane')} самолета — колкото са гейтовете на летищата ти. Надгради летище или добави гейтове.`, 'bad'); return; }
   const P = PLANES[kind];
   if (!(S.vouchers || {}).air && !econ.canAfford(P.cost)) { withLoan(P.cost, `Самолет: ${P.nm}`, () => buyPlane(kind)); return; }
   useVoucher('air', P.cost, `първия самолет — подарък от ${subName(S, 'air')}`);
@@ -5922,7 +5924,7 @@ function addRouteShip(r, quiet = false) {
   if (routeShip(r)) return true;
   const kind = firstShipFor(r.km); if (!kind) return false;
   if ((S.ships || []).length >= portBerths()) { if (!quiet) toast('Няма свободен кей за кораба на линията — надгради пристанището.', 'bad'); return false; }
-  if ((S.ships || []).length >= fleetCap.ship()) { if (!quiet) toast(`⚓ Имаш ${fleetTxt('ship')} кораба — всяко пристанище дава място за 2, пристанище на максимално ниво — за 4.`, 'bad'); return false; }
+  if ((S.ships || []).length >= fleetCap.ship()) { if (!quiet) toast(`⚓ Имаш ${fleetTxt('ship')} кораба — колкото са кейовете на пристанищата ти. Надгради пристанище или добави кейове.`, 'bad'); return false; }
   const P = SHIPS[kind]; if (!econ.canAfford(P.cost)) { if (!quiet) toast(`Нямаш ${fmt(P.cost)} € за кораба на линията.`, 'bad'); return false; }
   econ.spend(P.cost, 'покупка', `Кораб за линия ${cityById(r.a).nm} — ${cityById(r.b).nm}: ${P.nm}`);
   S.shipSeq = (S.shipSeq || 0) + 1;
@@ -5949,7 +5951,7 @@ function buyShip(kind) {
   const home = Object.keys(S.ports || {}).find(id => portLv(id) > 0);
   if (!home) { toast('Първо построй пристанище.', 'bad'); return; }
   if ((S.ships || []).length >= portBerths()) { toast('Няма свободен кей — надгради пристанището.', 'bad'); return; }
-  if ((S.ships || []).length >= fleetCap.ship()) { toast(`⚓ Имаш ${fleetTxt('ship')} кораба — всяко пристанище дава място за 2, пристанище на максимално ниво — за 4.`, 'bad'); return; }
+  if ((S.ships || []).length >= fleetCap.ship()) { toast(`⚓ Имаш ${fleetTxt('ship')} кораба — колкото са кейовете на пристанищата ти. Надгради пристанище или добави кейове.`, 'bad'); return; }
   const P = SHIPS[kind];
   if (!(S.vouchers || {}).sea && !econ.canAfford(P.cost)) { withLoan(P.cost, `Кораб: ${P.nm}`, () => buyShip(kind)); return; }
   useVoucher('sea', P.cost, `първия кораб — подарък от ${subName(S, 'sea')}`);
@@ -9322,6 +9324,7 @@ const CITY_STING = { lasvegas: 'assets/local/vegas-elvis.mp3', newyork: 'assets/
 const stingOk = id => !!CITY_STING[id] && /^(localhost|127\.0\.0\.1)$/.test(location.hostname);   // песните са само локално — на сайта не се търсят (без 404)
 function frame() {
   perf.frame();
+  if (city.p2Pending && city.planView) { const pv = city.planView; pv.userData.pump(4); if (pv.userData.done) { city.p2Pending = false; try { planViewDone(pv, city.plan); } catch (e) { console.warn('planView', e); } } }   // поетапното строене на града — до 4 ms на кадър
   if (city.osmView) { const d = camera.position.distanceTo(controls.target); osmFog.near = Math.max(180, d * 0.9); osmFog.far = Math.max(420, d * 2.4 + 200); }   // weather.js я прилага (fogBase)
   if ((++lmLabT % 60) === 0) try { updLmLabels(); } catch (e) { }
   if (lmLabT % 20 === 0) try { updMyBeams(); } catch (e) { myBeams.err = e.message; }
