@@ -95,7 +95,7 @@ import { createConquest } from './conquest.js';
 import { createMapLayers } from './maplayers.js';
 import { applyRoadLook, makeCrosswalks } from './roadlook.js';
 // градски планове: извити улици и парцели покрай тях (cityplan*.js) — само за градовете в S.plans; другите са на мрежата 9×9
-import { gamePlan, planLots, planTiles, planCount } from './cityplangame.js';
+import { gamePlan, planLots, planTiles, planCount, PLAN_CORE, PLAN_EXT, MEGA_LOTS } from './cityplangame.js';
 import { buildPlanView } from './cityplan3d.js';
 import { prepNightFloors } from './nightfloors.js';
 import { loadIndustry } from './industry.js';
@@ -458,7 +458,7 @@ let europe = null;
   for (const n of H2) jobs.push(load(`assets/heavy/houses2/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => HOUSES.splice(HOUSES.indexOf(n), 1)));   // не се зареди → не се строи
   for (const n of GAS_KINDS) jobs.push(load(`assets/heavy/gas/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; }).catch(() => {}));   // бензиностанции (всяка — свое „✓ OK“)
   if (feature('plants-real')) for (const k of ['bush-0', 'bush-1', 'bush-2', 'flowers', 'fountain']) jobs.push(load(`assets/heavy/plants/${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['pl-' + k] = g; }).catch(() => {}));
-  for (const [dir, list] of Object.entries(MODELS)) if (dir !== 'industrial' && dir !== 'construction') for (const n of list) jobs.push(load(`assets/${dir}/${n}.glb`).then(g => { A[dir === 'industrial' ? 'ind-' + n : n] = g; if (dir === 'commercial' || dir === 'commercial2' || n === 'building-type-a' || n === 'building-type-b' || n === 'Building_Medium_2_001') prepNightFloors(g.scene, n);   // Building_Medium_2_001 — Лабораторията → night-nyextra
+  for (const [dir, list] of Object.entries(MODELS)) if (dir !== 'industrial' && dir !== 'construction') for (const n of list) jobs.push(load(`assets/${dir}/${n}.glb`).then(g => { A[dir === 'industrial' ? 'ind-' + n : n] = g; if (dir === 'commercial' || dir === 'commercial2' || n === 'building-type-a' || n === 'building-type-b' || n === 'Building_Medium_2_001' || n === 'Building_Small_1') prepNightFloors(g.scene, n);   // Building_Medium_2_001 — Лабораторията → night-nyextra
     if (n === 'building-type-b') g.scene.traverse(o => { if (o.isMesh && o.material?.name === 'phong1') o.visible = false; }); }));   // бръшлянът на house-b е JPEG без прозрачност → черни петна   // нощем етажите светват (nightfloors.js)
   // истинска строителна техника и коли за трафика (vehmodels.js, Sketchfab)
   jobs.push(loadVehModels(load, A));
@@ -2282,8 +2282,9 @@ function newGame(cityId, brand = null, brandNm = '') {
   if (brandNm) S.brandNm = brandNm;   // името, което играчът си е дал (group.js: brandOf)
   S.foundFirst = 1;   // дъщерните фирми (пътна, жп, морска, авиация) — с ръчно основаване и стартов пакет
   if (params.has('plan') ? params.get('plan') === '1' : !AUTOTEST) S.planAll = feature('road-clean') ? 9 : feature('city-size') ? 8 : feature('la-osm') ? 7 : 6;   // 7: Лос Анджелис по картата (PLAN_TPL7); 6: по-чист център (cityplan opts.clean)   // нова игра — средните и големите градове с план (извити улици); старите записи остават на мрежата   // нов град с план (извити улици); старите записи остават на мрежата
-  if (S.planAll && feature('plan2-game')) S.plan2gen = 1;   // 🏙️ новите градове от 16-те шаблона
+  if (S.planAll && feature('plan2-game')) { S.plan2gen = 1; S.plan2genV = 2; }   // 🏙️ новите градове от 16-те шаблона (V2 — модулите са заредени още в първата сесия)
   if (S.planAll) { const ids = [...PLAN2_CITIES].filter(id => plan2Ready(id)); if (ids.length) S.plan2 = Object.fromEntries(ids.map(id => [id, 1])); }   // и градовете, в които ще отвориш филиал по-късно (switchCity презарежда → plan2Preload)
+  if (S.plan2gen && !plan2.mod) { const s0 = S; plan2Preload(S).then(() => { if (S !== s0) return; if (!plan2.mod) { delete S.plan2gen; delete S.plan2genV; } newGameEnter(brand); }); return; }   // иначе първата сесия строи града по стария план, а след презареждането — по новия (други парцели)
   if (S.plan2 && S.plan2[cityId]) { if (!plan2.data[cityId]) { const s0 = S; plan2Preload(S).then(() => { if (S !== s0) return; if (!plan2.data[cityId]) delete S.plan2; newGameEnter(brand); }); return; } }   // 🇮🇹 Рим по истинската карта — данните първо
   newGameEnter(brand);
 }
@@ -2358,7 +2359,7 @@ function setupWorld() {
   for (const j of S.hwJobs) for (const u of units) if (u.proj && u.proj.seg === j.seg) u.proj = j;
   restoreSpurs();   // собствените участъци (напр. Монтана — София) трябва да са известни, преди да се нарисува пътят в града
   buildCityHighway();
-  { const E = est(); for (const id of E.land) city.lots[id].busy = 'land'; for (const o of E.owned) if (city.lots[o.lot].busy !== 'project') city.lots[o.lot].busy = 'owned'; for (const l of E.listings) city.lots[l.lot].busy = 'listing'; }
+  { const E = est(), L = city.lots; for (const id of E.land) if (L[id]) L[id].busy = 'land'; for (const o of E.owned) if (L[o.lot] && L[o.lot].busy !== 'project') L[o.lot].busy = 'owned'; E.listings = E.listings.filter(l => L[l.lot]); for (const l of E.listings) L[l.lot].busy = 'listing'; }   // парцел, който го няма в този град (стар запис / градът мина на истинска карта) — пропуска се, вместо грешка при влизане
   for (const id of rivals.busyLots()) if (city.lots[id] && !city.lots[id].built) city.lots[id].busy = 'rival';
   restoreSpurs();
   refreshMines3D();   // преди поръчките — площадките на добива пазят парцелите си
@@ -9330,6 +9331,7 @@ if (!AUTOTEST) {
 }
 // 🇮🇹 Рим по истинската карта: данните на плана v2 — преди влизането в града (само ако записът е такъв)
 plan2Adopt(saved);   // старите записи, които още нямат нищо в Рим — новият Рим идва сам
+if (saved && saved.plan2gen && !saved.plan2genV) { delete saved.plan2gen; }   // записите от първите часа на plan2-game (до 2026-10-20): първият град е строен по стария план — остават на него
 await plan2Preload(AUTOTEST ? (() => { try { return JSON.parse(sessionStorage.getItem('stroiAT')); } catch { return null; } })() : saved);
 if (AUTOTEST) {
   const at = sessionStorage.getItem('stroiAT');
