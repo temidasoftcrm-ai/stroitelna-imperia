@@ -311,7 +311,7 @@ export function buildPlan2View(P, opts = {}) {
     const m = new THREE.Matrix4(); F.lamps.forEach(([x, z], i) => pools.setMatrixAt(i, m.makeTranslation(x, 0.15, z))); pools.visible = false; pools.frustumCulled = false; F.FURN.add(pools);
   }
   // Рома Термини (opts.termini): гарата по фасадата към площада (opts.stationModel — моделът на играта, иначе кутия) и перони с навеси и коловози отзад
-  const TL = opts.termini ? P.lots.find(L => L.lm === 'termini' || L.lm === 'sirkeci') : null;   // главната гара: Термини (Рим), Сиркеджи (Истанбул)
+  const TL = opts.termini ? P.lots.find(L => L.lm === 'termini' || L.lm === 'sirkeci' || L.lm === 'saintlazare') : null;   // главната гара: Термини (Рим), Сиркеджи (Истанбул), Сен Лазар (Париж)
   if (TL) G.add(terminiView(TL, opts.stationModel));
   // надписите на картата: водите (Златният рог, Босфорът…, Тибър) и кварталите — спрайтове, отблизо се скриват
   const LB = D && opts.labels !== false ? mapLabels(G, D) : null;
@@ -343,10 +343,7 @@ export function buildPlan2View(P, opts = {}) {
 
 // ---- надписи: [lat, lon, текст, вид] — вид 'w' (вода), 'd' (квартал)
 const LABELS = {
-  istanbul: [[41.0295, 28.9585, 'Златният рог', 'w'], [41.031, 29.012, 'Босфорът', 'w'], [40.995, 28.985, 'Мраморно море', 'w'],
-    [41.0055, 28.977, 'Султанахмет', 'd'], [41.0165, 28.973, 'Еминьоню', 'd'], [41.0195, 28.952, 'Фатих', 'd'], [41.0225, 28.976, 'Каракьой', 'd'], [41.0262, 28.974, 'Галата', 'd'],
-    [41.0335, 28.978, 'Бейоглу', 'd'], [41.0295, 28.95, 'Фенер', 'd'], [41.034, 28.948, 'Балат', 'd'], [41.0365, 28.987, 'Таксим', 'd'], [41.0315, 28.983, 'Джихангир', 'd'],
-    [41.0265, 29.017, 'Ускюдар', 'd'], [40.9905, 29.027, 'Кадъкьой', 'd'], [41.0085, 29.015, 'Харем', 'd'], [41.0125, 28.958, 'Беязът', 'd'], [41.0085, 28.952, 'Аксарай', 'd'], [41.004, 28.959, 'Кумкапъ', 'd']],
+  istanbul: [[41.0295, 28.9585, 'Златният рог', 'w'], [41.031, 29.012, 'Босфорът', 'w'], [40.995, 28.985, 'Мраморно море', 'w']],   // кварталите — от данните (OSM2.istanbul.districts)
   rome: [[41.9, 12.4765, '', ''], [41.8865, 12.4745, 'Тибър', 'w']],
   paris: [[48.8605, 2.3, 'Сена', 'w'], [48.8547, 2.3478, 'о. Сите', 'w'], [48.8517, 2.3567, 'о. Сен Луи', 'w'], [48.8705, 2.3655, 'канал Сен Мартен', 'w']],
 };
@@ -364,7 +361,7 @@ function labelSprite(text, kind) {
 function mapLabels(G, D) {
   const K = D.k, at = (la, lo) => [(lo - D.center[1]) * Math.cos(D.center[0] * Math.PI / 180) * 111320 * K, -(la - D.center[0]) * 110540 * K], out = [];
   for (const [la, lo, text, kind] of LABELS[D.style || 'rome'] || []) { if (!text) continue; const [x, z] = at(la, lo); out.push({ x, z, text, kind }); }
-  for (const d of D.districts || []) { if (d.kind !== 'quarter' && !RIONI_BG[d.nm]) continue; const xs = d.poly.map(p => p[0]), zs = d.poly.map(p => p[1]); out.push({ x: xs.reduce((a, b) => a + b) / xs.length, z: zs.reduce((a, b) => a + b) / zs.length, text: RIONI_BG[d.nm] || arrBg(d.nm), kind: 'd' }); }
+  for (const d of D.districts || []) { if (d.kind !== 'quarter' && !RIONI_BG[d.nm]) continue; const xs = d.poly.map(p => p[0]), zs = d.poly.map(p => p[1]); out.push({ x: d.lab ? d.lab[0] : xs.reduce((a, b) => a + b) / xs.length, z: d.lab ? d.lab[1] : zs.reduce((a, b) => a + b) / zs.length, text: RIONI_BG[d.nm] || arrBg(d.nm), kind: 'd' }); }
   const grp = new THREE.Group(); G.add(grp);
   const L = out.map(o => { const sp = labelSprite(o.text, o.kind); sp.position.set(o.x, o.kind === 'w' ? 6 : 30, o.z); grp.add(sp); return { sp, ...o }; });
   return { list: L, update(cam) {   // размерът — постоянен на екрана (по разстоянието); отблизо (под ~140 м) кварталите се крият, водите остават

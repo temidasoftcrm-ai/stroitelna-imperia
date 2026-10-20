@@ -119,7 +119,7 @@ function romeLm(L) {
 }
 let put = () => {};
 const ROME_SAVED = await fetch('../assets/plans/rome.json').then(r => r.ok ? r.json() : null).catch(() => null);   // готовият план (без 2–3 s генериране)
-const PARIS_SAVED = await fetch('../assets/plans/paris.json').then(r => r.ok ? r.json() : null).catch(() => null);
+const PARIS_SAVED = await fetch('../assets/plans/paris.json').then(r => r.ok ? r.json() : null).catch(() => null), IST_SAVED = await fetch('../assets/plans/istanbul.json').then(r => r.ok ? r.json() : null).catch(() => null);
 // надпис (спрайт) — за кварталите и котвите
 function tag(text, col = '#fff', h = 18) { const c = document.createElement('canvas'), g = c.getContext('2d'); g.font = 'bold 44px system-ui'; c.width = Math.ceil(g.measureText(text).width) + 30; c.height = 64; g.font = 'bold 44px system-ui';
   g.fillStyle = 'rgba(20,22,27,0.72)'; g.fillRect(0, 0, c.width, 64); g.fillStyle = col; g.textBaseline = 'middle'; g.fillText(text, 15, 34); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
@@ -170,7 +170,7 @@ function build() {
   if (city) { scene.remove(city); city.traverse(o => { if (o.isInstancedMesh) o.dispose(); if (o.geometry && !o.userData.shared) o.geometry.dispose(); }); }   // InstancedMesh.dispose — буферите на инстанциите
   city = new THREE.Group(); scene.add(city);
   OSMD = OSM2[fam.value] || null;
-  P = fam.value === 'rome' ? (ROME_SAVED ? plan2Load(ROME_SAVED, OSM2.rome) : plan2('rome', { osm: OSM2.rome, size: 'xl' })) : fam.value === 'istanbul' ? plan2('istanbul', { osm: OSM2.istanbul, size: 'xl' }) : fam.value === 'paris' ? (PARIS_SAVED ? plan2Load(PARIS_SAVED, OSM2.paris) : plan2('paris', { osm: OSM2.paris, size: 'xl' })) : plan2('demo', { fam: fam.value, size: size.value, seed: +seed.value || 0 });
+  P = fam.value === 'rome' ? (ROME_SAVED ? plan2Load(ROME_SAVED, OSM2.rome) : plan2('rome', { osm: OSM2.rome, size: 'xl' })) : fam.value === 'istanbul' ? (IST_SAVED ? plan2Load(IST_SAVED, OSM2.istanbul) : plan2('istanbul', { osm: OSM2.istanbul, size: 'xl' })) : fam.value === 'paris' ? (PARIS_SAVED ? plan2Load(PARIS_SAVED, OSM2.paris) : plan2('paris', { osm: OSM2.paris, size: 'xl' })) : plan2('demo', { fam: fam.value, size: size.value, seed: +seed.value || 0 });
   VIEW = buildPlan2View(P, { osm: OSMD, bridgeModels: { bosphorus: A['lm-bosphorus'] }, boatModels: { ferry: A['sh-ferry'], cruise: A['sh-cruise'], tanker: A['sh-tanker'], container: A['sh-container'], small: ['bt-fish', 'bt-sail', 'bt-motor', 'bt-yacht', 'bt-sail', 'bt-fish', 'bt-motor'].map(k => A[k]).filter(Boolean) }, termini: true, stationModel: A['station-big'] || A.station }); city.add(VIEW);
   const trees = [];
   // парцели: очертания + сгради по зона; големите места — свой модел (паркът — дървета)
