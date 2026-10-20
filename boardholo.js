@@ -89,7 +89,7 @@ const HOLO_GLB = {
   'train-s': { parts: [HV + 'trains/gp38.glb', HV + 'trains/boxcar.glb'], size: 0.4 },
   'train-b': { parts: [HV + 'trains/vl82.glb', HV + 'trains/boxcar.glb', HV + 'trains/hopper2.glb'], size: 0.56 },
   bullet: { parts: [HV + 'trains/hsw.glb'], size: 0.56 },
-  'plane-s': { parts: [HV + 'air/regional.glb'], size: 0.3 }, 'plane-b': { parts: [HV + 'air/wide.glb'], size: 0.42 }, plane: { parts: [HV + 'air/a320.glb'], size: 0.38 },
+  'plane-s': { parts: [HV + 'air/regional.glb'], size: 0.3, axis: 'z' }, 'plane-b': { parts: [HV + 'air/wide.glb'], size: 0.42, axis: 'z' }, plane: { parts: [HV + 'air/regional.glb'], size: 0.38, axis: 'z' },   // самолетите: фюзелажът — по X (a320) или по Z (regional, wide; по опашката) (размахът е почти колкото дължината — по размера се объркваше и се виждаше „в носа“)
   'ship-s': { parts: [HV + 'ships/tanker.glb'], size: 0.32 }, 'ship-b': { parts: [HV + 'ships/container.glb'], size: 0.46 },
   'truck-s': { parts: [HV + 'trucks/volvo.glb'], size: 0.26 }, 'truck-b': { parts: [HV + 'trucks/scania.glb'], size: 0.34 },
 };
@@ -98,14 +98,15 @@ const glbCache = {};
 const loadG = url => glbCache[url] = glbCache[url] || new GLTFLoader().loadAsync(url);
 // всяка част — нормализирана: дългата хоризонтална ос по X, основа на y = 0; частите — една след друга, общата дължина = size
 function holoGlb(key, fallback) {
-  const { parts, size } = HOLO_GLB[key], g = new THREE.Group();
+  const { parts, size, axis } = HOLO_GLB[key], g = new THREE.Group();
+  if (axis) { g.rotation.order = 'XYZ'; g.rotation.x = 0.55; }   // самолетът — наклонен към нас: крилата се виждат отгоре, не като черта
   Promise.all(parts.map(loadG)).then(gls => {
     const fill = new THREE.MeshBasicMaterial({ color: CYAN, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }), edge = lineMat(CYAN);
     const geos = gls.map(gl => {
       const src = gl.scene; src.updateMatrixWorld(true); const list = [];
       src.traverse(o => { if (o.isMesh) { const ge = o.geometry.clone(); ge.applyMatrix4(o.matrixWorld); list.push(ge); } });
       const bb = new THREE.Box3(); list.forEach(ge => { ge.computeBoundingBox(); bb.union(ge.boundingBox); });
-      const sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3()), rot = sz.z > sz.x;
+      const sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3()), rot = axis ? axis === 'z' : sz.z > sz.x;
       list.forEach(ge => { ge.translate(-c.x, -bb.min.y, -c.z); if (rot) ge.rotateY(Math.PI / 2); });
       return { list, len: rot ? sz.z : sz.x, h: sz.y };
     });

@@ -4046,8 +4046,8 @@ function hwDonePath(a, b) {
   return result;
 }
 const cityWh = id => ((id === S?.cityId ? S?.whLevel : S?.cities?.[id]?.whLevel) || 0) > 0;
-const hwTrucks = createHwTrucks({ onBuy: () => { if (feature('xp-km')) dev.add(XP_BUY.truck); }, cap: () => fleetCap.truck(), S: () => S, econ: () => econ, sound: n => Sound.play(n), svcAll: () => dev.best() >= 6, toast, modal, fmt, save, cityName: id => cityById(id)?.nm || id, owned: () => ownedCities(), here: () => S.cityId, route: (a, b) => hwDonePath(a, b),
-  hasWh: id => cityWh(id), pop: (k, a, b) => showEventPop(k, a, b), redraw: () => { if (!$('mapScreen').classList.contains('hidden')) drawMap(); }, renderPanel: () => { renderPanel(); if (bigWin) renderBig(); } });
+const hwTrucks = createHwTrucks({ onBuy: () => { if (feature('xp-km')) { if (batchN > 0) batchXp += XP_BUY.truck; else dev.add(XP_BUY.truck); } }, cap: () => fleetCap.truck(), S: () => S, econ: () => econ, sound: n => Sound.play(n), svcAll: () => dev.best() >= 6, toast, modal, fmt, save, cityName: id => cityById(id)?.nm || id, owned: () => ownedCities(), here: () => S.cityId, route: (a, b) => hwDonePath(a, b),
+  hasWh: id => cityWh(id), pop: (k, a, b) => batchN > 0 ? true : showEventPop(k, a, b), redraw: () => { if (!$('mapScreen').classList.contains('hidden')) drawMap(); }, renderPanel: () => { renderPanel(); if (bigWin) renderBig(); } });
 function updateMapTrucks() { if (lodLow()) return; hwTrucks.draw(document.getElementById('truckLayer'), { proj, cityLL: id => { const c = cityById(id); return c && [c.lon, c.lat]; }, k: (mapEU ? 4 : mapWide ? 1.6 : 1) * mapK(), near: mapNear(), inView: p => mapIn(...p) }); }
 function clickCity(id) {
   const c = CITIES.find(q => q.id === id);
@@ -5050,7 +5050,7 @@ function buyPlane(kind) {
   econ.spend(P.cost, 'покупка', `Самолет: ${P.nm}`);
   S.planeSeq = (S.planeSeq || 0) + 1;
   S.planes = [...(S.planes || []), { id: S.planeSeq, kind, nm: `${P.ico} №${S.planeSeq}`, at: home, path: null, km: 0, total: 0 }];
-  toast(`${P.ico} Купи ${P.nm}. Лети сам по авиолиниите ти.`, 'good'); Sound.play('plane'); if (feature('xp-km')) dev.add(XP_BUY.plane); save();
+  toast(`${P.ico} Купи ${P.nm}. Лети сам по авиолиниите ти.`, 'good'); if (!batchN) Sound.play('plane'); if (feature('xp-km')) { if (batchN > 0) batchXp += XP_BUY.plane; else dev.add(XP_BUY.plane); } save();
 }
 // надграждане по стълбицата (витлов → регионален → A320 → A380); B787 се надгражда направо до A380. Само на земята
 const planeNext = k => k === 'wide' ? 'a380' : PLANE_LADDER.includes(k) ? PLANE_LADDER[PLANE_LADDER.indexOf(k) + 1] || null : null;   // товарният не се надгражда
@@ -6064,7 +6064,8 @@ function buyShip(kind) {
   econ.spend(P.cost, 'покупка', `Кораб: ${P.nm}`);
   S.shipSeq = (S.shipSeq || 0) + 1;
   S.ships = [...(S.ships || []), { id: S.shipSeq, kind, nm: `${P.ico} №${S.shipSeq}`, at: home, path: null, km: 0, total: 0 }];
-  toast(`${P.ico} Купи ${P.nm}. Плава сам по морските ти линии.`, 'good'); Sound.play('ship'); if (feature('xp-km')) dev.add(['container', 'tanker', 'cruise'].includes(kind) ? XP_BUY.shipBig : XP_BUY.ship); save();
+  toast(`${P.ico} Купи ${P.nm}. Плава сам по морските ти линии.`, 'good'); if (!batchN) Sound.play('ship'); if (feature('xp-km')) { const x = ['container', 'tanker', 'cruise'].includes(kind) ? XP_BUY.shipBig : XP_BUY.ship; if (batchN > 0) batchXp += x; else dev.add(x); } save();
+  if (batchN > 0) return;   // партида (бордът): без картинка за всеки кораб
   showEventPop('ship-' + shipPic(kind), `${P.ico} Нов ${P.nm.toLowerCase()}!`, `${P.cargo} · ~${fmt(shipDaily(kind))} €/ден чисто${P.range ? ` · обсег ${fmt(P.range)} км` : ''}. Плава сам по морските ти линии.`);
 }
 // флот: продажба (60% от цената) и надграждане до следващия клас (новата цена минус 60% от старата)
@@ -8655,7 +8656,7 @@ function boardProposals0() {
       needsGear: hwMissing().length ? `първо пътна техника (${hwMissingTxt().replace('Нямаш: ', '')})` : '', geo: a => geoOf('route', a.flatMap(x => [x.a, x.b]), a.slice(0, 2).map((x, i) => [i * 2, i * 2 + 1])) });
     const L = abUpList(); P({ dir: 'hw', ico: '🔴', key: 'abup', items: L, cost: () => 0, run: o => abUpgrade(o.c.id), text: a => `Предлагам да надградим ${pl(a.length, 'коридор', 'коридора')} в аутобани (${a.slice(0, 3).map(o => o.c.nm).join(', ')}${a.length > 3 ? '…' : ''}) — държавна поръчка за половин срок.`,
       why: 'по-висок тол и по-бързи ТИР-ове', days: a => 30 / hwSpeedMul(), goal: a => `${pl(a.length, 'коридор е аутобан', 'коридора са аутобани')}`, track: a => ({ k: 'seg', ids: a.flatMap(o => o.segs.map(x => x.id)) }) });
-    const tr = Math.max(0, fleetCap.truck() - fleetN.truck());
+    const tr = Math.min(TRAIN_BATCH, Math.max(0, fleetCap.truck() - fleetN.truck()));   // по една партида (до 50) на предложение
     P({ dir: 'hw', ico: '🚚', key: 'trucks', items: Array.from({ length: tr }, (_, i) => i), cost: () => hwTrucks.TRUCK.cost, run: () => hwTrucks.buy(), text: a => `Мрежата позволява още ${pl(a.length, 'ТИР', 'ТИР-а')} (лимит ${fleetCap.truck()}). Предлагам да ${gi(a.length)} купя.`,
       why: 'превозите по нашите магистрали носят пари всеки ден, а тол таксите остават у нас', days: () => 1, gainTxt: a => `${a.length * hwTrucks.TRUCK.cap} т товар на курс между градовете`, goal: a => `+${pl(a.length, 'ТИР', 'ТИР-а')}`, track: a => ({ k: 'count', what: 'truck', target: fleetN.truck() + a.length }) }); }
   // ━━ 🚆 ЖП: линии, влакове, гари, „Стрела“, надграждане на влаковете, преки връзки, отклонения
@@ -8689,7 +8690,7 @@ function boardProposals0() {
     P({ dir: 'air', ico: '✈️', key: 'new', items: own.filter(id => cityById(id) && airportMax(id) > 0 && !airLv(id) && !airportOf(id)?.build).slice(0, 10), cost: id => amL(AIRPORT_LEVELS[0], id, 'air').cost, run: id => buildAirport(id),
       text: a => `${pl(a.length, 'наш град няма', 'наши града нямат')} летище (${list(a)}). Предлагам да ${gi(a.length)} построя.`, why: 'туристи и бизнес — и по-високата заетост на хотелите', days: () => AIRPORT_LEVELS[0].days || 20, income: a => a.length * planeDaily('narrow'),
       goal: a => `${pl(a.length, 'ново летище', 'нови летища')}`, track: a => ({ k: 'air', ids: a, base: Object.fromEntries(a.map(id => [id, 0])) }), geo: a => geoOf('airport', a) });
-    const plN = Math.max(0, Math.min(fleetCap.plane(), airGates()) - fleetN.plane());
+    const plN = Math.min(TRAIN_BATCH, Math.max(0, Math.min(fleetCap.plane(), airGates()) - fleetN.plane()));   // без таван 60 гейтовете са стотици (×877 забиваше залата) — по една партида
     P({ dir: 'air', ico: '🛩️', key: 'planes', items: Array.from({ length: plN }, (_, i) => i), cost: () => PLANES.narrow.cost, run: () => buyPlane('narrow'), text: a => `Има свободни гейтове за ${pl(a.length, 'самолет', 'самолета')}. Предлагам ${a.length === 1 ? 'теснофюзелажен пътнически самолет' : `${a.length} теснофюзелажни пътнически самолета`}.`,
       why: 'гейтовете стоят празни', days: () => 0, income: a => a.length * planeDaily('narrow'), goal: a => `+${pl(a.length, 'самолет', 'самолета')}`, track: a => ({ k: 'count', what: 'plane', target: fleetN.plane() + a.length }) });
     const free = Math.max(0, maxRoutes() - (S.airRoutes || []).length), from = Object.keys(S.airports || {}).filter(id => airLv(id) > 0), cand = [];
@@ -8704,7 +8705,7 @@ function boardProposals0() {
     P({ dir: 'sea', ico: '🏗️', key: 'new', items: own.filter(id => cityById(id) && portMax(id) > 0 && !portLv(id) && !portOf(id)?.build).slice(0, 10), cost: id => amL(PORT_LEVELS[0], id, 'port').cost, run: id => buildPort(id),
       text: a => `${pl(a.length, 'крайбрежен град няма', 'крайбрежни града нямат')} пристанище (${list(a)}). Предлагам да ${gi(a.length)} построя.`, why: 'корабите носят най-големия товар', days: () => PORT_LEVELS[0].days || 15, income: a => a.length * shipDaily('container'),
       goal: a => `${pl(a.length, 'ново пристанище', 'нови пристанища')}`, track: a => ({ k: 'port', ids: a, base: Object.fromEntries(a.map(id => [id, 0])) }), geo: a => geoOf('port', a) });
-    const sp = Math.max(0, Math.min(fleetCap.ship(), portBerths()) - fleetN.ship());
+    const sp = Math.min(TRAIN_BATCH, Math.max(0, Math.min(fleetCap.ship(), portBerths()) - fleetN.ship()));   // без таван 60 кейовете са стотици — по една партида
     P({ dir: 'sea', ico: '🚢', key: 'ships', items: Array.from({ length: sp }, (_, i) => i), cost: () => SHIPS.container.cost, run: () => buyShip('container'), text: a => `Има свободни кейове за ${pl(a.length, 'кораб', 'кораба')}. Предлагам ${a.length === 1 ? 'контейнеровоз' : `${a.length} контейнеровоза`}.`,
       why: 'кейовете стоят празни', days: () => 0, income: a => a.length * shipDaily('container'), goal: a => `+${pl(a.length, 'кораб', 'кораба')}`, track: a => ({ k: 'count', what: 'ship', target: fleetN.ship() + a.length }) });
     const free = Math.max(0, maxSeaRoutes() - (S.seaRoutes || []).length), from = Object.keys(S.ports || {}).filter(id => portLv(id) > 0), cand = [];
