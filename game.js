@@ -1290,7 +1290,7 @@ function buildHQ() {
   if (away) parkingLines(g, 4, 2, -5.5);   // гаражът се изнесе: още места за бусовете на бригадите
   // офис (задният ляв ъгъл)
   let office;
-  const style = level >= STYLE_LV && S.officeStyle ? OFFICE_STYLES.find(x => x.id === S.officeStyle && (x.lm || x.sf || A[x.model])) : null;
+  const sid = S.officeStyle || officeAutoStyle(), style = level >= STYLE_LV && sid ? OFFICE_STYLES.find(x => x.id === sid && (x.lm || x.sf || A[x.model])) : null;
   city.hqLm = null;
   if (style) {   // избран облик на кулата (officestyle.js): модел от пакета или процедурна кула
     const o = buildOfficeTower(style, { model, fitScale, A }, 6.5 + level * 0.25);
@@ -3066,16 +3066,20 @@ function hqCard(kind) {
 }
 // облик на офиса-кула: от ниво STYLE_LV избираш небостъргача (за всеки град поотделно)
 let styleOpen = false;   // списъкът с облици е разгънат
+// облик на кулата по подразбиране — случаен за всеки град (постоянен — по името на града), докато играчът не избере (Лабораторията → office-random)
+const officeStylesOk = () => OFFICE_STYLES.filter(x => x.id !== 'std' && (x.lm || x.sf || A[x.model]));
+function officeAutoStyle() { if (!feature('office-random') || !S) return null; const L = officeStylesOk(); return L.length ? L[hashStr('ostyle:' + S.cityId) % L.length].id : null; }
 function officeStyleHtml() {
-  const lv = S.officeLevel || 1, cur = S.officeStyle || 'std';
-  if (S.officeStyle && !styleOpen) { const x = OFFICE_STYLES.find(q => q.id === cur); return `<div class="row" style="margin-top:8px"><span class="meta" style="margin:0">🏙️ Облик: <b style="color:var(--txt)">${x ? x.nm : cur}</b></span><button class="btn2" id="bStyleOpen" style="padding:4px 9px;font-size:12px">🔄 Смени</button></div>`; }
+  const lv = S.officeLevel || 1, cur = S.officeStyle || officeAutoStyle() || 'std';
+  if ((S.officeStyle || (lv >= STYLE_LV && officeAutoStyle())) && !styleOpen) { const x = OFFICE_STYLES.find(q => q.id === cur); return `<div class="row" style="margin-top:8px"><span class="meta" style="margin:0">🏙️ Облик: <b style="color:var(--txt)">${x ? x.nm : cur}</b></span><button class="btn2" id="bStyleOpen" style="padding:4px 9px;font-size:12px">🔄 Смени</button></div>`; }
   if (lv < STYLE_LV) return `<div class="meta" style="margin-top:8px">🏙️ От ниво ${STYLE_LV} („${OFFICE_LEVELS[STYLE_LV - 1].nm}“) можеш да си избереш облика на кулата.</div>`;
   const list = OFFICE_STYLES.filter(x => x.id === 'std' || x.lm || x.sf || A[x.model]);
   return `<div class="sect" style="margin-top:10px">🏙️ Облик на кулата · смяна ${fmt(STYLE_COST)} €</div>
-    <div style="display:flex;flex-wrap:wrap;gap:5px">${list.map(x => `<button class="btn2" data-ostyle="${x.id}" title="${x.ds || ''}" style="padding:5px 8px;font-size:12px;${x.id === cur ? 'background:var(--acc);color:#1a1200;border-color:var(--acc)' : ''}" ${x.id !== cur && !econ.canAfford(STYLE_COST) ? 'disabled' : ''}>${x.ico} ${x.nm}</button>`).join('')}</div>`;
+    <div style="display:flex;flex-wrap:wrap;gap:5px">${feature('office-random') ? `<button class="btn2" data-ostyle="__rnd" title="Случаен облик (различен от сегашния)" style="padding:5px 8px;font-size:12px" ${!econ.canAfford(STYLE_COST) ? 'disabled' : ''}>🎲 Случаен</button>` : ''}${list.map(x => `<button class="btn2" data-ostyle="${x.id}" title="${x.ds || ''}" style="padding:5px 8px;font-size:12px;${x.id === cur ? 'background:var(--acc);color:#1a1200;border-color:var(--acc)' : ''}" ${x.id !== cur && !econ.canAfford(STYLE_COST) ? 'disabled' : ''}>${x.ico} ${x.nm}</button>`).join('')}</div>`;
 }
 function setOfficeStyle(id) {
-  if ((S.officeStyle || 'std') === id) return;
+  if (id === '__rnd') { const cur = S.officeStyle || officeAutoStyle(), L = officeStylesOk().filter(x => x.id !== cur); if (!L.length) return; id = L[Math.floor(Math.random() * L.length)].id; }
+  if ((S.officeStyle || officeAutoStyle() || 'std') === id) return;
   if (!econ.canAfford(STYLE_COST)) { toast('Нямаш пари за преустройството.', 'bad'); return; }
   econ.spend(STYLE_COST, 'покупка', 'Нов облик на офиса');
   S.officeStyle = id; styleOpen = false; buildHQ(); poofAt(city.hq.x, city.hq.z); Sound.play('buy');
@@ -4037,7 +4041,8 @@ const openSettingsUI = () => window.__settings ? window.__settings({ credits: sh
 { const b = document.createElement('button'); b.id = 'btnGlobe'; b.className = 'btn2'; b.innerHTML = '🌍 Глобус'; b.title = 'Твоята империя върху глобуса';
   b.onclick = () => { if (!S) return; const ex = document.getElementById('globeView'); if (ex) { ex.querySelector('#globeClose').click(); return; } openGlobe(globeData()); };
   $('btnMapToggle').parentNode.insertBefore(b, $('btnMapToggle')); }
-const conquest = createConquest({ cities: () => CITIES.map(c => c.id), contOf: id => contOf(id)?.key || null, conts: () => CONTS, countries: () => COUNTRIES, isFinished: id => !!econ && econ.isFinished(id), hwSegs: () => allSegs(), abSegs: () => ALL_AB, hwDone: () => hwDone(), portMax: id => portMax(id), portLv: id => portLv(id), airMax: id => airportMax(id), airLv: id => airLv(id), modal: (t, h, b) => modal(t, h, b) });
+// завладяването: „само летище“ (Инчхон, Йокохама, Манила) и Империал Сити не се превземат — не се броят
+const conquest = createConquest({ cities: () => CITIES.filter(c => !AIR_ONLY.has(c.id) && c.id !== NEOM_ID).map(c => c.id), contOf: id => contOf(id)?.key || null, conts: () => CONTS, countries: () => COUNTRIES, isFinished: id => !!econ && econ.isFinished(id), hwSegs: () => allSegs(), abSegs: () => ALL_AB, hwDone: () => hwDone(), portMax: id => portMax(id), portLv: id => portLv(id), airMax: id => airportMax(id), airLv: id => airLv(id), modal: (t, h, b) => modal(t, h, b) });
 { const b = document.createElement('button'); b.id = 'btnConquest'; b.className = 'btn2'; b.innerHTML = '🏆 Завладяване'; b.title = 'Колко % от всеки континент е твой';
   b.onclick = () => { if (S) conquest.open(); };
   $('btnGlobe').parentNode.insertBefore(b, $('btnGlobe')); }
@@ -4448,6 +4453,7 @@ function trainHome() {
 function trainShopHtml() {
   const can = totalTracks() > (S.trains || []).length;
   if (!can) return `<div class="meta late">🚆 Влакове ${(S.trains || []).length}/${totalTracks()} — всички коловози са заети. Надгради гарите (таб „Офис“), за да купиш още.</div>`;
+  if ((S.trains || []).length >= fleetCap.train()) return `<div class="meta late">🚆 Влакове ${fleetTxt('train')} — всяка готова жп линия дава място за 2 влака, модернизираната за 4 (общо за всички континенти). Построй или модернизирай линия, за да купиш още.</div>`;   // същото правило като buyTrain — иначе бутонът се вижда, а покупката отказва
   const home = trainHome();
   if (!home.ok) return `<div class="meta late">🚉 На ${CONT_NM[home.k] || 'този континент'} още нямаш гара${home.id ? ` — построй в ${cityById(home.id).nm} (таб „Офис“ → Гара)` : ''}. Влаковете не минават през морето.</div>${home.id ? `<div class="row" style="justify-content:flex-end"><button class="btn" data-goto="${home.id}">🚉 Към ${cityById(home.id).nm}</button></div>` : ''}`;
   const lad = L => `<div style="display:flex;gap:6px;align-items:flex-end;justify-content:space-between;margin:4px 0 8px;flex-wrap:wrap">${L.map((k, i) => { const T = TRAIN_TYPES[k]; return `<div style="text-align:center;flex:1;min-width:90px">${trainImg(k, 44)}<div class="meta" style="margin:2px 0 0"><b style="color:var(--txt)">${i + 1}. ${T.nm}</b><br>${T.wagons} ваг.${T.minKm ? ` · над ${fmt(T.minKm)} км` : ''}<br>${i ? `⬆️ +${fmt(upCost(TRAIN_TYPES[L[i - 1]], T))} €` : `${fmt(T.cost)} €`}</div></div>`; }).join('<div style="align-self:center;color:var(--mut)">→</div>')}</div>`;
@@ -8204,7 +8210,7 @@ function boardProposals() {
     cost: (o, i) => { const c = ECON.BRANCH_COST(o.id, brN() + i); return c + branchExtra(o.id, c); }, run: o => openBranchNow(o.id), text: a => `Предлагам да открием ${pl(a.length, 'нов филиал', 'нови филиала')}: ${list(a.map(o => o.id))}.`,   // цената расте след всяко отваряне
     why: 'нови пазари — всеки град носи поръчки и после пари, докато не си там', days: () => 1, income: a => a.length * brIncome(),
     goal: a => `${pl(a.length, 'нов филиал работи', 'нови филиала работят')}`, track: a => ({ k: 'branch', ids: a.map(o => o.id) }), geo: a => geoOf('branch', a.map(o => o.id)) });
-  { const sh0 = garShort(), gb = garBuyable(), sh = { ...sh0, total: gb.n, costNow: gb.cost }; if (gb.full && hasSub('con') && !gb.n) out.push({ id: `con:garfull:${gb.full}`, dir: 'con', ico: '🏢', text: `Липсват ${pl(gb.full, 'машина или бригада', 'машини и бригади')}, но офисът или гаражът са пълни. Предлагам първо да ги разширим.`, why: 'без място не може да се купи нова техника', cost: 0, count: 1, days: 0, gainTxt: 'после купувам липсващото', noAuto: true, apply: () => openBig('garage') });
+  { const sh0 = garShort(), gb = garBuyable(), sh = { ...sh0, total: gb.n, costNow: gb.cost }; if (gb.full && hasSub('con') && !gb.n) out.push({ id: `con:garfull:${gb.full}`, dir: 'con', ico: '🏢', text: `Липсват ${pl(gb.full, 'машина или бригада', 'машини и бригади')}, но офисът или гаражът са пълни. Предлагам първо да ги разширим.`, why: 'без място не може да се купи нова техника', cost: 0, count: 1, days: 0, gainTxt: 'после купувам липсващото', noAuto: true, apply: () => { garGrow(); for (const [id, kind] of garShort().full) if (id === S.cityId) upgGo(id, kind, true); } });
     if (sh.total && hasSub('con')) out.push({ id: `con:gear:${sh.total}`, dir: 'con', ico: '🚜', text: `${sh.total === 1 ? 'Липсва' : 'Липсват'} ${pl(sh.total, 'машина или бригада', 'машини и бригади')} за обектите. Предлагам да ${sh.total === 1 ? 'я' : 'ги'} купя.`, why: 'обектите стоят и срокът тече', cost: sh.costNow, count: sh.total, days: 2, income: 0, gainTxt: 'обектите тръгват отново',
     goal: 'Обектите имат нужната техника', track: { k: 'gear' }, apply: () => garBuyShort(null, true, true) }); }
   // 🏛️ поръчката на общината (muniorders.js — градовете по истинската карта): Ивайло предлага да я поемем
@@ -9606,6 +9612,7 @@ if (AUTOTEST) {
       return 'no-oe'; },
     resortCam(px, py, pz, tx, ty, tz) { if (!hwv || !hwv.cam) return false; hwv.cam.position.set(px, py, pz); hwv.ctl.target.set(tx, ty, tz); hwv.ctl.update(); return true; },
     conquest() { return conquest.stats(); },
+    conqGaps() { return CITIES.filter(c => AIR_ONLY.has(c.id) || c.id === NEOM_ID || !COUNTRIES.some(k => k.cities.includes(c.id))).map(c => ({ id: c.id, air: airportMax(c.id), port: portMax(c.id), cont: contOf(c.id)?.key || 'eu', inCountry: COUNTRIES.some(k => k.cities.includes(c.id)) })); },   // тест: градове, които директорите не могат да превземат (само летище, Империал Сити, без държава)
     globeTest() { const d = globeData(); openGlobe(d); return { won: d.stats, partial: d.partial.size, cities: d.cities.length }; },
     airTowerLook(lv = 7) { __dbg.airLook(lv); const g = city.airport?.group; if (!g) return null; g.updateMatrixWorld(true); let b = null; g.traverse(o => { if (o.isMesh && o.geometry?.type === 'SphereGeometry' && o.geometry.parameters?.radius === 0.6) b = o; }); if (!b) return 'nobeacon'; const v = b.getWorldPosition(new THREE.Vector3()), gp = g.getWorldPosition(new THREE.Vector3()); __dbg.camAt(v.x - 60, 25, v.z + 60, v.x, 10, v.z); return { beacon: [v.x | 0, v.y | 0, v.z | 0], group: [gp.x | 0, gp.y | 0, gp.z | 0] }; },
     addBranches(ids) { S.dev.xp = 260000; S.dev.lv = 10; S.branches = S.branches || []; S.cities = S.cities || {}; for (const id of ids) { if (!S.branches.includes(id)) S.branches.push(id); S.cities[id] = S.cities[id] || { ...newCityState(), left: nowDays() }; } contTick(); return ownedCities().length; },
