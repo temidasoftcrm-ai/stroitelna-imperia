@@ -555,11 +555,14 @@ function niceTree(n, scale) {
   return [pool[(treeN++ * 7 + 3) % pool.length], scale * (sz.max.y - sz.min.y) * (palm ? 1.35 : 1.15)];
 }
 const plazaTree = h => { const sz = sizeOf('tree-large'); return model('tree-large', h / (sz.max.y - sz.min.y)); };   // дърво с височина ~h (по-истинско — niceTree)
+// ⚡ флаг perf-fix (perf-report #4): частите вътре в статичен модел (сграда, дърво) не мърдат — матриците им се смятат веднъж,
+// не на всеки кадър (~30 хил. обекта в голям град). Коренът остава подвижен (позиция, завъртане, мащаб от кода).
+const freezeKids = o => { if (!feature('perf-fix')) return o; o.traverse(c => { if (c !== o && !c.isSkinnedMesh && !c.isBone) { c.updateMatrix(); c.matrixAutoUpdate = false; } }); return o; };
 function model(n, scale = 1, shadow = true) {
   let rot = null;
   if (n === 'tree-large' || n === 'tree-small') { const t = niceTree(n, scale); if (t) { n = t[0]; scale = t[1]; rot = treeN * 2.39; } }
   const V = A[n].variants, o = (V ? V[(model.k = (model.k || 0) + 1) % V.length] : A[n].scene).clone(true);   // одобрените варианти (полиция, пожарни, линейки) се редуват
-  if (rot != null) o.rotation.y = rot;
+  if (rot != null) { o.rotation.y = rot; freezeKids(o); }   // дърво
   o.scale.setScalar(scale); o.userData.src = n;
   o.traverse(m => { if (m.isMesh) { m.castShadow = shadow; m.receiveShadow = true; } });
   return o;
@@ -1164,6 +1167,7 @@ function placeBuilding(lot, n, rot = 0) {
       o.add(pn);
     }
   }
+  freezeKids(o);   // след соларните панели
   lot.built = n; lot.obj = o;
   return o;
 }
@@ -6519,8 +6523,9 @@ function garGrow(quiet = false) {
 // праща техниката от градовете без работа (до 3 дни път), разширява пълните сгради и купува останалото веднага на място.
 // Не взима от град, който работи (иначе машините обикалят напред-назад и всеки път се плаща транспорт).
 const garAutoOn = () => S.garAutoOn !== false;
-function garAutoTick() {
+function garAutoTick(force) {
   if (!garAutoOn()) return;
+  if (!force && S.day % 3) return;   // разпределението на техниката е скъпо (~260 ms при голяма игра) — веднъж на 3 игрови дни (perf-report)
   const idleCity = id => id !== S.cityId && !garCity(id).projects?.length && !garCity(id).autoJobs?.length;
   for (const m of garPlan()) if (idleCity(m.from) && garDays(m.from, m.to) <= 3) garMove(m.t, m.from, m.to, m.n, true);
   garGrow(true);
