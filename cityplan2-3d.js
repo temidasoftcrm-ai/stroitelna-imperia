@@ -3,7 +3,7 @@
 // спирки) и „фоновите“ римски квартали (фасади с керемидени покриви — за парцелите, които играта не ползва).
 // БЕЗ сградите по парцелите — тях ги слага играта (или демото lab/plan2-3d.html). Всичко е слято или инстанцирано.
 // buildPlan2View(P, opts) → THREE.Group; userData: { update(dt, { camera, signals }), setNight(on), refill(), lamps, groundMat, nightMats, blocks, dispose() }
-// opts: { osm (данните от cityplan2-osm.js — за Рим), offset: [ox, oz] (изместване към рамката на играта), fillLot(lot) → bool,
+// opts: { osm (данните от cityplan2-osm.js — за Рим), offset: [ox, oz] (изместване към рамката на играта), fillLot(lot) → bool, freeLot(lot) → bool (свободен за строеж — трева, ограда, табела),
 //         blocks: true (фоновите квартали в Рим), furniture: true, lampGlow: true (собствени светли петна под фенерите) }
 import * as THREE from 'three';
 
@@ -382,7 +382,9 @@ export function buildPlan2View(P, opts = {}) {
   const BT = D && D.sea && opts.boats !== false ? seaTraffic(G, D, opts.boatModels || {}) : null;   // Истанбул: фериботи по линиите, кораби по Босфора, лодки в Златния рог
   // фоновите римски квартали — фасади с покриви (за парцелите, които играта не ползва: opts.fillLot)
   const BL = D && opts.blocks !== false ? romeBlocks(G, P, D.style) : null;
-  const refill = () => { if (BL) BL.fill(opts.fillLot || (() => true)); };
+  // свободните парцели (истинската карта): трева с пръст, ниска ограда отзад и отстрани, табела „Продава се“ откъм улицата — не голо бежово (opts.freeLot)
+  const FP = D && opts.freeLot ? freePlots(G, P) : null;
+  const refill = () => { if (BL) BL.fill(opts.fillLot || (() => true)); if (FP) FP.set(opts.freeLot); };
   refill();
   let sigT = 0;
   const off = opts.offset || [0, 0];
@@ -393,6 +395,7 @@ export function buildPlan2View(P, opts = {}) {
     // signals — tr.signals() на трафика (traffic.js); camera — дребното се крие отдалеч
     update(dt, o = {}) {
       if (F && o.camera) F.FURN.visible = o.camera.position.y < 420;
+      if (FP && o.camera) FP.near(o.camera.position.y < 260);   // оградите и табелите — само отблизо
       if (LB && o.camera) LB.update(o.camera);
       if (BT) BT.update(dt);
       if (!F || !F.SIG.heads || !o.signals || (sigT = (sigT + 1) % 6)) return;
@@ -521,6 +524,35 @@ function romeBlocks(G, P, style) {
       roof.setMatrixAt(i, m.compose(V.set(V.x, V.y + Sc.y / 2, V.z), Q, t === 2 || t === 5 ? Sc.set(Sc.x * (t === 5 ? 0.8 : 1.02), t === 5 ? 3 : 0.6, Sc.z * (t === 5 ? 0.8 : 1.02)) : Sc.set(Sc.x, Math.min(4, Sc.x * RF[t][2]), Sc.z))); }
     parts.forEach(({ box, roof }, t) => { box.count = roof.count = n[t]; box.instanceMatrix.needsUpdate = roof.instanceMatrix.needsUpdate = true; if (box.instanceColor) box.instanceColor.needsUpdate = true; }); };
   return { list, fill(f) { fl = f; draw(); }, hide(set) { hidden = set; draw(); } };
+}
+// ---- свободните парцели: петно трева с пръст (по целия парцел), ниска дървена ограда отзад и отстрани, табела „ПРОДАВА СЕ“ отпред
+// (лицето на парцела е локално +z — към улицата). Инстанции; set(fn) — кои парцели са свободни; near(on) — оградите/табелите само отблизо.
+function freePlots(G, P) {
+  const lots = P.lots.filter(L => !L.big && !L.lm), N = Math.max(1, lots.length);
+  const cv = document.createElement('canvas'); cv.width = cv.height = 128; const g = cv.getContext('2d'); g.fillStyle = '#7d9a55'; g.fillRect(0, 0, 128, 128);
+  for (let i = 0; i < 260; i++) { const x = Math.random() * 128, y = Math.random() * 128, r = 2 + Math.random() * 7; g.fillStyle = Math.random() < 0.35 ? 'rgba(122,98,66,0.55)' : `rgba(${90 + Math.random() * 40 | 0},${120 + Math.random() * 40 | 0},${60 + Math.random() * 20 | 0},0.5)`; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
+  const gt = new THREE.CanvasTexture(cv); gt.colorSpace = THREE.SRGBColorSpace; gt.wrapS = gt.wrapT = THREE.RepeatWrapping;
+  const patch = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: gt, roughness: 1, polygonOffset: true, polygonOffsetFactor: -1 }), N);
+  const fence = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), M(0x8a7458), N * 3);
+  const sc = document.createElement('canvas'); sc.width = 128; sc.height = 64; const s2 = sc.getContext('2d'); s2.fillStyle = '#f4f1ea'; s2.fillRect(0, 0, 128, 64); s2.fillStyle = '#c62828'; s2.fillRect(0, 0, 128, 18); s2.fillStyle = '#fff'; s2.font = 'bold 14px system-ui'; s2.textAlign = 'center'; s2.fillText('ПРОДАВА СЕ', 64, 14);
+  s2.fillStyle = '#2b2b2b'; s2.font = 'bold 20px system-ui'; s2.fillText('ПАРЦЕЛ', 64, 44); s2.strokeStyle = '#c62828'; s2.lineWidth = 3; s2.strokeRect(1.5, 1.5, 125, 61);
+  const st = new THREE.CanvasTexture(sc); st.colorSpace = THREE.SRGBColorSpace;
+  const board = new THREE.InstancedMesh(new THREE.PlaneGeometry(1.6, 0.8), new THREE.MeshStandardMaterial({ map: st, roughness: 0.8, side: THREE.DoubleSide }), N), post = new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, 1.9, 0.1).translate(0, 0.95, 0), M(0x5a5048), N);
+  for (const m of [patch, fence, board, post]) { m.count = 0; m.frustumCulled = false; G.add(m); } patch.receiveShadow = true; fence.castShadow = board.castShadow = true;
+  const T = new THREE.Matrix4(), L4 = new THREE.Matrix4(), O = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), V = new THREE.Vector3(), S3 = new THREE.Vector3(), C = new THREE.Color();
+  const at = (im, i, x, y, z, sx, sy, sz, ry = 0) => { L4.compose(V.set(x, y, z), q.setFromAxisAngle(up, ry), S3.set(sx, sy, sz)); im.setMatrixAt(i, O.multiplyMatrices(T, L4)); };
+  return {
+    set(fn) { let n = 0, nf = 0;
+      for (const L of lots) { if (!fn(L)) continue; T.compose(V.set(L.x, 0, L.z), q.setFromAxisAngle(up, L.rot || 0), S3.set(1, 1, 1));
+        const w = L.w - 0.6, d = L.d - 0.6, h = ((L.id * 2654435761) >>> 0) % 1000 / 1000;
+        at(patch, n, 0, 0.05, 0, w, 1, d); patch.setColorAt(n, C.setHSL(0.24 + h * 0.05, 0.25, 0.8 + h * 0.15));
+        at(fence, nf++, 0, 0, -d / 2, w, 0.7, 0.08); at(fence, nf++, -w / 2, 0, 0, 0.08, 0.7, d); at(fence, nf++, w / 2, 0, 0, 0.08, 0.7, d);   // отзад и отстрани (отпред — отворено към улицата)
+        const sx = (h - 0.5) * w * 0.5; at(post, n, sx, 0, d / 2 - 0.6, 1, 1, 1); at(board, n, sx, 1.75, d / 2 - 0.62, 1, 1, 1);
+        n++; }
+      patch.count = board.count = post.count = n; fence.count = nf;
+      for (const m of [patch, fence, board, post]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; } },
+    near(on) { fence.visible = board.visible = post.visible = on; },
+  };
 }
 function inPoly2(p, poly) { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > p[1]) !== (zj > p[1]) && p[0] < (xj - xi) * (p[1] - zi) / (zj - zi) + xi) c = !c; } return c; }
 const SIG_C = { red: [0xff2a20, 0x2a1210, 0x0f2010], yellow: [0x2a1210, 0xffc020, 0x0f2010], green: [0x2a1210, 0x2a2410, 0x30ff60] }, SC = new THREE.Color();
