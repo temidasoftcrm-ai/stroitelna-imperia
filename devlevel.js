@@ -70,6 +70,7 @@ export function createDevLevel(deps) {
 
   // 🏙️ нивата 21–25: градът изпълни условията (imperial.js) — картинка или известие, както при 1–20
   function cityUp(lv, text) {
+    if (lv > capLv()) { const S = deps.S(); if (S.coopWait == null) S.coopWait = Math.min(lv - 1, best()); deps.toast(`⏳ Ниво ${lv} е готово, но чака партньора (ниво ${capLv()}) — отключванията идват, щом и той стигне`, 'good'); render(); deps.save(); return; }   // coop-lv: и нивата 21+ (imperial.js) чакат партньора
     deps.toast(`🏅 Фирмата е ниво ${lv}! ${text || UNLOCKS[lv] || ''}`, 'good', open);
     if (feature('lv-pics') && LV_PICS.has(lv)) showLevel(lv, text || UNLOCKS[lv] || '');
     else { deps.sound('lvup'); if (deps.pop && !deps.pop(`lv-${lv}`, `🏅 Ниво на развитие ${lv}`, text || UNLOCKS[lv] || '')) deps.pop('empire', `🏅 Ниво на развитие ${lv}`, text || UNLOCKS[lv] || ''); }

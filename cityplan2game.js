@@ -37,7 +37,7 @@ export function gamePlan2(P, o = {}) {
   if (o.count != null) src = src.slice(0, o.count);   // генерираните градове: първите count (по разстояние от центъра) — купените квартали се добавят в края
   const lots = src.map((L, i) => { const [x, z] = sh([L.x, L.z]), zone = L.zone === 'outer' ? 'outer' : L.zone;
     return { id: i, x, z, rot: L.rot, w: L.w, d: L.d, zone, kinds: LOT_KINDS[zone] || LOT_KINDS.mid, street: L.front ? L.front.road : 0,
-      fresh: false, built: null, obj: null, busy: null, mega: false, plan: true, district: L.district, tier: L.tier || 1, reno: L.reserved === 'reno', p2: L.id }; });
+      fresh: false, built: null, obj: null, busy: null, mega: false, plan: true, district: L.district, tier: L.tier || 1, reno: L.reserved === 'reno', under: L.under || null, p2: L.id }; });   // under — под късна забележителност (Св. Патрик): заето
   // централата: най-близкият до площада парцел за строеж (не реставрация) от първото ниво — не се мести при отключване
   let hqLot = 0, bd = 1e18; lots.forEach((L, i) => { if (L.reno || L.tier > 1) return; const d = (L.x - sqx) ** 2 + (L.z - sqz) ** 2; if (d < bd) { bd = d; hqLot = i; } });
   const shA = a => a && { ...a, x: a.x + ox, z: a.z + oz, ...(a.road ? { road: { ...a.road, x: a.road.x + ox, z: a.road.z + oz } } : {}) };

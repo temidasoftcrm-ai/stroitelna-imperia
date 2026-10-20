@@ -17,6 +17,7 @@ import { createCinema } from './cinema.js';
 import { makeStateTenders } from './statetenders.js';
 import { createMuni } from './muniorders.js';
 import { createRescue } from './boardrescue.js';
+import { createMinimap } from './minimap.js';
 import { createRivals, LOCAL_FIRMS, FIRMS } from './rivals.js';
 import { createDevLevel, THRESH as DEV_THRESH, LV as DEV_LV, unlockText } from './devlevel.js';
 import { createCityPanel } from './citypanel.js';
@@ -962,6 +963,10 @@ function buildCity(cityId) {
   ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; ground.receiveShadow = true;
   if (pv) { pv.position.y = 0; g.add(pv); city.planView = pv; } else g.add(ground);
   // градовете по истинската карта са големи: камерата се отдалечава до ~900 (мъглата и далечината — по разстоянието, във frame())
+  // 🗺️ миникартата (флаг minimap) — градовете с плана v2: вода, улици, квартали по нива, твоите обекти; цъкване → камерата отива там
+  if (city.mm) { city.mm.dispose(); city.mm = null; }
+  if (P && P.p2 && feature('minimap')) try { city.mm = createMinimap(P, { parent: document.body, size: 220, tier: P.osm ? plan2Tier() : 5, onJump: (x, z) => { const off = camera.position.clone().sub(controls.target); controls.target.set(x, 0, z); camera.position.set(x + off.x, off.y, z + off.z); } });
+    Object.assign(city.mm.el.style, { right: 'auto', left: '12px', bottom: '12px', zIndex: 6 }); const mm0 = city.mm; setTimeout(() => { try { if (city.mm === mm0) mm0.update({ camera, target: controls.target, marks: [] }); } catch (e) { } }, 300); } catch (e) { console.warn('minimap', e); }
   city.osmView = !!(P && P.p2 && P.osm); controls.maxDistance = city.osmView ? 900 : 320; camera.far = city.osmView ? 3200 : 900; camera.updateProjectionMatrix();
   if (!city.osmView && scene.fog) { scene.fog.near = 180; scene.fog.far = 420; }
   osmFog.on = city.osmView;
@@ -1034,7 +1039,8 @@ function buildCity(cityId) {
   city.center = LMC ? city.lots.filter(l => Math.abs(l.bi - c) <= 2 && Math.abs(l.bj - c) <= 2) : null;
   city.hq.busy = 'hq';
   // Рим по истинската карта: ~60% от парцелите (и всички за реставрация) са чужди — там са римските фонови квартали на 3D изгледа
-  if (P && P.p2 && P.osm) { for (const lot of city.lots) if (!lot.busy && (lot.reno || r() < 0.6)) lot.busy = 'bg'; city.p2Map = new Map(city.lots.map(l => [l.p2, l])); muni.attach(); pv.userData.refill(); muni.draw(THREE); }   // и обществените сгради (muniorders.js) — на мястото на фоновите
+  if (P && P.p2 && P.osm) { for (const lot of city.lots) if (lot.under && !lot.busy && !(S.built || []).some(b => b.lot === lot.id)) lot.busy = 'lm';   // под късна забележителност (Св. Патрик) — заето; ако там вече има твоя сграда, остава
+    for (const lot of city.lots) if (!lot.busy && (lot.reno || r() < 0.6)) lot.busy = 'bg'; city.p2Map = new Map(city.lots.map(l => [l.p2, l])); muni.attach(); pv.userData.refill(); muni.draw(THREE); }   // и обществените сгради (muniorders.js) — на мястото на фоновите
   // готов град: ~60% от парцелите са застроени (според зоната)
   for (const lot of city.lots) {
     if (lot.busy || lot.fresh || cityId === NEOM_ID || (P && P.p2 && P.osm)) continue;   // градът от нулата започва като празна пустиня
@@ -3817,7 +3823,7 @@ const rivals = createRivals({ S: () => S, acquired: id => corp.acquired(id), toa
 // Фаза 7: ниво на развитие (devlevel.js)
 // maxLevel минава през всички градове — пази се до края на текущата задача (картата пита dev.has() стотици пъти на рисуване)
 let maxLevelC = null;
-const dev = createDevLevel({ coopCap: () => { if (!S || !feature('coop-lv')) return null; let p = null; try { p = coop.partnerLv?.() ?? null; } catch { }   /* coop се създава след dev */ if (p == null) { delete S.coopLvFloor; return null; } if (S.coopLvFloor == null) S.coopLvFloor = dev.rawBest(); return Math.max(p, S.coopLvFloor); },   /* 🤝 общото ниво: не над партньора (каквото си имал при свързването — остава) */ impRatio: n => imperial.ratio(n), impLv: () => S?.imp?.lv || 0, impNeed: n => n === 21 ? 'Основи Империал Сити и избери държавата (ниво 19)' : imperial.NEED[n] || '', S: () => S, lvTime: l => playtime.levelTxt(l), playSummary: () => playtime.summaryHtml(), cityName: () => S ? cityName() : '', maxLevel: () => maxLevelC ?? (queueMicrotask(() => { maxLevelC = null; }), maxLevelC = Math.max(S?.dev?.lv || 1, ...Object.values(S?.cities || {}).map(c => c.dev?.lv || 1), holdLv())), toast, sound: n => Sound.play(n), save, modal, pop: (k, a, b) => { if (k === 'lv-5' && !S.balkansPop) { S.balkansPop = S.day; return showEventPop('balkans-open', '👑 Балканите са твои!', 'Ниво 5: жп линии и магистрали до Сърбия, Румъния, Гърция, Турция и С. Македония.'); } return showEventPop(k, a, b); }, balkansOpen: () => true });   // първото ниво 5 — „Балканите са твои“
+const dev = createDevLevel({ coopCap: () => { if (!S || !feature('coop-lv')) return null; let p = null, cst = null; try { p = coop.partnerLv?.() ?? null; cst = coop.state?.() ?? null; } catch { }   /* coop се създава след dev */ if (p != null) { S.coopPartnerLv = p; if (S.coopLvFloor == null) S.coopLvFloor = dev.rawBest(); return Math.max(p, S.coopLvFloor); } if (cst && cst.pair?.status !== 'active') { delete S.coopLvFloor; delete S.coopPartnerLv; return null; } /* данните още не са дошли (старт, без връзка) — последното известно ниво на партньора; иначе при всяко презареждане чакането изчезваше */ return S.coopLvFloor != null && S.coopPartnerLv != null ? Math.max(S.coopPartnerLv, S.coopLvFloor) : null; },   /* 🤝 общото ниво: не над партньора (каквото си имал при свързването — остава) */ impRatio: n => imperial.ratio(n), impLv: () => S?.imp?.lv || 0, impNeed: n => n === 21 ? 'Основи Империал Сити и избери държавата (ниво 19)' : imperial.NEED[n] || '', S: () => S, lvTime: l => playtime.levelTxt(l), playSummary: () => playtime.summaryHtml(), cityName: () => S ? cityName() : '', maxLevel: () => maxLevelC ?? (queueMicrotask(() => { maxLevelC = null; }), maxLevelC = Math.max(S?.dev?.lv || 1, ...Object.values(S?.cities || {}).map(c => c.dev?.lv || 1), holdLv())), toast, sound: n => Sound.play(n), save, modal, pop: (k, a, b) => { if (k === 'lv-5' && !S.balkansPop) { S.balkansPop = S.day; return showEventPop('balkans-open', '👑 Балканите са твои!', 'Ниво 5: жп линии и магистрали до Сърбия, Румъния, Гърция, Турция и С. Македония.'); } return showEventPop(k, a, b); }, balkansOpen: () => true });   // първото ниво 5 — „Балканите са твои“
 // ⏱️ изиграно време и кога е достигнато всяко ниво (playtime.js)
 const playtime = createPlaytime({ S: () => S, level: () => dev.best(), speed: () => (AUTOTEST ? 0 : speed) });
 // 💥 фалит: дълъг минус → несъстоятелност (15 дни) → синдикът продава активите; ако не стигнат — край на играта
@@ -5467,11 +5473,11 @@ function lmRiverSpot(k, mem) {
 }
 // Рим по истинската карта: забележителностите — на реалните им места (P.landmarks), вписани в основата си
 // от плана се добавят само тези с правилен модел за града (иначе 'opera' в Париж става операта в Сидни, 'pantheon' — римският)
-const LM_EXTRA = { newyork: new Set(['liberty']), istanbul: new Set(['topkapi', 'bluemosque', 'maiden', 'grandbazaar', 'galata', 'suleymaniye', 'haydarpasa']) };
+const LM_EXTRA = { newyork: new Set(['liberty', 'stpatrick']), istanbul: new Set(['topkapi', 'bluemosque', 'maiden', 'grandbazaar', 'galata', 'suleymaniye', 'haydarpasa']) };
 // истинската височина (м) на високите забележителности — мащабът е по-малкият от основата и височината
-LANDMARK_NM.empire = LANDMARK_NM.empire || 'Емпайър Стейт Билдинг'; LANDMARK_NM.chrysler = LANDMARK_NM.chrysler || 'Крайслер Билдинг';
-const LM_REAL_H = { bigben: 96, londoneye: 135, shard: 310, eiffel: 330, galata: 67, maiden: 23, towerbridge: 65, stpeter: 136, liberty: 93 };
-const LM_ALIAS = { suleymaniye: 'mosque2' }, LM_NOT = new Set(['termini', 'sirkeci', 'saintlazare', 'haydarpasa_st']);   // гарите ги рисува изгледът на града
+LANDMARK_NM.empire = LANDMARK_NM.empire || 'Емпайър Стейт Билдинг'; LANDMARK_NM.stpatrick2 = LANDMARK_NM.stpatrick2 || 'Катедралата „Св. Патрик“'; LANDMARK_NM.chrysler = LANDMARK_NM.chrysler || 'Крайслер Билдинг';
+const LM_REAL_H = { bigben: 96, londoneye: 135, shard: 310, eiffel: 330, galata: 67, maiden: 23, towerbridge: 65, stpeter: 136, liberty: 93, stpatrick: 100 };
+const LM_ALIAS = { suleymaniye: 'mosque2', stpatrick: 'stpatrick2' }, LM_NOT = new Set(['termini', 'sirkeci', 'saintlazare', 'haydarpasa_st']);   // гарите ги рисува изгледът на града
 function landmarkPlan2(kinds) {
   const P = city.plan, box = new THREE.Box3(), sz = new THREE.Vector3();
   // всички забележителности на реалните им места: от списъка на града (вариантите с модел — colosseo3, vittoriano2…) и от плана (Синята джамия, Топкапъ…), ако има модел
@@ -5487,7 +5493,7 @@ function landmarkPlan2(kinds) {
     let s0 = lmFit(k); if (!s0) { const sg = o.group.userData.sign; if (sg) sg.removeFromParent(); box.setFromObject(o.group).getSize(sz); s0 = Math.max(sz.x, sz.z) || 1; if (sg) o.group.add(sg); }   // моделите (GLB) се зареждат после — по основата им, не по временната плоча
     let k0 = Math.max(at.w, at.d) * 0.95 / s0; const hr = LM_REAL_H[k] || LM_REAL_H[k.replace(/\d+$/, '')];
     if (hr) { let h0 = lmH(k); if (!h0) { box.setFromObject(o.group).getSize(sz); h0 = sz.y || 1; } k0 = Math.min(k0, hr * (P.p2.osmData?.k || 0.45) / h0); }   // кулите — и по истинската височина (парцелът на Парламента е 225 м, а моделът е само Биг Бен)
-    o.group.scale.multiplyScalar(k0); if (at.rot) o.group.rotation.y = at.rot; o.group.position.set(at.x, 0.1, at.z);
+    o.group.scale.multiplyScalar(k0); if (at.rot) o.group.rotation.y = at.rot; if (k === 'stpatrick2') o.group.rotation.y += Math.PI / 2;   // дългата ос на модела е z, а на парцела — напреки o.group.position.set(at.x, 0.1, at.z);
     o.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
     city.group.add(o.group); city.landmarks.push(o);
   }
@@ -9228,6 +9234,7 @@ function frame() {
   if (city.osmView) { const d = camera.position.distanceTo(controls.target); osmFog.near = Math.max(180, d * 0.9); osmFog.far = Math.max(420, d * 2.4 + 200); }   // weather.js я прилага (fogBase)
   if ((++lmLabT % 60) === 0) try { updLmLabels(); } catch (e) { }
   if (lmLabT % 20 === 0) try { updMyBeams(); } catch (e) { myBeams.err = e.message; }
+  if (city.mm && lmLabT % 12 === 0) try { const om = !$('mapScreen').classList.contains('hidden'); city.mm.el.style.display = om || hwv ? 'none' : ''; if (!om) city.mm.update({ camera, target: controls.target, marks: [...(city.hq ? [{ x: city.hq.x, z: city.hq.z, kind: 'hq' }] : []), ...(S.built || []).map(b => city.lots[b.lot]).filter(Boolean).map(l => ({ x: l.x, z: l.z, kind: 'own' })), ...projects.map(p => city.lots[p.lot]).filter(Boolean).map(l => ({ x: l.x, z: l.z, kind: 'site' }))] }); } catch (e) { }
   requestAnimationFrame(frame);
   const rdt = Math.min(clock.getDelta(), 0.1);
   const dt = (AUTOTEST ? 1 / 30 * 8 : rdt) * speed;
@@ -9381,6 +9388,7 @@ if (AUTOTEST) {
   window.__dbg = {
     state: () => S,
     muni: () => muni,   // 🏛️ поръчките на общината (тест)
+    mmTest() { if (!city.mm) return 'none'; try { city.mm.update({ camera, target: controls.target, marks: [] }); return 'ok'; } catch (e) { return 'err ' + e.message + ' ' + (e.stack || '').split('\n')[1]; } },
     beams: () => (updMyBeams(), { n: myBeams.mesh && myBeams.mesh.count, vis: myBeams.mesh && myBeams.mesh.visible, err: myBeams.err || null, t: lmLabT }),
     lmLabels() { updLmLabels(); return (city.landmarks || []).map(o => [o.kind, !!o.gold, o.gold && o.gold.position.y | 0]); },   // ✨ тест: златните надписи
     openBig: k => openBig(k), closeBig: () => closeBig(), scene: () => scene,
