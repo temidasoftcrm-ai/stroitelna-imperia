@@ -512,6 +512,7 @@ const GLB_LM = {
   liberty: { h: 22, fit: 13, plate: 0x7d9a6a }, redeemer: { h: 18, fit: 14, plate: 0x6f8f55 }, stbasil: { h: 20, fit: 15, plate: 0xb9b0a3 },
   opera: { h: 30, fit: 40, plate: 0x4f86b8 }, manhattan: { h: 34, fit: 15, grid: true },
   colosseo: { h: 13, fit: 15, plate: 0xb9ad98 },   // Рим: Колизеумът (Carlos.Maciel)
+  maiden2: { h: 10, fit: 15, plate: 0x5d6b78 },   // Истанбул: Момината кула (модел на потребителя, Meshy AI, олекотен 1 млн. → 120 хил. △) — нощем златиста (nightfloors.js 'maiden')
   colosseo3: { h: 13, fit: 15, plate: 0xb9ad98 },   // Рим: Колизеумът от дъгата на Meshy AI (модел на потребителя) — сглобен в Blender в пълен овал, истинските пропорции 190 × 156 × 48 м (feature 'lm-colosseo3')
   sagrada: { h: 17, fit: 15, plate: 0xc9bfa8 },   // Барселона: Саграда Фамилия (vmmaniac)
   bigben2: { h: 30, fit: 8, plate: 0xb8b0a0 },   // Лондон: Биг Бен (Daqian Dong, Poly Pizza; feature 'london-real')
