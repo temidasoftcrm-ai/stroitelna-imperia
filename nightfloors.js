@@ -205,7 +205,8 @@ export function prepNightFloors(root, name) {
                 float hz = clamp((vNfY - uY0) / uH, 0.0, 1.0), lum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
                 vec3 nn = normalize(vNfN); float vt = step(abs(dot(nn, uAx)), 0.3);
                 float crown = clamp((hz - 0.64) * 4.0, 0.0, 1.0), dk = clamp((0.06 - lum) * 14.0, 0.0, 1.0) * vt * step(0.02, hz) * step(hz, 0.68);
-                totalEmissiveRadiance = ((diffuseColor.rgb * 2.6 + 0.1) * vec3(1.0, 0.86, 0.62) * crown + vec3(1.0, 0.75, 0.4) * dk * 1.2) * nNight;
+                vec3 cr = mix(vec3(0.95, 0.82, 0.6), diffuseColor.rgb * 2.6, 0.3);   // короната — почти равно (текстурата на Meshy е на петна), малко от нея за релефа
+                totalEmissiveRadiance = (cr * crown * (0.8 + 0.4 * hz) + vec3(1.0, 0.75, 0.4) * dk * 1.2) * nNight;
               } else if (uGrid > 18.5) {   // Радио Сити: 19 — неонът (цветът на материала; слабо и денем), 20 — стената под таблото (топло), 21 — фасадата топло отдолу, прозорците
                 float hz = clamp((vNfY - uY0) / uH, 0.0, 1.0), lum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
                 vec3 nn = normalize(vNfN); float vt = step(abs(dot(nn, uAx)), 0.3);
@@ -345,7 +346,7 @@ export function prepNightFloors(root, name) {
               }
             #endif`);
       };
-      m.customProgramCacheKey = () => 'nightfloors19' + (mode === 'petro' ? 'p' : '');
+      m.customProgramCacheKey = () => 'nightfloors20' + (mode === 'petro' ? 'p' : '');
       m.needsUpdate = true;
     }
   });
