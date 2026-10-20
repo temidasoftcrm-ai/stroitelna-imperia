@@ -11,6 +11,7 @@
 // sp.byDistrict(rec) → { [квартал]: { lots, share, [k]: брой } }      — за нуждите по квартали
 // sp.release(rec, k, i)                              — освобождава парцелите на сграда (разрушаване)
 // sp.spot(k, lvl, ids) → { x, z, rot, w, d, … }     — мястото върху вече избрани парцели (строеж в ход → serviceSite)
+import { feature } from './lab/feature.js';
 import { SERVICES } from './services.js';
 
 const MAIN = new Set(['blvd', 'quay', 'ring', 'main']);
@@ -74,10 +75,25 @@ export function servicePlacer(gp) {
 }
 
 // 3D слой: всички сгради с парцели (services3d.js buildService) — в групата; update(night) — светлините; dispose()
+// 🏛️ височината по съседите (потребителят: „обществените сгради са твърде ниски до фоновите блокове — трябва да им оправим размерите“):
+// o.blocks = { list: view.userData.blocks ([{ x, z, h }] в координатите на изгледа), off: [ox, oz] } → медианата на блоковете в радиус 70 м;
+// кметство/болница ×1,0, училище/полиция/пожарна ×0,85, другите ×0,9 (services3d: разтягане до ×3,5, отпечатъкът остава)
+const H_NEAR = { hall: 1, hosp: 1, school: 0.85, police: 0.85, fire: 0.85 };
+export function heightNear(blocks, R = 70) {
+  if (!blocks || !blocks.list || !blocks.list.length) return null;
+  const C = 50, grid = new Map(), [ox, oz] = blocks.off || [0, 0];
+  for (const b of blocks.list) { if (!(b.h > 0)) continue; const k = Math.floor((b.x + ox) / C) * 100003 + Math.floor((b.z + oz) / C); (grid.get(k) || grid.set(k, []).get(k)).push(b.x + ox, b.z + oz, b.h); }
+  return (x, z, k) => {
+    const hs = [], i0 = Math.floor((x - R) / C), i1 = Math.floor((x + R) / C), j0 = Math.floor((z - R) / C), j1 = Math.floor((z + R) / C);
+    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { const c = grid.get(i * 100003 + j); if (c) for (let q = 0; q < c.length; q += 3) if (Math.hypot(c[q] - x, c[q + 1] - z) <= R) hs.push(c[q + 2]); }
+    if (hs.length < 4) return null; hs.sort((a, b) => a - b);
+    return hs[hs.length >> 1] * (H_NEAR[k] ?? 0.9);
+  };
+}
 export async function servicesLayer(gp, rec, o = {}) {
   const { buildService } = await import('./services3d.js'), THREE = await import('three');
-  const sp = servicePlacer(gp), group = new THREE.Group(), items = [];
-  for (const s of sp.spots(rec)) { const b = buildService(s.k, s.lvl, { w: s.w, d: s.d }, { seed: s.i + s.k.length, region: o.region || 'eu', outline: !!o.outline, fill: o.fill ?? !!gp.osm, minH: o.minH ?? (gp.osm ? 24 : 0) }); /* истинската карта: обществените сгради — едри, колкото блоковете наоколо (20–40 м) */ b.group.position.set(s.x, 0, s.z); b.group.name = 'svc-' + s.k; b.group.rotation.y = s.rot; group.add(b.group); items.push({ ...s, b }); }
+  const sp = servicePlacer(gp), group = new THREE.Group(), items = [], hNear = feature('svc-height') ? heightNear(o.blocks) : null;
+  for (const s of sp.spots(rec)) { const b = buildService(s.k, s.lvl, { w: s.w, d: s.d }, { seed: s.i + s.k.length, region: o.region || 'eu', outline: !!o.outline, fill: o.fill ?? !!gp.osm, minH: o.minH ?? (gp.osm ? 24 : 0), hAbs: hNear ? hNear(s.x, s.z, s.k) : null }); /* истинската карта: обществените сгради — едри, колкото блоковете наоколо (20–40 м) */ b.group.position.set(s.x, 0, s.z); b.group.name = 'svc-' + s.k; b.group.rotation.y = s.rot; group.add(b.group); items.push({ ...s, b }); }
   return { group, items, setNight: on => items.forEach(it => it.b.setNight(on)), dispose: () => items.forEach(it => it.b.dispose()) };
 }
 

@@ -38,7 +38,7 @@ async function build() {
   rec = rec || seedBase({}, 'x', 1); const t0 = performance.now(); const placed = sp.assign(rec); const ms = performance.now() - t0;
   const used = new Set(); for (const list of Object.values(rec)) for (const b of list) for (const id of b.lots || []) used.add(gp.lots[id].p2);
   VIEW = buildPlan2View(P, { osm: OSM2.rome, offset: gp.offset, fillLot: L => !used.has(L.id) }); scene.add(VIEW);
-  layer = await servicesLayer(gp, rec, { outline: true }); scene.add(layer.group); layer.setNight(night);
+  layer = await servicesLayer(gp, rec, { outline: true, blocks: { list: VIEW.userData.blocks || [], off: [VIEW.position.x, VIEW.position.z] } }); scene.add(layer.group); layer.setNight(night);
   const pop = popOf(3, true, 120, tier, 5), list = cityServices(rec, pop, 'x'), nd = needs(rec, pop, 'x'), noLot = Object.values(rec).flat().filter(b => !b.lots || !b.lots.length).length;
   st.textContent = `Рим · ${TIER_NM.x} · ~${(pop / 1e6).toFixed(1)} млн. жители · ${gp.lots.length} парцела · ${layer.items.length} сгради на ${[...used].length} парцела · разполагане ${ms.toFixed(0)} ms${noLot ? ` · ⚠️ без място: ${noLot}` : ''} · поръчки: ${nd.length}`;
   tb.innerHTML = '<tr><td></td><td class="m">има</td><td class="m">покритие</td><td class="m">кв.</td></tr>' + list.map(s => { const D = new Set(layer.items.filter(it => it.k === s.k).map(it => it.district)); return `<tr><td>${s.ico} ${s.nm}</td><td>${s.built}</td><td>${Math.round(s.cover * 100)}%</td><td class="m">${[...D].slice(0, 3).join(', ')}${D.size > 3 ? '…' : ''}</td></tr>`; }).join('');

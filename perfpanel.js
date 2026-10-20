@@ -60,7 +60,7 @@ export function createPerfPanel(deps) {
       models: mem.models, texMB: Math.round(mem.texMB), geoMB: Math.round(mem.geoMB), gpuGeo: i?.memory.geometries, gpuTex: i?.memory.textures, progs: i?.programs?.length,
       calls: i?.render.calls, tris: i?.render.triangles, heapMB: h == null ? null : Math.round(h), fps: s.fps ? +s.fps.toFixed(1) : null, p95: s.p95 ? +s.p95.toFixed(1) : null };
   }
-  perf.snap = snap; perf.renderer = deps.renderer;   // за опити от конзолата (сенки, pixel ratio)
+  perf.snap = snap; perf.renderer = deps.renderer; perf.A = deps.A;   // за опити от конзолата (сенки, pixel ratio)
   function paint() {
     if (!el) return;
     const s = perf.stats(), x = snap(), ld = deps.loads ? (() => { try { return deps.loads(); } catch { return null; } })() : null;

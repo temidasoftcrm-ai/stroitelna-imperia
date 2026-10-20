@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Каталог на моделите</title>
+<style>
+  :root { --bg:#14161b; --card:#1d2027; --txt:#e8e8ea; --mut:#9aa0aa; --ok:#5fc27a; --bad:#e06a5a; --warn:#e8b14a; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:14px/1.45 system-ui,sans-serif; padding:16px; }
+  h1 { font-size:20px; margin:0 0 4px; } h2 { font-size:16px; margin:22px 0 8px; } .lead { color:var(--mut); margin:0 0 12px; max-width:980px; }
+  .bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0 0 8px; }
+  button, input { background:var(--card); color:var(--txt); border:1px solid #333a45; border-radius:8px; padding:6px 12px; font:inherit; } button { cursor:pointer; } button.on { border-color:#4ea1ff; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:10px; }
+  .it { background:var(--card); border-radius:10px; padding:6px; border:2px solid transparent; }
+  .it.unused { border-color:var(--bad); }
+  .th { width:100%; aspect-ratio:1; border-radius:6px; background:#262a33; display:block; object-fit:contain; }
+  .n { font-weight:600; font-size:12px; margin-top:4px; word-break:break-all; } .m { font-size:11px; color:var(--mut); }
+  .m b { color:var(--ok); font-weight:600; } .m i { color:var(--bad); font-style:normal; font-weight:600; }
+  .note { background:#2a2418; border-left:3px solid var(--warn); padding:8px 12px; border-radius:6px; margin:6px 0; max-width:980px; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script></head><body>
+<h1>📚 Каталог на одобрените модели</h1>
+<p class="lead">Всеки одобрен модел от Лабораторията — по категория: файл, размер, лиценз, автор и къде го ползва играта (файл:ред в кода). С червена рамка — <b>неизползван</b>. Данните — lab/catalog.json (<code>node _source/make-catalog.mjs</code>). Миниатюрите се рисуват тук, когато картата се покаже.</p>
+<div class="bar" id="filt"></div>
+<div id="notes"></div>
+<div id="out"></div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+const C = await fetch('catalog.json').then(r => r.json());
+// категории, в които още се рисуват детски/процедурни модели, макар да има истински (проверено в кода)
+const KIDS = [
+  ['Камиони, техника, строежи', 'Строежът на магистралите (autobahn.js:22, game.js:449) още ползва детските булдозери bulldozer-a/b/c, dump-truck и crane-c — а одобрени са истинските dump.glb, mcrane.glb, excavator.glb.'],
+  ['Полицейски коли', 'Police_SUV в инцидентите (incidents.js:79–94) и по магистралата (hwtraffic.js:32) е детската sf-car-Police_SUV — истинските полицейски коли заместват само Police_Sedan (vehmodels.js EMERG).'],
+  ['Офиси и сгради в центъра', 'Пакетът „city“ (Building_Small_1, Building_Medium_2_001, Building_Large_2) още се зарежда (game.js:450) и е централата в онлайн изгледа (online3d.js:125).'],
+  ['Курорти', 'Детските части на хижите (cabin-*, resortview.js:19) и снежните елхи (tree-snow-*, game.js:446) остават като резерва, когато истинските не са заредени.'],
+];
+const by = {}; for (const it of C.items) (by[it.cat] ||= []).push(it);
+const cats = Object.keys(by); let only = null, unusedOnly = false;
+const f = document.getElementById('filt');
+f.innerHTML = `<button data-c="">Всички (${C.items.length})</button>` + cats.map(c => `<button data-c="${c}">${c} (${by[c].length})</button>`).join('') + `<button id="un">Само неизползваните (${C.items.filter(x => !x.used).length})</button>`;
+f.onclick = e => { const b = e.target.closest('button'); if (!b) return; if (b.id === 'un') unusedOnly = !unusedOnly; else only = b.dataset.c || null; draw(); };
+const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
+function draw() {
+  for (const b of f.querySelectorAll('button')) b.classList.toggle('on', b.id === 'un' ? unusedOnly : (b.dataset.c || null) === only);
+  document.getElementById('notes').innerHTML = KIDS.filter(([c]) => !only || c === only).map(([c, t]) => `<div class="note">🧸 <b>${c}:</b> ${t}</div>`).join('');
+  document.getElementById('out').innerHTML = cats.filter(c => !only || c === only).map(c => { const l = by[c].filter(x => !unusedOnly || !x.used); if (!l.length) return '';
+    return `<h2>${c}</h2><div class="grid">` + l.map(x => `<div class="it ${x.used ? '' : 'unused'}"><img class="th" data-f="../${x.file}" alt="">
+      <div class="n">${esc(x.file.split('/').pop())}</div>
+      <div class="m">${esc(x.title)}</div>
+      <div class="m">${x.size ? (x.size / 1e6).toFixed(2) + ' MB' : '—'} · ${esc(x.licence || 'лиценз?')}${x.author ? ' · ' + esc(x.author) : ''}</div>
+      <div class="m">${x.used ? '<b>ползва се:</b> ' + esc([...x.uses, ...x.flag.map(q => 'флаг ' + q)].slice(0, 4).join(', ')) : '<i>неизползван</i>'}</div></div>`).join('') + '</div>'; }).join('');
+  for (const im of document.querySelectorAll('img.th')) io.observe(im);
+}
+// миниатюри: един рендерер, по една на ред (опашка); резултатът — dataURL в <img>
+const R = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); R.setSize(256, 256); R.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x262a33); scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.6)); const sun = new THREE.DirectionalLight(0xffffff, 1.8); sun.position.set(3, 5, 4); scene.add(sun);
+const cam = new THREE.PerspectiveCamera(35, 1, 0.01, 1e5), loader = new GLTFLoader(), cache = {}, q = []; let busy = false;
+const io = new IntersectionObserver(es => { for (const e of es) if (e.isIntersecting) { io.unobserve(e.target); q.push(e.target); pump(); } }, { rootMargin: '200px' });
+async function pump() {
+  if (busy || !q.length) return; busy = true; const im = q.shift(), u = im.dataset.f;
+  try {
+    const url = cache[u] || (cache[u] = await loader.loadAsync(u).then(g => { const o = g.scene; scene.add(o); const b = new THREE.Box3().setFromObject(o), s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3()), r = Math.max(s.x, s.y, s.z);
+      cam.position.set(c.x + r * 1.1, c.y + r * 0.8, c.z + r * 1.3); cam.lookAt(c); cam.near = r / 100; cam.far = r * 10; cam.updateProjectionMatrix(); R.render(scene, cam); const d = R.domElement.toDataURL('image/jpeg', 0.85); scene.remove(o); return d; }).catch(() => ''));
+    if (url) im.src = url;
+  } finally { busy = false; pump(); }
+}
+draw();
+</script></body></html>

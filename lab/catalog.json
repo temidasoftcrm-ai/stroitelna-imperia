@@ -1,0 +1,1667 @@
+{
+ "made": "2026-10-20",
+ "items": [
+  {
+   "id": "com-a",
+   "cat": "Офиси и сгради в центъра",
+   "title": "Реалистична сграда вместо building-a",
+   "file": "assets/commercial/building-a.glb",
+   "size": 735680,
+   "licence": "CC BY 4.0",
+   "author": "Orzechu",
+   "uses": [
+    "game.js:436",
+    "game.js:443",
+    "game.js:790",
+    "game.js:794",
+    "game.js:811",
+    "game.js:1246"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "com-b",
+   "cat": "Офиси и сгради в центъра",
+   "title": "Реалистична сграда вместо building-b",
+   "file": "assets/commercial/building-b.glb",
+   "size": 386164,
+   "licence": "CC BY 4.0",
+   "author": "aitortilla01",
+   "uses": [
+    "game.js:436",
+    "game.js:443",
+    "game.js:794",
+    "game.js:811",
+    "impstyle.js:15",
+    "industry.js:13"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "com-c",
+   "cat": "Офиси и сгради в центъра",
+   "title": "Реалистична сграда вместо building-c",
+   "file": "assets/commercial/building-c.glb",
+   "size": 462556,
+   "licence": "CC BY 4.0",
+   "author": "aitortilla01",
+   "uses": [
+    "game.js:436",
+    "game.js:443",
+    "game.js:794",
+    "game.js:811",
+    "game.js:1247",
+    "impstyle.js:15"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "com-d",
+   "cat": "Офиси и сгради в центъра",
+   "title": "Реалистична сграда вместо building-d",
+   "file": "assets/commercial/building-d.glb",
+   "size": 323284,
+   "licence": "CC BY 4.0",
+   "author": "aitortilla01",
+   "uses": [
+    "game.js:436",
+    "game.js:443",
+    "game.js:794",
+    "game.js:811",
+    "impstyle.js:15",
+    "industry.js:14"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "com-e",
+   "cat": "Офиси и сгради в центъра",
+   "title": "Реалистична сграда вместо building-e",
+   "file": "assets/commercial/building-e.glb",
+   "size": 470584,
+   "licence": "CC BY 4.0",
+   "author": "aitortilla01",
+   "uses": [
+    "game.js:436",
+    "game.js:443",
+    "game.js:794",
+    "game.js:1248",
+    "impstyle.js:15",
+    "industry.js:14"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "com-f",
+   "cat": "Офиси и сгради в центъра",
+   "title": "Реалистична сграда вместо building-f",
+   "file": "assets/commercial/building-f.glb",
+   "size": 573216,
+   "licence": "CC BY 4.0",
+   "author": "aitortilla01",
+   "uses": [
+    "game.js:436",
+    "game.js:443",
+    "game.js:794",
+    "industry.js:14",
+    "industry.js:22",
+    "nightfloors.js:9"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "com-g",
+   "cat": "Офиси и сгради в центъра",
+   "title": "Реалистична сграда вместо building-g",
+   "file": "assets/commercial/building-g.glb",
+   "size": 307900,
+   "licence": "CC BY 4.0",
+   "author": "hamma085",
+   "uses": [
+    "game.js:436",
+    "game.js:443",
+    "game.js:794",
+    "game.js:1249",
+    "industry.js:15",
+    "industry.js:22"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "com-h",
+   "cat": "Офиси и сгради в центъра",
+   "title": "Реалистична сграда вместо building-h",
+   "file": "assets/commercial/building-h.glb",
+   "size": 404216,
+   "licence": "CC BY 4.0",
+   "author": "hamma085",
+   "uses": [
+    "game.js:436",
+    "game.js:443",
+    "game.js:794",
+    "industry.js:15",
+    "industry.js:22",
+    "nightfloors.js:10"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "com-sky-a",
+   "cat": "Небостъргачи",
+   "title": "Реалистична сграда вместо building-skyscraper-a (небостъргач)",
+   "file": "assets/commercial/building-skyscraper-a.glb",
+   "size": 1123976,
+   "licence": "CC BY 4.0",
+   "author": "aitortilla01",
+   "uses": [
+    "game.js:436",
+    "game.js:795",
+    "game.js:1250",
+    "nightfloors.js:10",
+    "officestyle.js:14",
+    "online3d.js:21"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "com-sky-b",
+   "cat": "Небостъргачи",
+   "title": "Реалистична сграда вместо building-skyscraper-b (небостъргач)",
+   "file": "assets/commercial/building-skyscraper-b.glb",
+   "size": 762088,
+   "licence": "CC BY 4.0",
+   "author": "aitortilla01",
+   "uses": [
+    "game.js:436",
+    "game.js:795",
+    "game.js:1251",
+    "nightfloors.js:10",
+    "officestyle.js:15",
+    "online3d.js:21"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "com-sky-c",
+   "cat": "Небостъргачи",
+   "title": "Реалистична сграда вместо building-skyscraper-c (небостъргач)",
+   "file": "assets/commercial/building-skyscraper-c.glb",
+   "size": 702772,
+   "licence": "CC BY 4.0",
+   "author": "mitya-petrov",
+   "uses": [
+    "game.js:436",
+    "game.js:795",
+    "game.js:1252",
+    "nightfloors.js:10",
+    "nightfloors.js:76",
+    "nightfloors.js:165"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "com2-sky-d",
+   "cat": "Небостъргачи",
+   "title": "Модерен небостъргач D (мегаполисите)",
+   "file": "assets/commercial2/building-skyscraper-d.glb",
+   "size": 4064636,
+   "licence": "CC BY 4.0",
+   "author": "99.Miles",
+   "uses": [
+    "game.js:438",
+    "game.js:802",
+    "nightfloors.js:14",
+    "nightfloors.js:53",
+    "nightfloors.js:62",
+    "nightfloors.js:76"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "com2-sky-e",
+   "cat": "Небостъргачи",
+   "title": "Модерен небостъргач E (мегаполисите)",
+   "file": "assets/commercial2/building-skyscraper-e.glb",
+   "size": 368016,
+   "licence": "CC BY 4.0",
+   "author": "Raise3D",
+   "uses": [
+    "game.js:438",
+    "game.js:802",
+    "nightfloors.js:14",
+    "nightfloors.js:53",
+    "nightfloors.js:62",
+    "nightfloors.js:76"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "house-a",
+   "cat": "Малки къщи",
+   "title": "Реалистична къща A",
+   "file": "assets/houses/building-type-a.glb",
+   "size": 298168,
+   "licence": "CC BY 4.0",
+   "author": "Vitalii.Sandula",
+   "uses": [
+    "game.js:435",
+    "game.js:465",
+    "game.js:782",
+    "game.js:793",
+    "game.js:1245",
+    "game.js:9847"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "house-b",
+   "cat": "Малки къщи",
+   "title": "Реалистична къща B",
+   "file": "assets/houses/building-type-b.glb",
+   "size": 250704,
+   "licence": "CC BY 4.0",
+   "author": "danzl0",
+   "uses": [
+    "game.js:435",
+    "game.js:465",
+    "game.js:466",
+    "game.js:782",
+    "game.js:793",
+    "game.js:9847"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "gear-dump",
+   "cat": "Камиони, техника, строежи",
+   "title": "Нов самосвал",
+   "file": "assets/heavy/gear/dump.glb",
+   "size": 1333956,
+   "licence": "CC BY 4.0",
+   "author": "benjamintang2012",
+   "uses": [
+    "_gear.html:20",
+    "construct.js:22",
+    "construct.js:22",
+    "mine3d.js:66",
+    "vehmodels.js:13"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "gear-exc",
+   "cat": "Камиони, техника, строежи",
+   "title": "Нов багер",
+   "file": "assets/heavy/gear/excavator.glb",
+   "size": 1866728,
+   "licence": "CC BY 4.0",
+   "author": "rhymone",
+   "uses": [
+    "boardholo.js:88",
+    "vehmodels.js:15"
+   ],
+   "flag": [
+    "vehmodels.js:15"
+   ],
+   "used": true
+  },
+  {
+   "id": "gear-mcrane",
+   "cat": "Камиони, техника, строежи",
+   "title": "Нов автокран",
+   "file": "assets/heavy/gear/mcrane.glb",
+   "size": 1467344,
+   "licence": "CC BY 4.0",
+   "author": "doty_aecom",
+   "uses": [
+    "vehmodels.js:16"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "lm-redeemer",
+   "cat": "Забележителности",
+   "title": "Нова статуя на Христос Спасителя (Рио)",
+   "file": "assets/heavy/lm/redeemer.glb",
+   "size": 287220,
+   "licence": "CC BY 4.0",
+   "author": "naveenhimal",
+   "uses": [
+    "landmarks.js:22",
+    "nightfloors.js:31",
+    "nightfloors.js:162",
+    "nightfloors.js:167",
+    "nightfloors.js:168",
+    "nightfloors.js:173"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "lm-colosseo",
+   "cat": "Забележителности",
+   "title": "Нов Колизеум (Рим)",
+   "file": "assets/heavy/lm/colosseo.glb",
+   "size": 2868436,
+   "licence": "CC BY 4.0",
+   "author": "alexanderleth",
+   "uses": [
+    "cityplan2-3d.js:284",
+    "cityplan2-osm.js:3",
+    "landmarks.js:13",
+    "landmarks.js:30",
+    "landmarks.js:33",
+    "nightfloors.js:32"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "com2-sky-e2",
+   "cat": "Небостъргачи",
+   "title": "Обикновен стъклен небостъргач вместо Bank of China",
+   "file": "assets/commercial2/building-skyscraper-e.glb",
+   "size": 368016,
+   "licence": "CC BY 4.0",
+   "author": "hamma085",
+   "uses": [
+    "game.js:438",
+    "game.js:802",
+    "nightfloors.js:14",
+    "nightfloors.js:53",
+    "nightfloors.js:62",
+    "nightfloors.js:76"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "pol-charger",
+   "cat": "Полицейски коли",
+   "title": "Полиция: Dodge Charger",
+   "file": "assets/heavy/cars/pol-charger.glb",
+   "size": 505512,
+   "licence": "CC BY 4.0",
+   "author": "zairiqzairiqpixarcarsbfdi",
+   "uses": [
+    "ops3d.js:293",
+    "opsfire.js:21",
+    "vehmodels.js:71"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "pol-crownvic",
+   "cat": "Полицейски коли",
+   "title": "Полиция: Ford Crown Victoria",
+   "file": "assets/heavy/cars/pol-crownvic.glb",
+   "size": 236448,
+   "licence": "CC BY 4.0",
+   "author": "aeroux",
+   "uses": [
+    "ops3d.js:25",
+    "opsfire.js:21",
+    "services3d.js:44",
+    "vehmodels.js:71"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "pol-interceptor",
+   "cat": "Полицейски коли",
+   "title": "Полиция: Police Interceptor",
+   "file": "assets/heavy/cars/pol-interceptor.glb",
+   "size": 344504,
+   "licence": "CC BY 4.0",
+   "author": "vj32621",
+   "uses": [
+    "ops3d.js:293",
+    "opsfire.js:21",
+    "vehmodels.js:71"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "pol-volga",
+   "cat": "Полицейски коли",
+   "title": "Полиция: Волга на КАТ",
+   "file": "assets/heavy/cars/pol-volga.glb",
+   "size": 804856,
+   "licence": "CC BY 4.0",
+   "author": "eightismore",
+   "uses": [
+    "ops3d.js:293",
+    "vehmodels.js:71"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "fire-red",
+   "cat": "Пожарни коли",
+   "title": "Пожарна: червена европейска",
+   "file": "assets/heavy/cars/fire-red.glb",
+   "size": 691848,
+   "licence": "CC BY 4.0",
+   "author": "jg-3d",
+   "uses": [
+    "opsfire.js:19",
+    "services3d.js:44",
+    "vehmodels.js:72"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "fire-us",
+   "cat": "Пожарни коли",
+   "title": "Пожарна: американска",
+   "file": "assets/heavy/cars/fire-us.glb",
+   "size": 319768,
+   "licence": "CC BY 4.0",
+   "author": "ramonaflowers",
+   "uses": [
+    "opsfire.js:19",
+    "vehmodels.js:72"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "amb-gaz",
+   "cat": "Линейки",
+   "title": "Линейка: ГАЗ „Газела“ (03)",
+   "file": "assets/heavy/cars/amb-gaz.glb",
+   "size": 376776,
+   "licence": "CC BY 4.0",
+   "author": "grox777",
+   "uses": [
+    "vehmodels.js:73"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "amb-us",
+   "cat": "Линейки",
+   "title": "Линейка: американска",
+   "file": "assets/heavy/cars/amb-us.glb",
+   "size": 358664,
+   "licence": "CC BY 4.0",
+   "author": "axi0m",
+   "uses": [
+    "opsaid.js:79",
+    "opsaid.js:79",
+    "opsfire.js:22",
+    "vehmodels.js:73"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "amb-eu",
+   "cat": "Линейки",
+   "title": "Линейка: жълта европейска",
+   "file": "assets/heavy/cars/amb-eu.glb",
+   "size": 1439284,
+   "licence": "CC BY 4.0",
+   "author": "rccdesign",
+   "uses": [
+    "ops3d.js:25",
+    "ops3d.js:287",
+    "opsfire.js:22",
+    "opsflood.js:20",
+    "opsrebuild.js:19",
+    "services3d.js:44"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "road-signs",
+   "cat": "Улично обзавеждане",
+   "title": "Пътни знаци в градовете и бариери пред магистралите",
+   "file": "assets/heavy/signs/signs.glb",
+   "size": 886840,
+   "licence": "CC BY",
+   "author": "drcrazzie",
+   "uses": [
+    "roadsigns.js:20",
+    "roadsigns.js:21"
+   ],
+   "flag": [
+    "game.js:1028",
+    "highways.js:352"
+   ],
+   "used": true
+  },
+  {
+   "id": "real-tlights",
+   "cat": "Улично обзавеждане",
+   "title": "Истински светофари в центъра на града",
+   "file": "assets/heavy/signs/tlight.glb",
+   "size": 409140,
+   "licence": "CC BY",
+   "author": "Ronata-Venya",
+   "uses": [
+    "ops3d.js:23",
+    "roadsigns.js:31"
+   ],
+   "flag": [
+    "game.js:1809",
+    "game.js:1821"
+   ],
+   "used": true
+  },
+  {
+   "id": "hw-service",
+   "cat": "Бензиностанции",
+   "title": "Бензиностанция до магистралата край града",
+   "file": "assets/heavy/gas/gas-big.glb",
+   "size": 997788,
+   "licence": "",
+   "author": "",
+   "uses": [
+    "game.js:432",
+    "game.js:432",
+    "game.js:9804",
+    "highways.js:172",
+    "nightfloors.js:43",
+    "nightfloors.js:62"
+   ],
+   "flag": [
+    "game.js:7601"
+   ],
+   "used": true
+  },
+  {
+   "id": "resort-real",
+   "cat": "Курорти",
+   "title": "🏔️ Курортите: истински хижи вместо детските сглобени",
+   "file": "assets/heavy/resort/aframe.glb",
+   "size": 2475008,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "game.js:7515"
+   ],
+   "flag": [
+    "resortview.js:385"
+   ],
+   "used": true
+  },
+  {
+   "id": "resort-real",
+   "cat": "Курорти",
+   "title": "🏔️ Курортите: истински хижи вместо детските сглобени",
+   "file": "assets/heavy/resort/dubrovnik.glb",
+   "size": 3801248,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "resorts.js:29",
+    "resortview.js:144"
+   ],
+   "flag": [
+    "resortview.js:385"
+   ],
+   "used": true
+  },
+  {
+   "id": "resort-real",
+   "cat": "Курорти",
+   "title": "🏔️ Курортите: истински хижи вместо детските сглобени",
+   "file": "assets/heavy/resort/grebeni.glb",
+   "size": 5953600,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "resortview.js:143"
+   ],
+   "flag": [
+    "resortview.js:385"
+   ],
+   "used": true
+  },
+  {
+   "id": "resort-real",
+   "cat": "Курорти",
+   "title": "🏔️ Курортите: истински хижи вместо детските сглобени",
+   "file": "assets/heavy/resort/sf-cabin2.glb",
+   "size": 1270160,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "resortview.js:110",
+    "resortview.js:385"
+   ],
+   "flag": [
+    "resortview.js:385"
+   ],
+   "used": true
+  },
+  {
+   "id": "resort-real",
+   "cat": "Курорти",
+   "title": "🏔️ Курортите: истински хижи вместо детските сглобени",
+   "file": "assets/heavy/resort/sf-cabin3.glb",
+   "size": 3154908,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "resortview.js:110",
+    "resortview.js:385"
+   ],
+   "flag": [
+    "resortview.js:385"
+   ],
+   "used": true
+  },
+  {
+   "id": "resort-real",
+   "cat": "Курорти",
+   "title": "🏔️ Курортите: истински хижи вместо детските сглобени",
+   "file": "assets/heavy/resort/sf-chalet.glb",
+   "size": 762236,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "resortview.js:110",
+    "resortview.js:385"
+   ],
+   "flag": [
+    "resortview.js:385"
+   ],
+   "used": true
+  },
+  {
+   "id": "resort-bench",
+   "cat": "Курорти",
+   "title": "Истинска пейка вместо детската (площадите с фонтан)",
+   "file": "assets/holiday/bench.glb",
+   "size": 633380,
+   "licence": "CC BY",
+   "author": "berkgedik",
+   "uses": [
+    "game.js:446",
+    "game.js:8142"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "resort-lantern",
+   "cat": "Курорти",
+   "title": "Истински уличен фенер вместо детския (площадите с фонтан)",
+   "file": "assets/holiday/lantern.glb",
+   "size": 328508,
+   "licence": "CC BY",
+   "author": "bez_glaza",
+   "uses": [
+    "game.js:446",
+    "game.js:8143"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "lm-vittoriano",
+   "cat": "Забележителности",
+   "title": "🏛️ Нов Витториано (Рим)",
+   "file": "assets/heavy/lm/vittoriano2.glb",
+   "size": 1882828,
+   "licence": "",
+   "author": "",
+   "uses": [
+    "game.js:5621",
+    "landmarks.js:32",
+    "landmarks.js:32"
+   ],
+   "flag": [
+    "landmarks.js:32"
+   ],
+   "used": true
+  },
+  {
+   "id": "lm-colosseo3",
+   "cat": "Забележителности",
+   "title": "🏛️ Нов Колизеум (Рим) — сглобен от твоя модел, с нощно осветление",
+   "file": "assets/heavy/lm/colosseo3.glb",
+   "size": 10521144,
+   "licence": "",
+   "author": "",
+   "uses": [
+    "game.js:5621",
+    "landmarks.js:33",
+    "landmarks.js:33"
+   ],
+   "flag": [
+    "landmarks.js:33"
+   ],
+   "used": true
+  },
+  {
+   "id": "boats-real",
+   "cat": "Кораби и пристанища",
+   "title": "Истински лодки, шамандури, контейнери и товарни кораби (морските градове и курортите)",
+   "file": "assets/heavy/boats/sf-buoy.glb",
+   "size": 2201768,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "boatsreal.js:9",
+    "boatsreal.js:11"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "boats-real",
+   "cat": "Кораби и пристанища",
+   "title": "Истински лодки, шамандури, контейнери и товарни кораби (морските градове и курортите)",
+   "file": "assets/heavy/boats/sf-container.glb",
+   "size": 1446448,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "boatsreal.js:9",
+    "boatsreal.js:11",
+    "boatsreal.js:11",
+    "boatsreal.js:11",
+    "construct.js:23",
+    "construct.js:23"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "boats-real",
+   "cat": "Кораби и пристанища",
+   "title": "Истински лодки, шамандури, контейнери и товарни кораби (морските градове и курортите)",
+   "file": "assets/heavy/boats/sf-fisherboat.glb",
+   "size": 1333044,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "boatsreal.js:9",
+    "boatsreal.js:10",
+    "game.js:650"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "boats-real",
+   "cat": "Кораби и пристанища",
+   "title": "Истински лодки, шамандури, контейнери и товарни кораби (морските градове и курортите)",
+   "file": "assets/heavy/boats/sf-fishship.glb",
+   "size": 2611572,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "boatsreal.js:9",
+    "boatsreal.js:11",
+    "opshormuz.js:57"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "boats-real",
+   "cat": "Кораби и пристанища",
+   "title": "Истински лодки, шамандури, контейнери и товарни кораби (морските градове и курортите)",
+   "file": "assets/heavy/boats/sf-sailboat.glb",
+   "size": 336444,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "boatsreal.js:9",
+    "boatsreal.js:10",
+    "boatsreal.js:10",
+    "game.js:650"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "boats-real",
+   "cat": "Кораби и пристанища",
+   "title": "Истински лодки, шамандури, контейнери и товарни кораби (морските градове и курортите)",
+   "file": "assets/heavy/boats/sf-yacht.glb",
+   "size": 2255504,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "boatsreal.js:9",
+    "boatsreal.js:10",
+    "boatsreal.js:10",
+    "game.js:650",
+    "opshormuz.js:58"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "ind-real",
+   "cat": "Заводи и складове",
+   "title": "Истински заводи, складове, водни кули, вятърни турбини и соларни панели",
+   "file": "assets/heavy/industry/sf-indbuilding.glb",
+   "size": 1175992,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "industry.js:21",
+    "industry.js:42",
+    "plan.html:74"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "ind-real",
+   "cat": "Заводи и складове",
+   "title": "Истински заводи, складове, водни кули, вятърни турбини и соларни панели",
+   "file": "assets/heavy/industry/sf-indset.glb",
+   "size": 5490624,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "industry.js:42",
+    "industry.js:46"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "ind-real",
+   "cat": "Заводи и складове",
+   "title": "Истински заводи, складове, водни кули, вятърни турбини и соларни панели",
+   "file": "assets/heavy/industry/sf-oldwarehouse.glb",
+   "size": 479180,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "industry.js:22",
+    "industry.js:42",
+    "plan.html:74"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "ind-real",
+   "cat": "Заводи и складове",
+   "title": "Истински заводи, складове, водни кули, вятърни турбини и соларни панели",
+   "file": "assets/heavy/industry/sf-solar.glb",
+   "size": 216144,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "industry.js:42",
+    "industry.js:70",
+    "industry.js:71"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "ind-real",
+   "cat": "Заводи и складове",
+   "title": "Истински заводи, складове, водни кули, вятърни турбини и соларни панели",
+   "file": "assets/heavy/industry/sf-warehouses.glb",
+   "size": 502216,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "industry.js:22",
+    "industry.js:42",
+    "plan.html:74"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "ind-real",
+   "cat": "Заводи и складове",
+   "title": "Истински заводи, складове, водни кули, вятърни турбини и соларни панели",
+   "file": "assets/heavy/industry/sf-watertower.glb",
+   "size": 4450688,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "industry.js:42",
+    "industry.js:50",
+    "industry.js:51"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "ind-real",
+   "cat": "Заводи и складове",
+   "title": "Истински заводи, складове, водни кули, вятърни турбини и соларни панели",
+   "file": "assets/heavy/industry/sf-windturbine.glb",
+   "size": 285880,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "industry.js:42",
+    "industry.js:57",
+    "industry.js:58"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "cs-real",
+   "cat": "Камиони, техника, строежи",
+   "title": "Истински строежи: кулокран, контейнери, тоалетна, материали, самосвали, бетоновоз",
+   "file": "assets/heavy/construct/sf-bricks.glb",
+   "size": 635340,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "construct.js:20"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "cs-real",
+   "cat": "Камиони, техника, строежи",
+   "title": "Истински строежи: кулокран, контейнери, тоалетна, материали, самосвали, бетоновоз",
+   "file": "assets/heavy/construct/sf-drums.glb",
+   "size": 1592508,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "construct.js:21"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "cs-real",
+   "cat": "Камиони, техника, строежи",
+   "title": "Истински строежи: кулокран, контейнери, тоалетна, материали, самосвали, бетоновоз",
+   "file": "assets/heavy/construct/sf-mixer.glb",
+   "size": 1525228,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "construct.js:22"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "cs-real",
+   "cat": "Камиони, техника, строежи",
+   "title": "Истински строежи: кулокран, контейнери, тоалетна, материали, самосвали, бетоновоз",
+   "file": "assets/heavy/construct/sf-sitepack.glb",
+   "size": 5829888,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "construct.js:20"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "cs-real",
+   "cat": "Камиони, техника, строежи",
+   "title": "Истински строежи: кулокран, контейнери, тоалетна, материали, самосвали, бетоновоз",
+   "file": "assets/heavy/construct/sf-skip.glb",
+   "size": 411620,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "construct.js:21",
+    "opsrebuild.js:60"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "cs-real",
+   "cat": "Камиони, техника, строежи",
+   "title": "Истински строежи: кулокран, контейнери, тоалетна, материали, самосвали, бетоновоз",
+   "file": "assets/heavy/construct/sf-toilet.glb",
+   "size": 336748,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "construct.js:19"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "cs-real",
+   "cat": "Камиони, техника, строежи",
+   "title": "Истински строежи: кулокран, контейнери, тоалетна, материали, самосвали, бетоновоз",
+   "file": "assets/heavy/construct/sf-towercrane.glb",
+   "size": 5691320,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "construct.js:19",
+    "opsrebuild.js:59"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "st-bernabeu",
+   "cat": "Стадиони",
+   "title": "Стадион за световното: Сантяго Бернабеу (Мадрид)",
+   "file": "assets/heavy/stadium2/sf-bernabeu.glb",
+   "size": 1473048,
+   "licence": "CC BY",
+   "author": "Sketchfab",
+   "uses": [
+    "stadiums.js:8"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "st-stadefrance",
+   "cat": "Стадиони",
+   "title": "Стадион за световното: Стад дьо Франс (Париж)",
+   "file": "assets/heavy/stadium2/sf-stadefrance.glb",
+   "size": 11897760,
+   "licence": "CC BY",
+   "author": "Sketchfab",
+   "uses": [
+    "stadiums.js:9"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "st-maracana",
+   "cat": "Стадиони",
+   "title": "Стадион за световното: Маракана (Рио)",
+   "file": "assets/heavy/stadium2/sf-maracana.glb",
+   "size": 8176712,
+   "licence": "CC BY",
+   "author": "Sketchfab",
+   "uses": [
+    "stadiums.js:10"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "st-bombonera",
+   "cat": "Стадиони",
+   "title": "Стадион за световното: Бомбонера (Буенос Айрес)",
+   "file": "assets/heavy/stadium2/sf-bombonera.glb",
+   "size": 12623832,
+   "licence": "CC BY",
+   "author": "Sketchfab",
+   "uses": [
+    "stadiums.js:11"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "st-azteca",
+   "cat": "Стадиони",
+   "title": "Стадион за световното: Ацтека (Мексико Сити)",
+   "file": "assets/heavy/stadium2/sf-azteca.glb",
+   "size": 18436792,
+   "licence": "CC BY",
+   "author": "Sketchfab",
+   "uses": [
+    "stadiums.js:12"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "st-alwakrah",
+   "cat": "Стадиони",
+   "title": "Стадион за световното: Ал Уакра — общият стадион на световното",
+   "file": "assets/heavy/stadium2/sf-alwakrah.glb",
+   "size": 27428896,
+   "licence": "CC BY",
+   "author": "Sketchfab",
+   "uses": [
+    "stadiums.js:13"
+   ],
+   "flag": [
+    "stadiums.js:18"
+   ],
+   "used": true
+  },
+  {
+   "id": "port-real",
+   "cat": "Кораби и пристанища",
+   "title": "Истински пристанища: портални кранове, фар, склад, зърнен терминал, козлов кран, страдъл кари и яхти",
+   "file": "assets/heavy/port/sf-gantry.glb",
+   "size": 1343408,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "portreal.js:54"
+   ],
+   "flag": [
+    "seaside.js:199"
+   ],
+   "used": true
+  },
+  {
+   "id": "port-real",
+   "cat": "Кораби и пристанища",
+   "title": "Истински пристанища: портални кранове, фар, склад, зърнен терминал, козлов кран, страдъл кари и яхти",
+   "file": "assets/heavy/port/sf-grain.glb",
+   "size": 5710572,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "portreal.js:54"
+   ],
+   "flag": [
+    "seaside.js:199"
+   ],
+   "used": true
+  },
+  {
+   "id": "port-real",
+   "cat": "Кораби и пристанища",
+   "title": "Истински пристанища: портални кранове, фар, склад, зърнен терминал, козлов кран, страдъл кари и яхти",
+   "file": "assets/heavy/port/sf-lighthouse.glb",
+   "size": 1525644,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "opshormuz.js:45",
+    "portreal.js:54"
+   ],
+   "flag": [
+    "seaside.js:199"
+   ],
+   "used": true
+  },
+  {
+   "id": "port-real",
+   "cat": "Кораби и пристанища",
+   "title": "Истински пристанища: портални кранове, фар, склад, зърнен терминал, козлов кран, страдъл кари и яхти",
+   "file": "assets/heavy/port/sf-straddle.glb",
+   "size": 715164,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "portreal.js:54"
+   ],
+   "flag": [
+    "seaside.js:199"
+   ],
+   "used": true
+  },
+  {
+   "id": "port-real",
+   "cat": "Кораби и пристанища",
+   "title": "Истински пристанища: портални кранове, фар, склад, зърнен терминал, козлов кран, страдъл кари и яхти",
+   "file": "assets/heavy/port/sf-stscrane.glb",
+   "size": 6598568,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "opshormuz.js:44",
+    "portreal.js:54"
+   ],
+   "flag": [
+    "seaside.js:199"
+   ],
+   "used": true
+  },
+  {
+   "id": "port-real",
+   "cat": "Кораби и пристанища",
+   "title": "Истински пристанища: портални кранове, фар, склад, зърнен терминал, козлов кран, страдъл кари и яхти",
+   "file": "assets/heavy/port/sf-warehouse.glb",
+   "size": 8334440,
+   "licence": "CC BY",
+   "author": "",
+   "uses": [
+    "opshormuz.js:46",
+    "portreal.js:54"
+   ],
+   "flag": [
+    "seaside.js:199"
+   ],
+   "used": true
+  },
+  {
+   "id": "civ2-police-s1",
+   "cat": "Обществени: полиция",
+   "title": "🚓 Полиция за малък град 1: Hawkins Police Station",
+   "file": "assets/heavy/civic2/police-s1.glb",
+   "size": 710292,
+   "licence": "CC BY",
+   "author": "sealandair",
+   "uses": [
+    "nightfloors.js:52",
+    "services.js:24"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "civ2-police-s2",
+   "cat": "Обществени: полиция",
+   "title": "🚓 Полиция за малък град 2: Cook Ville Police Head Quarters",
+   "file": "assets/heavy/civic2/police-s2.glb",
+   "size": 1055860,
+   "licence": "CC BY",
+   "author": "wirmagnus",
+   "uses": [
+    "nightfloors.js:52",
+    "services.js:24"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "civ2-police-m1",
+   "cat": "Обществени: полиция",
+   "title": "🚓 Полиция за среден град 1: Police station",
+   "file": "assets/heavy/civic2/police-m1.glb",
+   "size": 250716,
+   "licence": "CC BY",
+   "author": "kirsel91",
+   "uses": [
+    "nightfloors.js:52",
+    "services.js:24"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "civ2-police-l1",
+   "cat": "Обществени: полиция",
+   "title": "🚓 Полиция за голям град 1: police station",
+   "file": "assets/heavy/civic2/police-l1.glb",
+   "size": 7534284,
+   "licence": "CC BY",
+   "author": "tnikita",
+   "uses": [
+    "nightfloors.js:52",
+    "services.js:24"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "civ2-police-l2",
+   "cat": "Обществени: полиция",
+   "title": "🚓 Полиция за голям град 2: HK Police Force - Central District Headquarters",
+   "file": "assets/heavy/civic2/police-l2.glb",
+   "size": 2618052,
+   "licence": "CC BY",
+   "author": "patrick.young",
+   "uses": [
+    "nightfloors.js:52",
+    "services.js:24"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "civ2-fire-s1",
+   "cat": "Обществени: пожарни",
+   "title": "🚒 Пожарна за малък град 1: Fire Department Building",
+   "file": "assets/heavy/civic2/fire-s1.glb",
+   "size": 3341416,
+   "licence": "CC BY",
+   "author": "jimbogies",
+   "uses": [
+    "nightfloors.js:52",
+    "services.js:22"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "civ2-fire-s2",
+   "cat": "Обществени: пожарни",
+   "title": "🚒 Пожарна за малък град 2: Hook & Ladder Firehouse (Simplified)",
+   "file": "assets/heavy/civic2/fire-s2.glb",
+   "size": 1186100,
+   "licence": "CC BY",
+   "author": "KevinTheLonewolf",
+   "uses": [
+    "nightfloors.js:52",
+    "services.js:22"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "civ2-fire-m1",
+   "cat": "Обществени: пожарни",
+   "title": "🚒 Пожарна за среден град 1: Minneapolis Former 1902 Station 10b F01",
+   "file": "assets/heavy/civic2/fire-m1.glb",
+   "size": 610400,
+   "licence": "CC BY",
+   "author": "eatc7402",
+   "uses": [
+    "nightfloors.js:52",
+    "services.js:22"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "civ2-fire-l1",
+   "cat": "Обществени: пожарни",
+   "title": "🚒 Пожарна за голям град 1: St Paul Former 1883 Fire Station 8",
+   "file": "assets/heavy/civic2/fire-l1.glb",
+   "size": 2056656,
+   "licence": "CC BY",
+   "author": "eatc7402",
+   "uses": [
+    "nightfloors.js:52",
+    "services.js:22"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "civ2-hosp-s1",
+   "cat": "Обществени: болници",
+   "title": "🏥 Болница за малък град 1: Hospital Building",
+   "file": "assets/heavy/civic2/hosp-s1.glb",
+   "size": 332660,
+   "licence": "CC BY",
+   "author": "silentsheri",
+   "uses": [
+    "nightfloors.js:52",
+    "services.js:20"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "civ2-hosp-s2",
+   "cat": "Обществени: болници",
+   "title": "🏥 Болница за малък град 2: Jejungwon Hospital",
+   "file": "assets/heavy/civic2/hosp-s2.glb",
+   "size": 4177976,
+   "licence": "CC BY",
+   "author": "gwangju_inmunstory",
+   "uses": [
+    "nightfloors.js:52",
+    "services.js:20"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "civ2-hosp-m1",
+   "cat": "Обществени: болници",
+   "title": "🏥 Болница за среден град 1: Hospital",
+   "file": "assets/heavy/civic2/hosp-m1.glb",
+   "size": 238756,
+   "licence": "CC BY",
+   "author": "prankscare99",
+   "uses": [
+    "nightfloors.js:52",
+    "opsrebuild.js:56",
+    "services.js:20"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "civ2-hosp-m2",
+   "cat": "Обществени: болници",
+   "title": "🏥 Болница за среден град 2: Hospital",
+   "file": "assets/heavy/civic2/hosp-m2.glb",
+   "size": 1210688,
+   "licence": "CC BY",
+   "author": "iagoDev",
+   "uses": [
+    "nightfloors.js:52",
+    "services.js:20"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "civ2-hosp-l1",
+   "cat": "Обществени: болници",
+   "title": "🏥 Болница за голям град 1: Building of the polyclinic in russia",
+   "file": "assets/heavy/civic2/hosp-l1.glb",
+   "size": 266712,
+   "licence": "CC BY",
+   "author": "narcozisne1",
+   "uses": [
+    "nightfloors.js:52",
+    "services.js:20"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "civ2-hosp-l2",
+   "cat": "Обществени: болници",
+   "title": "🏥 Болница за голям град 2: Aster M.C Building , in TCA -AUH",
+   "file": "assets/heavy/civic2/hosp-l2.glb",
+   "size": 1145552,
+   "licence": "CC BY",
+   "author": "amerkhafagi",
+   "uses": [
+    "nightfloors.js:52",
+    "services.js:20"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "h2-greyporch",
+   "cat": "Малки къщи",
+   "title": "Къща: Сива двуетажна с веранда",
+   "file": "assets/heavy/houses2/h2-greyporch.glb",
+   "size": 281264,
+   "licence": "CC BY 4.0",
+   "author": "designedbyjonathan",
+   "uses": [
+    "game.js:430",
+    "impstyle.js:14",
+    "nightfloors.js:26",
+    "online3d.js:16",
+    "opsflood.js:9"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "h2-brickcabin",
+   "cat": "Малки къщи",
+   "title": "Къща: Тухлено-каменна къща",
+   "file": "assets/heavy/houses2/h2-brickcabin.glb",
+   "size": 423184,
+   "licence": "CC BY 4.0",
+   "author": "Everex.agency",
+   "uses": [
+    "game.js:430",
+    "nightfloors.js:27",
+    "online3d.js:16",
+    "opsflood.js:9"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "h2-pink",
+   "cat": "Малки къщи",
+   "title": "Къща: Розова европейска къща",
+   "file": "assets/heavy/houses2/h2-pink.glb",
+   "size": 304612,
+   "licence": "CC BY 4.0",
+   "author": "Satik64",
+   "uses": [
+    "game.js:430",
+    "game.js:9822",
+    "impstyle.js:14",
+    "nightfloors.js:27",
+    "online3d.js:16",
+    "opsflood.js:9"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "h2-townhouse",
+   "cat": "Малки къщи",
+   "title": "Къща: Белгийска градска къща (тухла)",
+   "file": "assets/heavy/houses2/h2-townhouse.glb",
+   "size": 355356,
+   "licence": "CC BY 4.0",
+   "author": "Lost_Gecko",
+   "uses": [
+    "game.js:430",
+    "game.js:1245",
+    "game.js:1245",
+    "game.js:9822",
+    "impstyle.js:14",
+    "nightfloors.js:27"
+   ],
+   "flag": [
+    "game.js:1245"
+   ],
+   "used": true
+  },
+  {
+   "id": "h2-blue",
+   "cat": "Малки къщи",
+   "title": "Къща: Синя викторианска с веранда",
+   "file": "assets/heavy/houses2/h2-blue.glb",
+   "size": 353212,
+   "licence": "CC BY 4.0",
+   "author": "NienkeSt",
+   "uses": [
+    "game.js:430",
+    "game.js:793",
+    "impstyle.js:14",
+    "nightfloors.js:27",
+    "nightfloors.js:55",
+    "online3d.js:16"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "h2-swedish",
+   "cat": "Малки къщи",
+   "title": "Къща: Червена шведска вила",
+   "file": "assets/heavy/houses2/h2-swedish.glb",
+   "size": 877700,
+   "licence": "CC BY 4.0",
+   "author": "michaelmiz92",
+   "uses": [
+    "game.js:430",
+    "impstyle.js:19",
+    "nightfloors.js:26",
+    "online3d.js:16",
+    "opsflood.js:9"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "h2-lodge",
+   "cat": "Малки къщи",
+   "title": "Къща: Синя едноетажна с тераса",
+   "file": "assets/heavy/houses2/h2-lodge.glb",
+   "size": 1395384,
+   "licence": "CC BY 4.0",
+   "author": "lodgelus",
+   "uses": [
+    "game.js:430",
+    "game.js:833",
+    "impstyle.js:19",
+    "nightfloors.js:26",
+    "online3d.js:16",
+    "opsflood.js:9"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "h2-porch",
+   "cat": "Малки къщи",
+   "title": "Къща: Бяла с черен покрив и веранда",
+   "file": "assets/heavy/houses2/h2-porch.glb",
+   "size": 311028,
+   "licence": "CC BY 4.0",
+   "author": "jessicabrooke",
+   "uses": [
+    "game.js:430",
+    "game.js:793",
+    "impstyle.js:14",
+    "nightfloors.js:27",
+    "online3d.js:16",
+    "opsflood.js:9"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "fire-man",
+   "cat": "Пожарни коли",
+   "title": "Пожарна: MAN със стълба (реалистична)",
+   "file": "assets/heavy/cars/fire-man.glb",
+   "size": 5090732,
+   "licence": "CC BY 4.0",
+   "author": "cm_dp",
+   "uses": [
+    "opsfire.js:19",
+    "vehmodels.js:72"
+   ],
+   "flag": [],
+   "used": true
+  },
+  {
+   "id": "pol-nypd",
+   "cat": "Полицейски коли",
+   "title": "Полиция: Dodge Charger NYPD (реалистична)",
+   "file": "assets/heavy/cars/pol-nypd.glb",
+   "size": 1203432,
+   "licence": "CC BY 4.0",
+   "author": "David_Holiday",
+   "uses": [
+    "ops3d.js:293",
+    "vehmodels.js:71"
+   ],
+   "flag": [],
+   "used": true
+  }
+ ]
+}
