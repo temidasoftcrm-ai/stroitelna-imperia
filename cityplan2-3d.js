@@ -220,7 +220,7 @@ function seaView(G, D, RR) {
   const Mt = []; for (const r of D.metro || []) if (r.kind !== 'rail') Mt.push(ribbon(r.pts, r.kind === 'tram' ? 2.2 : 2.6, 0.085)); if (Mt.length) G.add(merge(Mt, M(0x9a9184)));   // метро/трамвай на повърхността
   romeBridges(G, D);
   // висящите мостове (Босфорския): моделът — дължината по x, центриран; мащабът — от бряг до бряг
-  for (const B of D.bigBridges || []) { const proto = (D._models || {})[B.k]; if (!proto) continue;
+  for (const B of D.bigBridges || []) { const proto = (D._models || {})[B.k]; if (!proto) continue; floodMats(proto, 0xd8e8ff, 0.35);   // нощем — осветен (студено бяло, като Босфорския)
     const o = proto.clone(true); o.userData.extShared = 1; const bb = new THREE.Box3().setFromObject(o), len = Math.hypot(B.b[0] - B.a[0], B.b[1] - B.a[1]), k = len / (bb.max.x - bb.min.x);
     const w = new THREE.Group(); o.scale.setScalar(k); o.position.set(-(bb.min.x + bb.max.x) / 2 * k, -bb.min.y * k - 1.2, -(bb.min.z + bb.max.z) / 2 * k); w.add(o);
     w.position.set((B.a[0] + B.b[0]) / 2, 0, (B.a[1] + B.b[1]) / 2); w.rotation.y = -Math.atan2(B.b[1] - B.a[1], B.b[0] - B.a[0]); w.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); G.add(w); }
@@ -293,7 +293,7 @@ function floodWash(G, P) {
 // материалите на модел-забележителност светват нощем (прожектори): emissive = топъл цвят, emissiveMap = текстурата; вече светещите (nightfloors) — не
 export function floodMats(obj, col = 0xffd8a0, k = 0.45) {
   const out = []; obj.traverse(o => { if (!o.isMesh) return; for (const m of [].concat(o.material)) { if (!m || !('emissive' in m) || m.userData.flood || m.userData.nfK || m.emissiveMap || WIN_MATS.includes(m)) continue;
-    m.emissive = new THREE.Color(col); if (m.map) m.emissiveMap = m.map; m.emissiveIntensity = 0; m.userData.winK = k; m.userData.flood = 1; out.push(m); } });
+    m.emissive = new THREE.Color(col); if (m.map) m.emissiveMap = m.map; m.emissiveIntensity = 0; m.userData.winK = k; m.userData.flood = 1; out.push(m); WIN_MATS.push(m); } });   // и в nightMats на изгледа
   return out;
 }
 function* furniture(G, P) {   // генератор: yield след всеки път (постепенното строене)
@@ -588,6 +588,7 @@ function ferryModel() {
 function seaTraffic(G, D, models) {
   const K = D.k, at = (la, lo) => [(lo - D.center[1]) * Math.cos(D.center[0] * Math.PI / 180) * 111320 * K, -(la - D.center[0]) * 110540 * K], grp = new THREE.Group(); grp.position.y = -1.0; G.add(grp);
   const boats = [], cum = p => { const L = [0]; for (let i = 1; i < p.length; i++) L.push(L[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1])); return L; };
+  for (const m of [models.ferry, models.cruise, models.tanker, models.container, ...(models.small || [])]) if (m) floodMats(m, 0xffe2b0, m === models.cruise ? 0.5 : 0.3);   // корабите нощем — с осветени палуби
   const fit = (proto, len) => { if (!proto) return null; const o = proto.clone(true), w = new THREE.Group(); o.userData.extShared = 1; const b = new THREE.Box3().setFromObject(o), sz = b.getSize(new THREE.Vector3()), long = sz.x > sz.z, k = len / Math.max(sz.x, sz.z); o.scale.setScalar(k); const b2 = new THREE.Box3().setFromObject(o), c = b2.getCenter(new THREE.Vector3()); o.position.set(-c.x, -b2.min.y - 0.6, -c.z); if (long) o.rotation.y = Math.PI / 2; w.add(o); return w; };
   const add = (obj, path, sp, mode, ph) => { if (!obj || path.length < 2) return; const L = cum(path); grp.add(obj); boats.push({ obj, path, L, T: L[L.length - 1], sp, mode, s: ph * L[L.length - 1], dir: 1, wait: 0 }); };
   // фериботите: еднаквите линии — веднъж; по един ферибот на линия (до 14)
