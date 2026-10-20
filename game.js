@@ -7562,9 +7562,13 @@ function refreshEstateSigns() {
 }
 // ---- земя
 const MAX_LAND = 5;   // до 5 празни парцела наведнъж в град — иначе не им се вижда краят
+// потребителят: най-много 5 твои имота на град — сгради под наем + празни парцели + строящите се за наем
+const MAX_OWN = 5, ownCount = () => { const E = est(); return E.owned.length + E.land.length + projects.filter(p => p.invest && !E.land.includes(p.lot) && !E.owned.some(o => o.lot === p.lot)).length; };
+const ownFull = () => ownCount() >= MAX_OWN;
 function buyLand(id) {
   const lot = city.lots[id], price = lotPrice(lot);
   if (lot.built || lot.busy) return;
+  if (ownFull()) { toast(`🔑 Имаш ${MAX_OWN} имота в ${cityName()} — това е максимумът. Продай някой, за да купиш нов.`, 'bad'); Sound.play('error'); return; }
   if (est().land.length >= MAX_LAND) { toast(`Имаш ${MAX_LAND} празни парцела в ${cityName()} — застрой или продай някой, преди да купиш нов.`, 'bad'); Sound.play('error'); return; }
   if (!econ.canAfford(price)) { toast('Нямаш достатъчно пари за парцела.', 'bad'); Sound.play('error'); return; }
   econ.spend(price, 'покупка', `Парцел (${lot.zone === 'center' ? 'център' : lot.zone === 'mid' ? 'среден пояс' : 'покрайнини'})`);
@@ -7624,6 +7628,7 @@ function makeListing() {
 }
 function buyListing(id) {
   const l = est().listings.find(q => q.id === id); if (!l) return;
+  if (ownFull()) { toast(`🔑 Имаш ${MAX_OWN} имота в ${cityName()} — това е максимумът. Продай някой, за да купиш нов.`, 'bad'); Sound.play('error'); return; }
   if (!econ.canAfford(l.price)) { toast('Нямаш достатъчно пари за къщата.', 'bad'); Sound.play('error'); return; }
   econ.spend(l.price, 'покупка', 'Къща (имот)');
   est().listings.splice(est().listings.indexOf(l), 1);
@@ -8463,7 +8468,7 @@ function boardProposals0() {
     why: 'всяко ниво на офиса дава още място за обект и бригади', days: () => 5, gainTxt: a => `+1 обект наведнъж в ${pl(a.length, 'град', 'града')}`, goal: a => `${pl(a.length, 'офис е разширен', 'офиса са разширени')}` });
   // имотите в текущия град (без свободна бригада ремонтът идва после — 🔨 estreno): старите къщи на пазара (купи + ремонтирай), ремонт и поддръжка на твоите, офертите на купувачите
   { const E = est(), cap = () => Math.max(0, officeLv().proj - busyCount()), freeOf = o => !projects.some(p => p.lot === o.lot);
-    P({ dir: 'con', ico: '🏠', key: 'estbuy', items: [...E.listings].sort((a, b) => a.price - b.price).slice(0, 3), cost: l => l.price + RENO_COST,
+    P({ dir: 'con', ico: '🏠', key: 'estbuy', items: [...E.listings].sort((a, b) => a.price - b.price).slice(0, Math.max(0, Math.min(3, MAX_OWN - ownCount()))), cost: l => l.price + RENO_COST,
       run: l => { const lot = l.lot; buyListing(l.id); if (cap() > 0) startReno(lot); }, text: a => `Предлагам да купим ${pl(a.length, 'стара къща', 'стари къщи')} в ${cityNm(S.cityId)} и да ${a.length === 1 ? 'я ремонтираме' : 'ги ремонтираме'}.`,
       why: 'след ремонта наемът и цената растат', days: () => 6, income: a => a.length * 600 / 30, goal: a => `${pl(a.length, 'къща', 'къщи')} в ремонт` });
     P({ dir: 'con', ico: '🔨', key: 'estreno', items: E.owned.filter(o => o.old && freeOf(o)).slice(0, Math.min(4, cap())), cost: () => RENO_COST, run: o => startReno(o.lot),

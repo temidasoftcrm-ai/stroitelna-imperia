@@ -41,7 +41,7 @@ function card(P) {
   const box = document.querySelector('#bigWin .bw-box'), head = box && box.querySelector('.bw-head'); if (!head) return;
   const c = document.createElement('div'); c.id = 'pIntro';
   c.innerHTML = `<div class="pt">${P[2]} Какво е това?</div><div class="pr"><b>Какво е</b><span>${P[3]}</span></div><div class="pr"><b>За какво</b><span>${P[4]}</span></div><div class="pr"><b>Как</b><span>${P[5]}</span></div><div class="pf"><button class="btn2" data-pi="ok">👍 Разбрах</button></div>`;
-  c.querySelector('[data-pi]').onclick = () => { seen[P[0]] = 1; keep(); c.remove(); };
+  c.querySelector('[data-pi]').onclick = () => { seen[P[0]] = 1; seen.__all = 1; keep(); c.remove(); };   // „Разбрах“ веднъж → не излиза повече в никой прозорец (❓ остава)
   head.after(c);
 }
 function check() {
@@ -53,6 +53,6 @@ function check() {
   if (head && !document.getElementById('pIntroQ')) { const q = document.createElement('button'); q.id = 'pIntroQ'; q.className = 'btn2'; q.textContent = '❓'; q.title = 'Какво е този прозорец?'; q.onclick = () => { const P2 = keyOf(document.getElementById('bwTitle')?.textContent || ''); if (!P2) return; document.getElementById('pIntro') ? document.getElementById('pIntro').remove() : card(P2); }; head.insertBefore(q, document.getElementById('bwClose')); }
   if (P[0] === cur) return;
   cur = P[0]; document.getElementById('pIntro')?.remove();
-  if (!seen[P[0]]) card(P);   // първото отваряне на този прозорец
+  if (!seen[P[0]] && !seen.__all) card(P);   // първото отваряне на този прозорец — докато не натиснеш „Разбрах“ веднъж
 }
 if (!new URLSearchParams(location.search).has('autotest') || new URLSearchParams(location.search).has('tips')) setInterval(() => { try { check(); } catch (e) {} }, 500);
