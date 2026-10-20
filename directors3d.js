@@ -589,7 +589,7 @@ export function openBoardroom(o) {
       const gain = p.gainTxt || (p.gain ? `+${B(p.gain)}/месец` : p.income ? `+${f(p.income)} €/ден` : '');
       const must = !!(p.mustVote && o.voteOn), Fr = o.frame ? o.frame() : null, imp = isImportant(p, Fr);
       const fit = p.inBudget == null ? '' : p.inBudget ? '<div class="fit" style="color:#5fd38a">✅ в рамките на бюджета за инвестиции</div>' : '<div class="fit" style="color:#ffb347">⚠️ над бюджета за инвестиции</div>';
-      scr.innerHTML = `${hd('📋 Предложение към борда')}<div class="tx"></div>${q('Защо', p.why)}${q('Колко', p.cost ? B(p.cost) : 'без разход')}${q('Кога', p.days ? `~${p.days} дни` : '')}${q('Очакваме', gain)}${p.needsGear ? q('Условие', p.needsGear) : ''}${fit}<div class="row">${must ? `<button class="vt imp">🗳️ Решава бордът — гласуване</button>` : `<button class="y">✓ Да</button>${p.small ? `<button class="sm">½ По-малък вариант · ${B(p.small.cost)}</button>` : ''}`}<button class="n">✖ Не</button><button class="l">⏳ По-късно</button>${o.voteOn && !must ? `<button class="vt${imp ? ' imp' : ''}">${imp ? '⭐ Важен проект — 🗳️ на гласуване' : '🗳️ Подложи на гласуване'}</button>` : ''}</div>${must ? '<div class="q" style="margin-top:6px;color:#8fd0ff">🏛️ Мегапроект: само с мнозинство в борда.</div>' : ''}`;
+      scr.innerHTML = `${hd(p.head || '📋 Предложение към борда')}<div class="tx"></div>${q('Защо', p.why)}${q('Колко', p.cost ? B(p.cost) : 'без разход')}${q('Кога', p.days ? `~${p.days} дни` : '')}${q('Очакваме', gain)}${p.needsGear ? q('Условие', p.needsGear) : ''}${fit}<div class="row">${must ? `<button class="vt imp">🗳️ Решава бордът — гласуване</button>` : `<button class="y">✓ Да</button>${p.small ? `<button class="sm">½ По-малък вариант · ${B(p.small.cost)}</button>` : ''}`}<button class="n">✖ Не</button><button class="l">⏳ По-късно</button>${o.voteOn && !must ? `<button class="vt${imp ? ' imp' : ''}">${imp ? '⭐ Важен проект — 🗳️ на гласуване' : '🗳️ Подложи на гласуване'}</button>` : ''}</div>${must ? '<div class="q" style="margin-top:6px;color:#8fd0ff">🏛️ Мегапроект: само с мнозинство в борда.</div>' : ''}`;
       const vt = scr.querySelector('.vt'); if (vt) vt.onclick = () => { const r = o.voteOn(p.id); if (r) showVote(r, true); };
       const y = scr.querySelector('.y') || {}; y.disabled = p.can === false; if (y.disabled) y.title = 'Нямаш достатъчно пари';
       for (const [c, a] of [['y', 'yes'], ['sm', 'small'], ['n', 'no'], ['l', 'later']]) { const b = scr.querySelector('.' + c); if (b) b.onclick = () => { const r = o.onDecide && o.onDecide(p.id, a); if (r && r.need === 'vote') showVote(r); else { const ok = (a === 'yes' || a === 'small') && !(r && r.done === false); if (ok && imp) cheer(); after(ok ? 'ok' : a === 'yes' || a === 'small' ? 'no' : a); } }; }   // решеното изчезва — на същото място идва следващото
@@ -833,7 +833,7 @@ const DEMO_PROPS = [
   { id: 'demo-energy', dir: 'con', ico: '⚡', text: 'Соларен и вятърен парк край Бургас и Варна — 120 MW.', cost: 9e7, inBudget: true, days: 150, gainTxt: '+3,1 млн. €/месец', geo: { country: 'BGR', kind: 'energy', cities: [{ nm: 'Бургас', lat: 42.5, lon: 27.47 }, { nm: 'Варна', lat: 43.21, lon: 27.91 }] } },
   { id: 'demo-bank', dir: 'bank', ico: '🏦', text: 'Аржентина иска кредит от 1,2 млрд. € за 5 години при 7,5% годишно. Рейтинг BBB. Да го отпуснем ли?', why: 'държавата плаща редовно, лихвата е над пазарната', cost: 1.2e9, inBudget: false, days: 1825, gainTxt: '+7,5 млн. €/месец лихва', geo: { country: 'ARG', kind: 'loan', rating: 'BBB', ratingCol: '#ffd54a', amt: 1.2e9, cities: [{ nm: 'Буенос Айрес', lat: -34.6, lon: -58.38 }] } },
 ];
-export function demoBoardroom() {
+export function demoBoardroom(ov = {}) {
   const C = [['con', '🏗️', 'Констръкшън', 'Ивайло Петров', 5, 2.1e6], ['hw', '🛣️', 'Толроуд', 'Надя Иванова', 5, 1.4e6], ['rail', '🚆', 'Рейл', 'Мария Стоянова', 5, 9.8e5], ['sea', '🚢', 'Оушън Експрес', 'Стефан Колев', 5, 1.1e6],
     ['air', '✈️', 'Флайеър', 'Елена Димитрова', 5, 1.6e6], ['hotel', '🏨', 'Хотелс', 'Георги Николов', 5, 7.2e5], ['oil', '🛢️', 'Петролиум', 'Вера Ангелова', 5, 3.4e6], ['bank', '🏦', 'Банк', 'Борис Тодоров', 5, 2.7e6], ['glob', '🌍', 'Глобъл Ризортс & Констръкшън', 'Александър Владимиров', 0, 0], ['mayor', '🏙️', 'Империал Сити', 'Десислава Илиева', 0, 0]];
   return openBoardroom({
@@ -857,5 +857,21 @@ export function demoBoardroom() {
       const votes = D.map(([dir, name], i) => ({ dir, name, yes: dir === p.dir || (i + p.id.length) % 3 !== 0, cond: dir === 'con' && i % 2 === 0, why: dir === p.dir ? 'моето предложение' : (i + p.id.length) % 3 ? 'полезно за холдинга' : 'чакат пари за моето дружество' }));
       const yes = votes.filter(v => v.yes).length; return { p, v: { votes, yes, no: votes.length - yes, passed: yes > votes.length / 2, bank: { ok: true } } }; },
     seats: () => C.map(([k, ico, suf, d, lv, inc]) => ({ k, ico, company: 'Титан ' + suf, what: '', open: true, director: d, lv, lvMax: 5, inc, bonus: inc * (lv * 0.1 + (d ? 0.15 : 0)), bonusPct: Math.round((lv * 0.1 + (d ? 0.15 : 0)) * 100), up: lv < 5 ? { cost: 5e6, can: true } : null, hire: !d && lv >= 5 ? { cost: 4e6, can: true } : null })),
+    ...ov,
   });
+}
+
+// ⛔ Лабораторията: извънредно заседание (group.js emergency) — супер поръчка, само тази точка и задължително гласуване
+export function demoEmergency() {
+  const it = { id: 'mega:chunnel', head: '⛔ Извънредна точка', dir: 'rail', ico: '🚄🇬🇧🇫🇷', mustVote: true, inBudget: false, can: true, cost: 3.1e8, days: 300,
+    text: 'Британското и френското правителство ни възлагат „Тунелът под Ламанша“: подводен жп тунел — Лондон и Париж за 2 часа с влак. Награда 90 млн. €, аванс 15% веднага.',
+    why: 'супер поръчка — идва веднъж на милион; срок 300 дни, иначе връщаме аванса и губим 0.3 ★', gainTxt: '90 млн. € + 150 000 €/ден завинаги' };
+  let left = true;
+  const D = [['rail', 'Мария Стоянова', true, 'моето предложение'], ['bank', 'Борис Тодоров', false, 'струва 310 млн. €, а свободни са 740 млн. € — рисково, но възможно'], ['con', 'Ивайло Петров', true, 'полезно за холдинга'], ['hw', 'Надя Иванова', false, 'ще остане без пари за Титан Толроуд (40 млн. €)'],
+    ['sea', 'Стефан Колев', true, 'полезно за холдинга'], ['air', 'Елена Димитрова', true, 'Лондон и Париж — повече пътници и за нас'], ['oil', 'Вера Ангелова', true, 'полезно за холдинга']];
+  return demoBoardroom({ title: 'Титан Груп — демо', hallTitle: '⛔ Извънредно заседание', loadText: '🚨 Директорите се събират спешно…', report: null, speech: null, summary: null,
+    proposals: () => left ? [it] : [],
+    onDecide: (id, a) => { if (a === 'no') left = false; return null; },
+    voteOn: () => { const votes = D.map(([dir, name, yes, why]) => ({ dir, name, yes, why })), yes = votes.filter(v => v.yes).length; return { p: it, v: { votes, yes, no: votes.length - yes, passed: yes > votes.length - yes, bank: { ok: true } } }; },
+    onResolve: (id, how) => { if (how !== 'drop') left = false; return { done: how !== 'drop' }; } });
 }

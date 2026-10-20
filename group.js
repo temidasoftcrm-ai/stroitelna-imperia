@@ -275,5 +275,43 @@ export function createGroup(deps) {
       onResolve: (id, how, shown) => { const r = deps.board2().resolve(id, how, shown); re(); return r; },   // shown — показаният вот (без преизчисляване)
       settings: deps.board2 ? () => deps.board2().settingsHtml() : null, bindSettings: (box, rr) => deps.board2().bindSettings(box, () => { rr(); re(); }) }));
   }
-  return { dirEv, dirPanel, bindPanels, check, winHtml, bind, board, proposals, decide, dailyTick, dailyBonus, upgrade, hire, found, canFound };
+  // ⛔ извънредно заседание — при важна поръчка (супер поръчка или такава над EMG_SHARE от касата): червен бутон долу вляво,
+  // залата само с тази точка и задължително гласуване. „Одобри“ → item.accept(), „Отхвърли“ → item.decline(), „Отложи“ — бутонът остава.
+  // item: { id, ico, text, short?, why?, cost? (вложението), value? (стойността на поръчката), days?, gainTxt?, dir? ('con'), until? (ден), live()?, accept(), decline() }
+  // Свиква се само при холдинг с директори в залата (feature 'boardroom' + 'board-emg'); иначе връща false и поръчката върви по стария път.
+  const EMG_SHARE = 0.25;
+  let emg = [];
+  const emgOn = () => { const S = deps.S(); return !!(S && S.holding && feature('boardroom') && feature('board-emg') && Object.keys((S.hold && S.hold.dir) || {}).length); };
+  function emgBtn() {
+    const day = deps.S().day || 0; emg = emg.filter(it => !(it.until < day) && !(it.live && !it.live()));   // live() — поръчката още чака отговор (не е приета/отказана другаде)
+    let b = document.getElementById('emgBtn');
+    if (!emg.length) { if (b) b.remove(); return; }
+    if (!b) { b = document.createElement('button'); b.id = 'emgBtn'; b.style.cssText = 'position:fixed;left:14px;bottom:86px;z-index:60;background:#b3121b;color:#fff;border:2px solid #ff6b6b;border-radius:12px;padding:9px 14px;font:800 14px system-ui;box-shadow:0 0 0 0 #ff4d4d;animation:emgP 1.4s infinite;cursor:pointer';
+      if (!document.getElementById('emgCss')) { const st = document.createElement('style'); st.id = 'emgCss'; st.textContent = '@keyframes emgP{0%{box-shadow:0 0 0 0 #ff4d4daa}70%{box-shadow:0 0 0 14px #ff4d4d00}100%{box-shadow:0 0 0 0 #ff4d4d00}}'; document.head.appendChild(st); } document.body.appendChild(b); b.onclick = () => emergencyBoard(); }
+    const t = `⛔ Извънредно заседание · ${emg[0].ico || ''} ${emg[0].short || emg[0].text.split(/[.:—!?]/)[0].slice(0, 40)}${emg.length > 1 ? ` (+${emg.length - 1})` : ''}`;
+    b.textContent = t;
+  }
+  function emergency(item) {
+    if (!emgOn() || !item || !item.accept) return false;
+    if (!emg.some(it => it.id === item.id)) emg.push(item);
+    deps.toast(`⛔ Извънредно заседание на борда: ${item.ico || ''} ${item.short || item.text}. Директорите се събират — решението е с гласуване.`, 'bad', () => emergencyBoard());
+    deps.sound && deps.sound('offer'); emgBtn();
+    return true;
+  }
+  // поръчка над EMG_SHARE от касата → извънредно заседание; иначе false (поръчката върви по стария път)
+  const emergencyIf = item => { const cash = Math.max(1, deps.econ().money || 0), v = Math.max(item.value || 0, item.cost || 0); return v > cash * EMG_SHARE ? emergency({ ...item, why: item.why || `${Math.round(v / cash * 100)}% от касата — над прага от ${EMG_SHARE * 100}%` }) : false; };
+  function emergencyBoard(rerender) {
+    emgBtn(); if (!emg.length) return;
+    const re = () => { emgBtn(); rerender && rerender(); }, B2 = () => deps.board2 && deps.board2();
+    const props = () => emg.filter(it => !(it.live && !it.live())).map(it => { const F = B2() && B2().frame ? B2().frame() : null; return { dir: 'con', head: '⛔ Извънредна точка', ...it, mustVote: true, inBudget: it.cost && F ? it.cost <= F.free : null, can: true }; });
+    const done = (id, ok) => { const it = emg.find(x => x.id === id); if (!it) return; emg = emg.filter(x => x !== it); try { ok ? it.accept() : it.decline && it.decline(); } catch (e) { console.warn('emergency', e); } deps.save(); re(); };
+    const voteOf = p => { const b = B2(); if (b && b.vote) return b.vote(p); const votes = Object.keys(deps.S().hold.dir || {}).map(d => ({ dir: d, name: deps.S().hold.dir[d], yes: true, why: d === p.dir ? 'моето предложение' : 'полезно за холдинга' })); return { votes, yes: votes.length, no: 0, passed: true, bank: { ok: true } }; };
+    import('./directors3d.js').then(m => m.openBoardroom({ title: groupName(deps.S()), brand: brandOf(deps.S()) && { ...brandOf(deps.S()), group: groupName(deps.S()) }, seats: boardSeats, fmt: deps.fmt, sound: deps.sound,
+      hallTitle: '⛔ Извънредно заседание', loadText: '🚨 Директорите се събират спешно…',
+      proposals: props, frame: B2() ? () => B2().frame() : null,
+      onDecide: (id, a) => { if (a === 'no') done(id, false); return null; },
+      voteOn: id => { const p = props().find(q => q.id === id); return p ? { v: voteOf(p), p } : null; },
+      onResolve: (id, how, shown) => { if (how === 'drop') return { done: false }; if (shown && shown.yes < shown.no) { deps.toast('🗳️ Бордът не подкрепи поръчката — без мнозинство не се поема.', 'bad'); return { done: false }; } done(id, true); return { done: true }; } }));
+  }
+  return { dirEv, dirPanel, bindPanels, check, winHtml, bind, board, proposals, decide, dailyTick, dailyBonus, upgrade, hire, found, canFound, emergency, emergencyIf, emergencyBoard, emgOn };
 }

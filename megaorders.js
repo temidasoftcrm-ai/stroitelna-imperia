@@ -20,6 +20,7 @@ const P = { chance: 1 / 260, offerDays: 15, adv: 0.15, retry: 720 };
 // deps: { S(), econ(), toast, modal, fmt, save, sound, contOpen(key), rep(), addRep(d), addXp(n), cityName(id),
 //   railLeg(a, b) → null | { built, prog }, railQuote(a, b) → { km, cost, days }, railBuild(a, b),
 //   abId(a, b), abDone(id), abJob(id) → { pct } | null, abQuote(a, b) → { km, reward, days }, abWhy(id) → '' | причина, abTake(id), pop(key, cap, sub), openWin() }
+//   emergency?(item) — group.js: извънредно заседание на борда вместо прозореца с офертата
 export function createMega(deps) {
   const st = k => { const S = deps.S(); S.mega = S.mega || {}; return S.mega[k] = S.mega[k] || { st: 'none' }; };
   const day = () => deps.S().day, f = n => deps.fmt(n), byKey = k => MEGA.find(m => m.key === k);
@@ -38,8 +39,18 @@ export function createMega(deps) {
     const s = st(m.key); s.st = 'offer'; s.at = day();
     deps.sound && deps.sound('offer');
     deps.pop && deps.pop(m.pic, `${m.ico}${m.flag} ${m.nm} — специална поръчка!`, `${m.who} търси фирма: ${routeTxt(m)}.`);
+    // ⛔ при холдинг с директори — извънредно заседание на борда (group.js emergency): решението е с гласуване, вместо прозореца
+    if (deps.emergency && deps.emergency(emgItem(m))) return;
     deps.toast(`${m.ico}${m.flag} Специална поръчка: „${m.nm}“! Награда ${f(m.fee)} €. Отговори до ден ${s.at + P.offerDays}.`, 'good', () => deps.openWin());
     ask(m.key);
+  }
+  // точката за извънредното заседание: вложението — шлюзовете или неготовите жп участъци (аутобанът се плаща по участъци от прозореца)
+  function emgItem(m) {
+    const L = legs(m), cost = m.kind === 'works' ? m.cost : m.kind === 'rail' && deps.railQuote ? L.filter(l => !l.done && !l.started).reduce((a, l) => a + ((deps.railQuote(l.a, l.b) || {}).cost || 0), 0) : 0;
+    return { id: 'mega:' + m.key, ico: m.ico + m.flag, short: m.nm, dir: m.kind === 'rail' ? 'rail' : m.kind === 'ab' ? 'hw' : 'con', cost, value: m.fee, days: m.days, until: st(m.key).at + P.offerDays,
+      text: `${m.who} ни възлага „${m.nm}“: ${m.what}. Награда ${f(m.fee)} €, аванс ${Math.round(P.adv * 100)}% веднага.`,
+      why: `супер поръчка — идва веднъж на милион; срок ${m.days} дни, иначе връщаме аванса и губим 0.3 ★`, gainTxt: `${f(m.fee)} € + ${f(m.daily)} €/ден завинаги`,
+      live: () => st(m.key).st === 'offer', accept: () => accept(m.key), decline: () => decline(m.key) };
   }
   function ask(k) {
     const m = byKey(k), p = progress(k);

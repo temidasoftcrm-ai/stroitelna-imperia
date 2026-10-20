@@ -2331,6 +2331,9 @@ function makeOffer() {
   const o = sizeTower({ id: S.seq++, type, lot: lot.id, client, reward: Math.round(ECON.quoteReward(type, S.rep) * (hasStaff('architect') ? 1.1 : 1) * dev.offerMul() * events.offerMul() * (isAm(S.cityId) ? AM_K.reward : 1) / 500) * 500, days: bt.days, expires: S.day + 4 });
   lot.busy = 'offer';
   S.offers.push(rivals.attach(o));
+  // ⛔ голяма поръчка спрямо касата (над 25%) при холдинг с директори — извънредно заседание (group.js, feature 'board-emg')
+  group.emergencyIf({ id: `offer:${o.id}`, ico: BTYPES[type]?.ico || '🏗️', short: `${BTYPES[type]?.nm || 'Поръчка'} — ${o.client}`, text: `${o.client} поръчва ${(BTYPES[type]?.nm || 'обект').toLowerCase()} в ${cityName()} за ${fmt(o.reward)} €.`, value: o.reward, days: o.days, dir: 'con',
+    live: () => S.offers.some(x => x.id === o.id), accept: () => acceptOffer(o.id), decline: () => declineOffer(o.id) });
 }
 // наддаване (bidding.js): избраният множител на цената за всяка оферта
 const bidSel = {};
@@ -5141,7 +5144,7 @@ const route66 = createRoute66({ S: () => S, econ: () => econ, toast, modal, fmt,
   pop: (cap, sub) => showEventPop(/открит/.test(cap) ? 'r66-done' : 'ab-done', cap, sub), openWin: () => openBig('super') });
 // ⭐ супер поръчки по континентите (megaorders.js): Ламанша, Кейп — Кайро, Панамският канал, Дариен, Транссибирската, „Гън“
 const megaAbWhy = id => { const sg = segById(id); if (!sg) return 'няма участък'; if (!abUnlocked()) return '🔒 аутобани'; if ((S.hwJobs || []).length >= HW_MAX_JOBS() + HW_PRIO) return 'няма свободен екип'; return ''; };
-const mega = createMega({ S: () => S, econ: () => econ, toast, modal, fmt, save, sound: n => Sound.play(n), rep: () => S.rep || 0,
+const mega = createMega({ emergency: it => group.emergency(it), S: () => S, econ: () => econ, toast, modal, fmt, save, sound: n => Sound.play(n), rep: () => S.rep || 0,
   contOpen: k => !!S && dev.has(['eu', 'af'].includes(k) ? 'MEGA_EU' : 'MEGA_WORLD') && (k === 'eu' ? dev.has('EUROPE') : !!contByKey(k)?.open?.()),   // специалните поръчки: ниво 13 (Европа, Африка), 19 (светът)
   addRep: d => { S.rep = Math.max(0, Math.min(5, S.rep + d)); }, addXp: n => dev.add(n), cityName: id => cityById(id)?.nm || id,
   railLeg: (a, b) => (S.rails || []).find(r => !r.c && ((r.a === a && r.b === b) || (r.a === b && r.b === a))) || null, railQuote: (a, b, mul = 1) => { const q = railQuote(a, b); return { ...q, cost: Math.round(q.cost * mul / 1000) * 1000 }; }, railBuild: (a, b, mul = 1) => orientBuild(a, b, mul),
@@ -5184,7 +5187,7 @@ function tenderLevelUp(t) {
 const ccOrBg = id => cityById(id) ? cityById(id).cc || '🇧🇬' : null;
 const tenderCountryOk = t => !t.id.startsWith('st-') || ownedCities().some(id => ccOrBg(id) && ccOrBg(id) === ccOrBg(t.city));
 // 🏛️ поръчките на общината (muniorders.js) — в градовете по истинската карта (план v2): услугите, които не стигат
-const muni = createMuni({ S: () => S, cityId: () => S.cityId, plan: () => city.plan, lots: () => city.lots, econ: () => econ, toast, fmt, save, sound: n => Sound.play(n), addXp: n => dev.add(n),
+const muni = createMuni({ emergencyIf: it => group.emergencyIf(it), S: () => S, cityId: () => S.cityId, plan: () => city.plan, lots: () => city.lots, econ: () => econ, toast, fmt, save, sound: n => Sound.play(n), addXp: n => dev.add(n),
   addRep: d => { S.rep = Math.max(0, Math.min(5, S.rep + d)); }, cityName: id => cityById(id)?.nm || id, sz: id => cityById(id)?.sz || 1, mega: id => MEGAPOLIS.has(id), built: () => (S.built || []).length,
   ext: () => S.cityExt || 0, extMax: () => MAX_EXT, lv: () => dev.best(), group: () => city.group, night: () => dayNight.night > 0.5, redraw: () => { muni.draw(THREE); renderPanel(); } });
 const tenders = createTenders({ voice: () => tenderDir(), canTender: t => !!S && dev.best() >= 3 && tenderCountryOk(t), pop: (k, c, s) => showEventPop(k, c, s), onComplete: (id, t) => { if (t) tenderLevelUp(t); if (t && t.kind === 'port') { portBonus(t.city); showEventPop(id === 'port-istanbul' ? 'bosphorus-done' : 'port-done', `🏛️ ${t.ico} ${t.nm} е предаден!`, `${cityById(t.city)?.nm || ''} · +0.5 ★ · пристанището поема повече кораби`); } }, S: () => S, econ: () => econ, toast, modal, fmt, save, sound: n => Sound.play(n === 'done' ? 'tenderDone' : n), rep: () => S.rep || 0, devBest: () => dev.best(),

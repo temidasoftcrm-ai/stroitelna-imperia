@@ -97,6 +97,7 @@ const DEMOS = [
   ['🏗️ Оперативна карта: възстановяване на район (Украйна)', 'sofia', () => $('fr').contentWindow.eval("import('/ops.js').then(m => m.demoOps('US', false, 'rebuild'))")],
   ['🌍 Геополитическата карта (САЩ)', 'sofia', d => d.geoDemo('US')],
   ['🌍 Геополитическата карта (Русия)', 'sofia', d => d.geoDemo('RU')],
+  ['⛔ Извънредно заседание (супер поръчка)', 'sofia', () => $('fr').contentWindow.eval("import('/directors3d.js').then(m => m.demoEmergency())")],   // group.js emergency()
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

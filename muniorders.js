@@ -6,7 +6,7 @@
 // Записи: S.svc[cityId] = { [k]: [{ lvl, built, lots }] } (services.js) · S.muni[cityId] = { offer, job, done, skip }.
 // deps: { S(), cityId(), plan() (city.plan — gamePlan2), lots() (city.lots — същите id като plan.lots), econ(), toast(msg, kind),
 //   fmt, save(), sound(n), addXp(n), addRep(d), cityName(id), sz(id), mega(id), built() (брой построени обекти в града), ext(), extMax(),
-//   lv() (нивото на фирмата), group() (city.group), night() → bool, label? }
+//   lv() (нивото на фирмата), group() (city.group), night() → bool, label?, emergencyIf?(item) (group.js — извънредно заседание) }
 import { needs, builds, seedBase, cityServices, popOf, tierOf, costOf, daysOf, SERVICES } from './services.js';
 import { servicePlacer, servicesLayer, serviceSite } from './servicesplace.js';
 
@@ -69,6 +69,10 @@ export function createMuni(deps) {
     for (const c of needs(rec(), pop(), tier()).slice(0, 5)) { for (const lv of [c.lvl, 'm', 's'].filter((v, i, a) => SERVICES[c.k].lot[v] && a.indexOf(v) === i)) { p = sp.place(c.k, lv, rec(), taken); if (p) { n = { ...c, lvl: lv, cost: costOf(c.k, lv), days: daysOf(c.k, lv) }; break; } } if (n) break; }
     if (!n) { s.skip = d + MUNI.gap * 3; return; }
     s.offer = { k: n.k, lvl: n.lvl, cost: n.cost, days: n.days, why: n.why, lots: p.lots, district: p.district, until: d + MUNI.offerDays };
+    // ⛔ голяма поръчка спрямо касата (над 25%) при холдинг с директори → извънредно заседание (group.js emergencyIf)
+    const of = s.offer; if (deps.emergencyIf && deps.emergencyIf({ id: `muni:${id()}:${d}`, ico: ico(n.k), short: `${nm(n.k)} — ${deps.cityName(id())}`, dir: 'con', value: n.cost, cost: Math.round(n.cost * MUNI.mat), days: n.days, until: of.until,
+      text: `Общината на ${deps.cityName(id())} възлага ${nm(n.k).toLowerCase()} в ${p.district} — ${f(n.cost)} €, аванс ${Math.round(MUNI.adv * 100)}%.`, gainTxt: `${f(n.cost * (1 - MUNI.mat))} € печалба`,
+      live: () => st().offer === of, accept: () => accept(), decline: () => decline() })) return;
     deps.toast(`🏛️ Общината на ${deps.cityName(id())} обявява поръчка: ${ico(n.k)} ${nm(n.k)} в ${p.district} — ${f(n.cost)} €. Виж „Поръчки“.`, 'good');
     deps.sound && deps.sound('offer');
   }
