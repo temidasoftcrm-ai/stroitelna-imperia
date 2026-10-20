@@ -64,7 +64,7 @@ import { syncImpCivic, updateImpCivic } from './impcivic.js';   // общест�
 import { pickModel as impPick, decor as impDecor, IMP_MODELS, IMP_H } from './impstyle.js';
 import { createNeom, NEOM_CITY, NEOM_ID, DISTRICTS as NEOM_DISTRICTS, FOUND_COST as NEOM_FOUND } from './neom.js';
 import { buildSite3D } from './mine3d.js';
-import { CITY_LANDMARKS, LANDMARK_CENTER, BIG_LANDMARKS, SEA_LANDMARKS, buildLandmark, buildSeaLandmark, manhattanTowers } from './landmarks.js';
+import { CITY_LANDMARKS, LANDMARK_CENTER, BIG_LANDMARKS, SEA_LANDMARKS, buildLandmark, buildSeaLandmark, manhattanTowers, lmFit } from './landmarks.js';
 import { OFFICE_STYLES, STYLE_LV, STYLE_COST, buildOfficeTower } from './officestyle.js';
 import { shipRange, PORT_LEVELS, portMax, SHIPS, seaKm, seaPath, SEA_ROUTE_COST, voyagePay, shipDaily, SEA_LV } from './seaways.js';
 import { makeTrackMap, placeCars } from './trackpath.js';
@@ -634,7 +634,7 @@ const PLAN_TPL5 = { sofia: 'osm' };
 const PLAN_TPL7 = { losangeles: 'osm' };
 // 🇮🇹 планът v2 по истинската карта (cityplan2game.js + cityplan2-3d.js): Рим в НОВИТЕ игри (флаг rome-osm → S.plan2.rome);
 // старите записи остават на стария план. Данните (~5 MB) се зареждат само когато градът е такъв — plan2Preload преди влизането.
-const PLAN2_CITIES = new Set(['rome']);
+const PLAN2_CITIES = new Set(['rome', 'paris']);   // градовете по истинската карта (флагове <id>-osm + <id>-game)
 const plan2 = { mod: null, view: null, data: {}, cache: null };
 const plan2On = id => !!(S && S.plan2 && S.plan2[id] && plan2.data[id]);
 const plan2Tier = () => 1 + Math.min(4, S.cityExt || 0);   // всеки купен квартал отключва следващото ниво рионе (1…5)
@@ -647,15 +647,15 @@ async function plan2Preload(s) {
 }
 const plan2Plan = id => { const t = plan2Tier(), c = plan2.cache; if (c && c.id === id && c.t === t) return c.P; const P = plan2.mod.gamePlan2(plan2.data[id], { tier: t }); plan2.cache = { id, t, P }; return P; };
 // старите записи: градът по истинската карта идва сам, ако още нямаш нищо там; иначе — по избор с изкупуване (plan2Move)
-const plan2Ready = () => feature('rome-osm') && feature('rome-game');
+const plan2Ready = (id = S && S.cityId) => !!id && feature(id + '-osm') && feature(id + '-game');
 const plan2Touched = (s, id) => s.cityId === id || s.hqCity === id || !!(s.cities || {})[id] || (s.branches || []).includes(id);
-function plan2Adopt(s) { if (!s || !plan2Ready()) return; for (const id of PLAN2_CITIES) if (!(s.plan2 && s.plan2[id]) && !plan2Touched(s, id)) s.plan2 = { ...(s.plan2 || {}), [id]: 1 }; }
+function plan2Adopt(s) { if (!s) return; for (const id of PLAN2_CITIES) if (plan2Ready(id) && !(s.plan2 && s.plan2[id]) && !plan2Touched(s, id)) s.plan2 = { ...(s.plan2 || {}), [id]: 1 }; }
 // преместване на филиала в новия град (сега си в него): имотите и земята — изкупени по пазарна цена +15%, текущите обекти — платени изцяло;
 // остават техниката, служителите, развитието, нивата на офиса/гаража/склада/гарата и купените квартали (те отключват рионе)
 const plan2MoveValue = () => { const E = S.estate || {}; return Math.round(((E.owned || []).reduce((a, o) => a + (o.value || 0), 0) * 1.15 + (E.land || []).reduce((a, id) => a + (city.lots[id] ? lotPrice(city.lots[id]) : 0), 0)
   + projects.reduce((a, p) => a + Math.max(0, (p.reward || 0) * (1 - (p.prog || 0))), 0)) / 1000) * 1000; };
 function plan2Move() {
-  const id = S.cityId; if (!PLAN2_CITIES.has(id) || (S.plan2 && S.plan2[id]) || !plan2Ready()) return;
+  const id = S.cityId; if (!PLAN2_CITIES.has(id) || (S.plan2 && S.plan2[id]) || !plan2Ready(id)) return;
   const v = plan2MoveValue(); if (v > 0) econ.earn(v, 'продажба', `Новият ${cityName()}: изкупени имоти и обекти`);
   for (const p of [...projects]) { if (p.lot != null && city.lots[p.lot]) city.lots[p.lot].busy = null; }
   projects.length = 0;
@@ -668,12 +668,12 @@ function plan2Move() {
   save(); sessionStorage.setItem('stroiEnter', '1'); location.reload();
 }
 function plan2MoveCard() {
-  if (!S || !PLAN2_CITIES.has(S.cityId) || (S.plan2 && S.plan2[S.cityId]) || !plan2Ready()) return '';
+  if (!S || !PLAN2_CITIES.has(S.cityId) || (S.plan2 && S.plan2[S.cityId]) || !plan2Ready(S.cityId)) return '';
   return `<div class="card" style="border:1px solid #d4af37"><h3>🇮🇹 Новият ${cityName()} по истинската карта</h3><div class="meta">Истинските улици, Тибърът с мостовете, кварталите (рионе), Термини и забележителностите на реалните им места. Минаваш с техниката, служителите и нивата си; имотите и земята ти тук общината изкупува по пазарна цена +15%, а текущите обекти плаща изцяло: <b style="color:var(--ok)">${fmt(plan2MoveValue())} €</b>.</div>
     <div class="row" style="justify-content:flex-end"><button class="btn" data-p2move="1">🏛️ Мини в новия ${cityName()}</button></div></div>`;
 }
 // 🏙️ генерираните градове (16-те шаблона plan2: eu/us/coast/radial × s/m/l/xl) — в НОВИТЕ игри (S.plan2gen, флаг plan2-game) всички градове без истинска карта
-const plan2GenOn = id => !!(S && S.plan2gen && plan2.mod && !PLAN2_CITIES.has(id) && id !== NEOM_ID && !AIR_ONLY.has(id));
+const plan2GenOn = id => !!(S && S.plan2gen && plan2.mod && !(S.plan2 && S.plan2[id]) && id !== NEOM_ID && !AIR_ONLY.has(id));
 const plan2GenPlan = id => { const mega = MEGAPOLIS.has(id), t = cityTier(id), cnt = planCount(mega, S.cityExt || 0), c = plan2.cache;
   if (c && c.id === id && c.t === 'g' + cnt) return c.P;
   const P = plan2.mod.gamePlan2Gen(id, { tier: mega ? 'xl' : t === 'xl' ? 'xl' : t === 'l' ? 'l' : t === 's' ? 's' : 'm', coastal: SEASIDE.includes(id), region: isAm(id) ? 'us' : null, mega, count: cnt, minLots: mega ? MEGA_LOTS : PLAN_CORE + PLAN_EXT * Math.max(MAX_EXT, extRule(id)) });
@@ -2256,7 +2256,7 @@ function newGame(cityId, brand = null, brandNm = '') {
   S.foundFirst = 1;   // дъщерните фирми (пътна, жп, морска, авиация) — с ръчно основаване и стартов пакет
   if (params.has('plan') ? params.get('plan') === '1' : !AUTOTEST) S.planAll = feature('road-clean') ? 9 : feature('city-size') ? 8 : feature('la-osm') ? 7 : 6;   // 7: Лос Анджелис по картата (PLAN_TPL7); 6: по-чист център (cityplan opts.clean)   // нова игра — средните и големите градове с план (извити улици); старите записи остават на мрежата   // нов град с план (извити улици); старите записи остават на мрежата
   if (S.planAll && feature('plan2-game')) S.plan2gen = 1;   // 🏙️ новите градове от 16-те шаблона
-  if (S.planAll && feature('rome-osm') && feature('rome-game')) S.plan2 = Object.fromEntries([...PLAN2_CITIES].map(id => [id, 1]));   // и градовете, в които ще отвориш филиал по-късно (switchCity презарежда → plan2Preload)
+  if (S.planAll) { const ids = [...PLAN2_CITIES].filter(id => plan2Ready(id)); if (ids.length) S.plan2 = Object.fromEntries(ids.map(id => [id, 1])); }   // и градовете, в които ще отвориш филиал по-късно (switchCity презарежда → plan2Preload)
   if (S.plan2 && S.plan2[cityId]) { if (!plan2.data[cityId]) { const s0 = S; plan2Preload(S).then(() => { if (S !== s0) return; if (!plan2.data[cityId]) delete S.plan2; newGameEnter(brand); }); return; } }   // 🇮🇹 Рим по истинската карта — данните първо
   newGameEnter(brand);
 }
@@ -4974,7 +4974,7 @@ function airSite3D(id) {
   city.airSite = { g, x, pct, setPct };
 }
 // летището: на източния край (tx(NI - 1) + 70, z 0); Рим по истинската карта — на ръба към Фиумичино (P.anchors.airport, ЮЗ), извън града
-const airXZ = () => { const a = city.plan && city.plan.p2 && city.plan.osm && city.plan.anchors && city.plan.anchors.airport; return a ? [a.x - 190, a.z] : [tx(NI - 1) + 70, 0]; };
+const airXZ = () => { const a = city.plan && city.plan.p2 && city.plan.osm && city.plan.anchors && city.plan.anchors.airport; return a ? [a.x + Math.sin(a.dir || 0) * 200 - 30, a.z + Math.cos(a.dir || 0) * 200] : [tx(NI - 1) + 70, 0]; };   // навън от ръба, в посоката на летището
 function refreshAirport3D(id = S?.cityId) {
   if (!city.group || !id) return;
   airSite3D(id);
@@ -5416,7 +5416,7 @@ function landmarkPlan2(kinds) {
   for (const k of kinds) {
     const at = P.landmarks.find(L => L.k === k) || P.landmarks.find(L => L.k === k.replace(/\d+$/, '')); if (!at) continue;
     const o = buildLandmark(k, { label }); if (!o) continue;
-    box.setFromObject(o.group).getSize(sz); const s0 = Math.max(sz.x, sz.z) || 1;
+    let s0 = lmFit(k); if (!s0) { const sg = o.group.userData.sign; if (sg) sg.removeFromParent(); box.setFromObject(o.group).getSize(sz); s0 = Math.max(sz.x, sz.z) || 1; if (sg) o.group.add(sg); }   // моделите (GLB) се зареждат после — по основата им, не по временната плоча
     o.group.scale.multiplyScalar(Math.max(at.w, at.d) * 0.95 / s0); o.group.position.set(at.x, 0.1, at.z);
     o.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
     city.group.add(o.group); city.landmarks.push(o);

@@ -51,6 +51,20 @@ function facadeMat() {
   return FAC_MAT = new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 });
 }
 // Истанбул: османска къща — дъски, бели рамки на прозорците, еркер (cumba) на горните етажи; блок — светли балкони и парапети
+// Париж: османова сграда — светъл варовик, високи прозорци с ковани балкони на 2-ри и 5-и етаж, партер с витрини; покрив — мансарда от цинк
+let HAUSS_MAT = null;
+const HAUSS = [0xf0e6d2, 0xe9dcc3, 0xf3ead9, 0xe4d6bd, 0xeee2cc];
+function haussMat() {
+  if (HAUSS_MAT) return HAUSS_MAT;
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  g.fillStyle = '#f6efe2'; g.fillRect(0, 0, 128, 128); g.fillStyle = 'rgba(120,105,85,0.25)'; for (let y = 0; y < 128; y += 21) g.fillRect(0, y, 128, 1.5);   // корнизите на етажите
+  for (let r = 0; r < 5; r++) for (let k = 0; k < 4; k++) { const x = 9 + k * 30, y = 6 + r * 21; g.fillStyle = '#3a4250'; g.fillRect(x, y, 12, 15); g.fillStyle = '#e8dcc6'; g.fillRect(x - 2, y - 2, 16, 2); }
+  g.fillStyle = '#1d2024'; for (const y of [27, 90]) { g.fillRect(0, y, 128, 2); for (let x = 0; x < 128; x += 3) g.fillRect(x, y - 4, 1, 4); }   // ковани балкони (2-ри и 5-и етаж)
+  g.fillStyle = '#d9cdb5'; g.fillRect(0, 108, 128, 20); g.fillStyle = '#2f3a44'; for (let k = 0; k < 4; k++) g.fillRect(6 + k * 31, 111, 22, 17);   // витрините
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return HAUSS_MAT = new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 });
+}
+function mansardGeo() { const g = new THREE.BufferGeometry(), v = [-0.5, 0, -0.5, 0.5, 0, -0.5, 0.5, 0, 0.5, -0.5, 0, 0.5, -0.3, 1, -0.5, 0.3, 1, -0.5, 0.3, 1, 0.5, -0.3, 1, 0.5];   // мансарда: стръмни скатове и плосък връх
+  g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); g.setIndex([0, 4, 7, 0, 7, 3, 1, 2, 6, 1, 6, 5, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 3, 7, 6, 3, 6, 2]); g.computeVertexNormals(); return g; }
 let OTTO_MAT = null, APT_MAT = null;
 const OTTO = [0xd9a066, 0xe8c6a0, 0xc97d5d, 0xa9c4cf, 0xb7c9a0, 0xe2d6c0, 0x8a5a3c, 0xd4a9a9], APT = [0xf2efe6, 0xe9e3d4, 0xf3e8d2, 0xe0dcd2, 0xefe2c8];
 function ottoMat() {
@@ -91,7 +105,10 @@ function seaGround(sea) {
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
 }
 function seaView(G, D, RR) {
-  const S2 = D.sea, w = new THREE.Mesh(new THREE.PlaneGeometry(S2.nx * S2.cell * 1.6, S2.nz * S2.cell * 1.6).rotateX(-Math.PI / 2), MAT.water); w.position.set(S2.x0 + S2.nx * S2.cell / 2, -1.2, S2.z0 + S2.nz * S2.cell / 2); G.add(w);
+  const S2 = D.sea, IN = D.style === 'paris', w = new THREE.Mesh(new THREE.PlaneGeometry(S2.nx * S2.cell * (IN ? 1 : 1.6), S2.nz * S2.cell * (IN ? 1 : 1.6)).rotateX(-Math.PI / 2), MAT.water); w.position.set(S2.x0 + S2.nx * S2.cell / 2, -1.2, S2.z0 + S2.nz * S2.cell / 2); G.add(w);
+  if (IN) {   // град без море (Париж — само реката): около растера — суша (рамка), не вода
+    const W = S2.nx * S2.cell, H = S2.nz * S2.cell, F = 3000, fr = [[-F, -F, W + 2 * F, F], [-F, H, W + 2 * F, F], [-F, 0, F, H], [W, 0, F, H]].map(([x, z, w2, d2]) => new THREE.PlaneGeometry(w2, d2).rotateX(-Math.PI / 2).translate(S2.x0 + x + w2 / 2, 0, S2.z0 + z + d2 / 2));
+    for (const f of fr) { const m = new THREE.Mesh(f, MAT.urban); m.receiveShadow = true; G.add(m); } }
   const Pi = []; for (const p of D.piers || []) if (p.length > 1) Pi.push(ribbon(p, 4, -0.2)); if (Pi.length) G.add(merge(Pi, MAT.pier));
   const Fe = [], seenF = new Set(); for (const f of D.ferries || []) { const key = f.pts.length > 1 ? [f.pts[0], f.pts[f.pts.length - 1]].map(p => Math.round(p[0] / 40) + ',' + Math.round(p[1] / 40)).sort().join('|') : ''; if (seenF.has(key)) continue; seenF.add(key); dashed(f.pts, 5, 22, 0.7, -1.1, Fe); }   // еднаквите линии (двете посоки) — веднъж if (Fe.length) G.add(merge(Fe, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 })));   // фериботните линии по водата
   const Mt = []; for (const r of D.metro || []) if (r.kind !== 'rail') Mt.push(ribbon(r.pts, r.kind === 'tram' ? 2.2 : 2.6, 0.085)); if (Mt.length) G.add(merge(Mt, M(0x9a9184)));   // метро/трамвай на повърхността
@@ -331,9 +348,12 @@ const LABELS = {
     [41.0335, 28.978, 'Бейоглу', 'd'], [41.0295, 28.95, 'Фенер', 'd'], [41.034, 28.948, 'Балат', 'd'], [41.0365, 28.987, 'Таксим', 'd'], [41.0315, 28.983, 'Джихангир', 'd'],
     [41.0265, 29.017, 'Ускюдар', 'd'], [40.9905, 29.027, 'Кадъкьой', 'd'], [41.0085, 29.015, 'Харем', 'd'], [41.0125, 28.958, 'Беязът', 'd'], [41.0085, 28.952, 'Аксарай', 'd'], [41.004, 28.959, 'Кумкапъ', 'd']],
   rome: [[41.9, 12.4765, '', ''], [41.8865, 12.4745, 'Тибър', 'w']],
+  paris: [[48.8605, 2.3, 'Сена', 'w'], [48.8547, 2.3478, 'о. Сите', 'w'], [48.8517, 2.3567, 'о. Сен Луи', 'w'], [48.8705, 2.3655, 'канал Сен Мартен', 'w']],
 };
 const RIONI_BG = { Monti: 'Монти', Trevi: 'Треви', Esquilino: 'Есквилино', 'Castro Pretorio': 'Кастро Преторио', Colonna: 'Колона', 'Campo Marzio': 'Кампо Марцио', Trastevere: 'Трастевере', Prati: 'Прати', Ludovisi: 'Лудовизи', Sallustiano: 'Салустиано', Testaccio: 'Тестачо',
   Pigna: 'Пиня', "Sant'Eustachio": 'Сант Еустакио', Parione: 'Парионе', Regola: 'Регола', Ponte: 'Понте', Ripa: 'Рипа', Celio: 'Челио', 'San Saba': 'Сан Саба', "Sant'Angelo": 'Сант Анджело', Campitelli: 'Кампители', Borgo: 'Борго', Flaminio: 'Фламинио', Pinciano: 'Пинчано', Ostiense: 'Остиензе', Gianicolense: 'Джаниколензе', Aurelio: 'Аурелио' };
+// Париж: „Paris 7e Arrondissement“ → „7-и арондисман“
+const arrBg = nm => { const m = /^Paris (\d+)e/.exec(nm); if (!m) return nm; const n = +m[1], sfx = n === 1 ? 'ви' : n === 2 ? 'ри' : n === 3 || n === 4 ? 'ти' : 'и'; return `${n}-${sfx} арондисман`; };
 function labelSprite(text, kind) {
   const c = document.createElement('canvas'), g = c.getContext('2d'), F = kind === 'w' ? 'italic 600 46px Georgia, serif' : '700 38px system-ui, sans-serif';
   g.font = F; const w = Math.ceil(g.measureText(text).width) + 24; c.width = w; c.height = 64; g.font = F; g.textBaseline = 'middle'; g.textAlign = 'center';
@@ -344,7 +364,7 @@ function labelSprite(text, kind) {
 function mapLabels(G, D) {
   const K = D.k, at = (la, lo) => [(lo - D.center[1]) * Math.cos(D.center[0] * Math.PI / 180) * 111320 * K, -(la - D.center[0]) * 110540 * K], out = [];
   for (const [la, lo, text, kind] of LABELS[D.style || 'rome'] || []) { if (!text) continue; const [x, z] = at(la, lo); out.push({ x, z, text, kind }); }
-  for (const d of D.districts || []) { if (d.kind !== 'quarter' && !RIONI_BG[d.nm]) continue; const xs = d.poly.map(p => p[0]), zs = d.poly.map(p => p[1]); out.push({ x: xs.reduce((a, b) => a + b) / xs.length, z: zs.reduce((a, b) => a + b) / zs.length, text: RIONI_BG[d.nm] || d.nm, kind: 'd' }); }
+  for (const d of D.districts || []) { if (d.kind !== 'quarter' && !RIONI_BG[d.nm]) continue; const xs = d.poly.map(p => p[0]), zs = d.poly.map(p => p[1]); out.push({ x: xs.reduce((a, b) => a + b) / xs.length, z: zs.reduce((a, b) => a + b) / zs.length, text: RIONI_BG[d.nm] || arrBg(d.nm), kind: 'd' }); }
   const grp = new THREE.Group(); G.add(grp);
   const L = out.map(o => { const sp = labelSprite(o.text, o.kind); sp.position.set(o.x, o.kind === 'w' ? 6 : 30, o.z); grp.add(sp); return { sp, ...o }; });
   return { list: L, update(cam) {   // размерът — постоянен на екрана (по разстоянието); отблизо (под ~140 м) кварталите се крият, водите остават
@@ -410,7 +430,7 @@ function romeBlocks(G, P, style) {
   const lg = new Map(), lk = (x, z) => Math.floor(x / 40) + ',' + Math.floor(z / 40); for (const L of P.lots) { const k = lk(L.x, L.z); (lg.get(k) || lg.set(k, []).get(k)).push(L); }
   const lotAt = (x, z) => { const i = Math.floor(x / 40), j = Math.floor(z / 40); for (let a = i - 1; a <= i + 1; a++) for (let b = j - 1; b <= j + 1; b++) for (const L of lg.get(a + ',' + b) || []) { const c = Math.cos(L.rot), s = Math.sin(L.rot), dx = x - L.x, dz = z - L.z; if (Math.abs(dx * c - dz * s) < L.w / 2 + 4 && Math.abs(dx * s + dz * c) < L.d / 2 + 4) return L; } return null; };
   const list = [], m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
-  const IST = style === 'istanbul', DEP0 = IST ? 12 : 15, STEP = IST ? 10 : 14, used = new Set();
+  const IST = style === 'istanbul', PAR = style === 'paris', DEP0 = IST ? 12 : 15, STEP = IST ? 10 : PAR ? 13 : 14, used = new Set();
   for (const rd of P.roads) { if (rd.w > 14) continue;
     const T = rd.L[rd.L.length - 1];
     for (let s = 6; s < T - 6; s += STEP) { let i = 1; while (i < rd.L.length - 1 && rd.L[i] < s) i++; const a = rd.pts[i - 1], b = rd.pts[i], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, t = (s - rd.L[i - 1]) / ((rd.L[i] - rd.L[i - 1]) || 1), ux = (b[0] - a[0]) / l, uz = (b[1] - a[1]) / l;
@@ -420,16 +440,16 @@ function romeBlocks(G, P, style) {
         if (bad) continue; used.add(k);
         const h = ((rd.id * 7919 + Math.round(s) * 31 + (sg > 0 ? 17 : 0)) >>> 0) % 1000 / 1000, h2 = ((rd.id * 104729 + Math.round(s) * 13 + (sg > 0 ? 5 : 0)) >>> 0) % 1000 / 1000;
         // Истанбул: османски дървени къщи с еркери (историческият полуостров, Галата — европейският бряг) и бели жилищни блокове
-        const ty = !IST ? 0 : (x < 250 && h2 < 0.55) ? 1 : 2, H = ty === 1 ? 8 + h * 4 : ty === 2 ? 15 + h * 8 : 13 + h * 8, col = ty === 1 ? OTTO[Math.floor(h * OTTO.length)] : ty === 2 ? APT[Math.floor(h * APT.length)] : ROMA[Math.floor(h * ROMA.length)];
+        const ty = PAR ? 3 : !IST ? 0 : (x < 250 && h2 < 0.55) ? 1 : 2, H = ty === 1 ? 8 + h * 4 : ty === 2 ? 15 + h * 8 : ty === 3 ? 18 + h * 4 : 13 + h * 8, col = ty === 1 ? OTTO[Math.floor(h * OTTO.length)] : ty === 2 ? APT[Math.floor(h * APT.length)] : ty === 3 ? HAUSS[Math.floor(h * HAUSS.length)] : ROMA[Math.floor(h * ROMA.length)];   // Париж: османовите сгради — еднаква височина (~6 етажа)
         q.setFromAxisAngle(up, Math.atan2(ux, uz));
         list.push({ x, z, w: STEP, d: DEP, h: H, rot: Math.atan2(uz * sg, -ux * sg), t: ty, col, M: m.compose(new THREE.Vector3(x, H / 2, z), q, new THREE.Vector3(DEP, H, STEP + 0.3)).clone(), lot: lotAt(x, z) }); break; } } }
   // по вид: фасада (текстура) + покрив (римски — на две води; османски — нисък, тъмна керемида; блоковете — плосък)
-  const FM = [facadeMat(), ottoMat(), aptMat()], RF = [[roofGeo(), 0xa8553a, 0.3], [roofGeo(), 0x8d4a34, 0.22], [new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), 0xb9b6ae, 0]];
-  const parts = [0, 1, 2].map(t => { const n = Math.max(1, list.filter(b => b.t === t).length), box = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), FM[t], n), roof = new THREE.InstancedMesh(RF[t][0], new THREE.MeshStandardMaterial({ color: RF[t][1], roughness: 0.85, side: THREE.DoubleSide }), n);
+  const FM = [facadeMat(), ottoMat(), aptMat(), haussMat()], RF = [[roofGeo(), 0xa8553a, 0.3], [roofGeo(), 0x8d4a34, 0.22], [new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), 0xb9b6ae, 0], [mansardGeo(), 0x5e6872, 0.35]];
+  const parts = [0, 1, 2, 3].map(t => { const n = Math.max(1, list.filter(b => b.t === t).length), box = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), FM[t], n), roof = new THREE.InstancedMesh(RF[t][0], new THREE.MeshStandardMaterial({ color: RF[t][1], roughness: 0.85, side: THREE.DoubleSide }), n);
     box.frustumCulled = roof.frustumCulled = false; box.receiveShadow = box.castShadow = true; box.count = roof.count = 0; G.add(box, roof); return { box, roof }; });
   const V = new THREE.Vector3(), Q = new THREE.Quaternion(), Sc = new THREE.Vector3(), C = new THREE.Color();
   let hidden = null, fl = () => true;
-  const draw = () => { const n = [0, 0, 0];
+  const draw = () => { const n = [0, 0, 0, 0];
     for (const b of list) { if ((b.lot && !fl(b.lot)) || (hidden && hidden.has(b))) continue; const t = b.t || 0, { box, roof } = parts[t], i = n[t]++;
       box.setMatrixAt(i, b.M); box.setColorAt(i, C.setHex(b.col)); b.M.decompose(V, Q, Sc);
       roof.setMatrixAt(i, m.compose(V.set(V.x, V.y + Sc.y / 2, V.z), Q, t === 2 ? Sc.set(Sc.x * 1.02, 0.6, Sc.z * 1.02) : Sc.set(Sc.x, Math.min(4, Sc.x * RF[t][2]), Sc.z))); }
