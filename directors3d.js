@@ -491,15 +491,18 @@ export function openBoardroom(o) {
   // докато директорът жестикулира (говори, гласува, ръкопляска) и се включва, когато се върне в покой
   const ikA = new THREE.Vector3(), ikB = new THREE.Vector3(), ikT = new THREE.Vector3(), ikQ = new THREE.Quaternion(), ikP = new THREE.Quaternion(), ikW0 = new THREE.Quaternion();
   // глава и шия — леко вдигнати и обърнати към целта (до ~45° встрани, без да се навеждат към плота); плавно
-  const lookAt = new THREE.Vector3(), hlA = new THREE.Vector3(), hlQ = new THREE.Quaternion(), hlP = new THREE.Quaternion(), hlF = new THREE.Vector3();
+  const lookAt = new THREE.Vector3(), hlA = new THREE.Vector3(), hlQ = new THREE.Quaternion(), hlP = new THREE.Quaternion(), hlF = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
   function headLook(p, tgt, dt) {
     p.lookW = (p.lookW || 0) + (((tgt ? 1 : 0) * (p.cur === p.base ? 1 : 0.35)) - (p.lookW || 0)) * Math.min(1, dt * 2.5); if (p.lookW < 0.02 || !tgt) return;
+    // само завъртане около вертикалата (без наклон: дъгата от „напред“ към съсед до теб накланяше главата към рамото) + лек кимок нагоре/надолу
     for (const [nm, k] of [['mixamorigNeck', 0.4], ['mixamorigHead', 0.6]]) {
       const b = p.m.getObjectByName(nm); if (!b) continue; b.updateMatrixWorld(true); b.getWorldPosition(hlA); b.getWorldQuaternion(hlP);
-      hlF.set(0, 0, 1).applyQuaternion(hlP); hlF.y = Math.max(hlF.y, -0.25);   // напред от главата (Mixamo: +Z), без да гледа в масата
-      const want = tgt.clone().sub(hlA).normalize(); want.y = THREE.MathUtils.clamp(want.y, -0.3, 0.35);
-      hlQ.setFromUnitVectors(hlF.normalize(), want.normalize()); const ang = 2 * Math.acos(Math.min(1, Math.abs(hlQ.w))); if (ang > 0.8) hlQ.slerp(new THREE.Quaternion(), 1 - 0.8 / ang);
-      hlQ.slerp(new THREE.Quaternion(), 1 - k * p.lookW); hlP.premultiply(hlQ); b.parent.getWorldQuaternion(hlQ); b.quaternion.copy(hlQ.invert().multiply(hlP)); b.updateMatrixWorld(true);
+      hlF.set(0, 0, 1).applyQuaternion(hlP); const want = tgt.clone().sub(hlA);
+      let yaw = Math.atan2(want.x, want.z) - Math.atan2(hlF.x, hlF.z); yaw = Math.atan2(Math.sin(yaw), Math.cos(yaw)); yaw = THREE.MathUtils.clamp(yaw, -0.8, 0.8) * k * p.lookW;
+      hlQ.setFromAxisAngle(UP, yaw); hlP.premultiply(hlQ);
+      const pitch = THREE.MathUtils.clamp(Math.atan2(want.y, Math.hypot(want.x, want.z)), -0.15, 0.2) * k * p.lookW * 0.5; hlF.set(0, 0, 1).applyQuaternion(hlP); hlA.set(hlF.z, 0, -hlF.x).normalize();   // оста „дясно“ (хоризонтална)
+      if (hlA.lengthSq() > 0.5) { hlQ.setFromAxisAngle(hlA, -pitch); hlP.premultiply(hlQ); }
+      b.parent.getWorldQuaternion(hlQ); b.quaternion.copy(hlQ.invert().multiply(hlP)); b.updateMatrixWorld(true);
     }
   }
   function restIK(p, dt) {
