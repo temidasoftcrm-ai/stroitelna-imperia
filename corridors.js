@@ -10,6 +10,48 @@ export const AUTOBAHNS = [
   ...RUSSIA_AB,   // 🇷🇺 Русия
   { id: 'E67', nm: 'Мюнхен — Прага — Москва', cities: ['munich', 'plzen', 'prague', 'wroclaw', 'warsaw', 'moscow'] },   // последният участък е общ с E30
   ...UKRAINE_AB,  // 🇺🇦 Украйна
+  // 🇪🇺 истински магистрали до градовете, които нямаха нито един участък (Линц, Бърно, Амстердам, Берлин, Рим…)
+  { id: 'A1-AT', nm: 'Западна: Мюнхен — Залцбург — Линц — Виена', cities: ['munich', 'salzburg', 'linz', 'vienna'] },   // A8 + A1 Westautobahn
+  { id: 'A9-AT', nm: 'Пирн: Линц — Грац', cities: ['linz', 'graz'] },
+  { id: 'E59', nm: 'Южна: Виена — Грац — Загреб', cities: ['vienna', 'graz', 'zagreb'] },   // A2 + A9 (Марибор) + A2 HR
+  { id: 'E45-AT', nm: 'Бренер: Мюнхен — Инсбрук — Милано', cities: ['munich', 'innsbruck', 'milan'] },   // A12/A13 + A22 (Верона) + A4
+  { id: 'D1', nm: 'D1: Прага — Бърно — Острава — Краков', cities: ['prague', 'brno', 'olomouc', 'ostrava', 'krakow'] },   // D1 + A1/A4 PL
+  { id: 'E461', nm: 'Бърно — Виена', cities: ['brno', 'vienna'] },   // D52 + A5
+  { id: 'E60-HU', nm: 'M1: Виена — Дьор — Будапеща', cities: ['vienna', 'gyor', 'budapest'] },
+  { id: 'E75-N', nm: 'M5: Будапеща — Сегед — Нови Сад — Белград', cities: ['budapest', 'szeged', 'subotica', 'novisad', 'belgrade'] },
+  { id: 'M35', nm: 'Будапеща — Дебрецен — Клуж', cities: ['budapest', 'debrecen', 'cluj'] },   // M3/M35 + A3 RO (Орадя)
+  { id: 'A1-RO', nm: 'Сегед — Тимишоара — Букурещ', cities: ['szeged', 'timisoara', 'bucharest'] },   // M43 + A1 RO
+  { id: 'E73', nm: 'Коридор Vc: Будапеща — Печ — Сараево — Сплит', cities: ['budapest', 'pecs', 'sarajevo', 'split'] },   // M6 + A1 BiH (Мостар, Плоче)
+  { id: 'E70', nm: 'Торино — Милано — Любляна — Загреб — Белград', cities: ['turin', 'milan', 'ljubljana', 'zagreb', 'belgrade'] },   // A4 IT + A1 SI + A3 HR/SRB
+  { id: 'A1-HR', nm: 'Далматина: Загреб — Сплит', cities: ['zagreb', 'split'] },
+  { id: 'A1-SRB', nm: 'Белград — Крагуевац', cities: ['belgrade', 'kragujevac'] },
+  { id: 'A1-MNE', nm: 'Бар — Боляре: Подгорица — Белград', cities: ['podgorica', 'belgrade'] },
+  { id: 'R7', nm: 'Пътят на нацията: Тирана — Прищина — Скопие', cities: ['tirana', 'pristina', 'skopje'] },
+  { id: 'VIII', nm: 'Коридор 8: Тирана — Охрид — Скопие — Куманово', cities: ['tirana', 'ohrid', 'skopje', 'kumanovo'] },
+  { id: 'A3-MK', nm: 'Скопие — Прилеп — Битоля', cities: ['skopje', 'prilep', 'bitola'] },
+  { id: 'A8-GR', nm: 'Олимпия Одос: Атина — Патра', cities: ['athens', 'patras'] },
+  { id: 'O-5', nm: 'Истанбул — Бурса — Измир', cities: ['istanbul', 'bursa', 'izmir'] },   // мостът Осман Гази
+  { id: 'E35', nm: 'Амстердам — Кьолн — Франкфурт — Базел — Милано — Рим — Неапол', cities: ['amsterdam', 'utrecht', 'cologne', 'frankfurt', 'basel', 'milan', 'florence', 'rome', 'naples'] },   // + A1 Autostrada del Sole
+  { id: 'E19', nm: 'Брюксел — Антверпен — Ротердам — Амстердам', cities: ['brussels', 'antwerp', 'rotterdam', 'hague', 'amsterdam'] },
+  { id: 'E40-W', nm: 'Брюж — Гент — Брюксел — Лиеж — Кьолн', cities: ['bruges', 'ghent', 'brussels', 'liege', 'cologne'] },
+  { id: 'E25', nm: 'Утрехт — Айндховен — Лиеж — Люксембург', cities: ['utrecht', 'eindhoven', 'liege', 'luxembourg'] },   // A2 NL + E25
+  { id: 'A1-DE', nm: 'Хамбург — Кьолн — Франкфурт — Мюнхен', cities: ['hamburg', 'cologne', 'frankfurt', 'munich'] },   // A1 + A3 + A9
+  { id: 'A24', nm: 'Берлин — Хамбург', cities: ['berlin', 'hamburg'] },
+  { id: 'A9-DE', nm: 'Берлин — Мюнхен', cities: ['berlin', 'munich'] },
+  { id: 'E30-W', nm: 'Берлин — Познан — Варшава', cities: ['berlin', 'poznan', 'warsaw'] },   // A2 PL
+  { id: 'E55', nm: 'Берлин — Прага', cities: ['berlin', 'prague'] },   // A13 + D8 (Дрезден)
+  { id: 'S7', nm: 'Гданск — Варшава — Краков', cities: ['gdansk', 'warsaw', 'krakow'] },
+  { id: 'A4-PL', nm: 'Вроцлав — Краков', cities: ['wroclaw', 'krakow'] },
+  { id: 'A6-FR', nm: 'Слънчевата: Париж — Лион — Марсилия', cities: ['paris', 'lyon', 'marseille'] },   // A6 + A7
+  { id: 'E80-FR', nm: 'Ница — Марсилия — Тулуза', cities: ['nice', 'marseille', 'toulouse'] },   // A8 + A54/A9 + A61
+  { id: 'A10-IT', nm: 'Ница — Торино', cities: ['nice', 'turin'] },   // A10 (Вентимиля) + A6
+  { id: 'A61', nm: 'Тулуза — Барселона', cities: ['toulouse', 'barcelona'] },   // A61 + A9 + AP-7
+  { id: 'A1-CH', nm: 'Лион — Женева — Лозана — Берн — Цюрих', cities: ['lyon', 'geneva', 'lausanne', 'bern', 'zurich'] },   // A40/A41 + A1 CH
+  { id: 'A3-CH', nm: 'Базел — Цюрих', cities: ['basel', 'zurich'] },
+  { id: 'AP-7', nm: 'Средиземноморска: Барселона — Валенсия — Мадрид', cities: ['barcelona', 'valencia', 'madrid'] },   // AP-7 + A-3
+  { id: 'E5', nm: 'Париж — Билбао — Мадрид — Севиля', cities: ['paris', 'bilbao', 'madrid', 'seville'] },   // A10/A63 + AP-8/AP-1 + A-1 + A-4
+  { id: 'M6', nm: 'Лондон — Бирмингам — Манчестър — Единбург', cities: ['london', 'birmingham', 'manchester', 'edinburgh'] },   // M1/M6 + M74/M8
+  { id: 'M62', nm: 'Манчестър — Ливърпул', cities: ['manchester', 'liverpool'] },
   // 🌍 трансафрикански магистрали (africa.js; отключват се с Африка — ниво 10)
   { id: 'TAH1', nm: 'Кайро — Дакар', af: true, cont: 'af', cities: ['cairo', 'alexandria', 'tripoli', 'sfax', 'sousse', 'tunis', 'annaba', 'constantine', 'setif', 'algiers', 'oran', 'fes', 'rabat', 'casablanca', 'marrakesh', 'nouakchott', 'saintlouis', 'thies', 'dakar'] },
   { id: 'TAH4', nm: 'Кайро — Кейптаун', af: true, cont: 'af', cities: ['cairo', 'luxor', 'aswan', 'khartoum', 'gondar', 'bahirdar', 'addisababa', 'nairobi', 'arusha', 'dodoma', 'lusaka', 'harare', 'pretoria', 'johannesburg', 'capetown'] },
@@ -113,6 +155,12 @@ export const ROUTE_VIA = {
   'limon|santiagopa': [[-82.04, 8.6]],
   'chitre|panama': [[-80.93, 8.21]],
   'laserena|valparaiso': [[-70.86, -29.8], [-70.86, -32.8]],
+  // новите европейски аутобани — по сушата, където правата линия минава над море/езеро
+  'athens|patras': [[22.99, 37.92], [22.72, 37.99], [22.58, 38.05], [22.07, 38.23]],   // Коринт, Кято, Ксилокастро, Егио — по южния бряг на Коринтския залив
+  'bursa|istanbul': [[29.31, 40.49], [29.51, 40.70], [29.43, 40.80]],   // Орхангази, мостът Осман Гази, Гебзе (от Бурса към Истанбул)
+  'barcelona|valencia': [[1.2, 41.15], [0.45, 40.6], [-0.1, 40.0]],   // Тарагона, Винарос, Кастельон
+  'bilbao|paris': [[-2.0, 43.25], [-1.40, 43.45], [-0.58, 44.84]],   // Сан Себастиан, Байон, Бордо (от Билбао към Париж)
+  'geneva|lausanne': [[6.24, 46.40], [6.50, 46.52]],   // Нион, Морж — по северния бряг на Женевското езеро
 };
 export const viaOf = (a, b) => { const k = [a, b].sort().join('|'), v = ROUTE_VIA[k]; return !v ? null : a <= b ? v : [...v].reverse(); };
 export const abSegId = (a, b) => 'ab:' + [a, b].sort().join('-');

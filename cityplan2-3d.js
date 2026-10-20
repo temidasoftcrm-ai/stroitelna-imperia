@@ -56,12 +56,12 @@ function nightWin(mat, c, o = {}) {
   for (let i = 0; i < W * H; i++) { if (lab[i] >= 0 || !dark(i)) continue; const st = [i], px = []; lab[i] = i;
     while (st.length) { const k = st.pop(); px.push(k); const x = k % W, y = (k / W) | 0; for (const n of [x > 0 && k - 1, x < W - 1 && k + 1, y > 0 && k - W, y < H - 1 && k + W]) if (n !== false && lab[n] < 0 && dark(n)) { lab[n] = i; st.push(n); } }
     if (px.length < 6 || px.length > W * H / 20) continue;   // точки и линии — не са прозорци
-    if (rnd() > (o.lit || 0.5)) continue; const warm = rnd() < 0.8, k2 = 0.6 + rnd() * 0.4, col = warm ? [255, 196, 110] : [200, 225, 255];
+    if (rnd() > (o.lit || 0.25)) continue; const warm = rnd() < 0.9, k2 = 0.45 + rnd() * 0.4,   /* потребителят: „като дискотека“ — светнали ~25 %, по-тъмни, 10 % бели */ col = warm ? [255, 196, 110] : [200, 225, 255];
     for (const q of px) { D[q * 4] = col[0] * k2; D[q * 4 + 1] = col[1] * k2; D[q * 4 + 2] = col[2] * k2; } }
   for (let i = 3; i < D.length; i += 4) D[i] = 255;
   g.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(out); t.colorSpace = THREE.SRGBColorSpace;
   if (mat.map) { t.wrapS = mat.map.wrapS; t.wrapT = mat.map.wrapT; }
-  mat.emissive = new THREE.Color(0xffffff); mat.emissiveMap = t; mat.emissiveIntensity = 0; mat.userData.winK = o.k || 1.4; WIN_MATS.push(mat); return mat;
+  mat.emissive = new THREE.Color(0xffffff); mat.emissiveMap = t; mat.emissiveIntensity = 0; mat.userData.winK = o.k || 0.62; WIN_MATS.push(mat); return mat;
 }
 // повтаряща се фасада по истинските размери на инстанцията (небостъргачите не са разтеглени): uv × (ширина/период, височина/период)
 function tileByScale(mat, pw, ph) {
@@ -117,7 +117,7 @@ function glassMat() {
   g.fillStyle = 'rgba(40,50,60,0.55)'; for (let y = 0; y < 128; y += 8) g.fillRect(0, y, 128, 1.2); for (let x = 0; x < 128; x += 10.67) g.fillRect(x, 0, 1, 128);   // етажите и профилите
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; const cc = document.createElement('canvas'); cc.width = cc.height = 128; const g2 = cc.getContext('2d'); g2.fillStyle = '#fff'; g2.fillRect(0, 0, 128, 128); g2.fillStyle = '#000';
   for (let y = 0; y < 16; y++) for (let x = 0; x < 12; x++) g2.fillRect(Math.round(x * 10.67) + 2, y * 8 + 2, 7, 5);   // стъклото: всяка клетка (етаж × профил) — прозорец
-  return GLASS_MAT = tileByScale(nightWin(new THREE.MeshStandardMaterial({ map: t, roughness: 0.25, metalness: 0.35 }), cc, { lit: 0.58, k: 1.9, seed: 99 }), 16, 48);   // 12 профила ≈ 16 м, 16 етажа ≈ 48 м
+  return GLASS_MAT = tileByScale(nightWin(new THREE.MeshStandardMaterial({ map: t, roughness: 0.25, metalness: 0.35 }), cc, { lit: 0.32, k: 0.8, seed: 99 }), 16, 48);   // 12 профила ≈ 16 м, 16 етажа ≈ 48 м
 }
 let HAUSS_MAT = null;
 const HAUSS = [0xf0e6d2, 0xe9dcc3, 0xf3ead9, 0xe4d6bd, 0xeee2cc];
@@ -467,6 +467,7 @@ export function buildPlan2View(P, opts = {}) {
     // Рома Термини (opts.termini): гарата по фасадата към площада (opts.stationModel — моделът на играта, иначе кутия) и перони с навеси и коловози
     const TL = opts.termini ? P.lots.find(L => L.lm === 'termini' || L.lm === 'sirkeci' || L.lm === 'saintlazare' || L.lm === 'waterloo' || L.lm === 'grandcentral' || L.lm === 'kursky') : null;   // главната гара: Термини (Рим), Сиркеджи (Истанбул), Сен Лазар (Париж), Ватерло, Гранд Сентрал, Курската
     if (TL) G.add(terminiView(TL, opts.stationModel, opts.stationFacing));   // stationFacing: { face: '-z', depth: 0.8 } — фасадата на модела е към −z (към улицата), сградата заема 80 % от дълбочината
+    const TS = opts.timesSquareModel && P.lots.find(L => L.lm === 'timessquare'); if (TS) G.add(timesSquareView(TS, opts.timesSquareModel));   // Ню Йорк: билбордовете около Таймс Скуеър
     tm('termini'); yield 0;
     // надписите на картата: водите (Златният рог, Босфорът…, Тибър) и кварталите — спрайтове, отблизо се скриват
     ST.LB = D && opts.labels !== false ? mapLabels(G, D) : null; yield 0;
@@ -586,6 +587,22 @@ function seaTraffic(G, D, models) {
       let i = 1; while (i < b.L.length - 1 && b.L[i] < b.s) i++; const a = b.path[i - 1], c = b.path[i], t = (b.s - b.L[i - 1]) / ((b.L[i] - b.L[i - 1]) || 1);
       b.obj.position.set(a[0] + (c[0] - a[0]) * t, 0, a[1] + (c[1] - a[1]) * t); b.obj.rotation.y = Math.atan2((c[0] - a[0]) * b.dir, (c[1] - a[1]) * b.dir);
     } } };
+}
+// ---- Таймс Скуеър: ъгловата сграда с билбордове (assets/heavy/lm/timessq.glb, Building-studio, CC BY; плакатите — наши реклами) в 4 копия
+// по двата края на площада (по дългата му ос), обърнати към него; нощем билбордовете светят сами (emissiveMap = map → WIN_MATS)
+function timesSquareView(L, model) {
+  const g = new THREE.Group(), lit = new Set();
+  model.traverse(o => { const uv = o.isMesh && o.geometry.attributes.uv; let rep = false; if (uv) for (let i = 0; i < uv.count && !rep; i++) rep = Math.abs(uv.getX(i)) > 1.05 || Math.abs(uv.getY(i)) > 1.05;   /* стените (повтаряща се текстура) не светят — само билбордовете */
+    if (o.isMesh && !rep) for (const m of [].concat(o.material)) if (m && m.map && !lit.has(m) && !WIN_MATS.includes(m)) { m.emissive = new THREE.Color(0xffffff); m.emissiveMap = m.map; m.emissiveIntensity = 0; m.userData.winK = 1.6; WIN_MATS.push(m); lit.add(m); } });
+  const b0 = new THREE.Box3().setFromObject(model), s0 = b0.getSize(new THREE.Vector3()), FP = 30, k = FP / Math.max(s0.x, s0.z);   // основа ~30 м
+  const c = Math.cos(L.rot), sn = Math.sin(L.rot), long = L.d >= L.w, half = (long ? L.d : L.w) / 2, side = (long ? L.w : L.d) / 2 + FP / 2 + 2;
+  for (const [u, v] of [[-1, -0.55], [1, -0.55], [-1, 0.55], [1, 0.55]]) {   // u — от двете страни на площада, v — по дължината му
+    const lx = long ? u * side : v * half, lz = long ? v * half : u * side, x = L.x + lx * c + lz * sn, z = L.z - lx * sn + lz * c;
+    const o = model.clone(true); o.userData.extShared = 1; const w = new THREE.Group(), inner = new THREE.Group(); inner.add(o); w.add(inner);
+    inner.scale.setScalar(k); const b = new THREE.Box3().setFromObject(inner), cc = b.getCenter(new THREE.Vector3()); inner.position.set(-cc.x, -b.min.y, -cc.z);
+    w.position.set(x, 0, z); w.rotation.y = Math.atan2(L.x - x, L.z - z) + Math.PI;   // лицето (с билбордовете) — към площада
+    w.traverse(m => { if (m.isMesh) m.castShadow = m.receiveShadow = true; }); g.add(w); }
+  return g;
 }
 function terminiView(L, model, sf = {}) {
   const g = new THREE.Group(), nx = -Math.sin(L.rot), nz = -Math.cos(L.rot), tx = Math.cos(L.rot), tz = -Math.sin(L.rot), len = 140, N = 9;

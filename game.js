@@ -558,6 +558,9 @@ const plazaTree = h => { const sz = sizeOf('tree-large'); return model('tree-lar
 // ⚡ флаг perf-fix (perf-report #4): частите вътре в статичен модел (сграда, дърво) не мърдат — матриците им се смятат веднъж,
 // не на всеки кадър (~30 хил. обекта в голям град). Коренът остава подвижен (позиция, завъртане, мащаб от кода).
 const freezeKids = o => { if (!feature('perf-fix')) return o; o.traverse(c => { if (c !== o && !c.isSkinnedMesh && !c.isBone) { c.updateMatrix(); c.matrixAutoUpdate = false; } }); return o; };
+// декорът на града (userData.detail: улиците, дърветата, бензиностанциите, табелите) — вече е на мястото си след setupWorld (и thamesRelocate)
+function freezeDetail() { if (!feature('perf-fix') || !city.group) return; for (const o of city.group.children) if (o.userData.detail || STATIC_SRC.test(o.userData.src || '')) { o.updateMatrix(); o.matrixAutoUpdate = false; freezeKids(o); } }
+const STATIC_SRC = /^(pl-bush|light-|yield$|stop$|speed$|tree)/;
 function model(n, scale = 1, shadow = true) {
   let rot = null;
   if (n === 'tree-large' || n === 'tree-small') { const t = niceTree(n, scale); if (t) { n = t[0]; scale = t[1]; rot = treeN * 2.39; } }
@@ -644,8 +647,8 @@ const PLAN_TPL7 = { losangeles: 'osm' };
 const PLAN2_CITIES = new Set(['rome', 'paris', 'istanbul', 'london', 'newyork', 'moscow']);   // градовете по истинската карта (флагове <id>-osm + <id>-game)
 const plan2 = { mod: null, view: null, data: {}, cache: null, models: {} };
 // моделите за изгледа на града (Истанбул: висящият мост, фериботите и корабите) — зареждат се с плана, само за този град
-const PLAN2_MODELS = { paris: { 'lm-lazare2': 'lm/lazare2.glb' }, newyork: { 'lm-gc2': 'lm/grandcentral2.glb' }, istanbul: { 'lm-bosphorus': 'lm/bosphorus.glb', 'sh-ferry': 'ships/ferry-bandirma.glb', 'sh-cruise': 'ships/cruise.glb', 'sh-tanker': 'ships/tanker.glb', 'sh-container': 'ships/container.glb', 'bt-fish': 'boats/sf-fisherboat.glb', 'bt-sail': 'boats/sf-sailboat.glb', 'bt-motor': 'marina/motoryacht.glb', 'bt-yacht': 'boats/sf-yacht.glb' } };
-const plan2Opts = id => { const M = plan2.models; return id !== 'istanbul' ? {} : { bridgeModels: { bosphorus: M['lm-bosphorus'] }, boatModels: { ferry: M['sh-ferry'], cruise: M['sh-cruise'], tanker: M['sh-tanker'], container: M['sh-container'], small: ['bt-fish', 'bt-sail', 'bt-motor', 'bt-yacht'].map(k => M[k]).filter(Boolean) } }; };
+const PLAN2_MODELS = { paris: { 'lm-lazare2': 'lm/lazare2.glb' }, newyork: { 'lm-gc2': 'lm/grandcentral2.glb', 'lm-timessq': 'lm/timessq.glb' }, istanbul: { 'lm-bosphorus': 'lm/bosphorus.glb', 'sh-ferry': 'ships/ferry-bandirma.glb', 'sh-cruise': 'ships/cruise.glb', 'sh-tanker': 'ships/tanker.glb', 'sh-container': 'ships/container.glb', 'bt-fish': 'boats/sf-fisherboat.glb', 'bt-sail': 'boats/sf-sailboat.glb', 'bt-motor': 'marina/motoryacht.glb', 'bt-yacht': 'boats/sf-yacht.glb' } };
+const plan2Opts = id => { const M = plan2.models; if (id === 'newyork') return M['lm-timessq'] ? { timesSquareModel: M['lm-timessq'] } : {}; return id !== 'istanbul' ? {} : { bridgeModels: { bosphorus: M['lm-bosphorus'] }, boatModels: { ferry: M['sh-ferry'], cruise: M['sh-cruise'], tanker: M['sh-tanker'], container: M['sh-container'], small: ['bt-fish', 'bt-sail', 'bt-motor', 'bt-yacht'].map(k => M[k]).filter(Boolean) } }; };
 const plan2On = id => !!(S && S.plan2 && S.plan2[id] && plan2.data[id]);
 const plan2Tier = () => 1 + Math.min(4, S.cityExt || 0);   // всеки купен квартал отключва следващото ниво рионе (1…5)
 async function plan2Preload(s) {
@@ -2291,7 +2294,7 @@ function sendTir(order, delay = 0) {
     for (const p of projects) p.matWarned = false;
     Sound.play('truck');
     const m = ECON.MATERIALS[o.matId];
-    toast(`🚚 ТИР разтовари ${m.ico} ${m.nm}: ${o.qty} ${m.unit} в склада.`, 'good');
+    // 🚚 разтоварен ТИР — без известие (рутинно; складът и обектът го показват)
     save();
     if (tab === 'store') renderPanel();
   }, delay);
@@ -2304,7 +2307,7 @@ function sendSiteTir(order, delay = 0) {
     for (const p of projects) p.matWarned = false;
     Sound.play('truck');
     const m = ECON.MATERIALS[o.matId], p = projects.find(q => q.lot === o.lot);
-    toast(`🚚 ТИР разтовари ${m.ico} ${m.nm}: ${o.qty} ${m.unit}${p ? ` на „${p.title}“` : ''}.`, 'good');
+    // 🚚 разтоварен ТИР за обект — без известие (рутинно)
     save();
   }, delay);
 }
@@ -2349,7 +2352,7 @@ function warmShaders() {
   try { const p = renderer.compileAsync ? renderer.compileAsync(g, camera, scene) : renderer.compile(g, camera, scene); if (p && p.catch) p.catch(() => {}); } catch (e) { console.warn('warmShaders', e); }
 }
 function enterCity() {
-  if (!city.ready) { setupWorld(); fastForward(); warmShaders(); }
+  if (!city.ready) { setupWorld(); fastForward(); warmShaders(); freezeDetail(); }
   showMap(false);
   $('panel').classList.remove('hidden');
   renderPanel();
@@ -2594,11 +2597,10 @@ function ensureMaterials(p, opts = {}) {
     if (r.ok && r.rail && r.cost) sendCityTrain(`🚆 Материалите за „${p.title}“ пристигнаха с влак.`);
     if (r.ok && econ.consumeStage(p.type, p.stage)) {
       p.mat[p.stage] = true; addPallets(p);
-      if (r.cost) toast(`📦 Материали за „${p.title}“: ${fmt(r.cost)} €`);
       return true;
     }
   }
-  if (!p.matWarned) { p.matWarned = true; toast(`⚠️ „${p.title}“ чака материали. Купи ги от таб „Склад“ (или вземи кредит, ако нямаш пари).`, 'bad'); }
+  if (!p.matWarned && S.autoBuy === false) { p.matWarned = true; toast(`⚠️ „${p.title}“ чака материали. Купи ги от таб „Склад“ (или вземи кредит, ако нямаш пари).`, 'bad'); }
   if (S.autoBuy !== false) {   // няма пари за материалите → строежът стои, а заплатите текат: предлагаме кредит с един бутон
     const cost = Object.entries(econ.missing(p.type, p.stage)).reduce((a, [m, q]) => a + econ.quoteMaterial(m, q, connected(), supplyOpts()).total, 0);
     if (cost > econ.money) offerLoan(`🏗️ „${p.title}“ спря: материалите за етапа струват <b>${fmt(cost)} €</b>, а имаш <b>${fmt(econ.money)} €</b>. Докато обектът стои, заплатите и поддръжката текат — без приход сметката ще потъне.`, cost - econ.money);
