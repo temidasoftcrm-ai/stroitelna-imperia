@@ -3914,7 +3914,10 @@ function coopInfraSync(I, pn) {
   if (got.length) { toast(`🤝 Общо развитие с ${pn}: ${got.join(', ')}.`, 'good'); save(); renderPanel(); }
 }
 const coopCity = id => !!S && !ownedCities().includes(id) && (window.__coopShared?.cities || []).includes(id);
-function joinCoopCity(id) {
+// Лабораторията → coop-br (потребителят: „когато играеш с партньор — това, което си купил ти като филиал, да не му излиза и на него да го закупува“):
+// градът на партньора не се предлага за купуване (списъкът „Без филиал“, бордът, първият филиал на континента) — влизаш безплатно
+const coopFree = id => feature('coop-br') && coopCity(id);
+function joinCoopCity(id, stay = false) {   // stay — без да превключваш града (бордът, автоматичният първи филиал)
   if (ownedCities().includes(id) || !coopCity(id)) return;
   const c = cityById(id), pn = window.__coopShared.name || 'партньора';
   S.branches = [...(S.branches || []), id];
@@ -3926,6 +3929,7 @@ function joinCoopCity(id) {
 }
 // отваря филиала (след плащане/кредит) — от картата, от „Без филиал“ и автоматично при отваряне на континент
 function openBranchNow(id) {
+  if (coopFree(id)) { joinCoopCity(id, true); return; }   // градът на партньора — безплатно
   const c = cityById(id), cost = ECON.BRANCH_COST(id, brN()), disc = (S.branchDiscounts || 0) > 0 ? Math.round(cost * 0.3 / 1000) * 1000 : 0;
   if (ownedCities().includes(id)) return;
   const extra = branchExtra(id, cost);   // Европа и светът са по-скъпи
@@ -4758,14 +4762,14 @@ function afCheckOpen() {
   S.gateOpen = S.gateOpen || (S.afGateOpen ? { af: true } : {});
   for (const key of Object.keys(CONT_GATE)) {
     if (S.gateOpen[key] && !(S.gateBr || {})[key] && contLinked(key) && !ownedCities().some(id => inCont(key, id))) {   // стар запис: вратата е отворена, но филиал още няма
-      S.gateBr = { ...(S.gateBr || {}), [key]: true }; const g = CONT_GATE[key], cost = ECON.BRANCH_COST(g, brN()); withLoan(cost + branchExtra(g, cost), `Първи филиал: ${cityById(g).nm}`, () => openBranchNow(g)); continue; }
+      S.gateBr = { ...(S.gateBr || {}), [key]: true }; const g = CONT_GATE[key], cost = ECON.BRANCH_COST(g, brN()); if (coopFree(g)) { joinCoopCity(g, true); continue; } withLoan(cost + branchExtra(g, cost), `Първи филиал: ${cityById(g).nm}`, () => openBranchNow(g)); continue; }
     if (S.gateOpen[key] || !contByKey(key).open() || !contLinked(key)) continue;
     S.gateBr = { ...(S.gateBr || {}), [key]: true };
     S.gateOpen[key] = true; S.contSeen = { ...(S.contSeen || {}) }; delete S.contSeen[key]; if (key === 'af') delete S.afSeen;
     contFirstLook(contByKey(key));
     // първият филиал на континента — във „вратата“, автоматично (входният билет CONT_FIRST; при нужда — от депозита/кредит)
     const g = CONT_GATE[key];
-    if (!ownedCities().some(id => inCont(key, id))) { const cost = ECON.BRANCH_COST(g, brN()), p = cost + branchExtra(g, cost); setTimeout(() => withLoan(p, `Първи филиал: ${cityById(g).nm}`, () => openBranchNow(g)), 7600); }
+    if (!ownedCities().some(id => inCont(key, id))) { const cost = ECON.BRANCH_COST(g, brN()), p = cost + branchExtra(g, cost); if (coopFree(g)) setTimeout(() => joinCoopCity(g, true), 7600); else setTimeout(() => withLoan(p, `Първи филиал: ${cityById(g).nm}`, () => openBranchNow(g)), 7600); }
     if (!$('mapScreen').classList.contains('hidden')) drawMap();
   }
 }
@@ -8248,7 +8252,7 @@ function boardProposals() {
     cost: o => o.q.cost, run: o => buyDistrictAt(o.id), text: a => `Предлагам да изкупим по един нов квартал в ${pl(a.length, 'град', 'града')} (${list(a.map(o => o.id))}).`,
     why: 'свободните парцели свършват — без място няма нови поръчки', days: () => 1, gainTxt: a => `${a.length * 9} нови парцела за поръчки`,
     goal: a => `Нов квартал в ${pl(a.length, 'град', 'града')}`, track: a => ({ k: 'district', ids: a.map(o => o.id), base: Object.fromEntries(a.map(o => [o.id, o.q.ext])) }), geo: a => geoOf('district', a.map(o => o.id)) });
-  P({ dir: 'con', ico: '🏢', key: 'branches', items: CITIES.filter(c => branchOk(c.id)).map(c => { const cost = ECON.BRANCH_COST(c.id, brN()); return { id: c.id, cost: cost + branchExtra(c.id, cost) }; }).sort((a, b) => a.cost - b.cost).slice(0, 5),
+  P({ dir: 'con', ico: '🏢', key: 'branches', items: CITIES.filter(c => branchOk(c.id) && !coopFree(c.id)).map(c => { const cost = ECON.BRANCH_COST(c.id, brN()); return { id: c.id, cost: cost + branchExtra(c.id, cost) }; }).sort((a, b) => a.cost - b.cost).slice(0, 5),
     cost: (o, i) => { const c = ECON.BRANCH_COST(o.id, brN() + i); return c + branchExtra(o.id, c); }, run: o => openBranchNow(o.id), text: a => `Предлагам да открием ${pl(a.length, 'нов филиал', 'нови филиала')}: ${list(a.map(o => o.id))}.`,   // цената расте след всяко отваряне
     why: 'нови пазари — всеки град носи поръчки и после пари, докато не си там', days: () => 1, income: a => a.length * brIncome(),
     goal: a => `${pl(a.length, 'нов филиал работи', 'нови филиала работят')}`, track: a => ({ k: 'branch', ids: a.map(o => o.id) }), geo: a => geoOf('branch', a.map(o => o.id)) });
@@ -8525,12 +8529,12 @@ function cpTabsHtml() {
 const wonHide = id => { const cc = cityById(id)?.cc || '🇧🇬'; return wonCountries(x => econ.isFinished(x)).some(k => k.cc === cc); };
 function buyBranchHtml() {
   const hid = CITIES.filter(c => branchOk(c.id) && inScope(c.id) && wonHide(c.id)).length;
-  const n0 = brN(), rows = CITIES.filter(c => branchOk(c.id) && inScope(c.id) && !wonHide(c.id)).map(c => { const cost = ECON.BRANCH_COST(c.id, n0); return { c, price: cost + branchExtra(c.id, cost) - ((S.branchDiscounts || 0) > 0 ? Math.round(cost * 0.3 / 1000) * 1000 : 0) }; });
+  const n0 = brN(), rows = CITIES.filter(c => branchOk(c.id) && inScope(c.id) && !wonHide(c.id)).map(c => { const cost = ECON.BRANCH_COST(c.id, n0); return coopFree(c.id) ? { c, price: 0, coop: true } : { c, price: cost + branchExtra(c.id, cost) - ((S.branchDiscounts || 0) > 0 ? Math.round(cost * 0.3 / 1000) * 1000 : 0) }; });
   const hidNote = hid ? `<div class="meta" style="margin:6px 0 0">🏆 Скрити са ${hid} града в завладени държави. Купуваш ги от картата, ако ги искаш.</div>` : '';
   if (!rows.length) return `<div class="card"><div class="meta" style="margin:0">Няма отключени градове без филиал в този обхват — смени филтъра горе или вдигни нивото на фирмата.</div>${hidNote}</div>`;
   const by = new Map(); for (const r of rows) { const cc = r.c.cc || '🇧🇬', k = COUNTRIES.find(x => x.cc === cc); if (!by.has(cc)) by.set(cc, { cc, nm: k ? k.nm : '', rs: [] }); by.get(cc).rs.push(r); }
   const SZ = ['', 'малък', 'среден', 'голям', 'мегаполис'];
-  return [...by.values()].sort((a, b) => a.rs[0].price - b.rs[0].price).map(g => bwCard(`${g.cc} ${g.nm}`, g.rs.sort((a, b) => a.price - b.price).map(({ c, price }) => `<div class="row" style="margin:4px 0;align-items:center;gap:8px"><span class="meta" style="margin:0;flex:1"><b style="color:var(--txt)">${c.nm}</b> · ${SZ[Math.min(4, (c.sz || 1) + (MEGAPOLIS.has(c.id) ? 1 : 0))]}${CAPITALS.has(c.id) ? ' · столица' : ''}${COUNTRIES.some(k => k.cities.includes(c.id)) ? ' · 🗺️ ключов' : ''}</span><button class="btn" data-buybr="${c.id}" ${econ.canAfford(price) ? '' : 'title="Ще се предложи банков кредит"'}>🛒 ${fmt(price)} €</button></div>`).join(''))).join('') + (hidNote ? `<div class="card">${hidNote}</div>` : '');
+  return [...by.values()].sort((a, b) => a.rs[0].price - b.rs[0].price).map(g => bwCard(`${g.cc} ${g.nm}`, g.rs.sort((a, b) => a.price - b.price).map(({ c, price, coop }) => `<div class="row" style="margin:4px 0;align-items:center;gap:8px"><span class="meta" style="margin:0;flex:1"><b style="color:var(--txt)">${c.nm}</b> · ${SZ[Math.min(4, (c.sz || 1) + (MEGAPOLIS.has(c.id) ? 1 : 0))]}${CAPITALS.has(c.id) ? ' · столица' : ''}${COUNTRIES.some(k => k.cities.includes(c.id)) ? ' · 🗺️ ключов' : ''}${coop ? ` · 🤝 градът на ${window.__coopShared?.name || 'партньора'}` : ''}</span><button class="btn" data-buybr="${c.id}" ${coop || econ.canAfford(price) ? '' : 'title="Ще се предложи банков кредит"'}>${coop ? '🤝 Влез безплатно' : `🛒 ${fmt(price)} €`}</button></div>`).join(''))).join('') + (hidNote ? `<div class="card">${hidNote}</div>` : '');
 }
 // 📜 Оферти: доставчиците (материали на заводска цена) и отворените държавни търгове — на едно място
 function offersWinHtml() {
@@ -9417,6 +9421,9 @@ if (AUTOTEST) {
       controls.target.set(h.x - 10, 4, h.z + 34); camera.position.set(h.x - 10, 75, h.z + 160); fly = null; $('panel').classList.add('hidden'); return true; },
     emergLook() { __dbg.time && __dbg.time(20.5); showMap(false); const h = city.hq, ks = ['sf-car-Police_Sedan', 'sf-car-Police_SUV', 'sf-car-Ambulance', 'sf-car-Firetruck', 'sf-car-Police_Sedan', 'sf-car-Ambulance'].filter(k => A[k]); const g = new THREE.Group(); ks.forEach((k, i) => { const o = model(k, 1); o.position.set((i % 3) * 7 - 7, 0, Math.floor(i / 3) * 9); o.rotation.y = Math.PI / 2; o.userData.forceBeacons = 1; g.add(o); }); g.position.set(h.x - 4, 0, h.z + 14); scene.add(g); controls.target.set(h.x - 4, 1, h.z + 18); camera.position.set(h.x + 10, 12, h.z + 34); fly = null; $('panel').classList.add('hidden'); return ks; },
     trainLook(kinds = ['loco', 'hopper', 'flat', 'ave', 'hsw', 'aveTail', 'oeLoco', 'oeCar']) { const g = new THREE.Group(); kinds.forEach((k, i) => { if (!hasTrainModel(k)) return; const c = trainCar(k, i); c.position.set(i * 10, 0, 0); g.add(c); }); g.position.set(0, 0.3, 300); scene.add(g); showMap(false); controls.target.set(35, 2, 300); camera.position.set(35, 30, 345); controls.update(); fly = null; return kinds.filter(hasTrainModel); },
+    coopBrTest() {   // coop-br: фалшив партньор с филиал в първия отключен град без филиал — в списъка „безплатно“, отварянето не струва пари
+      const id = CITIES.find(c => branchOk(c.id) && inScope(c.id) && !wonHide(c.id))?.id || CITIES.find(c => branchOk(c.id))?.id; if (!id) return { none: CITIES.filter(c => !ownedCities().includes(c.id)).length }; window.__coopShared = { v: 1, name: 'Тест', hw: [], rails: [], cities: [id], infra: {} };
+      const html = buyBranchHtml(), m0 = econ.s.money; openBranchNow(id); const r = { id, inScope: inScope(id), free: html.includes(`data-buybr="${id}"`) && /Влез безплатно/.test(html), paid: m0 - econ.s.money, owned: ownedCities().includes(id), coopBr: (S.coopBr || {})[id], city: S.cityId }; window.__coopShared = null; return r; },
     stingTest(id) { econ.earn(5e8, 'друго', 'тест'); openBranchNow(id); return (S.branches || []).includes(id); },   // тест: песента на града при нов филиал
     heightRow() {   // Лабораторията: къща, блок на 5 етажа, на 10 етажа, небостъргачи на 15/20/30 етажа — един до друг по улицата
       const ns = ['building-type-c', 'h2-pink', 'building-a', 'sf-blk-jade', 'sf-blk-soviet', 'Building_Medium_2_001', 'building-skyscraper-a@15', 'building-skyscraper-b@20', 'sf-sky-night', 'building-skyscraper-d@30'].filter(n => A[n]);
