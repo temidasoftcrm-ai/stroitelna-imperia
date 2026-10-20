@@ -60,7 +60,7 @@ await Promise.all([...HOUSES.map(k => load(k, `../assets/heavy/houses2/${k}.glb`
   load('hospital', '../assets/heavy/hospital/hospital.glb'),
   ...['townhouse-terracotta', 'palazzo-small', 'palazzo-big', 'corner-shop'].map(k => load('it-' + k, `../assets/heavy/rome/it-${k}.glb`).then(() => itTints('it-' + k))),
   ...['hotel', 'store', 'palazzo3', 'medkit'].map(k => load('it-sf-' + k, `../assets/heavy/rome/it-sf-${k}.glb`).then(() => A['it-sf-' + k]?.traverse(m => { const c = m.isMesh && !m.material.map && m.material.color; if (c && c.r > 0.8 && c.g < 0.25 && c.b < 0.25) m.material.color.setHex(0xd9a066); }))),   /* червеният „заместител“ без текстура → охра */   /* истински италиански (Sketchfab, CC-BY) */
-  load('colosseo', `../assets/heavy/lm/${feature('lm-colosseo3') ? 'colosseo3' : 'colosseo'}.glb`), load('vittoriano2', '../assets/heavy/lm/vittoriano2.glb'), load('lm-hagia', '../assets/heavy/lm/hagia.glb'), load('lm-mosque', '../assets/heavy/lm/mosque.glb'), load('station', '../assets/heavy/station/small.glb'), load('station-big', '../assets/heavy/station/big.glb'), load('term-l', '../assets/heavy/air/term-l.glb'), load('air-tower', '../assets/heavy/air/tower.glb'), load('a320', '../assets/heavy/air/a320.glb'), load('stadium', '../assets/heavy/stadium/stadium.glb'), load('cityhall', '../assets/heavy/civic/cityhall.glb'),
+  load('colosseo', `../assets/heavy/lm/${feature('lm-colosseo3') ? 'colosseo3' : 'colosseo'}.glb`), load('vittoriano2', '../assets/heavy/lm/vittoriano2.glb'), load('lm-hagia', '../assets/heavy/lm/hagia.glb'), load('lm-mosque', '../assets/heavy/lm/mosque.glb'), load('sh-tanker', '../assets/heavy/ships/tanker.glb'), load('sh-container', '../assets/heavy/ships/container.glb'), load('bt-fish', '../assets/heavy/boats/sf-fisherboat.glb'), load('bt-sail', '../assets/heavy/boats/sf-sailboat.glb'), load('bt-yacht', '../assets/heavy/boats/sf-yacht.glb'), load('station', '../assets/heavy/station/small.glb'), load('station-big', '../assets/heavy/station/big.glb'), load('term-l', '../assets/heavy/air/term-l.glb'), load('air-tower', '../assets/heavy/air/tower.glb'), load('a320', '../assets/heavy/air/a320.glb'), load('stadium', '../assets/heavy/stadium/stadium.glb'), load('cityhall', '../assets/heavy/civic/cityhall.glb'),
   ...CARS.map(k => load(k, `../assets/heavy/cars/${k}.glb`))]);
 // ---- инстанции: всяка част на модела — един InstancedMesh за всичките му копия (вместо клонинги: малко draw calls)
 const PARTS = {}, BOX = {};
@@ -106,7 +106,7 @@ function lodUpdate(force) {
 // забележителност на реалното ѝ място: моделът се побира в основата fp (GLB-тата се зареждат по-късно — тогава се нагласят)
 function romeLm(L) {
   const plaza = disc(L.x, L.z, Math.max(L.w, L.d) / 2 + (L.guard || 4), 0.055); city.add(merge([plaza], MAT.walk));   // площад / защитен периметър
-  if (L.lm === 'termini') return;   // гарата и пероните — модулът (termini: true)
+  if (L.lm === 'termini' || L.lm === 'sirkeci') return;   // гарата и пероните — модулът (termini: true)
   if (L.lm === 'vittoriano' && A.vittoriano2) { const n0 = BLD.length; put('vittoriano2', { ...L, rot: VIT_ROT }, 0); if (BLD.length > n0) BLD[BLD.length - 1].always = 1; return; }   // Витториано — моделът на потребителя (Meshy AI)
   const GLBK = { hagia: 'lm-hagia', bluemosque: 'lm-mosque' }[L.lm];   // Истанбул: Ая София и Синята джамия — 3D моделите (Meshy AI), побрани в основата
   if (GLBK && A[GLBK]) { const n0 = BLD.length; put(GLBK, L, 0); if (BLD.length > n0) BLD[BLD.length - 1].always = 1; return; }
@@ -169,7 +169,7 @@ function build() {
   city = new THREE.Group(); scene.add(city);
   OSMD = OSM2[fam.value] || null;
   P = fam.value === 'rome' ? (ROME_SAVED ? plan2Load(ROME_SAVED, OSM2.rome) : plan2('rome', { osm: OSM2.rome, size: 'xl' })) : fam.value === 'istanbul' ? plan2('istanbul', { osm: OSM2.istanbul, size: 'xl' }) : plan2('demo', { fam: fam.value, size: size.value, seed: +seed.value || 0 });
-  VIEW = buildPlan2View(P, { osm: OSMD, termini: true, stationModel: A['station-big'] || A.station }); city.add(VIEW);
+  VIEW = buildPlan2View(P, { osm: OSMD, boatModels: { tanker: A['sh-tanker'], container: A['sh-container'], small: ['bt-fish', 'bt-sail', 'bt-yacht', 'bt-sail', 'bt-fish'].map(k => A[k]).filter(Boolean) }, termini: true, stationModel: A['station-big'] || A.station }); city.add(VIEW);
   const trees = [];
   // парцели: очертания + сгради по зона; големите места — свой модел (паркът — дървета)
   const lp = []; for (const L of P.lots) for (let i = 0; i < 4; i++) { const a = L.poly[i], b = L.poly[(i + 1) % 4]; lp.push(a[0], 0.15, a[1], b[0], 0.15, b[1]); }

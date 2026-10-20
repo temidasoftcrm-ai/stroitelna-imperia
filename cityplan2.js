@@ -634,10 +634,13 @@ function placeLots(P, sk, r) {
     const edgeToward = (la, lo) => { const [tx, tz] = toXZ(la, lo), l = Math.hypot(tx, tz), ux = tx / l, uz = tz / l; let t = 1e9; for (const [c, u] of [[x0, ux], [x1, ux], [z0, uz], [z1, uz]]) { const tt = c / u; if (u && tt > 0) t = Math.min(t, tt); } const e = [ux * t, uz * t];
       let best = null, bd = 1e9; for (const r of P.roads) { if (r.noCars || r.cls === 'street') continue; for (const end of [0, 1]) { const q = r.pts[end ? r.pts.length - 1 : 0], d = Math.hypot(q[0] - e[0], q[1] - e[1]); if (d < bd) { bd = d; best = { road: r.id, end, x: q[0], z: q[1] }; } } }
       return { x: e[0], z: e[1], dir: Math.atan2(ux, uz), road: best }; };
-    const ter = lots.find(L => L.lm === 'termini');
-    P.anchors = { station: ter ? { x: ter.x, z: ter.z, w: ter.w, d: ter.d, lot: ter.id, name: 'Roma Termini' } : null,
-      airport: { ...edgeToward(41.7999, 12.2462), name: 'Fiumicino (FCO)', km: 26 },   // летището е извън картата — връзката е на ръба, в посоката му
-      highway: { ...edgeToward(41.835, 12.42), name: 'A91 Roma–Fiumicino / GRA' } };
+    // по град: гарата (запазеното място на забележителността), летището и магистралата — в истинската посока до ръба
+    const AN = { rome: { st: ['termini', 'Roma Termini'], ap: [41.7999, 12.2462, 'Fiumicino (FCO)', 26], hw: [41.835, 12.42, 'A91 Roma–Fiumicino / GRA'] },
+      istanbul: { st: ['sirkeci', 'Гара Сиркеджи'], st2: ['haydarpasa', 'Гара Хайдарпаша'], ap: [41.2753, 28.7519, 'Летище Истанбул (IST)', 35], hw: [41.07, 28.87, 'Магистрала O-1 / D-100'] } }[P.cityId] || {};
+    const stOf = k => { const L = k && lots.find(q => q.lm === k[0]); return L ? { x: L.x, z: L.z, w: L.w, d: L.d, lot: L.id, name: k[1] } : null; };
+    P.anchors = { station: stOf(AN.st), station2: stOf(AN.st2),
+      airport: AN.ap ? { ...edgeToward(AN.ap[0], AN.ap[1]), name: AN.ap[2], km: AN.ap[3] } : null,   // летището е извън картата — връзката е на ръба, в посоката му
+      highway: AN.hw ? { ...edgeToward(AN.hw[0], AN.hw[1]), name: AN.hw[2] } : null };
   }
   P.lots = lots;
 }

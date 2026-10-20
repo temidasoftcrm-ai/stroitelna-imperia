@@ -289,10 +289,11 @@ export function buildPlan2View(P, opts = {}) {
     const m = new THREE.Matrix4(); F.lamps.forEach(([x, z], i) => pools.setMatrixAt(i, m.makeTranslation(x, 0.15, z))); pools.visible = false; pools.frustumCulled = false; F.FURN.add(pools);
   }
   // Рома Термини (opts.termini): гарата по фасадата към площада (opts.stationModel — моделът на играта, иначе кутия) и перони с навеси и коловози отзад
-  const TL = opts.termini ? P.lots.find(L => L.lm === 'termini') : null;
+  const TL = opts.termini ? P.lots.find(L => L.lm === 'termini' || L.lm === 'sirkeci') : null;   // главната гара: Термини (Рим), Сиркеджи (Истанбул)
   if (TL) G.add(terminiView(TL, opts.stationModel));
   // надписите на картата: водите (Златният рог, Босфорът…, Тибър) и кварталите — спрайтове, отблизо се скриват
   const LB = D && opts.labels !== false ? mapLabels(G, D) : null;
+  const BT = D && D.sea && opts.boats !== false ? seaTraffic(G, D, opts.boatModels || {}) : null;   // Истанбул: фериботи по линиите, кораби по Босфора, лодки в Златния рог
   // фоновите римски квартали — фасади с покриви (за парцелите, които играта не ползва: opts.fillLot)
   const BL = D && opts.blocks !== false ? romeBlocks(G, P, D.style) : null;
   const refill = () => { if (BL) BL.fill(opts.fillLot || (() => true)); };
@@ -307,6 +308,7 @@ export function buildPlan2View(P, opts = {}) {
     update(dt, o = {}) {
       if (F && o.camera) F.FURN.visible = o.camera.position.y < 420;
       if (LB && o.camera) LB.update(o.camera);
+      if (BT) BT.update(dt);
       if (!F || !F.SIG.heads || !o.signals || (sigT = (sigT + 1) % 6)) return;
       const byNode = new Map(); for (const s2 of o.signals) byNode.set(s2.node, s2.arms || {});
       F.SIG.heads.forEach((h, i) => { const st = (byNode.get(h.node) || {})[h.arm], cols = SIG_C[st ? st.go : 'red'] || SIG_C.red; for (let k = 0; k < 3; k++) F.SIG.bulbs.setColorAt(i * 3 + k, SC.setHex(cols[k])); });
@@ -342,6 +344,38 @@ function mapLabels(G, D) {
   const L = out.map(o => { const sp = labelSprite(o.text, o.kind); sp.position.set(o.x, o.kind === 'w' ? 6 : 30, o.z); grp.add(sp); return { sp, ...o }; });
   return { list: L, update(cam) {   // размерът — постоянен на екрана (по разстоянието); отблизо (под ~140 м) кварталите се крият, водите остават
     const h = cam.position.y; for (const l of L) { const d = Math.hypot(cam.position.x - l.x - G.position.x, cam.position.z - l.z - G.position.z, h), k = Math.max(10, d * (l.kind === 'w' ? 0.05 : 0.035)); l.sp.scale.set(k * l.sp.userData.ar, k, 1); l.sp.visible = l.kind === 'w' ? h > 60 : h > 140 && d < 3000; } } };
+}
+// ---- морски трафик: фериботите (процедурни — бели, два палуби, комин) по фериботните линии напред-назад със спиране на кея;
+// танкери и контейнеровози по Босфора; лодки и платноходки в Златния рог. models: { tanker, container, small: [..] } — прототипи (по желание)
+const LANES = { bosphorus: [[41.042, 29.026], [41.034, 29.012], [41.024, 29.006], [41.012, 28.999], [41.0, 28.992], [40.988, 28.98]], horn: [[41.0215, 28.976], [41.0265, 28.966], [41.031, 28.957], [41.036, 28.949]] };
+function ferryModel() {
+  const g = new THREE.Group(), white = M(0xf4f4f0), dark = M(0x2b2f36), yel = M(0xe7b416), win = M(0x3a5068);
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(7, 2.2, 32), white); hull.position.y = 1.1; const keel = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.9, 32.4), dark); keel.position.y = 0.2;
+  const d1 = new THREE.Mesh(new THREE.BoxGeometry(6.4, 2.2, 24), white); d1.position.y = 3.3; const w1 = new THREE.Mesh(new THREE.BoxGeometry(6.5, 0.9, 22), win); w1.position.y = 3.4;
+  const d2 = new THREE.Mesh(new THREE.BoxGeometry(5, 1.6, 12), white); d2.position.y = 5.2; const fun = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1, 2.6, 10), yel); fun.position.set(0, 7.1, -2); const top = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.5, 10), dark); top.position.set(0, 8.6, -2);
+  for (const o of [hull, keel, d1, w1, d2, fun, top]) { o.castShadow = true; g.add(o); } return g;
+}
+function seaTraffic(G, D, models) {
+  const K = D.k, at = (la, lo) => [(lo - D.center[1]) * Math.cos(D.center[0] * Math.PI / 180) * 111320 * K, -(la - D.center[0]) * 110540 * K], grp = new THREE.Group(); grp.position.y = -1.0; G.add(grp);
+  const boats = [], cum = p => { const L = [0]; for (let i = 1; i < p.length; i++) L.push(L[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1])); return L; };
+  const fit = (proto, len) => { if (!proto) return null; const o = proto.clone(true), w = new THREE.Group(), b = new THREE.Box3().setFromObject(o), sz = b.getSize(new THREE.Vector3()), long = sz.x > sz.z, k = len / Math.max(sz.x, sz.z); o.scale.setScalar(k); const b2 = new THREE.Box3().setFromObject(o), c = b2.getCenter(new THREE.Vector3()); o.position.set(-c.x, -b2.min.y - 0.6, -c.z); if (long) o.rotation.y = Math.PI / 2; w.add(o); return w; };
+  const add = (obj, path, sp, mode, ph) => { if (!obj || path.length < 2) return; const L = cum(path); grp.add(obj); boats.push({ obj, path, L, T: L[L.length - 1], sp, mode, s: ph * L[L.length - 1], dir: 1, wait: 0 }); };
+  // фериботите: еднаквите линии — веднъж; по един ферибот на линия (до 14)
+  const seen = new Set(); let n = 0;
+  for (const f of D.ferries || []) { if (f.pts.length < 2 || n >= 14) continue; const key = [f.pts[0], f.pts[f.pts.length - 1]].map(p => Math.round(p[0] / 40) + ',' + Math.round(p[1] / 40)).sort().join('|'); if (seen.has(key)) continue; seen.add(key); n++; add(ferryModel(), f.pts, 7, 'shuttle', (n * 0.37) % 1); }
+  const bos = LANES.bosphorus.map(q => at(...q)), horn = LANES.horn.map(q => at(...q)), off = (p, d) => p.map(([x, z], i) => { const a = p[Math.max(0, i - 1)], b = p[Math.min(p.length - 1, i + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [x - (b[1] - a[1]) / l * d, z + (b[0] - a[0]) / l * d]; });
+  [[models.tanker, 95, 0.1, 1], [models.container, 110, 0.55, 1], [models.tanker, 85, 0.3, -1], [models.container, 100, 0.8, -1]].forEach(([m, len, ph, side]) => add(fit(m, len), off(side > 0 ? bos : bos.slice().reverse(), 40 * side), 9, 'loop', ph));   // двупосочно: всяка посока в своя половина
+  (models.small || []).forEach((m, i) => add(fit(m, i % 2 ? 9 : 12), off(i % 2 ? horn : horn.slice().reverse(), (i % 3 - 1) * 25), 4, 'loop', (i * 0.29) % 1));
+  const V = new THREE.Vector3();
+  return { update(dt) { dt = Math.min(dt || 0, 0.1);
+    for (const b of boats) {
+      if (b.wait > 0) { b.wait -= dt; continue; }
+      b.s += b.dir * b.sp * dt;
+      if (b.mode === 'shuttle' && (b.s >= b.T || b.s <= 0)) { b.s = Math.max(0, Math.min(b.T, b.s)); b.dir *= -1; b.wait = 8; }   // на кея — 8 s
+      if (b.mode === 'loop' && b.s >= b.T) b.s = 0;
+      let i = 1; while (i < b.L.length - 1 && b.L[i] < b.s) i++; const a = b.path[i - 1], c = b.path[i], t = (b.s - b.L[i - 1]) / ((b.L[i] - b.L[i - 1]) || 1);
+      b.obj.position.set(a[0] + (c[0] - a[0]) * t, 0, a[1] + (c[1] - a[1]) * t); b.obj.rotation.y = Math.atan2((c[0] - a[0]) * b.dir, (c[1] - a[1]) * b.dir);
+    } } };
 }
 function terminiView(L, model) {
   const g = new THREE.Group(), nx = -Math.sin(L.rot), nz = -Math.cos(L.rot), tx = Math.cos(L.rot), tz = -Math.sin(L.rot), back = L.d * 0.3, len = 140, N = 9;
