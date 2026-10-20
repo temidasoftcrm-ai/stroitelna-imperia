@@ -6046,8 +6046,8 @@ function railSvg() {
   for (const [a, b] of window.__coopShared?.rails || []) {
     if (!cityById(a) || !cityById(b) || !mapIn(a, b) || (S?.rails || []).some(r => r.built && !r.c && ((r.a === a && r.b === b) || (r.a === b && r.b === a)))) continue;
     const ps = railPts(a, b).map(p => p.map(v => v.toFixed(1)).join(',')).join(' ');
-    if (!near) { h += `<polyline points="${ps}" fill="none" stroke="${coopCol()}" stroke-width="${(3 * zs).toFixed(2)}" stroke-linecap="round" opacity=".4"/><polyline points="${ps}" fill="none" stroke="#4a3b2e" stroke-width="${(1.5 * zs).toFixed(2)}" stroke-linecap="round" opacity=".85"/>`; continue; }
-    h += `<polyline points="${ps}" fill="none" stroke="${coopCol()}" stroke-width="${(4.6 * zs).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round" opacity=".45"/><polyline points="${ps}" fill="none" stroke="#3b2f25" stroke-width="${(3.2 * zs).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/><polyline points="${ps}" fill="none" stroke="#d8cbb0" stroke-width="${(1.6 * zs).toFixed(2)}" stroke-dasharray="${(1.2 * zs).toFixed(2)} ${(2 * zs).toFixed(2)}"/>`;
+    if (!near) { h += `<polyline points="${ps}" fill="none" stroke="${coopCol()}" stroke-width="${(3 * zs).toFixed(2)}" stroke-linecap="round" opacity="${feature('coop-col') ? '.75' : '.4'}"/><polyline points="${ps}" fill="none" stroke="#4a3b2e" stroke-width="${(1.5 * zs).toFixed(2)}" stroke-linecap="round" opacity=".85"/>`; continue; }
+    h += `<polyline points="${ps}" fill="none" stroke="${coopCol()}" stroke-width="${(4.6 * zs).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round" opacity="${feature('coop-col') ? '.75' : '.45'}"/><polyline points="${ps}" fill="none" stroke="#3b2f25" stroke-width="${(3.2 * zs).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/><polyline points="${ps}" fill="none" stroke="#d8cbb0" stroke-width="${(1.6 * zs).toFixed(2)}" stroke-dasharray="${(1.2 * zs).toFixed(2)} ${(2 * zs).toFixed(2)}"/>`;
   }
   return h;
 }
@@ -6874,12 +6874,12 @@ function abSvg() {
     if (via) {   // начупено трасе (по брега и т.н.)
       const pts = [[x1, y1], ...via.map(([lo, la]) => proj(lo, la)), [x2, y2]], P = a => a.map(p => p.map(v => v.toFixed(1)).join(',')).join(' ');
       const k = j ? (j.stage + j.prog) / abStages().length : 0, [lx, ly] = ptAlong(pts, 0.5);
-      if (done) h += `<polyline points="${P(pts)}" fill="none" stroke="#ff2a1f" stroke-width="${16 * w}" stroke-linecap="round" stroke-linejoin="round" opacity=".32"/><polyline points="${P(pts)}" fill="none" stroke="#c62828" stroke-width="${5.5 * w}" stroke-linecap="round" stroke-linejoin="round"/><polyline points="${P(pts)}" fill="none" stroke="#fff" stroke-width="${1 * w}" stroke-dasharray="${3 * w} ${3 * w}"/>`;
+      if (done) h += `<polyline points="${P(pts)}" fill="none" stroke="${hwPartner(sg.id) ? coopCol() : '#ff2a1f'}" stroke-width="${16 * w}" stroke-linecap="round" stroke-linejoin="round" opacity=".32"/><polyline points="${P(pts)}" fill="none" stroke="#c62828" stroke-width="${5.5 * w}" stroke-linecap="round" stroke-linejoin="round"/><polyline points="${P(pts)}" fill="none" stroke="#fff" stroke-width="${1 * w}" stroke-dasharray="${3 * w} ${3 * w}"/>`;
       else if (j) h += `<polyline points="${P(pts)}" fill="none" stroke="#ef9a9a" stroke-width="${4 * w}" stroke-dasharray="${4 * w} ${3 * w}"/><polyline points="${P(donePts(pts, k))}" fill="none" stroke="#c62828" stroke-width="${5.5 * w}" stroke-linecap="round" stroke-linejoin="round"/><text x="${lx}" y="${ly - mapPx(9)}" font-size="${mapPx(13)}" font-weight="800" fill="#8e0000" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${mapPx(3)}">🔴 ${Math.floor(k * 100)}%</text>`;
       else if (on) h += `<polyline points="${P(pts)}" fill="none" stroke="#e53935" stroke-width="${2.2 * w}" stroke-dasharray="${2 * w} ${3 * w}" opacity=".7"/>`;
       continue;
     }
-    if (done) h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#ff2a1f" stroke-width="${16 * w}" stroke-linecap="round" opacity=".32"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#c62828" stroke-width="${5.5 * w}" stroke-linecap="round"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#fff" stroke-width="${1 * w}" stroke-dasharray="${3 * w} ${3 * w}"/>`;
+    if (done) h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${hwPartner(sg.id) ? coopCol() : '#ff2a1f'}" stroke-width="${16 * w}" stroke-linecap="round" opacity=".32"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#c62828" stroke-width="${5.5 * w}" stroke-linecap="round"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#fff" stroke-width="${1 * w}" stroke-dasharray="${3 * w} ${3 * w}"/>`;
     else if (j) {
       const k = (j.stage + j.prog) / abStages().length;
       h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#ef9a9a" stroke-width="${4 * w}" stroke-dasharray="${4 * w} ${3 * w}"/><line x1="${x1}" y1="${y1}" x2="${x1 + (x2 - x1) * k}" y2="${y1 + (y2 - y1) * k}" stroke="#c62828" stroke-width="${5.5 * w}"/>`;
@@ -6895,7 +6895,9 @@ let _hwOwn = null, _hwV = -1, _hwAll = [];
 const hwAll = () => { const own = hwDone(), sh = window.__coopShared; if (!sh || !sh.hw?.length) return own;
   if (own !== _hwOwn || sh.v !== _hwV) { _hwOwn = own; _hwV = sh.v; _hwAll = [...new Set([...own, ...sh.hw])]; } return _hwAll; };
 const hwMine = id => hwDone().includes(id);
-const coopCol = () => window.__coopCol || '#2f8cff';   // цветът на партньора (син; ако твоята марка е синя — оранжев)
+// Лабораторията → coop-col (потребителят: линията, построена от партньора, да е в НЕГОВИЯ цвят — и на двете карти): цветът на марката му (coop.js → __coopShared.col)
+const coopCol = () => (feature('coop-col') && window.__coopShared?.col) || window.__coopCol || '#2f8cff';
+const hwPartner = id => feature('coop-col') && !hwMine(id) && hwAll().includes(id);   // участъкът е построен от партньора   // цветът на партньора (син; ако твоята марка е синя — оранжев)
 const JCOL = '#b45cff';   // общ строеж (магистрала/линия, която строите заедно) — лилав
 const coopJoint = (kind, ref) => !!window.__coopJoint?.[kind]?.has(ref);
 // градове, свързани с централата по готови магистрали (за по-евтин превоз с камиони)
@@ -7103,7 +7105,7 @@ function hwSvg() {
     const X1 = x1 + ox, Y1 = y1 + oy, X2 = x2 + ox, Y2 = y2 + oy;
     const jt = coopJoint('hw', s.id);
     if (jt) h += `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="${JCOL}" stroke-width="${((near ? 7 : 5) * zs).toFixed(2)}" stroke-linecap="round" opacity=".55"${hwAll().includes(s.id) || jobs[s.id] ? '' : ` stroke-dasharray="${(4 * zs).toFixed(2)} ${(3 * zs).toFixed(2)}"`}><title>🤝 Общ строеж с партньора</title></line>`;   // строите заедно — лилаво
-    if (hwAll().includes(s.id)) h += `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#2b8cff" stroke-width="${((near ? 10 : 7) * zs).toFixed(2)}" stroke-linecap="round" opacity=".42"/>` + (hwMine(s.id) || jt ? '' : `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="${coopCol()}" stroke-width="${((near ? 5 : 3.6) * zs).toFixed(2)}" stroke-linecap="round" opacity=".45"/>`) + (near
+    if (hwAll().includes(s.id)) h += `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="${hwPartner(s.id) ? coopCol() : '#2b8cff'}" stroke-width="${((near ? 10 : 7) * zs).toFixed(2)}" stroke-linecap="round" opacity="${hwPartner(s.id) ? '.6' : '.42'}"/>` + (hwMine(s.id) || jt || hwPartner(s.id) ? '' : `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="${coopCol()}" stroke-width="${((near ? 5 : 3.6) * zs).toFixed(2)}" stroke-linecap="round" opacity=".45"/>`) + (near
       ? `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#2f66b3" stroke-width="${(3 * zs).toFixed(2)}" stroke-linecap="round"/><line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#ffffff" stroke-width="${(0.6 * zs).toFixed(2)}"/>`
       : `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#6b88b5" stroke-width="${(1.8 * zs).toFixed(2)}" stroke-linecap="round" opacity=".9"/>`);   // отдалеч — тънка и приглушена; строежите остават ярки
     else if (jobs[s.id]) {
@@ -9424,6 +9426,10 @@ if (AUTOTEST) {
     coopLvTest(p) {   // coop-lv: фалшив партньор на ниво p (сякаш сте свързани отдавна) → нивото на фирмата, чакането, лентата; p = null — край
       if (p == null) { coop.partnerLv = () => null; dev.render(); return { best: dev.best(), raw: dev.rawBest() }; }
       coop.partnerLv = () => p; S.coopLvFloor = Math.min(p, dev.rawBest()); dev.render(); return { best: dev.best(), raw: dev.rawBest(), waiting: dev.waiting(), bar: $('devBtn')?.textContent, wait: S.coopWait }; },
+    coopColTest(col = '#e91e63') {   // coop-col: фалшив партньор (цвят col) с 3 магистрали и 2 жп линии, които не са твои → колко линии на картата са в неговия цвят
+      const hw = [...allSegs(), ...ALL_AB].filter(x => !hwMine(x.id) && !(x.cont && !contByKey(x.cont)?.open())).slice(0, 3).map(x => x.id), own = new Set((S.rails || []).map(r => [r.a, r.b].sort().join('|'))), rails = allSegs().filter(x => !own.has([x.a, x.b].sort().join('|'))).slice(3, 5).map(x => [x.a, x.b]);
+      window.__coopShared = { v: Date.now(), name: 'Тест', col, hw, rails, cities: [], infra: {} }; showMap(true); drawMap();
+      const n = document.querySelectorAll(`#mapSvg [stroke="${col}"]`).length; return { hw, rails, n, inRail: railSvg().split(col).length - 1, inHw: hwSvg().split(col).length - 1, inAb: abSvg().split(col).length - 1, mapIn: rails.map(r => mapIn(...r)) }; },
     coopBrTest() {   // coop-br: фалшив партньор с филиал в първия отключен град без филиал — в списъка „безплатно“, отварянето не струва пари
       const id = CITIES.find(c => branchOk(c.id) && inScope(c.id) && !wonHide(c.id))?.id || CITIES.find(c => branchOk(c.id))?.id; if (!id) return { none: CITIES.filter(c => !ownedCities().includes(c.id)).length }; window.__coopShared = { v: 1, name: 'Тест', hw: [], rails: [], cities: [id], infra: {} };
       const html = buyBranchHtml(), m0 = econ.s.money; openBranchNow(id); const r = { id, inScope: inScope(id), free: html.includes(`data-buybr="${id}"`) && /Влез безплатно/.test(html), paid: m0 - econ.s.money, owned: ownedCities().includes(id), coopBr: (S.coopBr || {})[id], city: S.cityId }; window.__coopShared = null; return r; },
