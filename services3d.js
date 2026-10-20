@@ -8,9 +8,10 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { SERVICES, baseFor, districtFor, modelOf, TIER_NM } from './services.js';
 import { emergCar } from './vehmodels.js';
+import { prepNightFloors } from './nightfloors.js';
 
 const cache = {}, loader = new GLTFLoader(), SHARED = new WeakSet();
-const load = p => cache[p] || (cache[p] = loader.loadAsync(p).then(g => { g.scene.traverse(o => { if (o.geometry) SHARED.add(o.geometry); for (const m of o.material ? [].concat(o.material) : []) SHARED.add(m); }); return g; }).catch(() => null));
+const load = p => cache[p] || (cache[p] = loader.loadAsync(p).then(g => { prepNightFloors(g.scene, 'svc-' + p.split('/').pop().replace('.glb', ''));   /* нощем — прозорците (nightfloors.js, флаг night-civic) */ g.scene.traverse(o => { if (o.geometry) SHARED.add(o.geometry); for (const m of o.material ? [].concat(o.material) : []) SHARED.add(m); }); return g; }).catch(() => null));
 // регионални палитри: настилка на площада, покриви/фасади на процедурните, цвят на пейки/огради
 const REG = {
   eu: { pave: '#cbc3b2', wall: 0xe8e0d0, roof: 0x8a4b3a, trim: 0x3f5a3a }, us: { pave: '#c9c9c4', wall: 0xd8d6d0, roof: 0x4f5b66, trim: 0x2e3f5a },
