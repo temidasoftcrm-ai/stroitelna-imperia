@@ -636,6 +636,7 @@ function placeLots(P, sk, r) {
       return { x: e[0], z: e[1], dir: Math.atan2(ux, uz), road: best }; };
     // по град: гарата (запазеното място на забележителността), летището и магистралата — в истинската посока до ръба
     const AN = { rome: { st: ['termini', 'Roma Termini'], ap: [41.7999, 12.2462, 'Fiumicino (FCO)', 26], hw: [41.835, 12.42, 'A91 Roma–Fiumicino / GRA'] },
+      london: { st: ['waterloo', 'Гара Ватерло'], ap: [51.47, -0.4543, 'Летище Хийтроу (LHR)', 24], hw: [51.511, -0.03, 'A13 / M25'] },
       paris: { st: ['saintlazare', 'Гара Сен Лазар'], ap: [49.0097, 2.5479, 'Летище Шарл дьо Гол (CDG)', 25], hw: [48.846, 2.255, 'A13 / Периферик (Порт д’Отьой)'] },
       istanbul: { st: ['sirkeci', 'Гара Сиркеджи'], st2: ['haydarpasa', 'Гара Хайдарпаша'], ap: [41.2753, 28.7519, 'Летище Истанбул (IST)', 35], hw: [41.07, 28.87, 'Магистрала O-1 / D-100'] } }[P.cityId] || {};
     const stOf = k => { const L = k && lots.find(q => q.lm === k[0]); return L ? { x: L.x, z: L.z, w: L.w, d: L.d, lot: L.id, name: k[1] } : null; };

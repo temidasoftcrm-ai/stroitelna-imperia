@@ -635,6 +635,7 @@ function cropLm(w, m, [x0, x1, z0, z1]) {
 // размерът на забележителност от модел (GLB_LM.fit — основата ѝ след зареждането); null за процедурните (те са готови веднага)
 export const hasLandmark = kind => !!BUILD[kind];   // има ли модел (иначе buildLandmark дава Галата)
 export const lmFit = kind => (GLB_LM[kind] && GLB_LM[kind].fit) || null;
+export const lmH = kind => (GLB_LM[kind] && GLB_LM[kind].h) || null;   // височината на модела (след зареждането)
 function glbLm(kind) {
   const C = GLB_LM[kind], g = new THREE.Group(), flood = [];
   box(g, 15, 0.3, 15, mat(C.plate ?? 0x9a9a92, 0.95), 0, 0.15, 0);

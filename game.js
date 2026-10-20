@@ -64,7 +64,7 @@ import { syncImpCivic, updateImpCivic } from './impcivic.js';   // общест�
 import { pickModel as impPick, decor as impDecor, IMP_MODELS, IMP_H } from './impstyle.js';
 import { createNeom, NEOM_CITY, NEOM_ID, DISTRICTS as NEOM_DISTRICTS, FOUND_COST as NEOM_FOUND } from './neom.js';
 import { buildSite3D } from './mine3d.js';
-import { LANDMARK_NM, CITY_LANDMARKS, LANDMARK_CENTER, BIG_LANDMARKS, SEA_LANDMARKS, buildLandmark, buildSeaLandmark, manhattanTowers, lmFit, hasLandmark } from './landmarks.js';
+import { LANDMARK_NM, CITY_LANDMARKS, LANDMARK_CENTER, BIG_LANDMARKS, SEA_LANDMARKS, buildLandmark, buildSeaLandmark, manhattanTowers, lmFit, lmH, hasLandmark } from './landmarks.js';
 import { OFFICE_STYLES, STYLE_LV, STYLE_COST, buildOfficeTower } from './officestyle.js';
 import { shipRange, PORT_LEVELS, portMax, SHIPS, seaKm, seaPath, SEA_ROUTE_COST, voyagePay, shipDaily, SEA_LV } from './seaways.js';
 import { makeTrackMap, placeCars } from './trackpath.js';
@@ -634,7 +634,7 @@ const PLAN_TPL5 = { sofia: 'osm' };
 const PLAN_TPL7 = { losangeles: 'osm' };
 // 🇮🇹 планът v2 по истинската карта (cityplan2game.js + cityplan2-3d.js): Рим в НОВИТЕ игри (флаг rome-osm → S.plan2.rome);
 // старите записи остават на стария план. Данните (~5 MB) се зареждат само когато градът е такъв — plan2Preload преди влизането.
-const PLAN2_CITIES = new Set(['rome', 'paris', 'istanbul']);   // градовете по истинската карта (флагове <id>-osm + <id>-game)
+const PLAN2_CITIES = new Set(['rome', 'paris', 'istanbul', 'london']);   // градовете по истинската карта (флагове <id>-osm + <id>-game)
 const plan2 = { mod: null, view: null, data: {}, cache: null, models: {} };
 // моделите за изгледа на града (Истанбул: висящият мост, фериботите и корабите) — зареждат се с плана, само за този град
 const PLAN2_MODELS = { istanbul: { 'lm-bosphorus': 'lm/bosphorus.glb', 'sh-ferry': 'ships/ferry-bandirma.glb', 'sh-cruise': 'ships/cruise.glb', 'sh-tanker': 'ships/tanker.glb', 'sh-container': 'ships/container.glb', 'bt-fish': 'boats/sf-fisherboat.glb', 'bt-sail': 'boats/sf-sailboat.glb', 'bt-motor': 'marina/motoryacht.glb', 'bt-yacht': 'boats/sf-yacht.glb' } };
@@ -5440,6 +5440,8 @@ function lmRiverSpot(k, mem) {
 // Рим по истинската карта: забележителностите — на реалните им места (P.landmarks), вписани в основата си
 // от плана се добавят само тези с правилен модел за града (иначе 'opera' в Париж става операта в Сидни, 'pantheon' — римският)
 const LM_EXTRA = { istanbul: new Set(['topkapi', 'bluemosque', 'maiden', 'grandbazaar', 'galata', 'suleymaniye', 'haydarpasa']) };
+// истинската височина (м) на високите забележителности — мащабът е по-малкият от основата и височината
+const LM_REAL_H = { bigben: 96, londoneye: 135, shard: 310, eiffel: 330, galata: 67, maiden: 23, towerbridge: 65, stpeter: 136 };
 const LM_ALIAS = { suleymaniye: 'mosque2' }, LM_NOT = new Set(['termini', 'sirkeci', 'saintlazare', 'haydarpasa_st']);   // гарите ги рисува изгледът на града
 function landmarkPlan2(kinds) {
   const P = city.plan, box = new THREE.Box3(), sz = new THREE.Vector3();
@@ -5449,7 +5451,9 @@ function landmarkPlan2(kinds) {
     const at = P.landmarks.find(L => L.k === k) || P.landmarks.find(L => L.k === base(k)) || P.landmarks.find(L => LM_ALIAS[L.k] === k); if (!at) continue;
     const o = buildLandmark(k, { label }); if (!o) continue;
     let s0 = lmFit(k); if (!s0) { const sg = o.group.userData.sign; if (sg) sg.removeFromParent(); box.setFromObject(o.group).getSize(sz); s0 = Math.max(sz.x, sz.z) || 1; if (sg) o.group.add(sg); }   // моделите (GLB) се зареждат после — по основата им, не по временната плоча
-    o.group.scale.multiplyScalar(Math.max(at.w, at.d) * 0.95 / s0); o.group.position.set(at.x, 0.1, at.z);
+    let k0 = Math.max(at.w, at.d) * 0.95 / s0; const hr = LM_REAL_H[k] || LM_REAL_H[k.replace(/\d+$/, '')];
+    if (hr) { let h0 = lmH(k); if (!h0) { box.setFromObject(o.group).getSize(sz); h0 = sz.y || 1; } k0 = Math.min(k0, hr * (P.p2.osmData?.k || 0.45) / h0); }   // кулите — и по истинската височина (парцелът на Парламента е 225 м, а моделът е само Биг Бен)
+    o.group.scale.multiplyScalar(k0); o.group.position.set(at.x, 0.1, at.z);
     o.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
     city.group.add(o.group); city.landmarks.push(o);
   }
