@@ -1,0 +1,254 @@
+[
+ {
+  "title": "Сгради — тъмни нощем",
+  "items": [
+   {
+    "k": "h2-blue",
+    "nm": "Синята къща",
+    "n": 79,
+    "cities": [
+     "london",
+     "newyork",
+     "paris",
+     "rome",
+     "sofia",
+     "tokyo",
+     "Варна"
+    ],
+    "img": "night/h2-blue.webp"
+   },
+   {
+    "k": "b2-office6",
+    "nm": "Офис 6 (блокове 2)",
+    "n": 58,
+    "cities": [
+     "london",
+     "newyork",
+     "paris",
+     "rome",
+     "tokyo"
+    ],
+    "img": "night/b2-office6.webp"
+   },
+   {
+    "k": "b2-office3",
+    "nm": "Офис 3 (блокове 2)",
+    "n": 55,
+    "cities": [
+     "london",
+     "newyork",
+     "paris",
+     "rome",
+     "tokyo"
+    ],
+    "img": "night/b2-office3.webp"
+   },
+   {
+    "k": "b2-office2",
+    "nm": "Офис 2 (блокове 2)",
+    "n": 4,
+    "cities": [
+     "london",
+     "tokyo"
+    ],
+    "img": ""
+   },
+   {
+    "k": "b2-pp-townhouse",
+    "nm": "Градска къща (блокове 2)",
+    "n": 4,
+    "cities": [
+     "london",
+     "tokyo"
+    ],
+    "img": ""
+   },
+   {
+    "k": "b2-midwest",
+    "nm": "Сграда „Мидуест“ (блокове 2)",
+    "n": 3,
+    "cities": [
+     "paris",
+     "rome"
+    ],
+    "img": "night/b2-midwest.webp"
+   }
+  ]
+ },
+ {
+  "title": "Заводи и складове — тъмни",
+  "items": [
+   {
+    "k": "ind-building-a",
+    "nm": "Завод / склад A",
+    "n": 3,
+    "cities": [
+     "rome"
+    ],
+    "img": "night/ind-building-a.webp"
+   },
+   {
+    "k": "ind-building-d",
+    "nm": "Завод / склад D",
+    "n": 2,
+    "cities": [
+     "rome"
+    ],
+    "img": "night/ind-building-d.webp"
+   },
+   {
+    "k": "ind-building-e",
+    "nm": "Завод / склад E",
+    "n": 2,
+    "cities": [
+     "rome"
+    ],
+    "img": "night/ind-building-e.webp"
+   },
+   {
+    "k": "ind-building-f",
+    "nm": "Завод / склад F",
+    "n": 4,
+    "cities": [
+     "rome"
+    ],
+    "img": "night/ind-building-f.webp"
+   },
+   {
+    "k": "ind-building-g",
+    "nm": "Завод / склад G",
+    "n": 4,
+    "cities": [
+     "rome",
+     "Варна"
+    ],
+    "img": "night/ind-building-g.webp"
+   },
+   {
+    "k": "ind-building-h",
+    "nm": "Завод / склад H",
+    "n": 1,
+    "cities": [
+     "Варна"
+    ],
+    "img": "night/ind-building-h.webp"
+   },
+   {
+    "k": "ind-building-i",
+    "nm": "Завод / склад I",
+    "n": 1,
+    "cities": [
+     "Варна"
+    ],
+    "img": "night/ind-building-i.webp"
+   },
+   {
+    "k": "ind-building-j",
+    "nm": "Завод / склад J",
+    "n": 2,
+    "cities": [
+     "Варна"
+    ],
+    "img": "night/ind-building-j.webp"
+   },
+   {
+    "k": "ind-building-k",
+    "nm": "Завод / склад K",
+    "n": 2,
+    "cities": [
+     "rome",
+     "Варна"
+    ],
+    "img": "night/ind-building-k.webp"
+   },
+   {
+    "k": "ind-building-l",
+    "nm": "Завод / склад L",
+    "n": 3,
+    "cities": [
+     "rome",
+     "Варна"
+    ],
+    "img": "night/ind-building-l.webp"
+   },
+   {
+    "k": "ind-water-tower",
+    "nm": "Водна кула",
+    "n": 5,
+    "cities": [
+     "rome",
+     "Варна"
+    ],
+    "img": "night/ind-water-tower.webp"
+   }
+  ]
+ },
+ {
+  "title": "Бензиностанции — тъмни",
+  "items": [
+   {
+    "k": "gas-lowpoly",
+    "nm": "Бензиностанция (проста)",
+    "n": 6,
+    "cities": [
+     "london",
+     "newyork",
+     "paris",
+     "rome"
+    ],
+    "img": "night/gas-lowpoly.webp"
+   },
+   {
+    "k": "gas-modern",
+    "nm": "Бензиностанция (модерна)",
+    "n": 3,
+    "cities": [
+     "newyork",
+     "sofia",
+     "tokyo"
+    ],
+    "img": ""
+   },
+   {
+    "k": "gas-big",
+    "nm": "Бензиностанция (голяма)",
+    "n": 2,
+    "cities": [
+     "sofia",
+     "Варна"
+    ],
+    "img": "night/gas-big.webp"
+   },
+   {
+    "k": "gas-green",
+    "nm": "Бензиностанция (зелена)",
+    "n": 1,
+    "cities": [
+     "Варна"
+    ],
+    "img": "night/gas-green.webp"
+   }
+  ]
+ },
+ {
+  "title": "Светят, но само равномерно (без прозорци)",
+  "items": [
+   {
+    "k": "Building_Small_1",
+    "nm": "Малка сграда от градския пакет",
+    "n": 444,
+    "cities": [
+     "dubai",
+     "london",
+     "newyork",
+     "paris",
+     "rome",
+     "sofia",
+     "tokyo",
+     "Варна"
+    ],
+    "img": "night/Building_Small_1.webp"
+   }
+  ]
+ }
+]
