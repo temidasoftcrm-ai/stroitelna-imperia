@@ -186,7 +186,7 @@ function build() {
     if (L.big) { const k = { hospital: 'hospital', station: 'station', stadium: 'stadium', special: 'cityhall' }[L.big]; put(k, L, 6); continue; }
     const [list, hMax] = BUILD[L.build] || BUILD.house, have = list.filter(k => A[k]); put(pick(have, L.id), L, L.build === 'house' ? 5 : 4, hMax);
   }
-  if (P.osm) romeNear();
+  if (P.osm && fam.value === 'rome') romeNear();   // италианските модели — само в Рим (Истанбул — фасадите на модула и отблизо)
   lodSetup();
   spawnCars(); anchorsView(); distView(distOn); stats(); view(viewMode);
 }
