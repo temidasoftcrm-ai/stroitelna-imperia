@@ -3773,7 +3773,10 @@ const bust = createBankrupt({ S: () => S, econ: () => econ, toast, modal, fmt, s
 setTimeout(() => { try { if (S) bust.banner(); } catch {} }, 3000);
 window.__stroiMe = () => { if (!S || !S.hqCity) return null; const b = brandOf(S); return { name: b ? `${b.ico} ${b.nm}` : 'Фирма', city: cityById(S.cityId)?.nm || S.cityId, day: S.day | 0 }; };   // за „👥 Онлайн сега“ в ⚙️ Настройки (cloud.js)
 // 🤝 партньорство в самостоятелната игра (coop.js): пари, техника, материали, общи поръчки, партньорът на картата
-const coop = createCoop({ lv: () => dev.rawBest(), S: () => S, econ: () => econ, infra: () => coopInfra(), infraSync: (I, pn) => coopInfraSync(I, pn), toast, modal, fmt, save, renderPanel, stocksOpen: () => !!S && dev.has('STOCKS'), drawMap: () => { try { if (!$('mapScreen').classList.contains('hidden')) drawMap(); } catch {} },
+const coop = createCoop({ lv: () => dev.rawBest(),
+  fleet: () => [...(S.trains || []).map(t => ({ ref: 't' + t.id, cost: TRAIN_TYPES[t.kind || 'small']?.cost || 0, nm: t.nm })), ...(S.ships || []).map(p => ({ ref: 's' + p.id, cost: SHIPS[p.kind]?.cost || 0, nm: p.nm })), ...(S.planes || []).map(p => ({ ref: 'p' + p.id, cost: PLANES[p.kind]?.cost || 0, nm: p.nm }))],   // 🚆✈️🚢 общият флот (coop-fleet)
+  fleetNet: () => { const h = econ.s.history || [], c = (h[h.length - 1] || {}).cats || {}; return ['превози', AIR_CAT, SEA_CAT].filter((k, i, a) => a.indexOf(k) === i).reduce((a, k) => a + (+c[k] || 0), 0); },   // вчерашната нетна печалба на влаковете, полетите и корабите
+  S: () => S, econ: () => econ, infra: () => coopInfra(), infraSync: (I, pn) => coopInfraSync(I, pn), toast, modal, fmt, save, renderPanel, stocksOpen: () => !!S && dev.has('STOCKS'), drawMap: () => { try { if (!$('mapScreen').classList.contains('hidden')) drawMap(); } catch {} },
   ready: () => !!(S && econ && city.ready), cityName: id => cityById(id)?.nm || id, ownedCities: () => ownedCities(), brand: () => brandOf(S),
   netWorth: () => econ.netWorth(units.map(u => u.type)), unitsHere: () => units.filter(u => !u.proj).map(u => u.type),
   takeUnit: type => { const u = units.find(q => q.type === type && !q.proj); if (!u) return false; scene.remove(u.obj); units.splice(units.indexOf(u), 1); S.units.splice(S.units.indexOf(type), 1); refreshGarageLabel(); save(); renderPanel(); return true; },

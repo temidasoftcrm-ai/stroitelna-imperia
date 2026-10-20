@@ -59,7 +59,8 @@ export function createCoop(d) {
       hwDone: d.hwInfo().done.slice(0, 200), hwJobs: d.hwInfo().jobs.map(j => j.seg), rails: d.rails().map(r => r.ref).slice(0, 200),
       railKm: Object.fromEntries(d.rails().slice(0, 200).map(r => [r.ref, r.km])),
       infra: d.infra ? d.infra() : {},   // { град: [гара, летище, пристанище] } — партньорът ги развива заедно с теб
-      lv: d.lv ? d.lv() : null };   // нивото на фирмата (неограничено) — общото ниво (флаг coop-lv, devlevel.js)
+      lv: d.lv ? d.lv() : null,
+      fleet: d.fleet ? d.fleet().slice(0, 300) : [] };   // влаковете, корабите и самолетите [{ ref, cost, nm }] — общият флот (флаг coop-fleet)   // нивото на фирмата (неограничено) — общото ниво (флаг coop-lv, devlevel.js)
   }
   // къде строя по градове: текущият град се чете от играта, другите — от последното посещение (localStorage)
   const SITES = 'stroi-coop-sites';
@@ -130,7 +131,7 @@ export function createCoop(d) {
         } else if (+D.amount > 0) {
           const amt = Math.round(+D.amount);
           if (r.kind === 'vault' && /Дивидент/i.test(r.note || '') && +D.amount > 0) d.modal('🏦 Холдингът разпредели печалбата', `Твоят дял от месечния дивидент: <b>+${f(Math.round(+D.amount))} €</b>.<br>${esc(r.note || '')}`, [['Супер! 💰', null]]);
-        const why = { gift: `🎁 Подарък от ${pn}`, loan: `💸 Заем от ${pn} — върни ${f(D.owed)} € до ${D.hours} ч`, repay: `💸 ${pn} върна по заема`, refund: r.note || 'Върнати пари', mega: 'Обща поръчка', rent: `🏢 ${pn} плати наем за ${UNIT_TYPES[D.type]?.nm.toLowerCase() || 'техника'}`, vault: r.note || '🏦 От общата касичка' }[r.kind] || 'Партньор';
+        const why = D.fleet === 'buy' ? `🚆 ${pn} плати половината от ${D.nm || 'превозното средство'} (общ флот)` : D.fleet === 'income' ? `🚆 Половината от печалбата на общия флот на ${pn}` : { gift: `🎁 Подарък от ${pn}`, loan: `💸 Заем от ${pn} — върни ${f(D.owed)} € до ${D.hours} ч`, repay: `💸 ${pn} върна по заема`, refund: r.note || 'Върнати пари', mega: 'Обща поръчка', rent: `🏢 ${pn} плати наем за ${UNIT_TYPES[D.type]?.nm.toLowerCase() || 'техника'}`, vault: r.note || '🏦 От общата касичка' }[r.kind] || 'Партньор';
           E().earn(amt, 'партньор', why.replace(/^[^\wА-я]+\s*/, ''));
           d.toast(`${why}: +${f(amt)} €`, 'good');
         }
@@ -235,8 +236,33 @@ export function createCoop(d) {
   window.__coopDay = () => {
     const sum = [...activeJoints('hw'), ...activeJoints('rail')].filter(j => j.done).reduce((a, j) => a + j.km * (j.kind === 'hw' ? 3 : 8), 0);
     if (sum > 0) E().earn(sum, 'партньор', `🤝 Общи магистрали и влакове с ${partnerName()}`);
-    holdDay();
+    holdDay(); fleetDay();
   };
+  // 🚆✈️🚢 общият флот (флаг coop-fleet; потребителят: „каквото е купил единият — самолети, кораби или влакове — да ги разделя на двамата“):
+  // всяко превозно средство, купено докато сте партньори, е 50/50 — партньорът връща половината от цената (щом има пари),
+  // а половината от дневната печалба на тези превозни средства отива при него. Старите (отпреди партньорството) остават само на собственика.
+  function fleetDay() {
+    const S = d.S(), P = st?.partner?.snap; if (!feature('coop-fleet') || !S || !st2 || !P || !d.fleet) return;
+    let F = S.coopFleet; if (!F || F.who !== P.name) F = S.coopFleet = { who: P.name, baseMine: null, basePartner: null, mine: {}, paid: {} };   // нов партньор — отначало
+    const mine = d.fleet(), pf = Array.isArray(P.fleet) ? P.fleet : null;
+    if (!F.baseMine) F.baseMine = Object.fromEntries(mine.map(v => [v.ref, 1]));   // каквото имаш при свързването — само твое
+    for (const v of mine) if (!F.baseMine[v.ref] && !F.mine[v.ref]) F.mine[v.ref] = v.cost;
+    if (pf && !F.basePartner) F.basePartner = Object.fromEntries(pf.map(v => [v.ref, 1]));
+    for (const v of pf && F.basePartner ? pf : []) {   // новите на партньора: плащаш половината
+      if (F.basePartner[v.ref] || F.paid[v.ref]) continue;
+      const half = Math.round((+v.cost || 0) / 2); if (half <= 0) { F.paid[v.ref] = 1; continue; } if (E().money < half) break;   // нямаш пари — утре пак
+      F.paid[v.ref] = half; E().spend(half, 'партньор', `🤝 Половината от ${v.nm || 'превозно средство'} на ${partnerName()} (общ флот)`);
+      fleetSend({ fn: 'coop_send', args: { p_req: uid(), p_kind: 'gift', p_data: { amount: half, fleet: 'buy', nm: v.nm || '' } }, refund: { money: half } });
+    }
+    const tot = mine.reduce((a, v) => a + v.cost, 0), sh = mine.filter(v => F.mine[v.ref]).reduce((a, v) => a + v.cost, 0), net = d.fleetNet ? d.fleetNet() : 0;
+    const send = Math.round(net * 0.5 * (tot > 0 ? sh / tot : 0));   // половината от печалбата на общите — по дела им в целия флот
+    if (send > 0) { E().spend(send, 'партньор', `🤝 Половината от печалбата на общия флот → ${partnerName()}`); fleetSend({ fn: 'coop_send', args: { p_req: uid(), p_kind: 'gift', p_data: { amount: send, fleet: 'income' } }, refund: { money: send } }); }
+    d.save();
+  }
+  let fleetSend = op => queue(op);
+  // тест (без сървъра): фалшив партньор P, пратките — само се записват; връща S.coopFleet и пратките
+  window.__coopFleetTest = P => { const s0 = st, s20 = st2, sent = []; st = { pair: { status: 'active' }, partner: { snap: P } }; st2 = st2 || {}; fleetSend = op => { sent.push(op.args.p_data); return Promise.resolve({ ok: true }); };
+    try { fleetDay(); } finally { st = s0; st2 = s20; fleetSend = op => queue(op); } return { F: d.S().coopFleet, sent }; };
   // 🏦 холдингът всеки игрален ден: спасяване от фалит (10-ия ден на минус) и дивидент в края на месеца
   function holdDay() {
     const S = d.S(), b = S?.bust; if (!S || !st2) return;
