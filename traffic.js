@@ -152,7 +152,7 @@ export function createTraffic(opts) {
     }
     return null;
   }
-  const heavyKind = v => v.kind === 'bus' || v.kind === 'truck' || v.len > 7.5;
+  const heavyKind = v => v.kind ? v.kind === 'bus' || v.kind === 'truck' : v.len > 7.5;   // по вида; без вид — по дължината
   const narrow = l => (l.edge?.w || 99) < W_HEAVY;   // лентата е на тясна улица (Рим: 3–6 м)
   const insert = (p, c) => { let k = 0; while (k < p.cars.length && p.cars[k].s < c.s) k++; p.cars.splice(k, 0, c); };
   const remove = (p, c) => { const k = p.cars.indexOf(c); if (k >= 0) p.cars.splice(k, 1); };
