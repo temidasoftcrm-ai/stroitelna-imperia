@@ -5502,6 +5502,7 @@ function landmarkPlan2(kinds) {
     const at = P.landmarks.find(L => L.k === k) || P.landmarks.find(L => L.k === base(k)) || P.landmarks.find(L => LM_ALIAS[L.k] === k) || P.landmarks.find(L => LM_PREF[L.k] === k); if (!at) continue;
     const labelNm = LM_LABEL[at.k] || null;
     const o = buildLandmark(k, { label }); if (!o) continue; if (labelNm) o.labelNm = labelNm;
+    if (lmFit(k)) { const pl = o.group.children.find(c => c.isMesh && c.geometry?.type === 'BoxGeometry' && c.geometry.parameters?.width === 15 && c.geometry.parameters?.depth === 15); if (pl) pl.visible = false; }   // квадратната плоча на моделите (15×15) — на истинската карта парцелът е правоъгълен и плочата излиза на улиците
     let s0 = lmFit(k); if (!s0) { const sg = o.group.userData.sign; if (sg) sg.removeFromParent(); box.setFromObject(o.group).getSize(sz); s0 = Math.max(sz.x, sz.z) || 1; if (sg) o.group.add(sg); }   // моделите (GLB) се зареждат после — по основата им, не по временната плоча
     let k0 = Math.max(at.w, at.d) * 0.95 / s0; const hr = LM_REAL_H[k] || LM_REAL_H[k.replace(/\d+$/, '')];
     if (hr) { let h0 = lmH(k); if (!h0) { box.setFromObject(o.group).getSize(sz); h0 = sz.y || 1; } k0 = Math.min(k0, hr * (P.p2.osmData?.k || 0.45) / h0); }   // кулите — и по истинската височина (парцелът на Парламента е 225 м, а моделът е само Биг Бен)
@@ -9945,6 +9946,8 @@ else if (saved) { S = saved; pruneCities(S); setTimeout(() => { if (S && !S.bran
 else { showMap(true); if (!AUTOTEST) setTimeout(() => showIntro({ start: true, sound: n => Sound.play(n) }), 1700); }   // без запис: картинката „Зареждане“ → интро → картата
 if (params.has('profile')) {
   window.__benchReady = () => !!(S && city.ready);
+  // измерванията (_source/tasks/perf-report.md): обиколка на градовете и зуум — само с ?profile
+  window.__benchOps = { cities: () => ownedCities(), here: () => S.cityId, city: id => switchCity(id), cam: d => { const off = camera.position.clone().sub(controls.target).setLength(d); camera.position.copy(controls.target).add(off); fly = null; return Math.round(camera.position.distanceTo(controls.target)); } };
   // 🗺️ картата: време за drawMap и за подвижните слоеве на кадър, брой елементи, видими надписи и застъпванията им — по изгледи и зуум
   window.__mapBench = (views = [['world', [1, 2, 4, 8, 16]], ['eu', [1, 2.5]]], at = [24.75, 42.15]) => {
     const t = (f, n) => { const t0 = performance.now(); for (let i = 0; i < n; i++) f(); return +((performance.now() - t0) / n).toFixed(2); };
