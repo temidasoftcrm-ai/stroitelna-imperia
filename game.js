@@ -973,7 +973,7 @@ function buildCity(cityId) {
   city.osmView = !!(P && P.p2 && P.osm); controls.maxDistance = city.osmView ? 900 : 320; camera.far = city.osmView ? 3200 : 900; camera.updateProjectionMatrix();
   if (!city.osmView && scene.fog) { scene.fog.near = 180; scene.fog.far = 420; }
   osmFog.on = city.osmView;
-  if (P) { dayNight.setLamps(pv.userData.lamps); signals.length = 0; if (feature('hollywood-night') || (P.p2 && feature('osm-night'))) for (const m of pv.userData.nightMats || []) dayNight.winMats.add(m); }   // и планът v2: прозорците на фоновите сгради и светлината на улиците нощем   // надписът HOLLYWOOD свети нощем
+  if (P) { dayNight.setLamps(pv.userData.lamps); signals.length = 0; if (feature('hollywood-night') || P.p2) for (const m of pv.userData.nightMats || []) dayNight.winMats.add(m); }   // и планът v2: прозорците на фоновите сгради и светлината на улиците нощем   // надписът HOLLYWOOD свети нощем
   if (!P) {
   // 🌊 Темза: улиците север–юг пресичат реката само на мостовете (през 9 плочки) — между тях водата е непрекъсната
   city.noRoadR = null;
@@ -5478,15 +5478,15 @@ function lmRiverSpot(k, mem) {
 }
 // Рим по истинската карта: забележителностите — на реалните им места (P.landmarks), вписани в основата си
 // от плана се добавят само тези с правилен модел за града (иначе 'opera' в Париж става операта в Сидни, 'pantheon' — римският)
-const LM_EXTRA = { moscow: new Set(['kotelnicheskaya']), newyork: new Set(['liberty', 'stpatrick']), istanbul: new Set(['topkapi', 'bluemosque', 'maiden', 'grandbazaar', 'galata', 'suleymaniye', 'haydarpasa']) };
+const LM_EXTRA = { moscow: new Set(['kotelnicheskaya']), newyork: new Set(['liberty', 'stpatrick', 'rockefeller']), istanbul: new Set(['topkapi', 'bluemosque', 'maiden', 'grandbazaar', 'galata', 'suleymaniye', 'haydarpasa']) };
 // истинската височина (м) на високите забележителности — мащабът е по-малкият от основата и височината
 LANDMARK_NM.empire = LANDMARK_NM.empire || 'Емпайър Стейт Билдинг'; LANDMARK_NM.stpatrick2 = LANDMARK_NM.stpatrick2 || 'Катедралата „Св. Патрик“'; LANDMARK_NM.chrysler = LANDMARK_NM.chrysler || 'Крайслер Билдинг';
-const LM_REAL_H = { bigben: 96, londoneye: 135, shard: 310, eiffel: 330, galata: 67, maiden: 23, towerbridge: 65, stpeter: 136, liberty: 93, stpatrick: 100, mgu: 176, stbasil: 65, parliament2: 96 };   // mgu — тук е Котелническа (сталинската висотка)
+const LM_REAL_H = { bigben: 96, londoneye: 135, shard: 310, eiffel: 330, galata: 67, maiden: 23, towerbridge: 65, stpeter: 136, liberty: 93, stpatrick: 100, mgu: 176, stbasil: 65, parliament2: 96, rockefeller: 260 };   // mgu — тук е Котелническа (сталинската висотка)
 const LM_TURN = { vittoriano2: Math.PI };   // завъртане на модела на реалното място: Витториано — лицето към Пиаца Венеция, гърбът към Колизеума
 // моделите на потребителя (Meshy AI) имат предимство пред процедурните и по-старите: в градовете по истинската карта винаги те
-const LM_PREF = { maiden: 'maiden2', bluemosque: 'mosque', bigben: 'parliament2', bigben2: 'parliament2', colosseo: 'colosseo3', vittoriano: 'vittoriano2' };
+const LM_PREF = { rockefeller: 'rockefeller2', maiden: 'maiden2', bluemosque: 'mosque', bigben: 'parliament2', bigben2: 'parliament2', colosseo: 'colosseo3', vittoriano: 'vittoriano2' };
 const lmPref = k => (LM_PREF[k] && hasLandmark(LM_PREF[k])) ? LM_PREF[k] : k;
-LANDMARK_NM.maiden2 = LANDMARK_NM.maiden2 || 'Момината кула'; LANDMARK_NM.parliament2 = LANDMARK_NM.parliament2 || 'Уестминстърският дворец и Биг Бен'; LANDMARK_NM.colosseo3 = LANDMARK_NM.colosseo3 || 'Колизеумът'; LANDMARK_NM.vittoriano2 = LANDMARK_NM.vittoriano2 || 'Витториано';
+LANDMARK_NM.maiden2 = LANDMARK_NM.maiden2 || 'Момината кула'; LANDMARK_NM.rockefeller2 = LANDMARK_NM.rockefeller2 || 'Рокфелер Сентър'; LANDMARK_NM.parliament2 = LANDMARK_NM.parliament2 || 'Уестминстърският дворец и Биг Бен'; LANDMARK_NM.colosseo3 = LANDMARK_NM.colosseo3 || 'Колизеумът'; LANDMARK_NM.vittoriano2 = LANDMARK_NM.vittoriano2 || 'Витториано';
 const LM_LABEL = { kotelnicheskaya: 'Котелническа висотка' };   // надписът, когато моделът е назаем (mgu → Котелническа)
 const LM_ALIAS = { suleymaniye: 'mosque2', stpatrick: 'stpatrick2', kotelnicheskaya: 'mgu' }, LM_NOT = new Set(['termini', 'sirkeci', 'saintlazare', 'haydarpasa_st']);   // гарите ги рисува изгледът на града
 function landmarkPlan2(kinds) {
