@@ -215,7 +215,7 @@ export function createCoop(d) {
     // общ участък/линия, завършен (от единия — картата е обща) → еднократен бонус за всеки
     for (const j of st2.joints) if (j.status === 'active' && j.done && !j.bonus_claimed) {
       const r = await rpc('coop_joint_bonus', { p_id: j.id }, 1).catch(() => null);
-      if (r?.ok) { E().earn(r.amount, 'партньор', `🤝 Общ обект: ${r.title}`); d.save(); d.renderPanel(); d.toast(`🤝 ${r.title} е готов и при двама ви! Бонус +${f(r.amount)} €, а всеки ден — още доход.`, 'good'); }
+      if (r?.ok) { E().earn(r.amount, 'партньор', `🤝 Общ обект: ${r.title}`); if (feature('xp-km')) d.addXp?.(500); d.save(); d.renderPanel(); d.toast(`🤝 ${r.title} е готов и при двама ви! Бонус +${f(r.amount)} €, а всеки ден — още доход.`, 'good'); }
     }
     // наета техника: срокът изтече → връща се сама (щом е свободна)
     for (const r of st2.rentals) if (!r.out && r.status === 'active' && r.until && Date.parse(r.until) <= Date.now()) {
@@ -568,7 +568,7 @@ export function createCoop(d) {
       if (amt > 0) E().spend(amt, 'партньор', `🎁 Изненада за ${partnerName()}`);
       const r = await queue({ fn: 'coop_surprise', args: { p_req: uid(), p_city: d.cityId(), p_x: sp.x, p_z: sp.z, p_text: txt, p_amount: amt }, refund: amt > 0 ? { money: amt } : null });
       if (r?.ok) d.toast(`🎁 Изненадата е оставена в ${d.cityName(d.cityId())}.`, 'good'); d.renderPanel(); return; }
-    if (c === 'qclaim') { const r = await rpc('coop_quest_claim', { p_id: +a }); if (!say(r)) return; E().earn(r.reward, 'партньор', '🏆 Обща задача'); d.save(); d.renderPanel(); d.toast(`🏆 Обща задача: +${f(r.reward)} €`, 'good'); return; }
+    if (c === 'qclaim') { const r = await rpc('coop_quest_claim', { p_id: +a }); if (!say(r)) return; E().earn(r.reward, 'партньор', '🏆 Обща задача'); if (feature('xp-km')) d.addXp?.(300); d.save(); d.renderPanel(); d.toast(`🏆 Обща задача: +${f(r.reward)} €`, 'good'); return; }
     if (c === 'vput') { const n = Math.round(num(el.querySelector('#cpV').value)); if (!money(n)) return; E().spend(n, 'партньор', '🏦 Вноска в общата касичка');
       const r = await queue({ fn: 'coop_vault', args: { p_req: uid(), p_amount: n }, refund: { money: n } }); if (r?.ok) d.toast(`🏦 Внесе ${f(n)} €.`, 'good'); d.renderPanel(); return; }
     if (c === 'vtake') { const n = Math.round(num(el.querySelector('#cpV').value)); if (!(n > 0)) return d.toast('Въведи сума.', 'bad');
@@ -616,7 +616,7 @@ export function createCoop(d) {
       const r = await queue({ fn: 'coop_mega_put', args: { p_req: uid(), p_mega: +a, p_amount: n }, refund: { money: n } });
       if (r?.ok) d.toast(r.building ? '🏗️ Сумата е събрана — строежът започна!' : `Вложи ${f(r.put)} €.`, 'good'); d.renderPanel(); return; }
     if (c === 'claim') { const r = await rpc('coop_mega_claim', { p_mega: +a }); if (!say(r)) return;
-      E().earn(r.reward, 'партньор', `${r.nm} — обща поръчка`); d.save(); d.renderPanel();
+      E().earn(r.reward, 'партньор', `${r.nm} — обща поръчка`); if (feature('xp-km')) d.addXp?.(3000); d.save(); d.renderPanel();
       d.toast(`✅ Изпълнена поръчка: ${r.ico} ${r.nm}! +${f(r.reward)} €${r.fair ? ' (вложеното + половината от печалбата)' : ' (без печалба — единият е вложил под 20%)'}`, 'good'); return; }
   }
 

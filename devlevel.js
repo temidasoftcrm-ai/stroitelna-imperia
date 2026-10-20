@@ -7,6 +7,10 @@ import { showLevel, LV_PICS } from './lvshow.js';
 import { IMP_UNLOCKS } from './imperial.js';   // нивата 21–25 идват от Империал Сити (не от опит)   // ново ниво — картинка на черен екран (feature 'lv-pics')
 export const THRESH = [0, 1000, 4000, 10000, 20000, 40000, 70000, 110000, 170000, 250000, 350000, 480000, 640000, 840000, 1100000, 1400000, 1800000, 2300000, 2900000, 3600000];
 export const XP = { house: 50, shop: 200, office: 600, tower: 2000, rail: 1000, highway: 1500, branch: 3000, quest: 100 };
+// флаг xp-km (потребителят: „да дава ХП на построена магистрала според км… и на жп линия… и на закупуване на влак, тир, кораб, самолет“):
+// магистрала ~4,6 XP/км (325 км ≈ 1500 — средно както досега), аутобан ×2, жп ~3 XP/км; покупки — ТИР 10, влак 20, кораб 30 (големите 50), самолет 100
+export const XP_KM = { highway: 4.6, rail: 3 }, XP_BUY = { truck: 10, train: 20, ship: 30, shipBig: 50, plane: 100 };
+export const kmXp = (kind, km) => Math.max(100, Math.round((km || 0) * XP_KM[kind] / 10) * 10);
 // стари скали (по версия на записа) — за преизчисляване на опита
 const SCALES = { 1: [0, 100, 250, 500, 900, 1500, 2400, 3600, 5200, 7500], 2: [0, 500, 1500, 3500, 7000, 12000, 20000, 35000, 60000, 100000] }, VER = 3;
 // записи със старата скала: същото ниво и същата част от пътя до следващото
@@ -79,7 +83,10 @@ export function createDevLevel(deps) {
   // докато е отворена 3D зала (window.__overlay3d — Директорската зала, кабинетът): опитът се трупа тихо — без „+XP“, без преначертаване и
   // без запис на всеки квартал/филиал (одобрение на 248 квартала = 248 записа на цялата игра → забиване); всичко се показва веднъж, щом излезеш
   let held = 0, heldT = 0;
-  const inRoom = () => typeof window !== 'undefined' && (window.__overlay3d || 0) > 0;
+  const inRoom = () => typeof window !== 'undefined' && (window.__overlay3d || 0) > 0 && (!feature('xp-km') || roomShown());
+  // залата наистина ли е отворена: по средата на екрана не е градът/картата (#app, #mapScreen) — ако брояч е останал > 0 след затваряне, опитът не се задържа завинаги
+  const roomShown = () => { const e = document.elementFromPoint(innerWidth / 2, innerHeight / 2), app = document.getElementById('app'), map = document.getElementById('mapScreen');
+    return !!e && !(app && app.contains(e)) && !(map && !map.classList.contains('hidden') && map.contains(e)); };
   function flushHeld() {
     if (inRoom()) { heldT = setTimeout(flushHeld, 700); return; }
     heldT = 0; const n = held; held = 0; if (!n) return;
@@ -165,7 +172,7 @@ export function createDevLevel(deps) {
       + (L >= 19 && L < 35 && deps.impNeed ? `<div class="meta" style="margin:6px 0 0;color:#7dd3ff">🎯 Към ниво ${Math.max(21, L + 1)}: ${deps.impNeed(Math.max(21, L + 1))}</div>` : '');
     const nxt = THRESH[d.lv];
     deps.modal(`🏢 Ниво на развитие на фирмата · ${L}`, `Всеки твой град се развива отделно. Отключванията (градове, линии, Балканите, Европа, борса) идват от най-развития ти град; специалистите — от нивото на текущия град.<br>Опит: <b>${Math.round(d.xp)} XP</b>${nxt != null ? ` · до ниво ${d.lv + 1}: ${Math.round(nxt - d.xp)} XP` : ' · максимално ниво'}<br>
-      <span style="color:var(--mut)">XP: къща ${XP.house}, магазин ${XP.shop}, офис ${XP.office}, небостъргач ${XP.tower}, жп линия ${XP.rail}, участък магистрала ${XP.highway}, филиал ${XP.branch}, куест ${XP.quest}.</span><br><br>${deps.playSummary ? deps.playSummary() + '<br>' : ''}${rows}`, [['Затвори', null]]);
+      <span style="color:var(--mut)">XP: къща ${XP.house}, магазин ${XP.shop}, офис ${XP.office}, небостъргач ${XP.tower}, ${feature('xp-km') ? `магистрала ~${XP_KM.highway} на км (аутобан ×2), жп линия ~${XP_KM.rail} на км, филиал ${XP.branch}, куест ${XP.quest} · покупки: ТИР ${XP_BUY.truck}, влак ${XP_BUY.train}, кораб ${XP_BUY.ship}–${XP_BUY.shipBig}, самолет ${XP_BUY.plane} · общо имаш ${Math.round(firmXP()).toLocaleString('bg-BG')} XP` : `жп линия ${XP.rail}, участък магистрала ${XP.highway}, филиал ${XP.branch}, куест ${XP.quest}`}.</span><br><br>${deps.playSummary ? deps.playSummary() + '<br>' : ''}${rows}`, [['Затвори', null]]);
     // на живо: лентите се обновяват всяка секунда, докато прозорецът е отворен
     clearInterval(dvTimer); dvTimer = setInterval(() => { const els = document.querySelectorAll('[data-dvn]'); if (!els.length) { clearInterval(dvTimer); return; }
       for (const e of els) { const n = +e.dataset.dvn, p = prog(n); e.style.width = (p.k * 100).toFixed(1) + '%'; e.style.background = p.k >= 1 ? '#43d17a' : 'linear-gradient(90deg,#c9a14a,#ffd54a)'; const t = document.querySelector(`[data-dvt="${n}"]`); if (t && t.textContent !== p.t) t.textContent = p.t; } }, 1000);

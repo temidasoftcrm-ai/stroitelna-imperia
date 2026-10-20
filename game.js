@@ -19,7 +19,7 @@ import { createMuni } from './muniorders.js';
 import { createRescue } from './boardrescue.js';
 import { createMinimap } from './minimap.js';
 import { createRivals, LOCAL_FIRMS, FIRMS } from './rivals.js';
-import { createDevLevel, THRESH as DEV_THRESH, LV as DEV_LV, unlockText } from './devlevel.js';
+import { createDevLevel, THRESH as DEV_THRESH, LV as DEV_LV, unlockText, kmXp, XP_BUY } from './devlevel.js';
 import { createCityPanel } from './citypanel.js';
 import { createPlaytime } from './playtime.js';
 import { createBankrupt } from './bankrupt.js';
@@ -2922,7 +2922,7 @@ function endOfDay() {
   if (S.holding && feature('boardroom')) boardL.autoTick();   // 🤖 автопилотът на директорите
   const doneHighways = hwDone();
   if (doneHighways.length) econ.earn(hwToll(doneHighways), 'тол', `Ден ${S.day}: тол такси`);
-  if (S.day % 10 === 0 && (S.trains || []).length && (S.trains || []).length >= totalTracks()) {
+  if (false) {   // влаковете вече не зависят от коловозите (2 на линия) — напомнянето за гарите отпада
     const weak = ownedCities().filter(id => (id === S.cityId ? (S.stationLevel || 0) : ((S.cities || {})[id]?.stationLevel || 0)) < 5);
     if (weak.length) toast(`🚉 Влаковете са на лимита. Развий гарата в ${weak.map(id => cityById(id).nm).join(', ')} до ниво 5 за още влакове.`, '', () => { tab = 'hq'; renderPanel(); });
   }
@@ -3835,7 +3835,7 @@ const bust = createBankrupt({ S: () => S, econ: () => econ, toast, modal, fmt, s
 setTimeout(() => { try { if (S) bust.banner(); } catch {} }, 3000);
 window.__stroiMe = () => { if (!S || !S.hqCity) return null; const b = brandOf(S); return { name: b ? `${b.ico} ${b.nm}` : 'Фирма', city: cityById(S.cityId)?.nm || S.cityId, day: S.day | 0 }; };   // за „👥 Онлайн сега“ в ⚙️ Настройки (cloud.js)
 // 🤝 партньорство в самостоятелната игра (coop.js): пари, техника, материали, общи поръчки, партньорът на картата
-const coop = createCoop({ lv: () => dev.rawBest(),
+const coop = createCoop({ addXp: n => dev.add(n), lv: () => dev.rawBest(),
   fleet: () => [...(S.trains || []).map(t => ({ ref: 't' + t.id, cost: TRAIN_TYPES[t.kind || 'small']?.cost || 0, nm: t.nm })), ...(S.ships || []).map(p => ({ ref: 's' + p.id, cost: SHIPS[p.kind]?.cost || 0, nm: p.nm })), ...(S.planes || []).map(p => ({ ref: 'p' + p.id, cost: PLANES[p.kind]?.cost || 0, nm: p.nm }))],   // 🚆✈️🚢 общият флот (coop-fleet)
   fleetNet: () => { const h = econ.s.history || [], c = (h[h.length - 1] || {}).cats || {}; return ['превози', AIR_CAT, SEA_CAT].filter((k, i, a) => a.indexOf(k) === i).reduce((a, k) => a + (+c[k] || 0), 0); },   // вчерашната нетна печалба на влаковете, полетите и корабите
   S: () => S, econ: () => econ, infra: () => coopInfra(), infraSync: (I, pn) => coopInfraSync(I, pn), toast, modal, fmt, save, renderPanel, stocksOpen: () => !!S && dev.has('STOCKS'), drawMap: () => { try { if (!$('mapScreen').classList.contains('hidden')) drawMap(); } catch {} },
@@ -3931,7 +3931,7 @@ function hwDonePath(a, b) {
   return result;
 }
 const cityWh = id => ((id === S?.cityId ? S?.whLevel : S?.cities?.[id]?.whLevel) || 0) > 0;
-const hwTrucks = createHwTrucks({ cap: () => fleetCap.truck(), S: () => S, econ: () => econ, sound: n => Sound.play(n), svcAll: () => dev.best() >= 6, toast, modal, fmt, save, cityName: id => cityById(id)?.nm || id, owned: () => ownedCities(), here: () => S.cityId, route: (a, b) => hwDonePath(a, b),
+const hwTrucks = createHwTrucks({ onBuy: () => { if (feature('xp-km')) dev.add(XP_BUY.truck); }, cap: () => fleetCap.truck(), S: () => S, econ: () => econ, sound: n => Sound.play(n), svcAll: () => dev.best() >= 6, toast, modal, fmt, save, cityName: id => cityById(id)?.nm || id, owned: () => ownedCities(), here: () => S.cityId, route: (a, b) => hwDonePath(a, b),
   hasWh: id => cityWh(id), pop: (k, a, b) => showEventPop(k, a, b), redraw: () => { if (!$('mapScreen').classList.contains('hidden')) drawMap(); }, renderPanel: () => { renderPanel(); if (bigWin) renderBig(); } });
 function updateMapTrucks() { if (lodLow()) return; hwTrucks.draw(document.getElementById('truckLayer'), { proj, cityLL: id => { const c = cityById(id); return c && [c.lon, c.lat]; }, k: (mapEU ? 4 : mapWide ? 1.6 : 1) * mapK(), near: mapNear(), inView: p => mapIn(...p) }); }
 function clickCity(id) {
@@ -4510,7 +4510,7 @@ function updateRails(dtDays) {
     if (r.prog >= 1) {
       r.built = true; r.prog = 1;
       invalidateRailGraph();
-      dev.add(dev.XP.rail);
+      dev.add(feature('xp-km') ? kmXp('rail', r.km || (r.b ? kmBetween(r.a, r.b) : 0)) : dev.XP.rail);   // флаг xp-km — според км
       setTimeout(() => supply.tryDeliver(), 0);
       showEventPop('rail-done', `🛤️ ${cityById(r.a).nm} — ${cityById(r.b).nm}`, `${r.km} км жп линия е готова.`);
       toast(`🚆 Линията ${cityById(r.a).nm} — ${cityById(r.b).nm} е готова!${(S.trains || []).length ? '' : ' Купи влак, за да я използваш.'}`, 'good');
@@ -4526,7 +4526,7 @@ function updateRails(dtDays) {
 const FLEET_TOP = 60;
 const fleetCap = {
   truck: () => { const ab = new Set(ALL_AB.map(x => x.id)); return Math.min(FLEET_TOP, hwDone().reduce((a, id) => a + (ab.has(id) ? 4 : 2), 0)); },
-  train: () => Math.min(FLEET_TOP, totalTracks(), (S.rails || []).filter(r => r.built).reduce((a, r) => a + (r.hs ? 4 : 2), 0)),
+  train: () => (S.rails || []).filter(r => r.built).reduce((a, r) => a + (r.hs ? 4 : 2), 0),   // потребителят: „за всяка линия по 2 влака: 10 линии → 20, 100 → 200“ — без FLEET_TOP и без коловозите
   ship: () => Math.min(FLEET_TOP, portBerths(), Object.keys(S.ports || {}).filter(id => portLv(id) > 0).reduce((a, id) => a + (portLv(id) >= portMax(id) ? 4 : 2), 0)),
   plane: () => Math.min(FLEET_TOP, airGates(), Object.keys(S.airports || {}).filter(id => airLv(id) > 0).reduce((a, id) => a + (airLv(id) >= airportMax(id) ? 4 : 2), 0)),
 };
@@ -4560,8 +4560,7 @@ function trainHome() {
   return st ? { id: st, ok: true } : { id: ownedCities().find(id => contKeyOf(id) === k) || null, ok: false, k };
 }
 function trainShopHtml() {
-  const can = totalTracks() > (S.trains || []).length;
-  if (!can) return `<div class="meta late">🚆 Влакове ${(S.trains || []).length}/${totalTracks()} — всички коловози са заети. Надгради гарите (таб „Офис“), за да купиш още.</div>`;
+  if (!totalTracks()) return `<div class="meta late">🚉 Първо построй гара (таб „Офис“ → Гара), за да купуваш влакове.</div>`;
   if ((S.trains || []).length >= fleetCap.train()) return `<div class="meta late">🚆 Влакове ${fleetTxt('train')} — всяка готова жп линия дава място за 2 влака, модернизираната за 4 (общо за всички континенти). Построй или модернизирай линия, за да купиш още.</div>`;   // същото правило като buyTrain — иначе бутонът се вижда, а покупката отказва
   const home = trainHome();
   if (!home.ok) return `<div class="meta late">🚉 На ${CONT_NM[home.k] || 'този континент'} още нямаш гара${home.id ? ` — построй в ${cityById(home.id).nm} (таб „Офис“ → Гара)` : ''}. Влаковете не минават през морето.</div>${home.id ? `<div class="row" style="justify-content:flex-end"><button class="btn" data-goto="${home.id}">🚉 Към ${cityById(home.id).nm}</button></div>` : ''}`;
@@ -4571,7 +4570,7 @@ function trainShopHtml() {
     <div class="meta" style="margin:0 0 6px">Купуваш най-малкия и после го надграждаш (бутонът ⬆️ при влака горе) — плащаш само разликата. Новият влак тръгва от <b style="color:var(--txt)">${cityById(home.id).nm}</b>.</div>${buy('small')}${buy('pax')}`;
 }
 function openTrainShop() {
-  modal(`${trainImg('mid', 22)} Купи влак`, `Влакове на фирмата: ${(S.trains || []).length}/${totalTracks()} коловоза.<br><br>${trainShopHtml()}`, [['Затвори', null]]);
+  modal(`${trainImg('mid', 22)} Купи влак`, `Влакове на фирмата: ${fleetTxt('train')} (по 2 на линия, 4 на линия за „Стрела“).<br><br>${trainShopHtml()}`, [['Затвори', null]]);
   document.querySelectorAll('#modalBox [data-buytrain]').forEach(b => b.onclick = () => { $('modal').classList.add('hidden'); buyTrain(b.dataset.buytrain); });
 }
 function buyTrain(kind = 'small', at = null) {
@@ -4579,9 +4578,8 @@ function buyTrain(kind = 'small', at = null) {
   if (!at) { const h = trainHome(); if (!h.ok) { toast('🚉 На този континент още нямаш гара — построй гара там (таб „Офис“).', 'bad'); return; } at = h.id; }
   if (T.express && !dev.has('AIR')) { toast('🚄 Експрес „Стрела“ се отключва на ниво 9 на развитие.', 'bad'); return; }
   if (T.express && stLvOf(at) < 5) { toast(`🚄 Експрес „Стрела“ иска гара ниво 5 в ${cityById(at).nm} (сега ${stLvOf(at)}).`, 'bad'); return; }
-  if (!totalTracks()) { toast('🚉 Първо построй гара в града — таб „Офис“ → Гара.', 'bad'); return; }
-  if ((S.trains || []).length >= fleetCap.train() && (S.trains || []).length < totalTracks()) { toast(`🚉 Имаш ${fleetTxt('train')} влака — всяка готова жп линия дава място за 2, модернизираната за „Стрела“ — за 4. Построй още линии.`, 'bad'); return; }
-  if ((S.trains || []).length >= totalTracks()) { toast(`🚉 Гарите ти имат общо ${totalTracks()} ${totalTracks() === 1 ? 'коловоз' : 'коловоза'} — надгради гара (таб „Офис“), за да купиш още влак.`, 'bad'); return; }
+  if (!totalTracks()) { toast('🚉 Първо построй гара в града — таб „Офис“ → Гара.', 'bad'); return; }   // гара трябва, за да купиш влак; броят — от линиите
+  if ((S.trains || []).length >= fleetCap.train()) { toast(`🚉 Имаш ${fleetTxt('train')} влака — всяка готова жп линия дава място за 2, модернизираната за „Стрела“ — за 4. Построй още линии.`, 'bad'); return; }
   if (!(S.vouchers || {}).rail && !econ.canAfford(T.cost)) { if (T.cost >= 1000000) withLoan(T.cost, `Влак: ${T.nm}`, () => buyTrain(kind, at)); else toast('Нямаш достатъчно пари за влак.', 'bad'); return; }   // скъпите (Стрела, гигант) — и на кредит
   if (T.express && !hsNeighbors(at).length) toast(`🚄 В ${cityById(at).nm} няма модернизирана линия — „Стрела“ ще отиде сама до най-близкия град със скоростна линия.`, '');
   useVoucher('rail', T.cost, `първия влак — подарък от ${subName(S, 'rail')}`);
@@ -4591,6 +4589,7 @@ function buyTrain(kind = 'small', at = null) {
   S.trains.push({ id: S.seq++, nm: `${T.ico} №${n} ${T.nm.toLowerCase()}`, kind, wagons: T.wagons, at, job: null, path: null, km: 0, total: 0, leg: 'idle' });
   toast(`${T.ico} Купи ${T.nm.toLowerCase()} влак с ${T.wagons} вагона${at !== S.cityId ? ` — тръгва от ${cityById(at).nm}` : ''}!`, 'good');
   Sound.play('buy');   // свирката на влака — само при строеж на нова линия
+  if (feature('xp-km')) dev.add(XP_BUY.train);
   parkedSig = ''; updateParked();
   if (n === 1) showEventPop('first-train', '🚆 Първият влак на фирмата!', 'Превозвай товари и купувай материали на заводска цена.');
   else showEventPop('new-train', '🚆 Имате нов влак!', `Влаковете на фирмата вече са ${n}.`);
@@ -4657,6 +4656,9 @@ function autoTrip(t) {
     cand = longOnes.length ? longOnes.map(o => o.c) : far.sort((x, y) => y.km - x.km).slice(0, 1).map(o => o.c);
     if (!cand.length) return;
   }
+  // разпределение по линиите: към градовете с най-малко влакове там и на път натам (от 3-те най-свободни — случаен)
+  if (!T.express && !T.long && cand.length > 3) { const load = new Map(); for (const q of S.trains || []) if (q !== t) for (const c of [q.at, q.job?.to]) if (c) load.set(c, (load.get(c) || 0) + 1);
+    cand = cand.map(c => ({ c, k: (load.get(c) || 0) + Math.random() * 0.5 })).sort((x, y) => x.k - y.k).slice(0, 3).map(o => o.c); }
   const dest = pick(cand), path = T.express ? hsPath(t.at, dest) : railPath(t.at, dest); if (!path) return;
   const pay = Math.round(pathKm(path) * trainWagons(t) * (T.express ? rand(8, 10) * (dev.has('FAST') ? 1.3 : 1) : pax ? rand(5, 7) : rand(8, 11)) / 10) * 10;
   t.job = { pax, shuttle: !pax, from: t.at, to: dest, ico: T.express ? '🚄' : T.long ? '🚛' : pax ? '🎫' : '📦', cargo: T.express ? 'експрес' : T.long ? '50 вагона товари' : pax ? 'пътници' : 'товари', pay };
@@ -4909,7 +4911,7 @@ function buyPlane(kind) {
   econ.spend(P.cost, 'покупка', `Самолет: ${P.nm}`);
   S.planeSeq = (S.planeSeq || 0) + 1;
   S.planes = [...(S.planes || []), { id: S.planeSeq, kind, nm: `${P.ico} №${S.planeSeq}`, at: home, path: null, km: 0, total: 0 }];
-  toast(`${P.ico} Купи ${P.nm}. Лети сам по авиолиниите ти.`, 'good'); Sound.play('plane'); save();
+  toast(`${P.ico} Купи ${P.nm}. Лети сам по авиолиниите ти.`, 'good'); Sound.play('plane'); if (feature('xp-km')) dev.add(XP_BUY.plane); save();
 }
 // надграждане по стълбицата (витлов → регионален → A320 → A380); B787 се надгражда направо до A380. Само на земята
 const planeNext = k => k === 'wide' ? 'a380' : PLANE_LADDER.includes(k) ? PLANE_LADDER[PLANE_LADDER.indexOf(k) + 1] || null : null;   // товарният не се надгражда
@@ -5921,7 +5923,7 @@ function buyShip(kind) {
   econ.spend(P.cost, 'покупка', `Кораб: ${P.nm}`);
   S.shipSeq = (S.shipSeq || 0) + 1;
   S.ships = [...(S.ships || []), { id: S.shipSeq, kind, nm: `${P.ico} №${S.shipSeq}`, at: home, path: null, km: 0, total: 0 }];
-  toast(`${P.ico} Купи ${P.nm}. Плава сам по морските ти линии.`, 'good'); Sound.play('ship'); save();
+  toast(`${P.ico} Купи ${P.nm}. Плава сам по морските ти линии.`, 'good'); Sound.play('ship'); if (feature('xp-km')) dev.add(['container', 'tanker', 'cruise'].includes(kind) ? XP_BUY.shipBig : XP_BUY.ship); save();
   showEventPop('ship-' + shipPic(kind), `${P.ico} Нов ${P.nm.toLowerCase()}!`, `${P.cargo} · ~${fmt(shipDaily(kind))} €/ден чисто${P.range ? ` · обсег ${fmt(P.range)} км` : ''}. Плава сам по морските ти линии.`);
 }
 // флот: продажба (60% от цената) и надграждане до следващия клас (новата цена минус 60% от старата)
@@ -6702,7 +6704,7 @@ function stationsOverview() {
   const rows = ownedCities().map(id => ({ id, lv: id === S.cityId ? (S.stationLevel || 0) : ((S.cities || {})[id]?.stationLevel || 0) }));
   const weak = rows.filter(r => r.lv < 5);
   if (!weak.length) return '';
-  return `<div class="meta" style="margin-top:6px">🚉 Гари за развиване: ${weak.map(r => `${cityById(r.id).nm} ${r.lv}/5`).join(' · ')}<br>${(S.trains || []).length >= totalTracks() ? '<b style="color:var(--acc)">Влаковете са на лимита</b> — ' : ''}развий ${weak.map(r => cityById(r.id).nm).join(', ')} до гара ниво 5 за още влакове.</div>`;
+  return `<div class="meta" style="margin-top:6px">🚉 Гари за развиване: ${weak.map(r => `${cityById(r.id).nm} ${r.lv}/5`).join(' · ')}<br>развий ${weak.map(r => cityById(r.id).nm).join(', ')} до гара ниво 5.</div>`;
 }
 // летището на града в таб „Офис“ — като гарата; показва се само когато е налично (ниво 9 и градът може да има летище)
 function airportCard() {
@@ -6728,7 +6730,7 @@ function stationCard() {
   let h = `<div class="card"><h3><span class="ico">🚉</span>Гара · ниво ${lv}/5</h3>
     <div class="meta"><b style="color:var(--txt)">${L.nm}</b>${lv ? ` · ${lv} ${lv === 1 ? 'коловоз' : 'коловоза'}` : ' · влаковете нямат къде да стоят'}</div>
     <div class="stages">${STATION_LEVELS.map((_, i) => `<span class="${i < lv ? 'done' : ''}"></span>`).join('')}</div>
-    <div class="meta">🚆 Влакове на фирмата: ${(S.trains || []).length}/${totalTracks()} (общо коловози във всичките ти гари) · тук: ${homeTrains().length}</div>`;
+    <div class="meta">🚆 Влакове на фирмата: ${fleetTxt('train')} влака (по 2 на линия) · тук: ${homeTrains().length}</div>`;
   if (b) h += `<div class="sect" style="margin-top:10px">🔨 Строи се ниво ${b.target}: ${STATION_LEVELS[b.target - 1].nm}</div>
       <div class="row" style="margin-top:4px"><span class="meta" style="margin:0">${STATION_LEVELS[b.target - 1].days} дни</span><span>${Math.round(b.prog * 100)}%</span></div>
       <div class="bar"><i style="width:${(b.prog * 100).toFixed(1)}%"></i></div>`;
@@ -6934,7 +6936,7 @@ function finishAutobahn(j) {
   S.hwJobs.splice(S.hwJobs.indexOf(j), 1);
   const gain = abTollGain(segById(j.seg));
   S.hwDone = [...hwDone(), j.seg]; setTimeout(hwQueueTick, 0);   // свободен екип → следващият от опашката
-  dev.add(dev.XP.highway * 2);
+  { const s = segById(j.seg); dev.add(feature('xp-km') && s ? kmXp('highway', kmBetween(s.a, s.b)) * 2 : dev.XP.highway * 2); }   // флаг xp-km — според км, аутобанът ×2
   setTimeout(() => supply.tryDeliver(), 0);
   const sg = segById(j.seg), names = AUTOBAHNS.filter(c => corridorSegIds(c).includes(j.seg)).map(c => `„${c.nm}“`).join(', ');
   econ.earn(j.reward, 'обект', `Аутобан ${cityById(sg.a).nm} — ${cityById(sg.b).nm}`);
@@ -7215,7 +7217,7 @@ function finishHighway(j) {
   for (const u of units) if (u.proj === j) { u.obj.visible = true; releaseUnit(u); }
   S.hwJobs.splice(S.hwJobs.indexOf(j), 1);
   S.hwDone = [...hwDone(), j.seg]; setTimeout(hwQueueTick, 0);   // свободен екип → следващият от опашката
-  dev.add(dev.XP.highway);
+  { const s = segById(j.seg); dev.add(feature('xp-km') && s ? kmXp('highway', kmBetween(s.a, s.b)) : dev.XP.highway); }   // флаг xp-km — според км
   setTimeout(() => supply.tryDeliver(), 0);
   const s = segById(j.seg);
   econ.earn(j.reward, 'обект', `АМ „${s.hw.nm}“ ${cityById(s.a).nm} — ${cityById(s.b).nm}`);
@@ -8440,7 +8442,7 @@ function boardProposals() {
     const mkRail = o => { if (!econ.canAfford(o.q.cost)) return; econ.spend(o.q.cost, 'покупка', `Жп линия ${cityNm(o.a)} — ${cityNm(o.b)} (борд)`); S.rails = [...(S.rails || []), { a: o.a, b: o.b, km: o.q.km, days: o.q.days, prog: 0, built: false }]; };
     P({ dir: 'rail', ico: '🛤️', key: 'lines', items: miss, cost: o => o.q.cost, run: mkRail, text: a => `${pl(a.length, 'наш град още няма', 'наши града още нямат')} жп (${list(a.map(o => o.b))}). Предлагам да построя ${a.length === 1 ? 'линията' : 'линиите'}.`,
       why: 'материалите идват по-евтино с влак, а влаковете носят превози', gainTxt: a => `${pl(a.length, 'град', 'града')} в жп мрежата — по-евтини материали и товарни курсове`, days: a => Math.max(...a.map(o => o.q.days)), goal: a => `${pl(a.length, 'град е свързан', 'града са свързани')} с жп`, track: a => ({ k: 'rail', pairs: a.map(o => [o.a, o.b]) }), geo: a => geoOf('rail', a.flatMap(o => [o.a, o.b]), a.slice(0, 2).map((o, i) => [i * 2, i * 2 + 1])) });
-    const tn = Math.max(0, Math.min(fleetCap.train(), totalTracks()) - fleetN.train());
+    const tn = Math.max(0, fleetCap.train() - fleetN.train());
     P({ dir: 'rail', ico: '🚆', key: 'trains', items: Array.from({ length: tn }, (_, i) => i), cost: () => TRAIN_TYPES.mid.cost, run: () => buyTrain('mid'), text: a => `Линиите и гарите поемат още ${pl(a.length, 'влак', 'влака')}. Предлагам да купя ${a.length === 1 ? 'среден товарен влак' : `${a.length} средни товарни влака`}.`,
       why: 'има свободни коловози — линиите не се ползват докрай', days: () => 0, goal: a => `+${pl(a.length, 'влак', 'влака')}`, track: a => ({ k: 'count', what: 'train', target: fleetN.train() + a.length }) });
     P({ dir: 'rail', ico: '🚉', key: 'stations', items: own.filter(id => cityById(id) && stLvOf(id) > 0 && stLvOf(id) < 5).map(id => ({ id, u: (upgInfo(id) || []).find(x => x.kind === 'station'), lv: stLvOf(id) })).filter(o => o.u && !o.u.max && !o.u.busy).slice(0, 10),
@@ -8852,7 +8854,7 @@ function autoTick() {
 function closeBig() { bigWin = null; $('bigWin')?.classList.add('hidden'); }
 // 📋 Задачи (tasks.js): какво да купиш (влак 4/15…), обновиш и свържеш, плюс току-що завършените градове
 const tasks = createTasks({ S: () => S, fmt, ready: () => !!S && !!city && city.ready, open: () => openBig('tasks'), openKind: k => openBig(k), cityName: id => cityById(id)?.nm || id,
-  fleet: () => ({ train: [fleetN.train(), Math.min(fleetCap.train(), totalTracks())], plane: [fleetN.plane(), fleetCap.plane()], ship: [fleetN.ship(), fleetCap.ship()], truck: [fleetN.truck(), fleetCap.truck()] }),
+  fleet: () => ({ train: [fleetN.train(), fleetCap.train()], plane: [fleetN.plane(), fleetCap.plane()], ship: [fleetN.ship(), fleetCap.ship()], truck: [fleetN.truck(), fleetCap.truck()] }),
   upg: () => upgAvail().map(u => ({ ...u, nm: UPG_KIND[u.kind].nm, ico: UPG_KIND[u.kind].ico })),
   hints: k => hintList(k),
   airUps: () => dev.has('AIR') ? ownedCities().map(id => { const ap = airportOf(id), lv = ap?.lv || 0; return ap && !ap.muni && !ap.build && lv && lv < airportMax(id) && lv < AIRPORT_LEVELS.length && (lv < 5 || dev.has('MEGAHUB')) ? { id, lv, cost: amL(AIRPORT_LEVELS[lv], id, 'air').cost } : null; }).filter(Boolean) : [],
@@ -9154,10 +9156,10 @@ let railShowDone = false;   // „▸ Покажи готовите“ в про
 function railWinHtml() {
   const rails = (S.rails || []).filter(r => inScope(r.a, r.b, r.c)), built = rails.filter(r => r.built), building = rails.filter(r => !r.built), trains = (S.trains || []).filter(t => ['all', 'intl'].includes(scopeNow()) || inScope(t.at));
   const km = built.reduce((a, r) => a + (r.km || 0), 0);
-  let h = `<div class="bw-stats"><div><b>${built.length}</b><span>готови линии</span></div><div><b>${fmt(km)} км</b><span>релси</span></div><div><b>${building.length}</b><span>в строеж</span></div><div title="2 влака на жп линия, 4 на линия за „Стрела“; и не повече от коловозите (${totalTracks()})"><b>${trains.length} / ${fleetCap.train()}</b><span>влакове / лимит</span></div><div><b>${connectedCities().length}</b><span>свързани града</span></div></div>`;
+  let h = `<div class="bw-stats"><div><b>${built.length}</b><span>готови линии</span></div><div><b>${fmt(km)} км</b><span>релси</span></div><div><b>${building.length}</b><span>в строеж</span></div><div title="2 влака на жп линия, 4 на линия за „Стрела“"><b>${trains.length} / ${fleetCap.train()}</b><span>влакове / лимит</span></div><div><b>${connectedCities().length}</b><span>свързани града</span></div></div>`;
   h += `<div class="row" style="justify-content:flex-end"><button class="btn" id="bwNewRail">🛤️ Строй нова линия</button></div>`;
   if (['c:eu', 'all'].includes(scopeNow())) h += orient.cardHtml();   // Ориент Експрес — само в Европа
-  h += totalTracks() > (S.trains || []).length ? bwCard(`${trainImg('mid', 20)} Купи влак`, trainShopHtml()) : `<div class="meta">${trainShopHtml()}</div>`;   // магазинът — над линиите
+  h += fleetCap.train() > (S.trains || []).length ? bwCard(`${trainImg('mid', 20)} Купи влак`, trainShopHtml()) : `<div class="meta">${trainShopHtml()}</div>`;   // магазинът — над линиите
   const railRow = r => {
     const st = r.built ? { stage: 4, prog: 1 } : railStageOf(r.prog);
     return `<div class="row" style="margin:4px 0"><span class="meta" style="margin:0">${r.built ? '✅' : RAIL_STAGES[st.stage].ico} <b style="color:var(--txt)">${r.c ? `🔀 ${cityById(r.a).nm} ⤳ линия ${cityById(r.b).nm} — ${cityById(r.c).nm}` : `${cityById(r.a).nm} — ${cityById(r.b).nm}`}</b> · ${r.km} км${r.built ? '' : ` · ${RAIL_STAGES[st.stage].nm} ${Math.floor(r.prog * 100)}%`}</span><button class="btn2" data-railview="rail:${r.a}-${r.b}">👁 Виж</button></div>${r.built ? '' : `<div class="bar"><i style="width:${(r.prog * 100).toFixed(1)}%"></i></div>`}${!r.built || r.c ? '' : r.hs ? '<div class="meta" style="margin:0 0 4px;color:#3fa7ff">⚡ Скоростна линия — за „Стрела“</div>' : r.hsBuild ? `<div class="meta" style="margin:0">⚡ Модернизира се ${Math.floor(r.hsBuild.prog * 100)}%</div><div class="bar"><i style="width:${(r.hsBuild.prog * 100).toFixed(1)}%;background:#3fa7ff"></i></div>` : `<div class="row" style="justify-content:flex-end;margin:0 0 4px"><button class="btn2" data-hsup="${(S.rails || []).indexOf(r)}" ${econ.canAfford(hsQuote(r).cost) ? '' : 'disabled'} title="${hsQuote(r).days} дни">⚡ Модернизирай за „Стрела“ · ${fmt(hsQuote(r).cost)} €</button></div>`}`;
@@ -9170,7 +9172,7 @@ function railWinHtml() {
   const tripTxt = t => { const j = t.job; if (!j) return 'чака курс в ' + cityById(t.at).nm;
     const pct = Math.floor(t.km / Math.max(1, t.total) * 100);
     return `${j.ico} ${j.cargo} ${cityById(j.from).nm} → ${cityById(j.to).nm} · ${t.leg === 'empty' ? `отива за товара (${pct}%)` : `${pct}%`}`; };
-  h += bwCard(`${trainImg('mid', 20)} Влакове · ${trains.length}/${totalTracks()} <span class="meta" style="margin:0 0 0 auto">курсовете са случайни</span>`, (trains.length ? trains.map(t => `<div class="row" style="margin:6px 0;align-items:center"><span class="meta" style="margin:0">${trainImg(t.kind || 'small', 26)} <b style="color:var(--txt)">${t.nm}</b> · ${trainWagons(t)} ваг.<br>${tripTxt(t)}</span>${t.job && !t.job.empty ? `<b style="color:var(--ok);font-size:16px">+${fmt(t.job.pay ?? t.job.reward ?? 0)} €</b>` : ''}</div>${(() => { const T = trainType(t), nx0 = TRAIN_NEXT[t.kind || 'small'], lock = nx0 && TRAIN_TYPES[nx0].express && (stLvOf(t.at) < 5 || !dev.has('AIR')), nx = lock ? null : nx0; return `<div class="row" style="margin:0 0 6px;justify-content:flex-end">${lock ? `<span class="meta" style="margin:0 6px 0 0">🔒 „Стрела“ — ${!dev.has('AIR') ? 'ниво 9 на развитие' : `гара ниво 5 в ${cityById(t.at).nm} (сега ${stLvOf(t.at)})`}</span>` : ''}${fleetBtns('train', t.id, nx, nx && TRAIN_TYPES[nx], nx ? upCost(T, TRAIN_TYPES[nx]) : 0, Math.round(T.cost * TRADE_IN / 1000) * 1000)}</div>`; })()}`).join('') : '<div class="meta">Нямаш влакове.</div>') + stationsOverview());
+  h += bwCard(`${trainImg('mid', 20)} Влакове · ${trains.length}/${fleetCap.train()} <span class="meta" style="margin:0 0 0 auto">курсовете са случайни</span>`, (trains.length ? trains.map(t => `<div class="row" style="margin:6px 0;align-items:center"><span class="meta" style="margin:0">${trainImg(t.kind || 'small', 26)} <b style="color:var(--txt)">${t.nm}</b> · ${trainWagons(t)} ваг.<br>${tripTxt(t)}</span>${t.job && !t.job.empty ? `<b style="color:var(--ok);font-size:16px">+${fmt(t.job.pay ?? t.job.reward ?? 0)} €</b>` : ''}</div>${(() => { const T = trainType(t), nx0 = TRAIN_NEXT[t.kind || 'small'], lock = nx0 && TRAIN_TYPES[nx0].express && (stLvOf(t.at) < 5 || !dev.has('AIR')), nx = lock ? null : nx0; return `<div class="row" style="margin:0 0 6px;justify-content:flex-end">${lock ? `<span class="meta" style="margin:0 6px 0 0">🔒 „Стрела“ — ${!dev.has('AIR') ? 'ниво 9 на развитие' : `гара ниво 5 в ${cityById(t.at).nm} (сега ${stLvOf(t.at)})`}</span>` : ''}${fleetBtns('train', t.id, nx, nx && TRAIN_TYPES[nx], nx ? upCost(T, TRAIN_TYPES[nx]) : 0, Math.round(T.cost * TRADE_IN / 1000) * 1000)}</div>`; })()}`).join('') : '<div class="meta">Нямаш влакове.</div>') + stationsOverview());
   if ((S.jobs || []).length) h += bwCard('📦 Чакащи превози <span class="meta" style="margin:0 0 0 auto">товарните влакове ги поемат сами</span>', S.jobs.map(j => `<div class="row" style="margin:4px 0"><span class="meta" style="margin:0">${j.ico} ${j.wagons} вагона ${j.cargo} · ${cityById(j.from).nm} → ${cityById(j.to).nm} · ${j.km} км</span><b style="color:var(--ok)">+${fmt(j.reward)} €</b></div>`).join(''));
   return h;
 }

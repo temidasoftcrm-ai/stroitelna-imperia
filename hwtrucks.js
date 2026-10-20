@@ -44,7 +44,7 @@ export function createHwTrucks(d) {
     if (!E().canAfford(TRUCK.cost)) { d.toast(`ТИР струва ${f(TRUCK.cost)} € — нямаш достатъчно.`, 'bad'); return; }
     E().spend(TRUCK.cost, 'покупка', 'ТИР');
     const S = d.S(), t = { id: (S.seq = (S.seq || 1) + 1), nm: `🚚 ТИР №${L().length + 1}`, at: d.here(), path: null, segs: [], km: 0, total: 0, cond: 100, since: S.day, cargo: 'цимент', trips: 0, earned: 0 };
-    L().push(t); d.sound?.('truckBuy');
+    L().push(t); d.sound?.('truckBuy'); d.onBuy?.(t);
     const ok = autoTrip(t); d.save(); d.redraw(); d.renderPanel();
     if (!d.pop || !d.pop('tir-bought', '🚚 Закупихте ТИР!', ok ? `${t.nm} тръгва: ${name(t.a)} → ${name(t.b)} с ${t.cargo}.` : 'Чака готова магистрала до друг твой град.'))
       d.toast(ok ? `🚚 Купи ${t.nm}! Тръгва: ${name(t.a)} → ${name(t.b)}.` : `🚚 Купи ${t.nm}. Ще тръгне, щом има готова магистрала до друг твой град.`, 'good');
