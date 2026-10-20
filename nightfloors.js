@@ -34,6 +34,7 @@ const MODE = { 'building-a': 'dark', 'building-b': 'cool', 'building-c': 'dark',
   maiden2: 'maiden',
   lazare2: ['lazare', [/^court$/, null]],
   stpatrick2: 'patrick',
+  grandcentral2: ['gct', [/^wingroof$/, null]],   // Гранд Сентръл: кремавата фасада топло отдолу, арковидните прозорци (и по крилото) — златисти
   // заводите и складовете (industry.js; потребителят: „харесват ми заводите, вкарвай ги в играта“ — прегледани в Blender): натриеви прожектори отдолу, част от прозорците по етажи
   ...Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l'].map(k => ['ind-building-' + k, 'ind'])), 'ind-water-tower': 'ind',   // „Св. Патрик“: белият мрамор топло отдолу, витражите и розетата светят кехлибарено (само по стените — не покривите)
   // офиси и къщи (потребителят: „да ги качваме в играта“ — прегледани в Blender): стъклените кутии — 'grid2' (мрежа малки прозорци по стените, етажите по истинската
@@ -48,7 +49,7 @@ const WHITE = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
 const NF_K = { petronas: 0.9 };   // по-ярки етажи (снимковата текстура дава тесни прозорци)
 export const NF_MATS = new Set();
 export const NF_T = { value: 0 };   // време (s) — daynight.js го върти; през нощта етажи угасват и светват
-const FEAT = { stpatrick2: 'newyork-osm', lazare2: 'paris-osm', maiden2: 'istanbul-osm', colosseo3: 'lm-colosseo3', vittoriano2: 'lm-vittoriano', redeemer: 'night-rio', manhattan: 'night-manhattan', Building_Medium_2_001: 'night-nyextra', liberty: 'night-nyextra', cruise: 'night-nyextra', ...Object.fromEntries(['greyporch', 'brickcabin', 'pink', 'townhouse', 'blue', 'swedish', 'lodge', 'porch'].map(k => ['h2-' + k, 'night-houses'])), 'building-type-a': 'night-houses', 'building-type-b': 'night-houses', ...Object.fromEntries(['brick', 'oldbld', 'modoffice', 'richmond', 'dbrick', 'jade', 'soviet', 'panel12', 'gamecity', 'asian'].map(k => ['sf-blk-' + k, 'night-houses'])), sagrada: 'night-sagrada', burj: 'night-burj', petronas: 'night-towers', willis: 'night-towers', cntower: 'night-towers', 'building-skyscraper-d': 'night-towers', 'building-skyscraper-e': 'night-towers' };
+const FEAT = { grandcentral2: 'newyork-osm', stpatrick2: 'newyork-osm', lazare2: 'paris-osm', maiden2: 'istanbul-osm', colosseo3: 'lm-colosseo3', vittoriano2: 'lm-vittoriano', redeemer: 'night-rio', manhattan: 'night-manhattan', Building_Medium_2_001: 'night-nyextra', liberty: 'night-nyextra', cruise: 'night-nyextra', ...Object.fromEntries(['greyporch', 'brickcabin', 'pink', 'townhouse', 'blue', 'swedish', 'lodge', 'porch'].map(k => ['h2-' + k, 'night-houses'])), 'building-type-a': 'night-houses', 'building-type-b': 'night-houses', ...Object.fromEntries(['brick', 'oldbld', 'modoffice', 'richmond', 'dbrick', 'jade', 'soviet', 'panel12', 'gamecity', 'asian'].map(k => ['sf-blk-' + k, 'night-houses'])), sagrada: 'night-sagrada', burj: 'night-burj', petronas: 'night-towers', willis: 'night-towers', cntower: 'night-towers', 'building-skyscraper-d': 'night-towers', 'building-skyscraper-e': 'night-towers' };
 const WORLD_H = { burj: 70, willis: 46, cntower: 58, 'building-type-b': 12 };   // каменната къща: мешовете са с вътрешен мащаб — етажите по височината в света   // височина в света (landmarks.js GLB_LM.h) — моделът е от много части с различни оси   // отделно „✓ OK“ в Лабораторията (иначе — night-floors)   // материалите с нощни етажи — daynight.js ги пали вечер
 // прозорците, маркирани на ръка (u0, v0, u1, v1 в текстурата, v отгоре) — снимковите фасади, където маската по яркост дава петна
 const RECTS = {
@@ -134,25 +135,25 @@ export function prepNightFloors(root, name) {
       if (!m || m.userData.nightFloors || !('emissive' in m)) continue;
       if (name === 'building-skyscraper-c' && /roof|heli|top/i.test(m.name || '')) continue;
       let mode = modeOf(name, m); if (isGrid(name) && (mode || name === 'sf-sky-blue')) mode = 'grid';   /* синият — и стъклото (vraymm) */ if (name === 'petronas' && feature('night-petronas2')) mode = 'petro';
-      if (!mode || (!m.map && mode !== 'solid' && mode !== 'solidW' && mode !== 'grid' && mode !== 'petro' && mode !== 'empire' && mode !== 'liberty' && mode !== 'ship' && mode !== 'redeemer' && mode !== 'colosseo' && mode !== 'colosseoC' && mode !== 'vittoriano' && mode !== 'maiden' && mode !== 'lazare' && mode !== 'grid2' && mode !== 'patrick' && mode !== 'ind') || (mode === 'aux' && !m.userData.nfAux)) continue;
-      const mk = mode === 'solid' || mode === 'solidW' || mode === 'grid' || mode === 'petro' || mode === 'empire' || mode === 'liberty' || mode === 'ship' || mode === 'redeemer' || mode === 'colosseo' || mode === 'colosseoC' || mode === 'vittoriano' || mode === 'maiden' || mode === 'lazare' || mode === 'grid2' || mode === 'patrick' || mode === 'ind' ? WHITE : mode === 'aux' ? maskFor(m.userData.nfAux.tex, m.userData.nfAux.kind) : maskFor(m.map, mode); if (!mk) continue;
+      if (!mode || (!m.map && mode !== 'solid' && mode !== 'solidW' && mode !== 'grid' && mode !== 'petro' && mode !== 'empire' && mode !== 'liberty' && mode !== 'ship' && mode !== 'redeemer' && mode !== 'colosseo' && mode !== 'colosseoC' && mode !== 'vittoriano' && mode !== 'maiden' && mode !== 'lazare' && mode !== 'grid2' && mode !== 'patrick' && mode !== 'ind' && mode !== 'gct') || (mode === 'aux' && !m.userData.nfAux)) continue;
+      const mk = mode === 'solid' || mode === 'solidW' || mode === 'grid' || mode === 'petro' || mode === 'empire' || mode === 'liberty' || mode === 'ship' || mode === 'redeemer' || mode === 'colosseo' || mode === 'colosseoC' || mode === 'vittoriano' || mode === 'maiden' || mode === 'lazare' || mode === 'grid2' || mode === 'patrick' || mode === 'ind' || mode === 'gct' ? WHITE : mode === 'aux' ? maskFor(m.userData.nfAux.tex, m.userData.nfAux.kind) : maskFor(m.map, mode); if (!mk) continue;
       m.userData.nfName = name; m.emissiveMap = mk; m.emissive.setRGB(1, 1, 1); m.emissiveIntensity = 0; m.userData.nightFloors = true; m.userData.winK = 1; m.userData.nfK = NF_K[name] || 1; NF_MATS.add(m);
       const ax = new THREE.Vector3(0, 1, 0);   // оста „нагоре“ в координатите на меша
       m.onBeforeCompile = sh => {
         let fH = floorH, fY0 = y0, fHt = bb.max.y - bb.min.y;
-        if (mode === 'coolW' || mode === 'led' || mode === 'empire' || mode === 'liberty' || mode === 'ship' || mode === 'redeemer' || mode === 'colosseo' || mode === 'colosseoC' || mode === 'vittoriano' || mode === 'maiden' || mode === 'lazare' || mode === 'grid2' || mode === 'patrick' || mode === 'ind') {   // Бурж (и Емпайър Стейт): височината по оста на меша, която в модела сочи нагоре (възлите на модела са завъртени/мащабирани)
+        if (mode === 'coolW' || mode === 'led' || mode === 'empire' || mode === 'liberty' || mode === 'ship' || mode === 'redeemer' || mode === 'colosseo' || mode === 'colosseoC' || mode === 'vittoriano' || mode === 'maiden' || mode === 'lazare' || mode === 'grid2' || mode === 'patrick' || mode === 'ind' || mode === 'gct') {   // Бурж (и Емпайър Стейт): височината по оста на меша, която в модела сочи нагоре (възлите на модела са завъртени/мащабирани)
           root.updateMatrixWorld(true); const M = new THREE.Matrix4().copy(root.matrixWorld).invert().multiply(o.matrixWorld), e = M.elements;
           const ys = [e[1], e[5], e[9]], k = ys.map(Math.abs).indexOf(Math.max(...ys.map(Math.abs))), sg = Math.sign(ys[k]) || 1;
           ax.set(k === 0 ? sg : 0, k === 1 ? sg : 0, k === 2 ? sg : 0);
           o.geometry.computeBoundingBox(); const gb = o.geometry.boundingBox, lo = ['x', 'y', 'z'][k];
           const a0 = sg > 0 ? gb.min[lo] : -gb.max[lo], a1 = sg > 0 ? gb.max[lo] : -gb.min[lo];
           fY0 = a0; fHt = Math.max(1e-3, a1 - a0); fH = fHt / FLOORS(name);
-          if (mode === 'redeemer' || mode === 'colosseo' || mode === 'colosseoC' || mode === 'vittoriano' || mode === 'maiden' || mode === 'lazare' || mode === 'grid2' || mode === 'patrick' || mode === 'ind') { const v1 = sg * (bb.min.y - e[13]) / ys[k], v2 = sg * (bb.max.y - e[13]) / ys[k]; fY0 = Math.min(v1, v2); fHt = Math.max(1e-3, Math.abs(v2 - v1)); }   // по целия модел, не по тази част
+          if (mode === 'redeemer' || mode === 'colosseo' || mode === 'colosseoC' || mode === 'vittoriano' || mode === 'maiden' || mode === 'lazare' || mode === 'grid2' || mode === 'patrick' || mode === 'ind' || mode === 'gct') { const v1 = sg * (bb.min.y - e[13]) / ys[k], v2 = sg * (bb.max.y - e[13]) / ys[k]; fY0 = Math.min(v1, v2); fHt = Math.max(1e-3, Math.abs(v2 - v1)); }   // по целия модел, не по тази част
           if (mode === 'grid2' || mode === 'ind') fH = fHt / FLOORS(name);   // етажите — по височината на целия модел
         }
         sh.uniforms.uAx = { value: ax }; sh.uniforms.uWH = { value: WORLD_H[name] || 0 };
         if (WORLD_H[name]) { fY0 = 0; fHt = WORLD_H[name]; fH = fHt / FLOORS(name); }   // в света: от земята до върха
-        sh.uniforms.uFloorH = { value: fH }; sh.uniforms.uY0 = { value: fY0 }; sh.uniforms.uFlood = { value: mode === 'flood' || WHOLE(mode) ? 1 : mode === 'floodUp' ? 2 : 0 }; sh.uniforms.uCoolW = { value: mode === 'coolW' ? 1 : mode === 'led' ? 2 : 0 }; sh.uniforms.uT = NF_T; sh.uniforms.uH = { value: fHt }; sh.uniforms.uSolid = { value: mode === 'solid' ? 1 : 0 }; sh.uniforms.uGrid = { value: mode === 'grid' ? 1 : mode === 'petro' ? 2 : mode === 'empire' ? 3 : mode === 'liberty' ? 4 : mode === 'ship' ? 5 : mode === 'redeemer' ? 6 : mode === 'colosseo' ? 7 : mode === 'colosseoC' ? 8 : mode === 'vittoriano' ? 9 : mode === 'maiden' ? 10 : mode === 'lazare' ? 11 : mode === 'grid2' ? 12 : mode === 'patrick' ? 13 : mode === 'ind' ? 14 : 0 };
+        sh.uniforms.uFloorH = { value: fH }; sh.uniforms.uY0 = { value: fY0 }; sh.uniforms.uFlood = { value: mode === 'flood' || WHOLE(mode) ? 1 : mode === 'floodUp' ? 2 : 0 }; sh.uniforms.uCoolW = { value: mode === 'coolW' ? 1 : mode === 'led' ? 2 : 0 }; sh.uniforms.uT = NF_T; sh.uniforms.uH = { value: fHt }; sh.uniforms.uSolid = { value: mode === 'solid' ? 1 : 0 }; sh.uniforms.uGrid = { value: mode === 'grid' ? 1 : mode === 'petro' ? 2 : mode === 'empire' ? 3 : mode === 'liberty' ? 4 : mode === 'ship' ? 5 : mode === 'redeemer' ? 6 : mode === 'colosseo' ? 7 : mode === 'colosseoC' ? 8 : mode === 'vittoriano' ? 9 : mode === 'maiden' ? 10 : mode === 'lazare' ? 11 : mode === 'grid2' ? 12 : mode === 'patrick' ? 13 : mode === 'ind' ? 14 : mode === 'gct' ? 15 : 0 };
         const pg = mode === 'petro' ? petroGeo(o.geometry) : null;
         sh.uniforms.uPetro = { value: pg ? new THREE.Vector4(pg.y0, pg.y1, pg.mx, 0) : new THREE.Vector4() }; sh.uniforms.uPTL = { value: pg ? pg.tl : new THREE.Vector2() }; sh.uniforms.uPTR = { value: pg ? pg.tr : new THREE.Vector2() };
         sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vNfY; varying float vNfSeed; varying vec3 vNfW; varying vec3 vNfL; varying vec3 vNfN; varying vec3 vNfWN; uniform vec3 uAx; uniform float uWH;')
@@ -176,7 +177,12 @@ export function prepNightFloors(root, name) {
               if (uFlood > 1.5) col = vec3(1.0, 0.8, 0.52) * (0.55 + 0.9 * clamp((vNfY - uY0) / uH, 0.0, 1.0));   // нагоре — по-светло (кулите)
               vec3 tx = texture2D(emissiveMap, vEmissiveMapUv).rgb;
               totalEmissiveRadiance = tx * col * on * (uFlood > 0.5 ? 0.55 : 1.15);
-              if (uGrid > 13.5) {   // заводите: натриеви прожектори отдолу (оранжево, нагоре гасне); прозорците (тъмното в текстурата, по стените) — ~50% от етажите, 25% светват и угасват
+              if (uGrid > 14.5) {   // Гранд Сентръл: кремавата фасада топло отдолу; арковидните прозорци (тъмното в текстурата, по стените, 8–60%) — златисти
+                float hz = clamp((vNfY - uY0) / uH, 0.0, 1.0), lum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+                vec3 nn = normalize(vNfN); float vt = step(abs(dot(nn, uAx)), 0.35);
+                float dk = clamp((0.05 - lum) * 14.0, 0.0, 1.0) * step(0.08, hz) * step(hz, 0.6) * vt;
+                totalEmissiveRadiance = (diffuseColor.rgb * vec3(1.0, 0.88, 0.68) * 0.45 * (1.0 - 0.35 * hz) + vec3(1.0, 0.6, 0.22) * dk * 2.2) * nNight;
+              } else if (uGrid > 13.5) {   // заводите: натриеви прожектори отдолу (оранжево, нагоре гасне); прозорците (тъмното в текстурата, по стените) — ~50% от етажите, 25% светват и угасват
                 float hz = clamp((vNfY - uY0) / uH, 0.0, 1.0), lum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)), fl = floor((vNfY - uY0) / uFloorH);
                 vec3 nn = normalize(vNfN); float vt = step(abs(dot(nn, uAx)), 0.25);
                 float rl = fract(sin(fl * 47.3 + vNfSeed * 91.7) * 43758.5453), tt = floor(uT / 1.5 + rl * 7.0) * step(rl, 0.25);
@@ -288,7 +294,7 @@ export function prepNightFloors(root, name) {
               }
             #endif`);
       };
-      m.customProgramCacheKey = () => 'nightfloors13' + (mode === 'petro' ? 'p' : '');
+      m.customProgramCacheKey = () => 'nightfloors14' + (mode === 'petro' ? 'p' : '');
       m.needsUpdate = true;
     }
   });

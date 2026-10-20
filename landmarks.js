@@ -512,6 +512,7 @@ const GLB_LM = {
   liberty: { h: 22, fit: 13, plate: 0x7d9a6a }, redeemer: { h: 18, fit: 14, plate: 0x6f8f55 }, stbasil: { h: 20, fit: 15, plate: 0xb9b0a3 },
   opera: { h: 30, fit: 40, plate: 0x4f86b8 }, manhattan: { h: 34, fit: 15, grid: true },
   colosseo: { h: 13, fit: 15, plate: 0xb9ad98 },   // Рим: Колизеумът (Carlos.Maciel)
+  grandcentral2: { h: 6, fit: 15, plate: 0x8a8580 },   // Ню Йорк: гара Гранд Сентръл (модел на потребителя, Meshy AI) — в Blender удължена назад (3 участъка странични стени с арките + задната стена, плосък покрив), 200 хил. △; нощем — nightfloors.js 'gct'
   stpatrick2: { h: 14, fit: 15, plate: 0x8a8a86 },   // Ню Йорк: катедралата „Св. Патрик“ (модел на потребителя, Meshy AI, олекотен 4,5 млн. → 220 хил. △, 7 MB); нощем — nightfloors.js 'patrick'
   lazare2: { h: 9, fit: 15, plate: 0x8f8a82 },   // Париж: гара Сен Лазар (модел на потребителя, Meshy AI) — в Blender затворена в квадрат (4 фасади, срязани на 45° в ъглите) около вътрешен двор; нощем — nightfloors.js 'lazare'
   maiden2: { h: 10, fit: 15, plate: 0x5d6b78 },   // Истанбул: Момината кула (модел на потребителя, Meshy AI, олекотен 1 млн. → 120 хил. △) — нощем златиста (nightfloors.js 'maiden')
