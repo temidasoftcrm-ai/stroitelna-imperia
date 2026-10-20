@@ -98,6 +98,7 @@ const DEMOS = [
   ['🌍 Геополитическата карта (САЩ)', 'sofia', d => d.geoDemo('US')],
   ['🌍 Геополитическата карта (Русия)', 'sofia', d => d.geoDemo('RU')],
   ['⛔ Извънредно заседание (супер поръчка)', 'sofia', () => $('fr').contentWindow.eval("import('/directors3d.js').then(m => m.demoEmergency())")],   // group.js emergency()
+  ['🆘 Извънредно заседание: касата на минус', 'sofia', () => $('fr').contentWindow.eval("import('/directors3d.js').then(m => m.demoEmergency('rescue'))")],   // boardrescue.js
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

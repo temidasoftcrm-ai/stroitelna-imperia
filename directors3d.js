@@ -589,7 +589,7 @@ export function openBoardroom(o) {
       const gain = p.gainTxt || (p.gain ? `+${B(p.gain)}/месец` : p.income ? `+${f(p.income)} €/ден` : '');
       const must = !!(p.mustVote && o.voteOn), Fr = o.frame ? o.frame() : null, imp = isImportant(p, Fr);
       const fit = p.inBudget == null ? '' : p.inBudget ? '<div class="fit" style="color:#5fd38a">✅ в рамките на бюджета за инвестиции</div>' : '<div class="fit" style="color:#ffb347">⚠️ над бюджета за инвестиции</div>';
-      scr.innerHTML = `${hd(p.head || '📋 Предложение към борда')}<div class="tx"></div>${q('Защо', p.why)}${q('Колко', p.cost ? B(p.cost) : 'без разход')}${q('Кога', p.days ? `~${p.days} дни` : '')}${q('Очакваме', gain)}${p.needsGear ? q('Условие', p.needsGear) : ''}${fit}<div class="row">${must ? `<button class="vt imp">🗳️ Решава бордът — гласуване</button>` : `<button class="y">✓ Да</button>${p.small ? `<button class="sm">½ По-малък вариант · ${B(p.small.cost)}</button>` : ''}`}<button class="n">✖ Не</button><button class="l">⏳ По-късно</button>${o.voteOn && !must ? `<button class="vt${imp ? ' imp' : ''}">${imp ? '⭐ Важен проект — 🗳️ на гласуване' : '🗳️ Подложи на гласуване'}</button>` : ''}</div>${must ? '<div class="q" style="margin-top:6px;color:#8fd0ff">🏛️ Мегапроект: само с мнозинство в борда.</div>' : ''}`;
+      scr.innerHTML = `${hd(p.head || '📋 Предложение към борда')}<div class="tx"></div>${q('Защо', p.why)}${q('Колко', p.cost ? B(p.cost) : 'без разход')}${q('Кога', p.days ? `~${p.days} дни` : '')}${q('Очакваме', gain)}${p.needsGear ? q('Условие', p.needsGear) : ''}${fit}<div class="row">${must ? `<button class="vt imp">🗳️ Решава бордът — гласуване</button>` : `<button class="y">✓ Да</button>${p.small ? `<button class="sm">½ По-малък вариант · ${B(p.small.cost)}</button>` : ''}`}<button class="n">✖ Не</button><button class="l">⏳ По-късно</button>${o.voteOn && !must ? `<button class="vt${imp ? ' imp' : ''}">${imp ? '⭐ Важен проект — 🗳️ на гласуване' : '🗳️ Подложи на гласуване'}</button>` : ''}</div>${must ? `<div class="q" style="margin-top:6px;color:#8fd0ff">${esc(p.mustNote || '🏛️ Мегапроект: само с мнозинство в борда.')}</div>` : ''}`;
       const vt = scr.querySelector('.vt'); if (vt) vt.onclick = () => { const r = o.voteOn(p.id); if (r) showVote(r, true); };
       const y = scr.querySelector('.y') || {}; y.disabled = p.can === false; if (y.disabled) y.title = 'Нямаш достатъчно пари';
       for (const [c, a] of [['y', 'yes'], ['sm', 'small'], ['n', 'no'], ['l', 'later']]) { const b = scr.querySelector('.' + c); if (b) b.onclick = () => { const r = o.onDecide && o.onDecide(p.id, a); if (r && r.need === 'vote') showVote(r); else { const ok = (a === 'yes' || a === 'small') && !(r && r.done === false); if (ok && imp) cheer(); after(ok ? 'ok' : a === 'yes' || a === 'small' ? 'no' : a); } }; }   // решеното изчезва — на същото място идва следващото
@@ -862,8 +862,10 @@ export function demoBoardroom(ov = {}) {
 }
 
 // ⛔ Лабораторията: извънредно заседание (group.js emergency) — супер поръчка, само тази точка и задължително гласуване
-export function demoEmergency() {
-  const it = { id: 'mega:chunnel', head: '⛔ Извънредна точка', dir: 'rail', ico: '🚄🇬🇧🇫🇷', mustVote: true, inBudget: false, can: true, cost: 3.1e8, days: 300,
+export function demoEmergency(kind) {
+  const it = kind === 'rescue' ? { id: 'rescue:cash', head: '⛔ Извънредна точка', alarm: true, alarmTxt: '⚠ Касата: −480 млн. €', mustNote: '⛔ Извънредно заседание: решава се с гласуване; „🏦 С кредит“ — без да продаваме акции.', dir: 'bank', ico: '🆘', mustVote: true, can: true, cost: 0, loan: true,
+    text: 'Касата е на минус: −480 млн. €. Трябват ни ~600 млн. €, за да се върнем над резерва. Предлагам да продадем 10% от холдинга на борсата (~1,9 млрд. €) или стабилизационен кредит 600 млн. €.',
+    why: 'на минус фирмата фалира след 15 дни — продават ни техниката и акциите на половин цена', gainTxt: '~1,9 млрд. € от борсата, без лихва' } : { id: 'mega:chunnel', head: '⛔ Извънредна точка', dir: 'rail', ico: '🚄🇬🇧🇫🇷', mustVote: true, inBudget: false, can: true, cost: 3.1e8, days: 300,
     text: 'Британското и френското правителство ни възлагат „Тунелът под Ламанша“: подводен жп тунел — Лондон и Париж за 2 часа с влак. Награда 90 млн. €, аванс 15% веднага.',
     why: 'супер поръчка — идва веднъж на милион; срок 300 дни, иначе връщаме аванса и губим 0.3 ★', gainTxt: '90 млн. € + 150 000 €/ден завинаги' };
   let left = true;
@@ -872,6 +874,7 @@ export function demoEmergency() {
   return demoBoardroom({ title: 'Титан Груп — демо', hallTitle: '⛔ Извънредно заседание', loadText: '🚨 Директорите се събират спешно…', report: null, speech: null, summary: null,
     proposals: () => left ? [it] : [],
     onDecide: (id, a) => { if (a === 'no') left = false; return null; },
-    voteOn: () => { const votes = D.map(([dir, name, yes, why]) => ({ dir, name, yes, why })), yes = votes.filter(v => v.yes).length; return { p: it, v: { votes, yes, no: votes.length - yes, passed: yes > votes.length - yes, bank: { ok: true } } }; },
+    voteOn: () => { const R = [['bank', 'Борис Тодоров', true, 'моето предложение'], ['con', 'Ивайло Петров', true, 'акциите — без лихва, и пак държим 80%'], ['rail', 'Мария Стоянова', false, 'по-добре кредит — не продаваме дялове на дъното'], ['hw', 'Надя Иванова', true, 'спасяваме фирмата'], ['sea', 'Стефан Колев', true, 'полезно за холдинга'], ['air', 'Елена Димитрова', false, 'кредит — после изкупуваме обратно'], ['oil', 'Вера Ангелова', true, 'полезно за холдинга']];
+      const votes = (kind === 'rescue' ? R : D).map(([dir, name, yes, why]) => ({ dir, name, yes, why })), yes = votes.filter(v => v.yes).length; return { p: it, v: { votes, yes, no: votes.length - yes, passed: yes > votes.length - yes, bank: kind === 'rescue' ? { ok: false, why: 'кредит 600 млн. € — с лихва, но без да продаваме дялове' } : { ok: true } } }; },
     onResolve: (id, how) => { if (how !== 'drop') left = false; return { done: how !== 'drop' }; } });
 }

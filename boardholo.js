@@ -164,6 +164,23 @@ function textSprite(lines, opt = {}) {
   const k = (opt.h || 0.06) / (fs * 1.3); s.scale.set(w * k, h * k, 1); s.renderOrder = 5;
   return s;
 }
+// 🆘 тревога: голямо червено „SOS“ (светещо) и триъгълни знаци „внимание“ — платна за спрайтове
+function canvasSprite(w, h, draw, H) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false, toneMapped: false })); s.scale.set(H * w / h, H, 1); s.renderOrder = 6; return s;
+}
+const sosSprite = H => canvasSprite(640, 280, (g, w, h) => {
+  g.fillStyle = 'rgba(40,0,0,.82)'; g.strokeStyle = '#ff2a2a'; g.lineWidth = 12; g.beginPath(); g.roundRect(8, 8, w - 16, h - 16, 26); g.fill(); g.stroke();   // тъмночервена табела — буквите се четат
+  g.font = '900 200px "Arial Black", Impact, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.shadowColor = '#ff0000'; g.shadowBlur = 16; g.fillStyle = '#ff1c1c'; g.fillText('SOS', w / 2, h / 2 + 10);
+  g.shadowBlur = 0; g.lineWidth = 4; g.strokeStyle = '#ffd0d0'; g.strokeText('SOS', w / 2, h / 2 + 10);
+}, H);
+const warnSprite = H => canvasSprite(256, 228, (g, w, h) => {
+  g.shadowColor = '#ff3b1f'; g.shadowBlur = 22; g.lineJoin = 'round';
+  g.beginPath(); g.moveTo(w / 2, 14); g.lineTo(w - 14, h - 14); g.lineTo(14, h - 14); g.closePath(); g.fillStyle = '#ffcc00'; g.fill(); g.lineWidth = 16; g.strokeStyle = '#d40000'; g.stroke();
+  g.shadowBlur = 0; g.fillStyle = '#111'; g.font = '900 140px "Arial Black", system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('!', w / 2, h * 0.62);
+}, H);
 const lineMat = col => new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
 
 // fmt — за сумите; base — точката над медальона
@@ -257,9 +274,18 @@ export function createHolo(scene, { fmt = n => Math.round(n).toLocaleString('bg-
     const m = new THREE.Mesh(new THREE.CircleGeometry(0.24, 48), new THREE.MeshBasicMaterial({ map: tx, transparent: true, opacity: 0.92, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }));
     m.position.set(0, 0.62, 0); m.userData.spinM = true; g.add(m); return m;
   }
+  // 🆘 извънредна тревога (p.alarm — boardrescue.js): мигащо „SOS“, знаци „внимание“ отстрани, червен пръстен и сумата; лъчът — червен
+  function alarm(p) {
+    const g = begin(), sos = sosSprite(0.34); sos.position.set(0, 0.6, 0); sos.userData.blink = 1; g.add(sos);
+    for (const x of [-0.72, 0.72]) { const w = warnSprite(0.28); w.position.set(x, 0.6, 0); w.userData.pulse = true; g.add(w); }
+    if (p.alarmTxt) { const l = textSprite([p.alarmTxt], { h: 0.075, col: '#ff6b6b' }); l.position.set(0, 0.18, 0); g.add(l); }
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.56, 64), new THREE.MeshBasicMaterial({ color: RED, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+    ring.rotation.x = -Math.PI / 2; ring.position.y = -0.02; ring.userData.marker = true; g.add(ring);
+  }
   function show(p) {
-    token++; flashT = 0;
+    token++; flashT = 0; beam.material.color.setHex(p && p.alarm ? RED : CYAN); beam.material.opacity = p && p.alarm ? 0.12 : 0.05;
     if (!p) { clear(); return; }
+    if (p.alarm) return alarm(p);
     if (p.geo && !p.geo.rating && /^bank:loan/.test(p.id || '')) { const m = String(p.text || '').match(/рейтинг\s+([A-D]{1,3}[+-]?)/); if (m) p = { ...p, geo: { ...p.geo, kind: 'loan', rating: m[1], ratingCol: RCOL(m[1]), amt: p.geo.amt || (String(p.text).match(/иска\s+([\d\s,.]+)\s*(млн|млрд)/) ? null : null) } }; }
     if (p.info) globe(p);
     else if (p.geo && p.geo.country) country(p);
@@ -287,7 +313,8 @@ export function createHolo(scene, { fmt = n => Math.round(n).toLocaleString('bg-
       if (o.userData.marker) o.scale.setScalar(1 + Math.sin(t * 4) * 0.25);
       if (o.userData.spinM) o.rotation.y += dt * 0.6;
       if (o.userData.sway != null) o.rotation.y = -0.55 + Math.sin(t * 0.8 + o.userData.sway) * 0.25;   // три четвърти отстрани, леко полюшване
-      if (o.userData.pulse) { const k = 1 + Math.sin(t * 5) * 0.15; o.scale.set(k, k, k); }
+      if (o.userData.pulse) { if (!o.userData.s0) o.userData.s0 = o.scale.clone(); const k = 1 + Math.sin(t * 5) * 0.15; o.scale.copy(o.userData.s0).multiplyScalar(k); }
+      if (o.userData.blink) o.material.opacity = Math.sin(t * 6) > -0.4 ? 1 : 0.35;   // SOS мига като аварийна лампа
     });
     if (flashT > 0) flashT = Math.max(0, flashT - dt * 0.6);
   }

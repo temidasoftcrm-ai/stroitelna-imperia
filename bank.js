@@ -153,5 +153,7 @@ export function createBank(deps) {
     on('[data-bkfound]', () => found()); on('[data-bkup]', () => upgrade()); on('[data-bkcap]', x => addCap(+x.dataset.bkcap));
     on('[data-bkdiv]', x => setDiv(+x.dataset.bkdiv)); on('[data-bkacc]', x => accept(+x.dataset.bkacc)); on('[data-bkdec]', x => decline(+x.dataset.bkdec));
   }
-  return { room, lent, upCost, addCap, upgrade, setDiv, divRate, DIV_OPTS, LV_MAX, RATINGS, decline, state: st, found, accept, dailyTick, value, winHtml, bind, daily: () => (st()?.incDay || 0) + (st()?.refund || 0) };
+  // капиталовият недостиг: кредитите не могат да са повече от капитала × лоста (boardrescue.js — предложение/извънредно заседание)
+  const capNeed = () => { const b = st(); return b ? Math.max(0, lent() / LEV(b.lv) - b.cap) : 0; };
+  return { room, lent, capNeed, upCost, addCap, upgrade, setDiv, divRate, DIV_OPTS, LV_MAX, RATINGS, decline, state: st, found, accept, dailyTick, value, winHtml, bind, daily: () => (st()?.incDay || 0) + (st()?.refund || 0) };
 }

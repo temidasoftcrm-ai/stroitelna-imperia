@@ -277,7 +277,7 @@ export function createGroup(deps) {
   }
   // ⛔ извънредно заседание — при важна поръчка (супер поръчка или такава над EMG_SHARE от касата): червен бутон долу вляво,
   // залата само с тази точка и задължително гласуване. „Одобри“ → item.accept(), „Отхвърли“ → item.decline(), „Отложи“ — бутонът остава.
-  // item: { id, ico, text, short?, why?, cost? (вложението), value? (стойността на поръчката), days?, gainTxt?, dir? ('con'), until? (ден), live()?, accept(), decline() }
+  // item: { id, ico, text, short?, why?, cost? (вложението), value? (стойността на поръчката), days?, gainTxt?, dir? ('con'), until? (ден), live()?, accept(), decline(), loan()?, loanWhy? }
   // Свиква се само при холдинг с директори в залата (feature 'boardroom' + 'board-emg'); иначе връща false и поръчката върви по стария път.
   const EMG_SHARE = 0.25;
   let emg = [];
@@ -303,15 +303,16 @@ export function createGroup(deps) {
   function emergencyBoard(rerender) {
     emgBtn(); if (!emg.length) return;
     const re = () => { emgBtn(); rerender && rerender(); }, B2 = () => deps.board2 && deps.board2();
-    const props = () => emg.filter(it => !(it.live && !it.live())).map(it => { const F = B2() && B2().frame ? B2().frame() : null; return { dir: 'con', head: '⛔ Извънредна точка', ...it, mustVote: true, inBudget: it.cost && F ? it.cost <= F.free : null, can: true }; });
-    const done = (id, ok) => { const it = emg.find(x => x.id === id); if (!it) return; emg = emg.filter(x => x !== it); try { ok ? it.accept() : it.decline && it.decline(); } catch (e) { console.warn('emergency', e); } deps.save(); re(); };
+    const props = () => emg.filter(it => !(it.live && !it.live())).map(it => { const F = B2() && B2().frame ? B2().frame() : null; return { dir: 'con', head: '⛔ Извънредна точка', mustNote: it.loan ? '⛔ Извънредно заседание: решава се с гласуване; „🏦 С кредит“ — другият изход.' : '⛔ Извънредно заседание: само с мнозинство в борда.', ...it, mustVote: true, inBudget: it.cost && F ? it.cost <= F.free : null, can: true }; });
+    const done = (id, ok, how) => { const it = emg.find(x => x.id === id); if (!it) return; emg = emg.filter(x => x !== it); try { how === 'loan' && it.loan ? it.loan() : ok ? it.accept() : it.decline && it.decline(); } catch (e) { console.warn('emergency', e); } deps.save(); re(); };
     const voteOf = p => { const b = B2(); if (b && b.vote) return b.vote(p); const votes = Object.keys(deps.S().hold.dir || {}).map(d => ({ dir: d, name: deps.S().hold.dir[d], yes: true, why: d === p.dir ? 'моето предложение' : 'полезно за холдинга' })); return { votes, yes: votes.length, no: 0, passed: true, bank: { ok: true } }; };
     import('./directors3d.js').then(m => m.openBoardroom({ title: groupName(deps.S()), brand: brandOf(deps.S()) && { ...brandOf(deps.S()), group: groupName(deps.S()) }, seats: boardSeats, fmt: deps.fmt, sound: deps.sound,
       hallTitle: '⛔ Извънредно заседание', loadText: '🚨 Директорите се събират спешно…',
       proposals: props, frame: B2() ? () => B2().frame() : null,
       onDecide: (id, a) => { if (a === 'no') done(id, false); return null; },
-      voteOn: id => { const p = props().find(q => q.id === id); return p ? { v: voteOf(p), p } : null; },
-      onResolve: (id, how, shown) => { if (how === 'drop') return { done: false }; if (shown && shown.yes < shown.no) { deps.toast('🗳️ Бордът не подкрепи поръчката — без мнозинство не се поема.', 'bad'); return { done: false }; } done(id, true); return { done: true }; } }));
+      // item.loan — втори изход „🏦 С кредит“ (залата го показва, когато банката „възразява“): напр. стабилизационен кредит вместо продажба на акции
+      voteOn: id => { const p = props().find(q => q.id === id); if (!p) return null; const v = voteOf(p); return { v: p.loan ? { ...v, bank: { ...(v.bank || {}), ok: false, why: p.loanWhy || 'има и вариант с кредит' } } : v, p }; },
+      onResolve: (id, how, shown) => { if (how === 'drop') return { done: false }; if (shown && shown.yes < shown.no && how !== 'loan') { deps.toast('🗳️ Бордът не подкрепи поръчката — без мнозинство не се поема.', 'bad'); return { done: false }; } done(id, true, how); return { done: true }; } }));
   }
   return { dirEv, dirPanel, bindPanels, check, winHtml, bind, board, proposals, decide, dailyTick, dailyBonus, upgrade, hire, found, canFound, emergency, emergencyIf, emergencyBoard, emgOn };
 }

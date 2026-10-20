@@ -16,6 +16,7 @@ import { createSilkRoad, SILK } from './silkroad.js';
 import { createCinema } from './cinema.js';
 import { makeStateTenders } from './statetenders.js';
 import { createMuni } from './muniorders.js';
+import { createRescue } from './boardrescue.js';
 import { createRivals, LOCAL_FIRMS, FIRMS } from './rivals.js';
 import { createDevLevel, THRESH as DEV_THRESH, LV as DEV_LV, unlockText } from './devlevel.js';
 import { createCityPanel } from './citypanel.js';
@@ -2868,7 +2869,7 @@ function endOfDay() {
   tenderAutoFix();
   mines.dailyTick();
   oil.dailyTick(); updOilBtn();
-  gridCheck(); holdingCheck(); autoTick(); group.check(); group.dailyTick(); corp.dailyTick(); mw.dailyTick(); hotels.dailyTick(); bank.dailyTick(); neom.dailyTick(); imperial.dailyTick(); muni.dailyTick(); if (S.president && !S.pres) pres.start(S.president.cc); pres.dailyTick(); ops.tick(1); if (geoMap.on() && $('mapScreen')?.offsetParent) drawMap(); impCiv3D(); neomDecor(); if (imperial.needChoice() && !S.impAsked && $('modal').classList.contains('hidden')) { S.impAsked = S.day; imperial.choose(() => renderBig()); } holdMilestones(); if (S.holding) holdXP(Math.max(0, regNet()) / 10000);
+  gridCheck(); holdingCheck(); autoTick(); group.check(); group.dailyTick(); corp.dailyTick(); mw.dailyTick(); hotels.dailyTick(); bank.dailyTick(); neom.dailyTick(); imperial.dailyTick(); muni.dailyTick(); if (S.holding) rescue.dailyCheck(); if (S.president && !S.pres) pres.start(S.president.cc); pres.dailyTick(); ops.tick(1); if (geoMap.on() && $('mapScreen')?.offsetParent) drawMap(); impCiv3D(); neomDecor(); if (imperial.needChoice() && !S.impAsked && $('modal').classList.contains('hidden')) { S.impAsked = S.day; imperial.choose(() => renderBig()); } holdMilestones(); if (S.holding) holdXP(Math.max(0, regNet()) / 10000);
   airAutoPlanes();
   tenders.dailyTick();
   orient.dailyTick();
@@ -5214,6 +5215,8 @@ function tenderLevelUp(t) {
 // българските градове нямат cc (знамето по подразбиране е 🇧🇬) — затова българските „st-“ поръчки никога не излизаха; сега cc || 🇧🇬
 const ccOrBg = id => cityById(id) ? cityById(id).cc || '🇧🇬' : null;
 const tenderCountryOk = t => !t.id.startsWith('st-') || ownedCities().some(id => ccOrBg(id) && ccOrBg(id) === ccOrBg(t.city));
+// 🆘 Борис пази холдинга от липса на пари (boardrescue.js, feature 'board-rescue'): IPO при ниска каса / банка под капиталовия минимум, извънредно заседание при минус
+const rescue = createRescue({ S: () => S, econ: () => econ, corp, bank, frame: () => boardL.frame(), lv: () => dev.best(), ipoLv: 17, fmt, toast, emergency: it => feature('board-rescue') && group.emergency(it) });
 // 🏛️ поръчките на общината (muniorders.js) — в градовете по истинската карта (план v2): услугите, които не стигат
 const muni = createMuni({ emergencyIf: it => group.emergencyIf(it), S: () => S, cityId: () => S.cityId, plan: () => city.plan, lots: () => city.lots, econ: () => econ, toast, fmt, save, sound: n => Sound.play(n), addXp: n => dev.add(n),
   addRep: d => { S.rep = Math.max(0, Math.min(5, S.rep + d)); }, cityName: id => cityById(id)?.nm || id, sz: id => cityById(id)?.sz || 1, mega: id => MEGAPOLIS.has(id), built: () => (S.built || []).length,
@@ -8433,7 +8436,8 @@ function boardProposals() {
   }
 
   // ━━ 🌍 Глобъл (ниво 20): мегапроекти, концесии, придобивания (globdir.js); на нива 18–19 мегапроектите ги предлага Констръкшън
-  for (const p of globProposals({ strip: h => String(h).replace(/<[^>]+>/g, ''), S: () => S, econ: () => econ, fmt, mw, corp, GLOBAL, localFirms: () => corp.localFirms(), empire: () => dev.best() >= 20 })) if (hasSub('glob')) out.push(p); else if ((p.id.startsWith('glob:mw-') || p.id.startsWith('glob:deal-')) && dev.best() >= HOLD_LV.mega && hasSub('con')) out.push({ ...p, id: p.id.replace('glob:', 'con:'), dir: 'con' });
+  for (const p of globProposals({ strip: h => String(h).replace(/<[^>]+>/g, ''), S: () => S, econ: () => econ, fmt, mw, corp, GLOBAL, localFirms: () => corp.localFirms(), empire: () => dev.best() >= 20, acqOn: () => feature('board-rescue') && dev.best() >= HOLD_LV.acq })) if (hasSub('glob')) out.push(p); else if (((p.id.startsWith('glob:mw-') || p.id.startsWith('glob:deal-')) && dev.best() >= HOLD_LV.mega || p.id.startsWith('glob:acq-') || p.id.startsWith('glob:loc')) && hasSub('con')) out.push({ ...p, id: p.id.replace('glob:', 'con:'), dir: 'con' });   // придобиванията (от ниво 16) — Констръкшън, докато няма Глобъл
+  if (feature('board-rescue')) out.push(...rescue.proposals());   // 🆘 IPO за касата или капитала на банката
   // ━━ 🏦 Банка: всяко искане за кредит поотделно (холограмата: държавата, рейтингът и сумата), капиталът, дивидентът; 📈 борсата
   if (S.bank && hasSub('bank')) {
     const b = S.bank, room = bank.room(), RT = bank.RATINGS, B9 = n => n >= 1e9 ? `${(n / 1e9).toLocaleString('bg-BG', { maximumFractionDigits: 2 })} млрд. €` : `${M(n / 1e6)} млн. €`;

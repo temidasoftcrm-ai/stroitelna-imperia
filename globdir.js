@@ -1,7 +1,7 @@
 // globdir.js — 🌍 директорът на „Глобъл Ризортс & Констръкшън“ (ниво 20): предложенията му към борда.
 // Мегапроекти (следващият етап за финансиране), концесии (оферта в отворения търг), придобивания (10% от конкурентен холдинг,
 // изкупуване на местни конкуренти). Форматът е като boardProposals() в game.js: [{ id, dir: 'glob', ico, text, cost, count, apply() }].
-// ctx: { S(), econ(), fmt, mw (megaworld.js), corp (corp.js), GLOBAL (corp.js), localFirms(), empire() }
+// ctx: { S(), econ(), fmt, mw (megaworld.js), corp (corp.js), GLOBAL (corp.js), localFirms(), empire(), acqOn()? }
 export function globProposals(ctx) {
   const S = ctx.S(); if (!S || !S.holding) return [];
   const out = [], f = n => ctx.fmt(Math.round(n)), B = n => n >= 1e9 ? `${(n / 1e9).toLocaleString('bg-BG', { maximumFractionDigits: 1 })} млрд. €` : `${f(n / 1e6)} млн. €`;
@@ -19,9 +19,10 @@ export function globProposals(ctx) {
     const p = out[out.length - 1]; if (p && p.id.startsWith(`glob:deal-${wait.key}-${d.k}`)) { p.why = `без договорите ${wait.nm} не може да тръгне`; if (block.length) p.needsGear = ctx.strip(mw.condTxt(wait.key, block[0].c)); if (bank.length) p.gainTxt = `кредитът (${bank.map(o => B(o.c.amt)).join(' + ')}) е от нашата банка при 2%`; }
   }
   for (const o of next.slice(0, 2)) add('mw-' + o.m.key + '-' + o.r.ph, o.m.ico, `${o.m.nm}: ${o.r.ph ? `етап ${o.r.ph} е готов — да финансираме етап ${o.r.ph + 1}?` : 'да направим първа копка?'} Готовият проект носи ~${f(o.m.inc)} €/ден.`, o.c, 1, () => mw.fund(o.m.key), { mustVote: true, noAuto: true, why: o.m.effect ? `огромен приход всеки ден, а и ${o.m.effect}` : 'огромен приход всеки ден', days: Math.round(o.m.days / ((mw.MW.find(x => x.key === o.m.key)?.phases) || 3)) || o.m.days, gainTxt: `~${f(o.m.inc)} €/ден, когато проектът е готов`, track: null });
-  if (!ctx.empire()) return out;   // концесиите и придобиванията — от ниво 20
+  // концесиите — от ниво 20; придобиванията — от отключването на „Придобивания“ (ctx.acqOn, ниво 16; без него — също от 20)
+  const emp = ctx.empire(), acqOn = ctx.acqOn ? ctx.acqOn() : emp; if (!emp && !acqOn) return out;
   // — концесия: оферта с 15% над началната цена в отворения търг (печели често, без да надплаща много)
-  const t = ctx.corp.tender && ctx.corp.tender();
+  const t = emp && ctx.corp.tender && ctx.corp.tender();
   if (t && !t.my) add('conc-' + t.nm, t.ico || '🌐', `Отворен търг за концесия „${t.nm}“ (начална цена ${B(t.price)}, носи ~${f(t.inc)} €/ден). Да дадем оферта +15% — ${B(t.price * 1.15)}?`, t.price * 1.15, 1, () => ctx.corp.concBid(1.15), { noAuto: true, why: '15% над началната цена — печели често, без да надплаща', gainTxt: `~${f(t.inc)} €/ден за десетилетия` });
   // — придобивания: 10% от най-евтиния конкурентен холдинг, който още не е погълнат; местните конкуренти в твоите държави
   const c = ctx.corp.state(), gl = ctx.GLOBAL.filter(g => c.gl[g.id] && !c.gl[g.id].merged).map(g => ({ g, cost: ctx.corp.trancheCost(g.id), stake: c.gl[g.id].stake })).sort((a, b) => b.stake - a.stake || a.cost - b.cost)[0];
