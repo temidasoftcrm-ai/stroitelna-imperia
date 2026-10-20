@@ -7,7 +7,7 @@ import { OSM2 } from './cityplan2-osm.js';
 import { LOT_KINDS } from './cityplan.js';
 
 const EDGE = -108;   // както в cityplangame.js
-const SQUARE = { rome: [41.8960, 12.4826], paris: [48.8566, 2.3522] };   // площадът на централата: Пиаца Венеция · Отел дьо Вил   // площадът на централата: Пиаца Венеция
+const SQUARE = { rome: [41.8960, 12.4826], paris: [48.8566, 2.3522], istanbul: [41.0082, 28.9784] };   // площадът на централата: Пиаца Венеция · Отел дьо Вил   // площадът на централата: Пиаца Венеция
 const cache = new Map();
 const cumLen = pts => { const L = [0]; for (let i = 1; i < pts.length; i++) L.push(L[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])); return L; };
 
