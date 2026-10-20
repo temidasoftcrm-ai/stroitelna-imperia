@@ -512,6 +512,7 @@ const GLB_LM = {
   liberty: { h: 22, fit: 13, plate: 0x7d9a6a }, redeemer: { h: 18, fit: 14, plate: 0x6f8f55 }, stbasil: { h: 20, fit: 15, plate: 0xb9b0a3 },
   opera: { h: 30, fit: 40, plate: 0x4f86b8 }, manhattan: { h: 34, fit: 15, grid: true },
   colosseo: { h: 13, fit: 15, plate: 0xb9ad98 },   // Рим: Колизеумът (Carlos.Maciel)
+  empire2: { h: 45, fit: 15, plate: 0x8a8580 },   // Ню Йорк: Емпайър Стейт (модел на потребителя, Meshy AI, олекотен 1,3 млн. → 160 хил. △) — вместо кулата от пакета Манхатън; нощем тъмно тяло с прозорци, светла корона и шпил — nightfloors 'empire2'
   radiocity2: { h: 40, fit: 15, plate: 0x8a8580 },   // Ню Йорк: Радио Сити Мюзик Хол (модел на потребителя, Meshy AI) — в Blender: кулата по-широка и напред до надписите, неоновите „RADIO CITY“ (вертикалните и на таблото около ъгъла), стената под таблото; нощем — nightfloors 'radio'/'neon'
   rockefeller2: { h: 40, fit: 15, plate: 0x8a8580 },   // Ню Йорк: 30 Rockefeller Plaza (модел на потребителя, Meshy AI, олекотен 2,6 млн. → 180 хил. △); нощем синьо-виолетово, нагоре по-светло — nightfloors.js 'rock'
   parliament2: { h: 9, fit: 15, plate: 0x5f6d4f },   // Лондон: Уестминстърският дворец с Биг Бен (модел на потребителя, Meshy AI) — в Blender плочата изрязана до сградите и дворът стеснен (площта ~3 пъти по-малка), 200 хил. △; нощем — nightfloors.js 'westm'
