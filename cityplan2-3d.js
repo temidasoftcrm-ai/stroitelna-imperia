@@ -376,7 +376,7 @@ export function buildPlan2View(P, opts = {}) {
   }
   // Рома Термини (opts.termini): гарата по фасадата към площада (opts.stationModel — моделът на играта, иначе кутия) и перони с навеси и коловози отзад
   const TL = opts.termini ? P.lots.find(L => L.lm === 'termini' || L.lm === 'sirkeci' || L.lm === 'saintlazare' || L.lm === 'waterloo' || L.lm === 'grandcentral' || L.lm === 'kursky') : null;   // главната гара: Термини (Рим), Сиркеджи (Истанбул), Сен Лазар (Париж)
-  if (TL) G.add(terminiView(TL, opts.stationModel));
+  if (TL) G.add(terminiView(TL, opts.stationModel, opts.stationFacing));   // stationFacing: { face: '-z', depth: 0.8 } — фасадата на модела е към −z (към улицата), сградата заема 80 % от дълбочината
   // надписите на картата: водите (Златният рог, Босфорът…, Тибър) и кварталите — спрайтове, отблизо се скриват
   const LB = D && opts.labels !== false ? mapLabels(G, D) : null;
   const BT = D && D.sea && opts.boats !== false ? seaTraffic(G, D, opts.boatModels || {}) : null;   // Истанбул: фериботи по линиите, кораби по Босфора, лодки в Златния рог
@@ -466,14 +466,15 @@ function seaTraffic(G, D, models) {
       b.obj.position.set(a[0] + (c[0] - a[0]) * t, 0, a[1] + (c[1] - a[1]) * t); b.obj.rotation.y = Math.atan2((c[0] - a[0]) * b.dir, (c[1] - a[1]) * b.dir);
     } } };
 }
-function terminiView(L, model) {
-  const g = new THREE.Group(), nx = -Math.sin(L.rot), nz = -Math.cos(L.rot), tx = Math.cos(L.rot), tz = -Math.sin(L.rot), back = L.d * 0.3, len = 140, N = 9;
+function terminiView(L, model, sf = {}) {
+  const g = new THREE.Group(), nx = -Math.sin(L.rot), nz = -Math.cos(L.rot), tx = Math.cos(L.rot), tz = -Math.sin(L.rot), len = 140, N = 9;
   const roof = new THREE.MeshStandardMaterial({ color: 0xc9ccd0, roughness: 0.5, metalness: 0.4 }), plat = M(0xb9b2a4), rail = M(0x5a544c), col = M(0x6d7278);
   // сградата: моделът, побран в предните 55 % от парцела, с лицето към площада
   const ms = model && new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3()), sq = ms && Math.abs(ms.x / ms.z - 1) < 0.25;   // квадратен модел (Сен Лазар — сграда около двор) — по-дълбоко в парцела
-  const bw = L.w, bd = L.d * (sq ? 0.7 : 0.55), bx = L.x - nx * (L.d - bd) / 2, bz = L.z - nz * (L.d - bd) / 2;
+  const dep = sf.depth || (sq ? 1 : 0.55), back = L.d * Math.max(0.3, dep - 0.5), bw = sq ? L.d : L.w, bd = L.d * dep, bx =   /* квадратният модел — квадрат с цялата дълбочина */ L.x - nx * (L.d - bd) / 2, bz = L.z - nz * (L.d - bd) / 2;
   if (model) { const o = model.clone(true), w = new THREE.Group(), inner = new THREE.Group(); inner.add(o); w.add(inner);
     let b = new THREE.Box3().setFromObject(inner), sz = b.getSize(new THREE.Vector3()); if ((sz.x > sz.z) !== (bw > bd)) { inner.rotation.y = Math.PI / 2; b = new THREE.Box3().setFromObject(inner); sz = b.getSize(new THREE.Vector3()); }
+    if (sf.face === '-z') inner.rotation.y += Math.PI;   // лицето (−z) — към улицата пред гарата, пероните — зад нея
     const k = Math.min(bw / sz.x, bd / sz.z); inner.scale.setScalar(k); b = new THREE.Box3().setFromObject(inner); const c = b.getCenter(new THREE.Vector3()); inner.position.set(-c.x, -b.min.y, -c.z);
     w.position.set(bx, 0, bz); w.rotation.y = L.rot; w.traverse(m => { if (m.isMesh) m.castShadow = m.receiveShadow = true; }); g.add(w); }
   else { const o = new THREE.Mesh(new THREE.BoxGeometry(bw, 12, bd), M(0xd8d2c4)); o.position.set(bx, 6, bz); o.rotation.y = L.rot; o.castShadow = true; g.add(o); }
