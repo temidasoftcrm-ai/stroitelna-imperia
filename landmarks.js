@@ -30,6 +30,7 @@ export const LANDMARK_NM = { bigben2: 'Биг Бен', londoneye2: 'Лондон
 export const LANDMARK_CENTER = new Set(['pyramids', 'burj', 'manhattan', 'cntower', 'willis', 'shtower', 'eiffel', 'arc', 'bigben', 'shard', 'brandenburg', 'reichstag', 'ladefense', 'sapphire', 'twist', 'twin', 'colosseum', 'colosseo', 'vatican', 'vittoriano', 'derotterdam', 'markthal', 'cubes', 'canal', 'rijks', 'centraal']);
 // 🇬🇧 Лондон с истински модели (feature 'london-real'): Биг Бен и London Eye от Poly Pizza вместо процедурните
 if (feature('lm-vittoriano')) { CITY_LANDMARKS.rome = CITY_LANDMARKS.rome.map(k => k === 'vittoriano' ? 'vittoriano2' : k); LANDMARK_NM.vittoriano2 = LANDMARK_NM.vittoriano || 'Витториано'; if (LANDMARK_CENTER.has('vittoriano')) LANDMARK_CENTER.add('vittoriano2'); }   // процедурният остава, ако флагът е изключен
+if (feature('lm-colosseo3')) { CITY_LANDMARKS.rome = CITY_LANDMARKS.rome.map(k => k === 'colosseo' ? 'colosseo3' : k); LANDMARK_NM.colosseo3 = LANDMARK_NM.colosseo || 'Колизеумът'; LANDMARK_CENTER.add('colosseo3'); }   // Колизеумът, сглобен в Blender от модела на потребителя (Meshy AI) — с нощното осветление (nightfloors.js)
 if (feature('london-real')) { CITY_LANDMARKS.london = ['bigben2', 'londoneye2', 'towerbridge', 'shard']; LANDMARK_CENTER.add('bigben2'); }
 
 const mat = (c, r = 0.8, m = 0, extra = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m, ...extra });
@@ -474,6 +475,7 @@ const GLB_LM = {
   liberty: { h: 22, fit: 13, plate: 0x7d9a6a }, redeemer: { h: 18, fit: 14, plate: 0x6f8f55 }, stbasil: { h: 20, fit: 15, plate: 0xb9b0a3 },
   opera: { h: 30, fit: 40, plate: 0x4f86b8 }, manhattan: { h: 34, fit: 15, grid: true },
   colosseo: { h: 13, fit: 15, plate: 0xb9ad98 },   // Рим: Колизеумът (Carlos.Maciel)
+  colosseo3: { h: 13, fit: 15, plate: 0xb9ad98 },   // Рим: Колизеумът от дъгата на Meshy AI (модел на потребителя) — сглобен в Blender в пълен овал, истинските пропорции 190 × 156 × 48 м (feature 'lm-colosseo3')
   sagrada: { h: 17, fit: 15, plate: 0xc9bfa8 },   // Барселона: Саграда Фамилия (vmmaniac)
   bigben2: { h: 30, fit: 8, plate: 0xb8b0a0 },   // Лондон: Биг Бен (Daqian Dong, Poly Pizza; feature 'london-real')
   londoneye2: { h: 42, fit: 22, plate: 0xb8b0a0 },
