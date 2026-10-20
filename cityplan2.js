@@ -585,6 +585,17 @@ function placeLots(P, sk, r) {
       }
     }
   }
+  // истинската карта: парцелите — в дълбочина до вътрешността на квартала (до 30 м, на стъпки по 2 м, всички едновременно),
+  // за да побират сгради в истински размер (училище, болница…); спират до улица, вода, парк или съседен парцел
+  if (P.osm) { const grow = lots.filter(L => !L.big);
+    for (let it = 0; it < 9; it++) { let any = false;
+      for (const L of grow) { if (L.d >= 30 || L.stop) continue; const nx = -Math.sin(L.rot), nz = -Math.cos(L.rot), T = { ...L, x: L.x + nx * 1, z: L.z + nz * 1, d: L.d + 2 };
+        const cs = rectCorners(T.x, T.z, T.w / 2, T.d / 2, T.rot);
+        let ok = cs.every(q => inB(q) && !P.waterAt(q[0], q[1]) && !greenIn(q[0], q[1])) && !roadIn(T, 0.5);
+        if (ok) lg.near([T.x, T.z], 80, (q, o) => { if (ok && o !== L && rectsOverlap(o, T, 0.4)) ok = false; });
+        if (!ok) { L.stop = 1; continue; } L.x = T.x; L.z = T.z; L.d = T.d; any = true; }
+      if (!any) break; }
+    for (const L of grow) delete L.stop; }
   const C = P.center;
   lots.sort((a, b) => Math.round(Math.hypot(a.x - C.x, a.z - C.z)) - Math.round(Math.hypot(b.x - C.x, b.z - C.z)) || Math.atan2(a.z - C.z, a.x - C.x) - Math.atan2(b.z - C.z, b.x - C.x));
   lots.forEach((L, i) => { L.id = i; L.poly = rectCorners(L.x, L.z, L.w / 2, L.d / 2, L.rot); L.area = Math.round(L.w * L.d); L.block = null; L.reserved = L.reserved || null; L.big = L.big || null; delete L._k; for (const k of ['x', 'z', 'w', 'd', 'rot']) L[k] = Math.round(L[k] * 100) / 100; });

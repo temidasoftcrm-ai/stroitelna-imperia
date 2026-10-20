@@ -268,6 +268,9 @@ export function buildPlan2View(P, opts = {}) {
     pools = new THREE.InstancedMesh(new THREE.PlaneGeometry(9, 9).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -6 }), F.lamps.length);
     const m = new THREE.Matrix4(); F.lamps.forEach(([x, z], i) => pools.setMatrixAt(i, m.makeTranslation(x, 0.15, z))); pools.visible = false; pools.frustumCulled = false; F.FURN.add(pools);
   }
+  // Рома Термини (opts.termini): гарата по фасадата към площада (opts.stationModel — моделът на играта, иначе кутия) и перони с навеси и коловози отзад
+  const TL = opts.termini ? P.lots.find(L => L.lm === 'termini') : null;
+  if (TL) G.add(terminiView(TL, opts.stationModel));
   // фоновите римски квартали — фасади с покриви (за парцелите, които играта не ползва: opts.fillLot)
   const BL = D && opts.blocks !== false ? romeBlocks(G, P) : null;
   const refill = () => { if (BL) BL.fill(opts.fillLot || (() => true)); };
@@ -291,6 +294,22 @@ export function buildPlan2View(P, opts = {}) {
   return G;
 }
 
+function terminiView(L, model) {
+  const g = new THREE.Group(), nx = -Math.sin(L.rot), nz = -Math.cos(L.rot), tx = Math.cos(L.rot), tz = -Math.sin(L.rot), back = L.d * 0.3, len = 140, N = 9;
+  const roof = new THREE.MeshStandardMaterial({ color: 0xc9ccd0, roughness: 0.5, metalness: 0.4 }), plat = M(0xb9b2a4), rail = M(0x5a544c), col = M(0x6d7278);
+  // сградата: моделът, побран в предните 55 % от парцела, с лицето към площада
+  const bw = L.w, bd = L.d * 0.55, bx = L.x - nx * (L.d - bd) / 2, bz = L.z - nz * (L.d - bd) / 2;
+  if (model) { const o = model.clone(true), w = new THREE.Group(), inner = new THREE.Group(); inner.add(o); w.add(inner);
+    let b = new THREE.Box3().setFromObject(inner), sz = b.getSize(new THREE.Vector3()); if ((sz.x > sz.z) !== (bw > bd)) { inner.rotation.y = Math.PI / 2; b = new THREE.Box3().setFromObject(inner); sz = b.getSize(new THREE.Vector3()); }
+    const k = Math.min(bw / sz.x, bd / sz.z); inner.scale.setScalar(k); b = new THREE.Box3().setFromObject(inner); const c = b.getCenter(new THREE.Vector3()); inner.position.set(-c.x, -b.min.y, -c.z);
+    w.position.set(bx, 0, bz); w.rotation.y = L.rot; w.traverse(m => { if (m.isMesh) m.castShadow = m.receiveShadow = true; }); g.add(w); }
+  else { const o = new THREE.Mesh(new THREE.BoxGeometry(bw, 12, bd), M(0xd8d2c4)); o.position.set(bx, 6, bz); o.rotation.y = L.rot; o.castShadow = true; g.add(o); }
+  for (let i = 0; i < N; i++) { const u = (i - (N - 1) / 2) * (L.w * 0.9 / N), c = [L.x + tx * u + nx * (back + len / 2), L.z + tz * u + nz * (back + len / 2)];
+    const p2 = new THREE.Mesh(new THREE.BoxGeometry(3, 0.9, len), plat), r2 = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.25, len), roof), tr = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.12, len + 30), rail);
+    for (const [o, y, off] of [[p2, 0.45, 0], [r2, 5.2, 0], [tr, 0.06, L.w * 0.45 / N]]) { o.position.set(c[0] + tx * off + nx * (o === tr ? 15 : 0), y, c[1] + tz * off + nz * (o === tr ? 15 : 0)); o.rotation.y = L.rot; o.castShadow = o !== tr; o.receiveShadow = true; g.add(o); }
+    for (let k = -len / 2 + 8; k < len / 2; k += 16) { const cl = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 4.6, 6), col); cl.position.set(c[0] + nx * k, 2.9, c[1] + nz * k); g.add(cl); } }
+  return g;
+}
 // Рим: затворено застрояване — по двете страни на всяка улица редица от сгради (14 м фасада, 15 м дълбочина, 13–21 м височина),
 // в цветовете на Рим; не върху улица, вода, парк/археология или забележителност. Рисуват се като фасада + керемиден покрив (2 инстанции).
 const ROMA = [0xd9a066, 0xc8794e, 0xe2c27a, 0xb5654a, 0xd8b48a, 0xe7d3a8, 0xc98f5b, 0xa9583f];

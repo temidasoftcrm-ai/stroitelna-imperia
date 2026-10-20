@@ -106,7 +106,7 @@ function lodUpdate(force) {
 // забележителност на реалното ѝ място: моделът се побира в основата fp (GLB-тата се зареждат по-късно — тогава се нагласят)
 function romeLm(L) {
   const plaza = disc(L.x, L.z, Math.max(L.w, L.d) / 2 + (L.guard || 4), 0.055); city.add(merge([plaza], MAT.walk));   // площад / защитен периметър
-  if (L.lm === 'termini') { termini(L); return; }
+  if (L.lm === 'termini') return;   // гарата и пероните — модулът (termini: true)
   if (L.lm === 'vittoriano' && A.vittoriano2) { const n0 = BLD.length; put('vittoriano2', { ...L, rot: VIT_ROT }, 0); if (BLD.length > n0) BLD[BLD.length - 1].always = 1; return; }   // Витториано — моделът на потребителя (Meshy AI)
   if (L.lm === 'colosseo') { const n0 = BLD.length; put('colosseo', L, 0); if (BLD.length > n0) BLD[BLD.length - 1].always = 1; return; }   // забележителността — винаги пълният модел
   const LMK = { stpeter: 'stpeter', pantheon: 'pantheon', vittoriano: 'vittoriano', hagia: 'hagia', galata: 'galata', bluemosque: 'mosque2' }[L.lm]; if (!LMK) return;   // Истанбул: Ая София, Галата, Синята джамия (mosque2)   // Треви, Кастел Сант'Анджело, Circus Maximus… — запазено място (моделите — по-късно)
@@ -132,17 +132,6 @@ function distView(on) {
     const sp = tag(`${d.nm} · ниво ${d.tier} · ${st.build}🏗 ${st.reno}🛠`, '#' + new THREE.Color(TIER_C[d.tier]).getHexString(), 22); sp.position.set(cx, 60, cz); DIST.add(sp); }
 }
 // котвите: Термини (гарата), летището (Фиумичино, на ръба в истинската посока) и магистралата
-// Рома Термини: сградата по фасадата към площада (голямата гара), отзад — перони с навеси към жп линиите
-function termini(L) {
-  const k = A['station-big'] ? 'station-big' : 'station', n0 = BLD.length; put(k, { ...L, d: L.d * 0.55 }, 1); if (BLD.length > n0) BLD[BLD.length - 1].always = 1;
-  const nx = -Math.sin(L.rot), nz = -Math.cos(L.rot), tx = Math.cos(L.rot), tz = -Math.sin(L.rot), back = L.d * 0.3, len = 140, N = 9, g = new THREE.Group();
-  const roof = new THREE.MeshStandardMaterial({ color: 0xc9ccd0, roughness: 0.5, metalness: 0.4 }), plat = M(0xb9b2a4), rail = M(0x5a544c), col = M(0x6d7278);
-  for (let i = 0; i < N; i++) { const u = (i - (N - 1) / 2) * (L.w * 0.9 / N), c = [L.x + tx * u + nx * (back + len / 2), L.z + tz * u + nz * (back + len / 2)];
-    const p2 = new THREE.Mesh(new THREE.BoxGeometry(3, 0.9, len), plat), r2 = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.25, len), roof), tr = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.12, len + 30), rail);
-    for (const [o, y, off] of [[p2, 0.45, 0], [r2, 5.2, 0], [tr, 0.06, L.w * 0.45 / N]]) { o.position.set(c[0] + tx * off + nx * (o === tr ? 15 : 0), y, c[1] + tz * off + nz * (o === tr ? 15 : 0)); o.rotation.y = L.rot; o.castShadow = o !== tr; o.receiveShadow = true; g.add(o); }
-    for (let k = -len / 2 + 8; k < len / 2; k += 16) { const cl = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 4.6, 6), col); cl.position.set(c[0] + nx * k, 2.9, c[1] + nz * k); g.add(cl); } }
-  city.add(g);
-}
 // летището (Фиумичино): извън картата, в истинската посока — писта, рулежка, перон, терминал, кула и самолети на перона
 function airportView(a) {
   const ux = Math.sin(a.dir), uz = Math.cos(a.dir), cx = a.x + ux * 320, cz = a.z + uz * 320, rot = a.dir, g = new THREE.Group(); g.position.set(cx, 0, cz); g.rotation.y = rot; city.add(g);
@@ -178,7 +167,7 @@ function build() {
   city = new THREE.Group(); scene.add(city);
   OSMD = OSM2[fam.value] || null;
   P = fam.value === 'rome' ? (ROME_SAVED ? plan2Load(ROME_SAVED, OSM2.rome) : plan2('rome', { osm: OSM2.rome, size: 'xl' })) : fam.value === 'istanbul' ? plan2('istanbul', { osm: OSM2.istanbul, size: 'xl' }) : plan2('demo', { fam: fam.value, size: size.value, seed: +seed.value || 0 });
-  VIEW = buildPlan2View(P, { osm: OSMD }); city.add(VIEW);
+  VIEW = buildPlan2View(P, { osm: OSMD, termini: true, stationModel: A['station-big'] || A.station }); city.add(VIEW);
   const trees = [];
   // парцели: очертания + сгради по зона; големите места — свой модел (паркът — дървета)
   const lp = []; for (const L of P.lots) for (let i = 0; i < 4; i++) { const a = L.poly[i], b = L.poly[(i + 1) % 4]; lp.push(a[0], 0.15, a[1], b[0], 0.15, b[1]); }
