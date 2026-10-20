@@ -96,6 +96,11 @@ function seaView(G, D, RR) {
   const Fe = [], seenF = new Set(); for (const f of D.ferries || []) { const key = f.pts.length > 1 ? [f.pts[0], f.pts[f.pts.length - 1]].map(p => Math.round(p[0] / 40) + ',' + Math.round(p[1] / 40)).sort().join('|') : ''; if (seenF.has(key)) continue; seenF.add(key); dashed(f.pts, 5, 22, 0.7, -1.1, Fe); }   // еднаквите линии (двете посоки) — веднъж if (Fe.length) G.add(merge(Fe, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 })));   // фериботните линии по водата
   const Mt = []; for (const r of D.metro || []) if (r.kind !== 'rail') Mt.push(ribbon(r.pts, r.kind === 'tram' ? 2.2 : 2.6, 0.085)); if (Mt.length) G.add(merge(Mt, M(0x9a9184)));   // метро/трамвай на повърхността
   romeBridges(G, D);
+  // висящите мостове (Босфорския): моделът — дължината по x, центриран; мащабът — от бряг до бряг
+  for (const B of D.bigBridges || []) { const proto = (D._models || {})[B.k]; if (!proto) continue;
+    const o = proto.clone(true), bb = new THREE.Box3().setFromObject(o), len = Math.hypot(B.b[0] - B.a[0], B.b[1] - B.a[1]), k = len / (bb.max.x - bb.min.x);
+    const w = new THREE.Group(); o.scale.setScalar(k); o.position.set(-(bb.min.x + bb.max.x) / 2 * k, -bb.min.y * k - 1.2, -(bb.min.z + bb.max.z) / 2 * k); w.add(o);
+    w.position.set((B.a[0] + B.b[0]) / 2, 0, (B.a[1] + B.b[1]) / 2); w.rotation.y = -Math.atan2(B.b[1] - B.a[1], B.b[0] - B.a[0]); w.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); G.add(w); }
 }
 function romeGround(RR, D) {
   const S2 = RR * 1.2, sh = new THREE.Shape([new THREE.Vector2(-S2, -S2), new THREE.Vector2(S2, -S2), new THREE.Vector2(S2, S2), new THREE.Vector2(-S2, S2)]);
@@ -187,7 +192,7 @@ function furniture(G, P) {
 // ---- основното
 export function buildPlan2View(P, opts = {}) {
   mats();
-  const G = new THREE.Group(), D = opts.osm || null; G.userData.plan = P;
+  const G = new THREE.Group(), D = opts.osm ? { ...opts.osm, _models: opts.bridgeModels || {} } : null;   // bridgeModels: { bosphorus } — висящите мостове G.userData.plan = P;
   if (opts.offset) G.position.set(opts.offset[0], 0, opts.offset[1]);
   const RR = P.R * 1.6, g0 = new THREE.Mesh(new THREE.PlaneGeometry(RR * 2.4, RR * 2.4).rotateX(-Math.PI / 2), D ? MAT.urban : MAT.grass); g0.receiveShadow = true; if (D && D.sea) g0.geometry = seaGround(D.sea); else if (D) g0.geometry = romeGround(RR, D); G.add(g0); G.userData.groundMat = g0.material;   // Рим: дворовете и площадите — светъл камък, тревата — само в парковете
   if (P.coastZ) { const sh = new THREE.Shape(); sh.moveTo(-RR * 1.2, -RR * 1.2); for (let i = 0; i <= 80; i++) { const x = -RR * 1.2 + i * RR * 2.4 / 80; sh.lineTo(x, P.coastZ(x)); } sh.lineTo(RR * 1.2, -RR * 1.2); const wg = new THREE.ShapeGeometry(sh); wg.rotateX(Math.PI / 2); const wm = new THREE.Mesh(wg, MAT.water); wm.position.y = 0.02; G.add(wm);
