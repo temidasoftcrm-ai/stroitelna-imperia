@@ -8,7 +8,7 @@
 //   fmt, save(), sound(n), addXp(n), addRep(d), cityName(id), sz(id), mega(id), built() (брой построени обекти в града), ext(), extMax(),
 //   lv() (нивото на фирмата), group() (city.group), night() → bool, label? }
 import { needs, builds, seedBase, cityServices, popOf, tierOf, costOf, daysOf, SERVICES } from './services.js';
-import { servicePlacer, servicesLayer } from './servicesplace.js';
+import { servicePlacer, servicesLayer, serviceSite } from './servicesplace.js';
 
 export const MUNI = { lv: 6, offerDays: 12, gap: 6, adv: 0.2, mat: 0.6, fin: 0.6 };
 
@@ -25,7 +25,7 @@ export function createMuni(deps) {
   // за разполагането: чуждите фонови квартали ('bg') се броят за свободни — общината строи там, а свободните парцели остават за теб
   const gpBg = () => ({ ...deps.plan(), lots: deps.lots().map(l => l.busy === 'bg' ? { ...l, busy: null } : l) });
   const nm = k => SERVICES[k]?.nm || k, ico = k => SERVICES[k]?.ico || '🏛️';
-  let layer = null, sites = [];
+  let layer = null, sites = [], gen = 0;   // gen — draw() е async: по-старо рисуване, свършило след clear(), не добавя нищо
 
   // при влизане в града: парцели за базовите сгради (веднъж), заетите парцели — 'svc'; връща p2-id-тата им (за fillLot на 3D изгледа)
   function attach() {
@@ -40,16 +40,14 @@ export function createMuni(deps) {
   // 3D: готовите сгради (services3d.js) + скелета/кран на текущия строеж
   async function draw(THREE) {
     if (!on()) return;
-    clear();
+    clear(); const my = gen;
     const g = deps.group(); if (!g) return;
-    try { layer = await servicesLayer(gp(), rec(), { region: 'eu' }); if (deps.group() !== g) { layer.dispose(); layer = null; return; } g.add(layer.group); layer.setNight(deps.night()); } catch (e) { console.warn('muni 3D', e); }
-    const s = st(); if (s.job && THREE) { const L = deps.lots(), ids = s.job.lots, x = ids.reduce((a, i) => a + L[i].x, 0) / ids.length, z = ids.reduce((a, i) => a + L[i].z, 0) / ids.length, w = ids.reduce((a, i) => a + L[i].w, 0), d = Math.min(...ids.map(i => L[i].d));
-      const grp = new THREE.Group(), h = 4 + 14 * Math.min(1, s.job.prog || 0), mat = new THREE.MeshStandardMaterial({ color: 0xb8a98c, roughness: 0.9 }), sc = new THREE.MeshStandardMaterial({ color: 0xd9a33a, roughness: 0.6, wireframe: true });
-      const body = new THREE.Mesh(new THREE.BoxGeometry(w * 0.8, h, d * 0.7), mat); body.position.y = h / 2; grp.add(body);
-      const scaf = new THREE.Mesh(new THREE.BoxGeometry(w * 0.86, h + 2, d * 0.76), sc); scaf.position.y = (h + 2) / 2; grp.add(scaf);
-      grp.position.set(x, 0, z); grp.rotation.y = L[ids[0]].rot || 0; g.add(grp); sites.push(grp); }
+    try { const ly = await servicesLayer(gp(), rec(), { region: 'eu' }); if (my !== gen || deps.group() !== g) { ly.dispose(); return; } layer = ly; g.add(layer.group); layer.setNight(deps.night()); } catch (e) { console.warn('muni 3D', e); }
+    const s = st(); if (s.job && s.job.lots && s.job.lots.length) {   // строителната площадка (servicesplace.js serviceSite: ограда, скелет по етажи, кран, контейнери)
+      const p = servicePlacer(gp()).spot(s.job.k, s.job.lvl, s.job.lots), site = await serviceSite(s.job.k, s.job.lvl, p, s.job.prog || 0);
+      if (my !== gen || deps.group() !== g) { site.dispose(); return; } site.group.position.set(p.x, 0, p.z); site.group.rotation.y = p.rot; g.add(site.group); sites.push(site); }
   }
-  function clear() { if (layer) { layer.group.parent?.remove(layer.group); layer.dispose(); layer = null; } for (const o of sites) o.parent?.remove(o); sites = []; }
+  function clear() { gen++; if (layer) { layer.group.parent?.remove(layer.group); layer.dispose(); layer = null; } for (const o of sites) o.dispose(); sites = []; }
   const setNight = n => { if (layer) layer.setNight(n); };
 
   // всеки ден: нова поръчка, когато няма; строежът напредва, ако има пари за материалите

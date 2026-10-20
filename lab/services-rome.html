@@ -14,7 +14,7 @@
 <canvas id="c"></canvas><div class="lbs" id="lbs"></div>
 <div class="ui"><h1>🏛️ Обществените услуги — Рим (план v2)</h1>
   <div class="row"><select id="tier"><option value="1">квартали ниво 1</option><option value="2">до ниво 2</option><option value="3">до ниво 3</option><option value="5" selected>всички</option></select>
-    <button id="top">⬆ Отгоре</button><button id="game" class="on">🎮 Отблизо</button><button id="next">➡ Следваща сграда</button><button id="order">🧾 Поръчка от общината (+1)</button><button id="night">🌙</button></div>
+    <button id="top">⬆ Отгоре</button><button id="game" class="on">🎮 Отблизо</button><button id="next">➡ Следваща сграда</button><button id="order">🧾 Поръчка от общината (+1)</button><button id="night">🌙</button><button id="site">🏗️ Строеж</button><input id="prog" type="range" min="0" max="1" step="0.05" value="0.4" style="display:none;width:120px"></div>
   <div id="st" class="m">зарежда…</div><table id="tb"></table></div>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
 <script type="module">
@@ -25,7 +25,7 @@ import { OSM2 } from './cityplan2-osm.js';
 import { gamePlan2 } from './cityplan2game.js';
 import { buildPlan2View } from './cityplan2-3d.js';
 import { SERVICES, seedBase, needs, builds, cityServices, popOf, TIER_NM } from './services.js';
-import { servicePlacer, servicesLayer } from './servicesplace.js';
+import { servicePlacer, servicesLayer, serviceSite } from './servicesplace.js';
 
 const R = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true }); R.setPixelRatio(Math.min(devicePixelRatio, 1.75)); R.setSize(innerWidth, innerHeight); R.outputColorSpace = THREE.SRGBColorSpace; R.shadowMap.enabled = true;
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0xb7cde0); const hemi = new THREE.HemisphereLight(0xffffff, 0x666655, 1.1), sun = new THREE.DirectionalLight(0xffffff, 2); sun.position.set(-300, 500, 200); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -500, right: 500, top: 500, bottom: -500, far: 1500 }); scene.add(hemi, sun);
@@ -51,11 +51,20 @@ document.getElementById('next').onclick = () => { focus++; view('game'); };
 document.getElementById('tier').onchange = () => { rec = null; build(); };
 document.getElementById('night').onclick = e => { night = !night; e.target.classList.toggle('on', night); VIEW.userData.setNight && VIEW.userData.setNight(night); layer.setNight(night); scene.background.set(night ? 0x0b1220 : 0xb7cde0); hemi.intensity = night ? 0.25 : 1.1; sun.intensity = night ? 0.1 : 2; };
 document.getElementById('order').onclick = () => { const tier = +document.getElementById('tier').value, pop = popOf(3, true, 120, tier, 5), n = needs(rec, pop, 'x')[0]; if (!n) return; builds(rec, n.k, n.lvl, 1); build().then(() => { focus = layer.items.findIndex(it => it.k === n.k && it.i === rec[n.k].length - 1); view('game'); }); };
+// 🏗️ строежът на следващата поръчка (както в muniorders.js draw()): мястото от sp.place, напредъкът — плъзгачът
+let site = null, siteP = null; const prog = document.getElementById('prog');
+async function showSite() { if (site) { site.dispose(); site = null; } if (!siteP) return; site = await serviceSite(siteP.k, siteP.lvl, siteP, +prog.value); site.group.position.set(siteP.x, 0, siteP.z); site.group.rotation.y = siteP.rot; scene.add(site.group); }
+document.getElementById('site').onclick = async e => { const on = e.target.classList.toggle('on'); prog.style.display = on ? '' : 'none'; if (!on) { siteP = null; showSite(); return; }
+  const tier = +document.getElementById('tier').value, n = needs(rec, popOf(3, true, 120, tier, 5), 'x')[0]; if (!n) return; siteP = { k: n.k, lvl: n.lvl, ...sp.place(n.k, n.lvl, rec) }; if (!siteP.lots) { siteP = null; return; }
+  const used = new Set(siteP.lots.map(i => gp.lots[i].p2)); for (const list of Object.values(rec)) for (const b of list) for (const id of b.lots || []) used.add(gp.lots[id].p2);
+  scene.remove(VIEW); VIEW.userData.dispose && VIEW.userData.dispose(); VIEW = buildPlan2View(P, { osm: OSM2.rome, offset: gp.offset, fillLot: L => !used.has(L.id) }); scene.add(VIEW);
+  await showSite(); ctl.target.set(siteP.x, 6, siteP.z); cam.position.set(siteP.x + Math.sin(siteP.rot) * 80 + 30, 60, siteP.z + Math.cos(siteP.rot) * 80); st.textContent = `🏗️ ${SERVICES[n.k].nm} (${n.lvl}) · ${siteP.lots.length} парцела · ${Math.round(siteP.w)}×${Math.round(siteP.d)} м · ${siteP.district}`; };
+prog.oninput = () => showSite();
 const v = new THREE.Vector3();
 (function loop() { requestAnimationFrame(loop); ctl.update(); VIEW && VIEW.userData.update && VIEW.userData.update(1 / 60, { camera: cam });
   if (layer) { lbs.innerHTML = ''; const near = cam.position.y < 400; if (near) for (const it of layer.items) { v.set(it.x, 18, it.z).project(cam); if (v.z > 1 || Math.abs(v.x) > 1 || Math.abs(v.y) > 1) continue; const d = document.createElement('div'); d.textContent = `${SERVICES[it.k].ico} ${SERVICES[it.k].nm} · ${it.lvl}`; d.style.left = `${(v.x + 1) / 2 * innerWidth}px`; d.style.top = `${(1 - v.y) / 2 * innerHeight}px`; lbs.appendChild(d); } }
   R.render(scene, cam); })();
 addEventListener('resize', () => { R.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); });
-window.__svc = { get rec() { return rec; }, get gp() { return gp; }, get layer() { return layer; } };
+window.__svc = { get rec() { return rec; }, get gp() { return gp; }, get layer() { return layer; }, cam, ctl, get site() { return siteP; } };
 build();
 </script></body></html>

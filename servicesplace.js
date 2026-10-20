@@ -10,6 +10,7 @@
 // sp.assign(rec, t) → [{ k, i, ...place }]          — дава парцели на всички сгради в rec без lots (при първо отваряне / след builds())
 // sp.byDistrict(rec) → { [квартал]: { lots, share, [k]: брой } }      — за нуждите по квартали
 // sp.release(rec, k, i)                              — освобождава парцелите на сграда (разрушаване)
+// sp.spot(k, lvl, ids) → { x, z, rot, w, d, … }     — мястото върху вече избрани парцели (строеж в ход → serviceSite)
 import { SERVICES } from './services.js';
 
 const MAIN = new Set(['blvd', 'quay', 'ring', 'main']);
@@ -43,7 +44,7 @@ export function servicePlacer(gp) {
       const L0 = lots[ids[0]], x = ids.reduce((s, i) => s + lots[i].x, 0) / ids.length, z = ids.reduce((s, i) => s + lots[i].z, 0) / ids.length, dist2 = Math.hypot(x - sq.x, z - sq.z);
       let sc = (MAIN.has(info[ids[0]].cls) ? 0 : wantMain ? 400 : 0) + (w - needW) * 2 + Math.max(0, needD - d) * 4;
       if (k === 'hall') sc += dist2; else { const share = (dist[L0.district] || 0) / total; sc += ((inD[L0.district] || 0) / Math.max(0.02, share)) * 60 + dist2 * 0.05; }
-      if (sc < bs) { bs = sc; best = { lots: ids, x, z, rot: L0.rot, w: Math.min(w, needW * 1.1), d: Math.min(d, needD * 1.15), district: L0.district, main: MAIN.has(info[ids[0]].cls) }; }
+      if (sc < bs) { const dd = Math.min(d, needD * 1.15), sh = (d - dd) / 2; bs = sc; best = { lots: ids, x: x + Math.sin(L0.rot) * sh, z: z + Math.cos(L0.rot) * sh, rot: L0.rot, w: Math.min(w, needW * 1.1), d: dd, district: L0.district, main: MAIN.has(info[ids[0]].cls) }; }
     }
     return best;
   }
@@ -53,11 +54,14 @@ export function servicePlacer(gp) {
     return out;
   }
   // готовите сгради с парцели → място за 3D (комбинираният парцел)
+  // мястото на сграда върху парцелите ids (комбинираният парцел; по-плитка от него → към улицата, локално +z)
+  function spot(k, lvl, ids) {
+    const L0 = lots[ids[0]], R = realSize(k, lvl), full = Math.min(...ids.map(j => lots[j].d)), w = Math.min(ids.reduce((s, j) => s + lots[j].w, 0), R[0] * 1.1), d = Math.min(full, R[1] * 1.15), sh = (full - d) / 2;
+    return { x: ids.reduce((s, j) => s + lots[j].x, 0) / ids.length + Math.sin(L0.rot) * sh, z: ids.reduce((s, j) => s + lots[j].z, 0) / ids.length + Math.cos(L0.rot) * sh, rot: L0.rot, w, d, district: L0.district, main: MAIN.has(info[ids[0]].cls) };
+  }
   function spots(rec) {
     const out = [];
-    for (const [k, list] of Object.entries(rec || {})) (list || []).forEach((b, i) => { if (!b.lots || !b.lots.length) return; const ids = b.lots, L0 = lots[ids[0]], R = realSize(k, b.lvl), full = Math.min(...ids.map(j => lots[j].d));
-      const w = Math.min(ids.reduce((s, j) => s + lots[j].w, 0), R[0] * 1.1), d = Math.min(full, R[1] * 1.15), sh = (full - d) / 2;   // по-плитка от парцела → към улицата (локално +z)
-      out.push({ k, i, lvl: b.lvl, prog: b.prog, x: ids.reduce((s, j) => s + lots[j].x, 0) / ids.length + Math.sin(L0.rot) * sh, z: ids.reduce((s, j) => s + lots[j].z, 0) / ids.length + Math.cos(L0.rot) * sh, rot: L0.rot, w, d, district: L0.district, main: MAIN.has(info[ids[0]].cls) }); });
+    for (const [k, list] of Object.entries(rec || {})) (list || []).forEach((b, i) => { if (b.lots && b.lots.length) out.push({ k, i, lvl: b.lvl, prog: b.prog, ...spot(k, b.lvl, b.lots) }); });
     return out;
   }
   function byDistrict(rec) {
@@ -66,7 +70,7 @@ export function servicePlacer(gp) {
     return out;
   }
   const release = (rec, k, i) => { const b = rec && rec[k] && rec[k][i]; if (b) b.lots = []; };
-  return { place, assign, spots, byDistrict, release };
+  return { place, assign, spot, spots, byDistrict, release };
 }
 
 // 3D слой: всички сгради с парцели (services3d.js buildService) — в групата; update(night) — светлините; dispose()
@@ -75,4 +79,45 @@ export async function servicesLayer(gp, rec, o = {}) {
   const sp = servicePlacer(gp), group = new THREE.Group(), items = [];
   for (const s of sp.spots(rec)) { const b = buildService(s.k, s.lvl, { w: s.w, d: s.d }, { seed: s.i + s.k.length, region: o.region || 'eu', outline: !!o.outline }); b.group.position.set(s.x, 0, s.z); b.group.rotation.y = s.rot; group.add(b.group); items.push({ ...s, b }); }
   return { group, items, setNight: on => items.forEach(it => it.b.setNight(on)), dispose: () => items.forEach(it => it.b.dispose()) };
+}
+
+// 🏗️ строежът на услуга (поръчка в ход): ограда с вход откъм улицата, бетонен скелет, който расте по етажи с prog (0…1),
+// скеле по фасадата на най-горния етаж, кулокран отзад и площадката (контейнери, тоалетна, тухли, дъски, кош) — моделите от construct.js.
+// sz = { w, d } (като spots/place), предна страна = +z (към улицата) → { group, dispose }
+let CK = null;
+export async function serviceSite(k, lvl, sz, prog = 0) {
+  const THREE = await import('three');
+  if (!CK) CK = (async () => { const [{ GLTFLoader }, { loadConstruct }] = await Promise.all([import('three/addons/loaders/GLTFLoader.js'), import('./construct.js')]), L = new GLTFLoader(), A = {}; await loadConstruct(u => L.loadAsync(u), A); return A; })().catch(e => { console.warn('site', e); return {}; });
+  const A = await CK, group = new THREE.Group(), own = [], { w, d } = sz, p = Math.max(0, Math.min(1, prog || 0));
+  const M = (c, ex = {}) => { const m = new THREE.MeshStandardMaterial({ color: c, roughness: 0.9, ...ex }); own.push(m); return m; };
+  const box = (bw, bh, bd, m, x, y, z, ry = 0) => { const g = new THREE.BoxGeometry(bw, bh, bd); own.push(g); const o = new THREE.Mesh(g, m); o.position.set(x, y + bh / 2, z); o.rotation.y = ry; o.castShadow = o.receiveShadow = true; group.add(o); return o; };
+  const put = (n, x, z, ry = 0, s = 1) => { const a = A[n]; if (!a) return; const o = (a.scene || a).clone(true); o.position.set(x, 0, z); o.rotation.y = ry; o.scale.setScalar(s); group.add(o); };
+  group.name = 'svc-site';
+  const dirt = M(0x8a7a62), conc = M(0xa9a59c), slab = M(0x8f8b84), fence = M(0x2f6b8a, { roughness: 0.7 }), post = M(0xcfcfcf), scaf = M(0xd9a33a, { roughness: 0.6, metalness: 0.2 }), net = M(0x3f8f4a, { transparent: true, opacity: 0.55, side: THREE.DoubleSide });
+  // площадката и оградата (2 м, вход 8 м отпред)
+  box(w, 0.06, d, dirt, 0, 0, 0);
+  const fh = 2, side = (len, x, z, ry) => { box(len, fh, 0.12, fence, x, 0, z, ry); for (let t = -len / 2; t <= len / 2 + 0.01; t += 3) box(0.14, fh + 0.15, 0.14, post, x + Math.cos(ry) * t, 0, z - Math.sin(ry) * t); };
+  side(w, 0, -d / 2, 0); side(d, -w / 2, 0, Math.PI / 2); side(d, w / 2, 0, Math.PI / 2); const gw = Math.min(8, w * 0.3), half = (w - gw) / 2; side(half, -w / 2 + half / 2, d / 2, 0); side(half, w / 2 - half / 2, d / 2, 0);
+  // скелетът: сградата е в задните 65% от парцела; етажите — 3,6 м, колкото е стигнал строежът
+  // сградата — в средата отзад; лентите отстрани: вляво контейнерите/тоалетната/бетоновозът, вдясно кулокранът; отпред — материалите
+  const R = realSize(k, lvl), FL = Math.max(2, Math.min(6, Math.round((R[0] * R[1]) / 450))), sw = Math.max(4, Math.min(8, w * 0.15)), bw = w - 2 * sw, bd = Math.max(8, d * 0.62), bz = -d / 2 + bd / 2 + 1.2, H = 3.6, fy0 = bz + bd / 2, fz = (fy0 + d / 2) / 2;
+  const n = p < 0.08 ? 0 : Math.max(1, Math.ceil(p * FL)), cols = Math.max(2, Math.round(bw / 6)), rows = Math.max(2, Math.round(bd / 6));
+  box(bw, 0.5, bd, conc, 0, 0, bz);   // основата
+  for (let f = 0; f < n; f++) {
+    const y = 0.5 + f * H, top = f === n - 1, part = top ? Math.min(1, (p * FL) - f + 0.25) : 1;   // последният етаж — колоните растат
+    for (let i = 0; i <= cols; i++) for (let j = 0; j <= rows; j++) if (i === 0 || j === 0 || i === cols || j === rows || (i % 2 === 0 && j % 2 === 0)) box(0.45, H * part, 0.45, conc, -bw / 2 + (bw / cols) * i, y, bz - bd / 2 + (bd / rows) * j);
+    if (!top || part >= 1) box(bw + 0.3, 0.3, bd + 0.3, slab, 0, y + H - 0.3, bz);
+    if (f >= n - 2) { const fy = y; for (const sgn of [-1, 1]) { box(bw + 2, 0.08, 0.9, scaf, 0, fy + H - 0.4, bz + sgn * (bd / 2 + 0.8)); box(bw + 2, H, 0.02, net, 0, fy, bz + sgn * (bd / 2 + 1.25)); }
+      for (let t = -bw / 2 - 1; t <= bw / 2 + 1.01; t += 2.5) for (const sgn of [-1, 1]) box(0.08, H, 0.08, scaf, t, fy, bz + sgn * (bd / 2 + 1.25)); }
+  }
+  // кулокранът: мачтата му (MAST в construct.js при мащаб 1) — в дясната лента до сградата
+  if (p < 0.97 && A['crane-tower']) { const ks = Math.max(0.55, Math.min(1, (FL * H + 14) / 54)), ry = Math.PI * (0.25 + p), mx = 5.91 * ks, mz = -10.85 * ks, o = A['crane-tower'].scene.clone(true);
+    o.scale.setScalar(ks); o.rotation.y = ry; o.position.set(w / 2 - sw / 2 - (mx * Math.cos(ry) + mz * Math.sin(ry)), 0, bz - (-mx * Math.sin(ry) + mz * Math.cos(ry))); group.add(o); }
+  const lx = -w / 2 + sw / 2;
+  put('container-office-green', lx, -d / 2 + 5); if (d > 34) put('container-office-red', lx, -d / 2 + 12.5);
+  put('toilet-portable', lx - 1, d / 2 - 2.5); put('barrel', lx + 1.3, d / 2 - 2.5);
+  if (d / 2 - fy0 > 3.5) { put('box-stack-brown', bw / 2 - 3, fz); put('box-stack-brown', bw / 2 - 5, fz, 0.4); put('planks-wood-a', -bw / 2 + 4, fz, Math.PI / 2); put('container-rubble-red', 0, fz, Math.PI / 2); }
+  else { put('box-stack-brown', w / 2 - sw / 2, d / 2 - 2); put('container-rubble-red', w / 2 - sw / 2, d / 2 - 6); }
+  if (p > 0.15 && p < 0.7 && d > 26) put('truck-concrete-red', lx, d / 2 - 8.5, Math.PI);
+  return { group, dispose: () => { group.parent?.remove(group); own.forEach(o => o.dispose()); } };
 }
