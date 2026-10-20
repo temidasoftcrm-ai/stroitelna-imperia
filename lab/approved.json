@@ -83,6 +83,7 @@
     "ind-real",
     "istanbul-game",
     "istanbul-osm",
+    "kids-models",
     "la-osm",
     "lm-colosseo",
     "lm-colosseo3",
@@ -159,6 +160,7 @@
     "traffic2",
     "trains-real",
     "trees-real",
-    "trucks-real"
+    "trucks-real",
+    "xp-km"
   ]
 }

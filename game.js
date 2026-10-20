@@ -19,6 +19,7 @@ import { createMuni } from './muniorders.js';
 import { createRescue } from './boardrescue.js';
 import { createMinimap } from './minimap.js';
 import { createRivals, LOCAL_FIRMS, FIRMS } from './rivals.js';
+import { perf, createPerfPanel } from './perfpanel.js';   // ⏱️ панел за производителност (флаг perf-panel, F8)
 import { createDevLevel, THRESH as DEV_THRESH, LV as DEV_LV, unlockText, kmXp, XP_BUY } from './devlevel.js';
 import { createCityPanel } from './citypanel.js';
 import { createPlaytime } from './playtime.js';
@@ -451,6 +452,7 @@ const MODELS = {
   people: ['worker_male', 'worker_male_alt', 'farmer'],
 };
 const A = {};
+const perfPanel = createPerfPanel({ renderer, A: () => A, THREE, enabled: () => feature('perf-panel') });
 let europe = null;
 {
   const jobs = [];
@@ -9283,6 +9285,7 @@ let megaSndT = 180 + Math.random() * 120;
 const CITY_STING = { lasvegas: 'assets/local/vegas-elvis.mp3', newyork: 'assets/local/newyork-sinatra.mp3', rio: 'assets/local/rio-timmaia.mp3', cairo: 'assets/local/cairo-tune.mp3', paris: 'assets/local/paris-vieenrose.mp3' };
 const stingOk = id => !!CITY_STING[id] && /^(localhost|127\.0\.0\.1)$/.test(location.hostname);   // песните са само локално — на сайта не се търсят (без 404)
 function frame() {
+  perf.frame();
   if (city.osmView) { const d = camera.position.distanceTo(controls.target); osmFog.near = Math.max(180, d * 0.9); osmFog.far = Math.max(420, d * 2.4 + 200); }   // weather.js я прилага (fogBase)
   if ((++lmLabT % 60) === 0) try { updLmLabels(); } catch (e) { }
   if (lmLabT % 20 === 0) try { updMyBeams(); } catch (e) { myBeams.err = e.message; }
@@ -9341,7 +9344,7 @@ function frame() {
     for (const g of parkGroups) { const j = g.userData.jet; j.scale.y = 0.85 + Math.sin(simT * 6 + g.id) * 0.15; j.rotation.y += rdt; }
     if (city.hqGroup?.userData.star) city.hqGroup.userData.star.rotation.y += rdt * 1.5;
     S.dayT += dt;
-    if (S.dayT >= DAY_SEC) { S.dayT -= DAY_SEC; endOfDay(); autoFillTick(true); }
+    if (S.dayT >= DAY_SEC) { S.dayT -= DAY_SEC; const pt0 = perf.now(); endOfDay(); autoFillTick(true); perf.add('day', pt0); }
     autoT -= dt; if (autoT <= 0) { autoT = 3; autoFillTick(false); }
     if (dt > 0 && Math.random() < dt * 2) { hwDispatch(); dispatch(); }   // магистралата първа — иначе освободената бригада винаги отива на обект в града
     panelT -= rdt;
@@ -9349,6 +9352,7 @@ function frame() {
     if (hlT > 0) { hlT -= rdt; hl.material.opacity = Math.min(1, hlT); if (hlT <= 0) hl.visible = false; }
     if (AUTOTEST) autobot();
   }
+  perf.lap('sim');
   if (fly) {
     fly.t = Math.min(1, fly.t + rdt * 2);
     const k = 1 - Math.pow(1 - fly.t, 3);
@@ -9363,7 +9367,9 @@ function frame() {
   controls.update();
   if (S) { dayNight.update(todF(), controls.target); weather.update(rdt, controls.target); setSiteLightsNight(dayNight.night); }
   perfTune(rdt);
+  perf.lap('prep');
   renderer.render(scene, camera);
+  perf.lap('render');
 }
 
 // ============================================================ autotest (headless)
@@ -9414,7 +9420,7 @@ addEventListener('unhandledrejection', e => { if (!AUTOTEST) logError('promise: 
 const cine = createCinema({ S: () => S, sound: () => Sound, ready: () => !!S && city.ready, cityById, speed: () => speed, setSpeed, save, lv20: () => dev.has('EMPIRE'),
   firstPlane: () => !!S.firstAirport, firstOil: () => mines.state().sites.some(x => x.kind === 'oilwell'), auto: () => !AUTOTEST });
 cine.start();
-{ const el = $('loading'); $('ldTxt').textContent = 'Готово!'; setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 700); }, AUTOTEST ? 0 : 900); }
+{ const el = $('loading'); $('ldTxt').textContent = 'Готово!'; perf.ready(); setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 700); }, AUTOTEST ? 0 : 900); }
 const saved = loadSave();
 if (saved && !AUTOTEST) backupRaw(currentSlot(), localStorage.getItem(SAVE_KEY), 'старт');
 // 💾 автозапис: записва всяка минута и при затваряне; на всеки 5 минути пази и резервно копие (🕒 Автозаписи)
