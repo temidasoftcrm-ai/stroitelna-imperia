@@ -545,7 +545,7 @@ function placeLots(P, sk, r) {
   // истинската карта: забележителностите на реалните си места (основа fp, защитен периметър guard) — парцел със запазено място
   if (P.osm) for (const lm of sk.osm.landmarks || []) {
     let best = null, bd = 1e9; for (const rd of P.roads) for (const q of rd.pts) { const d = dist(q, [lm.x, lm.z]); if (d < bd) { bd = d; best = rd; } }
-    const L = { x: lm.x, z: lm.z, w: lm.fp[0], d: lm.fp[1], rot: 0, zone: 'center', big: 'lm', lm: lm.k, reserved: 'lm:' + lm.k, guard: lm.guard, front: { road: best ? best.id : 0, s: 0, side: 1, cls: best ? best.cls : 'street' } };
+    const L = { x: lm.x, z: lm.z, w: lm.fp[0], d: lm.fp[1], rot: lm.rot || 0, zone: 'center', big: 'lm', lm: lm.k, reserved: 'lm:' + lm.k, guard: lm.guard, front: { road: best ? best.id : 0, s: 0, side: 1, cls: best ? best.cls : 'street' } };
     lg.add([L.x, L.z], L); lots.push(L); bigs.push(L);
   }
   for (const [kind, w0, d0, want] of BIG || []) for (const f of [1, 0.85, 0.7]) {   // ако не се събере — по-малко
@@ -636,6 +636,7 @@ function placeLots(P, sk, r) {
       return { x: e[0], z: e[1], dir: Math.atan2(ux, uz), road: best }; };
     // по град: гарата (запазеното място на забележителността), летището и магистралата — в истинската посока до ръба
     const AN = { rome: { st: ['termini', 'Roma Termini'], ap: [41.7999, 12.2462, 'Fiumicino (FCO)', 26], hw: [41.835, 12.42, 'A91 Roma–Fiumicino / GRA'] },
+      newyork: { st: ['grandcentral', 'Гранд Сентрал'], st2: ['penn', 'Пен Стейшън'], ap: [40.6413, -73.7781, 'Летище Джон Ф. Кенеди (JFK)', 20], hw: [40.770, -74.02, 'Магистрала Уест Сайд / I-95'] },
       london: { st: ['waterloo', 'Гара Ватерло'], ap: [51.47, -0.4543, 'Летище Хийтроу (LHR)', 24], hw: [51.511, -0.03, 'A13 / M25'] },
       paris: { st: ['saintlazare', 'Гара Сен Лазар'], ap: [49.0097, 2.5479, 'Летище Шарл дьо Гол (CDG)', 25], hw: [48.846, 2.255, 'A13 / Периферик (Порт д’Отьой)'] },
       istanbul: { st: ['sirkeci', 'Гара Сиркеджи'], st2: ['haydarpasa', 'Гара Хайдарпаша'], ap: [41.2753, 28.7519, 'Летище Истанбул (IST)', 35], hw: [41.07, 28.87, 'Магистрала O-1 / D-100'] } }[P.cityId] || {};

@@ -634,7 +634,7 @@ const PLAN_TPL5 = { sofia: 'osm' };
 const PLAN_TPL7 = { losangeles: 'osm' };
 // 🇮🇹 планът v2 по истинската карта (cityplan2game.js + cityplan2-3d.js): Рим в НОВИТЕ игри (флаг rome-osm → S.plan2.rome);
 // старите записи остават на стария план. Данните (~5 MB) се зареждат само когато градът е такъв — plan2Preload преди влизането.
-const PLAN2_CITIES = new Set(['rome', 'paris', 'istanbul', 'london']);   // градовете по истинската карта (флагове <id>-osm + <id>-game)
+const PLAN2_CITIES = new Set(['rome', 'paris', 'istanbul', 'london', 'newyork']);   // градовете по истинската карта (флагове <id>-osm + <id>-game)
 const plan2 = { mod: null, view: null, data: {}, cache: null, models: {} };
 // моделите за изгледа на града (Истанбул: висящият мост, фериботите и корабите) — зареждат се с плана, само за този град
 const PLAN2_MODELS = { istanbul: { 'lm-bosphorus': 'lm/bosphorus.glb', 'sh-ferry': 'ships/ferry-bandirma.glb', 'sh-cruise': 'ships/cruise.glb', 'sh-tanker': 'ships/tanker.glb', 'sh-container': 'ships/container.glb', 'bt-fish': 'boats/sf-fisherboat.glb', 'bt-sail': 'boats/sf-sailboat.glb', 'bt-motor': 'marina/motoryacht.glb', 'bt-yacht': 'boats/sf-yacht.glb' } };
@@ -5441,19 +5441,25 @@ function lmRiverSpot(k, mem) {
 // от плана се добавят само тези с правилен модел за града (иначе 'opera' в Париж става операта в Сидни, 'pantheon' — римският)
 const LM_EXTRA = { istanbul: new Set(['topkapi', 'bluemosque', 'maiden', 'grandbazaar', 'galata', 'suleymaniye', 'haydarpasa']) };
 // истинската височина (м) на високите забележителности — мащабът е по-малкият от основата и височината
+LANDMARK_NM.empire = LANDMARK_NM.empire || 'Емпайър Стейт Билдинг';
 const LM_REAL_H = { bigben: 96, londoneye: 135, shard: 310, eiffel: 330, galata: 67, maiden: 23, towerbridge: 65, stpeter: 136 };
 const LM_ALIAS = { suleymaniye: 'mosque2' }, LM_NOT = new Set(['termini', 'sirkeci', 'saintlazare', 'haydarpasa_st']);   // гарите ги рисува изгледът на града
 function landmarkPlan2(kinds) {
   const P = city.plan, box = new THREE.Box3(), sz = new THREE.Vector3();
   // всички забележителности на реалните им места: от списъка на града (вариантите с модел — colosseo3, vittoriano2…) и от плана (Синята джамия, Топкапъ…), ако има модел
   const base = k => k.replace(/\d+$/, ''), all = [...kinds]; for (const L of P.landmarks) { if (LM_NOT.has(L.k) || !(LM_EXTRA[S.cityId] && LM_EXTRA[S.cityId].has(L.k))) continue; const k = LM_ALIAS[L.k] || L.k; if (!all.some(x => x === k || base(x) === L.k) && hasLandmark(k)) all.push(k); }
+  // 🇺🇸 Ню Йорк: Емпайър Стейт — отделната кула от модела на Манхатън (по името на мешовете), в истинския ръст
+  if (all.includes('manhattan')) { all.splice(all.indexOf('manhattan'), 1); const at = P.landmarks.find(L => L.k === 'empire');
+    if (at) { const g = new THREE.Group(), o = { group: g, update() {}, kind: 'empire' }; g.position.set(at.x, 0, at.z); g.rotation.y = at.rot || 0; city.group.add(g); city.landmarks.push(o); const gen = city.group;
+      manhattanTowers().then(parts => { if (city.group !== gen) return; let pt = parts.find(p => { let hit = false; p.traverse(m => { if (m.isMesh && /empire/i.test(m.name || '')) hit = true; }); return hit; }) || parts[1] || parts[0]; if (!pt) return;
+        pt.scale.multiplyScalar(381 * (P.p2.osmData?.k || 0.45) / (pt.userData.h || 1)); g.add(pt); }); } }
   for (const k of all) {
     const at = P.landmarks.find(L => L.k === k) || P.landmarks.find(L => L.k === base(k)) || P.landmarks.find(L => LM_ALIAS[L.k] === k); if (!at) continue;
     const o = buildLandmark(k, { label }); if (!o) continue;
     let s0 = lmFit(k); if (!s0) { const sg = o.group.userData.sign; if (sg) sg.removeFromParent(); box.setFromObject(o.group).getSize(sz); s0 = Math.max(sz.x, sz.z) || 1; if (sg) o.group.add(sg); }   // моделите (GLB) се зареждат после — по основата им, не по временната плоча
     let k0 = Math.max(at.w, at.d) * 0.95 / s0; const hr = LM_REAL_H[k] || LM_REAL_H[k.replace(/\d+$/, '')];
     if (hr) { let h0 = lmH(k); if (!h0) { box.setFromObject(o.group).getSize(sz); h0 = sz.y || 1; } k0 = Math.min(k0, hr * (P.p2.osmData?.k || 0.45) / h0); }   // кулите — и по истинската височина (парцелът на Парламента е 225 м, а моделът е само Биг Бен)
-    o.group.scale.multiplyScalar(k0); o.group.position.set(at.x, 0.1, at.z);
+    o.group.scale.multiplyScalar(k0); if (at.rot) o.group.rotation.y = at.rot; o.group.position.set(at.x, 0.1, at.z);
     o.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
     city.group.add(o.group); city.landmarks.push(o);
   }

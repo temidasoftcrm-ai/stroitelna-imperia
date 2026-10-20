@@ -7,7 +7,7 @@ import { OSM2 } from './cityplan2-osm.js';
 import { LOT_KINDS } from './cityplan.js';
 
 const EDGE = -108;   // както в cityplangame.js
-const SQUARE = { rome: [41.8960, 12.4826], paris: [48.8566, 2.3522], istanbul: [41.0082, 28.9784], london: [51.5007, -0.1263] };   // площадът на централата: Пиаца Венеция · Отел дьо Вил   // площадът на централата: Пиаца Венеция
+const SQUARE = { rome: [41.8960, 12.4826], paris: [48.8566, 2.3522], istanbul: [41.0082, 28.9784], london: [51.5007, -0.1263], newyork: [40.7536, -73.9832] };   // … · Брайънт Парк   // площадът на централата: Пиаца Венеция · Отел дьо Вил   // площадът на централата: Пиаца Венеция
 const cache = new Map();
 const cumLen = pts => { const L = [0]; for (let i = 1; i < pts.length; i++) L.push(L[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])); return L; };
 
@@ -44,7 +44,7 @@ export function gamePlan2(P, o = {}) {
   const anchors = P.anchors ? { station: shA(P.anchors.station), airport: shA(P.anchors.airport), highway: shA(P.anchors.highway) } : {};
   // пътищата до летището и магистралата (за маршрутите на ТИР-овете, както P.links в game.js)
   const links = ['airport', 'highway'].map(k => anchors[k]).filter(a => a && a.road).map(a => { const pts = [[a.road.x, a.road.z], [a.x, a.z]]; return { pts, L: cumLen(pts), w: 12, cls: 'road' }; });
-  const landmarks = P.lots.filter(L => L.lm).map(L => ({ k: L.lm, x: L.x + ox, z: L.z + oz, w: L.w, d: L.d, guard: L.guard || 0 }));
+  const landmarks = P.lots.filter(L => L.lm).map(L => ({ k: L.lm, x: L.x + ox, z: L.z + oz, w: L.w, d: L.d, guard: L.guard || 0, rot: L.rot || 0 }));   // rot — завъртените (мрежата на Манхатън)
   const bnd = B.map(sh), x1 = Math.max(...bnd.map(p => p[0])), z1 = Math.max(...bnd.map(p => p[1]));
   const waterAt = (x, z) => P.waterAt(x - ox, z - oz);
   return {
