@@ -15,6 +15,7 @@ import { createMega } from './megaorders.js';
 import { createSilkRoad, SILK } from './silkroad.js';
 import { createCinema } from './cinema.js';
 import { makeStateTenders } from './statetenders.js';
+import { createMuni } from './muniorders.js';
 import { createRivals, LOCAL_FIRMS, FIRMS } from './rivals.js';
 import { createDevLevel, THRESH as DEV_THRESH, LV as DEV_LV, unlockText } from './devlevel.js';
 import { createCityPanel } from './citypanel.js';
@@ -989,7 +990,7 @@ function buildCity(cityId) {
   city.center = LMC ? city.lots.filter(l => Math.abs(l.bi - c) <= 2 && Math.abs(l.bj - c) <= 2) : null;
   city.hq.busy = 'hq';
   // Рим по истинската карта: ~60% от парцелите (и всички за реставрация) са чужди — там са римските фонови квартали на 3D изгледа
-  if (P && P.p2) { for (const lot of city.lots) if (!lot.busy && (lot.reno || r() < 0.6)) lot.busy = 'bg'; city.p2Map = new Map(city.lots.map(l => [l.p2, l])); pv.userData.refill(); }
+  if (P && P.p2) { for (const lot of city.lots) if (!lot.busy && (lot.reno || r() < 0.6)) lot.busy = 'bg'; city.p2Map = new Map(city.lots.map(l => [l.p2, l])); muni.attach(); pv.userData.refill(); muni.draw(THREE); }   // и обществените сгради (muniorders.js) — на мястото на фоновите
   // готов град: ~60% от парцелите са застроени (според зоната)
   for (const lot of city.lots) {
     if (lot.busy || lot.fresh || cityId === NEOM_ID || (P && P.p2)) continue;   // градът от нулата започва като празна пустиня
@@ -2837,7 +2838,7 @@ function endOfDay() {
   tenderAutoFix();
   mines.dailyTick();
   oil.dailyTick(); updOilBtn();
-  gridCheck(); holdingCheck(); autoTick(); group.check(); group.dailyTick(); corp.dailyTick(); mw.dailyTick(); hotels.dailyTick(); bank.dailyTick(); neom.dailyTick(); imperial.dailyTick(); if (S.president && !S.pres) pres.start(S.president.cc); pres.dailyTick(); ops.tick(1); if (geoMap.on() && $('mapScreen')?.offsetParent) drawMap(); impCiv3D(); neomDecor(); if (imperial.needChoice() && !S.impAsked && $('modal').classList.contains('hidden')) { S.impAsked = S.day; imperial.choose(() => renderBig()); } holdMilestones(); if (S.holding) holdXP(Math.max(0, regNet()) / 10000);
+  gridCheck(); holdingCheck(); autoTick(); group.check(); group.dailyTick(); corp.dailyTick(); mw.dailyTick(); hotels.dailyTick(); bank.dailyTick(); neom.dailyTick(); imperial.dailyTick(); muni.dailyTick(); if (S.president && !S.pres) pres.start(S.president.cc); pres.dailyTick(); ops.tick(1); if (geoMap.on() && $('mapScreen')?.offsetParent) drawMap(); impCiv3D(); neomDecor(); if (imperial.needChoice() && !S.impAsked && $('modal').classList.contains('hidden')) { S.impAsked = S.day; imperial.choose(() => renderBig()); } holdMilestones(); if (S.holding) holdXP(Math.max(0, regNet()) / 10000);
   airAutoPlanes();
   tenders.dailyTick();
   orient.dailyTick();
@@ -2921,6 +2922,7 @@ function renderPanel() {
     if (S.offers.length > 1) h += S.rep >= 3
       ? `<div class="row" style="margin:0 0 8px;flex-wrap:wrap;gap:6px"><span class="meta" style="margin:0;flex:1 1 160px">📨 Всички ${S.offers.length} оферти наведнъж — с избраните цени · място в офиса: <b>${Math.max(0, officeLv().proj - busyCount())}</b></span><button class="btn" id="bOfferAll" style="touch-action:manipulation">📨 Предложи всички</button></div>`
       : `<div class="meta" style="margin:0 0 8px;opacity:.7">🔒 „📨 Предложи всички“ се отключва при репутация 3 ★ (сега ${S.rep.toFixed(1)} ★).</div>`;
+    h += muni.cardHtml();
     h += rivals.marketHtml();
     if (tenderDir()) { const n = TENDERS.filter(t => tenders.state(t.id)?.st === 'open').length; if (n) h += `<div class="card"><div class="row" style="margin:0;align-items:center;gap:8px"><span class="meta" style="margin:0;flex:1">🏛️ <b style="color:var(--txt)">${tenderDir()}</b> подготвя оферти за ${n} ${n === 1 ? 'търг' : 'търга'}.</span><button class="btn2" data-dtend="1">Предложенията му →</button></div></div>`; }
     else h += tenders.cardsHtml('open');   // взетите (в строеж) — в „📜 Оферти“; от ниво 15 с директор — търговете са негови предложения
@@ -2941,6 +2943,7 @@ function renderPanel() {
     const lockedNext = offerTypes().map(e => e[1]).find(t => S.rep < t.rep);
     if (lockedNext) h += `<div class="meta" style="text-align:center">🔒 ${lockedNext.ico} ${lockedNext.nm} — нужна репутация ${lockedNext.rep} ★</div>`;
   } else if (tab === 'projects') {
+    if (pd) h += muni.cardHtml();   // с директор „Поръчки“ ги няма — общината е тук
     h += `<label class="meta" style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" id="autoBuy" ${S.autoBuy !== false ? 'checked' : ''}> Автоматично купувай материали за обектите</label>`;
     if (!projects.length) h += `<div class="empty">Нямаш активни обекти.<br>Приеми поръчка от „Поръчки“.</div>`;
     for (const p of projects) {
@@ -2989,6 +2992,7 @@ function renderPanel() {
     el.querySelectorAll('[data-pmanual]').forEach(b => b.onclick = () => { S.hold.trust = S.hold.trust || {}; S.hold.trust.con = Math.max(0.5, (S.hold.trust.con ?? 1) - 0.02); manualWin.add('panel'); toast(`👔 ${pd}: намесихте се в работата ми.`, ''); save(); renderPanel(); }); }
   if (tab === 'offers') { tenders.bind(el); el.querySelectorAll('[data-dtend]').forEach(b => b.onclick = () => openBig('offers')); }
   if ($('bOfferAll')) $('bOfferAll').onclick = offerAll;
+  el.querySelectorAll('[data-muni]').forEach(b => b.onclick = e => { e.stopPropagation(); if (b.dataset.muni === 'yes') muni.accept(); else { muni.decline(); renderPanel(); } });
   el.querySelectorAll('[data-acc]').forEach(b => b.onclick = e => { e.stopPropagation(); acceptOffer(+b.dataset.acc); });
   el.querySelectorAll('[data-dec]').forEach(b => b.onclick = e => { e.stopPropagation(); declineOffer(+b.dataset.dec); });
   el.querySelectorAll('[data-cancelp]').forEach(b => b.onclick = e => { e.stopPropagation(); const p = projects.find(q => q.id === +b.dataset.cancelp); if (p) modal('✖ Откажи поръчката?', `„${p.title}“ — обектът се изоставя, вложените материали и труд се губят, клиентът е недоволен (−0.2 ⭐ репутация). Техниката се връща свободна.`, [['Не', null], ['✖ Откажи', () => cancelProject(p)]]); });
@@ -4915,10 +4919,10 @@ function airSite3D(id) {
   setPct(pct);
   city.airSite = { g, x, pct, setPct };
 }
-function refreshAirport3D(id = S?.cityId) {
-  if (!city.group || !id) return;
 // летището: на източния край (tx(NI - 1) + 70, z 0); Рим по истинската карта — на ръба към Фиумичино (P.anchors.airport, ЮЗ), извън града
 const airXZ = () => { const a = city.plan && city.plan.p2 && city.plan.anchors && city.plan.anchors.airport; return a ? [a.x - 190, a.z] : [tx(NI - 1) + 70, 0]; };
+function refreshAirport3D(id = S?.cityId) {
+  if (!city.group || !id) return;
   airSite3D(id);
   const lv = airLv(id);
   if (!lv) { if (city.airport) { city.airport.dispose(); city.airport = null; } return; }
@@ -5172,6 +5176,10 @@ function tenderLevelUp(t) {
 // българските градове нямат cc (знамето по подразбиране е 🇧🇬) — затова българските „st-“ поръчки никога не излизаха; сега cc || 🇧🇬
 const ccOrBg = id => cityById(id) ? cityById(id).cc || '🇧🇬' : null;
 const tenderCountryOk = t => !t.id.startsWith('st-') || ownedCities().some(id => ccOrBg(id) && ccOrBg(id) === ccOrBg(t.city));
+// 🏛️ поръчките на общината (muniorders.js) — в градовете по истинската карта (план v2): услугите, които не стигат
+const muni = createMuni({ S: () => S, cityId: () => S.cityId, plan: () => city.plan, lots: () => city.lots, econ: () => econ, toast, fmt, save, sound: n => Sound.play(n), addXp: n => dev.add(n),
+  addRep: d => { S.rep = Math.max(0, Math.min(5, S.rep + d)); }, cityName: id => cityById(id)?.nm || id, sz: id => cityById(id)?.sz || 1, mega: id => MEGAPOLIS.has(id), built: () => (S.built || []).length,
+  ext: () => S.cityExt || 0, extMax: () => MAX_EXT, lv: () => dev.best(), group: () => city.group, night: () => dayNight.night > 0.5, redraw: () => { muni.draw(THREE); renderPanel(); } });
 const tenders = createTenders({ voice: () => tenderDir(), canTender: t => !!S && dev.best() >= 3 && tenderCountryOk(t), pop: (k, c, s) => showEventPop(k, c, s), onComplete: (id, t) => { if (t) tenderLevelUp(t); if (t && t.kind === 'port') { portBonus(t.city); showEventPop(id === 'port-istanbul' ? 'bosphorus-done' : 'port-done', `🏛️ ${t.ico} ${t.nm} е предаден!`, `${cityById(t.city)?.nm || ''} · +0.5 ★ · пристанището поема повече кораби`); } }, S: () => S, econ: () => econ, toast, modal, fmt, save, sound: n => Sound.play(n === 'done' ? 'tenderDone' : n), rep: () => S.rep || 0, devBest: () => dev.best(),
   owns: id => ownedCities().includes(id), cityName: id => cityById(id)?.nm || id, ccOf: id => cityById(id)?.cc, groupOf: id => { const k = contKeyOf(id); return k === 'eu' && !isEurope(id) && !isWorld(id) ? 'balkan' : k; }, showCity: id => showCityOnMap(id),
   unitLabel: k => ECON.UNIT_TYPES[k] ? ECON.UNIT_TYPES[k].ico + ' ' + ECON.UNIT_TYPES[k].nm : k,
@@ -8198,6 +8206,9 @@ function boardProposals() {
   { const sh0 = garShort(), gb = garBuyable(), sh = { ...sh0, total: gb.n, costNow: gb.cost }; if (gb.full && hasSub('con') && !gb.n) out.push({ id: `con:garfull:${gb.full}`, dir: 'con', ico: '🏢', text: `Липсват ${pl(gb.full, 'машина или бригада', 'машини и бригади')}, но офисът или гаражът са пълни. Предлагам първо да ги разширим.`, why: 'без място не може да се купи нова техника', cost: 0, count: 1, days: 0, gainTxt: 'после купувам липсващото', noAuto: true, apply: () => openBig('garage') });
     if (sh.total && hasSub('con')) out.push({ id: `con:gear:${sh.total}`, dir: 'con', ico: '🚜', text: `${sh.total === 1 ? 'Липсва' : 'Липсват'} ${pl(sh.total, 'машина или бригада', 'машини и бригади')} за обектите. Предлагам да ${sh.total === 1 ? 'я' : 'ги'} купя.`, why: 'обектите стоят и срокът тече', cost: sh.costNow, count: sh.total, days: 2, income: 0, gainTxt: 'обектите тръгват отново',
     goal: 'Обектите имат нужната техника', track: { k: 'gear' }, apply: () => garBuyShort(null, true, true) }); }
+  // 🏛️ поръчката на общината (muniorders.js — градовете по истинската карта): Ивайло предлага да я поемем
+  { const o = muni.on() && muni.state().offer; if (o && !muni.state().job && hasSub('con')) out.push({ id: `con:muni-${o.k}-${o.until}:1`, dir: 'con', ico: '🏛️', text: `Общината на ${cityNm(S.cityId)} поръчва ${muni.nm(o.k)} в ${o.district} (${fmt(o.cost)} €, ${o.days} дни). Предлагам да я поемем.`,
+      why: 'аванс 20% веднага, материалите се плащат по дни, остатъкът при предаването — печалба около 20%', cost: 0, count: 1, days: o.days, gainTxt: `~${fmt(o.cost * 0.2)} € печалба + опит`, goal: 'Поръчката на общината е подписана', apply: () => muni.accept() }); }
   // имотите в текущия град (без свободна бригада ремонтът идва после — 🔨 estreno): старите къщи на пазара (купи + ремонтирай), ремонт и поддръжка на твоите, офертите на купувачите
   { const E = est(), cap = () => Math.max(0, officeLv().proj - busyCount()), freeOf = o => !projects.some(p => p.lot === o.lot);
     P({ dir: 'con', ico: '🏠', key: 'estbuy', items: [...E.listings].sort((a, b) => a.price - b.price).slice(0, 3), cost: l => l.price + RENO_COST,
@@ -9137,7 +9148,7 @@ function frame() {
     camera.position.copy(controls.target).add(fly.off);
     if (fly.t >= 1) fly = null;
   }
-  if (city.planView && city.planView.userData.update && !onMap) { if (city.plan && city.plan.p2) { city.planView.userData.update(rdt, { camera, signals: tr2 && tr2On() ? tr2.signals() : undefined }); const nt = dayNight.night > 0.5; if (nt !== city.p2Night) { city.p2Night = nt; city.planView.userData.setNight?.(nt); } } else city.planView.userData.update(simT); }   // светофарите в плана
+  if (city.planView && city.planView.userData.update && !onMap) { if (city.plan && city.plan.p2) { city.planView.userData.update(rdt, { camera, signals: tr2 && tr2On() ? tr2.signals() : undefined }); const nt = dayNight.night > 0.5; if (nt !== city.p2Night) { city.p2Night = nt; city.planView.userData.setNight?.(nt); muni.setNight(nt); } } else city.planView.userData.update(simT); }   // светофарите в плана
   if (hwv) return renderHwView(rdt);
   if (onMap) return;   // картата е SVG — 3D сцената не се рисува отдолу
   if (window.__overlay3d > 0) return;   // директорската зала (directors3d.js) е втори WebGL на цял екран — градът под нея не се рисува (иначе две сцени на кадър)
@@ -9219,6 +9230,7 @@ if (AUTOTEST) {
   // достъп за headless тестовете
   window.__dbg = {
     state: () => S,
+    muni: () => muni,   // 🏛️ поръчките на общината (тест)
     openBig: k => openBig(k), closeBig: () => closeBig(), scene: () => scene,
     coopInfraTest(I) { coopInfraSync(I, 'Тест'); return { here: [stLvOf(S.cityId), airLv(S.cityId), portLv(S.cityId)], infra: coopInfra() }; },
     linkRoute() { const P = city.plan; if (!P) return null; const gap = r => r.reduce((m, p, i) => i ? Math.max(m, Math.hypot(p.x - r[i - 1].x, p.z - r[i - 1].z)) : 0, 0), c = city.lots[0]; return { links: (P.links || []).length, tir: gap(roadRoute(tx(NI - 1), -12, c.x, c.z)), st: gap(roadRoute(STATION_X + 10, 0, c.x, c.z)), hw: P.hwX == null ? null : gap(roadRoute(P.hwX, tx(NJ - 1) + 22, c.x, c.z)) }; },
