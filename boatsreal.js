@@ -45,7 +45,8 @@ function fitTo(real, n, s) {
   inner.position.add(new THREE.Vector3(cx - rc.x, by - rb.min.y - draft, cz - rc.z));
   real.traverse(m => {
     if (!m.isMesh) return; m.castShadow = true; m.receiveShadow = true;
-    const mt = m.material; if (!mt) return;
+    let mt = m.material; if (!mt) return;
+    if (mt.transmission > 0) { m.material = mt.clone(); m.material.transmission = 0; m.material.transparent = true; m.material.opacity = Math.min(mt.opacity ?? 1, 0.55); m.material.depthWrite = false; mt = m.material; }   // прозрачното (шамандурата): transmission удвоява draw calls на цялата сцена (втори проход) — обикновена прозрачност
     if (TINT[n] || mt.metalness > 0.5) { m.material = mt.clone(); m.material.metalness = Math.min(mt.metalness, 0.3); m.material.roughness = Math.max(mt.roughness ?? 0.5, 0.6); }   // без огледална среда металът излиза черен
     if (TINT[n]) { m.material.map = null; m.material.metalnessMap = null; m.material.metalness = 0.15; m.material.roughness = 0.75; m.material.color.set(TINT[n]); }   // контейнерът: текстурата е ръждясала и тъмна — боядисан, ребрата остават
   });
