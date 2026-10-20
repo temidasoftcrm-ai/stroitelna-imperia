@@ -55,7 +55,8 @@ export function createCoop(d) {
       cities: d.ownedCities().filter(Boolean).slice(0, 80), sites: sites(), stats: d.stats(),
       hwDone: d.hwInfo().done.slice(0, 200), hwJobs: d.hwInfo().jobs.map(j => j.seg), rails: d.rails().map(r => r.ref).slice(0, 200),
       railKm: Object.fromEntries(d.rails().slice(0, 200).map(r => [r.ref, r.km])),
-      infra: d.infra ? d.infra() : {} };   // { град: [гара, летище, пристанище] } — партньорът ги развива заедно с теб
+      infra: d.infra ? d.infra() : {},   // { град: [гара, летище, пристанище] } — партньорът ги развива заедно с теб
+      lv: d.lv ? d.lv() : null };   // нивото на фирмата (неограничено) — общото ниво (флаг coop-lv, devlevel.js)
   }
   // къде строя по градове: текущият град се чете от играта, другите — от последното посещение (localStorage)
   const SITES = 'stroi-coop-sites';
@@ -569,5 +570,7 @@ export function createCoop(d) {
     setInterval(() => { if (document.visibilityState === 'visible') tick(); }, POLL);
   }
   window.__coopDbg = () => ({ partner: st?.partner?.snap?.name, sites: st?.partner?.snap?.sites, marks: lastMarks, here: d.ready() && d.cityId() });
-  return { tick, state: () => st };
+  // нивото на партньора (активно партньорство) — devlevel.js чака него (coop-lv)
+  const partnerLv = () => { const P = st?.pair?.status === 'active' ? st?.partner?.snap : null; return P && Number.isFinite(P.lv) ? P.lv : null; };
+  return { tick, state: () => st, partnerLv };
 }

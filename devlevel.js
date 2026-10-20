@@ -59,7 +59,11 @@ export function createDevLevel(deps) {
   const level = () => (st() || { lv: 1 }).lv;
   const offerMul = () => 1 + 0.02 * (level() - 1);
   // общите за фирмата неща (оферти, борса) се отключват от най-развития ти град
-  const best = () => Math.max(level(), deps.maxLevel ? deps.maxLevel() : 1, deps.impLv ? deps.impLv() : 0);
+  const rawBest = () => Math.max(level(), deps.maxLevel ? deps.maxLevel() : 1, deps.impLv ? deps.impLv() : 0);
+  // 🤝 общото ниво с партньора (флаг coop-lv, game.js → deps.coopCap): който е напред, чака — опитът се трупа, отключванията — щом и партньорът стигне
+  const capLv = () => { const c = deps.coopCap ? deps.coopCap() : null; return c == null ? Infinity : c; };
+  const best = () => Math.min(rawBest(), capLv());
+  const waiting = () => rawBest() > best();
   const offersOpen = () => best() >= OFFERS_LV;
   const has = k => best() >= LV[k];
   const stocksOpen = () => best() >= STOCKS_LV;
@@ -90,7 +94,8 @@ export function createDevLevel(deps) {
     const nl = lvOf(d.xp);
     while (d.lv < nl) {
       d.lv++;
-      if (d.lv <= firm0) { deps.toast(`🏙️ ${deps.cityName ? deps.cityName() : 'Градът'} стигна ниво ${d.lv}`, 'good'); continue; }   // градът догонва фирмата (друг град вече е бил на това ниво) — само съобщение, без картинка
+      if (d.lv <= firm0) { deps.toast(`🏙️ ${deps.cityName ? deps.cityName() : 'Градът'} стигна ниво ${d.lv}`, 'good'); continue; }
+      if (d.lv > capLv()) { const S = deps.S(); if (S.coopWait == null) S.coopWait = firm0; deps.toast(`⏳ Ниво ${d.lv} е готово, но чака партньора (ниво ${capLv()}) — отключванията идват, щом и той стигне`, 'good'); continue; }   // градът догонва фирмата (друг град вече е бил на това ниво) — само съобщение, без картинка
       deps.toast(`🏅 Фирмата е ниво ${d.lv}! ${UNLOCKS[d.lv] || ''}`, 'good', open);
       if (feature('lv-pics') && LV_PICS.has(d.lv)) { showLevel(d.lv, UNLOCKS[d.lv] || ''); continue; }   // градът е задминал фирмата → нова фирмена степен
       deps.sound('lvup');
@@ -125,14 +130,20 @@ export function createDevLevel(deps) {
   const top = document.getElementById('top'), q = document.getElementById('qBtn');
   top.insertBefore(btn, q || top.querySelector('.sp'));
   btn.onclick = open;
+  // партньорът стигна — отложените нива се показват сега (картинка/известие за всяко)
+  function catchUp() {
+    const S = deps.S(); if (!S || S.coopWait == null) return; const b = best();
+    for (let l = S.coopWait + 1; l <= b; l++) { S.coopWait = l; cityUp(l); }
+    if (!waiting()) S.coopWait = null;
+  }
   function render() {
     const d = st(); if (!d) { btn.style.display = 'none'; return; }
-    btn.style.display = '';
+    btn.style.display = ''; catchUp();
     const bst = best();   // в лентата — само нивото на фирмата (= най-развитият град, от него идват отключванията); лентата — неговият напредък
     const bd = bst > d.lv ? (Object.values(deps.S().cities || {}).map(c => c.dev).find(x => x && x.lv === bst) || { lv: bst, xp: THRESH[bst - 1] }) : d;
     const top = bst >= THRESH.length, nx = top && bst < 35 && deps.impRatio ? deps.impRatio(bst + 1) : null;   // над 20 — напредъкът към следващото ниво по условията на града (imperial.js)
     const a = THRESH[bd.lv - 1], b = THRESH[bd.lv] ?? a, k = top ? (nx ?? 1) : Math.max(0, Math.min(1, (bd.xp - a) / (b - a)));
-    btn.innerHTML = `🏢 Фирма ${bst}<span class="dbar"><i style="width:${(k * 100).toFixed(0)}%"></i></span>`;
+    btn.innerHTML = `🏢 Фирма ${bst}<span class="dbar"><i style="width:${(k * 100).toFixed(0)}%"></i></span>${waiting() ? `<span style="font-size:11px;opacity:.85">⏳ чакаш партньора (ниво ${bst})</span>` : ''}`;
     btn.title = `Ниво на развитие на фирмата: ${bst} (по най-развития град — оттам идват отключванията)${bst > d.lv ? ` · ${deps.cityName ? deps.cityName() : 'този град'}: ниво ${d.lv}` : ''}${nx != null ? ` · към ниво ${bst + 1}: ${Math.round(nx * 100)}%${deps.impNeed ? ` — ${deps.impNeed(bst + 1)}` : ''}` : ''}`;
   }
   const firmXP = () => { const S = deps.S(), d = st(); return Math.max(d ? d.xp : 0, ...Object.values(S?.cities || {}).map(c => c.dev?.xp || 0)) + (S?.holding ? S.hxp || 0 : 0); };
@@ -158,5 +169,5 @@ export function createDevLevel(deps) {
     clearInterval(dvTimer); dvTimer = setInterval(() => { const els = document.querySelectorAll('[data-dvn]'); if (!els.length) { clearInterval(dvTimer); return; }
       for (const e of els) { const n = +e.dataset.dvn, p = prog(n); e.style.width = (p.k * 100).toFixed(1) + '%'; e.style.background = p.k >= 1 ? '#43d17a' : 'linear-gradient(90deg,#c9a14a,#ffd54a)'; const t = document.querySelector(`[data-dvt="${n}"]`); if (t && t.textContent !== p.t) t.textContent = p.t; } }, 1000);
   }
-  return { cityUp, add, level, best, has, offerMul, offersOpen, stocksOpen, render, open, XP };
+  return { cityUp, add, level, best, rawBest, waiting, has, offerMul, offersOpen, stocksOpen, render, open, XP };
 }
