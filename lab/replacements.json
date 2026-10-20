@@ -82,5 +82,13 @@
   "com2-sky-e2": {
     "from": "/assets/commercial2/building-skyscraper-e.glb",
     "to": "/assets/commercial2/building-skyscraper-e-new.glb"
+  },
+  "resort-bench": {
+    "from": "/assets/holiday/bench.glb",
+    "to": "/assets/holiday/bench-new.glb"
+  },
+  "resort-lantern": {
+    "from": "/assets/holiday/lantern.glb",
+    "to": "/assets/holiday/lantern-new.glb"
   }
 }

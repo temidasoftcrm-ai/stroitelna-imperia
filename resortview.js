@@ -2,6 +2,7 @@
 // с лифт. Вилното селище се вижда според етапа: празен парцел → строеж (вилите растат) → готово (басейн, алеи).
 // Извън сезона: плажът е празен (затворени чадъри), а зимният курорт е зелен, без сняг.
 import * as THREE from 'three';
+import { feature } from './lab/feature.js';
 import { EXTRAS, hotelStylesOf, rentOf, SEASON_M, OFF_SEASON } from './resorts.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { makeWater } from './water.js';
@@ -106,6 +107,7 @@ export const RESORT_MODELS = {
   commercial2: ['detail-parasol-a', 'detail-parasol-b'],
   nature: ['tree_palm', 'tree_palmBend', 'tree_palmTall', 'tree_palmDetailedTall', 'rock_largeA', 'tree_pineTallA', 'tree_default_fall'],
   modular: ['building-sample-tower-a', 'building-sample-tower-c', 'building-sample-tower-d', 'building-sample-house-c'],
+  'heavy/resort': ['sf-cabin2', 'sf-cabin3', 'sf-chalet'],   // истинските хижи за зимните вили (Sketchfab, CC BY; флаг resort-real) — вместо детските сглобени от части
 };
 
 // deps: { model(name, scale), houses: [имена], realHouses (без Kenney), tintRoof(obj, seed), fitScale(name, size), label(text, color, w) }
@@ -380,7 +382,9 @@ export function buildResortView(A, r, st, season, deps) {
     for (let ix = -1; ix <= 1; ix++) for (let iz = -1; iz <= 1; iz++) {
       if (!ix && !iz) continue;
       let o;
-      if (!summer && A['sf-aframe'] && k % 2 === 0) { o = deps.model('sf-aframe', deps.fitScale('sf-aframe', 13)); o.rotation.y = 0; }   // A-frame хижи (Sketchfab), редувани с дървените
+      const realC = !summer && feature('resort-real') ? ['sf-aframe', 'sf-cabin2', 'sf-chalet', 'sf-cabin3'].filter(n => A[n]) : [];   // истинските хижи — по ред, без детските
+      if (realC.length) { const n = realC[k % realC.length]; o = deps.model(n, deps.fitScale(n, n === 'sf-aframe' ? 13 : 12)); o.rotation.y = 0; }
+      else if (!summer && A['sf-aframe'] && k % 2 === 0) { o = deps.model('sf-aframe', deps.fitScale('sf-aframe', 13)); o.rotation.y = 0; }   // A-frame хижи (Sketchfab), редувани с дървените
       else if (!summer && A['cabin-wall']) o = buildChalet(A, deps.model, 3.4, k);   // зимните курорти: дървени хижи
       else {
         const pool = deps.houses, n = pool[(k * 3 + r.id.length) % pool.length];   // истинските къщи (feature 'houses-real') — вместо Kenney
