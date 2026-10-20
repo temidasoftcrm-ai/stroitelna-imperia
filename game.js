@@ -4894,12 +4894,12 @@ const flowAvg = k => { const h = S && S.flow && S.flow[k] && S.flow[k].h; return
 function lookAirport() { if (!S) return; const x = tx(NI - 1) + 85; showMap(false); controls.target.set(x, 0, 0); camera.position.set(x - 160, 140, 150); controls.update(); fly = null; }
 // строежът на първото ниво: площадката на летището (кал, ограда, кранове, табела с процента) — да се вижда къде е
 function airSite3D(id) {
-  const ap = airportOf(id), x = tx(NI - 1) + 70;
+  const ap = airportOf(id), x = airXZ()[0];
   if (!(ap?.build && !ap.lv)) { if (city.airSite) { city.group.remove(city.airSite.g); city.airSite = null; } return; }
   const pct = Math.floor(ap.build.prog * 100);
   if (city.airSite && city.airSite.x === x) { if (city.airSite.pct !== pct) { city.airSite.pct = pct; city.airSite.setPct(pct); } return; }
   if (city.airSite) city.group.remove(city.airSite.g);
-  const g = new THREE.Group(); g.position.set(x, 0, 0); city.group.add(g);
+  const g = new THREE.Group(); g.position.set(x, 0, airXZ()[1]); city.group.add(g);
   const M = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 }), B = (w, h, d, m, px, py, pz) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(px, py, pz); o.castShadow = o.receiveShadow = true; g.add(o); return o; };
   B(90, 0.1, 230, M(0x7a5c3e), 15, 0.05, 5);
   B(14, 0.12, 120, M(0x55575c), 46, 0.08, 5 + 55 * (1 - Math.min(1, ap.build.prog * 1.4)));   // пистата расте
@@ -4913,11 +4913,13 @@ function airSite3D(id) {
 }
 function refreshAirport3D(id = S?.cityId) {
   if (!city.group || !id) return;
+// летището: на източния край (tx(NI - 1) + 70, z 0); Рим по истинската карта — на ръба към Фиумичино (P.anchors.airport, ЮЗ), извън града
+const airXZ = () => { const a = city.plan && city.plan.p2 && city.plan.anchors && city.plan.anchors.airport; return a ? [a.x - 190, a.z] : [tx(NI - 1) + 70, 0]; };
   airSite3D(id);
   const lv = airLv(id);
   if (!lv) { if (city.airport) { city.airport.dispose(); city.airport = null; } return; }
   if (city.airport) { if (city.airport.level !== lv) city.airport.setLevel(lv); return; }
-  try { city.airport = makeAirport3D(city.group, { A, model, label }, { lv, x: tx(NI - 1) + 70, z: 0, seed: hashStr('air:' + id) }); city.airportNI = NI; } catch (e) { console.warn('airport', e); city.airport = null; }
+  try { city.airport = makeAirport3D(city.group, { A, model, label }, { lv, x: airXZ()[0], z: airXZ()[1], seed: hashStr('air:' + id) }); city.airportNI = NI; } catch (e) { console.warn('airport', e); city.airport = null; }
   loadTerminals(u => new Promise((res, rej) => new GLTFLoader().load(u, res, undefined, rej))).then(() => { if (city.airport && city.airport.refresh) city.airport.refresh(); });
 }
 // ---- транспортни връзки на града (linkoffers.js): твое (земя + строеж) или общинско (такса, само ползване)
@@ -5535,7 +5537,7 @@ function refreshTender3D() {
     if (t.kind === 'airterm' && !city.plan) {   // терминалът на летището — до пистата (летището е на източния край), не насред града; парцелите остават за сгради
       if (S.tenderLots4) delete S.tenderLots4[t.id]; if (S.tenderLots) delete S.tenderLots[t.id];   // стар запис: площадката беше в града
       const side = 8 * TILE - 2, k = side / 26;
-      const o = city.tender3D[t.id] = buildAirTerminal(city.group, { label, model: (n, k2) => A[n] ? model(n, k2) : null }, { x: tx(NI - 1) + 70 + 64 + 4 * TILE, z: 0, scale: k, prog: p, sign: t.sign, kind: t.kind, ext: [side / k, (11 * TILE - 2) / k] });
+      const o = city.tender3D[t.id] = buildAirTerminal(city.group, { label, model: (n, k2) => A[n] ? model(n, k2) : null }, { x: airXZ()[0] + 64 + 4 * TILE, z: airXZ()[1], scale: k, prog: p, sign: t.sign, kind: t.kind, ext: [side / k, (11 * TILE - 2) / k] });
       o.group.position.y = 0.06; o.group.userData.tender = true; continue;
     }
     if (t.kind !== 'port') {
@@ -9097,7 +9099,7 @@ function frame() {
     for (const o of city.landmarks || []) o.update(simT, dayNight.night);
     if (station && station.setNight) station.setNight(dayNight.night);
     if (city.hqLm) city.hqLm(simT, dayNight.night);
-    if (city.airport) { if (city.airportNI !== NI) { city.airportNI = NI; city.airport.setPos(tx(NI - 1) + 70, 0); } city.airport.update(simT, dayNight.night); }
+    if (city.airport) { if (city.airportNI !== NI) { city.airportNI = NI; city.airport.setPos(...airXZ()); } city.airport.update(simT, dayNight.night); }
     updateCityTrain(dt);
     if (passing) passing.update(Math.min(dt, 0.25));
     tirs.update(Math.min(dt, 0.25));
@@ -9577,7 +9579,7 @@ if (AUTOTEST) {
         const m0 = econ.money; for (let d = 0; d < run; d++) { S.day++; silk.dailyTick(); } out.run = { st: silk.state().st, paid: silk.state().paid, run: silk.state().run, gain: econ.money - m0, pr: silk.progress() }; }
       return out; },
     wallLook(p = 1) { const id = 'st-greatwall-beijing'; S.tenders = S.tenders || {}; S.tenders[id] = { ...(S.tenders[id] || {}), st: p >= 1 ? 'done' : 'building', prog: p, start: S.day, due: S.day + 140 }; refreshTender3D(); const o = (city.tender3D || {})[id]; if (o) { const v = o.group.position; S.dayT = DAY_SEC * 0.3; showMap(false); controls.target.set(v.x, 0, v.z); camera.position.set(v.x + 70, 60, v.z + 80); controls.update(); fly = null; } return { ok: !!o, city: S.cityId }; },
-    air3d() { refreshAirport3D(); showMap(false); const x = tx(NI - 1) + 70; controls.target.set(x, 0, 0); camera.position.set(x - 150, 130, 170); fly = null; return !!city.airport; },
+    air3d() { refreshAirport3D(); showMap(false); const [x, z] = airXZ(); controls.target.set(x, 0, z); camera.position.set(x - 150, 130, z + 170); fly = null; return !!city.airport; },
     lookRail(d = 150) { const x = tx(0) - 40, z = tx(0) - 30; controls.target.set(x, 0, z); camera.position.set(x + d * 0.5, d * 0.7, z + d * 0.8); fly = null; },
     lookPort(d = 160) { if (!city.sea) return false; showMap(false); const P = city.sea.port; controls.target.set(P.x, 0, P.z - 70); camera.position.set(P.x + d * 0.7, d * 0.55, P.z - 70 + d * 0.8); fly = null; return true; },
     gearTest() { econ.earn(1e6, 'друго', 'тест'); S.garageLevel = 5; for (const t of ['crane', 'tractor', 'roller', 'loader', 'truck', 'grader']) buyUnit(t); const h = city.hq; controls.target.set(h.x, 2, h.z); camera.position.set(h.x + 18, 16, h.z + 22); fly = null; return units.map(u => u.type); },
