@@ -342,6 +342,12 @@ export function buildPlan2View(P, opts = {}) {
       const mid = curve[curve.length >> 1], tst = offLine(curve, 1)[curve.length >> 1], sg = Math.hypot(tst[0] - n.x, tst[1] - n.z) > Math.hypot(mid[0] - n.x, mid[1] - n.z) ? 1 : -1;
       W.push(ribbon(offLine(curve, sg * ww / 2), ww, 0.045)); Cb.push(ribbon(offLine(curve, sg * 0.15), 0.3, 0.09)); }
   }
+  // задънените краища вътре в картата (OSM: изхвърлените къси улички прекъсват връзките): близо до друга улица (< 25 м) и с лице към нея —
+  // асфалтово продължение до нея; иначе — кръгла площадка за обръщане с тротоар и бордюр (само изгледът; планът и парцелите не се променят)
+  for (const n of ND) { if (n.arms.length !== 1 || !ends.inside(n.x, n.z)) continue; const a = n.arms[0], rd = P.roads[a.road], pts = rd.pts, e = a.end ? pts[pts.length - 1] : pts[0], pr = a.end ? pts[pts.length - 2] : pts[1];
+    const q = ends.near(e, rd.id, [e[0] - pr[0], e[1] - pr[1]]);
+    if (q) { As.push(ribbon([e, q], rd.w, 0.072)); W.push(ribbon([e, q], rd.w + 2 * rd.walk, 0.044)); }
+    else { const r = Math.max(5.5, rd.w / 2 + 2.5); W.push(disc(n.x, n.z, r + rd.walk, 0.045)); As.push(disc(n.x, n.z, r, 0.075)); Cb.push(ribbon(circle(n.x, n.z, r + 0.15, 32), 0.3, 0.09)); } }
   for (const t of TU) { W.push(disc(t.x, t.z, t.r + 2.5, 0.045)); As.push(disc(t.x, t.z, t.r, 0.075)); }
   // маркировка по пътищата: бордюри до среза; булевард — крайни линии, линии до разделителната ивица, прекъснати между лентите (до стоп линията)
   for (const rd of RD) { yield 0;
@@ -382,6 +388,16 @@ export function buildPlan2View(P, opts = {}) {
       T2.castShadow = true; T1.frustumCulled = T2.frustumCulled = false; G.add(T1, T2);
     }
   };
+  // задънените краища: рамката на картата (краищата до ръба са продължения извън нея — не се пипат) и точки по улиците през 3 м в мрежа 25 м
+  const ends = (() => { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; const S0 = D && D.sea;
+    if (S0) { x0 = S0.x0; z0 = S0.z0; x1 = S0.x0 + S0.nx * S0.cell; z1 = S0.z0 + S0.nz * S0.cell; } else for (const [x, z] of P.boundary || []) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    let grid = null; const gk = (x, z) => Math.floor(x / 25) * 100003 + Math.floor(z / 25);
+    const build = () => { grid = new Map(); for (const rd of P.roads) { if (rd.noCars) continue; const L = rd.L; for (let s = 0, i = 1; s <= L[L.length - 1]; s += 3) { while (i < L.length - 1 && L[i] < s) i++; const a = rd.pts[i - 1], b = rd.pts[i], t = (s - L[i - 1]) / ((L[i] - L[i - 1]) || 1), x = a[0] + (b[0] - a[0]) * t, z = a[1] + (b[1] - a[1]) * t, k = gk(x, z); (grid.get(k) || grid.set(k, []).get(k)).push(x, z, rd.id); } } };
+    return { inside: (x, z) => x > x0 + 40 && x < x1 - 40 && z > z0 + 40 && z < z1 - 40,
+      near(e, own, dir) { if (!grid) build(); const l = Math.hypot(dir[0], dir[1]) || 1, ux = dir[0] / l, uz = dir[1] / l; let best = null, bd = 25 * 25; const i = Math.floor(e[0] / 25), j = Math.floor(e[1] / 25);
+        for (let a = i - 1; a <= i + 1; a++) for (let b = j - 1; b <= j + 1; b++) { const c = grid.get(a * 100003 + b); if (c) for (let k = 0; k < c.length; k += 3) { if (c[k + 2] === own) continue; const dx = c[k] - e[0], dz = c[k + 1] - e[1], d = dx * dx + dz * dz; if (d < bd && d > 0.25 && (dx * ux + dz * uz) / Math.sqrt(d) > 0.5) { bd = d; best = [c[k], c[k + 1]]; } } }   // само напред (до 60° от посоката на пътя)
+        return best; } };
+  })();
   // ---- главният генератор: пръстените на улиците (най-близките — първи), дърветата, мебелта и светофарите, гарата, надписите, корабите,
   // Кремъл, фоновите сгради, свободните парцели. Всяко yield е малка стъпка; 'usable' — след първия пръстен (opts.progressive: дотук — веднага).
   const ST = { F: null, pools: null, LB: null, BT: null, BL: null, FP: null, night: false, lampsOut: [] };
