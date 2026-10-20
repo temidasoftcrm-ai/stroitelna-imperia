@@ -142,7 +142,8 @@ export function createDevLevel(deps) {
     const xp = firmXP(), a = THRESH[n - 2] ?? 0, b = THRESH[n - 1], k = Math.max(0, Math.min(1, (xp - a) / Math.max(1, b - a)));
     return { k, t: `${Math.round(k * 100)}% · остават ${Math.max(0, Math.round(b - xp)).toLocaleString('bg-BG')} XP` };
   }
-  const barHtml = n => { const p = prog(n); return `<div style="display:flex;align-items:center;gap:8px;margin:-2px 8px 6px 8px"><div style="flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden"><i data-dvn="${n}" style="display:block;height:100%;width:${(p.k * 100).toFixed(1)}%;background:${p.k >= 1 ? '#43d17a' : 'linear-gradient(90deg,#c9a14a,#ffd54a)'}"></i></div><span class="meta" data-dvt="${n}" style="margin:0;font-size:11px;min-width:150px;text-align:right">${p.t}</span></div>`; };
+  const barHtml = n => { if (n !== best() + 1) return '';   // само следващото ниво — жълтата лента, която расте (изпълнените — без лента)
+    const p = prog(n); return `<div style="display:flex;align-items:center;gap:8px;margin:-2px 8px 6px 8px"><div style="flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden"><i data-dvn="${n}" style="display:block;height:100%;width:${(p.k * 100).toFixed(1)}%;background:${p.k >= 1 ? '#43d17a' : 'linear-gradient(90deg,#c9a14a,#ffd54a)'}"></i></div><span class="meta" data-dvt="${n}" style="margin:0;font-size:11px;min-width:150px;text-align:right">${p.t}</span></div>`; };
   let dvTimer = null;
   function open() {
     const d = st(); if (!d) return;
