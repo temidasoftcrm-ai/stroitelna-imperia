@@ -7,6 +7,7 @@
 // Записът: S.trucks = [{ id, nm, at, a, b, path:[градове], segs:[{ id, a, b, km, own }], km, total, cond, since, cargo, trips, earned, wait }]
 // deps: { S(), econ(), toast, modal, fmt, save, cityName(id), owned(), here(), route(a, b) → { path, segs } | null (само готови участъци),
 //         hasWh(id), redraw(), renderPanel(), pop?(key, cap, sub) }
+import { feature } from './lab/feature.js';
 export const TRUCK = { cost: 25000, upkeep: 100, speed: 260, rate: 1.6, toll: 0.25, cap: 6, free: 3, wearDay: 0.12, minCond: 30, service: 0.2, sell: 0.5, minKm: 60 };
 const CARGO = [['цимент', '⚪', 1.0], ['контейнери', '📦', 1.15], ['автомобили', '🚗', 1.35], ['храни', '🥫', 1.1]];
 
@@ -21,13 +22,16 @@ export function createHwTrucks(d) {
   const legToll = t => Math.round((t.segs || []).filter(s => !s.own).reduce((a, s) => a + s.km, 0) * TRUCK.toll);
   const name = id => d.cityName(id);
 
+  // ⚡ маршрутите между два града — веднъж на игрален ден (и наново при нов участък): иначе всеки чакащ ТИР търсеше път до всеки град (perf-report)
+  let rc = new Map(), rcKey = '';
+  const route = (a, b) => { if (!feature('perf-fix2')) return d.route(a, b); const S = d.S(), k = `${S?.day}|${(S?.hwDone || []).length}|${(S?.abDone || []).length}`; if (k !== rcKey) { rcKey = k; rc = new Map(); } const key = a + '>' + b; if (!rc.has(key)) rc.set(key, d.route(a, b)); return rc.get(key); };
   // сам избира следващия курс: до твой град по готови участъци, без задръстените; по-далечните — по-често
   function autoTrip(t) {
     const from = t.at || d.here(); t.at = from;
     const opts = [];
     for (const id of d.owned()) {
       if (!id || id === from) continue;
-      const r = d.route(from, id); if (!r || !r.segs.length) continue;
+      const r = route(from, id); if (!r || !r.segs.length) continue;
       if (r.segs.some(s => segLoad(s.id, t) >= TRUCK.cap)) continue;
       const km = r.segs.reduce((a, s) => a + s.km, 0); if (km < TRUCK.minKm) continue;
       opts.push({ id, r, km });
