@@ -6858,12 +6858,12 @@ function abSvg() {
     if (via) {   // начупено трасе (по брега и т.н.)
       const pts = [[x1, y1], ...via.map(([lo, la]) => proj(lo, la)), [x2, y2]], P = a => a.map(p => p.map(v => v.toFixed(1)).join(',')).join(' ');
       const k = j ? (j.stage + j.prog) / abStages().length : 0, [lx, ly] = ptAlong(pts, 0.5);
-      if (done) h += `<polyline points="${P(pts)}" fill="none" stroke="#c62828" stroke-width="${5.5 * w}" stroke-linecap="round" stroke-linejoin="round"/><polyline points="${P(pts)}" fill="none" stroke="#fff" stroke-width="${1 * w}" stroke-dasharray="${3 * w} ${3 * w}"/>`;
+      if (done) h += `<polyline points="${P(pts)}" fill="none" stroke="#ff2a1f" stroke-width="${16 * w}" stroke-linecap="round" stroke-linejoin="round" opacity=".32"/><polyline points="${P(pts)}" fill="none" stroke="#c62828" stroke-width="${5.5 * w}" stroke-linecap="round" stroke-linejoin="round"/><polyline points="${P(pts)}" fill="none" stroke="#fff" stroke-width="${1 * w}" stroke-dasharray="${3 * w} ${3 * w}"/>`;
       else if (j) h += `<polyline points="${P(pts)}" fill="none" stroke="#ef9a9a" stroke-width="${4 * w}" stroke-dasharray="${4 * w} ${3 * w}"/><polyline points="${P(donePts(pts, k))}" fill="none" stroke="#c62828" stroke-width="${5.5 * w}" stroke-linecap="round" stroke-linejoin="round"/><text x="${lx}" y="${ly - mapPx(9)}" font-size="${mapPx(13)}" font-weight="800" fill="#8e0000" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${mapPx(3)}">🔴 ${Math.floor(k * 100)}%</text>`;
       else if (on) h += `<polyline points="${P(pts)}" fill="none" stroke="#e53935" stroke-width="${2.2 * w}" stroke-dasharray="${2 * w} ${3 * w}" opacity=".7"/>`;
       continue;
     }
-    if (done) h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#c62828" stroke-width="${5.5 * w}" stroke-linecap="round"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#fff" stroke-width="${1 * w}" stroke-dasharray="${3 * w} ${3 * w}"/>`;
+    if (done) h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#ff2a1f" stroke-width="${16 * w}" stroke-linecap="round" opacity=".32"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#c62828" stroke-width="${5.5 * w}" stroke-linecap="round"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#fff" stroke-width="${1 * w}" stroke-dasharray="${3 * w} ${3 * w}"/>`;
     else if (j) {
       const k = (j.stage + j.prog) / abStages().length;
       h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#ef9a9a" stroke-width="${4 * w}" stroke-dasharray="${4 * w} ${3 * w}"/><line x1="${x1}" y1="${y1}" x2="${x1 + (x2 - x1) * k}" y2="${y1 + (y2 - y1) * k}" stroke="#c62828" stroke-width="${5.5 * w}"/>`;
@@ -7087,7 +7087,7 @@ function hwSvg() {
     const X1 = x1 + ox, Y1 = y1 + oy, X2 = x2 + ox, Y2 = y2 + oy;
     const jt = coopJoint('hw', s.id);
     if (jt) h += `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="${JCOL}" stroke-width="${((near ? 7 : 5) * zs).toFixed(2)}" stroke-linecap="round" opacity=".55"${hwAll().includes(s.id) || jobs[s.id] ? '' : ` stroke-dasharray="${(4 * zs).toFixed(2)} ${(3 * zs).toFixed(2)}"`}><title>🤝 Общ строеж с партньора</title></line>`;   // строите заедно — лилаво
-    if (hwAll().includes(s.id)) h += (hwMine(s.id) || jt ? '' : `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="${coopCol()}" stroke-width="${((near ? 5 : 3.6) * zs).toFixed(2)}" stroke-linecap="round" opacity=".45"/>`) + (near
+    if (hwAll().includes(s.id)) h += `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#2b8cff" stroke-width="${((near ? 10 : 7) * zs).toFixed(2)}" stroke-linecap="round" opacity=".42"/>` + (hwMine(s.id) || jt ? '' : `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="${coopCol()}" stroke-width="${((near ? 5 : 3.6) * zs).toFixed(2)}" stroke-linecap="round" opacity=".45"/>`) + (near
       ? `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#2f66b3" stroke-width="${(3 * zs).toFixed(2)}" stroke-linecap="round"/><line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#ffffff" stroke-width="${(0.6 * zs).toFixed(2)}"/>`
       : `<line x1="${X1}" y1="${Y1}" x2="${X2}" y2="${Y2}" stroke="#6b88b5" stroke-width="${(1.8 * zs).toFixed(2)}" stroke-linecap="round" opacity=".9"/>`);   // отдалеч — тънка и приглушена; строежите остават ярки
     else if (jobs[s.id]) {
