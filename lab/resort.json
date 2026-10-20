@@ -1,0 +1,106 @@
+{
+ "have": [],
+ "now": [],
+ "reuse": [
+  {
+   "n": "Заснежените борове",
+   "how": "вече са истински (sf-pinesnow — Sketchfab); детските елхи са само резерва, ако не се заредят → трием ги"
+  },
+  {
+   "n": "A-образната хижа",
+   "how": "вече е истинска (половината вили в зимните курорти) — остава"
+  }
+ ],
+ "cand": [
+  {
+   "cat": "cabin",
+   "title": "Хижа (вместо сглобените детски)",
+   "uid": "f4540e14dd8d447d958336e184ffcf8f",
+   "name": "Log Cabin",
+   "user": "chelC",
+   "tri": 56811,
+   "url": "https://sketchfab.com/3d-models/log-cabin-f4540e14dd8d447d958336e184ffcf8f",
+   "img": "cand-f4540e14.webp"
+  },
+  {
+   "cat": "cabin",
+   "title": "Хижа (вместо сглобените детски)",
+   "uid": "94ed8fca6efa48eaabe37b62da2fd333",
+   "name": "Log Cabin Wooden",
+   "user": "tylertyler",
+   "tri": 12883,
+   "url": "https://sketchfab.com/3d-models/log-cabin-wooden-94ed8fca6efa48eaabe37b62da2fd333",
+   "img": "cand-94ed8fca.webp"
+  },
+  {
+   "cat": "cabin",
+   "title": "Хижа (вместо сглобените детски)",
+   "uid": "21bf3df011b147598cdb43fea839cef7",
+   "name": "Wooden Log Cabin",
+   "user": "donnichols",
+   "tri": 8776,
+   "url": "https://sketchfab.com/3d-models/wooden-log-cabin-21bf3df011b147598cdb43fea839cef7",
+   "img": "cand-21bf3df0.webp"
+  },
+  {
+   "cat": "cabin",
+   "title": "Хижа (вместо сглобените детски)",
+   "uid": "44ed4093f2904361898b9cbc3dcc1aa9",
+   "name": "Snowy North American Chalet Cabin – Low Poly",
+   "user": "artel_3D",
+   "tri": 17226,
+   "url": "https://sketchfab.com/3d-models/snowy-north-american-chalet-cabin-low-poly-44ed4093f2904361898b9cbc3dcc1aa9",
+   "img": "cand-44ed4093.webp"
+  },
+  {
+   "cat": "cabin",
+   "title": "Хижа (вместо сглобените детски)",
+   "uid": "2ac40506a2d74e60be6e9df6657a6367",
+   "name": "Alpine Chalet house",
+   "user": "Gerhald",
+   "tri": 1999,
+   "url": "https://sketchfab.com/3d-models/alpine-chalet-house-2ac40506a2d74e60be6e9df6657a6367",
+   "img": "cand-2ac40506.webp"
+  },
+  {
+   "cat": "bench",
+   "title": "Пейка (площадите)",
+   "uid": "01a5b64427984632bb44242da3813bb1",
+   "name": "Classic Park Bench (Low Poly)",
+   "user": "berkgedik",
+   "tri": 4796,
+   "url": "https://sketchfab.com/3d-models/classic-park-bench-low-poly-01a5b64427984632bb44242da3813bb1",
+   "img": "cand-01a5b644.webp"
+  },
+  {
+   "cat": "bench",
+   "title": "Пейка (площадите)",
+   "uid": "2ee2bc87756d4bf0932d83ab860ddb8f",
+   "name": "Park Bench",
+   "user": "RBG_illustrations",
+   "tri": 2924,
+   "url": "https://sketchfab.com/3d-models/park-bench-2ee2bc87756d4bf0932d83ab860ddb8f",
+   "img": "cand-2ee2bc87.webp"
+  },
+  {
+   "cat": "lamp",
+   "title": "Фенер (площадите)",
+   "uid": "6881aa1e84b047d79860fa9297e05e22",
+   "name": "Street Lamp",
+   "user": "bez_glaza",
+   "tri": 7810,
+   "url": "https://sketchfab.com/3d-models/street-lamp-6881aa1e84b047d79860fa9297e05e22",
+   "img": "cand-6881aa1e.webp"
+  },
+  {
+   "cat": "lamp",
+   "title": "Фенер (площадите)",
+   "uid": "d4006d2762ab434cb262d46d69433f1f",
+   "name": "Victorian Street Lamp",
+   "user": "Blulike1969",
+   "tri": 39698,
+   "url": "https://sketchfab.com/3d-models/victorian-street-lamp-d4006d2762ab434cb262d46d69433f1f",
+   "img": "cand-d4006d27.webp"
+  }
+ ]
+}
