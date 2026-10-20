@@ -44,7 +44,7 @@ export function gamePlan2(P, o = {}) {
   const anchors = P.anchors ? { station: shA(P.anchors.station), airport: shA(P.anchors.airport), highway: shA(P.anchors.highway) } : {};
   // пътищата до летището и магистралата (за маршрутите на ТИР-овете, както P.links в game.js)
   const links = ['airport', 'highway'].map(k => anchors[k]).filter(a => a && a.road).map(a => { const pts = [[a.road.x, a.road.z], [a.x, a.z]]; return { pts, L: cumLen(pts), w: 12, cls: 'road' }; });
-  const landmarks = P.lots.filter(L => L.lm).map(L => ({ k: L.lm, x: L.x + ox, z: L.z + oz, w: L.w, d: L.d, guard: L.guard || 0, rot: L.rot || 0 }));   // rot — завъртените (мрежата на Манхатън)
+  const landmarks = P.lots.filter(L => L.lm).map(L => ({ k: L.lm, x: L.x + ox, z: L.z + oz, w: L.w, d: L.d, guard: L.guard || 0, rot: L.rot || 0, vrot: L.vrot }));   // vrot — истинското завъртане на модела (Манхатън: −0,506)   // rot — завъртените (мрежата на Манхатън)
   const bnd = B.map(sh), x1 = Math.max(...bnd.map(p => p[0])), z1 = Math.max(...bnd.map(p => p[1]));
   const waterAt = (x, z) => P.waterAt(x - ox, z - oz);
   return {

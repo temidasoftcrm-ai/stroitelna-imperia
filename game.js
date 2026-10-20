@@ -5511,15 +5511,15 @@ function lmRiverSpot(k, mem) {
 }
 // Рим по истинската карта: забележителностите — на реалните им места (P.landmarks), вписани в основата си
 // от плана се добавят само тези с правилен модел за града (иначе 'opera' в Париж става операта в Сидни, 'pantheon' — римският)
-const LM_EXTRA = { moscow: new Set(['kotelnicheskaya']), newyork: new Set(['liberty', 'stpatrick', 'rockefeller']), istanbul: new Set(['topkapi', 'bluemosque', 'maiden', 'grandbazaar', 'galata', 'suleymaniye', 'haydarpasa']) };
+const LM_EXTRA = { moscow: new Set(['kotelnicheskaya']), newyork: new Set(['liberty', 'stpatrick', 'rockefeller', 'radiocity']), istanbul: new Set(['topkapi', 'bluemosque', 'maiden', 'grandbazaar', 'galata', 'suleymaniye', 'haydarpasa']) };
 // истинската височина (м) на високите забележителности — мащабът е по-малкият от основата и височината
 LANDMARK_NM.empire = LANDMARK_NM.empire || 'Емпайър Стейт Билдинг'; LANDMARK_NM.stpatrick2 = LANDMARK_NM.stpatrick2 || 'Катедралата „Св. Патрик“'; LANDMARK_NM.chrysler = LANDMARK_NM.chrysler || 'Крайслер Билдинг';
-const LM_REAL_H = { bigben: 96, londoneye: 135, shard: 310, eiffel: 330, galata: 67, maiden: 23, towerbridge: 65, stpeter: 136, liberty: 93, stpatrick: 100, mgu: 176, stbasil: 65, parliament2: 96, rockefeller: 260 };   // mgu — тук е Котелническа (сталинската висотка)
+const LM_REAL_H = { bigben: 96, londoneye: 135, shard: 310, eiffel: 330, galata: 67, maiden: 23, towerbridge: 65, stpeter: 136, liberty: 93, stpatrick: 100, mgu: 176, stbasil: 65, parliament2: 96, rockefeller: 260, radiocity: 60 };   // mgu — тук е Котелническа (сталинската висотка)
 const LM_TURN = { vittoriano2: Math.PI };   // завъртане на модела на реалното място: Витториано — лицето към Пиаца Венеция, гърбът към Колизеума
 // моделите на потребителя (Meshy AI) имат предимство пред процедурните и по-старите: в градовете по истинската карта винаги те
-const LM_PREF = { rockefeller: 'rockefeller2', maiden: 'maiden2', bluemosque: 'mosque', bigben: 'parliament2', bigben2: 'parliament2', colosseo: 'colosseo3', vittoriano: 'vittoriano2' };
+const LM_PREF = { radiocity: 'radiocity2', rockefeller: 'rockefeller2', maiden: 'maiden2', bluemosque: 'mosque', bigben: 'parliament2', bigben2: 'parliament2', colosseo: 'colosseo3', vittoriano: 'vittoriano2' };
 const lmPref = k => (LM_PREF[k] && hasLandmark(LM_PREF[k])) ? LM_PREF[k] : k;
-LANDMARK_NM.maiden2 = LANDMARK_NM.maiden2 || 'Момината кула'; LANDMARK_NM.rockefeller2 = LANDMARK_NM.rockefeller2 || 'Рокфелер Сентър'; LANDMARK_NM.parliament2 = LANDMARK_NM.parliament2 || 'Уестминстърският дворец и Биг Бен'; LANDMARK_NM.colosseo3 = LANDMARK_NM.colosseo3 || 'Колизеумът'; LANDMARK_NM.vittoriano2 = LANDMARK_NM.vittoriano2 || 'Витториано';
+LANDMARK_NM.maiden2 = LANDMARK_NM.maiden2 || 'Момината кула'; LANDMARK_NM.rockefeller2 = LANDMARK_NM.rockefeller2 || 'Рокфелер Сентър'; LANDMARK_NM.radiocity2 = LANDMARK_NM.radiocity2 || 'Радио Сити Мюзик Хол'; LANDMARK_NM.parliament2 = LANDMARK_NM.parliament2 || 'Уестминстърският дворец и Биг Бен'; LANDMARK_NM.colosseo3 = LANDMARK_NM.colosseo3 || 'Колизеумът'; LANDMARK_NM.vittoriano2 = LANDMARK_NM.vittoriano2 || 'Витториано';
 const LM_LABEL = { kotelnicheskaya: 'Котелническа висотка' };   // надписът, когато моделът е назаем (mgu → Котелническа)
 const LM_ALIAS = { suleymaniye: 'mosque2', stpatrick: 'stpatrick2', kotelnicheskaya: 'mgu' }, LM_NOT = new Set(['termini', 'sirkeci', 'saintlazare', 'haydarpasa_st']);   // гарите ги рисува изгледът на града
 function landmarkPlan2(kinds) {
@@ -5528,7 +5528,7 @@ function landmarkPlan2(kinds) {
   const base = k => k.replace(/\d+$/, ''), all = [...new Set(kinds.map(lmPref))]; for (const L of P.landmarks) { if (LM_NOT.has(L.k) || !(LM_EXTRA[S.cityId] && LM_EXTRA[S.cityId].has(L.k))) continue; const k = LM_ALIAS[L.k] || L.k; const kp = lmPref(k); if (!all.some(x => x === kp || base(x) === L.k || x === k) && hasLandmark(kp)) all.push(kp); }
   // 🇺🇸 Ню Йорк: Емпайър Стейт — отделната кула от модела на Манхатън (по името на мешовете), в истинския ръст
   if (all.includes('manhattan')) { all.splice(all.indexOf('manhattan'), 1); const gen = city.group, NYT = [['empire', /emp_?state|empire/i, 381], ['chrysler', /chr[iy]s?t?ler/i, 319]];   // кулите от модела на Манхатън — по имената на възлите
-    const slots = NYT.map(([k, re, h]) => { const at = P.landmarks.find(L => L.k === k); if (!at) return null; const g = new THREE.Group(), o = { group: g, update() {}, kind: k }; g.position.set(at.x, 0, at.z); g.rotation.y = at.rot || 0; city.group.add(g); city.landmarks.push(o); return { g, re, h }; }).filter(Boolean);
+    const slots = NYT.map(([k, re, h]) => { const at = P.landmarks.find(L => L.k === k); if (!at) return null; const g = new THREE.Group(), o = { group: g, update() {}, kind: k }; g.position.set(at.x, 0, at.z); g.rotation.y = at.vrot ?? at.rot ?? 0; city.group.add(g); city.landmarks.push(o); return { g, re, h }; }).filter(Boolean);
     if (slots.length) manhattanTowers().then(parts => { if (city.group !== gen) return; for (const sl of slots) { const pt = parts.find(p => sl.re.test(p.userData.nm || '')); if (!pt) continue;
       pt.scale.multiplyScalar(sl.h * (P.p2.osmData?.k || 0.45) / (pt.userData.h || 1)); sl.g.add(pt); } }); }
   for (const k of all) {
@@ -5539,7 +5539,7 @@ function landmarkPlan2(kinds) {
     let s0 = lmFit(k); if (!s0) { const sg = o.group.userData.sign; if (sg) sg.removeFromParent(); box.setFromObject(o.group).getSize(sz); s0 = Math.max(sz.x, sz.z) || 1; if (sg) o.group.add(sg); }   // моделите (GLB) се зареждат после — по основата им, не по временната плоча
     let k0 = Math.max(at.w, at.d) * 0.95 / s0; const hr = LM_REAL_H[k] || LM_REAL_H[k.replace(/\d+$/, '')];
     if (hr) { let h0 = lmH(k); if (!h0) { box.setFromObject(o.group).getSize(sz); h0 = sz.y || 1; } k0 = Math.min(k0, hr * (P.p2.osmData?.k || 0.45) / h0); }   // кулите — и по истинската височина (парцелът на Парламента е 225 м, а моделът е само Биг Бен)
-    o.group.scale.multiplyScalar(k0); if (at.rot) o.group.rotation.y = at.rot; if (k === 'stpatrick2') o.group.rotation.y += Math.PI / 2; if (LM_TURN[k]) o.group.rotation.y += LM_TURN[k];   /* дългата ос на модела е z, а на парцела — напреки */ o.group.position.set(at.x, 0.1, at.z);
+    o.group.scale.multiplyScalar(k0); o.group.rotation.y = at.vrot ?? at.rot ?? 0; if (k === 'stpatrick2') o.group.rotation.y += Math.PI / 2; if (LM_TURN[k]) o.group.rotation.y += LM_TURN[k];   /* дългата ос на модела е z, а на парцела — напреки */ o.group.position.set(at.x, 0.1, at.z);
     o.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
     city.group.add(o.group); city.landmarks.push(o);
   }
@@ -5785,7 +5785,7 @@ let airSelA = null, airSelB = null;
 function airWinHtml() {
   if (!dev.has('AIR')) return `<div class="meta late">${airLockTxt()}</div><div class="meta">На ниво 9 строиш летища в твоите градове, купуваш самолети и отваряш авиолинии. На ниво 10 линиите стигат до Ню Йорк, Токио, Сингапур, Рио и още 15 града по света — там можеш да отвориш филиал, щом имаш линия дотам.</div>`;
   const aps = Object.keys(S.airports || {}).filter(id => airLv(id)), planes = (S.planes || []).filter(p => inScope(...(p.path || [p.at]))), routes = (S.airRoutes || []).filter(r => inScope(r.a, r.b));
-  let h = `<div class="bw-stats"><div><b>${aps.length}</b><span>летища</span></div><div><b>${airGates()}</b><span>гейта</span></div><div title="2 самолета на летище, 4 на летище на максимално ниво; и не повече от гейтовете (${airGates()})"><b>${planes.length} / ${fleetCap.plane()}</b><span>самолети / лимит</span></div><div><b>${routes.length} / ${maxRoutes()}</b><span>авиолинии</span></div><div><b>${fmt(S.airEarned || 0)} €</b><span>спечелено от полети</span></div></div>
+  let h = `<div class="bw-stats"><div><b>${aps.length}</b><span>летища</span></div><div><b>${airGates()}</b><span>гейта</span></div><div title="Самолетите са колкото гейтовете на летищата ти (${airGates()}) — надгради летище за още"><b>${planes.length} / ${fleetCap.plane()}</b><span>самолети / лимит</span></div><div><b>${routes.length} / ${maxRoutes()}</b><span>авиолинии</span></div><div><b>${fmt(S.airEarned || 0)} €</b><span>спечелено от полети</span></div></div>
     <div class="meta">Поддръжка на летищата и самолетите: <span class="late">−${fmt(airUpkeep())} €/ден</span>. Самолетите летят сами по случайни линии в обсега си.${dev.has('WORLD') ? '' : ' 🔒 Градовете по света идват на ниво 10.'}</div>`;
   // летищата в твоите градове
   h += bwCard('🛫 Летища', ownedCities().filter(id => scopeNow() === 'intl' || inScope(id)).map(id => {
@@ -9488,6 +9488,7 @@ if (AUTOTEST) {
   window.__dbg = {
     state: () => S,
     muni: () => muni,   // 🏛️ поръчките на общината (тест)
+    fleetCapTest() { econ.earn(5e10, 'друго', 'тест'); S.dev.lv = 12; S.dev.xp = 6e5; S.airports = {}; S.ports = {}; for (const id of ['sofia', 'varna', 'burgas', 'plovdiv', 'istanbul', 'athens', 'rome', 'paris', 'london', 'berlin']) { S.airports[id] = { lv: 7, build: null }; S.ports[id] = { lv: 5, build: null, xb: 4 }; } S.planes = S.planes || []; const p0 = S.planes.length; for (let i = 0; i < 90; i++) buyPlane('prop'); const s0 = (S.ships || []).length; for (let i = 0; i < 90; i++) { try { buyShip('boat'); } catch (e) { break; } } $('modal')?.classList.add('hidden'); return { gates: airGates(), planeCap: fleetCap.plane(), planes: S.planes.length - p0, berths: portBerths(), shipCap: fleetCap.ship(), ships: (S.ships || []).length - s0 }; },
     pickTest(a, kind = 'hw') { mapEU = true; showMap(true); if (kind === 'hw') { railPick = null; hwPick = a || 'pickA'; } else { hwPick = null; railPick = a || 'pickA'; } drawMap(); return pickSvg().split('<line').length - 1; },
     mmTest() { if (!city.mm) return 'none'; try { city.mm.update({ camera, target: controls.target, marks: [] }); return 'ok'; } catch (e) { return 'err ' + e.message + ' ' + (e.stack || '').split('\n')[1]; } },
     beams: () => (updMyBeams(), { n: myBeams.mesh && myBeams.mesh.count, vis: myBeams.mesh && myBeams.mesh.visible, err: myBeams.err || null, t: lmLabT }),

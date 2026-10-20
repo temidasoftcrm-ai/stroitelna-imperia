@@ -11,7 +11,7 @@ import { loadConstruct } from './construct.js';
 const TILE = 8, NB = 9, N = NB * 3 + 1, C = (NB - 1) / 2, HQ = [4, 5];
 const tx = i => (i - (N - 1) / 2) * TILE;
 const isRoad = (i, j) => i % 3 === 0 || j % 3 === 0;
-const KENNEY = 'abcdefghijklmnopqrstu'.split('').map(c => 'building-type-' + c);
+const KENNEY = ['building-type-a', 'building-type-b'];   // детските c…u вече не се зареждат
 // истинските къщи вместо детските Kenney (feature 'houses-real'): A/B (assets/houses) и одобрените h2-* (assets/heavy/houses2)
 const H2 = ['h2-greyporch', 'h2-brickcabin', 'h2-pink', 'h2-townhouse', 'h2-blue', 'h2-swedish', 'h2-lodge', 'h2-porch'].filter(n => feature(n));
 const REAL = feature('houses-real') && H2.length >= 2 ? ['building-type-a', 'building-type-b', ...H2] : null;

@@ -267,15 +267,32 @@ function romeBridges(G, D) {
 // на трафика (traffic.js → tr.signals), знаци „Стоп“ на второстепенните, пейки и кошчета по площадите, фонтани, спирки
 // ---- нощем улиците светят оранжево (като от самолет): адитивна ивица по всяка улица за коли — по-ярко по двата края (фенерите), по-тъмно
 // в средата; черен цвят + emissive, така че денем (emissiveIntensity 0) не се вижда. Видима и отдалеч (за разлика от фенерите).
-function streetGlow(G, P) {
+function streetGlow(G, P, style) {
   const parts = []; for (const rd of P.roads) if (!rd.noCars && rd.pts.length > 1) parts.push(ribbon(rd.pts, rd.w + 2 * (rd.walk || 2), 0.16));
   if (!parts.length) return null;
   const c = document.createElement('canvas'); c.width = 64; c.height = 1; const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 64, 0);
   gr.addColorStop(0, '#000'); gr.addColorStop(0.12, '#d8d8d8'); gr.addColorStop(0.3, '#383838'); gr.addColorStop(0.5, '#202020'); gr.addColorStop(0.7, '#383838'); gr.addColorStop(0.88, '#d8d8d8'); gr.addColorStop(1, '#000'); g.fillStyle = gr; g.fillRect(0, 0, 64, 1);
-  const t = new THREE.CanvasTexture(c), mat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xff9a3a, emissiveMap: t, emissiveIntensity: 0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 });
-  mat.userData.winK = 0.75;
+  const t = new THREE.CanvasTexture(c), mat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: { rome: 0xff7a18, istanbul: 0xffb27a, paris: 0xffb860, london: 0xffa850, moscow: 0xffb070 }[style] ?? 0xff9a3a, emissiveMap: t, emissiveIntensity: 0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 });
+  mat.userData.winK = style === 'rome' ? 0.85 : 0.75;   // Рим — натриево (по-оранжево, малко по-силно), Истанбул — смесено (по-бяло)
   const m = merge(parts, mat), uv = m.geometry.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, i % 2, 0.5);   // лентите са двойки връх (ляв, десен) — uv.x напреки
   m.receiveShadow = false; m.renderOrder = 2; G.add(m); return mat;
+}
+// ---- прожекторите на забележителностите (нощем): при основата — ниска топла „мъгла“ нагоре (отворен цилиндър с градиент, адитивен)
+// по периметъра на парцела; самите модели светват с floodMats (играта/демото ги подават на dayNight.winMats)
+function floodWash(G, P) {
+  const lms = P.lots.filter(L => L.lm && !/^(termini|sirkeci|saintlazare|waterloo|grandcentral|kursky|haydarpasa|maiden|liberty|towerbridge|redsquare|circusmax|timessquare)$/.test(L.lm)); if (!lms.length) return null;
+  const c = document.createElement('canvas'); c.width = 4; c.height = 64; const g = c.getContext('2d'), gr = g.createLinearGradient(0, 64, 0, 0); gr.addColorStop(0, '#fff'); gr.addColorStop(0.35, '#555'); gr.addColorStop(1, '#000'); g.fillStyle = gr; g.fillRect(0, 0, 4, 64);
+  const mat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffc070, emissiveMap: new THREE.CanvasTexture(c), emissiveIntensity: 0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  mat.userData.winK = 0.5;
+  const im = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1.15, 1, 28, 1, true).translate(0, 0.5, 0), mat, lms.length), m = new THREE.Matrix4();
+  lms.forEach((L, i) => { const r = Math.max(L.w, L.d) * 0.5; im.setMatrixAt(i, m.makeScale(r, Math.min(45, 10 + r * 0.6), r).setPosition(L.x, 0.2, L.z)); });
+  im.frustumCulled = false; im.renderOrder = 3; G.add(im); return mat;
+}
+// материалите на модел-забележителност светват нощем (прожектори): emissive = топъл цвят, emissiveMap = текстурата; вече светещите (nightfloors) — не
+export function floodMats(obj, col = 0xffd8a0, k = 0.45) {
+  const out = []; obj.traverse(o => { if (!o.isMesh) return; for (const m of [].concat(o.material)) { if (!m || !('emissive' in m) || m.userData.flood || m.userData.nfK || m.emissiveMap || WIN_MATS.includes(m)) continue;
+    m.emissive = new THREE.Color(col); if (m.map) m.emissiveMap = m.map; m.emissiveIntensity = 0; m.userData.winK = k; m.userData.flood = 1; out.push(m); } });
+  return out;
 }
 function* furniture(G, P) {   // генератор: yield след всеки път (постепенното строене)
   const FURN = new THREE.Group(); G.add(FURN); let SIG = {};
@@ -463,7 +480,7 @@ export function buildPlan2View(P, opts = {}) {
       ST.lampsOut = F.lamps.filter((_, i) => i % Math.max(1, Math.ceil(F.lamps.length / 160)) === 0).map(([x, z]) => ({ x: x + off[0], y: 4.8, z: z + off[1] }));
       api.setNight(ST.night); }
     tm('furniture'); yield 0;
-    if (D) { ST.glow = streetGlow(G, P); tm('glow'); yield 0; }
+    if (D) { ST.glow = streetGlow(G, P, D.style); ST.wash = floodWash(G, P); tm('glow'); yield 0; }
     // Рома Термини (opts.termini): гарата по фасадата към площада (opts.stationModel — моделът на играта, иначе кутия) и перони с навеси и коловози
     const TL = opts.termini ? P.lots.find(L => L.lm === 'termini' || L.lm === 'sirkeci' || L.lm === 'saintlazare' || L.lm === 'waterloo' || L.lm === 'grandcentral' || L.lm === 'kursky') : null;   // главната гара: Термини (Рим), Сиркеджи (Истанбул), Сен Лазар (Париж), Ватерло, Гранд Сентрал, Курската
     if (TL) G.add(terminiView(TL, opts.stationModel, opts.stationFacing));   // stationFacing: { face: '-z', depth: 0.8 } — фасадата на модела е към −z (към улицата), сградата заема 80 % от дълбочината
@@ -490,9 +507,9 @@ export function buildPlan2View(P, opts = {}) {
     timing: TM, refill,
     get blocks() { return ST.BL ? ST.BL.list : []; },
     hideBlocks: set => ST.BL && ST.BL.hide(set),
-    get nightMats() { return [...(ST.F ? [ST.F.lampMat] : []), ...WIN_MATS, ...(ST.glow ? [ST.glow] : [])]; },
+    get nightMats() { return [...(ST.F ? [ST.F.lampMat] : []), ...WIN_MATS, ...(ST.glow ? [ST.glow] : []), ...(ST.wash ? [ST.wash] : [])]; },
     get lamps() { return ST.lampsOut; },   // за daynight.js (до 160) — готови, когато progress стигне 1 (или веднага без progressive)
-    setNight(on) { ST.night = !!on; if (ST.F) ST.F.lampMat.emissiveIntensity = on ? 2.2 : 0.2; if (ST.pools) ST.pools.visible = !!on; for (const m of [...WIN_MATS, ...(ST.glow ? [ST.glow] : [])]) m.emissiveIntensity = on ? (m.userData.winK || 1) : 0; },
+    setNight(on) { ST.night = !!on; if (ST.F) ST.F.lampMat.emissiveIntensity = on ? 2.2 : 0.2; if (ST.pools) ST.pools.visible = !!on; for (const m of [...WIN_MATS, ...(ST.glow ? [ST.glow] : []), ...(ST.wash ? [ST.wash] : [])]) m.emissiveIntensity = on ? (m.userData.winK || 1) : 0; },
     // постепенното строене (opts.progressive): pump(ms) — от frame() на играта, работи до ms милисекунди; progress() — 0…1; cancel() — при смяна на града
     pump(ms = 4) { if (done || cancelled) return 1; const t0 = performance.now(); while (!done && performance.now() - t0 < ms) step(); if (done) TM.total = performance.now() - T0; return api.progress(); },
     progress: () => done ? 1 : Math.min(0.99, units / EST),
@@ -590,7 +607,8 @@ function seaTraffic(G, D, models) {
 }
 // ---- Таймс Скуеър: ъгловата сграда с билбордове (assets/heavy/lm/timessq.glb, Building-studio, CC BY; плакатите — наши реклами) в 4 копия
 // по двата края на площада (по дългата му ос), обърнати към него; нощем билбордовете светят сами (emissiveMap = map → WIN_MATS)
-function timesSquareView(L, model) {
+function timesSquareView(L0, model) {
+  const L = L0.vrot != null ? { ...L0, rot: L0.vrot } : L0;
   const g = new THREE.Group(), lit = new Set();
   model.traverse(o => { const uv = o.isMesh && o.geometry.attributes.uv; let rep = false; if (uv) for (let i = 0; i < uv.count && !rep; i++) rep = Math.abs(uv.getX(i)) > 1.05 || Math.abs(uv.getY(i)) > 1.05;   /* стените (повтаряща се текстура) не светят — само билбордовете */
     if (o.isMesh && !rep) for (const m of [].concat(o.material)) if (m && m.map && !lit.has(m) && !WIN_MATS.includes(m)) { m.emissive = new THREE.Color(0xffffff); m.emissiveMap = m.map; m.emissiveIntensity = 0; m.userData.winK = 1.6; WIN_MATS.push(m); lit.add(m); } });
@@ -604,7 +622,8 @@ function timesSquareView(L, model) {
     w.traverse(m => { if (m.isMesh) m.castShadow = m.receiveShadow = true; }); g.add(w); }
   return g;
 }
-function terminiView(L, model, sf = {}) {
+function terminiView(L0, model, sf = {}) {
+  const L = L0.vrot != null ? { ...L0, rot: L0.vrot } : L0;   // vrot — истинското завъртане (Ню Йорк)
   const g = new THREE.Group(), nx = -Math.sin(L.rot), nz = -Math.cos(L.rot), tx = Math.cos(L.rot), tz = -Math.sin(L.rot), len = 140, N = 9;
   const roof = new THREE.MeshStandardMaterial({ color: 0xc9ccd0, roughness: 0.5, metalness: 0.4 }), plat = M(0xb9b2a4), rail = M(0x5a544c), col = M(0x6d7278);
   // сградата: моделът, побран в предните 55 % от парцела, с лицето към площада

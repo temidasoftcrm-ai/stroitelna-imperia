@@ -545,7 +545,7 @@ function placeLots(P, sk, r) {
   // истинската карта: забележителностите на реалните си места (основа fp, защитен периметър guard) — парцел със запазено място
   if (P.osm) for (const lm of sk.osm.landmarks || []) { if (lm.late) continue;   // късните — след номерирането на парцелите (по-долу)
     let best = null, bd = 1e9; for (const rd of P.roads) for (const q of rd.pts) { const d = dist(q, [lm.x, lm.z]); if (d < bd) { bd = d; best = rd; } }
-    const L = { x: lm.x, z: lm.z, w: lm.fp[0], d: lm.fp[1], rot: lm.rot || 0, zone: 'center', big: 'lm', lm: lm.k, reserved: 'lm:' + lm.k, guard: lm.guard, front: { road: best ? best.id : 0, s: 0, side: 1, cls: best ? best.cls : 'street' } };
+    const L = { x: lm.x, z: lm.z, w: lm.fp[0], d: lm.fp[1], rot: lm.rot || 0, ...(lm.vrot != null ? { vrot: lm.vrot } : {}),   /* vrot — завъртането на модела (Ню Йорк: rot е с обратен знак) */ zone: 'center', big: 'lm', lm: lm.k, reserved: 'lm:' + lm.k, guard: lm.guard, front: { road: best ? best.id : 0, s: 0, side: 1, cls: best ? best.cls : 'street' } };
     lg.add([L.x, L.z], L); lots.push(L); bigs.push(L);
   }
   for (const [kind, w0, d0, want] of BIG || []) for (const f of [1, 0.85, 0.7]) {   // ако не се събере — по-малко
@@ -603,9 +603,9 @@ function placeLots(P, sk, r) {
   // остават със същите id-та и се маркират under: '<lm>' — играта не строи там (иначе номерата на парцелите в записаните игри се разместват)
   if (P.osm) for (const lm of sk.osm.landmarks || []) { if (!lm.late) continue;
     let best = null, bd = 1e9; for (const rd of P.roads) for (const q of rd.pts) { const d = dist(q, [lm.x, lm.z]); if (d < bd) { bd = d; best = rd; } }
-    const L = { id: lots.length, x: lm.x, z: lm.z, w: lm.fp[0], d: lm.fp[1], rot: lm.rot || 0, zone: 'center', big: 'lm', lm: lm.k, reserved: 'lm:' + lm.k, guard: lm.guard, block: null, front: { road: best ? best.id : 0, s: 0, side: 1, cls: best ? best.cls : 'street' } };
+    const L = { id: lots.length, x: lm.x, z: lm.z, w: lm.fp[0], d: lm.fp[1], rot: lm.rot || 0, ...(lm.vrot != null ? { vrot: lm.vrot } : {}), zone: 'center', big: 'lm', lm: lm.k, reserved: 'lm:' + lm.k, guard: lm.guard, block: null, front: { road: best ? best.id : 0, s: 0, side: 1, cls: best ? best.cls : 'street' } };
     L.poly = rectCorners(L.x, L.z, L.w / 2, L.d / 2, L.rot); L.area = Math.round(L.w * L.d);
-    for (const q of lots) if (!q.big && rectsOverlap(q, L, 0)) q.under = lm.k;
+    const LV = L.vrot != null ? { ...L, rot: L.vrot } : L; for (const q of lots) if (!q.big && rectsOverlap(q, LV, 0)) q.under = lm.k;   // по истинското завъртане
     lots.push(L); }
   // застрояване по размер на града и зона (какви модели стават за парцела — не прескача прогреса на играча):
   // малък — къщи и ниски; среден — къщи, блокове и компактен офисен център; голям — плътни квартали и група високи в центъра;

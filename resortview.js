@@ -106,7 +106,6 @@ export const RESORT_MODELS = {
   commercial2: ['detail-parasol-a', 'detail-parasol-b'],
   nature: ['tree_palm', 'tree_palmBend', 'tree_palmTall', 'tree_palmDetailedTall', 'rock_largeA', 'tree_pineTallA', 'tree_default_fall'],
   modular: ['building-sample-tower-a', 'building-sample-tower-c', 'building-sample-tower-d', 'building-sample-house-c'],
-  suburban: ['building-type-k', 'building-type-n', 'building-type-o', 'building-type-s', 'building-type-t', 'building-type-u'],
 };
 
 // deps: { model(name, scale), houses: [имена], realHouses (без Kenney), tintRoof(obj, seed), fitScale(name, size), label(text, color, w) }
@@ -384,7 +383,7 @@ export function buildResortView(A, r, st, season, deps) {
       if (!summer && A['sf-aframe'] && k % 2 === 0) { o = deps.model('sf-aframe', deps.fitScale('sf-aframe', 13)); o.rotation.y = 0; }   // A-frame хижи (Sketchfab), редувани с дървените
       else if (!summer && A['cabin-wall']) o = buildChalet(A, deps.model, 3.4, k);   // зимните курорти: дървени хижи
       else {
-        const sub = deps.realHouses ? [] : RESORT_MODELS.suburban.filter(n => A[n]), pool = sub.length ? sub : deps.houses, n = pool[(k * 3 + r.id.length) % pool.length];   // истинските къщи (feature 'houses-real') — вместо Kenney
+        const pool = deps.houses, n = pool[(k * 3 + r.id.length) % pool.length];   // истинските къщи (feature 'houses-real') — вместо Kenney
         const fit = n.startsWith('h2-') ? 14 : n === 'building-type-a' || n === 'building-type-b' ? 15 : 11;
         o = deps.model(n, deps.fitScale(n, fit)); if (fit === 11) deps.tintRoof(o, k * 7 + r.id.length);
       }
