@@ -90,6 +90,7 @@ const nearR = () => P && P.osm ? 160 : NEAR;   // Рим — много сгра
 const LOD_MAT = new THREE.MeshStandardMaterial({ roughness: 0.9 }), LC = new THREE.Color();
 // Рим отдалеч: сградата — кутия с фасада (прозорци със зелени капаци, партер с арки; цветът — от инстанцията) и керемиден покрив на две води
 function lodSetup() {
+  for (const k in lodIM || {}) for (const im of lodIM[k]) { city.remove(im); im.dispose(); } if (lodBox) { city.remove(lodBox); lodBox.dispose(); lodBox = null; }   // повторно (постепенното строене: след фоновите сгради)
   lodIM = {}; lodAt = null; const n = {}; for (const b of BLD) n[b.k] = (n[b.k] || 0) + 1;
   const Z0 = new THREE.Matrix4().makeScale(0, 0, 0); for (const k in n) lodIM[k] = instance(city, k, Array(n[k]).fill(Z0));
   lodBox = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), LOD_MAT, Math.max(1, BLD.length)); lodBox.frustumCulled = false; lodBox.receiveShadow = true;
@@ -176,13 +177,16 @@ function romeNear() {
   VIEW.userData.blocks.forEach((b, i) => { const k = have[((i * 2654435761) >>> 0) % have.length]; put(k, { x: b.x, z: b.z, w: b.w, d: b.d, rot: b.rot, build: 'rome' }, 0.6, b.h); const e = BLD[BLD.length - 1]; e.blk = b; e.col = b.col; e.box = b.M; });
 }
 function inPoly2(p, poly) { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > p[1]) !== (zj > p[1]) && p[0] < (xj - xi) * (p[1] - zi) / (zj - zi) + xi) c = !c; } return c; }
+let BUILD_MS = null, PEND = null, FULL_T0 = 0, FULL_MS = null;
+const PROG = /[?&]prog=1/.test(location.search);   // постепенното строене на града (cityplan2-3d.js: progressive, pump)
 function build() {
+  const tb0 = FULL_T0 = performance.now(); BUILD_MS = null; PEND = null; FULL_MS = null; if (VIEW && VIEW.userData.cancel) VIEW.userData.cancel();
   if (tr) { tr.clear(); tr = null; }
   if (city) { scene.remove(city); city.traverse(o => { if (o.isInstancedMesh) o.dispose(); if (o.geometry && !o.userData.shared) o.geometry.dispose(); }); }   // InstancedMesh.dispose — буферите на инстанциите
   city = new THREE.Group(); scene.add(city);
   OSMD = OSM2[fam.value] || null;
   P = fam.value === 'rome' ? (ROME_SAVED ? plan2Load(ROME_SAVED, OSM2.rome) : plan2('rome', { osm: OSM2.rome, size: 'xl' })) : fam.value === 'istanbul' ? (IST_SAVED ? plan2Load(IST_SAVED, OSM2.istanbul) : plan2('istanbul', { osm: OSM2.istanbul, size: 'xl' })) : fam.value === 'moscow' ? (MOS_SAVED ? plan2Load(MOS_SAVED, OSM2.moscow) : plan2('moscow', { osm: OSM2.moscow, size: 'xl' })) : fam.value === 'newyork' ? (NY_SAVED ? plan2Load(NY_SAVED, OSM2.newyork) : plan2('newyork', { osm: OSM2.newyork, size: 'xl' })) : fam.value === 'london' ? (LON_SAVED ? plan2Load(LON_SAVED, OSM2.london) : plan2('london', { osm: OSM2.london, size: 'xl' })) : fam.value === 'paris' ? (PARIS_SAVED ? plan2Load(PARIS_SAVED, OSM2.paris) : plan2('paris', { osm: OSM2.paris, size: 'xl' })) : plan2('demo', { fam: fam.value, size: size.value, seed: +seed.value || 0 });
-  VIEW = buildPlan2View(P, { osm: OSMD, bridgeModels: { bosphorus: A['lm-bosphorus'] }, boatModels: { ferry: A['sh-ferry'], cruise: A['sh-cruise'], tanker: A['sh-tanker'], container: A['sh-container'], small: ['bt-fish', 'bt-sail', 'bt-motor', 'bt-yacht', 'bt-sail', 'bt-fish', 'bt-motor'].map(k => A[k]).filter(Boolean) }, termini: true, stationModel: (fam.value === 'paris' && A['lm-lazare2']) || (fam.value === 'newyork' && A['lm-gct']) || A['station-big'] || A.station, stationFacing: fam.value === 'newyork' && A['lm-gct'] ? { face: '-z', depth: 0.8 } : undefined, ...(OSMD && feature('free-plots') ? { fillLot: L => !demoFree(L), freeLot: demoFree } : {}) }); city.add(VIEW);
+  VIEW = buildPlan2View(P, { progressive: PROG, osm: OSMD, bridgeModels: { bosphorus: A['lm-bosphorus'] }, boatModels: { ferry: A['sh-ferry'], cruise: A['sh-cruise'], tanker: A['sh-tanker'], container: A['sh-container'], small: ['bt-fish', 'bt-sail', 'bt-motor', 'bt-yacht', 'bt-sail', 'bt-fish', 'bt-motor'].map(k => A[k]).filter(Boolean) }, termini: true, stationModel: (fam.value === 'paris' && A['lm-lazare2']) || (fam.value === 'newyork' && A['lm-gct']) || A['station-big'] || A.station, stationFacing: fam.value === 'newyork' && A['lm-gct'] ? { face: '-z', depth: 0.8 } : undefined, ...(OSMD && feature('free-plots') ? { fillLot: L => !demoFree(L), freeLot: demoFree } : {}) }); city.add(VIEW);
   const trees = [];
   // парцели: очертания + сгради по зона; големите места — свой модел (паркът — дървета)
   const lp = []; for (const L of P.lots) for (let i = 0; i < 4; i++) { const a = L.poly[i], b = L.poly[(i + 1) % 4]; lp.push(a[0], 0.15, a[1], b[0], 0.15, b[1]); }
@@ -199,9 +203,11 @@ function build() {
     if (L.big) { const k = { hospital: 'hospital', station: 'station', stadium: 'stadium', special: 'cityhall' }[L.big]; put(k, L, 6); continue; }
     const [list, hMax] = BUILD[L.build] || BUILD.house, have = list.filter(k => A[k]); put(pick(have, L.id), L, L.build === 'house' ? 5 : 4, hMax);
   }
-  if (P.osm && fam.value === 'rome') romeNear();   // италианските модели — само в Рим (Истанбул — фасадите на модула и отблизо)
+  if (PROG && !VIEW.userData.done) PEND = () => { if (P.osm && fam.value === 'rome') romeNear(); lodSetup(); };   // ?prog=1: италианските модели — когато фоновите сгради са готови
+  else if (P.osm && fam.value === 'rome') romeNear();   // италианските модели — само в Рим (Истанбул — фасадите на модула и отблизо)
   lodSetup();
   spawnCars(); anchorsView(); distView(distOn); stats(); view(viewMode);
+  { const tb1 = performance.now(); requestAnimationFrame(() => requestAnimationFrame(() => { BUILD_MS = { build: Math.round(tb1 - tb0), firstFrame: Math.round(performance.now() - tb0) }; })); }   // замерване: построяване и първи кадър
   // минипътът (Lab: minimap) — само градовете по истинската карта; в демото „твоите обекти“ са примерни (до централата); камерата е в рамката на плана → camOffset
   if (MM) { MM.dispose(); MM = null; }
   if (OSMD && feature('minimap')) { P.osmData = OSMD; const gp = gamePlan2(P, { tier: 2 }), [ox, oz] = gp.offset, hq = gp.lots[gp.hqLot];
@@ -318,7 +324,8 @@ document.getElementById('mem').onclick = async () => {
 scene.background = new THREE.Color(0x9fc9ee); build();
 let last = performance.now();
 R.setAnimationLoop(() => { const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now;
-  const t0 = performance.now(); moveCars(dt); const t1 = performance.now(); ctl.update(); lodUpdate(); R.render(scene, cam); const t2 = performance.now(); if (MM && (mmT += dt) > 0.15) { mmT = 0; MM.update({ camera: cam, marks: MM_MARKS }); }
+  const t0 = performance.now(); moveCars(dt); const t1 = performance.now(); if (VIEW && VIEW.userData.pump && !VIEW.userData.done) { VIEW.userData.pump(4); if (VIEW.userData.done) { if (PEND) { const f = PEND; PEND = null; f(); } FULL_MS = Math.round(performance.now() - FULL_T0); } }
+  ctl.update(); lodUpdate(); R.render(scene, cam); const t2 = performance.now(); if (MM && (mmT += dt) > 0.15) { mmT = 0; MM.update({ camera: cam, marks: MM_MARKS }); }
   T.tr += t1 - t0; T.rn += t2 - t1; T.n++; fr++; if (bench) benchTick(now); if (now - ft > 1000) { fps = fr; fr = 0; ft = now; stats(); } });
-window.__p2 = { distView, vitRot: r => { VIT_ROT = r; }, city: () => city, camTop: (x, z, h = 70) => { ctl.target.set(x, 0, z); cam.position.set(x, h, z + 0.01); ctl.update(); lodUpdate(true); }, camAt: (x, z, d = 40) => { ctl.target.set(x, 0, z); cam.position.set(x + d * 0.55, d * 0.85, z + d * 0.75); ctl.update(); lodUpdate(true); }, P: () => P, view, setNight, cars: () => cars, tr: () => tr && tr.stats(), bench: benchStart, lod: () => ({ near: Object.values(lodIM).reduce((a, ims) => a + (ims[0]?.count || 0), 0), far: lodBox?.count }) };
+window.__p2 = { vw: () => VIEW, buildMs: () => BUILD_MS && { ...BUILD_MS, full: PROG ? FULL_MS : BUILD_MS.firstFrame, view: VIEW && VIEW.userData.stats && VIEW.userData.stats() }, distView, vitRot: r => { VIT_ROT = r; }, city: () => city, camTop: (x, z, h = 70) => { ctl.target.set(x, 0, z); cam.position.set(x, h, z + 0.01); ctl.update(); lodUpdate(true); }, camAt: (x, z, d = 40) => { ctl.target.set(x, 0, z); cam.position.set(x + d * 0.55, d * 0.85, z + d * 0.75); ctl.update(); lodUpdate(true); }, P: () => P, view, setNight, cars: () => cars, tr: () => tr && tr.stats(), bench: benchStart, lod: () => ({ near: Object.values(lodIM).reduce((a, ims) => a + (ims[0]?.count || 0), 0), far: lodBox?.count }) };
 </script></body></html>

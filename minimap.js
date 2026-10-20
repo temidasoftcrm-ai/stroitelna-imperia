@@ -29,11 +29,11 @@ export function createMinimap(gp, o = {}) {
 
   // ---- основата (веднъж)
   const base = document.createElement('canvas'); base.width = base.height = W; const b = base.getContext('2d');
-  b.fillStyle = '#d9d2c3'; b.fillRect(0, 0, W, W);
-  // вода: по пиксели (waterAt) — до 256×256 проби
-  const N = Math.min(256, W), img = b.getImageData(0, 0, W, W), cell = W / N;
+  // суша и вода: пикселите се пишат направо (createImageData — без getImageData: четенето от платното струваше ~2 s); до 192×192 проби на waterAt
+  const N = Math.min(192, W), img = b.createImageData(W, W), D8 = img.data, cell = W / N;
+  for (let q = 0; q < D8.length; q += 4) { D8[q] = 217; D8[q + 1] = 210; D8[q + 2] = 195; D8[q + 3] = 255; }
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) if (gp.waterAt(wx((i + 0.5) * cell), wz((j + 0.5) * cell)))
-    for (let v = Math.floor(j * cell); v < Math.floor((j + 1) * cell); v++) for (let u = Math.floor(i * cell); u < Math.floor((i + 1) * cell); u++) { const q = (v * W + u) * 4; img.data[q] = 86; img.data[q + 1] = 142; img.data[q + 2] = 196; }
+    for (let v = Math.floor(j * cell); v < Math.floor((j + 1) * cell); v++) for (let u = Math.floor(i * cell); u < Math.floor((i + 1) * cell); u++) { const q = (v * W + u) * 4; D8[q] = 86; D8[q + 1] = 142; D8[q + 2] = 196; }
   b.putImageData(img, 0, 0);
   const poly = (pts, sh) => { b.beginPath(); pts.forEach(([x, z], i) => b[i ? 'lineTo' : 'moveTo'](px(x + sh[0]), pz(z + sh[1]))); b.closePath(); };
   // паркове
