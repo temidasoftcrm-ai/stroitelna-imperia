@@ -644,6 +644,32 @@ async function plan2Preload(s) {
   catch (e) { console.warn('plan2', e); }
 }
 const plan2Plan = id => { const t = plan2Tier(), c = plan2.cache; if (c && c.id === id && c.t === t) return c.P; const P = plan2.mod.gamePlan2(plan2.data[id], { tier: t }); plan2.cache = { id, t, P }; return P; };
+// старите записи: градът по истинската карта идва сам, ако още нямаш нищо там; иначе — по избор с изкупуване (plan2Move)
+const plan2Ready = () => feature('rome-osm') && feature('rome-game');
+const plan2Touched = (s, id) => s.cityId === id || s.hqCity === id || !!(s.cities || {})[id] || (s.branches || []).includes(id);
+function plan2Adopt(s) { if (!s || !plan2Ready()) return; for (const id of PLAN2_CITIES) if (!(s.plan2 && s.plan2[id]) && !plan2Touched(s, id)) s.plan2 = { ...(s.plan2 || {}), [id]: 1 }; }
+// преместване на филиала в новия град (сега си в него): имотите и земята — изкупени по пазарна цена +15%, текущите обекти — платени изцяло;
+// остават техниката, служителите, развитието, нивата на офиса/гаража/склада/гарата и купените квартали (те отключват рионе)
+const plan2MoveValue = () => { const E = S.estate || {}; return Math.round(((E.owned || []).reduce((a, o) => a + (o.value || 0), 0) * 1.15 + (E.land || []).reduce((a, id) => a + (city.lots[id] ? lotPrice(city.lots[id]) : 0), 0)
+  + projects.reduce((a, p) => a + Math.max(0, (p.reward || 0) * (1 - (p.prog || 0))), 0)) / 1000) * 1000; };
+function plan2Move() {
+  const id = S.cityId; if (!PLAN2_CITIES.has(id) || (S.plan2 && S.plan2[id]) || !plan2Ready()) return;
+  const v = plan2MoveValue(); if (v > 0) econ.earn(v, 'продажба', `Новият ${cityName()}: изкупени имоти и обекти`);
+  for (const p of [...projects]) { if (p.lot != null && city.lots[p.lot]) city.lots[p.lot].busy = null; }
+  projects.length = 0;
+  Object.assign(S, { offers: [], built: [], cleared: [], cash: [], estate: { land: [], owned: [], listings: [] }, landPrice: {}, parks: [], garageLot: null, whLot: null, buildQ: [], autoJobs: [], rbuild: null });
+  delete S.extBig; delete S.megaV; delete S.lotAuto;
+  if (S.landmarks) delete S.landmarks[id]; if (S.svc) delete S.svc[id]; if (S.muni) delete S.muni[id];
+  for (const t of TENDERS.filter(t => t.city === id)) { if (S.tenderLots) delete S.tenderLots[t.id]; if (S.tenderLots4) delete S.tenderLots4[t.id]; }
+  S.plan2 = { ...(S.plan2 || {}), [id]: 1 }; S.projects = projects;
+  toast(`🇮🇹 Минаваш в новия ${cityName()}${v ? ` — общината изкупи имотите и обектите ти за ${fmt(v)} €` : ''}.`, 'good');
+  save(); sessionStorage.setItem('stroiEnter', '1'); location.reload();
+}
+function plan2MoveCard() {
+  if (!S || !PLAN2_CITIES.has(S.cityId) || (S.plan2 && S.plan2[S.cityId]) || !plan2Ready()) return '';
+  return `<div class="card" style="border:1px solid #d4af37"><h3>🇮🇹 Новият ${cityName()} по истинската карта</h3><div class="meta">Истинските улици, Тибърът с мостовете, кварталите (рионе), Термини и забележителностите на реалните им места. Минаваш с техниката, служителите и нивата си; имотите и земята ти тук общината изкупува по пазарна цена +15%, а текущите обекти плаща изцяло: <b style="color:var(--ok)">${fmt(plan2MoveValue())} €</b>.</div>
+    <div class="row" style="justify-content:flex-end"><button class="btn" data-p2move="1">🏛️ Мини в новия ${cityName()}</button></div></div>`;
+}
 const planOf = id => plan2On(id) ? plan2Plan(id) : planOn(id) ? gamePlan(id, { exts: Math.max(MAX_EXT, extRule(id)), landmark: !!CITY_LANDMARKS[id], seaside: SEASIDE.includes(id), mega: MEGAPOLIS.has(id), bigZone: bigZoneOf(id), clean: S.planAll >= 6, clean2: S.planAll >= 9, tpl: (S.planAll >= 7 && PLAN_TPL7[id]) || (S.planAll >= 5 && PLAN_TPL5[id]) || (S.planAll >= 4 ? PLAN_TPL4[id] : undefined) }) : null;
 // запазената зона в плана за голямата забележителност: колкото W×D парцела на мрежата ((3W − 1) плочки − 2 м)
 function bigZoneOf(id) { const b = (BIG_LANDMARKS[id] || [])[0]; if (!b) return null; const [kind, W, D, asp = 1, turn = 0] = b; return { kind, W, D, asp, turn, size: [(3 * W - 1) * TILE - 2, (3 * D - 1) * TILE - 2] }; }
@@ -2985,7 +3011,7 @@ function renderPanel() {
   } else if (tab === 'bank') {
     h += `<div id="financeBox"></div>`;
   } else if (tab === 'hq') {
-    h += hqCard('office') + linksCard() + stationCard() + airportCard() + districtCard() + finishCityCard() + sellBranchCard();
+    h += plan2MoveCard() + hqCard('office') + linksCard() + stationCard() + airportCard() + districtCard() + finishCityCard() + sellBranchCard();
   } else if (tab === 'store') {
     h += storeHtml();
   }
@@ -3015,6 +3041,7 @@ function renderPanel() {
   if (el.querySelector('#bGarWin')) el.querySelector('#bGarWin').onclick = () => openBig('garage');
   el.querySelectorAll('[data-buytrain]').forEach(b => b.onclick = () => { buyTrain(b.dataset.buytrain); renderPanel(); });
   el.querySelectorAll('[data-upg]').forEach(b => b.onclick = () => startUpgrade(b.dataset.upg));
+  el.querySelectorAll('[data-p2move]').forEach(b => b.onclick = () => modal(`🇮🇹 Новият ${cityName()}`, `Минаваш в новия ${cityName()} по истинската карта. Сградите и имотите ти тук остават в стария град — общината ги изкупува за <b>${fmt(plan2MoveValue())} €</b>. Това не може да се върне.`, [['Отказ', null], ['🏛️ Мини', () => plan2Move()]]));
   el.querySelectorAll('[data-ostyle]').forEach(b => b.onclick = () => setOfficeStyle(b.dataset.ostyle));
   if ($('bStyleOpen')) $('bStyleOpen').onclick = () => { styleOpen = true; renderPanel(); };
   el.querySelectorAll('[data-link]').forEach(b => b.onclick = () => linkAct(b.dataset.link));
@@ -9232,6 +9259,7 @@ if (!AUTOTEST) {
   } catch { }
 }
 // 🇮🇹 Рим по истинската карта: данните на плана v2 — преди влизането в града (само ако записът е такъв)
+plan2Adopt(saved);   // старите записи, които още нямат нищо в Рим — новият Рим идва сам
 await plan2Preload(AUTOTEST ? (() => { try { return JSON.parse(sessionStorage.getItem('stroiAT')); } catch { return null; } })() : saved);
 if (AUTOTEST) {
   const at = sessionStorage.getItem('stroiAT');
