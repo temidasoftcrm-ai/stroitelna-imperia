@@ -8264,6 +8264,11 @@ function boardProposals() {
   // 🏛️ поръчката на общината (muniorders.js — градовете по истинската карта): Ивайло предлага да я поемем
   { const o = muni.on() && muni.state().offer; if (o && !muni.state().job && hasSub('con')) out.push({ id: `con:muni-${o.k}-${o.until}:1`, dir: 'con', ico: '🏛️', text: `Общината на ${cityNm(S.cityId)} поръчва ${muni.nm(o.k)} в ${o.district} (${fmt(o.cost)} €, ${o.days} дни). Предлагам да я поемем.`,
       why: 'аванс 20% веднага, материалите се плащат по дни, остатъкът при предаването — печалба около 20%', cost: 0, count: 1, days: o.days, gainTxt: `~${fmt(o.cost * 0.2)} € печалба + опит`, goal: 'Поръчката на общината е подписана', apply: () => muni.accept() }); }
+  // 🏢 офисът е пълен с обекти, а чакат поръчки (или техниката/бригадите стоят) — Ивайло предлага по-голям офис (повече обекти наведнъж)
+  P({ dir: 'con', ico: '🏢', key: 'office', items: own.filter(id => cityById(id)).map(id => { const here = id === S.cityId, c = here ? S : (S.cities || {})[id] || {}, lv = c.officeLevel || 1, pr = (here ? projects : c.projects || []).filter(p => !p.own).length, waiting = here ? (S.offers || []).length : (c.offers || []).length;
+      const u = upgInfo(id).find(x => x.kind === 'office'); return u && !u.max && !u.busy && pr >= OFFICE_LEVELS[lv - 1].proj && waiting > 0 ? { id, cost: u.cost, lv } : null; }).filter(Boolean).slice(0, 5),
+    cost: o => o.cost, run: o => upgGo(o.id, 'office', true), text: a => `Офисът е пълен с обекти в ${a.map(o => cityNm(o.id)).join(', ')}, а чакат нови поръчки. Предлагам да го разширим — повече обекти наведнъж.`,
+    why: 'всяко ниво на офиса дава още място за обект и бригади', days: () => 5, gainTxt: a => `+1 обект наведнъж в ${pl(a.length, 'град', 'града')}`, goal: a => `${pl(a.length, 'офис е разширен', 'офиса са разширени')}` });
   // имотите в текущия град (без свободна бригада ремонтът идва после — 🔨 estreno): старите къщи на пазара (купи + ремонтирай), ремонт и поддръжка на твоите, офертите на купувачите
   { const E = est(), cap = () => Math.max(0, officeLv().proj - busyCount()), freeOf = o => !projects.some(p => p.lot === o.lot);
     P({ dir: 'con', ico: '🏠', key: 'estbuy', items: [...E.listings].sort((a, b) => a.price - b.price).slice(0, 3), cost: l => l.price + RENO_COST,
