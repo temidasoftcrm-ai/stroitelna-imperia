@@ -837,7 +837,8 @@ function fitScale(n, target = 12.5) { const s = sizeOf(n).getSize(new THREE.Vect
 
 const dayNight = new DayNight(scene, hemi, sun);
 // времето (weather.js): дъжд, сняг, мъгла, буря — върху светлината на денонощието
-const weather = createWeather({ scene, hemi, sun });
+const osmFog = { on: false, near: 180, far: 420 };   // мъглата в градовете по истинската карта — по разстоянието на камерата (frame)
+const weather = createWeather({ scene, hemi, sun, fogBase: () => osmFog.on ? osmFog : null });
 // парцелите, по които записът има нещо (сграда, обект, имот, парк, склад, гараж…)
 function occupiedLots(cityId) {
   const s = new Set(), add = v => { if (v != null) s.add(+v); }, E = S.estate || {};
@@ -956,10 +957,14 @@ function buildCity(cityId) {
   city.airport = null; city.airportNI = 0; city.airSite = null; refreshAirport3D(cityId);
   // крайморски град: жп линията свива на запад преди брега (концентрични дъги; най-западният коловоз е с радиус 12)
   { const westmost = tx(0) - 16 - 6 * 6.5, cx = westmost - 12, seaZ = tx(0) - TILE / 2 - 2 - 22; trackMap = SEASIDE.includes(cityId) ? makeTrackMap({ cx, zC: seaZ + 6 + (tx(0) - 16 - cx) }) : makeTrackMap(null); }
-  city.sea = SEASIDE.includes(cityId) ? addSeaside(g, { A, model, label }, { zEdge: tx(0) - TILE / 2 - 2, xMin: tx(0), xMax: tx(NI - 1), railX: [-1e9, -1e9], seed: hashStr(cityId) }) : null;
+  city.sea = SEASIDE.includes(cityId) && !(P && P.osm) ? addSeaside(g, { A, model, label }, { zEdge: tx(0) - TILE / 2 - 2, xMin: tx(0), xMax: tx(NI - 1), railX: [-1e9, -1e9], seed: hashStr(cityId) }) : null;
   seaFleetSig = ''; if (city.sea) city.sea.setPortLevel?.(portLv(cityId));
   ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; ground.receiveShadow = true;
   if (pv) { pv.position.y = 0; g.add(pv); city.planView = pv; } else g.add(ground);
+  // градовете по истинската карта са големи: камерата се отдалечава до ~900 (мъглата и далечината — по разстоянието, във frame())
+  city.osmView = !!(P && P.p2 && P.osm); controls.maxDistance = city.osmView ? 900 : 320; camera.far = city.osmView ? 3200 : 900; camera.updateProjectionMatrix();
+  if (!city.osmView && scene.fog) { scene.fog.near = 180; scene.fog.far = 420; }
+  osmFog.on = city.osmView;
   if (P) { dayNight.setLamps(pv.userData.lamps); signals.length = 0; if (feature('hollywood-night')) for (const m of pv.userData.nightMats || []) dayNight.winMats.add(m); }   // надписът HOLLYWOOD свети нощем
   if (!P) {
   // 🌊 Темза: улиците север–юг пресичат реката само на мостовете (през 9 плочки) — между тях водата е непрекъсната
@@ -1189,6 +1194,27 @@ function updLmLabels() {   // всяка секунда: нов надпис з�
     o.gold.position.set((lmBox.min.x + lmBox.max.x) / 2, lmBox.max.y + 6, (lmBox.min.z + lmBox.max.z) / 2);
   }
   for (const s of [...city.group.children]) if (s.userData.lm && (!s.userData.lm.group.parent || !(city.landmarks || []).includes(s.userData.lm))) { city.group.remove(s); s.material.map.dispose(); s.material.dispose(); s.userData.lm.gold = null; }
+}
+// 🔆 отдалеч (камерата високо) — светлинни колони над твоите обекти: златни над построеното, сини над строежите, бяла над централата
+const myBeams = { mesh: null, n: 0, t: 0 };
+function updMyBeams() {
+  if (!city.group || !city.lots) return;
+  const d = camera.position.distanceTo(controls.target), on = d > 260;
+  if (!myBeams.mesh || myBeams.mesh.parent !== city.group) {
+    const geo = new THREE.CylinderGeometry(1.6, 3.2, 1, 10, 1, true).translate(0, 0.5, 0), cv = document.createElement('canvas'); cv.width = 4; cv.height = 128; const cg = cv.getContext('2d'), gr = cg.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.55, 'rgba(255,255,255,.35)'); gr.addColorStop(1, 'rgba(255,255,255,1)'); cg.fillStyle = gr; cg.fillRect(0, 0, 4, 128);
+    const am = new THREE.CanvasTexture(cv), mat = new THREE.MeshBasicMaterial({ color: 0xffffff, alphaMap: am, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.FrontSide, fog: false });   // ярка долу, разтапя се нагоре
+    myBeams.mesh = new THREE.InstancedMesh(geo, mat, 512); myBeams.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(512 * 3), 3); myBeams.mesh.frustumCulled = false; myBeams.mesh.renderOrder = 12; city.group.add(myBeams.mesh); myBeams.t = 0;
+  }
+  myBeams.mesh.visible = on; if (!on) return;
+  myBeams.mesh.material.opacity = Math.min(0.32, 0.14 + (d - 260) / 2500);
+  const m4 = new THREE.Matrix4(), col = new THREE.Color(), H = 60 + d * 0.3, W = 1.2 + d / 320;
+  const pts = [];
+  if (city.hq) pts.push([city.hq, 0xffffff, 1.4]);
+  for (const b of S.built || []) { const l = city.lots[b.lot]; if (l) pts.push([l, 0xffcc33, 1]); }
+  for (const p of projects) { const l = city.lots[p.lot]; if (l) pts.push([l, 0x4fc3f7, 1]); }
+  let n = 0;
+  for (const [l, c, k] of pts) { if (n >= 512) break; m4.makeScale(W * k, H * k, W * k).setPosition(l.x, 0, l.z); myBeams.mesh.setMatrixAt(n, m4); myBeams.mesh.setColorAt(n, col.setHex(c)); n++; }
+  myBeams.mesh.count = n; myBeams.mesh.instanceMatrix.needsUpdate = true; if (myBeams.mesh.instanceColor) myBeams.mesh.instanceColor.needsUpdate = true;
 }
 // ============================================================ централата: офис и гараж (отделни нива 1–10)
 // Офисът държи хората: бригади, едновременни обекти, поръчки на таблото. Гаражът държи техниката (всичко без бригадите).
@@ -1514,6 +1540,7 @@ function finishOwnProject(p) {
   if (p.own === 'office') toast(`🏢 Офисът е ниво ${S.officeLevel}: ${officeLv().nm}! Бригади: ${officeLv().crews}, обекти наведнъж: ${officeLv().proj}.`, 'good');
   else if (p.own === 'garage') toast(`🔧 Гаражът е ниво ${S.garageLevel}: ${garageLv().nm}! Места за техника: ${garageLv().cap}.`, 'good');
   else toast(`📦 Складът е ниво ${S.whLevel}: ${whLv().nm}! Побира ${whLv().mul}× повече материали.`, 'good');
+  if (feature('gar-fill') && (p.own === 'garage' || p.own === 'office')) garFillCity(S.cityId);   // новите места — с нужната техника
 }
 
 // ============================================================ техника (единици)
@@ -6428,6 +6455,12 @@ function garShort() {
   return { lack, total, moveN, buy, cost, full, now, costNow };
 }
 // разширява пълните офиси/гаражи там, където липсва техника (строят се сами за няколко дни); връща броя
+// gar-fill: щом гаражът/офисът в града се разшири — липсващата там техника идва от най-близките градове (свободната), а останалото се купува
+function garFillCity(id) {
+  let moved = 0; for (const m of garPlan()) if (m.to === id) moved += garMove(m.t, m.from, m.to, m.n, true);
+  const bought = garBuyShort(id, true) || 0;
+  if (moved || bought) { toast(`🚚 ${cityById(id).nm}: за разширения ${moved ? `${moved} машини тръгнаха от най-близките градове` : ''}${moved && bought ? ' · ' : ''}${bought ? `${bought} купени на място` : ''}.`, 'good', () => openBig('garage')); save(); }
+}
 function garGrow(quiet = false) {
   let n = 0, spent = 0;
   for (const [id, kind] of garShort().full) {
@@ -6491,7 +6524,7 @@ function garPlan() {
   for (const t of GAR_TYPES()) {
     const def = ids.map(id => [id, (need[id][t] || 0) - (have[id][t] || 0)]).filter(([, d]) => d > 0);
     const sur = ids.map(id => [id, Math.min(idle[id][t] || 0, (have[id][t] || 0) - (need[id][t] || 0))]).filter(([, d]) => d > 0);
-    for (const dd of def) for (const ss of sur) { if (dd[1] <= 0) break; const n = Math.min(dd[1], ss[1], Math.max(0, roomOf(dd[0], t))); if (n > 0) { plan.push({ t, from: ss[0], to: dd[0], n }); take(dd[0], t, n); dd[1] -= n; ss[1] -= n; } }
+    for (const dd of def) for (const ss of feature('gar-fill') ? [...sur].sort((a, b) => kmBetween(a[0], dd[0]) - kmBetween(b[0], dd[0])) : sur) { /* gar-fill: първо от най-близкия град */ if (dd[1] <= 0) break; const n = Math.min(dd[1], ss[1], Math.max(0, roomOf(dd[0], t))); if (n > 0) { plan.push({ t, from: ss[0], to: dd[0], n }); take(dd[0], t, n); dd[1] -= n; ss[1] -= n; } }
   }
   return plan;
 }
@@ -6506,7 +6539,7 @@ function garageWinHtml() {
   const all = ids.reduce((a, id) => a + cityUnitTypes(id).length, 0), tr = garTransit(), plan = garPlan();
   const lackCities = ids.filter(id => { const inc = garTransit(id); return Object.entries(garNeed(id)).some(([t, n]) => (garHave(id)[t] || 0) + inc.filter(m => m.t === t).length < n); }).length;   // без пътуващите
   let h = `<div class="bw-stats"><div><b>${all}</b><span>машини и бригади</span></div><div><b>${ids.length}</b><span>града</span></div><div><b style="color:${lackCities ? 'var(--bad)' : 'var(--ok)'}">${lackCities}</b><span>града с липси</span></div><div><b>${tr.length}</b><span>на път</span></div></div>`;
-  h += `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0;flex-shrink:0"><span class="meta" style="margin:0;flex:1 1 300px">🔴 липсва за обектите · 🟡 няма, но можеш да купиш · натисни клетка → <b>+1</b> · „своб.“ — свободна и ненужна (⚖️ отива където липсва) · транспорт 10%, ~1 ден на 450 км</span>${(() => { const x = garRoadExtra(), n = x.reduce((a, r) => a + r[2], 0), v = x.reduce((a, [, t, k]) => a + k * econ.sellPrice(t), 0); return n ? `<button class="btn2" id="garSellX" style="flex:0 0 auto" title="Пътната техника над 2 комплекта на град (и над нуждата на магистралите в строеж)">💰 Продай излишната пътна техника · ${n} бр. · +${fmt(v)} €</button>` : ''; })()}<button class="btn" id="garAuto" style="flex:0 0 auto" ${plan.length ? '' : 'disabled'}>⚖️ Разпредели автоматично${plan.length ? ` (${plan.reduce((a, m) => a + m.n, 0)})` : ''}</button></div>`;
+  h += `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0;flex-shrink:0"><span class="meta" style="margin:0;flex:1 1 300px">🔴 липсва за обектите · 🟡 няма, но можеш да купиш · натисни клетка → <b>+1</b> · „своб.“ — свободна и ненужна (⚖️ отива където липсва) · транспорт 10%, ~1 ден на 450 км</span>${(() => { const x = garRoadExtra(), n = x.reduce((a, r) => a + r[2], 0), v = x.reduce((a, [, t, k]) => a + k * econ.sellPrice(t), 0); return !n ? '' : feature('gar-fill') ? `<span class="meta" style="margin:0;flex:0 1 auto" title="Пътната техника над 2 комплекта на град — не се продава: щом някъде започне магистрала или липсва, тръгва сама от най-близкия град">🅿️ В резерв: ${n} бр. пътна техника — отива сама там, където потрябва</span>` : `<button class="btn2" id="garSellX" style="flex:0 0 auto" title="Пътната техника над 2 комплекта на град (и над нуждата на магистралите в строеж)">💰 Продай излишната пътна техника · ${n} бр. · +${fmt(v)} €</button>`; })()}<button class="btn" id="garAuto" style="flex:0 0 auto" ${plan.length ? '' : 'disabled'}>⚖️ Разпредели автоматично${plan.length ? ` (${plan.reduce((a, m) => a + m.n, 0)})` : ''}</button></div>`;
   { const sh = garShort();
     h += sh.total ? `<div class="card" style="border:1px solid rgba(255,90,90,.45);flex-shrink:0"><div class="row" style="align-items:center;gap:8px;flex-wrap:wrap"><span class="meta" style="margin:0;flex:1 1 320px">🔴 <b style="color:var(--bad)">Липсват ${sh.total}</b>: ${Object.entries(sh.lack).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${garIco(t)} ${ECON.UNIT_TYPES[t].nm} ×${n}`).join(' · ')}${sh.moveN ? `<br>⚖️ ${sh.moveN} ще дойдат от свободните в другите градове („Разпредели автоматично“)` : ''}${sh.buy.length ? `<br>🛒 За купуване: ${sh.buy.reduce((a, [, , n]) => a + n, 0)} бр. в ${new Set(sh.buy.map(b => b[0])).size} града` : ''}</span>
       ${sh.moveN ? `<button class="btn" id="garFixAll">🚚🛒 Оправи всичко</button>` : sh.buy.length ? `<button class="btn" id="garBuyShort" ${econ.canAfford(sh.cost) ? '' : 'disabled'}>🛒 Купи липсващите · ${fmt(sh.cost)} €</button>` : ''}</div>
@@ -7361,17 +7394,21 @@ function buildCityHighway() {
   const done = mine.find(s => hwAll().includes(s.id)), job = (S.hwJobs || []).find(j => mine.some(s => s.id === j.seg));
   if (!done && !job) return;
   const g = new THREE.Group();
-  const hLen = Math.max(1200, 2 * (tx(NI - 1) + 380)) - 10, hcx = 0;   // от край до край на земята (като релсите) — не свършва рязко
+  // градовете по истинската карта: магистралата е при изхода от плана (anchors.highway — Истанбул на север, не през Мраморно море), напречно на посоката му
+  const HA = city.plan && city.plan.p2 && city.plan.osm && city.plan.anchors && city.plan.anchors.highway;
+  const hLen = HA ? 900 : Math.max(1200, 2 * (tx(NI - 1) + 380)) - 10, hcx = 0;   // от край до край на земята (като релсите) — не свършва рязко
   const OVER = [{ c: STATION_X - 15 - hcx, w: 48 }];   // надлез над коловозите на гарата: от X+8 до X−40 — петте гарови и коловоза на минаващите влакове (outerX = X−32,5)
   const seg0 = done || mine.find(s => s.id === job.seg), isAb = ALL_AB.some(x => x.id === seg0.id), far = isAb ? cityById(seg0.a === S.cityId ? seg0.b : seg0.a) : null;
-  const hz = tx(NJ - 1) + (isAb ? 42 : 34);   // аутобанът е по-широк (4 ленти на посока) — малко по-далеч от града
-  const v = buildHighwayView(A, { len: hLen, river: false, ground: false, ab: isAb, abName: isAb ? 'A' + (1 + (hashStr(seg0.id) % 9)) : '', exitTo: far ? far.nm : '', over: OVER, exitZ: hLen * 0.28, service: feature('hw-service') ? 70 : null });   // крайпътният комплекс — между надлеза над гарата и изхода на аутобана   // изходът на аутобана — откъм другия край, далеч от гарата
+  const hz = HA ? (isAb ? 42 : 34) : tx(NJ - 1) + (isAb ? 42 : 34);   // аутобанът е по-широк (4 ленти на посока) — малко по-далеч от града
+  const v = buildHighwayView(A, { len: hLen, river: false, ground: !!HA, ab: isAb, abName: isAb ? 'A' + (1 + (hashStr(seg0.id) % 9)) : '', exitTo: far ? far.nm : '', over: OVER, exitZ: hLen * 0.28, service: feature('hw-service') ? 70 : null });   // крайпътният комплекс — между надлеза над гарата и изхода на аутобана   // изходът на аутобана — откъм другия край, далеч от гарата
   v.group.rotation.y = Math.PI / 2;
   v.group.position.set(hcx, 0, hz);
   g.add(v.group);
-  // пътна връзка от южната улица към магистралата
+  // пътна връзка от южната улица към магистралата (при истинската карта — от пътя на изхода, в рамката на g)
   const conn = [];
-  for (let z = tx(NJ - 1) + TILE; z < hz - (isAb ? 18 : 12); z += TILE) {
+  if (HA) { g.position.set(HA.x, 0, HA.z); g.rotation.y = HA.dir || 0; const rd = HA.road ? Math.hypot(HA.road.x - HA.x, HA.road.z - HA.z) : 0;
+    for (let z = -rd + TILE / 2; z < hz - (isAb ? 18 : 12); z += TILE) { const t = model('road-straight', TILE); t.rotation.y = Math.PI / 2; t.position.set(0, 0.01, z); g.add(t); conn.push(t); } }
+  else for (let z = tx(NJ - 1) + TILE; z < hz - (isAb ? 18 : 12); z += TILE) {
     const t = model('road-straight', TILE); t.rotation.y = Math.PI / 2; t.position.set(city.plan?.hwX ?? tx(3 * Math.floor(NB / 2)), 0.01, z); g.add(t); conn.push(t);
   }
   city.group.add(g);
@@ -7755,6 +7792,7 @@ function rbuildTick() {
         if (here) { buildHQ(); refreshWarehouse && refreshWarehouse(); }
       }
       toast(`⬆️ ${K.ico} ${K.nm} в ${cityById(id).nm} вече е ниво ${b.target}!`, 'good');
+      if (feature('gar-fill') && (kind === 'garage' || kind === 'office')) garFillCity(id);   // новите места — с нужната техника (от най-близките градове, после покупка)
     }
     if (c.rbuild && !Object.keys(c.rbuild).length) delete c.rbuild;
   };
@@ -9187,7 +9225,9 @@ let megaSndT = 180 + Math.random() * 120;
 const CITY_STING = { lasvegas: 'assets/local/vegas-elvis.mp3', newyork: 'assets/local/newyork-sinatra.mp3', rio: 'assets/local/rio-timmaia.mp3', cairo: 'assets/local/cairo-tune.mp3', paris: 'assets/local/paris-vieenrose.mp3' };
 const stingOk = id => !!CITY_STING[id] && /^(localhost|127\.0\.0\.1)$/.test(location.hostname);   // песните са само локално — на сайта не се търсят (без 404)
 function frame() {
+  if (city.osmView) { const d = camera.position.distanceTo(controls.target); osmFog.near = Math.max(180, d * 0.9); osmFog.far = Math.max(420, d * 2.4 + 200); }   // weather.js я прилага (fogBase)
   if ((++lmLabT % 60) === 0) try { updLmLabels(); } catch (e) { }
+  if (lmLabT % 20 === 0) try { updMyBeams(); } catch (e) { myBeams.err = e.message; }
   requestAnimationFrame(frame);
   const rdt = Math.min(clock.getDelta(), 0.1);
   const dt = (AUTOTEST ? 1 / 30 * 8 : rdt) * speed;
@@ -9341,6 +9381,7 @@ if (AUTOTEST) {
   window.__dbg = {
     state: () => S,
     muni: () => muni,   // 🏛️ поръчките на общината (тест)
+    beams: () => (updMyBeams(), { n: myBeams.mesh && myBeams.mesh.count, vis: myBeams.mesh && myBeams.mesh.visible, err: myBeams.err || null, t: lmLabT }),
     lmLabels() { updLmLabels(); return (city.landmarks || []).map(o => [o.kind, !!o.gold, o.gold && o.gold.position.y | 0]); },   // ✨ тест: златните надписи
     openBig: k => openBig(k), closeBig: () => closeBig(), scene: () => scene,
     coopInfraTest(I) { coopInfraSync(I, 'Тест'); return { here: [stLvOf(S.cityId), airLv(S.cityId), portLv(S.cityId)], infra: coopInfra() }; },

@@ -543,7 +543,7 @@ function placeLots(P, sk, r) {
     let clash = false; lg.near([L.x, L.z], 80, (q, o) => { if (!clash && rectsOverlap(o, L, o.guard ?? pad)) clash = true; }); return !clash; };
   const bigs = [];
   // истинската карта: забележителностите на реалните си места (основа fp, защитен периметър guard) — парцел със запазено място
-  if (P.osm) for (const lm of sk.osm.landmarks || []) {
+  if (P.osm) for (const lm of sk.osm.landmarks || []) { if (lm.late) continue;   // късните — след номерирането на парцелите (по-долу)
     let best = null, bd = 1e9; for (const rd of P.roads) for (const q of rd.pts) { const d = dist(q, [lm.x, lm.z]); if (d < bd) { bd = d; best = rd; } }
     const L = { x: lm.x, z: lm.z, w: lm.fp[0], d: lm.fp[1], rot: lm.rot || 0, zone: 'center', big: 'lm', lm: lm.k, reserved: 'lm:' + lm.k, guard: lm.guard, front: { road: best ? best.id : 0, s: 0, side: 1, cls: best ? best.cls : 'street' } };
     lg.add([L.x, L.z], L); lots.push(L); bigs.push(L);
@@ -599,6 +599,14 @@ function placeLots(P, sk, r) {
   const C = P.center;
   lots.sort((a, b) => Math.round(Math.hypot(a.x - C.x, a.z - C.z)) - Math.round(Math.hypot(b.x - C.x, b.z - C.z)) || Math.atan2(a.z - C.z, a.x - C.x) - Math.atan2(b.z - C.z, b.x - C.x));
   lots.forEach((L, i) => { L.id = i; L.poly = rectCorners(L.x, L.z, L.w / 2, L.d / 2, L.rot); L.area = Math.round(L.w * L.d); L.block = null; L.reserved = L.reserved || null; L.big = L.big || null; delete L._k; for (const k of ['x', 'z', 'w', 'd', 'rot']) L[k] = Math.round(L[k] * 100) / 100; });
+  // късни забележителности (добавени, след като градът вече е в играта): парцелът им е накрая (нов id), а обикновените парцели под тях
+  // остават със същите id-та и се маркират under: '<lm>' — играта не строи там (иначе номерата на парцелите в записаните игри се разместват)
+  if (P.osm) for (const lm of sk.osm.landmarks || []) { if (!lm.late) continue;
+    let best = null, bd = 1e9; for (const rd of P.roads) for (const q of rd.pts) { const d = dist(q, [lm.x, lm.z]); if (d < bd) { bd = d; best = rd; } }
+    const L = { id: lots.length, x: lm.x, z: lm.z, w: lm.fp[0], d: lm.fp[1], rot: lm.rot || 0, zone: 'center', big: 'lm', lm: lm.k, reserved: 'lm:' + lm.k, guard: lm.guard, block: null, front: { road: best ? best.id : 0, s: 0, side: 1, cls: best ? best.cls : 'street' } };
+    L.poly = rectCorners(L.x, L.z, L.w / 2, L.d / 2, L.rot); L.area = Math.round(L.w * L.d);
+    for (const q of lots) if (!q.big && rectsOverlap(q, L, 0)) q.under = lm.k;
+    lots.push(L); }
   // застрояване по размер на града и зона (какви модели стават за парцела — не прескача прогреса на играча):
   // малък — къщи и ниски; среден — къщи, блокове и компактен офисен център; голям — плътни квартали и група високи в центъра;
   // мегаполис — няколко плътни центъра (около всеки — високи), жилищни райони със средна височина, ниска периферия
@@ -636,14 +644,23 @@ function placeLots(P, sk, r) {
       return { x: e[0], z: e[1], dir: Math.atan2(ux, uz), road: best }; };
     // по град: гарата (запазеното място на забележителността), летището и магистралата — в истинската посока до ръба
     const AN = { rome: { st: ['termini', 'Roma Termini'], ap: [41.7999, 12.2462, 'Fiumicino (FCO)', 26], hw: [41.835, 12.42, 'A91 Roma–Fiumicino / GRA'] },
-      newyork: { st: ['grandcentral', 'Гранд Сентрал'], st2: ['penn', 'Пен Стейшън'], ap: [40.6413, -73.7781, 'Летище Джон Ф. Кенеди (JFK)', 20], hw: [40.770, -74.02, 'Магистрала Уест Сайд / I-95'] },
+      newyork: { pt: [40.7640, -73.9990, 'Круизният терминал на Манхатън'], st: ['grandcentral', 'Гранд Сентрал'], st2: ['penn', 'Пен Стейшън'], ap: [40.6413, -73.7781, 'Летище Джон Ф. Кенеди (JFK)', 20], hw: [40.770, -74.02, 'Магистрала Уест Сайд / I-95'] },
       london: { st: ['waterloo', 'Гара Ватерло'], ap: [51.47, -0.4543, 'Летище Хийтроу (LHR)', 24], hw: [51.511, -0.03, 'A13 / M25'] },
       paris: { st: ['saintlazare', 'Гара Сен Лазар'], ap: [49.0097, 2.5479, 'Летище Шарл дьо Гол (CDG)', 25], hw: [48.846, 2.255, 'A13 / Периферик (Порт д’Отьой)'] },
-      istanbul: { st: ['sirkeci', 'Гара Сиркеджи'], st2: ['haydarpasa', 'Гара Хайдарпаша'], ap: [41.2753, 28.7519, 'Летище Истанбул (IST)', 35], hw: [41.07, 28.87, 'Магистрала O-1 / D-100'] } }[P.cityId] || {};
+      istanbul: { pt: [41.0005, 29.0135, 'Пристанище Хайдарпаша'], st: ['sirkeci', 'Гара Сиркеджи'], st2: ['haydarpasa', 'Гара Хайдарпаша'], ap: [41.2753, 28.7519, 'Летище Истанбул (IST)', 35], hw: [41.07, 28.87, 'Магистрала O-1 / D-100'] } }[P.cityId] || {};
     const stOf = k => { const L = k && lots.find(q => q.lm === k[0]); return L ? { x: L.x, z: L.z, w: L.w, d: L.d, lot: L.id, name: k[1] } : null; };
     P.anchors = { station: stOf(AN.st), station2: stOf(AN.st2),
       airport: AN.ap ? { ...edgeToward(AN.ap[0], AN.ap[1]), name: AN.ap[2], km: AN.ap[3] } : null,   // летището е извън картата — връзката е на ръба, в посоката му
-      highway: AN.hw ? { ...edgeToward(AN.hw[0], AN.hw[1]), name: AN.hw[2] } : null };
+      highway: AN.hw ? { ...edgeToward(AN.hw[0], AN.hw[1]), name: AN.hw[2] } : null, port: AN.pt ? portAt(AN.pt) : null };
+    // пристанището (градовете на море): брегът най-близо до истинското място; dir — посоката към водата (atan2(x, z), като другите котви)
+    function portAt([la, lo, name]) {
+      const [tx, tz] = toXZ(la, lo); let best = null, bd = 1e18;
+      for (let r = 0; r <= 600; r += 6) { for (let a = 0; a < 64; a++) { const x = tx + Math.cos(a / 64 * 6.283) * r, z = tz + Math.sin(a / 64 * 6.283) * r; if (P.waterAt(x, z)) continue;
+        let wx = 0, wz = 0, n = 0; for (let b2 = 0; b2 < 16; b2++) { const ux = Math.cos(b2 / 16 * 6.283), uz = Math.sin(b2 / 16 * 6.283); if (P.waterAt(x + ux * 30, z + uz * 30)) { wx += ux; wz += uz; n++; } }
+        if (n >= 3 && n <= 10) { const d = r; if (d < bd) { bd = d; best = { x, z, dir: Math.atan2(wx, wz), name }; } } }
+        if (best) break; }
+      return best;
+    }
   }
   P.lots = lots;
 }

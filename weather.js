@@ -61,7 +61,8 @@ export function createWeather(deps) {
     cur.sun += (w.sun - cur.sun) * k; cur.hemi += (w.hemi - cur.hemi) * k; cur.fog += (w.fog - cur.fog) * k;
     deps.sun.intensity *= cur.sun;
     deps.hemi.intensity *= cur.hemi;
-    if (baseFog) { deps.scene.fog.near = baseFog.near * cur.fog; deps.scene.fog.far = baseFog.far * (0.35 + 0.65 * cur.fog); }
+    const bf = (deps.fogBase && deps.fogBase()) || baseFog;   // градовете по истинската карта — мъглата по разстоянието на камерата (game.js)
+    if (bf) { deps.scene.fog.near = bf.near * cur.fog; deps.scene.fog.far = bf.far * (0.35 + 0.65 * cur.fog); }
     // мълнии при буря
     if (kind === 'storm') {
       nextFlash -= dt;
