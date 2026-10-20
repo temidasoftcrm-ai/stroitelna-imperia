@@ -4672,6 +4672,8 @@ function totalTracks() {
   return ownedCities().reduce((a, id) => a + (id === S.cityId ? (S.stationLevel || 0) : ((S.cities || {})[id]?.stationLevel || 0)), 0);
 }
 // видове влакове: товарните поемат превози до своя брой вагони; пътническият кара редовна линия и носи билети
+const TRAIN_BATCH = 50;   // най-много влакове в едно предложение на борда
+let batchTrains = false, batchXp = 0;
 const TRAIN_TYPES = {
   small: { nm: 'Малък товарен', ico: '🚂', wagons: 4, cost: 60000, upkeep: 250, speed: 160 },
   mid: { nm: 'Среден товарен', ico: '🚆', wagons: 8, cost: 110000, upkeep: 350, speed: 150 },
@@ -4725,8 +4727,9 @@ function buyTrain(kind = 'small', at = null) {
   S.trains.push({ id: S.seq++, nm: `${T.ico} №${n} ${T.nm.toLowerCase()}`, kind, wagons: T.wagons, at, job: null, path: null, km: 0, total: 0, leg: 'idle' });
   toast(`${T.ico} Купи ${T.nm.toLowerCase()} влак с ${T.wagons} вагона${at !== S.cityId ? ` — тръгва от ${cityById(at).nm}` : ''}!`, 'good');
   Sound.play('buy');   // свирката на влака — само при строеж на нова линия
-  if (feature('xp-km')) dev.add(XP_BUY.train);
-  parkedSig = ''; updateParked();
+  if (feature('xp-km')) { if (batchN > 0) batchXp += XP_BUY.train; else dev.add(XP_BUY.train); }
+  parkedSig = ''; if (!batchN) updateParked();   // в партида — кадърът ги пренарежда веднъж
+  if (batchN > 0) { batchTrains = true; return; }   // покупка на партида (бордът): картинката и картата — веднъж накрая (batchEnd), не за всеки влак
   if (n === 1) showEventPop('first-train', '🚆 Първият влак на фирмата!', 'Превозвай товари и купувай материали на заводска цена.');
   else showEventPop('new-train', '🚆 Имате нов влак!', `Влаковете на фирмата вече са ${n}.`);
   save(); showMap(!$('mapScreen').classList.contains('hidden'));
@@ -5928,6 +5931,7 @@ function addXBerths(id) {
   toast(`⚓ ${nm}: +${XB_STEP} нови кея (общо ${PORT_LEVELS[p.lv - 1].berths + p.xb}). Линиите без кораб ще си купят.`, 'good'); Sound.play('buy'); save(); if (bigWin) renderBig();
 }
 const seaRouteKm = (a, b) => seaKm(cityById(a), cityById(b));
+const seaKmMemo = new Map(), seaCandMemo = { k: '', v: [] };   // разстоянието по море между два града не се мени — за предложенията на борда
 const hasSeaRoute = (a, b) => (S.seaRoutes || []).some(r => (r.a === a && r.b === b) || (r.a === b && r.b === a));
 // всяка линия има собствен кораб — линиите не повече от корабите, които може да имаш (fleetCap: 2/4 на пристанище, общо до FLEET_TOP);
 // иначе след ниво 10 се отваряха линии, които никога не получават кораб. Вече отворените в старите записи остават.
@@ -8604,7 +8608,7 @@ function boardProposals0() {
     const its = o.items; if (!its.length || !hasSub(o.dir)) return;
     const mk = arr => ({ cost: Math.round(arr.reduce((a, it, i) => a + (o.cost ? o.cost(it, i) : 0), 0)), count: arr.length, text: o.text(arr), days: o.days ? Math.round(o.days(arr)) : 0,
       income: o.income ? Math.round(o.income(arr)) : 0, gainTxt: o.gainTxt ? o.gainTxt(arr) : '', goal: o.goal ? o.goal(arr) : '', track: o.track ? o.track(arr) : null, geo: o.geo ? o.geo(arr) : null,
-      apply: () => { batchN++; batchToasts = 0; let ok = 0; try { for (const it of arr) { try { o.run(it); ok++; } catch (e) { console.warn('board run', e); } } } finally { batchN--; } if (batchN === 0) { batchDirty = false; save(); if (arr.length > 1) toast(`${o.ico} ${o.goal ? o.goal(arr) : `Изпълнено: ${ok} от ${arr.length}`}`, 'good'); } } });
+      apply: () => { batchN++; batchToasts = 0; let ok = 0; try { for (const it of arr) { try { o.run(it); ok++; } catch (e) { console.warn('board run', e); } } } finally { batchN--; } if (batchN === 0) { batchDirty = false; save(); if (batchXp) { const x = batchXp; batchXp = 0; dev.add(x); } if (batchTrains) { batchTrains = false; parkedSig = ''; showMap(!$('mapScreen').classList.contains('hidden')); } if (arr.length > 1) toast(`${o.ico} ${o.goal ? o.goal(arr) : `Изпълнено: ${ok} от ${arr.length}`}`, 'good'); } } });
     const full = mk(its), half = its.length >= 2 ? mk(its.slice(0, Math.ceil(its.length / 2))) : null;
     out.push({ id: `${o.dir}:${o.key}:${its.length}`, dir: o.dir, ico: o.ico, why: o.why, needsGear: o.needsGear, noAuto: o.noAuto, ...full, gain: full.income * 30, small: half ? { ...half, gain: half.income * 30, text: `½ ${half.text}` } : null });
   };
@@ -8660,7 +8664,7 @@ function boardProposals0() {
     const mkRail = o => { if (!econ.canAfford(o.q.cost)) return; econ.spend(o.q.cost, 'покупка', `Жп линия ${cityNm(o.a)} — ${cityNm(o.b)} (борд)`); S.rails = [...(S.rails || []), { a: o.a, b: o.b, km: o.q.km, days: o.q.days, prog: 0, built: false }]; };
     P({ dir: 'rail', ico: '🛤️', key: 'lines', items: miss, cost: o => o.q.cost, run: mkRail, text: a => `${pl(a.length, 'наш град още няма', 'наши града още нямат')} жп (${list(a.map(o => o.b))}). Предлагам да построя ${a.length === 1 ? 'линията' : 'линиите'}.`,
       why: 'материалите идват по-евтино с влак, а влаковете носят превози', gainTxt: a => `${pl(a.length, 'град', 'града')} в жп мрежата — по-евтини материали и товарни курсове`, days: a => Math.max(...a.map(o => o.q.days)), goal: a => `${pl(a.length, 'град е свързан', 'града са свързани')} с жп`, track: a => ({ k: 'rail', pairs: a.map(o => [o.a, o.b]) }), geo: a => geoOf('rail', a.flatMap(o => [o.a, o.b]), a.slice(0, 2).map((o, i) => [i * 2, i * 2 + 1])) });
-    const tn = Math.max(0, fleetCap.train() - fleetN.train());
+    const tn = Math.min(TRAIN_BATCH, Math.max(0, fleetCap.train() - fleetN.train()));   // по 2 на линия → при стотици линии свободните места са хиляди; бордът предлага по една партида
     P({ dir: 'rail', ico: '🚆', key: 'trains', items: Array.from({ length: tn }, (_, i) => i), cost: () => TRAIN_TYPES.mid.cost, run: () => buyTrain('mid'), text: a => `Линиите и гарите поемат още ${pl(a.length, 'влак', 'влака')}. Предлагам да купя ${a.length === 1 ? 'среден товарен влак' : `${a.length} средни товарни влака`}.`,
       why: 'има свободни коловози — линиите не се ползват докрай', days: () => 0, goal: a => `+${pl(a.length, 'влак', 'влака')}`, track: a => ({ k: 'count', what: 'train', target: fleetN.train() + a.length }) });
     P({ dir: 'rail', ico: '🚉', key: 'stations', items: own.filter(id => cityById(id) && stLvOf(id) > 0 && stLvOf(id) < 5).map(id => ({ id, u: (upgInfo(id) || []).find(x => x.kind === 'station'), lv: stLvOf(id) })).filter(o => o.u && !o.u.max && !o.u.busy).slice(0, 10),
@@ -8704,8 +8708,13 @@ function boardProposals0() {
     P({ dir: 'sea', ico: '🚢', key: 'ships', items: Array.from({ length: sp }, (_, i) => i), cost: () => SHIPS.container.cost, run: () => buyShip('container'), text: a => `Има свободни кейове за ${pl(a.length, 'кораб', 'кораба')}. Предлагам ${a.length === 1 ? 'контейнеровоз' : `${a.length} контейнеровоза`}.`,
       why: 'кейовете стоят празни', days: () => 0, income: a => a.length * shipDaily('container'), goal: a => `+${pl(a.length, 'кораб', 'кораба')}`, track: a => ({ k: 'count', what: 'ship', target: fleetN.ship() + a.length }) });
     const free = Math.max(0, maxSeaRoutes() - (S.seaRoutes || []).length), from = Object.keys(S.ports || {}).filter(id => portLv(id) > 0), cand = [];
-    if (free) for (const a of from) for (const c of CITIES) { const b = c.id; if (b === a || !portMax(b) || dev.best() < cityLv(b) || hasSeaRoute(a, b) || cand.some(o => o.a === b && o.b === a)) continue; const km = seaRouteKm(a, b); if (!km || !isFinite(km) || km > 12000) continue; cand.push({ a, b, km, cost: SEA_ROUTE_COST(km) }); }
-    P({ dir: 'sea', ico: '🧭', key: 'routes', items: cand.sort((x, y) => (own.includes(y.b) - own.includes(x.b)) || x.km - y.km).slice(0, Math.min(free, 10)), cost: o => o.cost, run: o => openSeaRoute(o.a, o.b),
+    // ⚡ същото като преди, но без квадратите: пристанища × градове × (линии + кандидати) правеше секунди при голяма империя → „Page Unresponsive“ в залата на борда
+    const ck = free ? from.join(',') + '#' + (S.seaRoutes || []).map(r => r.a + r.b).join(',') + '#' + dev.best() + '#' + own.length + '#' + free : '';
+    if (free && seaCandMemo.k === ck) cand.push(...seaCandMemo.v);
+    else if (free) { const pk = (x, y) => x < y ? x + '|' + y : y + '|' + x, have = new Set((S.seaRoutes || []).map(r => pk(r.a, r.b))), seen = new Set(), lv = dev.best(), tgt = CITIES.filter(c => portMax(c.id) && lv >= cityLv(c.id)).map(c => c.id);
+      for (const a of from) for (const b of tgt) { if (b === a) continue; const k = pk(a, b); if (seen.has(k) || have.has(k)) continue; seen.add(k); let km = seaKmMemo.get(k); if (km === undefined) seaKmMemo.set(k, km = seaRouteKm(a, b)); if (!km || !isFinite(km) || km > 12000) continue; cand.push({ a, b, km, cost: SEA_ROUTE_COST(km) }); }
+      const ownS = new Set(own); cand.sort((x, y) => (ownS.has(y.b) - ownS.has(x.b)) || x.km - y.km); cand.length = Math.min(cand.length, free, 10); seaCandMemo.k = ck; seaCandMemo.v = cand.slice(); }   // готовият подреден топ (до 10) — кешът
+    P({ dir: 'sea', ico: '🧭', key: 'routes', items: cand.slice(0, Math.min(free, 10)), cost: o => o.cost, run: o => openSeaRoute(o.a, o.b),
       text: a => `Има място за ${pl(free, 'нова морска линия', 'нови морски линии')}. Предлагам ${a.length}: ${a.slice(0, 3).map(o => `${cityNm(o.a)} — ${cityNm(o.b)}`).join(', ')}${a.length > 3 ? '…' : ''}.`, why: 'корабите плават само по линии', days: () => 0, geo: a => geoOf('route', a.flatMap(o => [o.a, o.b]), a.slice(0, 2).map((o, i) => [i * 2, i * 2 + 1])) }); }
   // ━━ 🏨 Хотели: офиси на ниво 10 → хотели, звезди, Гранд
   if (S.holding) {
@@ -10170,7 +10179,7 @@ else { showMap(true); if (!AUTOTEST) setTimeout(() => showIntro({ start: true, s
 if (params.has('profile')) {
   window.__benchReady = () => !!(S && city.ready);
   // измерванията (_source/tasks/perf-report.md): обиколка на градовете и зуум — само с ?profile
-  window.__benchOps = { scene: () => scene, cities: () => ownedCities(), here: () => S.cityId, city: id => switchCity(id), cam: d => { const off = camera.position.clone().sub(controls.target).setLength(d); camera.position.copy(controls.target).add(off); fly = null; return Math.round(camera.position.distanceTo(controls.target)); } };
+  window.__benchOps = { board: () => group.board(), bp: () => { boardC = null; const t = performance.now(), L = boardProposals(), n = L.length; return { n, ms: Math.round(performance.now() - t), trains: (L.find(p => p.id && p.id.includes('trains')) || {}).count ?? null }; }, bpApply: k => { boardC = null; const p = boardProposals().find(q => q.id && q.id.includes(k)); if (!p) return null; const t = performance.now(), n0 = fleetN.train(); p.apply(); return { ms: Math.round(performance.now() - t), bought: fleetN.train() - n0 }; }, scene: () => scene, cities: () => ownedCities(), here: () => S.cityId, city: id => switchCity(id), cam: d => { const off = camera.position.clone().sub(controls.target).setLength(d); camera.position.copy(controls.target).add(off); fly = null; return Math.round(camera.position.distanceTo(controls.target)); } };
   // 🗺️ картата: време за drawMap и за подвижните слоеве на кадър, брой елементи, видими надписи и застъпванията им — по изгледи и зуум
   window.__mapBench = (views = [['world', [1, 2, 4, 8, 16]], ['eu', [1, 2.5]]], at = [24.75, 42.15]) => {
     const t = (f, n) => { const t0 = performance.now(); for (let i = 0; i < n; i++) f(); return +((performance.now() - t0) / n).toFixed(2); };

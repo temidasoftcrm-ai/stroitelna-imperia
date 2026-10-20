@@ -395,6 +395,7 @@ export function openBoardroom(o) {
   requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.debug.checkShaderErrors = false;   // ⚡ иначе getProgramInfoLog чака компилацията синхронно (~1,6 s при първото отваряне) — compileAsync не помага
   window.__overlay3d = (window.__overlay3d || 0) + 1;
   window.__room = { renderer, get scene() { return scene; } };   // за измерване от конзолата (кадри, draw calls, триъгълници)   // game.js спира да рисува 3D града, докато залата е отворена
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
@@ -473,6 +474,8 @@ export function openBoardroom(o) {
           const hx = TABLE_W / 2, hz = TABLE_L / 2, P = new THREE.Vector3(THREE.MathUtils.clamp(a.x, -hx, hx), 0, THREE.MathUtils.clamp(a.z, -hz, hz)), d = new THREE.Vector3(P.x - a.x, 0, P.z - a.z), L = d.length();
           if (L > 0.2) { d.multiplyScalar((L - 0.18) / L); wrap.position.add(d); s.chair.position.add(d); wrap.updateMatrixWorld(true); } } }
       people.push(p);
+      // ⚡ шейдърите на човека — асинхронно (KHR_parallel_shader_compile), докато е скрит: иначе първото му рисуване спираше страницата („Page Unresponsive“ при голяма зала)
+      if (renderer.compileAsync) { wrap.visible = false; renderer.compileAsync(wrap, cam, scene).catch(() => { }).then(() => { wrap.visible = true; }); }
     }));
     el.querySelector('.load').style.opacity = 0; snd.ambience(true);
     mergeStatic(scene, new Set([holo.root, ...people.map(p => p.wrap)].filter(Boolean)));   // ~500 draw calls → под 150
@@ -757,7 +760,7 @@ export function openBoardroom(o) {
     cam.position.x = Math.max(-ROOM_W + 1.4, Math.min(ROOM_W - 1.4, cam.position.x)); cam.position.z = Math.max(ROOM_BACK + 1.2, Math.min(ROOM_FRONT - 0.8, cam.position.z));   // и в залата — пред завесите, не в стените
     renderer.render(scene, cam);
   }
-  loop();
+  if (renderer.compileAsync) renderer.compileAsync(scene, cam).catch(() => { }).then(() => { if (!shut) loop(); }); else loop();   // стаята — също асинхронно, после рисуваме
 
   function close() {
     if (shut) return; shut = true; try { o.onClose && o.onClose(); } catch {}
