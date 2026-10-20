@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import './glbfix.js';   // ⚡ флаг perf-fix: стъклата без transmission и прозрачните двустранни на един проход — за всички GLB
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import * as ECON from './economy.js';
@@ -672,7 +673,7 @@ function plan2Move() {
   for (const t of TENDERS.filter(t => t.city === id)) { if (S.tenderLots) delete S.tenderLots[t.id]; if (S.tenderLots4) delete S.tenderLots4[t.id]; }
   S.plan2 = { ...(S.plan2 || {}), [id]: 1 }; S.projects = projects;
   toast(`🇮🇹 Минаваш в новия ${cityName()}${v ? ` — общината изкупи имотите и обектите ти за ${fmt(v)} €` : ''}.`, 'good');
-  save(); sessionStorage.setItem('stroiEnter', '1'); location.reload();
+  save(true); sessionStorage.setItem('stroiEnter', '1'); location.reload();
 }
 function plan2MoveCard() {
   if (!S || !PLAN2_CITIES.has(S.cityId) || (S.plan2 && S.plan2[S.cityId]) || !plan2Ready(S.cityId)) return '';
@@ -6674,7 +6675,7 @@ function sellBranch() {
       for (const k of CITY_KEYS) S[k] = c[k];
       S.cityId = S.hqCity; S.ffFrom = c.left ?? null;
       projects.length = 0; projects.push(...(S.projects || [])); S.projects = projects;
-      Sound.play('cash'); save(); sessionStorage.setItem('stroiEnter', '1'); location.reload();
+      Sound.play('cash'); save(true); sessionStorage.setItem('stroiEnter', '1'); location.reload();
     }]]);
 }
 function buyDistrict(all = false) {
@@ -6905,7 +6906,9 @@ const abMissingTxt = () => { const m = Object.entries(abFleet()).map(([k, n]) =>
 // аутобанът се строи само като продължение на съществуваща пътна мрежа: единият край трябва да е
 // град с готов участък от магистрала или аутобан (не може участък „в нищото“)
 // „вратите“ на отворените континенти (Александрия, Ню Йорк…) имат местна пътна мрежа по подразбиране — оттам започват магистралите на континента
-const roadHubs = () => new Set([...allSegs(), ...ALL_AB].filter(s => hwAll().includes(s.id)).flatMap(s => [s.a, s.b]).concat(S ? Object.entries(CONT_GATE).filter(([k]) => contLinked(k)).map(([, g]) => g) : []));
+let roadHubsC = null;   // кеш: възлите на готовата пътна мрежа — пресмята се наново само при нов участък или нов ден (perf-report #2)
+const roadHubs = () => { const hw = hwAll(), key = hw.length + ':' + (S ? S.day : 0); if (roadHubsC && roadHubsC.key === key) return roadHubsC.set; const have = new Set(hw);
+  const set = new Set([...allSegs(), ...ALL_AB].filter(s => have.has(s.id)).flatMap(s => [s.a, s.b]).concat(S ? Object.entries(CONT_GATE).filter(([k]) => contLinked(k)).map(([, g]) => g) : [])); roadHubsC = { key, set }; return set; };
 const abReach = sg => { const h = roadHubs(); return h.has(sg.a) || h.has(sg.b) || (sg.cont && (ownedCities().includes(sg.a) || ownedCities().includes(sg.b))); };
 const abShown = c => !c.cont || contByKey(c.cont).open();
 // ⬆️ ъпгрейд в аутобан: участък от основен аутобан (E1, E2, E3…), чиито два града вече свързва твоя готова магистрала
@@ -8186,7 +8189,7 @@ function switchCity(id) {
   S.ffFrom = c.left ?? null;
   // градът се изгражда наново от записа (както при новите квартали)
   if (AUTOTEST) sessionStorage.setItem('stroiAT', JSON.stringify(S, (k, v) => k === 'vis' ? undefined : v));
-  else save();
+  else save(true);
   sessionStorage.setItem('stroiEnter', '1');
   location.reload();
 }
@@ -9257,10 +9260,12 @@ function hwWinHtml() {
 // техниката в завършения град остава за поддръжка — economy.js плаща нейната издръжка и вдига прихода
 function syncFinishedFleet() { if (S && city.ready && econ.setFinishedFleet && econ.isFinished(S.cityId)) econ.setFinishedFleet(S.cityId, units.map(u => u.type)); }
 var saveLock = false, saveWarned = false;   // saveLock: друг раздел/връщане на автозапис — този раздел вече не записва
-function save() { if (batchN > 0) { batchDirty = true; return; } syncFinishedFleet(); if (AUTOTEST || !S || saveLock) return; try { S.projects = projects; if (city.ready) syncUnits(); localStorage.setItem(SAVE_KEY, JSON.stringify(S, (k, v) => k === 'vis' ? undefined : v)); saveWarned = false; }
+// записът е скъп (~110 ms при голяма игра): не по-често от веднъж на 2 s — останалите се събират в един отложен (perf-report: 4× = 3 записа на ден); save(true) — веднага
+let saveAt = 0, saveTimer = null;
+function save(now) { if (batchN > 0) { batchDirty = true; return; } if (!now && !AUTOTEST) { const t = Date.now(); if (t - saveAt < 2000) { if (!saveTimer) saveTimer = setTimeout(() => { saveTimer = null; save(true); }, 2000 - (t - saveAt)); return; } } if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; } saveAt = Date.now(); syncFinishedFleet(); if (AUTOTEST || !S || saveLock) return; try { S.projects = projects; if (city.ready) syncUnits(); localStorage.setItem(SAVE_KEY, JSON.stringify(S, (k, v) => k === 'vis' ? undefined : v)); saveWarned = false; }
   catch (e) { logError('запис: ' + (e?.message || e), { day: S?.day }); if (!saveWarned) { saveWarned = true; toast('⚠️ Играта не успя да се запише в браузъра (няма място?). Автозаписите в „💾 Записи“ са запазени.', 'bad'); } } }
 // „Нова игра“: първо пази копие (може да се върне от „💾 Записи“ → „🕒 Автозаписи“), после трие слота
-function wipeSlot() { save(); saveLock = true; backupNow('преди нова игра').finally(() => { localStorage.removeItem(SAVE_KEY); location.reload(); }); }
+function wipeSlot() { save(true); saveLock = true; backupNow('преди нова игра').finally(() => { localStorage.removeItem(SAVE_KEY); location.reload(); }); }
 function loadSave() { if (AUTOTEST) return null; try { return JSON.parse(localStorage.getItem(SAVE_KEY)); } catch { return null; } }
 
 // клик върху парцел в 3D → избира обекта или офертата
@@ -9450,12 +9455,12 @@ if (saved && !AUTOTEST) backupRaw(currentSlot(), localStorage.getItem(SAVE_KEY),
 // 💾 автозапис: записва всяка минута и при затваряне; на всеки 5 минути пази и резервно копие (🕒 Автозаписи)
 if (!AUTOTEST) {
   let mins = 0;
-  setInterval(() => { if (!S || saveLock) return; save(); if (++mins % 5 === 0) backupNow('авто'); }, 60000);
-  addEventListener('pagehide', () => save());
+  setInterval(() => { if (!S || saveLock) return; save(true); if (++mins % 5 === 0) backupNow('авто'); }, 60000);
+  addEventListener('pagehide', () => save(true));
   // два раздела с една и съща игра: по-старият спира да записва, иначе би върнал прогреса назад
   try {
     const ch = new BroadcastChannel('stroi-tabs');
-    ch.onmessage = e => { if (e.data?.hello === SAVE_KEY && !saveLock) { save(); saveLock = true; modal('⚠️ Играта е отворена в друг раздел', 'За да не се загуби прогресът, този раздел спря да записва. Играй в новия раздел — или презареди този (тогава другият спира).', [['🔄 Презареди', () => location.reload()]], { noClose: true }); } };
+    ch.onmessage = e => { if (e.data?.hello === SAVE_KEY && !saveLock) { save(true); saveLock = true; modal('⚠️ Играта е отворена в друг раздел', 'За да не се загуби прогресът, този раздел спря да записва. Играй в новия раздел — или презареди този (тогава другият спира).', [['🔄 Презареди', () => location.reload()]], { noClose: true }); } };
     ch.postMessage({ hello: SAVE_KEY });
   } catch { }
 }

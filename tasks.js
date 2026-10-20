@@ -60,8 +60,11 @@ export function createTasks(deps) {
     btn.onclick = () => deps.open();
     const tips = document.getElementById('btnTips'); if (tips && tips.parentNode === top) top.insertBefore(btn, tips); else top.appendChild(btn);
   }
+  let lastAt = 0, lastKey = '';
   function refresh() {
     if (!deps.ready()) return; mount(); if (!btn) return;
+    // броят на задачите е скъп (подсказките за връзките минават през мрежата): само при нов игрови ден и не по-често от 20 s (perf-report #2)
+    const S = deps.S(), key = S ? S.day + ':' + (S.cityId || '') : '', now = Date.now(); if (key === lastKey && now - lastAt < 20000) return; lastKey = key; lastAt = now;
     const n = count(collect()); if (n === last) return; last = n;
     btn.innerHTML = n ? `📋 <b style="color:#ffd54a">${n}</b>` : '📋';
   }
