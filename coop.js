@@ -10,6 +10,8 @@
 // парите/техниката от своята игра и пази заявката в localStorage, докато сървърът я потвърди — при срив се праща пак
 // със същия req_id (без двойно изпращане); при отказ от сървъра се връща обратно.
 import { UNIT_TYPES, MATERIALS } from './economy.js';
+import { feature } from './lab/feature.js';
+import { centerRender } from './coopcenter.js';   // 🤝 „Център на партньорството“ (feature 'coop-center') — новият прозорец
 
 let PCOL = '#2f8cff';   // цветът на партньора: син, а ако твоята марка е синя — оранжев (pickCol)
 const JCOL = '#b45cff';   // общ строеж — лилав
@@ -27,6 +29,7 @@ export function createCoop(d) {
   // облакът се зарежда отделно: ако няма интернет, самостоятелната игра работи както винаги
   let cloud = { user: () => null, sb: null }, sb = null;
   import('./cloud.js').then(m => { cloud = m.cloud; sb = cloud.sb; sb.auth.onAuthStateChange(() => setTimeout(tick, 300)); tick(); }).catch(() => {});
+  let fetchedAt = 0;   // кога за последно дойдоха данните на партньора (горната лента на центъра)
   let st3 = null, st2 = null, tab = 'help', lastMarks = 0, st = null, open = false, busy = false, lastSnap = 0, user = null, applying = false;
   const E = () => d.econ(), f = n => d.fmt(n);
   const pend = () => { try { return JSON.parse(localStorage.getItem(PEND)) || []; } catch { return []; } };
@@ -158,10 +161,10 @@ export function createCoop(d) {
     if (!P) { if (window.__coopShared) { window.__coopShared = null; shareSig = ''; } return; }
     const hw = (P.hwDone || []).filter(x => typeof x === 'string' || typeof x === 'number'),
       rails = (P.rails || []).map(r => String(r).split('|')).filter(x => x.length === 2 && x[0] && x[1]),
-      cities = (P.cities || []).filter(x => typeof x === 'string'), infra = P.infra && typeof P.infra === 'object' ? P.infra : {}, sig = JSON.stringify([P.name, hw, rails, cities, infra]);
+      cities = (P.cities || []).filter(x => typeof x === 'string'), infra = P.infra && typeof P.infra === 'object' ? P.infra : {}, sig = JSON.stringify([P.name, hw, rails, cities, infra, P.col || null]);
     if (sig === shareSig) return;
     shareSig = sig;
-    window.__coopShared = { v: (window.__coopShared?.v || 0) + 1, name: P.name || 'партньора', hw, rails, cities, infra };
+    window.__coopShared = { v: (window.__coopShared?.v || 0) + 1, name: P.name || 'партньора', hw, rails, cities, infra, col: P.col || null };   // col — цветът на марката му (линиите на картата, флаг coop-col)
     try { d.infraSync && d.infraSync(infra, P.name || 'партньора'); } catch (e) { console.warn('coop infra', e); }
   }
   async function tick() {
@@ -174,7 +177,7 @@ export function createCoop(d) {
       const r = await rpc('coop_status', {}, 1);
       pickCol();
       const before = JSON.stringify([st?.partner?.snap?.cities || [], st2?.joints || [], window.__coopShared?.v, PCOL]);
-      st = r && r.ok ? r : st;
+      st = r && r.ok ? r : st; if (r && r.ok) fetchedAt = Date.now();
       const r2 = st?.pair?.status === 'active' ? await rpc('coop_status2', {}, 1) : null;
       st2 = r2 && r2.ok && r2.active ? r2 : null;
       const r3 = st2 ? await rpc('coop_status3', {}, 1).catch(() => null) : null;
@@ -336,6 +339,8 @@ export function createCoop(d) {
     }
     if (!S || !d.ready()) { h += '<p class="mut">Първо основи фирмата си и влез в града.</p>'; el.innerHTML = h; bind(el); return; }
     if (!st) { h += '<p class="mut">Зареждам…</p>'; el.innerHTML = h; bind(el); return; }
+    if (feature('coop-center') && st.pair?.status === 'active') { centerRender(el, centerCtx()); bind(el); return; }
+    el.classList.remove('cc');
     const P = st.partner;
     if (!st.pair) {
       h += `<p class="mut">Всеки играе своята игра — своята карта и своето темпо. Партньорите си помагат: пари (подарък или заем), техника, материали и общи големи поръчки. Градовете на партньора се виждат на картата ти в <b style="color:${PCOL}">синьо</b>.</p>
@@ -463,6 +468,9 @@ export function createCoop(d) {
     return h;
   }
   const QUICK = ['Трябва ми кран! 🏗️', 'Може ли малко пари? 💶', 'Да строим заедно? 🛣️', 'Благодаря! 💖'];
+  // контекстът за coopcenter.js: данните, форматирането и същите действия (act/bind остават тук)
+  const centerCtx = () => ({ st, st2, st3, d, E, f, esc, ago, left, PCOL, JCOL, partnerName, myName, unread, UNIT_TYPES, MATERIALS, logTxt, holdInfo, QUICK, fetchedAt, partnerLv: partnerLv(),
+    markRead: () => { const mx = Math.max(0, ...(st2?.messages || []).map(m => m.id)); if (mx) LS('stroi-coop-read', mx); }, act: (c, a, x, el) => act(c, a, x, el), render, tick });
   function chatHtml() {
     const M = st2?.messages || [];
     let h = `<div class="card" id="cpChat" style="max-height:300px;overflow:auto">${M.map(m => `<div style="display:flex;justify-content:${m.me ? 'flex-end' : 'flex-start'};margin:4px 0"><div style="max-width:80%;padding:7px 11px;border-radius:12px;background:${m.sos ? '#ff6b6b33' : m.me ? '#ffb30022' : PCOL + '22'};border:1px solid ${m.sos ? 'var(--bad)' : 'var(--line)'}">${m.sos ? '🆘 ' : ''}${esc(m.text)}<div class="mut" style="font-size:11px">${m.me ? 'ти' : esc(partnerName())} · ${ago(m.at)}</div></div></div>`).join('') || '<div class="mut">Още няма съобщения. Кажи здрасти! 👋</div>'}</div>`;
