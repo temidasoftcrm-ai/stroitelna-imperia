@@ -6,6 +6,7 @@
 // opts: { osm (данните от cityplan2-osm.js — за Рим), offset: [ox, oz] (изместване към рамката на играта), fillLot(lot) → bool, freeLot(lot) → bool (свободен за строеж — трева, ограда, табела),
 //         blocks: true (фоновите квартали в Рим), furniture: true, lampGlow: true (собствени светли петна под фенерите) }
 import * as THREE from 'three';
+import { timesSquareAds } from './timessq-ads.js';   // Таймс Скуеър: светещите екрани с рекламите
 
 const M = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.92 });
 let MAT = null;
@@ -487,6 +488,7 @@ export function buildPlan2View(P, opts = {}) {
     const TL = opts.termini ? P.lots.find(L => L.lm === 'termini' || L.lm === 'sirkeci' || L.lm === 'saintlazare' || L.lm === 'waterloo' || L.lm === 'grandcentral' || L.lm === 'kursky') : null;   // главната гара: Термини (Рим), Сиркеджи (Истанбул), Сен Лазар (Париж), Ватерло, Гранд Сентрал, Курската
     if (TL) G.add(terminiView(TL, opts.stationModel, opts.stationFacing));   // stationFacing: { face: '-z', depth: 0.8 } — фасадата на модела е към −z (към улицата), сградата заема 80 % от дълбочината
     const TS = opts.timesSquareModel && P.lots.find(L => L.lm === 'timessquare'); if (TS) G.add(timesSquareView(TS, opts.timesSquareModel));   // Ню Йорк: билбордовете около Таймс Скуеър
+    { const TSL = P.lots.find(L => L.lm === 'timessquare'); if (TSL) { const L = TSL.vrot != null ? { ...TSL, rot: TSL.vrot } : TSL; ST.TSA = timesSquareAds(L, { side: (L.d >= L.w ? L.w : L.d) / 2 + 2 }); G.add(ST.TSA.group); ST.TSA.setNight(ST.night ? 1 : 0); } }   /* и светещите екрани с рекламите (timessq-ads.js) */
     tm('termini'); yield 0;
     // надписите на картата: водите (Златният рог, Босфорът…, Тибър) и кварталите — спрайтове, отблизо се скриват
     ST.LB = D && opts.labels !== false ? mapLabels(G, D) : null; yield 0;
@@ -511,7 +513,7 @@ export function buildPlan2View(P, opts = {}) {
     hideBlocks: set => ST.BL && ST.BL.hide(set),
     get nightMats() { return [...(ST.F ? [ST.F.lampMat] : []), ...WIN_MATS, ...(ST.glow ? [ST.glow] : []), ...(ST.wash ? [ST.wash] : [])]; },
     get lamps() { return ST.lampsOut; },   // за daynight.js (до 160) — готови, когато progress стигне 1 (или веднага без progressive)
-    setNight(on) { ST.night = !!on; if (ST.F) ST.F.lampMat.emissiveIntensity = on ? 2.2 : 0.2; if (ST.pools) ST.pools.visible = !!on; for (const m of [...WIN_MATS, ...(ST.glow ? [ST.glow] : []), ...(ST.wash ? [ST.wash] : [])]) m.emissiveIntensity = on ? (m.userData.winK || 1) : 0; },
+    setNight(on) { ST.night = !!on; if (ST.TSA) ST.TSA.setNight(on ? 1 : 0); if (ST.F) ST.F.lampMat.emissiveIntensity = on ? 2.2 : 0.2; if (ST.pools) ST.pools.visible = !!on; for (const m of [...WIN_MATS, ...(ST.glow ? [ST.glow] : []), ...(ST.wash ? [ST.wash] : [])]) m.emissiveIntensity = on ? (m.userData.winK || 1) : 0; },
     // постепенното строене (opts.progressive): pump(ms) — от frame() на играта, работи до ms милисекунди; progress() — 0…1; cancel() — при смяна на града
     pump(ms = 4) { if (done || cancelled) return 1; const t0 = performance.now(); while (!done && performance.now() - t0 < ms) step(); if (done) TM.total = performance.now() - T0; return api.progress(); },
     progress: () => done ? 1 : Math.min(0.99, units / EST),
@@ -525,13 +527,14 @@ export function buildPlan2View(P, opts = {}) {
       if (ST.FP && o.camera) ST.FP.near(o.camera.position.y < 260);   // оградите и табелите — само отблизо
       if (ST.LB && o.camera) ST.LB.update(o.camera);
       if (ST.BT) ST.BT.update(dt);
+      if (ST.TSA) ST.TSA.update(performance.now() / 1000);   // рекламите на Таймс Скуеър се сменят
       if (!F || !F.SIG.heads || !o.signals || (sigT = (sigT + 1) % 6)) return;
       const byNode = new Map(); for (const s2 of o.signals) byNode.set(s2.node, s2.arms || {});
       F.SIG.heads.forEach((h, i) => { const st = (byNode.get(h.node) || {})[h.arm], cols = SIG_C[st ? st.go : 'red'] || SIG_C.red; for (let k = 0; k < 3; k++) F.SIG.bulbs.setColorAt(i * 3 + k, SC.setHex(cols[k])); });
       F.SIG.bulbs.instanceColor.needsUpdate = true;
     },
     // освобождава геометриите, материалите и текстурите на изгледа — без общите (MAT, фасадите) и без чуждите модели (гарата, корабите, мостът)
-    dispose() { api.cancel(); const keep = new Set([...Object.values(MAT).flat(), FAC_MAT, OTTO_MAT, APT_MAT, HAUSS_MAT, BRICK_MAT, GLASS_MAT].filter(Boolean));
+    dispose() { api.cancel(); if (ST.TSA) ST.TSA.dispose(); const keep = new Set([...Object.values(MAT).flat(), FAC_MAT, OTTO_MAT, APT_MAT, HAUSS_MAT, BRICK_MAT, GLASS_MAT].filter(Boolean));
       const freeMat = m => { if (!m || keep.has(m)) return; for (const k in m) { const v = m[k]; if (v && v.isTexture) v.dispose(); } m.dispose(); };
       const walk = o => { if (o.userData && o.userData.extShared) return; if (o.isInstancedMesh) o.dispose(); if (o.geometry) o.geometry.dispose(); if (o.material) [].concat(o.material).forEach(freeMat); for (const c of o.children) walk(c); };
       walk(G); },
