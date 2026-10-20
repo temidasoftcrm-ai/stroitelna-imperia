@@ -70,7 +70,7 @@ const KIND_MODELS = {
   shop: ['commercial/building-a', 'commercial/building-b', 'commercial/building-c', 'commercial/building-d'],
   block: ['commercial/building-e', 'commercial/building-g', 'commercial/building-c'],
   civic: ['commercial/building-h'],
-  house: 'abcdefghijklmnopqrstu'.split('').map(c => 'suburban/building-type-' + c),
+  house: ['houses/building-type-a', 'houses/building-type-b'],   // детските c…u са изтрити (2026-10-20)
   factory: ['heavy/industry/sf-warehouses', 'heavy/industry/sf-oldwarehouse', 'heavy/industry/sf-indbuilding'],   // детските заводи са изтрити — истинските (industry.js)
 };
 const loader = new GLTFLoader(), cache = {};
