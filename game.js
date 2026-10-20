@@ -64,7 +64,7 @@ import { syncImpCivic, updateImpCivic } from './impcivic.js';   // общест�
 import { pickModel as impPick, decor as impDecor, IMP_MODELS, IMP_H } from './impstyle.js';
 import { createNeom, NEOM_CITY, NEOM_ID, DISTRICTS as NEOM_DISTRICTS, FOUND_COST as NEOM_FOUND } from './neom.js';
 import { buildSite3D } from './mine3d.js';
-import { CITY_LANDMARKS, LANDMARK_CENTER, BIG_LANDMARKS, SEA_LANDMARKS, buildLandmark, buildSeaLandmark, manhattanTowers, lmFit, hasLandmark } from './landmarks.js';
+import { LANDMARK_NM, CITY_LANDMARKS, LANDMARK_CENTER, BIG_LANDMARKS, SEA_LANDMARKS, buildLandmark, buildSeaLandmark, manhattanTowers, lmFit, hasLandmark } from './landmarks.js';
 import { OFFICE_STYLES, STYLE_LV, STYLE_COST, buildOfficeTower } from './officestyle.js';
 import { shipRange, PORT_LEVELS, portMax, SHIPS, seaKm, seaPath, SEA_ROUTE_COST, voyagePay, shipDaily, SEA_LV } from './seaways.js';
 import { makeTrackMap, placeCars } from './trackpath.js';
@@ -1167,6 +1167,29 @@ function label(text, color = '#fff', w = 10, bg = 'rgba(15,20,28,.85)') {
   return s;
 }
 
+// ✨ златният надпис над забележителностите (Айфеловата кула, Нотр Дам, Колизеумът…) — отделен спрайт над модела (моделът се мащабира)
+function goldLabel(text, w = 64) {
+  const c = document.createElement('canvas'); c.width = 768; c.height = 128; const g = c.getContext('2d');
+  g.fillStyle = 'rgba(20,14,4,.72)'; g.beginPath(); g.roundRect(6, 10, 756, 108, 54); g.fill();
+  g.lineWidth = 5; g.strokeStyle = '#d4af37'; g.stroke();
+  g.font = '800 58px Georgia, "Times New Roman", serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  const gr = g.createLinearGradient(0, 30, 0, 100); gr.addColorStop(0, '#fff3b0'); gr.addColorStop(0.5, '#ffd54a'); gr.addColorStop(1, '#b8860b');
+  g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,.55)'; g.strokeText(text, 384, 66, 720); g.fillStyle = gr; g.fillText(text, 384, 66, 720);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true })); s.scale.set(w, w * 128 / 768, 1); s.renderOrder = 11; return s;
+}
+const lmBox = new THREE.Box3(), lmTmp = new THREE.Box3(); let lmLabT = 0;
+function updLmLabels() {   // всяка секунда: нов надпис за новата забележителност, височината — по модела (GLB-тата се зареждат после), махане на старите
+  if (!city.group) return;
+  for (const o of city.landmarks || []) {
+    const nm = o.kind && LANDMARK_NM[o.kind]; if (!nm || !o.group.parent) continue;
+    if (!o.gold) { o.gold = goldLabel(nm); o.gold.userData.lm = o; city.group.add(o.gold); }
+    if (o.group.userData.sign) o.group.userData.sign.visible = false;
+    lmBox.makeEmpty(); o.group.updateMatrixWorld(true); o.group.traverse(m => { if (m.isMesh && m.visible && m.geometry) { if (!m.geometry.boundingBox) m.geometry.computeBoundingBox(); lmBox.union(lmTmp.copy(m.geometry.boundingBox).applyMatrix4(m.matrixWorld)); } }); if (lmBox.isEmpty()) continue;   // само по моделите (без спрайтовете)
+    o.gold.position.set((lmBox.min.x + lmBox.max.x) / 2, lmBox.max.y + 6, (lmBox.min.z + lmBox.max.z) / 2);
+  }
+  for (const s of [...city.group.children]) if (s.userData.lm && (!s.userData.lm.group.parent || !(city.landmarks || []).includes(s.userData.lm))) { city.group.remove(s); s.material.map.dispose(); s.material.dispose(); s.userData.lm.gold = null; }
+}
 // ============================================================ централата: офис и гараж (отделни нива 1–10)
 // Офисът държи хората: бригади, едновременни обекти, поръчки на таблото. Гаражът държи техниката (всичко без бригадите).
 // Надграждането се плаща веднага, но го строи самата фирма (свой обект със своя бригада) — новото ниво важи, щом е готово.
@@ -5415,11 +5438,13 @@ function lmRiverSpot(k, mem) {
   return o;
 }
 // Рим по истинската карта: забележителностите — на реалните им места (P.landmarks), вписани в основата си
+// от плана се добавят само тези с правилен модел за града (иначе 'opera' в Париж става операта в Сидни, 'pantheon' — римският)
+const LM_EXTRA = { istanbul: new Set(['topkapi', 'bluemosque', 'maiden', 'grandbazaar', 'galata', 'suleymaniye', 'haydarpasa']) };
 const LM_ALIAS = { suleymaniye: 'mosque2' }, LM_NOT = new Set(['termini', 'sirkeci', 'saintlazare', 'haydarpasa_st']);   // гарите ги рисува изгледът на града
 function landmarkPlan2(kinds) {
   const P = city.plan, box = new THREE.Box3(), sz = new THREE.Vector3();
   // всички забележителности на реалните им места: от списъка на града (вариантите с модел — colosseo3, vittoriano2…) и от плана (Синята джамия, Топкапъ…), ако има модел
-  const base = k => k.replace(/\d+$/, ''), all = [...kinds]; for (const L of P.landmarks) { if (LM_NOT.has(L.k)) continue; const k = LM_ALIAS[L.k] || L.k; if (!all.some(x => x === k || base(x) === L.k) && hasLandmark(k)) all.push(k); }
+  const base = k => k.replace(/\d+$/, ''), all = [...kinds]; for (const L of P.landmarks) { if (LM_NOT.has(L.k) || !(LM_EXTRA[S.cityId] && LM_EXTRA[S.cityId].has(L.k))) continue; const k = LM_ALIAS[L.k] || L.k; if (!all.some(x => x === k || base(x) === L.k) && hasLandmark(k)) all.push(k); }
   for (const k of all) {
     const at = P.landmarks.find(L => L.k === k) || P.landmarks.find(L => L.k === base(k)) || P.landmarks.find(L => LM_ALIAS[L.k] === k); if (!at) continue;
     const o = buildLandmark(k, { label }); if (!o) continue;
@@ -9151,6 +9176,7 @@ let megaSndT = 180 + Math.random() * 120;
 const CITY_STING = { lasvegas: 'assets/local/vegas-elvis.mp3', newyork: 'assets/local/newyork-sinatra.mp3', rio: 'assets/local/rio-timmaia.mp3', cairo: 'assets/local/cairo-tune.mp3', paris: 'assets/local/paris-vieenrose.mp3' };
 const stingOk = id => !!CITY_STING[id] && /^(localhost|127\.0\.0\.1)$/.test(location.hostname);   // песните са само локално — на сайта не се търсят (без 404)
 function frame() {
+  if ((++lmLabT % 60) === 0) try { updLmLabels(); } catch (e) { }
   requestAnimationFrame(frame);
   const rdt = Math.min(clock.getDelta(), 0.1);
   const dt = (AUTOTEST ? 1 / 30 * 8 : rdt) * speed;
@@ -9303,6 +9329,7 @@ if (AUTOTEST) {
   window.__dbg = {
     state: () => S,
     muni: () => muni,   // 🏛️ поръчките на общината (тест)
+    lmLabels() { updLmLabels(); return (city.landmarks || []).map(o => [o.kind, !!o.gold, o.gold && o.gold.position.y | 0]); },   // ✨ тест: златните надписи
     openBig: k => openBig(k), closeBig: () => closeBig(), scene: () => scene,
     coopInfraTest(I) { coopInfraSync(I, 'Тест'); return { here: [stLvOf(S.cityId), airLv(S.cityId), portLv(S.cityId)], infra: coopInfra() }; },
     linkRoute() { const P = city.plan; if (!P) return null; const gap = r => r.reduce((m, p, i) => i ? Math.max(m, Math.hypot(p.x - r[i - 1].x, p.z - r[i - 1].z)) : 0, 0), c = city.lots[0]; return { links: (P.links || []).length, tir: gap(roadRoute(tx(NI - 1), -12, c.x, c.z)), st: gap(roadRoute(STATION_X + 10, 0, c.x, c.z)), hw: P.hwX == null ? null : gap(roadRoute(P.hwX, tx(NJ - 1) + 22, c.x, c.z)) }; },

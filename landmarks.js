@@ -837,5 +837,5 @@ export function buildLandmark(kind, deps = {}) {
     if (g.userData.sparkle) g.userData.sparkle(t, night);
     if (g.userData.spin) g.userData.spin.rotation.z = t * (g.userData.spinAxis ? 0.05 : 0.6);
   }
-  return { group: g, update };
+  return { group: g, update, kind };   // kind — за златния надпис в играта
 }
