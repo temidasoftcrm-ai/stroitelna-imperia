@@ -104,7 +104,7 @@ export const RESORT_MODELS = {
   watercraft: ['boat-row-small'],   // другите детски лодки са изтрити — истинските (boatsreal.js), заредени оттук
   'heavy/boats': BOAT_FILES,
   commercial2: ['detail-parasol-a', 'detail-parasol-b'],
-  nature: ['tree_palm', 'tree_palmBend', 'tree_palmTall', 'tree_palmDetailedTall', 'plant_bushLarge', 'rock_largeA', 'tree_pineTallA', 'tree_default_fall'],
+  nature: ['tree_palm', 'tree_palmBend', 'tree_palmTall', 'tree_palmDetailedTall', 'rock_largeA', 'tree_pineTallA', 'tree_default_fall'],
   modular: ['building-sample-tower-a', 'building-sample-tower-c', 'building-sample-tower-d', 'building-sample-house-c'],
   suburban: ['building-type-k', 'building-type-n', 'building-type-o', 'building-type-s', 'building-type-t', 'building-type-u'],
 };
