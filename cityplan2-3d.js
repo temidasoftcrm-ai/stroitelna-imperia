@@ -362,9 +362,9 @@ function seaTraffic(G, D, models) {
   const add = (obj, path, sp, mode, ph) => { if (!obj || path.length < 2) return; const L = cum(path); grp.add(obj); boats.push({ obj, path, L, T: L[L.length - 1], sp, mode, s: ph * L[L.length - 1], dir: 1, wait: 0 }); };
   // фериботите: еднаквите линии — веднъж; по един ферибот на линия (до 14)
   const seen = new Set(); let n = 0;
-  for (const f of D.ferries || []) { if (f.pts.length < 2 || n >= 14) continue; const key = [f.pts[0], f.pts[f.pts.length - 1]].map(p => Math.round(p[0] / 40) + ',' + Math.round(p[1] / 40)).sort().join('|'); if (seen.has(key)) continue; seen.add(key); n++; add(ferryModel(), f.pts, 7, 'shuttle', (n * 0.37) % 1); }
+  for (const f of D.ferries || []) { if (f.pts.length < 2 || n >= 14) continue; const key = [f.pts[0], f.pts[f.pts.length - 1]].map(p => Math.round(p[0] / 40) + ',' + Math.round(p[1] / 40)).sort().join('|'); if (seen.has(key)) continue; seen.add(key); n++; add(fit(models.ferry, 34) || ferryModel(), f.pts, 7, 'shuttle', (n * 0.37) % 1); }   // моделът (Бандърма вапуру) или процедурният
   const bos = LANES.bosphorus.map(q => at(...q)), horn = LANES.horn.map(q => at(...q)), off = (p, d) => p.map(([x, z], i) => { const a = p[Math.max(0, i - 1)], b = p[Math.min(p.length - 1, i + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [x - (b[1] - a[1]) / l * d, z + (b[0] - a[0]) / l * d]; });
-  [[models.tanker, 95, 0.1, 1], [models.container, 110, 0.55, 1], [models.tanker, 85, 0.3, -1], [models.container, 100, 0.8, -1]].forEach(([m, len, ph, side]) => add(fit(m, len), off(side > 0 ? bos : bos.slice().reverse(), 40 * side), 9, 'loop', ph));   // двупосочно: всяка посока в своя половина
+  [[models.tanker, 95, 0.1, 1], [models.container, 110, 0.55, 1], [models.cruise, 120, 0.4, 1], [models.tanker, 85, 0.3, -1], [models.container, 100, 0.8, -1], [models.cruise, 110, 0.95, -1]].forEach(([m, len, ph, side]) => add(fit(m, len), off(side > 0 ? bos : bos.slice().reverse(), 40 * side), 9, 'loop', ph));   // двупосочно: всяка посока в своя половина
   (models.small || []).forEach((m, i) => add(fit(m, i % 2 ? 9 : 12), off(i % 2 ? horn : horn.slice().reverse(), (i % 3 - 1) * 25), 4, 'loop', (i * 0.29) % 1));
   const V = new THREE.Vector3();
   return { update(dt) { dt = Math.min(dt || 0, 0.1);
