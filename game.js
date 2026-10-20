@@ -967,7 +967,7 @@ function buildCity(cityId) {
   // 🗺️ миникартата (флаг minimap) — градовете с плана v2: вода, улици, квартали по нива, твоите обекти; цъкване → камерата отива там
   if (city.mm) { city.mm.dispose(); city.mm = null; }
   if (P && P.p2 && feature('minimap')) try { city.mm = createMinimap(P, { parent: document.body, size: 220, tier: P.osm ? plan2Tier() : 5, onJump: (x, z) => { const off = camera.position.clone().sub(controls.target); controls.target.set(x, 0, z); camera.position.set(x + off.x, off.y, z + off.z); } });
-    Object.assign(city.mm.el.style, { right: 'auto', left: '12px', bottom: '12px', zIndex: 6 }); const mm0 = city.mm; setTimeout(() => { try { if (city.mm === mm0) mm0.update({ camera, target: controls.target, marks: [] }); } catch (e) { } }, 300); } catch (e) { console.warn('minimap', e); }
+    Object.assign(city.mm.el.style, { left: 'auto', bottom: '12px', zIndex: 6 }); const mm0 = city.mm; setTimeout(() => { try { if (city.mm === mm0) mm0.update({ camera, target: controls.target, marks: [] }); } catch (e) { } }, 300); } catch (e) { console.warn('minimap', e); }
   city.osmView = !!(P && P.p2 && P.osm); controls.maxDistance = city.osmView ? 900 : 320; camera.far = city.osmView ? 3200 : 900; camera.updateProjectionMatrix();
   if (!city.osmView && scene.fog) { scene.fog.near = 180; scene.fog.far = 420; }
   osmFog.on = city.osmView;
@@ -9285,7 +9285,7 @@ function frame() {
   if ((++lmLabT % 60) === 0) try { updLmLabels(); } catch (e) { }
   if (lmLabT % 20 === 0) try { updMyBeams(); } catch (e) { myBeams.err = e.message; }
   if (lmLabT % 120 === 0 && city.p2Map && city.planView && city.planView.userData.refill) { let sig = 0; for (const l of city.lots) if (l.busy || l.built) sig = (sig * 31 + l.id + 1) | 0; if (sig !== city.p2Sig) { city.p2Sig = sig; try { city.planView.userData.refill(); } catch (e) { } } }   // купен/застроен/освободен парцел → фоновите квартали и празните места наново
-  if (city.mm && lmLabT % 12 === 0) try { const om = !$('mapScreen').classList.contains('hidden'); city.mm.el.style.display = om || hwv ? 'none' : ''; if (!om) city.mm.update({ camera, target: controls.target, marks: [...(city.hq ? [{ x: city.hq.x, z: city.hq.z, kind: 'hq' }] : []), ...(S.built || []).map(b => city.lots[b.lot]).filter(Boolean).map(l => ({ x: l.x, z: l.z, kind: 'own' })), ...projects.map(p => city.lots[p.lot]).filter(Boolean).map(l => ({ x: l.x, z: l.z, kind: 'site' }))] }); } catch (e) { }
+  if (city.mm && lmLabT % 12 === 0) try { const om = !$('mapScreen').classList.contains('hidden'); city.mm.el.style.display = om || hwv ? 'none' : ''; { const pn = $('panel'), pw = pn && !pn.classList.contains('hidden') ? pn.getBoundingClientRect().width : 0; city.mm.el.style.right = (pw + 12) + 'px'; }   /* вдясно, до панела */ if (!om) city.mm.update({ camera, target: controls.target, marks: [...(city.hq ? [{ x: city.hq.x, z: city.hq.z, kind: 'hq' }] : []), ...(S.built || []).map(b => city.lots[b.lot]).filter(Boolean).map(l => ({ x: l.x, z: l.z, kind: 'own' })), ...projects.map(p => city.lots[p.lot]).filter(Boolean).map(l => ({ x: l.x, z: l.z, kind: 'site' }))] }); } catch (e) { }
   requestAnimationFrame(frame);
   const rdt = Math.min(clock.getDelta(), 0.1);
   const dt = (AUTOTEST ? 1 / 30 * 8 : rdt) * speed;
