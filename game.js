@@ -1216,7 +1216,7 @@ function updMyBeams() {
   const m4 = new THREE.Matrix4(), col = new THREE.Color(), H = 60 + d * 0.3, W = 1.2 + d / 320;
   const pts = [];
   if (city.hq) pts.push([city.hq, 0xffffff, 1.4]);
-  for (const b of S.built || []) { const l = city.lots[b.lot]; if (l) pts.push([l, 0xffcc33, 1]); }
+  for (const c of S.cash || []) { const l = city.lots[c.lot]; if (l) pts.push([l, 0xffcc33, 1]); }   // златна — само докато парите не са събрани (готовите и събраните — без колона)
   for (const p of projects) { const l = city.lots[p.lot]; if (l) pts.push([l, 0x4fc3f7, 1]); }
   let n = 0;
   for (const [l, c, k] of pts) { if (n >= 512) break; m4.makeScale(W * k, H * k, W * k).setPosition(l.x, 0, l.z); myBeams.mesh.setMatrixAt(n, m4); myBeams.mesh.setColorAt(n, col.setHex(c)); n++; }
@@ -5476,21 +5476,25 @@ function lmRiverSpot(k, mem) {
 const LM_EXTRA = { moscow: new Set(['kotelnicheskaya']), newyork: new Set(['liberty', 'stpatrick']), istanbul: new Set(['topkapi', 'bluemosque', 'maiden', 'grandbazaar', 'galata', 'suleymaniye', 'haydarpasa']) };
 // истинската височина (м) на високите забележителности — мащабът е по-малкият от основата и височината
 LANDMARK_NM.empire = LANDMARK_NM.empire || 'Емпайър Стейт Билдинг'; LANDMARK_NM.stpatrick2 = LANDMARK_NM.stpatrick2 || 'Катедралата „Св. Патрик“'; LANDMARK_NM.chrysler = LANDMARK_NM.chrysler || 'Крайслер Билдинг';
-const LM_REAL_H = { bigben: 96, londoneye: 135, shard: 310, eiffel: 330, galata: 67, maiden: 23, towerbridge: 65, stpeter: 136, liberty: 93, stpatrick: 100, mgu: 176, stbasil: 65 };   // mgu — тук е Котелническа (сталинската висотка)
+const LM_REAL_H = { bigben: 96, londoneye: 135, shard: 310, eiffel: 330, galata: 67, maiden: 23, towerbridge: 65, stpeter: 136, liberty: 93, stpatrick: 100, mgu: 176, stbasil: 65, parliament2: 96 };   // mgu — тук е Котелническа (сталинската висотка)
 const LM_TURN = { vittoriano2: Math.PI };   // завъртане на модела на реалното място: Витториано — лицето към Пиаца Венеция, гърбът към Колизеума
+// моделите на потребителя (Meshy AI) имат предимство пред процедурните и по-старите: в градовете по истинската карта винаги те
+const LM_PREF = { maiden: 'maiden2', bluemosque: 'mosque', bigben: 'parliament2', bigben2: 'parliament2', colosseo: 'colosseo3', vittoriano: 'vittoriano2' };
+const lmPref = k => (LM_PREF[k] && hasLandmark(LM_PREF[k])) ? LM_PREF[k] : k;
+LANDMARK_NM.maiden2 = LANDMARK_NM.maiden2 || 'Момината кула'; LANDMARK_NM.parliament2 = LANDMARK_NM.parliament2 || 'Уестминстърският дворец и Биг Бен'; LANDMARK_NM.colosseo3 = LANDMARK_NM.colosseo3 || 'Колизеумът'; LANDMARK_NM.vittoriano2 = LANDMARK_NM.vittoriano2 || 'Витториано';
 const LM_LABEL = { kotelnicheskaya: 'Котелническа висотка' };   // надписът, когато моделът е назаем (mgu → Котелническа)
 const LM_ALIAS = { suleymaniye: 'mosque2', stpatrick: 'stpatrick2', kotelnicheskaya: 'mgu' }, LM_NOT = new Set(['termini', 'sirkeci', 'saintlazare', 'haydarpasa_st']);   // гарите ги рисува изгледът на града
 function landmarkPlan2(kinds) {
   const P = city.plan, box = new THREE.Box3(), sz = new THREE.Vector3();
   // всички забележителности на реалните им места: от списъка на града (вариантите с модел — colosseo3, vittoriano2…) и от плана (Синята джамия, Топкапъ…), ако има модел
-  const base = k => k.replace(/\d+$/, ''), all = [...kinds]; for (const L of P.landmarks) { if (LM_NOT.has(L.k) || !(LM_EXTRA[S.cityId] && LM_EXTRA[S.cityId].has(L.k))) continue; const k = LM_ALIAS[L.k] || L.k; if (!all.some(x => x === k || base(x) === L.k) && hasLandmark(k)) all.push(k); }
+  const base = k => k.replace(/\d+$/, ''), all = [...new Set(kinds.map(lmPref))]; for (const L of P.landmarks) { if (LM_NOT.has(L.k) || !(LM_EXTRA[S.cityId] && LM_EXTRA[S.cityId].has(L.k))) continue; const k = LM_ALIAS[L.k] || L.k; const kp = lmPref(k); if (!all.some(x => x === kp || base(x) === L.k || x === k) && hasLandmark(kp)) all.push(kp); }
   // 🇺🇸 Ню Йорк: Емпайър Стейт — отделната кула от модела на Манхатън (по името на мешовете), в истинския ръст
   if (all.includes('manhattan')) { all.splice(all.indexOf('manhattan'), 1); const gen = city.group, NYT = [['empire', /emp_?state|empire/i, 381], ['chrysler', /chr[iy]s?t?ler/i, 319]];   // кулите от модела на Манхатън — по имената на възлите
     const slots = NYT.map(([k, re, h]) => { const at = P.landmarks.find(L => L.k === k); if (!at) return null; const g = new THREE.Group(), o = { group: g, update() {}, kind: k }; g.position.set(at.x, 0, at.z); g.rotation.y = at.rot || 0; city.group.add(g); city.landmarks.push(o); return { g, re, h }; }).filter(Boolean);
     if (slots.length) manhattanTowers().then(parts => { if (city.group !== gen) return; for (const sl of slots) { const pt = parts.find(p => sl.re.test(p.userData.nm || '')); if (!pt) continue;
       pt.scale.multiplyScalar(sl.h * (P.p2.osmData?.k || 0.45) / (pt.userData.h || 1)); sl.g.add(pt); } }); }
   for (const k of all) {
-    const at = P.landmarks.find(L => L.k === k) || P.landmarks.find(L => L.k === base(k)) || P.landmarks.find(L => LM_ALIAS[L.k] === k); if (!at) continue;
+    const at = P.landmarks.find(L => L.k === k) || P.landmarks.find(L => L.k === base(k)) || P.landmarks.find(L => LM_ALIAS[L.k] === k) || P.landmarks.find(L => LM_PREF[L.k] === k); if (!at) continue;
     const labelNm = LM_LABEL[at.k] || null;
     const o = buildLandmark(k, { label }); if (!o) continue; if (labelNm) o.labelNm = labelNm;
     let s0 = lmFit(k); if (!s0) { const sg = o.group.userData.sign; if (sg) sg.removeFromParent(); box.setFromObject(o.group).getSize(sz); s0 = Math.max(sz.x, sz.z) || 1; if (sg) o.group.add(sg); }   // моделите (GLB) се зареждат после — по основата им, не по временната плоча

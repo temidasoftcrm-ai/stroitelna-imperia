@@ -1,5 +1,6 @@
 {
   "approved": [
+    "ab-up-fx",
     "air-big-only",
     "air-models",
     "amb-eu",
@@ -51,6 +52,7 @@
     "estate-random",
     "fire-man",
     "fire-real",
+    "gar-fill",
     "gas-big",
     "gas-green",
     "gas-lowpoly",
@@ -95,9 +97,13 @@
     "map-look",
     "mega-sound",
     "mine-quarry-real",
+    "minimap",
+    "moscow-game",
+    "moscow-osm",
     "newyork-game",
     "newyork-osm",
     "night-burj",
+    "night-dark",
     "night-floors",
     "night-grid",
     "night-houses",

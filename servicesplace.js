@@ -15,7 +15,7 @@ import { SERVICES } from './services.js';
 
 const MAIN = new Set(['blvd', 'quay', 'ring', 'main']);
 // истински размери в метри (сградите и колите са 1:1, картата е ×0,45): [фронт, дълбочина] за ниво l; s ×0,75, m ×0,88
-const REAL = { hall: [50, 40], hosp: [60, 40], fire: [32, 26], police: [30, 24], school: [45, 30], kinder: [25, 20], voc: [45, 30], uni: [70, 45], park: [40, 34], sport: [60, 45], bus: [45, 30], util: [36, 28], recycle: [40, 30] };
+const REAL = { hall: [50, 40], hosp: [60, 40], fire: [32, 26], police: [45, 34], school: [45, 30], kinder: [25, 20], voc: [45, 30], uni: [70, 45], park: [40, 34], sport: [60, 45], bus: [45, 30], util: [36, 28], recycle: [40, 30] };
 const LK = { s: 0.75, m: 0.88, l: 1, x: 1 };
 export const realSize = (k, lvl) => { const S0 = SERVICES[k], a = (S0 && (S0.lot[lvl] || Object.values(S0.lot).pop())) || [20, 18], r = REAL[k] ? REAL[k].map(v => v * (LK[lvl] || 1)) : a; return [Math.max(a[0], r[0]), Math.max(a[1], r[1])]; };
 export function servicePlacer(gp) {
@@ -77,7 +77,7 @@ export function servicePlacer(gp) {
 export async function servicesLayer(gp, rec, o = {}) {
   const { buildService } = await import('./services3d.js'), THREE = await import('three');
   const sp = servicePlacer(gp), group = new THREE.Group(), items = [];
-  for (const s of sp.spots(rec)) { const b = buildService(s.k, s.lvl, { w: s.w, d: s.d }, { seed: s.i + s.k.length, region: o.region || 'eu', outline: !!o.outline }); b.group.position.set(s.x, 0, s.z); b.group.rotation.y = s.rot; group.add(b.group); items.push({ ...s, b }); }
+  for (const s of sp.spots(rec)) { const b = buildService(s.k, s.lvl, { w: s.w, d: s.d }, { seed: s.i + s.k.length, region: o.region || 'eu', outline: !!o.outline, fill: o.fill ?? !!gp.osm, minH: o.minH ?? (gp.osm ? 24 : 0) }); /* истинската карта: обществените сгради — едри, колкото блоковете наоколо (20–40 м) */ b.group.position.set(s.x, 0, s.z); b.group.name = 'svc-' + s.k; b.group.rotation.y = s.rot; group.add(b.group); items.push({ ...s, b }); }
   return { group, items, setNight: on => items.forEach(it => it.b.setNight(on)), dispose: () => items.forEach(it => it.b.dispose()) };
 }
 
