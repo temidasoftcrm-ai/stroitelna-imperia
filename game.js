@@ -5495,7 +5495,7 @@ function landmarkPlan2(kinds) {
     let s0 = lmFit(k); if (!s0) { const sg = o.group.userData.sign; if (sg) sg.removeFromParent(); box.setFromObject(o.group).getSize(sz); s0 = Math.max(sz.x, sz.z) || 1; if (sg) o.group.add(sg); }   // моделите (GLB) се зареждат после — по основата им, не по временната плоча
     let k0 = Math.max(at.w, at.d) * 0.95 / s0; const hr = LM_REAL_H[k] || LM_REAL_H[k.replace(/\d+$/, '')];
     if (hr) { let h0 = lmH(k); if (!h0) { box.setFromObject(o.group).getSize(sz); h0 = sz.y || 1; } k0 = Math.min(k0, hr * (P.p2.osmData?.k || 0.45) / h0); }   // кулите — и по истинската височина (парцелът на Парламента е 225 м, а моделът е само Биг Бен)
-    o.group.scale.multiplyScalar(k0); if (at.rot) o.group.rotation.y = at.rot; if (k === 'stpatrick2') o.group.rotation.y += Math.PI / 2;   // дългата ос на модела е z, а на парцела — напреки o.group.position.set(at.x, 0.1, at.z);
+    o.group.scale.multiplyScalar(k0); if (at.rot) o.group.rotation.y = at.rot; if (k === 'stpatrick2') o.group.rotation.y += Math.PI / 2;   /* дългата ос на модела е z, а на парцела — напреки */ o.group.position.set(at.x, 0.1, at.z);
     o.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
     city.group.add(o.group); city.landmarks.push(o);
   }
