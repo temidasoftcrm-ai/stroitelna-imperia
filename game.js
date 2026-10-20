@@ -3207,7 +3207,7 @@ function storeHtml() {
   // автоматично пълнене: бутон и дневен бюджет; при склад на макс. ниво — всичко в една карта
   const af = autoFill(), whMax = (S.whLevel || 0) >= WH_LEVELS.length, mark = h.length;
   h += `<div class="card" style="${af.on ? 'border-color:var(--ok)' : ''}"><h3><span class="ico">🔄</span>Автоматично пълнене
-      <button class="${af.on ? 'btn' : 'btn2'}" id="bAutoFill" style="margin-left:auto">${af.on ? 'ВКЛ.' : 'ИЗКЛ.'}</button></h3>
+      <span class="meta" style="margin:0 0 0 auto;color:${af.on ? 'var(--ok)' : 'var(--mut)'}">${af.on ? '✅ включено' : `🔒 от склад ниво ${AF_LV}`}</span></h3>
     <div class="meta">Поръчва ТИР-ове сам: първо каквото трябва на обектите, после допълва всеки материал, паднал под половината. Харчи до ${fmt(AF_BUDGET)} € на ден и не влиза на минус.</div>
     <div class="meta">Днес: <b style="color:var(--txt)">${fmt(af.day === S.day ? af.spent : 0)} / ${fmt(af.budget)} €</b></div>
     <div class="bar"><i style="width:${Math.min(100, (af.day === S.day ? af.spent : 0) / Math.max(1, af.budget) * 100)}%"></i></div></div>`;
@@ -3256,7 +3256,8 @@ function buyForStock(m, q, quiet = false) {
 }
 // ---------- автоматично пълнене на склада
 const AF_BUDGET = 50000;   // дневният бюджет на автоматичното пълнене (фиксиран)
-const autoFill = () => { const a = S.autoFill = S.autoFill || { on: false, budget: AF_BUDGET, spent: 0, day: S.day }; a.budget = AF_BUDGET; return a; };
+const AF_LV = 2;   // автоматичното пълнене се включва само щом складът е ниво 2 (потребителят: бутонът е излишен)
+const autoFill = () => { const a = S.autoFill = S.autoFill || { on: false, budget: AF_BUDGET, spent: 0, day: S.day }; a.budget = AF_BUDGET; a.on = (S.whLevel || 0) >= AF_LV; return a; };
 // full: в началото на деня допълва всичко под 80%; иначе само под 50% и каквото трябва на обектите
 function autoFillTick(full = false) {
   const af = autoFill();
