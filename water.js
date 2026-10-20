@@ -3,15 +3,16 @@
 // гладка повърхност с отблясъци от слънцето. Евтино — без отражения и без допълнително рендериране.
 import * as THREE from 'three';
 
-let tex = null;
+// копията (clone) се отбелязват за качване чак когато картинката дойде — иначе three.js пише „Texture marked for update but no image data found“
+let tex = null, ready = false; const pending = [];
 function normals() {
-  if (!tex) { tex = new THREE.TextureLoader().load('assets/heavy/water/waternormals.jpg'); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; }
+  if (!tex) { tex = new THREE.TextureLoader().load('assets/heavy/water/waternormals.jpg', () => { ready = true; for (const c of pending) c.needsUpdate = true; pending.length = 0; }); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; }
   return tex;
 }
+const copy = () => { const c = normals().clone(); if (ready) c.needsUpdate = true; else pending.push(c); return c; };
 // opts: { color, repeat (колко пъти се повтаря текстурата по площта), strength, vertexColors }
 export function makeWater(opts = {}) {
-  const rep = opts.repeat || 24, n1 = normals().clone(), n2 = normals().clone();
-  n1.needsUpdate = n2.needsUpdate = true;
+  const rep = opts.repeat || 24, n1 = copy(), n2 = copy();
   n1.repeat.set(rep, rep); n2.repeat.set(rep * 0.55, rep * 0.55);
   const k = opts.strength ?? 0.55;
   const material = new THREE.MeshPhysicalMaterial({

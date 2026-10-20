@@ -14,7 +14,7 @@ export const MUNI = { lv: 6, offerDays: 12, gap: 6, adv: 0.2, mat: 0.6, fin: 0.6
 
 export function createMuni(deps) {
   const day = () => deps.S().day, f = n => deps.fmt(Math.round(n));
-  const on = () => { const P = deps.plan(); return !!(P && P.p2); };
+  const on = () => { const P = deps.plan(); return !!(P && P.p2 && P.osm); };   // само градовете по истинската карта (там общината строи на мястото на фоновите квартали)
   const id = () => deps.cityId();
   const tier = () => tierOf(deps.sz(id()), deps.mega(id()));
   const pop = () => popOf(deps.sz(id()), deps.mega(id()), deps.built(), deps.ext(), deps.extMax());

@@ -99,8 +99,8 @@ function pointGrid(cell) {
 }
 
 // ---- скелет по семейство: граница, вода, главни пътища (линии с клас), центрове на квартали
-function skeleton(fam, size, r) {
-  const Z = SIZE[size], R = Z.R * (fam === 'coast' ? 1.3 : 1) /* крайбрежният — по-голям радиус: половината кръг е вода */, rr = (a, b) => lerp(a, b, r()), lines = [], hubs = [{ x: 0, z: 0, main: true }];
+function skeleton(fam, size, r, rk = 1) {
+  const Z = SIZE[size], R = Z.R * (fam === 'coast' ? 1.3 : 1) * rk /* крайбрежният — по-голям радиус: половината кръг е вода */, rr = (a, b) => lerp(a, b, r()), lines = [], hubs = [{ x: 0, z: 0, main: true }];
   const big = size === 'l' || size === 'xl';
   let bnd = [], waterAt = () => false, coastZ = null;
   const ring = (rad, cls, n = 18, wob = 0.05) => { const ph = rr(0, TAU), c = []; for (let k = 0; k < n; k++) { const a = k / n * TAU; c.push([Math.cos(a) * rad * (1 + wob * Math.sin(3 * a + ph)), Math.sin(a) * rad * (1 + wob * Math.sin(3 * a + ph))]); } lines.push({ cls, pts: closedCurve(c), closed: true }); };
@@ -344,10 +344,10 @@ export function plan2Load(data, osm) {
 // ---- основното: plan2(cityId, { fam, size, seed, ext })
 const cache = new Map();
 export function plan2(cityId, o = {}) {
-  const fam = o.fam || 'eu', size = o.size || 'm', seed = o.seed ?? hashStr(cityId), ext = o.ext || 0, key = [cityId, fam, size, seed, ext].join(':');
+  const fam = o.fam || 'eu', size = o.size || 'm', seed = o.seed ?? hashStr(cityId), ext = o.ext || 0, key = [cityId, fam, size, seed, ext, o.rk || 1].join(':');
   if (cache.has(key)) return cache.get(key);
   const t0 = Date.now(), r = rng(hashStr(`plan2:${cityId}:${fam}:${size}:${seed}`));
-  const sk = o.osm ? osmSkeleton(o.osm) : skeleton(fam, size, r);
+  const sk = o.osm ? osmSkeleton(o.osm) : skeleton(fam, size, r, o.rk || 1);   // rk — по-голям радиус (играта иска повече парцели)
   // главните пътища: мрежа от точки (за отстоянието на кварталните)
   const mg = pointGrid(24); sk.lines.forEach((L, li) => L.pts.forEach(p => mg.add(p, li)));
   const majorNear = (p, rad) => { let hit = null; mg.near(p, rad + widthOf('blvd') / 2, (q, li) => { if (hit === null && dist(p, q) < rad + widthOf(sk.lines[li].cls) / 2) hit = li; }); return hit; };

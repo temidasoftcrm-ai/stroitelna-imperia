@@ -231,8 +231,9 @@ async function wipeAll(account) {
   }
   hooks.lock?.(); wiping = true;   // играта спира да записва (и при затваряне на страницата)
   await dropBackups();
-  for (const k of Object.keys(localStorage)) if (/^stroi|^sb-/.test(k)) localStorage.removeItem(k);
-  if (account || user) await sb.auth.signOut({ scope: 'local' }).catch(() => { });
+  // входът ('stroi-auth') остава — „Нова игра“ / „Изтрий данните“ не те изхвърлят от акаунта (иначе при следващото отваряне пак искаше код)
+  for (const k of Object.keys(localStorage)) if (/^stroi|^sb-/.test(k) && (account || k !== 'stroi-auth')) localStorage.removeItem(k);
+  if (account) await sb.auth.signOut({ scope: 'local' }).catch(() => { });
   toast(account ? '❌ Акаунтът е изтрит.' : '🗑️ Данните са изтрити.');
   setTimeout(() => location.reload(), 700);
 }
@@ -347,11 +348,57 @@ function regGate() {
   const body = el.querySelector('#rgBody'), close = () => { el.remove(); };
   el.querySelector('#rgSkip').onclick = e => { e.preventDefault(); close(); };
   const msg = (t, bad) => { const m = body.querySelector('.rgMsg'); m.style.color = bad ? '#ff6b6b' : '#8b96a8'; m.textContent = t; };
-  const stepEmail = (pre = '') => {
-    body.innerHTML = `<p style="color:#a9b6c8;font-size:14px;line-height:1.5;margin:10px 0 4px">1️⃣ <b style="color:#fff">Регистрирай имейл</b> — ще ти пратим код. Без парола. Играта ти се пази в облака и можеш да играеш от всяко устройство.</p>
-      <input id="rgEmail" type="email" autocomplete="email" inputmode="email" placeholder="ime@primer.com" style="${inp}"><div class="rgMsg" style="font-size:13px;min-height:18px"></div>
-      <button id="rgSend" style="${go}">📧 Регистрирай</button>`;
+  const PASS = feature('reg-pass'), lastMail = () => { try { return localStorage.getItem('stroi-email') || ''; } catch { return ''; } }, keepMail = m => { try { localStorage.setItem('stroi-email', m); } catch {} };
+  // 🔑 (feature 'reg-pass') вход с имейл и парола — кодът е само за нов акаунт или забравена парола
+  const stepLogin = (pre = lastMail()) => {
+    body.innerHTML = `<p style="color:#a9b6c8;font-size:14px;line-height:1.5;margin:10px 0 4px">🔑 <b style="color:#fff">Влез</b> с имейла и паролата си — играта ти чака в облака.</p>
+      <input id="rgEmail" type="email" autocomplete="username" inputmode="email" placeholder="ime@primer.com" style="${inp}">
+      <input id="rgPass" type="password" autocomplete="current-password" placeholder="парола" style="${inp}"><div class="rgMsg" style="font-size:13px;min-height:18px"></div>
+      <button id="rgLogin" style="${go}">▶ Влез</button>
+      <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:13px"><a href="#" id="rgNew" style="color:#ffd54a">🆕 Нов акаунт</a><a href="#" id="rgForgot" style="color:#8b96a8">Забравена парола?</a></div>`;
+    const e = body.querySelector('#rgEmail'), pw = body.querySelector('#rgPass'); e.value = pre; setTimeout(() => (pre ? pw : e).focus(), 50);
+    body.querySelector('#rgNew').onclick = ev => { ev.preventDefault(); stepEmail(e.value.trim(), 'new'); };
+    body.querySelector('#rgForgot').onclick = ev => { ev.preventDefault(); stepEmail(e.value.trim(), 'reset'); };
+    const login = () => {
+      const email = e.value.trim(), password = pw.value;
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return msg('Невалиден имейл.', true);
+      if (!password) return msg('Въведи паролата.', true);
+      msg('Влизам…'); body.querySelector('#rgLogin').disabled = true;
+      sb.auth.signInWithPassword({ email, password }).then(({ error }) => {
+        body.querySelector('#rgLogin').disabled = false;
+        if (error) return msg(/invalid login/i.test(error.message) ? 'Грешен имейл или парола. Ако досега влизаше с код — натисни „Забравена парола?“ и си сложи парола.' : /rate|seconds/i.test(error.message) ? 'Твърде много опити — изчакай малко.' : error.message, true);
+        keepMail(email); close();
+      });
+    };
+    body.querySelector('#rgLogin').onclick = login; pw.onkeydown = ev => { if (ev.key === 'Enter') login(); }; e.onkeydown = ev => { if (ev.key === 'Enter') pw.focus(); };
+  };
+  // след кода: парола за следващите влизания (по желание — „Пропусни“)
+  const stepPass = (email, mode) => {
+    body.innerHTML = `<p style="color:#a9b6c8;font-size:14px;line-height:1.5;margin:10px 0 4px">3️⃣ ${mode === 'reset' ? 'Нова парола' : 'Сложи си парола'} — следващия път влизаш с нея, без код.</p>
+      <input id="rgP1" type="password" autocomplete="new-password" placeholder="парола (поне 6 знака)" style="${inp}">
+      <input id="rgP2" type="password" autocomplete="new-password" placeholder="още веднъж" style="${inp}"><div class="rgMsg" style="font-size:13px;min-height:18px"></div>
+      <button id="rgSet" style="${go}">💾 Запази паролата</button>${mode === 'reset' ? '' : '<div style="text-align:center;margin-top:8px"><a href="#" id="rgNoPass" style="color:#8b96a8;font-size:13px">Пропусни — ще влизам с код</a></div>'}`;
+    const p1 = body.querySelector('#rgP1'), p2 = body.querySelector('#rgP2'); setTimeout(() => p1.focus(), 50);
+    const skip = body.querySelector('#rgNoPass'); if (skip) skip.onclick = ev => { ev.preventDefault(); stepEnter(email); };
+    const set = () => {
+      if (p1.value.length < 6) return msg('Паролата е поне 6 знака.', true);
+      if (p1.value !== p2.value) return msg('Двете пароли се различават.', true);
+      msg('Запазвам…'); body.querySelector('#rgSet').disabled = true;
+      sb.auth.updateUser({ password: p1.value }).then(({ error }) => {
+        body.querySelector('#rgSet').disabled = false;
+        if (error) return msg(/same|different/i.test(error.message) ? 'Това е старата парола — избери друга.' : /weak|short|least/i.test(error.message) ? 'Паролата е твърде слаба.' : error.message, true);
+        stepEnter(email, true);
+      });
+    };
+    body.querySelector('#rgSet').onclick = set; p2.onkeydown = ev => { if (ev.key === 'Enter') set(); };
+  };
+  const stepEmail = (pre = '', mode = 'new') => {
+    body.innerHTML = PASS ? `<p style="color:#a9b6c8;font-size:14px;line-height:1.5;margin:10px 0 4px">${mode === 'reset' ? '🔁 <b style="color:#fff">Забравена парола</b> — пращаме код на имейла ти, после си слагаш нова.' : '1️⃣ <b style="color:#fff">Нов акаунт</b> — пращаме код на имейла ти, после си слагаш парола. Играта ти се пази в облака и можеш да играеш от всяко устройство.'}</p>`
+      : `<p style="color:#a9b6c8;font-size:14px;line-height:1.5;margin:10px 0 4px">1️⃣ <b style="color:#fff">Регистрирай имейл</b> — ще ти пратим код. Без парола. Играта ти се пази в облака и можеш да играеш от всяко устройство.</p>`;
+    body.innerHTML += `<input id="rgEmail" type="email" autocomplete="email" inputmode="email" placeholder="ime@primer.com" style="${inp}"><div class="rgMsg" style="font-size:13px;min-height:18px"></div>
+      <button id="rgSend" style="${go}">📧 ${PASS ? 'Прати код' : 'Регистрирай'}</button>${PASS ? '<div style="text-align:center;margin-top:8px"><a href="#" id="rgHave" style="color:#8b96a8;font-size:13px">← Имам акаунт — вход с парола</a></div>' : ''}`;
     const e = body.querySelector('#rgEmail'); e.value = pre; setTimeout(() => e.focus(), 50);
+    const have = body.querySelector('#rgHave'); if (have) have.onclick = ev => { ev.preventDefault(); stepLogin(e.value.trim()); };
     const send = () => {
       const email = e.value.trim();
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return msg('Невалиден имейл.', true);
@@ -359,36 +406,36 @@ function regGate() {
       sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } }).then(({ error }) => {
         body.querySelector('#rgSend').disabled = false;
         if (error) return msg(/rate|seconds/i.test(error.message) ? 'Твърде много опити — изчакай малко.' : error.message, true);
-        stepCode(email);
+        stepCode(email, mode);
       });
     };
     body.querySelector('#rgSend').onclick = send; e.onkeydown = ev => { if (ev.key === 'Enter') send(); };
   };
-  const stepCode = email => {
+  const stepCode = (email, mode) => {
     body.innerHTML = `<p style="color:#a9b6c8;font-size:14px;line-height:1.5;margin:10px 0 4px">2️⃣ Пратихме код на <b style="color:#fff"></b>. Въведи го тук (ако го няма — виж „Спам“).</p>
       <input id="rgCode" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456" style="${inp};letter-spacing:4px;text-align:center"><div class="rgMsg" style="font-size:13px;min-height:18px"></div>
       <button id="rgOk" style="${go}">✅ Потвърди</button><div style="text-align:center;margin-top:8px"><a href="#" id="rgBack" style="color:#8b96a8;font-size:13px">← друг имейл</a></div>`;
     body.querySelector('b').textContent = email;
     const c = body.querySelector('#rgCode'); setTimeout(() => c.focus(), 50);
-    body.querySelector('#rgBack').onclick = ev => { ev.preventDefault(); stepEmail(email); };
+    body.querySelector('#rgBack').onclick = ev => { ev.preventDefault(); stepEmail(email, mode); };
     const ok = () => {
       const token = c.value.replace(/\D/g, ''); if (token.length < 6) return msg('Кодът е от 6 цифри.', true);
       msg('Проверявам…');
       sb.auth.verifyOtp({ email, token, type: 'email' }).then(({ error }) => {
         if (error) return msg(/expired|invalid/i.test(error.message) ? 'Грешен или изтекъл код.' : error.message, true);
-        stepEnter(email);
+        keepMail(email); PASS ? stepPass(email, mode) : stepEnter(email);
       });
     };
     body.querySelector('#rgOk').onclick = ok; c.onkeydown = ev => { if (ev.key === 'Enter') ok(); };
   };
-  const stepEnter = email => {
-    el.querySelector('#rgSkip').parentElement.remove();
-    body.innerHTML = `<p style="color:#5fe39a;font-size:15px;text-align:center;margin:14px 0 6px">✅ Регистриран си като <b style="color:#fff"></b></p>
+  const stepEnter = (email, pass) => {
+    el.querySelector('#rgSkip')?.parentElement.remove();
+    body.innerHTML = `<p style="color:#5fe39a;font-size:15px;text-align:center;margin:14px 0 6px">✅ ${pass ? 'Паролата е запазена. Влязъл си като' : 'Регистриран си като'} <b style="color:#fff"></b></p>
       <button id="rgIn" style="${go};font-size:20px;padding:15px">▶ Влез в играта</button>`;
     body.querySelector('b').textContent = email;
     body.querySelector('#rgIn').onclick = close;
   };
-  stepEmail();
+  PASS ? (lastMail() ? stepLogin() : stepEmail('', 'new')) : stepEmail();   // познат имейл на това устройство → вход с парола; иначе — нов акаунт
 }
 const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);   // на localhost (разработка) — без екрана, освен с ?gate
 if (!AUTOTEST && feature('reg-gate') && ((window.top === window && !LOCAL) || /[?&]gate/.test(location.search)))
