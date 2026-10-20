@@ -432,7 +432,7 @@ const H2 = ['h2-greyporch', 'h2-brickcabin', 'h2-pink', 'h2-townhouse', 'h2-blue
 const GAS_KINDS = ['gas-modern', 'gas-big', 'gas-green', 'gas-lowpoly'].filter(n => feature(n)), GAS_W = { 'gas-modern': 24, 'gas-big': 26, 'gas-green': 26, 'gas-lowpoly': 9 };
 const MODELS = {
   roads: ['road-straight', 'road-crossroad', 'road-intersection', 'road-bend', 'construction-cone', 'construction-barrier', 'light-square'],
-  houses: ['building-type-a', 'building-type-b', 'building-type-c', 'building-type-d', 'building-type-e', 'building-type-f', 'building-type-g', 'building-type-h', 'building-type-i', 'building-type-j', 'building-type-k', 'building-type-l', 'building-type-m', 'building-type-n', 'building-type-o', 'building-type-p', 'building-type-q', 'building-type-r', 'building-type-s', 'building-type-t', 'building-type-u', 'tree-large', 'tree-small'],   // всичките 21 къщи от пакета (Kenney, CC0)
+  houses: ['building-type-a', 'building-type-b', 'tree-large', 'tree-small'],   // от Kenney се зареждат само истинските A/B; детските building-type-c…u са само имена (KID_HOUSE_NAMES → houseOf)
   commercial: ['building-a', 'building-b', 'building-c', 'building-d', 'building-e', 'building-f', 'building-g', 'building-h', 'building-skyscraper-a', 'building-skyscraper-b', 'building-skyscraper-c'],
   // Commercial 2.1: модерни сгради и стъклени небостъргачи — за центъра на мегаполисите
   commercial2: ['building-skyscraper-d', 'building-skyscraper-e'],   // building-i…n (детските) са изтрити — вместо тях истинските от heavy/blocks2 (blk2Pick)
@@ -774,13 +774,14 @@ function instanced(name, mats) {
   });
   return g;
 }
-const HOUSES = MODELS.houses.filter(n => n.startsWith('building'));
+// имената на всичките 21 къщи от пакета — редът и броят се пазят (изборът r() в градовете и записите S.built ги ползват); c…u не се зареждат, рисуват се като истински
+const HOUSES = 'abcdefghijklmnopqrstu'.split('').map(c => 'building-type-' + c);
 HOUSES.push(...H2);   // истинските цветни къщи (H2 — при MODELS)
 // 🏠 детските къщи на Kenney (building-type-c…u) → истински (feature 'houses-real'): при рисуване всяка става една от истинските
 // (A/B и одобрените h2-*), винаги същата за парцела — записите не се пипат; новите къщи се избират само от истинските
 const KID_HOUSES = new Set(HOUSES.filter(n => /^building-type-[c-u]$/.test(n))), REAL_HOUSES = ['building-type-a', 'building-type-b', ...H2];
-const realHouses = feature('houses-real') && REAL_HOUSES.length >= 4;
-const houseOf = (n, seed) => realHouses && KID_HOUSES.has(n) ? REAL_HOUSES[hashStr(n + ':' + seed) % REAL_HOUSES.length] : n;
+const realHouses = true;   // детските файлове вече не се зареждат — винаги истинските (бившият feature 'houses-real')
+const houseOf = (n, seed) => KID_HOUSES.has(n) ? REAL_HOUSES[hashStr(n + ':' + seed) % REAL_HOUSES.length] : n;
 const HOUSE_POOL = realHouses ? REAL_HOUSES : HOUSES;
 // истинските блокове вместо стъклените building-i…n — изборът от Лабораторията (lab/blocks.html); всеки парцел — един от избраните за тази сграда
 function blk2Pick() { return { 'building-i': ['pp-townhouse', 'midwest'], 'building-j': ['office4', 'office5'], 'building-k': ['office2'], 'building-l': ['office3'], 'building-m': ['hirise'], 'building-n': ['office6'] }; }
@@ -1240,7 +1241,7 @@ function updMyBeams() {
 // Надграждането се плаща веднага, но го строи самата фирма (свой обект със своя бригада) — новото ниво важи, щом е готово.
 const OFFICE_LEVELS = [
   { nm: 'Фургон', model: null, crews: 2, proj: 2, offers: 3 },
-  { nm: 'Малък офис', model: feature('houses-real') && feature('h2-townhouse') ? 'h2-townhouse' : 'building-type-c', crews: 3, proj: 2, offers: 4 },   // при истинските къщи — тухлената градска къща
+  { nm: 'Малък офис', model: feature('h2-townhouse') ? 'h2-townhouse' : 'building-type-a', crews: 3, proj: 2, offers: 4 },   // при истинските къщи — тухлената градска къща
   { nm: 'Офис', model: 'building-a', crews: 4, proj: 3, offers: 4 },
   { nm: 'Голям офис', model: 'building-c', crews: 5, proj: 3, offers: 5 },
   { nm: 'Бизнес център', model: 'building-e', crews: 6, proj: 4, offers: 5 },
@@ -8903,8 +8904,9 @@ const tasks = createTasks({ S: () => S, fmt, ready: () => !!S && !!city && city.
 const tenderDir = () => { const n = S?.holding && dev.best() >= 15 && feature('boardroom') && (S.hold?.dir || {}).con; return n ? String(n).split(' ')[0] : ''; };
 // 👔 страничният панел с директор на Констръкшън (ниво 15+): без Поръчки, Техника и Склад — обобщение горе, прибран по подразбиране
 const panelDir = () => { try { return !manualWin.has('panel') ? tenderDir() : ''; } catch { return ''; } };
+let panelNpC = null;
 function panelDirHtml(nm) {
-  const m = Math.floor(S.day / 30), acc = S.accM && S.accM.m === m ? S.accM : { n: 0, sum: 0 }, sh = garShort(), np = (() => { try { return group.proposals().filter(p => !p.info && p.dir === 'con').length; } catch { return 0; } })();
+  const m = Math.floor(S.day / 30), acc = S.accM && S.accM.m === m ? S.accM : { n: 0, sum: 0 }, sh = garShort(), np = (() => { const k = S.day + ':' + projects.length + ':' + (S.offers || []).length; if (panelNpC && panelNpC.k === k) return panelNpC.n; let n = 0; try { n = group.proposals().filter(p => !p.info && p.dir === 'con').length; } catch { } panelNpC = { k, n }; return n; })();   // броят предложения в панела — веднъж на ден/при промяна (perf: boardProposals на всеки 0,5 s)
   const row = (ico, txt, btn) => `<div class="row" style="margin:4px 0;align-items:center;gap:6px"><span class="meta" style="margin:0;flex:1">${ico} ${txt}</span>${btn || ''}</div>`;
   return `<div class="card" style="border:1px solid #ffd54a"><div class="meta" style="margin:0 0 4px">👔 <b style="color:var(--txt)">${nm}</b> води поръчките, техниката и склада.</div>`
     + row('📜', acc.n ? `${nm} прие ${acc.n} ${acc.n === 1 ? 'поръчка' : 'поръчки'} този месец · <b style="color:var(--ok)">+${fmt(acc.sum)} €</b>` : `${nm} още не е приел поръчки този месец`, `<button class="btn2" data-poff="1" style="padding:3px 8px">→</button>`)
@@ -9637,7 +9639,7 @@ if (AUTOTEST) {
       const html = buyBranchHtml(), m0 = econ.s.money; openBranchNow(id); const r = { id, inScope: inScope(id), free: html.includes(`data-buybr="${id}"`) && /Влез безплатно/.test(html), paid: m0 - econ.s.money, owned: ownedCities().includes(id), coopBr: (S.coopBr || {})[id], city: S.cityId }; window.__coopShared = null; return r; },
     stingTest(id) { econ.earn(5e8, 'друго', 'тест'); openBranchNow(id); return (S.branches || []).includes(id); },   // тест: песента на града при нов филиал
     heightRow() {   // Лабораторията: къща, блок на 5 етажа, на 10 етажа, небостъргачи на 15/20/30 етажа — един до друг по улицата
-      const ns = ['building-type-c', 'h2-pink', 'building-a', 'sf-blk-jade', 'sf-blk-soviet', 'Building_Medium_2_001', 'building-skyscraper-a@15', 'building-skyscraper-b@20', 'sf-sky-night', 'building-skyscraper-d@30'].filter(n => A[n]);
+      const ns = ['h2-townhouse', 'h2-pink', 'building-a', 'sf-blk-jade', 'sf-blk-soviet', 'Building_Medium_2_001', 'building-skyscraper-a@15', 'building-skyscraper-b@20', 'sf-sky-night', 'building-skyscraper-d@30'].filter(n => A[n]);
       const q = city.plan?.square || city.hq, ls = city.lots.filter(l => !l.built && !l.busy && l !== city.hq).sort((a, b) => Math.hypot(a.x - q.x, a.z - q.z) - Math.hypot(b.x - q.x, b.z - q.z)).slice(0, ns.length);
       ns.forEach((n, i) => { const l = ls[i]; if (!l) return; if (l.obj) city.group.remove(l.obj); placeBuilding(l, n); l.busy = 'landmark'; });
       const cx = ls.reduce((a, l) => a + l.x, 0) / ls.length, cz = ls.reduce((a, l) => a + l.z, 0) / ls.length; showMap(false); __dbg.camAt(cx + 110, 75, cz + 140, cx, 15, cz); return ns.length; },
