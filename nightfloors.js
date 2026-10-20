@@ -127,9 +127,27 @@ function maskFor(tex, mode) {
   byMode.set(img, t);
   return t;
 }
+// бензиностанциите нощем: под навеса — кръгло светло петно на асфалта (адитивно; пали се с нощта като етажите — NF_MATS)
+let poolTex = null;
+function gasPool(root) {
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), bb = new THREE.Box3().setFromObject(root).applyMatrix4(inv), H = bb.max.y - bb.min.y;
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), box = new THREE.Box3(), M = new THREE.Matrix4();
+  root.traverse(o => { if (!o.isMesh || !o.geometry?.attributes.position) return; M.multiplyMatrices(inv, o.matrixWorld); const P = o.geometry.attributes.position, I = o.geometry.index, n = I ? I.count : P.count;
+    for (let t = 0; t + 2 < n; t += 3) { a.fromBufferAttribute(P, I ? I.getX(t) : t).applyMatrix4(M); b.fromBufferAttribute(P, I ? I.getX(t + 1) : t + 1).applyMatrix4(M); c.fromBufferAttribute(P, I ? I.getX(t + 2) : t + 2).applyMatrix4(M);
+      e1.subVectors(b, a); e2.subVectors(c, a); e1.cross(e2); const L = e1.length(); if (L < 1e-9) continue; e1.divideScalar(L);
+      if (e1.y < -0.7 && a.y > bb.min.y + 0.25 * H) { box.expandByPoint(a); box.expandByPoint(b); box.expandByPoint(c); } } });   // долните страни на навеса
+  if (box.isEmpty()) return;
+  if (!poolTex) { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d'), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, '#fff'); gr.addColorStop(0.55, '#8a8a8a'); gr.addColorStop(1, '#000'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); poolTex = new THREE.CanvasTexture(cv); }
+  const w = (box.max.x - box.min.x) * 1.3, d = (box.max.z - box.min.z) * 1.3;
+  const mt = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xf0f3ff, emissiveMap: poolTex, emissiveIntensity: 0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+  mt.userData.nfK = 0.55; mt.userData.nightFloors = true; NF_MATS.add(mt);   // nightFloors — да не го пипа traverse-ът по-долу
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2), mt); m.position.set((box.min.x + box.max.x) / 2, bb.min.y + H * 0.01, (box.min.z + box.max.z) / 2); m.renderOrder = 2; m.userData.noShadow = true; root.add(m);
+}
 // подготвя моделя веднъж (материалите се делят от всички сгради с този модел)
 export function prepNightFloors(root, name) {
   if (!MODE[name] || !feature(FEAT[name] || 'night-floors')) return;
+  if (/^gas-/.test(name)) gasPool(root);   // бензиностанцията: светло петно на асфалта под навеса (отгоре долната страна не се вижда)
   const bb = new THREE.Box3().setFromObject(root), floorH = Math.max(1e-3, (bb.max.y - bb.min.y) / FLOORS(name)), y0 = bb.min.y;
   root.traverse(o => {
     if (!o.isMesh) return;
