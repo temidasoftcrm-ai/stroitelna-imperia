@@ -574,7 +574,8 @@ export function manhattanTowers() {
       const part = new THREE.Group(), inner = new THREE.Group(); part.add(inner);
       for (const m of it.m) { const c = m.clone(); c.matrixAutoUpdate = false; c.matrix.copy(m.matrixWorld); c.castShadow = c.receiveShadow = true; const mt = c.material; if (mt && mt.metalness > 0.4) { mt.metalness = 0.25; mt.roughness = Math.max(mt.roughness ?? 0.5, 0.45); } inner.add(c); }   // без огледална среда металът излиза черен (като glbLm)
       const c = it.b.getCenter(new THREE.Vector3()); inner.position.set(-c.x, -it.b.min.y, -c.z); part.scale.setScalar(1 / H);
-      part.userData = { h: it.h / H, w: Math.max(it.w, it.d) / H };
+      const nmOf = m => { for (let o = m; o; o = o.parent) if (o.name && !/^(Object_|root|GLTF|Sketchfab|RootNode)/i.test(o.name)) return o.name; return ''; };
+      part.userData = { h: it.h / H, w: Math.max(it.w, it.d) / H, nm: it.m.map(nmOf).find(Boolean) || '' };   // nm — коя сграда е (emp_state, christler, metlife, new_york_times…)
       prepNightFloors(part, 'manhattan');   // нощем: прозорците и короната на Емпайър Стейт (Лабораторията → night-manhattan)
       return part;
     });

@@ -5439,20 +5439,20 @@ function lmRiverSpot(k, mem) {
 }
 // Рим по истинската карта: забележителностите — на реалните им места (P.landmarks), вписани в основата си
 // от плана се добавят само тези с правилен модел за града (иначе 'opera' в Париж става операта в Сидни, 'pantheon' — римският)
-const LM_EXTRA = { istanbul: new Set(['topkapi', 'bluemosque', 'maiden', 'grandbazaar', 'galata', 'suleymaniye', 'haydarpasa']) };
+const LM_EXTRA = { newyork: new Set(['liberty']), istanbul: new Set(['topkapi', 'bluemosque', 'maiden', 'grandbazaar', 'galata', 'suleymaniye', 'haydarpasa']) };
 // истинската височина (м) на високите забележителности — мащабът е по-малкият от основата и височината
-LANDMARK_NM.empire = LANDMARK_NM.empire || 'Емпайър Стейт Билдинг';
-const LM_REAL_H = { bigben: 96, londoneye: 135, shard: 310, eiffel: 330, galata: 67, maiden: 23, towerbridge: 65, stpeter: 136 };
+LANDMARK_NM.empire = LANDMARK_NM.empire || 'Емпайър Стейт Билдинг'; LANDMARK_NM.chrysler = LANDMARK_NM.chrysler || 'Крайслер Билдинг';
+const LM_REAL_H = { bigben: 96, londoneye: 135, shard: 310, eiffel: 330, galata: 67, maiden: 23, towerbridge: 65, stpeter: 136, liberty: 93 };
 const LM_ALIAS = { suleymaniye: 'mosque2' }, LM_NOT = new Set(['termini', 'sirkeci', 'saintlazare', 'haydarpasa_st']);   // гарите ги рисува изгледът на града
 function landmarkPlan2(kinds) {
   const P = city.plan, box = new THREE.Box3(), sz = new THREE.Vector3();
   // всички забележителности на реалните им места: от списъка на града (вариантите с модел — colosseo3, vittoriano2…) и от плана (Синята джамия, Топкапъ…), ако има модел
   const base = k => k.replace(/\d+$/, ''), all = [...kinds]; for (const L of P.landmarks) { if (LM_NOT.has(L.k) || !(LM_EXTRA[S.cityId] && LM_EXTRA[S.cityId].has(L.k))) continue; const k = LM_ALIAS[L.k] || L.k; if (!all.some(x => x === k || base(x) === L.k) && hasLandmark(k)) all.push(k); }
   // 🇺🇸 Ню Йорк: Емпайър Стейт — отделната кула от модела на Манхатън (по името на мешовете), в истинския ръст
-  if (all.includes('manhattan')) { all.splice(all.indexOf('manhattan'), 1); const at = P.landmarks.find(L => L.k === 'empire');
-    if (at) { const g = new THREE.Group(), o = { group: g, update() {}, kind: 'empire' }; g.position.set(at.x, 0, at.z); g.rotation.y = at.rot || 0; city.group.add(g); city.landmarks.push(o); const gen = city.group;
-      manhattanTowers().then(parts => { if (city.group !== gen) return; let pt = parts.find(p => { let hit = false; p.traverse(m => { if (m.isMesh && /empire/i.test(m.name || '')) hit = true; }); return hit; }) || parts[1] || parts[0]; if (!pt) return;
-        pt.scale.multiplyScalar(381 * (P.p2.osmData?.k || 0.45) / (pt.userData.h || 1)); g.add(pt); }); } }
+  if (all.includes('manhattan')) { all.splice(all.indexOf('manhattan'), 1); const gen = city.group, NYT = [['empire', /emp_?state|empire/i, 381], ['chrysler', /chr[iy]s?t?ler/i, 319]];   // кулите от модела на Манхатън — по имената на възлите
+    const slots = NYT.map(([k, re, h]) => { const at = P.landmarks.find(L => L.k === k); if (!at) return null; const g = new THREE.Group(), o = { group: g, update() {}, kind: k }; g.position.set(at.x, 0, at.z); g.rotation.y = at.rot || 0; city.group.add(g); city.landmarks.push(o); return { g, re, h }; }).filter(Boolean);
+    if (slots.length) manhattanTowers().then(parts => { if (city.group !== gen) return; for (const sl of slots) { const pt = parts.find(p => sl.re.test(p.userData.nm || '')); if (!pt) continue;
+      pt.scale.multiplyScalar(sl.h * (P.p2.osmData?.k || 0.45) / (pt.userData.h || 1)); sl.g.add(pt); } }); }
   for (const k of all) {
     const at = P.landmarks.find(L => L.k === k) || P.landmarks.find(L => L.k === base(k)) || P.landmarks.find(L => LM_ALIAS[L.k] === k); if (!at) continue;
     const o = buildLandmark(k, { label }); if (!o) continue;
