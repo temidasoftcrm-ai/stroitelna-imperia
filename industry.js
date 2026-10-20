@@ -5,6 +5,7 @@
 //   sf-windturbine — турбина (перките се въртят), sf-solar — соларен панел (нарежда се на редици).
 // Всяка истинска застава в кутията на детския модел при мащаб 1 (KID) — game.js ги слага като досега: model('ind-…', мащаб).
 import * as THREE from 'three';
+import { prepNightFloors } from './nightfloors.js';
 
 const BASE = 'assets/heavy/industry/';
 // детският модел при мащаб 1: [ширина x, височина y, дължина z, център x, основа y, център z]
@@ -44,11 +45,12 @@ export function loadIndustry(load, A) {
     const SET = {};
     G['sf-indset']?.traverse(m => { if (!m.isMesh) return; const k = (m.name.match(/^Industrial_([A-Za-z]+_\d+)/) || [])[1]; if (k) (SET[k] = SET[k] || []).push(m); });
     const real = k => k.startsWith('sf-') ? (G[k] ? partOf((() => { const L = []; G[k].traverse(m => { if (m.isMesh) L.push(m); }); return L; })()) : null) : SET[k] ? partOf(SET[k]) : null;
-    for (const [kid, k] of Object.entries(FACT)) { const o = real(k); if (o) A['ind-' + kid] = { scene: fitTo(o, kid) }; }
+    for (const [kid, k] of Object.entries(FACT)) { const o = real(k); if (o) { const sc = fitTo(o, kid); prepNightFloors(sc, 'ind-' + kid); A['ind-' + kid] = { scene: sc }; } }   // нощем — прожектори и прозорци (nightfloors 'ind')
     // водните кули: 4 варианта (по x) — model() ги редува
     if (G['sf-watertower']) {
       const by = {}; G['sf-watertower'].traverse(m => { if (!m.isMesh) return; const x = Math.round(box(m).getCenter(new THREE.Vector3()).x / 20); (by[x] = by[x] || []).push(m); });
       const V = Object.keys(by).sort((a, b) => a - b).map(x => fitTo(partOf(by[x]), 'water-tower', true));
+      V.forEach(v => prepNightFloors(v, 'ind-water-tower'));
       if (V.length) A['ind-water-tower'] = { scene: V[0], variants: V };
     }
     // турбината: перките се въртят около главината (оста — най-тънката страна на перките)
