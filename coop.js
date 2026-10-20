@@ -29,7 +29,7 @@ export function createCoop(d) {
   // облакът се зарежда отделно: ако няма интернет, самостоятелната игра работи както винаги
   let cloud = { user: () => null, sb: null }, sb = null;
   import('./cloud.js').then(m => { cloud = m.cloud; sb = cloud.sb; sb.auth.onAuthStateChange(() => setTimeout(tick, 300)); tick(); }).catch(() => {});
-  let fetchedAt = 0;   // кога за последно дойдоха данните на партньора (горната лента на центъра)
+  let fetchedAt = 0, st4 = null;   // кога за последно дойдоха данните на партньора (горната лента на центъра)
   let st3 = null, st2 = null, tab = 'help', lastMarks = 0, st = null, open = false, busy = false, lastSnap = 0, user = null, applying = false;
   const E = () => d.econ(), f = n => d.fmt(n);
   const pend = () => { try { return JSON.parse(localStorage.getItem(PEND)) || []; } catch { return []; } };
@@ -95,7 +95,7 @@ export function createCoop(d) {
   function refund(rf, why) {
     if (!rf) return;
     if (rf.money) { E().earn(rf.money, 'партньор', 'Върнато — пратката не мина'); }
-    if (rf.unit && d.giveUnit(rf.unit) !== 'ok') E().earn(UNIT_TYPES[rf.unit]?.cost || 0, 'партньор', 'Върната техника (няма място — стойността)');
+    if (rf.unit) for (let i = 0; i < (rf.n || 1); i++) if (d.giveUnit(rf.unit) !== 'ok') E().earn(UNIT_TYPES[rf.unit]?.cost || 0, 'партньор', 'Върната техника (няма място — стойността)');   // n — няколко машини наведнъж (центърът, v2)
     if (rf.mat) E().s.stock[rf.mat] = (E().s.stock[rf.mat] || 0) + rf.qty;
     d.save(); d.renderPanel();
     d.toast(`↩️ ${why || 'Пратката не мина'} — върнато обратно.`, 'bad');
@@ -114,6 +114,8 @@ export function createCoop(d) {
     applying = true;
     try {
       for (const x of st.inbox) {
+        // техника „за град X“ (центърът, v2): чака в пощата, докато влезеш в този твой град
+        if (feature('coop-center2') && x.kind === 'unit' && x.data?.city && x.data.city !== d.cityId() && d.ownedCities().includes(x.data.city)) continue;
         let r; try { r = await rpc('coop_claim', { p_id: x.id }, 2); } catch { break; }
         if (!r?.ok) continue;
         const D = r.data || {}, pn = partnerName();
@@ -183,6 +185,8 @@ export function createCoop(d) {
       st2 = r2 && r2.ok && r2.active ? r2 : null;
       const r3 = st2 ? await rpc('coop_status3', {}, 1).catch(() => null) : null;
       st3 = r3 && r3.ok && r3.active ? r3 : null;
+      const r4 = st2 && feature('coop-center2') ? await rpc('coop_status4', {}, 1).catch(() => null) : null;   // правилата на общата каса (миграция coop4 — без нея няма карта)
+      st4 = r4 && r4.ok && r4.active ? r4 : null;
       shareMap();
       const J = (st2?.joints || []).filter(j => j.status === 'active');
       window.__coopJoint = st2 ? { hw: new Set(J.filter(j => j.kind === 'hw').map(j => j.ref)), rail: new Set(J.filter(j => j.kind === 'rail').map(j => j.ref)) } : null;
@@ -495,7 +499,8 @@ export function createCoop(d) {
   }
   const QUICK = ['Трябва ми кран! 🏗️', 'Може ли малко пари? 💶', 'Да строим заедно? 🛣️', 'Благодаря! 💖'];
   // контекстът за coopcenter.js: данните, форматирането и същите действия (act/bind остават тук)
-  const centerCtx = () => ({ st, st2, st3, d, E, f, esc, ago, left, PCOL, JCOL, partnerName, myName, unread, UNIT_TYPES, MATERIALS, logTxt, holdInfo, QUICK, fetchedAt, partnerLv: partnerLv(),
+  const centerCtx = () => ({ st, st2, st3, st4, v2: feature('coop-center2'), d, E, f, esc, ago, left, PCOL, JCOL, partnerName, myName, unread, UNIT_TYPES, MATERIALS, logTxt, holdInfo, QUICK, fetchedAt, partnerLv: partnerLv(),
+    fleet: feature('coop-fleet') && d.fleet ? { mine: d.fleet(), partner: st?.partner?.snap?.fleet || [], F: d.S()?.coopFleet || null } : null,
     markRead: () => { const mx = Math.max(0, ...(st2?.messages || []).map(m => m.id)); if (mx) LS('stroi-coop-read', mx); }, act: (c, a, x, el) => act(c, a, x, el), render, tick });
   function chatHtml() {
     const M = st2?.messages || [];
@@ -567,7 +572,23 @@ export function createCoop(d) {
     if (c === 'vput') { const n = Math.round(num(el.querySelector('#cpV').value)); if (!money(n)) return; E().spend(n, 'партньор', '🏦 Вноска в общата касичка');
       const r = await queue({ fn: 'coop_vault', args: { p_req: uid(), p_amount: n }, refund: { money: n } }); if (r?.ok) d.toast(`🏦 Внесе ${f(n)} €.`, 'good'); d.renderPanel(); return; }
     if (c === 'vtake') { const n = Math.round(num(el.querySelector('#cpV').value)); if (!(n > 0)) return d.toast('Въведи сума.', 'bad');
-      if (say(await rpc('coop_vault', { p_req: uid(), p_amount: -n }))) d.toast(`🏦 Изтегли ${f(n)} € — идват след миг.`, 'good'); return; }
+      const r = await rpc('coop_vault', { p_req: uid(), p_amount: -n }); if (r?.err === 'need_approval') return d.toast(`🏦 ${r.msg} Натисни „🙋 Поискай одобрение“.`, 'bad');
+      if (say(r)) d.toast(`🏦 Изтегли ${f(n)} € — идват след миг.`, 'good'); return; }
+    // ── центърът, v2: техника с количество, структурирано 🆘, правила на касата и заявки над лимита ──
+    if (c === 'unitn' || c === 'rentn') { const want = Math.max(1, Math.round(num(el.querySelector('#ccQty')?.value) || 1)), city = el.querySelector('#ccDest')?.value || null, hrs = +(el.querySelector('#cpRH')?.value || 12), pr = Math.round(num(el.querySelector('#cpRP')?.value) || 0);
+      let got = 0; if (c === 'unitn') { for (let i = 0; i < want; i++) { if (!d.takeUnit(a)) break; got++; } if (!got) return d.toast('Няма свободна такава техника тук.', 'bad');
+        const r = await queue({ fn: 'coop_send', args: { p_req: uid(), p_kind: 'unit', p_data: { type: a, n: got, city } }, refund: { unit: a, n: got } });
+        if (r?.ok) d.toast(`🚚 ${got} × ${UNIT_TYPES[a].ico} ${UNIT_TYPES[a].nm} пътуват към ${partnerName()}${city ? ` (за ${d.cityName(city)})` : ''}.`, 'good'); return; }
+      for (let i = 0; i < want; i++) { if (!d.takeUnit(a)) break; const r = await queue({ fn: 'coop_rent_offer', args: { p_req: uid(), p_type: a, p_hours: hrs, p_price: pr }, refund: { unit: a } }); if (r?.ok) got++; }
+      if (got) d.toast(`📤 ${got} × ${UNIT_TYPES[a]?.nm} — предложени ${pr ? `под наем за ${f(pr)} € всяка` : 'като помощ'} за ${hrs} ч. Чака ${partnerName()}.`, 'good'); else d.toast('Няма свободна такава техника тук.', 'bad'); return; }
+    if (c === 'sosx') { const t = (el.querySelector('#ccSosTxt')?.value || '').slice(0, 280); if (!t) return; if (say(await rpc('coop_say', { p_text: t, p_sos: true }))) d.toast('🆘 Молбата е изпратена.', 'good'); return; }
+    if (c === 'helped') { const m = (st2?.messages || []).find(q => q.id === +a); if (say(await rpc('coop_say', { p_text: `✅ Помогнах: ${(m?.text || '').slice(0, 200)}` }))) d.toast('✅ Отбелязано — партньорът вижда, че е помогнато.', 'good'); return; }
+    if (c === 'rulesp') { const lim = id => { const v = String(el.querySelector(id)?.value || '').trim(); return v === '' ? null : Math.round(num(v)); };
+      if (say(await rpc('coop_rules_propose', { p_self: lim('#ccSelf'), p_rescue: lim('#ccRescue') }))) d.toast('📜 Правилата са предложени — важат, щом партньорът ги приеме.', 'good'); return; }
+    if (c === 'rulesact') { if (say(await rpc('coop_rules_act', { p_action: a }))) d.toast({ accept: '📜 Правилата на касата важат от сега.', decline: 'Отказано.', cancel: 'Оттеглено.' }[a] || 'Готово.', 'good'); return; }
+    if (c === 'wreq') { const n = Math.round(num(el.querySelector('#cpV')?.value)); if (!(n > 0)) return d.toast('Въведи сумата горе (в полето на холдинга).', 'bad');
+      if (say(await rpc('coop_withdraw_request', { p_req: uid(), p_amount: n, p_reason: el.querySelector('#ccReason')?.value || '' }))) d.toast(`🙋 Заявката за ${f(n)} € е пратена на ${partnerName()}.`, 'good'); return; }
+    if (c === 'wact') { const r = await rpc('coop_withdraw_act', { p_id: +a, p_action: x }); if (say(r)) d.toast({ approve: `✅ Одобри тегленето — ${f(r.amount || 0)} € тръгват към ${partnerName()}.`, decline: 'Отказано.', cancel: 'Оттеглено.' }[x] || 'Готово.', 'good'); return; }
     if (c === 'ipo') { const r = await rpc('coop_ipo', a === 'propose' ? { p_action: 'propose', p_pct: +el.querySelector('#cpIP').value, p_hours: +el.querySelector('#cpIH').value } : { p_action: a });
       if (say(r)) d.toast({ propose: '📈 Предложението е пратено — партньорът трябва да го одобри.', accept: '📈 Акциите на холдинга тръгнаха на борсата!', decline: 'Отказано.', cancel: 'Оттеглено.' }[a] || 'Готово.', 'good'); return; }
     if (c === 'vname') { if (say(await rpc('coop_vault_name', { p_name: el.querySelector('#cpVN').value }))) d.toast('Името е запазено.'); return; }

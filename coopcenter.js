@@ -30,7 +30,7 @@ const CSS = `
 #coopBox .cc .stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin:4px 0 10px; }
 #coopBox .cc .stat { border:1px solid var(--line); border-radius:11px; padding:9px 11px; background:#ffffff08; } #coopBox .cc .stat b { display:block; font-size:19px; } #coopBox .cc .stat span { color:var(--mut); font-size:12px; }
 #coopBox .cc .ac { display:flex; align-items:center; gap:10px; border:1px solid var(--line); border-left:4px solid var(--acc); border-radius:10px; padding:9px 11px; margin:6px 0; background:#ffffff08; }
-#coopBox .cc .ac div { flex:1; min-width:0; } #coopBox .cc .sub { display:flex; gap:4px; border-bottom:1px solid var(--line); margin:0 0 8px; overflow-x:auto; }
+#coopBox .cc .ac { flex-wrap:wrap; } #coopBox .cc .ac > div { flex:1 1 200px; min-width:0; } #coopBox .cc .sub { display:flex; gap:4px; border-bottom:1px solid var(--line); margin:0 0 8px; overflow-x:auto; }
 #coopBox .cc .sub button { background:none; border:0; border-bottom:2px solid transparent; color:var(--mut); padding:7px 10px; cursor:pointer; font:inherit; font-size:14px; white-space:nowrap; } #coopBox .cc .sub button.on { color:var(--txt); border-color:var(--acc); font-weight:800; }
 #coopBox .cc .chip { display:inline-block; border:1px solid; border-radius:9px; padding:0 7px; font-size:12px; font-weight:700; white-space:nowrap; }
 #coopBox .cc .three { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; } #coopBox .cc .three .stat b { font-size:17px; }
@@ -80,7 +80,15 @@ export function centerRender(el, C) {
 // ── локалните действия (навигация, съветник) ──
 async function local(cc, C, el) {
   const [c, a, x] = cc.split(':');
+  grab(el);
   if (c === 'sec') { V.sec = a; V.cities = V.gear = false; }
+  else if (c === 'eqT') { V.eqT = a; V.eqQ = 1; }
+  else if (c === 'eqQ') V.eqQ = +a;
+  else if (c === 'eqM') V.eqM = a;
+  else if (c === 'sosK') V.sosK = a;
+  else if (c === 'sosPrev') { }
+  else if (c === 'helpMoney') { V.sec = 'fin'; V.fin = 'tr'; V.giftA = +a; V.helpMsg = +x; }
+  else if (c === 'helpUnit') { const [t, n, city] = a.split('|'); V.sec = 'eq'; V.eqT = t; V.eqQ = +n || 1; V.eqM = 'gift'; if (city) V.eqC = city; V.helpMsg = +x; }
   else if (c === 'cities') { V.cities = !V.cities; V.gear = false; }
   else if (c === 'gear') { V.gear = !V.gear; V.cities = false; }
   else if (c === 'proj') V.proj = a;
@@ -102,6 +110,13 @@ async function local(cc, C, el) {
   C.render();
 }
 
+// полетата на формите се помнят между прерисуванията (количество, срок, цена, молбата)
+function grab(el) {
+  const v = id => el.querySelector('#' + id)?.value, n = id => +String(v(id) || '').replace(/[^\d]/g, '');
+  if (v('ccQty') != null) V.eqQ = n('ccQty') || 1; if (v('cpRH') != null) V.eqH = +v('cpRH'); if (v('cpRP') != null && el.querySelector('#cpRP').type !== 'hidden') V.eqP = n('cpRP'); if (v('ccDest') != null) V.eqC = v('ccDest');
+  if (v('ccSosAmt') != null) V.sosA = n('ccSosAmt'); if (v('ccSosWhy') != null) V.sosW = v('ccSosWhy'); if (v('ccSosN') != null) V.sosN = n('ccSosN') || 1; if (v('ccSosT') != null) V.sosT = v('ccSosT'); if (v('ccSosC') != null) V.sosC = v('ccSosC');
+  if (v('cpAmt') != null && V.sec === 'fin') V.giftA = n('cpAmt') || V.giftA;
+}
 // ── какво чака моето решение (картите в обзора) ──
 function decisions(C) {
   const { st, st2, st3, f, esc } = C, pn = esc(C.partnerName()), out = [];
@@ -111,7 +126,10 @@ function decisions(C) {
   for (const r of st2?.rentals || []) if (r.status === 'active' && r.until && Date.parse(r.until) - Date.now() < 3600e3) out.push({ ico: '⏰', t: `Изтича наемът на ${C.UNIT_TYPES[r.type]?.nm.toLowerCase() || 'техника'} — след ${C.left(r.until)}`, go: 'eq', btn: 'Виж договора', soft: true });
   for (const l of st.loans || []) if (l.status === 'open' && !l.out && l.due_at && Date.parse(l.due_at) - Date.now() < 6 * 3600e3) out.push({ ico: '⏰', t: `Заемът към ${pn} е до ${C.left(l.due_at)} — остават ${f(l.owed - l.repaid)} €`, go: 'fin:loan', btn: 'Върни', soft: true });
   const I = st3?.ipo; if (I && I.status === 'proposed' && !I.mine) out.push({ ico: '📈', t: `${pn} предлага холдингът да пусне ${I.pct}% акции`, go: 'fin:hold', btn: 'Разгледай' });
-  for (const m of (st2?.messages || []).slice(-5)) if (m.sos && !m.me && Date.now() - Date.parse(m.at) < 86400e3) out.push({ ico: '🆘', t: `${pn}: „${esc(m.text)}“`, go: 'fin:tr', btn: 'Помогни', sos: true });
+  for (const m of (st2?.messages || []).slice(-5)) if (m.sos && !m.me && Date.now() - Date.parse(m.at) < 86400e3 && !(C.v2 && helped(C, m))) { const q = C.v2 && sosParse(C, m.text);
+    out.push({ ico: '🆘', t: `${pn}: „${esc(m.text)}“`, go: q && q.type ? `eq` : 'fin:tr', btn: 'Помогни', sos: true, cc: q ? (q.money ? `helpMoney:${q.money}:${m.id}` : `helpUnit:${q.type}|${q.n}|${q.city || ''}:${m.id}`) : null }); }
+  const R4 = C.st4; if (R4?.rules?.pending && !R4.rules.pending.mine) out.push({ ico: '📜', t: `${pn} предлага правила за общата каса`, go: 'fin:hold', btn: 'Разгледай' });
+  for (const r of R4?.requests || []) if (r.status === 'requested' && !r.mine) out.push({ ico: '🏦', t: `${pn} моли за теглене <b>${f(r.amount)} €</b> от общата каса${r.reason ? ` — ${esc(r.reason)}` : ''}`, go: 'fin:hold', btn: 'Реши' });
   return out;
 }
 // ── готовите награди: общи задачи + изпълнени общи поръчки ──
@@ -128,7 +146,7 @@ function home(C, todo, ready) {
   const act = (st2?.joints || []).filter(j => j.status === 'active' && !j.done).length + (st.megas || []).filter(m => m.status === 'forming' || m.status === 'building').length + (st2?.rentals || []).filter(r => r.status === 'active').length;
   let h = `<div class="stats"><div class="stat"><b>${f(V0.balance)} €</b><span>🏦 Общи средства</span></div><div class="stat"><b>${act}</b><span>🛣️ Активни проекти</span></div>
     <div class="stat"><b style="color:${todo.some(t => !t.soft) ? 'var(--acc)' : ''}">${todo.filter(t => !t.soft).length}</b><span>📨 За твое решение</span></div><div class="stat"><b style="color:${ready.n ? 'var(--ok)' : ''}">${ready.n}</b><span>🏆 Готови награди</span></div></div>`;
-  h += todo.map(t => `<div class="ac" style="${t.sos ? 'border-left-color:var(--bad)' : t.soft ? 'border-left-color:#ffb347' : ''}"><span style="font-size:20px">${t.ico}</span><div>${t.t}</div><button class="${t.soft ? 'btn2' : 'btn'}" data-cc="go:${t.go}">${t.btn} →</button></div>`).join('');
+  h += todo.map(t => `<div class="ac" style="${t.sos ? 'border-left-color:var(--bad)' : t.soft ? 'border-left-color:#ffb347' : ''}"><span style="font-size:20px">${t.ico}</span><div>${t.t}</div><button class="${t.soft ? 'btn2' : 'btn'}" data-cc="${t.cc || 'go:' + t.go}">${t.btn} →</button></div>`).join('');
   if (ready.n) h += `<div class="ac" style="border-left-color:var(--ok)"><span style="font-size:20px">🏆</span><div>${ready.n} ${ready.n === 1 ? 'готова награда' : 'готови награди'}${ready.list.some(r => r.amt) ? ` · ${f(ready.list.reduce((a, r) => a + r.amt, 0))} € от задачите` : ''}</div><button class="btn" data-cc="claimall">Вземи всички</button></div>`;
   if (!todo.length && !ready.n) h += '<div class="mut" style="margin:10px 0">✅ Всичко е наред — няма чакащи решения.</div>';
   const both = (s.cities || []).filter(id => d.ownedCities().includes(id));
@@ -210,9 +228,10 @@ function wizard(C) {
 function eq(C) {
   const { st, st2, d, f, esc, E } = C, S = d.S(), pn = esc(C.partnerName()), U = C.UNIT_TYPES, MT = C.MATERIALS;
   const cnt = {}; d.unitsHere().forEach(t => cnt[t] = (cnt[t] || 0) + 1);
-  let h = `<h3>🚚 Изпрати техника <span class="mut">(свободна в ${esc(d.cityName(S.cityId))})</span></h3>` + (Object.keys(cnt).length ? `<div class="card">${Object.entries(cnt).map(([t, n]) => `<div class="led"><span>${U[t]?.ico} ${U[t]?.nm} · свободни ${n}</span><button class="btn2" data-c="unit:${t}">Изпрати 1</button></div>`).join('')}</div>` : '<div class="mut">Няма свободна техника в този град (заетата на обект не може да се праща).</div>');
-  h += `<h3>🏢 Под наем или като помощ</h3><div class="mut">Даваш машина за определено време (реално); партньорът плаща наема наведнъж и тя се връща сама. Цена 0 = помощ.</div>`;
-  h += Object.keys(cnt).length ? `<div class="row"><select id="cpRT">${Object.entries(cnt).map(([x, n]) => `<option value="${x}">${U[x]?.ico} ${U[x]?.nm} (свободни ${n})</option>`).join('')}</select>
+  let h = C.v2 ? sendForm(C, cnt) + sosForm(C) : '';
+  if (!C.v2) h += `<h3>🚚 Изпрати техника <span class="mut">(свободна в ${esc(d.cityName(S.cityId))})</span></h3>` + (Object.keys(cnt).length ? `<div class="card">${Object.entries(cnt).map(([t, n]) => `<div class="led"><span>${U[t]?.ico} ${U[t]?.nm} · свободни ${n}</span><button class="btn2" data-c="unit:${t}">Изпрати 1</button></div>`).join('')}</div>` : '<div class="mut">Няма свободна техника в този град (заетата на обект не може да се праща).</div>');
+  if (!C.v2) h += `<h3>🏢 Под наем или като помощ</h3><div class="mut">Даваш машина за определено време (реално); партньорът плаща наема наведнъж и тя се връща сама. Цена 0 = помощ.</div>`;
+  if (!C.v2) h += Object.keys(cnt).length ? `<div class="row"><select id="cpRT">${Object.entries(cnt).map(([x, n]) => `<option value="${x}">${U[x]?.ico} ${U[x]?.nm} (свободни ${n})</option>`).join('')}</select>
     <select id="cpRH">${[2, 6, 12, 24, 48, 72].map(x => `<option value="${x}"${x === 12 ? ' selected' : ''}>за ${x} ч</option>`).join('')}</select><input id="cpRP" inputmode="numeric" placeholder="наем € (0 = помощ)" style="width:150px"><button class="btn2" data-c="rent">📤 Предложи</button></div>` : '';
   const R = st2?.rentals || [];
   const rCard = r => { const u = U[r.type] || {}; let b = '';
@@ -224,14 +243,66 @@ function eq(C) {
   for (const [t, L] of grp) if (L.length) h += `<h3>${t}</h3><div class="card">${L.map(rCard).join('')}</div>`;
   // поискана помощ: 🆘 съобщенията на партньора (последното денонощие)
   const sos = (st2?.messages || []).filter(m => m.sos && !m.me && Date.now() - Date.parse(m.at) < 86400e3);
-  if (sos.length) h += `<h3>🆘 Поискана помощ</h3>${sos.map(m => `<div class="ac" style="border-left-color:var(--bad)"><div>${esc(m.text)}<div class="mut">${C.ago(m.at)}</div></div><button class="btn" data-cc="go:fin:tr">Помогни →</button></div>`).join('')}`;
+  if (sos.length) h += `<h3>🆘 Поискана помощ</h3>${sos.map(m => { const q = C.v2 && sosParse(C, m.text), done = C.v2 && helped(C, m);
+    const go = !q ? '<button class="btn" data-cc="go:fin:tr">Помогни →</button>' : q.money ? `<button class="btn" data-cc="helpMoney:${q.money}:${m.id}">🎁 Помогни с ${f(q.money)} €</button>` : `<button class="btn" data-cc="helpUnit:${q.type}|${q.n}|${q.city || ''}:${m.id}">🚚 Прати ${q.n} × ${U[q.type]?.nm}</button>`;
+    return `<div class="ac" style="border-left-color:${done ? 'var(--ok)' : 'var(--bad)'}"><div>${esc(m.text)}<div class="mut">${C.ago(m.at)}</div></div>${C.v2 ? chip(done ? 'done' : 'wait') : ''}${done ? '' : go}${C.v2 && !done ? `<button class="btn2" data-c="helped:${m.id}">✅ Помогнах</button>` : ''}</div>`; }).join('')}`;
+  // 🚢 общият флот (coop.js fleetDay, флаг coop-fleet): купеното от единия като партньори е наполовина на другия
+  if (C.fleet) { const F = C.fleet.F || {}, all = [...C.fleet.mine.map(v => ({ ...v, me: true })), ...C.fleet.partner.map(v => ({ ...v, me: false }))];
+    const sh = all.filter(v => v.me ? (F.mine || {})[v.ref] : (F.paid || {})[v.ref]), ico = r => /^t/.test(r) ? '🚆' : /^s/.test(r) ? '🚢' : '✈️';
+    h += `<h3>🚢 Общ флот <span class="mut">(${sh.length})</span></h3>` + (sh.length ? `<div class="card">${sh.slice(0, 40).map(v => `<div class="led"><span>${ico(v.ref)} ${esc(v.nm || v.ref)}</span><span class="mut">${v.me ? 'твой' : `на ${pn}`} · по 50% · ${f(v.cost)} €</span></div>`).join('')}${sh.length > 40 ? `<div class="mut">…и още ${sh.length - 40}</div>` : ''}</div>`
+      : `<div class="mut">Влаковете, корабите и самолетите, които някой от вас купи като партньори, стават общи — всеки плаща половината и взема половината от печалбата им (веднъж на игрален ден, автоматично).</div>`); }
+  // пратки с техника, които чакат в друг твой град (C.v2: получаваш ги, щом влезеш там)
+  const wait = (st.inbox || []).filter(x => x.kind === 'unit' && x.data?.city && x.data.city !== S.cityId);
+  if (wait.length) h += `<h3>📦 Чакат те в друг град</h3><div class="card">${wait.map(x => `<div class="led"><span>${U[x.data.type]?.ico || ''} ${x.data.n || 1} × ${U[x.data.type]?.nm || x.data.type} от ${pn}</span><span class="mut">в ${esc(d.cityName(x.data.city))} — влез там</span></div>`).join('')}</div>`;
   const stock = Object.entries(E().s.stock || {}).filter(([k, q]) => q > 0 && MT[k]);
   h += `<h3>📦 Материали</h3>` + (stock.length ? `<div class="card">${stock.map(([k, q]) => `<div class="led"><span>${MT[k].ico} ${MT[k].nm} · ${Math.round(q * 100) / 100} ${MT[k].unit}</span><span class="row" style="margin:0"><input data-mq="${k}" inputmode="decimal" value="${Math.round(q * 100) / 100}" style="width:80px"><button class="btn2" data-c="mat:${k}">Изпрати</button></span></div>`).join('')}</div>` : '<div class="mut">Складът е празен.</div>');
   const H = (st.history || []).filter(x => x.kind === 'unit' || x.kind === 'mat');
-  if (H.length) h += `<h3>📜 Изпратени и получени</h3><div class="card">${H.slice(0, 20).map(x => { const D = x.data || {}; const w = x.kind === 'unit' ? `${U[D.type]?.ico || ''} ${U[D.type]?.nm || D.type}` : `${MT[D.mat]?.ico || ''} ${D.qty} ${MT[D.mat]?.unit || ''} ${MT[D.mat]?.nm || D.mat}`;
+  if (H.length) h += `<h3>📜 Изпратени и получени</h3><div class="card">${H.slice(0, 20).map(x => { const D = x.data || {}; const w = x.kind === 'unit' ? `${U[D.type]?.ico || ''} ${(D.n || 1) > 1 ? D.n + ' × ' : ''}${U[D.type]?.nm || D.type}${D.city ? ' → ' + esc(d.cityName(D.city)) : ''}` : `${MT[D.mat]?.ico || ''} ${D.qty} ${MT[D.mat]?.unit || ''} ${MT[D.mat]?.nm || D.mat}`;
     return `<div class="led"><span>${x.out ? `→ към ${pn}` : `← от ${pn}`} · ${w}</span><span class="mut">${C.ago(x.at)}${x.status === 'sent' ? ' · ⏳ на път' : ''}</span></div>`; }).join('')}</div>`;
   return h;
 }
+
+// ── 🚚 (v2) техника с количество: вид → количество → град → помощ / подарък / наем → предложение ──
+function sendForm(C, cnt) {
+  const { st, d, f, esc } = C, S = d.S(), U = C.UNIT_TYPES, pn = esc(C.partnerName()), P = st.partner?.snap || {};
+  const types = Object.keys(cnt); if (!types.length) return `<h3>🚚 Изпрати техника</h3><div class="mut">Няма свободна техника в ${esc(d.cityName(S.cityId))} (заетата на обект не може да се праща). Смени града, за да пратиш от друг.</div>`;
+  if (!V.eqT || !cnt[V.eqT]) V.eqT = types[0];
+  const free = cnt[V.eqT], q = Math.max(1, Math.min(free, V.eqQ || 1)), mode = V.eqM || 'gift', cities = P.cities || [], dest = cities.includes(V.eqC) ? V.eqC : (cities.includes(S.cityId) ? S.cityId : P.hq || cities[0] || '');
+  let h = `<h3>🚚 Изпрати техника <span class="mut">от ${esc(d.cityName(S.cityId))}</span></h3><div class="card">
+    <div class="row" style="margin:0 0 6px">${types.map(t => `<button class="${t === V.eqT ? 'btn' : 'btn2'}" data-cc="eqT:${t}">${U[t]?.ico} ${U[t]?.nm} · свободни ${cnt[t]}</button>`).join('')}</div>
+    <div class="row"><span class="mut" style="width:90px">Количество</span><button class="btn2" data-cc="eqQ:${q - 1}"${q <= 1 ? ' disabled' : ''}>−</button><input id="ccQty" inputmode="numeric" value="${q}" style="width:60px;text-align:center"><button class="btn2" data-cc="eqQ:${q + 1}"${q >= free ? ' disabled' : ''}>+</button><span class="mut">от ${free}</span></div>
+    <div class="row"><span class="mut" style="width:90px">Как</span>${[['gift', '🎁 Подарък'], ['help', '🤝 Помощ за срок'], ['rent', '🏢 Под наем']].map(([k, t]) => `<button class="${mode === k ? 'btn' : 'btn2'}" data-cc="eqM:${k}">${t}</button>`).join('')}</div>`;
+  if (mode === 'gift') h += `<div class="row"><span class="mut" style="width:90px">За град</span><select id="ccDest">${cities.map(id => `<option value="${id}"${id === dest ? ' selected' : ''}>${esc(d.cityName(id))}${id === P.hq ? ' ★' : ''}</option>`).join('')}</select><span class="mut">— ${pn} я получава, щом влезе там</span></div>`;
+  else h += `<div class="row"><span class="mut" style="width:90px">Срок</span><select id="cpRH">${[2, 6, 12, 24, 48, 72].map(x => `<option value="${x}"${x === (V.eqH || 12) ? ' selected' : ''}>${x} ч</option>`).join('')}</select>${mode === 'rent' ? `<input id="cpRP" inputmode="numeric" placeholder="наем € за всяка" value="${V.eqP || ''}" style="width:150px">` : '<input id="cpRP" type="hidden" value="0">'}<span class="mut">— връща се сама след срока (реално време)</span></div>`;
+  const what = `${q} × ${U[V.eqT]?.ico} ${U[V.eqT]?.nm}`;
+  h += `<div class="ac" style="margin-top:8px"><div><b>Предложение:</b> ${what} → ${pn}${mode === 'gift' ? ` · за ${esc(d.cityName(dest))} · подарък` : mode === 'help' ? ` · помощ за ${V.eqH || 12} ч (безплатно)` : ` · под наем за ${V.eqH || 12} ч${V.eqP ? ` · ${f(V.eqP)} € за всяка` : ''}`}</div>
+    <button class="btn" data-c="${mode === 'gift' ? 'unitn' : 'rentn'}:${V.eqT}">📤 Изпрати</button></div></div>`;
+  return h;
+}
+// ── 🆘 (v2) структурирана молба за помощ: пари за нещо / машина в град ──
+const SOS_WHY = ['заплати', 'материали', 'кредита', 'нов строеж', 'техника'];
+function sosForm(C) {
+  const { d, esc, f } = C, U = C.UNIT_TYPES, k = V.sosK || 'money', mine = d.ownedCities();
+  const txt = sosText(C);
+  return `<h3>🆘 Поискай помощ</h3><div class="card"><div class="row" style="margin:0 0 6px">${[['money', '💶 Пари'], ['unit', '🚜 Машина']].map(([x, t]) => `<button class="${k === x ? 'btn' : 'btn2'}" data-cc="sosK:${x}">${t}</button>`).join('')}</div>
+    ${k === 'money' ? `<div class="row"><input id="ccSosAmt" inputmode="numeric" placeholder="сума в €" value="${V.sosA || ''}" style="width:140px"><span class="mut">за</span><select id="ccSosWhy">${SOS_WHY.map(w => `<option${w === V.sosW ? ' selected' : ''}>${w}</option>`).join('')}</select></div>`
+      : `<div class="row"><input id="ccSosN" inputmode="numeric" value="${V.sosN || 1}" style="width:50px;text-align:center"><span class="mut">×</span><select id="ccSosT">${Object.entries(U).map(([t, u]) => `<option value="${t}"${t === V.sosT ? ' selected' : ''}>${u.ico} ${u.nm}</option>`).join('')}</select><span class="mut">в</span><select id="ccSosC">${mine.map(id => `<option value="${id}"${id === (V.sosC || d.S().cityId) ? ' selected' : ''}>${esc(d.cityName(id))}</option>`).join('')}</select></div>`}
+    <div class="row"><button class="btn2" data-cc="sosPrev">👁️ Виж текста</button>${txt ? `<span class="mut">„${esc(txt)}“</span><input id="ccSosTxt" type="hidden" value="${esc(txt)}"><button class="btn" data-c="sosx" style="background:var(--bad);color:#fff">🆘 Изпрати</button>` : ''}</div></div>`;
+}
+function sosText(C) {
+  const U = C.UNIT_TYPES, f = C.f;
+  if ((V.sosK || 'money') === 'money') return V.sosA > 0 ? `Трябват ми ${f(V.sosA)} € за ${V.sosW || SOS_WHY[0]}` : '';
+  const u = U[V.sosT]; return u && V.sosC ? `Нужни ми са ${V.sosN || 1} × ${u.nm} в ${C.d.cityName(V.sosC)}` : '';
+}
+// разчитане на 🆘 съобщение на партньора → { money } или { type, n, city }
+function sosParse(C, text) {
+  const m = /Трябват ми ([\d\s\u00a0\u202f.,]+) €(?: за (.+))?/.exec(text || ''); if (m) return { money: +m[1].replace(/[^\d]/g, ''), why: m[2] || '' };
+  const u = /Нужни ми са (\d+) × (.+?) в (.+)$/.exec(text || ''); if (!u) return null;
+  const type = Object.keys(C.UNIT_TYPES).find(t => C.UNIT_TYPES[t].nm === u[2]); const city = (C.st.partner?.snap?.cities || []).find(id => C.d.cityName(id) === u[3]) || null;
+  return type ? { type, n: +u[1], city } : null;
+}
+// помогнато ли е: по-късно съобщение „✅ Помогнах: …“ от другия
+const helped = (C, m) => (C.st2?.messages || []).some(x => x.id > m.id && x.me !== m.me && /^✅ Помогнах/.test(x.text));
 
 // ── 💶 Финанси: Преводи · Заеми · Общ холдинг ──
 function fin(C) {
@@ -240,7 +311,8 @@ function fin(C) {
   // трите вида пари — винаги ясно разделени
   h += `<div class="three"><div class="stat"><b>${f(E().money)} €</b><span>👤 Твои средства</span></div><div class="stat"><b style="color:${C.PCOL}">${f(s.money || 0)} €</b><span>🤝 Средства на ${pn}</span></div><div class="stat"><b style="color:var(--acc)">${f(st2?.vault?.balance || 0)} €</b><span>🏦 Общи средства (холдинг)</span></div></div>`;
   if (V.fin === 'tr') {
-    h += `<h3>🎁 Подари пари</h3><div class="row"><input id="cpAmt" inputmode="numeric" placeholder="сума в €"><button class="btn" data-c="gift">🎁 Подари на ${pn}</button></div><div class="mut">Парите тръгват от твоите средства веднага.</div>`;
+    if (V.helpMsg) { const m = (st2?.messages || []).find(x => x.id === V.helpMsg); if (m) h += `<div class="ac" style="border-left-color:var(--bad)"><div>🆘 Помагаш на ${pn}: „${esc(m.text)}“<div class="mut">Подари сумата, после натисни „✅ Помогнах“ — партньорът вижда, че е изпълнено.</div></div><button class="btn2" data-c="helped:${m.id}">✅ Помогнах</button></div>`; }
+    h += `<h3>🎁 Подари пари</h3><div class="row"><input id="cpAmt" inputmode="numeric" placeholder="сума в €" value="${V.giftA || ''}"><button class="btn" data-c="gift">🎁 Подари на ${pn}</button></div><div class="mut">Парите тръгват от твоите средства веднага.</div>`;
     const sh = (C.st.partner?.snap?.cities || []).includes(C.d.S().cityId);
     h += `<h3>🎁 Изненада в общ град</h3>` + (sh ? `<div class="row"><input id="cpST" maxlength="60" placeholder="Текст на табелата" style="width:200px"><input id="cpSA" inputmode="numeric" placeholder="подарък € (по желание)" style="width:150px"><button class="btn2" data-c="surp">🎁 Остави тук</button></div>` : `<div class="mut">Отиди в град, в който и ${pn} има фирма, за да оставиш изненада.</div>`);
     const SM = st2?.surprises_mine || []; if (SM.length) h += `<div class="card">${SM.map(x => `<div class="led"><span>🎁 ${esc(C.d.cityName(x.city))} · „${esc(x.text)}“${x.amount ? ` · ${f(x.amount)} €` : ''}</span>${chip(x.status === 'found' ? 'done' : 'wait')}</div>`).join('')}</div>`;
@@ -271,9 +343,27 @@ function fin(C) {
       ${C.holdInfo()}
       <div class="row"><button class="btn2" data-cc="hist">${V.hist ? '▲ Скрий историята' : `📜 История (${log.length})`}</button></div>
       ${V.hist ? log.map(l => `<div class="led"><span>${C.logTxt(l)}</span><span class="${l.amount > 0 ? 'ok' : 'bad'}">${l.amount > 0 ? '+' : ''}${f(l.amount)} € · ${C.ago(l.at)}</span></div>`).join('') : ''}</div>`;
+    if (C.st4) h += rulesHtml(C);
     h += `<h3>🏆 Най-силен тандем</h3><div class="card">${T.map((x, i) => `<div class="led" style="${x.me ? `color:${C.PCOL};font-weight:800` : ''}"><span>${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${esc(x.name)}${x.me ? ' (вие)' : ''}</span><b>${f(x.worth)} €</b></div>`).join('') || '<div class="mut">Още няма тандеми.</div>'}</div>`;
   }
   return h;
+}
+
+// ── 📜 (v2, coop_status4) правилата на общата каса: лимит за самостоятелно теглене, лимит за автоматичното спасяване, заявки ──
+function rulesHtml(C) {
+  const { f, esc } = C, R = C.st4.rules || {}, P = R.pending, pn = esc(C.partnerName()), lim = n => n == null ? 'без лимит' : n === 0 ? 'изключено' : f(n) + ' €';
+  let h = `<h3>📜 Правила на общата каса</h3><div class="card">`;
+  h += R.at ? `<div class="led"><span>💳 Сам теглиш до</span><b>${lim(R.self_limit)}${R.self_limit != null ? ' за 24 ч' : ''}</b></div><div class="led"><span>🛟 Автоматично спасяване от фалит до</span><b>${lim(R.rescue_limit)}</b></div>
+      <div class="mut">Приети от двамата ${C.ago(R.at)}.${R.self_limit != null ? ` Изтеглил си ${f(C.st4.used24 || 0)} € за последните 24 ч — над лимита тегленето става заявка, която ${pn} одобрява.` : ''}</div>`
+    : `<div class="mut">Още няма приети правила: всеки тегли колкото иска, а холдингът покрива дълга до цялата каса. Предложи правила — важат, щом ${pn} ги приеме.</div>`;
+  if (P) h += `<div class="ac" style="margin-top:8px"><div><b>${P.mine ? 'Предложи' : `${pn} предлага`}:</b> сам до ${lim(P.self_limit)}${P.self_limit != null ? ' за 24 ч' : ''} · спасяване до ${lim(P.rescue_limit)}</div>${chip(P.mine ? 'wait' : 'mine')}${P.mine ? '<button class="btn2" data-c="rulesact:cancel">Оттегли</button>' : '<button class="btn" data-c="rulesact:accept">✅ Приеми</button><button class="btn2" data-c="rulesact:decline">Откажи</button>'}</div>`;
+  else h += `<div class="row" style="margin-top:8px"><span class="mut">Сам до</span><input id="ccSelf" inputmode="numeric" placeholder="€ за 24 ч (празно = без)" style="width:170px"><span class="mut">спасяване до</span><input id="ccRescue" inputmode="numeric" placeholder="€ (празно = цялата каса)" style="width:170px"><button class="btn2" data-c="rulesp">📜 Предложи</button></div>`;
+  if (R.self_limit != null) h += `<div class="row"><span class="mut">Над лимита:</span><input id="ccReason" maxlength="120" placeholder="за какво (по желание)" style="flex:1;min-width:140px"><button class="btn2" data-c="wreq">🙋 Поискай одобрение за сумата горе</button></div>`;
+  const Q = C.st4.requests || [];
+  if (Q.length) h += `<div style="margin-top:8px">${Q.map(r => { const k = r.status === 'requested' ? (r.mine ? 'wait' : 'mine') : r.status === 'approved' ? 'done' : r.status === 'declined' ? 'no' : r.status === 'expired' ? 'exp' : 'cancel';
+    const b = r.status !== 'requested' ? '' : r.mine ? `<button class="btn2" data-c="wact:${r.id}:cancel">Оттегли</button>` : `<button class="btn" data-c="wact:${r.id}:approve">✅ Одобри</button><button class="btn2" data-c="wact:${r.id}:decline">Откажи</button>`;
+    return `<div class="led"><span>🏦 ${r.mine ? 'Ти' : pn} · теглене <b>${f(r.amount)} €</b>${r.reason ? ` — ${esc(r.reason)}` : ''}<br><span class="mut">${C.ago(r.at)}</span></span><span class="row" style="margin:0">${chip(k)}${b}</span></div>`; }).join('')}</div>`;
+  return h + '</div>';
 }
 
 // ── 🏆 Общи цели: приносът на всеки (моят — от снимката ми при първото виждане на задачата; на партньора — остатъкът) ──
