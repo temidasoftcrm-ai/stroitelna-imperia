@@ -1186,7 +1186,39 @@ function placeBuilding(lot, n, rot = 0) {
   freezeKids(o);   // след соларните панели
   o.userData.bld = true;   // perf-cliff: сградата е статична — частите ѝ се сливат по материал (citycull.js)
   lot.built = n; lot.obj = o;
+  if (feature('lot-paths')) pathsDirty();
   return o;
+}
+// 🚶 (lot-paths) пътека/алея от входа на всяка сграда до тротоара: къщите — тъмна алея за кола (2,6 м), другите — светла пешеходна (2,2 м).
+// Входът е по посоката, в която гледа сградата (в плана — към улицата). Един общ меш на град (два материала), прерисува се веднъж след промени.
+let pathsT = 0;
+function pathsDirty() { if (pathsT) return; pathsT = setTimeout(() => { pathsT = 0; buildLotPaths(); }, 0); }
+function buildLotPaths() {
+  if (!city || !city.group) return;
+  if (city.pathGroup) { city.group.remove(city.pathGroup); city.pathGroup.traverse(m => m.geometry && m.geometry.dispose()); city.pathGroup = null; }
+  if (!feature('lot-paths')) return;
+  const skip = new Set([city.hq?.id, S.garageLot, S.whLot]), Q = { drive: [], walk: [] }, V = new THREE.Vector3(), bb = new THREE.Box3();
+  for (const l of city.lots) {
+    const o = l.obj; if (!o || skip.has(l.id) || l.busy === 'landmark') continue;
+    const r = o.rotation.y, dx = Math.sin(r), dz = Math.cos(r), px = Math.cos(r), pz = -Math.sin(r);
+    const half = l.plan ? (Math.abs(dz) > Math.abs(dx) ? l.d : l.w) / 2 : 8 * lotK(l);
+    bb.setFromObject(o); let fd = -1e9;
+    for (const x of [bb.min.x, bb.max.x]) for (const z of [bb.min.z, bb.max.z]) fd = Math.max(fd, (x - l.x) * dx + (z - l.z) * dz);
+    const t0 = Math.max(0, fd - 0.3), t1 = half + 0.8; if (t1 - t0 < 0.8) continue;   // сградата стига до тротоара
+    const house = HOUSES.includes(l.built) || /^h2-|^building-type-/.test(String(l.built)), w = (house ? 2.6 : 2.2) / 2;
+    const P = (t, u) => [l.x + dx * t + px * u, l.z + dz * t + pz * u];
+    Q[house ? 'drive' : 'walk'].push([P(t0, -w), P(t0, w), P(t1, w), P(t1, -w)]);
+  }
+  const g = city.pathGroup = new THREE.Group();
+  for (const [k, list] of Object.entries(Q)) {
+    if (!list.length) continue;
+    const pos = new Float32Array(list.length * 12), idx = [];
+    list.forEach((q, i) => { q.forEach(([x, z], j) => pos.set([x, 0.045, z], i * 12 + j * 3)); const b = i * 4; idx.push(b, b + 2, b + 1, b, b + 3, b + 2); });
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: k === 'drive' ? 0x55585e : 0xbdb6a8, roughness: 0.95, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 }));
+    m.receiveShadow = true; m.matrixAutoUpdate = false; m.updateMatrix(); m.userData.paths = k; g.add(m);
+  }
+  city.group.add(g);
 }
 
 // надпис-табела (sprite с canvas текст)
@@ -1289,7 +1321,9 @@ const crewCount = () => units.filter(u => !isMachine(u.type)).length;
 // пътната техника (валяци, асфалтополагачи, грейдери…) стои в пътна база при трасето — не заема места в гаража
 const isRoadGear = t => !!(ECON.UNIT_TYPES[t] && ECON.UNIT_TYPES[t].road);
 const machineCount = () => units.filter(u => isMachine(u.type) && !isRoadGear(u.type)).length;
-const garageLotObj = () => S.garageLot == null ? null : city.lots[S.garageLot];
+// 🏢 (hq-campus) гаражът/складът, чийто парцел е зает от сграда и няма свободен — рисуват се отзад в централата (S.campusIn)
+const campusIn = k => feature('hq-campus') && !!(S && S.campusIn || {})[k], campusAny = () => campusIn('garage') || campusIn('warehouse');
+const garageLotObj = () => S.garageLot == null || campusIn('garage') ? null : city.lots[S.garageLot];
 const lotKey = { garage: 'garageLot', warehouse: 'whLot' }, levelKey = { office: 'officeLevel', garage: 'garageLevel', warehouse: 'whLevel' };
 const levelOf = kind => S[levelKey[kind]] || (kind === 'warehouse' ? 0 : 1);
 // трябва ли нов парцел за следващото ниво
@@ -1380,13 +1414,14 @@ function refreshWarehouse() {
 function buildWarehouse() {
   if (city.whGroup) { city.group.remove(city.whGroup); city.whGroup = city.whYard = null; }
   if (S.whLot == null) return;
-  const lot = city.lots[S.whLot], g = city.whGroup = new THREE.Group();
-  g.position.set(lot.x, 0, lot.z); g.rotation.y = lotRot(lot); g.scale.setScalar(lotK(lot));
+  const camp = campusIn('warehouse'), lot = camp ? city.hq : city.lots[S.whLot], g = city.whGroup = new THREE.Group();
+  if (camp) { const p = lotPt(lot, -3.9, -4.1); g.position.set(p.x, 0, p.z); g.scale.setScalar(0.46 * lotK(lot)); }   // кампус: отзад вляво в централата
+  else g.position.set(lot.x, 0, lot.z);
+  g.rotation.y = lotRot(lot); if (!camp) g.scale.setScalar(lotK(lot));
   city.group.add(g);
-  for (const t of lot.trees || []) city.group.remove(t);
-  lot.trees = [];
+  if (!camp) { for (const t of lot.trees || []) city.group.remove(t); lot.trees = []; }
   const pav = new THREE.Mesh(new THREE.PlaneGeometry(15.5, 15.5), new THREE.MeshStandardMaterial({ color: 0x9a968c, roughness: 1 }));
-  pav.rotation.x = -Math.PI / 2; pav.position.y = 0.03; pav.receiveShadow = true; g.add(pav);
+  pav.rotation.x = -Math.PI / 2; pav.position.y = 0.03; pav.receiveShadow = true; if (!camp) g.add(pav);
   const wh = warehouseMesh(S.whLevel);
   wh.position.set(0, 0, -4); g.add(wh);
   const lb = label(`📦 СКЛАД ${S.whLevel}`, '#ffffff', 6.5);
@@ -1415,7 +1450,7 @@ function buildHQ() {
     office = o.group; city.hqLm = o.update;
     dayNight.registerWindows(office);
     const bb = new THREE.Box3().setFromObject(office);
-    office.position.set(-3.6 - (bb.min.x + bb.max.x) / 2, 0, -3.6 - (bb.min.z + bb.max.z) / 2);
+    office.position.set(-3.6 - (bb.min.x + bb.max.x) / 2, 0, (campusAny() ? 3.6 : -3.6) - (bb.min.z + bb.max.z) / 2);
   } else if (!L.model) {
     // ниво 1: строителен фургон-контейнер
     office = new THREE.Group();
@@ -1423,13 +1458,13 @@ function buildHQ() {
     box.position.y = 1.5; box.castShadow = true; office.add(box);
     for (const x of [-1.6, 1.6]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.8), new THREE.MeshStandardMaterial({ color: 0x7fb3d5, emissive: 0x223344 })); w.position.set(x, 1.7, 1.31); office.add(w); }
     const d = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 1.8), new THREE.MeshStandardMaterial({ color: 0x555555 })); d.position.set(0, 1.1, 1.31); office.add(d);
-    office.position.set(-3.8, 0, -4.2);
+    office.position.set(-3.8, 0, campusAny() ? 4.2 : -4.2);
   } else {
     const isQ = L.model.startsWith('Building_'), w = 6.5 + level * 0.25;
     office = model(L.model, fitScale(L.model, isQ ? w + 1.5 : w));
     dayNight.registerWindows(office);
     const bb = new THREE.Box3().setFromObject(office);
-    office.position.set(-3.6 - (bb.min.x + bb.max.x) / 2, 0, -3.6 - (bb.min.z + bb.max.z) / 2);
+    office.position.set(-3.6 - (bb.min.x + bb.max.x) / 2, 0, (campusAny() ? 3.6 : -3.6) - (bb.min.z + bb.max.z) / 2);
   }
   office.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
   g.add(office);
@@ -1456,10 +1491,10 @@ function buildHQ() {
     for (const ry of [0, Math.PI]) { const f = new THREE.Mesh(new THREE.PlaneGeometry(bw, bh), bmat); f.rotation.y = ry; f.position.z = ry ? -0.06 : 0.06; board.add(f); }
     const back = new THREE.Mesh(new THREE.BoxGeometry(bw + 0.3, bh + 0.3, 0.1), new THREE.MeshStandardMaterial({ color: 0x222831 })); board.add(back);
     for (const x of [-bw / 3, bw / 3]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.25, 1.6, 0.25), new THREE.MeshStandardMaterial({ color: 0x3a3f46 })); leg.position.set(x, -bh / 2 - 0.8, 0); board.add(leg); }
-    board.position.set(-3.6, top + bh / 2 + 1.6, -3.6); board.rotation.y = Math.PI / 8;
+    board.position.set(-3.6, top + bh / 2 + 1.6, campusAny() ? 3.6 : -3.6); board.rotation.y = Math.PI / 8;
     g.add(board);
     const star = new THREE.Mesh(new THREE.OctahedronGeometry(1.2), new THREE.MeshStandardMaterial({ color: 0xffd54a, emissive: 0xaa7a00, metalness: 0.6, roughness: 0.3 }));
-    star.position.set(-3.6, top + bh + 3.6, -3.6); g.add(star); g.userData.star = star;
+    star.position.set(-3.6, top + bh + 3.6, campusAny() ? 3.6 : -3.6); g.add(star); g.userData.star = star;
   }
   // гараж
   let gar, gl;
@@ -1603,7 +1638,7 @@ function yardZones() {
   if (away) { const [W, D] = lotHalf(away); Z.push({ lot: away, x0: -W + 1, x1: W - 1, z0: -0.6, z1: D - 1, only: 'm' }); }   // пред хангара
   if (yl) Z.push(whole(yl));
   const [W, D] = lotHalf(h);
-  Z.push({ lot: h, x0: -W + 1, x1: W - 1, z0: 0.2, z1: D - 0.8 });   // предната част на двора на централата
+  Z.push({ lot: h, x0: campusAny() ? 0.6 : -W + 1, x1: W - 1, z0: 0.2, z1: D - 0.8 });   // предната част на двора на централата (кампус — само дясната половина)
   if (away) Z.push({ lot: h, x0: 0.3, x1: W - 1, z0: -D + 1, z1: -0.4 });   // гаражът се изнесе — задният десен ъгъл е свободен
   return Z;
 }
@@ -7711,7 +7746,7 @@ const ownedAt = id => est().owned.find(o => o.lot === id);
 const lotPrice = lot => Math.round(bigCityMul() * LAND_PRICE[pz(lot.zone)] * (1 + 0.04 * S.day / 10) * (1 + 0.2 * Math.min(2, (S.parks || []).filter(id => Math.hypot(city.lots[id].x - lot.x, city.lots[id].z - lot.z) <= PARK_R).length)) / 500) * 500;   // земята поскъпва с времето
 // махане на сграда от парцел (събаряне); помни се в записа, защото градът се генерира от seed
 function clearLot(lot) {
-  if (lot.obj) { city.group.remove(lot.obj); poofAt(lot.x, lot.z); }
+  if (lot.obj) { city.group.remove(lot.obj); poofAt(lot.x, lot.z); if (feature('lot-paths')) pathsDirty(); }
   lot.obj = null; lot.built = null;
   for (const t of lot.trees || []) city.group.remove(t);
   lot.trees = [];
@@ -7985,7 +8020,7 @@ function campusRepair() {
     const old = city.lots[id]; if (old && old.busy === kind) old.busy = null;
     S[key] = null;
     const l = autoLot(kind);
-    if (!l) { S[key] = id; if (old) old.busy = kind; continue; }   // няма свободен парцел — остава както беше
+    if (!l) { S[key] = id; if (old) old.busy = kind; S.campusIn = { ...(S.campusIn || {}), [kind]: 1 }; continue; }   // няма свободен парцел — рисува се отзад в централата (кампус), парцелът остава само със сградата
     (S.campusLog = S.campusLog || []).push({ kind, from: id, to: l.id, day: S.day });
   }
 }
