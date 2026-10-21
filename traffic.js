@@ -188,11 +188,13 @@ export function createTraffic(opts) {
     if (c.route) { c.next = c.route[c.ri + 1] || null; return; }   // агент: маршрутът е избран предварително (вход → маневра → изход)
     if (c.p.kind === 'conn') { c.next = c.p.outL; return; }
     const n = nodes.get(c.p.to), L = n.conns.filter(x => x.inL === c.p);
-    if (n.ring) { c.next = L.find(x => x.exitArm != null && x.exitArm === c.ringExit) || L.find(x => x.cont) || L[0] || null; return; }   // в пръстена: изходът или напред
+    if (n.ring) {   // в пръстена: избраният изход; без избран (появила се в пръстена) или след 2 обиколки — първият изход; изходът дълго зает — още една обиколка (не спира пръстена)
+      const again = c.ringP === c.p; if (!again) { c.ringP = c.p; c.ringK = (c.ringK || 0) + 1; } const last = c.ringK > 2 * n.ringN;
+      const ex = L.find(x => x.exitArm != null && (x.exitArm === c.ringExit || c.ringExit == null || last)); c.next = (again && !last ? null : ex) || L.find(x => x.cont) || L[0] || null; return; }
     const Q = c.heavy ? L.filter(x => !narrow(x.outL)) : L;   // автобусът/камионът завива само към широка улица
     if (c.heavy && L.length && !Q.length) { c.next = null; c.park = true; return; }   // няма широк изход — спира в края на лентата и си отива (като на изхода от града)
     c.next = Q.length ? Q[(rnd() * Q.length) | 0] : null;
-    if (c.next && c.next.ringIn) c.ringExit = c.next.pickExit(rnd);   // влиза в кръгово — избира изход (не обратно)
+    if (c.next && c.next.ringIn) { c.ringExit = c.next.pickExit(rnd); c.ringK = 0; }   // влиза в кръгово — избира изход (не обратно)
   }
   // предната кола: в същата пътека (следващата по s) или в следващата (последната в нея) — разстояние между броните
   function leader(c) {
@@ -456,6 +458,8 @@ function roundNet(P, n, N, nodes, lanes, jp) {
     const L = mkPath(P2.length > 1 ? P2 : [P2[0], P2[0]], 'lane', { from: id, to: idN, ring: ri, rank: 3, vmax: 7.5 });
     lanes.push(L); nodes.get(id).outL.push(L); nodes.get(idN).inL.push(L); segs.push(L);
   }
+  const hasOut = a => segs.some((sg, k) => nodes.get(`r${ri}:${(k + 1) % pts.length}`).conns.some(c => c.exitArm === a));   // проверява се при избора — връзките са вече построени
+  pts.forEach((q, k) => { nodes.get(`r${ri}:${k}`).ringN = pts.length; });
   pts.forEach((q, k) => {
     const V = nodes.get(`r${ri}:${k}`), inSeg = segs[(k - 1 + segs.length) % segs.length], outSeg = segs[k];
     const cont = mkPath([inSeg.pts[inSeg.pts.length - 1], outSeg.pts[0]], 'conn', { node: V.id, inL: inSeg, outL: outSeg, turn: 'straight', vmax: 7.5, conf: [], cont: true });
@@ -468,7 +472,7 @@ function roundNet(P, n, N, nodes, lanes, jp) {
       const arm = R.entries[q.in].arm, inL = N.inL.find(l => l.armIn === arm && l.laneI === 0);
       if (inL) {
         const pp = jp ? tangentCurve(inL, outSeg) : P.roundPath(ri, q.in, 'in'), c = mkPath(pp, 'conn', { node: n.id, inL, outL: outSeg, turn: 'right', vmax: jp ? curveV(pp, 6.5) : 6, conf: [cont], ringIn: true, yieldTo: [[inSeg, 16]] });
-        const exits = R.entries.map(e => e.arm).filter(a => a !== arm); c.pickExit = r => exits[(r() * exits.length) | 0];
+        c.pickExit = r => { const ex = R.entries.map(e => e.arm).filter(a => a !== arm && hasOut(a)), all = ex.length ? ex : R.entries.map(e => e.arm).filter(hasOut); return all.length ? all[(r() * all.length) | 0] : null; };   // само ръкав с изходна връзка (еднопосочен навътре — не)
         N.conns.push(c); cont.conf.push(c);
       }
     }
