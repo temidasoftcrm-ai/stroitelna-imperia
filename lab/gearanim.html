@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Раздвижената техника</title>
+<style>
+  body { margin:0; background:#14161b; color:#e8e8ea; font:14px/1.45 system-ui,sans-serif; overflow:hidden; }
+  #hud { position:absolute; left:12px; top:12px; background:rgba(20,22,27,.88); padding:10px 14px; border-radius:10px; max-width:520px; }
+  h1 { font-size:17px; margin:0 0 4px; } p { margin:0 0 6px; color:#9aa0aa; font-size:13px; }
+  button { background:#1d2027; color:#e8e8ea; border:1px solid #333a45; border-radius:8px; padding:5px 10px; font:inherit; cursor:pointer; margin:2px 4px 0 0; } button.on { border-color:#4ea1ff; }
+  .lbl { position:absolute; transform:translate(-50%,-100%); background:rgba(20,22,27,.82); padding:2px 7px; border-radius:6px; font-size:12px; white-space:nowrap; pointer-events:none; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script></head><body>
+<div id="hud"><h1>🚜 Раздвижената строителна техника (Blender)</h1>
+<p>Всички машини, раздвижени в Blender, в истински размер и в непрекъснат цикъл: багерът копае и изсипва, автокранът вдига и върти стрелата, трактор-багерът вдига товарача и копае отзад, самосвалът вдига коша, валякът върти валците, грейдерът спуска и върти ножа, бетоновозът върти барабана. Влачи с мишката; бутоните — към машина.</p>
+<div id="bt"></div><div><button id="pz">⏸ Пауза</button></div></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { SITE } from '../scale.js';
+const R = new THREE.WebGLRenderer({ antialias: true }); R.setSize(innerWidth, innerHeight); R.setPixelRatio(Math.min(2, devicePixelRatio)); R.outputColorSpace = THREE.SRGBColorSpace; R.shadowMap.enabled = true; document.body.appendChild(R.domElement);
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0xc9dcec); sc.add(new THREE.HemisphereLight(0xffffff, 0x667788, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 2); sun.position.set(40, 60, 50); sun.castShadow = true; Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 30, bottom: -30 }); sun.shadow.mapSize.set(2048, 2048); sc.add(sun);
+const gnd = new THREE.Mesh(new THREE.PlaneGeometry(220, 60).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x9a8a6c })); gnd.position.x = 40; gnd.receiveShadow = true; sc.add(gnd);
+const grid = new THREE.GridHelper(220, 220, 0x8a7a5c, 0x8a7a5c); grid.position.set(40, 0.01, 0); grid.scale.z = 0.27; sc.add(grid);
+const cam = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.5, 1000); const ctl = new OrbitControls(cam, R.domElement);
+const L = new GLTFLoader(), mixers = [], labels = [];
+// [файл, истинска дължина (м), клип, надпис]
+const GEAR = [['excavator-rig', SITE['sf-excavator'].m, 'work', 'багер'], ['mcrane-rig', SITE['sf-mcrane'].m, 'work', 'автокран'], ['backhoe-rig', 6, 'work', 'трактор-багер'], ['dump-rig', 8, 'tip', 'самосвал'],
+  ['roller-rig', 4.5, 'roll', 'валяк'], ['grader-rig', 8.5, 'grade', 'грейдер'], ['mixer-rig', 7.6, 'spin', 'бетоновоз']];
+let x = 0; const bt = document.getElementById('bt'), at = [];
+for (const [f, len, clip, nm] of GEAR) {
+  const g = await L.loadAsync(`../assets/heavy/gear/${f}.glb`).catch(() => null); if (!g) continue;
+  const w = new THREE.Group(), inner = new THREE.Group(); inner.add(g.scene); w.add(inner);
+  let b = new THREE.Box3().setFromObject(inner), s = b.getSize(new THREE.Vector3());
+  if (s.x > s.z) { inner.rotation.y = Math.PI / 2; b = new THREE.Box3().setFromObject(inner); s = b.getSize(new THREE.Vector3()); }
+  inner.scale.setScalar(len / s.z); b = new THREE.Box3().setFromObject(inner); const c = b.getCenter(new THREE.Vector3()); inner.position.set(-c.x, -b.min.y, -c.z);
+  w.rotation.y = Math.PI / 2; w.position.x = x + len / 2; sc.add(w); w.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+  const mx = new THREE.AnimationMixer(g.scene), cl = g.animations.find(a => a.name === clip) || g.animations[0]; if (cl) mx.clipAction(cl).play(); mixers.push(mx);
+  const h = new THREE.Box3().setFromObject(w).max.y, d = document.createElement('div'); d.className = 'lbl'; d.textContent = `${nm} · ${cl ? cl.name : '—'}`; document.body.appendChild(d); labels.push([d, new THREE.Vector3(w.position.x, h + 1, 0)]);
+  const px = w.position.x; at.push(px); const btn = document.createElement('button'); btn.textContent = nm; btn.onclick = () => { ctl.target.set(px, 2, 0); cam.position.set(px + 6, 7, 20); ctl.update(); }; bt.appendChild(btn);
+  x += len + 4;
+}
+ctl.target.set(x / 2, 3, 0); cam.position.set(x / 2, 18, 70); ctl.update();
+let paused = false; document.getElementById('pz').onclick = e => { paused = !paused; e.target.textContent = paused ? '▶ Продължи' : '⏸ Пауза'; };
+const clock = new THREE.Clock(), P = new THREE.Vector3();
+R.setAnimationLoop(() => { const dt = clock.getDelta(); if (!paused) for (const m of mixers) m.update(dt); ctl.update(); R.render(sc, cam);
+  for (const [d, p] of labels) { P.copy(p).project(cam); d.style.left = (P.x * 0.5 + 0.5) * innerWidth + 'px'; d.style.top = (-P.y * 0.5 + 0.5) * innerHeight + 'px'; d.style.display = Math.abs(P.z) < 1 ? '' : 'none'; } });
+addEventListener('resize', () => { R.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); });
+window.__ready = true; window.__at = (i, t) => { for (const m of mixers) m.setTime(t); const px = at[i]; ctl.target.set(px, 2, 0); cam.position.set(px + 4, 6, 18); ctl.update(); R.render(sc, cam); return 1; };
+window.__all = t => { for (const m of mixers) m.setTime(t); return 1; };
+</script></body></html>
