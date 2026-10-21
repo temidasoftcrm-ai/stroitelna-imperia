@@ -14,7 +14,7 @@
 <div class="ui"><h1>⭕ Кръстовища и кръгови (junction-paths)</h1>
   <div class="row"><select id="fam"><option value="eu">Европейски</option><option value="radial">Радиален</option><option value="us">Американски</option></select>
     <select id="size"><option value="m">среден</option><option value="l" selected>голям</option></select>
-    <button id="go">↻ Град</button><button id="nextR">⭕ Следващо кръгово</button></div>
+    <button id="go">↻ Град</button><select id="jk"><option value="round">⭕ Кръгово</option><option value="T">┳ Т-кръстовище</option><option value="X">╋ Кръстовище +</option></select><button id="nextR">▶ Следващото</button></div>
   <div class="row"><button id="seq" class="on">▶ Един по един (кола, самосвал, ТИР × всеки вход → всеки изход)</button><button id="many">🚚 Много наведнъж</button>
     <button id="bg">🚗 Трафик</button><button id="dbg" class="on">🧭 Дебъг</button><select id="spd"><option value="1">1×</option><option value="4">4×</option><option value="8">8×</option></select></div>
   <div id="st">зарежда…</div></div>
@@ -56,16 +56,20 @@ function build() {
     makeCar: () => { if (!bgOn) return null; const t = Math.random() < 0.1 ? 'dump' : 'car', T = TYPES[t], o = body(T.len, T.w, T.h, 0x8a8f99); city.add(o); return { obj: o, len: T.len, w: T.w, kind: t === 'car' ? 'car' : 'truck' }; } });
   router = makeRouter(tr); dbg = debugLayer(tr, city); ri = 0; pickRound();
 }
+// възелът за теста: кръгово (P.rounds) или обикновено кръстовище с 3 / 4 клона (J — { node, x, z, island? })
+let J = null;
+const pool = () => { const k = $('jk').value; return k === 'round' ? P.rounds.map(r => ({ node: r.node, x: r.x, z: r.z, island: r.island, round: r })) : P.nodes.filter(n => n.kind !== 'round' && n.arms.length === (k === 'T' ? 3 : 4) && n.outline).map(n => ({ node: n.id, x: n.x, z: n.z })); };
 function pickRound() {
-  if (!P.rounds.length) { $('st').textContent = 'няма кръгово в този град'; return; }
-  R = P.rounds[ri % P.rounds.length]; cam.position.set(R.x + 40, 95, R.z + 70); ctl.target.set(R.x, 0, R.z); ctl.update();
+  const L0 = pool(); if (!L0.length) { $('st').textContent = 'няма такъв възел в този град'; return; }
+  R = J = L0[ri % L0.length]; if (!R.island) R.island = -1; cam.position.set(R.x + 40, 95, R.z + 70); ctl.target.set(R.x, 0, R.z); ctl.update();
   stats = { started: 0, done: 0, islandHits: 0, maxYawRate: 0, maxYawAt: '', noRoute: 0, stuck: 0, byType: {} }; window.__jpStats = stats; queue = [];
   if ($('seq').classList.contains('on')) fillSeq();
 }
 // всички комбинации: за всеки вид × всеки вход → всеки друг изход
 function combos() {
   const N = tr.nodes.get(R.node), out = [];
-  for (const e of R.entries) for (const f of R.entries) if (e.arm !== f.arm) {
+  if (!R.round) { for (const C of N.conns) if (C.turn !== 'uturn' && C.inL.len > 20 && C.outL.len > 20) out.push({ inL: C.inL, outL: C.outL, from: C.inL.armIn, to: C.outL.armOut + ' ' + C.turn }); return out; }
+  for (const e of R.round.entries) for (const f of R.round.entries) if (e.arm !== f.arm) {
     const inL = N.inL.find(l => l.armIn === e.arm && l.laneI === 0), outL = N.outL.find(l => l.armOut === f.arm && l.laneI === 0);
     if (inL && outL) out.push({ inL, outL, from: e.arm, to: f.arm });
   }
@@ -73,7 +77,7 @@ function combos() {
 }
 function fillSeq() { queue = []; for (const t of ['car', 'dump', 'tir']) for (const c of combos()) queue.push({ t, ...c }); $('st').textContent = `опашка: ${queue.length}`; }
 function launch(q) {
-  const T = TYPES[q.t], s0 = Math.max(1, q.inL.len - 45), o = {}, sO = Math.min(q.outL.len - 1, 40), k = (() => { let i = 1; while (i < q.outL.cum.length - 1 && q.outL.cum[i] < sO) i++; return i; })(), a = q.outL.pts[k - 1], b = q.outL.pts[k], t = (sO - q.outL.cum[k - 1]) / ((q.outL.cum[k] - q.outL.cum[k - 1]) || 1);
+  const T = TYPES[q.t], s0 = Math.max(1, q.inL.len - 45), o = {}, sO = Math.min(q.outL.len - 1, 30), k = (() => { let i = 1; while (i < q.outL.cum.length - 1 && q.outL.cum[i] < sO) i++; return i; })(), a = q.outL.pts[k - 1], b = q.outL.pts[k], t = (sO - q.outL.cum[k - 1]) / ((q.outL.cum[k] - q.outL.cum[k - 1]) || 1);
   const r = router.route({ p: q.inL, s: s0 }, { p: q.outL, s: sO }, { heavy: q.t !== 'car' });
   if (!r) { stats.noRoute++; return null; }
   if (q.inL.cars.some(c => Math.abs(c.s - s0) < (c.L + T.len) / 2 + 3)) return null;   // мястото на тръгване е заето — по-късно
@@ -84,11 +88,22 @@ function launch(q) {
   const c = tr.addAgent(ag), L = { c, obj: cab, trl, q, age: 0, lastYaw: c.yaw, lastTY: c.tr ? c.tr.yaw : 0 }; live.push(L); stats.started++;
   return L;
 }
+// асфалтът: вътре в очертанието на кръстовище / в кръга на кръговото, или до половин платно от оста на улица (мрежа 20 м)
+let AG = null;
+function onAsphalt(x, z) {
+  if (!AG) { AG = new Map(); const add = (k, v) => (AG.get(k) || AG.set(k, []).get(k)).push(v); for (const rd of P.roads) for (let i = 1; i < rd.pts.length; i++) { const a = rd.pts[i - 1], b = rd.pts[i]; add(Math.floor((a[0] + b[0]) / 40) * 9973 + Math.floor((a[1] + b[1]) / 40), [a, b, rd.w / 2]); } }
+  for (const r of P.rounds) if (Math.hypot(x - r.x, z - r.z) < r.outer + 0.3) return true;
+  for (const n of P.nodes) if (n.outline && Math.abs(n.x - x) < 40 && Math.abs(n.z - z) < 40) { let c = false; const o = n.outline; for (let i = 0, j = o.length - 1; i < o.length; j = i++) if ((o[i][1] > z) !== (o[j][1] > z) && x < (o[j][0] - o[i][0]) * (z - o[i][1]) / (o[j][1] - o[i][1]) + o[i][0]) c = !c; if (c) return true; }
+  const gi = Math.floor(x / 20), gj = Math.floor(z / 20);
+  for (let a = gi - 1; a <= gi + 1; a++) for (let b = gj - 1; b <= gj + 1; b++) for (const [p, q, hw] of AG.get(a * 9973 + b) || []) { const dx = q[0] - p[0], dz = q[1] - p[1], l2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - p[0]) * dx + (z - p[1]) * dz) / l2)); if (Math.hypot(p[0] + dx * t - x, p[1] + dz * t - z) <= hw + 0.25) return true; }
+  return false;
+}
 // проверки на всяка стъпка: габаритът не влиза в острова; посоката не скача (потрепване); не стои вечно
 const corners = (x, z, yaw, hl, hw) => { const fx = Math.sin(yaw), fz = Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw); return [[1, 1], [1, -1], [-1, -1], [-1, 1]].map(([a, b]) => [x + fx * hl * a + rx * hw * b, z + fz * hl * a + rz * hw * b]); };
 function check(dt) {
   for (const L of live) {
     const c = L.c, T = TYPES[L.q.t], boxes = [[c.x, c.z, c.yaw, (c.trl ? T.cab : T.len) / 2]]; if (c.tr) boxes.push([c.tr.x, c.tr.z, c.tr.yaw, T.trl / 2]);
+    for (const [x, z, yaw, hl] of boxes) for (const [px, pz] of corners(x, z, yaw, hl, T.w / 2)) if (Math.hypot(px - R.x, pz - R.z) < 45 && !onAsphalt(px, pz)) { stats.curb = (stats.curb || 0) + 1; const k = L.q.t + (boxes.length > 1 && x === boxes[1][0] ? '-трл' : '') + ' ' + L.q.from + '→' + L.q.to; (stats.curbBy = stats.curbBy || {})[k] = (stats.curbBy[k] || 0) + 1; }
     for (const [x, z, yaw, hl] of boxes) for (const [px, pz] of corners(x, z, yaw, hl, T.w / 2)) if (Math.hypot(px - R.x, pz - R.z) < R.island - 0.3) { stats.islandHits++; stats.lastHit = L.q.t + ' ' + L.q.from + '→' + L.q.to; const k = L.q.t + (boxes.length > 1 && x === boxes[1][0] ? '-трл' : ''); stats.hitBy = stats.hitBy || {}; stats.hitBy[k] = Math.max(stats.hitBy[k] || 0, +(R.island - Math.hypot(px - R.x, pz - R.z)).toFixed(2)); }
     const yr = Math.abs(Math.atan2(Math.sin(c.yaw - L.lastYaw), Math.cos(c.yaw - L.lastYaw))) / Math.max(1e-3, dt); if (c.v > 0.5 && yr > stats.maxYawRate) { stats.maxYawRate = yr; stats.maxYawAt = L.q.t + ' ' + L.q.from + '→' + L.q.to + ' v=' + c.v.toFixed(1) + ' ' + c.p.kind + '#' + c.ri + ' s=' + c.s.toFixed(1) + '/' + c.p.len.toFixed(1); }
     if (c.v > 0.5 && yr * dt > 0.3 && (stats.jumps = stats.jumps || []).length < 6) stats.jumps.push([L.q.t, c.p.kind, c.ri, +c.s.toFixed(2), +(L.lastYaw * 57.3).toFixed(0), +(c.yaw * 57.3).toFixed(0), +c.x.toFixed(2), +c.z.toFixed(2), +dt.toFixed(3), c.hist.map(h => h.kind + h.len.toFixed(1)).join(',')]);
@@ -107,11 +122,11 @@ function loop() {
     tr.opts.maxCars = bgOn ? 60 : 0;
     const steps = Math.ceil(dt / (1 / 30)); for (let k = 0; k < steps; k++) { tr.update(dt / steps, 64); check(dt / steps); }
     if ($('dbg').classList.contains('on')) dbg.update();
-    $('st').textContent = `кръгово ${ri % P.rounds.length + 1}/${P.rounds.length} · входове ${R.entries.length} · опашка ${queue.length} · на път ${live.length}\nготови ${stats.done}/${stats.started} · в острова ${stats.islandHits} · без маршрут ${stats.noRoute} · заседнали ${stats.stuck}\nнай-бързо въртене ${(stats.maxYawRate * 180 / Math.PI).toFixed(0)}°/s (${stats.maxYawAt})`;
+    $('st').textContent = `${({ round: 'кръгово', T: 'Т-кръстовище', X: 'кръстовище +' })[$('jk').value]} ${ri % pool().length + 1}/${pool().length} · маневри ${combos().length} · бордюр ${stats.curb || 0} · опашка ${queue.length} · на път ${live.length}\nготови ${stats.done}/${stats.started} · в острова ${stats.islandHits} · без маршрут ${stats.noRoute} · заседнали ${stats.stuck}\nнай-бързо въртене ${(stats.maxYawRate * 180 / Math.PI).toFixed(0)}°/s (${stats.maxYawAt})`;
   }
   ctl.update(); renderer.render(scene, cam); requestAnimationFrame(loop);
 }
-$('go').onclick = build; $('nextR').onclick = () => { ri++; pickRound(); };
+$('go').onclick = () => { AG = null; build(); }; $('nextR').onclick = () => { ri++; pickRound(); }; $('jk').onchange = () => { ri = 0; pickRound(); };
 $('seq').onclick = () => { $('seq').classList.add('on'); $('many').classList.remove('on'); fillSeq(); };
 $('many').onclick = () => { $('many').classList.add('on'); $('seq').classList.remove('on'); queue = []; };
 $('bg').onclick = () => { bgOn = !bgOn; $('bg').classList.toggle('on', bgOn); };
@@ -121,7 +136,7 @@ let PLANTS = [], FOUNTAIN = null;
 const gl = new GLTFLoader(), ld = f => gl.loadAsync('../assets/heavy/plants/' + f + '.glb').then(g => g.scene).catch(() => null);
 Promise.all(['bush-0', 'bush-1', 'bush-2', 'flowers', 'fountain'].map(ld)).then(([b0, b1, b2, fl, fo]) => {
   PLANTS = [b0].filter(Boolean).map((o, i) => { o.scale.setScalar(i === 3 ? 2.2 : 1.8); o.traverse(m => { if (m.isMesh) m.castShadow = true; }); return o; });
-  FOUNTAIN = fo; build(); loop(); });
+  FOUNTAIN = fo; const jk = (location.search.match(/[?&]jk=(\w+)/) || [])[1]; if (jk) $('jk').value = jk; build(); loop(); });
 window.__night = on => { VIEW.userData.setNight && VIEW.userData.setNight(on); scene.background.set(on ? 0x0b1020 : 0xbfd8ef); sun.intensity = on ? 0.05 : 1.6; scene.children.filter(o => o.isHemisphereLight).forEach(h => h.intensity = on ? 0.25 : 1.6); };
 window.__camRound = (dx, h, dz) => { cam.position.set(R.x + dx, h, R.z + dz); ctl.target.set(R.x, 0, R.z); ctl.update(); renderer.render(scene, cam); };
 // обектите за сравнение преди/след (един и същ изглед отгоре): задънен край, завой, Т, кръстовище +, кръгово
