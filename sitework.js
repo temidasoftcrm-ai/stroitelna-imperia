@@ -28,7 +28,9 @@ export function loadSiteRigs(load, A) {
 // машината на играта (model(sf, len) — вътре моделът с дължина 1) → раздвиженият модел на същото място и в същия размер; len — дължината на вътрешния модел
 // every (сек.) — клипът се пуска веднъж на толкова (самосвалът изсипва), иначе — непрекъснато. Връща rig ({ mixer, action, every }) или null
 export function swapRig(obj, A, key, clip, o = {}) {
-  if (!A[key]) return null; obj.remove(...obj.children); const r = A[key].scene.clone(true); if (o.len) r.scale.setScalar(o.len); obj.add(r);
+  if (!A[key]) return null;
+  { const R = A[key]; if (R.meshN == null) { let n = 0; R.scene.traverse(m => { if (m.isMesh) n++; }); R.meshN = n; } if (R.meshN > 60) return null; }   /* временно: раздвижен модел от стотици части = стотици draw calls на кадър (самосвал 1974) — до сливането по стави остава обикновеният модел */
+  obj.remove(...obj.children); const r = A[key].scene.clone(true); if (o.len) r.scale.setScalar(o.len); obj.add(r);
   const rig = rigPlay(r, A, key, clip, !o.every); if (rig) { rig.every = o.every || 0; rig.wait = 0; if (rig.every) rig.action.stop(); } return rig;   /* с every — първия път след паузата */
 }
 // пуска клип (по име) на клонинг на раздвижен модел; връща { mixer, action }

@@ -30,7 +30,7 @@ const grid = new THREE.GridHelper(220, 220, 0x8a7a5c, 0x8a7a5c); grid.position.s
 const cam = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.5, 1000); const ctl = new OrbitControls(cam, R.domElement);
 const L = new GLTFLoader(), mixers = [], labels = [];
 // [файл, истинска дължина (м), клип, надпис]
-const GEAR = [['excavator-rig', SITE['sf-excavator'].m, 'work', 'багер'], ['mcrane-rig', SITE['sf-mcrane'].m, 'work', 'автокран'], ['backhoe-rig', 6, 'work', 'трактор-багер'], ['dump-rig', 8, 'tip', 'самосвал'],
+const GEAR = [['excavator-rig', SITE['sf-excavator'].m, 'work', 'багер'], ['mcrane-rig', SITE['sf-mcrane'].m, 'work', 'автокран'], ['backhoe-rig', 9.6, 'work', 'трактор-багер'], ['dump-rig', 8, 'tip', 'самосвал'],
   ['roller-rig', 4.5, 'roll', 'валяк'], ['grader-rig', 8.5, 'grade', 'грейдер'], ['mixer-rig', 7.6, 'spin', 'бетоновоз']];
 let x = 0; const bt = document.getElementById('bt'), at = [];
 for (const [f, len, clip, nm] of GEAR) {

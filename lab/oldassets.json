@@ -1,0 +1,3633 @@
+{
+ "made": "2026-10-21",
+ "items": [
+  {
+   "dir": "modular",
+   "n": "building-corner-bottom",
+   "f": "assets/modular/building-corner-bottom.glb",
+   "size": 4460,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-corner-top",
+   "f": "assets/modular/building-corner-top.glb",
+   "size": 3064,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-corner-window-middle",
+   "f": "assets/modular/building-corner-window-middle.glb",
+   "size": 4396,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-corner-window-narrow",
+   "f": "assets/modular/building-corner-window-narrow.glb",
+   "size": 4396,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-corner-window-sill",
+   "f": "assets/modular/building-corner-window-sill.glb",
+   "size": 9180,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-corner-window-top-round",
+   "f": "assets/modular/building-corner-window-top-round.glb",
+   "size": 5308,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-corner-window-top-square",
+   "f": "assets/modular/building-corner-window-top-square.glb",
+   "size": 4408,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-corner-window",
+   "f": "assets/modular/building-corner-window.glb",
+   "size": 4376,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-corner",
+   "f": "assets/modular/building-corner.glb",
+   "size": 3152,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-door-window-narrow",
+   "f": "assets/modular/building-door-window-narrow.glb",
+   "size": 5292,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-door-window",
+   "f": "assets/modular/building-door-window.glb",
+   "size": 5272,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-door",
+   "f": "assets/modular/building-door.glb",
+   "size": 4048,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-edges-door",
+   "f": "assets/modular/building-edges-door.glb",
+   "size": 4668,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-sample-house-a",
+   "f": "assets/modular/building-sample-house-a.glb",
+   "size": 28336,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-sample-house-b",
+   "f": "assets/modular/building-sample-house-b.glb",
+   "size": 33788,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-sample-house-c",
+   "f": "assets/modular/building-sample-house-c.glb",
+   "size": 31552,
+   "uses": [
+    "resortview.js:68"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "modular",
+   "n": "building-sample-tower-a",
+   "f": "assets/modular/building-sample-tower-a.glb",
+   "size": 35256,
+   "uses": [
+    "resortview.js:68",
+    "resortview.js:415"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "modular",
+   "n": "building-sample-tower-b",
+   "f": "assets/modular/building-sample-tower-b.glb",
+   "size": 28904,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-sample-tower-c",
+   "f": "assets/modular/building-sample-tower-c.glb",
+   "size": 33964,
+   "uses": [
+    "resortview.js:68",
+    "resortview.js:414",
+    "resortview.js:415",
+    "resortview.js:415",
+    "resortview.js:416"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "modular",
+   "n": "building-sample-tower-d",
+   "f": "assets/modular/building-sample-tower-d.glb",
+   "size": 44856,
+   "uses": [
+    "resortview.js:68",
+    "resortview.js:414",
+    "resortview.js:415",
+    "resortview.js:415"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "modular",
+   "n": "building-steps-narrow-windows-round",
+   "f": "assets/modular/building-steps-narrow-windows-round.glb",
+   "size": 12180,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-steps-narrow-windows",
+   "f": "assets/modular/building-steps-narrow-windows.glb",
+   "size": 10324,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-steps-narrow",
+   "f": "assets/modular/building-steps-narrow.glb",
+   "size": 7900,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-steps-wide",
+   "f": "assets/modular/building-steps-wide.glb",
+   "size": 8512,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-window-awnings",
+   "f": "assets/modular/building-window-awnings.glb",
+   "size": 10912,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-window-balcony",
+   "f": "assets/modular/building-window-balcony.glb",
+   "size": 7512,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-window-door-window-round",
+   "f": "assets/modular/building-window-door-window-round.glb",
+   "size": 8320,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-window-door-window",
+   "f": "assets/modular/building-window-door-window.glb",
+   "size": 6496,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-window-large-left",
+   "f": "assets/modular/building-window-large-left.glb",
+   "size": 3788,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-window-large-middle",
+   "f": "assets/modular/building-window-large-middle.glb",
+   "size": 3492,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-window-large-right",
+   "f": "assets/modular/building-window-large-right.glb",
+   "size": 3788,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-window-large",
+   "f": "assets/modular/building-window-large.glb",
+   "size": 4072,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-window-left-sill",
+   "f": "assets/modular/building-window-left-sill.glb",
+   "size": 5096,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-window-left",
+   "f": "assets/modular/building-window-left.glb",
+   "size": 4068,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-window-right-sill",
+   "f": "assets/modular/building-window-right-sill.glb",
+   "size": 9032,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-window-right",
+   "f": "assets/modular/building-window-right.glb",
+   "size": 4072,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-window-sill",
+   "f": "assets/modular/building-window-sill.glb",
+   "size": 5080,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-window-wide-sill",
+   "f": "assets/modular/building-window-wide-sill.glb",
+   "size": 5116,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-window-wide",
+   "f": "assets/modular/building-window-wide.glb",
+   "size": 4068,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-window",
+   "f": "assets/modular/building-window.glb",
+   "size": 4052,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-windows-high-middle",
+   "f": "assets/modular/building-windows-high-middle.glb",
+   "size": 5480,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-windows-high-top-round",
+   "f": "assets/modular/building-windows-high-top-round.glb",
+   "size": 7112,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-windows-high-top-square",
+   "f": "assets/modular/building-windows-high-top-square.glb",
+   "size": 5308,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-windows-round",
+   "f": "assets/modular/building-windows-round.glb",
+   "size": 7084,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-windows-sills-round",
+   "f": "assets/modular/building-windows-sills-round.glb",
+   "size": 9128,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-windows-sills",
+   "f": "assets/modular/building-windows-sills.glb",
+   "size": 7292,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "building-windows",
+   "f": "assets/modular/building-windows.glb",
+   "size": 5260,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "detail-ac-a",
+   "f": "assets/modular/detail-ac-a.glb",
+   "size": 6560,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "detail-ac-b",
+   "f": "assets/modular/detail-ac-b.glb",
+   "size": 8956,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "door-brown-glass",
+   "f": "assets/modular/door-brown-glass.glb",
+   "size": 4072,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "door-brown-window",
+   "f": "assets/modular/door-brown-window.glb",
+   "size": 4076,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "door-brown",
+   "f": "assets/modular/door-brown.glb",
+   "size": 4072,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "door-white-glass",
+   "f": "assets/modular/door-white-glass.glb",
+   "size": 4092,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "door-white-window",
+   "f": "assets/modular/door-white-window.glb",
+   "size": 4092,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "door-white",
+   "f": "assets/modular/door-white.glb",
+   "size": 4056,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-flat-awning-a",
+   "f": "assets/modular/roof-flat-awning-a.glb",
+   "size": 4452,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-flat-awning-b",
+   "f": "assets/modular/roof-flat-awning-b.glb",
+   "size": 3852,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-flat-awning-c",
+   "f": "assets/modular/roof-flat-awning-c.glb",
+   "size": 7044,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-flat-border-center-corner",
+   "f": "assets/modular/roof-flat-border-center-corner.glb",
+   "size": 4716,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-flat-border-center",
+   "f": "assets/modular/roof-flat-border-center.glb",
+   "size": 4092,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-flat-border-corner-slanted-passage",
+   "f": "assets/modular/roof-flat-border-corner-slanted-passage.glb",
+   "size": 5344,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-flat-border-corner-slanted",
+   "f": "assets/modular/roof-flat-border-corner-slanted.glb",
+   "size": 4416,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-flat-border-corner",
+   "f": "assets/modular/roof-flat-border-corner.glb",
+   "size": 3792,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-flat-border-end",
+   "f": "assets/modular/roof-flat-border-end.glb",
+   "size": 4084,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-flat-border-side",
+   "f": "assets/modular/roof-flat-border-side.glb",
+   "size": 3484,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-flat-border-straight",
+   "f": "assets/modular/roof-flat-border-straight.glb",
+   "size": 4096,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-flat-center",
+   "f": "assets/modular/roof-flat-center.glb",
+   "size": 2868,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-flat-corner-high",
+   "f": "assets/modular/roof-flat-corner-high.glb",
+   "size": 3184,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-flat-corner",
+   "f": "assets/modular/roof-flat-corner.glb",
+   "size": 3168,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-flat-detail-a",
+   "f": "assets/modular/roof-flat-detail-a.glb",
+   "size": 6892,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-flat-detail-b",
+   "f": "assets/modular/roof-flat-detail-b.glb",
+   "size": 5676,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-flat-detail-c",
+   "f": "assets/modular/roof-flat-detail-c.glb",
+   "size": 5124,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-flat-detail-d",
+   "f": "assets/modular/roof-flat-detail-d.glb",
+   "size": 6148,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-flat-top",
+   "f": "assets/modular/roof-flat-top.glb",
+   "size": 4212,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-gable-corner",
+   "f": "assets/modular/roof-gable-corner.glb",
+   "size": 3548,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-gable-end",
+   "f": "assets/modular/roof-gable-end.glb",
+   "size": 3452,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-gable",
+   "f": "assets/modular/roof-gable.glb",
+   "size": 3624,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-slanted-corner-a",
+   "f": "assets/modular/roof-slanted-corner-a.glb",
+   "size": 4688,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-slanted-corner-b",
+   "f": "assets/modular/roof-slanted-corner-b.glb",
+   "size": 4288,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-slanted-corner-c",
+   "f": "assets/modular/roof-slanted-corner-c.glb",
+   "size": 3992,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-slanted-corner-inner",
+   "f": "assets/modular/roof-slanted-corner-inner.glb",
+   "size": 3428,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-slanted-detail",
+   "f": "assets/modular/roof-slanted-detail.glb",
+   "size": 5120,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-slanted-flat",
+   "f": "assets/modular/roof-slanted-flat.glb",
+   "size": 2872,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-slanted-window",
+   "f": "assets/modular/roof-slanted-window.glb",
+   "size": 9080,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "roof-slanted",
+   "f": "assets/modular/roof-slanted.glb",
+   "size": 4104,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "window-brown-detailed",
+   "f": "assets/modular/window-brown-detailed.glb",
+   "size": 4324,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "window-brown-large",
+   "f": "assets/modular/window-brown-large.glb",
+   "size": 4504,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "window-brown-narrow",
+   "f": "assets/modular/window-brown-narrow.glb",
+   "size": 7344,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "window-brown-round-low",
+   "f": "assets/modular/window-brown-round-low.glb",
+   "size": 5948,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "window-brown-round-middle",
+   "f": "assets/modular/window-brown-round-middle.glb",
+   "size": 4116,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "window-brown-round-narrow",
+   "f": "assets/modular/window-brown-round-narrow.glb",
+   "size": 5940,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "window-brown-round-top",
+   "f": "assets/modular/window-brown-round-top.glb",
+   "size": 5916,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "window-brown-round-wide",
+   "f": "assets/modular/window-brown-round-wide.glb",
+   "size": 5932,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "window-brown-tall",
+   "f": "assets/modular/window-brown-tall.glb",
+   "size": 7320,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "window-brown-wide",
+   "f": "assets/modular/window-brown-wide.glb",
+   "size": 4516,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "window-brown",
+   "f": "assets/modular/window-brown.glb",
+   "size": 7320,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "window-white-detailed",
+   "f": "assets/modular/window-white-detailed.glb",
+   "size": 4324,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "window-white-large",
+   "f": "assets/modular/window-white-large.glb",
+   "size": 4504,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "window-white-narrow",
+   "f": "assets/modular/window-white-narrow.glb",
+   "size": 4524,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "window-white-round-low",
+   "f": "assets/modular/window-white-round-low.glb",
+   "size": 5928,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "window-white-round-middle",
+   "f": "assets/modular/window-white-round-middle.glb",
+   "size": 4116,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "window-white-round-narrow",
+   "f": "assets/modular/window-white-round-narrow.glb",
+   "size": 5940,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "window-white-round-top",
+   "f": "assets/modular/window-white-round-top.glb",
+   "size": 5916,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "window-white-round-wide",
+   "f": "assets/modular/window-white-round-wide.glb",
+   "size": 5932,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "window-white-tall",
+   "f": "assets/modular/window-white-tall.glb",
+   "size": 4504,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "window-white-wide",
+   "f": "assets/modular/window-white-wide.glb",
+   "size": 4532,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "modular",
+   "n": "window-white",
+   "f": "assets/modular/window-white.glb",
+   "size": 4504,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "bridge_stone",
+   "f": "assets/nature/bridge_stone.glb",
+   "size": 17708,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "bridge_stoneRound",
+   "f": "assets/nature/bridge_stoneRound.glb",
+   "size": 22552,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "bridge_wood",
+   "f": "assets/nature/bridge_wood.glb",
+   "size": 15692,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "bridge_woodRound",
+   "f": "assets/nature/bridge_woodRound.glb",
+   "size": 21192,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "cliff_blockHalf_rock",
+   "f": "assets/nature/cliff_blockHalf_rock.glb",
+   "size": 2788,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "cliff_blockSlope_rock",
+   "f": "assets/nature/cliff_blockSlope_rock.glb",
+   "size": 6720,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "cliff_block_rock",
+   "f": "assets/nature/cliff_block_rock.glb",
+   "size": 2776,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "cliff_corner_rock",
+   "f": "assets/nature/cliff_corner_rock.glb",
+   "size": 2360,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "cliff_top_rock",
+   "f": "assets/nature/cliff_top_rock.glb",
+   "size": 5312,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "cliff_waterfall_rock",
+   "f": "assets/nature/cliff_waterfall_rock.glb",
+   "size": 4488,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "flower_purpleB",
+   "f": "assets/nature/flower_purpleB.glb",
+   "size": 8084,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "ground_grass",
+   "f": "assets/nature/ground_grass.glb",
+   "size": 1576,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "ground_pathBend",
+   "f": "assets/nature/ground_pathBend.glb",
+   "size": 4132,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "ground_pathStraight",
+   "f": "assets/nature/ground_pathStraight.glb",
+   "size": 5620,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "ground_riverBend",
+   "f": "assets/nature/ground_riverBend.glb",
+   "size": 5684,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "ground_riverCorner",
+   "f": "assets/nature/ground_riverCorner.glb",
+   "size": 4844,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "ground_riverStraight",
+   "f": "assets/nature/ground_riverStraight.glb",
+   "size": 6044,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "path_stone",
+   "f": "assets/nature/path_stone.glb",
+   "size": 12392,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "path_wood",
+   "f": "assets/nature/path_wood.glb",
+   "size": 6448,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "plant_bushLargeTriangle",
+   "f": "assets/nature/plant_bushLargeTriangle.glb",
+   "size": 4564,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "plant_bushSmall",
+   "f": "assets/nature/plant_bushSmall.glb",
+   "size": 3212,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "plant_bushTriangle",
+   "f": "assets/nature/plant_bushTriangle.glb",
+   "size": 3956,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "rock_largeA",
+   "f": "assets/nature/rock_largeA.glb",
+   "size": 7552,
+   "uses": [
+    "game.js:461",
+    "game.js:1162",
+    "resortview.js:67"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "nature",
+   "n": "rock_largeB",
+   "f": "assets/nature/rock_largeB.glb",
+   "size": 8560,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "rock_smallA",
+   "f": "assets/nature/rock_smallA.glb",
+   "size": 3044,
+   "uses": [
+    "game.js:461",
+    "game.js:1162"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "nature",
+   "n": "rock_smallB",
+   "f": "assets/nature/rock_smallB.glb",
+   "size": 3528,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "rock_tallA",
+   "f": "assets/nature/rock_tallA.glb",
+   "size": 12072,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "stone_largeA",
+   "f": "assets/nature/stone_largeA.glb",
+   "size": 7124,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "stone_smallA",
+   "f": "assets/nature/stone_smallA.glb",
+   "size": 2620,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "stone_tallA",
+   "f": "assets/nature/stone_tallA.glb",
+   "size": 11644,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "tree_cone_fall",
+   "f": "assets/nature/tree_cone_fall.glb",
+   "size": 10916,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "tree_default",
+   "f": "assets/nature/tree_default.glb",
+   "size": 9428,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "tree_default_fall",
+   "f": "assets/nature/tree_default_fall.glb",
+   "size": 16940,
+   "uses": [
+    "resortview.js:67"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "nature",
+   "n": "tree_detailed",
+   "f": "assets/nature/tree_detailed.glb",
+   "size": 31412,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "tree_fat_fall",
+   "f": "assets/nature/tree_fat_fall.glb",
+   "size": 5572,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "tree_oak",
+   "f": "assets/nature/tree_oak.glb",
+   "size": 14644,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "tree_oak_fall",
+   "f": "assets/nature/tree_oak_fall.glb",
+   "size": 14640,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "tree_palm",
+   "f": "assets/nature/tree_palm.glb",
+   "size": 13616,
+   "uses": [
+    "resortview.js:67",
+    "resortview.js:229"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "nature",
+   "n": "tree_palmBend",
+   "f": "assets/nature/tree_palmBend.glb",
+   "size": 14820,
+   "uses": [
+    "resortview.js:67",
+    "resortview.js:229"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "nature",
+   "n": "tree_palmDetailedShort",
+   "f": "assets/nature/tree_palmDetailedShort.glb",
+   "size": 28212,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "tree_palmDetailedTall",
+   "f": "assets/nature/tree_palmDetailedTall.glb",
+   "size": 28204,
+   "uses": [
+    "resortview.js:67",
+    "resortview.js:229"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "nature",
+   "n": "tree_palmShort",
+   "f": "assets/nature/tree_palmShort.glb",
+   "size": 15596,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "tree_palmTall",
+   "f": "assets/nature/tree_palmTall.glb",
+   "size": 15592,
+   "uses": [
+    "resortview.js:67",
+    "resortview.js:229"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "nature",
+   "n": "tree_pineDefaultA",
+   "f": "assets/nature/tree_pineDefaultA.glb",
+   "size": 17220,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "tree_pineRoundA",
+   "f": "assets/nature/tree_pineRoundA.glb",
+   "size": 14488,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "tree_pineSmallA",
+   "f": "assets/nature/tree_pineSmallA.glb",
+   "size": 12820,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "nature",
+   "n": "tree_pineTallA",
+   "f": "assets/nature/tree_pineTallA.glb",
+   "size": 7200,
+   "uses": [
+    "resortview.js:67"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "nature",
+   "n": "tree_pineTallB_detailed",
+   "f": "assets/nature/tree_pineTallB_detailed.glb",
+   "size": 12632,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "ambulance",
+   "f": "assets/vehicles/ambulance.glb",
+   "size": 233612,
+   "uses": [
+    "game.js:450",
+    "game.js:1868",
+    "hwtraffic.js:32",
+    "hwtraffic.js:32",
+    "incidents.js:25",
+    "incidents.js:140",
+    "ops3d.js:14",
+    "ops3d.js:317"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "vehicles",
+   "n": "box",
+   "f": "assets/vehicles/box.glb",
+   "size": 14108,
+   "uses": [
+    "cinema.js:567",
+    "cityplan2-3d.js:199",
+    "cityplan2-3d.js:200",
+    "cityplan2-3d.js:203",
+    "cityplan2-3d.js:203",
+    "cityplan2-3d.js:208",
+    "cityplan2-3d.js:208",
+    "cityplan2-3d.js:209"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "vehicles",
+   "n": "cone-flat",
+   "f": "assets/vehicles/cone-flat.glb",
+   "size": 16712,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "cone",
+   "f": "assets/vehicles/cone.glb",
+   "size": 16696,
+   "uses": [
+    "cityplan2-3d.js:203",
+    "game.js:443",
+    "game.js:2220",
+    "online3d.js:24",
+    "online3d.js:149",
+    "scenery.js:228",
+    "scenery.js:229"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "vehicles",
+   "n": "debris-bolt",
+   "f": "assets/vehicles/debris-bolt.glb",
+   "size": 4768,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "debris-bumper",
+   "f": "assets/vehicles/debris-bumper.glb",
+   "size": 11312,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "debris-door-window",
+   "f": "assets/vehicles/debris-door-window.glb",
+   "size": 7576,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "debris-door",
+   "f": "assets/vehicles/debris-door.glb",
+   "size": 7052,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "debris-drivetrain-axle",
+   "f": "assets/vehicles/debris-drivetrain-axle.glb",
+   "size": 18740,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "debris-drivetrain",
+   "f": "assets/vehicles/debris-drivetrain.glb",
+   "size": 36896,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "debris-nut",
+   "f": "assets/vehicles/debris-nut.glb",
+   "size": 4744,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "debris-plate-a",
+   "f": "assets/vehicles/debris-plate-a.glb",
+   "size": 5048,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "debris-plate-b",
+   "f": "assets/vehicles/debris-plate-b.glb",
+   "size": 5380,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "debris-plate-small-a",
+   "f": "assets/vehicles/debris-plate-small-a.glb",
+   "size": 4224,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "debris-plate-small-b",
+   "f": "assets/vehicles/debris-plate-small-b.glb",
+   "size": 5392,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "debris-spoiler-a",
+   "f": "assets/vehicles/debris-spoiler-a.glb",
+   "size": 5616,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "debris-spoiler-b",
+   "f": "assets/vehicles/debris-spoiler-b.glb",
+   "size": 8596,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "debris-tire",
+   "f": "assets/vehicles/debris-tire.glb",
+   "size": 26548,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "delivery-flat",
+   "f": "assets/vehicles/delivery-flat.glb",
+   "size": 214456,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "delivery",
+   "f": "assets/vehicles/delivery.glb",
+   "size": 240264,
+   "uses": [
+    "coopholding.js:33",
+    "coopholding.js:60",
+    "game.js:450",
+    "game.js:1633",
+    "game.js:4997",
+    "hwtraffic.js:10",
+    "quests.js:55",
+    "quests.js:62"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "vehicles",
+   "n": "firetruck",
+   "f": "assets/vehicles/firetruck.glb",
+   "size": 232448,
+   "uses": [
+    "firesim.js:82",
+    "firesim.js:82",
+    "game.js:450",
+    "game.js:1868",
+    "hwtraffic.js:32",
+    "incidents.js:25"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "vehicles",
+   "n": "garbage-truck",
+   "f": "assets/vehicles/garbage-truck.glb",
+   "size": 268224,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "hatchback-sports",
+   "f": "assets/vehicles/hatchback-sports.glb",
+   "size": 197804,
+   "uses": [
+    "game.js:450",
+    "game.js:1151",
+    "game.js:1868",
+    "hwtraffic.js:9"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "vehicles",
+   "n": "police",
+   "f": "assets/vehicles/police.glb",
+   "size": 195336,
+   "uses": [
+    "civic3d.js:17",
+    "game.js:450",
+    "game.js:1868",
+    "hwtraffic.js:9",
+    "hwtraffic.js:32",
+    "hwtraffic.js:32",
+    "hwtraffic.js:39",
+    "incidents.js:25"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "vehicles",
+   "n": "sedan-sports",
+   "f": "assets/vehicles/sedan-sports.glb",
+   "size": 177676,
+   "uses": [
+    "game.js:450",
+    "game.js:1868",
+    "hwtraffic.js:9"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "vehicles",
+   "n": "sedan",
+   "f": "assets/vehicles/sedan.glb",
+   "size": 172216,
+   "uses": [
+    "autobahn.js:20",
+    "game.js:450",
+    "game.js:1151",
+    "game.js:1868",
+    "game.js:1868",
+    "game.js:10016",
+    "game.js:10063",
+    "hwtraffic.js:9"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "vehicles",
+   "n": "suv-luxury",
+   "f": "assets/vehicles/suv-luxury.glb",
+   "size": 175908,
+   "uses": [
+    "game.js:450",
+    "game.js:1868",
+    "hwtraffic.js:9"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "vehicles",
+   "n": "suv",
+   "f": "assets/vehicles/suv.glb",
+   "size": 207572,
+   "uses": [
+    "autobahn.js:20",
+    "game.js:450",
+    "game.js:1151",
+    "game.js:1868",
+    "game.js:1868",
+    "hwtraffic.js:9"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "vehicles",
+   "n": "taxi",
+   "f": "assets/vehicles/taxi.glb",
+   "size": 175608,
+   "uses": [
+    "autobahn.js:20",
+    "game.js:450",
+    "game.js:1151",
+    "game.js:1868",
+    "hwtraffic.js:9",
+    "ops3d.js:26",
+    "ops3d.js:26",
+    "opsflood.js:51"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "vehicles",
+   "n": "tractor-police",
+   "f": "assets/vehicles/tractor-police.glb",
+   "size": 196308,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "tractor-shovel",
+   "f": "assets/vehicles/tractor-shovel.glb",
+   "size": 222584,
+   "uses": [
+    "_highway.html:15",
+    "game.js:450",
+    "game.js:1633",
+    "highways.js:362",
+    "highways.js:362",
+    "railbuild.js:115",
+    "railbuild.js:115"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "vehicles",
+   "n": "tractor",
+   "f": "assets/vehicles/tractor.glb",
+   "size": 175960,
+   "uses": [
+    "game.js:450",
+    "game.js:1633",
+    "game.js:1633",
+    "game.js:1633",
+    "game.js:1643",
+    "game.js:3014",
+    "game.js:7910",
+    "game.js:9857"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "vehicles",
+   "n": "truck-flat",
+   "f": "assets/vehicles/truck-flat.glb",
+   "size": 207424,
+   "uses": [
+    "game.js:450",
+    "game.js:1633",
+    "game.js:1633",
+    "hwtraffic.js:10"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "vehicles",
+   "n": "truck",
+   "f": "assets/vehicles/truck.glb",
+   "size": 176360,
+   "uses": [
+    "_highway.html:15",
+    "autobahn.js:290",
+    "boardholo.js:82",
+    "boardholo.js:82",
+    "boardholo.js:96",
+    "economy.js:20",
+    "game.js:450",
+    "game.js:458"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "vehicles",
+   "n": "van",
+   "f": "assets/vehicles/van.glb",
+   "size": 175664,
+   "uses": [
+    "autobahn.js:20",
+    "game.js:450",
+    "game.js:1151",
+    "game.js:1633",
+    "game.js:1761",
+    "game.js:1868",
+    "hwtraffic.js:9",
+    "ops3d.js:25"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "vehicles",
+   "n": "wheel-dark",
+   "f": "assets/vehicles/wheel-dark.glb",
+   "size": 29116,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "wheel-default",
+   "f": "assets/vehicles/wheel-default.glb",
+   "size": 26820,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "wheel-tractor-back",
+   "f": "assets/vehicles/wheel-tractor-back.glb",
+   "size": 36628,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "wheel-tractor-dark-back",
+   "f": "assets/vehicles/wheel-tractor-dark-back.glb",
+   "size": 36644,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "wheel-tractor-dark-front",
+   "f": "assets/vehicles/wheel-tractor-dark-front.glb",
+   "size": 29156,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "wheel-tractor-front",
+   "f": "assets/vehicles/wheel-tractor-front.glb",
+   "size": 29140,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "vehicles",
+   "n": "wheel-truck",
+   "f": "assets/vehicles/wheel-truck.glb",
+   "size": 34304,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "arrow-standing",
+   "f": "assets/watercraft/arrow-standing.glb",
+   "size": 4616,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "arrow",
+   "f": "assets/watercraft/arrow.glb",
+   "size": 6776,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "boat-fan",
+   "f": "assets/watercraft/boat-fan.glb",
+   "size": 31172,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "boat-house-a",
+   "f": "assets/watercraft/boat-house-a.glb",
+   "size": 38416,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "boat-house-b",
+   "f": "assets/watercraft/boat-house-b.glb",
+   "size": 36316,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "boat-house-c",
+   "f": "assets/watercraft/boat-house-c.glb",
+   "size": 40780,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "boat-house-d",
+   "f": "assets/watercraft/boat-house-d.glb",
+   "size": 48676,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "boat-row-large",
+   "f": "assets/watercraft/boat-row-large.glb",
+   "size": 15988,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "boat-row-small",
+   "f": "assets/watercraft/boat-row-small.glb",
+   "size": 17636,
+   "uses": [
+    "resortview.js:64",
+    "resortview.js:208",
+    "seaside.js:15"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "watercraft",
+   "n": "boat-speed-b",
+   "f": "assets/watercraft/boat-speed-b.glb",
+   "size": 15800,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "boat-speed-d",
+   "f": "assets/watercraft/boat-speed-d.glb",
+   "size": 23536,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "boat-speed-e",
+   "f": "assets/watercraft/boat-speed-e.glb",
+   "size": 25116,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "boat-speed-f",
+   "f": "assets/watercraft/boat-speed-f.glb",
+   "size": 22284,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "boat-speed-g",
+   "f": "assets/watercraft/boat-speed-g.glb",
+   "size": 14168,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "boat-speed-h",
+   "f": "assets/watercraft/boat-speed-h.glb",
+   "size": 19816,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "boat-speed-i",
+   "f": "assets/watercraft/boat-speed-i.glb",
+   "size": 14992,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "boat-speed-j",
+   "f": "assets/watercraft/boat-speed-j.glb",
+   "size": 20572,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "boat-tow-a",
+   "f": "assets/watercraft/boat-tow-a.glb",
+   "size": 50924,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "boat-tow-b",
+   "f": "assets/watercraft/boat-tow-b.glb",
+   "size": 51476,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "boat-tug-a",
+   "f": "assets/watercraft/boat-tug-a.glb",
+   "size": 41036,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "boat-tug-b",
+   "f": "assets/watercraft/boat-tug-b.glb",
+   "size": 33524,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "boat-tug-c",
+   "f": "assets/watercraft/boat-tug-c.glb",
+   "size": 18844,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "buoy-flag",
+   "f": "assets/watercraft/buoy-flag.glb",
+   "size": 21720,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "cargo-pile-a",
+   "f": "assets/watercraft/cargo-pile-a.glb",
+   "size": 18304,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "cargo-pile-b",
+   "f": "assets/watercraft/cargo-pile-b.glb",
+   "size": 34760,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "gate-finish",
+   "f": "assets/watercraft/gate-finish.glb",
+   "size": 9140,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "gate",
+   "f": "assets/watercraft/gate.glb",
+   "size": 9888,
+   "uses": [
+    "cloud.js:357",
+    "cloud.js:463"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "watercraft",
+   "n": "ramp-wide",
+   "f": "assets/watercraft/ramp-wide.glb",
+   "size": 14824,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "ramp",
+   "f": "assets/watercraft/ramp.glb",
+   "size": 14808,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "watercraft",
+   "n": "ship-large",
+   "f": "assets/watercraft/ship-large.glb",
+   "size": 155808,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "industrial",
+   "n": "building-m",
+   "f": "assets/industrial/building-m.glb",
+   "size": 138920,
+   "uses": [
+    "game.js:801",
+    "game.js:816",
+    "nightfloors.js:12"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "industrial",
+   "n": "building-n",
+   "f": "assets/industrial/building-n.glb",
+   "size": 109256,
+   "uses": [
+    "game.js:801",
+    "game.js:816",
+    "nightfloors.js:12"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "industrial",
+   "n": "building-o",
+   "f": "assets/industrial/building-o.glb",
+   "size": 76552,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "industrial",
+   "n": "building-p",
+   "f": "assets/industrial/building-p.glb",
+   "size": 103760,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "industrial",
+   "n": "building-q",
+   "f": "assets/industrial/building-q.glb",
+   "size": 181248,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "industrial",
+   "n": "building-r",
+   "f": "assets/industrial/building-r.glb",
+   "size": 173056,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "industrial",
+   "n": "building-s",
+   "f": "assets/industrial/building-s.glb",
+   "size": 81192,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "industrial",
+   "n": "building-t",
+   "f": "assets/industrial/building-t.glb",
+   "size": 139896,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "industrial",
+   "n": "chimney-basic",
+   "f": "assets/industrial/chimney-basic.glb",
+   "size": 9036,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "industrial",
+   "n": "chimney-large",
+   "f": "assets/industrial/chimney-large.glb",
+   "size": 20932,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "industrial",
+   "n": "chimney-medium",
+   "f": "assets/industrial/chimney-medium.glb",
+   "size": 15020,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "industrial",
+   "n": "chimney-small",
+   "f": "assets/industrial/chimney-small.glb",
+   "size": 10536,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "industrial",
+   "n": "detail-tank-large",
+   "f": "assets/industrial/detail-tank-large.glb",
+   "size": 47452,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "industrial",
+   "n": "detail-tank",
+   "f": "assets/industrial/detail-tank.glb",
+   "size": 31436,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "industrial",
+   "n": "shipping-container-a",
+   "f": "assets/industrial/shipping-container-a.glb",
+   "size": 36624,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "industrial",
+   "n": "shipping-container-b",
+   "f": "assets/industrial/shipping-container-b.glb",
+   "size": 37052,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "industrial",
+   "n": "shipping-container-c",
+   "f": "assets/industrial/shipping-container-c.glb",
+   "size": 36620,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "industrial",
+   "n": "solar-panel-flat",
+   "f": "assets/industrial/solar-panel-flat.glb",
+   "size": 13964,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "industrial",
+   "n": "solar-panel-landscape",
+   "f": "assets/industrial/solar-panel-landscape.glb",
+   "size": 21776,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "industrial",
+   "n": "solar-panel-portrait",
+   "f": "assets/industrial/solar-panel-portrait.glb",
+   "size": 21772,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "industrial",
+   "n": "windmill-low",
+   "f": "assets/industrial/windmill-low.glb",
+   "size": 46296,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "construction",
+   "n": "box-black",
+   "f": "assets/construction/box-black.glb",
+   "size": 8368,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "construction",
+   "n": "box-stack-large",
+   "f": "assets/construction/box-stack-large.glb",
+   "size": 17820,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "construction",
+   "n": "box-white",
+   "f": "assets/construction/box-white.glb",
+   "size": 8368,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "construction",
+   "n": "boxes-small",
+   "f": "assets/construction/boxes-small.glb",
+   "size": 12784,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "construction",
+   "n": "building-under-construction",
+   "f": "assets/construction/building-under-construction.glb",
+   "size": 620092,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "construction",
+   "n": "container-cargo-blue-boxes",
+   "f": "assets/construction/container-cargo-blue-boxes.glb",
+   "size": 22432,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "construction",
+   "n": "container-cargo-white-boxes",
+   "f": "assets/construction/container-cargo-white-boxes.glb",
+   "size": 22432,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "construction",
+   "n": "container-office-stack",
+   "f": "assets/construction/container-office-stack.glb",
+   "size": 48760,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "construction",
+   "n": "container-rubble-blue-small",
+   "f": "assets/construction/container-rubble-blue-small.glb",
+   "size": 10708,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "construction",
+   "n": "container-rubble-blue",
+   "f": "assets/construction/container-rubble-blue.glb",
+   "size": 10716,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "construction",
+   "n": "container-rubble-green",
+   "f": "assets/construction/container-rubble-green.glb",
+   "size": 10716,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "construction",
+   "n": "crane-tower-rooftop",
+   "f": "assets/construction/crane-tower-rooftop.glb",
+   "size": 143640,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "construction",
+   "n": "fence-perimeter",
+   "f": "assets/construction/fence-perimeter.glb",
+   "size": 17176,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "construction",
+   "n": "planks-blue",
+   "f": "assets/construction/planks-blue.glb",
+   "size": 16792,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "construction",
+   "n": "planks-wood-b",
+   "f": "assets/construction/planks-wood-b.glb",
+   "size": 14276,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "construction",
+   "n": "planks-wood-c",
+   "f": "assets/construction/planks-wood-c.glb",
+   "size": 14304,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "construction",
+   "n": "planks-yellow",
+   "f": "assets/construction/planks-yellow.glb",
+   "size": 17656,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "construction",
+   "n": "ramp",
+   "f": "assets/construction/ramp.glb",
+   "size": 12124,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "construction",
+   "n": "rubble-chute",
+   "f": "assets/construction/rubble-chute.glb",
+   "size": 20260,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "construction",
+   "n": "stairs-container",
+   "f": "assets/construction/stairs-container.glb",
+   "size": 11980,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "suburban",
+   "n": "driveway-long",
+   "f": "assets/suburban/driveway-long.glb",
+   "size": 2952,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "suburban",
+   "n": "driveway-short",
+   "f": "assets/suburban/driveway-short.glb",
+   "size": 2956,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "suburban",
+   "n": "fence-1x2",
+   "f": "assets/suburban/fence-1x2.glb",
+   "size": 16492,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "suburban",
+   "n": "fence-1x3",
+   "f": "assets/suburban/fence-1x3.glb",
+   "size": 21032,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "suburban",
+   "n": "fence-1x4",
+   "f": "assets/suburban/fence-1x4.glb",
+   "size": 25544,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "suburban",
+   "n": "fence-2x2",
+   "f": "assets/suburban/fence-2x2.glb",
+   "size": 23872,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "suburban",
+   "n": "fence-2x3",
+   "f": "assets/suburban/fence-2x3.glb",
+   "size": 28412,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "suburban",
+   "n": "fence-3x2",
+   "f": "assets/suburban/fence-3x2.glb",
+   "size": 31280,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "suburban",
+   "n": "fence-3x3",
+   "f": "assets/suburban/fence-3x3.glb",
+   "size": 35820,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "suburban",
+   "n": "fence-low",
+   "f": "assets/suburban/fence-low.glb",
+   "size": 18552,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "suburban",
+   "n": "fence",
+   "f": "assets/suburban/fence.glb",
+   "size": 9672,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "suburban",
+   "n": "path-long",
+   "f": "assets/suburban/path-long.glb",
+   "size": 2940,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "suburban",
+   "n": "path-short",
+   "f": "assets/suburban/path-short.glb",
+   "size": 2944,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "suburban",
+   "n": "path-stones-long",
+   "f": "assets/suburban/path-stones-long.glb",
+   "size": 6664,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "suburban",
+   "n": "path-stones-messy",
+   "f": "assets/suburban/path-stones-messy.glb",
+   "size": 5476,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "suburban",
+   "n": "path-stones-short",
+   "f": "assets/suburban/path-stones-short.glb",
+   "size": 4284,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "suburban",
+   "n": "planter",
+   "f": "assets/suburban/planter.glb",
+   "size": 20368,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "suburban",
+   "n": "tree-large",
+   "f": "assets/suburban/tree-large.glb",
+   "size": 5812,
+   "uses": [
+    "game.js:444",
+    "game.js:556",
+    "game.js:569",
+    "game.js:569",
+    "game.js:578",
+    "game.js:1096",
+    "game.js:1145",
+    "game.js:1163"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "suburban",
+   "n": "tree-small",
+   "f": "assets/suburban/tree-small.glb",
+   "size": 5812,
+   "uses": [
+    "game.js:444",
+    "game.js:556",
+    "game.js:578",
+    "game.js:1096",
+    "game.js:1163",
+    "game.js:8332",
+    "online3d.js:25",
+    "online3d.js:117"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "roads",
+   "n": "construction-barrier",
+   "f": "assets/roads/construction-barrier.glb",
+   "size": 7052,
+   "uses": [
+    "game.js:443",
+    "highways.js:58",
+    "highways.js:349",
+    "scenery.js:225",
+    "scenery.js:225"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "roads",
+   "n": "construction-cone",
+   "f": "assets/roads/construction-cone.glb",
+   "size": 7056,
+   "uses": [
+    "game.js:443",
+    "game.js:2220",
+    "online3d.js:24",
+    "online3d.js:149",
+    "scenery.js:228",
+    "scenery.js:229"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "roads",
+   "n": "construction-fence",
+   "f": "assets/roads/construction-fence.glb",
+   "size": 14856,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "roads",
+   "n": "construction-light",
+   "f": "assets/roads/construction-light.glb",
+   "size": 15320,
+   "uses": [
+    "highways.js:58",
+    "highways.js:350"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "roads",
+   "n": "light-square-double",
+   "f": "assets/roads/light-square-double.glb",
+   "size": 9216,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "roads",
+   "n": "light-square",
+   "f": "assets/roads/light-square.glb",
+   "size": 6996,
+   "uses": [
+    "game.js:443",
+    "game.js:1036",
+    "online3d.js:24"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "roads",
+   "n": "road-bend",
+   "f": "assets/roads/road-bend.glb",
+   "size": 20164,
+   "uses": [
+    "game.js:443",
+    "game.js:1008",
+    "game.js:1020",
+    "online3d.js:24",
+    "online3d.js:73",
+    "online3d.js:82"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "roads",
+   "n": "road-crossroad",
+   "f": "assets/roads/road-crossroad.glb",
+   "size": 10084,
+   "uses": [
+    "game.js:443",
+    "game.js:1008",
+    "game.js:1016",
+    "online3d.js:24",
+    "online3d.js:73",
+    "online3d.js:78"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "roads",
+   "n": "road-end",
+   "f": "assets/roads/road-end.glb",
+   "size": 4940,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "roads",
+   "n": "road-intersection",
+   "f": "assets/roads/road-intersection.glb",
+   "size": 7900,
+   "uses": [
+    "game.js:443",
+    "game.js:1008",
+    "game.js:1017",
+    "online3d.js:24",
+    "online3d.js:73",
+    "online3d.js:79"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "roads",
+   "n": "road-square",
+   "f": "assets/roads/road-square.glb",
+   "size": 4436,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "roads",
+   "n": "road-straight",
+   "f": "assets/roads/road-straight.glb",
+   "size": 5248,
+   "uses": [
+    "game.js:443",
+    "game.js:1008",
+    "game.js:1015",
+    "game.js:1022",
+    "game.js:7771",
+    "game.js:7773",
+    "online3d.js:24",
+    "online3d.js:73"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "roads",
+   "n": "tile-low",
+   "f": "assets/roads/tile-low.glb",
+   "size": 2800,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "highway",
+   "n": "Street_4Lane",
+   "f": "assets/highway/Street_4Lane.glb",
+   "size": 575840,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "highway",
+   "n": "Street_Asphalt_6x6",
+   "f": "assets/highway/Street_Asphalt_6x6.glb",
+   "size": 8596,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "highway",
+   "n": "bridge-pillar-wide",
+   "f": "assets/highway/bridge-pillar-wide.glb",
+   "size": 5488,
+   "uses": [
+    "highways.js:58",
+    "highways.js:271"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "highway",
+   "n": "construction-barrier",
+   "f": "assets/highway/construction-barrier.glb",
+   "size": 7052,
+   "uses": [
+    "game.js:443",
+    "highways.js:58",
+    "highways.js:349",
+    "scenery.js:225",
+    "scenery.js:225"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "highway",
+   "n": "construction-light",
+   "f": "assets/highway/construction-light.glb",
+   "size": 15320,
+   "uses": [
+    "highways.js:58",
+    "highways.js:350"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "highway",
+   "n": "light-curved-double",
+   "f": "assets/highway/light-curved-double.glb",
+   "size": 14208,
+   "uses": [
+    "highways.js:58",
+    "highways.js:306"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "highway",
+   "n": "light-square-double",
+   "f": "assets/highway/light-square-double.glb",
+   "size": 9216,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "highway",
+   "n": "road-bridge",
+   "f": "assets/highway/road-bridge.glb",
+   "size": 24796,
+   "uses": [
+    "highways.js:58"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "highway",
+   "n": "road-straight-barrier-end",
+   "f": "assets/highway/road-straight-barrier-end.glb",
+   "size": 3640,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "highway",
+   "n": "road-straight-barrier",
+   "f": "assets/highway/road-straight-barrier.glb",
+   "size": 4196,
+   "uses": [
+    "highways.js:58",
+    "highways.js:292"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "highway",
+   "n": "sign-highway-detailed",
+   "f": "assets/highway/sign-highway-detailed.glb",
+   "size": 23532,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "highway",
+   "n": "sign-highway-wide",
+   "f": "assets/highway/sign-highway-wide.glb",
+   "size": 13968,
+   "uses": [
+    "highways.js:58",
+    "highways.js:317"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "highway",
+   "n": "sign-highway",
+   "f": "assets/highway/sign-highway.glb",
+   "size": 17288,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "trains",
+   "n": "railroad-straight",
+   "f": "assets/trains/railroad-straight.glb",
+   "size": 34736,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "trains",
+   "n": "track",
+   "f": "assets/trains/track.glb",
+   "size": 8464,
+   "uses": [
+    "game.js:448",
+    "passtrains.js:20",
+    "station.js:56",
+    "station.js:173"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "trains",
+   "n": "train-carriage-box",
+   "f": "assets/trains/train-carriage-box.glb",
+   "size": 98768,
+   "uses": [
+    "game.js:448",
+    "game.js:7048",
+    "passtrains.js:8",
+    "railbuild.js:124",
+    "station.js:217",
+    "station.js:242"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "trains",
+   "n": "train-carriage-coal",
+   "f": "assets/trains/train-carriage-coal.glb",
+   "size": 110244,
+   "uses": [
+    "game.js:448",
+    "game.js:7048",
+    "passtrains.js:8",
+    "railbuild.js:124",
+    "station.js:217",
+    "station.js:242"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "trains",
+   "n": "train-carriage-container-blue",
+   "f": "assets/trains/train-carriage-container-blue.glb",
+   "size": 116192,
+   "uses": [
+    "game.js:448",
+    "station.js:242"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "trains",
+   "n": "train-carriage-container-red",
+   "f": "assets/trains/train-carriage-container-red.glb",
+   "size": 116192,
+   "uses": [
+    "game.js:448",
+    "game.js:7048",
+    "passtrains.js:8",
+    "railbuild.js:124",
+    "station.js:242"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "trains",
+   "n": "train-carriage-flatbed-wood",
+   "f": "assets/trains/train-carriage-flatbed-wood.glb",
+   "size": 103004,
+   "uses": [
+    "game.js:448",
+    "game.js:7048",
+    "passtrains.js:8",
+    "railbuild.js:124",
+    "station.js:217",
+    "station.js:242"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "trains",
+   "n": "train-carriage-lumber",
+   "f": "assets/trains/train-carriage-lumber.glb",
+   "size": 110308,
+   "uses": [
+    "game.js:448",
+    "station.js:242"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "trains",
+   "n": "train-carriage-tank",
+   "f": "assets/trains/train-carriage-tank.glb",
+   "size": 106752,
+   "uses": [
+    "game.js:448",
+    "station.js:242"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "trains",
+   "n": "train-electric-city-a",
+   "f": "assets/trains/train-electric-city-a.glb",
+   "size": 104168,
+   "uses": [
+    "game.js:448",
+    "passtrains.js:52",
+    "passtrains.js:55",
+    "railbuild.js:132",
+    "railbuild.js:132",
+    "station.js:244",
+    "station.js:244"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "trains",
+   "n": "train-electric-city-b",
+   "f": "assets/trains/train-electric-city-b.glb",
+   "size": 135720,
+   "uses": [
+    "game.js:448",
+    "passtrains.js:55",
+    "railbuild.js:132",
+    "railbuild.js:132",
+    "station.js:244"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "trains",
+   "n": "train-locomotive-a",
+   "f": "assets/trains/train-locomotive-a.glb",
+   "size": 154620,
+   "uses": [
+    "game.js:448",
+    "game.js:7048",
+    "passtrains.js:60",
+    "railbuild.js:123",
+    "railbuild.js:124",
+    "station.js:245"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "commercial",
+   "n": "building-a",
+   "f": "assets/commercial/building-a.glb",
+   "size": 735680,
+   "uses": [
+    "game.js:445",
+    "game.js:452",
+    "game.js:804",
+    "game.js:808",
+    "game.js:825",
+    "game.js:1308",
+    "game.js:10080",
+    "impstyle.js:15"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "commercial",
+   "n": "building-b",
+   "f": "assets/commercial/building-b.glb",
+   "size": 386164,
+   "uses": [
+    "game.js:445",
+    "game.js:452",
+    "game.js:808",
+    "game.js:825",
+    "impstyle.js:15",
+    "industry.js:13",
+    "industry.js:21",
+    "nightfloors.js:9"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "commercial",
+   "n": "building-c",
+   "f": "assets/commercial/building-c.glb",
+   "size": 462556,
+   "uses": [
+    "game.js:445",
+    "game.js:452",
+    "game.js:808",
+    "game.js:825",
+    "game.js:1309",
+    "game.js:2121",
+    "impstyle.js:15",
+    "industry.js:13"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "commercial",
+   "n": "building-d",
+   "f": "assets/commercial/building-d.glb",
+   "size": 323284,
+   "uses": [
+    "game.js:445",
+    "game.js:452",
+    "game.js:808",
+    "game.js:825",
+    "impstyle.js:15",
+    "industry.js:14",
+    "industry.js:21",
+    "nightfloors.js:9"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "commercial",
+   "n": "building-e",
+   "f": "assets/commercial/building-e.glb",
+   "size": 470584,
+   "uses": [
+    "game.js:445",
+    "game.js:452",
+    "game.js:808",
+    "game.js:1310",
+    "game.js:2121",
+    "impstyle.js:15",
+    "industry.js:14",
+    "industry.js:21"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "commercial",
+   "n": "building-f",
+   "f": "assets/commercial/building-f.glb",
+   "size": 573216,
+   "uses": [
+    "game.js:445",
+    "game.js:452",
+    "game.js:808",
+    "game.js:2121",
+    "industry.js:14",
+    "industry.js:22",
+    "nightfloors.js:9",
+    "plan.html:69"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "commercial",
+   "n": "building-g",
+   "f": "assets/commercial/building-g.glb",
+   "size": 307900,
+   "uses": [
+    "game.js:445",
+    "game.js:452",
+    "game.js:808",
+    "game.js:1311",
+    "industry.js:15",
+    "industry.js:22",
+    "nightfloors.js:10",
+    "online3d.js:124"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "commercial",
+   "n": "building-h",
+   "f": "assets/commercial/building-h.glb",
+   "size": 404216,
+   "uses": [
+    "game.js:445",
+    "game.js:452",
+    "game.js:808",
+    "industry.js:15",
+    "industry.js:22",
+    "nightfloors.js:10",
+    "plan.html:69",
+    "plan.html:72"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "commercial",
+   "n": "building-skyscraper-a",
+   "f": "assets/commercial/building-skyscraper-a.glb",
+   "size": 1123976,
+   "uses": [
+    "game.js:445",
+    "game.js:809",
+    "game.js:1312",
+    "nightfloors.js:10",
+    "officestyle.js:14",
+    "online3d.js:21",
+    "plan.html:68",
+    "tall.js:9"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "commercial",
+   "n": "building-skyscraper-b",
+   "f": "assets/commercial/building-skyscraper-b.glb",
+   "size": 762088,
+   "uses": [
+    "game.js:445",
+    "game.js:809",
+    "game.js:1313",
+    "nightfloors.js:10",
+    "officestyle.js:15",
+    "online3d.js:21",
+    "plan.html:68",
+    "tall.js:10"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "commercial",
+   "n": "building-skyscraper-c",
+   "f": "assets/commercial/building-skyscraper-c.glb",
+   "size": 702772,
+   "uses": [
+    "game.js:445",
+    "game.js:809",
+    "game.js:1314",
+    "nightfloors.js:10",
+    "nightfloors.js:76",
+    "nightfloors.js:165",
+    "officestyle.js:16",
+    "online3d.js:21"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "houses",
+   "n": "building-type-a",
+   "f": "assets/houses/building-type-a.glb",
+   "size": 298168,
+   "uses": [
+    "game.js:444",
+    "game.js:474",
+    "game.js:796",
+    "game.js:807",
+    "game.js:1307",
+    "game.js:10105",
+    "game.js:10105",
+    "impstyle.js:14"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "houses",
+   "n": "building-type-b",
+   "f": "assets/houses/building-type-b.glb",
+   "size": 250704,
+   "uses": [
+    "game.js:444",
+    "game.js:474",
+    "game.js:475",
+    "game.js:796",
+    "game.js:807",
+    "game.js:10105",
+    "game.js:10105",
+    "impstyle.js:14"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "houses",
+   "n": "fence",
+   "f": "assets/houses/fence.glb",
+   "size": 9672,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "houses",
+   "n": "planter",
+   "f": "assets/houses/planter.glb",
+   "size": 20368,
+   "uses": [],
+   "tpl": [],
+   "status": "unused"
+  },
+  {
+   "dir": "houses",
+   "n": "tree-large",
+   "f": "assets/houses/tree-large.glb",
+   "size": 5812,
+   "uses": [
+    "game.js:444",
+    "game.js:556",
+    "game.js:569",
+    "game.js:569",
+    "game.js:578",
+    "game.js:1096",
+    "game.js:1145",
+    "game.js:1163"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "houses",
+   "n": "tree-small",
+   "f": "assets/houses/tree-small.glb",
+   "size": 5812,
+   "uses": [
+    "game.js:444",
+    "game.js:556",
+    "game.js:578",
+    "game.js:1096",
+    "game.js:1163",
+    "game.js:8332",
+    "online3d.js:25",
+    "online3d.js:117"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "city",
+   "n": "Building_Large_2",
+   "f": "assets/city/Building_Large_2.glb",
+   "size": 1116540,
+   "uses": [
+    "game.js:459"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "city",
+   "n": "Building_Medium_2_001",
+   "f": "assets/city/Building_Medium_2_001.glb",
+   "size": 607212,
+   "uses": [
+    "game.js:459",
+    "game.js:474",
+    "game.js:843",
+    "game.js:2121",
+    "game.js:10080",
+    "game.js:10085"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "city",
+   "n": "Building_Small_1",
+   "f": "assets/city/Building_Small_1.glb",
+   "size": 519112,
+   "uses": [
+    "game.js:459",
+    "game.js:474",
+    "game.js:2120",
+    "game.js:10085"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "holiday",
+   "n": "bench",
+   "f": "assets/holiday/bench.glb",
+   "size": 633380,
+   "uses": [
+    "game.js:455",
+    "game.js:8333"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "holiday",
+   "n": "lantern",
+   "f": "assets/holiday/lantern.glb",
+   "size": 328508,
+   "uses": [
+    "game.js:455",
+    "game.js:8334"
+   ],
+   "tpl": [],
+   "status": "used"
+  },
+  {
+   "dir": "holiday",
+   "n": "tree",
+   "f": "assets/holiday/tree.glb",
+   "size": 24380,
+   "uses": [
+    "game.js:455",
+    "game.js:482",
+    "game.js:563",
+    "resortview.js:317"
+   ],
+   "tpl": [],
+   "status": "used"
+  }
+ ]
+}
