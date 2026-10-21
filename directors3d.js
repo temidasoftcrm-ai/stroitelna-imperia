@@ -9,7 +9,9 @@ import { createHolo } from './boardholo.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { buildPresRoom } from './presrooms.js';   // 🇺🇸/🇷🇺 президентските зали (Министерският съвет)
-import { createRoomSound } from './roomsound.js';   // шум на залата, хартия, чукче, аплодисменти, говор на глас
+import { createRoomSound } from './roomsound.js';
+import { feature } from './lab/feature.js';
+import { vaultDoor, createVault } from './vault3d.js';   // 🏦 трезорът зад борда (флаг vault)   // шум на залата, хартия, чукче, аплодисменти, говор на глас
 
 const DIR = 'assets/heavy/directors/';
 const SIT_HIP = [0, -1, -57];
@@ -25,9 +27,9 @@ const HAVE = new Set(['ivaylo', 'nadya', 'maria', 'stefan', 'elena', 'vera', 'bo
 // …и девето — начело откъм картата (side 0): директорът на Глобъл, срещу председателя
 const SEATS = [[-1, -2.7], [1, -2.7], [-1, -0.9], [1, -0.9], [-1, 0.9], [1, 0.9], [-1, 2.7], [1, 2.7], [0, -4.25, -0.5], [0, -4.25, 0.5], [0, -4.25]];   // [10] — начело в средата (министър-председателят)   // начело — Глобъл и градоначалникът на Империал Сити (10-ото място)
 const seatX = i => { const [side, , dx] = SEATS[i] || SEATS[SEATS.length - 1]; return side * SIT_X + (dx || 0); };
+const SEAT_HIP = 0.1;   // ханшът (ставата) — толкова над възглавницата на стола
 const SIT_X = 1.66, TABLE_W = 2.4, TABLE_L = 7.4, TABLE_H = 0.7, SCALE = 0.9, TURN = 0.3;   // TURN — директорите са леко обърнати към председателя
 const seatRy = side => side < 0 ? Math.PI / 2 - TURN : side > 0 ? -Math.PI / 2 + TURN : 0;   // накъде гледа столът (начело — към председателя)
-const SEAT_HIP = 0.1;   // ханшът (ставата) — толкова над възглавницата на стола
 
 const css = `
 #boardRoom { position:fixed; inset:0; z-index:9780; background:#07090d; opacity:0; transition:opacity .45s; }
@@ -225,14 +227,14 @@ function chair(mat, metal, k) {
   if (k) {   // бродираната емблема горе на облегалката — над главата на директора, вижда се отсреща
     const em = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.24), new THREE.MeshStandardMaterial({ map: logoTex(k), transparent: true, alphaTest: 0.1, roughness: 0.6 }));
     em.position.set(0, 0.3, 0.062); back.add(em);
-  }
-  for (const sx of [-1, 1]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.04, 0.4), metal); arm.position.set(sx * 0.43, 0.56, -0.04); top.add(arm); const st = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.2, 0.04), metal); st.position.set(sx * 0.43, 0.5, 0.05); top.add(st); }   // подлакътниците — по-ниско и по-навън, лактите не влизат в тях
     const rear = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.36), em.material); rear.position.set(0, 0.12, -0.062); rear.rotation.y = Math.PI; back.add(rear);
     back.userData.keep = true;   /* mergeStatic: без това облегалката се слива и емблемите (деца на облегалката) изчезват */   // и отзад на облегалката — по-голямо, вижда се от другата страна на масата и от камерата зад директора
+  }
+  for (const sx of [-1, 1]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.04, 0.4), metal); arm.position.set(sx * 0.43, 0.56, -0.04); top.add(arm); const st = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.2, 0.04), metal); st.position.set(sx * 0.43, 0.5, 0.05); top.add(st); }   // подлакътниците — по-ниско и по-навън, лактите не влизат в тях
   const post = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.38, 10), metal); post.position.y = 0.22; g.add(post);
+  g.userData.lift = d => { top.position.y = d; post.scale.y = (0.38 + d) / 0.38; post.position.y = 0.22 + d / 2; g.userData.seatTop = 0.53 + d; g.userData.refit && g.userData.refit(); };   // седалката по-високо/ниско, основата остава на пода
   const base = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.04, 5), metal); base.position.y = 0.03; g.add(base);
   g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-  g.userData.lift = d => { top.position.y = d; post.scale.y = (0.38 + d) / 0.38; post.position.y = 0.22 + d / 2; g.userData.seatTop = 0.53 + d; g.userData.refit && g.userData.refit(); };   // седалката по-високо/ниско, основата остава на пода
   Object.assign(g.userData, { k, proc: [top, post, base], seatTop: 0.53 });
   return g;
 }
@@ -438,7 +440,7 @@ export function openBoardroom(o) {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.debug.checkShaderErrors = false;   // ⚡ иначе getProgramInfoLog чака компилацията синхронно (~1,6 s при първото отваряне) — compileAsync не помага
   window.__overlay3d = (window.__overlay3d || 0) + 1;
-  window.__room = { renderer, get scene() { return scene; } };   // за измерване от конзолата (кадри, draw calls, триъгълници)   // game.js спира да рисува 3D града, докато залата е отворена
+  window.__room = { renderer, get scene() { return scene; }, get cam() { return cam; } };   // за измерване от конзолата (кадри, draw calls, триъгълници)   // game.js спира да рисува 3D града, докато залата е отворена
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -460,6 +462,9 @@ export function openBoardroom(o) {
   // холограмата над медальона (boardholo.js): държавата, градовете и бюджетът на текущото предложение
   const short = n => { const a = Math.abs(n), r = (v, u) => `${(n / v).toLocaleString('bg-BG', { maximumFractionDigits: a / v >= 100 ? 0 : 1 })} ${u}`; return a >= 1e12 ? r(1e12, 'трлн.') : a >= 1e9 ? r(1e9, 'млрд.') : a >= 1e6 ? r(1e6, 'млн.') : Math.round(n).toLocaleString('bg-BG'); };   // холограмата — съкратено (310 млрд., 2,9 трлн.)
   const holo = createHolo(scene, { fmt: short, base: new THREE.Vector3(0, TABLE_H + 0.14, 0) });
+  // 🏦 трезорът (флаг vault): кръглата врата в стената зад масата, вляво между колоната и прозореца; клик → камерата влиза, вратата се отваря → стаята с парите
+  const VD = ROOM === 'corp' && o.vault && feature('vault') ? vaultDoor(scene, { x: -4.22, y: 1.7, z: ROOM_BACK + 0.02, r: 0.54 }) : null;
+  let vault = null, vaultT = 0;
 
   const tip = el.querySelector('.tip'), card = el.querySelector('.card'), hits = [], people = [];
   let sel = null, shut = false, raf = 0, nextChat = 4;
@@ -773,23 +778,37 @@ export function openBoardroom(o) {
   let down = null;
   const hitAt = e => { const r = renderer.domElement.getBoundingClientRect(); mv.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(mv, cam); return ray.intersectObjects(hits)[0]; };
   renderer.domElement.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY]; });
+  const doorHit = e => { if (!VD || vault) return false; const r = renderer.domElement.getBoundingClientRect(); mv.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(mv, cam); return ray.intersectObject(VD.hit).length > 0; };
+  function enterVault() {   // камерата към вратата, воланът се завърта и крилото се отваря; после — стаята
+    if (!VD || vault || vaultT) return; VD.setOpen(1); snd.paper && snd.paper(); uiHide(true);
+    tw = { p0: cam.position.clone(), t0: ctl.target.clone(), p1: new THREE.Vector3(-4.0, 1.75, ROOM_BACK + 1.6), t1: new THREE.Vector3(-4.22, 1.7, ROOM_BACK), k: 0 };
+    vaultT = setTimeout(() => { vaultT = 0; if (shut) return; vault = createVault(renderer, { ...o.vault, onBack: leaveVault }); }, 1700);
+  }
+  function uiHide(on) {   // залата — без интерфейса си, докато сме в трезора (и докато камерата лети към вратата); с !important — placeScreen пише visibility всеки кадър
+    if (!document.getElementById('vaultCss')) { const c = document.createElement('style'); c.id = 'vaultCss'; c.textContent = '.in-vault > :not(canvas) { visibility: hidden !important; }'; document.head.appendChild(c); }
+    el.classList.toggle('in-vault', on);
+  }
+
+  function leaveVault() { if (!vault) return; vault.dispose(); vault = null; VD.setOpen(0); uiHide(false); tip.style.display = 'none'; tw = { p0: cam.position.clone(), t0: ctl.target.clone(), p1: OVER.pos.clone(), t1: OVER.tgt.clone(), k: 0 }; }
   renderer.domElement.addEventListener('pointerup', e => {
     if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 6) return; down = null;
+    if (vault) return; if (doorHit(e)) return enterVault();
     const h = hitAt(e); if (!h) { card.classList.remove('on'); sel = null; return; }
     const i = h.object.userData.seat, pi = props.findIndex(p => p.dir === list[i].k);
     if (pi >= 0) board(pi); else showCard(i);
   });
   renderer.domElement.addEventListener('pointermove', e => {
+    if (vault) return; const dh = doorHit(e); if (VD) VD.hover(dh); if (dh) { renderer.domElement.style.cursor = 'pointer'; tip.textContent = '🏦 Трезорът'; tip.style.left = e.clientX + 'px'; tip.style.top = (e.clientY - 12) + 'px'; tip.style.display = 'block'; return; }
     const h = hitAt(e); renderer.domElement.style.cursor = h ? 'pointer' : 'grab';
     if (!h) { tip.style.display = 'none'; return; }
     const s = list[h.object.userData.seat]; tip.textContent = s.director ? `${s.director} · ${s.ico}` : `${s.ico} ${s.company}`;
     tip.style.left = e.clientX + 'px'; tip.style.top = (e.clientY - 12) + 'px'; tip.style.display = 'block';
   });
-  const onResize = () => { renderer.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); };
+  const onResize = () => { renderer.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); if (vault) vault.resize(); };
   addEventListener('resize', onResize);
   // ⌨️ Enter/интервал — Да (или Продължи), N — Не, L — По-късно, ← → — предишното/следващото, Esc — затвори
   const key = e => {
-    if (e.key === 'Escape') return close();
+    if (e.key === 'Escape') return vault ? leaveVault() : close();
     if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '')) return;
     const btn = c => { const b = scr.querySelector(c); if (b && !b.disabled && scr.style.display !== 'none') { b.click(); e.preventDefault(); } };
     if (e.key === 'Enter' || e.key === ' ') btn('.row button.y'); else if (/^[nн]$/i.test(e.key)) btn('.row button.n'); else if (/^[lл]$/i.test(e.key)) btn('.row button.l');
@@ -815,12 +834,13 @@ export function openBoardroom(o) {
     placeScreen(dt); placeBadges(); holo.update(dt); camStep(dt); R.update && R.update(clock.elapsedTime); ctl.update();
     if (cam.position.y > ROOM_H - 0.3) cam.position.y = ROOM_H - 0.3;   // камерата — под тавана
     cam.position.x = Math.max(-ROOM_W + 1.4, Math.min(ROOM_W - 1.4, cam.position.x)); cam.position.z = Math.max(ROOM_BACK + 1.2, Math.min(ROOM_FRONT - 0.8, cam.position.z));   // и в залата — пред завесите, не в стените
-    renderer.render(scene, cam);
+    if (VD) VD.update(dt, o.vault && o.vault.night ? o.vault.night() : 0);
+    if (vault) { vault.update(dt); renderer.render(vault.scene, vault.cam); } else renderer.render(scene, cam);   // в трезора — неговата сцена
   }
   if (renderer.compileAsync) renderer.compileAsync(scene, cam).catch(() => { }).then(() => { if (!shut) loop(); }); else loop();   // стаята — също асинхронно, после рисуваме
 
   function close() {
-    if (shut) return; shut = true; try { o.onClose && o.onClose(); } catch {}
+    if (shut) return; shut = true; clearTimeout(vaultT); if (vault) { vault.dispose(); vault = null; } try { o.onClose && o.onClose(); } catch {}
     window.__overlay3d = Math.max(0, (window.__overlay3d || 1) - 1);
     removeEventListener('keydown', key); removeEventListener('resize', onResize);
     el.classList.remove('on');
@@ -898,6 +918,8 @@ export function demoBoardroom(ov = {}) {
     ['air', '✈️', 'Флайеър', 'Елена Димитрова', 5, 1.6e6], ['hotel', '🏨', 'Хотелс', 'Георги Николов', 5, 7.2e5], ['oil', '🛢️', 'Петролиум', 'Вера Ангелова', 5, 3.4e6], ['bank', '🏦', 'Банк', 'Борис Тодоров', 5, 2.7e6], ['glob', '🌍', 'Глобъл Ризортс & Констръкшън', 'Александър Владимиров', 0, 0], ['mayor', '🏙️', 'Империал Сити', 'Десислава Илиева', 0, 0]];
   return openBoardroom({
     title: 'Титан Груп — демо', brand: { nm: 'Титан', col: '#4fc3f7', ico: '🗿', group: 'Титан Груп' },
+    // 🏦 трезорът (флаг vault): в демото — парите от window.__vaultMoney (Лабораторията: малко / много), разпределението — само локално
+    vault: { money: () => window.__vaultMoney ?? 476.6e9, split: { res: 10, inv: 60 }, monthCost: () => (window.__vaultMoney ?? 476.6e9) * 0.02, night: () => window.__vaultNight ? 1 : 0 },
     proposals: () => DEMO_PROPS.filter(p => !p.done),
     report: () => DEMO_REPORT ? '<div class="card"><div class="meta">🚆 <b>Мария Стоянова: „2 от 3 одобрени проекта са изпълнени. Линията Варна — Бургас чака влакове.“</b></div><div class="meta" style="margin-left:18px">⚠️ <b style="color:#ffb347">забавено</b> · Линия Варна — Бургас · 70% · срок ден 412 <button class="btn2" data-bc="1|extend">📅 Удължи</button> <button class="btn2" data-bc="1|stop">✖ Прекрати</button></div><div class="meta">✈️ <b>Елена Димитрова: „1 от 1 одобрени проекта са изпълнени.“</b></div></div>' : '',
     bindReport: (box, rr) => box.querySelectorAll('[data-bc]').forEach(b => b.onclick = () => { DEMO_REPORT = false; rr(); }),
