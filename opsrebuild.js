@@ -15,7 +15,7 @@ export function openOpsRebuild(ops, o = {}) {
     cars: {
       sapper: [{ model: CARS + 'car-uaz452.glb', len: 4.6, path: [[-220, ROAD_Z], [-46, ROAD_Z], [-46, ROAD_Z - 8]] }],
       power: [{ model: CARS + 'car-hilux.glb', kind: 'utility', len: 5.6, path: [[220, ROAD_Z], [SUB[0] - 10, ROAD_Z], [SUB[0] - 10, SUB[1] - 10]] }],
-      build: [{ model: 'assets/heavy/dump-truck.glb', len: 7, path: [[-220, ROAD_Z + 3], [-20, ROAD_Z + 3]] }, { model: CARS + 'car-truck.glb', len: 7, path: [[220, ROAD_Z + 3], [60, ROAD_Z + 3]], delay: 0.03 }],
+      build: [{ model: 'assets/heavy/gear/dump.glb', len: 7, path: [[-220, ROAD_Z + 3], [-20, ROAD_Z + 3]] }, { model: CARS + 'car-truck.glb', len: 7, path: [[220, ROAD_Z + 3], [60, ROAD_Z + 3]], delay: 0.03 }],
       med: [{ model: CARS + 'amb-eu.glb', kind: 'ambulance', len: 7.2, path: [[-220, ROAD_Z], [HOSP[0] + 10, ROAD_Z], [HOSP[0] + 10, HOSP[1] - 12]] }],
       bridge: [{ model: CARS + 'car-truck.glb', len: 7, path: [[220, ROAD_Z - 3], [BR_X + 10, ROAD_Z - 3], [BR_X + 10, RIVER_Z + 20]] }],
       bus: [{ model: CARS + 'bus-citaro.glb', len: 11.5, path: [[-220, ROAD_Z + 3], [STOP[0], ROAD_Z + 3]] }],

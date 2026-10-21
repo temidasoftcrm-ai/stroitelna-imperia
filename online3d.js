@@ -27,7 +27,6 @@ const LIST = {
   commercial: [...SHOPS, ...SKY],
   commercial2: ['building-skyscraper-d', 'building-skyscraper-e'],
   'heavy/blocks2': ['office3', 'hirise'],
-  city: ['Building_Medium_2_001', 'Building_Large_2'],
 };
 const OWN_LOTS = 30;   // най-близките до офиса парцели са за строежите на фирмата; останалите — съседите
 
@@ -122,7 +121,7 @@ export async function createCity3D(el, { onProgress } = {}) {
     for (const l of own) for (let k = 0; k < 2; k++) { const t = model('tree-small', 5 + r() * 2); t.position.set(l.x + (r() - 0.5) * 12, 0, l.z + (r() - 0.5) * 12); t.userData.ownTree = l; filler.add(t); }
     // централата
     if (hqObj) world.remove(hqObj);
-    hqObj = model('Building_Medium_2_001', 14); centerOn(hqObj, hx, hz); world.add(hqObj);
+    hqObj = model('building-g', 14);   /* централата — истински офис (вместо детския Building_Medium_2_001) */ centerOn(hqObj, hx, hz); world.add(hqObj);
     sign = label(`${brand.ico} ${brand.nm}`, brand.col); hqObj.updateMatrixWorld(true);
     sign.position.set(hx, new THREE.Box3().setFromObject(hqObj).max.y + 4, hz); world.add(sign);
   }

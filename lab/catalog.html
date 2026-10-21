@@ -32,9 +32,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const C = await fetch('catalog.json').then(r => r.json());
 // категории, в които още се рисуват детски/процедурни модели, макар да има истински (проверено в кода)
 const KIDS = [
-  ['Камиони, техника, строежи', 'Строежът на магистралите (autobahn.js:22, game.js:449) още ползва детските булдозери bulldozer-a/b/c, dump-truck и crane-c — а одобрени са истинските dump.glb, mcrane.glb, excavator.glb.'],
-  ['Полицейски коли', 'Police_SUV в инцидентите (incidents.js:79–94) и по магистралата (hwtraffic.js:32) е детската sf-car-Police_SUV — истинските полицейски коли заместват само Police_Sedan (vehmodels.js EMERG).'],
-  ['Офиси и сгради в центъра', 'Пакетът „city“ (Building_Small_1, Building_Medium_2_001, Building_Large_2) още се зарежда (game.js:450) и е централата в онлайн изгледа (online3d.js:125).'],
+  ['Камиони, техника, строежи', 'Детските булдозери bulldozer-a/b/c, dump-truck и crane-c още се зареждат (game.js:449), но аутобаните вече ползват истинските багер, грейдер и трактор-багер (autobahn.js).'],
+  ['Офиси и сгради в центъра', 'Пакетът „city“ (Building_Small_1, Building_Medium_2_001, Building_Large_2) още се зарежда (game.js:450) и е бившата централа в онлайн изгледа (сега — истински офис building-g).'],
   ['Курорти', 'Детските части на хижите (cabin-*, resortview.js:19) и снежните елхи (tree-snow-*, game.js:446) остават като резерва, когато истинските не са заредени.'],
 ];
 const by = {}; for (const it of C.items) (by[it.cat] ||= []).push(it);

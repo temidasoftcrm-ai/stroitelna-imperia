@@ -17,14 +17,14 @@ export const AB_TOLL_MUL = 3;        // тол таксата е 3 пъти по
 export const AB_FULL_BONUS = 0.5;    // +50% тол, когато целият коридор е готов
 export const AB_MAT_DISC = 0.30;     // −30% за материали, докарани по готов аутобан
 // Модели, които трябва да са заредени в A (колите и камионите вече се зареждат от game.js)
-export const AB_MODELS = { vehicles: ['sedan', 'suv', 'taxi', 'van', 'truck', 'truck-flat', 'delivery', 'sedan-sports', 'suv-luxury', 'police'],
-  // истинска техника (assets/heavy от poly.pizza + Majadroid/Kenney); ако липсва — процедурните машини по-долу
-  heavy: ['bulldozer-a', 'bulldozer-b', 'bulldozer-c', 'dump-truck', 'crane-c'] };
+export const AB_MODELS = { vehicles: ['sf-car-Sedan', 'sf-car-SUV', 'sf-car-Taxi', 'sf-car-Van', 'sf-car-Hatchback', 'sf-car-Pickup', 'sf-car-Muscle', 'sf-car-Police_Sedan', 'sedan', 'suv', 'taxi', 'van'],   // истинските коли (vehmodels.js, в метри); детските — само ако истинските липсват
+  // техниката — истинските модели от vehmodels.js (sf-excavator, sf-backhoe, sf-grader, sf-dump, sf-mcrane — зарежда ги game.js); ако липсват — процедурните машини по-долу
+  heavy: [] };
 // [модел, дължина в м, завъртане до „напред = +z“, оцветяване]
 const HEAVY = {
-  dozerA: ['bulldozer-a', 6.5, Math.PI / 2], dozerB: ['bulldozer-b', 6.5, 0], dozerC: ['bulldozer-c', 6.5, -Math.PI / 2, 0xf2b705],
+  dozerA: ['sf-excavator', 8, 0], dozerB: ['sf-grader', 8, 0], dozerC: ['sf-backhoe', 6, 0],   // земните работи: багер, грейдер, трактор-багер (вместо детските булдозери)
   mine: ['sf-dump', 8, 0], dumpR: ['truck-dump-red', 8, 0], dumpG: ['truck-dump-green', 8, 0], mixer: ['truck-concrete-red', 8.2, 0],   // минният — истинският самосвал (vehmodels.js); червеният/зеленият и бетоновозът — истинските от construct.js
-  loader: ['sf-backhoe', 5.5, 0], tower: ['crane-tower', 34, 0],   // багер-товарачът и кулокранът — истинските
+  loader: ['sf-backhoe', 5.5, 0], tower: ['crane-tower', 34, 0], mcrane: ['sf-mcrane', 11, 0],   // багер-товарачът и кулокранът — истинските
 };
 
 const LANES = 6, LW = 3.6, CW = LANES * LW, MED = 4, SH = 2.5;   // платна, ширина на платно, разделител, банкет
@@ -287,11 +287,11 @@ export function buildAutobahnView(A, opts = {}) {
 
   // движение след откриването: 12 ленти, по-бавните камиони вдясно
   const traffic = new THREE.Group(); g.add(traffic);
-  const cars = AB_MODELS.vehicles.filter(n => A[n]), list = [];
+  const real = AB_MODELS.vehicles.filter(n => n.startsWith('sf-') && A[n]), cars = real.length ? real : AB_MODELS.vehicles.filter(n => A[n]), list = [], TRK = A['sf-semi-0'] ? 'sf-semi-0' : A['sf-car-Truck'] ? 'sf-car-Truck' : 'truck';
   for (let k = 0; k < 60 && cars.length; k++) {
     const dir = k % 2 ? 1 : -1, lane = k % LANES, truck = lane >= 4 && k % 3 === 0;
-    const n = truck ? (A['truck'] ? 'truck' : cars[0]) : cars[(k * 7) % cars.length];
-    const o = A[n].scene.clone(true); o.scale.setScalar(truck ? 2.4 : 1.8); o.rotation.y = dir > 0 ? 0 : Math.PI;
+    const n = truck && A[TRK] ? TRK : cars[(k * 7) % cars.length], sf = n.startsWith('sf-');
+    const o = (A[n].variants ? A[n].variants[k % A[n].variants.length] : A[n].scene).clone(true); o.scale.setScalar(sf ? 1 : truck ? 2.4 : 1.8);   // истинските са в метри o.rotation.y = dir > 0 ? 0 : Math.PI;
     // дясно движение: посока +z е в дясното (x > 0) платно; лента 0 е до разделителя
     const x = dir * (MED / 2 + SH / 2 + LW * (lane + 0.5));
     list.push({ o, dir, x, z: z0 + Math.random() * LEN, v: (truck ? 22 : 30) + Math.random() * 14 + (LANES - lane) * 2 });
@@ -303,10 +303,10 @@ export function buildAutobahnView(A, opts = {}) {
   const crowd = [];
   const KIT = [   // [етап, направа, брой, разпръскване по ширина]
     [0, dozer, 7], [0, makeGrader, 4], [0, () => dump(0xd62828), 5], [0, () => heavy('loader') || makeDozer(), 2],
-    [1, makeCrane, 4], [1, mixer, 5], [1, () => dump(0x1f5fbf), 3], [1, dozer, 2],
+    [1, () => heavy('mcrane') || makeCrane(), 4], [1, mixer, 5], [1, () => dump(0x1f5fbf), 3], [1, dozer, 2],
     [2, makeGrader, 5], [2, makeRoller, 6], [2, () => dump(0xffb300), 5],
     [3, makePaver, 2], [3, makeRoller, 7], [3, () => dump(0x2d8f4e), 5], [3, mixer, 1],
-    [4, makeMarker, 5], [4, makeBarrierTruck, 4], [4, makeCrane, 2],
+    [4, makeMarker, 5], [4, makeBarrierTruck, 4], [4, () => heavy('mcrane') || makeCrane(), 2],
   ];
   let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   // всяка машина има своя лента (12 ленти) и свой участък по дължината — не минават една през друга
