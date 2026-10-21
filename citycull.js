@@ -1,0 +1,68 @@
+// citycull.js — ⚡ флаг perf-cliff (f1: „Империал Сити забива — над ~3000 draw calls GPU процесът на Chrome пада от ръба“):
+//   1) детайлите на града (userData.detail: светофари, лампи, дървета, градинки, бензиностанции) — видими само до ~130 м от целта на камерата
+//      (по-далеч при отдалечена камера), с хистерезис, проверка на ~0,5 s;
+//   2) хората (минувачи и групички) — до ~80 м;
+//   3) статичните модели с много части (стълбовете на светофарите — 21 части, сградите, декорът) — сливат се по материал
+//      (mergeGeometries) на порции, за да няма едно дълго спиране. Подвижното (скелети, инстанции, userData.keep) не се пипа.
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+const _v = new THREE.Vector3(), _box = new THREE.Box3(), _inv = new THREE.Matrix4(), _m = new THREE.Matrix4();
+// центърът и радиусът на обекта (веднъж; градът не мърда)
+function sphereOf(o) {
+  let s = o.userData.cull; if (s) return s;
+  _box.setFromObject(o); if (_box.isEmpty()) { s = { x: o.position.x, z: o.position.z, r: 0 }; }
+  else { _box.getCenter(_v); s = { x: _v.x, z: _v.z, r: Math.max(_box.max.x - _box.min.x, _box.max.z - _box.min.z) / 2 }; }
+  return (o.userData.cull = s);
+}
+
+// сливане на частите на един статичен обект по материал (в локалните му координати); връща колко мрежи са махнати
+export function mergeKids(o, minMeshes = 6) {
+  if (o.userData.merged) return 0; o.userData.merged = true;
+  const parts = []; let bad = false;
+  o.traverse(m => { if (m === o) return; if (m.isSkinnedMesh || m.isInstancedMesh || m.isSprite || m.isPoints || m.isLine || m.userData.keep || m.morphTargetInfluences) { if (m.isSkinnedMesh || m.isInstancedMesh) bad = true; return; } if (m.isMesh && m.visible && !Array.isArray(m.material) && m.geometry) parts.push(m); });
+  if (bad || parts.length < minMeshes) return 0;
+  o.updateMatrixWorld(true); _inv.copy(o.matrixWorld).invert();
+  const groups = new Map();
+  for (const m of parts) {
+    const g = m.geometry, at = Object.keys(g.attributes).sort().join(',') + (g.index ? '#i' : '#n'), k = m.material.uuid + '|' + at + '|' + m.castShadow + m.receiveShadow;
+    (groups.get(k) || groups.set(k, []).get(k)).push(m);
+  }
+  let removed = 0;
+  for (const list of groups.values()) {
+    if (list.length < 2) continue;
+    const geos = list.map(m => { _m.multiplyMatrices(_inv, m.matrixWorld); const g = m.geometry.clone(); for (const n of Object.keys(g.morphAttributes || {})) delete g.morphAttributes[n]; g.applyMatrix4(_m); return g; });
+    let mg = null; try { mg = mergeGeometries(geos, false); } catch (e) { mg = null; }
+    for (const g of geos) g.dispose();
+    if (!mg) continue;
+    const mesh = new THREE.Mesh(mg, list[0].material); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow; mesh.userData.mergedOf = list.length;
+    mesh.matrixAutoUpdate = false; o.add(mesh); mesh.updateMatrix();
+    for (const m of list) { m.parent && m.parent.remove(m); removed++; }
+  }
+  return removed - 0;
+}
+
+// deps: { group() → city.group, target() → controls.target, camDist() → разстоянието на камерата, peds() → [обекти], on() → флагът }
+export function createCityCull(deps) {
+  let t = 0, queue = [], qSig = '';
+  return {
+    // всеки кадър (perfTune): на ~0,5 s — видимостта; всеки кадър — по няколко сливания от опашката
+    tick(dt, high) {
+      if (!deps.on()) return;
+      const g = deps.group(); if (!g) return;
+      // опашката за сливане: детайлите и сградите (lot.obj) с много части — новите (донесени по-късно модели) влизат сами
+      if (qSig !== g.uuid + ':' + g.children.length) { qSig = g.uuid + ':' + g.children.length; queue = g.children.filter(o => !o.userData.merged && (o.userData.detail || o.userData.bld)); }
+      let budget = 12; while (budget-- > 0 && queue.length) { const o = queue.shift(); if (o.parent === g) try { mergeKids(o); } catch (e) { o.userData.merged = true; } }
+      t += dt; if (t < 0.5) return; t = 0;
+      if (high) return;   // отдалечено: perfTune така или иначе крие детайлите
+      const tg = deps.target(), cd = deps.camDist(), R = 130 * Math.max(1, cd / 110), Rp = 80 * Math.max(1, cd / 140);
+      for (const o of g.children) {
+        if (!o.userData.detail) continue;
+        const s = sphereOf(o); if (s.r > R * 0.5) { o.visible = true; continue; }   // огромното (напр. площад) — винаги
+        const d = Math.hypot(s.x - tg.x, s.z - tg.z) - s.r;
+        if (o.visible && d > R * 1.06) o.visible = false; else if (!o.visible && d < R * 0.94) o.visible = true;
+      }
+      for (const m of deps.peds()) { if (!m) continue; const d = Math.hypot(m.position.x - tg.x, m.position.z - tg.z); m.visible = d < Rp; }
+    },
+  };
+}
