@@ -128,15 +128,16 @@ async function loadArt(list, brand) {
 }
 // изрязване на картината по пропорциите на платното (a = ширина/височина): по-тясното — откъм логото
 const LOGO_X = { left: [0, 0.47], right: [0.6, 1], center: [0.02, 0.47] };   // къде е блокът с логото в картината (center — марката, нарисувана отгоре вляво)
-function portraitTex(art, a) {   // тясно/вертикално платно: блокът с логото, вписан по ширина, върху тъмен фон
+function portraitTex(art, a, full) {   // тясно/вертикално платно: блокът с логото, вписан по ширина, върху тъмен фон
   const img = art.tex.image, H = 1024, W = Math.round(H * a), c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
-  const [x0, x1] = LOGO_X[art.logo] || LOGO_X.center, sw = (x1 - x0) * img.width, sh = img.height, dh = W * sh / sw;
+  const [x0, x1] = full ? [0, 1] : LOGO_X[art.logo] || LOGO_X.center, sw = (x1 - x0) * img.width, sh = img.height, dh = W * sh / sw;
   const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#0b1a3a'); gr.addColorStop(1, '#14284f'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
   g.drawImage(img, x0 * img.width, 0, sw, sh, 0, (H - dh) / 2, W, dh);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
 }
 function cropTex(art, a) {
-  if (a < 1.2 && art.tex.image && art.tex.image.width) return portraitTex(art, a);
+  if (a < 1.2 && art.tex.image && art.tex.image.width) return portraitTex(art, a, !!art.design);
+  if (art.design && a < art.aspect * 0.8 && art.tex.image) return portraitTex(art, a, true);   // нарисуваният дизайн (името на фирмата) — цял, не изрязан
   const t = art.tex.clone(); t.needsUpdate = true; t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
   if (a >= art.aspect) { const ch = art.aspect / a; t.repeat.set(1, ch); t.offset.set(0, (1 - ch) / 2); }
   else { const cw = a / art.aspect; t.repeat.set(cw, 1); t.offset.set(art.logo === 'left' ? 0 : art.logo === 'right' ? 1 - cw : (1 - cw) / 2, 0); }
@@ -191,7 +192,7 @@ export function buildBillboards(group, o = {}) {
   Promise.all([...new Set(sizes)].map(k => loadKit(k).then(gl => [k, gl]))).then(async L => {
     const kits = Object.fromEntries(L);
     let arts = await loadArt(artList, brand);
-    if (!arts.length || o.designs) arts = [...arts, ...[0, 1, 2].map(i => ({ tex: design(i, { ...brand, years: o.years }), logo: 'left', aspect: 1024 / 342 }))];   // без снимки (или o.designs) — и нарисуваните с марката
+    if (!arts.length || o.designs) arts = [...arts, ...[0, 1, 2].map(i => ({ tex: design(i, { ...brand, years: o.years }), logo: 'left', aspect: 1024 / 342, design: true }))];   // без снимки (или o.designs) — и нарисуваните с марката
     if (!alive) return;
     spots.forEach((s, i) => { const k = sizes[i], b = makeBoard(k, kits[k], arts, i); b.root.position.set(s.x, 0, s.z); b.root.rotation.y = s.ry; g.add(b.root); boards.push(b); });
     api.setNight(night);

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<base href="../">
+<title>Билбордове</title>
+<style>
+  body { margin:0; background:#0d1014; color:#e8e8ea; font:14px/1.45 system-ui,sans-serif; overflow:hidden; }
+  #hud { position:absolute; left:12px; top:12px; background:rgba(20,22,27,.88); padding:10px 14px; border-radius:10px; max-width:600px; }
+  h1 { font-size:17px; margin:0 0 4px; } p { margin:0 0 6px; color:#9aa0aa; font-size:13px; }
+  .row { margin-top:4px; } .row b { display:inline-block; width:70px; color:#9aa0aa; font-weight:500; }
+  button { background:#1d2027; color:#e8e8ea; border:1px solid #333a45; border-radius:8px; padding:5px 10px; font:inherit; cursor:pointer; margin:2px 4px 0 0; }
+  button.on { background:#ffb300; color:#111; border-color:#ffb300; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script></head><body>
+<div id="hud"><h1>🪧 Билбордовете — всеки поотделно</h1>
+<p>Петте модела (Sketchfab, CC BY) в истински размер, човекът до стълба е 1,8 м. Избери размер, картина и ден/нощ; мишката върти и приближава.</p>
+<div class="row" id="sizes"><b>Размер</b></div>
+<div class="row" id="arts"><b>Картина</b></div>
+<div class="row" id="time"><b>Време</b></div>
+<p id="info" style="margin-top:6px"></p></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { buildBillboards } from './billboards3d.js';
+const SIZES = [['small', 'Малък'], ['medium', 'Среден'], ['large', 'Голям'], ['mega', 'Мега'], ['rotating', 'Въртящ се']];
+const IMP = { nm: 'Империал', col: '#d4a72c', ico: '🏛️', k: 'imperial' }, TIT = { nm: 'Титан', col: '#4fc3f7', ico: '🗿' };
+const PANO = { logo: 'center', over: true };
+const ARTS = [
+  ['Империал 1', IMP, [{ url: 'assets/ui/billboards/imperial-1.webp', logo: 'left' }]],
+  ['Империал 2', IMP, [{ url: 'assets/ui/billboards/imperial-2.webp', logo: 'right' }]],
+  ['Империал 3', IMP, [{ url: 'assets/ui/billboards/imperial-3.webp', ...PANO }]],
+  ['Империал 4', IMP, [{ url: 'assets/ui/billboards/imperial-4.webp', ...PANO }]],
+  ['Титан (нарисуван)', TIT, []],
+];
+const R = new THREE.WebGLRenderer({ antialias: true }); R.setSize(innerWidth, innerHeight); R.setPixelRatio(Math.min(2, devicePixelRatio)); R.outputColorSpace = THREE.SRGBColorSpace; R.shadowMap.enabled = true; document.body.appendChild(R.domElement);
+const sc = new THREE.Scene(), hemi = new THREE.HemisphereLight(0xdfe8ff, 0x3a3f33, 1.1), sun = new THREE.DirectionalLight(0xfff4e0, 2.2);
+sun.position.set(30, 50, 40); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -40, right: 40, top: 50, bottom: -10, far: 200 }); sc.add(hemi, sun);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x7d8a6a, roughness: 1 })); ground.receiveShadow = true; sc.add(ground);
+const road = new THREE.Mesh(new THREE.PlaneGeometry(400, 10).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x3b3e44, roughness: 0.95 })); road.position.set(0, 0.01, 14); road.receiveShadow = true; sc.add(road);
+const man = new THREE.Group(), skin = new THREE.MeshStandardMaterial({ color: 0x2f5d8a });
+{ const b = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 1.0, 4, 8), skin); b.position.y = 0.73; const h = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8), new THREE.MeshStandardMaterial({ color: 0xe0b48a })); h.position.y = 1.67; man.add(b, h); man.traverse(m => m.castShadow = true); sc.add(man); }
+const cam = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 1000), ctl = new OrbitControls(cam, R.domElement);
+let size = 'large', art = 0, night = false, bb = null, framed = false;
+function build() {
+  if (bb) { bb.dispose(); sc.remove(holder); } holder.clear(); sc.add(holder);
+  const [, brand, images] = ARTS[art];
+  bb = buildBillboards(holder, { spots: [{ x: 0, z: 0, ry: 0 }], sizes: [size], brand, company: `${brand.nm} Констръкшън`, years: 25, images, designs: !images.length });
+  bb.setNight(night ? 1 : 0); framed = false;
+}
+const holder = new THREE.Group();
+function frame() {
+  const b = new THREE.Box3(); holder.traverse(m => { if (m.isMesh && m.visible) b.expandByObject(m); }); if (b.isEmpty()) return false;
+  const s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3()), d = Math.max(s.x, s.y) * 1.6 + 6;
+  ctl.target.set(c.x - s.x * 0.25, c.y, c.z); cam.position.set(c.x + d * 0.35, c.y * 0.7 + 1.5, c.z + d); man.position.set(b.max.x + 1.2, 0, 1.5);
+  document.getElementById('info').textContent = `${SIZES.find(x => x[0] === size)[1]}: ${s.x.toFixed(1)} × ${s.y.toFixed(1)} м (ширина × височина)`;
+  return true;
+}
+function setTime() {
+  hemi.intensity = night ? 0.12 : 1.1; sun.intensity = night ? 0.05 : 2.2;
+  sc.background = new THREE.Color(night ? 0x0b1020 : 0x9cc3e6); if (bb) bb.setNight(night ? 1 : 0);
+}
+function buttons(id, list, cur, on) {
+  const el = document.getElementById(id);
+  list.forEach((x, i) => { const b = document.createElement('button'); b.textContent = x; b.onclick = () => { el.querySelectorAll('button').forEach(q => q.classList.remove('on')); b.classList.add('on'); on(i); }; if (i === cur) b.classList.add('on'); el.appendChild(b); });
+}
+buttons('sizes', SIZES.map(x => x[1]), 2, i => { size = SIZES[i][0]; build(); });
+buttons('arts', ARTS.map(x => x[0]), 0, i => { art = i; build(); });
+buttons('time', ['☀️ Ден', '🌙 Нощ'], 0, i => { night = !!i; setTime(); });
+setTime(); build();
+addEventListener('resize', () => { R.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); });
+const clock = new THREE.Clock();
+R.setAnimationLoop(() => { const dt = clock.getDelta(); if (!framed) framed = frame(); if (bb && bb.update) bb.update(dt); ctl.update(); R.render(sc, cam); });
+</script>
+</body></html>
