@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Всички превозни средства</title>
+<style>
+  body { margin:0; background:#14161b; color:#e8e8ea; font:14px/1.45 system-ui,sans-serif; overflow:hidden; }
+  #hud { position:absolute; left:12px; top:12px; bottom:12px; overflow:auto; background:rgba(20,22,27,.9); padding:10px 14px; border-radius:10px; width:520px; }
+  h1 { font-size:17px; margin:0 0 4px; } p { margin:0 0 6px; color:#9aa0aa; font-size:13px; }
+  table { border-collapse:collapse; font-size:12px; width:100%; } td, th { padding:2px 5px; border-bottom:1px solid #2a2f38; text-align:left; } td.n { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .ok { color:#5fc27a; } .warn { color:#e8b14a; } .bad { color:#e06a5a; } tr { cursor:pointer; } tr:hover td { background:#1d2027; }
+  .lbl { position:absolute; transform:translate(-50%,-100%); background:rgba(20,22,27,.8); padding:1px 6px; border-radius:5px; font-size:11px; white-space:nowrap; pointer-events:none; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script></head><body>
+<div id="hud"><h1>🚗 Всички превозни средства — истинският размер</h1>
+<p>Всяка кола, бус, спешна кола, камион, автобус и машина от строежите — така, както ги зарежда играта (vehmodels.js, бусовете, раздвижените машини), в редица с човек 1,75 м върху метрова мрежа. Таблицата: размерът в играта срещу истинския (Д × Ш × В, м); зелено — до 8 % разлика по дължина, жълто — до 15 %, червено — повече. Цъкни ред — камерата отива при колата.</p>
+<table id="tab"><tr><th>модел</th><th>в играта</th><th>истински</th><th>Δ дълж.</th></tr></table></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { loadVehModels } from '../vehmodels.js';
+import { loadVans } from '../vanlogo.js';
+import { loadSiteRigs } from '../sitework.js';
+import { VEH_SPEC, siteK, scaleFor } from '../scale.js';
+const R = new THREE.WebGLRenderer({ antialias: true }); R.setSize(innerWidth, innerHeight); R.setPixelRatio(Math.min(2, devicePixelRatio)); R.outputColorSpace = THREE.SRGBColorSpace; document.body.appendChild(R.domElement);
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0xd8e4ee); sc.add(new THREE.HemisphereLight(0xffffff, 0x778899, 1.7)); const sun = new THREE.DirectionalLight(0xffffff, 1.8); sun.position.set(30, 50, 40); sc.add(sun);
+const gnd = new THREE.Mesh(new THREE.PlaneGeometry(600, 60).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xc8c6bc })); gnd.position.x = 250; sc.add(gnd);
+const g1 = new THREE.GridHelper(600, 600, 0xa6a49c, 0xb8b6ae); g1.position.set(250, 0.01, 0); g1.scale.z = 0.1; sc.add(g1);
+const cam = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.5, 2000); const ctl = new OrbitControls(cam, R.domElement);
+const L = new GLTFLoader(), A = {}, load = u => L.loadAsync('../' + u);
+await Promise.all([loadVehModels(load, A, 'assets/heavy/gear/'), loadSiteRigs(load, A)]); await loadVans(load, A);
+// [ключ в A, вариант (null — scene), ключ в VEH_SPEC, мащаб в играта (null — 1: вече в метри)]
+const V = (k, i, s, m = null) => ({ k, i, s, m });
+const LIST = [
+  V('sf-car-Hatchback', null, 'car-p206'), V('sf-car-Sedan', null, 'car-polo'), V('sf-car-Muscle_2', null, 'car-corolla'), V('sf-car-SUV', null, 'car-renegade'), V('sf-car-Muscle', null, 'car-accord'), V('sf-car-Taxi', null, 'car-taxi'), V('sf-car-Pickup', null, 'car-hilux'),
+  ...['pol-charger', 'pol-crownvic', 'pol-interceptor', 'pol-volga', 'pol-nypd'].map((s, i) => V('sf-car-Police_Sedan', i, s)), V('sf-car-Police_SUV', null, 'car-polsuv'),
+  ...['van-sprinter', 'van-ducato', 'van-mb207', 'van-transit'].map(s => V('sf-van-' + s.slice(4), null, s)),
+  ...['amb-gaz', 'amb-us', 'amb-eu'].map((s, i) => V('sf-car-Ambulance', i, s)), V('sf-car-Limousine', null, 'car-limo'), V('sf-car-Truck', null, 'car-truck'),
+  ...['fire-red', 'fire-us', 'fire-man'].map((s, i) => V('sf-car-Firetruck', i, s)), V('sf-car-Bus', null, 'bus-citaro'),
+  V('sf-trk-0', null, 'trk-cab', 4.6), V('sf-semi-0', null, 'trk-semi'),
+  V('sf-roller', null, 'sf-roller', 'site'), V('sf-backhoe', null, 'sf-backhoe', 'site'), V('sf-dump', null, 'sf-dump', 'site'), V('sf-grader', null, 'sf-grader', 'site'), V('sf-excavator-rig', null, 'sf-excavator', 'site'), V('sf-mcrane-rig', null, 'sf-mcrane', 'site'),
+];
+// кутията само на каросерията: без светлините (фарове, конуси, буркани — прозрачни/адитивни, emissive платна) — иначе колата излиза 12 м
+const bodyBox = o => { o.updateMatrixWorld(true); const b = new THREE.Box3(), t = new THREE.Box3(); o.traverse(m => { if (!m.isMesh || !m.visible) return; const mt = [].concat(m.material)[0]; if (!mt || mt.transparent || mt.blending === THREE.AdditiveBlending || m.geometry.type === 'PlaneGeometry') return; t.setFromObject(m); b.union(t); }); return b.isEmpty() ? new THREE.Box3().setFromObject(o) : b; };
+const labels = [], tab = document.getElementById('tab'); let x = 0;
+const ped = await L.loadAsync('../assets/heavy/people/peds/ped-adam.glb').then(g => g.scene).catch(() => null);
+if (ped) { ped.scale.setScalar(scaleFor('ped-adam', ped)); const b = new THREE.Box3().setFromObject(ped); ped.position.set(-2, -b.min.y, 0); sc.add(ped); }
+for (const it of LIST) {
+  const e = A[it.k]; if (!e) continue; const src = it.i != null && e.variants ? e.variants[it.i] : e.scene; if (!src) continue;
+  const o = src.clone(true), w = new THREE.Group(); w.add(o);
+  const k = it.m === 'site' ? siteK(A, it.s === 'sf-excavator' || it.s === 'sf-mcrane' ? it.s : it.k) : it.m || 1; o.scale.multiplyScalar(k);   // trk-0 — както trucks.js (4,6), машините — siteK
+  w.rotation.y = Math.PI / 2; sc.add(w); w.updateMatrixWorld(true);
+  let b = bodyBox(w), s = b.getSize(new THREE.Vector3()); w.position.set(x + s.x / 2 - (b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2); w.updateMatrixWorld(true);
+  const len = s.x, wid = s.z, hgt = s.y, sp = VEH_SPEC[it.s] || [0, 0, 0, it.s], d = sp[0] ? (len - sp[0]) / sp[0] : 0, cls = Math.abs(d) <= 0.08 ? 'ok' : Math.abs(d) <= 0.15 ? 'warn' : 'bad';
+  const cx = x + s.x / 2, row = document.createElement('tr'); row.innerHTML = `<td>${sp[3]}<br><span style="color:#777">${it.s}</span></td><td class="n">${len.toFixed(1)} × ${wid.toFixed(1)} × ${hgt.toFixed(1)}</td><td class="n" style="color:#9aa0aa">${sp[0]} × ${sp[1]} × ${sp[2]}</td><td class="n ${cls}">${d >= 0 ? '+' : ''}${(d * 100).toFixed(0)} %</td>`;
+  row.onclick = () => { ctl.target.set(cx, 1.5, 0); cam.position.set(cx + 4, 6, 16 + len); ctl.update(); }; tab.appendChild(row);
+  const dv = document.createElement('div'); dv.className = 'lbl'; dv.textContent = `${sp[3]} ${len.toFixed(1)} м`; document.body.appendChild(dv); labels.push([dv, new THREE.Vector3(cx, hgt + 0.5, 0)]);
+  x += s.x + 2;
+}
+ctl.target.set(12, 1.5, 0); cam.position.set(12, 8, 34); ctl.update();
+const P = new THREE.Vector3();
+R.setAnimationLoop(() => { ctl.update(); R.render(sc, cam); for (const [d, p] of labels) { P.copy(p).project(cam); d.style.left = (P.x * 0.5 + 0.5) * innerWidth + 'px'; d.style.top = (-P.y * 0.5 + 0.5) * innerHeight + 'px'; d.style.display = Math.abs(P.z) < 1 && P.x > -1.2 && P.x < 1.2 ? '' : 'none'; } });
+addEventListener('resize', () => { R.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); });
+window.__ready = true; window.__rows = () => [...tab.querySelectorAll('tr')].slice(1).map(r => r.innerText.replace(/\s+/g, ' ')).join('\n');
+</script></body></html>

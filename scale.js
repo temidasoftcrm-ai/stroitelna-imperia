@@ -63,3 +63,32 @@ export function siteK(A, name) {
   const b = new THREE.Box3().setFromObject(o), s = b.getSize(new THREE.Vector3()), v = c.by === 'h' ? s.y : Math.max(s.x, s.z);
   return c.m / (v || 1);
 }
+
+// ---- превозните средства: истинските размери [дължина, ширина, височина] м — за проверката в Лабораторията (lab/vehicles.html)
+export const VEH_SPEC = {
+  'car-polo': [4.05, 1.75, 1.46, 'VW Polo'], 'car-p206': [3.84, 1.67, 1.43, 'Peugeot 206'], 'car-renegade': [4.24, 1.81, 1.69, 'Jeep Renegade'], 'car-hilux': [5.33, 1.86, 1.82, 'Toyota Hilux'],
+  'car-taxi': [5.0, 1.85, 1.5, 'такси'], 'car-accord': [4.9, 1.86, 1.45, 'Honda Accord'], 'car-corolla': [4.63, 1.78, 1.44, 'Toyota Corolla'], 'car-crownvic': [5.39, 1.98, 1.47, 'Ford Crown Victoria'],
+  'bus-citaro': [12.0, 2.55, 3.1, 'Mercedes Citaro'], 'car-limo': [7.6, 2.0, 1.5, 'лимузина'], 'car-polsuv': [5.05, 2.0, 1.78, 'полицейски джип'], 'car-truck': [6.5, 2.3, 3.0, 'камион с фургон'],
+  'pol-charger': [5.08, 1.9, 1.48, 'Dodge Charger'], 'pol-crownvic': [5.39, 1.98, 1.47, 'Crown Victoria'], 'pol-interceptor': [5.05, 2.0, 1.78, 'Police Interceptor'], 'pol-volga': [4.8, 1.8, 1.48, 'Волга'], 'pol-nypd': [5.08, 1.9, 1.48, 'Charger NYPD'],
+  'fire-red': [9.0, 2.5, 3.2, 'пожарна (Европа)'], 'fire-us': [10.0, 2.5, 3.0, 'пожарна (САЩ)'], 'fire-man': [10.5, 2.5, 3.4, 'MAN със стълба'],
+  'amb-gaz': [6.2, 2.1, 2.6, 'ГАЗела'], 'amb-us': [7.0, 2.4, 2.9, 'линейка (САЩ)'], 'amb-eu': [6.9, 2.1, 2.9, 'линейка (Европа)'],
+  'van-sprinter': [5.9, 2.0, 2.5, 'Sprinter'], 'van-ducato': [5.4, 2.05, 2.5, 'Ducato'], 'van-mb207': [5.3, 2.0, 2.5, 'Mercedes 207'], 'van-transit': [5.2, 1.97, 2.3, 'Transit'],
+  'trk-semi': [16.5, 2.55, 4.0, 'влекач + полуремарке'], 'trk-cab': [6.0, 2.5, 3.9, 'влекач (кабина)'],
+  'sf-mcrane': [13.5, 3.0, 4.0, 'автокран'], 'sf-excavator': [9.6, 2.9, 3.1, 'багер 20 т'], 'sf-dump': [8.0, 2.5, 3.3, 'самосвал'], 'sf-grader': [8.5, 2.5, 3.3, 'грейдер'], 'sf-backhoe': [5.9, 2.3, 3.6, 'трактор-багер'], 'sf-roller': [4.5, 2.2, 3.0, 'валяк'],
+};
+
+// ---- сградите в играта (real-scale): цялата височина с покрива, м — една еднаква мярка по трите оси; къщите по етажите
+// (1 етаж ≈ 3 м до стряхата + покрив), така че едноетажната е по-ниска от триетажната. Тук са изброени тези, на които етажите се виждат по модела.
+export const REAL_BLD = {
+  'h2-lodge': 3.5, 'h2-brickcabin': 6.0, 'h2-pink': 5.3, 'h2-swedish': 6.5, 'building-type-b': 5.5,   // едноетажни (с таван)
+  'h2-greyporch': 8.5, 'h2-blue': 9.5, 'h2-porch': 8.5, 'building-type-a': 8.0,                           // двуетажни
+  'h2-townhouse': 12.0,                                                                                     // триетажна
+  'building-a': 6.2, 'building-e': 6.0, 'building-f': 7.0, 'building-b': 11.5, 'building-c': 15.0, 'building-d': 16.5,   // магазини/офиси: 2, 2, 2, 4, 5, 5–6 етажа
+};
+// сгради, които в истински размер не се побират на парцел 16 м (дълги редови сгради) — не се избират при real-scale
+export const TOO_LONG = new Set(['building-g', 'building-h']);
+// еднаквият мащаб: височината H (от REAL_BLD или дадена), но не по-широка от maxW (тогава — по ширината; никога разтягане само по една ос)
+export function realScaleK(n, size, maxW, H = null) {
+  const h = H ?? REAL_BLD[n]; if (!h) return null; const len = Math.max(size.x, size.z);
+  return Math.min(h / Math.max(0.01, size.y), maxW / Math.max(0.01, len));
+}
