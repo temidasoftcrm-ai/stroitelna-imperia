@@ -21,7 +21,8 @@ import { createRescue } from './boardrescue.js';
 import { createMinimap } from './minimap.js';
 import { createRivals, LOCAL_FIRMS, FIRMS } from './rivals.js';
 import { perf, createPerfPanel } from './perfpanel.js';
-import { createCityCull } from './citycull.js';   // ⚡ флаг perf-cliff: детайлите и хората по разстояние, сливане на статичните модели   // ⏱️ панел за производителност (флаг perf-panel, F8)
+import { createCityCull } from './citycull.js';
+import { createFires } from './firesim.js';   // 🔥 флаг fire-seq: пожарът като последователност (здравина, гасене, оценка, ремонт/разчистване)   // ⚡ флаг perf-cliff: детайлите и хората по разстояние, сливане на статичните модели   // ⏱️ панел за производителност (флаг perf-panel, F8)
 import { createDevLevel, THRESH as DEV_THRESH, LV as DEV_LV, unlockText, kmXp, XP_BUY } from './devlevel.js';
 import { createCityPanel } from './citypanel.js';
 import { createPlaytime } from './playtime.js';
@@ -1777,6 +1778,13 @@ const traffic = [];
 const incidents = createIncidents({ scene, model, has: n => !!A[n], route: roadRoute, point: () => roadPoint() || { x: tx(3 * ((Math.random() * (NBI + 1)) | 0)), z: tx((Math.random() * NJ) | 0) },
   focus: () => controls.target, cam: () => camera.position, ready: () => S && city.ready && !AUTOTEST,
   building: (x, z) => { let best = null, bd = 70 * 70; for (const l of city.lots || []) if (l.obj && l.built) { const d = (l.obj.position.x - x) ** 2 + (l.obj.position.z - z) ** 2; if (d < bd) { bd = d; best = l.obj; } } if (!best) return null; const b = new THREE.Box3().setFromObject(best); return { x0: b.min.x, x1: b.max.x, z0: b.min.z, z1: b.max.z, h: b.max.y }; } });
+// 🔥 пожарите (fire-seq): игровото време, парцелите, пожарната по улиците, поръчката след пожара
+const fires = createFires({ S: () => S, group: () => city.group, lots: () => city.lots, model, has: n => !!A[n], route: roadRoute, cityId: () => S.cityId,
+  skinned: n => A[n] ? { scene: cloneSkinned(A[n].scene), animations: A[n].animations || [] } : null,
+  startPoint: at => { let best = null, bs = -1; for (let k = 0; k < 30; k++) { const p = roadPoint(); if (!p) continue; const d = Math.hypot(p.x - at.x, p.z - at.z), sc = d < 120 ? d : d > 300 ? 600 - d : 300; if (sc > bs) { bs = sc; best = p; } } return best; },
+  day: () => S.day + S.dayT / DAY_SEC, cam: () => camera.position, econ: () => econ, hasStaff: k => hasStaff(k), crewFree: () => units.some(u => u.type === 'crew' && u.state === 'idle'),
+  modal: (...a) => modal(...a), toast: (...a) => toast(...a), fly: lot => flyTo(lot), save: () => save(),   // обвити — дефинирани по-долу във файла
+  rebuild: lot => { if (lot.obj) city.group.remove(lot.obj); const b = (S.built || []).find(x => x.lot === lot.id); placeBuilding(lot, b ? b.model : lot.built, b ? b.rot || 0 : lot.rot || 0); } });
 function addCar() {
   let i = 3 * ((Math.random() * NBI) | 0), j = (Math.random() * NJ) | 0;
   for (let k = 0; k < 40 && !isRoad(i, j); k++) { i = 3 * ((Math.random() * NBI) | 0); j = (Math.random() * NJ) | 0; }   // не по улица под площад/парк (Белия дом, поръчките) — иначе стои на тревата
@@ -2528,6 +2536,7 @@ function setupWorld() {
   parkGroups.length = 0;
   for (const id of S.parks || []) { const l = city.lots[id]; if (!l) continue; for (const t of l.trees || []) city.group.remove(t); l.trees = []; if (l.obj) city.group.remove(l.obj); placePark(l); l.busy = 'park'; }
   refreshEstateSigns();
+  if (feature('fire-seq')) fires.sync();   // пожарите на този град: обезопасените пазят парцела, чакащата поръчка — пак
   tirs.clear();
   // стоката, която беше на път при записа, пак тръгва: към строежа, ако той още е тук, иначе към склада
   econ.s.transit.forEach((o, k) => (o.lot != null && o.city === S.cityId && projects.some(p => p.lot === o.lot) ? sendSiteTir : sendTir)(o, k * 1.5));
@@ -9605,6 +9614,7 @@ function frame() {
     updateSea(dt / DAY_SEC);
     updateStationBuild(dt / DAY_SEC);
     updateParked();
+    if (feature('fire-seq')) fires.update(dt / DAY_SEC);   // игрово време: на пауза (dt = 0) всичко спира
     updateTrains(dt / DAY_SEC);
     hwTrucks.update(dt / DAY_SEC);
     updateHighways(dt / DAY_SEC);
@@ -9635,7 +9645,7 @@ function frame() {
     for (const g of parkGroups) { const j = g.userData.jet; j.scale.y = 0.85 + Math.sin(simT * 6 + g.id) * 0.15; j.rotation.y += rdt; }
     if (city.hqGroup?.userData.star) city.hqGroup.userData.star.rotation.y += rdt * 1.5;
     S.dayT += dt;
-    if (S.dayT >= DAY_SEC) { S.dayT -= DAY_SEC; const pt0 = perf.now(); endOfDay(); autoFillTick(true); perf.add('day', pt0); }
+    if (S.dayT >= DAY_SEC) { S.dayT -= DAY_SEC; const pt0 = perf.now(); endOfDay(); if (feature('fire-seq')) fires.dailyTick(); autoFillTick(true); perf.add('day', pt0); }
     autoT -= dt; if (autoT <= 0) { autoT = 3; autoFillTick(false); }
     if (dt > 0 && Math.random() < dt * 2) { hwDispatch(); dispatch(); }   // магистралата първа — иначе освободената бригада винаги отива на обект в града
     panelT -= rdt;
@@ -9737,6 +9747,8 @@ if (AUTOTEST) {
   // достъп за headless тестовете
   window.__dbg = {
     state: () => S,
+    fireTest(sev = 1, travel) { const tg = controls.target; const L = city.lots.filter(l => l.obj && l.built && !l.busy).sort((a, b) => Math.hypot(a.x - tg.x, a.z - tg.z) - Math.hypot(b.x - tg.x, b.z - tg.z))[0]; if (!L) return null; const f = fires.start(L.id, { sev, travel }); flyTo(L); return f && f.id; },   // 🔥 fire-seq: пожар в най-близката сграда
+    fires: () => fires.state(),
     muni: () => muni,   // 🏛️ поръчките на общината (тест)
     ownTest() { econ.earn(1e9, 'друго', 'тест'); const ls = city.lots.filter(l => !l.built && !l.busy && l !== city.hq).slice(0, 8); for (const l of ls) buyLand(l.id); $('modal')?.classList.add('hidden'); return { own: ownCount(), land: est().land.length }; },
     fleetCapTest() { econ.earn(5e10, 'друго', 'тест'); S.dev.lv = 12; S.dev.xp = 6e5; S.airports = {}; S.ports = {}; for (const id of ['sofia', 'varna', 'burgas', 'plovdiv', 'istanbul', 'athens', 'rome', 'paris', 'london', 'berlin']) { S.airports[id] = { lv: 7, build: null }; S.ports[id] = { lv: 5, build: null, xb: 4 }; } S.planes = S.planes || []; const p0 = S.planes.length; for (let i = 0; i < 90; i++) buyPlane('prop'); const s0 = (S.ships || []).length; for (let i = 0; i < 90; i++) { try { buyShip('boat'); } catch (e) { break; } } $('modal')?.classList.add('hidden'); return { gates: airGates(), planeCap: fleetCap.plane(), planes: S.planes.length - p0, berths: portBerths(), shipCap: fleetCap.ship(), ships: (S.ships || []).length - s0 }; },

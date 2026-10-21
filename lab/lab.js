@@ -103,6 +103,9 @@ const DEMOS = [
   ['🏦 Трезорът зад борда (476 млрд. €)', 'sofia', () => $('fr').contentWindow.eval("window.__vaultMoney = 476.6e9; import('/directors3d.js').then(m => m.demoBoardroom())")],   // vault3d.js — вратата вляво зад масата
   ['🏦 Трезорът: малко пари (40 млн. €)', 'sofia', () => $('fr').contentWindow.eval("window.__vaultMoney = 4e7; import('/directors3d.js').then(m => m.demoBoardroom())")],
   ['🏦 Трезорът: пълен (620 млрд. €), нощ', 'sofia', () => $('fr').contentWindow.eval("window.__vaultMoney = 6.2e11; window.__vaultNight = 1; import('/directors3d.js').then(m => m.demoBoardroom())")],
+  ['🔥 Пожар: спасена (над 30%)', 'sofia', () => $('fr').contentWindow.__dbg.fireTest(0.4)],   // firesim.js (fire-seq)
+  ['🔥 Пожар: критични щети (под 30%) → спешен ремонт', 'sofia', () => $('fr').contentWindow.__dbg.fireTest(1.4)],
+  ['🔥 Пожар: изгоряла (0%) → разчистване и нов строеж', 'sofia', () => $('fr').contentWindow.__dbg.fireTest(2.2)],
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
