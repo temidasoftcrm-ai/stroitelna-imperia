@@ -140,6 +140,9 @@ const DEMOS = [
   ['🛣️ Магистралата: изходи към града, бензиностанцията, изпреварване (hw-ramps)', 'plovdiv', () => $('fr').contentWindow.eval("__dbg.hwOpen(); setTimeout(() => __dbg.hwLookRamps(), 600)")],
   ['🏷️ 3D емблемите на марките — всички в редица', 'sofia', d => { for (const ms of [0, 4000]) setTimeout(() => d.logoRow(1, 'titan', true), ms); }],   // brand-logo3d (game.js logo3d)
   ['🏷️ 3D емблемата над офиса (Империал, ниво 5)', 'sofia', d => { for (const ms of [0, 4000]) setTimeout(() => d.logoRow(5, 'imperial'), ms); }],
+  ['🏢 Общ парцел на фирмата — ниво 1', 'plovdiv', d => d.campus2Look(1)],   // campus2
+  ['🏢 Общ парцел на фирмата — ниво 5', 'plovdiv', d => d.campus2Look(5)],   // campus2
+  ['🏢 Общ парцел на фирмата — ниво 10', 'plovdiv', d => d.campus2Look(10)],   // campus2
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

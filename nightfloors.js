@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';
 
-const MODE = { ...Object.fromEntries([3, 4, 5, 6, 7, 8, 9, 10].map(l => [`office2-l${l}`, 'dark'])),   // 🆕 новите нива на офиса (game.js OFFICE2): прозорците — по-тъмни от фасадата
+const MODE = { ...Object.fromEntries([3, 4, 5, 6, 7, 8, 9, 10].map(l => [`office2-l${l}`, l === 10 ? 'cool' : 'dark'])),   /* 10 — синкавото стъкло на кулата */   // 🆕 новите нива на офиса (game.js OFFICE2): прозорците — по-тъмни от фасадата
   'building-a': 'dark', 'building-b': 'cool', 'building-c': 'dark', 'building-d': 'dark', 'building-e': 'cool', 'building-f': 'cool',
   'building-g': 'dark', 'building-h': 'dark', 'building-skyscraper-a': 'dark', 'building-skyscraper-b': 'cool', 'building-skyscraper-c': 'cool',
   // Kenney Commercial 2 (обща палитра colormap): стъклата са синкавите петна; високите варианти (@20…) делят материала
