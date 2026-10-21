@@ -35,7 +35,7 @@ import { createResorts, RESORTS, seasonOf, monthName } from './resorts.js';
 import { buildResortView, RESORT_MODELS } from './resortview.js';
 import { createDemolition } from './demolish.js';
 import { createDemolition2, machineWork, craneLift, loadSiteRigs, rigPlay } from './sitework.js';
-import { siteK } from './scale.js';   // 🏗️ флаг site-anim: истински кран при събаряне, машините работят, кранът вдига
+import { siteK, realScaleK, REAL_BLD, TOO_LONG } from './scale.js';   // 🏗️ флаг site-anim: истински кран при събаряне, машините работят, кранът вдига
 import { createEvents } from './events.js';
 import { createWeather, rollWeather } from './weather.js';
 import { bidHtml, resolveBid } from './bidding.js';
@@ -846,7 +846,9 @@ function realH(n) {
   if (SKY.includes(base) || MODERN_SKY.includes(base)) return Math.min(90, Math.max(30, (+fl || 15) * 2.8));
   return SKY_H[n] || H10[n] || 16;   // магазини, офиси, блокове на ~5 етажа
 }
+const shopPool = () => feature('real-scale') ? SHOPS.filter(n => !TOO_LONG.has(n)) : SHOPS;   // real-scale (55): без редовите сгради, които в истински размер не се побират на парцела
 function realHeight(o, n, maxW) {
+  if (feature('real-scale')) { const k = realScaleK(n, sizeOf(n).getSize(new THREE.Vector3()), maxW, REAL_BLD[n] ?? realH(n)); if (k) { o.scale.setScalar(k); return true; } }   /* real-scale (55): еднакъв мащаб по трите оси — къщите по етажите (scale.js), не по-широка от парцела */
   if (!feature('real-heights')) return false;
   if (n.startsWith('ind-')) return false;   // истинските заводи (industry.js) — със своите пропорции, не до 16 м
   const sz = sizeOf(n).getSize(new THREE.Vector3()), fy = realH(n) / Math.max(0.01, sz.y), w = Math.max(sz.x, sz.z), fx = Math.min(fy, maxW / Math.max(0.01, w));
@@ -1072,9 +1074,10 @@ function buildCity(cityId) {
     const chance = lot.mega ? (lot.zone === 'center' ? 0.92 : lot.zone === 'mid' ? 0.82 : 0.7) : lot.zone === 'center' ? 0.75 : lot.zone === 'mid' ? 0.6 : 0.5;
     if (r() > chance) continue;
     let n;
-    if (lot.zone === 'center') n = r() < 0.6 && !isAfrica(cityId) ? SKY[(r() * SKY.length) | 0] : SHOPS[(r() * SHOPS.length) | 0];   // в Африка — без небостъргачи
-    else if (lot.zone === 'mid') n = r() < 0.7 ? SHOPS[(r() * SHOPS.length) | 0] : HOUSES[(r() * HOUSES.length) | 0];
-    else n = lot.mega && r() < 0.5 ? SHOPS[(r() * SHOPS.length) | 0] : HOUSES[(r() * HOUSES.length) | 0];   // и в покрайнините на мегаполиса има блокове
+    const SP = shopPool();   /* real-scale (55): без дългите редови сгради */
+    if (lot.zone === 'center') n = r() < 0.6 && !isAfrica(cityId) ? SKY[(r() * SKY.length) | 0] : SP[(r() * SP.length) | 0];   // в Африка — без небостъргачи
+    else if (lot.zone === 'mid') n = r() < 0.7 ? SP[(r() * SP.length) | 0] : HOUSES[(r() * HOUSES.length) | 0];
+    else n = lot.mega && r() < 0.5 ? SP[(r() * SP.length) | 0] : HOUSES[(r() * HOUSES.length) | 0];   // и в покрайнините на мегаполиса има блокове
     const rot = Math.floor(r() * 4) * Math.PI / 2;
     // в градовете с доставчици ~1/4 от къщите в покрайнините са заводи (решава се по хеш, без нови r() — градовете не се разместват)
     n = tierModel(cityId, lot, n);
@@ -2083,7 +2086,7 @@ const scaffoldMat = new THREE.LineBasicMaterial({ color: 0xd9a53a });
 
 function buildingFor(type, floors = 20) {
   if (type === 'house') return pick(HOUSE_POOL);
-  if (type === 'shop') return feature('real-shops') ? pick(SHOPS) : 'Building_Small_1';   /* real-shops (55): истинските магазини building-a…h */
+  if (type === 'shop') return feature('real-shops') ? pick(shopPool()) : 'Building_Small_1';   /* real-shops (55): истинските магазини building-a…h */
   if (type === 'office') return SF_BLK().length && Math.random() < 0.5 ? pick(SF_BLK()) : feature('real-shops') ? pick(['building-e', 'building-c', 'building-f']) : 'Building_Medium_2_001';
   if (floors >= 15 && SF_SKY().length && Math.random() < 0.4) return pick(SF_SKY());   // разнообразие: истински небостъргачи
   if (floors > 20 || (cityTier(S.cityId) === 'xl' && A['building-skyscraper-d@20'])) return `${pick(MODERN_SKY)}@${Math.max(20, floors)}`;
@@ -2200,7 +2203,7 @@ function makeSite(p) {
   const isQ = p.model.startsWith('Building_');
   const s = isQ ? fitScale(p.model, 14) : HOUSES.includes(p.model) ? fitScale(p.model, houseFit(p.model)) : fitScale(p.model, SHOPS.includes(p.model) ? SHOP_FIT : 12.5);
   const b = model(p.model, s);
-  { const sl = city.lots[p.lot], k = lotK(sl); if (realHeight(b, p.model, (sl.plan ? Math.min(sl.w, sl.d) - 1.5 : 15 * k) / k)) b.scale.y /= k; }   // площадката е мащабирана с lotK — височината в метри
+  { const sl = city.lots[p.lot], k = lotK(sl); if (realHeight(b, p.model, (sl.plan ? Math.min(sl.w, sl.d) - 1.5 : 15 * k) / k)) { if (feature('real-scale')) b.scale.multiplyScalar(1 / k); else b.scale.y /= k; } }   /* real-scale: и трите оси (групата на обекта е ×k еднакво) */   // площадката е мащабирана с lotK — височината в метри
   if (!feature('real-heights')) { blkHeight(b, p.model, s); if (SHOPS.includes(p.model)) b.scale.y *= shopTall(p.model); }
   if (HOUSES.includes(p.model) && houseFit(p.model) === 11) tintRoof(b, p.lot);
   const bb = new THREE.Box3().setFromObject(b);
@@ -3958,7 +3961,7 @@ const bank = createBank({ S: () => S, econ: () => econ, fmt, toast, save, sound:
 // 🏙️ градът от нулата (neom.js): „<марка> Сити“ на Червено море
 const neomName = () => { const c = cityById(NEOM_ID); if (c) c.nm = `${brandOf(S)?.nm || 'Титан'} Сити`; };
 const neom = createNeom({ S: () => S, econ: () => econ, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), brand: () => brandOf(S)?.nm || 'Титан', holding: () => !!S.holding,
-  pickModel: (k, r) => { if (S.imp?.cc) return impPick(S.imp.cc, k, r, n => !!A[n.split('@')[0]]); const L = k === 'sky' ? SKY : k === 'shop' ? SHOPS : HOUSE_POOL; return L[Math.floor(r() * L.length)]; },
+  pickModel: (k, r) => { if (S.imp?.cc) return impPick(S.imp.cc, k, r, n => !!A[n.split('@')[0]]); const L = k === 'sky' ? SKY : k === 'shop' ? shopPool() : HOUSE_POOL; return L[Math.floor(r() * L.length)]; },
   occ: () => imperial.occ(), needCountry: () => !S.imp?.cc, chooseCountry: then => imperial.choose(then), where: () => { const C = IMP_CC[S.imp?.cc]; return C ? `${C.cc} ${C.nm}` : ''; },
   cityBuilt: () => { const c = S.cityId === NEOM_ID ? S : S.cities?.[NEOM_ID] || {}; return [...(c.built || []).map(b => b.lot), c.garageLot, c.whLot, ...(S.cityId === NEOM_ID && city.lots ? city.lots.filter(l => l.busy || l.built).map(l => l.id) : [])].filter(x => x != null); },
   place: (id, m, rot) => { if (S.cityId === NEOM_ID && city.lots?.[id]) { placeBuilding(city.lots[id], m, rot); S.built.push({ lot: id, model: m, rot }); if (neom.lineDone()) neomDecor(); } else { const c = S.cities[NEOM_ID] = S.cities[NEOM_ID] || newCityState(); c.built = [...(c.built || []), { lot: id, model: m, rot }]; } },

@@ -9,6 +9,8 @@ import { NF_MATS } from './nightfloors.js';
 import { Sound } from './sound.js';
 import { loadVans } from './vanlogo.js';   // бусовете (вместо УАЗ): sf-car-Van — 4 варианта; бригадата — с логото   // сирените на спешните коли (Лабораторията → sirens)   // нощем daynight.js вдига emissiveIntensity — фаровете на ТИР-овете
 
+// истинският мащаб (Лабораторията → real-scale): дължините на колите по истинските им размери (lab/vehicles.html), влекачът с ремаркето — 16,5 м
+const RS = feature('real-scale'), HITCH = RS ? 3.1 : 1.2;   // м — колко се застъпват влекачът и полуремаркето
 const CAR_LEN = 4.5;   // дължината на седана в света на играта (другите коли са в същия мащаб); 1 единица ≈ 1 м (хората са ~1,9), всички коли — в истинските си метри
 const GEAR = {
   roller: { f: 'roller', yaw: 0 }, backhoe: { f: 'backhoe', yaw: 0 }, dump: { f: 'dump', yaw: 0 },
@@ -52,8 +54,8 @@ export function loadVehModels(load, A, base = 'assets/heavy/gear/') {
 // реалистичните коли (Sketchfab, CC-BY; assets/heavy/cars, нормализирани: дължина 1 по z, предницата към +z, текстури 512 px).
 // Заместват част от „Free Low Poly Vehicles Pack“ под същите имена; дължината — истинската в метри × мащаба на града.
 const REAL_CARS = {   // име: [файл, дължина в м]
-  Sedan: ['car-polo', 4.4], Hatchback: ['car-p206', 3.8], SUV: ['car-renegade', 4.25], Pickup: ['car-hilux', 5.3], Taxi: ['car-taxi', 4.9],
-Muscle: ['car-accord', 4.7], Muscle_2: ['car-corolla', 4.2], Police_Sedan: ['car-crownvic', 5.4], Bus: ['bus-citaro', 12], Limousine: ['car-limo', 7.6], Police_SUV: ['car-polsuv', 4.9], Truck: ['car-truck', 6.5],
+  Sedan: ['car-polo', RS ? 4.05 : 4.4], Hatchback: ['car-p206', 3.8], SUV: ['car-renegade', 4.25], Pickup: ['car-hilux', 5.3], Taxi: ['car-taxi', 4.9],
+Muscle: ['car-accord', RS ? 4.9 : 4.7], Muscle_2: ['car-corolla', RS ? 4.63 : 4.2], Police_Sedan: ['car-crownvic', 5.4], Bus: ['bus-citaro', 12], Limousine: ['car-limo', 7.6], Police_SUV: ['car-polsuv', RS ? 6.0 : 4.9], Truck: ['car-truck', 6.5],
 };
 const M_PER = CAR_LEN / 4.5;   // седанът от пакета (≈4,5 м) е CAR_LEN в света на играта
 function loadRealCars(load, A) {
@@ -71,7 +73,7 @@ const EMERG_K = { Police_Sedan: 1, Ambulance: 1, Firetruck: 1 };   // всичк
 const EMERG = {
   Police_Sedan: [['pol-charger', 5.1], ['pol-crownvic', 5.4], ['pol-interceptor', 5.3], ['pol-volga', 4.8], ['pol-nypd', 5.1]],
   Firetruck: [['fire-red', 9], ['fire-us', 10], ['fire-man', 10.5]],
-  Ambulance: [['amb-gaz', 7], ['amb-us', 7.5], ['amb-eu', 7.2]],
+  Ambulance: [['amb-gaz', RS ? 6.2 : 7], ['amb-us', 7.5], ['amb-eu', 7.2]],
 };
 // почиства модел на кола: маха плоските мешове (сянка/земя под колата — от тях amb-eu беше квадрат 5,8×5,8 и наполовина висок);
 // връща завъртането, ако колата лежи по x (дължината трябва да е по z)
@@ -144,12 +146,12 @@ function loadRealTrucks(load, A) {
     A['sf-trk-' + i] = { scene: wrap(g.scene, 0, null) };
     // полуремарке за магистралата: влекач 6 м + ремарке 13,6 м
     const semi = new THREE.Group(), cab = wrap(g.scene.clone(true), 0, null), cabL = 6 * M_PER, trL = 13.6 * M_PER, W = 2.5 * M_PER;
-    cab.scale.setScalar(cabL); cab.position.z = trL / 2 + cabL / 2 - 1.2 * M_PER; semi.add(cab);
+    cab.scale.setScalar(cabL); cab.position.z = trL / 2 + cabL / 2 - HITCH * M_PER; semi.add(cab);
     const box = new THREE.Mesh(new THREE.BoxGeometry(W, 2.9 * M_PER, trL), new THREE.MeshStandardMaterial({ color: 0xeeeeea, roughness: 0.6 })); box.position.y = 2.65 * M_PER; box.castShadow = false; semi.add(box);
     const stripe = new THREE.Mesh(new THREE.BoxGeometry(W + 0.02, 0.5 * M_PER, trL * 0.9), new THREE.MeshStandardMaterial({ color: SEMI_COL[i], roughness: 0.5 })); stripe.position.y = 2.2 * M_PER; semi.add(stripe);
     for (const z of [-trL / 2 + 1.2 * M_PER, -trL / 2 + 2.5 * M_PER]) for (const x of [-1, 1]) { const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.5 * M_PER, 0.5 * M_PER, 0.35 * M_PER, 12).rotateZ(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x15171a })); wh.position.set(x * W * 0.42, 0.5 * M_PER, z); semi.add(wh); }
     addTruckLamps(semi, 0, W, 0.9 * M_PER, -trL / 2);
-    for (const c of semi.children) if (c.geometry?.type === 'PlaneGeometry' && c.position.z > 0) c.position.z = trL / 2 + cabL - 1.2 * M_PER + 0.05;   // фаровете — на челото на влекача
+    for (const c of semi.children) if (c.geometry?.type === 'PlaneGeometry' && c.position.z > 0) c.position.z = trL / 2 + cabL - HITCH * M_PER + 0.05;   // фаровете — на челото на влекача
     A['sf-semi-' + i] = { scene: semi };
   }).catch(e => console.warn('real truck', f, e))));
 }
