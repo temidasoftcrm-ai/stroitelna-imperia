@@ -1998,8 +1998,16 @@ const traffic = [];
 const incidents = createIncidents({ scene, model, has: n => !!A[n], route: roadRoute, point: () => roadPoint() || { x: tx(3 * ((Math.random() * (NBI + 1)) | 0)), z: tx((Math.random() * NJ) | 0) },
   focus: () => controls.target, cam: () => camera.position, ready: () => S && city.ready && !AUTOTEST,
   building: (x, z, r = 70) => { let best = null, bd = r * r; for (const l of city.lots || []) if (l.obj && l.built) { const d = (l.obj.position.x - x) ** 2 + (l.obj.position.z - z) ** 2; if (d < bd) { bd = d; best = l.obj; } } if (!best) return null; const b = new THREE.Box3(); best.updateMatrixWorld(true); best.traverse(m => { if (m.isMesh && !m.isSprite && !m.material?.transparent) b.expandByObject(m); }); if (b.isEmpty()) b.setFromObject(best); return { x0: b.min.x, x1: b.max.x, z0: b.min.z, z1: b.max.z, h: b.max.y }; },   /* incidents2 (55): само сградата — без табелите и прозрачните (пламъците бяха в двора) */
-  roadAt: (x, z) => roadAtPt(x, z) });
+  roadAt: (x, z) => roadAtPt(x, z), spotOk: (x, z, ring, node) => spotOkAt(x, z, ring, node) });
 // incidents2 (55): посоката и ширината на улицата в точката — за кордона, зяпачите по тротоарите и затварянето на платната
+// incidents2 (55): мястото не е в кръгово движение (пръстенът + ring м) и не е до кръстовище (node м от възел с ≥ 3 рамена)
+function spotOkAt(x, z, ring = 8, node = 15) {
+  const P = city.plan; if (!P) return true;
+  const p2 = P.p2, [ox, oz] = P.offset || [0, 0];
+  if (p2) for (const r of p2.rounds || []) if (Math.hypot(x - r.x - ox, z - r.z - oz) < (r.outer || r.r || 12) + ring) return false;
+  for (const n of P.nodes || []) if ((n.deg || 0) >= 3 && Math.hypot(x - n.x, z - n.z) < node) return false;
+  return true;
+}
 function roadAtPt(x, z) {
   const P = city.plan; let best = null, bd = 1e18;
   if (P && P.streets) P.streets.forEach((st, si) => { const p = st.pts; for (let k = 1; k < p.length; k++) { const ax = p[k - 1][0], az = p[k - 1][1], dx = p[k][0] - ax, dz = p[k][1] - az, L2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2)), d = (x - ax - dx * t) ** 2 + (z - az - dz * t) ** 2; if (d < bd) { bd = d; const l = Math.sqrt(L2); best = { dx: dx / l, dz: dz / l, w: st.w || 8, walk: P.p2?.roads?.[si]?.walk ?? 2.5, median: P.p2?.roads?.[si]?.median || 0 }; } } });

@@ -31,7 +31,7 @@ export function createIncidents(ctx) {
   // мястото — по улица, близо до това, което гледаш (за да се види); отделно — откъде тръгва всяка кола (120–300 м по-далеч)
   function pickSpot() {
     const f = ctx.focus(); let best = null, bd = 1e18;
-    for (let k = 0; k < 40; k++) { const p = ctx.point(); if (!p) continue; const d = Math.hypot(p.x - f.x, p.z - f.z); if (d < bd) { bd = d; best = p; } }
+    for (let k = 0; k < 80; k++) { const p = ctx.point(); if (!p || (ctx.spotOk && !ctx.spotOk(p.x, p.z))) continue; const d = Math.hypot(p.x - f.x, p.z - f.z); if (d < bd) { bd = d; best = p; } }   // не в кръгово движение и не до кръстовище
     return best;
   }
   function pickStart(at) {
@@ -45,6 +45,8 @@ export function createIncidents(ctx) {
     if (!path.length) return null;
     if (back > 0) {   // спира back м преди мястото, по пътя си (не кара до самото място и после назад — през останките)
       let rem = back; while (path.length > 1) { const a = path[path.length - 2], b = path[path.length - 1], l = Math.hypot(b.x - a.x, b.z - a.z); if (l > rem) { const t = rem / l; path[path.length - 1] = { x: b.x + (a.x - b.x) * t, z: b.z + (a.z - b.z) * t }; break; } rem -= l; path.pop(); }
+      // не спира в кръгово движение или на кръстовище (там е островът/паметникът): още назад по пътя, до 40 м
+      for (let k = 0; k < 40 && path.length > 1 && ctx.spotOk && !ctx.spotOk(path[path.length - 1].x, path[path.length - 1].z, 3, 9); k++) { const a = path[path.length - 2], b = path[path.length - 1], l = Math.hypot(b.x - a.x, b.z - a.z); if (l <= 1) path.pop(); else path[path.length - 1] = { x: b.x + (a.x - b.x) / l, z: b.z + (a.z - b.z) / l }; }
       path[path.length - 1].last = true; return path;
     }
     const e = path[path.length - 1], pv = path[path.length - 2] || { x: x0, z: z0 }, dx = e.x - pv.x, dz = e.z - pv.z, l = Math.hypot(dx, dz) || 1;
@@ -195,7 +197,7 @@ export function createIncidents(ctx) {
     let at = pickSpot(); if (!at) return null;
     if (type === 'bfire' && ctx.building) {   // пожар в сграда: първо сградата (близо до камерата), после улицата до нея
       const f = ctx.focus(), b = ctx.building(f.x, f.z, 400);   // най-близката сграда до 400 м (иначе огънят е на улицата)
-      if (b) { const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2; let bd = 1e18; for (let k = 0; k < 60; k++) { const p = ctx.point(); if (!p) continue; const d = Math.hypot(p.x - cx, p.z - cz); if (d < bd) { bd = d; at = p; } } }
+      if (b) { const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2; let bd = 1e18; for (let k = 0; k < 90; k++) { const p = ctx.point(); if (!p || (ctx.spotOk && !ctx.spotOk(p.x, p.z))) continue; const d = Math.hypot(p.x - cx, p.z - cz); if (d < bd) { bd = d; at = p; } } }
     }
     if (T.heavy) lastHeavy = performance.now() / 1000;
     const T2 = I2() && TYPES2[type], R = T2 && roadFrame(at);   // incidents2: в рамката на улицата
