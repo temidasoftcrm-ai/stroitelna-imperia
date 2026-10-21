@@ -263,3 +263,9 @@ Incidents (incidents.js, Lab flag incidents2) in assets/heavy/inc/ — from Sket
 
 Rails in assets/heavy/rail/ — Sketchfab, CC BY 4.0.
 - track.glb, track-tile.glb — railway track by hifrak958 — https://sketchfab.com/3d-models/72f4906d6f484cf693a342478f2ae102 (track-tile: one 4 m piece cut in Blender)
+
+Replacements (Lab: "Изтрий и намери нов подобен модел") — Sketchfab, CC BY 4.0, reduced in Blender:
+- gear/backhoe2.glb — "JCB Backhoe Loader 3CX Tractor" by chimeracreations (Kyle Burton) — https://sketchfab.com/3d-models/5b2d02e1c1c14deba0f9c8d75fff54b6 (replaces gear/backhoe.glb)
+- trucks/scania-r.glb — "[XYZ] KR Scania R_Draft" by radzig541 — https://sketchfab.com/3d-models/c46e8ee246aa4863a2cf602cddf1bfeb (replaces trucks/scania.glb)
+- civic2/police-l1b.glb — "Paris Police Station" by aitortilla01 — https://sketchfab.com/3d-models/6314692176a44290b1ba432f9ea4840f (replaces civic2/police-l1.glb)
+- civic2/fire-l1b.glb — "Fire Station No. 1" by commonspence — https://sketchfab.com/3d-models/87edf04deb28434993274d9f05070865 (replaces civic2/fire-l1.glb)

@@ -13,7 +13,7 @@ import { loadVans } from './vanlogo.js';   // бусовете (вместо У�
 const RS = feature('real-scale'), HITCH = RS ? 3.1 : 1.2;   // м — колко се застъпват влекачът и полуремаркето
 const CAR_LEN = 4.5;   // дължината на седана в света на играта (другите коли са в същия мащаб); 1 единица ≈ 1 м (хората са ~1,9), всички коли — в истинските си метри
 const GEAR = {
-  roller: { f: 'roller', yaw: 0 }, backhoe: { f: 'backhoe', yaw: 0 }, dump: { f: 'dump', yaw: 0 },
+  roller: { f: 'roller', yaw: 0 }, backhoe: { f: 'backhoe2', yaw: 0 },   /* JCB 3CX (chimeracreations, CC BY) — замества стария (55) */ dump: { f: 'dump', yaw: 0 },
   grader: { f: 'grader', yaw: -Math.PI / 2 },   // ножът и предните колела са към +x
   excavator: { f: 'excavator', yaw: feature('gear-exc') ? 0 : Math.PI / 2 },   // старият: стрелата е към −x → завърта се напред; новият (Лабораторията) вече гледа напред
   mcrane: { f: 'mcrane', yaw: 0 },
@@ -59,7 +59,7 @@ function loadRealCars(load, A) {
 // всички с мигащи буркани; при няколко одобрени — A[...].variants (game.js model() може да ги редува)
 const EMERG_K = { Police_Sedan: 1, Ambulance: 1, Firetruck: 1 };   // всички коли са в истински метри (1 м ≈ 1 единица, хората ~1,9) — спешните вече не се уголемяват
 const EMERG = {
-  Police_Sedan: [['pol-charger', 5.1], ['pol-crownvic', 5.4], ['pol-interceptor', 5.3], ['pol-nypd', 5.1]],   // pol-volga — изтрита (55 добавя заместник)
+  Police_Sedan: [['pol-charger', 5.1], ['pol-crownvic', 5.4], ['pol-interceptor', 5.3], ['pol-nypd', 5.1], ['pol-volga', 4.1]],   // pol-volga — вече ВАЗ 2101 на КАТ (файлът — EMERG_FILE)
   Firetruck: [['fire-us', 10], ['fire-man', 10.5]],   // fire-red — изтрита
   Ambulance: [['amb-gaz', RS ? 6.2 : 7], ['amb-us', 7.5], ['amb-eu', 7.2]],
 };
@@ -77,10 +77,12 @@ function tidyCar(sc) {
 // модели с предница към −Z (вървят на заден ход, ако не се обърнат)
 export const CAR_FLIP = new Set(['amb-eu']);
 export function emergCar(src, len, kind = 'police', name = '') { const sc0 = src.clone(true); sc0.traverse(m => { if (m.isMesh) m.castShadow = false; }); const [yaw, L0] = tidyCar(sc0), sc = wrap(sc0, yaw + (CAR_FLIP.has(name) ? Math.PI : 0), len / L0); addBeacons(sc, len, kind); sc.userData.noSiren = 1; return sc; }
+// отбелязаните в Лабораторията „Изтрий и намери нов подобен“: флагът (одобреният) остава, файлът — новият модел (55)
+const EMERG_FILE = { 'fire-us': 'fire-us2', 'pol-volga': 'pol-vaz' };   // Firetruck (OzerGokmen, CC BY) · VAZ 2101 Road Police (eightismore, CC BY)
 export function loadPoliceCars(load, A) {
   return Promise.all(Object.entries(EMERG).map(([nm, opts]) => {
     const ok = opts.filter(([f]) => feature(f)); if (!ok.length) return null;
-    return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + (feature('sirens-real') ? 'sirens/' : '') + f + '.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = false; }); const [yaw, L0] = tidyCar(g.scene), K = EMERG_K[nm] * len * M_PER, sc = wrap(g.scene, yaw + (CAR_FLIP.has(f) ? Math.PI : 0), K / L0); /* мащабът е във вътрешната група — model() пипа само външния */ addBeacons(sc, K, nm === 'Firetruck' ? 'fire' : nm === 'Ambulance' ? 'ambulance' : 'police'); return sc; }).catch(() => null)))
+    return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + (feature('sirens-real') ? 'sirens/' : '') + (EMERG_FILE[f] || f) + '.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = false; }); const [yaw, L0] = tidyCar(g.scene), K = EMERG_K[nm] * len * M_PER, sc = wrap(g.scene, yaw + (CAR_FLIP.has(f) ? Math.PI : 0), K / L0); /* мащабът е във вътрешната група — model() пипа само външния */ addBeacons(sc, K, nm === 'Firetruck' ? 'fire' : nm === 'Ambulance' ? 'ambulance' : 'police'); return sc; }).catch(() => null)))
       .then(list => { list = list.filter(Boolean); if (list.length) A['sf-car-' + nm] = { scene: list[0], variants: list }; });
   }));
 }
@@ -88,7 +90,7 @@ export function loadPoliceCars(load, A) {
 // модерни ТИР-ове (Лабораторията → trucks-real): влекачи Scania S и Volvo FH (Sketchfab, CC-BY; assets/heavy/trucks, дължина 1 по z).
 //   A['sf-trk-0|1'] — само влекачът (дължина 1; trucks.js го мащабира и закача своето ремарке с товара)
 //   A['sf-semi-0|1'] — влекач + бяло полуремарке с цветна ивица, в мащаба на града (магистралите, hwtraffic.js)
-const TRK = ['scania', 'volvo'], SEMI_COL = [0xd62828, 0x1f5fbf];
+const TRK = ['scania-r', 'volvo'],   /* Scania R (radzig541, CC BY) — замества старата S-Series (55) */ SEMI_COL = [0xd62828, 0x1f5fbf];
 export const truckLamps = (() => { let m = null; return () => m || (m = (() => {
   const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 1, 32, 32, 31);
   gr.addColorStop(0, 'rgba(255,250,225,1)'); gr.addColorStop(0.35, 'rgba(255,235,180,0.55)'); gr.addColorStop(1, 'rgba(255,220,150,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64);

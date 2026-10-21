@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Сменените модели</title>
+<style>
+  body { margin:0; background:#14161b; color:#e8e8ea; font:14px/1.45 system-ui,sans-serif; overflow:hidden; }
+  #hud { position:absolute; left:12px; top:12px; background:rgba(20,22,27,.88); padding:10px 14px; border-radius:10px; max-width:560px; }
+  h1 { font-size:17px; margin:0 0 4px; } p { margin:0 0 6px; color:#9aa0aa; font-size:13px; }
+  button { background:#1d2027; color:#e8e8ea; border:1px solid #333a45; border-radius:8px; padding:5px 10px; font:inherit; cursor:pointer; margin:2px 4px 0 0; } button.on { border-color:#4ea1ff; }
+  .lbl { position:absolute; transform:translate(-50%,-100%); background:rgba(20,22,27,.82); padding:2px 7px; border-radius:6px; font-size:12px; white-space:nowrap; pointer-events:none; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script></head><body>
+<div id="hud"><h1>🔁 Сменените модели</h1>
+<p>Отбелязаните в Лабораторията „Изтрий и намери нов подобен“: новите модели (Sketchfab, CC BY; старите са изтрити — в кошчето), в истински размер; човек 1,75 м за мащаба, жълтата стрелка — накъдето е предницата в играта. Грейдерът остава (в Sketchfab няма друг).</p><div id="bar"></div></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+const R = new THREE.WebGLRenderer({ antialias: true }); R.setSize(innerWidth, innerHeight); R.setPixelRatio(Math.min(2, devicePixelRatio)); R.outputColorSpace = THREE.SRGBColorSpace; R.shadowMap.enabled = true; document.body.appendChild(R.domElement);
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0xc9dcec); sc.add(new THREE.HemisphereLight(0xffffff, 0x667788, 1.5));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(30, 50, 25); sun.castShadow = true; Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60 }); sun.shadow.mapSize.set(2048, 2048); sc.add(sun);
+const gnd = new THREE.Mesh(new THREE.PlaneGeometry(400, 400).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x86a064 })); gnd.receiveShadow = true; sc.add(gnd);
+const cam = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.1, 900); const ctl = new OrbitControls(cam, R.domElement);
+const L = new GLTFLoader(), H = '../assets/heavy/', labels = [], G = new THREE.Group(); sc.add(G);
+// [име, стар, нов, мащаб: len (м, моделът е с дължина 1) | 1 (вече в метри)]
+const PAIRS = [
+  ['Трактор-багер', null, H + 'gear/backhoe2.glb', 'gear', 6.0],
+  ['Влекач Scania', null, H + 'trucks/scania-r.glb', 'len', 6.0],
+  ['Американска пожарна', null, H + 'cars/fire-us2.glb', 'len', 10.0],
+  ['Полицейска кола', null, H + 'cars/pol-vaz.glb', 'len', 4.1],
+  ['Пожарна станция (l1)', null, H + 'civic2/fire-l1b.glb', 'fit', 31],
+  ['Полицейски участък (l1)', null, H + 'civic2/police-l1b.glb', 'fit', 34],
+];
+const bar = document.getElementById('bar'); let cur = -1;
+function size(o, mode, v) { o.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(o), s = b.getSize(new THREE.Vector3()); const k = mode === 'len' ? v / Math.max(s.z, s.x) : mode === 'gear' || mode === 'fit' ? v / Math.max(s.x, s.z) : 1; o.scale.multiplyScalar(k); o.updateMatrixWorld(true); const b2 = new THREE.Box3().setFromObject(o), c = b2.getCenter(new THREE.Vector3()); o.position.set(o.position.x - c.x, o.position.y - b2.min.y, o.position.z - c.z); return b2.getSize(new THREE.Vector3()); }
+const ped = (() => { const g = new THREE.Group(), m = new THREE.MeshStandardMaterial({ color: 0x3060c0 }); const b = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 1.1, 4, 8), m); b.position.y = 0.77; g.add(b); const h = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), m); h.position.y = 1.62; g.add(h); return g; })();   // човек 1,75 м
+async function show(i) {
+  cur = i; for (const [d] of labels) d.remove(); labels.length = 0; G.clear(); bar.querySelectorAll('button').forEach((b, k) => b.classList.toggle('on', k === i));
+  const [nm, a, b, mode, v] = PAIRS[i]; let x = 0, maxW = 0;
+  for (const [u, t] of [[a, 'старият'], [b, 'новият']]) { if (!u) continue; const g = await L.loadAsync(u).then(q => q.scene).catch(() => null); if (!g) { x += 10; continue; }
+    const w = new THREE.Group(); w.add(g); const s = size(g, mode, v); w.traverse(m => { if (m.isMesh) m.castShadow = true; }); const W = Math.max(s.x, s.z); maxW = Math.max(maxW, W);
+    w.position.x = x + W / 2; G.add(w);
+    const ar = new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(x + W / 2, 0.2, s.z / 2 + 0.5), Math.max(2, s.z * 0.3), 0xffd000, 0.8, 0.5); G.add(ar);
+    const d = document.createElement('div'); d.className = 'lbl'; d.textContent = `${t}: ${s.z.toFixed(1)} × ${s.x.toFixed(1)} × ${s.y.toFixed(1)} м`; document.body.appendChild(d); labels.push([d, new THREE.Vector3(x + W / 2, s.y + 0.6, 0)]);
+    x += W + Math.max(4, W * 0.4); }
+  { const p = ped.clone(true); p.position.set(x, 0, 0); G.add(p); }
+  const cx = x / 2, D = Math.max(12, maxW * 2.2); ctl.target.set(cx, maxW * 0.2, 0); cam.position.set(cx + D * 0.25, D * 0.45, D); ctl.update();
+}
+PAIRS.forEach(([nm], i) => { const b = document.createElement('button'); b.textContent = nm; b.onclick = () => show(i); bar.appendChild(b); });
+await show(0);
+const P = new THREE.Vector3();
+R.setAnimationLoop(() => { ctl.update(); R.render(sc, cam); for (const [d, p] of labels) { P.copy(p).project(cam); d.style.left = (P.x * 0.5 + 0.5) * innerWidth + 'px'; d.style.top = (-P.y * 0.5 + 0.5) * innerHeight + 'px'; } });
+addEventListener('resize', () => { R.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); });
+window.__ready = true; window.__show = i => show(i);
+</script></body></html>

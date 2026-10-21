@@ -17,7 +17,7 @@ export const SCALE = {
   'gear-dump': { cat: 'dumptruck', by: 'len', m: 8, f: 'assets/heavy/gear/dump.glb', note: 'самосвал 8 × 2,5 × 3,3 м' },
   'van-sprinter': { cat: 'van', by: 'len', m: 5.9, f: 'assets/heavy/vans/van-sprinter.glb', note: 'бусът на бригадата 5,9 × 2,0 × 2,5 м' },
   'bus-citaro': { cat: 'bus', by: 'len', m: 12, f: 'assets/heavy/cars/bus-citaro.glb' },
-  'trk-scania': { cat: 'tractor-unit', by: 'len', m: 6, f: 'assets/heavy/trucks/scania.glb', note: 'влекач 6 м + ремарке 13,6 м − 3,1 м застъпване = 16,5 м' },
+  'trk-scania': { cat: 'tractor-unit', by: 'len', m: 6, f: 'assets/heavy/trucks/scania-r.glb', note: 'влекач 6 м + ремарке 13,6 м − 3,1 м застъпване = 16,5 м' },
   // сгради: eave — етажи × 3 м (+ цокъл 0,3 м)
   'h2-lodge': { cat: 'house', by: 'eave', m: 1 * STOREY + 0.3, floors: 1, f: 'assets/heavy/houses2/h2-lodge.glb' },
   'h2-townhouse': { cat: 'house', by: 'eave', m: 3 * STOREY + 0.3, floors: 3, f: 'assets/heavy/houses2/h2-townhouse.glb' },
@@ -51,7 +51,7 @@ export const SITE = {
   'sf-excavator': { by: 'len', m: 9.6, nm: 'багер 20 т (със стрелата)', spec: '9,5–10 × 2,8 × 3,0' },
   'sf-dump': { by: 'len', m: 8, nm: 'самосвал', spec: '8 × 2,5 × 3,3' },
   'sf-grader': { by: 'len', m: 8.5, nm: 'грейдер', spec: '8,5 × 2,5 × 3,3' },
-  'sf-backhoe': { by: 'h', m: 3.7, nm: 'трактор-багер', spec: '5,9 (7,3 с рамото) × 2,35 × 3,7' },   // по височината до кабината: дължината на модела е с изпънатото задно рамо
+  'sf-backhoe': { by: 'len', m: 5.9, nm: 'трактор-багер (JCB 3CX)', spec: '5,6–5,9 × 2,35 × 2,9' },   /* новият модел — със сгънатото рамо (55) */   // по височината до кабината: дължината на модела е с изпънатото задно рамо
   'sf-roller': { by: 'h', m: 3.0, nm: 'валяк', spec: '4,5–5 × 2,2 × 3,0' },
   'container-office-green': { by: 'len', m: 6.06, nm: 'фургон (20 ft)', spec: '6,06 × 2,44 × 2,6' },
   'toilet-portable': { by: 'h', m: 2.3, nm: 'тоалетна', spec: '1,1 × 1,2 × 2,3' },
@@ -70,11 +70,11 @@ export const VEH_SPEC = {
   'car-taxi': [5.0, 1.85, 1.5, 'такси'], 'car-accord': [4.9, 1.86, 1.45, 'Honda Accord'], 'car-corolla': [4.63, 1.78, 1.44, 'Toyota Corolla'],
   'bus-citaro': [12.0, 2.55, 3.1, 'Mercedes Citaro'], 'car-limo': [7.6, 2.0, 1.5, 'лимузина'], 'car-polsuv': [5.05, 2.0, 1.78, 'полицейски джип'], 'car-truck': [6.5, 2.3, 3.0, 'камион с фургон'],
   'pol-charger': [5.08, 1.9, 1.48, 'Dodge Charger'], 'pol-crownvic': [5.39, 1.98, 1.47, 'Crown Victoria'], 'pol-interceptor': [5.05, 2.0, 1.78, 'Police Interceptor'], 'pol-nypd': [5.08, 1.9, 1.48, 'Charger NYPD'],
-  'fire-us': [10.0, 2.5, 3.0, 'пожарна (САЩ)'], 'fire-man': [10.5, 2.5, 3.4, 'MAN със стълба'],
+  'fire-us': [10.0, 2.5, 3.0, 'пожарна (САЩ)'], 'fire-us2': [10.0, 2.5, 3.0, 'пожарна (САЩ, помпена)'], 'pol-vaz': [4.07, 1.61, 1.44, 'ВАЗ 2101 на КАТ'], 'fire-man': [10.5, 2.5, 3.4, 'MAN със стълба'],
   'amb-gaz': [6.2, 2.1, 2.6, 'ГАЗела'], 'amb-us': [7.0, 2.4, 2.9, 'линейка (САЩ)'], 'amb-eu': [6.9, 2.1, 2.9, 'линейка (Европа)'],
   'van-sprinter': [5.9, 2.0, 2.5, 'Sprinter'], 'van-ducato': [5.4, 2.05, 2.5, 'Ducato'], 'van-mb207': [5.3, 2.0, 2.5, 'Mercedes 207'], 'van-transit': [5.2, 1.97, 2.3, 'Transit'],
   'trk-semi': [16.5, 2.55, 4.0, 'влекач + полуремарке'], 'trk-cab': [6.0, 2.5, 3.9, 'влекач (кабина)'],
-  'sf-mcrane': [13.5, 3.0, 4.0, 'автокран'], 'sf-excavator': [9.6, 2.9, 3.1, 'багер 20 т'], 'sf-dump': [8.0, 2.5, 3.3, 'самосвал'], 'sf-grader': [8.5, 2.5, 3.3, 'грейдер'], 'sf-backhoe': [9.6, 2.35, 3.7, 'трактор-багер (с изпънатото рамо)'], 'sf-roller': [4.5, 2.2, 3.0, 'валяк'],
+  'sf-mcrane': [13.5, 3.0, 4.0, 'автокран'], 'sf-excavator': [9.6, 2.9, 3.1, 'багер 20 т'], 'sf-dump': [8.0, 2.5, 3.3, 'самосвал'], 'sf-grader': [8.5, 2.5, 3.3, 'грейдер'], 'sf-backhoe': [5.9, 2.35, 2.9, 'трактор-багер JCB 3CX'], 'sf-roller': [4.5, 2.2, 3.0, 'валяк'],
 };
 
 // ---- детските коли (Kenney, assets/vehicles) — резервите, докато истинските не са заредени: [собствена дължина, истинска дължина] м

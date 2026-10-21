@@ -91,7 +91,7 @@ const HOLO_GLB = {
   bullet: { parts: [HV + 'trains/hsw.glb'], size: 0.56 },
   'plane-s': { parts: [HV + 'air/regional.glb'], size: 0.3, axis: 'z' }, 'plane-b': { parts: [HV + 'air/wide.glb'], size: 0.42, axis: 'z' }, plane: { parts: [HV + 'air/regional.glb'], size: 0.38, axis: 'z' },   // самолетите: фюзелажът — по X (a320) или по Z (regional, wide; по опашката) (размахът е почти колкото дължината — по размера се объркваше и се виждаше „в носа“)
   'ship-s': { parts: [HV + 'ships/tanker.glb'], size: 0.32 }, 'ship-b': { parts: [HV + 'ships/container.glb'], size: 0.46 },
-  'truck-s': { parts: [HV + 'trucks/volvo.glb'], size: 0.26 }, 'truck-b': { parts: [HV + 'trucks/scania.glb'], size: 0.34 },
+  'truck-s': { parts: [HV + 'trucks/volvo.glb'], size: 0.26 }, 'truck-b': { parts: [HV + 'trucks/scania-r.glb'], size: 0.34 },
 };
 const holoKey = (kind, big) => HOLO_GLB[kind] && kind !== 'train' && kind !== 'ship' && kind !== 'truck' ? kind : HOLO_GLB[`${kind}-${big ? 'b' : 's'}`] ? `${kind}-${big ? 'b' : 's'}` : null;
 const glbCache = {};

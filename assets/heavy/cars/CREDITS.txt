@@ -24,3 +24,5 @@
 - amb-eu.glb — "Ambulance" by rccdesign — https://sketchfab.com/3d-models/1061168f9ec345db81cffb81c17f3649
 - fire-man.glb — "German Ladder Fire Truck(MAN TGA truck)" by cm_dp — https://sketchfab.com/3d-models/403fbe45460041c2a97031d0635634cf
 - pol-nypd.glb — "Dodge Charger Police NYPD" by David_Holiday — https://sketchfab.com/3d-models/578e2bfb9c8f415d932527a938e2fc64
+- fire-us2.glb (+ sirens/fire-us2.glb, the roof bar split into siren_L/R) — "Firetruck" by OzerGokmen — https://sketchfab.com/3d-models/27a6b95f768d415282e2f5de48ba6d99 (replaces fire-us.glb)
+- pol-vaz.glb (+ sirens/pol-vaz.glb, two roof lenses added) — "VAZ 2101 Road Police" by eightismore — https://sketchfab.com/3d-models/da518db0b8ff41088db45b55122267d3 (replaces pol-volga.glb)
