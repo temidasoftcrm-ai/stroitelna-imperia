@@ -79,6 +79,7 @@ import { LANDMARK_NM, CITY_LANDMARKS, LANDMARK_CENTER, BIG_LANDMARKS, SEA_LANDMA
 import { OFFICE_STYLES, STYLE_LV, STYLE_COST, buildOfficeTower } from './officestyle.js';
 import { shipRange, PORT_LEVELS, portMax, SHIPS, seaKm, seaPath, SEA_ROUTE_COST, voyagePay, shipDaily, SEA_LV } from './seaways.js';
 import { makeTrackMap, placeCars } from './trackpath.js';
+import { createRailX } from './railx.js';   // 🚦 прелези и тунели (rail-crossings)
 import { airportMax as airportMax0, AIRPORT_LEVELS, PLANES, PLANE_LADDER, PLANE_PIC, ROUTE_COST, airKm, flightPay, planeDaily, WORLD, WORLD_IDS } from './airways.js';
 import { MUNI_SHARE, linkPrices, buyoutPrice } from './linkoffers.js';
 import { EXTRA_BALKAN, EXTRA_EUROPE, EXTRA_WORLD, COUNTRIES, countryProgress, wonCountries, wonIncomeMul, countryLabelLL, setCountryCities } from './countries.js';
@@ -985,6 +986,7 @@ function buildCity(cityId) {
   if (P) { const [ti, tj] = planTiles(P, TILE); NI = Math.max(NI, ti); NJ = Math.max(NJ, tj); }   // гарата, магистралата и летището се отдръпват до края на плана
   // земя (при мегаполисите — по-широка на изток)
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(Math.max(1200, 2 * (tx(NI - 1) + 380)), Math.max(1200, 2 * (tx(NJ - 1) + 300))), new THREE.MeshStandardMaterial({ color: isDesert(cityId) ? 0xd9bf86 : 0x8fb36a, roughness: 1 }));   // Африка — пясък
+  city.groundHZ = Math.max(1200, 2 * (tx(NJ - 1) + 300)) / 2;   // rail-crossings: докъде стига земята по z (тунелите)
   if (P && !P.links) P.links = planLinks(P);   // и в мрежата на маршрутите (cityplanroute.js) — ТИР-овете и техниката карат по тях
   const pv = P && P.p2 ? plan2.view.buildPlan2View(P.p2, { treeModels: plan2Trees(), roadGeo: feature('road-geo') && !P.osm, osm: P.p2.osmData, offset: P.offset, termini: !!P.osm, blocks: !!P.osm, ...(P.osm && feature('city-prog') && P.square && P.toPlan ? { progressive: true, focus: P.toPlan(P.square.x, P.square.z) } : {}),   /* поетапно: първо терен и улици около централата */ ...(P.osm ? plan2Opts(cityId) : {}), stationModel: plan2.models[{ paris: 'lm-lazare2', newyork: 'lm-gc2' }[cityId]] || A['station-big']?.scene, ...(cityId === 'newyork' && plan2.models['lm-gc2'] ? { stationFacing: { face: '-z', depth: 0.8, maxW: 48 } } : {}), fillLot: L2 => { if (!P.osm) return false; const l = city.p2Map && city.p2Map.get(L2.id); return !l || l.busy === 'bg'; },
       ...(feature('free-plots') ? { freeLot: L2 => { const l = city.p2Map && city.p2Map.get(L2.id); return !!l && !l.busy && !l.built && !l.reno && !l.under && !l.obj; } } : {}) })   // свободните парцели — празни места с ограда и табела   // Рим: фоновите квартали — върху парцелите, които играта не ползва
@@ -1942,7 +1944,7 @@ function traffic2Make() {
   if (tr2) tr2.clear(); if (tr2G) { scene.remove(tr2G); tr2G = null; }
   const p2 = city.plan && city.plan.p2;   // планът v2: лентите от planNetwork, колите — в група, изместена с offset (като 3D изгледа на плана)
   if (p2) { tr2G = new THREE.Group(); tr2G.position.set(city.plan.offset[0], 0, city.plan.offset[1]); scene.add(tr2G); }
-  tr2 = createTraffic({ scene: tr2G || scene, camera, jp: feature('junction-paths'), drive: p2 && p2.drive === 'L' ? 'left' : 'right', maxCars: wantedTraffic(),   // camera — истинските фарове само за най-близките коли
+  tr2 = createTraffic({ scene: tr2G || scene, camera, jp: feature('junction-paths'), drive: p2 && p2.drive === 'L' ? 'left' : 'right', maxCars: wantedTraffic(), blockers: () => railx ? railx.blockers().map(b => p2 ? { x: b.x - city.plan.offset[0], z: b.z - city.plan.offset[1] } : b) : [],   // camera — истинските фарове само за най-близките коли
     ...(p2 ? { built: planNetwork(p2, { jp: feature('junction-paths') }) } : { net: gridNetwork({ NBI, NBJ, tx, isRoad, TILE, signal: (i, j) => signals.some(s => s.i === i && s.j === j) }) }),
     makeCar: () => { addCar(); const t = traffic.pop(); if (!t) return null; const heavy = /Bus|Truck|Firetruck|firetruck/.test(t.obj.userData.src || '');
       if (tr2G) { const k = t.len > 3 && t.len < 14 ? 1 : (heavy ? 11 : 4.5) / (t.len || 4.5);   /* колите вече са в истинския размер (sf-car-* и резервите с kidK) — не ги изравняваме до 4,5 м; само ако мярката е сбъркана (55) */ t.obj.scale.multiplyScalar(k); t.len = (t.len || 4.5) * k; tr2G.add(t.obj); }   // планът v2 е в истински метри — колите в истинския си размер
@@ -6567,14 +6569,49 @@ const stationLv = () => S.stationLevel || 0;
 const homeTrains = () => (S.trains || []).filter(t => !t.job && t.at === S.cityId);
 function buildStation() {
   if (S.stationLevel == null) S.stationLevel = (S.trains || []).length ? Math.min(5, Math.max(1, S.trains.length)) : 0;   // стари записи
-  station = createStation({ group: city.group, model, instanced, label, x: STATION_X, path: trackMap });
+  station = createStation({ group: city.group, model, instanced, label, x: STATION_X, path: trackMap, len: railEnd() });
   station.build(stationLv(), S.stationBuild ? S.stationBuild.target : null);
   parkedSig = '';
   refreshPassing();
 }
 function refreshPassing() {
   if (passing) passing.clear();
-  passing = createPassingTrains({ scene, group: city.group, model, instanced, x: STATION_X, trackX: station.outerX(), path: trackMap, horn: () => {}, orient: () => S?.orient?.st === 'done' });
+  passing = createPassingTrains({ scene, group: city.group, model, instanced, x: STATION_X, trackX: station.outerX(), path: trackMap, horn: () => {}, orient: () => S?.orient?.st === 'done', len: railEnd() });
+  buildRailX();
+}
+// 🚦 (rail-crossings) коловозите свършват в тунел до ръба на земята (не висят над празното), а където улица пресича линията — прелез
+const railOn = () => feature('rail-crossings') && !!city && !SEASIDE.includes(S.cityId);   // крайморските — линията завива покрай брега (trackpath.js)
+const railEnd = () => railOn() && city.groundHZ ? Math.min(1600, city.groundHZ - 30) : undefined;
+let railx = null, railBellAt = 0;
+function buildRailX() {
+  if (railx) { railx.dispose(); railx = null; }
+  if (!railOn() || !station || !passing) return;
+  const xa = station.outerX() - 6.5 - 2.5, xb = STATION_X + 2.5, xm = (xa + xb) / 2, Z = railEnd(), cr = [];
+  const P = city.plan, p2 = P && P.p2, off = P && P.offset ? (Array.isArray(P.offset) ? { x: P.offset[0], z: P.offset[1] } : P.offset) : { x: 0, z: 0 };
+  if (p2) for (const r of p2.roads) { const pts = r.pts || []; for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i], ax = (a.x ?? a[0]) + off.x, az = (a.z ?? a[1]) + off.z, bx = (b.x ?? b[0]) + off.x, bz = (b.z ?? b[1]) + off.z;
+    if ((ax - xm) * (bx - xm) >= 0) continue;
+    const t = (xm - ax) / (bx - ax), z = az + (bz - az) * t; if (Math.abs(z) > Z - 20 || cr.some(c => Math.abs(c.z - z) < 12)) continue;
+    const L = Array.isArray(r.lanes) ? r.lanes[0] + r.lanes[1] : (r.lanes || 2), w = Math.max(6, L * (r.laneW || 3.2) + (r.median || 0));
+    cr.push({ x: xm, z, ang: -Math.atan2(bz - az, bx - ax), w, x0: xa, x1: xb });
+  } }
+  railx = createRailX({ group: city.group, crossings: cr, portals: [{ z: Z, x0: xa, x1: xb, dir: 1 }, { z: -Z, x0: xa, x1: xb, dir: -1 }], trains: () => passing ? passing.trainsAt() : [], bell: on => { railBellAt = on ? 0.01 : 0; } });
+}
+// звуците (assets/sfx, f9): звънецът — в цикъл, докато бариерите са спуснати, само близо до камерата (< 250 м), със затихване;
+// минаващ влак — веднъж за влак, ако мине на < 200 м, по един наведнъж
+const RAIL_BELL = 'assets/sfx/rail-crossing-bell.mp3', TRAIN_PASS = 'assets/sfx/train-pass.mp3', trainHeard = new WeakSet();
+let bellA = null, passA = null;
+const camD = (x, z) => Math.hypot(camera.position.x - x, camera.position.z - z);
+function railTick(dt) {
+  if (!railx) return;
+  railx.update(dt);
+  const bells = railx.blockers(), d = bells.length ? Math.min(...bells.map(b => camD(b.x, b.z))) : 1e9, want = railBellAt && d < 250 && !Sound.muted ? 0.55 * (1 - d / 250) : 0;
+  if (want > 0 && !bellA) { bellA = new Audio(RAIL_BELL); bellA.loop = true; bellA.volume = 0; bellA.play().catch(() => {}); }
+  if (bellA) { bellA.volume = Math.max(0, Math.min(1, want > 0 ? want : bellA.volume - dt / 0.3 * 0.55)); if (!want && bellA.volume <= 0.001) { bellA.pause(); bellA = null; } }   // ~0,3 s затихване
+  if (!Sound.muted && (!passA || passA.ended || passA.paused)) for (const t of passing ? passing.trainsAt() : []) {
+    const dd = camD(t.x, t.z); if (trainHeard.has(t.ref) || dd >= 200) continue;
+    trainHeard.add(t.ref); passA = new Audio(TRAIN_PASS); passA.volume = Math.max(0.1, 0.5 * (1 - dd / 200)); passA.play().catch(() => {}); break;
+  }
 }
 // влаковете у дома стоят на коловозите; обновява се само при промяна
 function updateParked() {
@@ -9880,6 +9917,7 @@ function frame() {
     if (city.airport) { if (city.airportNI !== NI) { city.airportNI = NI; city.airport.setPos(...airXZ()); } city.airport.update(simT, dayNight.night); }
     updateCityTrain(dt);
     if (passing) passing.update(Math.min(dt, 0.25));
+    railTick(Math.min(dt, 0.25));
     tirs.update(Math.min(dt, 0.25));
     if (!onMap) {
       const tg = controls.target, near = units.filter(u => u.state === 'working' && Math.hypot(u.x - tg.x, u.z - tg.z) < 60).length;
@@ -10541,6 +10579,12 @@ if (AUTOTEST) {
     // 🚶 Лабораторията (lot-paths): пътеките/алеите от сградите до тротоара
     pathsLook() { if (city.lots.filter(l => l.obj).length < 5) this.lotFill(); buildLotPaths(); showMap(false); this.tod(0.2); const m = city.pathGroup && city.pathGroup.children[0]; if (!m) return 0;
       const p = m.geometry.attributes.position, x = (p.getX(0) + p.getX(2)) / 2, z = (p.getZ(0) + p.getZ(2)) / 2; this.camAt(x + 9, 30, z + 12, x, 0, z); return city.pathGroup.children.reduce((a, c) => a + c.geometry.attributes.position.count / 4, 0); },
+    // 🚦 Лабораторията (rail-crossings): прелезът и тунелът; пуска влакове, които минават през прелеза
+    railLook(k = 0) { showMap(false); this.tod(0.2); buildRailX(); if (!railx) return 'няма (флаг/крайморски град)'; for (let i = 0; i < 3; i++) passing.update(20);
+      const L = railx.list(), c = L[k] || null, Z = railEnd(); if (c) this.camAt(c.x + 26, 16, c.z + 30, c.x, 0, c.z); else this.camAt(STATION_X + 40, 40, Z - 80, STATION_X, 0, Z);
+      return { ...railx.count(), at: L.map(x => Math.round(x.z)), end: Z }; },
+    railState() { return railx ? railx.list().map(x => [Math.round(x.z), x.on]).concat([passing ? passing.trainsAt().map(t => [Math.round(t.z), Math.round(t.v)]) : []]) : null; },
+    tunnelLook(s = 1) { showMap(false); this.tod(0.2); const Z = railEnd() || 600; this.camAt(STATION_X + 45, 28, s * (Z - 70), STATION_X - 6, 0, s * Z); return Z; },
     garage: () => ({ office: S.officeLevel, garage: S.garageLevel, lot: S.garageLot, wh: S.whLevel, whLot: S.whLot, stock: { ...econ.s.stock }, crews: crewCount(), machines: machineCount(), own: projects.filter(p => p.own).map(p => `${p.type}:${p.stage}:${p.prog.toFixed(2)}`) }),
     look(lotId, dist = 34) { const l = lotId == null ? city.hq : city.lots[lotId]; controls.target.set(l.x, 3, l.z); camera.position.set(l.x + dist * 0.7, dist * 0.75, l.z + dist); fly = null; },
     cash: () => (S.cash || []).map(c => c.lot),

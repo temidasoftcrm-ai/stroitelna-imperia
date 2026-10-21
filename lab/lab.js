@@ -135,6 +135,8 @@ const DEMOS = [
   ['🚨 Градска сцена: ❤️ Инфаркт на тротоара', 'sofia', d => { for (const ms of [0, 3500, 8000]) setTimeout(() => d.incidentLook(ms > 0, 'heart'), ms); }],
   ['🚨 Градска сцена: 🐈 Котка на дърво', 'sofia', d => { for (const ms of [0, 3500, 8000]) setTimeout(() => d.incidentLook(ms > 0, 'cat'), ms); }],
   ['🚨 Градска сцена: ⚠️ Изтичане на газ', 'sofia', d => { for (const ms of [0, 3500, 8000]) setTimeout(() => d.incidentLook(ms > 0, 'gas'), ms); }],
+  ['🚦 Прелез: светлини, звънец и бариери (влакове минават)', 'plovdiv', d => d.railLook()],   // rail-crossings (railx.js)
+  ['🚇 Тунел в края на линията (без отрязани релси)', 'plovdiv', d => d.tunnelLook(1)],   // rail-crossings
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

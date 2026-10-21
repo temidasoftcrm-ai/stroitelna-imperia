@@ -4,11 +4,12 @@ import * as THREE from 'three';
 import { placeCars } from './trackpath.js';
 import { hasTrainModel, trainCar } from './trainmodels.js';
 
-const LEN = 600, CAR = 6.2, SCALE = 2.2, GAP = 6.5, MAX = 5;   // от край до край на земята
+const LEN0 = 600, CAR = 6.2, SCALE = 2.2, GAP = 6.5, MAX = 5;   // от край до край на земята
 const FREIGHT = ['train-carriage-box', 'train-carriage-flatbed-wood', 'train-carriage-coal', 'train-carriage-container-red'];
 
 // deps: { scene, group (за коловозите), model(name, scale), instanced(name, mats), x (оста на гаровия коловоз), trackX?, horn() }
 export function createPassingTrains(deps) {
+  const LEN = deps.len || LEN0;   // rail-crossings: до тунела в края на земята (иначе 600)
   const X0 = deps.trackX ?? deps.x - 4.6;
   // два коловоза: по външния се движи към +z, по следващия — към −z
   const lines = [{ x: X0, dir: 1, list: [] }, { x: X0 - GAP, dir: -1, list: [] }];
@@ -99,5 +100,7 @@ export function createPassingTrains(deps) {
     for (const L of lines) { for (const t of L.list) deps.scene.remove(t.g); L.list.length = 0; }
     for (const tr of tracks) deps.group.remove(tr);
   }
-  return { update, clear, get train() { const t = lines[0].list[0] || lines[1].list[0]; return t ? { z: t.z, v: t.v, stop: 0 } : null; }, count };
+  // rail-crossings: всички влакове по линията — главата (z), дължината и скоростта със знака на посоката
+  const trainsAt = () => lines.flatMap(L => L.list.map(t => ({ z: t.z, len: t.len, v: L.dir * t.v, x: L.x, ref: t })));
+  return { update, clear, trainsAt, get train() { const t = lines[0].list[0] || lines[1].list[0]; return t ? { z: t.z, v: t.v, stop: 0 } : null; }, count };
 }

@@ -63,10 +63,11 @@ export function createStation(deps) {
     g = new THREE.Group(); lamps = []; pools = []; glows = [];
     deps.group.add(g);
     level = lv;
-    g.add(rails(X, -LEN, LEN));   // главната линия
+    const LN = deps.len || LEN;   // rail-crossings: до тунелите в края на земята
+    g.add(rails(X, -LN, LN));   // главната линия
     if (lv >= 1) {
       const plen = 30 + lv * 8, side = lv >= 3 ? 0x8f8a80 : 0xb9b2a3;
-      for (let k = 1; k < lv; k++) g.add(rails(trackX(k), -LEN, LEN));   // гаровите коловози също минават от край до край
+      for (let k = 1; k < lv; k++) g.add(rails(trackX(k), -LN, LN));   // гаровите коловози също минават от край до край
       // перон откъм града + островни перони между коловозите
       const main = new THREE.Mesh(new THREE.BoxGeometry(5, 0.8, plen * 2), mat(side));
       main.position.set(X + 5.5, 0.4, 0); main.receiveShadow = main.castShadow = true; g.add(main);

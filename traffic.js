@@ -234,6 +234,10 @@ export function createTraffic(opts) {
       if (jp && c.next) vmax = Math.min(vmax, Math.sqrt((c.next.vmax * (c.vk || 1)) ** 2 + 2 * B_COMF * 0.6 * Math.max(0, c.p.len - c.s - c.L / 2)));   // по-бавно преди завоя, ускорява след него
       c.why = ld && ld.gap < 6 && ld.v < 0.5 ? 'кола отпред' : null;
       let gap = ld ? ld.gap : 1e9, dv = ld ? c.v - ld.v : 0;
+      if (opts.blockers) for (const b of opts.blockers()) {   // 🚦 спусната бариера на прелез (railx.js): спира пред нея, ако е отпред в посоката му; който е минал — продължава
+        const dx = b.x - c.x, dz = b.z - c.z, fw = dx * Math.sin(c.yaw) + dz * Math.cos(c.yaw), sd = Math.abs(dx * Math.cos(c.yaw) - dz * Math.sin(c.yaw));
+        if (fw > 0 && fw < 40 && sd < 6) { const g = fw - c.L / 2 - 1; if (g < gap) { gap = Math.max(0, g); dv = c.v; } c.why = 'прелез'; }
+      }
       // стоп линията: ако не може да влезе — виртуално препятствие в края на лентата
       const stop = c.p.kind === 'lane' && c.next && c.p.len - c.s < 22 && !mayEnter(c);
       if (stop) { const g = c.p.len - c.s - c.L / 2 - 0.3; if (g < gap) { gap = g; dv = c.v; } c.wait += H; } else c.wait = 0;
