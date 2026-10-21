@@ -139,7 +139,12 @@ const DEMOS = [
   ['🚇 Тунел в края на линията (без отрязани релси)', 'plovdiv', d => d.tunnelLook(1)],   // rail-crossings
   ['🛣️ Магистралата: изходи към града, бензиностанцията, изпреварване (hw-ramps)', 'plovdiv', () => $('fr').contentWindow.eval("__dbg.hwOpen(); setTimeout(() => __dbg.hwLookRamps(), 600)")],
   ['🏷️ 3D емблемите на марките — всички в редица', 'sofia', d => { for (const ms of [0, 4000]) setTimeout(() => d.logoRow(1, 'titan', true), ms); }],   // brand-logo3d (game.js logo3d)
-  ['🏷️ 3D емблемата над офиса (Империал, ниво 5)', 'sofia', d => { for (const ms of [0, 4000]) setTimeout(() => d.logoRow(5, 'imperial'), ms); }],
+  ['🏷️ Емблемата над офиса — Империал (нива 1 → 3 → 5 → 10)', 'sofia', d => setTimeout(() => d.logoTour('imperial'), 4000)],   // brand-logo3d
+  ['🏷️ Емблемата над офиса — Индустриал (нива 1 → 3 → 5 → 10)', 'sofia', d => setTimeout(() => d.logoTour('industrial'), 4000)],   // brand-logo3d
+  ['🏷️ Емблемата над офиса — Титан (нива 1 → 3 → 5 → 10)', 'sofia', d => setTimeout(() => d.logoTour('titan'), 4000)],   // brand-logo3d
+  ['🏷️ Емблемата над офиса — Атлас (нива 1 → 3 → 5 → 10)', 'sofia', d => setTimeout(() => d.logoTour('atlas'), 4000)],   // brand-logo3d
+  ['🏷️ Емблемата над офиса — Хоризон (нива 1 → 3 → 5 → 10)', 'sofia', d => setTimeout(() => d.logoTour('horizon'), 4000)],   // brand-logo3d
+  ['🏷️ Емблемата над офиса — своя фирма (нива 1 → 3 → 5 → 10)', 'sofia', d => setTimeout(() => d.logoTour('custom'), 4000)],   // brand-logo3d
   ['🏢 Общ парцел на фирмата — ниво 1', 'plovdiv', d => d.campus2Look(1)],   // campus2
   ['🏢 Общ парцел на фирмата — ниво 5', 'plovdiv', d => d.campus2Look(5)],   // campus2
   ['🏢 Общ парцел на фирмата — ниво 10', 'plovdiv', d => d.campus2Look(10)],   // campus2
