@@ -120,6 +120,9 @@ const DEMOS = [
   ['🏢 Кампус: офис отпред, гараж и склад отзад, общ двор', 'sofia', d => d.campusLook()],   // hq-campus (game.js __dbg.campusLook)
   ['🚶 Пътеки и алеи от сградите до тротоара', 'sofia', d => d.pathsLook()],   // lot-paths (game.js __dbg.pathsLook)
   ['🏢 Офис, гараж и склад — всички нива (1–10) в редица', 'sofia', d => { for (const ms of [0, 4000]) setTimeout(() => d.hqLevelsRow(), ms); }],
+  ['🆕 Офисът — новите нива 1–10 (една линия, Sketchfab)', 'sofia', d => { for (const ms of [0, 4000]) setTimeout(() => d.hqLevelsRow('new'), ms); }],   // office-levels2 (game.js OFFICE2)
+  ['🏡 Кварталите: дворове, паркове, площадки (Пловдив, ден)', 'plovdiv', d => { setTimeout(() => { d.lotFill(); d.tod && d.tod(0.5); d.districts('on'); d.districts('focus'); }, 2500); }],
+  ['🏡 Кварталите: диагностика на земята (парцели, сгради, свободно)', 'plovdiv', d => { setTimeout(() => { d.lotFill(); d.districts('on'); d.districts('diag'); d.districts('focus', 2.2); }, 2500); }],
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
