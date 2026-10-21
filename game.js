@@ -463,6 +463,12 @@ const MODELS = {
   nature: ['rock_smallA', 'rock_largeA'],   // детските храсти и цветя са изтрити — истинските (plants-real, assets/heavy/plants)
   people: ['worker_male', 'worker_male_alt', 'farmer'],
 };
+// 🏢 флаг office-levels2: една линия корпоративни офиси (Sketchfab, CC BY — assets/heavy/office/CREDITS.txt), моделите в метри, основата в 0;
+// h — височината на нивото (м): гладко ~×1,35 от ниво на ниво; f — файлът (4 и 5 са разменени: по-ниският и по-широкият е по-рано)
+const OFFICE2 = [[1, 2.9], [2, 7.5], [3, 11], [5, 15], [4, 20], [6, 27], [7, 37], [8, 50], [9, 68], [10, 92]].map(([f, h], i) => ({ lv: i + 1, url: `assets/heavy/office/office-l${f}.glb`, h }));
+const office2Cache = {}, office2Load = L => office2Cache[L.url] = office2Cache[L.url] || new GLTFLoader().loadAsync(L.url).then(g => { g.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } }); return g.scene; }).catch(() => null);
+// мащабът на нивото: височината h, но основата — не по-голяма от мястото (w × d); връща { k, h, w, d } — истинските размери след мащаба
+function office2Fit(src, L, w = 1e9, d = 1e9) { const b = new THREE.Box3().setFromObject(src), s = b.getSize(new THREE.Vector3()), k = Math.min(L.h / s.y, w / s.x, d / s.z); return { k, h: s.y * k, w: s.x * k, d: s.z * k }; }
 const A = {};
 const perfPanel = createPerfPanel({ renderer, A: () => A, THREE, enabled: () => feature('perf-panel') });
 let europe = null;
@@ -471,6 +477,7 @@ let europe = null;
   // заводските модели се казват като търговските (building-a…) — пазим ги под 'ind-…'
   // истински храсти, цветя и фонтан (assets/heavy/plants, нормализирани: най-широката страна 1, основа 0) — зад feature('plants-real')
   for (const n of H2) jobs.push(load(`assets/heavy/houses2/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => HOUSES.splice(HOUSES.indexOf(n), 1)));   // не се зареди → не се строи
+  if (feature('office-levels2')) for (const L of OFFICE2) jobs.push(load(L.url).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[`office2-l${L.lv}`] = g; prepNightFloors(g.scene, `office2-l${L.lv}`); }).catch(() => {}));   // 🆕 новите нива на офиса
   for (const n of GAS_KINDS) jobs.push(load(`assets/heavy/gas/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => {}));   // бензиностанции (всяка — свое „✓ OK“); нощем — навесът и магазинът (nightfloors 'gas')
   if (feature('plants-real')) for (const k of ['bush-0', 'bush-1', 'bush-2', 'flowers', 'fountain']) jobs.push(load(`assets/heavy/plants/${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['pl-' + k] = g; }).catch(() => {}));
   for (const [dir, list] of Object.entries(MODELS)) if (dir !== 'industrial' && dir !== 'construction') for (const n of list) jobs.push(load(`assets/${dir}/${n}.glb`).then(g => { A[dir === 'industrial' ? 'ind-' + n : n] = g; if (dir === 'commercial' || dir === 'commercial2' || n === 'building-type-a' || n === 'building-type-b' || n === 'Building_Medium_2_001' || n === 'Building_Small_1') prepNightFloors(g.scene, n);   // Building_Medium_2_001 — Лабораторията → night-nyextra
@@ -1337,6 +1344,25 @@ const OFFICE_LEVELS = [
   { nm: 'Небостъргач', model: 'building-skyscraper-c', crews: 14, proj: 7, offers: 7 },
   { nm: 'Империя', model: 'building-skyscraper-c@10', crews: 16, proj: 8, offers: 8 },   // небостъргач на 10 етажа с табела на покрива
 ];
+// табелата с марката на покрива (новите нива 5–10): името и емблемата на фирмата, светеща; ширината — по покрива; на 10 — и звездата
+function roofLogo(g, office, level) {
+  const b = brandOf(S) || { nm: 'Империя', col: '#ffb300', ico: '🏗️' }, c = document.createElement('canvas'); c.width = 1024; c.height = 256; const cg = c.getContext('2d');
+  const grd = cg.createLinearGradient(0, 0, 0, 256); grd.addColorStop(0, '#1b2433'); grd.addColorStop(1, '#0d1420'); cg.fillStyle = grd; cg.fillRect(0, 0, 1024, 256);
+  cg.strokeStyle = b.col || '#ffb300'; cg.lineWidth = 14; cg.strokeRect(10, 10, 1004, 236); cg.textBaseline = 'middle';
+  cg.font = '150px "Noto Color Emoji", sans-serif'; cg.fillText(b.ico || '🏗️', 40, 132);
+  cg.shadowColor = b.col || '#ffb300'; cg.shadowBlur = 20; cg.fillStyle = '#ffffff'; cg.font = '900 104px system-ui, sans-serif'; cg.fillText((b.nm || '').toUpperCase(), 230, 92, 760);
+  cg.fillStyle = b.col || '#ffd54a'; cg.font = '800 62px system-ui, sans-serif'; cg.fillText('КОНСТРЪКШЪН', 232, 190, 760);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  g.updateMatrixWorld(true); const gi = new THREE.Matrix4().copy(g.matrixWorld).invert(), lb = new THREE.Box3().setFromObject(office).applyMatrix4(gi), roofW = Math.min(lb.max.x - lb.min.x, lb.max.z - lb.min.z);
+  const bw = Math.max(5, Math.min(16, roofW * 0.85)), bh = bw / 4, top = lb.max.y, cx = (lb.min.x + lb.max.x) / 2, cz = (lb.min.z + lb.max.z) / 2, bmat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
+  const board = new THREE.Group();
+  for (const ry of [0, Math.PI]) { const f = new THREE.Mesh(new THREE.PlaneGeometry(bw, bh), bmat); f.rotation.y = ry; f.position.z = ry ? -0.06 : 0.06; board.add(f); }
+  board.add(new THREE.Mesh(new THREE.BoxGeometry(bw + 0.3, bh + 0.3, 0.1), new THREE.MeshStandardMaterial({ color: 0x222831 })));
+  for (const x of [-bw / 3, bw / 3]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.25, 1.6, 0.25), new THREE.MeshStandardMaterial({ color: 0x3a3f46 })); leg.position.set(x, -bh / 2 - 0.8, 0); board.add(leg); }
+  board.position.set(cx, top + bh / 2 + 1.6, cz); g.add(board);
+  g.userData.roofLogo = { x: cx, y: top, z: cz, w: bw, h: bh, board };   // мястото на покрива (в координатите на централата)
+  if (level === 10) { const star = new THREE.Mesh(new THREE.OctahedronGeometry(1.2), new THREE.MeshStandardMaterial({ color: 0xffd54a, emissive: 0xaa7a00, metalness: 0.6, roughness: 0.3 })); star.position.set(cx, top + bh + 3.6, cz); g.add(star); g.userData.star = star; }
+}
 OFFICE_LEVELS.forEach((l, i) => { l.upkeep = 70 * (i + 1); l.cost = Math.round(20000 * Math.pow(1.6, i) / 1000) * 1000; });   // cost = цена за следващото ниво
 const GARAGE_LEVELS = [
   { nm: 'Навес', cap: 3 }, { nm: 'Барака', cap: 4 }, { nm: 'Гараж', cap: 6 }, { nm: 'Голям гараж', cap: 8 }, { nm: 'Автобаза', cap: 10 },
@@ -1495,7 +1521,12 @@ function buildHQ() {
   let office;
   const sid = S.officeStyle || officeAutoStyle(), style = level >= STYLE_LV && sid ? OFFICE_STYLES.find(x => x.id === sid && (x.lm || x.sf || A[x.model])) : null;
   city.hqLm = null;
-  if (style) {   // избран облик на кулата (officestyle.js): модел от пакета или процедурна кула
+  const O2 = !style && feature('office-levels2') && A[`office2-l${level}`] ? OFFICE2[level - 1] : null;   // 🆕 новите нива (избраният облик на кулата има предимство)
+  if (O2) {   // височината на нивото; основата — половината парцел (кампус: предната, иначе задната), по-голямото се смалява целиком
+    const n = `office2-l${level}`, [W, D] = lotHalf(city.hq);
+    office = model(n, office2Fit(A[n].scene, O2).k); dayNight.registerWindows(office);
+    campusFit(office, -W + 0.5, W - 0.5, campusAny() ? 0.4 : -D + 0.5, campusAny() ? D - 0.5 : -0.4);
+  } else if (style) {   // избран облик на кулата (officestyle.js): модел от пакета или процедурна кула
     const o = buildOfficeTower(style, { model, fitScale, A }, 6.5 + level * 0.25);
     office = o.group; city.hqLm = o.update;
     dayNight.registerWindows(office);
@@ -1523,10 +1554,11 @@ function buildHQ() {
   g.userData.officeTop = ob.max.y - g.position.y;
   // табела на фирмата с нивото на офиса и бригадите
   const sign = label(officeSignText(), '#ffb300', 14);
-  sign.position.set(0, ob.max.y + 4.2 + (level === 10 ? 7 : 0), 0);   // на ниво 10 над табелата на покрива
+  sign.position.set(0, ob.max.y + 4.2 + (level === 10 || (O2 && level >= 5) ? 7 : 0), 0);   // на ниво 10 (и при новите нива от 5) — над табелата на покрива
   g.add(sign);
   g.userData.officeLabel = sign;
-  if (level === 10) {
+  if (O2 && level >= 5) roofLogo(g, office, level);   // 🆕 марката на фирмата на покрива; мястото — g.userData.roofLogo (кампусът на f6 може да го ползва)
+  else if (level === 10) {
     // светеща табела „СТРОИТЕЛНА ИМПЕРИЯ“ на покрива (от двете страни) и златна звезда над нея
     const c = document.createElement('canvas'); c.width = 1024; c.height = 256;
     const cg = c.getContext('2d'), grd = cg.createLinearGradient(0, 0, 0, 256);
@@ -9980,22 +10012,28 @@ if (AUTOTEST) {
       if (night != null) __dbg.time && __dbg.time(night ? 22 : 12);
       const mid = (spots[0].x + spots[4].x) / 2; controls.target.set(mid, 9, z0); camera.position.set(mid, 16, z0 + 78); fly = null; return city.bbRow.spots.length; },
     // 🏢 Лабораторията: всички нива на офиса, гаража и склада в три реда (градът скрит), човек за мащаб
-    hqLevelsRow() {
+    hqLevelsRow(view) {   // view 'new' — камерата към новите нива на офиса (office-levels2)
       if (city.hqRow) { scene.remove(city.hqRow); city.hqRow = null; }
-      const G = city.hqRow = new THREE.Group(), cx = city.hq.x, cz = city.hq.z, SP = 22, put = (o, x, z, txt) => { o.position.x += x; o.position.z += z; G.add(o); const b = new THREE.Box3().setFromObject(o), lb = label(txt, '#fff', 9); lb.position.set(x, b.max.y + 3, z); G.add(lb); };
-      const ground = new THREE.Mesh(new THREE.PlaneGeometry(SP * 11, 90), new THREE.MeshStandardMaterial({ color: 0x8f9a7c, roughness: 1 })); ground.rotation.x = -Math.PI / 2; ground.position.set(SP * 4.5, 0.02, 0); G.add(ground);
-      OFFICE_LEVELS.forEach((L, i) => {
+      const G = city.hqRow = new THREE.Group(); G.userData.view = view; const cx = city.hq.x, cz = city.hq.z, SP = 22, SP2 = 40, put = (o, x, z, txt) => { o.position.x += x; o.position.z += z; G.add(o); const b = new THREE.Box3().setFromObject(o), lb = label(txt, '#fff', 9); lb.position.set(x, b.max.y + 3, z); G.add(lb); };
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(SP2 * 13, 200), new THREE.MeshStandardMaterial({ color: 0x8f9a7c, roughness: 1 })); ground.rotation.x = -Math.PI / 2; ground.position.set(SP2 * 5.5, 0.02, -50); G.add(ground);
+      const nw = view === 'new', zN = nw ? 0 : -100;
+      if (!nw) OFFICE_LEVELS.forEach((L, i) => {
         let o; if (!L.model) { o = new THREE.Group(); const bx = new THREE.Mesh(new THREE.BoxGeometry(6, 2.6, 2.6), new THREE.MeshStandardMaterial({ color: 0xf2f2ee })); bx.position.y = 1.5; o.add(bx); }
         else { const n = L.model.split('@')[0]; if (!A[n]) return; o = model(n, fitScale(n, 6.5 + (i + 1) * 0.25)); const b = new THREE.Box3().setFromObject(o); o.position.set(-(b.min.x + b.max.x) / 2, 0, -(b.min.z + b.max.z) / 2); }
         put(o, i * SP, -28, `🏢 ${i + 1} · ${L.nm}`);
       });
-      GARAGE_LEVELS.forEach((L, i) => put(garageMesh(i + 1, Math.min(15, 8 + (i + 1) * 0.7), 6 + Math.min(i + 1, 8) * 0.15), i * SP, 0, `🚜 ${i + 1} · ${L.nm} (${L.cap})`));
-      WH_LEVELS.forEach((L, i) => put(warehouseMesh(i + 1), i * SP, 28, `📦 ${i + 1} · ${L.nm}`));
-      const pk = [0, 1, 2, 3, 4, 5].map(k => `sf-person-${k}`).find(n => A[n]); if (pk) for (const z of [-28, 0, 28]) { const m = model(pk, 1); m.position.set(-8, 0, z + 4); G.add(m); }
+      // 🆕 новите нива (office-levels2) — ред зад старите; размерите — истинските след мащаба (в скоби — без ограничението на парцела)
+      const [hw, hd] = lotHalf(city.hq), info = [];
+      let xN = -10; Promise.all(OFFICE2.map(office2Load)).then(list => list.forEach((src, i) => { if (!src || city.hqRow !== G) return; const L = OFFICE2[i], f = office2Fit(src, L), o = src.clone(); o.scale.setScalar(f.k);
+        xN += f.w / 2 + 10; put(o, xN, zN, `🆕 ${i + 1} · ${OFFICE_LEVELS[i].nm} · ${Math.round(f.h)} м · ${Math.round(f.w)}×${Math.round(f.d)}`); info.push([i + 1, Math.round(f.h), Math.round(f.w), Math.round(f.d)]); xN += f.w / 2; }));
+      G.userData.info = info;
+      if (!nw) GARAGE_LEVELS.forEach((L, i) => put(garageMesh(i + 1, Math.min(15, 8 + (i + 1) * 0.7), 6 + Math.min(i + 1, 8) * 0.15), i * SP, 0, `🚜 ${i + 1} · ${L.nm} (${L.cap})`));
+      if (!nw) WH_LEVELS.forEach((L, i) => put(warehouseMesh(i + 1), i * SP, 28, `📦 ${i + 1} · ${L.nm}`));
+      const pk = [0, 1, 2, 3, 4, 5].map(k => `sf-person-${k}`).find(n => A[n]); if (pk) for (const z of nw ? [0] : [-100, -28, 0, 28]) { const m = model(pk, 1); m.position.set(-8, 0, z + 4); G.add(m); }
       G.position.set(cx, 0, cz); scene.add(G); city.group.visible = false;
       __dbg.time && __dbg.time(12);
-      controls.target.set(cx + SP * 4.5, 4, cz); camera.position.set(cx + SP * 4.5, 95, cz + 150); controls.update();
-      return { offices: OFFICE_LEVELS.length, garages: GARAGE_LEVELS.length, wh: WH_LEVELS.length };
+      if (nw) { Object.assign(osmFog, { on: true, near: 900, far: 2400 }); weather.set('clear'); controls.target.set(cx + 225, 40, cz); camera.position.set(cx + 225, 105, cz + 330); }   // демото: мъглата далеч (weather.js я взима от osmFog) — редицата е ~300 м else { controls.target.set(cx + SP2 * 4.5, 20, cz - 30); camera.position.set(cx + SP2 * 4.5, 110, cz + 190); } controls.update();
+      return { offices: OFFICE_LEVELS.length, garages: GARAGE_LEVELS.length, wh: WH_LEVELS.length, hqLot: [hw * 2, hd * 2], info };
     },
     billboardLook(i = 0) { const s = city.billboards?.spots?.[i]; if (!s) return null; controls.target.set(s.x, 8, s.z); camera.position.set(s.x + Math.sin(s.ry) * 34 + 8, 14, s.z + Math.cos(s.ry) * 34); fly = null; return city.billboards.spots.length; },   // 🪧 демо
     muni: () => muni,   // 🏛️ поръчките на общината (тест)

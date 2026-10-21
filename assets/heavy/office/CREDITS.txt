@@ -1,0 +1,11 @@
+Нивата на офиса (game.js OFFICE2, флаг office-levels2). Олекотени (Blender decimate, по-светли текстури, webp, quantize). Лиценз CC BY — изисква се посочване на автора:
+office-l1.glb — "Site Office using Container" by asera2131 (@aseranempoeng), CC Attribution-ShareAlike, https://sketchfab.com/3d-models/site-office-using-container-f1f8f02b8ad2440984b041a489a4ec0b
+office-l2.glb — "Two-story modern office building" by lowspecs (@lowspecs), CC Attribution, https://sketchfab.com/3d-models/two-story-modern-office-building-caa35855dca54299921e04cddd17b837
+office-l3.glb — "Low rise wall to wall office building" by aitortilla01 (@aitortilla01), CC Attribution, https://sketchfab.com/3d-models/low-rise-wall-to-wall-office-building-3461ee8c13184a6bb3942ee552059235
+office-l4.glb — "Low rise wall to wall office building" by aitortilla01 (@aitortilla01), CC Attribution, https://sketchfab.com/3d-models/low-rise-wall-to-wall-office-building-2dd3bdd5e0724eb1b1025a922fa754cf
+office-l5.glb — "Low rise wall to wall office building" by aitortilla01 (@aitortilla01), CC Attribution, https://sketchfab.com/3d-models/low-rise-wall-to-wall-office-building-be7583ca46f5411d8921ac85d8c33f3f
+office-l6.glb — "Mid rise wall to wall office building" by aitortilla01 (@aitortilla01), CC Attribution, https://sketchfab.com/3d-models/mid-rise-wall-to-wall-office-building-4d2c3f3450ef4e849056b88b49873ce2
+office-l7.glb — "W2W building with 45 degree angle" by aitortilla01 (@aitortilla01), CC Attribution, https://sketchfab.com/3d-models/w2w-building-with-45-degree-angle-3aa1ea0087e448d7beb1c91e5b9d8eb0
+office-l8.glb — "NCCI Towers (Riyadh)" by aitortilla01 (@aitortilla01), CC Attribution, https://sketchfab.com/3d-models/ncci-towers-riyadh-81712b1642e44da1bc5146f0a207323b
+office-l9.glb — "Torre Picasso (Madrid)" by aitortilla01 (@aitortilla01), CC Attribution, https://sketchfab.com/3d-models/torre-picasso-madrid-f2779648c2444fa39a30b11b0ec1f4d3
+office-l10.glb — "Shinjuku Park Tower (Tokyo)" by aitortilla01 (@aitortilla01), CC Attribution, https://sketchfab.com/3d-models/shinjuku-park-tower-tokyo-0b53fac684a448349220104e8309956c

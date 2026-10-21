@@ -6,7 +6,8 @@
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';
 
-const MODE = { 'building-a': 'dark', 'building-b': 'cool', 'building-c': 'dark', 'building-d': 'dark', 'building-e': 'cool', 'building-f': 'cool',
+const MODE = { ...Object.fromEntries([3, 4, 5, 6, 7, 8, 9, 10].map(l => [`office2-l${l}`, 'dark'])),   // 🆕 новите нива на офиса (game.js OFFICE2): прозорците — по-тъмни от фасадата
+  'building-a': 'dark', 'building-b': 'cool', 'building-c': 'dark', 'building-d': 'dark', 'building-e': 'cool', 'building-f': 'cool',
   'building-g': 'dark', 'building-h': 'dark', 'building-skyscraper-a': 'dark', 'building-skyscraper-b': 'cool', 'building-skyscraper-c': 'cool',
   // Kenney Commercial 2 (обща палитра colormap): стъклата са синкавите петна; високите варианти (@20…) делят материала
   'building-i': 'kenney', 'building-j': 'kenney', 'building-k': 'kenney', 'building-l': 'kenney', 'building-m': 'kenney', 'building-n': 'kenney',
@@ -50,7 +51,8 @@ const MODE = { 'building-a': 'dark', 'building-b': 'cool', 'building-c': 'dark',
   'sf-sky-night': ['bright'], 'sf-sky-blue': ['cool', [/glass/i, 'solid'], [/./, null]],
   // обществените сгради (services3d.js: болници, полиция, пожарни, кметство, съд, училище) — мрежа прозорци по стените, както офисите
   ...Object.fromEntries(['school', 'fire', 'police', 'fire-l1', 'fire-m1', 'fire-s1', 'fire-s2', 'hosp-l1', 'hosp-l2', 'hosp-m1', 'hosp-m2', 'hosp-s1', 'hosp-s2', 'police-l1', 'police-l2', 'police-m1', 'police-s1', 'police-s2'].map(k => ['svc-' + k, 'grid2'])), 'svc-cityhall': 'vittoriano', 'svc-court': 'vittoriano' };   // кметството и съдът (стари сгради) — топли прожектори отдолу по фасадата, като Колизеума   // забележителност (landmarks.js) — хотелът в Лас Вегас: цялата фасада в топла светлина (прожектори), етажите леко различни
-const FLOORS = n => (n.startsWith('h2-') ? 2 : 0) || (n.startsWith('svc-') ? (/hosp/.test(n) ? 5 : 3) : 0) || (n.startsWith('ind-') ? 3 : 0) || ({ 'b2-office2': 6, 'b2-office3': 7, 'b2-office4': 9, 'b2-office5': 6, 'b2-office6': 7, 'b2-hirise': 22, 'b2-midwest': 4, 'b2-pp-townhouse': 4, Building_Small_1: 4, 'building-type-a': 1, 'building-type-b': 2, burj: 90, petronas: 88, bellagio: 28, 'building-skyscraper-d': 8, 'building-skyscraper-e': 8 })[n] || (/skyscraper|sf-sky/.test(n) ? 32 : 9);
+const OFFICE2_FL = [1, 2, 7, 7, 9, 14, 20, 30, 45, 52];   // етажите на новите нива на офиса (по модела)
+const FLOORS = n => (n.startsWith('office2-l') ? OFFICE2_FL[+n.slice(9) - 1] : 0) || (n.startsWith('h2-') ? 2 : 0) || (n.startsWith('svc-') ? (/hosp/.test(n) ? 5 : 3) : 0) || (n.startsWith('ind-') ? 3 : 0) || ({ 'b2-office2': 6, 'b2-office3': 7, 'b2-office4': 9, 'b2-office5': 6, 'b2-office6': 7, 'b2-hirise': 22, 'b2-midwest': 4, 'b2-pp-townhouse': 4, Building_Small_1: 4, 'building-type-a': 1, 'building-type-b': 2, burj: 90, petronas: 88, bellagio: 28, 'building-skyscraper-d': 8, 'building-skyscraper-e': 8 })[n] || (/skyscraper|sf-sky/.test(n) ? 32 : 9);
 // когато прозорците са отделна част, но със същия материал като стените: [/името на частта/, режим] — материалът ѝ се клонира
 const MESH_MODE = { 'h2-blue': [/Windows/i, 'solidW'] };   // синята къща — прозорците светят целите, топло
 // режимът на материала: MODE[name] е низ или [по подразбиране, [/име/, режим|null]…]
