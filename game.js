@@ -855,13 +855,30 @@ const LOWRISE = new Set(['washington']);   // ниски градове: без 
 const cityTier = id => MEGA.includes(id) || MEGAPOLIS.has(id) ? 'xl' : (CITIES.find(c => c.id === id)?.sz || 1) >= 3 ? 'l' : (CITIES.find(c => c.id === id)?.sz || 1) === 2 ? 'm' : 's';
 const SF_BLK = () => ['richmond', 'panel12', 'gamecity', 'soviet', 'oldbld', 'dbrick', 'brick', 'asian', 'modoffice', 'jade'].map(k => 'sf-blk-' + k).filter(n => A[n]);   // истински блокове
 const SF_SKY = () => ['sing', 'rand', 'usb', 'blue', 'night'].map(k => 'sf-sky-' + k).filter(n => A[n]);   // истинските небостъргачи (ако са заредени)
+// 🏢 (55, задачите от играта №1) обликът по региони: в България — много панелни блокове (6–12 етажа), малко американски кули;
+// в бившия соц. блок — същото, по-леко. В центъра на големите градове остават и модерни кули (без цилиндричната американска в БГ).
+const EAST_CC = new Set(['🇷🇴', '🇷🇸', '🇲🇰', '🇷🇺', '🇺🇦', '🇧🇾', '🇲🇩', '🇵🇱', '🇨🇿', '🇸🇰', '🇭🇺', '🇦🇱', '🇧🇦', '🇲🇪', '🇭🇷', '🇸🇮', '🇽🇰', '🇱🇹', '🇱🇻', '🇪🇪', '🇬🇪', '🇦🇲', '🇦🇿', '🇰🇿', '🇺🇿']);
+const panelTilt = id => { const c = cityById(id); if (!c) return 0; const cc = c.cc || '🇧🇬'; return cc === '🇧🇬' ? 1 : EAST_CC.has(cc) ? 0.5 : 0; };
+const PANELS = () => ['sf-blk-soviet', 'sf-blk-panel12'].filter(n => A[n]);
+const isTowerName = n => /skyscraper|^sf-sky-|@\d+$/.test(n);
+function regionTilt(cityId, lot, n) {
+  const k = panelTilt(cityId), P = PANELS(); if (!k || !P.length || !n) return n;
+  if (HOUSES.includes(n) || /^h2-|^building-type-|^ind-/.test(n)) return n;   // къщите и заводите остават
+  const h = hashStr('east:' + cityId + ':' + lot.id), u = (h % 1000) / 1000, pn = P[(h >>> 10) % P.length], core = lot.zone === 'center', big = /^(l|xl)$/.test(cityTier(cityId));
+  if (isTowerName(n)) {
+    if (core && big) { if (u < 0.3 * k) return pn; if (n === 'sf-sky-usb' && k >= 1) { const o = SF_SKY().filter(x => x !== 'sf-sky-usb'); return o.length ? o[(h >>> 4) % o.length] : pn; } return n; }   // центърът на големия град: повечето кули остават
+    return u < 0.8 * k ? pn : n;   // извън центъра — панелни блокове вместо кули
+  }
+  return u < (core ? 0.35 : 0.6) * k ? pn : n;   // блоковете и магазините
+}
 const MODERN_SKY = ['building-skyscraper-d', 'building-skyscraper-e'], MODERN = ['building-i', 'building-j', 'building-k', 'building-l', 'building-m', 'building-n'];
 // етажи на небостъргачите в поръчките според големината на града
 const TOWER_FLOORS0 = { s: [], m: [10], l: [10, 15, 20], xl: [20, 25, 30] };
 // мегаполисите: от ниво 15 — и 40 етажа
 const TOWER_FLOORS = new Proxy(TOWER_FLOORS0, { get: (o, k) => k === 'xl' && S && dev.has('SKY40') && A['building-skyscraper-d@40'] ? [25, 30, 40] : o[k] });
 // замяна на модела според големината (решава се по хеш на града и парцела, без нови r() — градовете не се разместват)
-function tierModel(cityId, lot, n) {
+const tierModel = (cityId, lot, n) => regionTilt(cityId, lot, tierModel0(cityId, lot, n));   // + обликът по региони (панелите в България)
+function tierModel0(cityId, lot, n) {
   const t = cityTier(cityId), h = hashStr('tier:' + cityId + ':' + lot.id);
   if (t === 's') {
     if (SKY.includes(n)) return h % 3 === 0 ? HOUSES[h % HOUSES.length] : ['building-a', 'building-b', 'building-c', 'building-d'][h % 4];   // блок до 3 етажа или къща
@@ -2335,8 +2352,10 @@ const scaffoldMat = new THREE.LineBasicMaterial({ color: 0xd9a53a });
 function buildingFor(type, floors = 20) {
   if (type === 'house') return pick(HOUSE_POOL);
   if (type === 'shop') return feature('real-shops') ? pick(shopPool()) : 'Building_Small_1';   /* real-shops (55): истинските магазини building-a…h */
+  const tilt = S ? panelTilt(S.cityId) : 0;   // България (и по-леко бившият соц. блок): панелни блокове, малко американски кули
+  if (type === 'office' && tilt && PANELS().length && Math.random() < 0.5 * tilt) return pick(PANELS());
   if (type === 'office') return SF_BLK().length && Math.random() < 0.5 ? pick(SF_BLK()) : feature('real-shops') ? pick(['building-e', 'building-c', 'building-f']) : 'Building_Medium_2_001';
-  if (floors >= 15 && SF_SKY().length && Math.random() < 0.4) return pick(SF_SKY());   // разнообразие: истински небостъргачи
+  if (floors >= 15 && SF_SKY().length && Math.random() < 0.4 * (1 - 0.7 * tilt)) return pick(tilt >= 1 ? SF_SKY().filter(x => x !== 'sf-sky-usb') : SF_SKY());   // разнообразие: истински небостъргачи (в БГ — по-рядко, без цилиндричната)
   if (floors > 20 || (cityTier(S.cityId) === 'xl' && A['building-skyscraper-d@20'])) return `${pick(MODERN_SKY)}@${Math.max(20, floors)}`;
   return `${pick(SKY)}@${Math.min(20, floors)}`;
 }
