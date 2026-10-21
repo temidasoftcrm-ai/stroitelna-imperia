@@ -19,7 +19,10 @@ body.hub1:not(.mob) #top::after { display:none; }
 #btnHub.on { background:var(--acc); color:#111; }
 #btnHub.new { box-shadow:0 0 0 2px #ffd54a, 0 0 14px rgba(255,213,74,.7); animation:hubPulse 1.4s ease-in-out infinite; }
 @keyframes hubPulse { 50% { box-shadow:0 0 0 2px #ffd54a, 0 0 4px rgba(255,213,74,.2); } }
+#hub .grid > button { position:relative; }
 #hub .grid > button.new { box-shadow:0 0 0 2px #ffd54a inset; }
+#hub .grid > button.new::after { content:''; position:absolute; top:6px; right:6px; width:9px; height:9px; border-radius:50%; background:#ff5252; box-shadow:0 0 6px #ff5252; }   /* новото вътре — с точка */
+#btnNewVer { font-weight:800; color:#111; background:#ffd54a; animation:hubPulse 1.4s ease-in-out infinite; box-shadow:0 0 0 2px #ffd54a, 0 0 14px rgba(255,213,74,.7); }
 #hub { position:fixed; z-index:40; top:calc(var(--topH, 52px) + 6px); width:min(640px, calc(100vw - 24px)); max-height:calc(100vh - 90px); overflow:auto;
   background:var(--panel); border:1px solid var(--line); border-radius:14px; box-shadow:0 16px 40px rgba(0,0,0,.5); padding:10px; display:none; }
 #hub.on { display:block; }
@@ -58,9 +61,11 @@ export function mountHub(top, after, opts = {}) {
   let seen = '';
   const badges = () => [...grid.querySelectorAll(':scope > button')].filter(b => b.style.display !== 'none' && b.querySelector('b[style*="ffd54a"]'));
   const sigOf = L => L.map(b => b.id + ':' + b.querySelector('b[style*="ffd54a"]').textContent.trim()).join('|');
-  const mark = () => { if (hub.classList.contains('on')) return; const L = badges(), isNew = !!L.length && sigOf(L) !== seen; btn.classList.toggle('new', isNew); };
+  const forced = new Set();   // window.hubNew(id) — игра казва „ново вътре“ (предложение, награда, отчет…), без жълто число
+  window.hubNew = id => { forced.add(id); mark(); };
+  const mark = () => { if (hub.classList.contains('on')) return; const L = badges(), isNew = (!!L.length && sigOf(L) !== seen) || [...forced].some(id => { const b = document.getElementById(id); return b && b.parentNode === grid && b.style.display !== 'none'; }); btn.classList.toggle('new', isNew); };
   setInterval(mark, 2000);
-  const open = v => { if (v) { const L = badges(), sig = sigOf(L); grid.querySelectorAll(':scope > button.new').forEach(b => b.classList.remove('new')); if (sig !== seen) L.forEach(b => b.classList.add('new')); seen = sig; btn.classList.remove('new'); } if (v && opts.extra) { try { extra.innerHTML = opts.extra() || ''; } catch { extra.innerHTML = ''; } } if (v) locks(); hub.classList.toggle('on', v); btn.classList.toggle('on', v); btn.textContent = v ? '📊 Империя ▴' : '📊 Империя ▾'; if (v) place(); };
+  const open = v => { if (v) { const L = badges(), sig = sigOf(L); grid.querySelectorAll(':scope > button.new').forEach(b => b.classList.remove('new')); if (sig !== seen) L.forEach(b => b.classList.add('new')); for (const id of forced) document.getElementById(id)?.classList.add('new'); forced.clear(); seen = sig; btn.classList.remove('new'); } if (v && opts.extra) { try { extra.innerHTML = opts.extra() || ''; } catch { extra.innerHTML = ''; } } if (v) locks(); hub.classList.toggle('on', v); btn.classList.toggle('on', v); btn.textContent = v ? '📊 Империя ▴' : '📊 Империя ▾'; if (v) place(); };
   btn.onclick = e => { e.stopPropagation(); open(!hub.classList.contains('on')); };
   grid.addEventListener('click', () => setTimeout(() => open(false), 0));   // избор на плочка → прозорецът ѝ се отваря, панелът се затваря
   addEventListener('click', e => { if (hub.classList.contains('on') && !hub.contains(e.target) && e.target !== btn) open(false); });
@@ -68,5 +73,11 @@ export function mountHub(top, after, opts = {}) {
   addEventListener('resize', () => { if (hub.classList.contains('on')) place(); });
   take(); document.body.classList.add('hub1'); dispatchEvent(new Event('resize'));   // по-ниската лента — рендерът и панелите се преоразмеряват
   new MutationObserver(take).observe(top, { childList: true });
+  // 🆕 нова версия на сървъра (cloud.js VERSION) — на ~5 мин; ако е друга от заредената → бутон „Нова версия — презареди“, който свети
+  if (opts.version) { const VER = t => (/export const VERSION = '([^']+)'/.exec(t || '') || [])[1], tag = document.querySelector('script[src^="cloud.js"]');   // заредената — същият адрес като в index.html (от кеша)
+    let cur = null; fetch(tag ? tag.getAttribute('src') : 'cloud.js').then(r => r.ok ? r.text() : '').then(t => { cur = VER(t); }).catch(() => {});
+    const chk = () => cur && fetch('cloud.js?t=' + Date.now(), { cache: 'no-store' }).then(r => r.ok ? r.text() : '').then(t => { const v = VER(t); if (!v || v === cur || document.getElementById('btnNewVer')) return; const m = [0, v];
+      const b = document.createElement('button'); b.id = 'btnNewVer'; b.className = 'btn2'; b.textContent = `🆕 Нова версия ${m[1]} — презареди`; b.title = 'Записът се пази — презарежда играта с новата версия'; b.onclick = () => location.reload(); btn.after(b); }).catch(() => {});
+    setTimeout(chk, 60000); setInterval(chk, 5 * 60000); }
   return { open, el: hub };
 }

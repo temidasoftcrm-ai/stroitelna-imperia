@@ -131,7 +131,7 @@ export function createFires(deps) {
     const o = f.order, stg = o.kind === 'clear' ? CLEAR : STAGES, days = stg.reduce((a, s) => a + s[1], 0);
     return `<b>${o.kind === 'clear' ? '🏗️ Разчистване и нов строеж' : '🏗️ Спешно възстановяване'}</b> · остатъчна здравина <b style="color:${f.hp < 30 ? '#ff6b6b' : '#ffd54a'}">${Math.round(f.hp)}%</b><br>
       Етапи: ${stg.map(s => `${s[0]} (${s[1]} ${s[1] === 1 ? 'ден' : 'дни'})`).join(' → ')}<br>
-      Нужни: 👷 бригада · 🧑‍🔧 инженер · 📦 материали <b>${fmt(o.cost)} €</b><br>
+      Нужни: 👷 бригада и техника (щом се освободят) · 📦 материали ~<b>${fmt(o.cost)} €</b> (от склада, по етапи)<br>
       Възнаграждение: <b style="color:#43d17a">${fmt(o.reward)} €</b> · срок: ${days + 6} дни (до ден ${Math.ceil(o.deadline)})`;
   }
   function offer(f, kind) {
@@ -148,6 +148,11 @@ export function createFires(deps) {
   }
   function accept(id) {
     const f = st().find(q => q.id === id); if (!f || !f.order || f.order.st !== 'offer') return false;
+    if (deps.startJob) {   // истински обект в „Обекти“: етапите, бригадата (щом се освободи), техниката и материалите — като всеки строеж; плаща се при завършване
+      const lot = lotOf(f), pid = lot && deps.startJob(f, lot); if (!pid) return false;
+      f.order.st = 'work'; f.order.pid = pid; f.order.t0 = deps.day(); f.st = 'repair'; drop(f.id);
+      deps.toast('🏗️ Приета — обектът е в „Обекти“. Бригадата тръгва, щом се освободи.', 'good'); deps.save(); return true;
+    }
     const why = !deps.crewFree() ? 'Няма свободна бригада.' : !deps.hasStaff('engineer') ? 'Трябва инженер (таб „Офис“ → Специалисти).' : !deps.econ().canAfford(f.order.cost) ? `Нямаш ${fmt(f.order.cost)} € за материали.` : null;
     if (why) { deps.toast(`🏗️ ${why}`, 'bad'); return false; }
     deps.econ().spend(f.order.cost, 'обект', f.order.kind === 'clear' ? 'Разчистване след пожар' : 'Спешно възстановяване след пожар');
@@ -176,6 +181,10 @@ export function createFires(deps) {
             f.hp = Math.max(0, f.hp - h * BURN * f.sev * f.inten);
             if (f.hp <= 0 || f.inten <= 0) { f.out = tt; f.inten = 0; assess(f); }
           }
+        } else if (f.st === 'repair' && f.order && f.order.pid != null) {   // обектът в „Обекти“ води напредъка; изчезне ли — завършен (платен от играта)
+          const p = deps.project && deps.project(f.order.pid), n = p ? ((p.type === 'fireClear' ? 4 : 3)) : 1;
+          if (p) { f.order.prog = Math.min(1, ((p.stage || 0) + (p.prog || 0)) / n); f.hp = Math.max(f.hp, f.order.kind === 'clear' ? 0 : 100 * f.order.prog); }
+          else { f.order.st = 'done'; f.order.prog = 1; f.st = 'done'; f.hp = 100; f.out = f.out ?? now; const lot = lotOf(f); if (lot && lot.busy === 'secured') lot.busy = null; deps.save(); }
         } else if (f.st === 'repair' && f.order) {
           const stg = f.order.kind === 'clear' ? CLEAR : STAGES, days = stg.reduce((a, s) => a + s[1], 0);
           f.order.prog = Math.min(1, (now - f.order.t0) / days);
@@ -186,6 +195,7 @@ export function createFires(deps) {
       }
       // визуалното
       const lot = lotOf(f); if (!lot) continue;
+      if (f.order && f.order.pid != null) { if (vis.has(f.id)) drop(f.id); continue; }   // обект — визуалното е на строежа (скеле, събаряне)
       let v = vis.get(f.id); if (!v && f.st !== 'done') v = build(f); if (!v) continue;
       const near = cam.distanceTo(v.W.ctr) < 160;
       const burning = f.st === 'travel' || f.st === 'fight';

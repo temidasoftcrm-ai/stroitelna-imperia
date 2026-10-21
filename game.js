@@ -2076,6 +2076,7 @@ const fires = createFires({ S: () => S, group: () => city.group, lots: () => cit
   startPoint: at => { let best = null, bs = -1; for (let k = 0; k < 30; k++) { const p = roadPoint(); if (!p) continue; const d = Math.hypot(p.x - at.x, p.z - at.z), sc = d < 120 ? d : d > 300 ? 600 - d : 300; if (sc > bs) { bs = sc; best = p; } } return best; },
   day: () => S.day + S.dayT / DAY_SEC, cam: () => camera.position, econ: () => econ, hasStaff: k => hasStaff(k), crewFree: () => units.some(u => u.type === 'crew' && u.state === 'idle'),
   modal: (...a) => modal(...a), toast: (...a) => toast(...a), fly: lot => flyTo(lot), save: () => save(),   // обвити — дефинирани по-долу във файла
+  startJob: (f, lot) => startFireJob(f, lot), project: id => projects.find(q => q.id === id) || null,   // поръчките след пожар — обекти
   rebuild: lot => { if (lot.obj) city.group.remove(lot.obj); const b = (S.built || []).find(x => x.lot === lot.id); placeBuilding(lot, b ? b.model : lot.built, b ? b.rot || 0 : lot.rot || 0); } });
 function addCar() {
   let i = 3 * ((Math.random() * NBI) | 0), j = (Math.random() * NJ) | 0;
@@ -2438,7 +2439,7 @@ function finishDemo(p) {
 }
 function makeSite(p) {
   if (p.demo && city.lots[p.lot].obj) return makeDemoSite(p);
-  if (p.maint || p.remodel || p.park) return makeRenoSite(p);
+  if (p.maint || p.remodel || p.park || p.fixFire) return makeRenoSite(p);   // ремонтът след пожар — сградата остава, скеле около нея
   if (p.own) return makeOwnSite(p);
   if (p.model) p.model = houseOf(p.model, p.lot);   // детска къща в започнат строеж — истинска (feature 'houses-real')
   if (p.reno) return makeRenoSite(p);
@@ -3200,6 +3201,7 @@ function completeProject(p) {
   spawnCash(cash);
   const lot = city.lots[p.lot];
   lot.busy = null;
+  if (p.fire != null) S.built = S.built.filter(x => x.lot !== p.lot);   // след пожар — същият парцел, без двоен запис
   S.built.push({ lot: p.lot, model: p.model });
   projects.splice(projects.indexOf(p), 1);
   S.done++;
@@ -8473,7 +8475,7 @@ const cityPanel = createCityPanel({ S: () => S, firmLv: () => dev.best(), firmUp
   mk('btnOffers', '📜 Оферти', 'Оферти от доставчици и търгове', 'offers');
   mk('btnMines', '⛏️ Добив', 'Кариери, мини и заводи в Азия · енергия в Австралия · автоматизация', 'mines');
   mk('btnUpg', '🏢 Подобрения', 'Офис, склад, гараж и гара във всеки град', 'upg'); $('btnUpg').style.display = 'none'; }   // подобренията са подтаб в „🏙️ Градове“
-if (feature('top-hub')) setTimeout(() => mountHub($('top'), $('devBtn'), { extra: hubProgHtml }), 0);   // лентата на един ред: останалото — в „📊 Империя ▾“
+if (feature('top-hub')) setTimeout(() => mountHub($('top'), $('devBtn'), { extra: hubProgHtml, version: true }), 0);   // лентата на един ред: останалото — в „📊 Империя ▾“
 // всеки ден: готовите строежи от картата (в другите градове, и в текущия, ако си влязъл там междувременно)
 function rbuildTick() {
   const done = (c, id) => {
@@ -8573,6 +8575,21 @@ function rebuildBigger(lotId) {
 }
 // ---- паркове: строят се на твой парцел; вдигат наемите (+15%) и цените в радиус ~2 карета
 const PARK_COST = 25000, PARK_R = 34;
+// 🔥 fire-seq: поръчките след пожар — истински обекти в „Обекти“ (бригада, техника, материали по етапи), платени при завършване
+BTYPES.fireFix = { nm: 'Спешно възстановяване', ico: '🔥', est: true, rep: Infinity, repGain: 0.3,
+  stages: [{ nm: 'Обезопасяване', need: { crew: 1 }, work: 15 }, { nm: 'Конструкция', need: { crew: 1, truck: 1 }, work: 35 }, { nm: 'Фасада', need: { crew: 1 }, work: 20 }] };
+BTYPES.fireClear = { nm: 'Разчистване и нов строеж', ico: '⬛', est: true, rep: Infinity, repGain: 0.3,
+  stages: [{ nm: 'Разчистване', need: { loader: 1, truck: 1 }, work: 25 }, { nm: 'Основи', need: { truck: 1, crew: 1 }, work: 25 }, { nm: 'Конструкция', need: { crew: 1 }, work: 45 }, { nm: 'Фасада', need: { crew: 1 }, work: 20 }] };
+ECON.STAGE_MATERIALS.fireFix = [{ sand: 4 }, { concrete: 16, bricks: 3, steel: 2 }, { glass: 12, sand: 8 }];
+ECON.STAGE_MATERIALS.fireClear = [{}, { gravel: 20, concrete: 20 }, { concrete: 24, bricks: 4, steel: 3 }, { glass: 14, sand: 10 }];
+// приетата поръчка → обект; връща id-то му (firesim следи напредъка и завършването)
+function startFireJob(f, lot) {
+  const clear = f.order.kind === 'clear',   /* спешната поръчка — и над капацитета на офиса (бригадата идва, щом се освободи) */ b = (S.built || []).find(x => x.lot === lot.id), mdl = b ? b.model : lot.built;
+  const p = { id: S.seq++, type: clear ? 'fireClear' : 'fireFix', fire: f.id, fixFire: !clear, lot: lot.id, client: 'собственикът', title: `${clear ? '⬛ Разчистване и нов строеж' : '🔥 Спешно възстановяване'} след пожар`,
+    reward: f.order.reward, repGain: 0.3, startDay: S.day, deadlineDay: Math.ceil(f.order.deadline), stage: 0, prog: 0, model: mdl, demo: clear && lot.obj ? { prog: 0, days: 2.5 } : undefined };
+  lot.busy = 'project'; projects.push(p); makeSite(p); dispatch(); save(); renderPanel();
+  return p.id;
+}
 BTYPES.park = { nm: 'Парк', ico: '🌳', est: true, rep: Infinity, repGain: 0, stages: [{ nm: 'Озеленяване', need: { tractor: 1 }, work: 25 }] };   // само трактор: с бригада паркът чакаше вечно (бригадите са все по къщите)
 const parksNear = lot => (S.parks || []).filter(id => id !== lot.id && Math.hypot(city.lots[id].x - lot.x, city.lots[id].z - lot.z) <= PARK_R).length;
 const parkMul = lot => 1 + Math.min(2, parksNear(lot)) * 0.15;
@@ -9588,7 +9605,7 @@ function updHoldBtn() {
   let b = $('holdBtn');
   if (!b) { const top = document.getElementById('top'); if (!top) return; b = document.createElement('button'); b.id = 'holdBtn'; b.className = 'btn2'; b.style.cssText = 'color:#ffd54a;font-weight:800'; b.onclick = () => openBig('group'); top.insertBefore(b, $('superBtn') || top.querySelector('.sp')); }
   const on = !!(S && S.holding); b.style.display = on ? '' : 'none';
-  if (on) { const bon = group.dailyBonus(); b.innerHTML = `🏛️ Холдинг${bon ? ` <b style="color:#7dffa8">+${fmt(bon)}/ден</b>` : ''}`; }
+  if (on) { const bon = group.dailyBonus(), aw = feature('awards') ? awardsPending((S.hold && S.hold.awards) || {}).length : 0; b.innerHTML = `🏛️ Холдинг${bon ? ` <b style="color:#7dffa8">+${fmt(bon)}/ден</b>` : ''}${aw ? ` <b style="color:#ffd54a">🏆 ${aw}</b>` : ''}`; }   // 🏆 награди за връчване — жълто число → „Империя ▾“ свети
 }
 const autoLog = t => { S.autoLog = [`ден ${S.day}: ${t}`, ...(S.autoLog || [])].slice(0, 10); };
 function autoTick() {
