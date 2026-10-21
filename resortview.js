@@ -14,47 +14,6 @@ import { loadMountains, mtnModel } from './mtn.js';
 const mat = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9, ...o });
 const rnd = (seed => () => (seed = (seed * 16807) % 2147483647) / 2147483647);
 
-// дървена хижа от модулите на Kenney Holiday Kit: W×D клетки, стени с прозорци и врата, двускатен заснежен покрив.
-// Клетката е 1×1 (стената е на ръба +z на клетката); s = метри на клетка.
-export const CHALET_PIECES = ['cabin-wall', 'cabin-corner-logs', 'cabin-window-a', 'cabin-window-large', 'cabin-doorway', 'cabin-door-rotate',
-  'cabin-roof-snow', 'cabin-roof-snow-chimney', 'cabin-wall-roof', 'cabin-roof-top', 'floor-wood-snow'];
-export function buildChalet(A, model, s = 3.2, seed = 1) {
-  const g = new THREE.Group(), W = 2, D = 3;
-  const put = (n, x, z, ry, y = 0) => { if (!A[n]) return; const o = model(n, 1); o.position.set(x, y, z); o.rotation.y = ry; g.add(o); };
-  const cx = i => i - W / 2 + 0.5, cz = j => j - D / 2 + 0.5;   // център на клетка
-  for (let i = 0; i < W; i++) for (let j = 0; j < D; j++) put('floor-wood-snow', cx(i), cz(j), 0);
-  // стени: отпред (z+) врата и прозорец, отстрани прозорци, отзад плътно
-  for (let i = 0; i < W; i++) {
-    put(i === 0 ? 'cabin-doorway' : 'cabin-window-large', cx(i), cz(D - 1), 0);
-    if (i === 0) put('cabin-door-rotate', cx(i), cz(D - 1), 0);
-    put('cabin-wall', cx(i), cz(0), Math.PI);
-  }
-  for (let j = 0; j < D; j++) {
-    const n = j === 1 ? 'cabin-window-a' : 'cabin-wall';
-    put(n, cx(0), cz(j), -Math.PI / 2);
-    put(n, cx(W - 1), cz(j), Math.PI / 2);
-  }
-  // ъгли
-  put('cabin-corner-logs', cx(0), cz(D - 1), 0);
-  put('cabin-corner-logs', cx(W - 1), cz(D - 1), Math.PI / 2);
-  put('cabin-corner-logs', cx(W - 1), cz(0), Math.PI);
-  put('cabin-corner-logs', cx(0), cz(0), -Math.PI / 2);
-  // фронтони над стените (отпред и отзад)
-  for (let i = 0; i < W; i++) {
-    put('cabin-wall-roof', cx(i), cz(D - 1), 0, 1);
-    put('cabin-wall-roof', cx(i), cz(0), Math.PI, 1);
-  }
-  // двускатен покрив: билото е по оста x = 0, всяка половина пада навън
-  for (let j = 0; j < D; j++) {
-    put(j === 1 && seed % 2 ? 'cabin-roof-snow-chimney' : 'cabin-roof-snow', cx(W - 1), cz(j), 0, 1);
-    put('cabin-roof-snow', cx(0), cz(j), Math.PI, 1);
-    put('cabin-roof-top', 0, cz(j), 0, 2.3);
-  }
-  g.scale.setScalar(s);
-  g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-  return g;
-}
-
 // шумна текстура (трева/пясък/сняг): различни петна, за да не е земята еднаква
 function noiseTex(base, spread, n = 2600, rep = 60) {
   const c = document.createElement('canvas'); c.width = c.height = 256;
@@ -355,7 +314,7 @@ export function buildResortView(A, r, st, season, deps) {
     }
     // борове (заснежени в сезона)
     const sfk = snowy ? 'pinesnow' : 'pine', sf = [0, 1, 2, 3, 4].map(i => `sf-${sfk}-${i}`).filter(n => A[n]);   // по-хубавите борове (Sketchfab)
-    const pine = sf.length ? (snowy ? sf : [...sf, ...[0, 1, 2, 3].map(i => `sf-tree-${i}`).filter(n => A[n])]) : snowy ? ['tree-snow-a', 'tree-snow-b', 'tree-snow-c'] : ['tree'];
+    const pine = sf.length ? (snowy ? sf : [...sf, ...[0, 1, 2, 3].map(i => `sf-tree-${i}`).filter(n => A[n])]) : ['tree'];   // без Sketchfab боровете — простата елха (детските заснежени са изтрити)
     for (let k = 0; k < 90; k++) {
       const x = (rand() - 0.5) * 380, z = -120 + rand() * 230;
       if (Math.abs(x) < 70 && z > -10) continue;   // мястото на селището и пистата остават свободни
@@ -385,7 +344,6 @@ export function buildResortView(A, r, st, season, deps) {
       const realC = !summer && feature('resort-real') ? ['sf-aframe', 'sf-cabin2', 'sf-chalet', 'sf-cabin3'].filter(n => A[n]) : [];   // истинските хижи — по ред, без детските
       if (realC.length) { const n = realC[k % realC.length]; o = deps.model(n, deps.fitScale(n, n === 'sf-aframe' ? 13 : 12)); o.rotation.y = 0; }
       else if (!summer && A['sf-aframe'] && k % 2 === 0) { o = deps.model('sf-aframe', deps.fitScale('sf-aframe', 13)); o.rotation.y = 0; }   // A-frame хижи (Sketchfab), редувани с дървените
-      else if (!summer && A['cabin-wall']) o = buildChalet(A, deps.model, 3.4, k);   // зимните курорти: дървени хижи
       else {
         const pool = deps.houses, n = pool[(k * 3 + r.id.length) % pool.length];   // истинските къщи (feature 'houses-real') — вместо Kenney
         const fit = n.startsWith('h2-') ? 14 : n === 'building-type-a' || n === 'building-type-b' ? 15 : 11;

@@ -194,24 +194,6 @@
     "ok": false
    },
    {
-    "n": "tree-snow-a",
-    "f": "assets/holiday/tree-snow-a.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "tree-snow-b",
-    "f": "assets/holiday/tree-snow-b.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "tree-snow-c",
-    "f": "assets/holiday/tree-snow-c.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
     "n": "bench",
     "f": "assets/holiday/bench.glb",
     "st": "детски — ползва се",
@@ -220,72 +202,6 @@
    {
     "n": "lantern",
     "f": "assets/holiday/lantern.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "cabin-wall",
-    "f": "assets/holiday/cabin-wall.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "cabin-corner-logs",
-    "f": "assets/holiday/cabin-corner-logs.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "cabin-window-a",
-    "f": "assets/holiday/cabin-window-a.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "cabin-window-large",
-    "f": "assets/holiday/cabin-window-large.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "cabin-doorway",
-    "f": "assets/holiday/cabin-doorway.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "cabin-door-rotate",
-    "f": "assets/holiday/cabin-door-rotate.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "cabin-roof-snow",
-    "f": "assets/holiday/cabin-roof-snow.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "cabin-roof-snow-chimney",
-    "f": "assets/holiday/cabin-roof-snow-chimney.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "cabin-wall-roof",
-    "f": "assets/holiday/cabin-wall-roof.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "cabin-roof-top",
-    "f": "assets/holiday/cabin-roof-top.glb",
-    "st": "детски — ползва се",
-    "ok": false
-   },
-   {
-    "n": "floor-wood-snow",
-    "f": "assets/holiday/floor-wood-snow.glb",
     "st": "детски — ползва се",
     "ok": false
    }
