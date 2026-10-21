@@ -220,7 +220,7 @@ function realSirens(car, kind) {
   const bb = new THREE.Box3().setFromObject(car), W = bb.max.x - bb.min.x, Lc = bb.max.z - bb.min.z, cols = [...(BAR_COL[kind] || BAR_COL.police)], segs = [];
   for (const o of nodes) { const side = o.userData.side ?? (/_R/.test(o.name) ? 1 : 0), col = SIREN_COL[o.userData.col] ?? cols[side]; cols[side] = col;
     const ms = []; o.traverse(m => { if (m.isMesh) ms.push(m); });
-    for (const m of ms) { const mat = BEACON[side ? 'b' : 'r'].clone(); mat.emissive.setHex(col); mat.color.setHex(col).multiplyScalar(0.25); mat.transparent = true; mat.opacity = 0.9;
+    for (const m of ms) { const mat = BEACON[side ? 'b' : 'r'].clone(); mat.emissive.setHex(col); mat.color.setHex(col).multiplyScalar(0.25); mat.transparent = true; mat.opacity = 0.6; mat.depthWrite = false;
       const sg = new BarSeg(m.geometry, mat); sg.name = m.name; sg.position.copy(m.position); sg.quaternion.copy(m.quaternion); sg.scale.set(1, 1, 1); sg.castShadow = false;
       sg.userData = { red: false, kind, side, j: 0 }; m.parent.add(sg); m.parent.remove(m); segs.push(sg); } }
   (segs.find(x => x.userData.side === 0) || segs[0]).userData.red = true;   // звукът и sirenKind — от една леща
