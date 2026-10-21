@@ -2484,6 +2484,8 @@ const AWARD_RULES = {
   hotel: { at: [1, 5, 15, 40], v: () => Object.values(S.hotels || {}).filter(h => (h.t || 0) >= 2).length, res: n => `${fmt(n)} хотела 5★ и Гранд по света` },
   // потребителят: „борд на годината при 100% завършване на света“ — платината при 100%; по пътя — 25 / 50 / 75%
   year: { at: [25, 50, 75, 100], v: () => { const L = CITIES.filter(c => !AIR_ONLY.has(c.id) && c.id !== NEOM_ID); return L.length ? Math.floor(100 * L.filter(c => econ.isFinished(c.id)).length / L.length) : 0; }, res: n => `${n}% от света е завършен` },
+  // Империал Сити: 6 поредни месеца (imperial.js пази месечните средни: удовлетвореност и баланс) с удовлетвореност ≥ прага и баланс на плюс → прагът
+  city: { at: [60, 70, 80, 90], v: () => { const H = (imperial.state() || {}).hist || []; let best = 0; for (const T of [60, 70, 80, 90]) { let run = 0; for (let i = H.length - 1; i >= 0 && H[i].sat >= T && H[i].bal > 0; i--) run++; if (run >= 6) best = T; } return best; }, res: n => `6 месеца поред: удовлетвореност ≥ ${n}% и баланс на плюс в Империал Сити` },
   oil: { at: [3, 10, 30, 80], v: () => { const L = mines.state().sites, has = k => L.some(x => x.kind === k); return has('oilwell') && has('refinery') && has('terminal') ? L.filter(x => ['oilwell', 'refinery', 'terminal'].includes(x.kind)).length : 0; }, res: n => `${fmt(n)} обекта във веригата добив → преработка → доставка` },
 };
 // „Златен резерв“ (Борис): серия от месеци (по 30 игрови дни) — касата не пада под резерва му (оперативният от boardlogic, с „Резерв“ от трезора при vault-rules)
@@ -2539,6 +2541,7 @@ function setupWorld() {
   if (S.whLot != null) city.lots[S.whLot].busy = 'warehouse';
   for (const k of Object.keys(S.lotAuto || {})) if (S[lotKey[k]] == null) autoLot(k);   // строено от картата, докато не беше тук
   delete S.lotAuto;
+  if (feature('hq-campus')) campusRepair();   // гаражът/складът върху сграда (стари записи) → на свободен парцел до централата
   S.units.forEach((t, i) => { const u = spawnUnit(t); u.xp = (S.unitXp || [])[i] || 0; });
   buildHQ();
   for (const id of S.cleared || []) { const l = city.lots[id]; if (l.obj) city.group.remove(l.obj); l.obj = null; l.built = null; for (const t of l.trees || []) city.group.remove(t); l.trees = []; }
@@ -7967,9 +7970,24 @@ function upgHudHtml() {
 // в друг град — строи се сам за няколко дни (S.cities[id].rbuild), без да влизаш там
 const RB_DAYS = (kind, target) => kind === 'station' ? STATION_LEVELS[target - 1].days : kind === 'office' ? 2 + target : 2 + Math.ceil(target / 2);
 function freeLotNearHq() {
-  // при влизане в града сградите още не са поставени — затова се гледа и записът
-  const used = new Set([...(S.built || []).map(b => b.lot), ...projects.map(p => p.lot), ...(S.offers || []).map(o => o.lot), ...((S.estate || {}).land || []), ...((S.estate || {}).owned || []).map(o => o.lot), ...((S.rivals || {}).sites || []).map(x => x.lot)]);
-  return city.lots.filter(l => !l.built && !l.busy && !used.has(l.id)).sort((a, b) => Math.hypot(a.x - city.hq.x, a.z - city.hq.z) - Math.hypot(b.x - city.hq.x, b.z - city.hq.z))[0] || null;
+  // при влизане в града сградите още не са поставени — затова се гледа и записът (и S.projects: projects още е от предишния град)
+  const used = new Set([...(S.built || []).map(b => b.lot), ...projects.map(p => p.lot), ...(S.projects || []).map(p => p.lot), ...(S.offers || []).map(o => o.lot), ...((S.estate || {}).land || []), ...((S.estate || {}).owned || []).map(o => o.lot), ...((S.rivals || {}).sites || []).map(x => x.lot)]);
+  const occ = occupiedLots(S.cityId);   // и търговете, парковете, разчистените, парите на покрива…
+  return city.lots.filter(l => !l.built && !l.busy && !used.has(l.id) && !occ.has(l.id)).sort((a, b) => Math.hypot(a.x - city.hq.x, a.z - city.hq.z) - Math.hypot(b.x - city.hq.x, b.z - city.hq.z))[0] || null;
+}
+// 🏢 (hq-campus) стари записи: гаражът или складът на парцел, на който има и сграда/обект на играча (autoLot при влизане гледаше
+// обектите на предишния град) — местят се на най-близкия свободен парцел до централата; сградата остава, нищо не се събаря.
+function campusRepair() {
+  for (const kind of ['garage', 'warehouse']) {
+    const key = lotKey[kind], id = S[key]; if (id == null) continue;
+    const clash = (S.built || []).some(b => b.lot === id) || (S.projects || []).some(p => p.lot === id && !p.own) || ((S.estate || {}).owned || []).some(o => o.lot === id);
+    if (!clash) continue;
+    const old = city.lots[id]; if (old && old.busy === kind) old.busy = null;
+    S[key] = null;
+    const l = autoLot(kind);
+    if (!l) { S[key] = id; if (old) old.busy = kind; continue; }   // няма свободен парцел — остава както беше
+    (S.campusLog = S.campusLog || []).push({ kind, from: id, to: l.id, day: S.day });
+  }
 }
 function autoLot(kind) {
   const l = freeLotNearHq(); if (!l) return null;
