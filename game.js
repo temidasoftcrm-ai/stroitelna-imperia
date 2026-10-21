@@ -2472,6 +2472,27 @@ function newGameEnter(brand) {
   save();
 }
 const cityName = () => CITIES.find(c => c.id === S.cityId).nm;
+// 🏆 отличията (флаг awards, awards3d.js): мерките по директори и праговете на степените; връща заслужените над вече връчените
+const AWARD_TIERS = ['bronze', 'silver', 'gold', 'platinum'];
+const AWARD_RULES = {
+  con: { at: [50, 500, 5000, 50000], v: () => (S.done || 0) + Object.values(S.cities || {}).reduce((a, c) => a + (c.done || 0), 0), res: n => `Завършени ${fmt(n)} обекта` },
+  hw: { at: [300, 1500, 6000, 20000], v: () => Math.round(hwAll().reduce((a, id) => { const s = segById(id); return a + (s ? kmBetween(s.a, s.b) : 0); }, 0)), res: n => `${fmt(n)} км готови магистрали и аутобани` },
+  rail: { at: [300, 1500, 6000, 20000], v: () => Math.round((S.rails || []).filter(r => r.built).reduce((a, r) => a + (r.km || (r.b ? kmBetween(r.a, r.b) : 0)), 0)), res: n => `${fmt(n)} км готови жп линии` },
+  sea: { at: [5, 20, 60, 150], v: () => (S.seaRoutes || []).length, res: n => `${fmt(n)} морски линии` },
+  air: { at: [5, 20, 60, 150], v: () => (S.airRoutes || []).length, res: n => `${fmt(n)} авиолинии` },
+  oil: { at: [3, 10, 30, 80], v: () => { const L = mines.state().sites, has = k => L.some(x => x.kind === k); return has('oilwell') && has('refinery') && has('terminal') ? L.filter(x => ['oilwell', 'refinery', 'terminal'].includes(x.kind)).length : 0; }, res: n => `${fmt(n)} обекта във веригата добив → преработка → доставка` },
+};
+function awardsPending(st) {
+  if (!S) return [];
+  const out = [];
+  for (const [k, R] of Object.entries(AWARD_RULES)) {
+    let n = 0; try { n = R.v(); } catch (e) { continue; }
+    let ti = -1; R.at.forEach((t, i) => { if (n >= t) ti = i; }); if (ti < 0) continue;
+    const have = st[k] ? AWARD_TIERS.indexOf(st[k].tier) : -1; if (ti <= have) continue;
+    out.push({ k, tier: AWARD_TIERS[ti], res: R.res(n) });
+  }
+  return out;
+}
 
 // шейдърите на всички модели се компилират веднага при влизане в града, а не при първата поява на кола, човек или сграда (иначе — накъсване)
 function warmShaders() {
@@ -3835,7 +3856,7 @@ const mines = createMines({ S: () => S, econ: () => econ, MATERIALS: ECON.MATERI
 const boardL = createBoardLogic({ trackStatus: t => boardTrack(t), sig: () => { const ip = corp.state()?.ipo; return JSON.stringify([S.bank && [S.bank.loans.length, S.bank.div, S.bank.lv, S.bank.cap], S.mega, S.r66?.st, S.mw, ip && [ip.out, ip.div], Object.values(S.tenders || {}).map(x => x && x.my), S.oil && [(S.oil.contracts || []).length, S.oil.stock], !!S.neom, S.imp && [S.imp.cc, S.imp.b, S.imp.z, (S.imp.zr || []).length], S.resorts, (S.mines?.sites || []).length]); }, fixTrack: t => boardFix(t), S: () => S, econ: () => econ, fmt, toast, save, sound: n => Sound.play(n), proposals: () => group.proposals(), decide: (id, a) => group.decide(id, a),
   dirName: d => d === 'mayor' ? mayorName() : (S && S.hold && S.hold.dir || {})[d] || '', subName: d => d === 'mayor' ? 'Империал Сити' : subName(S, d), dailyCost: () => { const h = (econ && econ.s.history) || []; const L = h.slice(-7); return L.length ? L.reduce((a, x) => a + (x.out || 0), 0) / L.length : 0; },
   loan: amt => { if (!econ.canTakeLoan(S.rep)) { toast('🏦 Банката няма свободен кредит за теб.', 'bad'); return false; } const step = econ.loanStep(S.rep), a = Math.min(econ.loanRoom(S.rep), Math.ceil(amt / step) * step); return econ.takeLoan(S.rep, a); } });
-const group = createGroup({ night: () => dayNight.night, mayorName: () => mayorName() || null, board2: () => boardL, proposals: () => boardProposals(), subShow: (k, mode, text) => subScreen(k, mode, text), askFound: (k, re) => subScreen(k, 'ask', '', re), S: () => S, econ: () => econ, lv: () => dev.best(), gift: k => giftSub(k), toast, fmt, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b),
+const group = createGroup({ night: () => dayNight.night, awardsPending: st => awardsPending(st), mayorName: () => mayorName() || null, board2: () => boardL, proposals: () => boardProposals(), subShow: (k, mode, text) => subScreen(k, mode, text), askFound: (k, re) => subScreen(k, 'ask', '', re), S: () => S, econ: () => econ, lv: () => dev.best(), gift: k => giftSub(k), toast, fmt, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b),
   hwN: () => hwDone().length, railN: () => (S.rails || []).filter(r => r.built).length, portN: () => Object.values(S.ports || {}).filter(p => p.lv).length, airN: () => Object.values(S.airports || {}).filter(a => a.lv).length,
   oilN: () => mines.state().sites.filter(x => x.kind === 'oilwell').length, empire: () => dev.has('EMPIRE'), toll: () => hwToll(), flow: k => flowAvg(k),
   finDaily: () => Object.values(econ?.s?.finished || {}).reduce((a, f) => a + (f.daily || 0), 0), bankOn: () => !!S.bank, bankDaily: () => bank.daily(), hotelN: () => Object.keys(S.hotels || {}).length, hotelDaily: () => hotels.daily(), oilDaily: () => oil.dailyAvg() || mines.dailyValue(x => MINE_KINDS[x.kind]?.oil) });

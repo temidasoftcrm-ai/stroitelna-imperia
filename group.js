@@ -267,6 +267,9 @@ export function createGroup(deps) {
     import('./directors3d.js').then(m => m.openBoardroom({ title: groupName(deps.S()), brand: brandOf(deps.S()) && { ...brandOf(deps.S()), group: groupName(deps.S()) }, seats: boardSeats, fmt: deps.fmt, sound: deps.sound,
       proposals, onUp: k => { upgrade(k); re(); }, onHire: k => { hire(k); re(); },
       // 🏦 трезорът зад борда (флаг vault): парите на фирмата; разделянето резерв / за инвестиции / свободни — в записа (S.hold.vault); резервът на Борис — оперативният от boardlogic
+      // 🏆 стената с отличията (флаг awards): получените — в записа (S.hold.awards), всяка степен — веднъж; заслужените — от game.js (awardsPending)
+      awards: feature('awards') ? { state: () => hold().awards || {}, pending: () => deps.awardsPending ? deps.awardsPending(hold().awards || {}) : [],
+        grant: (k, tier, res) => { const h = hold(); h.awards = h.awards || {}; h.awards[k] = { tier, day: deps.S().day, res: res || '' }; deps.save(); } } : null,
       vault: feature('vault') ? { money: () => deps.econ().money, split: { res: 20, inv: 50, ...(hold().vault || {}) }, onSplit: sp => { hold().vault = { res: sp.res, inv: sp.inv }; deps.save(); },
         monthCost: () => { try { return deps.board2 ? deps.board2().frame().op : 0; } catch (e) { return 0; } }, night: () => deps.night ? deps.night() : 0 } : null,
       // „Да“ минава през boardlogic.js (бюджет → банка → гласуване); връща { need: 'vote', v, p }, ако бордът трябва да гласува

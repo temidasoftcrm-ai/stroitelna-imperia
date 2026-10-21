@@ -12,6 +12,7 @@ import { buildPresRoom } from './presrooms.js';   // 🇺🇸/🇷🇺 през�
 import { createRoomSound } from './roomsound.js';
 import { feature } from './lab/feature.js';
 import { vaultDoor, createVault } from './vault3d.js';
+import { buildAwardsWall, AWARDS, TIERS } from './awards3d.js';   // 🏆 стената с отличията (флаг awards)
 import { loadMoney, bonusStacks } from './money3d.js';   // 💵 флаг money-real: бонусът — пачки на масата пред директора   // 🏦 трезорът зад борда (флаг vault)   // шум на залата, хартия, чукче, аплодисменти, говор на глас
 
 const DIR = 'assets/heavy/directors/';
@@ -441,7 +442,7 @@ export function openBoardroom(o) {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.debug.checkShaderErrors = false;   // ⚡ иначе getProgramInfoLog чака компилацията синхронно (~1,6 s при първото отваряне) — compileAsync не помага
   window.__overlay3d = (window.__overlay3d || 0) + 1;
-  window.__room = { renderer, get scene() { return scene; }, get cam() { return cam; } };   // за измерване от конзолата (кадри, draw calls, триъгълници)   // game.js спира да рисува 3D града, докато залата е отворена
+  window.__room = { renderer, get scene() { return scene; }, get cam() { return cam; }, get aw() { return AW; }, look: (p, t) => { tw = { p0: cam.position.clone(), t0: ctl.target.clone(), p1: p, t1: t, k: 0 }; } };   // look — за снимките от конзолата   // за измерване от конзолата (кадри, draw calls, триъгълници)   // game.js спира да рисува 3D града, докато залата е отворена
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -466,6 +467,9 @@ export function openBoardroom(o) {
   // 🏦 трезорът (флаг vault): кръглата врата в стената зад масата, вляво между колоната и прозореца; клик → камерата влиза, вратата се отваря → стаята с парите
   const VD = ROOM === 'corp' && o.vault && feature('vault') ? vaultDoor(scene, { x: -4.22, y: 1.7, z: ROOM_BACK + 0.02, r: 0.54 }) : null;
   let vault = null, vaultT = 0;
+  // 🏆 стената с отличията (флаг awards): витрина вдясно срещу масата; o.awards: { state() → { k: { tier, day, res } }, pending() → [{ k, tier, res }], grant(k, tier) }
+  const AW = ROOM === 'corp' && o.awards && feature('awards') ? buildAwardsWall(scene) : null;
+  if (AW) AW.setState(o.awards.state());
 
   const tip = el.querySelector('.tip'), card = el.querySelector('.card'), hits = [], people = [];
   let sel = null, shut = false, raf = 0, nextChat = 4;
@@ -542,7 +546,7 @@ export function openBoardroom(o) {
       if (renderer.compileAsync) { wrap.visible = false; renderer.compileAsync(wrap, cam, scene).catch(() => { }).then(() => { wrap.visible = true; }); }
     }));
     el.querySelector('.load').style.opacity = 0; snd.ambience(true);
-    mergeStatic(scene, new Set([holo.root, ...people.map(p => p.wrap)].filter(Boolean)));   // ~500 draw calls → под 150
+    mergeStatic(scene, new Set([holo.root, ...people.map(p => p.wrap), AW && AW.group, VD && VD.root].filter(Boolean)));   // витрината и вратата — с мишени за клик и анимации   // ~500 draw calls → под 150
     board(0);   // бордът започва с първото предложение
   }).catch(e => { console.warn('boardroom', e); el.querySelector('.load').textContent = 'Моделите не се заредиха.'; });
 
@@ -625,7 +629,9 @@ export function openBoardroom(o) {
     const ps = o.proposals ? o.proposals() : [], rep = o.report ? o.report() : '', out = [];
     if (rep) out.push({ step: 'report', html: rep });
     out.push(...ps);
-    if (o.summary && ps.length) out.push({ step: 'summary', dir: 'bank' });
+    const aw = AW && o.awards.pending ? o.awards.pending() : [];   // 🏆 отличията — след предложенията, преди обобщението
+    for (const a of aw) { const A = AWARDS.find(x => x.k === a.k); if (A) out.push({ step: 'award', id: 'award:' + a.k + ':' + a.tier, dir: A.dir, aw: a }); }
+    if (o.summary && (ps.length || aw.length)) out.push({ step: 'summary', dir: 'bank' });
     return out;
   }
   const B = n => Math.abs(n) >= 1e9 ? `${(n / 1e9).toLocaleString('bg-BG', { maximumFractionDigits: 1 })} млрд. €` : Math.abs(n) >= 1e6 ? `${(n / 1e6).toLocaleString('bg-BG', { maximumFractionDigits: 1 })} млн. €` : `${f(n)} €`;
@@ -651,6 +657,17 @@ export function openBoardroom(o) {
       scr.innerHTML = `${hd(p.info ? (o.bankTitle || '🏦 Банката: с какво разполагаме') : '🏦 Обобщение на заседанието')}<div class="tx"></div>${rows.length ? `<div class="fin">${rows.map(([k, v], j) => `<div><span>${k}</span><b style="color:${k.startsWith('Достъпни') ? '#5fd38a' : v < 0 ? '#ffb347' : '#fff'}">${B(v)}</b></div>`).join('')}${F.loan ? `<div><span>+ свободен кредит</span><b>${B(F.loan)}</b></div>` : ''}</div>` : p.avail != null ? `<div class="cost">💶 за инвестиции: ${f(p.avail)} €${p.reserve ? ` · резерв ${f(p.reserve)} €` : ''}</div>` : ''}<div class="row"><button class="y">${p.info ? 'Продължи →' : '✓ Закрий заседанието'}</button></div>`;
       scr.querySelector('.tx').textContent = p.info ? (o.speech ? o.speech() : p.text) : o.summary();
       scr.querySelector('.y').onclick = () => { if (p.info) return board(qi + 1); cheer(); setTimeout(close, 2200); };   // 👏 закриване — с аплодисменти
+    } else if (p.step === 'award') {   // 🏆 връчването: камерата — към директора; „Връчи“ → благодари, аплодисменти, статуетката се появява на рафта
+      const A = AWARDS.find(x => x.k === p.aw.k), T = TIERS[p.aw.tier];
+      scr.innerHTML = `${hd('🏆 Отличия')}<div class="tx"></div><div class="q"><b>Резултат:</b> ${esc(p.aw.res || A.cond)}</div><div class="row"><button class="y">🏆 Връчи наградата</button><button class="l">Пропусни</button></div>`;
+      scr.querySelector('.tx').textContent = `${A.who} — „${A.nm}“ · ${T.ico} ${T.nm}`;
+      scr.querySelector('.y').onclick = () => {
+        o.awards.grant(p.aw.k, p.aw.tier, p.aw.res); AW.setState(o.awards.state()); AW.reveal(p.aw.k); cheer(); decided.add(p.id);
+        scr.querySelector('.tx').textContent = `${A.who}: „${A.quote || 'Благодаря за доверието!'}“`;
+        scr.querySelector('.row').innerHTML = '<button class="y">Продължи →</button>'; scr.querySelector('.y').onclick = () => board(nextStep());
+        setTimeout(() => { if (shut) return; const v = AW.focus(p.aw.k); if (v) tw = { p0: cam.position.clone(), t0: ctl.target.clone(), p1: v.clone().add(new THREE.Vector3(-1.7, 0.3, 0.5)), t1: v, k: 0 }; }, 1600);   // към витрината
+      };
+      scr.querySelector('.l').onclick = () => { decided.add(p.id); board(nextStep()); };
     } else {   // 📋 предложение: петте въпроса — какво, защо, колко, кога, какво ще донесе
       const q = (k, v) => v ? `<div class="q"><b>${k}:</b> ${esc(v)}</div>` : '';
       const gain = p.gainTxt || (p.gain ? `+${B(p.gain)}/месец` : p.income ? `+${f(p.income)} €/ден` : '');
@@ -799,7 +816,9 @@ export function openBoardroom(o) {
     const i = h.object.userData.seat, pi = props.findIndex(p => p.dir === list[i].k);
     if (pi >= 0) board(pi); else showCard(i);
   });
+  const awardAt = e => { if (!AW || vault) return null; const r = renderer.domElement.getBoundingClientRect(); mv.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(mv, cam); const h = ray.intersectObjects(AW.hits)[0]; return h ? AW.infoAt(h.object) : null; };
   renderer.domElement.addEventListener('pointermove', e => {
+    const ai = awardAt(e); if (ai) { renderer.domElement.style.cursor = 'help'; tip.textContent = ai.s ? `🏆 ${ai.A.nm} · ${ai.A.who} · ${ai.T.ico} ${ai.T.nm} · ден ${ai.s.day ?? '—'}${ai.s.res ? ' · ' + ai.s.res : ''}` : `🔒 ${ai.A.nm} — ${ai.A.cond}`; tip.style.left = e.clientX + 'px'; tip.style.top = (e.clientY - 12) + 'px'; tip.style.display = 'block'; return; }
     if (vault) return; const dh = doorHit(e); if (VD) VD.hover(dh); if (dh) { renderer.domElement.style.cursor = 'pointer'; tip.textContent = '🏦 Трезорът'; tip.style.left = e.clientX + 'px'; tip.style.top = (e.clientY - 12) + 'px'; tip.style.display = 'block'; return; }
     const h = hitAt(e); renderer.domElement.style.cursor = h ? 'pointer' : 'grab';
     if (!h) { tip.style.display = 'none'; return; }
@@ -838,6 +857,7 @@ export function openBoardroom(o) {
     if (cam.position.y > ROOM_H - 0.3) cam.position.y = ROOM_H - 0.3;   // камерата — под тавана
     cam.position.x = Math.max(-ROOM_W + 1.4, Math.min(ROOM_W - 1.4, cam.position.x)); cam.position.z = Math.max(ROOM_BACK + 1.2, Math.min(ROOM_FRONT - 0.8, cam.position.z));   // и в залата — пред завесите, не в стените
     if (VD) VD.update(dt, o.vault && o.vault.night ? o.vault.night() : 0);
+    if (AW) AW.update(dt, o.vault && o.vault.night ? o.vault.night() : 0);
     if (vault) { vault.update(dt); renderer.render(vault.scene, vault.cam); } else renderer.render(scene, cam);   // в трезора — неговата сцена
   }
   if (renderer.compileAsync) renderer.compileAsync(scene, cam).catch(() => { }).then(() => { if (!shut) loop(); }); else loop();   // стаята — също асинхронно, после рисуваме
@@ -927,6 +947,9 @@ export function demoBoardroom(ov = {}) {
   return openBoardroom({
     title: 'Титан Груп — демо', brand: { nm: 'Титан', col: '#4fc3f7', ico: '🗿', group: 'Титан Груп' },
     // 🏦 трезорът (флаг vault): в демото — парите от window.__vaultMoney (Лабораторията: малко / много), разпределението — само локално
+    // 🏆 отличията (флаг awards): window.__awTier — Ивайло в тази степен; window.__awCeremony — връчване в края на заседанието
+    awards: (() => { const st = window.__awTier ? { con: { tier: window.__awTier, day: 412, res: 'Завършени 12 проекта в срок и в бюджет' } } : {}; return {
+      state: () => st, pending: () => window.__awCeremony && !st.con ? [{ k: 'con', tier: window.__awCeremony, res: 'Завършени 12 проекта в срок и в бюджет' }] : [], grant: (k, tier) => { st[k] = { tier, day: 412, res: 'Завършени 12 проекта в срок и в бюджет' }; } }; })(),
     vault: { money: () => window.__vaultMoney ?? 476.6e9, split: { res: 10, inv: 60 }, monthCost: () => (window.__vaultMoney ?? 476.6e9) * 0.02, night: () => window.__vaultNight ? 1 : 0 },
     proposals: () => DEMO_PROPS.filter(p => !p.done),
     report: () => DEMO_REPORT ? '<div class="card"><div class="meta">🚆 <b>Мария Стоянова: „2 от 3 одобрени проекта са изпълнени. Линията Варна — Бургас чака влакове.“</b></div><div class="meta" style="margin-left:18px">⚠️ <b style="color:#ffb347">забавено</b> · Линия Варна — Бургас · 70% · срок ден 412 <button class="btn2" data-bc="1|extend">📅 Удължи</button> <button class="btn2" data-bc="1|stop">✖ Прекрати</button></div><div class="meta">✈️ <b>Елена Димитрова: „1 от 1 одобрени проекта са изпълнени.“</b></div></div>' : '',
