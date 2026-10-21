@@ -430,7 +430,11 @@ function uturnPath(P, n, a, b) {
 // кръгово: пръстенът се реже на отсечки при всеки вход и изход; във всяка точка — възел с връзка „напред“ и (при изход) „навън“
 function roundNet(P, n, N, nodes, lanes, jp) {
   const ri = P.rounds.findIndex(r => r.node === n.id), R = P.rounds[ri], ring = R.ring, rp = mkPath(ring, 'tmp'), T = rp.len;
-  const pts = []; R.entries.forEach((e, k) => { pts.push({ s: e.inS, in: k }); pts.push({ s: e.outS, out: k }); });
+  // jp: изходът напуска пръстена 3,5 м по-рано, входът се влива 3,5 м по-късно, а лентите на клона свършват/започват 6 м по-навън
+  // (зад разделителното островче) — входът и изходът стават плавни дъги вместо завой на място
+  const D = jp ? 3.5 : 0, TR = 6, cutL = (L, atEnd) => { if (!jp || !L || L.len < TR + 10) return; const p2 = trim(L.pts, atEnd ? 0 : TR, atEnd ? TR : 0), q = mkPath(p2); if (L.ys) L.ys = q.cum.map(() => L.ys[atEnd ? 0 : L.ys.length - 1]); L.pts = q.pts; L.cum = q.cum; L.len = q.len; };   /* височината — плоска (кръговите не са на мост) */
+  if (jp) for (const e of R.entries) { cutL(N.inL.find(l => l.armIn === e.arm && l.laneI === 0), true); cutL(N.outL.find(l => l.armOut === e.arm && l.laneI === 0), false); }
+  const pts = []; R.entries.forEach((e, k) => { pts.push({ s: (e.inS + D) % T, in: k }); pts.push({ s: (e.outS - D + T) % T, out: k }); });
   pts.sort((a, b) => a.s - b.s);
   const segs = [], o = {};
   for (let k = 0; k < pts.length; k++) {   // отсечка от точка k до k+1 (по пръстена, затворено)
