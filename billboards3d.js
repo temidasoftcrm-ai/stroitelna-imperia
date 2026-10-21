@@ -31,6 +31,9 @@ function design(i, b) {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
 }
 
+// размерът по класа на улицата (f1: „мега на стълб до двулентов път стърчи над всичко“): булевард/широка — голям 12 × 4 (долу на ~7 м),
+// обикновена — среден 6 × 2,5, през две — малък; мега и въртящият се — само ръчно (o.sizes, Лабораторията), никога на стълб до пътя
+const sizeFor = (i, r) => r.main || (r.w || 0) >= 14 ? 'large' : i % 3 === 2 ? 'small' : 'medium';
 // местата: по най-дългите булеварди, през ~gap м, отстъп от оста = половината ширина + 3 м, редуват се страните; не по-близо от 0,6·gap един до друг
 export function billboardSpots(roads, { max = 8, gap: gap0, widthOf } = {}) {
   const out = [], L = r => { let s = 0; for (let i = 1; i < r.pts.length; i++) s += Math.hypot(r.pts[i][0] - r.pts[i - 1][0], r.pts[i][1] - r.pts[i - 1][1]); return s; };
@@ -42,9 +45,9 @@ export function billboardSpots(roads, { max = 8, gap: gap0, widthOf } = {}) {
     for (let i = 1; i < r.pts.length && out.length < max; i++) {
       const [x0, z0] = r.pts[i - 1], [x1, z1] = r.pts[i], d = Math.hypot(x1 - x0, z1 - z0); if (d < 1e-6) continue;
       while (acc + d >= next && out.length < max) {
-        const f = (next - acc) / d, x = x0 + (x1 - x0) * f, z = z0 + (z1 - z0) * f, dx = (x1 - x0) / d, dz = (z1 - z0) / d, nx = -dz * side, nz = dx * side, fw = widthOf ? widthOf(out.length) : 12, off = (r.w || 12) / 2 + 2 + fw / 2 * 0.95;   // платното е напречно на пътя — отстъп колкото половината му ширина
+        const f = (next - acc) / d, x = x0 + (x1 - x0) * f, z = z0 + (z1 - z0) * f, dx = (x1 - x0) / d, dz = (z1 - z0) / d, nx = -dz * side, nz = dx * side, k = sizeFor(out.length, r), fw = widthOf ? widthOf(out.length, k) : 12, off = (r.w || 12) / 2 + 2 + fw / 2 * 0.95;   // платното е напречно на пътя — отстъп колкото половината му ширина
         const p = { x: x + nx * off, z: z + nz * off, ry: Math.atan2(dx * side, dz * side) + side * 0.35 };   // лицето — срещу идващите коли, леко към платното
-        if (!out.some(q => Math.hypot(q.x - p.x, q.z - p.z) < Math.max(gap * 0.6, (fw + (q.fw || 12)) / 2 + 4))) { p.fw = fw; out.push(p); side = -side; }
+        if (!out.some(q => Math.hypot(q.x - p.x, q.z - p.z) < Math.max(gap * 0.6, (fw + (q.fw || 12)) / 2 + 4))) { p.fw = fw; p.k = k; out.push(p); side = -side; }
         next += gap;
       }
       acc += d;
@@ -98,11 +101,10 @@ const HVB = 'assets/heavy/billboards/';
 export const BB_KIT = {
   small: { url: HVB + 'bb-small.glb', face: 'Object_5', hide: ['Object_5', 'Object_7'], axis: 'z', faceW: 1.4 },
   medium: { url: HVB + 'bb-medium.glb', face: 'Cube005_Material004_0', hide: ['Cube005_Material004_0'], axis: 'x', faceW: 6 },
-  large: { url: HVB + 'bb-large.glb', face: 'ADs_AD_0', hide: ['ADs_AD_0'], axis: 'z', faceW: 12 },
+  large: { url: HVB + 'bb-large.glb', face: 'ADs_AD_0', hide: ['ADs_AD_0'], axis: 'z', faceW: 12, sink: 1.2 },   // sink — стълбът влиза в земята: платното от ~7 до ~11,3 м (истинският 12 × 4)
   mega: { url: HVB + 'bb-mega.glb', face: 'Object_10', hide: ['Object_10'], axis: 'x', faceW: 24, surface: true },   // surface — платното точно пред/зад конструкцията (бялото табло)
   rotating: { url: HVB + 'bb-rotating.glb', slats: true, axis: 'z', faceW: 9 },
 };
-const ORDER = ['large', 'mega', 'medium', 'rotating', 'large', 'small', 'medium', 'small'];   // кой размер на кое място (първите — по най-дългите булеварди)
 const kitCache = {};
 const loadKit = k => kitCache[k] = kitCache[k] || new GLTFLoader().loadAsync(BB_KIT[k].url);
 
@@ -178,8 +180,7 @@ function makeBoard(k, gl, arts, ai) {
 
 // публичното: местата → билбордове (истинските модели; ако не дойдат — нарисуваните)
 export function buildBillboards(group, o = {}) {
-  const sizeAt = i => o.sizes ? o.sizes[i % o.sizes.length] : ORDER[i % ORDER.length];
-  const spots = o.spots || billboardSpots(o.roads || [], { ...o, widthOf: i => BB_KIT[sizeAt(i)].faceW }), g = new THREE.Group(); g.name = 'billboards'; group.add(g);   // o.spots — ръчно (демото в Лабораторията)
+  const spots = o.spots || billboardSpots(o.roads || [], { ...o, widthOf: (i, k) => BB_KIT[o.sizes ? o.sizes[i % o.sizes.length] : k].faceW }), g = new THREE.Group(); g.name = 'billboards'; group.add(g);   // o.spots — ръчно (демото в Лабораторията)
   let alive = true, boards = [], fallback = null, night = 0;
   const api = { group: g, spots,
     setNight(k = 0) { night = k; for (const b of boards) for (const m of b.mats) m.emissiveIntensity = 0.05 + 0.75 * k; if (fallback) fallback.setNight(k); },
@@ -188,13 +189,13 @@ export function buildBillboards(group, o = {}) {
   if (!spots.length) return api;
   const brand = { ...(o.brand || {}), company: o.company };
   const artList = (o.images && o.images.length ? o.images : []).map(x => typeof x === 'string' ? { url: x } : x);
-  const sizes = spots.map((s, i) => sizeAt(i));
+  const sizes = spots.map((s, i) => o.sizes ? o.sizes[i % o.sizes.length] : s.k || 'large');
   Promise.all([...new Set(sizes)].map(k => loadKit(k).then(gl => [k, gl]))).then(async L => {
     const kits = Object.fromEntries(L);
     let arts = await loadArt(artList, brand);
     if (!arts.length || o.designs) arts = [...arts, ...[0, 1, 2].map(i => ({ tex: design(i, { ...brand, years: o.years }), logo: 'left', aspect: 1024 / 342, design: true }))];   // без снимки (или o.designs) — и нарисуваните с марката
     if (!alive) return;
-    spots.forEach((s, i) => { const k = sizes[i], b = makeBoard(k, kits[k], arts, i); b.root.position.set(s.x, 0, s.z); b.root.rotation.y = s.ry; g.add(b.root); boards.push(b); });
+    spots.forEach((s, i) => { const k = sizes[i], b = makeBoard(k, kits[k], arts, i); b.root.position.set(s.x, -(BB_KIT[k].sink || 0), s.z); b.root.rotation.y = s.ry; g.add(b.root); boards.push(b); });
     api.setNight(night);
   }).catch(e => { console.warn('billboards models', e); if (alive) { fallback = buildProcedural(g, o); api.setNight(night); } });
   return api;
