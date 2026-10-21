@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Истински магазини и офиси</title>
+<style>
+  body { margin:0; background:#14161b; color:#e8e8ea; font:14px/1.45 system-ui,sans-serif; overflow:hidden; }
+  #hud { position:absolute; left:12px; top:12px; background:rgba(20,22,27,.85); padding:10px 14px; border-radius:10px; max-width:520px; }
+  h1 { font-size:17px; margin:0 0 4px; } p { margin:0; color:#9aa0aa; font-size:13px; }
+  .lbl { position:absolute; transform:translate(-50%,-100%); background:rgba(20,22,27,.8); padding:3px 8px; border-radius:6px; font-size:12px; white-space:nowrap; pointer-events:none; }
+  .old { color:#e8b14a; } .new { color:#5fc27a; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script></head><body>
+<div id="hud"><h1>🏪 Магазини и офиси на поръчките — сега и с флага real-shops</h1>
+<p>Горният ред (жълто) — каквото играта строи сега за поръчка „магазин“, „офис“ и булдозера на бригадата (детските модели). Долният ред (зелено) — с флага: истинските сгради building-a…h за магазин, building-e/g/c за офис, истинският багер вместо булдозера. Същите парцели (16 × 16 м) и мащаб като в играта. Влачи с мишката.</p></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+const R = new THREE.WebGLRenderer({ antialias: true }); R.setSize(innerWidth, innerHeight); R.setPixelRatio(Math.min(2, devicePixelRatio)); R.outputColorSpace = THREE.SRGBColorSpace; R.shadowMap.enabled = true; document.body.appendChild(R.domElement);
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0xbcd6ec); sc.add(new THREE.HemisphereLight(0xffffff, 0x667788, 1.5));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(60, 90, 40); sun.castShadow = true; Object.assign(sun.shadow.camera, { left: -80, right: 80, top: 80, bottom: -80 }); sun.shadow.mapSize.set(2048, 2048); sc.add(sun);
+const cam = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 1, 2000); cam.position.set(30, 70, 120); const ctl = new OrbitControls(cam, R.domElement); ctl.target.set(30, 6, 0); ctl.update();
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x8aa66c })); ground.receiveShadow = true; sc.add(ground);
+const L = new GLTFLoader(), load = u => L.loadAsync('../' + u).then(g => g.scene).catch(() => null);
+// като в играта: сграда в парцел 16 м (fitScale — по по-дългата хоризонтална страна; магазините SHOP_FIT 15,5, другите 12,5); техниката — по дължина
+const fit = (o, size, byLen) => { const b = new THREE.Box3().setFromObject(o), s = b.getSize(new THREE.Vector3()), k = size / Math.max(s.x, s.z); o.scale.setScalar(k); const b2 = new THREE.Box3().setFromObject(o), c = b2.getCenter(new THREE.Vector3()); o.position.sub(new THREE.Vector3(c.x, b2.min.y, c.z)); const g = new THREE.Group(); g.add(o); o.traverse(m => { if (m.isMesh) m.castShadow = m.receiveShadow = true; }); return g; };
+const labels = [];
+const put = async (u, x, z, size, txt, cls) => { const o = await load(u); const pad = new THREE.Mesh(new THREE.PlaneGeometry(16, 16).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xb8b2a6 })); pad.position.set(x, 0.02, z); pad.receiveShadow = true; sc.add(pad);
+  if (!o) return; const g = fit(o, size); g.position.set(x, 0, z); sc.add(g); const h = new THREE.Box3().setFromObject(g).max.y; const d = document.createElement('div'); d.className = 'lbl ' + cls; d.textContent = txt; document.body.appendChild(d); labels.push([d, new THREE.Vector3(x, h + 2, z)]); };
+const ROW = [   // [сега, с флага, размер, надпис]
+  ['assets/city/Building_Small_1.glb', 'assets/commercial/building-b.glb', 15.5, 'магазин'],
+  ['assets/city/Building_Medium_2_001.glb', 'assets/commercial/building-g.glb', 12.5, 'офис'],
+  ['assets/heavy/bulldozer-b.glb', 'assets/heavy/gear/excavator.glb', 6.5, 'булдозер на бригадата'],
+];
+await Promise.all(ROW.flatMap(([a, b, s, t], i) => [put(a, i * 30, -15, s, 'сега: ' + t, 'old'), put(b, i * 30, 15, s, 'real-shops: ' + t, 'new')]));
+await Promise.all(['a', 'c', 'd', 'h'].map((k, i) => put(`assets/commercial/building-${k}.glb`, i * 22 - 5, 45, 15.5, 'магазин (вариант)', 'new')));
+const V = new THREE.Vector3();
+R.setAnimationLoop(() => { ctl.update(); R.render(sc, cam); for (const [d, p] of labels) { V.copy(p).project(cam); d.style.left = (V.x * 0.5 + 0.5) * innerWidth + 'px'; d.style.top = (-V.y * 0.5 + 0.5) * innerHeight + 'px'; d.style.display = V.z < 1 ? '' : 'none'; } });
+addEventListener('resize', () => { R.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); });
+window.__ready = true;
+</script></body></html>

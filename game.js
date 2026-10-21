@@ -20,7 +20,8 @@ import { createMuni } from './muniorders.js';
 import { createRescue } from './boardrescue.js';
 import { createMinimap } from './minimap.js';
 import { createRivals, LOCAL_FIRMS, FIRMS } from './rivals.js';
-import { perf, createPerfPanel } from './perfpanel.js';   // ⏱️ панел за производителност (флаг perf-panel, F8)
+import { perf, createPerfPanel } from './perfpanel.js';
+import { createCityCull } from './citycull.js';   // ⚡ флаг perf-cliff: детайлите и хората по разстояние, сливане на статичните модели   // ⏱️ панел за производителност (флаг perf-panel, F8)
 import { createDevLevel, THRESH as DEV_THRESH, LV as DEV_LV, unlockText, kmXp, XP_BUY } from './devlevel.js';
 import { createCityPanel } from './citypanel.js';
 import { createPlaytime } from './playtime.js';
@@ -29,7 +30,7 @@ import { createCoop } from './coop.js';
 import { RAIL_STAGES, railStageOf, buildRailView } from './railbuild.js';
 import { createStation, STATION_LEVELS } from './station.js';
 import { createResorts, RESORTS, seasonOf, monthName } from './resorts.js';
-import { buildResortView, CHALET_PIECES, RESORT_MODELS } from './resortview.js';
+import { buildResortView, RESORT_MODELS } from './resortview.js';
 import { createDemolition } from './demolish.js';
 import { createEvents } from './events.js';
 import { createWeather, rollWeather } from './weather.js';
@@ -377,8 +378,10 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 // не се преизчисляват; иначе сенките се обновяват през 2 кадъра. Ако кадрите са бавни — по-ниска резолюция (pixelRatio).
 let perfFr = 0, perfT = 0, perfN = 0, perfHigh = null, perfDownAt = -1e9;
 const PR_MAX = Math.min(devicePixelRatio, 1.5);
+const cityCull = createCityCull({ group: () => city.group, target: () => controls.target, camDist: () => camera.position.distanceTo(controls.target), peds: () => [...standers, ...peds.map(p => p.m)], on: () => feature('perf-cliff') });
 function perfTune(rdt) {
   const high = camera.position.distanceTo(controls.target) > 230;
+  cityCull.tick(rdt, high);
   renderer.shadowMap.autoUpdate = false;
   perfFr++;
   if (!high && perfFr % (megaBase ? 8 : 4) === 0) renderer.shadowMap.needsUpdate = true;   // статичният град се променя рядко; обновяваме сенките през 4/8 кадъра
@@ -387,7 +390,7 @@ function perfTune(rdt) {
     if (city.group) for (const o of city.group.children) if (o.userData.detail) o.visible = !high;
     renderer.shadowMap.needsUpdate = true;
   }
-  if (perfFr % 30 === 0 || high) { for (const m of standers) m.visible = !high; for (const p of peds) p.m.visible = !high; }   // и новодошлите
+  if ((perfFr % 30 === 0 || high) && (high || !feature('perf-cliff'))) { for (const m of standers) m.visible = !high; for (const p of peds) p.m.visible = !high; }   // perf-cliff: близо — по разстояние (citycull.js)   // и новодошлите
   perfT += rdt; perfN++;
   if (perfT > 2.5) {
     const fps = perfN / perfT, pr = renderer.getPixelRatio(); perfT = 0; perfN = 0;
@@ -443,7 +446,7 @@ const MODELS = {
   industrial: ['building-a', 'building-b', 'building-c', 'building-d', 'building-e', 'building-f', 'building-g', 'building-h', 'building-i', 'building-j', 'building-k', 'building-l', 'water-tower', 'windmill', 'solar-panel-landscape-group', 'solar-panel-portrait-group'],
   // Majadroid House Construction Site (CC0): кула-кран и реквизит за строежите
   // Kenney Holiday Kit (CC0): борове за зимните курорти
-  holiday: ['tree', 'tree-snow-a', 'tree-snow-b', 'tree-snow-c', 'bench', 'lantern', ...CHALET_PIECES],
+  holiday: ['tree', 'bench', 'lantern'],
   construction: ['crane-tower', 'container-office-green', 'container-office-red', 'toilet-portable', 'planks-wood-a', 'box-stack-brown', 'container-rubble-red', 'barrel', 'truck-dump-red', 'truck-dump-green', 'truck-concrete-red'],
   // poly.pizza (CC-BY 3.0 / CC0, виж assets/heavy/CREDITS.txt): булдозери, минен самосвал, кулокран — за аутобаните
   heavy: ['bulldozer-a', 'bulldozer-b', 'bulldozer-c', 'dump-truck', 'crane-c'],
@@ -1174,6 +1177,7 @@ function placeBuilding(lot, n, rot = 0) {
     }
   }
   freezeKids(o);   // след соларните панели
+  o.userData.bld = true;   // perf-cliff: сградата е статична — частите ѝ се сливат по материал (citycull.js)
   lot.built = n; lot.obj = o;
   return o;
 }
@@ -1684,8 +1688,8 @@ function homeSlot(u) {
   return away ? { ...lotPt(h, -3.6, -3.6), inGarage: true } : { ...lotPt(h, 3.8, -4.3), inGarage: true };
 }
 // истинските модели (vehmodels.js) — дължина в света на играта
-const SF_VEH = { loader: 'sf-excavator', truck: 'sf-dump', crane: 'sf-mcrane', tractor: 'sf-backhoe', roller: 'sf-roller', grader: 'sf-grader', crew: 'sf-car-Van', marker: 'sf-car-Van' };   // бусът на бригадата и маркировката — истинският бус (УАЗ, vehmodels.js) вместо детския delivery/van
-const SF_LEN = { loader: 6.5, truck: 7.5, crane: 9, tractor: 4.6, roller: 4.5, grader: 7, crew: 1, marker: 1 };   // колите (sf-car-*) вече са в мащаба на града — 1   // м по дължина — в мащаба на колите (седан 4,5 м, vehmodels.js)
+const SF_VEH = { loader: 'sf-excavator', truck: 'sf-dump', crane: 'sf-mcrane', tractor: 'sf-backhoe', roller: 'sf-roller', grader: 'sf-grader', crew: 'sf-car-Van', marker: 'sf-car-Van', ...(feature('real-shops') ? { bulldozer: 'sf-excavator' } : {}) };   // бусът на бригадата и маркировката — истинският бус (УАЗ, vehmodels.js) вместо детския delivery/van
+const SF_LEN = { loader: 6.5, truck: 7.5, crane: 9, tractor: 4.6, roller: 4.5, grader: 7, crew: 1, marker: 1, bulldozer: 7.5 };   // колите (sf-car-*) вече са в мащаба на града — 1   // м по дължина — в мащаба на колите (седан 4,5 м, vehmodels.js)
 const VEH_LEN = { bulldozer: 6 };   // м — моделите от пакетите, които не са в метри: мащаб по най-дългата хоризонтална страна (булдозерът беше колкото сграда; другите Kenney са с процедурни добавки, нагласени за VSCALE)
 function spawnUnit(type, at) {
   const sf = A[SF_VEH[type]] ? SF_VEH[type] : null;
@@ -1836,7 +1840,7 @@ function realSignals() {
   if (!hasTrafficLight()) return;
   for (const s of signals) for (const P of s.poles || []) {
     if (P.real || !P.pole.parent) continue;
-    const RT = trafficLight(), g = P.pole.parent; RT.obj.position.copy(P.pole.position); RT.obj.rotation.y = P.ry; RT.obj.userData.tile = P.pole.userData.tile; g.remove(P.pole); g.add(RT.obj); P.pole = RT.obj; P.real = true;
+    const RT = trafficLight(), g = P.pole.parent; RT.obj.position.copy(P.pole.position); RT.obj.rotation.y = P.ry; RT.obj.userData.tile = P.pole.userData.tile; RT.obj.userData.detail = P.pole.userData.detail; g.remove(P.pole); g.add(RT.obj); P.pole = RT.obj; P.real = true;
     P.heads.forEach(h => [h.r, h.y, h.gr].forEach((m, k) => { const L = RT.lens[h.axis][k], v = new THREE.Vector3(L[0], L[1], L[2]).applyAxisAngle(new THREE.Vector3(0, 1, 0), P.ry); m.position.set(RT.obj.position.x + v.x, v.y, RT.obj.position.z + v.z); m.scale.setScalar(0.5); }));
   }
 }
@@ -2014,8 +2018,8 @@ const scaffoldMat = new THREE.LineBasicMaterial({ color: 0xd9a53a });
 
 function buildingFor(type, floors = 20) {
   if (type === 'house') return pick(HOUSE_POOL);
-  if (type === 'shop') return 'Building_Small_1';
-  if (type === 'office') return SF_BLK().length && Math.random() < 0.5 ? pick(SF_BLK()) : 'Building_Medium_2_001';
+  if (type === 'shop') return feature('real-shops') ? pick(SHOPS) : 'Building_Small_1';   /* real-shops (55): истинските магазини building-a…h */
+  if (type === 'office') return SF_BLK().length && Math.random() < 0.5 ? pick(SF_BLK()) : feature('real-shops') ? pick(['building-e', 'building-c', 'building-f']) : 'Building_Medium_2_001';
   if (floors >= 15 && SF_SKY().length && Math.random() < 0.4) return pick(SF_SKY());   // разнообразие: истински небостъргачи
   if (floors > 20 || (cityTier(S.cityId) === 'xl' && A['building-skyscraper-d@20'])) return `${pick(MODERN_SKY)}@${Math.max(20, floors)}`;
   return `${pick(SKY)}@${Math.min(20, floors)}`;
