@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<base href="../">
+<title>Табели над магистралата</title>
+<style>
+  body { margin:0; background:#0d1014; color:#e8e8ea; font:14px/1.45 system-ui,sans-serif; overflow:hidden; }
+  #hud { position:absolute; left:12px; top:12px; background:rgba(20,22,27,.88); padding:10px 14px; border-radius:10px; max-width:620px; }
+  h1 { font-size:17px; margin:0 0 4px; } p { margin:0 0 6px; color:#9aa0aa; font-size:13px; }
+  .row { margin-top:4px; } .row b { display:inline-block; width:70px; color:#9aa0aa; font-weight:500; }
+  button { background:#1d2027; color:#e8e8ea; border:1px solid #333a45; border-radius:8px; padding:5px 10px; font:inherit; cursor:pointer; margin:2px 4px 0 0; }
+  button.on { background:#ffb300; color:#111; border-color:#ffb300; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script></head><body>
+<div id="hud"><h1>🛣️ Табели над магистралата</h1>
+<p>Порталът „Highway Sign“ (haleem, Sketchfab, CC BY) над 6-лентова магистрала, човек 1,8 м и кола за мащаб. Английските надписи са заменени с наши: посоки, изходи и разстояния на български (и на латиница под тях, както по нашите магистрали).</p>
+<div class="row" id="sets"><b>Табели</b></div>
+<div class="row" id="time"><b>Време</b></div></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { gantrySigns } from './hwsigns.js';
+const SETS = [
+  ['София → Пловдив', { a: 'София', b: 'Пловдив', exit: 'Център', km: 2, road: 'А1' }],
+  ['Пловдив → Бургас', { a: 'Пловдив', b: 'Бургас', exit: 'Асеновград', km: 1, road: 'А1' }],
+  ['Варна → Шумен', { a: 'Варна', b: 'Шумен', exit: 'Летище', km: 0.5, road: 'А2' }],
+  ['Отладка (UV)', { debug: true }],
+];
+const R = new THREE.WebGLRenderer({ antialias: true }); R.setSize(innerWidth, innerHeight); R.setPixelRatio(Math.min(2, devicePixelRatio)); R.outputColorSpace = THREE.SRGBColorSpace; R.shadowMap.enabled = true; document.body.appendChild(R.domElement);
+const sc = new THREE.Scene(), hemi = new THREE.HemisphereLight(0xdfe8ff, 0x3a3f33, 1.1), sun = new THREE.DirectionalLight(0xfff4e0, 2.2);
+sun.position.set(-30, 50, 40); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, far: 200 }); sc.add(hemi, sun);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x7d8a6a, roughness: 1 })); ground.receiveShadow = true; sc.add(ground);
+const road = new THREE.Mesh(new THREE.PlaneGeometry(28, 400).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x3b3e44, roughness: 0.95 })); road.position.y = 0.01; road.receiveShadow = true; sc.add(road);
+for (const x of [-8.5, -4.5, 4.5, 8.5]) { const l = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 400).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xdddddd })); l.position.set(x, 0.02, 0); sc.add(l); }
+const man = new THREE.Group(); { const b = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 1.0, 4, 8), new THREE.MeshStandardMaterial({ color: 0x2f5d8a })); b.position.y = 0.73; const h = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8), new THREE.MeshStandardMaterial({ color: 0xe0b48a })); h.position.y = 1.67; man.add(b, h); man.position.set(-14.5, 0, 2); sc.add(man); }
+const car = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.45, 4.5), new THREE.MeshStandardMaterial({ color: 0xb03030 })); car.position.set(-6.5, 0.75, 12); car.castShadow = true; sc.add(car);
+const cam = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 1000), ctl = new OrbitControls(cam, R.domElement);
+cam.position.set(-3, 3, 30); ctl.target.set(-4, 5, 0); ctl.update();
+const gl = await new GLTFLoader().loadAsync('assets/heavy/highway/hw-gantry.glb');
+// по един портал над всяко платно: над дясното (към камерата — колите отиват навътре, т.е. платното отляво) и над насрещното (с гръб)
+const G = gantrySigns(gl.scene, 13), G2 = gantrySigns(gl.scene, 13); G.root.position.x = -6.5; G2.root.position.set(6.5, 0, -60); G2.root.rotation.y = Math.PI;
+for (const q of [G, G2]) { q.root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); sc.add(q.root); }
+let night = false;
+const el = document.getElementById('sets');
+SETS.forEach(([nm, s], i) => { const b = document.createElement('button'); b.textContent = nm; b.onclick = () => { el.querySelectorAll('button').forEach(q => q.classList.remove('on')); b.classList.add('on'); G.set(s); G2.set(s.debug ? s : { ...s, a: s.b, b: s.a }); }; if (!i) b.classList.add('on'); el.appendChild(b); });
+G.set(SETS[0][1]); G2.set({ ...SETS[0][1], a: SETS[0][1].b, b: SETS[0][1].a });
+const tl = document.getElementById('time');
+['☀️ Ден', '🌙 Нощ'].forEach((nm, i) => { const b = document.createElement('button'); b.textContent = nm; b.onclick = () => { tl.querySelectorAll('button').forEach(q => q.classList.remove('on')); b.classList.add('on'); night = !!i; hemi.intensity = night ? 0.12 : 1.1; sun.intensity = night ? 0.05 : 2.2; sc.background = new THREE.Color(night ? 0x0b1020 : 0x9cc3e6); G.setNight(night ? 1 : 0); G2.setNight(night ? 1 : 0); }; if (!i) b.classList.add('on'); tl.appendChild(b); });
+sc.background = new THREE.Color(0x9cc3e6);
+addEventListener('resize', () => { R.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); });
+R.setAnimationLoop(() => { ctl.update(); R.render(sc, cam); });
+window.__ready = 1;
+</script>
+</body></html>

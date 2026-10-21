@@ -1,0 +1,2 @@
+Порталът с табели над магистралата (hwsigns.js, Лабораторията lab/gantry.html). Олекотен (Blender decimate на решетката, webp, quantize); табелите — наши надписи на канава. Лиценз CC BY — изисква се посочване на автора:
+hw-gantry.glb — "Highway Sign" by haleem (@haleem4), CC Attribution, https://sketchfab.com/3d-models/highway-sign-28c2081eb3664308a53d38c674e08eff
