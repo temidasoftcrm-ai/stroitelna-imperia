@@ -59,7 +59,8 @@ Muscle: ['car-accord', RS ? 4.9 : 4.7], Muscle_2: ['car-corolla', RS ? 4.63 : 4.
 };
 const M_PER = CAR_LEN / 4.5;   // седанът от пакета (≈4,5 м) е CAR_LEN в света на играта
 function loadRealCars(load, A) {
-  return Promise.all(Object.entries(REAL_CARS).map(([nm, [f, len]]) => load('assets/heavy/cars/' + f + '.glb').then(g => {
+  const SIREN_FILES = new Set(['car-polsuv']);   // REAL_CARS с версия с лещи в cars/sirens (sirens-real) — иначе моделираната лента + процедурната = двойна
+  return Promise.all(Object.entries(REAL_CARS).map(([nm, [f, len]]) => load('assets/heavy/cars/' + (feature('sirens-real') && SIREN_FILES.has(f) ? 'sirens/' : '') + f + '.glb').then(g => {
     g.scene.traverse(o => { if (o.isMesh) o.castShadow = false; });
     const sc = wrap(g.scene, 0, len * M_PER);
     if (/^Police/.test(nm)) addBeacons(sc, len * M_PER, 'police');
