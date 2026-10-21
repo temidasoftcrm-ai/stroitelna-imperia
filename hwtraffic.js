@@ -28,7 +28,7 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
   const realCars = REAL_CARS.filter(([n]) => A['sf-car-' + n]), wsum = realCars.reduce((t, [, w]) => t + w, 0);
   const pickCar = r => { let t = r * wsum; for (const [n, w] of realCars) { if ((t -= w) <= 0) return 'sf-car-' + n; } return 'sf-car-' + realCars[0][0]; };
   let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  for (let k = 0; k < (ab ? 44 : 28); k++) {
+  for (let k = 0; k < (ab ? 64 : 44); k++) {   // потребителят: „повече движение по магистралата“ (беше 44 / 28)
     const truck = k % 3 === 0, bus = !truck && k % 7 === 3 && A['sf-car-Bus'], dir = k % 2 ? 1 : -1;
     const semis = feature('trucks-real') && A['sf-semi-0'] ? ['sf-semi-0', 'sf-semi-1', ...(A['sf-car-Truck'] ? ['sf-car-Truck'] : [])] : TRUCKS;
     const names = (truck ? semis : bus ? ['sf-car-Bus'] : feature('cars-real') && realCars.length ? [pickCar(rnd())] : CARS).filter(n => A[n]);   // модерните ТИР-ове (trucks-real)
