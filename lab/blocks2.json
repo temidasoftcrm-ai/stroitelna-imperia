@@ -189,15 +189,6 @@
   "kb": 136
  },
  {
-  "k": "pp-roofgarden",
-  "title": "City Building with Roof Garden",
-  "by": "Anonymous",
-  "lic": "CC-BY",
-  "src": "https://poly.pizza/m/8ywGTrLRgBE",
-  "verts": 61459,
-  "kb": 2074
- },
- {
   "k": "pp-office",
   "title": "Office",
   "by": "SoyMaria",
@@ -205,15 +196,6 @@
   "src": "https://poly.pizza/m/KRT3e3kgEb",
   "verts": 6116,
   "kb": 215
- },
- {
-  "k": "pp-smallbld",
-  "title": "Small Building",
-  "by": "Quaternius",
-  "lic": "CC0",
-  "src": "https://poly.pizza/m/6q5cwgep0I",
-  "verts": 8014,
-  "kb": 282
  },
  {
   "k": "pp-brown",
@@ -241,14 +223,5 @@
   "src": "https://poly.pizza/m/AP79CnmFDv",
   "verts": 4408,
   "kb": 155
- },
- {
-  "k": "pp-sky",
-  "title": "Skyscraper",
-  "by": "Jarlan Perez",
-  "lic": "CC-BY",
-  "src": "https://poly.pizza/m/7WF09z31G_v",
-  "verts": 696,
-  "kb": 20
  }
 ]
