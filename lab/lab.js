@@ -112,6 +112,7 @@ const DEMOS = [
   ['🔥 Пожар: спасена (над 30%)', 'sofia', () => $('fr').contentWindow.__dbg.fireTest(0.4)],   // firesim.js (fire-seq)
   ['🔥 Пожар: критични щети (под 30%) → спешен ремонт', 'sofia', () => $('fr').contentWindow.__dbg.fireTest(1.4)],
   ['🔥 Пожар: изгоряла (0%) → разчистване и нов строеж', 'sofia', () => $('fr').contentWindow.__dbg.fireTest(2.2)],
+  ['🪧 Билбордове с фирмата по булевардите', 'sofia', d => d.billboardLook()],   // billboards3d.js
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

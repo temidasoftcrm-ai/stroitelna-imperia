@@ -22,7 +22,8 @@ import { createMinimap } from './minimap.js';
 import { createRivals, LOCAL_FIRMS, FIRMS } from './rivals.js';
 import { perf, createPerfPanel } from './perfpanel.js';
 import { createCityCull } from './citycull.js';
-import { createFires } from './firesim.js';   // 🔥 флаг fire-seq: пожарът като последователност (здравина, гасене, оценка, ремонт/разчистване)   // ⚡ флаг perf-cliff: детайлите и хората по разстояние, сливане на статичните модели   // ⏱️ панел за производителност (флаг perf-panel, F8)
+import { createFires } from './firesim.js';
+import { buildBillboards } from './billboards3d.js';   // 🪧 флаг billboards: билбордове с фирмата по булевардите   // 🔥 флаг fire-seq: пожарът като последователност (здравина, гасене, оценка, ремонт/разчистване)   // ⚡ флаг perf-cliff: детайлите и хората по разстояние, сливане на статичните модели   // ⏱️ панел за производителност (флаг perf-panel, F8)
 import { createDevLevel, THRESH as DEV_THRESH, LV as DEV_LV, unlockText, kmXp, XP_BUY } from './devlevel.js';
 import { createCityPanel } from './citypanel.js';
 import { createPlaytime } from './playtime.js';
@@ -2568,6 +2569,16 @@ function enterCity() {
   $('panel').classList.remove('hidden');
   renderPanel();
 }
+// 🪧 булевардите за билбордовете: от плана (cls blvd / ring или широки), иначе — централните авенюта на мрежата
+// снимките на потребителя за билбордовете (3:1) — само за марката „Империал“; другите — нарисуваните дизайни с тяхното име и лого
+const BB_IMAGES = { imperial: [{ url: 'assets/ui/billboards/imperial-1.webp', logo: 'left' }, { url: 'assets/ui/billboards/imperial-2.webp', logo: 'right' }, { url: 'assets/ui/billboards/imperial-3.webp', logo: 'center' }] };   // 3-тата — панорама без надпис
+const bbImages = b => (b && /империал|imperial/i.test(`${b.nm} ${b.k}`) ? BB_IMAGES.imperial : []);
+function billboardRoads() {
+  const P = city.plan;
+  if (P && P.streets && P.streets.length) { const main = P.streets.filter(s => s.cls === 'blvd' || s.cls === 'ring' || (s.w || 0) >= 14).map(s => ({ ...s, main: true })), wide = P.streets.filter(s => !main.some(m => m.id === s.id && m.pts === s.pts) && (s.w || 0) >= 9 && s.cls !== 'blvd' && s.cls !== 'ring'); if (main.length + wide.length) return [...main, ...wide]; }   // булевардите първо, после широките улици
+  const ci = 3 * Math.floor(NBI / 2), cj = 3 * Math.floor(NBJ / 2);
+  return [{ pts: [[tx(ci), tx(0)], [tx(ci), tx(NJ - 1)]], w: TILE }, { pts: [[tx(0), tx(cj)], [tx(NI - 1), tx(cj)]], w: TILE }];
+}
 function setupWorld() {
   city.ready = true;
   S.hqCity = S.hqCity || S.cityId; S.cities = S.cities || {};
@@ -2631,6 +2642,7 @@ function setupWorld() {
   S.rails = S.rails || []; S.trains = S.trains || []; S.jobs = S.jobs || [];
   controls.target.set(city.hq.x, 0, city.hq.z);
   camera.position.set(city.hq.x + 55, 85, city.hq.z + 90);
+  if (feature('billboards')) try { const b = brandOf(S) || { nm: 'Титан', col: '#4fc3f7', ico: '🗿' }; city.billboards = buildBillboards(city.group, { roads: billboardRoads(), brand: b, company: `${b.nm} Констръкшън`, years: Math.max(1, Math.floor((S.day || 1) / 360)), images: bbImages(b) }); } catch (e) { console.warn('billboards', e); }
 }
 
 function freeLots(type) {
@@ -9773,7 +9785,7 @@ function frame() {
   if (onMap) return;   // картата е SVG — 3D сцената не се рисува отдолу
   if (window.__overlay3d > 0) return;   // директорската зала (directors3d.js) е втори WebGL на цял екран — градът под нея не се рисува (иначе две сцени на кадър)
   controls.update();
-  if (S) { dayNight.update(todF(), controls.target); weather.update(rdt, controls.target); setSiteLightsNight(dayNight.night); }
+  if (S) { dayNight.update(todF(), controls.target); weather.update(rdt, controls.target); setSiteLightsNight(dayNight.night); if (city.billboards) city.billboards.setNight(dayNight.night); }
   perfTune(rdt);
   perf.lap('prep');
   renderer.render(scene, camera);
@@ -9856,6 +9868,8 @@ if (AUTOTEST) {
     state: () => S,
     fireTest(sev = 1, travel) { const tg = controls.target; const L = city.lots.filter(l => l.obj && l.built && !l.busy).sort((a, b) => Math.hypot(a.x - tg.x, a.z - tg.z) - Math.hypot(b.x - tg.x, b.z - tg.z))[0]; if (!L) return null; const f = fires.start(L.id, { sev, travel }); flyTo(L); return f && f.id; },   // 🔥 fire-seq: пожар в най-близката сграда
     fires: () => fires.state(),
+    bbRebuild(brand) { if (brand) S.brand = brand; if (city.billboards) city.billboards.dispose(); const b = brandOf(S) || { nm: 'Титан', col: '#4fc3f7', ico: '🗿' }; city.billboards = buildBillboards(city.group, { roads: billboardRoads(), brand: b, company: `${b.nm} Констръкшън`, years: Math.max(1, Math.floor((S.day || 1) / 360)), images: bbImages(b) }); return city.billboards.spots.length; },
+    billboardLook() { const s = city.billboards?.spots?.[0]; if (!s) return null; controls.target.set(s.x, 8, s.z); camera.position.set(s.x + Math.sin(s.ry) * 34 + 8, 14, s.z + Math.cos(s.ry) * 34); fly = null; return city.billboards.spots.length; },   // 🪧 демо
     muni: () => muni,   // 🏛️ поръчките на общината (тест)
     ownTest() { econ.earn(1e9, 'друго', 'тест'); const ls = city.lots.filter(l => !l.built && !l.busy && l !== city.hq).slice(0, 8); for (const l of ls) buyLand(l.id); $('modal')?.classList.add('hidden'); return { own: ownCount(), land: est().land.length }; },
     fleetCapTest() { econ.earn(5e10, 'друго', 'тест'); S.dev.lv = 12; S.dev.xp = 6e5; S.airports = {}; S.ports = {}; for (const id of ['sofia', 'varna', 'burgas', 'plovdiv', 'istanbul', 'athens', 'rome', 'paris', 'london', 'berlin']) { S.airports[id] = { lv: 7, build: null }; S.ports[id] = { lv: 5, build: null, xb: 4 }; } S.planes = S.planes || []; const p0 = S.planes.length; for (let i = 0; i < 90; i++) buyPlane('prop'); const s0 = (S.ships || []).length; for (let i = 0; i < 90; i++) { try { buyShip('boat'); } catch (e) { break; } } $('modal')?.classList.add('hidden'); return { gates: airGates(), planeCap: fleetCap.plane(), planes: S.planes.length - p0, berths: portBerths(), shipCap: fleetCap.ship(), ships: (S.ships || []).length - s0 }; },
