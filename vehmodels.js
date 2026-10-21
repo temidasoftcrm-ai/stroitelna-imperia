@@ -90,7 +90,7 @@ export function emergCar(src, len, kind = 'police', name = '') { const sc0 = src
 export function loadPoliceCars(load, A) {
   return Promise.all(Object.entries(EMERG).map(([nm, opts]) => {
     const ok = opts.filter(([f]) => feature(f)); if (!ok.length) return null;
-    return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + f + '.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = false; }); const [yaw, L0] = tidyCar(g.scene), K = EMERG_K[nm] * len * M_PER, sc = wrap(g.scene, yaw + (CAR_FLIP.has(f) ? Math.PI : 0), K / L0); /* мащабът е във вътрешната група — model() пипа само външния */ addBeacons(sc, K, nm === 'Firetruck' ? 'fire' : nm === 'Ambulance' ? 'ambulance' : 'police'); return sc; }).catch(() => null)))
+    return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + (feature('sirens-real') ? 'sirens/' : '') + f + '.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = false; }); const [yaw, L0] = tidyCar(g.scene), K = EMERG_K[nm] * len * M_PER, sc = wrap(g.scene, yaw + (CAR_FLIP.has(f) ? Math.PI : 0), K / L0); /* мащабът е във вътрешната група — model() пипа само външния */ addBeacons(sc, K, nm === 'Firetruck' ? 'fire' : nm === 'Ambulance' ? 'ambulance' : 'police'); return sc; }).catch(() => null)))
       .then(list => { list = list.filter(Boolean); if (list.length) A['sf-car-' + nm] = { scene: list[0], variants: list }; });
   }));
 }
@@ -209,6 +209,25 @@ class BarPool extends THREE.Mesh {   // петното светлина на п�
   onBeforeRender() { if (!this.userData.own) { this.material = this.material.clone(); this.userData.own = 1; } const car = carOf(this); if (!car) return; const t = performance.now() / 1000, L = barLit(car, 0, 0, t), R = barLit(car, 1, 0, t);
     this.material.opacity = L || R ? 0.8 : 0; if (L || R) this.material.color.setHex(this.userData.cols[L ? 0 : 1]); }
 }
+// 🚨 истинските сирени (Лабораторията → sirens-real): assets/heavy/cars/sirens/*.glb имат лещи siren_L/siren_R (+L1/R1 отзад, siren_C — един буркан)
+// точно върху моделираната лента/бурканите (Blender). Всяка леща става BarSeg (същият ритъм и звук като лентата на beacons2), + ореол и петно на пътя.
+const SIREN_COL = { red: 0xff2a2a, blue: 0x2a6bff, white: 0xf4f6ff };
+function realSirens(car, kind) {
+  const nodes = []; car.traverse(o => { if (/^siren_[LRC]\d*$/.test(o.name)) nodes.push(o); }); if (!nodes.length) return false;
+  const bb = new THREE.Box3().setFromObject(car), W = bb.max.x - bb.min.x, Lc = bb.max.z - bb.min.z, cols = [...(BAR_COL[kind] || BAR_COL.police)], segs = [];
+  for (const o of nodes) { const side = o.userData.side ?? (/_R/.test(o.name) ? 1 : 0), col = SIREN_COL[o.userData.col] ?? cols[side]; cols[side] = col;
+    const ms = []; o.traverse(m => { if (m.isMesh) ms.push(m); });
+    for (const m of ms) { const mat = BEACON[side ? 'b' : 'r'].clone(); mat.emissive.setHex(col); mat.color.setHex(col).multiplyScalar(0.25); mat.transparent = true; mat.opacity = 0.9;
+      const sg = new BarSeg(m.geometry, mat); sg.name = m.name; sg.position.copy(m.position); sg.quaternion.copy(m.quaternion); sg.scale.set(1, 1, 1); sg.castShadow = false;
+      sg.userData = { red: false, kind, side, j: 0 }; m.parent.add(sg); m.parent.remove(m); segs.push(sg); } }
+  (segs.find(x => x.userData.side === 0) || segs[0]).userData.red = true;   // звукът и sirenKind — от една леща
+  car.updateMatrixWorld(true);
+  for (const sg of segs) { const g = new BarGlow(new THREE.SpriteMaterial({ map: glowTex, color: cols[sg.userData.side], transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
+    g.position.copy(car.worldToLocal(sg.getWorldPosition(new THREE.Vector3()))); g.position.y += W * 0.04; g.renderOrder = 2; g.scale.setScalar(W * 0.9); g.userData.side = sg.userData.side; car.add(g); }
+  const pool = new BarPool(new THREE.PlaneGeometry(W * 3.2, Lc * 1.5).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: glowTex, color: cols[0], transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0, polygonOffset: true, polygonOffsetFactor: -4 }));
+  pool.position.set(0, bb.min.y + 0.06, (bb.min.z + bb.max.z) / 2); pool.userData.cols = cols; pool.renderOrder = 1; car.add(pool);
+  return true;
+}
 function addLightBar(car, kind) {
   const bb = new THREE.Box3().setFromObject(car), W = bb.max.x - bb.min.x, Lc = bb.max.z - bb.min.z, y = bb.max.y + 0.02, z = (bb.min.z + bb.max.z) / 2 + Lc * 0.04;
   const bw = W * 0.66, bd = Math.max(0.12, W * 0.13), bh = Math.max(0.06, W * 0.055), cols = BAR_COL[kind] || BAR_COL.police;
@@ -230,6 +249,7 @@ function addLightBar(car, kind) {
 function addBeacons(car, len, kind = 'police') {
   if (!glowTex) { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 1, 32, 32, 31); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.12, 'rgba(255,255,255,0.7)'); gr.addColorStop(0.4, 'rgba(255,255,255,0.18)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); glowTex = new THREE.CanvasTexture(c); }
   car.userData.isCar = true; car.updateMatrixWorld(true);
+  if (feature('sirens-real') && realSirens(car, kind)) return;   // моделът си има лентата/бурканите — светят те (assets/heavy/cars/sirens)
   if (feature('beacons2')) return addLightBar(car, kind);
   const bb = new THREE.Box3().setFromObject(car), W = bb.max.x - bb.min.x, y = bb.max.y + 0.06, z = (bb.min.z + bb.max.z) / 2 + len * 0.08, r = Math.max(0.07, W * 0.04);
   const geo = new THREE.SphereGeometry(r, 12, 8);

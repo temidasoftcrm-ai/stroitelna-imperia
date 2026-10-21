@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<base href="../">
+<title>Сирени на спешните коли</title>
+<style>
+  html, body { margin:0; height:100%; background:#05070c; color:#eef1f6; font:14px/1.4 system-ui, sans-serif; overflow:hidden; }
+  #ui { position:fixed; left:10px; top:10px; z-index:2; background:#0b1018d9; border:1px solid #ffffff22; border-radius:12px; padding:10px 12px; max-width:min(420px, calc(100vw - 44px)); }
+  #ui h1 { font-size:16px; margin:0 0 4px; } #ui p { margin:0 0 8px; color:#9aa3b5; font-size:13px; }
+  #ui a, #ui button { font:inherit; color:#eef1f6; background:#ffffff12; border:1px solid #ffffff2a; border-radius:8px; padding:5px 10px; cursor:pointer; text-decoration:none; margin:2px 4px 2px 0; display:inline-block; }
+  #ui a.on { background:#ffb300; color:#1a1200; font-weight:800; }
+  .lbl { position:fixed; transform:translate(-50%, 0); color:#fff; font-size:12px; background:#000a; padding:1px 6px; border-radius:6px; pointer-events:none; white-space:nowrap; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head><body>
+<div id="ui"><h1>🚨 Сирените на спешните коли</h1>
+<p>Нощ, сирените са включени. „Нови“ — светлините са точно върху моделираната лента/бурканите (assets/heavy/cars/sirens, flag <b>sirens-real</b>); „Стари“ — досегашната лента на покрива (по кутията на модела).</p>
+<a id="bNew" href="lab/sirens.html">🆕 Нови</a><a id="bOld" href="lab/sirens.html?old=1">⏮️ Стари</a><button id="bCam">🔄 Обиколи</button></div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { emergCar } from './vehmodels.js';
+const OLD = new URLSearchParams(location.search).has('old');
+document.getElementById(OLD ? 'bOld' : 'bNew').classList.add('on');
+const CARS = [['pol-charger', 'police', 5.1], ['pol-crownvic', 'police', 5.4], ['pol-interceptor', 'police', 5.3], ['pol-nypd', 'police', 5.1], ['pol-volga', 'police', 4.8], ['car-polsuv', 'police', 5],
+  ['amb-eu', 'ambulance', 7.2], ['amb-gaz', 'ambulance', 7], ['amb-us', 'ambulance', 7.5], ['fire-red', 'fire', 9], ['fire-us', 'fire', 10], ['fire-man', 'fire', 10.5]];
+const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x05070c); scene.fog = new THREE.Fog(0x05070c, 60, 160);
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 500); camera.position.set(0, 30, 58);
+const controls = new OrbitControls(camera, renderer.domElement); controls.target.set(0, 1, 0); controls.update();
+scene.add(new THREE.HemisphereLight(0x3a4a70, 0x080808, 0.35)); { const m = new THREE.DirectionalLight(0x8ea6ff, 0.35); m.position.set(-20, 30, 10); scene.add(m); }   // луна
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0x1b1d22, roughness: 0.95 })); ground.rotation.x = -Math.PI / 2; scene.add(ground);
+const loader = new GLTFLoader(), labels = [];
+CARS.forEach(([nm, kind, len], i) => {
+  const row = i < 6 ? 0 : 1, col = row ? i - 6 : i, x = (col - 2.5) * (row ? 13 : 8), z = row ? -9 : 6;
+  loader.load(`assets/heavy/cars/${OLD ? '' : 'sirens/'}${nm}.glb`, g => {
+    const car = emergCar(g.scene, len, kind, nm); car.userData.beaconsOn = true;
+    const h = new THREE.Group(); h.add(car); h.position.set(x, 0, z); h.rotation.y = -0.5; scene.add(h);
+    const el = document.createElement('div'); el.className = 'lbl'; el.textContent = nm; document.body.appendChild(el); labels.push([el, h]);
+  }, undefined, e => console.warn(nm, e));
+});
+let spin = false; document.getElementById('bCam').onclick = () => { spin = !spin; controls.autoRotate = spin; };
+const v = new THREE.Vector3();
+renderer.setAnimationLoop(() => {
+  controls.update(); renderer.render(scene, camera);
+  for (const [el, h] of labels) { v.copy(h.position); v.y = -0.6; v.project(camera); el.style.left = `${(v.x + 1) / 2 * innerWidth}px`; el.style.top = `${(1 - v.y) / 2 * innerHeight}px`; }
+});
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+window.__sir = { scene, camera, controls };
+</script></body></html>
