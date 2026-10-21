@@ -253,3 +253,4 @@ money/money-bundle.glb — "Cash bundle" by Vincent.Corleone (CC BY 4.0) — htt
 money/money-stacks.glb — "Money Stacks" by 3D_Crackhouse (CC BY 4.0) — https://sketchfab.com/3d-models/1998b42922be4cbbb752de8b307bdaf4
 money/money-crate.glb — "Money Crate" by 3D_Crackhouse (CC BY 4.0) — https://sketchfab.com/3d-models/6dff4a83c3f44d138f29cae51bb9266d
 money/gold-bar.glb — "Realistic Gold Bar" by Seth7Santos (CC BY 4.0) — https://sketchfab.com/3d-models/194d2227c82549fcba14a37342ea3d08
+gear/mcrane-rig.glb, gear/excavator-rig.glb — the same models as mcrane.glb / excavator.glb (see above), split into moving parts and animated in Blender for this game

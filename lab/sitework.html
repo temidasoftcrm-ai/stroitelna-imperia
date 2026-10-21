@@ -23,7 +23,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { loadVehModels } from '../vehmodels.js';
 import { loadConstruct } from '../construct.js';
-import { createDemolition2, machineWork, craneLift } from '../sitework.js';
+import { createDemolition2, machineWork, craneLift, loadSiteRigs, rigPlay } from '../sitework.js';
+import { SITE, siteK, scaleFor } from '../scale.js';
 const R = new THREE.WebGLRenderer({ antialias: true }); R.setSize(innerWidth, innerHeight); R.setPixelRatio(Math.min(2, devicePixelRatio)); R.outputColorSpace = THREE.SRGBColorSpace; R.shadowMap.enabled = true; R.localClippingEnabled = true; document.body.appendChild(R.domElement);
 const sc = new THREE.Scene(); sc.background = new THREE.Color(0xbcd6ec); sc.add(new THREE.HemisphereLight(0xffffff, 0x667788, 1.5));
 const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(40, 70, 30); sun.castShadow = true; Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 50, bottom: -50 }); sun.shadow.mapSize.set(2048, 2048); sc.add(sun);
@@ -34,9 +35,9 @@ const road = new THREE.Mesh(new THREE.PlaneGeometry(200, 8).rotateX(-Math.PI / 2
 const walk = new THREE.Mesh(new THREE.PlaneGeometry(200, 2.4).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xc9c4b8 })); walk.position.set(0, 0.04, 9.2); sc.add(walk);
 const cam = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.5, 1000); cam.position.set(0, 34, 62); const ctl = new OrbitControls(cam, R.domElement); ctl.target.set(0, 4, 0); ctl.update();
 const L = new GLTFLoader(), A = {}, load = u => L.loadAsync('../' + u);
-await Promise.all([loadVehModels(load, A, 'assets/heavy/gear/'), loadConstruct(load, A)]);
+await Promise.all([loadVehModels(load, A, 'assets/heavy/gear/'), loadConstruct(load, A), loadSiteRigs(load, A)]);
 const house = await L.loadAsync('../assets/heavy/houses2/h2-greyporch.glb').then(g => g.scene);
-const mdl = (n, len) => { const o = (A[n].scene || A[n]).clone(true); o.scale.setScalar(len); o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); return o; };
+const mdl = (n) => { const o = (A[n].scene || A[n]).clone(true); o.scale.setScalar(siteK(A, n)); o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); return o; };
 // ---- парцел 1 (x = −20): къща 12 × 8 м, събаряне
 const LOT1 = { x: -20, z: 0, rot: 0, w: 16, d: 16 };
 let demo = null, h1 = null, prog = 0, paused = false;
@@ -58,21 +59,28 @@ const mound = new THREE.Mesh(new THREE.ConeGeometry(2.6, 1.6, 10), new THREE.Mes
 // оградата (2 м, вход откъм улицата)
 const fenceM = new THREE.MeshStandardMaterial({ color: 0x2f6b8a, roughness: 0.7 }), side = (w, x, z, ry) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, 2, 0.1), fenceM); m.position.set(x, 1, z); m.rotation.y = ry; m.castShadow = true; site.add(m); };
 side(16, 0, -8, 0); side(16, -8, 0, Math.PI / 2); side(16, 8, 0, Math.PI / 2); side(5.5, -5.25, 8, 0); side(5.5, 5.25, 8, 0);
-const prop = (n, k, x, z, ry) => { if (!A[n]) return; const o = (A[n].scene || A[n]).clone(true); o.scale.setScalar(k); o.position.set(x, 0.05, z); o.rotation.y = ry; o.traverse(m => { if (m.isMesh) m.castShadow = true; }); site.add(o); };
+const prop = (n, k, x, z, ry) => { if (!A[n]) return; const o = (A[n].scene || A[n]).clone(true); o.scale.setScalar(SITE[n] ? siteK(A, n) : k); o.position.set(x, 0.05, z); o.rotation.y = ry; o.traverse(m => { if (m.isMesh) m.castShadow = true; }); site.add(o); };
 prop('container-office-green', 0.85, -6, 5, Math.PI / 2); prop('toilet-portable', 1, 6.8, 6.8, Math.PI); prop('planks-wood-a', 0.9, -6.6, -6.2, 0); prop('box-stack-brown', 1, 6.4, 3.5, 0); prop('container-rubble-red', 1, 6.2, -1, 0); prop('barrel', 1, 4.8, 6.9, 0);
 const machines = [];
-const put = (n, len, kind, x, z, ry) => { if (!A[n]) return; const o = mdl(n, len); o.position.set(x, 0.05, z); o.rotation.y = ry; o.userData.src = n; site.add(o); machines.push([o, kind]); };
-put('sf-excavator', 8.5, 'excavator', -2, -2, Math.PI * 0.75); put('sf-backhoe', 6, 'bulldozer', 2, 2.5, -Math.PI / 2); put('sf-roller', 4.5, 'roller', -4, 3.5, 0); put('sf-dump', 8, 'truck', 2.5, -5.2, Math.PI / 2);
+const put = (n, len, kind, x, z, ry) => { if (!A[n]) return; const o = mdl(n); o.position.set(x, 0.05, z); o.rotation.y = ry; o.userData.src = n; site.add(o); machines.push([o, kind]); };
+{ const o = (A['sf-excavator-rig'] || A['sf-excavator']).scene.clone(true); o.scale.setScalar(siteK(A, 'sf-excavator')); o.position.set(-2, 0.05, -2); o.rotation.y = Math.PI * 0.75; o.userData.rig = rigPlay(o, A, 'sf-excavator-rig', 'work'); site.add(o); machines.push([o, 'excavator']); } put('sf-backhoe', 6, 'bulldozer', 2, 2.5, -Math.PI / 2); put('sf-roller', 4.5, 'roller', -4, 3.5, 0); put('sf-dump', 8, 'truck', 2.5, -5.2, Math.PI / 2);
 // кулокранът с палета (кулата — в задния ляв ъгъл)
 let lift = null; if (A['crane-tower']) { const k = 30 / 56, pv = new THREE.Group(), m = (A['crane-tower'].scene || A['crane-tower']).clone(true); m.scale.setScalar(k); m.position.set(-6 * k, 0, 10.75 * k); pv.add(m); pv.position.set(-9.5, 0, -9.5); pv.rotation.y = Math.PI / 4; site.add(pv); lift = craneLift(pv, 28, 26); }
+// ---- редица за сравнение (z = 34, отвъд улицата): всички машини и обзавеждането в истински размер + човек 1,75 м; таблицата — в панела
+{ let x = -40; const rows = []; const ped = await L.loadAsync('../assets/heavy/people/peds/ped-adam.glb').then(g => g.scene).catch(() => null);
+  if (ped) { ped.scale.setScalar(scaleFor('ped-adam', ped)); const b = new THREE.Box3().setFromObject(ped); ped.position.set(x, -b.min.y, 34); sc.add(ped); x += 3; }
+  for (const n of Object.keys(SITE)) { if (!A[n]) continue; const o = (A[n].scene || A[n]).clone(true); o.scale.setScalar(siteK(A, n)); o.rotation.y = Math.PI / 2; sc.add(o); const b = new THREE.Box3().setFromObject(o), sz = b.getSize(new THREE.Vector3()); o.position.set(x + sz.x / 2 - (b.min.x + b.max.x) / 2, -b.min.y, 34 - (b.min.z + b.max.z) / 2); x += sz.x + 2.5;
+    rows.push(`<tr><td>${SITE[n].nm}</td><td>${sz.x.toFixed(1)} × ${sz.z.toFixed(1)} × ${sz.y.toFixed(1)}</td><td style="color:#9aa0aa">${SITE[n].spec}</td></tr>`); }
+  document.getElementById('hud').insertAdjacentHTML('beforeend', `<table style="font-size:12px;margin-top:6px;border-collapse:collapse"><tr><th align=left>машина</th><th align=left>в играта, м (Д × Ш × В)</th><th align=left>истинска</th></tr>${rows.join('')}</table><div><button id="line">👀 Редицата с човека</button></div>`);
+  document.getElementById('line').onclick = () => { ctl.target.set(x / 2 - 20, 2, 34); cam.position.set(x / 2 - 20, 9, 66); ctl.update(); }; }
 let t = 0; const clock = new THREE.Clock(), bar = document.querySelector('#bar i');
 R.setAnimationLoop(() => {
   const dt = paused ? 0 : Math.min(0.1, clock.getDelta()); if (paused) clock.getDelta(); t += dt;
   if (demo) { prog = Math.min(1, prog + dt / 28); demo.update(prog, dt, true); bar.style.width = (prog * 100).toFixed(0) + '%'; }
-  for (const [o, k] of machines) machineWork(o, k, t, machines.indexOf(machines.find(q => q[0] === o)));
+  machines.forEach(([o, k], i) => machineWork(o, k, t, i, dt));
   if (lift) lift.update(t);
   ctl.update(); R.render(sc, cam);
 });
 addEventListener('resize', () => { R.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); });
-window.__ready = true; window.__prog = p => { prog = p; };
+window.__ready = true; window.__prog = p => { prog = p; }; window.__line = () => document.getElementById('line').click(); window.__cam = (x, y, z, tx, ty, tz) => { cam.position.set(x, y, z); ctl.target.set(tx, ty, tz); ctl.update(); }; window.__hud = v => { document.getElementById('hud').style.display = v ? '' : 'none'; };
 </script></body></html>

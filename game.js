@@ -33,7 +33,8 @@ import { createStation, STATION_LEVELS } from './station.js';
 import { createResorts, RESORTS, seasonOf, monthName } from './resorts.js';
 import { buildResortView, RESORT_MODELS } from './resortview.js';
 import { createDemolition } from './demolish.js';
-import { createDemolition2, machineWork, craneLift } from './sitework.js';   // 🏗️ флаг site-anim: истински кран при събаряне, машините работят, кранът вдига
+import { createDemolition2, machineWork, craneLift, loadSiteRigs, rigPlay } from './sitework.js';
+import { siteK } from './scale.js';   // 🏗️ флаг site-anim: истински кран при събаряне, машините работят, кранът вдига
 import { createEvents } from './events.js';
 import { createWeather, rollWeather } from './weather.js';
 import { bidHtml, resolveBid } from './bidding.js';
@@ -498,7 +499,8 @@ let europe = null;
   const ldT0 = performance.now();
   jobs.forEach(j => j.then(() => { const k = Math.round(++done / jobs.length * 100); $('ldBar').style.width = Math.max(3, k) + '%'; $('ldTxt').textContent = `Зареждане… ${k}%`; }));
   await Promise.all(jobs);
-  await loadConstruct(load, A);   // строежите: кулокран, контейнери, тоалетна, материали, самосвали, бетоновоз — истинските (construct.js) под старите имена
+  await loadConstruct(load, A);
+  if (feature('site-anim')) await loadSiteRigs(load, A).catch(() => {});   // 🏗️ кранът и багерът с истински стави (Blender)   // строежите: кулокран, контейнери, тоалетна, материали, самосвали, бетоновоз — истинските (construct.js) под старите имена
   await loadIndustry(load, A);   // истинските заводи, водни кули, турбини и соларни панели (industry.js) — заместват детските 'ind-*' (Лабораторията → ind-real)
   // GLTFLoader оставя parser-а (вкл. JSON и кешовете на dependency-тата) в резултата.
   // След зареждането вече е нужен само за допълнителната текстура на блоковете (горе).
@@ -1694,12 +1696,13 @@ function homeSlot(u) {
 }
 // истинските модели (vehmodels.js) — дължина в света на играта
 const SF_VEH = { loader: 'sf-excavator', truck: 'sf-dump', crane: 'sf-mcrane', tractor: 'sf-backhoe', roller: 'sf-roller', grader: 'sf-grader', crew: 'sf-car-Van', marker: 'sf-car-Van', ...(feature('real-shops') ? { bulldozer: 'sf-excavator' } : {}) };   // бусът на бригадата и маркировката — истинският бус (УАЗ, vehmodels.js) вместо детския delivery/van
-const SF_LEN = { loader: 6.5, truck: 7.5, crane: 9, tractor: 4.6, roller: 4.5, grader: 7, crew: 1, marker: 1, bulldozer: 7.5 };   // колите (sf-car-*) вече са в мащаба на града — 1   // м по дължина — в мащаба на колите (седан 4,5 м, vehmodels.js)
+const SF_LEN = feature('site-anim') ? { loader: 9.6, truck: 8, crane: 13.5, tractor: 6, roller: 3.9, grader: 8.5, crew: 1, marker: 1, bulldozer: 9.6 } : { loader: 6.5, truck: 7.5, crane: 9, tractor: 4.6, roller: 4.5, grader: 7, crew: 1, marker: 1, bulldozer: 7.5 };   // колите (sf-car-*) вече са в мащаба на града — 1   // м по дължина — в мащаба на колите (седан 4,5 м, vehmodels.js)
 const VEH_LEN = { bulldozer: 6 };   // м — моделите от пакетите, които не са в метри: мащаб по най-дългата хоризонтална страна (булдозерът беше колкото сграда; другите Kenney са с процедурни добавки, нагласени за VSCALE)
 function spawnUnit(type, at) {
   const sf = A[SF_VEH[type]] ? SF_VEH[type] : null;
   const nm = A[VEH_MODEL[type]] ? VEH_MODEL[type] : 'truck', bs = VEH_LEN[type] && A[nm] ? sizeOf(nm).getSize(new THREE.Vector3()) : null;
   const obj = sf ? model(sf, SF_LEN[type]) : model(nm, bs ? VEH_LEN[type] / Math.max(bs.x, bs.z, 1e-3) : A[VEH_MODEL[type]] ? VEH_SCALE[type] || VSCALE : VSCALE);
+  if (feature('site-anim') && (type === 'loader' || type === 'bulldozer') && sf && A['sf-excavator-rig']) { obj.remove(...obj.children); const r = A['sf-excavator-rig'].scene.clone(true); obj.add(r); obj.userData.rig = rigPlay(r, A, 'sf-excavator-rig', 'work'); }   /* багерът копае с истинските стави */
   if (type === 'crew' && sf && feature('crew-van')) { addVanLogo(obj, brandOf(S)); obj.userData.doors = vanDoors(obj); }
   if (type === 'crane' && !sf) {
     // жълта стрела отзад на платформата, за да личи, че е кран
@@ -1723,7 +1726,8 @@ function spawnUnit(type, at) {
   return u;
 }
 function sendTo(u, x, z, onArrive) {
-  if (u.obj.userData.home) { u.obj.rotation.y = u.obj.userData.home.ry; delete u.obj.userData.home; }   // site-anim: машината тръгва — без работната поза
+  if (u.obj.userData.home) { u.obj.rotation.y = u.obj.userData.home.ry; delete u.obj.userData.home; }
+  if (u.obj.userData.rig) u.obj.userData.rig.action.paused = true;   // site-anim: машината тръгва — без работната поза
   u.path = roadRoute(u.x, u.z, x, z).map(p => ({ x: p.x, z: p.z, road: true }));
   u.path.push({ x, z, road: false });
   u.pi = 0; u.state = u.state === 'working' || u.state === 'idle' ? 'driving' : u.state; u.onArrive = onArrive;
@@ -1733,7 +1737,7 @@ function updateUnits(dt) {
   for (const u of units) {
     u.obj.userData.doors?.mixer.update(dt);
     if (!u.path) {
-      if (u.state === 'working') { if (feature('site-anim')) { u.wt = (u.wt || 0) + dt; if (u.obj.position.distanceToSquared(camera.position) < 260 * 260) machineWork(u.obj, u.type, u.wt, u.id); } else u.obj.position.y = Math.abs(Math.sin(performance.now() / 180 + u.id)) * 0.06; }
+      if (u.state === 'working') { if (feature('site-anim')) { u.wt = (u.wt || 0) + dt; if (u.obj.position.distanceToSquared(camera.position) < 260 * 260) machineWork(u.obj, u.type, u.wt, u.id, dt); } else u.obj.position.y = Math.abs(Math.sin(performance.now() / 180 + u.id)) * 0.06; }
       continue;
     }
     const wp = u.path[u.pi];
@@ -2183,7 +2187,7 @@ function makeSite(p) {
   g.add(v.crane);
   addSiteLights(g, 7.6, 9);   // прожектори нощем (sitelights.js)
   // фургон, тоалетна, дъски и кашони в ъглите на обекта
-  const prop = (n, s, x, z, ry) => { if (!A[n]) return; const o = model(n, s); o.position.set(x, 0.05, z); o.rotation.y = ry; g.add(o); };
+  const prop = (n, s, x, z, ry) => { if (!A[n]) return; if (feature('site-anim') && /^(container-office|toilet-portable|container-rubble)/.test(n)) s = siteK(A, n) / lotK(lot); const o = model(n, s); o.position.set(x, 0.05, z); o.rotation.y = ry; g.add(o); };
   prop(p.id % 2 ? 'container-office-green' : 'container-office-red', 0.45, -6.5, -4.6, 0);
   prop('toilet-portable', 0.75, 6.7, 6.7, Math.PI);
   prop('planks-wood-a', 0.45, -6.8, 4.5, 0);
@@ -2665,7 +2669,7 @@ function assignUnit(u, p) {
   u.proj = p;
   const k = units.filter(q => q.proj === p).length - 1;
   const spot = [[-4.5, 5.5], [0, 4.5], [4.5, 5.5], [-4.5, 1], [4.5, 1], [0, 0]][k % 6];
-  sendTo(u, lot.x + spot[0], lot.z + spot[1], () => { if (u.proj === p) { u.state = 'working'; u.obj.userData.doors?.open(true); u.yaw = Math.PI; u.obj.rotation.y = u.yaw; } });
+  sendTo(u, lot.x + spot[0], lot.z + spot[1], () => { if (u.proj === p) { u.state = 'working'; u.obj.userData.doors?.open(true); if (u.obj.userData.rig) u.obj.userData.rig.action.paused = false; u.yaw = Math.PI; u.obj.rotation.y = u.yaw; } });
   u.state = 'driving';
 }
 function missingRoles(p) {

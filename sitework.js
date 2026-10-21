@@ -8,15 +8,28 @@
 //   machineWork(obj, kind, t, seed) — позата на машината в момент t (сек. игра); връща нищо (мести децата на obj / obj.rotation)
 //   craneLift(craneGroup, H) → { update(t) } — кука с палет под стрелата на кулокрана
 import * as THREE from 'three';
+import { siteK } from './scale.js';   // истинските размери на машините (едно място)
 
 const dark = new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: 0.6, metalness: 0.4 });
 const steel = new THREE.MeshStandardMaterial({ color: 0xf2b705, roughness: 0.55, metalness: 0.2 });
 const rubbleMat = new THREE.MeshStandardMaterial({ color: 0x8a8079, roughness: 1 });
 const debrisGeo = new THREE.BoxGeometry(1, 1, 1), dustGeo = new THREE.SphereGeometry(1, 10, 8);
-const MCRANE_LEN = 11, EXC_LEN = 8.5, DUMP_LEN = 8;   // м — автокранът, багерът, самосвалът
 
+// ---- раздвижените в Blender модели (assets/heavy/gear/*-rig.glb): автокранът (кула slew, стрела luff, телескоп tele, кука hook; клипове raise, work)
+// и багерът (кула swing, стрела boom, рамо stick, кофа bucket; клипове dig, work). Нормализирани като vehmodels.js: дължина 1 по z, колелата на y = 0.
+export function loadSiteRigs(load, A) {
+  const one = (f, key) => load(`assets/heavy/gear/${f}.glb`).then(g => { const inner = new THREE.Group(), w = new THREE.Group(); inner.add(g.scene); w.add(inner); w.updateMatrixWorld(true);
+    let b = new THREE.Box3().setFromObject(w); const s = b.getSize(new THREE.Vector3()); inner.scale.setScalar(1 / s.z); w.updateMatrixWorld(true); b = new THREE.Box3().setFromObject(w); const c = b.getCenter(new THREE.Vector3()); inner.position.set(-c.x, -b.min.y, -c.z);
+    w.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); A[key] = { scene: w, clips: g.animations }; }).catch(e => console.warn('rig', f, e));
+  return Promise.all([one('mcrane-rig', 'sf-mcrane-rig'), one('excavator-rig', 'sf-excavator-rig')]);
+}
+// пуска клип (по име) на клонинг на раздвижен модел; връща { mixer, action }
+export function rigPlay(obj, A, key, clip, loop = true) {
+  const R = A[key]; if (!R || !R.clips) return null; const c = R.clips.find(q => q.name === clip); if (!c) return null;
+  const mixer = new THREE.AnimationMixer(obj), action = mixer.clipAction(c); if (!loop) { action.setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = true; } action.play(); return { mixer, action };
+}
 // модел с дължина 1 (vehmodels.js) → в метри; лице към +z
-const vehicle = (A, n, len) => { if (!A[n]) return null; const o = (A[n].scene || A[n]).clone(true); o.scale.setScalar(len); o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); return o; };
+const vehicle = (A, n) => { if (!A[n]) return null; const o = (A[n].scene || A[n]).clone(true); o.scale.setScalar(siteK(A, n)); o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); return o; };
 
 // obj — сградата в сцената; parent — групата в координатите на света; lot { x, z, rot, w, d } — парцелът (лицето към улицата е локално +z)
 export function createDemolition2(obj, parent, A, o = {}) {
@@ -35,17 +48,19 @@ export function createDemolition2(obj, parent, A, o = {}) {
   // автокранът — на тротоара пред парцела, успоредно на улицата (никога през улицата); стрелата — решетъчна, към средата на сградата
   const crane = new THREE.Group(), sideV = L.d / 2 + 2.2, [kx, kz] = toW(-L.w * 0.15, sideV);
   crane.position.set(kx, base, kz); crane.rotation.y = rot + Math.PI / 2; g.add(crane);
-  const truck = vehicle(A, 'sf-mcrane', MCRANE_LEN); if (truck) crane.add(truck); else { const b = new THREE.Mesh(new THREE.BoxGeometry(2.5, 3, MCRANE_LEN), steel); b.position.y = 1.5; crane.add(b); }
+  const MCRANE_LEN = A['sf-mcrane'] ? siteK(A, 'sf-mcrane') : 13.5, rig = A['sf-mcrane-rig'] ? (() => { const o = A['sf-mcrane-rig'].scene.clone(true); o.scale.setScalar(siteK(A, 'sf-mcrane')); return o; })() : null, truck = rig || vehicle(A, 'sf-mcrane'); if (truck) crane.add(truck); else { const b = new THREE.Mesh(new THREE.BoxGeometry(2.5, 3, MCRANE_LEN), steel); b.position.y = 1.5; crane.add(b); }
   // въртящата се кула над задния мост и стрелата: от кулата до точка 4 м над сградата
+  const anim = rig ? rigPlay(rig, A, 'sf-mcrane-rig', 'raise', false) : null, slewN = rig && rig.getObjectByName('slew'), hookN = rig && rig.getObjectByName('hook');
+  if (anim) anim.action.timeScale = 1.6;   // стрелата се вдига и телескопира (~4 s), после стои
   const turret = new THREE.Group(); turret.position.set(0, 3.2, -MCRANE_LEN * 0.18); crane.add(turret);
   const tip = new THREE.Vector3(cx, base + H + 4, cz); crane.updateMatrixWorld(true);
   const tl = turret.worldToLocal(tip.clone()), yaw = Math.atan2(tl.x, tl.z); turret.rotation.y = yaw;
   const reach = Math.hypot(tl.x, tl.z), rise = tl.y, len = Math.hypot(reach, rise), pitch = Math.atan2(rise, reach);
-  const boom = new THREE.Group(); boom.rotation.x = -pitch; turret.add(boom);
+  const boom = new THREE.Group(); boom.rotation.x = -pitch; turret.add(boom); boom.visible = !rig;   // с раздвижения модел — неговата стрела; процедурната — само резерва
   const lat = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, len), new THREE.MeshStandardMaterial({ color: 0xf2b705, roughness: 0.5, wireframe: true })); lat.position.z = len / 2; boom.add(lat);   // решетката
   for (const [x, y] of [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]]) { const ch = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, len), steel); ch.position.set(x, y, len / 2); boom.add(ch); }   // поясите
   const head = new THREE.Group(); head.position.z = len; boom.add(head);
-  const pivot = new THREE.Group(); head.add(pivot); pivot.rotation.x = pitch;   // отвес надолу, независимо от наклона на стрелата
+  const pivot = new THREE.Group(); (rig ? g : head).add(pivot); pivot.rotation.x = rig ? 0 : pitch;   // отвес надолу, независимо от наклона на стрелата
   const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1, 5), dark); pivot.add(cable);
   const ball = new THREE.Mesh(new THREE.SphereGeometry(0.9, 16, 12), dark); pivot.add(ball);
   crane.traverse(m => { if (m.isMesh) m.castShadow = true; });
@@ -54,7 +69,7 @@ export function createDemolition2(obj, parent, A, o = {}) {
 
   // руините, багерът и самосвалът (накрая, при prog > 0,7)
   const rubble = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 10), rubbleMat); rubble.position.set(cx, base, cz); rubble.scale.setScalar(0.01); rubble.castShadow = rubble.receiveShadow = true; g.add(rubble);
-  const exc = vehicle(A, 'sf-excavator', EXC_LEN), dump = vehicle(A, 'sf-dump', DUMP_LEN);
+  const exc = vehicle(A, 'sf-excavator'), dump = vehicle(A, 'sf-dump');
   if (exc) { const [x, z] = toW(L.w / 2 - 2.5, L.d * 0.15); exc.position.set(x, base, z); exc.rotation.y = rot - Math.PI / 2; exc.visible = false; g.add(exc); }
   if (dump) { const [x, z] = toW(-L.w * 0.15, sideV);   /* на мястото на автокрана, след като той си тръгне */ dump.position.set(x, base, z); dump.rotation.y = rot + Math.PI / 2; dump.visible = false; g.add(dump); }
 
@@ -72,8 +87,12 @@ export function createDemolition2(obj, parent, A, o = {}) {
     const want = level >= steps ? base - 1 : cutY(level);
     clip.constant += (want - clip.constant) * Math.min(1, dt * 3);
     // топката: махало над сградата; удар при най-далечната точка (към стената), докато има какво да се руши
-    const ang = Math.sin(t * 1.6) * 0.55; pivot.rotation.set(pitch + ang, 0, 0);
-    const drop = Math.max(2, (base + H + 4) - Math.max(base + 1.2, clip.constant - 1.2)); cable.scale.y = drop; cable.position.y = -drop / 2; ball.position.y = -drop;
+    if (anim && near) anim.mixer.update(dt);
+    if (rig && slewN && hookN) {   // кулата — към сградата; топката — под куката
+      const want = Math.atan2(cx - crane.position.x, cz - crane.position.z) - crane.rotation.y,   /* стрелата на модела е по +z (към кабината) */ d = Math.atan2(Math.sin(want - slewN.rotation.y), Math.cos(want - slewN.rotation.y)); slewN.rotation.y += d * Math.min(1, dt * 0.8);
+      hookN.updateWorldMatrix(true, false); const hp = new THREE.Vector3().setFromMatrixPosition(hookN.matrixWorld); g.worldToLocal(hp); pivot.position.copy(hp); }
+    const ang = Math.sin(t * 1.6) * 0.55; pivot.rotation.set((rig ? 0 : pitch) + ang, rig ? Math.atan2(cx - pivot.position.x, cz - pivot.position.z) : 0, 0, 'YXZ');
+    const topY = rig ? pivot.position.y : base + H + 4, drop = Math.max(2, topY - Math.max(base + 1.2, clip.constant - 1.2)); cable.scale.y = drop; cable.position.y = -drop / 2; ball.position.y = -drop;
     if (near && !late && Math.sin(t * 1.6) > 0.98 && t - lastHit > 1.2) { lastHit = t; burst(Math.max(base + 0.5, clip.constant - 1), 5); }
     const rs = 1 + prog * Math.max(W, D) * 0.9; rubble.scale.set(rs, 0.2 + prog * Math.min(4, H * 0.15), rs); rubble.position.y = base + rubble.scale.y / 2;
     // накрая: багерът товари в самосвала (върти се между купа и самосвала)
@@ -89,9 +108,10 @@ export function createDemolition2(obj, parent, A, o = {}) {
 }
 
 // ---- техниката на обекта: позата в момента t (секунди на играта); obj — машината (model() на играта), h — нейното начално място
-// kind: 'excavator' (копае: върти се към изкопа и назад, с леко „кимане“), 'bulldozer'/'loader' (бута напред-назад 4 м), 'roller' (бавно напред-назад 6 м),
+// с раздвижен модел (obj.userData.rig = rigPlay(obj, A, 'sf-excavator-rig', 'work')) — само клипът; иначе — kind: 'excavator' (копае: върти се към изкопа и назад, с леко „кимане“), 'bulldozer'/'loader' (бута напред-назад 4 м), 'roller' (бавно напред-назад 6 м),
 // 'truck' (стои, коша се вдига при разтоварване — тук само леко клатене), другите — стоят
-export function machineWork(obj, kind, t, seed = 0) {
+export function machineWork(obj, kind, t, seed = 0, dt = 0) {
+  if (obj.userData.rig) { obj.userData.rig.mixer.update(dt); return; }   // раздвиженият багер — истинският цикъл (копае, върти, изсипва)
   const h = obj.userData.home || (obj.userData.home = { x: obj.position.x, z: obj.position.z, ry: obj.rotation.y });
   const ph = t + seed * 1.7, fx = Math.sin(h.ry), fz = Math.cos(h.ry);
   if (kind === 'excavator' || kind === 'loader' && /excav/.test(obj.userData.src || '')) { obj.rotation.y = h.ry + Math.sin(ph * 0.7) * 0.8; obj.rotation.x = Math.max(0, Math.sin(ph * 1.4)) * 0.03; return; }

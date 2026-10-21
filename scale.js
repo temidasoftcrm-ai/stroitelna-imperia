@@ -43,3 +43,23 @@ export function scaleFor(key, obj, m = null) {
   const c = SCALE[key]; if (!c) return 1; const q = measure(obj), val = c.by === 'len' ? q.len : c.by === 'eave' ? q.eave : q.h;
   return (m ?? c.m) / (val || 1);
 }
+
+// ---- машините и обзавеждането на строежите (истински размери; моделите от vehmodels.js са с дължина 1, на construct.js — в кутията на детските)
+// by: 'len' — по дължина, 'h' — по височина (валякът: моделът е висок — по дължина излиза 4,3 м висок); spec — за таблицата в Лабораторията
+export const SITE = {
+  'sf-mcrane': { by: 'len', m: 13.5, nm: 'автокран (5 оси)', spec: '13,5–15 × 3,0 × 4,0' },
+  'sf-excavator': { by: 'len', m: 9.6, nm: 'багер 20 т (със стрелата)', spec: '9,5–10 × 2,8 × 3,0' },
+  'sf-dump': { by: 'len', m: 8, nm: 'самосвал', spec: '8 × 2,5 × 3,3' },
+  'sf-grader': { by: 'len', m: 8.5, nm: 'грейдер', spec: '8,5 × 2,5 × 3,3' },
+  'sf-backhoe': { by: 'len', m: 6, nm: 'трактор-багер', spec: '5,9 × 2,3 × 3,6' },
+  'sf-roller': { by: 'h', m: 3.0, nm: 'валяк', spec: '4,5–5 × 2,2 × 3,0' },
+  'container-office-green': { by: 'len', m: 6.06, nm: 'фургон (20 ft)', spec: '6,06 × 2,44 × 2,6' },
+  'toilet-portable': { by: 'h', m: 2.3, nm: 'тоалетна', spec: '1,1 × 1,2 × 2,3' },
+  'container-rubble-red': { by: 'len', m: 4.0, nm: 'контейнер за отпадъци', spec: '4,0 × 1,8 × 1,5' },
+};
+// множителят за model(name, k) в играта: от измерените размери на заредения модел (A[name]) до целта
+export function siteK(A, name) {
+  const c = SITE[name], o = A[name] && (A[name].scene || A[name]); if (!c || !o) return 1;
+  const b = new THREE.Box3().setFromObject(o), s = b.getSize(new THREE.Vector3()), v = c.by === 'h' ? s.y : Math.max(s.x, s.z);
+  return c.m / (v || 1);
+}
