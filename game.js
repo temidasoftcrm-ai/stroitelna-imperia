@@ -42,7 +42,7 @@ import { bidHtml, resolveBid } from './bidding.js';
 import { addSiteLights, setSiteLightsNight } from './sitelights.js';
 import { createHwTraffic } from './hwtraffic.js';
 import { createTraffic, gridNetwork, planNetwork } from './traffic.js';
-import { makeRouter } from './junctionpaths.js';   /* junction-paths: маршрутите на ТИР-овете по лентите */
+import { makeRouter, pointOn } from './junctionpaths.js';   /* junction-paths: маршрутите на ТИР-овете по лентите */
 import { createIncidents } from './incidents.js';
 import { createBoardLogic } from './boardlogic.js';
 import { addRouteScenery } from './scenery.js';
@@ -1782,14 +1782,30 @@ function spawnUnit(type, at) {
 function sendTo(u, x, z, onArrive) {
   if (u.obj.userData.home) { u.obj.rotation.y = u.obj.userData.home.ry; delete u.obj.userData.home; }
   if (u.obj.userData.rig) u.obj.userData.rig.action.paused = true;   // site-anim: машината тръгва — без работната поза
+  // junction-paths: по улиците — агент в трафика (лентите, кривите на кръстовищата, кръговите); до лентата и от нея до обекта — по старому
+  if (u.agent) { const A0 = jpAgents(); if (A0 && A0.alive(u.agent)) A0.remove(u.agent); u.agent = null; u.jp = null; u.jpDone = false; scene.add(u.obj); u.obj.position.set(u.x, 0, u.z); }   /* нова задача насред пътя — само една система движи машината */
+  { const A = jpAgents(), r = A && A.route({ x: u.x, z: u.z }, { x, z }, true);
+    if (r && r.len > 40) { const p0 = A.point(r.paths[0], r.s0); u.path = [{ x: p0.x, z: p0.z, road: false }]; u.pi = 0; u.jp = { r, x, z, cb: onArrive }; u.onArrive = () => jpUnitGo(u); if (u.state !== 'returning') u.state = 'driving'; return; } }
   u.path = roadRoute(u.x, u.z, x, z).map(p => ({ x: p.x, z: p.z, road: true }));
   u.path.push({ x, z, road: false });
   u.pi = 0; u.state = u.state === 'working' || u.state === 'idle' ? 'driving' : u.state; u.onArrive = onArrive;
   if (u.state !== 'returning') u.state = 'driving';
 }
+// junction-paths: техниката по лентите — старт на агента (на лентата) и край (обратно в сцената, последните метри до обекта)
+function jpUnitGo(u) {
+  const A = jpAgents(), j = u.jp; if (!j) return;
+  if (!A || !A.free(j.r.paths[0], j.r.s0, 10)) { u.path = [{ x: j.x, z: j.z, road: false }]; u.pi = 0; u.onArrive = j.cb; u.jp = null; return; }   // без трафик/заето — направо (както при прекъснат път)
+  if (!u.jpSize) { const b = new THREE.Box3().setFromObject(u.obj), sz = b.getSize(new THREE.Vector3()); u.jpSize = [Math.max(3, Math.min(14, sz.z)), Math.max(1.8, Math.min(3.2, sz.x))]; }
+  A.group.add(u.obj); u.agent = A.add({ obj: u.obj, len: u.jpSize[0], w: u.jpSize[1], h: 3, kind: 'truck', name: u.type, route: j.r, onArrive: () => { u.jpDone = true; } });
+}
+function jpUnitEnd(u) {
+  const A = jpAgents(); if (A && u.agent && A.alive(u.agent)) A.remove(u.agent); u.agent = null; u.jpDone = false; scene.add(u.obj);
+  const j = u.jp; u.jp = null; if (!j) return; u.path = [{ x: j.x, z: j.z, road: false }]; u.pi = 0; u.onArrive = j.cb;
+}
 function updateUnits(dt) {
   for (const u of units) {
     u.obj.userData.doors?.mixer.update(dt);
+    if (u.agent) { const A = jpAgents(); if (!A || !A.alive(u.agent)) jpUnitEnd(u); else { const gp = A.group.position; u.x = u.agent.x + gp.x; u.z = u.agent.z + gp.z; u.yaw = u.agent.yaw; econ.addFuel(u.agent.v * dt); if (u.jpDone) jpUnitEnd(u); else continue; } }
     if (!u.path) {
       if (u.state === 'working') { if (feature('site-anim')) { u.wt = (u.wt || 0) + dt; if (u.obj.position.distanceToSquared(camera.position) < 260 * 260) machineWork(u.obj, u.type, u.wt, u.id, dt); } else u.obj.position.y = Math.abs(Math.sin(performance.now() / 180 + u.id)) * 0.06; }
       continue;
@@ -1872,7 +1888,7 @@ let jpR = null;
 function jpAgents() {
   if (!tr2 || !tr2.opts.jp || !tr2G || !city.plan || !city.plan.p2 || !tr2On()) return null;
   if (!jpR || jpR.tr !== tr2) { const o = city.plan.offset, L = q => q.p ? q : { x: q.x - o[0], z: q.z - o[1] }, R = makeRouter(tr2);
-    jpR = { tr: tr2, group: tr2G, route: (a, b, heavy) => R.route(L(a), L(b), { heavy }), add: sp => tr2.addAgent(sp), retarget: (c, r) => tr2.retarget(c, r), remove: c => tr2.removeAgent(c), alive: c => jpR.tr === tr2 && tr2.cars.includes(c), free: (p, s, len) => p.cars.every(c => Math.abs(c.s - s) > (c.L + len) / 2 + 3) }; }
+    jpR = { tr: tr2, group: tr2G, route: (a, b, heavy) => R.route(L(a), L(b), { heavy }), add: sp => tr2.addAgent(sp), retarget: (c, r) => tr2.retarget(c, r), remove: c => tr2.removeAgent(c), alive: c => jpR.tr === tr2 && tr2.cars.includes(c), free: (p, s, len) => p.cars.every(c => Math.abs(c.s - s) > (c.L + len) / 2 + 3), point: (p, s) => { const q = pointOn(p, s); return { x: q.x + o[0], z: q.z + o[1] }; } }; }
   return jpR;
 }
 function spawnTraffic(n) {
@@ -10340,6 +10356,7 @@ if (AUTOTEST) {
     passing: () => passing && passing.train ? { z: Math.round(passing.train.z), v: +passing.train.v.toFixed(1), stop: +passing.train.stop.toFixed(1) } : null,
     tirs: () => tirs.list.map(t => `${t.order.matId}:${t.state}`),
     jpAg: () => tr2 && tr2.cars.filter(c => c.agent).map(c => [c.agent.name, c.p.kind, +c.s.toFixed(1), +c.p.len.toFixed(1), +c.v.toFixed(2), c.why, +c.wait.toFixed(1), c.ri, c.route.length, +c.goal.toFixed(1)]),   /* junction-paths: агентите */
+    unitTest() { const u = units.find(q => q.state === 'idle'); if (!u) return null; const far = [...city.lots].sort((a, b) => Math.hypot(b.x - u.x, b.z - u.z) - Math.hypot(a.x - u.x, a.z - u.z))[0]; u.state = 'driving'; sendTo(u, far.x, far.z, () => { u.state = 'idle'; }); return [u.type, Math.round(Math.hypot(far.x - u.x, far.z - u.z))]; },   /* junction-paths: машина до най-далечния парцел */
     tirTest(m = 'sand', delay = 0) { sendTir({ id: 9e8 + ((Math.random() * 1e6) | 0), matId: m, qty: 1 }, delay); return tirs.list.length; },   /* junction-paths: пробен ТИР (поръчката не съществува — складът не се променя) */
     lookTir(k = 0, dist = 26) { const t = tirs.list[k]; if (!t) return; controls.target.set(t.x, 2, t.z); camera.position.set(t.x + dist * 0.8, dist * 0.6, t.z + dist * 0.7); fly = null; },
     money(n) { econ.earn(n, 'друго', 'тест'); },

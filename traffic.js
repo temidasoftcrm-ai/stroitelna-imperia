@@ -216,7 +216,7 @@ export function createTraffic(opts) {
   }
   function mayEnter(c) {
     const C = c.next; if (!C || C.kind !== 'conn') return true;
-    if (c.agent && c.wait > 25) return true;   // агентът (ТИР, техника) не остава завинаги — след 25 s минава
+    if (c.agent && c.wait > 25 && !(nodes.get(C.node).sig && !sigAllows(nodes.get(C.node).sig, C))) return true;   // агентът (ТИР, техника) не остава завинаги — след 25 s минава (но не на червено)
     if (!canGo(c, C)) return false;
     // предимство (без светофар): отстъпва само на кола, която чака на стоп линията и сама може да тръгне — иначе вечно блокиране
     if (!nodes.get(C.node).sig) for (const d of C.conf) { const w = d.inL.cars[d.inL.cars.length - 1]; if (w && w !== c && w.next === d && w.wait > 0 && priority(d, C, w, c) && canGo(w, d)) { c.why = 'предимство'; return false; } }
