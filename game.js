@@ -383,7 +383,36 @@ const CLIENTS = ['сем. Петрови', 'сем. Георгиеви', 'Ива
   '„Булмаркет“ ЕООД', '„Тракия Трейд“', '„Витоша Офис Парк“', '„Дунав Инвест“', '„Черноморие Холдинг“', '„Родопа Билд“', '„Балкан Партнърс“'];
 
 // ============================================================ renderer / scene
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+// WebGL липсва или renderer-ът не се създава (изключено хардуерно ускорение, стар драйвер, блокиран WebGL) →
+// вместо „Зареждане… 0%“ завинаги — ясно съобщение с насоки
+function webglFail(err) {
+  console.error('WebGL', err);
+  const ld = document.getElementById('loading'); if (ld) ld.style.display = 'none';
+  if (document.getElementById('webglFail')) return;
+  const d = document.createElement('div'); d.id = 'webglFail';
+  d.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:#0f141c;color:#e8edf3;font:16px/1.55 system-ui,sans-serif;padding:16px';
+  d.innerHTML = `<div style="max-width:560px;background:#1a2230;border:1px solid #2c3a50;border-radius:14px;padding:26px 28px;box-shadow:0 10px 40px rgba(0,0,0,.5)">
+    <div style="font-size:22px;font-weight:700;margin-bottom:10px">⚠️ Браузърът не може да покаже 3D графиката</div>
+    <div style="color:#b9c4d2;margin-bottom:14px">Играта използва WebGL, а той не е наличен или е изключен на това устройство.</div>
+    <div style="font-weight:600;margin-bottom:6px">Какво да опиташ:</div>
+    <ol style="margin:0 0 14px 18px;padding:0;color:#d6dee8">
+      <li><b>Включи хардуерното ускорение</b> — Chrome/Edge: Настройки → Система → „Използвай графично ускорение, когато е налично“, после рестартирай браузъра.</li>
+      <li>Отвори <code>chrome://gpu</code> и провери дали „WebGL“ е „Hardware accelerated“.</li>
+      <li>Обнови драйвера на видеокартата.</li>
+      <li>Опитай с друг браузър — Chrome, Edge или Firefox (последна версия).</li>
+      <li>Изключи разширения, които блокират WebGL/canvas.</li>
+    </ol>
+    <button onclick="location.reload()" style="background:#ffc83d;color:#1a1300;border:0;border-radius:10px;padding:10px 18px;font-weight:700;font-size:15px;cursor:pointer">↻ Опитай пак</button>
+    <div style="color:#6f7d90;font-size:12px;margin-top:12px">Техническо: ${String(err && err.message || err).replace(/[<>&]/g, '')}</div></div>`;
+  document.body.appendChild(d);
+}
+const renderer = (() => {
+  try {
+    const c = document.createElement('canvas');
+    if (!window.WebGLRenderingContext || !(c.getContext('webgl2') || c.getContext('webgl'))) throw new Error('WebGL не е наличен');
+    return new THREE.WebGLRenderer({ antialias: true });
+  } catch (e) { webglFail(e); throw e; }   // спира модула — без него играта не може да тръгне
+})();
 // производителност: отдалеч (високо над града) дребните детайли (дървета, лампи, светофари, хора) се скриват, а сенките
 // не се преизчисляват; иначе сенките се обновяват през 2 кадъра. Ако кадрите са бавни — по-ниска резолюция (pixelRatio).
 let perfFr = 0, perfT = 0, perfN = 0, perfHigh = null, perfDownAt = -1e9;
