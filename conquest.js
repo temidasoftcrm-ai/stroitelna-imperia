@@ -37,6 +37,20 @@ export function createConquest(deps) {
     return out;
   }
 
+  // какво точно остава до 100% (feature 'conquest-board' — директорите го предлагат): същите правила като stats()
+  // { hw: [segId], ab: [segId], ports: [cityId], air: [cityId], countries: [{ cc, nm, cities: [незавършени] }], total, done }
+  function missing() {
+    const done = new Set(deps.hwDone()), m = { hw: [], ab: [], ports: [], air: [], countries: [], total: 0, done: 0 };
+    for (const k of deps.countries()) { const left = k.cities.filter(id => !deps.isFinished(id)); m.total++; if (left.length) m.countries.push({ cc: k.cc, nm: k.nm, cities: left }); else m.done++; }
+    for (const s of deps.hwSegs()) { m.total++; if (done.has(s.id)) m.done++; else m.hw.push(s.id); }
+    for (const s of deps.abSegs()) if (!s.spur) { m.total++; if (done.has(s.id)) m.done++; else m.ab.push(s.id); }
+    for (const id of deps.cities()) {
+      if (deps.portMax(id) > 0) { m.total++; if (deps.portLv(id) > 0) m.done++; else m.ports.push(id); }
+      if (deps.airMax(id) > 0) { m.total++; if (deps.airLv(id) > 0) m.done++; else m.air.push(id); }
+    }
+    return m;
+  }
+
   const bar = (pct, h = 8) => `<div style="height:${h}px;border-radius:${h}px;background:rgba(255,255,255,.08);overflow:hidden"><div style="height:100%;width:${pct}%;background:linear-gradient(90deg,var(--acc),var(--ok))"></div></div>`;
 
   function html() {
@@ -56,5 +70,5 @@ export function createConquest(deps) {
   }
 
   const open = () => deps.modal('🏆 Завладяване', html(), [['Добре', null]]);
-  return { stats, html, open };
+  return { stats, html, open, missing };
 }

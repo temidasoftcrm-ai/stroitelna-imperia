@@ -8615,7 +8615,7 @@ function boardProposals0() {
       income: o.income ? Math.round(o.income(arr)) : 0, gainTxt: o.gainTxt ? o.gainTxt(arr) : '', goal: o.goal ? o.goal(arr) : '', track: o.track ? o.track(arr) : null, geo: o.geo ? o.geo(arr) : null,
       apply: () => { batchN++; batchToasts = 0; let ok = 0; try { for (const it of arr) { try { o.run(it); ok++; } catch (e) { console.warn('board run', e); } } } finally { batchN--; } if (batchN === 0) { batchDirty = false; save(); if (batchXp) { const x = batchXp; batchXp = 0; dev.add(x); } if (batchTrains) { batchTrains = false; parkedSig = ''; showMap(!$('mapScreen').classList.contains('hidden')); } if (arr.length > 1) toast(`${o.ico} ${o.goal ? o.goal(arr) : `Изпълнено: ${ok} от ${arr.length}`}`, 'good'); } } });
     const full = mk(its), half = its.length >= 2 ? mk(its.slice(0, Math.ceil(its.length / 2))) : null;
-    out.push({ id: `${o.dir}:${o.key}:${its.length}`, dir: o.dir, ico: o.ico, why: o.why, needsGear: o.needsGear, noAuto: o.noAuto, ...full, gain: full.income * 30, small: half ? { ...half, gain: half.income * 30, text: `½ ${half.text}` } : null });
+    out.push({ id: `${o.dir}:${o.key}:${its.length}`, dir: o.dir, ico: o.ico, why: o.why, needsGear: o.needsGear, noAuto: o.noAuto, conq: o.conq || undefined, ...full, gain: full.income * 30, small: half ? { ...half, gain: half.income * 30, text: `½ ${half.text}` } : null });
   };
   const brIncome = () => Math.round(1400 + 350 * (S.rep || 0) + 120 * (S.officeLevel || 1));   // филиал без теб (endOfDay)
   // ━━ 🏗️ Констръкшън: квартали, нови филиали, липсваща техника
@@ -8650,6 +8650,28 @@ function boardProposals0() {
     P({ dir: 'con', ico: '🤝', key: 'estsale', items: E.owned.filter(o => o.sale?.price), cost: () => 0, run: o => acceptSale(o.lot),
       text: a => `Има ${pl(a.length, 'оферта', 'оферти')} за нашите обявени имоти (${fmt(a.reduce((t, o) => t + o.sale.price, 0))} €). Предлагам да продадем.`, why: 'имотите са обявени за продан и купувачите чакат', days: () => 0,
       gainTxt: a => `+${fmt(a.reduce((t, o) => t + o.sale.price, 0))} € веднага`, goal: a => `${pl(a.length, 'имот е продаден', 'имота са продадени')}` }); }
+  // ━━ 🏆 Завладяване (feature 'conquest-board', от ниво 21): директорите предлагат всичко, което остава до 100% — първите в борда
+  if (feature('conquest-board') && dev.best() >= 21) {
+    const cm = conquest.missing(), cpct = n => `+${(n / Math.max(1, cm.total) * 100).toLocaleString('bg-BG', { maximumFractionDigits: 1 })}% към завладяването`;
+    const contOk = id => { const k = contOf(id); return !k || !!contByKey(k.key)?.open(); };
+    const busy = new Set([...(S.hwJobs || []).map(j => j.seg), ...hwQueue()]);
+    const segs = [...cm.hw, ...cm.ab].map(segById).filter(x => x && !busy.has(x.id) && segOpen(x) && (!x.cont || contByKey(x.cont)?.open()) && (!x.ab || (abUnlocked() && abReach(x))))
+      .sort((a, b) => kmBetween(a.a, a.b) - kmBetween(b.a, b.b)).slice(0, Math.max(5, HW_MAX_JOBS()));
+    const segMat = x => segmentQuote(kmBetween(x.a, x.b)).mats.reduce((b, m) => b + Object.entries(m).reduce((c, [mm, q]) => c + econ.quoteMaterial(mm, q, [], {}).total, 0), 0);
+    P({ dir: 'hw', ico: '🏆', key: 'conq-segs', conq: true, items: segs, cost: segMat, run: x => takeSeg(x.id),
+      text: a => `🏆 За завладяването: предлагам да поемем ${pl(a.length, 'участък', 'участъка')} (${a.slice(0, 3).map(x => `${cityNm(x.a)} — ${cityNm(x.b)}`).join(', ')}${a.length > 3 ? '…' : ''}) — ${cpct(a.length)}. Остават ${cm.hw.length + cm.ab.length}.`,
+      why: 'всеки готов участък магистрала/аутобан е част от завладяването', days: a => Math.max(...a.map(x => segmentQuote(kmBetween(x.a, x.b)).days)) / hwSpeedMul() * Math.max(1, a.length / Math.max(1, HW_MAX_JOBS())),
+      income: a => a.reduce((t, x) => t + kmBetween(x.a, x.b) * TOLL_PER_KM_DAY, 0), goal: a => `${pl(a.length, 'участък е поет', 'участъка са поети')} за завладяването`, track: a => ({ k: 'seg', ids: a.map(x => x.id) }),
+      needsGear: hwMissing().length ? `първо пътна техника (${hwMissingTxt().replace('Нямаш: ', '')})` : '', geo: a => geoOf('route', a.flatMap(x => [x.a, x.b]), a.slice(0, 2).map((x, i) => [i * 2, i * 2 + 1])) });
+    const ports = seaOn() ? cm.ports.filter(id => cityById(id) && contOk(id) && !portOf(id)?.build && !portOf(id)?.muni).slice(0, 20) : [];
+    P({ dir: 'sea', ico: '🏆', key: 'conq-ports', conq: true, items: ports, cost: id => amL(PORT_LEVELS[0], id, 'port').cost, run: id => buildPort(id),
+      text: a => `🏆 За завладяването: ${pl(a.length, 'пристанище', 'пристанища')} ниво 1 (${list(a)}) — ${cpct(a.length)}. Остават ${cm.ports.length}.`, why: 'всяко построено пристанище е част от завладяването', days: () => PORT_LEVELS[0].days || 15,
+      income: a => a.length * shipDaily('container'), goal: a => `${pl(a.length, 'ново пристанище', 'нови пристанища')} за завладяването`, track: a => ({ k: 'port', ids: a, base: Object.fromEntries(a.map(id => [id, 0])) }), geo: a => geoOf('port', a) });
+    const airs = dev.has('AIR') ? cm.air.filter(id => cityById(id) && contOk(id) && !airportOf(id)?.build && !airportOf(id)?.muni).slice(0, 20) : [];
+    P({ dir: 'air', ico: '🏆', key: 'conq-air', conq: true, items: airs, cost: id => amL(AIRPORT_LEVELS[0], id, 'air').cost, run: id => buildAirport(id),
+      text: a => `🏆 За завладяването: ${pl(a.length, 'летище', 'летища')} ниво 1 (${list(a)}) — ${cpct(a.length)}. Остават ${cm.air.length}.`, why: 'всяко построено летище е част от завладяването', days: () => AIRPORT_LEVELS[0].days || 20,
+      income: a => a.length * planeDaily('narrow'), goal: a => `${pl(a.length, 'ново летище', 'нови летища')} за завладяването`, track: a => ({ k: 'air', ids: a, base: Object.fromEntries(a.map(id => [id, 0])) }), geo: a => geoOf('airport', a) });
+  }
   // ━━ 🛣️ Магистрали: участъци до градовете без мрежа, надграждане в аутобан, ТИР-ове
   { const net = new Set(hwAll().flatMap(id => { const x = segById(id); return x ? [x.a, x.b] : []; })), busy = new Set([...(S.hwJobs || []).map(j => j.seg), ...hwQueue()]);
     const segs = [...allSegs(), ...ALL_AB.filter(x => !x.spur && (!x.cont || contByKey(x.cont)?.open()))].filter(x => !hwAll().includes(x.id) && !busy.has(x.id) && (own.includes(x.a) || own.includes(x.b)) && (!net.has(x.a) || !net.has(x.b)) && segOpen(x)).slice(0, 15);
@@ -8864,6 +8886,7 @@ function boardProposals0() {
     const ask = out.reduce((a, p) => a + (p.cost || 0), 0);
     out.unshift({ id: `bank:brief:${S.day}`, dir: 'bank', ico: '🏦', info: true, cost: 0, count: 1, avail: F.free, reserve: F.op, reserved: F.reserved, cash: F.cash, apply: () => {},
       text: `${boardL.bankSpeech()} ${ask ? `Предложенията днес искат общо ${M(ask)} €${ask > F.free ? ' — повече, отколкото можем; първо тези в рамките на бюджета.' : ' — вместват се.'}` : 'Днешните предложения са без разход от касата.'}` }); }
+  { const cq = out.filter(p => p.conq); if (cq.length) { const rest = out.filter(p => !p.conq), k = rest[0]?.info ? 1 : 0; out.splice(0, out.length, ...rest.slice(0, k), ...cq, ...rest.slice(k)); } }   // 🏆 завладяването — най-отгоре (след банката)
   return out;
 }
 // 📊 статусът на ангажимент от борда (boardlogic.js review): { done, total, reason, blocked } — от игровите данни
