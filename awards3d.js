@@ -16,8 +16,8 @@ export const AWARDS = [
   { k: 'air', dir: 'air', who: 'Елена Димитрова', nm: 'Небето е наше', cond: 'всички отключени континенти свързани по въздух', model: HV + 'award-elena.glb', quote: 'Небето вече няма граници за нас. Благодаря на пилотите и на кулите.' },
   { k: 'oil', dir: 'oil', who: 'Вера Ангелова', nm: 'Черното злато', cond: 'верига добив → преработка → доставка', model: HV + 'award-vera.glb', quote: 'От кладенеца до пристанището — всяка брънка издържа. Благодаря на хората по веригата.' },
   { k: 'bank', dir: 'bank', who: 'Борис Тодоров', nm: 'Златен резерв', cond: 'месеци поред: касата над резерва и паричният поток на плюс (3 / 12 / 36 / 120)', model: HV + 'award-boris.glb', quote: 'Парите обичат тишината и реда. Благодаря на счетоводството — и на всички, които не харчиха излишно.' },
-  { k: 'year', dir: '', who: 'Целият борд', nm: 'Борд на годината', cond: 'годишна програма без критично просрочени проекти', wide: true },
-  { k: 'hotel', dir: 'hotel', who: 'Георги Николов', nm: 'Петзвездна империя', cond: 'завършен сезон на международната хотелска верига' },
+  { k: 'year', dir: '', who: 'Целият борд', nm: 'Борд на годината', cond: 'завършеният свят: 25 / 50 / 75 / 100% от градовете', wide: true, quote: 'Целият свят е построен. Това е заслуга на всички на тази маса — благодарим!' },
+  { k: 'hotel', dir: 'hotel', who: 'Георги Николов', nm: 'Петзвездна империя', cond: 'хотели 5★ и Гранд по света (1 / 5 / 15 / 40)', model: HV + 'award-georgi.glb', quote: 'Гостът помни как се е чувствал. Благодаря на всеки рецепционист и камериерка по веригата.' },
   { k: 'city', dir: 'mayor', who: 'Десислава Илиева', nm: 'Град за хората', cond: 'Империал Сити: баланс услуги / работа / удовлетвореност' },
 ];
 export const TIERS = {
@@ -45,6 +45,19 @@ function tintMat(m0, tier) {
   return m;
 }
 
+// статуетката в степента: { group (основата на y = 0, височина h), dispose } — за рафта и за холограмата над масата
+export async function makeTrophy(k, tier, h = 0.4) {
+  const A = AWARDS.find(x => x.k === k); let obj = null;
+  if (A && A.model) { const gl = await loadG(A.model); if (gl) { obj = gl.scene.clone(true); obj.traverse(o => { if (o.isMesh) { o.material = tintMat(o.material, tier); o.castShadow = true; } }); } }
+  if (!obj) {   // модел още няма — скромна чаша в степента
+    const m = new THREE.MeshStandardMaterial({ color: TIERS[tier].tint, metalness: 1, roughness: 0.3 });
+    obj = new THREE.Group(); const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.03, 0.12, 20), m); cup.position.y = 0.16; const st = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.08, 10), m); st.position.y = 0.06; const bs = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.02, 20), m); bs.position.y = 0.01; obj.add(cup, st, bs);
+  }
+  const b = new THREE.Box3().setFromObject(obj), sz = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3());
+  const w = new THREE.Group(); obj.position.set(-c.x, -b.min.y, -c.z); w.add(obj); w.scale.setScalar(h / Math.max(1e-6, sz.y)); w.userData.foot = Math.max(sz.x, sz.z) / sz.y;
+  return { group: w, dispose: () => w.traverse(o => { if (o.material) o.material.dispose(); if (o.geometry && !A?.model) o.geometry.dispose(); }) };
+}
+
 function plaqueTex(lines, on) {
   const c = document.createElement('canvas'); c.width = 512; c.height = 128; const g = c.getContext('2d');
   const gr = g.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, on ? '#d9b45a' : '#3a352c'); gr.addColorStop(1, on ? '#8a6a24' : '#24211c'); g.fillStyle = gr; g.fillRect(0, 0, 512, 128);
@@ -55,10 +68,10 @@ function plaqueTex(lines, on) {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
 }
 
-export function buildAwardsWall(scene, { x = 4.95, z = -3.2, ry = -Math.PI / 2 } = {}) {
+export function buildAwardsWall(scene, { x = 4.95, z = -3.2, ry = -Math.PI / 2, W = 2.7, H = 2.15, TH = 0.36 } = {}) {
   const own = [], M = o => { own.push(o); return o; };
   const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; scene.add(g);
-  const W = 2.7, H = 2.15, D = 0.42, SH = [0.98, 1.62], N = 5, step = W / N;
+  const D = 0.42 * Math.max(1, W / 2.7), SH = [0.5 + (H - 0.5) * 0.24, 0.5 + (H - 0.5) * 0.62], N = 5, step = W / N;   // рафтовете — по височината на шкафа
   const walnut = M(new THREE.MeshStandardMaterial({ color: 0x3b2416, roughness: 0.45, metalness: 0.05 })), goldTrim = M(new THREE.MeshStandardMaterial({ color: 0xd4a73a, metalness: 1, roughness: 0.3 }));
   const glass = M(new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.14, depthWrite: false }));
   const velvet = M(new THREE.MeshStandardMaterial({ color: 0x1d2a4a, roughness: 0.9 }));
@@ -70,16 +83,16 @@ export function buildAwardsWall(scene, { x = 4.95, z = -3.2, ry = -Math.PI / 2 }
   box(W + 0.18, 0.5, D + 0.04, walnut, 0, 0.25, 0); box(W + 0.24, 0.08, D + 0.1, walnut, 0, H + 0.04, 0);
   for (const y of [0.5, H]) box(W + 0.2, 0.02, 0.02, goldTrim, 0, y, D / 2 + 0.02);
   for (const y of SH) { const sh = box(W - 0.02, 0.025, D - 0.04, glass, 0, y, 0); sh.castShadow = false; box(W - 0.02, 0.012, 0.012, goldTrim, 0, y + 0.012, D / 2 - 0.03); }
-  const title = new THREE.Mesh(M(new THREE.PlaneGeometry(1.4, 0.18)), M(new THREE.MeshBasicMaterial({ map: M(plaqueTex(['🏆 СТЕНА НА ПОСТИЖЕНИЯТА', ''], true)), toneMapped: false })));
+  const title = new THREE.Mesh(M(new THREE.PlaneGeometry(1.4 * W / 2.7, 0.18 * W / 2.7)), M(new THREE.MeshBasicMaterial({ map: M(plaqueTex(['🏆 СТЕНА НА ПОСТИЖЕНИЯТА', ''], true)), toneMapped: false })));
   title.position.set(0, H - 0.12, -D / 2 + 0.04); g.add(title);
   const lamps = SH.map(y => { const L = new THREE.PointLight(0xffe2a8, 0.9, 2.6, 1.6); L.position.set(0, y + 0.55, 0.2); g.add(L); return L; });
   // местата
   const places = AWARDS.map((A, i) => {
     const row = i < N ? 1 : 0, col = i % N, px = -W / 2 + step * (col + 0.5), py = SH[row] + 0.013;
-    const ped = new THREE.Mesh(M(new THREE.CylinderGeometry(A.wide ? 0.16 : 0.11, A.wide ? 0.18 : 0.13, 0.05, 28)), walnut); ped.position.set(px, py + 0.025, 0); ped.userData.keep = true; g.add(ped);
+    const pr = TH / 0.36, ped = new THREE.Mesh(M(new THREE.CylinderGeometry((A.wide ? 0.16 : 0.11) * pr, (A.wide ? 0.18 : 0.13) * pr, 0.05, 28)), walnut); ped.position.set(px, py + 0.025, 0); ped.userData.keep = true; g.add(ped);
     const pl = new THREE.Mesh(M(new THREE.PlaneGeometry(step * 0.9, step * 0.9 / 4)), new THREE.MeshStandardMaterial({ roughness: 0.4, metalness: 0.2 })); pl.position.set(px, py - 0.07, D / 2 + 0.002); pl.rotation.x = -0.05; g.add(pl);
-    const hit = new THREE.Mesh(M(new THREE.BoxGeometry(step * 0.9, 0.5, D)), M(new THREE.MeshBasicMaterial({ visible: false }))); hit.position.set(px, py + 0.25, 0); hit.userData.award = A.k; g.add(hit);
-    const halo = new THREE.Mesh(M(new THREE.CircleGeometry(0.16, 24)), M(new THREE.MeshBasicMaterial({ color: 0xffd36a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })));
+    const hit = new THREE.Mesh(M(new THREE.BoxGeometry(step * 0.9, TH * 1.4, D)), M(new THREE.MeshBasicMaterial({ visible: false }))); hit.position.set(px, py + TH * 0.7, 0); hit.userData.award = A.k; g.add(hit);
+    const halo = new THREE.Mesh(M(new THREE.CircleGeometry(0.16 * TH / 0.36, 24)), M(new THREE.MeshBasicMaterial({ color: 0xffd36a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })));
     halo.rotation.x = -Math.PI / 2; halo.position.set(px, py + 0.052, 0); g.add(halo);
     return { A, px, py, ped, pl, hit, halo, trophy: null, tier: null, pop: 1 };
   });
@@ -90,22 +103,21 @@ export function buildAwardsWall(scene, { x = 4.95, z = -3.2, ry = -Math.PI / 2 }
     p.pl.material.map = plaqueTex(s ? [`${p.A.nm}`, `${p.A.who} · ${T.ico} ${T.nm}`] : [`🔒 ${p.A.nm}`, p.A.cond], !!s); p.pl.material.needsUpdate = true;
   }
   async function placeTrophy(p) {
-    const s = state[p.A.k];
-    if (p.trophy && (!s || s.tier !== p.tier)) { g.remove(p.trophy); p.trophy.traverse(o => { if (o.material) o.material.dispose(); }); p.trophy = null; }
-    p.tier = s ? s.tier : null; if (!s || p.trophy) return;
-    let obj = null;
-    if (p.A.model) { const gl = await loadG(p.A.model); if (gl) { obj = gl.scene.clone(true); obj.traverse(o => { if (o.isMesh) { o.material = tintMat(o.material, s.tier); o.castShadow = true; } }); } }
-    if (!obj) {   // модел още няма (останалите 9 идват) — скромна чаша в степента
-      const m = new THREE.MeshStandardMaterial({ color: TIERS[s.tier].tint, metalness: 1, roughness: 0.3 });
-      obj = new THREE.Group(); const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.03, 0.12, 20), m); cup.position.y = 0.16; const st = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.08, 10), m); st.position.y = 0.06; const bs = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.02, 20), m); bs.position.y = 0.01; obj.add(cup, st, bs);
-    }
-    if (state[p.A.k] !== s || p.trophy) return;   // докато се зареждаше, степента се смени
-    const b = new THREE.Box3().setFromObject(obj), sz = b.getSize(new THREE.Vector3()), k = (p.A.wide ? 0.42 : 0.36) / Math.max(1e-6, sz.y), c = b.getCenter(new THREE.Vector3());
-    const w = new THREE.Group(); obj.position.set(-c.x, -b.min.y, -c.z); w.add(obj); w.scale.setScalar(Math.min(k, (step * 0.8) / Math.max(sz.x, sz.z)));
-    w.position.set(p.px, p.py + 0.05, 0); g.add(w); p.trophy = w;
+    const s0 = state[p.A.k];
+    if (p.trophy && (!s0 || s0.tier !== p.tier)) { g.remove(p.trophy.group); p.trophy.dispose(); p.trophy = null; }
+    p.tier = s0 ? s0.tier : null; if (!s0 || p.trophy) return;
+    const t = await makeTrophy(p.A.k, s0.tier, p.A.wide ? TH * 1.15 : TH);
+    if (state[p.A.k] !== s0 || p.trophy) { t.dispose(); return; }   // докато се зареждаше, степента се смени
+    const w = t.group; if (w.userData.foot * TH > step * 0.8) w.scale.multiplyScalar(step * 0.8 / (w.userData.foot * TH));
+    w.position.set(p.px, p.py + 0.05, 0); g.add(w); p.trophy = t; t.s0 = w.scale.x;
   }
+  // невидима мишена върху целия шкаф — клик → камерата показва само витрината
+  const cab = new THREE.Mesh(M(new THREE.BoxGeometry(W + 0.2, H + 0.1, D + 0.1)), M(new THREE.MeshBasicMaterial({ visible: false }))); cab.position.set(0, H / 2, 0); cab.userData.cabinet = true; g.add(cab);
   return {
-    group: g, hits: places.map(p => p.hit),
+    group: g, hits: places.map(p => p.hit), cab,
+    // кадърът за камерата: витрината в цял ръст (позиция, цел) в световни координати
+    frame(aspect = 1.6, fov = 45) { const hv = Math.tan(fov * Math.PI / 360), dist = Math.max((H / 2 + 0.25) / hv, (W / 2 + 0.35) / (hv * aspect)); const t = new THREE.Vector3(0, H / 2, 0), p = new THREE.Vector3(0, H / 2 + 0.05, D / 2 + dist); g.localToWorld(t); g.localToWorld(p); return { p, t }; },
+    slot(k) { const p = places.find(q => q.A.k === k); if (!p) return null; const v = new THREE.Vector3(p.px, p.py + 0.05, 0); g.localToWorld(v); return { pos: v, h: p.A.wide ? TH * 1.15 : TH }; },
     setState(s) { state = { ...(s || {}) }; for (const p of places) { setPlaque(p); placeTrophy(p); } },
     // церемонията: статуетката „изниква“ със сияние
     reveal(k) { const p = places.find(q => q.A.k === k); if (p) { p.pop = 0; placeTrophy(p); } },
@@ -116,7 +128,7 @@ export function buildAwardsWall(scene, { x = 4.95, z = -3.2, ry = -Math.PI / 2 }
       for (const p of places) {
         if (p.pop < 1) p.pop = Math.min(1, p.pop + dt / 1.6);
         const e = p.pop < 1 ? 1 - Math.pow(1 - p.pop, 3) : 1;
-        if (p.trophy) { p.trophy.rotation.y = Math.sin(t * 0.4 + p.px) * 0.25; const s0 = p.trophy.userData.s0 ?? (p.trophy.userData.s0 = p.trophy.scale.x); p.trophy.scale.setScalar(s0 * (0.2 + 0.8 * e)); }
+        if (p.trophy) { const w = p.trophy.group; w.rotation.y = Math.sin(t * 0.4 + p.px) * 0.25; w.scale.setScalar(p.trophy.s0 * (0.2 + 0.8 * e)); }
         p.halo.material.opacity = p.trophy ? (0.18 + 0.1 * Math.sin(t * 2 + p.px * 3)) * (p.pop < 1 ? 2.5 : 1) + night * 0.1 : 0;
       }
       for (const L of lamps) L.intensity = 0.8 + night * 0.6;

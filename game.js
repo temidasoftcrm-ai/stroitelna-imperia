@@ -2481,6 +2481,9 @@ const AWARD_RULES = {
   sea: { at: [5, 20, 60, 150], v: () => (S.seaRoutes || []).length, res: n => `${fmt(n)} морски линии` },
   air: { at: [5, 20, 60, 150], v: () => (S.airRoutes || []).length, res: n => `${fmt(n)} авиолинии` },
   bank: { at: [3, 12, 36, 120], v: () => (S.hold?.bankRun?.months || 0), res: n => `${fmt(n)} ${n === 1 ? 'месец' : 'месеца'} поред: касата над резерва и паричният поток на плюс` },
+  hotel: { at: [1, 5, 15, 40], v: () => Object.values(S.hotels || {}).filter(h => (h.t || 0) >= 2).length, res: n => `${fmt(n)} хотела 5★ и Гранд по света` },
+  // потребителят: „борд на годината при 100% завършване на света“ — платината при 100%; по пътя — 25 / 50 / 75%
+  year: { at: [25, 50, 75, 100], v: () => { const L = CITIES.filter(c => !AIR_ONLY.has(c.id) && c.id !== NEOM_ID); return L.length ? Math.floor(100 * L.filter(c => econ.isFinished(c.id)).length / L.length) : 0; }, res: n => `${n}% от света е завършен` },
   oil: { at: [3, 10, 30, 80], v: () => { const L = mines.state().sites, has = k => L.some(x => x.kind === k); return has('oilwell') && has('refinery') && has('terminal') ? L.filter(x => ['oilwell', 'refinery', 'terminal'].includes(x.kind)).length : 0; }, res: n => `${fmt(n)} обекта във веригата добив → преработка → доставка` },
 };
 // „Златен резерв“ (Борис): серия от месеци (по 30 игрови дни) — касата не пада под резерва му (оперативният от boardlogic, с „Резерв“ от трезора при vault-rules)
@@ -5798,7 +5801,7 @@ function tenderGroup(t) {
   const centre = new Set((city.center || []).map(l => l.id));
   const free = l => l && !l.fresh && l !== city.hq && !centre.has(l.id) && !taken.has(l.id) && (!l.busy || l.busy === 'tender');
   const zr = { center: 0, mid: 1, outer: 2 }, ctr = city.center ? city.center[12] : city.hq, old = city.lots[S.tenderLots[t.id]], sg = t.outer ? -1 : 1;   // инфраструктурата (вятърен/соларен парк, язовир…) — в покрайнините
-  const cands = city.lots.filter(free).sort((a, b) => (old ? Math.hypot(a.x - old.x, a.z - old.z) - Math.hypot(b.x - old.x, b.z - old.z) : 0) || sg * ((zr[a.zone] - zr[b.zone]) || Math.hypot(a.x - ctr.x, a.z - ctr.z) - Math.hypot(b.x - ctr.x, b.z - ctr.z)));
+  const cands = city.lots.filter(free).sort((a, b) => (old ? Math.hypot(a.x - old.x, a.z - old.z) - Math.hypot(b.x - old.x, b.z - old.z) : 0) || sg * ((zr[pz(a.zone)] - zr[pz(b.zone)]) || Math.hypot(a.x - ctr.x, a.z - ctr.z) - Math.hypot(b.x - ctr.x, b.z - ctr.z)));
   if (city.plan) { const l = cands[0]; if (!l) return null; S.tenderLots4[t.id] = [l.id]; S.tenderLots[t.id] = l.id; return [l]; }   // град с план: парцелите не са в мрежа — площадката е на един (по-голям) парцел
   for (const l of cands) {
     const q = []; for (let a = 0; a < W; a++) for (let b = 0; b < D; b++) q.push(a || b ? at(l.bi + a, l.bj + b) : l);
@@ -5818,7 +5821,7 @@ function mineGroup(site, W0, D0, near) {   // W0×D0 — за големите �
   const free = l => l && (near || !l.fresh) && l !== city.hq && !centre.has(l.id) && !taken.has(l.id) && (!l.busy || l.busy === 'mine') && (built || !l.built);   // забележителностите — и в купените (празни) квартали
   const dist = l => Math.hypot(l.x + 1.5 * TILE * (W - 1) - ctr.x, l.z + 1.5 * TILE * (D - 1) - ctr.z);   // до центъра на цялата зона
   for (built of near ? [true] : [false, true]) {
-  const cands = city.lots.filter(free).sort(near ? (a, b) => dist(a) - dist(b) : (a, b) => (zr[b.zone] - zr[a.zone]) || Math.hypot(b.x - ctr.x, b.z - ctr.z) - Math.hypot(a.x - ctr.x, a.z - ctr.z));   // забележителностите — плътно до центъра; добивът — най-далеч
+  const cands = city.lots.filter(free).sort(near ? (a, b) => dist(a) - dist(b) : (a, b) => (zr[pz(b.zone)] - zr[pz(a.zone)]) || Math.hypot(b.x - ctr.x, b.z - ctr.z) - Math.hypot(a.x - ctr.x, a.z - ctr.z));   // забележителностите — плътно до центъра; добивът — най-далеч
   if (city.plan) { if (cands[0]) { site.lots = [cands[0].id]; return [cands[0]]; } continue; }   // град с план: един парцел
   for (const l of cands) {
     const q = []; for (let a = 0; a < W; a++) for (let b = 0; b < D; b++) q.push(a || b ? at(l.bi + a, l.bj + b) : l);
@@ -7696,11 +7699,13 @@ function updateCityHighway(t) {
 // ============================================================ имоти: земя, наеми, флипване, инвеститори
 const LAND_PRICE = { outer: 12000, mid: 25000, center: 50000 };
 const HOUSE_PRICE = { outer: 30000, mid: 45000, center: 70000 };
+// генерираните градове (cityplan2: business / residential / periphery) — към трите ценови пояса; иначе цената е NaN
+const pz = z => ({ business: 'center', residential: 'mid', periphery: 'outer' })[z] || (z in LAND_PRICE ? z : 'mid');
 const RENT = { house: 400, shop: 1200, office: 2800, tower: 10000 };
 const RENO_COST = 7000;   // материали за ремонт (плащат се при старта)
 const est = () => (S.estate = S.estate || { land: [], owned: [], listings: [] });
 const ownedAt = id => est().owned.find(o => o.lot === id);
-const lotPrice = lot => Math.round(bigCityMul() * LAND_PRICE[lot.zone] * (1 + 0.04 * S.day / 10) * (1 + 0.2 * Math.min(2, (S.parks || []).filter(id => Math.hypot(city.lots[id].x - lot.x, city.lots[id].z - lot.z) <= PARK_R).length)) / 500) * 500;   // земята поскъпва с времето
+const lotPrice = lot => Math.round(bigCityMul() * LAND_PRICE[pz(lot.zone)] * (1 + 0.04 * S.day / 10) * (1 + 0.2 * Math.min(2, (S.parks || []).filter(id => Math.hypot(city.lots[id].x - lot.x, city.lots[id].z - lot.z) <= PARK_R).length)) / 500) * 500;   // земята поскъпва с времето
 // махане на сграда от парцел (събаряне); помни се в записа, защото градът се генерира от seed
 function clearLot(lot) {
   if (lot.obj) { city.group.remove(lot.obj); poofAt(lot.x, lot.z); }
@@ -7774,7 +7779,7 @@ function finishInvestment(p) {
   finishSite(p);
   const lot = city.lots[p.lot];
   S.built.push({ lot: p.lot, model: p.model });
-  const land = (S.landPrice || {})[p.lot] || LAND_PRICE[lot.zone];
+  const land = (S.landPrice || {})[p.lot] || LAND_PRICE[pz(lot.zone)];
   est().owned.push({ cond: 100, lot: p.lot, kind: p.type, rent: Math.round(RENT[p.type] * rand(0.9, 1.1) / 10) * 10, value: land + BTYPES[p.type].reward, since: S.day });
   lot.busy = 'owned';
   Sound.play('done');
@@ -7787,7 +7792,7 @@ function makeListing() {
   const cand = city.lots.filter(l => l.built && HOUSES.includes(l.built) && !l.busy && l !== city.hq);
   if (!cand.length) return;
   const lot = pick(cand);
-  est().listings.push({ id: S.seq++, lot: lot.id, price: Math.round(HOUSE_PRICE[lot.zone] * rand(0.85, 1.15) / 500) * 500, expires: S.day + 4 });
+  est().listings.push({ id: S.seq++, lot: lot.id, price: Math.round(HOUSE_PRICE[pz(lot.zone)] * rand(0.85, 1.15) / 500) * 500, expires: S.day + 4 });
   lot.busy = 'listing';
 }
 function buyListing(id) {
@@ -7843,7 +7848,7 @@ function takeoverAssets(id) {
     c.sort((a, b) => (a.zone === 'center' ? 0 : a.zone === 'mid' ? 1 : 2) - (b.zone === 'center' ? 0 : b.zone === 'mid' ? 1 : 2));
     for (const lot of c.slice(0, n)) {
       const k = kind === 'tower' ? 'tower' : kindOf(lot.built);
-      est().owned.push({ cond: 85, lot: lot.id, kind: k, rent: Math.round(RENT[k] * rand(0.9, 1.1) / 10) * 10, value: LAND_PRICE[lot.zone] + BTYPES[k].reward, since: S.day });
+      est().owned.push({ cond: 85, lot: lot.id, kind: k, rent: Math.round(RENT[k] * rand(0.9, 1.1) / 10) * 10, value: LAND_PRICE[pz(lot.zone)] + BTYPES[k].reward, since: S.day });
       lot.busy = 'owned'; poofAt(lot.x, lot.z); got.push(BTYPES[k].nm.toLowerCase());
     }
   }
@@ -8300,6 +8305,8 @@ function estateHtml() {
   }
   h += `<div class="sect">Къщи за продан</div>`;
   if (!E.listings.length) h += `<div class="meta">Няма обяви в момента. Нови идват почти всеки ден.</div>`;
+  for (const l of E.listings) if (!Number.isFinite(l.price)) { const lt = city.lots[l.lot]; l.price = Math.round(HOUSE_PRICE[pz(lt && lt.zone)] * rand(0.85, 1.15) / 500) * 500; }   // старите обяви с NaN (генерираните градове)
+  for (const o of E.owned || []) if (!Number.isFinite(o.value)) { const lt = city.lots[o.lot]; o.value = LAND_PRICE[pz(lt && lt.zone)] + (BTYPES[o.kind]?.reward || 0); }
   for (const l of E.listings) h += `<div class="card" data-lot="${l.lot}"><h3><span class="ico">🏷️</span>Къща за продан</h3>
     <div class="meta">Обявата важи до ден ${l.expires}. Ако не я купиш, може да я вземе инвеститор и да я събори за по-голяма сграда.</div>
     <div class="row"><span class="money" style="color:var(--txt)">${fmt(l.price)} €</span><button class="btn" data-buyl="${l.id}" ${econ.canAfford(l.price) ? '' : 'disabled'}>Купи</button></div></div>`;

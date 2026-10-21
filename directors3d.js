@@ -12,7 +12,7 @@ import { buildPresRoom } from './presrooms.js';   // 🇺🇸/🇷🇺 през�
 import { createRoomSound } from './roomsound.js';
 import { feature } from './lab/feature.js';
 import { vaultDoor, createVault } from './vault3d.js';
-import { buildAwardsWall, AWARDS, TIERS } from './awards3d.js';   // 🏆 стената с отличията (флаг awards)
+import { buildAwardsWall, makeTrophy, AWARDS, TIERS } from './awards3d.js';   // 🏆 стената с отличията (флаг awards)
 import { loadMoney, bonusStacks } from './money3d.js';   // 💵 флаг money-real: бонусът — пачки на масата пред директора   // 🏦 трезорът зад борда (флаг vault)   // шум на залата, хартия, чукче, аплодисменти, говор на глас
 
 const DIR = 'assets/heavy/directors/';
@@ -468,7 +468,16 @@ export function openBoardroom(o) {
   const VD = ROOM === 'corp' && o.vault && feature('vault') ? vaultDoor(scene, { x: -4.22, y: 1.7, z: ROOM_BACK + 0.02, r: 0.54 }) : null;
   let vault = null, vaultT = 0;
   // 🏆 стената с отличията (флаг awards): витрина вдясно срещу масата; o.awards: { state() → { k: { tier, day, res } }, pending() → [{ k, tier, res }], grant(k, tier) }
-  const AW = ROOM === 'corp' && o.awards && feature('awards') ? buildAwardsWall(scene) : null;
+  // потребителят: „да я сложи отзад“ — на стената зад председателя (зад камерата), по-голяма: 4,2 × 2,5 м, статуетките — по 0,5 м
+  const AW = ROOM === 'corp' && o.awards && feature('awards') ? buildAwardsWall(scene, { x: 0, z: ROOM_FRONT - 0.3, ry: Math.PI, W: 4.2, H: 2.5, TH: 0.5 }) : null;
+  // статуетката над масата при връчване (вместо холограмата): върти се; клик → лети до мястото си във витрината
+  let awT = null, awFly = null;
+  const awClear = () => { if (awT) { scene.remove(awT.t.group); awT.t.dispose(); awT = null; } awFly = null; };
+  const awFrame = () => { if (!AW) return; const f = AW.frame(innerWidth / innerHeight, cam.fov); tw = { p0: cam.position.clone(), t0: ctl.target.clone(), p1: f.p, t1: f.t, k: 0 }; };
+  function awPlace() {   // полетът: от масата до рафта, камерата — към витрината
+    if (!awT || awFly || !awT.granted) return; const sl = AW.slot(awT.k); if (!sl) return;
+    awFly = { k: 0, p0: awT.t.group.position.clone(), s0: awT.t.group.scale.x, p1: sl.pos, s1: awT.t.group.scale.x * sl.h / awT.h }; awFrame();
+  }
   if (AW) AW.setState(o.awards.state());
 
   const tip = el.querySelector('.tip'), card = el.querySelector('.card'), hits = [], people = [];
@@ -637,7 +646,7 @@ export function openBoardroom(o) {
   const B = n => Math.abs(n) >= 1e9 ? `${(n / 1e9).toLocaleString('bg-BG', { maximumFractionDigits: 1 })} млрд. €` : Math.abs(n) >= 1e6 ? `${(n / 1e6).toLocaleString('bg-BG', { maximumFractionDigits: 1 })} млн. €` : `${f(n)} €`;
   const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   function board(go = qi) {
-    clearBadges();
+    clearBadges(); if (awT && !awFly) awClear();
     props = stepsNow();
     nav.style.display = props.length ? 'flex' : 'none';
     if (!props.length) { holo.show(null); scr.classList.remove('on'); setTimeout(() => { if (!props.length) scr.style.display = 'none'; }, 350); scrSeat = -1; aim.set(0, 1.15, -3); return; }
@@ -645,7 +654,7 @@ export function openBoardroom(o) {
     const p = props[qi], i = list.findIndex(s => s.k === (p.step === 'report' ? '' : p.dir)), s = list[i], n = `${qi + 1} / ${props.length}`;
     nav.querySelector('b').textContent = n;
     const F = o.frame ? o.frame() : null;
-    holo.show(p.step === 'report' ? null : p.info || p.step === 'summary' ? { info: true, avail: F ? F.free : p.avail, reserve: F ? F.op : p.reserve } : p);
+    holo.show(p.step === 'report' || p.step === 'award' ? null : p.info || p.step === 'summary' ? { info: true, avail: F ? F.free : p.avail, reserve: F ? F.op : p.reserve } : p);
     scr.classList.toggle('wide', p.step === 'report');
     const hd = (t) => `<div class="hd"><span>${t}</span><span>${n}</span></div><div class="who"></div>`;
     if (p.step === 'report') {   // 📊 отчетът (boardlogic.reportHtml) — с бутоните удължи / пренасочи / прекрати
@@ -657,15 +666,16 @@ export function openBoardroom(o) {
       scr.innerHTML = `${hd(p.info ? (o.bankTitle || '🏦 Банката: с какво разполагаме') : '🏦 Обобщение на заседанието')}<div class="tx"></div>${rows.length ? `<div class="fin">${rows.map(([k, v], j) => `<div><span>${k}</span><b style="color:${k.startsWith('Достъпни') ? '#5fd38a' : v < 0 ? '#ffb347' : '#fff'}">${B(v)}</b></div>`).join('')}${F.loan ? `<div><span>+ свободен кредит</span><b>${B(F.loan)}</b></div>` : ''}</div>` : p.avail != null ? `<div class="cost">💶 за инвестиции: ${f(p.avail)} €${p.reserve ? ` · резерв ${f(p.reserve)} €` : ''}</div>` : ''}<div class="row"><button class="y">${p.info ? 'Продължи →' : '✓ Закрий заседанието'}</button></div>`;
       scr.querySelector('.tx').textContent = p.info ? (o.speech ? o.speech() : p.text) : o.summary();
       scr.querySelector('.y').onclick = () => { if (p.info) return board(qi + 1); cheer(); setTimeout(close, 2200); };   // 👏 закриване — с аплодисменти
-    } else if (p.step === 'award') {   // 🏆 връчването: камерата — към директора; „Връчи“ → благодари, аплодисменти, статуетката се появява на рафта
+    } else if (p.step === 'award') {   // 🏆 връчването: камерата — към директора, над масата — статуетката (вместо холограмата); „Връчи“ → благодари, аплодисменти; клик по статуетката → на витрината
       const A = AWARDS.find(x => x.k === p.aw.k), T = TIERS[p.aw.tier];
       scr.innerHTML = `${hd('🏆 Отличия')}<div class="tx"></div><div class="q"><b>Резултат:</b> ${esc(p.aw.res || A.cond)}</div><div class="row"><button class="y">🏆 Връчи наградата</button><button class="l">Пропусни</button></div>`;
       scr.querySelector('.tx').textContent = `${A.who} — „${A.nm}“ · ${T.ico} ${T.nm}`;
+      const key = p.id; makeTrophy(p.aw.k, p.aw.tier, 0.4).then(t => { if (shut || props[qi]?.id !== key || awT) { t.dispose(); return; } t.group.position.set(0, TABLE_H + 0.32, 0); scene.add(t.group); awT = { t, k: p.aw.k, h: 0.4, granted: false }; });
       scr.querySelector('.y').onclick = () => {
-        o.awards.grant(p.aw.k, p.aw.tier, p.aw.res); AW.setState(o.awards.state()); AW.reveal(p.aw.k); cheer(); decided.add(p.id);
+        o.awards.grant(p.aw.k, p.aw.tier, p.aw.res); cheer(); decided.add(p.id); if (awT) awT.granted = true;
         scr.querySelector('.tx').textContent = `${A.who}: „${A.quote || 'Благодаря за доверието!'}“`;
-        scr.querySelector('.row').innerHTML = '<button class="y">Продължи →</button>'; scr.querySelector('.y').onclick = () => board(nextStep());
-        setTimeout(() => { if (shut) return; const v = AW.focus(p.aw.k); if (v) tw = { p0: cam.position.clone(), t0: ctl.target.clone(), p1: v.clone().add(new THREE.Vector3(-1.7, 0.3, 0.5)), t1: v, k: 0 }; }, 1600);   // към витрината
+        scr.querySelector('.row').innerHTML = '<button class="y">🏆 Сложи на витрината</button><button class="l">Продължи →</button>';
+        scr.querySelector('.y').onclick = () => awPlace(); scr.querySelector('.l').onclick = () => { if (awT && !awFly) { awPlace(); setTimeout(() => !shut && board(nextStep()), 2300); } else board(nextStep()); };
       };
       scr.querySelector('.l').onclick = () => { decided.add(p.id); board(nextStep()); };
     } else {   // 📋 предложение: петте въпроса — какво, защо, колко, кога, какво ще донесе
@@ -742,6 +752,7 @@ export function openBoardroom(o) {
   tgl('snd', snd.isOn()); tgl('voice', voiceOn); tgl('cine', cine);
   el.querySelector('.top .snd').onclick = () => { snd.setOn(!snd.isOn()); savePref('snd', snd.isOn()); tgl('snd', snd.isOn()); if (snd.isOn()) snd.ambience(true); };
   el.querySelector('.top .voice').onclick = () => { voiceOn = !voiceOn; savePref('voice', voiceOn); tgl('voice', voiceOn); if (!voiceOn) snd.hush(); };
+  if (AW) { const b = document.createElement('button'); b.className = 'tg'; b.title = 'Стената с отличията'; b.textContent = '🏆'; b.onclick = awFrame; el.querySelector('.top .cine').before(b); }   // бутон: камерата към витрината
   el.querySelector('.top .cine').onclick = () => { cine = !cine; savePref('cine', cine); tgl('cine', cine); shot(cine ? sel ?? -1 : -1); };
   const showVoice = () => { if (snd.canSpeak()) el.querySelector('.top .voice').style.display = ''; };
   showVoice(); setTimeout(showVoice, 1200);
@@ -812,6 +823,9 @@ export function openBoardroom(o) {
   renderer.domElement.addEventListener('pointerup', e => {
     if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 6) return; down = null;
     if (vault) return; if (doorHit(e)) return enterVault();
+    if (AW) { const r = renderer.domElement.getBoundingClientRect(); mv.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(mv, cam);
+      if (awT && awT.granted && ray.intersectObject(awT.t.group, true).length) return awPlace();   // кликната статуетка → на витрината
+      if (ray.intersectObjects([AW.cab, ...AW.hits]).length) return awFrame(); }   // кликната витрина → камерата само към нея, в цял ръст
     const h = hitAt(e); if (!h) { card.classList.remove('on'); sel = null; return; }
     const i = h.object.userData.seat, pi = props.findIndex(p => p.dir === list[i].k);
     if (pi >= 0) board(pi); else showCard(i);
@@ -858,6 +872,10 @@ export function openBoardroom(o) {
     cam.position.x = Math.max(-ROOM_W + 1.4, Math.min(ROOM_W - 1.4, cam.position.x)); cam.position.z = Math.max(ROOM_BACK + 1.2, Math.min(ROOM_FRONT - 0.8, cam.position.z));   // и в залата — пред завесите, не в стените
     if (VD) VD.update(dt, o.vault && o.vault.night ? o.vault.night() : 0);
     if (AW) AW.update(dt, o.vault && o.vault.night ? o.vault.night() : 0);
+    if (awT) { const w = awT.t.group; w.rotation.y += dt * (awFly ? 3 : 0.7);
+      if (awFly) { awFly.k = Math.min(1, awFly.k + dt / 1.6); const e = awFly.k < 0.5 ? 2 * awFly.k * awFly.k : 1 - Math.pow(-2 * awFly.k + 2, 2) / 2; w.position.lerpVectors(awFly.p0, awFly.p1, e); w.position.y += Math.sin(e * Math.PI) * 0.9; w.scale.setScalar(awFly.s0 + (awFly.s1 - awFly.s0) * e);
+        if (awFly.k >= 1) { const k = awT.k; awClear(); AW.setState(o.awards.state()); AW.reveal(k); } }
+      else w.position.y = TABLE_H + 0.32 + Math.sin(clock.elapsedTime * 1.4) * 0.03; }
     if (vault) { vault.update(dt); renderer.render(vault.scene, vault.cam); } else renderer.render(scene, cam);   // в трезора — неговата сцена
   }
   if (renderer.compileAsync) renderer.compileAsync(scene, cam).catch(() => { }).then(() => { if (!shut) loop(); }); else loop();   // стаята — също асинхронно, после рисуваме
