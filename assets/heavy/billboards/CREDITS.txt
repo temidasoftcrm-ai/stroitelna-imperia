@@ -1,0 +1,7 @@
+Билбордове (Sketchfab, CC Attribution 4.0 — https://creativecommons.org/licenses/by/4.0/). Платната са заменени с нашите реклами; текстурите — свалени до 1024 px (WebP).
+
+bb-small.glb    — „Street billboard“ by EVID (@evid.33)            https://sketchfab.com/3d-models/2e0e7e7046044f70b6283547d7f243a9
+bb-medium.glb   — „Billboard“ by DARK_2LORD2                       https://sketchfab.com/3d-models/800c324581684cdbaa0a074ab3f01c0c
+bb-large.glb    — „Billboard (.psd layered texture maps included)“ by TampaJoey   https://sketchfab.com/3d-models/20d1a51fbfa94373900e29de74a0f9ee
+bb-mega.glb     — „Metal Billboard Advertising Single Sided [Free]“ by Jotrain   https://sketchfab.com/3d-models/33c164cf9e4346d1b48eb0c49cb2643f
+bb-rotating.glb — „Animated Rotating Billboard“ by Coroca3D         https://sketchfab.com/3d-models/d5d7960ac1574f94adabf03c7eea33d1

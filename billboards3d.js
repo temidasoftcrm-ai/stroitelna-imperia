@@ -5,6 +5,8 @@
 // Евтино: всичко е InstancedMesh (стълбове, рамки, лампи — по един; платната — по един на дизайн), текстурите — общи.
 // buildBillboards(group, { roads: [{ pts: [[x, z]…], w }], brand: { nm, col, ico }, company, years, images, max, gap }) → { group, spots, setNight(k), dispose }
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { mergeKids } from './citycull.js';
 
 const PW = 12, PH = 4, POLE = 7;
 function design(i, b) {
@@ -30,7 +32,7 @@ function design(i, b) {
 }
 
 // местата: по най-дългите булеварди, през ~gap м, отстъп от оста = половината ширина + 3 м, редуват се страните; не по-близо от 0,6·gap един до друг
-export function billboardSpots(roads, { max = 8, gap: gap0 } = {}) {
+export function billboardSpots(roads, { max = 8, gap: gap0, widthOf } = {}) {
   const out = [], L = r => { let s = 0; for (let i = 1; i < r.pts.length; i++) s += Math.hypot(r.pts[i][0] - r.pts[i - 1][0], r.pts[i][1] - r.pts[i - 1][1]); return s; };
   const list = roads.filter(r => r.pts && r.pts.length > 1).map(r => ({ r, len: L(r) })).filter(q => q.len > 45).sort((a, b) => (b.r.main ? 1e9 : 0) + b.len - ((a.r.main ? 1e9 : 0) + a.len));   // булевардите (main) първо; плановете от картата са на къси отсечки
   const tot = list.reduce((t, q) => t + q.len, 0), gap = gap0 || Math.max(70, Math.min(220, tot / (max + 1)));   // малките градове — по-гъсто, иначе се събира един
@@ -40,9 +42,9 @@ export function billboardSpots(roads, { max = 8, gap: gap0 } = {}) {
     for (let i = 1; i < r.pts.length && out.length < max; i++) {
       const [x0, z0] = r.pts[i - 1], [x1, z1] = r.pts[i], d = Math.hypot(x1 - x0, z1 - z0); if (d < 1e-6) continue;
       while (acc + d >= next && out.length < max) {
-        const f = (next - acc) / d, x = x0 + (x1 - x0) * f, z = z0 + (z1 - z0) * f, dx = (x1 - x0) / d, dz = (z1 - z0) / d, nx = -dz * side, nz = dx * side, off = (r.w || 12) / 2 + 3;
+        const f = (next - acc) / d, x = x0 + (x1 - x0) * f, z = z0 + (z1 - z0) * f, dx = (x1 - x0) / d, dz = (z1 - z0) / d, nx = -dz * side, nz = dx * side, fw = widthOf ? widthOf(out.length) : 12, off = (r.w || 12) / 2 + 2 + fw / 2 * 0.95;   // платното е напречно на пътя — отстъп колкото половината му ширина
         const p = { x: x + nx * off, z: z + nz * off, ry: Math.atan2(dx * side, dz * side) + side * 0.35 };   // лицето — срещу идващите коли, леко към платното
-        if (!out.some(q => Math.hypot(q.x - p.x, q.z - p.z) < gap * 0.6)) { out.push(p); side = -side; }
+        if (!out.some(q => Math.hypot(q.x - p.x, q.z - p.z) < Math.max(gap * 0.6, (fw + (q.fw || 12)) / 2 + 4))) { p.fw = fw; out.push(p); side = -side; }
         next += gap;
       }
       acc += d;
@@ -52,7 +54,7 @@ export function billboardSpots(roads, { max = 8, gap: gap0 } = {}) {
   return out;
 }
 
-export function buildBillboards(group, o = {}) {
+function buildProcedural(group, o = {}) {   // резервният (без моделите): нарисуван 12 × 4 на стълб
   const spots = billboardSpots(o.roads || [], o), n = spots.length, own = [], M = x => { own.push(x); return x; };
   const g = new THREE.Group(); g.name = 'billboards'; group.add(g);
   if (!n) return { group: g, spots, setNight() {}, dispose() { group.remove(g); } };
@@ -86,4 +88,113 @@ export function buildBillboards(group, o = {}) {
     setNight(k = 0) { lampM.emissiveIntensity = 0.2 + 2.2 * k; for (const m of mats) m.emissiveIntensity = 0.05 + 0.75 * k; for (const L of lights) L.intensity = 40 * k; },
     dispose() { group.remove(g); for (const x of own) x.dispose && x.dispose(); for (const m of [pole, frame, walk, lamps, ...panels]) m.dispose(); },
   };
+}
+
+
+// ---------- истинските модели (Sketchfab, CC BY — assets/heavy/billboards/CREDITS.txt): 4 размера + въртящ се ----------
+// face — мрежата на платното (скрива се; отпред и отзад слагаме наше платно с картината, изрязана по пропорциите му);
+// axis — накъде гледа лицето на модела ('x' → завъртаме, за да гледа +z); faceW — колко широко е платното на място (м)
+const HVB = 'assets/heavy/billboards/';
+export const BB_KIT = {
+  small: { url: HVB + 'bb-small.glb', face: 'Object_5', hide: ['Object_5', 'Object_7'], axis: 'z', faceW: 1.4 },
+  medium: { url: HVB + 'bb-medium.glb', face: 'Cube005_Material004_0', hide: ['Cube005_Material004_0'], axis: 'x', faceW: 6 },
+  large: { url: HVB + 'bb-large.glb', face: 'ADs_AD_0', hide: ['ADs_AD_0'], axis: 'z', faceW: 12 },
+  mega: { url: HVB + 'bb-mega.glb', face: 'Object_10', hide: ['Object_10'], axis: 'x', faceW: 24, surface: true },   // surface — платното точно пред/зад конструкцията (бялото табло)
+  rotating: { url: HVB + 'bb-rotating.glb', slats: true, axis: 'z', faceW: 9 },
+};
+const ORDER = ['large', 'mega', 'medium', 'rotating', 'large', 'small', 'medium', 'small'];   // кой размер на кое място (първите — по най-дългите булеварди)
+const kitCache = {};
+const loadKit = k => kitCache[k] = kitCache[k] || new GLTFLoader().loadAsync(BB_KIT[k].url);
+
+// картините: { url, logo: 'left'|'right'|'center' } → платно с изрязване; панорамите без надпис (logo 'center' или over) — с марката отгоре в ъгъла
+function overlayTex(img, b) {
+  const W = 2048, H = Math.round(W * img.height / img.width), c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+  g.drawImage(img, 0, 0, W, H);
+  const bw = W * 0.42, bh = H * 0.3, x = W * 0.03, y = H - bh - H * 0.06;
+  g.fillStyle = 'rgba(8,14,28,.78)'; g.beginPath(); g.roundRect(x, y, bw, bh, 26); g.fill(); g.strokeStyle = b.col || '#d4af37'; g.lineWidth = 8; g.stroke();
+  g.textBaseline = 'middle'; g.font = `${bh * 0.62}px "Noto Color Emoji", sans-serif`; g.fillText(b.ico || '🏗️', x + bh * 0.12, y + bh / 2);
+  g.fillStyle = '#ffffff'; g.font = `800 ${bh * 0.3}px system-ui, sans-serif`; g.fillText((b.company || b.nm || '').toUpperCase(), x + bh * 0.95, y + bh * 0.36, bw - bh * 1.05);
+  g.fillStyle = b.col || '#ffd54a'; g.font = `700 ${bh * 0.2}px Georgia, serif`; g.fillText(b.slogan || 'Строим бъдещето', x + bh * 0.97, y + bh * 0.72, bw - bh * 1.05);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+}
+async function loadArt(list, brand) {
+  const out = [];
+  for (const it of list) {
+    const img = await new Promise(r => { const im = new Image(); im.onload = () => r(im); im.onerror = () => r(null); im.src = it.url; }); if (!img) continue;
+    let tex; if (it.over) tex = overlayTex(img, brand); else { tex = new THREE.Texture(img); tex.needsUpdate = true; tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8; }
+    out.push({ tex, logo: it.logo || 'center', aspect: img.width / img.height });
+  }
+  return out;
+}
+// изрязване на картината по пропорциите на платното (a = ширина/височина): по-тясното — откъм логото
+const LOGO_X = { left: [0, 0.47], right: [0.6, 1], center: [0.02, 0.47] };   // къде е блокът с логото в картината (center — марката, нарисувана отгоре вляво)
+function portraitTex(art, a) {   // тясно/вертикално платно: блокът с логото, вписан по ширина, върху тъмен фон
+  const img = art.tex.image, H = 1024, W = Math.round(H * a), c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+  const [x0, x1] = LOGO_X[art.logo] || LOGO_X.center, sw = (x1 - x0) * img.width, sh = img.height, dh = W * sh / sw;
+  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#0b1a3a'); gr.addColorStop(1, '#14284f'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  g.drawImage(img, x0 * img.width, 0, sw, sh, 0, (H - dh) / 2, W, dh);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+}
+function cropTex(art, a) {
+  if (a < 1.2 && art.tex.image && art.tex.image.width) return portraitTex(art, a);
+  const t = art.tex.clone(); t.needsUpdate = true; t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  if (a >= art.aspect) { const ch = art.aspect / a; t.repeat.set(1, ch); t.offset.set(0, (1 - ch) / 2); }
+  else { const cw = a / art.aspect; t.repeat.set(cw, 1); t.offset.set(art.logo === 'left' ? 0 : art.logo === 'right' ? 1 - cw : (1 - cw) / 2, 0); }
+  return t;
+}
+const faceMat = tex => new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.05, roughness: 0.6 });
+
+// един билборд от модела: клонинг, мащаб по faceW, нашите платна; връща { root, mats, mixer? }
+function makeBoard(k, gl, arts, ai) {
+  const K = BB_KIT[k], root = new THREE.Group(), m = gl.scene.clone(true); root.add(m);
+  if (K.axis === 'x') m.rotation.y = -Math.PI / 2;   // лицето — към +z
+  m.updateMatrixWorld(true);
+  const mats = [], disp = [];
+  if (K.slats) {   // въртящият се: ламели „N_k“ — лице k показва картина k, всяка ламела — своята ивица
+    const sl = []; m.traverse(o => { if (!o.isMesh) return; const bb = new THREE.Box3().setFromObject(o), sz = bb.getSize(new THREE.Vector3()); if (sz.y < 0.05 && sz.x > 20) { o.visible = false; return; } const mm = /^(\d+)_(\d)$/.exec(o.name); if (mm) sl.push({ o, i: +mm[1], f: +mm[2], x: bb.getCenter(new THREE.Vector3()).x, h: sz.y }); });
+    const idx = [...new Set(sl.map(q => q.i))].sort((a, b) => a - b), n = idx.length || 1, h = sl[0] ? sl[0].h : 10, a = (n * 2) / h;
+    const s = K.faceW / (n * 2); m.scale.setScalar(s);
+    for (const q of sl) { const art = arts[(ai + q.f) % arts.length], t = cropTex(art, a), j = idx.indexOf(q.i); t.repeat.x /= n; t.offset.x += t.repeat.x * j; const mt = faceMat(t); q.o.material = mt; mats.push(mt); disp.push(t, mt); }
+    let mixer = null; if (gl.animations && gl.animations[0]) { mixer = new THREE.AnimationMixer(m); mixer.clipAction(gl.animations[0]).play(); }
+    return { root, mats, mixer, dispose: () => disp.forEach(x => x.dispose()) };
+  }
+  let face = null; m.traverse(o => { if (o.isMesh && o.name === K.face) face = o; if (o.isMesh && (K.hide || []).includes(o.name)) o.visible = false; });
+  const bbAll = new THREE.Box3().setFromObject(m), fb = face ? new THREE.Box3().setFromObject(face) : bbAll, fs = fb.getSize(new THREE.Vector3()), fc = fb.getCenter(new THREE.Vector3());
+  const s = K.faceW / Math.max(1e-6, fs.x); m.scale.multiplyScalar(s); m.position.set(-fc.x * s, -bbAll.min.y * s, -((bbAll.min.z + bbAll.max.z) / 2) * s);
+  const w = fs.x * s, hgt = fs.y * s, art = arts[ai % arts.length], t = cropTex(art, w / hgt), mt = faceMat(t); mats.push(mt); disp.push(t, mt);
+  let zC = (fc.z - (bbAll.min.z + bbAll.max.z) / 2) * s, half = Math.max(0.02, fs.z * s / 2 + 0.02), zBack = fs.z * s < 0.05 ? -(Math.abs(zC) + 0.02) : zC - half, zFront = fs.z * s < 0.05 ? zC + 0.02 : zC + half;
+  if (K.surface) {   // платното — по самата конструкция: най-предната и най-задната точка на видимите части на височината на платното
+    root.updateMatrixWorld(true); const y0 = (fc.y - bbAll.min.y) * s - fs.y * s / 2, y1 = y0 + fs.y * s, sb = new THREE.Box3(), v = new THREE.Vector3(); let any = false;
+    m.traverse(q => { if (!q.isMesh || !q.visible) return; const P = q.geometry.attributes.position; for (let i = 0; i < P.count; i += 3) { v.fromBufferAttribute(P, i).applyMatrix4(q.matrixWorld); if (v.y >= y0 && v.y <= y1) { sb.expandByPoint(v); any = true; } } });
+    if (any) { zFront = sb.max.z + 0.03; zBack = sb.min.z - 0.03; } }
+  const geo = new THREE.PlaneGeometry(w, hgt); disp.push(geo);
+  const front = new THREE.Mesh(geo, mt); front.position.set(0, (fc.y - bbAll.min.y) * s, zFront); root.add(front);
+  const back = new THREE.Mesh(geo, mt); back.position.set(0, (fc.y - bbAll.min.y) * s, zBack); back.rotation.y = Math.PI; root.add(back);
+  root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  try { mergeKids(root, 4); } catch (e) { }
+  return { root, mats, dispose: () => disp.forEach(x => x.dispose()) };
+}
+
+// публичното: местата → билбордове (истинските модели; ако не дойдат — нарисуваните)
+export function buildBillboards(group, o = {}) {
+  const sizeAt = i => o.sizes ? o.sizes[i % o.sizes.length] : ORDER[i % ORDER.length];
+  const spots = o.spots || billboardSpots(o.roads || [], { ...o, widthOf: i => BB_KIT[sizeAt(i)].faceW }), g = new THREE.Group(); g.name = 'billboards'; group.add(g);   // o.spots — ръчно (демото в Лабораторията)
+  let alive = true, boards = [], fallback = null, night = 0;
+  const api = { group: g, spots,
+    setNight(k = 0) { night = k; for (const b of boards) for (const m of b.mats) m.emissiveIntensity = 0.05 + 0.75 * k; if (fallback) fallback.setNight(k); },
+    update(dt) { for (const b of boards) if (b.mixer) b.mixer.update(dt); },
+    dispose() { alive = false; group.remove(g); for (const b of boards) b.dispose(); if (fallback) fallback.dispose(); } };
+  if (!spots.length) return api;
+  const brand = { ...(o.brand || {}), company: o.company };
+  const artList = (o.images && o.images.length ? o.images : []).map(x => typeof x === 'string' ? { url: x } : x);
+  const sizes = spots.map((s, i) => sizeAt(i));
+  Promise.all([...new Set(sizes)].map(k => loadKit(k).then(gl => [k, gl]))).then(async L => {
+    const kits = Object.fromEntries(L);
+    let arts = await loadArt(artList, brand);
+    if (!arts.length || o.designs) arts = [...arts, ...[0, 1, 2].map(i => ({ tex: design(i, { ...brand, years: o.years }), logo: 'left', aspect: 1024 / 342 }))];   // без снимки (или o.designs) — и нарисуваните с марката
+    if (!alive) return;
+    spots.forEach((s, i) => { const k = sizes[i], b = makeBoard(k, kits[k], arts, i); b.root.position.set(s.x, 0, s.z); b.root.rotation.y = s.ry; g.add(b.root); boards.push(b); });
+    api.setNight(night);
+  }).catch(e => { console.warn('billboards models', e); if (alive) { fallback = buildProcedural(g, o); api.setNight(night); } });
+  return api;
 }

@@ -37,7 +37,8 @@ export function mergeKids(o, minMeshes = 6) {
   for (const list of groups.values()) {
     if (list.length < 2) continue;
     const geos = list.map(m => { _m.multiplyMatrices(_inv, m.matrixWorld); const g = m.geometry.clone(); for (const n of Object.keys(g.morphAttributes || {})) delete g.morphAttributes[n];
-      for (const n of Object.keys(g.attributes)) { const a = g.attributes[n]; if (a.isInterleavedBufferAttribute) g.setAttribute(n, a.clone()); }   // GLB/meshopt: interleaved → обикновени (clone() без данни ги разгъва)
+      for (const n of Object.keys(g.attributes)) { let a = g.attributes[n]; if (a.isInterleavedBufferAttribute) g.setAttribute(n, a = a.clone());   /* GLB/meshopt: interleaved → обикновени (clone() без данни ги разгъва) */
+        if (a.normalized || !(a.array instanceof Float32Array)) { const f = new Float32Array(a.count * a.itemSize); for (let i = 0; i < a.count; i++) for (let c = 0; c < a.itemSize; c++) f[i * a.itemSize + c] = a.getComponent ? a.getComponent(i, c) : [a.getX, a.getY, a.getZ, a.getW][c].call(a, i); g.setAttribute(n, new THREE.BufferAttribute(f, a.itemSize)); } }   // квантизираните (KHR_mesh_quantization: Int16 normalized) — към Float32, иначе applyMatrix4 ги реже до ±1
       g.applyMatrix4(_m); return g; });
     let mg = null; try { mg = mergeGeometries(geos, false); } catch (e) { mg = null; }
     for (const g of geos) g.dispose();
