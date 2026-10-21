@@ -131,7 +131,11 @@ export function createVault(renderer, o = {}) {
     scene.add(cash, gold);
     return { Z, x: xs[i], cash, gold, cn: 0, gn: 0, ct: 0, gt: 0, v: 0 };
   });
-  if (feature('money-real')) loadMoney(u => new GLTFLoader().loadAsync(u)).then(R => { const cg = R.cashGeo(CASH), bg = R.barGeo(BAR); for (const z of zones) { if (cg) { z.cash.geometry = cg; z.cash.material = R.cashMat; } if (bg) z.gold.geometry = bg; } if (R.barMat && R.barMat.map) { goldM.map = R.barMat.map; goldM.color.set(0xffffff); goldM.needsUpdate = true; } }).catch(() => {});
+  // 💵 потребителят: „да останат само истинските пари и истинските кюлчета“ — винаги истинските модели (money3d.js);
+  // докато се заредят, стелажите са празни; сглобените пачки — само ако моделите не дойдат
+  for (const z of zones) z.cash.visible = z.gold.visible = false;
+  const showAll = () => { for (const z of zones) z.cash.visible = z.gold.visible = true; };
+  loadMoney(u => new GLTFLoader().loadAsync(u)).then(R => { const cg = R.cashGeo(CASH), bg = R.barGeo(BAR); for (const z of zones) { if (cg) { z.cash.geometry = cg; z.cash.material = R.cashMat; } if (bg) z.gold.geometry = bg; } if (R.barMat && R.barMat.map) { goldM.map = R.barMat.map; goldM.color.set(0xffffff); goldM.needsUpdate = true; } showAll(); }).catch(showAll);
   // HTML: картите на зоните, разпределението и бутонът обратно
   const el = document.createElement('div'); el.className = 'vault-ui';
   el.innerHTML = `<style>.vault-ui{position:fixed;inset:0;pointer-events:none;font:14px system-ui,sans-serif;color:#e8edf3;z-index:100000}
