@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Бусът на бригадата</title>
+<style>
+  body { margin:0; background:#14161b; color:#e8e8ea; font:14px/1.45 system-ui,sans-serif; overflow:hidden; }
+  #hud { position:absolute; left:12px; top:12px; background:rgba(20,22,27,.88); padding:10px 14px; border-radius:10px; max-width:540px; }
+  h1 { font-size:17px; margin:0 0 4px; } p { margin:0 0 6px; color:#9aa0aa; font-size:13px; }
+  button { background:#1d2027; color:#e8e8ea; border:1px solid #333a45; border-radius:8px; padding:5px 10px; font:inherit; cursor:pointer; margin:2px 4px 0 0; } button.on { border-color:#4ea1ff; }
+  .lbl { position:absolute; transform:translate(-50%,-100%); background:rgba(20,22,27,.82); padding:2px 7px; border-radius:6px; font-size:12px; white-space:nowrap; pointer-events:none; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script></head><body>
+<div id="hud"><h1>🚐 Бусът на бригадата — избери модел</h1>
+<p>Отляво — сегашният бус (sf-car-Van, УАЗ). Вдясно — 4 истински буса (Sketchfab, CC BY) в истински размер, с логото на фирмата от двете страни. До тях — човек 1,75 м и метрова мрежа за мащаба. Марка:</p>
+<div id="br"></div></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { VANS, crewVan } from '../vanlogo.js';
+import { BRANDS } from '../group.js';
+import { scaleFor } from '../scale.js';
+const R = new THREE.WebGLRenderer({ antialias: true }); R.setSize(innerWidth, innerHeight); R.setPixelRatio(Math.min(2, devicePixelRatio)); R.outputColorSpace = THREE.SRGBColorSpace; R.shadowMap.enabled = true; document.body.appendChild(R.domElement);
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0xd8e4ee); sc.add(new THREE.HemisphereLight(0xffffff, 0x778899, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 2); sun.position.set(20, 30, 25); sun.castShadow = true; Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 20, bottom: -20 }); sun.shadow.mapSize.set(2048, 2048); sc.add(sun);
+const gnd = new THREE.Mesh(new THREE.PlaneGeometry(120, 80).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xc8c6bc })); gnd.receiveShadow = true; sc.add(gnd);
+const g1 = new THREE.GridHelper(120, 120, 0x9a9890, 0xb4b2aa); g1.position.y = 0.01; sc.add(g1);
+const cam = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 500); cam.position.set(14, 7, 20); const ctl = new OrbitControls(cam, R.domElement); ctl.target.set(14, 1.5, 0); ctl.update();
+const L = new GLTFLoader(), labels = [], V = new THREE.Vector3();
+const lbl = (t, p) => { const d = document.createElement('div'); d.className = 'lbl'; d.textContent = t; document.body.appendChild(d); labels.push([d, p]); };
+const srcs = {}; for (const [k, [f]] of Object.entries(VANS)) srcs[k] = await L.loadAsync('../' + f).then(g => g.scene).catch(() => null);
+const uaz = await L.loadAsync('../assets/heavy/cars/car-uaz452.glb').then(g => g.scene).catch(() => null);
+const ped = await L.loadAsync('../assets/heavy/people/peds/ped-adam.glb').then(g => g.scene).catch(() => null);
+let group = new THREE.Group(); sc.add(group);
+function build(brand) {
+  sc.remove(group); group = new THREE.Group(); sc.add(group); for (const [d] of labels) d.remove(); labels.length = 0;
+  let x = 0;
+  if (uaz) { const u = crewVan(uaz, { len: 4.4 }); u.rotation.y = Math.PI / 2; u.position.x = x + 1.2; group.add(u); lbl('сега: УАЗ 4,4 м', new THREE.Vector3(u.position.x, 2.9, 0)); x += 5; }
+  for (const [k, [, len]] of Object.entries(VANS)) { const s = srcs[k]; if (!s) continue; const v = crewVan(s, { brand, len }); v.rotation.y = Math.PI / 2; v.position.x = x + v.userData.size.w / 2 + 1; group.add(v);   // страната с логото — към камерата
+    const z = v.userData.size; lbl(`${k}: ${z.len.toFixed(1)} × ${z.w.toFixed(1)} × ${z.h.toFixed(1)} м`, new THREE.Vector3(v.position.x, z.h + 0.6, 0)); x += Math.max(z.w, 2.4) + 4.5; }
+  if (ped) { const p = ped;   /* без clone: скинатият човек пази своя скелет (клонът рисуваше огромна сива фигура) */ p.scale.setScalar(scaleFor('ped-adam', p)); const b = new THREE.Box3().setFromObject(p); p.position.set(x, -b.min.y, 2.5); group.add(p); lbl('1,75 м', new THREE.Vector3(x, 2.1, 2.5)); }
+  ctl.target.set(x / 2, 1.5, 0); cam.position.set(x / 2, 9, 36); ctl.update();
+}
+const br = document.getElementById('br'), nm = new URLSearchParams(location.search).get('nm');
+br.innerHTML = BRANDS.map((b, i) => `<button data-i="${i}">${b.ico} ${b.nm}</button>`).join('');
+br.onclick = e => { const b = e.target.closest('button'); if (!b) return; for (const q of br.children) q.classList.toggle('on', q === b); build(BRANDS[+b.dataset.i]); };
+br.children[1].click();
+R.setAnimationLoop(() => { ctl.update(); R.render(sc, cam); for (const [d, p] of labels) { V.copy(p).project(cam); d.style.left = (V.x * 0.5 + 0.5) * innerWidth + 'px'; d.style.top = (-V.y * 0.5 + 0.5) * innerHeight + 'px'; } });
+addEventListener('resize', () => { R.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); });
+window.__ready = true; window.__dump = () => group.children.map(c => { const b = new THREE.Box3().setFromObject(c), s = b.getSize(new THREE.Vector3()); return [c.position.x.toFixed(1), s.x.toFixed(1), s.y.toFixed(1), s.z.toFixed(1)].join(' '); });
+</script></body></html>

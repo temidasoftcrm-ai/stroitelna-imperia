@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Истински мащаб</title>
+<style>
+  body { margin:0; background:#14161b; color:#e8e8ea; font:14px/1.45 system-ui,sans-serif; overflow:hidden; }
+  #hud { position:absolute; left:12px; top:12px; background:rgba(20,22,27,.88); padding:10px 14px; border-radius:10px; max-width:560px; }
+  h1 { font-size:17px; margin:0 0 4px; } p { margin:0 0 6px; color:#9aa0aa; font-size:13px; }
+  button { background:#1d2027; color:#e8e8ea; border:1px solid #333a45; border-radius:8px; padding:5px 10px; font:inherit; cursor:pointer; margin:2px 4px 0 0; } button.on { border-color:#4ea1ff; }
+  table { border-collapse:collapse; font-size:12px; margin-top:6px; } td, th { padding:2px 6px; border-bottom:1px solid #2a2f38; text-align:left; } td.n { text-align:right; font-variant-numeric:tabular-nums; }
+  .ok { color:#5fc27a; } .bad { color:#e06a5a; }
+  .lbl { position:absolute; transform:translate(-50%,-100%); background:rgba(20,22,27,.82); padding:2px 7px; border-radius:6px; font-size:12px; white-space:nowrap; pointer-events:none; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script></head><body>
+<div id="hud"><h1>📏 Истински мащаб — контролна сцена (1 единица = 1 м)</h1>
+<p>Метрова мрежа (тънките линии — 1 м, дебелите — 10 м). Всеки модел е мащабиран еднакво по трите оси от scale.js: колите — по дължина, човекът — по ръст 1,75 м, къщите — по височина до стряхата (етажи × 3 м), покривът е отгоре. Червената линия на къщите — намерената стряха. Влекачът е с ремаркето (16,5 м).</p>
+<div><button id="persp" class="on">Перспектива</button><button id="front">Отпред (ортогонално)</button><button id="top">Отгоре</button></div>
+<table id="tab"><tr><th>модел</th><th>цел</th><th>Д × Ш × В, м</th><th>стряха</th></tr></table></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { SCALE, scaleFor, measure, TRAILER, SEMI } from '../scale.js';
+const R = new THREE.WebGLRenderer({ antialias: true }); R.setSize(innerWidth, innerHeight); R.setPixelRatio(Math.min(2, devicePixelRatio)); R.outputColorSpace = THREE.SRGBColorSpace; R.shadowMap.enabled = true; document.body.appendChild(R.domElement);
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0xd8e4ee); sc.add(new THREE.HemisphereLight(0xffffff, 0x778899, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 2); sun.position.set(30, 50, 40); sun.castShadow = true; Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 40, bottom: -40 }); sun.shadow.mapSize.set(2048, 2048); sc.add(sun);
+const gnd = new THREE.Mesh(new THREE.PlaneGeometry(200, 120).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xc8c6bc })); gnd.receiveShadow = true; sc.add(gnd);
+const g1 = new THREE.GridHelper(200, 200, 0x9a9890, 0xb4b2aa); g1.position.y = 0.01; sc.add(g1); const g10 = new THREE.GridHelper(200, 20, 0x55534c, 0x55534c); g10.position.y = 0.02; sc.add(g10);
+// вертикална линийка 0–15 м с деления през 1 м
+const ruler = new THREE.Group(); for (let y = 0; y <= 15; y++) { const m = new THREE.Mesh(new THREE.BoxGeometry(y % 5 ? 0.4 : 0.9, 0.05, 0.05), new THREE.MeshBasicMaterial({ color: y % 5 ? 0x333333 : 0xc62828 })); m.position.set(0, y, 0); ruler.add(m); }
+const pole = new THREE.Mesh(new THREE.BoxGeometry(0.08, 15, 0.08), new THREE.MeshBasicMaterial({ color: 0x333333 })); pole.position.y = 7.5; ruler.add(pole); ruler.position.set(-6, 0, 0); sc.add(ruler);
+const persp = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 1000); persp.position.set(28, 18, 42);
+const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000); let cam = persp; const ctl = new OrbitControls(persp, R.domElement); ctl.target.set(28, 3, 0); ctl.update();
+const setOrtho = (pos, up) => { const a = innerWidth / innerHeight, H = 13; Object.assign(ortho, { left: -H * a, right: H * a, top: H, bottom: -H }); ortho.position.set(...pos); ortho.up.set(...up); ortho.lookAt(28, pos[1] > 50 ? 0 : 6, 0); ortho.updateProjectionMatrix(); cam = ortho; };
+document.getElementById('persp').onclick = () => { cam = persp; mark('persp'); };
+document.getElementById('front').onclick = () => { setOrtho([28, 6, 100], [0, 1, 0]); mark('front'); };
+document.getElementById('top').onclick = () => { setOrtho([28, 100, 0.01], [0, 0, -1]); mark('top'); };
+const mark = id => { for (const b of document.querySelectorAll('#hud button')) b.classList.toggle('on', b.id === id); };
+const L = new GLTFLoader(), labels = [], tab = document.getElementById('tab');
+const lbl = (txt, p) => { const d = document.createElement('div'); d.className = 'lbl'; d.textContent = txt; document.body.appendChild(d); labels.push([d, p]); };
+// модел key на позиция x (по оста x, всички с лице към +z), с мащаба от каталога; връща групата и измерените размери в метри
+async function place(key, x, extra) {
+  const c = SCALE[key], g = (await L.loadAsync('../' + c.f)).scene, k = scaleFor(key, g), w = new THREE.Group(), inner = new THREE.Group(); inner.add(g); w.add(inner);
+  inner.scale.setScalar(k); const q0 = measure(inner); if (q0.w > q0.d && c.cat !== 'person' && c.cat !== 'house') inner.rotation.y = Math.PI / 2;   // дължината — по z (напред)
+  const b = new THREE.Box3().setFromObject(inner), cc = b.getCenter(new THREE.Vector3()); inner.position.set(-cc.x, -b.min.y, -cc.z);
+  w.position.x = x; w.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); sc.add(w);
+  const q1 = measure(w);   /* проверката — по самия модел (без ремаркето) */ if (extra) extra(w);
+  const q = measure(w), D = Math.max(q.w, q.d), Wd = Math.min(q.w, q.d);
+  if (c.cat === 'house') { const eave = new THREE.Mesh(new THREE.BoxGeometry(q.w + 1, 0.06, q.d + 1), new THREE.MeshBasicMaterial({ color: 0xe02020, transparent: true, opacity: 0.6 })); eave.position.set(x, q.eave, 0); sc.add(eave); }
+  const ok = Math.abs((c.by === 'len' ? Math.max(q1.w, q1.d) : c.by === 'eave' ? q1.eave : q1.h) - c.m) < 0.05;
+  tab.insertAdjacentHTML('beforeend', `<tr><td>${key}</td><td class="n">${c.by === 'len' ? 'дължина' : c.by === 'eave' ? 'стряха' : 'ръст'} ${c.m} м</td><td class="n ${ok ? 'ok' : 'bad'}">${D.toFixed(2)} × ${Wd.toFixed(2)} × ${q.h.toFixed(2)}</td><td class="n">${c.cat === 'house' ? q.eave.toFixed(2) + ' м' : ''}</td></tr>`);
+  lbl(`${key}: ${D.toFixed(1)} × ${Wd.toFixed(1)} × ${q.h.toFixed(1)} м`, new THREE.Vector3(x, q.h + 0.8, 0));
+  return { w, q };
+}
+// подредени отляво надясно с 2 м между тях
+let x = 0; const row = async (key, gap, extra) => { const r = await place(key, 0, extra); const q = r.q; r.w.position.x = x + q.w / 2; for (const l of labels.slice(-1)) l[1].x = x + q.w / 2; x += q.w + gap; return r; };
+await row('ped-adam', 2);
+await row('car-polo', 2);
+await row('car-uaz452', 2);
+await row('gear-dump', 2.5);
+await row('trk-scania', 2.5, w => {   // полуремаркето 13,6 м зад влекача (застъпване 3,1 м) — общо 16,5 м
+  const b = new THREE.Box3().setFromObject(w), cabL = b.max.z - b.min.z, tr = new THREE.Mesh(new THREE.BoxGeometry(2.55, 2.9, TRAILER), new THREE.MeshStandardMaterial({ color: 0xeeeeea })); tr.position.set(0, 1.25 + 1.45, b.min.z - TRAILER / 2 + (cabL + TRAILER - SEMI)); tr.castShadow = true; w.add(tr); });
+await row('bus-citaro', 3);
+await row('h2-lodge', 3);
+await row('h2-townhouse', 3);
+ctl.target.set(x / 2, 3, 0); persp.position.set(x / 2, 16, 48); ctl.update();
+const V = new THREE.Vector3();
+R.setAnimationLoop(() => { if (cam === persp) ctl.update(); R.render(sc, cam); for (const [d, p] of labels) { V.copy(p).project(cam); d.style.left = (V.x * 0.5 + 0.5) * innerWidth + 'px'; d.style.top = (-V.y * 0.5 + 0.5) * innerHeight + 'px'; d.style.display = Math.abs(V.z) < 1 ? '' : 'none'; } });
+addEventListener('resize', () => { R.setSize(innerWidth, innerHeight); persp.aspect = innerWidth / innerHeight; persp.updateProjectionMatrix(); });
+window.__ready = true; window.__front = () => document.getElementById('front').click();
+</script></body></html>
