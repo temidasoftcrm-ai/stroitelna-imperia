@@ -1935,7 +1935,7 @@ function addCar() {
     : (n => model(n, kidK(n, 1.15)))(r < 0.04 ? pick(['ambulance', 'police', 'firetruck']) : pick(['sedan', 'taxi', 'suv', 'van', 'sedan', 'suv', 'sedan-sports', 'suv-luxury', 'hatchback-sports']));   /* резервата — детската кола в истинския размер (55) */
   scene.add(o);
   const rp = roadPoint();
-  { const b = new THREE.Box3().setFromObject(o), sz = b.getSize(new THREE.Vector3()); traffic.push({ obj: o, x: rp ? rp.x : tx(i), z: rp ? rp.z : tx(j), yaw: 0, path: null, pi: 0, wait: 0, len: Math.max(sz.x, sz.z) }); }   // len — дистанцията до колата отпред
+  { const b = new THREE.Box3(); o.updateMatrixWorld(true); o.traverse(m => { if (m.isMesh && !m.material?.transparent) b.expandByObject(m); }); if (b.isEmpty()) b.setFromObject(o); const sz = b.getSize(new THREE.Vector3()); traffic.push({   /* само каросерията: лъчът на фаровете (car-lights, прозрачен, ~2× дължината напред) правеше len ≈ 15 м и tr2 смаляваше колата до ~1,4 м (55) */ obj: o, x: rp ? rp.x : tx(i), z: rp ? rp.z : tx(j), yaw: 0, path: null, pi: 0, wait: 0, len: Math.max(sz.x, sz.z) }); }   // len — дистанцията до колата отпред
 }
 // Лабораторията → traffic2: новият трафик (traffic.js) — ленти, дистанция, кръстовища с фази; засега по решетката (не в градовете с план)
 let tr2 = null, tr2G = null, tr2Force = 0;   // tr2Force — за тестовете (__dbg.tr2(n)): толкова коли
@@ -7880,7 +7880,9 @@ function buildCityHighway() {
   const OVER = [{ c: STATION_X - 15 - hcx, w: 48 }];   // надлез над коловозите на гарата: от X+8 до X−40 — петте гарови и коловоза на минаващите влакове (outerX = X−32,5)
   const seg0 = done || mine.find(s => s.id === job.seg), isAb = ALL_AB.some(x => x.id === seg0.id), far = isAb ? cityById(seg0.a === S.cityId ? seg0.b : seg0.a) : null;
   const hz = HA ? (isAb ? 42 : 34) : tx(NJ - 1) + (isAb ? 42 : 34);   // аутобанът е по-широк (4 ленти на посока) — малко по-далеч от града
-  const v = buildHighwayView(A, { len: hLen, river: false, ground: !!HA, ab: isAb, abName: isAb ? 'A' + (1 + (hashStr(seg0.id) % 9)) : '', exitTo: far ? far.nm : '', over: OVER, exitZ: hLen * 0.28, service: feature('hw-service') ? 70 : null });   // крайпътният комплекс — между надлеза над гарата и изхода на аутобана   // изходът на аутобана — откъм другия край, далеч от гарата
+  const RAMPS = feature('hw-ramps') && !HA ? { cx: (city.plan?.hwX ?? tx(3 * Math.floor(NB / 2))) - hcx, xs: hz - tx(NJ - 1) } : null;   /* изходите към града: пътят от града минава под магистралата (тя се вдига като над релсите) */
+  if (RAMPS) OVER.push({ c: RAMPS.cx, w: 14 });
+  const v = buildHighwayView(A, { ramps: RAMPS, len: hLen, river: false, ground: !!HA, ab: isAb, abName: isAb ? 'A' + (1 + (hashStr(seg0.id) % 9)) : '', exitTo: far ? far.nm : '', over: OVER, exitZ: hLen * 0.28, service: feature('hw-service') ? 70 : null });   // крайпътният комплекс — между надлеза над гарата и изхода на аутобана   // изходът на аутобана — откъм другия край, далеч от гарата
   v.group.rotation.y = Math.PI / 2;
   v.group.position.set(hcx, 0, hz);
   g.add(v.group);
@@ -7888,7 +7890,7 @@ function buildCityHighway() {
   const conn = [];
   if (HA) { g.position.set(HA.x, 0, HA.z); g.rotation.y = HA.dir || 0; const rd = HA.road ? Math.hypot(HA.road.x - HA.x, HA.road.z - HA.z) : 0;
     for (let z = -rd + TILE / 2; z < hz - (isAb ? 18 : 12); z += TILE) { const t = model('road-straight', TILE); t.rotation.y = Math.PI / 2; t.position.set(0, 0.01, z); g.add(t); conn.push(t); } }
-  else for (let z = tx(NJ - 1) + TILE; z < hz - (isAb ? 18 : 12); z += TILE) {
+  else if (!RAMPS) for (let z = tx(NJ - 1) + TILE; z < hz - (isAb ? 18 : 12); z += TILE) {   /* с изходите (hw-ramps) — пътят под магистралата е част от изгледа */
     const t = model('road-straight', TILE); t.rotation.y = Math.PI / 2; t.position.set(city.plan?.hwX ?? tx(3 * Math.floor(NB / 2)), 0.01, z); g.add(t); conn.push(t);
   }
   city.group.add(g);
@@ -7896,14 +7898,14 @@ function buildCityHighway() {
   // коли и камиони по готовата магистрала (hwtraffic.js); платната са по x, около z = tx(N−1)+34
   const tg = new THREE.Group(); tg.position.x = hcx; g.add(tg); tg.userData.keep = true;   // трафикът — не се слива
   { const sid = cityHw.seg; g.userData.mergeWhen = () => hwAll().includes(sid) && cityHw && cityHw.g === g; }   // ⚡ perf-cliff: готовата магистрала в града (колоните, лампите, мантинелите) — сливане по материал
-  cityHw.traffic = createHwTraffic(tg, model, A, hz, hLen, 0.92, isAb, x => overLift(OVER, x), v.service);
+  cityHw.traffic = createHwTraffic(tg, model, A, hz, hLen, 0.92, isAb, x => overLift(OVER, x), v.service, v.ramps && v.ramps.paths);
 }
 function updateCityHighway(t) {
   if (!cityHw) return;
   const done = hwAll().includes(cityHw.seg), j = (S.hwJobs || []).find(q => q.seg === cityHw.seg);
   const stage = done ? 4 : j ? j.stage : 4, prog = j ? j.prog : 1;
   cityHw.v.update(stage, prog, t);
-  for (const c of cityHw.conn) c.visible = stage >= 2;
+  for (const c of cityHw.conn) c.visible = stage >= 2; if (cityHw.v.ramps) cityHw.v.ramps.group.visible = stage >= 4;   /* изходите — с готовата магистрала */
   if (cityHw.traffic) {
     const dt = cityHw.lastT == null ? 0 : Math.min(0.2, Math.max(0, t - cityHw.lastT)); cityHw.lastT = t;
     cityHw.traffic.visible = stage >= 4;
@@ -10495,8 +10497,11 @@ if (AUTOTEST) {
     abSegView(stage = 2, prog = 0.5) { const sg = ALL_AB[0]; S.hwJobs = [{ seg: sg.id, ab: true, km: 100, ...abQuote(100), stage, prog, mat: {}, start: S.day, v2: true, city: S.cityId }]; openHwView(sg.id); return sg.id; },
     wx(k, cover) { weather.set(k); if (cover != null) weather.setCover(cover); return weather.kind; },
     event: () => { for (let k = 0; k < 40; k++) { S.events && (S.events.last = -9); const e = events.dailyTick(S.day + k * 3); if (e) return e.title; } return null; },
-    hwStats() { const L = cityHw && cityHw.traffic && cityHw.traffic.list; if (!L) return null; let ov = 0; for (const a of L) for (const b of L) if (a !== b && !a.s && !b.s && a.dir === b.dir && Math.abs(a.z - b.z) < 1.6 && Math.abs(a.x - b.x) < (a.L + b.L) / 2 - 0.3) ov++; return { hasSvc: !!cityHw.v.service, elig: L.filter(c => c.dir > 0 && !c.heavy && c.lane === Math.max(...L.map(q => q.lane))).length, n: L.length, overlap: ov / 2, svc: L.filter(c => c.s).length, stopped: L.filter(c => c.s && c.s.wait > 0).length, lanes: L.map(c => c.lane).join(''), v: +(L.reduce((t, c) => t + c.v, 0) / L.length).toFixed(1) }; },   /* hwtraffic: застъпени коли, отбили в комплекса */
+    hwStats() { const L = cityHw && cityHw.traffic && cityHw.traffic.list; if (!L) return null; let ov = 0; for (const a of L) for (const b of L) if (a !== b && !a.s && !b.s && !(a.away > 0) && !(b.away > 0) && a.dir === b.dir && Math.abs(a.z - b.z) < 1.6 && Math.abs(a.x - b.x) < (a.L + b.L) / 2 - 0.3) ov++; return { hasSvc: !!cityHw.v.service, elig: L.filter(c => c.dir > 0 && !c.heavy && c.lane === Math.max(...L.map(q => q.lane))).length, n: L.length, overlap: ov / 2, svc: L.filter(c => c.s).length, stopped: L.filter(c => c.s && c.s.wait > 0).length, lanes: L.map(c => c.lane).join(''), v: +(L.reduce((t, c) => t + c.v, 0) / L.length).toFixed(1) }; },   /* hwtraffic: застъпени коли, отбили в комплекса */
     hwLook(dx = 0, h = 60) { if (!cityHw) return; const p = new THREE.Vector3(); cityHw.g.getWorldPosition(p); const sv = cityHw.v.service; controls.target.set(p.x + (sv ? sv.zs : 0) + dx, 0, p.z + cityHw.v.group.position.z - (sv ? sv.xE - 20 : 0)); camera.position.set(controls.target.x + h * 0.5, h, controls.target.z + h * 0.8); },
+    hwRampInfo() { if (!cityHw || !cityHw.v.ramps) return null; const g = cityHw.v.ramps.group; g.updateWorldMatrix(true, true); const b = new THREE.Box3().setFromObject(g); return { vis: g.visible, n: g.children.length, min: b.min.toArray().map(Math.round), max: b.max.toArray().map(Math.round), groundY: city.ground ? city.ground.position.y : null }; },
+    hwLookAt(dz, dx, h = 70) { if (!cityHw || !cityHw.v.ramps) return false; const cx = cityHw.v.ramps.paths.nearOff[0][1] - 330 + cityHw.v.group.position.x, z = cityHw.v.group.position.z; controls.target.set(cx + dz, 0, z - dx); camera.position.set(cx + dz + 1, h, z - dx + 2); return true; },   /* hw-ramps: отгоре — dz по оста, dx напреки (откъм града +) */
+    hwLookRamps(h = 120) { if (!cityHw || !cityHw.v.ramps) return false; const cx = cityHw.v.ramps.paths.nearOff[0][1] - 330 + cityHw.v.group.position.x, z = cityHw.v.group.position.z; const sd = __dbg.__rampSide || 1; controls.target.set(cx, 0, z - 20); camera.position.set(cx + h * 1.3, h, z - 20 - sd * h * 0.9); return true; },   /* hw-ramps: изгледът към изходите */
     hwOpen() { const s = allSegs().find(q => q.a === S.cityId || q.b === S.cityId); if (!s) return null; S.hwDone = [...new Set([...(S.hwDone || []), s.id])]; buildCityHighway(); return s.id; },
     enterResort: id => openHwView('resort:' + id),
     siteStage(n) { const p = projects.find(q => !q.own && q.type !== 'house'); if (!p) return null; p.stage = n; p.prog = 0.3; p.mat = { 0: true, 1: true, 2: true, 3: true }; for (const u of units) if (u.proj === p) releaseUnit(u); dispatch(); return p.lot; },

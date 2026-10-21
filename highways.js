@@ -214,6 +214,44 @@ function clone(A, n, s) {
 function reveal(list, front) { for (const o of list) o.visible = o.userData.z <= front; }
 
 // opts: { len = 240, river = true, ground = true, title, service } — без река/терен може да се сложи покрай град; service — z на крайпътния комплекс
+// изходи към града (Лабораторията → hw-ramps): пътят от града минава ПОД магистралата (тя се вдига като над релсите — opts.over);
+// откъм града (посоката −z) — изход и вход направо към южната улица на града (Т-кръстовища); от далечната страна (посоката +z) —
+// полу-диамант: изход и вход към Т-кръстовище на пътя под магистралата. Всичко е на нивото на земята (не се вдига с надлеза).
+// { cx — къде е пътят от града (z по оста), xs — оста на южната улица на града (x напреки, откъм +x), xr — дясната лента } →
+// { group, paths: { nearOff, nearOn, farOff, farOn } } — пътищата за колите (hwtraffic.js) в координатите на изгледа [x, z]
+const rSmooth = P => { const out = []; for (let i = 0; i < P.length - 1; i++) { const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)], n = Math.max(2, Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / 2)); for (let k = 0; k < n; k++) { const t = k / n, t2 = t * t, t3 = t2 * t; out.push([0, 1].map(j => 0.5 * (2 * p1[j] + (-p0[j] + p2[j]) * t + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * t2 + (-p0[j] + 3 * p1[j] - 3 * p2[j] + p3[j]) * t3))); } } out.push(P[P.length - 1]); return out; };
+// пътищата на рампите (без three — и за теста): { paths, ramps: [pts…] (асфалтът на рампите), xT }
+export function rampPaths(W, cx, xs, xr) {
+  const xe = W / 2, xT = -(xe + 30), lane = 1.75, ramps = [], ramp = P => { const pts = rSmooth(P); ramps.push(pts); return pts; };
+  const paths = {
+    // откъм града: изход от посоката −z → Т с южната улица (завой наляво към западната лента на улицата)
+    nearOff: ramp([[xr, cx + 330], [xe + 1.8, cx + 272], [xe + 5.5, cx + 235], [xe + 9, cx + 190], [xs - 9, cx + 120], [xs - 4.5, cx + 95]]).concat(rSmooth([[xs - 4.5, cx + 95], [xs, cx + 91], [xs + lane, cx + 84], [xs + lane, cx + 40]]).slice(1)),
+    // вход от южната улица (западната лента) → посоката −z
+    nearOn: rSmooth([[xs + lane, cx - 30], [xs + lane, cx - 52], [xs, cx - 58]]).concat(ramp([[xs - 4.5, cx - 62], [xs - 9, cx - 82], [xe + 9, cx - 150], [xe + 5.5, cx - 195], [xe + 1.8, cx - 232], [xr, cx - 290]]).slice(1)),
+    // далечната страна: изход от посоката +z → Т-то → наляво под магистралата към града
+    farOff: ramp([[-xr, cx - 330], [-(xe + 1.8), cx - 272], [-(xe + 5.5), cx - 235], [-(xe + 12), cx - 170], [xT - 6, cx - 70], [xT - 6, cx - 12]]).concat(rSmooth([[xT - 6, cx - 12], [xT - 3, cx - 3], [xT + 4, cx + lane], [xs - 6, cx + lane], [xs + lane, cx + 6], [xs + lane, cx + 40]]).slice(1)),
+    // от града под магистралата → Т-то → наляво по входа → посоката +z
+    farOn: rSmooth([[xs + lane, cx - 40], [xs + lane, cx - 8], [xs - 6, cx - lane], [xT + 4, cx - lane], [xT - 3, cx + 3], [xT - 6, cx + 12]]).concat(ramp([[xT - 6, cx + 12], [xT - 6, cx + 70], [-(xe + 12), cx + 170], [-(xe + 5.5), cx + 235], [-(xe + 1.8), cx + 272], [-xr, cx + 330]]).slice(1)),
+  };
+  return { paths, ramps, xT, xe };
+}
+// височината на рампа в точка с напречно x: върху насипа (до W/2 + 3) — на нивото на платното, после слиза плавно до земята (6 м)
+export const rampY = (xe, vx, y0 = 0.25, top = 0.95) => { const t = Math.max(0, Math.min(1, (Math.abs(vx) - xe - 3) / 6)); return top - (top - y0) * t * t * (3 - 2 * t); };
+function cityRamps(W, cx, xs, xr, y0 = 0.25) {   // над терена на града (иначе тревата го покрива)
+  const g = new THREE.Group(), xe = W / 2, asph = new THREE.MeshStandardMaterial({ color: 0x55585e, roughness: 0.95, side: THREE.DoubleSide }), paint = new THREE.MeshBasicMaterial({ color: 0xf0f0f0, side: THREE.DoubleSide });
+  g.userData.keep = true;   /* perf-cliff (citycull.js) не ги слива — видимостта им следва етапа на магистралата */
+  const band = (pts, w, y, mat, hy = false) => { const pos = [], idx = []; pts.forEach((p, i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1, nx = -dz / l, nz = dx / l, yy = hy ? rampY(xe, p[0], y) + (y - y0) : y; pos.push(p[0] + nx * w / 2, yy, p[1] + nz * w / 2, p[0] - nx * w / 2, yy, p[1] - nz * w / 2); if (i) { const k = 2 * i; idx.push(k - 2, k - 1, k, k - 1, k + 1, k); } });
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals(); const m = new THREE.Mesh(geo, mat); m.receiveShadow = true; g.add(m); return m; };
+  const off = (pts, d) => pts.map((p, i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return [p[0] - dz / l * d, p[1] + dx / l * d]; });
+  const R = rampPaths(W, cx, xs, xr), xT = R.xT;
+  for (const pts of R.ramps) { band(pts, 5, y0, asph, true); for (const d of [2.25, -2.25]) band(off(pts, d), 0.15, y0 + 0.02, paint, true); }   /* от насипа плавно надолу */
+  // пътят от града под магистралата до Т-то от далечната страна (две ленти, прекъсната ос) и площадката на Т-то
+  { const pts = rSmooth([[xs - 4, cx], [xT - 6, cx]]); band(pts, 7.5, y0 - 0.01, asph); for (let x = xs - 6; x > xT; x -= 6) band([[x, cx], [x - 3, cx]], 0.15, y0 + 0.02, paint); band([[xT - 6, cx - 9], [xT - 6, cx + 9]], 7.5, y0 - 0.005, asph); }
+  // табели „Изход“ преди отбивките
+  for (const [x, z, ry] of [[xe + 3, cx + 380, 0], [-(xe + 3), cx - 380, Math.PI]]) { const b = abBoard(['↗ ИЗХОД', 'ГРАД'], 4.5, 2.4); b.rotation.y = ry; b.position.set(x, 3.6, z); g.add(b); const p = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3.6, 0.2), new THREE.MeshStandardMaterial({ color: 0x8a9096 })); p.position.set(x, 1.8, z); g.add(p); }
+  R.paths.xe = xe; return { group: g, paths: R.paths };
+}
+
 // надлез над релсите в града (opts.over = [{ c, w }] — център и ширина по оста на магистралата): платното се качва по рампи
 // до OVER_H, минава върху колони и плоча над коловозите и слиза; всичко с userData.z се вдига с overLift(over, z)
 export const OVER_H = 7.5, OVER_RAMP = 80;
@@ -312,6 +350,7 @@ export function buildHighwayView(A, opts = {}) {
     }
   }
   const service = opts.service != null ? serviceArea(g, gear, A, { W, H, zs: opts.service }) : null;
+  const ramps = opts.ramps ? cityRamps(W, opts.ramps.cx, opts.ramps.xs, AB ? med / 2 + cw * 7 / 8 : med / 2 + cw * 3 / 4) : null; if (ramps) g.add(ramps.group);   // изходите към града (hw-ramps)
   if (AB && opts.exit !== false) abExit(g, gear, { W, cw, med, z0, LEN, H, zE: opts.exitZ ?? z0 + LEN * 0.22, name: opts.abName || 'A', exitTo: opts.exitTo || '' });
   for (const z of [z0 + 30, z0 + LEN - 40]) {
     const sgn = clone(A, 'sign-highway-wide', 11); sgn.position.set(W / 2 + 1.5, 0, z); sgn.rotation.y = Math.PI / 2; sgn.userData.z = z; g.add(sgn); gear.push(sgn);
@@ -395,5 +434,5 @@ export function buildHighwayView(A, opts = {}) {
     });
   }
   update(opts.stage ?? 0, opts.prog ?? 0);
-  return { group: g, update, length: LEN, width: W, service };
+  return { group: g, update, length: LEN, width: W, service, ramps };
 }

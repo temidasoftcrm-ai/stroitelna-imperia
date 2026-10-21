@@ -19,7 +19,7 @@ const A_MAX = 2.2, B_COMF = 3.2, T_HEAD = 1.2, S0 = 3;
 
 // parent: групата на магистралата в града; model(name, scale); A: заредените модели
 // zc: оста на магистралата (z в света); len: дължина по x; y: височина на платното
-export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false, lift = null, svc = null) {   // lift(x) — надлезът над релсите (highways.js overLift)   // ab — аутобан: 4 ленти на посока
+export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false, lift = null, svc = null, ramps = null) {   // ramps — изходите към града (highways.js cityRamps: пътищата в координатите на изгледа)   // lift(x) — надлезът над релсите (highways.js overLift)   // ab — аутобан: 4 ленти на посока
   const g = new THREE.Group(); parent.add(g);
   const list = [], half = len / 2, NL = ab ? 4 : 2, RIGHT = NL - 1;
   // посока +x (на изток) е откъм +z (дясно движение), −x е откъм −z; лента 0 = бърза (към разделителната ивица)
@@ -57,8 +57,8 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
   const ahead = (a, b) => (((b.x - a.x) * a.dir) % len + len) % len;
   // предната кола в лента lane (по z — включително тези, които влизат/излизат от нея)
   const inLane = (q, lane, zl) => q.lane === lane || Math.abs(q.z - zl) < 2.4;   // в лентата: целта ѝ или физически в нея (и по средата на смяната — и в двете)
-  function leaderIn(c, lane) { const zl = laneZ(c.dir, lane); let best = null, bd = 1e9; for (const q of list) { if (q === c || q.dir !== c.dir || q.s || !inLane(q, lane, zl)) continue; const d = ahead(c, q); if (d > 0.01 && d < bd) { bd = d; best = q; } } return best ? { q: best, gap: bd - (best.L + c.L) / 2 } : null; }
-  function followerIn(c, lane) { const zl = laneZ(c.dir, lane); let best = null, bd = 1e9; for (const q of list) { if (q === c || q.dir !== c.dir || q.s || !inLane(q, lane, zl)) continue; const d = ahead(q, c); if (d > 0.01 && d < bd) { bd = d; best = q; } } return best ? { q: best, gap: bd - (best.L + c.L) / 2 } : null; }
+  function leaderIn(c, lane) { const zl = laneZ(c.dir, lane); let best = null, bd = 1e9; for (const q of list) { if (q === c || q.dir !== c.dir || q.s || q.away || !inLane(q, lane, zl)) continue; const d = ahead(c, q); if (d > 0.01 && d < bd) { bd = d; best = q; } } return best ? { q: best, gap: bd - (best.L + c.L) / 2 } : null; }
+  function followerIn(c, lane) { const zl = laneZ(c.dir, lane); let best = null, bd = 1e9; for (const q of list) { if (q === c || q.dir !== c.dir || q.s || q.away || !inLane(q, lane, zl)) continue; const d = ahead(q, c); if (d > 0.01 && d < bd) { bd = d; best = q; } } return best ? { q: best, gap: bd - (best.L + c.L) / 2 } : null; }
   const freeLane = (c, lane, back = 22, front = 30) => { const l = leaderIn(c, lane), f = followerIn(c, lane); return (!l || l.gap > front) && (!f || f.gap > back + Math.max(0, f.q.v - c.v) * 2); };
   const idm = (c, ld) => { let a = A_MAX * (1 - Math.pow(c.v / c.v0, 4)); if (ld) { const dv = c.v - ld.q.v, ss = S0 + Math.max(0, c.v * T_HEAD + c.v * dv / (2 * Math.sqrt(A_MAX * B_COMF))); a -= A_MAX * Math.pow(ss / Math.max(0.5, ld.gap), 2); } return Math.max(-8, Math.min(A_MAX, a)); };
 
@@ -80,20 +80,29 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
   function svcStep(c, dt) {
     const S = c.s, L = S.legs[S.i], rest = L.len - S.d;
     if (S.wait > 0) { S.wait -= dt; c.v = 0; if (S.wait <= 0) { S.i++; S.d = 0; if (S.i >= S.legs.length) return done(c); } return; }
-    const last = S.i === S.legs.length - 1; let tv = S.i === 0 && S.d < 30 ? 14 : last && rest < 45 ? 20 : L.slow ?? 8;   /* забавителната лента / в комплекса / ускорителната лента */
-    if (last && rest < 30) { const ghost = { x: L.pts[L.pts.length - 1][0], dir: 1, L: c.L, v: c.v, lane: RIGHT, z: laneZ(1, RIGHT) }; if (!freeLane(ghost, RIGHT, 25, 20)) tv = Math.min(tv, Math.sqrt(2 * 3 * Math.max(0, rest - 4))); }   /* включване — само в свободно място */
+    const last = S.i === S.legs.length - 1; let tv = S.i === 0 && S.d < 30 ? 14 : last && rest < 45 && !S.exit ? 20 : L.slow ?? 8;   /* забавителната лента / в комплекса / ускорителната лента */
+    if (S.exit) tv = Math.min(S.d < 70 ? 16 : L.slow ?? 9, Math.sqrt(2 * 2.5 * Math.max(0, rest)) + 2);   // изходът към града — забавя към кръстовището
+    if (last && rest < 30 && !S.exit) { const md = S.mdir || 1, ghost = { x: L.pts[L.pts.length - 1][0], dir: md, L: c.L, v: c.v, lane: RIGHT, z: laneZ(md, RIGHT) }; if (!freeLane(ghost, RIGHT, 25, 20)) tv = Math.min(tv, Math.sqrt(2 * 3 * Math.max(0, rest - 4))); }   /* включване — само в свободно място */
     if (L.stop || L.rev) tv = Math.min(tv, Math.sqrt(2 * 2.5 * Math.max(0, rest - 0.3)) + 0.3);   // спира плавно на колонката / в мястото
     { const h = c.o.rotation.y + (L.rev ? Math.PI : 0), fx = Math.sin(h), fz = Math.cos(h); for (const q of list) { if (q === c || !q.s) continue; const dx = q.x - c.x, dz = q.z - c.z, along = dx * fx + dz * fz, side = Math.abs(-dx * fz + dz * fx); if (along > 0 && along < (c.L + q.L) / 2 + 4 && side < 2.2) { tv = Math.min(tv, Math.max(0, (along - (c.L + q.L) / 2 - 1.5) * 0.8)); } } }   /* в комплекса — зад предната кола (и при включването една по една) */
     c.v += Math.sign(tv - c.v) * Math.min(Math.abs(tv - c.v), 3 * dt); S.d += c.v * dt;
-    if (S.d >= L.len) { if (L.stop) { S.wait = L.stop; S.d = L.len; } else if (last) { const ghost = { x: L.pts[L.pts.length - 1][0], dir: 1, L: c.L, v: 12, lane: RIGHT, z: laneZ(1, RIGHT) }; if (freeLane(ghost, RIGHT, 30, 20)) return done(c); S.d = L.len - 0.01; c.v = 0; } else { S.i++; S.d = 0; } }   /* края на ускорителната лента — включване само в свободно място, иначе чака */
+    if (S.d >= L.len) { if (L.stop) { S.wait = L.stop; S.d = L.len; } else if (last && S.exit) return away(c); else if (last) { const md = S.mdir || 1, ghost = { x: L.pts[L.pts.length - 1][0], dir: md, L: c.L, v: 12, lane: RIGHT, z: laneZ(md, RIGHT) }; if (freeLane(ghost, RIGHT, 30, 20)) return done(c); S.d = L.len - 0.01; c.v = 0; } else { S.i++; S.d = 0; } }   /* края на ускорителната лента — включване само в свободно място, иначе чака */
     const L2 = S.legs[Math.min(S.i, S.legs.length - 1)], p = at(L2, Math.min(S.d, L2.len)), q = at(L2, Math.min(S.d + 1.5, L2.len)), q0 = at(L2, Math.max(0, S.d - 1.5));
-    c.x = p[0]; c.z = p[1]; c.o.position.set(p[0], y, p[1]); const dx = q[0] - q0[0], dz = q[1] - q0[1]; if (Math.hypot(dx, dz) > 0.05) c.o.rotation.y = Math.atan2(dx, dz) + (L2.rev ? Math.PI : 0);
+    c.x = p[0]; c.z = p[1]; c.o.position.set(p[0], L2.ramp ? rampY(zc - p[1]) : y, p[1]); const dx = q[0] - q0[0], dz = q[1] - q0[1]; if (Math.hypot(dx, dz) > 0.05) c.o.rotation.y = Math.atan2(dx, dz) + (L2.rev ? Math.PI : 0);
   }
   const at = (L, s) => { let i = 1; while (i < L.cum.length - 1 && L.cum[i] < s) i++; const a = L.pts[i - 1], b = L.pts[i], t = (s - L.cum[i - 1]) / ((L.cum[i] - L.cum[i - 1]) || 1); return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; };
-  function done(c) { if (c.s.res) c.s.res.busy = null; c.s = null; c.lane = RIGHT; c.z = laneZ(1, RIGHT); c.o.rotation.y = Math.PI / 2; c.v = Math.max(c.v, 12); }
+  function done(c) { const md = c.s.mdir || 1; if (c.s.res) c.s.res.busy = null; c.s = null; c.dir = md; c.lane = RIGHT; c.z = laneZ(md, RIGHT); c.o.rotation.y = md > 0 ? Math.PI / 2 : -Math.PI / 2; c.v = Math.max(c.v, 12); }
+  // изходите към града: колата излиза по рампата и „влиза в града“ (скрива се); след малко се връща по някой от входовете
+  const RP = ramps ? Object.fromEntries(Object.entries(ramps).filter(([k]) => k !== 'xe').map(([k, P]) => [k, legOf(P.map(([vx, vz]) => W(vx, vz)), { slow: 9, ramp: true })])) : null;
+  const rampY = vx => { const t = Math.max(0, Math.min(1, (Math.abs(vx) - ramps.xe - 3) / 6)); return y + (0.25 - 0.95) * t * t * (3 - 2 * t); };   // като highways.js rampY: от насипа — до земята
+  const rampCx = ramps ? (ramps.nearOff[0][1] - 330) : 0;
+  function away(c) { c.s = null; c.away = 6 + Math.random() * 20; c.o.visible = false; c.v = 0; }
+  function comeBack(c) { const near = Math.random() < 0.5, L = near ? RP.nearOn : RP.farOn, p0 = L.pts[0]; if (list.some(q => q.s && Math.hypot(q.x - p0[0], q.z - p0[1]) < 12)) { c.away = 3; return; }
+    c.away = 0; c.o.visible = true; c.x = p0[0]; c.z = p0[1]; c.v = 6; c.s = { legs: [L], i: 0, d: 0, wait: 0, mdir: near ? -1 : 1 }; }
 
   function update(dt) {
     for (const c of list) {
+      if (c.away > 0) { c.away -= dt; if (c.away <= 0) comeBack(c); continue; }
       if (c.s) { svcStep(c, dt); continue; }
       const px = c.x, ld = leaderIn(c, c.lane);
       // изпреварване: по-бавен отпред — наляво, ако там е свободно; после — обратно вдясно
@@ -111,6 +120,8 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
       if (svc && c.dir > 0 && px < svc.z0 - 30 && c.x >= svc.z0 - 30 && c.lane === RIGHT && !c.heavy && Math.random() < 0.45 && list.filter(q => q.s).length < 5) {   // отбива
         const plan = svcPlan(c); if (plan) { c.s = { ...plan, i: 0, d: 0, wait: 0 }; continue; }
       }
+      if (RP && c.lane === RIGHT && !c.s && list.filter(q => q.s || q.away).length < 7) {   // излиза към града (по-рядко камионите)
+        const T = rampCx - c.dir * 330; if ((px - T) * c.dir < 0 && (c.x - T) * c.dir >= 0 && Math.random() < (c.heavy ? 0.06 : 0.16)) { c.s = { legs: [c.dir < 0 ? RP.nearOff : RP.farOff], i: 0, d: 0, wait: 0, exit: true }; continue; } }
       if (c.x > half) c.x -= len; else if (c.x < -half) c.x += len;
       c.o.position.set(c.x, y + (lift ? lift(c.x) : 0), c.z);
       c.o.rotation.y = (c.dir > 0 ? Math.PI / 2 : -Math.PI / 2) - c.dir * Math.atan2(dz / Math.max(dt, 1e-3), Math.max(3, c.v)) ;
