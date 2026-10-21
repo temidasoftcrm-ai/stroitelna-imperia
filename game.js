@@ -1342,6 +1342,12 @@ const crewCount = () => units.filter(u => !isMachine(u.type)).length;
 const isRoadGear = t => !!(ECON.UNIT_TYPES[t] && ECON.UNIT_TYPES[t].road);
 const machineCount = () => units.filter(u => isMachine(u.type) && !isRoadGear(u.type)).length;
 // 🏢 (hq-campus) гаражът/складът, чийто парцел е зает от сграда и няма свободен — рисуват се отзад в централата (S.campusIn)
+// вписва обект (още без родител — координатите са в групата на парцела) в правоъгълника [x0,x1]×[z0,z1]: само смалява, центрира
+function campusFit(o, x0, x1, z0, z1) {
+  o.updateMatrixWorld(true); let b = new THREE.Box3().setFromObject(o); const s = b.getSize(new THREE.Vector3());
+  const k = Math.min(1, (x1 - x0) / Math.max(0.1, s.x), (z1 - z0) / Math.max(0.1, s.z)); if (k < 1) { o.scale.multiplyScalar(k); o.updateMatrixWorld(true); b = new THREE.Box3().setFromObject(o); }
+  o.position.x += (x0 + x1) / 2 - (b.min.x + b.max.x) / 2; o.position.z += (z0 + z1) / 2 - (b.min.z + b.max.z) / 2; return k;
+}
 const campusIn = k => feature('hq-campus') && !!(((S && S.campusIn) || {})[S && S.cityId] || {})[k], campusAny = () => campusIn('garage') || campusIn('warehouse');
 const garageLotObj = () => S.garageLot == null || campusIn('garage') ? null : city.lots[S.garageLot];
 const lotKey = { garage: 'garageLot', warehouse: 'whLot' }, levelKey = { office: 'officeLevel', garage: 'garageLevel', warehouse: 'whLevel' };
@@ -1435,7 +1441,7 @@ function buildWarehouse() {
   if (city.whGroup) { city.group.remove(city.whGroup); city.whGroup = city.whYard = null; }
   if (S.whLot == null) return;
   const camp = campusIn('warehouse'), lot = camp ? city.hq : city.lots[S.whLot], g = city.whGroup = new THREE.Group();
-  if (camp) { const p = lotPt(lot, -3.9, -4.1); g.position.set(p.x, 0, p.z); g.scale.setScalar(0.46 * lotK(lot)); }   // кампус: отзад вляво в централата
+  if (camp) { const [W, D] = lotHalf(lot), p = lotPt(lot, -W / 2 - 0.05, -D / 2 - 0.05); g.position.set(p.x, 0, p.z); }   // кампус: отзад вляво в централата (мащабът — по рамката, долу)
   else g.position.set(lot.x, 0, lot.z);
   g.rotation.y = lotRot(lot); if (!camp) g.scale.setScalar(lotK(lot));
   city.group.add(g);
@@ -1443,10 +1449,12 @@ function buildWarehouse() {
   const pav = new THREE.Mesh(new THREE.PlaneGeometry(15.5, 15.5), new THREE.MeshStandardMaterial({ color: 0x9a968c, roughness: 1 }));
   pav.rotation.x = -Math.PI / 2; pav.position.y = 0.03; pav.receiveShadow = true; if (!camp) g.add(pav);
   const wh = warehouseMesh(S.whLevel);
-  wh.position.set(0, 0, -4); g.add(wh);
+  wh.position.set(0, 0, camp ? 0 : -4);
+  if (camp) { const [W, D] = lotHalf(lot); campusFit(wh, -(W - 0.7) / 2, (W - 0.7) / 2, -(D - 0.7) / 2, (D - 0.7) / 2); }   // в своята четвъртина, по рамката
+  g.add(wh);
   const lb = label(`📦 СКЛАД ${S.whLevel}`, '#ffffff', 6.5);
-  lb.position.set(0, wh.userData.h + 2, -4); g.add(lb); g.userData.label = lb;
-  city.whYard = new THREE.Group(); city.whYard.position.set(0, 0, 4); g.add(city.whYard);
+  lb.position.set(0, wh.userData.h * wh.scale.y + 2, camp ? 0 : -4); g.add(lb); g.userData.label = lb;
+  city.whYard = new THREE.Group(); city.whYard.position.set(0, 0, 4); city.whYard.visible = !camp; g.add(city.whYard);   // в кампуса — без двора с палетите (беше отпред, върху офиса)
   refreshWarehouse();
 }
 // офисът и (докато е малък) гаражът стоят на парцела на централата; голямият гараж и складът — на свои парцели
@@ -1486,6 +1494,7 @@ function buildHQ() {
     const bb = new THREE.Box3().setFromObject(office);
     office.position.set(-3.6 - (bb.min.x + bb.max.x) / 2, 0, (campusAny() ? 3.6 : -3.6) - (bb.min.z + bb.max.z) / 2);
   }
+  if (campusAny()) { const [W, D] = lotHalf(city.hq); campusFit(office, -W + 0.5, W - 0.5, 0.4, D - 0.5); }   // кампус: офисът — цялата предна половина, по истинската си рамка (големите кули се смаляват)
   office.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
   g.add(office);
   const ob = new THREE.Box3().setFromObject(office);
@@ -1521,6 +1530,7 @@ function buildHQ() {
   if (!away) {   // в задния десен ъгъл на централата
     gar = garageMesh(Math.min(gLevel, 3), 6 + Math.min(gLevel, 5) * 0.22, 5.6);
     gar.position.set(3.8, 0, -4.3);
+    if (campusAny()) { const [W, D] = lotHalf(city.hq); campusFit(gar, 0.3, W - 0.4, -D + 0.4, -0.3); }   // кампус: задната дясна четвъртина
     g.add(gar);
   } else {       // свой парцел: хангар отзад, паркинг отпред
     const gg = city.garGroup = new THREE.Group();
@@ -1658,7 +1668,7 @@ function yardZones() {
   if (away) { const [W, D] = lotHalf(away); Z.push({ lot: away, x0: -W + 1, x1: W - 1, z0: -0.6, z1: D - 1, only: 'm' }); }   // пред хангара
   if (yl) Z.push(whole(yl));
   const [W, D] = lotHalf(h);
-  Z.push({ lot: h, x0: campusAny() ? 0.6 : -W + 1, x1: W - 1, z0: 0.2, z1: D - 0.8 });   // предната част на двора на централата (кампус — само дясната половина)
+  if (!campusAny()) Z.push({ lot: h, x0: -W + 1, x1: W - 1, z0: 0.2, z1: D - 0.8 });   // предната част на двора на централата (кампус — само дясната половина)
   if (away) Z.push({ lot: h, x0: 0.3, x1: W - 1, z0: -D + 1, z1: -0.4 });   // гаражът се изнесе — задният десен ъгъл е свободен
   return Z;
 }
