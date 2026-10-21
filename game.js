@@ -7910,10 +7910,10 @@ function hwGantries(v, seg0, mine, isAb, OVER, RAMPS) {
   const far = sg => { const c = cityById(sg.a === S.cityId ? sg.b : sg.a); return c ? c.nm : ''; };
   const here = (cityById(S.cityId) || {}).nm || '', toB = far(seg0), other = mine.find(q => q.id !== seg0.id), toA = other ? far(other) : toB;
   const cw = isAb ? 14.4 : 9, med = isAb ? 4 : 3, L = v.length, z0 = -L / 2, ex = RAMPS ? RAMPS.cx : null, out = [];
-  const bad = z => z < z0 + 80 || z > z0 + L - 80 || OVER.some(o => Math.abs(z - o.c) < o.w / 2 + 30) || (ex != null && Math.abs(z - ex) < 60);
+  const bad = z => z < z0 + 80 || z > z0 + L - 80 || OVER.some(o => Math.abs(z - o.c) < o.w / 2 + 30) || (ex != null && Math.abs(z - ex) < 360);   // изходите (hw-ramps): лентите се отделят на cx ± 330, табелите „↗ ИЗХОД“ са на cx ± 380
   const spots = [];
   for (const side of [-1, 1]) {   // side −1: платното x < 0 (към +z, към toB); +1: x > 0 (към −z, към toA)
-    const dirZ = -side, exZ = ex != null ? ex - dirZ * 400 : null;   // пред изхода — 400 м преди него по посоката на колите
+    const dirZ = -side, exZ = ex != null ? ex - dirZ * 450 : null;   // пред изхода — 450 м преди него по посоката на колите (70 м преди крайпътната табела на 2a)
     if (exZ != null && !bad(exZ)) spots.push({ side, z: exZ, dirZ });
     for (let z = z0 + 250 + (side > 0 ? 500 : 0); z < z0 + L - 150; z += 1000) if (!bad(z) && (exZ == null || Math.abs(z - exZ) > 300)) spots.push({ side, z, dirZ });
   }
