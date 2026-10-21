@@ -123,6 +123,18 @@ const DEMOS = [
   ['🆕 Офисът — новите нива 1–10 (една линия, Sketchfab)', 'sofia', d => { for (const ms of [0, 4000]) setTimeout(() => d.hqLevelsRow('new'), ms); }],   // office-levels2 (game.js OFFICE2)
   ['🏡 Кварталите: дворове, паркове, площадки (Пловдив, ден)', 'plovdiv', d => { setTimeout(() => { d.lotFill(); d.tod && d.tod(0.5); d.districts('on'); d.districts('focus'); }, 2500); }],
   ['🏡 Кварталите: диагностика на земята (парцели, сгради, свободно)', 'plovdiv', d => { setTimeout(() => { d.lotFill(); d.districts('on'); d.districts('diag'); d.districts('focus', 2.2); }, 2500); }],
+  ['🚨 Градска сцена: 🚶 Блъснат пешеходец', 'sofia', d => { for (const ms of [0, 3500, 8000]) setTimeout(() => d.incidentLook(ms > 0, 'ped'), ms); }],
+  ['🚨 Градска сцена: 💥 Челна катастрофа', 'sofia', d => { for (const ms of [0, 3500, 8000]) setTimeout(() => d.incidentLook(ms > 0, 'headon'), ms); }],
+  ['🚨 Градска сцена: 🌳 Кола в дърво', 'sofia', d => { for (const ms of [0, 3500, 8000]) setTimeout(() => d.incidentLook(ms > 0, 'pole'), ms); }],
+  ['🚨 Градска сцена: 🙃 Кола по таван', 'sofia', d => { for (const ms of [0, 3500, 8000]) setTimeout(() => d.incidentLook(ms > 0, 'roll'), ms); }],
+  ['🚨 Градска сцена: 🚗🚗🚗 Верижна катастрофа', 'sofia', d => { for (const ms of [0, 3500, 8000]) setTimeout(() => d.incidentLook(ms > 0, 'pile'), ms); }],
+  ['🚨 Градска сцена: 🔥 Горяща кола', 'sofia', d => { for (const ms of [0, 3500, 8000]) setTimeout(() => d.incidentLook(ms > 0, 'carfire'), ms); }],
+  ['🚨 Градска сцена: 🏍️ Паднал моторист', 'sofia', d => { for (const ms of [0, 3500, 8000]) setTimeout(() => d.incidentLook(ms > 0, 'moto'), ms); }],
+  ['🚨 Градска сцена: 📦 Камион изсипа товара', 'sofia', d => { for (const ms of [0, 3500, 8000]) setTimeout(() => d.incidentLook(ms > 0, 'spill'), ms); }],
+  ['🚨 Градска сцена: 🔥🏢 Пожар в сграда', 'sofia', d => { for (const ms of [0, 3500, 8000]) setTimeout(() => d.incidentLook(ms > 0, 'bfire'), ms); }],
+  ['🚨 Градска сцена: ❤️ Инфаркт на тротоара', 'sofia', d => { for (const ms of [0, 3500, 8000]) setTimeout(() => d.incidentLook(ms > 0, 'heart'), ms); }],
+  ['🚨 Градска сцена: 🐈 Котка на дърво', 'sofia', d => { for (const ms of [0, 3500, 8000]) setTimeout(() => d.incidentLook(ms > 0, 'cat'), ms); }],
+  ['🚨 Градска сцена: ⚠️ Изтичане на газ', 'sofia', d => { for (const ms of [0, 3500, 8000]) setTimeout(() => d.incidentLook(ms > 0, 'gas'), ms); }],
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
