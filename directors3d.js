@@ -27,6 +27,7 @@ const SEATS = [[-1, -2.7], [1, -2.7], [-1, -0.9], [1, -0.9], [-1, 0.9], [1, 0.9]
 const seatX = i => { const [side, , dx] = SEATS[i] || SEATS[SEATS.length - 1]; return side * SIT_X + (dx || 0); };
 const SIT_X = 1.66, TABLE_W = 2.4, TABLE_L = 7.4, TABLE_H = 0.7, SCALE = 0.9, TURN = 0.3;   // TURN — директорите са леко обърнати към председателя
 const seatRy = side => side < 0 ? Math.PI / 2 - TURN : side > 0 ? -Math.PI / 2 + TURN : 0;   // накъде гледа столът (начело — към председателя)
+const SEAT_HIP = 0.1;   // ханшът (ставата) — толкова над възглавницата на стола
 
 const css = `
 #boardRoom { position:fixed; inset:0; z-index:9780; background:#07090d; opacity:0; transition:opacity .45s; }
@@ -218,17 +219,20 @@ function roundedRect(w, l, r) {
 }
 // висок кожен стол в тъмносиньо
 function chair(mat, metal, k) {
-  const g = new THREE.Group();
-  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.12, 0.54), mat); seat.position.y = 0.47; g.add(seat);
-  const back = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.92, 0.12), mat); back.position.set(0, 1.0, -0.28); back.rotation.x = -0.1; g.add(back);
+  const g = new THREE.Group(), top = new THREE.Group(); g.add(top);   // top — седалката, облегалката и подлакътниците (вдигат се заедно с газовия амортисьор)
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.12, 0.54), mat); seat.position.y = 0.47; top.add(seat);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.92, 0.12), mat); back.position.set(0, 1.0, -0.28); back.rotation.x = -0.1; top.add(back);
   if (k) {   // бродираната емблема горе на облегалката — над главата на директора, вижда се отсреща
     const em = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.24), new THREE.MeshStandardMaterial({ map: logoTex(k), transparent: true, alphaTest: 0.1, roughness: 0.6 }));
     em.position.set(0, 0.3, 0.062); back.add(em);
   }
-  for (const sx of [-1, 1]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.04, 0.4), metal); arm.position.set(sx * 0.43, 0.56, -0.04); g.add(arm); const st = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.2, 0.04), metal); st.position.set(sx * 0.43, 0.5, 0.05); g.add(st); }   // подлакътниците — по-ниско и по-навън, лактите не влизат в тях
+  for (const sx of [-1, 1]) { const arm = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.04, 0.4), metal); arm.position.set(sx * 0.43, 0.56, -0.04); top.add(arm); const st = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.2, 0.04), metal); st.position.set(sx * 0.43, 0.5, 0.05); top.add(st); }   // подлакътниците — по-ниско и по-навън, лактите не влизат в тях
+    const rear = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.36), em.material); rear.position.set(0, 0.12, -0.062); rear.rotation.y = Math.PI; back.add(rear);
+    back.userData.keep = true;   /* mergeStatic: без това облегалката се слива и емблемите (деца на облегалката) изчезват */   // и отзад на облегалката — по-голямо, вижда се от другата страна на масата и от камерата зад директора
   const post = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.38, 10), metal); post.position.y = 0.22; g.add(post);
   const base = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.04, 5), metal); base.position.y = 0.03; g.add(base);
   g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  g.userData.lift = d => { top.position.y = d; post.scale.y = (0.38 + d) / 0.38; post.position.y = 0.22 + d / 2; };   // седалката по-високо/ниско, основата остава на пода
   return g;
 }
 function plant(scene, x, z, leafM, potM) {
@@ -465,7 +469,10 @@ export function openBoardroom(o) {
       if (hips) {
         hips.getWorldPosition(hp);
         wrap.position.x += seatX(s.si) - hp.x; wrap.position.z += z - hp.z; wrap.updateMatrixWorld(true);
-        hips.getWorldPosition(hp); s.chair.position.set(hp.x + side * 0.06, THREE.MathUtils.clamp(hp.y - 0.58, -0.15, 0.15), hp.z);
+        // стъпалата — на пода (иначе пръстите влизат в пода, а дупето — във възглавницата): тялото се вдига, седалката — под ханша
+        m.updateMatrixWorld(true); let lo = Infinity; for (const n of ['mixamorigLeftToeBase', 'mixamorigRightToeBase']) { const b = m.getObjectByName(n); if (b) lo = Math.min(lo, b.getWorldPosition(new THREE.Vector3()).y); }
+        if (lo < 0.03) { wrap.position.y += 0.03 - lo; wrap.updateMatrixWorld(true); }
+        hips.getWorldPosition(hp); s.chair.position.set(hp.x + side * 0.06, 0, hp.z); s.chair.userData.lift(THREE.MathUtils.clamp(hp.y - SEAT_HIP - 0.53, -0.15, 0.3));
       }
       p.wrap = wrap; p.restTable = base.name === 'Sit_Table_Idle'; p.ikW = p.restTable ? 1 : 0;
       // ръцете на масата: в покой директорът се придърпва към масата (раменете ~18 см от ръба), столът — с него
