@@ -2480,8 +2480,20 @@ const AWARD_RULES = {
   rail: { at: [300, 1500, 6000, 20000], v: () => Math.round((S.rails || []).filter(r => r.built).reduce((a, r) => a + (r.km || (r.b ? kmBetween(r.a, r.b) : 0)), 0)), res: n => `${fmt(n)} км готови жп линии` },
   sea: { at: [5, 20, 60, 150], v: () => (S.seaRoutes || []).length, res: n => `${fmt(n)} морски линии` },
   air: { at: [5, 20, 60, 150], v: () => (S.airRoutes || []).length, res: n => `${fmt(n)} авиолинии` },
+  bank: { at: [3, 12, 36, 120], v: () => (S.hold?.bankRun?.months || 0), res: n => `${fmt(n)} ${n === 1 ? 'месец' : 'месеца'} поред: касата над резерва и паричният поток на плюс` },
   oil: { at: [3, 10, 30, 80], v: () => { const L = mines.state().sites, has = k => L.some(x => x.kind === k); return has('oilwell') && has('refinery') && has('terminal') ? L.filter(x => ['oilwell', 'refinery', 'terminal'].includes(x.kind)).length : 0; }, res: n => `${fmt(n)} обекта във веригата добив → преработка → доставка` },
 };
+// „Златен резерв“ (Борис): серия от месеци (по 30 игрови дни) — касата не пада под резерва му (оперативният от boardlogic, с „Резерв“ от трезора при vault-rules)
+// и месецът е с положителен паричен поток; провал → серията почва отначало. S.hold.bankRun = { months, start, m0, low }
+function bankRunDay() {
+  if (!S || !S.holding) return;
+  const h = S.hold = S.hold || {}, r = h.bankRun = h.bankRun || { months: 0, start: S.day, m0: econ.money, low: false };
+  let op = 0; try { op = boardL.frame().op; } catch (e) { }
+  if (econ.money < op) r.low = true;
+  if (S.day - r.start < 30) return;
+  r.months = !r.low && econ.money - r.m0 > 0 ? r.months + 1 : 0;
+  r.start = S.day; r.m0 = econ.money; r.low = false;
+}
 function awardsPending(st) {
   if (!S) return [];
   const out = [];
@@ -9670,7 +9682,7 @@ function frame() {
     for (const g of parkGroups) { const j = g.userData.jet; j.scale.y = 0.85 + Math.sin(simT * 6 + g.id) * 0.15; j.rotation.y += rdt; }
     if (city.hqGroup?.userData.star) city.hqGroup.userData.star.rotation.y += rdt * 1.5;
     S.dayT += dt;
-    if (S.dayT >= DAY_SEC) { S.dayT -= DAY_SEC; const pt0 = perf.now(); endOfDay(); if (feature('fire-seq')) fires.dailyTick(); autoFillTick(true); perf.add('day', pt0); }
+    if (S.dayT >= DAY_SEC) { S.dayT -= DAY_SEC; const pt0 = perf.now(); endOfDay(); if (feature('fire-seq')) fires.dailyTick(); if (feature('awards')) bankRunDay(); autoFillTick(true); perf.add('day', pt0); }
     autoT -= dt; if (autoT <= 0) { autoT = 3; autoFillTick(false); }
     if (dt > 0 && Math.random() < dt * 2) { hwDispatch(); dispatch(); }   // магистралата първа — иначе освободената бригада винаги отива на обект в града
     panelT -= rdt;
