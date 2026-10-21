@@ -107,7 +107,8 @@ function sigStep(s, dt) {
 // може ли да тръгне по връзката c (по светофара): зелено за оста и вида на завоя; при „наляво“ във фазата „направо“ — само ако няма
 // насрещен поток (тогава лявото е в своята фаза)
 function sigAllows(s, c) {
-  if (s.stage !== 'green') return false; const [ax, k] = s.ph[s.i];
+  if (s.stage !== 'green') return false; if (s.sets) return s.sets[s.i].has(c);   // roadnet.js: фазата е множество от криви (конфликтните — никога заедно)
+  const [ax, k] = s.ph[s.i];
   if (c.inL.axis !== ax) return false;
   return k === 'left' ? c.turn === 'left' : c.turn !== 'left' || !s.ph.some(p => p[0] === ax && p[1] === 'left');
 }
@@ -318,6 +319,10 @@ export function createTraffic(opts) {
     },
     // нов маршрут от мястото, където агентът е сега (route.paths[0] === c.p)
     retarget(c, r) { if (r.paths[0] !== c.p) return false; c.route = r.paths; c.ri = 0; c.goal = r.s1; c.arrived = false; pickNext(c); return true; },
+    // мрежата е променена (roadnet.js update): колите на махнатите пътеки — навън (агентите — също; собственикът им вижда, че не са живи);
+    // следващата пътека е махната — нов избор
+    invalidate(removed) { for (let k = cars.length - 1; k >= 0; k--) { const c = cars[k], gone = removed.has(c.p) || (c.route && c.route.slice(c.ri).some(p => removed.has(p))) || c.hist.some(p => removed.has(p) && c.tailC === p);
+        if (gone) { unlist(c); if (!c.agent) drop({ obj: c.obj, remove: c.rm }); else nAg--; cars.splice(k, 1); continue; } if (c.next && removed.has(c.next)) pickNext(c); } },
     removeAgent(c) { const k = cars.indexOf(c); if (k < 0) return; unlist(c); cars.splice(k, 1); nAg--; },
   };
 }

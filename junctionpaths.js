@@ -33,26 +33,27 @@ export function makeRouter(built) {
     if (!A || !B) return null;
     const s0 = Math.min(A.s, A.p.len), s1 = Math.max(0.5, Math.min(B.s, B.p.len - 0.5));
     if (A.p === B.p && s1 >= s0) return { paths: [A.p], s0, s1, len: s1 - s0 };
+    if (o.anyLane && A.p.sibs && A.p.sibs.includes(B.p) && s1 >= s0) return { paths: [B.p], s0, s1, len: s1 - s0 };
     // купчина с [разстояние, пътека, цел?]: целта е отделен запис (до s1 на последната лента), за да може и „назад по същата лента“ (обиколка)
-    const dist = new Map([[A.p, A.p.len - s0]]), prev = new Map(), heap = [[A.p.len - s0, A.p, false]];
+    const seeds = o.anyLane && A.p.sibs ? A.p.sibs : [A.p], dist = new Map(seeds.map(q => [q, q.len - s0])), prev = new Map(), heap = seeds.map(q => [q.len - s0, q, false]);   /* anyLane: от която и да е успоредна лента (новият агент избира лентата) */
     const push = e => { heap.push(e); let k = heap.length - 1; while (k) { const q = (k - 1) >> 1; if (heap[q][0] <= heap[k][0]) break; [heap[q], heap[k]] = [heap[k], heap[q]]; k = q; } };
     const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
-    let goalPrev = null;
+    let goalPrev = null, goalLane = B.p; const goals = o.anyLane && B.p.sibs ? new Set(B.p.sibs) : new Set([B.p]);
     while (heap.length) {
-      const [d, p, goal] = pop();   // d — разстоянието до края на пътеката p (за целта — до s1)
-      if (goal) { goalPrev = p; break; }
+      const [d, p, goal, gl] = pop();   // d — разстоянието до края на пътеката p (за целта — до s1)
+      if (goal) { goalPrev = p; goalLane = gl; break; }
       if (d > dist.get(p) + 1e-9) continue;
       for (const q of next.get(p) || []) {
         if (q.kind === 'lane' && !okL(q)) continue; if (q.kind === 'conn' && !okL(q.outL)) continue;
-        if (q === B.p) push([d + s1, p, true]);
+        if (goals.has(q)) push([d + s1, p, true, q]);
         const dq = d + q.len; if (dist.has(q) && dist.get(q) <= dq) continue;
         dist.set(q, dq); prev.set(q, p); push([dq, q, false]);
       }
     }
     if (!goalPrev) return o.heavy ? route(from, to, { ...o, heavy: false }) : null;   // камионът няма широк път — по обикновения
-    const paths = [B.p]; for (let p = goalPrev; p; p = p === A.p ? null : prev.get(p)) paths.push(p);
-    paths.reverse(); if (paths[0] !== A.p) return null;
-    return { paths, s0, s1, len: paths.reduce((t, p) => t + p.len, 0) - s0 - (B.p.len - s1) };
+    const paths = [goalLane]; for (let p = goalPrev; p; p = seeds.includes(p) ? null : prev.get(p)) paths.push(p);
+    paths.reverse(); if (!seeds.includes(paths[0])) return null;
+    return { paths, s0, s1: Math.min(s1, goalLane.len - 0.5), len: paths.reduce((t, p) => t + p.len, 0) - s0 - (goalLane.len - s1) };
   }
   return { route, nearest };
 }

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Пътна мрежа</title>
+<style>
+  :root { --bg:#14161b; --card:#1d2027ee; --txt:#e8e8ea; --mut:#9aa0aa; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--txt); font:13px/1.4 system-ui,sans-serif; overflow:hidden; }
+  #c { position:fixed; inset:0; }
+  .ui { position:fixed; left:12px; top:12px; background:var(--card); border-radius:10px; padding:10px 12px; width:min(460px, calc(100vw - 24px)); max-height:calc(100vh - 24px); overflow:auto; }
+  .ui h1 { font-size:15px; margin:0 0 6px; } .row { display:flex; gap:6px; flex-wrap:wrap; margin:6px 0; align-items:center; }
+  button, select { background:#2a2f38; color:var(--txt); border:1px solid #3a414d; border-radius:7px; padding:5px 9px; font:inherit; cursor:pointer; }
+  button.on { background:#2a6b3e; border-color:#2a6b3e; } #st, #chk { color:var(--mut); white-space:pre-line; } #chk.bad { color:#ff8a80; } #chk.good { color:#9be7a5; }
+</style></head><body>
+<canvas id="c"></canvas>
+<div class="ui"><h1>🛣️ Пътна мрежа (road-network) — тестов квартал</h1>
+  <div class="row"><button id="tour">▶ Всички маневри (кола, автобус, ТИР)</button><button id="bg">🚗 Трафик</button><button id="peds">🚶 Пешеходци</button><button id="dbg" class="on">🧭 Дебъг</button>
+    <select id="spd"><option value="1">1×</option><option value="4" selected>4×</option><option value="8">8×</option></select></div>
+  <div class="row">Към обект: <button data-go="X">╋ Светофар</button><button data-go="T">┳ Т към булевард</button><button data-go="round">⭕ Кръгово</button><button data-go="bend">↪ Завой</button><button data-go="bridge">🌉 Мост</button><button data-go="all">🗺️ Всичко</button></div>
+  <div class="row"><b>Нова улица:</b> <select id="cls"><option value="street">улица</option><option value="avenue">авеню</option><option value="blvd">булевард</option></select>
+    <select id="lvl"><option value="0">на нивото</option><option value="1">мост</option><option value="-1">тунел</option></select><select id="tpl"><option value="">кръстовище</option><option value="round">кръгово</option></select>
+    <button id="draw">✏️ Рисувай</button><button id="build">✔ Строй</button><button id="cancel">✖</button></div>
+  <div id="chk"></div>
+  <div id="st">зарежда…</div></div>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { createRoadNet } from '../roadnet.js';
+import { buildRoadView } from '../roadnet3d.js';
+import { createTraffic } from '../traffic.js';
+import { makeRouter, debugLayer } from '../junctionpaths.js';
+
+const $ = id => document.getElementById(id);
+const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xbfd8ef);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x667766, 1.6)); const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(80, 160, 60); scene.add(sun);
+const cam = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.5, 4000), ctl = new OrbitControls(cam, renderer.domElement);
+addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); });
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(1600, 1600).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x7fa462, roughness: 1 })); ground.position.y = -0.02; scene.add(ground);
+
+// ---- тестовият квартал: булевард, авеню (светофар), улица към булеварда (Т), завой и права, кръгово, мост над улица; сграда (пречка)
+const net = createRoadNet({ obstacles: [{ nm: 'жилищен блок', poly: [[150, 60], [200, 60], [200, 110], [150, 110]] }] });
+const D = new Set(), add = (pts, cls, o) => net.addRoad(pts, cls, o).dirty.forEach(x => D.add(x));
+add([[-320, 0], [320, 0]], 'blvd');
+add([[-120, -280], [-120, 260]], 'avenue');
+add([[60, 0], [60, 200], [220, 200], [330, 200]], 'street');
+add([[-270, -180], [30, -180]], 'street');
+add([[260, -150], [260, 120]], 'street', { level: 1 });   // мостът над булеварда (без кръстовище с него)
+for (const n of net.nodes.values()) if (Math.hypot(n.x + 120, n.z + 180) < 2) net.setRound(n.id);
+const ch0 = net.update(D);
+const PLANTS = [], ld = f => new GLTFLoader().loadAsync('../assets/heavy/plants/' + f + '.glb').then(g => g.scene).catch(() => null);
+const [b0, fo] = await Promise.all([ld('bush-0'), ld('fountain')]); if (b0) { b0.scale.setScalar(1.8); PLANTS.push(b0); }
+const view = buildRoadView(net, { plants: PLANTS, fountain: fo }); scene.add(view.group);
+const tr = createTraffic({ scene, built: net.built, seed: 3, maxCars: 40, jp: true, drive: 'right', makeCar: () => { if (!bgOn) return null; const o = body(4.5, 1.9, 1.5, 0x8a8f99); scene.add(o); return { obj: o, len: 4.5, w: 1.9, kind: 'car' }; } });
+let router = makeRouter(net.built); const dbg = debugLayer(tr, scene);
+
+// ---- превозните средства (истински размери): кола 4,5×1,9; автобус 12×2,55; ТИР — влекач 6 + ремарке 13,6
+const TYPES = { car: { len: 4.5, w: 1.9, h: 1.5, col: 0x3a7bd5 }, bus: { len: 12, w: 2.55, h: 3.1, col: 0x2e9d5a }, tir: { len: 20, w: 2.55, h: 3.8, col: 0xd62828, cab: 6, trl: 13.6 } };
+function body(len, w, h, col) { const g = new THREE.Group(), m = new THREE.Mesh(new THREE.BoxGeometry(w, h, len), new THREE.MeshStandardMaterial({ color: col, roughness: 0.6 })); m.position.y = h / 2; g.add(m); const nose = new THREE.Mesh(new THREE.BoxGeometry(w * 0.9, h * 0.3, 0.3), new THREE.MeshStandardMaterial({ color: 0xffffff })); nose.position.set(0, h * 0.75, len / 2); g.add(nose); return g; }
+let bgOn = false, live = [], queue = [], stats = { started: 0, done: 0, curb: 0, curbBy: {}, island: 0, maxYaw: 0, maxYawAt: '', stuck: 0, phaseBad: 0 };
+window.__rn = { net, tr, view, stats, pedStats: () => pedStats, get live() { return live; }, get queue() { return queue; } };
+// всички маневри: за всеки възел (без задънените краища) — всяка крива (без обратния завой) × кола, автобус, ТИР
+function manoeuvres() { const out = []; for (const [id, v] of net.built.nodes) { if (typeof id !== 'number') continue; const n = net.nodes.get(id); if (!n || n.kind === 'end' || n.kind === 'cont') continue; for (const c of v.conns) { if (c.turn === 'uturn' || c.inL.ring != null || c.outL.ring != null && !c.ringIn) continue; if (c.inL.laneI !== c.inL.nLanes - 1 && c.turn === 'right') continue; out.push({ node: id, kind: n.kind, c }); } } return out; }
+function tour() { queue = []; for (const t of ['car', 'bus', 'tir']) for (const m of manoeuvres()) queue.push({ t, ...m }); }
+function launch(q) {
+  const T = TYPES[q.t], inL = q.c.inL, s0 = Math.max(1, inL.len - 40); let outL = q.c.outL, extra = null;
+  if (q.kind === 'round') { const ex = q.c.pickExit ? null : null; }   // кръгово: целта — всеки изход (по-долу)
+  if (inL.cars.some(c => Math.abs(c.s - s0) < (c.L + T.len) / 2 + 3)) return false;
+  let goal = { p: outL, s: Math.min(outL.len - 1, 30) };
+  if (q.kind === 'round') { const B = net.built.nodes.get(q.node), outs = B.outL.filter(l => l.laneI === 0 && l.armOut !== inL.armIn), o2 = outs[q.exitK ?? ((Math.random() * outs.length) | 0)]; if (!o2) return true; goal = { p: o2, s: Math.min(o2.len - 1, 30) }; q.to = o2.armOut; }
+  const r = router.route({ p: inL, s: s0 }, goal, { heavy: q.t !== 'car' }); if (!r) { stats.noRoute = (stats.noRoute || 0) + 1; return true; }
+  const cab = body(q.t === 'tir' ? T.cab : T.len, T.w, T.h, T.col), trl = q.t === 'tir' ? body(T.trl, T.w, T.h * 0.95, 0xdddddd) : null; scene.add(cab); if (trl) scene.add(trl);
+  const L = { q, age: 0 }, c = tr.addAgent({ obj: cab, len: T.len, w: T.w, h: T.h, kind: q.t === 'car' ? 'car' : 'truck', name: `${q.t} ${q.kind} ${q.c.turn}`, route: r, cab: T.cab, trailer: trl ? { obj: trl, len: T.trl } : null,
+    onArrive: cc => { tr.removeAgent(cc); scene.remove(cab); if (trl) scene.remove(trl); live.splice(live.indexOf(L), 1); stats.done++; } });
+  Object.assign(L, { c, cab, trl, lastYaw: c.yaw }); live.push(L); stats.started++; return true;
+}
+// асфалтът: възел (очертание / кръгово / дъга на завоя / площадка) или сегмент (до половин платно от оста)
+const inPoly = (p, poly) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) if ((poly[i][1] > p[1]) !== (poly[j][1] > p[1]) && p[0] < (poly[j][0] - poly[i][0]) * (p[1] - poly[i][1]) / (poly[j][1] - poly[i][1]) + poly[i][0]) c = !c; return c; };
+const segD = (p, a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / l2)); return Math.hypot(a[0] + dx * t - p[0], a[1] + dz * t - p[1]); };
+function onAsphalt(x, z) {
+  for (const n of net.nodes.values()) { if (Math.abs(n.x - x) > 60 || Math.abs(n.z - z) > 60) continue; const T = n.tpl_;
+    if (n.kind === 'round' && Math.hypot(x - n.x, z - n.z) < T.round.outer + 0.3) return Math.hypot(x - n.x, z - n.z) > T.round.outer - T.round.lane - T.round.apron - 0.05 ? true : 'island';
+    if (T.outline && inPoly([x, z], T.outline)) return true;
+    if (n.kind === 'end' && T.end.kind === 'bulb' && Math.hypot(x - n.x, z - n.z) < T.end.r + 0.25) return true;
+    if (n.kind === 'bend') { const arc = T.bend.arc, hw = n.arms[0].sg.w / 2 + 0.25; for (let k = 1; k < arc.length; k++) if (segD([x, z], arc[k - 1], arc[k]) <= hw) return true; }
+    if (n.kind === 'round') for (let i = 0; i < n.arms.length; i++) { const f = T.arms[i].flare, a = n.arms[i], ux = Math.cos(a.angle), uz = Math.sin(a.angle), d = (x - n.x) * ux + (z - n.z) * uz, l = -(x - n.x) * uz + (z - n.z) * ux; if (d >= f.r0 - 0.5 && d <= f.r1) { const t = (d - f.r0) / (f.r1 - f.r0), e = Math.max(0, Math.min(1, t)) ** 2 * (3 - 2 * Math.max(0, Math.min(1, t))); if (Math.abs(l) <= f.h0 + (f.h1 - f.h0) * e + 0.25) return true; } }   /* разширението на клона */
+  }
+  for (const sg of net.segs.values()) for (let i = 1; i < sg.pts.length; i++) if (segD([x, z], sg.pts[i - 1], sg.pts[i]) <= sg.w / 2 + 0.25) return true;
+  return false;
+}
+const corners = (x, z, yaw, hl, hw) => { const fx = Math.sin(yaw), fz = Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw); return [[1, 1], [1, -1], [-1, -1], [-1, 1]].map(([a, b]) => [x + fx * hl * a + rx * hw * b, z + fz * hl * a + rz * hw * b]); };
+function check(dt) {
+  for (const L of [...live]) { const c = L.c, T = TYPES[L.q.t], boxes = [[c.x, c.z, c.yaw, (c.trl ? T.cab : T.len) / 2, '']]; if (c.tr) boxes.push([c.tr.x, c.tr.z, c.tr.yaw, T.trl / 2, '-ремарке']);
+    for (const [x, z, yaw, hl, sfx] of boxes) for (const [px, pz] of corners(x, z, yaw, hl, T.w / 2)) { const r = onAsphalt(px, pz); if (r === 'island') { stats.island++; (stats.ih = stats.ih || []).length < 8 && stats.ih.push([L.q.t + sfx, L.q.kind, L.q.c.turn, c.p.kind + (c.p.ring != null ? 'R' : '') + (c.p.ringIn ? 'in' : '') + (c.p.exitArm != null ? 'out' : ''), +c.s.toFixed(1), +c.p.len.toFixed(1)]); } else if (!r) { stats.curb++; const k = L.q.t + sfx + ' ' + L.q.kind + ' ' + L.q.c.turn; stats.curbBy[k] = (stats.curbBy[k] || 0) + 1; if (L.q.kind === 'round') { const n = net.nodes.get(L.q.node), rr = Math.hypot(px - n.x, pz - n.z); let best = null; for (const a of n.arms) { const ux = Math.cos(a.angle), uz = Math.sin(a.angle), d = (px - n.x) * ux + (pz - n.z) * uz, l = -(px - n.x) * uz + (pz - n.z) * ux; if (d > 0 && (!best || Math.abs(l) < Math.abs(best[2]))) best = [k, +rr.toFixed(1), +l.toFixed(1), +d.toFixed(1), c.p.kind + (c.p.ring != null ? 'R' : '')]; } (stats.rh = stats.rh || []).length < 12 && stats.rh.push(best); } } else if (r === 'island') { (stats.ih = stats.ih || []).length < 8 && stats.ih.push([L.q.t + sfx, L.q.kind, L.q.c.turn, c.p.kind + (c.p.ring != null ? 'R' : '') + (c.p.ringIn ? 'in' : '') + (c.p.exitArm != null ? 'out' : ''), +c.s.toFixed(1), +c.p.len.toFixed(1)]); } }
+    const yr = Math.abs(Math.atan2(Math.sin(c.yaw - L.lastYaw), Math.cos(c.yaw - L.lastYaw))) / Math.max(1e-3, dt); if (c.v > 0.5 && yr > stats.maxYaw) { stats.maxYaw = yr; stats.maxYawAt = L.q.t + ' ' + L.q.kind + ' ' + L.q.c.turn; }
+    L.lastYaw = c.yaw; L.age += dt; if (L.age > 200) { stats.stuck++; stats.stuckBy = stats.stuckBy || []; if (stats.stuckBy.length < 5) stats.stuckBy.push(L.q.t + ' ' + L.q.kind + ' ' + L.q.c.turn + ' ' + (c.why || '')); tr.removeAgent(c); scene.remove(L.cab); if (L.trl) scene.remove(L.trl); live.splice(live.indexOf(L), 1); } }
+}
+// конфликтите във фазите на светофарите (не бива да има)
+for (const [id, v] of net.built.nodes) if (v.sig) stats.phaseBad += net.verifyPhases(v).length;
+
+// ---- рисуване на нова улица: точки с клик по земята, проверка зелено/червено, строеж → само засегнатите сегменти и възли
+let drawing = false, pts = [], prev = null, marks = new THREE.Group(); scene.add(marks);
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+renderer.domElement.addEventListener('pointerdown', e => { if (!drawing || e.button !== 0) return; ndc.set(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1); ray.setFromCamera(ndc, cam); const h = ray.intersectObject(ground)[0]; if (!h) return; pts.push([h.point.x, h.point.z]); preview(); });
+function preview() {
+  while (marks.children.length) { const o = marks.children.pop(); o.geometry?.dispose(); }
+  if (pts.length < 2) { $('chk').textContent = pts.length ? 'още една точка…' : ''; return; }
+  const r = net.check(pts, $('cls').value, { level: +$('lvl').value }), col = r.ok ? 0x2ee06a : 0xff3b30;
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts.map(p => new THREE.Vector3(p[0], 0.6, p[1]))), new THREE.LineBasicMaterial({ color: col, linewidth: 3, depthTest: false })); line.renderOrder = 10; marks.add(line);
+  for (const p of r.problems) { if (p.type === 'info') continue; const m = new THREE.Mesh(new THREE.SphereGeometry(2.2, 12, 8), new THREE.MeshBasicMaterial({ color: 0xff3b30, depthTest: false })); m.position.set(p.at[0], 1.5, p.at[1]); m.renderOrder = 10; marks.add(m); }
+  $('chk').className = r.ok ? 'good' : 'bad'; $('chk').textContent = r.ok ? '✔ може да се строи' + (r.problems.length ? ' · ' + r.problems.map(p => p.msg).join(' · ') : '') : '✖ ' + r.problems.filter(p => p.type !== 'info').map(p => p.msg).join('\n✖ ');
+  window.__lastCheck = r;
+}
+function buildDrawn() {
+  if (pts.length < 2) return; const r = net.check(pts, $('cls').value, { level: +$('lvl').value }); if (!r.ok) { preview(); return; }
+  const t0 = performance.now(), res = net.addRoad(pts, $('cls').value, { level: +$('lvl').value, tpl: $('tpl').value || null }), ch = net.update(res.dirty);
+  tr.invalidate(ch.removed); view.update(ch); router = makeRouter(net.built);
+  stats.lastUpdate = { ms: +(performance.now() - t0).toFixed(1), nodes: ch.nodes.length, segs: ch.segs.length, of: [net.nodes.size, net.segs.size] };
+  pts = []; preview(); drawing = false; $('draw').classList.remove('on');
+}
+window.__drawRoad = (P, cls = 'street', o = {}) => { pts = P; $('cls').value = cls; $('lvl').value = String(o.level || 0); $('tpl').value = o.tpl || ''; preview(); const r = window.__lastCheck; if (o.build) buildDrawn(); return r; };
+$('draw').onclick = () => { drawing = !drawing; $('draw').classList.toggle('on', drawing); pts = []; preview(); };
+$('build').onclick = buildDrawn; $('cancel').onclick = () => { pts = []; drawing = false; $('draw').classList.remove('on'); preview(); };
+$('tour').onclick = () => { $('tour').classList.toggle('on'); if ($('tour').classList.contains('on')) tour(); else queue = []; };
+$('bg').onclick = () => { bgOn = !bgOn; $('bg').classList.toggle('on', bgOn); };
+$('dbg').onclick = () => $('dbg').classList.toggle('on');
+const SPOTS = { X: [-120, 0, 90], T: [60, 0, 80], round: [-120, -180, 100], bend: [60, 200, 80], bridge: [260, 0, 90], all: [0, 0, 520] };
+const goTo = k => { const [x, z, h] = SPOTS[k]; cam.position.set(x + h * 0.45, h, z + h * 0.75); ctl.target.set(x, 0, z); ctl.update(); };
+document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => goTo(b.dataset.go)); goTo('all');
+window.__goTo = goTo;
+
+// 🚶 пешеходци: тротоарите и зебрите на мрежата (net.pedNet); при светофар — когато колите на клона са на червено, иначе — без кола наблизо
+let peds = [], pedOn = false; const pedStats = { crossed: 0, waits: 0 }, pedGeo = new THREE.CapsuleGeometry(0.28, 1.1, 3, 6).translate(0, 0.85, 0), pedMats = [0xd84a3a, 0x3a6bd8, 0x2f9d58, 0xe0b23a, 0x8a4ad8].map(c => new THREE.MeshStandardMaterial({ color: c }));
+function canCross(c) { if (c.signal) { const sg = tr.signals(c.node)[0], a = sg && sg.arms && sg.arms[c.arm]; if (a && (a.go !== 'red' || (a.left && a.left !== 'red'))) return false; } for (const car of tr.cars) { const d = Math.hypot(car.x - c.x, car.z - c.z); if (d < 7 || (d < 18 && car.v > 1)) return false; } return true; }
+function pedStep(dt) {
+  if (!pedOn) { for (const p of peds) scene.remove(p.m); peds = []; return; } const PN = net.pedNet();
+  while (peds.length < 60) { const i = (Math.random() * PN.X.length) | 0, m = new THREE.Mesh(pedGeo, pedMats[peds.length % 5]); scene.add(m); peds.push({ m, x: PN.X[i], z: PN.Z[i], path: null, pi: 0, sp: 1.2 + Math.random() * 0.6 }); }
+  for (const p of peds) { if (!p.path) { const j = (Math.random() * PN.X.length) | 0; p.path = PN.route(p.x, p.z, PN.X[j], PN.Z[j]) || []; p.pi = 0; p.ok = false; if (!p.path.length) { p.path = null; continue; } }
+    const wp = p.path[p.pi], pv = p.pi > 0 && p.path[p.pi - 1];
+    if (pv && pv.cross && !p.ok) { if (!canCross(pv.cross)) { if (!p.w) { p.w = 1; pedStats.waits++; } continue; } p.ok = true; p.w = 0; pedStats.crossed++; }
+    const dx = wp.x - p.x, dz = wp.z - p.z, d = Math.hypot(dx, dz), st = p.sp * dt; if (d <= st) { p.x = wp.x; p.z = wp.z; p.ok = false; if (++p.pi >= p.path.length) p.path = null; } else { p.x += dx / d * st; p.z += dz / d * st; p.m.rotation.y = Math.atan2(dx, dz); }
+    p.m.position.set(p.x, 0.15, p.z); } }
+$('peds').onclick = () => { pedOn = !pedOn; $('peds').classList.toggle('on', pedOn); };
+let last = performance.now(), relT = 0;
+function loop() {
+  const now = performance.now(), rdt = Math.min(0.1, (now - last) / 1000); last = now; const dt = rdt * +$('spd').value;
+  relT -= dt; if (queue.length && relT <= 0) { const q = queue[0]; if (live.length < 12 && launch(q)) queue.shift(); relT = 0.8; }
+  const steps = Math.max(1, Math.ceil(dt / (1 / 30))); for (let k = 0; k < steps; k++) { tr.update(dt / steps, 64); check(dt / steps); pedStep(dt / steps); }
+  view.lights(tr.signals());
+  if ($('dbg').classList.contains('on')) dbg.update();
+  const au = net.audit();
+  $('st').textContent = `възли ${net.nodes.size} · сегменти ${net.segs.size} · ленти ${net.built.lanes.length}\nманеври в опашката ${queue.length} · на път ${live.length} · готови ${stats.done}/${stats.started}\nбордюр ${stats.curb} · остров ${stats.island} · заседнали ${stats.stuck} · без маршрут ${stats.noRoute || 0} · конфликти във фазите ${stats.phaseBad}\nнай-бързо въртене ${(stats.maxYaw * 57.3).toFixed(0)}°/s (${stats.maxYawAt})\n🚶 пресекли ${pedStats.crossed}, чакали ${pedStats.waits} · тротоари: ${(() => { const s = net.pedNet().stats; return s.nodes + ' точки, ' + s.crossings + ' зебри, ' + s.comps + ' части'; })()}\nодит: ${au.length ? au.map(a => a.msg).join(' · ') : 'без проблеми'}${stats.lastUpdate ? `\nпоследната промяна: ${stats.lastUpdate.ms} ms, ${stats.lastUpdate.nodes} възела и ${stats.lastUpdate.segs} сегмента от ${stats.lastUpdate.of.join(' / ')}` : ''}`;
+  ctl.update(); renderer.render(scene, cam); requestAnimationFrame(loop);
+}
+loop(); window.__ready = 1;
+</script></body></html>
