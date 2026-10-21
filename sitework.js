@@ -18,10 +18,18 @@ const debrisGeo = new THREE.BoxGeometry(1, 1, 1), dustGeo = new THREE.SphereGeom
 // ---- раздвижените в Blender модели (assets/heavy/gear/*-rig.glb): автокранът (кула slew, стрела luff, телескоп tele, кука hook; клипове raise, work)
 // и багерът (кула swing, стрела boom, рамо stick, кофа bucket; клипове dig, work). Нормализирани като vehmodels.js: дължина 1 по z, колелата на y = 0.
 export function loadSiteRigs(load, A) {
-  const one = (f, key) => load(`assets/heavy/gear/${f}.glb`).then(g => { const inner = new THREE.Group(), w = new THREE.Group(); inner.add(g.scene); w.add(inner); w.updateMatrixWorld(true);
+  // yaw — като vehmodels.js GEAR (грейдерът е с предницата по +x); бетоновозът — като construct.js (по-дългата страна към z)
+  const one = (f, key, yaw = 0) => load(`assets/heavy/gear/${f}.glb`).then(g => { const inner = new THREE.Group(), w = new THREE.Group(); inner.add(g.scene); inner.rotation.y = yaw; w.add(inner); w.updateMatrixWorld(true);
     let b = new THREE.Box3().setFromObject(w); const s = b.getSize(new THREE.Vector3()); inner.scale.setScalar(1 / s.z); w.updateMatrixWorld(true); b = new THREE.Box3().setFromObject(w); const c = b.getCenter(new THREE.Vector3()); inner.position.set(-c.x, -b.min.y, -c.z);
     w.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); A[key] = { scene: w, clips: g.animations }; }).catch(e => console.warn('rig', f, e));
-  return Promise.all([one('mcrane-rig', 'sf-mcrane-rig'), one('excavator-rig', 'sf-excavator-rig')]);
+  return Promise.all([one('mcrane-rig', 'sf-mcrane-rig'), one('excavator-rig', 'sf-excavator-rig'), one('dump-rig', 'sf-dump-rig'), one('backhoe-rig', 'sf-backhoe-rig'), one('roller-rig', 'sf-roller-rig'),
+    one('grader-rig', 'sf-grader-rig', -Math.PI / 2), one('mixer-rig', 'sf-mixer-rig', Math.PI / 2)]);
+}
+// машината на играта (model(sf, len) — вътре моделът с дължина 1) → раздвиженият модел на същото място и в същия размер; len — дължината на вътрешния модел
+// every (сек.) — клипът се пуска веднъж на толкова (самосвалът изсипва), иначе — непрекъснато. Връща rig ({ mixer, action, every }) или null
+export function swapRig(obj, A, key, clip, o = {}) {
+  if (!A[key]) return null; obj.remove(...obj.children); const r = A[key].scene.clone(true); if (o.len) r.scale.setScalar(o.len); obj.add(r);
+  const rig = rigPlay(r, A, key, clip, !o.every); if (rig) { rig.every = o.every || 0; rig.wait = 0; if (rig.every) rig.action.stop(); } return rig;   /* с every — първия път след паузата */
 }
 // пуска клип (по име) на клонинг на раздвижен модел; връща { mixer, action }
 export function rigPlay(obj, A, key, clip, loop = true) {
@@ -111,7 +119,10 @@ export function createDemolition2(obj, parent, A, o = {}) {
 // с раздвижен модел (obj.userData.rig = rigPlay(obj, A, 'sf-excavator-rig', 'work')) — само клипът; иначе — kind: 'excavator' (копае: върти се към изкопа и назад, с леко „кимане“), 'bulldozer'/'loader' (бута напред-назад 4 м), 'roller' (бавно напред-назад 6 м),
 // 'truck' (стои, коша се вдига при разтоварване — тук само леко клатене), другите — стоят
 export function machineWork(obj, kind, t, seed = 0, dt = 0) {
-  if (obj.userData.rig) { obj.userData.rig.mixer.update(dt); return; }   // раздвиженият багер — истинският цикъл (копае, върти, изсипва)
+  const rig = obj.userData.rig;
+  if (rig) {   // раздвижената машина — истинският цикъл; с every — веднъж на толкова секунди (самосвалът изсипва и чака)
+    if (rig.every && !rig.action.isRunning()) { rig.wait += dt; if (rig.wait >= rig.every) { rig.wait = 0; rig.action.reset().play(); } }
+    rig.mixer.update(dt); return; }
   const h = obj.userData.home || (obj.userData.home = { x: obj.position.x, z: obj.position.z, ry: obj.rotation.y });
   const ph = t + seed * 1.7, fx = Math.sin(h.ry), fz = Math.cos(h.ry);
   if (kind === 'excavator' || kind === 'loader' && /excav/.test(obj.userData.src || '')) { obj.rotation.y = h.ry + Math.sin(ph * 0.7) * 0.8; obj.rotation.x = Math.max(0, Math.sin(ph * 1.4)) * 0.03; return; }

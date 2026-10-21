@@ -34,7 +34,7 @@ import { createStation, STATION_LEVELS } from './station.js';
 import { createResorts, RESORTS, seasonOf, monthName } from './resorts.js';
 import { buildResortView, RESORT_MODELS } from './resortview.js';
 import { createDemolition } from './demolish.js';
-import { createDemolition2, machineWork, craneLift, loadSiteRigs, rigPlay } from './sitework.js';
+import { createDemolition2, machineWork, craneLift, loadSiteRigs, rigPlay, swapRig } from './sitework.js';
 import { siteK, realScaleK, REAL_BLD, TOO_LONG } from './scale.js';   // 🏗️ флаг site-anim: истински кран при събаряне, машините работят, кранът вдига
 import { createEvents } from './events.js';
 import { createWeather, rollWeather } from './weather.js';
@@ -1752,11 +1752,12 @@ function homeSlot(u) {
 const SF_VEH = { loader: 'sf-excavator', truck: 'sf-dump', crane: 'sf-mcrane', tractor: 'sf-backhoe', roller: 'sf-roller', grader: 'sf-grader', crew: 'sf-car-Van', marker: 'sf-car-Van', ...(feature('real-shops') ? { bulldozer: 'sf-excavator' } : {}) };   // бусът на бригадата и маркировката — истинският бус (УАЗ, vehmodels.js) вместо детския delivery/van
 const SF_LEN = feature('site-anim') ? { loader: 9.6, truck: 8, crane: 13.5, tractor: 6, roller: 3.9, grader: 8.5, crew: 1, marker: 1, bulldozer: 9.6 } : { loader: 6.5, truck: 7.5, crane: 9, tractor: 4.6, roller: 4.5, grader: 7, crew: 1, marker: 1, bulldozer: 7.5 };   // колите (sf-car-*) вече са в мащаба на града — 1   // м по дължина — в мащаба на колите (седан 4,5 м, vehmodels.js)
 const VEH_LEN = { bulldozer: 6 };   // м — моделите от пакетите, които не са в метри: мащаб по най-дългата хоризонтална страна (булдозерът беше колкото сграда; другите Kenney са с процедурни добавки, нагласени за VSCALE)
+const SITE_RIG = { loader: ['sf-excavator-rig', 'work'], bulldozer: ['sf-excavator-rig', 'work'], truck: ['sf-dump-rig', 'tip', 14], tractor: ['sf-backhoe-rig', 'work'], roller: ['sf-roller-rig', 'roll'], grader: ['sf-grader-rig', 'grade'] };   // тип → [модел, клип, пауза между циклите, s]
 function spawnUnit(type, at) {
   const sf = A[SF_VEH[type]] ? SF_VEH[type] : null;
   const nm = A[VEH_MODEL[type]] ? VEH_MODEL[type] : 'truck', bs = VEH_LEN[type] && A[nm] ? sizeOf(nm).getSize(new THREE.Vector3()) : null;
   const obj = sf ? model(sf, SF_LEN[type]) : model(nm, bs ? VEH_LEN[type] / Math.max(bs.x, bs.z, 1e-3) : A[VEH_MODEL[type]] ? VEH_SCALE[type] || VSCALE : VSCALE);
-  if (feature('site-anim') && (type === 'loader' || type === 'bulldozer') && sf && A['sf-excavator-rig']) { obj.remove(...obj.children); const r = A['sf-excavator-rig'].scene.clone(true); obj.add(r); obj.userData.rig = rigPlay(r, A, 'sf-excavator-rig', 'work'); }   /* багерът копае с истинските стави */
+  if (feature('site-anim') && sf && SITE_RIG[type]) { const [k, c, ev] = SITE_RIG[type], rg = swapRig(obj, A, k, c, { every: ev }); if (rg) obj.userData.rig = rg; }   /* site-anim (55): раздвижените в Blender машини — багер, самосвал, трактор-багер, валяк, грейдер */
   if (type === 'crew' && sf && feature('crew-van')) { addVanLogo(obj, brandOf(S)); obj.userData.doors = vanDoors(obj); }
   if (type === 'crane' && !sf) {
     // жълта стрела отзад на платформата, за да личи, че е кран
@@ -1781,7 +1782,7 @@ function spawnUnit(type, at) {
 }
 function sendTo(u, x, z, onArrive) {
   if (u.obj.userData.home) { u.obj.rotation.y = u.obj.userData.home.ry; delete u.obj.userData.home; }
-  if (u.obj.userData.rig) u.obj.userData.rig.action.paused = true;   // site-anim: машината тръгва — без работната поза
+  if (u.obj.userData.rig) u.obj.userData.rig.action.stop();   // site-anim: машината тръгва — обратно в покой (коша долу, стрелата прибрана)
   // junction-paths: по улиците — агент в трафика (лентите, кривите на кръстовищата, кръговите); до лентата и от нея до обекта — по старому
   if (u.agent) { const A0 = jpAgents(); if (A0 && A0.alive(u.agent)) A0.remove(u.agent); u.agent = null; u.jp = null; u.jpDone = false; scene.add(u.obj); u.obj.position.set(u.x, 0, u.z); }   /* нова задача насред пътя — само една система движи машината */
   { const A = jpAgents(), r = A && A.route({ x: u.x, z: u.z }, { x, z }, true);
@@ -2226,7 +2227,7 @@ function makeSite(p) {
   v.mound = new THREE.Mesh(new THREE.ConeGeometry(2.6, 1, 10), dirtMat); v.mound.position.set(4.5, 0, -4.5); v.mound.visible = false; v.mound.castShadow = true; g.add(v.mound);
   v.slab = new THREE.Mesh(new THREE.BoxGeometry(12.6, 1, 12.6), concreteMat); v.slab.visible = false; v.slab.castShadow = v.slab.receiveShadow = true; g.add(v.slab);
   // бетоновоз до основите (вижда се по време на етап „Основи“)
-  if (A['truck-concrete-red']) { v.mixer = model('truck-concrete-red', 0.62); v.mixer.position.set(4.2, 0.05, 3.2); v.mixer.rotation.y = -Math.PI / 2; v.mixer.visible = false; g.add(v.mixer); }
+  if (A['truck-concrete-red']) { v.mixer = model('truck-concrete-red', 0.62); if (feature('site-anim') && A['sf-mixer-rig']) { const sz = new THREE.Box3().setFromObject(A['truck-concrete-red'].scene).getSize(new THREE.Vector3()); v.mixer.userData.rig = swapRig(v.mixer, A, 'sf-mixer-rig', 'spin', { len: Math.max(sz.x, sz.z) }); }   /* барабанът се върти */ v.mixer.position.set(4.2, 0.05, 3.2); v.mixer.rotation.y = -Math.PI / 2; v.mixer.visible = false; g.add(v.mixer); }
   // сградата се „издига“ чрез клипинг равнина
   v.clip = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
   const tmpLot = { x: 0, z: 0 };
@@ -2298,7 +2299,7 @@ function updateSite(p, t) {
   if (st === 0) { v.mound.scale.set(1, 0.2 + k * 3, 1); v.mound.position.y = (0.2 + k * 3) / 2; }
   if (st === 1) { const s = 1 - k * 0.8; v.mound.scale.set(s, 3.2 * s, s); v.mound.position.y = 1.6 * s; }
   v.slab.visible = st >= 1;
-  if (v.mixer) v.mixer.visible = st === 1;
+  if (v.mixer) { v.mixer.visible = st === 1; if (st === 1 && v.mixer.userData.rig) { const d = v.mixT == null ? 0 : Math.min(0.2, Math.max(0, t - v.mixT)); v.mixT = t; if (camera.position.distanceToSquared(v.g.position) < 260 * 260) v.mixer.userData.rig.mixer.update(d); } }   /* t — времето на играта (пауза = стоп) */
   if (st >= 1) { const h = st === 1 ? 0.05 + k * 0.6 : 0.65; v.slab.scale.y = h; v.slab.position.y = h / 2; }
   v.building.visible = st >= 2;
   if (st === 2) v.clip.constant = 0.6 + v.H * k;
@@ -2800,7 +2801,7 @@ function assignUnit(u, p) {
   u.proj = p;
   const k = units.filter(q => q.proj === p).length - 1;
   const spot = [[-4.5, 5.5], [0, 4.5], [4.5, 5.5], [-4.5, 1], [4.5, 1], [0, 0]][k % 6];
-  sendTo(u, lot.x + spot[0], lot.z + spot[1], () => { if (u.proj === p) { u.state = 'working'; u.obj.userData.doors?.open(true); if (u.obj.userData.rig) u.obj.userData.rig.action.paused = false; u.yaw = Math.PI; u.obj.rotation.y = u.yaw; } });
+  sendTo(u, lot.x + spot[0], lot.z + spot[1], () => { if (u.proj === p) { u.state = 'working'; u.obj.userData.doors?.open(true); if (u.obj.userData.rig) { const rg = u.obj.userData.rig; rg.wait = 0; if (!rg.every) rg.action.reset().play(); } u.yaw = Math.PI; u.obj.rotation.y = u.yaw; } });
   u.state = 'driving';
 }
 function missingRoles(p) {
