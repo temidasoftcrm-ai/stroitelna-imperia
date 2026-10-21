@@ -5,6 +5,9 @@
 // o: { money() → наличните €, split: { res, inv } (%; свободните — останалото), onSplit(split), monthCost() → разходите за месец, night() → 0…1, onBack() }
 // Пълен трезор: 500 млрд. € (скалата е логаритмична — и малките суми се виждат). Над това — „трезорът е пълен — надгради“.
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { feature } from './lab/feature.js';
+import { loadMoney } from './money3d.js';   // 💵 флаг money-real: истински пачки и кюлчета
 
 export const VAULT_CAP = 500e9;
 const ZONES = [
@@ -128,6 +131,7 @@ export function createVault(renderer, o = {}) {
     scene.add(cash, gold);
     return { Z, x: xs[i], cash, gold, cn: 0, gn: 0, ct: 0, gt: 0, v: 0 };
   });
+  if (feature('money-real')) loadMoney(u => new GLTFLoader().loadAsync(u)).then(R => { const cg = R.cashGeo(CASH), bg = R.barGeo(BAR); for (const z of zones) { if (cg) { z.cash.geometry = cg; z.cash.material = R.cashMat; } if (bg) z.gold.geometry = bg; } if (R.barMat && R.barMat.map) { goldM.map = R.barMat.map; goldM.color.set(0xffffff); goldM.needsUpdate = true; } }).catch(() => {});
   // HTML: картите на зоните, разпределението и бутонът обратно
   const el = document.createElement('div'); el.className = 'vault-ui';
   el.innerHTML = `<style>.vault-ui{position:fixed;inset:0;pointer-events:none;font:14px system-ui,sans-serif;color:#e8edf3;z-index:100000}

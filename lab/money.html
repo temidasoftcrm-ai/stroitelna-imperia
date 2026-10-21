@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Истински пари</title>
+<style>
+  body { margin:0; background:#0d1014; color:#e8e8ea; font:14px/1.45 system-ui,sans-serif; overflow:hidden; }
+  #hud { position:absolute; left:12px; top:12px; background:rgba(20,22,27,.88); padding:10px 14px; border-radius:10px; max-width:560px; }
+  h1 { font-size:17px; margin:0 0 4px; } p { margin:0 0 6px; color:#9aa0aa; font-size:13px; }
+  button { background:#1d2027; color:#e8e8ea; border:1px solid #333a45; border-radius:8px; padding:5px 10px; font:inherit; cursor:pointer; margin:2px 4px 0 0; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script></head><body>
+<div id="hud"><h1>💵 Истински пари — трезорът и бонусът на масата</h1>
+<p>Отляво — рафтът в трезора досега (процедурни кутийки и кюлчета). В средата — същият рафт с истинските пачки с бандерол и златни кюлчета (Sketchfab, CC BY; пак InstancedMesh — 2 draw calls на рафт). Отдясно — масата на борда: бонусът на директора — купчини пачки и рула, плъзгат се към него (1–5 според сумата).</p>
+<div><button data-n="1">Бонус: 1</button><button data-n="3">3</button><button data-n="5">5</button></div></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { loadMoney, bonusStacks } from '../money3d.js';
+const R = new THREE.WebGLRenderer({ antialias: true }); R.setSize(innerWidth, innerHeight); R.setPixelRatio(Math.min(2, devicePixelRatio)); R.outputColorSpace = THREE.SRGBColorSpace; R.shadowMap.enabled = true; document.body.appendChild(R.domElement);
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0x15181c); sc.add(new THREE.HemisphereLight(0xdfe8ff, 0x20242a, 0.9));
+const key = new THREE.SpotLight(0xfff1d8, 60, 14, 0.9, 0.5, 1.6); key.position.set(0, 4, 3); key.target.position.set(0, 0.6, 0); key.castShadow = true; key.shadow.mapSize.set(1024, 1024); sc.add(key, key.target);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(12, 8).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x23262b, roughness: 0.8 })); floor.receiveShadow = true; sc.add(floor);
+const cam = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.05, 50); cam.position.set(0, 1.9, 4.2); const ctl = new OrbitControls(cam, R.domElement); ctl.target.set(0, 0.8, 0); ctl.update();
+const L = new GLTFLoader(), M = await loadMoney(u => L.loadAsync('../' + u));
+// рафт като в трезора: 1,7 × 0,55, три рафта; 18 пачки + 8 кюлчета на рафт
+const CASH = { w: 0.16, h: 0.07, d: 0.075 }, BAR = { w: 0.2, h: 0.06, d: 0.09 }, steel = new THREE.MeshStandardMaterial({ color: 0x8c949e, metalness: 0.85, roughness: 0.35 });
+function shelf(x, real) {
+  for (const y of [0.32, 0.86, 1.4]) { const b = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.03, 0.55), steel); b.position.set(x, y - 0.015, 0); b.receiveShadow = true; sc.add(b); }
+  const cg = real && M.cashGeo(CASH) || new THREE.BoxGeometry(CASH.w, CASH.h, CASH.d), cm = real && M.cashMat || new THREE.MeshStandardMaterial({ color: 0x7fae6a, roughness: 0.75 });
+  const bg = real && M.barGeo(BAR) || new THREE.CylinderGeometry(Math.SQRT1_2 * 0.75, Math.SQRT1_2, 1, 4, 1).rotateY(Math.PI / 4).scale(BAR.w, BAR.h, BAR.d).translate(0, BAR.h / 2, 0), bm = real && M.barMat || new THREE.MeshStandardMaterial({ color: 0xf2c14e, metalness: 1, roughness: 0.22 });
+  const cs = [], gs = []; for (const y of [0.32, 0.86]) for (let r = 0; r < 3; r++) for (let c = 0; c < 9; c++) for (let z = 0; z < 2; z++) cs.push([(c - 4) * 0.175, y + r * CASH.h, (z - 0.5) * 0.2]);
+  for (let r = 0; r < 2; r++) for (let c = 0; c < 7; c++) for (let z = 0; z < 2; z++) gs.push([(c - 3) * 0.22, 1.4 + r * BAR.h, (z - 0.5) * 0.18]);
+  const ci = new THREE.InstancedMesh(cg, cm, cs.length), gi = new THREE.InstancedMesh(bg, bm, gs.length), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
+  cs.forEach((s, k) => { q.setFromAxisAngle(up, ((k * 7919) % 7 - 3) * 0.012); ci.setMatrixAt(k, m4.compose(new THREE.Vector3(x + s[0], s[1] + CASH.h / 2, s[2]), q, one)); });
+  gs.forEach((s, k) => { q.setFromAxisAngle(up, (k % 2) * Math.PI); gi.setMatrixAt(k, m4.compose(new THREE.Vector3(x + s[0], s[1], s[2]), q, one)); });
+  ci.castShadow = gi.castShadow = ci.receiveShadow = gi.receiveShadow = true; sc.add(ci, gi);
+}
+shelf(-2.0, false); shelf(0, true);
+// масата (кант 0,7 м) отдясно, директорът — от страната +x
+const table = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.06, 2.2), new THREE.MeshStandardMaterial({ color: 0x5a3a24, roughness: 0.5 })); table.position.set(2.6, 0.7, 0.2); table.castShadow = table.receiveShadow = true; sc.add(table);
+let bonus = null;
+const give = n => { if (bonus) sc.remove(bonus.group); bonus = bonusStacks(M, n, { x: 3.0, z: 0.2, y: 0.73, ry: -Math.PI / 2, from: [2.3, 0.73, 0.2] }); sc.add(bonus.group); };
+document.querySelectorAll('#hud button').forEach(b => b.onclick = () => give(+b.dataset.n)); give(3);
+const clock = new THREE.Clock();
+R.setAnimationLoop(() => { const dt = clock.getDelta(); if (bonus) bonus.update(dt); ctl.update(); R.render(sc, cam); });
+addEventListener('resize', () => { R.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); });
+window.__ready = true; window.__give = give; window.__cam = (x, y, z, tx, ty, tz) => { cam.position.set(x, y, z); ctl.target.set(tx, ty, tz); ctl.update(); };
+</script></body></html>

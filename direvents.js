@@ -80,7 +80,7 @@ export function createDirEvents(deps) {
       const lossDay = inc * 0.15, chance = Math.round(Math.min(0.85, Math.max(0.1, mood(k) * 0.9)) * 100), x = h();
       ask(`🎣 ${/[„"]/.test(rv) ? rv : `„${rv}“`} примамва ${first(k)}`, `${nm} има оферта: +${Math.round(up * 100)}% заплата (${B(P * (1 + up))} годишно вместо ${B(P)}). ${mood(k) < 0.45 ? `Последните откази ${g.acc} изнервиха — настроението ${g.dat} е ниско.` : `${g.he === 'тя' ? 'Тя' : 'Той'} се колебае.`} Ако си тръгне, ${sub} губи бонуса на директора (~${B(lossDay)} на ден), докато назначиш нов.`, [
         [`💼 Насрещно предложение: +${Math.round(up * 100)}% заплата (+${B(P * up)} годишно)`, () => { x.raise[k] = (x.raise[k] || 0) + Math.round(P * up / 1e4) * 1e4; setMood(k, 0.92); deps.toast(`🤝 ${first(k)} остава в ${sub} с по-висока заплата.`, 'good'); }],
-        [`💰 Бонус за задържане — ${B(P * 0.5)} еднократно`, () => { if (!pay(Math.round(P * 0.5 / 1e4) * 1e4)) return false; setMood(k, 0.72); deps.toast(`🤝 ${first(k)} остава засега — но заплатата ${g.dat} не е по-висока.`, 'good'); }],
+        [`💰 Бонус за задържане — ${B(P * 0.5)} еднократно`, () => { if (!pay(Math.round(P * 0.5 / 1e4) * 1e4)) return false; if (feature('money-real')) window.__room?.bonus?.(k, Math.round(P * 0.5 / 1e4) * 1e4); setMood(k, 0.72); deps.toast(`🤝 ${first(k)} остава засега — но заплатата ${g.dat} не е по-висока.`, 'good'); }],
         [`🗣️ Разговор без пари (шанс ~${chance}%)`, () => { if (Math.random() * 100 < chance) { setMood(k, mood(k) + 0.1); deps.toast(`🤝 ${first(k)}: „Добре, оставам — но искам повече свобода.“`, 'good'); } else leave(k); }],
         [`👋 Пусни ${g.acc}`, () => leave(k)],
       ]);

@@ -249,3 +249,7 @@ vans/van-ducato.glb — "2014 Fiat Ducato" by razor24 (CC BY 4.0) — https://sk
 vans/van-mb207.glb — "European Delivery Van" by evan.hiltz (CC BY 4.0) — https://sketchfab.com/3d-models/0b2f1ad95a79419f9a092420024d329c
 vans/van-transit.glb — "1999 Ford Transit" by tonielpro520 (CC BY 4.0) — https://sketchfab.com/3d-models/0c297ccac00b4649bfcc9a3ee5159733
 (all four: textures reduced, company logo decals added in-game)
+money/money-bundle.glb — "Cash bundle" by Vincent.Corleone (CC BY 4.0) — https://sketchfab.com/3d-models/19c1558f1bbb403b943f338a9a70da89
+money/money-stacks.glb — "Money Stacks" by 3D_Crackhouse (CC BY 4.0) — https://sketchfab.com/3d-models/1998b42922be4cbbb752de8b307bdaf4
+money/money-crate.glb — "Money Crate" by 3D_Crackhouse (CC BY 4.0) — https://sketchfab.com/3d-models/6dff4a83c3f44d138f29cae51bb9266d
+money/gold-bar.glb — "Realistic Gold Bar" by Seth7Santos (CC BY 4.0) — https://sketchfab.com/3d-models/194d2227c82549fcba14a37342ea3d08

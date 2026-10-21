@@ -11,7 +11,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { buildPresRoom } from './presrooms.js';   // 🇺🇸/🇷🇺 президентските зали (Министерският съвет)
 import { createRoomSound } from './roomsound.js';
 import { feature } from './lab/feature.js';
-import { vaultDoor, createVault } from './vault3d.js';   // 🏦 трезорът зад борда (флаг vault)   // шум на залата, хартия, чукче, аплодисменти, говор на глас
+import { vaultDoor, createVault } from './vault3d.js';
+import { loadMoney, bonusStacks } from './money3d.js';   // 💵 флаг money-real: бонусът — пачки на масата пред директора   // 🏦 трезорът зад борда (флаг vault)   // шум на залата, хартия, чукче, аплодисменти, говор на глас
 
 const DIR = 'assets/heavy/directors/';
 const SIT_HIP = [0, -1, -57];
@@ -468,6 +469,7 @@ export function openBoardroom(o) {
 
   const tip = el.querySelector('.tip'), card = el.querySelector('.card'), hits = [], people = [];
   let sel = null, shut = false, raf = 0, nextChat = 4;
+  const anims = [];   // money-real: пачките на масата (bonus)
   const clock = new THREE.Clock();
   const seatsNow = () => o.seats();
   // столове и табелки за всички дружества; директорите — където има назначен
@@ -820,6 +822,7 @@ export function openBoardroom(o) {
   function loop() {
     raf = requestAnimationFrame(loop);
     const dt = Math.min(clock.getDelta(), 0.05);
+    for (let j = anims.length - 1; j >= 0; j--) if (!anims[j].update(dt)) anims.splice(j, 1);
     // от време на време някой взима думата
     nextChat -= dt;
     if (nextChat <= 0 && people.length) {
@@ -851,7 +854,12 @@ export function openBoardroom(o) {
       snd.ambience(false); snd.hush(); holo.dispose(); scene.environment && scene.environment.dispose(); pmrem.dispose(); renderer.dispose(); el.remove();
     }, 450);
   }
-  return { close };
+  function bonus(k, amount) {   // money-real: пачките се плъзгат по масата към директора
+    const s = list.find(q => q.k === k); if (!s) return; const [side, z] = SEATS[s.si] || SEATS[SEATS.length - 1], x = seatX(s.si), n = amount < 5e4 ? 1 : amount < 2e5 ? 2 : amount < 1e6 ? 3 : amount < 5e6 ? 4 : 5;
+    loadMoney(u => loader.loadAsync(u)).then(R => { if (shut) return; const tx = side ? side * (TABLE_W / 2 - 0.45) : x, tz = side ? z : -TABLE_L / 2 + 0.6, b = bonusStacks(R, n, { x: tx, z: tz, y: TABLE_H + 0.03, ry: side ? (side < 0 ? Math.PI / 2 : -Math.PI / 2) : 0, from: [0, TABLE_H + 0.03, tz] }); scene.add(b.group); anims.push(b); }).catch(() => {});
+  }
+  if (window.__room) window.__room.bonus = bonus;
+  return { close, bonus };
 }
 
 // 🏛️ Министерският съвет (етап 3): същите герои с нови роли. k — ключът на министерството (dir на предложенията), seat — мястото на масата
