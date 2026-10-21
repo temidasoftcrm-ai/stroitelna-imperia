@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Живият строеж</title>
+<style>
+  body { margin:0; background:#14161b; color:#e8e8ea; font:14px/1.45 system-ui,sans-serif; overflow:hidden; }
+  #hud { position:absolute; left:12px; top:12px; background:rgba(20,22,27,.88); padding:10px 14px; border-radius:10px; max-width:560px; }
+  h1 { font-size:17px; margin:0 0 4px; } p { margin:0 0 6px; color:#9aa0aa; font-size:13px; }
+  button { background:#1d2027; color:#e8e8ea; border:1px solid #333a45; border-radius:8px; padding:5px 10px; font:inherit; cursor:pointer; margin:2px 4px 0 0; } button.on { border-color:#4ea1ff; }
+  #bar { height:6px; background:#2a2f38; border-radius:3px; margin-top:6px; } #bar i { display:block; height:6px; background:#ffb46b; border-radius:3px; width:0; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script></head><body>
+<div id="hud"><h1>🏗️ Живият строеж — събаряне и работа на техниката</h1>
+<p>Отляво — събаряне: истинският автокран стои на тротоара пред парцела (не през улицата), топката се люлее и удря, къщата пада на етапи с прах; накрая багерът товари руините в самосвала. Отдясно — строеж: багерът копае, булдозерът бута, валякът минава, кулокранът вдига палет с тухли; обектът — ограда, фургон, тоалетна, материали, контейнер за отпадъци. Всичко в истински метри (метровата мрежа).</p>
+<div><button id="go">▶ Пусни събарянето отначало</button><button id="pz">⏸ Пауза</button></div><div id="bar"><i></i></div></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { loadVehModels } from '../vehmodels.js';
+import { loadConstruct } from '../construct.js';
+import { createDemolition2, machineWork, craneLift } from '../sitework.js';
+const R = new THREE.WebGLRenderer({ antialias: true }); R.setSize(innerWidth, innerHeight); R.setPixelRatio(Math.min(2, devicePixelRatio)); R.outputColorSpace = THREE.SRGBColorSpace; R.shadowMap.enabled = true; R.localClippingEnabled = true; document.body.appendChild(R.domElement);
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0xbcd6ec); sc.add(new THREE.HemisphereLight(0xffffff, 0x667788, 1.5));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(40, 70, 30); sun.castShadow = true; Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 50, bottom: -50 }); sun.shadow.mapSize.set(2048, 2048); sc.add(sun);
+const gnd = new THREE.Mesh(new THREE.PlaneGeometry(200, 160).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x8aa66c })); gnd.receiveShadow = true; sc.add(gnd);
+const grid = new THREE.GridHelper(200, 200, 0x7c9564, 0x7c9564); grid.position.y = 0.02; grid.material.transparent = true; grid.material.opacity = 0.35; sc.add(grid);
+// улица по z = 12 (пред двата парцела), тротоар 2 м
+const road = new THREE.Mesh(new THREE.PlaneGeometry(200, 8).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x3a3d42 })); road.position.set(0, 0.03, 14); sc.add(road);
+const walk = new THREE.Mesh(new THREE.PlaneGeometry(200, 2.4).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xc9c4b8 })); walk.position.set(0, 0.04, 9.2); sc.add(walk);
+const cam = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.5, 1000); cam.position.set(0, 34, 62); const ctl = new OrbitControls(cam, R.domElement); ctl.target.set(0, 4, 0); ctl.update();
+const L = new GLTFLoader(), A = {}, load = u => L.loadAsync('../' + u);
+await Promise.all([loadVehModels(load, A, 'assets/heavy/gear/'), loadConstruct(load, A)]);
+const house = await L.loadAsync('../assets/heavy/houses2/h2-greyporch.glb').then(g => g.scene);
+const mdl = (n, len) => { const o = (A[n].scene || A[n]).clone(true); o.scale.setScalar(len); o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); return o; };
+// ---- парцел 1 (x = −20): къща 12 × 8 м, събаряне
+const LOT1 = { x: -20, z: 0, rot: 0, w: 16, d: 16 };
+let demo = null, h1 = null, prog = 0, paused = false;
+function startDemo() {
+  if (demo) demo.dispose(); if (h1) sc.remove(h1);
+  h1 = house.clone(true); h1.traverse(m => { if (m.isMesh) { m.material = m.material.clone(); m.castShadow = true; } });
+  const b0 = new THREE.Box3().setFromObject(h1), s0 = b0.getSize(new THREE.Vector3()); h1.scale.setScalar(12 / Math.max(s0.x, s0.z));
+  const b = new THREE.Box3().setFromObject(h1), c = b.getCenter(new THREE.Vector3()); h1.position.set(LOT1.x - c.x, -b.min.y, LOT1.z - c.z); sc.add(h1);
+  demo = createDemolition2(h1, sc, A, { lot: LOT1 }); prog = 0;
+}
+document.getElementById('go').onclick = startDemo;
+document.getElementById('pz').onclick = e => { paused = !paused; e.target.textContent = paused ? '▶ Продължи' : '⏸ Пауза'; };
+startDemo();
+// ---- парцел 2 (x = +20): строеж — земни работи
+const LOT2 = { x: 20, z: 0 }, site = new THREE.Group(); site.position.set(LOT2.x, 0, LOT2.z); sc.add(site);
+const dirt = new THREE.Mesh(new THREE.PlaneGeometry(14, 14).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x7a5a3a, roughness: 1 })); dirt.position.y = 0.05; dirt.receiveShadow = true; site.add(dirt);
+const pit = new THREE.Mesh(new THREE.BoxGeometry(8, 0.1, 8), new THREE.MeshStandardMaterial({ color: 0x5a4028, roughness: 1 })); pit.position.set(-1, 0.06, -1.5); site.add(pit);
+const mound = new THREE.Mesh(new THREE.ConeGeometry(2.6, 1.6, 10), new THREE.MeshStandardMaterial({ color: 0x7a5a3a, roughness: 1 })); mound.position.set(4.6, 0.8, -4.8); mound.castShadow = true; site.add(mound);
+// оградата (2 м, вход откъм улицата)
+const fenceM = new THREE.MeshStandardMaterial({ color: 0x2f6b8a, roughness: 0.7 }), side = (w, x, z, ry) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, 2, 0.1), fenceM); m.position.set(x, 1, z); m.rotation.y = ry; m.castShadow = true; site.add(m); };
+side(16, 0, -8, 0); side(16, -8, 0, Math.PI / 2); side(16, 8, 0, Math.PI / 2); side(5.5, -5.25, 8, 0); side(5.5, 5.25, 8, 0);
+const prop = (n, k, x, z, ry) => { if (!A[n]) return; const o = (A[n].scene || A[n]).clone(true); o.scale.setScalar(k); o.position.set(x, 0.05, z); o.rotation.y = ry; o.traverse(m => { if (m.isMesh) m.castShadow = true; }); site.add(o); };
+prop('container-office-green', 0.85, -6, 5, Math.PI / 2); prop('toilet-portable', 1, 6.8, 6.8, Math.PI); prop('planks-wood-a', 0.9, -6.6, -6.2, 0); prop('box-stack-brown', 1, 6.4, 3.5, 0); prop('container-rubble-red', 1, 6.2, -1, 0); prop('barrel', 1, 4.8, 6.9, 0);
+const machines = [];
+const put = (n, len, kind, x, z, ry) => { if (!A[n]) return; const o = mdl(n, len); o.position.set(x, 0.05, z); o.rotation.y = ry; o.userData.src = n; site.add(o); machines.push([o, kind]); };
+put('sf-excavator', 8.5, 'excavator', -2, -2, Math.PI * 0.75); put('sf-backhoe', 6, 'bulldozer', 2, 2.5, -Math.PI / 2); put('sf-roller', 4.5, 'roller', -4, 3.5, 0); put('sf-dump', 8, 'truck', 2.5, -5.2, Math.PI / 2);
+// кулокранът с палета (кулата — в задния ляв ъгъл)
+let lift = null; if (A['crane-tower']) { const k = 30 / 56, pv = new THREE.Group(), m = (A['crane-tower'].scene || A['crane-tower']).clone(true); m.scale.setScalar(k); m.position.set(-6 * k, 0, 10.75 * k); pv.add(m); pv.position.set(-9.5, 0, -9.5); pv.rotation.y = Math.PI / 4; site.add(pv); lift = craneLift(pv, 28, 26); }
+let t = 0; const clock = new THREE.Clock(), bar = document.querySelector('#bar i');
+R.setAnimationLoop(() => {
+  const dt = paused ? 0 : Math.min(0.1, clock.getDelta()); if (paused) clock.getDelta(); t += dt;
+  if (demo) { prog = Math.min(1, prog + dt / 28); demo.update(prog, dt, true); bar.style.width = (prog * 100).toFixed(0) + '%'; }
+  for (const [o, k] of machines) machineWork(o, k, t, machines.indexOf(machines.find(q => q[0] === o)));
+  if (lift) lift.update(t);
+  ctl.update(); R.render(sc, cam);
+});
+addEventListener('resize', () => { R.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); });
+window.__ready = true; window.__prog = p => { prog = p; };
+</script></body></html>

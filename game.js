@@ -32,6 +32,7 @@ import { createStation, STATION_LEVELS } from './station.js';
 import { createResorts, RESORTS, seasonOf, monthName } from './resorts.js';
 import { buildResortView, RESORT_MODELS } from './resortview.js';
 import { createDemolition } from './demolish.js';
+import { createDemolition2, machineWork, craneLift } from './sitework.js';   // 🏗️ флаг site-anim: истински кран при събаряне, машините работят, кранът вдига
 import { createEvents } from './events.js';
 import { createWeather, rollWeather } from './weather.js';
 import { bidHtml, resolveBid } from './bidding.js';
@@ -1721,6 +1722,7 @@ function spawnUnit(type, at) {
   return u;
 }
 function sendTo(u, x, z, onArrive) {
+  if (u.obj.userData.home) { u.obj.rotation.y = u.obj.userData.home.ry; delete u.obj.userData.home; }   // site-anim: машината тръгва — без работната поза
   u.path = roadRoute(u.x, u.z, x, z).map(p => ({ x: p.x, z: p.z, road: true }));
   u.path.push({ x, z, road: false });
   u.pi = 0; u.state = u.state === 'working' || u.state === 'idle' ? 'driving' : u.state; u.onArrive = onArrive;
@@ -1730,7 +1732,7 @@ function updateUnits(dt) {
   for (const u of units) {
     u.obj.userData.doors?.mixer.update(dt);
     if (!u.path) {
-      if (u.state === 'working') u.obj.position.y = Math.abs(Math.sin(performance.now() / 180 + u.id)) * 0.06;
+      if (u.state === 'working') { if (feature('site-anim')) { u.wt = (u.wt || 0) + dt; if (u.obj.position.distanceToSquared(camera.position) < 260 * 260) machineWork(u.obj, u.type, u.wt, u.id); } else u.obj.position.y = Math.abs(Math.sin(performance.now() / 180 + u.id)) * 0.06; }
       continue;
     }
     const wp = u.path[u.pi];
@@ -2094,7 +2096,7 @@ function makeDemoSite(p) {
   scene.add(g);
   const sign = label(`🔨 Събаряне · ${p.client}`, '#ffb46b', 11); sign.position.set(0, 14, 0); g.add(sign);
   if (A['container-rubble-red']) { const rc = model('container-rubble-red', 0.8); rc.position.set(-6.2, 0.05, 6.4); rc.rotation.y = Math.PI / 2; g.add(rc); }
-  p.vis = { g, demoOnly: true, demo: createDemolition(lot.obj, city.group), t: null };
+  p.vis = { g, demoOnly: true, demo: feature('site-anim') ? createDemolition2(lot.obj, city.group, A, { lot: { x: lot.x, z: lot.z, rot: lotRot(lot), w: lot.plan ? lot.w : 16 * lotK(lot), d: lot.plan ? lot.d : 16 * lotK(lot) } }) : createDemolition(lot.obj, city.group), t: null };
 }
 function finishDemo(p) {
   const lot = city.lots[p.lot];
@@ -2166,7 +2168,7 @@ function makeSite(p) {
     m.position.set(-6 * k, 0, 10.75 * k);   // мачтата на модела е в (6, −10.75): слагаме я в оста на завъртане
     pivot.add(m);
     pivot.userData = { real: true, base: Math.PI / 4 };
-    v.crane = pivot;
+    v.crane = pivot; if (feature('site-anim')) v.lift = craneLift(pivot, v.H + 6, 30 * k);
   } else v.crane = makeTowerCrane(v.H + 9);
   v.crane.position.set(-W - 1.5, 0, -W - 1.5);
   v.crane.visible = false;
@@ -2179,6 +2181,7 @@ function makeSite(p) {
   prop('planks-wood-a', 0.45, -6.8, 4.5, 0);
   prop('box-stack-brown', 0.6, 6.6, -6.4, Math.PI / 2);
   prop('barrel', 0.6, 6.9, 4.9, 0);
+  if (feature('site-anim')) prop('container-rubble-red', 0.8, 6.6, 1.2, 0);
 }
 function makeTowerCrane(h) {
   const g = new THREE.Group(), y = new THREE.MeshStandardMaterial({ color: 0xffc400, roughness: 0.6 });
@@ -2195,7 +2198,7 @@ function makeTowerCrane(h) {
   return g;
 }
 function updateSite(p, t) {
-  if (p.vis && p.vis.demoOnly) { const v = p.vis, dt = v.t == null ? 0 : Math.min(0.2, Math.max(0, t - v.t)); v.t = t; v.demo.update(p.demo.prog, dt); return; }
+  if (p.vis && p.vis.demoOnly) { const v = p.vis, dt = v.t == null ? 0 : Math.min(0.2, Math.max(0, t - v.t)); v.t = t; v.demo.update(p.demo.prog, dt, camera.position.distanceTo(v.g.position) < 260); return; }
   const v = p.vis; if (!v) return;
   if (v.own) return updateOwnSite(p);
   if (v.reno) return;
@@ -2215,7 +2218,7 @@ function updateSite(p, t) {
   if (st === 3) v.scaffClip.constant = 0.6 + (v.H + 1.5) * (1 - k);
   const craneHere = units.some(u => u.proj === p && u.type === 'crane' && u.state === 'working');
   v.crane.visible = craneHere;
-  if (craneHere && v.crane.userData.real) v.crane.rotation.y = v.crane.userData.base + Math.sin(t * 0.25 + p.id) * 0.7;   // стрелата бавно се върти над обекта
+  if (craneHere && v.crane.userData.real) v.crane.rotation.y = v.crane.userData.base + Math.sin(t * 0.25 + p.id) * 0.7; if (craneHere && v.lift) v.lift.update(t);   // стрелата бавно се върти над обекта
   else if (craneHere) {
     const d = v.crane.userData, a = t * 0.35 + p.id;
     d.top.rotation.y = Math.sin(a) * 1.4;
