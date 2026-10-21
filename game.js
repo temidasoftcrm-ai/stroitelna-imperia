@@ -23,6 +23,7 @@ import { createRivals, LOCAL_FIRMS, FIRMS } from './rivals.js';
 import { perf, createPerfPanel } from './perfpanel.js';
 import { createCityCull } from './citycull.js';
 import { createFires } from './firesim.js';
+import { gantrySigns } from './hwsigns.js';   // 🛣️ флаг hw-gantry: порталите с табели над магистралата в града
 import { buildBillboards } from './billboards3d.js';   // 🪧 флаг billboards: билбордове с фирмата по булевардите   // 🔥 флаг fire-seq: пожарът като последователност (здравина, гасене, оценка, ремонт/разчистване)   // ⚡ флаг perf-cliff: детайлите и хората по разстояние, сливане на статичните модели   // ⏱️ панел за производителност (флаг perf-panel, F8)
 import { createDevLevel, THRESH as DEV_THRESH, LV as DEV_LV, unlockText, kmXp, XP_BUY } from './devlevel.js';
 import { createCityPanel } from './citypanel.js';
@@ -478,6 +479,7 @@ let europe = null;
   // заводските модели се казват като търговските (building-a…) — пазим ги под 'ind-…'
   // истински храсти, цветя и фонтан (assets/heavy/plants, нормализирани: най-широката страна 1, основа 0) — зад feature('plants-real')
   for (const n of H2) jobs.push(load(`assets/heavy/houses2/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => HOUSES.splice(HOUSES.indexOf(n), 1)));   // не се зареди → не се строи
+  if (feature('hw-gantry')) jobs.push(load('assets/heavy/highway/hw-gantry.glb').then(g => { A['hw-gantry'] = g; }).catch(() => {}));   // 🛣️ порталът с табелите
   if (feature('office-levels2')) for (const L of OFFICE2) jobs.push(load(L.url).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[`office2-l${L.lv}`] = g; prepNightFloors(g.scene, `office2-l${L.lv}`); }).catch(() => {}));   // 🆕 новите нива на офиса
   for (const n of GAS_KINDS) jobs.push(load(`assets/heavy/gas/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => {}));   // бензиностанции (всяка — свое „✓ OK“); нощем — навесът и магазинът (nightfloors 'gas')
   if (feature('plants-real')) for (const k of ['bush-0', 'bush-1', 'bush-2', 'flowers', 'fountain']) jobs.push(load(`assets/heavy/plants/${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['pl-' + k] = g; }).catch(() => {}));
@@ -7895,10 +7897,34 @@ function buildCityHighway() {
   }
   city.group.add(g);
   cityHw = { g, v, conn, seg: (done || mine.find(s => s.id === job.seg)).id };
+  if (feature('hw-gantry') && A['hw-gantry']) try { cityHw.signs = hwGantries(v, seg0, mine, isAb, OVER, RAMPS); } catch (e) { console.warn('hw-gantry', e); }
   // коли и камиони по готовата магистрала (hwtraffic.js); платната са по x, около z = tx(N−1)+34
   const tg = new THREE.Group(); tg.position.x = hcx; g.add(tg); tg.userData.keep = true;   // трафикът — не се слива
   { const sid = cityHw.seg; g.userData.mergeWhen = () => hwAll().includes(sid) && cityHw && cityHw.g === g; }   // ⚡ perf-cliff: готовата магистрала в града (колоните, лампите, мантинелите) — сливане по материал
   cityHw.traffic = createHwTraffic(tg, model, A, hz, hLen, 0.92, isAb, x => overLift(OVER, x), v.service, v.ramps && v.ramps.paths);
+}
+// 🛣️ порталите над магистралата (hwsigns.js): над всяко платно ~през 1 км и пред изхода към града (≈400 м преди него);
+// в рамката на изгледа (v.group): пътят е по z, платното x < 0 — колите към +z (табелите гледат към −z), x > 0 — към −z
+function hwGantries(v, seg0, mine, isAb, OVER, RAMPS) {
+  const roadOf = sg => { const h = HIGHWAYS.find(q => q.segs.some(([a, b]) => (a === sg.a && b === sg.b) || (a === sg.b && b === sg.a))); return h ? h.id.replace('A', 'А') : isAb ? 'А' : 'А1'; };
+  const far = sg => { const c = cityById(sg.a === S.cityId ? sg.b : sg.a); return c ? c.nm : ''; };
+  const here = (cityById(S.cityId) || {}).nm || '', toB = far(seg0), other = mine.find(q => q.id !== seg0.id), toA = other ? far(other) : toB;
+  const cw = isAb ? 14.4 : 9, med = isAb ? 4 : 3, L = v.length, z0 = -L / 2, ex = RAMPS ? RAMPS.cx : null, out = [];
+  const bad = z => z < z0 + 80 || z > z0 + L - 80 || OVER.some(o => Math.abs(z - o.c) < o.w / 2 + 30) || (ex != null && Math.abs(z - ex) < 60);
+  const spots = [];
+  for (const side of [-1, 1]) {   // side −1: платното x < 0 (към +z, към toB); +1: x > 0 (към −z, към toA)
+    const dirZ = -side, exZ = ex != null ? ex - dirZ * 400 : null;   // пред изхода — 400 м преди него по посоката на колите
+    if (exZ != null && !bad(exZ)) spots.push({ side, z: exZ, dirZ });
+    for (let z = z0 + 250 + (side > 0 ? 500 : 0); z < z0 + L - 150; z += 1000) if (!bad(z) && (exZ == null || Math.abs(z - exZ) > 300)) spots.push({ side, z, dirZ });
+  }
+  for (const sp of spots) {
+    const G = gantrySigns(A['hw-gantry'].scene, cw), km = ex != null ? Math.max(0.5, Math.round(Math.abs(ex - sp.z) / 500) / 2) : 1, ahead = ex != null && (ex - sp.z) * sp.dirZ > 0;
+    G.set({ a: here, b: sp.side < 0 ? toB : toA, exit: ahead ? 'Център' : 'Паркинг', km: ahead ? km : 2, road: roadOf(sp.side < 0 || !other ? seg0 : other) });   // изходът към града — само преди него; след него — паркингът напред
+    G.root.position.set(sp.side * (med / 2 + cw / 2), 0.9 + overLift(OVER, sp.z), sp.z); if (sp.side < 0) G.root.rotation.y = Math.PI;
+    G.root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    v.group.add(G.root); out.push(G);
+  }
+  return out;
 }
 function updateCityHighway(t) {
   if (!cityHw) return;
@@ -9958,7 +9984,7 @@ function frame() {
   if (onMap) return;   // картата е SVG — 3D сцената не се рисува отдолу
   if (window.__overlay3d > 0) return;   // директорската зала (directors3d.js) е втори WebGL на цял екран — градът под нея не се рисува (иначе две сцени на кадър)
   controls.update();
-  if (S) { dayNight.update(todF(), controls.target); weather.update(rdt, controls.target); setSiteLightsNight(dayNight.night); if (city.billboards) { city.billboards.setNight(dayNight.night); city.billboards.update && city.billboards.update(rdt); } }
+  if (S) { dayNight.update(todF(), controls.target); weather.update(rdt, controls.target); setSiteLightsNight(dayNight.night); if (cityHw && cityHw.signs) for (const G of cityHw.signs) G.setNight(dayNight.night); if (city.billboards) { city.billboards.setNight(dayNight.night); city.billboards.update && city.billboards.update(rdt); } }
   perfTune(rdt);
   perf.lap('prep');
   renderer.render(scene, camera);
@@ -10075,6 +10101,7 @@ if (AUTOTEST) {
       if (nw) { Object.assign(osmFog, { on: true, near: 900, far: 2400 }); weather.set('clear'); controls.target.set(cx + 225, 40, cz); camera.position.set(cx + 225, 105, cz + 330); }   // демото: мъглата далеч (weather.js я взима от osmFog) — редицата е ~300 м else { controls.target.set(cx + SP2 * 4.5, 20, cz - 30); camera.position.set(cx + SP2 * 4.5, 110, cz + 190); } controls.update();
       return { offices: OFFICE_LEVELS.length, garages: GARAGE_LEVELS.length, wh: WH_LEVELS.length, hqLot: [hw * 2, hd * 2], info };
     },
+    gantryLook(i = 0, d = 60) { const G = cityHw && cityHw.signs && cityHw.signs[i]; if (!G) return null; const p = new THREE.Vector3(), q = new THREE.Vector3(0, 0, 1); G.root.getWorldPosition(p); q.applyQuaternion(G.root.getWorldQuaternion(new THREE.Quaternion())); controls.target.set(p.x, 6, p.z); camera.position.set(p.x + q.x * d + 6, 12, p.z + q.z * d + 6); fly = null; return cityHw.signs.length; },   // 🛣️ демо: портал i отпред
     billboardLook(i = 0) { const s = city.billboards?.spots?.[i]; if (!s) return null; controls.target.set(s.x, 8, s.z); camera.position.set(s.x + Math.sin(s.ry) * 34 + 8, 14, s.z + Math.cos(s.ry) * 34); fly = null; return city.billboards.spots.length; },   // 🪧 демо
     muni: () => muni,   // 🏛️ поръчките на общината (тест)
     ownTest() { econ.earn(1e9, 'друго', 'тест'); const ls = city.lots.filter(l => !l.built && !l.busy && l !== city.hq).slice(0, 8); for (const l of ls) buyLand(l.id); $('modal')?.classList.add('hidden'); return { own: ownCount(), land: est().land.length }; },

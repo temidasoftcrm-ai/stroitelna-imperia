@@ -53,7 +53,7 @@ function faceOf(o, mi) {
   return { fw: sz.x, fh: sz.y, c, dir, zf: dir > 0 ? bb.max.z : bb.min.z };
 }
 export function gantrySigns(scene, roadW = 26) {
-  const root = new THREE.Group(), m = scene.clone(true); root.add(m);
+  const root = new THREE.Group(), m = scene.clone(true); root.add(m); root.name = 'gantryroot';
   // плочата под модела (материал Mat.5) — не ни трябва: пътят е наш
   m.traverse(o => { if (!o.isMesh) return; if (Array.isArray(o.material)) o.material = o.material.map(mt => /^Mat\.5$/.test(mt.name) ? Object.assign(mt.clone(), { visible: false }) : mt); else if (/^Mat\.5$/.test(o.material.name)) o.visible = false; });
   const box = () => { root.updateMatrixWorld(true); const bb = new THREE.Box3(); m.traverse(o => { if (o.isMesh && o.visible) bb.expandByObject(o); }); return bb; };   // expandByObject минава и през невидимите групи — затова по мешове
