@@ -148,6 +148,8 @@ const DEMOS = [
   ['🏢 Общ парцел на фирмата — ниво 1', 'plovdiv', d => d.campus2Look(1)],   // campus2
   ['🏢 Общ парцел на фирмата — ниво 5', 'plovdiv', d => d.campus2Look(5)],   // campus2
   ['🏢 Общ парцел на фирмата — ниво 10', 'plovdiv', d => d.campus2Look(10)],   // campus2
+  ['📦 Складовете 1–10: стари (горе) и нови (долу)', 'plovdiv', d => d.whRow()],   // wh-levels2
+  ['📦 Нов склад в общия парцел (ниво 6)', 'plovdiv', d => d.campus2Look(6)],   // wh-levels2 + campus2
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

@@ -1,0 +1,12 @@
+Складовете 1–10 (Лабораторията → wh-levels2). Всички — Sketchfab, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/).
+Обработка: почистена земя, обединени в един меш, истински мащаб (дължина по x), текстури ≤1024 px JPEG, олекотени ≤12k триъгълника.
+wh-l1  — „Container_01“ by krishVector — https://sketchfab.com/3d-models/container-01-dcf7ebc2413a4655b0de3abe14ee272c
+wh-l2  — „LOW POLY - INDUSTRIAL WAREHOUSE“ by Colin.Greenall — https://sketchfab.com/3d-models/low-poly-industrial-warehouse-316a80fb28c04e14933b8b1b40187c90
+wh-l3  — „Locomotive Storage Building“ by CommonSpence — https://sketchfab.com/3d-models/locomotive-storage-building-c1c431c2ee324a1a9a130ad36ca5377d
+wh-l4  — „Factory Building A“ by CevoCreative — https://sketchfab.com/3d-models/factory-building-a-57efdff2043f4f519084b5e40cb0ce79
+wh-l5  — „Metal Storage Building“ by jimbogies — https://sketchfab.com/3d-models/metal-storage-building-2f48782f3c924079a2554113e086b539
+wh-l6  — „Warehouse“ by VertexForge — https://sketchfab.com/3d-models/warehouse-02097a13aec040068629eacc75dffc5e
+wh-l7  — „Logistics Center MAP Low Poly“ by neosearch — https://sketchfab.com/3d-models/logistics-center-map-low-poly-7d043153e1074851a97a3c5903fe6f99
+wh-l8  — „APEX INDUSTRIAL COMPLEX“ by VertexForge — https://sketchfab.com/3d-models/apex-industrial-complex-c4fae9f3e28b4bf898eacce4bdb89d44
+wh-l9  — „Logistics Center MAP Low Poly“ (neosearch) + „Warehouse“ (VertexForge), съединени — линковете горе
+wh-l10 — „Pack - Realistic - 3 Warehouse“ by Islide — https://sketchfab.com/3d-models/pack-realistic-3-warehouse-320c272513a94c0482dbb3c4e79d61f5

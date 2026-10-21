@@ -511,6 +511,7 @@ let europe = null;
   if (feature('hw-gantry')) jobs.push(load('assets/heavy/highway/hw-gantry.glb').then(g => { A['hw-gantry'] = g; }).catch(() => {}));   // 🛣️ порталът с табелите
   if (feature('office-levels2')) for (const L of OFFICE2) jobs.push(load(L.url).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[`office2-l${L.lv}`] = g; prepNightFloors(g.scene, `office2-l${L.lv}`); }).catch(() => {}));   // 🆕 новите нива на офиса
   for (const n of GAS_KINDS) jobs.push(load(`assets/heavy/gas/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => {}));   // бензиностанции (всяка — свое „✓ OK“); нощем — навесът и магазинът (nightfloors 'gas')
+  if (feature('wh-levels2')) for (let k = 1; k <= 10; k++) jobs.push(load(`assets/heavy/wh2/wh-l${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['wh2-l' + k] = g; }).catch(() => {}));   // 📦 складовете 1–10 (Sketchfab, CC-BY — assets/heavy/wh2/CREDITS.txt)
   if (feature('plants-real')) for (const k of ['bush-0', 'bush-1', 'bush-2', 'flowers', 'fountain']) jobs.push(load(`assets/heavy/plants/${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['pl-' + k] = g; }).catch(() => {}));
   for (const [dir, list] of Object.entries(MODELS)) if (dir !== 'industrial' && dir !== 'construction') for (const n of list) jobs.push(load(`assets/${dir}/${n}.glb`).then(g => { A[dir === 'industrial' ? 'ind-' + n : n] = g; if (dir === 'commercial' || dir === 'commercial2' || n === 'building-type-a' || n === 'building-type-b' || n === 'Building_Medium_2_001' || n === 'Building_Small_1') prepNightFloors(g.scene, n);   // Building_Medium_2_001 — Лабораторията → night-nyextra
     if (n === 'building-type-b') g.scene.traverse(o => { if (o.isMesh && o.material?.name === 'phong1') o.visible = false; }); }));   // бръшлянът на house-b е JPEG без прозрачност → черни петна   // нощем етажите светват (nightfloors.js)
@@ -1547,7 +1548,14 @@ function garageMesh(level, w, d) {
   return gar;
 }
 // сградата на склада: дълго хале с ролетни врати и рампа
-function warehouseMesh(level) {
+// 📦 (wh-levels2) истинските складове 1–10: контейнер → малък склад → … → логистичен парк; в метри (дължината по x — към улицата)
+function wh2Mesh(level) {
+  const n = 'wh2-l' + Math.max(1, Math.min(10, level)); if (!A[n]) return null;
+  const g = new THREE.Group(), o = A[n].scene.clone(true); g.add(o); g.updateMatrixWorld(true);
+  const b = new THREE.Box3().setFromObject(g); g.userData.h = b.max.y - b.min.y; g.userData.wh2 = n; return g;
+}
+function warehouseMesh(level, old = false) {
+  if (!old && feature('wh-levels2')) { const g2 = wh2Mesh(level); if (g2) return g2; }
   const W = Math.min(15, 9 + level * 0.6), D = 6.5, H = 3.6 + level * 0.3, g = new THREE.Group();
   const walls = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), new THREE.MeshStandardMaterial({ color: level < 5 ? 0xc9cdd2 : 0x8fa3b5, roughness: 0.7, metalness: 0.2 }));
   walls.position.y = H / 2; walls.castShadow = walls.receiveShadow = true; g.add(walls);
@@ -1600,6 +1608,7 @@ function buildWarehouse() {
   pav.rotation.x = -Math.PI / 2; pav.position.y = 0.03; pav.receiveShadow = true; if (!camp) g.add(pav);
   const wh = warehouseMesh(S.whLevel);
   wh.position.set(0, 0, camp ? 0 : -4);
+  if (!camp && wh.userData.wh2) campusFit(wh, -7.4, 7.4, -7.4, 2.6);   // истинският склад — в парцела (отпред — дворът с палетите)
   if (wr) { const hw = (wr.x1 - wr.x0) / 2, hd = (wr.z1 - wr.z0) / 2; campusFit(wh, -hw, hw, -hd, hd); }
   else if (camp) { const [W, D] = lotHalf(lot); campusFit(wh, -(W - 0.7) / 2, (W - 0.7) / 2, -(D - 0.7) / 2, (D - 0.7) / 2); }   // в своята четвъртина, по рамката
   g.add(wh);
@@ -10766,6 +10775,12 @@ if (AUTOTEST) {
       city.campusPlot = undefined; buildHQ(); showMap(false); this.tod(0.2); const h = city.hq, P = campusPlot(), r = lotRot(h), cx = P ? (P.all.x0 + P.all.x1) / 2 : 0, c = lotPt(h, cx, 0);
       this.camAt(c.x + Math.sin(r) * 55 + Math.cos(r) * 30, 48, c.z + Math.cos(r) * 55 - Math.sin(r) * 30, c.x, 4, c.z);
       return P ? { lots: P.lots, all: P.all, gar: S.garageLot, wh: S.whLot } : 'няма съседни парцели (стар план) — кампус на един парцел'; },
+    // 📦 Лабораторията (wh-levels2): складовете 1–10 — стари (горе) и нови (долу), край града
+    whRow() { if (city.whRowG) city.group.remove(city.whRowG); const g = city.whRowG = new THREE.Group(), z0 = tx(NJ - 1) + 60; let x = tx(0);
+      for (let lv = 1; lv <= 10; lv++) { const n = wh2Mesh(lv), o = warehouseMesh(lv, true), w = n ? new THREE.Box3().setFromObject(n).getSize(new THREE.Vector3()).x : 12;
+        o.position.set(x + w / 2, 0, z0); n && n.position.set(x + w / 2, 0, z0 + 40); g.add(o); if (n) g.add(n);
+        const t = label(`ниво ${lv}`, '#ffffff', 5); t.position.set(x + w / 2, 18, z0 + 20); g.add(t); x += w + 10; }
+      city.group.add(g); showMap(false); this.tod(0.2); const cx = (tx(0) + x) / 2; this.camAt(cx, x * 0.35, z0 + 20 + x * 0.55, cx, 0, z0 + 20); return { width: Math.round(x - tx(0)), loaded: Object.keys(A).filter(k => k.startsWith('wh2-')).length }; },
     garage: () => ({ office: S.officeLevel, garage: S.garageLevel, lot: S.garageLot, wh: S.whLevel, whLot: S.whLot, stock: { ...econ.s.stock }, crews: crewCount(), machines: machineCount(), own: projects.filter(p => p.own).map(p => `${p.type}:${p.stage}:${p.prog.toFixed(2)}`) }),
     look(lotId, dist = 34) { const l = lotId == null ? city.hq : city.lots[lotId]; controls.target.set(l.x, 3, l.z); camera.position.set(l.x + dist * 0.7, dist * 0.75, l.z + dist); fly = null; },
     cash: () => (S.cash || []).map(c => c.lot),
