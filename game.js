@@ -1854,7 +1854,7 @@ let jpR = null;
 function jpAgents() {
   if (!tr2 || !tr2.opts.jp || !tr2G || !city.plan || !city.plan.p2 || !tr2On()) return null;
   if (!jpR || jpR.tr !== tr2) { const o = city.plan.offset, L = q => q.p ? q : { x: q.x - o[0], z: q.z - o[1] }, R = makeRouter(tr2);
-    jpR = { tr: tr2, group: tr2G, route: (a, b, heavy) => R.route(L(a), L(b), { heavy }), add: sp => tr2.addAgent(sp), retarget: (c, r) => tr2.retarget(c, r), remove: c => tr2.removeAgent(c), alive: c => jpR.tr === tr2 && tr2.cars.includes(c) }; }
+    jpR = { tr: tr2, group: tr2G, route: (a, b, heavy) => R.route(L(a), L(b), { heavy }), add: sp => tr2.addAgent(sp), retarget: (c, r) => tr2.retarget(c, r), remove: c => tr2.removeAgent(c), alive: c => jpR.tr === tr2 && tr2.cars.includes(c), free: (p, s, len) => p.cars.every(c => Math.abs(c.s - s) > (c.L + len) / 2 + 3) }; }
   return jpR;
 }
 function spawnTraffic(n) {
@@ -2519,19 +2519,19 @@ function newGameEnter(brand) {
 const cityName = () => CITIES.find(c => c.id === S.cityId).nm;
 // 🏆 отличията (флаг awards, awards3d.js): мерките по директори и праговете на степените; връща заслужените над вече връчените
 const AWARD_TIERS = ['bronze', 'silver', 'gold', 'platinum'];
-const AWARD_RULES = {
-  con: { at: [50, 500, 5000, 50000], v: () => (S.done || 0) + Object.values(S.cities || {}).reduce((a, c) => a + (c.done || 0), 0), res: n => `Завършени ${fmt(n)} обекта` },
-  hw: { at: [300, 1500, 6000, 20000], v: () => Math.round(hwAll().reduce((a, id) => { const s = segById(id); return a + (s ? kmBetween(s.a, s.b) : 0); }, 0)), res: n => `${fmt(n)} км готови магистрали и аутобани` },
-  rail: { at: [300, 1500, 6000, 20000], v: () => Math.round((S.rails || []).filter(r => r.built).reduce((a, r) => a + (r.km || (r.b ? kmBetween(r.a, r.b) : 0)), 0)), res: n => `${fmt(n)} км готови жп линии` },
-  sea: { at: [5, 20, 60, 150], v: () => (S.seaRoutes || []).length, res: n => `${fmt(n)} морски линии` },
-  air: { at: [5, 20, 60, 150], v: () => (S.airRoutes || []).length, res: n => `${fmt(n)} авиолинии` },
+const AWARD_RULES = {   // прагове — вдигнати (потребителят: „да може“): голяма империя е по средата, платината остава за гонене; връчената степен не се губи
+  con: { at: [1000, 10000, 100000, 250000], v: () => (S.done || 0) + Object.values(S.cities || {}).reduce((a, c) => a + (c.done || 0), 0), res: n => `Завършени ${fmt(n)} обекта` },
+  hw: { at: [5000, 50000, 200000, 500000], v: () => Math.round(hwAll().reduce((a, id) => { const s = segById(id); return a + (s ? kmBetween(s.a, s.b) : 0); }, 0)), res: n => `${fmt(n)} км готови магистрали и аутобани` },
+  rail: { at: [5000, 50000, 200000, 500000], v: () => Math.round((S.rails || []).filter(r => r.built).reduce((a, r) => a + (r.km || (r.b ? kmBetween(r.a, r.b) : 0)), 0)), res: n => `${fmt(n)} км готови жп линии` },
+  sea: { at: [50, 300, 1000, 2500], v: () => (S.seaRoutes || []).length, res: n => `${fmt(n)} морски линии` },
+  air: { at: [50, 250, 700, 1500], v: () => (S.airRoutes || []).length, res: n => `${fmt(n)} авиолинии` },
   bank: { at: [3, 12, 36, 120], v: () => (S.hold?.bankRun?.months || 0), res: n => `${fmt(n)} ${n === 1 ? 'месец' : 'месеца'} поред: касата над резерва и паричният поток на плюс` },
   hotel: { at: [1, 5, 15, 40], v: () => Object.values(S.hotels || {}).filter(h => (h.t || 0) >= 2).length, res: n => `${fmt(n)} хотела 5★ и Гранд по света` },
   // потребителят: „борд на годината при 100% завършване на света“ — платината при 100%; по пътя — 25 / 50 / 75%
   year: { at: [25, 50, 75, 100], v: () => { const L = CITIES.filter(c => !AIR_ONLY.has(c.id) && c.id !== NEOM_ID); return L.length ? Math.floor(100 * L.filter(c => econ.isFinished(c.id)).length / L.length) : 0; }, res: n => `${n}% от света е завършен` },
   // Империал Сити: 6 поредни месеца (imperial.js пази месечните средни: удовлетвореност и баланс) с удовлетвореност ≥ прага и баланс на плюс → прагът
   city: { at: [60, 70, 80, 90], v: () => { const H = (imperial.state() || {}).hist || []; let best = 0; for (const T of [60, 70, 80, 90]) { let run = 0; for (let i = H.length - 1; i >= 0 && H[i].sat >= T && H[i].bal > 0; i--) run++; if (run >= 6) best = T; } return best; }, res: n => `6 месеца поред: удовлетвореност ≥ ${n}% и баланс на плюс в Империал Сити` },
-  oil: { at: [3, 10, 30, 80], v: () => { const L = mines.state().sites, has = k => L.some(x => x.kind === k); return has('oilwell') && has('refinery') && has('terminal') ? L.filter(x => ['oilwell', 'refinery', 'terminal'].includes(x.kind)).length : 0; }, res: n => `${fmt(n)} обекта във веригата добив → преработка → доставка` },
+  oil: { at: [5, 20, 60, 150], v: () => { const L = mines.state().sites, has = k => L.some(x => x.kind === k); return has('oilwell') && has('refinery') && has('terminal') ? L.filter(x => ['oilwell', 'refinery', 'terminal'].includes(x.kind)).length : 0; }, res: n => `${fmt(n)} обекта във веригата добив → преработка → доставка` },
 };
 // „Златен резерв“ (Борис): серия от месеци (по 30 игрови дни) — касата не пада под резерва му (оперативният от boardlogic, с „Резерв“ от трезора при vault-rules)
 // и месецът е с положителен паричен поток; провал → серията почва отначало. S.hold.bankRun = { months, start, m0, low }
@@ -10298,6 +10298,8 @@ if (AUTOTEST) {
     autofill(on = true, budget = 20000) { const af = autoFill(); af.on = on; af.budget = budget; autoFillTick(true); return { ...af }; },
     passing: () => passing && passing.train ? { z: Math.round(passing.train.z), v: +passing.train.v.toFixed(1), stop: +passing.train.stop.toFixed(1) } : null,
     tirs: () => tirs.list.map(t => `${t.order.matId}:${t.state}`),
+    jpAg: () => tr2 && tr2.cars.filter(c => c.agent).map(c => [c.agent.name, c.p.kind, +c.s.toFixed(1), +c.p.len.toFixed(1), +c.v.toFixed(2), c.why, +c.wait.toFixed(1), c.ri, c.route.length, +c.goal.toFixed(1)]),   /* junction-paths: агентите */
+    tirTest(m = 'sand', delay = 0) { sendTir({ id: 9e8 + ((Math.random() * 1e6) | 0), matId: m, qty: 1 }, delay); return tirs.list.length; },   /* junction-paths: пробен ТИР (поръчката не съществува — складът не се променя) */
     lookTir(k = 0, dist = 26) { const t = tirs.list[k]; if (!t) return; controls.target.set(t.x, 2, t.z); camera.position.set(t.x + dist * 0.8, dist * 0.6, t.z + dist * 0.7); fly = null; },
     money(n) { econ.earn(n, 'друго', 'тест'); },
     rep(n) { S.rep = n; },
