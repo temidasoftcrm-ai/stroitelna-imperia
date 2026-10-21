@@ -13,7 +13,7 @@ export function openOpsRebuild(ops, o = {}) {
     title: 'възстановяване на района', sky: 0xb9c3cc, cam: [-40, 70, 130], target: [0, 4, 20], bounds: [-120, 120, -90, 100], maxDist: 200, minY: 10,
     sirens: { med: 'siren-ambulance' },
     cars: {
-      sapper: [{ model: CARS + 'car-uaz452.glb', len: 4.6, path: [[-220, ROAD_Z], [-46, ROAD_Z], [-46, ROAD_Z - 8]] }],
+      sapper: [{ model: 'assets/heavy/vans/van-transit.glb', len: 5.2, path: [[-220, ROAD_Z], [-46, ROAD_Z], [-46, ROAD_Z - 8]] }],
       power: [{ model: CARS + 'car-hilux.glb', kind: 'utility', len: 5.6, path: [[220, ROAD_Z], [SUB[0] - 10, ROAD_Z], [SUB[0] - 10, SUB[1] - 10]] }],
       build: [{ model: 'assets/heavy/gear/dump.glb', len: 7, path: [[-220, ROAD_Z + 3], [-20, ROAD_Z + 3]] }, { model: CARS + 'car-truck.glb', len: 7, path: [[220, ROAD_Z + 3], [60, ROAD_Z + 3]], delay: 0.03 }],
       med: [{ model: CARS + 'amb-eu.glb', kind: 'ambulance', len: 7.2, path: [[-220, ROAD_Z], [HOSP[0] + 10, ROAD_Z], [HOSP[0] + 10, HOSP[1] - 12]] }],

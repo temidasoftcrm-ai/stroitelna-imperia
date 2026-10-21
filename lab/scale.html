@@ -60,7 +60,8 @@ async function place(key, x, extra) {
 let x = 0; const row = async (key, gap, extra) => { const r = await place(key, 0, extra); const q = r.q; r.w.position.x = x + q.w / 2; for (const l of labels.slice(-1)) l[1].x = x + q.w / 2; x += q.w + gap; return r; };
 await row('ped-adam', 2);
 await row('car-polo', 2);
-await row('car-uaz452', 2);
+await row('car-renegade', 2);
+await row('van-sprinter', 2);
 await row('gear-dump', 2.5);
 await row('trk-scania', 2.5, w => {   // полуремаркето 13,6 м зад влекача (застъпване 3,1 м) — общо 16,5 м
   const b = new THREE.Box3().setFromObject(w), cabL = b.max.z - b.min.z, tr = new THREE.Mesh(new THREE.BoxGeometry(2.55, 2.9, TRAILER), new THREE.MeshStandardMaterial({ color: 0xeeeeea })); tr.position.set(0, 1.25 + 1.45, b.min.z - TRAILER / 2 + (cabL + TRAILER - SEMI)); tr.castShadow = true; w.add(tr); });

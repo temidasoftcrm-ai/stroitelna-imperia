@@ -23,7 +23,7 @@ const BLD = ['brick', 'richmond', 'dbrick', 'modoffice', 'asian', 'jade'].map(k 
 const TLIGHT = 'assets/heavy/signs/tlight.glb', FOREST = 'assets/heavy/trees/forest.glb';
 const RIOT = 'assets/heavy/riot/';   // изгорели коли, контейнер, боклук, бусът и полицаят на силите на реда (Sketchfab, CC BY — CREDITS.txt)
 const VEH = { neg: 'assets/heavy/cars/car-accord.glb', med: 'assets/heavy/cars/amb-eu.glb', pol: 'assets/heavy/cars/pol-crownvic.glb', riot: RIOT + 'riot-van.glb' };
-const TRAFFIC = ['polo', 'corolla', 'taxi', 'renegade', 'p206', 'hilux', 'accord', 'polo', 'taxi', 'corolla', 'uaz452', 'p206'].map(k => `assets/heavy/cars/car-${k}.glb`), BUS = 'assets/heavy/cars/bus-citaro.glb';
+const TRAFFIC = ['polo', 'corolla', 'taxi', 'renegade', 'p206', 'hilux', 'accord', 'polo', 'taxi', 'corolla', 'renegade', 'p206'].map(k => `assets/heavy/cars/car-${k}.glb`), BUS = 'assets/heavy/cars/bus-citaro.glb';
 const HALL = 'assets/heavy/civic/cityhall.glb';
 // истинските дървета: пакетът „Tree Pack“ (Sketchfab, CC BY) — стволът и короната са отделни възли; събираме ги по двойки (най-близкия по X)
 let treeP = null;

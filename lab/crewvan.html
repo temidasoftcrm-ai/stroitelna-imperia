@@ -15,13 +15,13 @@
 } }
 </script></head><body>
 <div id="hud"><h1>🚐 Бусът на бригадата — избери модел</h1>
-<p>Отляво — сегашният бус (sf-car-Van, УАЗ). Вдясно — 4 истински буса (Sketchfab, CC BY) в истински размер, с логото на фирмата от двете страни. До тях — човек 1,75 м и метрова мрежа за мащаба. Марка:</p>
+<p>4-те истински буса на бригадата (вместо УАЗ; спринтерът отваря вратите) (Sketchfab, CC BY) в истински размер, с логото на фирмата от двете страни. До тях — човек 1,75 м и метрова мрежа за мащаба. Марка:</p>
 <div id="br"></div></div>
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { VANS, crewVan } from '../vanlogo.js';
+import { VANS, crewVan, VAN_CLIPS, vanDoors } from '../vanlogo.js';
 import { BRANDS } from '../group.js';
 import { scaleFor } from '../scale.js';
 const R = new THREE.WebGLRenderer({ antialias: true }); R.setSize(innerWidth, innerHeight); R.setPixelRatio(Math.min(2, devicePixelRatio)); R.outputColorSpace = THREE.SRGBColorSpace; R.shadowMap.enabled = true; document.body.appendChild(R.domElement);
@@ -32,24 +32,24 @@ const g1 = new THREE.GridHelper(120, 120, 0x9a9890, 0xb4b2aa); g1.position.y = 0
 const cam = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 500); cam.position.set(14, 7, 20); const ctl = new OrbitControls(cam, R.domElement); ctl.target.set(14, 1.5, 0); ctl.update();
 const L = new GLTFLoader(), labels = [], V = new THREE.Vector3();
 const lbl = (t, p) => { const d = document.createElement('div'); d.className = 'lbl'; d.textContent = t; document.body.appendChild(d); labels.push([d, p]); };
-const srcs = {}; for (const [k, [f]] of Object.entries(VANS)) srcs[k] = await L.loadAsync('../' + f).then(g => g.scene).catch(() => null);
-const uaz = await L.loadAsync('../assets/heavy/cars/car-uaz452.glb').then(g => g.scene).catch(() => null);
+const srcs = {}; for (const [k, [f]] of Object.entries(VANS)) srcs[k] = await L.loadAsync('../' + f).then(g => { if (g.animations.length) VAN_CLIPS[k] = g.animations; return g.scene; }).catch(() => null);
+let doors = [], open = false; const clock = new THREE.Clock();
 const ped = await L.loadAsync('../assets/heavy/people/peds/ped-adam.glb').then(g => g.scene).catch(() => null);
 let group = new THREE.Group(); sc.add(group);
 function build(brand) {
-  sc.remove(group); group = new THREE.Group(); sc.add(group); for (const [d] of labels) d.remove(); labels.length = 0;
+  doors = []; sc.remove(group); group = new THREE.Group(); sc.add(group); for (const [d] of labels) d.remove(); labels.length = 0;
   let x = 0;
-  if (uaz) { const u = crewVan(uaz, { len: 4.4 }); u.rotation.y = Math.PI / 2; u.position.x = x + 1.2; group.add(u); lbl('сега: УАЗ 4,4 м', new THREE.Vector3(u.position.x, 2.9, 0)); x += 5; }
-  for (const [k, [, len]] of Object.entries(VANS)) { const s = srcs[k]; if (!s) continue; const v = crewVan(s, { brand, len }); v.rotation.y = Math.PI / 2; v.position.x = x + v.userData.size.w / 2 + 1; group.add(v);   // страната с логото — към камерата
+  for (const [k, [, len]] of Object.entries(VANS)) { const s = srcs[k]; if (!s) continue; const v = crewVan(s, { brand, len }); v.userData.van = k; const dr = vanDoors(v); if (dr) doors.push(dr); v.rotation.y = Math.PI / 2; v.position.x = x + v.userData.size.w / 2 + 1; group.add(v);   // страната с логото — към камерата
     const z = v.userData.size; lbl(`${k}: ${z.len.toFixed(1)} × ${z.w.toFixed(1)} × ${z.h.toFixed(1)} м`, new THREE.Vector3(v.position.x, z.h + 0.6, 0)); x += Math.max(z.w, 2.4) + 4.5; }
   if (ped) { const p = ped;   /* без clone: скинатият човек пази своя скелет (клонът рисуваше огромна сива фигура) */ p.scale.setScalar(scaleFor('ped-adam', p)); const b = new THREE.Box3().setFromObject(p); p.position.set(x, -b.min.y, 2.5); group.add(p); lbl('1,75 м', new THREE.Vector3(x, 2.1, 2.5)); }
   ctl.target.set(x / 2, 1.5, 0); cam.position.set(x / 2, 9, 36); ctl.update();
 }
 const br = document.getElementById('br'), nm = new URLSearchParams(location.search).get('nm');
+document.getElementById('hud').insertAdjacentHTML('beforeend', '<div><button id="dr">🚪 Отвори / затвори вратите (спринтерът)</button></div>'); document.getElementById('dr').onclick = () => { open = !open; for (const d of doors) d.open(open); };
 br.innerHTML = BRANDS.map((b, i) => `<button data-i="${i}">${b.ico} ${b.nm}</button>`).join('');
 br.onclick = e => { const b = e.target.closest('button'); if (!b) return; for (const q of br.children) q.classList.toggle('on', q === b); build(BRANDS[+b.dataset.i]); };
 br.children[1].click();
-R.setAnimationLoop(() => { ctl.update(); R.render(sc, cam); for (const [d, p] of labels) { V.copy(p).project(cam); d.style.left = (V.x * 0.5 + 0.5) * innerWidth + 'px'; d.style.top = (-V.y * 0.5 + 0.5) * innerHeight + 'px'; } });
+R.setAnimationLoop(() => { const dt = clock.getDelta(); for (const d of doors) d.mixer.update(dt); ctl.update(); R.render(sc, cam); for (const [d, p] of labels) { V.copy(p).project(cam); d.style.left = (V.x * 0.5 + 0.5) * innerWidth + 'px'; d.style.top = (-V.y * 0.5 + 0.5) * innerHeight + 'px'; } });
 addEventListener('resize', () => { R.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); });
 window.__ready = true; window.__dump = () => group.children.map(c => { const b = new THREE.Box3().setFromObject(c), s = b.getSize(new THREE.Vector3()); return [c.position.x.toFixed(1), s.x.toFixed(1), s.y.toFixed(1), s.z.toFixed(1)].join(' '); });
 </script></body></html>

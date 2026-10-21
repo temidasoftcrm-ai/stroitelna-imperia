@@ -96,6 +96,7 @@ import { loadVehModels } from './vehmodels.js';
 import { openGlobe } from './globe.js';
 import { clientName } from './names.js';
 import { createConquest } from './conquest.js';
+import { addVanLogo, vanDoors } from './vanlogo.js';   // 🚐 бусът на бригадата: логото отстрани и вратите на Спринтера (флаг crew-van)
 import { createMapLayers } from './maplayers.js';
 import { applyRoadLook, makeCrosswalks } from './roadlook.js';
 // градски планове: извити улици и парцели покрай тях (cityplan*.js) — само за градовете в S.plans; другите са на мрежата 9×9
@@ -1697,6 +1698,7 @@ function spawnUnit(type, at) {
   const sf = A[SF_VEH[type]] ? SF_VEH[type] : null;
   const nm = A[VEH_MODEL[type]] ? VEH_MODEL[type] : 'truck', bs = VEH_LEN[type] && A[nm] ? sizeOf(nm).getSize(new THREE.Vector3()) : null;
   const obj = sf ? model(sf, SF_LEN[type]) : model(nm, bs ? VEH_LEN[type] / Math.max(bs.x, bs.z, 1e-3) : A[VEH_MODEL[type]] ? VEH_SCALE[type] || VSCALE : VSCALE);
+  if (type === 'crew' && sf && feature('crew-van')) { addVanLogo(obj, brandOf(S)); obj.userData.doors = vanDoors(obj); }
   if (type === 'crane' && !sf) {
     // жълта стрела отзад на платформата, за да личи, че е кран
     const arm = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 3.2), new THREE.MeshStandardMaterial({ color: 0xffc400 }));
@@ -1726,6 +1728,7 @@ function sendTo(u, x, z, onArrive) {
 }
 function updateUnits(dt) {
   for (const u of units) {
+    u.obj.userData.doors?.mixer.update(dt);
     if (!u.path) {
       if (u.state === 'working') u.obj.position.y = Math.abs(Math.sin(performance.now() / 180 + u.id)) * 0.06;
       continue;
@@ -1758,6 +1761,7 @@ function updateUnits(dt) {
   for (const u of units) u.obj.visible = u.state !== 'away' && !(u.state === 'idle' && u.home && u.home.inGarage);
 }
 function releaseUnit(u) {
+  u.obj.userData.doors?.open(false);
   u.proj = null;
   u.state = 'returning';
   const slot = u.home = homeSlot(u);
@@ -2649,7 +2653,7 @@ function assignUnit(u, p) {
   u.proj = p;
   const k = units.filter(q => q.proj === p).length - 1;
   const spot = [[-4.5, 5.5], [0, 4.5], [4.5, 5.5], [-4.5, 1], [4.5, 1], [0, 0]][k % 6];
-  sendTo(u, lot.x + spot[0], lot.z + spot[1], () => { if (u.proj === p) { u.state = 'working'; u.yaw = Math.PI; u.obj.rotation.y = u.yaw; } });
+  sendTo(u, lot.x + spot[0], lot.z + spot[1], () => { if (u.proj === p) { u.state = 'working'; u.obj.userData.doors?.open(true); u.yaw = Math.PI; u.obj.rotation.y = u.yaw; } });
   u.state = 'driving';
 }
 function missingRoles(p) {

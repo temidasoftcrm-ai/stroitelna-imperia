@@ -6,7 +6,8 @@
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';
 import { NF_MATS } from './nightfloors.js';
-import { Sound } from './sound.js';   // сирените на спешните коли (Лабораторията → sirens)   // нощем daynight.js вдига emissiveIntensity — фаровете на ТИР-овете
+import { Sound } from './sound.js';
+import { loadVans } from './vanlogo.js';   // бусовете (вместо УАЗ): sf-car-Van — 4 варианта; бригадата — с логото   // сирените на спешните коли (Лабораторията → sirens)   // нощем daynight.js вдига emissiveIntensity — фаровете на ТИР-овете
 
 const CAR_LEN = 4.5;   // дължината на седана в света на играта (другите коли са в същия мащаб); 1 единица ≈ 1 м (хората са ~1,9), всички коли — в истинските си метри
 const GEAR = {
@@ -44,7 +45,7 @@ export function loadVehModels(load, A, base = 'assets/heavy/gear/') {
       for (const p of parts) { const q = p.clone(true); q.applyMatrix4(p.parent.matrixWorld); grp.add(q); }   // в световни координати на пакета
       A['sf-car-' + nm] = { scene: wrap(grp, 0, k) }; addCarLights(A['sf-car-' + nm].scene);
     }
-  }).catch(e => console.warn('vehmodels cars', e)).then(() => feature('cars-real') && loadRealCars(load, A)).then(() => feature('trucks-real') && loadRealTrucks(load, A)).then(() => loadPoliceCars(load, A)));
+  }).catch(e => console.warn('vehmodels cars', e)).then(() => feature('cars-real') && loadRealCars(load, A)).then(() => loadVans(load, A, M_PER)).then(() => feature('trucks-real') && loadRealTrucks(load, A)).then(() => loadPoliceCars(load, A)));
   return Promise.all(jobs);
 }
 
@@ -52,7 +53,7 @@ export function loadVehModels(load, A, base = 'assets/heavy/gear/') {
 // Заместват част от „Free Low Poly Vehicles Pack“ под същите имена; дължината — истинската в метри × мащаба на града.
 const REAL_CARS = {   // име: [файл, дължина в м]
   Sedan: ['car-polo', 4.4], Hatchback: ['car-p206', 3.8], SUV: ['car-renegade', 4.25], Pickup: ['car-hilux', 5.3], Taxi: ['car-taxi', 4.9],
-  Van: ['car-uaz452', 4.4], Muscle: ['car-accord', 4.7], Muscle_2: ['car-corolla', 4.2], Police_Sedan: ['car-crownvic', 5.4], Bus: ['bus-citaro', 12], Limousine: ['car-limo', 7.6], Police_SUV: ['car-polsuv', 4.9], Truck: ['car-truck', 6.5],
+Muscle: ['car-accord', 4.7], Muscle_2: ['car-corolla', 4.2], Police_Sedan: ['car-crownvic', 5.4], Bus: ['bus-citaro', 12], Limousine: ['car-limo', 7.6], Police_SUV: ['car-polsuv', 4.9], Truck: ['car-truck', 6.5],
 };
 const M_PER = CAR_LEN / 4.5;   // седанът от пакета (≈4,5 м) е CAR_LEN в света на играта
 function loadRealCars(load, A) {

@@ -2,7 +2,7 @@
 // Каталог: за всеки модел — категория и по какво се мащабира: превозните средства — по дължина, хората — по ръст,
 // сградите — по височината до стряхата (етажи × височина на етаж), без покрива, комините и антените. Мащабът е еднакъв по трите оси.
 //   import { SCALE, scaleFor, measure } from './scale.js';
-//   const k = scaleFor('car-uaz452', gltf.scene); obj.scale.setScalar(k);
+//   const k = scaleFor('car-renegade', gltf.scene); obj.scale.setScalar(k);
 // measure(obj) → { w, d, h, len, eave } в единиците на модела (len — по-дългата хоризонтална страна; eave — височината до стряхата)
 import * as THREE from 'three';
 
@@ -13,9 +13,9 @@ export const SCALE = {
   'ped-adam': { cat: 'person', by: 'h', m: 1.75, f: 'assets/heavy/people/peds/ped-adam.glb' },
   // превозни средства
   'car-polo': { cat: 'car', by: 'len', m: 4.5, f: 'assets/heavy/cars/car-polo.glb' },
-  'car-uaz452': { cat: 'jeep', by: 'len', m: 4.4, f: 'assets/heavy/cars/car-uaz452.glb', note: 'УАЗ-452: 4,36 × 1,94 × 2,10 м' },
   'car-renegade': { cat: 'jeep', by: 'len', m: 4.25, f: 'assets/heavy/cars/car-renegade.glb' },
   'gear-dump': { cat: 'dumptruck', by: 'len', m: 8, f: 'assets/heavy/gear/dump.glb', note: 'самосвал 8 × 2,5 × 3,3 м' },
+  'van-sprinter': { cat: 'van', by: 'len', m: 5.9, f: 'assets/heavy/vans/van-sprinter.glb', note: 'бусът на бригадата 5,9 × 2,0 × 2,5 м' },
   'bus-citaro': { cat: 'bus', by: 'len', m: 12, f: 'assets/heavy/cars/bus-citaro.glb' },
   'trk-scania': { cat: 'tractor-unit', by: 'len', m: 6, f: 'assets/heavy/trucks/scania.glb', note: 'влекач 6 м + ремарке 13,6 м − 3,1 м застъпване = 16,5 м' },
   // сгради: eave — етажи × 3 м (+ цокъл 0,3 м)
