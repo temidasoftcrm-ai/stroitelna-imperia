@@ -1,0 +1,4 @@
+Руините след пожар (firesim.js, флаг fire-seq). Олекотени (decimate, webp, quantize). Лиценз CC BY — изисква се посочване на автора:
+burned-tower.glb — "War Damaged building 2" by local.yany (@local.yany), CC Attribution, https://sketchfab.com/3d-models/war-damaged-building-2-03c5583c895b432697dbfa62ed5d35f3
+burned-wood.glb — "Burned wooden building for reconstruction" by Alexandiir (@alexandiir), CC Attribution, https://sketchfab.com/3d-models/burned-wooden-building-for-reconstruction-306a0e85203147caa78d04070d070a10
+burned-frame.glb — "House Large Burned" by Guillermo T (@guillermot), CC Attribution, https://sketchfab.com/3d-models/house-large-burned-40d6f3df4f7649479e79deb4e5bf67a0

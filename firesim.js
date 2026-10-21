@@ -9,12 +9,18 @@
 //         day() → игрови дни (с дробната част), cam() → Vector3, econ(), hasStaff(k), crewFree() → bool, modal(t, html, buttons), toast(t, kind),
 //         fly(lot), save(), rebuild(lot) (нова сграда на парцела), cityId() }
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { flameSprite } from './fireflip.js';
 
 export const FIRE_ST = { travel: '🚒 Пожарната пътува', fight: '🚒 Гасене', saved: '✅ Спасена', burned: '⬛ Изгоряла', repair: '🏗️ Ремонт', secured: '🚧 Обезопасена', done: '✅ Възстановена' };
 const TRAVEL = 0.45, KNOCK = 0.9, BURN = 60;   // дни път; колко сила на огъня свалят пожарникарите за ден; колко % здравина на ден при пълна сила × sev
 const STAGES = [['🦺 Обезопасяване', 1], ['🏗️ Конструкция', 3], ['🎨 Фасада', 2]], CLEAR = [['🚜 Разчистване', 2], ['🏗️ Нов строеж', 5]];
 const fmt = n => Math.round(n).toLocaleString('bg-BG');
+// 0% — изгорялата сграда се сменя с руина (Sketchfab, CC BY — assets/heavy/burned/CREDITS.txt): висока → тухлената, ниска → дървената, малка къща → скелетът;
+// при разчистването руината става скелет и се снишава, после новата сграда расте под скелето
+const RUIN = { tower: 'assets/heavy/burned/burned-tower.glb', wood: 'assets/heavy/burned/burned-wood.glb', frame: 'assets/heavy/burned/burned-frame.glb' }, ruinCache = {};
+const loadRuin = k => ruinCache[k] = ruinCache[k] || new GLTFLoader().loadAsync(RUIN[k]).then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = m.receiveShadow = true; }); return g.scene; }).catch(() => null);
+const ruinKind = W => W.h >= 12 ? 'tower' : W.wid < 9 && W.half < 9 ? 'frame' : 'wood';
 
 export function createFires(deps) {
   const st = () => { const S = deps.S(); return S ? (S.fires = S.fires || []) : []; };
@@ -62,10 +68,20 @@ export function createFires(deps) {
     for (const [m, c0] of o.userData.scorchMats) m.color.copy(c0).lerp(dark, Math.min(0.85, k));
   }
 
+  const W0 = v => v.W.top - v.W.h;   // земята под сградата
+  // руината — вписана в петното на сградата (ширина по улицата, дълбочина навътре), обърната към улицата, не по-висока от сградата
+  function fitRuin(src, W, rot) {
+    const b = new THREE.Box3().setFromObject(src), sz = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3());
+    const s = Math.min(W.wid * 0.95 / sz.x, W.half * 0.95 / sz.z, W.h * 1.05 / sz.y), inner = src.clone(), r = new THREE.Group();
+    inner.position.set(-c.x, -b.min.y, -c.z); r.add(inner); r.scale.setScalar(s); r.userData.s = s; r.userData.h = sz.y * s; r.rotation.y = rot; r.position.set(W.ctr.x, W.top - W.h, W.ctr.z);
+    return r;
+  }
   function build(f) {
     const lot = lotOf(f), grp = deps.group(); if (!lot || !grp) return null;
     const g = new THREE.Group(); grp.add(g);
-    const W = windowsOf(lot), v = { g, W, flames: [], smoke: [], glows: [], steam: [], label: makeLabel(), crew: [], water: null, truck: null, path: null, scaf: null };
+    const o = lot.obj, sy = o && o.userData.sy0 != null ? o.scale.y : null; if (sy != null) o.scale.y = o.userData.sy0;   // мерките — на цялата сграда
+    const W = windowsOf(lot), v = { g, W, flames: [], smoke: [], glows: [], steam: [], label: makeLabel(), crew: [], water: null, truck: null, path: null, scaf: null, ruins: {}, ruinK: null };
+    if (sy != null) o.scale.y = sy; v.ruinK = ruinKind(W);
     v.label.position.set(W.ctr.x, W.top + 5, W.ctr.z); g.add(v.label);
     for (let i = 0; i < W.pts.length; i++) {   // по една точка на прозорец: пламък + сияние + 2 кълбета дим
       const p = W.pts[i], fl = flameSprite(1); fl.position.copy(p); fl.userData.ph = i * 1.7; fl.visible = false; g.add(fl); v.flames.push(fl);
@@ -95,7 +111,7 @@ export function createFires(deps) {
     v.hose = new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(new THREE.Vector3(), new THREE.Vector3(0, 0, 1)), 2, 0.08, 6), new THREE.MeshStandardMaterial({ color: 0x8a1c1c })); v.hose.visible = false; g.add(v.hose);
     vis.set(f.id, v); return v;
   }
-  function drop(id) { const v = vis.get(id); if (!v) return; v.g.parent && v.g.parent.remove(v.g); v.g.traverse(o => { if (o.geometry && !o.isSkinnedMesh) o.geometry.dispose(); if (o.isSkinnedMesh && o.skeleton) o.skeleton.dispose(); if (o.material && o.material.map && o.material.map !== puff && o.material.map !== glowT && o.material.map.isCanvasTexture) o.material.map.dispose(); }); vis.delete(id); }
+  function drop(id) { const v = vis.get(id); if (!v) return; { const f = st().find(q => q.id === id), lot = f && lotOf(f); if (lot && lot.obj) { lot.obj.visible = true; if (lot.obj.userData.sy0 != null) lot.obj.scale.y = lot.obj.userData.sy0; } } for (const k in v.ruins) { const r = v.ruins[k]; if (r.isObject3D && r.parent) r.parent.remove(r); }   /* руините делят геометрията с кеша — не се освобождават */ v.g.parent && v.g.parent.remove(v.g); v.g.traverse(o => { if (o.geometry && !o.isSkinnedMesh) o.geometry.dispose(); if (o.isSkinnedMesh && o.skeleton) o.skeleton.dispose(); if (o.material && o.material.map && o.material.map !== puff && o.material.map !== glowT && o.material.map.isCanvasTexture) o.material.map.dispose(); }); vis.delete(id); }
 
   // ---------- последователността ----------
   function start(lotId, o = {}) {
@@ -176,11 +192,20 @@ export function createFires(deps) {
       const lit = Math.ceil(v.flames.length * Math.min(1, 0.15 + f.inten * (0.35 + (100 - f.hp) / 140)));   // колкото по-силно и по-разрушено — толкова повече прозорци
       v.t = (v.t || 0) + dd * 24;   // „секунди“ по игровото време (24 s за ден на 1×)
       v.flames.forEach((s, i) => { const on = burning && i < lit; s.visible = on; v.glows[i].visible = on; if (on) { const k = 0.8 + 0.25 * Math.sin(v.t * 9 + s.userData.ph) * Math.sin(v.t * 6.3 + s.userData.ph * 2), h = (1.6 + 2.6 * f.inten) * k; s.scale.set(h * 0.8, h, 1); s.position.y = v.W.pts[i].y + h * 0.35; v.glows[i].material.opacity = 0.5 * f.inten; } });
-      v.smoke.forEach(s => { const i = s.userData.i, on = (burning && i < lit) || (f.st === 'saved' && f.out != null && now - f.out < 0.4 && i < 3); s.visible = on; if (!on) return; const ph = (v.t * 0.12 + s.userData.ph) % 1, o = s.userData.o; s.position.set(o.x + v.W.n.x * ph * 2, o.y + ph * 9, o.z + v.W.n.z * ph * 2); s.scale.setScalar(2 + ph * 6); s.material.opacity = (burning ? 0.55 : 0.3) * (1 - ph); });
+      const clr = f.st === 'repair' && f.order && f.order.kind === 'clear', d0 = CLEAR[0][1] / (CLEAR[0][1] + CLEAR[1][1]), k0 = clr ? f.order.prog / d0 : 0;
+      const ruinOn = f.hp <= 0 && (f.st === 'burned' || f.st === 'secured' || (clr && f.order.stage === 0)), gy = W0(v);
+      v.smoke.forEach(s => { const i = s.userData.i, on = (burning && i < lit) || (f.st === 'saved' && f.out != null && now - f.out < 0.4 && i < 3) || (ruinOn && !clr && i < 2); s.visible = on; if (!on) return; const ph = (v.t * (burning ? 0.12 : 0.06) + s.userData.ph) % 1, o = burning ? s.userData.o : (s.userData.ro || (s.userData.ro = v.W.ctr.clone().addScaledVector(v.W.side, (s.userData.ph - 0.5) * v.W.wid * 0.5))).setY(gy + 0.8 * ((v.ruins[v.ruinK] || {}).userData?.h || 3));   /* тлее — от върха на руината */ s.position.set(o.x + v.W.n.x * ph * 2, o.y + ph * 9, o.z + v.W.n.z * ph * 2); const sm = !burning && ruinOn; s.scale.setScalar(sm ? 5 + ph * 10 : 2 + ph * 6); s.material.color.setHex(sm ? 0x4a4744 : 0x2a2a2a); s.material.opacity = (burning ? 0.55 : sm ? 0.85 : 0.3) * (1 - ph * ph); });
       // пара след успешно гасене (~0,4 дни)
       const steamOn = f.out != null && f.hp > 0 && now - f.out < 0.4; v.steam.forEach(s => { s.visible = steamOn; if (!steamOn) return; const ph = (v.t * 0.1 + s.userData.ph) % 1, p = v.W.pts[(s.userData.ph * 6 | 0) % Math.max(1, v.W.pts.length)] || v.W.ctr; s.position.set(p.x, p.y + ph * 6, p.z); s.scale.setScalar(1.5 + ph * 4); s.material.opacity = 0.4 * (1 - ph) * (1 - (now - f.out) / 0.4); });
-      scorch(lot, (100 - f.hp) / 100 * 1.1);
-      if (f.st === 'burned' || (f.order && f.order.kind === 'clear' && f.st === 'repair' && f.order.stage === 0)) { if (lot.obj) lot.obj.scale.y = Math.max(0.35, lot.obj.userData.sy0 ?? (lot.obj.userData.sy0 = lot.obj.scale.y)) * (f.st === 'burned' ? 0.45 : 0.45 * (1 - f.order.prog * 2)); }
+      if (!(clr && f.order.stage >= 1)) scorch(lot, (100 - f.hp) / 100 * 1.1);
+      // руината: вместо изгорялата сграда; при разчистването — скелетът, който се снишава; после новата сграда расте
+      const want = ruinOn ? (clr && k0 > 0.5 ? 'frame' : v.ruinK) : null;
+      if (want && !v.ruins[want]) { v.ruins[want] = 'loading'; loadRuin(want).then(src => { if (!src || vis.get(f.id) !== v) return; v.ruins[want] = fitRuin(src, v.W, lot.rot || 0); v.g.add(v.ruins[want]); }); }
+      for (const k in v.ruins) { const r = v.ruins[k]; if (!r.isObject3D) continue; r.visible = k === want; if (k === want) r.scale.y = r.userData.s * (clr ? Math.max(0.15, k0 > 0.5 ? 2 - 2 * k0 + 0.15 : 1 - k0 * 0.6) : 1); }
+      const ready = want && v.ruins[want] && v.ruins[want].isObject3D;
+      if (lot.obj) { const sy0 = lot.obj.userData.sy0 ?? (lot.obj.userData.sy0 = lot.obj.scale.y);
+        if (clr && f.order.stage >= 1) { lot.obj.visible = true; lot.obj.scale.y = sy0 * Math.max(0.05, (f.order.prog - d0) / (1 - d0)); scorch(lot, 0); }
+        else { lot.obj.visible = !ready; lot.obj.scale.y = sy0; } }
       // пожарната: по пътя (игрово време) → паркира с бурканите
       if (v.truck) {
         const k = f.st === 'travel' ? Math.min(1, 1 - (f.arrive - now) / (f.arrive - f.t0)) : 1, d = k * v.len;
@@ -211,7 +236,7 @@ export function createFires(deps) {
   }
   function finish(f) {
     const lot = lotOf(f); f.order.st = 'done'; f.st = 'done';
-    if (f.order.kind === 'clear') { if (lot && lot.obj) { lot.obj.scale.y = lot.obj.userData.sy0 ?? lot.obj.scale.y; } deps.rebuild && lot && deps.rebuild(lot); }
+    if (f.order.kind === 'clear') { if (lot && lot.obj) { lot.obj.scale.y = lot.obj.userData.sy0 ?? lot.obj.scale.y; lot.obj.visible = true; } deps.rebuild && lot && deps.rebuild(lot); }
     f.hp = 100; if (lot && lot.obj) scorch(lot, 0);
     if (lot && lot.busy === 'secured') lot.busy = null;
     deps.econ().earn(f.order.reward, 'обект', f.order.kind === 'clear' ? 'Нов строеж след пожар' : 'Възстановяване след пожар');
