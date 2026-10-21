@@ -104,6 +104,7 @@ const DEMOS = [
   ['🏦 Трезорът: малко пари (40 млн. €)', 'sofia', () => $('fr').contentWindow.eval("window.__vaultMoney = 4e7; import('/directors3d.js').then(m => m.demoBoardroom())")],
   ['🏦 Трезорът: пълен (620 млрд. €), нощ', 'sofia', () => $('fr').contentWindow.eval("window.__vaultMoney = 6.2e11; window.__vaultNight = 1; import('/directors3d.js').then(m => m.demoBoardroom())")],
   ['🏆 Отличия: връчване на Ивайло (злато) в края на заседанието', 'sofia', () => $('fr').contentWindow.eval("window.__awTier = null; window.__awCeremony = 'gold'; import('/directors3d.js').then(m => m.demoBoardroom())")],   // awards3d.js
+  ['🏆 Отличия: всичките 10 на витрината', 'sofia', () => $('fr').contentWindow.eval("window.__awCeremony = null; window.__awTier = null; window.__awAll = 1; import('/directors3d.js').then(m => m.demoBoardroom())")],
   ['🏆 Отличия: Ивайло — бронз', 'sofia', () => $('fr').contentWindow.eval("window.__awCeremony = null; window.__awTier = 'bronze'; import('/directors3d.js').then(m => m.demoBoardroom())")],
   ['🏆 Отличия: Ивайло — сребро', 'sofia', () => $('fr').contentWindow.eval("window.__awCeremony = null; window.__awTier = 'silver'; import('/directors3d.js').then(m => m.demoBoardroom())")],
   ['🏆 Отличия: Ивайло — злато', 'sofia', () => $('fr').contentWindow.eval("window.__awCeremony = null; window.__awTier = 'gold'; import('/directors3d.js').then(m => m.demoBoardroom())")],

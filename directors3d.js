@@ -473,10 +473,12 @@ export function openBoardroom(o) {
   // статуетката над масата при връчване (вместо холограмата): върти се; клик → лети до мястото си във витрината
   let awT = null, awFly = null;
   const awClear = () => { if (awT) { scene.remove(awT.t.group); awT.t.dispose(); awT = null; } awFly = null; };
-  const awFrame = () => { if (!AW) return; const f = AW.frame(innerWidth / innerHeight, cam.fov); tw = { p0: cam.position.clone(), t0: ctl.target.clone(), p1: f.p, t1: f.t, k: 0 }; };
+  const awFrame = (hide = true) => { if (!AW) return; const f = AW.frame(innerWidth / innerHeight, cam.fov); tw = { p0: cam.position.clone(), t0: ctl.target.clone(), p1: f.p, t1: f.t, k: 0 };
+    if (!document.getElementById('awViewCss')) { const c = document.createElement('style'); c.id = 'awViewCss'; c.textContent = '.aw-view .scr, .aw-view .card { visibility: hidden !important; }'; document.head.appendChild(c); }
+    if (hide === true) el.classList.add('aw-view'); };   // екранът с предложението не закрива витрината; връща се при въртене на камерата или следващата точка
   function awPlace() {   // полетът: от масата до рафта, камерата — към витрината
     if (!awT || awFly || !awT.granted) return; const sl = AW.slot(awT.k); if (!sl) return;
-    awFly = { k: 0, p0: awT.t.group.position.clone(), s0: awT.t.group.scale.x, p1: sl.pos, s1: awT.t.group.scale.x * sl.h / awT.h }; awFrame();
+    awFly = { k: 0, p0: awT.t.group.position.clone(), s0: awT.t.group.scale.x, p1: sl.pos, s1: awT.t.group.scale.x * sl.h / awT.h }; awFrame(false);
   }
   if (AW) AW.setState(o.awards.state());
 
@@ -646,7 +648,7 @@ export function openBoardroom(o) {
   const B = n => Math.abs(n) >= 1e9 ? `${(n / 1e9).toLocaleString('bg-BG', { maximumFractionDigits: 1 })} млрд. €` : Math.abs(n) >= 1e6 ? `${(n / 1e6).toLocaleString('bg-BG', { maximumFractionDigits: 1 })} млн. €` : `${f(n)} €`;
   const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   function board(go = qi) {
-    clearBadges(); if (awT && !awFly) awClear();
+    clearBadges(); if (awT && !awFly) awClear(); el.classList.remove('aw-view');
     props = stepsNow();
     nav.style.display = props.length ? 'flex' : 'none';
     if (!props.length) { holo.show(null); scr.classList.remove('on'); setTimeout(() => { if (!props.length) scr.style.display = 'none'; }, 350); scrSeat = -1; aim.set(0, 1.15, -3); return; }
@@ -752,7 +754,7 @@ export function openBoardroom(o) {
   tgl('snd', snd.isOn()); tgl('voice', voiceOn); tgl('cine', cine);
   el.querySelector('.top .snd').onclick = () => { snd.setOn(!snd.isOn()); savePref('snd', snd.isOn()); tgl('snd', snd.isOn()); if (snd.isOn()) snd.ambience(true); };
   el.querySelector('.top .voice').onclick = () => { voiceOn = !voiceOn; savePref('voice', voiceOn); tgl('voice', voiceOn); if (!voiceOn) snd.hush(); };
-  if (AW) { const b = document.createElement('button'); b.className = 'tg'; b.title = 'Стената с отличията'; b.textContent = '🏆'; b.onclick = awFrame; el.querySelector('.top .cine').before(b); }   // бутон: камерата към витрината
+  if (AW) { const b = document.createElement('button'); b.className = 'tg'; b.title = 'Стената с отличията'; b.textContent = '🏆'; b.onclick = () => awFrame(); el.querySelector('.top .cine').before(b); }   // бутон: камерата към витрината
   el.querySelector('.top .cine').onclick = () => { cine = !cine; savePref('cine', cine); tgl('cine', cine); shot(cine ? sel ?? -1 : -1); };
   const showVoice = () => { if (snd.canSpeak()) el.querySelector('.top .voice').style.display = ''; };
   showVoice(); setTimeout(showVoice, 1200);
@@ -773,7 +775,7 @@ export function openBoardroom(o) {
     if (!tw) return; tw.k = Math.min(1, tw.k + dt / 1.4); const e = tw.k < 0.5 ? 2 * tw.k * tw.k : 1 - Math.pow(-2 * tw.k + 2, 2) / 2;
     cam.position.lerpVectors(tw.p0, tw.p1, e); ctl.target.lerpVectors(tw.t0, tw.t1, e); if (tw.k >= 1) tw = null;
   }
-  ctl.addEventListener('start', () => { tw = null; });
+  ctl.addEventListener('start', () => { tw = null; el.classList.remove('aw-view'); });
   // ⚙️ бюджети и автопилот (boardlogic.js) — панел в залата
   const cfg = el.querySelector('.cfg'), setEl = el.querySelector('.set');
   const fillSet = () => { setEl.innerHTML = o.settings(); o.bindSettings && o.bindSettings(setEl, fillSet); };
@@ -966,7 +968,7 @@ export function demoBoardroom(ov = {}) {
     title: 'Титан Груп — демо', brand: { nm: 'Титан', col: '#4fc3f7', ico: '🗿', group: 'Титан Груп' },
     // 🏦 трезорът (флаг vault): в демото — парите от window.__vaultMoney (Лабораторията: малко / много), разпределението — само локално
     // 🏆 отличията (флаг awards): window.__awTier — Ивайло в тази степен; window.__awCeremony — връчване в края на заседанието
-    awards: (() => { const st = window.__awTier ? { con: { tier: window.__awTier, day: 412, res: 'Завършени 12 проекта в срок и в бюджет' } } : {}; return {
+    awards: (() => { const st = window.__awAll ? Object.fromEntries(AWARDS.map((a, i) => [a.k, { tier: ['bronze', 'silver', 'gold', 'platinum'][(i * 3 + 1) % 4], day: 400 + i, res: a.cond }])) : window.__awTier ? { con: { tier: window.__awTier, day: 412, res: 'Завършени 12 проекта в срок и в бюджет' } } : {}; return {
       state: () => st, pending: () => window.__awCeremony && !st.con ? [{ k: 'con', tier: window.__awCeremony, res: 'Завършени 12 проекта в срок и в бюджет' }] : [], grant: (k, tier) => { st[k] = { tier, day: 412, res: 'Завършени 12 проекта в срок и в бюджет' }; } }; })(),
     vault: { money: () => window.__vaultMoney ?? 476.6e9, split: { res: 10, inv: 60 }, monthCost: () => (window.__vaultMoney ?? 476.6e9) * 0.02, night: () => window.__vaultNight ? 1 : 0 },
     proposals: () => DEMO_PROPS.filter(p => !p.done),
