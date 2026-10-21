@@ -84,6 +84,7 @@ const DEMOS = [
   ['🏛️ Дъщерна фирма: екран с логото', 'sofia', d => { d.subShowTest('rail', 'ask'); }],
   ['🏨 5★ хотели — 5 кандидата', 'sofia', d => d.hotel5Look()],
   ['🏛️ Директорската зала', 'sofia', () => $('fr').contentWindow.eval("import('/directors3d.js').then(m => m.demoBoardroom())")],
+  ['🪑 Директорската зала — сравнение на столовете', 'sofia', () => $('fr').contentWindow.eval("import('/directors3d.js').then(m => m.demoBoardroom({ chairChoices: true }))")],
   ['🇺🇸 Кабинет на САЩ — Белият дом', 'sofia', () => $('fr').contentWindow.eval("import('/directors3d.js').then(m => m.demoCabinet('US'))")],
   ['🇷🇺 Министерски съвет — Кремъл', 'sofia', () => $('fr').contentWindow.eval("import('/directors3d.js').then(m => m.demoCabinet('RU'))")],
   ['🇺🇸 Президентска кампания — 51 щата', 'sofia', () => $('fr').contentWindow.eval("import('/campaign.js').then(m => m.demoCampaign())")],
@@ -99,6 +100,9 @@ const DEMOS = [
   ['🌍 Геополитическата карта (Русия)', 'sofia', d => d.geoDemo('RU')],
   ['⛔ Извънредно заседание (супер поръчка)', 'sofia', () => $('fr').contentWindow.eval("import('/directors3d.js').then(m => m.demoEmergency())")],   // group.js emergency()
   ['🆘 Извънредно заседание: касата на минус', 'sofia', () => $('fr').contentWindow.eval("import('/directors3d.js').then(m => m.demoEmergency('rescue'))")],   // boardrescue.js
+  ['🏦 Трезорът зад борда (476 млрд. €)', 'sofia', () => $('fr').contentWindow.eval("window.__vaultMoney = 476.6e9; import('/directors3d.js').then(m => m.demoBoardroom())")],   // vault3d.js — вратата вляво зад масата
+  ['🏦 Трезорът: малко пари (40 млн. €)', 'sofia', () => $('fr').contentWindow.eval("window.__vaultMoney = 4e7; import('/directors3d.js').then(m => m.demoBoardroom())")],
+  ['🏦 Трезорът: пълен (620 млрд. €), нощ', 'sofia', () => $('fr').contentWindow.eval("window.__vaultMoney = 6.2e11; window.__vaultNight = 1; import('/directors3d.js').then(m => m.demoBoardroom())")],
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

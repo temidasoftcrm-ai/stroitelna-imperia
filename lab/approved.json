@@ -53,6 +53,7 @@
     "coop-col",
     "coop-lv",
     "cs-real",
+    "dir-conseq",
     "estate-random",
     "fire-man",
     "fire-real",
@@ -179,6 +180,7 @@
     "trains-real",
     "trees-real",
     "trucks-real",
+    "vault",
     "xp-km"
   ]
 }
