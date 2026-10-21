@@ -12,7 +12,7 @@ import { kidK } from './scale.js';   // детските коли (резерв�
 
 const CARS = ['sedan', 'suv', 'taxi', 'van', 'sedan-sports', 'suv-luxury', 'hatchback-sports', 'police'];
 const TRUCKS = ['truck', 'truck-flat', 'delivery', 'truck-dump-red', 'truck-concrete-red'];
-const SCALE = new Proxy({ 'truck-dump-red': 0.62, 'truck-concrete-red': 0.62, 'sf-semi-0': 1, 'sf-semi-1': 1 }, { get: (o, k) => typeof k === 'string' && k.startsWith('sf-car-') ? 1 : o[k] });   // sf-* са вече в мащаба на града
+const SCALE = new Proxy({ 'truck-dump-red': 1.14, 'truck-concrete-red': 1.18,   /* строителният пакет: 7,0 / 7,2 м при мащаб 1 → 8 / 8,5 м (беше 0,62 → 4,4 м, детски) (55) */ 'sf-semi-0': 1, 'sf-semi-1': 1 }, { get: (o, k) => typeof k === 'string' && k.startsWith('sf-car-') ? 1 : o[k] });   // sf-* са вече в мащаба на града
 // истинските: [име, тегло] — колкото по-голямо, толкова по-често
 const REAL_CARS = [['Sedan', 5], ['Hatchback', 4], ['SUV', 4], ['Pickup', 2], ['Taxi', 2], ['Muscle', 2], ['Muscle_2', 2], ['Van', 3], ['Limousine', 0.4], ['Police_Sedan', 0.5], ['Police_SUV', 0.5]];
 const A_MAX = 2.2, B_COMF = 3.2, T_HEAD = 1.2, S0 = 3;
