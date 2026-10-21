@@ -197,7 +197,7 @@ const CHANGES = [
 ];
 const seenKey = 'stroi-seen-ver';
 function changesHtml() {
-  return CHANGES.map(([v, d, L], i) => `<div style="margin-top:${i ? 10 : 0}px"><b style="color:var(--txt)">v${v}</b> <span style="color:var(--mut)">· ${d}</span>
+  return CHANGES.slice(0, 2).map(([v, d, L], i) => `<div style="margin-top:${i ? 10 : 0}px"><b style="color:var(--txt)">v${v}</b> <span style="color:var(--mut)">· ${d}</span>
     <ul style="margin:4px 0 0;padding-left:18px;font-size:13px;line-height:1.6;color:var(--mut)">${L.map(x => `<li>${x}</li>`).join('')}</ul></div>`).join('');
 }
 // hooks от game.js: credits(), newGame(), lock() — записва и спира записите (преди изтриване)
