@@ -8,6 +8,11 @@
 // deps: { S, econ, fmt, toast, save, sound, name(k), sub(k), inc(k) → приход €/ден, hired() → [k], trust(k, d) }
 
 import { FIRMS } from './rivals.js';
+import { feature } from './lab/feature.js';
+// feature 'dir-conseq': изборите имат видими последици — защитеният скандал може да се върне по-голям, отстраненият директор не предлага нищо,
+// потвърдената проверка носи глоба; бутоните казват последицата, а в панела се вижда стачка/отстраняване с оставащите дни.
+const CQ = () => feature('dir-conseq');
+const BACK_RISK = 0.25;
 const EV_EVERY = 30, STRIKE_DAYS = 10, AWAY_DAYS = 30, AUDIT_DAYS = 15;
 // 💼 годишната заплата на директора — според големината на дружеството (0,18…6 млн. €), плюс вдигнатото при насрещни предложения
 const PAY_MIN = 18e4, PAY_MAX = 6e6, PAY_K = 0.002;
@@ -21,7 +26,7 @@ const css = `
 `;
 export function createDirEvents(deps) {
   const S = () => deps.S(), day = () => S().day || 0;
-  const h = () => { const x = S().hold = S().hold || {}; x.morale = x.morale || {}; x.no = x.no || {}; x.strike = x.strike || {}; x.away = x.away || {}; x.raise = x.raise || {}; x.audit = x.audit || {}; return x; };
+  const h = () => { const x = S().hold = S().hold || {}; x.morale = x.morale || {}; x.no = x.no || {}; x.strike = x.strike || {}; x.away = x.away || {}; x.raise = x.raise || {}; x.audit = x.audit || {}; x.scandal = x.scandal || {}; return x; };
   const payOf = k => Math.round(Math.min(PAY_MAX, Math.max(PAY_MIN, 12e4 + (deps.inc(k) || 0) * 365 * PAY_K)) / 1e4) * 1e4 + (h().raise[k] || 0);
   const mood = k => h().morale[k] ?? 0.8;
   const setMood = (k, v) => { h().morale[k] = Math.max(0, Math.min(1, v)); };
@@ -54,7 +59,12 @@ export function createDirEvents(deps) {
     { const r = deps.hired().reduce((a, k) => a + (x.raise[k] || 0), 0) / 365; if (r > 0) deps.econ().spend(Math.round(r), 'заплати', 'Холдинг: увеличения на директорите'); }   // насрещните предложения — всеки ден
     for (const [k, t] of Object.entries(x.audit)) if (t && t <= d) { x.audit[k] = 0; if (!deps.name(k)) continue;   // 🔎 независимата проверка
       if (Math.random() < 0.7) { deps.trust && deps.trust(k, 0.05); setMood(k, mood(k) + 0.08); deps.toast(`🔎 Проверката изчисти ${first(k)} — обвиненията са неверни. Доверието расте.`, 'good'); }
+      else if (CQ()) { const fine = fineOf(k); deps.trust && deps.trust(k, -0.03); deps.econ().spend(fine, 'заплати', 'Холдинг: глоба след проверка'); note(`🔎 Проверката потвърди нарушението`, `${deps.name(k)} напуска ${deps.sub(k) || k}. Регулаторът глоби холдинга ${B(fine)}. Дружеството е без директор — назначи нов от „Холдинг“.`); leave(k); }
       else { deps.trust && deps.trust(k, -0.03); deps.toast(`🔎 Проверката потвърди нарушението — ${deps.name(k)} напуска.`, 'bad'); leave(k); } }
+    for (const [k, v] of Object.entries(x.scandal)) if (v && v.at <= d) { delete x.scandal[k]; if (!deps.name(k)) continue;   // 🛡️ защитеният скандал: утихва или се връща по-голям
+      if (v.back) { const fine = fineOf(k) * 2; deps.econ().spend(fine, 'заплати', 'Холдинг: глоба — скандалът се върна'); deps.trust && deps.trust(k, -0.1); setMood(k, mood(k) - 0.15); x.away[k] = d + AWAY_DAYS;
+        note(`📰 Скандалът около ${first(k)} се върна — по-голям`, `Излязоха доказателства. Холдингът плаща глоба ${B(fine)}, доверието пада с 10%, а ${deps.name(k)} е отстранен${G(k).ed} принудително за ${AWAY_DAYS} дни — ${deps.sub(k) || k} е без бонус на директора и без предложения.`); }
+      else deps.toast(`📰 Скандалът около ${first(k)} утихна — защитата се оказа правилна.`, 'good'); }
     if (document.getElementById('dirEv') || (typeof window !== 'undefined' && (window.__overlay3d || 0) > 0)) return;   // не по време на заседание
     if (d - (x.evDay || 0) < EV_EVERY || deps.hired().length < 2 || Math.random() > 0.06) return;
     x.evDay = d; fire();
@@ -79,13 +89,13 @@ export function createDirEvents(deps) {
       ask(`✊ Стачка в ${sub}`, `Синдикатът иска +8% заплати. Без споразумение — ${STRIKE_DAYS} дни стачка: холдингът губи ~${B(inc * 0.5)} на ден (общо ~${B(loss)}). ${first(k)} предлага да се договорим.`, [
         [`🤝 Приеми исканията — ${B(c)}`, () => { if (!pay(c)) return false; setMood(k, mood(k) + 0.05); deps.toast(`✅ ${sub}: споразумение, стачката е отменена.`, 'good'); }],
         [`⚖️ Компромис +4% — ${B(half)} (шанс ~60%)`, () => { if (!pay(half)) return false; if (Math.random() < 0.6) deps.toast(`✅ ${sub}: компромисът е приет.`, 'good'); else { h().strike[k] = day() + Math.ceil(STRIKE_DAYS / 2); deps.toast(`✊ ${sub}: синдикатът отказа компромиса — ${Math.ceil(STRIKE_DAYS / 2)} дни стачка.`, 'bad'); } }],
-        ['⏳ Изчакай', () => { h().strike[k] = day() + STRIKE_DAYS; setMood(k, mood(k) - 0.05); deps.toast(`✊ ${sub}: стачка за ${STRIKE_DAYS} дни.`, 'bad'); }],
+        [CQ() ? `⏳ Изчакай — ${STRIKE_DAYS} дни стачка: −50% приход (~${B(loss)}), без бонус` : '⏳ Изчакай', () => { h().strike[k] = day() + STRIKE_DAYS; setMood(k, mood(k) - 0.05); deps.toast(`✊ ${sub}: стачка за ${STRIKE_DAYS} дни.`, 'bad'); }],
       ]);
     } else if (r < 0.75) {   // 📰 скандал
       ask(`📰 Скандал около ${first(k)}`, `Медиите пишат, че ${nm} е дал${g.ed} поръчка на фирма на свой роднина. Доказателства още няма.`, [
-        [`🔎 Независима проверка — ${B(Math.max(5e4, Math.round(payOf(k) * 0.15 / 1e4) * 1e4))}, резултат след ${AUDIT_DAYS} дни`, () => { if (!pay(Math.max(5e4, Math.round(payOf(k) * 0.15 / 1e4) * 1e4))) return false; h().audit[k] = day() + AUDIT_DAYS; deps.toast(`🔎 Започна независима проверка — ${first(k)} продължава да работи.`, ''); }],
-        [`🛡️ Застани зад ${g.it}`, () => { deps.trust && deps.trust(k, -0.05); setMood(k, mood(k) + 0.1); deps.toast(`🛡️ Холдингът защити ${first(k)} — доверието на пазара леко пада.`, ''); }],
-        [`⏸️ Отстрани ${g.acc} за ${AWAY_DAYS} дни (разследване)`, () => { h().away[k] = day() + AWAY_DAYS; setMood(k, mood(k) - 0.15); deps.toast(`⏸️ ${first(k)} е отстранен${g.ed} до края на разследването — ${sub} е без бонус на директора.`, ''); }],
+        [`🔎 Независима проверка — ${B(Math.max(5e4, Math.round(payOf(k) * 0.15 / 1e4) * 1e4))}, резултат след ${AUDIT_DAYS} дни${CQ() ? ` (чист: доверие и настроение ↑; виновен: напуска + глоба ~${B(fineOf(k))})` : ''}`, () => { if (!pay(Math.max(5e4, Math.round(payOf(k) * 0.15 / 1e4) * 1e4))) return false; h().audit[k] = day() + AUDIT_DAYS; deps.toast(`🔎 Започна независима проверка — ${first(k)} продължава да работи.`, ''); }],
+        [CQ() ? `🛡️ Застани зад ${g.it} — доверие −5%, риск ~${Math.round(BACK_RISK * 100)}% скандалът да се върне по-голям` : `🛡️ Застани зад ${g.it}`, () => { deps.trust && deps.trust(k, -0.05); setMood(k, mood(k) + 0.1); if (CQ()) h().scandal[k] = { at: day() + 30 + Math.floor(Math.random() * 31), back: Math.random() < BACK_RISK }; deps.toast(`🛡️ Холдингът защити ${first(k)} — доверието на пазара леко пада.`, ''); }],
+        [CQ() ? `⏸️ Отстрани ${g.acc} за ${AWAY_DAYS} дни — без бонус и без предложения, настроение −15%` : `⏸️ Отстрани ${g.acc} за ${AWAY_DAYS} дни (разследване)`, () => { h().away[k] = day() + AWAY_DAYS; setMood(k, mood(k) - 0.15); deps.toast(`⏸️ ${first(k)} е отстранен${g.ed} до края на разследването — ${sub} е без бонус на директора.`, ''); }],
       ]);
     } else {   // 🏆 награда
       setMood(k, mood(k) + 0.1); deps.trust && deps.trust(k, 0.05);
@@ -97,6 +107,10 @@ export function createDirEvents(deps) {
     const x = h(), nm = deps.name(k), g = G(k); delete x.dir[k]; setMood(k, 0.8); x.no[k] = []; delete x.raise[k];
     deps.toast(`👋 ${nm} напусна${fem(k) ? '' : ''}. ${deps.sub(k) || k} е без директор — назначи нов от „Холдинг“.`, 'bad'); deps.save();
   }
+  const fineOf = k => Math.max(1e5, Math.round(payOf(k) * 0.3 / 1e4) * 1e4);
+  const note = (title, text) => { if (document.getElementById('dirEv') || (window.__overlay3d || 0) > 0) deps.toast(`${title}: ${text}`, 'bad'); else ask(title, text, [['Разбрах', () => { }]]); };   // последицата — като прозорец (или известие, ако вече има отворен)
+  // ✊/⏸️ в панела на холдинга: какво става с дружеството и още колко дни
+  const tag = k => { const d = day(), x = h(); if (struck(k)) return `✊ стачка — −50% приход, без бонус, още ${x.strike[k] - d} дни · `; if (away(k)) return `⏸️ отстранен — без бонус и предложения, още ${x.away[k] - d} дни · `; return x.scandal[k] ? '📰 скандалът тлее · ' : ''; };
   const pay = c => { const e = deps.econ(); if (!e.canAfford(c)) { deps.toast(`Нямаш ${B(c)}.`, 'bad'); return false; } e.spend(c, 'заплати', 'Холдинг: директори'); return true; };
   // малък прозорец с избор (сам — не зависи от game.js)
   function ask(title, text, opts) {
@@ -107,5 +121,5 @@ export function createDirEvents(deps) {
     opts.forEach(([lab, fn], i) => { const b = document.createElement('button'); b.textContent = lab; if (i === 0) b.className = 'go'; b.onclick = () => { if (fn() === false) return; w.remove(); deps.save(); }; w.firstChild.appendChild(b); });
     document.body.appendChild(w);
   }
-  return { onNo, onYes, dailyTick, bonusOff, mood, struck, away, fire, payOf };
+  return { onNo, onYes, dailyTick, bonusOff, mood, struck, away, fire, payOf, tag, cq: CQ };
 }

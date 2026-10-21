@@ -8597,7 +8597,7 @@ function boardProposals() {
   boardC = { k: bk, t: now, out: out0 }; return out0;
 }
 function boardProposals0() {
-  const hasSub = dir => dir === 'mayor' ? !!mayorName() : (dir === 'bank' ? !!S.bank : !S.foundFirst || !!(S.group || {})[dir]) && !!((S.hold || {}).dir || {})[dir];   // предлага само основано дружество с назначен директор
+  const hasSub = dir => (dir === 'mayor' ? !!mayorName() : (dir === 'bank' ? !!S.bank : !S.foundFirst || !!(S.group || {})[dir]) && !!((S.hold || {}).dir || {})[dir]) && !(feature('dir-conseq') && (((S.hold || {}).away || {})[dir] || 0) > S.day);   // отстранен директор (dir-conseq) — без предложения   // предлага само основано дружество с назначен директор
   const out = [], M = n => fmt(Math.round(n)), own = [...new Set(ownedCities())], cityNm = id => cityById(id)?.nm || id;
   const list = ids => ids.slice(0, 4).map(cityNm).join(', ') + (ids.length > 4 ? ` и още ${ids.length - 4}` : '');
   const pl = (n, one, many) => `${n} ${n === 1 ? one : many}`, gi = n => n === 1 ? 'го' : 'ги', pct1 = v => (v * 100).toLocaleString('bg-BG', { minimumFractionDigits: 1, maximumFractionDigits: 1 });   // 1 филиал / 2 филиала; десетична запетая

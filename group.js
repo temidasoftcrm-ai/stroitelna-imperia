@@ -188,7 +188,7 @@ export function createGroup(deps) {
   }
   // 📋 панелът на директора в „Холдинг“: неговите предложения (Да / ½ / По-късно / Не, съвещателен вот при нужда) и ангажиментите му с напредъка
   const openPanels = new Set();
-  const moodTag = k => { const m = dirEv.mood(k); return `<span title="Настроение на директора">${dirEv.away(k) ? '⏸️ отстранен · ' : dirEv.struck(k) ? '✊ стачка · ' : ''}${m >= 0.7 ? '😊' : m >= 0.45 ? '😐' : '😤'} ${Math.round(m * 100)}%</span> · `; };
+  const moodTag = k => { const m = dirEv.mood(k); return `<span title="Настроение на директора">${dirEv.cq() ? dirEv.tag(k) : dirEv.away(k) ? '⏸️ отстранен · ' : dirEv.struck(k) ? '✊ стачка · ' : ''}${m >= 0.7 ? '😊' : m >= 0.45 ? '😐' : '😤'} ${Math.round(m * 100)}%</span> · `; };
   function dirPanel(k) {
     const B2 = deps.board2 && deps.board2(); if (!B2) return '';
     const ps = proposals().filter(p => p.dir === k && !p.info), cs = (B2.commits ? B2.commits() : []).filter(c => c.dir === k && (c.st === 'active' || (c.st === 'done' && c.end >= (deps.S().day || 0) - 30)));
