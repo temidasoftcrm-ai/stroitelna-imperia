@@ -9950,6 +9950,24 @@ if (AUTOTEST) {
       const prev = city.billboards; city.billboards = { setNight: k => { city.bbRow.setNight(k); prev && prev.setNight(k); }, update: dt => { city.bbRow.update(dt); prev && prev.update && prev.update(dt); }, dispose: () => { city.bbRow.dispose(); prev && prev.dispose(); }, spots: prev ? prev.spots : [] };
       if (night != null) __dbg.time && __dbg.time(night ? 22 : 12);
       const mid = (spots[0].x + spots[4].x) / 2; controls.target.set(mid, 9, z0); camera.position.set(mid, 16, z0 + 78); fly = null; return city.bbRow.spots.length; },
+    // 🏢 Лабораторията: всички нива на офиса, гаража и склада в три реда (градът скрит), човек за мащаб
+    hqLevelsRow() {
+      if (city.hqRow) { scene.remove(city.hqRow); city.hqRow = null; }
+      const G = city.hqRow = new THREE.Group(), cx = city.hq.x, cz = city.hq.z, SP = 22, put = (o, x, z, txt) => { o.position.x += x; o.position.z += z; G.add(o); const b = new THREE.Box3().setFromObject(o), lb = label(txt, '#fff', 9); lb.position.set(x, b.max.y + 3, z); G.add(lb); };
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(SP * 11, 90), new THREE.MeshStandardMaterial({ color: 0x8f9a7c, roughness: 1 })); ground.rotation.x = -Math.PI / 2; ground.position.set(SP * 4.5, 0.02, 0); G.add(ground);
+      OFFICE_LEVELS.forEach((L, i) => {
+        let o; if (!L.model) { o = new THREE.Group(); const bx = new THREE.Mesh(new THREE.BoxGeometry(6, 2.6, 2.6), new THREE.MeshStandardMaterial({ color: 0xf2f2ee })); bx.position.y = 1.5; o.add(bx); }
+        else { const n = L.model.split('@')[0]; if (!A[n]) return; o = model(n, fitScale(n, 6.5 + (i + 1) * 0.25)); const b = new THREE.Box3().setFromObject(o); o.position.set(-(b.min.x + b.max.x) / 2, 0, -(b.min.z + b.max.z) / 2); }
+        put(o, i * SP, -28, `🏢 ${i + 1} · ${L.nm}`);
+      });
+      GARAGE_LEVELS.forEach((L, i) => put(garageMesh(i + 1, Math.min(15, 8 + (i + 1) * 0.7), 6 + Math.min(i + 1, 8) * 0.15), i * SP, 0, `🚜 ${i + 1} · ${L.nm} (${L.cap})`));
+      WH_LEVELS.forEach((L, i) => put(warehouseMesh(i + 1), i * SP, 28, `📦 ${i + 1} · ${L.nm}`));
+      const pk = [0, 1, 2, 3, 4, 5].map(k => `sf-person-${k}`).find(n => A[n]); if (pk) for (const z of [-28, 0, 28]) { const m = model(pk, 1); m.position.set(-8, 0, z + 4); G.add(m); }
+      G.position.set(cx, 0, cz); scene.add(G); city.group.visible = false;
+      __dbg.time && __dbg.time(12);
+      controls.target.set(cx + SP * 4.5, 4, cz); camera.position.set(cx + SP * 4.5, 95, cz + 150); controls.update();
+      return { offices: OFFICE_LEVELS.length, garages: GARAGE_LEVELS.length, wh: WH_LEVELS.length };
+    },
     billboardLook() { const s = city.billboards?.spots?.[0]; if (!s) return null; controls.target.set(s.x, 8, s.z); camera.position.set(s.x + Math.sin(s.ry) * 34 + 8, 14, s.z + Math.cos(s.ry) * 34); fly = null; return city.billboards.spots.length; },   // 🪧 демо
     muni: () => muni,   // 🏛️ поръчките на общината (тест)
     ownTest() { econ.earn(1e9, 'друго', 'тест'); const ls = city.lots.filter(l => !l.built && !l.busy && l !== city.hq).slice(0, 8); for (const l of ls) buyLand(l.id); $('modal')?.classList.add('hidden'); return { own: ownCount(), land: est().land.length }; },

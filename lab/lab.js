@@ -119,6 +119,7 @@ const DEMOS = [
   ['🪧 Билбордове по булеварда (Империал, нощ)', 'sofia', d => { d.bbRebuild('imperial'); d.time && d.time(22); setTimeout(() => d.billboardLook(), 1500); }],
   ['🏢 Кампус: офис отпред, гараж и склад отзад, общ двор', 'sofia', d => d.campusLook()],   // hq-campus (game.js __dbg.campusLook)
   ['🚶 Пътеки и алеи от сградите до тротоара', 'sofia', d => d.pathsLook()],   // lot-paths (game.js __dbg.pathsLook)
+  ['🏢 Офис, гараж и склад — всички нива (1–10) в редица', 'sofia', d => { for (const ms of [0, 4000]) setTimeout(() => d.hqLevelsRow(), ms); }],
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
