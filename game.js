@@ -7621,7 +7621,8 @@ function buildCityHighway() {
   city.group.add(g);
   cityHw = { g, v, conn, seg: (done || mine.find(s => s.id === job.seg)).id };
   // коли и камиони по готовата магистрала (hwtraffic.js); платната са по x, около z = tx(N−1)+34
-  const tg = new THREE.Group(); tg.position.x = hcx; g.add(tg);
+  const tg = new THREE.Group(); tg.position.x = hcx; g.add(tg); tg.userData.keep = true;   // трафикът — не се слива
+  { const sid = cityHw.seg; g.userData.mergeWhen = () => hwAll().includes(sid) && cityHw && cityHw.g === g; }   // ⚡ perf-cliff: готовата магистрала в града (колоните, лампите, мантинелите) — сливане по материал
   cityHw.traffic = createHwTraffic(tg, model, A, hz, hLen, 0.92, isAb, x => overLift(OVER, x), v.service);
 }
 function updateCityHighway(t) {
@@ -8667,10 +8668,34 @@ function boardProposals0() {
     P({ dir: 'sea', ico: '🏆', key: 'conq-ports', conq: true, items: ports, cost: id => amL(PORT_LEVELS[0], id, 'port').cost, run: id => buildPort(id),
       text: a => `🏆 За завладяването: ${pl(a.length, 'пристанище', 'пристанища')} ниво 1 (${list(a)}) — ${cpct(a.length)}. Остават ${cm.ports.length}.`, why: 'всяко построено пристанище е част от завладяването', days: () => PORT_LEVELS[0].days || 15,
       income: a => a.length * shipDaily('container'), goal: a => `${pl(a.length, 'ново пристанище', 'нови пристанища')} за завладяването`, track: a => ({ k: 'port', ids: a, base: Object.fromEntries(a.map(id => [id, 0])) }), geo: a => geoOf('port', a) });
-    const airs = dev.has('AIR') ? cm.air.filter(id => cityById(id) && contOk(id) && !airportOf(id)?.build && !airportOf(id)?.muni).slice(0, 20) : [];
+    const needAir = new Set(cm.countries.flatMap(k => k.cities).filter(id => !airOkFin(id)));
+    const airs = dev.has('AIR') ? [...cm.air].sort((a, b) => needAir.has(b) - needAir.has(a)).filter(id => cityById(id) && contOk(id) && !airportOf(id)?.build && !airportOf(id)?.muni).slice(0, 20) : [];
     P({ dir: 'air', ico: '🏆', key: 'conq-air', conq: true, items: airs, cost: id => amL(AIRPORT_LEVELS[0], id, 'air').cost, run: id => buildAirport(id),
       text: a => `🏆 За завладяването: ${pl(a.length, 'летище', 'летища')} ниво 1 (${list(a)}) — ${cpct(a.length)}. Остават ${cm.air.length}.`, why: 'всяко построено летище е част от завладяването', days: () => AIRPORT_LEVELS[0].days || 20,
       income: a => a.length * planeDaily('narrow'), goal: a => `${pl(a.length, 'ново летище', 'нови летища')} за завладяването`, track: a => ({ k: 'air', ids: a, base: Object.fromEntries(a.map(id => [id, 0])) }), geo: a => geoOf('airport', a) });
+    // етап 2: държавите — филиали в градовете им (най-близките до завладяване държави първо), после квартал/завършване на готовите
+    const ks = [...cm.countries].sort((a, b) => a.cities.length - b.cities.length), kOf = id => ks.find(k => k.cities.includes(id));
+    const kCities = ks.flatMap(k => k.cities).filter(id => cityById(id) && contOk(id) && id !== S.cityId);
+    const brs = kCities.filter(id => branchOk(id) && !coopFree(id)).slice(0, 10);
+    P({ dir: 'con', ico: '🏆', key: 'conq-branches', conq: true, items: brs.map(id => ({ id })), cost: (o, i) => { const c = ECON.BRANCH_COST(o.id, brN() + i); return c + branchExtra(o.id, c); }, run: o => openBranchNow(o.id),
+      text: a => `🏆 За завладяването: ${pl(a.length, 'филиал', 'филиала')} в незавладените държави (${list(a.map(o => o.id))}) — първата стъпка към ${[...new Set(a.map(o => kOf(o.id)?.nm).filter(Boolean))].slice(0, 3).join(', ')}.`,
+      why: 'държава е завладяна, когато всичките ѝ ключови градове са завършени — без филиал там няма как', days: () => 1, income: a => a.length * brIncome(),
+      goal: a => `${pl(a.length, 'нов филиал', 'нови филиала')} за завладяването`, track: a => ({ k: 'branch', ids: a.map(o => o.id) }), geo: a => geoOf('branch', a.map(o => o.id)) });
+    const mine = kCities.filter(id => own.includes(id) && (S.cities || {})[id]);
+    const ready = id => { const c = S.cities[id]; return (c.cityExt || 0) >= extNeedOf(id) && remFree(c, id) != null && remFree(c, id) <= freeMax(id) && rivals.share() >= 0.6 && airOkFin(id); };
+    const fin = mine.filter(ready).slice(0, 10);
+    P({ dir: 'con', ico: '🏆', key: 'conq-finish', conq: true, items: fin, cost: () => 0, run: id => finishCityRemote(id),
+      text: a => `🏆 За завладяването: ${pl(a.length, 'град е готов', 'града са готови')} за завършване (${list(a)}). Предлагам да ${a.length === 1 ? 'го' : 'ги'} завършим.`,
+      why: 'всеки завършен ключов град приближава държавата до завладяване', days: () => 0, gainTxt: a => `${pl(a.length, 'завършен град', 'завършени града')} — по-близо до ${[...new Set(a.map(id => kOf(id)?.nm).filter(Boolean))].slice(0, 3).join(', ')}`,
+      goal: a => `${pl(a.length, 'град е завършен', 'града са завършени')}` });
+    const dists = mine.filter(id => !ready(id) && (S.cities[id].cityExt || 0) < extNeedOf(id)).map(id => ({ id, q: districtInfo(id) })).filter(o => o.q.ext < o.q.max).slice(0, 10);
+    P({ dir: 'con', ico: '🏆', key: 'conq-districts', conq: true, items: dists, cost: o => o.q.cost, run: o => buyDistrictAt(o.id),
+      text: a => `🏆 За завладяването: ${pl(a.length, 'град има нужда', 'града имат нужда')} от още квартал, за да ${a.length === 1 ? 'може да бъде завършен' : 'могат да бъдат завършени'} (${list(a.map(o => o.id))}).`,
+      why: 'за завършване градът иска нужния брой квартали', days: () => 1, gainTxt: a => `${a.length * 9} нови парцела`, goal: a => `Нов квартал в ${pl(a.length, 'град', 'града')}`,
+      track: a => ({ k: 'district', ids: a.map(o => o.id), base: Object.fromEntries(a.map(o => [o.id, o.q.ext])) }), geo: a => geoOf('district', a.map(o => o.id)) });
+    // заглавният ред най-отгоре: колко е завладяно и колко предложения остават
+    { const n = out.filter(p => p.conq).length, wp = Math.floor(cm.done / Math.max(1, cm.total) * 100);
+      out.push({ id: `con:conq-head:${S.day}`, dir: 'con', ico: '🏆', info: true, conq: true, head: true, cost: 0, count: 1, apply: () => {}, text: `🏆 Завладяване ${wp}% → остават ${pl(n, 'предложение', 'предложения')} (${cm.countries.length} държави, ${cm.hw.length + cm.ab.length} участъка, ${cm.ports.length} пристанища, ${cm.air.length} летища)` }); }
   }
   // ━━ 🛣️ Магистрали: участъци до градовете без мрежа, надграждане в аутобан, ТИР-ове
   { const net = new Set(hwAll().flatMap(id => { const x = segById(id); return x ? [x.a, x.b] : []; })), busy = new Set([...(S.hwJobs || []).map(j => j.seg), ...hwQueue()]);
@@ -8886,7 +8911,7 @@ function boardProposals0() {
     const ask = out.reduce((a, p) => a + (p.cost || 0), 0);
     out.unshift({ id: `bank:brief:${S.day}`, dir: 'bank', ico: '🏦', info: true, cost: 0, count: 1, avail: F.free, reserve: F.op, reserved: F.reserved, cash: F.cash, apply: () => {},
       text: `${boardL.bankSpeech()} ${ask ? `Предложенията днес искат общо ${M(ask)} €${ask > F.free ? ' — повече, отколкото можем; първо тези в рамките на бюджета.' : ' — вместват се.'}` : 'Днешните предложения са без разход от касата.'}` }); }
-  { const cq = out.filter(p => p.conq); if (cq.length) { const rest = out.filter(p => !p.conq), k = rest[0]?.info ? 1 : 0; out.splice(0, out.length, ...rest.slice(0, k), ...cq, ...rest.slice(k)); } }   // 🏆 завладяването — най-отгоре (след банката)
+  { const cq = out.filter(p => p.conq); if (cq.length) { const rest = out.filter(p => !p.conq), k = rest[0]?.info ? 1 : 0; cq.sort((a, b) => !!b.head - !!a.head); out.splice(0, out.length, ...rest.slice(0, k), ...cq, ...rest.slice(k)); } }   // 🏆 завладяването — най-отгоре (след банката)
   return out;
 }
 // 📊 статусът на ангажимент от борда (boardlogic.js review): { done, total, reason, blocked } — от игровите данни
