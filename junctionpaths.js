@@ -29,7 +29,7 @@ export function makeRouter(built) {
   }
   // from: { x, z } или { p, s } (оттам, където агентът е сега); to: { x, z }. Дейкстра по пътеките (лента → връзка → лента)
   function route(from, to, o = {}) {
-    const okL = o.heavy ? wide : () => true, A = from.p ? from : nearest(from.x, from.z, L => okL(L) && !L.leave && L.ring == null), B = to.p ? to : nearest(to.x, to.z, L => okL(L) && L.ring == null);   // целта — лента извън пръстена (или зададена направо)
+    const okL = o.heavy ? wide : () => true, A = from.p ? from : nearest(from.x, from.z, L => okL(L) && !L.leave && L.ring == null), B = to.p ? to : nearest(to.x, to.z, L => okL(L) && L.ring == null && !L.enter);   // целта — лента извън пръстена, не входяща от края на картата (до нея няма път)   // целта — лента извън пръстена (или зададена направо)
     if (!A || !B) return null;
     const s0 = Math.min(A.s, A.p.len), s1 = Math.max(0.5, Math.min(B.s, B.p.len - 0.5));
     if (A.p === B.p && s1 >= s0) return { paths: [A.p], s0, s1, len: s1 - s0 };
@@ -55,6 +55,16 @@ export function makeRouter(built) {
     return { paths, s0, s1, len: paths.reduce((t, p) => t + p.len, 0) - s0 - (B.p.len - s1) };
   }
   return { route, nearest };
+}
+
+// точка на пътека p на разстояние s (в координатите на плана)
+export function pointOn(p, s) { s = Math.max(0, Math.min(p.len, s)); let k = 1; while (k < p.cum.length - 1 && p.cum[k] < s) k++; const a = p.pts[k - 1], b = p.pts[k], t = (s - p.cum[k - 1]) / ((p.cum[k] - p.cum[k - 1]) || 1); return { x: a[0] + (b[0] - a[0]) * t, z: a[1] + (b[1] - a[1]) * t }; }
+// маршрутът — само последните max метра (ТИР-ът се появява близо до целята): премества началото напред по пътеките
+export function trimRoute(r, max) {
+  if (!r || r.len <= max) return r; let skip = r.len - max, i = 0, s0 = r.s0;
+  while (i < r.paths.length - 1 && r.paths[i].len - s0 < skip) { skip -= r.paths[i].len - s0; s0 = 0; i++; }
+  while (i < r.paths.length - 1 && r.paths[i].kind !== 'lane') { i++; s0 = 0; }   // начало — на лента (не в кръстовище)
+  return { ...r, paths: r.paths.slice(i), s0: Math.min(s0 + skip, Math.max(0, r.paths[i].len - 1)), len: max };
 }
 
 // ---- дебъг: window.__jpDebug = true (или debugLayer(...) от конзолата/Лабораторията)

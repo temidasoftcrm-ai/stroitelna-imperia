@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';
 import { addTruckLamps } from './vehmodels.js';
+import { trimRoute } from './junctionpaths.js';
 
 const SPEED = 12, UNLOAD = 2.2, LANE = 1.9;
 // в големите градове (плановете по истинска карта, ~1,3 км) пътят от входа до обекта беше 4–5 игрови дни на етап → къщите закъсняваха.
@@ -14,6 +15,7 @@ const KIND = { sand: 'tipper', gravel: 'tipper', concrete: 'mixer', bricks: 'fla
 const mat = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.75 });
 
 // ремарке по вида на товара; връща групата и частта, която се движи при разтоварване
+const TRL_REAL = 10.5;
 function trailer(matId) {
   const g = new THREE.Group(), kind = KIND[matId] || 'flat', col = COL[matId] ?? 0xcccccc, load = [];
   const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.35, 8.2), mat(0x2b2f36));
@@ -93,28 +95,43 @@ function tractorUnit(color) {
   return g;
 }
 
-// deps: { scene, label(text, color, width), roadPath(x0, z0, x1, z1) → [{x, z}], entry() → {x, z}, matInfo(id) → {ico, nm, unit} }
+// deps: { scene, label(text, color, width), roadPath(x0, z0, x1, z1) → [{x, z}], entry() → {x, z}, matInfo(id) → {ico, nm, unit},
+//   agents() → null | { group, route(from, to, heavy), add(spec), retarget(c, r), remove(c), alive(c) } — junction-paths: ТИР-ът е агент в трафика
+//   (по лентите, през кръстовищата и кръговите по кривите, влекачът и ремаркето на шарнира); иначе — старото движение по точките }
 export function createTirs(deps) {
   const list = [];
-  function build(order) {
+  function build(order, art) {   // art — влекачът и ремаркето поотделно (агент в трафика: ремаркето следва шарнира)
     const root = new THREE.Group();
     let cab = null;
-    if (feature('trucks-real') && deps.model) try { const m = deps.model('sf-trk-' + (order.id % 2), 4.6); cab = new THREE.Group(); cab.add(m); addTruckLamps(cab, 4.6, 2.5, 1.1); } catch (e) { cab = null; }   // модерният влекач (trucks-real); фаровете — на немащабираната група
+    const CL = feature('real-scale') ? 6 : 4.6;   /* real-scale (55): истинската кабина на влекача — 6 м */
+    if (feature('trucks-real') && deps.model) try { const m = deps.model('sf-trk-' + (order.id % 2), CL); cab = new THREE.Group(); cab.add(m); addTruckLamps(cab, CL, 2.5, 1.1); } catch (e) { cab = null; }   // модерният влекач (trucks-real); фаровете — на немащабираната група
     if (!cab) cab = tractorUnit(CAB_COLS[order.id % CAB_COLS.length]);
-    cab.position.z = 3.6;   // влекачът отпред (+z е посоката на движение)
+    cab.position.z = art ? 0 : 3.6 + (CL - 4.6) / 2;   // влекачът отпред (+z е посоката на движение)
     root.add(cab);
     const tr = trailer(order.matId);
-    tr.g.position.z = -1.6;
-    root.add(tr.g);
+    if (feature('real-scale')) tr.g.scale.z = TRL_REAL / 8.2;   /* real-scale: градско ремарке 10,5 м */
+    tr.g.position.z = art ? 0 : -1.6 - (tr.g.scale.z * 8.2 - 8.2) / 2;
+    if (!art) root.add(tr.g);
     const mi = deps.matInfo(order.matId);
     const tag = deps.label(`🚚 ${mi.ico} ${mi.nm} · ${order.qty} ${mi.unit}`, '#ffffff', 7);
     tag.position.y = 5.2; root.add(tag);
-    deps.scene.add(root);
-    return { root, mover: tr.mover, load: tr.load, tag };
+    if (art) { art.add(root); art.add(tr.g); } else deps.scene.add(root);
+    return { root, trl: art ? tr.g : null, mover: tr.mover, load: tr.load, tag };
+  }
+  const AG_MAX = 220;   // агентът: влекач, ремарке (м); появява се най-много толкова преди целта
+  const CAB_L = () => feature('real-scale') ? 6 : 4.6, TRL_L = () => (feature('real-scale') ? TRL_REAL : 8.2) + 0.4;   // агентът: влекач, ремарке (м)
+  function agentStart(t, A) {
+    const r = trimRoute(A.route(deps.entry(), t.target, true), AG_MAX); if (!r) return false;
+    if (A.free && !A.free(r.paths[0], r.s0, CAB_L() + TRL_L() + 0.4)) { t.t = -1.5; return true; }   /* мястото на тръгване е заето — след малко */
+    t.agent = A.add({ obj: t.root, len: CAB_L() + TRL_L() + 0.4, w: 2.5, h: 3.8, kind: 'truck', name: 'ТИР ' + t.order.id, route: r, cab: CAB_L(), trailer: { obj: t.trl, len: TRL_L() },
+      onArrive: () => { if (t.state === 'go') { t.state = 'unload'; t.u = 0; } else if (t.state === 'back') t.done = true; } });
+    t.A = A; t.root.visible = t.trl.visible = true; return true;
   }
   // order: { id, matId, qty }; target: { x, z } — дворът на склада; onArrive(order) се вика при разтоварване.
   // ТИР-ът спира на улицата пред склада (най-близката плочка път), разтоварва и се връща празен откъдето е дошъл.
   function send(order, target, onArrive, delay = 0) {
+    const A = deps.agents && deps.agents();
+    if (A) { const t = { order, target, onArrive, ...build(order, A.group), state: 'go', t: -delay, x: 0, z: 0 }; t.root.visible = t.trl.visible = false; list.push(t); if (delay <= 0 && !agentStart(t, A)) { onArrive && onArrive(order); dropT(t); return null; } return t; }   /* без маршрут — доставено без пътя (като преди) */
     const e = deps.entry();
     let path = deps.roadPath(e.x, e.z, target.x, target.z), x = e.x, z = e.z;
     { let rem = 0; for (let i = path.length - 1; i > 0; i--) { rem += Math.hypot(path[i].x - path[i - 1].x, path[i].z - path[i - 1].z); if (rem > MAX_RUN) { x = path[i - 1].x; z = path[i - 1].z; path = path.slice(i); break; } } }
@@ -143,9 +160,28 @@ export function createTirs(deps) {
     t.root.rotation.y = t.yaw;
     return t.pi >= t.path.length;
   }
+  const dropT = t => { if (t.agent && t.A) t.A.remove(t.agent); t.agent = null; for (const o of [t.root, t.trl]) if (o && o.parent) o.parent.remove(o); const k = list.indexOf(t); if (k >= 0) list.splice(k, 1); };
+  // агентът: движението е на трафика; тук — само разтоварването и обратният маршрут до изхода
+  function updAgent(t, dt) {
+    if (t.t < 0 || !t.agent) { t.t += dt; if (t.t < 0) return; const A = deps.agents && deps.agents(); if (!A || !agentStart(t, A)) { t.onArrive && t.onArrive(t.order); dropT(t); } return; }   // без трафик (друг град) — доставено без пътя
+    { const gp = t.A.group.position; t.x = t.agent.x + gp.x; t.z = t.agent.z + gp.z; t.state2 = t.agent.why || ''; }   /* за камерата (lookTir) и дебъга */
+    if (!t.A.alive(t.agent)) { if (t.state === 'go') t.onArrive && t.onArrive(t.order); dropT(t); return; }   // трафикът е сменен (друг град)
+    if (t.mover && t.mover.kind === 'mixer') t.mover.obj.rotation.z += dt * (t.state === 'unload' ? 6 : 2);
+    if (t.state === 'unload') {
+      t.u += dt; const k2 = Math.min(1, t.u / UNLOAD);
+      if (t.mover && t.mover.kind === 'tipper') { t.mover.obj.rotation.x = -Math.sin(k2 * Math.PI) * 0.75; t.mover.obj.position.z = -Math.sin(k2 * Math.PI) * 0.6; }
+      if (t.u >= UNLOAD) {
+        t.onArrive && t.onArrive(t.order); for (const m of t.load) m.visible = false; t.tag.visible = false;
+        if (t.mover && t.mover.kind === 'tipper') { t.mover.obj.rotation.x = 0; t.mover.obj.position.z = 0; }
+        const c = t.agent, r = t.A.route({ p: c.p, s: c.s }, deps.entry(), true);
+        if (r && t.A.retarget(c, r)) t.state = 'back'; else dropT(t);
+      }
+    } else if (t.done) dropT(t);
+  }
   function update(dt) {
     for (let k = list.length - 1; k >= 0; k--) {
       const t = list[k];
+      if (t.A !== undefined || t.trl) { updAgent(t, dt); continue; }
       if (t.t < 0) { t.t += dt; if (t.t >= 0) t.root.visible = true; else continue; }
       if (t.mover && t.mover.kind === 'mixer') t.mover.obj.rotation.z += dt * (t.state === 'unload' ? 6 : 2);
       if (t.state === 'go') {
@@ -169,6 +205,6 @@ export function createTirs(deps) {
       }
     }
   }
-  function clear() { for (const t of list) deps.scene.remove(t.root); list.length = 0; }
+  function clear() { for (const t of [...list]) { if (t.trl) dropT(t); else deps.scene.remove(t.root); } list.length = 0; }
   return { send, update, clear, list };
 }
