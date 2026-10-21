@@ -181,7 +181,7 @@ export function buildAirport(group, deps, opts = {}) {
   for (let z = -95; z <= 105; z += 20) { box(0.2, 6, 0.2, mat(0x555a60), BX - 5, 3, z, g); box(1.6, 0.3, 0.5, lampM, BX - 4.3, 6, z, g); }
   // движещи се коли: по входния път и по булеварда (затворени маршрути)
   const traffic = [], carCols = [0xd62828, 0xf2f2f2, 0x1f5fbf, 0x2b2d31, 0xffb300, 0x2d8f4e];
-  const mkCar = (k, bus) => { if (!bus && deps.model) { try { const nm = ['sf-car-Taxi', 'sf-car-Sedan', 'sf-car-SUV', 'sf-car-Hatchback', 'sf-car-Van'][k % 5]; if (deps.A && deps.A[nm]) return deps.model(nm, 1.6); } catch (e) { /* без модел */ } }
+  const mkCar = (k, bus) => { if (!bus && deps.model) { try { const nm = ['sf-car-Taxi', 'sf-car-Sedan', 'sf-car-SUV', 'sf-car-Hatchback', 'sf-car-Van'][k % 5]; if (deps.A && deps.A[nm]) return deps.model(nm, 1);   /* sf-car-* вече са в истински метри (беше ×1.6 → 6–10 м) */ } catch (e) { /* без модел */ } }
     const c = new THREE.Group(); box(bus ? 2.6 : 1.9, bus ? 3 : 1.3, bus ? 11 : 4, mat(bus ? 0x1f8f5f : carCols[k % carCols.length], 0.5, 0.3), 0, bus ? 1.7 : 0.8, 0, c); return c; };
   const routes = [
     { pts: [[xCity, ROAD_Z - 2], [BX + 2, ROAD_Z - 2], [BX + 2, 105], [BX - 2, 105], [BX - 2, ROAD_Z + 2], [xCity, ROAD_Z + 2]], n: 5 },

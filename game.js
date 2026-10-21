@@ -35,7 +35,7 @@ import { createResorts, RESORTS, seasonOf, monthName } from './resorts.js';
 import { buildResortView, RESORT_MODELS } from './resortview.js';
 import { createDemolition } from './demolish.js';
 import { createDemolition2, machineWork, craneLift, loadSiteRigs, rigPlay, swapRig } from './sitework.js';
-import { siteK, realScaleK, REAL_BLD, TOO_LONG } from './scale.js';   // 🏗️ флаг site-anim: истински кран при събаряне, машините работят, кранът вдига
+import { siteK, realScaleK, REAL_BLD, TOO_LONG, kidK } from './scale.js';   // 🏗️ флаг site-anim: истински кран при събаряне, машините работят, кранът вдига
 import { createEvents } from './events.js';
 import { createWeather, rollWeather } from './weather.js';
 import { bidHtml, resolveBid } from './bidding.js';
@@ -1150,7 +1150,7 @@ function decorLot(g, lot, cityId) {
     for (let k = -2; k <= 2; k++) flat(0.15, L * 0.6, 0xf2f2f2, k * 2.8, -L * 0.45, 0.15), flat(0.15, L * 0.6, 0xf2f2f2, k * 2.8, L * 0.45, 0.15);
     const real = Object.keys(A).filter(n => n.startsWith('sf-car-') && !/Bus|Truck|Firetruck|Ambulance|Police|Limousine/.test(n));   // истинските коли (трафика), ако са заредени
     const cars = real.length ? real : ['sedan', 'suv', 'hatchback-sports', 'van', 'taxi'].filter(n => A[n]), n = 2 + (h >>> 4) % 3;
-    for (let k = 0; k < n && cars.length; k++) { const o = model(cars[(h >>> (k * 3)) % cars.length], real.length ? 1 : 1.15); o.rotation.y = rot + (k % 2 ? Math.PI : 0); at(o, (-1.5 + (k % 4)) * 2.8 + 1.4, (k % 2 ? 1 : -1) * L * 0.45); }
+    for (let k = 0; k < n && cars.length; k++) { const o = model(cars[(h >>> (k * 3)) % cars.length], real.length ? 1 : kidK(cars[(h >>> (k * 3)) % cars.length], 1.15)); o.rotation.y = rot + (k % 2 ? Math.PI : 0); at(o, (-1.5 + (k % 4)) * 2.8 + 1.4, (k % 2 ? 1 : -1) * L * 0.45); }
     put('plant_bush', 2.5, -L + 0.8, L - 0.8); put('plant_bush', 2.5, L - 0.8, -L + 0.8);
   } else if (kind === 4) {   // детска площадка: пясък, люлка, пързалка, пейка, храсти
     flat(L * 1.4, L * 1.4, 0xe0cc95, 0, 0, 0.13);
@@ -1762,7 +1762,7 @@ function homeSlot(u) {
 // истинските модели (vehmodels.js) — дължина в света на играта
 const SF_VEH = { loader: 'sf-excavator', truck: 'sf-dump', crane: 'sf-mcrane', tractor: 'sf-backhoe', roller: 'sf-roller', grader: 'sf-grader', crew: 'sf-car-Van', marker: 'sf-car-Van', ...(feature('real-shops') ? { bulldozer: 'sf-excavator' } : {}) };   // бусът на бригадата и маркировката — истинският бус (УАЗ, vehmodels.js) вместо детския delivery/van
 const SF_LEN = feature('site-anim') ? { loader: 9.6, truck: 8, crane: 13.5, tractor: 9.6, roller: 3.9, grader: 8.5, crew: 1, marker: 1, bulldozer: 9.6 } : { loader: 6.5, truck: 7.5, crane: 9, tractor: 4.6, roller: 4.5, grader: 7, crew: 1, marker: 1, bulldozer: 7.5 };   // колите (sf-car-*) вече са в мащаба на града — 1   // м по дължина — в мащаба на колите (седан 4,5 м, vehmodels.js)
-const VEH_LEN = { bulldozer: 6 };   // м — моделите от пакетите, които не са в метри: мащаб по най-дългата хоризонтална страна (булдозерът беше колкото сграда; другите Kenney са с процедурни добавки, нагласени за VSCALE)
+const VEH_LEN = { bulldozer: 6, paver: 6.5, crane: 9, loader: 7, tractor: 5, grader: 8.5, roller: 4.5, crew: 6, marker: 5 };   /* резервите и асфалтополагачът (няма истински модел) — в истинската дължина, не ×1.25 (55) */   // м — моделите от пакетите, които не са в метри: мащаб по най-дългата хоризонтална страна (булдозерът беше колкото сграда; другите Kenney са с процедурни добавки, нагласени за VSCALE)
 const SITE_RIG = { loader: ['sf-excavator-rig', 'work'], bulldozer: ['sf-excavator-rig', 'work'], truck: ['sf-dump-rig', 'tip', 14], tractor: ['sf-backhoe-rig', 'work'], roller: ['sf-roller-rig', 'roll'], grader: ['sf-grader-rig', 'grade'] };   // тип → [модел, клип, пауза между циклите, s]
 function spawnUnit(type, at) {
   const sf = A[SF_VEH[type]] ? SF_VEH[type] : null;
@@ -1876,7 +1876,7 @@ function addCar() {
   for (let k = 0; k < 40 && !isRoad(i, j); k++) { i = 3 * ((Math.random() * NBI) | 0); j = (Math.random() * NJ) | 0; }   // не по улица под площад/парк (Белия дом, поръчките) — иначе стои на тревата
   const r = Math.random(), sf = A['sf-car-Sedan'];
   const o = sf ? model('sf-car-' + (r < 0.04 ? pick(['Ambulance', 'Police_Sedan', 'Police_SUV', 'Firetruck']) : r < 0.1 ? pick(['Bus', 'Truck', 'Van']) : pick(['Sedan', 'Hatchback', 'SUV', 'Pickup', 'Taxi', 'Sedan', 'Hatchback', 'SUV', 'Muscle', 'Muscle_2', 'Sports', 'Roadster', 'Taxi', 'Taxi', 'Taxi', 'Limousine'])), 1)
-    : model(r < 0.04 ? pick(['ambulance', 'police', 'firetruck']) : pick(['sedan', 'taxi', 'suv', 'van', 'sedan', 'suv', 'sedan-sports', 'suv-luxury', 'hatchback-sports']), 1.15);
+    : (n => model(n, kidK(n, 1.15)))(r < 0.04 ? pick(['ambulance', 'police', 'firetruck']) : pick(['sedan', 'taxi', 'suv', 'van', 'sedan', 'suv', 'sedan-sports', 'suv-luxury', 'hatchback-sports']));   /* резервата — детската кола в истинския размер (55) */
   scene.add(o);
   const rp = roadPoint();
   { const b = new THREE.Box3().setFromObject(o), sz = b.getSize(new THREE.Vector3()); traffic.push({ obj: o, x: rp ? rp.x : tx(i), z: rp ? rp.z : tx(j), yaw: 0, path: null, pi: 0, wait: 0, len: Math.max(sz.x, sz.z) }); }   // len — дистанцията до колата отпред
@@ -1891,7 +1891,7 @@ function traffic2Make() {
   tr2 = createTraffic({ scene: tr2G || scene, camera, jp: feature('junction-paths'), drive: p2 && p2.drive === 'L' ? 'left' : 'right', maxCars: wantedTraffic(),   // camera — истинските фарове само за най-близките коли
     ...(p2 ? { built: planNetwork(p2, { jp: feature('junction-paths') }) } : { net: gridNetwork({ NBI, NBJ, tx, isRoad, TILE, signal: (i, j) => signals.some(s => s.i === i && s.j === j) }) }),
     makeCar: () => { addCar(); const t = traffic.pop(); if (!t) return null; const heavy = /Bus|Truck|Firetruck|firetruck/.test(t.obj.userData.src || '');
-      if (tr2G) { const k = (heavy ? 11 : 4.5) / (t.len || 4.5); t.obj.scale.multiplyScalar(k); t.len = (t.len || 4.5) * k; tr2G.add(t.obj); }   // планът v2 е в истински метри — колите в истинския си размер
+      if (tr2G) { const k = t.len > 3 && t.len < 14 ? 1 : (heavy ? 11 : 4.5) / (t.len || 4.5);   /* колите вече са в истинския размер (sf-car-* и резервите с kidK) — не ги изравняваме до 4,5 м; само ако мярката е сбъркана (55) */ t.obj.scale.multiplyScalar(k); t.len = (t.len || 4.5) * k; tr2G.add(t.obj); }   // планът v2 е в истински метри — колите в истинския си размер
       return { obj: t.obj, len: t.len || 4.5, kind: heavy ? 'bus' : 'car' }; },   // автобус/камион — само по улици ≥ 6 м
     onSignal: (n, v) => { const s = sigMap.get(n.id); if (!s || !v) return; for (const h of s.heads) { const mine = h.axis === v.axis && !v.red; h.gr.visible = mine && !v.yellow; h.y.visible = mine && v.yellow; h.r.visible = !mine; } } });
 }
@@ -10062,7 +10062,7 @@ if (AUTOTEST) {
       L.forEach(([n, nm], i) => loader.load(`assets/heavy/hotels5/hotel5-${n}.glb`, gl => { const o = gl.scene, sz = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3()), k = Math.min(60 / sz.y, 90 / Math.max(sz.x, sz.z)), x = [-75, 0, 75, -38, 38][i], zz = i < 3 ? 0 : 90;   // два реда — да се съберат в мъглата
         o.scale.setScalar(k); o.position.set(x, 0, zz); o.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; } }); g.add(o);
         const lb = label(`${i + 1} · ${nm}`, '#ffd54a', 14); lb.position.set(x, sz.y * k + 12, zz); g.add(lb);
-        const c = A['sf-car-Sedan'] ? model('sf-car-Sedan', 1) : model('sedan', 1.15); c.position.set(x - 4, 0, zz + Math.max(sz.z * k / 2, 10) + 8); c.rotation.y = Math.PI / 2; g.add(c);
+        const c = A['sf-car-Sedan'] ? model('sf-car-Sedan', 1) : model('sedan', kidK('sedan')); c.position.set(x - 4, 0, zz + Math.max(sz.z * k / 2, 10) + 8); c.rotation.y = Math.PI / 2; g.add(c);
         const pp = new THREE.Group(), tb = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.55, 4, 8), new THREE.MeshStandardMaterial({ color: 0x2f6fd6 })); tb.position.y = 1.15; pp.add(tb); const hd = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), new THREE.MeshStandardMaterial({ color: 0xe0b090 })); hd.position.y = 1.68; pp.add(hd); pp.position.set(x + 2, 0, zz + Math.max(sz.z * k / 2, 10) + 8); g.add(pp); }));
       controls.target.set(h.x, 15, h.z + 45); camera.position.set(h.x, 120, h.z + 245); const f0 = scene.fog && [scene.fog.near, scene.fog.far]; if (f0) { scene.fog.near = 400; scene.fog.far = 1400; } fly = null; $('panel').classList.add('hidden'); return true; },
     boardAuto() { return boardL.autoTick(); },
@@ -10109,7 +10109,7 @@ if (AUTOTEST) {
     gasLook() {   // Лабораторията: трите кандидата за бензиностанция (assets/heavy/gas) един до друг пред централата — 1 = 30 м
       showMap(false); const h = { x: tx(NI - 1) + 75, z: tx(NJ - 1) + 90 }, g = new THREE.Group(); g.position.set(h.x - 10, 0, h.z + 30); scene.add(g);   // на празното поле югоизточно от града
       ['gas-lowpoly', 'gas-modern', 'gas-big', 'gas-green'].forEach((n, i) => loader.load(`assets/heavy/gas/${n}.glb`, gl => { const o = gl.scene; o.scale.setScalar(25); o.position.set((i - 1.5) * 40, 0, 0);   // ~25 м широки; кола и човек отпред за мащаб
-        { const c = A['sf-car-Sedan'] ? model('sf-car-Sedan', 1) : model('sedan', 1.15); c.position.set((i - 1.5) * 40 - 4, 0, 15); c.rotation.y = Math.PI / 2; g.add(c);
+        { const c = A['sf-car-Sedan'] ? model('sf-car-Sedan', 1) : model('sedan', kidK('sedan')); c.position.set((i - 1.5) * 40 - 4, 0, 15); c.rotation.y = Math.PI / 2; g.add(c);
           const pm = new THREE.MeshStandardMaterial({ color: 0x2f6fd6 }), pp = new THREE.Group(), tb = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.55, 4, 8), pm); tb.position.y = 1.15; pp.add(tb); const hd = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), new THREE.MeshStandardMaterial({ color: 0xe0b090 })); hd.position.y = 1.68; pp.add(hd); for (const sd of [-1, 1]) { const lg = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.6, 3, 6), new THREE.MeshStandardMaterial({ color: 0x2a2f3a })); lg.position.set(sd * 0.11, 0.42, 0); pp.add(lg); } pp.position.set((i - 1.5) * 40 + 2, 0, 15); g.add(pp); } o.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; } }); g.add(o); const lb = label(['1 · Low Poly', '2 · Модерна', '3 · Голяма', '4 · Зелена'][i], '#ffd54a', 10); lb.position.set((i - 1.5) * 40, 26, 0); g.add(lb); }));
       controls.target.set(h.x - 10, 4, h.z + 34); camera.position.set(h.x - 10, 75, h.z + 160); fly = null; $('panel').classList.add('hidden'); return true; },
     emergLook() { __dbg.time && __dbg.time(20.5); showMap(false); const h = city.hq, ks = ['sf-car-Police_Sedan', 'sf-car-Police_SUV', 'sf-car-Ambulance', 'sf-car-Firetruck', 'sf-car-Police_Sedan', 'sf-car-Ambulance'].filter(k => A[k]); const g = new THREE.Group(); ks.forEach((k, i) => { const o = model(k, 1); o.position.set((i % 3) * 7 - 7, 0, Math.floor(i / 3) * 9); o.rotation.y = Math.PI / 2; o.userData.forceBeacons = 1; g.add(o); }); g.position.set(h.x - 4, 0, h.z + 14); scene.add(g); controls.target.set(h.x - 4, 1, h.z + 18); camera.position.set(h.x + 10, 12, h.z + 34); fly = null; $('panel').classList.add('hidden'); return ks; },

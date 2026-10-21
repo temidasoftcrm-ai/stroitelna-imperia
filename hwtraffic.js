@@ -5,6 +5,7 @@
 // svc — крайпътният комплекс (highways.js serviceArea): някои коли в посока +x отбиват, спират за малко на колонките и се връщат.
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';
+import { kidK } from './scale.js';   // детските коли (резервата) в истинския размер
 
 const CARS = ['sedan', 'suv', 'taxi', 'van', 'sedan-sports', 'suv-luxury', 'hatchback-sports', 'police'];
 const TRUCKS = ['truck', 'truck-flat', 'delivery', 'truck-dump-red', 'truck-concrete-red'];
@@ -22,7 +23,7 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
     const realCars = ['Sedan', 'Hatchback', 'SUV', 'Pickup', 'Taxi', 'Muscle', 'Muscle_2', 'Van', 'Police_SUV'].map(n => 'sf-car-' + n).filter(n => A[n]);
     const names = (truck ? (feature('trucks-real') && A['sf-semi-0'] ? ['sf-semi-0', 'sf-semi-1'] : TRUCKS) : (feature('cars-real') && realCars.length ? realCars : CARS)).filter(n => A[n]);   // модерните ТИР-ове (trucks-real)
     if (!names.length) continue;
-    const n = names[(k * 7) % names.length], o = model(n, SCALE[n] || 1.25);
+    const n = names[(k * 7) % names.length], o = model(n, SCALE[n] || kidK(n, 1.25));
     o.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2;
     const c = { o, dir, x: -half + Math.random() * len, z: laneZ(dir, lane), v: (truck ? 15 : 22) + Math.random() * (truck ? 4 : 10) };
     o.position.set(c.x, y, c.z);
@@ -31,7 +32,7 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
   // спешните коли: по един модел от вид, скрити, докато не дойде ред
   const EM = [['police', ['sf-car-Police_SUV', 'sf-car-Police_Sedan', 'police']], ['ambulance', ['sf-car-Ambulance', 'ambulance']], ['fire', ['sf-car-Firetruck', 'firetruck']]];
   const em = [];
-  for (const [kind, ns] of EM) { const n = ns.find(x => A[x]); if (!n) continue; const o = model(n, SCALE[n] || 1.25); o.visible = false; o.userData.beaconsOn = 1; o.position.y = y; g.add(o); em.push({ kind, o, on: false }); }
+  for (const [kind, ns] of EM) { const n = ns.find(x => A[x]); if (!n) continue; const o = model(n, SCALE[n] || kidK(n, 1.25)); o.visible = false; o.userData.beaconsOn = 1; o.position.y = y; g.add(o); em.push({ kind, o, on: false }); }
   let emT = 8 + Math.random() * 20;
   function emSend() {
     const free = em.filter(e => !e.on); if (!free.length) return;

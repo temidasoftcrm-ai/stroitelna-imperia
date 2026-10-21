@@ -16,7 +16,7 @@
 } }
 </script></head><body>
 <div id="hud"><h1>🚗 Всички превозни средства — истинският размер</h1>
-<p>Всяка кола, бус, спешна кола, камион, автобус и машина от строежите — така, както ги зарежда играта (vehmodels.js, бусовете, раздвижените машини), в редица с човек 1,75 м върху метрова мрежа. Таблицата: размерът в играта срещу истинския (Д × Ш × В, м); зелено — до 8 % разлика по дължина, жълто — до 15 %, червено — повече. Цъкни ред — камерата отива при колата.</p>
+<p>Всяка кола, бус, спешна кола, камион, автобус и машина от строежите — така, както ги зарежда играта (vehmodels.js, бусовете, раздвижените машини), в редица с човек 1,75 м върху метрова мрежа. Таблицата: размерът в играта срещу истинския (Д × Ш × В, м); зелено — до 8 % разлика по дължина, жълто — до 15 %, червено — повече. Цъкни ред — камерата отива при колата. Втората редица (отзад) — детските модели (Kenney) с мащаба, който им дава кодът (резервите, когато истинските не са заредени, и асфалтополагачът — той е само детски); червено — под 80 % от истинския размер.</p>
 <table id="tab"><tr><th>модел</th><th>в играта</th><th>истински</th><th>Δ дълж.</th></tr></table></div>
 <script type="module">
 import * as THREE from 'three';
@@ -25,7 +25,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { loadVehModels } from '../vehmodels.js';
 import { loadVans } from '../vanlogo.js';
 import { loadSiteRigs } from '../sitework.js';
-import { VEH_SPEC, siteK, scaleFor } from '../scale.js';
+import { VEH_SPEC, siteK, scaleFor, kidK } from '../scale.js';
 const R = new THREE.WebGLRenderer({ antialias: true }); R.setSize(innerWidth, innerHeight); R.setPixelRatio(Math.min(2, devicePixelRatio)); R.outputColorSpace = THREE.SRGBColorSpace; document.body.appendChild(R.domElement);
 const sc = new THREE.Scene(); sc.background = new THREE.Color(0xd8e4ee); sc.add(new THREE.HemisphereLight(0xffffff, 0x778899, 1.7)); const sun = new THREE.DirectionalLight(0xffffff, 1.8); sun.position.set(30, 50, 40); sc.add(sun);
 const gnd = new THREE.Mesh(new THREE.PlaneGeometry(600, 60).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xc8c6bc })); gnd.position.x = 250; sc.add(gnd);
@@ -60,6 +60,27 @@ for (const it of LIST) {
   row.onclick = () => { ctl.target.set(cx, 1.5, 0); cam.position.set(cx + 4, 6, 16 + len); ctl.update(); }; tab.appendChild(row);
   const dv = document.createElement('div'); dv.className = 'lbl'; dv.textContent = `${sp[3]} ${len.toFixed(1)} м`; document.body.appendChild(dv); labels.push([dv, new THREE.Vector3(cx, hgt + 0.5, 0)]);
   x += s.x + 2;
+}
+// ---- втората редица (z = −12): детските модели (Kenney) и пътищата в кода, които ги слагат — с мащаба, който кодът им дава; червено < 80 %
+const KID = [   // [модел, мащаб в кода, истинска дължина (м), къде]
+  ['sedan', 1.15, 4.5, 'game.js addCar (резерва, ако няма sf-car)'], ['taxi', 1.15, 4.9, 'game.js addCar (резерва)'], ['suv', 1.15, 4.6, 'game.js addCar · паркинг (резерва)'],
+  ['police', 1.15, 5.0, 'incidents.js (резерва)'], ['ambulance', 1.15, 6.5, 'game.js addCar · incidents.js (резерва)'], ['firetruck', 1.15, 9.0, 'incidents.js · firesim.js (резерва)'],
+  ['sedan', 1.25, 4.5, 'hwtraffic.js магистралата (резерва)'], ['truck', 1.25, 8.0, 'hwtraffic.js ТИР (резерва)'], ['delivery', 1.25, 6.0, 'hwtraffic.js · бригадата (резерва)'],
+  ['truck-flat', 1.25, 6.5, 'game.js spawnUnit: ПАВЕРЪТ (асфалтополагач) — ОСНОВЕН, без истински модел', 6.5], ['truck-flat', 1.25, 9.0, 'game.js spawnUnit: кран (резерва)', 9], ['van', 1.25, 5.0, 'game.js spawnUnit: маркировка (резерва)', 5],
+  ['tractor', 1.25, 5.0, 'game.js spawnUnit: трактор (резерва; грейдерът 8,5 м, валякът 4,5 м)', 5], ['tractor-shovel', 1.25, 7.0, 'game.js spawnUnit: товарач (резерва)', 7],
+];
+const kidRows = []; let kx = 0;
+const krow = document.createElement('tr'); krow.innerHTML = '<th colspan="4" style="padding-top:10px">Детските (Kenney) — резервите, сега в истинския размер</th>'; tab.appendChild(krow);
+for (const [n, f0, real, where, vl] of KID) {
+  const g = await L.loadAsync(`../assets/vehicles/${n}.glb`).then(q => q.scene).catch(() => null); if (!g) continue;
+  const g0 = new THREE.Box3().setFromObject(g).getSize(new THREE.Vector3()), f = vl ? vl / Math.max(g0.x, g0.z) : kidK(n, f0), was = Math.max(g0.x, g0.z) * f0;   /* сега: VEH_LEN (spawnUnit) или kidK; беше ×f0 */
+  const w = new THREE.Group(), o = g.clone(true); o.scale.setScalar(f); w.add(o); w.rotation.y = Math.PI / 2; sc.add(w); w.updateMatrixWorld(true);
+  const b = bodyBox(w), s3 = b.getSize(new THREE.Vector3()); w.position.set(kx + s3.x / 2 - (b.min.x + b.max.x) / 2, -b.min.y, -12 - (b.min.z + b.max.z) / 2);
+  const len = s3.x, d = (len - real) / real, cls = len / real < 0.8 ? 'bad' : Math.abs(d) <= 0.15 ? 'ok' : 'warn', cx = kx + s3.x / 2;
+  const row = document.createElement('tr'); row.innerHTML = `<td>${n} ×${f.toFixed(2)} <span style="color:#777">(беше ×${f0} → ${was.toFixed(1)} м, ${(was / real * 100).toFixed(0)} %)</span><br><span style="color:#777">${where}</span></td><td class="n">${len.toFixed(1)} × ${s3.z.toFixed(1)} × ${s3.y.toFixed(1)}</td><td class="n" style="color:#9aa0aa">${real}</td><td class="n ${cls}">${(len / real * 100).toFixed(0)} %</td>`;
+  row.onclick = () => { ctl.target.set(cx, 1, -12); cam.position.set(cx + 3, 5, 0 + len); ctl.update(); }; tab.appendChild(row);
+  const dv = document.createElement('div'); dv.className = 'lbl'; dv.style.color = cls === 'bad' ? '#ff8a7a' : ''; dv.textContent = `${n} ${len.toFixed(1)} м`; document.body.appendChild(dv); labels.push([dv, new THREE.Vector3(cx, s3.y + 0.4, -12)]);
+  kx += s3.x + 2;
 }
 ctl.target.set(12, 1.5, 0); cam.position.set(12, 8, 34); ctl.update();
 const P = new THREE.Vector3();

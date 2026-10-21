@@ -6,6 +6,7 @@
 // point() → случайна точка по улица, focus() → накъде гледа камерата. update(dt движение, rdt истинско време) — в кадъра.
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';
+import { kidK } from './scale.js';   // детските коли (резервата) в истинския размер
 import { playSiren, sirenKind } from './vehmodels.js';
 import { flameSprite, flameSize } from './fireflip.js';   // истинските пламъци (Блендър) — Лабораторията → fire-real
 
@@ -22,7 +23,7 @@ export function createIncidents(ctx) {
     const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 2, 32, 32, 31);
     g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c);
   })();
-  const vehName = k => ctx.has('sf-car-' + k) ? ['sf-car-' + k, 1] : [{ Police_Sedan: 'police', Police_SUV: 'police', Firetruck: 'firetruck', Ambulance: 'ambulance', Truck: 'truck' }[k], 1.15];
+  const vehName = k => ctx.has('sf-car-' + k) ? ['sf-car-' + k, 1] : (n => [n, kidK(n, 1.15)])({ Police_Sedan: 'police', Police_SUV: 'police', Firetruck: 'firetruck', Ambulance: 'ambulance', Truck: 'truck' }[k]);   /* резервата в истинския размер (55) */
 
   // мястото — по улица, близо до това, което гледаш (за да се види); отделно — откъде тръгва всяка кола (120–300 м по-далеч)
   function pickSpot() {
@@ -62,7 +63,7 @@ export function createIncidents(ctx) {
     for (const [x, z] of pts) { const c = cone(); c.position.set(x, 0, z); g.add(c); }
   }
   const fireTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 40, 2, 32, 34, 30); g.addColorStop(0, 'rgba(255,250,200,1)'); g.addColorStop(0.35, 'rgba(255,170,40,0.9)'); g.addColorStop(1, 'rgba(255,60,0,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
-  const car = (k, sc = 1) => { const wn = (k ? [k] : ['Sedan', 'Hatchback', 'SUV', 'Taxi', 'Pickup']).map(n => 'sf-car-' + n).filter(ctx.has); return wn.length ? ctx.model(wn[(Math.random() * wn.length) | 0], sc) : ctx.model('sedan', 1.15); };
+  const car = (k, sc = 1) => { const wn = (k ? [k] : ['Sedan', 'Hatchback', 'SUV', 'Taxi', 'Pickup']).map(n => 'sf-car-' + n).filter(ctx.has); return wn.length ? ctx.model(wn[(Math.random() * wn.length) | 0], sc) : ctx.model('sedan', kidK('sedan')); };
   function moto() { const m = new THREE.Group(), dk = M(0x222222), rd = M(0xc81e1e, 0.4);
     for (const z of [-0.65, 0.65]) { const w = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.08, 6, 14), dk); w.position.set(0, 0.32, z); w.rotation.y = Math.PI / 2; m.add(w); }
     const b = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.3, 1.1), rd); b.position.y = 0.6; m.add(b); m.rotation.z = Math.PI / 2 - 0.15; m.position.y = 0.3; const w = new THREE.Group(); w.add(m); return w; }

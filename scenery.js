@@ -150,7 +150,7 @@ export function addRouteScenery(group, deps, opts = {}) {
       const cp = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3), flat(0x666666)); cp.position.set(sd * (half + 6), 1.5, roadZ + sd * 4.2); g.add(cp);
     }
     const cars = ['sf-car-Sedan', 'sf-car-Pickup', 'sf-car-Van', 'sf-car-Hatchback', 'sf-car-Truck'].filter(q => deps.A[q]);
-    for (let k = 0; k < 5 && cars.length; k++) { const x = (k % 2 ? 1 : -1) * (half + 14 + k * 22 + r() * 10), o = deps.model(cars[k % cars.length], 1.6); o.position.set(x, 0.05, roadZ + (k % 2 ? 1.5 : -1.5)); o.rotation.y = k % 2 ? -Math.PI / 2 : Math.PI / 2; g.add(o); }
+    for (let k = 0; k < 5 && cars.length; k++) { const x = (k % 2 ? 1 : -1) * (half + 14 + k * 22 + r() * 10), o = deps.model(cars[k % cars.length], 1);   /* sf-car-* вече са в истински метри (беше ×1.6) */ o.position.set(x, 0.05, roadZ + (k % 2 ? 1.5 : -1.5)); o.rotation.y = k % 2 ? -Math.PI / 2 : Math.PI / 2; g.add(o); }
   }
   // стопанства: червен хамбар, силоз и ограда
   for (let k = 0; k < 3; k++) {
