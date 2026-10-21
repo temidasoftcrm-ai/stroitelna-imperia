@@ -16,7 +16,7 @@
     <select id="size"><option value="m">среден</option><option value="l" selected>голям</option></select>
     <button id="go">↻ Град</button><select id="jk"><option value="round">⭕ Кръгово</option><option value="T">┳ Т-кръстовище</option><option value="X">╋ Кръстовище +</option></select><button id="nextR">▶ Следващото</button></div>
   <div class="row"><button id="seq" class="on">▶ Един по един (кола, самосвал, ТИР × всеки вход → всеки изход)</button><button id="many">🚚 Много наведнъж</button>
-    <button id="bg">🚗 Трафик</button><button id="dbg" class="on">🧭 Дебъг</button><select id="spd"><option value="1">1×</option><option value="4">4×</option><option value="8">8×</option></select></div>
+    <button id="bg">🚗 Трафик</button><button id="peds">🚶 Пешеходци</button><button id="dbg" class="on">🧭 Дебъг</button><select id="spd"><option value="1">1×</option><option value="4">4×</option><option value="8">8×</option></select></div>
   <div id="st">зарежда…</div></div>
 <script type="importmap">
 { "imports": {
@@ -31,6 +31,7 @@ import { plan2 } from '../cityplan2.js';
 import { buildPlan2View } from '../cityplan2-3d.js';
 import { createTraffic, planNetwork } from '../traffic.js';
 import { makeRouter, debugLayer } from '../junctionpaths.js';
+import { makePedNet } from '../pedpaths.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const $ = id => document.getElementById(id);
@@ -44,13 +45,13 @@ addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); ca
 const TYPES = { car: { len: 4.5, w: 1.9, h: 1.5, col: 0x3a7bd5 }, dump: { len: 8.5, w: 2.55, h: 3.2, col: 0xf2a900 }, tir: { len: 6 + 13.6 + 0.4, w: 2.55, h: 3.8, col: 0xd62828, cab: 6, trl: 13.6 } };
 function body(len, w, h, col) { const g = new THREE.Group(), m = new THREE.Mesh(new THREE.BoxGeometry(w, h, len), new THREE.MeshStandardMaterial({ color: col, roughness: 0.6 })); m.position.y = h / 2; g.add(m); const nose = new THREE.Mesh(new THREE.BoxGeometry(w * 0.9, h * 0.3, 0.3), new THREE.MeshStandardMaterial({ color: 0xffffff })); nose.position.set(0, h * 0.75, len / 2); g.add(nose); return g; }
 
-let P, VIEW, tr, router, dbg, R, ri = 0, queue = [], live = [], stats, bgOn = false;
+let GEO_ON = true, P, VIEW, tr, router, dbg, R, ri = 0, queue = [], live = [], stats, bgOn = false;
 const city = new THREE.Group(); scene.add(city);
 function build() {
   if (tr) { for (const a of live) { city.remove(a.obj); if (a.trl) city.remove(a.trl); } tr.clear(); }
   if (dbg) dbg.dispose(); live = []; queue = [];
   while (city.children.length) city.remove(city.children[0]);
-  const GEO = !/[?&]geo=0/.test(location.search); P = plan2('jtest', { fam: $('fam').value, size: $('size').value, seed: 7, roadGeo: GEO });   /* road-geo и в генератора (нов град) */
+  const GEO = GEO_ON = !/[?&]geo=0/.test(location.search); PN = null; for (const p of peds) city.remove(p.m); peds = []; P = plan2('jtest', { fam: $('fam').value, size: $('size').value, seed: 7, roadGeo: GEO });   /* road-geo и в генератора (нов град) */
   VIEW = buildPlan2View(P, { roadGeo: !/[?&]geo=0/.test(location.search), plants: PLANTS, fountain: FOUNTAIN });   /* ?geo=0 — както досега (за сравнение) */ city.add(VIEW);
   tr = createTraffic({ scene: city, built: planNetwork(P, { jp: true }), seed: 3, maxCars: 0, jp: true, drive: P.drive === 'L' ? 'left' : 'right',
     makeCar: () => { if (!bgOn) return null; const t = Math.random() < 0.1 ? 'dump' : 'car', T = TYPES[t], o = body(T.len, T.w, T.h, 0x8a8f99); city.add(o); return { obj: o, len: T.len, w: T.w, kind: t === 'car' ? 'car' : 'truck' }; } });
@@ -110,6 +111,27 @@ function check(dt) {
     L.lastYaw = c.yaw; L.age += dt; if (L.age > 150) { stats.stuck++; tr.removeAgent(c); city.remove(L.obj); if (L.trl) city.remove(L.trl); live.splice(live.indexOf(L), 1); break; }
   }
 }
+// 🚶 пешеходци (ped-paths): тротоарите и зебрите на плана; пресичат при зелено (колите на клона — червено) или без кола наблизо
+let PN = null, peds = [], pedOn = false; const pedStats = { crossed: 0, waits: 0 };
+const pedGeo = new THREE.CapsuleGeometry(0.28, 1.1, 3, 6).translate(0, 0.85, 0), pedMats = [0xd84a3a, 0x3a6bd8, 0x2f9d58, 0xe0b23a, 0x8a4ad8].map(c => new THREE.MeshStandardMaterial({ color: c }));
+function canCross(c) {
+  if (c.signal) { const sg = tr.signals(c.node)[0], a = sg && sg.arms && sg.arms[c.arm]; if (a && (a.go !== 'red' || (a.left && a.left !== 'red'))) return false; }
+  for (const car of tr.cars) { const d = Math.hypot(car.x - c.x, car.z - c.z); if (d < 7 || (d < 18 && car.v > 1)) return false; }
+  return true;
+}
+function pedStep(dt) {
+  if (!pedOn) { for (const p of peds) city.remove(p.m); peds = []; return; }
+  if (!PN) PN = makePedNet(P, { roadGeo: GEO_ON });
+  while (peds.length < 40) { const i = (Math.random() * PN.X.length) | 0, x = R.x + (Math.random() - 0.5) * 160, z = R.z + (Math.random() - 0.5) * 160, s0 = PN.nearest(x, z), m = new THREE.Mesh(pedGeo, pedMats[peds.length % 5]); city.add(m); peds.push({ m, x: s0.x, z: s0.z, path: null, pi: 0, sp: 1.2 + Math.random() * 0.6 }); }
+  for (const p of peds) {
+    if (!p.path) { const t = PN.nearest(R.x + (Math.random() - 0.5) * 200, R.z + (Math.random() - 0.5) * 200); p.path = PN.route(p.x, p.z, t.x, t.z) || []; p.pi = 0; p.ok = false; if (!p.path.length) { p.path = null; continue; } }
+    const wp = p.path[p.pi], pv = p.pi > 0 && p.path[p.pi - 1];
+    if (pv && pv.cross && !p.ok) { if (!canCross(pv.cross)) { if (!p.waiting) { p.waiting = true; pedStats.waits++; } continue; } p.ok = true; p.waiting = false; pedStats.crossed++; }
+    const dx = wp.x - p.x, dz = wp.z - p.z, d = Math.hypot(dx, dz), st = p.sp * dt;
+    if (d <= st) { p.x = wp.x; p.z = wp.z; p.ok = false; if (++p.pi >= p.path.length) p.path = null; } else { p.x += dx / d * st; p.z += dz / d * st; p.m.rotation.y = Math.atan2(dx, dz); }
+    p.m.position.set(p.x, 0.15, p.z);
+  }
+}
 const speed = () => +$('spd').value;
 let lastT = performance.now(), relT = 0;
 function loop() {
@@ -120,9 +142,9 @@ function loop() {
     if ($('seq').classList.contains('on')) { if (!live.length && queue.length && relT <= 0) { if (launch(queue[0])) queue.shift(); relT = 1; } }
     else if ($('many').classList.contains('on') && relT <= 0) { const C = combos(); if (live.length < 14) launch({ t: ['car', 'car', 'dump', 'tir'][(Math.random() * 4) | 0], ...C[(Math.random() * C.length) | 0] }); relT = 1.2; }
     tr.opts.maxCars = bgOn ? 60 : 0;
-    const steps = Math.ceil(dt / (1 / 30)); for (let k = 0; k < steps; k++) { tr.update(dt / steps, 64); check(dt / steps); }
+    const steps = Math.ceil(dt / (1 / 30)); for (let k = 0; k < steps; k++) { tr.update(dt / steps, 64); check(dt / steps); pedStep(dt / steps); }
     if ($('dbg').classList.contains('on')) dbg.update();
-    $('st').textContent = `${({ round: 'кръгово', T: 'Т-кръстовище', X: 'кръстовище +' })[$('jk').value]} ${ri % pool().length + 1}/${pool().length} · маневри ${combos().length} · бордюр ${stats.curb || 0} · опашка ${queue.length} · на път ${live.length}\nготови ${stats.done}/${stats.started} · в острова ${stats.islandHits} · без маршрут ${stats.noRoute} · заседнали ${stats.stuck}\nнай-бързо въртене ${(stats.maxYawRate * 180 / Math.PI).toFixed(0)}°/s (${stats.maxYawAt})`;
+    $('st').textContent = `${({ round: 'кръгово', T: 'Т-кръстовище', X: 'кръстовище +' })[$('jk').value]} ${ri % pool().length + 1}/${pool().length} · маневри ${combos().length} · бордюр ${stats.curb || 0} · опашка ${queue.length} · на път ${live.length} · 🚶 пресекли ${pedStats.crossed}, чакали ${pedStats.waits}\nготови ${stats.done}/${stats.started} · в острова ${stats.islandHits} · без маршрут ${stats.noRoute} · заседнали ${stats.stuck}\nнай-бързо въртене ${(stats.maxYawRate * 180 / Math.PI).toFixed(0)}°/s (${stats.maxYawAt})`;
   }
   ctl.update(); renderer.render(scene, cam); requestAnimationFrame(loop);
 }
@@ -131,6 +153,7 @@ $('seq').onclick = () => { $('seq').classList.add('on'); $('many').classList.rem
 $('many').onclick = () => { $('many').classList.add('on'); $('seq').classList.remove('on'); queue = []; };
 $('bg').onclick = () => { bgOn = !bgOn; $('bg').classList.toggle('on', bgOn); };
 $('dbg').onclick = () => { $('dbg').classList.toggle('on'); };
+$('peds').onclick = () => { pedOn = !pedOn; $('peds').classList.toggle('on', pedOn); };
 // истинските храсти и фонтанът (assets/heavy/plants — нормализирани: най-широката страна 1, основа 0)
 let PLANTS = [], FOUNTAIN = null;
 const gl = new GLTFLoader(), ld = f => gl.loadAsync('../assets/heavy/plants/' + f + '.glb').then(g => g.scene).catch(() => null);

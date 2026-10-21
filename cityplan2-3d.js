@@ -7,6 +7,7 @@
 //         blocks: true (фоновите квартали в Рим), furniture: true, lampGlow: true (собствени светли петна под фенерите) }
 import * as THREE from 'three';
 import { timesSquareAds } from './timessq-ads.js';   // Таймс Скуеър: светещите екрани с рекламите
+import { crossingsOf } from './pedpaths.js';   // road-geo: зебрите — същите, по които пресичат пешеходците
 
 const M = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.92 });
 let MAT = null;
@@ -410,7 +411,7 @@ export function buildPlan2View(P, opts = {}) {
   // срезовете по дължината на пътя: кръгово — до пръстена; кръстовище — до очертанието му (arm.t от плана, + отместване)
   // road-geo (opts.roadGeo): всеки задънен край вътре в картата има изричен вид — 'cont' (асфалт до близката улица), 'bulb' (компактна площадка
   // за обръщане — само жилищна улица), 'bar' (булевард/с разделителна ивица или към бъдещ квартал — прав край с бариера, никога „лопата“)
-  const RG = !!opts.roadGeo, ET = new Map();
+  const RG = !!opts.roadGeo, ET = new Map(), ZBM = RG ? crossingsOf(P, { roadGeo: true }) : null;   /* зебрите — общи с пешеходците */
   const endType = n => { if (!RG || n.arms.length !== 1) return null; if (ET.has(n.id)) return ET.get(n.id);
     const a = n.arms[0], rd = P.roads[a.road], pts = rd.pts, e = a.end ? pts[pts.length - 1] : pts[0], pr = a.end ? pts[pts.length - 2] : pts[1];
     let t = null; if (ends.inside(n.x, n.z) || n.endKind === 'dead') { const q = ends.inside(n.x, n.z) ? ends.near(e, rd.id, [e[0] - pr[0], e[1] - pr[1]]) : null;
@@ -499,7 +500,7 @@ export function buildPlan2View(P, opts = {}) {
     const dm = zDist(m, b), far = dm ? dm + 1.8 : zoneOf(m, b); if (d + 1.8 + far <= T - 0.5) return true; if (!dm) return false;
     const rank = q => q.kind === 'round' ? 0 : q.ctrl === 'signal' ? 2 : 1; return rank(n) > rank(m) || (rank(n) === rank(m) && n.id < m.id); };
   for (const n of ND) { if (n.arms.length < 3 || n.kind === 'round') continue;
-    for (const a of n.arms) { if (a.stop) Pt.push(ribbon(a.stop, 0.45, 0.13)); if ((n.ctrl === 'signal' || (n.ctrl === 'yield' && !a.prio)) && zebraOk(n, a)) zebra(n, a, (a.t || n.r) + 2.3); } }
+    n.arms.forEach((a, i) => { if (a.stop) Pt.push(ribbon(a.stop, 0.45, 0.13)); if (RG) { const d = ZBM.get(n.id + ':' + i); if (d) zebra(n, a, d); } else if (n.ctrl === 'signal' || (n.ctrl === 'yield' && !a.prio)) zebra(n, a, (a.t || n.r) + 2.3); }); }   /* road-geo: зебрите на пешеходната мрежа (pedpaths.js — и свързващите) */
   // road-geo: истинско кръгово — платно ~5,5 м, престилка за камионите 2 м (паваж, нисък бордюр), повдигнат остров с бордюр, трева, храсти
   // (opts.plants — истинските модели) и фонтан (opts.fountain) или паметник; бордюрът и линиите — прекъснати на входовете; на всеки вход —
   // разделително островче с бордюр, „отстъпи“ (линия + триъгълници) и една зебра, отдръпната от пръстена
@@ -527,7 +528,7 @@ export function buildPlan2View(P, opts = {}) {
       const e0 = sg * (sw0 + 0.25), e1 = sg * (rd.w / 2 - 0.25);   /* „отстъпи“ на влизащата лента: прекъсната линия по ръба на пръстена + триъгълници */
       dashed([at(o0 + 0.2, e0), at(o0 + 0.2, e1)], 0.6, 0.4, 0.35, 0.13, Pt);
       for (let t = Math.min(e0, e1) + 0.5; t < Math.max(e0, e1) - 0.4; t += 1.0) { const c = at(o0 + 1.3, t); Pt.push({ pos: [c[0] - vx * 0.35 - ux * 0.5, 0.13, c[1] - vz * 0.35 - uz * 0.5, c[0] + vx * 0.35 - ux * 0.5, 0.13, c[1] + vz * 0.35 - uz * 0.5, c[0] + ux * 0.5, 0.13, c[1] + uz * 0.5], idx: [0, 2, 1] }); }
-      const zd = r.outer + 7.5; if (zebraOk(n, a)) zebra(n, a, zd, sw0 + (sw1 - sw0) * (zd - o0) / (o1 - o0) + 0.35); }
+      const zd = r.outer + 7.5; if (ZBM.has(n.id + ':' + n.arms.indexOf(a))) zebra(n, a, zd, sw0 + (sw1 - sw0) * (zd - o0) / (o1 - o0) + 0.35); }
   };
   // кръгови: пръстен с бордюри и линии, павирана ивица около острова, трева с цветя и дървета, фонтан; на входовете — островче, „отстъпи“, зебра
   for (const r of RO) { yield 0; const n = P.nodes[r.node];

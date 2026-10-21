@@ -42,7 +42,8 @@ import { bidHtml, resolveBid } from './bidding.js';
 import { addSiteLights, setSiteLightsNight } from './sitelights.js';
 import { createHwTraffic } from './hwtraffic.js';
 import { createTraffic, gridNetwork, planNetwork } from './traffic.js';
-import { makeRouter, pointOn } from './junctionpaths.js';   /* junction-paths: маршрутите на ТИР-овете по лентите */
+import { makeRouter, pointOn } from './junctionpaths.js';
+import { makePedNet } from './pedpaths.js';   /* ped-paths: пешеходците по тротоарите и зебрите */   /* junction-paths: маршрутите на ТИР-овете по лентите */
 import { createIncidents } from './incidents.js';
 import { createBoardLogic } from './boardlogic.js';
 import { addRouteScenery } from './scenery.js';
@@ -2039,6 +2040,22 @@ function addStanders() {
     m.userData.detail = true; scene.add(m); standers.push(m);
   }
 }
+// ped-paths: мрежата на тротоарите (градовете с плана v2 и road-geo — зебрите на изгледа са същите); координатите на света ↔ на плана
+let pedNet = null;
+function pedNetOf() {
+  const P = city.plan; if (!feature('ped-paths') || !feature('road-geo') || !P || !P.p2 || P.osm) return null;
+  if (!pedNet || pedNet.P !== P.p2) { const N = makePedNet(P.p2, { roadGeo: true }), o = P.offset;
+    pedNet = { P: P.p2, route: (x0, z0, x1, z1) => { const r = N.route(x0 - o[0], z0 - o[1], x1 - o[0], z1 - o[1]); return r && r.map(q => ({ ...q, x: q.x + o[0], z: q.z + o[1] })); } }; }
+  return pedNet;
+}
+// може ли да пресече по зебрата c (координатите на плана, като колите на traffic2): при светофар — колите на този клон са на червено; иначе —
+// никоя кола на по-малко от 7 м и никоя движеща се на по-малко от 18 м
+function pedCanCross(c) {
+  if (!tr2 || !tr2On()) return true;
+  if (c.signal) { const s = tr2.signals(c.node)[0], a = s && s.arms && s.arms[c.arm]; if (a && (a.go !== 'red' || (a.left && a.left !== 'red'))) return false; }
+  for (const car of tr2.cars) { const d = Math.hypot(car.x - c.x, car.z - c.z); if (d < 7 || (d < 18 && car.v > 1)) return false; }
+  return true;
+}
 function updatePeds(dt) {
   for (const mx of standMix) mx.update(dt);   // стоящите истински хора се движат (говорят, пушат…)
   if (!S || !city.ready) return;
@@ -2048,7 +2065,7 @@ function updatePeds(dt) {
     if (!p.path) {
       // до случаен ъгъл; понякога до парк
       const pk = (S.parks || []).length && Math.random() < 0.35 ? city.lots[pick(S.parks)] : null;
-      if (city.plan) { const q = pk || roadPoint(); p.path = roadRoute(p.x, p.z, q.x, q.z).map(w => ({ x: w.x, z: w.z })); }
+      if (city.plan) { const q = pk || roadPoint(), pn = pedNetOf(); p.path = (pn && pn.route(p.x, p.z, q.x, q.z)) || roadRoute(p.x, p.z, q.x, q.z).map(w => ({ x: w.x, z: w.z })); p.xOk = false; }   /* ped-paths: по тротоара, улицата — по зебрите */
       else {
       const b = pk ? nearestRoad(pk.x, pk.z) : [3 * ((Math.random() * (NB + 1)) | 0), 3 * ((Math.random() * (NB + 1)) | 0)];
       p.path = bfs(nearestRoad(p.x, p.z), b).map(([i, j]) => ({ x: tx(i), z: tx(j) }));
@@ -2058,9 +2075,10 @@ function updatePeds(dt) {
     }
     const wp = p.path[p.pi];
     let x2 = wp.x, z2 = wp.z;
-    if (p.pi > 0 && !wp.park) { const pv = p.path[p.pi - 1], dx = wp.x - pv.x, dz = wp.z - pv.z, l = Math.hypot(dx, dz) || 1; x2 += -dz / l * PED_SIDE * p.side; z2 += dx / l * PED_SIDE * p.side; }
+    if (p.pi > 0 && !wp.park && !wp.walk) { const pv = p.path[p.pi - 1], dx = wp.x - pv.x, dz = wp.z - pv.z, l = Math.hypot(dx, dz) || 1; x2 += -dz / l * PED_SIDE * p.side; z2 += dx / l * PED_SIDE * p.side; }
+    { const pv = p.pi > 0 && p.path[p.pi - 1]; if (pv && pv.cross && !p.xOk) { if (!pedCanCross(pv.cross)) continue; p.xOk = true; } }   /* ped-paths: преди зебрата — зелено за пешеходците или пролука в колите */
     const dx = x2 - p.x, dz = z2 - p.z, d = Math.hypot(dx, dz), st = p.sp * dt;
-    if (d <= st) { if (d > 0.05) p.yaw = Math.atan2(dx, dz); p.x = x2; p.z = z2; if (++p.pi >= p.path.length) p.path = null; }
+    if (d <= st) { if (d > 0.05) p.yaw = Math.atan2(dx, dz); p.x = x2; p.z = z2; p.xOk = false; if (++p.pi >= p.path.length) p.path = null; }
     else { p.x += dx / d * st; p.z += dz / d * st; const w = Math.atan2(dx, dz); let dy = w - p.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); p.yaw += dy * Math.min(1, dt * 6); }
     p.m.position.set(p.x, 0.05, p.z); p.m.rotation.y = p.yaw;
     p.mixer.update(dt * p.sp / 1.5);
