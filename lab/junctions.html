@@ -31,6 +31,7 @@ import { plan2 } from '../cityplan2.js';
 import { buildPlan2View } from '../cityplan2-3d.js';
 import { createTraffic, planNetwork } from '../traffic.js';
 import { makeRouter, debugLayer } from '../junctionpaths.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const $ = id => document.getElementById(id);
 const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
@@ -50,9 +51,9 @@ function build() {
   if (dbg) dbg.dispose(); live = []; queue = [];
   while (city.children.length) city.remove(city.children[0]);
   P = plan2('jtest', { fam: $('fam').value, size: $('size').value, seed: 7 });
-  VIEW = buildPlan2View(P, {}); city.add(VIEW);
+  VIEW = buildPlan2View(P, { roadGeo: !/[?&]geo=0/.test(location.search), plants: PLANTS, fountain: FOUNTAIN });   /* ?geo=0 — както досега (за сравнение) */ city.add(VIEW);
   tr = createTraffic({ scene: city, built: planNetwork(P, { jp: true }), seed: 3, maxCars: 0, jp: true, drive: P.drive === 'L' ? 'left' : 'right',
-    makeCar: () => { const t = Math.random() < 0.1 ? 'dump' : 'car', T = TYPES[t], o = body(T.len, T.w, T.h, 0x8a8f99); city.add(o); return { obj: o, len: T.len, w: T.w, kind: t === 'car' ? 'car' : 'truck' }; } });
+    makeCar: () => { if (!bgOn) return null; const t = Math.random() < 0.1 ? 'dump' : 'car', T = TYPES[t], o = body(T.len, T.w, T.h, 0x8a8f99); city.add(o); return { obj: o, len: T.len, w: T.w, kind: t === 'car' ? 'car' : 'truck' }; } });
   router = makeRouter(tr); dbg = debugLayer(tr, city); ri = 0; pickRound();
 }
 function pickRound() {
@@ -115,7 +116,14 @@ $('seq').onclick = () => { $('seq').classList.add('on'); $('many').classList.rem
 $('many').onclick = () => { $('many').classList.add('on'); $('seq').classList.remove('on'); queue = []; };
 $('bg').onclick = () => { bgOn = !bgOn; $('bg').classList.toggle('on', bgOn); };
 $('dbg').onclick = () => { $('dbg').classList.toggle('on'); };
-build(); loop();
+// истинските храсти и фонтанът (assets/heavy/plants — нормализирани: най-широката страна 1, основа 0)
+let PLANTS = [], FOUNTAIN = null;
+const gl = new GLTFLoader(), ld = f => gl.loadAsync('../assets/heavy/plants/' + f + '.glb').then(g => g.scene).catch(() => null);
+Promise.all(['bush-0', 'bush-1', 'bush-2', 'flowers', 'fountain'].map(ld)).then(([b0, b1, b2, fl, fo]) => {
+  PLANTS = [b0].filter(Boolean).map((o, i) => { o.scale.setScalar(i === 3 ? 2.2 : 1.8); o.traverse(m => { if (m.isMesh) m.castShadow = true; }); return o; });
+  FOUNTAIN = fo; build(); loop(); });
+window.__night = on => { VIEW.userData.setNight && VIEW.userData.setNight(on); scene.background.set(on ? 0x0b1020 : 0xbfd8ef); sun.intensity = on ? 0.05 : 1.6; scene.children.filter(o => o.isHemisphereLight).forEach(h => h.intensity = on ? 0.25 : 1.6); };
+window.__camRound = (dx, h, dz) => { cam.position.set(R.x + dx, h, R.z + dz); ctl.target.set(R.x, 0, R.z); ctl.update(); renderer.render(scene, cam); };
 // обектите за сравнение преди/след (един и същ изглед отгоре): задънен край, завой, Т, кръстовище +, кръгово
 function spots() {
   const inside = n => P.nodes.every(() => true) && n.endKind === 'dead', out = {};
@@ -123,6 +131,8 @@ function spots() {
   out.deadSt = P.nodes.find(n => n.arms.length === 1 && n.endKind === 'dead' && !P.roads[n.arms[0].road].median);
   out.t = P.nodes.find(n => n.arms.length === 3 && n.kind !== 'round'); out.x4 = P.nodes.find(n => n.arms.length === 4 && n.kind !== 'round' && n.ctrl === 'signal') || P.nodes.find(n => n.arms.length === 4 && n.kind !== 'round');
   out.round = P.rounds[0] && { x: P.rounds[0].x, z: P.rounds[0].z };
+  out.bar = P.nodes.find(n => n.arms.length === 1 && (n.endKind === 'grow' || (n.endKind === 'dead' && (P.roads[n.arms[0].road].median || P.roads[n.arms[0].road].cls === 'blvd'))));
+  out.bend2 = (() => { let b = null; for (const n of P.nodes) if (n.arms.length === 2) { const g = Math.abs(Math.atan2(Math.sin(n.arms[0].angle - n.arms[1].angle), Math.cos(n.arms[0].angle - n.arms[1].angle))), th = Math.PI - g; if (!b || th > b.th) b = { th, x: n.x, z: n.z, deg: Math.round(th * 57.3) }; } return b; })();
   let best = null; for (const rd of P.roads) for (let k = 2; k < rd.pts.length; k++) { const a = rd.pts[k - 2], b = rd.pts[k - 1], c = rd.pts[k], d1 = Math.atan2(b[1] - a[1], b[0] - a[0]), d2 = Math.atan2(c[1] - b[1], c[0] - b[0]), t = Math.abs(Math.atan2(Math.sin(d2 - d1), Math.cos(d2 - d1))); if (!best || t > best.t) best = { t, x: b[0], z: b[1], deg: Math.round(t * 57.3) }; }
   out.bend = best;
   return out;
