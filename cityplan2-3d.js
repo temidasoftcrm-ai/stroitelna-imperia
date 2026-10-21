@@ -308,6 +308,17 @@ export function floodMats(obj, col = 0xffd8a0, k = 0.45) {
     m.emissive = new THREE.Color(col); if (m.map) m.emissiveMap = m.map; m.emissiveIntensity = 0; m.userData.winK = k; m.userData.flood = 1; out.push(m); WIN_MATS.push(m); } });   // и в nightMats на изгледа
   return out;
 }
+// 🌳 истинските дървета (opts.treeModels — trees-real от играта): всяко дърво — части по модел, InstancedMesh; височината = h
+function realTrees(G, list, models) {
+  const vars = models.map(src => { src.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(src), h = (b.max.y - b.min.y) || 1, parts = [];
+    src.traverse(o => { if (o.isMesh) { const g = o.geometry.clone().applyMatrix4(o.matrixWorld); g.translate(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2); g.scale(1 / h, 1 / h, 1 / h); parts.push([g, o.material]); } }); return parts; }).filter(v => v.length);
+  if (!vars.length) return false;
+  const by = vars.map(() => []); list.forEach((t, i) => by[(i * 7 + 3) % vars.length].push(t));
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), v = new THREE.Vector3(), sc = new THREE.Vector3();
+  vars.forEach((parts, vi) => { const L = by[vi]; if (!L.length) return; for (const [g, mat] of parts) { const I = new THREE.InstancedMesh(g, mat, L.length);
+    L.forEach(([x, z, h], i) => { q.setFromAxisAngle(up, (i * 2.39) % 6.283); I.setMatrixAt(i, m.compose(v.set(x, 0, z), q, sc.set(h, h, h))); }); I.castShadow = true; I.frustumCulled = false; G.add(I); } });
+  return true;
+}
 function* furniture(G, P, o = {}) {   // генератор: yield след всеки път (постепенното строене)
   const FURN = new THREE.Group(); G.add(FURN); let SIG = {};
   const stone = M(0x8a8478), iron = M(0x2a2c2e), lampG = new THREE.MeshStandardMaterial({ color: 0xfff1c8, emissive: 0xffd88a, emissiveIntensity: 0.2 });
@@ -336,8 +347,9 @@ function* furniture(G, P, o = {}) {   // генератор: yield след вс
   const P1 = (x, y, z) => (it, v, q, sc, up) => { v.set(it[0], y, it[1]); q.setFromAxisAngle(up, it[2] || 0); sc.set(1, 1, 1); };
   inst(new THREE.CylinderGeometry(0.09, 0.14, 4.6, 6).translate(0, 2.3, 0), iron, lamps, P1(0, 0, 0), true);   // стълб
   inst(new THREE.CylinderGeometry(0.32, 0.18, 0.7, 6).translate(0, 4.75, 0), lampG, lamps, P1(0, 0, 0)).userData.lamp = 1;   // фенерът (свети нощем)
+  if (!(o.treeModels && o.treeModels.length && realTrees(G, trees, o.treeModels))) {
   inst(new THREE.CylinderGeometry(0.22, 0.32, 1, 6).translate(0, 0.5, 0), M(0x6b5a44), trees, (it, v, q, sc) => { v.set(it[0], 0, it[1]); q.identity(); sc.set(1, it[2] * 0.4, 1); }, true);
-  inst(new THREE.IcosahedronGeometry(1, 0), M(0x5d8a3e), trees, (it, v, q, sc) => { v.set(it[0], it[2] * 0.62, it[1]); q.identity(); sc.set(it[2] * 0.33, it[2] * 0.28, it[2] * 0.33); }, true);
+  inst(new THREE.IcosahedronGeometry(1, 0), M(0x5d8a3e), trees, (it, v, q, sc) => { v.set(it[0], it[2] * 0.62, it[1]); q.identity(); sc.set(it[2] * 0.33, it[2] * 0.28, it[2] * 0.33); }, true); }
   inst(new THREE.BoxGeometry(1.8, 0.45, 0.55).translate(0, 0.45, 0), M(0x6d4c33), benches, P1(0, 0, 0), true);
   inst(new THREE.CylinderGeometry(0.18, 0.22, 0.22, 10).translate(0, 0.45, 0), lampG, ups, P1(0, 0, 0));   /* прожекторите в острова на кръговото (road-geo) */
   inst(new THREE.CylinderGeometry(0.28, 0.24, 0.9, 8).translate(0, 0.45, 0), iron, bins, P1(0, 0, 0));
@@ -541,7 +553,8 @@ export function buildPlan2View(P, opts = {}) {
   // дърветата на парковете (големите места park) и на островите на кръговите
   const parkTrees = () => {
     for (const L of P.lots) if (L.big === 'park') for (let k = 0; k < Math.floor(L.w * L.d / 70); k++) { const h = 4 + (k * 7 % 5), u = ((k * 0.7548776662 + 0.5) % 1 - 0.5) * (L.w - 6), v = ((k * 0.5698402910 + 0.5) % 1 - 0.5) * (L.d - 6), c = Math.cos(L.rot), s = Math.sin(L.rot); trees.push([L.x + u * c + v * s, L.z - u * s + v * c, h]); }
-    if (trees.length) {
+    if (trees.length && opts.treeModels && opts.treeModels.length && realTrees(G, trees, opts.treeModels)) {}
+    else if (trees.length) {
       const tg = new THREE.CylinderGeometry(0.2, 0.3, 1, 6).translate(0, 0.5, 0), cg = new THREE.IcosahedronGeometry(1, 0), T1 = new THREE.InstancedMesh(tg, M(0x6b4a2e), trees.length), T2 = new THREE.InstancedMesh(cg, M(0x4f8a3a), trees.length), m = new THREE.Matrix4();
       trees.forEach(([x, z, h], i) => { T1.setMatrixAt(i, m.compose(new THREE.Vector3(x, 0, z), new THREE.Quaternion(), new THREE.Vector3(1, h * 0.45, 1))); T2.setMatrixAt(i, m.compose(new THREE.Vector3(x, h * 0.55, z), new THREE.Quaternion(), new THREE.Vector3(h * 0.3, h * 0.3, h * 0.3))); });
       T2.castShadow = true; T1.frustumCulled = T2.frustumCulled = false; G.add(T1, T2);
