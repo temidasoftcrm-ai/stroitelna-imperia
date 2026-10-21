@@ -54,6 +54,10 @@ const C = { v2: true, fleet: { mine: [{ ref: 't3', nm: 'Влак Сименс В
   act: async (c, a) => { await new Promise(r => setTimeout(r, 300)); if (c === 'qclaim') { const q = st2.quests.find(x => x.id === +a); if (q) q.claimed = true; } if (c === 'claim') st.megas = st.megas.filter(m => m.id !== +a); console.log('act', c, a); },
   render: () => draw(), tick: async () => draw() };
 function draw() { centerRender(el, C); el.querySelectorAll('[data-c]').forEach(b => b.onclick = async () => { const [c, a, x] = b.dataset.c.split(':'); if (c === 'close') return; b.disabled = true; d.toast(`действие: ${b.dataset.c}`); if (c === 'helped') st2.messages.push({ id: 99 + st2.messages.length, me: true, text: '✅ Помогнах: ' + (st2.messages.find(m => m.id === +a)?.text || ''), at: new Date().toISOString() }); await C.act(c, a, x, el); draw(); }); }
+// 🏛️ нивата на холдинга (coop-levels) — горната лента на „Общ холдинг“ с примерни данни
+const CH = await import('./coopholding.js'); { const st = document.createElement('style'); st.textContent = CH.CSS; document.head.appendChild(st); }
+const HM = { name: 'Титан-Хоризон', level: 2, xp: 2380, xpAt: 1000, free: 3250000, reserved: 1400000, contrib: { me: { money: 900000 }, them: { mat: 400000, exec: 200000 } }, ach: { corridors: 0 } };
+C.holdTop = () => CH.headerHtml(HM, { fmt: f });
 window.__cc = { C, draw };
 draw();
 </script></body></html>

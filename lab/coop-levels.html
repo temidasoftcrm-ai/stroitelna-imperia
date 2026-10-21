@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<base href="../">
+<title>Нива на холдинга</title>
+<style>
+  :root { --bg:#0f141c; --panel:rgba(16,21,30,.96); --line:rgba(255,255,255,.12); --acc:#ffb300; --ok:#4cd07d; --bad:#ff6b6b; --txt:#eef1f6; --mut:#9aa3b5; }
+  html, body { margin:0; min-height:100%; background:#1b2433; color:var(--txt); font:14px/1.45 system-ui, sans-serif; }
+  .wrap { max-width:760px; margin:0 auto; padding:16px; }
+  h1 { font-size:20px; margin:0 0 4px; } .lead { color:var(--mut); margin:0 0 12px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 16px; margin:0 0 12px; }
+  h3 { font-size:15px; margin:12px 0 6px; } h3:first-child { margin-top:0; }
+  .row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin:6px 0; }
+  button { font:inherit; color:inherit; cursor:pointer; } .btn { background:var(--acc); color:#1a1200; border:0; border-radius:9px; padding:7px 12px; font-weight:800; }
+  .btn2 { border:1px solid var(--line); background:rgba(255,255,255,.06); border-radius:9px; padding:7px 11px; font-weight:700; }
+  .btn2:disabled, .btn:disabled { opacity:.45; cursor:default; }
+  #log { font-size:13px; color:var(--mut); max-height:160px; overflow:auto; } #log div { padding:2px 0; border-bottom:1px solid #ffffff0d; }
+  #cer { position:fixed; inset:0; background:#000a; display:none; align-items:center; justify-content:center; z-index:9; } #cer > div { background:var(--panel); border:1px solid #b45cff88; border-radius:16px; width:min(420px, 92vw); padding:8px 16px 14px; }
+  label { font-size:13px; color:var(--mut); } input[type=checkbox] { vertical-align:middle; }
+</style></head><body><div class="wrap">
+<h1>🏛️ Нива на общия холдинг (партньорство)</h1>
+<p class="lead">Демо с примерни данни, без сървър. Натискай бутоните долу — опитът идва само от обща работа, нивото иска опит + постижение + принос и от двамата, а взетото ниво не се губи.</p>
+<div class="panel" id="top"></div>
+<div class="panel"><h3>Условия за следващото ниво</h3><div id="req"></div><div class="row"><button class="btn" id="up">🏛️ Вдигни нивото</button></div></div>
+<div class="panel"><h3>Общи проекти</h3><div id="proj"></div></div>
+<div class="panel"><h3>🧪 Събития</h3>
+  <div class="row"><button class="btn2" data-e="done">🏁 Завърши общ проект</button><button class="btn2" data-e="corridor">🛣️ Завърши общ коридор</button><button class="btn2" data-e="deliv">🚚 Доставка към общ проект (ти)</button><button class="btn2" data-e="delivT">🚚 Доставка (партньорът)</button></div>
+  <div class="row"><button class="btn2" data-e="conc">📜 Успешна концесия</button><button class="btn2" data-e="mega">🏟️ Общ мегапроект</button><button class="btn2" data-e="money">💶 Прехвърли 1 млн. € (0 опит)</button><button class="btn2" data-e="fail">❌ Провален проект</button></div>
+  <div class="row"><label><input type="checkbox" id="off"> партньорът е офлайн</label><button class="btn2" data-e="small">Разход 300 000 €</button><button class="btn2" data-e="big">Разход 2 млн. €</button><span style="color:var(--mut);font-size:13px">лимит без съгласие: <b id="lim"></b></span></div>
+  <div id="log"></div></div>
+</div>
+<div id="cer"><div><div id="cerIn"></div><div class="row" style="justify-content:center"><button class="btn" id="cerOk">🎉 Продължи</button></div></div></div>
+<script type="module">
+import * as CH from './coopholding.js';
+const css = document.createElement('style'); css.textContent = CH.CSS; document.head.appendChild(css);
+const f = n => Math.round(n).toLocaleString('bg-BG'), $ = id => document.getElementById(id);
+const now = Date.now(), DAY = 864e5, ME = 'Титан', THEM = 'Хоризон';
+const h = { name: 'Титан-Хоризон', level: 1, xp: 620, xpAt: 0, trust: 100, limit: 500000, free: 3250000, reserved: 1400000,
+  contrib: { me: { money: 600000, gear: 250000 }, them: { mat: 90000 } }, ach: { projects: 2, deliveries: 3 },
+  projects: [
+    { id: 1, title: '🛣️ АМ „Хемус“: Плевен — В. Търново', kind: 'hw', budget: 1400000, deadline: now + 18 * DAY, split: [55, 45], status: 'active', reserved: 1400000,
+      gives: { me: [{ k: 'money', v: 800000 }, { k: 'gear', v: 0, txt: '2 багера, 1 кран (12 дни)' }], them: [{ k: 'mat', v: 400000, txt: '1 200 м³ бетон' }, { k: 'exec', v: 200000, txt: '3 бригади' }] }, ok: { me: 1, them: 1 } },
+    { id: 2, title: '🚆 Жп линия София — Пловдив (общ влак)', kind: 'rail', budget: 2600000, deadline: now + 30 * DAY, split: [50, 50], status: 'proposed',
+      gives: { me: [{ k: 'money', v: 1300000 }], them: [{ k: 'money', v: 900000 }, { k: 'gear', v: 400000, txt: 'локомотив + 4 вагона' }] }, ok: { me: 0, them: 1 } },
+  ] };
+const log = t => { const d = document.createElement('div'); d.textContent = `${new Date().toLocaleTimeString('bg-BG')} · ${t}`; $('log').prepend(d); };
+function draw() {
+  $('top').innerHTML = CH.headerHtml(h, { fmt: f });
+  $('req').innerHTML = CH.reqHtml(h, { fmt: f, me: ME, them: THEM });
+  $('proj').innerHTML = h.projects.map(p => CH.projectHtml(p, { fmt: f, me: ME, them: THEM, act: true, now })).join('');
+  const c = CH.check(h); $('up').disabled = !c.ok; $('up').textContent = c.max ? '👑 Най-високото ниво' : `🏛️ Вдигни на ниво ${c.nx.n} — ${c.nx.nm}`;
+  $('lim').textContent = `${f(h.limit)} €`;
+  document.querySelectorAll('[data-c^="hproj:"]').forEach(b => b.onclick = () => { const [, id, a] = b.dataset.c.split(':'), p = h.projects.find(x => x.id === +id);
+    if (a === 'ok') { p.ok.me = 1; if (p.ok.them) { p.status = 'active'; p.reserved = p.budget; h.reserved += p.budget; h.free -= p.gives.me.reduce((s, g) => s + (g.k === 'money' ? g.v : 0), 0); log(`🔒 ${p.title}: и двамата приеха — ${f(p.budget)} € резервирани`); } }
+    else { p.status = 'failed'; log(`✖ отказа ${p.title}`); }
+    draw(); });
+}
+const ev = (e, txt) => { const r = CH.apply(h, e); log(`${txt} → ${r.xp ? `+${f(r.xp)} опит` : '0 опит'}`); draw(); };
+const A = {
+  done: () => ev({ t: 'project_done', budget: 1400000, gives: { me: [{ k: 'money', v: 800000 }], them: [{ k: 'mat', v: 400000 }, { k: 'exec', v: 200000 }] } }, '🏁 общ проект завършен (1,4 млн. €)'),
+  corridor: () => ev({ t: 'project_done', budget: 6e6, corridor: true, gives: { me: [{ k: 'exec', v: 3e6 }], them: [{ k: 'money', v: 2e6 }] } }, '🛣️ общ коридор завършен (6 млн. €)'),
+  deliv: () => ev({ t: 'delivery', value: 300000, by: 'me', k: 'mat' }, '🚚 твоя доставка към общ проект (300 000 €)'),
+  delivT: () => ev({ t: 'delivery', value: 250000, by: 'them', k: 'gear' }, '🚚 доставка на партньора (250 000 €)'),
+  conc: () => ev({ t: 'concession', value: 8e7 }, '📜 успешна обща концесия (80 млн. €)'),
+  mega: () => ev({ t: 'project_done', budget: 5e7, mega: true, gives: { me: [{ k: 'money', v: 2.5e7 }], them: [{ k: 'money', v: 2.5e7 }] } }, '🏟️ общ мегапроект завършен'),
+  money: () => { h.free += 1e6; ev({ t: 'transfer', amount: 1e6 }, '💶 прехвърляне на пари към фонда'); },
+  fail: () => ev({ t: 'project_fail', loss: 400000 }, `❌ провален проект: −400 000 € и −${CH.FAIL_TRUST} доверие за ${CH.FAIL_DAYS} дни (нивото остава)`),
+  small: () => spend(3e5), big: () => spend(2e6),
+};
+function spend(c) {
+  if ($('off').checked && CH.needsConsent(h, c)) return log(`⏳ разход ${f(c)} € > лимита — чака съгласието на партньора (офлайн)`);
+  h.free -= c; log(`✅ разход ${f(c)} € — ${$('off').checked ? 'под лимита, без да чака партньора' : 'партньорът е онлайн и одобри'}`); draw();
+}
+document.querySelectorAll('[data-e]').forEach(b => b.onclick = () => A[b.dataset.e]());
+$('up').onclick = () => { const r = CH.apply(h, { t: 'levelup' }); if (r.level) { $('cerIn').innerHTML = CH.ceremonyHtml(r.level, h.name); $('cer').style.display = 'flex'; log(`🏛️ ниво ${r.level.n} — ${r.level.nm}`); } draw(); };
+$('cerOk').onclick = () => { $('cer').style.display = 'none'; };
+window.__ch = { h, CH, draw };
+draw();
+</script></body></html>

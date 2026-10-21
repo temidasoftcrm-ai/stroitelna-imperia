@@ -6,8 +6,8 @@
 // Локалната навигация е с data-cc (без сървър). C — контекстът от coop.js (centerCtx): { st, st2, st3, d, E, f, esc, ago, left, PCOL, JCOL,
 //   partnerName, myName, unread, markRead, UNIT_TYPES, MATERIALS, logTxt, QUICK, fetchedAt, act(c, a, x, el), render() }.
 
-const V = { sec: 'home', proj: 'prop', fin: 'tr', hist: false, cities: false, gear: false, wiz: null, inflight: new Set() };
-const SECS = [['home', '🏠', 'Обзор'], ['proj', '🛣️', 'Общи проекти'], ['eq', '🚜', 'Техника и доставки'], ['fin', '💶', 'Финанси'], ['goals', '🏆', 'Общи цели'], ['chat', '💬', 'Чат'], ['feed', '📜', 'Активност']];
+const V = { sec: 'hold', proj: 'prop', fin: 'tr', hist: false, cities: false, gear: false, wiz: null, inflight: new Set() };
+const SECS = [['hold', '🏦', 'Общ холдинг'], ['home', '🏠', 'Обзор'], ['proj', '🛣️', 'Общи проекти'], ['eq', '🚜', 'Техника и доставки'], ['fin', '💶', 'Финанси'], ['goals', '🏆', 'Общи цели'], ['chat', '💬', 'Чат'], ['feed', '📜', 'Активност']];
 const STATUS = { wait: ['⏳ чака отговор', '#ffb347'], ok: ['✅ прието', '#5fd38a'], no: ['✖ отказано', '#ff6b6b'], exp: ['⌛ изтекло', '#9aa0aa'], done: ['🏁 изпълнено', '#4fc3f7'], cancel: ['↩️ оттеглено', '#9aa0aa'], mine: ['📨 за твое решение', '#ffd54a'] };
 const chip = k => { const [t, c] = STATUS[k] || STATUS.wait; return `<span class="chip" style="color:${c};border-color:${c}55">${t}</span>`; };
 // статусите от сървъра → едно от горните
@@ -66,7 +66,7 @@ export function centerRender(el, C) {
   // менюто
   const badge = k => k === 'home' && nTodo ? nTodo : k === 'chat' && nU ? nU : k === 'goals' && ready.goals ? ready.goals : 0;
   h += `<nav>${SECS.map(([k, ico, nm]) => `<button class="${V.sec === k ? 'on' : ''}" data-cc="sec:${k}">${ico} <span class="t">${nm}</span>${badge(k) ? `<span class="n">${badge(k)}</span>` : ''}</button>`).join('')}</nav><main>`;
-  h += ({ home, proj, eq, fin, goals, chat, feed }[V.sec] || home)(C, todo, ready);
+  h += ({ hold: holdSec, home, proj, eq, fin, goals, chat, feed }[V.sec] || holdSec)(C, todo, ready);
   el.innerHTML = h + '</main>';
   for (const k of V.inflight) { const b = el.querySelector(`[data-c="${k}"]`); if (b) { b.disabled = true; b.textContent = '⏳ ' + b.textContent; } else V.inflight.delete(k); }
   el.querySelectorAll('[data-cc]').forEach(b => b.onclick = () => local(b.dataset.cc, C, el));
@@ -92,9 +92,9 @@ async function local(cc, C, el) {
   else if (c === 'cities') { V.cities = !V.cities; V.gear = false; }
   else if (c === 'gear') { V.gear = !V.gear; V.cities = false; }
   else if (c === 'proj') V.proj = a;
-  else if (c === 'fin') V.fin = a;
+  else if (c === 'fin') { if (a === 'hold') V.sec = 'hold'; else V.fin = a; }   // старите връзки към „Финанси → Общ холдинг“
   else if (c === 'hist') V.hist = !V.hist;
-  else if (c === 'go') { V.sec = a; if (x) { if (a === 'proj') V.proj = x; if (a === 'fin') V.fin = x; } }
+  else if (c === 'go') { V.sec = a; if (x) { if (a === 'proj') V.proj = x; if (a === 'fin') { if (x === 'hold') V.sec = 'hold'; else V.fin = x; } } }
   else if (c === 'wiz') {
     if (a === 'new') V.wiz = { step: 0, type: null, ref: null };
     else if (a === 'close') V.wiz = null;
@@ -304,12 +304,15 @@ function sosParse(C, text) {
 // помогнато ли е: по-късно съобщение „✅ Помогнах: …“ от другия
 const helped = (C, m) => (C.st2?.messages || []).some(x => x.id > m.id && x.me !== m.me && /^✅ Помогнах/.test(x.text));
 
-// ── 💶 Финанси: Преводи · Заеми · Общ холдинг ──
+// трите вида пари — винаги ясно разделени (във „Финанси“ и в „Общ холдинг“)
+const THREE_HTML = (C, s, pn) => `<div class="three"><div class="stat"><b>${C.f(C.E().money)} €</b><span>👤 Твои средства</span></div><div class="stat"><b style="color:${C.PCOL}">${C.f(s.money || 0)} €</b><span>🤝 Средства на ${pn}</span></div><div class="stat"><b style="color:var(--acc)">${C.f(C.st2?.vault?.balance || 0)} €</b><span>🏦 Общи средства (холдинг)</span></div></div>`;
+// ── 💶 Финанси: Преводи · Заеми (общият холдинг е отделен раздел — най-отгоре) ──
 function fin(C) {
-  let h = `<div class="sub">${[['tr', '🎁 Преводи'], ['loan', '💸 Заеми'], ['hold', '🏦 Общ холдинг']].map(([k, t]) => `<button class="${V.fin === k ? 'on' : ''}" data-cc="fin:${k}">${t}</button>`).join('')}</div>`;
+  if (V.fin === 'hold') V.fin = 'tr';
+  let h = `<div class="sub">${[['tr', '🎁 Преводи'], ['loan', '💸 Заеми']].map(([k, t]) => `<button class="${V.fin === k ? 'on' : ''}" data-cc="fin:${k}">${t}</button>`).join('')}</div>`;
   const { st, st2, f, esc, E } = C, pn = esc(C.partnerName()), s = st.partner?.snap || {};
   // трите вида пари — винаги ясно разделени
-  h += `<div class="three"><div class="stat"><b>${f(E().money)} €</b><span>👤 Твои средства</span></div><div class="stat"><b style="color:${C.PCOL}">${f(s.money || 0)} €</b><span>🤝 Средства на ${pn}</span></div><div class="stat"><b style="color:var(--acc)">${f(st2?.vault?.balance || 0)} €</b><span>🏦 Общи средства (холдинг)</span></div></div>`;
+  h += THREE_HTML(C, s, pn);
   if (V.fin === 'tr') {
     if (V.helpMsg) { const m = (st2?.messages || []).find(x => x.id === V.helpMsg); if (m) h += `<div class="ac" style="border-left-color:var(--bad)"><div>🆘 Помагаш на ${pn}: „${esc(m.text)}“<div class="mut">Подари сумата, после натисни „✅ Помогнах“ — партньорът вижда, че е изпълнено.</div></div><button class="btn2" data-c="helped:${m.id}">✅ Помогнах</button></div>`; }
     h += `<h3>🎁 Подари пари</h3><div class="row"><input id="cpAmt" inputmode="numeric" placeholder="сума в €" value="${V.giftA || ''}"><button class="btn" data-c="gift">🎁 Подари на ${pn}</button></div><div class="mut">Парите тръгват от твоите средства веднага.</div>`;
@@ -333,20 +336,26 @@ function fin(C) {
     for (const [t, G] of grp) if (G.length) h += `<h3>${t}</h3><div class="card">${G.map(lc).join('')}</div>`;
     if (!L.length) h += '<div class="mut" style="margin-top:10px">Още няма заеми.</div>';
   }
-  if (V.fin === 'hold') {
-    const V0 = st2?.vault || { balance: 0, log: [] }, log = C.st3?.log || V0.log || [], T = st2?.tandems || [];
-    const inn = log.filter(l => l.amount > 0).reduce((a, l) => a + l.amount, 0), out = log.filter(l => l.amount < 0).reduce((a, l) => a - l.amount, 0);
-    const days = log.length ? Math.max(1, Math.round((Date.now() - Math.min(...log.map(l => Date.parse(l.at)))) / 86400e3)) : 0;
-    h += `<h3>🏦 ${esc(V0.name || 'Вашият холдинг')}</h3><div class="card"><div class="mut">Обща касичка — внасяте и двамата, тегли всеки при нужда.</div>
-      <div class="row"><input id="cpV" inputmode="numeric" placeholder="сума в €"><button class="btn" data-c="vput">⬆️ Внеси от твоите</button><button class="btn2" data-c="vtake">⬇️ Изтегли при теб</button></div>
-      <div class="led"><span>За периода${days ? ` (последните ${days} дни)` : ''}: внесени</span><b class="ok">+${f(inn)} €</b></div><div class="led"><span>изтеглени / покрити</span><b class="bad">−${f(out)} €</b></div>
-      ${C.holdInfo()}
-      <div class="row"><button class="btn2" data-cc="hist">${V.hist ? '▲ Скрий историята' : `📜 История (${log.length})`}</button></div>
-      ${V.hist ? log.map(l => `<div class="led"><span>${C.logTxt(l)}</span><span class="${l.amount > 0 ? 'ok' : 'bad'}">${l.amount > 0 ? '+' : ''}${f(l.amount)} € · ${C.ago(l.at)}</span></div>`).join('') : ''}</div>`;
-    if (C.st4) h += rulesHtml(C);
-    h += `<h3>🏆 Най-силен тандем</h3><div class="card">${T.map((x, i) => `<div class="led" style="${x.me ? `color:${C.PCOL};font-weight:800` : ''}"><span>${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${esc(x.name)}${x.me ? ' (вие)' : ''}</span><b>${f(x.worth)} €</b></div>`).join('') || '<div class="mut">Още няма тандеми.</div>'}</div>`;
-  }
   return h;
+}
+
+// ── 🏦 Общ холдинг — първият раздел на центъра (касата, правилата, тандемите; нивата на холдинга — feature 'coop-levels', coopholding.js) ──
+function holdSec(C) {
+  const { st, st2, f, esc, E } = C, pn = esc(C.partnerName()), s = st.partner?.snap || {};
+  let h = C.holdTop ? C.holdTop() : '';   // 🏛️ ниво на холдинга, следващо, опит, свободни/резервирани, следваща обща цел (coop-levels)
+  h += THREE_HTML(C, s, pn);
+  const V0 = st2?.vault || { balance: 0, log: [] }, log = C.st3?.log || V0.log || [], T = st2?.tandems || [];
+  const inn = log.filter(l => l.amount > 0).reduce((a, l) => a + l.amount, 0), out = log.filter(l => l.amount < 0).reduce((a, l) => a - l.amount, 0);
+  const days = log.length ? Math.max(1, Math.round((Date.now() - Math.min(...log.map(l => Date.parse(l.at)))) / 86400e3)) : 0;
+  h += `<h3>🏦 ${esc(V0.name || 'Вашият холдинг')}</h3><div class="card"><div class="mut">Обща касичка — внасяте и двамата, тегли всеки при нужда.</div>
+    <div class="row"><input id="cpV" inputmode="numeric" placeholder="сума в €"><button class="btn" data-c="vput">⬆️ Внеси от твоите</button><button class="btn2" data-c="vtake">⬇️ Изтегли при теб</button></div>
+    <div class="led"><span>За периода${days ? ` (последните ${days} дни)` : ''}: внесени</span><b class="ok">+${f(inn)} €</b></div><div class="led"><span>изтеглени / покрити</span><b class="bad">−${f(out)} €</b></div>
+    ${C.holdInfo()}
+    <div class="row"><button class="btn2" data-cc="hist">${V.hist ? '▲ Скрий историята' : `📜 История (${log.length})`}</button></div>
+    ${V.hist ? log.map(l => `<div class="led"><span>${C.logTxt(l)}</span><span class="${l.amount > 0 ? 'ok' : 'bad'}">${l.amount > 0 ? '+' : ''}${f(l.amount)} € · ${C.ago(l.at)}</span></div>`).join('') : ''}</div>`;
+  if (C.st4) h += rulesHtml(C);
+  h += `<h3>🏆 Най-силен тандем</h3><div class="card">${T.map((x, i) => `<div class="led" style="${x.me ? `color:${C.PCOL};font-weight:800` : ''}"><span>${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${esc(x.name)}${x.me ? ' (вие)' : ''}</span><b>${f(x.worth)} €</b></div>`).join('') || '<div class="mut">Още няма тандеми.</div>'}</div>`;
+    return h;
 }
 
 // ── 📜 (v2, coop_status4) правилата на общата каса: лимит за самостоятелно теглене, лимит за автоматичното спасяване, заявки ──
