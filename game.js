@@ -570,9 +570,11 @@ function model(n, scale = 1, shadow = true) {
   const V = A[n].variants, o = (V ? V[(model.k = (model.k || 0) + 1) % V.length] : A[n].scene).clone(true);   // одобрените варианти (полиция, пожарни, линейки) се редуват
   if (rot != null) { o.rotation.y = rot; freezeKids(o); }   // дърво
   o.scale.setScalar(scale); o.userData.src = n;
+  if (shadow && isVehModel(n)) shadow = false;   /* колите и техниката — без сянка (картата на сенките е статична и сянката изостава) */
   o.traverse(m => { if (m.isMesh) { m.castShadow = shadow; m.receiveShadow = true; } });
   return o;
 }
+const isVehModel = n => /^sf-(car-|em-|semi|excavator|dump|mcrane|backhoe|roller|grader|bus|van|truck)/.test(n) || (MODELS.vehicles || []).includes(n) || (MODELS.heavy || []).includes(n);
 
 // ============================================================ градът (процедурен по името на града)
 // Мрежа от плочки TILE×TILE; улица на всеки 3 плочки; между улиците има парцели 2×2 плочки.

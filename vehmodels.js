@@ -57,7 +57,7 @@ const REAL_CARS = {   // име: [файл, дължина в м]
 const M_PER = CAR_LEN / 4.5;   // седанът от пакета (≈4,5 м) е CAR_LEN в света на играта
 function loadRealCars(load, A) {
   return Promise.all(Object.entries(REAL_CARS).map(([nm, [f, len]]) => load('assets/heavy/cars/' + f + '.glb').then(g => {
-    g.scene.traverse(o => { if (o.isMesh) o.castShadow = true; });
+    g.scene.traverse(o => { if (o.isMesh) o.castShadow = false; });
     const sc = wrap(g.scene, 0, len * M_PER);
     if (/^Police/.test(nm)) addBeacons(sc, len * M_PER, 'police');
     addCarLights(sc);
@@ -85,11 +85,11 @@ function tidyCar(sc) {
 // светлинната лента/бурканите (kind: police | fire | ambulance); светят, докато car.userData.beaconsOn е истина (сирените — от картата)
 // модели с предница към −Z (вървят на заден ход, ако не се обърнат)
 export const CAR_FLIP = new Set(['amb-eu']);
-export function emergCar(src, len, kind = 'police', name = '') { const sc0 = src.clone(true); sc0.traverse(m => { if (m.isMesh) m.castShadow = true; }); const [yaw, L0] = tidyCar(sc0), sc = wrap(sc0, yaw + (CAR_FLIP.has(name) ? Math.PI : 0), len / L0); addBeacons(sc, len, kind); sc.userData.noSiren = 1; return sc; }
+export function emergCar(src, len, kind = 'police', name = '') { const sc0 = src.clone(true); sc0.traverse(m => { if (m.isMesh) m.castShadow = false; }); const [yaw, L0] = tidyCar(sc0), sc = wrap(sc0, yaw + (CAR_FLIP.has(name) ? Math.PI : 0), len / L0); addBeacons(sc, len, kind); sc.userData.noSiren = 1; return sc; }
 export function loadPoliceCars(load, A) {
   return Promise.all(Object.entries(EMERG).map(([nm, opts]) => {
     const ok = opts.filter(([f]) => feature(f)); if (!ok.length) return null;
-    return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + f + '.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = true; }); const [yaw, L0] = tidyCar(g.scene), K = EMERG_K[nm] * len * M_PER, sc = wrap(g.scene, yaw + (CAR_FLIP.has(f) ? Math.PI : 0), K / L0); /* мащабът е във вътрешната група — model() пипа само външния */ addBeacons(sc, K, nm === 'Firetruck' ? 'fire' : nm === 'Ambulance' ? 'ambulance' : 'police'); return sc; }).catch(() => null)))
+    return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + f + '.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = false; }); const [yaw, L0] = tidyCar(g.scene), K = EMERG_K[nm] * len * M_PER, sc = wrap(g.scene, yaw + (CAR_FLIP.has(f) ? Math.PI : 0), K / L0); /* мащабът е във вътрешната група — model() пипа само външния */ addBeacons(sc, K, nm === 'Firetruck' ? 'fire' : nm === 'Ambulance' ? 'ambulance' : 'police'); return sc; }).catch(() => null)))
       .then(list => { list = list.filter(Boolean); if (list.length) A['sf-car-' + nm] = { scene: list[0], variants: list }; });
   }));
 }
@@ -139,12 +139,12 @@ export function addCarLights(sc) {
 }
 function loadRealTrucks(load, A) {
   return Promise.all(TRK.map((f, i) => load('assets/heavy/trucks/' + f + '.glb').then(g => {
-    g.scene.traverse(m => { if (m.isMesh) { m.castShadow = true; if (f === 'volvo') { m.material = m.material.clone(); m.material.color.multiplyScalar(2.2); } } });   // черният Volvo — малко по-светъл
+    g.scene.traverse(m => { if (m.isMesh) { m.castShadow = false; if (f === 'volvo') { m.material = m.material.clone(); m.material.color.multiplyScalar(2.2); } } });   // черният Volvo — малко по-светъл
     A['sf-trk-' + i] = { scene: wrap(g.scene, 0, null) };
     // полуремарке за магистралата: влекач 6 м + ремарке 13,6 м
     const semi = new THREE.Group(), cab = wrap(g.scene.clone(true), 0, null), cabL = 6 * M_PER, trL = 13.6 * M_PER, W = 2.5 * M_PER;
     cab.scale.setScalar(cabL); cab.position.z = trL / 2 + cabL / 2 - 1.2 * M_PER; semi.add(cab);
-    const box = new THREE.Mesh(new THREE.BoxGeometry(W, 2.9 * M_PER, trL), new THREE.MeshStandardMaterial({ color: 0xeeeeea, roughness: 0.6 })); box.position.y = 2.65 * M_PER; box.castShadow = true; semi.add(box);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(W, 2.9 * M_PER, trL), new THREE.MeshStandardMaterial({ color: 0xeeeeea, roughness: 0.6 })); box.position.y = 2.65 * M_PER; box.castShadow = false; semi.add(box);
     const stripe = new THREE.Mesh(new THREE.BoxGeometry(W + 0.02, 0.5 * M_PER, trL * 0.9), new THREE.MeshStandardMaterial({ color: SEMI_COL[i], roughness: 0.5 })); stripe.position.y = 2.2 * M_PER; semi.add(stripe);
     for (const z of [-trL / 2 + 1.2 * M_PER, -trL / 2 + 2.5 * M_PER]) for (const x of [-1, 1]) { const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.5 * M_PER, 0.5 * M_PER, 0.35 * M_PER, 12).rotateZ(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x15171a })); wh.position.set(x * W * 0.42, 0.5 * M_PER, z); semi.add(wh); }
     addTruckLamps(semi, 0, W, 0.9 * M_PER, -trL / 2);

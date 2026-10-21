@@ -59,7 +59,7 @@ function trailer(matId) {
       b.position.set(0, 1.12 + geo.parameters.height / 2, -2.9 + k * 1.9); g.add(b); load.push(b);
     }
   }
-  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  g.traverse(o => { if (o.isMesh) o.castShadow = false; });
   return { g, mover, load };
 }
 
@@ -89,7 +89,7 @@ function tractorUnit(color) {
     const w = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 0.4, 12).rotateZ(Math.PI / 2), mat(0x15171a));
     w.position.set(x, 0.52, z); g.add(w);
   }
-  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  g.traverse(o => { if (o.isMesh) o.castShadow = false; });
   return g;
 }
 
