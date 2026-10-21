@@ -35,6 +35,7 @@ import { createResorts, RESORTS, seasonOf, monthName } from './resorts.js';
 import { buildResortView, RESORT_MODELS } from './resortview.js';
 import { createDemolition } from './demolish.js';
 import { createDemolition2, machineWork, craneLift, loadSiteRigs, rigPlay, swapRig } from './sitework.js';
+import { createDistricts } from './districts.js';   // 🏡 districts-look (55): дворове, паркове и площадки в кварталите на плана v2
 import { siteK, realScaleK, REAL_BLD, TOO_LONG, kidK } from './scale.js';   // 🏗️ флаг site-anim: истински кран при събаряне, машините работят, кранът вдига
 import { createEvents } from './events.js';
 import { createWeather, rollWeather } from './weather.js';
@@ -1196,6 +1197,27 @@ function placeBuilding(lot, n, rot = 0) {
   lot.built = n; lot.obj = o;
   if (feature('lot-paths')) pathsDirty();
   return o;
+}
+// 🏡 (districts-look) дворове, паркове и площадки в кварталите на плана v2 (districts.js); districtsOff — за снимките „преди“
+let districtsOff = false;
+function districtsTick() {
+  const P = city.plan; if (!P || !P.p2 || !city.group || !city.ready) return;
+  if (city.dl && city.dlG !== city.group) { city.dl.dispose(); city.dl = null; }
+  if (districtsOff) { if (city.dl) { city.dl.dispose(); city.dl = null; } return; }
+  let sig = 0; for (const l of city.lots) if (l.busy || l.built) sig = (sig * 31 + l.id * 3 + (l.busy ? 1 : 0) + (l.obj ? 2 : 0)) | 0;
+  if (city.dl && sig === city.dlSig) return; city.dlSig = sig;
+  if (!city.dl) { city.dlG = city.group; city.dl = createDistricts({ city, P, isHouse: n => HOUSES.includes(n) || /^h2-|^building-type-/.test(n), skip: () => new Set([city.hq?.id, S.garageLot, S.whLot]), lotPaths: feature('lot-paths'),
+    treeProtos: plan2Trees(), bushProtos: ['pl-bush-0', 'pl-bush-1', 'pl-bush-2'].filter(k => A[k]).map(k => A[k].scene), cars: ['Sedan', 'Hatchback', 'SUV', 'Muscle_2', 'Pickup'].map(n => 'sf-car-' + n).filter(k => A[k]).map(k => [k, A[k].scene]) }); }
+  city.dl.rebuild();
+}
+function districtsDbg(cmd, k = 1) {
+  if (cmd === 'off') { districtsOff = true; districtsTick(); return 'off'; }
+  if (cmd === 'on') { districtsOff = false; city.dlSig = null; districtsTick(); return city.dl && city.dl.stats(); }
+  if (!city.dl) { districtsTick(); if (!city.dl) return null; }
+  if (cmd === 'diag' || cmd === 'nodiag') return city.dl.diag(cmd === 'diag');
+  if (cmd === 'lot') { const l = city.lots[k]; if (l) { controls.target.set(l.x, 0, l.z); camera.position.set(l.x + 26, 30, l.z + 34); controls.update(); } return l && l.built; }
+  if (cmd === 'focus') { const f = city.dl.focus(); if (f) { controls.target.set(f.x, 0, f.z); camera.position.set(f.x + 70 * k, 95 * k, f.z + 110 * k); controls.update(); } return f; }
+  return city.dl.stats();
 }
 // 🚶 (lot-paths) пътека/алея от входа на всяка сграда до тротоара: къщите — тъмна алея за кола (2,6 м), другите — светла пешеходна (2,2 м).
 // Входът е по посоката, в която гледа сградата (в плана — към улицата). Един общ меш на град (два материала), прерисува се веднъж след промени.
@@ -9785,6 +9807,8 @@ function frame() {
   if ((++lmLabT % 60) === 0) try { updLmLabels(); } catch (e) { }
   if (lmLabT % 20 === 0) try { updMyBeams(); } catch (e) { myBeams.err = e.message; }
   if (lmLabT % 120 === 0 && city.p2Map && city.planView && city.planView.userData.refill) { let sig = 0; for (const l of city.lots) if (l.busy || l.built) sig = (sig * 31 + l.id + 1) | 0; if (sig !== city.p2Sig) { city.p2Sig = sig; try { city.planView.userData.refill(); } catch (e) { } } }   // купен/застроен/освободен парцел → фоновите квартали и празните места наново
+  if (lmLabT % 120 === 60 && feature('districts-look')) try { districtsTick(); } catch (e) { console.warn('districts', e); }   /* 🏡 districts-look (55): дворовете и парковете — наново при промяна на застрояването */
+  if (city.dl && lmLabT % 10 === 0) city.dl.update(camera, controls.target);
   if (city.mm && lmLabT % 12 === 0) try { const om = !$('mapScreen').classList.contains('hidden'); city.mm.el.style.display = om || hwv ? 'none' : ''; { const pn = $('panel'), r = pn && !pn.classList.contains('hidden') ? pn.getBoundingClientRect() : null, pw = r && r.width > 0 ? Math.max(0, innerWidth - r.left) : 0; city.mm.el.style.right = (pw + 12) + 'px'; }   /* вдясно, до панела */ if (!om) city.mm.update({ camera, target: controls.target, marks: [...(city.hq ? [{ x: city.hq.x, z: city.hq.z, kind: 'hq' }] : []), ...(S.built || []).map(b => city.lots[b.lot]).filter(Boolean).map(l => ({ x: l.x, z: l.z, kind: 'own' })), ...projects.map(p => city.lots[p.lot]).filter(Boolean).map(l => ({ x: l.x, z: l.z, kind: 'site' }))] }); } catch (e) { }
   requestAnimationFrame(frame);
   const rdt = Math.min(clock.getDelta(), 0.1);
@@ -9943,6 +9967,8 @@ if (AUTOTEST) {
   // достъп за headless тестовете
   window.__dbg = {
     state: () => S,
+    city: () => city,   // districts-look (55): диагностиката на парцелите
+    districts: (cmd, k) => districtsDbg(cmd, k),   // 🏡 districts-look: 'diag' | 'nodiag' | 'focus' | 'off' | 'on' | (числата)
     fireTest(sev = 1, travel) { const tg = controls.target; const L = city.lots.filter(l => l.obj && l.built && !l.busy).sort((a, b) => Math.hypot(a.x - tg.x, a.z - tg.z) - Math.hypot(b.x - tg.x, b.z - tg.z))[0]; if (!L) return null; const f = fires.start(L.id, { sev, travel }); flyTo(L); return f && f.id; },   // 🔥 fire-seq: пожар в най-близката сграда
     fires: () => fires.state(),
     bbRebuild(brand) { if (brand) S.brand = brand; if (city.billboards) city.billboards.dispose(); const b = brandOf(S) || { nm: 'Титан', col: '#4fc3f7', ico: '🗿' }; city.billboards = buildBillboards(city.group, { roads: billboardRoads(), brand: b, company: `${b.nm} Констръкшън`, years: Math.max(1, Math.floor((S.day || 1) / 360)), images: bbImages(b), designs: !isImperial(b) }); return city.billboards.spots.length; },
