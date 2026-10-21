@@ -1,3 +1,4 @@
+import { feature } from './lab/feature.js';   // vault-rules
 // boardlogic.js — логиката на борда на директорите (етап 1 по плана на играча):
 //   🏦 финансова рамка (налични · резервирани за одобрени проекти · оперативен резерв · достъпни за нови решения),
 //   📋 одобрението създава ангажимент (резервиран бюджет, отговорен директор, срок, измерима цел),
@@ -29,7 +30,10 @@ export function createBoardLogic(deps) {
   // ---- 🏦 финансовата рамка: всичко е вече в касата, затова не приспадаме два пъти — резервираното е само неизхарченото от одобреното
   function frame() {
     const e = deps.econ(), cash = Math.max(0, Math.round(e.money)), reserved = active().reduce((a, c) => a + (c.reserved || 0), 0);
-    const op = Math.round((deps.dailyCost ? deps.dailyCost() : 0) * RESERVE_DAYS), free = Math.max(0, cash - reserved - op);
+    let op = Math.round((deps.dailyCost ? deps.dailyCost() : 0) * RESERVE_DAYS), free = Math.max(0, cash - reserved - op);
+    // 🏦 флаг vault-rules: разделянето от трезора (S.hold.vault) — резервът на Борис е поне „Резерв“ (и пак ≥ месец разходи),
+    // а предложенията на директорите харчат само от „За инвестиции“
+    const V = hold().vault; if (V && feature('vault-rules')) { op = Math.max(op, Math.round(cash * (V.res || 0) / 100)); free = Math.max(0, Math.min(cash - reserved - op, Math.round(cash * (V.inv || 0) / 100))); }
     return { cash, reserved, op, free, loan: e.loanRoom ? e.loanRoom(deps.S().rep) : 0 };
   }
   const active = () => hold().commits.filter(c => c.st === 'active');
