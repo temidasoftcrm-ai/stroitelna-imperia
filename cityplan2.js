@@ -52,6 +52,27 @@ function closedCurve(ctrl, step = 4) {   // затворена крива; по�
   out.push(out[0].slice()); return out;
 }
 const cumLen = pts => { const L = [0]; for (let i = 1; i < pts.length; i++) L.push(L[i - 1] + dist(pts[i], pts[i - 1])); return L; };
+// road-geo (нови игри): чупките в улица → дъги. Опростяване (Дъглас–Пекер, 0,4 м) намира истинските върхове; всеки със завой > 20°
+// става квадратна Безие (≈ дъга) с допирателна дължина L = 18·tan(θ/2), но ≤ 45% от съседните отсечки. Краищата (възлите) не мърдат.
+function dpSimplify(pts, tol) {
+  if (pts.length < 3) return pts.slice(); const keep = new Uint8Array(pts.length); keep[0] = keep[pts.length - 1] = 1; const st = [[0, pts.length - 1]];
+  while (st.length) { const [i, j] = st.pop(), a = pts[i], b = pts[j], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; let m = -1, md = tol;
+    for (let k = i + 1; k < j; k++) { const d = Math.abs((pts[k][0] - a[0]) * dz - (pts[k][1] - a[1]) * dx) / l; if (d > md) { md = d; m = k; } }
+    if (m >= 0) { keep[m] = 1; st.push([i, m], [m, j]); } }
+  return pts.filter((_, k) => keep[k]);
+}
+function filletRoad(pts) {
+  const S = dpSimplify(pts, 0.4); if (S.length < 3) return pts;
+  const out = [S[0]];
+  for (let i = 1; i < S.length - 1; i++) {
+    const a = S[i - 1], b = S[i], c = S[i + 1], d1 = dist(a, b), d2 = dist(b, c), u1 = [(b[0] - a[0]) / d1, (b[1] - a[1]) / d1], u2 = [(c[0] - b[0]) / d2, (c[1] - b[1]) / d2];
+    const th = Math.acos(Math.max(-1, Math.min(1, u1[0] * u2[0] + u1[1] * u2[1])));
+    if (th < 0.35 || !d1 || !d2) { out.push(b); continue; }
+    const L = Math.min(18 * Math.tan(th / 2), 0.45 * d1, 0.45 * d2), p0 = [b[0] - u1[0] * L, b[1] - u1[1] * L], p1 = [b[0] + u2[0] * L, b[1] + u2[1] * L], m = Math.max(4, Math.ceil(th * 57.3 / 6));
+    for (let k = 0; k <= m; k++) { const t = k / m, u = 1 - t; out.push([u * u * p0[0] + 2 * u * t * b[0] + t * t * p1[0], u * u * p0[1] + 2 * u * t * b[1] + t * t * p1[1]]); }
+  }
+  out.push(S[S.length - 1]); return out;
+}
 function resample(pts, step) {
   const L = cumLen(pts), T = L[L.length - 1], n = Math.max(1, Math.round(T / step)), out = [];
   let j = 1;
@@ -344,7 +365,7 @@ export function plan2Load(data, osm) {
 // ---- основното: plan2(cityId, { fam, size, seed, ext })
 const cache = new Map();
 export function plan2(cityId, o = {}) {
-  const fam = o.fam || 'eu', size = o.size || 'm', seed = o.seed ?? hashStr(cityId), ext = o.ext || 0, key = [cityId, fam, size, seed, ext, o.rk || 1].join(':');
+  const fam = o.fam || 'eu', size = o.size || 'm', seed = o.seed ?? hashStr(cityId), ext = o.ext || 0, RG = !!o.roadGeo && !o.osm, key = [cityId, fam, size, seed, ext, o.rk || 1, RG ? 'rg' : ''].join(':');   // RG — road-geo (само нови игри: парцелите се местят)
   if (cache.has(key)) return cache.get(key);
   const t0 = Date.now(), r = rng(hashStr(`plan2:${cityId}:${fam}:${size}:${seed}`));
   const sk = o.osm ? osmSkeleton(o.osm) : skeleton(fam, size, r, o.rk || 1);   // rk — по-голям радиус (играта иска повече парцели)
@@ -417,7 +438,7 @@ export function plan2(cityId, o = {}) {
   const P = { osm: !!o.osm, greensSrc: sk.greens || [], v: PLAN2_V, cityId, fam, size, seed, ext, drive: o.drive || 'R', center: { x: sk.hubs[0].x, z: sk.hubs[0].z }, R: sk.R, boundary: sk.bnd, waterAt: sk.waterAt, coastZ: sk.coastZ, hubs: sk.hubs,
     roads: [], nodes: nodeOut, rounds: [], lots: [], blocks: [], greens: [], landmarks: [] };
   roads.forEach(rd => {
-    const k = CLS[rd.cls], pts = resample(rd.pts, P.osm ? 5 : 2), id = P.roads.length, a = nid(rd.from), b = nid(rd.to);
+    const k = CLS[rd.cls], pts = resample(RG ? filletRoad(rd.pts) : rd.pts, P.osm ? 5 : 2), id = P.roads.length, a = nid(rd.from), b = nid(rd.to);
     const n1 = rd.oneway ? Math.min(2, k.lanes[0]) || 1 : 0, lanes = rd.oneway ? (rd.oneway > 0 ? [n1, 0] : [0, n1]) : k.lanes.slice();   // еднопосочен — всички ленти в една посока, без разделителна ивица
     P.roads.push({ id, cls: rd.cls, osmBridge: !!rd.bridge, noCars: !!rd.noCars, nm: rd.nm || '', oneway: !!rd.oneway, pts, L: cumLen(pts), lanes, laneW: k.laneW, median: rd.oneway ? 0 : k.median, walk: k.walk, w: rd.oneway ? n1 * k.laneW : widthOf(rd.cls), from: a, to: b, bridge: [] });
   });
@@ -442,7 +463,7 @@ export function plan2(cityId, o = {}) {
     if (n.arms.length !== 1) continue;
     const rd = P.roads[n.arms[0].road], bd = bDist(n.x, n.z);
     n.endKind = isMain(rd.cls) && bd < 30 ? 'exit' : bd < 40 ? 'grow' : 'dead';
-    if (n.endKind === 'dead' && !P.osm) { n.r = rd.w / 2 + 5; P.turns.push({ node: n.id, x: n.x, z: n.z, r: n.r }); }
+    if (n.endKind === 'dead' && !P.osm && !(RG && (rd.median || rd.cls === 'blvd'))) { n.r = rd.w / 2 + (RG ? 3 : 5); P.turns.push({ node: n.id, x: n.x, z: n.z, r: n.r }); }   // road-geo: булевардът свършва с бариера, улицата — с компактна площадка
   }
   // кръгови: центърът (ако е кръстовище на главни) + важни 4-клонни на булевардите, раздалечени ≥ 0,45R
   const want = o.osm ? 0 : SIZE[size].rounds + (fam === 'eu' || fam === 'radial' ? 1 : 0);   // истинската карта — без измислени кръгови
@@ -455,7 +476,8 @@ export function plan2(cityId, o = {}) {
     // ъглите между входовете — поне 60°
     const as = n.arms.map(a => a.angle).sort((p, q2) => p - q2); if (as.some((a, i) => (i ? a - as[i - 1] : a + TAU - as[as.length - 1]) < 1.0)) continue;
     const island = n === cand[0] && (fam === 'eu' || fam === 'radial') ? 14 : 9, outer = island + 7;
-    if (P.nodes.some(m => m !== n && m.arms.length && Math.hypot(m.x - n.x, m.z - n.z) < outer + 14)) continue;   // друг възел в кръговото → не става (улица през острова)
+    if (P.nodes.some(m => m !== n && m.arms.length && Math.hypot(m.x - n.x, m.z - n.z) < outer + 14)) continue;
+    if (RG && P.nodes.some(m => m !== n && m.arms.length >= 3 && Math.hypot(m.x - n.x, m.z - n.z) < outer + 32)) continue;   // road-geo: кръстовище до самия вход на кръговото — не (зебри, стоп линии, островчета нямат място)   // друг възел в кръговото → не става (улица през острова)
     n.kind = 'round'; n.ctrl = 'round'; n.r = outer + 2;
     const ring = []; for (let k = 0; k <= 48; k++) { const a = -k / 48 * TAU; ring.push([n.x + Math.cos(a) * (island + 3.5), n.z + Math.sin(a) * (island + 3.5)]); }   // обратно на часовника отгоре (дясно движение)
     const rr0 = island + 3.5, circ = TAU * rr0, sOf = ang => { const t = P.drive === 'R' ? -ang : ang; return ((t % TAU) + TAU) % TAU / TAU * circ; }, dl = Math.asin(Math.min(0.9, 3.3 / rr0));

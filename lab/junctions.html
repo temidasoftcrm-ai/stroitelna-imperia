@@ -50,7 +50,7 @@ function build() {
   if (tr) { for (const a of live) { city.remove(a.obj); if (a.trl) city.remove(a.trl); } tr.clear(); }
   if (dbg) dbg.dispose(); live = []; queue = [];
   while (city.children.length) city.remove(city.children[0]);
-  P = plan2('jtest', { fam: $('fam').value, size: $('size').value, seed: 7 });
+  const GEO = !/[?&]geo=0/.test(location.search); P = plan2('jtest', { fam: $('fam').value, size: $('size').value, seed: 7, roadGeo: GEO });   /* road-geo и в генератора (нов град) */
   VIEW = buildPlan2View(P, { roadGeo: !/[?&]geo=0/.test(location.search), plants: PLANTS, fountain: FOUNTAIN });   /* ?geo=0 — както досега (за сравнение) */ city.add(VIEW);
   tr = createTraffic({ scene: city, built: planNetwork(P, { jp: true }), seed: 3, maxCars: 0, jp: true, drive: P.drive === 'L' ? 'left' : 'right',
     makeCar: () => { if (!bgOn) return null; const t = Math.random() < 0.1 ? 'dump' : 'car', T = TYPES[t], o = body(T.len, T.w, T.h, 0x8a8f99); city.add(o); return { obj: o, len: T.len, w: T.w, kind: t === 'car' ? 'car' : 'truck' }; } });
