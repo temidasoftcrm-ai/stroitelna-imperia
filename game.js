@@ -1387,7 +1387,7 @@ function roofLogo(g, office, level) {
   for (const x of [-bw / 3, bw / 3]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.25, 1.6, 0.25), new THREE.MeshStandardMaterial({ color: 0x3a3f46 })); leg.position.set(x, -bh / 2 - 0.8, 0); board.add(leg); }
   board.position.set(cx, top + bh / 2 + 1.6, cz); g.add(board);
   g.userData.roofLogo = { x: cx, y: top, z: cz, w: bw, h: bh, board };   // мястото на покрива (в координатите на централата)
-  if (level === 10) { const star = new THREE.Mesh(new THREE.OctahedronGeometry(1.2), new THREE.MeshStandardMaterial({ color: 0xffd54a, emissive: 0xaa7a00, metalness: 0.6, roughness: 0.3 })); star.position.set(cx, top + bh + 3.6, cz); g.add(star); g.userData.star = star; }
+  if (level === 10 && !feature('brand-logo3d')) { const star = new THREE.Mesh(new THREE.OctahedronGeometry(1.2), new THREE.MeshStandardMaterial({ color: 0xffd54a, emissive: 0xaa7a00, metalness: 0.6, roughness: 0.3 })); star.position.set(cx, top + bh + 3.6, cz); g.add(star); g.userData.star = star; }
 }
 OFFICE_LEVELS.forEach((l, i) => { l.upkeep = 70 * (i + 1); l.cost = Math.round(20000 * Math.pow(1.6, i) / 1000) * 1000; });   // cost = цена за следващото ниво
 const GARAGE_LEVELS = [
@@ -1634,7 +1634,7 @@ function buildHQ() {
   g.add(sign);
   g.userData.officeLabel = sign;
   if (O2 && level >= 5) roofLogo(g, office, level);   // 🆕 марката на фирмата на покрива; мястото — g.userData.roofLogo (кампусът на f6 може да го ползва)
-  else if (level === 10) {
+  else if (level === 10 && !feature('brand-logo3d')) {   // с 3D емблемата (brand-logo3d) — без старата табела и звездата (потребителят: „да махнем надписа строителна империя“)
     // светеща табела „СТРОИТЕЛНА ИМПЕРИЯ“ на покрива (от двете страни) и златна звезда над нея
     const c = document.createElement('canvas'); c.width = 1024; c.height = 256;
     const cg = c.getContext('2d'), grd = cg.createLinearGradient(0, 0, 0, 256);
