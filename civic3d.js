@@ -119,6 +119,8 @@ export function buildCivic(group, deps, opts = {}) {
   const kit = crane(g, 20, W / 2 - 3, -D / 2 + 3);
   const scaf = new THREE.Mesh(new THREE.BoxGeometry(W * 0.7, 10, D * 0.6, 6, 4, 6), new THREE.MeshStandardMaterial({ color: 0x9aa0a6, wireframe: true })); g.add(scaf);
   let prog = -1;
+  for (const h of rot) h.userData.keep = true;   // перките се въртят — не се сливат
+  g.userData.mergeWhen = () => prog >= 1 && (!GLB[kind] || body.children.length > 0);   // ⚡ perf-cliff (citycull.js): готовата сграда е статична — сливане по материал
   function setProg(p) {
     p = Math.max(0, Math.min(1, p)); if (p === prog) return; prog = p;
     const k = Math.max(0, Math.min(1, (p - 0.1) / 0.85)); body.visible = k > 0; body.scale.y = Math.max(0.001, k);

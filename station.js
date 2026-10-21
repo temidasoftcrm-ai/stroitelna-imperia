@@ -115,6 +115,7 @@ export function createStation(deps) {
       if (lv >= 2 && !real && !stLoad) loadStationModels().then(() => { if (level === lv) build(lv, buildingNow); });
       if (real) {   // истинската сграда — до перона, в северния му край
         real.position.set(X + 5.5 + (lv >= 5 ? 6 : 3), 0, lv >= 5 ? plen + 24.5 : -plen - (hl + 4) / 2 - 1); if (lv >= 5) real.rotation.y = Math.PI; g.add(real);
+        { const r0 = real; g.userData.mergeWhen = () => [r0]; }   // ⚡ perf-cliff (citycull.js): гаровата сграда е статична — частите ѝ се сливат по материал (паркираните влакове — не)
         { const seen = new Set(); real.traverse(o => { if (!o.isMesh) return; for (const m of [].concat(o.material)) { if (!m || seen.has(m) || !('emissive' in m)) continue; seen.add(m); m.emissive.set(0xffd9a0); if (m.map) m.emissiveMap = m.map; m.needsUpdate = true; glows.push([m, 0.55]); } }); }   // нощем сградата е осветена
         const lab = deps.label(`🚉 ${STATION_LEVELS[lv - 1].nm.toUpperCase()} · ${lv} ${lv === 1 ? 'коловоз' : 'коловоза'}`, '#ffffff', 9);
         lab.position.set(real.position.x, real.userData.h + 4, real.position.z); g.add(lab);

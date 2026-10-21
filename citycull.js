@@ -20,7 +20,12 @@ function sphereOf(o) {
 export function mergeKids(o, minMeshes = 6) {
   if (o.userData.merged) return 0; o.userData.merged = true;
   const parts = []; let bad = false;
-  o.traverse(m => { if (m === o) return; if (m.isSkinnedMesh || m.isInstancedMesh || m.isSprite || m.isPoints || m.isLine || m.userData.keep || m.morphTargetInfluences) { if (m.isSkinnedMesh || m.isInstancedMesh) bad = true; return; } if (m.isMesh && m.visible && !Array.isArray(m.material) && m.geometry) parts.push(m); });
+  // обхождане без скритите и без поддърветата с userData.keep (подвижното: трафик, перки…) — те остават както са
+  const walk = (n, top) => { for (const m of n.children) { if (!m.visible || m.userData.keep) continue;
+    if (m.isSkinnedMesh || m.isInstancedMesh) { if (top) bad = true; continue; }
+    if (m.isSprite || m.isPoints || m.isLine || m.morphTargetInfluences) continue;
+    if (m.isMesh && !Array.isArray(m.material) && m.geometry) parts.push(m); walk(m, top); } };
+  walk(o, !o.userData.mergeWhen);   // голямата група (mergeWhen) може да има инстанции вътре — просто ги прескачаме
   if (bad || parts.length < minMeshes) return 0;
   o.updateMatrixWorld(true); _inv.copy(o.matrixWorld).invert();
   const groups = new Map();
@@ -54,6 +59,9 @@ export function createCityCull(deps) {
       const g = deps.group(); if (!g) return;
       // опашката за сливане: детайлите и сградите (lot.obj) с много части — новите (донесени по-късно модели) влизат сами
       if (qSig !== g.uuid + ':' + g.children.length) { qSig = g.uuid + ':' + g.children.length; queue = g.children.filter(o => !o.userData.merged && (o.userData.detail || o.userData.bld)); }
+      // големите групи (магистралата в града, обществените сгради, гарата): userData.mergeWhen() → true (цялата група) или [обекти] — щом са готови
+      if (t + dt >= 0.5) for (const o of g.children) { const w = o.userData.mergeWhen; if (!w || o.userData.merged) continue; let r = false; try { r = w(); } catch (e) { } if (!r) continue;
+        if (r === true) try { mergeKids(o, 6); } catch (e) { o.userData.merged = true; } else { for (const x of r) try { mergeKids(x, 6); } catch (e) { } o.userData.merged = true; } }
       let budget = 12; while (budget-- > 0 && queue.length) { const o = queue.shift(); if (o.parent === g) try { mergeKids(o); } catch (e) { o.userData.merged = true; } }
       t += dt; if (t < 0.5) return; t = 0;
       if (high) return;   // отдалечено: perfTune така или иначе крие детайлите

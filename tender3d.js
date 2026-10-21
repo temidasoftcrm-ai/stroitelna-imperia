@@ -366,6 +366,7 @@ export function buildHospital(group, deps, opts = {}) {
   const sign = deps.label ? deps.label(opts.sign || '🏥 БОЛНИЦА', '#ffe9a8', 16) : null;
   if (sign) { sign.position.set(0, 17, -4); g.add(sign); }
   const kit = siteKit(g, 18, 10, 18); kit.kit.position.z = -4;
+  g.userData.mergeWhen = () => prog >= 1 && body.children.length > 0;   // ⚡ perf-cliff (citycull.js): готовата болница е статична — сливане по материал (линейките на паркинга — също)
   let prog = -1;
   function setProg(p) {
     p = Math.max(0, Math.min(1, p)); if (p === prog) return; prog = p;
