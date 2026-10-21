@@ -9772,6 +9772,8 @@ const TOWN_BG = { istanbul: ['assets/sfx/istanbul-prayer.mp3', 0.3] };   // на
 // на всеки 3–5 минути (случайно) — пожарна, полиция или автобус. По-тихо отдалеч и нощем (силата на града).
 const MEGA_TRAFFIC = 'assets/sfx/mega-traffic.mp3', MEGA_EVENTS = ['assets/sfx/mega-fire.mp3', 'assets/sfx/mega-police.mp3', 'assets/sfx/mega-bus.mp3'];
 let megaSndT = 180 + Math.random() * 120;
+// 🔔 камбана (потребителят: „от време на време на 10 минути звук на камбана“) — в града, на ~10 мин (±1), не в мюсюлманските градове с езан
+let bellT = 540 + Math.random() * 120; const BELL = 'assets/sfx/church-bell.mp3';
 // песен при купуването на филиал в града (щом звукът е включен) — не при всяко влизане. Записите са с авторски права — само локално:
 // assets/local/ не се качва в GitHub (.gitignore); на сайта файлът го няма и просто не свири
 const CITY_STING = { lasvegas: 'assets/local/vegas-elvis.mp3', newyork: 'assets/local/newyork-sinatra.mp3', rio: 'assets/local/rio-timmaia.mp3', cairo: 'assets/local/cairo-tune.mp3', paris: 'assets/local/paris-vieenrose.mp3' };
@@ -9831,6 +9833,7 @@ function frame() {
       Sound.town(townOn ? (TOWN_SND[S.cityId] || (mega ? MEGA_TRAFFIC : 'assets/sfx/town.mp3')) : null, ...(TOWN_BG[S.cityId] || (mega && TOWN_SND[S.cityId] ? [MEGA_TRAFFIC, 0.6] : [])));
       const town = townOn ? 0.32 * (1 - dayNight.night * 0.65) * (0.35 + 0.65 * Math.max(0, 1 - camera.position.distanceTo(tg) / 500)) : 0;
       if (mega && speed && town > 0.03 && (megaSndT -= rdt) <= 0) { megaSndT = 180 + Math.random() * 120; Sound.file(pick(MEGA_EVENTS), Math.min(0.9, 0.2 + 1.8 * town)); }
+      if ((bellT -= rdt) <= 0) { bellT = 540 + Math.random() * 120; if (!TOWN_BG[S.cityId]) Sound.file(BELL, 0.25 + 0.25 * Math.max(0, 1 - camera.position.distanceTo(tg) / 400)); }
       Sound.update(rdt, { night: dayNight.night, activity: Math.min(1, near / 4) * zoom, speed, traffic: 0.6, town });
     } else Sound.update(rdt, { night: dayNight.night, activity: 0, speed, traffic: 0.2, town: 0 });
     for (const p of projects) { updateSite(p, simT); updateWorkers(p, Math.min(dt, 0.1)); }

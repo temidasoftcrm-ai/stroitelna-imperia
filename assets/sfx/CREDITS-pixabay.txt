@@ -30,3 +30,4 @@ flood.mp3 — „water stream“ (26327991, Pixabay, sound 108384), Pixabay Cont
 fire-crackle.mp3 — „fogo“ (magiaz, Pixabay, sound 383784), Pixabay Content License — оперативната карта „Пожар“ (opsfire.js)
 applause.mp3 — „applause“ (driken5482, Pixabay, sound 236785), Pixabay Content License — ръкоплясканията в залите (roomsound.js), първите 5,5 s
 xp.mp3 — „xp gain magic tone“ (humordome, Pixabay, sound 453274), Pixabay Content License — „+XP“ в играта (devlevel.js), първите 2,2 s
+church-bell.mp3 — „church bell“ (freesound_community, Pixabay, sound 5993), Pixabay Content License — камбаната в града на ~10 мин (game.js), първите 18 s
