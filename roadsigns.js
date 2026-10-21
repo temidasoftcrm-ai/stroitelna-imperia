@@ -89,3 +89,39 @@ export function citySigns(g, grid) {
   if (grid.center) { const [ci, cj] = grid.center; for (const [dx, dz] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { const i = ci + dx * 3, j = cj + dz * 3; if (isRoad(i, j)) approach('roundabout', i, j, dx, dz); } }
   return n;
 }
+
+// ---- градовете с плана v2 (генерираните и по истинската карта): знаците от плана — инстанции по части на модела (малко draw calls)
+// „Стоп“ на второстепенните клонове при предимство; „Пропусни“ + „Кръгово движение“ на всеки вход на кръгово; „50“ / „край“ на входовете
+// на града; „Забранено влизането“ в края на еднопосочна улица, откъдето колите не бива да влизат. Знакът е вдясно от колата, лице към нея.
+// P — планът (cityplan2.js); връща { group, n } в координатите на плана (game.js го мести с offset)
+export function plan2Signs(P) {
+  if (!SRC) return null;
+  const place = { stop: [], yield: [], roundabout: [], speed: [], speedend: [], noentry: [] }, ST = P.STOP || 4.6;
+  const U = a => [Math.cos(a.angle), Math.sin(a.angle)];
+  // към възела (посоката −u): вдясно е (uz, −ux); навън (посоката +u): вдясно е (−uz, ux)
+  const inR = u => [u[1], -u[0]], outR = u => [-u[1], u[0]], faceOut = u => Math.atan2(u[0], u[1]), faceIn = u => Math.atan2(-u[0], -u[1]);
+  for (const n of P.nodes) {
+    if (n.ctrl === 'yield' && n.kind !== 'round') for (const a of n.arms) { if (a.prio || P.roads[a.road].noCars) continue; const rd = P.roads[a.road], u = U(a), r = inR(u), d = (a.t || n.r || 6) + ST + 0.6, hw = rd.w / 2 + 0.9;
+      if (rd.oneway && !a.stop) continue; place.stop.push([n.x + u[0] * d + r[0] * hw, n.z + u[1] * d + r[1] * hw, faceOut(u)]); }
+    if (n.endKind === 'exit' && n.arms.length === 1) { const a = n.arms[0], rd = P.roads[a.road], u = U(a), hw = rd.w / 2 + 0.9, ro = outR(u), ri = inR(u);
+      place.speed.push([n.x + u[0] * 30 + ro[0] * hw, n.z + u[1] * 30 + ro[1] * hw, faceIn(u)]); place.speedend.push([n.x + u[0] * 24 + ri[0] * hw, n.z + u[1] * 24 + ri[1] * hw, faceOut(u)]); }
+  }
+  for (const R of P.rounds || []) { const n = P.nodes[R.node]; for (const a of n.arms) { const rd = P.roads[a.road]; if (rd.noCars) continue; const u = U(a), r = inR(u), hw = rd.w / 2 + 0.9, d = R.outer + 5;
+    place.yield.push([n.x + u[0] * d + r[0] * hw, n.z + u[1] * d + r[1] * hw, faceOut(u)]); place.roundabout.push([n.x + u[0] * (d + 1.4) + r[0] * hw, n.z + u[1] * (d + 1.4) + r[1] * hw, faceOut(u)]); } }
+  // еднопосочна: lanes = [напред, назад] по pts; колите излизат при края с нулевите ленти назад → там е „забранено“ за влизащите
+  const OW = new Map(); for (const rd of P.roads) if (rd.oneway && !rd.noCars) { const fw = rd.lanes[0] > 0 ? 1 : -1; for (let i = 1; i < rd.pts.length; i++) { const a = rd.pts[i - 1], b = rd.pts[i], k = Math.floor((a[0] + b[0]) / 40) + ',' + Math.floor((a[1] + b[1]) / 40), L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; (OW.get(k) || OW.set(k, []).get(k)).push([rd.id, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, fw * (b[0] - a[0]) / L, fw * (b[1] - a[1]) / L]); } }
+  const paired = (rd, x, z, ux, uz) => { const gx = Math.floor(x / 20), gz = Math.floor(z / 20); for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const q of OW.get((gx + i) + ',' + (gz + j)) || []) if (q[0] !== rd.id && Math.hypot(q[1] - x, q[2] - z) < rd.w / 2 + 14 && q[3] * ux + q[4] * uz > 0.8) return true; return false; };   // второто платно (движи се навън) до нас → двойно платно, не еднопосочна улица
+  for (const rd of P.roads) { if (!rd.oneway || rd.noCars) continue; const fwd = rd.lanes[0] > 0, nid = fwd ? rd.to : rd.from, n = P.nodes[nid], a = n && n.arms.find(q => q.road === rd.id && q.end === (fwd ? 1 : 0)); if (!a) continue;
+    if (n.arms.length < 3 || rd.cls !== 'street') continue;   /* булевардите с две еднопосочни платна не са „еднопосочна улица“ */ // само на истинско кръстовище (по веригата от сегменти на една улица — не)
+    const u = U(a), r = outR(u), d = (a.t || n.r || 4) + 2.5, hw = rd.w / 2 + 0.9, x = n.x + u[0] * d + r[0] * hw, z = n.z + u[1] * d + r[1] * hw;
+    if (paired(rd, n.x + u[0] * (d + 6), n.z + u[1] * (d + 6), u[0], u[1])) continue;
+    if (place.noentry.some(q => Math.hypot(q[0] - x, q[1] - z) < 25)) continue;   // не по-гъсто от 25 м
+    place.noentry.push([x, z, faceIn(u)]); }
+  const g = new THREE.Group(), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), Y = new THREE.Vector3(0, 1, 0), V = new THREE.Vector3(), S1 = new THREE.Vector3(1, 1, 1); let total = 0;
+  for (const [k, list] of Object.entries(place)) { if (!list.length || !SRC[k]) continue; const proto = SRC[k]; proto.updateMatrixWorld(true); total += list.length;
+    proto.traverse(m => { if (!m.isMesh) return; const local = m.matrixWorld.clone(), im = new THREE.InstancedMesh(m.geometry, m.material, list.length);
+      list.forEach(([x, z, yaw], i) => { M.compose(V.set(x, 0, z), Q.setFromAxisAngle(Y, yaw), S1).multiply(local); im.setMatrixAt(i, M); });
+      im.castShadow = true; im.computeBoundingSphere(); im.userData.roadSign = k; g.add(im); }); }
+  g.name = 'plan2Signs'; g.userData.keep = true;
+  return { group: g, n: total, counts: Object.fromEntries(Object.entries(place).map(([k, l]) => [k, l.length])) };
+}

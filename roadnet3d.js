@@ -22,11 +22,24 @@ export function buildRoadView(net, opts = {}) {
   const add = (g, arr, mat) => { if (arr.length) g.add(merge(arr, mat)); };
   const cutOf = (n, segId, end, what) => net.cut(n, segId, end, what);   // срезовете — от мрежата (общи с тротоарите на пешеходците)
   // ---- сегмент
+  // строежът и ремонтът: ограда (стълбове + мрежа), пръст, чакъл; барикада (червено-бяла) и конуси; табела „Ремонт“
+  const site = { fence: new THREE.MeshStandardMaterial({ color: 0xd8dde2, transparent: true, opacity: 0.55, side: THREE.DoubleSide }), post: new THREE.MeshStandardMaterial({ color: 0x8a8f96, metalness: 0.4, roughness: 0.5 }),
+    earth: new THREE.MeshStandardMaterial({ color: 0x7a5a3a, roughness: 1 }), base: new THREE.MeshStandardMaterial({ color: 0xa79f90, roughness: 1 }), cone: new THREE.MeshStandardMaterial({ color: 0xff6a00, roughness: 0.6 }) };
+  const barrierAt = (g, p, ang, w) => { const bg = new THREE.Group(), Lb = Math.max(3, w - 0.6), beam = new THREE.Mesh(new THREE.BoxGeometry(Lb, 0.28, 0.14), BAR.beam); beam.position.y = 0.95; bg.add(beam); for (const sx of [-1, 1]) { const q = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.1, 8), BAR.post); q.position.set(sx * (Lb / 2 - 0.15), 0.55, 0); bg.add(q); } bg.position.set(p[0], 0, p[1]); bg.rotation.y = -(ang + Math.PI / 2); g.add(bg); return bg; };
+  function siteSeg(g, sg, pa) {   // недовършеният сегмент: ограда по двата края на коридора; пръст / чакъл / асфалт според етапа
+    const W2 = sg.w + 2 * sg.walk, st = sg.stage;
+    if (st === 'earth' || st === 'fence') g.add(merge([ribbon(pa, W2, st === 'fence' ? 0.02 : 0.05)], st === 'fence' ? MAT.grass || site.earth : site.earth));
+    if (st === 'base') g.add(merge([ribbon(pa, W2, 0.06)], site.base));
+    for (const s2 of [1, -1]) { const fl = offLine(pa, s2 * (W2 / 2 + 0.6)), L2 = cumLen(fl), T2 = L2[L2.length - 1];
+      for (let s = 0; s <= T2; s += 3) { const q = at(fl, L2, s).p, post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2, 5), site.post); post.position.set(q[0], 1, q[1]); g.add(post); }
+      const r = ribbon(fl, 1.9, 0); for (let i = 0; i < r.pos.length; i += 6) { r.pos[i + 1] = 0.1; r.pos[i + 4] = 1.95; } g.add(merge([r], site.fence, false)); }
+  }
   function buildSeg(sg) {
     const g = new THREE.Group(), nA = net.nodes.get(sg.a), nB = net.nodes.get(sg.b), As = [], W = [], Cb = [], Pt = [], Md = [], L = sg.L, T = L[L.length - 1];
     const ys = pts => pts.map(p => { let best = 0, bd = 1e9; for (let k = 0; k < sg.pts.length; k++) { const d = (sg.pts[k][0] - p[0]) ** 2 + (sg.pts[k][1] - p[1]) ** 2; if (d < bd) { bd = d; best = k; } } return net.yAt(sg, L[best]); });
     const pa = trimS(sg.pts, L, cutOf(nA, sg.id, 0, 'asph'), cutOf(nB, sg.id, 1, 'asph'));
-    const below = sg.level < 0;   // тунел: под земята — само порталите
+    const below = sg.level < 0;
+    if (sg.stage !== 'open' && pa) { siteSeg(g, sg, pa); if (sg.stage === 'fence' || sg.stage === 'earth' || sg.stage === 'base') return g; }   /* строеж: до основата — без асфалт */   // тунел: под земята — само порталите
     if (pa && !below) As.push(sg.level ? ribbonY(pa, ys(pa), sg.w, 0.07) : ribbon(pa, sg.w, 0.07));
     for (const [sgn, key] of [[1, 'walkL'], [-1, 'walkR']]) {
       const ps = trimS(sg.pts, L, cutOf(nA, sg.id, 0, key), cutOf(nB, sg.id, 1, sgn > 0 ? 'walkR' : 'walkL')); if (!ps || below) continue;
@@ -39,7 +52,12 @@ export function buildRoadView(net, opts = {}) {
       else if (sg.lanes[0] + sg.lanes[1] > 2) for (const s2 of [0.12, -0.12]) put(offLine(pl, s2), 0.12);   // авеню без ивица — двойна непрекъсната
       if (sg.rank >= 2) for (const s2 of [1, -1]) { put(offLine(pl, s2 * (sg.w / 2 - 0.4)), 0.15); if (sg.lanes[0] > 1) { const dl = []; dashed(offLine(pl, s2 * (sg.median / 2 + sg.laneW)), 3, 6, 0.15, sg.level ? 0 : 0.12, dl); if (sg.level) for (const d of dl) for (let k = 1; k < d.pos.length; k += 3) d.pos[k] += 0.12 + net.yAt(sg, T / 2); Pt.push(...dl); } }
       else { const dl = []; dashed(pl, 3, 4, 0.16, sg.level ? 0 : 0.12, dl); if (sg.level) for (const d of dl) for (let k = 1; k < d.pos.length; k += 3) d.pos[k] += 0.12 + net.yAt(sg, T / 2); Pt.push(...dl); } }
+    if (sg.stage === 'asphalt') Pt.length = 0;   // асфалтът е положен — маркировката е следващият етап
     add(g, As, MAT.asph); add(g, W, MAT.walk); add(g, Cb, MAT.curb); add(g, Pt, MAT.paint); add(g, Md, MAT.median);
+    if (sg.closed && pa) {   // ремонт: барикади в двата края, конуси по средата, табела „Ремонт“
+      const L3 = cumLen(pa), T3 = L3[L3.length - 1]; for (const s of [1.5, T3 - 1.5]) { const q = at(pa, L3, s); barrierAt(g, q.p, Math.atan2(q.u[1], q.u[0]), sg.w); }
+      for (let s = 8; s < T3 - 8; s += 6) { const q = at(pa, L3, s), cn = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.75, 10), site.cone); cn.position.set(q.p[0] - q.u[1] * (s % 12 ? 1 : -1) * sg.w / 4, 0.45, q.p[1] + q.u[0] * (s % 12 ? 1 : -1) * sg.w / 4); g.add(cn); }
+      const q = at(pa, L3, T3 / 2), sign = new THREE.Mesh(new THREE.CircleGeometry(0.55, 3), new THREE.MeshStandardMaterial({ color: 0xffd400 })); sign.position.set(q.p[0] + q.u[1] * (sg.w / 2 + 1), 2.2, q.p[1] - q.u[0] * (sg.w / 2 + 1)); sign.rotation.y = -Math.atan2(q.u[1], q.u[0]); g.add(sign); }
     if (sg.level > 0) {   // мостът: стълбове под платното и парапети
       for (let s = 20; s < T - 20; s += 18) { const p = at(sg.pts, L, s).p, y = net.yAt(sg, s); if (y < 2) continue; const col = new THREE.Mesh(new THREE.BoxGeometry(1.2, y, 1.2), deck); col.position.set(p[0], y / 2, p[1]); g.add(col); }
       for (const s2 of [1, -1]) { const pp = offLine(sg.pts, s2 * (sg.w / 2 + sg.walk + 0.1)), r = ribbonY(pp, sg.pts.map((_, k) => net.yAt(sg, L[k])), 0.25, 0.9); g.add(merge([r], deck)); }
@@ -72,6 +90,10 @@ export function buildRoadView(net, opts = {}) {
         else if (n.ctrl === 'yield' && nIn) { const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.4, 5), iron); pole.position.set(px, 1.2, pz); g.add(pole);
           const sh = a.prio ? new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 0.05), signMat.prio) : new THREE.Mesh(new THREE.CircleGeometry(0.45, 3), signMat.red); sh.position.set(px, 2.55, pz); sh.rotation.y = rot; if (a.prio) sh.rotation.z = Math.PI / 4; else sh.rotation.z = -Math.PI / 2; g.add(sh); }   // предимство (жълт ромб) / „пропусни“ (триъгълник)
       });
+    } else if (n.kind === 'bend' && n.arms.some(a => a.sg.stage !== 'open')) {   // завой на недовършена улица — като най-изостаналия ѝ клон
+      const lag = n.arms.reduce((m, a) => ['fence', 'earth', 'base', 'asphalt', 'markings', 'open'].indexOf(a.sg.stage) < ['fence', 'earth', 'base', 'asphalt', 'markings', 'open'].indexOf(m.sg.stage) ? a : m, n.arms[0]);
+      const sg = { ...lag.sg, stage: lag.sg.stage }; if (sg.stage === 'asphalt' || sg.stage === 'markings') { As.push(ribbon(T.bend.arc, sg.w, 0.07)); for (const s2 of [1, -1]) { W.push(ribbon(offLine(T.bend.arc, s2 * (sg.w / 2 + sg.walk / 2)), sg.walk, 0.04)); Cb.push(ribbon(offLine(T.bend.arc, s2 * (sg.w / 2 + 0.15)), 0.3, 0.09)); } if (sg.stage === 'markings' && sg.rank < 2) dashed(T.bend.arc, 3, 4, 0.16, 0.12, Pt); }
+      siteSeg(g, sg, T.bend.arc);
     } else if (n.kind === 'bend') {   // дъга с постоянна ширина
       const [a, b] = n.arms, sg = a.sg, arc = T.bend.arc;   /* същата дъга като лентите */
       As.push(ribbon(arc, sg.w, 0.07)); for (const s2 of [1, -1]) { W.push(ribbon(offLine(arc, s2 * (sg.w / 2 + sg.walk / 2)), sg.walk, 0.04)); Cb.push(ribbon(offLine(arc, s2 * (sg.w / 2 + 0.15)), 0.3, 0.09)); }
@@ -108,6 +130,7 @@ export function buildRoadView(net, opts = {}) {
         for (let k = 0; k < 2; k++) { const a2 = a.angle + (k ? 0.6 : -0.6), lp = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.14, 4.6, 6), iron); lp.position.set(n.x + Math.cos(a2) * (R.outer + 1.6), 2.3, n.z + Math.sin(a2) * (R.outer + 1.6)); g.add(lp); }
       }
     }
+    if (n.kind === 'T' || n.kind === 'X' || n.kind === 'X5' || n.kind === 'round') n.arms.forEach((a, i) => { if (net.passable(a.sg)) return; const d = (T.arms[i].t || 0) + 1.5, ux = Math.cos(a.angle), uz = Math.sin(a.angle); barrierAt(g, [n.x + ux * d, n.z + uz * d], a.angle + Math.PI, a.sg.w); });   /* затворен / недовършен клон — бариера в устието */
     add(g, As, MAT.asph); add(g, W, MAT.walk); add(g, Cb, MAT.curb); add(g, Pt, MAT.paint); add(g, Ap, MAT.apron); add(g, Is, MAT.island); add(g, Md, MAT.median);
     g.traverse(o => { if (o.isMesh) o.receiveShadow = true; });
     return g;

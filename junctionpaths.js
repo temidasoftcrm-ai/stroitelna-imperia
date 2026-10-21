@@ -14,7 +14,7 @@ export function makeRouter(built) {
   const { lanes, nodes } = built, next = new Map();
   for (const L of lanes) { const n = nodes.get(L.to); next.set(L, n ? n.conns.filter(c => c.inL === L) : []); }
   for (const n of nodes.values()) for (const c of n.conns) next.set(c, [c.outL]);
-  const wide = p => (p.edge?.w ?? 99) >= W_HEAVY;
+  const wide = p => p.edge?.heavy !== false && (p.edge?.w ?? 99) >= W_HEAVY;   // edge.heavy === false — улица само за коли (roadnet.js: класът „улица“)
   // най-близката лента (не връзка) до точката: проекция върху отсечките на полилинията → { p, s, d }
   function nearest(x, z, ok = () => true) {
     let best = null;

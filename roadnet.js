@@ -16,6 +16,10 @@ export const CLASSES = {
   avenue: { lanes: [2, 2], laneW: 3.25, median: 0, walk: 3, rank: 2, vmax: 13, nm: 'булевард без ивица' },
   blvd: { lanes: [2, 2], laneW: 3.25, median: 3, walk: 3.5, rank: 3, vmax: 14, nm: 'булевард' },
 };
+// етапите на строежа (точка 6): ограда → изкоп → основа → асфалт → маркировка → открита; проходима е само откритата и незатворената
+export const STAGES = ['fence', 'earth', 'base', 'asphalt', 'markings', 'open'];
+export const STAGE_NM = { fence: 'ограда', earth: 'изкоп', base: 'основа', asphalt: 'асфалт', markings: 'маркировка', open: 'открита' };
+export const STAGE_T = { fence: 1, earth: 2, base: 1.5, asphalt: 1.5, markings: 0.7 };   // относителна продължителност (×dur)
 export const ROUND = { outer: 24, lane: 5.5, apron: 3, splitter: 14 };   // кръгово с една лента: външен радиус, платно, престилка, островчето на входа
 const ZW = 3.2, ST = 4.6, R_TIR = 12, MIN_GAP = 30, SNAP_N = 10, LEVEL_H = 6.5, RAMP = 45, TAU = Math.PI * 2;
 const widthOf = c => { const k = CLASSES[c]; return (k.lanes[0] + k.lanes[1]) * k.laneW + k.median; };
@@ -38,6 +42,7 @@ export function filletPath(pa, da, pb, db, Rwant = 0) {   // Rwant — жела�
   const t = ((pb[0] - pa[0]) * db[1] - (pb[1] - pa[1]) * db[0]) / r, X = [pa[0] + da[0] * t, pa[1] + da[1] * t], u = (X[0] - pb[0]) * db[0] + (X[1] - pb[1]) * db[1];   // X = pa + da·t = pb − db·(−u)
   if (t <= 0.2 || u >= -0.2) return tangentCurve(pa, da, pb, db);
   const th = Math.acos(Math.max(-1, Math.min(1, da[0] * db[0] + da[1] * db[1]))); if (th < 0.08) return [pa, pb]; const Lf = Math.min(t, -u, Rwant ? Rwant * Math.tan(th / 2) : 1e9);
+  if (Lf / Math.tan(th / 2) < 4) return tangentCurve(pa, da, pb, db);   // изродена дъга (пресечната точка е почти в края на лентата) — плавна крива вместо чупка
   const R = Lf / Math.tan(th / 2), S1 = [X[0] - da[0] * Lf, X[1] - da[1] * Lf], S2 = [X[0] + db[0] * Lf, X[1] + db[1] * Lf], sg = Math.sign(r), nrm = [-da[1] * sg, da[0] * sg], C = [S1[0] + nrm[0] * R, S1[1] + nrm[1] * R];
   const a0 = Math.atan2(S1[1] - C[1], S1[0] - C[0]), a1 = Math.atan2(S2[1] - C[1], S2[0] - C[0]); let d = a1 - a0; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
   const m = Math.max(6, Math.ceil(Math.abs(d) * R / 1.2)), out = [pa]; if (dist(pa, S1) > 0.3) out.push(S1);
@@ -59,7 +64,7 @@ export function createRoadNet(o = {}) {
 
   // ---- модел
   const newNode = (x, z, extra = {}) => { const n = { id: nid++, x, z, segs: new Set(), tpl: null, ...extra }; net.nodes.set(n.id, n); return n; };
-  const newSeg = (a, b, pts, cls, level = 0) => { const s = { id: sid++, a: a.id, b: b.id, pts, L: cumLen(pts), cls, level, ...CLASSES[cls], w: widthOf(cls) }; s.lanes = CLASSES[cls].lanes.slice(); net.segs.set(s.id, s); a.segs.add(s.id); b.segs.add(s.id); return s; };
+  const newSeg = (a, b, pts, cls, level = 0, stage = 'open') => { const s = { id: sid++, a: a.id, b: b.id, pts, L: cumLen(pts), cls, level, ...CLASSES[cls], w: widthOf(cls), stage, prog: 0, closed: null }; s.lanes = CLASSES[cls].lanes.slice(); net.segs.set(s.id, s); a.segs.add(s.id); b.segs.add(s.id); return s; };
   // височина по сегмента: мост/тунел — нагоре/надолу в средата, рампи от двата края
   const yAt = (sg, s) => { if (!sg.level) return 0; const T = sg.L[sg.L.length - 1], r = Math.min(RAMP, T / 2), k = Math.min(1, s / r, (T - s) / r), e = k * k * (3 - 2 * k); return sg.level * LEVEL_H * e; };
   net.yAt = yAt;
@@ -68,7 +73,7 @@ export function createRoadNet(o = {}) {
     const T = sg.L[sg.L.length - 1], p = at(sg.pts, sg.L, s).p, A = [], B = [p];
     for (let i = 0; i < sg.pts.length; i++) { if (sg.L[i] < s - 0.01) A.push(sg.pts[i]); else if (sg.L[i] > s + 0.01) B.push(sg.pts[i]); }
     A.push(p); const nb = net.nodes.get(sg.b); nb.segs.delete(sg.id);
-    const s2 = newSeg(n, nb, B, sg.cls, sg.level); sg.pts = A; sg.L = cumLen(A); sg.b = n.id; n.segs.add(sg.id);
+    const s2 = newSeg(n, nb, B, sg.cls, sg.level, sg.stage); s2.prog = sg.prog; s2.closed = sg.closed && { ...sg.closed }; sg.pts = A;   /* частите наследяват етапа и затварянето */ sg.L = cumLen(A); sg.b = n.id; n.segs.add(sg.id);
     return [sg, s2, T];
   }
   // пресичанията на нова ос pts със същото ниво; краищата — прилепване към възел (≤ 10 м) или улица (≤ половин ширина + 4 м)
@@ -103,7 +108,7 @@ export function createRoadNet(o = {}) {
     for (let k = 1; k < br.length; k++) {
       const A = br[k - 1], B = br[k], piece = [[A.node.x, A.node.z]]; for (let i = 0; i < pts.length; i++) if (L[i] > A.s + 1 && L[i] < B.s - 1) piece.push(pts[i]); piece.push([B.node.x, B.node.z]);
       if (A.node === B.node || dist(piece[0], piece[piece.length - 1]) < 1) continue;
-      made.push(newSeg(A.node, B.node, resample(piece, 2), cls, level)); dirty.add(A.node.id); dirty.add(B.node.id);
+      made.push(newSeg(A.node, B.node, resample(piece, 2), cls, level, opt.stages ? 'fence' : 'open'));   /* opt.stages — строи се на етапи */ dirty.add(A.node.id); dirty.add(B.node.id);
     }
     if (opt.tpl === 'round') { const mid = br.filter(b => b.node && b.node.segs.size >= 3); for (const b of mid) b.node.tpl = 'round'; }
     for (const id of dirty) { const n = net.nodes.get(id); if (n && opt.ctrl) n.ctrlForced = opt.ctrl; }
@@ -134,7 +139,7 @@ export function createRoadNet(o = {}) {
     const T = n.tpl_ = { arms: n.arms.map(a => ({ t: 0, tL: 0, tR: 0, zebra: 0, stop: 0 })), outline: null, corners: [], issues: [] };
     const A = n.arms;
     if (n.kind === 'round') {
-      const R = T.round = { ...ROUND, x: n.x, z: n.z }; R.ringR = R.outer - R.lane / 2 - 0.6;   /* оста на пръстена — малко навътре: надвесът на автобуса отвън, престилката поема вътрешната страна */ R.island = R.outer - R.lane - R.apron;
+      const R = T.round = { ...ROUND, ...(n.roundOuter ? { outer: n.roundOuter, lane: Math.min(ROUND.lane, n.roundOuter - 10), apron: Math.min(ROUND.apron, (n.roundOuter - 10) * 0.35) } : {}), x: n.x, z: n.z }; R.ringR = R.outer - R.lane / 2 - 0.6;   /* roundOuter — радиусът от плана (генераторът) */   /* оста на пръстена — малко навътре: надвесът на автобуса отвън, престилката поема вътрешната страна */ R.island = R.outer - R.lane - R.apron;
       A.forEach((a, i) => { const t = T.arms[i]; t.t = t.tL = t.tR = R.outer; t.zebra = R.outer + 7.5; t.lane = R.outer + R.splitter - 7; t.stop = t.lane;
         t.flare = { r0: R.outer - 3, r1: R.outer + R.splitter + 6, h0: a.hw + 6.5, h1: a.hw };   /* клонът се разширява плавно към пръстена (входът/изходът са дъги), без внезапно стесняване */ if (a.sg.L[a.sg.L.length - 1] < R.outer + R.splitter + 15) T.issues.push({ type: 'short', msg: 'клонът е твърде къс за входа на кръговото' }); });
       for (let k = 0; k < A.length; k++) { let g = A[(k + 1) % A.length].angle - A[k].angle; if (k === A.length - 1) g += TAU; if (g < 1.0) T.issues.push({ type: 'angle', msg: 'входовете на кръговото са под по-малко от 60°' }); }
@@ -168,7 +173,7 @@ export function createRoadNet(o = {}) {
     const edge = (i, sideL, tt) => { const a = A[i], u = [Math.cos(a.angle), Math.sin(a.angle)], v = sideL ? [-u[1], u[0]] : [u[1], -u[0]], t = tt ?? (sideL ? T.arms[i].tL : T.arms[i].tR); return [n.x + v[0] * a.hw + u[0] * t, n.z + v[1] * a.hw + u[1] * t]; };
     T.edge = edge; T.outline = [];
     for (const c of T.corners) { T.outline.push(edge(c.a, false)); const p0 = edge(c.a, true), p1 = edge(c.b, false); c.p0 = p0; c.p1 = p1;
-      if (c.c) { const uA = [Math.cos(A[c.a].angle), Math.sin(A[c.a].angle)], uB = [Math.cos(A[c.b].angle), Math.sin(A[c.b].angle)]; c.curve = filletPath(p0, [-uA[0], -uA[1]], p1, uB, c.rc); T.outline.push(...c.curve); }   /* бордюрът на ъгъла — кръгова дъга с радиус rc (по нея карат и колите) */
+      if (c.c) { const uA = [Math.cos(A[c.a].angle), Math.sin(A[c.a].angle)], uB = [Math.cos(A[c.b].angle), Math.sin(A[c.b].angle)], th = Math.acos(Math.max(-1, Math.min(1, -uA[0] * uB[0] - uA[1] * uB[1]))), Lav = Math.min(dist(p0, c.c), dist(p1, c.c)); c.rEff = Math.max(2, Math.min(c.rc, th > 0.05 ? Lav / Math.tan(th / 2) : c.rc)); c.curve = filletPath(p0, [-uA[0], -uA[1]], p1, uB, c.rEff); T.outline.push(...c.curve); }   /* действителният радиус (късият клон съкращава ъгъла) — и за десния завой */   /* бордюрът на ъгъла — кръгова дъга с радиус rc (по нея карат и колите) */
       else { c.curve = [p0, p1]; T.outline.push(p0, p1); } }
   }
 
@@ -176,14 +181,17 @@ export function createRoadNet(o = {}) {
   const cutIn = (n, i) => { const t = n.tpl_.arms[i]; return n.kind === 'end' ? 0.5 : n.kind === 'cont' ? 0 : t.lane || t.t; };
   const cutOut = (n, i) => { const t = n.tpl_.arms[i]; return n.kind === 'end' ? 0.5 : n.kind === 'cont' ? 0 : n.kind === 'round' ? t.lane : n.kind === 'bend' ? t.t : t.t + 0.5; };
   const armIdx = (n, segId, end) => n.arms.findIndex(a => a.seg === segId && a.end === end);
+  const passable = sg => sg.stage === 'open' && !sg.closed;
+  net.passable = passable;
   function segLanes(sg) {
+    if (!passable(sg)) return [];   // строеж / ремонт — без ленти (колите заобикалят)
     const out = [], nA = net.nodes.get(sg.a), nB = net.nodes.get(sg.b);
     for (const [dir, from, to] of [[1, nA, nB], [-1, nB, nA]]) {
       const n = dir > 0 ? sg.lanes[0] : sg.lanes[1], P = dir > 0 ? sg.pts : sg.pts.slice().reverse(), endTo = dir > 0 ? 1 : 0, endFrom = dir > 0 ? 0 : 1;
       const iOut = armIdx(from, sg.id, endFrom), iIn = armIdx(to, sg.id, endTo);
       for (let i = 0; i < n; i++) {
         const off = side * (sg.median / 2 + (i + 0.5) * sg.laneW), lp = trimPts(offsetPts(P, off), cutOut(from, iOut), cutIn(to, iIn));
-        const Lp = mkPath(lp, 'lane', { lat: Math.abs(off), from: from.id, to: to.id, seg: sg.id, edge: { w: sg.w }, rank: sg.rank, vmax: sg.vmax, laneI: i, nLanes: n, armIn: iIn, armOut: iOut, level: sg.level });
+        const Lp = mkPath(lp, 'lane', { lat: Math.abs(off), from: from.id, to: to.id, seg: sg.id, edge: { w: sg.w, heavy: sg.cls !== 'street' }, rank: sg.rank, vmax: sg.vmax, laneI: i, nLanes: n, armIn: iIn, armOut: iOut, level: sg.level });
         if (sg.level) { const T = sg.L[sg.L.length - 1]; Lp.ys = Lp.cum.map((q, k) => { const pr = project(sg.pts, sg.L, lp[k]); return yAt(sg, pr.s); }); }
         out.push(Lp);
       }
@@ -205,10 +213,16 @@ export function createRoadNet(o = {}) {
       // второстепенна към булевард с разделителна ивица: наляво от второстепенната и през ивицата — само ако ивицата има отвор (кръстовище със светофар)
       let pts;
       if (kind === 'uturn') { const pa = a.pts[a.pts.length - 1], pb = b.pts[0], c = [(pa[0] + pb[0]) / 2, (pa[1] + pb[1]) / 2], r = dist(pa, pb) / 2, a0 = Math.atan2(pa[1] - c[1], pa[0] - c[0]), da = dirEnd(a); pts = []; const s2 = (Math.cos(a0 + 0.5) - Math.cos(a0)) * da[0] + (Math.sin(a0 + 0.5) - Math.sin(a0)) * da[1] > 0 ? 1 : -1; for (let k = 0; k <= 12; k++) { const ang2 = a0 + s2 * Math.PI * k / 12; pts.push([c[0] + Math.cos(ang2) * r, c[1] + Math.sin(ang2) * r]); } }
-      else { const cr = kind === 'right' && n.tpl_.corners && n.tpl_.corners.find(c => c.c && ((c.a === a.armIn && c.b === b.armOut) || (c.b === a.armIn && c.a === b.armOut))), Rw = cr ? cr.rc + Math.max(0.8, n.arms[a.armIn].hw - a.lat) : 0;   /* десният — успоредно на бордюра */
-        pts = kind === 'straight' ? tangentCurve(a.pts[a.pts.length - 1], dirEnd(a), b.pts[0], dirStart(b), 6) : filletPath(a.pts[a.pts.length - 1], dirEnd(a), b.pts[0], dirStart(b), Rw); }
+      else { const cr = kind === 'right' && n.tpl_.corners && n.tpl_.corners.find(c => c.c && ((c.a === a.armIn && c.b === b.armOut) || (c.b === a.armIn && c.a === b.armOut))), Rw = cr ? (cr.rEff ?? cr.rc) + Math.max(0.8, n.arms[a.armIn].hw - a.lat) : 0;   /* десният — успоредно на бордюра */
+        pts = kind === 'straight' ? tangentCurve(a.pts[a.pts.length - 1], dirEnd(a), b.pts[0], dirStart(b), 16) :   /* 16 точки — разместените улици дават S-крива (скоростта и посоката — по истинската ѝ кривина) */ filletPath(a.pts[a.pts.length - 1], dirEnd(a), b.pts[0], dirStart(b), Rw); }
       B.conns.push(mkPath(pts, 'conn', { node: n.id, inL: a, outL: b, turn: kind, vmax: curveV(pts, kind === 'straight' ? (a.vmax || 11) * 0.85 : 7), conf: [] }));
     }
+    // бордюрът на ъгъла — от пътя на десния завой (външната лента), отместен навътре с разстоянието лента–бордюр: проектира се по габарита
+    // на превозното средство, затова колата никога не излиза от асфалта (и при кос ъгъл, където срезовете на клоновете са неравни)
+    if (n.tpl_.corners && n.tpl_.outline) { const T = n.tpl_; let changed = false;
+      for (const c of T.corners) { if (!c.c) continue; const R = B.conns.find(q => q.turn === 'right' && q.inL.laneI === q.inL.nLanes - 1 && ((q.inL.armIn === c.a && q.outL.armOut === c.b) || (q.inL.armIn === c.b && q.outL.armOut === c.a))); if (!R) continue;
+        const off = Math.max(0.6, n.arms[R.inL.armIn].hw - R.inL.lat); let cv = offsetPts(R.pts, side * off); if (R.inL.armIn !== c.a) cv = cv.slice().reverse(); c.curve = cv; changed = true; }   /* по посоката на завоя: от клона a към клона b */
+      if (changed) { T.outline = []; for (const c of T.corners) { T.outline.push(T.edge(c.a, false)); T.outline.push(...c.curve); } } }
     // лента без маневра на този възел (напр. външната лента там, където направо няма) — най-близката възможна, иначе би била задънена
     for (const a of B.inL) if (!B.conns.some(c => c.inL === a)) { const alt = B.conns.filter(c => c.inL.armIn === a.armIn).sort((p, q) => ({ straight: 0, right: 1, left: 2, uturn: 3 })[p.turn] - ({ straight: 0, right: 1, left: 2, uturn: 3 })[q.turn])[0]; if (alt) { const pts = tangentCurve(a.pts[a.pts.length - 1], dirEnd(a), alt.outL.pts[0], dirStart(alt.outL), 16); B.conns.push(mkPath(pts, 'conn', { node: n.id, inL: a, outL: alt.outL, turn: alt.turn, vmax: curveV(pts, 7), conf: [] })); } }
     for (const c of B.conns) for (const d of B.conns) if (c !== d && c.inL !== d.inL && (c.outL === d.outL || crosses(c, d))) c.conf.push(d);
@@ -249,6 +263,12 @@ export function createRoadNet(o = {}) {
     for (const ax of ['A', 'B']) {
       const go = B.conns.filter(c => c.inL.axis === ax && c.turn !== 'left' && c.turn !== 'uturn'), left = B.conns.filter(c => c.inL.axis === ax && c.turn === 'left');
       if (go.length) { ph.push([ax, 'go']); sets.push(new Set(go)); } if (left.length) { ph.push([ax, 'left']); sets.push(new Set(left)); }
+    }
+    // неправоъгълно кръстовище (5 клона, кос ъгъл): ако във фаза има пресичащи се криви — разпределение наново (алчно оцветяване по реда на фазите)
+    const clash = (c, d) => c.inL !== d.inL && (c.outL === d.outL || crosses(c, d));
+    if (sets.some(S => { const L = [...S]; return L.some((c, i) => L.some((d, j) => j > i && clash(c, d))); })) {
+      const out = [], lab = []; sets.forEach((S, k) => { for (const c of S) { let placed = false; for (let q = 0; q < out.length && !placed; q++) if (q >= k - 1 && ![...out[q]].some(d => clash(c, d))) { out[q].add(c); placed = true; } if (!placed) { out.push(new Set([c])); lab.push([c.inL.axis, c.turn === 'left' ? 'left' : 'go']); } } });
+      return { ph: lab, sets: out, i: 0, t: Math.random() * 9, stage: 'green' };
     }
     return { ph, sets, i: 0, t: Math.random() * 9, stage: 'green' };
   }
@@ -298,7 +318,7 @@ export function createRoadNet(o = {}) {
     const X = [], Z = [], adj = [], addP = (x, z) => { X.push(x); Z.push(z); adj.push([]); return X.length - 1; }, link = (a, b, info = null) => { if (a == null || b == null || a === b) return; const d = Math.hypot(X[a] - X[b], Z[a] - Z[b]); adj[a].push([b, d, info]); adj[b].push([a, d, info && { ...info, rev: true }]); };
     const chain = pts => { let prev = null, first = null; for (const p of pts) { const id = addP(p[0], p[1]); if (prev != null) link(prev, id); else first = id; prev = id; } return [first, prev]; };
     const side = new Map();   // 'seg:sgn' → { ids, ss, T }
-    for (const sg of net.segs.values()) { const nA = net.nodes.get(sg.a), nB = net.nodes.get(sg.b), T = sg.L[sg.L.length - 1];
+    for (const sg of net.segs.values()) { if (sg.stage !== 'open') continue; const nA = net.nodes.get(sg.a), nB = net.nodes.get(sg.b), T = sg.L[sg.L.length - 1];   /* строежът е ограден — без тротоар */
       for (const sgn of [1, -1]) { const c0 = cut(nA, sg.id, 0, sgn > 0 ? 'walkL' : 'walkR'), c1 = cut(nB, sg.id, 1, sgn > 0 ? 'walkR' : 'walkL'); if (T - c0 - c1 < 1) continue;
         const m = Math.max(1, Math.round((T - c0 - c1) / 4)), ids = [], ss = []; for (let k = 0; k <= m; k++) { const s = c0 + (T - c0 - c1) * k / m, q = at(sg.pts, sg.L, s), off = sgn * (sg.w / 2 + sg.walk / 2); ids.push(addP(q.p[0] - q.u[1] * off, q.p[1] + q.u[0] * off)); ss.push(s); if (k) link(ids[k - 1], ids[k]); }
         side.set(sg.id + ':' + sgn, { ids, ss, T }); } }
@@ -362,6 +382,29 @@ export function createRoadNet(o = {}) {
   // одит на готовата мрежа: проблемите на шаблоните (островче без място, булевард с площадка за обръщане, остър ъгъл, радиус)
   function audit() { const out = []; for (const n of net.nodes.values()) { if (!n.tpl_) continue; for (const i of n.tpl_.issues) out.push({ node: n.id, kind: n.kind, ...i }); if (n.kind === 'end' && n.tpl_.end.kind === 'bulb' && n.arms[0].sg.median) out.push({ node: n.id, type: 'bulb', msg: 'булевард с площадка за обръщане' }); } return out; }
 
-  Object.assign(net, { addRoad, setRound, update, check, audit, cut, pedNet, armsOf, classify, lanesOfSeg: id => segLanesMap.get(id) || [], nodeBuilt: id => nodeBuilt.get(id) });
+  // ---- етапите и ремонтите във времето: dur — секунди за цял сегмент (по дължината); връща променените сегменти (за update)
+  function tick(dt, dur = 60) {
+    const ch = new Set();
+    for (const sg of net.segs.values()) {
+      if (sg.stage !== 'open') { const T = Math.max(10, sg.L[sg.L.length - 1]) / 100 * dur * (STAGE_T[sg.stage] || 1) / 3; sg.prog += dt / T; if (sg.prog >= 1) { sg.prog = 0; sg.stage = STAGES[STAGES.indexOf(sg.stage) + 1]; ch.add(sg.id); } }
+      if (sg.closed) { sg.closed.t -= dt; if (sg.closed.t <= 0) { sg.closed = null; ch.add(sg.id); } }
+    }
+    return ch;
+  }
+  // сегментите → възлите им (за update)
+  const nodesOf = segIds => { const d = new Set(); for (const id of segIds) { const sg = net.segs.get(id); if (sg) { d.add(sg.a); d.add(sg.b); } } return d; };
+  // ремонт: временно затваряне за s секунди; има ли обиколен път (от единия край до другия без този сегмент) — по мрежата на лентите
+  function repair(segId, s = 60) { const sg = net.segs.get(segId); if (!sg) return null; sg.closed = { t: s, total: s }; return nodesOf([segId]); }
+  // готов граф (генераторът на градове — roadnet-plan2.js): възли и сегменти направо, без автоматичното свързване; сегментът пази
+  // ширините от плана (lanes, laneW, median, walk, w); връща възлите за update
+  function importGraph(G) {
+    const byKey = new Map(), dirty = new Set();
+    for (const q of G.nodes) { const n = newNode(q.x, q.z, { key: q.key }); if (q.tpl) n.tpl = q.tpl; if (q.roundOuter) n.roundOuter = q.roundOuter; if (q.ctrl) n.ctrlForced = q.ctrl; byKey.set(q.key, n); dirty.add(n.id); }
+    for (const q of G.segs) { const a = byKey.get(q.a), b = byKey.get(q.b); if (!a || !b || a === b) continue; const sg = newSeg(a, b, q.pts, q.cls, q.level || 0);
+      for (const k of ['lanes', 'laneW', 'median', 'walk', 'w', 'noCars', 'nm']) if (q[k] != null) sg[k] = Array.isArray(q[k]) ? q[k].slice() : q[k];
+      if (q.noCars) sg.lanes = [0, 0]; }
+    return dirty;
+  }
+  Object.assign(net, { importGraph, tick, repair, nodesOf, addRoad, setRound, update, check, audit, cut, pedNet, armsOf, classify, lanesOfSeg: id => segLanesMap.get(id) || [], nodeBuilt: id => nodeBuilt.get(id) });
   return net;
 }
