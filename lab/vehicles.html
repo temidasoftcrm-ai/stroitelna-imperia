@@ -37,10 +37,10 @@ await Promise.all([loadVehModels(load, A, 'assets/heavy/gear/'), loadSiteRigs(lo
 const V = (k, i, s, m = null) => ({ k, i, s, m });
 const LIST = [
   V('sf-car-Hatchback', null, 'car-p206'), V('sf-car-Sedan', null, 'car-polo'), V('sf-car-Muscle_2', null, 'car-corolla'), V('sf-car-SUV', null, 'car-renegade'), V('sf-car-Muscle', null, 'car-accord'), V('sf-car-Taxi', null, 'car-taxi'), V('sf-car-Pickup', null, 'car-hilux'),
-  ...['pol-charger', 'pol-crownvic', 'pol-interceptor', 'pol-volga', 'pol-nypd'].map((s, i) => V('sf-car-Police_Sedan', i, s)), V('sf-car-Police_SUV', null, 'car-polsuv'),
+  ...['pol-charger', 'pol-crownvic', 'pol-interceptor', 'pol-nypd'].map((s, i) => V('sf-car-Police_Sedan', i, s)), V('sf-car-Police_SUV', null, 'car-polsuv'),
   ...['van-sprinter', 'van-ducato', 'van-mb207', 'van-transit'].map(s => V('sf-van-' + s.slice(4), null, s)),
   ...['amb-gaz', 'amb-us', 'amb-eu'].map((s, i) => V('sf-car-Ambulance', i, s)), V('sf-car-Limousine', null, 'car-limo'), V('sf-car-Truck', null, 'car-truck'),
-  ...['fire-red', 'fire-us', 'fire-man'].map((s, i) => V('sf-car-Firetruck', i, s)), V('sf-car-Bus', null, 'bus-citaro'),
+  ...['fire-us', 'fire-man'].map((s, i) => V('sf-car-Firetruck', i, s)), V('sf-car-Bus', null, 'bus-citaro'),
   V('sf-trk-0', null, 'trk-cab', 4.6), V('sf-semi-0', null, 'trk-semi'),
   V('sf-roller', null, 'sf-roller', 'site'), V('sf-backhoe', null, 'sf-backhoe', 'site'), V('sf-dump', null, 'sf-dump', 'site'), V('sf-grader', null, 'sf-grader', 'site'), V('sf-excavator-rig', null, 'sf-excavator', 'site'), V('sf-mcrane-rig', null, 'sf-mcrane', 'site'),
 ];
@@ -64,8 +64,8 @@ for (const it of LIST) {
 // ---- втората редица (z = −12): детските модели (Kenney) и пътищата в кода, които ги слагат — с мащаба, който кодът им дава; червено < 80 %
 const KID = [   // [модел, мащаб в кода, истинска дължина (м), къде]
   ['sedan', 1.15, 4.5, 'game.js addCar (резерва, ако няма sf-car)'], ['taxi', 1.15, 4.9, 'game.js addCar (резерва)'], ['suv', 1.15, 4.6, 'game.js addCar · паркинг (резерва)'],
-  ['police', 1.15, 5.0, 'incidents.js (резерва)'], ['ambulance', 1.15, 6.5, 'game.js addCar · incidents.js (резерва)'], ['firetruck', 1.15, 9.0, 'incidents.js · firesim.js (резерва)'],
-  ['sedan', 1.25, 4.5, 'hwtraffic.js магистралата (резерва)'], ['truck', 1.25, 8.0, 'hwtraffic.js ТИР (резерва)'], ['delivery', 1.25, 6.0, 'hwtraffic.js · бригадата (резерва)'],
+  ['police', 1.15, 5.0, 'incidents.js (резерва)'],
+  ['sedan', 1.25, 4.5, 'hwtraffic.js магистралата (резерва)'], ['truck', 1.25, 8.0, 'hwtraffic.js ТИР (резерва)'],
   ['truck-flat', 1.25, 6.5, 'game.js spawnUnit: ПАВЕРЪТ (асфалтополагач) — ОСНОВЕН, без истински модел', 6.5], ['truck-flat', 1.25, 9.0, 'game.js spawnUnit: кран (резерва)', 9], ['van', 1.25, 5.0, 'game.js spawnUnit: маркировка (резерва)', 5],
   ['tractor', 1.25, 5.0, 'game.js spawnUnit: трактор (резерва; грейдерът 8,5 м, валякът 4,5 м)', 5], ['tractor-shovel', 1.25, 7.0, 'game.js spawnUnit: товарач (резерва)', 7],
 ];

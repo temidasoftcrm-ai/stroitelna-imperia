@@ -120,8 +120,8 @@ export function buildRailView(A, opts = {}) {
   const realTrain = (grp, kinds) => { let z = 0; for (const kd of kinds) { const m = trainCar(kd, z | 0); if (!m) return false; const k = 2.4 * 6.6 / 6.6; z -= m.userData.len / 2; m.position.z = z; z -= m.userData.len / 2 + 0.5; grp.add(m); } return true; };
   if (hasTrainModel('vl82')) realTrain(train, ['vl82', 'boxcar', 'hopper2', 'flat', 'boxcar']);
   else if (hasTrainModel('loco')) realTrain(train, ['loco', 'hopper', 'flat', 'hopper', 'flat']);
-  else if (A['train-locomotive-a']) {
-    ['train-locomotive-a', 'train-carriage-container-red', 'train-carriage-box', 'train-carriage-coal', 'train-carriage-flatbed-wood'].forEach((n, i) => {
+  else if (A['train-carriage-box']) {   // резерва: само вагоните (детският локомотив е изтрит)
+    ['train-carriage-container-red', 'train-carriage-box', 'train-carriage-coal', 'train-carriage-flatbed-wood'].forEach((n, i) => {
       if (!A[n]) return; const o = A[n].scene.clone(true); o.scale.setScalar(2.4); o.position.z = -i * 6.6; train.add(o);
     });
   }
@@ -129,9 +129,6 @@ export function buildRailView(A, opts = {}) {
   // втори влак в обратна посока по другия коловоз: пътнически (електрически мотриси)
   const train2 = new THREE.Group();
   if (hasTrainModel('paxLoco') && hasTrainModel('paxCar')) realTrain(train2, ['paxLoco', 'paxCar', 'paxCar', 'paxCar']);
-  else ['train-electric-city-a', 'train-electric-city-b', 'train-electric-city-b', 'train-electric-city-a'].forEach((n, i) => {
-    if (!A[n]) return; const o = A[n].scene.clone(true); o.scale.setScalar(2.4); o.position.z = -i * 6.6; if (i === 3) o.rotation.y = Math.PI; train2.add(o);
-  });
   train2.rotation.y = Math.PI;
   g.add(train2);
 

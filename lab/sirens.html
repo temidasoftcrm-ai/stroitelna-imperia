@@ -28,7 +28,7 @@ import { emergCar } from './vehmodels.js';
 const OLD = new URLSearchParams(location.search).has('old');
 document.getElementById(OLD ? 'bOld' : 'bNew').classList.add('on');
 const CARS = [['pol-charger', 'police', 5.1], ['pol-crownvic', 'police', 5.4], ['pol-interceptor', 'police', 5.3], ['pol-nypd', 'police', 5.1], ['pol-volga', 'police', 4.8], ['car-polsuv', 'police', 5],
-  ['amb-eu', 'ambulance', 7.2], ['amb-gaz', 'ambulance', 7], ['amb-us', 'ambulance', 7.5], ['fire-red', 'fire', 9], ['fire-us', 'fire', 10], ['fire-man', 'fire', 10.5]];
+  ['amb-eu', 'ambulance', 7.2], ['amb-gaz', 'ambulance', 7], ['amb-us', 'ambulance', 7.5], ['fire-us', 'fire', 10], ['fire-man', 'fire', 10.5]];
 const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0x05070c); scene.fog = new THREE.Fog(0x05070c, 60, 160);

@@ -11,7 +11,7 @@ import { feature } from './lab/feature.js';
 import { kidK } from './scale.js';   // детските коли (резервата) в истинския размер
 
 const CARS = ['sedan', 'suv', 'taxi', 'van', 'sedan-sports', 'suv-luxury', 'hatchback-sports', 'police'];
-const TRUCKS = ['truck', 'truck-flat', 'delivery', 'truck-dump-red', 'truck-concrete-red'];
+const TRUCKS = ['truck', 'truck-flat', 'truck-dump-red', 'truck-concrete-red'];
 const SCALE = new Proxy({ 'truck-dump-red': 1.14, 'truck-concrete-red': 1.18,   /* строителният пакет: 7,0 / 7,2 м при мащаб 1 → 8 / 8,5 м (беше 0,62 → 4,4 м, детски) (55) */ 'sf-semi-0': 1, 'sf-semi-1': 1 }, { get: (o, k) => typeof k === 'string' && k.startsWith('sf-car-') ? 1 : o[k] });   // sf-* са вече в мащаба на града
 // истинските: [име, тегло] — колкото по-голямо, толкова по-често
 const REAL_CARS = [['Sedan', 5], ['Hatchback', 4], ['SUV', 4], ['Pickup', 2], ['Taxi', 2], ['Muscle', 2], ['Muscle_2', 2], ['Van', 3], ['Limousine', 0.4], ['Police_Sedan', 0.5], ['Police_SUV', 0.5]];
@@ -43,7 +43,7 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
   { const by = new Map(); for (const c of list) { const k = c.dir + ':' + c.lane; (by.get(k) || by.set(k, []).get(k)).push(c); }
     for (const L of by.values()) { const step = len / L.length, off = rnd() * step; L.forEach((c, i) => { c.x = -half + off + i * step; c.o.position.set(c.x, y, c.z); }); } }
   // спешните коли: по един модел от вид, скрити, докато не дойде ред
-  const EM = [['police', ['sf-car-Police_SUV', 'sf-car-Police_Sedan', 'police']], ['ambulance', ['sf-car-Ambulance', 'ambulance']], ['fire', ['sf-car-Firetruck', 'firetruck']]];
+  const EM = [['police', ['sf-car-Police_SUV', 'sf-car-Police_Sedan', 'police']], ['ambulance', ['sf-car-Ambulance']], ['fire', ['sf-car-Firetruck']]];
   const em = [];
   for (const [kind, ns] of EM) { const n = ns.find(x => A[x]); if (!n) continue; const o = model(n, SCALE[n] || kidK(n, 1.25)); o.visible = false; o.userData.beaconsOn = 1; o.position.y = y; g.add(o); em.push({ kind, o, on: false }); }
   let emT = 8 + Math.random() * 20;

@@ -11,7 +11,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { flameSprite } from './fireflip.js';
-import { kidK } from './scale.js';   // детската пожарна (резервата) в истинския размер
 
 export const FIRE_ST = { travel: '🚒 Пожарната пътува', fight: '🚒 Гасене', saved: '✅ Спасена', burned: '⬛ Изгоряла', repair: '🏗️ Ремонт', secured: '🚧 Обезопасена', done: '✅ Възстановена' };
 const TRAVEL = 0.45, KNOCK = 0.9, BURN = 60;   // дни път; колко сила на огъня свалят пожарникарите за ден; колко % здравина на ден при пълна сила × sev
@@ -96,7 +95,7 @@ export function createFires(deps) {
     const path = (deps.route(s0.x, s0.z, park.x, park.z) || []).map(p => new THREE.Vector3(p.x, 0, p.z)); if (!path.length || path[path.length - 1].distanceTo(park) > 3) path.push(park);
     if (path.length < 2) path.unshift(new THREE.Vector3(s0.x, 0, s0.z));
     v.path = path; v.len = path.reduce((a, p, i) => i ? a + p.distanceTo(path[i - 1]) : 0, 0);
-    const tk = deps.has('sf-car-Firetruck') ? deps.model('sf-car-Firetruck', 1) : deps.has('firetruck') ? deps.model('firetruck', kidK('firetruck')) : null;
+    const tk = deps.has('sf-car-Firetruck') ? deps.model('sf-car-Firetruck', 1) : null;   // детската пожарна е изтрита
     if (tk) { g.add(tk); v.truck = tk; const red = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowT, color: 0xff2020, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })), blue = red.clone(); blue.material = red.material.clone(); blue.material.color.set(0x2a6bff);
       red.position.set(-0.6, 3.1, 1.6); blue.position.set(0.6, 3.1, 1.6); red.scale.setScalar(1.6); blue.scale.setScalar(1.6); tk.add(red, blue); v.beacons = [red, blue]; }
     // двамата пожарникари + маркуч + водна струя (само отблизо)

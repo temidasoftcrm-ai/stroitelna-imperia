@@ -478,9 +478,9 @@ const MODELS = {
   commercial: ['building-a', 'building-b', 'building-c', 'building-d', 'building-e', 'building-f', 'building-g', 'building-h', 'building-skyscraper-a', 'building-skyscraper-b', 'building-skyscraper-c'],
   // Commercial 2.1: модерни сгради и стъклени небостъргачи — за центъра на мегаполисите
   commercial2: ['building-skyscraper-d', 'building-skyscraper-e'],   // building-i…n (детските) са изтрити — вместо тях истинските от heavy/blocks2 (blk2Pick)
-  trains: ['track', 'train-locomotive-a', 'train-carriage-box', 'train-carriage-flatbed-wood', 'train-carriage-coal', 'train-carriage-container-red', 'train-carriage-container-blue', 'train-carriage-tank', 'train-carriage-lumber', 'train-electric-city-a', 'train-electric-city-b'],
+  trains: ['track', 'train-carriage-box', 'train-carriage-flatbed-wood', 'train-carriage-coal', 'train-carriage-container-red', 'train-carriage-container-blue', 'train-carriage-lumber'],
   highway: HW_MODELS.highway,
-  vehicles: ['tractor', 'tractor-shovel', 'truck', 'truck-flat', 'delivery', 'sedan', 'taxi', 'suv', 'van', 'ambulance', 'police', 'firetruck', 'sedan-sports', 'suv-luxury', 'hatchback-sports'],
+  vehicles: ['tractor', 'tractor-shovel', 'truck', 'truck-flat', 'sedan', 'taxi', 'suv', 'van', 'police', 'sedan-sports', 'suv-luxury', 'hatchback-sports'],
   // Kenney City Kit Industrial (CC0): заводи в градовете с доставчици
   industrial: ['building-a', 'building-b', 'building-c', 'building-d', 'building-e', 'building-f', 'building-g', 'building-h', 'building-i', 'building-j', 'building-k', 'building-l', 'water-tower', 'windmill', 'solar-panel-landscape-group', 'solar-panel-portrait-group'],
   // Majadroid House Construction Site (CC0): кула-кран и реквизит за строежите
@@ -488,7 +488,7 @@ const MODELS = {
   holiday: ['tree', 'bench', 'lantern'],
   construction: ['crane-tower', 'container-office-green', 'container-office-red', 'toilet-portable', 'planks-wood-a', 'box-stack-brown', 'container-rubble-red', 'barrel', 'truck-dump-red', 'truck-dump-green', 'truck-concrete-red'],
   // poly.pizza (CC-BY 3.0 / CC0, виж assets/heavy/CREDITS.txt): булдозери, минен самосвал, кулокран — за аутобаните
-  heavy: ['bulldozer-a', 'bulldozer-b', 'bulldozer-c', 'dump-truck', 'crane-c'],
+  heavy: ['bulldozer-a', 'crane-c'],   // bulldozer-b/c и dump-truck — изтрити (Лабораторията: „Изтрий окончателно“)
   city: ['Building_Small_1', 'Building_Medium_2_001', 'Building_Large_2'],
   // Kenney Nature Kit (CC0): храсти, цветя и камъни — украса на празните парцели (decorLot)
   nature: ['rock_smallA', 'rock_largeA'],   // детските храсти и цветя са изтрити — истинските (plants-real, assets/heavy/plants)
@@ -1812,7 +1812,7 @@ function finishOwnProject(p) {
 }
 
 // ============================================================ техника (единици)
-const VEH_MODEL = { crew: 'delivery', loader: 'tractor-shovel', truck: 'truck-dump-red', tractor: 'tractor', crane: 'truck-flat', bulldozer: 'bulldozer-b', grader: 'tractor', paver: 'truck-flat', roller: 'tractor', marker: 'van' };
+const VEH_MODEL = { crew: 'van', loader: 'tractor-shovel', truck: 'truck-dump-red', tractor: 'tractor', crane: 'truck-flat', bulldozer: 'bulldozer-a', grader: 'tractor', paver: 'truck-flat', roller: 'tractor', marker: 'van' };
 const VEH_SCALE = { truck: 0.62, bulldozer: 0.6 };   // моделите от строителния пакет са в метри
 const VSCALE = 1.25, SPEED = 14;
 const units = [];
@@ -1950,7 +1950,7 @@ function spawnUnit(type, at) {
   }
   // пътната техника: процедурни добавки върху базовите модели, за да се различават
   const addBox = (w, h, d, c, x, y, z, rx = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: c, roughness: 0.6 })); m.position.set(x, y, z); m.rotation.x = rx; m.castShadow = true; obj.add(m); return m; };
-  if (type === 'bulldozer' && !A['bulldozer-b']) addBox(2.6, 0.9, 0.25, 0xffb300, 0, 0.5, 1.9);   // без модела — процедурно гребло                          // гребло отпред
+  if (type === 'bulldozer' && !A['bulldozer-a']) addBox(2.6, 0.9, 0.25, 0xffb300, 0, 0.5, 1.9);   // без модела — процедурно гребло                          // гребло отпред
   if (type === 'grader' && !sf) { addBox(0.5, 0.35, 3.4, 0xffb300, 0, 0.8, 1.2); addBox(2.4, 0.5, 0.15, 0x555555, 0, 0.3, 0.9, 0.3); }   // дълга рама + нож
   if (type === 'paver') { addBox(2.2, 0.9, 1.5, 0xffb300, 0, 1.2, -0.6); addBox(2.6, 0.3, 0.5, 0x2a2a2a, 0, 0.3, -1.7); }       // бункер + плоча
   if (type === 'roller' && !sf) { const d = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 2.2, 16), new THREE.MeshStandardMaterial({ color: 0x9aa0a6, metalness: 0.5, roughness: 0.4 })); d.rotation.z = Math.PI / 2; d.position.set(0, 0.7, 1.7); d.castShadow = true; obj.add(d); }
@@ -2064,8 +2064,8 @@ function addCar() {
   let i = 3 * ((Math.random() * NBI) | 0), j = (Math.random() * NJ) | 0;
   for (let k = 0; k < 40 && !isRoad(i, j); k++) { i = 3 * ((Math.random() * NBI) | 0); j = (Math.random() * NJ) | 0; }   // не по улица под площад/парк (Белия дом, поръчките) — иначе стои на тревата
   const r = Math.random(), sf = A['sf-car-Sedan'];
-  const o = sf ? model('sf-car-' + (r < 0.04 ? pick(['Ambulance', 'Police_Sedan', 'Police_SUV', 'Firetruck']) : r < 0.1 ? pick(['Bus', 'Truck', 'Van']) : pick(['Sedan', 'Hatchback', 'SUV', 'Pickup', 'Taxi', 'Sedan', 'Hatchback', 'SUV', 'Muscle', 'Muscle_2', 'Sports', 'Roadster', 'Taxi', 'Taxi', 'Taxi', 'Limousine'])), 1)
-    : (n => model(n, kidK(n, 1.15)))(r < 0.04 ? pick(['ambulance', 'police', 'firetruck']) : pick(['sedan', 'taxi', 'suv', 'van', 'sedan', 'suv', 'sedan-sports', 'suv-luxury', 'hatchback-sports']));   /* резервата — детската кола в истинския размер (55) */
+  const o = sf ? model('sf-car-' + (L => { const ok = L.filter(n => A['sf-car-' + n]); return pick(ok.length ? ok : ['Sedan']); })(r < 0.04 ? ['Ambulance', 'Police_Sedan', 'Police_SUV', 'Firetruck'] : r < 0.1 ? ['Bus', 'Truck', 'Van'] : ['Sedan', 'Hatchback', 'SUV', 'Pickup', 'Taxi', 'Sedan', 'Hatchback', 'SUV', 'Muscle', 'Muscle_2', 'Sports', 'Roadster', 'Taxi', 'Taxi', 'Taxi', 'Limousine']), 1)
+    : (n => model(n, kidK(n, 1.15)))(r < 0.04 ? 'police' : pick(['sedan', 'taxi', 'suv', 'van', 'sedan', 'suv', 'sedan-sports', 'suv-luxury', 'hatchback-sports']));   /* резервата — детската кола в истинския размер (55) */
   scene.add(o);
   const rp = roadPoint();
   { const b = new THREE.Box3(); o.updateMatrixWorld(true); o.traverse(m => { if (m.isMesh && !m.material?.transparent) b.expandByObject(m); }); if (b.isEmpty()) b.setFromObject(o); const sz = b.getSize(new THREE.Vector3()); traffic.push({   /* само каросерията: лъчът на фаровете (car-lights, прозрачен, ~2× дължината напред) правеше len ≈ 15 м и tr2 смаляваше колата до ~1,4 м (55) */ obj: o, x: rp ? rp.x : tx(i), z: rp ? rp.z : tx(j), yaw: 0, path: null, pi: 0, wait: 0, len: Math.max(sz.x, sz.z) }); }   // len — дистанцията до колата отпред
@@ -7298,7 +7298,7 @@ function sendCityTrain(text) {
   if (cityTrain) return;
   const g = new THREE.Group();
   if (hasTrainModel('loco')) ['loco', 'hopper', 'flat', 'hopper', 'flat'].forEach((k, i) => g.add(trainCar(k, i * 3)));
-  else ['train-locomotive-a', 'train-carriage-box', 'train-carriage-flatbed-wood', 'train-carriage-coal', 'train-carriage-container-red'].forEach((n, i) => { const m = model(n, 2.2); m.position.z = -i * 6.2; g.add(m); });
+  else ['train-carriage-box', 'train-carriage-flatbed-wood', 'train-carriage-coal', 'train-carriage-container-red'].filter(n => A[n]).forEach((n, i) => { const m = model(n, 2.2); m.position.z = -i * 6.2; g.add(m); });
   placeCars(g, trackMap, STATION_X, -600, 1, 6.2, 0.3);
   scene.add(g);
   cityTrain = { g, z: -600, stop: 3, text };

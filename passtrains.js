@@ -50,16 +50,9 @@ export function createPassingTrains(deps) {
       for (let i = 1; i <= n; i++) g.add(trainCar(Math.random() < 0.45 ? 'hopper' : 'flat', (Math.random() * 99) | 0));
       return { g, len: lenOf() };
     }
-    if (passenger && deps.model && hasModel('train-electric-city-a')) {
-      n = 3 + (Math.random() * 3 | 0);
-      for (let i = 0; i <= n; i++) {
-        const m = deps.model(i === 0 || i === n ? 'train-electric-city-a' : 'train-electric-city-b', SCALE);
-        m.position.z = -i * CAR; if (i === n) m.rotation.y = Math.PI; g.add(m);
-      }
-    } else {
-      n = 5 + (Math.random() * 7 | 0);
-      g.add(deps.model('train-locomotive-a', SCALE));
-      for (let i = 1; i <= n; i++) { const m = deps.model(FREIGHT[(Math.random() * FREIGHT.length) | 0], SCALE); m.position.z = -i * CAR; g.add(m); }
+    {   // резерва без истинските модели: само вагони (детските локомотиви и мотриси са изтрити)
+      n = 5 + (Math.random() * 7 | 0); const fr = FREIGHT.filter(hasModel); if (!fr.length) return { g, len: 0 };
+      for (let i = 1; i <= n; i++) { const m = deps.model(fr[(Math.random() * fr.length) | 0], SCALE); m.position.z = -i * CAR; g.add(m); }
     }
     return { g, len: (n + 1) * CAR };
   }

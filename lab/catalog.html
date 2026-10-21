@@ -32,7 +32,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const C = await fetch('catalog.json').then(r => r.json());
 // категории, в които още се рисуват детски/процедурни модели, макар да има истински (проверено в кода)
 const KIDS = [
-  ['Камиони, техника, строежи', 'Детските булдозери bulldozer-a/b/c, dump-truck и crane-c още се зареждат (game.js:449), но аутобаните вече ползват истинските багер, грейдер и трактор-багер (autobahn.js).'],
+  ['Камиони, техника, строежи', 'Детските bulldozer-a и crane-c още се зареждат (game.js); bulldozer-b/c и dump-truck са изтрити; аутобаните вече ползват истинските багер, грейдер и трактор-багер (autobahn.js).'],
   ['Офиси и сгради в центъра', 'Пакетът „city“ (Building_Small_1, Building_Medium_2_001, Building_Large_2) още се зарежда (game.js:450) и е бившата централа в онлайн изгледа (сега — истински офис building-g).'],
   ['Курорти', 'Детските части на хижите (cabin-*, resortview.js:19) и снежните елхи (tree-snow-*, game.js:446) остават като резерва, когато истинските не са заредени.'],
 ];

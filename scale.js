@@ -67,10 +67,10 @@ export function siteK(A, name) {
 // ---- превозните средства: истинските размери [дължина, ширина, височина] м — за проверката в Лабораторията (lab/vehicles.html)
 export const VEH_SPEC = {
   'car-polo': [4.05, 1.75, 1.46, 'VW Polo'], 'car-p206': [3.84, 1.67, 1.43, 'Peugeot 206'], 'car-renegade': [4.24, 1.81, 1.69, 'Jeep Renegade'], 'car-hilux': [5.33, 1.86, 1.82, 'Toyota Hilux'],
-  'car-taxi': [5.0, 1.85, 1.5, 'такси'], 'car-accord': [4.9, 1.86, 1.45, 'Honda Accord'], 'car-corolla': [4.63, 1.78, 1.44, 'Toyota Corolla'], 'car-crownvic': [5.39, 1.98, 1.47, 'Ford Crown Victoria'],
+  'car-taxi': [5.0, 1.85, 1.5, 'такси'], 'car-accord': [4.9, 1.86, 1.45, 'Honda Accord'], 'car-corolla': [4.63, 1.78, 1.44, 'Toyota Corolla'],
   'bus-citaro': [12.0, 2.55, 3.1, 'Mercedes Citaro'], 'car-limo': [7.6, 2.0, 1.5, 'лимузина'], 'car-polsuv': [5.05, 2.0, 1.78, 'полицейски джип'], 'car-truck': [6.5, 2.3, 3.0, 'камион с фургон'],
-  'pol-charger': [5.08, 1.9, 1.48, 'Dodge Charger'], 'pol-crownvic': [5.39, 1.98, 1.47, 'Crown Victoria'], 'pol-interceptor': [5.05, 2.0, 1.78, 'Police Interceptor'], 'pol-volga': [4.8, 1.8, 1.48, 'Волга'], 'pol-nypd': [5.08, 1.9, 1.48, 'Charger NYPD'],
-  'fire-red': [9.0, 2.5, 3.2, 'пожарна (Европа)'], 'fire-us': [10.0, 2.5, 3.0, 'пожарна (САЩ)'], 'fire-man': [10.5, 2.5, 3.4, 'MAN със стълба'],
+  'pol-charger': [5.08, 1.9, 1.48, 'Dodge Charger'], 'pol-crownvic': [5.39, 1.98, 1.47, 'Crown Victoria'], 'pol-interceptor': [5.05, 2.0, 1.78, 'Police Interceptor'], 'pol-nypd': [5.08, 1.9, 1.48, 'Charger NYPD'],
+  'fire-us': [10.0, 2.5, 3.0, 'пожарна (САЩ)'], 'fire-man': [10.5, 2.5, 3.4, 'MAN със стълба'],
   'amb-gaz': [6.2, 2.1, 2.6, 'ГАЗела'], 'amb-us': [7.0, 2.4, 2.9, 'линейка (САЩ)'], 'amb-eu': [6.9, 2.1, 2.9, 'линейка (Европа)'],
   'van-sprinter': [5.9, 2.0, 2.5, 'Sprinter'], 'van-ducato': [5.4, 2.05, 2.5, 'Ducato'], 'van-mb207': [5.3, 2.0, 2.5, 'Mercedes 207'], 'van-transit': [5.2, 1.97, 2.3, 'Transit'],
   'trk-semi': [16.5, 2.55, 4.0, 'влекач + полуремарке'], 'trk-cab': [6.0, 2.5, 3.9, 'влекач (кабина)'],
@@ -80,7 +80,7 @@ export const VEH_SPEC = {
 // ---- детските коли (Kenney, assets/vehicles) — резервите, докато истинските не са заредени: [собствена дължина, истинска дължина] м
 export const KID_LEN = {
   sedan: [2.55, 4.5], 'sedan-sports': [2.55, 4.5], suv: [2.55, 4.7], 'suv-luxury': [2.85, 5.0], 'hatchback-sports': [2.85, 4.2], taxi: [2.75, 4.8], van: [2.75, 5.0],
-  police: [2.9, 4.9], ambulance: [3.25, 6.5], firetruck: [3.25, 9.0], delivery: [3.25, 6.0], truck: [2.95, 8.0], 'truck-flat': [2.745, 8.0], tractor: [1.98, 5.0], 'tractor-shovel': [2.0, 7.0],
+  police: [2.9, 4.9], truck: [2.95, 8.0], 'truck-flat': [2.745, 8.0], tractor: [1.98, 5.0], 'tractor-shovel': [2.0, 7.0],
 };
 // множителят за model(name, k): детската кола в истинския ѝ размер (иначе d)
 export const kidK = (n, d = 1) => KID_LEN[n] ? KID_LEN[n][1] / KID_LEN[n][0] : d;

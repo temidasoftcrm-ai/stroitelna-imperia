@@ -34,20 +34,7 @@ function wrap(obj, yaw = 0, k = null) {
 // load(url) → Promise<gltf>; A — речникът с модели на играта. Връща Promise (липсващ файл не спира играта).
 export function loadVehModels(load, A, base = 'assets/heavy/gear/') {
   const jobs = Object.entries(GEAR).map(([k, c]) => load(base + c.f + '.glb').then(g => { A['sf-' + k] = { scene: wrap(g.scene, c.yaw) }; }).catch(e => console.warn('vehmodels', k, e)));
-  jobs.push(load(base + 'cars.glb').then(g => {
-    const root = g.scene; root.updateMatrixWorld(true);
-    let n = root; while (n.children.length === 1) n = n.children[0];
-    // мащаб от седана, за да са всички коли в една и съща пропорция
-    const sedan = n.children.find(c => c.name === 'Sedan');
-    const k = sedan ? CAR_LEN / new THREE.Box3().setFromObject(sedan).getSize(new THREE.Vector3()).z : 0.57;
-    for (const nm of CAR_NAMES) {
-      const parts = n.children.filter(c => c.name === nm || c.name.startsWith(nm + '_wheel'));
-      if (!parts.length) continue;
-      const grp = new THREE.Group();
-      for (const p of parts) { const q = p.clone(true); q.applyMatrix4(p.parent.matrixWorld); grp.add(q); }   // в световни координати на пакета
-      A['sf-car-' + nm] = { scene: wrap(grp, 0, k) }; addCarLights(A['sf-car-' + nm].scene);
-    }
-  }).catch(e => console.warn('vehmodels cars', e)).then(() => feature('cars-real') && loadRealCars(load, A)).then(() => loadVans(load, A, M_PER)).then(() => feature('trucks-real') && loadRealTrucks(load, A)).then(() => loadPoliceCars(load, A)));
+  jobs.push(Promise.resolve().then(() => feature('cars-real') && loadRealCars(load, A)).then(() => loadVans(load, A, M_PER)).then(() => feature('trucks-real') && loadRealTrucks(load, A)).then(() => loadPoliceCars(load, A)));
   return Promise.all(jobs);
 }
 
@@ -55,7 +42,7 @@ export function loadVehModels(load, A, base = 'assets/heavy/gear/') {
 // Заместват част от „Free Low Poly Vehicles Pack“ под същите имена; дължината — истинската в метри × мащаба на града.
 const REAL_CARS = {   // име: [файл, дължина в м]
   Sedan: ['car-polo', RS ? 4.05 : 4.4], Hatchback: ['car-p206', 3.8], SUV: ['car-renegade', 4.25], Pickup: ['car-hilux', 5.3], Taxi: ['car-taxi', 4.9],
-Muscle: ['car-accord', RS ? 4.9 : 4.7], Muscle_2: ['car-corolla', RS ? 4.63 : 4.2], Police_Sedan: ['car-crownvic', 5.4], Bus: ['bus-citaro', 12], Limousine: ['car-limo', 7.6], Police_SUV: ['car-polsuv', RS ? 6.0 : 4.9], Truck: ['car-truck', 6.5],
+Muscle: ['car-accord', RS ? 4.9 : 4.7], Muscle_2: ['car-corolla', RS ? 4.63 : 4.2], Police_Sedan: ['pol-crownvic', 5.4], Bus: ['bus-citaro', 12], Limousine: ['car-limo', 7.6], Police_SUV: ['car-polsuv', RS ? 6.0 : 4.9], Truck: ['car-truck', 6.5],
 };
 const M_PER = CAR_LEN / 4.5;   // седанът от пакета (≈4,5 м) е CAR_LEN в света на играта
 function loadRealCars(load, A) {
@@ -72,8 +59,8 @@ function loadRealCars(load, A) {
 // всички с мигащи буркани; при няколко одобрени — A[...].variants (game.js model() може да ги редува)
 const EMERG_K = { Police_Sedan: 1, Ambulance: 1, Firetruck: 1 };   // всички коли са в истински метри (1 м ≈ 1 единица, хората ~1,9) — спешните вече не се уголемяват
 const EMERG = {
-  Police_Sedan: [['pol-charger', 5.1], ['pol-crownvic', 5.4], ['pol-interceptor', 5.3], ['pol-volga', 4.8], ['pol-nypd', 5.1]],
-  Firetruck: [['fire-red', 9], ['fire-us', 10], ['fire-man', 10.5]],
+  Police_Sedan: [['pol-charger', 5.1], ['pol-crownvic', 5.4], ['pol-interceptor', 5.3], ['pol-nypd', 5.1]],   // pol-volga — изтрита (55 добавя заместник)
+  Firetruck: [['fire-us', 10], ['fire-man', 10.5]],   // fire-red — изтрита
   Ambulance: [['amb-gaz', RS ? 6.2 : 7], ['amb-us', 7.5], ['amb-eu', 7.2]],
 };
 // почиства модел на кола: маха плоските мешове (сянка/земя под колата — от тях amb-eu беше квадрат 5,8×5,8 и наполовина висок);

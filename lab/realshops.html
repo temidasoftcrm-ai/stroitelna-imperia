@@ -34,7 +34,7 @@ const put = async (u, x, z, size, txt, cls) => { const o = await load(u); const 
 const ROW = [   // [сега, с флага, размер, надпис]
   ['assets/city/Building_Small_1.glb', 'assets/commercial/building-b.glb', 15.5, 'магазин'],
   ['assets/city/Building_Medium_2_001.glb', 'assets/commercial/building-g.glb', 12.5, 'офис'],
-  ['assets/heavy/bulldozer-b.glb', 'assets/heavy/gear/excavator.glb', 6.5, 'булдозер на бригадата'],
+  ['assets/heavy/bulldozer-a.glb', 'assets/heavy/gear/excavator.glb', 6.5, 'булдозер на бригадата'],
 ];
 await Promise.all(ROW.flatMap(([a, b, s, t], i) => [put(a, i * 30, -15, s, 'сега: ' + t, 'old'), put(b, i * 30, 15, s, 'real-shops: ' + t, 'new')]));
 await Promise.all(['a', 'c', 'd', 'h'].map((k, i) => put(`assets/commercial/building-${k}.glb`, i * 22 - 5, 45, 15.5, 'магазин (вариант)', 'new')));

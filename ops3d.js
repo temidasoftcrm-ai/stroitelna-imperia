@@ -290,7 +290,7 @@ export function openOpsSquare(ops, o = {}) {
   }
   const lerp2 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
   // 🚓 колоната: след първата кола идват още (спират в редица зад нея, с малко закъснение)
-  const CONVOY = { pol: [['pol-charger', 5.6, 0.02], ['pol-interceptor', 11.2, 0.04], ['pol-nypd', 16.8, 0.06]], riot: [['car-polsuv', 7, 0.03], ['pol-volga', 12.5, 0.05]] }, conv = [];
+  const CONVOY = { pol: [['pol-charger', 5.6, 0.02], ['pol-interceptor', 11.2, 0.04], ['pol-nypd', 16.8, 0.06]], riot: [['car-polsuv', 7, 0.03], ['pol-crownvic', 12.5, 0.05]] }, conv = [];
   for (const [k, list] of Object.entries(CONVOY)) for (const [nm, back, delay] of list) load(`assets/heavy/cars/${nm}.glb`).then(g => { if (!g || shut) return; const v = emergCar(g.scene, 5.2, 'police'); const h = new THREE.Group(); h.add(v); h.visible = false; scene.add(h); h.userData.car = v;
     const L = []; if (false) for (const [c, dx] of [[0xff2020, -0.35], [0x2060ff, 0.35]]) { const b = new THREE.Mesh(own(new THREE.SphereGeometry(0.16, 10, 8)), own(new THREE.MeshBasicMaterial({ color: c }))); b.position.set(dx, 1.6, 0.2); h.add(b); L.push(b); } conv.push({ k, h, back, delay, L }); });
   function placeConvoy(m, tt) { for (const c of conv) { const tm = m.teams[c.k]; if (!tm) continue; const [a, b0] = ENTRY[c.k], dir = Math.atan2(b0[0] - a[0], b0[1] - a[1]), ux = Math.sin(dir), uz = Math.cos(dir), b = [b0[0] - ux * c.back, b0[1] - uz * c.back]; let pos = null;

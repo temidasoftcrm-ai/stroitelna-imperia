@@ -18,7 +18,7 @@ export function openOpsFlood(ops, o = {}) {
     ambient: { file: 'flood', vol: m => m.out ? 0.12 : Math.min(0.8, 0.25 + m.level / 160) },   // шумът на водата — по-силен с нивото
     cars: {
       med: [{ model: CARS + 'amb-eu.glb', kind: 'ambulance', len: 7.2, y: NB, path: [[-90, -30], [EVAC[0] + 4, -30]] }],
-      power: [{ model: CARS + 'car-hilux.glb', kind: 'utility', len: 5.6, y: NB, path: [[-90, -30.5], [EVAC[0] - 6, -30.5]] }, { model: 'assets/heavy/dump-truck.glb', len: 6, path: [[90, 27], [SUB[0] + 4, 27], [SUB[0] + 4, 25]], delay: 0.03 }],
+      power: [{ model: CARS + 'car-hilux.glb', kind: 'utility', len: 5.6, y: NB, path: [[-90, -30.5], [EVAC[0] - 6, -30.5]] }, { model: 'assets/heavy/gear/dump.glb', len: 8, path: [[90, 27], [SUB[0] + 4, 27], [SUB[0] + 4, 25]], delay: 0.03 }],
       sand: [{ model: CARS + 'car-truck.glb', len: 7, path: [[90, 27], [SUB[0] - 6, 27]] }, { model: CARS + 'car-truck.glb', len: 7, path: [[90, 26.5], [6, 26.5], [6, 15]], delay: 0.03 }],
     },
     labelAt: (k, m) => k === 'boat' ? boatLb : k === 'heli' ? heliLb : null,

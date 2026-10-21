@@ -240,10 +240,9 @@ export function createStation(deps) {
     stabledCars(trains.slice(0, level).map((_, i) => level - 1 - i));
     trains.slice(0, level).forEach((t, i) => {
       const k = level - 1 - i, o = new THREE.Group();
-      const FREIGHT = ['train-carriage-box', 'train-carriage-container-red', 'train-carriage-flatbed-wood', 'train-carriage-coal', 'train-carriage-container-blue', 'train-carriage-tank', 'train-carriage-lumber'];
+      const FREIGHT = ['train-carriage-box', 'train-carriage-container-red', 'train-carriage-flatbed-wood', 'train-carriage-coal', 'train-carriage-container-blue', 'train-carriage-lumber'];
       const n = t.wagons || 3;
-      const parts = t.pax ? ['train-electric-city-a', ...Array(Math.max(0, n - 2)).fill('train-electric-city-b'), 'train-electric-city-a']
-        : ['train-locomotive-a', ...Array.from({ length: n }, (_, j) => FREIGHT[(j + t.id) % FREIGHT.length])];
+      const parts = Array.from({ length: n }, (_, j) => FREIGHT[(j + t.id) % FREIGHT.length]);   // резерва без истинските модели — само вагони (детските локомотиви и мотриси са изтрити)
       // истински модели (trainmodels.js): „Стрела“ — скоростният влак, товарните — дизелов локомотив с бункери и платформи
       const real = t.pax && !t.express && hasTrainModel('paxLoco') ? ['paxLoco', ...Array(Math.max(1, n - 1)).fill('paxCar')]
         : !t.pax && !t.express && hasTrainModel('vl82') ? ['vl82', ...Array.from({ length: n }, (_, j) => ['boxcar', 'hopper2', 'flat'][(j + t.id) % 3])]
@@ -257,7 +256,7 @@ export function createStation(deps) {
         return;
       }
       parts.forEach((n, j) => {
-        const m = deps.model(n, SCALE); m.position.z = -j * CAR; o.add(m);
+        let m; try { m = deps.model(n, SCALE); } catch (e) { return; } m.position.z = -j * CAR; o.add(m);
         if (t.express) {   // Експрес „Стрела“: жълт покрив на всеки вагон, за да се познава на гарата
           const bb = new THREE.Box3().setFromObject(m), sz = bb.getSize(new THREE.Vector3());
           const roof = new THREE.Mesh(new THREE.BoxGeometry(sz.x * 0.8, 0.18, sz.z * 0.9), ROOF_Y);

@@ -26,7 +26,7 @@ export function createIncidents(ctx) {
     const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 2, 32, 32, 31);
     g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c);
   })();
-  const vehName = k => ctx.has('sf-car-' + k) ? ['sf-car-' + k, 1] : (n => [n, kidK(n, 1.15)])({ Police_Sedan: 'police', Police_SUV: 'police', Firetruck: 'firetruck', Ambulance: 'ambulance', Truck: 'truck' }[k]);   /* резервата в истинския размер (55) */
+  const vehName = k => ctx.has('sf-car-' + k) ? ['sf-car-' + k, 1] : (n => [n, kidK(n, 1.15)])({ Police_Sedan: 'police', Police_SUV: 'police', Firetruck: 'truck', Ambulance: 'van', Truck: 'truck' }[k]);   /* резервата в истинския размер (55) */
 
   // мястото — по улица, близо до това, което гледаш (за да се види); отделно — откъде тръгва всяка кола (120–300 м по-далеч)
   function pickSpot() {

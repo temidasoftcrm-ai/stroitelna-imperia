@@ -16,7 +16,7 @@ export function openOpsFire(ops, o = {}) {
     sirens: { fire: 'siren-fire', ladder: 'siren-fire-2', med: 'siren-ambulance', pol: 'siren-police' },
     ambient: { file: 'fire-crackle', vol: m => Math.min(0.85, Math.max(...m.b) / 100 * 0.9 + m.b.filter(v => v > 0).length * 0.05) },   // пращенето на огъня — по-силно с пожара
     cars: {
-      fire: [['fire-red', -24], ['fire-us', 8], ['fire-man', 22]].map(([n, x], i) => ({ model: CARS + n + '.glb', kind: 'fire', len: 9, path: [[-95, LANE], [x, LANE]], delay: i * 0.02 })),
+      fire: [['fire-man', -24], ['fire-us', 8], ['fire-man', 22]].map(([n, x], i) => ({ model: CARS + n + '.glb', kind: 'fire', len: 9, path: [[-95, LANE], [x, LANE]], delay: i * 0.02 })),
       ladder: [{ model: OPS + 'ladder-truck.glb', len: 10, path: [[95, LANE], [-7, LANE]], beacons: true, beaconY: 3.2, lbY: 4 }],
       pol: [{ model: CARS + 'pol-crownvic.glb', kind: 'police', len: 5.4, path: [[-95, ROAD_Z + 2], [-36, ROAD_Z + 0.5]] }, { model: CARS + 'pol-charger.glb', kind: 'police', len: 5.1, path: [[95, ROAD_Z - 2], [36, ROAD_Z - 0.5]], delay: 0.02 }, { model: CARS + 'pol-interceptor.glb', kind: 'police', len: 5.3, path: [[95, ROAD_Z + 2], [30, ROAD_Z + 2.5]], delay: 0.04 }],
       med: [{ model: CARS + 'amb-eu.glb', kind: 'ambulance', len: 7.2, path: [[95, ROAD_Z + 2.2], [27, ROAD_Z + 2.2]] }, { model: CARS + 'amb-us.glb', kind: 'ambulance', len: 7.5, path: [[95, ROAD_Z + 2.2], [18, ROAD_Z + 2.2]], delay: 0.03 }],
