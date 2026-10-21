@@ -1348,6 +1348,27 @@ const OFFICE_LEVELS = [
   { nm: 'Небостъргач', model: 'building-skyscraper-c', crews: 14, proj: 7, offers: 7 },
   { nm: 'Империя', model: 'building-skyscraper-c@10', crews: 16, proj: 8, offers: 8 },   // небостъргач на 10 етажа с табела на покрива
 ];
+// 🏷️ флаг brand-logo3d: 3D емблемата на марката над офиса (assets/heavy/logos/<марка>.glb, Meshy от потребителя); няма файл — остава плоската табела.
+// Ниво 1 (контейнерът) — малка на стълб до него; 2–4 — на покрива; 5+ — на мястото на табелата (roofLogo), табелата се скрива. Бавно се върти (frame).
+const logoCache = {}, logoLoad = k => logoCache[k] = logoCache[k] || new GLTFLoader().loadAsync(`assets/heavy/logos/${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = true; }); return g.scene; }).catch(() => null);
+function logo3d(g, office, level) {
+  const b = brandOf(S), key = b && BRANDS.some(x => x.k === b.k) ? b.k : 'custom';   // своята фирма (не от петте) — общата емблема custom.glb
+  logoLoad(key).then(src => {
+    if (!src || city.hqGroup !== g) return;
+    g.updateMatrixWorld(true); const gi = new THREE.Matrix4().copy(g.matrixWorld).invert(), lb = new THREE.Box3().setFromObject(office).applyMatrix4(gi);
+    const sb = new THREE.Box3().setFromObject(src), ss = sb.getSize(new THREE.Vector3()), roofW = Math.min(lb.max.x - lb.min.x, lb.max.z - lb.min.z), rl = g.userData.roofLogo;
+    const H = level === 1 ? 2.2 : rl ? Math.max(3, rl.w * 0.5) : Math.max(1.8, Math.min(5, roofW * 0.4)), k = H / ss.y, o = new THREE.Group(), m = src.clone(); m.scale.setScalar(k);
+    m.position.set(-(sb.min.x + sb.max.x) / 2 * k, -sb.min.y * k, -(sb.min.z + sb.max.z) / 2 * k); o.add(m);
+    const cx = (lb.min.x + lb.max.x) / 2, cz = (lb.min.z + lb.max.z) / 2;
+    if (level === 1) {   // стълб до контейнера
+      const px = lb.min.x + 0.6, pz = cz < 0 ? lb.max.z + 1.4 : lb.min.z - 1.4, pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 5, 8), new THREE.MeshStandardMaterial({ color: 0x5b6168, metalness: 0.6, roughness: 0.4 })); pole.position.set(px, 2.5, pz); pole.castShadow = true; g.add(pole); g.userData.logoPole = pole;   // пред контейнера, откъм средата на двора (гаражът е встрани)
+      o.position.set(px, 5, pz);
+    } else if (rl) { rl.board.visible = false; o.position.set(rl.x, rl.y + 0.6, rl.z); }   // 5+: вместо плоската табела
+    else o.position.set(cx, lb.max.y + 0.2, cz);
+    g.add(o); g.userData.logo3d = o;
+    const sg = g.userData.officeLabel; if (sg) sg.position.y = Math.max(sg.position.y, o.position.y + H + 3);   // табелката с името — над емблемата
+  });
+}
 // табелата с марката на покрива (новите нива 5–10): името и емблемата на фирмата, светеща; ширината — по покрива; на 10 — и звездата
 function roofLogo(g, office, level) {
   const b = brandOf(S) || { nm: 'Империя', col: '#ffb300', ico: '🏗️' }, c = document.createElement('canvas'); c.width = 1024; c.height = 256; const cg = c.getContext('2d');
@@ -1583,6 +1604,7 @@ function buildHQ() {
     const star = new THREE.Mesh(new THREE.OctahedronGeometry(1.2), new THREE.MeshStandardMaterial({ color: 0xffd54a, emissive: 0xaa7a00, metalness: 0.6, roughness: 0.3 }));
     star.position.set(-3.6, top + bh + 3.6, campusAny() ? 3.6 : -3.6); g.add(star); g.userData.star = star;
   }
+  if (feature('brand-logo3d')) logo3d(g, office, level);   // 🏷️ 3D емблемата на марката
   // гараж
   let gar, gl;
   if (!away) {   // в задния десен ъгъл на централата
@@ -7903,7 +7925,7 @@ function buildCityHighway() {
   { const sid = cityHw.seg; g.userData.mergeWhen = () => hwAll().includes(sid) && cityHw && cityHw.g === g; }   // ⚡ perf-cliff: готовата магистрала в града (колоните, лампите, мантинелите) — сливане по материал
   cityHw.traffic = createHwTraffic(tg, model, A, hz, hLen, 0.92, isAb, x => overLift(OVER, x), v.service, v.ramps && v.ramps.paths);
 }
-// 🛣️ порталите над магистралата (hwsigns.js): над всяко платно ~през 1 км и пред изхода към града (≈400 м преди него);
+// 🛣️ порталите над магистралата (hwsigns.js): над всяко платно ~през 1 км и пред изхода към града (≈450 м преди него);
 // в рамката на изгледа (v.group): пътят е по z, платното x < 0 — колите към +z (табелите гледат към −z), x > 0 — към −z
 function hwGantries(v, seg0, mine, isAb, OVER, RAMPS) {
   const roadOf = sg => { const h = HIGHWAYS.find(q => q.segs.some(([a, b]) => (a === sg.a && b === sg.b) || (a === sg.b && b === sg.a))); return h ? h.id.replace('A', 'А') : isAb ? 'А' : 'А1'; };
@@ -9962,6 +9984,7 @@ function frame() {
     updateCash(rdt);
     for (const g of parkGroups) { const j = g.userData.jet; j.scale.y = 0.85 + Math.sin(simT * 6 + g.id) * 0.15; j.rotation.y += rdt; }
     if (city.hqGroup?.userData.star) city.hqGroup.userData.star.rotation.y += rdt * 1.5;
+    if (city.hqGroup?.userData.logo3d) city.hqGroup.userData.logo3d.rotation.y += rdt * 0.5;   // 🏷️ емблемата бавно се върти
     S.dayT += dt;
     if (S.dayT >= DAY_SEC) { S.dayT -= DAY_SEC; const pt0 = perf.now(); endOfDay(); if (feature('fire-seq')) fires.dailyTick(); if (feature('awards')) bankRunDay(); autoFillTick(true); perf.add('day', pt0); }
     autoT -= dt; if (autoT <= 0) { autoT = 3; autoFillTick(false); }
@@ -10101,6 +10124,18 @@ if (AUTOTEST) {
       if (nw) { Object.assign(osmFog, { on: true, near: 900, far: 2400 }); weather.set('clear'); controls.target.set(cx + 225, 40, cz); camera.position.set(cx + 225, 105, cz + 330); }   // демото: мъглата далеч (weather.js я взима от osmFog) — редицата е ~300 м else { controls.target.set(cx + SP2 * 4.5, 20, cz - 30); camera.position.set(cx + SP2 * 4.5, 110, cz + 190); } controls.update();
       return { offices: OFFICE_LEVELS.length, garages: GARAGE_LEVELS.length, wh: WH_LEVELS.length, hqLot: [hw * 2, hd * 2], info };
     },
+    logoRow(lv = 5, brand, row) {   // 🏷️ Лабораторията: row — емблемите на всички марки в редица (градът скрит, човек за мащаб); иначе — офисът на ниво lv с емблемата на марката отблизо
+      if (brand) S.brand = brand; S.officeLevel = lv; buildHQ(); if (city.logoRow) { scene.remove(city.logoRow); city.logoRow = null; } city.group.visible = !row;
+      const h = city.hq; __dbg.time && __dbg.time(12); weather.set('clear'); fly = null;
+      if (row) {
+        const R = city.logoRow = new THREE.Group(); R.position.set(h.x, 0, h.z); scene.add(R);
+        const gr = new THREE.Mesh(new THREE.PlaneGeometry(90, 40), new THREE.MeshStandardMaterial({ color: 0x8f9a7c, roughness: 1 })); gr.rotation.x = -Math.PI / 2; gr.position.set(14, 0.02, 0); R.add(gr);
+        const pk = [0, 1, 2, 3, 4, 5].map(k => `sf-person-${k}`).find(n => A[n]); if (pk) { const m = model(pk, 1); m.position.set(-5, 0, 2); R.add(m); }
+        const LR = [...BRANDS, { k: 'custom', nm: 'Своя фирма', ico: '🏗️' }]; Promise.all(LR.map(b => logoLoad(b.k))).then(list => list.forEach((src, i) => { if (city.logoRow !== R) return; const x = i * 7, lb = label(`${LR[i].ico} ${LR[i].nm}${src ? '' : ' — няма модел'}`, '#fff', 6); lb.position.set(x, 5.6, 0); R.add(lb);
+          if (!src) return; const sb = new THREE.Box3().setFromObject(src), k = 4 / sb.getSize(new THREE.Vector3()).y, m = src.clone(); m.scale.setScalar(k); m.position.set(x - (sb.min.x + sb.max.x) / 2 * k, -sb.min.y * k, -(sb.min.z + sb.max.z) / 2 * k); R.add(m); }));
+        controls.target.set(h.x + 17.5, 2.5, h.z); camera.position.set(h.x + 17.5, 10, h.z + 46);
+      } else { setTimeout(() => { const top = (city.hqGroup && city.hqGroup.userData.officeTop) || 8; controls.target.set(h.x, top * 0.8, h.z); camera.position.set(h.x + top * 0.9 + 12, top * 1.1 + 6, h.z + top * 1.2 + 16); }, 50); }
+      return BRANDS.map(b => b.k); },
     gantryLook(i = 0, d = 60) { const G = cityHw && cityHw.signs && cityHw.signs[i]; if (!G) return null; const p = new THREE.Vector3(), q = new THREE.Vector3(0, 0, 1); G.root.getWorldPosition(p); q.applyQuaternion(G.root.getWorldQuaternion(new THREE.Quaternion())); controls.target.set(p.x, 6, p.z); camera.position.set(p.x + q.x * d + 6, 12, p.z + q.z * d + 6); fly = null; return cityHw.signs.length; },   // 🛣️ демо: портал i отпред
     billboardLook(i = 0) { const s = city.billboards?.spots?.[i]; if (!s) return null; controls.target.set(s.x, 8, s.z); camera.position.set(s.x + Math.sin(s.ry) * 34 + 8, 14, s.z + Math.cos(s.ry) * 34); fly = null; return city.billboards.spots.length; },   // 🪧 демо
     muni: () => muni,   // 🏛️ поръчките на общината (тест)

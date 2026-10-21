@@ -138,6 +138,8 @@ const DEMOS = [
   ['🚦 Прелез: светлини, звънец и бариери (влакове минават)', 'plovdiv', d => d.railLook()],   // rail-crossings (railx.js)
   ['🚇 Тунел в края на линията (без отрязани релси)', 'plovdiv', d => d.tunnelLook(1)],   // rail-crossings
   ['🛣️ Магистралата: изходи към града, бензиностанцията, изпреварване (hw-ramps)', 'plovdiv', () => $('fr').contentWindow.eval("__dbg.hwOpen(); setTimeout(() => __dbg.hwLookRamps(), 600)")],
+  ['🏷️ 3D емблемите на марките — всички в редица', 'sofia', d => { for (const ms of [0, 4000]) setTimeout(() => d.logoRow(1, 'titan', true), ms); }],   // brand-logo3d (game.js logo3d)
+  ['🏷️ 3D емблемата над офиса (Империал, ниво 5)', 'sofia', d => { for (const ms of [0, 4000]) setTimeout(() => d.logoRow(5, 'imperial'), ms); }],
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
