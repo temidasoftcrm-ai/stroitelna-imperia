@@ -113,6 +113,12 @@ const DEMOS = [
   ['🔥 Пожар: критични щети (под 30%) → спешен ремонт', 'sofia', () => $('fr').contentWindow.__dbg.fireTest(1.4)],
   ['🔥 Пожар: изгоряла (0%) → разчистване и нов строеж', 'sofia', () => $('fr').contentWindow.__dbg.fireTest(2.2)],
   ['🪧 Билбордове с фирмата по булевардите', 'sofia', d => d.billboardLook()],   // billboards3d.js
+  ['🪧 Билбордове: петте размера (Империал, ден)', 'sofia', d => d.bbRow('imperial', false)],
+  ['🪧 Билбордове: петте размера (Империал, нощ)', 'sofia', d => d.bbRow('imperial', true)],
+  ['🪧 Билбордове: петте размера (друга марка — Титан)', 'sofia', d => d.bbRow('titan', false)],
+  ['🪧 Билбордове по булеварда (Империал, нощ)', 'sofia', d => { d.bbRebuild('imperial'); d.time && d.time(22); setTimeout(() => d.billboardLook(), 1500); }],
+  ['🏢 Кампус: офис отпред, гараж и склад отзад, общ двор', 'sofia', d => d.campusLook()],   // hq-campus (game.js __dbg.campusLook)
+  ['🚶 Пътеки и алеи от сградите до тротоара', 'sofia', d => d.pathsLook()],   // lot-paths (game.js __dbg.pathsLook)
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

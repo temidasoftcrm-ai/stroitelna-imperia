@@ -1207,13 +1207,25 @@ function buildLotPaths() {
   const skip = new Set([city.hq?.id, S.garageLot, S.whLot]), Q = { drive: [], walk: [] }, V = new THREE.Vector3(), bb = new THREE.Box3();
   for (const l of city.lots) {
     const o = l.obj; if (!o || skip.has(l.id) || l.busy === 'landmark') continue;
-    const r = o.rotation.y, dx = Math.sin(r), dz = Math.cos(r), px = Math.cos(r), pz = -Math.sin(r);
-    const half = l.plan ? (Math.abs(dz) > Math.abs(dx) ? l.d : l.w) / 2 : 8 * lotK(l);
-    bb.setFromObject(o); let fd = -1e9;
-    for (const x of [bb.min.x, bb.max.x]) for (const z of [bb.min.z, bb.max.z]) fd = Math.max(fd, (x - l.x) * dx + (z - l.z) * dz);
+    // към улицата, не по модела: в плана парцелът гледа към своята улица (lot.rot — от пътя към парцела, cityplan2 front.road);
+    // в стария план парцелът е между четири улици — страната с най-голямото свободно място (при равенство — към центъра на града)
+    bb.setFromObject(o); let dx, dz, half;
+    let pre = null;
+    if (l.plan) { const r = l.rot || 0; dx = Math.sin(r); dz = Math.cos(r); half = l.d / 2 + 1.5;   // cityplan2: 1,5 м между парцела и тротоара
+      // завъртяната сграда — по нейната собствена рамка (иначе AABB е по-голяма и пътеката не стига до входа)
+      const r0 = o.rotation.y; o.rotation.y = r0 - r; o.updateMatrixWorld(true); const b2 = new THREE.Box3().setFromObject(o); o.rotation.y = r0; o.updateMatrixWorld(true);
+      const ox = o.position.x - l.x, oz = o.position.z - l.z, off = ox * dx + oz * dz, offU = ox * dz - oz * dx;
+      pre = { fd: b2.max.z - o.position.z + off, u0: b2.min.x - o.position.x + offU, u1: b2.max.x - o.position.x + offU }; }
+    else { const H = 8 * lotK(l), c = city.hq || { x: 0, z: 0 }, toC = (ax, az) => -((c.x - l.x) * ax + (c.z - l.z) * az) * 1e-4;   // към центъра — лек бонус
+      const sides = [[1, 0, H - (bb.max.x - l.x)], [-1, 0, H + (bb.min.x - l.x)], [0, 1, H - (bb.max.z - l.z)], [0, -1, H + (bb.min.z - l.z)]].map(([ax, az, gap]) => [ax, az, gap - toC(ax, az)]);
+      [dx, dz] = sides.sort((p, q) => q[2] - p[2])[0]; half = H; }
+    const px = dz, pz = -dx;
+    let fd = -1e9, u0 = 1e9, u1 = -1e9;
+    if (pre) ({ fd, u0, u1 } = pre);
+    else for (const x of [bb.min.x, bb.max.x]) for (const z of [bb.min.z, bb.max.z]) { fd = Math.max(fd, (x - l.x) * dx + (z - l.z) * dz); const u = (x - l.x) * px + (z - l.z) * pz; u0 = Math.min(u0, u); u1 = Math.max(u1, u); }
     const t0 = Math.max(0, fd - 0.3), t1 = half + 0.8; if (t1 - t0 < 0.8) continue;   // сградата стига до тротоара
-    const house = HOUSES.includes(l.built) || /^h2-|^building-type-/.test(String(l.built)), w = (house ? 2.6 : 2.2) / 2;
-    const P = (t, u) => [l.x + dx * t + px * u, l.z + dz * t + pz * u];
+    const house = HOUSES.includes(l.built) || /^h2-|^building-type-/.test(String(l.built)), w = (house ? 2.6 : 2.2) / 2, uc = (u0 + u1) / 2;   // по средата на сградата
+    const P = (t, u) => [l.x + dx * t + px * (u + uc), l.z + dz * t + pz * (u + uc)];
     Q[house ? 'drive' : 'walk'].push([P(t0, -w), P(t0, w), P(t1, w), P(t1, -w)]);
   }
   const g = city.pathGroup = new THREE.Group();
@@ -1329,7 +1341,7 @@ const crewCount = () => units.filter(u => !isMachine(u.type)).length;
 const isRoadGear = t => !!(ECON.UNIT_TYPES[t] && ECON.UNIT_TYPES[t].road);
 const machineCount = () => units.filter(u => isMachine(u.type) && !isRoadGear(u.type)).length;
 // 🏢 (hq-campus) гаражът/складът, чийто парцел е зает от сграда и няма свободен — рисуват се отзад в централата (S.campusIn)
-const campusIn = k => feature('hq-campus') && !!(S && S.campusIn || {})[k], campusAny = () => campusIn('garage') || campusIn('warehouse');
+const campusIn = k => feature('hq-campus') && !!(((S && S.campusIn) || {})[S && S.cityId] || {})[k], campusAny = () => campusIn('garage') || campusIn('warehouse');
 const garageLotObj = () => S.garageLot == null || campusIn('garage') ? null : city.lots[S.garageLot];
 const lotKey = { garage: 'garageLot', warehouse: 'whLot' }, levelKey = { office: 'officeLevel', garage: 'garageLevel', warehouse: 'whLevel' };
 const levelOf = kind => S[levelKey[kind]] || (kind === 'warehouse' ? 0 : 1);
@@ -8047,8 +8059,18 @@ function campusRepair() {
     const old = city.lots[id]; if (old && old.busy === kind) old.busy = null;
     S[key] = null;
     const l = autoLot(kind);
-    if (!l) { S[key] = id; if (old) old.busy = kind; S.campusIn = { ...(S.campusIn || {}), [kind]: 1 }; continue; }   // няма свободен парцел — рисува се отзад в централата (кампус), парцелът остава само със сградата
+    if (!l) { S[key] = id; if (old) old.busy = kind; S.campusIn = { ...(S.campusIn || {}), [S.cityId]: { ...((S.campusIn || {})[S.cityId] || {}), [kind]: 1 } }; continue; }   // няма свободен парцел — рисува се отзад в централата (кампус), парцелът остава само със сградата
     (S.campusLog = S.campusLog || []).push({ kind, from: id, to: l.id, day: S.day });
+  }
+  // пълният кампус: гараж/склад далеч от централата → на свободен СЪСЕДЕН парцел (само ако има такъв; нищо не се събаря)
+  const NEAR = 40, d = l => Math.hypot(l.x - city.hq.x, l.z - city.hq.z);
+  for (const kind of ['garage', 'warehouse']) {
+    const key = lotKey[kind], id = S[key]; if (id == null || campusIn(kind)) continue;
+    const cur = city.lots[id]; if (!cur || d(cur) <= NEAR || (S.projects || []).some(p => p.lot === id)) continue;   // вече е до централата / в момента се надгражда
+    const l = freeLotNearHq(); if (!l || d(l) > NEAR) continue;
+    if (cur.busy === kind) cur.busy = null;
+    S[key] = l.id; l.busy = kind; for (const t of l.trees || []) city.group.remove(t); l.trees = [];
+    (S.campusLog = S.campusLog || []).push({ kind, from: id, to: l.id, day: S.day, near: 1 });
   }
 }
 function autoLot(kind) {
@@ -10371,6 +10393,12 @@ if (AUTOTEST) {
     errs: [],
     finishOwn() { for (const p of [...projects]) if (p.own) completeProject(p); },
     yard: () => { const vis = units.filter(u => u.obj.visible && u.state === 'idle'), ov = []; for (let i = 0; i < vis.length; i++) for (let j = i + 1; j < vis.length; j++) { const mb = o => { const bb = new THREE.Box3(); o.traverse(m => { if (m.isMesh && m.visible && !m.material?.transparent) bb.expandByObject(m); }); return bb; }, a = mb(vis[i].obj), b = mb(vis[j].obj); if (a.intersectsBox(b)) ov.push([vis[i].type, vis[j].type]); } return { list: units.map(u => `${u.type}:${u.state}${u.home?.inGarage ? ':G' : ''}:${u.dims ? u.dims.len.toFixed(1) + 'x' + u.dims.w.toFixed(1) : '?'}`).join(' '), on: yardOn(), lot: city.yardLot?.id ?? null, hq: city.hq.id, hqXZ: [city.hq.x, city.hq.z], yardXZ: city.yardLot ? [city.yardLot.x, city.yardLot.z] : null, garLot: S.garageLot, units: units.length, idleVisible: vis.length, inGarage: units.filter(u => u.home?.inGarage).length, overlaps: ov.length, ovSample: ov.slice(0, 5), types: units.map(u => u.type).join(',') }; },   // тест: плацът (hq-yard)
+    // 🏢 Лабораторията (hq-campus): офисът отпред, гаражът и складът отзад в централата, общият двор
+    campusLook() { const ids = city.lots.filter(l => !l.busy && !l.built && l !== city.hq).slice(0, 2); S.officeLevel = 7; S.garageLevel = 8; S.whLevel = 5; S.garageLot = ids[0] ? ids[0].id : null; S.whLot = ids[1] ? ids[1].id : null;
+      S.campusIn = { ...(S.campusIn || {}), [S.cityId]: { garage: 1, warehouse: 1 } }; buildHQ(); showMap(false); this.tod(0.2); const h = city.hq; { const r = lotRot(h), bx = h.x - Math.sin(r) * 34 + Math.cos(r) * 18, bz = h.z - Math.cos(r) * 34 - Math.sin(r) * 18; this.camAt(bx, 42, bz, h.x, 4, h.z); } return S.campusIn[S.cityId]; },
+    // 🚶 Лабораторията (lot-paths): пътеките/алеите от сградите до тротоара
+    pathsLook() { if (city.lots.filter(l => l.obj).length < 5) this.lotFill(); buildLotPaths(); showMap(false); this.tod(0.2); const m = city.pathGroup && city.pathGroup.children[0]; if (!m) return 0;
+      const p = m.geometry.attributes.position, x = (p.getX(0) + p.getX(2)) / 2, z = (p.getZ(0) + p.getZ(2)) / 2; this.camAt(x + 9, 30, z + 12, x, 0, z); return city.pathGroup.children.reduce((a, c) => a + c.geometry.attributes.position.count / 4, 0); },
     garage: () => ({ office: S.officeLevel, garage: S.garageLevel, lot: S.garageLot, wh: S.whLevel, whLot: S.whLot, stock: { ...econ.s.stock }, crews: crewCount(), machines: machineCount(), own: projects.filter(p => p.own).map(p => `${p.type}:${p.stage}:${p.prog.toFixed(2)}`) }),
     look(lotId, dist = 34) { const l = lotId == null ? city.hq : city.lots[lotId]; controls.target.set(l.x, 3, l.z); camera.position.set(l.x + dist * 0.7, dist * 0.75, l.z + dist); fly = null; },
     cash: () => (S.cash || []).map(c => c.lot),
