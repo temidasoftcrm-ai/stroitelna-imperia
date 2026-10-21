@@ -255,3 +255,11 @@ money/money-crate.glb — "Money Crate" by 3D_Crackhouse (CC BY 4.0) — https:/
 money/gold-bar.glb — "Realistic Gold Bar" by Seth7Santos (CC BY 4.0) — https://sketchfab.com/3d-models/194d2227c82549fcba14a37342ea3d08
 gear/mcrane-rig.glb, gear/excavator-rig.glb — the same models as mcrane.glb / excavator.glb (see above), split into moving parts and animated in Blender for this game
 gear/{dump,backhoe,roller,grader,mixer}-rig.glb — the same models as dump/backhoe/roller/grader and construct/sf-mixer (see above), split into moving parts and animated in Blender for this game
+
+Incidents (incidents.js, Lab flag incidents2) in assets/heavy/inc/ — from Sketchfab, Creative Commons Attribution 4.0 (https://creativecommons.org/licenses/by/4.0/); reduced in Blender (decimated, textures 512–1024 px, JPEG).
+- paramedic.glb — "Emergency medical uniformed person" by AlejandroCossi — https://sketchfab.com/3d-models/7894ed56b23745b296973278e6fa20de
+- towtruck.glb — "Lightbody '90 MD Tow Truck - Low poly model" by Daniel Zhabotinsky — https://sketchfab.com/3d-models/5cba208001c64e8ea164f89e4dde91e7 (without the interior)
+- moto.glb — "Honda NR750 1994" by Comrade1280 — https://sketchfab.com/3d-models/89a79e0a3c334b23830561961f9644c8 (without the floor)
+
+Rails in assets/heavy/rail/ — Sketchfab, CC BY 4.0.
+- track.glb, track-tile.glb — railway track by hifrak958 — https://sketchfab.com/3d-models/72f4906d6f484cf693a342478f2ae102 (track-tile: one 4 m piece cut in Blender)

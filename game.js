@@ -1996,7 +1996,15 @@ const traffic = [];
 // инцидент от време на време: 2 полицейски, пожарна и линейка идват по улиците, стоят ~1 мин и се разотиват (incidents.js, Лабораторията → incidents)
 const incidents = createIncidents({ scene, model, has: n => !!A[n], route: roadRoute, point: () => roadPoint() || { x: tx(3 * ((Math.random() * (NBI + 1)) | 0)), z: tx((Math.random() * NJ) | 0) },
   focus: () => controls.target, cam: () => camera.position, ready: () => S && city.ready && !AUTOTEST,
-  building: (x, z) => { let best = null, bd = 70 * 70; for (const l of city.lots || []) if (l.obj && l.built) { const d = (l.obj.position.x - x) ** 2 + (l.obj.position.z - z) ** 2; if (d < bd) { bd = d; best = l.obj; } } if (!best) return null; const b = new THREE.Box3().setFromObject(best); return { x0: b.min.x, x1: b.max.x, z0: b.min.z, z1: b.max.z, h: b.max.y }; } });
+  building: (x, z, r = 70) => { let best = null, bd = r * r; for (const l of city.lots || []) if (l.obj && l.built) { const d = (l.obj.position.x - x) ** 2 + (l.obj.position.z - z) ** 2; if (d < bd) { bd = d; best = l.obj; } } if (!best) return null; const b = new THREE.Box3(); best.updateMatrixWorld(true); best.traverse(m => { if (m.isMesh && !m.isSprite && !m.material?.transparent) b.expandByObject(m); }); if (b.isEmpty()) b.setFromObject(best); return { x0: b.min.x, x1: b.max.x, z0: b.min.z, z1: b.max.z, h: b.max.y }; },   /* incidents2 (55): само сградата — без табелите и прозрачните (пламъците бяха в двора) */
+  roadAt: (x, z) => roadAtPt(x, z) });
+// incidents2 (55): посоката и ширината на улицата в точката — за кордона, зяпачите по тротоарите и затварянето на платната
+function roadAtPt(x, z) {
+  const P = city.plan; let best = null, bd = 1e18;
+  if (P && P.streets) P.streets.forEach((st, si) => { const p = st.pts; for (let k = 1; k < p.length; k++) { const ax = p[k - 1][0], az = p[k - 1][1], dx = p[k][0] - ax, dz = p[k][1] - az, L2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2)), d = (x - ax - dx * t) ** 2 + (z - az - dz * t) ** 2; if (d < bd) { bd = d; const l = Math.sqrt(L2); best = { dx: dx / l, dz: dz / l, w: st.w || 8, walk: P.p2?.roads?.[si]?.walk ?? 2.5, median: P.p2?.roads?.[si]?.median || 0 }; } } });
+  if (best) return best;
+  const [i, j] = tileOfPos(x, z), ew = isRoad(i - 1, j) || isRoad(i + 1, j); return { dx: ew ? 1 : 0, dz: ew ? 0 : 1, w: 8, walk: 2 };
+}
 // 🔥 пожарите (fire-seq): игровото време, парцелите, пожарната по улиците, поръчката след пожара
 const fires = createFires({ S: () => S, group: () => city.group, lots: () => city.lots, model, has: n => !!A[n], route: roadRoute, cityId: () => S.cityId,
   skinned: n => A[n] ? { scene: cloneSkinned(A[n].scene), animations: A[n].animations || [] } : null,
@@ -2021,7 +2029,7 @@ function traffic2Make() {
   if (tr2) tr2.clear(); if (tr2G) { scene.remove(tr2G); tr2G = null; }
   const p2 = city.plan && city.plan.p2;   // планът v2: лентите от planNetwork, колите — в група, изместена с offset (като 3D изгледа на плана)
   if (p2) { tr2G = new THREE.Group(); tr2G.position.set(city.plan.offset[0], 0, city.plan.offset[1]); scene.add(tr2G); }
-  tr2 = createTraffic({ scene: tr2G || scene, camera, jp: feature('junction-paths'), drive: p2 && p2.drive === 'L' ? 'left' : 'right', maxCars: wantedTraffic(), blockers: () => railx ? railx.blockers().map(b => p2 ? { x: b.x - city.plan.offset[0], z: b.z - city.plan.offset[1] } : b) : [],   // camera — истинските фарове само за най-близките коли
+  tr2 = createTraffic({ scene: tr2G || scene, camera, jp: feature('junction-paths'), drive: p2 && p2.drive === 'L' ? 'left' : 'right', maxCars: wantedTraffic(), blockers: () => [...(railx ? railx.blockers() : []), ...(incidents.blockers?.() || [])].map(b => p2 ? { x: b.x - city.plan.offset[0], z: b.z - city.plan.offset[1] } : b),   /* + затворената улица при инцидент (incidents2, 55) */   // camera — истинските фарове само за най-близките коли
     ...(p2 ? { built: planNetwork(p2, { jp: feature('junction-paths') }) } : { net: gridNetwork({ NBI, NBJ, tx, isRoad, TILE, signal: (i, j) => signals.some(s => s.i === i && s.j === j) }) }),
     makeCar: () => { addCar(); const t = traffic.pop(); if (!t) return null; const heavy = /Bus|Truck|Firetruck|firetruck/.test(t.obj.userData.src || '');
       if (tr2G) { const k = t.len > 3 && t.len < 14 ? 1 : (heavy ? 11 : 4.5) / (t.len || 4.5);   /* колите вече са в истинския размер (sf-car-* и резервите с kidK) — не ги изравняваме до 4,5 м; само ако мярката е сбъркана (55) */ t.obj.scale.multiplyScalar(k); t.len = (t.len || 4.5) * k; tr2G.add(t.obj); }   // планът v2 е в истински метри — колите в истинския си размер
@@ -2388,7 +2396,8 @@ function makeSite(p) {
   v.mound = new THREE.Mesh(new THREE.ConeGeometry(2.6, 1, 10), dirtMat); v.mound.position.set(4.5, 0, -4.5); v.mound.visible = false; v.mound.castShadow = true; g.add(v.mound);
   v.slab = new THREE.Mesh(new THREE.BoxGeometry(12.6, 1, 12.6), concreteMat); v.slab.visible = false; v.slab.castShadow = v.slab.receiveShadow = true; g.add(v.slab);
   // бетоновоз до основите (вижда се по време на етап „Основи“)
-  if (A['truck-concrete-red']) { v.mixer = model('truck-concrete-red', 0.62); if (feature('site-anim') && A['sf-mixer-rig']) { const sz = new THREE.Box3().setFromObject(A['truck-concrete-red'].scene).getSize(new THREE.Vector3()); v.mixer.userData.rig = swapRig(v.mixer, A, 'sf-mixer-rig', 'spin', { len: Math.max(sz.x, sz.z) }); }   /* барабанът се върти */ v.mixer.position.set(4.2, 0.05, 3.2); v.mixer.rotation.y = -Math.PI / 2; v.mixer.visible = false; g.add(v.mixer); }
+  if (A['truck-concrete-red']) { v.mixer = model('truck-concrete-red', 0.62); if (feature('site-anim') && A['sf-mixer-rig']) { const sz = new THREE.Box3().setFromObject(A['truck-concrete-red'].scene).getSize(new THREE.Vector3()); v.mixer.userData.rig = swapRig(v.mixer, A, 'sf-mixer-rig', 'spin', { len: Math.max(sz.x, sz.z) }); }   /* барабанът се върти */ if (feature('site-anim')) { const k = lotK(lot), D = lotHalf(lot)[1], sw = lot.plan ? (city.plan?.p2?.roads?.[lot.street]?.walk ?? 2.5) + 1.5 : 4; v.mixer.scale.setScalar(1.18 / k); v.mixer.position.set(0, 0.05, (D + sw + 1.4) / k); v.mixer.rotation.y = Math.PI / 2; }   /* site-anim (55): истинските 8,5 м — до бордюра пред оградата, успоредно на улицата (не върху строежа) */
+    else { v.mixer.position.set(4.2, 0.05, 3.2); v.mixer.rotation.y = -Math.PI / 2; } v.mixer.visible = false; g.add(v.mixer); }
   // сградата се „издига“ чрез клипинг равнина
   v.clip = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
   const tmpLot = { x: 0, z: 0 };
@@ -10274,6 +10283,8 @@ if (AUTOTEST) {
       const sg = ALL_AB.find(x => isAm(x.a) || isAm(x.b)), eu = ALL_AB.find(x => !isAm(x.a) && !isAm(x.b)), q = s => { const km = kmBetween(s.a, s.b), r = abQuoteSeg(s, km); return [s.id, km, r.reward, JSON.stringify(r.mats[1])]; };
       return { boston: bc('boston'), chicago: bc('chicago'), paris: bc('paris'), air: [amL(AIRPORT_LEVELS[0], 'boston', 'air').cost, AIRPORT_LEVELS[0].cost], port: [amL(PORT_LEVELS[0], 'miami', 'port').cost, PORT_LEVELS[0].cost], ab: [sg && q(sg), q(eu)] }; },
     balkTest() { S.balkansPop = 0; S.dev.xp = 15000; S.dev.lv = 4; dev.add(6000); return { lv: S.dev.lv, pop: S.balkansPop, img: document.querySelector('#buyPop img')?.getAttribute('src') }; },
+    incidentState: () => incidents.active,   // incidents2 (55): кой къде е
+    incidentSpeed: k => incidents.speed(k),
     incidentLook(camOnly, type) { const r = camOnly && incidents.active ? null : incidents.start(type); const a = incidents.spot(); if (a) __dbg.camAt(a.x + 28, 30, a.z + 40, a.x, 0, a.z); fly = null; $('panel').classList.add('hidden'); return r; },
     hotel5Look() {   // Лабораторията: кандидатите за 5★/Гранд хотел (assets/heavy/hotels5) един до друг извън града; височина ~60 м (широките — до ~110 м), кола и човек за мащаб
       showMap(false); const h = { x: tx(NI - 1) + 120, z: tx(NJ - 1) + 120 }, g = new THREE.Group(); g.position.set(h.x, 0, h.z); scene.add(g);

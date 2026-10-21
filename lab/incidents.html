@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Хората на инцидентите</title>
+<style>
+  body { margin:0; background:#14161b; color:#e8e8ea; font:14px/1.45 system-ui,sans-serif; overflow:hidden; }
+  #hud { position:absolute; left:12px; top:12px; background:rgba(20,22,27,.88); padding:10px 14px; border-radius:10px; max-width:520px; }
+  h1 { font-size:17px; margin:0 0 4px; } p { margin:0 0 6px; color:#9aa0aa; font-size:13px; }
+  .lbl { position:absolute; transform:translate(-50%,-100%); background:rgba(20,22,27,.82); padding:2px 7px; border-radius:6px; font-size:12px; white-space:nowrap; pointer-events:none; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script></head><body>
+<div id="hud"><h1>🚨 Инцидентите — хората и колите (incidents2)</h1>
+<p>Отпред: минувачи (оглеждат се, говорят по телефона, махат), полицай, пожарникар, парамедичка, пострадал. Отзад: истинският мотор (легнал) и пътната помощ с натоварената кола. Кордонът — раирана лента на стълбчета. Влачи с мишката.</p></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { loadInc2, createInc2Kit } from '../incidents2.js';
+const R = new THREE.WebGLRenderer({ antialias: true }); R.setSize(innerWidth, innerHeight); R.setPixelRatio(Math.min(2, devicePixelRatio)); R.outputColorSpace = THREE.SRGBColorSpace; R.shadowMap.enabled = true; document.body.appendChild(R.domElement);
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0xc9dcec); sc.add(new THREE.HemisphereLight(0xffffff, 0x667788, 1.5));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(10, 20, 12); sun.castShadow = true; Object.assign(sun.shadow.camera, { left: -20, right: 20, top: 20, bottom: -20 }); sc.add(sun);
+const gnd = new THREE.Mesh(new THREE.PlaneGeometry(80, 80).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x55585e })); gnd.receiveShadow = true; sc.add(gnd);
+const cam = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 300); cam.position.set(2, 6, 16); const ctl = new OrbitControls(cam, R.domElement); ctl.target.set(2, 1, 0); ctl.update();
+const labels = [], lab = (t, x, y, z) => { const d = document.createElement('div'); d.className = 'lbl'; d.textContent = t; document.body.appendChild(d); labels.push([d, new THREE.Vector3(x, y, z)]); };
+const K = createInc2Kit(await loadInc2()), g = new THREE.Group(); sc.add(g);
+const row = [['ped', 'look', 'минувач — оглежда се'], ['ped', 'phone', 'по телефона'], ['ped', 'wave', 'маха'], ['cop', 'wave', 'полицай'], ['cop', 'idle', 'полицай (стои)'], ['ff', 'idle', 'пожарникар'], ['ff', 'talk', 'пожарникар (говори)'], ['medic', 'idle', 'парамедичка']];
+row.forEach(([k, a, t], i) => { const x = (i - 3.5) * 1.6; K.put(g, k, a, x, 2, x, 12); lab(t, x, 2.1, 2); });
+{ const v = K.person('ped', 'idle', { lying: true }); v.position.set(6.5, 0, 2); g.add(v); lab('пострадал', 6.5, 0.6, 2); }
+const m = K.moto(); if (m) { m.position.set(-5, 0, -3); g.add(m); lab('мотор (легнал)', -5, 1.2, -3); }
+const tw = K.tow(); if (tw) { tw.position.set(3, 0, -5); g.add(tw); lab('пътна помощ — предницата към +z', 3, 2.4, -5);
+  const car = await new GLTFLoader().loadAsync('../assets/heavy/cars/car-polo.glb').then(q => q.scene).catch(() => null);
+  if (car) { const w = new THREE.Group(), b0 = new THREE.Box3().setFromObject(car), s = b0.getSize(new THREE.Vector3()), k = 4.05 / Math.max(s.x, s.z); car.scale.setScalar(k); w.add(car); const b = new THREE.Box3().setFromObject(w), c = b.getCenter(new THREE.Vector3()); car.position.set(-c.x, -b.min.y, -c.z);
+    const d = new THREE.Group(); d.position.set(0, 0.32, -(2.83 + 2.02 - 0.35)); d.rotation.x = -0.1; tw.add(d); d.add(w); } }
+K.cordon(g, [[-7, -9], [8, -9], [8, 5], [-7, 5]]);
+const P = new THREE.Vector3(), clock = new THREE.Clock();
+R.setAnimationLoop(() => { const dt = clock.getDelta(); K.update(dt, null); ctl.update(); R.render(sc, cam); for (const [d, p] of labels) { P.copy(p).project(cam); d.style.left = (P.x * 0.5 + 0.5) * innerWidth + 'px'; d.style.top = (-P.y * 0.5 + 0.5) * innerHeight + 'px'; } });
+addEventListener('resize', () => { R.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); });
+window.__ready = true; window.__cam = (x, y, z, tx, ty, tz) => { cam.position.set(x, y, z); ctl.target.set(tx, ty, tz); ctl.update(); };
+</script></body></html>
