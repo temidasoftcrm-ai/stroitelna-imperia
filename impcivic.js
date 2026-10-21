@@ -90,7 +90,7 @@ export function syncImpCivic(city, ctx) {
   const taken = new Set(Object.values(bl));
   // свободни парцели: външният пояс, без застроените/заетите; подредени по ъгъл около центъра — сградите се пръскат равномерно
   let cx = 0, cz = 0; for (const l of city.lots) { cx += l.x; cz += l.z; } cx /= city.lots.length; cz /= city.lots.length;
-  const free = () => city.lots.filter(l => l.zone === 'outer' && !l.built && !l.busy && !taken.has(l.id)).sort((a, b) => Math.atan2(a.z - cz, a.x - cx) - Math.atan2(b.z - cz, b.x - cx));
+  const free = () => city.lots.filter(l => (l.zone === 'outer' || l.zone === 'periphery') && !l.built && !l.busy && !taken.has(l.id)).sort((a, b) => Math.atan2(a.z - cz, a.x - cx) - Math.atan2(b.z - cz, b.x - cx));
   let n = 0, turn = 0;
   for (const [key, arr] of Object.entries(imp.b)) {
     if (!Array.isArray(arr) || !VIA[key]) continue;
