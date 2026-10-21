@@ -104,10 +104,11 @@ export function createDevLevel(deps) {
       d.lv++;
       if (d.lv <= firm0) { deps.toast(`🏙️ ${deps.cityName ? deps.cityName() : 'Градът'} стигна ниво ${d.lv}`, 'good'); continue; }
       if (d.lv > capLv()) { const S = deps.S(); if (S.coopWait == null) S.coopWait = firm0; deps.toast(`⏳ Ниво ${d.lv} е готово, но чака партньора (ниво ${capLv()}) — отключванията идват, щом и той стигне`, 'good'); continue; }   // градът догонва фирмата (друг град вече е бил на това ниво) — само съобщение, без картинка
-      deps.toast(`🏅 Фирмата е ниво ${d.lv}! ${UNLOCKS[d.lv] || ''}`, 'good', open);
-      if (feature('lv-pics') && LV_PICS.has(d.lv)) { showLevel(d.lv, UNLOCKS[d.lv] || ''); continue; }   // градът е задминал фирмата → нова фирмена степен
+      const ut = (UNLOCKS[d.lv] || '') + (deps.levelBonus ? deps.levelBonus(d.lv) : '');   // 🎁 бонусът за нивото (game.js, start-easy) — веднъж, в същото съобщение
+      deps.toast(`🏅 Фирмата е ниво ${d.lv}! ${ut}`, 'good', open);
+      if (feature('lv-pics') && LV_PICS.has(d.lv)) { showLevel(d.lv, ut); continue; }   // градът е задминал фирмата → нова фирмена степен
       deps.sound('lvup');
-      if (deps.pop && !deps.pop(`lv-${d.lv}`, `🏅 Ниво на развитие ${d.lv}`, UNLOCKS[d.lv] || '')) deps.pop('office-up', `🏅 Ниво на развитие ${d.lv}`, UNLOCKS[d.lv] || '');
+      if (deps.pop && !deps.pop(`lv-${d.lv}`, `🏅 Ниво на развитие ${d.lv}`, ut)) deps.pop('office-up', `🏅 Ниво на развитие ${d.lv}`, ut);
     }
     render();
     deps.save();
