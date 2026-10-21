@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Кръстовища и кръгови</title>
+<style>
+  :root { --bg:#14161b; --card:#1d2027ee; --txt:#e8e8ea; --mut:#9aa0aa; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--txt); font:13px/1.4 system-ui,sans-serif; overflow:hidden; }
+  #c { position:fixed; inset:0; }
+  .ui { position:fixed; left:12px; top:12px; background:var(--card); border-radius:10px; padding:10px 12px; max-width:min(440px, calc(100vw - 24px)); }
+  .ui h1 { font-size:15px; margin:0 0 6px; } .row { display:flex; gap:6px; flex-wrap:wrap; margin:6px 0; }
+  button, select { background:#2a2f38; color:var(--txt); border:1px solid #3a414d; border-radius:7px; padding:5px 9px; font:inherit; cursor:pointer; }
+  button.on { background:#2a6b3e; border-color:#2a6b3e; } #st { color:var(--mut); white-space:pre-line; }
+</style></head><body>
+<canvas id="c"></canvas>
+<div class="ui"><h1>⭕ Кръстовища и кръгови (junction-paths)</h1>
+  <div class="row"><select id="fam"><option value="eu">Европейски</option><option value="radial">Радиален</option><option value="us">Американски</option></select>
+    <select id="size"><option value="m">среден</option><option value="l" selected>голям</option></select>
+    <button id="go">↻ Град</button><button id="nextR">⭕ Следващо кръгово</button></div>
+  <div class="row"><button id="seq" class="on">▶ Един по един (кола, самосвал, ТИР × всеки вход → всеки изход)</button><button id="many">🚚 Много наведнъж</button>
+    <button id="bg">🚗 Трафик</button><button id="dbg" class="on">🧭 Дебъг</button><select id="spd"><option value="1">1×</option><option value="4">4×</option><option value="8">8×</option></select></div>
+  <div id="st">зарежда…</div></div>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { plan2 } from '../cityplan2.js';
+import { buildPlan2View } from '../cityplan2-3d.js';
+import { createTraffic, planNetwork } from '../traffic.js';
+import { makeRouter, debugLayer } from '../junctionpaths.js';
+
+const $ = id => document.getElementById(id);
+const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xbfd8ef);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x667766, 1.6)); const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(80, 160, 60); scene.add(sun);
+const cam = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.5, 4000), ctl = new OrbitControls(cam, renderer.domElement);
+addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); });
+
+// превозните средства — кутии в истинския размер (габаритът е важен): кола 4,5×1,9; самосвал 8,5×2,55; ТИР — влекач 6×2,55 + ремарке 13,6×2,55
+const TYPES = { car: { len: 4.5, w: 1.9, h: 1.5, col: 0x3a7bd5 }, dump: { len: 8.5, w: 2.55, h: 3.2, col: 0xf2a900 }, tir: { len: 6 + 13.6 + 0.4, w: 2.55, h: 3.8, col: 0xd62828, cab: 6, trl: 13.6 } };
+function body(len, w, h, col) { const g = new THREE.Group(), m = new THREE.Mesh(new THREE.BoxGeometry(w, h, len), new THREE.MeshStandardMaterial({ color: col, roughness: 0.6 })); m.position.y = h / 2; g.add(m); const nose = new THREE.Mesh(new THREE.BoxGeometry(w * 0.9, h * 0.3, 0.3), new THREE.MeshStandardMaterial({ color: 0xffffff })); nose.position.set(0, h * 0.75, len / 2); g.add(nose); return g; }
+
+let P, VIEW, tr, router, dbg, R, ri = 0, queue = [], live = [], stats, bgOn = false;
+const city = new THREE.Group(); scene.add(city);
+function build() {
+  if (tr) { for (const a of live) { city.remove(a.obj); if (a.trl) city.remove(a.trl); } tr.clear(); }
+  if (dbg) dbg.dispose(); live = []; queue = [];
+  while (city.children.length) city.remove(city.children[0]);
+  P = plan2('jtest', { fam: $('fam').value, size: $('size').value, seed: 7 });
+  VIEW = buildPlan2View(P, {}); city.add(VIEW);
+  tr = createTraffic({ scene: city, built: planNetwork(P, { jp: true }), seed: 3, maxCars: 0, jp: true, drive: P.drive === 'L' ? 'left' : 'right',
+    makeCar: () => { const t = Math.random() < 0.1 ? 'dump' : 'car', T = TYPES[t], o = body(T.len, T.w, T.h, 0x8a8f99); city.add(o); return { obj: o, len: T.len, w: T.w, kind: t === 'car' ? 'car' : 'truck' }; } });
+  router = makeRouter(tr); dbg = debugLayer(tr, city); ri = 0; pickRound();
+}
+function pickRound() {
+  if (!P.rounds.length) { $('st').textContent = 'няма кръгово в този град'; return; }
+  R = P.rounds[ri % P.rounds.length]; cam.position.set(R.x + 40, 95, R.z + 70); ctl.target.set(R.x, 0, R.z); ctl.update();
+  stats = { started: 0, done: 0, islandHits: 0, maxYawRate: 0, maxYawAt: '', noRoute: 0, stuck: 0, byType: {} }; window.__jpStats = stats; queue = [];
+  if ($('seq').classList.contains('on')) fillSeq();
+}
+// всички комбинации: за всеки вид × всеки вход → всеки друг изход
+function combos() {
+  const N = tr.nodes.get(R.node), out = [];
+  for (const e of R.entries) for (const f of R.entries) if (e.arm !== f.arm) {
+    const inL = N.inL.find(l => l.armIn === e.arm && l.laneI === 0), outL = N.outL.find(l => l.armOut === f.arm && l.laneI === 0);
+    if (inL && outL) out.push({ inL, outL, from: e.arm, to: f.arm });
+  }
+  return out;
+}
+function fillSeq() { queue = []; for (const t of ['car', 'dump', 'tir']) for (const c of combos()) queue.push({ t, ...c }); $('st').textContent = `опашка: ${queue.length}`; }
+function launch(q) {
+  const T = TYPES[q.t], s0 = Math.max(1, q.inL.len - 45), o = {}, sO = Math.min(q.outL.len - 1, 40), k = (() => { let i = 1; while (i < q.outL.cum.length - 1 && q.outL.cum[i] < sO) i++; return i; })(), a = q.outL.pts[k - 1], b = q.outL.pts[k], t = (sO - q.outL.cum[k - 1]) / ((q.outL.cum[k] - q.outL.cum[k - 1]) || 1);
+  const r = router.route({ p: q.inL, s: s0 }, { p: q.outL, s: sO }, { heavy: q.t !== 'car' });
+  if (!r) { stats.noRoute++; return null; }
+  if (q.inL.cars.some(c => Math.abs(c.s - s0) < (c.L + T.len) / 2 + 3)) return null;   // мястото на тръгване е заето — по-късно
+  const cab = q.t === 'tir' ? body(T.cab, T.w, T.h, T.col) : body(T.len, T.w, T.h, T.col), trl = q.t === 'tir' ? body(T.trl, T.w, T.h * 0.95, 0xdddddd) : null;
+  city.add(cab); if (trl) city.add(trl);
+  const ag = { obj: cab, len: T.len, w: T.w, h: T.h, kind: q.t === 'car' ? 'car' : 'truck', name: `${q.t} ${q.from}→${q.to}`, route: r, cab: T.cab, trailer: trl ? { obj: trl, len: T.trl } : null,
+    onArrive: c => { tr.removeAgent(c); city.remove(cab); if (trl) city.remove(trl); live.splice(live.indexOf(L), 1); stats.done++; (stats.byType[q.t] = stats.byType[q.t] || { done: 0 }).done++; } };
+  const c = tr.addAgent(ag), L = { c, obj: cab, trl, q, age: 0, lastYaw: c.yaw, lastTY: c.tr ? c.tr.yaw : 0 }; live.push(L); stats.started++;
+  return L;
+}
+// проверки на всяка стъпка: габаритът не влиза в острова; посоката не скача (потрепване); не стои вечно
+const corners = (x, z, yaw, hl, hw) => { const fx = Math.sin(yaw), fz = Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw); return [[1, 1], [1, -1], [-1, -1], [-1, 1]].map(([a, b]) => [x + fx * hl * a + rx * hw * b, z + fz * hl * a + rz * hw * b]); };
+function check(dt) {
+  for (const L of live) {
+    const c = L.c, T = TYPES[L.q.t], boxes = [[c.x, c.z, c.yaw, (c.trl ? T.cab : T.len) / 2]]; if (c.tr) boxes.push([c.tr.x, c.tr.z, c.tr.yaw, T.trl / 2]);
+    for (const [x, z, yaw, hl] of boxes) for (const [px, pz] of corners(x, z, yaw, hl, T.w / 2)) if (Math.hypot(px - R.x, pz - R.z) < R.island - 0.3) { stats.islandHits++; stats.lastHit = L.q.t + ' ' + L.q.from + '→' + L.q.to; const k = L.q.t + (boxes.length > 1 && x === boxes[1][0] ? '-трл' : ''); stats.hitBy = stats.hitBy || {}; stats.hitBy[k] = Math.max(stats.hitBy[k] || 0, +(R.island - Math.hypot(px - R.x, pz - R.z)).toFixed(2)); }
+    const yr = Math.abs(Math.atan2(Math.sin(c.yaw - L.lastYaw), Math.cos(c.yaw - L.lastYaw))) / Math.max(1e-3, dt); if (c.v > 0.5 && yr > stats.maxYawRate) { stats.maxYawRate = yr; stats.maxYawAt = L.q.t + ' ' + L.q.from + '→' + L.q.to + ' v=' + c.v.toFixed(1) + ' ' + c.p.kind + '#' + c.ri + ' s=' + c.s.toFixed(1) + '/' + c.p.len.toFixed(1); }
+    if (c.v > 0.5 && yr * dt > 0.3 && (stats.jumps = stats.jumps || []).length < 6) stats.jumps.push([L.q.t, c.p.kind, c.ri, +c.s.toFixed(2), +(L.lastYaw * 57.3).toFixed(0), +(c.yaw * 57.3).toFixed(0), +c.x.toFixed(2), +c.z.toFixed(2), +dt.toFixed(3), c.hist.map(h => h.kind + h.len.toFixed(1)).join(',')]);
+    L.lastYaw = c.yaw; L.age += dt; if (L.age > 150) { stats.stuck++; tr.removeAgent(c); city.remove(L.obj); if (L.trl) city.remove(L.trl); live.splice(live.indexOf(L), 1); break; }
+  }
+}
+const speed = () => +$('spd').value;
+let lastT = performance.now(), relT = 0;
+function loop() {
+  const now = performance.now(), rdt = Math.min(0.1, (now - lastT) / 1000); lastT = now;
+  const dt = rdt * speed();
+  if (tr && R) {
+    relT -= dt;
+    if ($('seq').classList.contains('on')) { if (!live.length && queue.length && relT <= 0) { if (launch(queue[0])) queue.shift(); relT = 1; } }
+    else if ($('many').classList.contains('on') && relT <= 0) { const C = combos(); if (live.length < 14) launch({ t: ['car', 'car', 'dump', 'tir'][(Math.random() * 4) | 0], ...C[(Math.random() * C.length) | 0] }); relT = 1.2; }
+    tr.opts.maxCars = bgOn ? 60 : 0;
+    const steps = Math.ceil(dt / (1 / 30)); for (let k = 0; k < steps; k++) { tr.update(dt / steps, 64); check(dt / steps); }
+    if ($('dbg').classList.contains('on')) dbg.update();
+    $('st').textContent = `кръгово ${ri % P.rounds.length + 1}/${P.rounds.length} · входове ${R.entries.length} · опашка ${queue.length} · на път ${live.length}\nготови ${stats.done}/${stats.started} · в острова ${stats.islandHits} · без маршрут ${stats.noRoute} · заседнали ${stats.stuck}\nнай-бързо въртене ${(stats.maxYawRate * 180 / Math.PI).toFixed(0)}°/s (${stats.maxYawAt})`;
+  }
+  ctl.update(); renderer.render(scene, cam); requestAnimationFrame(loop);
+}
+$('go').onclick = build; $('nextR').onclick = () => { ri++; pickRound(); };
+$('seq').onclick = () => { $('seq').classList.add('on'); $('many').classList.remove('on'); fillSeq(); };
+$('many').onclick = () => { $('many').classList.add('on'); $('seq').classList.remove('on'); queue = []; };
+$('bg').onclick = () => { bgOn = !bgOn; $('bg').classList.toggle('on', bgOn); };
+$('dbg').onclick = () => { $('dbg').classList.toggle('on'); };
+build(); loop();
+// обектите за сравнение преди/след (един и същ изглед отгоре): задънен край, завой, Т, кръстовище +, кръгово
+function spots() {
+  const inside = n => P.nodes.every(() => true) && n.endKind === 'dead', out = {};
+  out.dead = P.nodes.find(n => n.arms.length === 1 && n.endKind === 'dead' && P.roads[n.arms[0].road].median) || P.nodes.find(n => n.arms.length === 1 && n.endKind === 'dead');
+  out.deadSt = P.nodes.find(n => n.arms.length === 1 && n.endKind === 'dead' && !P.roads[n.arms[0].road].median);
+  out.t = P.nodes.find(n => n.arms.length === 3 && n.kind !== 'round'); out.x4 = P.nodes.find(n => n.arms.length === 4 && n.kind !== 'round' && n.ctrl === 'signal') || P.nodes.find(n => n.arms.length === 4 && n.kind !== 'round');
+  out.round = P.rounds[0] && { x: P.rounds[0].x, z: P.rounds[0].z };
+  let best = null; for (const rd of P.roads) for (let k = 2; k < rd.pts.length; k++) { const a = rd.pts[k - 2], b = rd.pts[k - 1], c = rd.pts[k], d1 = Math.atan2(b[1] - a[1], b[0] - a[0]), d2 = Math.atan2(c[1] - b[1], c[0] - b[0]), t = Math.abs(Math.atan2(Math.sin(d2 - d1), Math.cos(d2 - d1))); if (!best || t > best.t) best = { t, x: b[0], z: b[1], deg: Math.round(t * 57.3) }; }
+  out.bend = best;
+  return out;
+}
+window.__view = (k, h = 70) => { const s = spots()[k]; if (!s) return false; cam.position.set(s.x, h, s.z + 0.01); ctl.target.set(s.x, 0, s.z); ctl.update(); renderer.render(scene, cam); return true; };
+window.__jp = { get tr() { return tr; }, get R() { return R; }, get P() { return P; }, launch, combos, fillSeq };
+</script></body></html>
