@@ -378,7 +378,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 // не се преизчисляват; иначе сенките се обновяват през 2 кадъра. Ако кадрите са бавни — по-ниска резолюция (pixelRatio).
 let perfFr = 0, perfT = 0, perfN = 0, perfHigh = null, perfDownAt = -1e9;
 const PR_MAX = Math.min(devicePixelRatio, 1.5);
-const cityCull = createCityCull({ group: () => city.group, target: () => controls.target, camDist: () => camera.position.distanceTo(controls.target), peds: () => [...standers, ...peds.map(p => p.m)], on: () => feature('perf-cliff') });
+const cityCull = createCityCull({ group: () => city.group, target: () => controls.target, camDist: () => camera.position.distanceTo(controls.target), peds: () => [...standers, ...peds.map(p => p.m)], on: () => feature('perf-cliff') && !window.__noCull });   // __noCull — за сравнение преди/след от конзолата
 function perfTune(rdt) {
   const high = camera.position.distanceTo(controls.target) > 230;
   cityCull.tick(rdt, high);

@@ -25,13 +25,15 @@ export function mergeKids(o, minMeshes = 6) {
   o.updateMatrixWorld(true); _inv.copy(o.matrixWorld).invert();
   const groups = new Map();
   for (const m of parts) {
-    const g = m.geometry, at = Object.keys(g.attributes).sort().join(',') + (g.index ? '#i' : '#n'), k = m.material.uuid + '|' + at + '|' + m.castShadow + m.receiveShadow;
+    const g = m.geometry, at = Object.keys(g.attributes).sort().map(n => { const a = g.attributes[n]; return `${n}:${a.itemSize}:${(a.array || a.data?.array)?.constructor.name}:${!!a.normalized}`; }).join(',') + (g.index ? '#i' : '#n'), k = m.material.uuid + '|' + at + '|' + m.castShadow + m.receiveShadow;   // пълният подпис — иначе mergeGeometries пише грешки
     (groups.get(k) || groups.set(k, []).get(k)).push(m);
   }
   let removed = 0;
   for (const list of groups.values()) {
     if (list.length < 2) continue;
-    const geos = list.map(m => { _m.multiplyMatrices(_inv, m.matrixWorld); const g = m.geometry.clone(); for (const n of Object.keys(g.morphAttributes || {})) delete g.morphAttributes[n]; g.applyMatrix4(_m); return g; });
+    const geos = list.map(m => { _m.multiplyMatrices(_inv, m.matrixWorld); const g = m.geometry.clone(); for (const n of Object.keys(g.morphAttributes || {})) delete g.morphAttributes[n];
+      for (const n of Object.keys(g.attributes)) { const a = g.attributes[n]; if (a.isInterleavedBufferAttribute) g.setAttribute(n, a.clone()); }   // GLB/meshopt: interleaved → обикновени (clone() без данни ги разгъва)
+      g.applyMatrix4(_m); return g; });
     let mg = null; try { mg = mergeGeometries(geos, false); } catch (e) { mg = null; }
     for (const g of geos) g.dispose();
     if (!mg) continue;
@@ -55,7 +57,7 @@ export function createCityCull(deps) {
       let budget = 12; while (budget-- > 0 && queue.length) { const o = queue.shift(); if (o.parent === g) try { mergeKids(o); } catch (e) { o.userData.merged = true; } }
       t += dt; if (t < 0.5) return; t = 0;
       if (high) return;   // отдалечено: perfTune така или иначе крие детайлите
-      const tg = deps.target(), cd = deps.camDist(), R = 130 * Math.max(1, cd / 110), Rp = 80 * Math.max(1, cd / 140);
+      const tg = deps.target(), cd = deps.camDist(), R = 125 + Math.max(0, cd - 150) * 0.5, Rp = 80 + Math.max(0, cd - 150) * 0.3;   // ~130 м (f1: над ~140 м се печелят най-много кадри); по-далеч само при отдалечена камера
       for (const o of g.children) {
         if (!o.userData.detail) continue;
         const s = sphereOf(o); if (s.r > R * 0.5) { o.visible = true; continue; }   // огромното (напр. площад) — винаги
