@@ -69,7 +69,7 @@ const partCache = new WeakMap();
 function protoParts(src, norm) {
   const key = src, c = partCache.get(key); if (c && c.norm === norm) return c.parts;
   src.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(src), k = norm === 'h' ? 1 / ((b.max.y - b.min.y) || 1) : norm === 'w' ? 1 / (Math.max(b.max.x - b.min.x, b.max.z - b.min.z) || 1) : 1, parts = [];
-  src.traverse(o => { if (!o.isMesh || !o.visible) return; const ms = [].concat(o.material); if (ms.some(m => m.transparent || (m.emissive && m.emissive.getHex() && m.emissiveIntensity > 0.5))) return;   // без фаровете и лъчите
+  src.traverse(o => { if (!o.isMesh || !o.visible) return; const ms = [].concat(o.material); if (norm == null && ms.some(m => m.transparent || (m.emissive && m.emissive.getHex() && m.emissiveIntensity > 0.5))) return;   // колите (norm null) — без фаровете и лъчите; листата на дърветата и храстите са прозрачни — остават
     const g = o.geometry.clone().applyMatrix4(o.matrixWorld); g.translate(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2); g.scale(k, k, k); parts.push([g, o.material]); });
   partCache.set(key, { norm, parts }); return parts;
 }
