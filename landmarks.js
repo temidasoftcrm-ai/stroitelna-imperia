@@ -508,7 +508,7 @@ function reichstag() {
 // ---- забележителности от готови модели (assets/heavy/lm/*.glb, Sketchfab, CC-BY — виж assets/heavy/CREDITS.txt)
 // h — височина в метри на играта; fit — най-много толкова ширина/дължина (парцелът е ~15 м); grid — пакет от сгради, подредени в квартал
 const GLB_LM = {
-  burj: { h: 70, fit: 14 }, cntower: { h: 58, fit: 14 }, willis: { h: 46, fit: 14 }, shtower: { h: 56, fit: 14 },
+  burj: { h: 70, fit: 14 }, cntower: { h: 58, fit: 14 }, willis: { h: 46, fit: 14, onLoad: (w, g) => { if (feature('night-willis')) willisLights(w, g); } }, shtower: { h: 56, fit: 14 },
   liberty: { h: 22, fit: 13, plate: 0x7d9a6a }, redeemer: { h: 18, fit: 14, plate: 0x6f8f55 }, stbasil: { h: 20, fit: 15, plate: 0xb9b0a3 },
   opera: { h: 30, fit: 40, plate: 0x4f86b8 }, manhattan: { h: 34, fit: 15, grid: true },
   colosseo: { h: 13, fit: 15, plate: 0xb9ad98 },   // Рим: Колизеумът (Carlos.Maciel)
@@ -694,6 +694,20 @@ function pyramids() {   // Гиза: Хеопс, Хефрен (с бялата �
 // Айфеловата кула нощем: златно осветление + хиляди проблясващи светлинки (като всеки час в Париж) и прожектор на върха
 // Петронас нощем: кулите светят сребристо-бели (прожекторите — floodK), а на двата шпила мигат червени светлини за самолетите
 const _ws = new THREE.Vector3();
+// Уилис тауър нощем (night-willis): двете антени — червени светлини за самолетите на върха и по средата, мигат на смени
+function willisLights(w, g) {
+  w.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(w), H = b.max.y - b.min.y, v = new THREE.Vector3(), top = [];
+  w.traverse(o => { if (!o.isMesh) return; const P = o.geometry.attributes.position; for (let i = 0; i < P.count; i += 2) { v.fromBufferAttribute(P, i).applyMatrix4(o.matrixWorld); if (v.y > b.min.y + H * 0.88) top.push(v.clone()); } });
+  if (!top.length) return;
+  const tb = new THREE.Box3().setFromPoints(top), alongX = tb.max.x - tb.min.x >= tb.max.z - tb.min.z, mid = tb.getCenter(new THREE.Vector3());
+  const ants = [false, true].map(sd => { const h = top.filter(p => ((alongX ? p.x - mid.x : p.z - mid.z) > 0) === sd); return h.length ? new THREE.Box3().setFromPoints(h) : null; }).filter(Boolean);
+  const ws = w.getWorldScale(new THREE.Vector3()).x || 1, loc = (x, y, z) => w.worldToLocal(new THREE.Vector3(x, y, z));
+  const reds = [0, 1].map(() => mat(0x400000, 0.4, 0, { emissive: 0xff2020, emissiveIntensity: 0 }));
+  ants.forEach(a => { const c = a.getCenter(new THREE.Vector3()), r = H * 0.0035 / ws;
+    for (const [f, k] of [[1, 0], [0.55, 1]]) { const m = new THREE.Mesh(new THREE.SphereGeometry(Math.max(r, 0.05), 8, 6), reds[k]); m.position.copy(loc(c.x, a.min.y + (a.max.y - a.min.y) * f + (f === 1 ? r * ws : 0), c.z)); w.add(m); } });
+  const prev = g.userData.sparkle;
+  g.userData.sparkle = (t, night) => { if (prev) prev(t, night); const on = Math.sin(t * 2.0) > 0.25; reds[0].emissiveIntensity = (on ? 2.6 : 0.12) * (0.2 + night); reds[1].emissiveIntensity = (!on ? 2.0 : 0.12) * (0.2 + night); };
+}
 function petronasLights(w, g) {
   // върховете — от самия меш (кутията на групата включва и други неща): върховете над 90% от височината, разделени на две по дългата ос
   w.updateMatrixWorld(true); let big = null; w.traverse(o => { if (o.isMesh && (!big || o.geometry.attributes.position.count > big.geometry.attributes.position.count)) big = o; });
