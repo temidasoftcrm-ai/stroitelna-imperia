@@ -212,7 +212,7 @@ const BAR_COL = { police: [0xff2a2a, 0x2a6bff], ambulance: [0xff2a2a, 0x2a6bff],
 const BAR_T = 0.7, BAR_ON = [[0, 0.07], [0.12, 0.19], [0.24, 0.31]];
 const barLit = (car, side, j, t) => { if (!beaconState(car, t)) return false; const u = (((t + (car.id || 0) * 0.37 - j * 0.025) / BAR_T) % 1 + 1) % 1 - side * 0.5; return BAR_ON.some(([a, b]) => u >= a && u < b); };
 class BarSeg extends Beacon {
-  onBeforeRender(renderer, scene, camera) { super.onBeforeRender(renderer, scene, camera); const car = carOf(this); if (car) this.material.emissiveIntensity = barLit(car, this.userData.side, this.userData.j, performance.now() / 1000) ? 2.6 : 0.08; }
+  onBeforeRender(renderer, scene, camera) { super.onBeforeRender(renderer, scene, camera); const car = carOf(this); if (car) this.material.emissiveIntensity = barLit(car, this.userData.side, this.userData.j, performance.now() / 1000) ? 2.6 : 0.35; }   /* угасналата страна — слабо в своя цвят (иначе лентата изглежда едноцветна) */
 }
 class BarGlow extends THREE.Sprite {
   onBeforeRender() { if (!this.userData.own) { this.material = this.material.clone(); this.userData.own = 1; } const car = carOf(this); if (car) this.material.opacity = barLit(car, this.userData.side, 0, performance.now() / 1000) ? 1 : 0; }
@@ -235,7 +235,7 @@ function realSirens(car, kind) {
   (segs.find(x => x.userData.side === 0) || segs[0]).userData.red = true;   // звукът и sirenKind — от една леща
   car.updateMatrixWorld(true);
   for (const sg of segs) { const g = new BarGlow(new THREE.SpriteMaterial({ map: glowTex, color: cols[sg.userData.side], transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
-    g.position.copy(car.worldToLocal(sg.getWorldPosition(new THREE.Vector3()))); g.position.y += W * 0.04; g.renderOrder = 2; g.scale.setScalar(W * 0.9); g.userData.side = sg.userData.side; car.add(g); }
+    g.position.copy(car.worldToLocal(sg.getWorldPosition(new THREE.Vector3()))); g.position.y += W * 0.04; g.renderOrder = 2; g.scale.setScalar(W * 0.42); g.userData.side = sg.userData.side; car.add(g); }   /* по-малък ореол (бе W·0,9) — светещата страна покриваше цялата лента с един цвят */
   const pool = new BarPool(new THREE.PlaneGeometry(W * 3.2, Lc * 1.5).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: glowTex, color: cols[0], transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0, polygonOffset: true, polygonOffsetFactor: -4 }));
   pool.position.set(0, bb.min.y + 0.06, (bb.min.z + bb.max.z) / 2); pool.userData.cols = cols; pool.renderOrder = 1; car.add(pool);
   return true;
