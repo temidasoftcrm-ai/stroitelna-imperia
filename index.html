@@ -255,6 +255,7 @@
   #loading .ld-bg { position:absolute; inset:-30px; background:url(assets/ui/splash.webp) center/cover; filter:blur(18px) brightness(.55); }
   /* картината е 1672×941 — кутията пази пропорцията, за да е лентата точно на нарисуваното място */
   #loading .ld-box { position:relative; width:min(100vw, 177.7vh); aspect-ratio:1672/941; background:url(assets/ui/splash.webp) center/100% 100% no-repeat; box-shadow:0 0 60px rgba(0,0,0,.6); }
+  #loading.pol .ld-bg, #loading.pol .ld-box { background-image:url(assets/ui/splash-pol.webp); }   /* след ниво 20 — „Пътят към политиката“ */
   #loading .ld-bar { position:absolute; left:31.9%; top:90.8%; width:36.3%; height:3.6%; border-radius:999px; background:#0d1424; box-shadow:0 0 0 2px #c9a14a, inset 0 2px 6px rgba(0,0,0,.6); overflow:hidden; }
   #loading .ld-bar i { display:block; height:100%; width:3%; border-radius:999px; background:linear-gradient(90deg,#f7c64a,#ffe28a 60%,#fff6cf); box-shadow:0 0 12px #ffd25a; transition:width .25s ease-out; }
   #loading .ld-txt { position:absolute; left:0; right:0; top:85.2%; text-align:center; color:#fff; font-weight:700; font-size:clamp(11px,1.9vw,24px); text-shadow:0 2px 6px #000; background:linear-gradient(90deg,transparent,rgba(30,22,10,.85) 35%,rgba(30,22,10,.85) 65%,transparent); padding:.2em 0; }
@@ -602,6 +603,7 @@
 
 <div id="modal" class="hidden"><div class="box" id="modalBox"></div></div>
 <div id="loading"><div class="ld-bg"></div><div class="ld-box"><div class="ld-txt" id="ldTxt">Зареждане… 0%</div><div class="ld-bar"><i id="ldBar"></i></div></div></div>
+<script>/* след ниво 20 (политиката) — новата картина при зареждане */ try { const n = Math.min(3, Math.max(1, +localStorage.getItem('stroi-slot') || 1)), raw = localStorage.getItem(n === 1 ? 'stroi-save-v1' : 'stroi-save-v1-s' + n), lv = raw ? +((JSON.parse(raw) || {}).dev || {}).lv || 0 : 0; if (lv > 20) document.getElementById('loading').classList.add('pol'); } catch (e) {}</script>
 
 <script src="mobile.js?v=7d605a2f"></script>
 <script type="module" src="memfix.js?v=391cec42"></script>
