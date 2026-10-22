@@ -73,7 +73,7 @@ const strHash = s => { let h = 2166136261; for (const c of String(s)) h = Math.i
 export function gamePlan2Gen(cityId, o = {}) {
   const fs = o.fam && o.size ? { fam: o.fam, size: o.size } : famSizeOf(cityId, o), seed = o.seed ?? strHash(cityId);
   // minLots: колкото играта ще отключи най-много (ядро + всички квартали) — ако шаблонът е по-малък, радиусът расте (×1,12 до 6 пъти)
-  let P, rk = 1; for (let k = 0; k < 7; k++) { P = plan2(cityId, { fam: fs.fam, size: fs.size, seed, rk, roadGeo: !!o.roadGeo });   /* road-geo — само новите игри (S.roadGeo) */ if (!o.minLots || P.lots.filter(L => !L.big && !L.lm).length >= o.minLots) break; rk *= 1.12; }
+  let P, rk = 1; for (let k = 0; k < 7; k++) { P = plan2(cityId, { fam: fs.fam, size: fs.size, seed, rk, roadGeo: !!o.roadGeo, jfix: !!o.jfix });   /* junction-fix (#22) — също само новите игри (S.jfix) */   /* road-geo — само новите игри (S.roadGeo) */ if (!o.minLots || P.lots.filter(L => !L.big && !L.lm).length >= o.minLots) break; rk *= 1.12; }
   if (!P.anchors) {   // котви: гарата — голямото място „station“; магистралата и летището — изходите към другите градове (най-източният и най-далечният от него)
     const st = P.lots.find(L => L.big === 'station'), C = P.center;
     const ex = P.nodes.filter(n => n.endKind === 'exit').map(n => { const a = n.arms[0], rd = P.roads[a.road], q = a.end ? rd.pts[rd.pts.length - 1] : rd.pts[0]; return { x: n.x, z: n.z, dir: Math.atan2(n.x - C.x, n.z - C.z), road: { road: rd.id, end: a.end, x: q[0], z: q[1] } }; });

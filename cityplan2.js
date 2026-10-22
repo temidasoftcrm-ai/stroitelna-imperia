@@ -19,6 +19,29 @@ const CLS = {
   quay: { lanes: [1, 1], laneW: 3.3, median: 0, walk: 4, rank: 3 },
   street: { lanes: [1, 1], laneW: 3.1, median: 0, walk: 2.5, rank: 1 },
 };
+// #22 junction-fix: след сливането на ребрата в улици — (1) две улици между едни и същи кръстовища (примка): остава по-късата;
+// (2) кръстовище, където две улици се разминават под < 60° (на ~12 м от възела): последните ≤ 40 м на второстепенната се извиват
+// (последните ~30 м — право под ≥ 60°, после плавна кубична крива до старата линия на ≤ 90 м), така че да влиза в най-широката празнина между другите клонове (истинско Т, без слепен асфалт)
+const JF_MIN = 60 * Math.PI / 180, JF_D = 90, JF_S = 30;   // JF_S — правата част до възела под новия ъгъл; JF_D — докъдето стига преходът
+function fixJunctions(roads, nodes) {
+  const lenOf = pts => pts.reduce((t, p, i) => i ? t + Math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]) : 0, 0);
+  const seen = new Map();
+  for (const rd of [...roads].sort((a, b) => lenOf(a.pts) - lenOf(b.pts))) { if (rd.from === rd.to || rd.oneway) continue; const k = Math.min(rd.from, rd.to) + ':' + Math.max(rd.from, rd.to); if (seen.has(k) && seen.get(k).cls === rd.cls) rd.dup = true; else if (!seen.has(k)) seen.set(k, rd); }
+  for (let i = roads.length - 1; i >= 0; i--) if (roads[i].dup) roads.splice(i, 1);
+  const outPts = (rd, n) => rd.from === n ? rd.pts : rd.pts.slice().reverse();   // от възела навън
+  const at = (P, d) => { let L = 0; for (let k = 1; k < P.length; k++) { const l = Math.hypot(P[k][0] - P[k - 1][0], P[k][1] - P[k - 1][1]); if (L + l >= d) { const t = (d - L) / (l || 1); return { p: [P[k - 1][0] + (P[k][0] - P[k - 1][0]) * t, P[k - 1][1] + (P[k][1] - P[k - 1][1]) * t], k, u: [(P[k][0] - P[k - 1][0]) / (l || 1), (P[k][1] - P[k - 1][1]) / (l || 1)] }; } L += l; } return null; };
+  const dAng = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+  const arms = new Map(); for (const rd of roads) for (const n of [rd.from, rd.to]) { if (!arms.has(n)) arms.set(n, []); if (rd.from !== rd.to) arms.get(n).push(rd); }
+  for (const [n, A] of arms) { if (A.length < 3) continue; const N = nodes[n], c = [N.x, N.z];
+    const dir = rd => { const q = at(outPts(rd, n), 12); return q ? Math.atan2(q.p[1] - c[1], q.p[0] - c[0]) : null; };
+    for (let it = 0; it < A.length; it++) { const D = A.map(dir); let bad = null;
+      for (let i = 0; i < A.length; i++) for (let j = i + 1; j < A.length; j++) if (D[i] != null && D[j] != null && dAng(D[i], D[j]) < JF_MIN) { const ri = CLS[A[i].cls].rank, rj = CLS[A[j].cls].rank, m = ri !== rj ? (ri < rj ? i : j) : lenOf(A[i].pts) < lenOf(A[j].pts) ? i : j; if (!bad || D[m] != null) bad = m; }
+      if (bad == null) break; const rd = A[bad], P = outPts(rd, n), L = lenOf(P), d = Math.min(JF_D, L * 0.45), S0 = Math.min(JF_S, d * 0.4), q = at(P, d); if (!q || d < 25) break;
+      let best = null, bs = -1; for (let k = 0; k < 72; k++) { const a = k / 72 * Math.PI * 2, sep = Math.min(...A.map((o, i) => i === bad || D[i] == null ? 9 : dAng(a, D[i]))), turn = dAng(a, Math.atan2(q.p[1] - c[1], q.p[0] - c[0])); const sc = Math.min(sep, Math.PI / 2) * 3 - turn; if (sep >= JF_MIN + 0.09 && sc > bs) { bs = sc; best = a; } }   /* ≥ 65° (правата част го пази и на 30 м) */
+      if (best == null) break; const u0 = [Math.cos(best), Math.sin(best)], E = [c[0] + u0[0] * S0, c[1] + u0[1] * S0], kk = Math.hypot(q.p[0] - E[0], q.p[1] - E[1]) * 0.4, B1 = [E[0] + u0[0] * kk, E[1] + u0[1] * kk], B2 = [q.p[0] - q.u[0] * kk, q.p[1] - q.u[1] * kk], cur = [c];
+      for (let s = 0; s <= 16; s++) { const t = s / 16, m = 1 - t; cur.push([m * m * m * E[0] + 3 * m * m * t * B1[0] + 3 * m * t * t * B2[0] + t * t * t * q.p[0], m * m * m * E[1] + 3 * m * m * t * B1[1] + 3 * m * t * t * B2[1] + t * t * t * q.p[1]]); }
+      const np = [...cur, ...P.slice(q.k)]; rd.pts = rd.from === n ? np : np.reverse(); rd.jfix = true; } }
+}
 const widthOf = c => { const k = CLS[c]; return (k.lanes[0] + k.lanes[1]) * k.laneW + k.median; };
 const isMain = c => c === 'blvd' || c === 'ring' || c === 'quay';
 
@@ -365,7 +388,7 @@ export function plan2Load(data, osm) {
 // ---- основното: plan2(cityId, { fam, size, seed, ext })
 const cache = new Map();
 export function plan2(cityId, o = {}) {
-  const fam = o.fam || 'eu', size = o.size || 'm', seed = o.seed ?? hashStr(cityId), ext = o.ext || 0, RG = !!o.roadGeo && !o.osm, key = [cityId, fam, size, seed, ext, o.rk || 1, RG ? 'rg' : ''].join(':');   // RG — road-geo (само нови игри: парцелите се местят)
+  const fam = o.fam || 'eu', size = o.size || 'm', seed = o.seed ?? hashStr(cityId), ext = o.ext || 0, RG = !!o.roadGeo && !o.osm, JF = !!o.jfix && !o.osm, key = [cityId, fam, size, seed, ext, o.rk || 1, RG ? 'rg' : '', JF ? 'jf' : ''].join(':');   // RG — road-geo (само нови игри: парцелите се местят)
   if (cache.has(key)) return cache.get(key);
   const t0 = Date.now(), r = rng(hashStr(`plan2:${cityId}:${fam}:${size}:${seed}`));
   const sk = o.osm ? osmSkeleton(o.osm) : skeleton(fam, size, r, o.rk || 1);   // rk — по-голям радиус (играта иска повече парцели)
@@ -432,6 +455,7 @@ export function plan2(cityId, o = {}) {
     }
     roads.push({ cls: e.cls, from: a, to: cur, pts, noCars: e.noCars, bridge: e.bridge, nm: e.nm, oneway: e.oneway ? (fwd ? 1 : -1) : 0 });
   }
+  if (JF) fixJunctions(roads, G.nodes);   // #22 junction-fix (само новите игри): без дублите и острите съединения
   // изход: възли (само използваните), пътища с параметри
   const live = new Map(); const nodeOut = [];
   const nid = i => { if (!live.has(i)) { live.set(i, nodeOut.length); nodeOut.push({ id: nodeOut.length, x: G.nodes[i].x, z: G.nodes[i].z, arms: [] }); } return live.get(i); };
