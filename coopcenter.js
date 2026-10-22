@@ -6,7 +6,10 @@
 // Локалната навигация е с data-cc (без сървър). C — контекстът от coop.js (centerCtx): { st, st2, st3, d, E, f, esc, ago, left, PCOL, JCOL,
 //   partnerName, myName, unread, markRead, UNIT_TYPES, MATERIALS, logTxt, QUICK, fetchedAt, act(c, a, x, el), render() }.
 
-const V = { sec: 'hold', proj: 'prop', fin: 'tr', hist: false, cities: false, gear: false, wiz: null, inflight: new Set() };
+import { feature } from './lab/feature.js';
+import { moneySliderHtml, wireMoneySlider } from './moneyslider.js';   // внасяне/теглене в холдинга като в банката (hold-slider)
+
+const V = { sec: 'hold', hpick: { in: 0, out: 0 }, proj: 'prop', fin: 'tr', hist: false, cities: false, gear: false, wiz: null, inflight: new Set() };
 const SECS = [['hold', '🏦', 'Общ холдинг'], ['home', '🏠', 'Обзор'], ['proj', '🛣️', 'Общи проекти'], ['eq', '🚜', 'Техника и доставки'], ['fin', '💶', 'Финанси'], ['goals', '🏆', 'Общи цели'], ['chat', '💬', 'Чат'], ['feed', '📜', 'Активност']];
 const STATUS = { wait: ['⏳ чака отговор', '#ffb347'], ok: ['✅ прието', '#5fd38a'], no: ['✖ отказано', '#ff6b6b'], exp: ['⌛ изтекло', '#9aa0aa'], done: ['🏁 изпълнено', '#4fc3f7'], cancel: ['↩️ оттеглено', '#9aa0aa'], mine: ['📨 за твое решение', '#ffd54a'] };
 const chip = k => { const [t, c] = STATUS[k] || STATUS.wait; return `<span class="chip" style="color:${c};border-color:${c}55">${t}</span>`; };
@@ -70,6 +73,7 @@ export function centerRender(el, C) {
   el.innerHTML = h + '</main>';
   for (const k of V.inflight) { const b = el.querySelector(`[data-c="${k}"]`); if (b) { b.disabled = true; b.textContent = '⏳ ' + b.textContent; } else V.inflight.delete(k); }
   el.querySelectorAll('[data-cc]').forEach(b => b.onclick = () => local(b.dataset.cc, C, el));
+  wireHold(el, C);
   // наградите и „Вземи всички“ — веднъж (бутонът остава изключен, докато сървърът не потвърди)
   el.querySelectorAll('[data-c^="qclaim:"],[data-c^="claim:"]').forEach(b => b.addEventListener('click', () => V.inflight.add(b.dataset.c), true));
   // съветникът: след „Изпрати“ се затваря и показва предложението (полетата се четат преди прерисуването)
@@ -348,7 +352,7 @@ function holdSec(C) {
   const inn = log.filter(l => l.amount > 0).reduce((a, l) => a + l.amount, 0), out = log.filter(l => l.amount < 0).reduce((a, l) => a - l.amount, 0);
   const days = log.length ? Math.max(1, Math.round((Date.now() - Math.min(...log.map(l => Date.parse(l.at)))) / 86400e3)) : 0;
   h += `<h3>🏦 ${esc(V0.name || 'Вашият холдинг')}</h3><div class="card"><div class="mut">Обща касичка — внасяте и двамата, тегли всеки при нужда.</div>
-    <div class="row"><input id="cpV" inputmode="numeric" placeholder="сума в €"><button class="btn" data-c="vput">⬆️ Внеси от твоите</button><button class="btn2" data-c="vtake">⬇️ Изтегли при теб</button></div>
+    ${feature('hold-slider') ? holdSliders(C, V0.balance || 0) : `<div class="row"><input id="cpV" inputmode="numeric" placeholder="сума в €"><button class="btn" data-c="vput">⬆️ Внеси от твоите</button><button class="btn2" data-c="vtake">⬇️ Изтегли при теб</button></div>`}
     <div class="led"><span>За периода${days ? ` (последните ${days} дни)` : ''}: внесени</span><b class="ok">+${f(inn)} €</b></div><div class="led"><span>изтеглени / покрити</span><b class="bad">−${f(out)} €</b></div>
     ${C.holdInfo()}
     <div class="row"><button class="btn2" data-cc="hist">${V.hist ? '▲ Скрий историята' : `📜 История (${log.length})`}</button></div>
@@ -356,6 +360,27 @@ function holdSec(C) {
   if (C.st4) h += rulesHtml(C);
   h += `<h3>🏆 Най-силен тандем</h3><div class="card">${T.map((x, i) => `<div class="led" style="${x.me ? `color:${C.PCOL};font-weight:800` : ''}"><span>${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${esc(x.name)}${x.me ? ' (вие)' : ''}</span><b>${f(x.worth)} €</b></div>`).join('') || '<div class="mut">Още няма тандеми.</div>'}</div>`;
     return h;
+}
+
+// ── 🏦 внасяне и теглене с плъзгач, като в банката (Лабораторията → hold-slider): действията са същите (coop.js vput / vtake / wreq),
+// плъзгачът само попълва скритото поле #cpV. Тегленето пази правилата: над „сам до … за 24 ч“ бутонът става заявка към партньора.
+function holdCtx(C, bal) {
+  const { f, esc } = C, pn = esc(C.partnerName()), cash = Math.max(0, Math.floor(C.E().money || 0)), R = C.st4?.rules || {}, lim = R.at && R.self_limit != null ? R.self_limit : null;
+  const free = lim == null ? Infinity : Math.max(0, lim - (C.st4.used24 || 0));
+  return { in: { max: cash, after: v => `След това: холдингът ${f(bal + v)} € · у теб ${f(cash - v)} €`, go: v => ({ txt: `🏦 Внеси ${f(v)} €`, c: 'vput' }) },
+    out: { max: Math.floor(bal),
+      after: v => `След това: холдингът ${f(bal - v)} € · у теб ${f(cash + v)} €` + (lim == null ? '' : v > free ? `<br><b class="bad">Над лимита</b> — сам теглиш до ${f(lim)} € за 24 ч (остават ${f(free)} €): ще стане заявка, която ${pn} одобрява.` : `<br>В лимита: остават ${f(free)} € от ${f(lim)} € за 24 ч.`),
+      go: v => v > free ? { txt: `🙋 Поискай одобрение за ${f(v)} €`, c: 'wreq', cls: 'btn2' } : { txt: `💶 Изтегли ${f(v)} €`, c: 'vtake', cls: 'btn2' } } };
+}
+function holdSliders(C, bal) {
+  const K = holdCtx(C, bal);
+  return `<input id="cpV" type="hidden" value="">` + ['in', 'out'].map(k => moneySliderHtml({ id: k, kind: k, max: K[k].max, value: V.hpick[k], after: K[k].after, go: K[k].go })).join('');
+}
+function wireHold(el, C) {
+  const boxes = el.querySelectorAll('.msl[data-msl]'); if (!boxes.length) return;
+  const hid = el.querySelector('#cpV'), bal = C.st2?.vault?.balance || 0, K = holdCtx(C, bal);
+  boxes.forEach(box => { const k = box.dataset.msl, w = wireMoneySlider(box, { ...K[k], onPick: v => { V.hpick[k] = v; hid.value = v; } });
+    box.querySelector('.msl-go').addEventListener('click', () => { hid.value = w.value(); V.hpick[k] = 0; }, true); });   // преди onclick-а на coop.js, който чете #cpV
 }
 
 // ── 📜 (v2, coop_status4) правилата на общата каса: лимит за самостоятелно теглене, лимит за автоматичното спасяване, заявки ──
