@@ -3341,6 +3341,7 @@ function completeProject(p) {
   }
   // сумата се изчислява по правилата на economy.js, но се плаща едва при клик върху пачките на покрива
   const res = new ECON.Economy(ECON.newEconState()).completionPayout(p, S.day);
+  if (res.repDelta < 0 && S.rep < 4) { res.repDelta = 0; res.note += ' (под 4 ★ — без загуба на звезди)'; }   // потребителят 22.10: закъсненията вадят звезди чак от 4 ★ нагоре, иначе няма как да се стигне до големите поръчки
   S.rep = Math.max(0, Math.min(5, S.rep + res.repDelta * (res.repDelta > 0 && hasStaff('architect') ? 1.25 : 1)));
   finishSite(p);
   if (p.adv) { res.amount = Math.max(0, res.amount - p.adv); res.note += ` · аванс ${fmt(p.adv)} € вече получен`; }   // 💶 остатъкът (70% ± закъснение/предсрочно)
