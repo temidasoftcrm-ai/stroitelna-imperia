@@ -607,8 +607,8 @@ function niceTree(n, scale) {
   const palm = !!S && (PALM_CITIES.has(S.cityId) || isDesert(S.cityId)), key = palm ? 'palm' : 'tree';
   const pool = treePools[key] || (treePools[key] = palm ? Object.keys(A).filter(k => k.startsWith('sf-palm-')) : [...Object.keys(A).filter(k => k.startsWith('sf-tree-')).flatMap(k => [k, k]), ...Object.keys(A).filter(k => k.startsWith('sf-pine-'))]);
   if (!pool.length) { delete treePools[key]; return null; }
-  const sz = sizeOf(n);
-  return [pool[(treeN++ * 7 + 3) % pool.length], scale * (sz.max.y - sz.min.y) * (palm ? 1.35 : 1.15)];
+  const sz = sizeOf(n), pk = pool[(treeN++ * 7 + 3) % pool.length], rk = !feature('real-sizes') || palm ? 1 : pk.startsWith('sf-pine-') ? 2 : 1.7;   // real-sizes (55, одитът на f1): дърветата бяха 5,5–6,5 м — истинските са 9–12 м, боровете 10–12 м
+  return [pk, scale * (sz.max.y - sz.min.y) * (palm ? 1.35 : 1.15) * rk];
 }
 const plazaTree = h => { const sz = sizeOf('tree-large'); return model('tree-large', h / (sz.max.y - sz.min.y)); };   // дърво с височина ~h (по-истинско — niceTree)
 // ⚡ флаг perf-fix (perf-report #4): частите вътре в статичен модел (сграда, дърво) не мърдат — матриците им се смятат веднъж,

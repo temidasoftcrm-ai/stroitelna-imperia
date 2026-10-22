@@ -65,24 +65,26 @@ const EMERG = {
 };
 // почиства модел на кола: маха плоските мешове (сянка/земя под колата — от тях amb-eu беше квадрат 5,8×5,8 и наполовина висок);
 // връща завъртането, ако колата лежи по x (дължината трябва да е по z)
+// real-sizes (55, одитът на f1): дължината е по каталога, но не по-широка от 2,6 м (пожарната излизаше 3,6 м широка) — еднакво по осите
+const capW = (k, W0) => feature('real-sizes') && W0 * k > 2.6 ? 2.6 / W0 : k;
 function tidyCar(sc) {
   sc.updateMatrixWorld(true); const all = new THREE.Box3().setFromObject(sc), S = all.getSize(new THREE.Vector3()), big = Math.max(S.x, S.y, S.z), drop = [];
   sc.traverse(m => { if (m.isMesh) { const b = new THREE.Box3().setFromObject(m), s = b.getSize(new THREE.Vector3()); if (s.y < big * 0.01 && Math.max(s.x, s.z) > big * 0.5) drop.push(m); } });
   for (const m of drop) m.parent.remove(m);
   sc.updateMatrixWorld(true); const s2 = new THREE.Box3().setFromObject(sc).getSize(new THREE.Vector3());
-  return s2.x > s2.z * 1.15 ? [Math.PI / 2, s2.x] : [0, s2.z];   // [завъртане, дължина]
+  return s2.x > s2.z * 1.15 ? [Math.PI / 2, s2.x, s2.z] : [0, s2.z, s2.x];   // [завъртане, дължина, ширина]
 }
 // спешна кола за оперативните карти (ops3d.js, opskit.js): копие на модела, почистено и обърнато като в играта, дължина len (м),
 // светлинната лента/бурканите (kind: police | fire | ambulance); светят, докато car.userData.beaconsOn е истина (сирените — от картата)
 // модели с предница към −Z (вървят на заден ход, ако не се обърнат)
 export const CAR_FLIP = new Set(['amb-eu']);
-export function emergCar(src, len, kind = 'police', name = '') { const sc0 = src.clone(true); sc0.traverse(m => { if (m.isMesh) m.castShadow = false; }); const [yaw, L0] = tidyCar(sc0), sc = wrap(sc0, yaw + (CAR_FLIP.has(name) ? Math.PI : 0), len / L0); addBeacons(sc, len, kind); sc.userData.noSiren = 1; return sc; }
+export function emergCar(src, len, kind = 'police', name = '') { const sc0 = src.clone(true); sc0.traverse(m => { if (m.isMesh) m.castShadow = false; }); const [yaw, L0, W0] = tidyCar(sc0), k = capW(len / L0, W0), sc = wrap(sc0, yaw + (CAR_FLIP.has(name) ? Math.PI : 0), k); addBeacons(sc, L0 * k, kind); sc.userData.noSiren = 1; return sc; }
 // отбелязаните в Лабораторията „Изтрий и намери нов подобен“: флагът (одобреният) остава, файлът — новият модел (55)
 const EMERG_FILE = { 'fire-us': 'fire-us2', 'pol-volga': 'pol-vaz' };   // Firetruck (OzerGokmen, CC BY) · VAZ 2101 Road Police (eightismore, CC BY)
 export function loadPoliceCars(load, A) {
   return Promise.all(Object.entries(EMERG).map(([nm, opts]) => {
     const ok = opts.filter(([f]) => feature(f)); if (!ok.length) return null;
-    return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + (feature('sirens-real') ? 'sirens/' : '') + (EMERG_FILE[f] || f) + '.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = false; }); const [yaw, L0] = tidyCar(g.scene), K = EMERG_K[nm] * len * M_PER, sc = wrap(g.scene, yaw + (CAR_FLIP.has(f) ? Math.PI : 0), K / L0); /* мащабът е във вътрешната група — model() пипа само външния */ addBeacons(sc, K, nm === 'Firetruck' ? 'fire' : nm === 'Ambulance' ? 'ambulance' : 'police'); return sc; }).catch(() => null)))
+    return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + (feature('sirens-real') ? 'sirens/' : '') + (EMERG_FILE[f] || f) + '.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = false; }); const [yaw, L0, W0] = tidyCar(g.scene), K = L0 * capW(EMERG_K[nm] * len * M_PER / L0, W0 / M_PER) /* real-sizes: ширината ≤ 2,6 м */, sc = wrap(g.scene, yaw + (CAR_FLIP.has(f) ? Math.PI : 0), K / L0); /* мащабът е във вътрешната група — model() пипа само външния */ addBeacons(sc, K, nm === 'Firetruck' ? 'fire' : nm === 'Ambulance' ? 'ambulance' : 'police'); return sc; }).catch(() => null)))
       .then(list => { list = list.filter(Boolean); if (list.length) A['sf-car-' + nm] = { scene: list[0], variants: list }; });
   }));
 }
