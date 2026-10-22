@@ -156,6 +156,7 @@ const DEMOS = [
   ['📏 Панелните блокове и секциите им в истински размер (червеното — човек 1,8 м)', 'plovdiv', d => { d.sectRow(); setTimeout(() => d.sectRow(), 3000); }],   // real-sizes (d129)
   ['🌃 Нощните прозорци — по-приглушени (Чикаго, 22:00)', 'chicago', d => { d.time(22); d.lookLm(0, 260); setTimeout(() => { d.time(22); d.lookLm(0, 260); }, 4000); }],   // night-dim
   ['🏷️ Емблемите на марките нощем — светещите акценти', 'sofia', d => { for (const ms of [0, 4000]) setTimeout(() => { d.logoRow(1, 'titan', true); setTimeout(() => d.time(22), 300); }, ms); }],   // logo-glow
+  ['🪧 Билбордовете по местата: големите в покрайнините, без кръгови/кръстовища (Хасково, през 5 s следващият)', 'haskovo', d => { let i = 0; const go = () => { const r = d.bbLook(i, 60); if (r) { i = (i + 1) % r[1]; setTimeout(go, 5000); } }; setTimeout(go, 3000); }],   // bb-place
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

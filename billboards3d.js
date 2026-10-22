@@ -35,7 +35,7 @@ function design(i, b) {
 // обикновена — среден 6 × 2,5, през две — малък; мега и въртящият се — само ръчно (o.sizes, Лабораторията), никога на стълб до пътя
 const sizeFor = (i, r) => r.main || (r.w || 0) >= 14 ? 'large' : i % 3 === 2 ? 'small' : 'medium';
 // местата: по най-дългите булеварди, през ~gap м, отстъп от оста = половината ширина + 3 м, редуват се страните; не по-близо от 0,6·gap един до друг
-export function billboardSpots(roads, { max = 8, gap: gap0, widthOf } = {}) {
+export function billboardSpots(roads, { max = 8, gap: gap0, widthOf, avoid, sizeAt } = {}) {   // avoid(x, z, fw, ax, az) → true: не тук (кръстовище, кръгово, централата); sizeAt(x, z, r, i) → размерът по мястото
   const out = [], L = r => { let s = 0; for (let i = 1; i < r.pts.length; i++) s += Math.hypot(r.pts[i][0] - r.pts[i - 1][0], r.pts[i][1] - r.pts[i - 1][1]); return s; };
   const list = roads.filter(r => r.pts && r.pts.length > 1).map(r => ({ r, len: L(r) })).filter(q => q.len > 45).sort((a, b) => (b.r.main ? 1e9 : 0) + b.len - ((a.r.main ? 1e9 : 0) + a.len));   // булевардите (main) първо; плановете от картата са на къси отсечки
   const tot = list.reduce((t, q) => t + q.len, 0), gap = gap0 || Math.max(70, Math.min(220, tot / (max + 1)));   // малките градове — по-гъсто, иначе се събира един
@@ -45,8 +45,9 @@ export function billboardSpots(roads, { max = 8, gap: gap0, widthOf } = {}) {
     for (let i = 1; i < r.pts.length && out.length < max; i++) {
       const [x0, z0] = r.pts[i - 1], [x1, z1] = r.pts[i], d = Math.hypot(x1 - x0, z1 - z0); if (d < 1e-6) continue;
       while (acc + d >= next && out.length < max) {
-        const f = (next - acc) / d, x = x0 + (x1 - x0) * f, z = z0 + (z1 - z0) * f, dx = (x1 - x0) / d, dz = (z1 - z0) / d, nx = -dz * side, nz = dx * side, k = sizeFor(out.length, r), fw = widthOf ? widthOf(out.length, k) : 12, off = (r.w || 12) / 2 + 2 + fw / 2 * 0.95;   // платното е напречно на пътя — отстъп колкото половината му ширина
+        const f = (next - acc) / d, x = x0 + (x1 - x0) * f, z = z0 + (z1 - z0) * f, dx = (x1 - x0) / d, dz = (z1 - z0) / d, nx = -dz * side, nz = dx * side, k = (sizeAt && sizeAt(x, z, r, out.length)) || sizeFor(out.length, r), fw = widthOf ? widthOf(out.length, k) : 12, off = (r.w || 12) / 2 + 2 + fw / 2 * 0.95;   // платното е напречно на пътя — отстъп колкото половината му ширина
         const p = { x: x + nx * off, z: z + nz * off, ry: Math.atan2(dx * side, dz * side) + side * 0.35 };   // лицето — срещу идващите коли, леко към платното
+        if (avoid && avoid(p.x, p.z, fw, x, z)) { next += 12; continue; }   // забранено място — малко по-нататък по улицата
         if (!out.some(q => Math.hypot(q.x - p.x, q.z - p.z) < Math.max(gap * 0.6, (fw + (q.fw || 12)) / 2 + 4))) { p.fw = fw; p.k = k; out.push(p); side = -side; }
         next += gap;
       }

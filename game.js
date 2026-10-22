@@ -2862,6 +2862,20 @@ function enterCity() {
 const BB_PANO = [{ url: 'assets/ui/billboards/imperial-3.webp', logo: 'center', over: true }, { url: 'assets/ui/billboards/imperial-4.webp', logo: 'center', over: true }];
 const BB_IMAGES = { imperial: [{ url: 'assets/ui/billboards/imperial-1.webp', logo: 'left' }, { url: 'assets/ui/billboards/imperial-2.webp', logo: 'right' }, ...BB_PANO] };
 const isImperial = b => !!b && /империал|imperial/i.test(`${b.nm} ${b.k}`), bbImages = b => isImperial(b) ? BB_IMAGES.imperial : BB_PANO;
+// bb-place (т. 10/19): билбордовете не на кръстовища, кръгови (пръстенът + 15 м), зебри и до централата; големите 12 × 4 — само в покрайнините (към изходите), в центъра — средни и малки
+function bbPlaceOpts() {
+  if (!feature('bb-place')) return {};
+  const P = city.plan, p2 = P && P.p2, off = (P && P.offset) || [0, 0], bad = [];
+  if (p2) { for (const n of p2.nodes || []) { const rd = (p2.rounds || []).find(r => r.node === n.id); if (rd) bad.push([n.x + off[0], n.z + off[1], rd.outer + 15]); else if ((n.arms || []).length >= 3) bad.push([n.x + off[0], n.z + off[1], (n.r || 8) + 16]); } }   // кръстовището + зебрите + стоп линията
+  else if (P && P.nodes) for (const n of P.nodes) if (n.x != null && ((n.deg || 0) >= 3 || n.square)) bad.push([n.x, n.z, (n.r || 8) + 16]);
+  if (city.hq) bad.push([city.hq.x, city.hq.z, 45]);   // централата, гаражът и складът до нея
+  const pc = p2 && p2.center, c = p2 ? [(pc ? (pc.x ?? pc[0]) : 0) + off[0], (pc ? (pc.z ?? pc[1]) : 0) + off[1]] : city.hq ? [city.hq.x, city.hq.z] : [0, 0], R = (p2 && p2.R) || 300;
+  return {
+    avoid: (x, z, fw, ax, az) => bad.some(([bx, bz, r]) => Math.hypot(x - bx, z - bz) < r + fw / 2 || Math.hypot(ax - bx, az - bz) < r)
+      || (city.lots || []).some(l => l.plan && Math.hypot(x - l.x, z - l.z) < Math.min(l.w, l.d) / 2 + fw / 4),   // не върху парцел (строеж, сграда или бъдеща сграда)
+    sizeAt: (x, z, r, i) => Math.hypot(x - c[0], z - c[1]) > R * 0.62 && (r.main || (r.w || 0) >= 14) ? 'large' : i % 2 ? 'small' : 'medium',
+  };
+}
 function billboardRoads() {
   const P = city.plan;
   if (P && P.streets && P.streets.length) { const main = P.streets.filter(s => s.cls === 'blvd' || s.cls === 'ring' || (s.w || 0) >= 14).map(s => ({ ...s, main: true })), wide = P.streets.filter(s => !main.some(m => m.id === s.id && m.pts === s.pts) && (s.w || 0) >= 9 && s.cls !== 'blvd' && s.cls !== 'ring'); if (main.length + wide.length) return [...main, ...wide]; }   // булевардите първо, после широките улици
@@ -2931,7 +2945,7 @@ function setupWorld() {
   S.rails = S.rails || []; S.trains = S.trains || []; S.jobs = S.jobs || [];
   controls.target.set(city.hq.x, 0, city.hq.z);
   camera.position.set(city.hq.x + 55, 85, city.hq.z + 90);
-  if (feature('billboards')) try { const b = brandOf(S) || { nm: 'Титан', col: '#4fc3f7', ico: '🗿' }; city.billboards = buildBillboards(city.group, { roads: billboardRoads(), brand: b, company: `${b.nm} Констръкшън`, years: Math.max(1, Math.floor((S.day || 1) / 360)), images: bbImages(b), designs: !isImperial(b) }); } catch (e) { console.warn('billboards', e); }
+  if (feature('billboards')) try { const b = brandOf(S) || { nm: 'Титан', col: '#4fc3f7', ico: '🗿' }; city.billboards = buildBillboards(city.group, { roads: billboardRoads(), ...bbPlaceOpts(), brand: b, company: `${b.nm} Констръкшън`, years: Math.max(1, Math.floor((S.day || 1) / 360)), images: bbImages(b), designs: !isImperial(b) }); } catch (e) { console.warn('billboards', e); }
 }
 
 function freeLots(type) {
@@ -10277,7 +10291,7 @@ if (AUTOTEST) {
     districts: (cmd, k) => districtsDbg(cmd, k),   // 🏡 districts-look: 'diag' | 'nodiag' | 'focus' | 'off' | 'on' | (числата)
     fireTest(sev = 1, travel) { const tg = controls.target; const L = city.lots.filter(l => l.obj && l.built && !l.busy).sort((a, b) => Math.hypot(a.x - tg.x, a.z - tg.z) - Math.hypot(b.x - tg.x, b.z - tg.z))[0]; if (!L) return null; const f = fires.start(L.id, { sev, travel }); flyTo(L); return f && f.id; },   // 🔥 fire-seq: пожар в най-близката сграда
     fires: () => fires.state(),
-    bbRebuild(brand) { if (brand) S.brand = brand; if (city.billboards) city.billboards.dispose(); const b = brandOf(S) || { nm: 'Титан', col: '#4fc3f7', ico: '🗿' }; city.billboards = buildBillboards(city.group, { roads: billboardRoads(), brand: b, company: `${b.nm} Констръкшън`, years: Math.max(1, Math.floor((S.day || 1) / 360)), images: bbImages(b), designs: !isImperial(b) }); return city.billboards.spots.length; },
+    bbRebuild(brand) { if (brand) S.brand = brand; if (city.billboards) city.billboards.dispose(); const b = brandOf(S) || { nm: 'Титан', col: '#4fc3f7', ico: '🗿' }; city.billboards = buildBillboards(city.group, { roads: billboardRoads(), ...bbPlaceOpts(), brand: b, company: `${b.nm} Констръкшън`, years: Math.max(1, Math.floor((S.day || 1) / 360)), images: bbImages(b), designs: !isImperial(b) }); return city.billboards.spots.length; },
     bbRow(brand, night) {   // 🪧 демо: петте размера в редица до града (малък, среден, голям, мега, въртящ се)
       if (brand) S.brand = brand; if (city.bbRow) city.bbRow.dispose(); const b = brandOf(S) || { nm: 'Титан', col: '#4fc3f7', ico: '🗿' }, x0 = tx(NI - 1) + 60, z0 = tx(0) - 40;
       const SZ = ['small', 'medium', 'large', 'mega', 'rotating'], W = [3, 8, 14, 26, 11]; let x = x0; const spots = SZ.map((k, i) => { x += (i ? W[i - 1] / 2 : 0) + W[i] / 2 + 6; return { x, z: z0, ry: 0 }; });
@@ -10868,6 +10882,7 @@ if (AUTOTEST) {
         const t = label(`ниво ${lv}`, '#ffffff', 5); t.position.set(x + w / 2, 18, z0 + 20); g.add(t); x += w + 10; }
       city.group.add(g); showMap(false); this.tod(0.2); const cx = (tx(0) + x) / 2; this.camAt(cx, x * 0.35, z0 + 20 + x * 0.55, cx, 0, z0 + 20); return { width: Math.round(x - tx(0)), loaded: Object.keys(A).filter(k => k.startsWith('wh2-')).length }; },
     garage: () => ({ office: S.officeLevel, garage: S.garageLevel, lot: S.garageLot, wh: S.whLevel, whLot: S.whLot, stock: { ...econ.s.stock }, crews: crewCount(), machines: machineCount(), own: projects.filter(p => p.own).map(p => `${p.type}:${p.stage}:${p.prog.toFixed(2)}`) }),
+    bbLook(i = 0, dist = 70) { const q = city.billboards && city.billboards.spots[i]; if (!q) return null; showMap(false); fly = null; controls.target.set(q.x, 5, q.z); camera.position.set(q.x + dist * 0.6, dist * 0.7, q.z + dist * 0.8); return [q.k, city.billboards.spots.length]; },   // bb-place: камерата при i-тия билборд
     look(lotId, dist = 34) { const l = lotId == null ? city.hq : city.lots[lotId]; controls.target.set(l.x, 3, l.z); camera.position.set(l.x + dist * 0.7, dist * 0.75, l.z + dist); fly = null; },
     cash: () => (S.cash || []).map(c => c.lot),
   };
