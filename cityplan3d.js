@@ -208,7 +208,7 @@ export function buildPlanView(P0, opts = {}) {
   g.add(mesh(...pl, M.plaza));
   if (!opts.noFountain && opts.fountainProto) { const f = opts.fountainProto.clone(true); const fr = Math.min(feature('real-sizes') ? 3.4 : 6.5, sq.r * 0.33); f.scale.setScalar(fr); f.position.set(sq.x, 0.08, sq.z);   /* real-sizes (55): моделът е 2,08 м широк → басейн ~7 м, не 13,5 м */ f.traverse(o => { if (o.isMesh) o.castShadow = true; }); g.add(f);
     if (opts.benchProto) {   // пейки в кръг около фонтана, с лице към него
-      const bp = opts.benchProto, bb = new THREE.Box3().setFromObject(bp), bs = bb.getSize(new THREE.Vector3()), k = 2.2 / Math.max(bs.x, bs.z), R = fr / 2 + 4.5;
+      const bp = opts.benchProto, bb = new THREE.Box3().setFromObject(bp), bs = bb.getSize(new THREE.Vector3()), k = bp.userData.real ? 1 : 2.2 / Math.max(bs.x, bs.z), R = fr / 2 + 4.5;   // yards-real: истинската пейка — в истински размер
       for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + Math.PI / 8, b = bp.clone(true); b.scale.setScalar(k); b.position.set(sq.x + Math.cos(a) * R, 0.08 - bb.min.y * k, sq.z + Math.sin(a) * R); b.rotation.y = -a - Math.PI / 2; b.traverse(o => { if (o.isMesh) o.castShadow = true; }); detail.add(b); }
     }
   }   // истинският фонтан (plants-real)

@@ -36,7 +36,7 @@ import { createResorts, RESORTS, seasonOf, monthName } from './resorts.js';
 import { buildResortView, RESORT_MODELS } from './resortview.js';
 import { createDemolition } from './demolish.js';
 import { createDemolition2, machineWork, craneLift, loadSiteRigs, rigPlay, swapRig } from './sitework.js';
-import { createDistricts } from './districts.js';   // 🏡 districts-look (55): дворове, паркове и площадки в кварталите на плана v2
+import { createDistricts, parkLayout, parkMesh } from './districts.js';   // 🏡 districts-look (55): дворове, паркове и площадки в кварталите на плана v2
 import { siteK, realScaleK, REAL_BLD, TOO_LONG, kidK, SECTIONS, sectName, pickSection } from './scale.js';   // 🏗️ флаг site-anim: истински кран при събаряне, машините работят, кранът вдига
 import { createEvents } from './events.js';
 import { createWeather, rollWeather } from './weather.js';
@@ -1051,7 +1051,7 @@ function buildCity(cityId) {
   const pv = P && P.p2 ? plan2.view.buildPlan2View(P.p2, { realSigns: feature('road-signs'), streetReal: feature('street-real'), treeModels: plan2Trees(), roadGeo: feature('road-geo') && !P.osm, ...(feature('plants-real') && A['pl-bush-0'] ? { plants: [A['pl-bush-0'].scene.clone(true)].map(o => (o.scale.setScalar(1.8), o)), fountain: A['pl-fountain']?.scene } : {}),   /* #13: островът на кръговото — истински храсти и фонтан (без тях — цветните точки) */ osm: P.p2.osmData, offset: P.offset, termini: !!P.osm, seaPort: feature('sea-coast') && SEASIDE.includes(cityId) && !P.osm, blocks: !!P.osm, ...(P.osm && feature('city-prog') && P.square && P.toPlan ? { progressive: true, focus: P.toPlan(P.square.x, P.square.z) } : {}),   /* поетапно: първо терен и улици около централата */ ...(P.osm ? plan2Opts(cityId) : {}), stationModel: plan2.models[{ paris: 'lm-lazare2', newyork: 'lm-gc2' }[cityId]] || A['station-big']?.scene, ...(cityId === 'newyork' && plan2.models['lm-gc2'] ? { stationFacing: { face: '-z', depth: 0.8, maxW: 48 } } : {}), fillLot: L2 => { if (!P.osm) return false; const l = city.p2Map && city.p2Map.get(L2.id); return !l || l.busy === 'bg'; },
       ...(feature('free-plots') ? { freeLot: L2 => { const l = city.p2Map && city.p2Map.get(L2.id); return !!l && !l.busy && !l.built && !l.reno && !l.under && !l.obj; } } : {}) })   // свободните парцели — празни места с ограда и табела   // Рим: фоновите квартали — върху парцелите, които играта не ползва
     : P ? buildPlanView({ ...P, streets: [...P.streets, ...P.links] }, { streetReal: feature('street-real'), size: Math.max(1600, 2 * (tx(NI - 1) + 400)), seg: 170, target: controls.target, lotCount: Math.min(P.lots.length, planCount(P.mega, S.cityExt || 0)),
-    seaZ: SEASIDE.includes(cityId) ? tx(0) - TILE / 2 - 2 : null, noFountain: !!CITY_LANDMARKS[cityId], plantProtos: ['pl-bush-0', 'pl-bush-1', 'pl-bush-2', 'pl-flowers'].filter(k => A[k]).map(k => A[k].scene), fountainProto: A['pl-fountain']?.scene, benchProto: A.bench?.scene, treeProtos: Object.keys(A).filter(k => k.startsWith('sf-tree-') || k.startsWith('sf-pine-')).map(k => { const o = A[k].scene; o.userData.pine = k.startsWith('sf-pine-'); return o; }) }) : null;
+    seaZ: SEASIDE.includes(cityId) ? tx(0) - TILE / 2 - 2 : null, noFountain: !!CITY_LANDMARKS[cityId], plantProtos: ['pl-bush-0', 'pl-bush-1', 'pl-bush-2', 'pl-flowers'].filter(k => A[k]).map(k => A[k].scene), fountainProto: A['pl-fountain']?.scene, benchProto: (feature('yards-real') && yardReal()?.bench) || A.bench?.scene, treeProtos: Object.keys(A).filter(k => k.startsWith('sf-tree-') || k.startsWith('sf-pine-')).map(k => { const o = A[k].scene; o.userData.pine = k.startsWith('sf-pine-'); return o; }) }) : null;
   weather.setGround(pv ? pv.userData.groundMat : ground.material);   // снежната покривка оцветява земята
   // крайбрежните градове: море на север с плаж, пристанище, фар и кораби (seaside.js)
   city.airport = null; city.airportNI = 0; city.airSite = null; refreshAirport3D(cityId);
@@ -1208,7 +1208,7 @@ function decorLot(g, lot, cityId) {
       return true; } }
   if (kind < 2 || isDesert(cityId) || !A['pl-bush-0']) return false;   // градинките — с истинските растения
   const rr = (k => () => ((k = Math.imul(k ^ (k >>> 15), 2246822507) >>> 0) % 1000) / 1000)(h || 1);
-  const L = lot.plan ? Math.min(lot.w, lot.d) / 2 - 1.5 : 7, rot = lot.plan ? lot.rot || 0 : 0, c = Math.cos(rot), sn = Math.sin(rot);
+  const L = lot.plan ? Math.min(lot.w, lot.d) / 2 - 1.5 : 7, rot = lot.plan ? lot.rot || 0 : 0, c = Math.cos(rot), sn = Math.sin(rot), yr = feature('yards-real') && yardReal();   // yr — 🛝 yards-real: истинските модели
   const at = (o, u, v, y = 0) => { o.position.set(lot.x + u * c + v * sn, y, lot.z - u * sn + v * c); o.userData.detail = true; g.add(o); (lot.trees = lot.trees || []).push(o); return o; };
   const flat = (w, d, col, u = 0, v = 0, y = 0.14) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: col, roughness: 1 })); m.rotation.y = rot; m.receiveShadow = true; return at(m, u, v, y); };   // y — над плочата на парцела (в плана е на 0.04)
   const box = (w, hh, d, col, u, v, y) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, hh, d), new THREE.MeshStandardMaterial({ color: col, roughness: 0.8 })); m.rotation.y = rot; m.castShadow = true; return at(m, u, v, y + hh / 2); };
@@ -1220,9 +1220,22 @@ function decorLot(g, lot, cityId) {
       for (let k = 0; k < 5; k++) put(['flower_redA', 'flower_yellowA', 'flower_purpleA'][(k + su + 2) % 3], 2.6, su * (2 + rr() * (L - 3)), sv * (2 + rr() * (L - 3)));
       put(rr() < 0.5 ? 'plant_bushLarge' : 'plant_bushDetailed', 3.2, su * (L - 1.2), sv * (L - 1.2));
     }
-    for (const sv of [-1.5, 1.5]) { box(2.2, 0.12, 0.6, 0x8a5a33, 0, sv, 0.45); box(0.12, 0.45, 0.5, 0x333333, -0.9, sv, 0); box(0.12, 0.45, 0.5, 0x333333, 0.9, sv, 0); }
+    for (const sv of [-1.5, 1.5]) { if (yr) { const b = yr.bench.clone(true); b.rotation.y = rot + (sv > 0 ? Math.PI : 0); at(b, 0, sv, 0.04); continue; }   /* yards-real: истинската пейка, с лице към алеята */ box(2.2, 0.12, 0.6, 0x8a5a33, 0, sv, 0.45); box(0.12, 0.45, 0.5, 0x333333, -0.9, sv, 0); box(0.12, 0.45, 0.5, 0x333333, 0.9, sv, 0); }
     const t = model('tree-large', rand(6, 8)); at(t, L * 0.55, -L * 0.55);
     if (A['pl-fountain'] && h % 2) { const f = model('pl-fountain', 3.2); at(f, 0, 0); }   // фонтан на кръстопътя на алеите
+  } else if (kind === 3 && yr) {   // 🅿️ yards-real (№31): истински паркинг — места 2,5 × 5 м (бусове 3 × 6), пътека 6 м, отбивка до тротоара, стрелки, бордюр
+    const w = lot.plan ? lot.w : 2 * L + 3, d = lot.plan ? lot.d : 2 * L + 3, Lp = parkLayout(w - 1, d - 1); if (!Lp.n) return false;
+    const pg = parkMesh(Lp, lot.plan ? 2.3 : 0.5); pg.rotation.y = rot; at(pg, 0, 0, 0);
+    const real = Object.keys(A).filter(n => n.startsWith('sf-car-') && !/Bus|Truck|Firetruck|Ambulance|Police|Limousine|Van/.test(n)), cars = real.length ? real : ['sedan', 'suv', 'hatchback-sports', 'taxi'].filter(n => A[n]), van = A['sf-car-Van'] ? 'sf-car-Van' : A.van ? 'van' : null; let nc = 0;   // истинските коли още не са заредени при първия строеж → тези на Kenney
+    Lp.spots.forEach(([a, b, da, db, isVan], k) => { if (nc >= 8 || ((h >>> (k % 24)) & 3) === 0 || rr() < 0.3) return; const n = isVan && van ? van : cars[(h + k * 7) % Math.max(1, cars.length)]; if (!n || !A[n]) return;
+      const o = model(n, n.startsWith('sf-') ? 1 : kidK(n, 1.15)), back = rr() < 0.25 ? Math.PI : 0; o.traverse(m => { if (m.isMesh && [].concat(m.material).some(x => x.transparent && x.opacity < 0.9)) m.visible = false; });   /* паркираните — без лъчите на фаровете */ o.rotation.y = rot + Math.atan2(da, db) + back; at(o, a, b, 0.13); nc++; });
+  } else if (kind === 4 && yr) {   // 🛝 yards-real (№42.1): истинската детска площадка (по региона), върху настилка — пръст, пясък или гума
+    const keys = yardRegion() === 'west' ? ['play-tower', 'play-small', 'play-swings'] : ['play-swings', 'play-small', 'play-tower'], room = 2 * L + 2;
+    for (const k of [keys[(h >>> 5) % 3], ...keys]) { if (!yr[k]) continue; const sz = new THREE.Box3().setFromObject(yr[k]).getSize(new THREE.Vector3()), turn = sz.z > sz.x; if (Math.max(sz.x, sz.z) + 1 > room) continue;   /* дългата страна — по улицата */
+      const sw = Math.max(sz.x, sz.z) + 1.2, sd = Math.min(sz.x, sz.z) + 1.2; flat(sw, sd, k === 'play-swings' ? 0x9a8466 : k === 'play-small' ? 0xe0cc95 : 0xb5523b, 0, 0, 0.13);
+      const o = yr[k].clone(true); o.rotation.y = rot + (turn ? Math.PI / 2 : 0); at(o, 0, 0, 0.13);
+      if (sd / 2 + 1.6 < L + 1) { const b = yr.bench.clone(true); b.rotation.y = rot; at(b, 0, -sd / 2 - 1.1, 0.13); }   // пейката — с лице към площадката
+      break; }
   } else if (kind === 3) {   // паркинг: асфалт, маркировка, 2–4 коли
     flat(L * 2, L * 1.6, 0x4a4d52, 0, 0, 0.13);
     for (let k = -2; k <= 2; k++) flat(0.15, L * 0.6, 0xf2f2f2, k * 2.8, -L * 0.45, 0.15), flat(0.15, L * 0.6, 0xf2f2f2, k * 2.8, L * 0.45, 0.15);
@@ -1275,6 +1288,32 @@ function placeBuilding(lot, n, rot = 0) {
   if (feature('lot-paths')) pathsDirty();
   return o;
 }
+// 🛝 (yards-real) истинските пейки, площадки и огради (assets/heavy/street): всяка част — в истински размер (само равномерен мащаб),
+// основата в 0, центърът в (0, 0), дължината по x, лицето към +z; userData.len — стъпката, през която се редят модулите на оградата
+let yardRealC = null, yardsOff = false;   // yardsOff — Лабораторията: старите кутии за снимките „преди“ (__dbg.yardsLook)
+function yardReal() {
+  if (yardRealC) return yardRealC; const s = n => A['st-' + n]?.scene; if (!s('bench')) return null;
+  const norm = (o, k = 1, ry = 0, len = 0) => { const w = new THREE.Group(), c = o.clone(true); c.scale.setScalar(k); c.rotation.y = ry; w.add(c); w.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(w); c.position.set(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2); w.updateMatrixWorld(true); if (len) w.userData.len = len; return w; };
+  const R = { bench: norm(s('bench')) }; R.bench.userData.real = true;   // 2,0 × 0,9 × 0,72 м; real — cityplan3d.js не я мащабира
+  if (s('play-swings')) { const o = s('play-swings').clone(true), gr = []; o.traverse(m => { if (m.isMesh && /ground/.test(m.name)) gr.push(m); }); gr.forEach(m => m.removeFromParent()); R['play-swings'] = norm(o, 4 / 3742); }   // в сантиметри; лампата 3742 → 4 м, площадката ~7,9 × 6,9 м; плоската пръст на модела — махната (бие се с парцела)
+  if (s('play-tower')) R['play-tower'] = norm(s('play-tower'));   // 9,2 × 5,9 × 11,8 м
+  if (s('play-small')) R['play-small'] = norm(s('play-small'));   // 4,0 × 3,3 × 3,3 м
+  const fw = s('fence-wood'); if (fw) { [[1.5, 1.9], [0.5, 0.8], [-0.65, -0.3]].forEach(([z0, z1], i) => { R['f-wood' + i] = norm(pickPart(fw, 3.38, 5.42, z0, z1), 1, 0, 2); });   // дървена, варосана, сива: 2 × 1,11 м
+    R['f-wpost'] = norm(pickPart(fw, 2.2, 2.45, 1.5, 1.9)); R['f-wgate'] = norm(pickPart(fw, -6.8, -4.6, 1.5, 1.9)); }   // кол 1 м; портичката с арка 2 × 1,31 м
+  if (s('fence-iron')) R['f-iron'] = norm(s('fence-iron'), 1, 0, 2.85);   // ковано желязо 2,85 × 1,76 м
+  if (s('fence-cement')) R['f-cement'] = norm(pickPart(s('fence-cement'), -0.8, 0.9, -0.3, 0.2), 1.25, 0, 2);   // бетонна ажурна (стои изправена; колоните през 1,6 → ×1,25 = 2 м, висока 0,8 м)
+  if (s('fence-modern')) R['f-modern'] = norm(pickPart(s('fence-modern'), -0.6, 0.6, 1.6, 8.6), 1, Math.PI / 2, 6.45);   // модерна: две колони и дървени пана, 7,2 × 2,26 м
+  return (yardRealC = R);
+}
+// оградата на къщата по региона и мястото: селата и покрайнините — дървена; градът — желязна/бетонна (България — бетонна и дървена); Западът — модерна
+function yardFence(l) {
+  const c = cityById(S.cityId) || {}, cc = c.cc || '🇧🇬', h = hashStr('yf:' + S.cityId + ':' + l.id) % 100, east = cc === '🇧🇬' || EAST_CC.has(cc), z = l.zone || 'mid', small = (c.sz || 1) <= 1;
+  const wood = ['wood0', 'wood0', 'wood1', 'wood2'][h % 4];
+  if (small || z === 'outer') return east ? wood : h < 50 ? 'wood1' : h < 80 ? wood : 'modern';
+  if (east) return cc === '🇧🇬' ? (h < 55 ? 'cement' : h < 85 ? wood : 'iron') : (h < 45 ? 'iron' : h < 75 ? 'cement' : wood);
+  return h < 55 ? 'modern' : h < 85 ? 'iron' : 'wood1';
+}
+const yardRegion = () => { const cc = cityById(S.cityId)?.cc || '🇧🇬'; return cc === '🇧🇬' ? 'bg' : EAST_CC.has(cc) ? 'east' : 'west'; };
 // 🏡 (districts-look) дворове, паркове и площадки в кварталите на плана v2 (districts.js); districtsOff — за снимките „преди“
 let districtsOff = false;
 function districtsTick() {
@@ -1284,6 +1323,7 @@ function districtsTick() {
   let sig = 0; for (const l of city.lots) if (l.busy || l.built) sig = (sig * 31 + l.id * 3 + (l.busy ? 1 : 0) + (l.obj ? 2 : 0)) | 0;
   if (city.dl && sig === city.dlSig) return; city.dlSig = sig;
   if (!city.dl) { city.dlG = city.group; city.dl = createDistricts({ city, P, isHouse: n => HOUSES.includes(n) || /^h2-|^building-type-/.test(n), skip: () => new Set([city.hq?.id, S.garageLot, S.whLot]), lotPaths: feature('lot-paths'),
+    ...(feature('yards-real') && !yardsOff && yardReal() ? { real: yardReal(), region: yardRegion(), fenceStyle: yardFence, carsFn: () => ['Sedan', 'Hatchback', 'SUV', 'Muscle_2', 'Pickup', 'Van'].map(n => 'sf-car-' + n).filter(k => A[k]).map(k => [k, A[k].scene]) } : {}),   // 🛝 yards-real: истинските модели и паркингите
     treeProtos: plan2Trees(), bushProtos: ['pl-bush-0', 'pl-bush-1', 'pl-bush-2'].filter(k => A[k]).map(k => A[k].scene), cars: ['Sedan', 'Hatchback', 'SUV', 'Muscle_2', 'Pickup'].map(n => 'sf-car-' + n).filter(k => A[k]).map(k => [k, A[k].scene]) }); }
   city.dl.rebuild();
 }
@@ -10860,6 +10900,17 @@ if (AUTOTEST) {
     airTowerLook(lv = 7) { __dbg.airLook(lv); const g = city.airport?.group; if (!g) return null; g.updateMatrixWorld(true); let b = null; g.traverse(o => { if (o.isMesh && o.geometry?.type === 'SphereGeometry' && o.geometry.parameters?.radius === 0.6) b = o; }); if (!b) return 'nobeacon'; const v = b.getWorldPosition(new THREE.Vector3()), gp = g.getWorldPosition(new THREE.Vector3()); __dbg.camAt(v.x - 60, 25, v.z + 60, v.x, 10, v.z); return { beacon: [v.x | 0, v.y | 0, v.z | 0], group: [gp.x | 0, gp.y | 0, gp.z | 0] }; },
     addBranches(ids) { S.dev.xp = 260000; S.dev.lv = 10; S.branches = S.branches || []; S.cities = S.cities || {}; for (const id of ids) { if (!S.branches.includes(id)) S.branches.push(id); S.cities[id] = S.cities[id] || { ...newCityState(), left: nowDays() }; } contTick(); return ownedCities().length; },
     mineLook(kind = 'oilwell', lv = 2, d = 70) { S.mines = S.mines || { sites: [], seq: 0 }; const id = 'dbg-' + kind; S.mines.sites = S.mines.sites.filter(x => x.id !== id); S.mines.sites.push({ id, city: S.cityId, kind, lv, store: 0 }); refreshMines3D(); const o = city.mine3D[id]; if (!o) return null; const v = o.group.position; showMap(false); controls.target.set(v.x, 4, v.z); camera.position.set(v.x + d * 0.7, d * 0.55, v.z + d * 0.8); fly = null; return [Math.round(v.x), Math.round(v.z)]; },
+    // 🛝 yards-real: кварталът с дворове — къщи отвън, блокове в средата, офиси в центъра; mode 'houses' | 'blocks' | 'park' | 'decor3' (паркинг на празен парцел) | 'decor4' (площадка); off — старите кутии
+    yardsLook(mode = 'houses', h = 11, off = false, k = 0) { showMap(false); this.time(h); const id = S.cityId, dk = l => hashStr('dec:' + id + ':' + l.id) % 6;
+      if (!city.yardsFilled) { city.yardsFilled = true; for (const l of city.lots) { if (l.built || l.busy || l.big || (l.trees && (dk(l) === 3 || dk(l) === 4))) continue;
+        (l.trees || []).forEach(t => t.parent && t.parent.remove(t)); l.trees = null; const hh = hashStr('yl' + l.id), n = l.zone === 'center' || l.zone === 'business' ? 'building-j' : hh % 3 ? HOUSE_POOL[hh % HOUSE_POOL.length] : 'building-i'; placeBuilding(l, n, 0); S.built.push({ lot: l.id, model: n }); } }
+      yardsOff = off; if (city.dl) { city.dl.dispose(); city.dl = null; } city.dlSig = null; districtsTick(); const dl = city.dl;
+      const look = (l, d = 30) => { if (!l) return null; const r = l.rot || 0, fx = Math.sin(r), fz = Math.cos(r); this.camAt(l.x + fx * d + fz * d * 0.55, d * 0.75, l.z + fz * d - fx * d * 0.55, l.x, 0, l.z); return { lot: l.id, built: l.built, zone: l.zone, plan: !!l.plan, w: l.w, d: l.d, p2: !!city.plan?.p2, dl: !!city.dl }; };
+      const isH = l => l.obj && (HOUSES.includes(String(l.built)) || /^h2-|^building-type-/.test(String(l.built)));
+      if (mode === 'park') { const pl = dl ? dl.plays() : [], q = pl[k % Math.max(1, pl.length)], f = q ? { x: q[1], z: q[2] } : dl && dl.focus(); if (f) this.camAt(f.x + 16, 20, f.z + 22, f.x, 0, f.z); return { play: q, plays: pl.length, reals: dl && dl.reals(), focus: f, stats: dl && dl.stats() }; }
+      if (mode === 'decor3' || mode === 'decor4') return look(city.lots.filter(l => !l.obj && !l.busy && l.trees && dk(l) === +mode.slice(5))[k], 34);
+      if (mode === 'blocks') { const fp = (dl && dl.analysis && dl.analysis.freeParks) || [], p = fp[k % Math.max(1, fp.length)]; if (p) this.camAt(p.x + 30, 30, p.z + 36, p.x, 0, p.z); return { inLot: dl ? dl.parkLotsOf().length : 0, free: fp.length, p, cars: Object.keys(A).filter(k => k.startsWith('sf-car-')) }; }
+      return look(city.lots.filter(isH)[k], 26); },
     // street-real: камерата до k-тото кръстовище със светофар, ниско над улицата; night — 22:00, иначе обед. Връща височините на лампите (м)
     streetLook(k = 0, night = false, dist = 30) { const P2 = city.plan && city.plan.p2, off = (city.plan && city.plan.offset) || [0, 0];
       const J = P2 ? P2.nodes.filter(n => n.ctrl === 'signal').map(n => [n.x + off[0], n.z + off[1]]) : signals.map(s => [s.x, s.z]); this.time(night ? 22 : 12);
