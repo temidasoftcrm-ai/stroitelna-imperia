@@ -354,7 +354,7 @@ const COUNTRY_LABEL_WIDE = { ROU: [24.8, 45.6], SRB: [20.9, 44.2], MKD: [21.7, 4
 // need: колко единици от всеки тип трябва на обекта през етапа; work: обем (единица-дни × RATE)
 const RATE = 20;
 const BTYPES = {
-  house: { nm: 'Къща', ico: '🏠', reward: 28000, days: 8, rep: 0, repGain: 0.25,
+  house: { nm: 'Къща', ico: '🏠', reward: 28000, days: 11,   /* срокът — 11 дни (беше 8; потребителят 22.10) */ rep: 0, repGain: 0.25,
     stages: [{ nm: 'Изкоп', need: { loader: 1, crew: 1 }, work: 30 }, { nm: 'Основи', need: { truck: 1, crew: 1 }, work: 30 },
       { nm: 'Конструкция', need: { crew: 1 }, work: 50 }, { nm: 'Довършване', need: { crew: 1 }, work: 20 }] },
   shop: { nm: 'Магазин', ico: '🏪', reward: 75000, days: 12, rep: 1, repGain: 0.4,

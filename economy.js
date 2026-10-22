@@ -434,7 +434,7 @@ export class Economy {
   completionPayout(project, day) {
     const late = day - project.deadlineDay;
     let amount = project.reward, repDelta, note;
-    if (late > 0) { amount = Math.round(project.reward * Math.max(0.5, 1 - 0.1 * late)); repDelta = -Math.round(Math.min(0.3, 0.03 * late + (project.reward >= 150000 ? 0.1 : 0.05)) * 100) / 100; note = `закъснение ${late} дни`; }   // по-малко наказание: според закъснението и големината (макс. −0.3)
+    if (late > 0) { amount = Math.round(project.reward * Math.max(0.6, 1 - 0.05 * late)); repDelta = late <= 1 ? 0 : -Math.round(Math.min(0.15, 0.02 * (late - 1) + (project.reward >= 150000 ? 0.03 : 0.01)) * 100) / 100; note = `закъснение ${late} ${late === 1 ? 'ден' : 'дни'}`; }   // по-меко (потребителят 22.10): 1 ден гратис за звездите, −5% на ден (до −40%), звездите −0,03…−0,15
     else if (late <= -2) { amount = Math.round(project.reward * 1.1); repDelta = project.repGain * 1.5; note = 'предсрочно (+10%)'; }
     else { repDelta = project.repGain; note = 'навреме'; }
     this.earn(amount, 'обект', `${project.title} — ${note}`);
