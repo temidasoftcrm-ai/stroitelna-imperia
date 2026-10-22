@@ -60,6 +60,7 @@ export function addSeaside(group, deps, opts) {
   const { A, model } = deps, r = rnd(opts.seed || 777);
   const g = new THREE.Group(); group.add(g);
   const zE = opts.zEdge, x0 = opts.xMin - 400, x1 = opts.xMax + 400, beachD = 22, seaZ = zE - beachD;
+  const CO = feature('sea-coast') && opts.coast ? opts.coast : null;   // sea-coast: бреговата линия на плана v2 (крива) — тогава правият плаж, алеята, палмите и чадърите не се правят (планът си има свои по брега)
   const [rx1, rx2] = opts.railX || [-1e9, -1e9];
   // плаж и крайбрежна алея
   const sand = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, beachD), mat(0xe6d29a, 1)); sand.rotation.x = -Math.PI / 2; sand.position.set((x0 + x1) / 2, 0.01, zE - beachD / 2); sand.receiveShadow = true; g.add(sand);
@@ -73,7 +74,9 @@ export function addSeaside(group, deps, opts) {
     const s = new THREE.Mesh(geo, seaMat); s.position.set((a + b) / 2, 0.04, seaZ - seaD / 2); g.add(s);
     waves.push({ geo, base: Float32Array.from(geo.attributes.position.array) });
   }
+  if (CO) sand.visible = walk.visible = false;   // sea-coast: пясъкът и алеята — тези на плана, по брега
   const foam = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, 1.6), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 })); foam.rotation.x = -Math.PI / 2; foam.position.set((x0 + x1) / 2, 0.08, seaZ); g.add(foam);
+  if (CO) foam.visible = false;
   // жп насип през морето
   if (rx2 > rx1) { const e = box(rx2 - rx1, 1.2, seaD, mat(0x8f8a80, 1), (rx1 + rx2) / 2, -0.5, seaZ - seaD / 2, g); e.castShadow = false; }
   // палми по алеята
@@ -85,10 +88,10 @@ export function addSeaside(group, deps, opts) {
   };
   const sfp = [0, 1, 2, 3].map(i => `sf-palm-${i}`).filter(n => A && A[n]);   // хубавите палми (Sketchfab), ако са заредени
   let pk = 0; const INST = feature('perf-fix2'), inst = [];
-  for (let x = opts.xMin; x <= opts.xMax; x += 14) { const pn = sfp.length ? sfp[pk++ % sfp.length] : null, p = pn ? model(pn, 8 + r() * 3) : palm(); p.position.set(x + r() * 4, 0, zE - 6.5); if (sfp.length) p.rotation.y = r() * 6; g.add(p); if (pn) inst.push({ o: p, key: pn }); }
+  if (!CO) for (let x = opts.xMin; x <= opts.xMax; x += 14) { const pn = sfp.length ? sfp[pk++ % sfp.length] : null, p = pn ? model(pn, 8 + r() * 3) : palm(); p.position.set(x + r() * 4, 0, zE - 6.5); if (sfp.length) p.rotation.y = r() * 6; g.add(p); if (pn) inst.push({ o: p, key: pn }); }
   // чадъри на плажа
   const cols = [0xff5a5a, 0xffd23f, 0x3fa7ff, 0x50d18b];
-  if (INST) {   // ⚡ perf-fix2: 48 отделни мрежи → 2 (цветът — по инстанция)
+  if (CO) { /* sea-coast: чадърите — не по правата линия във водата */ } else if (INST) {   // ⚡ perf-fix2: 48 отделни мрежи → 2 (цветът — по инстанция)
     const poles = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.06, 0.06, 2.4), mat(0xeeeeee), 24), tops = new THREE.InstancedMesh(new THREE.ConeGeometry(1.7, 0.7, 10), mat(0xffffff), 24), col = new THREE.Color();
     for (let k = 0; k < 24; k++) {
       const x = opts.xMin + 20 + r() * (opts.xMax - opts.xMin) * 0.55, z = zE - 10 - r() * 9;
@@ -101,30 +104,35 @@ export function addSeaside(group, deps, opts) {
     const top = new THREE.Mesh(new THREE.ConeGeometry(1.7, 0.7, 10), mat(cols[k % 4])); top.position.set(x, 2.5, z); g.add(top);
   }
   // пристанище (източната част): кей, портални кранове, контейнери, товарен кораб
-  const px = opts.xMax - 60, pierZ = seaZ - 40;
-  box(110, 1.4, 70, mat(0xb8b4aa, 0.9), px, 0.5, seaZ - 34, g);
+  const px = CO && opts.port ? opts.port.x : opts.xMax - 60, pSeaZ = CO ? CO(px) - 3 : seaZ, pierZ = pSeaZ - 40;   // sea-coast: кейът — от брега пред пристанищния парцел на плана (3 м навътре във водата — до пясъка, не върху алеята)
+  // sea-coast: всичко на пристанището е в своя група, завъртяна по посоката на брега (допирателната в px) около точката на брега — кеят е перпендикулярен на брега
+  const pg = CO ? new THREE.Group() : g;
+  if (CO) { const th = -Math.atan((CO(px + 20) - CO(px - 20)) / 40), c = Math.cos(th), sn = Math.sin(th); pg.rotation.y = th; pg.position.set(px - (px * c + pSeaZ * sn), 0, pSeaZ - (-px * sn + pSeaZ * c)); g.add(pg); }
+  box(110, 1.4, 70, mat(0xb8b4aa, 0.9), px, 0.5, pSeaZ - 34, pg);
   const cranes = [], PL = createPortLights();
   // нощно осветление на кея: прожектори по брега и по ръба на кея
-  for (const [mx, mz] of [[-50, -2], [0, -2], [50, -2], [-50, -64], [0, -64], [50, -64]]) PL.mast(g, px + mx, seaZ + mz, { h: 20, r: 26 });
+  for (const [mx, mz] of [[-50, -2], [0, -2], [50, -2], [-50, -64], [0, -64], [50, -64]]) PL.mast(pg, px + mx, pSeaZ + mz, { h: 20, r: 26 });
   for (let k = 0; k < 3; k++) {
     const c = new THREE.Group(), red = mat(k % 2 ? 0xd62828 : 0x1f5fbf, 0.6);
     for (const [sx, sz] of [[-4, -3], [4, -3], [-4, 3], [4, 3]]) box(0.8, 22, 0.8, red, sx, 12, sz, c);
     box(10, 1.6, 8, red, 0, 23, 0, c); const boom = box(1.2, 1.2, 46, red, 0, 24.5, -14, c); boom.castShadow = true;
     box(3, 2.4, 3, mat(0xeeeeee), 0, 21, -4, c);
     PL.beaconAt(c, 0, 24.4, 0); PL.beaconAt(c, 0, 25.6, -36.5, 0.5);
-    c.position.set(px - 35 + k * 26, 1.2, pierZ + 8); g.add(c); cranes.push(c);
+    c.position.set(px - 35 + k * 26, 1.2, pierZ + 8); pg.add(c); cranes.push(c);
   }
   for (let k = 0; k < 40; k++) {
     const n = ['cargo-container-a', 'cargo-container-b', 'cargo-container-c'][k % 3];
     const real = useModel(A, model, n, 3.2), o = real || box(4.4, 3.5, 8.8, mat([0xd62828, 0x1f5fbf, 0x2d8f4e, 0xffb300][k % 4], 0.7), 0, 0, 0, new THREE.Group());
-    o.position.set(px - 40 + (k % 10) * 8, 1.2 + Math.floor(k / 20) * 3.5, seaZ - 10 - Math.floor((k % 20) / 10) * 10); o.rotation.y = Math.PI / 2;
+    o.position.set(px - 40 + (k % 10) * 8, 1.2 + Math.floor(k / 20) * 3.5, pSeaZ - 10 - Math.floor((k % 20) / 10) * 10); o.rotation.y = Math.PI / 2;
+    if (CO && opts.port && opts.port.lot) { const Lt = opts.port.lot, u = ((k % 10) - 4.5) * 7, v = (Math.floor((k % 20) / 10) - 0.5) * 14, cr = Math.cos(Lt.rot || 0), sr = Math.sin(Lt.rot || 0);   // sea-coast: контейнерният двор — на пристанищния парцел (не на кутия-склад)
+      o.position.set(Lt.x + u * cr + v * sr, (real ? 0 : 1.75) + Math.floor(k / 20) * 3.5, Lt.z - u * sr + v * cr); o.rotation.y = (Lt.rot || 0) + Math.PI / 2; }
     g.add(o); if (real) inst.push({ o, key: n });
   }
   let cargo = useModel(A, model, 'ship-cargo-a', 6);
-  if (cargo) { cargo.position.set(px, 0, pierZ - 18); cargo.rotation.y = Math.PI / 2; g.add(cargo); }
+  if (cargo) { cargo.position.set(px, 0, pierZ - 18); cargo.rotation.y = Math.PI / 2; pg.add(cargo); }
   // фар на вълнолома (западната част)
-  const lx = opts.xMin + 30, lz = seaZ - 90;
-  box(8, 1.2, 90, mat(0x8f8a80, 1), lx, 0.2, seaZ - 45, g);
+  const lx = opts.xMin + 30, lSeaZ = CO ? CO(lx) : seaZ, lz = lSeaZ - 90;   // вълноломът с фара — от брега
+  box(8, 1.2, 90, mat(0x8f8a80, 1), lx, 0.2, lSeaZ - 45, g);
   const tower = new THREE.Group();
   for (let k = 0; k < 6; k++) { const sgm = new THREE.Mesh(new THREE.CylinderGeometry(2.2 - k * 0.15, 2.3 - k * 0.15, 3, 16), mat(k % 2 ? 0xd62828 : 0xffffff, 0.6)); sgm.position.y = 1.5 + k * 3; tower.add(sgm); }
   const lamp = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 2, 12), new THREE.MeshStandardMaterial({ color: 0xfff2c0, emissive: 0xffd060, emissiveIntensity: 1.5 })); lamp.position.y = 19.5; tower.add(lamp);
@@ -147,17 +155,17 @@ export function addSeaside(group, deps, opts) {
     o.position.set(x, 0, z); g.add(o); boats.push({ o, x0: x, z, ph: r() * 6, sp: 0.4 + r() * 0.8 });
   }
   for (let k = 0; k < 8; k++) { const b = useModel(A, model, 'buoy', 1.6); if (!b) break; b.position.set(opts.xMin + k * 30, 0, seaZ - 30); g.add(b); ships.push({ o: b, ph: r() * 6 }); }
-  const sign = deps.label('⚓ ПРИСТАНИЩЕ', '#ffffff', 12); sign.position.set(px, 32, pierZ + 8); g.add(sign);
+  const sign = deps.label('⚓ ПРИСТАНИЩЕ', '#ffffff', 12); sign.position.set(px, 32, pierZ + 8); pg.add(sign);
 
   // ---- твоите кораби (Фаза „Пристанища“): на кей до старото пристанище, а един влиза/излиза от морето
   // list = [{ kind: 'container'|'bulk'|'tanker'|'cruise', state: 'docked'|'arriving'|'leaving' }]
   const SHIP = { container: ['ship-cargo-a', 6], bulk: ['ship-cargo-b', 6], tanker: ['ship-cargo-a', 6, 0x7a1f1f], cruise: ['ship-cargo-b', 6] /* докато истинският круизен не е зареден */, coaster: ['ship-small', 3], boat: ['boat-fishing-small', 2.6, null, 'boat-speed-a'] };
-  const fleetG = new THREE.Group(); g.add(fleetG);
-  const berthZ = seaZ - 69 - 9;
+  const fleetG = new THREE.Group(); pg.add(fleetG);
+  const berthZ = pSeaZ - 69 - 9;
   let movers = [], portLv = 0, lastFleet = [];
   // кейове: 2 пред стария кей, още 2 пред разширението (ниво 4+); останалите кораби чакат на котва
   // [x, ръбът на кея по z]; морето е към −z
-  const berthsAt = () => [[px - 27, seaZ - 69], [px + 27, seaZ - 69], ...(portLv >= 4 ? [[px - 108, seaZ - 55], [px - 72, seaZ - 55]] : [])];
+  const berthsAt = () => [[px - 27, pSeaZ - 69], [px + 27, pSeaZ - 69], ...(portLv >= 4 ? [[px - 108, pSeaZ - 55], [px - 72, pSeaZ - 55]] : [])];
   // половината ширина на кораба (по z, след завъртането) — за да стои до кея, а не в него
   const halfBeam = o => { o.position.set(0, 0, 0); o.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(o); return (b.max.z - b.min.z) / 2; };
   function makeShip(kind) {
@@ -178,7 +186,7 @@ export function addSeaside(group, deps, opts) {
       const B = berthsAt();
       const small = f.kind === 'boat' || f.kind === 'coaster';
       if (i < B.length) { o.rotation.y = Math.PI / 2; const hb = halfBeam(o); o.position.set(B[i][0], 0, B[i][1] - hb - (small ? 1 : 2)); }
-      else { o.position.set(px - 140 + (i - B.length) * 60, 0, seaZ - 230 - (i % 2) * 50); o.rotation.y = 0.3 + i; }   // на котва, чакат кей
+      else { o.position.set(px - 140 + (i - B.length) * 60, 0, pSeaZ - 230 - (i % 2) * 50); o.rotation.y = 0.3 + i; }   // на котва, чакат кей
       fleetG.add(o); ships.push({ o, ph: i * 1.7, fleet: true });
     });
     if (cargo) cargo.visible = !docked.length;   // декоративният кораб отстъпва кея на твоите
@@ -188,29 +196,29 @@ export function addSeaside(group, deps, opts) {
     });
   }
   // ниво на пристанището 0–5: всяко ниво добавя кранове, контейнери и складове около стария кей
-  const lvG = [1, 2, 3, 4, 5].map(() => { const q = new THREE.Group(); q.visible = false; g.add(q); return q; });
+  const lvG = [1, 2, 3, 4, 5].map(() => { const q = new THREE.Group(); q.visible = false; pg.add(q); return q; });
   { const blue = mat(0x1f5fbf, 0.6), red = mat(0xd62828, 0.6), shed = mat(0xb8bec6, 0.5, 0.4);
     const crane = (q, x, m) => { const c = new THREE.Group(); for (const [sx, sz] of [[-4, -3], [4, -3], [-4, 3], [4, 3]]) box(0.8, 22, 0.8, m, sx, 12, sz, c); box(10, 1.6, 8, m, 0, 23, 0, c); box(1.2, 1.2, 46, m, 0, 24.5, -14, c); PL.beaconAt(c, 0, 24.4, 0); PL.beaconAt(c, 0, 25.6, -36.5, 0.5); c.position.set(x, 1.2, pierZ + 8); q.add(c); cranes.push(c); };
     crane(lvG[0], px + 44, blue);
     for (let k = 0; k < 20; k++) {   // третият ред контейнери (истинските — boatsreal.js), иначе цветни кутии
       const o = useModel(A, model, ['cargo-container-a', 'cargo-container-b', 'cargo-container-c'][k % 3], 3.2);
-      if (o) { o.position.set(px - 40 + (k % 10) * 8, 1.2 + 7, seaZ - 10 - Math.floor(k / 10) * 10); o.rotation.y = Math.PI / 2; lvG[1].add(o); inst.push({ o, key: ['cargo-container-a', 'cargo-container-b', 'cargo-container-c'][k % 3] }); }
-      else box(4.4, 3.5, 8.8, mat([0xd62828, 0x1f5fbf, 0x2d8f4e, 0xffb300][k % 4], 0.7), px - 40 + (k % 10) * 8, 1.2 + 1.75 + 7, seaZ - 10 - Math.floor(k / 10) * 10, lvG[1]).rotation.y = Math.PI / 2;
+      if (o) { o.position.set(px - 40 + (k % 10) * 8, 1.2 + 7, pSeaZ - 10 - Math.floor(k / 10) * 10); o.rotation.y = Math.PI / 2; lvG[1].add(o); inst.push({ o, key: ['cargo-container-a', 'cargo-container-b', 'cargo-container-c'][k % 3] }); }
+      else box(4.4, 3.5, 8.8, mat([0xd62828, 0x1f5fbf, 0x2d8f4e, 0xffb300][k % 4], 0.7), px - 40 + (k % 10) * 8, 1.2 + 1.75 + 7, pSeaZ - 10 - Math.floor(k / 10) * 10, lvG[1]).rotation.y = Math.PI / 2;
     }
-    for (let k = 0; k < 2; k++) { box(26, 9, 14, shed, px - 30 + k * 32, 5.7, seaZ - 2 + 12, lvG[2]); box(26.6, 0.8, 14.6, mat(0x8a3b2b, 0.7), px - 30 + k * 32, 10.5, seaZ + 10, lvG[2]); }
-    box(70, 1.4, 50, mat(0xb8b4aa, 0.9), px - 90, 0.5, seaZ - 30, lvG[3]); PL.mast(lvG[3], px - 118, seaZ - 8, { h: 18, r: 24 }); PL.mast(lvG[3], px - 62, seaZ - 52, { h: 18, r: 24 }); crane(lvG[3], px - 100, red); crane(lvG[3], px - 76, red);
+    for (let k = 0; k < 2; k++) { box(26, 9, 14, shed, px - 30 + k * 32, 5.7, pSeaZ - 2 + (CO ? -12 : 12), lvG[2]); box(26.6, 0.8, 14.6, mat(0x8a3b2b, 0.7), px - 30 + k * 32, 10.5, pSeaZ + (CO ? -14 : 10), lvG[2]); }
+    box(70, 1.4, 50, mat(0xb8b4aa, 0.9), px - 90, 0.5, pSeaZ - 30, lvG[3]); PL.mast(lvG[3], px - 118, pSeaZ - 8, { h: 18, r: 24 }); PL.mast(lvG[3], px - 62, pSeaZ - 52, { h: 18, r: 24 }); crane(lvG[3], px - 100, red); crane(lvG[3], px - 76, red);
     for (let k = 0; k < 24; k++) {   // контейнерите на разширението (истинските — boatsreal.js), иначе цветни кутии
       const o = useModel(A, model, ['cargo-container-a', 'cargo-container-b', 'cargo-container-c'][k % 3], 3.2);
-      if (o) { o.position.set(px - 115 + (k % 8) * 7, 1.25 + Math.floor(k / 16) * 3.5, seaZ - 14 - Math.floor((k % 16) / 8) * 11); o.rotation.y = Math.PI / 2; lvG[4].add(o); inst.push({ o, key: ['cargo-container-a', 'cargo-container-b', 'cargo-container-c'][k % 3] }); }
-      else box(4.4, 3.5, 8.8, mat([0x7b2cbf, 0x0a9396, 0xe8e2d4, 0xd62828][k % 4], 0.7), px - 115 + (k % 8) * 7, 3 + Math.floor(k / 16) * 3.5, seaZ - 14 - Math.floor((k % 16) / 8) * 11, lvG[4]).rotation.y = Math.PI / 2;
+      if (o) { o.position.set(px - 115 + (k % 8) * 7, 1.25 + Math.floor(k / 16) * 3.5, pSeaZ - 14 - Math.floor((k % 16) / 8) * 11); o.rotation.y = Math.PI / 2; lvG[4].add(o); inst.push({ o, key: ['cargo-container-a', 'cargo-container-b', 'cargo-container-c'][k % 3] }); }
+      else box(4.4, 3.5, 8.8, mat([0x7b2cbf, 0x0a9396, 0xe8e2d4, 0xd62828][k % 4], 0.7), px - 115 + (k % 8) * 7, 3 + Math.floor(k / 16) * 3.5, pSeaZ - 14 - Math.floor((k % 16) / 8) * 11, lvG[4]).rotation.y = Math.PI / 2;
     }
-    const silo = mat(0xdcdcdc, 0.5, 0.3); for (let k = 0; k < 3; k++) { const c = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 18, 16), silo); c.position.set(px - 70 + k * 9, 9, seaZ + 14); c.castShadow = true; lvG[4].add(c); } }
+    const silo = mat(0xdcdcdc, 0.5, 0.3); for (let k = 0; k < 3; k++) { const c = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 18, 16), silo); c.position.set(px - 70 + k * 9, 9, pSeaZ + (CO ? -10 : 14)); c.castShadow = true; lvG[4].add(c); } }
   if (INST) instancify(inst);
   // истинските кранове, фар, склад, зърнен терминал, страдъл карите и яхтите (portreal.js)
-  const portUp = feature('port-real') ? portReal({ g, lvG, cranes, tower, lamp, beam, px, seaZ, pierZ, x0: opts.xMin - 150, x1: opts.xMax + 150 }) : null;
+  const portUp = feature('port-real') ? portReal({ g: pg, yg: g, ySeaZ: seaZ, lvG, cranes, tower, lamp, beam, px, seaZ: pSeaZ, pierZ, x0: opts.xMin - 150, x1: opts.xMax + 150 }) : null;
   // щом истинските кораби се заредят: пречертай флота и смени декоративния кораб на кея с танкер (до ръба на кея)
   loadShipModels().then(() => {
-    if (cargo && hasShipModel('tanker')) { const o = shipModel('tanker'), p0 = cargo.position.clone(), hb0 = halfBeam(cargo); cargo.position.copy(p0); o.rotation.y = cargo.rotation.y; const hb = halfBeam(o); o.position.set(p0.x, 0, seaZ - 69 - hb - 2); o.visible = cargo.visible; g.remove(cargo); g.add(o); cargo = o; }
+    if (cargo && hasShipModel('tanker')) { const o = shipModel('tanker'), p0 = cargo.position.clone(), hb0 = halfBeam(cargo); cargo.position.copy(p0); o.rotation.y = cargo.rotation.y; const hb = halfBeam(o); o.position.set(p0.x, 0, pSeaZ - 69 - hb - 2); o.visible = cargo.visible; const cp = cargo.parent || g; cp.remove(cargo); cp.add(o); cargo = o; }
     swapPendingShips(g, ships);
     if (hasShipModel('cruise')) { const o = shipModel('cruise'); o.position.set((opts.xMin + opts.xMax) / 2 - 120, 0, seaZ - 260); o.rotation.y = linerRot; g.add(o); ships.push({ o, ph: r() * 6 }); }   // на котва
     setFleet(lastFleet);
@@ -246,7 +254,7 @@ export function addSeaside(group, deps, opts) {
     if (portUp) portUp(t);
     beam.rotation.y = t * 0.8; beam.material.opacity = 0.04 + 0.16 * night; lamp.material.emissiveIntensity = 0.5 + 2 * night;
   }
-  const api = { group: g, update, setFleet, setPortLevel, port: { x: px, z: seaZ, xMax: opts.xMax } };
+  const api = { group: g, update, setFleet, setPortLevel, port: { x: px, z: pSeaZ, xMax: opts.xMax } };
   g.name = 'seaside'; g.userData.sea = api;   // за тестовете
   return api;
 }

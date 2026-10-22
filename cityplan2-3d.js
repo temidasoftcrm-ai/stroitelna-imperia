@@ -404,7 +404,7 @@ export function buildPlan2View(P, opts = {}) {
     const sand = ribbon(off(0.5), 5, 0.05), prom = ribbon(off(5.2), 4.2, 0.06);
     const sm = merge([sand], MAT.sand), pm = merge([prom], MAT.walk); G.add(sm, pm);
     const port = P.lots.find(L => L.big === 'port');
-    if (port) { const rd = P.roads[port.front.road]; let best = rd.pts[0]; for (const q of rd.pts) if (Math.hypot(q[0] - port.x, q[1] - port.z) < Math.hypot(best[0] - port.x, best[1] - port.z)) best = q;
+    if (port && !opts.seaPort) { const rd = P.roads[port.front.road];   /* sea-coast: пристанището (кей, кранове, контейнери) го рисува seaside.js на брега пред парцела — тук гола плоча и кутия */ let best = rd.pts[0]; for (const q of rd.pts) if (Math.hypot(q[0] - port.x, q[1] - port.z) < Math.hypot(best[0] - port.x, best[1] - port.z)) best = q;
       const dz = P.coastZ(best[0]) - best[1], dir = Math.sign(dz) || -1;   // към водата
       const pier = new THREE.Mesh(new THREE.BoxGeometry(port.w * 0.8, 1.2, 70), MAT.pier); pier.position.set(best[0], 0.4, P.coastZ(best[0]) + dir * 35); pier.receiveShadow = true; G.add(pier);
       const sh = new THREE.Mesh(new THREE.BoxGeometry(port.w * 0.9, 9, port.d * 0.7), M(0x6f7f8f)); sh.position.set(port.x, 4.5, port.z); sh.rotation.y = port.rot; sh.castShadow = true; G.add(sh); }   // склад на пристанището

@@ -1048,7 +1048,7 @@ function buildCity(cityId) {
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(Math.max(1200, 2 * (tx(NI - 1) + 380)), Math.max(1200, 2 * (tx(NJ - 1) + 300))), new THREE.MeshStandardMaterial({ color: isDesert(cityId) ? 0xd9bf86 : 0x8fb36a, roughness: 1 }));   // Африка — пясък
   city.groundHZ = Math.max(1200, 2 * (tx(NJ - 1) + 300)) / 2;   // rail-crossings: докъде стига земята по z (тунелите)
   if (P && !P.links) P.links = planLinks(P);   // и в мрежата на маршрутите (cityplanroute.js) — ТИР-овете и техниката карат по тях
-  const pv = P && P.p2 ? plan2.view.buildPlan2View(P.p2, { realSigns: feature('road-signs'), streetReal: feature('street-real'), treeModels: plan2Trees(), roadGeo: feature('road-geo') && !P.osm, ...(feature('plants-real') && A['pl-bush-0'] ? { plants: [A['pl-bush-0'].scene.clone(true)].map(o => (o.scale.setScalar(1.8), o)), fountain: A['pl-fountain']?.scene } : {}),   /* #13: островът на кръговото — истински храсти и фонтан (без тях — цветните точки) */ osm: P.p2.osmData, offset: P.offset, termini: !!P.osm, blocks: !!P.osm, ...(P.osm && feature('city-prog') && P.square && P.toPlan ? { progressive: true, focus: P.toPlan(P.square.x, P.square.z) } : {}),   /* поетапно: първо терен и улици около централата */ ...(P.osm ? plan2Opts(cityId) : {}), stationModel: plan2.models[{ paris: 'lm-lazare2', newyork: 'lm-gc2' }[cityId]] || A['station-big']?.scene, ...(cityId === 'newyork' && plan2.models['lm-gc2'] ? { stationFacing: { face: '-z', depth: 0.8, maxW: 48 } } : {}), fillLot: L2 => { if (!P.osm) return false; const l = city.p2Map && city.p2Map.get(L2.id); return !l || l.busy === 'bg'; },
+  const pv = P && P.p2 ? plan2.view.buildPlan2View(P.p2, { realSigns: feature('road-signs'), streetReal: feature('street-real'), treeModels: plan2Trees(), roadGeo: feature('road-geo') && !P.osm, ...(feature('plants-real') && A['pl-bush-0'] ? { plants: [A['pl-bush-0'].scene.clone(true)].map(o => (o.scale.setScalar(1.8), o)), fountain: A['pl-fountain']?.scene } : {}),   /* #13: островът на кръговото — истински храсти и фонтан (без тях — цветните точки) */ osm: P.p2.osmData, offset: P.offset, termini: !!P.osm, seaPort: feature('sea-coast') && SEASIDE.includes(cityId) && !P.osm, blocks: !!P.osm, ...(P.osm && feature('city-prog') && P.square && P.toPlan ? { progressive: true, focus: P.toPlan(P.square.x, P.square.z) } : {}),   /* поетапно: първо терен и улици около централата */ ...(P.osm ? plan2Opts(cityId) : {}), stationModel: plan2.models[{ paris: 'lm-lazare2', newyork: 'lm-gc2' }[cityId]] || A['station-big']?.scene, ...(cityId === 'newyork' && plan2.models['lm-gc2'] ? { stationFacing: { face: '-z', depth: 0.8, maxW: 48 } } : {}), fillLot: L2 => { if (!P.osm) return false; const l = city.p2Map && city.p2Map.get(L2.id); return !l || l.busy === 'bg'; },
       ...(feature('free-plots') ? { freeLot: L2 => { const l = city.p2Map && city.p2Map.get(L2.id); return !!l && !l.busy && !l.built && !l.reno && !l.under && !l.obj; } } : {}) })   // свободните парцели — празни места с ограда и табела   // Рим: фоновите квартали — върху парцелите, които играта не ползва
     : P ? buildPlanView({ ...P, streets: [...P.streets, ...P.links] }, { streetReal: feature('street-real'), size: Math.max(1600, 2 * (tx(NI - 1) + 400)), seg: 170, target: controls.target, lotCount: Math.min(P.lots.length, planCount(P.mega, S.cityExt || 0)),
     seaZ: SEASIDE.includes(cityId) ? tx(0) - TILE / 2 - 2 : null, noFountain: !!CITY_LANDMARKS[cityId], plantProtos: ['pl-bush-0', 'pl-bush-1', 'pl-bush-2', 'pl-flowers'].filter(k => A[k]).map(k => A[k].scene), fountainProto: A['pl-fountain']?.scene, benchProto: A.bench?.scene, treeProtos: Object.keys(A).filter(k => k.startsWith('sf-tree-') || k.startsWith('sf-pine-')).map(k => { const o = A[k].scene; o.userData.pine = k.startsWith('sf-pine-'); return o; }) }) : null;
@@ -1057,7 +1057,7 @@ function buildCity(cityId) {
   city.airport = null; city.airportNI = 0; city.airSite = null; refreshAirport3D(cityId);
   // крайморски град: жп линията свива на запад преди брега (концентрични дъги; най-западният коловоз е с радиус 12)
   { const westmost = tx(0) - 16 - 6 * 6.5, cx = westmost - 12, seaZ = tx(0) - TILE / 2 - 2 - 22; trackMap = SEASIDE.includes(cityId) ? makeTrackMap({ cx, zC: seaZ + 6 + (tx(0) - 16 - cx) }) : makeTrackMap(null); }
-  city.sea = SEASIDE.includes(cityId) && !(P && P.osm) ? addSeaside(g, { A, model, label }, { zEdge: tx(0) - TILE / 2 - 2, xMin: tx(0), xMax: tx(NI - 1), railX: [-1e9, -1e9], seed: hashStr(cityId) }) : null;
+  city.sea = SEASIDE.includes(cityId) && !(P && P.osm) ? addSeaside(g, { A, model, label }, { zEdge: tx(0) - TILE / 2 - 2, xMin: tx(0), xMax: tx(NI - 1), railX: [-1e9, -1e9], seed: hashStr(cityId), ...seaCoastOpts(P) }) : null;
   seaFleetSig = ''; if (city.sea) city.sea.setPortLevel?.(portLv(cityId));
   ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; ground.receiveShadow = true;
   if (pv) { pv.position.y = 0; g.add(pv); city.planView = pv; } else g.add(ground);
@@ -2913,6 +2913,12 @@ function bbPlaceOpts() {
       || (city.lots || []).some(l => l.plan && Math.hypot(x - l.x, z - l.z) < Math.min(l.w, l.d) / 2 + fw / 4),   // не върху парцел (строеж, сграда или бъдеща сграда)
     sizeAt: (x, z, r, i) => Math.hypot(x - c[0], z - c[1]) > R * 0.62 && (r.main || (r.w || 0) >= 14) ? 'large' : i % 2 ? 'small' : 'medium',
   };
+}
+// sea-coast: крайморските градове с плана v2 — бреговата линия е крива (p2.coastZ), а seaside.js рисуваше плажа и пристанището по старата права линия навътре в морето
+function seaCoastOpts(P) {
+  const p2 = P && P.p2, off = (P && P.offset) || [0, 0]; if (!feature('sea-coast') || !p2 || typeof p2.coastZ !== 'function') return {};
+  const pl = (p2.lots || []).find(L => L.big === 'port'), lot = pl ? { x: pl.x + off[0], z: pl.z + off[1], w: pl.w, d: pl.d, rot: pl.rot || 0 } : null;
+  return { coast: x => p2.coastZ(x - off[0]) + off[1], port: lot ? { x: lot.x, lot } : null };
 }
 function billboardRoads() {
   const P = city.plan;
