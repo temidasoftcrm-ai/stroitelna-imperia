@@ -43,3 +43,19 @@ export function cutMirror(root, axis = 'x', f = 0.25) {
   }
   return o;
 }
+
+// част от пакет с модели (лампите, оградите): триъгълниците, чийто център е в кутията [x0, x1] × [z0, z1] (в системата на root);
+// нищо не се реже — частите в пакетите са отделени една от друга. Връща нов обект с основата в 0 и центъра в (0, 0).
+export function pickPart(root, x0, x1, z0, z1) {
+  const o = root.clone(true); o.position.set(0, 0, 0); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1); o.updateMatrixWorld(true);
+  const meshes = []; o.traverse(m => { if (m.isMesh) meshes.push(m); }); const v = new THREE.Vector3(), c = new THREE.Vector3();
+  for (const m of meshes) {
+    const g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry, P = g.attributes.position, keep = [];
+    for (let f = 0; f < P.count; f += 3) { c.set(0, 0, 0); for (let e = 0; e < 3; e++) c.add(v.fromBufferAttribute(P, f + e).applyMatrix4(m.matrixWorld)); c.multiplyScalar(1 / 3);
+      if (c.x >= x0 && c.x <= x1 && c.z >= z0 && c.z <= z1) keep.push(f, f + 1, f + 2); }
+    if (!keep.length) { m.removeFromParent(); continue; }
+    const r = new THREE.BufferGeometry(); for (const [nm, A] of Object.entries(g.attributes)) { const arr = new Float32Array(keep.length * A.itemSize); keep.forEach((i, k) => { for (let j = 0; j < A.itemSize; j++) arr[k * A.itemSize + j] = A.getComponent(i, j); }); r.setAttribute(nm, new THREE.BufferAttribute(arr, A.itemSize, A.normalized)); }
+    m.geometry = r;
+  }
+  o.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(o), G = new THREE.Group(); o.position.set(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2); G.add(o); return G;
+}
