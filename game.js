@@ -37,7 +37,7 @@ import { buildResortView, RESORT_MODELS } from './resortview.js';
 import { createDemolition } from './demolish.js';
 import { createDemolition2, machineWork, craneLift, loadSiteRigs, rigPlay, swapRig } from './sitework.js';
 import { createDistricts } from './districts.js';   // 🏡 districts-look (55): дворове, паркове и площадки в кварталите на плана v2
-import { siteK, realScaleK, REAL_BLD, TOO_LONG, kidK } from './scale.js';   // 🏗️ флаг site-anim: истински кран при събаряне, машините работят, кранът вдига
+import { siteK, realScaleK, REAL_BLD, TOO_LONG, kidK, SECTIONS, sectName, pickSection } from './scale.js';   // 🏗️ флаг site-anim: истински кран при събаряне, машините работят, кранът вдига
 import { createEvents } from './events.js';
 import { createWeather, rollWeather } from './weather.js';
 import { bidHtml, resolveBid } from './bidding.js';
@@ -120,6 +120,7 @@ import { mountHub } from './hub.js';
 import { showLevel } from './lvshow.js';
 import { showSub } from './subshow.js';   // дъщерните дружества — екран с логото (feature 'sub-screen')   // картинката на ниво 1 — при основаването на фирмата (feature 'lv-pics')   // „📊 Империя ▾“ — бутоните от втория ред на лентата в падащ панел (feature 'top-hub')
 import { sampleCurve, rectCorners } from './cityplan.js';
+import { cutMirror } from './blkcut.js';   // real-sizes (55): по-къси секции на панелните блокове
 import { makeWater } from './water.js';   // 🌊 Темза в Лондон (feature 'thames')
 import { LOD, LOD_NM, lodOf, CONT_AT, CONT_NM as LOD_CONT_NM, cityScore, topPerGroup, corridors, searchCities } from './maplod.js';   // степени на детайлност на картата (feature 'map-lod')
 import { planRoute, randomRoadPoint } from './cityplanroute.js';
@@ -509,7 +510,7 @@ let europe = null;
   // истински храсти, цветя и фонтан (assets/heavy/plants, нормализирани: най-широката страна 1, основа 0) — зад feature('plants-real')
   for (const n of H2) jobs.push(load(`assets/heavy/houses2/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => HOUSES.splice(HOUSES.indexOf(n), 1)));   // не се зареди → не се строи
   if (feature('hw-gantry')) jobs.push(load('assets/heavy/highway/hw-gantry.glb').then(g => { A['hw-gantry'] = g; }).catch(() => {}));   // 🛣️ порталът с табелите
-  if (feature('office-levels2')) for (const L of OFFICE2) jobs.push(load(L.url).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[`office2-l${L.lv}`] = g; prepNightFloors(g.scene, `office2-l${L.lv}`); }).catch(() => {}));   // 🆕 новите нива на офиса
+  if (feature('office-levels2')) for (const L of OFFICE2) jobs.push(load(L.url).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[`office2-l${L.lv}`] = g; prepNightFloors(g.scene, `office2-l${L.lv}`); blkSections(`office2-l${L.lv}`); }).catch(() => {}));   // 🆕 новите нива на офиса
   for (const n of GAS_KINDS) jobs.push(load(`assets/heavy/gas/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => {}));   // бензиностанции (всяка — свое „✓ OK“); нощем — навесът и магазинът (nightfloors 'gas')
   if (feature('wh-levels2')) for (let k = 1; k <= 10; k++) jobs.push(load(`assets/heavy/wh2/wh-l${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['wh2-l' + k] = g; }).catch(() => {}));   // 📦 складовете 1–10 (Sketchfab, CC-BY — assets/heavy/wh2/CREDITS.txt)
   if (feature('plants-real')) for (const k of ['bush-0', 'bush-1', 'bush-2', 'flowers', 'fountain']) jobs.push(load(`assets/heavy/plants/${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['pl-' + k] = g; }).catch(() => {}));
@@ -527,6 +528,7 @@ let europe = null;
   for (const [n, path] of Object.entries(IMP_MODELS)) jobs.push(load(path).then(g => { A[n] = g; prepNightFloors(g.scene, n); }).catch(() => {}));   // Империал Сити: сталинската кула (impstyle.js)
   for (const k of new Set(Object.values(blk2Pick()).flat())) jobs.push(load(`assets/heavy/blocks2/${k}.glb`).then(g => { g.scene.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; if (m.material && m.material.metalness > 0.5) m.material.metalness = 0.3; } }); A['b2-' + k] = g; prepNightFloors(g.scene, 'b2-' + k); }).catch(() => {}));   // истинските блокове вместо стъклените (Лабораторията → blocks-real)
   for (const k of ['richmond', 'panel12', 'gamecity', 'soviet', 'oldbld', 'dbrick', 'brick', 'asian', 'modoffice', 'jade']) jobs.push(load(`assets/heavy/blocks/${k}.glb`).then(g => { g.scene.traverse(m => { if (m.isMesh && m.material && m.material.metalness > 0.5) m.material.metalness = 0.3; });
+    if (feature('real-sizes')) { const lod1 = []; g.scene.traverse(m => { if (m.isMesh && /LOD1/.test(m.name)) lod1.push(m); }); lod1.forEach(m => m.removeFromParent()); }   // real-sizes (55): panel12 носи и второ копие (LOD1) на 32 м отзад — на снимката стояха два блока
     if (k === 'oldbld') {   // моделът е кух отгоре (само стени) — плосък покрив малко под ръба и няколко кутии на покрива
       g.scene.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(g.scene), sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3()), top = bb.max.y - sz.y * 0.035;
       const roof = new THREE.Mesh(new THREE.BoxGeometry(sz.x * 0.97, sz.y * 0.01, sz.z * 0.97), new THREE.MeshStandardMaterial({ color: 0x55585c, roughness: 0.95 })); roof.position.set(c.x, top, c.z); roof.receiveShadow = true; g.scene.add(roof);
@@ -534,7 +536,7 @@ let europe = null;
     }
     A['sf-blk-' + k] = g;
     const aux = { panel12: [3, 'white'], gamecity: [1, 'magenta'], asian: [1, 'magenta'] }[k];   // [№ на картинката, вид] — картата с прозорците (nightfloors.js, 'aux')
-    return (aux ? g.parser.getDependency('texture', g.parser.json.textures.findIndex(t => (t.extensions?.EXT_texture_webp?.source ?? t.source) === aux[0])).then(t => g.scene.traverse(o => { if (o.isMesh && o.material?.map) o.material.userData.nfAux = { tex: t, kind: aux[1] }; })).catch(() => {}) : Promise.resolve()).then(() => prepNightFloors(g.scene, 'sf-blk-' + k)); }).catch(() => {}));   // истински блокове (Sketchfab)
+    return (aux ? g.parser.getDependency('texture', g.parser.json.textures.findIndex(t => (t.extensions?.EXT_texture_webp?.source ?? t.source) === aux[0])).then(t => g.scene.traverse(o => { if (o.isMesh && o.material?.map) o.material.userData.nfAux = { tex: t, kind: aux[1] }; })).catch(() => {}) : Promise.resolve()).then(() => { prepNightFloors(g.scene, 'sf-blk-' + k); blkSections('sf-blk-' + k); }); }).catch(() => {}));   // истински блокове (Sketchfab)
   // хотелите и A-frame хижите на курортите (~7 MB) се зареждат чак при влизане в курорт — loadResortModels()
   // кораби и контейнери за крайбрежните градове (seaside.js)
   for (const n of SEA_MODELS) if (!A[n]) jobs.push(load(`assets/watercraft/${n}.glb`).then(g => { A[n] = g; }).catch(() => {}));
@@ -908,7 +910,11 @@ function realH(n) {
   return SKY_H[n] || H10[n] || 16;   // магазини, офиси, блокове на ~5 етажа
 }
 const shopPool = () => feature('real-scale') ? SHOPS.filter(n => !TOO_LONG.has(n)) : SHOPS;   // real-scale (55): без редовите сгради, които в истински размер не се побират на парцела
+// real-sizes (55, №9/№12): панелните блокове — в истинска височина; в парцела влиза най-дългата секция, която се побира (blkcut.js)
+function blkSections(n) { const S = SECTIONS[n]; if (!S || !feature('real-sizes') || !A[n]) return; S.cuts.forEach((f, i) => { A[sectName(n, i)] = { scene: (Array.isArray(f) ? f : [[S.axis, f]]).reduce((r, [ax, q]) => cutMirror(r, ax, q), A[n].scene) }; }); }
 function realHeight(o, n, maxW) {
+  if (feature('real-sizes') && SECTIONS[n] && A[n]) { const p = pickSection(n, v => A[v] ? sizeOf(v).getSize(new THREE.Vector3()) : null, maxW);
+    if (p) { if (p[0] !== n) { o.clear(); for (const c of A[p[0]].scene.clone(true).children) o.add(c); o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); o.userData.sect = p[0]; } o.scale.setScalar(p[1]); return true; } }
   if (feature('real-scale')) { const k = realScaleK(n, sizeOf(n).getSize(new THREE.Vector3()), maxW, REAL_BLD[n] ?? realH(n)); if (k) { o.scale.setScalar(k); return true; } }   /* real-scale (55): еднакъв мащаб по трите оси — къщите по етажите (scale.js), не по-широка от парцела */
   if (!feature('real-heights')) return false;
   if (n.startsWith('ind-')) return false;   // истинските заводи (industry.js) — със своите пропорции, не до 16 м
@@ -1470,6 +1476,9 @@ const machineCount = () => units.filter(u => isMachine(u.type) && !isRoadGear(u.
 // 🏢 (hq-campus) гаражът/складът, чийто парцел е зает от сграда и няма свободен — рисуват се отзад в централата (S.campusIn)
 // вписва обект (още без родител — координатите са в групата на парцела) в правоъгълника [x0,x1]×[z0,z1]: само смалява, центрира
 function campusFit(o, x0, x1, z0, z1) {
+  if (feature('real-sizes') && SECTIONS[o.userData.src]) { const n = o.userData.src, k = o.scale.x;   /* real-sizes (55): секцията, която се побира в истински размер, вместо смаляване */
+    const v = [n, ...SECTIONS[n].cuts.map((f, i) => sectName(n, i))].filter(v => A[v]).find(v => { const s = sizeOf(v).getSize(new THREE.Vector3()); return s.x * k <= x1 - x0 && s.z * k <= z1 - z0; });
+    if (v && v !== n) { o.clear(); for (const c of A[v].scene.clone(true).children) o.add(c); o.userData.sect = v; } }
   o.updateMatrixWorld(true); let b = new THREE.Box3().setFromObject(o); const s = b.getSize(new THREE.Vector3());
   const k = Math.min(1, (x1 - x0) / Math.max(0.1, s.x), (z1 - z0) / Math.max(0.1, s.z)); if (k < 1) { o.scale.multiplyScalar(k); o.updateMatrixWorld(true); b = new THREE.Box3().setFromObject(o); }
   o.position.x += (x0 + x1) / 2 - (b.min.x + b.max.x) / 2; o.position.z += (z0 + z1) / 2 - (b.min.z + b.max.z) / 2; return k;
@@ -10508,6 +10517,13 @@ if (AUTOTEST) {
       ns.forEach((n, i) => { const l = ls[i]; if (!l) return; const fs = fitScale(n, HOUSES.includes(n) ? houseFit(n) : 14), o = blkHeight(model(n, fs), n, fs); o.position.set(l.x, 0, l.z); city.group.add(o); dayNight.registerWindows(o); });
       const u = ls.slice(0, ns.length), cx = u.reduce((a, l) => a + l.x, 0) / u.length, cz = u.reduce((a, l) => a + l.z, 0) / u.length, r = Math.max(30, ...u.map(l => Math.hypot(l.x - cx, l.z - cz)));
       __dbg.camAt(cx + r * 0.9, r * 1.1, cz + r * 1.2, cx, 4, cz); return u.map((l, i) => [ns[i], Math.round(l.x), Math.round(l.z)]); },
+    sectRow(night) {   // 📏 real-sizes (55): панелните блокове и секциите им в редица, в истински размер (кубът отпред — 1,8 м човек)
+      if (city.sectRow) city.group.remove(city.sectRow); const G = city.sectRow = new THREE.Group(), x0 = tx(NI - 1) + 50, z0 = tx(0) - 40, V3 = () => new THREE.Vector3(); let x = x0;
+      for (const n of Object.keys(SECTIONS)) { if (!A[n]) continue; const k = SECTIONS[n].H / sizeOf(n).getSize(V3()).y;
+        for (const v of [n, ...SECTIONS[n].cuts.map((f, i) => sectName(n, i))]) { if (!A[v]) continue; const o = model(v, k), b = new THREE.Box3().setFromObject(o), w = b.max.x - b.min.x;
+          o.position.set(x + w / 2 - (b.min.x + b.max.x) / 2, -b.min.y, z0 - (b.min.z + b.max.z) / 2); G.add(o); dayNight.registerWindows(o);
+          const man = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.8, 0.3), new THREE.MeshStandardMaterial({ color: 0xd04040 })); man.position.set(x + w / 2, 0.9, z0 + (b.max.z - b.min.z) / 2 + 3); G.add(man); x += w + 8; } x += 12; }
+      city.group.add(G); if (night != null) __dbg.time && __dbg.time(night ? 22 : 12); const mid = (x0 + x) / 2 + 70; __dbg.camAt(mid, 80, z0 + (x - x0) * 0.8, mid, 12, z0); return Math.round(x - x0); },
     blkLook(k = 'oldbld') { const l = city.lots.find(x => !x.built && !x.busy && x.zone === 'mid'); if (!l || !A['sf-blk-' + k]) return null; const o = model('sf-blk-' + k, fitScale('sf-blk-' + k, 14)); o.position.set(l.x, 0, l.z); city.group.add(o); __dbg.camAt(l.x + 22, 30, l.z + 26, l.x, 6, l.z); return { x: l.x, z: l.z }; },
     berthTest() { S.dev.xp = 260000; S.dev.lv = 10; econ.earn(2e8, 'друго', 'тест'); S.ports = { varna: { lv: 1, build: null }, burgas: { lv: 2, build: null } }; S.ships = [];
       S.seaRoutes = [['varna', 'istanbul'], ['varna', 'constanta'], ['burgas', 'thessaloniki'], ['burgas', 'athens'], ['varna', 'izmir'], ['burgas', 'patras']].map(([a, b]) => ({ a, b, km: seaRouteKm(a, b) }));

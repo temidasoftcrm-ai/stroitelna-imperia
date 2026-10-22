@@ -205,14 +205,14 @@ export function buildPlanView(P0, opts = {}) {
   // --- площад: павета, фонтан, кръг от дървета
   const sq = P.square, pl = [[], []]; disc(sq.x, sq.z, sq.r + 1, 0.08, ...pl, 32);
   g.add(mesh(...pl, M.plaza));
-  if (!opts.noFountain && opts.fountainProto) { const f = opts.fountainProto.clone(true); const fr = Math.min(6.5, sq.r * 0.33); f.scale.setScalar(fr); f.position.set(sq.x, 0.08, sq.z); f.traverse(o => { if (o.isMesh) o.castShadow = true; }); g.add(f);
+  if (!opts.noFountain && opts.fountainProto) { const f = opts.fountainProto.clone(true); const fr = Math.min(feature('real-sizes') ? 3.4 : 6.5, sq.r * 0.33); f.scale.setScalar(fr); f.position.set(sq.x, 0.08, sq.z);   /* real-sizes (55): моделът е 2,08 м широк → басейн ~7 м, не 13,5 м */ f.traverse(o => { if (o.isMesh) o.castShadow = true; }); g.add(f);
     if (opts.benchProto) {   // пейки в кръг около фонтана, с лице към него
       const bp = opts.benchProto, bb = new THREE.Box3().setFromObject(bp), bs = bb.getSize(new THREE.Vector3()), k = 2.2 / Math.max(bs.x, bs.z), R = fr / 2 + 4.5;
       for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + Math.PI / 8, b = bp.clone(true); b.scale.setScalar(k); b.position.set(sq.x + Math.cos(a) * R, 0.08 - bb.min.y * k, sq.z + Math.sin(a) * R); b.rotation.y = -a - Math.PI / 2; b.traverse(o => { if (o.isMesh) o.castShadow = true; }); detail.add(b); }
     }
   }   // истинският фонтан (plants-real)
-  else if (!opts.noFountain) { const f = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.6, 0.8, 24), M.stone); f.position.set(sq.x, 0.4, sq.z); g.add(f);
-    const w = new THREE.Mesh(new THREE.CylinderGeometry(3.7, 3.7, 0.1, 24), M.fountain); w.position.set(sq.x, 0.82, sq.z); g.add(w);
+  else if (!opts.noFountain) { const fk = feature('real-sizes') ? 0.76 : 1;   /* real-sizes (55): басейн 7 м вместо 9,2 м */ const f = new THREE.Mesh(new THREE.CylinderGeometry(4.2 * fk, 4.6 * fk, 0.8, 24), M.stone); f.position.set(sq.x, 0.4, sq.z); g.add(f);
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(3.7 * fk, 3.7 * fk, 0.1, 24), M.fountain); w.position.set(sq.x, 0.82, sq.z); g.add(w);
     const s = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 4, 10), M.stone); s.position.set(sq.x, 2.2, sq.z); g.add(s); }
   // --- парцели: светли площадки (цвят по зона), очертания отблизо
   const lp = [[], [], []], le = [], zc = { center: new THREE.Color(0xc9c1ad), mid: new THREE.Color(0xb7bd98), outer: new THREE.Color(0xa3b97f) };

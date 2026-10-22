@@ -100,3 +100,24 @@ export function realScaleK(n, size, maxW, H = null) {
   const h = H ?? REAL_BLD[n]; if (!h) return null; const len = Math.max(size.x, size.z);
   return Math.min(h / Math.max(0.01, size.y), maxW / Math.max(0.01, len));
 }
+
+// ---- панелните блокове в секции (real-sizes, задачи №9/№12; blkcut.js): цялата височина H (м) и дългата ос на модела;
+// cuts — секциите: частта от дължината по axis, която се запазва и огледа (0,2 → ~0,4 от целия блок; < 0 — от другия край),
+// или [[ос, част], …] — няколко рязания. В парцела влиза най-голямата секция, която се побира при истинската височина;
+// не се побере ли и последната — тя, смалена (както досега).
+// panel12: 12 етажа, моделът е в метри (54 × 11 × 40 м с машинните помещения) → 39 / 22 / 14 м; soviet: 6 етажа, 26 × 11 м → 18 / 14 м;
+// richmond: 3 етажа над цокъла, 24 × 23 × 12 м (в см) → крилото без портика, 14 × 14 м.
+export const SECTIONS = {
+  'sf-blk-panel12': { H: 40, axis: 'x', cuts: [0.36, 0.2, 0.13] },
+  'sf-blk-soviet': { H: 19, axis: 'z', cuts: [0.35, 0.27] },
+  'sf-blk-richmond': { H: 12.5, axis: 'x', cuts: [[['x', -0.3], ['z', -0.31]]] },
+  'office2-l1': { H: 2.95, axis: 'x', cuts: [0.25, 0.12] },   // офисът на ниво 1: 4 контейнера 25 × 7,6 × 2,95 м → 2 (12,5 м) или 1 (6 м); не се смалява от campusFit
+};
+export const sectName = (n, i) => `${n}-s${i + 1}`;
+// size(name) → Vector3 на модела; връща [името, k] — избраната секция и еднаквият мащаб
+export function pickSection(n, size, maxW) {
+  const S = SECTIONS[n]; if (!S) return null; const h = size(n).y, k = S.H / Math.max(0.01, h);
+  const all = [n, ...S.cuts.map((f, i) => sectName(n, i))].map(v => { try { const s = size(v); return s ? [v, Math.max(s.x, s.z)] : null; } catch (e) { return null; } }).filter(Boolean);
+  for (const [v, len] of all) if (len * k <= maxW) return [v, k];
+  const [v, len] = all.at(-1); return [v, Math.min(k, maxW / Math.max(0.01, len))];
+}
