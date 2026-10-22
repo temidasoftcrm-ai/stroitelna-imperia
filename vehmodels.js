@@ -34,6 +34,7 @@ function wrap(obj, yaw = 0, k = null) {
 // load(url) → Promise<gltf>; A — речникът с модели на играта. Връща Promise (липсващ файл не спира играта).
 export function loadVehModels(load, A, base = 'assets/heavy/gear/') {
   const jobs = Object.entries(GEAR).map(([k, c]) => load(base + c.f + '.glb').then(g => { A['sf-' + k] = { scene: wrap(g.scene, c.yaw) }; }).catch(e => console.warn('vehmodels', k, e)));
+  if (feature('cars-more')) jobs.push(loadMoreCars(load, A));   // cars-more (55): още 18 градски коли по региони
   jobs.push(Promise.resolve().then(() => feature('cars-real') && loadRealCars(load, A)).then(() => loadVans(load, A, M_PER)).then(() => feature('trucks-real') && loadRealTrucks(load, A)).then(() => loadPoliceCars(load, A)));
   return Promise.all(jobs);
 }
@@ -45,6 +46,22 @@ const REAL_CARS = {   // име: [файл, дължина в м]
 Muscle: ['car-accord', RS ? 4.9 : 4.7], Muscle_2: ['car-corolla', RS ? 4.63 : 4.2], Police_Sedan: ['pol-crownvic', 5.4], Bus: ['bus-citaro', 12], Limousine: ['car-limo', 7.6], Police_SUV: ['car-polsuv', RS ? 6.0 : 4.9], Truck: ['car-truck', 6.5],
 };
 const M_PER = CAR_LEN / 4.5;   // седанът от пакета (≈4,5 м) е CAR_LEN в света на играта
+// cars-more (55): още градски коли (Sketchfab, CC-BY; нормализирани в Blender — предница +z, колела на 0, истинска дължина в м).
+// регионите — тегла: bg България, eu Европа, ru Русия и бившият СССР (изтокът), am Северна Америка, xx останалият свят
+export const CAR_POOL = {
+  golf2: [3.99, { bg: 3, eu: 3, ru: 1 }], clio2: [3.81, { bg: 2, eu: 3 }], corsab: [3.73, { bg: 3, eu: 3, ru: 1 }], octavia: [4.69, { bg: 3, eu: 3, ru: 2, xx: 1 }],
+  felicia: [3.86, { bg: 2, eu: 2, ru: 1 }], logan: [4.36, { bg: 3, eu: 2, ru: 3, xx: 2 }], duster: [4.34, { bg: 3, eu: 2, ru: 3, xx: 2 }], tesla3: [4.69, { eu: 1, am: 3, xx: 1 }],
+  wagon: [5.0, { am: 2 }], sienna: [5.08, { am: 3, xx: 1 }], wrangler: [4.22, { am: 3, xx: 1 }], f150: [5.89, { am: 4 }], kenworth: [8.5, { am: 1 }],
+  lada2107: [4.13, { bg: 1, ru: 4 }], vaz2104: [4.12, { bg: 1, ru: 3 }], niva: [3.74, { bg: 1, ru: 3 }], moskvich: [4.35, { ru: 2 }], uaz: [4.03, { ru: 2 }],
+};
+function loadMoreCars(load, A) {
+  return Promise.all(Object.entries(CAR_POOL).map(([k, [len]]) => load('assets/heavy/cars/cv-' + k + '.glb').then(g => {
+    g.scene.traverse(o => { if (o.isMesh) { o.castShadow = false; if (o.material && o.material.metalness > 0.5) o.material.metalness = 0.3; } });
+    const sc = wrap(g.scene, 0, M_PER); addCarLights(sc, null); A['sf-cv-' + k] = { scene: sc };   /* файловете вече са в метри (len — за таблицата) */
+  }).catch(e => console.warn('cars-more', k, e))));
+}
+// колите за региона: [[име в A, тегло]…]
+export const carsFor = (reg, A) => Object.entries(CAR_POOL).filter(([k, [, w]]) => w[reg] && A['sf-cv-' + k]).map(([k, [, w]]) => ['sf-cv-' + k, w[reg]]);
 function loadRealCars(load, A) {
   const SIREN_FILES = new Set(['car-polsuv']);   // REAL_CARS с версия с лещи в cars/sirens (sirens-real) — иначе моделираната лента + процедурната = двойна
   return Promise.all(Object.entries(REAL_CARS).map(([nm, [f, len]]) => load('assets/heavy/cars/' + (feature('sirens-real') && SIREN_FILES.has(f) ? 'sirens/' : '') + f + '.glb').then(g => {
@@ -162,6 +179,7 @@ export const sirenKind = car => { let k = null; car.traverse(o => { if (!k && o.
 // буркан: свой клас, за да оцелее анимацията при clone() (методите са в прототипа); всяко копие си прави свой материал.
 // Леща (емисивна сфера) + ореол (спрайт): ляво червено, дясно синьо, редуват се ~2,5 Hz; включват се „от време на време“.
 const beaconState = (car, t) => car.userData.forceBeacons || car.userData.beaconsOn || Math.sin(t / 20 * Math.PI * 2 + (car.id * 2.39) % 6.28) > 0.1;
+export const beaconsLit = car => !!car && beaconState(car, performance.now() / 1000);   // #14: светят ли бурканите сега (трафикът: колите ѝ правят път)
 const carOf = o => { let c = o.parent; while (c && !c.userData.isCar) c = c.parent; return c; };
 class Beacon extends THREE.Mesh {
   onBeforeRender(renderer, scene, camera) {

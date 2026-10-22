@@ -288,3 +288,23 @@ Street furniture, yards and warehouse materials (55, #42/#33/#34) — Sketchfab,
 - whmat/mat-steel.glb — „Steelbeam“ by jkvarel (@jkvarel1701), CC Attribution — https://sketchfab.com/3d-models/f5d4f9baa5ca48ac97efc3573ef08994
 - whmat/mat-sand.glb — „Photoscan Low-poly Construction Sand Pile“ by Martin Topolski (@martin.topolski), CC Attribution — https://sketchfab.com/3d-models/7a7533e1ecab4b1d96da55cc3ad9ad98
 - whmat/mat-box.glb — „CC0 - Cardboard Box Closed“ by plaggy (@plaggy), CC Attribution — https://sketchfab.com/3d-models/76c43725661d4e609e47a4dec95b72cf
+
+More city cars (55, cars-more) — Sketchfab, normalized in Blender (front +z, real length), gltf-transform webp 512:
+- cars/cv-golf2.glb — „Volkswagen Golf II“ by ARDmation (@ardmation), CC Attribution — https://sketchfab.com/3d-models/740500f10bc94e7a91c2290e445fcb39
+- cars/cv-clio2.glb — „1997 Renault Clio Mk.2“ by ImperialBlue3D (@ImperialBlue3D), CC Attribution — https://sketchfab.com/3d-models/e3bbb96f7a61412086868ea3b136de2c
+- cars/cv-corsab.glb — „Opel Corsa B - Low Poly“ by JiggleSticks (@JiggleSticks), CC Attribution — https://sketchfab.com/3d-models/773b1c83b4a240f2ac415c351d3a65c6
+- cars/cv-octavia.glb — „low-poly Škoda Octavia RS 2020“ by D_U (@DU1701), CC Attribution — https://sketchfab.com/3d-models/d567807ce57e415ba9a1ffdf07e0cf5b
+- cars/cv-wagon.glb — „Fairheaven SW '84 - Low poly model“ by Daniel Zhabotinsky (@DanielZhabotinsky), CC Attribution — https://sketchfab.com/3d-models/aa0becb6e854422596cac6b21bf79787
+- cars/cv-tesla3.glb — „VEHICLE - TESLA MODEL 3“ by Thcyrax (@thcyrax), CC Attribution — https://sketchfab.com/3d-models/43512c27667f412297bced6b9857a735
+- cars/cv-logan.glb — „Dacia Logan Low Poly“ by solid3DDD (@solid3ddd), CC Attribution — https://sketchfab.com/3d-models/aedc2d2f43fb40639d17b77f3f5c8d47
+- cars/cv-duster.glb — „Dacia Duster Low Poly“ by solid3DDD (@solid3ddd), CC Attribution — https://sketchfab.com/3d-models/ea275644cd634593b6a97eacf0ede405
+- cars/cv-lada2107.glb — „Lada Riva 1986“ by pinokio21 (@pinokio21), CC Attribution — https://sketchfab.com/3d-models/300e85f5786f48b3abd5f8ab3851c3a1
+- cars/cv-vaz2104.glb — „VAZ-2104 FREE“ by sMoKi (@vsevolod_smoki), CC Attribution — https://sketchfab.com/3d-models/ba563a31b4754a66a5f0e7f893145922
+- cars/cv-felicia.glb — „Skoda Felicia (1998 Facelift)“ by SimonStrikesBack (@SimonStrikesBack), CC Attribution — https://sketchfab.com/3d-models/346c9d3fcbaf4e84a8b443041239b3ad
+- cars/cv-sienna.glb — „2011 Toyota Sienna SE (reupload)“ by beanz_ncheese (@beanzncheese), CC Attribution — https://sketchfab.com/3d-models/b30fe2623ab54876b2bb0229f9c051bc
+- cars/cv-wrangler.glb — „VEHICLE - JEEP WRANGLER“ by Thcyrax (@thcyrax), CC Attribution — https://sketchfab.com/3d-models/5c090410ea544b72a6d265d1ede55795
+- cars/cv-f150.glb — „ford f-150“ by amogusstrikesback2 (@amogusstrikesback2), CC Attribution — https://sketchfab.com/3d-models/606bccade8db412daf90d4a9dd2aabd3
+- cars/cv-uaz.glb — „UAZ 001 УАЗ“ by hawol (@hawol), CC Attribution — https://sketchfab.com/3d-models/09016f12adde42e996c29209635e2b92
+- cars/cv-moskvich.glb — „AZLK Moskvich 2141“ by Mona x Supercars (@Car2022), CC Attribution — https://sketchfab.com/3d-models/8b2e431a32334db98613ff43dd620fec
+- cars/cv-niva.glb — „Lada Niva“ by Greg McKechnie (@mckechniegreg6), CC Attribution — https://sketchfab.com/3d-models/26ebf5872bce4ff4ad2baee41882d6b2
+- cars/cv-kenworth.glb — „Kenworth W-900 A 1973“ by eightismore (@eightismore), CC Attribution — https://sketchfab.com/3d-models/248f403be9164e46ab9992ecbd8cc52c
