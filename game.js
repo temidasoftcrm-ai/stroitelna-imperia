@@ -568,7 +568,7 @@ const sizeOf = n => sizeCache[n] || (sizeCache[n] = new THREE.Box3().setFromObje
 function splitTrees(scene, { trunksOnly = false, glow = 0x2c3a24, plain = false } = {}) {
   scene.updateMatrixWorld(true);
   const parts = [];
-  scene.traverse(o => { if (o.isMesh && !/plane|rock/i.test(o.name)) parts.push({ o, b: new THREE.Box3().setFromObject(o), trunk: /bark|trunk|trank/i.test(o.name + ' ' + (o.material?.name || '')) }); });
+  scene.traverse(o => { if (o.isMesh && !/plane|rock|background/i.test(o.name)) parts.push({ o, b: new THREE.Box3().setFromObject(o), trunk: /bark|trunk|trank/i.test(o.name + ' ' + (o.material?.name || '')) }); });
   const trunks = parts.filter(p => p.trunk), groups = trunks.map(t => [t]), solo = [];
   for (const p of parts) {
     if (p.trunk) continue;
