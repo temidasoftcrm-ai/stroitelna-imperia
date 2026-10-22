@@ -2904,7 +2904,10 @@ function setupWorld() {
   S.units.forEach((t, i) => { const u = spawnUnit(t); u.xp = (S.unitXp || [])[i] || 0; });
   buildHQ();
   for (const id of S.cleared || []) { const l = city.lots[id]; if (l.obj) city.group.remove(l.obj); l.obj = null; l.built = null; for (const t of l.trees || []) city.group.remove(t); l.trees = []; }
-  for (const b of S.built) placeBuilding(city.lots[b.lot], b.model, b.rot || 0);
+  // (#20) парцелът на централата (и общият парцел на фирмата) е само за фирмата: стари записи със сграда там (номерата на парцелите
+  // се разместват при смяна на плана на града) — сградата не се рисува върху офиса/гаража; записът остава, нищо не се трие
+  const hqOnly = l => !!l && (l === city.hq || l.busy === 'campus');
+  for (const b of S.built) { const l = city.lots[b.lot]; if (hqOnly(l)) { (S.hqHidden = S.hqHidden || []).includes(b.lot) || S.hqHidden.push(b.lot); continue; } placeBuilding(l, b.model, b.rot || 0); }
   if (S.cityId === NEOM_ID) { neomDecor(); impLook(); }
   for (const g of cashObjs) scene.remove(g);
   cashObjs.length = 0;
