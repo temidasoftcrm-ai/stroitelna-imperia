@@ -120,7 +120,8 @@ import { mountHub } from './hub.js';
 import { showLevel } from './lvshow.js';
 import { showSub } from './subshow.js';   // дъщерните дружества — екран с логото (feature 'sub-screen')   // картинката на ниво 1 — при основаването на фирмата (feature 'lv-pics')   // „📊 Империя ▾“ — бутоните от втория ред на лентата в падащ панел (feature 'top-hub')
 import { sampleCurve, rectCorners } from './cityplan.js';
-import { cutMirror } from './blkcut.js';   // real-sizes (55): по-къси секции на панелните блокове
+import { whMatsLoad, whMatsYard, whMatsInfo, SLOT as WHM_SLOT } from './whmats.js';   // 📦 wh-mats (т. 34): кой материал е кой в двора на склада
+import { cutMirror, pickPart } from './blkcut.js';   // real-sizes (55): по-къси секции на панелните блокове
 import { makeWater } from './water.js';   // 🌊 Темза в Лондон (feature 'thames')
 import { LOD, LOD_NM, lodOf, CONT_AT, CONT_NM as LOD_CONT_NM, cityScore, topPerGroup, corridors, searchCities } from './maplod.js';   // степени на детайлност на картата (feature 'map-lod')
 import { planRoute, randomRoadPoint } from './cityplanroute.js';
@@ -513,6 +514,8 @@ let europe = null;
   if (feature('office-levels2')) for (const L of OFFICE2) jobs.push(load(L.url).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[`office2-l${L.lv}`] = g; prepNightFloors(g.scene, `office2-l${L.lv}`); blkSections(`office2-l${L.lv}`); }).catch(() => {}));   // 🆕 новите нива на офиса
   for (const n of GAS_KINDS) jobs.push(load(`assets/heavy/gas/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => {}));   // бензиностанции (всяка — свое „✓ OK“); нощем — навесът и магазинът (nightfloors 'gas')
   if (feature('wh-levels2')) for (let k = 1; k <= 10; k++) jobs.push(load(`assets/heavy/wh2/wh-l${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['wh2-l' + k] = g; }).catch(() => {}));   // 📦 складовете 1–10 (Sketchfab, CC-BY — assets/heavy/wh2/CREDITS.txt)
+  if (feature('wh-mats')) jobs.push(whMatsLoad(load));   // 📦 палети тухли, цимент, дъски, греди, пясък, кашони (assets/heavy/whmat, CC-BY)
+  if (feature('yards-real')) for (const k of ['bench', 'fence-wood', 'fence-iron', 'fence-cement', 'fence-modern', 'play-swings', 'play-tower', 'play-small']) jobs.push(load(`assets/heavy/street/${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['st-' + k] = g; }).catch(() => {}));   // 🛝 yards-real: пейка, площадки, огради (Sketchfab, CC-BY — assets/heavy/CREDITS.txt)
   if (feature('plants-real')) for (const k of ['bush-0', 'bush-1', 'bush-2', 'flowers', 'fountain']) jobs.push(load(`assets/heavy/plants/${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['pl-' + k] = g; }).catch(() => {}));
   for (const [dir, list] of Object.entries(MODELS)) if (dir !== 'industrial' && dir !== 'construction') for (const n of list) jobs.push(load(`assets/${dir}/${n}.glb`).then(g => { A[dir === 'industrial' ? 'ind-' + n : n] = g; if (dir === 'commercial' || dir === 'commercial2' || n === 'building-type-a' || n === 'building-type-b' || n === 'Building_Medium_2_001' || n === 'Building_Small_1') prepNightFloors(g.scene, n);   // Building_Medium_2_001 — Лабораторията → night-nyextra
     if (n === 'building-type-b') g.scene.traverse(o => { if (o.isMesh && o.material?.name === 'phong1') o.visible = false; }); }));   // бръшлянът на house-b е JPEG без прозрачност → черни петна   // нощем етажите светват (nightfloors.js)
@@ -1607,7 +1610,8 @@ function refreshWarehouse() {
   const y = city.whYard;
   while (y.children.length) y.remove(y.children[0]);
   let k = 0;
-  for (const m of Object.keys(ECON.MATERIALS)) {
+  if (feature('wh-mats')) whMatsYard(y, Object.keys(ECON.MATERIALS).map(m => ({ m, q: econ.stock(m), cap: matCap(m), unit: ECON.MATERIALS[m].unit, col: PALLET_COL[m] })));   // 📦 wh-mats: истински модели и/или иконки (whmats.js)
+  else for (const m of Object.keys(ECON.MATERIALS)) {
     const fill = Math.min(1, econ.stock(m) / matCap(m)), n = Math.ceil(fill * 4);
     for (let j = 0; j < n; j++) {
       const b = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.8, 1.3), new THREE.MeshStandardMaterial({ color: PALLET_COL[m] ?? 0xcccccc, roughness: 0.9 }));
@@ -10917,6 +10921,13 @@ if (AUTOTEST) {
       this.camAt(c.x + Math.sin(r) * 55 + Math.cos(r) * 30, 48, c.z + Math.cos(r) * 55 - Math.sin(r) * 30, c.x, 4, c.z);
       return P ? { lots: P.lots, all: P.all, gar: S.garageLot, wh: S.whLot } : 'няма съседни парцели (стар план) — кампус на един парцел'; },
     // 📦 Лабораторията (wh-levels2): складовете 1–10 — стари (горе) и нови (долу), край града
+    // 📦 Лабораторията (wh-mats): дворът на склада с материали; mode 'icons' | 'models' | 'both', h — час (22 = нощ), d — разстояние на камерата
+    whMatsLook(mode = 'both', h = 11, d = 30, lv = 4, a = 0.35, focus = null) { try { localStorage.setItem('whMatsMode', mode); } catch (e) { }
+      S.whLevel = lv; if (S.whLot == null || S.whLot === city.hq.id) { const l = city.lots.find(l => !l.busy && !l.built && l !== city.hq && !l.big); if (l) { S.whLot = l.id; l.busy = 'warehouse'; } }
+      const fr = [0.9, 0.6, 0.35, 1, 0.75, 0.5, 0.8, 0.25, 0.65]; Object.keys(ECON.MATERIALS).forEach((m, i) => { econ.s.stock[m] = Math.round(matCap(m) * fr[i % fr.length] * 10) / 10; });
+      buildWarehouse(); showMap(false); $('panel').classList.add('hidden'); this.time(h); const y = city.whYard; if (!y) return 'няма склад'; y.updateMatrixWorld(true);
+      const p = focus && WHM_SLOT[focus] ? y.localToWorld(new THREE.Vector3(WHM_SLOT[focus][0], 0, WHM_SLOT[focus][1])) : y.getWorldPosition(new THREE.Vector3()), r = lotRot(city.lots[S.whLot] || city.hq), sx = Math.sin(r), cz = Math.cos(r);
+      this.camAt(p.x + sx * d + cz * d * a, d * 0.7, p.z + cz * d - sx * d * a, p.x, 1, p.z); return { mode, camp: campusIn('warehouse'), yard: y.visible, kids: y.children.length, lot: S.whLot, sizes: whMatsInfo() }; },
     whRow() { if (city.whRowG) city.group.remove(city.whRowG); const g = city.whRowG = new THREE.Group(), z0 = tx(NJ - 1) + 60; let x = tx(0);
       for (let lv = 1; lv <= 10; lv++) { const n = wh2Mesh(lv), o = warehouseMesh(lv, true), w = n ? new THREE.Box3().setFromObject(n).getSize(new THREE.Vector3()).x : 12;
         o.position.set(x + w / 2, 0, z0); n && n.position.set(x + w / 2, 0, z0 + 40); g.add(o); if (n) g.add(n);

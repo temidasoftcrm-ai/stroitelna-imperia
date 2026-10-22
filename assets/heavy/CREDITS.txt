@@ -269,3 +269,22 @@ Replacements (Lab: "Изтрий и намери нов подобен моде�
 - trucks/scania-r.glb — "[XYZ] KR Scania R_Draft" by radzig541 — https://sketchfab.com/3d-models/c46e8ee246aa4863a2cf602cddf1bfeb (replaces trucks/scania.glb)
 - civic2/police-l1b.glb — "Paris Police Station" by aitortilla01 — https://sketchfab.com/3d-models/6314692176a44290b1ba432f9ea4840f (replaces civic2/police-l1.glb)
 - civic2/fire-l1b.glb — "Fire Station No. 1" by commonspence — https://sketchfab.com/3d-models/87edf04deb28434993274d9f05070865 (replaces civic2/fire-l1.glb)
+
+Street furniture, yards and warehouse materials (55, #42/#33/#34) — Sketchfab, reduced with gltf-transform (webp 1024, quantize):
+- street/play-swings.glb — „Playground“ by Tetiana_Andronova (@prudence), CC Attribution — https://sketchfab.com/3d-models/7901a2157cd94deda3d1e9621f9f04fc
+- street/play-tower.glb — „Low Poly Kids Playground“ by 99.Miles (@99.Miles), CC Attribution — https://sketchfab.com/3d-models/61c6f6f70db14bbb89ecdfa04b99bbc6
+- street/play-small.glb — „Playground“ by JanStano (@JanStano), CC Attribution — https://sketchfab.com/3d-models/965816aa987644c59de6eb9e844619ae
+- street/bench.glb — „Classic Park Bench (Low Poly)“ by Berk Gedik (@berkgedik), CC Attribution — https://sketchfab.com/3d-models/01a5b64427984632bb44242da3813bb1
+- street/lamps-pack.glb — „Various Low-Poly Street Lights“ by KMB3D (@kmb_jr), CC Attribution — https://sketchfab.com/3d-models/1173b0c4d9b0400bbeaafbee0e94ca59
+- street/lamp-classic.glb — „Street Lamp“ by bez_glaza (@bez_glaza), CC Attribution — https://sketchfab.com/3d-models/6881aa1e84b047d79860fa9297e05e22
+- street/tlight.glb — „Traffic Lights [Street Assets Vol. 02]“ by Alt (@whisper.alt), CC Attribution — https://sketchfab.com/3d-models/ab3efdd259a54d4aba5f878eacbe3f20
+- street/fence-wood.glb — „Fence pack - (low poly, game ready)“ by TampaJoey (@TampaJoey), CC Attribution — https://sketchfab.com/3d-models/f2ed9f555ff64eae95b408409cbff602
+- street/fence-iron.glb — „CC0 - Iron Fence“ by plaggy (@plaggy), CC Attribution — https://sketchfab.com/3d-models/9c5ad29c104c48e69a1227927655d489
+- street/fence-modern.glb — „Modern Fence Set“ by Visthétique (@visthetique), CC Attribution — https://sketchfab.com/3d-models/2ce34dc74fb7448e924d8a165669c575
+- street/fence-cement.glb — „Garden cement fence Wall Building“ by Mehdi Shahsavan (@ahmagh2e), CC Attribution — https://sketchfab.com/3d-models/19d283b94d664ef4ae3eab99d17cc00a
+- whmat/mat-bricks.glb — „Bricks On Pallet Set“ by nermin (@nermin), CC Attribution — https://sketchfab.com/3d-models/1802a2aae346409eb9bdb87c028a8d8a
+- whmat/mat-cement.glb — „Concrete bags and pallet“ by neverfollow81 (@neverfollow81), CC Attribution — https://sketchfab.com/3d-models/3c66c95bfbf4469186696b133e930f48
+- whmat/mat-wood.glb — „Wood stack“ by Maf'j Alvarez (@blujay), CC Attribution — https://sketchfab.com/3d-models/b370af957fa7405bb029e279fafeacb2
+- whmat/mat-steel.glb — „Steelbeam“ by jkvarel (@jkvarel1701), CC Attribution — https://sketchfab.com/3d-models/f5d4f9baa5ca48ac97efc3573ef08994
+- whmat/mat-sand.glb — „Photoscan Low-poly Construction Sand Pile“ by Martin Topolski (@martin.topolski), CC Attribution — https://sketchfab.com/3d-models/7a7533e1ecab4b1d96da55cc3ad9ad98
+- whmat/mat-box.glb — „CC0 - Cardboard Box Closed“ by plaggy (@plaggy), CC Attribution — https://sketchfab.com/3d-models/76c43725661d4e609e47a4dec95b72cf
