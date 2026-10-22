@@ -16,7 +16,7 @@
 // Мрежата: { nodes: [{ id, x, z, signal }], edges: [{ a, b, pts?: [[x,z]…], lanes: 1, w, rank }] } — сега от решетката
 // на града (gridNetwork), после — от плана на улиците (част A).
 import * as THREE from 'three';
-import { lampMats, truckLamps } from './vehmodels.js';
+import { lampMats, truckLamps, sirenKind, beaconsLit } from './vehmodels.js';
 import { feature } from './lab/feature.js';   // car-lens (55): по-малките лещи на фаровете
 import { makeRouter } from './junctionpaths.js';
 
@@ -149,7 +149,7 @@ export function createTraffic(opts) {
       if (heavyKind(v) && narrow(p)) { drop(v); continue; }   // автобус/камион — не по тясна улица
       const s = fromEdge ? 3 : 2 + rnd() * (p.len - 4);   // от входа на града — в началото на лентата
       if (!free(p, s, v.len)) { drop(v); continue; }   // без нова кола на заето място
-      const c = { obj: v.obj, set: v.set, rm: v.remove, w: v.w || 1.9, h: v.h || 1.45, L: v.len, kind: v.kind, heavy: heavyKind(v), p, s, v: 0, next: null, px: 0, pz: 0, pyaw: 0, x: 0, z: 0, yaw: 0, y: 0, py: 0, wait: 0, a: 0 };
+      const c = { em: v.obj ? sirenKind(v.obj) : null, obj: v.obj, set: v.set, rm: v.remove, w: v.w || 1.9, h: v.h || 1.45, L: v.len, kind: v.kind, heavy: heavyKind(v), p, s, v: 0, next: null, px: 0, pz: 0, pyaw: 0, x: 0, z: 0, yaw: 0, y: 0, py: 0, wait: 0, a: 0 };
       c.rear = []; c.blinkL = []; c.blinkR = []; if (v.obj) v.obj.traverse(m => { const l = m.userData.lamp; if (l === 'rear') c.rear.push(m); else if (l === 'blink') (m.userData.side === 'L' ? c.blinkL : c.blinkR).push(m); });
       c.rearMat = c.rear[0]?.material; c.brake = false;
       c.hist = [];
@@ -202,10 +202,10 @@ export function createTraffic(opts) {
   // предната кола: в същата пътека (следващата по s) или в следващата (последната в нея) — разстояние между броните
   function leader(c) {
     const P = c.p.cars, k = P.indexOf(c);
-    if (k < P.length - 1) { const f = P[k + 1]; return { gap: f.s - c.s - (f.L + c.L) / 2, v: f.v }; }
+    if (k < P.length - 1) { const f = P[k + 1]; return { gap: f.s - c.s - (f.L + c.L) / 2, v: f.v, car: f }; }
     const rest = c.p.len - c.s;
-    if (c.next && c.next.cars.length) { const f = c.next.cars[0]; return { gap: rest + f.s - (f.L + c.L) / 2, v: f.v }; }
-    if (c.next && c.next.kind === 'conn' && c.next.outL.cars.length) { const f = c.next.outL.cars[0]; return { gap: rest + c.next.len + f.s - (f.L + c.L) / 2, v: f.v }; }
+    if (c.next && c.next.cars.length) { const f = c.next.cars[0]; return { gap: rest + f.s - (f.L + c.L) / 2, v: f.v, car: f }; }
+    if (c.next && c.next.kind === 'conn' && c.next.outL.cars.length) { const f = c.next.outL.cars[0]; return { gap: rest + c.next.len + f.s - (f.L + c.L) / 2, v: f.v, car: f }; }
     return null;
   }
   // може ли да влезе във връзката c.next (стоп линията): светофар/предимство, свободна конфликтна зона, място след кръстовището
@@ -213,7 +213,7 @@ export function createTraffic(opts) {
   // c.why — защо чака (дебъг изгледът на junctionpaths.js); jp: зоната е заета и докато задницата на излязлата кола е още в нея
   function canGo(c, C) {
     const n = nodes.get(C.node);
-    if (n.sig && !sigAllows(n.sig, C)) { c.why = 'светофар'; return false; }
+    if (n.sig && !sigAllows(n.sig, C) && !c.emOn) { c.why = 'светофар'; return false; }   // #14: спешната с буркани — и на червено, щом зоната е свободна
     if (C.conf.some(d => d.cars.length || (jp && d.tails && d.tails.size))) { c.why = 'конфликтна зона'; return false; }   // пресичаща се крива — заета
     const tail = C.outL.cars[0];                                             // място след кръстовището
     if (tail && tail.s - tail.L / 2 < c.L + S0 + 1) { c.why = 'няма място след изхода'; return false; }
@@ -259,16 +259,26 @@ export function createTraffic(opts) {
     replan();
     while (cars.length - nAg < Math.min(opts.maxCars || 40, capacity)) if (!spawn()) break;   // и новите коли — на стъпка (еднакво при 1× и 4×)
     for (const n of nodes.values()) if (n.sig) sigStep(n.sig, H);
+    const MV = opts.movers ? opts.movers() : [];
+    // #14: спешните с буркани (линейка/полиция/пожарна от трафика и идващите към инцидент) — колите пред тях отбиват вдясно и спират, те минават покрай тях
+    for (const c of cars) c.emOn = !!c.em && beaconsLit(c.obj);
+    const EMV = [...cars.filter(c => c.emOn).map(e => ({ x: e.x, z: e.z, yaw: e.yaw, self: e })), ...MV.filter(m => m.em)], SIDE = opts.drive === 'left' ? -1 : 1;   // извън трафика (техниката по стария път, ТИР без агент, спешните коли): { x, z, l, w } — колите спират пред тях
     for (const c of cars) { c.px = c.x; c.pz = c.z; c.py = c.y; c.pyaw = c.yaw; if (c.tr) { c.tr.px = c.tr.x; c.tr.pz = c.tr.z; c.tr.pyaw = c.tr.yaw; } }
     for (const c of cars) {
       let vmax = c.p.vmax * (c.vk || 1); const ld = leader(c);
       if (jp && c.next) vmax = Math.min(vmax, Math.sqrt((c.next.vmax * (c.vk || 1)) ** 2 + 2 * B_COMF * 0.6 * Math.max(0, c.p.len - c.s - c.L / 2)));   // по-бавно преди завоя, ускорява след него
       c.why = ld && ld.gap < 6 && ld.v < 0.5 ? 'кола отпред' : null;
-      let gap = ld ? ld.gap : 1e9, dv = ld ? c.v - ld.v : 0;
+      let gap = ld && !(c.emOn && ld.car && ld.car.yieldT > 0) ? ld.gap : 1e9, dv = ld ? c.v - ld.v : 0;   // спешната — покрай отбилите
+      c.offT = c.emOn ? -SIDE * 0.5 : 0;
+      if (!c.emOn && !c.agent) for (const e of EMV) { if (e.self === c) continue; const dx = c.x - e.x, dz = c.z - e.z; if (dx * dx + dz * dz > 2500) continue; const fw = dx * Math.sin(e.yaw) + dz * Math.cos(e.yaw), sd = Math.abs(dx * Math.cos(e.yaw) - dz * Math.sin(e.yaw)); if (fw > 0 && fw < 45 && sd < 3 && Math.cos(c.yaw - e.yaw) > 0.5) { c.yieldT = 2; break; } }
+      if (c.yieldT > 0) { c.yieldT -= H; const g = 1 + c.v * c.v / (2 * B_COMF); if (g < gap) { gap = g; dv = c.v; } c.why = 'пропуска спешна'; c.offT = SIDE * 1.5; }
+      if (c.emOn && jp && c.next && c.next.kind === 'conn' && nodes.get(c.next.node)?.sig && c.p.len - c.s < 25) vmax = Math.min(vmax, 6);   // внимателно през кръстовището
       if (opts.blockers) for (const b of opts.blockers()) {   // 🚦 спусната бариера на прелез (railx.js): спира пред нея, ако е отпред в посоката му; който е минал — продължава
         const dx = b.x - c.x, dz = b.z - c.z, fw = dx * Math.sin(c.yaw) + dz * Math.cos(c.yaw), sd = Math.abs(dx * Math.cos(c.yaw) - dz * Math.sin(c.yaw));
         if (fw > 0 && fw < 40 && sd < 6) { const g = fw - c.L / 2 - 1; if (g < gap) { gap = Math.max(0, g); dv = c.v; } c.why = 'прелез'; }
       }
+      for (const m of MV) { const dx = m.x - c.x, dz = m.z - c.z; if (dx * dx + dz * dz > 1600) continue; const fw = dx * Math.sin(c.yaw) + dz * Math.cos(c.yaw), sd = Math.abs(dx * Math.cos(c.yaw) - dz * Math.sin(c.yaw));
+        if (fw > 0 && fw < 35 && sd < (m.w || 2.5) / 2 + (c.w || 2) / 2 + 0.3) { const g = fw - c.L / 2 - (m.l || 5) / 2 - 1; if (g < gap) { gap = Math.max(0, g); dv = c.v; c.why = 'машина отпред'; } } }
       const blk = c.why === 'прелез';
       // стоп линията: ако не може да влезе — виртуално препятствие в края на лентата
       const stop = c.p.kind === 'lane' && c.next && c.p.len - c.s < 22 && !mayEnter(c);
@@ -334,7 +344,7 @@ export function createTraffic(opts) {
       acc += dt; let n = 0; while (acc >= H && n < maxSteps) { step(); acc -= H; n++; }
       if (acc > H * maxSteps) acc = 0;   // прекалено бавен кадър — без натрупване (колите не прескачат — стъпките са същите)
       const t = acc / H;
-      for (const c of cars) { c.rx = c.px + (c.x - c.px) * t; c.rz = c.pz + (c.z - c.pz) * t; c.ry = c.py + (c.y - c.py) * t; c.ryaw = lerpA(c.pyaw, c.yaw, t); if (c.set) c.set(c.rx, 0.05 + c.ry, c.rz, c.ryaw); else { c.obj.position.set(c.rx, 0.05 + c.ry, c.rz); c.obj.rotation.y = c.ryaw; }
+      for (const c of cars) { c.rx = c.px + (c.x - c.px) * t; c.rz = c.pz + (c.z - c.pz) * t; c.ry = c.py + (c.y - c.py) * t; c.ryaw = lerpA(c.pyaw, c.yaw, t); c.off = (c.off || 0) + ((c.offT || 0) - (c.off || 0)) * Math.min(1, dt * 2.5); if (Math.abs(c.off) > 0.01) { c.rx -= Math.cos(c.ryaw) * c.off; c.rz += Math.sin(c.ryaw) * c.off; }   /* #14: отбива встрани */ if (c.set) c.set(c.rx, 0.05 + c.ry, c.rz, c.ryaw); else { c.obj.position.set(c.rx, 0.05 + c.ry, c.rz); c.obj.rotation.y = c.ryaw; }
         if (c.tr && c.tr.obj) { const r = c.tr; r.obj.position.set(r.px + (r.x - r.px) * t, 0.05 + c.ry, r.pz + (r.z - r.pz) * t); r.obj.rotation.y = lerpA(r.pyaw, r.yaw, t); } }
       if (opts.onSignal) for (const nd of nodes.values()) if (nd.sig) opts.onSignal(nd, sigView(nd.sig));
       lights();

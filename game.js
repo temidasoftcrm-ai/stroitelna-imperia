@@ -2019,7 +2019,9 @@ function sendTo(u, x, z, onArrive) {
 // junction-paths: техниката по лентите — старт на агента (на лентата) и край (обратно в сцената, последните метри до обекта)
 function jpUnitGo(u) {
   const A = jpAgents(), j = u.jp; if (!j) return;
-  if (!A || !A.free(j.r.paths[0], j.r.s0, 10)) { u.path = [{ x: j.x, z: j.z, road: false }]; u.pi = 0; u.onArrive = j.cb; u.jp = null; return; }   // без трафик/заето — направо (както при прекъснат път)
+  if (A && !A.free(j.r.paths[0], j.r.s0, 10) && (u.jpTry = (u.jpTry || 0) + 1) < 15) { u.jpWaitT = 1; return; }   // мястото на лентата е заето — пак след 1 s (до 15 пъти)
+  if (!A || !A.free(j.r.paths[0], j.r.s0, 10)) { u.jpTry = 0; u.path = roadRoute(u.x, u.z, j.x, j.z).map(p => ({ x: p.x, z: p.z, road: true })); u.path.push({ x: j.x, z: j.z, road: false }); u.pi = 0; u.onArrive = j.cb; u.jp = null; return; }   // без трафик/все заето — по улиците по старому (не по права линия през колите и сградите)
+  u.jpTry = 0;
   if (!u.jpSize) { const b = new THREE.Box3().setFromObject(u.obj), sz = b.getSize(new THREE.Vector3()); u.jpSize = [Math.max(3, Math.min(14, sz.z)), Math.max(1.8, Math.min(3.2, sz.x))]; }
   A.group.add(u.obj); u.agent = A.add({ obj: u.obj, len: u.jpSize[0], w: u.jpSize[1], h: 3, kind: 'truck', name: u.type, route: j.r, onArrive: () => { u.jpDone = true; } });
 }
@@ -2031,6 +2033,8 @@ function updateUnits(dt) {
   for (const u of units) {
     u.obj.userData.doors?.mixer.update(dt);
     if (u.agent) { const A = jpAgents(); if (!A || !A.alive(u.agent)) jpUnitEnd(u); else { const gp = A.group.position; u.x = u.agent.x + gp.x; u.z = u.agent.z + gp.z; u.yaw = u.agent.yaw; econ.addFuel(u.agent.v * dt); if (u.jpDone) jpUnitEnd(u); else continue; } }
+    if (u.jpWaitT > 0) { u.jpWaitT -= dt; if (u.jpWaitT <= 0) jpUnitGo(u); continue; }
+    if (u.path && u.path[u.pi]?.road && carBlocks(u.x, u.z, u.yaw, u.jpSize?.[0] || 6)) { u.wb = (u.wb || 0) + dt; if (u.wb < 8) continue; } else u.wb = 0;   // кола отпред — чака (до 8 s, после минава)
     if (!u.path) {
       if (u.state === 'working') { if (feature('site-anim')) { u.wt = (u.wt || 0) + dt; if (u.obj.position.distanceToSquared(camera.position) < 260 * 260) machineWork(u.obj, u.type, u.wt, u.id, dt); } else u.obj.position.y = Math.abs(Math.sin(performance.now() / 180 + u.id)) * 0.06; }
       continue;
@@ -2118,7 +2122,7 @@ function traffic2Make() {
   if (tr2) tr2.clear(); if (tr2G) { scene.remove(tr2G); tr2G = null; }
   const p2 = city.plan && city.plan.p2;   // планът v2: лентите от planNetwork, колите — в група, изместена с offset (като 3D изгледа на плана)
   if (p2) { tr2G = new THREE.Group(); tr2G.position.set(city.plan.offset[0], 0, city.plan.offset[1]); scene.add(tr2G); }
-  tr2 = createTraffic({ scene: tr2G || scene, camera, jp: feature('junction-paths'), drive: p2 && p2.drive === 'L' ? 'left' : 'right', maxCars: wantedTraffic(), blockers: () => [...(railx ? railx.blockers() : []), ...(incidents.blockers?.() || [])].map(b => p2 ? { x: b.x - city.plan.offset[0], z: b.z - city.plan.offset[1] } : b),   /* + затворената улица при инцидент (incidents2, 55) */   // camera — истинските фарове само за най-близките коли
+  tr2 = createTraffic({ scene: tr2G || scene, camera, movers: () => moversNow(), jp: feature('junction-paths'), drive: p2 && p2.drive === 'L' ? 'left' : 'right', maxCars: wantedTraffic(), blockers: () => [...(railx ? railx.blockers() : []), ...(incidents.blockers?.() || [])].map(b => p2 ? { x: b.x - city.plan.offset[0], z: b.z - city.plan.offset[1] } : b),   /* + затворената улица при инцидент (incidents2, 55) */   // camera — истинските фарове само за най-близките коли
     ...(p2 ? { built: planNetwork(p2, { jp: feature('junction-paths') }) } : { net: gridNetwork({ NBI, NBJ, tx, isRoad, TILE, signal: (i, j) => signals.some(s => s.i === i && s.j === j) }) }),
     makeCar: () => { addCar(); const t = traffic.pop(); if (!t) return null; const heavy = /Bus|Truck|Firetruck|firetruck/.test(t.obj.userData.src || '');
       if (tr2G) { const k = t.len > 3 && t.len < 14 ? 1 : (heavy ? 11 : 4.5) / (t.len || 4.5);   /* колите вече са в истинския размер (sf-car-* и резервите с kidK) — не ги изравняваме до 4,5 м; само ако мярката е сбъркана (55) */ t.obj.scale.multiplyScalar(k); t.len = (t.len || 4.5) * k; tr2G.add(t.obj); }   // планът v2 е в истински метри — колите в истинския си размер
@@ -2127,6 +2131,22 @@ function traffic2Make() {
 }
 // junction-paths: ТИР-овете — агенти в трафика по лентите (само градовете с плана v2, при traffic2 с jp); координатите на света → на плана
 let jpR = null;
+// превозните средства извън трафика (самосвалът и другата техника по стария път, ТИР без агент, идващите спешни коли): колите от трафика спират пред тях,
+// а техниката и ТИР-ът — пред колите (carBlocks). Координатите — на трафика (планът v2: без отместването на групата)
+function moversNow() {
+  const o = tr2G ? tr2G.position : { x: 0, z: 0 }, out = [];
+  for (const u of units) if (u.path && !u.agent && u.obj.parent) out.push({ x: u.x - o.x, z: u.z - o.z, l: u.jpSize?.[0] || 6, w: u.jpSize?.[1] || 2.6 });
+  for (const t of tirs.list) if (!t.agent && !t.trl && t.root.visible) out.push({ x: t.x - o.x, z: t.z - o.z, l: 12, w: 2.6 });
+  for (const m of incidents.movers?.() || []) out.push({ ...m, x: m.x - o.x, z: m.z - o.z });
+  return out;
+}
+function carBlocks(x, z, yaw, len = 6) {
+  const fx = Math.sin(yaw), fz = Math.cos(yaw), reach = len / 2 + 4;
+  const hit = (cx, cz) => { const dx = cx - x, dz = cz - z, fw = dx * fx + dz * fz; return fw > 0 && fw < reach && Math.abs(dx * fz - dz * fx) < 2.4; };
+  if (tr2 && tr2On()) { const o = tr2G ? tr2G.position : { x: 0, z: 0 }; for (const c of tr2.cars) if (hit(c.x + o.x, c.z + o.z)) return true; return false; }
+  for (const t of traffic) if (hit(t.obj.position.x, t.obj.position.z)) return true;
+  return false;
+}
 function jpAgents() {
   if (!tr2 || !tr2.opts.jp || !tr2G || !city.plan || !city.plan.p2 || !tr2On()) return null;
   if (!jpR || jpR.tr !== tr2) { const o = city.plan.offset, L = q => q.p ? q : { x: q.x - o[0], z: q.z - o[1] }, R = makeRouter(tr2);
@@ -2775,6 +2795,7 @@ const tirs = createTirs({
   roadPath: (x0, z0, x1, z1) => roadRoute(x0, z0, x1, z1).map(p => ({ x: p.x, z: p.z })),
   entry: () => ({ x: tx(NI - 1), z: tx(3 * Math.round((N - 1) / 6)) }),
   matInfo: id => ECON.MATERIALS[id],
+  blocked: (x, z, yaw) => carBlocks(x, z, yaw, 12),   /* ТИР-ът без агент чака колата пред себе си */
   agents: () => jpAgents(),   /* junction-paths: ТИР-ът — агент в трафика по лентите (градовете с плана v2) */
 });
 const whTarget = () => S.whLot != null ? { x: city.lots[S.whLot].x, z: city.lots[S.whLot].z + 3.5 } : { x: city.hq.x, z: city.hq.z + 5 };
@@ -10895,6 +10916,7 @@ if (AUTOTEST) {
     passing: () => passing && passing.train ? { z: Math.round(passing.train.z), v: +passing.train.v.toFixed(1), stop: +passing.train.stop.toFixed(1) } : null,
     tirs: () => tirs.list.map(t => `${t.order.matId}:${t.state}`),
     jpAg: () => tr2 && tr2.cars.filter(c => c.agent).map(c => [c.agent.name, c.p.kind, +c.s.toFixed(1), +c.p.len.toFixed(1), +c.v.toFixed(2), c.why, +c.wait.toFixed(1), c.ri, c.route.length, +c.goal.toFixed(1)]),   /* junction-paths: агентите */
+    moverHits() { if (!tr2) return null; const M = moversNow(); let n = 0; for (const m of M) for (const c of tr2.cars) if (Math.hypot(c.x - m.x, c.z - m.z) < 2.5) n++; return { movers: M.length, hits: n, yielding: tr2.cars.filter(c => c.why === 'машина отпред').length, waiting: units.filter(u => u.wb > 0).length }; },   /* самосвалът през колите: колко коли са върху техниката извън трафика */
     unitTest() { const u = units.find(q => q.state === 'idle'); if (!u) return null; const far = [...city.lots].sort((a, b) => Math.hypot(b.x - u.x, b.z - u.z) - Math.hypot(a.x - u.x, a.z - u.z))[0]; u.state = 'driving'; sendTo(u, far.x, far.z, () => { u.state = 'idle'; }); return [u.type, Math.round(Math.hypot(far.x - u.x, far.z - u.z))]; },   /* junction-paths: машина до най-далечния парцел */
     tirTest(m = 'sand', delay = 0) { sendTir({ id: 9e8 + ((Math.random() * 1e6) | 0), matId: m, qty: 1 }, delay); return tirs.list.length; },   /* junction-paths: пробен ТИР (поръчката не съществува — складът не се променя) */
     lookTir(k = 0, dist = 26) { const t = tirs.list[k]; if (!t) return; controls.target.set(t.x, 2, t.z); camera.position.set(t.x + dist * 0.8, dist * 0.6, t.z + dist * 0.7); fly = null; },

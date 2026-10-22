@@ -193,6 +193,7 @@ export function createTirs(deps) {
       if (t.A !== undefined || t.trl) { updAgent(t, dt); continue; }
       if (t.t < 0) { t.t += dt; if (t.t >= 0) t.root.visible = true; else continue; }
       if (t.mover && t.mover.kind === 'mixer') t.mover.obj.rotation.z += dt * (t.state === 'unload' ? 6 : 2);
+      if (t.state !== 'unload' && deps.blocked && deps.blocked(t.x, t.z, t.yaw)) { t.wb = (t.wb || 0) + dt; if (t.wb < 8) continue; } else t.wb = 0;   // кола отпред — чака (до 8 s)
       if (t.state === 'go') {
         t.age += dt; if (follow(t, dt)) { t.state = 'unload'; t.u = 0; }
       } else if (t.state === 'unload') {
