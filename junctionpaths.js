@@ -16,44 +16,58 @@ export function makeRouter(built) {
   for (const n of nodes.values()) for (const c of n.conns) next.set(c, [c.outL]);
   const wide = p => p.edge?.heavy !== false && (p.edge?.w ?? 99) >= W_HEAVY;   // edge.heavy === false — улица само за коли (roadnet.js: класът „улица“)
   // най-близката лента (не връзка) до точката: проекция върху отсечките на полилинията → { p, s, d }
-  function nearest(x, z, ok = () => true) {
+  function proj(L, x, z) {   // най-близката точка на лентата L → { p, s, d }
     let best = null;
-    for (const L of lanes) {
-      if (L.len < 4 || !ok(L)) continue;
-      for (let k = 1; k < L.pts.length; k++) {
-        const a = L.pts[k - 1], b = L.pts[k], dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / l2));
-        const d = Math.hypot(a[0] + dx * t - x, a[1] + dz * t - z); if (!best || d < best.d) best = { p: L, s: L.cum[k - 1] + (L.cum[k] - L.cum[k - 1]) * t, d };
-      }
+    for (let k = 1; k < L.pts.length; k++) {
+      const a = L.pts[k - 1], b = L.pts[k], dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / l2));
+      const d = Math.hypot(a[0] + dx * t - x, a[1] + dz * t - z); if (!best || d < best.d) best = { p: L, s: L.cum[k - 1] + (L.cum[k] - L.cum[k - 1]) * t, d };
     }
     return best;
+  }
+  function nearest(x, z, ok = () => true) {
+    let best = null;
+    for (const L of lanes) { if (L.len < 4 || !ok(L)) continue; const q = proj(L, x, z); if (q && (!best || q.d < best.d)) best = q; }
+    return best;
+  }
+  // целта { x, z }: всички ленти до GOAL_SLACK м по-далеч от най-близката — и двете посоки на улицата (и съседната улица при ъглов парцел);
+  // маршрутът спира на тази, до която се стига най-бързо, вместо да обикаля през задънения край/карето за отсрещната лента
+  const GOAL_SLACK = 8;
+  function goalsNear(x, z, B, ok) {
+    const G = new Map();
+    for (const L of lanes) { if (L.len < 4 || !ok(L)) continue; const q = proj(L, x, z); if (q && q.d <= B.d + GOAL_SLACK) G.set(L, Math.max(0.5, Math.min(q.s, L.len - 0.5))); }
+    return G;
   }
   // from: { x, z } или { p, s } (оттам, където агентът е сега); to: { x, z }. Дейкстра по пътеките (лента → връзка → лента)
   function route(from, to, o = {}) {
     const okL = o.heavy ? wide : () => true, A = from.p ? from : nearest(from.x, from.z, L => okL(L) && !L.leave && L.ring == null), B = to.p ? to : nearest(to.x, to.z, L => okL(L) && L.ring == null && !L.enter);   // целта — лента извън пръстена, не входяща от края на картата (до нея няма път)   // целта — лента извън пръстена (или зададена направо)
     if (!A || !B) return null;
     const s0 = Math.min(A.s, A.p.len), s1 = Math.max(0.5, Math.min(B.s, B.p.len - 0.5));
+    const gS = to.p || o.oneSide ? new Map((o.anyLane && B.p.sibs ? B.p.sibs : [B.p]).map(q => [q, s1])) : goalsNear(to.x, to.z, B, L => okL(L) && L.ring == null && !L.enter);   // лента → s на целта
+    { const sA = gS.get(A.p); if (sA != null && sA >= s0) return { paths: [A.p], s0, s1: sA, len: sA - s0 }; }
     if (A.p === B.p && s1 >= s0) return { paths: [A.p], s0, s1, len: s1 - s0 };
     if (o.anyLane && A.p.sibs && A.p.sibs.includes(B.p) && s1 >= s0) return { paths: [B.p], s0, s1, len: s1 - s0 };
     // купчина с [разстояние, пътека, цел?]: целта е отделен запис (до s1 на последната лента), за да може и „назад по същата лента“ (обиколка)
     const seeds = o.anyLane && A.p.sibs ? A.p.sibs : [A.p], dist = new Map(seeds.map(q => [q, q.len - s0])), prev = new Map(), heap = seeds.map(q => [q.len - s0, q, false]);   /* anyLane: от която и да е успоредна лента (новият агент избира лентата) */
     const push = e => { heap.push(e); let k = heap.length - 1; while (k) { const q = (k - 1) >> 1; if (heap[q][0] <= heap[k][0]) break; [heap[q], heap[k]] = [heap[k], heap[q]]; k = q; } };
     const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
-    let goalPrev = null, goalLane = B.p; const goals = o.anyLane && B.p.sibs ? new Set(B.p.sibs) : new Set([B.p]);
+    let goalPrev = null, goalLane = B.p; const goals = gS;
+    const avoid = o.noAvoid ? null : o.avoid || (built.closed && built.closed());   // 🚧 затворените пътеки (traffic.js → closed: инцидент, прелез, ремонт) — без тях, освен целта
     while (heap.length) {
       const [d, p, goal, gl] = pop();   // d — разстоянието до края на пътеката p (за целта — до s1)
       if (goal) { goalPrev = p; goalLane = gl; break; }
       if (d > dist.get(p) + 1e-9) continue;
       for (const q of next.get(p) || []) {
-        if (q.kind === 'lane' && !okL(q)) continue; if (q.kind === 'conn' && !okL(q.outL)) continue;
-        if (goals.has(q)) push([d + s1, p, true, q]);
+        if (q.kind === 'lane' && !okL(q)) continue; if (q.kind === 'conn' && !okL(q.outL)) continue; if (avoid && avoid.size && avoid.has(q) && !goals.has(q)) continue;
+        if (goals.has(q)) push([d + goals.get(q), p, true, q]);
         const dq = d + q.len; if (dist.has(q) && dist.get(q) <= dq) continue;
         dist.set(q, dq); prev.set(q, p); push([dq, q, false]);
       }
     }
-    if (!goalPrev) return o.heavy ? route(from, to, { ...o, heavy: false }) : null;   // камионът няма широк път — по обикновения
+    if (!goalPrev) return o.heavy ? route(from, to, { ...o, heavy: false }) : avoid && avoid.size && !o.noAvoid ? route(from, to, { ...o, avoid: null, noAvoid: true }) : null;   /* без обход — през затвореното (ще чака отварянето) */   // камионът няма широк път — по обикновения
     const paths = [goalLane]; for (let p = goalPrev; p; p = seeds.includes(p) ? null : prev.get(p)) paths.push(p);
     paths.reverse(); if (!seeds.includes(paths[0])) return null;
-    return { paths, s0, s1: Math.min(s1, goalLane.len - 0.5), len: paths.reduce((t, p) => t + p.len, 0) - s0 - (goalLane.len - s1) };
+    const sG = goals.get(goalLane) ?? s1;
+    return { paths, s0, s1: Math.min(sG, goalLane.len - 0.5), len: paths.reduce((t, p) => t + p.len, 0) - s0 - (goalLane.len - sG) };
   }
   return { route, nearest };
 }
