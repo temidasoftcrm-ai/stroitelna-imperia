@@ -159,6 +159,7 @@ const DEMOS = [
   ['🪧 Билбордовете по местата: големите в покрайнините, без кръгови/кръстовища (Хасково, през 5 s следващият)', 'haskovo', d => { let i = 0; const go = () => { const r = d.bbLook(i, 60); if (r) { i = (i + 1) % r[1]; setTimeout(go, 5000); } }; setTimeout(go, 3000); }],   // bb-place
   ['🕌 Сюлеймание (модел от Meshy) — ден, после нощ (Истанбул)', 'istanbul', d => { const go = () => { const L = d.city().landmarks, i = L.findIndex(o => o.kind === 'suleymaniye2'); if (i >= 0) d.lookLm(i, 110); }; setTimeout(go, 3000); setTimeout(() => { d.time(22); go(); }, 10000); }],   // lm-suleymaniye2
   ['🌃 Уилис тауър нощем — прозорците и червените светлини по антените (Чикаго)', 'chicago', d => { const go = () => { d.time(22); const o = d.city().landmarks.find(x => x.kind === 'willis'); if (!o) return; let top = 0; o.group.traverse(m => { if (m.isMesh) { m.geometry.computeBoundingBox(); top = Math.max(top, m.geometry.boundingBox.clone().applyMatrix4(m.matrixWorld).max.y); } }); const p = o.group.position; d.camAt(p.x + 110, top * 0.7, p.z + 150, p.x, top * 0.6, p.z); }; setTimeout(go, 3000); }],   // night-willis
+  ['🏛️ Котелническа висотка — без плочата с парка, 176 м (Москва)', 'moscow', d => { const go = () => { const L = d.city().landmarks, i = L.findIndex(o => o.kind === 'kotel'); if (i >= 0) d.lookLm(i, 160); }; setTimeout(go, 3000); }],   // lm-kotel
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
