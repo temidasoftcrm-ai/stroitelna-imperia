@@ -4332,7 +4332,8 @@ function applySel() {
 // главите с куести на континентите излизат, щом континентът е отключен И имаш връзка до „вратата“ му (линия/филиал там)
 for (const [ch, k] of [[AFRICA_CHAPTER, 'af'], [NA_CHAPTER, 'na'], [SA_CHAPTER, 'sa'], [AS_CHAPTER, 'as'], [OC_CHAPTER, 'oc']]) { const f = ch.openIf; ch.openIf = c => { if (!f(c) || !S || !contByKey(k)?.open()) return false; try { return contLinked(k); } catch { return false; } }; ch.lockTxt = (ch.lockTxt || '') + ' После създай линия до „вратата“ на континента.'; }
 const quests = createQuests({ S: () => S, econ: () => econ, toast, fmt, save, sound: n => Sound.play(n),
-  railPath: (a, b) => railPath(a, b), connectedCities: () => connectedCities(), factories: ECON.FACTORIES, toll: () => hwToll(), isForeign: id => isForeign(id), pop: (k, a, b) => showEventPop(k, a, b), onClaim: () => dev.add(dev.XP.quest), devBest: () => dev.best() });
+  railPath: (a, b) => railPath(a, b), connectedCities: () => connectedCities(), factories: ECON.FACTORIES, toll: () => hwToll(), isForeign: id => isForeign(id), pop: (k, a, b) => showEventPop(k, a, b), onClaim: () => dev.add(dev.XP.quest), devBest: () => dev.best(),
+  firstPct: () => { if (!S || !econ) return 0; const id = S.hqCity || S.cityId; if (econ.isFinished(id)) return 100; if (id === S.cityId) return city && city.lots ? builtPct() : 0; const c = (S.cities || {})[id]; return c && c.lotTotal ? Math.round((1 - (c.freeAll ?? 0) / c.lotTotal) * 100) : 0; } });   /* куестът „Пълен първи град“ */
 // оферти от доставчици (supply.js): стоката идва, щом има жп линия или магистрала до доставчика
 const supply = createSupply({ S: () => S, econ: () => econ, MATERIALS: ECON.MATERIALS, FACTORIES: ECON.FACTORIES || [], cityOk: id => cityLv(id) <= 5 || dev.best() >= cityLv(id),
   cityName: id => cityById(id).nm, ownedCities: () => ownedCities(), isForeign: id => isForeign(id),

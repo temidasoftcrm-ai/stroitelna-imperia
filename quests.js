@@ -21,6 +21,7 @@ const CHAPTERS = [
     { id: 'm50', ico: '💶', nm: 'Първите пари', ds: 'Имай 50 000 € в банката.', goal: c => [c.money(), 50000], money: M(5000) },
     { id: 'rep1', ico: '⭐', nm: 'Добро име', ds: 'Достигни репутация 1 ★.', goal: c => [c.rep(), 1], money: M(10000) },
     { id: 'off2', ico: '🏢', nm: 'Истински офис', ds: 'Надгради офиса до ниво 2.', goal: c => [c.max('officeLevel'), 2], money: M(15000) },
+    { id: 'full1', ico: '🏙️', nm: 'Пълен първи град', ds: 'Застрой първия си град на 100% — бонусът е за втория град.', goal: c => [Math.min(100, c.firstPct()), 100], money: M(500000) },   // потребителят 22.10
   ] },
   { id: 'c2', nm: 'Растеж', ico: '📈', quests: [
     { id: 's1', ico: '🏪', nm: 'Първият магазин', ds: 'Завърши магазин.', goal: ['shop', 1], money: M(25000) },
@@ -123,6 +124,7 @@ export function createQuests(deps) {
     money: () => deps.econ().money,
     deposit: () => deps.econ().s.deposit || 0,
     devBest: () => deps.devBest ? deps.devBest() : 1,
+    firstPct: () => deps.firstPct ? deps.firstPct() : 0,
     S: () => S(),
     econ: () => deps.econ(),
     rep: () => S().rep || 0,
