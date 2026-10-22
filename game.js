@@ -4337,12 +4337,20 @@ const quests = createQuests({ S: () => S, econ: () => econ, toast, fmt, save, so
 const supply = createSupply({ S: () => S, econ: () => econ, MATERIALS: ECON.MATERIALS, FACTORIES: ECON.FACTORIES || [], cityOk: id => cityLv(id) <= 5 || dev.best() >= cityLv(id),
   cityName: id => cityById(id).nm, ownedCities: () => ownedCities(), isForeign: id => isForeign(id),
   rail: (a, b) => { const p = railPath(a, b); return !!p && p.length > 1; },
-  road: (a, b) => { const done = [...allSegs(), ...ALL_AB].filter(x => hwAll().includes(x.id)), seen = new Set([a]), q = [a]; while (q.length) { const c = q.shift(); if (c === b) return true; for (const x of done) { const n = x.a === c ? x.b : x.b === c ? x.a : null; if (n && !seen.has(n)) { seen.add(n); q.push(n); } } } return false; },
+  road: (a, b) => hwReach(a, b),
   toast, fmt, save, sound: n => Sound.play(n), canOffer: () => dev.offersOpen(), devLevel: () => dev.best(), balkans: () => true,
   onRailDelivery: txt => { if (!$('mapScreen').classList.contains('hidden')) toast(txt, 'good'); else sendCityTrain(txt); refreshWarehouse(); } });
 // ⛏️ Азия: собствени кариери, мини и заводи (mines.js)
 const railLinked = (a, b) => { const p = railPath(a, b); return !!p && p.length > 1; };
-const roadLinked = (a, b) => { const done = [...allSegs(), ...ALL_AB].filter(x => hwAll().includes(x.id)), seen = new Set([a]), q = [a]; while (q.length) { const c = q.shift(); if (c === b) return true; for (const x of done) { const n = x.a === c ? x.b : x.b === c ? x.a : null; if (n && !seen.has(n)) { seen.add(n); q.push(n); } } } return false; };
+// ⚡ (55, бавното зареждане): свързани ли са два града по готовите магистрали — съседството се строи веднъж (беше O(градове × отсечки),
+// с hwAll() за всяка отсечка) и се пази, докато не се смени броят на готовите/всички отсечки
+var _hwAdj = null, _hwAdjKey = '';   // var — road() по-горе може да се извика преди този ред
+function hwReach(a, b) {
+  const done = hwAll(), segs = [...allSegs(), ...ALL_AB], key = done.length + ':' + segs.length;
+  if (key !== _hwAdjKey || !_hwAdj) { const ok = new Set(done); _hwAdj = new Map(); for (const x of segs) if (ok.has(x.id)) { (_hwAdj.get(x.a) || _hwAdj.set(x.a, []).get(x.a)).push(x.b); (_hwAdj.get(x.b) || _hwAdj.set(x.b, []).get(x.b)).push(x.a); } _hwAdjKey = key; }
+  const seen = new Set([a]), q = [a]; while (q.length) { const c = q.shift(); if (c === b) return true; for (const n of _hwAdj.get(c) || []) if (!seen.has(n)) { seen.add(n); q.push(n); } } return false;
+}
+const roadLinked = (a, b) => hwReach(a, b);
 let _mineLinkRail = null, _mineLinkRoad = null, _mineLinkBranches = null, _mineLinkSea = null, _mineLinkSeaN = -1, _mineLinkAbN = -1, _mineLinkHQ = null;
 const _mineLinkCache = new Map();
 // как стига продукцията от азиатски град до Европа: по жп (Пътят на коприната) или по море (пристанище там или в свързан град)
@@ -10267,7 +10275,7 @@ const CITY_STING = { lasvegas: 'assets/local/vegas-elvis.mp3', newyork: 'assets/
 const stingOk = id => !!CITY_STING[id] && /^(localhost|127\.0\.0\.1)$/.test(location.hostname);   // песните са само локално — на сайта не се търсят (без 404)
 function frame() {
   perf.frame();
-  if (city.p2Pending && city.planView) { const pv = city.planView; pv.userData.pump(4); if (pv.userData.done) { city.p2Pending = false; try { planViewDone(pv, city.plan); } catch (e) { console.warn('planView', e); } } }   // поетапното строене на града — до 4 ms на кадър
+  if (city.p2Pending && city.planView) { const pv = city.planView; pv.userData.pump(4); if (pv.userData.done) { city.p2Pending = false; try { planViewDone(pv, city.plan); } catch (e) { console.warn('planView', e); } if (renderer.compileAsync) renderer.compileAsync(scene, camera).catch(() => {}); } }   /* ⚡ шейдърите на поетапно построения град — паралелно */   // поетапното строене на града — до 4 ms на кадър
   if (city.osmView) { const d = camera.position.distanceTo(controls.target); osmFog.near = Math.max(180, d * 0.9); osmFog.far = Math.max(420, d * 2.4 + 200); }   // weather.js я прилага (fogBase)
   if ((++lmLabT % 60) === 0) try { updLmLabels(); if (lmLabT % 600 === 0) updGasLogos(); } catch (e) { }
   if (lmLabT % 20 === 0) try { updMyBeams(); } catch (e) { myBeams.err = e.message; }
@@ -10408,7 +10416,13 @@ addEventListener('unhandledrejection', e => { if (!AUTOTEST) logError('promise: 
 const cine = createCinema({ S: () => S, sound: () => Sound, ready: () => !!S && city.ready, cityById, speed: () => speed, setSpeed, save, lv20: () => dev.has('EMPIRE'),
   firstPlane: () => !!S.firstAirport, firstOil: () => mines.state().sites.some(x => x.kind === 'oilwell'), auto: () => !AUTOTEST });
 cine.start();
-{ const el = $('loading'); $('ldTxt').textContent = 'Готово!'; perf.ready(); setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 700); }, AUTOTEST ? 0 : 900); }
+// ⚡ (55, „забива при зареждане“): екранът стои, докато градът се построи и видеокартата компилира шейдърите (~200 програми) —
+// паралелно (KHR_parallel_shader_compile, renderer.compileAsync), а не една по една при първия кадър (замръзване ~19 s след „Готово!“)
+const ldFinish = () => { const el = $('loading'); if (!el) return; $('ldTxt').textContent = 'Готово!'; setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 700); }, AUTOTEST ? 0 : 900); };
+renderer.debug.checkShaderErrors = params.has('shadercheck');   /* ⚡ иначе getProgramInfoLog чака всяка компилация синхронно (както в directors3d.js); ?shadercheck — за отстраняване на грешки */
+const ldWarm = async () => { if (!renderer.compileAsync || !S || !city || !city.group) return; const t = $('ldTxt'); if (t) t.textContent = 'Подготвям графиката…';
+  try { await Promise.race([renderer.compileAsync(scene, camera), new Promise(r => setTimeout(r, 8000))]); } catch (e) { console.warn('compileAsync', e); } };
+perf.ready();
 const saved = loadSave();
 if (saved && !AUTOTEST) backupRaw(currentSlot(), localStorage.getItem(SAVE_KEY), 'старт');
 // 💾 автозапис: записва всяка минута и при затваряне; на всеки 5 минути пази и резервно копие (🕒 Автозаписи)
@@ -11294,4 +11308,5 @@ if (params.has('profile')) {
     window.__bench = { setSpeed, stop() { alive = false; }, dump() { const finish = b => Object.fromEntries(Object.entries(b).map(([k,x]) => { const a = [...x.samples].sort((p,q) => p-q); return [k,{n:x.n,mean:+(x.sum/x.n).toFixed(3),p95:+(a[Math.floor(a.length*.95)]||0).toFixed(3),max:+x.max.toFixed(3)}]; })); const sorted = [...frameMs].sort((a,b)=>a-b); const gl=renderer.getContext(), ext=gl.getExtension('WEBGL_debug_renderer_info'); return { day:S.day, cities:Object.keys(S.cities||{}).length, built:(S.built||[]).length+Object.values(S.cities||{}).reduce((n,c)=>n+(c.built||[]).length,0), frames:frameMs.length, frameMean:+(frameMs.reduce((a,b)=>a+b,0)/frameMs.length).toFixed(3), frameP95:+(sorted[Math.floor(sorted.length*.95)]||0).toFixed(3), frameMax:+Math.max(...frameMs).toFixed(3), days, dayStats:finish(dayStats), totals:finish(stats), longTasks:longTasks.length, longTaskMax:+Math.max(0,...longTasks.map(x=>x.duration)).toFixed(3), visible, gpu:drawInfo, pixelRatio:renderer.getPixelRatio(), shadows:{enabled:renderer.shadowMap.enabled,autoUpdate:renderer.shadowMap.autoUpdate,casters:visible.castsShadow}, gl:ext?[gl.getParameter(ext.UNMASKED_VENDOR_WEBGL),gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)]:[gl.getParameter(7936),gl.getParameter(7937)], heap:performance.memory?.usedJSHeapSize||0, cam:[camera.position.x,camera.position.y,camera.position.z,controls.target.x,controls.target.y,controls.target.z] }; } };
   };
 }
+await ldWarm(); ldFinish();   // ⚡ (55): чак когато градът е готов и шейдърите са компилирани
 frame();
