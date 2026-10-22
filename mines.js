@@ -64,7 +64,7 @@ export function createMines(deps) {
   function buy(id, kind) {
     const K = MINE_KINDS[kind]; if (!K || !canBuild(id, kind)) return false;
     const e = deps.econ(); if (!e.canAfford(K.cost)) { deps.toast(`Нямаш ${deps.fmt(K.cost)} € за ${K.nm.toLowerCase()}.`, 'bad'); return false; }
-    e.spend(K.cost, 'покупка', `${K.nm} в ${deps.cityName(id)}`);
+    e.spend(K.cost, 'покупка', `${K.nm} в ${deps.cityName(id)}`); deps.xp && deps.xp(1000);
     const m = st(); m.seq = (m.seq || 0) + 1;
     m.sites.push({ id: m.seq, city: id, kind, lv: 1, store: 0, since: deps.S().day });
     deps.toast(`${K.ico} ${K.nm} в ${deps.cityName(id)} е твоя!${K.out ? ` Произвежда ~${deps.fmt(rate(m.sites[m.sites.length - 1]))} ${mat(K.out).unit}/ден.` : kind === 'grid' ? ' Градът е в националната мрежа.' : kind === 'battery' ? ' Пази тока от обяд за вечерния пик (+30% цена).' : ' Танкерите ще изнасят петрола и горивото всяка седмица.'}`, 'good');
@@ -73,7 +73,7 @@ export function createMines(deps) {
   function upgrade(sid) {
     const s = st().sites.find(x => x.id === sid); if (!s || (s.lv || 1) >= LV_MAX) return;
     const c = upCost(s), e = deps.econ(); if (!e.canAfford(c)) { deps.toast(`Нямаш ${deps.fmt(c)} €.`, 'bad'); return; }
-    e.spend(c, 'покупка', `Разширение: ${MINE_KINDS[s.kind].nm} в ${deps.cityName(s.city)}`); s.lv = (s.lv || 1) + 1;
+    e.spend(c, 'покупка', `Разширение: ${MINE_KINDS[s.kind].nm} в ${deps.cityName(s.city)}`); deps.xp && deps.xp(500); s.lv = (s.lv || 1) + 1;
     deps.toast(`⬆️ ${MINE_KINDS[s.kind].nm} в ${deps.cityName(s.city)} — ниво ${s.lv}, добив ~${deps.fmt(rate(s))}/ден.`, 'good'); deps.sound && deps.sound('upgrade'); deps.save(); deps.onChange && deps.onChange(s.city);
   }
   function sell(sid) {   // продава склада на обекта на място

@@ -30,7 +30,7 @@ export function createHotels(deps) {
     const t = nextT(id); if (t == null) return; const c = costOf(id, t), e = deps.econ();
     if (!e.canAfford(c)) { deps.toast(`Нямаш ${deps.fmt(c)} €.`, 'bad'); return; }
     const first = !Object.keys(st()).length, nm = deps.city(id)?.nm || id;
-    e.spend(c, 'хотели', `${TIERS[t].nm} ${TIERS[t].st} в ${nm}`); st()[id] = { t, since: st()[id]?.since || deps.day() };
+    e.spend(c, 'хотели', `${TIERS[t].nm} ${TIERS[t].st} в ${nm}`); deps.xp && deps.xp(1000); st()[id] = { t, since: st()[id]?.since || deps.day() };
     const label = t === 3 ? `Гранд хотел „${deps.brand()}“` : `${TIERS[t].nm} ${TIERS[t].st}`;
     if (first) deps.pop && deps.pop('resort-unlock', `🏨 ${deps.brand()} Хотелс — първият хотел!`, `${label} в ${nm}. Всеки нов хотел прави марката по-позната — заетостта расте във всички.`);
     else deps.toast(`🏨 ${label} в ${nm} — ~${deps.fmt(revOf(id))} €/ден.`, 'good');
@@ -42,7 +42,7 @@ export function createHotels(deps) {
   const canConvert = id => !st()[id] && deps.officeLv(id) >= OFFICE_MAX;
   function convert(id) {
     if (!canConvert(id)) return; const e = deps.econ(); if (!e.canAfford(CONVERT)) { deps.toast(`Нямаш ${deps.fmt(CONVERT)} € за преобразуването.`, 'bad'); return; }
-    e.spend(CONVERT, 'хотели', `Преобразуване на офиса в ${deps.city(id)?.nm} в хотел`);
+    e.spend(CONVERT, 'хотели', `Преобразуване на офиса в ${deps.city(id)?.nm} в хотел`); deps.xp && deps.xp(2000);
     const first = !Object.keys(st()).length; st()[id] = { t: 1, since: deps.day(), office: true };
     if (first) deps.pop && deps.pop('resort-unlock', `🏨 ${deps.brand()} Хотелс — първият хотел!`, `Кулата „Империя“ в ${deps.city(id)?.nm} вече е ${TIERS[1].nm.toLowerCase()} ${TIERS[1].st}. Всеки нов хотел прави марката по-позната — заетостта расте във всички.`);
     else deps.toast(`🏨 Офисът в ${deps.city(id)?.nm} стана ${TIERS[1].nm.toLowerCase()} ${TIERS[1].st} — ~${deps.fmt(revOf(id))} €/ден.`, 'good');

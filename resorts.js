@@ -183,7 +183,7 @@ export function createResorts(deps) {
     if (!r || !ev || (what === 'rooms' ? ev.bRooms : ev.bTrans) || ev.day - S.day < EV.close) return false;
     const c = evCost(r, s, ev, what, S.day);
     if (!econ.canAfford(c)) { deps.toast(`Нямаш достатъчно пари (${deps.fmt(c)} €).`, 'bad'); return false; }
-    econ.spend(c, 'покупка', `${r.nm}: ${what === 'rooms' ? 'стаи' : 'транспорт'} за „${ev.nm}“`);
+    econ.spend(c, 'покупка', `${r.nm}: ${what === 'rooms' ? 'стаи' : 'транспорт'} за „${ev.nm}“`); deps.xp && deps.xp(100);
     ev[what === 'rooms' ? 'bRooms' : 'bTrans'] = c;
     deps.sound('buy'); deps.toast(`${what === 'rooms' ? '🏨 Резервира стаите' : (airOf(r) ? '✈️ Осигури полетите' : '🚌 Осигури автобусите')} за „${ev.nm}“ (${deps.fmt(c)} €).`, 'good'); deps.save(); deps.redraw();
     return true;
@@ -240,7 +240,7 @@ export function createResorts(deps) {
     if (!r || !s || s.stage !== 'built' || s.extBuild || (s.ext || {})[k] || !x) return false;
     const c = extCost(r, x);
     if (!econ.canAfford(c)) { deps.toast(`Нямаш достатъчно пари за ${x.nm.toLowerCase()}.`, 'bad'); return false; }
-    econ.spend(c, 'покупка', `${r.nm}: ${x.nm.toLowerCase()}`);
+    econ.spend(c, 'покупка', `${r.nm}: ${x.nm.toLowerCase()}`); deps.xp && deps.xp(500);
     s.extBuild = { key: k, prog: 0 };
     deps.sound('buy'); deps.toast(`🔨 ${x.ico} ${x.nm} в ${r.nm} (${x.days} дни).`, 'good'); deps.save(); deps.redraw();
     return true;
@@ -282,7 +282,7 @@ export function createResorts(deps) {
   function buildVillage(id) {
     const S = deps.S(), r = R(id), s = st()[id], econ = deps.econ(); if (!r || !s || s.stage !== 'land') return false;
     if (!econ.canAfford(r.build)) { deps.toast('Нямаш достатъчно пари за вилното селище.', 'bad'); return false; }
-    econ.spend(r.build, 'покупка', `${r.nm}: вилно селище`);
+    econ.spend(r.build, 'покупка', `${r.nm}: вилно селище`); deps.xp && deps.xp(3000);
     Object.assign(s, { stage: 'building', prog: 0, start: S.day });
     deps.sound('buy'); deps.toast(`🔨 Започна строежът на вилното селище в ${r.nm} (${r.days} дни).`, 'good'); deps.save(); deps.redraw(); return true;
   }

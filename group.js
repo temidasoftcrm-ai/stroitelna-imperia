@@ -86,7 +86,7 @@ export function createGroup(deps) {
     if (!isG && (hold().lv[k] || 0) < DIR_LV) { deps.toast(`👔 Директор — когато дружеството е развито поне 90% (ниво ${DIR_LV}).`, 'bad'); return; } const c = isG ? GLOB_DIR_COST : dirCost(k), e = deps.econ();
     if (!e.canAfford(c)) { deps.toast(`Нямаш ${deps.fmt(c)} €.`, 'bad'); return; }
     const nm = DIR_OF[k];
-    e.spend(c, 'заплати', `Холдинг: директор на ${subName(deps.S(), k)}`); hold().dir[k] = nm;
+    e.spend(c, 'заплати', `Холдинг: директор на ${subName(deps.S(), k)}`); deps.xp && deps.xp(1000); hold().dir[k] = nm;
     showDirectorOf(k, nm, subName(deps.S(), k), `Поема ${subBy(k)?.what || 'дружеството'} · +${Math.round(HOLD_DIR_K * 100)}% от прихода всеки ден · предложенията идват в борда.`, deps.sound); deps.save();   // тъмен екран със снимката
   }
   // дневният бонус на холдинга от развитието и директорите
@@ -160,7 +160,7 @@ export function createGroup(deps) {
     const S = deps.S(), F = FOUND[k], s = SUBS.find(x => x.k === k), b = brandOf(S) || { nm: S?.brandNm || 'Фирмата' }, e = deps.econ();   // стари записи без марка — не гърми
     if (!canFound(k)) return false;
     if (!e.canAfford(F.cost)) { deps.toast(`Нужни са ${deps.fmt(F.cost)} €, за да основеш ${b.nm} ${s.suf}.`, 'bad'); return false; }
-    e.spend(F.cost, 'покупка', `Основаване на ${b.nm} ${s.suf}`);
+    e.spend(F.cost, 'покупка', `Основаване на ${b.nm} ${s.suf}`); deps.xp && deps.xp(5000);
     (S.group = S.group || {})[k] = S.day || 1;
     deps.gift && deps.gift(k);
     if (!(deps.subShow && deps.subShow(k, 'done', `Стартов пакет: <b>${F.gift}</b>.<br>${F.next}`))) deps.pop('new-branch', `${s.ico} Основа ${b.nm} ${s.suf}!`, `Стартов пакет: ${F.gift}. ${F.next}`);

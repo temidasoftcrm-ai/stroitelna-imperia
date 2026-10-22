@@ -1827,7 +1827,7 @@ function beginOwnProject(kind, lot, cost) {
 }
 function finishOwnProject(p) {
   const lot = city.lots[p.lot], key = lotKey[p.own];
-  S[levelKey[p.own]] = p.target;
+  S[levelKey[p.own]] = p.target; xpMore(150 * p.target);   // xp-more: ново ниво на офиса/гаража/склада
   if (p.type === 'own_garage_new' || p.type === 'own_wh_new') { S[key] = lot.id; lot.busy = p.own; }
   buildHQ();
   // паркираната техника отива на новите си места
@@ -4252,7 +4252,7 @@ function mineLinkEU(id) {
   const via = seaRoutes.some(r => (near(r.a) && contKeyOf(r.b) === 'eu') || (near(r.b) && contKeyOf(r.a) === 'eu')) ? 'sea' : null;
   _mineLinkCache.set(id, via); return via;
 }
-const mines = createMines({ S: () => S, econ: () => econ, MATERIALS: ECON.MATERIALS, cityName: id => cityById(id)?.nm || id, cityCc: id => cityById(id)?.cc || '',
+const mines = createMines({ xp: n => xpMore(n), S: () => S, econ: () => econ, MATERIALS: ECON.MATERIALS, cityName: id => cityById(id)?.nm || id, cityCc: id => cityById(id)?.cc || '',
   oilIntake: (m, q) => oil.intake(m, q), isAsia: id => contKeyOf(id) === 'as', isOceania: id => contKeyOf(id) === 'oc', ownedCities: () => ownedCities(), linkEU: mineLinkEU, coastal: id => SEASIDE.includes(id) || portMax(id) > 0, fuelBill: () => { const h = econ.s.history[econ.s.history.length - 1]; return h ? -Math.min(0, h.cats['гориво'] || 0) : 0; }, linked: (a, b) => railLinked(a, b) || roadLinked(a, b),
   toast, fmt, save, sound: n => Sound.play(n), onChange: id => { if (typeof refreshMines3D === 'function' && id === S.cityId) refreshMines3D(); if (bigWin) renderBig(); } });
 
@@ -4260,12 +4260,12 @@ const mines = createMines({ S: () => S, econ: () => econ, MATERIALS: ECON.MATERI
 const boardL = createBoardLogic({ trackStatus: t => boardTrack(t), sig: () => { const ip = corp.state()?.ipo; return JSON.stringify([S.bank && [S.bank.loans.length, S.bank.div, S.bank.lv, S.bank.cap], S.mega, S.r66?.st, S.mw, ip && [ip.out, ip.div], Object.values(S.tenders || {}).map(x => x && x.my), S.oil && [(S.oil.contracts || []).length, S.oil.stock], !!S.neom, S.imp && [S.imp.cc, S.imp.b, S.imp.z, (S.imp.zr || []).length], S.resorts, (S.mines?.sites || []).length]); }, fixTrack: t => boardFix(t), S: () => S, econ: () => econ, fmt, toast, save, sound: n => Sound.play(n), proposals: () => group.proposals(), decide: (id, a) => group.decide(id, a),
   dirName: d => d === 'mayor' ? mayorName() : (S && S.hold && S.hold.dir || {})[d] || '', subName: d => d === 'mayor' ? 'Империал Сити' : subName(S, d), dailyCost: () => { const h = (econ && econ.s.history) || []; const L = h.slice(-7); return L.length ? L.reduce((a, x) => a + (x.out || 0), 0) / L.length : 0; },
   loan: amt => { if (!econ.canTakeLoan(S.rep)) { toast('🏦 Банката няма свободен кредит за теб.', 'bad'); return false; } const step = econ.loanStep(S.rep), a = Math.min(econ.loanRoom(S.rep), Math.ceil(amt / step) * step); return econ.takeLoan(S.rep, a); } });
-const group = createGroup({ night: () => dayNight.night, awardsPending: st => awardsPending(st), mayorName: () => mayorName() || null, board2: () => boardL, proposals: () => boardProposals(), subShow: (k, mode, text) => subScreen(k, mode, text), askFound: (k, re) => subScreen(k, 'ask', '', re), S: () => S, econ: () => econ, lv: () => dev.best(), gift: k => giftSub(k), toast, fmt, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b),
+const group = createGroup({ xp: n => xpMore(n), night: () => dayNight.night, awardsPending: st => awardsPending(st), mayorName: () => mayorName() || null, board2: () => boardL, proposals: () => boardProposals(), subShow: (k, mode, text) => subScreen(k, mode, text), askFound: (k, re) => subScreen(k, 'ask', '', re), S: () => S, econ: () => econ, lv: () => dev.best(), gift: k => giftSub(k), toast, fmt, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b),
   hwN: () => hwDone().length, railN: () => (S.rails || []).filter(r => r.built).length, portN: () => Object.values(S.ports || {}).filter(p => p.lv).length, airN: () => Object.values(S.airports || {}).filter(a => a.lv).length,
   oilN: () => mines.state().sites.filter(x => x.kind === 'oilwell').length, empire: () => dev.has('EMPIRE'), toll: () => hwToll(), flow: k => flowAvg(k),
   finDaily: () => Object.values(econ?.s?.finished || {}).reduce((a, f) => a + (f.daily || 0), 0), bankOn: () => !!S.bank, bankDaily: () => bank.daily(), hotelN: () => Object.keys(S.hotels || {}).length, hotelDaily: () => hotels.daily(), oilDaily: () => oil.dailyAvg() || mines.dailyValue(x => MINE_KINDS[x.kind]?.oil) });
 // 🏆 следващата фаза на холдинга (corp.js): световна класация, придобивания, световна борса
-const corp = createCorp({ S: () => S, econ: () => econ, empire: () => dev.best() >= HOLD_LV.conc,
+const corp = createCorp({ xp: n => xpMore(n), S: () => S, econ: () => econ, empire: () => dev.best() >= HOLD_LV.conc,
   network: () => (S.rails || []).filter(r => r.built).length * 5e7 + hwDone().length * 8e7 + Object.values(S.ports || {}).reduce((a, p) => a + (p.lv || 0), 0) * 1.5e8 + Object.values(S.airports || {}).reduce((a, p) => a + (p.lv || 0), 0) * 2.5e8
     + Object.keys(econ.s.finished || {}).length * 5e8 + wonCountries(x => econ.isFinished(x)).length * 2e9, extraValue: () => mw.value() + hotels.value() + bank.value() + neom.value(), fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), brandName: () => groupName(S) || 'Твоят холдинг',
   netWorth: () => { const h = econ.s.worthHist; return h && h.length ? h[h.length - 1][1] : econ.s.money; },
@@ -4275,13 +4275,13 @@ const corp = createCorp({ S: () => S, econ: () => econ, empire: () => dev.best()
     const cnm = cc === '🇧🇬' ? 'България' : COUNTRIES.find(k => k.cc === cc)?.nm || '', tier = cc === '🇧🇬' ? 1 : isEurope(id) || !isWorld(id) ? 3 : 6;
     for (const f of (LOCAL_FIRMS[cc] || (cc === '🇧🇬' ? FIRMS : []))) out.push({ f, cc, cnm, tier }); } return out; } });
 // 🌍 световните мегапроекти на холдинга (megaworld.js)
-const mw = createMegaWorld({ viaBoard: () => { if (!S?.holding || !feature('boardroom') || !Object.keys(S.hold?.dir || {}).length) return false; toast('🗳️ Мегапроектите решава бордът с гласуване — отварям залата.', ''); group.board(() => renderBig()); return true; }, S: () => S, econ: () => econ, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), seaDaily: () => flowAvg('sea') });
+const mw = createMegaWorld({ xp: n => xpMore(n), viaBoard: () => { if (!S?.holding || !feature('boardroom') || !Object.keys(S.hold?.dir || {}).length) return false; toast('🗳️ Мегапроектите решава бордът с гласуване — отварям залата.', ''); group.board(() => renderBig()); return true; }, S: () => S, econ: () => econ, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), seaDaily: () => flowAvg('sea') });
 // 🏨 хотелската верига (hotels.js): офисите на ниво 10 стават хотели
-const hotels = createHotels({ S: () => S, econ: () => econ, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), brand: () => brandOf(S)?.nm || 'Титан',
+const hotels = createHotels({ xp: n => xpMore(n), S: () => S, econ: () => econ, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), brand: () => brandOf(S)?.nm || 'Титан',
   cities: () => [...new Set(ownedCities())], city: id => cityById(id), big: id => MEGAPOLIS.has(id) || CAPITALS.has(id), airLv: id => airLv(id), isAm: id => isAm(id), day: () => S.day,
   officeLv: id => (id === S.cityId ? S.officeLevel : S.cities?.[id]?.officeLevel) || 1 });
 // 🏦 своята банка на холдинга (bank.js)
-const bank = createBank({ S: () => S, econ: () => econ, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), brand: () => brandOf(S)?.nm || 'Титан',
+const bank = createBank({ xp: n => xpMore(n), S: () => S, econ: () => econ, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), brand: () => brandOf(S)?.nm || 'Титан',
   cities: () => [...new Set(ownedCities())].map(id => cityById(id)?.nm).filter(Boolean), firms: () => [...new Set(ownedCities().map(id => cityById(id)?.cc || '🇧🇬'))].flatMap(cc => (LOCAL_FIRMS[cc] || (cc === '🇧🇬' ? FIRMS : [])).filter(f => !corp.acquired(f.id)).map(f => f.nm)),
   countries: () => COUNTRIES.map(k => k.nm), interestPaid: () => { const h = econ.s.history || []; return -((h[h.length - 1]?.cats || {})['лихва'] || 0); } });
 // 🏙️ градът от нулата (neom.js): „<марка> Сити“ на Червено море
@@ -4347,7 +4347,7 @@ function impLook() { if (S.cityId !== NEOM_ID || !city.group || !S.imp?.cc) retu
 // 🏥 обществените сгради (imperial.js S.imp.b) на свободни парцели във външния пояс — при влизане и всеки ден (строежът расте)
 function impCiv3D() { if (S.cityId !== NEOM_ID || !city.group || !S.imp?.cc) return; syncImpCivic(city, { imp: S.imp, cc: S.imp.cc, side: 2 * TILE - 2, builders: { civic: buildCivic, hospital: buildHospital, metro: buildMetro }, deps: { label, model: (n, k) => A[n] ? model(n, k) : null } }); }
 // 🛢️ петролната империя (oil.js): танкова ферма, световна цена, договори с танкери, бензиностанции
-const oil = createOil({ S: () => S, econ: () => econ, priceMul: () => mw.done('pipeline') ? 1.1 : 1, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), cityName: id => cityById(id)?.nm || id, cityOk: id => !!cityById(id),
+const oil = createOil({ xp: n => xpMore(n), S: () => S, econ: () => econ, priceMul: () => mw.done('pipeline') ? 1.1 : 1, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), cityName: id => cityById(id)?.nm || id, cityOk: id => !!cityById(id),
   ownedCities: () => ownedCities(), unlinked: () => { const t = mines.state().sites.filter(x => x.kind === 'terminal'); return mines.state().sites.filter(x => ['oilwell', 'refinery'].includes(x.kind) && !t.some(q => q.city === x.city || railLinked(q.city, x.city) || roadLinked(q.city, x.city))).map(x => x.city); }, tankers: () => (S.ships || []).filter(p => p.kind === 'tanker').length, terminalCity: () => mines.state().sites.find(x => x.kind === 'terminal')?.city || null, isAm: id => isAm(id) });
 // полето за името на фирмата: пишеш → „✓ Запази“ (или Enter) → отметка с името; после избираш знак и цвят
 const brandField = () => `<div style="display:flex;gap:6px;margin:8px 0 4px"><input id="brandNm" maxlength="24" placeholder="Името на фирмата (напр. Петров)" autocomplete="off" style="flex:1;min-width:0;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:#0f141c;color:var(--txt);font-size:16px"><button type="button" class="btn" id="brandOk" style="flex:0 0 auto">✓ Запази</button></div><div id="brandMsg" style="font-size:13px;color:var(--mut);min-height:18px">Напиши името и натисни „✓ Запази“, после избери знак и цвят.</div>`;
@@ -4442,7 +4442,7 @@ const coop = createCoop({ addXp: n => dev.add(n), lv: () => dev.rawBest(),
   } });
 const tutorial = createTutorial({ S: () => S, projects: () => projects, units: () => units, save,
   onMap: () => !$('mapScreen').classList.contains('hidden'), openTab: t => { tab = t; renderPanel(); } });
-const resorts = createResorts({
+const resorts = createResorts({ xp: n => xpMore(n),
   S: () => S, econ: () => econ, toast, modal, proj, fmt, save, devBest: () => dev.best(), symK: () => (mapEU ? 2.6 : (mapWide ? 1.6 : 1) * (mapNear() ? 1 : 0.7)) * mapK(),   // отдалеч курортите са по-малки
   onExtDone: key => { if (key === 'hotel') quests.emit('resortHotel'); },
   onSeasonEnd: (r, got, total) => { showEventPop('resort-season-end', `🏁 Край на сезона в ${r.nm}`, `Спечели ${fmt(got)} € този сезон · общо ${fmt(total)} €`); SFXcash(); },
@@ -5091,7 +5091,7 @@ function updateRails(dtDays) {
   for (const r of S.rails || []) {
     if (r.built && r.hsBuild) {
       r.hsBuild.prog += dtDays / r.hsBuild.days;
-      if (r.hsBuild.prog >= 1) { delete r.hsBuild; r.hs = true; toast(`⚡ Линията ${cityById(r.a).nm} — ${cityById(r.b).nm} е модернизирана — „Стрела“ вече може да минава по нея!`, 'good'); SFXcash(); save(); }
+      if (r.hsBuild.prog >= 1) { delete r.hsBuild; r.hs = true; xpMore(kmXp('rail', r.km || (r.b ? kmBetween(r.a, r.b) : 0)) / 2); toast(`⚡ Линията ${cityById(r.a).nm} — ${cityById(r.b).nm} е модернизирана — „Стрела“ вече може да минава по нея!`, 'good'); SFXcash(); save(); }
     }
     if (r.built) continue;
     r.prog += dtDays / r.days;
@@ -5126,6 +5126,8 @@ function totalTracks() {
 // видове влакове: товарните поемат превози до своя брой вагони; пътническият кара редовна линия и носи билети
 const TRAIN_BATCH = 50;   // най-много влакове в едно предложение на борда
 let batchTrains = false, batchXp = 0;
+// xp-more (т. 37): опит и за действията, които досега не даваха (одитът — _source/tasks/xp-audit.md); в пакет от борда — сумарно накрая (batchXp)
+const xpMore = (n, why) => { if (!feature('xp-more') || !(n > 0) || !dev) return; if (batchN > 0) batchXp += n; else dev.add(Math.round(n), why); };
 const TRAIN_TYPES = {
   small: { nm: 'Малък товарен', ico: '🚂', wagons: 4, cost: 60000, upkeep: 250, speed: 160 },
   mid: { nm: 'Среден товарен', ico: '🚆', wagons: 8, cost: 110000, upkeep: 350, speed: 150 },
@@ -5416,7 +5418,7 @@ function afCheckOpen() {
   if (!S) return;
   if (dev.has('EMPIRE') && !S.empireShown) { S.empireShown = true; save(); setTimeout(() => showEmpireEnd(), 600); }   // 🏁 финалът на играта
   { const won = wonCountries(x => econ.isFinished(x)); if (S.wonN == null) S.wonN = won.length;   // 🏆 нова завладяна държава — химн и картина
-    else if (won.length > S.wonN) { const k = won[won.length - 1]; S.wonN = won.length; Sound.play('country'); showEventPop('country-won', `🏆 ${k.cc} ${k.nm} е твоя!`, 'Всички ключови градове са завършени · +10% към прихода им'); toast(`🏆 Завладя ${k.cc} ${k.nm}! Всички ключови градове са завършени — +10% към прихода им.`, 'good'); save(); } }
+    else if (won.length > S.wonN) { const k = won[won.length - 1]; S.wonN = won.length; Sound.play('country'); xpMore(10000); showEventPop('country-won', `🏆 ${k.cc} ${k.nm} е твоя!`, 'Всички ключови градове са завършени · +10% към прихода им'); toast(`🏆 Завладя ${k.cc} ${k.nm}! Всички ключови градове са завършени — +10% към прихода им.`, 'good'); save(); } }
   S.gateOpen = S.gateOpen || (S.afGateOpen ? { af: true } : {});
   for (const key of Object.keys(CONT_GATE)) {
     if (S.gateOpen[key] && !(S.gateBr || {})[key] && contLinked(key) && !ownedCities().some(id => inCont(key, id))) {   // стар запис: вратата е отворена, но филиал още няма
@@ -5485,7 +5487,7 @@ function openAirRoute(a, b) {
   if ((S.airRoutes || []).length >= maxRoutes()) { toast(maxRoutes() < airGates() * 2 ? `Авиолиниите са до 2 на самолет — самолетите ти са до ${fleetCap.plane()} (общо до ${FLEET_TOP}), значи до ${maxRoutes()} линии.` : `Летищата ти поемат до ${maxRoutes()} авиолинии — надгради ги за още гейтове.`, 'bad'); return; }
   const km = routeKm(a, b), cost = ROUTE_COST(km);
   if (!econ.canAfford(cost)) { toast('Нямаш достатъчно пари за правата на линията.', 'bad'); return; }
-  econ.spend(cost, 'покупка', `Авиолиния ${cityById(a).nm} — ${cityById(b).nm}`);
+  econ.spend(cost, 'покупка', `Авиолиния ${cityById(a).nm} — ${cityById(b).nm}`); xpMore(50);
   S.airRoutes = [...(S.airRoutes || []), { a, b, km }];
   toast(`✈️ Нова авиолиния ${cityById(a).nm} — ${cityById(b).nm} (${fmt(km)} км).${isWorld(b) ? ` Вече можеш да отвориш филиал в ${cityById(b).nm}.` : ''}`, 'good');
   Sound.play('buy'); save(); if (!$('mapScreen').classList.contains('hidden')) drawMap();
@@ -5513,8 +5515,8 @@ function upgradePlane(id) {
   const n = planeNext(p.kind); if (!n) return;
   if (p.upTo) return;
   const c = planeUpCost(p.kind); if (!econ.canAfford(c)) { toast(`Нямаш ${fmt(c)} € за надграждането.`, 'bad'); return; }
-  if (p.path) { econ.spend(c, 'покупка', `Надграждане: ${PLANES[p.kind].nm} → ${PLANES[n].nm}`); p.upTo = n; toast(`⏳ Самолет №${p.id} е във въздуха — става ${PLANES[n].nm} щом кацне.`, 'good'); Sound.play('buy'); save(); return; }   // във въздуха: плащаш сега, сменя се при кацане
-  econ.spend(c, 'покупка', `Надграждане: ${PLANES[p.kind].nm} → ${PLANES[n].nm}`);
+  if (p.path) { econ.spend(c, 'покупка', `Надграждане: ${PLANES[p.kind].nm} → ${PLANES[n].nm}`); xpMore(50); p.upTo = n; toast(`⏳ Самолет №${p.id} е във въздуха — става ${PLANES[n].nm} щом кацне.`, 'good'); Sound.play('buy'); save(); return; }   // във въздуха: плащаш сега, сменя се при кацане
+  econ.spend(c, 'покупка', `Надграждане: ${PLANES[p.kind].nm} → ${PLANES[n].nm}`); xpMore(50);
   p.kind = n; p.nm = `${PLANES[n].ico} №${p.id}`;
   Sound.play('upgrade'); toast(`⬆️ Самолет №${p.id} вече е ${PLANES[n].nm} — ${PLANES[n].seats} места, обсег ${fmt(PLANES[n].range)} км.`, 'good'); save();
 }
@@ -5650,7 +5652,7 @@ function linkNeeds(id) {
   return { road, port, air, any: road || port || air };
 }
 function linkAct(act, id = S.cityId) {
-  const P = linkP(id), nm = cityById(id).nm, pay = (n, note) => { if (!econ.canAfford(n)) { toast('Нямаш достатъчно пари.', 'bad'); Sound.play('error'); return false; } econ.spend(n, 'покупка', note); return true; };
+  const P = linkP(id), nm = cityById(id).nm, pay = (n, note) => { if (!econ.canAfford(n)) { toast('Нямаш достатъчно пари.', 'bad'); Sound.play('error'); return false; } econ.spend(n, 'покупка', note); xpMore(/-buy$/.test(act) ? 1000 : 200); return true; };   /* xp-more: връзка с общината / изкупуване */
   if (act === 'road-own') { if (onAnySeg(id)) roadOwn(id); else offerSpur(id); return; }
   if (act === 'road-muni') { const ab = onAbCorridor(id), c = ab ? P.abMuni : P.roadMuni; if (!pay(c, `Включване в ${ab ? 'аутобан' : 'магистрала'}: ${nm}`)) return; S.roadAccess = { ...(S.roadAccess || {}), [id]: ab ? 'ab' : 'road' }; toast(`🛣️ ${nm} е включен в ${ab ? 'аутобана' : 'пътната мрежа'} — материалите идват с −${ab ? 30 : 25}%.`, 'good'); }
   if (act === 'port-own') { if (!seaOn()) { toast(seaLockTxt().replace(/<[^>]+>/g, ''), 'bad'); return; } if (!econ.canAfford(P.portOwn)) { withLoan(P.portOwn, `Пристанище в ${nm}`, () => linkAct('port-own', id)); return; } econ.spend(P.portLand, 'покупка', `Терен за пристанище: ${nm}`); buildPort(id); }
@@ -6380,7 +6382,7 @@ const xbCan = id => { const p = portOf(id); return !!p && !p.muni && !p.build &&
 function addXBerths(id) {
   if (!xbCan(id)) return; const c = xbCost(id), nm = cityById(id).nm;
   if (!econ.canAfford(c)) { withLoan(c, `Нови кейове в ${nm}`, () => addXBerths(id)); return; }
-  econ.spend(c, 'покупка', `+${XB_STEP} кея в пристанище ${nm}`); const p = portOf(id); p.xb = (p.xb || 0) + XB_STEP;
+  econ.spend(c, 'покупка', `+${XB_STEP} кея в пристанище ${nm}`); xpMore(300); const p = portOf(id); p.xb = (p.xb || 0) + XB_STEP;
   toast(`⚓ ${nm}: +${XB_STEP} нови кея (общо ${PORT_LEVELS[p.lv - 1].berths + p.xb}). Линиите без кораб ще си купят.`, 'good'); Sound.play('buy'); save(); if (bigWin) renderBig();
 }
 const seaRouteKm = (a, b) => seaKm(cityById(a), cityById(b));
@@ -6499,7 +6501,7 @@ function openSeaRoute(a, b) {
   if ((S.seaRoutes || []).length >= maxSeaRoutes()) { toast(maxSeaRoutes() < portBerths() * 2 ? `Всяка линия има свой кораб, а корабите ти са до ${fleetCap.ship()} (2 на пристанище, 4 на пристанище на максимално ниво, общо до ${FLEET_TOP}) — нова линия няма да получи кораб.` : `Пристанищата ти поемат до ${maxSeaRoutes()} морски линии — надгради ги за още кейове.`, 'bad'); return; }
   const km = seaRouteKm(a, b), cost = SEA_ROUTE_COST(km);
   if (!econ.canAfford(cost)) { toast('Нямаш достатъчно пари за линията.', 'bad'); return; }
-  econ.spend(cost, 'покупка', `Морска линия ${cityById(a).nm} — ${cityById(b).nm}`);
+  econ.spend(cost, 'покупка', `Морска линия ${cityById(a).nm} — ${cityById(b).nm}`); xpMore(50);
   S.seaRoutes = [...(S.seaRoutes || []), { a, b, km }];
   addRouteShip({ a, b, km });   // собственият кораб на линията
   toast(`🚢 Нова морска линия ${cityById(a).nm} — ${cityById(b).nm} (${fmt(km)} км).`, 'good');
@@ -6536,7 +6538,7 @@ function upgradeShip(id) {
   const p = (S.ships || []).find(x => x.id === id), to = p && SHIP_NEXT[p.kind]; if (!to) return;
   if (to === 'cruise' && !dev.has('MEGAHUB')) { toast(`🔒 Круизните кораби се отключват на ниво ${DEV_LV.MEGAHUB} на развитие.`, 'bad'); return; }
   const c = upCost(SHIPS[p.kind], SHIPS[to]); if (!econ.canAfford(c)) { toast('Нямаш достатъчно пари за надграждането.', 'bad'); return; }
-  econ.spend(c, 'покупка', `Надграждане на кораб: ${SHIPS[p.kind].nm} → ${SHIPS[to].nm}`);
+  econ.spend(c, 'покупка', `Надграждане на кораб: ${SHIPS[p.kind].nm} → ${SHIPS[to].nm}`); xpMore(25);
   p.kind = to; p.nm = `${SHIPS[to].ico} №${p.id}`; p.path = null; p.km = 0; p.total = 0;
   toast(`⬆️ Корабът стана ${SHIPS[to].ico} ${SHIPS[to].nm}!`, 'good'); Sound.play('buy'); save();
 }
@@ -6554,7 +6556,7 @@ function upgradeTrain(id) {
   if (N.express && !dev.has('AIR')) { toast('🚄 Експрес „Стрела“ се отключва на ниво 9 на развитие.', 'bad'); return; }
   if (N.express && stLvOf(t.at) < 5) { toast(`🚄 Експрес „Стрела“ иска гара ниво 5 в ${cityById(t.at).nm} (сега ${stLvOf(t.at)}).`, 'bad'); return; }
   if (!econ.canAfford(c)) { toast('Нямаш достатъчно пари за надграждането.', 'bad'); return; }
-  econ.spend(c, 'покупка', `Надграждане на влак: ${T.nm} → ${N.nm}`);
+  econ.spend(c, 'покупка', `Надграждане на влак: ${T.nm} → ${N.nm}`); xpMore(10);
   t.kind = to; t.wagons = N.wagons; t.nm = `${N.ico} №${S.trains.indexOf(t) + 1} ${N.nm.toLowerCase()}`;
   toast(`⬆️ Влакът стана ${N.ico} ${N.nm.toLowerCase()} с ${N.wagons} вагона!${N.express ? ' Кара по модернизирани линии.' : ''}`, 'good'); Sound.play('upgrade'); parkedSig = ''; updateParked(); save();
 }
@@ -6849,7 +6851,7 @@ function updateStationBuild(dtDays) {
   if (!b) return;
   b.prog += dtDays / STATION_LEVELS[b.target - 1].days;
   if (b.prog < 1) return;
-  S.stationLevel = b.target; S.stationBuild = null;
+  S.stationLevel = b.target; S.stationBuild = null; xpMore(300 * b.target);   /* xp-more: гарата */
   station.build(S.stationLevel);
   parkedSig = '';
   refreshPassing();
@@ -6962,7 +6964,7 @@ function finishCityRemote(id) {
   const stats = { built: (c.built || []).length, owned: ((c.estate || {}).owned || []).length, day: S.day };
   const r = econ.finishCity(id, share, stats);
   if (econ.setFinishedFleet) econ.setFinishedFleet(id, c.units || []);
-  S.finishedCount = (S.finishedCount || 0) + 1; S.branchDiscounts = (S.branchDiscounts || 0) + 1;
+  S.finishedCount = (S.finishedCount || 0) + 1; S.branchDiscounts = (S.branchDiscounts || 0) + 1; xpMore(5000);
   clampFinished();
   showEventPop('city-done', `🏁 ${cityById(id).nm} е завършен!`, `${stats.built} сгради · дял ${Math.round(share * 100)}% · носи ~${fmt(Math.min(r.daily, econ.s.finished[id].daily))} €/ден. Следващият филиал е −30%.`);
   Sound.play('cityDone'); quests.emit('cityDone'); save(); updFinBtn();
@@ -6971,7 +6973,7 @@ function finishCity() {
   if (!canFinishCity()) return;
   const share = rivals.share(), stats = { built: S.built.length, owned: est().owned.length, day: S.day };
   const r = econ.finishCity(S.cityId, share, stats);
-  S.finishedCount = (S.finishedCount || 0) + 1; S.branchDiscounts = (S.branchDiscounts || 0) + 1;
+  S.finishedCount = (S.finishedCount || 0) + 1; S.branchDiscounts = (S.branchDiscounts || 0) + 1; xpMore(5000);
   clampFinished();
   showEventPop('city-done', `🏁 ${cityName()} е завършен!`, `${stats.built} сгради · дял ${Math.round(share * 100)}% · носи ~${fmt(r.daily)} €/ден, докато си другаде. Следващият филиал е −30%.`);
   Sound.play('cityDone');
@@ -7287,7 +7289,8 @@ function buyDistrict(all = false) {
   const cost = all ? allDistrictsCost() : districtCost();
   if (!econ.canAfford(cost)) { toast('Нямаш достатъчно пари за новия квартал.', 'bad'); return; }
   econ.spend(cost, 'покупка', all ? `Всички квартали (${(S.cityExt || 0) + 1}–${extMaxOf(S.cityId)})` : `Нов квартал №${(S.cityExt || 0) + 1}`);
-  S.cityExt = all ? extMaxOf(S.cityId) : (S.cityExt || 0) + 1;
+  { const e0 = S.cityExt || 0;
+  S.cityExt = all ? extMaxOf(S.cityId) : (S.cityExt || 0) + 1; xpMore(300 * (S.cityExt - e0)); }   // xp-more: 300 на квартал
   save();
   // градът се построява наново от записа (парцелите и пътищата се смятат при зареждане)
   toast('🏙️ Купи земя за нов квартал! Градът се разширява…', 'good');
@@ -7311,7 +7314,7 @@ function buyDistrictAt(id, all = false) {
   if (!econ.canAfford(cost)) { toast('Нямаш достатъчно пари за новия квартал.', 'bad'); return; }
   econ.spend(cost, 'покупка', `${cityById(id).nm}: ${all ? `всички квартали (${q.ext + 1}–${q.max})` : `нов квартал №${q.ext + 1}`}`);
   if (MEGAPOLIS.has(id) && c.extBig == null) c.extBig = q.ext;   // новите квартали на мегаполиса са с новия (по-малък) размер
-  c.cityExt = all ? q.max : q.ext + 1;   // парцелите се появяват при следващото влизане (градът се строи от записа)
+  c.cityExt = all ? q.max : q.ext + 1; xpMore(300 * (c.cityExt - q.ext));   // парцелите се появяват при следващото влизане (градът се строи от записа)
   if (c.freeLots && !MEGAPOLIS.has(id)) {   // новите квартали са празни парцели след ядрото 9×9 — добавят се към запомнените свободни
     for (let e = q.ext; e < c.cityExt; e++) for (let k = 0; k < NB; k++) c.freeLots.push([NB * NB + e * NB + k, 'outer']);
     c.lotTotal = NB * NB + NB * c.cityExt; c.freeAll = c.freeLots.length;
@@ -8541,7 +8544,7 @@ function rbuildTick() {
         c[levelKey[kind]] = b.target;
         if (here) { buildHQ(); refreshWarehouse && refreshWarehouse(); }
       }
-      toast(`⬆️ ${K.ico} ${K.nm} в ${cityById(id).nm} вече е ниво ${b.target}!`, 'good');
+      toast(`⬆️ ${K.ico} ${K.nm} в ${cityById(id).nm} вече е ниво ${b.target}!`, 'good'); xpMore((kind === 'station' ? 300 : 150) * b.target);
       if (feature('gar-fill') && (kind === 'garage' || kind === 'office')) garFillCity(id);   // новите места — с нужната техника (от най-близките градове, после покупка)
     }
     if (c.rbuild && !Object.keys(c.rbuild).length) delete c.rbuild;
@@ -8622,7 +8625,7 @@ function rebuildBigger(lotId) {
   lot.busy = 'project';
   projects.push(p); makeSite(p);
   Sound.play('error');
-  toast(`🏚️ Старата сграда ще бъде съборена — на мястото ѝ строиш ${bt.nm.toLowerCase()} за наем.`, 'good');
+  toast(`🏚️ Старата сграда ще бъде съборена — на мястото ѝ строиш ${bt.nm.toLowerCase()} за наем.`, 'good'); xpMore(300);
   dispatch(); refreshEstateSigns(); save(); renderPanel();
 }
 // ---- паркове: строят се на твой парцел; вдигат наемите (+15%) и цените в радиус ~2 карета
@@ -8679,7 +8682,7 @@ function estRoll(id) {
 function buildPark(id) {
   const lot = city.lots[id];
   if (!econ.canAfford(PARK_COST)) { toast('Нямаш достатъчно пари за парка.', 'bad'); return; }
-  econ.spend(PARK_COST, 'материали', 'Парк: дървета, алеи, фонтан');
+  econ.spend(PARK_COST, 'материали', 'Парк: дървета, алеи, фонтан'); xpMore(50);
   est().land = est().land.filter(x => x !== id);
   const p = { id: S.seq++, type: 'park', park: true, lot: id, client: 'града', title: 'Парк — твоя инвестиция', reward: 0, repGain: 0, startDay: S.day, deadlineDay: S.day + 999, stage: 0, prog: 0, model: null };
   lot.busy = 'project'; projects.push(p); makeSite(p);
@@ -9431,8 +9434,39 @@ function boardProposals0() {
 
   // ━━ 🌍 Глобъл (ниво 20): мегапроекти, концесии, придобивания (globdir.js); на нива 18–19 мегапроектите ги предлага Констръкшън
   for (const p of globProposals({ strip: h => String(h).replace(/<[^>]+>/g, ''), S: () => S, econ: () => econ, fmt, mw, corp, GLOBAL, localFirms: () => corp.localFirms(), empire: () => dev.best() >= 20, acqOn: () => feature('board-rescue') && dev.best() >= HOLD_LV.acq })) if (hasSub('glob')) out.push(p); else if (((p.id.startsWith('glob:mw-') || p.id.startsWith('glob:deal-')) && dev.best() >= HOLD_LV.mega || p.id.startsWith('glob:acq-') || p.id.startsWith('glob:loc')) && hasSub('con')) out.push({ ...p, id: p.id.replace('glob:', 'con:'), dir: 'con' });   // придобиванията (от ниво 16) — Констръкшън, докато няма Глобъл
+  // ━━ dir-cover (т. 41): каквото директорите досега не предлагаха (одитът — _source/tasks/dir-audit.md)
+  if (feature('dir-cover')) try {
+    const upg = (id, k) => (upgInfo(id) || []).find(x => x.kind === k), freeU = u => u && !u.max && !u.busy;
+    // 👷 Ивайло: гаражът (машините нямат място), складът (изостава от офиса), завършването на града, техниката за държавните поръчки
+    { const gb = garBuyable(), u = upg(S.cityId, 'garage'); if (gb.full && freeU(u)) P({ dir: 'con', ico: '🚜', key: 'garage', items: [{ id: S.cityId, u }], cost: o => o.u.cost, run: o => upgGo(o.id, 'garage', true),
+      text: () => `Гаражът в ${cityNm(S.cityId)} е пълен — ${pl(gb.full, 'машина няма', 'машини нямат')} място. Предлагам да го разширим до ниво ${(S.garageLevel || 1) + 1}.`, why: 'без място не можем да купим нужната техника', days: () => RB_DAYS('garage', (S.garageLevel || 1) + 1), goal: () => 'По-голям гараж' }); }
+    P({ dir: 'con', ico: '📦', key: 'whup', items: own.filter(id => cityById(id)).map(id => { const c = id === S.cityId ? S : (S.cities || {})[id] || {}, u = upg(id, 'warehouse'); return freeU(u) && (c.whLevel || 0) + 1 < (c.officeLevel || 1) ? { id, u } : null; }).filter(Boolean).slice(0, 5),
+      cost: o => o.u.cost, run: o => upgGo(o.id, 'warehouse', true), text: a => `Складовете изостават от офисите в ${list(a.map(o => o.id))} — предлагам да ги разширим.`, why: 'по-голям склад — повече материали наведнъж, по-малко чакане', days: () => 5, goal: a => `${pl(a.length, 'по-голям склад', 'по-големи склада')}` });
+    if (canFinishCity()) P({ dir: 'con', ico: '🏁', key: 'finish', items: [S.cityId], cost: () => 0, run: () => finishCity(), text: () => `${cityNm(S.cityId)} е готов — предлагам да го обявим за завършен.`, why: 'завършеният град носи приход, докато сме другаде, и отстъпка за следващия филиал', days: () => 1, goal: () => 'Завършен град' });
+    P({ dir: 'con', ico: '🚚', key: 'tfix', items: activeTenders().filter(t => tenderLack(t).length).slice(0, 4), cost: () => 0, run: t => tenderFix(t, false), text: a => `На ${pl(a.length, 'държавна поръчка', 'държавни поръчки')} (${a.map(t => t.nm).join(', ')}) липсва техника — ще пратя свободните машини.`, why: 'търгът има срок — без техника закъсняваме', days: () => 1, goal: () => 'Техниката на търговете' });
+    // 🛣️ Надя: липсващата пътна техника, включване на градовете без път в магистралата/аутобана на общината
+    { const m = hwMissing(); if (m.length && (S.hwJobs || []).length) P({ dir: 'hw', ico: '🚜', key: 'roadgear', items: [m], cost: x => roadCost(x), run: x => buyRoadMissing(x), text: () => `За магистралите ни липсва техника: ${hwMissingTxt().replace('Нямаш: ', '')}.`, why: 'без нея участъците стоят', days: () => 1, goal: () => 'Пътната техника' }); }
+    P({ dir: 'hw', ico: '🛣️', key: 'roadmuni', items: own.filter(id => cityById(id) && id !== S.hqCity && linkNeeds(id).road).slice(0, 6), cost: id => onAbCorridor(id) ? linkP(id).abMuni : linkP(id).roadMuni, run: id => linkAct('road-muni', id),
+      text: a => `${list(a)} ${a.length === 1 ? 'няма' : 'нямат'} път до мрежата ни — предлагам да ги включим в магистралата на общината.`, why: 'ТИР-овете минават по-бързо, материалите идват по-евтино', days: () => 1, goal: a => `${pl(a.length, 'град на пътя', 'града на пътя')}` });
+    // 🚉 Мария: първата гара в градовете, до които вече стигат релсите
+    { const onNet = new Set((S.rails || []).filter(r => r.built).flatMap(r => [r.a, r.b, r.c].filter(Boolean)));
+      P({ dir: 'rail', ico: '🚉', key: 'st0', items: own.filter(id => cityById(id) && onNet.has(id) && !stLvOf(id)).map(id => ({ id, u: upg(id, 'station') })).filter(o => freeU(o.u)).slice(0, 8),
+        cost: o => o.u.cost || 0, run: o => { if (o.id === S.cityId) startStationUpgrade(); else upgGo(o.id, 'station', true); }, text: a => `Релсите стигат до ${list(a.map(o => o.id))}, но там няма гара — предлагам да ги построим.`, why: 'без гара влаковете само минават', days: () => 6, goal: a => `${pl(a.length, 'нова гара', 'нови гари')}` }); }
+    // ⚓ Стефан: надграждане на корабите, още кейове при пълните пристанища, пристанище на общината
+    P({ dir: 'sea', ico: '⬆️', key: 'shipup', items: (S.ships || []).filter(p => { const to = SHIP_NEXT[p.kind]; return to && (to !== 'cruise' || dev.has('MEGAHUB')) && to !== 'tanker'; }).slice(0, 20), cost: p => upCost(SHIPS[p.kind], SHIPS[SHIP_NEXT[p.kind]]), run: p => upgradeShip(p.id),
+      text: a => `Мога да надградя ${pl(a.length, 'кораб', 'кораба')} до по-голям клас.`, why: 'по-голям кораб — повече товар на курс', days: () => 1, goal: a => `${pl(a.length, 'надграден кораб', 'надградени кораба')}` });
+    if (fleetN.ship() >= portBerths()) P({ dir: 'sea', ico: '⚓', key: 'xb', items: own.filter(id => xbCan(id)).slice(0, 4), cost: id => xbCost(id), run: id => addXBerths(id), text: a => `Всички кейове са заети — предлагам още кейове в ${list(a)}.`, why: 'новите линии нямат къде да вземат кораб', days: () => 5, goal: a => `Кейове в ${pl(a.length, 'пристанище', 'пристанища')}` });
+    if (seaOn()) P({ dir: 'sea', ico: '⚓', key: 'portmuni', items: own.filter(id => cityById(id) && id !== S.hqCity && linkNeeds(id).port).slice(0, 5), cost: id => linkP(id).portMuni, run: id => linkAct('port-muni', id), text: a => `${list(a)} ${a.length === 1 ? 'е' : 'са'} на море, но без пристанище — предлагам да ползваме това на общината.`, why: 'корабите ни стигат и дотам', days: () => 1, goal: a => `${pl(a.length, 'пристанище', 'пристанища')} на общината` });
+    // ✈️ Елена: надграждане на самолетите, летището на общината
+    P({ dir: 'air', ico: '⬆️', key: 'planeup', items: (S.planes || []).filter(p => planeNext(p.kind) && !p.upTo).slice(0, 20), cost: p => planeUpCost(p.kind), run: p => upgradePlane(p.id), text: a => `Мога да надградя ${pl(a.length, 'самолет', 'самолета')} до по-голям.`, why: 'повече места и по-голям обсег — по-далечни линии', days: () => 1, goal: a => `${pl(a.length, 'надграден самолет', 'надградени самолета')}` });
+    if (dev.has('AIR')) P({ dir: 'air', ico: '🛫', key: 'airmuni', items: own.filter(id => cityById(id) && id !== S.hqCity && linkNeeds(id).air).slice(0, 5), cost: id => linkP(id).airMuni, run: id => linkAct('air-muni', id), text: a => `${list(a)} ${a.length === 1 ? 'няма' : 'нямат'} летище — предлагам да ползваме това на общината.`, why: 'полетите стигат и до тях', days: () => 1, goal: a => `${pl(a.length, 'летище', 'летища')} на общината` });
+    // 🛢️ Вера: още бензиностанции във веригите
+    { const o = (S.oil && S.oil.stations) || {}; P({ dir: 'oil', ico: '⛽', key: 'stup', items: own.filter(id => o[id] && o[id] < oil.STATION.lvMax).slice(0, 8), cost: id => oil.STATION.upCost * o[id] * (isAm(id) ? 2 : 1), run: id => oil.upStation(id), text: a => `Предлагам още бензиностанции във веригите в ${list(a)}.`, why: 'горивото ни се продава на повече места', days: () => 1, goal: a => `По-големи вериги в ${pl(a.length, 'град', 'града')}` }); }
+    // 🏦 Борис: основаването на банката (преди това банков сектор няма — затова мимо hasSub)
+    if (S.holding && !S.bank && dev.best() >= HOLD_LV.bank && ((S.hold || {}).dir || {}).bank) out.push({ id: 'bank:found:1', dir: 'bank', ico: '🏦', cost: bank.FOUND, count: 1, days: 1, text: `Време е за своя банка — ${M(bank.FOUND)} € начален капитал. Кредитите на другите ще ни носят лихви.`, why: 'постоянен приход от лихви и финансиране на големите проекти', gainTxt: 'своя банка', apply: () => bank.found() });
+  } catch (e) { console.warn('dir-cover', e); }
   if (feature('board-rescue')) out.push(...rescue.proposals());   // 🆘 IPO за касата или капитала на банката
-  if (feature('board-own-dir')) { const k = out.filter(p => hasSub(p.dir)); out.splice(0, out.length, ...k); }   // само секторите с назначен директор: с един директор — само неговите предложения (и действия — autoTick минава през същия списък)
+  if (feature('board-own-dir')) { const k = out.filter(p => hasSub(p.dir) || p.id === 'bank:found:1'); out.splice(0, out.length, ...k); }   // само секторите с назначен директор: с един директор — само неговите предложения (и действия — autoTick минава през същия списък)
   // ━━ 🏦 Банка: всяко искане за кредит поотделно (холограмата: държавата, рейтингът и сумата), капиталът, дивидентът; 📈 борсата
   if (S.bank && hasSub('bank')) {
     const b = S.bank, room = bank.room(), RT = bank.RATINGS, B9 = n => n >= 1e9 ? `${(n / 1e9).toLocaleString('bg-BG', { maximumFractionDigits: 2 })} млрд. €` : `${M(n / 1e6)} млн. €`;
@@ -10535,6 +10569,9 @@ if (AUTOTEST) {
       ns.forEach((n, i) => { const l = ls[i]; if (!l) return; const fs = fitScale(n, HOUSES.includes(n) ? houseFit(n) : 14), o = blkHeight(model(n, fs), n, fs); o.position.set(l.x, 0, l.z); city.group.add(o); dayNight.registerWindows(o); });
       const u = ls.slice(0, ns.length), cx = u.reduce((a, l) => a + l.x, 0) / u.length, cz = u.reduce((a, l) => a + l.z, 0) / u.length, r = Math.max(30, ...u.map(l => Math.hypot(l.x - cx, l.z - cz)));
       __dbg.camAt(cx + r * 0.9, r * 1.1, cz + r * 1.2, cx, 4, cz); return u.map((l, i) => [ns[i], Math.round(l.x), Math.round(l.z)]); },
+    carLensLook() {   // 🚗 car-lens (55): нощ, камерата зад кола от трафика (фаровете ѝ — напред)
+      __dbg.time && __dbg.time(22); const c = tr2 && tr2.cars.find(c => !c.heavy) || (tr2 && tr2.cars[0]); if (!c) return null; const ox = tr2G ? tr2G.position.x : 0, oz = tr2G ? tr2G.position.z : 0, x = c.rx + ox, z = c.rz + oz, fx = Math.sin(c.ryaw), fz = Math.cos(c.ryaw);
+      __dbg.camAt(x - fx * 9 + fz * 5, 6, z - fz * 9 - fx * 5, x + fx * 6, 0.5, z + fz * 6); return [Math.round(x), Math.round(z)]; },
     sectRow(night) {   // 📏 real-sizes (55): панелните блокове и секциите им в редица, в истински размер (кубът отпред — 1,8 м човек)
       if (city.sectRow) city.group.remove(city.sectRow); const G = city.sectRow = new THREE.Group(), x0 = tx(NI - 1) + 50, z0 = tx(0) - 40, V3 = () => new THREE.Vector3(); let x = x0;
       for (const n of Object.keys(SECTIONS)) { if (!A[n]) continue; const k = SECTIONS[n].H / sizeOf(n).getSize(V3()).y;

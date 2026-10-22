@@ -87,12 +87,12 @@ export function createOil(deps) {
   function buyStation(id) {
     const o = st(); if (o.stations[id]) return; const c = stationCost(id), e = deps.econ();
     if (!e.canAfford(c)) { deps.toast(`Нямаш ${deps.fmt(c)} €.`, 'bad'); return; }
-    e.spend(c, 'покупка', `⛽ Бензиностанции в ${deps.cityName(id)}`); o.stations[id] = 1; deps.toast(`⛽ Веригата бензиностанции в ${deps.cityName(id)} е отворена.`, 'good'); deps.sound && deps.sound('buy'); deps.save();
+    e.spend(c, 'покупка', `⛽ Бензиностанции в ${deps.cityName(id)}`); deps.xp && deps.xp(300); o.stations[id] = 1; deps.toast(`⛽ Веригата бензиностанции в ${deps.cityName(id)} е отворена.`, 'good'); deps.sound && deps.sound('buy'); deps.save();
   }
   function upStation(id) {
     const o = st(), L = o.stations[id]; if (!L || L >= STATION.lvMax) return; const c = STATION.upCost * L * (deps.isAm(id) ? 2 : 1), e = deps.econ();
     if (!e.canAfford(c)) { deps.toast(`Нямаш ${deps.fmt(c)} €.`, 'bad'); return; }
-    e.spend(c, 'покупка', `⛽ Още бензиностанции в ${deps.cityName(id)}`); o.stations[id] = L + 1; deps.sound && deps.sound('upgrade'); deps.save();
+    e.spend(c, 'покупка', `⛽ Още бензиностанции в ${deps.cityName(id)}`); deps.xp && deps.xp(150); o.stations[id] = L + 1; deps.sound && deps.sound('upgrade'); deps.save();
   }
   function stationsDay() {
     const o = st(); let sold = 0, got = 0;

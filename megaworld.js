@@ -99,7 +99,7 @@ export function createMegaWorld(deps) {
     const m = byKey(k), r = st()[k]; if (!m || r.done || r.run) return;
     if (DEALS[k] && !r.ph && !signedAll(k)) { deps.toast(DL(k).length > 1 ? '✍️ Първо всички държави по трасето трябва да подпишат договорите.' : `✍️ Първо ${DL(k)[0].nm} трябва да подпише договора.`, 'bad'); return; }
     const c = phaseCost(m), e = deps.econ(); if (!e.canAfford(c)) { deps.toast(`Нямаш ${B(c)} за етап ${r.ph + 1}.`, 'bad'); return; }
-    e.spend(c, 'мегапроекти', `${m.nm}: етап ${r.ph + 1}`); r.run = true; r.prog = 0;
+    e.spend(c, 'мегапроекти', `${m.nm}: етап ${r.ph + 1}`); deps.xp && deps.xp(5000); r.run = true; r.prog = 0;
     if (!r.ph) deps.pop && deps.pop('hw-open', `${m.ico} ${m.nm} — първа копка!`, `${m.what}. Етап 1 от ${PHASES} тръгна — ${Math.round(m.days / PHASES)} дни.`);
     else deps.toast(`${m.ico} ${m.nm}: етап ${r.ph + 1} от ${PHASES} тръгна.`, 'good');
     deps.sound && deps.sound('buy'); deps.save();

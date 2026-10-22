@@ -67,6 +67,7 @@
     "crew-van",
     "cs-real",
     "dir-conseq",
+    "dir-cover",
     "emerg-lights",
     "estate-random",
     "fire-man",
@@ -229,6 +230,7 @@
     "vault",
     "vault-rules",
     "wh-levels2",
-    "xp-km"
+    "xp-km",
+    "xp-more"
   ]
 }

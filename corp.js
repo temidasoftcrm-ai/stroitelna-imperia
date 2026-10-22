@@ -53,7 +53,7 @@ export function createCorp(deps) {
     if (!deps.empire()) return;   // придобиванията се отварят на ниво 20
     const c = st(), x = deps.localFirms().find(q => q.f.id === id); if (!x || c.loc[id]) return;
     const cost = locValue(x), e = deps.econ(); if (!e.canAfford(cost)) { deps.toast(`Нямаш ${B(cost)}.`, 'bad'); return; }
-    e.spend(cost, 'придобивания', `Изкупуване на ${x.f.nm}`); c.loc[id] = deps.S().day;
+    e.spend(cost, 'придобивания', `Изкупуване на ${x.f.nm}`); deps.xp && deps.xp(500); c.loc[id] = deps.S().day;
     deps.toast(`🤝 ${x.f.nm} (${x.cc} ${x.cnm}) е твоя — вече не ти взема поръчки, а пазарът ѝ е твой.`, 'good'); deps.sound && deps.sound('buy'); deps.save();
   }
   // 📈 борса
@@ -89,7 +89,7 @@ export function createCorp(deps) {
   function concBid(k) { const c = st(); if (!c.tender) return; c.tender.my = Math.round(c.tender.price * k / 1e8) * 1e8; deps.toast(`🌐 Твоята оферта: ${B(c.tender.my)}.`, ''); deps.save(); }
   function concResolve() {
     const c = st(), t = c.tender; c.tender = null; const best = [...t.riv].sort((a, b) => b.bid - a.bid)[0], e = deps.econ();
-    if (t.my && t.my > best.bid && e.canAfford(t.my)) { e.spend(t.my, 'придобивания', `Концесия: ${t.nm}`); c.conc = [...(c.conc || []), { ico: t.ico, nm: t.nm, price: t.my, inc: t.inc, day: deps.S().day }];
+    if (t.my && t.my > best.bid && e.canAfford(t.my)) { e.spend(t.my, 'придобивания', `Концесия: ${t.nm}`); deps.xp && deps.xp(3000); c.conc = [...(c.conc || []), { ico: t.ico, nm: t.nm, price: t.my, inc: t.inc, day: deps.S().day }];
       deps.pop && deps.pop(t.pic || CONC.find(x => x[1] === t.nm)?.[4] || 'empire', `🌐 Спечели концесията!`, `${t.ico} ${t.nm} е твоя за ${B(t.my)} — ~${deps.fmt(t.inc)} €/ден за десетилетия.`); deps.sound && deps.sound('levelup'); }
     else { const g = GLOBAL.find(x => x.id === best.id); c.gl[best.id].w += t.price * 1.2;
       deps.toast(`🌐 ${g.flag} ${g.nm} спечели „${t.nm}“ с ${B(best.bid)}${t.my ? ` (твоята оферта: ${B(t.my)}${t.my > best.bid ? ' — но нямаше пари' : ''})` : ''} — тя расте в класацията.`, 'bad'); }

@@ -51,7 +51,7 @@ export function createBank(deps) {
   const upCost = () => Math.round(UP_BASE * (st().lv + 1) / 1e6) * 1e6;
   function found() {
     const S = deps.S(); if (!S.holding || st()) return; const e = deps.econ(); if (!e.canAfford(FOUND)) { deps.toast(`Нямаш ${B(FOUND)} за основаването на банката.`, 'bad'); return; }
-    e.spend(FOUND, 'банка', 'Основаване на банката (начален капитал)');
+    e.spend(FOUND, 'банка', 'Основаване на банката (начален капитал)'); deps.xp && deps.xp(5000);
     S.bank = { day: S.day, lv: 1, cap: FOUND, loans: [], offers: [], seq: 0, earned: 0, lost: 0, crisis: null };
     deps.pop && deps.pop('empire', `🏦 ${deps.brand()} Банк е основана!`, `Капитал ${B(FOUND)} — можеш да даваш кредити до ${B(FOUND * LEV(1))}. Лихвите се трупат в банката и всеки месец ти изплаща дивидент (по подразбиране 20% от капитала годишно), а твоите кредити в чуждите банки ти излизат наполовина по-евтино.`);
     for (let i = 0; i < 3; i++) offer(); dropDeposit(); deps.sound && deps.sound('levelup'); deps.save();
@@ -66,7 +66,7 @@ export function createBank(deps) {
   function setDiv(r) { const b = st(); if (!b || !DIV_OPTS.includes(r)) return; b.div = r; deps.toast(`🏦 Дивидентът е ${Math.round(r * 100)}% от капитала годишно — изплаща се всеки месец.`, 'good'); deps.save(); }
   function addCap(n) { const b = st(); if (!b) return; const e = deps.econ(); if (!e.canAfford(n)) { deps.toast(`Нямаш ${B(n)}.`, 'bad'); return; } e.spend(n, 'банка', 'Увеличение на капитала на банката'); b.cap += n; deps.toast(`🏦 Капиталът е ${B(b.cap)} — може да кредитира до ${B(b.cap * LEV(b.lv))}.`, 'good'); deps.save(); }
   function upgrade() { const b = st(); if (!b || b.lv >= LV_MAX) return; const c = upCost(), e = deps.econ(); if (!e.canAfford(c)) { deps.toast(`Нямаш ${B(c)}.`, 'bad'); return; }
-    e.spend(c, 'банка', `Банката: нови клонове (ниво ${b.lv + 1})`); b.lv++; deps.toast(`🏦 Ниво ${b.lv}: повече клонове и депозити — кредитира до ${LEV(b.lv)}× капитала.`, 'good'); deps.sound && deps.sound('upgrade'); deps.save(); }
+    e.spend(c, 'банка', `Банката: нови клонове (ниво ${b.lv + 1})`); deps.xp && deps.xp(2000); b.lv++; deps.toast(`🏦 Ниво ${b.lv}: повече клонове и депозити — кредитира до ${LEV(b.lv)}× капитала.`, 'good'); deps.sound && deps.sound('upgrade'); deps.save(); }
   function offer() {
     const b = st(); if (!b || b.offers.length >= 5) return;
     const K = KIND[Math.floor(Math.random() * KIND.length)], src = K.k === 'muni' ? deps.cities() : K.k === 'firm' ? deps.firms() : govs(); if (!src.length) return;
@@ -155,5 +155,5 @@ export function createBank(deps) {
   }
   // капиталовият недостиг: кредитите не могат да са повече от капитала × лоста (boardrescue.js — предложение/извънредно заседание)
   const capNeed = () => { const b = st(); return b ? Math.max(0, lent() / LEV(b.lv) - b.cap) : 0; };
-  return { room, lent, capNeed, upCost, addCap, upgrade, setDiv, divRate, DIV_OPTS, LV_MAX, RATINGS, decline, state: st, found, accept, dailyTick, value, winHtml, bind, daily: () => (st()?.incDay || 0) + (st()?.refund || 0) };
+  return { FOUND, room, lent, capNeed, upCost, addCap, upgrade, setDiv, divRate, DIV_OPTS, LV_MAX, RATINGS, decline, state: st, found, accept, dailyTick, value, winHtml, bind, daily: () => (st()?.incDay || 0) + (st()?.refund || 0) };
 }
