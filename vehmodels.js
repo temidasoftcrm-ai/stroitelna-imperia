@@ -106,7 +106,7 @@ export const lampMats = (() => { let m = null; return () => m || (m = (() => {
   return { brake: mk(0xff1a1a, 2.2), blink: mk(0xffa21a, 2.4) };
 })()); })();
 export function addTruckLamps(o, len, w = 2.4, y = 1.1, rearZ = null) {
-  const L = truckLamps(), B = lampMats();
+  const L = truckLamps(), B = lampMats(), fs = feature('car-lens') ? 0.42 : 0.9;
   for (const sx of [-1, 1]) {
     const f = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), L.front); f.position.set(sx * w * 0.36, y, len / 2 + 0.05); f.userData.lamp = 'front'; o.add(f);
     const r = new THREE.Mesh(new THREE.PlaneGeometry(fs < 0.9 ? fs * 0.62 : 0.5, fs < 0.9 ? fs * 0.62 : 0.5), L.rear);   /* car-lens: стоповете ~0,26 м (бяха 0,5) */ r.rotation.y = Math.PI; r.position.set(sx * w * 0.42, y, (rearZ ?? -len / 2) - 0.05); r.userData.lamp = 'rear'; o.add(r);
