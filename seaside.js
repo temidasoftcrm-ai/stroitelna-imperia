@@ -12,6 +12,17 @@ import { feature } from './lab/feature.js';
 import { EXTRA_COASTAL } from './countries.js';
 export const SEASIDE = ['varna', 'burgas', 'constanta', 'istanbul', 'thessaloniki', 'athens', 'barcelona', 'amsterdam', 'rotterdam', 'newyork', 'losangeles', 'rio', 'buenosaires', 'capetown', 'dubai', 'mumbai', 'singapore', 'hongkong', 'shanghai', 'tokyo', 'sydney'];
 SEASIDE.push(...EXTRA_COASTAL);
+// sea2: следата зад лодките — V от пяна, избледнява назад (една текстура за всички)
+const SEA2 = feature('sea2'), WAKE_GEO = new THREE.PlaneGeometry(7, 26).rotateX(-Math.PI / 2);
+let WAKE_T = null;
+function wakeTex() {
+  if (WAKE_T) return WAKE_T;
+  const c = document.createElement('canvas'); c.width = 64; c.height = 256; const x = c.getContext('2d');
+  const gr = x.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = gr; x.globalAlpha = 0.28; x.beginPath(); x.moveTo(29, 0); x.lineTo(35, 0); x.lineTo(64, 256); x.lineTo(0, 256); x.closePath(); x.fill();   // разбърканата вода между ръкавите
+  x.globalAlpha = 1; x.strokeStyle = gr; x.lineWidth = 5; x.beginPath(); x.moveTo(32, 2); x.lineTo(3, 256); x.moveTo(32, 2); x.lineTo(61, 256); x.stroke();   // двата ръкава на V-то
+  return (WAKE_T = new THREE.CanvasTexture(c));
+}
 export const SEA_MODELS = ['boat-row-small'];   // детските кораби, лодки и контейнери са изтрити — вместо тях boatsreal.js
 
 const mat = (c, r = 0.9, m = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
@@ -221,6 +232,15 @@ export function addSeaside(group, deps, opts) {
     foam.material.opacity = 0.35 + Math.sin(t * 1.5) * 0.2;
     for (const s of ships) { s.o.position.y = Math.sin(t * 0.8 + s.ph) * 0.25; s.o.rotation.z = Math.sin(t * 0.6 + s.ph) * 0.02; }
     for (const q of boats) { q.o.position.x = q.x0 + Math.sin(t * 0.04 * q.sp + q.ph) * 80; q.o.rotation.y = Math.cos(t * 0.04 * q.sp + q.ph) > 0 ? Math.PI / 2 : -Math.PI / 2; q.o.position.y = Math.sin(t * 1.3 + q.ph) * 0.2; }
+    if (SEA2) {   // sea2: люлеене по вълните (и надлъжно) + пенлива следа зад движещите се лодки
+      for (const s of ships) s.o.rotation.x = Math.sin(t * 0.47 + s.ph * 1.3) * 0.012;
+      for (const q of boats) {
+        const v = Math.cos(t * 0.04 * q.sp + q.ph), dir = v > 0 ? 1 : -1;
+        q.o.rotation.z = Math.sin(t * 1.1 + q.ph) * 0.05; q.o.rotation.x = Math.sin(t * 0.9 + q.ph * 2) * 0.035;
+        if (!q.wake) { q.wake = new THREE.Mesh(WAKE_GEO, new THREE.MeshBasicMaterial({ map: wakeTex(), transparent: true, depthWrite: false, opacity: 0 })); q.wake.renderOrder = 2; g.add(q.wake); }
+        q.wake.position.set(q.o.position.x - dir * 13, 0.14, q.o.position.z); q.wake.rotation.y = -dir * Math.PI / 2; q.wake.material.opacity = Math.min(1, Math.abs(v) * 1.4) * 0.75;
+      }
+    }
     cranes.forEach((c, k) => { c.position.x += Math.sin(t * 0.2 + k) * 0.01; });
     PL.setNight(night, t); water.update(t); setShipNight(night);
     if (portUp) portUp(t);

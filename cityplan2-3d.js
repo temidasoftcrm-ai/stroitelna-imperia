@@ -7,13 +7,15 @@
 //         blocks: true (фоновите квартали в Рим), furniture: true, lampGlow: true (собствени светли петна под фенерите) }
 import * as THREE from 'three';
 import { timesSquareAds } from './timessq-ads.js';   // Таймс Скуеър: светещите екрани с рекламите
+import { makeWater } from './water.js';   // sea2: водата — общият шейдър с вълните
+import { feature } from './lab/feature.js';
 import { crossingsOf } from './pedpaths.js';   // road-geo: зебрите — същите, по които пресичат пешеходците
 
 const M = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.92 });
 let MAT = null;
 export function mats() {
   if (MAT) return MAT;
-  MAT = { grass: M(0x7fa462), walk: M(0xc9c4b8), asph: M(0x3a3d42), median: M(0x5f9a45), island: M(0x6aa84f), water: new THREE.MeshStandardMaterial({ color: 0x3f7fb0, roughness: 0.2, metalness: 0.1, side: THREE.DoubleSide }), sand: M(0xd8c79a), pier: M(0xa9a59c), paint: M(0xf2f2ea) };
+  MAT = { grass: M(0x7fa462), walk: M(0xc9c4b8), asph: M(0x3a3d42), median: M(0x5f9a45), island: M(0x6aa84f), water: feature('sea2') ? Object.assign(makeWater({ color: 0x2f86c8 }).material, { side: THREE.DoubleSide }) : new THREE.MeshStandardMaterial({ color: 0x3f7fb0, roughness: 0.2, metalness: 0.1, side: THREE.DoubleSide }), sand: M(0xd8c79a), pier: M(0xa9a59c), paint: M(0xf2f2ea) };
   for (const k of ['walk', 'asph', 'median', 'paint']) Object.assign(MAT[k], { polygonOffset: true, polygonOffsetFactor: { walk: -1, asph: -2, median: -3, paint: -4 }[k], polygonOffsetUnits: { walk: -1, asph: -2, median: -3, paint: -4 }[k] });
 
   const ASPH_T = ctex(256, (g, n) => { g.fillStyle = '#4a4d52'; g.fillRect(0, 0, n, n); for (let i = 0; i < 9000; i++) { const v = 60 + Math.random() * 40 | 0; g.fillStyle = `rgba(${v},${v},${v + 4},${Math.random() * 0.5})`; g.fillRect(Math.random() * n, Math.random() * n, 1.5, 1.5); } });
