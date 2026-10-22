@@ -23,6 +23,7 @@ export function bidHtml(o, selected, rep, fmt) {
     <div class="meta" style="margin:0 0 4px">💬 Твоята оферта: <b style="color:var(--txt)">${fmt(Math.round(o.reward * m / 500) * 500)} €</b>
       · шанс <b style="color:${ch > 0.6 ? 'var(--ok)' : ch > 0.35 ? 'var(--acc)' : 'var(--bad)'}">${Math.round(ch * 100)}%</b>
       ${o.rival ? ` · ${o.rival.nm} предлага ~${fmt(o.rival.bid)} €` : ''}</div>
+    ${globalThis.__adv30 ? `<div class="meta" style="margin:0 0 4px">💶 Аванс 30% при приемане: <b style="color:var(--ok)">${fmt(Math.round(o.reward * m * 0.3 / 100) * 100)} €</b> · остават 70% при завършване</div>` : ''}
     <div style="display:flex;gap:4px;flex-wrap:wrap">${BID_STEPS.map(s => `<button class="btn2" data-bid="${o.id}:${s}" style="padding:4px 7px;font-size:12px;${s === m ? 'background:var(--acc);color:#1a1200;border-color:var(--acc)' : ''}">${s < 1 ? '−' : s > 1 ? '+' : ''}${Math.round(Math.abs(s - 1) * 100)}%</button>`).join('')}</div>
   </div>`;
 }

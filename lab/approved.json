@@ -1,6 +1,7 @@
 {
   "approved": [
     "ab-up-fx",
+    "advance30",
     "air-big-only",
     "air-models",
     "amb-eu",
@@ -213,6 +214,7 @@
     "trucks-real",
     "vault",
     "vault-rules",
+    "wh-levels2",
     "xp-km"
   ]
 }

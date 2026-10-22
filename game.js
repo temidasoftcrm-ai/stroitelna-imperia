@@ -2970,6 +2970,16 @@ function offerAll() {
   toast(`📨 Предложи ${won + lost} оферти: спечели ${won} (+${fmt(money)} €)${lost ? `, загуби ${lost}` : ''}${left ? ` · ${left} чакат — офисът е пълен` : ''}.`, won ? 'good' : 'bad');
   save(); renderPanel();
 }
+// 💶 (advance30) аванс 30% при приемане на поръчката (за материалите), останалите 70% — при завършване; при отказ авансът се връща
+const ADV = 0.3, advOn = () => feature('advance30');
+globalThis.__adv30 = feature('advance30');
+// колко струват липсващите материали за текущия етап (0 — има ги/взети са)
+function matShortCost(p) {
+  if (!econ.stageNeeds || (p.mat && p.mat[p.stage])) return 0;
+  const miss = econ.missing(p.type, p.stage); let c = 0;
+  for (const [m, q] of Object.entries(miss)) if (q > 0) c += econ.quoteMaterial(m, q, connected()).total;
+  return Math.round(c);
+}
 function acceptOffer(id) {
   const i = S.offers.findIndex(o => o.id === id);
   if (i < 0) return;
@@ -2998,11 +3008,12 @@ function acceptOffer(id) {
   }
   city.lots[o.lot].busy = 'project';
   projects.push(p);
+  if (advOn() && p.reward > 0) { p.adv = Math.round(p.reward * ADV / 100) * 100; econ.earn(p.adv, 'обект', `Аванс 30% — ${p.title}`); }   // 💶 аванс
   { const m = Math.floor(S.day / 30); S.accM = S.accM && S.accM.m === m ? { m, n: S.accM.n + 1, sum: S.accM.sum + (p.reward || 0) } : { m, n: 1, sum: p.reward || 0 }; }   // за обобщението на директора в страничния панел
   makeSite(p);
   dispatch();
   if (bulkOffer) return;
-  toast(`Поръчката „${p.title}“ е приета. Техниката тръгва към обекта.`, 'good'); Sound.play('build');
+  toast(`Поръчката „${p.title}“ е приета.${p.adv ? ` 💶 Аванс 30%: +${fmt(p.adv)} € (за материалите).` : ''} Техниката тръгва към обекта.`, 'good'); Sound.play('build');
   flyTo(city.lots[p.lot]);
   save();
   renderPanel();
@@ -3173,7 +3184,8 @@ function cancelProject(p) {
   projects.splice(projects.indexOf(p), 1);
   S.rep = Math.max(0, S.rep - 0.2);
   if (selProject === p.id) selProject = null;
-  toast(`✖ Поръчката „${p.title}“ е отказана (−0.2 ⭐).`, 'bad'); Sound.play('error');
+  if (p.adv) econ.spend(p.adv, 'обект', `Върнат аванс — ${p.title}`);   // 💶 авансът се връща на клиента
+  toast(`✖ Поръчката „${p.title}“ е отказана (−0.2 ⭐)${p.adv ? ` — авансът ${fmt(p.adv)} € е върнат` : ''}.`, 'bad'); Sound.play('error');
   dispatch(); save(); renderPanel();
 }
 function completeProject(p) {
@@ -3196,6 +3208,7 @@ function completeProject(p) {
   const res = new ECON.Economy(ECON.newEconState()).completionPayout(p, S.day);
   S.rep = Math.max(0, Math.min(5, S.rep + res.repDelta * (res.repDelta > 0 && hasStaff('architect') ? 1.25 : 1)));
   finishSite(p);
+  if (p.adv) { res.amount = Math.max(0, res.amount - p.adv); res.note += ` · аванс ${fmt(p.adv)} € вече получен`; }   // 💶 остатъкът (70% ± закъснение/предсрочно)
   const cash = { lot: p.lot, amount: res.amount, note: res.note, title: p.title };
   S.cash = S.cash || []; S.cash.push(cash);
   spawnCash(cash);
@@ -3565,7 +3578,8 @@ function renderPanel() {
       h += `<div class="card ${selProject === p.id ? 'sel' : ''}" data-lot="${p.lot}" data-proj="${p.id}"><h3><span class="ico">${bt.ico}</span>${p.title}</h3>
         <div class="stages">${bt.stages.map((s, i) => `<span class="${i < p.stage ? 'done' : i === p.stage ? 'cur' : ''}" title="${s.nm}"></span>`).join('')}</div>
         ${p.demo ? `<div class="row"><b>🔨 Събаряне на старата сграда</b><span>${Math.round(p.demo.prog * 100)}%</span></div><div class="bar"><i style="width:${(p.demo.prog * 100).toFixed(1)}%;background:linear-gradient(90deg,#c0603a,#ff9a5e)"></i></div>` : ''}
-        <div class="row"><b>${p.stage + 1}. ${st.nm}</b><span class="${left < 0 ? 'late' : ''}">${mine ? `${Math.round(p.prog * 100)}%` : left >= 0 ? `остават ${left} дни` : `закъснение ${-left} дни`}</span></div>
+        <div class="row"><b>${p.stage + 1}. ${st.nm}</b>${(() => { const mc = !mine && advOn() ? matShortCost(p) : 0; return mc > econ.s.money ? `<span class="late" title="Материалите за етапа струват ~${fmt(mc)} €, а в касата няма толкова — купи ги с кредит („Склад“) или изчакай плащане">⏸️ чака пари за материали (~${fmt(mc)} €)</span>` : `<span class="${left < 0 ? 'late' : ''}">${mine ? `${Math.round(p.prog * 100)}%` : left >= 0 ? `остават ${left} дни` : `закъснение ${-left} дни`}</span>`; })()}</div>
+        ${p.adv ? `<div class="meta" style="margin:2px 0">💶 Аванс 30% получен (${fmt(p.adv)} €) · остават 70% при завършване</div>` : ''}
         <div class="bar"><i style="width:${(p.prog * 100).toFixed(1)}%"></i></div>
         <div class="need">${needHtml(p)}${matHtml(p)}</div>
         ${!(p.own || p.invest || p.reno || p.maint || p.remodel || p.park) ? `<div class="row" style="justify-content:flex-end;margin-top:2px"><button class="btn2" data-cancelp="${p.id}" style="font-size:12px;padding:4px 9px">✖ Откажи поръчката</button></div>` : ''}
@@ -3639,6 +3653,7 @@ function renderPanel() {
   if ($('bDistrictAll')) $('bDistrictAll').onclick = () => buyDistrict(true);
   el.querySelectorAll('[data-mat]').forEach(b => b.onclick = () => { if (buyForStock(b.dataset.mat, +b.dataset.q)) { refreshWarehouse(); SFXcash(); save(); } renderPanel(); });
   if ($('bBuyNeed')) $('bBuyNeed').onclick = () => { buyForProjects(); refreshWarehouse(); save(); renderPanel(); };
+  if ($('bLoanNeed')) $('bLoanNeed').onclick = () => { const { cost } = projShortage(); withLoan(cost, 'Материали за обектите', () => { buyForProjects(); refreshWarehouse(); save(); renderPanel(); }); };   // 💶 advance30
   if ($('bAutoFill')) $('bAutoFill').onclick = () => { const af = autoFill(); af.on = !af.on; toast(af.on ? `🔄 Автоматичното пълнене е включено (до ${fmt(af.budget)} € на ден).` : '🔄 Автоматичното пълнене е изключено.'); if (af.on) autoFillTick(true); save(); renderPanel(); };
   if ($('autoBuy')) $('autoBuy').onchange = e => { S.autoBuy = e.target.checked; for (const p of projects) p.matWarned = false; save(); };
 }
@@ -3723,7 +3738,7 @@ function storeHtml() {
     h += `<div class="card" style="border-color:var(--acc)"><h3><span class="ico">⚠️</span>Обектите чакат материали</h3>
       <div class="need">${short.map(([m, q]) => `<span class="miss">${ECON.MATERIALS[m].ico} ${q - econ.stock(m) - econ.inTransit(m)} ${ECON.MATERIALS[m].unit}</span>`).join('')}</div>
       <div class="row"><span class="money" style="color:var(--txt)">~${fmt(cost)} €</span><button class="btn" id="bBuyNeed" ${econ.canAfford(cost) ? '' : 'disabled'}>Купи за обектите</button></div>
-      ${econ.canAfford(cost) ? '' : `<div class="meta late">Нямаш пари. Вземи кредит от „Банка“ или продай техника.</div>`}</div>`;
+      ${econ.canAfford(cost) ? '' : advOn() ? `<div class="row"><span class="meta late" style="margin:0">Нямаш пари за материалите.</span><button class="btn2" id="bLoanNeed">🏦 Кредит за материалите</button></div>` : `<div class="meta late">Нямаш пари. Вземи кредит от „Банка“ или продай техника.</div>`}</div>`;
   }
   h += `<div class="sect">Материали · място ×${whLv().mul}</div>`;
   for (const [id, m] of Object.entries(ECON.MATERIALS)) {
