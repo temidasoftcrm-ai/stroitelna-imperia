@@ -56,6 +56,7 @@ import { buildAirport as makeAirport3D, loadAirModels, loadTerminals } from './a
 import { createTenders, TENDERS, BID_MS } from './tenders.js';
 import { createTasks } from './tasks.js';
 import { loadSigns, citySigns, trafficLight, hasTrafficLight, plan2Signs } from './roadsigns.js';
+import { loadStreetReal, streetReal, lampField, tlightField, tlightLens, lensGeo, pedGeo, lensMatrix, lampMats, lampHeight } from './streetreal.js';   // 💡 флаг street-real: истински улични лампи и светофари (#42.4–42.6)
 import { buildUniversity, buildHospital, buildStadium, buildMetro, buildAirTerminal, buildCanal, buildPortTerminal } from './tender3d.js';
 import { buildGreatWall } from './greatwall3d.js';
 import { buildCivic, CIVIC_KINDS } from './civic3d.js';
@@ -713,6 +714,7 @@ const plan2Opts = id => { const M = plan2.models; if (id === 'newyork') return M
 const plan2On = id => !!(S && S.plan2 && S.plan2[id] && plan2.data[id]);
 const plan2Tier = () => 1 + Math.min(4, S.cityExt || 0);   // всеки купен квартал отключва следващото ниво рионе (1…5)
 async function plan2Preload(s) {
+  if (feature('street-real')) { await loadStreetReal(); for (const m of lampMats()) dayNight.winMats.add(m); }   // street-real: абажурите светят нощем (daynight.js: winMats); моделите на лампите и светофарите — преди строежа на града (мрежата, планът v1 и v2 ги ползват веднага)
   if (s && s.plan2gen && !plan2.mod) { try { const [m, v] = await Promise.all([import('./cityplan2game.js'), import('./cityplan2-3d.js')]); plan2.mod = m; plan2.view = v; } catch (e) { console.warn('plan2gen', e); } }   // генерираните градове (шаблоните plan2) — само модулите
   const id = s && s.cityId; if (!id || !(s.plan2 && s.plan2[id]) || plan2.data[id]) return;
   try { const [m, v] = await Promise.all([import('./cityplan2game.js'), import('./cityplan2-3d.js')]); plan2.mod = m; plan2.view = v; const d = await m.loadPlan2(id); if (d) plan2.data[id] = d;
@@ -1046,9 +1048,9 @@ function buildCity(cityId) {
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(Math.max(1200, 2 * (tx(NI - 1) + 380)), Math.max(1200, 2 * (tx(NJ - 1) + 300))), new THREE.MeshStandardMaterial({ color: isDesert(cityId) ? 0xd9bf86 : 0x8fb36a, roughness: 1 }));   // Африка — пясък
   city.groundHZ = Math.max(1200, 2 * (tx(NJ - 1) + 300)) / 2;   // rail-crossings: докъде стига земята по z (тунелите)
   if (P && !P.links) P.links = planLinks(P);   // и в мрежата на маршрутите (cityplanroute.js) — ТИР-овете и техниката карат по тях
-  const pv = P && P.p2 ? plan2.view.buildPlan2View(P.p2, { realSigns: feature('road-signs'), treeModels: plan2Trees(), roadGeo: feature('road-geo') && !P.osm, osm: P.p2.osmData, offset: P.offset, termini: !!P.osm, blocks: !!P.osm, ...(P.osm && feature('city-prog') && P.square && P.toPlan ? { progressive: true, focus: P.toPlan(P.square.x, P.square.z) } : {}),   /* поетапно: първо терен и улици около централата */ ...(P.osm ? plan2Opts(cityId) : {}), stationModel: plan2.models[{ paris: 'lm-lazare2', newyork: 'lm-gc2' }[cityId]] || A['station-big']?.scene, ...(cityId === 'newyork' && plan2.models['lm-gc2'] ? { stationFacing: { face: '-z', depth: 0.8, maxW: 48 } } : {}), fillLot: L2 => { if (!P.osm) return false; const l = city.p2Map && city.p2Map.get(L2.id); return !l || l.busy === 'bg'; },
+  const pv = P && P.p2 ? plan2.view.buildPlan2View(P.p2, { realSigns: feature('road-signs'), streetReal: feature('street-real'), treeModels: plan2Trees(), roadGeo: feature('road-geo') && !P.osm, ...(feature('plants-real') && A['pl-bush-0'] ? { plants: [A['pl-bush-0'].scene.clone(true)].map(o => (o.scale.setScalar(1.8), o)), fountain: A['pl-fountain']?.scene } : {}),   /* #13: островът на кръговото — истински храсти и фонтан (без тях — цветните точки) */ osm: P.p2.osmData, offset: P.offset, termini: !!P.osm, blocks: !!P.osm, ...(P.osm && feature('city-prog') && P.square && P.toPlan ? { progressive: true, focus: P.toPlan(P.square.x, P.square.z) } : {}),   /* поетапно: първо терен и улици около централата */ ...(P.osm ? plan2Opts(cityId) : {}), stationModel: plan2.models[{ paris: 'lm-lazare2', newyork: 'lm-gc2' }[cityId]] || A['station-big']?.scene, ...(cityId === 'newyork' && plan2.models['lm-gc2'] ? { stationFacing: { face: '-z', depth: 0.8, maxW: 48 } } : {}), fillLot: L2 => { if (!P.osm) return false; const l = city.p2Map && city.p2Map.get(L2.id); return !l || l.busy === 'bg'; },
       ...(feature('free-plots') ? { freeLot: L2 => { const l = city.p2Map && city.p2Map.get(L2.id); return !!l && !l.busy && !l.built && !l.reno && !l.under && !l.obj; } } : {}) })   // свободните парцели — празни места с ограда и табела   // Рим: фоновите квартали — върху парцелите, които играта не ползва
-    : P ? buildPlanView({ ...P, streets: [...P.streets, ...P.links] }, { size: Math.max(1600, 2 * (tx(NI - 1) + 400)), seg: 170, target: controls.target, lotCount: Math.min(P.lots.length, planCount(P.mega, S.cityExt || 0)),
+    : P ? buildPlanView({ ...P, streets: [...P.streets, ...P.links] }, { streetReal: feature('street-real'), size: Math.max(1600, 2 * (tx(NI - 1) + 400)), seg: 170, target: controls.target, lotCount: Math.min(P.lots.length, planCount(P.mega, S.cityExt || 0)),
     seaZ: SEASIDE.includes(cityId) ? tx(0) - TILE / 2 - 2 : null, noFountain: !!CITY_LANDMARKS[cityId], plantProtos: ['pl-bush-0', 'pl-bush-1', 'pl-bush-2', 'pl-flowers'].filter(k => A[k]).map(k => A[k].scene), fountainProto: A['pl-fountain']?.scene, benchProto: A.bench?.scene, treeProtos: Object.keys(A).filter(k => k.startsWith('sf-tree-') || k.startsWith('sf-pine-')).map(k => { const o = A[k].scene; o.userData.pine = k.startsWith('sf-pine-'); return o; }) }) : null;
   weather.setGround(pv ? pv.userData.groundMat : ground.material);   // снежната покривка оцветява земята
   // крайбрежните градове: море на север с плаж, пристанище, фар и кораби (seaside.js)
@@ -1102,6 +1104,10 @@ function buildCity(cityId) {
     }
     if (arms.length) g.add(makeCrosswalks(arms, TILE * 0.62)); }
   const lampPos = [];
+  if (feature('street-real') && streetReal() && lights.length) {   // street-real: модерна LED лампа 9 м на тротоара, рамото над платното (вместо „light-square“ 4,2 м); инстанции — една на вид
+    const LF = lampField(lights.map(([i, j, v]) => [tx(i) + (v ? TILE * 0.42 : 0), tx(j) + (v ? 0 : TILE * 0.42), v ? -Math.PI / 2 : Math.PI, 'cobra']));
+    LF.group.userData.instTiles = lights.map(([i, j]) => [i, j]); LF.group.userData.detail = true; g.add(LF.group); lampPos.push(...LF.heads);
+    lights.length = 0; }
   for (const [i, j, vertical] of lights) {
     const l = model('light-square', 7, false);
     l.position.set(tx(i) + (vertical ? TILE * 0.42 : 0), 0, tx(j) + (vertical ? 0 : TILE * 0.42));
@@ -2149,11 +2155,12 @@ function buildSignals(g) {
   signals.length = 0;
   const lampGeo = new THREE.SphereGeometry(0.28, 10, 8);
   const mk = c => new THREE.MeshBasicMaterial({ color: c });
-  const c = (NB - 1) / 2;
+  const c = (NB - 1) / 2, SRP = feature('street-real') && streetReal() ? { list: [], tiles: [] } : null;   // street-real: стълбовете на целия град — едни инстанции
   for (let bi = 1; bi < NB; bi++) for (let bj = 1; bj < NB; bj++) {
     if (Math.max(Math.abs(bi - 0.5 - c), Math.abs(bj - 0.5 - c)) > 2.6) continue;   // само в центъра и средната зона
     const i = 3 * bi, j = 3 * bj, x = tx(i), z = tx(j);
     const sig = { i, j, x, z, t: Math.random() * (SIG_GREEN + SIG_YELLOW) * 2, heads: [], poles: [] };
+    if (SRP) { streetSignal(g, sig, i, j, x, z, SRP); signals.push(sig); continue; }   // street-real: светофар на конзола за всеки клон, на тротоара
     // два стълба по диагонал; всеки има светлини за двете посоки
     for (const [sx, sz, ry] of [[1, 1, 0], [-1, -1, Math.PI]]) {
       const RT = feature('real-tlights') && hasTrafficLight() ? trafficLight() : null, pole = RT ? RT.obj : A['traffic-light'] ? model('traffic-light', 9, false) : new THREE.Group();   /* детският е изтрит — до зареждането празно място, realSignals() го сменя с истинския */ pole.userData.detail = true; pole.userData.tile = [i, j];
@@ -2168,6 +2175,26 @@ function buildSignals(g) {
     }
     signals.push(sig);
   }
+  if (SRP && SRP.list.length) { const T = tlightField(SRP.list), J = T.group, n = SRP.list.length, M = new THREE.Matrix4();
+    const offL = new THREE.InstancedMesh(SIGG.lens, SIGG.off, n * 3), offP = new THREE.InstancedMesh(SIGG.ped, SIGG.off, n * 2); offL.userData.per = 3; offP.userData.per = 2;
+    const back = (p, yaw, ped) => ped ? [p[0] - Math.sin(yaw) * 0.01, p[1], p[2] - Math.cos(yaw) * 0.01] : [p[0] - Math.cos(yaw) * 0.01, p[1], p[2] + Math.sin(yaw) * 0.01];   // угасналите лещи — на 1 см зад светещите (покриват нарисуваните в текстурата)
+    SRP.list.forEach(([, , yaw], q) => { T.lens[q].forEach((p, k) => offL.setMatrixAt(q * 3 + k, lensMatrix(back(p, yaw), yaw, M))); T.ped[q].forEach((p, k) => offP.setMatrixAt(q * 2 + k, lensMatrix(back(p, yaw, 1), yaw, M))); });
+    offL.frustumCulled = offP.frustumCulled = false; J.add(offL, offP); J.userData.instTiles = SRP.tiles; J.userData.detail = true; g.add(J); }
+}
+// street-real (#42.5, #42.6): светофар на конзола за всеки клон на кръстовището — на тротоара до стоп линията (след зебрата), главата над платното,
+// пешеходният сигнал до зебрата. Главата: { axis, r, y, gr } — както досега (updateSignals / traffic2 onSignal палят r/y/gr); „върви“ свети с червеното за колите.
+let SIGG = null;
+function streetSignal(g, sig, i, j, x, z, SRP) {
+  if (!SIGG) SIGG = { lens: lensGeo(), ped: pedGeo(), m: [0xff3030, 0xffc400, 0x30ff60, 0x40ff70, 0xff3020].map(c => new THREE.MeshBasicMaterial({ color: c })), off: new THREE.MeshBasicMaterial({ color: 0x24201e }) };
+  const list = [], axes = [];
+  for (const [ux, uz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { if (!isRoad(i + ux, j + uz)) continue; const d = TILE / 2 + 2.6, sd = TILE * 0.45; list.push([x + ux * d + uz * sd, z + uz * d - ux * sd, Math.atan2(-uz, ux)]); axes.push(ux ? 'ew' : 'ns'); }   // вдясно на идващата кола: (uz, −ux)
+  const T = tlightLens(list); SRP.list.push(...list); for (const _ of list) SRP.tiles.push([i, j]);   // стълбовете — в общите инстанции (buildSignals), тук — само светлините на фазите
+  list.forEach(([, , yaw], n) => {
+    const mk = (geo, mat, p) => { const o = new THREE.Mesh(geo, mat); lensMatrix(p, yaw, o.matrix); o.matrixAutoUpdate = false; return o; };
+    const L = T.lens[n], Pd = T.ped[n], head = { axis: axes[n], r: new THREE.Group(), y: new THREE.Group(), gr: new THREE.Group() };
+    head.r.add(mk(SIGG.lens, SIGG.m[0], L[0]), mk(SIGG.ped, SIGG.m[3], Pd[0])); head.y.add(mk(SIGG.lens, SIGG.m[1], L[1]), mk(SIGG.ped, SIGG.m[4], Pd[1])); head.gr.add(mk(SIGG.lens, SIGG.m[2], L[2]), mk(SIGG.ped, SIGG.m[4], Pd[1]));
+    for (const o of [head.r, head.y, head.gr]) { o.userData.tile = [i, j]; g.add(o); } sig.heads.push(head); });
+  sig.poles.push({ pole: new THREE.Group(), ry: 0, real: true, heads: sig.heads });   // realSignals() (real-tlights) не ги пипа
 }
 // истинските светофари: сменя стълбовете на Kenney (построени преди модела) и мести кръгчетата на фазите върху лещите
 function realSignals() {
@@ -2182,6 +2209,7 @@ function realSignals() {
 function pruneStreetDetail() {
   if (!city.group) return;
   for (const o of [...city.group.children]) { const t = o.userData.tile; if (t && !isRoad(t[0], t[1])) city.group.remove(o); }
+  for (const o of city.group.children) if (o.userData.instTiles) o.userData.instTiles.forEach(([i, j], k) => { if (isRoad(i, j)) return; const z0 = new THREE.Matrix4().makeScale(0, 0, 0); for (const im of o.children) { const per = im.userData.per || 1; for (let q = 0; q < per; q++) im.setMatrixAt(k * per + q, z0); im.instanceMatrix.needsUpdate = true; } });   // street-real: лампите и стълбовете са инстанции — скриват се поотделно (per — инстанции на стълб)
   for (let k = signals.length - 1; k >= 0; k--) if (!isRoad(signals[k].i, signals[k].j)) signals.splice(k, 1);
 }
 const sigKey = (i, j) => i * 1000 + j;
@@ -10802,6 +10830,11 @@ if (AUTOTEST) {
     airTowerLook(lv = 7) { __dbg.airLook(lv); const g = city.airport?.group; if (!g) return null; g.updateMatrixWorld(true); let b = null; g.traverse(o => { if (o.isMesh && o.geometry?.type === 'SphereGeometry' && o.geometry.parameters?.radius === 0.6) b = o; }); if (!b) return 'nobeacon'; const v = b.getWorldPosition(new THREE.Vector3()), gp = g.getWorldPosition(new THREE.Vector3()); __dbg.camAt(v.x - 60, 25, v.z + 60, v.x, 10, v.z); return { beacon: [v.x | 0, v.y | 0, v.z | 0], group: [gp.x | 0, gp.y | 0, gp.z | 0] }; },
     addBranches(ids) { S.dev.xp = 260000; S.dev.lv = 10; S.branches = S.branches || []; S.cities = S.cities || {}; for (const id of ids) { if (!S.branches.includes(id)) S.branches.push(id); S.cities[id] = S.cities[id] || { ...newCityState(), left: nowDays() }; } contTick(); return ownedCities().length; },
     mineLook(kind = 'oilwell', lv = 2, d = 70) { S.mines = S.mines || { sites: [], seq: 0 }; const id = 'dbg-' + kind; S.mines.sites = S.mines.sites.filter(x => x.id !== id); S.mines.sites.push({ id, city: S.cityId, kind, lv, store: 0 }); refreshMines3D(); const o = city.mine3D[id]; if (!o) return null; const v = o.group.position; showMap(false); controls.target.set(v.x, 4, v.z); camera.position.set(v.x + d * 0.7, d * 0.55, v.z + d * 0.8); fly = null; return [Math.round(v.x), Math.round(v.z)]; },
+    // street-real: камерата до k-тото кръстовище със светофар, ниско над улицата; night — 22:00, иначе обед. Връща височините на лампите (м)
+    streetLook(k = 0, night = false, dist = 30) { const P2 = city.plan && city.plan.p2, off = (city.plan && city.plan.offset) || [0, 0];
+      const J = P2 ? P2.nodes.filter(n => n.ctrl === 'signal').map(n => [n.x + off[0], n.z + off[1]]) : signals.map(s => [s.x, s.z]); this.time(night ? 22 : 12);
+      if (J.length) { const [x, z] = J[k % J.length]; this.camAt(x + dist, dist * 0.32, z + 4, x, 2.5, z); }   /* вдоль улицата — сградите не закриват */
+      return { junctions: J.length, at: J[k % Math.max(1, J.length)] || null, heights: Object.fromEntries(['cobra', 'cobra2', 'arm', 'post', 'double', 'globe', 'ornate'].map(q => [q, lampHeight(q)])) }; },
     camAt(px, py, pz, tx, ty, tz) { controls.target.set(tx, ty, tz); camera.position.set(px, py, pz); fly = null; return STATION_X; },
     abCityTest() { const s = ALL_AB.find(q => q.a === S.cityId || q.b === S.cityId); if (!s) return 'no ab'; S.hwDone = [...new Set([...(S.hwDone || []), s.id])]; buildCityHighway(); showMap(false); const z = tx(N - 1) + 34; controls.target.set(0, 0, z - 20); camera.position.set(60, 90, z + 90); fly = null; return [s.id, !!cityHw]; },
     lookBeach(d = 40) { showMap(false); const z = tx(0) - TILE / 2 - 8, x = tx(0) + 60; controls.target.set(x, 2, z); camera.position.set(x + d * 0.9, d * 0.6, z + d * 0.9); fly = null; return [x, z]; },

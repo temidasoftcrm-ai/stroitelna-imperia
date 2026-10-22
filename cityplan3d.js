@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { pointAt, rectCorners, rectHas } from './cityplan.js';
 import { feature } from './lab/feature.js';
 import { makeWater } from './water.js';
+import { streetReal, lampField, tlightField, lensGeo, pedGeo, lensMatrix } from './streetreal.js';   // street-real (opts.streetReal): истинските лампи и светофари
 
 const MAT = {};   // общи материали за всички градове
 function mats() {
@@ -177,7 +178,7 @@ export function buildPlanView(P0, opts = {}) {
       ribbon([[cx - p.tx * 1.4, cz - p.tz * 1.4], [cx + p.tx * 1.4, cz + p.tz * 1.4]], 0.6, () => 0.1, ...zebra);
     }
     const o = st.w / 2 + 1.0, q = pointAt(st, s + dir * (rad + 2.2));
-    sig.push([q.x - q.tz * o * dir, q.z + q.tx * o * dir, Math.atan2(q.tx, q.tz), Math.abs(q.tx) > Math.abs(q.tz) ? 0 : 1]);
+    sig.push([q.x - q.tz * o * dir, q.z + q.tx * o * dir, Math.atan2(q.tx, q.tz), Math.abs(q.tx) > Math.abs(q.tz) ? 0 : 1, q.x + q.tz * o * dir, q.z - q.tx * o * dir, q.tx * dir, q.tz * dir]);   // + street-real: вдясно на идващите коли и посоката навън
   }
   g.add(mesh(...walk, M.walk), mesh(...asph, M.asph), mesh(...paint, M.paint));
   if (br[0].length) g.add(mesh(...br, M.bridge));
@@ -234,14 +235,25 @@ export function buildPlanView(P0, opts = {}) {
       const side = k++ % 2 ? 1 : -1, p = pointAt(st, s), o = st.w / 2 + 1.1; if (P.waterAt(p.x, p.z) || !P.buildable(p.x, p.z) && P.heightAt(p.x, p.z) > 0.3) continue;
       const x = p.x - p.tz * o * side, z = p.z + p.tx * o * side;
       if (onAsph(x, z) || lampAt.some(([a, b]) => Math.hypot(a - x, b - z) < 14)) continue;
-      lampAt.push([x, z]);
+      lampAt.push([x, z, Math.atan2(p.tz * side, -p.tx * side)]);   // + накъде е платното (street-real: рамото на лампата)
     } });
+  const SR = opts.streetReal && streetReal(), LF = SR ? lampField(lampAt.map(([x, z, a]) => [x, z, a, 'cobra'])) : null, m4 = new THREE.Matrix4();   // street-real: модерна LED 9 м по булевардите
+  if (LF) { detail.add(LF.group); g.userData.lampMats = LF.mats; } else {
   const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.12, 0.16, 6, 6), M.pole, lampAt.length);
-  const head = new THREE.InstancedMesh(new THREE.SphereGeometry(0.42, 8, 6), M.lamp, lampAt.length), m4 = new THREE.Matrix4();
+  const head = new THREE.InstancedMesh(new THREE.SphereGeometry(0.42, 8, 6), M.lamp, lampAt.length);
   lampAt.forEach(([x, z], i) => { pole.setMatrixAt(i, m4.makeTranslation(x, 3, z)); head.setMatrixAt(i, m4.makeTranslation(x, 6.1, z)); });
-  detail.add(pole, head);
+  detail.add(pole, head); }
   // --- светофари на големите кръстовища: стълб + кутия + червена/зелена светлина; двете оси се редуват (g.userData.update)
-  if (sig.length) {
+  if (sig.length && SR) {   // street-real (#42.5, #42.6): светофар на конзола на тротоара вдясно на идващите коли, главата над платното; лещите — по фазата (ос 0/1 се редуват)
+    const L = sig.map(s0 => [s0[4], s0[5], Math.atan2(-s0[7], s0[6])]), T = tlightField(L); detail.add(T.group);   /* лицето — навън по улицата, към идващите */
+    const bulbs = new THREE.InstancedMesh(lensGeo(), new THREE.MeshBasicMaterial({ color: 0xffffff }), sig.length * 3), ped = new THREE.InstancedMesh(pedGeo(), new THREE.MeshBasicMaterial({ color: 0xffffff }), sig.length * 2), C = new THREE.Color();
+    sig.forEach((s0, i) => { T.lens[i].forEach((p, k) => bulbs.setMatrixAt(i * 3 + k, lensMatrix(p, L[i][2], m4))); T.ped[i].forEach((p, k) => ped.setMatrixAt(i * 2 + k, lensMatrix(p, L[i][2], m4))); });
+    bulbs.frustumCulled = ped.frustumCulled = false; detail.add(bulbs, ped); let ph = -1;
+    g.userData.update = t => { const p2 = Math.floor(t / 8) % 2; if (p2 === ph) return; ph = p2;
+      sig.forEach((s0, i) => { const go = s0[3] === p2; [go ? 0x2a1210 : 0xff3030, 0x2a2410, go ? 0x30ff60 : 0x0f2010].forEach((c, k) => bulbs.setColorAt(i * 3 + k, C.setHex(c))); ped.setColorAt(i * 2, C.setHex(go ? 0x0f2010 : 0x40ff70)); ped.setColorAt(i * 2 + 1, C.setHex(go ? 0xff3020 : 0x2a1210)); });
+      bulbs.instanceColor.needsUpdate = ped.instanceColor.needsUpdate = true; };
+    g.userData.update(0);
+  } else if (sig.length) {
     const sp = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.1, 0.12, 4.2, 6), M.pole, sig.length);
     const bx = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 1.3, 0.45), new THREE.MeshStandardMaterial({ color: 0x1d2126, roughness: 0.6 }), sig.length);
     const red = new THREE.InstancedMesh(new THREE.SphereGeometry(0.17, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff3b30 }), sig.length);
@@ -261,7 +273,7 @@ export function buildPlanView(P0, opts = {}) {
     g.userData.update(0);
   }
   { const sigUpd = g.userData.update; g.userData.update = t => { WV.update(t); if (sigUpd) sigUpd(t); }; }   // вълните се движат всеки кадър
-  g.userData.lamps = lampAt.filter((_, i) => i % Math.ceil(lampAt.length / 160) === 0).map(([x, z]) => ({ x, y: 6.1, z }));   // светлините нощем (daynight.js) — до 160
+  g.userData.lamps = (LF ? LF.heads.map(h => [h.x, h.z, h.y]) : lampAt).filter((_, i) => i % Math.ceil(lampAt.length / 160) === 0).map(([x, z, y]) => ({ x, y: LF ? y : 6.1, z }));   // street-real: ореолите — на абажурите   // светлините нощем (daynight.js) — до 160
   // --- дървета: в града (около площада, празните кътчета) и гори по хълмовете — общи инстанции
   const trees = [], rnd = (() => { let s = 1234567; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
   for (let k = 0; k < (opts.noFountain ? 16 : 10); k++) { const a = k / (opts.noFountain ? 16 : 10) * Math.PI * 2; trees.push([sq.x + Math.cos(a) * (sq.r - 2.5), sq.z + Math.sin(a) * (sq.r - 2.5), 0.9, 0]); }

@@ -10,6 +10,7 @@ import { timesSquareAds } from './timessq-ads.js';   // Таймс Скуеър:
 import { makeWater } from './water.js';   // sea2: водата — общият шейдър с вълните
 import { feature } from './lab/feature.js';
 import { crossingsOf } from './pedpaths.js';   // road-geo: зебрите — същите, по които пресичат пешеходците
+import { streetReal, lampField, tlightField, lensGeo, pedGeo, lensMatrix, CLASSIC } from './streetreal.js';   // street-real: истинските лампи и светофари (opts.streetReal)
 
 const M = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.92 });
 let MAT = null;
@@ -328,9 +329,14 @@ function* furniture(G, P, o = {}) {   // генератор: yield след вс
   const lamps = [], trees = [], benches = [], bins = [], stops = [], signs = [], fountains = [], at = (rd, s) => { const L = rd.L; let i = 1; while (i < L.length - 1 && L[i] < s) i++; const a = rd.pts[i - 1], b = rd.pts[i], t = (s - L[i - 1]) / ((L[i] - L[i - 1]) || 1), l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, (b[0] - a[0]) / l, (b[1] - a[1]) / l]; };
   const NG = new Map(), ngk = (i, j) => i * 100003 + j; for (const n of P.nodes) if (n.arms.length >= 3) { const k = ngk(Math.floor(n.x / 30), Math.floor(n.z / 30)); (NG.get(k) || NG.set(k, []).get(k)).push(n); }   // кръстовищата в мрежа 30 м
   const nearNode = (x, z) => { const i = Math.floor(x / 30), j = Math.floor(z / 30); for (let a = i - 1; a <= i + 1; a++) for (let b = j - 1; b <= j + 1; b++) for (const n of NG.get(ngk(a, b)) || []) if (Math.hypot(n.x - x, n.z - z) < (n.r || 6) + 4) return true; return false; };
+  // street-real: улиците и булевардите — модерни LED по 9 м на бордюра (двойните — на разделителната ивица), старият център (по картата — всички улички), кейовете и пешеходните — класически ~5 м
+  const SR = o.streetReal && streetReal(), OLD = P.osm ? 1e9 : (P.R || 1200) * 0.45, cx0 = P.center ? P.center.x : 0, cz0 = P.center ? P.center.z : 0;
   for (const rd of P.roads) { yield 0;
     const T = rd.L[rd.L.length - 1], main = rd.cls !== 'street', step = rd.cls === 'quay' ? 24 : main ? 28 : 40, sides = main ? [1, -1] : [1];
-    for (let s = 10; s < T - 6; s += step) { const [x, z, ux, uz] = at(rd, s); for (const sg of sides) { const o = rd.w / 2 + rd.walk - 0.5, px = x - uz * o * sg, pz = z + ux * o * sg; if (!nearNode(px, pz)) lamps.push([px, pz]); } }
+    if (SR) { const [mx, mz] = at(rd, T / 2), old = rd.noCars || rd.cls === 'quay' || (rd.cls === 'street' && Math.hypot(mx - cx0, mz - cz0) < OLD), kind = rd.cls === 'quay' ? 'ornate' : old ? CLASSIC[(rd.id | 0) % CLASSIC.length] : rd.median ? 'cobra2' : 'cobra';
+      if (kind === 'cobra2') { for (let s = 29; s < T - 10; s += 30) { const [x, z, ux, uz] = at(rd, s); if (!nearNode(x, z)) lamps.push([x, z, Math.atan2(uz, -ux), kind]); } }   /* на ивицата между платната: рамената — към двете платна */
+      else for (let s = 10; s < T - 6; s += step) { const [x, z, ux, uz] = at(rd, s); for (const sg of sides) { const o2 = old ? rd.w / 2 + rd.walk - 0.5 : rd.w / 2 + 0.6, px = x - uz * o2 * sg, pz = z + ux * o2 * sg; if (!nearNode(px, pz)) lamps.push([px, pz, Math.atan2(uz * sg, -ux * sg), kind]); } } }
+    else for (let s = 10; s < T - 6; s += step) { const [x, z, ux, uz] = at(rd, s); for (const sg of sides) { const o = rd.w / 2 + rd.walk - 0.5, px = x - uz * o * sg, pz = z + ux * o * sg; if (!nearNode(px, pz)) lamps.push([px, pz]); } }
     if (rd.median) for (let s = 14; s < T - 10; s += 30) { const [x, z] = at(rd, s); if (!nearNode(x, z)) trees.push([x, z, 7]); }   // дървета по разделителната ивица
     if (rd.cls === 'quay' || (P.osm && rd.cls === 'blvd')) for (let s = 6; s < T - 6; s += 11) { const [x, z, ux, uz] = at(rd, s); for (const sg of [1, -1]) { const o = rd.w / 2 + rd.walk * 0.55, px = x - uz * o * sg, pz = z + ux * o * sg; if (!nearNode(px, pz) && !(P.waterAt && P.waterAt(px, pz))) trees.push([px, pz, 11]); } }   // платаните по Лунготевере
     if (main && T > 120) for (let s = 60; s < T - 40; s += 260) { const [x, z, ux, uz] = at(rd, s), o = rd.w / 2 + rd.walk - 1.2; stops.push([x - uz * o, z + ux * o, Math.atan2(ux, uz)]); }   // спирки (с навес)
@@ -341,15 +347,17 @@ function* furniture(G, P, o = {}) {   // генератор: yield след вс
     if (['navona', 'popolo', 'trevi', 'spanishsteps'].includes(L.lm) || L.big === 'park') fountains.push([L.x, L.z]); }
   // road-geo: лампи около кръговите (по тротоара, без входовете) и прожектори в острова, насочени нагоре (светят с нощта — общият фенер)
   const ups = []; if (o.roadGeo) for (const r of P.rounds || []) { const n = P.nodes[r.node], ro = r.outer + 1.6, ri = r.outer - Math.min(5.5, r.outer - 6) - 2;
-    for (let k = 0; k < 8; k++) { const a = (k + 0.5) / 8 * Math.PI * 2; if (n.arms.some(q => Math.abs(Math.atan2(Math.sin(q.angle - a), Math.cos(q.angle - a))) < Math.asin(Math.min(0.95, (P.roads[q.road].w / 2 + 2.5) / ro)))) continue; lamps.push([r.x + Math.cos(a) * ro, r.z + Math.sin(a) * ro]); }
+    for (let k = 0; k < 8; k++) { const a = (k + 0.5) / 8 * Math.PI * 2; if (n.arms.some(q => Math.abs(Math.atan2(Math.sin(q.angle - a), Math.cos(q.angle - a))) < Math.asin(Math.min(0.95, (P.roads[q.road].w / 2 + 2.5) / ro)))) continue; lamps.push([r.x + Math.cos(a) * ro, r.z + Math.sin(a) * ro, ...(SR ? [Math.atan2(-Math.cos(a), -Math.sin(a)), 'cobra'] : [])]); }
     for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; ups.push([r.x + Math.cos(a) * (ri - 0.7), r.z + Math.sin(a) * (ri - 0.7)]); } }
   // знаци „Стоп“ на второстепенните клонове без светофар
   if (!o.realSigns) for (const n of P.nodes) { if (n.ctrl !== 'yield' || n.kind === 'round') continue; for (const a of n.arms) if (!a.prio && a.stop) {   /* road-signs: истинските знаци са в roadsigns.js (plan2Signs) */ const rd = P.roads[a.road], p = a.stop[1]; signs.push([p[0] + Math.sin(a.angle) * 0.8, p[1] - Math.cos(a.angle) * 0.8, -a.angle + Math.PI / 2]); } }
   const inst = (geo, mat, list, f, shadow = false) => { if (!list.length) return null; const im = new THREE.InstancedMesh(geo, mat, list.length), m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), v = new THREE.Vector3(), sc = new THREE.Vector3();
     list.forEach((it, i) => { f(it, v, q, sc, up); im.setMatrixAt(i, m.compose(v, q, sc)); }); im.castShadow = shadow; im.frustumCulled = false; FURN.add(im); return im; };
   const P1 = (x, y, z) => (it, v, q, sc, up) => { v.set(it[0], y, it[1]); q.setFromAxisAngle(up, it[2] || 0); sc.set(1, 1, 1); };
+  let LF = null; if (SR && lamps.length) { LF = lampField(lamps); FURN.add(LF.group); }   // street-real: истинските лампи (инстанции по вид; абажурите светят нощем)
+  else if (lamps.length) {
   inst(new THREE.CylinderGeometry(0.09, 0.14, 4.6, 6).translate(0, 2.3, 0), iron, lamps, P1(0, 0, 0), true);   // стълб
-  inst(new THREE.CylinderGeometry(0.32, 0.18, 0.7, 6).translate(0, 4.75, 0), lampG, lamps, P1(0, 0, 0)).userData.lamp = 1;   // фенерът (свети нощем)
+  inst(new THREE.CylinderGeometry(0.32, 0.18, 0.7, 6).translate(0, 4.75, 0), lampG, lamps, P1(0, 0, 0)).userData.lamp = 1; }   // фенерът (свети нощем)
   if (!(o.treeModels && o.treeModels.length && realTrees(G, trees, o.treeModels))) {
   inst(new THREE.CylinderGeometry(0.22, 0.32, 1, 6).translate(0, 0.5, 0), M(0x6b5a44), trees, (it, v, q, sc) => { v.set(it[0], 0, it[1]); q.identity(); sc.set(1, it[2] * 0.4, 1); }, true);
   inst(new THREE.IcosahedronGeometry(1, 0), M(0x5d8a3e), trees, (it, v, q, sc) => { v.set(it[0], it[2] * 0.62, it[1]); q.identity(); sc.set(it[2] * 0.33, it[2] * 0.28, it[2] * 0.33); }, true); }
@@ -364,14 +372,21 @@ function* furniture(G, P, o = {}) {   // генератор: yield след вс
     b.position.y = 0.4; w.position.y = 0.75; c.position.y = 2; t.position.y = 3.4; f.add(b, w, c, t); f.position.set(x, 0, z); f.traverse(o => { if (o.isMesh) o.castShadow = true; }); FURN.add(f); }
   // светофари: стълб вдясно преди стоп линията и глава с 3 лампи; лампите — по фазата на клона (lightsUpdate)
   const heads = []; for (const n of P.nodes) { if (n.ctrl !== 'signal') continue; n.arms.forEach((a, ai) => { if (!a.stop) return; const p = a.stop[1], ox = Math.cos(a.angle), oz = Math.sin(a.angle); heads.push({ node: n.id, arm: ai, x: p[0] + ox * 0.6 - oz * 0.9, z: p[1] + oz * 0.6 + ox * 0.9, rot: Math.atan2(ox, oz) }); }); }
-  if (heads.length) {
+  if (heads.length && SR) {   // street-real (#42.5, #42.6): светофар на конзола на тротоара — на бордюра до стоп линията, главата над платното, пешеходният сигнал до зебрата
+    for (const h of heads) { const n = P.nodes[h.node], a = n.arms[h.arm], rd = P.roads[a.road], ux = Math.cos(a.angle), uz = Math.sin(a.angle), p = a.stop[1], d = (p[0] - n.x) * ux + (p[1] - n.z) * uz + 0.4, side = rd.w / 2 + 0.7;
+      h.x = n.x + ux * d + uz * side; h.z = n.z + uz * d - ux * side; h.yaw = Math.atan2(-uz, ux); }   /* вдясно на идващата кола: (uz, −ux) */
+    const TLF = tlightField(heads.map(h => [h.x, h.z, h.yaw])); FURN.add(TLF.group);
+    const bulbs = new THREE.InstancedMesh(lensGeo(), new THREE.MeshBasicMaterial({ color: 0xffffff }), heads.length * 3), ped = new THREE.InstancedMesh(pedGeo(), new THREE.MeshBasicMaterial({ color: 0xffffff }), heads.length * 2), m = new THREE.Matrix4(), c = new THREE.Color(0x333333);
+    heads.forEach((h, i) => { TLF.lens[i].forEach((p, k) => { bulbs.setMatrixAt(i * 3 + k, lensMatrix(p, h.yaw, m)); bulbs.setColorAt(i * 3 + k, c); }); TLF.ped[i].forEach((p, k) => { ped.setMatrixAt(i * 2 + k, lensMatrix(p, h.yaw, m)); ped.setColorAt(i * 2 + k, c); }); });
+    bulbs.frustumCulled = ped.frustumCulled = false; FURN.add(bulbs, ped); SIG = { heads, bulbs, ped, tl: TLF.group };
+  } else if (heads.length) {
     inst(new THREE.CylinderGeometry(0.07, 0.09, 3.4, 6).translate(0, 1.7, 0), iron, heads.map(h => [h.x, h.z]), P1(0, 0, 0), true);
     inst(new THREE.BoxGeometry(0.42, 1.1, 0.32).translate(0, 3.5, 0), M(0x1e2022), heads.map(h => [h.x, h.z, h.rot]), P1(0, 0, 0));
     const bulbs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.12, 5, 3), new THREE.MeshBasicMaterial({ color: 0xffffff }), heads.length * 3), m = new THREE.Matrix4(), c = new THREE.Color(0x333333);
     heads.forEach((h, i) => [3.85, 3.5, 3.15].forEach((y, k) => { bulbs.setMatrixAt(i * 3 + k, m.makeTranslation(h.x + Math.sin(h.rot) * 0.17, y, h.z + Math.cos(h.rot) * 0.17)); bulbs.setColorAt(i * 3 + k, c); }));
     bulbs.frustumCulled = false; FURN.add(bulbs); SIG = { heads, bulbs };
   }
-  return { FURN, SIG, lamps, lampMat: lampG };
+  return { FURN, SIG, lamps: LF ? LF.heads.map(h => [h.x, h.z, h.y]) : lamps, lampMat: LF ? LF.mats : lampG };   // street-real: светлите петна и ореолите — под абажурите (y — височината им)
 }
 
 
@@ -416,13 +431,15 @@ export function buildPlan2View(P, opts = {}) {
   const RG = !!opts.roadGeo, ET = new Map(), ZBM = RG ? crossingsOf(P, { roadGeo: true }) : null;   /* зебрите — общи с пешеходците */
   const endType = n => { if (!RG || n.arms.length !== 1) return null; if (ET.has(n.id)) return ET.get(n.id);
     const a = n.arms[0], rd = P.roads[a.road], pts = rd.pts, e = a.end ? pts[pts.length - 1] : pts[0], pr = a.end ? pts[pts.length - 2] : pts[1];
-    let t = null; if (ends.inside(n.x, n.z) || n.endKind === 'dead') { const q = ends.inside(n.x, n.z) ? ends.near(e, rd.id, [e[0] - pr[0], e[1] - pr[1]]) : null;
+    let t = null; const jn = ends.onRoad(e, rd.id);   /* #21: краят стъпва върху друга улица (булевард) — без площадка за обръщане (белият кръг през платната); пътят спира до ръба ѝ */
+    if (jn) t = { kind: 'join', rd, e, cut: Math.max(0, jn.rd.w / 2 - jn.d) + 0.5, side: Math.max(0, jn.rd.w / 2 + jn.rd.walk - jn.d) };
+    else if (ends.inside(n.x, n.z) || n.endKind === 'dead') { const q = ends.inside(n.x, n.z) ? ends.near(e, rd.id, [e[0] - pr[0], e[1] - pr[1]]) : null;
       t = q ? { kind: 'cont', q } : rd.median || rd.cls === 'blvd' || n.endKind === 'grow' ? { kind: 'bar' } : { kind: 'bulb', r: rd.w / 2 + 3 };
       Object.assign(t, { rd, e, ang: Math.atan2(pr[1] - e[1], pr[0] - e[0]) }); } else if (n.endKind === 'grow') t = { kind: 'bar', rd, e, ang: Math.atan2(pr[1] - e[1], pr[0] - e[0]) };
     ET.set(n.id, t); return t; };
   // докъде стигат маркировката/ивицата/тротоарът от задънения край (extra — допълнително отстъпване)
   const deadCut = (n, extra = 0, med = false) => { if (RG && n.kind === 'round') { const o = P.rounds.find(r => r.node === n.id).outer; return med ? o + 14 : o + 9.6; }   /* кръгово: линиите — след зебрата, ивицата — след разделителното островче */
-    const b = bendOf(n); if (b) return b.L; const t = endType(n); return !t ? 0 : t.kind === 'bulb' ? t.r + extra : t.kind === 'bar' ? 1.5 + extra : 0; };
+    const b = bendOf(n); if (b) return b.L; const t = endType(n); return !t ? 0 : t.kind === 'bulb' ? t.r + extra : t.kind === 'bar' ? 1.5 + extra : t.kind === 'join' ? t.cut + extra : 0; };
   // възел с два клона (една улица завива): дъга с постоянна ширина вместо чупка — клоновете се режат на L = R·tan(θ/2) (R ≤ 15 м, L ≤ 40% от късия)
   const BN = new Map(), bendOf = n => { if (!RG || n.arms.length !== 2 || n.kind === 'round') return null; if (BN.has(n.id)) return BN.get(n.id);
     const [a, b] = n.arms, ra = P.roads[a.road], rb = P.roads[b.road]; let t = null;
@@ -432,13 +449,13 @@ export function buildPlan2View(P, opts = {}) {
       if (L > 1) t = { L, a, b, ra, rb }; }
     BN.set(n.id, t); return t; };
   const bendCut = n => { const t = bendOf(n); return t ? t.L : 0; };
-  const deadSide = n => { const t = endType(n); if (!t || t.kind !== 'bulb') return 0; const w = t.rd.walk, ro = t.r + w / 2, lo = t.rd.w / 2 + w / 2; return Math.sqrt(Math.max(0, ro * ro - lo * lo)); };
+  const deadSide = n => { const t = endType(n); if (t && t.kind === 'join') return t.side; if (!t || t.kind !== 'bulb') return 0; const w = t.rd.walk, ro = t.r + w / 2, lo = t.rd.w / 2 + w / 2; return Math.sqrt(Math.max(0, ro * ro - lo * lo)); };
   const arcPts = (cx, cz, r, a0, a1, m = 28) => Array.from({ length: m + 1 }, (_, k) => { const a = a0 + (a1 - a0) * k / m; return [cx + Math.cos(a) * r, cz + Math.sin(a) * r]; });
   const ST = P.STOP || 4.6, armT = (n, rd, end, far) => { const a = n.arms.find(q => q.road === rd.id && q.end === end); return a && a.t != null ? (far ? a.t : a.t0 ?? a.t) : 0; };   // t0 — докъде е пътят; t — стоп линията (от плана)
   // срез t (по посоката на клона, както в плана) → разстояние по дъгата на пътя от този му край (иначе при извит път остава процеп)
   const sAt = (n, rd, end, t) => { const a = n.arms.find(q => q.road === rd.id && q.end === end); if (!a) return t; const u = [Math.cos(a.angle), Math.sin(a.angle)], L = rd.L, T = L[L.length - 1], N = rd.pts.length;
     let prev = 0, ps = 0; for (let k = 0; k < N; k++) { const i = end ? N - 1 - k : k, p = rd.pts[i], pr = (p[0] - n.x) * u[0] + (p[1] - n.z) * u[1], sk = end ? T - L[i] : L[i]; if (pr >= t) return k ? ps + (sk - ps) * (t - prev) / ((pr - prev) || 1) : sk; prev = pr; ps = sk; } return t; };
-  const endCut = (n, rd, end, extra = 0, rpad = -0.5) => n.kind === 'round' ? P.rounds.find(r => r.node === n.id).outer + rpad : n.arms.length >= 3 ? sAt(n, rd, end, armT(n, rd, end, extra > 0) + extra) : 0;
+  const endCut = (n, rd, end, extra = 0, rpad = -0.5) => n.kind === 'round' ? P.rounds.find(r => r.node === n.id).outer + rpad : n.arms.length >= 3 ? sAt(n, rd, end, armT(n, rd, end, extra > 0) + extra) : RG && n.arms.length === 1 && endType(n)?.kind === 'join' ? endType(n).cut : 0;
   const atS = (rd, s) => { const L = rd.L; let i = 1; while (i < L.length - 1 && L[i] < s) i++; const a = rd.pts[i - 1], b = rd.pts[i], t = (s - L[i - 1]) / ((L[i] - L[i - 1]) || 1), l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return { p: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], u: [(b[0] - a[0]) / l, (b[1] - a[1]) / l] }; };
   // срезът на една страна на пътя (sg: +1 — лявата спрямо посоката на pts): при началото на пътя лявата е лявата на клона (tL), при края — дясната (tR)
   const sideCut = (n, rd, end, sg) => { if (n.kind === 'round') return P.rounds.find(r => r.node === n.id).outer + 0.2; if (RG && n.arms.length === 1) return deadSide(n); if (bendOf(n)) return bendCut(n); const a = n.arms.length >= 3 && n.arms.find(q => q.road === rd.id && q.end === end); if (!a || a.tL == null) return 0; return sAt(n, rd, end, (end === 0) === (sg > 0) ? a.tL : a.tR); };
@@ -465,7 +482,7 @@ export function buildPlan2View(P, opts = {}) {
   }
   // задънените краища вътре в картата (OSM: изхвърлените къси улички прекъсват връзките): близо до друга улица (< 25 м) и с лице към нея —
   // асфалтово продължение до нея; иначе — кръгла площадка за обръщане с тротоар и бордюр (само изгледът; планът и парцелите не се променят)
-  if (RG) for (const n of ND) { const t = endType(n); if (!t) continue; const rd = t.rd, e = t.e;   /* road-geo: изричният вид на края */
+  if (RG) for (const n of ND) { const t = endType(n); if (!t || t.kind === 'join') continue; const rd = t.rd, e = t.e;   /* road-geo: изричният вид на края */
     if (t.kind === 'cont') { As.push(ribbon([e, t.q], rd.w, 0.072)); W.push(ribbon([e, t.q], rd.w + 2 * rd.walk, 0.044)); continue; }
     if (t.kind === 'bulb') {   /* компактна площадка: асфалтов кръг, тротоарът и бордюрът — дъга без входа (не пресичат улицата) */
       const r = t.r, w = rd.walk, aW = Math.asin(Math.min(0.99, (rd.w / 2 + w / 2) / (r + w / 2))), aC = Math.asin(Math.min(0.99, (rd.w / 2) / (r + 0.15)));
@@ -481,6 +498,7 @@ export function buildPlan2View(P, opts = {}) {
     else if (rd.cls !== 'street') for (const sg of [1, -1]) { Pt.push(ribbon(offLine(arc, sg * (rd.w / 2 - 0.4)), 0.15, 0.12)); if (rd.lanes[0] > 1) dashed(offLine(arc, sg * ((rd.median || 0) / 2 + rd.laneW)), 3, 6, 0.15, 0.12, Pt); }
   }
   else for (const n of ND) { if (n.arms.length !== 1 || !ends.inside(n.x, n.z)) continue; const a = n.arms[0], rd = P.roads[a.road], pts = rd.pts, e = a.end ? pts[pts.length - 1] : pts[0], pr = a.end ? pts[pts.length - 2] : pts[1];
+    if (ends.onRoad(e, rd.id)) continue;   // #21: стъпва върху друга улица — без кръг
     const q = ends.near(e, rd.id, [e[0] - pr[0], e[1] - pr[1]]);
     if (q) { As.push(ribbon([e, q], rd.w, 0.072)); W.push(ribbon([e, q], rd.w + 2 * rd.walk, 0.044)); }
     else { const r = Math.max(5.5, rd.w / 2 + 2.5); W.push(disc(n.x, n.z, r + rd.walk, 0.045)); As.push(disc(n.x, n.z, r, 0.075)); Cb.push(ribbon(circle(n.x, n.z, r + 0.15, 32), 0.3, 0.09)); } }
@@ -571,6 +589,9 @@ export function buildPlan2View(P, opts = {}) {
     return { inside: (x, z) => x > x0 + 40 && x < x1 - 40 && z > z0 + 40 && z < z1 - 40,
       near(e, own, dir) { if (!grid) build(); const l = Math.hypot(dir[0], dir[1]) || 1, ux = dir[0] / l, uz = dir[1] / l; let best = null, bd = 25 * 25; const i = Math.floor(e[0] / 25), j = Math.floor(e[1] / 25);
         for (let a = i - 1; a <= i + 1; a++) for (let b = j - 1; b <= j + 1; b++) { const c = grid.get(a * 100003 + b); if (c) for (let k = 0; k < c.length; k += 3) { if (c[k + 2] === own) continue; const dx = c[k] - e[0], dz = c[k + 1] - e[1], d = dx * dx + dz * dz; if (d < bd && d > 0.25 && (dx * ux + dz * uz) / Math.sqrt(d) > 0.5) { bd = d; best = [c[k], c[k + 1]]; } } }   // само напред (до 60° от посоката на пътя)
+        return best; },
+      onRoad(e, own) { if (!grid) build(); let best = null; const i = Math.floor(e[0] / 25), j = Math.floor(e[1] / 25);   // друга улица, върху чието платно/тротоар е точката → { rd, d }
+        for (let a = i - 1; a <= i + 1; a++) for (let b = j - 1; b <= j + 1; b++) { const c = grid.get(a * 100003 + b); if (c) for (let k = 0; k < c.length; k += 3) { if (c[k + 2] === own) continue; const R2 = P.roads[c[k + 2]]?.id === c[k + 2] ? P.roads[c[k + 2]] : P.roads.find(r => r.id === c[k + 2]), d = Math.hypot(c[k] - e[0], c[k + 1] - e[1]); if (R2 && d < R2.w / 2 + R2.walk && (!best || d < best.d)) best = { rd: R2, d }; } }
         return best; } };
   })();
   // ---- главният генератор: пръстените на улиците (най-близките — първи), дърветата, мебелта и светофарите, гарата, надписите, корабите,
@@ -586,9 +607,9 @@ export function buildPlan2View(P, opts = {}) {
       if (F && F.lamps.length && opts.lampGlow !== false) {
         const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 1, 32, 32, 31); gr.addColorStop(0, 'rgba(255,214,140,0.9)'); gr.addColorStop(0.5, 'rgba(255,190,110,0.3)'); gr.addColorStop(1, 'rgba(255,170,90,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
         ST.pools = new THREE.InstancedMesh(new THREE.PlaneGeometry(9, 9).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -6 }), F.lamps.length);
-        const m = new THREE.Matrix4(); F.lamps.forEach(([x, z], i) => ST.pools.setMatrixAt(i, m.makeTranslation(x, 0.15, z))); ST.pools.visible = false; ST.pools.frustumCulled = false; F.FURN.add(ST.pools);
+        const m = new THREE.Matrix4(); F.lamps.forEach(([x, z, y], i) => ST.pools.setMatrixAt(i, y > 7 ? m.makeScale(1.6, 1, 1.6).setPosition(x, 0.15, z) : m.makeTranslation(x, 0.15, z)));   /* street-real: под високите LED — по-широко петно */ ST.pools.visible = false; ST.pools.frustumCulled = false; F.FURN.add(ST.pools);
       }
-      ST.lampsOut = F.lamps.filter((_, i) => i % Math.max(1, Math.ceil(F.lamps.length / 160)) === 0).map(([x, z]) => ({ x: x + off[0], y: 4.8, z: z + off[1] }));
+      ST.lampsOut = F.lamps.filter((_, i) => i % Math.max(1, Math.ceil(F.lamps.length / 160)) === 0).map(([x, z, y]) => ({ x: x + off[0], y: y || 4.8, z: z + off[1] }));
       api.setNight(ST.night); }
     tm('furniture'); yield 0;
     if (D) { ST.glow = streetGlow(G, P, D.style); ST.wash = floodWash(G, P); tm('glow'); yield 0; }
@@ -619,9 +640,9 @@ export function buildPlan2View(P, opts = {}) {
     timing: TM, refill,
     get blocks() { return ST.BL ? ST.BL.list : []; },
     hideBlocks: set => ST.BL && ST.BL.hide(set),
-    get nightMats() { return [...(ST.F ? [ST.F.lampMat] : []), ...WIN_MATS, ...(ST.glow ? [ST.glow] : []), ...(ST.wash ? [ST.wash] : [])]; },
+    get nightMats() { return [...(ST.F ? [].concat(ST.F.lampMat) : []), ...WIN_MATS, ...(ST.glow ? [ST.glow] : []), ...(ST.wash ? [ST.wash] : [])]; },
     get lamps() { return ST.lampsOut; },   // за daynight.js (до 160) — готови, когато progress стигне 1 (или веднага без progressive)
-    setNight(on) { ST.night = !!on; if (ST.TSA) ST.TSA.setNight(on ? 1 : 0); if (ST.F) ST.F.lampMat.emissiveIntensity = on ? 2.2 : 0.2; if (ST.pools) ST.pools.visible = !!on; for (const m of [...WIN_MATS, ...(ST.glow ? [ST.glow] : []), ...(ST.wash ? [ST.wash] : [])]) m.emissiveIntensity = on ? (m.userData.winK || 1) : 0; },
+    setNight(on) { ST.night = !!on; if (ST.TSA) ST.TSA.setNight(on ? 1 : 0); if (ST.F) for (const m of [].concat(ST.F.lampMat)) m.emissiveIntensity = on ? (m.userData.winK || 2.2) : m.userData.winK ? 0 : 0.2; if (ST.pools) ST.pools.visible = !!on; for (const m of [...WIN_MATS, ...(ST.glow ? [ST.glow] : []), ...(ST.wash ? [ST.wash] : [])]) m.emissiveIntensity = on ? (m.userData.winK || 1) : 0; },
     // постепенното строене (opts.progressive): pump(ms) — от frame() на играта, работи до ms милисекунди; progress() — 0…1; cancel() — при смяна на града
     pump(ms = 4) { if (done || cancelled) return 1; const t0 = performance.now(); while (!done && performance.now() - t0 < ms) step(); if (done) TM.total = performance.now() - T0; return api.progress(); },
     progress: () => done ? 1 : Math.min(0.99, units / EST),
@@ -632,14 +653,16 @@ export function buildPlan2View(P, opts = {}) {
     update(dt, o = {}) {
       const F = ST.F;
       if (F && o.camera) F.FURN.visible = o.camera.position.y < 420;
+      if (F && F.SIG.tl && o.camera) F.SIG.tl.visible = F.SIG.ped.visible = o.camera.position.y < 220;   // street-real: светофарите (~2,5 хил. триъгълника всеки) — само отблизо
       if (ST.FP && o.camera) ST.FP.near(o.camera.position.y < 260);   // оградите и табелите — само отблизо
       if (ST.LB && o.camera) ST.LB.update(o.camera);
       if (ST.BT) ST.BT.update(dt);
       if (ST.TSA) ST.TSA.update(performance.now() / 1000);   // рекламите на Таймс Скуеър се сменят
       if (!F || !F.SIG.heads || !o.signals || (sigT = (sigT + 1) % 6)) return;
       const byNode = new Map(); for (const s2 of o.signals) byNode.set(s2.node, s2.arms || {});
-      F.SIG.heads.forEach((h, i) => { const st = (byNode.get(h.node) || {})[h.arm], cols = SIG_C[st ? st.go : 'red'] || SIG_C.red; for (let k = 0; k < 3; k++) F.SIG.bulbs.setColorAt(i * 3 + k, SC.setHex(cols[k])); });
-      F.SIG.bulbs.instanceColor.needsUpdate = true;
+      F.SIG.heads.forEach((h, i) => { const st = (byNode.get(h.node) || {})[h.arm], cols = SIG_C[st ? st.go : 'red'] || SIG_C.red; for (let k = 0; k < 3; k++) F.SIG.bulbs.setColorAt(i * 3 + k, SC.setHex(cols[k]));
+        if (F.SIG.ped) { const walk = !st || (st.go === 'red' && (!st.left || st.left === 'red')); F.SIG.ped.setColorAt(i * 2, SC.setHex(walk ? 0x40ff70 : 0x0f2010)); F.SIG.ped.setColorAt(i * 2 + 1, SC.setHex(walk ? 0x2a1210 : 0xff3020)); } });   // пешеходците: „върви“, когато колите от този клон чакат
+      F.SIG.bulbs.instanceColor.needsUpdate = true; if (F.SIG.ped) F.SIG.ped.instanceColor.needsUpdate = true;
     },
     // освобождава геометриите, материалите и текстурите на изгледа — без общите (MAT, фасадите) и без чуждите модели (гарата, корабите, мостът)
     dispose() { api.cancel(); if (ST.TSA) ST.TSA.dispose(); const keep = new Set([...Object.values(MAT).flat(), FAC_MAT, OTTO_MAT, APT_MAT, HAUSS_MAT, BRICK_MAT, GLASS_MAT].filter(Boolean));
