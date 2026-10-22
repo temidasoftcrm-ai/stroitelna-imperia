@@ -150,6 +150,8 @@ const DEMOS = [
   ['🏢 Общ парцел на фирмата — ниво 10', 'plovdiv', d => d.campus2Look(10)],   // campus2
   ['📦 Складовете 1–10: стари (горе) и нови (долу)', 'plovdiv', d => d.whRow()],   // wh-levels2
   ['📦 Нов склад в общия парцел (ниво 6)', 'plovdiv', d => d.campus2Look(6)],   // wh-levels2 + campus2
+  ['✨ Надписите на забележителностите — само златни букви', 'paris', d => { d.lookLm(1, 160); setTimeout(() => { d.lookLm(1, 160); d.lmLabels(); }, 4000); }],   // lm-label-text
+  ['🌸 Сезонът до часовника (горе)', 'sofia', d => { d.skipDays(75); }],   // season-bar
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

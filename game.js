@@ -1339,11 +1339,12 @@ function label(text, color = '#fff', w = 10, bg = 'rgba(15,20,28,.85)') {
 // ✨ златният надпис над забележителностите (Айфеловата кула, Нотр Дам, Колизеумът…) — отделен спрайт над модела (моделът се мащабира)
 function goldLabel(text, w = 64) {
   const c = document.createElement('canvas'); c.width = 768; c.height = 128; const g = c.getContext('2d');
-  g.fillStyle = 'rgba(20,14,4,.72)'; g.beginPath(); g.roundRect(6, 10, 756, 108, 54); g.fill();
-  g.lineWidth = 5; g.strokeStyle = '#d4af37'; g.stroke();
+  const bare = feature('lm-label-text');   // само златни букви с лека сянка — без тъмна табела и рамка
+  if (!bare) { g.fillStyle = 'rgba(20,14,4,.72)'; g.beginPath(); g.roundRect(6, 10, 756, 108, 54); g.fill(); g.lineWidth = 5; g.strokeStyle = '#d4af37'; g.stroke(); }
   g.font = '800 58px Georgia, "Times New Roman", serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
   const gr = g.createLinearGradient(0, 30, 0, 100); gr.addColorStop(0, '#fff3b0'); gr.addColorStop(0.5, '#ffd54a'); gr.addColorStop(1, '#b8860b');
-  g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,.55)'; g.strokeText(text, 384, 66, 720); g.fillStyle = gr; g.fillText(text, 384, 66, 720);
+  if (bare) { g.shadowColor = 'rgba(0,0,0,.6)'; g.shadowBlur = 8; g.shadowOffsetY = 3; g.lineWidth = 3; g.strokeStyle = 'rgba(60,40,0,.45)'; g.strokeText(text, 384, 66, 720); g.shadowColor = 'transparent'; g.fillStyle = gr; g.fillText(text, 384, 66, 720); }
+  else { g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,.55)'; g.strokeText(text, 384, 66, 720); g.fillStyle = gr; g.fillText(text, 384, 66, 720); }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true })); s.scale.set(w, w * 128 / 768, 1); s.renderOrder = 11; return s;
 }
@@ -3210,21 +3211,22 @@ function completeProject(p) {
   finishSite(p);
   if (p.adv) { res.amount = Math.max(0, res.amount - p.adv); res.note += ` · аванс ${fmt(p.adv)} € вече получен`; }   // 💶 остатъкът (70% ± закъснение/предсрочно)
   const cash = { lot: p.lot, amount: res.amount, note: res.note, title: p.title };
-  S.cash = S.cash || []; S.cash.push(cash);
-  spawnCash(cash);
+  const direct = p.fire != null && feature('fire-pay');   // 🔥 (#17) спешните поръчки след пожар: плащат се направо в касата (пачките на покрива на изгорялата сграда се пропускаха)
+  if (direct) { econ.earn(cash.amount, 'обект', `${cash.title} — ${cash.note}`, { city: true }); try { window.__coopOrder?.(cash.amount, cash.title); } catch (e) { } }
+  else { S.cash = S.cash || []; S.cash.push(cash); spawnCash(cash); }
   const lot = city.lots[p.lot];
   lot.busy = null;
   if (p.fire != null) S.built = S.built.filter(x => x.lot !== p.lot);   // след пожар — същият парцел, без двоен запис
   S.built.push({ lot: p.lot, model: p.model });
   projects.splice(projects.indexOf(p), 1);
   S.done++;
-  dev.add(dev.XP[p.type] || 0);
+  dev.add(dev.XP[p.type] || (direct ? (p.type === 'fireClear' ? 800 : 400) : 0));   // спешните — и опит (досега 0: няма ги в XP)
   quests.emit('complete', { type: p.type, early: S.day <= p.deadlineDay - 2, demolish: /\(събаряне\)/.test(p.title) });
   if (p.type === 'tower' && p.floors >= 25) quests.emit('tower25');
   if (p.type === 'tower' && p.floors >= 30) quests.emit('tower30');
   Sound.play('done');
-  showEventPop(`done-${p.type}`, `✅ ${p.title}`, `Плащане ${fmt(res.amount)} € (${res.note}) — вземи пачките от покрива!`);
-  toast(`✅ ${p.title} е завършен${p.type === 'house' ? 'а' : ''} (${res.note}). Вземи парите от покрива! 💶`, res.repDelta >= 0 ? 'good' : 'bad');
+  showEventPop(`done-${p.type}`, `✅ ${p.title}`, direct ? `Плащане ${fmt(res.amount)} € (${res.note}) — вече е в касата.` : `Плащане ${fmt(res.amount)} € (${res.note}) — вземи пачките от покрива!`);
+  toast(direct ? `✅ ${p.title} — завършено (${res.note}). 💶 +${fmt(res.amount)} € в касата.` : `✅ ${p.title} е завършен${p.type === 'house' ? 'а' : ''} (${res.note}). Вземи парите от покрива! 💶`, res.repDelta >= 0 ? 'good' : 'bad');
   for (const [, t] of offerTypes()) if (S.rep >= t.rep && S.rep - res.repDelta < t.rep) toast(`⭐ Репутацията ти отключи поръчки за ${t.nm.toLowerCase()}!`, 'good');
   dispatch();
   save();
@@ -3507,6 +3509,11 @@ function renderTop() {
   $('money').classList.toggle('neg', econ.money < 0);
   $('day').textContent = S.day;
   $('clock').textContent = clockText(todF());
+  if (feature('season-bar')) {   // 🌸/☀️/🍂/❄️ сезонът и месецът до часовника (по игровия календар)
+    let e = $('seasonBar'); if (!e && $('clock')) { e = document.createElement('div'); e.className = 'stat'; e.id = 'seasonBar'; $('clock').parentNode.after(e); }
+    const mo = monthOf(S.day), se = mo === 11 || mo < 2 ? ['❄️', 'Зима'] : mo < 5 ? ['🌸', 'Пролет'] : mo < 8 ? ['☀️', 'Лято'] : ['🍂', 'Есен'];
+    if (e) { const t = `${se[0]} ${monthName(S.day)}`; if (e.textContent !== t) { e.textContent = t; e.title = `${se[1]} · ${monthName(S.day)}`; } }
+  }
   $('rep').textContent = stars(S.rep);
   const wi = weather.info(); if ($('wx')) { $('wx').textContent = wi.ico; $('wx').title = `Времето: ${wi.nm}`; }
   if ($('evchips')) { const h = events.hudHtml(); if ($('evchips').dataset.h !== h) { $('evchips').dataset.h = h; $('evchips').innerHTML = h; } }
@@ -9395,6 +9402,7 @@ function boardProposals0() {
   // ━━ 🌍 Глобъл (ниво 20): мегапроекти, концесии, придобивания (globdir.js); на нива 18–19 мегапроектите ги предлага Констръкшън
   for (const p of globProposals({ strip: h => String(h).replace(/<[^>]+>/g, ''), S: () => S, econ: () => econ, fmt, mw, corp, GLOBAL, localFirms: () => corp.localFirms(), empire: () => dev.best() >= 20, acqOn: () => feature('board-rescue') && dev.best() >= HOLD_LV.acq })) if (hasSub('glob')) out.push(p); else if (((p.id.startsWith('glob:mw-') || p.id.startsWith('glob:deal-')) && dev.best() >= HOLD_LV.mega || p.id.startsWith('glob:acq-') || p.id.startsWith('glob:loc')) && hasSub('con')) out.push({ ...p, id: p.id.replace('glob:', 'con:'), dir: 'con' });   // придобиванията (от ниво 16) — Констръкшън, докато няма Глобъл
   if (feature('board-rescue')) out.push(...rescue.proposals());   // 🆘 IPO за касата или капитала на банката
+  if (feature('board-own-dir')) { const k = out.filter(p => hasSub(p.dir)); out.splice(0, out.length, ...k); }   // само секторите с назначен директор: с един директор — само неговите предложения (и действия — autoTick минава през същия списък)
   // ━━ 🏦 Банка: всяко искане за кредит поотделно (холограмата: държавата, рейтингът и сумата), капиталът, дивидентът; 📈 борсата
   if (S.bank && hasSub('bank')) {
     const b = S.bank, room = bank.room(), RT = bank.RATINGS, B9 = n => n >= 1e9 ? `${(n / 1e9).toLocaleString('bg-BG', { maximumFractionDigits: 2 })} млрд. €` : `${M(n / 1e6)} млн. €`;
