@@ -17,6 +17,7 @@
 // на града (gridNetwork), после — от плана на улиците (част A).
 import * as THREE from 'three';
 import { lampMats, truckLamps } from './vehmodels.js';
+import { feature } from './lab/feature.js';   // car-lens (55): по-малките лещи на фаровете
 
 const H = 1 / 30;                 // фиксираната стъпка, s
 const V_LANE = 12, V_TURN = 6.5;  // желана скорост по улица / в завой, m/s
@@ -338,7 +339,7 @@ export function createTraffic(opts) {
 // begin(нощ 0…1) → car(x, z, yaw, дължина, ширина, височина, спира, ляв, десен) за всяка кола → end()
 export function lampInstances(scene, max) {
   const t = truckLamps().front.emissiveMap, mk = col => new THREE.MeshBasicMaterial({ color: col, map: t, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
-  const geo = new THREE.PlaneGeometry(0.9, 0.9), F = new THREE.InstancedMesh(geo, mk(0xfff0d0), max), R = new THREE.InstancedMesh(geo, mk(0xffffff), max), K = new THREE.InstancedMesh(geo, mk(0xffa21a), max * 2);
+  const geo = new THREE.PlaneGeometry(0.9, 0.9), fs = feature('car-lens') ? 0.42 : 0.9, F = new THREE.InstancedMesh(new THREE.PlaneGeometry(fs, fs), mk(0xfff0d0), max),   /* car-lens (55): леща ~0,4 м вместо петно 0,9 м */ R = new THREE.InstancedMesh(geo, mk(0xffffff), max), K = new THREE.InstancedMesh(geo, mk(0xffa21a), max * 2);
   // петното пред колата: конус, който избледнява напред (адитивно — избледнява към черно); лежи на асфалта, нощем
   const bc = document.createElement('canvas'); bc.width = 64; bc.height = 128; const bx = bc.getContext('2d'); bx.fillStyle = '#000'; bx.fillRect(0, 0, 64, 128);
   for (let y = 0; y < 128; y++) { const q = y / 127, w = 10 + q * 26, a = Math.pow(1 - q, 1.6) * (q < 0.06 ? q / 0.06 : 1), g = bx.createLinearGradient(32 - w, 0, 32 + w, 0); g.addColorStop(0, '#000'); g.addColorStop(0.5, `rgb(${Math.round(255 * a)},${Math.round(236 * a)},${Math.round(190 * a)})`); g.addColorStop(1, '#000'); bx.fillStyle = g; bx.fillRect(32 - w, y, 2 * w, 1); }
@@ -355,12 +356,12 @@ export function lampInstances(scene, max) {
       if (night > 0.02 && nb < max) { const bl2 = Math.max(8, L * 1.7); Q.setFromAxisAngle(Y, yaw); P.set(x + fx * (L / 2 + bl2 / 2), gy + 0.07, z + fz * (L / 2 + bl2 / 2)); SB.set(w * 2.2, 1, bl2); M.compose(P, Q, SB); BM.setMatrixAt(nb++, M); }   // петното на асфалта
       for (const sx of [-1, 1]) {
         if (night > 0.02 && nf < max) put(F, nf++, x + fx * (L / 2 + 0.05) + rx * sx * w * 0.36, y, z + fz * (L / 2 + 0.05) + rz * sx * w * 0.36, yaw, 1);
-        if (nr < max && (brake || night > 0.02)) { put(R, nr, x - fx * (L / 2 + 0.05) + rx * sx * w * 0.42, y, z - fz * (L / 2 + 0.05) + rz * sx * w * 0.42, yaw + Math.PI, brake ? 0.62 : 0.5); R.setColorAt(nr++, brake ? hot : dim); }
+        if (nr < max && (brake || night > 0.02)) { put(R, nr, x - fx * (L / 2 + 0.05) + rx * sx * w * 0.42, y, z - fz * (L / 2 + 0.05) + rz * sx * w * 0.42, yaw + Math.PI, (brake ? 0.62 : 0.5) * (fs < 0.9 ? 0.55 : 1)); R.setColorAt(nr++, brake ? hot : dim); }   /* car-lens: по-малки стопове */
         if ((sx > 0 ? bl : br) && nk < max * 2) for (const e of [1, -1]) put(K, nk++, x + fx * e * (L / 2 + 0.06) + rx * sx * w * 0.47, y + 0.05, z + fz * e * (L / 2 + 0.06) + rz * sx * w * 0.47, e > 0 ? yaw : yaw + Math.PI, 0.47);
       }
     },
     end() { F.count = nf; R.count = nr; K.count = nk; BM.count = nb; for (const m of [F, R, K, BM]) m.instanceMatrix.needsUpdate = true; if (R.instanceColor) R.instanceColor.needsUpdate = true; },
-    clear() { for (const m of [F, R, K, BM]) { scene.remove(m); m.material.dispose(); m.dispose(); } BM.material.map.dispose(); geo.dispose(); beamGeo.dispose(); },   // и паметта (текстурата е общата на фаровете — остава)
+    clear() { for (const m of [F, R, K, BM]) { scene.remove(m); m.material.dispose(); m.dispose(); } BM.material.map.dispose(); geo.dispose(); F.geometry.dispose(); beamGeo.dispose(); },   // и паметта (текстурата е общата на фаровете — остава)
   };
 }
 

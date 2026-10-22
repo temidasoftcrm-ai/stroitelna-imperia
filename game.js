@@ -1167,7 +1167,7 @@ function buildCity(cityId) {
     }
   }
   // вятърни мелници и водни кули на някои празни парцели в индустриалните градове
-  if (FACTORY_CITIES.has(cityId)) for (const lot of city.lots) {
+  if (FACTORY_CITIES.has(cityId) && !(feature('real-sizes') && P && P.osm)) for (const lot of city.lots) {   /* real-sizes (55, одитът на f1): не и в центровете на OSM градовете (Рим, Ню Йорк…) */
     if (lot.built || lot.busy || lot.zone !== 'outer' || lot.fresh) continue;
     const hh = hashStr('wm:' + cityId + ':' + lot.id);
     if (hh % 5) continue;

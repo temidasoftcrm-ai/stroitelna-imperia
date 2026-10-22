@@ -109,7 +109,7 @@ export function addTruckLamps(o, len, w = 2.4, y = 1.1, rearZ = null) {
   const L = truckLamps(), B = lampMats();
   for (const sx of [-1, 1]) {
     const f = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), L.front); f.position.set(sx * w * 0.36, y, len / 2 + 0.05); f.userData.lamp = 'front'; o.add(f);
-    const r = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), L.rear); r.rotation.y = Math.PI; r.position.set(sx * w * 0.42, y, (rearZ ?? -len / 2) - 0.05); r.userData.lamp = 'rear'; o.add(r);
+    const r = new THREE.Mesh(new THREE.PlaneGeometry(fs < 0.9 ? fs * 0.62 : 0.5, fs < 0.9 ? fs * 0.62 : 0.5), L.rear);   /* car-lens: стоповете ~0,26 м (бяха 0,5) */ r.rotation.y = Math.PI; r.position.set(sx * w * 0.42, y, (rearZ ?? -len / 2) - 0.05); r.userData.lamp = 'rear'; o.add(r);
     for (const [z, ry] of [[len / 2 + 0.06, 0], [(rearZ ?? -len / 2) - 0.06, Math.PI]]) {   // мигачите: отпред и отзад, в ъглите; лявата страна е +x (колата гледа към +z)
       const b = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.42), B.blink); b.rotation.y = ry; b.position.set(sx * w * 0.47, y + 0.05, z); b.visible = false; b.userData.lamp = 'blink'; b.userData.side = sx > 0 ? 'L' : 'R'; o.add(b);
     }
