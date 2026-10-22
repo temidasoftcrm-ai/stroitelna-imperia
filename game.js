@@ -2774,6 +2774,12 @@ function sendSiteTir(order, delay = 0) {
     save();
   }, delay);
 }
+// #13: поръчка „на път“ без ТИР (изгубен) държеше обекта вечно — броеше се за идваща и не се поръчваше пак; веднъж на ден се доставя направо
+function tirOrphans() {
+  const lost = econ.s.transit.filter(o => !tirs.list.some(t => t.order.id === o.id));
+  for (const o of lost) econ.receive(o.id);
+  if (lost.length) { for (const p of projects) p.matWarned = false; refreshWarehouse(); }
+}
 // звукът тръгва след първото действие на играча (изискване на браузъра)
 addEventListener('pointerdown', () => Sound.init(), { once: false });
 addEventListener('keydown', () => Sound.init());
@@ -3459,6 +3465,7 @@ function dayWeatherAndEvents() {
   if (ev) renderPanel();
 }
 function endOfDay() {
+  tirOrphans();
   rbuildTick();
   garAutoTick();
   saleTip();

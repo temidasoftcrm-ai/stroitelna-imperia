@@ -37,13 +37,14 @@ function loadTL() {
   }, undefined, () => res(null)));
 }
 export const hasTrafficLight = () => !!TL;
-// нов светофар: { obj, lens: { ns: [[x,y,z]×3], ew: [[x,y,z]×3] } } — ew е втората глава (копие, завъртяно на 90° около стълба)
+// нов светофар: { obj, lens: { ns: [[x,y,z]×3], ew: [[x,y,z]×3] } } — лещите на главата от модела гледат към +x (към колите по оста ew);
+// ns е втората глава (копие, завъртяно на 90° около стълба — гледа към −z). #30: бяха разменени — колите тръгваха на „червено“
 export function trafficLight() {
   if (!TL) return null;
   const o = TL.src.clone(true), head = o.getObjectByName('Trafic_Light_Up');
   if (head) { o.updateMatrixWorld(true); const h2 = head.clone(true); head.parent.add(h2); const piv = new THREE.Group(); o.add(piv); o.updateMatrixWorld(true); piv.attach(h2); piv.rotation.y = Math.PI / 2; }   // в координатите на стълба (моделът от FBX има завъртени възли)
   o.traverse(m => { if (m.isMesh) m.castShadow = true; });
-  const k = TL.k, ns = TL_LENS.map(([x, y, z]) => [x * k, y * k, z * k]), ew = ns.map(([x, y, z]) => [z, y, -x]);
+  const k = TL.k, ew = TL_LENS.map(([x, y, z]) => [x * k, y * k, z * k]), ns = ew.map(([x, y, z]) => [z, y, -x]);
   o.userData.detail = true;
   return { obj: o, lens: { ns, ew } };
 }
