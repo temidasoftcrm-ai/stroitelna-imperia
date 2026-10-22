@@ -23,6 +23,8 @@ function wakeTex() {
   x.globalAlpha = 1; x.strokeStyle = gr; x.lineWidth = 5; x.beginPath(); x.moveTo(32, 2); x.lineTo(3, 256); x.moveTo(32, 2); x.lineTo(61, 256); x.stroke();   // двата ръкава на V-то
   return (WAKE_T = new THREE.CanvasTexture(c));
 }
+// sea-coast: с колко брегът (извит) влиза навътре спрямо допирателната в x ± h — с толкова кеят се отмества към морето, за да не стъпва на пясъка в ъглите
+const coastBulge = (CO, x, h) => { const sl = (CO(x + 20) - CO(x - 20)) / 40; let m = 0; for (const d of [-h, -h / 2, h / 2, h]) m = Math.max(m, CO(x) + sl * d - CO(x + d)); return m; };
 export const SEA_MODELS = ['boat-row-small'];   // детските кораби, лодки и контейнери са изтрити — вместо тях boatsreal.js
 
 const mat = (c, r = 0.9, m = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
@@ -104,7 +106,7 @@ export function addSeaside(group, deps, opts) {
     const top = new THREE.Mesh(new THREE.ConeGeometry(1.7, 0.7, 10), mat(cols[k % 4])); top.position.set(x, 2.5, z); g.add(top);
   }
   // пристанище (източната част): кей, портални кранове, контейнери, товарен кораб
-  const px = CO && opts.port ? opts.port.x : opts.xMax - 60, pSeaZ = CO ? CO(px) - 3 : seaZ, pierZ = pSeaZ - 40;   // sea-coast: кейът — от брега пред пристанищния парцел на плана (3 м навътре във водата — до пясъка, не върху алеята)
+  const px = CO && opts.port ? opts.port.x : opts.xMax - 60, pSeaZ = CO ? CO(px) - 3 - coastBulge(CO, px, 60) : seaZ, pierZ = pSeaZ - 40;   // sea-coast: кейът — от брега пред пристанищния парцел на плана (3 м навътре във водата — до пясъка, не върху алеята)
   // sea-coast: всичко на пристанището е в своя група, завъртяна по посоката на брега (допирателната в px) около точката на брега — кеят е перпендикулярен на брега
   const pg = CO ? new THREE.Group() : g;
   if (CO) { const th = -Math.atan((CO(px + 20) - CO(px - 20)) / 40), c = Math.cos(th), sn = Math.sin(th); pg.rotation.y = th; pg.position.set(px - (px * c + pSeaZ * sn), 0, pSeaZ - (-px * sn + pSeaZ * c)); g.add(pg); }

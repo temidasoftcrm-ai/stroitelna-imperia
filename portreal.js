@@ -93,7 +93,7 @@ export function portReal(P) {
       drop.forEach(m => m.parent.remove(m));
       const w = fit(o, { len, alongX: true }), b = box(w), hull = (b.max.y - b.min.y) * (k === 'sailboat' ? 0.12 : 1);
       w.children[0].position.y -= hull * sink;
-      const y = new THREE.Group(); y.add(w); y.visible = false; g.add(y);
+      const y = new THREE.Group(); y.add(w); y.visible = false; (P.yg || g).add(y);   /* yg — sea-coast: яхтите в морето, не в завъртяната група на пристанището */
       st.yachts.push({ o: y, i });
     });
   });
@@ -107,7 +107,7 @@ export function portReal(P) {
     for (const y of st.yachts) y.o.visible = false;
     if (k < 0.7) {   // 70% от цикъла — минава, после празен залив
       const dir = cyc % 2 ? -1 : 1, u = k / 0.7, x = P.x0 + span * (dir > 0 ? u : 1 - u);
-      cur.o.visible = true; cur.o.position.set(x, Math.sin(t * 0.9) * 0.15, seaZ - 150 - (cyc % 3) * 40); cur.o.rotation.y = dir > 0 ? 0 : Math.PI;
+      cur.o.visible = true; cur.o.position.set(x, Math.sin(t * 0.9) * 0.15, (P.ySeaZ ?? seaZ) - 150 - (cyc % 3) * 40); cur.o.rotation.y = dir > 0 ? 0 : Math.PI;
     }
   };
 }

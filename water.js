@@ -40,7 +40,7 @@ function normals() {
   if (!tex) { tex = new THREE.TextureLoader().load('assets/heavy/water/waternormals.jpg', () => { ready = true; for (const c of pending) c.needsUpdate = true; pending.length = 0; }); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; }
   return tex;
 }
-const copy = () => { const c = normals().clone(); if (ready) c.needsUpdate = true; else pending.push(c); return c; };
+const copy = () => { const t = normals(), c = new THREE.Texture(); c.source = t.source; c.wrapS = c.wrapT = THREE.RepeatWrapping; if (ready) c.needsUpdate = true; else pending.push(c); return c; };   // не clone(): в three r160 clone() сам вдига needsUpdate още преди картинката (предупреждението „no image data“)
 // opts: { color, repeat (колко пъти се повтаря текстурата по площта), strength, vertexColors }
 export function makeWater(opts = {}) {
   const rep = opts.repeat || 24, n1 = copy(), n2 = copy();
