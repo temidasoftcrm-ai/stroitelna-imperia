@@ -1408,7 +1408,7 @@ const OFFICE_LEVELS = [
 ];
 // 🏷️ флаг brand-logo3d: 3D емблемата на марката над офиса (assets/heavy/logos/<марка>.glb, Meshy от потребителя); няма файл — остава плоската табела.
 // Ниво 1 (контейнерът) — малка на стълб до него; 2–4 — на покрива; 5+ — на мястото на табелата (roofLogo), табелата се скрива. Бавно се върти (frame).
-const logoCache = {}, logoLoad = k => logoCache[k] = logoCache[k] || new GLTFLoader().loadAsync(`assets/heavy/logos/${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = true; }); return g.scene; }).catch(() => null);
+const logoCache = {}, logoLoad = k => logoCache[k] = logoCache[k] || new GLTFLoader().loadAsync(`assets/heavy/logos/${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; const m = o.material; if (m && m.emissiveMap) { m.emissiveIntensity = 0; if (feature('logo-glow')) { m.userData.winK = 1.6; dayNight.winMats.add(m); } } } }); return g.scene; })   /* logo-glow: акцентите (emissiveMap от Blender) светят нощем — daynight.js ги пали с нощта */.catch(() => null);
 function logo3d(g, office, level) {
   const b = brandOf(S), key = b && BRANDS.some(x => x.k === b.k) ? b.k : 'custom';   // своята фирма (не от петте) — общата емблема custom.glb
   logoLoad(key).then(src => {
