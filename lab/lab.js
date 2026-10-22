@@ -152,6 +152,7 @@ const DEMOS = [
   ['📦 Нов склад в общия парцел (ниво 6)', 'plovdiv', d => d.campus2Look(6)],   // wh-levels2 + campus2
   ['✨ Надписите на забележителностите — само златни букви', 'paris', d => { d.lookLm(1, 160); setTimeout(() => { d.lookLm(1, 160); d.lmLabels(); }, 4000); }],   // lm-label-text
   ['🌸 Сезонът до часовника (горе)', 'sofia', d => { d.skipDays(75); }],   // season-bar
+  ['⛽ Бензиностанцията: без лого → с логото (след 5 s — петролното дружество)', 'plovdiv', d => { d.gasLogoLook(false); setTimeout(() => d.gasLogoLook(false), 3000); setTimeout(() => d.gasLogoLook(true), 8000); }],   // gas-logo-own
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
