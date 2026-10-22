@@ -18,39 +18,61 @@
 </script>
 </head><body>
 <div id="ui"><h1>🚨 Сирените на спешните коли</h1>
-<p>Нощ, сирените са включени. „Нови“ — светлините са точно върху моделираната лента/бурканите (assets/heavy/cars/sirens, flag <b>sirens-real</b>); „Стари“ — досегашната лента на покрива (по кутията на модела).</p>
-<a id="bNew" href="lab/sirens.html">🆕 Нови</a><a id="bOld" href="lab/sirens.html?old=1">⏮️ Стари</a><button id="bCam">🔄 Обиколи</button></div>
+<p>Сирените са включени. С <b>emerg-lights</b>: фарове и стопове, петно светлина пред колата, по-силен ореол, цветни петна на пътя отстрани, окраската леко свети нощем, работни светлини на пожарните, задни прожектори на линейките. „Нови“ — светлините са точно върху моделираната лента/бурканите (assets/heavy/cars/sirens, flag <b>sirens-real</b>); „Стари“ — досегашната лента на покрива (по кутията на модела).</p>
+<a id="bNew" href="lab/sirens.html">🆕 Нови</a><a id="bOld" href="lab/sirens.html?old=1">⏮️ Стари</a><button id="bCam">🔄 Обиколи</button><br><button id="bDay">🌙 Нощ</button><button id="bTraffic">🚗 В движение</button></div>
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { emergCar } from './vehmodels.js';
+import { NF_MATS } from './nightfloors.js';
 const OLD = new URLSearchParams(location.search).has('old');
 document.getElementById(OLD ? 'bOld' : 'bNew').classList.add('on');
 const CARS = [['pol-charger', 'police', 5.1], ['pol-crownvic', 'police', 5.4], ['pol-interceptor', 'police', 5.3], ['pol-nypd', 'police', 5.1], ['pol-vaz', 'police', 4.1], ['car-polsuv', 'police', 5],
-  ['amb-eu', 'ambulance', 7.2], ['amb-gaz', 'ambulance', 7], ['amb-us', 'ambulance', 7.5], ['fire-us2', 'fire', 10], ['fire-man', 'fire', 10.5]];
+  ['amb-eu', 'ambulance', 7.2], ['amb-gaz', 'ambulance', 7], ['amb-us', 'ambulance', 7.5], ['fire-us2', 'fire', 10], ['fire-man', 'fire', 10.5], ['fire-red', 'fire', 9.5]];
 const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0x05070c); scene.fog = new THREE.Fog(0x05070c, 60, 160);
 const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 500); camera.position.set(0, 30, 58);
 const controls = new OrbitControls(camera, renderer.domElement); controls.target.set(0, 1, 0); controls.update();
-scene.add(new THREE.HemisphereLight(0x3a4a70, 0x080808, 0.35)); { const m = new THREE.DirectionalLight(0x8ea6ff, 0.35); m.position.set(-20, 30, 10); scene.add(m); }   // луна
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0x1b1d22, roughness: 0.95 })); ground.rotation.x = -Math.PI / 2; scene.add(ground);
-const loader = new GLTFLoader(), labels = [];
+const hemi = new THREE.HemisphereLight(0x3a4a70, 0x080808, 0.35), sun = new THREE.DirectionalLight(0x8ea6ff, 0.35); sun.position.set(-20, 30, 10); scene.add(hemi, sun);   // луна / слънце
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(240, 240), new THREE.MeshStandardMaterial({ color: 0x1b1d22, roughness: 0.95 })); ground.rotation.x = -Math.PI / 2; scene.add(ground);
+// пътят за „В движение“: заоблен правоъгълник 90×46 м, колите се движат по него една след друга
+const RW = 45, RD = 23, RR = 10, roadM = new THREE.MeshStandardMaterial({ color: 0x2a2c31, roughness: 0.9 }), road = new THREE.Group(); road.visible = false; scene.add(road);
+{ const sh = new THREE.Shape(), hole = new THREE.Path(), rr = (P, w, d, r) => { P.moveTo(-w + r, -d); P.lineTo(w - r, -d); P.quadraticCurveTo(w, -d, w, -d + r); P.lineTo(w, d - r); P.quadraticCurveTo(w, d, w - r, d); P.lineTo(-w + r, d); P.quadraticCurveTo(-w, d, -w, d - r); P.lineTo(-w, -d + r); P.quadraticCurveTo(-w, -d, -w + r, -d); };
+  rr(sh, RW + 5, RD + 5, RR + 5); rr(hole, RW - 5, RD - 5, Math.max(1, RR - 5)); sh.holes.push(hole);
+  const m = new THREE.Mesh(new THREE.ShapeGeometry(sh, 24), roadM); m.rotation.x = -Math.PI / 2; m.position.y = 0.02; road.add(m); }
+const curve = new THREE.CurvePath(); { const P = [[-RW + RR, -RD], [RW - RR, -RD], [RW, -RD], [RW, -RD + RR], [RW, RD - RR], [RW, RD], [RW - RR, RD], [-RW + RR, RD], [-RW, RD], [-RW, RD - RR], [-RW, -RD + RR], [-RW, -RD], [-RW + RR, -RD]].map(([x, z]) => new THREE.Vector3(x, 0, z));
+  for (let i = 0; i < 12; i += 3) { curve.add(new THREE.LineCurve3(P[i], P[i + 1])); curve.add(new THREE.QuadraticBezierCurve3(P[i + 1], P[i + 2], P[i + 3])); } }
+let night = true, traffic = false;
+function setDay(n) {
+  night = n; document.getElementById('bDay').textContent = n ? '🌙 Нощ' : '☀️ Ден';
+  scene.background.setHex(n ? 0x05070c : 0x9cc4ea); scene.fog.color.copy(scene.background);
+  hemi.color.setHex(n ? 0x3a4a70 : 0xdfeaff); hemi.groundColor.setHex(n ? 0x080808 : 0x4a4436); hemi.intensity = n ? 0.35 : 1.1;
+  sun.color.setHex(n ? 0x8ea6ff : 0xfff2dc); sun.intensity = n ? 0.35 : 2.2;
+  ground.material.color.setHex(n ? 0x1b1d22 : 0x5d7044);
+  for (const m of NF_MATS) m.emissiveIntensity = n ? (m.userData.nfK || 1) : 0;   // като daynight.js
+}
+document.getElementById('bDay').onclick = () => setDay(!night);
+document.getElementById('bTraffic').onclick = () => { traffic = !traffic; road.visible = traffic; document.getElementById('bTraffic').classList.toggle('on', traffic); if (!traffic) cars.forEach(c => { c.h.position.copy(c.home); c.h.rotation.y = -0.5; }); else { camera.position.set(0, 55, 75); controls.target.set(0, 0, 0); } };
+const loader = new GLTFLoader(), labels = [], cars = [];
 CARS.forEach(([nm, kind, len], i) => {
-  const row = i < 6 ? 0 : 1, col = row ? i - 6 : i, x = (col - 2.5) * (row ? 13 : 8), z = row ? -9 : 6;
+  const row = i < 6 ? 0 : 1, col = row ? i - 6 : i, x = (col - 2.5) * (row ? 13 : 8), z = row ? -9 : 6;   // 6 полицейски отпред, 6 линейки/пожарни отзад
   loader.load(`assets/heavy/cars/${OLD ? '' : 'sirens/'}${nm}.glb`, g => {
     const car = emergCar(g.scene, len, kind, nm); car.userData.beaconsOn = true;
-    const h = new THREE.Group(); h.add(car); h.position.set(x, 0, z); h.rotation.y = -0.5; scene.add(h);
+    const h = new THREE.Group(); h.add(car); h.position.set(x, 0, z); h.rotation.y = -0.5; scene.add(h); cars.push({ h, i, home: h.position.clone() });
     const el = document.createElement('div'); el.className = 'lbl'; el.textContent = nm; document.body.appendChild(el); labels.push([el, h]);
   }, undefined, e => console.warn(nm, e));
 });
+setDay(true);
 let spin = false; document.getElementById('bCam').onclick = () => { spin = !spin; controls.autoRotate = spin; };
-const v = new THREE.Vector3();
+const v = new THREE.Vector3(), tg = new THREE.Vector3(), clock = new THREE.Clock(); let run = 0;
 renderer.setAnimationLoop(() => {
+  const dt = Math.min(0.1, clock.getDelta());
+  if (traffic) { run += dt * 9; const L = curve.getLength(); for (const c of cars) { const u = (((run + c.i * L / CARS.length) % L) + L) % L / L; curve.getPointAt(u, c.h.position); curve.getTangentAt(u, tg); c.h.position.addScaledVector(new THREE.Vector3(-tg.z, 0, tg.x), 2.2); c.h.rotation.y = Math.atan2(tg.x, tg.z); } }   // дясното платно
   controls.update(); renderer.render(scene, camera);
   for (const [el, h] of labels) { v.copy(h.position); v.y = -0.6; v.project(camera); el.style.left = `${(v.x + 1) / 2 * innerWidth}px`; el.style.top = `${(1 - v.y) / 2 * innerHeight}px`; }
 });
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
-window.__sir = { scene, camera, controls };
+window.__sir = { scene, camera, controls, cars, setDay, NF_MATS };
 </script></body></html>

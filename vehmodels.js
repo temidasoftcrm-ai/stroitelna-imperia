@@ -84,7 +84,7 @@ const EMERG_FILE = { 'fire-us': 'fire-us2', 'pol-volga': 'pol-vaz' };   // Firet
 export function loadPoliceCars(load, A) {
   return Promise.all(Object.entries(EMERG).map(([nm, opts]) => {
     const ok = opts.filter(([f]) => feature(f)); if (!ok.length) return null;
-    return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + (feature('sirens-real') ? 'sirens/' : '') + (EMERG_FILE[f] || f) + '.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = false; }); const [yaw, L0, W0] = tidyCar(g.scene), K = L0 * capW(EMERG_K[nm] * len * M_PER / L0, W0 / M_PER) /* real-sizes: ширината ≤ 2,6 м */, sc = wrap(g.scene, yaw + (CAR_FLIP.has(f) ? Math.PI : 0), K / L0); /* мащабът е във вътрешната група — model() пипа само външния */ addBeacons(sc, K, nm === 'Firetruck' ? 'fire' : nm === 'Ambulance' ? 'ambulance' : 'police'); return sc; }).catch(() => null)))
+    return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + (feature('sirens-real') ? 'sirens/' : '') + (EMERG_FILE[f] || f) + '.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = false; }); const [yaw, L0, W0] = tidyCar(g.scene), K = L0 * capW(EMERG_K[nm] * len * M_PER / L0, W0 / M_PER) /* real-sizes: ширината ≤ 2,6 м */, sc = wrap(g.scene, yaw + (CAR_FLIP.has(f) ? Math.PI : 0), K / L0); /* мащабът е във вътрешната група — model() пипа само външния */ addBeacons(sc, K, nm === 'Firetruck' ? 'fire' : nm === 'Ambulance' ? 'ambulance' : 'police'); if (feature('car-lens')) addCarLights(sc, LENS[f] || null); /* car-lens: и спешните коли — с фарове (нямаха) */ return sc; }).catch(() => null)))
       .then(list => { list = list.filter(Boolean); if (list.length) A['sf-car-' + nm] = { scene: list[0], variants: list }; });
   }));
 }
@@ -126,7 +126,7 @@ const carBeam = () => beamM || (beamM = (() => {
   NF_MATS.add(m); m.userData.nfK = 0.9; return m;
 })());
 export function addCarLights(sc) {
-  if (!feature('car-lights')) return;
+  if (!feature('car-lights') || sc.userData.emergLit) return;   // спешните (emerg-lights) си имат свои
   sc.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(sc), s = b.getSize(new THREE.Vector3()), len = s.z;
   const g = new THREE.Group(); g.position.z = (b.min.z + b.max.z) / 2; sc.add(g);
   addTruckLamps(g, len, s.x, s.y * 0.42);
@@ -240,7 +240,8 @@ function addLightBar(car, kind) {
   const pool = new BarPool(new THREE.PlaneGeometry(W * 3.2, Lc * 1.5).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: glowTex, color: cols[0], transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0, polygonOffset: true, polygonOffsetFactor: -4 }));
   pool.position.set(0, bb.min.y + 0.06, (bb.min.z + bb.max.z) / 2); pool.userData.cols = cols; pool.renderOrder = 1; car.add(pool);
 }
-function addBeacons(car, len, kind = 'police') {
+function addBeacons(car, len, kind = 'police') { addBeacons0(car, len, kind); if (feature('emerg-lights')) emergLights(car, kind); }
+function addBeacons0(car, len, kind) {
   if (!glowTex) { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 1, 32, 32, 31); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.12, 'rgba(255,255,255,0.7)'); gr.addColorStop(0.4, 'rgba(255,255,255,0.18)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); glowTex = new THREE.CanvasTexture(c); }
   car.userData.isCar = true; car.updateMatrixWorld(true);
   if (feature('sirens-real') && realSirens(car, kind)) return;   // моделът си има лентата/бурканите — светят те (assets/heavy/cars/sirens)
@@ -250,5 +251,55 @@ function addBeacons(car, len, kind = 'police') {
   for (const [k, sx, col] of [['r', -1, 0xff3030], ['b', 1, 0x3070ff]]) {
     const m = new Beacon(geo, BEACON[k]); m.position.set(sx * W * 0.18, y, z); m.scale.y = 0.7; m.userData.red = k === 'r'; m.userData.kind = kind; car.add(m);
     const g = new BeaconGlow(new THREE.SpriteMaterial({ map: glowTex, color: col, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 })); g.position.copy(m.position); g.position.y += r; g.material.depthTest = true; g.renderOrder = 2; g.scale.setScalar(W * 0.6); g.userData.red = k === 'r'; car.add(g);
+  }
+}
+
+// 💡 светлините на спешните коли (Лабораторията → emerg-lights): фарове + стопове и светло петно пред колата (като car-lights),
+// по-голям ореол на сирените, цветни петна на пътя отляво/отдясно (редуват се с проблясъците), окраската леко свети нощем,
+// пожарните — бели работни светлини отстрани, линейките — задни прожектори. Само емисивни материали и спрайтове — без истински светлини/сенки.
+const nightK = () => truckLamps().front.emissiveIntensity;   // 0 денем … 1 нощем (daynight.js → NF_MATS)
+// нощните петна и лампи — MeshBasic (без отблясъци денем), прозрачността следва нощта; всеки материал е с една сила k
+let EL = null;
+const elMats = () => EL || (EL = (() => {
+  const mk = (col, k, map = glowTex) => { const m = new THREE.MeshBasicMaterial({ color: col, map, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4 }); m.userData.k = k; return m; };
+  return { front: mk(0xfff2d8, 1), rear: mk(0xff2010, 0.9), work: mk(0xfff4e0, 1), pool: mk(0xfff0d8, 0.32), scene: mk(0xffffff, 0.4), beam: mk(0xfff0d0, 0.75, carBeam().emissiveMap) };
+})());
+class ElNight extends THREE.Mesh { onBeforeRender() { const k = this.material.userData.k; if (k != null) this.material.opacity = nightK() * k; } }   // стоповете при спиране (traffic.js сменя материала) — без k
+class ElWash extends THREE.Sprite {   // цветното сияние върху каросерията — страната, която свети
+  onBeforeRender() { if (!this.userData.own) { this.material = this.material.clone(); this.userData.own = 1; } const car = carOf(this); if (car) this.material.opacity = barLit(car, this.userData.side, 0, performance.now() / 1000) ? this.userData.k * (0.4 + 0.6 * nightK()) : 0; }
+}
+class ElPool extends THREE.Mesh {     // петно на пътя отстрани на колата, в цвета на своята страна
+  onBeforeRender() { if (!this.userData.own) { this.material = this.material.clone(); this.userData.own = 1; } const car = carOf(this); if (car) this.material.opacity = barLit(car, this.userData.side, 0, performance.now() / 1000) ? 0.85 * (0.3 + 0.7 * nightK()) : 0; }
+}
+const LIVERY = new Map();   // материал на модела → копие, което нощем леко свети с текстурата си
+function emergLights(car, kind) {
+  car.userData.emergLit = 1; car.updateMatrixWorld(true);
+  const bb = new THREE.Box3().setFromObject(car), s = bb.getSize(new THREE.Vector3()), W = s.x, len = s.z, cz = (bb.min.z + bb.max.z) / 2, y0 = bb.min.y, E = elMats();
+  let cols = BAR_COL[kind] || BAR_COL.police; const glows = [];
+  car.traverse(o => { if (o instanceof BarPool) cols = o.userData.cols; if (o instanceof BarGlow || o instanceof BeaconGlow) glows.push(o); else if (o.isMesh && !(o instanceof Beacon) && !(o instanceof BarPool)) {
+    const ms = Array.isArray(o.material) ? o.material : [o.material], out = ms.map(m => { if (!m?.isMeshStandardMaterial || !m.map || m.transparent || m.emissive.getHex()) return m;
+      let L = LIVERY.get(m); if (!L) { L = m.clone(); L.emissive.setHex(0xffffff); L.emissiveMap = m.map; L.emissiveIntensity = 0; L.userData.nfK = 0.13; NF_MATS.add(L); LIVERY.set(m, L); } return L; });
+    o.material = Array.isArray(o.material) ? out : out[0]; } });
+  for (const g of glows) g.scale.multiplyScalar(1.7);   // по-силен ореол
+  car.traverse(o => { if (o instanceof BarPool) o.scale.set(1.3, 1, 1.5); });
+  const g = new THREE.Group(); g.position.z = cz; car.add(g);
+  addTruckLamps(g, len, W, y0 + Math.min(s.y * 0.38, 1.0));
+  for (const o of [...g.children]) if (o.userData.lamp === 'front' || o.userData.lamp === 'rear') {   // фаровете/стоповете — без отблясъци денем (MeshBasic); userData.lamp остава за traffic.js
+    const m = new ElNight(o.geometry, E[o.userData.lamp]); m.position.copy(o.position); m.rotation.copy(o.rotation); m.userData = o.userData; g.add(m); g.remove(o); }
+  const beam = new ElNight(new THREE.PlaneGeometry(W * 2.2, len * 1.8), E.beam); beam.rotation.x = -Math.PI / 2; beam.position.set(0, y0 + 0.06, len / 2 + len * 0.9); beam.renderOrder = 2; g.add(beam);
+  for (const side of [0, 1]) {
+    const sx = side ? 1 : -1;
+    const w = new ElWash(new THREE.SpriteMaterial({ map: glowTex, color: cols[side], transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
+    w.position.set(sx * W * 0.25, y0 + s.y * 0.75, 0); w.scale.setScalar(Math.max(W, s.y) * 2.6); w.userData = { side, k: 0.45 }; w.renderOrder = 2; g.add(w);
+    const p = new ElPool(new THREE.PlaneGeometry(W * 2.4, len * 1.4).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: glowTex, color: cols[side], transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0, polygonOffset: true, polygonOffsetFactor: -4 }));
+    p.position.set(sx * W * 1.3, y0 + 0.07, 0); p.userData = { side }; p.renderOrder = 1; g.add(p);
+  }
+  const plate = (x, y, z, ry, k = 0.55) => { const m = new ElNight(new THREE.PlaneGeometry(k, k), E.work); m.position.set(x, y, z); m.rotation.y = ry; g.add(m); };
+  const ground = (x, z, w, d, M = E.pool) => { const m = new ElNight(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2), M); m.position.set(x, y0 + 0.08, z); m.renderOrder = 1; g.add(m); };
+  if (kind === 'fire') {   // работните светлини: по три отстрани, високо, и бяло петно на земята до колата
+    for (const sx of [-1, 1]) { for (const f of [-0.3, 0, 0.3]) plate(sx * (W / 2 + 0.04), y0 + s.y * 0.62, f * len, sx * Math.PI / 2); ground(sx * (W / 2 + W * 0.7), 0, W * 1.4, len * 0.75); }
+  } else if (kind === 'ambulance') {   // задните прожектори горе в ъглите + петно зад колата
+    for (const sx of [-1, 1]) plate(sx * W * 0.4, y0 + s.y * 0.86, -len / 2 - 0.05, Math.PI, 0.45);
+    ground(0, -len / 2 - len * 0.22, W * 1.6, len * 0.45, E.scene);
   }
 }
