@@ -5,6 +5,8 @@
 // daynight.js пали материалите вечер (emissiveIntensity = нощта 0…1). Зад feature('night-floors') — първо в Лабораторията.
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';
+// night-dim (т. 42.9): прозорците нощем — по-малко светещи, по-топли и по-тъмни, без студено-белите „решетки“ по кулите
+const ND = feature('night-dim');
 
 const MODE = { ...Object.fromEntries([3, 4, 5, 6, 7, 8, 9, 10].map(l => [`office2-l${l}`, l === 10 ? 'cool' : 'dark'])),   /* 10 — синкавото стъкло на кулата */   // 🆕 новите нива на офиса (game.js OFFICE2): прозорците — по-тъмни от фасадата
   'building-a': 'dark', 'building-b': 'cool', 'building-c': 'dark', 'building-d': 'dark', 'building-e': 'cool', 'building-f': 'cool',
@@ -195,19 +197,19 @@ export function prepNightFloors(root, name) {
               float nNight = emissive.r;   // нощта 0…1 (daynight.js → emissiveIntensity)
               float fl = floor((vNfY - uY0) / uFloorH);
               float r = fract(sin(fl * 91.17 + vNfSeed * 311.7) * 43758.5453);
-              float on = step(r, nNight * 1.05) * step(r, 0.8);   // всеки етаж в свой момент; >0.8 — тъмен
+              float on = step(r, nNight * 1.05) * step(r, ${ND ? '0.62' : '0.8'});   // всеки етаж в свой момент; >0.8 — тъмен (night-dim: >0.62)
               float tw = fract(sin((fl + 7.0 * floor(uT / 9.0 + r * 6.0 + vNfSeed * 5.0)) * 12.9898) * 43758.5453);
               if (nNight > 0.95 && tw > 0.86) on = (r < 0.92 ? 1.0 - on : on);   // живот през нощта: от време на време етаж угасва/светва
               vec2 cell = floor(vEmissiveMapUv * (uCoolW > 0.5 ? 12.0 : 48.0));   // Бурж — едри петна (стаи), не шум   // и отделните прозорци: ~60% светят (иначе стъклената фасада е цялата бяла)
               float wf = fract(sin(dot(cell, vec2(127.1, 311.7)) + fl * 17.3 + vNfSeed * 91.3) * 43758.5453);
-              on *= step(wf, uCoolW > 0.5 ? 0.3 : 0.6);   // Бурж Халифа — по-рядко
+              on *= step(wf, uCoolW > 0.5 ? 0.3 : ${ND ? '0.38' : '0.6'});   // Бурж Халифа — по-рядко
               if (uCoolW > 0.5) on *= step(r, 0.35);        // и само ~1/3 от етажите
-              vec3 col = r < 0.3 ? vec3(1.0, 0.72, 0.38) : r < 0.55 ? vec3(0.62, 0.48, 0.3) : vec3(0.85, 0.9, 1.0);
+              vec3 col = ${ND ? 'wf < 0.16 ? vec3(1.0, 0.66, 0.32) : wf < 0.3 ? vec3(0.62, 0.45, 0.26) : vec3(0.95, 0.82, 0.62) * 0.8' : 'r < 0.3 ? vec3(1.0, 0.72, 0.38) : r < 0.55 ? vec3(0.62, 0.48, 0.3) : vec3(0.85, 0.9, 1.0)'};   // night-dim: оттенъкът по прозорец (не по етаж) — топло, приглушено
               if (uCoolW > 0.5) col = vec3(0.82, 0.9, 1.0) * (0.45 + 0.3 * r);   // студено бяло, по-меко (Бурж Халифа)
               if (uFlood > 0.5) { on = nNight; col = vec3(1.0, 0.78, 0.5) * (0.8 + 0.4 * r); }   // прожектори: всичко, топло, етажите малко различни
               if (uFlood > 1.5) col = vec3(1.0, 0.8, 0.52) * (0.55 + 0.9 * clamp((vNfY - uY0) / uH, 0.0, 1.0));   // нагоре — по-светло (кулите)
               vec3 tx = texture2D(emissiveMap, vEmissiveMapUv).rgb;
-              totalEmissiveRadiance = tx * col * on * (uFlood > 0.5 ? 0.55 : 1.15);
+              totalEmissiveRadiance = tx * col * on * (uFlood > 0.5 ? 0.55 : ${ND ? '0.72' : '1.15'});
               if (uGrid > 21.5) {   // Емпайър Стейт: короната (над 68% от височината) — топло-бяло, нагоре по-светло; тялото — само прозорците (тъмното в текстурата)
                 float hz = clamp((vNfY - uY0) / uH, 0.0, 1.0), lum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
                 vec3 nn = normalize(vNfN); float vt = step(abs(dot(nn, uAx)), 0.3);
@@ -318,13 +320,13 @@ export function prepNightFloors(root, name) {
                 float gz = vNfW.y / 1.6, gf = floor(gz), fz = fract(gz), gh = dot(vNfW.xz, tg) / 0.8, gc = floor(gh), fh = fract(gh);
                 float gap = step(0.28, fz) * step(fz, 0.92) * step(0.1, fh) * step(fh, 0.9) * step(abs(wn.y), 0.12);   // покривите, пирамидите, шпиловете — не
                 float rf = fract(sin(gf * 91.17 + vNfSeed * 311.7) * 43758.5453);
-                float fOn = step(rf, nNight * 1.05) * step(0.22, rf);   // етажът — в свой момент; ~20% тъмни
+                float fOn = step(rf, nNight * 1.05) * step(${ND ? '0.34' : '0.22'}, rf);   // етажът — в свой момент; ~20% тъмни (night-dim: ~1/3)
                 float wv = fract(sin(dot(vec2(gc, gf), vec2(127.1, 311.7)) + vNfSeed * 91.3) * 43758.5453), wd = fract(sin(dot(vec2(gc, gf), vec2(269.5, 183.3)) + vNfSeed * 17.1) * 43758.5453);
                 float wp = fract(sin(dot(vec2(gc, gf), vec2(419.2, 371.9)) + vNfSeed * 47.7) * 43758.5453);
-                float lit = step(0.6, wv);   // ~40% от прозорците
+                float lit = step(${ND ? '0.76' : '0.6'}, wv);   // ~40% от прозорците (night-dim: ~24%)
                 if (wp < 0.2) { float wt = floor(uT / 6.0 + wd * 9.0); lit = step(0.5, fract(sin(dot(vec3(gc, gf, wt), vec3(12.99, 78.23, 37.71)) + vNfSeed * 5.3) * 43758.5453)); }   // ~20% светват и угасват — всеки в свой момент
-                vec3 gcol = wv < 0.75 ? vec3(1.0, 0.72, 0.38) : wv < 0.9 ? vec3(1.0, 0.9, 0.7) : vec3(0.75, 0.85, 1.0);
-                totalEmissiveRadiance = gcol * gap * fOn * lit * (0.25 + 0.75 * wd) * (0.6 + 0.4 * dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * 0.9;
+                vec3 gcol = ${ND ? 'wd < 0.5 ? vec3(1.0, 0.64, 0.3) : wd < 0.85 ? vec3(0.95, 0.78, 0.55) : vec3(0.8, 0.8, 0.82)' : 'wv < 0.75 ? vec3(1.0, 0.72, 0.38) : wv < 0.9 ? vec3(1.0, 0.9, 0.7) : vec3(0.75, 0.85, 1.0)'};
+                totalEmissiveRadiance = gcol * gap * fOn * lit * (0.25 + 0.75 * wd) * (0.6 + 0.4 * dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * ${ND ? '0.55' : '0.9'};
                 if (uGrid > 2.5) {   // Емпайър Стейт: горните етажи — колоните осветени отвън, короната — вертикални ивици, иглата — бяла на пояси
                   float hz = clamp((vNfY - uY0) / uH, 0.0, 1.0), vt = step(abs(wn.y), 0.4);
                   float band = smoothstep(0.64, 0.68, hz) * (1.0 - smoothstep(0.735, 0.745, hz)), crown = smoothstep(0.735, 0.745, hz) * (1.0 - smoothstep(0.835, 0.845, hz));
@@ -353,7 +355,7 @@ export function prepNightFloors(root, name) {
               }
             #endif`);
       };
-      m.customProgramCacheKey = () => 'nightfloors20' + (mode === 'petro' ? 'p' : '');
+      m.customProgramCacheKey = () => 'nightfloors20' + (mode === 'petro' ? 'p' : '') + (ND ? 'd' : '');
       m.needsUpdate = true;
     }
   });

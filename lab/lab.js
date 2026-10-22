@@ -153,6 +153,8 @@ const DEMOS = [
   ['✨ Надписите на забележителностите — само златни букви', 'paris', d => { d.lookLm(1, 160); setTimeout(() => { d.lookLm(1, 160); d.lmLabels(); }, 4000); }],   // lm-label-text
   ['🌸 Сезонът до часовника (горе)', 'sofia', d => { d.skipDays(75); }],   // season-bar
   ['⛽ Бензиностанцията: без лого → с логото (след 5 s — петролното дружество)', 'plovdiv', d => { d.gasLogoLook(false); setTimeout(() => d.gasLogoLook(false), 3000); setTimeout(() => d.gasLogoLook(true), 8000); }],   // gas-logo-own
+  ['📏 Панелните блокове и секциите им в истински размер (червеното — човек 1,8 м)', 'plovdiv', d => { d.sectRow(); setTimeout(() => d.sectRow(), 3000); }],   // real-sizes (d129)
+  ['🌃 Нощните прозорци — по-приглушени (Чикаго, 22:00)', 'chicago', d => { d.time(22); d.lookLm(0, 260); setTimeout(() => { d.time(22); d.lookLm(0, 260); }, 4000); }],   // night-dim
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
