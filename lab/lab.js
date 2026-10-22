@@ -297,13 +297,22 @@ function renderScenes() {
 }
 
 // ---- Мисии/демо
+const demoOk = nm => ['reviewed', 'done'].includes(mstatus.status['demo:' + nm]?.state);   // ✓ одобрено в „Мисии/демо“
 function renderDemos() {
-  sideNav(`<div class="grp">В града <i>(действие след зареждане)</i></div>` + DEMOS.map(([nm, c], i) => row(state.item === 'd' + i, nm, c, `data-d="d${i}"`)).join('')
+  if (!renderDemos.loaded) { renderDemos.loaded = 1; fetch('/__lab/status').then(r => r.json()).then(s => { mstatus = s; if (state.tab === 'demos') renderDemos(); }).catch(() => { }); }
+  sideNav(`<label class="chk" style="display:block;margin:6px 10px"><input type="checkbox" id="hideOkD" ${hideOk ? 'checked' : ''}> Скрий одобрените</label><div class="grp">В града <i>(действие след зареждане)</i></div>` + DEMOS.map(([nm, c], i) => hideOk && demoOk(nm) && state.item !== 'd' + i ? '' : row(state.item === 'd' + i, (demoOk(nm) ? '✓ ' : '') + nm, c, `data-d="d${i}"`)).join('')
     + `<div class="grp">Страници</div>` + PAGES.map(([u, nm]) => row(state.item === u, nm, u, `data-d="${u}"`)).join(''));
   $('side').querySelectorAll('[data-d]').forEach(b => b.onclick = () => pick('demos', b.dataset.d));
   if (!state.item) { $('main').innerHTML = `<div class="empty">Избери отляво — градът се зарежда и Лабораторията сама отива до мястото (__dbg).</div>`; return; }
-  if (state.item.startsWith('d')) { const [nm, c, fn] = DEMOS[+state.item.slice(1)] || []; if (fn) frame(`${GAME}&plan=1&city=${c}`, `Демо: ${nm}`, fn); }
+  $('hideOkD').onchange = e => { hideOk = e.target.checked; try { localStorage.setItem('lab.hideReviewed', hideOk ? '1' : '0'); } catch { } renderDemos(); };
+  if (state.item.startsWith('d')) { const [nm, c, fn] = DEMOS[+state.item.slice(1)] || []; if (fn) { frame(`${GAME}&plan=1&city=${c}`, `Демо: ${nm}`, fn); demoOkBtn(nm); } }
   else frame(state.item, `Страница: ${state.item}`);
+}
+// бутонът „✓ Одобри“ в лентата на демото: записва се (/__lab/feedback → status 'demo:…') и демото изчезва от списъка, ако „Скрий одобрените“ е включено
+function demoOkBtn(nm) {
+  const ok = demoOk(nm), b = document.createElement('button'); b.className = 'btn ' + (ok ? 'dim' : 'ok'); b.textContent = ok ? '✓ Одобрено' : '✓ Одобри'; b.disabled = ok;
+  b.onclick = () => post('/__lab/feedback', { target: `Демо: ${nm}`, kind: 'reviewed', text: '' }).then(() => { mstatus.status['demo:' + nm] = { state: 'reviewed', at: new Date().toISOString() }; b.textContent = '✓ Одобрено'; b.className = 'btn dim'; b.disabled = true; const r = $('side').querySelector(`[data-d="${state.item}"]`); if (r && hideOk) r.remove(); }).catch(() => { b.textContent = '⚠ не стигна'; });
+  $('bar').prepend(b);
 }
 
 // ---- 3D модели

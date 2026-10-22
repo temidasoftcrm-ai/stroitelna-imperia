@@ -46,6 +46,7 @@ function status() {
     try {
       const f = JSON.parse(l), m = /^Модел: (\S+)/.exec(f.target), n = /^Ново: (\S+)/.exec(f.target);
       if (m) set(m[1], f.kind === 'reviewed' ? 'reviewed' : f.kind === 'ok' || f.kind === 'deleted' ? 'done' : 'working', f.at);
+      { const dm = /^Демо: (.+)$/.exec(f.target); if (dm) set('demo:' + dm[1], f.kind === 'reviewed' ? 'reviewed' : 'working', f.at); }   // ✓ одобрените мисии/демота (Лабораторията → „Мисии/демо“)
       if (n && f.kind === 'approved' && R[n[1]]) set(R[n[1]].from, 'done', f.at);
     } catch { }
   }
