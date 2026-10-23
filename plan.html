@@ -78,6 +78,8 @@
   <div id="v2box" style="display:none;margin-top:7px;padding:7px;border:1px solid var(--line);border-radius:9px;font-size:12px">
     <b>🆕 Планът на новите игри</b> <span style="color:var(--mut)">(генераторът plan2; всяка промяна го пресмята наново)</span>
     <div class="actions" style="margin:5px 0;align-items:center">Вид <select id="v2fam"><option value="eu">Европа</option><option value="us">САЩ</option><option value="coast">крайбрежен</option><option value="radial">звезда</option></select> Размер <select id="v2size"><option value="s">S</option><option value="m">M</option><option value="l">L</option><option value="xl">XL</option></select> Радиус × <input id="v2rk" type="number" min="1" max="2.2" step="0.12" style="width:58px"></div>
+    <div class="actions" id="v2tools" style="margin:5px 0;align-items:center"><button data-v2="tier">🏘️ Квартал</button><select id="v2tier" title="С кой квартал се отключва (ядро — от началото)"><option value="1">ядро</option><option value="2" selected>кв. 1</option><option value="3">кв. 2</option><option value="4">кв. 3</option><option value="5">кв. 4</option><option value="6">кв. 5</option><option value="7">кв. 6</option></select><button data-v2="park">🌳 Парк</button><button data-v2="free">⬜ Свободно</button><button data-v2="lot">▢ Парцел</button></div>
+    <div style="color:var(--mut);margin-bottom:5px">Кликни или влачи по парцелите. Квартал — кога се отключва парцелът (подредбата в играта: ядро, после кв. 1, 2…; всеки квартал отключва 18/22/27 парцела според размера; ядрото — 81).</div>
     <div class="actions"><button id="v2save">💾 Запази за новите игри</button><button id="v2drop" title="Новите игри пак ще ползват генерирания план">↺ Махни от играта</button><button id="v2reset" title="Изчисти промените в редактора">✖ Без промени</button></div>
     <div id="v2st" style="margin-top:5px"></div>
   </div>
@@ -129,14 +131,20 @@ const miscCount = modelList.filter(m => m.group.startsWith('Други ·')).len
 $('categoryStrip').innerHTML = [['', 'Всички'], ...groupOrder.map(c => [c, c]), ['__other', 'Други']].map(([v, label]) => `<button type="button" data-category="${esc(v)}">${esc(label)}</button>`).join('');
 let activeCategory = '';
 let V2 = null, SAVED_EDITS = {};   // V2 — { city, fam, size, seed, rk, add: [{ cls, pts }], cut: [pts] } в рамката на плана (P.toPlan); SAVED_EDITS — assets/plans/edits.json
-const v2Copy = e => e && { add: e.add.map(L => ({ cls: L.cls, pts: L.pts.map(p => [...p]) })), cut: e.cut.map(c => c.map(p => [...p])) };
+const v2Copy = e => e && { add: e.add.map(L => ({ cls: L.cls, pts: L.pts.map(p => [...p]) })), cut: e.cut.map(c => c.map(p => [...p])), lots: (e.lots || []).map(o => ({ ...o })) };
+const EXT_LOTS = { s: 18, m: 22, l: 27, xl: 27 }, CORE = 81, DCOL = [0xf3e3a0, 0x58b4ff, 0xff8a5c, 0xb07cff, 0x52d68a, 0xff5fa8, 0x4fd6d0, 0xc9d84a];   // как играта отключва парцелите: ядро 81, после по EXT_LOTS[размер] на квартал (game.js → planCountOf, S.extLots)
+const distOf = (i, size) => i < CORE ? 0 : 1 + Math.floor((i - CORE) / EXT_LOTS[size]);
+let v2tool = 'tier', v2tier = 2, v2pend = [];
 function makeP(id) {
   if (!V2) return editablePlan(id.includes('@') ? makePlan(id.split('@')[0], { tpl: id.split('@')[1] }) : makePlan(id));
-  const gp = gamePlan2Gen(V2.city, { edit: { ...V2, roadGeo: true, jfix: true } }); return { ...editablePlan(gp), tpl: `v2 ${V2.fam}/${V2.size} ×${V2.rk}` };
+  const gp = gamePlan2Gen(V2.city, { edit: { ...V2, extLots: EXT_LOTS[V2.size], roadGeo: true, jfix: true } }); return { ...editablePlan(gp), tpl: `v2 ${V2.fam}/${V2.size} ×${V2.rk}` };
 }
 function makeView() {
   if (!V2) return buildPlanView(P, { target: controls.target, erasedTrees: erasedTreeKeys, hideTrees });
-  const W = new THREE.Group(), v = buildPlan2View(P.p2, { offset: P.offset, roadGeo: true }); W.add(v);   // планът v2 — в рамката на играта (offset), парцелите — рамки като във v1
+  const W = new THREE.Group(), v = buildPlan2View(P.p2, { offset: P.offset, roadGeo: true }); W.add(v);
+  { const g = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), im = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.38, depthWrite: false }), Math.max(1, P.lots.length)), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color();   // парцелите, оцветени по квартала, с който се отключват (ядро — жълто)
+    P.lots.forEach((L, i) => { m4.compose(new THREE.Vector3(L.x, 0.3, L.z), q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), L.rot || 0), new THREE.Vector3(L.w - 1, 1, L.d - 1)); im.setMatrixAt(i, m4); im.setColorAt(i, col.setHex(DCOL[Math.min(DCOL.length - 1, distOf(i, V2.size))])); });
+    im.count = P.lots.length; im.renderOrder = 3; im.name = 'lotDistricts'; W.add(im); }   // планът v2 — в рамката на играта (offset), парцелите — рамки като във v1
   const pos = []; for (const L of P.lots) { const c = Math.cos(L.rot || 0), s2 = Math.sin(L.rot || 0), cs = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => [L.x + a * L.w / 2 * c + b * L.d / 2 * s2, L.z - a * L.w / 2 * s2 + b * L.d / 2 * c]); for (let k = 0; k < 4; k++) { const p = cs[k], q = cs[(k + 1) % 4]; pos.push(p[0], 0.35, p[1], q[0], 0.35, q[1]); } }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); const le = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 })); le.name = 'lotEdges'; W.add(le);
   W.userData.lod = cam => v.userData.lod?.(cam);   /* рисуването вика view.userData.lod(camera) */
@@ -150,8 +158,9 @@ function v2Regen(msg) {
 function v2Status() {
   const box = $('v2box'); if (!box) return; box.style.display = V2 ? 'block' : 'none'; if (!V2) return;
   $('v2fam').value = V2.fam; $('v2size').value = V2.size; $('v2rk').value = V2.rk;
-  const sv = SAVED_EDITS[V2.city], same = sv && JSON.stringify(v2Copy(sv)) === JSON.stringify(v2Copy(V2)) && sv.fam === V2.fam && sv.size === V2.size && sv.rk === V2.rk && sv.seed === V2.seed;
-  $('v2st').innerHTML = `Промени: <b>+${V2.add.length}</b> улици, <b>−${V2.cut.length}</b> изтрити · ${same ? '✅ записано в играта' : sv ? '✏️ има незаписани промени (в играта е по-стара версия)' : V2.add.length || V2.cut.length ? '✏️ още не е записано в играта' : 'генерираният план (без промени)'}`;
+  const sv = SAVED_EDITS[V2.city], same = sv && JSON.stringify(v2Copy({ lots: [], ...sv })) === JSON.stringify(v2Copy(V2)) && sv.fam === V2.fam && sv.size === V2.size && sv.rk === V2.rk && sv.seed === V2.seed;
+  const nD = P ? Math.max(0, Math.ceil((P.lots.length - CORE) / EXT_LOTS[V2.size])) : 0, legend = P ? [`<span style="color:#${DCOL[0].toString(16)}">■</span> ядро ${Math.min(CORE, P.lots.length)}`, ...Array.from({ length: Math.min(nD, DCOL.length - 1) }, (_, k) => `<span style="color:#${DCOL[k + 1].toString(16)}">■</span> кв. ${k + 1}`)].join(' · ') + ` · паркове ${P.p2.lots.filter(L => L.big === 'park').length}` : '';
+  $('v2st').innerHTML = `${legend}<br>Промени: <b>+${V2.add.length}</b> улици, <b>−${V2.cut.length}</b> изтрити, <b>${(V2.lots || []).length}</b> по парцелите · ${same ? '✅ записано в играта' : sv ? '✏️ има незаписани промени (в играта е по-стара версия)' : V2.add.length || V2.cut.length || (V2.lots || []).length ? '✏️ още не е записано в играта' : 'генерираният план (без промени)'}`;
 }
 let P = null, view = null, built = new Map(), freeBuilt = new Map(), freeSeq = 0, selectedFree = null, brushScale = 1, brushRotation = 0, customRoads = [], erasedTreeKeys = new Set(), hideTrees = false, roadDrawing = [], hl = null, cityId = '', selected = null, chosen = null, edgesOn = true, sceneGen = 0, cap = 30, pending = 0, tool = 'pan', moveFrom = null;
 const undoStack = [], redoStack = [];
@@ -542,7 +551,7 @@ async function placeFree(x, z) {
   catch (e) { status(`Не успях да поставя ${m.name}: ${e.message}`); }
   finally { if (gen === sceneGen) pending--; }
 }
-function setTool(t) { tool = t; $('tools').querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === tool)); $('roadWidthLabel').style.display = tool === 'road' ? 'flex' : 'none'; moveFrom = null; status(({ pan: 'Камера: влачи с мишката, за да преместиш изгледа.', place: chosen ? `Избран е ${chosen.name}. Кликни за свободно поставяне или върху парцел.` : 'Избери модел, за да го поставяш свободно с клик.', road: 'Избери тип път и влачи по картата. Линиите се изглаждат автоматично; кръстовищата се оформят сами.', erase: 'Триене: влачи по проекта, за да изтриеш поставени модели и улици навсякъде.', scale: 'Кликни върху поставен свободен модел, после използвай бутоните за размер и завъртане.', pick: 'Пипета: избери модел от вече застроен парцел.', move: 'Преместване: избери зает парцел, после празен.' })[tool]); }
+function setTool(t) { tool = t; document.querySelectorAll('#v2tools [data-v2]').forEach(b => b.classList.toggle('on', t === 'v2lot' && b.dataset.v2 === v2tool)); $('tools').querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === tool)); $('roadWidthLabel').style.display = tool === 'road' ? 'flex' : 'none'; moveFrom = null; status(({ pan: 'Камера: влачи с мишката, за да преместиш изгледа.', place: chosen ? `Избран е ${chosen.name}. Кликни за свободно поставяне или върху парцел.` : 'Избери модел, за да го поставяш свободно с клик.', road: 'Избери тип път и влачи по картата. Линиите се изглаждат автоматично; кръстовищата се оформят сами.', erase: 'Триене: влачи по проекта, за да изтриеш поставени модели и улици навсякъде.', scale: 'Кликни върху поставен свободен модел, после използвай бутоните за размер и завъртане.', pick: 'Пипета: избери модел от вече застроен парцел.', move: 'Преместване: избери зает парцел, после празен.' })[tool]); }
 function pickModel(m) { chosen = m; selectedFree = null; updateScaleStatus(); previewModel(m); renderModels(); if (selected) lotInfo(selected); }
 function applyTool(L) {
   selected = L; lotInfo(L);
@@ -652,6 +661,7 @@ function finishRoad() {
   roadDrawing = [];
 }
 function paintAt(e) {
+  if (tool === 'v2lot') { const p = worldFromEvent(e); if (!p || !V2) return; if (v2pend.some(o => Math.hypot(o.gx - p.x, o.gz - p.z) < 6)) return; const L = lotFromEvent(e); if (L && v2pend.some(o => o.lot === L.id)) return; const q = P.toPlan(L ? L.x : p.x, L ? L.z : p.z); v2pend.push({ gx: p.x, gz: p.z, lot: L ? L.id : -1, x: +q[0].toFixed(1), z: +q[1].toFixed(1), op: v2tool, ...(v2tool === 'tier' ? { tier: v2tier } : {}) }); if (hl && L) { hl.scale.set(L.w, 1, L.d); hl.rotation.y = L.rot; hl.position.set(L.x, 0.4, L.z); hl.visible = true; } return; }
   if (tool === 'road') { addRoadPoint(e); return; }
   if (tool === 'place' && selectFreeAt(e)) { lastFreePoint = null; return; }
   if (tool === 'erase' && eraseFreeAt(e)) { lastFreePoint = null; return; }
@@ -676,10 +686,12 @@ function paintAt(e) {
 }
 renderer.domElement.addEventListener('pointerdown', e => {
   if (e.button !== 0) return; down = [e.clientX, e.clientY];
+  if (tool === 'v2lot' && V2) { painting = true; v2pend = []; controls.enabled = false; e.preventDefault(); paintAt(e); return; }
   if (tool === 'erase' || tool === 'road' || tool === 'place' && chosen) { painting = true; painted = new Set(); roadPaint = new Set(); customRoadPaint = new Set(); treePaint = new Set(); roadDrawing = []; lastFreePoint = null; controls.enabled = false; e.preventDefault(); paintAt(e); }
 }, true);
 renderer.domElement.addEventListener('pointermove', e => { if (painting) paintAt(e); }, true);
 renderer.domElement.addEventListener('pointerup', e => {
+  if (painting && tool === 'v2lot') { painting = false; controls.enabled = true; down = null; if (V2 && v2pend.length) { remember(); V2.lots = [...(V2.lots || []), ...v2pend.map(({ x, z, op, tier }) => ({ x, z, op, ...(tier ? { tier } : {}) }))]; const n = v2pend.length; v2pend = []; v2Regen(`Парцели: ${n} (${({ tier: 'квартал', park: 'парк', free: 'свободно', lot: 'парцел' })[v2tool]})`); } return; }
   if (painting) { if (tool !== 'place') paintAt(e); painting = false; controls.enabled = true; down = null; if (tool === 'road') finishRoad(); else if (roadPaint.size || customRoadPaint.size || treePaint.size) eraseRoads([...roadPaint], [...customRoadPaint], [...treePaint]); roadPaint.clear(); customRoadPaint.clear(); treePaint.clear(); return; }
   if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) { down = null; return; }
   down = null; if (selectFreeAt(e)) return; const L = lotFromEvent(e);
@@ -699,9 +711,11 @@ addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; cam
 const loadSaved = () => fetch('assets/plans/edits.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : {}).catch(() => ({})).then(d => { SAVED_EDITS = d || {}; });
 for (const k of ['v2fam', 'v2size', 'v2rk']) $(k).onchange = () => { if (!V2) return; remember(); V2.fam = $('v2fam').value; V2.size = $('v2size').value; V2.rk = Math.max(1, Math.min(2.2, +$('v2rk').value || 1)); v2Regen('Друг вид/размер'); focusPlan(); };
 const postEdit = edit => fetch('/__lab/plan-edit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ city: V2.city, edit }) }).then(r => r.json());
-$('v2save').onclick = async () => { if (!V2) return; const r = await postEdit({ fam: V2.fam, size: V2.size, seed: V2.seed, rk: V2.rk, roadGeo: true, jfix: true, ...v2Copy(V2) }).catch(e => ({ ok: false, error: String(e) })); await loadSaved(); v2Status(); status(r.ok ? `💾 Записано: новите игри в ${V2.city} ще ползват този план (флаг plan-edit; старите записи — без промяна).` : `Не успях да запиша: ${r.error || '?'} (рестартирай Лабораторията, ако е стара).`); };
+$('v2save').onclick = async () => { if (!V2) return; const r = await postEdit({ fam: V2.fam, size: V2.size, seed: V2.seed, rk: V2.rk, extLots: EXT_LOTS[V2.size], roadGeo: true, jfix: true, ...v2Copy(V2) }).catch(e => ({ ok: false, error: String(e) })); await loadSaved(); v2Status(); status(r.ok ? `💾 Записано: новите игри в ${V2.city} ще ползват този план (флаг plan-edit; старите записи — без промяна).` : `Не успях да запиша: ${r.error || '?'} (рестартирай Лабораторията, ако е стара).`); };
 $('v2drop').onclick = async () => { if (!V2) return; const r = await postEdit(null).catch(e => ({ ok: false, error: String(e) })); await loadSaved(); v2Status(); status(r.ok ? 'Махнато: новите игри пак ще ползват генерирания план.' : `Не успях: ${r.error || '?'}`); };
-$('v2reset').onclick = () => { if (!V2 || (!V2.add.length && !V2.cut.length)) return; remember(); V2.add = []; V2.cut = []; v2Regen('Без промени'); };
+$('v2tools').querySelectorAll('[data-v2]').forEach(b => b.onclick = () => { v2tool = b.dataset.v2; setTool('v2lot'); $('v2tools').querySelectorAll('[data-v2]').forEach(x => x.classList.toggle('on', x === b)); status(({ tier: 'Квартал: кликни/влачи по парцелите — отключват се с избрания квартал.', park: 'Парк: кликни/влачи по парцелите.', free: 'Свободна зона: парцелите изчезват (празно място).', lot: 'Парцел: връща обикновения парцел (и от парк или свободно).' })[v2tool]); });
+$('v2tier').onchange = () => { v2tier = +$('v2tier').value; };
+$('v2reset').onclick = () => { if (!V2 || (!V2.add.length && !V2.cut.length && !(V2.lots || []).length)) return; remember(); V2.add = []; V2.cut = []; V2.lots = []; v2Regen('Без промени'); };
 await loadSaved();
 show($('city').value);
 window.__plan = { get P() { return P; }, get V2() { return V2; }, v2Regen, liveCheck, built, camera, controls, show, renderer, scene, placeModel, removeModel };

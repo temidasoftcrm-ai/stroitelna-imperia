@@ -69,6 +69,25 @@ export function famSizeOf(cityId, o = {}) {
   return { fam, size };
 }
 const strHash = s => { let h = 2166136261; for (const c of String(s)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
+// #29 plan-edit: редакциите на парцелите по точка (в рамката на плана; последната, която пада в парцела, печели) — върху копие на плана (plan2 е в кеша):
+// tier — с кой квартал се отключва (1 — ядрото, 2… — купените квартали по ред); park — парк; free — свободна зона (без парцел); lot — обратно на обикновен парцел
+export function lotEdits(P, ops, ext = 27, core = 81) {
+  const inLot = (L, x, z) => { const c = Math.cos(L.rot || 0), s = Math.sin(L.rot || 0), dx = x - L.x, dz = z - L.z; return Math.abs(dx * c - dz * s) <= L.w / 2 && Math.abs(dx * s + dz * c) <= L.d / 2; };
+  const lots = [], want = new Map();   // want: парцел → желаният квартал (0 — ядрото)
+  for (const L0 of P.lots) {
+    if (L0.lm || (L0.big && L0.big !== 'park')) { lots.push(L0); continue; }   // забележителностите и големите места (гара, болница…) — не се пипат
+    let op = null; for (const o of ops) if (inLot(L0, o.x, o.z)) op = o;
+    if (!op) { lots.push(L0); continue; } if (op.op === 'free') continue;
+    const L = { ...L0 }; if (op.op === 'park') L.big = 'park'; else if (op.op === 'lot') L.big = null; else if (op.op === 'tier') { want.set(L, Math.max(0, Math.min(8, (op.tier | 0) - 1))); if (L.big === 'park') L.big = null; }
+    lots.push(L);
+  }
+  if (!want.size) return { ...P, lots };
+  // подредбата в играта: ядрото (core), после всеки купен квартал по ext парцела (по id — от центъра навън); избраните — в своя квартал, останалите допълват
+  const free = lots.filter(L => !L.big && !L.lm && !want.has(L)).sort((a, b) => a.id - b.id); let fi = 0, left = lots.filter(L => !L.big && !L.lm).length;
+  for (let g = 0; left > 0 && g < 60; g++) { const G = [...want].filter(([, w]) => w === g).map(([L]) => L); let n = 0; for (const L of G) { L.tier = g + 1; n++; } while (n < (g ? ext : core) && fi < free.length) { free[fi++].tier = g + 1; n++; } left -= n; }
+  for (; fi < free.length; fi++) free[fi].tier = 60;
+  return { ...P, lots, tiered: true };
+}
 // gamePlan2Gen(cityId, { fam, size, seed, count, minLots, mega }) — count: колко парцела са отключени (ядро + купените квартали; f1 ги смята)
 export function gamePlan2Gen(cityId, o = {}) {
   const fs = o.fam && o.size ? { fam: o.fam, size: o.size } : famSizeOf(cityId, o), seed = o.seed ?? strHash(cityId);
@@ -76,11 +95,12 @@ export function gamePlan2Gen(cityId, o = {}) {
   let P, rk = 1; const ED = o.edit && o.edit.fam ? o.edit : null;   /* #29 plan-edit: планът от Лаб редактора — точно с параметрите, с които е чертан (без търсенето на радиуса) */
   if (ED) P = plan2(cityId, { fam: ED.fam, size: ED.size, seed: ED.seed, rk: ED.rk || 1, roadGeo: ED.roadGeo ?? !!o.roadGeo, jfix: ED.jfix ?? !!o.jfix, edit: ED });
   else for (let k = 0; k < 7; k++) { P = plan2(cityId, { fam: fs.fam, size: fs.size, seed, rk, roadGeo: !!o.roadGeo, jfix: !!o.jfix });   /* junction-fix (#22) — също само новите игри (S.jfix) */   /* road-geo — само новите игри (S.roadGeo) */ if (!o.minLots || P.lots.filter(L => !L.big && !L.lm).length >= o.minLots) break; rk *= 1.12; }
+  if (ED && ED.lots && ED.lots.length) P = lotEdits(P, ED.lots, ED.extLots || 27);   /* #29: кварталите (ниво), парковете и свободните зони от редактора */
   if (!P.anchors) {   // котви: гарата — голямото място „station“; магистралата и летището — изходите към другите градове (най-източният и най-далечният от него)
     const st = P.lots.find(L => L.big === 'station'), C = P.center;
     const ex = P.nodes.filter(n => n.endKind === 'exit').map(n => { const a = n.arms[0], rd = P.roads[a.road], q = a.end ? rd.pts[rd.pts.length - 1] : rd.pts[0]; return { x: n.x, z: n.z, dir: Math.atan2(n.x - C.x, n.z - C.z), road: { road: rd.id, end: a.end, x: q[0], z: q[1] } }; });
     const hw = ex.slice().sort((a, b) => b.x - a.x)[0] || null, ap = hw ? ex.filter(e => e !== hw).sort((a, b) => Math.hypot(b.x - hw.x, b.z - hw.z) - Math.hypot(a.x - hw.x, a.z - hw.z))[0] || null : null;
     P.anchors = { station: st ? { x: st.x, z: st.z, w: st.w, d: st.d, lot: st.id, name: 'Гара' } : null, highway: hw ? { ...hw, name: 'Магистрала' } : null, airport: ap ? { ...ap, name: 'Летище' } : null };
   }
-  return gamePlan2(P, { count: o.count, mega: o.mega });
+  return gamePlan2(P, { count: o.count, mega: o.mega, ...(P.tiered ? { tier: 99 } : {}) });   /* с нивата от редактора: всички парцели, подредени по ниво (count отрязва неотключените) */
 }

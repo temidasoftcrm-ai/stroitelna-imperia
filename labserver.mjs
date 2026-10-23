@@ -83,9 +83,9 @@ createServer(async (req, res) => {
     if (url === '/__lab/plan-edit' && req.method === 'POST') {
       const { city, edit } = await body(req), F = join(ROOT, 'assets/plans/edits.json'), num = v => typeof v === 'number' && Number.isFinite(v), path = a => Array.isArray(a) && a.length > 1 && a.length < 5000 && a.every(p => Array.isArray(p) && p.length === 2 && p.every(num));
       if (!city || !/^[a-z0-9]+$/.test(city)) return json(res, { ok: false, error: 'град?' });
-      if (edit && !(['eu', 'us', 'coast', 'radial'].includes(edit.fam) && ['s', 'm', 'l', 'xl'].includes(edit.size) && num(edit.seed) && num(edit.rk) && Array.isArray(edit.add) && Array.isArray(edit.cut) && edit.add.every(L => typeof L.cls === 'string' && path(L.pts)) && edit.cut.every(path))) return json(res, { ok: false, error: 'лоша редакция' });
+      if (edit && !(['eu', 'us', 'coast', 'radial'].includes(edit.fam) && ['s', 'm', 'l', 'xl'].includes(edit.size) && num(edit.seed) && num(edit.rk) && Array.isArray(edit.add) && Array.isArray(edit.cut) && edit.add.every(L => typeof L.cls === 'string' && path(L.pts)) && edit.cut.every(path) && (edit.lots == null || (Array.isArray(edit.lots) && edit.lots.length < 20000 && edit.lots.every(o => o && num(o.x) && num(o.z) && ['tier', 'park', 'free', 'lot'].includes(o.op) && (o.tier == null || num(o.tier))))))) return json(res, { ok: false, error: 'лоша редакция' });
       let all = {}; try { all = JSON.parse(readFileSync(F, 'utf8')); } catch { all = {}; }
-      if (edit) all[city] = { fam: edit.fam, size: edit.size, seed: edit.seed, rk: edit.rk, roadGeo: !!edit.roadGeo, jfix: !!edit.jfix, add: edit.add.map(L => ({ cls: L.cls, pts: L.pts })), cut: edit.cut, at: new Date().toISOString() }; else delete all[city];
+      if (edit) all[city] = { fam: edit.fam, size: edit.size, seed: edit.seed, rk: edit.rk, roadGeo: !!edit.roadGeo, jfix: !!edit.jfix, add: edit.add.map(L => ({ cls: L.cls, pts: L.pts })), cut: edit.cut, lots: (edit.lots || []).map(o => ({ x: o.x, z: o.z, op: o.op, ...(o.tier != null ? { tier: o.tier } : {}) })), extLots: num(edit.extLots) ? edit.extLots : 27, at: new Date().toISOString() }; else delete all[city];
       writeFileSync(F, JSON.stringify(all) + '\n');
       return json(res, { ok: true, cities: Object.keys(all) });
     }
