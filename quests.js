@@ -188,7 +188,8 @@ export function createQuests(deps) {
   #qBtn { position:relative; }
   #qBtn .qb { position:absolute; top:-6px; right:-6px; min-width:18px; height:18px; border-radius:9px; background:#4cd07d; color:#05200f; font-size:11px; font-weight:900; display:flex; align-items:center; justify-content:center; padding:0 4px; animation:qPulse 1.2s ease-in-out infinite; }
   @keyframes qPulse { 50% { transform:scale(1.18); } }
-  #qPanel { position:fixed; top:52px; left:0; bottom:0; width:min(420px,100vw); background:var(--panel); border-right:1px solid var(--line); z-index:8; display:flex; flex-direction:column; box-shadow:8px 0 30px rgba(0,0,0,.4); }
+  body:not(.mob):has(#qPanel:not(.hidden)) #toasts { left:calc(min(470px,100vw) + 14px); }   /* известията — вдясно от панела, за да не закриват ✕ (потребителят 24.10) */
+  #qPanel { position:fixed; top:52px; left:0; bottom:0; width:min(470px,100vw); background:var(--panel); border-right:1px solid var(--line); z-index:8; display:flex; flex-direction:column; box-shadow:8px 0 30px rgba(0,0,0,.4); }
   #qPanel .qh { display:flex; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid var(--line); }
   #qPanel .qh b { font-size:18px; color:var(--acc); flex:1; }
   #qList { overflow-y:auto; padding:10px 12px 20px; display:flex; flex-direction:column; gap:8px; }
