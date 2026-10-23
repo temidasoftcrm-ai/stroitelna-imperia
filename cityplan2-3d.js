@@ -226,14 +226,21 @@ function kremlinView(G, D) {
   const sq = new THREE.Mesh(new THREE.ShapeGeometry(sh2).rotateX(-Math.PI / 2), pave); sq.position.y = 0.07; sq.receiveShadow = true; G.add(sq);
   return { cx, cz };
 }
-function seaView(G, D, RR) {
+// (rail-tramcut) линията по повърхността (трамвай/метро) — без парчетата в лентата [x0, x1] (жп линията на насипа в Истанбул: T1 минаваше върху релсите)
+function cutBand(pts, cut) {
+  if (!cut) return [pts];
+  const dense = [pts[0]]; for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 2)); for (let k = 1; k <= n; k++) dense.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]); }
+  const out = []; let cur = []; for (const p of dense) { if (p[0] > cut[0] && p[0] < cut[1]) { if (cur.length > 1) out.push(cur); cur = []; } else cur.push(p); }
+  if (cur.length > 1) out.push(cur); return out;
+}
+function seaView(G, D, RR, cut = null) {
   const S2 = D.sea, IN = D.style === 'paris' || D.style === 'london' || D.style === 'newyork' || D.style === 'moscow' || D.style === 'washington', w = new THREE.Mesh(new THREE.PlaneGeometry(S2.nx * S2.cell * (IN ? 1 : 1.6), S2.nz * S2.cell * (IN ? 1 : 1.6)).rotateX(-Math.PI / 2), MAT.water); w.position.set(S2.x0 + S2.nx * S2.cell / 2, -1.2, S2.z0 + S2.nz * S2.cell / 2); G.add(w);
   if (IN) {   // град без море (Париж — само реката): около растера — суша (рамка), не вода
     const W = S2.nx * S2.cell, H = S2.nz * S2.cell, F = 3000, fr = [[-F, -F, W + 2 * F, F], [-F, H, W + 2 * F, F], [-F, 0, F, H], [W, 0, F, H]].map(([x, z, w2, d2]) => new THREE.PlaneGeometry(w2, d2).rotateX(-Math.PI / 2).translate(S2.x0 + x + w2 / 2, 0, S2.z0 + z + d2 / 2));
     for (const f of fr) { const m = new THREE.Mesh(f, MAT.urban); m.receiveShadow = true; G.add(m); } }
   const Pi = []; for (const p of D.piers || []) if (p.length > 1) Pi.push(ribbon(p, 4, -0.2)); if (Pi.length) G.add(merge(Pi, MAT.pier));
   const Fe = [], seenF = new Set(); for (const f of D.ferries || []) { const key = f.pts.length > 1 ? [f.pts[0], f.pts[f.pts.length - 1]].map(p => Math.round(p[0] / 40) + ',' + Math.round(p[1] / 40)).sort().join('|') : ''; if (seenF.has(key)) continue; seenF.add(key); dashed(f.pts, 5, 22, 0.7, -1.1, Fe); }   // еднаквите линии (двете посоки) — веднъж if (Fe.length) G.add(merge(Fe, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 })));   // фериботните линии по водата
-  const Mt = []; for (const r of D.metro || []) if (r.kind !== 'rail') Mt.push(ribbon(r.pts, r.kind === 'tram' ? 2.2 : 2.6, 0.085)); if (Mt.length) G.add(merge(Mt, M(0x9a9184)));   // метро/трамвай на повърхността
+  const Mt = []; for (const r of D.metro || []) if (r.kind !== 'rail') for (const pts of cutBand(r.pts, cut)) Mt.push(ribbon(pts, r.kind === 'tram' ? 2.2 : 2.6, 0.085)); if (Mt.length) G.add(merge(Mt, M(0x9a9184)));   // метро/трамвай на повърхността
   romeBridges(G, D);
   // висящите мостове (Босфорския): моделът — дължината по x, центриран; мащабът — от бряг до бряг
   for (const B of D.bigBridges || []) { const proto = (D._models || {})[B.k]; if (!proto) continue; floodMats(proto, 0xd8e8ff, 0.35);   // нощем — осветен (студено бяло, като Босфорския)
@@ -412,7 +419,7 @@ export function buildPlan2View(P, opts = {}) {
   tm('ground');
   const trees = [];
   if (D) {   // истинската карта: Тибърът (ивица около оста), остров Тиберина, паркове и археологически зони, жп линиите към Термини
-    if (D.sea) seaView(G, D, RR); else romeRiver(G, D);
+    if (D.sea) seaView(G, D, RR, opts.railCut || null); else romeRiver(G, D);
     const I = D.island; if (I) { const isl = new THREE.Mesh(new THREE.CircleGeometry(1, 32).rotateX(-Math.PI / 2), M(0xb9ad96)); isl.scale.set(I.w / 2, 1, I.d / 2); isl.rotation.y = I.rot; isl.position.set(I.x, 0.06, I.z); G.add(isl); }
     const gm = { park: M(0x6f9e4f), archaeo: M(0xb7b08a), cemetery: M(0x7d9468) };
     for (const g of P.greensSrc) { const sh = new THREE.Shape(g.poly.map(([x, z]) => new THREE.Vector2(x, z))); const ge = new THREE.ShapeGeometry(sh); ge.rotateX(Math.PI / 2); const m = new THREE.Mesh(ge, gm[g.kind] || gm.park); m.material.side = THREE.DoubleSide; m.position.y = 0.025; m.receiveShadow = true; G.add(m); }
