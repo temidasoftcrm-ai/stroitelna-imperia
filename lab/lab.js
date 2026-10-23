@@ -178,6 +178,8 @@ const DEMOS = [
   ['🏛️ Котелническа висотка — на брега, не в реката (Москва)', 'moscow', d => { const go = () => { const L = d.city().landmarks, i = L.findIndex(o => o.kind === 'kotel'); if (i >= 0) d.lookLm(i, 220); }; setTimeout(go, 3000); }],   // kotel-shore
   ['🎬 Филиал в Ню Йорк → влизаш в града и тръгва клипът (веднъж)', 'plovdiv', d => { setTimeout(() => d.branchClipTest('newyork'), 1500); }],   // branch-clip
   ['🚌 Градски автобус със спирки: линия по булевардите, навес и табела на тротоара, автобусът спира ~12 s (София; камерата на спирката)', 'sofia', d => setTimeout(() => d.busLook(), 6000)],   // city-bus (#15)
+  ['⭐ Зала на славата — Ивайло (злато), после Мария (платина)', 'sofia', d => { setTimeout(() => d.fame('con', 'gold'), 3000); setTimeout(() => { window.__fame && window.__fame.close(); setTimeout(() => d.fame('rail', 'platinum'), 600); }, 16000); }],   // hall-fame
+  ['🎬 Клипът на Истанбул (и след филиал там — същото като Ню Йорк)', 'istanbul', d => { setTimeout(() => d.cine('istanbul'), 2500); }],   // branch-clip (Истанбул)
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

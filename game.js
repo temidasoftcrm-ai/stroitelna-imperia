@@ -10793,6 +10793,7 @@ if (AUTOTEST) {
       const lf = ['glavbild', 'trakia']; for (const id of lf) corp.buyLocal(id); corp.sellTranche(); for (let d = 0; d < 5; d++) endOfDay();
       S.hTab = 'rank'; openBig('group'); const rank = document.getElementById('bwBody').innerText.slice(0, 700); S.hTab = 'acq'; renderBig(); const acq = document.getElementById('bwBody').innerText.slice(0, 500); S.hTab = 'ipo'; renderBig(); const ipo = document.getElementById('bwBody').innerText.slice(0, 500);
       return { r0, r: corp.myRank(), v: corp.myValue(), gl: { k: L.gl.kalahari, t: L.gl.tasman }, loc: L.loc, ipo: L.ipo && { out: L.ipo.out, mood: L.ipo.mood }, inc: L.incDay, share: rivals.share(), rank, acq, ipo }; },
+    fame(k = 'con', tier = 'gold') { return import('./halloffame.js').then(m => !!m.openHallOfFame({ k, tier })); },   // ⭐ hall-fame: Зала на славата (Лабораторията)
     holdTest() { S.brand = 'titan'; S.dev.lv = 15; S.dev.xp = 2e6; S.rep = 5; econ.earn(3e9, 'друго', 'тест'); S.branches = [...new Set([...(S.branches || []), 'plovdiv', 'varna'])]; S.rails = [{ a: 'sofia', b: 'plovdiv', km: 150, days: 5, prog: 1, built: true }];
       flowAdd('rail', 400000, 'тест'); flowDay('rail', 0); holdingCheck(); document.getElementById('modal')?.classList.add('hidden'); const r0 = { holding: S.holding, auto: S.autoCity, auto2: S.auto2 };
       openBig('group'); document.querySelector('[data-hup="rail"]')?.click(); document.querySelector('[data-hdir="rail"]')?.click(); const m0 = econ.s.money; for (let d = 0; d < 3; d++) endOfDay();

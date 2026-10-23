@@ -120,6 +120,13 @@ const loadClips = () => clipsP || (clipsP = loadGlb('clips').then(g => {
   }
   return out;
 }));
+// ⭐ hall-fame (halloffame.js): аватарът на директора за сцената на трибуната — модел (временен, ако няма свой) + общите клипове
+export async function directorRig(k, model) {
+  let mk = model || DIR_MODEL[k]; if (mk && !HAVE.has(mk)) mk = TEMP_MODEL[k]; if (!mk || !HAVE.has(mk)) return null;
+  const [g, clips] = await Promise.all([loadGlb(mk), loadClips()]);
+  return { m: cloneSkinned(g.scene), clips, scale: SCALE, fem: FEMALE.has(mk), photo: `assets/ui/directors/${mk}.webp` };
+}
+
 
 // ---- стаята (по картинката на потребителя): мраморна стена със златна карта на света, аплици, скрин и растения;
 // отстрани — прозорци към града (снимки от assets/ui/boardroom/window-l|r.webp, ако ги има — иначе нарисуван град); орехова маса с тъмна лента
@@ -492,7 +499,7 @@ export function openBoardroom(o) {
   list.forEach((s, i) => {
     s.si = s.seat ?? i; const [side, z] = SEATS[s.si] || SEATS[SEATS.length - 1], x = seatX(s.si);
     const ch = chair(leather, metal, s.logo !== false && s.open && LOGOS.has(s.k) ? s.k : null); ch.position.set(x, 0, z); ch.rotation.y = seatRy(side); scene.add(ch);
-    s.chair = ch; if (o.chairChoices) ch.traverse(q => { q.userData.keep = true; });   // сравнението сменя столовете на живо — без сливане
+    s.chair = ch; if (o.chairChoices || (o.chairPick && feature('hall-chairs'))) ch.traverse(q => { q.userData.keep = true; });   // сравнението сменя столовете на живо — без сливане
     const sub = !s.open ? '🔒 още не е основано' : s.director ? s.company : '👔 свободно място';
     seatProps(scene, side, z, s.director || s.company, sub, gold, s.logo !== false && s.open && LOGOS.has(s.k) ? s.k : null, (SEATS[s.si] || [])[2] || 0);
     const hit = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.6, 0.9), new THREE.MeshBasicMaterial()); hit.visible = false;
@@ -675,6 +682,7 @@ export function openBoardroom(o) {
       const key = p.id; makeTrophy(p.aw.k, p.aw.tier, 0.4).then(t => { if (shut || props[qi]?.id !== key || awT) { t.dispose(); return; } t.group.position.set(0, TABLE_H + 0.32, 0); scene.add(t.group); awT = { t, k: p.aw.k, h: 0.4, granted: false }; });
       scr.querySelector('.y').onclick = () => {
         o.awards.grant(p.aw.k, p.aw.tier, p.aw.res); cheer(); decided.add(p.id); if (awT) awT.granted = true;
+        if (feature('hall-fame')) setTimeout(() => { if (!shut) import('./halloffame.js').then(m => m.openHallOfFame({ k: p.aw.k, tier: p.aw.tier })); }, 1600);   // ⭐ Зала на славата: директорът на трибуната
         scr.querySelector('.tx').textContent = `${A.who}: „${A.quote || 'Благодаря за доверието!'}“`;
         scr.querySelector('.row').innerHTML = '<button class="y">🏆 Сложи на витрината</button><button class="l">Продължи →</button>';
         scr.querySelector('.y').onclick = () => awPlace(); scr.querySelector('.l').onclick = () => { if (awT && !awFly) { awPlace(); setTimeout(() => !shut && board(nextStep()), 2300); } else board(nextStep()); };
@@ -754,7 +762,22 @@ export function openBoardroom(o) {
   tgl('snd', snd.isOn()); tgl('voice', voiceOn); tgl('cine', cine);
   el.querySelector('.top .snd').onclick = () => { snd.setOn(!snd.isOn()); savePref('snd', snd.isOn()); tgl('snd', snd.isOn()); if (snd.isOn()) snd.ambience(true); };
   el.querySelector('.top .voice').onclick = () => { voiceOn = !voiceOn; savePref('voice', voiceOn); tgl('voice', voiceOn); if (!voiceOn) snd.hush(); };
-  if (AW) { const b = document.createElement('button'); b.className = 'tg'; b.title = 'Стената с отличията'; b.textContent = '🏆'; b.onclick = () => awFrame(); el.querySelector('.top .cine').before(b); }   // бутон: камерата към витрината
+  if (AW) { const b = document.createElement('button'); b.className = 'tg'; b.title = 'Стената с отличията'; b.textContent = '🏆'; b.onclick = () => awFrame(); el.querySelector('.top .cine').before(b); }
+  // 🪑 hall-chairs: столовете в залата — избор на играча (o.chairPick: { get() → { chair, throne }, set(v) }), до бутона на витрината; пази се в записа
+  if (o.chairPick && feature('hall-chairs') && !o.chairChoices) {
+    const head = new THREE.Group(); head.userData.proc = []; head.userData.seatTop = 0.5; head.position.set(0, 0, TABLE_L / 2 + 0.75); head.rotation.y = Math.PI; scene.add(head);
+    const apply = v => { list.forEach(z => z.chair && setRealChair(z.chair, v.chair && CHAIRS[v.chair] ? v.chair : null)); setRealChair(head, v.throne ? 'throne' : null); };
+    let cur = { chair: null, throne: false, ...(o.chairPick.get() || {}) }; apply(cur);
+    const b = document.createElement('button'); b.className = 'tg'; b.title = 'Столовете в залата'; b.textContent = '🪑'; el.querySelector('.top .cine').before(b);
+    const pan = document.createElement('div'); pan.style.cssText = 'position:absolute;right:16px;top:64px;z-index:6;display:none;flex-direction:column;gap:4px;padding:10px;border-radius:14px;background:rgba(13,20,36,.94);border:1px solid #fff3;color:#fff;font:600 13px system-ui,sans-serif;min-width:230px;box-shadow:0 8px 30px #0008';
+    const row = (txt, on, fn) => { const r = document.createElement('button'); r.style.cssText = `text-align:left;border:1px solid ${on ? '#ffd36a' : '#fff2'};border-radius:10px;background:${on ? '#2f6fd0' : '#1c2433'};color:#fff;font:600 13px system-ui,sans-serif;padding:7px 10px;cursor:pointer`; r.textContent = (on ? '✓ ' : '') + txt; r.onclick = fn; return r; };
+    const draw = () => { pan.innerHTML = '<div style="color:#ffd36a;margin:0 0 4px">🪑 Столовете на директорите</div>';
+      pan.appendChild(row('Сегашният', !cur.chair, () => pickC(null)));
+      for (const [k, C] of Object.entries(CHAIRS)) pan.appendChild(row(C.nm, cur.chair === k, () => pickC(k)));
+      pan.appendChild(row('👑 Трон за председателя', cur.throne, () => { cur = { ...cur, throne: !cur.throne }; o.chairPick.set(cur); apply(cur); draw(); })); };
+    const pickC = k => { cur = { ...cur, chair: k }; o.chairPick.set(cur); apply(cur); draw(); };
+    b.onclick = () => { draw(); pan.style.display = pan.style.display === 'flex' ? 'none' : 'flex'; }; el.appendChild(pan);
+  }   // бутон: камерата към витрината
   el.querySelector('.top .cine').onclick = () => { cine = !cine; savePref('cine', cine); tgl('cine', cine); shot(cine ? sel ?? -1 : -1); };
   const showVoice = () => { if (snd.canSpeak()) el.querySelector('.top .voice').style.display = ''; };
   showVoice(); setTimeout(showVoice, 1200);
@@ -827,6 +850,7 @@ export function openBoardroom(o) {
     if (vault) return; if (doorHit(e)) return enterVault();
     if (AW) { const r = renderer.domElement.getBoundingClientRect(); mv.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(mv, cam);
       if (awT && awT.granted && ray.intersectObject(awT.t.group, true).length) return awPlace();   // кликната статуетка → на витрината
+      { const hh = ray.intersectObjects(AW.hits)[0], ai = hh && AW.infoAt(hh.object); if (ai && ai.s && feature('hall-fame') && el.classList.contains('aw-view')) return import('./halloffame.js').then(m => m.openHallOfFame({ k: ai.A.k, tier: ai.s.tier })); }   // ⭐ витрината отблизо: клик по статуетка → Зала на славата отново
       if (ray.intersectObjects([AW.cab, ...AW.hits]).length) return awFrame(); }   // кликната витрина → камерата само към нея, в цял ръст
     const h = hitAt(e); if (!h) { card.classList.remove('on'); sel = null; return; }
     const i = h.object.userData.seat, pi = props.findIndex(p => p.dir === list[i].k);
