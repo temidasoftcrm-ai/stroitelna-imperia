@@ -189,6 +189,8 @@ const DEMOS = [
   ['🏨 Гранд хотел в Ню Йорк — Мариот', 'newyork', d => { setTimeout(() => d.hotel5City(3), 1500); }],   // hotel5-*
   ['📦 Складът в общия парцел (campus2, ниво 6): купчините на ивицата пред склада, плацът с техниката отпред — отблизо, отдалеч, нощ', 'plovdiv', d => { setTimeout(() => d.whMatsCampus(6, 'both', 11, 26), 2500); setTimeout(() => d.whMatsCampus(6, 'both', 11, 70), 8000); setTimeout(() => d.whMatsCampus(6, 'both', 22, 26), 13000); }],   // wh-mats
   ['💡 Мигачите: преди завоя и при смяна на лента (автобусът към спирката; камерата следи кола пред завой)', 'sofia', d => { for (let k = 0; k < 8; k++) setTimeout(() => d.blinkLook(), 5000 + k * 7000); }],   // blink-lane (#42.2)
+  ['🌃 Складовете нощем — вече не са черни кубове (редицата 1–10, 22:00)', 'plovdiv', d => setTimeout(() => { d.whRow(); setTimeout(() => d.time(22), 1500); }, 3000)],   // wh-night
+  ['🚗 Движението расте с квартала: над застроеното — много коли и хора, над празното — малко (Пловдив: центърът, после най-празният край)', 'plovdiv', d => { setTimeout(() => d.growLook(false), 8000); setTimeout(() => d.growLook(true), 22000); setTimeout(() => d.growLook(false), 36000); }],   // traffic-grow (#42.8)
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

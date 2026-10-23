@@ -148,6 +148,7 @@ export function createTraffic(opts) {
   function spawn() {
     for (let k = 0; k < 12; k++) {
       const ins = lanes.filter(l => l.enter), fromEdge = ins.length && rnd() < 0.35, p = fromEdge ? ins[(rnd() * ins.length) | 0] : lanes[(rnd() * lanes.length) | 0]; if (p.len < 10) continue;
+      if (opts.spawnW && !fromEdge && rnd() > opts.spawnW(p)) continue;   /* #42.8 traffic-grow: по-рядко там, където няма застроено */
       const v = opts.makeCar(); if (!v) return null;
       if (heavyKind(v) && narrow(p)) { drop(v); continue; }   // автобус/камион — не по тясна улица
       const s = fromEdge ? 3 : 2 + rnd() * (p.len - 4);   // от входа на града — в началото на лентата

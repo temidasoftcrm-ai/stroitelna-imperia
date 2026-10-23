@@ -515,7 +515,7 @@ let europe = null;
   if (feature('hw-gantry')) jobs.push(load('assets/heavy/highway/hw-gantry.glb').then(g => { A['hw-gantry'] = g; }).catch(() => {}));   // 🛣️ порталът с табелите
   if (feature('office-levels2')) for (const L of OFFICE2) jobs.push(load(L.url).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[`office2-l${L.lv}`] = g; prepNightFloors(g.scene, `office2-l${L.lv}`); blkSections(`office2-l${L.lv}`); }).catch(() => {}));   // 🆕 новите нива на офиса
   for (const n of GAS_KINDS) jobs.push(load(`assets/heavy/gas/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => {}));   // бензиностанции (всяка — свое „✓ OK“); нощем — навесът и магазинът (nightfloors 'gas')
-  if (feature('wh-levels2')) for (let k = 1; k <= 10; k++) jobs.push(load(`assets/heavy/wh2/wh-l${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['wh2-l' + k] = g; blkSections('wh2-l' + k); }).catch(() => {}));   /* №18: секциите на халетата */   // 📦 складовете 1–10 (Sketchfab, CC-BY — assets/heavy/wh2/CREDITS.txt)
+  if (feature('wh-levels2')) for (let k = 1; k <= 10; k++) jobs.push(load(`assets/heavy/wh2/wh-l${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['wh2-l' + k] = g; prepNightFloors(g.scene, 'wh2-l' + k); blkSections('wh2-l' + k); }).catch(() => {}));   /* №18: секциите на халетата */   // 📦 складовете 1–10 (Sketchfab, CC-BY — assets/heavy/wh2/CREDITS.txt)
   if (feature('rail-depot')) jobs.push(load('assets/heavy/rail/depot-shed.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; if (m.material.metalness > 0.4) m.material.metalness = 0.3; } }); A['depot-shed'] = g; }).catch(() => {}));   // 🛤️ rail-depot: депо за локомотиви (Engine Shed — Victor.Rodriguez3D, CC BY)
   if (feature('catenary')) jobs.push(load('assets/heavy/rail/catenary-mast.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; m.material.metalness = 0.25; m.material.roughness = 0.6; } }); A['cat-mast'] = g; })   /* без огледална среда металът излиза черен */.catch(() => {}));   // ⚡ catenary (#19): стълб с конзола (Low poly catenary — Ogfmh/mtafan, CC BY; оцветен в Blender)
   if (feature('rail-real')) jobs.push(load('assets/heavy/rail/track-tile.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) { m.castShadow = false; m.receiveShadow = true; } }); A['track-real'] = g; }).catch(() => {}));   // 🛤️ rail-real (#19): истинските релси (hifrak958, CC BY) — парче 1 × 0,75, като детското 'track'
@@ -2234,7 +2234,7 @@ function traffic2Make() {
   if (tr2) tr2.clear(); if (tr2G) { scene.remove(tr2G); tr2G = null; }
   const p2 = city.plan && city.plan.p2;   // планът v2: лентите от planNetwork, колите — в група, изместена с offset (като 3D изгледа на плана)
   if (p2) { tr2G = new THREE.Group(); tr2G.position.set(city.plan.offset[0], 0, city.plan.offset[1]); scene.add(tr2G); }
-  tr2 = createTraffic({ scene: tr2G || scene, camera, movers: () => moversNow(), onJam: j => jamPolice(j), jp: feature('junction-paths'), drive: p2 && p2.drive === 'L' ? 'left' : 'right', maxCars: wantedTraffic(), crossings: () => crossingsNow(), blockers: () => [...(railx && !feature('railx-stop') ? railx.blockers() : []), ...(incidents.blockers?.() || [])].map(b => p2 ? { x: b.x - city.plan.offset[0], z: b.z - city.plan.offset[1] } : b),   /* + затворената улица при инцидент (incidents2, 55) */   // camera — истинските фарове само за най-близките коли
+  tr2 = createTraffic({ scene: tr2G || scene, camera, movers: () => moversNow(), onJam: j => jamPolice(j), jp: feature('junction-paths'), drive: p2 && p2.drive === 'L' ? 'left' : 'right', maxCars: wantedTraffic(), spawnW: p => laneW(p), crossings: () => crossingsNow(), blockers: () => [...(railx && !feature('railx-stop') ? railx.blockers() : []), ...(incidents.blockers?.() || [])].map(b => p2 ? { x: b.x - city.plan.offset[0], z: b.z - city.plan.offset[1] } : b),   /* + затворената улица при инцидент (incidents2, 55) */   // camera — истинските фарове само за най-близките коли
     ...(p2 ? { built: planNetwork(p2, { jp: feature('junction-paths') }) } : { net: gridNetwork({ NBI, NBJ, tx, isRoad, TILE, signal: (i, j) => signals.some(s => s.i === i && s.j === j) }) }),
     makeCar: () => { addCar(); const t = traffic.pop(); if (!t) return null; const heavy = /Bus|Truck|Firetruck|firetruck|kenworth|sf-bus-/.test(t.obj.userData.src || '');
       if (tr2G) { const k = t.len > 3 && t.len < 14 ? 1 : (heavy ? 11 : 4.5) / (t.len || 4.5);   /* колите вече са в истинския размер (sf-car-* и резервите с kidK) — не ги изравняваме до 4,5 м; само ако мярката е сбъркана (55) */ t.obj.scale.multiplyScalar(k); t.len = (t.len || 4.5) * k; tr2G.add(t.obj); }   // планът v2 е в истински метри — колите в истинския си размер
@@ -2309,6 +2309,7 @@ function spawnTraffic(n) {
 // колкото по-застроен е градът и по-голяма фирмата, толкова повече коли
 function wantedTraffic() {
   const built = city.lots.filter(l => l.built).length;
+  if (feature('traffic-grow')) return Math.min(90, Math.round(6 + built * 0.5 + (S?.cityExt || 0) * 6 + (S?.parks || []).length + (S?.done || 0) * 0.3 + (S?.officeLevel || 1) * 2));   /* #42.8: и купените квартали, и парковете; до 90 */
   return Math.min(70, Math.round(8 + built * 0.45 + (S?.done || 0) * 0.5 + (S?.officeLevel || 1) * 2));
 }
 
@@ -2438,9 +2439,18 @@ function makePed() {
   mixer.update(Math.random() * 2);
   let i = 3 * ((Math.random() * NBI) | 0), j = (Math.random() * NJ) | 0;
   for (let k = 0; k < 40 && !isRoad(i, j); k++) { i = 3 * ((Math.random() * NBI) | 0); j = (Math.random() * NJ) | 0; }   // не по улица под площад/парк (Белия дом, поръчките) — иначе стои на тревата
-  const rp = roadPoint();
+  let rp = roadPoint();
+  if (feature('traffic-grow') && rp) { const B = city.lots.filter(l => l.built); for (let k = 0; k < 8; k++) { let n = 0; for (const b of B) if (Math.abs(b.x - rp.x) < 70 && Math.abs(b.z - rp.z) < 70 && ++n >= 3) break; if (Math.random() < 0.15 + 0.85 * n / 3) break; rp = roadPoint() || rp; } }   /* #42.8: хората — главно до застроеното */
   const pd = { wa, ia, m, mixer, real, x: rp ? rp.x : tx(i), z: rp ? rp.z : tx(j), path: null, pi: 0, side: Math.random() < 0.5 ? 1 : -1, sp: rand(1.2, 1.8), yaw: 0 };
   peds.push(pd);
+}
+// #42.8 traffic-grow: новите коли — главно до застроените парцели (лентата: 0,12 без нищо наоколо … 1 при 3+ застроени на ±70 м); кешът — на 20 s
+let laneWM = null, laneWT = 0;
+function laneW(p) {
+  if (!feature('traffic-grow') || !tr2G || p.kind !== 'lane') return 1;
+  const now = performance.now(); if (!laneWM || now - laneWT > 20000 || laneWM.tr !== tr2) { laneWM = new Map(); laneWM.tr = tr2; laneWT = now; const o = tr2G.position, B = city.lots.filter(l => l.built);
+    for (const L of tr2.lanes) { if (L.kind !== 'lane' || !L.pts) continue; const q = pointOn(L, L.len / 2), x = q.x + o.x, z = q.z + o.z; let n = 0; for (const b of B) if (Math.abs(b.x - x) < 70 && Math.abs(b.z - z) < 70 && ++n >= 3) break; laneWM.set(L, 0.12 + 0.88 * n / 3); } }
+  return laneWM.get(p) ?? 1;
 }
 const wantedPeds = () => feature('peds-more') ? Math.min(60, 10 + Math.round(city.lots.filter(l => l.built).length * 0.3) + (S?.cityExt || 0) * 5 + (S?.parks || []).length * 3)   /* #9: повече хора, растат с кварталите */
   : Math.min(26, 6 + Math.round(city.lots.filter(l => l.built).length * 0.18) + (S?.parks || []).length * 3);
@@ -11318,6 +11328,8 @@ if (AUTOTEST) {
     peds: () => { let ov = 0; for (let i = 0; i < peds.length; i++) for (let j = i + 1; j < peds.length; j++) if (Math.hypot(peds[i].x - peds[j].x, peds[i].z - peds[j].z) < 0.4) ov++; return { n: peds.length, want: wantedPeds(), waiting: peds.filter(p => p.wt > 0).length, maxWt: Math.round(Math.max(0, ...peds.map(p => p.wt || 0))), overlaps: ov, anim: peds.filter(p => p.wa && p.ia).length }; },   /* #10 */
     railBad() { if (!tr2 || !railx) return null; const XS = crossingsNow(); let bad = 0, wait = 0; for (const X of XS) for (const c of tr2.cars) { const dx = c.x - X.x, dz = c.z - X.z, al = Math.abs(dx * X.ux + dz * X.uz), sd = Math.abs(dx * X.uz - dz * X.ux); if (sd < 8 && al < X.h - 2.5 && X.on) bad++; if (c.why === 'прелез') wait++; } return { xs: XS.length, on: XS.filter(X => X.on).length, bad, wait }; },   /* #16: коли на релсите при спусната бариера */
     buses: () => cityBus.lines(), busDbg: () => cityBus.debug(),
+    growInfo() { const W = tr2 ? tr2.lanes.filter(l => l.kind === 'lane').map(l => laneW(l)) : []; return { built: city.lots.filter(l => l.built).length, ext: S.cityExt || 0, parks: (S.parks || []).length, wantCars: wantedTraffic(), cars: tr2 ? tr2.cars.length : traffic.length, wantPeds: wantedPeds(), peds: peds.length, lanesLow: W.filter(w => w < 0.5).length, lanes: W.length }; },   /* #42.8 */
+    growLook(far) { const B = city.lots.filter(l => l.built); if (!B.length) return null; const cx = B.reduce((t, l) => t + l.x, 0) / B.length, cz = B.reduce((t, l) => t + l.z, 0) / B.length; let p = { x: cx, z: cz }; if (far) { let bd = -1; for (const l of city.lots) { if (l.built) continue; const d = Math.min(...B.map(b => Math.hypot(b.x - l.x, b.z - l.z))); if (d > bd) { bd = d; p = l; } } } __dbg.lookAt(p.x, p.z, 140); return __dbg.growInfo(); },   /* #42.8: камерата над застроеното / над най-празното */
     blinkLook(d = 16) { if (!tr2) return null; const o = tr2G ? tr2G.position : { x: 0, z: 0 }, c = tr2.cars.find(c => c.lcT > 0 || c.hopW != null) || tr2.cars.find(c => c.next && c.next.kind === 'conn' && (c.next.turn === 'left' || c.next.turn === 'right') && c.p.len - c.s < 45 && c.p.len - c.s > 15); if (!c) return null; __dbg.lookAt(c.x + o.x, c.z + o.z, d); return { kind: c.kind, turn: c.next?.turn, lc: c.lcSide, v: +c.v.toFixed(1) }; },   /* #42.2: камерата към кола преди завой / смяна на лента */
     busLook() { const s = cityBus.stops()[0]; if (!s) return null; const o = tr2G ? tr2G.position : { x: 0, z: 0 }; __dbg.time && __dbg.time(10); __dbg.lookAt(s.x + o.x, s.z + o.z, 30); return cityBus.lines(); },   /* #15: камерата на първата спирка */
     moverHits() { if (!tr2) return null; const M = moversNow(); let n = 0; for (const m of M) for (const c of tr2.cars) if (Math.hypot(c.x - m.x, c.z - m.z) < 2.5) n++; return { movers: M.length, hits: n, yielding: tr2.cars.filter(c => c.why === 'машина отпред').length, waiting: units.filter(u => u.wb > 0).length }; },   /* самосвалът през колите: колко коли са върху техниката извън трафика */
