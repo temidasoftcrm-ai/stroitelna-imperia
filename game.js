@@ -7091,7 +7091,9 @@ function buildRailX() {
     if ((ax - xm) * (bx - xm) >= 0) continue;
     const t = (xm - ax) / (bx - ax), z = az + (bz - az) * t; if (Math.abs(z) > Z - 20 || cr.some(c => Math.abs(c.z - z) < 12)) continue;
     const L = Array.isArray(r.lanes) ? r.lanes[0] + r.lanes[1] : (r.lanes || 2), w = Math.max(6, L * (r.laneW || 3.2) + (r.median || 0));
-    cr.push({ x: xm, z, ang: -Math.atan2(bz - az, bx - ax), w, x0: xa, x1: xb });
+    let mnx = 1e9, mxx = -1e9; for (const p of pts) { const px = (p.x ?? p[0]) + off.x; mnx = Math.min(mnx, px); mxx = Math.max(mxx, px); }
+    const sW = bx > ax ? -1 : 1, cont = feature('rail-road') ? [...(mnx > xa - 15 ? [sW] : []), ...(mxx < xb + 15 ? [-sW] : [])] : [];   // #16: страната, от която улицата свършва при линията → продължава отвъд
+    cr.push({ x: xm, z, ang: -Math.atan2(bz - az, bx - ax), w, x0: xa, x1: xb, deck: feature('rail-road'), cont, median: r.median || 0 });
   } }
   city.railCross = cr;   // catenary: стълбовете не стъпват на прелезите
   railx = createRailX({ group: city.group, crossings: cr, portals: [{ z: Z, x0: xa, x1: xb, dir: 1 }, { z: -Z, x0: xa, x1: xb, dir: -1 }], trains: () => passing ? passing.trainsAt() : [], bell: on => { railBellAt = on ? 0.01 : 0; } });

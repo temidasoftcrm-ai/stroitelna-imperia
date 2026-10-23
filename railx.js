@@ -15,6 +15,11 @@ const M = {
   concrete: new THREE.MeshStandardMaterial({ color: 0x9b978e, roughness: 0.95 }),
   earth: new THREE.MeshStandardMaterial({ color: 0x6f8a4f, roughness: 1 }),
   hole: new THREE.MeshBasicMaterial({ color: 0x050505 }),
+  asph: new THREE.MeshStandardMaterial({ color: 0x2b2d31, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2 }),
+  walk: new THREE.MeshStandardMaterial({ color: 0xbdb8ae, roughness: 0.9 }),
+  deck: new THREE.MeshStandardMaterial({ color: 0x8f8b83, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -3 }),
+  line: new THREE.MeshBasicMaterial({ color: 0xf2f2f2, polygonOffset: true, polygonOffsetFactor: -4 }),
+  grass: new THREE.MeshStandardMaterial({ color: 0x5f9a45, roughness: 1, polygonOffset: true, polygonOffsetFactor: -4 }),
 };
 const lamp = () => new THREE.MeshStandardMaterial({ color: 0x400808, emissive: 0xff2010, emissiveIntensity: 0.05, roughness: 0.4 });
 
@@ -45,12 +50,36 @@ function portal(x0, x1, dir) {
   return g;
 }
 
+// край на пътя — червено-бяла греда на два стълба напряко на улицата
+function endBarrier(w) {
+  const g = new THREE.Group(), n = Math.max(4, Math.round(w / 0.8));
+  for (let k = 0; k < n; k++) { const o = new THREE.Mesh(new THREE.BoxGeometry(w / n, 0.38, 0.12), k % 2 ? M.armW : M.armR); o.position.set(-w / 2 + (k + 0.5) * w / n, 0.95, 0); o.castShadow = true; g.add(o); }
+  for (const s of [-1, 1]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.2, 8), M.post); p.position.set(s * (w / 2 + 0.05), 0.6, 0); p.castShadow = true; g.add(p); }
+  return g;
+}
+// #16 (rail-road): прелезът като истински — бетонна настилка между релсите по ширината на пътя и, ако улицата свършва при линията,
+// продължение отвъд нея (асфалт, разделителна ивица, тротоари, разделителни линии) ~45 м, накрая бариера „край на пътя“.
+// В координатите на групата на прелеза: +x — по улицата, z — напряко; half — половината от зоната на коловозите.
+function crossingRoad(g, c, half) {
+  const w = c.w || 7, flat = (m, len, wid, x, z, y) => { const o = new THREE.Mesh(new THREE.PlaneGeometry(len, wid).rotateX(-Math.PI / 2), m); o.position.set(x, y, z); o.receiveShadow = true; g.add(o); return o; };
+  if (c.deck) flat(M.deck, 2 * half, w, 0, 0, 0.07);   // настилката между релсите (релсите са отгоре)
+  const L = 45;
+  for (const s of c.cont || []) {
+    const x0 = s * half, xm = s * (half + L / 2);
+    flat(M.asph, L, w, xm, 0, 0.05);
+    if (c.median > 0.5) flat(M.grass, L, c.median, xm, 0, 0.06);
+    for (const k of [-1, 1]) { flat(M.line, L, 0.15, xm, k * (w / 2 - 0.4), 0.065); const sw = new THREE.Mesh(new THREE.BoxGeometry(L, 0.16, 2.2), M.walk); sw.position.set(xm, 0.08, k * (w / 2 + 1.1)); sw.receiveShadow = true; g.add(sw); }
+    for (let t = 2; t < L - 2; t += 6) for (const k of c.median > 0.5 ? [-1, 1] : [0]) flat(M.line, 3, 0.15, x0 + s * t + s * 1.5, k ? k * (c.median / 2 + (w - c.median) / 4) : 0, 0.065);   // прекъснатата линия по средата на платното
+    const b = endBarrier(w); b.position.set(s * (half + L - 1), 0, 0); b.rotation.y = Math.PI / 2; g.add(b);
+  }
+}
 export function createRailX(deps) {
   const root = new THREE.Group(); root.name = 'railx'; deps.group.add(root);
   const xs = (deps.crossings || []).map(c => {
     const g = new THREE.Group(); g.position.set(c.x, 0, c.z); g.rotation.y = c.ang; root.add(g);
     // по оста на улицата (+x на групата) линията е по средата; стълбовете — от дясната страна на всеки подход, бариерата затваря неговата лента
-    const half = (c.x1 - c.x0) / 2 + 4, w = c.w || 7, posts = [];
+    const bw = (c.x1 - c.x0) / 2, half = Math.max(bw + 4, bw / Math.max(0.3, Math.abs(Math.cos(c.ang))) + 2.5), w = c.w || 7, posts = [];   // по диагонал лентата на релсите по улицата е по-дълга (2a: същото h за стоп линията)
+    crossingRoad(g, c, half);
     for (const s of [1, -1]) { const p = crossingPost(w / 2 + 0.3); p.position.set(s * half, 0, s * (w / 2 + 0.9)); p.rotation.y = s > 0 ? -Math.PI / 2 : Math.PI / 2; g.add(p); posts.push(p); }
     return { c, g, posts, on: false, t: 0, block: [-1, 1].map(s => { const v = new THREE.Vector3(s * (half + 1.5), 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), c.ang); return { x: c.x + v.x, z: c.z + v.z }; }) };
   });
