@@ -271,7 +271,7 @@ const mapVis = (x, y) => { if (!mapView) return true; const [vx, vy, vw, vh] = m
 const zShrink = () => Math.pow(Math.max(1, mapZoom()), -0.8);
 const mapLS = () => zShrink() * 0.85;   // мащаб на надписите (и малко по-малки по принцип)
 const mapPx = px => px * (mapView ? mapView.vb[2] : 1000) / Math.max(300, document.getElementById('mapSvg')?.clientWidth || 1000);   // px на екрана → единици на картата (надписите със строежа са еднакво големи при всеки зуум)
-const mapK = () => (mapCont ? (viewOf(mapCont).k || 2.4) : mapWorld ? 6 : 1) * zShrink();   // допълнителен мащаб на знаците (световният изглед и приближаването)
+const mapK = () => (mapCont ? (viewOf(mapCont)?.k || 2.4) : mapWorld ? 6 : 1) * zShrink();   // допълнителен мащаб на знаците (световният изглед и приближаването)
 let worldGeo = null;
 // държавите на световната карта без нито един град в играта (Гренландия, Исландия, Монголия…) — няма какво да се строи там, затова са оцветени
 // (ледените на север — бели, другите — тихо зелени), а не като „незапочнати“. Map iso → лед (средна ширина > 58°). Смята се веднъж.
@@ -10689,7 +10689,7 @@ if (AUTOTEST) {
         const on = new Set([...document.querySelectorAll('#mapSvg [data-city], svg [data-city]')].map(e => e.dataset.city));
         for (const k of ks) { if (c && !k.cities.some(id => viewOf(c).ids.has(id))) continue; const miss = k.cities.filter(id => !on.has(id) && !gateHidden(id)); if (miss.length) out.push(`${c || 'свят'}: ${k.nm} — ${miss.join(', ')}`); } }
       return out; },
-    contMap(k = 'as', lv = 20) { S.dev.lv = lv; S.dev.xp = 9e6; mapWorld = true; mapEU = true; mapWide = true; mapCont = k; mapView = null; showMap(true); return contByKey(k)?.open(); },
+    contMap(k = 'as', lv = 20) { S.dev.lv = lv; S.dev.xp = 9e6; const base = !viewOf(k); mapWorld = !base; mapEU = true; mapWide = true; mapCont = base ? null : k;   /* 'eu' — основната карта, не континент */ mapView = null; showMap(true); return contByKey(k)?.open(); },
     garTest2() { econ.earn(5e8, 'друго', 'тест'); S.branches = ['plovdiv', 'varna']; S.cities = S.cities || {}; S.cities.plovdiv = { units: ['crew', 'crane', 'truck', 'truck'], unitXp: [1, 2, 0, 0], officeLevel: 1, garageLevel: 1, projects: [] }; S.cities.varna = { units: ['crew', 'crew', 'tractor', 'truck', 'loader'], unitXp: [0, 0, 0, 0, 0], officeLevel: 1, garageLevel: 1, projects: [{ type: 'office', stage: 1, prog: 0 }, { type: 'tower', stage: 1, prog: 0 }, { type: 'tower', stage: 2, prog: 0 }] }; const a = garShort(); openBig('garage'); const ui = { fix: !!document.getElementById('garFixAll'), grow: !!document.getElementById('garGrow'), auto: !!document.getElementById('garAutoOn') }; document.getElementById('garFixAll')?.click(); const b = garShort(); S.garAutoOn = true; for (let d = 0; d < 12; d++) { S.day++; endOfDay(); } const c = garShort(); return { before: [a.total, a.moveN, a.buy.length, a.full], ui, after: [b.total, b.full.length, garTransit().length], days12: [c.total, c.full.length, S.cities.varna.garageLevel, S.cities.varna.officeLevel] }; },
     tod(f = 0.92) { const d = f * CYCLE_DAYS; S.day = Math.floor(d) + 1; S.dayT = (d % 1) * DAY_SEC; return todF(); },   // час от денонощието (0…1) за тестове на нощното осветление
     oilTest2(days = 30) { S.rails = [...(S.rails || []), { a: 'riyadh', b: 'jeddah', km: kmBetween('riyadh', 'jeddah'), days: 5, prog: 1, built: true }]; this.oilTest(); S.ships = [...(S.ships || []), { id: 990, kind: 'tanker', at: 'jeddah' }, { id: 991, kind: 'tanker', at: 'jeddah' }]; const o = oil.state(); o.px = 1.2;
