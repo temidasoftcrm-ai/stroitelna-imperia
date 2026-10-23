@@ -3466,6 +3466,11 @@ function hireStaff(k) {
   showEventPop(`hire-${k}`, `${t.ico} Назначихме ${t.nm.toLowerCase()}!`, t.ds);
   save(); renderPanel();
 }
+// 👷 staff-auto (потребителят 23.10): специалистите се назначават сами, щом трябват — ниво 4+, има обекти в работа и пари с резерв (2× цената)
+function staffAuto() {
+  if (!feature('staff-auto') || dev.level() < 4 || !projects.some(p => !p.own)) return;
+  for (const [k, t] of Object.entries(STAFF)) if (!hasStaff(k) && econ.s.money >= t.cost * 2) { hireStaff(k); return; }   // по един на ден
+}
 function syncUnits() { S.units = units.map(u => u.type); S.unitXp = units.map(u => Math.round((u.xp || 0) * 100) / 100); }
 // норма техника според големината на града: малък 1, среден 3, голям 5 (багери); останалото — пропорционално
 function fleetNorm() {
@@ -3644,6 +3649,7 @@ function dayWeatherAndEvents() {
 function endOfDay() {
   tirOrphans();
   unitRepair();   // #12: заседналата техника
+  staffAuto();   // staff-auto: инженерът и архитектът — сами, когато трябват
   rbuildTick();
   garAutoTick();
   saleTip();
@@ -3828,7 +3834,7 @@ function renderPanel() {
     }
     if ((S.trucks || []).length) h += `<div class="meta" style="margin-top:8px">🚚 ТИР-овете по магистралите (${S.trucks.length}) са в прозореца <b>„🛣️ Магистрали“</b> горе.</div>`;
     h += `<details style="margin-top:10px"><summary class="meta" style="cursor:pointer">👷 Специалисти (инженер, архитект)</summary>` + Object.entries(STAFF).map(([k, t]) => `<div class="card" style="padding:9px 11px"><div class="row" style="margin:0"><b>${t.ico} ${t.nm}</b>${hasStaff(k) ? '<b style="color:var(--ok)">✓ в екипа</b>' : `<b>${fmt(t.cost)} €</b>`}</div>
-      <div class="meta">${t.ds} Заплата ${fmt(t.upkeep)} €/ден.</div>${dev.level() < 4 && !hasStaff(k) ? `<div class="meta late">🔒 Ниво 4 на развитие на града (сега ${dev.level()})</div>` : ''}${hasStaff(k) ? '' : `<div class="row" style="justify-content:flex-end;margin-top:4px"><button class="btn" data-staff="${k}" ${econ.canAfford(t.cost) ? '' : 'disabled'}>Назначи</button></div>`}</div>`).join('') + `</details>`;
+      <div class="meta">${t.ds} Заплата ${fmt(t.upkeep)} €/ден.${feature('staff-auto') && !hasStaff(k) ? ' Назначава се сам, щом има обекти и ' + fmt(t.cost * 2) + ' € в касата.' : ''}</div>${dev.level() < 4 && !hasStaff(k) ? `<div class="meta late">🔒 Ниво 4 на развитие на града (сега ${dev.level()})</div>` : ''}${hasStaff(k) ? '' : `<div class="row" style="justify-content:flex-end;margin-top:4px"><button class="btn" data-staff="${k}" ${econ.canAfford(t.cost) ? '' : 'disabled'}>Назначи</button></div>`}</div>`).join('') + `</details>`;
   } else if (tab === 'estate') {
     h += estateHtml();
   } else if (tab === 'bank') {
