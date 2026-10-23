@@ -515,6 +515,7 @@ let europe = null;
   if (feature('office-levels2')) for (const L of OFFICE2) jobs.push(load(L.url).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[`office2-l${L.lv}`] = g; prepNightFloors(g.scene, `office2-l${L.lv}`); blkSections(`office2-l${L.lv}`); }).catch(() => {}));   // 🆕 новите нива на офиса
   for (const n of GAS_KINDS) jobs.push(load(`assets/heavy/gas/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => {}));   // бензиностанции (всяка — свое „✓ OK“); нощем — навесът и магазинът (nightfloors 'gas')
   if (feature('wh-levels2')) for (let k = 1; k <= 10; k++) jobs.push(load(`assets/heavy/wh2/wh-l${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['wh2-l' + k] = g; }).catch(() => {}));   // 📦 складовете 1–10 (Sketchfab, CC-BY — assets/heavy/wh2/CREDITS.txt)
+  if (feature('catenary')) jobs.push(load('assets/heavy/rail/catenary-mast.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; m.material.metalness = 0.25; m.material.roughness = 0.6; } }); A['cat-mast'] = g; })   /* без огледална среда металът излиза черен */.catch(() => {}));   // ⚡ catenary (#19): стълб с конзола (Low poly catenary — Ogfmh/mtafan, CC BY; оцветен в Blender)
   if (feature('rail-real')) jobs.push(load('assets/heavy/rail/track-tile.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) { m.castShadow = false; m.receiveShadow = true; } }); A['track-real'] = g; }).catch(() => {}));   // 🛤️ rail-real (#19): истинските релси (hifrak958, CC BY) — парче 1 × 0,75, като детското 'track'
   if (feature('wh-mats')) jobs.push(whMatsLoad(load));   // 📦 палети тухли, цимент, дъски, греди, пясък, кашони (assets/heavy/whmat, CC-BY)
   if (feature('yards-real')) for (const k of ['bench', 'fence-wood', 'fence-iron', 'fence-cement', 'fence-modern', 'play-swings', 'play-tower', 'play-small']) jobs.push(load(`assets/heavy/street/${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['st-' + k] = g; }).catch(() => {}));   // 🛝 yards-real: пейка, площадки, огради (Sketchfab, CC-BY — assets/heavy/CREDITS.txt)
@@ -7021,6 +7022,32 @@ function refreshPassing() {
   if (passing) passing.clear();
   passing = createPassingTrains({ scene, group: city.group, model, instanced, x: STATION_X, trackX: station.outerX(), path: trackMap, horn: () => {}, orient: () => S?.orient?.st === 'done', len: railEnd() });
   buildRailX();
+  try { buildCatenary(); } catch (e) { console.warn('catenary', e); }
+}
+// ⚡ catenary (#19): контактна мрежа над всички коловози в града — стълбове (модела) от двете външни страни на всеки 50 м с конзола над крайния коловоз,
+// при повече коловози — портал (греда отгоре) и висулки над вътрешните; по всеки коловоз носещо въже (6,6 м) и контактен проводник (5,6 м). Всичко — инстанции.
+function buildCatenary() {
+  if (city.catenary) { city.group.remove(city.catenary); city.catenary.traverse(o => { if (o.isInstancedMesh && o.userData.own) o.geometry.dispose(); }); city.catenary = null; }
+  if (!feature('catenary') || !A['cat-mast'] || !station) return;
+  const GAPc = 6.5, outer = station.outerX(), xs = []; for (let x = STATION_X; x >= outer - GAPc - 0.1; x -= GAPc) xs.push(x);   // главната, гаровите и двата на минаващите влакове
+  const L = railEnd() || 600, SC = 1.8, ARM = 3.2, CW = 5.65, MW = 6.6, TOP = 7.4, east = STATION_X + ARM, west = xs[xs.length - 1] - ARM;
+  const g = new THREE.Group(); g.name = 'catenary'; city.group.add(g); city.catenary = g;
+  const up = new THREE.Vector3(0, 1, 0), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3(), M4 = () => new THREE.Matrix4();
+  // стълбовете
+  const onX = z => (city.railCross || []).some(c => Math.abs(c.z - z) < c.w / 2 + 6);   // на прелеза — без стълб (проводниците минават над него)
+  const masts = []; for (let z = -L + 25; z <= L - 25; z += 50) if (!onX(z)) for (const [x, rot] of [[east, Math.PI], [west, 0]]) { const m = trackMap(x, z); masts.push(M4().compose(v.set(m.x, 0, m.z), q.setFromAxisAngle(up, m.yaw + rot), sc.setScalar(SC))); }
+  const src = A['cat-mast'].scene; src.updateMatrixWorld(true);
+  src.traverse(o => { if (!o.isMesh) return; const im = new THREE.InstancedMesh(o.geometry, o.material, masts.length); masts.forEach((m, i) => im.setMatrixAt(i, tmpM.multiplyMatrices(m, o.matrixWorld))); im.castShadow = true; im.receiveShadow = true; g.add(im); });
+  // проводниците, гредите на порталите, висулките: единична кутия, разпъната между две точки
+  const segs = [], seg = (a, b, w) => { const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z, len = Math.hypot(dx, dy, dz); if (len < 0.01) return; const dir = new THREE.Vector3(dx, dy, dz).normalize();
+    segs.push(M4().compose(v.set((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2), q.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir), sc.set(w, w, len))); };
+  const P = (x, y, z) => { const m = trackMap(x, z); return new THREE.Vector3(m.x, y, m.z); };
+  for (const x of xs) for (const h of [CW, MW]) for (let z = -L + 25; z < L - 25; z += 10) seg(P(x, h, z), P(x, h, Math.min(z + 10, L - 25)), h === CW ? 0.035 : 0.05);
+  if (xs.length > 1) for (let z = -L + 25; z <= L - 25; z += 50) if (!onX(z)) { seg(P(west, TOP, z), P(east, TOP, z), 0.28);   // портал: греда между стълбовете
+    for (const x of xs.slice(1, -1)) seg(P(x, TOP, z), P(x, MW, z), 0.06); }   // висулки до носещото въже над вътрешните коловози
+  const wg = new THREE.BoxGeometry(1, 1, 1), wim = new THREE.InstancedMesh(wg, new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.3, roughness: 0.55 }), segs.length);   /* цветът — по инстанция */
+  segs.forEach((m, i) => wim.setMatrixAt(i, m)); wim.userData.own = 1; wim.castShadow = false; g.add(wim);
+  segs.forEach((m, i) => wim.setColorAt(i, new THREE.Color(m.elements[0] * m.elements[0] + m.elements[1] * m.elements[1] > 0.04 || m.elements[4] * m.elements[4] + m.elements[5] * m.elements[5] > 0.04 ? 0x8c949b : 0x2f3438)));   // гредите на порталите (по-дебели) — светъл поцинкован метал, проводниците — тъмни
 }
 // 🚦 (rail-crossings) коловозите свършват в тунел до ръба на земята (не висят над празното), а където улица пресича линията — прелез
 const railOn = () => feature('rail-crossings') && !!city && !SEASIDE.includes(S.cityId);   // крайморските — линията завива покрай брега (trackpath.js)
@@ -7043,6 +7070,7 @@ function railGroundZ() {
 let railx = null, railBellAt = 0;
 function buildRailX() {
   if (railx) { railx.dispose(); railx = null; }
+  city.railCross = null;
   if (!railOn() || !station || !passing) return;
   const xa = station.outerX() - 6.5 - 2.5, xb = STATION_X + 2.5, xm = (xa + xb) / 2, Z = railEnd(), cr = [];
   const P = city.plan, p2 = P && P.p2, off = P && P.offset ? (Array.isArray(P.offset) ? { x: P.offset[0], z: P.offset[1] } : P.offset) : { x: 0, z: 0 };
@@ -7053,6 +7081,7 @@ function buildRailX() {
     const L = Array.isArray(r.lanes) ? r.lanes[0] + r.lanes[1] : (r.lanes || 2), w = Math.max(6, L * (r.laneW || 3.2) + (r.median || 0));
     cr.push({ x: xm, z, ang: -Math.atan2(bz - az, bx - ax), w, x0: xa, x1: xb });
   } }
+  city.railCross = cr;   // catenary: стълбовете не стъпват на прелезите
   railx = createRailX({ group: city.group, crossings: cr, portals: [{ z: Z, x0: xa, x1: xb, dir: 1 }, { z: -Z, x0: xa, x1: xb, dir: -1 }], trains: () => passing ? passing.trainsAt() : [], bell: on => { railBellAt = on ? 0.01 : 0; } });
 }
 // звуците (assets/sfx, f9): звънецът — в цикъл, докато бариерите са спуснати, само близо до камерата (< 250 м), със затихване;

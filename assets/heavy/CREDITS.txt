@@ -263,6 +263,7 @@ Incidents (incidents.js, Lab flag incidents2) in assets/heavy/inc/ — from Sket
 
 Rails in assets/heavy/rail/ — Sketchfab, CC BY 4.0.
 - track.glb, track-tile.glb — railway track by hifrak958 — https://sketchfab.com/3d-models/72f4906d6f484cf693a342478f2ae102 (track-tile: one 4 m piece cut in Blender)
+- catenary-mast.glb — "Low poly catenary train system (USA)" by mtafan (@Ogfmh) — https://sketchfab.com/3d-models/412b4ce3ca9345bfaf05f728500ce00a — CC BY 4.0 (one mast with cantilever cut out and coloured in Blender; wires and portals are drawn in game.js)
 
 Replacements (Lab: "Изтрий и намери нов подобен модел") — Sketchfab, CC BY 4.0, reduced in Blender:
 - gear/backhoe2.glb — "JCB Backhoe Loader 3CX Tractor" by chimeracreations (Kyle Burton) — https://sketchfab.com/3d-models/5b2d02e1c1c14deba0f9c8d75fff54b6 (replaces gear/backhoe.glb)
