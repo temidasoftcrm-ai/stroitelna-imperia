@@ -4098,9 +4098,11 @@ function buyForProjects() {
 // гаранциите по държавните поръчки (tenders.js S.tenders[id].bond) — за лентата „Блокирани пари“ в банката
 // своята банка (bank.js) — отгоре в „Банка и финанси“; кредитът от чуждата банка се скрива (вече нямаш нужда), освен ако имаш дълг за връщане
 function mergeOwnBank(box) {
-  if (!box || !S.bank) return;
+  const canFoundBank = feature('sub-reach') && !S.bank && S.holding && dev.best() >= 17;   // #39: ниво 17 (group.js SUB_LV.bank) в ерата на холдинга — картата „Основи банката“ отгоре (досега я нямаше никъде)
+  if (!box || !(S.bank || canFoundBank)) return;
   const own = document.createElement('div'); own.innerHTML = bank.winHtml(); box.prepend(own);
   bank.bind(own, () => { $('bwBody').dataset.bank = ''; renderBig(); renderPanel(); });
+  if (!S.bank) return;   // без своя банка — кредитът и депозитът от чуждата остават
   for (const c of box.querySelectorAll('.card')) { const t = c.textContent.replace(/\s+/g, ' ').trim().slice(0, 14);   // чуждата банка: кредит и депозит — само ако имаш дълг/депозит там
     if (/^🏦 ?Кредит/.test(t) && !(econ.s.loan > 0)) c.style.display = 'none';
     if (/^🏦 ?Депозит/.test(t) && !(econ.s.deposit > 0)) c.style.display = 'none'; }
@@ -4497,7 +4499,7 @@ const mines = createMines({ xp: n => xpMore(n), S: () => S, econ: () => econ, MA
 const boardL = createBoardLogic({ trackStatus: t => boardTrack(t), sig: () => { const ip = corp.state()?.ipo; return JSON.stringify([S.bank && [S.bank.loans.length, S.bank.div, S.bank.lv, S.bank.cap], S.mega, S.r66?.st, S.mw, ip && [ip.out, ip.div], Object.values(S.tenders || {}).map(x => x && x.my), S.oil && [(S.oil.contracts || []).length, S.oil.stock], !!S.neom, S.imp && [S.imp.cc, S.imp.b, S.imp.z, (S.imp.zr || []).length], S.resorts, (S.mines?.sites || []).length]); }, fixTrack: t => boardFix(t), S: () => S, econ: () => econ, fmt, toast, save, sound: n => Sound.play(n), proposals: () => group.proposals(), decide: (id, a) => group.decide(id, a),
   dirName: d => d === 'mayor' ? mayorName() : (S && S.hold && S.hold.dir || {})[d] || '', subName: d => d === 'mayor' ? 'Империал Сити' : subName(S, d), dailyCost: () => { const h = (econ && econ.s.history) || []; const L = h.slice(-7); return L.length ? L.reduce((a, x) => a + (x.out || 0), 0) / L.length : 0; },
   loan: amt => { if (!econ.canTakeLoan(S.rep)) { toast('🏦 Банката няма свободен кредит за теб.', 'bad'); return false; } const step = econ.loanStep(S.rep), a = Math.min(econ.loanRoom(S.rep), Math.ceil(amt / step) * step); return econ.takeLoan(S.rep, a); } });
-const group = createGroup({ xp: n => xpMore(n), night: () => dayNight.night, awardsPending: st => awardsPending(st), mayorName: () => mayorName() || null, board2: () => boardL, proposals: () => boardProposals(), subShow: (k, mode, text) => subScreen(k, mode, text), askFound: (k, re) => subScreen(k, 'ask', '', re), S: () => S, econ: () => econ, lv: () => dev.best(), gift: k => giftSub(k), toast, fmt, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b),
+const group = createGroup({ openBank: () => openBig('bank'), xp: n => xpMore(n), night: () => dayNight.night, awardsPending: st => awardsPending(st), mayorName: () => mayorName() || null, board2: () => boardL, proposals: () => boardProposals(), subShow: (k, mode, text) => subScreen(k, mode, text), askFound: (k, re) => subScreen(k, 'ask', '', re), S: () => S, econ: () => econ, lv: () => dev.best(), gift: k => giftSub(k), toast, fmt, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b),
   hwN: () => hwDone().length, railN: () => (S.rails || []).filter(r => r.built).length, portN: () => Object.values(S.ports || {}).filter(p => p.lv).length, airN: () => Object.values(S.airports || {}).filter(a => a.lv).length,
   oilN: () => mines.state().sites.filter(x => x.kind === 'oilwell').length, empire: () => dev.has('EMPIRE'), toll: () => hwToll(), flow: k => flowAvg(k),
   finDaily: () => Object.values(econ?.s?.finished || {}).reduce((a, f) => a + (f.daily || 0), 0), bankOn: () => !!S.bank, bankDaily: () => bank.daily(), hotelN: () => Object.keys(S.hotels || {}).length, hotelDaily: () => hotels.daily(), oilDaily: () => oil.dailyAvg() || mines.dailyValue(x => MINE_KINDS[x.kind]?.oil) });
