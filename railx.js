@@ -73,6 +73,16 @@ function crossingRoad(g, c, half) {
     const b = endBarrier(w); b.position.set(s * (half + L - 1), 0, 0); b.rotation.y = Math.PI / 2; g.add(b);
   }
 }
+// 🌊 (rail-causeway) каменен насип под коловозите над водата: трапец (горе — ширината на снопа + 3 м от всяка страна, откосите надолу под водата),
+// отгоре — баластра; по дължината — от −z до z (до порталите на тунелите)
+function causeway(cw) {
+  const g = new THREE.Group(), top = (cw.x1 - cw.x0) / 2 + 3, bot = top + 7, cx = (cw.x0 + cw.x1) / 2, L = 2 * cw.z + 16;
+  const sh = new THREE.Shape([new THREE.Vector2(-bot, -4), new THREE.Vector2(bot, -4), new THREE.Vector2(top, -0.16), new THREE.Vector2(-top, -0.16)]);
+  const geo = new THREE.ExtrudeGeometry(sh, { depth: L, bevelEnabled: false }); geo.translate(0, 0, -L / 2);
+  const stone = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x8a8174, roughness: 0.95 })); stone.position.x = cx; stone.receiveShadow = true; g.add(stone);
+  const ballast = new THREE.Mesh(new THREE.PlaneGeometry(2 * top - 1, L).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x6d655c, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2 })); ballast.position.set(cx, -0.14, 0); ballast.receiveShadow = true; g.add(ballast);
+  return g;
+}
 export function createRailX(deps) {
   const root = new THREE.Group(); root.name = 'railx'; deps.group.add(root);
   const xs = (deps.crossings || []).map(c => {
@@ -83,6 +93,7 @@ export function createRailX(deps) {
     for (const s of [1, -1]) { const p = crossingPost(w / 2 + 0.3); p.position.set(s * half, 0, s * (w / 2 + 0.9)); p.rotation.y = s > 0 ? -Math.PI / 2 : Math.PI / 2; g.add(p); posts.push(p); }
     return { c, g, posts, on: false, t: 0, block: [-1, 1].map(s => { const v = new THREE.Vector3(s * (half + 1.5), 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), c.ang); return { x: c.x + v.x, z: c.z + v.z }; }) };
   });
+  if (deps.causeway) root.add(causeway(deps.causeway));
   for (const p of deps.portals || []) { const g = portal(p.x0, p.x1, p.dir); g.position.z = p.z; root.add(g); }
   let bellOn = false;
   function update(dt) {

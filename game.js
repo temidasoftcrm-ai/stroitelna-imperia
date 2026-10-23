@@ -1069,7 +1069,7 @@ function buildCity(cityId) {
   // крайбрежните градове: море на север с плаж, пристанище, фар и кораби (seaside.js)
   city.airport = null; city.airportNI = 0; city.airSite = null; refreshAirport3D(cityId);
   // крайморски град: жп линията свива на запад преди брега (концентрични дъги; най-западният коловоз е с радиус 12)
-  { const westmost = tx(0) - 16 - 6 * 6.5, cx = westmost - 12, seaZ = tx(0) - TILE / 2 - 2 - 22; trackMap = SEASIDE.includes(cityId) ? makeTrackMap({ cx, zC: seaZ + 6 + (tx(0) - 16 - cx) }) : makeTrackMap(null); }
+  { const westmost = tx(0) - 16 - 6 * 6.5, cx = westmost - 12, seaZ = tx(0) - TILE / 2 - 2 - 22; trackMap = SEASIDE.includes(cityId) && !causewayOn(cityId) ? makeTrackMap({ cx, zC: seaZ + 6 + (tx(0) - 16 - cx) }) : makeTrackMap(null); }
   city.sea = SEASIDE.includes(cityId) && !(P && P.osm) ? addSeaside(g, { A, model, label }, { zEdge: tx(0) - TILE / 2 - 2, xMin: tx(0), xMax: tx(NI - 1), railX: [-1e9, -1e9], seed: hashStr(cityId), ...seaCoastOpts(P) }) : null;
   seaFleetSig = ''; if (city.sea) city.sea.setPortLevel?.(portLv(cityId));
   ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; ground.receiveShadow = true;
@@ -7068,22 +7068,27 @@ function buildCatenary() {
   segs.forEach((m, i) => wim.setColorAt(i, new THREE.Color(m.elements[0] * m.elements[0] + m.elements[1] * m.elements[1] > 0.04 || m.elements[4] * m.elements[4] + m.elements[5] * m.elements[5] > 0.04 ? 0x8c949b : 0x2f3438)));   // гредите на порталите (по-дебели) — светъл поцинкован метал, проводниците — тъмни
 }
 // 🚦 (rail-crossings) коловозите свършват в тунел до ръба на земята (не висят над празното), а където улица пресича линията — прелез
-const railOn = () => feature('rail-crossings') && !!city && !SEASIDE.includes(S.cityId);   // крайморските — линията завива покрай брега (trackpath.js)
-const railEnd = () => railOn() && city.groundHZ ? Math.min(1600, city.groundHZ - 30, feature('rail-ends') ? railGroundZ() - 30 : 1e9) : undefined;
+// 🌊 (rail-causeway) крайморски град по истинската карта, в който линията (STATION_X около z = 0) е изцяло във водата — Истанбул: градът е на ~2 км
+// североизточно, суша до линията няма. Вместо крайбрежната извивка на града с решетка (минаваше над морето) — права линия на каменен насип
+// по цялата дължина, с тунелите в краищата (на насипа).
+const CAUSEWAY = new Set(['istanbul']);
+const causewayOn = (id = S && S.cityId) => feature('rail-causeway') && CAUSEWAY.has(id) && !!(S && S.plan2 && S.plan2[id]);
+const railOn = () => feature('rail-crossings') && !!city && (!SEASIDE.includes(S.cityId) || causewayOn());   // крайморските — линията завива покрай брега (trackpath.js)
+const railEnd = () => railOn() && city.groundHZ ? Math.min(1600, city.groundHZ - 30, feature('rail-ends') ? railGroundZ(causewayOn()) - 30 : 1e9) : undefined;   // насипът — докъдето стига водата (иначе висеше над празното)
 // #25 (rail-ends): в градовете с план (истинската карта) земята е на плана — не city.groundHZ (то е от неизползваната земя на решетката) и
 // често е по-къса там, където минава линията (Рим: на юг до −1360 при линия до ±1600 — релсите висяха над празното). Тук: докъде стига
 // равната земя на плана точно по линията (x = STATION_X), на север и на юг от z = 0 — по-късата страна (тунелите са симетрични); водата не е земя.
-function railGroundZ() {
-  const pv = city.planView, ud = city.group?.userData; if (!pv || !ud) return city.groundHZ || 1600;
-  if (ud.railGZ != null) return ud.railGZ;
+function railGroundZ(water = false) {   // water — и водата (насипът на rail-causeway стои в нея)
+  const pv = city.planView, ud = city.group?.userData, key = water ? 'railGZw' : 'railGZ'; if (!pv || !ud) return city.groundHZ || 1600;
+  if (ud[key] != null) return ud[key];
   pv.updateMatrixWorld(true); const bs = [];
-  pv.traverse(o => { if (!o.isMesh || !o.geometry || o.material?.isMeshPhysicalMaterial || o.material?.transparent) return;
+  pv.traverse(o => { if (!o.isMesh || !o.geometry || (!water && (o.material?.isMeshPhysicalMaterial || o.material?.transparent))) return;
     o.geometry.computeBoundingBox(); const b = o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld);
     if (b.max.y - b.min.y < 1 && b.max.y < 0.6 && b.max.x - b.min.x > 250 && b.max.z - b.min.z > 250 && STATION_X - 12 >= b.min.x && STATION_X + 12 <= b.max.x) bs.push(b); });
-  if (!bs.length) return ud.railGZ = city.groundHZ || 1600;
+  if (!bs.length) return ud[key] = city.groundHZ || 1600;
   const on = z => bs.some(b => z >= b.min.z && z <= b.max.z); let n = 0, s = 0;
   while (n < 4000 && on(n + 10)) n += 10; while (s < 4000 && on(-(s + 10))) s += 10;
-  return ud.railGZ = Math.max(200, Math.min(n, s));
+  return ud[key] = Math.max(200, Math.min(n, s));
 }
 let railx = null, railBellAt = 0;
 function buildRailX() {
@@ -7102,7 +7107,7 @@ function buildRailX() {
     cr.push({ x: xm, z, ang: -Math.atan2(bz - az, bx - ax), w, x0: xa, x1: xb, deck: feature('rail-road'), cont, median: r.median || 0 });
   } }
   city.railCross = cr;   // catenary: стълбовете не стъпват на прелезите
-  railx = createRailX({ group: city.group, crossings: cr, portals: [{ z: Z, x0: xa, x1: xb, dir: 1 }, { z: -Z, x0: xa, x1: xb, dir: -1 }], trains: () => passing ? passing.trainsAt() : [], bell: on => { railBellAt = on ? 0.01 : 0; } });
+  railx = createRailX({ group: city.group, causeway: causewayOn() ? { z: Z, x0: xa, x1: xb } : null, crossings: cr, portals: [{ z: Z, x0: xa, x1: xb, dir: 1 }, { z: -Z, x0: xa, x1: xb, dir: -1 }], trains: () => passing ? passing.trainsAt() : [], bell: on => { railBellAt = on ? 0.01 : 0; } });
 }
 // звуците (assets/sfx, f9): звънецът — в цикъл, докато бариерите са спуснати, само близо до камерата (< 250 м), със затихване;
 // минаващ влак — веднъж за влак, ако мине на < 200 м, по един наведнъж
