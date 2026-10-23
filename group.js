@@ -273,6 +273,7 @@ export function createGroup(deps) {
       proposals, onUp: k => { upgrade(k); re(); }, onHire: k => { hire(k); re(); },
       // 🏦 трезорът зад борда (флаг vault): парите на фирмата; разделянето резерв / за инвестиции / свободни — в записа (S.hold.vault); резервът на Борис — оперативният от boardlogic
       // 🏆 стената с отличията (флаг awards): получените — в записа (S.hold.awards), всяка степен — веднъж; заслужените — от game.js (awardsPending)
+      chairPick: { get: () => deps.S().hallChair || null, set: v => { deps.S().hallChair = v; deps.save(); } },   // 🪑 hall-chairs: столовете в залата — избор на играча
       awards: feature('awards') ? { state: () => hold().awards || {}, pending: () => deps.awardsPending ? deps.awardsPending(hold().awards || {}) : [],
         grant: (k, tier, res) => { const h = hold(); h.awards = h.awards || {}; h.awards[k] = { tier, day: deps.S().day, res: res || '' }; deps.save(); } } : null,
       vault: feature('vault') ? { money: () => deps.econ().money, split: { res: 20, inv: 50, ...(hold().vault || {}) }, onSplit: sp => { hold().vault = { res: sp.res, inv: sp.inv }; deps.save(); },

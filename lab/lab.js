@@ -180,6 +180,7 @@ const DEMOS = [
   ['🚌 Градски автобус със спирки: линия по булевардите, навес и табела на тротоара, автобусът спира ~12 s (София; камерата на спирката)', 'sofia', d => setTimeout(() => d.busLook(), 6000)],   // city-bus (#15)
   ['⭐ Зала на славата — Ивайло (злато), после Мария (платина)', 'sofia', d => { setTimeout(() => d.fame('con', 'gold'), 3000); setTimeout(() => { window.__fame && window.__fame.close(); setTimeout(() => d.fame('rail', 'platinum'), 600); }, 16000); }],   // hall-fame
   ['🎬 Клипът на Истанбул (и след филиал там — същото като Ню Йорк)', 'istanbul', d => { setTimeout(() => d.cine('istanbul'), 2500); }],   // branch-clip (Истанбул)
+  ['🪑 Столовете в залата — избор на играча (бутон 🪑 до 🏆)', 'sofia', d => setTimeout(() => { d.boardDemo(); setTimeout(() => { const w = document.querySelector('#fr')?.contentWindow || window; }, 100); }, 3000)],   // hall-chairs
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

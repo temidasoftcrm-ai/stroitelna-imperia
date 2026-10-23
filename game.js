@@ -61,7 +61,7 @@ import { buildUniversity, buildHospital, buildStadium, buildMetro, buildAirTermi
 import { buildGreatWall } from './greatwall3d.js';
 import { buildCivic, CIVIC_KINDS } from './civic3d.js';
 import { createMines, MINE_KINDS, GRID_NEED } from './mines.js';
-import { createGroup, BRANDS, groupName, brandOf, cleanBrand, subName, subLogo, FOUND, SUBS, showDirectorOf } from './group.js';
+import { createGroup, BRANDS, groupName, brandOf, cleanBrand, subName, subLogo, FOUND, SUBS, showDirectorOf, DIR_OF } from './group.js';
 import { createOil } from './oil.js';
 import { createCorp, GLOBAL } from './corp.js';
 import { globProposals } from './globdir.js';
@@ -10793,6 +10793,8 @@ if (AUTOTEST) {
       const lf = ['glavbild', 'trakia']; for (const id of lf) corp.buyLocal(id); corp.sellTranche(); for (let d = 0; d < 5; d++) endOfDay();
       S.hTab = 'rank'; openBig('group'); const rank = document.getElementById('bwBody').innerText.slice(0, 700); S.hTab = 'acq'; renderBig(); const acq = document.getElementById('bwBody').innerText.slice(0, 500); S.hTab = 'ipo'; renderBig(); const ipo = document.getElementById('bwBody').innerText.slice(0, 500);
       return { r0, r: corp.myRank(), v: corp.myValue(), gl: { k: L.gl.kalahari, t: L.gl.tasman }, loc: L.loc, ipo: L.ipo && { out: L.ipo.out, mood: L.ipo.mood }, inc: L.incDay, share: rivals.share(), rank, acq, ipo }; },
+    boardDemo() { this.holdTest(); S.dev = { xp: 2400000, lv: 18, v: 3 }; const K = ['con', 'hw', 'rail', 'sea', 'air', 'hotel', 'oil', 'bank', 'glob']; S.group = S.group || {}; S.hold = S.hold || {}; S.hold.dir = S.hold.dir || {}; S.hold.lv = S.hold.lv || {};
+      for (const k of K) { S.group[k] = S.group[k] || 1; S.hold.lv[k] = 5; S.hold.dir[k] = S.hold.dir[k] || DIR_OF[k]; } S.foundFirst = S.foundFirst || 1; document.getElementById('modal')?.classList.add('hidden'); group.board(() => {}); return true; },   // 🪑 hall-chairs / залата с всички директори (Лабораторията)
     fame(k = 'con', tier = 'gold') { return import('./halloffame.js').then(m => !!m.openHallOfFame({ k, tier })); },   // ⭐ hall-fame: Зала на славата (Лабораторията)
     holdTest() { S.brand = 'titan'; S.dev.lv = 15; S.dev.xp = 2e6; S.rep = 5; econ.earn(3e9, 'друго', 'тест'); S.branches = [...new Set([...(S.branches || []), 'plovdiv', 'varna'])]; S.rails = [{ a: 'sofia', b: 'plovdiv', km: 150, days: 5, prog: 1, built: true }];
       flowAdd('rail', 400000, 'тест'); flowDay('rail', 0); holdingCheck(); document.getElementById('modal')?.classList.add('hidden'); const r0 = { holding: S.holding, auto: S.autoCity, auto2: S.auto2 };
