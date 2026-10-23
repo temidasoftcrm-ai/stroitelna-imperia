@@ -388,7 +388,7 @@ export function plan2Load(data, osm) {
 // ---- основното: plan2(cityId, { fam, size, seed, ext })
 const cache = new Map();
 export function plan2(cityId, o = {}) {
-  const fam = o.fam || 'eu', size = o.size || 'm', seed = o.seed ?? hashStr(cityId), ext = o.ext || 0, RG = !!o.roadGeo && !o.osm, JF = !!o.jfix && !o.osm, key = [cityId, fam, size, seed, ext, o.rk || 1, RG ? 'rg' : '', JF ? 'jf' : ''].join(':');   // RG — road-geo (само нови игри: парцелите се местят)
+  const fam = o.fam || 'eu', size = o.size || 'm', seed = o.seed ?? hashStr(cityId), ext = o.ext || 0, RG = !!o.roadGeo && !o.osm, JF = !!o.jfix && !o.osm, ED = !o.osm && o.edit && (o.edit.add?.length || o.edit.cut?.length) ? o.edit : null, key = [cityId, fam, size, seed, ext, o.rk || 1, RG ? 'rg' : '', JF ? 'jf' : '', ED ? 'ed' + hashStr(JSON.stringify([ED.add, ED.cut])) : ''].join(':');   /* ED — редакциите от Лаб редактора (#29, plan-edit): начертани и изтрити улици */   // RG — road-geo (само нови игри: парцелите се местят)
   if (cache.has(key)) return cache.get(key);
   const t0 = Date.now(), r = rng(hashStr(`plan2:${cityId}:${fam}:${size}:${seed}`));
   const sk = o.osm ? osmSkeleton(o.osm) : skeleton(fam, size, r, o.rk || 1);   // rk — по-голям радиус (играта иска повече парцели)
@@ -426,12 +426,17 @@ export function plan2(cityId, o = {}) {
     }
   };
   locals.forEach((L, li) => { snapLocal(L, li, 0); snapLocal(L, li, 1); });
-  const lines = [...sk.lines, ...locals].map(L => ({ ...L, pts: L.pts }));
+  const lines = [...sk.lines, ...locals, ...(ED ? ED.add || [] : []).filter(L => L.pts && L.pts.length > 1).map(L => ({ cls: CLS[L.cls] ? L.cls : 'street', pts: resample(L.pts, 4), user: true }))].map(L => ({ ...L, pts: L.pts }));   /* + начертаните в редактора */
   // граф и правила
   const G = o.osm && o.osm.nodes ? { nodes: o.osm.nodes.map(([x, z]) => ({ x, z, rank: 0 })), edges: o.osm.roads.map((r, i) => { const pts = resample(r.pts, 4); pts[0] = o.osm.nodes[r.a].slice(); pts[pts.length - 1] = o.osm.nodes[r.b].slice();
       return { a: r.a, b: r.b, cls: r.cls, pts, src: i, noCars: !!r.noCars, bridge: !!r.bridge, nm: r.nm || '', oneway: !!r.oneway }; }) }   // истинската карта: възлите са общите точки на улиците в OSM
     : buildGraph(lines, { merge: 7 });
   let E = applyRules(G, o.osm ? { minAngle: 20 * Math.PI / 180, minLen: 4, minStub: 10 } : { minAngle: 55 * Math.PI / 180, minLen: 30, minStub: 46 });   // истинската карта — по-меки правила (Рим има остри ъгли и къси пресечки)
+  if (ED && ED.cut && ED.cut.length) {   // изтритите в редактора: ребро, чиито точки са поне 60% на ≤ 4 м от изтрита улица
+    const cg = pointGrid(8); ED.cut.forEach(c => resample(c, 2).forEach(p => cg.add(p, 1)));
+    const near = p => { let h = false; cg.near(p, 4, q => { if (!h && dist(p, q) <= 4) h = true; }); return h; };
+    E = E.filter(e => { const pts = e.pts || []; return !pts.length || pts.filter(near).length / pts.length < 0.6; });
+  }
   // свързаност: само компонентът на центъра
   const adj = G.nodes.map(() => []); E.forEach(e => { adj[e.a].push(e.b); adj[e.b].push(e.a); });
   let c0 = 0, cd = 1e9; G.nodes.forEach((n, i) => { const d = Math.hypot(n.x - sk.hubs[0].x, n.z - sk.hubs[0].z); if (adj[i].length && d < cd) { cd = d; c0 = i; } });

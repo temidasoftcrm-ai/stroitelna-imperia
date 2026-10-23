@@ -731,6 +731,7 @@ const plan2On = id => !!(S && S.plan2 && S.plan2[id] && plan2.data[id]);
 const plan2Tier = () => 1 + Math.min(4, S.cityExt || 0);   // всеки купен квартал отключва следващото ниво рионе (1…5)
 async function plan2Preload(s) {
   if (feature('street-real')) { await loadStreetReal(); for (const m of lampMats()) dayNight.winMats.add(m); }   // street-real: абажурите светят нощем (daynight.js: winMats); моделите на лампите и светофарите — преди строежа на града (мрежата, планът v1 и v2 ги ползват веднага)
+  if (s && s.planEd && !plan2.edits) plan2.edits = await fetch('assets/plans/edits.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : {}).catch(() => ({}));   /* #29 plan-edit: плановете от Лаб редактора */
   if (s && s.plan2gen && !plan2.mod) { try { const [m, v] = await Promise.all([import('./cityplan2game.js'), import('./cityplan2-3d.js')]); plan2.mod = m; plan2.view = v; } catch (e) { console.warn('plan2gen', e); } }   // генерираните градове (шаблоните plan2) — само модулите
   const id = s && s.cityId; if (!id || !(s.plan2 && s.plan2[id]) || plan2.data[id]) return;
   try { const [m, v] = await Promise.all([import('./cityplan2game.js'), import('./cityplan2-3d.js')]); plan2.mod = m; plan2.view = v; const d = await m.loadPlan2(id); if (d) plan2.data[id] = d;
@@ -768,9 +769,10 @@ function plan2MoveCard() {
 // 🏙️ генерираните градове (16-те шаблона plan2: eu/us/coast/radial × s/m/l/xl) — в НОВИТЕ игри (S.plan2gen, флаг plan2-game) всички градове без истинска карта
 const plan2GenOn = id => !!(S && S.plan2gen && plan2.mod && !(S.plan2 && S.plan2[id]) && id !== NEOM_ID && !AIR_ONLY.has(id));
 const plan2GenPlan = id => { const mega = MEGAPOLIS.has(id), t = cityTier(id), cnt = planCountOf(id, S.cityExt || 0), c = plan2.cache;
-  if (c && c.id === id && c.t === 'g' + cnt + (S.roadGeo ? 'r' : '') + (S.jfix ? 'j' : '')) return c.P;   /* road-geo — друг план (само новите игри) */
-  const P = plan2.mod.gamePlan2Gen(id, { roadGeo: !!S.roadGeo, jfix: !!S.jfix, tier: mega ? 'xl' : t === 'xl' ? 'xl' : t === 'l' ? 'l' : t === 's' ? 's' : 'm', coastal: SEASIDE.includes(id), region: isAm(id) ? 'us' : null, mega, count: cnt, minLots: mega ? MEGA_LOTS : PLAN_CORE + extLotsOf(id) * Math.max(MAX_EXT, extRule(id)) });
-  plan2.cache = { id, t: 'g' + cnt + (S.roadGeo ? 'r' : '') + (S.jfix ? 'j' : ''), P }; return P; };
+  const ed = S.planEd && plan2.edits ? (id in S.planEd ? S.planEd[id] : (S.planEd[id] = plan2.edits[id] || 0)) : 0;   /* #29 plan-edit: редакцията се копира в записа при първото влизане в града — по-късните промени в редактора не местят улиците на тази игра */
+  if (c && c.id === id && c.t === 'g' + cnt + (S.roadGeo ? 'r' : '') + (S.jfix ? 'j' : '') + (ed ? 'e' : '')) return c.P;   /* road-geo — друг план (само новите игри) */
+  const P = plan2.mod.gamePlan2Gen(id, { edit: ed || null, roadGeo: !!S.roadGeo, jfix: !!S.jfix, tier: mega ? 'xl' : t === 'xl' ? 'xl' : t === 'l' ? 'l' : t === 's' ? 's' : 'm', coastal: SEASIDE.includes(id), region: isAm(id) ? 'us' : null, mega, count: cnt, minLots: mega ? MEGA_LOTS : PLAN_CORE + extLotsOf(id) * Math.max(MAX_EXT, extRule(id)) });
+  plan2.cache = { id, t: 'g' + cnt + (S.roadGeo ? 'r' : '') + (S.jfix ? 'j' : '') + (ed ? 'e' : ''), P }; return P; };
 const planOf = id => plan2On(id) ? plan2Plan(id) : plan2GenOn(id) ? plan2GenPlan(id) : planOn(id) ? gamePlan(id, { exts: Math.max(MAX_EXT, extRule(id)), landmark: !!CITY_LANDMARKS[id], seaside: SEASIDE.includes(id), mega: MEGAPOLIS.has(id), bigZone: bigZoneOf(id), clean: S.planAll >= 6, clean2: S.planAll >= 9, tpl: (S.planAll >= 7 && PLAN_TPL7[id]) || (S.planAll >= 5 && PLAN_TPL5[id]) || (S.planAll >= 4 ? PLAN_TPL4[id] : undefined) }) : null;
 // запазената зона в плана за голямата забележителност: колкото W×D парцела на мрежата ((3W − 1) плочки − 2 м)
 function bigZoneOf(id) { const b = (BIG_LANDMARKS[id] || [])[0]; if (!b) return null; const [kind, W, D, asp = 1, turn = 0] = b; return { kind, W, D, asp, turn, size: [(3 * W - 1) * TILE - 2, (3 * D - 1) * TILE - 2] }; }
@@ -3014,11 +3016,11 @@ function newGame(cityId, brand = null, brandNm = '') {
   if (brandNm) S.brandNm = brandNm;   // името, което играчът си е дал (group.js: brandOf)
   S.foundFirst = 1;   // дъщерните фирми (пътна, жп, морска, авиация) — с ръчно основаване и стартов пакет
   if (params.has('plan') ? params.get('plan') === '1' : !AUTOTEST) S.planAll = feature('road-clean') ? 9 : feature('city-size') ? 8 : feature('la-osm') ? 7 : 6;   // 7: Лос Анджелис по картата (PLAN_TPL7); 6: по-чист център (cityplan opts.clean)   // нова игра — средните и големите градове с план (извити улици); старите записи остават на мрежата   // нов град с план (извити улици); старите записи остават на мрежата
-  if (S.planAll && feature('plan2-game')) { S.plan2gen = 1; S.plan2genV = 2; if (feature('road-geo')) S.roadGeo = 1; if (feature('junction-fix')) S.jfix = 1; }   /* road-geo: генераторът без чупки и залепени кръстовища — само новите игри */   // 🏙️ новите градове от 16-те шаблона (V2 — модулите са заредени още в първата сесия)
+  if (S.planAll && feature('plan2-game')) { S.plan2gen = 1; S.plan2genV = 2; if (feature('road-geo')) S.roadGeo = 1; if (feature('junction-fix')) S.jfix = 1; if (feature('plan-edit')) S.planEd = {}; }   /* road-geo: генераторът без чупки и залепени кръстовища — само новите игри */   // 🏙️ новите градове от 16-те шаблона (V2 — модулите са заредени още в първата сесия)
   if (S.planAll) { const ids = [...PLAN2_CITIES].filter(id => plan2Ready(id)); if (ids.length) S.plan2 = Object.fromEntries(ids.map(id => [id, 1])); }   // и градовете, в които ще отвориш филиал по-късно (switchCity презарежда → plan2Preload)
   // 🌱 (start-easy) по-лесно начало: първият град — с всички квартали (има парцели за поръчки), половин поддръжка първите 30 дни, бонус на ниво 2
   if (feature('start-easy') && !(AUTOTEST && params.get('ext'))) { S.startEasy = 1; S.cityExt = extRule(cityId); }
-  if (S.plan2gen && !plan2.mod) { const s0 = S; plan2Preload(S).then(() => { if (S !== s0) return; if (!plan2.mod) { delete S.plan2gen; delete S.plan2genV; } newGameEnter(brand); }); return; }   // иначе първата сесия строи града по стария план, а след презареждането — по новия (други парцели)
+  if (S.plan2gen && (!plan2.mod || (S.planEd && !plan2.edits))) { const s0 = S; plan2Preload(S).then(() => { if (S !== s0) return; if (!plan2.mod) { delete S.plan2gen; delete S.plan2genV; } newGameEnter(brand); }); return; }   // иначе първата сесия строи града по стария план, а след презареждането — по новия (други парцели)
   if (S.plan2 && S.plan2[cityId]) { if (!plan2.data[cityId]) { const s0 = S; plan2Preload(S).then(() => { if (S !== s0) return; if (!plan2.data[cityId]) delete S.plan2; newGameEnter(brand); }); return; } }   // 🇮🇹 Рим по истинската карта — данните първо
   newGameEnter(brand);
 }

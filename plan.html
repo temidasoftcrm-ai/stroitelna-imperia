@@ -75,6 +75,12 @@
   </div>
   <div id="info"></div>
   <div id="liveCheck" style="font-size:12px;margin-top:4px;color:var(--mut)"></div>
+  <div id="v2box" style="display:none;margin-top:7px;padding:7px;border:1px solid var(--line);border-radius:9px;font-size:12px">
+    <b>🆕 Планът на новите игри</b> <span style="color:var(--mut)">(генераторът plan2; всяка промяна го пресмята наново)</span>
+    <div class="actions" style="margin:5px 0;align-items:center">Вид <select id="v2fam"><option value="eu">Европа</option><option value="us">САЩ</option><option value="coast">крайбрежен</option><option value="radial">звезда</option></select> Размер <select id="v2size"><option value="s">S</option><option value="m">M</option><option value="l">L</option><option value="xl">XL</option></select> Радиус × <input id="v2rk" type="number" min="1" max="2.2" step="0.12" style="width:58px"></div>
+    <div class="actions"><button id="v2save">💾 Запази за новите игри</button><button id="v2drop" title="Новите игри пак ще ползват генерирания план">↺ Махни от играта</button><button id="v2reset" title="Изчисти промените в редактора">✖ Без промени</button></div>
+    <div id="v2st" style="margin-top:5px"></div>
+  </div>
 </div>
 <div id="lotBox"></div><input id="file" type="file" accept="application/json,.json" hidden>
 <script type="module">
@@ -83,13 +89,20 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { makePlan, lotAt, validatePlan } from './cityplan.js';
 import { buildPlanView, placeOnLot } from './cityplan3d.js';
+import { gamePlan2Gen, famSizeOf } from './cityplan2game.js';   // #29: v2 — планът на новите игри (генераторът plan2) с редакциите от редактора
+import { buildPlan2View } from './cityplan2-3d.js';
+import { SEASIDE } from './seaside.js';
 
 const CITIES = [['sofia@osm', 'София — истинският център (OpenStreetMap)'], ['sofia', 'София — равнина, радиални булеварди, околовръстен, планина'], ['varna', 'Варна — издължен крайбрежен град'], ['paris', 'Париж — река със завои и мостове'],
   ['newyork', 'Ню Йорк — издължен остров, правоъгълни квартали'], ['rio', 'Рио — между плажове и хълмове'], ['plovdiv', 'Пловдив — речен град'], ['ruse', 'Русе — по хеш на града'],
   ['chicago', 'Чикаго — правоъгълна мрежа'], ['washington', 'Вашингтон — мрежа с диагонални авенюта'], ['moscow', 'Москва — звезда с три пръстена'],
   ['amsterdam', 'Амстердам — полукръгли канали до залива'], ['barcelona', 'Барселона — блокове под 45° и „Диагонал“ до морето'], ['vienna', 'Виена — стар град в пръстен-булевард']];
+// v2 — генерираните планове на новите игри (както game.js → plan2GenPlan: размерът по големината на града — 3 → l, 2 → m, 1 → s); градовете по истинската карта (Рим, Париж…) не са тук
+const V2_CITIES = [['sofia', 'София', 3], ['plovdiv', 'Пловдив', 3], ['varna', 'Варна', 3], ['burgas', 'Бургас', 2], ['ruse', 'Русе', 2], ['stz', 'Стара Загора', 2], ['pleven', 'Плевен', 2], ['berlin', 'Берлин', 3], ['vienna', 'Виена', 3], ['chicago', 'Чикаго', 3], ['amsterdam', 'Амстердам', 3], ['barcelona', 'Барселона', 3]];
+const strHash = s => { let h = 2166136261; for (const c of String(s)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };   // както cityplan2game.js (seed по подразбиране)
+const v2Defaults = (id, sz) => ({ ...famSizeOf(id, { coastal: SEASIDE.includes(id), tier: sz >= 3 ? 'l' : sz === 2 ? 'm' : 's' }), seed: strHash(id), rk: 1 });
 const params = new URLSearchParams(location.search), $ = id => document.getElementById(id);
-$('city').innerHTML = CITIES.map(([id, nm]) => `<option value="${id}">${nm}</option>`).join('');
+$('city').innerHTML = `<optgroup label="🆕 Планът на новите игри (v2) — редакциите влизат в играта">` + V2_CITIES.map(([id, nm]) => `<option value="v2:${id}">${nm} — v2</option>`).join('') + `</optgroup><optgroup label="Старите шаблони (v1)">` + CITIES.map(([id, nm]) => `<option value="${id}">${nm}</option>`).join('') + `</optgroup>`;
 $('city').value = params.get('city') || 'sofia';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -115,6 +128,31 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 const miscCount = modelList.filter(m => m.group.startsWith('Други ·')).length;
 $('categoryStrip').innerHTML = [['', 'Всички'], ...groupOrder.map(c => [c, c]), ['__other', 'Други']].map(([v, label]) => `<button type="button" data-category="${esc(v)}">${esc(label)}</button>`).join('');
 let activeCategory = '';
+let V2 = null, SAVED_EDITS = {};   // V2 — { city, fam, size, seed, rk, add: [{ cls, pts }], cut: [pts] } в рамката на плана (P.toPlan); SAVED_EDITS — assets/plans/edits.json
+const v2Copy = e => e && { add: e.add.map(L => ({ cls: L.cls, pts: L.pts.map(p => [...p]) })), cut: e.cut.map(c => c.map(p => [...p])) };
+function makeP(id) {
+  if (!V2) return editablePlan(id.includes('@') ? makePlan(id.split('@')[0], { tpl: id.split('@')[1] }) : makePlan(id));
+  const gp = gamePlan2Gen(V2.city, { edit: { ...V2, roadGeo: true, jfix: true } }); return { ...editablePlan(gp), tpl: `v2 ${V2.fam}/${V2.size} ×${V2.rk}` };
+}
+function makeView() {
+  if (!V2) return buildPlanView(P, { target: controls.target, erasedTrees: erasedTreeKeys, hideTrees });
+  const W = new THREE.Group(), v = buildPlan2View(P.p2, { offset: P.offset, roadGeo: true }); W.add(v);   // планът v2 — в рамката на играта (offset), парцелите — рамки като във v1
+  const pos = []; for (const L of P.lots) { const c = Math.cos(L.rot || 0), s2 = Math.sin(L.rot || 0), cs = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => [L.x + a * L.w / 2 * c + b * L.d / 2 * s2, L.z - a * L.w / 2 * s2 + b * L.d / 2 * c]); for (let k = 0; k < 4; k++) { const p = cs[k], q = cs[(k + 1) % 4]; pos.push(p[0], 0.35, p[1], q[0], 0.35, q[1]); } }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); const le = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 })); le.name = 'lotEdges'; W.add(le);
+  W.userData.lod = cam => v.userData.lod?.(cam);   /* рисуването вика view.userData.lod(camera) */
+  return W;
+}
+// v2: всяка промяна — нов план от генератора (кръстовищата, парцелите и кварталите — наново, както ще ги види играта)
+function v2Regen(msg) {
+  const t = performance.now(); for (const o of built.values()) scene.remove(o); built.clear(); selected = null;
+  P = makeP(cityId); refreshPlanView(); renderCustomRoads(); saveDraft(); v2Status(); status(`${msg || 'Планът е пресметнат наново'} (${Math.round(performance.now() - t)} ms).`);
+}
+function v2Status() {
+  const box = $('v2box'); if (!box) return; box.style.display = V2 ? 'block' : 'none'; if (!V2) return;
+  $('v2fam').value = V2.fam; $('v2size').value = V2.size; $('v2rk').value = V2.rk;
+  const sv = SAVED_EDITS[V2.city], same = sv && JSON.stringify(v2Copy(sv)) === JSON.stringify(v2Copy(V2)) && sv.fam === V2.fam && sv.size === V2.size && sv.rk === V2.rk && sv.seed === V2.seed;
+  $('v2st').innerHTML = `Промени: <b>+${V2.add.length}</b> улици, <b>−${V2.cut.length}</b> изтрити · ${same ? '✅ записано в играта' : sv ? '✏️ има незаписани промени (в играта е по-стара версия)' : V2.add.length || V2.cut.length ? '✏️ още не е записано в играта' : 'генерираният план (без промени)'}`;
+}
 let P = null, view = null, built = new Map(), freeBuilt = new Map(), freeSeq = 0, selectedFree = null, brushScale = 1, brushRotation = 0, customRoads = [], erasedTreeKeys = new Set(), hideTrees = false, roadDrawing = [], hl = null, cityId = '', selected = null, chosen = null, edgesOn = true, sceneGen = 0, cap = 30, pending = 0, tool = 'pan', moveFrom = null;
 const undoStack = [], redoStack = [];
 const storeKey = id => `${STORE}:${id}`;
@@ -122,7 +160,7 @@ const readDraft = id => { try { return JSON.parse(localStorage.getItem(storeKey(
 const removedStreetKeys = new Set();
 const streetKey = st => JSON.stringify([st.cls, st.w, st.pts]);
 const editablePlan = base => ({ ...base, boundary: base.boundary.map(p => [...p]), streets: base.streets.map(st => ({ ...st, pts: st.pts.map(p => [...p]), L: [...st.L] })), nodes: base.nodes.map(n => ({ ...n })), edges: base.edges.map(e => ({ ...e })), lots: base.lots.map(L => ({ ...L })) });
-const saveDraft = () => { try { localStorage.setItem(storeKey(cityId), JSON.stringify({ cap, placements: Object.fromEntries([...built].map(([id, o]) => [id, o.userData.path])), freeObjects: [...freeBuilt.values()].map(o => ({ path: o.userData.path, x: o.position.x, z: o.position.z, rotation: o.rotation.y, scale: o.scale.x })), removedStreets: [...removedStreetKeys], customRoads, erasedTrees: [...erasedTreeKeys], hideTrees })); } catch { status('Не успях да запазя в браузъра. Изнеси проекта във файл.'); } };
+const saveDraft = () => { try { localStorage.setItem(storeKey(cityId), JSON.stringify({ cap, placements: Object.fromEntries([...built].map(([id, o]) => [id, o.userData.path])), freeObjects: [...freeBuilt.values()].map(o => ({ path: o.userData.path, x: o.position.x, z: o.position.z, rotation: o.rotation.y, scale: o.scale.x })), removedStreets: [...removedStreetKeys], customRoads, erasedTrees: [...erasedTreeKeys], hideTrees, v2: V2 ? { fam: V2.fam, size: V2.size, seed: V2.seed, rk: V2.rk, ...v2Copy(V2) } : undefined })); } catch { status('Не успях да запазя в браузъра. Изнеси проекта във файл.'); } };
 const status = s => { $('catalogStatus').textContent = s; };
 function placedCount() { return built.size + freeBuilt.size; }
 function count() { $('counter').textContent = `${placedCount()}/${cap}`; }
@@ -195,13 +233,14 @@ function show(id) {
   for (const o of built.values()) scene.remove(o); built.clear(); for (const o of freeBuilt.values()) scene.remove(o); freeBuilt.clear(); selectedFree = null; brushScale = 1; brushRotation = 0; updateScaleStatus(); pending = 0; selected = null; chosen = null; moveFrom = null; undoStack.length = redoStack.length = 0;
   $('thumbName').textContent = 'Избери модел за 3D преглед'; $('thumb').src = blankThumb; if (thumbObject && thumbScene) { thumbScene.remove(thumbObject); thumbObject = null; }
   cityId = id; const t = performance.now(); removedStreetKeys.clear();
-  P = editablePlan(id.includes('@') ? makePlan(id.split('@')[0], { tpl: id.split('@')[1] }) : makePlan(id));
-  const draft = readDraft(id); applyStreetRemovals(draft.removedStreets || []); customRoads = Array.isArray(draft.customRoads) ? draft.customRoads.map(s => ({ kind: s.kind || 'street', width: +s.width || 8, pts: s.pts.map(p => [...p]) })) : []; erasedTreeKeys = new Set(Array.isArray(draft.erasedTrees) ? draft.erasedTrees : []); hideTrees = !!draft.hideTrees;
-  view = buildPlanView(P, { target: controls.target, erasedTrees: erasedTreeKeys, hideTrees }); scene.add(view); renderCustomRoads(); focusPlan();
+  const draft = readDraft(id);
+  if (id.startsWith('v2:')) { const c = id.slice(3), sz = (V2_CITIES.find(x => x[0] === c) || [])[2] || 2, base = SAVED_EDITS[c] || draft.v2 || v2Defaults(c, sz), src = draft.v2 || SAVED_EDITS[c]; V2 = { city: c, fam: base.fam, size: base.size, seed: base.seed, rk: base.rk || 1, ...(v2Copy(src) || { add: [], cut: [] }) }; scene.fog.far = 2600; camera.far = 6000; } else { V2 = null; scene.fog.far = 1100; camera.far = 3000; }
+  camera.updateProjectionMatrix(); P = makeP(id); v2Status(); applyStreetRemovals(draft.removedStreets || []); customRoads = Array.isArray(draft.customRoads) ? draft.customRoads.map(s => ({ kind: s.kind || 'street', width: +s.width || 8, pts: s.pts.map(p => [...p]) })) : []; erasedTreeKeys = new Set(Array.isArray(draft.erasedTrees) ? draft.erasedTrees : []); hideTrees = !!draft.hideTrees;
+  view = makeView(); scene.add(view); renderCustomRoads(); focusPlan();
   const ms = performance.now() - t, bad = validatePlan(P), x3 = P.nodes.filter(n => n.deg >= 3).length;
   const cnt = z => P.lots.filter(L => L.zone === z).length;
   $('info').innerHTML = `Шаблон: <b>${P.tpl}</b> · улици <b>${P.streets.length + customRoads.length}</b> · кръстовища <b>${x3}</b><br>Парцели <b>${P.lots.length}</b> (център ${cnt('center')}, среден пояс ${cnt('mid')}, покрайнини ${cnt('outer')})<br>Проверка: ${bad.length ? '⚠️ ' + bad.length + ' проблема' : '✅ без застъпване'} · ${Math.round(ms)} ms`;
-  view.getObjectByName('lotEdges').visible = edgesOn;
+  { const le = view.getObjectByName('lotEdges'); if (le) le.visible = edgesOn; }
   hl = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xf5b942, transparent: true, opacity: 0.45, depthWrite: false }));
   hl.visible = false; view.add(hl); $('lotBox').style.display = 'none';
   cap = Math.max(1, Math.min(30, Number(draft.cap) || 30)); $('capacity').value = cap;
@@ -239,8 +278,8 @@ function applyStreetRemovals(keys) {
 }
 function refreshPlanView() {
   if (view) { scene.remove(view); view.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
-  view = buildPlanView(P, { target: controls.target, erasedTrees: erasedTreeKeys, hideTrees }); scene.add(view);
-  view.getObjectByName('lotEdges').visible = edgesOn;
+  view = makeView(); scene.add(view);
+  { const le = view.getObjectByName('lotEdges'); if (le) le.visible = edgesOn; }
   hl = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xf5b942, transparent: true, opacity: 0.45, depthWrite: false }));
   hl.visible = false; view.add(hl); if (selected && P.lots.includes(selected)) lotInfo(selected); else { selected = null; $('lotBox').style.display = 'none'; }
   const bad = validatePlan(P), x3 = P.nodes.filter(n => n.deg >= 3).length;
@@ -249,11 +288,12 @@ function refreshPlanView() {
 }
 function removeStreets(indices) {
   if (!indices.length) return;
-  remember(); mutateStreetRemovals(indices); refreshPlanView(); status(`Изтрити са улици: ${indices.length}.`);
+  remember(); if (V2) { V2.cut.push(...indices.map(i => P.streets[i].pts.map(p => P.toPlan(p[0], p[1])))); v2Regen(`Изтрити улици: ${indices.length}`); return; } mutateStreetRemovals(indices); refreshPlanView(); status(`Изтрити са улици: ${indices.length}.`);
 }
 function eraseRoads(streetIds, customIds, treeKeys = []) {
   if (!streetIds.length && !customIds.length && !treeKeys.length) return;
   remember();
+  if (V2) { if (!streetIds.length) return; V2.cut.push(...streetIds.map(i => P.streets[i].pts.map(p => P.toPlan(p[0], p[1])))); v2Regen(`Изтрити улици: ${streetIds.length}`); return; }   /* v2: изтриването — в редакцията, планът наново */
   if (streetIds.length) mutateStreetRemovals(streetIds);
   const gone = new Set(customIds); customRoads = customRoads.filter((_, i) => !gone.has(i));
   for (const key of treeKeys) erasedTreeKeys.add(key);
@@ -414,11 +454,15 @@ function renderCustomRoads() {
 // червени кръгове на картата и списък под „Проверка“; пуска се след всяка промяна (renderCustomRoads)
 const checkGroup = new THREE.Group(); scene.add(checkGroup);
 const checkMats = { bad: new THREE.MeshBasicMaterial({ color: 0xff3b30, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }), warn: new THREE.MeshBasicMaterial({ color: 0xffb020, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }) };
-const CHECK_TXT = { acute: 'остър ъгъл на пресичане (под 35°)', close: 'твърде близки кръстовища (под 18 м)', bend: 'тесен завой (радиус под 10 м)', lot: 'улица през парцел', dangle: 'висящ край (не стига до улица)' };
+const CHECK_TXT = { drop: 'начертаната улица не влезе в плана (остър ъгъл под 55°, по-къса от 30 м или задънена под 46 м)', part: 'начертаната улица влезе само отчасти', acute: 'остър ъгъл на пресичане (под 35°)', close: 'твърде близки кръстовища (под 18 м)', bend: 'тесен завой (радиус под 10 м)', lot: 'улица през парцел', dangle: 'висящ край (не стига до улица)' };
 function liveCheck() {
   for (const ch of [...checkGroup.children]) { checkGroup.remove(ch); ch.geometry.dispose(); }
   if (!P) return [];
   const out = [], add = (k, p, lvl = 'bad') => out.push({ k, x: p[0], z: p[1], lvl });
+  if (V2) {   // v2: генераторът сам прилага правилата (ъгъл ≥ 55°, ≥ 30 м, задънени ≥ 46 м) — проверява се коя начертана улица е оцеляла в плана
+    const R2 = P.p2.roads, near = (p, d) => R2.some(r => r.pts.some(q => Math.abs(q[0] - p[0]) < d && Math.abs(q[1] - p[1]) < d && Math.hypot(q[0] - p[0], q[1] - p[1]) < d));
+    for (const L of V2.add) { const pts = L.pts.flatMap((p, k) => { if (!k) return [p]; const a = L.pts[k - 1], d = Math.hypot(p[0] - a[0], p[1] - a[1]), m = Math.max(1, Math.ceil(d / 4)); return Array.from({ length: m }, (_, j) => [a[0] + (p[0] - a[0]) * (j + 1) / m, a[1] + (p[1] - a[1]) * (j + 1) / m]); }), n = pts.length, ok = pts.filter(p => near(p, 5)).length / n, m = pts[n >> 1], g = P.offset; if (ok < 0.6) add('drop', [m[0] + g[0], m[1] + g[1]]); else if (ok < 0.95) add('part', [m[0] + g[0], m[1] + g[1]], 'warn'); }
+  } else {
   const paths = [...customRoads.map((r, i) => ({ pts: r.pts, w: r.kind === 'boulevard' ? 20 : r.width || 8, own: i, ring: r.kind === 'circular' })), ...P.streets.map(st => ({ pts: st.pts, w: st.w, own: -1 }))];
   const xs = [];   // кръстовищата с поне една нова улица: { p, ang }
   for (let i = 0; i < customRoads.length; i++) for (let j = i + 1; j < paths.length; j++) {
@@ -444,13 +488,14 @@ function liveCheck() {
       for (let t = 0; t <= d; t += 3) for (const o of [0, w / 2 - 0.5, -(w / 2 - 0.5)]) { const x = a[0] + (b[0] - a[0]) * t / (d || 1) + nx * o, z = a[1] + (b[1] - a[1]) * t / (d || 1) + nz * o, L = lotAt(P, x, z); if (L && !hit.has(L.id) && !built.has(L.id)) { hit.add(L.id); add('lot', [L.x, L.z]); } } }
     if (r.kind !== 'circular') for (const e of [pts[0], pts.at(-1)]) { const onRoad = paths.some((q, j) => j !== i && q.pts.some((p, k) => k && distSeg(e, q.pts[k - 1], p) < q.w / 2 + 2)); if (!onRoad) add('dangle', e, 'warn'); }
   });
+  }
   for (const o of out) { const m = new THREE.Mesh(new THREE.RingGeometry(3.2, 4.6, 28).rotateX(-Math.PI / 2), checkMats[o.lvl]); m.position.set(o.x, P.heightAt(o.x, o.z) + 0.6, o.z); m.renderOrder = 5; m.userData.check = o.k; checkGroup.add(m); }
   const el = $('liveCheck'); if (el) { const by = {}; for (const o of out) by[o.k] = (by[o.k] || 0) + 1, by[o.k + ':lvl'] = o.lvl;
-    el.innerHTML = !customRoads.length ? 'Новите улици: — (начертай улица, проверката е на живо)' : !out.length ? '✅ Новите улици: без проблеми' : Object.keys(CHECK_TXT).filter(k => by[k]).map(k => `<span style="color:${by[k + ':lvl'] === 'bad' ? '#ff6b61' : '#ffc14d'}">${by[k + ':lvl'] === 'bad' ? '⛔' : '⚠️'} ${CHECK_TXT[k]}: ${by[k]}</span>`).join('<br>'); }
+    el.innerHTML = V2 ? (!V2.add.length ? 'Новите улици: — (начертай улица; генераторът я пуска през правилата си)' : !out.length ? '✅ Всички начертани улици са в плана' : Object.keys(CHECK_TXT).filter(k => by[k]).map(k => `<span style="color:${by[k + ':lvl'] === 'bad' ? '#ff6b61' : '#ffc14d'}">${by[k + ':lvl'] === 'bad' ? '⛔' : '⚠️'} ${CHECK_TXT[k]}: ${by[k]}</span>`).join('<br>')) : !customRoads.length ? 'Новите улици: — (начертай улица, проверката е на живо)' : !out.length ? '✅ Новите улици: без проблеми' : Object.keys(CHECK_TXT).filter(k => by[k]).map(k => `<span style="color:${by[k + ':lvl'] === 'bad' ? '#ff6b61' : '#ffc14d'}">${by[k + ':lvl'] === 'bad' ? '⛔' : '⚠️'} ${CHECK_TXT[k]}: ${by[k]}</span>`).join('<br>'); }
   window.__liveCheck = out; return out;
 }
 function distSeg(p, a, b) { const dx = b[0] - a[0], dz = b[1] - a[1], t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / (dx * dx + dz * dz || 1))); return Math.hypot(a[0] + dx * t - p[0], a[1] + dz * t - p[1]); }
-const snapshot = () => ({ lots: Object.fromEntries([...built].map(([id, o]) => [id, o.userData.path])), free: [...freeBuilt.values()].map(o => ({ path: o.userData.path, x: o.position.x, z: o.position.z, rotation: o.rotation.y, scale: o.scale.x })), removedStreets: [...removedStreetKeys], customRoads: customRoads.map(s => ({ kind: s.kind || 'street', width: s.width, pts: s.pts.map(p => [...p]) })), erasedTrees: [...erasedTreeKeys], hideTrees });
+const snapshot = () => ({ v2: v2Copy(V2), lots: Object.fromEntries([...built].map(([id, o]) => [id, o.userData.path])), free: [...freeBuilt.values()].map(o => ({ path: o.userData.path, x: o.position.x, z: o.position.z, rotation: o.rotation.y, scale: o.scale.x })), removedStreets: [...removedStreetKeys], customRoads: customRoads.map(s => ({ kind: s.kind || 'street', width: s.width, pts: s.pts.map(p => [...p]) })), erasedTrees: [...erasedTreeKeys], hideTrees });
 function remember() { undoStack.push(snapshot()); if (undoStack.length > 80) undoStack.shift(); redoStack.length = 0; }
 function freeObject(src, path, x, z, rotation = 0, savedScale = null) {
   const o = src.clone(true), original = new THREE.Box3().setFromObject(o), size = original.getSize(new THREE.Vector3());
@@ -516,7 +561,7 @@ function applyTool(L) {
 }
 async function restoreSnapshot(data) {
   const gen = ++sceneGen; for (const o of built.values()) scene.remove(o); built.clear(); for (const o of freeBuilt.values()) scene.remove(o); freeBuilt.clear(); pending = 0; count();
-  selected = null; selectedFree = null; P = editablePlan(cityId.includes('@') ? makePlan(cityId.split('@')[0], { tpl: cityId.split('@')[1] }) : makePlan(cityId)); applyStreetRemovals(data.removedStreets || []); customRoads = (data.customRoads || []).map(s => ({ kind: s.kind || 'street', width: +s.width || 8, pts: s.pts.map(p => [...p]) })); erasedTreeKeys = new Set(data.erasedTrees || []); hideTrees = !!data.hideTrees; refreshPlanView(); renderCustomRoads(); updateScaleStatus();
+  selected = null; selectedFree = null; if (V2 && data.v2) Object.assign(V2, v2Copy(data.v2)); P = makeP(cityId); v2Status(); applyStreetRemovals(data.removedStreets || []); customRoads = (data.customRoads || []).map(s => ({ kind: s.kind || 'street', width: +s.width || 8, pts: s.pts.map(p => [...p]) })); erasedTreeKeys = new Set(data.erasedTrees || []); hideTrees = !!data.hideTrees; refreshPlanView(); renderCustomRoads(); updateScaleStatus();
   for (const [id, path] of Object.entries(data.lots || {})) { if (gen !== sceneGen) return; const L = P.lots.find(x => x.id === +id); if (!L || !modelByPath.has(path)) continue; try { const src = await load(path); if (gen !== sceneGen) return; const o = placeOnLot(src.clone(true), L, { margin: 1.5 }); o.userData.path = path; built.set(L.id, o); scene.add(o); count(); } catch { } }
   for (const item of data.free || []) { if (gen !== sceneGen || placedCount() >= cap || !modelByPath.has(item.path)) continue; try { const src = await load(item.path); if (gen !== sceneGen) return; const o = freeObject(src, item.path, item.x, item.z, item.rotation, item.scale); freeBuilt.set(`free-${++freeSeq}`, o); scene.add(o); count(); } catch { } }
   saveDraft(); if (selected) lotInfo(selected);
@@ -528,7 +573,7 @@ $('tools').querySelectorAll('[data-tool]').forEach(b => b.onclick = () => setToo
 $('undo').onclick = undo; $('redo').onclick = redo;
 $('scaleDown').onclick = () => adjustFreeModel('scale', 1 / 1.2); $('scaleUp').onclick = () => adjustFreeModel('scale', 1.2);
 $('rotateLeft').onclick = () => adjustFreeModel('rotate', -1); $('rotateRight').onclick = () => adjustFreeModel('rotate', 1);
-$('edges').onclick = () => { edgesOn = !edgesOn; if (view) view.getObjectByName('lotEdges').visible = edgesOn; $('edges').classList.toggle('on', edgesOn); };
+$('edges').onclick = () => { edgesOn = !edgesOn; const le = view && view.getObjectByName('lotEdges'); if (le) le.visible = edgesOn; $('edges').classList.toggle('on', edgesOn); };
 $('fit').onclick = focusPlan;
 $('capacity').onchange = () => { const n = Math.max(placedCount() + pending, Math.min(30, Math.max(1, +$('capacity').value || 30))); cap = n; $('capacity').value = cap; count(); saveDraft(); };
 $('clear').onclick = () => {
@@ -601,6 +646,7 @@ function finishRoad() {
   const length = roadDrawing.slice(1).reduce((sum, p, i) => sum + Math.hypot(p[0] - roadDrawing[i][0], p[1] - roadDrawing[i][1]), 0);
   if (length >= 3) {
     const type = $('roadWidth').value, kind = type === 'boulevard' ? 'boulevard' : type === 'circular' ? 'circular' : 'street', width = kind === 'boulevard' || kind === 'circular' ? 8 : +type || 8, pts = kind === 'circular' ? circularRoadPath(roadDrawing) : smoothRoadPath(roadDrawing);
+    if (V2) { remember(); V2.add.push({ cls: kind === 'boulevard' ? 'blvd' : kind === 'circular' ? 'ring' : 'street', pts: pts.map(p => P.toPlan(p[0], p[1])) }); v2Regen(kind === 'boulevard' ? 'Булевардът е добавен' : kind === 'circular' ? 'Кръговата улица е добавена' : 'Улицата е добавена'); roadDrawing = []; return; }
     remember(); customRoads.push({ kind, width, pts }); renderCustomRoads(); saveDraft(); status(kind === 'boulevard' ? 'Булевардът с разделително островче е добавен.' : kind === 'circular' ? 'Кръговата улица е добавена.' : 'Улицата е изгладена и добавена. Кръстовищата се оформят автоматично.');
   }
   roadDrawing = [];
@@ -649,8 +695,16 @@ addEventListener('keydown', e => {
   else if (key === 'y') { e.preventDefault(); redo(); }
 });
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+// v2: параметрите и записът в играта (labserver.mjs → /__lab/plan-edit → assets/plans/edits.json)
+const loadSaved = () => fetch('assets/plans/edits.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : {}).catch(() => ({})).then(d => { SAVED_EDITS = d || {}; });
+for (const k of ['v2fam', 'v2size', 'v2rk']) $(k).onchange = () => { if (!V2) return; remember(); V2.fam = $('v2fam').value; V2.size = $('v2size').value; V2.rk = Math.max(1, Math.min(2.2, +$('v2rk').value || 1)); v2Regen('Друг вид/размер'); focusPlan(); };
+const postEdit = edit => fetch('/__lab/plan-edit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ city: V2.city, edit }) }).then(r => r.json());
+$('v2save').onclick = async () => { if (!V2) return; const r = await postEdit({ fam: V2.fam, size: V2.size, seed: V2.seed, rk: V2.rk, roadGeo: true, jfix: true, ...v2Copy(V2) }).catch(e => ({ ok: false, error: String(e) })); await loadSaved(); v2Status(); status(r.ok ? `💾 Записано: новите игри в ${V2.city} ще ползват този план (флаг plan-edit; старите записи — без промяна).` : `Не успях да запиша: ${r.error || '?'} (рестартирай Лабораторията, ако е стара).`); };
+$('v2drop').onclick = async () => { if (!V2) return; const r = await postEdit(null).catch(e => ({ ok: false, error: String(e) })); await loadSaved(); v2Status(); status(r.ok ? 'Махнато: новите игри пак ще ползват генерирания план.' : `Не успях: ${r.error || '?'}`); };
+$('v2reset').onclick = () => { if (!V2 || (!V2.add.length && !V2.cut.length)) return; remember(); V2.add = []; V2.cut = []; v2Regen('Без промени'); };
+await loadSaved();
 show($('city').value);
-window.__plan = { get P() { return P; }, built, camera, controls, show, renderer, scene, placeModel, removeModel };
+window.__plan = { get P() { return P; }, get V2() { return V2; }, v2Regen, liveCheck, built, camera, controls, show, renderer, scene, placeModel, removeModel };
 renderer.setAnimationLoop(() => { controls.update(); view?.userData.lod(camera); renderer.render(scene, camera); });
 </script>
 </body>
