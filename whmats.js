@@ -128,21 +128,35 @@ function iconFade(s, near, base, tier, ln) {
 }
 
 // дворът: items = [{ m, q, cap, unit, col }]
+// подредба в зададена площ [ширина, дълбочина]: редове отзад напред; ако не се побира — целият двор се смалява (един мащаб, до 0,5)
+const FOOT = { steel: [6.0, 2.2], glass: [2.4, 1.1], sand: [2.2, 2.2], gravel: [2.2, 2.2], bricks: [2.1, 1.0], concrete: [2.2, 1.0], wood: [2.3, 1.6], furniture: [1.9, 1.8], marble: [1.8, 1.1] };
+function areaLayout(w, d) {
+  const ids = Object.keys(FOOT); let best = null;
+  for (let k = 1; k >= 0.5 && !best; k -= 0.05) { const W = w / k, D = d / k, rows = [[]]; let x = 0;
+    for (const m of ids) { const fw = FOOT[m][0]; if (x + fw > W && rows[rows.length - 1].length) { rows.push([]); x = 0; } rows[rows.length - 1].push(m); x += fw + 0.35; }
+    const dep = rows.map(r => Math.max(...r.map(m => FOOT[m][1]))), tot = dep.reduce((a, b) => a + b, 0) + 0.3 * (rows.length - 1);
+    if ((tot <= D && rows.every(r => r.reduce((a, m) => a + FOOT[m][0] + 0.35, -0.35) <= W)) || k < 0.53) best = { k, rows, dep, tot }; }
+  const S2 = {}; let z = -best.tot / 2;
+  best.rows.forEach((r, ri) => { let x = -r.reduce((a, m) => a + FOOT[m][0] + 0.35, -0.35) / 2; z += best.dep[ri] / 2;
+    r.forEach((m, j) => { S2[m] = [x + FOOT[m][0] / 2, z, (best.rows.length - 1 - ri) * 2 + j % 2]; x += FOOT[m][0] + 0.35; }); z += best.dep[ri] / 2 + 0.3; });
+  return { k: best.k, slot: S2 };
+}
 export function whMatsYard(y, items, mode = whMatsMode()) {
   for (const t of y.userData.whmTex || []) { t.map && t.map.dispose(); t.dispose(); }
   y.userData.whmTex = [];
   while (y.children.length) y.remove(y.children[0]);
+  const ar = y.userData.area, L = ar ? areaLayout(ar[0], ar[1]) : null; y.scale.setScalar(L ? L.k : 1);   // campus2: площта на ивицата пред склада
   const ic = []; let top = 0, ti = 0;
   for (const it of items) {
-    const f = Math.min(1, it.q / Math.max(1, it.cap)), n = Math.ceil(f * 4), sl = SLOT[it.m] || [0, 0];
+    const f = Math.min(1, it.q / Math.max(1, it.cap)), n = Math.ceil(f * 4), sl = (L ? L.slot : SLOT)[it.m] || [0, 0];
     if (n > 0) { const p = mode === 'icons' ? cubes(n, it.col) : pileFor(it.m, n, f, it.col); p.updateMatrixWorld(true); ti = new THREE.Box3().setFromObject(p).max.y; top = Math.max(top, ti); p.position.set(sl[0], 0, sl[1]); y.add(p); }   // връх — преди да влезе в двора (локално)
     else ti = 0;
     if (mode !== 'models') ic.push([it, f, sl, ti]);
   }
   const rows = {}; ic.sort((a, b) => a[2][0] - b[2][0]);
-  for (const [it, f, sl, t0] of ic) { const back = sl[1] < 1, k = rows[back] = (rows[back] ?? -1) + 1;
+  for (const [it, f, sl, t0] of ic) { const back = sl[1] < 1, k = rows[back] = (rows[back] ?? -1) + 1, tier = sl.length > 2 ? sl[2] : (back ? 2 : 0) + k % 2;
     const s = iconSprite(it.m, it.q, f, it.unit); s.position.set(sl[0], top + 0.8, sl[1]); s.scale.set(1.5, 1.75, 1);
     const lg = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([sl[0], t0 + 0.05, sl[1], sl[0], top + 0.8, sl[1]], 3)), ln = new THREE.Line(lg, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, fog: false }));
     ln.renderOrder = 10; ln.frustumCulled = false; y.add(ln); y.userData.whmTex.push(lg, ln.material);
-    iconFade(s, mode === 'both', top + 0.8, (back ? 2 : 0) + k % 2, ln); y.add(s); y.userData.whmTex.push(s.material); }
+    iconFade(s, mode === 'both', top + 0.8, tier, ln); y.add(s); y.userData.whmTex.push(s.material); }
 }

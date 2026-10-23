@@ -187,6 +187,7 @@ const DEMOS = [
   ['🏘️ Празните квартали: чужди сгради по парцелите и вътре в кварталите (Пловдив — отгоре, отблизо, нощ)', 'plovdiv', d => { setTimeout(() => d.bgLook(false, true), 3000); setTimeout(() => d.bgLook(false), 10000); setTimeout(() => d.bgLook(true), 17000); }],   // bg-fill
   ['🏨 5★ хотел в града — офисът става истинският модел (Пловдив → Острив)', 'plovdiv', d => { setTimeout(() => d.hotel5City(2), 1500); }],   // hotel5-*
   ['🏨 Гранд хотел в Ню Йорк — Мариот', 'newyork', d => { setTimeout(() => d.hotel5City(3), 1500); }],   // hotel5-*
+  ['📦 Складът в общия парцел (campus2, ниво 6): купчините на ивицата пред склада, плацът с техниката отпред — отблизо, отдалеч, нощ', 'plovdiv', d => { setTimeout(() => d.whMatsCampus(6, 'both', 11, 26), 2500); setTimeout(() => d.whMatsCampus(6, 'both', 11, 70), 8000); setTimeout(() => d.whMatsCampus(6, 'both', 22, 26), 13000); }],   // wh-mats
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

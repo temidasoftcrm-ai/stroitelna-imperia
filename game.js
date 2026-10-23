@@ -1733,6 +1733,9 @@ function buildWarehouse() {
   const lb = label(`📦 СКЛАД ${S.whLevel}`, '#ffffff', 6.5);
   lb.position.set(0, wh.userData.h * wh.scale.y + 2, camp ? 0 : -4); g.add(lb); g.userData.label = lb;
   city.whYard = new THREE.Group(); city.whYard.position.set(0, 0, 4); city.whYard.visible = !camp; g.add(city.whYard);   // в кампуса — без двора с палетите (беше отпред, върху офиса)
+  if (wr && feature('wh-mats')) { const hw = (wr.x1 - wr.x0) / 2, hd = (wr.z1 - wr.z0) / 2, ry = g.rotation.y; g.rotation.y = 0; g.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(wh); g.rotation.y = ry; g.updateMatrixWorld(true);   // 📦 wh-mats: общият парцел — складът отива в дъното на правоъгълника си, купчините — отпред (плацът с техниката не се пипа)
+    wh.position.z += -hd - (b.min.z - g.position.z); const z0 = b.max.z - g.position.z + (-hd - (b.min.z - g.position.z)) + 0.6, dd = hd - z0 - 0.2;
+    if (dd >= 2.4) { city.whYard.position.set(0, 0, z0 + dd / 2); city.whYard.visible = true; city.whYard.userData.area = [2 * hw - 0.4, dd]; } }
   refreshWarehouse();
 }
 // офисът и (докато е малък) гаражът стоят на парцела на централата; голямият гараж и складът — на свои парцели
@@ -11382,6 +11385,28 @@ if (AUTOTEST) {
       return { ...railx.count(), at: L.map(x => Math.round(x.z)), end: Z }; },
     railState() { return railx ? railx.list().map(x => [Math.round(x.z), x.on]).concat([passing ? passing.trainsAt().map(t => [Math.round(t.z), Math.round(t.v)]) : []]) : null; },
     tunnelLook(s = 1) { showMap(false); this.tod(0.2); const Z = railEnd() || 600; this.camAt(STATION_X + 45, 28, s * (Z - 70), STATION_X - 6, 0, s * Z); return Z; },
+    // 🏢 (тест) campus2Force(lv, { hotel }) — ВИНАГИ образува общия парцел в текущия град (план v2): съседите на централата по същата улица
+    // (същото правило като campusPlot, без условието „свободен“) се изчистват — сградата, обявата/офертата, чуждият строеж; после нивата,
+    // централата и складът наново. hotel: true — хотелът в града става 5★ (S.hotels[град].t = 2 → hotel5Of, моделът се зарежда и buildHQ пак)
+    campus2Force(lv = 5, o = {}) {
+      const h = city.hq; if (!h || !h.plan) return { err: 'централата не е на парцел от плана (стар град с решетка)' };
+      const r = lotRot(h), c = Math.cos(r), sn = Math.sin(r), [W, D] = lotHalf(h), loc = l => { const dx = l.x - h.x, dz = l.z - h.z; return [dx * c - dz * sn, dx * sn + dz * c]; };
+      const near = city.lots.filter(l => l !== h && l.plan && Math.abs(Math.atan2(Math.sin(lotRot(l) - r), Math.cos(lotRot(l) - r))) < 0.06).map(l => { const [u, v] = loc(l); return { l, u, v }; })
+        .filter(q => Math.abs(q.v) < 2.5 && Math.abs(Math.abs(q.u) - (W + lotHalf(q.l)[0])) < 3 && !q.l.big && !q.l.lm && !(S.projects || []).some(p => p.lot === q.l.id));
+      const pick = [1, -1].map(s0 => near.find(q => Math.sign(q.u) === s0)).filter(Boolean), mine = new Set([S.garageLot, S.whLot].filter(v => v != null)), E = S.estate || {};
+      if (!pick.length) return { err: 'няма съседен парцел по същата улица', hq: h.id, hqWD: [+(2 * W).toFixed(1), +(2 * D).toFixed(1)], close: city.lots.filter(l => l !== h && Math.hypot(l.x - h.x, l.z - h.z) < 3 * W + 20).slice(0, 8).map(l => { const [u, v] = loc(l); return { id: l.id, u: +u.toFixed(1), v: +v.toFixed(1), drot: +(lotRot(l) - r).toFixed(2), plan: !!l.plan, busy: l.busy, built: !!l.built }; }) };
+      const cleared = [];
+      for (const { l } of pick) { if (mine.has(l.id)) continue;
+        if (l.obj) { city.group.remove(l.obj); l.obj = null; } if (l.built || l.busy) cleared.push({ id: l.id, built: l.built || null, busy: l.busy || null }); l.built = null; l.busy = null; l.reno = false;
+        const not = x => x !== l.id, notLot = x => x.lot !== l.id;
+        S.built = (S.built || []).filter(notLot); S.offers = (S.offers || []).filter(notLot); S.cash = (S.cash || []).filter(notLot); S.cleared = (S.cleared || []).filter(not); S.parks = (S.parks || []).filter(not);
+        if (E.land) E.land = E.land.filter(not); if (E.owned) E.owned = E.owned.filter(notLot); if (E.listings) E.listings = E.listings.filter(notLot); if (S.rivals && S.rivals.sites) S.rivals.sites = S.rivals.sites.filter(notLot); }
+      S.officeLevel = lv; S.garageLevel = Math.min(10, Math.max(GARAGE_LOT_FROM, lv)); S.whLevel = Math.max(1, Math.min(10, lv));
+      if (o.hotel) S.hotels = { ...(S.hotels || {}), [S.cityId]: { ...((S.hotels || {})[S.cityId] || {}), t: 2 } };
+      city.campusPlot = undefined; const P = campusPlot(); buildHQ(); buildWarehouse(); if (city.planView && city.planView.userData.refill) city.planView.userData.refill();
+      const sz = q => q && [+(q.x1 - q.x0).toFixed(1), +(q.z1 - q.z0).toFixed(1)];
+      return P ? { city: S.cityId, hq: h.id, lots: P.lots, cleared, gar: S.garageLot, wh: S.whLot, office: sz(P.office), garage: sz(P.garage), whRect: sz(P.wh), yard: (P.yard || []).map(sz), all: sz(P.all), hotel5: o.hotel ? hotel5Of(S.cityId) || 'зарежда се…' : null } : { err: 'campusPlot() = null (флагът campus2?)' };
+    },
     // 🏢 Лабораторията (campus2): общият парцел на фирмата при ниво lv (офис, гараж, склад)
     campus2Look(lv = 5) { S.officeLevel = lv; S.garageLevel = Math.min(10, Math.max(1, lv)); S.whLevel = Math.max(1, Math.min(10, lv)); if (S.whLot == null) S.whLot = city.hq.id;
       city.campusPlot = undefined; buildHQ(); showMap(false); this.tod(0.2); const h = city.hq, P = campusPlot(), r = lotRot(h), cx = P ? (P.all.x0 + P.all.x1) / 2 : 0, c = lotPt(h, cx, 0);
@@ -11395,6 +11420,13 @@ if (AUTOTEST) {
       buildWarehouse(); showMap(false); $('panel').classList.add('hidden'); this.time(h); const y = city.whYard; if (!y) return 'няма склад'; y.updateMatrixWorld(true);
       const p = focus && WHM_SLOT[focus] ? y.localToWorld(new THREE.Vector3(WHM_SLOT[focus][0], 0, WHM_SLOT[focus][1])) : y.getWorldPosition(new THREE.Vector3()), r = lotRot(city.lots[S.whLot] || city.hq), sx = Math.sin(r), cz = Math.cos(r);
       this.camAt(p.x + sx * d + cz * d * a, d * 0.7, p.z + cz * d - sx * d * a, p.x, 1, p.z); return { mode, camp: campusIn('warehouse'), yard: y.visible, kids: y.children.length, lot: S.whLot, sizes: whMatsInfo() }; },
+    // 📦 Лабораторията (wh-mats): общият парцел (campus2) — купчините на ивицата пред склада, плацът с техниката отпред
+    whMatsCampus(lv = 6, mode = 'both', h = 11, d = 26, a = 2.5) { try { localStorage.setItem('whMatsMode', mode); } catch (e) { }
+      const fr = [0.9, 0.6, 0.35, 1, 0.75, 0.5, 0.8, 0.25, 0.65]; this.campus2Look(lv); Object.keys(ECON.MATERIALS).forEach((m, i) => { econ.s.stock[m] = Math.round(matCap(m) * fr[i % fr.length] * 10) / 10; });
+      buildWarehouse(); $('panel').classList.add('hidden'); this.time(h); const y = city.whYard, P = campusPlot(); if (!y) return 'няма склад'; y.updateMatrixWorld(true);
+      const p = y.getWorldPosition(new THREE.Vector3()), r = lotRot(city.hq), sx = Math.sin(r), cz = Math.cos(r);
+      this.camAt(p.x + (sx + cz * a) * d * 0.3, d * 1.5, p.z + (cz - sx * a) * d * 0.3, p.x, 1, p.z);   /* стръмно отгоре — над съседните сгради */ const g = city.whGroup, ry = g.rotation.y; g.rotation.y = 0; g.updateMatrixWorld(true); const wb = new THREE.Box3().setFromObject(g.children.find(c => c.userData.h != null)); g.rotation.y = ry; g.updateMatrixWorld(true);
+      return { camp: campusIn('warehouse'), area: y.userData.area, wr: P && P.wh, whZ: [+(wb.min.z - g.position.z).toFixed(1), +(wb.max.z - g.position.z).toFixed(1)], whX: +(wb.max.x - wb.min.x).toFixed(1), k: y.scale.x, vis: y.visible, kids: y.children.length }; },
     whRow() { if (city.whRowG) city.group.remove(city.whRowG); const g = city.whRowG = new THREE.Group(), z0 = tx(NJ - 1) + 60; let x = tx(0);
       for (let lv = 1; lv <= 10; lv++) { const n = wh2Mesh(lv), o = warehouseMesh(lv, true), w = n ? new THREE.Box3().setFromObject(n).getSize(new THREE.Vector3()).x : 12;
         o.position.set(x + w / 2, 0, z0); n && n.position.set(x + w / 2, 0, z0 + 40); g.add(o); if (n) g.add(n);
