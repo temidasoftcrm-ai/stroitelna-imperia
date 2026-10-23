@@ -5022,16 +5022,12 @@ const topSetRows = () => { const C = topSetCounts(), tap = id => () => { const b
     { ico: () => txt('btnSound') || '🔊', nm: () => txt('btnSound') === '🔇' ? 'Звук: изключен' : 'Звук: включен', fn: tap('btnSound'), keep: true, on: !!$('btnSound') },
     { ico: () => txt('btnNotif') || '🔔', nm: () => ((document.getElementById('btnNotif') || {}).title || 'Известия').replace(/ — натисни за смяна$/, ''), fn: tap('btnNotif'), keep: true, on: !!document.getElementById('btnNotif') },
     { ico: () => '❓', nm: () => 'Помощ — обиколка на бутоните', fn: tap('btnTour'), on: !!document.getElementById('btnTour') },
-    { ico: () => '📋', nm: () => `Задачи${C.t ? ` · <b style="color:#ffd54a">${C.t}</b> чакат` : ''}`, fn: tap('btnTasks'), on: !!document.getElementById('btnTasks') },
-    { ico: () => '🎯', nm: () => `Куести${C.q ? ` · <b style="color:#4cd07d">${C.q}</b> за награда` : ''}`, fn: tap('qBtn'), on: !!document.getElementById('qBtn') },
     { ico: () => '💡', nm: () => 'Съвет — как да печелиш и да не фалираш', fn: tap('btnTips'), on: !!document.getElementById('btnTips') },
   ].filter(r => r.on); };
 if (feature('top-set')) {
   document.body.classList.add('topSet');
-  document.head.appendChild(Object.assign(document.createElement('style'), { textContent: 'body.topSet #btnSound, body.topSet #btnNotif, body.topSet #btnTour, body.topSet #btnTasks, body.topSet #btnTips { display:none !important; } body.mob.topSet #topRow2 > #btnSettings { order:-1; } #btnSettings { position:relative; } #btnSettings .setB { position:absolute; top:-6px; right:-6px; min-width:18px; height:18px; padding:0 4px; box-sizing:border-box; border-radius:9px; background:#ffd54a; color:#1a1200; font-size:11px; font-weight:900; display:flex; align-items:center; justify-content:center; pointer-events:none; }' }));
-  setInterval(() => { const b = document.getElementById('btnSettings'); if (!b) return; const n = topSetCounts().total; let e = b.querySelector('.setB');
-    if (n && !e) { e = document.createElement('span'); e.className = 'setB'; b.appendChild(e); } if (e) { if (n) e.textContent = n > 99 ? '99+' : n; else e.remove(); }
-    b.title = n ? `Настройки — ${n} задачи/награди чакат` : 'Настройки: звук, известия, помощ, задачи, съвети, вход, записи'; }, 1000);
+  document.head.appendChild(Object.assign(document.createElement('style'), { textContent: 'body.topSet #btnSound, body.topSet #btnNotif, body.topSet #btnTour, body.topSet #btnTips { display:none !important; } body.mob.topSet #topRow2 > #btnSettings { order:-1; } #btnSettings { position:relative; } #btnSettings .setB { position:absolute; top:-6px; right:-6px; min-width:18px; height:18px; padding:0 4px; box-sizing:border-box; border-radius:9px; background:#ffd54a; color:#1a1200; font-size:11px; font-weight:900; display:flex; align-items:center; justify-content:center; pointer-events:none; }' }));
+  // 24.10: 📋 Задачи — пак горе (със своя брояч), 🎯 Куести — в менюто „Империята“; на ⚙️ вече няма брояч
 }
 const openSettingsUI = () => window.__settings ? window.__settings({ quick: feature('top-set') ? topSetRows : null, credits: showCredits, saves: openSavesUI, rename: S && S.brand ? renameBrand : null, newGame: () => modal('Нова игра?', 'Сегашната фирма ще бъде изтрита.', [['Отказ', null], ['Изтрий и започни', wipeSlot]]), lock: () => { save(); saveLock = true; } })
   : modal('⚙️ Още', 'Авторите на моделите и музиката · или започни нова игра в този слот.', [['Затвори', null], ['📜 Автори', showCredits], ['🗑️ Нова игра', () => modal('Нова игра?', 'Сегашната фирма ще бъде изтрита.', [['Отказ', null], ['Изтрий и започни', wipeSlot]])]]);
