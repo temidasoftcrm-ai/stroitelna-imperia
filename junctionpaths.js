@@ -47,7 +47,7 @@ export function makeRouter(built) {
     if (A.p === B.p && s1 >= s0) return { paths: [A.p], s0, s1, len: s1 - s0 };
     if (o.anyLane && A.p.sibs && A.p.sibs.includes(B.p) && s1 >= s0) return { paths: [B.p], s0, s1, len: s1 - s0 };
     // купчина с [разстояние, пътека, цел?]: целта е отделен запис (до s1 на последната лента), за да може и „назад по същата лента“ (обиколка)
-    const seeds = o.anyLane && A.p.sibs ? A.p.sibs : [A.p], dist = new Map(seeds.map(q => [q, q.len - s0])), prev = new Map(), heap = seeds.map(q => [q.len - s0, q, false]);   /* anyLane: от която и да е успоредна лента (новият агент избира лентата) */
+    const seeds = (o.anyLane || o.anyFrom) && A.p.sibs ? A.p.sibs : [A.p], dist = new Map(seeds.map(q => [q, q.len - s0])), prev = new Map(), heap = seeds.map(q => [q.len - s0, q, false]);   /* anyLane: от която и да е успоредна лента (новият агент избира лентата) */
     const push = e => { heap.push(e); let k = heap.length - 1; while (k) { const q = (k - 1) >> 1; if (heap[q][0] <= heap[k][0]) break; [heap[q], heap[k]] = [heap[k], heap[q]]; k = q; } };
     const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
     let goalPrev = null, goalLane = B.p; const goals = gS;

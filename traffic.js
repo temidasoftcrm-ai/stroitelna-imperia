@@ -136,6 +136,8 @@ export function createTraffic(opts) {
   // собствен генератор (seed) — симулацията не зависи от чуждите Math.random (three.js, интерфейса): еднаква при 1× и 4×
   let seed = (opts.seed || 1) >>> 0;
   const rnd = () => { seed = (seed + 0x6D2B79F5) >>> 0; let t = seed; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  { const SG = new Map(); for (const L of lanes) if (L.kind === 'lane' && L.edge && L.from != null && L.ring == null && !L.sibs) { const k = (L.edge.id ?? '') + ':' + L.from + '>' + L.to; (SG.get(k) || SG.set(k, []).get(k)).push(L); }   // успоредните ленти (sibs) — за смяната на лента (laneTo) и маршрута от която и да е (anyFrom)
+    for (const g of SG.values()) if (g.length > 1) { g.sort((a, b) => (a.laneI || 0) - (b.laneI || 0)); for (const L of g) L.sibs = g; } }
   const cars = [], tmp = {}, jp = !!opts.jp;   // jp — флагът junction-paths: посоката по хордата (без потрепване), забавяне преди завой, зоната до излизане на задницата, агенти
   let nAg = 0;
   // таван: ~30% от местата по лентите (иначе на късите улици между кръстовищата решетката се задръства)
@@ -373,6 +375,9 @@ export function createTraffic(opts) {
     },
     clear() { if (POOL) { opts.scene.remove(POOL); POOL.geometry.dispose(); POOL.material.map.dispose(); POOL.material.dispose(); POOL.dispose(); POOL = null; } for (const sp of spots) { opts.scene.remove(sp); opts.scene.remove(sp.target); sp.dispose(); } spots.length = 0; for (const c of cars) drop({ obj: c.obj, remove: c.rm }); cars.length = 0; if (LI) { LI.clear(); LI = null; } for (const l of lanes) l.cars.length = 0; for (const n of nodes.values()) for (const c of n.conns) c.cars.length = 0; },
     // светофарите: [{ node, x, z, arms: sigArms }] — за всички кръстовища със светофар (или само nodeId)
+    // смяна на лента на агента (автобусът тръгва от спирката): същото s на успоредната лента, ако е свободно; рисуването — плавно (c.off → 0)
+    laneTo(c, L2) { if (c.p === L2) return true; if (!c.p.sibs || !c.p.sibs.includes(L2) || c.p.kind !== 'lane') return false; const s = Math.min(c.s, L2.len); if (!L2.cars.every(o => Math.abs(o.s - s) > (o.L + c.L) / 2 + 2)) return false;
+      const a = at(c.p, c.s, {}), b = at(L2, s, {}); remove(c.p, c); c.p = L2; c.s = s; insert(L2, c); c.next = null; c.off = (c.off || 0) + ((a.x - b.x) * -Math.cos(c.yaw) + (a.z - b.z) * Math.sin(c.yaw)); return true; },
     police(nodeId, on) { const n = nodes.get(nodeId); if (n) n.pol = on ? { arm: null, t: 0 } : null; return !!n; },   // #28: полицай на кръстовището
     jams: () => [...nodes.values()].filter(n => n.jamT > 0 || n.pol).map(n => ({ node: n.id, t: n.jamT || 0, pol: n.pol ? n.pol.arm : undefined })),
     signals: nodeId => [...nodes.values()].filter(n => n.sig && (nodeId == null || n.id === nodeId)).map(n => ({ node: n.id, x: n.x, z: n.z, arms: sigArms(n) })),

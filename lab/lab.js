@@ -177,6 +177,7 @@ const DEMOS = [
   ['📦 Складовете 1–10 на свой парцел — в истински размер, в парцела (през 3 s следващото ниво)', 'plovdiv', d => { let lv = 1; const t = () => { d.whFitLook(lv); if (++lv <= 10) setTimeout(t, 3000); }; t(); }],   // real-sizes (№18)
   ['🏛️ Котелническа висотка — на брега, не в реката (Москва)', 'moscow', d => { const go = () => { const L = d.city().landmarks, i = L.findIndex(o => o.kind === 'kotel'); if (i >= 0) d.lookLm(i, 220); }; setTimeout(go, 3000); }],   // kotel-shore
   ['🎬 Филиал в Ню Йорк → влизаш в града и тръгва клипът (веднъж)', 'plovdiv', d => { setTimeout(() => d.branchClipTest('newyork'), 1500); }],   // branch-clip
+  ['🚌 Градски автобус със спирки: линия по булевардите, навес и табела на тротоара, автобусът спира ~12 s (София; камерата на спирката)', 'sofia', d => setTimeout(() => d.busLook(), 6000)],   // city-bus (#15)
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
