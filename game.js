@@ -77,7 +77,7 @@ import { syncImpCivic, updateImpCivic } from './impcivic.js';   // общест�
 import { pickModel as impPick, decor as impDecor, IMP_MODELS, IMP_H } from './impstyle.js';
 import { createNeom, NEOM_CITY, NEOM_ID, DISTRICTS as NEOM_DISTRICTS, FOUND_COST as NEOM_FOUND } from './neom.js';
 import { buildSite3D } from './mine3d.js';
-import { LANDMARK_NM, CITY_LANDMARKS, LANDMARK_CENTER, BIG_LANDMARKS, SEA_LANDMARKS, buildLandmark, buildSeaLandmark, manhattanTowers, lmFit, lmH, hasLandmark } from './landmarks.js';
+import { LANDMARK_NM, CITY_LANDMARKS, LANDMARK_CENTER, BIG_LANDMARKS, SEA_LANDMARKS, buildLandmark, buildSeaLandmark, manhattanTowers, lmFit, lmH, hasLandmark, setLmTrees } from './landmarks.js';
 import { OFFICE_STYLES, STYLE_LV, STYLE_COST, buildOfficeTower } from './officestyle.js';
 import { shipRange, PORT_LEVELS, portMax, SHIPS, seaKm, seaPath, SEA_ROUTE_COST, voyagePay, shipDaily, SEA_LV } from './seaways.js';
 import { makeTrackMap, placeCars } from './trackpath.js';
@@ -606,6 +606,7 @@ function splitTrees(scene, { trunksOnly = false, glow = 0x2c3a24, plain = false 
 const PALM_CITIES = new Set(['lasvegas', 'losangeles', 'phoenix', 'miami', 'sandiego', 'honolulu']);
 const treePools = {}; let treeN = 0;
 // 🌳 истинските дървета и за градовете по новия план (паркове, булеварди, острови) — както в старите (niceTree)
+setLmTrees(() => plan2Trees());   // trees-more: дърветата в забележителностите (пирамидите, островът на Статуята, операта)
 const plan2Trees = () => { if (!feature('trees-real')) return null; const palm = !!S && (PALM_CITIES.has(S.cityId) || isDesert(S.cityId)), ks = Object.keys(A).filter(k => palm ? k.startsWith('sf-palm-') : k.startsWith('sf-tree-')); return ks.length ? ks.map(k => A[k].scene) : null; };
 function niceTree(n, scale) {
   const palm = !!S && (PALM_CITIES.has(S.cityId) || isDesert(S.cityId)), key = palm ? 'palm' : 'tree';
@@ -4547,7 +4548,7 @@ function campCard() {
 }
 // градът стои в избраната държава (координати и флаг; без флага на Саудитска Арабия няма пустиня)
 function impPlace() { const C = IMP_CC[S?.imp?.cc], c = C && cityById(NEOM_ID); if (!c || (c.lat === C.lat && c.cc === C.cc)) return; Object.assign(c, { lat: C.lat, lon: C.lon, cc: C.cc }); isoCitiesC.clear(); fixSeaSpurs(true); }   // пътната му връзка към старото място (напр. Гиза) — пренасочена в новата държава
-function impLook() { if (S.cityId !== NEOM_ID || !city.group || !S.imp?.cc) return; impPlace(); impDecor(city.group, S.imp.cc, city, { winter: seasonOf(S.day) === 'winter' }); impCiv3D(); }
+function impLook() { if (S.cityId !== NEOM_ID || !city.group || !S.imp?.cc) return; impPlace(); impDecor(city.group, S.imp.cc, city, { winter: seasonOf(S.day) === 'winter', trees: Object.fromEntries(['tree', 'pine', 'pinesnow', 'palm'].map(k => [k === 'tree' ? 'leaf' : k, Object.keys(A).filter(n => n.startsWith('sf-' + k + '-')).map(n => A[n].scene)])) }); impCiv3D(); }
 // 🏥 обществените сгради (imperial.js S.imp.b) на свободни парцели във външния пояс — при влизане и всеки ден (строежът расте)
 function impCiv3D() { if (S.cityId !== NEOM_ID || !city.group || !S.imp?.cc) return; syncImpCivic(city, { imp: S.imp, cc: S.imp.cc, side: 2 * TILE - 2, builders: { civic: buildCivic, hospital: buildHospital, metro: buildMetro }, deps: { label, model: (n, k) => A[n] ? model(n, k) : null } }); }
 // 🛢️ петролната империя (oil.js): танкова ферма, световна цена, договори с танкери, бензиностанции
@@ -6333,7 +6334,7 @@ function refreshLandmarks() {
   for (const o of city.landmarks || []) if (!o.big) city.group.remove(o.group);
   city.landmarks = [...(city.bigLm || [])];   // големите (МГУ…) живеят в refreshMines3D
   if (city.sea?.port) (SEA_LANDMARKS[S.cityId] || []).forEach((k, i) => {   // в морето пред града (Статуята на свободата)
-    const o = buildSeaLandmark(k, { label }), p = city.sea.port, x0 = tx(0);
+    const o = buildSeaLandmark(k, { label, trees: plan2Trees() }), p = city.sea.port, x0 = tx(0);
     o.group.position.set(x0 + (p.xMax - x0) * (0.28 + i * 0.2), 0, p.z - 75); o.group.rotation.y = Math.PI;
     city.group.add(o.group); city.landmarks.push(o);
   });

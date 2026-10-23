@@ -687,7 +687,7 @@ function pyramids() {   // Гиза: Хеопс, Хефрен (с бялата �
   box(sph, 1.1, 0.9, 3, st, 0, 0.45, 0); box(sph, 1.1, 0.35, 1.2, st, 0, 0.18, 2); box(sph, 0.8, 0.9, 0.8, st, 0, 1.2, 1.2); box(sph, 1.2, 0.7, 0.3, st, 0, 1.25, 0.95);
   // пясъчни дюни и палми покрай
   for (const [x, z, r] of [[-6, 6.3, 1.1], [6.3, -5.8, 1.3], [-6.4, -6.4, 0.9]]) { const d = add(g, new THREE.SphereGeometry(r, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), sand, x, 0.3, z); d.scale.y = 0.35; }
-  for (const [x, z] of [[6.4, -1.8], [6.6, -3], [-6.6, 1.6]]) { add(g, new THREE.CylinderGeometry(0.08, 0.12, 2.2, 5), mat(0x7a5c3e), x, 1.4, z); for (let k = 0; k < 5; k++) { const l = add(g, new THREE.ConeGeometry(0.25, 1.4, 4), mat(0x3f8f3a), x, 2.5, z); l.rotation.z = 1.2; l.rotation.y = k * 1.26; l.position.x += Math.cos(k * 1.26) * 0.5; l.position.z -= Math.sin(k * 1.26) * 0.5; } }
+  [[6.4, -1.8], [6.6, -3], [-6.6, 1.6]].forEach(([x, z], i) => { const rt = realTree(null, 3.2, i); if (rt) { rt.position.set(x, 0.3, z); g.add(rt); return; } add(g, new THREE.CylinderGeometry(0.08, 0.12, 2.2, 5), mat(0x7a5c3e), x, 1.4, z); for (let k = 0; k < 5; k++) { const l = add(g, new THREE.ConeGeometry(0.25, 1.4, 4), mat(0x3f8f3a), x, 2.5, z); l.rotation.z = 1.2; l.rotation.y = k * 1.26; l.position.x += Math.cos(k * 1.26) * 0.5; l.position.z -= Math.sin(k * 1.26) * 0.5; } });
   g.userData.flood = [st, cap];
   return g;
 }
@@ -811,6 +811,10 @@ function bellagio() {
 }
 const BUILD = { pyramids, ...Object.fromEntries(Object.keys(GLB_LM).map(k => [k, () => glbLm(k)])), arc, ladefense, bigben, londoneye, towerbridge, shard, brandenburg, fernsehturm, reichstag, erasmus, cubes, markthal, derotterdam, euromast, canal: () => canal(0), canal2: () => canal(1), rijks, centraal, adam, windmill, bellagio, mosque2: () => mosque(1), bluemosque: () => mosque(0), topkapi, maiden, grandbazaar, haydarpasa, galata, sapphire, twist, twin, colosseum, stpeter, pantheon, vittoriano };
 
+// trees-more: истинско дърво (протото от играта — deps.trees) с височина h вместо зелен конус; null — няма модели или флагът е изключен
+let lmTrees = () => null; export const setLmTrees = f => { lmTrees = f; };   // game.js: истинските дървета на града (plan2Trees — в пустинните палми)
+const realTree = (deps, h, i) => { const T0 = (deps && deps.trees) || lmTrees(), T = feature('trees-more') && T0 && T0.length ? T0 : null; if (!T) return null;
+  const P = T[i % T.length], o = P.clone(true), b = new THREE.Box3().setFromObject(P); o.scale.multiplyScalar(h / ((b.max.y - b.min.y) || 1)); o.rotation.y = i * 2.39; o.traverse(m => { if (m.isMesh) m.castShadow = true; }); return o; };
 // остров в морето за забележителност (Статуята на свободата — на звездовидния Форт Ууд на остров Либърти)
 export function buildSeaLandmark(kind, deps = {}) {
   if (kind === 'opera') return operaPoint(deps);
@@ -820,7 +824,7 @@ export function buildSeaLandmark(kind, deps = {}) {
   const island = new THREE.Mesh(new THREE.CylinderGeometry(24, 27, 2.2, 40), mat(0x6f9a55, 1)); island.position.y = 0.4; island.receiveShadow = true; g.add(island);
   const shore = new THREE.Mesh(new THREE.CylinderGeometry(27.5, 28.5, 0.6, 40), mat(0xd9c99a, 1)); shore.position.y = -0.2; g.add(shore);
   const fort = new THREE.Mesh(new THREE.ExtrudeGeometry(star, { depth: 2.2, bevelEnabled: false }), mat(0xb8ab92, 0.95)); fort.rotation.x = -Math.PI / 2; fort.position.y = 1.5; fort.castShadow = fort.receiveShadow = true; g.add(fort);
-  for (const [x, z] of [[-18, 8], [-14, 14], [16, 10], [12, -17], [-17, -12]]) { const t = new THREE.Mesh(new THREE.ConeGeometry(1.6, 5, 7), mat(0x3f7f3a, 1)); t.position.set(x, 4, z); t.castShadow = true; g.add(t); }
+  [[-18, 8], [-14, 14], [16, 10], [12, -17], [-17, -12]].forEach(([x, z], i) => { const rt = realTree(deps, 6.5, i); if (rt) { rt.position.set(x, 1.5, z); g.add(rt); return; } const t = new THREE.Mesh(new THREE.ConeGeometry(1.6, 5, 7), mat(0x3f7f3a, 1)); t.position.set(x, 4, z); t.castShadow = true; g.add(t); });
   box(g, 3, 0.6, 14, mat(0x8d8a84, 0.9), 0, 0.9, 30);   // кей за фериботите
   if (o.group.children[0]) o.group.children[0].visible = false;   // без квадратната плоча
   o.group.position.y = 3.4; o.group.scale.setScalar(1.9); g.add(o.group);
@@ -837,7 +841,7 @@ function operaPoint(deps) {
   box(g, 34, 2.3, 70, walk, 0, -0.05, -55).castShadow = false;   // алеята към брега (Circular Quay)
   box(g, 36, 1.6, 72, wall, 0, -0.9, -55);
   const stairs = box(g, 44, 0.8, 10, mat(0xe2d8c4, 0.9), 0, 1.4, -19); stairs.castShadow = false;   // монументалното стълбище пред входа (откъм града)
-  for (let k = 0; k < 14; k++) { const t = new THREE.Mesh(new THREE.ConeGeometry(1.4, 4.2, 7), mat(0x3f7f3a, 1)); t.position.set(k % 2 ? 15 : -15, 3.3, -30 - k * 3.4); t.castShadow = true; g.add(t); }   // дървета по алеята
+  for (let k = 0; k < 14; k++) { const rt = realTree(deps, 6, k); if (rt) { rt.position.set(k % 2 ? 15 : -15, 1.2, -30 - k * 3.4); g.add(rt); continue; } const t = new THREE.Mesh(new THREE.ConeGeometry(1.4, 4.2, 7), mat(0x3f7f3a, 1)); t.position.set(k % 2 ? 15 : -15, 3.3, -30 - k * 3.4); t.castShadow = true; g.add(t); }   // дървета по алеята
   const lampM = mat(0xfff2c0, 0.4, 0, { emissive: 0xffd890, emissiveIntensity: 0 }), lamps = [];
   for (let k = 0; k < 8; k++) for (const x of [-34, 34]) { cyl(g, 0.12, 0.12, 3, mat(0x444444), x, 2.7, -18 + k * 7, 6); lamps.push(add(g, new THREE.SphereGeometry(0.35, 8, 6), lampM, x, 4.3, -18 + k * 7)); }
   if (o.group.children[0]) o.group.children[0].visible = false;   // без квадратната плоча

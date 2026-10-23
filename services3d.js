@@ -9,6 +9,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { SERVICES, baseFor, districtFor, modelOf, TIER_NM } from './services.js';
 import { emergCar } from './vehmodels.js';
 import { prepNightFloors } from './nightfloors.js';
+import { feature } from './lab/feature.js';
 
 const cache = {}, loader = new GLTFLoader(), SHARED = new WeakSet();
 const load = p => cache[p] || (cache[p] = loader.loadAsync(p).then(g => { prepNightFloors(g.scene, 'svc-' + p.split('/').pop().replace('.glb', ''));   /* нощем — прозорците (nightfloors.js, флаг night-civic) */ g.scene.traverse(o => { if (o.geometry) SHARED.add(o.geometry); for (const m of o.material ? [].concat(o.material) : []) SHARED.add(m); }); return g; }).catch(() => null));
@@ -39,7 +40,11 @@ export function buildService(k, lvl, lot, opt = {}) {
   const glb = (path, depthK = 0.6, wK = 0.9, maxH) => tasks.push(load(path).then(g => { if (!g) return; if (opt.fill) { depthK = Math.max(depthK, 0.72); wK = 0.95; } const o = fit(g.scene.clone(true), w * wK, d * depthK, maxH);
     if (opt.fill && o.userData.sz[0] < w * wK * 0.8) { const sx = Math.min(1.8, w * wK / o.userData.sz[0]); o.scale.x *= sx; o.userData.sz[0] *= sx; }   // тесният модел — по-широк по фасадата (болница/училище — дълги сгради)
     const tH = opt.hAbs || (opt.minH || 0) * (HK[k] ?? 0.6); if (tH && o.userData.sz[1] < tH) { const sy = Math.min(opt.hAbs ? 3.5 : 2.2, tH / o.userData.sz[1]);   /* opt.hAbs — по блоковете наоколо (servicesplace.js), до ×3,5 */ o.scale.y *= sy; o.userData.sz[1] *= sy; } o.position.z = back + o.userData.sz[2] / 2 + 1; o.traverse(q => { if (q.isMesh) { q.castShadow = q.receiveShadow = true; } }); group.add(o); return o; }));
-  const tree = (x, z, s = 1) => { const t = cyl(0.18 * s, 2.2 * s, M(0x6b4a2a), x, 0, z, 6); const cr = new THREE.SphereGeometry(1.5 * s, 10, 8); own.push(cr); const o = new THREE.Mesh(cr, M(0x4f7f3a)); o.position.set(x, 3 * s, z); o.castShadow = true; group.add(o); return t; };
+  // trees-more: истинско дърво (протото от играта — opt.trees), височина ~8·s м; геометриите са общи (SHARED — dispose() не ги пипа)
+  const TP = feature('trees-more') && opt.trees && opt.trees.length ? opt.trees : null;
+  const tree = (x, z, s = 1) => { if (TP) { const P = TP[Math.abs(Math.round(x * 7 + z * 13 + (opt.seed || 0))) % TP.length], o = P.clone(true); o.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(P), h = (b.max.y - b.min.y) || 1;
+      o.scale.multiplyScalar(8 * s / h); o.position.set(x, 0, z); o.rotation.y = (x * 3.1 + z * 1.7) % 6.28; o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; if (m.geometry) SHARED.add(m.geometry); } }); group.add(o); return o; }
+ const t = cyl(0.18 * s, 2.2 * s, M(0x6b4a2a), x, 0, z, 6); const cr = new THREE.SphereGeometry(1.5 * s, 10, 8); own.push(cr); const o = new THREE.Mesh(cr, M(0x4f7f3a)); o.position.set(x, 3 * s, z); o.castShadow = true; group.add(o); return t; };
   const bench = (x, z, ry = 0) => { const b = box(1.6, 0.45, 0.5, M(R.trim), x, 0, z); b.rotation.y = ry; };
   const cars = (kind, n, z0) => tasks.push(load({ ambulance: 'assets/heavy/cars/amb-eu.glb', fire: 'assets/heavy/cars/fire-man.glb', police: 'assets/heavy/cars/pol-crownvic.glb' }[kind]).then(g => { if (!g) return; for (let i = 0; i < n; i++) { const c = emergCar(g.scene, kind === 'fire' ? 10.5 : kind === 'ambulance' ? 7 : 5.2, kind, kind === 'ambulance' ? 'amb-eu' : ''); c.position.set(-((n - 1) * 3.6) / 2 + i * 3.6, 0, z0); c.rotation.y = Math.PI; group.add(c); } }));
 

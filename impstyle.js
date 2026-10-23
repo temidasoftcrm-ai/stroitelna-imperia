@@ -3,6 +3,7 @@
 // панелни жилищни блокове, модерни бизнес кули. pickModel връща име на модел от A (каквото game.js вече зарежда) + 'imp-stalin' (IMP_MODELS).
 // decor(group, cc, city, opt) — земята и растителността около града вместо пустинята; в Русия през зимата — сняг.
 import * as THREE from 'three';
+import { feature } from './lab/feature.js';
 
 // новите модели, които game.js трябва да зареди в A (ключ → файл) и истинската им височина в метри (за realH)
 export const IMP_MODELS = { 'imp-stalin': 'assets/heavy/blocks/stalin.glb' };
@@ -45,7 +46,8 @@ export function decor(group, cc, city, opt = {}) {
   ground.rotation.x = -Math.PI / 2; ground.position.set(cx, -0.05, cz); ground.receiveShadow = true; g.add(ground);
   // дърветата: инстанции в пръстен R…R+380 (САЩ — широколистни + палми край Тексаския бряг; Русия — брези и ели)
   let seed = 1234 + (cc === 'RU' ? 77 : 0); const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  const kinds = cc === 'RU' ? [birch(snow), fir(snow)] : [oak(), palm()];
+  const RT = feature('trees-more') && opt.trees ? (cc === 'RU' ? [opt.trees.leaf, snow && opt.trees.pinesnow && opt.trees.pinesnow.length ? opt.trees.pinesnow : opt.trees.pine] : [opt.trees.leaf, opt.trees.palm]) : null;   // trees-more: истинските модели (по 1 прото на вид — малко draw calls)
+  const kinds = RT && RT.every(P => P && P.length) ? RT.map(P => realParts(P[0], 10)) : cc === 'RU' ? [birch(snow), fir(snow)] : [oak(), palm()];
   const N = 420, per = kinds.map(() => []);
   for (let i = 0; i < N; i++) {
     const a = rnd() * Math.PI * 2, r = R + Math.sqrt(rnd()) * 380, k = cc === 'RU' ? (rnd() < 0.55 ? 0 : 1) : (rnd() < 0.8 ? 0 : 1);
@@ -59,6 +61,16 @@ export function decor(group, cc, city, opt = {}) {
 // дърветата (метри): ствол + корона; споделени геометрии
 const std = (c, r = 0.9) => new THREE.MeshStandardMaterial({ color: c, roughness: r });
 const tr = (geo, y) => { geo.translate(0, y, 0); return geo; };
+// истинско дърво → [геометрия, материал] на части, основата на y = 0, височина H м (за InstancedMesh); кеш по модел
+const RP = new Map();
+function realParts(src, H) {
+  const key = src.uuid + ':' + H; if (RP.has(key)) return RP.get(key);
+  src.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(src), k = H / ((b.max.y - b.min.y) || 1), parts = [];
+  src.traverse(o => { if (!o.isMesh || !o.visible) return; const g = o.geometry.clone();
+    for (const [nm, at] of Object.entries(g.attributes)) if (at.normalized || at.isInterleavedBufferAttribute || !(at.array instanceof Float32Array)) { const f = new Float32Array(at.count * at.itemSize), get = [at.getX, at.getY, at.getZ, at.getW]; for (let i = 0; i < at.count; i++) for (let c = 0; c < at.itemSize; c++) f[i * at.itemSize + c] = get[c].call(at, i); g.setAttribute(nm, new THREE.BufferAttribute(f, at.itemSize)); }   // квантизираните (Int16 normalized) — към Float32, иначе applyMatrix4 ги реже до ±1
+    g.applyMatrix4(o.matrixWorld); g.translate(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2); g.scale(k, k, k); parts.push([g, o.material]); });
+  RP.set(key, parts); return parts;
+}
 function oak() { return [[tr(new THREE.CylinderGeometry(0.35, 0.5, 4, 6), 2), std(0x5b4330)], [tr(new THREE.IcosahedronGeometry(3.4, 0), 6.2), std(0x4f7a32)]]; }
 function palm() {
   const leaves = new THREE.ConeGeometry(3.2, 1.6, 7); leaves.translate(0, 9.2, 0);
