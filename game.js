@@ -674,6 +674,12 @@ const megaExtra = ext => { const big = Math.min(ext, (S && S.extBig) || 0); retu
 // #26 (lots-tier): в новите игри всеки купен квартал на град с решетка носи 2 колони (малък град, 18 парцела) или 3 (среден/голям, 27) — досега 1 (9).
 // Записва се в играта (S.extCols) — старите игри остават с 1 колона и същите номера на парцелите (новите колони са само на изток, след старите).
 const extColsT = id => (S && S.extCols && S.extCols[cityTier(id)]) || 1;
+// #26 (lots-tier) и за генерираните градове с план (plan2gen — всички градове в новите игри, и малките): парцели на купен квартал по размера
+// на града — S.extLots = { s: 18, m: 22, l: 27 } (55); старите игри — по 9. Мегаполисите и градовете по истинската карта — както досега.
+const extLotsOf = id => (S && S.extLots && !MEGAPOLIS.has(id) && S.extLots[cityTier(id)]) || PLAN_EXT;
+const planCountOf = (id, ext = 0) => MEGAPOLIS.has(id) ? planCount(true, ext) : PLAN_CORE + extLotsOf(id) * ext;
+// колко нови парцела дава един квартал в града id (решетка — колоните по 9; план — extLotsOf)
+const distLots = id => planOn(id) || plan2GenOn(id) ? extLotsOf(id) : NB * extColsT(id);
 function setCityExt(ext, base = megaBase) {
   megaBase = base;
   if (base) { megaSlots = spiralSlots(Math.ceil(megaExtra(ext) / (NB * NB))); NBI = NB * (1 + Math.max(...megaSlots.map(s => s[0]))); NBJ = NB * (1 + Math.max(...megaSlots.map(s => s[1]))); }
@@ -757,9 +763,9 @@ function plan2MoveCard() {
 }
 // 🏙️ генерираните градове (16-те шаблона plan2: eu/us/coast/radial × s/m/l/xl) — в НОВИТЕ игри (S.plan2gen, флаг plan2-game) всички градове без истинска карта
 const plan2GenOn = id => !!(S && S.plan2gen && plan2.mod && !(S.plan2 && S.plan2[id]) && id !== NEOM_ID && !AIR_ONLY.has(id));
-const plan2GenPlan = id => { const mega = MEGAPOLIS.has(id), t = cityTier(id), cnt = planCount(mega, S.cityExt || 0), c = plan2.cache;
+const plan2GenPlan = id => { const mega = MEGAPOLIS.has(id), t = cityTier(id), cnt = planCountOf(id, S.cityExt || 0), c = plan2.cache;
   if (c && c.id === id && c.t === 'g' + cnt + (S.roadGeo ? 'r' : '') + (S.jfix ? 'j' : '')) return c.P;   /* road-geo — друг план (само новите игри) */
-  const P = plan2.mod.gamePlan2Gen(id, { roadGeo: !!S.roadGeo, jfix: !!S.jfix, tier: mega ? 'xl' : t === 'xl' ? 'xl' : t === 'l' ? 'l' : t === 's' ? 's' : 'm', coastal: SEASIDE.includes(id), region: isAm(id) ? 'us' : null, mega, count: cnt, minLots: mega ? MEGA_LOTS : PLAN_CORE + PLAN_EXT * Math.max(MAX_EXT, extRule(id)) });
+  const P = plan2.mod.gamePlan2Gen(id, { roadGeo: !!S.roadGeo, jfix: !!S.jfix, tier: mega ? 'xl' : t === 'xl' ? 'xl' : t === 'l' ? 'l' : t === 's' ? 's' : 'm', coastal: SEASIDE.includes(id), region: isAm(id) ? 'us' : null, mega, count: cnt, minLots: mega ? MEGA_LOTS : PLAN_CORE + extLotsOf(id) * Math.max(MAX_EXT, extRule(id)) });
   plan2.cache = { id, t: 'g' + cnt + (S.roadGeo ? 'r' : '') + (S.jfix ? 'j' : ''), P }; return P; };
 const planOf = id => plan2On(id) ? plan2Plan(id) : plan2GenOn(id) ? plan2GenPlan(id) : planOn(id) ? gamePlan(id, { exts: Math.max(MAX_EXT, extRule(id)), landmark: !!CITY_LANDMARKS[id], seaside: SEASIDE.includes(id), mega: MEGAPOLIS.has(id), bigZone: bigZoneOf(id), clean: S.planAll >= 6, clean2: S.planAll >= 9, tpl: (S.planAll >= 7 && PLAN_TPL7[id]) || (S.planAll >= 5 && PLAN_TPL5[id]) || (S.planAll >= 4 ? PLAN_TPL4[id] : undefined) }) : null;
 // запазената зона в плана за голямата забележителност: колкото W×D парцела на мрежата ((3W − 1) плочки − 2 м)
@@ -2945,7 +2951,7 @@ const projects = [];   // активните обекти (огледало на
 function newGame(cityId, brand = null, brandNm = '') {
   pruneCities(null);
   S = { v: 1, brand, cityId, hqCity: cityId, cities: {}, day: 1, dayT: 0, rep: 0, cash: [], officeLevel: 1, garageLevel: 1, garageLot: null, whLevel: 0, whLot: null, cityExt: AUTOTEST ? +params.get('ext') || 0 : 0, rails: [], trains: [], jobs: [], econ: ECON.newEconState(), units: [...ECON.START.units], projects: [], offers: [], built: [], done: 0, seq: 1 };
-  if (feature('lots-tier')) S.extCols = { s: 2, m: 3, l: 3 };   // #26: повече парцели на купен квартал в градовете с решетка (само новите игри)
+  if (feature('lots-tier')) { S.extCols = { s: 2, m: 3, l: 3 }; S.extLots = { s: 18, m: 22, l: 27 }; }   // #26: повече парцели на купен квартал в градовете с решетка (само новите игри)
   if (brandNm) S.brandNm = brandNm;   // името, което играчът си е дал (group.js: brandOf)
   S.foundFirst = 1;   // дъщерните фирми (пътна, жп, морска, авиация) — с ръчно основаване и стартов пакет
   if (params.has('plan') ? params.get('plan') === '1' : !AUTOTEST) S.planAll = feature('road-clean') ? 9 : feature('city-size') ? 8 : feature('la-osm') ? 7 : 6;   // 7: Лос Анджелис по картата (PLAN_TPL7); 6: по-чист център (cityplan opts.clean)   // нова игра — средните и големите градове с план (извити улици); старите записи остават на мрежата   // нов град с план (извити улици); старите записи остават на мрежата
@@ -7171,7 +7177,7 @@ function virtualLots(cityId, cs) {
   const ext = cs.cityExt || 0, c = (NB - 1) / 2, lots = [];
   const addLot = (bi, bj, fresh) => { const d = Math.max(Math.abs(bi - c), Math.abs(bj - c)); lots.push({ id: lots.length, bi, bj, zone: d <= 1 ? 'center' : d <= 2 ? 'mid' : 'outer', fresh }); };
   const VP = planOn(cityId);   // град с план: id по разстояние от площада — 9 център, 16 среден пояс, останалите покрайнини (както в cityplan.js); централата е 0
-  if (VP) for (let id = 0; id < 81 + 9 * ext; id++) lots.push({ id, zone: id < 9 ? 'center' : id < 25 ? 'mid' : 'outer', fresh: id >= 81 });
+  if (VP || plan2GenOn(cityId)) for (let id = 0; id < PLAN_CORE + extLotsOf(cityId) * ext; id++) lots.push({ id, zone: id < 9 ? 'center' : id < 25 ? 'mid' : 'outer', fresh: id >= 81 });
   else {
   for (let bi = 0; bi < NB; bi++) for (let bj = 0; bj < NB; bj++) addLot(bi, bj, false);
   for (let bi = NB; bi < NB + ext * extColsT(cityId); bi++) for (let bj = 0; bj < NB; bj++) addLot(bi, bj, true);
@@ -7217,7 +7223,7 @@ function virtualLots(cityId, cs) {
 function virtFill(id, c) {
   if (!c || c.freeLots || id === S.cityId) return false;
   const v = virtualLots(id, c); if (!v) return false;
-  c.freeLots = v; c.freeV = 2; c.freeVirt = 1; c.lotTotal = NB * NB + NB * (c.cityExt || 0) * (planOn(id) ? 1 : extColsT(id)); c.freeAll = v.length;
+  c.freeLots = v; c.freeV = 2; c.freeVirt = 1; c.lotTotal = NB * NB + (c.cityExt || 0) * distLots(id); c.freeAll = v.length;
   return true;
 }
 const freeMax = id => CAPITALS.has(id) || MEGAPOLIS.has(id) || (cityById(id)?.sz || 0) >= 3 ? 0 : 1;   // важните градове (жълтата точка, като KEY_CITY в drawMap) се завършват само без нито един свободен парцел
@@ -7601,9 +7607,9 @@ function buyDistrictAt(id, all = false) {
   if (MEGAPOLIS.has(id) && c.extBig == null) c.extBig = q.ext;   // новите квартали на мегаполиса са с новия (по-малък) размер
   c.cityExt = all ? q.max : q.ext + 1; xpMore(300 * (c.cityExt - q.ext));   // парцелите се появяват при следващото влизане (градът се строи от записа)
   if (c.freeLots && !MEGAPOLIS.has(id)) {   // новите квартали са празни парцели след ядрото 9×9 — добавят се към запомнените свободни
-    const kc = planOn(id) ? 1 : extColsT(id);   // lots-tier: колоните на квартал (града с план — по 9)
-    for (let e = q.ext; e < c.cityExt; e++) for (let k = 0; k < NB * kc; k++) c.freeLots.push([NB * NB + e * NB * kc + k, 'outer']);
-    c.lotTotal = NB * NB + NB * c.cityExt * kc; c.freeAll = c.freeLots.length;
+    const per = distLots(id);   // lots-tier: парцелите на квартал (решетка — колоните по 9; град с план — по размера на града)
+    for (let e = q.ext; e < c.cityExt; e++) for (let k = 0; k < per; k++) c.freeLots.push([NB * NB + e * per + k, 'outer']);
+    c.lotTotal = NB * NB + per * c.cityExt; c.freeAll = c.freeLots.length;
   } else { delete c.freeLots; delete c.freeAll; delete c.lotTotal; virtFill(id, c); }   // никога не си бил тук — изчислява се без влизане (мегаполисът иска едно влизане)
   toast(`🏘️ ${cityById(id).nm}: купи ${all ? 'всички квартали' : `квартал №${c.cityExt}`} (${c.cityExt}/${q.max})!`, 'good');
   Sound.play('cash'); save();
@@ -7611,7 +7617,7 @@ function buyDistrictAt(id, all = false) {
 function districtCard() {
   const ext = S.cityExt || 0, cost = districtCost(), free = freeLotCount();
   let h = `<div class="card"><h3><span class="ico">🏙️</span>Нов квартал · ${ext}/${extMaxOf(S.cityId)}</h3>
-    <div class="meta">Свободни парцели в града: <b style="color:${free < 4 ? 'var(--bad)' : 'var(--txt)'}">${free}</b>. Нов квартал (около центъра — на изток и на юг) дава ${NB * (megaBase ? extCols() : extColsT(S.cityId))} празни парцела за поръчки, склад и гараж${megaBase ? ' — мегаполис: голям квартал' : ''}.</div>`;
+    <div class="meta">Свободни парцели в града: <b style="color:${free < 4 ? 'var(--bad)' : 'var(--txt)'}">${free}</b>. Нов квартал (около центъра — на изток и на юг) дава ${megaBase ? NB * extCols() : distLots(S.cityId)} празни парцела за поръчки, склад и гараж${megaBase ? ' — мегаполис: голям квартал' : ''}.</div>`;
   if (ext < extMaxOf(S.cityId)) h += `<div class="row"><span class="money" style="color:var(--txt)">${fmt(cost)} €</span><button class="btn" id="bDistrict" ${econ.canAfford(cost) ? '' : 'disabled'}>Купи земята</button></div>${MAX_EXT - ext > 1 ? `<div class="row" style="margin-top:4px"><span class="meta" style="margin:0">Всички ${MAX_EXT - ext} квартала наведнъж</span><button class="btn2" id="bDistrictAll" ${econ.canAfford(allDistrictsCost()) ? '' : 'disabled'}>🏙️ Купи всички · ${fmt(allDistrictsCost())} €</button></div>` : ''}`;
   else h += `<div class="meta" style="color:var(--acc)">👑 Градът е разширен докрай.</div>`;
   return h + `</div>`;
