@@ -26,7 +26,7 @@ export function createIncidents(ctx) {
     const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 2, 32, 32, 31);
     g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c);
   })();
-  const vehName = k => ctx.has('sf-car-' + k) ? ['sf-car-' + k, 1] : (n => [n, kidK(n, 1.15)])({ Police_Sedan: 'police', Police_SUV: 'police', Firetruck: 'truck', Ambulance: 'van', Truck: 'truck' }[k]);   /* резервата в истинския размер (55) */
+  const vehName = k => ctx.has('sf-car-' + k) ? ['sf-car-' + k, 1] : [null, 1];   /* №2 (55): без детските резерви — колата просто не идва */   /* резервата в истинския размер (55) */
 
   // мястото — по улица, близо до това, което гледаш (за да се види); отделно — откъде тръгва всяка кола (120–300 м по-далеч)
   function pickSpot() {
@@ -72,7 +72,7 @@ export function createIncidents(ctx) {
     for (const [x, z] of pts) { const c = cone(); c.position.set(x, 0, z); g.add(c); }
   }
   const fireTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 40, 2, 32, 34, 30); g.addColorStop(0, 'rgba(255,250,200,1)'); g.addColorStop(0.35, 'rgba(255,170,40,0.9)'); g.addColorStop(1, 'rgba(255,60,0,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
-  const car = (k, sc = 1) => { const wn = (k ? [k] : ['Sedan', 'Hatchback', 'SUV', 'Taxi', 'Pickup']).map(n => 'sf-car-' + n).filter(ctx.has); return wn.length ? ctx.model(wn[(Math.random() * wn.length) | 0], sc) : ctx.model('sedan', kidK('sedan')); };
+  const car = (k, sc = 1) => { const wn = (k ? [k] : ['Sedan', 'Hatchback', 'SUV', 'Taxi', 'Pickup']).map(n => 'sf-car-' + n).filter(ctx.has); return wn.length ? ctx.model(wn[(Math.random() * wn.length) | 0], sc) : new THREE.Group(); };   /* №2 (55): без детската кола */
   function moto() { const m = new THREE.Group(), dk = M(0x222222), rd = M(0xc81e1e, 0.4);
     for (const z of [-0.65, 0.65]) { const w = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.08, 6, 14), dk); w.position.set(0, 0.32, z); w.rotation.y = Math.PI / 2; m.add(w); }
     const b = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.3, 1.1), rd); b.position.y = 0.6; m.add(b); m.rotation.z = Math.PI / 2 - 0.15; m.position.y = 0.3; const w = new THREE.Group(); w.add(m); return w; }
@@ -135,6 +135,9 @@ export function createIncidents(ctx) {
     if (o.crowdSide) K2.crowd(g, n, o.crowdSide * cx, -L * 0.7, L * 0.7); else { K2.crowd(g, Math.ceil(n / 2), cx, -L * 0.7, L * 0.7); K2.crowd(g, Math.floor(n / 2), -cx, -L * 0.6, L * 0.6); }
     return cl; }
   const medics = (g, x, z, n = 2) => { for (let k = 0; k < n; k++) K2.put(g, 'medic', 'idle', x + (k ? -1.1 : 1.1), z + 0.5, x, z); };
+  // #28 (jam-police): задръстване на кръстовище — идва полицейска кола (паркира на бордюра), полицаят в средата регулира (трафикът: tr.police);
+  // само по повикване от game.js (w: 0 — не идва случайно)
+  TYPES.jam = { nm: '🚓 Полицай регулира движението', w: 0, hold: 45, cars: [['Police_Sedan', 16]], props(g) { if (K2) K2.put(g, 'cop', 'wave', 0, 0, 0, 6); else { const p = person(false); g.add(p); } } };
   const TYPES2 = {
     ped: { props(g, at, R) { const v = K2.person('ped', 'idle', { lying: true }); v.position.set(0.8, 0, 0.6); v.rotation.y = rnd(0, 6.28); g.add(v);
       const c = car(); c.position.set(R.hw * 0.45, 0, -6); c.rotation.y = 0.12; g.add(c); K2.put(g, 'ped', 'argue', R.hw * 0.45 + 1.6, -4.4, 0.8, 0.6);   // шофьорът
@@ -190,11 +193,11 @@ export function createIncidents(ctx) {
     let x = Math.random() * ok.reduce((a, [, T]) => a + T.w, 0); for (const [k, T] of ok) { x -= T.w; if (x <= 0) return k; } return ok[0][0];
   }
 
-  function start(force) {
-    if (k2p && !K2 && !start.wait) { start.wait = 1; k2p.then(() => { start.wait = 0; start(force); }); return { pending: true }; }   // incidents2: изчаква хората и моделите (първия път)
+  function start(force, at0) {   // at0 — мястото (иначе случайно около камерата)
+    if (k2p && !K2 && !start.wait) { start.wait = 1; k2p.then(() => { start.wait = 0; start(force, at0); }); return { pending: true }; }   // incidents2: изчаква хората и моделите (първия път)
     clear();
     const type = pickType(typeof force === 'string' ? force : null), T = TYPES[type];
-    let at = pickSpot(); if (!at) return null;
+    let at = at0 || pickSpot(); if (!at) return null;
     if (type === 'bfire' && ctx.building) {   // пожар в сграда: първо сградата (близо до камерата), после улицата до нея
       const f = ctx.focus(), b = ctx.building(f.x, f.z, 400);   // най-близката сграда до 400 м (иначе огънят е на улицата)
       if (b) { const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2; let bd = 1e18; for (let k = 0; k < 90; k++) { const p = ctx.point(); if (!p || (ctx.spotOk && !ctx.spotOk(p.x, p.z))) continue; const d = Math.hypot(p.x - cx, p.z - cz); if (d < bd) { bd = d; at = p; } } }
@@ -287,7 +290,7 @@ export function createIncidents(ctx) {
     for (const c of inc.cars) {
       if (c.delay > 0) { c.delay -= rdt; c.o.visible = c.delay <= 0; continue; }
       if (c.stage === 'go') {
-        if (c.path) move(c, dt); else c.stage = 'hold';
+        if (c.path) move(c, dt); else { c.stage = 'hold'; if (inc.type === 'jam') { c.o.position.x -= Math.cos(c.yaw) * 3.2; c.o.position.z += Math.sin(c.yaw) * 3.2; c.x = c.o.position.x; c.z = c.o.position.z; } }   // #28: полицейската — на бордюра, не в лентата
       } else if (c.stage === 'hold') {
         if (inc.cars.every(o => o.stage !== 'go') && inc.hold === undefined) inc.hold = inc.hold0 || HOLD;
       } else if (c.stage === 'leave') {

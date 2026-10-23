@@ -8,6 +8,7 @@
 //    Резервът, улиците (и разширението им) и входовете остават свободни. Без симулация — само се прерисува, когато се смени застрояването.
 // Всичко — InstancedMesh и слети мешове; дребните неща се крият отдалеч (update).
 import * as THREE from 'three';
+import { feature } from './lab/feature.js';   // park-dark
 
 const CELL = 2, FREE = 0, ROAD = 1, WATER = 2, LOT = 3, RES = 4, BIG = 5, BLD = 6, OUT = 7;
 const PARK_MIN = 1200, PARK_DT = 6;   // м²; м — най-малкият парк (площ и „дебелина“: половината от най-тясното място)
@@ -69,7 +70,7 @@ const partCache = new WeakMap();
 function protoParts(src, norm) {
   const key = src, c = partCache.get(key); if (c && c.norm === norm) return c.parts;
   src.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(src), k = norm === 'h' ? 1 / ((b.max.y - b.min.y) || 1) : norm === 'w' ? 1 / (Math.max(b.max.x - b.min.x, b.max.z - b.min.z) || 1) : 1, parts = [];
-  src.traverse(o => { if (!o.isMesh || !o.visible) return; const ms = [].concat(o.material); if (norm == null && ms.some(m => m.transparent || (m.emissive && m.emissive.getHex() && m.emissiveIntensity > 0.5))) return;   // колите (norm null) — без фаровете и лъчите; листата на дърветата и храстите са прозрачни — остават; 'real' (yards-real) — всичко, в истински размер
+  src.traverse(o => { if (!o.isMesh || !o.visible) return; if (norm == null && feature('park-dark')) { for (let q = o; q && q !== src; q = q.parent) if (q.userData.carLights) return; }   /* park-dark: без фаровете на паркираните */ const ms = [].concat(o.material); if (norm == null && ms.some(m => m.transparent || (m.emissive && m.emissive.getHex() && m.emissiveIntensity > 0.5))) return;   // колите (norm null) — без фаровете и лъчите; листата на дърветата и храстите са прозрачни — остават; 'real' (yards-real) — всичко, в истински размер
     const g = o.geometry.clone(); if (norm === 'real') for (const [nm, at] of Object.entries(g.attributes)) if (at.normalized || at.isInterleavedBufferAttribute || !(at.array instanceof Float32Array)) { const f = new Float32Array(at.count * at.itemSize); for (let i = 0; i < at.count; i++) for (let c = 0; c < at.itemSize; c++) f[i * at.itemSize + c] = at[['getX', 'getY', 'getZ', 'getW'][c]](i); g.setAttribute(nm, new THREE.BufferAttribute(f, at.itemSize)); }   // yards-real: KHR_mesh_quantization — цели числа; без това applyMatrix4 ги реже
     g.applyMatrix4(o.matrixWorld); g.translate(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2); g.scale(k, k, k); parts.push([g, o.material]); });
   partCache.set(key, { norm, parts }); return parts;

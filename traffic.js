@@ -23,6 +23,7 @@ import { makeRouter } from './junctionpaths.js';
 const H = 1 / 30;                 // фиксираната стъпка, s
 const V_LANE = 12, V_TURN = 6.5;  // желана скорост по улица / в завой, m/s
 const A_MAX = 2.6, B_COMF = 3.5;  // ускорение и комфортно спиране, m/s²
+const JAM_N = 8, JAM_S = 20, POL_T = 7;   // #28: задръстване — ≥ JAM_N спрели коли на подходите на възела ≥ JAM_S s; полицаят пуска по един подход за POL_T s
 const S0 = 2.2, T_HEAD = 1.1;     // минимална дистанция (m) и време до предната (s)
 const W_HEAVY = 6;                // автобусите и камионите — само по улици с платно поне толкова (m)
 const G_TIME = 9, Y_TIME = 2.2, L_TIME = 4.5, ALLRED = 0.8;   // фазите на светофара, s
@@ -213,7 +214,8 @@ export function createTraffic(opts) {
   // c.why — защо чака (дебъг изгледът на junctionpaths.js); jp: зоната е заета и докато задницата на излязлата кола е още в нея
   function canGo(c, C) {
     const n = nodes.get(C.node);
-    if (n.sig && !sigAllows(n.sig, C) && !c.emOn) { c.why = 'светофар'; return false; }   // #14: спешната с буркани — и на червено, щом зоната е свободна
+    if (n.pol) { if (C.inL.armIn !== n.pol.arm) { c.why = 'полицай'; return false; } }   // #28: полицаят пуска само един подход (светофарът не важи)
+    else if (n.sig && !sigAllows(n.sig, C) && !c.emOn) { c.why = 'светофар'; return false; }   // #14: спешната с буркани — и на червено, щом зоната е свободна
     if (C.conf.some(d => d.cars.length || (jp && d.tails && d.tails.size))) { c.why = 'конфликтна зона'; return false; }   // пресичаща се крива — заета
     const tail = C.outL.cars[0];                                             // място след кръстовището
     if (tail && tail.s - tail.L / 2 < c.L + S0 + 1) { c.why = 'няма място след изхода'; return false; }
@@ -226,7 +228,7 @@ export function createTraffic(opts) {
     if (c.agent && c.wait > 25 && !(nodes.get(C.node).sig && !sigAllows(nodes.get(C.node).sig, C))) return true;   // агентът (ТИР, техника) не остава завинаги — след 25 s минава (но не на червено)
     if (!canGo(c, C)) return false;
     // предимство (без светофар): отстъпва само на кола, която чака на стоп линията и сама може да тръгне — иначе вечно блокиране
-    if (!nodes.get(C.node).sig) for (const d of C.conf) { const w = d.inL.cars[d.inL.cars.length - 1]; if (w && w !== c && w.next === d && w.wait > 0 && priority(d, C, w, c) && canGo(w, d)) { c.why = 'предимство'; return false; } }
+    if (!nodes.get(C.node).sig && !nodes.get(C.node).pol) for (const d of C.conf) { const w = d.inL.cars[d.inL.cars.length - 1]; if (w && w !== c && w.next === d && w.wait > 0 && priority(d, C, w, c) && canGo(w, d)) { c.why = 'предимство'; return false; } }
     return true;
   }
   // d (кола w) има предимство пред C (кола c): главната улица; при равни — който чака по-дълго (без вечно блокиране)
@@ -259,6 +261,14 @@ export function createTraffic(opts) {
     replan();
     while (cars.length - nAg < Math.min(opts.maxCars || 40, capacity)) if (!spawn()) break;   // и новите коли — на стъпка (еднакво при 1× и 4×)
     for (const n of nodes.values()) if (n.sig) sigStep(n.sig, H);
+    // #28: полицаят — следващият подход с чакащи коли на всеки POL_T s; засичането на задръстване — веднъж в секунда (opts.onJam)
+    for (const n of nodes.values()) { const P = n.pol; if (!P || (P.t += H) < POL_T && P.arm != null) continue; P.t = 0;
+      const arms = [...new Set(n.inL.filter(l => l.cars.length).map(l => l.armIn))].sort((a, b) => a - b); P.arm = arms.length ? arms.find(a => a > (P.arm ?? -1)) ?? arms[0] : null; }
+    for (const n of nodes.values()) if (n.pol) for (const l of n.inL) { const h = l.cars[l.cars.length - 1]; if (!h || h.route || h.wait < 3 || !h.next || h.next.kind !== 'conn' || h.next.ringIn) continue;   // полицаят пренасочва: изходът е запушен — към друг със свободно място
+      const room = C => { const t = C.outL.cars[0]; return !t || t.s - t.L / 2 >= h.L + S0 + 1; }; if (room(h.next)) continue; const alt = n.conns.find(C => C.inL === l && room(C) && (!h.heavy || !narrow(C.outL))); if (alt) h.next = alt; }
+    if (opts.onJam && steps % 30 === 0) for (const n of nodes.values()) { if (n.ring || n.deg < 3 || n.pol) continue; let q = 0; for (const l of n.inL) for (const c of l.cars) if (c.v < 0.3) q++;
+      const stuck = n.inL.some(l => { const h = l.cars[l.cars.length - 1]; return h && h.wait > 30; });   // първата в опашката чака повече от цял цикъл на светофара
+      n.jamT = q >= JAM_N && stuck ? (n.jamT || 0) + 1 : 0; if (n.jamT >= JAM_S && !(n.jamCd > steps)) { n.jamCd = steps + 30 * 240; n.jamT = 0; opts.onJam({ node: n.id, x: n.x, z: n.z, q }); } }
     const MV = opts.movers ? opts.movers() : [];
     // #14: спешните с буркани (линейка/полиция/пожарна от трафика и идващите към инцидент) — колите пред тях отбиват вдясно и спират, те минават покрай тях
     for (const c of cars) c.emOn = !!c.em && beaconsLit(c.obj);
@@ -311,7 +321,7 @@ export function createTraffic(opts) {
     steps++;
   }
   // стопове, мигачи и истинските прожектори
-  const spots = []; let nightOn = false, LI = null;
+  const spots = []; let nightOn = false, LI = null, POOL = null; const _f = new THREE.Vector3(), _pm = new THREE.Matrix4(), _pq = new THREE.Quaternion(), _pv = new THREE.Vector3(), _ps = new THREE.Vector3(1, 1, 1), _Y = new THREE.Vector3(0, 1, 0);
   function lights() {
     const blinkOn = (performance.now() % 800) < 400, B = lampMats();
     if (!LI && cars.some(c => c.set)) LI = lampInstances(opts.scene, Math.max(64, (opts.maxCars || 40) * 2));
@@ -330,9 +340,15 @@ export function createTraffic(opts) {
     if (LI) LI.end();
     const n = truckLamps().front.emissiveIntensity;   // нощта (0…1) — от общия материал на фаровете; хистерезис около здрача
     if (!nightOn && n > 0.35) nightOn = true; else if (nightOn && n < 0.2) nightOn = false;
+    // car-pools (потребителят: „фаровете на полицейската се отразяват на пътя, а на другата отдолу не“): прожекторите са само 4 —
+    // всяка кола получава меко светло петно пред фаровете (едно InstancedMesh, адитивно)
+    if (feature('car-pools')) { if (!POOL) POOL = poolMesh(opts.scene, Math.max(64, (opts.maxCars || 40) * 2)); const k = nightOn ? Math.min(1, n) : 0; POOL.visible = k > 0;
+      if (k > 0) { let i = 0; for (const c of cars) { if (i >= POOL.userData.max) break; const fx = Math.sin(c.ryaw), fz = Math.cos(c.ryaw), d = c.L / 2 + 5; POOL.setMatrixAt(i++, _pm.compose(_pv.set(c.rx + fx * d, 0.1 + c.ry, c.rz + fz * d), _pq.setFromAxisAngle(_Y, c.ryaw), _ps)); }
+        POOL.count = i; POOL.instanceMatrix.needsUpdate = true; POOL.material.opacity = 0.5 * k; } }
     if (!opts.camera) return;
     if (!spots.length) for (let k = 0; k < 4; k++) { const sp = new THREE.SpotLight(0xfff0d0, 0, 38, 0.55, 0.6, 1.4); sp.castShadow = false; opts.scene.add(sp); opts.scene.add(sp.target); spots.push(sp); }
-    const cp = opts.camera.position, near = nightOn ? [...cars].sort((a, b) => ((a.rx - cp.x) ** 2 + (a.rz - cp.z) ** 2) - ((b.rx - cp.x) ** 2 + (b.rz - cp.z) ** 2)).slice(0, 4) : [];
+    const C = opts.camera, gp = opts.scene.position || { x: 0, z: 0 }; C.getWorldDirection(_f); const tt = _f.y < -0.05 ? Math.min(600, -C.position.y / _f.y) : 60;   // към мястото, което камерата гледа (в координатите на трафика), не към самата камера
+    const cp = { x: C.position.x + _f.x * tt - gp.x, z: C.position.z + _f.z * tt - gp.z }, near = nightOn ? [...cars].sort((a, b) => ((a.rx - cp.x) ** 2 + (a.rz - cp.z) ** 2) - ((b.rx - cp.x) ** 2 + (b.rz - cp.z) ** 2)).slice(0, 4) : [];
     spots.forEach((sp, k) => { const c = near[k]; sp.intensity = c ? 40 * Math.min(1, n) : 0; if (!c) return; const fx = Math.sin(c.ryaw), fz = Math.cos(c.ryaw);
       sp.position.set(c.rx + fx * c.L * 0.5, 1.1 + c.ry, c.rz + fz * c.L * 0.5); sp.target.position.set(c.rx + fx * 14, c.ry, c.rz + fz * 14); });
   }
@@ -349,10 +365,12 @@ export function createTraffic(opts) {
       if (opts.onSignal) for (const nd of nodes.values()) if (nd.sig) opts.onSignal(nd, sigView(nd.sig));
       lights();
     },
-    clear() { for (const sp of spots) { opts.scene.remove(sp); opts.scene.remove(sp.target); sp.dispose(); } spots.length = 0; for (const c of cars) drop({ obj: c.obj, remove: c.rm }); cars.length = 0; if (LI) { LI.clear(); LI = null; } for (const l of lanes) l.cars.length = 0; for (const n of nodes.values()) for (const c of n.conns) c.cars.length = 0; },
+    clear() { if (POOL) { opts.scene.remove(POOL); POOL.geometry.dispose(); POOL.material.map.dispose(); POOL.material.dispose(); POOL.dispose(); POOL = null; } for (const sp of spots) { opts.scene.remove(sp); opts.scene.remove(sp.target); sp.dispose(); } spots.length = 0; for (const c of cars) drop({ obj: c.obj, remove: c.rm }); cars.length = 0; if (LI) { LI.clear(); LI = null; } for (const l of lanes) l.cars.length = 0; for (const n of nodes.values()) for (const c of n.conns) c.cars.length = 0; },
     // светофарите: [{ node, x, z, arms: sigArms }] — за всички кръстовища със светофар (или само nodeId)
+    police(nodeId, on) { const n = nodes.get(nodeId); if (n) n.pol = on ? { arm: null, t: 0 } : null; return !!n; },   // #28: полицай на кръстовището
+    jams: () => [...nodes.values()].filter(n => n.jamT > 0 || n.pol).map(n => ({ node: n.id, t: n.jamT || 0, pol: n.pol ? n.pol.arm : undefined })),
     signals: nodeId => [...nodes.values()].filter(n => n.sig && (nodeId == null || n.id === nodeId)).map(n => ({ node: n.id, x: n.x, z: n.z, arms: sigArms(n) })),
-    stats: () => ({ cars: cars.length, cap: capacity, steps, left, waiting: cars.filter(c => c.wait > 0).length, parked, agents: nAg }),
+    stats: () => ({ pool: POOL ? [POOL.count, POOL.visible, +POOL.material.opacity.toFixed(2)] : null, night: nightOn, cars: cars.length, cap: capacity, steps, left, waiting: cars.filter(c => c.wait > 0).length, parked, agents: nAg }),
     // агент (jp): превозно средство с предварително избран маршрут (junctionpaths.js → route()): { obj, len, w, kind, route: { paths, s0, s1 },
     // onArrive(c), cab, trailer: { obj, len } (влекач с ремарке — len е общата дължина), vk — множител на скоростта }. Обектите са на викащия (не се трият).
     addAgent(a) {
@@ -378,6 +396,13 @@ export function createTraffic(opts) {
 // ---- светлините на колите-инстанции: четири общи InstancedMesh (фарове, стопове, мигачи, светлото петно на асфалта пред колата) —
 // 4 draw calls за всички коли.
 // begin(нощ 0…1) → car(x, z, yaw, дължина, ширина, височина, спира, ляв, десен) за всяка кола → end()
+// car-pools: светлото петно пред фаровете — четириъгълник 4,4 × 10 м с мек градиент (най-ярко до колата)
+function poolMesh(scene, max) {
+  const cv = document.createElement('canvas'); cv.width = 64; cv.height = 128; const x = cv.getContext('2d'), g = x.createRadialGradient(32, 8, 2, 32, 30, 70);
+  g.addColorStop(0, 'rgba(255,240,210,1)'); g.addColorStop(0.45, 'rgba(255,235,200,0.45)'); g.addColorStop(1, 'rgba(255,230,190,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 128);
+  const m = new THREE.InstancedMesh(new THREE.PlaneGeometry(4.4, 10).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending, color: 0xfff0d8 }), max);
+  m.count = 0; m.frustumCulled = false; m.renderOrder = 2; m.userData.max = max; scene.add(m); return m;
+}
 export function lampInstances(scene, max) {
   const t = truckLamps().front.emissiveMap, mk = col => new THREE.MeshBasicMaterial({ color: col, map: t, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
   const geo = new THREE.PlaneGeometry(0.9, 0.9), fs = feature('car-lens') ? 0.42 : 0.9, F = new THREE.InstancedMesh(new THREE.PlaneGeometry(fs, fs), mk(0xfff0d0), max),   /* car-lens (55): леща ~0,4 м вместо петно 0,9 м */ R = new THREE.InstancedMesh(geo, mk(0xffffff), max), K = new THREE.InstancedMesh(geo, mk(0xffa21a), max * 2);

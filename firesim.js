@@ -261,5 +261,8 @@ export function createFires(deps) {
   }
   // при влизане в града: отказаните/обезопасените пазят парцела; поръчката в изчакване — пак се показва
   function sync() { for (const id of [...vis.keys()]) drop(id); for (const f of st()) { if (f.city !== deps.cityId()) continue; const lot = lotOf(f); if (lot && f.st === 'secured') lot.busy = 'secured'; } const p = st().find(f => f.city === deps.cityId() && f.order && f.order.st === 'offer'); if (p) setTimeout(() => ask(p), 1500); }
-  return { start, update, dailyTick, sync, accept, decline, state: st, drop };
+  // #14: пожарната на път (с бурканите) — за трафика: колите пред нея отбиват и спират (тя се движи по разписание и не чака)
+  const _mw = new THREE.Vector3();
+  const movers = () => { const out = []; for (const f of st()) { if (f.st !== 'travel') continue; const v = vis.get(f.id); if (!v || !v.truck || !v.truck.visible) continue; v.truck.getWorldPosition(_mw); out.push({ x: _mw.x, z: _mw.z, yaw: v.truck.rotation.y, l: 9, w: 2.6, em: true }); } return out; };
+  return { start, update, dailyTick, sync, accept, decline, state: st, drop, movers };
 }
