@@ -194,6 +194,7 @@ const DEMOS = [
   ['⛽ Бензиностанциите — колонките към улицата (първата, после втората след 5 s)', 'sofia', d => { setTimeout(() => d.gasFaceLook(0), 1500); setTimeout(() => d.gasFaceLook(1), 6500); }],   // gas-face
   ['⚙️ Звук, известия, помощ, задачи, куести и съвети — в Настройки (⚙️ с брояч, когато чакат задачи/награди)', 'sofia', d => { setTimeout(() => d.settingsOpen(), 2500); }],   // top-set
   ['🏢 Блоковете нощем — цели прозорци, топли/хладни/телевизор (София: ден → 22:00 → 02:00)', 'sofia', d => { const go = hr => { d.time(hr); let t = null; d.city().group.traverse(o => { if (!t && o.userData && o.userData.src === 'sf-blk-soviet') t = o; }); if (t) { const p = t.getWorldPosition(t.position.clone()); d.camAt(p.x + 34, 22, p.z + 44, p.x, 9, p.z); } }; setTimeout(() => go(13), 3000); setTimeout(() => go(22), 9000); setTimeout(() => go(2), 16000); }],   // blk-night
+  ['🏛️ Триумфалната арка (модел от Meshy) — ден, после нощ (Париж)', 'paris', d => { const go = () => { const L = d.city().landmarks, i = L.findIndex(o => o.kind === 'arc2'); if (i >= 0) d.lookLm(i, 90); }; setTimeout(go, 3000); setTimeout(() => { d.time(22); go(); }, 10000); }],   // lm-arc2
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
