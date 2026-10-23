@@ -1529,7 +1529,7 @@ const machineCount = () => units.filter(u => isMachine(u.type) && !isRoadGear(u.
 // 🏢 (hq-campus) гаражът/складът, чийто парцел е зает от сграда и няма свободен — рисуват се отзад в централата (S.campusIn)
 // вписва обект (още без родител — координатите са в групата на парцела) в правоъгълника [x0,x1]×[z0,z1]: само смалява, центрира
 function campusFit(o, x0, x1, z0, z1) {
-  if (feature('real-sizes') && SECTIONS[o.userData.src]) { const n = o.userData.src, k = o.scale.x;   /* real-sizes (55): секцията, която се побира в истински размер, вместо смаляване */
+  if (feature('real-sizes') && SECTIONS[o.userData.src]) { const n = o.userData.src, k = o.userData.k0 ??= o.scale.x; o.scale.setScalar(k);   /* №8: мащабът от първото извикване (второто беше върху вече смаления) */   /* real-sizes (55): секцията, която се побира в истински размер, вместо смаляване */
     const v = [n, ...SECTIONS[n].cuts.map((f, i) => sectName(n, i))].filter(v => A[v]).find(v => { const s = sizeOf(v).getSize(new THREE.Vector3()); return s.x * k <= x1 - x0 && s.z * k <= z1 - z0; });
     if (v && v !== n) { o.clear(); for (const c of A[v].scene.clone(true).children) o.add(c); o.userData.sect = v; } }
   o.updateMatrixWorld(true); let b = new THREE.Box3().setFromObject(o); const s = b.getSize(new THREE.Vector3());
@@ -2191,6 +2191,19 @@ let jpR = null;
 // #28 (jam-police): задръстване на кръстовище (traffic.js onJam) — идва полицейска кола (инцидент 'jam'); щом пристигне, полицаят регулира
 // (tr2.police: пуска подходите един по един), когато си тръгне — обратно светофарът/предимството
 let jamNode = null, jamOn = false;
+// #6 (road-radio): инцидентът затваря улицата (incidents.blockers) → малко известие „🚧 Пътят при … е затворен — обходен маршрут“ с радио-сигнал;
+// при отваряне — „✅ Пътят … е отворен“. Звукът: assets/sfx/radio-road.mp3 (радиошум + сигнал, смесени от radio-tune/radio-alert)
+let roadShut = null;
+function streetNm(x, z) {
+  const P2 = city.plan && city.plan.p2; if (!P2) return ''; const o = city.plan.offset || [0, 0], px = x - o[0], pz = z - o[1]; let best = '', bd = 1e9;
+  for (const rd of P2.roads) { if (!rd.nm) continue; const p = rd.pts; for (let k = 1; k < p.length; k++) { const ax = p[k - 1][0], az = p[k - 1][1], dx = p[k][0] - ax, dz = p[k][1] - az, t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / (dx * dx + dz * dz || 1))), d = Math.hypot(ax + dx * t - px, az + dz * t - pz); if (d < bd && d < rd.w / 2 + 6) { bd = d; best = rd.nm; } } }
+  return best;
+}
+function roadNotice() {
+  if (!feature('road-radio') || !incidents.blockers) return; const b = incidents.blockers(), on = b.length > 0;
+  if (on && !roadShut) { roadShut = { nm: streetNm(b[0].x, b[0].z) }; toast(`🚧 Пътят${roadShut.nm ? ` при „${roadShut.nm}“` : ''} е затворен — движението е по обходен маршрут`); Sound.file('assets/sfx/radio-road.mp3', 0.6); }
+  else if (!on && roadShut) { toast(`✅ Пътят${roadShut.nm ? ` при „${roadShut.nm}“` : ''} е отворен`, 'good'); Sound.file('assets/sfx/radio-road.mp3', 0.45); roadShut = null; }
+}
 function jamPolice(j) {
   if (!feature('jam-police') || !tr2 || jamNode != null || incidents.active) return;
   const o = tr2G ? tr2G.position : { x: 0, z: 0 }, r = incidents.start('jam', { x: j.x + o.x, z: j.z + o.z }); if (r) { jamNode = j.node; jamOn = false; }
@@ -10374,6 +10387,7 @@ function frame() {
       updateSignals(rdt * Math.max(1, speed));
       incidents.update(rdt * Math.max(1, speed), rdt);
       jamTick();   // #28: полицаят на задръстеното кръстовище
+      roadNotice();   // #6: радио-известие при затворена/отворена улица
     }
     updateProjects(dt / DAY_SEC);
     updateRails(dt / DAY_SEC);
