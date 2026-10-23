@@ -269,7 +269,7 @@ export function createTraffic(opts) {
     if (opts.onJam && steps % 30 === 0) for (const n of nodes.values()) { if (n.ring || n.deg < 3 || n.pol) continue; let q = 0; for (const l of n.inL) for (const c of l.cars) if (c.v < 0.3) q++;
       const stuck = n.inL.some(l => { const h = l.cars[l.cars.length - 1]; return h && h.wait > 30; });   // първата в опашката чака повече от цял цикъл на светофара
       n.jamT = q >= JAM_N && stuck ? (n.jamT || 0) + 1 : 0; if (n.jamT >= JAM_S && !(n.jamCd > steps)) { n.jamCd = steps + 30 * 240; n.jamT = 0; opts.onJam({ node: n.id, x: n.x, z: n.z, q }); } }
-    const MV = opts.movers ? opts.movers() : [];
+    const MV = opts.movers ? opts.movers() : [], XS = opts.crossings ? opts.crossings() : [];   // XS — прелезите: { x, z, ux, uz (посоката на улицата), h (половината зона по улицата до бариерата), on }
     // #14: спешните с буркани (линейка/полиция/пожарна от трафика и идващите към инцидент) — колите пред тях отбиват вдясно и спират, те минават покрай тях
     for (const c of cars) c.emOn = !!c.em && beaconsLit(c.obj);
     const EMV = [...cars.filter(c => c.emOn).map(e => ({ x: e.x, z: e.z, yaw: e.yaw, self: e })), ...MV.filter(m => m.em)], SIDE = opts.drive === 'left' ? -1 : 1;   // извън трафика (техниката по стария път, ТИР без агент, спешните коли): { x, z, l, w } — колите спират пред тях
@@ -289,6 +289,12 @@ export function createTraffic(opts) {
       }
       for (const m of MV) { const dx = m.x - c.x, dz = m.z - c.z; if (dx * dx + dz * dz > 1600) continue; const fw = dx * Math.sin(c.yaw) + dz * Math.cos(c.yaw), sd = Math.abs(dx * Math.cos(c.yaw) - dz * Math.sin(c.yaw));
         if (fw > 0 && fw < 35 && sd < (m.w || 2.5) / 2 + (c.w || 2) / 2 + 0.3) { const g = fw - c.L / 2 - (m.l || 5) / 2 - 1; if (g < gap) { gap = Math.max(0, g); dv = c.v; c.why = 'машина отпред'; } } }
+      // #16 прелезът: стоп линия 3 м пред бариерата, когато е спусната/идва влак; и никога не влиза, ако след прелеза няма място за цялата кола (да не остане на релсите)
+      for (const X of XS) { const dx = X.x - c.x, dz = X.z - c.z; if (dx * dx + dz * dz > 6400) continue; const hx = Math.sin(c.yaw), hz = Math.cos(c.yaw);
+        if (Math.abs(hx * X.ux + hz * X.uz) < 0.5 || Math.abs(dx * hz - dz * hx) > 12) continue;   // не е по тази улица
+        const along = dx * hx + dz * hz, front = c.L / 2, nearD = along - X.h - 3, farD = along + X.h; if (front > nearD + 0.6 || nearD > 60) continue;   // вече е вътре — довършва
+        const room = !ld || ld.v > 4 || front + ld.gap - S0 - c.L >= farD + 1;
+        if (X.on || !room) { const g = nearD - front; if (g < gap) { gap = Math.max(0, g); dv = c.v; } c.why = 'прелез'; } }
       const blk = c.why === 'прелез';
       // стоп линията: ако не може да влезе — виртуално препятствие в края на лентата
       const stop = c.p.kind === 'lane' && c.next && c.p.len - c.s < 22 && !mayEnter(c);

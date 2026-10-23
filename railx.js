@@ -76,5 +76,5 @@ export function createRailX(deps) {
   // точките, пред които колите спират (traffic.js): прелезите с включени светлини
   const blockers = () => xs.filter(X => X.on).flatMap(X => X.block);
   const dispose = () => { deps.group.remove(root); };
-  return { update, blockers, dispose, list: () => xs.map(X => ({ x: X.c.x, z: X.c.z, ang: X.c.ang, on: X.on })), count: () => ({ crossings: xs.length, portals: (deps.portals || []).length, on: xs.filter(X => X.on).length }) };
+  return { update, blockers, dispose, list: () => xs.map(X => ({ x: X.c.x, z: X.c.z, ang: X.c.ang, on: X.on, x0: X.c.x0, x1: X.c.x1, w: X.c.w })),   /* x0/x1 — релсите (за спирането на колите, #16) */ count: () => ({ crossings: xs.length, portals: (deps.portals || []).length, on: xs.filter(X => X.on).length }) };
 }

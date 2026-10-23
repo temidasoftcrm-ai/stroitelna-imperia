@@ -2185,7 +2185,7 @@ function traffic2Make() {
   if (tr2) tr2.clear(); if (tr2G) { scene.remove(tr2G); tr2G = null; }
   const p2 = city.plan && city.plan.p2;   // планът v2: лентите от planNetwork, колите — в група, изместена с offset (като 3D изгледа на плана)
   if (p2) { tr2G = new THREE.Group(); tr2G.position.set(city.plan.offset[0], 0, city.plan.offset[1]); scene.add(tr2G); }
-  tr2 = createTraffic({ scene: tr2G || scene, camera, movers: () => moversNow(), onJam: j => jamPolice(j), jp: feature('junction-paths'), drive: p2 && p2.drive === 'L' ? 'left' : 'right', maxCars: wantedTraffic(), blockers: () => [...(railx ? railx.blockers() : []), ...(incidents.blockers?.() || [])].map(b => p2 ? { x: b.x - city.plan.offset[0], z: b.z - city.plan.offset[1] } : b),   /* + затворената улица при инцидент (incidents2, 55) */   // camera — истинските фарове само за най-близките коли
+  tr2 = createTraffic({ scene: tr2G || scene, camera, movers: () => moversNow(), onJam: j => jamPolice(j), jp: feature('junction-paths'), drive: p2 && p2.drive === 'L' ? 'left' : 'right', maxCars: wantedTraffic(), crossings: () => crossingsNow(), blockers: () => [...(railx && !feature('railx-stop') ? railx.blockers() : []), ...(incidents.blockers?.() || [])].map(b => p2 ? { x: b.x - city.plan.offset[0], z: b.z - city.plan.offset[1] } : b),   /* + затворената улица при инцидент (incidents2, 55) */   // camera — истинските фарове само за най-близките коли
     ...(p2 ? { built: planNetwork(p2, { jp: feature('junction-paths') }) } : { net: gridNetwork({ NBI, NBJ, tx, isRoad, TILE, signal: (i, j) => signals.some(s => s.i === i && s.j === j) }) }),
     makeCar: () => { addCar(); const t = traffic.pop(); if (!t) return null; const heavy = /Bus|Truck|Firetruck|firetruck|kenworth|sf-bus-/.test(t.obj.userData.src || '');
       if (tr2G) { const k = t.len > 3 && t.len < 14 ? 1 : (heavy ? 11 : 4.5) / (t.len || 4.5);   /* колите вече са в истинския размер (sf-car-* и резервите с kidK) — не ги изравняваме до 4,5 м; само ако мярката е сбъркана (55) */ t.obj.scale.multiplyScalar(k); t.len = (t.len || 4.5) * k; tr2G.add(t.obj); }   // планът v2 е в истински метри — колите в истинския си размер
@@ -2220,6 +2220,11 @@ function jamTick() {
   if (jamNode == null) return; const a = incidents.active, on = !!(tr2 && a && a.type === 'jam' && a.stages.length && a.stages.every(s => s === 'hold'));
   if (on !== jamOn && tr2) { tr2.police(jamNode, on); jamOn = on; }
   if (!a || a.type !== 'jam' || !tr2) { if (tr2 && jamOn) tr2.police(jamNode, false); jamNode = null; jamOn = false; }
+}
+// #16 (railx-stop): прелезите за трафика — центърът, посоката на улицата и половината зона по улицата (релсите x0…x1 под ъгъла на улицата + бариерата)
+function crossingsNow() {
+  if (!railx || !feature('railx-stop')) return []; const o = tr2G ? tr2G.position : { x: 0, z: 0 };
+  return railx.list().map(X => { const ux = Math.cos(X.ang), uz = -Math.sin(X.ang), h = Math.max(((X.x1 ?? X.x) - (X.x0 ?? X.x)) / 2 + 4, ((X.x1 ?? X.x) - (X.x0 ?? X.x)) / 2 / Math.max(0.3, Math.abs(ux)) + 2.5); return { x: X.x - o.x, z: X.z - o.z, ux, uz, h, on: X.on }; });
 }
 function moversNow() {
   const o = tr2G ? tr2G.position : { x: 0, z: 0 }, out = [];
@@ -11159,6 +11164,9 @@ if (AUTOTEST) {
     unitRepair: () => unitRepair(),
     unitBreakTest() { const idle = units.filter(u => u.state === 'idle' && !u.proj); if (idle.length < 3) return 'малко техника: ' + idle.length; const [A, B, C] = idle; A.proj = { title: 'призрак' }; A.state = 'working'; B.state = 'driving'; const far = city.lots[(city.lots.length / 2) | 0]; C.state = 'returning'; sendTo(C, far.x, far.z, () => { C.state = 'idle'; C.tagArrived = 1; }); C.state = 'returning'; C.moveD = 2; const before = __dbg.units(); const log = unitRepair(); return { log, before: before.slice(0, 3), after: __dbg.units().slice(0, 3), arrived: !!C.tagArrived }; },   /* #12: изкуствено заседнала техника → unitRepair */
     peds: () => { let ov = 0; for (let i = 0; i < peds.length; i++) for (let j = i + 1; j < peds.length; j++) if (Math.hypot(peds[i].x - peds[j].x, peds[i].z - peds[j].z) < 0.4) ov++; return { n: peds.length, want: wantedPeds(), waiting: peds.filter(p => p.wt > 0).length, maxWt: Math.round(Math.max(0, ...peds.map(p => p.wt || 0))), overlaps: ov, anim: peds.filter(p => p.wa && p.ia).length }; },   /* #10 */
+    railBad() { if (!tr2 || !railx) return null; const XS = crossingsNow(); let bad = 0, wait = 0; for (const X of XS) for (const c of tr2.cars) { const dx = c.x - X.x, dz = c.z - X.z, al = Math.abs(dx * X.ux + dz * X.uz), sd = Math.abs(dx * X.uz - dz * X.ux); if (sd < 8 && al < X.h - 2.5 && X.on) bad++; if (c.why === 'прелез') wait++; } return { xs: XS.length, on: XS.filter(X => X.on).length, bad, wait }; },   /* #16: коли на релсите при спусната бариера */
+    buses: () => cityBus.lines(),
+    busLook() { const s = cityBus.stops()[0]; if (!s) return null; const o = tr2G ? tr2G.position : { x: 0, z: 0 }; __dbg.time && __dbg.time(10); __dbg.lookAt(s.x + o.x, s.z + o.z, 30); return cityBus.lines(); },   /* #15: камерата на първата спирка */
     moverHits() { if (!tr2) return null; const M = moversNow(); let n = 0; for (const m of M) for (const c of tr2.cars) if (Math.hypot(c.x - m.x, c.z - m.z) < 2.5) n++; return { movers: M.length, hits: n, yielding: tr2.cars.filter(c => c.why === 'машина отпред').length, waiting: units.filter(u => u.wb > 0).length }; },   /* самосвалът през колите: колко коли са върху техниката извън трафика */
     unitTest() { const u = units.find(q => q.state === 'idle'); if (!u) return null; const far = [...city.lots].sort((a, b) => Math.hypot(b.x - u.x, b.z - u.z) - Math.hypot(a.x - u.x, a.z - u.z))[0]; u.state = 'driving'; sendTo(u, far.x, far.z, () => { u.state = 'idle'; }); return [u.type, Math.round(Math.hypot(far.x - u.x, far.z - u.z))]; },   /* junction-paths: машина до най-далечния парцел */
     tirTest(m = 'sand', delay = 0) { sendTir({ id: 9e8 + ((Math.random() * 1e6) | 0), matId: m, qty: 1 }, delay); return tirs.list.length; },   /* junction-paths: пробен ТИР (поръчката не съществува — складът не се променя) */
