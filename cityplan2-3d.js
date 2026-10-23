@@ -73,7 +73,8 @@ export function nightWin(mat, c, o = {}) {   // export — и за bgblocks.js
   for (let i = 0; i < W * H; i++) { if (lab[i] >= 0 || !dark(i)) continue; const st = [i], px = []; lab[i] = i;
     while (st.length) { const k = st.pop(); px.push(k); const x = k % W, y = (k / W) | 0; for (const n of [x > 0 && k - 1, x < W - 1 && k + 1, y > 0 && k - W, y < H - 1 && k + W]) if (n !== false && lab[n] < 0 && dark(n)) { lab[n] = i; st.push(n); } }
     if (px.length < 6 || px.length > W * H / 20) continue;   // точки и линии — не са прозорци
-    if (rnd() > (o.lit || 0.25)) continue; const warm = rnd() < 0.9, k2 = 0.45 + rnd() * 0.4,   /* потребителят: „като дискотека“ — светнали ~25 %, по-тъмни, 10 % бели */ col = warm ? [255, 196, 110] : [200, 225, 255];
+    const VIV = feature('blk-night');   /* blk-night: блоковете нощем — повече светнали, по-разнообразни (жълто, кехлибарено, топло бяло, хладно бяло, синкаво — телевизор) */
+    if (rnd() > (VIV ? Math.max(o.lit || 0.25, 0.42) : (o.lit || 0.25))) continue; const warm = rnd() < 0.9, k2 = VIV ? 0.6 + rnd() * 0.4 : 0.45 + rnd() * 0.4,   /* потребителят: „като дискотека“ — светнали ~25 %, по-тъмни, 10 % бели */ col = VIV ? (h => h < 0.42 ? [255, 160, 70] : h < 0.7 ? [255, 196, 110] : h < 0.83 ? [245, 222, 185] : h < 0.93 ? [190, 210, 255] : [90, 120, 255])(rnd()) : warm ? [255, 196, 110] : [200, 225, 255];
     for (const q of px) { D[q * 4] = col[0] * k2; D[q * 4 + 1] = col[1] * k2; D[q * 4 + 2] = col[2] * k2; } }
   for (let i = 3; i < D.length; i += 4) D[i] = 255;
   g.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(out); t.colorSpace = THREE.SRGBColorSpace;

@@ -193,6 +193,7 @@ const DEMOS = [
   ['🚗 Движението расте с квартала: над застроеното — много коли и хора, над празното — малко (Пловдив: центърът, после най-празният край)', 'plovdiv', d => { setTimeout(() => d.growLook(false), 8000); setTimeout(() => d.growLook(true), 22000); setTimeout(() => d.growLook(false), 36000); }],   // traffic-grow (#42.8)
   ['⛽ Бензиностанциите — колонките към улицата (първата, после втората след 5 s)', 'sofia', d => { setTimeout(() => d.gasFaceLook(0), 1500); setTimeout(() => d.gasFaceLook(1), 6500); }],   // gas-face
   ['⚙️ Звук, известия, помощ, задачи, куести и съвети — в Настройки (⚙️ с брояч, когато чакат задачи/награди)', 'sofia', d => { setTimeout(() => d.settingsOpen(), 2500); }],   // top-set
+  ['🏢 Блоковете нощем — цели прозорци, топли/хладни/телевизор (София: ден → 22:00 → 02:00)', 'sofia', d => { const go = hr => { d.time(hr); let t = null; d.city().group.traverse(o => { if (!t && o.userData && o.userData.src === 'sf-blk-soviet') t = o; }); if (t) { const p = t.getWorldPosition(t.position.clone()); d.camAt(p.x + 34, 22, p.z + 44, p.x, 9, p.z); } }; setTimeout(() => go(13), 3000); setTimeout(() => go(22), 9000); setTimeout(() => go(2), 16000); }],   // blk-night
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
