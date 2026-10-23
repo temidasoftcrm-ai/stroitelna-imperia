@@ -576,5 +576,6 @@ export function createCinema(deps) {
     document.body.appendChild(el);
   }
 
-  return { start, play, album, tick, due, scenes: () => SCENES.map(x => ({ key: x.key, nm: x.nm, seen: !!seen()[x.key] })), playing: () => playing && playing.key, close: () => playing && playing.close() };
+  const clipFor = id => { const x = SCENES.find(q => q.city === id && q.video && !q.start); return x && !seen()[x.key] ? x.key : null; };   // branch-clip (55): градът има клип, който още не е гледан
+  return { start, play, album, tick, due, clipFor, scenes: () => SCENES.map(x => ({ key: x.key, nm: x.nm, seen: !!seen()[x.key] })), playing: () => playing && playing.key, close: () => playing && playing.close() };
 }

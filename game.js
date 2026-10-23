@@ -4814,7 +4814,7 @@ function openBranchNow(id) {
         S.branchPaid = { ...(S.branchPaid || {}), [id]: cost + extra - disc };   // за оценката при продажба
         dev.add(dev.XP.branch);
         S.cities[id] = { ...newCityState(), left: nowDays() };   // начален екип: бригада, багер, самосвал
-        toast(`🏢 Отвори филиал в ${c.nm}!`, 'good'); showEventPop('new-branch', `📍 Нов филиал: ${c.nm}`, 'Влез в града от картата и строй и там.'); if (stingOk(id)) setTimeout(() => Sound.file(CITY_STING[id], 0.7), 1200); else Sound.play('branch'); save(); showMap(true);
+        toast(`🏢 Отвори филиал в ${c.nm}!`, 'good'); showEventPop('new-branch', `📍 Нов филиал: ${c.nm}`, 'Влез в града от картата и строй и там.'); if (stingOk(id)) setTimeout(() => Sound.file(CITY_STING[id], 0.7), 1200); else Sound.play('branch'); save(); showMap(true); if (feature('branch-clip') && cine.clipFor && cine.clipFor(id)) setTimeout(() => switchCity(id), 1500);   /* №3 (55): град с клип (Ню Йорк, Париж, Токио…) — влизаш в него и клипът тръгва (веднъж) */
 }
 // столиците и големите градове (Рим, Лондон, Барселона…): филиалът е с фиксирана цена CAPITAL_BRANCH, колкото и филиали да имаш
 const CAPITAL_BRANCH = 25000000;
@@ -10895,6 +10895,8 @@ if (AUTOTEST) {
       S.whLevel = lv; if (S.whLot == null || !city.lots[S.whLot]) { const l = city.lots.find(x => !x.built && !x.busy && x !== city.hq && x.plan) || city.lots.find(x => !x.built && !x.busy && x !== city.hq); if (!l) return null; S.whLot = l.id; l.busy = 'wh'; }
       buildWarehouse(); refreshWarehouse && refreshWarehouse(); const l = city.lots[S.whLot], w = city.whGroup.children.find(c => c.userData.wh2), b = w ? new THREE.Box3().setFromObject(w).getSize(new THREE.Vector3()) : null;
       __dbg.camAt(l.x + 10, 38, l.z + 22, l.x, 2, l.z); return { lv, lot: l.id, lw: l.w, ld: l.d, model: w && (w.userData.sect || w.userData.wh2), size: b && [+b.x.toFixed(1), +b.y.toFixed(1), +b.z.toFixed(1)] }; },
+    branchClipTest(id = 'newyork') {   // 🎬 branch-clip (55): отваря филиал в град с клип (клипът — като негледан) → влиза в града и го пуска
+      econ.earn(1e10, 'друго', 'тест'); if (S.cine && S.cine.seen) for (const k of Object.keys(S.cine.seen)) if (k === id) delete S.cine.seen[k]; S.branches = (S.branches || []).filter(x => x !== id); if (S.cities) delete S.cities[id]; openBranchNow(id); return { clip: cine.clipFor && cine.clipFor(id), branches: S.branches.length }; },
     sectRow(night) {   // 📏 real-sizes (55): панелните блокове и секциите им в редица, в истински размер (кубът отпред — 1,8 м човек)
       if (city.sectRow) city.group.remove(city.sectRow); const G = city.sectRow = new THREE.Group(), x0 = tx(NI - 1) + 50, z0 = tx(0) - 40, V3 = () => new THREE.Vector3(); let x = x0;
       for (const n of Object.keys(SECTIONS)) { if (!A[n]) continue; const k = SECTIONS[n].H / sizeOf(n).getSize(V3()).y;
