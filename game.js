@@ -471,7 +471,7 @@ addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; cam
 
 // ============================================================ assets
 const loader = new GLTFLoader();
-const load = url => new Promise((res, rej) => loader.load(url, res, undefined, rej));
+const load = (url, tries = 3) => new Promise((res, rej) => loader.load(url, res, undefined, e => tries > 1 ? setTimeout(() => load(url, tries - 1).then(res, rej), 800 * (4 - tries)) : rej(e)));   // повторен опит: GitHub Pages връща 503 няколко минути след пускане — един модел не бива да спира играта на 99%
 // истинските цветни къщи (assets/heavy/houses2, Sketchfab CC-BY) — всяка с отделно „✓ OK“ в Лабораторията (feature = името ѝ); добавят се към HOUSES
 const H2 = ['h2-greyporch', 'h2-brickcabin', 'h2-pink', 'h2-townhouse', 'h2-blue', 'h2-swedish', 'h2-lodge', 'h2-porch'].filter(n => feature(n));
 // бензиностанциите (decorLot) — тук, преди зареждането
@@ -552,7 +552,7 @@ let europe = null;
   let done = 0;
   const ldT0 = performance.now();
   jobs.forEach(j => j.then(() => { const k = Math.round(++done / jobs.length * 100); $('ldBar').style.width = Math.max(3, k) + '%'; $('ldTxt').textContent = `Зареждане… ${k}%`; }));
-  await Promise.all(jobs);
+  await Promise.all(jobs.map(j => Promise.resolve(j).catch(e => console.warn('asset', e && e.message || e))));   // липсващ/недостъпен модел не спира играта
   await loadConstruct(load, A);
   if (feature('site-anim')) await loadSiteRigs(load, A).catch(() => {});   // 🏗️ кранът и багерът с истински стави (Blender)   // строежите: кулокран, контейнери, тоалетна, материали, самосвали, бетоновоз — истинските (construct.js) под старите имена
   await loadIndustry(load, A);   // истинските заводи, водни кули, турбини и соларни панели (industry.js) — заместват детските 'ind-*' (Лабораторията → ind-real)
