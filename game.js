@@ -1747,11 +1747,11 @@ function buildWarehouse() {
 // офисът и (докато е малък) гаражът стоят на парцела на централата; голямият гараж и складът — на свои парцели
 // 🏨 hotel5-* (55): одобрените модели за 5★/Гранд хотел — по региона на града (Залива → Бурж, Азия → Марина Бей, Америка → Мариот, изтокът → Роза Хутор, Европа → Острив);
 // моделът се зарежда при нужда и офисът се прерисува, щом дойде
-const HOTEL5 = ['burj', 'mbs', 'marriott', 'ostriv', 'rosa'], hotel5Wait = new Set();
+const HOTEL5 = ['burj', 'mbs', 'marriott', 'ostriv', 'rosa', 'paris'], hotel5Wait = new Set(), H5_WEST = new Set(['🇫🇷', '🇧🇪', '🇳🇱', '🇱🇺', '🇨🇭', '🇩🇪', '🇦🇹', '🇮🇹', '🇪🇸', '🇵🇹', '🇬🇧', '🇮🇪', '🇩🇰', '🇲🇨', '🇸🇪', '🇳🇴', '🇫🇮']);   // hotel5-paris: Франция и Западна Европа
 function hotel5Of(id) {
   const h = (S.hotels || {})[id]; if (!h || (h.t || 0) < 2) return null; const ok = HOTEL5.filter(n => feature('hotel5-' + n)); if (!ok.length) return null;
   const c = cityById(id) || {}, cc = c.cc || '🇧🇬', gulf = ['🇦🇪', '🇶🇦', '🇸🇦', '🇰🇼', '🇧🇭', '🇴🇲'].includes(cc), reg = carRegion(id);
-  const pref = gulf ? 'burj' : reg === 'am' ? 'marriott' : reg === 'ru' ? 'rosa' : reg === 'xx' ? 'mbs' : 'ostriv', n = ok.includes(pref) ? pref : ok[hashStr('h5:' + id) % ok.length], key = 'hotel5-' + n;
+  const pref = gulf ? 'burj' : reg === 'am' ? 'marriott' : reg === 'ru' ? 'rosa' : reg === 'xx' ? 'mbs' : H5_WEST.has(cc) && ok.includes('paris') ? 'paris' : 'ostriv', n = ok.includes(pref) ? pref : ok[hashStr('h5:' + id) % ok.length], key = 'hotel5-' + n;
   if (A[key]) return key;
   if (!hotel5Wait.has(key)) { hotel5Wait.add(key); loader.load(`assets/heavy/hotels5/${key}.glb`, gl => { A[key] = gl; if (S && S.cityId === id) buildHQ(); }, undefined, () => {}); }
   return null;
