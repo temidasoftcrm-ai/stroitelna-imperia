@@ -3354,6 +3354,7 @@ function unitRepair() {
     if (u.proj && !alive.has(u.proj)) { log.push(u.type + ': няма обект'); releaseUnit(u); continue; }
     if (!u.proj && u.state !== 'idle' && u.state !== 'returning') { log.push(u.type + ': без задача'); releaseUnit(u); continue; }
     if (u.moveD > 1.5) { log.push(u.type + ': заседнал на пътя'); unitArrive(u); }
+    if (u.proj && u.state !== 'working' && !u.path && !u.agent && !(u.jpWaitT > 0)) { u.stD = (u.stD || 0) + 1; if (u.stD >= 2) { u.stD = 0; log.push(u.type + ': „на път“ без маршрут'); if (u.dest) unitArrive(u); else releaseUnit(u); } } else u.stD = 0;   // „на път“ 21 дни (24.10): вързана за обекта, но не се движи — 2 дни и се доставя (или се освобождава и dispatch я праща пак)
   }
   for (const q of projects) { const R = missingRoles(q), lack = R.filter(r => r.working + r.coming < r.cnt);
     if (lack.length !== 1 || R.some(r => r !== lack[0] && r.working + r.coming < 1)) continue;   // само ако стои единствено заради тази техника
