@@ -175,6 +175,7 @@ const DEMOS = [
   ['🛤️ Истинските релси на гарата (Пловдив)', 'plovdiv', d => setTimeout(() => d.lookSt(3, 30), 3000)],   // rail-real
   ['⚡ Контактната мрежа над коловозите (Пловдив: гарата, после прелеза)', 'plovdiv', d => { setTimeout(() => d.lookSt(3, 40), 3000); setTimeout(() => { const c = (d.city().railCross || [])[0]; if (c) d.camAt(c.x + 40, 22, c.z + 35, c.x, 3, c.z); }, 9000); }],   // catenary
   ['📦 Складовете 1–10 на свой парцел — в истински размер, в парцела (през 3 s следващото ниво)', 'plovdiv', d => { let lv = 1; const t = () => { d.whFitLook(lv); if (++lv <= 10) setTimeout(t, 3000); }; t(); }],   // real-sizes (№18)
+  ['🏛️ Котелническа висотка — на брега, не в реката (Москва)', 'moscow', d => { const go = () => { const L = d.city().landmarks, i = L.findIndex(o => o.kind === 'kotel'); if (i >= 0) d.lookLm(i, 220); }; setTimeout(go, 3000); }],   // kotel-shore
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

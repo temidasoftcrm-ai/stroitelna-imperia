@@ -529,6 +529,8 @@ const GLB_LM = {
   petronas: { h: 60, fit: 15, plate: 0xb9b2a5, floodK: 2.4, silver: 1.3, onLoad: petronasLights },   // silver — стомана и стъкло; нощем — етажите (nightfloors.js)   // Куала Лумпур: кулите Петронас (Meshy AI, от потребителя — 18.10); нощем сребристо осветени, червени светлини на шпиловете
   whitehouse: { h: 9, fit: 15, plate: 0x6f9a55, matte: 0xf4f1ea, rx: -0.28, cut: [[-0.35, 0.95, 0.8, 1.6]], floodK: 2.2, onLoad: whMonument },   // cut — колата от модела, останала на тревата пред южната фасада; floodK — по-силни прожектори нощем   // Вашингтон: Белият дом с крилата (Void); моделът е наклонен ~16° — rx го изправя (иначе едната страна и крилата висят във въздуха)
   capitol: { h: 11, fit: 15, plate: 0x6f8f55, floodK: 3 },   // Вашингтон: Капитолият (Meshy AI, от потребителя — 18.10; преди: фотоскан на ycpan3468)
+  // 🇺🇸 Вашингтон по истинската карта (washington-osm): същите модели, но h = истинската височина на модела при основа 15 (иначе lmH лъже и game.js го смачква) — Капитолият 229 × 88 м, Белият дом без обелиска (Монументът е отделно, на истинското си място)
+  capitol2: { file: 'capitol', h: 5.75, fit: 15, plate: 0x6f8f55, floodK: 3 }, whitehouse2: { file: 'whitehouse', h: 1.8, fit: 15, plate: 0x6f9a55, matte: 0xf4f1ea, rx: -0.28, cut: [[-0.35, 0.95, 0.8, 1.6]], floodK: 2.2 },
   vegassign: { h: 14, fit: 12, plate: 0xc9b98a },   // Лас Вегас: табелата „Welcome to Fabulous Las Vegas“ (sipulitrade)
   mgu: { h: 16, fit: 15, plate: 0x6f8f55 },
   kotel: { file: 'mgu', h: 14.6, fit: 15, plate: 0x8a8580, crop: [-4.4, 4.4, -3.9, 1.0] },   // Москва: Котелническа висотка (lm-kotel) — моделът на МГУ, изрязан до централната кула с крилата (без парка и площада); ръстът 176 м — game.js LM_REAL_H   // Москва: МГУ — сталинският небостъргач с крилата и парка (Meshy AI); голяма зона 2×2 (BIG_LANDMARKS)
@@ -810,6 +812,60 @@ function bellagio() {
   return g;
 }
 const BUILD = { pyramids, ...Object.fromEntries(Object.keys(GLB_LM).map(k => [k, () => glbLm(k)])), arc, ladefense, bigben, londoneye, towerbridge, shard, brandenburg, fernsehturm, reichstag, erasmus, cubes, markthal, derotterdam, euromast, canal: () => canal(0), canal2: () => canal(1), rijks, centraal, adam, windmill, bellagio, mosque2: () => mosque(1), bluemosque: () => mosque(0), topkapi, maiden, grandbazaar, haydarpasa, galata, sapphire, twist, twin, colosseum, stpeter, pantheon, vittoriano };
+// 🇺🇸 Вашингтон по истинската карта (washington-osm): Монументът на Вашингтон, Мемориалите на Линкълн и Джеферсън — процедурни, в истински метри
+// (game.js ги свежда до мащаба на картата по LM_REAL_H, както другите); без квадратната плоча — стоят на Мола
+function wmonument() {   // обелискът: 169 м, основа 16,8 м → 10,5 м под пирамидката; долната трета (до 46 м) — по-светъл мрамор (строежът спрял 1854–1879); кръг от 50 знамена
+  const g = new THREE.Group(), m1 = mat(0xf3efe6, 0.7, 0, { emissive: 0xffe9c8, emissiveIntensity: 0 }), m2 = mat(0xe6dfd0, 0.72, 0, { emissive: 0xffe9c8, emissiveIntensity: 0 });
+  m1.userData.floodK = m2.userData.floodK = 2.2;
+  cyl(g, 30, 31, 0.5, mat(0xd9d3c4, 0.95), 0, 0.25, 0, 40);   // кръглата площадка
+  const S2 = Math.SQRT2 / 2, sq = (rb, rt, h, m, y) => { const o = add(g, new THREE.CylinderGeometry(rt * S2, rb * S2, h, 4, 1), m, 0, y + h / 2, 0); o.rotation.y = Math.PI / 4; return o; };
+  const w = y => 16.8 - (16.8 - 10.5) * y / 152;   // страната на шахтата на височина y
+  box(g, 20, 1.2, 20, m2, 0, 1.1, 0);
+  sq(w(0), w(46), 46, m1, 1.7); sq(w(46), w(152), 106, m2, 47.7); sq(10.5, 0.3, 17, m2, 153.7);   // шахтата на две части + пирамидката
+  const red = mat(0x400000, 0.4, 0, { emissive: 0xff2020, emissiveIntensity: 0 });
+  for (const [x, z] of [[5.6, 0], [-5.6, 0], [0, 5.6], [0, -5.6]]) add(g, new THREE.SphereGeometry(0.5, 6, 4), red, x, 152, z);
+  const pole = mat(0xdddddd, 0.4, 0.4), stars = new THREE.MeshStandardMaterial({ color: 0x2b3a8a, side: THREE.DoubleSide }), stripes = new THREE.MeshStandardMaterial({ color: 0xc8102e, side: THREE.DoubleSide });
+  for (let k = 0; k < 50; k++) { const a = k / 50 * Math.PI * 2, x = Math.cos(a) * 25, z = Math.sin(a) * 25; cyl(g, 0.12, 0.12, 9, pole, x, 4.95, z, 5); const f = add(g, new THREE.PlaneGeometry(2.4, 1.5), k % 2 ? stars : stripes, x - Math.sin(a) * 1.2, 8.5, z + Math.cos(a) * 1.2); f.rotation.y = -a + Math.PI / 2; }
+  g.userData.flood = [m1, m2]; noFlood(g);
+  g.userData.sparkle = (t, night) => { red.emissiveIntensity = (Math.sin(t * 2.4) > 0.3 ? 2.2 : 0.15) * (0.25 + night); };
+  return g;
+}
+function lincoln() {   // гръцки храм: 58 × 36 м, 36 дорийски колони (по една за щат), атик; лицето (стълбите) — към +z, отвътре — седящият Линкълн
+  const g = new THREE.Group(), mb = mat(0xf2eee6, 0.75, 0, { emissive: 0xffe9c8, emissiveIntensity: 0 }), st = mat(0xd8d2c4, 0.9), dark = mat(0x3a3832, 0.9);
+  mb.userData.floodK = 2;
+  box(g, 64, 3, 44, st, 0, 1.5, -2);   // терасата
+  for (let k = 0; k < 8; k++) box(g, 34 - k * 0.5, 3 - k * 0.375, 1.6, st, 0, (3 - k * 0.375) / 2, 20 + k * 1.6);   // широките стълби към Мола
+  box(g, 58, 1.8, 36, mb, 0, 3.9, 0);   // стилобатът
+  box(g, 46, 13.4, 24, mb, 0, 4.8 + 6.7, 0); box(g, 14, 10, 0.3, dark, 0, 4.8 + 5, 12.05);   // целата и тъмният вход между колоните
+  box(g, 3.2, 3.4, 3, mb, 0, 6.5, 9.5); box(g, 3, 2.6, 2.4, mb, 0, 9.4, 9.2);   // седящият Линкълн (5,8 м)
+  const cols = []; for (let i = 0; i < 12; i++) { const x = -26.5 + i * 53 / 11; cols.push([x, -16], [x, 16]); } for (let j = 1; j < 7; j++) { const z = -16 + j * 32 / 7; cols.push([-26.5, z], [26.5, z]); }
+  for (const [x, z] of cols) cyl(g, 1.0, 1.13, 13.4, mb, x, 4.8 + 6.7, z, 10);
+  box(g, 58.6, 3.4, 36.6, mb, 0, 18.2 + 1.7, 0);   // антаблементът (фризът с имената на щатите)
+  box(g, 52, 1, 30, st, 0, 22.1, 0); box(g, 50, 2.6, 28, mb, 0, 23.9, 0);   // атикът
+  g.userData.flood = [mb]; noFlood(g);
+  return g;
+}
+function jefferson() {   // ротонда с 26 йонийски колони и плитък купол (39 м), портик с фронтон към +z (Тайдъл Бейсън и Белия дом)
+  const g = new THREE.Group(), mb = mat(0xf2eee6, 0.72, 0, { emissive: 0xffe9c8, emissiveIntensity: 0 }), st = mat(0xd8d2c4, 0.9);
+  mb.userData.floodK = 2;
+  cyl(g, 42, 43, 1.5, st, 0, 0.75, 0, 48); cyl(g, 30, 32, 2.5, mb, 0, 2.75, 0, 48);   // терасата и стъпалата
+  cyl(g, 19, 19, 14, mb, 0, 4 + 7, 0, 40);   // вътрешният барабан
+  for (let k = 0; k < 26; k++) { const a = k / 26 * Math.PI * 2; cyl(g, 0.8, 0.9, 12.7, mb, Math.sin(a) * 25, 4 + 6.35, Math.cos(a) * 25, 10); }
+  cyl(g, 26.5, 26.5, 3, mb, 0, 16.7 + 1.5, 0, 48); cyl(g, 24, 25, 3, mb, 0, 21.2, 0, 48);   // антаблементът и атикът
+  const d = add(g, new THREE.SphereGeometry(22.5, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2), mb, 0, 22.7, 0); d.scale.y = 0.72;   // куполът (връх ~39 м)
+  for (let k = 0; k < 8; k++) cyl(g, 0.8, 0.9, 12.7, mb, -11.6 + k * 23.2 / 7, 4 + 6.35, 36, 10);   // портикът
+  for (const sx of [-1, 1]) for (let r = 1; r < 3; r++) cyl(g, 0.8, 0.9, 12.7, mb, sx * 11.6, 4 + 6.35, 36 - r * 4.5, 10);
+  box(g, 26, 2.5, 13, mb, 0, 4 + 1.25 - 2.5, 32); box(g, 27, 3, 14, mb, 0, 16.7 + 1.5, 31);
+  const tri = new THREE.Shape(); tri.moveTo(-13.5, 0); tri.lineTo(13.5, 0); tri.lineTo(0, 5.5); tri.closePath();
+  const ped = new THREE.Mesh(new THREE.ExtrudeGeometry(tri, { depth: 14, bevelEnabled: false }), mb); ped.position.set(0, 19.7, 24); ped.castShadow = true; g.add(ped);
+  for (let k = 0; k < 10; k++) box(g, 26 - k * 0.3, 2.5 - k * 0.25, 1.2, st, 0, (2.5 - k * 0.25) / 2, 38.6 + k * 1.2);   // стълбите към водата
+  g.userData.flood = [mb]; noFlood(g);
+  return g;
+}
+// нощем в града (cityplan2-3d floodMats) светват само мраморите — не площадката, стъпалата и знамената
+function noFlood(g) { const keep = new Set(g.userData.flood); g.traverse(o => { if (o.isMesh) for (const m of [].concat(o.material)) if (m && !keep.has(m)) m.userData.flood = 1; }); }
+Object.assign(BUILD, { wmonument, lincoln, jefferson });
+Object.assign(LANDMARK_NM, { capitol2: 'Капитолият', whitehouse2: 'Белият дом', wmonument: 'Монументът на Вашингтон', lincoln: 'Мемориалът на Линкълн', jefferson: 'Мемориалът на Джеферсън' });
 
 // trees-more: истинско дърво (протото от играта — deps.trees) с височина h вместо зелен конус; null — няма модели или флагът е изключен
 let lmTrees = () => null; export const setLmTrees = f => { lmTrees = f; };   // game.js: истинските дървета на града (plan2Trees — в пустинните палми)
