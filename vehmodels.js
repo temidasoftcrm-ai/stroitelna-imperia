@@ -186,7 +186,8 @@ function loadRealTrucks(load, A) {
 
 // сирена: когато бурканите светнат на кола близо до камерата — веднъж на включване, не по-често от 14 s за всички
 // няколко записа на вид (Pixabay, CREDITS-pixabay.txt) — всяка кола си избира един и го пази
-const SIREN = { police: ['', '-2', '-3', '-4', '-5'].map(k => `assets/sfx/siren-police${k}.mp3`), fire: ['', '-2', '-3', '-4'].map(k => `assets/sfx/siren-fire${k}.mp3`), ambulance: ['assets/sfx/siren-ambulance.mp3'] };
+const SFX = n => new URL('assets/sfx/' + n, import.meta.url).href;   // спрямо модула — и от страниците в lab/ (иначе lab/assets/sfx → 404)
+const SIREN = { police: ['', '-2', '-3', '-4', '-5'].map(k => SFX(`siren-police${k}.mp3`)), fire: ['', '-2', '-3', '-4'].map(k => SFX(`siren-fire${k}.mp3`)), ambulance: [SFX('siren-ambulance.mp3')] };
 let sirenAt = -1e9;
 // сирена от кола (вид police/fire/ambulance) на разстояние d от камерата — общото ограничение (не една върху друга) важи и за incidents.js
 export function playSiren(kind, car, d, gap = 6) {
