@@ -74,9 +74,9 @@ export function createCityBus(deps) {
       for (const bus of line.buses) {
         if (!A.alive(bus.c)) { line.buses.splice(line.buses.indexOf(bus), 1); break; }   // трафикът е сменен — пак отначало
         if (bus.st !== 'dwell' || (bus.t -= dt) > 0) continue;
-        // следващата спирка, до която има път (трафикът е без смяна на лента — недостижимите се прескачат); дълго без път — изчезва и пак се появява на спирка
+        // следващата спирка (маршрутът сменя лентата по средата на улицата, hop — стигат се ~всички; недостижимите се прескачат); дълго без път — изчезва и пак се появява на спирка
         const c = bus.c, n = line.stops.length; let ok = false;
-        for (let k = 1; k <= n && !ok; k++) { const nx = (bus.i + k) % n, to = line.stops[nx], r = A.route({ p: c.p, s: c.s }, { p: to.p, s: to.s }, true, { anyFrom: true }); if (r && r.len > 20 && (r.paths[0] === c.p || A.laneTo(c, r.paths[0])) && A.retarget(c, r))   /* от която и да е успоредна лента — първо смяна на лентата */ { bus.i = nx; bus.st = 'go'; bus.err = ''; bus.fail = 0; ok = true; } }
+        for (let k = 1; k <= n && !ok; k++) { const nx = (bus.i + k) % n, to = line.stops[nx], r = A.route({ p: c.p, s: c.s }, { p: to.p, s: to.s }, true, { anyFrom: true, hop: true }); if (r && r.len > 20 && (r.paths[0] === c.p || A.laneTo(c, r.paths[0])) && A.retarget(c, r))   /* от която и да е успоредна лента — първо смяна на лентата */ { bus.i = nx; bus.st = 'go'; bus.err = ''; bus.fail = 0; ok = true; } }
         if (!ok) { bus.t = 3; bus.err = 'няма път'; if ((bus.fail = (bus.fail || 0) + 1) > 8) { A.remove(c); if (bus.obj.parent) bus.obj.parent.remove(bus.obj); line.buses.splice(line.buses.indexOf(bus), 1); break; } }   // няма път сега — след малко
       }
     }

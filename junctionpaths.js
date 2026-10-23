@@ -32,6 +32,7 @@ export function makeRouter(built) {
   // целта { x, z }: всички ленти до GOAL_SLACK м по-далеч от най-близката — и двете посоки на улицата (и съседната улица при ъглов парцел);
   // маршрутът спира на тази, до която се стига най-бързо, вместо да обикаля през задънения край/карето за отсрещната лента
   const GOAL_SLACK = 8;
+  const HOP_IN = 16, HOP_COST = 25;   // o.hop: смяната на лента — след HOP_IN м от началото на лентата (задницата е излязла от кръстовището), „цена“ HOP_COST м
   function goalsNear(x, z, B, ok) {
     const G = new Map();
     for (const L of lanes) { if (L.len < 4 || !ok(L)) continue; const q = proj(L, x, z); if (q && q.d <= B.d + GOAL_SLACK) G.set(L, Math.max(0.5, Math.min(q.s, L.len - 0.5))); }
@@ -62,6 +63,10 @@ export function makeRouter(built) {
         const dq = d + q.len; if (dist.has(q) && dist.get(q) <= dq) continue;
         dist.set(q, dq); prev.set(q, p); push([dq, q, false]);
       }
+      if (o.hop && p.kind === 'lane' && p.sibs) { const e = Math.max(seeds.includes(p) ? s0 : 0, HOP_IN), dIn = d - (p.len - (seeds.includes(p) ? s0 : 0));   /* смяна на лента по средата на улицата (автобусът): към успоредната лента на същото s, + HOP_COST м */
+        for (const q of p.sibs) { if (q === p || !okL(q) || (avoid && avoid.size && avoid.has(q) && !goals.has(q))) continue;
+          if (goals.has(q) && goals.get(q) >= e + 10) push([dIn + goals.get(q) - (seeds.includes(p) ? s0 : 0) + HOP_COST, p, true, q]);
+          if (p.len - e < 30) continue; const dq = d + HOP_COST; if (dist.has(q) && dist.get(q) <= dq) continue; dist.set(q, dq); prev.set(q, p); push([dq, q, false]); } }
     }
     if (!goalPrev) return o.heavy ? route(from, to, { ...o, heavy: false }) : avoid && avoid.size && !o.noAvoid ? route(from, to, { ...o, avoid: null, noAvoid: true }) : null;   /* без обход — през затвореното (ще чака отварянето) */   // камионът няма широк път — по обикновения
     const paths = [goalLane]; for (let p = goalPrev; p; p = seeds.includes(p) ? null : prev.get(p)) paths.push(p);

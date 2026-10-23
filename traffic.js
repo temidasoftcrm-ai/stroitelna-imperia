@@ -188,6 +188,11 @@ export function createTraffic(opts) {
   }
   const insert = (p, c) => { let k = 0; while (k < p.cars.length && p.cars[k].s < c.s) k++; p.cars.splice(k, 0, c); };
   const remove = (p, c) => { const k = p.cars.indexOf(c); if (k >= 0) p.cars.splice(k, 1); };
+  // смяна на лента (успоредна лента на същата улица): същото s, ако е свободно; рисуването — плавно (c.off → 0), мигачът — 3 s към новата лента
+  const isSib = (p, q) => !!(q && p.kind === 'lane' && q.kind === 'lane' && p.sibs && p !== q && p.sibs.includes(q));
+  const sideTo = (c, L2) => { const a = at(c.p, c.s, {}), b = at(L2, Math.min(c.s, L2.len), {}); return (a.x - b.x) * -Math.cos(c.yaw) + (a.z - b.z) * Math.sin(c.yaw) < 0 ? 'right' : 'left'; };   /* мигачът: 1,2 s преди смяната */
+  function hopTo(c, L2) { const s = Math.min(c.s, L2.len); if (!L2.cars.every(o => Math.abs(o.s - s) > (o.L + c.L) / 2 + 2)) return false;
+    const a = at(c.p, c.s, {}), b = at(L2, s, {}), lat = (a.x - b.x) * -Math.cos(c.yaw) + (a.z - b.z) * Math.sin(c.yaw); remove(c.p, c); c.p = L2; c.s = s; insert(L2, c); c.next = null; c.off = (c.off || 0) + lat; c.lcT = Math.max(c.lcT || 0, 2); c.lcSide = lat < 0 ? 'right' : 'left'; return true; }
   // следващата пътека: от лента — случайна връзка на възела (по-рядко обратно); от връзка — изходящата ѝ лента
   function pickNext(c) {
     if (c.route) { c.next = c.route[c.ri + 1] || null; return; }   // агент: маршрутът е избран предварително (вход → маневра → изход)
@@ -206,7 +211,7 @@ export function createTraffic(opts) {
   function leader(c) {
     const P = c.p.cars, k = P.indexOf(c);
     if (k < P.length - 1) { const f = P[k + 1]; return { gap: f.s - c.s - (f.L + c.L) / 2, v: f.v, car: f }; }
-    const rest = c.p.len - c.s;
+    const rest = c.p.len - c.s; if (isSib(c.p, c.next)) return null;   /* следва смяна на лента — съседната не е отпред */
     if (c.next && c.next.cars.length) { const f = c.next.cars[0]; return { gap: rest + f.s - (f.L + c.L) / 2, v: f.v, car: f }; }
     if (c.next && c.next.kind === 'conn' && c.next.outL.cars.length) { const f = c.next.outL.cars[0]; return { gap: rest + c.next.len + f.s - (f.L + c.L) / 2, v: f.v, car: f }; }
     return null;
@@ -248,7 +253,7 @@ export function createTraffic(opts) {
     const G = c.route[c.route.length - 1], ok = r => r && !r.paths.slice(1, -1).some(p => closed.has(p)) ? r : null, G2 = oppOf(G);
     return ok(RT.route({ p: from, s: s0 }, { p: G, s: c.goal }, { heavy: c.heavy, avoid: closed })) || (G2 && ok(RT.route({ p: from, s: s0 }, { p: G2, s: Math.max(0.5, G2.len - c.goal) }, { heavy: c.heavy, avoid: closed }))) || null;   // или от другата страна на улицата
   }
-  const useRoute = (c, r) => { c.route = r.paths; c.ri = 0; c.goal = r.s1; c.detour = closed.size > 0; pickNext(c); };
+  const useRoute = (c, r) => { c.route = r.paths; c.ri = 0; c.hopW = null; c.goal = r.s1; c.detour = closed.size > 0; pickNext(c); };
   const aheadClosed = c => { let d = c.p.len - c.s; for (let i = c.ri + 1; i < c.route.length - 1 && d < 400; i++) { if (closed.has(c.route[i])) return true; d += c.route[i].len; } return false; };
   function replan() {
     const ch = closures(); if (!ch && (!closed.size || (clT += H) < 2)) return; clT = 0;
@@ -277,6 +282,8 @@ export function createTraffic(opts) {
     const EMV = [...cars.filter(c => c.emOn).map(e => ({ x: e.x, z: e.z, yaw: e.yaw, self: e })), ...MV.filter(m => m.em)], SIDE = opts.drive === 'left' ? -1 : 1;   // извън трафика (техниката по стария път, ТИР без агент, спешните коли): { x, z, l, w } — колите спират пред тях
     for (const c of cars) { c.px = c.x; c.pz = c.z; c.py = c.y; c.pyaw = c.yaw; if (c.tr) { c.tr.px = c.tr.x; c.tr.pz = c.tr.z; c.tr.pyaw = c.tr.yaw; } }
     for (const c of cars) {
+      if (c.lcT > 0) c.lcT -= H;
+      let hopG = 1e9; if (c.route && isSib(c.p, c.next)) { if (c.s > c.L + 2 && c.hopW == null) { c.hopW = 1.2; c.lcT = 1.2; c.lcSide = sideTo(c, c.next); } if (c.hopW != null && (c.hopW -= H) <= 0 && hopTo(c, c.next)) { c.hopW = null; c.ri++; pickNext(c); } else hopG = c.p.len - c.s - c.L / 2 - 8; }   /* маршрутът с смяна на лента (route hop): сменя веднага щом има място; иначе чака преди края на лентата */
       let vmax = c.p.vmax * (c.vk || 1); const ld = leader(c);
       if (jp && c.next) vmax = Math.min(vmax, Math.sqrt((c.next.vmax * (c.vk || 1)) ** 2 + 2 * B_COMF * 0.6 * Math.max(0, c.p.len - c.s - c.L / 2)));   // по-бавно преди завоя, ускорява след него
       c.why = ld && ld.gap < 6 && ld.v < 0.5 ? 'кола отпред' : null;
@@ -303,6 +310,7 @@ export function createTraffic(opts) {
       if (stop) { const g = c.p.len - c.s - c.L / 2 - 0.3; if (g < gap) { gap = g; dv = c.v; } c.wait += H; } else c.wait = 0;
       c.bw = (blk || c.why === 'затворено') && c.v < 0.3 ? (c.bw || 0) + H : 0;   // колко стои пред затвореното
       if (c.park) { const g = c.p.len - c.s - c.L / 2 - 0.3; if (g < gap) { gap = g; dv = c.v; } }   // спира плавно в края
+      if (hopG < gap) { gap = Math.max(0, hopG); dv = c.v; c.why = 'смяна на лента'; }
       if (c.route && !c.next) { const g = c.goal - c.s + S0; if (g < gap) { gap = g; dv = c.v; } if (c.goal - c.s < 1 && c.v < 0.3 && !c.arrived) { c.arrived = true; c.why = 'цел'; if (c.agent.onArrive) c.agent.onArrive(c); } }   // агентът — до целта на последната пътека
       if (stop && !c.route && c.wait > 6 && ((c.wait / H) | 0) % 90 === 0) pickNext(c);   // изходът дълго е зает — друга посока (шофьорът заобикаля)
       const ss = S0 + Math.max(0, c.v * T_HEAD + c.v * dv / (2 * Math.sqrt(A_MAX * B_COMF)));
@@ -314,6 +322,7 @@ export function createTraffic(opts) {
       if (c.s >= c.p.len && c.p.leave && !c.route) { c.gone = true; continue; }   // напуска града
       if (c.park && c.v < 0.3 && c.s >= c.p.len - c.L / 2 - 2) { c.gone = true; parked++; continue; }   // автобусът/камионът без широк изход
       while (c.s >= c.p.len && c.next) {   // към следващата пътека
+        if (isSib(c.p, c.next)) { c.s = c.p.len; c.v = 0; break; }   /* смяната на лента не е станала — не минава в началото на съседната */
         if (c.p.kind === 'lane' && !mayEnter(c) && c.next.kind === 'conn') { c.s = c.p.len; c.v = 0; break; }
         const old = c.p; c.s -= old.len; remove(old, c); c.p = c.next; insert(c.p, c); if (c.route) c.ri++;
         if (jp) { c.hist.unshift(old); if (c.hist.length > 4) c.hist.pop(); if (old.kind === 'conn') { (old.tails || (old.tails = new Set())).add(c); if (c.tailC && c.tailC !== old) c.tailC.tails.delete(c); c.tailC = old; } }   // зоната се пази, докато задницата не излезе
@@ -330,18 +339,21 @@ export function createTraffic(opts) {
   }
   // стопове, мигачи и истинските прожектори
   const spots = []; let nightOn = false, LI = null, POOL = null; const _f = new THREE.Vector3(), _pm = new THREE.Matrix4(), _pq = new THREE.Quaternion(), _pv = new THREE.Vector3(), _ps = new THREE.Vector3(1, 1, 1), _Y = new THREE.Vector3(0, 1, 0);
+  // мигачът: завоят на връзката (в нея и 28 м преди нея); #42.2 blink-lane — и ~4 s преди завоя при скорост, при смяна на лента (3 s) и при отбиване пред спешна
+  const turnOf = c => { const BL = feature('blink-lane'); if (BL && c.lcT > 0) return c.lcSide; if (BL && c.yieldT > 0) return opts.drive === 'left' ? 'left' : 'right';
+    return c.p.kind === 'conn' ? c.p.turn : c.next && c.next.kind === 'conn' && c.p.len - c.s < (BL ? Math.max(28, c.v * 4) : 28) ? c.next.turn : null; };
   function lights() {
     const blinkOn = (performance.now() % 800) < 400, B = lampMats();
     if (!LI && cars.some(c => c.set)) LI = lampInstances(opts.scene, Math.max(64, (opts.maxCars || 40) * 2));
     if (LI) LI.begin(truckLamps().front.emissiveIntensity);
     for (const c of cars) {
       if (c.set) {   // инстанция: фаровете, стоповете и мигачите — в общите InstancedMesh
-        const br = c.a < -0.8 || c.v < 0.3, turn = c.p.kind === 'conn' ? c.p.turn : c.next && c.next.kind === 'conn' && c.p.len - c.s < 28 ? c.next.turn : null;
+        const br = c.a < -0.8 || c.v < 0.3, turn = turnOf(c);
         LI.car(c.rx, c.rz, c.ryaw, c.L, c.w, c.h, br, blinkOn && (turn === 'left' || turn === 'uturn'), blinkOn && turn === 'right', c.ry); continue;
       }
       const br = c.a < -0.8 || c.v < 0.3;
       if (br !== c.brake && c.rear.length) { c.brake = br; for (const m of c.rear) m.material = br ? B.brake : c.rearMat; }
-      const turn = c.p.kind === 'conn' ? c.p.turn : c.next && c.next.kind === 'conn' && c.p.len - c.s < 28 ? c.next.turn : null;
+      const turn = turnOf(c);
       const L = blinkOn && (turn === 'left' || turn === 'uturn'), R = blinkOn && turn === 'right';
       for (const m of c.blinkL) m.visible = L; for (const m of c.blinkR) m.visible = R;
     }
@@ -376,8 +388,7 @@ export function createTraffic(opts) {
     clear() { if (POOL) { opts.scene.remove(POOL); POOL.geometry.dispose(); POOL.material.map.dispose(); POOL.material.dispose(); POOL.dispose(); POOL = null; } for (const sp of spots) { opts.scene.remove(sp); opts.scene.remove(sp.target); sp.dispose(); } spots.length = 0; for (const c of cars) drop({ obj: c.obj, remove: c.rm }); cars.length = 0; if (LI) { LI.clear(); LI = null; } for (const l of lanes) l.cars.length = 0; for (const n of nodes.values()) for (const c of n.conns) c.cars.length = 0; },
     // светофарите: [{ node, x, z, arms: sigArms }] — за всички кръстовища със светофар (или само nodeId)
     // смяна на лента на агента (автобусът тръгва от спирката): същото s на успоредната лента, ако е свободно; рисуването — плавно (c.off → 0)
-    laneTo(c, L2) { if (c.p === L2) return true; if (!c.p.sibs || !c.p.sibs.includes(L2) || c.p.kind !== 'lane') return false; const s = Math.min(c.s, L2.len); if (!L2.cars.every(o => Math.abs(o.s - s) > (o.L + c.L) / 2 + 2)) return false;
-      const a = at(c.p, c.s, {}), b = at(L2, s, {}); remove(c.p, c); c.p = L2; c.s = s; insert(L2, c); c.next = null; c.off = (c.off || 0) + ((a.x - b.x) * -Math.cos(c.yaw) + (a.z - b.z) * Math.sin(c.yaw)); return true; },
+    laneTo(c, L2) { if (c.p === L2) return true; if (!isSib(c.p, L2)) return false; return hopTo(c, L2); },
     police(nodeId, on) { const n = nodes.get(nodeId); if (n) n.pol = on ? { arm: null, t: 0 } : null; return !!n; },   // #28: полицай на кръстовището
     jams: () => [...nodes.values()].filter(n => n.jamT > 0 || n.pol).map(n => ({ node: n.id, t: n.jamT || 0, pol: n.pol ? n.pol.arm : undefined })),
     signals: nodeId => [...nodes.values()].filter(n => n.sig && (nodeId == null || n.id === nodeId)).map(n => ({ node: n.id, x: n.x, z: n.z, arms: sigArms(n) })),
@@ -394,7 +405,7 @@ export function createTraffic(opts) {
       cars.push(c); nAg++; return c;
     },
     // нов маршрут от мястото, където агентът е сега (route.paths[0] === c.p)
-    retarget(c, r) { if (r.paths[0] !== c.p) return false; c.route = r.paths; c.ri = 0; c.goal = r.s1; c.arrived = false; pickNext(c); return true; },
+    retarget(c, r) { if (r.paths[0] !== c.p) return false; c.route = r.paths; c.ri = 0; c.hopW = null; c.goal = r.s1; c.arrived = false; pickNext(c); return true; },
     // мрежата е променена (roadnet.js update): колите на махнатите пътеки — навън (агентите — също; собственикът им вижда, че не са живи);
     // следващата пътека е махната — нов избор
     invalidate(removed) { for (let k = cars.length - 1; k >= 0; k--) { const c = cars[k], gone = removed.has(c.p) || (c.route && c.route.slice(c.ri).some(p => removed.has(p))) || c.hist.some(p => removed.has(p) && c.tailC === p);

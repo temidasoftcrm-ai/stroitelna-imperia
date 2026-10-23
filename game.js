@@ -1772,9 +1772,9 @@ function buildHQ() {
   if (H5) { office = model(H5, 1); office.traverse(m => { if (m.isMesh) m.castShadow = m.receiveShadow = true; });   /* hotel5: плоските площади/плочи на модела — скрити; мащабът — по самата сграда: до 60 м, в парцела */
     office.updateMatrixWorld(true); const ball = new THREE.Box3().setFromObject(office), Hm = ball.max.y - ball.min.y, Fm = Math.max(ball.max.x - ball.min.x, ball.max.z - ball.min.z), mb = new THREE.Box3(), sz = new THREE.Vector3();
     office.traverse(m => { if (!m.isMesh) return; mb.setFromObject(m).getSize(sz); if (sz.y < Hm * 0.05 && Math.max(sz.x, sz.z) > Fm * 0.3) m.visible = false; });
-    const bb = new THREE.Box3(); office.traverse(m => { if (m.isMesh && m.visible) bb.expandByObject(m); }); const s1 = bb.getSize(new THREE.Vector3()), [W, D] = lotHalf(city.hq), rw = 2 * W - 1, rd = campusAny() ? D - 0.9 : 2 * D - 1;
+    const bb = new THREE.Box3(); office.traverse(m => { if (m.isMesh && m.visible) bb.expandByObject(m); }); const s1 = bb.getSize(new THREE.Vector3()), [W, D] = lotHalf(city.hq), o0 = CP && CP.office, rw = o0 ? o0.x1 - o0.x0 : 2 * W - 1, rd = o0 ? o0.z1 - o0.z0 : campusAny() ? D - 0.9 : 2 * D - 1;   /* общият парцел (campus2): правоъгълникът на офиса */
     const k = Math.min(60 / Math.max(0.01, s1.y), rw / Math.max(0.01, s1.x), rd / Math.max(0.01, s1.z)); office.scale.setScalar(k); dayNight.registerWindows(office);
-    office.position.set(-(bb.min.x + bb.max.x) / 2 * k, -bb.min.y * k, (campusAny() ? (0.4 + D - 0.5) / 2 : 0) - (bb.min.z + bb.max.z) / 2 * k); }   // хотелът — целият парцел (в кампуса — предната половина)
+    office.position.set((o0 ? (o0.x0 + o0.x1) / 2 : 0) - (bb.min.x + bb.max.x) / 2 * k, -bb.min.y * k, (o0 ? (o0.z0 + o0.z1) / 2 : campusAny() ? (0.4 + D - 0.5) / 2 : 0) - (bb.min.z + bb.max.z) / 2 * k); office.userData.h5 = 1; }   // хотелът — целият парцел (в кампуса — предната половина)
   else if (O2) {   // височината на нивото; основата — половината парцел (кампус: предната, иначе задната), по-голямото се смалява целиком
     const n = `office2-l${level}`, [W, D] = lotHalf(city.hq);
     office = model(n, office2Fit(A[n].scene, O2).k); dayNight.registerWindows(office);
@@ -1800,7 +1800,8 @@ function buildHQ() {
     const bb = new THREE.Box3().setFromObject(office);
     office.position.set(-3.6 - (bb.min.x + bb.max.x) / 2, 0, (campusAny() ? 3.6 : -3.6) - (bb.min.z + bb.max.z) / 2);
   }
-  if (CP) { const o0 = CP.office; campusFit(office, o0.x0, o0.x1, o0.z0, o0.z1); }   // общият парцел: офисът — целият парцел на централата
+  if (office.userData.h5) { }   /* hotel5: вече вписан по самата сграда (без площада) — не се смалява втори път */
+  else if (CP) { const o0 = CP.office; campusFit(office, o0.x0, o0.x1, o0.z0, o0.z1); }   // общият парцел: офисът — целият парцел на централата
   else if (campusAny()) { const [W, D] = lotHalf(city.hq); campusFit(office, -W + 0.5, W - 0.5, 0.4, D - 0.5); }   // кампус: офисът — цялата предна половина, по истинската си рамка (големите кули се смаляват)
   office.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
   g.add(office);
@@ -11317,6 +11318,7 @@ if (AUTOTEST) {
     peds: () => { let ov = 0; for (let i = 0; i < peds.length; i++) for (let j = i + 1; j < peds.length; j++) if (Math.hypot(peds[i].x - peds[j].x, peds[i].z - peds[j].z) < 0.4) ov++; return { n: peds.length, want: wantedPeds(), waiting: peds.filter(p => p.wt > 0).length, maxWt: Math.round(Math.max(0, ...peds.map(p => p.wt || 0))), overlaps: ov, anim: peds.filter(p => p.wa && p.ia).length }; },   /* #10 */
     railBad() { if (!tr2 || !railx) return null; const XS = crossingsNow(); let bad = 0, wait = 0; for (const X of XS) for (const c of tr2.cars) { const dx = c.x - X.x, dz = c.z - X.z, al = Math.abs(dx * X.ux + dz * X.uz), sd = Math.abs(dx * X.uz - dz * X.ux); if (sd < 8 && al < X.h - 2.5 && X.on) bad++; if (c.why === 'прелез') wait++; } return { xs: XS.length, on: XS.filter(X => X.on).length, bad, wait }; },   /* #16: коли на релсите при спусната бариера */
     buses: () => cityBus.lines(), busDbg: () => cityBus.debug(),
+    blinkLook(d = 16) { if (!tr2) return null; const o = tr2G ? tr2G.position : { x: 0, z: 0 }, c = tr2.cars.find(c => c.lcT > 0 || c.hopW != null) || tr2.cars.find(c => c.next && c.next.kind === 'conn' && (c.next.turn === 'left' || c.next.turn === 'right') && c.p.len - c.s < 45 && c.p.len - c.s > 15); if (!c) return null; __dbg.lookAt(c.x + o.x, c.z + o.z, d); return { kind: c.kind, turn: c.next?.turn, lc: c.lcSide, v: +c.v.toFixed(1) }; },   /* #42.2: камерата към кола преди завой / смяна на лента */
     busLook() { const s = cityBus.stops()[0]; if (!s) return null; const o = tr2G ? tr2G.position : { x: 0, z: 0 }; __dbg.time && __dbg.time(10); __dbg.lookAt(s.x + o.x, s.z + o.z, 30); return cityBus.lines(); },   /* #15: камерата на първата спирка */
     moverHits() { if (!tr2) return null; const M = moversNow(); let n = 0; for (const m of M) for (const c of tr2.cars) if (Math.hypot(c.x - m.x, c.z - m.z) < 2.5) n++; return { movers: M.length, hits: n, yielding: tr2.cars.filter(c => c.why === 'машина отпред').length, waiting: units.filter(u => u.wb > 0).length }; },   /* самосвалът през колите: колко коли са върху техниката извън трафика */
     unitTest() { const u = units.find(q => q.state === 'idle'); if (!u) return null; const far = [...city.lots].sort((a, b) => Math.hypot(b.x - u.x, b.z - u.z) - Math.hypot(a.x - u.x, a.z - u.z))[0]; u.state = 'driving'; sendTo(u, far.x, far.z, () => { u.state = 'idle'; }); return [u.type, Math.round(Math.hypot(far.x - u.x, far.z - u.z))]; },   /* junction-paths: машина до най-далечния парцел */
