@@ -184,7 +184,7 @@ export function playSiren(kind, car, d, gap = 6) {
 export const sirenKind = car => { let k = null; car.traverse(o => { if (!k && o.userData?.kind && o.userData.red) k = o.userData.kind; }); return k; };
 // буркан: свой клас, за да оцелее анимацията при clone() (методите са в прототипа); всяко копие си прави свой материал.
 // Леща (емисивна сфера) + ореол (спрайт): ляво червено, дясно синьо, редуват се ~2,5 Hz; включват се „от време на време“.
-const beaconState = (car, t) => car.userData.forceBeacons || car.userData.beaconsOn || Math.sin(t / 20 * Math.PI * 2 + (car.id * 2.39) % 6.28) > 0.1;
+const beaconState = (car, t) => car.userData.forceBeacons || car.userData.beaconsOn || !car.userData.noBeacons && Math.sin(t / 20 * Math.PI * 2 + (car.id * 2.39) % 6.28) > 0.1;
 export const beaconsLit = car => !!car && beaconState(car, performance.now() / 1000);   // #14: светят ли бурканите сега (трафикът: колите ѝ правят път)
 const carOf = o => { let c = o.parent; while (c && !c.userData.isCar) c = c.parent; return c; };
 class Beacon extends THREE.Mesh {

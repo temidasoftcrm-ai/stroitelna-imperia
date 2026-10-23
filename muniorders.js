@@ -42,7 +42,7 @@ export function createMuni(deps) {
     if (!on()) return;
     clear(); const my = gen;
     const g = deps.group(); if (!g) return;
-    try { const ly = await servicesLayer(gp(), rec(), { region: 'eu', blocks: deps.blocks ? deps.blocks() : null });   /* блоковете наоколо — за височината (svc-height) */ if (my !== gen || deps.group() !== g) { ly.dispose(); return; } layer = ly; g.add(layer.group); layer.setNight(deps.night()); } catch (e) { console.warn('muni 3D', e); }
+    try { const ly = await servicesLayer(gp(), rec(), { region: 'eu', blocks: deps.blocks ? deps.blocks() : null, trees: deps.trees ? deps.trees() : null });   /* блоковете наоколо — за височината (svc-height) */ if (my !== gen || deps.group() !== g) { ly.dispose(); return; } layer = ly; g.add(layer.group); layer.setNight(deps.night()); } catch (e) { console.warn('muni 3D', e); }
     const s = st(); if (s.job && s.job.lots && s.job.lots.length) {   // строителната площадка (servicesplace.js serviceSite: ограда, скелет по етажи, кран, контейнери)
       const p = servicePlacer(gp()).spot(s.job.k, s.job.lvl, s.job.lots), site = await serviceSite(s.job.k, s.job.lvl, p, s.job.prog || 0);
       if (my !== gen || deps.group() !== g) { site.dispose(); return; } site.group.position.set(p.x, 0, p.z); site.group.rotation.y = p.rot; g.add(site.group); sites.push(site); }
@@ -111,5 +111,7 @@ export function createMuni(deps) {
     if (list.length) h += `<div class="meta" style="margin-top:6px">Не стигат: ${list.map(x => `${x.ico} ${x.nm} ${Math.round(Math.min(1, x.cover) * 100)}%`).join(' · ')}</div>`;
     return h + '</div>';
   }
-  return { nm: k => `${ico(k)} ${nm(k).toLowerCase()}`, attach, draw, clear, setNight, dailyTick, accept, decline, cardHtml, state: st, rec, on };
+  // #11 (emerg-home): участъците/болниците/пожарните в града — оттам тръгват спешните коли при инцидент и там се връщат
+  const stations = () => { try { return on() ? servicePlacer(gp()).spots(rec()).map(s => ({ k: s.k, x: s.x, z: s.z })) : []; } catch (e) { return []; } };
+  return { nm: k => `${ico(k)} ${nm(k).toLowerCase()}`, attach, draw, clear, setNight, dailyTick, accept, decline, cardHtml, state: st, rec, on, stations };
 }

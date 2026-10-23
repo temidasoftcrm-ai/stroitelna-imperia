@@ -30,8 +30,8 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
   let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   for (let k = 0; k < (ab ? 64 : 44); k++) {   // потребителят: „повече движение по магистралата“ (беше 44 / 28)
     const truck = k % 3 === 0, bus = !truck && k % 7 === 3 && A['sf-car-Bus'], dir = k % 2 ? 1 : -1;
-    const semis = feature('trucks-real') && A['sf-semi-0'] ? ['sf-semi-0', 'sf-semi-1', ...(A['sf-car-Truck'] ? ['sf-car-Truck'] : [])] : TRUCKS;
-    const names = (truck ? semis : bus ? ['sf-car-Bus'] : feature('cars-real') && realCars.length ? [pickCar(rnd())] : CARS).filter(n => A[n]);   // модерните ТИР-ове (trucks-real)
+    const semis = feature('trucks-real') && A['sf-semi-0'] ? ['sf-semi-0', 'sf-semi-1', ...(A['sf-car-Truck'] ? ['sf-car-Truck'] : [])] : ['sf-car-Truck'];   /* №2: без детските TRUCKS */
+    const names = (truck ? semis : bus ? ['sf-car-Bus'] : realCars.length ? [pickCar(rnd())] : []).filter(n => A[n]);   /* №2 (55): само истински коли — без детските CARS */   // модерните ТИР-ове (trucks-real)
     if (!names.length) continue;
     const n = names[(rnd() * names.length) | 0], o = model(n, SCALE[n] || kidK(n, 1.25));
     o.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2;

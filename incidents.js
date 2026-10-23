@@ -216,11 +216,11 @@ export function createIncidents(ctx) {
     const cars = [];
     const hoses = [...(fx.hoses || []).map(([p, t]) => [p, W(t)]), ...(fx.hosesW || []).map(([p, t]) => [p, new THREE.Vector3(t[0], t[1], t[2])])].filter(([p]) => p).map(([p, t]) => ({ p, t, s: K2.stream(ctx.scene) }));   // пожарникарите с маркучите
     ((T2 && T2.cars) || T.cars).forEach(([k, back], n) => {
-      const [nm, sc] = vehName(k), st = pickStart(at); if (!nm || !st || !ctx.has(nm) && nm.startsWith('sf-')) return;
+      const [nm, sc] = vehName(k), home = feature('emerg-home') && ctx.station ? ctx.station(k, at) : null, st = home || pickStart(at); if (!nm || !st || !ctx.has(nm) && nm.startsWith('sf-')) return;   // #11: от участъка/болницата/пожарната, ако ги има
       const path = pathTo(st.x, st.z, at, back + 7); if (!path) return;
       const o = ctx.model(nm, sc); o.userData.beaconsOn = 1; o.userData.noSiren = 1;   // сирените ги пуска update() — според разстоянието до камерата
       o.position.set(st.x, 0, st.z); ctx.scene.add(o);
-      cars.push({ o, x: st.x, z: st.z, yaw: 0, path, pi: 0, stage: 'go', delay: n * rnd(1.5, 4), kind: sirenKind(o) || { Firetruck: 'fire', Ambulance: 'ambulance' }[k] || (k === 'Truck' ? null : 'police') });
+      cars.push({ home, o, x: st.x, z: st.z, yaw: 0, path, pi: 0, stage: 'go', delay: n * rnd(1.5, 4), kind: sirenKind(o) || { Firetruck: 'fire', Ambulance: 'ambulance' }[k] || (k === 'Truck' ? null : 'police') });
     });
     inc = { at, g, cars, puffs, flames, type, hold0: T.hold, t: 0, force: !!force, fx, hoses, R };
     return { x: Math.round(at.x), z: Math.round(at.z), cars: cars.length, type, nm: T.nm };
@@ -302,7 +302,7 @@ export function createIncidents(ctx) {
       inc.leave = true;
       inc.cars.forEach((c, n) => {
         c.o.userData.beaconsOn = 0;
-        const to = pickStart(inc.at), path = to && ctx.route(c.x, c.z, to.x, to.z).map(p => ({ x: p.x, z: p.z }));
+        const to = c.home || pickStart(inc.at), path = to && ctx.route(c.x, c.z, to.x, to.z).map(p => ({ x: p.x, z: p.z }));
         c.stage = 'leave'; c.path = path && path.length ? path : null; c.pi = 0; c.wait = n * 3;
         if (!c.path) { c.stage = 'gone'; ctx.scene.remove(c.o); }
       });

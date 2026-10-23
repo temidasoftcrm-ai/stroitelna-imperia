@@ -17,7 +17,7 @@ export const AB_TOLL_MUL = 3;        // тол таксата е 3 пъти по
 export const AB_FULL_BONUS = 0.5;    // +50% тол, когато целият коридор е готов
 export const AB_MAT_DISC = 0.30;     // −30% за материали, докарани по готов аутобан
 // Модели, които трябва да са заредени в A (колите и камионите вече се зареждат от game.js)
-export const AB_MODELS = { vehicles: ['sf-car-Sedan', 'sf-car-SUV', 'sf-car-Taxi', 'sf-car-Van', 'sf-car-Hatchback', 'sf-car-Pickup', 'sf-car-Muscle', 'sf-car-Police_Sedan', 'sedan', 'suv', 'taxi', 'van'],   // истинските коли (vehmodels.js, в метри); детските — само ако истинските липсват
+export const AB_MODELS = { vehicles: ['sf-car-Sedan', 'sf-car-SUV', 'sf-car-Taxi', 'sf-car-Van', 'sf-car-Hatchback', 'sf-car-Pickup', 'sf-car-Muscle', 'sf-car-Police_Sedan'],   // истинските коли (vehmodels.js, в метри); детските — само ако истинските липсват
   // техниката — истинските модели от vehmodels.js (sf-excavator, sf-backhoe, sf-grader, sf-dump, sf-mcrane — зарежда ги game.js); ако липсват — процедурните машини по-долу
   heavy: [] };
 // [модел, дължина в м, завъртане до „напред = +z“, оцветяване]
@@ -287,7 +287,7 @@ export function buildAutobahnView(A, opts = {}) {
 
   // движение след откриването: 12 ленти, по-бавните камиони вдясно
   const traffic = new THREE.Group(); g.add(traffic);
-  const real = AB_MODELS.vehicles.filter(n => n.startsWith('sf-') && A[n]), cars = real.length ? real : AB_MODELS.vehicles.filter(n => A[n]), list = [], TRK = A['sf-semi-0'] ? 'sf-semi-0' : A['sf-car-Truck'] ? 'sf-car-Truck' : 'truck';
+  const real = AB_MODELS.vehicles.filter(n => n.startsWith('sf-') && A[n]), cars = real, list = [], TRK = A['sf-semi-0'] ? 'sf-semi-0' : A['sf-car-Truck'] ? 'sf-car-Truck' : null;   /* №2 (55): само истински коли и камиони — без детските резерви */
   for (let k = 0; k < 60 && cars.length; k++) {
     const dir = k % 2 ? 1 : -1, lane = k % LANES, truck = lane >= 4 && k % 3 === 0;
     const n = truck && A[TRK] ? TRK : cars[(k * 7) % cars.length], sf = n.startsWith('sf-');
