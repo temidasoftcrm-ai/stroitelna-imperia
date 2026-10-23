@@ -34,7 +34,8 @@ function wrap(obj, yaw = 0, k = null) {
 // load(url) → Promise<gltf>; A — речникът с модели на играта. Връща Promise (липсващ файл не спира играта).
 export function loadVehModels(load, A, base = 'assets/heavy/gear/') {
   const jobs = Object.entries(GEAR).map(([k, c]) => load(base + c.f + '.glb').then(g => { A['sf-' + k] = { scene: wrap(g.scene, c.yaw) }; }).catch(e => console.warn('vehmodels', k, e)));
-  if (feature('cars-more')) jobs.push(loadMoreCars(load, A));   // cars-more (55): още 18 градски коли по региони
+  if (feature('cars-more')) jobs.push(loadMoreCars(load, A));
+  if (feature('buses-more')) jobs.push(loadMoreBuses(load, A));   // buses-more (55, №15): градските автобуси по региони   // cars-more (55): още 18 градски коли по региони
   jobs.push(Promise.resolve().then(() => feature('cars-real') && loadRealCars(load, A)).then(() => loadVans(load, A, M_PER)).then(() => feature('trucks-real') && loadRealTrucks(load, A)).then(() => loadPoliceCars(load, A)));
   return Promise.all(jobs);
 }
@@ -60,6 +61,18 @@ function loadMoreCars(load, A) {
     const sc = wrap(g.scene, 0, M_PER); addCarLights(sc, null); A['sf-cv-' + k] = { scene: sc };   /* файловете вече са в метри (len — за таблицата) */
   }).catch(e => console.warn('cars-more', k, e))));
 }
+// buses-more (55, №15): градски автобуси (Sketchfab, CC-BY; нормализирани в Blender като cars-more) — дължина в м и тегла по регион;
+// Mercedes Citaro (sf-car-Bus) остава за Европа
+export const BUS_POOL = {
+  artic: [18.1, { eu: 2, bg: 1, xx: 2 }], roaz: [12.0, { bg: 2, ru: 3, eu: 1 }], trolley: [12.0, { bg: 2, ru: 3 }], xd40: [12.2, { am: 4 }],
+};
+function loadMoreBuses(load, A) {
+  return Promise.all(Object.keys(BUS_POOL).map(k => load('assets/heavy/cars/bus-' + k + '.glb').then(g => {
+    g.scene.traverse(o => { if (o.isMesh) { o.castShadow = false; if (o.material && o.material.metalness > 0.5) o.material.metalness = 0.3; } });
+    const sc = wrap(g.scene, 0, M_PER); addCarLights(sc, [0.38, 0.25]); A['sf-bus-' + k] = { scene: sc };
+  }).catch(e => console.warn('buses-more', k, e))));
+}
+export const busesFor = (reg, A) => [...Object.entries(BUS_POOL).filter(([k, [, w]]) => w[reg] && A['sf-bus-' + k]).map(([k, [, w]]) => ['sf-bus-' + k, w[reg]]), ...((reg === 'eu' || reg === 'bg') && A['sf-car-Bus'] ? [['sf-car-Bus', 2]] : [])];
 // колите за региона: [[име в A, тегло]…]
 export const carsFor = (reg, A) => Object.entries(CAR_POOL).filter(([k, [, w]]) => w[reg] && A['sf-cv-' + k]).map(([k, [, w]]) => ['sf-cv-' + k, w[reg]]);
 function loadRealCars(load, A) {

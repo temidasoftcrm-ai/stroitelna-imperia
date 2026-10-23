@@ -308,3 +308,9 @@ More city cars (55, cars-more) — Sketchfab, normalized in Blender (front +z, r
 - cars/cv-moskvich.glb — „AZLK Moskvich 2141“ by Mona x Supercars (@Car2022), CC Attribution — https://sketchfab.com/3d-models/8b2e431a32334db98613ff43dd620fec
 - cars/cv-niva.glb — „Lada Niva“ by Greg McKechnie (@mckechniegreg6), CC Attribution — https://sketchfab.com/3d-models/26ebf5872bce4ff4ad2baee41882d6b2
 - cars/cv-kenworth.glb — „Kenworth W-900 A 1973“ by eightismore (@eightismore), CC Attribution — https://sketchfab.com/3d-models/248f403be9164e46ab9992ecbd8cc52c
+
+City buses (55, buses-more) — Sketchfab, normalized in Blender (front +z, real length), gltf-transform webp 1024:
+- cars/bus-artic.glb — „Cee Urbano C7 Volvo B340M - Padrão Mobi Rio“ by CR3D Modelagens (@cr3dmods), CC Attribution — https://sketchfab.com/3d-models/bacf3741cd134f639a77ea635ecd2d5a
+- cars/bus-roaz.glb — „City Bus - rigged | РоАЗ-5236“ by Yo.Ri (@grox777), CC Attribution — https://sketchfab.com/3d-models/36646fcf41da498ca24a02f4b6fb1d95
+- cars/bus-trolley.glb — „trolley ZIU-682G | троллейбус ЗИУ-682Г“ by gildermanvladimir089 (@gildermanvladimir089), CC Attribution — https://sketchfab.com/3d-models/ad0b00db23164b13998150433c73fb4f
+- cars/bus-xd40.glb — „SEPTA XD40 With Bike Rack“ by jbbikeco (@jbbikeco), CC Attribution — https://sketchfab.com/3d-models/74874862ac5644f389dcbac53a72c089

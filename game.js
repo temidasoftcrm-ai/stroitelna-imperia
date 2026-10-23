@@ -102,7 +102,7 @@ import { createHwTrucks } from './hwtrucks.js';
 import { createOrient, OE_ROUTE } from './orient.js';
 import { createRoute66, R66_ROUTE } from './route66.js';
 import { loadTrainModels, hasTrainModel, trainCar } from './trainmodels.js';
-import { loadVehModels, carsFor, darkParked } from './vehmodels.js';
+import { loadVehModels, carsFor, darkParked, busesFor } from './vehmodels.js';
 import { openGlobe } from './globe.js';
 import { clientName } from './names.js';
 import { createConquest } from './conquest.js';
@@ -2163,7 +2163,8 @@ function addCar() {
   let i = 3 * ((Math.random() * NBI) | 0), j = (Math.random() * NJ) | 0;
   for (let k = 0; k < 40 && !isRoad(i, j); k++) { i = 3 * ((Math.random() * NBI) | 0); j = (Math.random() * NJ) | 0; }   // не по улица под площад/парк (Белия дом, поръчките) — иначе стои на тревата
   const r = Math.random(), sf = A['sf-car-Sedan'], cvL = feature('cars-more') && r >= 0.1 && Math.random() < 0.55 ? carsFor(carRegion(S.cityId), A) : null, cv = cvL && cvL.length ? (t => { for (const [n, w] of cvL) if ((t -= w) < 0) return n; return cvL[0][0]; })(Math.random() * cvL.reduce((a, b) => a + b[1], 0)) : null;   /* cars-more (55): половината коли — от регионалните (Лади на изток, пикапи в Америка) */
-  const o = cv ? model(cv, 1) : sf ? model('sf-car-' + (L => { const ok = L.filter(n => A['sf-car-' + n]); return pick(ok.length ? ok : ['Sedan']); })(r < 0.04 ? (feature('emerg-home') ? (patrolOn() ? ['Sedan', 'Hatchback', 'SUV'] : ['Police_Sedan']) : ['Ambulance', 'Police_Sedan', 'Police_SUV', 'Firetruck']) : r < 0.1 ? ['Bus', 'Truck', 'Van'] : ['Sedan', 'Hatchback', 'SUV', 'Pickup', 'Taxi', 'Sedan', 'Hatchback', 'SUV', 'Muscle', 'Muscle_2', 'Sports', 'Roadster', 'Taxi', 'Taxi', 'Taxi', 'Limousine']), 1)
+  const bL = feature('buses-more') && r >= 0.04 && r < 0.07 ? busesFor(carRegion(S.cityId), A) : null, bus = bL && bL.length ? (t => { for (const [n, w] of bL) if ((t -= w) < 0) return n; return bL[0][0]; })(Math.random() * bL.reduce((a, b) => a + b[1], 0)) : null;   /* buses-more (55, №15): автобусът — по региона (тролейбус и РоАЗ на изток, New Flyer в Америка) */
+  const o = bus ? model(bus, 1) : cv ? model(cv, 1) : sf ? model('sf-car-' + (L => { const ok = L.filter(n => A['sf-car-' + n]); return pick(ok.length ? ok : ['Sedan']); })(r < 0.04 ? (feature('emerg-home') ? (patrolOn() ? ['Sedan', 'Hatchback', 'SUV'] : ['Police_Sedan']) : ['Ambulance', 'Police_Sedan', 'Police_SUV', 'Firetruck']) : r < 0.1 ? ['Bus', 'Truck', 'Van'] : ['Sedan', 'Hatchback', 'SUV', 'Pickup', 'Taxi', 'Sedan', 'Hatchback', 'SUV', 'Muscle', 'Muscle_2', 'Sports', 'Roadster', 'Taxi', 'Taxi', 'Taxi', 'Limousine']), 1)
     : null;   /* №2 (55): без детски коли — докато истинските не са заредени, кола не тръгва */
   if (!o) return;
   if (feature('emerg-home') && /Police/.test(o.userData.src || '')) { o.userData.patrol = 1; o.traverse(m => { if (m === o || m.userData.isCar) m.userData.noBeacons = 1; }); }   // #11: патрулката — без буркани
@@ -2180,7 +2181,7 @@ function traffic2Make() {
   if (p2) { tr2G = new THREE.Group(); tr2G.position.set(city.plan.offset[0], 0, city.plan.offset[1]); scene.add(tr2G); }
   tr2 = createTraffic({ scene: tr2G || scene, camera, movers: () => moversNow(), onJam: j => jamPolice(j), jp: feature('junction-paths'), drive: p2 && p2.drive === 'L' ? 'left' : 'right', maxCars: wantedTraffic(), blockers: () => [...(railx ? railx.blockers() : []), ...(incidents.blockers?.() || [])].map(b => p2 ? { x: b.x - city.plan.offset[0], z: b.z - city.plan.offset[1] } : b),   /* + затворената улица при инцидент (incidents2, 55) */   // camera — истинските фарове само за най-близките коли
     ...(p2 ? { built: planNetwork(p2, { jp: feature('junction-paths') }) } : { net: gridNetwork({ NBI, NBJ, tx, isRoad, TILE, signal: (i, j) => signals.some(s => s.i === i && s.j === j) }) }),
-    makeCar: () => { addCar(); const t = traffic.pop(); if (!t) return null; const heavy = /Bus|Truck|Firetruck|firetruck|kenworth/.test(t.obj.userData.src || '');
+    makeCar: () => { addCar(); const t = traffic.pop(); if (!t) return null; const heavy = /Bus|Truck|Firetruck|firetruck|kenworth|sf-bus-/.test(t.obj.userData.src || '');
       if (tr2G) { const k = t.len > 3 && t.len < 14 ? 1 : (heavy ? 11 : 4.5) / (t.len || 4.5);   /* колите вече са в истинския размер (sf-car-* и резервите с kidK) — не ги изравняваме до 4,5 м; само ако мярката е сбъркана (55) */ t.obj.scale.multiplyScalar(k); t.len = (t.len || 4.5) * k; tr2G.add(t.obj); }   // планът v2 е в истински метри — колите в истинския си размер
       return { obj: t.obj, len: t.len || 4.5, kind: heavy ? 'bus' : 'car' }; },   // автобус/камион — само по улици ≥ 6 м
     onSignal: (n, v) => { const s = sigMap.get(n.id); if (!s || !v) return; for (const h of s.heads) { const mine = h.axis === v.axis && !v.red; h.gr.visible = mine && !v.yellow; h.y.visible = mine && v.yellow; h.r.visible = !mine; } } });

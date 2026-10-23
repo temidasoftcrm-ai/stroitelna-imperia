@@ -22,7 +22,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { loadVehModels, CAR_POOL } from '../vehmodels.js';
+import { loadVehModels, CAR_POOL, BUS_POOL } from '../vehmodels.js';
 import { loadVans } from '../vanlogo.js';
 import { loadSiteRigs } from '../sitework.js';
 import { VEH_SPEC, siteK, scaleFor, kidK } from '../scale.js';
@@ -42,6 +42,7 @@ const LIST = [
   ...['amb-gaz', 'amb-us', 'amb-eu'].map((s, i) => V('sf-car-Ambulance', i, s)), V('sf-car-Limousine', null, 'car-limo'), V('sf-car-Truck', null, 'car-truck'),
   ...['fire-us2', 'fire-man'].map((s, i) => V('sf-car-Firetruck', i, s)), V('sf-car-Bus', null, 'bus-citaro'),
   ...Object.keys(CAR_POOL).map(k => V('sf-cv-' + k, null, 'cv-' + k)),   // cars-more (55): новите градски коли
+  ...Object.keys(BUS_POOL).map(k => V('sf-bus-' + k, null, 'bus-' + k)),   // buses-more (55): градските автобуси
   V('sf-trk-0', null, 'trk-cab', 4.6), V('sf-semi-0', null, 'trk-semi'),
   V('sf-roller', null, 'sf-roller', 'site'), V('sf-backhoe', null, 'sf-backhoe', 'site'), V('sf-dump', null, 'sf-dump', 'site'), V('sf-grader', null, 'sf-grader', 'site'), V('sf-excavator-rig', null, 'sf-excavator', 'site'), V('sf-mcrane-rig', null, 'sf-mcrane', 'site'),
 ];
