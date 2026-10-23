@@ -68,6 +68,8 @@ export function createDevLevel(deps) {
   const capLv = () => { const c = deps.coopCap ? deps.coopCap() : null; return c == null ? Infinity : c; };
   const best = () => Math.min(rawBest(), capLv());
   const waiting = () => rawBest() > best();
+  // #4: партньорът е по-напред — чака теб, щом е повече от 2 нива пред теб (неговият таван е твоето ниво + 2, game.js → coopCap)
+  const partnerAhead = () => { const p = deps.partnerLv ? deps.partnerLv() : null; return p != null && p > rawBest() ? p : 0; };
   const offersOpen = () => best() >= OFFERS_LV;
   const has = k => best() >= LV[k];
   const stocksOpen = () => best() >= STOCKS_LV;
@@ -152,7 +154,7 @@ export function createDevLevel(deps) {
     const bd = bst > d.lv ? (Object.values(deps.S().cities || {}).map(c => c.dev).find(x => x && x.lv === bst) || { lv: bst, xp: THRESH[bst - 1] }) : d;
     const top = bst >= THRESH.length, nx = top && bst < 35 && deps.impRatio ? deps.impRatio(bst + 1) : null;   // над 20 — напредъкът към следващото ниво по условията на града (imperial.js)
     const a = THRESH[bd.lv - 1], b = THRESH[bd.lv] ?? a, k = top ? (nx ?? 1) : Math.max(0, Math.min(1, (bd.xp - a) / (b - a)));
-    btn.innerHTML = `🏢 Фирма ${bst}<span class="dbar"><i style="width:${(k * 100).toFixed(0)}%"></i></span>${waiting() ? `<span style="font-size:11px;opacity:.85">⏳ чакаш партньора (ниво ${bst})</span>` : ''}`;
+    btn.innerHTML = `🏢 Фирма ${bst}<span class="dbar"><i style="width:${(k * 100).toFixed(0)}%"></i></span>${waiting() ? `<span style="font-size:11px;opacity:.85">⏳ чакаш партньора (ниво ${bst})</span>` : partnerAhead() ? `<span style="font-size:11px;opacity:.85">${partnerAhead() > rawBest() + 2 ? '⏳ партньорът те чака' : '🤝 партньорът е напред'} (ниво ${partnerAhead()})</span>` : ''}`;
     btn.title = `Ниво на развитие на фирмата: ${bst} (по най-развития град — оттам идват отключванията)${bst > d.lv ? ` · ${deps.cityName ? deps.cityName() : 'този град'}: ниво ${d.lv}` : ''}${nx != null ? ` · към ниво ${bst + 1}: ${Math.round(nx * 100)}%${deps.impNeed ? ` — ${deps.impNeed(bst + 1)}` : ''}` : ''}`;
   }
   const firmXP = () => { const S = deps.S(), d = st(); return Math.max(d ? d.xp : 0, ...Object.values(S?.cities || {}).map(c => c.dev?.xp || 0)) + (S?.holding ? S.hxp || 0 : 0); };

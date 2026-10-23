@@ -2153,7 +2153,8 @@ const fires = createFires({ S: () => S, group: () => city.group, lots: () => cit
   startPoint: at => { let best = null, bs = -1; for (let k = 0; k < 30; k++) { const p = roadPoint(); if (!p) continue; const d = Math.hypot(p.x - at.x, p.z - at.z), sc = d < 120 ? d : d > 300 ? 600 - d : 300; if (sc > bs) { bs = sc; best = p; } } return best; },
   day: () => S.day + S.dayT / DAY_SEC, cam: () => camera.position, econ: () => econ, hasStaff: k => hasStaff(k), crewFree: () => units.some(u => u.type === 'crew' && u.state === 'idle'),
   modal: (...a) => modal(...a), toast: (...a) => toast(...a), fly: lot => flyTo(lot), save: () => save(),   // обвити — дефинирани по-долу във файла
-  startJob: (f, lot) => startFireJob(f, lot), project: id => projects.find(q => q.id === id) || null,   // поръчките след пожар — обекти
+  startJob: (f, lot) => startFireJob(f, lot), project: id => projects.find(q => q.id === id) || null,
+  early: () => feature('rescue-early') && ownedCities().length < 3,   // #13: под 3 града (централата + 1 филиал) спешните поръчки идват ×2,5 по-често   // поръчките след пожар — обекти
   rebuild: lot => { if (lot.obj) city.group.remove(lot.obj); const b = (S.built || []).find(x => x.lot === lot.id); placeBuilding(lot, b ? b.model : lot.built, b ? b.rot || 0 : lot.rot || 0); } });
 // #11 (emerg-home): спешните коли стоят в участъците и излизат само при инцидент/пожар; в трафика — най-много една патрулка, без буркани
 const patrolOn = () => [...traffic.map(t => t.obj), ...(tr2 ? tr2.cars.map(c => c.obj) : [])].some(o => o && o.userData.patrol);
@@ -4565,6 +4566,7 @@ const rivals = createRivals({ S: () => S, acquired: id => corp.acquired(id), toa
 // maxLevel минава през всички градове — пази се до края на текущата задача (картата пита dev.has() стотици пъти на рисуване)
 let maxLevelC = null;
 const dev = createDevLevel({ levelBonus: lv => { if (lv !== 2 || !S || !feature('start-easy') || S.lvBonus2) return ''; S.lvBonus2 = 1; econ.earn(100000, 'друго', 'Бонус за ниво 2'); return ' 🎁 Бонус за ниво 2: +100 000 €'; },   // 🌱 веднъж, записва се
+  partnerLv: () => feature('coop-lv') ? S?.coopPartnerLv ?? null : null,   // #4: последното известно ниво на партньора (coopCap го пази) — за надписа „партньорът те чака“
   coopCap: () => { if (!S || !feature('coop-lv')) return null; let p = null, cst = null; try { p = coop.partnerLv?.() ?? null; cst = coop.state?.() ?? null; } catch { }   /* coop се създава след dev */ if (p != null) { S.coopPartnerLv = p; if (S.coopLvFloor == null) S.coopLvFloor = dev.rawBest(); return Math.max(p + 2, S.coopLvFloor); }   /* до 2 нива пред партньора, после чака (потребителят 22.10) */ if (cst && cst.pair?.status !== 'active') { delete S.coopLvFloor; delete S.coopPartnerLv; return null; } /* данните още не са дошли (старт, без връзка) — последното известно ниво на партньора; иначе при всяко презареждане чакането изчезваше */ return S.coopLvFloor != null && S.coopPartnerLv != null ? Math.max(S.coopPartnerLv + 2, S.coopLvFloor) : null; },   /* 🤝 общото ниво: не над партньора (каквото си имал при свързването — остава) */ impRatio: n => imperial.ratio(n), impLv: () => S?.imp?.lv || 0, impNeed: n => n === 21 ? 'Основи Империал Сити и избери държавата (ниво 19)' : imperial.NEED[n] || '', S: () => S, lvTime: l => playtime.levelTxt(l), playSummary: () => playtime.summaryHtml(), cityName: () => S ? cityName() : '', maxLevel: () => maxLevelC ?? (queueMicrotask(() => { maxLevelC = null; }), maxLevelC = Math.max(S?.dev?.lv || 1, ...Object.values(S?.cities || {}).map(c => c.dev?.lv || 1), holdLv())), toast, sound: n => Sound.play(n), save, modal, pop: (k, a, b) => { if (k === 'lv-5' && !S.balkansPop) { S.balkansPop = S.day; return showEventPop('balkans-open', '👑 Балканите са твои!', 'Ниво 5: жп линии и магистрали до Сърбия, Румъния, Гърция, Турция и С. Македония.'); } return showEventPop(k, a, b); }, balkansOpen: () => true });   // първото ниво 5 — „Балканите са твои“
 // ⏱️ изиграно време и кога е достигнато всяко ниво (playtime.js)
 const playtime = createPlaytime({ S: () => S, level: () => dev.best(), speed: () => (AUTOTEST ? 0 : speed) });
@@ -7291,11 +7293,13 @@ function garFillCity(id) {
 function garGrow(quiet = false) {
   let n = 0, spent = 0;
   for (const [id, kind] of garShort().full) {
-    if (id === S.cityId) continue;   // в текущия град — с бригада, от „Подобрения“
+    if (id === S.cityId && (quiet || !feature('gar-btns'))) continue;   // в текущия град — с бригада, от „Подобрения“ (gar-btns: и с бутона „⬆️ Разшири“)
     const u = upgInfo(id).find(x => x.kind === kind); if (!u || u.max || u.busy || !econ.canAfford(u.cost)) continue;
+    if (id === S.cityId) { upgGo(id, kind, true); if (upgInfo(id).find(x => x.kind === kind)?.busy) { n++; spent += u.cost; } continue; }   // upgGo в текущия град не връща нищо — гледаме дали строежът тръгна
     if (upgGo(id, kind, true)) { n++; spent += u.cost; }
   }
   if (n && !quiet) { toast(`⬆️ Разширяват се ${n} офиса/гаража там, където няма място за техниката (${fmt(spent)} €).`, 'good'); Sound.play('buy'); }
+  else if (!n && !quiet && feature('gar-btns')) toast('⬆️ Нищо не може да се разшири сега — строи се вече, на максимално ниво е или нямаш пари.', 'bad');
   if (n) save();
   return n;
 }
@@ -7327,11 +7331,11 @@ function garBuyable() {
 }
 function garBuyShort(only = null, quiet = false, all = false) {   // all — купува всичко липсващо веднага, без да чака свободната техника от другите градове
   const sh = garShort(), list = (all ? sh.now : sh.buy).filter(([id]) => !only || id === only);
-  let n = 0, spent = 0, stop = '';
+  let n = 0, spent = 0, stop = '', full = new Set();
   for (const [id, t, k] of list) for (let i = 0; i < k; i++) {
     const T = ECON.UNIT_TYPES[t];
     if (!econ.canAfford(T.cost)) { stop = 'пари'; break; }
-    const cap = garCaps(id), hv = garWithTransit(id); if (!isMachine(t) ? hv.filter(x => !isMachine(x)).length >= cap.crews : !isRoadGear(t) && hv.filter(x => isMachine(x) && !isRoadGear(x)).length >= cap.mach) break;   // пълно — чака разширение
+    const cap = garCaps(id), hv = garWithTransit(id); if (!isMachine(t) ? hv.filter(x => !isMachine(x)).length >= cap.crews : !isRoadGear(t) && hv.filter(x => isMachine(x) && !isRoadGear(x)).length >= cap.mach) { full.add(`${isMachine(t) ? 'гаражът' : 'офисът'} в ${cityById(id).nm}`); break; }   // пълно — чака разширение
     const n0 = cityUnitTypes(id).length; garBuy(t, id, true);
     if (cityUnitTypes(id).length === n0) break;   // пълен офис/гараж — съобщението вече е излязло
     n++; spent += T.cost;
@@ -7339,6 +7343,7 @@ function garBuyShort(only = null, quiet = false, all = false) {   // all — к�
   if (n && !quiet) { toast(`🛒 Купи ${n} липсващи машини и бригади за ${fmt(spent)} €${stop ? ' — парите свършиха' : ''}.`, 'good'); Sound.play('cash'); }
   if (quiet) return n;
   else if (stop) toast('Нямаш достатъчно пари за липсващата техника.', 'bad');
+  else if (full.size && feature('gar-btns')) toast(`🔒 ${n ? 'Останалото не се побира' : 'Няма място'}: ${[...full].join(', ')} — пълен. Натисни „⬆️ Разшири“ (строи се няколко дни), после купи.`, 'bad');
 }
 // автоматично разпределение: излишното (свободно и ненужно) отива там, където липсва
 function garPlan() {
@@ -7400,14 +7405,16 @@ function garageWinHtml() {
   if (garSel === undefined) garSel = S.cityId;
   if (garSel && ids.includes(garSel)) {
     const id = garSel, hv = garHave(id), idl = garIdle(id), nd = garNeed(id), others = ids.filter(x => x !== id);
+    const gb = feature('gar-btns'), fixBtn = t => { const src = gearSrcOf(t, id), kind = isMachine(t) ? 'garage' : 'office', u = upgInfo(id).find(x => x.kind === kind);   // gar-btns: какво да се натисне, когато няма място
+      return `<button class="btn2" data-garfix="${id}|${t}" title="${garCanBuy(id, t).why}">${src ? `🚚 Прати от ${cityById(src).nm}` : !u || u.max ? '🔒 Пълно (макс. ниво)' : u.busy ? '⏳ Разширява се' : `⬆️ Разшири ${kind === 'garage' ? 'гаража' : 'офиса'} · ${fmt(u.cost)} €`}</button>`; };
     const myBuy = garShort().buy.filter(b => b[0] === id), myCost = myBuy.reduce((a, [, t, n]) => a + n * ECON.UNIT_TYPES[t].cost, 0), lackOf = t => Math.max(0, (nd[t] || 0) - (hv[t] || 0) - garTransit(id).filter(m => m.t === t).length);
     h += bwCard(`🏙️ ${cityById(id).nm} <span class="meta" style="margin:0 0 0 auto">${id === S.cityId ? 'тук си' : ''}</span>`,
-      (myBuy.length ? `<div class="row" style="align-items:center;gap:8px;margin:2px 0 8px;padding:8px;border-radius:10px;background:rgba(255,90,90,.12)"><span class="meta" style="margin:0;flex:1">🛒 <b style="color:var(--txt)">Трябва да се купи:</b> ${myBuy.map(([, t, n]) => `${garIco(t)} ${ECON.UNIT_TYPES[t].nm} ×${n}`).join(' · ')}</span><button class="btn" data-garbuyshort="${id}" ${econ.canAfford(myCost) ? '' : 'disabled'}>Купи · ${fmt(myCost)} €</button></div>`
+      (myBuy.length ? `<div class="row" style="align-items:center;gap:8px;margin:2px 0 8px;padding:8px;border-radius:10px;background:rgba(255,90,90,.12)"><span class="meta" style="margin:0;flex:1">🛒 <b style="color:var(--txt)">Трябва да се купи:</b> ${myBuy.map(([, t, n]) => `${garIco(t)} ${ECON.UNIT_TYPES[t].nm} ×${n}`).join(' · ')}</span>${gb && !myBuy.some(([, t]) => garCanBuy(id, t).ok || /^нямаш/.test(garCanBuy(id, t).why || '')) ? fixBtn(myBuy[0][1]) : `<button class="btn" data-garbuyshort="${id}" ${econ.canAfford(myCost) ? '' : 'disabled'}>Купи · ${fmt(myCost)} €</button>`}</div>`
         : Object.keys(nd).some(lackOf) ? `<div class="meta" style="margin:2px 0 8px">⚖️ Липсващото ще дойде от свободната техника в другите градове.</div>` : `<div class="meta" style="margin:2px 0 8px;color:var(--ok)">✅ Нищо не липсва тук.</div>`) +
       GAR_TYPES().filter(t => hv[t] || nd[t] || !ECON.UNIT_TYPES[t].road).map(t => {
-        const T = ECON.UNIT_TYPES[t], can = idl[t] || 0;
+        const T = ECON.UNIT_TYPES[t], can = idl[t] || 0, cb = garCanBuy(id, t), room = cb.ok || /^нямаш/.test(cb.why || '');
         return `<div class="row" style="margin:4px 0;align-items:center;gap:6px"><span class="meta" style="margin:0;flex:1">${T.ico} <b style="color:var(--txt)">${T.nm}</b> · ${hv[t] || 0} бр.${nd[t] ? ` · нужни ${nd[t]}` : ''}${lackOf(t) ? ` · <b style="color:var(--bad)">липсват ${lackOf(t)}</b>` : ''}${id === S.cityId && (hv[t] || 0) > can ? ` · ${(hv[t] || 0) - can} работят` : ''}</span>
-          <button class="btn" data-garbuy="${t}" ${econ.canAfford(T.cost) ? '' : 'disabled'}>+ ${fmt(T.cost)} €</button></div>`;
+          ${gb && !room ? `<span class="meta" style="margin:0;color:var(--bad)">🔒 ${cb.why}</span>${fixBtn(t)}` : `<button class="btn" data-garbuy="${t}" ${econ.canAfford(T.cost) ? '' : 'disabled'}>+ ${fmt(T.cost)} €</button>`}</div>`;
       }).join(''));
   }
   if (tr.length) h += bwCard('🚚 На път', tr.map(m => `<div class="meta" style="margin:2px 0">${garIco(m.t)} ${ECON.UNIT_TYPES[m.t].nm} · ${cityById(m.from).nm} → <b style="color:var(--txt)">${cityById(m.to).nm}</b> · пристига на ден ${m.arrive}</div>`).join(''));
@@ -10050,7 +10057,8 @@ function renderBig() {
   on('[data-garfix]', b => { const [id, t] = b.dataset.garfix.split('|'), src = gearSrcOf(t, id);   // липсва, а сградата е пълна
     if (src && garMove(t, src, id, 1)) { toast(`🚚 ${ECON.UNIT_TYPES[t].nm} пътува от ${cityById(src).nm} към ${cityById(id).nm}.`, 'good'); save(); }
     else { const kind = isMachine(t) ? 'garage' : 'office', u = upgInfo(id).find(x => x.kind === kind);
-      if (id === S.cityId) toast(`🔒 ${garCanBuy(id, t).why} — разшири ${kind === 'garage' ? 'гаража' : 'офиса'} от таб „Офис“.`, 'bad');
+      if (id === S.cityId && feature('gar-btns') && u && !u.max && !u.busy && econ.canAfford(u.cost)) { upgGo(id, kind, true); if (upgInfo(id).find(x => x.kind === kind)?.busy) { toast(`⬆️ ${kind === 'garage' ? 'Гаражът' : 'Офисът'} се разширява (${fmt(u.cost)} €) — после купи липсващото.`, 'good'); Sound.play('buy'); save(); } }
+      else if (id === S.cityId) toast(u?.busy && feature('gar-btns') ? `⏳ ${kind === 'garage' ? 'Гаражът' : 'Офисът'} вече се разширява — техниката ще се купи след това.` : `🔒 ${garCanBuy(id, t).why} — разшири ${kind === 'garage' ? 'гаража' : 'офиса'} от таб „Офис“.`, 'bad');
       else if (!u || u.max) toast(`🔒 ${garCanBuy(id, t).why} — ${kind === 'garage' ? 'гаражът' : 'офисът'} е на максимално ниво.`, 'bad');
       else if (u.busy) toast(`⏳ ${kind === 'garage' ? 'Гаражът' : 'Офисът'} в ${cityById(id).nm} вече се разширява — техниката ще се купи след това.`);
       else if (!econ.canAfford(u.cost)) toast(`Нямаш ${fmt(u.cost)} € за разширението.`, 'bad');

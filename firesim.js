@@ -7,7 +7,7 @@
 //   st: 'travel' (пожарната пътува) → 'fight' (гасене) → 'saved' (спасена) | 'burned' (изгоряла); 'repair' / 'secured' / 'done'
 // deps: { S(), group(), scene, lots(), model(n, s), has(n), skinned(n) → { scene, animations } | null, route(x0,z0,x1,z1) → [{x,z}], startPoint(),
 //         day() → игрови дни (с дробната част), cam() → Vector3, econ(), hasStaff(k), crewFree() → bool, modal(t, html, buttons), toast(t, kind),
-//         fly(lot), save(), rebuild(lot) (нова сграда на парцела), cityId() }
+//         fly(lot), save(), rebuild(lot) (нова сграда на парцела), cityId(), early?() → по-чести пожари (под 3 града) }
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { flameSprite } from './fireflip.js';
@@ -256,7 +256,8 @@ export function createFires(deps) {
   function dailyTick() {
     const now = deps.day(); for (const f of st()) if (f.order && f.order.st === 'offer' && now > f.order.deadline) decline(f.id);
     const S = deps.S(); S.fires = st().filter(f => f.st !== 'done' || now - (f.out ?? now) < 30);   // старите — от записа
-    const built = (deps.lots() || []).filter(l => l.obj && l.built && !l.busy); if (built.length < 20 || Math.random() > 0.04 || st().some(f => f.city === deps.cityId() && (f.st === 'travel' || f.st === 'fight'))) return;
+    const early = deps.early ? deps.early() : false;   // #13 (rescue-early): в първите 2 града — ×2,5 по-често и от 12 построени сгради (пари в началото)
+    const built = (deps.lots() || []).filter(l => l.obj && l.built && !l.busy); if (built.length < (early ? 12 : 20) || Math.random() > (early ? 0.1 : 0.04) || st().some(f => f.city === deps.cityId() && (f.st === 'travel' || f.st === 'fight'))) return;
     start(built[(Math.random() * built.length) | 0].id);
   }
   // при влизане в града: отказаните/обезопасените пазят парцела; поръчката в изчакване — пак се показва
