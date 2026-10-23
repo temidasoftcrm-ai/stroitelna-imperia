@@ -6998,7 +6998,22 @@ function refreshPassing() {
 }
 // 🚦 (rail-crossings) коловозите свършват в тунел до ръба на земята (не висят над празното), а където улица пресича линията — прелез
 const railOn = () => feature('rail-crossings') && !!city && !SEASIDE.includes(S.cityId);   // крайморските — линията завива покрай брега (trackpath.js)
-const railEnd = () => railOn() && city.groundHZ ? Math.min(1600, city.groundHZ - 30) : undefined;
+const railEnd = () => railOn() && city.groundHZ ? Math.min(1600, city.groundHZ - 30, feature('rail-ends') ? railGroundZ() - 30 : 1e9) : undefined;
+// #25 (rail-ends): в градовете с план (истинската карта) земята е на плана — не city.groundHZ (то е от неизползваната земя на решетката) и
+// често е по-къса там, където минава линията (Рим: на юг до −1360 при линия до ±1600 — релсите висяха над празното). Тук: докъде стига
+// равната земя на плана точно по линията (x = STATION_X), на север и на юг от z = 0 — по-късата страна (тунелите са симетрични); водата не е земя.
+function railGroundZ() {
+  const pv = city.planView, ud = city.group?.userData; if (!pv || !ud) return city.groundHZ || 1600;
+  if (ud.railGZ != null) return ud.railGZ;
+  pv.updateMatrixWorld(true); const bs = [];
+  pv.traverse(o => { if (!o.isMesh || !o.geometry || o.material?.isMeshPhysicalMaterial || o.material?.transparent) return;
+    o.geometry.computeBoundingBox(); const b = o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld);
+    if (b.max.y - b.min.y < 1 && b.max.y < 0.6 && b.max.x - b.min.x > 250 && b.max.z - b.min.z > 250 && STATION_X - 12 >= b.min.x && STATION_X + 12 <= b.max.x) bs.push(b); });
+  if (!bs.length) return ud.railGZ = city.groundHZ || 1600;
+  const on = z => bs.some(b => z >= b.min.z && z <= b.max.z); let n = 0, s = 0;
+  while (n < 4000 && on(n + 10)) n += 10; while (s < 4000 && on(-(s + 10))) s += 10;
+  return ud.railGZ = Math.max(200, Math.min(n, s));
+}
 let railx = null, railBellAt = 0;
 function buildRailX() {
   if (railx) { railx.dispose(); railx = null; }
