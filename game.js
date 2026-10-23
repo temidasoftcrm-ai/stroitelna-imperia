@@ -5008,7 +5008,26 @@ function globeData() {
 }
 // 💾 Записи и ⚙️ Настройки — и в горната лента (до „Карта“), не само на картата
 const openSavesUI = () => openSaves({ modal, toast, fmt, save, cityName: id => cityById(id)?.nm || id, lock: () => { saveLock = true; } });
-const openSettingsUI = () => window.__settings ? window.__settings({ credits: showCredits, saves: openSavesUI, rename: S && S.brand ? renameBrand : null, newGame: () => modal('Нова игра?', 'Сегашната фирма ще бъде изтрита.', [['Отказ', null], ['Изтрий и започни', wipeSlot]]), lock: () => { save(); saveLock = true; } })
+// ⚙️ (top-set) (на телефона бутоните са в #topRow2 — ⚙️ веднага след „Карта“, с брояча) потребителят: „звук, известия, помощ, задачи и съвети — да ги сложим в settings“: бутоните остават в DOM (скрити — логиката и броячите им
+// си работят), а в настройките са редове, които ги натискат; ⚙️ има брояч, когато има задачи или куести за награда (да не се изпускат)
+const topSetCounts = () => { const num = el => +(((el && el.textContent) || '').match(/\d+/) || [0])[0]; const t = num(document.querySelector('#btnTasks b')), q = num(document.querySelector('#qBtn .qb')); return { t, q, total: t + q }; };
+const topSetRows = () => { const C = topSetCounts(), tap = id => () => { const b = document.getElementById(id); if (b) b.click(); }, txt = id => (document.getElementById(id) || {}).textContent || '';
+  return [
+    { ico: () => txt('btnSound') || '🔊', nm: () => txt('btnSound') === '🔇' ? 'Звук: изключен' : 'Звук: включен', fn: tap('btnSound'), keep: true, on: !!$('btnSound') },
+    { ico: () => txt('btnNotif') || '🔔', nm: () => ((document.getElementById('btnNotif') || {}).title || 'Известия').replace(/ — натисни за смяна$/, ''), fn: tap('btnNotif'), keep: true, on: !!document.getElementById('btnNotif') },
+    { ico: () => '❓', nm: () => 'Помощ — обиколка на бутоните', fn: tap('btnTour'), on: !!document.getElementById('btnTour') },
+    { ico: () => '📋', nm: () => `Задачи${C.t ? ` · <b style="color:#ffd54a">${C.t}</b> чакат` : ''}`, fn: tap('btnTasks'), on: !!document.getElementById('btnTasks') },
+    { ico: () => '🎯', nm: () => `Куести${C.q ? ` · <b style="color:#4cd07d">${C.q}</b> за награда` : ''}`, fn: tap('qBtn'), on: !!document.getElementById('qBtn') },
+    { ico: () => '💡', nm: () => 'Съвет — как да печелиш и да не фалираш', fn: tap('btnTips'), on: !!document.getElementById('btnTips') },
+  ].filter(r => r.on); };
+if (feature('top-set')) {
+  document.body.classList.add('topSet');
+  document.head.appendChild(Object.assign(document.createElement('style'), { textContent: 'body.topSet #btnSound, body.topSet #btnNotif, body.topSet #btnTour, body.topSet #btnTasks, body.topSet #btnTips { display:none !important; } body.mob.topSet #topRow2 > #btnSettings { order:-1; } #btnSettings { position:relative; } #btnSettings .setB { position:absolute; top:-6px; right:-6px; min-width:18px; height:18px; padding:0 4px; box-sizing:border-box; border-radius:9px; background:#ffd54a; color:#1a1200; font-size:11px; font-weight:900; display:flex; align-items:center; justify-content:center; pointer-events:none; }' }));
+  setInterval(() => { const b = document.getElementById('btnSettings'); if (!b) return; const n = topSetCounts().total; let e = b.querySelector('.setB');
+    if (n && !e) { e = document.createElement('span'); e.className = 'setB'; b.appendChild(e); } if (e) { if (n) e.textContent = n > 99 ? '99+' : n; else e.remove(); }
+    b.title = n ? `Настройки — ${n} задачи/награди чакат` : 'Настройки: звук, известия, помощ, задачи, съвети, вход, записи'; }, 1000);
+}
+const openSettingsUI = () => window.__settings ? window.__settings({ quick: feature('top-set') ? topSetRows : null, credits: showCredits, saves: openSavesUI, rename: S && S.brand ? renameBrand : null, newGame: () => modal('Нова игра?', 'Сегашната фирма ще бъде изтрита.', [['Отказ', null], ['Изтрий и започни', wipeSlot]]), lock: () => { save(); saveLock = true; } })
   : modal('⚙️ Още', 'Авторите на моделите и музиката · или започни нова игра в този слот.', [['Затвори', null], ['📜 Автори', showCredits], ['🗑️ Нова игра', () => modal('Нова игра?', 'Сегашната фирма ще бъде изтрита.', [['Отказ', null], ['Изтрий и започни', wipeSlot]])]]);
 { let after = $('btnMapToggle');
   for (const [id, txt, title, fn] of [['btnSettings', '⚙️', 'Настройки: вход, изход, данни, хора онлайн, ъпдейти', openSettingsUI]]) {
@@ -11430,6 +11449,7 @@ if (AUTOTEST) {
       const sz = q => q && [+(q.x1 - q.x0).toFixed(1), +(q.z1 - q.z0).toFixed(1)];
       return P ? { city: S.cityId, hq: h.id, lots: P.lots, cleared, gar: S.garageLot, wh: S.whLot, office: sz(P.office), garage: sz(P.garage), whRect: sz(P.wh), yard: (P.yard || []).map(sz), all: sz(P.all), hotel5: o.hotel ? hotel5Of(S.cityId) || 'зарежда се…' : null } : { err: 'campusPlot() = null (флагът campus2?)' };
     },
+    settingsOpen() { openSettingsUI(); return { badge: document.querySelector('#btnSettings .setB')?.textContent || null, rows: topSetRows().map(r => r.nm().replace(/<[^>]+>/g, '')) }; },   // ⚙️ Лабораторията (top-set)
     // 🏢 Лабораторията (campus2): общият парцел на фирмата при ниво lv (офис, гараж, склад)
     campus2Look(lv = 5) { S.officeLevel = lv; S.garageLevel = Math.min(10, Math.max(1, lv)); S.whLevel = Math.max(1, Math.min(10, lv)); if (S.whLot == null) S.whLot = city.hq.id;
       city.campusPlot = undefined; buildHQ(); showMap(false); this.tod(0.2); const h = city.hq, P = campusPlot(), r = lotRot(h), cx = P ? (P.all.x0 + P.all.x1) / 2 : 0, c = lotPt(h, cx, 0);
