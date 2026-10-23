@@ -1736,6 +1736,17 @@ function buildWarehouse() {
   refreshWarehouse();
 }
 // офисът и (докато е малък) гаражът стоят на парцела на централата; голямият гараж и складът — на свои парцели
+// 🏨 hotel5-* (55): одобрените модели за 5★/Гранд хотел — по региона на града (Залива → Бурж, Азия → Марина Бей, Америка → Мариот, изтокът → Роза Хутор, Европа → Острив);
+// моделът се зарежда при нужда и офисът се прерисува, щом дойде
+const HOTEL5 = ['burj', 'mbs', 'marriott', 'ostriv', 'rosa'], hotel5Wait = new Set();
+function hotel5Of(id) {
+  const h = (S.hotels || {})[id]; if (!h || (h.t || 0) < 2) return null; const ok = HOTEL5.filter(n => feature('hotel5-' + n)); if (!ok.length) return null;
+  const c = cityById(id) || {}, cc = c.cc || '🇧🇬', gulf = ['🇦🇪', '🇶🇦', '🇸🇦', '🇰🇼', '🇧🇭', '🇴🇲'].includes(cc), reg = carRegion(id);
+  const pref = gulf ? 'burj' : reg === 'am' ? 'marriott' : reg === 'ru' ? 'rosa' : reg === 'xx' ? 'mbs' : 'ostriv', n = ok.includes(pref) ? pref : ok[hashStr('h5:' + id) % ok.length], key = 'hotel5-' + n;
+  if (A[key]) return key;
+  if (!hotel5Wait.has(key)) { hotel5Wait.add(key); loader.load(`assets/heavy/hotels5/${key}.glb`, gl => { A[key] = gl; if (S && S.cityId === id) buildHQ(); }, undefined, () => {}); }
+  return null;
+}
 function buildHQ() {
   if (city.hqGroup) city.group.remove(city.hqGroup);
   if (city.garGroup) { city.group.remove(city.garGroup); city.garGroup = null; }
@@ -1754,7 +1765,14 @@ function buildHQ() {
   const sid = S.officeStyle || officeAutoStyle(), style = level >= STYLE_LV && sid ? OFFICE_STYLES.find(x => x.id === sid && (x.lm || x.sf || A[x.model])) : null;
   city.hqLm = null;
   const O2 = !style && feature('office-levels2') && A[`office2-l${level}`] ? OFFICE2[level - 1] : null;   // 🆕 новите нива (избраният облик на кулата има предимство)
-  if (O2) {   // височината на нивото; основата — половината парцел (кампус: предната, иначе задната), по-голямото се смалява целиком
+  const H5 = hotel5Of(S.cityId);   // 🏨 hotel5-* (55): хотелът в града е 5★/Гранд — в града стои истинският модел (по региона)
+  if (H5) { office = model(H5, 1); office.traverse(m => { if (m.isMesh) m.castShadow = m.receiveShadow = true; });   /* hotel5: плоските площади/плочи на модела — скрити; мащабът — по самата сграда: до 60 м, в парцела */
+    office.updateMatrixWorld(true); const ball = new THREE.Box3().setFromObject(office), Hm = ball.max.y - ball.min.y, Fm = Math.max(ball.max.x - ball.min.x, ball.max.z - ball.min.z), mb = new THREE.Box3(), sz = new THREE.Vector3();
+    office.traverse(m => { if (!m.isMesh) return; mb.setFromObject(m).getSize(sz); if (sz.y < Hm * 0.05 && Math.max(sz.x, sz.z) > Fm * 0.3) m.visible = false; });
+    const bb = new THREE.Box3(); office.traverse(m => { if (m.isMesh && m.visible) bb.expandByObject(m); }); const s1 = bb.getSize(new THREE.Vector3()), [W, D] = lotHalf(city.hq), rw = 2 * W - 1, rd = campusAny() ? D - 0.9 : 2 * D - 1;
+    const k = Math.min(60 / Math.max(0.01, s1.y), rw / Math.max(0.01, s1.x), rd / Math.max(0.01, s1.z)); office.scale.setScalar(k); dayNight.registerWindows(office);
+    office.position.set(-(bb.min.x + bb.max.x) / 2 * k, -bb.min.y * k, (campusAny() ? (0.4 + D - 0.5) / 2 : 0) - (bb.min.z + bb.max.z) / 2 * k); }   // хотелът — целият парцел (в кампуса — предната половина)
+  else if (O2) {   // височината на нивото; основата — половината парцел (кампус: предната, иначе задната), по-голямото се смалява целиком
     const n = `office2-l${level}`, [W, D] = lotHalf(city.hq);
     office = model(n, office2Fit(A[n].scene, O2).k); dayNight.registerWindows(office);
     campusFit(office, -W + 0.5, W - 0.5, campusAny() ? 0.4 : -D + 0.5, campusAny() ? D - 0.5 : -0.4);
@@ -4539,7 +4557,7 @@ const corp = createCorp({ xp: n => xpMore(n), S: () => S, econ: () => econ, empi
 // 🌍 световните мегапроекти на холдинга (megaworld.js)
 const mw = createMegaWorld({ xp: n => xpMore(n), viaBoard: () => { if (!S?.holding || !feature('boardroom') || !Object.keys(S.hold?.dir || {}).length) return false; toast('🗳️ Мегапроектите решава бордът с гласуване — отварям залата.', ''); group.board(() => renderBig()); return true; }, S: () => S, econ: () => econ, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), seaDaily: () => flowAvg('sea') });
 // 🏨 хотелската верига (hotels.js): офисите на ниво 10 стават хотели
-const hotels = createHotels({ xp: n => xpMore(n), S: () => S, econ: () => econ, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), brand: () => brandOf(S)?.nm || 'Титан',
+const hotels = createHotels({ changed: id => { if (S && id === S.cityId && city.hq) buildHQ(); }, xp: n => xpMore(n), S: () => S, econ: () => econ, fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), brand: () => brandOf(S)?.nm || 'Титан',
   cities: () => [...new Set(ownedCities())], city: id => cityById(id), big: id => MEGAPOLIS.has(id) || CAPITALS.has(id), airLv: id => airLv(id), isAm: id => isAm(id), day: () => S.day,
   officeLv: id => (id === S.cityId ? S.officeLevel : S.cities?.[id]?.officeLevel) || 1 });
 // 🏦 своята банка на холдинга (bank.js)
@@ -10865,6 +10883,9 @@ if (AUTOTEST) {
     incidentState: () => incidents.active,   // incidents2 (55): кой къде е
     incidentSpeed: k => incidents.speed(k),
     incidentLook(camOnly, type) { const r = camOnly && incidents.active ? null : incidents.start(type); const a = incidents.spot(); if (a) __dbg.camAt(a.x + 28, 30, a.z + 40, a.x, 0, a.z); fly = null; $('panel').classList.add('hidden'); return r; },
+    hotel5City(t = 2) {   // 🏨 hotel5-* (55): хотелът в този град — 5★ (t 2) или Гранд (3); офисът става истинският модел (по региона)
+      S.officeLevel = 10; S.hotels = { ...(S.hotels || {}), [S.cityId]: { t, since: S.day } }; buildHQ(); const h = city.hq; __dbg.camAt(h.x + 70, 55, h.z + 80, h.x, 20, h.z);
+      return new Promise(r => setTimeout(() => { let n = null, sz = null; city.group.traverse(o => { if (!n && /^hotel5-/.test(o.userData.src || '')) { n = o.userData.src; const s = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3()); sz = [s.x, s.y, s.z].map(v => +v.toFixed(1)); } }); r({ city: S.cityId, model: n, size: sz }); }, 4000)); },
     hotel5Look() {   // Лабораторията: кандидатите за 5★/Гранд хотел (assets/heavy/hotels5) един до друг извън града; височина ~60 м (широките — до ~110 м), кола и човек за мащаб
       showMap(false); const h = { x: tx(NI - 1) + 120, z: tx(NJ - 1) + 120 }, g = new THREE.Group(); g.position.set(h.x, 0, h.z); scene.add(g);
       const L = [['burj', 'Бурж ал Араб'], ['mbs', 'Марина Бей'], ['marriott', 'Мариот'], ['ostriv', 'Острив'], ['rosa', 'Роза Хутор']];

@@ -30,7 +30,7 @@ export function createHotels(deps) {
     const t = nextT(id); if (t == null) return; const c = costOf(id, t), e = deps.econ();
     if (!e.canAfford(c)) { deps.toast(`Нямаш ${deps.fmt(c)} €.`, 'bad'); return; }
     const first = !Object.keys(st()).length, nm = deps.city(id)?.nm || id;
-    e.spend(c, 'хотели', `${TIERS[t].nm} ${TIERS[t].st} в ${nm}`); deps.xp && deps.xp(1000); st()[id] = { t, since: st()[id]?.since || deps.day() };
+    e.spend(c, 'хотели', `${TIERS[t].nm} ${TIERS[t].st} в ${nm}`); deps.xp && deps.xp(1000); st()[id] = { t, since: st()[id]?.since || deps.day() }; deps.changed && deps.changed(id);   /* hotel5 (55): 5★/Гранд — моделът в града */
     const label = t === 3 ? `Гранд хотел „${deps.brand()}“` : `${TIERS[t].nm} ${TIERS[t].st}`;
     if (first) deps.pop && deps.pop('resort-unlock', `🏨 ${deps.brand()} Хотелс — първият хотел!`, `${label} в ${nm}. Всеки нов хотел прави марката по-позната — заетостта расте във всички.`);
     else deps.toast(`🏨 ${label} в ${nm} — ~${deps.fmt(revOf(id))} €/ден.`, 'good');

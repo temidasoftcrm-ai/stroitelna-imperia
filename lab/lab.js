@@ -185,6 +185,8 @@ const DEMOS = [
   ['🏙️ Фоновите сгради в Париж — разнообразни фасади, етажи и мансарди (ден, после нощ)', 'paris', d => { setTimeout(() => d.bgLook(false), 3000); setTimeout(() => d.bgLook(true), 16000); }],   // bg-variety
   ['🕌 Фоновите сгради в Истанбул — османски къщи и блокове с балкони, плоски покриви с бойлери (ден, после нощ)', 'istanbul', d => { setTimeout(() => d.bgLook(false), 3000); setTimeout(() => d.bgLook(true), 16000); }],   // bg-variety
   ['🏘️ Празните квартали: чужди сгради по парцелите и вътре в кварталите (Пловдив — отгоре, отблизо, нощ)', 'plovdiv', d => { setTimeout(() => d.bgLook(false, true), 3000); setTimeout(() => d.bgLook(false), 10000); setTimeout(() => d.bgLook(true), 17000); }],   // bg-fill
+  ['🏨 5★ хотел в града — офисът става истинският модел (Пловдив → Острив)', 'plovdiv', d => { setTimeout(() => d.hotel5City(2), 1500); }],   // hotel5-*
+  ['🏨 Гранд хотел в Ню Йорк — Мариот', 'newyork', d => { setTimeout(() => d.hotel5City(3), 1500); }],   // hotel5-*
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
