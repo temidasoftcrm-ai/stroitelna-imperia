@@ -7864,7 +7864,7 @@ function abUpInvite() {
 }
 // линия/начупена линия по точките — частта от 0 до k (за преливането)
 const abFxPath = (pts, w, col, extra = '') => `<polyline points="${pts.map(p => p.map(v => v.toFixed(1)).join(',')).join(' ')}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" ${extra}/>`;
-// аутобаните на картата: червени и по-дебели от магистралите
+// аутобаните на картата: черни с бяла линия (потребителят 23.10; бяха червени) и по-дебели от магистралите
 function abSvg() {
   if (!S) return '';
   const on = abUnlocked(), jobs = Object.fromEntries((S.hwJobs || []).filter(j => j.ab).map(j => [j.seg, j])), w = (mapEU ? 4 : mapWide ? 1.6 : 1) * mapK();
@@ -7879,15 +7879,15 @@ function abSvg() {
     if (upSet) {   // ab-up-fx: покана · преливане · вълна
       const pts = [[x1, y1], ...(via || []).map(([lo, la]) => proj(lo, la)), [x2, y2]], [lx, ly] = ptAlong(pts, 0.5);
       if (!done && !j && upSet.has(sg.id)) {   // 1) може да стане аутобан: пулсиращ червен отблясък над синята магистрала + значка
-        h += `<polyline points="${pts.map(p => p.map(v => v.toFixed(1)).join(',')).join(' ')}" fill="none" stroke="#ff2a1f" stroke-width="${14 * w}" stroke-linecap="round" stroke-linejoin="round" opacity="0"><animate attributeName="opacity" values="0;.5;0" dur="1.6s" repeatCount="indefinite"/><title>Може да стане аутобан — виж „⬆️ Ъпгрейд в аутобан“</title></polyline>`;
-        h += `<text x="${lx}" y="${ly - mapPx(10)}" font-size="${mapPx(13)}" font-weight="900" fill="#ff5a4f" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${mapPx(3)}">⬆️ аутобан</text>`;
+        h += `<polyline points="${pts.map(p => p.map(v => v.toFixed(1)).join(',')).join(' ')}" fill="none" stroke="#000000" stroke-width="${14 * w}" stroke-linecap="round" stroke-linejoin="round" opacity="0"><animate attributeName="opacity" values="0;.5;0" dur="1.6s" repeatCount="indefinite"/><title>Може да стане аутобан — виж „⬆️ Ъпгрейд в аутобан“</title></polyline>`;
+        h += `<text x="${lx}" y="${ly - mapPx(10)}" font-size="${mapPx(13)}" font-weight="900" fill="#333333" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${mapPx(3)}">⬆️ аутобан</text>`;
         continue;
       }
       if (j && j.up) {   // 2) ъпгрейд в строеж: синьо → червено по дължината, с ярък фронт
         const k = Math.min(1, (j.stage + j.prog) / abStages().length), dp = donePts(pts, k), [fx, fy] = dp[dp.length - 1];
-        h += abFxPath(pts, 5.5 * w, '#1e6fd9') + abFxPath(dp, 16 * w, '#ff2a1f', 'opacity=".28"') + abFxPath(dp, 5.5 * w, '#c62828');
-        h += `<circle cx="${fx}" cy="${fy}" r="${4.5 * w}" fill="#ffd54a" stroke="#ff2a1f" stroke-width="${1.5 * w}"><animate attributeName="r" values="${3.5 * w};${6 * w};${3.5 * w}" dur="1s" repeatCount="indefinite"/></circle>`;
-        h += `<text x="${lx}" y="${ly - mapPx(9)}" font-size="${mapPx(13)}" font-weight="800" fill="#8e0000" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${mapPx(3)}">🔵→🔴 ${Math.floor(k * 100)}%</text>`;
+        h += abFxPath(pts, 5.5 * w, '#1e6fd9') + abFxPath(dp, 16 * w, '#000000', 'opacity=".28"') + abFxPath(dp, 5.5 * w, '#16181c');
+        h += `<circle cx="${fx}" cy="${fy}" r="${4.5 * w}" fill="#ffd54a" stroke="#000000" stroke-width="${1.5 * w}"><animate attributeName="r" values="${3.5 * w};${6 * w};${3.5 * w}" dur="1s" repeatCount="indefinite"/></circle>`;
+        h += `<text x="${lx}" y="${ly - mapPx(9)}" font-size="${mapPx(13)}" font-weight="800" fill="#222222" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${mapPx(3)}">🔵→⚫ ${Math.floor(k * 100)}%</text>`;
         continue;
       }
       if (done && abOpenFx && abOpenFx.seg === sg.id) {   // 3) откриването: червена вълна по линията (рисува се над готовия аутобан по-долу)
@@ -7898,17 +7898,17 @@ function abSvg() {
     if (via) {   // начупено трасе (по брега и т.н.)
       const pts = [[x1, y1], ...via.map(([lo, la]) => proj(lo, la)), [x2, y2]], P = a => a.map(p => p.map(v => v.toFixed(1)).join(',')).join(' ');
       const k = j ? (j.stage + j.prog) / abStages().length : 0, [lx, ly] = ptAlong(pts, 0.5);
-      if (done) h += `<polyline points="${P(pts)}" fill="none" stroke="${hwPartner(sg.id) ? coopCol() : '#ff2a1f'}" stroke-width="${16 * w}" stroke-linecap="round" stroke-linejoin="round" opacity=".32"/><polyline points="${P(pts)}" fill="none" stroke="#c62828" stroke-width="${5.5 * w}" stroke-linecap="round" stroke-linejoin="round"/><polyline points="${P(pts)}" fill="none" stroke="#fff" stroke-width="${1 * w}" stroke-dasharray="${3 * w} ${3 * w}"/>`;
-      else if (j) h += `<polyline points="${P(pts)}" fill="none" stroke="#ef9a9a" stroke-width="${4 * w}" stroke-dasharray="${4 * w} ${3 * w}"/><polyline points="${P(donePts(pts, k))}" fill="none" stroke="#c62828" stroke-width="${5.5 * w}" stroke-linecap="round" stroke-linejoin="round"/><text x="${lx}" y="${ly - mapPx(9)}" font-size="${mapPx(13)}" font-weight="800" fill="#8e0000" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${mapPx(3)}">🔴 ${Math.floor(k * 100)}%</text>`;
-      else if (on) h += `<polyline points="${P(pts)}" fill="none" stroke="#e53935" stroke-width="${2.2 * w}" stroke-dasharray="${2 * w} ${3 * w}" opacity=".7"/>`;
+      if (done) h += `<polyline points="${P(pts)}" fill="none" stroke="${hwPartner(sg.id) ? coopCol() : '#000000'}" stroke-width="${16 * w}" stroke-linecap="round" stroke-linejoin="round" opacity=".32"/><polyline points="${P(pts)}" fill="none" stroke="#16181c" stroke-width="${5.5 * w}" stroke-linecap="round" stroke-linejoin="round"/><polyline points="${P(pts)}" fill="none" stroke="#fff" stroke-width="${1 * w}" stroke-dasharray="${3 * w} ${3 * w}"/>`;
+      else if (j) h += `<polyline points="${P(pts)}" fill="none" stroke="#8a8f98" stroke-width="${4 * w}" stroke-dasharray="${4 * w} ${3 * w}"/><polyline points="${P(donePts(pts, k))}" fill="none" stroke="#16181c" stroke-width="${5.5 * w}" stroke-linecap="round" stroke-linejoin="round"/><text x="${lx}" y="${ly - mapPx(9)}" font-size="${mapPx(13)}" font-weight="800" fill="#222222" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${mapPx(3)}">⚫ ${Math.floor(k * 100)}%</text>`;
+      else if (on) h += `<polyline points="${P(pts)}" fill="none" stroke="#3a3d42" stroke-width="${2.2 * w}" stroke-dasharray="${2 * w} ${3 * w}" opacity=".7"/>`;
       continue;
     }
-    if (done) h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${hwPartner(sg.id) ? coopCol() : '#ff2a1f'}" stroke-width="${16 * w}" stroke-linecap="round" opacity=".32"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#c62828" stroke-width="${5.5 * w}" stroke-linecap="round"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#fff" stroke-width="${1 * w}" stroke-dasharray="${3 * w} ${3 * w}"/>`;
+    if (done) h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${hwPartner(sg.id) ? coopCol() : '#000000'}" stroke-width="${16 * w}" stroke-linecap="round" opacity=".32"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#16181c" stroke-width="${5.5 * w}" stroke-linecap="round"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#fff" stroke-width="${1 * w}" stroke-dasharray="${3 * w} ${3 * w}"/>`;
     else if (j) {
       const k = (j.stage + j.prog) / abStages().length;
-      h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#ef9a9a" stroke-width="${4 * w}" stroke-dasharray="${4 * w} ${3 * w}"/><line x1="${x1}" y1="${y1}" x2="${x1 + (x2 - x1) * k}" y2="${y1 + (y2 - y1) * k}" stroke="#c62828" stroke-width="${5.5 * w}"/>`;
-      h += `<text x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2 - mapPx(9)}" font-size="${mapPx(13)}" font-weight="800" fill="#8e0000" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${mapPx(3)}">🔴 ${Math.floor(k * 100)}%</text>`;
-    } else if (on) h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#e53935" stroke-width="${2.2 * w}" stroke-dasharray="${2 * w} ${3 * w}" opacity=".7"/>`;
+      h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#8a8f98" stroke-width="${4 * w}" stroke-dasharray="${4 * w} ${3 * w}"/><line x1="${x1}" y1="${y1}" x2="${x1 + (x2 - x1) * k}" y2="${y1 + (y2 - y1) * k}" stroke="#16181c" stroke-width="${5.5 * w}"/>`;
+      h += `<text x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2 - mapPx(9)}" font-size="${mapPx(13)}" font-weight="800" fill="#222222" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${mapPx(3)}">⚫ ${Math.floor(k * 100)}%</text>`;
+    } else if (on) h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#3a3d42" stroke-width="${2.2 * w}" stroke-dasharray="${2 * w} ${3 * w}" opacity=".7"/>`;
   }
   return h + wave;
 }
