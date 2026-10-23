@@ -86,9 +86,9 @@ function canvasTex(w, h, draw) { const c = document.createElement('canvas'); c.w
 export function openHallOfFame({ k, tier = 'gold', onClose } = {}) {
   const A = AWARDS.find(x => x.k === k); if (!A) return null; const T = TIERS[tier] || TIERS.gold, dk = A.dir || DIR_K[k] || 'glob';
   const line = (FAME_LINES[k] || {})[tier] || A.quote || 'Благодаря за доверието!';
-  document.getElementById('hallFame')?.remove();
+  { const old = document.getElementById('hallFame'); if (old) { if (old.__close) old.__close(); old.remove(); } }
   if (!document.getElementById('hallFameCss')) { const s = document.createElement('style'); s.id = 'hallFameCss'; s.textContent = css; document.head.appendChild(s); }
-  const el = document.createElement('div'); el.id = 'hallFame';
+  const el = document.createElement('div'); el.id = 'hallFame'; el.__close = () => close();
   el.innerHTML = `<div class="top"><span>⭐ Зала на славата<small></small></span><button class="x" title="Затвори">✕</button></div><div class="sub"><b></b><span></span></div>`;
   el.querySelector('.top small').textContent = `${A.nm} · ${T.ico} ${T.nm} · ${A.who}`;
   el.querySelector('.sub b').textContent = A.who.toUpperCase(); document.body.appendChild(el);

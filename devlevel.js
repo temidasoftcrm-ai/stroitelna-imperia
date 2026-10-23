@@ -87,7 +87,7 @@ export function createDevLevel(deps) {
   let held = 0, heldT = 0;
   const inRoom = () => typeof window !== 'undefined' && (window.__overlay3d || 0) > 0 && (!feature('xp-km') || roomShown());
   // залата наистина ли е отворена: по средата на екрана не е градът/картата (#app, #mapScreen) — ако брояч е останал > 0 след затваряне, опитът не се задържа завинаги
-  const roomShown = () => { const e = document.elementFromPoint(innerWidth / 2, innerHeight / 2), app = document.getElementById('app'), map = document.getElementById('mapScreen');
+  const roomShown = () => { if (!['boardRoom', 'hallFame', 'pres', 'presEnd', 'ops3d', 'svcDemo3d'].some(id => document.getElementById(id))) return false;   /* #1: брояч без отворена 3D сцена — опитът не се задържа */ const e = document.elementFromPoint(innerWidth / 2, innerHeight / 2), app = document.getElementById('app'), map = document.getElementById('mapScreen');
     return !!e && !(app && app.contains(e)) && !(map && !map.classList.contains('hidden') && map.contains(e)); };
   function flushHeld() {
     if (inRoom()) { heldT = setTimeout(flushHeld, 700); return; }
@@ -95,9 +95,13 @@ export function createDevLevel(deps) {
     const d = st(), lv0 = d.lv; d.xp -= n; add(n);   // сега — с надписа, нивата и записа
     if (d.lv === lv0) deps.toast && deps.toast(`⭐ +${Math.round(n).toLocaleString('bg-BG')} XP от решенията на борда`, 'good');
   }
+  // #1: при скриване/затваряне на страницата — задържаният опит (и нивата му) се прилага веднага, не чака залата да се затвори
+  let forceAdd = false;
+  const flushNow = () => { if (!held) return; clearTimeout(heldT); heldT = 0; const n = held; held = 0; const d = st(); if (!d) return; d.xp -= n; forceAdd = true; try { add(n); } finally { forceAdd = false; } };
+  if (typeof window !== 'undefined') { addEventListener('pagehide', flushNow); document.addEventListener('visibilitychange', () => { if (document.hidden) flushNow(); }); }
   function add(n, why) {
     const d = st(); if (!d || !n) return;
-    if (n > 0 && inRoom()) { d.xp += n; held += n; if (!heldT) heldT = setTimeout(flushHeld, 700); return; }
+    if (n > 0 && inRoom() && !forceAdd) { d.xp += n; held += n; if (!heldT) heldT = setTimeout(flushHeld, 700); return; }
     const firm0 = best();   // нивото на фирмата (най-развитият град) преди опита — картинката е само когато то се вдигне, не при всеки град
     d.xp += n;
     if (n > 0) xpFloat(n);

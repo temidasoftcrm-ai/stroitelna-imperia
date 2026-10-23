@@ -10607,7 +10607,12 @@ function frame() {
   if (city.planView && city.planView.userData.update && !onMap) { if (city.plan && city.plan.p2) { city.planView.userData.update(rdt, { camera, signals: tr2 && tr2On() ? tr2.signals() : undefined }); const nt = dayNight.night > 0.5; if (nt !== city.p2Night) { city.p2Night = nt; city.planView.userData.setNight?.(nt); muni.setNight(nt); } } else city.planView.userData.update(simT); }   // светофарите в плана
   if (hwv) return renderHwView(rdt);
   if (onMap) return;   // картата е SVG — 3D сцената не се рисува отдолу
-  if (window.__overlay3d > 0) return;   // директорската зала (directors3d.js) е втори WebGL на цял екран — градът под нея не се рисува (иначе две сцени на кадър)
+  if (window.__overlay3d > 0) {   // #1 самолечение: броячът > 0, а повече от 5 s няма отворена 3D сцена (залата, Зала на славата, президентът, операциите) → забравено отваряне, нулира се
+    if (performance.now() - ovChkT > 500) { ovChkT = performance.now();
+    const bare = !['boardRoom', 'hallFame', 'pres', 'presEnd', 'ops3d', 'svcDemo3d'].some(id => document.getElementById(id));   // никоя от 3D сцените не е отворена
+    if (!bare) ovStuckT = 0; else if (!ovStuckT) ovStuckT = performance.now(); else if (performance.now() - ovStuckT > 5000) { console.warn('overlay3d: брояч без отворена зала — нулиран', window.__overlay3d); window.__overlay3d = 0; ovStuckT = 0; } }
+    if (window.__overlay3d > 0) return;
+  }   // директорската зала (directors3d.js) е втори WebGL на цял екран — градът под нея не се рисува (иначе две сцени на кадър)
   controls.update();
   if (S) { dayNight.update(todF(), controls.target); weather.update(rdt, controls.target); setSiteLightsNight(dayNight.night); if (cityHw && cityHw.signs) for (const G of cityHw.signs) G.setNight(dayNight.night); if (city.billboards) { city.billboards.setNight(dayNight.night); city.billboards.update && city.billboards.update(rdt); } }
   perfTune(rdt);
@@ -10825,6 +10830,10 @@ if (AUTOTEST) {
       const lf = ['glavbild', 'trakia']; for (const id of lf) corp.buyLocal(id); corp.sellTranche(); for (let d = 0; d < 5; d++) endOfDay();
       S.hTab = 'rank'; openBig('group'); const rank = document.getElementById('bwBody').innerText.slice(0, 700); S.hTab = 'acq'; renderBig(); const acq = document.getElementById('bwBody').innerText.slice(0, 500); S.hTab = 'ipo'; renderBig(); const ipo = document.getElementById('bwBody').innerText.slice(0, 500);
       return { r0, r: corp.myRank(), v: corp.myValue(), gl: { k: L.gl.kalahari, t: L.gl.tasman }, loc: L.loc, ipo: L.ipo && { out: L.ipo.out, mood: L.ipo.mood }, inc: L.incDay, share: rivals.share(), rank, acq, ipo }; },
+    hireAll(open = true) { this.holdTest(); S.dev = { xp: 2400000, lv: 18, v: 3 }; econ.earn(5e10, 'друго', 'тест'); S.group = S.group || {}; S.hold = S.hold || {}; S.hold.lv = S.hold.lv || {}; S.hold.dir = {};
+      for (const k of ['con', 'hw', 'rail', 'sea', 'air', 'hotel', 'oil', 'bank', 'glob']) { S.group[k] = S.group[k] || 1; S.hold.lv[k] = 5; } S.foundFirst = S.foundFirst || 1; S.bank = S.bank || null;
+      const got = []; for (const k of ['con', 'hw', 'rail', 'sea', 'air', 'hotel', 'oil', 'bank', 'glob']) { group.hire(k); got.push(k + ':' + (S.hold.dir[k] ? 1 : 0)); document.getElementById('dirShow')?.remove(); }
+      document.getElementById('modal')?.classList.add('hidden'); if (open) group.board(() => {}); return got; },   // #1: наемането на всички 9 директора (истинският поток), после залата
     boardDemo() { this.holdTest(); S.dev = { xp: 2400000, lv: 18, v: 3 }; const K = ['con', 'hw', 'rail', 'sea', 'air', 'hotel', 'oil', 'bank', 'glob']; S.group = S.group || {}; S.hold = S.hold || {}; S.hold.dir = S.hold.dir || {}; S.hold.lv = S.hold.lv || {};
       for (const k of K) { S.group[k] = S.group[k] || 1; S.hold.lv[k] = 5; S.hold.dir[k] = S.hold.dir[k] || DIR_OF[k]; } S.foundFirst = S.foundFirst || 1; document.getElementById('modal')?.classList.add('hidden'); group.board(() => {}); return true; },   // 🪑 hall-chairs / залата с всички директори (Лабораторията)
     fame(k = 'con', tier = 'gold') { return import('./halloffame.js').then(m => !!m.openHallOfFame({ k, tier })); },   // ⭐ hall-fame: Зала на славата (Лабораторията)

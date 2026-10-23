@@ -121,7 +121,7 @@ let demoEl = null;
 export async function demoServices(tier = 'm') {
   demoEl && demoEl.close();
   const { OrbitControls } = await import('three/addons/controls/OrbitControls.js');
-  const el = document.createElement('div'); el.style.cssText = 'position:fixed;inset:0;z-index:9790;background:#0b1220;font:600 14px system-ui;color:#fff';
+  const el = document.createElement('div'); el.id = 'svcDemo3d'; el.style.cssText = 'position:fixed;inset:0;z-index:9790;background:#0b1220;font:600 14px system-ui;color:#fff';
   el.innerHTML = `<div style="position:absolute;left:12px;top:10px;z-index:2;display:flex;gap:6px;align-items:center"><b>🏛️ Обществените сгради — ${TIER_NM[tier]} град</b>${['s', 'm', 'l', 'x'].map(t => `<button data-t="${t}" style="border:0;border-radius:8px;padding:6px 10px;cursor:pointer;background:${t === tier ? '#ffd54a' : '#1d2a42'};color:${t === tier ? '#111' : '#fff'}">${TIER_NM[t]}</button>`).join('')}<button data-x style="border:0;border-radius:8px;padding:6px 10px;cursor:pointer">✕</button></div><div class="lbs"></div>`;
   document.body.appendChild(el); window.__overlay3d = (window.__overlay3d || 0) + 1;
   const r = new THREE.WebGLRenderer({ antialias: true }); r.setPixelRatio(Math.min(devicePixelRatio, 1.75)); r.setSize(innerWidth, innerHeight); r.outputColorSpace = THREE.SRGBColorSpace; r.shadowMap.enabled = true; el.prepend(r.domElement);

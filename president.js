@@ -394,7 +394,7 @@ export function createPresidency(deps) {
 #pres .m { color:#9fb0c8; font-size:13px; } #pres .map { flex:2 1 560px; }`;
   function open() {
     if (!st()) return; if (!document.getElementById('presCss')) { const c = document.createElement('style'); c.id = 'presCss'; c.textContent = css; document.head.appendChild(c); }
-    if (el) el.remove(); el = document.createElement('div'); el.id = 'pres'; document.body.appendChild(el); window.__overlay3d = (window.__overlay3d || 0) + 1; render();
+    if (el) { el.remove(); window.__overlay3d = Math.max(0, (window.__overlay3d || 1) - 1); } el = document.createElement('div'); el.id = 'pres';   /* #1: старият — със своя брояч */ document.body.appendChild(el); window.__overlay3d = (window.__overlay3d || 0) + 1; render();
   }
   function close() { if (!el) return; el.remove(); el = null; window.__overlay3d = Math.max(0, (window.__overlay3d || 1) - 1); }
   const bar = (v, col) => `<div class="bar"><i style="width:${Math.round(v)}%;background:${col || (v >= 60 ? '#3fae6b' : v >= 40 ? '#ffd54a' : '#ff6b6b')}"></i></div>`;

@@ -361,6 +361,7 @@ function buildRoom(scene) {
 // без transmission: той рисува цялата сцена още веднъж на всеки кадър (20 чаши = отделен пълен проход); отражението идва от envMap
 const glassM = new THREE.MeshStandardMaterial({ color: 0xcfe2f0, metalness: 0.1, roughness: 0.04, envMapIntensity: 1.6, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide });
 const waterM = new THREE.MeshStandardMaterial({ color: 0xbfe2f5, metalness: 0, roughness: 0.03, envMapIntensity: 1.8, transparent: true, opacity: 0.45, depthWrite: false });
+glassM.userData.shared = waterM.userData.shared = true;   // #1: общи за всички зали — при затваряне не се освобождават (иначе отнемат програмите на новата зала по време на compileAsync)
 // профилът на чашата (радиус, височина в m): дебело дъно, леко разширена нагоре, ръбът — двойна стена
 const GLASS = new THREE.LatheGeometry([[0, 0], [0.028, 0], [0.031, 0.004], [0.032, 0.014], [0.037, 0.115], [0.0385, 0.118], [0.0365, 0.118], [0.0345, 0.016], [0, 0.014]].map(([r, y]) => new THREE.Vector2(r, y)), 28);
 const WATER = new THREE.LatheGeometry([[0, 0.014], [0.034, 0.016], [0.0355, 0.082], [0, 0.082]].map(([r, y]) => new THREE.Vector2(r, y)), 28);
@@ -434,9 +435,9 @@ function isImportant(p, F) {
 // ---- залата
 // o: { title, brand: { nm, col, ico, group }, proposals(): [{ id, dir, ico, text, cost, can }], onDecide(id, 'yes'|'no'|'later'), seats(): [{ k, ico, company, what, open, director, lv, lvMax, inc, bonus, bonusPct, up: {cost, can}|null, hire: {cost, can}|null }], fmt, onUp(k), onHire(k), sound(n) }
 export function openBoardroom(o) {
-  document.getElementById('boardRoom')?.remove();
+  { const old = document.getElementById('boardRoom'); if (old) { if (old.__close) old.__close(); old.remove(); } }   // #1: повторно отваряне — старата зала се затваря (иначе window.__overlay3d остава > 0 завинаги: градът не се рисува, опитът се задържа)
   if (!document.getElementById('boardRoomCss')) { const s = document.createElement('style'); s.id = 'boardRoomCss'; s.textContent = css; document.head.appendChild(s); }
-  const el = document.createElement('div'); el.id = 'boardRoom';
+  const el = document.createElement('div'); el.id = 'boardRoom'; el.__close = () => close(); let compiling = 0;
   el.innerHTML = `<div class="top"><span><i class="hn"></i><small></small></span><button class="tg cine" title="Камерата следва говорещия">🎥</button><button class="tg voice" title="Говор на глас (български глас на браузъра)" style="display:none">🗣️</button><button class="tg snd" title="Звук на залата">🔊</button><button class="cfg" style="display:none">⚙️ Бюджети и автопилот</button><button class="x" title="Затвори (Esc)">✕</button></div><div class="set"></div><div class="load"></div><div class="tip"></div><div class="bnav"><button class="pv" title="Предишното">‹</button><span>📋 Предложение <b></b></span><button class="nx" title="Следващото">›</button></div><div class="scr"></div><div class="card"></div><div class="hint">🖱️ Клик на директор — доклад · влачи — обиколи масата · ⌨️ Enter — Да · N — Не · L — По-късно · ← →</div>`;
   const ROOM = o.room || 'corp';   // 'corp' — Директорската зала; 'us' / 'ru' — Министерският съвет в президентската зала
   el.querySelector('.top .hn').textContent = o.hallTitle || '🏛️ Директорската зала';
@@ -520,11 +521,16 @@ export function openBoardroom(o) {
   }
 
   // директорите идват асинхронно: стаята се вижда веднага
-  loadClips().then(async clips => {
+  // #1: влизането никога не виси — таймаут за клиповете (20 s), за всеки директор (15 s — пропуска се само той), общо 25 s; „Пропусни“ след 5 s
+  const withT = (p, ms) => Promise.race([p, new Promise(r => setTimeout(() => r(null), ms))]);
+  let skipNow = null; const skipB = document.createElement('button'); skipB.textContent = 'Пропусни ⏭'; skipB.style.cssText = 'position:absolute;left:50%;top:calc(50% + 34px);transform:translateX(-50%);z-index:4;display:none;border:1px solid #fff4;border-radius:999px;background:#1c2433;color:#fff;font:700 14px system-ui,sans-serif;padding:8px 16px;cursor:pointer';
+  skipB.onclick = () => skipNow && skipNow(); el.appendChild(skipB); const skipT = setTimeout(() => { if (!shut && el.querySelector('.load').style.opacity !== '0') skipB.style.display = 'block'; }, 5000);
+  withT(loadClips(), 20000).then(async clips => {
+    clips = clips || {};
     const pick = (...n) => n.map(x => clips[x]).filter(Boolean);
-    await Promise.all(list.map(async (s, i) => {
+    await Promise.race([Promise.all(list.map(async (s, i) => { try {
       let mk = s.director && (s.model || DIR_MODEL[s.k]); if (mk && !HAVE.has(mk)) mk = TEMP_MODEL[s.k]; if (!mk || !HAVE.has(mk)) return;
-      let g; try { g = await loadGlb(mk); } catch { return; }
+      let g; try { g = await withT(loadGlb(mk), 15000); } catch { return; } if (!g) { console.warn('boardroom: модел не дойде навреме', mk); return; }
       if (shut) return;
       const m = cloneSkinned(g.scene); m.scale.setScalar(SCALE); m.position.set(0, 0, 0); m.rotation.set(0, 0, 0);   // клонинг — един модел може да седи и като временен аватар
       m.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; c.frustumCulled = false; } });
@@ -561,12 +567,13 @@ export function openBoardroom(o) {
           if (L > 0.2) { d.multiplyScalar((L - 0.18) / L); wrap.position.add(d); s.chair.position.add(d); wrap.updateMatrixWorld(true); } } }
       people.push(p);
       // ⚡ шейдърите на човека — асинхронно (KHR_parallel_shader_compile), докато е скрит: иначе първото му рисуване спираше страницата („Page Unresponsive“ при голяма зала)
-      if (renderer.compileAsync) { wrap.visible = false; renderer.compileAsync(wrap, cam, scene).catch(() => { }).then(() => { wrap.visible = true; }); }
-    }));
+      if (renderer.compileAsync) { wrap.visible = false; compiling++; renderer.compileAsync(wrap, cam, scene).catch(() => { }).then(() => { compiling--; wrap.visible = true; }); }
+    } catch (e) { console.warn('boardroom: директор', s.k, e); } })), new Promise(r => { skipNow = r; setTimeout(r, 25000); })]);   // един счупен/бавен директор не спира залата
+    clearTimeout(skipT); skipB.remove(); if (shut) return;
     el.querySelector('.load').style.opacity = 0; snd.ambience(true);
-    mergeStatic(scene, new Set([holo.root, ...people.map(p => p.wrap), AW && AW.group, VD && VD.root].filter(Boolean)));   // витрината и вратата — с мишени за клик и анимации   // ~500 draw calls → под 150
+    { const doMerge = (n = 0) => { if (shut) return; if (compiling > 0 && n < 60) return setTimeout(() => doMerge(n + 1), 200); mergeStatic(scene, new Set([holo.root, ...people.map(p => p.wrap), AW && AW.group, VD && VD.root].filter(Boolean))); }; doMerge(); }   // #1: сливането — след компилациите (иначе three хвърля „reading 'isReady'“)   // витрината и вратата — с мишени за клик и анимации   // ~500 draw calls → под 150
     board(0);   // бордът започва с първото предложение
-  }).catch(e => { console.warn('boardroom', e); el.querySelector('.load').textContent = 'Моделите не се заредиха.'; });
+  }).catch(e => { console.warn('boardroom', e); clearTimeout(skipT); skipB.remove(); el.querySelector('.load').style.opacity = 0; try { board(0); } catch (e2) { console.warn('boardroom board', e2); } });   // #1: и при грешка — залата продължава (без да виси на „Директорите влизат“)
 
   // смяна на клип с меко преливане; one-shot → обратно към основния
   function play(p, a, once) {
@@ -904,7 +911,7 @@ export function openBoardroom(o) {
       else w.position.y = TABLE_H + 0.32 + Math.sin(clock.elapsedTime * 1.4) * 0.03; }
     if (vault) { vault.update(dt); renderer.render(vault.scene, vault.cam); } else renderer.render(scene, cam);   // в трезора — неговата сцена
   }
-  if (renderer.compileAsync) renderer.compileAsync(scene, cam).catch(() => { }).then(() => { if (!shut) loop(); }); else loop();   // стаята — също асинхронно, после рисуваме
+  if (renderer.compileAsync) { compiling++; let go = false; const start = () => { if (go) return; go = true; if (!shut) loop(); }; renderer.compileAsync(scene, cam).catch(() => { }).then(() => { compiling--; start(); }); setTimeout(start, 6000); } else loop();   // #1: рисуването тръгва най-късно след 6 s, дори компилацията да увисне   // стаята — също асинхронно, после рисуваме
 
   function close() {
     if (shut) return; shut = true; clearTimeout(vaultT); if (vault) { vault.dispose(); vault = null; } try { o.onClose && o.onClose(); } catch {}
@@ -912,10 +919,13 @@ export function openBoardroom(o) {
     removeEventListener('keydown', key); removeEventListener('resize', onResize);
     el.classList.remove('on');
     setTimeout(() => {
-      cancelAnimationFrame(raf); ctl.dispose();
+      cancelAnimationFrame(raf); ctl.dispose(); el.style.display = 'none'; el.id = 'boardRoomGone';   // #1: скрита веднага (самолечението и новото отваряне не я броят)
       for (const p of people) { p.mixer.stopAllAction(); p.wrap.remove(p.m); }   // моделите остават в кеша за следващия път
-      scene.traverse(c => { if (c.isMesh && !c.isSkinnedMesh) { c.geometry.dispose(); const ms = [].concat(c.material); ms.forEach(mm => { mm.map && mm.map.dispose(); mm.dispose(); }); } });
-      snd.ambience(false); snd.hush(); holo.dispose(); scene.environment && scene.environment.dispose(); pmrem.dispose(); renderer.dispose(); el.remove();
+      snd.ambience(false); snd.hush();
+      // #1: материалите и rendererът — след като компилациите на шейдърите приключат (иначе three хвърля „reading 'isReady'“)
+      const fin = (n = 0) => { if (compiling > 0 && n < 40) return setTimeout(() => fin(n + 1), 250);
+        scene.traverse(c => { if (c.isMesh && !c.isSkinnedMesh) { c.geometry.dispose(); const ms = [].concat(c.material); ms.forEach(mm => { if (mm.userData && mm.userData.shared) return; mm.map && mm.map.dispose(); mm.dispose(); }); } });
+        holo.dispose(); scene.environment && scene.environment.dispose(); pmrem.dispose(); renderer.dispose(); el.remove(); }; fin();
     }, 450);
   }
   function bonus(k, amount) {   // money-real: пачките се плъзгат по масата към директора
