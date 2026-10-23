@@ -191,6 +191,7 @@ const DEMOS = [
   ['💡 Мигачите: преди завоя и при смяна на лента (автобусът към спирката; камерата следи кола пред завой)', 'sofia', d => { for (let k = 0; k < 8; k++) setTimeout(() => d.blinkLook(), 5000 + k * 7000); }],   // blink-lane (#42.2)
   ['🌃 Складовете нощем — вече не са черни кубове (редицата 1–10, 22:00)', 'plovdiv', d => setTimeout(() => { d.whRow(); setTimeout(() => d.time(22), 1500); }, 3000)],   // wh-night
   ['🚗 Движението расте с квартала: над застроеното — много коли и хора, над празното — малко (Пловдив: центърът, после най-празният край)', 'plovdiv', d => { setTimeout(() => d.growLook(false), 8000); setTimeout(() => d.growLook(true), 22000); setTimeout(() => d.growLook(false), 36000); }],   // traffic-grow (#42.8)
+  ['⛽ Бензиностанциите — колонките към улицата (първата, после втората след 5 s)', 'sofia', d => { setTimeout(() => d.gasFaceLook(0), 1500); setTimeout(() => d.gasFaceLook(1), 6500); }],   // gas-face
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

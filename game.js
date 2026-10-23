@@ -475,6 +475,8 @@ const load = (url, tries = 3) => new Promise((res, rej) => loader.load(url, res,
 // истинските цветни къщи (assets/heavy/houses2, Sketchfab CC-BY) — всяка с отделно „✓ OK“ в Лабораторията (feature = името ѝ); добавят се към HOUSES
 const H2 = ['h2-greyporch', 'h2-brickcabin', 'h2-pink', 'h2-townhouse', 'h2-blue', 'h2-swedish', 'h2-lodge', 'h2-porch'].filter(n => feature(n));
 // бензиностанциите (decorLot) — тук, преди зареждането
+// №6 (55, gas-face): накъде гледат колонките на модела (в неговите оси) → завъртане, така че да гледат към улицата (+z на парцела)
+const GAS_YAW = { 'gas-modern': Math.PI / 2, 'gas-big': -Math.PI / 2, 'gas-green': -Math.PI / 2, 'gas-lowpoly': 0 }; let gasOne = null;
 const GAS_KINDS = ['gas-modern', 'gas-big', 'gas-green', 'gas-lowpoly'].filter(n => feature(n)), GAS_W = { 'gas-modern': 24, 'gas-big': 26, 'gas-green': 26, 'gas-lowpoly': 9 };
 const MODELS = {
   roads: ['road-straight', 'road-crossroad', 'road-intersection', 'road-bend', 'construction-cone', 'construction-barrier', 'light-square'],
@@ -1235,10 +1237,12 @@ function decorLot(g, lot, cityId) {
   if (gasCount.city !== cityId) gasCount = { city: cityId, n: 0, res: 0 };
   if ((kind === 3 || kind === 4) && gasCount.res >= Math.max(4, Math.round(city.lots.length / 15) - 2)) kind = kind === 3 ? 2 : 5;   /* №7: запазените (паркинг/площадка) — до ~1 на 15 парцела, иначе свършват парцелите за поръчки; останалите — градинка/ливада */
   { const gk = GAS_KINDS.filter(n => A[n]);   // бензиностанция: всеки ~6-и празен парцел, достатъчно голям, до 2 на град
-    if (gk.length && gasCount.n < 2 && (h >>> 7) % 6 === 0 && (!lot.plan || Math.min(lot.w, lot.d) >= 14)) {   // парцелите в плана са 11–17 м
-      const n = gk[(h >>> 11) % gk.length], o = model(n, 1), sz = sizeOf(n).getSize(new THREE.Vector3()), room = lot.plan ? Math.min(lot.w, lot.d) + 3 : 16;   // навесът може леко да излиза над тротоара
-      o.scale.setScalar(Math.min(GAS_W[n], room) / Math.max(sz.x, sz.z)); o.rotation.y = lot.plan ? lot.rot || 0 : 0; o.position.set(lot.x, 0, lot.z); o.userData.detail = true;
-      g.add(o); (lot.trees = lot.trees || []).push(o); gasCount.n++; lot.gas = 1; lot.busy = 'reserved'; lot.reserved = 'gas';   /* №7: бензиностанцията — запазена */   /* bg-fill: без чужда сграда тук */
+    const GF = feature('gas-face'), farGas = !GF || !(gasCount.at || []).some(([x, z]) => Math.hypot(x - lot.x, z - lot.z) < 40);   // №6 (55): не една до друга
+    if (gk.length && gasCount.n < 2 && farGas && (h >>> 7) % 6 === 0 && (!lot.plan || Math.min(lot.w, lot.d) >= 14)) {   // парцелите в плана са 11–17 м
+      const n = gk[(h >>> 11) % gk.length], one = GF && n === 'gas-big' ? (gasOne ||= pickPart(A[n].scene, -1e9, 1e9, 0, 1e9)) : null;   /* gas-big са две станции една до друга — само едната */
+      const o = one ? (c => { c.userData.src = n; c.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); return c; })(one.clone(true)) : model(n, 1), sz = (one ? new THREE.Box3().setFromObject(one) : sizeOf(n)).getSize(new THREE.Vector3()), room = lot.plan ? Math.min(lot.w, lot.d) + 3 : 16;   // навесът може леко да излиза над тротоара
+      o.scale.setScalar(Math.min(GAS_W[n], room) / Math.max(sz.x, sz.z)); o.rotation.y = (lot.plan ? lot.rot || 0 : 0) + (GF ? GAS_YAW[n] || 0 : 0); o.position.set(lot.x, 0, lot.z); o.userData.detail = true;   /* gas-face: колонките и навесът — към улицата */
+      g.add(o); (lot.trees = lot.trees || []).push(o); gasCount.n++; (gasCount.at ||= []).push([lot.x, lot.z]); lot.gas = 1; lot.busy = 'reserved'; lot.reserved = 'gas';   /* №7: бензиностанцията — запазена */   /* bg-fill: без чужда сграда тук */
       if (gasLogoTex) { o.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(o), sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: gasLogoTex, depthWrite: false }));   // логото на … Петролиум над станцията
         sp.scale.setScalar(4.2); const bc = bb.getCenter(new THREE.Vector3()); sp.position.set(bc.x, bb.max.y + 3, bc.z); sp.userData.detail = true; g.add(sp); lot.trees.push(sp); if (feature('gas-logo-own')) { sp.userData.gasLogo = true; sp.material.visible = ownsOilCo(); } }
       return true; } }
@@ -10954,6 +10958,9 @@ if (AUTOTEST) {
       if (own != null) { S.holding = S.holding || true; S.foundFirst = S.foundFirst || S.day; S.group = S.group || {}; if (own) S.group.oil = S.group.oil || S.day; else delete S.group.oil; }
       updGasLogos(); let sp = null; city.group.traverse(o => { if (!sp && o.userData.gasLogo) sp = o; }); if (!sp) return 0;
       const v = sp.position; showMap(false); fly = null; controls.target.set(v.x, 2, v.z); camera.position.set(v.x + 22, 20, v.z + 26); return sp.material.visible ? 'logo' : 'plain'; },
+    gasFaceLook(k = 0) {   // ⛽ gas-face (55): k-тата бензиностанция в града — камерата откъм улицата
+      const L = city.lots.filter(l => l.gas); const l = L[k % Math.max(1, L.length)]; if (!l) return { n: 0 }; const o = (l.trees || []).find(t => GAS_KINDS.includes(t.userData.src)); const r = l.plan ? l.rot || 0 : 0, fx = Math.sin(r), fz = Math.cos(r);
+      __dbg.camAt(l.x + fx * 30 + fz * 12, 16, l.z + fz * 30 - fx * 12, l.x, 2, l.z); return { n: L.length, lot: l.id, model: o && o.userData.src, rot: +(o ? o.rotation.y : 0).toFixed(2), lotRot: +r.toFixed(2) }; },
     gasLook() {   // Лабораторията: трите кандидата за бензиностанция (assets/heavy/gas) един до друг пред централата — 1 = 30 м
       showMap(false); const h = { x: tx(NI - 1) + 75, z: tx(NJ - 1) + 90 }, g = new THREE.Group(); g.position.set(h.x - 10, 0, h.z + 30); scene.add(g);   // на празното поле югоизточно от града
       ['gas-lowpoly', 'gas-modern', 'gas-big', 'gas-green'].forEach((n, i) => loader.load(`assets/heavy/gas/${n}.glb`, gl => { const o = gl.scene; o.scale.setScalar(25); o.position.set((i - 1.5) * 40, 0, 0);   // ~25 м широки; кола и човек отпред за мащаб
