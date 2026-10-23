@@ -181,6 +181,7 @@ const DEMOS = [
   ['⭐ Зала на славата — Ивайло (злато), после Мария (платина)', 'sofia', d => { setTimeout(() => d.fame('con', 'gold'), 3000); setTimeout(() => { window.__fame && window.__fame.close(); setTimeout(() => d.fame('rail', 'platinum'), 600); }, 16000); }],   // hall-fame
   ['🎬 Клипът на Истанбул (и след филиал там — същото като Ню Йорк)', 'istanbul', d => { setTimeout(() => d.cine('istanbul'), 2500); }],   // branch-clip (Истанбул)
   ['🪑 Столовете в залата — избор на играча (бутон 🪑 до 🏆)', 'sofia', d => setTimeout(() => { d.boardDemo(); setTimeout(() => { const w = document.querySelector('#fr')?.contentWindow || window; }, 100); }, 3000)],   // hall-chairs
+  ['🛤️ Жп депото до гарата — стари вагони и парен локомотив (Пловдив)', 'plovdiv', d => setTimeout(() => { const g = d.city().depot; if (!g) return; let n = 0, cx = 0, cz = 0; g.traverse(o => { if (o.isMesh) { const p = o.getWorldPosition(o.position.clone()); cx += p.x; cz += p.z; n++; } }); if (n) d.camAt(cx / n + 60, 40, cz / n + 60, cx / n, 0, cz / n); }, 8000)],   // rail-depot
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

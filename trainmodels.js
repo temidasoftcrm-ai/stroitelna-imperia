@@ -89,6 +89,11 @@ export function loadTrainModels(base = 'assets/heavy/trains/') {
       get('boxcar.glb').then(sc => { P.boxcar = normalize(sc, 0); }),
       get('hopper2.glb').then(sc => { P.hopper2 = normalize(sc, 0); }),
     ].map(p => p.catch(e => console.warn('trains-real', e))) : []),
+    // 🛤️ rail-depot: старите в депото — парен локомотив 0-4-0 (steve_Emfore, CC BY) и съветска цистерна (KojfDiscord, CC BY)
+    ...(feature('rail-depot') ? [
+      get('loco040.glb').then(sc => { tame(sc); P.loco040 = normalize(sc, 0); }),
+      get('tank-ussr.glb').then(sc => { tame(sc); P.tankUssr = normalize(sc, 0); }),
+    ].map(p => p.catch(e => console.warn('rail-depot', e))) : []),
   ]).then(() => { ready = true; }).catch(e => { console.warn('trainmodels', e); ready = false; });
   return loading;
 }

@@ -516,6 +516,7 @@ let europe = null;
   if (feature('office-levels2')) for (const L of OFFICE2) jobs.push(load(L.url).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[`office2-l${L.lv}`] = g; prepNightFloors(g.scene, `office2-l${L.lv}`); blkSections(`office2-l${L.lv}`); }).catch(() => {}));   // 🆕 новите нива на офиса
   for (const n of GAS_KINDS) jobs.push(load(`assets/heavy/gas/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => {}));   // бензиностанции (всяка — свое „✓ OK“); нощем — навесът и магазинът (nightfloors 'gas')
   if (feature('wh-levels2')) for (let k = 1; k <= 10; k++) jobs.push(load(`assets/heavy/wh2/wh-l${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['wh2-l' + k] = g; blkSections('wh2-l' + k); }).catch(() => {}));   /* №18: секциите на халетата */   // 📦 складовете 1–10 (Sketchfab, CC-BY — assets/heavy/wh2/CREDITS.txt)
+  if (feature('rail-depot')) jobs.push(load('assets/heavy/rail/depot-shed.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; if (m.material.metalness > 0.4) m.material.metalness = 0.3; } }); A['depot-shed'] = g; }).catch(() => {}));   // 🛤️ rail-depot: депо за локомотиви (Engine Shed — Victor.Rodriguez3D, CC BY)
   if (feature('catenary')) jobs.push(load('assets/heavy/rail/catenary-mast.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; m.material.metalness = 0.25; m.material.roughness = 0.6; } }); A['cat-mast'] = g; })   /* без огледална среда металът излиза черен */.catch(() => {}));   // ⚡ catenary (#19): стълб с конзола (Low poly catenary — Ogfmh/mtafan, CC BY; оцветен в Blender)
   if (feature('rail-real')) jobs.push(load('assets/heavy/rail/track-tile.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) { m.castShadow = false; m.receiveShadow = true; } }); A['track-real'] = g; }).catch(() => {}));   // 🛤️ rail-real (#19): истинските релси (hifrak958, CC BY) — парче 1 × 0,75, като детското 'track'
   if (feature('wh-mats')) jobs.push(whMatsLoad(load));   // 📦 палети тухли, цимент, дъски, греди, пясък, кашони (assets/heavy/whmat, CC-BY)
@@ -7030,7 +7031,7 @@ let trackMap = makeTrackMap(null);   // пътят на жп линията в �
 let passing = null;
 // гарата на фирмата: нива 1–5 = брой коловози; ниво 0 — само главната линия през града
 let station = null, parkedSig = '';
-loadTrainModels().then(() => { parkedSig = ''; try { updateParked(); } catch {} });   // истинските влакове (Sketchfab) — щом се заредят, гарата се пречертава
+loadTrainModels().then(() => { parkedSig = ''; try { updateParked(); } catch {} try { if (city.ready) buildDepot(); } catch {} });   // rail-depot: старите вагони — щом моделите дойдат   // истинските влакове (Sketchfab) — щом се заредят, гарата се пречертава
 const stationLv = () => S.stationLevel || 0;
 const homeTrains = () => (S.trains || []).filter(t => !t.job && t.at === S.cityId);
 function buildStation() {
@@ -7045,6 +7046,36 @@ function refreshPassing() {
   passing = createPassingTrains({ scene, group: city.group, model, instanced, x: STATION_X, trackX: station.outerX(), path: trackMap, horn: () => {}, orient: () => S?.orient?.st === 'done', len: railEnd() });
   buildRailX();
   try { buildCatenary(); } catch (e) { console.warn('catenary', e); }
+  try { buildDepot(); } catch (e) { console.warn('depot', e); }
+}
+// 🛤️ rail-depot: жп депо до гарата — три странични коловоза западно от линията (отвъд стълбовете на контактната мрежа), стрелка от
+// външния коловоз, депо за локомотиви над двата западни, стоп-огради в краищата и старите вагони (ръждясали) и парният локомотив.
+// Мястото: 150 м на юг от гарата (z > 0, без завоя край морето), или на север, ако там има прелез.
+function buildDepot() {
+  if (city.depot) { city.group.remove(city.depot); city.depot.traverse(o => { if (o.userData.own) { o.geometry.dispose(); } }); city.depot = null; }
+  if (!feature('rail-depot') || !station || !A['track']) return;
+  const L = railEnd() || 600, xw = station.outerX() - 6.5, SG = 5, xs = [xw - 8, xw - 8 - SG, xw - 8 - 2 * SG], LEN = 150;
+  const free = (a, b) => b < L - 30 && !(city.railCross || []).some(c => c.z > a - 20 && c.z < b + 20);
+  const z0 = free(60, 60 + LEN) ? 60 : free(-60 - LEN, -60) && !SEASIDE.includes(S.cityId) ? -60 - LEN : null; if (z0 == null) return;
+  const g = new THREE.Group(); g.name = 'depot'; city.group.add(g); city.depot = g;
+  const up = new THREE.Vector3(0, 1, 0), line = (x0, za, x1, zb) => { const dx = x1 - x0, dz = zb - za, Ln = Math.hypot(dx, dz), q = new THREE.Quaternion().setFromAxisAngle(up, Math.atan2(dx, dz)), mats = [];
+    for (let d = 2; d < Ln - 1; d += 4) { const m = trackMap(x0 + dx * d / Ln, za + dz * d / Ln); mats.push(new THREE.Matrix4().compose(new THREE.Vector3(m.x, 0.01, m.z), q, new THREE.Vector3(4, 4, 4))); } g.add(instanced('track', mats)); };
+  for (const x of xs) line(x, z0, x, z0 + LEN);
+  line(xw, z0 - 30, xs[0], z0); line(xs[0], z0 + 6, xs[1], z0 + 26); line(xs[1], z0 + 32, xs[2], z0 + 52);   // стрелката от външния коловоз и разклоненията
+  // стоп-огради (червено-бели) в края на всеки коловоз
+  const bufM = new THREE.MeshStandardMaterial({ color: 0xc8302a, roughness: 0.7 }), bufG = new THREE.BoxGeometry(3, 1.4, 0.6); bufG.userData = {};
+  for (const x of xs) { const b = new THREE.Mesh(bufG, bufM); b.position.set(x, 0.7, z0 + LEN + 0.5); b.castShadow = true; b.userData.own = 1; g.add(b); }
+  // депото — над двата западни коловоза, в северния край (входът към гарата)
+  if (A['depot-shed']) { const sh = A['depot-shed'].scene.clone(true), bb = new THREE.Box3().setFromObject(A['depot-shed'].scene), sz = bb.getSize(new THREE.Vector3()), along = sz.z >= sz.x;
+    const w = along ? sz.x : sz.z, k = (SG + 7) / w, inner = new THREE.Group(); inner.add(sh); if (!along) inner.rotation.y = Math.PI / 2; inner.scale.setScalar(k);
+    const wrap = new THREE.Group(); wrap.add(inner); wrap.updateMatrixWorld(true); const b2 = new THREE.Box3().setFromObject(wrap), c2 = b2.getCenter(new THREE.Vector3());
+    inner.position.set(-c2.x, -b2.min.y, -c2.z); wrap.position.set((xs[1] + xs[2]) / 2, 0, z0 + LEN - (b2.max.z - b2.min.z) / 2 - 2); g.add(wrap); }
+  // старите вагони: ръждясали (по-тъмно и кафеникаво, матово); парният локомотив — пред депото
+  const rust = o => { o.traverse(m => { if (m.isMesh && m.material) { m.material = m.material.clone(); if (m.material.color) m.material.color.lerp(new THREE.Color(0x6b4426), 0.4); m.material.roughness = 0.9; m.material.metalness = Math.min(m.material.metalness || 0, 0.2); } }); return o; };
+  const put = (x, zStart, kinds, rusty) => { let z = zStart; for (const [i, k] of kinds.entries()) { if (!hasTrainModel(k)) continue; const o = trainCar(k, i); if (!o) continue; if (rusty) rust(o); const l = o.userData.len || 6.2; z += l / 2; const m = trackMap(x, z); o.position.set(m.x, 0.3, m.z); o.rotation.y = m.yaw; z += l / 2 + 0.6; g.add(o); } };
+  put(xs[0], z0 + 20, ['tankUssr', 'tankUssr', 'tankUssr', 'hopper2', 'tankUssr'], false);
+  put(xs[1], z0 + 60, ['loco040'], false);
+  put(xs[2], z0 + 30, ['boxcar', 'hopper2', 'boxcar', 'oeCar'], true);
 }
 // ⚡ catenary (#19): контактна мрежа над всички коловози в града — стълбове (модела) от двете външни страни на всеки 50 м с конзола над крайния коловоз,
 // при повече коловози — портал (греда отгоре) и висулки над вътрешните; по всеки коловоз носещо въже (6,6 м) и контактен проводник (5,6 м). Всичко — инстанции.
