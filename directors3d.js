@@ -435,6 +435,7 @@ function isImportant(p, F) {
 // ---- залата
 // o: { title, brand: { nm, col, ico, group }, proposals(): [{ id, dir, ico, text, cost, can }], onDecide(id, 'yes'|'no'|'later'), seats(): [{ k, ico, company, what, open, director, lv, lvMax, inc, bonus, bonusPct, up: {cost, can}|null, hire: {cost, can}|null }], fmt, onUp(k), onHire(k), sound(n) }
 export function openBoardroom(o) {
+  if (feature('board-nomap') && window.__closeMap) window.__closeMap();   // първо се затваря картата — не държим и двете (паметта на таба при голяма игра)
   { const old = document.getElementById('boardRoom'); if (old) { if (old.__close) old.__close(); old.remove(); } }   // #1: повторно отваряне — старата зала се затваря (иначе window.__overlay3d остава > 0 завинаги: градът не се рисува, опитът се задържа)
   if (!document.getElementById('boardRoomCss')) { const s = document.createElement('style'); s.id = 'boardRoomCss'; s.textContent = css; document.head.appendChild(s); }
   const el = document.createElement('div'); el.id = 'boardRoom'; el.__close = () => close(); let compiling = 0;

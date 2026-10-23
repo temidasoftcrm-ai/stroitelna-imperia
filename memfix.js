@@ -63,3 +63,60 @@ if (!/[?&]nomemfix/.test(location.search)) GLTFLoader.prototype.parse = function
   return parse.call(this, data, path, gltf => { try { for (const sc of gltf.scenes || [gltf.scene]) shareTextures(sc, path || ''); } catch (e) { } onLoad(gltf); }, onError);
 };
 window.__texShare = () => ({ shrunk: shrunk.n, shrunkMB: Math.round(shrunk.savedMB), ...stat, savedMB: Math.round(stat.savedMB), ms: Math.round(stat.ms), distinct: bySig.size });
+// 🧠 копието в паметта след качването (feature 'tex-free'): смалените платна (по-горе) и картинките на моделите остават в браузъра и след като
+// видеокартата вече ги има — при голям град ~450 MB платна + ~200 MB ImageBitmap. След качване в главния рендер картинката се пуска;
+// ако някой я поиска пак (друга 3D сцена — бордът, услугите; нов вид филтър; roofs/nightfloors), source.data я възстановява синхронно,
+// като я чете обратно от текстурата във видеокартата (readPixels). Преди главният рендер да изтрие текстурата (dispose) — също се възстановява.
+const FREE = feature('tex-free') && !/[?&]notexfree/.test(location.search), freeStat = { freed: 0, freedMB: 0, back: 0, backMs: 0, lost: 0 };
+let R = null, fb = null;
+export function setMainRenderer(r) { R = r; }
+function readBack(rel, raw) {   // текстурата от видеокартата → ImageData (raw — за качване: точно същите байтове) или ново платно
+  const t0 = performance.now(), { w, h } = rel; let c = null;
+  try {
+    const gl = R.getContext(); if (gl.isContextLost() || !gl.isTexture(rel.gt)) throw 0;
+    const pr = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING), pd = gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING);
+    fb = fb || gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, rel.gt, 0);
+    const px = new Uint8ClampedArray(w * h * 4); gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, null, 0); gl.bindFramebuffer(gl.READ_FRAMEBUFFER, pr); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, pd);
+    if (rel.flipY) { const row = w * 4, tmp = new Uint8ClampedArray(row); for (let y = 0; y < h >> 1; y++) { const a = y * row, b = (h - 1 - y) * row; tmp.set(px.subarray(a, a + row)); px.copyWithin(a, b, b + row); px.set(tmp, b); } }
+    c = new ImageData(px, w, h); if (!raw) c = toCanvas(c);
+  } catch { freeStat.lost++; c = toCanvas(new ImageData(w, h)); }   // загубен контекст — остава празно платно със същия размер
+  freeStat.back++; freeStat.backMs += performance.now() - t0; return c;
+}
+function toCanvas(id) { const c = document.createElement('canvas'); c.width = id.width; c.height = id.height; c.getContext('2d').putImageData(id, 0, 0); return c; }   // платното премултиплицира алфата — само за кода извън three.js
+function freeable(src) {   // source.data става „мързеливо“ свойство (веднъж на източник)
+  if (src.__free) return src.__free; let d = src.data, ph = null; const st = src.__free = { rel: null };
+  st.back = raw => { if (st.rel) { d = readBack(st.rel, raw); st.rel = null; } else if (!raw && d instanceof ImageData) d = toCanvas(d); return d; };
+  // three.js чете texture.image и само за проверка (клонинг → нова версия на текстурата, без ново качване) — тогава заместител;
+  // ако качването наистина стигне до texImage2D/texSubImage2D, заместителят се сменя там с върнатата картинка (по-долу)
+  Object.defineProperty(src, 'data', { configurable: true, get() { if (st.rel) { if (THREE_CHK.test(new Error().stack)) return ph && ph.width === st.rel.w ? ph : (ph = { width: st.rel.w, height: st.rel.h, complete: true, __ph: st }); return st.back(); } return d instanceof ImageData && !THREE_CHK.test(new Error().stack) ? st.back() : d; }, set(v) { d = v; st.rel = null; } });
+  Object.defineProperty(src, 'needsUpdate', { configurable: true, set(v) { if (v === true && !st.rel) src.version++; } });   // пусната = непроменена (никой няма копие) — клонингът не изисква ново качване
+  st.drop = () => { const im = d; d = null; if (im && im.close) im.close(); else if (im instanceof HTMLCanvasElement) im.width = im.height = 0; };
+  st.peek = () => d;   // без възстановяване (за измерванията)
+  return st;
+}
+function onUp(tex) {   // three.js вика onUpdate след всяко качване — в кой да е рендер; пускаме само когато главният го има
+  const src = tex.source, st = src.__free; if (!R || !st || st.rel) return;
+  const p = R.properties.get(tex), im = st.peek(); if (!p.__webglTexture || R.properties.get(src).__version !== src.version || !im || !(im.width > 0)) return;
+  if (tex.premultiplyAlpha || tex.type !== THREE_UBYTE || tex.isRenderTargetTexture) return;
+  st.rel = { gt: p.__webglTexture, w: im.width, h: im.height, flipY: tex.flipY }; st.drop(); freeStat.freed++; freeStat.freedMB += st.rel.w * st.rel.h * 4 / 2 ** 20;
+}
+const THREE_UBYTE = 1009;   // THREE.UnsignedByteType
+const THREE_CHK = /setTexture2D|uploadTexture/;
+if (FREE) for (const P of [window.WebGL2RenderingContext, window.WebGLRenderingContext].filter(Boolean).map(c => c.prototype)) for (const fn of ['texImage2D', 'texSubImage2D']) {
+  const f0 = P[fn]; P[fn] = function (...a) { const l = a[a.length - 1]; if (l && l.__ph) a[a.length - 1] = l.__ph.back(true); return f0.apply(this, a); };
+}
+function markFree(tex) {
+  if (!FREE || !tex || !tex.isTexture || tex.__freeOk || tex.isDataTexture || tex.isCompressedTexture || tex.isVideoTexture || !tex.source) return;
+  const im = tex.source.__free ? tex.source.__free.peek() || 1 : tex.source.data;   /* вече пуснат общ източник — без да го връщаме */
+  if (im !== 1 && !(im instanceof HTMLCanvasElement || (typeof ImageBitmap !== 'undefined' && im instanceof ImageBitmap))) return;
+  tex.__freeOk = 1; freeable(tex.source); const up0 = tex.onUpdate; tex.onUpdate = t => { up0 && up0(t); onUp(t); };
+  tex.dispose = function () { this.__gone = 1; const st = this.source.__free; if (st && st.rel) void this.source.data; return Object.getPrototypeOf(this).dispose.call(this); };   // преди изтриването във видеокартата — обратно в паметта
+  pend.push(new WeakRef(tex));
+}
+// невидимите още модели (в кеша, скрити по разстояние) — качват се на порции на заден план, после се пускат и техните копия
+const pend = []; setInterval(() => { if (!R || document.hidden) return; for (let n = 0; n < 12 && pend.length;) { const t = pend.shift().deref(); if (!t || t.__gone) continue; const st = t.source.__free; if (!st || st.rel || !st.peek()) continue;
+  if (R.properties.get(t.source).__version === t.source.version) continue; try { R.initTexture(t); n++; } catch { } } }, 1500);
+if (FREE && !/[?&]nomemfix/.test(location.search)) { const p0 = GLTFLoader.prototype.parse; GLTFLoader.prototype.parse = function (data, path, onLoad, onError) {
+  return p0.call(this, data, path, gltf => { try { for (const sc of gltf.scenes || [gltf.scene]) sc.traverse(o => { for (const m of [].concat(o.material || [])) for (const k in m) markFree(m[k]); }); } catch (e) { } onLoad(gltf); }, onError); }; }
+window.__texFree = () => ({ on: FREE, ...freeStat, freedMB: Math.round(freeStat.freedMB), backMs: Math.round(freeStat.backMs) });

@@ -118,6 +118,7 @@ import { loadIndustry } from './industry.js';
 import { loadConstruct } from './construct.js';
 import { showIntro } from './intro.js';
 import { feature } from './lab/feature.js';
+import { setMainRenderer } from './memfix.js';
 import { mountHub } from './hub.js';
 import { showLevel } from './lvshow.js';
 import { showSub } from './subshow.js';   // дъщерните дружества — екран с логото (feature 'sub-screen')   // картинката на ниво 1 — при основаването на фирмата (feature 'lv-pics')   // „📊 Империя ▾“ — бутоните от втория ред на лентата в падащ панел (feature 'top-hub')
@@ -417,6 +418,8 @@ const renderer = (() => {
     return new THREE.WebGLRenderer({ antialias: true });
   } catch (e) { webglFail(e); throw e; }   // спира модула — без него играта не може да тръгне
 })();
+setMainRenderer(renderer);   // memfix.js 'tex-free': картинките на моделите се пускат след качването в този рендер
+const texImOf = t => { const f = t.source && t.source.__free; return !f ? t.image : f.peek() || (f.rel ? { width: f.rel.w, height: f.rel.h, freed: 1 } : null); };   // за измерванията — без да връща пуснатите картинки
 // производителност: отдалеч (високо над града) дребните детайли (дървета, лампи, светофари, хора) се скриват, а сенките
 // не се преизчисляват; иначе сенките се обновяват през 2 кадъра. Ако кадрите са бавни — по-ниска резолюция (pixelRatio).
 let perfFr = 0, perfT = 0, perfN = 0, perfHigh = null, perfDownAt = -1e9;
@@ -4915,6 +4918,7 @@ function newGameAll() {
   if (window.__wipeAll) return window.__wipeAll();
   modal('🆕 Нова игра?', 'Всички записи на това устройство се изтриват завинаги.', [['Отказ', null], ['Изтрий и започни', wipeSlot]]);
 }
+window.__closeMap = () => { if (!$('mapScreen').classList.contains('hidden')) { showMap(false); return true; } return false; };   // 'board-nomap': 3D залата на борда не се строи върху отворената карта
 function showMap(on) {
   $('mapScreen').classList.toggle('hidden', !on);
   if (on) $('mapHud').classList.remove('hidden');
@@ -10849,12 +10853,19 @@ if (AUTOTEST) {
         rows.push([k, Math.round(t / 2 ** 20), Math.round(gm / 2 ** 20)]); }
       const tot = rows.reduce((a, r) => [a[0] + r[1], a[1] + r[2]], [0, 0]);
       return { models: rows.length, texMB: tot[0], geoMB: tot[1], top: rows.sort((a, b) => (b[1] + b[2]) - (a[1] + a[2])).slice(0, 25).map(r => `${r[0]} t${r[1]} g${r[2]}`) }; },
+    texHash(n = 60) { const seen = new Map(); scene.traverse(o => { for (const m of [].concat(o.material || [])) if (m.map && m.map.source && (m.map.source.__free || texImOf(m.map) instanceof HTMLCanvasElement || texImOf(m.map) instanceof ImageBitmap)) { const k = (o.name || '') + '|' + (m.name || ''); if (!seen.has(k)) seen.set(k, m.map); } });   /* tex-free: картинките, върнати от видеокартата, = оригиналите? */
+      const c = document.createElement('canvas'), g = c.getContext('2d', { willReadFrequently: true }), out = {}; for (const [k, t] of [...seen].sort((a, b) => a[0] < b[0] ? -1 : 1).slice(0, n)) { const im = t.image; if (!im || !im.width) continue; c.width = im.width; c.height = im.height; g.drawImage(im, 0, 0); const d = g.getImageData(0, 0, c.width, c.height).data; let h = 2166136261; for (let i = 0; i < d.length; i += 4) h = Math.imul(h ^ (d[i] >> 2) ^ (d[i + 1] >> 2) << 6 ^ (d[i + 2] >> 2) << 12, 16777619); out[k] = c.width + 'x' + c.height + ':' + (h >>> 0).toString(36); } return out; },
+    async texRT(n = 40) { const L = []; scene.traverse(o => { for (const m of [].concat(o.material || [])) if (m.map && m.map.source && m.map.source.__free && m.map.source.__free.rel && !L.includes(m.map)) L.push(m.map); });   /* tex-free: върнато → качено пак → върнато = същите байтове? */
+      const H = d => { let h = 2166136261; for (let i = 0; i < d.length; i++) h = Math.imul(h ^ d[i], 16777619); return h >>> 0; }; let ok = 0, bad = 0;
+      for (const t of L.slice(0, n)) { const f = t.source.__free, a = H(f.back(true).data); t.source.needsUpdate = true; t.needsUpdate = true; renderer.initTexture(t); await new Promise(r => setTimeout(r, 0)); if (!f.rel) { bad++; continue; } H(f.back(true).data) === a ? ok++ : bad++; t.source.needsUpdate = true; renderer.initTexture(t); } return { ok, bad, of: L.length }; },
     texImg(close) { const tex = new Set(), by = {}; scene.traverse(o => { for (const m of [].concat(o.material || [])) for (const k in m) if (m[k] && m[k].isTexture) tex.add(m[k]); }); let n = 0;   /* 🧠 какво държат текстурите в паметта (тип на картинката → MB); close — пуска ImageBitmap на качените (опит) */
-      for (const t of tex) { const im = t.image, ty = im ? im.constructor.name : 'none', mb = im && im.width ? im.width * im.height * 4 / 2 ** 20 : 0; by[ty] = by[ty] || [0, 0]; by[ty][0]++; by[ty][1] += mb;
+      for (const t of tex) { const im = texImOf(t), ty = im ? (im.freed ? 'freed' : im.constructor.name) : 'none', mb = im && im.width ? im.width * im.height * 4 / 2 ** 20 : 0; by[ty] = by[ty] || [0, 0]; by[ty][0]++; by[ty][1] += mb;
         if (close && im instanceof ImageBitmap && renderer.properties.get(t).__webglTexture) { im.close(); n++; } }
-      for (const k in by) by[k][1] = Math.round(by[k][1]); return { by, closed: n }; },
+      for (const k in by) by[k][1] = Math.round(by[k][1]); const cv = {}; scene.traverse(o => { for (const m of [].concat(o.material || [])) for (const k in m) { const t = m[k]; if (t && t.isTexture && texImOf(t) instanceof HTMLCanvasElement) { const key = texImOf(t).width + 'x' + texImOf(t).height + ' ' + (o.name || o.parent?.name || o.parent?.parent?.name || o.type); cv[key] = cv[key] || new Set(); cv[key].add(t); } } });   /* платната по размер + чий обект */
+      const canv = Object.entries(cv).map(([k, v]) => [k, v.size]).sort((a, b) => b[1] - a[1]).slice(0, 40); const ab = new Set(); let geoMB = 0; scene.traverse(o => { const g = o.geometry; if (!g) return; for (const at of [...Object.values(g.attributes || {}), g.index]) { const ar = at && (at.array || at.data?.array); if (ar && !ab.has(ar.buffer)) { ab.add(ar.buffer); geoMB += ar.buffer.byteLength / 2 ** 20; } } });   /* массивите на геометриите (CPU копия) */
+      return { by, closed: n, geoMB: Math.round(geoMB), canv }; },
     mem() { const i = renderer.info, tex = new Set(), geo = new Set(), mat = new Set(); let objs = 0; scene.traverse(o => { objs++; if (o.geometry) geo.add(o.geometry); for (const m of [].concat(o.material || [])) { mat.add(m); for (const k in m) if (m[k] && m[k].isTexture) tex.add(m[k]); } });
-      let texMB = 0; for (const t of tex) { const im = t.image; if (im && im.width) texMB += im.width * im.height * 4 * (t.generateMipmaps !== false ? 1.33 : 1) / 2 ** 20; }
+      let texMB = 0; for (const t of tex) { const im = texImOf(t); if (im && im.width) texMB += im.width * im.height * 4 * (t.generateMipmaps !== false ? 1.33 : 1) / 2 ** 20; }
       return { gGeo: i.memory.geometries, gTex: i.memory.textures, progs: i.programs?.length, calls: i.render.calls, tris: i.render.triangles, objs, sceneGeo: geo.size, sceneMat: mat.size, sceneTex: tex.size, texMB: Math.round(texMB) }; },
     bustTest(debt = 2e6, days = 32) { econ.s.money = -debt; const out = []; for (let d = 0; d < days; d++) { endOfDay(); out.push([S.day, Math.round(econ.s.money), S.bust?.stage || '-', S.bust?.red]); } return { out: out.filter((x, i) => i % 3 === 0 || x[2] !== '-' || i === out.length - 1), units: S.units.length, rep: S.rep, bar: document.getElementById('bustBar')?.innerText || null, modal: !document.getElementById('modal').classList.contains('hidden') && document.getElementById('modal').innerText.slice(0, 300) }; },
     days(n = 1) { for (let d = 0; d < n; d++) endOfDay(); return S.day; },
