@@ -94,6 +94,7 @@ export function createRailX(deps) {
     return { c, g, posts, on: false, t: 0, block: [-1, 1].map(s => { const v = new THREE.Vector3(s * (half + 1.5), 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), c.ang); return { x: c.x + v.x, z: c.z + v.z }; }) };
   });
   if (deps.causeway) root.add(causeway(deps.causeway));
+  for (const e of deps.ends || []) { const b = endBarrier(e.w); b.position.set(e.x, 0, e.z); b.rotation.y = e.ang; root.add(b); }   // (rail-end-bar) края на улиците до линията; ang — посоката към линията
   for (const p of deps.portals || []) { const g = portal(p.x0, p.x1, p.dir); g.position.z = p.z; root.add(g); }
   let bellOn = false;
   function update(dt) {
@@ -116,5 +117,5 @@ export function createRailX(deps) {
   // точките, пред които колите спират (traffic.js): прелезите с включени светлини
   const blockers = () => xs.filter(X => X.on).flatMap(X => X.block);
   const dispose = () => { deps.group.remove(root); };
-  return { update, blockers, dispose, list: () => xs.map(X => ({ x: X.c.x, z: X.c.z, ang: X.c.ang, on: X.on, x0: X.c.x0, x1: X.c.x1, w: X.c.w })),   /* x0/x1 — релсите (за спирането на колите, #16) */ count: () => ({ crossings: xs.length, portals: (deps.portals || []).length, on: xs.filter(X => X.on).length }) };
+  return { update, blockers, dispose, list: () => xs.map(X => ({ x: X.c.x, z: X.c.z, ang: X.c.ang, on: X.on, x0: X.c.x0, x1: X.c.x1, w: X.c.w })),   /* x0/x1 — релсите (за спирането на колите, #16) */ count: () => ({ crossings: xs.length, portals: (deps.portals || []).length, ends: (deps.ends || []).length, on: xs.filter(X => X.on).length }) };
 }

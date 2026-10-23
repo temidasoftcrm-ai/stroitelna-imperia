@@ -7107,7 +7107,22 @@ function buildRailX() {
     cr.push({ x: xm, z, ang: -Math.atan2(bz - az, bx - ax), w, x0: xa, x1: xb, deck: feature('rail-road'), cont, median: r.median || 0 });
   } }
   city.railCross = cr;   // catenary: стълбовете не стъпват на прелезите
-  railx = createRailX({ group: city.group, causeway: causewayOn() ? { z: Z, x0: xa, x1: xb } : null, crossings: cr, portals: [{ z: Z, x0: xa, x1: xb, dir: 1 }, { z: -Z, x0: xa, x1: xb, dir: -1 }], trains: () => passing ? passing.trainsAt() : [], bell: on => { railBellAt = on ? 0.01 : 0; } });
+  // нарисувана ли е улицата при края си (изгледът на плана не рисува всичко от p2.roads — напр. продълженията извън картата в Париж): върхове на меш до 6 м
+  const pvBoxes = []; if (p2 && feature('rail-end-bar') && city.planView) { city.planView.updateMatrixWorld(true); city.planView.traverse(o => { if (!o.isMesh || !o.geometry?.attributes?.position) return; o.geometry.computeBoundingBox(); const b = o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld); if (b.min.x < xb + 40 && b.max.y < 1.5 && o.geometry.attributes.position.count > 8) pvBoxes.push([o, b]); }); }   // без големите равни плоскости (земята — 4 върха)
+  const drawnNear = (x, z) => { const v = new THREE.Vector3(); for (const [o, b] of pvBoxes) { if (x < b.min.x - 6 || x > b.max.x + 6 || z < b.min.z - 6 || z > b.max.z + 6) continue; const p = o.geometry.attributes.position;
+    for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld); if (Math.abs(v.x - x) < 6 && Math.abs(v.z - z) < 6) return true; } } return false; };
+  const ends = [];   // (rail-end-bar) улиците на плана, които свършват до линията (до 30 м източно от нея или върху коловозите) → бариера на 4 м преди линията
+  if (p2 && feature('rail-end-bar')) for (const r of p2.roads) { const pts = r.pts || []; if (pts.length < 2 || r.noCars) continue;   // пешеходните — без
+    for (const [e, f] of [[pts[0], pts[1]], [pts[pts.length - 1], pts[pts.length - 2]]]) {
+      const ex = (e.x ?? e[0]) + off.x, ez = (e.z ?? e[1]) + off.z, fx = (f.x ?? f[0]) + off.x, fz = (f.z ?? f[1]) + off.z;
+      if (ex > xb + 30 || ex < xa - 4 || fx <= ex || Math.abs(ez) > Z - 20) continue;   // само краищата, които идват от изток към линията
+      if (cr.some(c => Math.abs(c.z - ez) < 25)) continue;   // там вече има прелез
+      if (!drawnNear(Math.max(ex, xb + 4), ez)) continue;   // улицата не се вижда тук — без бариера на празна земя
+      const t = ex >= xb + 4 ? 0 : (xb + 4 - ex) / (fx - ex); if (t > 1) continue;
+      const x = ex + (fx - ex) * t, z = ez + (fz - ez) * t, w = Math.max(3, (r.w || 6) + 0.6);   // ширината на платното (r.w — както се рисува)
+      if (!ends.some(q => Math.hypot(q.x - x, q.z - z) < 8)) ends.push({ x, z, ang: Math.atan2(ex - fx, ez - fz), w });
+    } }
+  railx = createRailX({ group: city.group, ends, causeway: causewayOn() ? { z: Z, x0: xa, x1: xb } : null, crossings: cr, portals: [{ z: Z, x0: xa, x1: xb, dir: 1 }, { z: -Z, x0: xa, x1: xb, dir: -1 }], trains: () => passing ? passing.trainsAt() : [], bell: on => { railBellAt = on ? 0.01 : 0; } });
 }
 // звуците (assets/sfx, f9): звънецът — в цикъл, докато бариерите са спуснати, само близо до камерата (< 250 м), със затихване;
 // минаващ влак — веднъж за влак, ако мине на < 200 м, по един наведнъж
