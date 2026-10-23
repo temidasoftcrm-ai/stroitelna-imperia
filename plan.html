@@ -3,19 +3,48 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Градски планове</title>
+<title>Lab · редактор на градове</title>
 <style>
   :root { --bg:#0f1622; --panel:rgba(20,28,40,.92); --txt:#e8edf3; --mut:#9fb0c4; --acc:#f5b942; --line:#2c3a50; }
   html, body { margin:0; height:100%; background:var(--bg); color:var(--txt); font:14px/1.45 system-ui, sans-serif; overflow:hidden; }
-  #ui { position:fixed; left:12px; top:12px; z-index:2; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 12px; max-width:min(340px, calc(100vw - 48px)); }
+  #ui { position:fixed; left:12px; top:12px; z-index:2; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 12px; width:min(370px, calc(100vw - 24px)); max-height:calc(100vh - 24px); overflow:auto; }
   #ui h1 { font-size:16px; margin:0 0 6px; color:var(--acc); }
   #ui select, #ui button { font:inherit; background:#1d2838; color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:5px 9px; margin:2px 0; cursor:pointer; }
   #ui button:hover { border-color:var(--acc); }
   #ui label { color:var(--mut); font-size:13px; user-select:none; }
   #info { margin-top:8px; font-size:13px; color:var(--mut); }
   #info b { color:var(--txt); }
-  #lotBox { position:fixed; right:12px; bottom:12px; z-index:2; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 12px; width:min(300px, calc(100vw - 48px)); display:none; font-size:13px; }
+  #lotBox { position:fixed; right:12px; top:12px; z-index:2; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 12px; width:min(300px, calc(100vw - 24px)); display:none; font-size:13px; }
   #lotBox .k { display:inline-block; background:#24324a; border-radius:6px; padding:1px 6px; margin:2px 3px 0 0; }
+  #catalog { margin-top:9px; border-top:1px solid var(--line); padding-top:8px; }
+  #catalogHead { display:flex; align-items:center; gap:7px; }
+  #catalogHead b { flex:1; }
+  #catalog input,#catalog select { min-width:0; font:inherit; background:#1d2838; color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:6px 8px; }
+  #search { width:100%; margin:6px 0; }
+  #categoryStrip { display:flex; gap:5px; overflow-x:auto; padding:2px 0 6px; scrollbar-width:thin; }
+  #categoryStrip button { flex:0 0 auto; white-space:nowrap; font-size:11px; }
+  #categoryStrip button.on { border-color:var(--acc); color:#ffe2a3; background:#3a3020; }
+  #models { height:min(34vh,300px); overflow:auto; display:grid; grid-template-columns:1fr; gap:4px; }
+  .model { display:flex; align-items:center; gap:8px; text-align:left; width:100%; font-size:12px !important; line-height:1.25; padding:5px 6px !important; overflow-wrap:anywhere; }
+  .model.on { border-color:var(--acc) !important; background:#3a3020 !important; }
+  .model .tile { flex:0 0 56px; width:56px; height:44px; object-fit:contain; background:#151d28; border-radius:5px; }
+  .model .mtxt { min-width:0; }
+  .model small { display:block; color:var(--mut); font-size:10px; }
+  #counter { color:var(--acc); font-weight:800; white-space:nowrap; }
+  #catalogStatus { color:var(--mut); font-size:12px; min-height:18px; }
+  .actions { display:flex; gap:5px; flex-wrap:wrap; }
+  .actions button { flex:1; }
+  #tools { display:grid; grid-template-columns:repeat(2,1fr); gap:4px; margin:7px 0; }
+  #tools button { font-size:12px; }
+  #tools button.on { border-color:var(--acc); color:#ffe2a3; background:#3a3020; }
+  #scaleControls { align-items:center; margin:5px 0; }
+  #scaleStatus { flex:2 1 100%; color:var(--mut); font-size:11px; }
+  #roadWidthLabel { display:none; align-items:center; gap:7px; color:var(--mut); font-size:12px; }
+  #roadWidthLabel select { font:inherit; background:#1d2838; color:var(--txt); border:1px solid var(--line); border-radius:7px; padding:3px 6px; }
+  #thumbWrap { display:flex; gap:8px; align-items:center; margin:6px 0; padding:6px; background:#111923; border:1px solid var(--line); border-radius:8px; min-height:90px; }
+  #thumb { width:132px; height:86px; object-fit:contain; background:#18212d; border-radius:5px; }
+  #thumbName { font-size:12px; overflow-wrap:anywhere; white-space:pre-line; color:var(--mut); }
+  @media(max-width:700px) { #ui { width:min(310px, calc(100vw - 24px)); } #models { height:25vh; } #lotBox { width:min(260px, calc(100vw - 24px)); } }
   canvas { display:block; }
 </style>
 <script type="importmap">
@@ -27,15 +56,27 @@
 </head>
 <body>
 <div id="ui">
-  <h1>🏙️ Градски планове · прототип</h1>
+  <h1>🏙️ Lab · редактор на градове</h1>
   <select id="city"></select>
   <div>
-    <button id="fill">🏗️ Застрой 15</button> <button id="clear">🧹 Изчисти</button>
+    <button id="fit">⤢ Целият град</button> <button id="edges">▦ Парцели</button>
   </div>
-  <label><input type="checkbox" id="edges" checked> очертания на парцелите</label>
+  <div id="catalog">
+    <div id="catalogHead"><b>🧱 Каталог 3D модели</b><span id="counter" title="Поставени модели / общо места">0/30</span></div>
+    <div id="tools"><button data-tool="place">🖌️ Модел</button><button data-tool="road">🛣️ Улица</button><button data-tool="erase">🧹 Триене</button><button data-tool="scale">↕️ Размер</button><button data-tool="pick">🧪 Пипета</button><button data-tool="move">↔️ Преместване</button><button id="undo" title="Ctrl+Z">↶ Назад</button><button id="redo" title="Ctrl+Y или Ctrl+Shift+Z">↷ Напред</button></div>
+    <label id="roadWidthLabel">Тип път <select id="roadWidth"><option value="6">Улица · тясна</option><option value="8" selected>Улица · средна</option><option value="12">Улица · широка</option><option value="boulevard">Булевард · островче</option><option value="circular">Кръгова улица</option></select></label>
+    <div id="scaleControls" class="actions"><span id="scaleStatus">Размер на следващия модел: 100%</span><button id="scaleDown" title="Смаляване">−</button><button id="scaleUp" title="Уголемяване">＋</button><button id="rotateLeft" title="Завърти наляво">↶ 15°</button><button id="rotateRight" title="Завърти надясно">↷ 15°</button></div>
+    <div id="thumbWrap"><img id="thumb" alt="3D преглед на избрания модел"><div id="thumbName">Избери модел за 3D преглед</div></div>
+    <div class="actions"><label>Места <input id="capacity" type="number" min="1" max="30" value="30" style="width:58px"></label><button id="clear">🗑 Изчисти проекта</button><button id="export">⬇️ Изнеси</button><button id="import">⬆️ Внеси</button></div>
+    <input id="search" type="search" placeholder="Търси модел или папка…">
+    <div id="categoryStrip" aria-label="Категории модели"></div>
+    <div id="models"></div>
+    <div id="catalogStatus">Избери модел, после парцел върху картата.</div>
+  </div>
   <div id="info"></div>
+  <div id="liveCheck" style="font-size:12px;margin-top:4px;color:var(--mut)"></div>
 </div>
-<div id="lotBox"></div>
+<div id="lotBox"></div><input id="file" type="file" accept="application/json,.json" hidden>
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -56,6 +97,9 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWid
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0xa9cbe6); scene.fog = new THREE.Fog(0xa9cbe6, 500, 1100);
+const customRoadGroup = new THREE.Group(); scene.add(customRoadGroup);
+const customRoadMats = { walk: new THREE.MeshStandardMaterial({ color: 0xb9b4a8, roughness: 0.95 }), asphalt: new THREE.MeshStandardMaterial({ color: 0x3a3d42, roughness: 0.95 }), paint: new THREE.MeshStandardMaterial({ color: 0xf2f2ea, roughness: 0.9 }), median: new THREE.MeshStandardMaterial({ color: 0x73944e, roughness: 0.95 }) };
+const roadPreviewMat = new THREE.LineBasicMaterial({ color: 0xf5b942, linewidth: 3 });
 const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 1, 3000);
 camera.position.set(170, 230, 260);
 const controls = new MapControls(camera, renderer.domElement); controls.maxPolarAngle = 1.35; controls.minDistance = 30; controls.maxDistance = 900;
@@ -63,75 +107,550 @@ scene.add(new THREE.HemisphereLight(0xdfefff, 0x5a6a48, 1.1));
 const sun = new THREE.DirectionalLight(0xfff1d6, 1.9); sun.position.set(180, 300, 120); sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -320, right: 320, top: 320, bottom: -320, far: 900 }); scene.add(sun);
 
-// модели по вид сграда (общи геометрии и материали — клониране без копиране на данни)
-const KIND_MODELS = {
-  tower: ['commercial/building-skyscraper-a', 'commercial/building-skyscraper-b', 'commercial/building-skyscraper-c'],
-  office: ['commercial/building-e', 'commercial/building-f', 'commercial/building-g', 'commercial/building-h'],
-  shop: ['commercial/building-a', 'commercial/building-b', 'commercial/building-c', 'commercial/building-d'],
-  block: ['commercial/building-e', 'commercial/building-g', 'commercial/building-c'],
-  civic: ['commercial/building-h'],
-  house: ['houses/building-type-a', 'houses/building-type-b'],   // детските c…u са изтрити (2026-10-20)
-  factory: ['heavy/industry/sf-warehouses', 'heavy/industry/sf-oldwarehouse', 'heavy/industry/sf-indbuilding'],   // детските заводи са изтрити — истинските (industry.js)
+const loader = new GLTFLoader(), cache = new Map(), STORE = 'stroi-lab-city-editor-v1';
+const modelList = await fetch('lab/models.json').then(r => { if (!r.ok) throw new Error('model index'); return r.json(); });
+const modelByPath = new Map(modelList.map(m => [m.path, m]));
+const groupOrder = ['Улици и релси', 'Светофари', 'Улични лампи', 'Билборди', 'Къщи', 'Сгради', 'Транспорт', 'Дървета и паркове'];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const miscCount = modelList.filter(m => m.group.startsWith('Други ·')).length;
+$('categoryStrip').innerHTML = [['', 'Всички'], ...groupOrder.map(c => [c, c]), ['__other', 'Други']].map(([v, label]) => `<button type="button" data-category="${esc(v)}">${esc(label)}</button>`).join('');
+let activeCategory = '';
+let P = null, view = null, built = new Map(), freeBuilt = new Map(), freeSeq = 0, selectedFree = null, brushScale = 1, brushRotation = 0, customRoads = [], erasedTreeKeys = new Set(), hideTrees = false, roadDrawing = [], hl = null, cityId = '', selected = null, chosen = null, edgesOn = true, sceneGen = 0, cap = 30, pending = 0, tool = 'pan', moveFrom = null;
+const undoStack = [], redoStack = [];
+const storeKey = id => `${STORE}:${id}`;
+const readDraft = id => { try { return JSON.parse(localStorage.getItem(storeKey(id)) || '{}'); } catch { return {}; } };
+const removedStreetKeys = new Set();
+const streetKey = st => JSON.stringify([st.cls, st.w, st.pts]);
+const editablePlan = base => ({ ...base, boundary: base.boundary.map(p => [...p]), streets: base.streets.map(st => ({ ...st, pts: st.pts.map(p => [...p]), L: [...st.L] })), nodes: base.nodes.map(n => ({ ...n })), edges: base.edges.map(e => ({ ...e })), lots: base.lots.map(L => ({ ...L })) });
+const saveDraft = () => { try { localStorage.setItem(storeKey(cityId), JSON.stringify({ cap, placements: Object.fromEntries([...built].map(([id, o]) => [id, o.userData.path])), freeObjects: [...freeBuilt.values()].map(o => ({ path: o.userData.path, x: o.position.x, z: o.position.z, rotation: o.rotation.y, scale: o.scale.x })), removedStreets: [...removedStreetKeys], customRoads, erasedTrees: [...erasedTreeKeys], hideTrees })); } catch { status('Не успях да запазя в браузъра. Изнеси проекта във файл.'); } };
+const status = s => { $('catalogStatus').textContent = s; };
+function placedCount() { return built.size + freeBuilt.size; }
+function count() { $('counter').textContent = `${placedCount()}/${cap}`; }
+function focusPlan() {
+  const a = P.boundary, xs = a.map(p => p[0]), zs = a.map(p => p[1]), cx = (Math.min(...xs) + Math.max(...xs)) / 2, cz = (Math.min(...zs) + Math.max(...zs)) / 2;
+  const d = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs));
+  controls.target.set(cx, 0, cz); camera.position.set(cx + d * 0.42, d * 0.72, cz + d * 0.55); controls.maxDistance = Math.max(900, d * 1.8); controls.update();
+}
+const load = path => {
+  if (!cache.has(path)) cache.set(path, loader.loadAsync(path).then(g => { g.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); return g.scene; }).catch(e => { cache.delete(path); throw e; }));
+  return cache.get(path);
 };
-const loader = new GLTFLoader(), cache = {};
-const load = n => cache[n] || (cache[n] = loader.loadAsync(`assets/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); return g.scene; }));
-
-let P = null, view = null, built = new Map(), hl = null;
+const thumbCanvas = document.createElement('canvas'), thumbCache = new Map(), thumbQueue = [], thumbPending = new Map(), blankThumb = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
+let thumbRenderer = null, thumbScene = null, thumbCamera = null, thumbObject = null, thumbBusy = false, modelObserver = null;
+try {
+  thumbRenderer = new THREE.WebGLRenderer({ canvas: thumbCanvas, antialias: true, alpha: false, preserveDrawingBuffer: true }); thumbRenderer.setPixelRatio(1); thumbRenderer.setSize(264, 172, false);
+  thumbScene = new THREE.Scene(); thumbScene.background = new THREE.Color(0x18212d); thumbScene.add(new THREE.HemisphereLight(0xe5f1ff, 0x535c69, 2));
+  const tl = new THREE.DirectionalLight(0xffffff, 2); tl.position.set(3, 6, 4); thumbScene.add(tl);
+  thumbCamera = new THREE.PerspectiveCamera(32, 264 / 172, 0.01, 1000); thumbCamera.position.set(4, 2.6, 5); thumbCamera.lookAt(0, 1, 0);
+} catch (e) { $('thumbName').textContent = '3D прегледът не е наличен'; }
+function drawThumb(src) {
+  if (!thumbRenderer) return null;
+  if (thumbObject) thumbScene.remove(thumbObject);
+  const o = src.clone(true), box = new THREE.Box3().setFromObject(o), size = box.getSize(new THREE.Vector3()), max = Math.max(size.x, size.y, size.z, 0.001);
+  o.scale.setScalar(2.7 / max); o.updateMatrixWorld(true); box.setFromObject(o); const center = box.getCenter(new THREE.Vector3());
+  o.position.x -= center.x; o.position.z -= center.z; o.position.y -= box.min.y; thumbObject = o; thumbScene.add(o);
+  const h = Math.max(1, box.max.y - box.min.y); thumbCamera.position.set(4.2, h * 0.9 + 1.1, 5.6); thumbCamera.lookAt(0, h * 0.43, 0); thumbCamera.near = 0.01; thumbCamera.far = 100; thumbCamera.updateProjectionMatrix();
+  thumbRenderer.render(thumbScene, thumbCamera); return thumbCanvas.toDataURL('image/png');
+}
+function disposeSource(src) {
+  src.traverse(o => { if (o.geometry) o.geometry.dispose(); const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : []; for (const m of mats) { for (const v of Object.values(m)) if (v?.isTexture) v.dispose(); m.dispose(); } });
+}
+function requestThumb(m, done) {
+  if (thumbCache.has(m.path)) { done(thumbCache.get(m.path)); return; }
+  if (!thumbRenderer) { done(null); return; }
+  const waiters = thumbPending.get(m.path); if (waiters) { waiters.push(done); return; }
+  thumbPending.set(m.path, [done]); thumbQueue.push(m); pumpThumbs();
+}
+async function pumpThumbs() {
+  if (thumbBusy) return; thumbBusy = true;
+  while (thumbQueue.length) {
+    const m = thumbQueue.shift(), callbacks = thumbPending.get(m.path) || []; let src = null, data = null;
+    try { src = await load(m.path); data = drawThumb(src); if (data) thumbCache.set(m.path, data); }
+    catch { }
+    for (const cb of callbacks) cb(data); thumbPending.delete(m.path);
+    if (src && chosen?.path !== m.path && ![...built.values()].some(o => o.userData.path === m.path)) { cache.delete(m.path); disposeSource(src); }
+  }
+  thumbBusy = false;
+}
+function previewModel(m) {
+  $('thumbName').textContent = `${m.name} · зареждане…`;
+  requestThumb(m, data => { if (chosen?.path !== m.path) return; if (data) $('thumb').src = data; $('thumbName').textContent = `${m.name}\n${m.path}`; });
+}
+function renderModels() {
+  const q = $('search').value.trim().toLowerCase(), cat = activeCategory;
+  const arr = modelList.filter(m => (!cat || (cat === '__other' ? m.group.startsWith('Други ·') : m.group === cat)) && (!q || `${m.name} ${m.path} ${m.group}`.toLowerCase().includes(q)));
+  if (modelObserver) modelObserver.disconnect();
+  $('models').innerHTML = arr.slice(0, 240).map(m => `<button class="model${chosen?.path === m.path ? ' on' : ''}" data-model="${esc(m.path)}"><img class="tile" alt="" data-model-thumb="${esc(m.path)}" src="${thumbCache.get(m.path) || blankThumb}"><span class="mtxt">${esc(m.name)}<small>${esc(m.group)} · ${esc(m.path)}</small></span></button>`).join('') || '<div class="model">Няма съвпадения.</div>';
+  if (arr.length > 240) $('catalogStatus').textContent = `Показани са 240 от ${arr.length}; стесни търсенето.`;
+  $('categoryStrip').querySelectorAll('[data-category]').forEach(b => b.classList.toggle('on', b.dataset.category === cat));
+  $('models').querySelectorAll('[data-model]').forEach(b => b.onclick = () => { pickModel(modelByPath.get(b.dataset.model)); setTool('place'); status(`Избран: ${chosen.name}. Кликни по картата за свободно поставяне или върху парцел.`); });
+  if ('IntersectionObserver' in window) {
+    modelObserver = new IntersectionObserver(es => es.forEach(e => { if (!e.isIntersecting) return; const m = modelByPath.get(e.target.dataset.modelThumb); if (m) requestThumb(m, data => { if (data && e.target.isConnected) e.target.src = data; }); modelObserver.unobserve(e.target); }), { root: $('models'), rootMargin: '100px' });
+    $('models').querySelectorAll('[data-model-thumb]').forEach(img => { if (!thumbCache.has(img.dataset.modelThumb)) modelObserver.observe(img); });
+  }
+}
 function show(id) {
-  if (view) scene.remove(view);
-  for (const o of built.values()) scene.remove(o); built.clear();
-  const t = performance.now();
-  P = id.includes('@') ? makePlan(id.split('@')[0], { tpl: id.split('@')[1] }) : makePlan(id);
-  view = buildPlanView(P, { target: controls.target });
-  scene.add(view);
+  const gen = ++sceneGen;
+  if (view) { scene.remove(view); view.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
+  for (const o of built.values()) scene.remove(o); built.clear(); for (const o of freeBuilt.values()) scene.remove(o); freeBuilt.clear(); selectedFree = null; brushScale = 1; brushRotation = 0; updateScaleStatus(); pending = 0; selected = null; chosen = null; moveFrom = null; undoStack.length = redoStack.length = 0;
+  $('thumbName').textContent = 'Избери модел за 3D преглед'; $('thumb').src = blankThumb; if (thumbObject && thumbScene) { thumbScene.remove(thumbObject); thumbObject = null; }
+  cityId = id; const t = performance.now(); removedStreetKeys.clear();
+  P = editablePlan(id.includes('@') ? makePlan(id.split('@')[0], { tpl: id.split('@')[1] }) : makePlan(id));
+  const draft = readDraft(id); applyStreetRemovals(draft.removedStreets || []); customRoads = Array.isArray(draft.customRoads) ? draft.customRoads.map(s => ({ kind: s.kind || 'street', width: +s.width || 8, pts: s.pts.map(p => [...p]) })) : []; erasedTreeKeys = new Set(Array.isArray(draft.erasedTrees) ? draft.erasedTrees : []); hideTrees = !!draft.hideTrees;
+  view = buildPlanView(P, { target: controls.target, erasedTrees: erasedTreeKeys, hideTrees }); scene.add(view); renderCustomRoads(); focusPlan();
   const ms = performance.now() - t, bad = validatePlan(P), x3 = P.nodes.filter(n => n.deg >= 3).length;
   const cnt = z => P.lots.filter(L => L.zone === z).length;
-  $('info').innerHTML = `Шаблон: <b>${P.tpl}</b> · улици <b>${P.streets.length}</b> · кръстовища <b>${x3}</b><br>Парцели <b>${P.lots.length}</b> (център ${cnt('center')}, среден пояс ${cnt('mid')}, покрайнини ${cnt('outer')})<br>Проверка: ${bad.length ? '⚠️ ' + bad.length + ' проблема' : '✅ без застъпване'} · ${Math.round(ms)} ms`;
-  view.getObjectByName('lotEdges').visible = $('edges').checked;
+  $('info').innerHTML = `Шаблон: <b>${P.tpl}</b> · улици <b>${P.streets.length + customRoads.length}</b> · кръстовища <b>${x3}</b><br>Парцели <b>${P.lots.length}</b> (център ${cnt('center')}, среден пояс ${cnt('mid')}, покрайнини ${cnt('outer')})<br>Проверка: ${bad.length ? '⚠️ ' + bad.length + ' проблема' : '✅ без застъпване'} · ${Math.round(ms)} ms`;
+  view.getObjectByName('lotEdges').visible = edgesOn;
   hl = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xf5b942, transparent: true, opacity: 0.45, depthWrite: false }));
-  hl.visible = false; view.add(hl);
-  $('lotBox').style.display = 'none';
-  history.replaceState(null, '', '?city=' + id);
-}
-async function build(L, kind) {
-  if (built.has(L.id)) return;
-  kind = kind || L.kinds[(L.id * 7 + built.size) % L.kinds.length];
-  if (kind === 'park') { built.set(L.id, new THREE.Group()); return; }
-  const list = KIND_MODELS[kind] || KIND_MODELS.shop, src = await load(list[(L.id * 31) % list.length]);
-  if (built.has(L.id)) return;
-  const o = placeOnLot(src.clone(), L, { margin: kind === 'house' ? 3 : 2 });
-  if (kind === 'tower') o.scale.y *= 1.6;
-  o.userData.kind = kind; built.set(L.id, o); scene.add(o);
+  hl.visible = false; view.add(hl); $('lotBox').style.display = 'none';
+  cap = Math.max(1, Math.min(30, Number(draft.cap) || 30)); $('capacity').value = cap;
+  history.replaceState(null, '', '?city=' + encodeURIComponent(id)); renderModels(); count();
+  (async () => { for (const [lotId, path] of Object.entries(draft.placements || {}).slice(0, cap)) { if (gen !== sceneGen) return; const L = P.lots.find(x => x.id === +lotId), m = modelByPath.get(path); if (!L || !m) continue; try { const src = await load(path); if (gen !== sceneGen) return; const o = placeOnLot(src.clone(true), L, { margin: 1.5 }); o.userData.path = path; built.set(L.id, o); scene.add(o); count(); } catch (e) { status(`Не заредих ${m.name}: ${e.message}`); } } })();
+  (async () => { for (const item of (draft.freeObjects || []).slice(0, Math.max(0, cap - Object.keys(draft.placements || {}).length))) { if (gen !== sceneGen || !modelByPath.has(item.path)) continue; try { const src = await load(item.path); if (gen !== sceneGen) return; const o = freeObject(src, item.path, item.x, item.z, item.rotation || 0, item.scale || 1); freeBuilt.set(`free-${++freeSeq}`, o); scene.add(o); count(); } catch { } } })();
 }
 function lotInfo(L) {
-  const st = P.streets[L.street], b = built.get(L.id);
+  const st = P.streets[L.street], b = built.get(L.id), model = b && modelByPath.get(b.userData.path);
   $('lotBox').style.display = 'block';
-  $('lotBox').innerHTML = `<b>Парцел №${L.id}</b> · ${({ center: 'център', mid: 'среден пояс', outer: 'покрайнини' })[L.zone]}<br>
-    Размер ${L.w.toFixed(0)}×${L.d.toFixed(0)} м · завъртян ${Math.round(L.rot * 180 / Math.PI)}°<br>
-    Достъп: ${({ blvd: 'булевард', ring: 'пръстен', street: 'улица', quay: 'кей', road: 'крайбрежен път' })[st.cls]} №${st.id}<br>
-    Допустими: ${L.kinds.map(k => `<span class="k">${k}</span>`).join('')}<br>${b ? '🏢 застроен' + (b.userData.kind ? ' (' + b.userData.kind + ')' : '') : '🟩 свободен — натисни пак за строеж'}`;
+  $('lotBox').innerHTML = `<b>Парцел №${L.id}</b> · ${({ center: 'център', mid: 'среден пояс', outer: 'покрайнини' })[L.zone]}<br>Размер ${L.w.toFixed(0)}×${L.d.toFixed(0)} м<br>Достъп: ${({ blvd: 'булевард', ring: 'пръстен', street: 'улица', quay: 'кей', road: 'крайбрежен път' })[st.cls]} №${st.id}<br>${model ? `🏢 ${model.name}<small>${model.path}</small><button id="removeModel">🧹 Освободи парцела</button>` : '🟩 празен парцел'}<br>${chosen ? `Избран модел: <b>${chosen.name}</b><button id="placeModel" ${b || placedCount() + pending >= cap ? 'disabled' : ''}>📍 Постави модела тук</button>` : ''}`;
   hl.scale.set(L.w, 1, L.d); hl.rotation.y = L.rot; hl.position.set(L.x, 0.2, L.z); hl.visible = true;
+  const rm = $('removeModel'); if (rm) rm.onclick = () => removeModel(L);
+  const add = $('placeModel'); if (add) add.onclick = () => placeModel(L);
 }
+function mutateStreetRemovals(indices) {
+  const oldStreets = P.streets, removed = new Set(indices), remap = new Map();
+  const goneLots = new Set(P.lots.filter(L => removed.has(L.street)).map(L => L.id));
+  oldStreets.forEach((st, i) => { if (removed.has(i)) removedStreetKeys.add(streetKey(st)); });
+  P.streets = oldStreets.filter((_, i) => !removed.has(i));
+  P.streets.forEach((st, i) => { const old = oldStreets.indexOf(st); remap.set(old, i); st.id = i; st.name = `${st.cls}${i}`; });
+  P.edges = P.edges.filter(e => remap.has(e.st)).map(e => ({ ...e, st: remap.get(e.st) }));
+  P.nodes.forEach(n => { n.deg = 0; });
+  for (const e of P.edges) { P.nodes[e.a].deg++; P.nodes[e.b].deg++; }
+  // Lot.street refers to the pre-removal indexes; discard lots belonging to erased roads and remap the rest.
+  P.lots = P.lots.filter(L => { const old = L.street; if (removed.has(old)) return false; L.street = remap.get(old); return true; });
+  for (const lotId of goneLots) { const o = built.get(lotId); if (o) { scene.remove(o); built.delete(lotId); } }
+}
+function applyStreetRemovals(keys) {
+  removedStreetKeys.clear();
+  const keySet = new Set(keys), indices = [];
+  P.streets.forEach((st, i) => { if (keySet.has(streetKey(st))) indices.push(i); });
+  if (indices.length) mutateStreetRemovals(indices);
+  for (const key of keySet) removedStreetKeys.add(key);
+}
+function refreshPlanView() {
+  if (view) { scene.remove(view); view.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
+  view = buildPlanView(P, { target: controls.target, erasedTrees: erasedTreeKeys, hideTrees }); scene.add(view);
+  view.getObjectByName('lotEdges').visible = edgesOn;
+  hl = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xf5b942, transparent: true, opacity: 0.45, depthWrite: false }));
+  hl.visible = false; view.add(hl); if (selected && P.lots.includes(selected)) lotInfo(selected); else { selected = null; $('lotBox').style.display = 'none'; }
+  const bad = validatePlan(P), x3 = P.nodes.filter(n => n.deg >= 3).length;
+  $('info').innerHTML = `Шаблон: <b>${P.tpl}</b> · улици <b>${P.streets.length + customRoads.length}</b> · кръстовища <b>${x3}</b><br>Парцели <b>${P.lots.length}</b><br>Проверка: ${bad.length ? '⚠️ ' + bad.length + ' проблема' : '✅ без застъпване'}`;
+  count(); saveDraft();
+}
+function removeStreets(indices) {
+  if (!indices.length) return;
+  remember(); mutateStreetRemovals(indices); refreshPlanView(); status(`Изтрити са улици: ${indices.length}.`);
+}
+function eraseRoads(streetIds, customIds, treeKeys = []) {
+  if (!streetIds.length && !customIds.length && !treeKeys.length) return;
+  remember();
+  if (streetIds.length) mutateStreetRemovals(streetIds);
+  const gone = new Set(customIds); customRoads = customRoads.filter((_, i) => !gone.has(i));
+  for (const key of treeKeys) erasedTreeKeys.add(key);
+  if (streetIds.length || treeKeys.length) refreshPlanView();
+  renderCustomRoads(); saveDraft(); status(`Изтрити са ${streetIds.length + customIds.length + treeKeys.length} обекта.`);
+}
+function roadStrip(points, width, material, lift) {
+  if (points.length < 2) return null;
+  const pos = [], idx = [];
+  for (let i = 0; i < points.length; i++) {
+    const a = points[Math.max(0, i - 1)], b = points[Math.min(points.length - 1, i + 1)];
+    let dx = b[0] - a[0], dz = b[1] - a[1], len = Math.hypot(dx, dz) || 1; dx /= len; dz /= len;
+    const nx = -dz, nz = dx, p = points[i], y = P.heightAt(p[0], p[1]) + lift;
+    pos.push(p[0] + nx * width / 2, y, p[1] + nz * width / 2, p[0] - nx * width / 2, y, p[1] - nz * width / 2);
+    if (i) { const k = i * 2; idx.push(k - 2, k, k - 1, k - 1, k, k + 1); }
+  }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+  const mesh = new THREE.Mesh(geo, material); mesh.receiveShadow = true; mesh.renderOrder = 2; return mesh;
+}
+function roadPointAt(points, distance) {
+  for (let i = 1; i < points.length; i++) { const a = points[i - 1], b = points[i], d = Math.hypot(b[0] - a[0], b[1] - a[1]); if (distance <= d) { const t = d ? distance / d : 0; return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; } distance -= d; }
+  return points.at(-1);
+}
+function offsetPath(points, offset) {
+  return points.map((p, i) => { const a = points[Math.max(0, i - 1)], b = points[Math.min(points.length - 1, i + 1)], dx = b[0] - a[0], dz = b[1] - a[1], len = Math.hypot(dx, dz) || 1; return [p[0] - dz / len * offset, p[1] + dx / len * offset]; });
+}
+function smoothRoadPath(points) {
+  if (points.length < 3) return points.map(p => [...p]);
+  const sq = 1.8 * 1.8, keep = new Uint8Array(points.length), stack = [[0, points.length - 1]]; keep[0] = keep[points.length - 1] = 1;
+  while (stack.length) { const [a, b] = stack.pop(), p = points[a], q = points[b], dx = q[0] - p[0], dz = q[1] - p[1], den = dx * dx + dz * dz || 1; let best = sq, bi = -1;
+    for (let i = a + 1; i < b; i++) { const t = Math.max(0, Math.min(1, ((points[i][0] - p[0]) * dx + (points[i][1] - p[1]) * dz) / den)), ex = points[i][0] - p[0] - t * dx, ez = points[i][1] - p[1] - t * dz, d = ex * ex + ez * ez; if (d > best) { best = d; bi = i; } }
+    if (bi >= 0) { keep[bi] = 1; stack.push([a, bi], [bi, b]); }
+  }
+  let out = points.filter((_, i) => keep[i]).map(p => [...p]);
+  for (let pass = 0; pass < 2 && out.length > 2; pass++) { const next = [out[0]]; for (let i = 1; i < out.length; i++) { const a = out[i - 1], b = out[i]; next.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25], [a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]); } next.push(out.at(-1)); out = next; }
+  return out;
+}
+function circularRoadPath(points) {
+  const xs = points.map(p => p[0]), zs = points.map(p => p[1]), cx = (Math.min(...xs) + Math.max(...xs)) / 2, cz = (Math.min(...zs) + Math.max(...zs)) / 2, radius = Math.max(8, (Math.max(...xs) - Math.min(...xs) + Math.max(...zs) - Math.min(...zs)) / 4), circle = [];
+  for (let i = 0; i <= 64; i++) { const a = i / 64 * Math.PI * 2; circle.push([cx + Math.cos(a) * radius, cz + Math.sin(a) * radius]); }
+  return circle;
+}
+function parallelMedian(a, b) {
+  const low = (a.width + b.width) / 2 + 1, high = low + 8, run = []; let last = null;
+  const flush = () => { if (run.length >= 6 && Math.hypot(run.at(-1)[0] - run[0][0], run.at(-1)[1] - run[0][1]) >= 18) {
+    const width = Math.max(1.5, Math.min(6, run.reduce((s, p) => s + p.gap, 0) / run.length - (a.width + b.width) / 2));
+    const pts = run.map(p => p.mid), kerb = roadStrip(pts, width + 1, customRoadMats.walk, 0.27), grass = roadStrip(pts, width, customRoadMats.median, 0.34);
+    if (kerb) customRoadGroup.add(kerb); if (grass) customRoadGroup.add(grass);
+  } run.length = 0; last = null; };
+  for (let i = 0; i < a.pts.length; i += 2) {
+    const p = a.pts[i], p0 = a.pts[Math.max(0, i - 1)], p1 = a.pts[Math.min(a.pts.length - 1, i + 1)], ax = p1[0] - p0[0], az = p1[1] - p0[1], al = Math.hypot(ax, az) || 1;
+    let near = null;
+    for (let j = 1; j < b.pts.length; j++) {
+      const c = b.pts[j - 1], d = b.pts[j], dx = d[0] - c[0], dz = d[1] - c[1], t = Math.max(0, Math.min(1, ((p[0] - c[0]) * dx + (p[1] - c[1]) * dz) / (dx * dx + dz * dz || 1))), q = [c[0] + t * dx, c[1] + t * dz], gap = Math.hypot(p[0] - q[0], p[1] - q[1]), parallel = Math.abs((ax * dx + az * dz) / (al * (Math.hypot(dx, dz) || 1)));
+      if (parallel > 0.91 && gap >= low && gap <= high && (!near || gap < near.gap)) near = { q, gap };
+    }
+    if (!near || last && Math.hypot(p[0] - last[0], p[1] - last[1]) > 7) { flush(); if (!near) continue; }
+    run.push({ mid: [(p[0] + near.q[0]) / 2, (p[1] + near.q[1]) / 2], gap: near.gap }); last = p;
+  }
+  flush();
+}
+function segmentCross(a, b, c, d) {
+  const rx = b[0] - a[0], rz = b[1] - a[1], sx = d[0] - c[0], sz = d[1] - c[1], den = rx * sz - rz * sx;
+  if (Math.abs(den) < 1e-6) return null;
+  const qx = c[0] - a[0], qz = c[1] - a[1], t = (qx * sz - qz * sx) / den, u = (qx * rz - qz * rx) / den;
+  return t >= 0 && t <= 1 && u >= 0 && u <= 1 ? [a[0] + t * rx, a[1] + t * rz] : null;
+}
+function convexHull(points) {
+  const p = [...new Map(points.map(v => [`${v[0].toFixed(3)},${v[1].toFixed(3)}`, v])).values()].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (p.length < 3) return p;
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], hi = [];
+  for (const v of p) { while (lo.length > 1 && cross(lo.at(-2), lo.at(-1), v) <= 0) lo.pop(); lo.push(v); }
+  for (const v of p.slice().reverse()) { while (hi.length > 1 && cross(hi.at(-2), hi.at(-1), v) <= 0) hi.pop(); hi.push(v); }
+  lo.pop(); hi.pop(); return lo.concat(hi);
+}
+function junctionPoly(x, z, arms, expand, material, lift) {
+  const corners = [];
+  for (const arm of arms) {
+    const d = arm.dir, len = Math.hypot(d[0], d[1]) || 1, ux = d[0] / len, uz = d[1] / len, nx = -uz, nz = ux, r = arm.width / 2 + expand, reach = arm.width / 2 + expand;
+    for (const along of [-reach, reach]) for (const across of [-r, r]) corners.push([x + ux * along + nx * across, z + uz * along + nz * across]);
+  }
+  const hull = convexHull(corners), outline = [], positions = [], indices = [], center = hull.reduce((a, p) => [a[0] + p[0] / hull.length, a[1] + p[1] / hull.length], [0, 0]), y = P.heightAt(x, z) + lift;
+  for (let i = 0; i < hull.length; i++) {
+    const prev = hull[(i + hull.length - 1) % hull.length], p = hull[i], next = hull[(i + 1) % hull.length], lp = Math.hypot(prev[0] - p[0], prev[1] - p[1]), ln = Math.hypot(next[0] - p[0], next[1] - p[1]), cut = Math.min(3.2, lp * 0.4, ln * 0.4), a = [p[0] + (prev[0] - p[0]) * cut / (lp || 1), p[1] + (prev[1] - p[1]) * cut / (lp || 1)], b = [p[0] + (next[0] - p[0]) * cut / (ln || 1), p[1] + (next[1] - p[1]) * cut / (ln || 1)];
+    outline.push(a); for (let k = 1; k <= 5; k++) { const t = k / 5, u = 1 - t; outline.push([u * u * a[0] + 2 * u * t * p[0] + t * t * b[0], u * u * a[1] + 2 * u * t * p[1] + t * t * b[1]]); }
+  }
+  positions.push(center[0], y, center[1]); for (const p of outline) positions.push(p[0], P.heightAt(p[0], p[1]) + lift, p[1]);
+  for (let i = 0; i < outline.length; i++) indices.push(0, (i + 1) % outline.length + 1, i + 1);
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); g.setIndex(indices); g.computeVertexNormals();
+  const mesh = new THREE.Mesh(g, material); mesh.receiveShadow = true; mesh.renderOrder = material === customRoadMats.asphalt ? 3 : 2; customRoadGroup.add(mesh);
+}
+function addJunction(x, z, arms) {
+  const axes = [];
+  for (const arm of arms) { const l = Math.hypot(...arm.dir) || 1, d = [arm.dir[0] / l, arm.dir[1] / l], found = axes.find(q => Math.abs(q.dir[0] * d[0] + q.dir[1] * d[1]) > 0.95); if (found) found.width = Math.max(found.width, arm.width); else axes.push({ dir: d, width: arm.width }); }
+  // A one-arm endpoint or a bend is not a roundabout: let the road strip end cleanly.
+  if (axes.length < 2) return;
+  const width = Math.max(...arms.map(a => a.width), 8), radius = width / 2 + 2.1;
+  junctionPoly(x, z, arms, 2.1, customRoadMats.walk, 0.16);
+  junctionPoly(x, z, arms, 0.7, customRoadMats.asphalt, 0.21);
+  if (arms.length < 3) return;
+  const pos = [], idx = []; let vertex = 0;
+  for (const arm of arms) {
+    const len = Math.hypot(...arm.dir) || 1, dx = arm.dir[0] / len, dz = arm.dir[1] / len, nx = -dz, nz = dx, lanes = arm.width > 14 ? [-5.4, 5.4] : [0], laneWidth = arm.width > 14 ? 7 : Math.max(5, arm.width - 1);
+    for (const laneOffset of lanes) for (let stripe = -3; stripe <= 3; stripe++) {
+      const cx = x + dx * (radius + 2.8 + stripe * 0.85) + nx * laneOffset, cz = z + dz * (radius + 2.8 + stripe * 0.85) + nz * laneOffset, halfRoad = 0.32, halfCross = laneWidth / 2;
+      for (const [along, across] of [[-halfRoad, -halfCross], [halfRoad, -halfCross], [halfRoad, halfCross], [-halfRoad, halfCross]]) { const px = cx + dx * along + nx * across, pz = cz + dz * along + nz * across; pos.push(px, P.heightAt(px, pz) + 0.34, pz); }
+      idx.push(vertex, vertex + 2, vertex + 1, vertex, vertex + 3, vertex + 2); vertex += 4;
+    }
+  }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+  const crossing = new THREE.Mesh(geo, customRoadMats.paint); crossing.renderOrder = 4; customRoadGroup.add(crossing);
+}
+function renderCustomRoads() {
+  for (const child of [...customRoadGroup.children]) { customRoadGroup.remove(child); child.geometry?.dispose(); }
+  if (!P) return;
+  const junctions = new Map(), addCross = (p, ...arms) => { const key = `${p[0].toFixed(1)},${p[1].toFixed(1)}`; if (!junctions.has(key)) junctions.set(key, { p, arms: [] }); const j = junctions.get(key); for (const arm of arms) if (arm?.dir) j.arms.push({ dir: arm.dir, width: arm.width }); };
+  for (const road of customRoads) {
+    const pts = road.pts, width = road.width || 8;
+    if (road.kind === 'boulevard') {
+      const left = offsetPath(pts, 5.4), right = offsetPath(pts, -5.4), median = roadStrip(pts, 4.2, customRoadMats.walk, 0.25), grass = roadStrip(pts, 3.2, customRoadMats.median, 0.32);
+      for (const lane of [left, right]) { const walk = roadStrip(lane, 11.6, customRoadMats.walk, 0.12), asphalt = roadStrip(lane, 8, customRoadMats.asphalt, 0.18); if (walk) customRoadGroup.add(walk); if (asphalt) customRoadGroup.add(asphalt); }
+      if (median) customRoadGroup.add(median); if (grass) customRoadGroup.add(grass);
+    } else if (road.kind === 'circular') {
+      const walk = roadStrip(pts, width + 3.6, customRoadMats.walk, 0.12), asphalt = roadStrip(pts, width, customRoadMats.asphalt, 0.18);
+      if (walk) customRoadGroup.add(walk); if (asphalt) customRoadGroup.add(asphalt);
+      const ring = pts.slice(0, -1), cx = ring.reduce((s, p) => s + p[0], 0) / ring.length, cz = ring.reduce((s, p) => s + p[1], 0) / ring.length, radius = ring.reduce((s, p) => s + Math.hypot(p[0] - cx, p[1] - cz), 0) / ring.length - width / 2 - 1.8;
+      if (radius > 1) { const island = new THREE.Mesh(new THREE.CircleGeometry(radius, 48), customRoadMats.median); island.rotation.x = -Math.PI / 2; island.position.set(cx, P.heightAt(cx, cz) + 0.22, cz); island.renderOrder = 2; customRoadGroup.add(island); }
+    } else {
+      const walk = roadStrip(pts, width + 3.6, customRoadMats.walk, 0.12), asphalt = roadStrip(pts, width, customRoadMats.asphalt, 0.18);
+      if (walk) customRoadGroup.add(walk); if (asphalt) customRoadGroup.add(asphalt);
+    }
+    if (width >= 8 || road.kind === 'boulevard') {
+      const total = pts.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]), 0);
+      const markingPaths = road.kind === 'boulevard' ? [offsetPath(pts, 5.4), offsetPath(pts, -5.4)] : [pts];
+      for (const markingPath of markingPaths) { const markingLength = markingPath.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - markingPath[i][0], p[1] - markingPath[i][1]), 0); for (let d = 5; d < markingLength - 3; d += 12) { const dash = roadStrip([roadPointAt(markingPath, d), roadPointAt(markingPath, d + 3)], 0.24, customRoadMats.paint, 0.25); if (dash) customRoadGroup.add(dash); } }
+    }
+    if (road.kind !== 'circular') for (const [p, q] of [[pts[0], pts[1]], [pts.at(-1), pts.at(-2)]]) addCross(p, { dir: [p[0] - q[0], p[1] - q[1]], width: road.kind === 'boulevard' ? 20 : width });
+    for (let i = 1; i < pts.length - 1; i++) {
+      const a = pts[i - 1], p = pts[i], b = pts[i + 1], u = [a[0] - p[0], a[1] - p[1]], v = [b[0] - p[0], b[1] - p[1]];
+      const angle = Math.acos(Math.max(-1, Math.min(1, (u[0] * v[0] + u[1] * v[1]) / (Math.hypot(...u) * Math.hypot(...v) || 1))));
+      if (Math.abs(Math.PI - angle) > 0.7) { const junctionWidth = road.kind === 'boulevard' ? 20 : width; addCross(p, { dir: [p[0] - a[0], p[1] - a[1]], width: junctionWidth }, { dir: [b[0] - p[0], b[1] - p[1]], width: junctionWidth }); }
+    }
+  }
+  for (let i = 0; i < customRoads.length; i++) for (let j = i + 1; j < customRoads.length; j++) if (customRoads[i].kind !== 'boulevard' && customRoads[i].kind !== 'circular' && customRoads[j].kind !== 'boulevard' && customRoads[j].kind !== 'circular') parallelMedian(customRoads[i], customRoads[j]);
+  const allPaths = [...customRoads.map(r => ({ pts: r.pts, width: r.kind === 'boulevard' ? 20 : r.width || 8 })), ...P.streets.map(s => ({ pts: s.pts, width: s.w }))];
+  for (let i = 0; i < allPaths.length; i++) for (let j = i + 1; j < allPaths.length; j++) {
+    const a = allPaths[i], b = allPaths[j];
+    if (i >= customRoads.length && j >= customRoads.length) continue;
+    for (let ai = 1; ai < a.pts.length; ai++) for (let bi = 1; bi < b.pts.length; bi++) {
+      const aa = a.pts[ai - 1], ab = a.pts[ai], ba = b.pts[bi - 1], bb = b.pts[bi], p = segmentCross(aa, ab, ba, bb); if (p) { const da = [ab[0] - aa[0], ab[1] - aa[1]], db = [bb[0] - ba[0], bb[1] - ba[1]]; addCross(p, { dir: da, width: a.width }, { dir: [-da[0], -da[1]], width: a.width }, { dir: db, width: b.width }, { dir: [-db[0], -db[1]], width: b.width }); }
+    }
+  }
+  for (const { p, arms } of junctions.values()) addJunction(p[0], p[1], arms);
+  liveCheck();
+  const infoBold = $('info').querySelectorAll('b'); if (infoBold[1]) infoBold[1].textContent = P.streets.length + customRoads.length;
+}
+// живата проверка на начертаните улици (#29): остър ъгъл на пресичане, твърде близки кръстовища, тесен завой, улица през парцел, висящ край —
+// червени кръгове на картата и списък под „Проверка“; пуска се след всяка промяна (renderCustomRoads)
+const checkGroup = new THREE.Group(); scene.add(checkGroup);
+const checkMats = { bad: new THREE.MeshBasicMaterial({ color: 0xff3b30, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }), warn: new THREE.MeshBasicMaterial({ color: 0xffb020, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }) };
+const CHECK_TXT = { acute: 'остър ъгъл на пресичане (под 35°)', close: 'твърде близки кръстовища (под 18 м)', bend: 'тесен завой (радиус под 10 м)', lot: 'улица през парцел', dangle: 'висящ край (не стига до улица)' };
+function liveCheck() {
+  for (const ch of [...checkGroup.children]) { checkGroup.remove(ch); ch.geometry.dispose(); }
+  if (!P) return [];
+  const out = [], add = (k, p, lvl = 'bad') => out.push({ k, x: p[0], z: p[1], lvl });
+  const paths = [...customRoads.map((r, i) => ({ pts: r.pts, w: r.kind === 'boulevard' ? 20 : r.width || 8, own: i, ring: r.kind === 'circular' })), ...P.streets.map(st => ({ pts: st.pts, w: st.w, own: -1 }))];
+  const xs = [];   // кръстовищата с поне една нова улица: { p, ang }
+  for (let i = 0; i < customRoads.length; i++) for (let j = i + 1; j < paths.length; j++) {
+    const a = paths[i], b = paths[j];
+    for (let ai = 1; ai < a.pts.length; ai++) for (let bi = 1; bi < b.pts.length; bi++) {
+      const aa = a.pts[ai - 1], ab = a.pts[ai], ba = b.pts[bi - 1], bb = b.pts[bi], p = segmentCross(aa, ab, ba, bb); if (!p) continue;
+      const u = [ab[0] - aa[0], ab[1] - aa[1]], v = [bb[0] - ba[0], bb[1] - ba[1]], c = Math.abs(u[0] * v[0] + u[1] * v[1]) / (Math.hypot(...u) * Math.hypot(...v) || 1), ang = Math.acos(Math.min(1, c)) * 180 / Math.PI;
+      if (!xs.some(q => Math.hypot(q.p[0] - p[0], q.p[1] - p[1]) < 1)) xs.push({ p, ang });
+    }
+  }
+  for (const q of xs) if (q.ang < 35) add('acute', q.p);
+  const nodesAll = [...xs.map(q => q.p), ...P.nodes.filter(n => n.deg >= 3).map(n => [n.x, n.z])];
+  for (const q of xs) { const near = nodesAll.find(n => n !== q.p && Math.hypot(n[0] - q.p[0], n[1] - q.p[1]) > 1.5 && Math.hypot(n[0] - q.p[0], n[1] - q.p[1]) < 18); if (near) add('close', q.p); }
+  customRoads.forEach((r, i) => {
+    const pts = r.pts, w = paths[i].w;
+    if (r.kind !== 'circular') for (let k = 1; k < pts.length - 1; k++) {   // радиусът през три точки на ~6 м една от друга
+      const a = pts[k - 1], p = pts[k], b = pts[k + 1], la = Math.hypot(p[0] - a[0], p[1] - a[1]), lb = Math.hypot(b[0] - p[0], b[1] - p[1]); if (la < 0.5 || lb < 0.5) continue;
+      const cr = ((p[0] - a[0]) * (b[1] - p[1]) - (p[1] - a[1]) * (b[0] - p[0])), sinT = Math.abs(cr) / (la * lb), R = Math.min(la, lb) / (2 * Math.max(1e-6, Math.sin(Math.asin(Math.min(1, sinT)) / 2)));
+      if (sinT > 0.05 && R < 10 && !xs.some(q => Math.hypot(q.p[0] - p[0], q.p[1] - p[1]) < w)) { add('bend', p, 'warn'); break; }
+    }
+    const hit = new Set();
+    for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], b = pts[k], d = Math.hypot(b[0] - a[0], b[1] - a[1]), nx = -(b[1] - a[1]) / (d || 1), nz = (b[0] - a[0]) / (d || 1);
+      for (let t = 0; t <= d; t += 3) for (const o of [0, w / 2 - 0.5, -(w / 2 - 0.5)]) { const x = a[0] + (b[0] - a[0]) * t / (d || 1) + nx * o, z = a[1] + (b[1] - a[1]) * t / (d || 1) + nz * o, L = lotAt(P, x, z); if (L && !hit.has(L.id) && !built.has(L.id)) { hit.add(L.id); add('lot', [L.x, L.z]); } } }
+    if (r.kind !== 'circular') for (const e of [pts[0], pts.at(-1)]) { const onRoad = paths.some((q, j) => j !== i && q.pts.some((p, k) => k && distSeg(e, q.pts[k - 1], p) < q.w / 2 + 2)); if (!onRoad) add('dangle', e, 'warn'); }
+  });
+  for (const o of out) { const m = new THREE.Mesh(new THREE.RingGeometry(3.2, 4.6, 28).rotateX(-Math.PI / 2), checkMats[o.lvl]); m.position.set(o.x, P.heightAt(o.x, o.z) + 0.6, o.z); m.renderOrder = 5; m.userData.check = o.k; checkGroup.add(m); }
+  const el = $('liveCheck'); if (el) { const by = {}; for (const o of out) by[o.k] = (by[o.k] || 0) + 1, by[o.k + ':lvl'] = o.lvl;
+    el.innerHTML = !customRoads.length ? 'Новите улици: — (начертай улица, проверката е на живо)' : !out.length ? '✅ Новите улици: без проблеми' : Object.keys(CHECK_TXT).filter(k => by[k]).map(k => `<span style="color:${by[k + ':lvl'] === 'bad' ? '#ff6b61' : '#ffc14d'}">${by[k + ':lvl'] === 'bad' ? '⛔' : '⚠️'} ${CHECK_TXT[k]}: ${by[k]}</span>`).join('<br>'); }
+  window.__liveCheck = out; return out;
+}
+function distSeg(p, a, b) { const dx = b[0] - a[0], dz = b[1] - a[1], t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / (dx * dx + dz * dz || 1))); return Math.hypot(a[0] + dx * t - p[0], a[1] + dz * t - p[1]); }
+const snapshot = () => ({ lots: Object.fromEntries([...built].map(([id, o]) => [id, o.userData.path])), free: [...freeBuilt.values()].map(o => ({ path: o.userData.path, x: o.position.x, z: o.position.z, rotation: o.rotation.y, scale: o.scale.x })), removedStreets: [...removedStreetKeys], customRoads: customRoads.map(s => ({ kind: s.kind || 'street', width: s.width, pts: s.pts.map(p => [...p]) })), erasedTrees: [...erasedTreeKeys], hideTrees });
+function remember() { undoStack.push(snapshot()); if (undoStack.length > 80) undoStack.shift(); redoStack.length = 0; }
+function freeObject(src, path, x, z, rotation = 0, savedScale = null) {
+  const o = src.clone(true), original = new THREE.Box3().setFromObject(o), size = original.getSize(new THREE.Vector3());
+  const scale = savedScale ?? Math.min(1, 18 / Math.max(size.x, size.z, 0.001)) * brushScale;
+  o.scale.setScalar(scale); o.rotation.y = rotation; o.position.set(x, 0, z); o.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(o); o.position.y = P.heightAt(x, z) - box.min.y; o.userData.path = path; o.userData.freePlaced = true; return o;
+}
+function updateScaleStatus() { $('scaleStatus').textContent = selectedFree ? `Избран модел: ${Math.round(selectedFree.scale.x * 100)}% · ${Math.round(selectedFree.rotation.y * 180 / Math.PI)}°` : `Следващ модел: ${Math.round(brushScale * 100)}% · ${Math.round(brushRotation * 180 / Math.PI)}°`; }
+function selectFreeAt(e) {
+  if (!freeBuilt.size) return false;
+  const r = renderer.domElement.getBoundingClientRect(); mp.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1); ray.setFromCamera(mp, camera);
+  const target = ray.intersectObjects([...freeBuilt.values()], true)[0]?.object; if (!target) return false;
+  let root = target; while (root && !root.userData.freePlaced) root = root.parent;
+  if (!root) return false;
+  selectedFree = root; updateScaleStatus(); status('Моделът е избран. Използвай −/＋ за размер и ↶/↷ за завъртане.'); return true;
+}
+function adjustFreeModel(action, value) {
+  if (!selectedFree) {
+    if (action === 'scale') brushScale = Math.max(0.25, Math.min(5, brushScale * value));
+    else brushRotation += value * Math.PI / 12;
+    updateScaleStatus(); status('Променен е размерът и посоката за следващия поставен модел.'); return;
+  }
+  remember();
+  if (action === 'scale') selectedFree.scale.setScalar(Math.max(0.1, Math.min(10, selectedFree.scale.x * value)));
+  else selectedFree.rotation.y += value * Math.PI / 12;
+  selectedFree.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(selectedFree); selectedFree.position.y += P.heightAt(selectedFree.position.x, selectedFree.position.z) - box.min.y;
+  updateScaleStatus(); saveDraft(); status('Моделът е променен. Ctrl+Z отменя действието.');
+}
+async function placeModel(L) {
+  if (!chosen || built.has(L.id)) return;
+  if (placedCount() + pending >= cap) { status(`Всичките ${cap} места са заети. Увеличи лимита или освободи място.`); return; }
+  const gen = sceneGen, m = chosen; pending++; status(`Зареждам ${m.name}…`);
+  try { const src = await load(m.path); if (gen !== sceneGen || chosen?.path !== m.path || built.has(L.id)) return; remember(); const o = placeOnLot(src.clone(true), L, { margin: 1.5 }); o.userData.path = m.path; built.set(L.id, o); scene.add(o); count(); saveDraft(); lotInfo(L); status(`${m.name} е поставен. ${placedCount()}/${cap}`); }
+  catch (e) { status(`Грешка при зареждане на ${m.name}: ${e.message}`); }
+  finally { if (gen === sceneGen) pending--; }
+}
+function removeModel(L, record = true) { const o = built.get(L.id); if (!o) return; if (record) remember(); scene.remove(o); built.delete(L.id); count(); saveDraft(); lotInfo(L); status(`Парцел №${L.id} е освободен. ${placedCount()}/${cap}`); }
+async function placeFree(x, z) {
+  if (!chosen) return;
+  if (placedCount() + pending >= cap) { status(`Всичките ${cap} места са заети.`); return; }
+  const gen = sceneGen, m = chosen; pending++;
+  try { const src = await load(m.path); if (gen !== sceneGen || chosen?.path !== m.path) return; remember(); const o = freeObject(src, m.path, x, z, brushRotation); freeBuilt.set(`free-${++freeSeq}`, o); selectedFree = o; scene.add(o); count(); updateScaleStatus(); saveDraft(); status(`${m.name} е поставен свободно. Кликни го, за да го избереш за размер и завъртане.`); }
+  catch (e) { status(`Не успях да поставя ${m.name}: ${e.message}`); }
+  finally { if (gen === sceneGen) pending--; }
+}
+function setTool(t) { tool = t; $('tools').querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === tool)); $('roadWidthLabel').style.display = tool === 'road' ? 'flex' : 'none'; moveFrom = null; status(({ pan: 'Камера: влачи с мишката, за да преместиш изгледа.', place: chosen ? `Избран е ${chosen.name}. Кликни за свободно поставяне или върху парцел.` : 'Избери модел, за да го поставяш свободно с клик.', road: 'Избери тип път и влачи по картата. Линиите се изглаждат автоматично; кръстовищата се оформят сами.', erase: 'Триене: влачи по проекта, за да изтриеш поставени модели и улици навсякъде.', scale: 'Кликни върху поставен свободен модел, после използвай бутоните за размер и завъртане.', pick: 'Пипета: избери модел от вече застроен парцел.', move: 'Преместване: избери зает парцел, после празен.' })[tool]); }
+function pickModel(m) { chosen = m; selectedFree = null; updateScaleStatus(); previewModel(m); renderModels(); if (selected) lotInfo(selected); }
+function applyTool(L) {
+  selected = L; lotInfo(L);
+  if (tool === 'pan') return;
+  if (tool === 'place') { if (!chosen) return status('Избери модел от каталога, за да рисуваш.'); return placeModel(L); }
+  if (tool === 'erase') { if (built.has(L.id)) removeModel(L); else status(`Парцел №${L.id} вече е празен.`); return; }
+  if (tool === 'pick') { const b = built.get(L.id), m = b && modelByPath.get(b.userData.path); if (!m) return status('Този парцел е празен.'); pickModel(m); setTool('pan'); status(`Взех ${m.name}. Натисни „Рисуване“, за да го поставяш.`); return; }
+  if (tool === 'move') {
+    if (moveFrom == null) { if (!built.has(L.id)) return status('Избери зает парцел, от който да преместиш модела.'); moveFrom = L.id; status(`Източник №${L.id}. Сега избери празен парцел.`); return; }
+    const from = moveFrom; if (L.id === from) { moveFrom = null; status('Преместването е отменено.'); return; }
+    const srcObj = built.get(from); if (!srcObj) { moveFrom = null; return status('Началният модел вече не е там.'); }
+    if (built.has(L.id)) return status('Целевият парцел е зает. Избери празен парцел.');
+    const gen = sceneGen, path = srcObj.userData.path; pending++;
+    load(path).then(src => { if (gen !== sceneGen || moveFrom !== from || built.has(L.id) || built.get(from) !== srcObj) return; remember(); scene.remove(srcObj); built.delete(from); const o = placeOnLot(src.clone(true), L, { margin: 1.5 }); o.userData.path = path; built.set(L.id, o); scene.add(o); moveFrom = null; saveDraft(); lotInfo(L); status(`Моделът е преместен в парцел №${L.id}.`); }, e => status(`Не успях да преместя модела: ${e.message}`)).finally(() => { if (gen === sceneGen) pending--; });
+  }
+}
+async function restoreSnapshot(data) {
+  const gen = ++sceneGen; for (const o of built.values()) scene.remove(o); built.clear(); for (const o of freeBuilt.values()) scene.remove(o); freeBuilt.clear(); pending = 0; count();
+  selected = null; selectedFree = null; P = editablePlan(cityId.includes('@') ? makePlan(cityId.split('@')[0], { tpl: cityId.split('@')[1] }) : makePlan(cityId)); applyStreetRemovals(data.removedStreets || []); customRoads = (data.customRoads || []).map(s => ({ kind: s.kind || 'street', width: +s.width || 8, pts: s.pts.map(p => [...p]) })); erasedTreeKeys = new Set(data.erasedTrees || []); hideTrees = !!data.hideTrees; refreshPlanView(); renderCustomRoads(); updateScaleStatus();
+  for (const [id, path] of Object.entries(data.lots || {})) { if (gen !== sceneGen) return; const L = P.lots.find(x => x.id === +id); if (!L || !modelByPath.has(path)) continue; try { const src = await load(path); if (gen !== sceneGen) return; const o = placeOnLot(src.clone(true), L, { margin: 1.5 }); o.userData.path = path; built.set(L.id, o); scene.add(o); count(); } catch { } }
+  for (const item of data.free || []) { if (gen !== sceneGen || placedCount() >= cap || !modelByPath.has(item.path)) continue; try { const src = await load(item.path); if (gen !== sceneGen) return; const o = freeObject(src, item.path, item.x, item.z, item.rotation, item.scale); freeBuilt.set(`free-${++freeSeq}`, o); scene.add(o); count(); } catch { } }
+  saveDraft(); if (selected) lotInfo(selected);
+}
+function undo() { if (!undoStack.length) return; redoStack.push(snapshot()); const d = undoStack.pop(); restoreSnapshot(d); status('Последното действие е отменено.'); }
+function redo() { if (!redoStack.length) return; undoStack.push(snapshot()); const d = redoStack.pop(); restoreSnapshot(d); status('Действието е върнато.'); }
 $('city').onchange = () => show($('city').value);
-$('edges').onchange = () => { view.getObjectByName('lotEdges').visible = $('edges').checked; };
-$('fill').onclick = async () => { const free = P.lots.filter(L => !built.has(L.id)); for (let k = 0; k < 15 && free.length; k++) await build(free.splice((k * 13) % free.length, 1)[0]); };
-$('clear').onclick = () => { for (const o of built.values()) scene.remove(o); built.clear(); };
-// клик: първи — информация за парцела, втори — строеж
+$('tools').querySelectorAll('[data-tool]').forEach(b => b.onclick = () => setTool(tool === b.dataset.tool ? 'pan' : b.dataset.tool));
+$('undo').onclick = undo; $('redo').onclick = redo;
+$('scaleDown').onclick = () => adjustFreeModel('scale', 1 / 1.2); $('scaleUp').onclick = () => adjustFreeModel('scale', 1.2);
+$('rotateLeft').onclick = () => adjustFreeModel('rotate', -1); $('rotateRight').onclick = () => adjustFreeModel('rotate', 1);
+$('edges').onclick = () => { edgesOn = !edgesOn; if (view) view.getObjectByName('lotEdges').visible = edgesOn; $('edges').classList.toggle('on', edgesOn); };
+$('fit').onclick = focusPlan;
+$('capacity').onchange = () => { const n = Math.max(placedCount() + pending, Math.min(30, Math.max(1, +$('capacity').value || 30))); cap = n; $('capacity').value = cap; count(); saveDraft(); };
+$('clear').onclick = () => {
+  if (placedCount() || P.streets.length || customRoads.length || erasedTreeKeys.size || !hideTrees) remember();
+  sceneGen++; pending = 0;
+  if (P.streets.length) mutateStreetRemovals(P.streets.map((_, i) => i));
+  for (const o of built.values()) scene.remove(o); built.clear(); for (const o of freeBuilt.values()) scene.remove(o); freeBuilt.clear(); selectedFree = null; customRoads = []; erasedTreeKeys.clear(); hideTrees = true; selected = null; updateScaleStatus();
+  refreshPlanView(); renderCustomRoads(); count(); status('Проектът е изчистен. Ctrl+Z възстановява предишното състояние.');
+};
+$('search').oninput = renderModels;
+$('categoryStrip').onclick = e => { const b = e.target.closest('[data-category]'); if (!b) return; activeCategory = b.dataset.category; renderModels(); };
+$('export').onclick = () => { const data = { version: 1, city: cityId, cap, placements: Object.fromEntries([...built].map(([id, o]) => [id, o.userData.path])), freeObjects: [...freeBuilt.values()].map(o => ({ path: o.userData.path, x: o.position.x, z: o.position.z, rotation: o.rotation.y, scale: o.scale.x })), removedStreets: [...removedStreetKeys], customRoads, erasedTrees: [...erasedTreeKeys], hideTrees }; const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = `lab-city-${cityId.replace(/[^a-z0-9_-]/gi, '-')}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); };
+$('import').onclick = () => $('file').click();
+$('file').onchange = async () => { const f = $('file').files[0]; if (!f) return; try { const d = JSON.parse(await f.text()); if (d.version !== 1 || d.city !== cityId || !d.placements || typeof d.placements !== 'object') throw new Error('Файлът е за друг град или версия.'); const clean = {}; for (const [id, path] of Object.entries(d.placements)) if (P.lots.some(L => L.id === +id) && modelByPath.has(path) && Object.keys(clean).length < 30) clean[id] = path; const freeObjects = (Array.isArray(d.freeObjects) ? d.freeObjects : []).filter(o => modelByPath.has(o.path) && Number.isFinite(+o.x) && Number.isFinite(+o.z)).slice(0, 30 - Object.keys(clean).length); const customRoads = (Array.isArray(d.customRoads) ? d.customRoads : []).filter(s => Array.isArray(s.pts) && s.pts.length > 1).map(s => ({ kind: ["boulevard", "circular"].includes(s.kind) ? s.kind : "street", width: Math.max(4, Math.min(20, +s.width || 8)), pts: s.pts.filter(p => Array.isArray(p) && Number.isFinite(+p[0]) && Number.isFinite(+p[1])).map(p => [+p[0], +p[1]]) })).filter(s => s.pts.length > 1); const c = Math.max(Object.keys(clean).length + freeObjects.length, Math.min(30, +d.cap || 30)); localStorage.setItem(storeKey(cityId), JSON.stringify({ cap: c, placements: clean, freeObjects, removedStreets: Array.isArray(d.removedStreets) ? d.removedStreets : [], customRoads, erasedTrees: Array.isArray(d.erasedTrees) ? d.erasedTrees : [], hideTrees: !!d.hideTrees })); show(cityId); status('Проектът е зареден.'); } catch (e) { status(`Неуспешен внос: ${e.message}`); } $('file').value = ''; };
 const ray = new THREE.Raycaster(), ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), mp = new THREE.Vector2(), hit = new THREE.Vector3();
-let down = null, sel = null;
-renderer.domElement.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY]; });
+let down = null, painting = false, painted = new Set(), roadPaint = new Set(), customRoadPaint = new Set(), treePaint = new Set(), lastFreePoint = null;
+function lotFromEvent(e) { const r = renderer.domElement.getBoundingClientRect(); mp.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1); ray.setFromCamera(mp, camera); return ray.ray.intersectPlane(ground, hit) ? lotAt(P, hit.x, hit.z) : null; }
+function worldFromEvent(e) { const r = renderer.domElement.getBoundingClientRect(); mp.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1); ray.setFromCamera(mp, camera); return ray.ray.intersectPlane(ground, hit) ? { x: hit.x, z: hit.z } : null; }
+function eraseFreeAt(e) {
+  if (!freeBuilt.size) return false;
+  const r = renderer.domElement.getBoundingClientRect(); mp.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1); ray.setFromCamera(mp, camera);
+  const hitObj = ray.intersectObjects([...freeBuilt.values()], true)[0]?.object; if (!hitObj) return false;
+  let root = hitObj; while (root && !root.userData.freePlaced) root = root.parent;
+  if (!root) return false;
+  const [key] = [...freeBuilt].find(([, o]) => o === root) || []; if (key == null) return false;
+  remember(); scene.remove(root); freeBuilt.delete(key); if (selectedFree === root) { selectedFree = null; updateScaleStatus(); } count(); saveDraft(); status(`Свободно поставеният модел е изтрит. ${placedCount()}/${cap}`); return true;
+}
+function eraseTreeAt(e) {
+  if (!view || hideTrees) return false;
+  const r = renderer.domElement.getBoundingClientRect(); mp.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1); ray.setFromCamera(mp, camera);
+  const hitTree = ray.intersectObjects(view.children, true).find(h => h.object.isInstancedMesh && h.instanceId != null && h.object.userData.treeKeys);
+  if (!hitTree) return false;
+  const key = hitTree.object.userData.treeKeys[hitTree.instanceId];
+  if (!key || erasedTreeKeys.has(key)) return false;
+  treePaint.add(key); return true;
+}
+function streetFromEvent(e) {
+  const r = renderer.domElement.getBoundingClientRect(); mp.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1); ray.setFromCamera(mp, camera);
+  if (!ray.ray.intersectPlane(ground, hit)) return -1;
+  let best = -1, bestD = Infinity;
+  P.streets.forEach((st, si) => { for (let i = 1; i < st.pts.length; i++) { const a = st.pts[i - 1], b = st.pts[i], dx = b[0] - a[0], dz = b[1] - a[1], t = Math.max(0, Math.min(1, ((hit.x - a[0]) * dx + (hit.z - a[1]) * dz) / (dx * dx + dz * dz || 1))), d = Math.hypot(hit.x - a[0] - t * dx, hit.z - a[1] - t * dz); if (d < bestD) { bestD = d; best = d <= st.w / 2 + 2.5 ? si : -1; } } });
+  return best;
+}
+function customStreetFromEvent(e) {
+  const p = worldFromEvent(e); if (!p) return -1;
+  let best = -1, bestD = Infinity;
+  customRoads.forEach((road, ri) => { const width = road.kind === 'boulevard' ? 20 : road.width; for (let i = 1; i < road.pts.length; i++) { const a = road.pts[i - 1], b = road.pts[i], dx = b[0] - a[0], dz = b[1] - a[1], t = Math.max(0, Math.min(1, ((p.x - a[0]) * dx + (p.z - a[1]) * dz) / (dx * dx + dz * dz || 1))), d = Math.hypot(p.x - a[0] - t * dx, p.z - a[1] - t * dz); if (d < bestD) { bestD = d; best = d <= width / 2 + 3 ? ri : -1; } } });
+  return best;
+}
+let roadPreviewLine = null;
+function updateRoadPreview() {
+  if (roadPreviewLine) { customRoadGroup.remove(roadPreviewLine); roadPreviewLine.geometry.dispose(); roadPreviewLine = null; }
+  if (roadDrawing.length < 2) return;
+  const preview = $('roadWidth').value === 'circular' ? circularRoadPath(roadDrawing) : smoothRoadPath(roadDrawing), pos = []; for (const [x, z] of preview) pos.push(x, P.heightAt(x, z) + 0.28, z);
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  roadPreviewLine = new THREE.Line(g, roadPreviewMat); roadPreviewLine.renderOrder = 4; customRoadGroup.add(roadPreviewLine);
+}
+function addRoadPoint(e) {
+  const p = worldFromEvent(e); if (!p) return;
+  const last = roadDrawing.at(-1);
+  if (!last) roadDrawing.push([p.x, p.z]);
+  else {
+    const dx = p.x - last[0], dz = p.z - last[1], d = Math.hypot(dx, dz), n = Math.floor(d / 2.5);
+    for (let i = 1; i <= n; i++) roadDrawing.push([last[0] + dx * (i * 2.5 / d), last[1] + dz * (i * 2.5 / d)]);
+  }
+  updateRoadPreview();
+}
+function finishRoad() {
+  if (roadPreviewLine) { customRoadGroup.remove(roadPreviewLine); roadPreviewLine.geometry.dispose(); roadPreviewLine = null; }
+  const length = roadDrawing.slice(1).reduce((sum, p, i) => sum + Math.hypot(p[0] - roadDrawing[i][0], p[1] - roadDrawing[i][1]), 0);
+  if (length >= 3) {
+    const type = $('roadWidth').value, kind = type === 'boulevard' ? 'boulevard' : type === 'circular' ? 'circular' : 'street', width = kind === 'boulevard' || kind === 'circular' ? 8 : +type || 8, pts = kind === 'circular' ? circularRoadPath(roadDrawing) : smoothRoadPath(roadDrawing);
+    remember(); customRoads.push({ kind, width, pts }); renderCustomRoads(); saveDraft(); status(kind === 'boulevard' ? 'Булевардът с разделително островче е добавен.' : kind === 'circular' ? 'Кръговата улица е добавена.' : 'Улицата е изгладена и добавена. Кръстовищата се оформят автоматично.');
+  }
+  roadDrawing = [];
+}
+function paintAt(e) {
+  if (tool === 'road') { addRoadPoint(e); return; }
+  if (tool === 'place' && selectFreeAt(e)) { lastFreePoint = null; return; }
+  if (tool === 'erase' && eraseFreeAt(e)) { lastFreePoint = null; return; }
+  if (tool === 'erase' && eraseTreeAt(e)) return;
+  if (tool === 'erase') { const ci = customStreetFromEvent(e); if (ci >= 0) { customRoadPaint.add(ci); return; } }
+  const L = lotFromEvent(e);
+  if (!L) {
+    if (tool === 'erase') { const si = streetFromEvent(e); if (si >= 0) roadPaint.add(si); }
+    else if (tool === 'place' && chosen) {
+      const p = worldFromEvent(e); if (!p) return;
+      if (!lastFreePoint) { placeFree(p.x, p.z); lastFreePoint = p; return; }
+      const dx = p.x - lastFreePoint.x, dz = p.z - lastFreePoint.z, d = Math.hypot(dx, dz), steps = Math.floor(d / 7);
+      for (let i = 1; i <= steps; i++) placeFree(lastFreePoint.x + dx * (i * 7 / d), lastFreePoint.z + dz * (i * 7 / d));
+      if (steps) lastFreePoint = { x: lastFreePoint.x + dx * (steps * 7 / d), z: lastFreePoint.z + dz * (steps * 7 / d) };
+    }
+    return;
+  }
+  lastFreePoint = null;
+  if (painted.has(L.id)) return; painted.add(L.id); selected = L; lotInfo(L);
+  if (tool === 'erase') { if (built.has(L.id)) removeModel(L); }
+  else if (tool === 'place' && chosen && !built.has(L.id)) placeModel(L);
+}
+renderer.domElement.addEventListener('pointerdown', e => {
+  if (e.button !== 0) return; down = [e.clientX, e.clientY];
+  if (tool === 'erase' || tool === 'road' || tool === 'place' && chosen) { painting = true; painted = new Set(); roadPaint = new Set(); customRoadPaint = new Set(); treePaint = new Set(); roadDrawing = []; lastFreePoint = null; controls.enabled = false; e.preventDefault(); paintAt(e); }
+}, true);
+renderer.domElement.addEventListener('pointermove', e => { if (painting) paintAt(e); }, true);
 renderer.domElement.addEventListener('pointerup', e => {
-  if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
-  mp.set(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1); ray.setFromCamera(mp, camera);
-  if (!ray.ray.intersectPlane(ground, hit)) return;
-  const L = lotAt(P, hit.x, hit.z);
-  if (!L) { $('lotBox').style.display = 'none'; hl.visible = false; sel = null; return; }
-  if (sel === L.id && !built.has(L.id)) build(L).then(() => lotInfo(L)); else lotInfo(L);
-  sel = L.id;
+  if (painting) { if (tool !== 'place') paintAt(e); painting = false; controls.enabled = true; down = null; if (tool === 'road') finishRoad(); else if (roadPaint.size || customRoadPaint.size || treePaint.size) eraseRoads([...roadPaint], [...customRoadPaint], [...treePaint]); roadPaint.clear(); customRoadPaint.clear(); treePaint.clear(); return; }
+  if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) { down = null; return; }
+  down = null; if (selectFreeAt(e)) return; const L = lotFromEvent(e);
+  if (!L) { $('lotBox').style.display = 'none'; if (hl) hl.visible = false; selected = null; return; }
+  applyTool(L);
+}, true);
+renderer.domElement.addEventListener('pointercancel', () => { painting = false; lastFreePoint = null; roadPaint.clear(); customRoadPaint.clear(); treePaint.clear(); roadDrawing = []; if (roadPreviewLine) { customRoadGroup.remove(roadPreviewLine); roadPreviewLine.geometry.dispose(); roadPreviewLine = null; } controls.enabled = true; down = null; }, true);
+addEventListener('keydown', e => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+  const tag = e.target?.tagName?.toLowerCase(); if (['input', 'textarea', 'select'].includes(tag) || e.target?.isContentEditable) return;
+  const key = e.key.toLowerCase();
+  if (key === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+  else if (key === 'y') { e.preventDefault(); redo(); }
 });
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 show($('city').value);
-window.__plan = { get P() { return P; }, build: (id, k) => build(P.lots[id], k), built, camera, controls, show, renderer, scene };
+window.__plan = { get P() { return P; }, built, camera, controls, show, renderer, scene, placeModel, removeModel };
 renderer.setAnimationLoop(() => { controls.update(); view?.userData.lod(camera); renderer.render(scene, camera); });
 </script>
 </body>

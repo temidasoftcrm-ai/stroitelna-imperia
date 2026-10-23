@@ -192,7 +192,7 @@ const DEMOS = [
   ['🌃 Складовете нощем — вече не са черни кубове (редицата 1–10, 22:00)', 'plovdiv', d => setTimeout(() => { d.whRow(); setTimeout(() => d.time(22), 1500); }, 3000)],   // wh-night
   ['🚗 Движението расте с квартала: над застроеното — много коли и хора, над празното — малко (Пловдив: центърът, после най-празният край)', 'plovdiv', d => { setTimeout(() => d.growLook(false), 8000); setTimeout(() => d.growLook(true), 22000); setTimeout(() => d.growLook(false), 36000); }],   // traffic-grow (#42.8)
 ];
-const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
+const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
 const rejected = new Set((() => { try { return JSON.parse(localStorage.getItem('lab.rejected') || '[]'); } catch { return []; } })());   // „✖ Не е ОК“ — скрити, докато Claude не направи друго
 let state = readHash(), approved = [], showDone = false, frameKey = 0;
@@ -325,9 +325,12 @@ function renderReview(tab = 'review') {
 
 // ---- Сцени
 function renderScenes() {
-  sideNav(`<div class="grp">Градове <i>(нова игра с план)</i></div>` + SCENES.map(([id, nm, sub]) => row(state.item === id, nm, sub, `data-c="${id}"`)).join(''));
+  sideNav(`<div class="grp">Инструменти</div>` + row(state.item === 'editor', '🛠️ Редактор на градове', '3D модели от assets · подреждане по парцели', 'data-editor')
+    + `<div class="grp">Градове <i>(нова игра с план)</i></div>` + SCENES.map(([id, nm, sub]) => row(state.item === id, nm, sub, `data-c="${id}"`)).join(''));
+  $('side').querySelector('[data-editor]').onclick = () => pick('scenes', 'editor');
   $('side').querySelectorAll('[data-c]').forEach(b => b.onclick = () => pick('scenes', b.dataset.c));
-  if (!state.item) { $('main').innerHTML = `<div class="empty">Избери град отляво — зарежда се направо в града (нова игра с градски план, ботът не играе сам).</div>`; return; }
+  if (state.item === 'editor') { frame('plan.html', 'Lab: редактор на градове'); return; }
+  if (!state.item) { $('main').innerHTML = `<div class="empty">Избери редактора или град отляво — редакторът отваря 3D плановете, а градовете зареждат нова игра с план.</div>`; return; }
   frame(`${GAME}&plan=1&city=${state.item}`, `Сцена: ${state.item}`);
 }
 
