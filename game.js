@@ -514,7 +514,7 @@ let europe = null;
   if (feature('hw-gantry')) jobs.push(load('assets/heavy/highway/hw-gantry.glb').then(g => { A['hw-gantry'] = g; }).catch(() => {}));   // 🛣️ порталът с табелите
   if (feature('office-levels2')) for (const L of OFFICE2) jobs.push(load(L.url).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[`office2-l${L.lv}`] = g; prepNightFloors(g.scene, `office2-l${L.lv}`); blkSections(`office2-l${L.lv}`); }).catch(() => {}));   // 🆕 новите нива на офиса
   for (const n of GAS_KINDS) jobs.push(load(`assets/heavy/gas/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => {}));   // бензиностанции (всяка — свое „✓ OK“); нощем — навесът и магазинът (nightfloors 'gas')
-  if (feature('wh-levels2')) for (let k = 1; k <= 10; k++) jobs.push(load(`assets/heavy/wh2/wh-l${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['wh2-l' + k] = g; }).catch(() => {}));   // 📦 складовете 1–10 (Sketchfab, CC-BY — assets/heavy/wh2/CREDITS.txt)
+  if (feature('wh-levels2')) for (let k = 1; k <= 10; k++) jobs.push(load(`assets/heavy/wh2/wh-l${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['wh2-l' + k] = g; blkSections('wh2-l' + k); }).catch(() => {}));   /* №18: секциите на халетата */   // 📦 складовете 1–10 (Sketchfab, CC-BY — assets/heavy/wh2/CREDITS.txt)
   if (feature('catenary')) jobs.push(load('assets/heavy/rail/catenary-mast.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; m.material.metalness = 0.25; m.material.roughness = 0.6; } }); A['cat-mast'] = g; })   /* без огледална среда металът излиза черен */.catch(() => {}));   // ⚡ catenary (#19): стълб с конзола (Low poly catenary — Ogfmh/mtafan, CC BY; оцветен в Blender)
   if (feature('rail-real')) jobs.push(load('assets/heavy/rail/track-tile.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) { m.castShadow = false; m.receiveShadow = true; } }); A['track-real'] = g; }).catch(() => {}));   // 🛤️ rail-real (#19): истинските релси (hifrak958, CC BY) — парче 1 × 0,75, като детското 'track'
   if (feature('wh-mats')) jobs.push(whMatsLoad(load));   // 📦 палети тухли, цимент, дъски, греди, пясък, кашони (assets/heavy/whmat, CC-BY)
@@ -926,7 +926,7 @@ const shopPool = () => feature('real-scale') ? SHOPS.filter(n => !TOO_LONG.has(n
 function blkSections(n) { const S = SECTIONS[n]; if (!S || !feature('real-sizes') || !A[n]) return; S.cuts.forEach((f, i) => { A[sectName(n, i)] = { scene: (Array.isArray(f) ? f : [[S.axis, f]]).reduce((r, [ax, q]) => cutMirror(r, ax, q), A[n].scene) }; }); }
 function realHeight(o, n, maxW) {
   if (feature('real-sizes') && SECTIONS[n] && A[n]) { const p = pickSection(n, v => A[v] ? sizeOf(v).getSize(new THREE.Vector3()) : null, maxW);
-    if (p) { if (p[0] !== n) { o.clear(); for (const c of A[p[0]].scene.clone(true).children) o.add(c); o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); o.userData.sect = p[0]; } o.scale.setScalar(p[1]); return true; } }
+    if (p) { if (p[0] !== n) { o.clear(); for (const c of A[p[0]].scene.clone(true).children.slice()) o.add(c);   /* копие на масива: add() маха детето от стария родител */ o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); o.userData.sect = p[0]; } o.scale.setScalar(p[1]); return true; } }
   if (feature('real-scale')) { const k = realScaleK(n, sizeOf(n).getSize(new THREE.Vector3()), maxW, REAL_BLD[n] ?? realH(n)); if (k) { o.scale.setScalar(k); return true; } }   /* real-scale (55): еднакъв мащаб по трите оси — къщите по етажите (scale.js), не по-широка от парцела */
   if (!feature('real-heights')) return false;
   if (n.startsWith('ind-')) return false;   // истинските заводи (industry.js) — със своите пропорции, не до 16 м
@@ -1537,8 +1537,8 @@ const machineCount = () => units.filter(u => isMachine(u.type) && !isRoadGear(u.
 // вписва обект (още без родител — координатите са в групата на парцела) в правоъгълника [x0,x1]×[z0,z1]: само смалява, центрира
 function campusFit(o, x0, x1, z0, z1) {
   if (feature('real-sizes') && SECTIONS[o.userData.src]) { const n = o.userData.src, k = o.userData.k0 ??= o.scale.x; o.scale.setScalar(k);   /* №8: мащабът от първото извикване (второто беше върху вече смаления) */   /* real-sizes (55): секцията, която се побира в истински размер, вместо смаляване */
-    const v = [n, ...SECTIONS[n].cuts.map((f, i) => sectName(n, i))].filter(v => A[v]).find(v => { const s = sizeOf(v).getSize(new THREE.Vector3()); return s.x * k <= x1 - x0 && s.z * k <= z1 - z0; });
-    if (v && v !== n) { o.clear(); for (const c of A[v].scene.clone(true).children) o.add(c); o.userData.sect = v; } }
+    const vs = [n, ...SECTIONS[n].cuts.map((f, i) => sectName(n, i))].filter(v => A[v]), v = vs.find(v => { const s = sizeOf(v).getSize(new THREE.Vector3()); return s.x * k <= x1 - x0 && s.z * k <= z1 - z0; }) || vs[vs.length - 1];   /* №18: нищо не влиза — най-малката секция (после леко смаляване), не целият модел до играчка */
+    if (v && v !== n) { o.clear(); for (const c of A[v].scene.clone(true).children.slice()) o.add(c);   /* копие на масива: add() маха детето от стария родител */ o.userData.sect = v; } }
   o.updateMatrixWorld(true); let b = new THREE.Box3().setFromObject(o); const s = b.getSize(new THREE.Vector3());
   const k = Math.min(1, (x1 - x0) / Math.max(0.1, s.x), (z1 - z0) / Math.max(0.1, s.z)); if (k < 1) { o.scale.multiplyScalar(k); o.updateMatrixWorld(true); b = new THREE.Box3().setFromObject(o); }
   o.position.x += (x0 + x1) / 2 - (b.min.x + b.max.x) / 2; o.position.z += (z0 + z1) / 2 - (b.min.z + b.max.z) / 2; return k;
@@ -1640,7 +1640,7 @@ function garageMesh(level, w, d) {
 // сградата на склада: дълго хале с ролетни врати и рампа
 // 📦 (wh-levels2) истинските складове 1–10: контейнер → малък склад → … → логистичен парк; в метри (дължината по x — към улицата)
 function wh2Mesh(level) {
-  const n = 'wh2-l' + Math.max(1, Math.min(10, level)); if (!A[n]) return null;
+  const lv = Math.max(1, Math.min(10, level)), n = 'wh2-l' + (feature('real-sizes') && lv >= 7 ? (lv % 2 ? 5 : 4) : lv); if (!A[n]) return null;   /* №18 (55): нива 7–10 — високите халета (4 и 5), отрязани да влязат в парцела; терминалите и мега-комплексът (40–62 м, с навеси) не влизат — остават за пристанища/индустриални зони */
   const g = new THREE.Group(), o = A[n].scene.clone(true); g.add(o); g.updateMatrixWorld(true);
   const b = new THREE.Box3().setFromObject(g); g.userData.h = b.max.y - b.min.y; g.userData.wh2 = n; return g;
 }
@@ -1692,14 +1692,15 @@ function buildWarehouse() {
   if (wr) { const p = lotPt(lot, (wr.x0 + wr.x1) / 2, (wr.z0 + wr.z1) / 2); g.position.set(p.x, 0, p.z); }   // общият парцел: отзад на съседа
   else if (camp) { const [W, D] = lotHalf(lot), p = lotPt(lot, -W / 2 - 0.05, -D / 2 - 0.05); g.position.set(p.x, 0, p.z); }   // кампус: отзад вляво в централата (мащабът — по рамката, долу)
   else g.position.set(lot.x, 0, lot.z);
-  g.rotation.y = lotRot(lot); if (!camp) g.scale.setScalar(lotK(lot));
+  const whReal = feature('real-sizes') && !camp && lot.plan;   // №18 (55): складът на свой парцел по плана — 1:1 в целия парцел, не ×lotK
+  g.rotation.y = lotRot(lot); if (!camp && !whReal) g.scale.setScalar(lotK(lot));
   city.group.add(g);
   if (!camp) { for (const t of lot.trees || []) city.group.remove(t); lot.trees = []; }
-  const pav = new THREE.Mesh(new THREE.PlaneGeometry(15.5, 15.5), new THREE.MeshStandardMaterial({ color: 0x9a968c, roughness: 1 }));
+  const pav = new THREE.Mesh(whReal ? new THREE.PlaneGeometry(lot.w - 0.6, lot.d - 0.6) : new THREE.PlaneGeometry(15.5, 15.5), new THREE.MeshStandardMaterial({ color: 0x9a968c, roughness: 1 }));
   pav.rotation.x = -Math.PI / 2; pav.position.y = 0.03; pav.receiveShadow = true; if (!camp) g.add(pav);
   const wh = warehouseMesh(S.whLevel);
   wh.position.set(0, 0, camp ? 0 : -4);
-  if (!camp && wh.userData.wh2) campusFit(wh, -7.4, 7.4, -7.4, 2.6);   // истинският склад — в парцела (отпред — дворът с палетите)
+  if (!camp && wh.userData.wh2) { if (whReal) { const hw = lot.w / 2 - 0.8, hd = lot.d / 2 - 0.8; campusFit(wh, -hw, hw, -hd, Math.min(hd - 5, hd * 0.35)); } else campusFit(wh, -7.4, 7.4, -7.4, 2.6); }   /* №18: в целия парцел (отпред — дворът), не в 15 × 10 м */   // истинският склад — в парцела (отпред — дворът с палетите)
   if (wr) { const hw = (wr.x1 - wr.x0) / 2, hd = (wr.z1 - wr.z0) / 2; campusFit(wh, -hw, hw, -hd, hd); }
   else if (camp) { const [W, D] = lotHalf(lot); campusFit(wh, -(W - 0.7) / 2, (W - 0.7) / 2, -(D - 0.7) / 2, (D - 0.7) / 2); }   // в своята четвъртина, по рамката
   g.add(wh);
@@ -10871,6 +10872,10 @@ if (AUTOTEST) {
     carLensLook() {   // 🚗 car-lens (55): нощ, камерата зад кола от трафика (фаровете ѝ — напред)
       __dbg.time && __dbg.time(22); const c = tr2 && tr2.cars.find(c => !c.heavy) || (tr2 && tr2.cars[0]); if (!c) return null; const ox = tr2G ? tr2G.position.x : 0, oz = tr2G ? tr2G.position.z : 0, x = c.rx + ox, z = c.rz + oz, fx = Math.sin(c.ryaw), fz = Math.cos(c.ryaw);
       __dbg.camAt(x - fx * 9 + fz * 5, 6, z - fz * 9 - fx * 5, x + fx * 6, 0.5, z + fz * 6); return [Math.round(x), Math.round(z)]; },
+    whFitLook(lv = 1) {   // 📦 №18 (55): складът на ниво lv на своя парцел — в истински размер, в парцела
+      S.whLevel = lv; if (S.whLot == null || !city.lots[S.whLot]) { const l = city.lots.find(x => !x.built && !x.busy && x !== city.hq && x.plan) || city.lots.find(x => !x.built && !x.busy && x !== city.hq); if (!l) return null; S.whLot = l.id; l.busy = 'wh'; }
+      buildWarehouse(); refreshWarehouse && refreshWarehouse(); const l = city.lots[S.whLot], w = city.whGroup.children.find(c => c.userData.wh2), b = w ? new THREE.Box3().setFromObject(w).getSize(new THREE.Vector3()) : null;
+      __dbg.camAt(l.x + 10, 38, l.z + 22, l.x, 2, l.z); return { lv, lot: l.id, lw: l.w, ld: l.d, model: w && (w.userData.sect || w.userData.wh2), size: b && [+b.x.toFixed(1), +b.y.toFixed(1), +b.z.toFixed(1)] }; },
     sectRow(night) {   // 📏 real-sizes (55): панелните блокове и секциите им в редица, в истински размер (кубът отпред — 1,8 м човек)
       if (city.sectRow) city.group.remove(city.sectRow); const G = city.sectRow = new THREE.Group(), x0 = tx(NI - 1) + 50, z0 = tx(0) - 40, V3 = () => new THREE.Vector3(); let x = x0;
       for (const n of Object.keys(SECTIONS)) { if (!A[n]) continue; const k = SECTIONS[n].H / sizeOf(n).getSize(V3()).y;
