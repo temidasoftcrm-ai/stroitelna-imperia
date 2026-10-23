@@ -515,6 +515,7 @@ let europe = null;
   if (feature('office-levels2')) for (const L of OFFICE2) jobs.push(load(L.url).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[`office2-l${L.lv}`] = g; prepNightFloors(g.scene, `office2-l${L.lv}`); blkSections(`office2-l${L.lv}`); }).catch(() => {}));   // 🆕 новите нива на офиса
   for (const n of GAS_KINDS) jobs.push(load(`assets/heavy/gas/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => {}));   // бензиностанции (всяка — свое „✓ OK“); нощем — навесът и магазинът (nightfloors 'gas')
   if (feature('wh-levels2')) for (let k = 1; k <= 10; k++) jobs.push(load(`assets/heavy/wh2/wh-l${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['wh2-l' + k] = g; }).catch(() => {}));   // 📦 складовете 1–10 (Sketchfab, CC-BY — assets/heavy/wh2/CREDITS.txt)
+  if (feature('rail-real')) jobs.push(load('assets/heavy/rail/track-tile.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) { m.castShadow = false; m.receiveShadow = true; } }); A['track-real'] = g; }).catch(() => {}));   // 🛤️ rail-real (#19): истинските релси (hifrak958, CC BY) — парче 1 × 0,75, като детското 'track'
   if (feature('wh-mats')) jobs.push(whMatsLoad(load));   // 📦 палети тухли, цимент, дъски, греди, пясък, кашони (assets/heavy/whmat, CC-BY)
   if (feature('yards-real')) for (const k of ['bench', 'fence-wood', 'fence-iron', 'fence-cement', 'fence-modern', 'play-swings', 'play-tower', 'play-small']) jobs.push(load(`assets/heavy/street/${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['st-' + k] = g; }).catch(() => {}));   // 🛝 yards-real: пейка, площадки, огради (Sketchfab, CC-BY — assets/heavy/CREDITS.txt)
   if (feature('plants-real')) for (const k of ['bush-0', 'bush-1', 'bush-2', 'flowers', 'fountain']) jobs.push(load(`assets/heavy/plants/${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['pl-' + k] = g; }).catch(() => {}));
@@ -830,6 +831,7 @@ function bfs(a, b) {
 
 const tmpM = new THREE.Matrix4();
 function instanced(name, mats) {
+  if (name === 'track' && feature('rail-real') && A['track-real']) name = 'track-real';   // rail-real: истинските релси вместо детските
   const g = new THREE.Group(), src = A[name].scene;
   src.updateMatrixWorld(true);
   src.traverse(o => {

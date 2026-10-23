@@ -172,6 +172,7 @@ const DEMOS = [
   ['🅿️ Паркираните коли нощем — без фарове (Пловдив, 02:20)', 'plovdiv', d => setTimeout(() => { d.time(2.33); const cars = []; d.city().group.traverse(o => { if (/^sf-car-/.test(o.userData.src || '')) cars.push(o); }); const o = cars[Math.min(3, cars.length - 1)]; if (o) { const p = o.getWorldPosition(o.position.clone()); d.camAt(p.x + 22, 16, p.z + 26, p.x, 0, p.z); } }, 3000)],   // park-dark
   ['🌳 Истинските дървета и при обществените сгради и забележителностите (Рим: училището)', 'rome', d => setTimeout(() => { let root = d.city().group; while (root.parent) root = root.parent; let g = null; root.traverse(o => { if (!g && o.name === 'svc-school') g = o; }); if (g) { const p = g.getWorldPosition(g.position.clone()); d.camAt(p.x + 45, 40, p.z + 55, p.x, 0, p.z); } }, 4000)],   // trees-more
   ['🪧 Билбордовете — никога в сграда или строеж (Пловдив, през 5 s следващият)', 'plovdiv', d => { let i = 0; const go = () => { const r = d.bbLook(i, 60); if (r) { i = (i + 1) % r[1]; setTimeout(go, 5000); } }; setTimeout(go, 3000); }],   // bb-clear
+  ['🛤️ Истинските релси на гарата (Пловдив)', 'plovdiv', d => setTimeout(() => d.lookSt(3, 30), 3000)],   // rail-real
 ];
 const PAGES = [['plan.html', 'Градските планове (всички шаблони)'], ['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
