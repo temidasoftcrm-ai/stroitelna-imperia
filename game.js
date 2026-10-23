@@ -2373,10 +2373,11 @@ function makePed() {
   let i = 3 * ((Math.random() * NBI) | 0), j = (Math.random() * NJ) | 0;
   for (let k = 0; k < 40 && !isRoad(i, j); k++) { i = 3 * ((Math.random() * NBI) | 0); j = (Math.random() * NJ) | 0; }   // не по улица под площад/парк (Белия дом, поръчките) — иначе стои на тревата
   const rp = roadPoint();
-  const pd = { m, mixer, real, x: rp ? rp.x : tx(i), z: rp ? rp.z : tx(j), path: null, pi: 0, side: Math.random() < 0.5 ? 1 : -1, sp: rand(1.2, 1.8), yaw: 0 };
+  const pd = { wa, ia, m, mixer, real, x: rp ? rp.x : tx(i), z: rp ? rp.z : tx(j), path: null, pi: 0, side: Math.random() < 0.5 ? 1 : -1, sp: rand(1.2, 1.8), yaw: 0 };
   peds.push(pd);
 }
-const wantedPeds = () => Math.min(26, 6 + Math.round(city.lots.filter(l => l.built).length * 0.18) + (S?.parks || []).length * 3);
+const wantedPeds = () => feature('peds-more') ? Math.min(60, 10 + Math.round(city.lots.filter(l => l.built).length * 0.3) + (S?.cityExt || 0) * 5 + (S?.parks || []).length * 3)   /* #9: повече хора, растат с кварталите */
+  : Math.min(26, 6 + Math.round(city.lots.filter(l => l.built).length * 0.18) + (S?.parks || []).length * 3);
 // хора, които стоят по тротоарите на групички (истинските модели от Sketchfab — A['sf-person-N']); пешеходците, които вървят, си остават
 const standers = [];
 const wantedStanders = () => Math.min(30, 4 + Math.round(wantedPeds() * 0.9));
@@ -2422,7 +2423,7 @@ function updatePeds(dt) {
   for (const mx of standMix) mx.update(dt);   // стоящите истински хора се движат (говорят, пушат…)
   if (!S || !city.ready) return;
   if (standers.length < wantedStanders() && Math.random() < dt * 2) addStanders();
-  if (peds.length < wantedPeds() && Math.random() < dt * 0.6) makePed();
+  { const W = wantedPeds(); if (peds.length < W && Math.random() < dt * (0.6 + (feature('peds-more') ? (W - peds.length) * 0.15 : 0))) makePed(); }   // #9: доста под целта — идват по-бързо
   for (const p of peds) {
     if (!p.path) {
       // до случаен ъгъл; понякога до парк
@@ -2438,14 +2439,22 @@ function updatePeds(dt) {
     const wp = p.path[p.pi];
     let x2 = wp.x, z2 = wp.z;
     if (p.pi > 0 && !wp.park && !wp.walk) { const pv = p.path[p.pi - 1], dx = wp.x - pv.x, dz = wp.z - pv.z, l = Math.hypot(dx, dz) || 1; x2 += -dz / l * PED_SIDE * p.side; z2 += dx / l * PED_SIDE * p.side; }
-    { const pv = p.pi > 0 && p.path[p.pi - 1]; if (pv && pv.cross && !p.xOk) { if (!pedCanCross(pv.cross)) continue; p.xOk = true; } }   /* ped-paths: преди зебрата — зелено за пешеходците или пролука в колите */
+    { const pv = p.pi > 0 && p.path[p.pi - 1]; if (pv && pv.cross && !p.xOk) { p.wt = (p.wt || 0) + dt;   /* ped-paths: преди зебрата — зелено за пешеходците или пролука в колите */
+      if (!pedCanCross(pv.cross) && !(p.wt > 20 && pedGap(pv.cross))) { if (p.wt > 45) { p.path = null; p.wt = 0; } pedPose(p, true, dt); continue; }   // #10: чака (стои), след 20 s — щом няма кола на 7 м, след 45 s — друга цел
+      p.xOk = true; p.wt = 0; } }
     const dx = x2 - p.x, dz = z2 - p.z, d = Math.hypot(dx, dz), st = p.sp * dt;
     if (d <= st) { if (d > 0.05) p.yaw = Math.atan2(dx, dz); p.x = x2; p.z = z2; p.xOk = false; if (++p.pi >= p.path.length) p.path = null; }
     else { p.x += dx / d * st; p.z += dz / d * st; const w = Math.atan2(dx, dz); let dy = w - p.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); p.yaw += dy * Math.min(1, dt * 6); }
-    p.m.position.set(p.x, 0.05, p.z); p.m.rotation.y = p.yaw;
-    p.mixer.update(dt * p.sp / 1.5);
+    pedPose(p, false, dt * p.sp / 1.5);
   }
 }
+// #10: ходене/стоене (тежестта на клиповете), без застъпване с другите (раздалечават се на 0,65 м), позата в сцената
+function pedPose(p, idle, dt) {
+  if (p.wa && p.ia) { p.wa.setEffectiveWeight(idle ? 0 : 1); p.ia.setEffectiveWeight(idle ? 1 : 0); }
+  for (const q of peds) { if (q === p) continue; const dx = p.x - q.x, dz = p.z - q.z, d = Math.hypot(dx, dz); if (d < 0.65) { const k = (0.65 - d) / 2 / (d || 1); p.x += (d ? dx : 0.3) * k; p.z += (d ? dz : 0.2) * k; } }
+  p.m.position.set(p.x, 0.05, p.z); p.m.rotation.y = p.yaw; p.mixer.update(dt);
+}
+const pedGap = c => !tr2 || !tr2On() || !tr2.cars.some(car => Math.hypot(car.x - c.x, car.z - c.z) < 7);
 function updateTraffic(dt) {
   if (tr2 && tr2On()) { tr2.opts.maxCars = tr2Force || wantedTraffic(); const t0 = performance.now(); tr2.update(dt); tr2.ms = (tr2.ms || 0) * 0.95 + (performance.now() - t0) * 0.05; return; }   // traffic2: светофарите се управляват оттам
   if (S && traffic.length < wantedTraffic() && Math.random() < dt * 0.5) addCar();   // градът расте → идват още коли
@@ -11076,6 +11085,7 @@ if (AUTOTEST) {
     units: () => units.map(u => ({ t: u.type, st: u.state, proj: u.proj ? (projects.includes(u.proj) ? u.proj.title : S.hwJobs?.includes(u.proj) ? 'магистрала' : 'МЪРТЪВ') : null, moveD: +(u.moveD || 0).toFixed(2), jpTry: u.jpTry || 0, wb: +(u.wb || 0).toFixed(1), path: u.path ? u.path.length : 0, agent: !!u.agent })),   /* #12: техниката в града */
     unitRepair: () => unitRepair(),
     unitBreakTest() { const idle = units.filter(u => u.state === 'idle' && !u.proj); if (idle.length < 3) return 'малко техника: ' + idle.length; const [A, B, C] = idle; A.proj = { title: 'призрак' }; A.state = 'working'; B.state = 'driving'; const far = city.lots[(city.lots.length / 2) | 0]; C.state = 'returning'; sendTo(C, far.x, far.z, () => { C.state = 'idle'; C.tagArrived = 1; }); C.state = 'returning'; C.moveD = 2; const before = __dbg.units(); const log = unitRepair(); return { log, before: before.slice(0, 3), after: __dbg.units().slice(0, 3), arrived: !!C.tagArrived }; },   /* #12: изкуствено заседнала техника → unitRepair */
+    peds: () => { let ov = 0; for (let i = 0; i < peds.length; i++) for (let j = i + 1; j < peds.length; j++) if (Math.hypot(peds[i].x - peds[j].x, peds[i].z - peds[j].z) < 0.4) ov++; return { n: peds.length, want: wantedPeds(), waiting: peds.filter(p => p.wt > 0).length, maxWt: Math.round(Math.max(0, ...peds.map(p => p.wt || 0))), overlaps: ov, anim: peds.filter(p => p.wa && p.ia).length }; },   /* #10 */
     moverHits() { if (!tr2) return null; const M = moversNow(); let n = 0; for (const m of M) for (const c of tr2.cars) if (Math.hypot(c.x - m.x, c.z - m.z) < 2.5) n++; return { movers: M.length, hits: n, yielding: tr2.cars.filter(c => c.why === 'машина отпред').length, waiting: units.filter(u => u.wb > 0).length }; },   /* самосвалът през колите: колко коли са върху техниката извън трафика */
     unitTest() { const u = units.find(q => q.state === 'idle'); if (!u) return null; const far = [...city.lots].sort((a, b) => Math.hypot(b.x - u.x, b.z - u.z) - Math.hypot(a.x - u.x, a.z - u.z))[0]; u.state = 'driving'; sendTo(u, far.x, far.z, () => { u.state = 'idle'; }); return [u.type, Math.round(Math.hypot(far.x - u.x, far.z - u.z))]; },   /* junction-paths: машина до най-далечния парцел */
     tirTest(m = 'sand', delay = 0) { sendTir({ id: 9e8 + ((Math.random() * 1e6) | 0), matId: m, qty: 1 }, delay); return tirs.list.length; },   /* junction-paths: пробен ТИР (поръчката не съществува — складът не се променя) */

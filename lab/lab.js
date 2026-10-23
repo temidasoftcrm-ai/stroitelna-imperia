@@ -246,7 +246,7 @@ function renderReview(tab = 'review') {
   if ($('bDone')) $('bDone').onclick = () => { showDone = !showDone; render(); };
   const f = FEATURES.find(x => x.id === state.item);
   if (!f) { $('main').innerHTML = tab === 'done' ? `<div class="empty">Тук са проверените: избери отляво, за да го видиш пак или да го махнеш от играта.</div>` : `<div class="empty">Новото чака проверка: избери отляво, пробвай и натисни „✓ OK“ — тогава влиза в играта.</div>`; return; }
-  const fh = f.url.startsWith('#') ? new URLSearchParams(f.url.slice(1)) : null, mUrl = fh && fh.get('tab') === 'models' ? fh.get('item') : null, sUrl = fh && fh.get('tab') === 'sounds' ? fh.get('item') : null;
+  const fh = (f.url || '').startsWith('#') ? new URLSearchParams(f.url.slice(1)) : null, mUrl = fh && fh.get('tab') === 'models' ? fh.get('item') : null, sUrl = fh && fh.get('tab') === 'sounds' ? fh.get('item') : null;
   if (sUrl) {   // нов звук: пуска се тук, с „✓ OK“ отдолу
     closeModel();
     $('main').innerHTML = `<div class="snd"><h2>${esc(sUrl.replace(/^s:/, ''))}</h2><small style="color:var(--mut)">${sUrl.startsWith('s:') ? 'синтезиран в sound.js — новата версия' : esc(sUrl)}</small><button class="btn ok" id="bPlay">▶ Пусни</button></div><div class="bar" id="bar"></div>`;
@@ -256,7 +256,7 @@ function renderReview(tab = 'review') {
     $('main').innerHTML = `<div id="view" style="position:absolute;inset:0"></div><div class="bar" id="bar"></div>`;
     bar(`Ново: ${f.title} (${f.id})`, [`<button class="btn" id="bWire">Мрежа</button>`, `<button class="btn" id="bBg">Светъл фон</button>`]);
     openModel($('view'), mUrl);
-  } else if (!fh) { closeModel(); frame(f.url, `Ново: ${f.title} (${f.id})`); }
+  } else if (!fh) { closeModel(); frame(f.url || 'index.html', `Ново: ${f.title} (${f.id})`); }
   else {   // демо или сцена от другите раздели — също тук, за да е до „✓ OK“
     closeModel();
     const it = fh.get('item') || '', tb = fh.get('tab');
