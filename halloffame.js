@@ -191,7 +191,7 @@ export function openHallOfFame({ k, tier = 'gold', onClose } = {}) {
   function close() {
     if (shut) return; shut = true; window.__overlay3d = Math.max(0, (window.__overlay3d || 1) - 1); removeEventListener('resize', onResize); removeEventListener('keydown', onKey);
     el.classList.remove('on');
-    setTimeout(() => { cancelAnimationFrame(raf); if (mixer) mixer.stopAllAction(); if (trophy) trophy.dispose(); for (const x of own) x.dispose && x.dispose(); scene.environment && scene.environment.dispose(); pmrem.dispose(); renderer.dispose(); el.remove(); try { onClose && onClose(); } catch { } }, 450);
+    setTimeout(() => { cancelAnimationFrame(raf); if (mixer) mixer.stopAllAction(); if (trophy) trophy.dispose(); for (const x of own) x.dispose && x.dispose(); scene.environment && scene.environment.dispose(); pmrem.dispose(); renderer.dispose(); renderer.forceContextLoss(); el.remove(); try { onClose && onClose(); } catch { } }, 450);
   }
   window.__fame = { close, scene, cam };
   return { close };

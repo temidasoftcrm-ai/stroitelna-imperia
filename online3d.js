@@ -177,6 +177,6 @@ export async function createCity3D(el, { onProgress } = {}) {
     setCity, syncBuilds,
     setServerTime(iso) { offset = Date.parse(iso) - Date.now(); },
     focusLot(lot) { const l = own[(lot - 1) % OWN_LOTS]; controls.target.set(l.x, 0, l.z); camera.position.set(l.x + 45, 55, l.z + 60); },
-    dispose() { renderer.setAnimationLoop(null); renderer.dispose(); el.removeChild(renderer.domElement); },
+    dispose() { renderer.setAnimationLoop(null); renderer.dispose(); renderer.forceContextLoss(); el.removeChild(renderer.domElement); },
   };
 }

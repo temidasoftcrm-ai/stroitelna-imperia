@@ -925,7 +925,7 @@ export function openBoardroom(o) {
       // #1: материалите и rendererът — след като компилациите на шейдърите приключат (иначе three хвърля „reading 'isReady'“)
       const fin = (n = 0) => { if (compiling > 0 && n < 40) return setTimeout(() => fin(n + 1), 250);
         scene.traverse(c => { if (c.isMesh && !c.isSkinnedMesh) { c.geometry.dispose(); const ms = [].concat(c.material); ms.forEach(mm => { if (mm.userData && mm.userData.shared) return; mm.map && mm.map.dispose(); mm.dispose(); }); } });
-        holo.dispose(); scene.environment && scene.environment.dispose(); pmrem.dispose(); renderer.dispose(); el.remove(); }; fin();
+        holo.dispose(); scene.environment && scene.environment.dispose(); pmrem.dispose(); renderer.dispose(); renderer.forceContextLoss(); el.remove(); }; fin();
     }, 450);
   }
   function bonus(k, amount) {   // money-real: пачките се плъзгат по масата към директора

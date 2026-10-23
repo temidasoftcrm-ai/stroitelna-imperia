@@ -42,7 +42,7 @@ function labelSprite(text, color = '#fff') {
 
 export function openGlobe(data) {
   let el = document.getElementById('globeView');
-  if (el) el.remove();
+  if (el) { const b = el.querySelector('#globeClose'); b && b.onclick ? b.click() : el.remove(); }   // старият глобус се затваря изцяло (контекст, текстури)
   el = document.createElement('div'); el.id = 'globeView';
   el.style.cssText = 'position:fixed;inset:var(--topH,52px) 0 0 0;z-index:9;background:#02040a';
   el.innerHTML = `<div style="position:absolute;left:16px;bottom:16px;z-index:2;background:rgba(10,16,26,.82);border:1px solid var(--line);border-radius:14px;padding:12px 16px;color:#fff;max-width:340px">
@@ -98,7 +98,7 @@ export function openGlobe(data) {
   function close() {
     alive = false; removeEventListener('resize', size); ctl.dispose();
     sc.traverse(o => { o.geometry?.dispose?.(); const m = o.material; if (m) (Array.isArray(m) ? m : [m]).forEach(mm => { mm.map?.dispose?.(); mm.dispose(); }); });
-    r.dispose(); el.remove(); data.onClose && data.onClose();
+    r.dispose(); r.forceContextLoss(); el.remove(); data.onClose && data.onClose();
   }
   el.querySelector('#globeClose').onclick = close;
   return { close };

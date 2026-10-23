@@ -10849,6 +10849,10 @@ if (AUTOTEST) {
         rows.push([k, Math.round(t / 2 ** 20), Math.round(gm / 2 ** 20)]); }
       const tot = rows.reduce((a, r) => [a[0] + r[1], a[1] + r[2]], [0, 0]);
       return { models: rows.length, texMB: tot[0], geoMB: tot[1], top: rows.sort((a, b) => (b[1] + b[2]) - (a[1] + a[2])).slice(0, 25).map(r => `${r[0]} t${r[1]} g${r[2]}`) }; },
+    texImg(close) { const tex = new Set(), by = {}; scene.traverse(o => { for (const m of [].concat(o.material || [])) for (const k in m) if (m[k] && m[k].isTexture) tex.add(m[k]); }); let n = 0;   /* 🧠 какво държат текстурите в паметта (тип на картинката → MB); close — пуска ImageBitmap на качените (опит) */
+      for (const t of tex) { const im = t.image, ty = im ? im.constructor.name : 'none', mb = im && im.width ? im.width * im.height * 4 / 2 ** 20 : 0; by[ty] = by[ty] || [0, 0]; by[ty][0]++; by[ty][1] += mb;
+        if (close && im instanceof ImageBitmap && renderer.properties.get(t).__webglTexture) { im.close(); n++; } }
+      for (const k in by) by[k][1] = Math.round(by[k][1]); return { by, closed: n }; },
     mem() { const i = renderer.info, tex = new Set(), geo = new Set(), mat = new Set(); let objs = 0; scene.traverse(o => { objs++; if (o.geometry) geo.add(o.geometry); for (const m of [].concat(o.material || [])) { mat.add(m); for (const k in m) if (m[k] && m[k].isTexture) tex.add(m[k]); } });
       let texMB = 0; for (const t of tex) { const im = t.image; if (im && im.width) texMB += im.width * im.height * 4 * (t.generateMipmaps !== false ? 1.33 : 1) / 2 ** 20; }
       return { gGeo: i.memory.geometries, gTex: i.memory.textures, progs: i.programs?.length, calls: i.render.calls, tris: i.render.triangles, objs, sceneGeo: geo.size, sceneMat: mat.size, sceneTex: tex.size, texMB: Math.round(texMB) }; },
