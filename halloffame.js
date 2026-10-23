@@ -118,17 +118,39 @@ export function openHallOfFame({ k, tier = 'gold', onClose } = {}) {
     g.font = '600 34px system-ui, sans-serif'; g.fillText(A.who, w / 2, 280, w - 70); g.fillText(T.nm.toUpperCase(), w / 2, 340, w - 70);
   })), roughness: 0.35, metalness: 0.6 })));
   plate.position.set(0, 0.45, 0.252); plate.scale.setScalar(0.85); pod.add(plate);
+  // микрофоните: два на гъша шия + пресгрупа с цветни флагчета на медиите
+  const black = mat(0x15161a, 0.5, 0.4), steel = mat(0x9aa0a6, 0.3, 0.9);
+  for (const sx of [-1, 1]) { const c = new THREE.QuadraticBezierCurve3(new THREE.Vector3(sx * 0.16, 0.9, 0.12), new THREE.Vector3(sx * 0.16, 1.18, 0.1), new THREE.Vector3(sx * 0.07, 1.24, -0.08));
+    const neck = new THREE.Mesh(M(new THREE.TubeGeometry(c, 16, 0.008, 6)), steel); pod.add(neck); const head = new THREE.Mesh(M(new THREE.CapsuleGeometry(0.018, 0.05, 4, 8)), black); head.position.set(sx * 0.07, 1.24, -0.09); head.rotation.x = Math.PI / 2 - 0.4; pod.add(head);
+    const base = new THREE.Mesh(M(new THREE.CylinderGeometry(0.03, 0.035, 0.03, 12)), black); base.position.set(sx * 0.16, 0.9, 0.12); pod.add(base); }
+  const FLAG = [0xd62828, 0x1f5fbf, 0x2d8f4e, 0xffb300, 0xf2f2f2];
+  FLAG.forEach((col, i) => { const a = (i - 2) * 0.22, mic = new THREE.Group(); mic.position.set(Math.sin(a) * 0.12, 0.93, 0.18 - Math.cos(a) * 0.04); mic.rotation.set(-0.9, a * 0.8, 0); pod.add(mic);
+    const h = new THREE.Mesh(M(new THREE.CylinderGeometry(0.012, 0.014, 0.16, 8)), black); h.position.y = 0.08; mic.add(h);
+    const ball = new THREE.Mesh(M(new THREE.SphereGeometry(0.022, 10, 8)), mat(0x2a2c30, 0.8)); ball.position.y = 0.17; mic.add(ball);
+    const fl = new THREE.Mesh(M(new THREE.BoxGeometry(0.05, 0.035, 0.05)), mat(col, 0.5)); fl.position.y = 0.12; mic.add(fl); });
   // снимката (assets/ui/directors/<модел>.webp) — голям фон зад трибуната, в златна рамка
-  const photo = new THREE.Group(); photo.position.set(0, 2.05, -1.9); photo.scale.setScalar(0.72); scene.add(photo);
+  // стената зад сцената: тъмна ламперия с пиластри и златни кантове; снимката — окачена на нея, в рамка
+  const wallM = mat(0x2b1f18, 0.55, 0.05), wall = new THREE.Mesh(M(new THREE.BoxGeometry(9, 4.8, 0.2)), wallM); wall.position.set(0, 2.4, -2.15); wall.receiveShadow = true; scene.add(wall);
+  for (const x of [-3.3, -1.75, 1.75, 3.3]) { const pl = new THREE.Mesh(M(new THREE.BoxGeometry(0.28, 4.8, 0.12)), mat(0x3b2a20, 0.45, 0.05)); pl.position.set(x, 2.4, -2.0); pl.receiveShadow = true; scene.add(pl); }
+  for (const y of [0.55, 4.3]) { const tr = new THREE.Mesh(M(new THREE.BoxGeometry(9, 0.04, 0.06)), gold); tr.position.set(0, y, -2.02); scene.add(tr); }
+  const photo = new THREE.Group(); photo.position.set(0, 2.35, -1.99); photo.scale.setScalar(0.62); scene.add(photo);
   const frame = new THREE.Mesh(M(new THREE.BoxGeometry(3.3, 4.1, 0.08)), gold); frame.castShadow = false; photo.add(frame);
   const pic = new THREE.Mesh(M(new THREE.PlaneGeometry(3.1, 3.9)), M(new THREE.MeshBasicMaterial({ color: 0x222222, toneMapped: false }))); pic.position.z = 0.045; photo.add(pic);
   // прожектори: топъл отпред към трибуната, хладен — към снимката
   const key = new THREE.SpotLight(0xfff0d0, 60, 14, 0.42, 0.5, 1.6); key.position.set(1.6, 5.2, 4.2); key.target.position.set(0, 1.2, 0.3); key.castShadow = true; key.shadow.mapSize.set(1024, 1024); scene.add(key, key.target);
-  const rim = new THREE.SpotLight(0xbfd6ff, 30, 12, 0.5, 0.6, 1.6); rim.position.set(-2.4, 4.6, 2.5); rim.target.position.set(0, 2.05, -1.9); scene.add(rim, rim.target);
+  const rim = new THREE.SpotLight(0xbfd6ff, 30, 12, 0.5, 0.6, 1.6); rim.position.set(-2.4, 4.6, 2.5); rim.target.position.set(0, 2.35, -1.99); scene.add(rim, rim.target);
   const back = new THREE.PointLight(0xffd890, 4, 6, 1.5); back.position.set(0, 1.4, -1.2); scene.add(back);
   // статуетката — на малък пиедестал до трибуната
-  const ped = new THREE.Mesh(M(new THREE.CylinderGeometry(0.2, 0.24, 0.9, 32)), wood); ped.position.set(1.15, 0.63, 0.65); ped.castShadow = true; scene.add(ped);
-  let trophy = null; makeTrophy(k, tier, 0.42).then(t => { if (shut) { t.dispose(); return; } trophy = t; t.group.position.set(1.15, 1.09, 0.65); scene.add(t.group); });
+  const ped = new THREE.Mesh(M(new THREE.CylinderGeometry(0.2, 0.24, 0.9, 32)), wood); ped.position.set(1.0, 0.63, 0.65); ped.castShadow = true; scene.add(ped);
+  let trophy = null; makeTrophy(k, tier, 0.42).then(t => { if (shut) { t.dispose(); return; } trophy = t; const b = new THREE.Box3().setFromObject(t.group), sz = b.getSize(new THREE.Vector3()), f = Math.min(1, 0.36 / Math.max(sz.x, sz.z, 0.01), 0.42 / Math.max(sz.y, 0.01)); t.group.scale.multiplyScalar(f); t.group.position.set(1.0, 1.09, 0.65); scene.add(t.group); });   // широките (влакът) — вписани
+  // фотографите — силуети под сцената отстрани, със светкавици (и мигаща светлина върху директора)
+  const dark = mat(0x0c0d10, 0.9), flashT = M(canvasTex(128, 128, (g, w) => { const r = g.createRadialGradient(64, 64, 0, 64, 64, 64); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.25, 'rgba(230,240,255,.7)'); r.addColorStop(1, 'rgba(230,240,255,0)'); g.fillStyle = r; g.fillRect(0, 0, w, w); }));
+  const shooters = [[-2.3, 1.7], [-1.8, 2.3], [2.0, 1.9], [2.5, 2.4], [-2.7, 2.6]].map(([x, z]) => { const g2 = new THREE.Group(); g2.position.set(x, 0, z); g2.lookAt(0, 0, 0.3); scene.add(g2);
+    const body = new THREE.Mesh(M(new THREE.CapsuleGeometry(0.2, 0.85, 4, 10)), dark); body.position.y = 0.72; g2.add(body); const head = new THREE.Mesh(M(new THREE.SphereGeometry(0.12, 12, 10)), dark); head.position.y = 1.45; g2.add(head);
+    const cm = new THREE.Mesh(M(new THREE.BoxGeometry(0.16, 0.11, 0.1)), dark); cm.position.set(0, 1.45, 0.16); g2.add(cm);
+    const sp = new THREE.Sprite(M(new THREE.SpriteMaterial({ map: flashT, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 }))); sp.position.set(0, 1.5, 0.25); sp.scale.setScalar(0.6); g2.add(sp);
+    return { g: g2, sp, next: 1 + Math.random() * 2, k: 0 }; });
+  const flashL = new THREE.PointLight(0xeaf2ff, 0, 9, 1.4); scene.add(flashL);
   // аватарът — прав зад трибуната; говори, после кима
   let mixer = null, talkT = 0; const sub = el.querySelector('.sub'), subT = sub.querySelector('span');
   directorRig(dk).then(r => {
@@ -141,22 +163,26 @@ export function openHallOfFame({ k, tier = 'gold', onClose } = {}) {
     const wrap = new THREE.Group(); wrap.add(m); wrap.position.set(0, 0.18, 0.1); scene.add(wrap);
     mixer = new THREE.AnimationMixer(m); const C = r.clips, act = n => C[n] ? mixer.clipAction(C[n]) : null;
     const idle = act(r.fem && C.Female_Idle ? 'Female_Idle' : 'Idle_Standing') || act('Idle_Breathing'), talk = act(r.fem ? 'Talk_Conversation' : 'Talk_Two_Hands') || act('Talk_Conversation'), nod = act('Agree_Yes');
-    if (idle) idle.play();
+    const base = talk ? mixer.clipAction(talk.getClip().clone()) : idle; if (base) { base.timeScale = 0.4; base.setEffectiveWeight(0.8); base.play(); }   // бавни жестове над трибуната (не отпуснати ръце)
+    if (idle && !base) idle.play();
     { mixer.update(0); m.position.set(0, 0, 0); m.scale.setScalar(1); wrap.updateMatrixWorld(true); const v = new THREE.Vector3(), yOf = n => { const b = m.getObjectByName(n); return b ? b.getWorldPosition(v).y : null; };   // ръстът — по костите в позата (кутията на скелетния модел лъже)
       const head = yOf('mixamorigHeadTop_End') ?? yOf('mixamorigHead'), toes = [yOf('mixamorigLeftToeBase'), yOf('mixamorigRightToeBase'), yOf('mixamorigLeftFoot')].filter(x => x != null), foot = toes.length ? Math.min(...toes) : 0;
       if (head != null && head - foot > 0.01) { const k = (r.fem ? 1.68 : 1.78) / ((head - foot) * (yOf('mixamorigHeadTop_End') != null ? 1 : 1.1)); m.scale.setScalar(k); wrap.updateMatrixWorld(true); const f2 = Math.min(...[yOf('mixamorigLeftToeBase'), yOf('mixamorigRightToeBase')].filter(x => x != null)); if (isFinite(f2)) m.position.y = wrap.position.y - f2; } }
     setTimeout(() => { if (shut) return; subT.textContent = ''; sub.classList.add('on'); let i = 0; const typ = setInterval(() => { if (shut) return clearInterval(typ); subT.textContent = line.slice(0, ++i); if (i >= line.length) clearInterval(typ); }, 32);
-      if (talk) { talk.reset().setEffectiveWeight(1).fadeIn(0.4).play(); if (idle) idle.fadeOut(0.4); talkT = Math.max(3.5, line.length * 0.055); } }, 1400);
+      if (talk) { talk.reset().setEffectiveWeight(1).fadeIn(0.4).play(); if (base) base.fadeOut(0.4); talkT = Math.max(3.5, line.length * 0.055); } }, 1400);
     // след изявлението — кимва и се връща в покой
     mixer.addEventListener('loop', () => {});
-    const end = () => { if (shut || !talk) return; talk.fadeOut(0.5); if (nod) { nod.reset().setLoop(THREE.LoopOnce, 1).fadeIn(0.4).play(); nod.clampWhenFinished = false; } if (idle) idle.reset().fadeIn(0.6).play(); };
+    const end = () => { if (shut || !talk) return; talk.fadeOut(0.5); if (nod) { nod.reset().setLoop(THREE.LoopOnce, 1).fadeIn(0.4).play(); nod.clampWhenFinished = false; } if (base) base.reset().fadeIn(0.6).play(); };
     setTimeout(end, 1400 + Math.max(3500, line.length * 55) + 800);
   }).catch(e => console.warn('hall-fame', e));
   // камерата: бавно приближаване към трибуната
   let t = 0, raf = 0, shut = false; const clock = new THREE.Clock();
   const loop = () => { raf = requestAnimationFrame(loop); const dt = Math.min(0.05, clock.getDelta()); t += dt;
-    const e = Math.min(1, t / 7), s = 1 - Math.pow(1 - e, 3); cam.position.set(Math.sin(t * 0.12) * 0.45, 1.7 - 0.1 * s, 5.6 - 2.3 * s); cam.lookAt(0.2, 1.45, -0.3);
-    if (mixer) mixer.update(dt); if (trophy) trophy.group.rotation.y = t * 0.6; key.intensity = 60 * Math.min(1, t / 1.2);
+    const e = Math.min(1, t / 7), s = 1 - Math.pow(1 - e, 3); cam.position.set(Math.sin(t * 0.12) * 0.45, 1.7 - 0.1 * s, 5.9 - 2.1 * s); cam.lookAt(0.2, 1.45, -0.3);
+    if (mixer) mixer.update(dt);
+    let fl = 0; for (const q of shooters) { q.next -= dt; if (q.next <= 0 && t > 1.2) { q.k = 1; q.next = 0.4 + Math.random() * 2.2 + (Math.random() < 0.3 ? 0 : 0.8); q.sp.getWorldPosition(flashL.position); }   // светкавици: на случаен интервал, понякога серия
+      q.k = Math.max(0, q.k - dt * 7); q.sp.material.opacity = q.k; q.sp.scale.setScalar(0.4 + q.k * 0.6); fl = Math.max(fl, q.k); }
+    flashL.intensity = fl * 45; if (trophy) trophy.group.rotation.y = t * 0.6; key.intensity = 60 * Math.min(1, t / 1.2);
     renderer.render(scene, cam); };
   loop();
   const onResize = () => { renderer.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); };
