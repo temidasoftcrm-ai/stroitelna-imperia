@@ -2368,7 +2368,8 @@ function makePed() {
   scene.add(m);
   const mixer = new THREE.AnimationMixer(m);
   const walk = src.animations.find(c => c.name === 'Walk') || src.animations.find(c => /Walk/.test(c.name));
-  if (walk) mixer.clipAction(walk).play();
+  const wa = walk ? mixer.clipAction(walk) : null; if (wa) wa.play();
+  const idleC = src.animations.find(c => /Idle/.test(c.name)), ia = idleC ? mixer.clipAction(idleC) : null; if (ia) { ia.play(); ia.setEffectiveWeight(0); }   // #10: чакащият пред зебрата стои (не замръзва насред крачка)
   mixer.update(Math.random() * 2);
   let i = 3 * ((Math.random() * NBI) | 0), j = (Math.random() * NJ) | 0;
   for (let k = 0; k < 40 && !isRoad(i, j); k++) { i = 3 * ((Math.random() * NBI) | 0); j = (Math.random() * NJ) | 0; }   // не по улица под площад/парк (Белия дом, поръчките) — иначе стои на тревата
