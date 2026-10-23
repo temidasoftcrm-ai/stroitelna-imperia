@@ -47,7 +47,7 @@ export function billboardSpots(roads, { max = 8, gap: gap0, widthOf, avoid, size
       while (acc + d >= next && out.length < max) {
         const f = (next - acc) / d, x = x0 + (x1 - x0) * f, z = z0 + (z1 - z0) * f, dx = (x1 - x0) / d, dz = (z1 - z0) / d, nx = -dz * side, nz = dx * side, k = (sizeAt && sizeAt(x, z, r, out.length)) || sizeFor(out.length, r), fw = widthOf ? widthOf(out.length, k) : 12, off = (r.w || 12) / 2 + 2 + fw / 2 * 0.95;   // платното е напречно на пътя — отстъп колкото половината му ширина
         const p = { x: x + nx * off, z: z + nz * off, ry: Math.atan2(dx * side, dz * side) + side * 0.35 };   // лицето — срещу идващите коли, леко към платното
-        if (avoid && avoid(p.x, p.z, fw, x, z)) { next += 12; continue; }   // забранено място — малко по-нататък по улицата
+        if (avoid && avoid(p.x, p.z, fw, x, z, p.ry)) { next += 12; continue; }   // забранено място — малко по-нататък по улицата
         if (!out.some(q => Math.hypot(q.x - p.x, q.z - p.z) < Math.max(gap * 0.6, (fw + (q.fw || 12)) / 2 + 4))) { p.fw = fw; p.k = k; out.push(p); side = -side; }
         next += gap;
       }
@@ -186,6 +186,7 @@ export function buildBillboards(group, o = {}) {
   const api = { group: g, spots,
     setNight(k = 0) { night = k; for (const b of boards) for (const m of b.mats) m.emissiveIntensity = 0.05 + 0.75 * k; if (fallback) fallback.setNight(k); },
     update(dt) { for (const b of boards) if (b.mixer) b.mixer.update(dt); },
+    cull(fn) { spots.forEach((s, i) => { s.hidden = !!fn(s); if (boards[i]) boards[i].root.visible = !s.hidden; }); },   // bb-clear: билборд, върху чието място се е появила сграда/строеж — скрит
     dispose() { alive = false; group.remove(g); for (const b of boards) b.dispose(); if (fallback) fallback.dispose(); } };
   if (!spots.length) return api;
   const brand = { ...(o.brand || {}), company: o.company };

@@ -3014,6 +3014,18 @@ const BB_PANO = [{ url: 'assets/ui/billboards/imperial-3.webp', logo: 'center', 
 const BB_IMAGES = { imperial: [{ url: 'assets/ui/billboards/imperial-1.webp', logo: 'left' }, { url: 'assets/ui/billboards/imperial-2.webp', logo: 'right' }, ...BB_PANO] };
 const isImperial = b => !!b && /империал|imperial/i.test(`${b.nm} ${b.k}`), bbImages = b => isImperial(b) ? BB_IMAGES.imperial : BB_PANO;
 // bb-place (т. 10/19): билбордовете не на кръстовища, кръгови (пръстенът + 15 м), зебри и до централата; големите 12 × 4 — само в покрайнините (към изходите), в центъра — средни и малки
+// bb-clear (#17): платното на билборда (отсечка с ширина fw по посоката ry, 5 точки) срещу парцелите (правоъгълникът + 2 м) и забележителностите (кутията + 2 м)
+function bbHits(x, z, fw, ry = 0) {
+  if (!feature('bb-clear')) return false;
+  const ux = Math.cos(ry || 0), uz = -Math.sin(ry || 0), pts = [-0.5, -0.25, 0, 0.25, 0.5].map(t => [x + ux * fw * t, z + uz * fw * t]);
+  for (const l of city.lots || []) { const half = Math.max(l.w || 16, l.d || 16) / 2 + 2, c = Math.cos(l.rot || 0), sn = Math.sin(l.rot || 0);
+    for (const [px, pz] of pts) { const dx = px - l.x, dz = pz - l.z; if (Math.abs(dx * c - dz * sn) < half && Math.abs(dx * sn + dz * c) < half) return true; } }
+  for (const o of city.landmarks || []) { if (!o.group || !o.group.parent) continue; const now = performance.now(); if (!o.bbBox || now - o.bbT > 5000) { o.bbBox = new THREE.Box3().setFromObject(o.group); o.bbT = now; } const b = o.bbBox;   // моделите (GLB) идват по-късно — кутията се обновява
+    if (!b.isEmpty() && pts.some(([px, pz]) => px > b.min.x - 2 && px < b.max.x + 2 && pz > b.min.z - 2 && pz < b.max.z + 2)) return true; }
+  return false;
+}
+let bbCullT = 0;
+const bbCull = () => { if (city.billboards && city.billboards.cull && feature('bb-clear')) city.billboards.cull(s => bbHits(s.x, s.z, s.fw || 12, s.ry)); };
 function bbPlaceOpts() {
   if (!feature('bb-place')) return {};
   const P = city.plan, p2 = P && P.p2, off = (P && P.offset) || [0, 0], bad = [];
@@ -3022,7 +3034,7 @@ function bbPlaceOpts() {
   if (city.hq) bad.push([city.hq.x, city.hq.z, 45]);   // централата, гаражът и складът до нея
   const pc = p2 && p2.center, c = p2 ? [(pc ? (pc.x ?? pc[0]) : 0) + off[0], (pc ? (pc.z ?? pc[1]) : 0) + off[1]] : city.hq ? [city.hq.x, city.hq.z] : [0, 0], R = (p2 && p2.R) || 300;
   return {
-    avoid: (x, z, fw, ax, az) => bad.some(([bx, bz, r]) => Math.hypot(x - bx, z - bz) < r + fw / 2 || Math.hypot(ax - bx, az - bz) < r)
+    avoid: (x, z, fw, ax, az, ry) => bbHits(x, z, fw, ry) || bad.some(([bx, bz, r]) => Math.hypot(x - bx, z - bz) < r + fw / 2 || Math.hypot(ax - bx, az - bz) < r)
       || (city.lots || []).some(l => l.plan && Math.hypot(x - l.x, z - l.z) < Math.min(l.w, l.d) / 2 + fw / 4),   // не върху парцел (строеж, сграда или бъдеща сграда)
     sizeAt: (x, z, r, i) => Math.hypot(x - c[0], z - c[1]) > R * 0.62 && (r.main || (r.w || 0) >= 14) ? 'large' : i % 2 ? 'small' : 'medium',
   };
@@ -10397,6 +10409,7 @@ function frame() {
   if (city.p2Pending && city.planView) { const pv = city.planView; pv.userData.pump(4); if (pv.userData.done) { city.p2Pending = false; try { planViewDone(pv, city.plan); } catch (e) { console.warn('planView', e); } if (renderer.compileAsync) renderer.compileAsync(scene, camera).catch(() => {}); } }   /* ⚡ шейдърите на поетапно построения град — паралелно */   // поетапното строене на града — до 4 ms на кадър
   if (city.osmView) { const d = camera.position.distanceTo(controls.target); osmFog.near = Math.max(180, d * 0.9); osmFog.far = Math.max(420, d * 2.4 + 200); }   // weather.js я прилага (fogBase)
   if ((++lmLabT % 60) === 0) try { updLmLabels(); if (lmLabT % 600 === 0) updGasLogos(); } catch (e) { }
+  if (performance.now() - bbCullT > 3000) { bbCullT = performance.now(); try { bbCull(); } catch (e) { } }   // bb-clear: нов строеж/квартал върху място на билборд
   if (lmLabT % 20 === 0) try { updMyBeams(); } catch (e) { myBeams.err = e.message; }
   if (lmLabT % 120 === 0 && city.p2Map && city.planView && city.planView.userData.refill) { let sig = 0; for (const l of city.lots) if (l.busy || l.built) sig = (sig * 31 + l.id + 1) | 0; if (sig !== city.p2Sig) { city.p2Sig = sig; try { city.planView.userData.refill(); } catch (e) { } } }   // купен/застроен/освободен парцел → фоновите квартали и празните места наново
   if (lmLabT % 60 === 30) try { realSwapTick(); } catch (e) { }   // №2 (55): истинските модели на техниката, когато пристигнат
