@@ -483,7 +483,7 @@ const MODELS = {
   commercial2: ['building-skyscraper-d', 'building-skyscraper-e'],   // building-i…n (детските) са изтрити — вместо тях истинските от heavy/blocks2 (blk2Pick)
   trains: ['track', 'train-carriage-box', 'train-carriage-flatbed-wood', 'train-carriage-coal', 'train-carriage-container-red', 'train-carriage-container-blue', 'train-carriage-lumber'],
   highway: HW_MODELS.highway,
-  vehicles: ['tractor', 'tractor-shovel', 'truck', 'truck-flat', 'sedan', 'taxi', 'suv', 'van', 'police', 'sedan-sports', 'suv-luxury', 'hatchback-sports'],
+  vehicles: [],   // №2 (55, потребителят: „тези модели не трябва да се ползват“): детските коли/техника на Kenney вече не се зареждат — всичко е с истинските (sf-*)
   // Kenney City Kit Industrial (CC0): заводи в градовете с доставчици
   industrial: ['building-a', 'building-b', 'building-c', 'building-d', 'building-e', 'building-f', 'building-g', 'building-h', 'building-i', 'building-j', 'building-k', 'building-l', 'water-tower', 'windmill', 'solar-panel-landscape-group', 'solar-panel-portrait-group'],
   // Majadroid House Construction Site (CC0): кула-кран и реквизит за строежите
@@ -669,10 +669,13 @@ const extNeed = () => extNeedOf(S.cityId);   // за завършване на �
 // квадратна спирала от квартали около ядрото (0,0): пояс 1 — (1,0),(0,1),(1,1); пояс 2 — (2,0),(2,1),(0,2),(1,2),(2,2)…
 function spiralSlots(n) { const o = []; for (let r = 1; o.length < n; r++) { for (let dy = 0; dy < r && o.length < n; dy++) o.push([r, dy]); for (let dx = 0; dx <= r && o.length < n; dx++) o.push([dx, r]); } return o; }
 const megaExtra = ext => { const big = Math.min(ext, (S && S.extBig) || 0); return megaBase * NB + (big * MEGA_EXT_OLD + (ext - big) * MEGA_EXT_COLS) * NB; };   // парцелите на мегаполиса след ядрото
+// #26 (lots-tier): в новите игри всеки купен квартал на град с решетка носи 2 колони (малък град, 18 парцела) или 3 (среден/голям, 27) — досега 1 (9).
+// Записва се в играта (S.extCols) — старите игри остават с 1 колона и същите номера на парцелите (новите колони са само на изток, след старите).
+const extColsT = id => (S && S.extCols && S.extCols[cityTier(id)]) || 1;
 function setCityExt(ext, base = megaBase) {
   megaBase = base;
   if (base) { megaSlots = spiralSlots(Math.ceil(megaExtra(ext) / (NB * NB))); NBI = NB * (1 + Math.max(...megaSlots.map(s => s[0]))); NBJ = NB * (1 + Math.max(...megaSlots.map(s => s[1]))); }
-  else { megaSlots = []; NBI = NB + ext; NBJ = NB; }
+  else { megaSlots = []; NBI = NB + ext * extColsT(S && S.cityId); NBJ = NB; }
   NI = 3 * NBI + 1; NJ = 3 * NBJ + 1;
 }
 // стари записи на мегаполис с купени квартали: id-тата на купените парцели се изместват след мегаполисните
@@ -2028,7 +2031,7 @@ function spawnUnit(type, at) {
   const sf = A[SF_VEH[type]] ? SF_VEH[type] : null;
   const nm = A[VEH_MODEL[type]] ? VEH_MODEL[type] : 'truck', bs = VEH_LEN[type] && A[nm] ? sizeOf(nm).getSize(new THREE.Vector3()) : null;
   // №2 (55): без детски модели — ако истинският още не е зареден (възстановяване на записа), празно място, което realSwapTick() пълни, щом пристигне
-  const obj = sf ? model(sf, SF_LEN[type]) : SF_VEH[type] ? (g => { g.userData.waitReal = [SF_VEH[type], SF_LEN[type]]; g.userData.src = SF_VEH[type]; return g; })(new THREE.Group()) : model(nm, bs ? VEH_LEN[type] / Math.max(bs.x, bs.z, 1e-3) : A[VEH_MODEL[type]] ? VEH_SCALE[type] || VSCALE : VSCALE);
+  const obj = sf ? model(sf, SF_LEN[type]) : SF_VEH[type] ? (g => { g.userData.waitReal = [SF_VEH[type], SF_LEN[type]]; g.userData.src = SF_VEH[type]; return g; })(new THREE.Group()) : !A[nm] ? new THREE.Group() /* №2: детският 'truck' вече не се зарежда */ : model(nm, bs ? VEH_LEN[type] / Math.max(bs.x, bs.z, 1e-3) : A[VEH_MODEL[type]] ? VEH_SCALE[type] || VSCALE : VSCALE);
   if (feature('site-anim') && sf && SITE_RIG[type]) { const [k, c, ev] = SITE_RIG[type], rg = swapRig(obj, A, k, c, { every: ev }); if (rg) obj.userData.rig = rg; }   /* site-anim (55): раздвижените в Blender машини — багер, самосвал, трактор-багер, валяк, грейдер */
   if (type === 'crew' && sf && feature('crew-van')) { addVanLogo(obj, brandOf(S)); obj.userData.doors = vanDoors(obj); }
   if (type === 'crane' && !sf) {
@@ -2933,6 +2936,7 @@ const projects = [];   // активните обекти (огледало на
 function newGame(cityId, brand = null, brandNm = '') {
   pruneCities(null);
   S = { v: 1, brand, cityId, hqCity: cityId, cities: {}, day: 1, dayT: 0, rep: 0, cash: [], officeLevel: 1, garageLevel: 1, garageLot: null, whLevel: 0, whLot: null, cityExt: AUTOTEST ? +params.get('ext') || 0 : 0, rails: [], trains: [], jobs: [], econ: ECON.newEconState(), units: [...ECON.START.units], projects: [], offers: [], built: [], done: 0, seq: 1 };
+  if (feature('lots-tier')) S.extCols = { s: 2, m: 3, l: 3 };   // #26: повече парцели на купен квартал в градовете с решетка (само новите игри)
   if (brandNm) S.brandNm = brandNm;   // името, което играчът си е дал (group.js: brandOf)
   S.foundFirst = 1;   // дъщерните фирми (пътна, жп, морска, авиация) — с ръчно основаване и стартов пакет
   if (params.has('plan') ? params.get('plan') === '1' : !AUTOTEST) S.planAll = feature('road-clean') ? 9 : feature('city-size') ? 8 : feature('la-osm') ? 7 : 6;   // 7: Лос Анджелис по картата (PLAN_TPL7); 6: по-чист център (cityplan opts.clean)   // нова игра — средните и големите градове с план (извити улици); старите записи остават на мрежата   // нов град с план (извити улици); старите записи остават на мрежата
@@ -7133,7 +7137,7 @@ function virtualLots(cityId, cs) {
   if (VP) for (let id = 0; id < 81 + 9 * ext; id++) lots.push({ id, zone: id < 9 ? 'center' : id < 25 ? 'mid' : 'outer', fresh: id >= 81 });
   else {
   for (let bi = 0; bi < NB; bi++) for (let bj = 0; bj < NB; bj++) addLot(bi, bj, false);
-  for (let bi = NB; bi < NB + ext; bi++) for (let bj = 0; bj < NB; bj++) addLot(bi, bj, true);
+  for (let bi = NB; bi < NB + ext * extColsT(cityId); bi++) for (let bj = 0; bj < NB; bj++) addLot(bi, bj, true);
   }
   const LMC = !!CITY_LANDMARKS[cityId] && !VP, c0 = Math.floor(c), hqAt = [c0, c0 + (LMC ? 3 : 1)];
   const at = (bi, bj) => lots.find(l => l.bi === bi && l.bj === bj), inC = l => Math.abs(l.bi - c0) <= 2 && Math.abs(l.bj - c0) <= 2;
@@ -7176,7 +7180,7 @@ function virtualLots(cityId, cs) {
 function virtFill(id, c) {
   if (!c || c.freeLots || id === S.cityId) return false;
   const v = virtualLots(id, c); if (!v) return false;
-  c.freeLots = v; c.freeV = 2; c.freeVirt = 1; c.lotTotal = NB * NB + NB * (c.cityExt || 0); c.freeAll = v.length;
+  c.freeLots = v; c.freeV = 2; c.freeVirt = 1; c.lotTotal = NB * NB + NB * (c.cityExt || 0) * (planOn(id) ? 1 : extColsT(id)); c.freeAll = v.length;
   return true;
 }
 const freeMax = id => CAPITALS.has(id) || MEGAPOLIS.has(id) || (cityById(id)?.sz || 0) >= 3 ? 0 : 1;   // важните градове (жълтата точка, като KEY_CITY в drawMap) се завършват само без нито един свободен парцел
@@ -7560,8 +7564,9 @@ function buyDistrictAt(id, all = false) {
   if (MEGAPOLIS.has(id) && c.extBig == null) c.extBig = q.ext;   // новите квартали на мегаполиса са с новия (по-малък) размер
   c.cityExt = all ? q.max : q.ext + 1; xpMore(300 * (c.cityExt - q.ext));   // парцелите се появяват при следващото влизане (градът се строи от записа)
   if (c.freeLots && !MEGAPOLIS.has(id)) {   // новите квартали са празни парцели след ядрото 9×9 — добавят се към запомнените свободни
-    for (let e = q.ext; e < c.cityExt; e++) for (let k = 0; k < NB; k++) c.freeLots.push([NB * NB + e * NB + k, 'outer']);
-    c.lotTotal = NB * NB + NB * c.cityExt; c.freeAll = c.freeLots.length;
+    const kc = planOn(id) ? 1 : extColsT(id);   // lots-tier: колоните на квартал (града с план — по 9)
+    for (let e = q.ext; e < c.cityExt; e++) for (let k = 0; k < NB * kc; k++) c.freeLots.push([NB * NB + e * NB * kc + k, 'outer']);
+    c.lotTotal = NB * NB + NB * c.cityExt * kc; c.freeAll = c.freeLots.length;
   } else { delete c.freeLots; delete c.freeAll; delete c.lotTotal; virtFill(id, c); }   // никога не си бил тук — изчислява се без влизане (мегаполисът иска едно влизане)
   toast(`🏘️ ${cityById(id).nm}: купи ${all ? 'всички квартали' : `квартал №${c.cityExt}`} (${c.cityExt}/${q.max})!`, 'good');
   Sound.play('cash'); save();
@@ -7569,7 +7574,7 @@ function buyDistrictAt(id, all = false) {
 function districtCard() {
   const ext = S.cityExt || 0, cost = districtCost(), free = freeLotCount();
   let h = `<div class="card"><h3><span class="ico">🏙️</span>Нов квартал · ${ext}/${extMaxOf(S.cityId)}</h3>
-    <div class="meta">Свободни парцели в града: <b style="color:${free < 4 ? 'var(--bad)' : 'var(--txt)'}">${free}</b>. Нов квартал (около центъра — на изток и на юг) дава ${NB * extCols()} празни парцела за поръчки, склад и гараж${megaBase ? ' — мегаполис: голям квартал' : ''}.</div>`;
+    <div class="meta">Свободни парцели в града: <b style="color:${free < 4 ? 'var(--bad)' : 'var(--txt)'}">${free}</b>. Нов квартал (около центъра — на изток и на юг) дава ${NB * (megaBase ? extCols() : extColsT(S.cityId))} празни парцела за поръчки, склад и гараж${megaBase ? ' — мегаполис: голям квартал' : ''}.</div>`;
   if (ext < extMaxOf(S.cityId)) h += `<div class="row"><span class="money" style="color:var(--txt)">${fmt(cost)} €</span><button class="btn" id="bDistrict" ${econ.canAfford(cost) ? '' : 'disabled'}>Купи земята</button></div>${MAX_EXT - ext > 1 ? `<div class="row" style="margin-top:4px"><span class="meta" style="margin:0">Всички ${MAX_EXT - ext} квартала наведнъж</span><button class="btn2" id="bDistrictAll" ${econ.canAfford(allDistrictsCost()) ? '' : 'disabled'}>🏙️ Купи всички · ${fmt(allDistrictsCost())} €</button></div>` : ''}`;
   else h += `<div class="meta" style="color:var(--acc)">👑 Градът е разширен докрай.</div>`;
   return h + `</div>`;
@@ -10729,7 +10734,7 @@ if (AUTOTEST) {
       L.forEach(([n, nm], i) => loader.load(`assets/heavy/hotels5/hotel5-${n}.glb`, gl => { const o = gl.scene, sz = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3()), k = Math.min(60 / sz.y, 90 / Math.max(sz.x, sz.z)), x = [-75, 0, 75, -38, 38][i], zz = i < 3 ? 0 : 90;   // два реда — да се съберат в мъглата
         o.scale.setScalar(k); o.position.set(x, 0, zz); o.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; } }); g.add(o);
         const lb = label(`${i + 1} · ${nm}`, '#ffd54a', 14); lb.position.set(x, sz.y * k + 12, zz); g.add(lb);
-        const c = A['sf-car-Sedan'] ? model('sf-car-Sedan', 1) : model('sedan', kidK('sedan')); c.position.set(x - 4, 0, zz + Math.max(sz.z * k / 2, 10) + 8); c.rotation.y = Math.PI / 2; g.add(c);
+        const c = A['sf-car-Sedan'] ? model('sf-car-Sedan', 1) : new THREE.Group(); c.position.set(x - 4, 0, zz + Math.max(sz.z * k / 2, 10) + 8); c.rotation.y = Math.PI / 2; g.add(c);
         const pp = new THREE.Group(), tb = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.55, 4, 8), new THREE.MeshStandardMaterial({ color: 0x2f6fd6 })); tb.position.y = 1.15; pp.add(tb); const hd = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), new THREE.MeshStandardMaterial({ color: 0xe0b090 })); hd.position.y = 1.68; pp.add(hd); pp.position.set(x + 2, 0, zz + Math.max(sz.z * k / 2, 10) + 8); g.add(pp); }));
       controls.target.set(h.x, 15, h.z + 45); camera.position.set(h.x, 120, h.z + 245); const f0 = scene.fog && [scene.fog.near, scene.fog.far]; if (f0) { scene.fog.near = 400; scene.fog.far = 1400; } fly = null; $('panel').classList.add('hidden'); return true; },
     boardAuto() { return boardL.autoTick(); },
@@ -10780,7 +10785,7 @@ if (AUTOTEST) {
     gasLook() {   // Лабораторията: трите кандидата за бензиностанция (assets/heavy/gas) един до друг пред централата — 1 = 30 м
       showMap(false); const h = { x: tx(NI - 1) + 75, z: tx(NJ - 1) + 90 }, g = new THREE.Group(); g.position.set(h.x - 10, 0, h.z + 30); scene.add(g);   // на празното поле югоизточно от града
       ['gas-lowpoly', 'gas-modern', 'gas-big', 'gas-green'].forEach((n, i) => loader.load(`assets/heavy/gas/${n}.glb`, gl => { const o = gl.scene; o.scale.setScalar(25); o.position.set((i - 1.5) * 40, 0, 0);   // ~25 м широки; кола и човек отпред за мащаб
-        { const c = A['sf-car-Sedan'] ? model('sf-car-Sedan', 1) : model('sedan', kidK('sedan')); c.position.set((i - 1.5) * 40 - 4, 0, 15); c.rotation.y = Math.PI / 2; g.add(c);
+        { const c = A['sf-car-Sedan'] ? model('sf-car-Sedan', 1) : new THREE.Group(); c.position.set((i - 1.5) * 40 - 4, 0, 15); c.rotation.y = Math.PI / 2; g.add(c);
           const pm = new THREE.MeshStandardMaterial({ color: 0x2f6fd6 }), pp = new THREE.Group(), tb = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.55, 4, 8), pm); tb.position.y = 1.15; pp.add(tb); const hd = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), new THREE.MeshStandardMaterial({ color: 0xe0b090 })); hd.position.y = 1.68; pp.add(hd); for (const sd of [-1, 1]) { const lg = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.6, 3, 6), new THREE.MeshStandardMaterial({ color: 0x2a2f3a })); lg.position.set(sd * 0.11, 0.42, 0); pp.add(lg); } pp.position.set((i - 1.5) * 40 + 2, 0, 15); g.add(pp); } o.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; } }); g.add(o); const lb = label(['1 · Low Poly', '2 · Модерна', '3 · Голяма', '4 · Зелена'][i], '#ffd54a', 10); lb.position.set((i - 1.5) * 40, 26, 0); g.add(lb); }));
       controls.target.set(h.x - 10, 4, h.z + 34); camera.position.set(h.x - 10, 75, h.z + 160); fly = null; $('panel').classList.add('hidden'); return true; },
     emergLook() { __dbg.time && __dbg.time(20.5); showMap(false); const h = city.hq, ks = ['sf-car-Police_Sedan', 'sf-car-Police_SUV', 'sf-car-Ambulance', 'sf-car-Firetruck', 'sf-car-Police_Sedan', 'sf-car-Ambulance'].filter(k => A[k]); const g = new THREE.Group(); ks.forEach((k, i) => { const o = model(k, 1); o.position.set((i % 3) * 7 - 7, 0, Math.floor(i / 3) * 9); o.rotation.y = Math.PI / 2; o.userData.forceBeacons = 1; g.add(o); }); g.position.set(h.x - 4, 0, h.z + 14); scene.add(g); controls.target.set(h.x - 4, 1, h.z + 18); camera.position.set(h.x + 10, 12, h.z + 34); fly = null; $('panel').classList.add('hidden'); return ks; },

@@ -397,7 +397,7 @@ export function buildHighwayView(A, opts = {}) {
   fresh.rotation.x = -Math.PI / 2; g.add(fresh);
   const trucks = [];
   // истинската техника на играта (vehmodels.js), иначе Kenney
-  for (let k = 0; k < 2; k++) { const t = A['sf-dump'] ? clone(A, 'sf-dump', 7.5) : A.truck ? clone(A, 'truck', 2.2) : null; if (t) { g.add(t); trucks.push(t); } }
+  for (let k = 0; k < 2; k++) { const t = A['sf-dump'] ? clone(A, 'sf-dump', 7.5) : null;   /* №2: без детския камион */ if (t) { g.add(t); trucks.push(t); } }
   { const l = A['sf-excavator'] ? clone(A, 'sf-excavator', 8.5) : A['tractor-shovel'] ? clone(A, 'tractor-shovel', 2.2) : null; if (l) { g.add(l); trucks.push(l); } }
   if (A['sf-backhoe']) { const b = clone(A, 'sf-backhoe', 6.5); g.add(b); trucks.push(b); }
 

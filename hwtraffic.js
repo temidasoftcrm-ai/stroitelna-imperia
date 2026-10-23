@@ -43,7 +43,7 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
   { const by = new Map(); for (const c of list) { const k = c.dir + ':' + c.lane; (by.get(k) || by.set(k, []).get(k)).push(c); }
     for (const L of by.values()) { const step = len / L.length, off = rnd() * step; L.forEach((c, i) => { c.x = -half + off + i * step; c.o.position.set(c.x, y, c.z); }); } }
   // спешните коли: по един модел от вид, скрити, докато не дойде ред
-  const EM = [['police', ['sf-car-Police_SUV', 'sf-car-Police_Sedan', 'police']], ['ambulance', ['sf-car-Ambulance']], ['fire', ['sf-car-Firetruck']]];
+  const EM = [['police', ['sf-car-Police_SUV', 'sf-car-Police_Sedan']], ['ambulance', ['sf-car-Ambulance']], ['fire', ['sf-car-Firetruck']]];
   const em = [];
   for (const [kind, ns] of EM) { const n = ns.find(x => A[x]); if (!n) continue; const o = model(n, SCALE[n] || kidK(n, 1.25)); o.visible = false; o.userData.beaconsOn = 1; o.position.y = y; g.add(o); em.push({ kind, o, on: false }); }
   let emT = 8 + Math.random() * 20;
