@@ -928,11 +928,81 @@ function lvHotel(nm) {
     const n = src && src.getObjectByName(nm); if (!n) return;
     const m = n.clone(true);
     m.traverse(o => { if (!o.isMesh) return; o.castShadow = o.receiveShadow = true; const mt = o.material = o.material.clone(); mt.flatShading = true; mt.metalness = 0; mt.roughness = 0.85; mt.color.setScalar(2);   /* сканът е тъмен (сенките и стъклата са в текстурата) — ×2, колкото светлите фасади наоколо */
-      mt.emissive.set(0xffe4b8); mt.emissiveMap = mt.map; mt.emissiveIntensity = 0; mt.userData.floodK = 1.4; mt.needsUpdate = true; flood.push(mt); });
+      if (feature('lv-night') && mt.emissiveMap) { mt.emissive.set(0xffffff); mt.userData.floodK = 2.2; }   /* lv-night: нощната карта от GLB (night_<възел> — прозорците, короните, партерът) по нощната крива на flood */
+      else { mt.emissive.set(0xffe4b8); mt.emissiveMap = mt.map; mt.userData.floodK = 1.4; }
+      mt.emissiveIntensity = 0; mt.needsUpdate = true; flood.push(mt); });
     const top = new THREE.Box3().setFromObject(m).max.y; g.add(m);   // m още е без родител — кутията е в координатите на групата
     if (g.userData.sign) g.userData.sign.position.y = top + 6;
+    if (feature('lv-night2')) lvNight2(nm, n, m, g);
   });
   return g;
+}
+// 🎰 lv-night2 (f9): нощта на хотелите от скана — всичко в метрите на възела (position · scale + translation; север = −z, групата е ×0,4 / ×0,7):
+// Парис — Айфеловата кула в златно (решетката свети по текстурата, ребрата — златни линии, искри), балонът (неонови ивици) и подсветка отдолу по хотела;
+// Планет Холивуд — ръбовете на V-кулата в преливащи цветове и LED екранът към Стрипа; Космополитън — сините ивици по кулите и светещата „шапка“
+// над входа с екран над нея; Ария и Вдара — сребристи ръбове. Добавя се към emission на lv-night (f6) — не я заменя; яркостта — по night (плавно при залез)
+const LV_TOWERS = {   // контурите на кулите отгоре (x, z, височина на покрива) — от скана (височинна карта по триъгълниците, опростена до ~1,5 м)
+  planethollywood: [[[65,104,128],[50,97,128],[4,3,130],[50,-95,128],[61,-102,128],[70,-97,128],[74,-87,128],[56,-51,130],[60,-47,130],[52,-29,133],[34,-3,130],[34,5,130],[60,49,130],[58,57,130],[74,89,128]]],
+  cosmopolitan: [[[143,1,182],[95,1,179],[90,-4,184],[90,-44,184],[145,-47,179],[148,-36,171]], [[15,41,187],[-45,41,192],[-105,17,190],[-149,15,191],[-150,-8,189],[-91,-13,191],[-43,7,190],[15,9,191]]],
+  aria: [[[161,-84,188],[121,-84,190],[59,-108,188],[19,-108,190],[16,-133,188],[73,-138,190],[127,-116,186],[161,-116,189]], [[27,116,152],[18,99,152],[32,83,152],[40,65,152],[44,19,150],[65,-2,146],[70,19,155],[66,69,155],[50,107,155]],
+    [[1,270,183],[-10,253,188],[-20,223,187],[-22,163,186],[-10,121,184],[7,112,178],[16,129,182],[6,153,185],[2,197,185],[6,223,185],[16,245,181],[10,261,188]]],
+  vdara: [[[52,18,147],[20,2,147],[-8,0,147],[-18,-10,180],[-46,-2,180],[-65,-17,173],[-56,-24,173],[-24,-34,173],[28,-32,173],[38,-16,180],[57,-7,180],[53,3,180],[59,9,147]]] };
+const LV_EDGE = { planethollywood: { base: 40 }, cosmopolitan: { col: 0x2f6bff, base: 45 }, aria: { col: 0xdfe9ff, base: 45 }, vdara: { col: 0xdfe9ff, base: 45 } };
+const LV_VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+function lvNight2(nm, node, m, g) {
+  const U = { uT: { value: 0 }, uN: { value: 0 }, uSc: { value: node.scale.x }, uTr: { value: node.position.clone() } }, add = [];   // add — светлините, които гаснат денем
+  const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.3, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
+  const sprite = (col, x, y, z, sx, sy) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 })); sp.position.set(x, y, z); sp.scale.set(sx, sy, 1); g.add(sp); add.push([sp.material, 1]); return sp; };
+  // Парис: шейдърът на скана — решетката на кулата, балонът, подсветката (само за paris_mat)
+  if (nm === 'paris') m.traverse(o => { if (!o.isMesh) return; const mt = o.material;
+    mt.onBeforeCompile = sh => { Object.assign(sh.uniforms, U);
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uSc; uniform vec3 uTr; varying vec3 vLvP;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvLvP = position * uSc + uTr;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uT; uniform float uN; varying vec3 vLvP;')
+        .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        { vec3 lp = vLvP; float lum = dot(diffuseColor.rgb, vec3(0.333));
+          vec2 de = lp.xz - vec2(-87.6, -33.4); float rc = 4.0 + 22.0 * exp(-(lp.y - 30.0) / 30.0);   // кулата — ромб с ребрата по осите (L1 радиус)
+          float inT = step(29.0, lp.y) * (1.0 - smoothstep(rc * 1.08, rc * 1.3, abs(de.x) + abs(de.y)));
+          float h = fract(sin(dot(floor(lp * 1.3), vec3(12.9898, 78.233, 37.719))) * 43758.5453), spk = step(0.975, fract(h * 7.0 + uT * 0.9)) * step(0.5, fract(uT / 20.0));   // искри — 10 с от всеки 20
+          vec3 lv = inT * (vec3(1.0, 0.62, 0.18) * (0.5 + 2.2 * lum) + spk * vec3(1.0, 0.95, 0.85) * 5.0);
+          vec3 db = lp - vec3(-125.5, 44.0, 88.0); float inB = 1.0 - smoothstep(12.8, 14.5, length(db));   // балонът
+          vec3 bc = mix(vec3(1.0, 0.3, 0.65), vec3(0.35, 0.6, 1.0), 0.5 + 0.5 * sin(uT * 0.6 + atan(db.z, db.x) * 2.0));
+          lv += inB * bc * (0.5 + lum) * (0.5 + 1.3 * pow(0.5 + 0.5 * sin(lp.y * 0.9 - uT * 2.2), 3.0));
+          lv += (1.0 - inT) * (1.0 - inB) * vec3(1.0, 0.8, 0.55) * diffuseColor.rgb * pow(1.0 - clamp(lp.y / 125.0, 0.0, 1.0), 2.2) * 0.8;   // подсветка на хотела отдолу
+          totalEmissiveRadiance = totalEmissiveRadiance * (1.0 - 0.75 * max(inT, inB) * uN) + lv * uN; }`); };   /* кулата и балонът — без бялото осветяване на фасадата (иначе златото избледнява) */
+    mt.customProgramCacheKey = () => 'lv-night2-paris'; mt.needsUpdate = true; });
+  if (nm === 'paris') {   // ребрата на кулата — златни линии (4 ребра по профила), прожекторът на върха, ореолът на балона
+    const gold = new THREE.MeshBasicMaterial({ color: 0xffb648, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0 }); add.push([gold, 0.9]);
+    for (let k = 0; k < 4; k++) { const a = 0.09 + k * Math.PI / 2, P = []; for (let y = 30; y <= 148; y += 6) { const r = 4 + 22 * Math.exp(-(y - 30) / 30) + 0.6; P.push(new THREE.Vector3(-87.6 + Math.cos(a) * r, y, -33.4 + Math.sin(a) * r)); }
+      g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(P), 40, 0.55, 4, false), gold)); }
+    U.beacon = sprite(0xfff1c8, -87.6, 151, -33.4, 10, 14); sprite(0xff6fb0, -125.5, 44, 88, 34, 46);
+  }
+  // ръбовете на кулите: светещи ивици по покрива и по ъглите (InstancedMesh от кутийки)
+  const T = LV_TOWERS[nm], E = LV_EDGE[nm];
+  if (T && E) { const L = []; for (const poly of T) for (let i = 0; i < poly.length; i++) { const p = poly[i], q = poly[(i + 1) % poly.length], o = poly[(i + poly.length - 1) % poly.length];
+      const dx = q[0] - p[0], dz = q[1] - p[1], len = Math.hypot(dx, dz), y = Math.min(p[2], q[2]) - 1; L.push([(p[0] + q[0]) / 2, y, (p[1] + q[1]) / 2, len + 1, 1.2, 1, Math.atan2(-dz, dx), y]);   // покривът
+      const a1 = Math.atan2(p[1] - o[1], p[0] - o[0]), a2 = Math.atan2(dz, dx), turn = Math.abs(Math.atan2(Math.sin(a2 - a1), Math.cos(a2 - a1)));
+      if (turn > 0.5) L.push([p[0], (E.base + p[2]) / 2, p[1], 0.9, p[2] - E.base, 0.9, 0, p[2]]); }   // ъгъл (завой > 30°) — вертикална ивица
+    const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0 }), L.length), M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), c = new THREE.Color(E.col || 0xffffff);
+    L.forEach((b, i) => { im.setMatrixAt(i, M4.compose(new THREE.Vector3(b[0], b[1], b[2]), Q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), b[6]), new THREE.Vector3(b[3], b[4], b[5]))); im.setColorAt(i, c); });
+    im.frustumCulled = false; g.add(im); add.push([im.material, E.col === 0xdfe9ff ? 0.6 : 0.9]); U.edges = { im, L, chase: nm === 'planethollywood' };
+    for (const poly of T) { const tp = poly.reduce((a, p) => p[2] > a[2] ? p : a); sprite(E.col || 0xd070ff, tp[0], tp[2] + 2, tp[1], 26, 18); }   // ореол над покрива
+  }
+  // LED екрани: Планет Холивуд — по фасадата на подиума към Стрипа (−x); Космополитън — „шапката“ над входа и екранът над нея (+x)
+  const led = (pal) => new THREE.ShaderMaterial({ uniforms: { ...U, uPal: { value: pal } }, vertexShader: LV_VS, fragmentShader: `uniform float uT; uniform float uN; uniform float uPal; varying vec2 vUv;
+    void main(){ vec2 uv = vUv; float seg = floor(uv.x * 4.0), ph = floor(uT / 5.0 + seg * 0.37);   // 4 панела, всеки сменя „рекламата“ на 5 с
+      vec3 c1 = 0.5 + 0.5 * cos(6.2831 * (vec3(0.0, 0.33, 0.67) + fract(ph * 0.618 + uPal)));
+      float st = 0.5 + 0.5 * sin(uv.x * 22.0 + uv.y * 7.0 - uT * 3.0); vec2 q = fract(uv * vec2(4.0, 1.0)) - vec2(0.5 + 0.3 * sin(uT + seg), 0.5 + 0.3 * cos(uT * 1.3 + seg));
+      vec3 c = c1 * (0.35 + 0.45 * st) + smoothstep(0.3, 0.0, length(q * vec2(1.0, 0.6))) * vec3(1.0);
+      float pix = step(0.18, fract(uv.x * 260.0)) * step(0.18, fract(uv.y * 64.0)); c *= (1.0 - step(0.985, fract(uv.x * 4.0))) * (0.65 + 0.35 * pix);
+      gl_FragColor = vec4(c * (0.35 + 0.95 * uN), 1.0); }` });   // денем — по-слабо (екраните светят и денем)
+  if (nm === 'planethollywood') { const sc = new THREE.Mesh(new THREE.PlaneGeometry(80, 19), led(0.0)); sc.position.set(-86.2, 22.5, 12); sc.rotation.y = -Math.PI / 2; g.add(sc); sprite(0xb060ff, -92, 20, 12, 90, 30); }
+  if (nm === 'cosmopolitan') { const hat = new THREE.Mesh(new THREE.BoxGeometry(12, 3, 46), led(0.55)); hat.position.set(162, 13, 32); g.add(hat);
+    const sc = new THREE.Mesh(new THREE.PlaneGeometry(58, 13), led(0.3)); sc.position.set(167.6, 23.5, 32); sc.rotation.y = Math.PI / 2; g.add(sc); sprite(0xff5fd0, 172, 12, 32, 60, 22); }
+  const prev = g.userData.sparkle, hc = new THREE.Color();
+  g.userData.sparkle = (t, night) => { if (prev) prev(t, night); U.uT.value = t; U.uN.value = night;
+    for (const [mt, k] of add) mt.opacity = k * night;
+    if (U.beacon) U.beacon.material.opacity = night * (0.6 + 0.4 * Math.sin(t * 2.5));
+    const e = U.edges; if (e && e.chase && night > 0.01) { e.L.forEach((b, i) => e.im.setColorAt(i, hc.setHSL((0.75 + 0.12 * Math.sin(t * 0.7 - b[7] * 0.02 - i * 0.35)) % 1, 1, 0.55))); e.im.instanceColor.needsUpdate = true; } };   // V-кулата: лилаво ↔ розово ↔ синьо, вълна по ъглите
 }
 Object.assign(BUILD, { lvparis: () => lvHotel('paris'), lvph: () => lvHotel('planethollywood'), lvcosmo: () => lvHotel('cosmopolitan'), lvaria: () => lvHotel('aria'), lvvdara: () => lvHotel('vdara') });
 Object.assign(LANDMARK_NM, { lvparis: 'Парис Лас Вегас', lvph: 'Планет Холивуд', lvcosmo: 'Космополитън', lvaria: 'Ария', lvvdara: 'Вдара' });
