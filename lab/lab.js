@@ -203,6 +203,7 @@ const DEMOS = [
   ['🅿️ Паркингът за колите на трафика: пътищата навън (жълто) и навътре (синьо), вратите на шофьорите (червено — заето, зелено — свободно; Пловдив)', 'plovdiv', d => { let k = 0; const go = () => { d.parkLook(k++ % Math.max(1, d.parks().list.length)); }; setTimeout(go, 3000); setInterval(go, 8000); }],   // park-api
   ['🚨 „Тръгвайте спешно“ — бутонът до „Откажи поръчката“: техниката за етапа веднага на обекта (Пловдив, таб „Обекти“)', 'plovdiv', d => { setTimeout(() => { document.querySelector('#tabs button[data-t=projects]')?.click(); document.querySelector('[data-urgent]')?.scrollIntoView({ block: 'center' }); }, 4000); }],   // urgent-btn
   ['🏢 Офисите building-e и building-f — в истинска височина 22 м (6–7 етажа), секция в парцела; на всеки 8 s — другата (Пловдив)', 'plovdiv', d => { let k = 0; const go = () => d.bldALook(1, k++ % 2 ? 'building-f' : 'building-e'); setTimeout(go, 3000); setInterval(go, 8000); }],   // bld-ef-real
+  ['🚨 Полицейско преследване: беглецът кара бързо (изпреварва в насрещното), 1–3 полицейски коли със сирените го гонят, заклещват го — арест (камерата следва беглеца; Пловдив)', 'plovdiv', d => { setTimeout(() => d.chaseLook(), 6000); }],   // police-chase (#3)
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

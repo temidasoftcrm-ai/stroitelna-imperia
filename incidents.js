@@ -138,6 +138,9 @@ export function createIncidents(ctx) {
   // #28 (jam-police): задръстване на кръстовище — идва полицейска кола (паркира на бордюра), полицаят в средата регулира (трафикът: tr.police);
   // само по повикване от game.js (w: 0 — не идва случайно)
   TYPES.jam = { nm: '🚓 Полицай регулира движението', w: 0, hold: 45, cars: [['Police_Sedan', 16]], props(g) { if (K2) K2.put(g, 'cop', 'wave', 0, 0, 0, 6); else { const p = person(false); g.add(p); } } };
+  // #3 (police-chase, backlog 25.10): полицейско преследване — кола-беглец кара бързо по улиците (през червено, изпреварва в насрещното),
+  // 1–3 полицейски коли с бурканите и сирените я гонят по същия път; накрая я заклещват — полицаите слизат, арест, сцената се разпуска
+  TYPES.chase = { nm: '🚨 Полицейско преследване', get w() { return feature('police-chase') ? 1 : 0; }, hold: 40, chase: true, cars: [], props() {} };
   const TYPES2 = {
     ped: { props(g, at, R) { const v = K2.person('ped', 'idle', { lying: true }); v.position.set(0.8, 0, 0.6); v.rotation.y = rnd(0, 6.28); g.add(v);
       const c = car(); c.position.set(R.hw * 0.45, 0, -6); c.rotation.y = 0.12; g.add(c); K2.put(g, 'ped', 'argue', R.hw * 0.45 + 1.6, -4.4, 0.8, 0.6);   // шофьорът
@@ -198,6 +201,7 @@ export function createIncidents(ctx) {
     clear();
     const type = pickType(typeof force === 'string' ? force : null), T = TYPES[type];
     let at = at0 || pickSpot(); if (!at) return null;
+    if (T.chase) return startChase(at, !!force);
     if (type === 'bfire' && ctx.building) {   // пожар в сграда: първо сградата (близо до камерата), после улицата до нея
       const f = ctx.focus(), b = ctx.building(f.x, f.z, 400);   // най-близката сграда до 400 м (иначе огънят е на улицата)
       if (b) { const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2; let bd = 1e18; for (let k = 0; k < 90; k++) { const p = ctx.point(); if (!p || (ctx.spotOk && !ctx.spotOk(p.x, p.z))) continue; const d = Math.hypot(p.x - cx, p.z - cz); if (d < bd) { bd = d; at = p; } } }
@@ -225,6 +229,38 @@ export function createIncidents(ctx) {
     inc = { at, g, cars, puffs, flames, type, hold0: T.hold, t: 0, force: !!force, fx, hoses, R };
     return { x: Math.round(at.x), z: Math.round(at.z), cars: cars.length, type, nm: T.nm };
   }
+  // #3: беглецът тръгва 120–300 м от мястото на ареста, минава през още една точка (по-дълго гонене) и спира в at; полицията — по същия път след него
+  function startChase(at, force) {
+    const st = pickStart(at); if (!st) return null; let mid = null;
+    for (let k = 0; k < 40 && !mid; k++) { const p = ctx.point(); if (p && Math.hypot(p.x - at.x, p.z - at.z) > 120 && Math.hypot(p.x - at.x, p.z - at.z) < 330 && Math.hypot(p.x - st.x, p.z - st.z) > 120) mid = p; }
+    const r1 = ctx.route(st.x, st.z, (mid || at).x, (mid || at).z), r2 = mid ? ctx.route(mid.x, mid.z, at.x, at.z) : [];
+    const path = [...r1, ...r2.slice(1)].map(p => ({ x: p.x, z: p.z })); if (path.length < 2) return null;
+    const R = I2() ? roadFrame(at) : null, g = new THREE.Group(); g.position.set(at.x, 0, at.z); ctx.scene.add(g);
+    const cars = [], fo = car(); fo.position.set(st.x, 0, st.z); ctx.scene.add(fo);
+    cars.push({ o: fo, x: st.x, z: st.z, yaw: Math.atan2(path[1].x - path[0].x, path[1].z - path[0].z), path, pi: 0, stage: 'go', delay: 0, kind: null, flee: true, spd: 16, dist: 0, lat: 0 });
+    const n = 1 + ((Math.random() * 3) | 0);
+    for (let k = 0; k < n; k++) { const [nm] = vehName(k === 1 ? 'Police_SUV' : 'Police_Sedan'); if (!nm) continue; const o = ctx.model(nm, 1); o.userData.beaconsOn = 1; o.userData.noSiren = 1; o.position.set(st.x, 0, st.z); o.visible = false; ctx.scene.add(o);
+      cars.push({ o, x: st.x, z: st.z, yaw: cars[0].yaw, path: path.map(p => ({ ...p })), pi: 0, stage: 'go', delay: 2.2 + k * 1.7, kind: 'police', spd: 18, dist: 0, lat: 0, cop: k }); }
+    if (cars.length < 2) { ctx.scene.remove(g); for (const c of cars) ctx.scene.remove(c.o); return null; }
+    inc = { at, g, cars, puffs: [], flames: [], type: 'chase', hold0: TYPES.chase.hold, t: 0, force, fx: {}, hoses: [], R };
+    ctx.started && ctx.started('chase', at);
+    return { x: Math.round(at.x), z: Math.round(at.z), cars: cars.length, type: 'chase', nm: TYPES.chase.nm };
+  }
+  // #3: скоростта по пътя — беглецът изпреварва (насрещното платно) на моменти; полицаите го настигат, но не минават през колата пред себе си
+  function chaseStep(rdt, dt) {
+    const C = inc.cars, F = C[0], t = inc.t;
+    if (F.stage === 'go') { const want = Math.sin(t * 0.55) > 0.55 ? -2 * LANE : 0; F.lat += (want - F.lat) * Math.min(1, rdt * 2.5); F.spd = 15 + 3 * Math.abs(Math.sin(t * 0.3)); }
+    for (let k = 1; k < C.length; k++) { const c = C[k], ld = C[k - 1]; if (c.stage !== 'go' || c.delay > 0) continue; const gap = c.pi < ld.pi ? Math.hypot(ld.x - c.x, ld.z - c.z) : 0;   // по пътя (точките са на ~2 м): само зад колата пред себе си
+      c.spd = Math.min(18.5, Math.max(0, gap - 7) / Math.max(dt, 1e-3));   // не по-близо от 7 м (и при голям кадър) c.lat += ((k % 2 ? -1.2 : 0) - c.lat) * Math.min(1, rdt * 2);   // в лявата половина — вижда беглеца
+      if (ld.stage !== 'go' && gap < 8.5 && c.spd < 0.5) { c.stage = 'hold'; c.path = null; if (c.cop === 1) { c.yaw += 0.5; c.o.rotation.y = c.yaw; } } }   // заклещват го; втората — накриво
+    if (!inc.arrest && inc.hold !== undefined) arrest();
+  }
+  function arrest() {   // полицаите — до вратата на беглеца, той — до колата с ръце нагоре (incidents2: истинските хора; иначе — човечета)
+    const F = inc.cars[0], g = inc.g; inc.arrest = true; g.position.set(F.x, 0, F.z); g.rotation.y = F.yaw; g.updateMatrixWorld(true);
+    const cops = inc.cars.length - 1;
+    if (K2) { K2.put(g, 'ped', 'argue', -2.1, 0.4, 0, 0); for (let k = 0; k < Math.max(2, cops); k++) K2.put(g, 'cop', k ? 'wave' : 'talk', -2.6 - (k % 2) * 1.2, -1.4 + k * 1.6, -2.1, 0.4); K2.crowd(g, 5, (inc.R ? inc.R.hw + inc.R.walk * 0.8 : 7), -8, 8, 0, 0); }
+    else { const p = person(false, 0x222222); p.position.set(-2.1, 0, 0.4); g.add(p); for (let k = 0; k < Math.max(2, cops); k++) { const q = person(false, 0x1d3a7a); q.position.set(-2.8, 0, -1.4 + k * 1.6); g.add(q); } }
+  }
   function clear() {
     if (!inc) return;
     ctx.scene.remove(inc.g); for (const c of inc.cars) ctx.scene.remove(c.o); for (const s of [...inc.puffs, ...inc.flames]) ctx.scene.remove(s);
@@ -232,15 +268,16 @@ export function createIncidents(ctx) {
     inc = null;
   }
   function move(c, dt) {   // колкото път се пада за кадъра — и през няколко точки (иначе при малко кадри в секунда пълзят)
-    let st = SPEED * dt;
+    let st = (c.spd ?? SPEED) * dt; const st0 = st;   // #3: преследването — своя скорост и отместване (изпреварване)
     while (c.path && st > 1e-4) {
       const wp = c.path[c.pi];
       let x2 = wp.x, z2 = wp.z;
-      if (c.pi > 0) { const pv = c.path[c.pi - 1], dx = wp.x - pv.x, dz = wp.z - pv.z, l = Math.hypot(dx, dz) || 1; x2 += -dz / l * LANE; z2 += dx / l * LANE; }
+      if (c.pi > 0) { const pv = c.path[c.pi - 1], dx = wp.x - pv.x, dz = wp.z - pv.z, l = Math.hypot(dx, dz) || 1, lo = LANE + (c.lat || 0); x2 += -dz / l * lo; z2 += dx / l * lo; }
       const dx = x2 - c.x, dz = z2 - c.z, d = Math.hypot(dx, dz);
       if (d <= st) { c.x = x2; c.z = z2; st -= d; if (++c.pi >= c.path.length) c.path = null; }
       else { c.x += dx / d * st; c.z += dz / d * st; st = 0; const w = Math.atan2(dx, dz); let dy = w - c.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); c.yaw += dy * Math.min(1, dt * 8); }
     }
+    if (c.dist != null) c.dist += st0 - st;
     c.o.position.set(c.x, 0, c.z); c.o.rotation.y = c.yaw;
   }
   // пътната помощ (incidents2, горяща кола): идва след гасенето, спира пред останките, повдига ги отзад за 3 s и тръгва с тях
@@ -286,6 +323,7 @@ export function createIncidents(ctx) {
       if (on.length) { const c = on[(inc.sI = (inc.sI ?? -1) + 1) % on.length], d = Math.hypot(c.x - cam.x, c.z - cam.z, cam.y);
         inc.sT = playSiren(c.kind, c.o, d, 5) ? 7 : 1; }
     }
+    if (inc.type === 'chase' && !inc.leave) chaseStep(rdt, dt);
     let gone = 0;
     for (const c of inc.cars) {
       if (c.delay > 0) { c.delay -= rdt; c.o.visible = c.delay <= 0; continue; }
@@ -303,10 +341,11 @@ export function createIncidents(ctx) {
       inc.cars.forEach((c, n) => {
         c.o.userData.beaconsOn = 0;
         const to = c.home || pickStart(inc.at), path = to && ctx.route(c.x, c.z, to.x, to.z).map(p => ({ x: p.x, z: p.z }));
-        c.stage = 'leave'; c.path = path && path.length ? path : null; c.pi = 0; c.wait = n * 3;
+        c.stage = 'leave'; c.path = path && path.length ? path : null; c.pi = 0; c.wait = n * 3; c.spd = SPEED; c.lat = 0;
+        if (c.flee) c.wait = inc.cars.length * 3;   // #3: колата на беглеца — последна (кара я полицай)
         if (!c.path) { c.stage = 'gone'; ctx.scene.remove(c.o); }
       });
-      setTimeout(() => { if (inc && inc.leave) inc.g.visible = false; }, 9000);   // следите от инцидента се махат малко след като тръгнат
+      if (inc.type === 'chase') inc.g.visible = false; else setTimeout(() => { if (inc && inc.leave) inc.g.visible = false; }, 9000);   // #3: арестуваният е в полицейската кола   // следите от инцидента се махат малко след като тръгнат
     }
     if (inc.leave && gone === inc.cars.length) clear();
     if (inc && inc.t > (inc.hold0 || HOLD) + 240) clear();   // предпазно: ако някоя кола заседне
@@ -316,5 +355,6 @@ export function createIncidents(ctx) {
   const blockers = () => !inc || inc.leave || !inc.fx || !inc.R || inc.fx.open || !inc.cars.some(c => c.stage === 'hold') ? [] : [{ x: inc.at.x, z: inc.at.z }];
   const obstacles = () => !inc ? [] : [...inc.cars.filter(c => c.stage !== 'gone' && c.o.visible).map(c => ({ x: c.x, z: c.z })), ...(inc.leave ? [] : [{ x: inc.at.x, z: inc.at.z }])];
   const movers = () => !inc ? [] : inc.cars.filter(c => c.stage === 'go' && c.o.visible).map(c => ({ x: c.x, z: c.z, yaw: c.yaw, l: 5, w: 2.4, em: !!c.kind }));   // идващите спешни коли (колите от трафика спират пред тях)
-  return { update, start, clear, obstacles, blockers, movers, speed: k => { TS = k || 1; return TS; }, spot: () => inc && inc.at, types: () => Object.keys(TYPES), get active() { return inc && { t: Math.round(inc.t), type: inc.type, x: Math.round(inc.at.x), z: Math.round(inc.at.z), stages: inc.cars.map(c => c.stage), hold: inc.hold == null ? null : Math.round(inc.hold), cars: inc.cars.map(c => [c.stage, c.path ? c.path.length - c.pi : 0, Math.round(Math.hypot(c.x - inc.at.x, c.z - inc.at.z)), Math.round(c.delay || 0)]), tow: inc.towC ? (inc.towC.done ? 'done' : inc.towC.load ? 'load' : inc.towC.stage || '?') : null }; } };
+  const follow = () => inc && inc.type === 'chase' && !inc.leave ? { x: inc.cars[0].x, z: inc.cars[0].z } : null;   // #3: камерата след беглеца
+  return { update, start, clear, obstacles, blockers, movers, follow, speed: k => { TS = k || 1; return TS; }, spot: () => inc && inc.at, types: () => Object.keys(TYPES), get active() { return inc && { t: Math.round(inc.t), type: inc.type, x: Math.round(inc.at.x), z: Math.round(inc.at.z), stages: inc.cars.map(c => c.stage), hold: inc.hold == null ? null : Math.round(inc.hold), cars: inc.cars.map(c => [c.stage, c.path ? c.path.length - c.pi : 0, Math.round(Math.hypot(c.x - inc.at.x, c.z - inc.at.z)), Math.round(c.delay || 0)]), tow: inc.towC ? (inc.towC.done ? 'done' : inc.towC.load ? 'load' : inc.towC.stage || '?') : null }; } };
 }
