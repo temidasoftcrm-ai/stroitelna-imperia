@@ -70,8 +70,16 @@ function loadMoreBuses(load, A) {
   return Promise.all(Object.keys(BUS_POOL).map(k => load('assets/heavy/cars/bus-' + k + '.glb').then(g => {
     g.scene.traverse(o => { if (o.isMesh) { o.castShadow = false; if (o.material && o.material.metalness > 0.5) o.material.metalness = 0.3; } });
     const sc = wrap(g.scene, 0, M_PER); addCarLights(sc, [0.38, 0.25]); A['sf-bus-' + k] = { scene: sc };
-  }).catch(e => console.warn('buses-more', k, e))));
+  }).catch(e => console.warn('buses-more', k, e))).concat(['f', 'r'].map(h => load('assets/heavy/cars/bus-artic-' + h + '.glb').then(g => {   // bus-artic2 (55, №4): двете секции на съчленения
+    g.scene.traverse(o => { if (o.isMesh) { o.castShadow = false; if (o.material && o.material.metalness > 0.5) o.material.metalness = 0.3; } });
+    const sc = wrap(g.scene, 0, M_PER); addCarLights(sc); const cut = []; sc.traverse(o => { const l = o.userData.lamp, z = o.position.z; if (h === 'f' ? l === 'rear' || (l === 'blink' && z < 0) : l === 'front' || (l === 'blink' && z > 0) || (!l && o.isMesh && o.geometry?.type === 'PlaneGeometry' && z > 0)) cut.push(o); });
+    cut.forEach(o => o.removeFromParent()); A['sf-bus-artic-' + h] = { scene: sc };   /* без стоповете при хармониката (предната) и без фаровете/лъча (задната) */
+  }).catch(e => console.warn('bus-artic2', h, e)))));
 }
+// bus-artic2 (55, №4): съчлененият Volvo на 2 секции (Blender: срязан в средата на хармониката, всяка половина стига 0,4 м отвъд шарнира — застъпват се).
+// A['sf-bus-artic-f'] / A['sf-bus-artic-r'] — центрирани като другите (wrap: център по x/z, основа y=0, +z напред); в метри × M_PER.
+// Шарнирът: в предната — на z = ARTIC.pf от центъра ѝ; в задната — на z = ARTIC.pr от центъра ѝ (дължините f/r — с застъпването)
+export const ARTIC = { f: 10.3, r: 8.6, pf: -4.75, pr: 3.9, len: 18.1 };
 export const busesFor = (reg, A) => [...Object.entries(BUS_POOL).filter(([k, [, w]]) => w[reg] && A['sf-bus-' + k]).map(([k, [, w]]) => ['sf-bus-' + k, w[reg]]), ...((reg === 'eu' || reg === 'bg') && A['sf-car-Bus'] ? [['sf-car-Bus', 2]] : [])];
 // колите за региона: [[име в A, тегло]…]
 export const carsFor = (reg, A) => Object.entries(CAR_POOL).filter(([k, [, w]]) => w[reg] && A['sf-cv-' + k]).map(([k, [, w]]) => ['sf-cv-' + k, w[reg]]);

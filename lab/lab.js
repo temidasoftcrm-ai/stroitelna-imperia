@@ -197,6 +197,7 @@ const DEMOS = [
   ['🏛️ Триумфалната арка (модел от Meshy) — ден, после нощ (Париж)', 'paris', d => { const go = () => { const L = d.city().landmarks, i = L.findIndex(o => o.kind === 'arc2'); if (i >= 0) d.lookLm(i, 90); }; setTimeout(go, 3000); setTimeout(() => { d.time(22); go(); }, 10000); }],   // lm-arc2
   ['🏨 5★ хотел в Париж — „Парижка елегантност“ (модел от Meshy)', 'paris', d => { setTimeout(() => d.hotel5City(2), 2500); }],   // hotel5-paris
   ['🏰 Кремъл от моделите от Meshy — облитане денем, после нощем (Москва)', 'moscow', d => { let a = 2.3, n = 0; const tick = () => { if (!d.kremlin(a, 300, 110)) { setTimeout(tick, 1500); return; } a += 0.4; n++; if (n === 16) d.time(22); if (n < 32) setTimeout(tick, 1700); }; setTimeout(tick, 3000); }],   // lm-kremlin2
+  ['🏙️ „77% застроен“ в горната лента до „Империя“ — натисни го за „Завърши града“ (Пловдив)', 'plovdiv', d => { setTimeout(() => document.getElementById('btnBuilt')?.click(), 4000); }],   // top-built
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
