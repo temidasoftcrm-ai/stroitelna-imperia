@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { AWARDS, TIERS, makeTrophy } from './awards3d.js';
 import { directorRig } from './directors3d.js';
+import { feature } from './lab/feature.js';
 
 // изявленията: за всяко отличие — по едно за степента (1–2 изречения, говори директорът)
 export const FAME_LINES = {
@@ -156,7 +157,7 @@ export function openHallOfFame({ k, tier = 'gold', onClose } = {}) {
   directorRig(dk).then(r => {
     if (shut || !r) return;
     new THREE.TextureLoader().load(r.photo, t => { t.colorSpace = THREE.SRGBColorSpace; pic.material.map = t; pic.material.color.set(0xffffff); pic.material.needsUpdate = true; own.push(t);
-      const a = t.image.width / t.image.height; if (a > 0) pic.scale.x = Math.min(1, a * 3.9 / 3.1), frame.scale.x = (pic.scale.x * 3.1 + 0.2) / 3.3; });
+      const a = t.image.width / t.image.height; if (a > 0) pic.scale.x = feature('fame-wide') ? Math.min(1.6, a * 3.9 / 3.1) : Math.min(1, a * 3.9 / 3.1), frame.scale.x = (pic.scale.x * 3.1 + 0.2) / 3.3; });   /* fame-wide: снимката — в своето съотношение (беше смачкана в тясна рамка); до 1,6× — между пиластрите */
     const m = r.m; m.scale.setScalar(1); m.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(m), h0 = (bb.max.y - bb.min.y) || 1;
     m.scale.setScalar((r.fem ? 1.68 : 1.78) / h0); m.position.y = -bb.min.y * m.scale.x;   // в истински ръст (моделите са в различен мащаб)
     m.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; c.frustumCulled = false; } });
