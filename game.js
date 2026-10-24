@@ -113,6 +113,11 @@ import { applyRoadLook, makeCrosswalks } from './roadlook.js';
 // №10 (55, bld-a-real): тухлената двуетажна (building-a, 2,0 × 0,79 × 0,6 — 2 етажа ~4 м + корниз) беше смалена до ~5,6 м (15,7 м дълга → в 15 м парцел);
 // в истинска височина 9,5 м е 24 × 7 м — реже се по дължината (секции 14 / 10,5 м) и влиза в парцела без смаляване
 if (feature('bld-a-real')) SECTIONS['building-a'] = { H: 9.5, axis: 'x', cuts: [-0.3, -0.22] };   // от края с вратата
+// bld-ef-real (55): офисите building-e (6 етажа + мансарда, 2,0 × 0,78 × 1,02) и building-f (7–8 етажа, 2,0 × 0,89 × 1,73) бяха „2 етажа“ (6–7 м) —
+// в истинска височина 24 / 26 м са ~60 × 30–50 м; режат се по двете оси (ъгълът с входа, лицето +z) до ~14,5 или ~11 м
+if (feature('bld-ef-real')) Object.assign(SECTIONS, { 'building-e': { H: 24, axis: 'x', cuts: [[['x', 0.118], ['z', -0.234]], [['x', 0.09], ['z', -0.18]]] }, 'building-f': { H: 26, axis: 'x', cuts: [[['x', 0.125], ['z', -0.144]], [['x', 0.095], ['z', -0.11]]] } });
+import { createParkings } from './parking.js';   // 🅿️ park-api (55, №5): местата, входът/изходът и свободните места на паркингите — за трафика (2a)
+const parks = createParkings();
 // градски планове: извити улици и парцели покрай тях (cityplan*.js) — само за градовете в S.plans; другите са на мрежата 9×9
 import { gamePlan, planLots, planTiles, planCount, PLAN_CORE, PLAN_EXT, MEGA_LOTS } from './cityplangame.js';
 import { buildPlanView } from './cityplan3d.js';
@@ -1079,6 +1084,7 @@ function buildCity(cityId) {
   if (city.planView) { if (city.planView.userData.dispose) city.planView.userData.dispose(); else city.planView.traverse(o => { if (o.geometry) o.geometry.dispose(); }); city.planView = null; }   // геометрията на стария план (материалите са общи)
   const g = city.group = new THREE.Group();
   scene.add(g); city.lineObj = null;
+  parks.clear();   // park-api: паркингите на стария град
   const r = rng(hashStr(cityId));
   migrateMegaLots(cityId);
   const megaLay = MEGAPOLIS.has(cityId) && !plan2On(cityId);   // Рим по истинската карта — без спиралата от квартали на мегаполиса
@@ -1276,9 +1282,10 @@ function decorLot(g, lot, cityId) {
   } else if (kind === 3 && yr) {   // 🅿️ yards-real (№31): истински паркинг — места 2,5 × 5 м (бусове 3 × 6), пътека 6 м, отбивка до тротоара, стрелки, бордюр
     const w = lot.plan ? lot.w : 2 * L + 3, d = lot.plan ? lot.d : 2 * L + 3, Lp = parkLayout(w - 1, d - 1); if (!Lp.n) return false;
     const pg = parkMesh(Lp, lot.plan ? 2.3 : 0.5); pg.rotation.y = rot; at(pg, 0, 0, 0);
-    const real = Object.keys(A).filter(n => n.startsWith('sf-car-') && !/Bus|Truck|Firetruck|Ambulance|Police|Limousine|Van/.test(n)), cars = real   /* №2 (55): само истински коли — без детските резерви */, van = A['sf-car-Van'] ? 'sf-car-Van' : null;   /* №2: без детския бус */ let nc = 0;   // истинските коли още не са заредени при първия строеж → тези на Kenney
+    const real = Object.keys(A).filter(n => n.startsWith('sf-car-') && !/Bus|Truck|Firetruck|Ambulance|Police|Limousine|Van/.test(n)), cars = real   /* №2 (55): само истински коли — без детските резерви */, van = A['sf-car-Van'] ? 'sf-car-Van' : null;   /* №2: без детския бус */ let nc = 0; const pc = {};   // истинските коли още не са заредени при първия строеж → тези на Kenney
     Lp.spots.forEach(([a, b, da, db, isVan], k) => { if (nc >= 8 || ((h >>> (k % 24)) & 3) === 0 || rr() < 0.3) return; const n = isVan && van ? van : cars[(h + k * 7) % Math.max(1, cars.length)]; if (!n || !A[n]) return;
-      const o = darkParked(model(n, n.startsWith('sf-') ? 1 : kidK(n, 1.15))), back = rr() < 0.25 ? Math.PI : 0; o.traverse(m => { if (m.isMesh && [].concat(m.material).some(x => x.transparent && x.opacity < 0.9)) m.visible = false; });   /* паркираните — без лъчите на фаровете */ o.rotation.y = rot + Math.atan2(da, db) + back; at(o, a, b, 0.13); nc++; });
+      const o = darkParked(model(n, n.startsWith('sf-') ? 1 : kidK(n, 1.15))), back = rr() < 0.25 ? Math.PI : 0; o.traverse(m => { if (m.isMesh && [].concat(m.material).some(x => x.transparent && x.opacity < 0.9)) m.visible = false; });   /* паркираните — без лъчите на фаровете */ o.rotation.y = rot + Math.atan2(da, db) + back; o.userData.parkBack = !!back; at(o, a, b, 0.13); nc++; pc[k] = o; });
+    if (feature('park-api')) parks.add({ id: lot.id, x: lot.x, z: lot.z, rot, L: Lp, ext: lot.plan ? 2.3 : 0.5, cars: pc });   /* park-api (55, №5): за колите на 2a */
   } else if (kind === 4 && yr) {   // 🛝 yards-real (№42.1): истинската детска площадка (по региона), върху настилка — пръст, пясък или гума
     const keys = yardRegion() === 'west' ? ['play-tower', 'play-small', 'play-swings'] : ['play-swings', 'play-small', 'play-tower'], room = 2 * L + 2;
     for (const k of [keys[(h >>> 5) % 3], ...keys]) { if (!yr[k]) continue; const sz = new THREE.Box3().setFromObject(yr[k]).getSize(new THREE.Vector3()), turn = sz.z > sz.x; if (Math.max(sz.x, sz.z) + 1 > room) continue;   /* дългата страна — по улицата */
@@ -11137,9 +11144,15 @@ if (AUTOTEST) {
     carLensLook() {   // 🚗 car-lens (55): нощ, камерата зад кола от трафика (фаровете ѝ — напред)
       __dbg.time && __dbg.time(22); const c = tr2 && tr2.cars.find(c => !c.heavy) || (tr2 && tr2.cars[0]); if (!c) return null; const ox = tr2G ? tr2G.position.x : 0, oz = tr2G ? tr2G.position.z : 0, x = c.rx + ox, z = c.rz + oz, fx = Math.sin(c.ryaw), fz = Math.cos(c.ryaw);
       __dbg.camAt(x - fx * 9 + fz * 5, 6, z - fz * 9 - fx * 5, x + fx * 6, 0.5, z + fz * 6); return [Math.round(x), Math.round(z)]; },
-    bldALook(k = 1) {   // 🧱 №10 (55, bld-a-real): тухлената двуетажна (building-a) на свободен парцел — в истинска височина; червеният куб — човек 1,8 м
-      const l = city.lots.filter(x => !x.built && !x.busy && x !== city.hq && !x.plan)[k] || city.lots.find(x => !x.built && !x.busy && x !== city.hq); if (!l || !A['building-a']) return null;
-      if (city.bldA) city.group.remove(city.bldA); const G = city.bldA = new THREE.Group(), o = model('building-a', fitScale('building-a', SHOP_FIT) * lotK(l)); realHeight(o, 'building-a', l.plan ? Math.min(l.w, l.d) - 1.5 : 15 * lotK(l));
+    parks: () => parks,   // 🅿️ park-api (55, №5): паркингите (parking.js) — места, вход/изход, свободни
+    parkLook(k = 0, show = true) {   // 🅿️ park-api: k-тият паркинг — пътищата на всяко място: навън (жълто, от мястото до улицата) и навътре (синьо); точки — вратите на шофьорите
+      if (city.parkDbg) { city.group.remove(city.parkDbg); city.parkDbg = null; } const P = parks.list[k]; if (!P || !show) return P ? null : 'няма паркинг (park-api / yards-real)';
+      const G = city.parkDbg = new THREE.Group(), ln = (pts, col, y) => G.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts.map(([x, z]) => new THREE.Vector3(x, y, z))), new THREE.LineBasicMaterial({ color: col, depthTest: false })));
+      for (const s of P.spots) { ln(s.out, 0xffd600, 0.35); ln(s.in, 0x2196f3, 0.45); const d = new THREE.Mesh(new THREE.SphereGeometry(0.25), new THREE.MeshBasicMaterial({ color: s.state === 'free' ? 0x4caf50 : 0xe53935 })); d.position.set(s.door[0], 0.6, s.door[1]); G.add(d); }
+      G.renderOrder = 9; city.group.add(G); __dbg.camAt(P.x + 4, 32, P.z + 18, P.x, 0, P.z); return { n: parks.list.length, id: P.id, spots: P.spots.length, free: P.spots.filter(s => s.state === 'free').length, mouthIn: P.mouthIn, mouthOut: P.mouthOut }; },
+    bldALook(k = 1, n = 'building-a') {   // 🧱 №10 (55, bld-a-real / bld-ef-real): сградата n (building-a/e/f) на свободен парцел — в истинска височина; червеният куб — човек 1,8 м
+      const l = city.lots.filter(x => !x.built && !x.busy && x !== city.hq && !x.plan)[k] || city.lots.find(x => !x.built && !x.busy && x !== city.hq); if (!l || !A[n]) return null;
+      if (city.bldA) city.group.remove(city.bldA); const G = city.bldA = new THREE.Group(), o = model(n, fitScale(n, SHOP_FIT) * lotK(l)); realHeight(o, n, l.plan ? Math.min(l.w, l.d) - 1.5 : 15 * lotK(l));
       const b = new THREE.Box3().setFromObject(o), s = b.getSize(new THREE.Vector3()); o.position.set(l.x - (b.min.x + b.max.x) / 2, -b.min.y, l.z - (b.min.z + b.max.z) / 2); G.add(o); dayNight.registerWindows(o);
       const man = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.8, 0.3), new THREE.MeshStandardMaterial({ color: 0xd04040 })); man.position.set(l.x, 0.9, l.z + s.z / 2 + 2); G.add(man); city.group.add(G);
       __dbg.camAt(l.x + 6, 14, l.z + 30, l.x, 4, l.z); return { lot: l.id, sect: o.userData.sect || 'building-a', size: [+s.x.toFixed(1), +s.y.toFixed(1), +s.z.toFixed(1)] }; },
