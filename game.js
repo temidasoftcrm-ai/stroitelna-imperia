@@ -9487,7 +9487,7 @@ function teardownCity() {
   if (passing) { passing.clear(); passing = null; }
   for (const t of traffic) scene.remove(t.obj); traffic.length = 0;
   if (tr2) { tr2.clear(); tr2 = null; } if (tr2G) { scene.remove(tr2G); tr2G = null; }
-  incidents.clear(); tirs.clear(); cityBus.clear(); parkLife.clear();
+  incidents.clear(); tirs.clear(); cityBus.clear(); schoolBus.clear(); parkLife.clear();
   const old = city.group, pv = city.planView;
   if (old) scene.remove(old);
   { const seen = new Set(); dropGpu(old, seen); for (const o of gone) dropGpu(o, seen); }   /* преди dispose на модулите — те махат групите си от града и копията на текстурите им иначе остават */
