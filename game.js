@@ -110,6 +110,9 @@ import { createConquest } from './conquest.js';
 import { addVanLogo, vanDoors } from './vanlogo.js';   // 🚐 бусът на бригадата: логото отстрани и вратите на Спринтера (флаг crew-van)
 import { createMapLayers } from './maplayers.js';
 import { applyRoadLook, makeCrosswalks } from './roadlook.js';
+// №10 (55, bld-a-real): тухлената двуетажна (building-a, 2,0 × 0,79 × 0,6 — 2 етажа ~4 м + корниз) беше смалена до ~5,6 м (15,7 м дълга → в 15 м парцел);
+// в истинска височина 9,5 м е 24 × 7 м — реже се по дължината (секции 14 / 10,5 м) и влиза в парцела без смаляване
+if (feature('bld-a-real')) SECTIONS['building-a'] = { H: 9.5, axis: 'x', cuts: [-0.3, -0.22] };   // от края с вратата
 // градски планове: извити улици и парцели покрай тях (cityplan*.js) — само за градовете в S.plans; другите са на мрежата 9×9
 import { gamePlan, planLots, planTiles, planCount, PLAN_CORE, PLAN_EXT, MEGA_LOTS } from './cityplangame.js';
 import { buildPlanView } from './cityplan3d.js';
@@ -528,6 +531,7 @@ let europe = null;
   if (feature('yards-real')) for (const k of ['bench', 'fence-wood', 'fence-iron', 'fence-cement', 'fence-modern', 'play-swings', 'play-tower', 'play-small']) jobs.push(load(`assets/heavy/street/${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['st-' + k] = g; }).catch(() => {}));   // 🛝 yards-real: пейка, площадки, огради (Sketchfab, CC-BY — assets/heavy/CREDITS.txt)
   if (feature('plants-real')) for (const k of ['bush-0', 'bush-1', 'bush-2', 'flowers', 'fountain']) jobs.push(load(`assets/heavy/plants/${k}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A['pl-' + k] = g; }).catch(() => {}));
   for (const [dir, list] of Object.entries(MODELS)) if (dir !== 'industrial' && dir !== 'construction') for (const n of list) jobs.push(load(`assets/${dir}/${n}.glb`).then(g => { A[dir === 'industrial' ? 'ind-' + n : n] = g; if (dir === 'commercial' || dir === 'commercial2' || n === 'building-type-a' || n === 'building-type-b' || n === 'Building_Medium_2_001' || n === 'Building_Small_1') prepNightFloors(g.scene, n);   // Building_Medium_2_001 — Лабораторията → night-nyextra
+    blkSections(n);   /* bld-a-real (55, №10): секциите на building-a (само ако е в SECTIONS) */
     if (n === 'building-type-b') g.scene.traverse(o => { if (o.isMesh && o.material?.name === 'phong1') o.visible = false; }); }));   // бръшлянът на house-b е JPEG без прозрачност → черни петна   // нощем етажите светват (nightfloors.js)
   // истинска строителна техника и коли за трафика (vehmodels.js, Sketchfab)
   jobs.push(loadVehModels(load, A));
@@ -11133,6 +11137,12 @@ if (AUTOTEST) {
     carLensLook() {   // 🚗 car-lens (55): нощ, камерата зад кола от трафика (фаровете ѝ — напред)
       __dbg.time && __dbg.time(22); const c = tr2 && tr2.cars.find(c => !c.heavy) || (tr2 && tr2.cars[0]); if (!c) return null; const ox = tr2G ? tr2G.position.x : 0, oz = tr2G ? tr2G.position.z : 0, x = c.rx + ox, z = c.rz + oz, fx = Math.sin(c.ryaw), fz = Math.cos(c.ryaw);
       __dbg.camAt(x - fx * 9 + fz * 5, 6, z - fz * 9 - fx * 5, x + fx * 6, 0.5, z + fz * 6); return [Math.round(x), Math.round(z)]; },
+    bldALook(k = 1) {   // 🧱 №10 (55, bld-a-real): тухлената двуетажна (building-a) на свободен парцел — в истинска височина; червеният куб — човек 1,8 м
+      const l = city.lots.filter(x => !x.built && !x.busy && x !== city.hq && !x.plan)[k] || city.lots.find(x => !x.built && !x.busy && x !== city.hq); if (!l || !A['building-a']) return null;
+      if (city.bldA) city.group.remove(city.bldA); const G = city.bldA = new THREE.Group(), o = model('building-a', fitScale('building-a', SHOP_FIT) * lotK(l)); realHeight(o, 'building-a', l.plan ? Math.min(l.w, l.d) - 1.5 : 15 * lotK(l));
+      const b = new THREE.Box3().setFromObject(o), s = b.getSize(new THREE.Vector3()); o.position.set(l.x - (b.min.x + b.max.x) / 2, -b.min.y, l.z - (b.min.z + b.max.z) / 2); G.add(o); dayNight.registerWindows(o);
+      const man = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.8, 0.3), new THREE.MeshStandardMaterial({ color: 0xd04040 })); man.position.set(l.x, 0.9, l.z + s.z / 2 + 2); G.add(man); city.group.add(G);
+      __dbg.camAt(l.x + 6, 14, l.z + 30, l.x, 4, l.z); return { lot: l.id, sect: o.userData.sect || 'building-a', size: [+s.x.toFixed(1), +s.y.toFixed(1), +s.z.toFixed(1)] }; },
     whFitLook(lv = 1) {   // 📦 №18 (55): складът на ниво lv на своя парцел — в истински размер, в парцела
       S.whLevel = lv; if (S.whLot == null || !city.lots[S.whLot]) { const l = city.lots.find(x => !x.built && !x.busy && x !== city.hq && x.plan) || city.lots.find(x => !x.built && !x.busy && x !== city.hq); if (!l) return null; S.whLot = l.id; l.busy = 'wh'; }
       buildWarehouse(); refreshWarehouse && refreshWarehouse(); const l = city.lots[S.whLot], w = city.whGroup.children.find(c => c.userData.wh2), b = w ? new THREE.Box3().setFromObject(w).getSize(new THREE.Vector3()) : null;

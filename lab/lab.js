@@ -199,6 +199,7 @@ const DEMOS = [
   ['🏰 Кремъл от моделите от Meshy — облитане денем, после нощем (Москва)', 'moscow', d => { let a = 2.3, n = 0; const tick = () => { if (!d.kremlin(a, 300, 110)) { setTimeout(tick, 1500); return; } a += 0.4; n++; if (n === 16) d.time(22); if (n < 32) setTimeout(tick, 1700); }; setTimeout(tick, 3000); }],   // lm-kremlin2
   ['🏙️ „77% застроен“ в горната лента до „Империя“ — натисни го за „Завърши града“ (Пловдив)', 'plovdiv', d => { setTimeout(() => document.getElementById('btnBuilt')?.click(), 4000); }],   // top-built
   ['🚓 Задръстване/заклещени коли → известие „🚓 Извикай полиция“ + „🎥 гледай“ (натисни бутона — идва полицаят и разплита колите)', 'plovdiv', d => { setTimeout(() => d.jamCallTest(true), 7000); }],   // jam-call (#6)
+  ['🧱 Тухлената двуетажна (building-a) — в истинска височина 9,5 м, в парцела (червеният куб — човек 1,8 м; Пловдив)', 'plovdiv', d => { setTimeout(() => d.bldALook(1), 3000); }],   // bld-a-real
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
