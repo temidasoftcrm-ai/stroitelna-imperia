@@ -1970,7 +1970,7 @@ function beginOwnProject(kind, lot, cost) {
 }
 function finishOwnProject(p) {
   const lot = city.lots[p.lot], key = lotKey[p.own];
-  S[levelKey[p.own]] = p.target; xpMore(150 * p.target);   // xp-more: ново ниво на офиса/гаража/склада
+  S[levelKey[p.own]] = p.target; xpMore(xpCity(150 * p.target, S.cityId));   // xp-more: ново ниво на офиса/гаража/склада
   if (p.type === 'own_garage_new' || p.type === 'own_wh_new') { S[key] = lot.id; lot.busy = p.own; }
   buildHQ();
   // паркираната техника отива на новите си места
@@ -5026,7 +5026,7 @@ function openBranchNow(id) {
         S.branches = [...(S.branches || []), id];
         S.autoCity = { ...(S.autoCity || {}), [id]: true };   // новият филиал тръгва на автопилот (изключва се от „🏙️ Градове“)
         S.branchPaid = { ...(S.branchPaid || {}), [id]: cost + extra - disc };   // за оценката при продажба
-        dev.add(dev.XP.branch);
+        dev.add(xpCity(dev.XP.branch, id));
         S.cities[id] = { ...newCityState(), left: nowDays() };   // начален екип: бригада, багер, самосвал
         toast(`🏢 Отвори филиал в ${c.nm}!`, 'good'); showEventPop('new-branch', `📍 Нов филиал: ${c.nm}`, 'Влез в града от картата и строй и там.'); if (stingOk(id)) setTimeout(() => Sound.file(CITY_STING[id], 0.7), 1200); else Sound.play('branch'); save(); showMap(true); if (feature('branch-clip') && cine.clipFor && cine.clipFor(id)) setTimeout(() => switchCity(id), 1500);   /* №3 (55): град с клип (Ню Йорк, Париж, Токио…) — влизаш в него и клипът тръгва (веднъж) */
 }
@@ -5567,14 +5567,14 @@ function updateRails(dtDays) {
   for (const r of S.rails || []) {
     if (r.built && r.hsBuild) {
       r.hsBuild.prog += dtDays / r.hsBuild.days;
-      if (r.hsBuild.prog >= 1) { delete r.hsBuild; r.hs = true; xpMore(kmXp('rail', r.km || (r.b ? kmBetween(r.a, r.b) : 0)) / 2); toast(`⚡ Линията ${cityById(r.a).nm} — ${cityById(r.b).nm} е модернизирана — „Стрела“ вече може да минава по нея!`, 'good'); SFXcash(); save(); }
+      if (r.hsBuild.prog >= 1) { delete r.hsBuild; r.hs = true; xpMore(xpCity(kmXp('rail', r.km || (r.b ? kmBetween(r.a, r.b) : 0)) / 2, r.a, r.b)); toast(`⚡ Линията ${cityById(r.a).nm} — ${cityById(r.b).nm} е модернизирана — „Стрела“ вече може да минава по нея!`, 'good'); SFXcash(); save(); }
     }
     if (r.built) continue;
     r.prog += dtDays / r.days;
     if (r.prog >= 1) {
       r.built = true; r.prog = 1;
       invalidateRailGraph();
-      dev.add(feature('xp-km') ? kmXp('rail', r.km || (r.b ? kmBetween(r.a, r.b) : 0)) : dev.XP.rail);   // флаг xp-km — според км
+      dev.add(xpCity(feature('xp-km') ? kmXp('rail', r.km || (r.b ? kmBetween(r.a, r.b) : 0)) : dev.XP.rail, r.a, r.b));   // флаг xp-km — според км
       setTimeout(() => supply.tryDeliver(), 0);
       showEventPop('rail-done', `🛤️ ${cityById(r.a).nm} — ${cityById(r.b).nm}`, `${r.km} км жп линия е готова.`);
       toast(`🚆 Линията ${cityById(r.a).nm} — ${cityById(r.b).nm} е готова!${(S.trains || []).length ? '' : ' Купи влак, за да я използваш.'}`, 'good');
@@ -5603,6 +5603,14 @@ function totalTracks() {
 const TRAIN_BATCH = 50;   // най-много влакове в едно предложение на борда
 let batchTrains = false, batchXp = 0;
 // xp-more (т. 37): опит и за действията, които досега не даваха (одитът — _source/tasks/xp-audit.md); в пакет от борда — сумарно накрая (batchXp)
+// 📉 xp-taper (f1/потребителят: „ако имаш 50 града в Европа и всичките дават XP — следващото ниво да не е за 44 минути“): опитът, който идва
+// от отделен град (филиал, летище/пристанище, кейове, подобрения на офиса/гаража/склада/гарата, квартали, завършване, връзки с общината) отива в един
+// и същ град — този, в който си, и расте с броя на градовете. С флага — първите 10 града (централата и 9 филиала) както досега, после × √(10 / поредния номер);
+// магистрала/жп линия — по по-новия от двата града. Държавната поръчка — 30% от нивото на града, не цяло ниво
+const cityRank = id => { const L = [S.hqCity, ...(S.branches || [])].filter((x, i, a) => x && a.indexOf(x) === i), i = L.indexOf(id); return i < 0 ? L.length + 1 : i + 1; };
+const XP_FULL = 10;   // толкова града дават пълния опит
+const xpK = (...ids) => feature('xp-taper') && S ? Math.min(1, Math.sqrt(XP_FULL / Math.max(1, ...ids.filter(Boolean).map(cityRank)))) : 1;
+const xpCity = (n, ...ids) => Math.round(n * xpK(...ids));
 const xpMore = (n, why) => { if (!feature('xp-more') || !(n > 0) || !dev) return; if (batchN > 0) batchXp += n; else dev.add(Math.round(n), why); };
 const TRAIN_TYPES = {
   small: { nm: 'Малък товарен', ico: '🚂', wagons: 4, cost: 60000, upkeep: 250, speed: 160 },
@@ -6013,7 +6021,7 @@ function updateAir(dtDays) {
     if (id === S.cityId && !ap.lv) airSite3D(id);
     if (ap.build.prog >= 1) {
       ap.lv = ap.build.target; ap.build = null;
-      quests.emit('airport'); dev.add(dev.XP.branch); Sound.play('airport');
+      quests.emit('airport'); dev.add(xpCity(dev.XP.branch, id)); Sound.play('airport');
       if (id === S.cityId) refreshAirport3D(id);
       const first = !S.firstAirport && !Object.entries(S.airports || {}).some(([k, a]) => k !== id && a.lv); S.firstAirport = S.firstAirport || S.day;
       if (first) { Sound.play('levelup'); showEventPop('airport-first', `🛫 Построихте първото си летище — ${cityById(id).nm}!`, `${L.gates} гейта · отвори авиолинии и купи самолети от „✈️ Летища“.`); }   // първото летище — празнична картинка
@@ -6128,7 +6136,7 @@ function linkNeeds(id) {
   return { road, port, air, any: road || port || air };
 }
 function linkAct(act, id = S.cityId) {
-  const P = linkP(id), nm = cityById(id).nm, pay = (n, note) => { if (!econ.canAfford(n)) { toast('Нямаш достатъчно пари.', 'bad'); Sound.play('error'); return false; } econ.spend(n, 'покупка', note); xpMore(/-buy$/.test(act) ? 1000 : 200); return true; };   /* xp-more: връзка с общината / изкупуване */
+  const P = linkP(id), nm = cityById(id).nm, pay = (n, note) => { if (!econ.canAfford(n)) { toast('Нямаш достатъчно пари.', 'bad'); Sound.play('error'); return false; } econ.spend(n, 'покупка', note); xpMore(xpCity(/-buy$/.test(act) ? 1000 : 200, id)); return true; };   /* xp-more: връзка с общината / изкупуване */
   if (act === 'road-own') { if (onAnySeg(id)) roadOwn(id); else offerSpur(id); return; }
   if (act === 'road-muni') { const ab = onAbCorridor(id), c = ab ? P.abMuni : P.roadMuni; if (!pay(c, `Включване в ${ab ? 'аутобан' : 'магистрала'}: ${nm}`)) return; S.roadAccess = { ...(S.roadAccess || {}), [id]: ab ? 'ab' : 'road' }; toast(`🛣️ ${nm} е включен в ${ab ? 'аутобана' : 'пътната мрежа'} — материалите идват с −${ab ? 30 : 25}%.`, 'good'); }
   if (act === 'port-own') { if (!seaOn()) { toast(seaLockTxt().replace(/<[^>]+>/g, ''), 'bad'); return; } if (!econ.canAfford(P.portOwn)) { withLoan(P.portOwn, `Пристанище в ${nm}`, () => linkAct('port-own', id)); return; } econ.spend(P.portLand, 'покупка', `Терен за пристанище: ${nm}`); buildPort(id); }
@@ -6354,11 +6362,14 @@ function orientBuild(a, b, mul = 1) {
 TENDERS.push(...makeStateTenders(COUNTRIES, TENDERS, {
   region: id => isWorld(id) ? 'world' : isEurope(id) ? 'europe' : isForeign(id) ? 'balkan' : 'balkan', coastal: id => SEASIDE.includes(id), mega: id => MEGAPOLIS.has(id), name: id => cityById(id)?.nm || id }).filter(t => !TENDERS.some(x => x.id === t.id)));
 // изпълнена държавна поръчка → градът ѝ качва едно ниво (XP точно до следващия праг)
+// xp-taper: 30% от нивото на града (DEV_THRESH[lv] − DEV_THRESH[lv − 1]), до следващия праг — с много градове и търгове нивата иначе летят
+const TENDER_SHARE = 0.3;
+const tenderXp = d => feature('xp-taper') ? Math.min(DEV_THRESH[d.lv] - d.xp, Math.round(TENDER_SHARE * (DEV_THRESH[d.lv] - DEV_THRESH[d.lv - 1]))) : DEV_THRESH[d.lv] - d.xp;
 function tenderLevelUp(t) {
   const id = t.city;
-  if (id === S.cityId) { const d = S.dev || { xp: 0, lv: 1 }; if (d.lv < DEV_THRESH.length) dev.add(DEV_THRESH[d.lv] - d.xp, `държавна поръчка: ${t.nm}`); return; }
+  if (id === S.cityId) { const d = S.dev || { xp: 0, lv: 1 }; if (d.lv < DEV_THRESH.length) dev.add(tenderXp(d), `държавна поръчка: ${t.nm}`); return; }
   const c = (S.cities || {})[id]; if (!c) return;
-  const d = c.dev = c.dev || { xp: 0, lv: 1, v: 3 }; if (d.lv < DEV_THRESH.length) cityPanel.addXp(id, c, DEV_THRESH[d.lv] - d.xp);
+  const d = c.dev = c.dev || { xp: 0, lv: 1, v: 3 }; if (d.lv < DEV_THRESH.length) cityPanel.addXp(id, c, tenderXp(d));
 }
 // българските градове нямат cc (знамето по подразбиране е 🇧🇬) — затова българските „st-“ поръчки никога не излизаха; сега cc || 🇧🇬
 const ccOrBg = id => cityById(id) ? cityById(id).cc || '🇧🇬' : null;
@@ -6863,7 +6874,7 @@ const xbCan = id => { const p = portOf(id); return !!p && !p.muni && !p.build &&
 function addXBerths(id) {
   if (!xbCan(id)) return; const c = xbCost(id), nm = cityById(id).nm;
   if (!econ.canAfford(c)) { withLoan(c, `Нови кейове в ${nm}`, () => addXBerths(id)); return; }
-  econ.spend(c, 'покупка', `+${XB_STEP} кея в пристанище ${nm}`); xpMore(300); const p = portOf(id); p.xb = (p.xb || 0) + XB_STEP;
+  econ.spend(c, 'покупка', `+${XB_STEP} кея в пристанище ${nm}`); xpMore(xpCity(300, id)); const p = portOf(id); p.xb = (p.xb || 0) + XB_STEP;
   toast(`⚓ ${nm}: +${XB_STEP} нови кея (общо ${PORT_LEVELS[p.lv - 1].berths + p.xb}). Линиите без кораб ще си купят.`, 'good'); Sound.play('buy'); save(); if (bigWin) renderBig();
 }
 const seaRouteKm = (a, b) => seaKm(cityById(a), cityById(b));
@@ -7058,7 +7069,7 @@ function updateSea(dtDays) {
     pt.build.prog += dtDays / L.days;
     if (pt.build.prog >= 1) {
       pt.lv = pt.build.target; pt.build = null;
-      quests.emit('port'); dev.add(dev.XP.branch);
+      quests.emit('port'); dev.add(xpCity(dev.XP.branch, id));
       if (id === S.cityId) city.sea?.setPortLevel?.(pt.lv);
       showEventPop('port-done', `⚓ ${L.nm} в ${cityById(id).nm}`, `Пристанището е готово · ${L.berths} ${L.berths === 1 ? 'кей' : 'кея'}`);
       toast(`⚓ ${L.nm} в ${cityById(id).nm} е готово! ${L.berths} кея — купи кораби и отвори морски линии от „⚓ Пристанища“.`, 'good', () => openBig('sea')); save();
@@ -7427,7 +7438,7 @@ function updateStationBuild(dtDays) {
   if (!b) return;
   b.prog += dtDays / STATION_LEVELS[b.target - 1].days;
   if (b.prog < 1) return;
-  S.stationLevel = b.target; S.stationBuild = null; xpMore(300 * b.target);   /* xp-more: гарата */
+  S.stationLevel = b.target; S.stationBuild = null; xpMore(xpCity(300 * b.target, S.cityId));   /* xp-more: гарата */
   station.build(S.stationLevel);
   parkedSig = '';
   refreshPassing();
@@ -7540,7 +7551,7 @@ function finishCityRemote(id) {
   const stats = { built: (c.built || []).length, owned: ((c.estate || {}).owned || []).length, day: S.day };
   const r = econ.finishCity(id, share, stats);
   if (econ.setFinishedFleet) econ.setFinishedFleet(id, c.units || []);
-  S.finishedCount = (S.finishedCount || 0) + 1; S.branchDiscounts = (S.branchDiscounts || 0) + 1; xpMore(5000);
+  S.finishedCount = (S.finishedCount || 0) + 1; S.branchDiscounts = (S.branchDiscounts || 0) + 1; xpMore(xpCity(5000, id));
   clampFinished();
   showEventPop('city-done', `🏁 ${cityById(id).nm} е завършен!`, `${stats.built} сгради · дял ${Math.round(share * 100)}% · носи ~${fmt(Math.min(r.daily, econ.s.finished[id].daily))} €/ден. Следващият филиал е −30%.`);
   Sound.play('cityDone'); quests.emit('cityDone'); save(); updFinBtn();
@@ -7549,7 +7560,7 @@ function finishCity() {
   if (!canFinishCity()) return;
   const share = rivals.share(), stats = { built: S.built.length, owned: est().owned.length, day: S.day };
   const r = econ.finishCity(S.cityId, share, stats);
-  S.finishedCount = (S.finishedCount || 0) + 1; S.branchDiscounts = (S.branchDiscounts || 0) + 1; xpMore(5000);
+  S.finishedCount = (S.finishedCount || 0) + 1; S.branchDiscounts = (S.branchDiscounts || 0) + 1; xpMore(xpCity(5000, S.cityId));
   clampFinished();
   showEventPop('city-done', `🏁 ${cityName()} е завършен!`, `${stats.built} сгради · дял ${Math.round(share * 100)}% · носи ~${fmt(r.daily)} €/ден, докато си другаде. Следващият филиал е −30%.`);
   Sound.play('cityDone');
@@ -7871,7 +7882,7 @@ function buyDistrict(all = false) {
   if (!econ.canAfford(cost)) { toast('Нямаш достатъчно пари за новия квартал.', 'bad'); return; }
   econ.spend(cost, 'покупка', all ? `Всички квартали (${(S.cityExt || 0) + 1}–${extMaxOf(S.cityId)})` : `Нов квартал №${(S.cityExt || 0) + 1}`);
   { const e0 = S.cityExt || 0;
-  S.cityExt = all ? extMaxOf(S.cityId) : (S.cityExt || 0) + 1; xpMore(300 * (S.cityExt - e0)); }   // xp-more: 300 на квартал
+  S.cityExt = all ? extMaxOf(S.cityId) : (S.cityExt || 0) + 1; xpMore(xpCity(300 * (S.cityExt - e0), S.cityId)); }   // xp-more: 300 на квартал
   save();
   // градът се построява наново от записа (парцелите и пътищата се смятат при зареждане)
   toast('🏙️ Купи земя за нов квартал! Градът се разширява…', 'good');
@@ -7895,7 +7906,7 @@ function buyDistrictAt(id, all = false) {
   if (!econ.canAfford(cost)) { toast('Нямаш достатъчно пари за новия квартал.', 'bad'); return; }
   econ.spend(cost, 'покупка', `${cityById(id).nm}: ${all ? `всички квартали (${q.ext + 1}–${q.max})` : `нов квартал №${q.ext + 1}`}`);
   if (MEGAPOLIS.has(id) && c.extBig == null) c.extBig = q.ext;   // новите квартали на мегаполиса са с новия (по-малък) размер
-  c.cityExt = all ? q.max : q.ext + 1; xpMore(300 * (c.cityExt - q.ext));   // парцелите се появяват при следващото влизане (градът се строи от записа)
+  c.cityExt = all ? q.max : q.ext + 1; xpMore(xpCity(300 * (c.cityExt - q.ext), id));   // парцелите се появяват при следващото влизане (градът се строи от записа)
   if (c.freeLots && !MEGAPOLIS.has(id)) {   // новите квартали са празни парцели след ядрото 9×9 — добавят се към запомнените свободни
     const per = distLots(id);   // lots-tier: парцелите на квартал (решетка — колоните по 9; град с план — по размера на града)
     for (let e = q.ext; e < c.cityExt; e++) for (let k = 0; k < per; k++) c.freeLots.push([NB * NB + e * per + k, 'outer']);
@@ -8154,7 +8165,7 @@ function finishAutobahn(j) {
   S.hwJobs.splice(S.hwJobs.indexOf(j), 1);
   const gain = abTollGain(segById(j.seg));
   S.hwDone = [...hwDone(), j.seg]; setTimeout(hwQueueTick, 0);   // свободен екип → следващият от опашката
-  { const s = segById(j.seg); dev.add(feature('xp-km') && s ? kmXp('highway', kmBetween(s.a, s.b)) * 2 : dev.XP.highway * 2); }   // флаг xp-km — според км, аутобанът ×2
+  { const s = segById(j.seg); dev.add(xpCity(feature('xp-km') && s ? kmXp('highway', kmBetween(s.a, s.b)) * 2 : dev.XP.highway * 2, s && s.a, s && s.b)); }   // флаг xp-km — според км, аутобанът ×2
   setTimeout(() => supply.tryDeliver(), 0);
   const sg = segById(j.seg), names = AUTOBAHNS.filter(c => corridorSegIds(c).includes(j.seg)).map(c => `„${c.nm}“`).join(', ');
   econ.earn(j.reward, 'обект', `Аутобан ${cityById(sg.a).nm} — ${cityById(sg.b).nm}`);
@@ -8435,7 +8446,7 @@ function finishHighway(j) {
   for (const u of units) if (u.proj === j) { u.obj.visible = true; releaseUnit(u); }
   S.hwJobs.splice(S.hwJobs.indexOf(j), 1);
   S.hwDone = [...hwDone(), j.seg]; setTimeout(hwQueueTick, 0);   // свободен екип → следващият от опашката
-  { const s = segById(j.seg); dev.add(feature('xp-km') && s ? kmXp('highway', kmBetween(s.a, s.b)) : dev.XP.highway); }   // флаг xp-km — според км
+  { const s = segById(j.seg); dev.add(xpCity(feature('xp-km') && s ? kmXp('highway', kmBetween(s.a, s.b)) : dev.XP.highway, s && s.a, s && s.b)); }   // флаг xp-km — според км
   setTimeout(() => supply.tryDeliver(), 0);
   const s = segById(j.seg);
   econ.earn(j.reward, 'обект', `АМ „${s.hw.nm}“ ${cityById(s.a).nm} — ${cityById(s.b).nm}`);
@@ -9126,7 +9137,7 @@ function rbuildTick() {
         c[levelKey[kind]] = b.target;
         if (here) { buildHQ(); refreshWarehouse && refreshWarehouse(); }
       }
-      toast(`⬆️ ${K.ico} ${K.nm} в ${cityById(id).nm} вече е ниво ${b.target}!`, 'good'); xpMore((kind === 'station' ? 300 : 150) * b.target);
+      toast(`⬆️ ${K.ico} ${K.nm} в ${cityById(id).nm} вече е ниво ${b.target}!`, 'good'); xpMore(xpCity((kind === 'station' ? 300 : 150) * b.target, id));
       if (feature('gar-fill') && (kind === 'garage' || kind === 'office')) garFillCity(id);   // новите места — с нужната техника (от най-близките градове, после покупка)
     }
     if (c.rbuild && !Object.keys(c.rbuild).length) delete c.rbuild;
