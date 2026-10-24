@@ -2245,7 +2245,7 @@ function traffic2Make() {
   if (tr2) tr2.clear(); if (tr2G) { scene.remove(tr2G); tr2G = null; }
   const p2 = city.plan && city.plan.p2;   // планът v2: лентите от planNetwork, колите — в група, изместена с offset (като 3D изгледа на плана)
   if (p2) { tr2G = new THREE.Group(); tr2G.position.set(city.plan.offset[0], 0, city.plan.offset[1]); scene.add(tr2G); }
-  tr2 = createTraffic({ scene: tr2G || scene, camera, movers: () => moversNow(), onJam: j => jamPolice(j), jp: feature('junction-paths'), drive: p2 && p2.drive === 'L' ? 'left' : 'right', maxCars: wantedTraffic(), spawnW: p => laneW(p), crossings: () => crossingsNow(), blockers: () => [...(railx && !feature('railx-stop') ? railx.blockers() : []), ...(incidents.blockers?.() || [])].map(b => p2 ? { x: b.x - city.plan.offset[0], z: b.z - city.plan.offset[1] } : b),   /* + затворената улица при инцидент (incidents2, 55) */   // camera — истинските фарове само за най-близките коли
+  tr2 = createTraffic({ scene: tr2G || scene, camera, movers: () => moversNow(), onJam: j => jamPolice(j), ringClaim: feature('jam-call'), jp: feature('junction-paths'), drive: p2 && p2.drive === 'L' ? 'left' : 'right', maxCars: wantedTraffic(), spawnW: p => laneW(p), crossings: () => crossingsNow(), blockers: () => [...(railx && !feature('railx-stop') ? railx.blockers() : []), ...(incidents.blockers?.() || [])].map(b => p2 ? { x: b.x - city.plan.offset[0], z: b.z - city.plan.offset[1] } : b),   /* + затворената улица при инцидент (incidents2, 55) */   // camera — истинските фарове само за най-близките коли
     ...(p2 ? { built: planNetwork(p2, { jp: feature('junction-paths') }) } : { net: gridNetwork({ NBI, NBJ, tx, isRoad, TILE, signal: (i, j) => signals.some(s => s.i === i && s.j === j) }) }),
     makeCar: () => { addCar(); const t = traffic.pop(); if (!t) return null; const heavy = /Bus|Truck|Firetruck|firetruck|kenworth|sf-bus-/.test(t.obj.userData.src || '');
       if (tr2G) { const k = t.len > 3 && t.len < 14 ? 1 : (heavy ? 11 : 4.5) / (t.len || 4.5);   /* колите вече са в истинския размер (sf-car-* и резервите с kidK) — не ги изравняваме до 4,5 м; само ако мярката е сбъркана (55) */ t.obj.scale.multiplyScalar(k); t.len = (t.len || 4.5) * k; tr2G.add(t.obj); }   // планът v2 е в истински метри — колите в истинския си размер
@@ -2275,8 +2275,24 @@ function roadNotice() {
 // #15 (city-bus): 1–2 линии по главните улици, 4–8 спирки; автобусите — агенти в трафика (citybus.js); броят расте с града
 const cityBus = createCityBus({ agents: () => feature('city-bus') ? jpAgents() : null, lanes: () => tr2 ? tr2.lanes : [], center: () => city.plan?.p2?.center || { x: 0, z: 0 }, R: () => city.plan?.p2?.R || 400,
   bus: () => A['sf-car-Bus'] ? model('sf-car-Bus', 1) : null, want: () => { const b = city.lots.filter(l => l.built).length; return { lines: b > 120 ? 2 : 1, perLine: Math.min(3, 1 + Math.floor(b / 90)) }; } });
-function jamPolice(j) {
+// #6 (jam-call, bl25-05): задръстване/заклещени коли → известие „🚓 Извикай полиция“ + „🎥 гледай“; без натискане полицията идва сама след 90 s
+// (заклещените — винаги, обикновеното задръстване — през раз); при полицая трафикът разплита заклещените (traffic.js: ghT)
+let jamAsk = null;
+function jamNotice(j) {
+  if (jamAsk || jamNode != null || incidents.active) return;
+  const o = tr2G ? tr2G.position : { x: 0, z: 0 }, x = j.x + o.x, z = j.z + o.z, nm = streetNm(x, z), el = document.createElement('div');
+  el.className = 'toast bad'; el.style.pointerEvents = 'auto'; el.dataset.keep = '1';
+  el.innerHTML = `<div>🚦 ${j.lock ? 'Заклещени коли' : 'Задръстване'}${nm ? ` при „${nm}“` : ''}</div><div style="display:flex;gap:6px;margin-top:6px"><button data-k="pol">🚓 Извикай полиция</button><button data-k="cam">🎥 гледай</button></div>`;
+  for (const bt of el.querySelectorAll('button')) bt.style.cssText = 'background:#26313f;color:#fff;border:1px solid #4b5a6c;border-radius:7px;padding:4px 10px;font:inherit;font-size:13px;cursor:pointer';
+  const done = () => { el.remove(); if (jamAsk) clearTimeout(jamAsk.t); jamAsk = null; };
+  el.querySelector('[data-k=pol]').onclick = () => { done(); jamPolice(j, true); };
+  el.querySelector('[data-k=cam]').onclick = () => flyTo({ x, z });
+  $('toasts').prepend(el); setTimeout(() => el.remove(), 25000); Sound.file('assets/sfx/radio-road.mp3', 0.45);
+  jamAsk = { t: setTimeout(() => { done(); if (j.lock || Math.random() < 0.5) jamPolice(j, true); }, 90000) };
+}
+function jamPolice(j, now = false) {
   if (!feature('jam-police') || !tr2 || jamNode != null || incidents.active) return;
+  if (!now && feature('jam-call')) return jamNotice(j);
   const o = tr2G ? tr2G.position : { x: 0, z: 0 }, r = incidents.start('jam', { x: j.x + o.x, z: j.z + o.z }); if (r) { jamNode = j.node; jamOn = false; }
 }
 function jamTick() {
@@ -4221,7 +4237,7 @@ function toast(text, kind = '', onClick = null) {
   if (onClick) { t.style.pointerEvents = 'auto'; t.style.cursor = 'pointer'; t.onclick = () => { onClick(); t.remove(); }; }
   $('toasts').prepend(t);
   setTimeout(() => t.remove(), 5000);
-  while ($('toasts').children.length > 4) $('toasts').lastChild.remove();
+  while ($('toasts').children.length > 4) { const o = [...$('toasts').children].reverse().find(x => !x.dataset.keep); if (!o) break; o.remove(); }   // #6: известието с бутони (data-keep) не се изрязва
 }
 // плавно отиване на камерата до парцел
 let fly = null;
@@ -11424,6 +11440,7 @@ if (AUTOTEST) {
     jpAg: () => tr2 && tr2.cars.filter(c => c.agent).map(c => [c.agent.name, c.p.kind, +c.s.toFixed(1), +c.p.len.toFixed(1), +c.v.toFixed(2), c.why, +c.wait.toFixed(1), c.ri, c.route.length, +c.goal.toFixed(1)]),   /* junction-paths: агентите */
     units: () => units.map(u => ({ t: u.type, st: u.state, proj: u.proj ? (projects.includes(u.proj) ? u.proj.title : S.hwJobs?.includes(u.proj) ? 'магистрала' : 'МЪРТЪВ') : null, moveD: +(u.moveD || 0).toFixed(2), jpTry: u.jpTry || 0, wb: +(u.wb || 0).toFixed(1), path: u.path ? u.path.length : 0, agent: !!u.agent })),   /* #12: техниката в града */
     unitRepair: () => unitRepair(),
+    jamCallTest(lock = true) { if (!tr2) return null; const n = [...tr2.nodes.values()].find(q => q.deg >= 3 && !q.ring && q.conns.some(C => C.ringIn)) || [...tr2.nodes.values()].find(q => q.deg >= 3 && !q.ring); jamNotice({ node: n.id, x: n.x, z: n.z, q: 3, lock }); const o = tr2G ? tr2G.position : { x: 0, z: 0 }; __dbg.camAt(n.x + o.x + 30, 34, n.z + o.z + 42, n.x + o.x, 0, n.z + o.z); return { node: n.id, ask: !!jamAsk }; },   /* #6: известието „🚓 Извикай полиция“ */
     urgent: (i = 0) => urgentDispatch(projects[i]),   /* #12: „🚨 Тръгвайте спешно“ */
     needOf: (i = 0) => projects[i] && { t: projects[i].title, stage: projects[i].stage, roles: missingRoles(projects[i]) },
     unitIdleTest() { const u = units.find(q => q.proj && projects.includes(q.proj)); if (!u) return null; const A = jpAgents(); if (u.agent && A && A.alive(u.agent)) A.remove(u.agent); if (u.agent) scene.add(u.obj); u.agent = null; u.path = null; u.state = 'idle'; const log = unitRepair(); return { t: u.type, log, st: u.state, path: !!(u.path || u.agent || u.jp) }; },   /* #12: на плаца, а вързана за обекта → unitRepair */
