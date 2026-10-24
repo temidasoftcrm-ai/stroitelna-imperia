@@ -290,6 +290,7 @@ export function createTraffic(opts) {
     if (opts.onJam && steps % 30 === 0) for (const n of nodes.values()) { if (n.ring || n.deg < 3 || n.pol) continue; let q = 0; for (const l of n.inL) for (const c of l.cars) if (c.v < 0.3) q++;
       const stuck = n.inL.some(l => { const h = l.cars[l.cars.length - 1]; return h && h.wait > 30; });   // първата в опашката чака повече от цял цикъл на светофара
       n.jamT = q >= JAM_N && stuck ? (n.jamT || 0) + 1 : 0; if (n.jamT >= JAM_S && !(n.jamCd > steps)) { n.jamCd = steps + 30 * 240; n.jamT = 0; opts.onJam({ node: n.id, x: n.x, z: n.z, q }); } }
+    const PK = opts.pace ? opts.pace() : 1, PA = Math.min(1.35, PK);   // traffic-pace: желаната скорост ×PK (и завоите), ускорението ×PA; спирането — както досега
     const MV = opts.movers ? opts.movers() : [], XS = opts.crossings ? opts.crossings() : [];   // XS — прелезите: { x, z, ux, uz (посоката на улицата), h (половината зона по улицата до бариерата), on }
     // #14: спешните с буркани (линейка/полиция/пожарна от трафика и идващите към инцидент) — колите пред тях отбиват вдясно и спират, те минават покрай тях
     for (const c of cars) c.emOn = !!c.em && beaconsLit(c.obj);
@@ -299,8 +300,8 @@ export function createTraffic(opts) {
       if (c.lcT > 0) c.lcT -= H;
       let hopG = 1e9; if (c.route && isSib(c.p, c.next)) { if (c.s > c.L + 2 && c.hopW == null) { c.hopW = 1.2; c.lcT = 1.2; c.lcSide = sideTo(c, c.next); } if (c.hopW != null && (c.hopW -= H) <= 0 && hopTo(c, c.next)) { c.hopW = null; c.ri++; pickNext(c); } else hopG = c.p.len - c.s - c.L / 2 - 8; }   /* маршрутът с смяна на лента (route hop): сменя веднага щом има място; иначе чака преди края на лентата */
       const gh = c.ghT > 0; if (gh) c.ghT -= H;   // #6: полицаят го пуска да се размине
-      let vmax = c.p.vmax * (c.vk || 1); const ld = gh ? null : leader(c);
-      if (jp && c.next) vmax = Math.min(vmax, Math.sqrt((c.next.vmax * (c.vk || 1)) ** 2 + 2 * B_COMF * 0.6 * Math.max(0, c.p.len - c.s - c.L / 2)));   // по-бавно преди завоя, ускорява след него
+      let vmax = c.p.vmax * (c.vk || 1) * PK; const ld = gh ? null : leader(c);
+      if (jp && c.next) vmax = Math.min(vmax, Math.sqrt((c.next.vmax * (c.vk || 1) * PK) ** 2 + 2 * B_COMF * 0.6 * Math.max(0, c.p.len - c.s - c.L / 2)));   // по-бавно преди завоя, ускорява след него
       c.why = ld && ld.gap < 6 && ld.v < 0.5 ? 'кола отпред' : null;
       let gap = ld && !(c.emOn && ld.car && ld.car.yieldT > 0) ? ld.gap : 1e9, dv = ld ? c.v - ld.v : 0;   // спешната — покрай отбилите
       c.offT = c.emOn ? -SIDE * 0.5 : 0;
@@ -329,7 +330,7 @@ export function createTraffic(opts) {
       if (c.route && !c.next) { const g = c.goal - c.s + S0; if (g < gap) { gap = g; dv = c.v; } if (c.goal - c.s < 1 && c.v < 0.3 && !c.arrived) { c.arrived = true; c.why = 'цел'; if (c.agent.onArrive) c.agent.onArrive(c); } }   // агентът — до целта на последната пътека
       if (stop && !c.route && c.wait > 6 && ((c.wait / H) | 0) % 90 === 0) pickNext(c);   // изходът дълго е зает — друга посока (шофьорът заобикаля)
       const ss = S0 + Math.max(0, c.v * T_HEAD + c.v * dv / (2 * Math.sqrt(A_MAX * B_COMF)));
-      let a = A_MAX * (1 - Math.pow(c.v / vmax, 4) - (gap < 1e8 ? Math.pow(ss / Math.max(0.1, gap), 2) : 0));
+      let a = A_MAX * PA * (1 - Math.pow(c.v / vmax, 4) - (gap < 1e8 ? Math.pow(ss / Math.max(0.1, gap), 2) : 0));
       a = Math.max(-9, Math.min(A_MAX, a)); c.a = a;
       let v = Math.max(0, c.v + a * H), ds = v * H;
       if (gap < 1e8) { const lim = Math.max(0, gap - 0.4); if (ds > lim) { ds = lim; v = Math.min(v, lim / H); } }   // твърдото ограничение за стъпката

@@ -2269,7 +2269,7 @@ function traffic2Make() {
   if (tr2) tr2.clear(); if (tr2G) { scene.remove(tr2G); tr2G = null; }
   const p2 = city.plan && city.plan.p2;   // планът v2: лентите от planNetwork, колите — в група, изместена с offset (като 3D изгледа на плана)
   if (p2) { tr2G = new THREE.Group(); tr2G.position.set(city.plan.offset[0], 0, city.plan.offset[1]); scene.add(tr2G); }
-  tr2 = createTraffic({ scene: tr2G || scene, camera, movers: () => moversNow(), onJam: j => jamPolice(j), ringClaim: feature('jam-call'), jp: feature('junction-paths'), drive: p2 && p2.drive === 'L' ? 'left' : 'right', maxCars: wantedTraffic(), spawnW: p => laneW(p), crossings: () => crossingsNow(), blockers: () => [...(railx && !feature('railx-stop') ? railx.blockers() : []), ...(incidents.blockers?.() || [])].map(b => p2 ? { x: b.x - city.plan.offset[0], z: b.z - city.plan.offset[1] } : b),   /* + затворената улица при инцидент (incidents2, 55) */   // camera — истинските фарове само за най-близките коли
+  tr2 = createTraffic({ scene: tr2G || scene, camera, movers: () => moversNow(), onJam: j => jamPolice(j), ringClaim: feature('jam-call'), pace: () => feature('traffic-pace') ? 1.3 : 1, jp: feature('junction-paths'), drive: p2 && p2.drive === 'L' ? 'left' : 'right', maxCars: wantedTraffic(), spawnW: p => laneW(p), crossings: () => crossingsNow(), blockers: () => [...(railx && !feature('railx-stop') ? railx.blockers() : []), ...(incidents.blockers?.() || [])].map(b => p2 ? { x: b.x - city.plan.offset[0], z: b.z - city.plan.offset[1] } : b),   /* + затворената улица при инцидент (incidents2, 55) */   // camera — истинските фарове само за най-близките коли
     ...(p2 ? { built: planNetwork(p2, { jp: feature('junction-paths') }) } : { net: gridNetwork({ NBI, NBJ, tx, isRoad, TILE, signal: (i, j) => signals.some(s => s.i === i && s.j === j) }) }),
     makeCar: () => { addCar(); const t = traffic.pop(); if (!t) return null; const heavy = /Bus|Truck|Firetruck|firetruck|kenworth|sf-bus-/.test(t.obj.userData.src || '');
       if (tr2G && (t.obj.userData.src === 'sf-bus-artic' || articForce > 0 && articForce--) && feature('artic-bend') && A['sf-bus-artic-f'] && A['sf-bus-artic-r']) {   // #4 (artic-bend): съчлененият — две секции; задната следва като ремарке от шарнира в хармониката (traffic.js pose)
@@ -2628,7 +2628,9 @@ function pedPose(p, idle, dt) {
   p.m.position.set(p.x, 0.05, p.z); p.m.rotation.y = p.yaw; p.mixer.update(dt);
 }
 const pedGap = c => !tr2 || !tr2On() || !tr2.cars.some(car => Math.hypot(car.x - c.x, car.z - c.z) < 7);
+let spdProbe = null;   // __dbg.speedProbe: измерване на скоростите (колите, автобусите, ТИР-овете, техниката, спешните) за N истински секунди
 function updateTraffic(dt) {
+  if (spdProbe) spdProbe(dt);
   if (tr2 && tr2On()) { tr2.opts.maxCars = tr2Force || wantedTraffic(); const t0 = performance.now(); tr2.update(dt); tr2.ms = (tr2.ms || 0) * 0.95 + (performance.now() - t0) * 0.05; return; }   // traffic2: светофарите се управляват оттам
   if (S && traffic.length < wantedTraffic() && Math.random() < dt * 0.5) addCar();   // градът расте → идват още коли
   const obst = window.__noAvoid ? [] : [...traffic, ...(incidents.obstacles?.() || [])];   // колите и спешните на инцидента — за спиране и заобикаляне
@@ -10802,7 +10804,7 @@ function frame() {
     while (left > 0) { const st = Math.min(left, 0.05); updateUnits(st); left -= st; }
     if (!onMap) {   // колите, хората и светофарите са само за гледане — при отворена карта (SVG) не се движат
       updateTraffic(rdt * Math.max(1, speed));
-      updatePeds(rdt * Math.min(2, Math.max(1, speed)));
+      updatePeds(rdt * Math.min(feature('traffic-pace') ? 4 : 2, Math.max(1, speed)));   // traffic-pace: хората — и при ▶▶▶ (досега до 2×)
       updateSignals(rdt * Math.max(1, speed));
       incidents.update(rdt * Math.max(1, speed), rdt);
       jamTick();   // #28: полицаят на задръстеното кръстовище
@@ -11569,6 +11571,9 @@ if (AUTOTEST) {
     hwRampInfo() { if (!cityHw || !cityHw.v.ramps) return null; const g = cityHw.v.ramps.group; g.updateWorldMatrix(true, true); const b = new THREE.Box3().setFromObject(g); return { vis: g.visible, n: g.children.length, min: b.min.toArray().map(Math.round), max: b.max.toArray().map(Math.round), groundY: city.ground ? city.ground.position.y : null }; },
     hwLookAt(dz, dx, h = 70) { if (!cityHw || !cityHw.v.ramps) return false; const cx = cityHw.v.ramps.paths.nearOff[0][1] - 330 + cityHw.v.group.position.x, z = cityHw.v.group.position.z; controls.target.set(cx + dz, 0, z - dx); camera.position.set(cx + dz + 1, h, z - dx + 2); return true; },   /* hw-ramps: отгоре — dz по оста, dx напреки (откъм града +) */
     hwLookRamps(h = 120) { if (!cityHw || !cityHw.v.ramps) return false; const cx = cityHw.v.ramps.paths.nearOff[0][1] - 330 + cityHw.v.group.position.x, z = cityHw.v.group.position.z; const sd = __dbg.__rampSide || 1; controls.target.set(cx, 0, z - 20); camera.position.set(cx + h * 1.3, h, z - 20 - sd * h * 0.9); return true; },   /* hw-ramps: изгледът към изходите */
+    hwInc(type = 'rear', dir = 1, night = false) { if (!cityHw) this.hwOpen(); const T = cityHw && cityHw.traffic; if (!T || !T.inc) return 'off'; showMap(false); if (night) { this.time(22); setSpeed(1); } return Promise.resolve(T.inc.start(type, { dir })).then(r => new Promise(ok => { let k = 0; const tick = () => { if (T.inc.spot() || !r || r.fail || ++k > 80) { this.hwIncLook(); ok({ ...r, ...T.inc.info() }); } else setTimeout(tick, 250); }; tick(); })); },   /* чака подходяща кола на мястото */
+    hwIncLook(back = 80, h = 26, side = 34, ahead = 0) { const T = cityHw && cityHw.traffic, p = T && T.inc && T.inc.spot(); if (!p) return null; T.group.updateWorldMatrix(true, false); const w = (x, yy, z) => T.group.localToWorld(new THREE.Vector3(x, yy, z)); controls.target.copy(w(p.x - p.D * (10 - ahead), 1, p.z)); camera.position.copy(w(p.x - p.D * (back - ahead), h, p.z + p.D * side)); fly = null; return T.inc.info(); },
+    hwIncStep(sec = 10, full = false) { const T = cityHw && cityHw.traffic; if (!T || !T.inc) return null; for (let t = 0; t < sec; t += 0.2) T.update(0.2); return T.inc.info(full); },
     hwOpen() { const s = allSegs().find(q => q.a === S.cityId || q.b === S.cityId); if (!s) return null; S.hwDone = [...new Set([...(S.hwDone || []), s.id])]; buildCityHighway(); return s.id; },
     enterResort: id => openHwView('resort:' + id),
     siteStage(n) { const p = projects.find(q => !q.own && q.type !== 'house'); if (!p) return null; p.stage = n; p.prog = 0.3; p.mat = { 0: true, 1: true, 2: true, 3: true }; for (const u of units) if (u.proj === p) releaseUnit(u); dispatch(); return p.lot; },
@@ -11604,6 +11609,17 @@ if (AUTOTEST) {
       const bad = pts => { let k = 0; for (let i = 1; i < pts.length; i++) for (let t = 0; t <= 1; t += 0.25) { const x = pts[i - 1].x + (pts[i].x - pts[i - 1].x) * t, z = pts[i - 1].z + (pts[i].z - pts[i - 1].z) * t; if (isl.some(q => Math.hypot(x - q.cx, z - q.cz) < q.r)) { k++; break; } } return k; };
       let oldB = 0, newB = 0, viaRing = 0; for (let i = 0; i < n; i++) { const a = roadPoint(), b = roadPoint(); if (!a || !b) continue; const r0 = roadRoute(a.x, a.z, b.x, b.z), r1 = emRoute(a.x, a.z, b.x, b.z), b0 = bad(r0); oldB += b0; const b1 = bad(r1); newB += b1; if (b0) viaRing++; if (b1) (this.__w = this.__w || []).push({ fb: !r1[0]?.ln, b1, len: r1.length, a: [Math.round(a.x), Math.round(a.z)], b: [Math.round(b.x), Math.round(b.z)] }); }
       const w = this.__w; this.__w = null; return { rings: isl.length, n, routesCrossingIslandOld: viaRing, segInIslandOld: oldB, segInIslandNew: newB, w: (w || []).slice(0, 6) }; },   /* спешните коли през острова на кръговото — старият път и по лентите */
+    setSpeed: n => { setSpeed(n); return speed; },   /* traffic-pace: демото пуска ▶▶▶ */
+    speedProbe(sec = 20) {   /* „колите не се ли движат бавно спрямо часовника“: средна/медианна скорост (м/с, по времето на трафика), дял стоене, симулирано време за 1 истинска секунда, игрови часове */
+      const K = {}, add = (k, v, dt) => { const q = K[k] || (K[k] = { t: 0, d: 0, stop: 0, vs: [] }); q.t += dt; q.d += v * dt; if (v < 0.3) q.stop += dt; else if (q.vs.length < 20000) q.vs.push(v); };
+      const t0 = performance.now(), h0 = (S.day + S.dayT / DAY_SEC) / CYCLE_DAYS * 24; let sim = 0, frames = 0, st0 = tr2 ? tr2.stats().steps : 0; const U0 = new Map(units.map(u => [u, [u.x, u.z]])); let uSim = 0;
+      spdProbe = dt => { sim += dt; frames++;
+        if (tr2) for (const c of tr2.cars) add(c.agent ? (c.kind === 'bus' ? 'bus-agent' : c.trl ? 'tir' : /Училищ|Автобус/.test(c.agent?.name || '') ? 'bus-agent' : 'agent-' + c.kind) : c.em ? 'emergency' : c.L > 7.5 ? 'bus/truck' : 'car', c.v, dt);
+        for (const t of traffic) { const p = t.__pp; t.__pp = [t.x, t.z]; if (p && dt > 0) add('legacy', Math.hypot(t.x - p[0], t.z - p[1]) / dt, dt); } };   /* старият трафик (без tr2): по преместването за кадъра */
+      return new Promise(res => setTimeout(() => { spdProbe = null; const real = (performance.now() - t0) / 1000, h1 = (S.day + S.dayT / DAY_SEC) / CYCLE_DAYS * 24, out = {};
+        for (const [k, q] of Object.entries(K)) { q.vs.sort((a, b) => a - b); out[k] = { avg: +(q.d / q.t).toFixed(2), avgMoving: +(q.vs.reduce((a, b) => a + b, 0) / Math.max(1, q.vs.length)).toFixed(2), median: +(q.vs[q.vs.length >> 1] || 0).toFixed(2), stopped: +(q.stop / q.t).toFixed(2), n: Math.round(q.t / Math.max(sim, 1e-6)) }; }
+        let ud = 0, un = 0; for (const [u, p] of U0) { const d = Math.hypot(u.x - p[0], u.z - p[1]); if (d > 1) { ud += d; un++; } }
+        res({ speed, realSec: +real.toFixed(1), frames, fps: +(frames / real).toFixed(1), trafficSimSec: +sim.toFixed(1), simPerReal: +(sim / real).toFixed(2), steps: tr2 ? tr2.stats().steps - st0 : null, gameHours: +(h1 - h0).toFixed(2), simSecPerGameHour: +(sim / Math.max(1e-6, h1 - h0)).toFixed(1), kinds: out, unitsMoved: un, unitsAvgDisp: un ? +(ud / un).toFixed(0) : 0, tr2: !!(tr2 && tr2On()) }); }, sec * 1000)); },
     chaseState: () => { const a = incidents.active; return a && { ...a, follow: incidents.follow(), cam: chaseCam }; },
     urgent: (i = 0) => urgentDispatch(projects[i]),   /* #12: „🚨 Тръгвайте спешно“ */
     needOf: (i = 0) => projects[i] && { t: projects[i].title, stage: projects[i].stage, roles: missingRoles(projects[i]) },
