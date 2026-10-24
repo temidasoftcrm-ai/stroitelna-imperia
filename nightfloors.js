@@ -9,6 +9,7 @@ import { feature } from './lab/feature.js';
 const ND = feature('night-dim');
 // blk-night: жилищните блокове (sf-blk-*, b2-*) — цели прозорци по номер, топли/хладни/синкави (телевизор), меко осветяване на фасадата отдолу
 const BLK = n => /^sf-blk-|^b2-/.test(n || '') && feature('blk-night');
+const WINM = (n, md) => md === 'flood' && (n === 'sf-blk-brick' || n === 'sf-blk-oldbld') && BLK(n) && feature('blk-night2');   // blk-night2: отделен меш само с прозорците (тухлената с арките) — цели прозорци в тонове, не равно „flood“
 
 const MODE = { ...Object.fromEntries([3, 4, 5, 6, 7, 8, 9, 10].map(l => [`office2-l${l}`, l === 10 ? 'cool' : 'dark'])),   /* 10 — синкавото стъкло на кулата */   // 🆕 новите нива на офиса (game.js OFFICE2): прозорците — по-тъмни от фасадата
   'building-a': 'dark', 'building-b': 'cool', 'building-c': 'dark', 'building-d': 'dark', 'building-e': 'cool', 'building-f': 'cool',
@@ -172,8 +173,32 @@ function gasPool(root) {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2), mt); m.position.set((box.min.x + box.max.x) / 2, bb.min.y + H * 0.01, (box.min.z + box.max.z) / 2); m.renderOrder = 2; m.userData.noShadow = true; root.add(m);
 }
 // подготвя моделя веднъж (материалите се делят от всички сгради с този модел)
+function winIslands(geo) {   // blk-night2: всяко отделно парче стъкло (свързани триъгълници, по позицията) — свой номер → nfWin (ред на палене, цвят)
+  if (geo.attributes.nfWin) return; const P = geo.attributes.position, n = P.count, key = new Map(), up = new Int32Array(n), id = new Int32Array(n);
+  for (let i = 0; i < n; i++) { const k = P.getX(i).toFixed(3) + ',' + P.getY(i).toFixed(3) + ',' + P.getZ(i).toFixed(3); if (!key.has(k)) key.set(k, i); id[i] = key.get(k); up[i] = i; }
+  const f = i => { while (up[i] !== i) i = up[i] = up[up[i]]; return i; }, ix = geo.index ? geo.index.array : null, T = ix ? ix.length : n;
+  const pn = new Uint8Array(n).fill(1);
+  for (let t = 0; t < T; t += 3) { const a = f(id[ix ? ix[t] : t]), b = f(id[ix ? ix[t + 1] : t + 1]), c = f(id[ix ? ix[t + 2] : t + 2]); up[b] = a; up[f(c)] = a; }
+  const bx = new Map(); for (let i = 0; i < n; i++) { if (!pn[i]) continue; const r = f(id[i]); let b = bx.get(r); if (!b) bx.set(r, b = [1e9, 1e9, 1e9, -1e9, -1e9, -1e9]); const v = [P.getX(i), P.getY(i), P.getZ(i)]; for (let k = 0; k < 3; k++) { b[k] = Math.min(b[k], v[k]); b[k + 3] = Math.max(b[k + 3], v[k]); } }
+  const R = [...bx.keys()], e = 1e-3;   // застъпените парчета (двоен слой стъкло, рамка + стъкло) — един прозорец, иначе се бият (z-fighting) на точки
+  for (let a = 0; a < R.length; a++) for (let c = a + 1; c < R.length; c++) { const A = bx.get(R[a]), C = bx.get(R[c]); if (A[0] <= C[3] + e && C[0] <= A[3] + e && A[1] <= C[4] + e && C[1] <= A[4] + e && A[2] <= C[5] + e && C[2] <= A[5] + e) { const x = f(R[a]), y = f(R[c]); if (x !== y) up[y] = x; } }
+  const w = new Float32Array(n * 3); for (let i = 0; i < n; i++) { const r = f(id[i]); w[3 * i] = ((Math.imul(r + 1, 2654435761) >>> 0) % 997) / 997; w[3 * i + 1] = ((Math.imul(r + 7, 2246822519) >>> 0) % 991) / 991; w[3 * i + 2] = pn[i]; }
+  geo.setAttribute('nfWin', new THREE.BufferAttribute(w, 3));
+}
 export function prepNightFloors(root, name) {
   if (!MODE[name] || !feature(FEAT[name] || 'night-floors')) return;
+  if (name === 'sf-blk-modoffice' && BLK(name) && feature('blk-night2') && !root.getObjectByName('nfPanes')) {   // кулата: етажите са рамки с отвори (4 на стена) зад тъмно стъкло — в отворите плоскости, които нощем светят
+    const PAL = ['#ff9438', '#ffbd6b', '#f2d9b3', '#b3ccff', '#ffa94d', '#ffd08a', '#000', '#000', '#000', '#000', '#000', '#5d75ff'], cv = document.createElement('canvas'); cv.width = PAL.length; cv.height = 1;   // като blk-night: кехлибарено, жълто, топло/хладно бяло, телевизор; ~40% тъмни
+    const g = cv.getContext('2d'); PAL.forEach((c, k) => { g.fillStyle = c; g.fillRect(k, 0, 1, 1); }); const pal = new THREE.CanvasTexture(cv); pal.magFilter = pal.minFilter = THREE.NearestFilter; pal.generateMipmaps = false; pal.colorSpace = THREE.SRGBColorSpace;
+    const mat = new THREE.MeshStandardMaterial({ color: 0x0b0c0f, roughness: 0.35, emissive: 0xffffff, emissiveMap: pal, emissiveIntensity: 0, name: 'nfPanes' }); mat.userData.nfK = 7; mat.userData.nightFloors = true; NF_MATS.add(mat);   // daynight.js: яркостта нощем (силно — гледа се през тъмното стъкло)
+    const L = []; root.traverse(o => { if (o.isMesh && /^Layer/.test(o.name) && /BlackStone/.test(o.material && o.material.name || '')) L.push(o); });
+    L.forEach((o, li) => { const pos = [], nor = [], uv = []; let q0 = 0;
+      for (const [a, b] of [[-0.917, -0.583], [-0.417, -0.083], [0.083, 0.417], [0.583, 0.917]]) for (let sd = 0; sd < 4; sd++) {   // в координатите на слоя (−1…1), между външната (1) и вътрешната (0.958) стена
+        const P = (u, y) => { const d = 0.975; return sd === 0 ? [u, y, d] : sd === 1 ? [-u, y, -d] : sd === 2 ? [d, y, -u] : [-d, y, u]; }, n = [[0, 0, 1], [0, 0, -1], [1, 0, 0], [-1, 0, 0]][sd];
+        const k = (Math.imul(li * 31 + q0++ + 1, 2654435761) >>> 0) % PAL.length, u = (k + 0.5) / PAL.length;
+        for (const v of [P(a, -0.167), P(b, -0.167), P(b, 0.167), P(a, -0.167), P(b, 0.167), P(a, 0.167)]) { pos.push(...v); nor.push(...n); uv.push(u, 0.5); } }
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      const w = new THREE.Mesh(geo, mat); w.name = 'nfPanes'; o.add(w); }); }
   if (/^gas-/.test(name)) gasPool(root);   // бензиностанцията: светло петно на асфалта под навеса (отгоре долната страна не се вижда)
   const bb = new THREE.Box3().setFromObject(root), floorH = Math.max(1e-3, (bb.max.y - bb.min.y) / FLOORS(name)), y0 = bb.min.y;
   root.traverse(o => {
@@ -188,6 +213,7 @@ export function prepNightFloors(root, name) {
       const mk = mode === 'solid' || mode === 'solidW' || mode === 'grid' || mode === 'petro' || mode === 'empire' || mode === 'liberty' || mode === 'ship' || mode === 'redeemer' || mode === 'colosseo' || mode === 'colosseoC' || mode === 'vittoriano' || mode === 'maiden' || mode === 'lazare' || mode === 'grid2' || mode === 'patrick' || mode === 'ind' || mode === 'gct' || mode === 'gas' || mode === 'westm' || mode === 'rock' || mode === 'radio' || mode === 'neon' || mode === 'radioS' || mode === 'empire2' ? WHITE : mode === 'aux' ? maskFor(m.userData.nfAux.tex, m.userData.nfAux.kind, BLK(name)) : maskFor(m.map, mode, BLK(name) && (!WHOLE(mode) || mode.startsWith('rects:'))); if (!mk) continue;
       m.userData.nfName = name; m.emissiveMap = mk; m.emissive.setRGB(1, 1, 1); m.emissiveIntensity = 0; m.userData.nightFloors = true; m.userData.winK = 1; m.userData.nfK = NF_K[name] || 1; NF_MATS.add(m);
       const ax = new THREE.Vector3(0, 1, 0);   // оста „нагоре“ в координатите на меша
+      const wm = WINM(name, mode); if (wm) { winIslands(o.geometry); m.defines = { ...(m.defines || {}), NF_WINM: 1 }; m.polygonOffset = true; m.polygonOffsetFactor = -1; m.polygonOffsetUnits = -4; }   // стъклото е в равнината на стената — без отместване се бият на точки
       m.onBeforeCompile = sh => {
         let fH = floorH, fY0 = y0, fHt = bb.max.y - bb.min.y;
         if (mode === 'coolW' || mode === 'led' || mode === 'empire' || mode === 'liberty' || mode === 'ship' || mode === 'redeemer' || mode === 'colosseo' || mode === 'colosseoC' || mode === 'vittoriano' || mode === 'maiden' || mode === 'lazare' || mode === 'grid2' || mode === 'patrick' || mode === 'ind' || mode === 'gct' || mode === 'gas' || mode === 'westm' || mode === 'rock' || mode === 'radio' || mode === 'neon' || mode === 'radioS' || mode === 'empire2') {   // Бурж (и Емпайър Стейт): височината по оста на меша, която в модела сочи нагоре (възлите на модела са завъртени/мащабирани)
@@ -202,12 +228,12 @@ export function prepNightFloors(root, name) {
         }
         sh.uniforms.uAx = { value: ax }; sh.uniforms.uWH = { value: WORLD_H[name] || 0 };
         if (WORLD_H[name]) { fY0 = 0; fHt = WORLD_H[name]; fH = fHt / FLOORS(name); }   // в света: от земята до върха
-        sh.uniforms.uFloorH = { value: fH }; sh.uniforms.uWinW = { value: name === 'sf-blk-soviet' ? 1 : 0 }; sh.uniforms.uWinId = { value: BLK(name) && (!WHOLE(mode) || mode.startsWith('rects:')) ? 1 : 0 }; sh.uniforms.uIndK = { value: /^wh2-/.test(name) ? 0.35 : 1 };   /* wh-night: складовете — по-слаби прожектори от заводите */ sh.uniforms.uY0 = { value: fY0 }; sh.uniforms.uFlood = { value: mode === 'flood' || (WHOLE(mode) && !(BLK(name) && mode.startsWith('rects:'))) ? 1 : mode === 'floodUp' ? 2 : 0 }; sh.uniforms.uCoolW = { value: mode === 'coolW' ? 1 : mode === 'led' ? 2 : 0 }; sh.uniforms.uT = NF_T; sh.uniforms.uH = { value: fHt }; sh.uniforms.uSolid = { value: mode === 'solid' ? 1 : 0 }; sh.uniforms.uGrid = { value: mode === 'grid' ? 1 : mode === 'petro' ? 2 : mode === 'empire' ? 3 : mode === 'liberty' ? 4 : mode === 'ship' ? 5 : mode === 'redeemer' ? 6 : mode === 'colosseo' ? 7 : mode === 'colosseoC' ? 8 : mode === 'vittoriano' ? 9 : mode === 'maiden' ? 10 : mode === 'lazare' ? 11 : mode === 'grid2' ? 12 : mode === 'patrick' ? 13 : mode === 'ind' ? 14 : mode === 'gct' ? 15 : mode === 'gas' ? 16 : mode === 'westm' ? 17 : mode === 'rock' ? 18 : mode === 'neon' ? 19 : mode === 'radioS' ? 20 : mode === 'radio' ? 21 : mode === 'empire2' ? 22 : 0 };
+        sh.uniforms.uFloorH = { value: fH }; sh.uniforms.uWinW = { value: name === 'sf-blk-soviet' ? 1 : wm ? 2 : 0 }; sh.uniforms.uWinId = { value: (BLK(name) && (!WHOLE(mode) || mode.startsWith('rects:'))) || wm ? 1 : 0 }; sh.uniforms.uIndK = { value: /^wh2-/.test(name) ? 0.35 : 1 };   /* wh-night: складовете — по-слаби прожектори от заводите */ sh.uniforms.uY0 = { value: fY0 }; sh.uniforms.uFlood = { value: wm ? 0 : mode === 'flood' || (WHOLE(mode) && !(BLK(name) && mode.startsWith('rects:'))) ? 1 : mode === 'floodUp' ? 2 : 0 }; sh.uniforms.uCoolW = { value: mode === 'coolW' ? 1 : mode === 'led' ? 2 : 0 }; sh.uniforms.uT = NF_T; sh.uniforms.uH = { value: fHt }; sh.uniforms.uSolid = { value: mode === 'solid' ? 1 : 0 }; sh.uniforms.uGrid = { value: mode === 'grid' ? 1 : mode === 'petro' ? 2 : mode === 'empire' ? 3 : mode === 'liberty' ? 4 : mode === 'ship' ? 5 : mode === 'redeemer' ? 6 : mode === 'colosseo' ? 7 : mode === 'colosseoC' ? 8 : mode === 'vittoriano' ? 9 : mode === 'maiden' ? 10 : mode === 'lazare' ? 11 : mode === 'grid2' ? 12 : mode === 'patrick' ? 13 : mode === 'ind' ? 14 : mode === 'gct' ? 15 : mode === 'gas' ? 16 : mode === 'westm' ? 17 : mode === 'rock' ? 18 : mode === 'neon' ? 19 : mode === 'radioS' ? 20 : mode === 'radio' ? 21 : mode === 'empire2' ? 22 : 0 };
         const pg = mode === 'petro' ? petroGeo(o.geometry) : null;
         sh.uniforms.uPetro = { value: pg ? new THREE.Vector4(pg.y0, pg.y1, pg.mx, 0) : new THREE.Vector4() }; sh.uniforms.uPTL = { value: pg ? pg.tl : new THREE.Vector2() }; sh.uniforms.uPTR = { value: pg ? pg.tr : new THREE.Vector2() };
-        sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vNfY; varying float vNfSeed; varying vec3 vNfW; varying vec3 vNfL; varying vec3 vNfN; varying vec3 vNfWN; uniform vec3 uAx; uniform float uWH;')
-          .replace('#include <begin_vertex>', '#include <begin_vertex>\nvNfY = uWH > 0.0 ? (modelMatrix * vec4(transformed, 1.0)).y : dot(transformed, uAx); vNfSeed = fract(sin(dot(modelMatrix[3].xz, vec2(12.9898, 78.233))) * 43758.5453); vNfW = (modelMatrix * vec4(transformed, 1.0)).xyz; vNfL = transformed; vNfN = objectNormal; vNfWN = mat3(modelMatrix) * objectNormal;');
-        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vNfY; varying float vNfSeed; uniform float uFloorH; uniform float uWinId; uniform float uWinW; uniform float uIndK; uniform float uY0; uniform float uFlood; uniform float uSolid; uniform float uH; uniform float uCoolW; uniform float uT; uniform float uGrid; varying vec3 vNfW; varying vec3 vNfL; varying vec3 vNfN; varying vec3 vNfWN; uniform vec4 uPetro; uniform vec3 uAx; uniform vec2 uPTL; uniform vec2 uPTR;')
+        sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vNfY; varying float vNfSeed; varying vec3 vNfW; varying vec3 vNfL; varying vec3 vNfN; varying vec3 vNfWN; uniform vec3 uAx; uniform float uWH;\n#ifdef NF_WINM\nattribute vec3 nfWin; varying vec3 vNfWin;\n#endif')
+          .replace('#include <begin_vertex>', '#include <begin_vertex>\nvNfY = uWH > 0.0 ? (modelMatrix * vec4(transformed, 1.0)).y : dot(transformed, uAx); vNfSeed = fract(sin(dot(modelMatrix[3].xz, vec2(12.9898, 78.233))) * 43758.5453); vNfW = (modelMatrix * vec4(transformed, 1.0)).xyz; vNfL = transformed; vNfN = objectNormal; vNfWN = mat3(modelMatrix) * objectNormal;\n#ifdef NF_WINM\nvNfWin = nfWin;\n#endif');
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n#ifdef NF_WINM\nvarying vec3 vNfWin;\n#endif\nvarying float vNfY; varying float vNfSeed; uniform float uFloorH; uniform float uWinId; uniform float uWinW; uniform float uIndK; uniform float uY0; uniform float uFlood; uniform float uSolid; uniform float uH; uniform float uCoolW; uniform float uT; uniform float uGrid; varying vec3 vNfW; varying vec3 vNfL; varying vec3 vNfN; varying vec3 vNfWN; uniform vec4 uPetro; uniform vec3 uAx; uniform vec2 uPTL; uniform vec2 uPTR;')
           .replace('#include <emissivemap_fragment>', `
             #ifdef USE_EMISSIVEMAP
               float nNight = emissive.r;   // нощта 0…1 (daynight.js → emissiveIntensity)
@@ -227,10 +253,14 @@ export function prepNightFloors(root, name) {
               vec3 tx = texture2D(emissiveMap, vEmissiveMapUv).rgb;
               totalEmissiveRadiance = tx * col * on * (uFlood > 0.5 ? 0.55 : ${ND ? '0.72' : '1.15'});
               if (uWinId > 0.5 && uFlood < 0.5) {   // blk-night: целият прозорец по номера му (G — ред на палене, B — цвят)
-                float wr = tx.g, wc = tx.b, pane = step(0.35, tx.r);
+                float wr = tx.g, wc = tx.b, pane = uWinW > 1.5 ? 0.62 : step(0.35, tx.r);   /* 2 — мешът е само стъклата (по-меко — стъклото и без това е светло) */
+                #ifdef NF_WINM
+                wr = fract(vNfWin.x + vNfSeed * 7.13); wc = fract(vNfWin.y + vNfSeed * 3.71); pane *= step(0.5, vNfWin.z);   /* всяка сграда — своя подредба */
+                #else
                 if (uWinW > 0.5) {   // една картинка за всички прозорци — номерът е от мястото: етаж × колона по стената
                   vec3 wn = normalize(vNfWN); vec2 tg = normalize(vec2(-wn.z, wn.x) + 1e-5); vec2 cl = vec2(floor(dot(vNfW.xz, tg) / 2.6), floor((vNfY - uY0) / max(uFloorH, 0.01)));
                   wr = fract(sin(dot(cl, vec2(127.1, 311.7)) + vNfSeed * 91.3) * 43758.5453); wc = fract(sin(dot(cl, vec2(269.5, 183.3)) + vNfSeed * 17.1) * 43758.5453); }
+                #endif
                 float sw = floor(uT / 25.0 + wr * 11.0 + vNfSeed * 7.0), flip = step(fract(sin(sw * 12.9898 + wr * 78.233) * 43758.5453), 0.12);   // ~12% сменят състоянието си от време на време
                 float onW = step(wr, 0.62 * clamp(nNight * 1.15, 0.0, 1.0)); onW = abs(onW - flip * step(0.5, nNight));   // палят се постепенно със смрачаването
                 vec3 wcol = wc < 0.42 ? vec3(1.0, 0.58, 0.22) : wc < 0.7 ? vec3(1.0, 0.74, 0.42) : wc < 0.82 ? vec3(0.95, 0.85, 0.7) : wc < 0.91 ? vec3(0.7, 0.8, 1.0) : vec3(0.3, 0.45, 1.0) * (0.7 + 0.3 * sin(uT * 7.0 + wr * 60.0));   // жълто, кехлибарено, топло бяло, хладно бяло, синкаво (телевизор, трепти)
