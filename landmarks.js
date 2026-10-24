@@ -531,12 +531,12 @@ const GLB_LM = {
   whitehouse: { h: 9, fit: 15, plate: 0x6f9a55, matte: 0xf4f1ea, rx: -0.28, cut: [[-0.35, 0.95, 0.8, 1.6]], floodK: 2.2, onLoad: whMonument },   // cut — колата от модела, останала на тревата пред южната фасада; floodK — по-силни прожектори нощем   // Вашингтон: Белият дом с крилата (Void); моделът е наклонен ~16° — rx го изправя (иначе едната страна и крилата висят във въздуха)
   capitol: { h: 11, fit: 15, plate: 0x6f8f55, floodK: 3 },   // Вашингтон: Капитолият (Meshy AI, от потребителя — 18.10; преди: фотоскан на ycpan3468)
   // 🇺🇸 Вашингтон по истинската карта (washington-osm): същите модели, но h = истинската височина на модела при основа 15 (иначе lmH лъже и game.js го смачква) — Капитолият 229 × 88 м, Белият дом без обелиска (Монументът е отделно, на истинското си място)
-  capitol2: { file: 'capitol', h: 5.75, fit: 15, plate: 0x6f8f55, floodK: 3 }, whitehouse2: { file: 'whitehouse', h: 1.8, fit: 15, plate: 0x6f9a55, matte: 0xf4f1ea, rx: -0.28, cut: [[-0.35, 0.95, 0.8, 1.6]], floodK: 2.2 },
+  capitol2: { file: 'capitol', h: 5.75, fit: 15, plate: 0x6f8f55, floodK: 3, ...(feature('was-look') ? { ry: Math.PI } : {}) },   // was-look (55): западната фасада (с терасата) — към Мола whitehouse2: { file: 'whitehouse', h: 1.8, fit: 15, plate: 0x6f9a55, matte: 0xf4f1ea, rx: -0.28, cut: [[-0.35, 0.95, 0.8, 1.6]], floodK: 2.2 },
   vegassign: { h: 14, fit: 12, plate: 0xc9b98a },   // Лас Вегас: табелата „Welcome to Fabulous Las Vegas“ (sipulitrade)
   mgu: { h: 16, fit: 15, plate: 0x6f8f55 },
   kotel: { file: 'mgu', h: 14.6, fit: 15, plate: 0x8a8580, crop: [-4.4, 4.4, -3.9, 1.0] },   // Москва: Котелническа висотка (lm-kotel) — моделът на МГУ, изрязан до централната кула с крилата (без парка и площада); ръстът 176 м — game.js LM_REAL_H   // Москва: МГУ — сталинският небостъргач с крилата и парка (Meshy AI); голяма зона 2×2 (BIG_LANDMARKS)
   eiffel: { h: 26, fit: 15, plate: 0xc9bfa8, onLoad: eiffelLights },   // Париж: Айфеловата кула (Meshy AI); нощем златни светлини и проблясване
-  cityhall: { h: 18, fit: 15, plate: 0xb9b2a5, flat: true },   // Филаделфия: City Hall (Meshy AI; оцветен по върхове — оригиналът е черно-бял)
+  cityhall: { h: 18, fit: 15, plate: 0xb9b2a5, flat: true, onLoad: (w, g) => { if (feature('night-cityhall')) cityhallNight(w, g); } },   // Филаделфия: City Hall (Meshy AI; оцветен по върхове — оригиналът е черно-бял)
   ststephen: { h: 16, fit: 15, plate: 0xc9bfa8 },   // Будапеща: базиликата „Св. Стефан“ (Meshy AI)
   mosque: { h: 12, fit: 15, plate: 0xc9c0ae },   // Истанбул: Синята джамия (Meshy AI) — голяма зона 2×2 до центъра
   hagia: { h: 14, fit: 15, plate: 0xc9b99a },   // Истанбул: Света София (Meshy AI)
@@ -702,6 +702,33 @@ const _ws = new THREE.Vector3();
 // 🌃 Бурж Халифа нощем (флаг night-burj2): LED лентите по ръбовете на крилата, които следват стъпалата, пръстени-подсветки при основата и на всяко
 // стъпало, червена светлина и ореол на върха — изпечени в Блендър от профила на модела (_source/burj_lights.py → assets/heavy/lm/burj-lights.glb,
 // в координатите на burj.glb). Светлината: по лентите се катерят светли „вълни“, цветът бавно прелива синьо ↔ златно (като шоуто на фасадата).
+// 🌙 Филаделфия: кметството нощем (флаг night-cityhall). Моделът е с цветове по върховете и без текстура — общото осветяване на забележителностите
+// (flood: еднакъв кремав emissive) го правеше плоско бяло. Тук: прожектори отдолу (по-силни долу и по лицата нагоре — релефът личи), бавно
+// въртящо се „махало“ на светлината, топли прозорци в тъмните ниши (някои угасват/светват), светещ връх на кулата.
+function cityhallNight(w, g) {
+  w.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(w), c = b.getCenter(new THREE.Vector3());
+  const U = { uN: { value: 0 }, uT: { value: 0 }, uY0: { value: b.min.y }, uY1: { value: b.max.y }, uC: { value: new THREE.Vector2(c.x, c.z) }, uCell: { value: (b.max.y - b.min.y) / 60 } }, mats = new Set();
+  w.traverse(o => { if (o.isMesh && o.material) mats.add(o.material); });
+  const fl = g.userData.flood || []; for (const m of mats) { const i = fl.indexOf(m); if (i >= 0) fl.splice(i, 1);   // без общия flood
+    m.emissive.set(0xffffff); m.emissiveIntensity = 1; m.emissiveMap = null;
+    m.onBeforeCompile = sh => { Object.assign(sh.uniforms, U);
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vChP; varying vec3 vChN;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvChP = (modelMatrix * vec4(transformed, 1.0)).xyz; vChN = normalize(mat3(modelMatrix) * objectNormal);');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vChP; varying vec3 vChN; uniform float uN; uniform float uT; uniform float uY0; uniform float uY1; uniform vec2 uC; uniform float uCell;\nfloat chH(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }')
+        .replace('#include <emissivemap_fragment>', `
+          float h = clamp((vChP.y - uY0) / max(uY1 - uY0, 0.01), 0.0, 1.0), lum = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
+          vec3 n = normalize(vChN); float ang = atan(vChP.z - uC.y, vChP.x - uC.x);
+          float sweep = 0.55 + 0.45 * sin(uT * 0.35 + ang * 2.0);   // светлината бавно обикаля сградата
+          float flood = (1.0 - 0.75 * h) * (0.8 + 0.2 * clamp(0.5 + n.y, 0.0, 1.0)) * sweep;   // отдолу — по-силно; ръбовете и корнизите (нагоре) — по-светли
+          vec3 e = diffuseColor.rgb * vec3(1.0, 0.78, 0.5) * flood * 0.32;
+          float dk = smoothstep(0.42, 0.22, lum) * step(0.04, h) * step(h, 0.72) * step(abs(n.y), 0.35);   // тъмните ниши по стените — прозорците
+          vec2 cell = floor(vec2(dot(vChP.xz - uC, vec2(-n.z, n.x)), vChP.y) / uCell); float r = chH(cell), r2 = chH(cell + floor(uT / 9.0 + r * 7.0));
+          e += vec3(1.0, 0.72, 0.38) * dk * step(r2, 0.5) * (0.18 + 0.14 * r);   /* слабо — цветовете на модела са на петна, силните „прозорци“ ставаха шарка */
+          e += vec3(1.0, 0.9, 0.7) * smoothstep(0.82, 0.95, h) * (0.5 + 0.15 * sin(uT * 1.3));   // върхът на кулата свети
+          totalEmissiveRadiance = e * uN;`);
+    }; m.customProgramCacheKey = () => 'cityhall-night'; m.needsUpdate = true; }
+  const prev = g.userData.sparkle;
+  g.userData.sparkle = (t, night) => { if (prev) prev(t, night); U.uT.value = t; U.uN.value = night; };
+}
 let burjLm = null;
 function burjLights(w, g) {
   const m = w.children[0]; if (!m) return;
