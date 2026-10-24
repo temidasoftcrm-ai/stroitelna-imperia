@@ -89,6 +89,7 @@ People and resort hotel in assets/heavy/people/ — from Sketchfab, Creative Com
 - lm/whitehouse.glb — "The White House" by Void (CC-BY 4.0) — https://sketchfab.com/3d-models/dbdb320ba4c6427ca4f2b2c2438034f9 (опростен до ~38k триъгълника, текстури 1024 webp)
 - lm/capitol.glb — "US_capitol_building" by ycpan3468 (CC-BY 4.0) — https://sketchfab.com/3d-models/d4049804543d4d49813767d2e9b72664 (опростен до ~105k триъгълника, текстури 1024 webp)
 - lm/vegassign.glb — "Las Vegas Sign" by sipulitrade (CC-BY 4.0) — https://sketchfab.com/3d-models/a750f99fd63045ec8d8d7b8a59d0a7af (опростен до ~30k триъгълника, текстури 1024 webp)
+- lm/lvstrip-hotels.glb — "Las Vegas strip, Las Vegas, NV, USA" by Brian Trepanier (CC-BY 4.0) — https://sketchfab.com/3d-models/las-vegas-strip-las-vegas-nv-usa-1e035d7ccbb340db98fe0346afd01a29 (изрязани само Парис, Планет Холивуд, Космополитън, Ария и Вдара; без земята и паркингите, опростени до ~190k триъгълника, текстурите изпечени наново, webp)
 - mines/refinery.glb — "Large industrial factory or refinery complex" by Chenzoss (CC-BY 4.0) — https://sketchfab.com/3d-models/599735133b5b4641907f72c55ef3c8bb (опростен до ~60k триъгълника, текстури 512 webp)
 - mines/tanks.glb — "Large Industrial Storage Tanks" by Duane's Mind (CC-BY 4.0) — https://sketchfab.com/3d-models/bd3ac97071104b64bc388a155b64f79e (текстури 512 webp)
 - civic/school.glb — "school building" by swjeta (CC-BY 4.0) — https://sketchfab.com/3d-models/d34ac09a3ca544df999485c4b311abcc

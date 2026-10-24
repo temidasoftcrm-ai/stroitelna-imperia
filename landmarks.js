@@ -918,6 +918,24 @@ function bellagio() {
   return g;
 }
 const BUILD = { pyramids, ...Object.fromEntries(Object.keys(GLB_LM).map(k => [k, () => glbLm(k)])), arc, ladefense, bigben, londoneye, towerbridge, shard, brandenburg, fernsehturm, reichstag, erasmus, cubes, markthal, derotterdam, euromast, canal: () => canal(0), canal2: () => canal(1), rijks, centraal, adam, windmill, bellagio, mosque2: () => mosque(1), bluemosque: () => mosque(0), topkapi, maiden, grandbazaar, haydarpasa, galata, sapphire, twist, twin, colosseum, stpeter, pantheon, vittoriano };
+// 🎰 lv-hotels: хотелите на Стрипа, изрязани от сканирания „Las Vegas strip“ (Brian Trepanier, Sketchfab, CC-BY 4.0) — един GLB
+// (assets/heavy/lm/lvstrip-hotels.glb), всеки хотел — възел с името си: в метри, земята на y = 0, центърът (0, 0), север = −z (като картата).
+// Текстурата е изпечена (без нормали — плоско осветени стени, като сканът); нощем светва цялата фасада (flood, като другите забележителности)
+let lvSrc = null;
+function lvHotel(nm) {
+  const g = new THREE.Group(), flood = []; g.userData.flood = flood;
+  (lvSrc ||= new GLTFLoader().loadAsync('assets/heavy/lm/lvstrip-hotels.glb').then(gl => gl.scene).catch(() => null)).then(src => {
+    const n = src && src.getObjectByName(nm); if (!n) return;
+    const m = n.clone(true);
+    m.traverse(o => { if (!o.isMesh) return; o.castShadow = o.receiveShadow = true; const mt = o.material = o.material.clone(); mt.flatShading = true; mt.metalness = 0; mt.roughness = 0.85; mt.color.setScalar(2);   /* сканът е тъмен (сенките и стъклата са в текстурата) — ×2, колкото светлите фасади наоколо */
+      mt.emissive.set(0xffe4b8); mt.emissiveMap = mt.map; mt.emissiveIntensity = 0; mt.userData.floodK = 1.4; mt.needsUpdate = true; flood.push(mt); });
+    const top = new THREE.Box3().setFromObject(m).max.y; g.add(m);   // m още е без родител — кутията е в координатите на групата
+    if (g.userData.sign) g.userData.sign.position.y = top + 6;
+  });
+  return g;
+}
+Object.assign(BUILD, { lvparis: () => lvHotel('paris'), lvph: () => lvHotel('planethollywood'), lvcosmo: () => lvHotel('cosmopolitan'), lvaria: () => lvHotel('aria'), lvvdara: () => lvHotel('vdara') });
+Object.assign(LANDMARK_NM, { lvparis: 'Парис Лас Вегас', lvph: 'Планет Холивуд', lvcosmo: 'Космополитън', lvaria: 'Ария', lvvdara: 'Вдара' });
 // 🇺🇸 Вашингтон по истинската карта (washington-osm): Монументът на Вашингтон, Мемориалите на Линкълн и Джеферсън — процедурни, в истински метри
 // (game.js ги свежда до мащаба на картата по LM_REAL_H, както другите); без квадратната плоча — стоят на Мола
 function wmonument() {   // обелискът: 169 м, основа 16,8 м → 10,5 м под пирамидката; долната трета (до 46 м) — по-светъл мрамор (строежът спрял 1854–1879); кръг от 50 знамена
