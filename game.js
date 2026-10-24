@@ -736,7 +736,7 @@ const PLAN_TPL5 = { sofia: 'osm' };
 const PLAN_TPL7 = { losangeles: 'osm' };
 // 🇮🇹 планът v2 по истинската карта (cityplan2game.js + cityplan2-3d.js): Рим в НОВИТЕ игри (флаг rome-osm → S.plan2.rome);
 // старите записи остават на стария план. Данните (~5 MB) се зареждат само когато градът е такъв — plan2Preload преди влизането.
-const PLAN2_CITIES = new Set(['rome', 'paris', 'istanbul', 'london', 'newyork', 'moscow', 'washington']);   // градовете по истинската карта (флагове <id>-osm + <id>-game)
+const PLAN2_CITIES = new Set(['rome', 'paris', 'istanbul', 'london', 'newyork', 'moscow', 'washington', 'lasvegas']);   /* lasvegas (55): Стрипът — флагове lasvegas-osm + lasvegas-game */   // градовете по истинската карта (флагове <id>-osm + <id>-game)
 const plan2 = { mod: null, view: null, data: {}, cache: null, models: {} };
 // моделите за изгледа на града (Истанбул: висящият мост, фериботите и корабите) — зареждат се с плана, само за този град
 const PLAN2_MODELS = { paris: { 'lm-lazare2': 'lm/lazare2.glb' }, newyork: { 'lm-gc2': 'lm/grandcentral2.glb', 'lm-timessq': 'lm/timessq.glb' }, istanbul: { 'lm-bosphorus': 'lm/bosphorus.glb', 'sh-ferry': 'ships/ferry-bandirma.glb', 'sh-cruise': 'ships/cruise.glb', 'sh-tanker': 'ships/tanker.glb', 'sh-container': 'ships/container.glb', 'bt-fish': 'boats/sf-fisherboat.glb', 'bt-sail': 'boats/sf-sailboat.glb', 'bt-motor': 'marina/motoryacht.glb', 'bt-yacht': 'boats/sf-yacht.glb' } };
@@ -6560,7 +6560,7 @@ function lmRiverSpot(k, mem) {
 }
 // Рим по истинската карта: забележителностите — на реалните им места (P.landmarks), вписани в основата си
 // от плана се добавят само тези с правилен модел за града (иначе 'opera' в Париж става операта в Сидни, 'pantheon' — римският)
-const LM_EXTRA = { washington: new Set(['wmonument', 'lincoln', 'jefferson']), moscow: new Set(['kotelnicheskaya']), newyork: new Set(['liberty', 'stpatrick', 'rockefeller', 'radiocity', 'empire']), istanbul: new Set(['topkapi', 'bluemosque', 'maiden', 'grandbazaar', 'galata', 'suleymaniye', 'haydarpasa']) };
+const LM_EXTRA = { lasvegas: new Set(['luxor']), washington: new Set(['wmonument', 'lincoln', 'jefferson']), moscow: new Set(['kotelnicheskaya']), newyork: new Set(['liberty', 'stpatrick', 'rockefeller', 'radiocity', 'empire']), istanbul: new Set(['topkapi', 'bluemosque', 'maiden', 'grandbazaar', 'galata', 'suleymaniye', 'haydarpasa']) };
 // истинската височина (м) на високите забележителности — мащабът е по-малкият от основата и височината
 LANDMARK_NM.empire = LANDMARK_NM.empire || 'Емпайър Стейт Билдинг'; LANDMARK_NM.stpatrick2 = LANDMARK_NM.stpatrick2 || 'Катедралата „Св. Патрик“'; LANDMARK_NM.chrysler = LANDMARK_NM.chrysler || 'Крайслер Билдинг';
 const LM_REAL_H = { bigben: 96, londoneye: 135, shard: 310, eiffel: 330, galata: 67, maiden: 23, towerbridge: 65, stpeter: 136, liberty: 93, stpatrick: 100, mgu: 176, stbasil: 65, parliament2: 96, rockefeller: 260, radiocity: 60, radiocity2: 150, empire2: 443, suleymaniye2: 72, kotel: 176 };   /* suleymaniye2 — минаретата */   // empire2 — с антената   // radiocity2 — моделът е залата + кулата 1270 6th Ave (~150 м)   // mgu — тук е Котелническа (сталинската висотка)
@@ -6570,8 +6570,9 @@ const LM_PREF = { empire: 'empire2', radiocity: 'radiocity2', rockefeller: 'rock
 const lmPref = k => (LM_PREF[k] && hasLandmark(LM_PREF[k])) ? LM_PREF[k] : k;
 const LM_DRY = feature('nd-dry') ? { notredame: 0.42 } : {};   // дълбочина/дължина на модела
 const LM_SHORE = feature('kotel-shore') ? { kotel: 0.56 } : {};   // потребителят: Котелническа влизаше в реката — сградата се изтегля на сушата (стойността — дълбочина/ширина на модела, основата е по x)
-const LM_REAL_K = feature('washington-osm') ? { washington: 0.7 } : {};   /* потребителят избра „по средата“ (×0,7): Капитолият ~62 м, Монументът ~118 м */   // потребителят: във Вашингтон забележителностите — в истински размер 1:1 (Капитолият 229 м, куполът 88 м), не ×K на картата
+const LM_REAL_K = { ...(feature('washington-osm') ? { washington: 0.7 } : {}), ...(feature('lasvegas-osm') ? { lasvegas: 0.7 } : {}) };   /* lasvegas-osm (55): казината — ×0,7 като Вашингтон */   /* потребителят избра „по средата“ (×0,7): Капитолият ~62 м, Монументът ~118 м */   // потребителят: във Вашингтон забележителностите — в истински размер 1:1 (Капитолият 229 м, куполът 88 м), не ×K на картата
 if (feature('washington-osm')) { Object.assign(LM_PREF, { capitol: 'capitol2', whitehouse: 'whitehouse2' }); Object.assign(LM_REAL_H, { capitol2: 88, whitehouse2: 22, wmonument: 169, lincoln: 24, jefferson: 39 }); }   // 🇺🇸 Вашингтон по картата: истинските височини (×K като другите) — Капитолият до върха на купола, Белият дом без обелиска (Монументът — отделно)
+if (feature('lasvegas-osm')) Object.assign(LM_REAL_H, { bellagio: 155, luxor: 107, vegassign: 7.6 });   // 🇺🇸 Лас Вегас по картата (55): Беладжио — кулата 155 м, Луксор — пирамидата 107 м, знакът 7,6 м
 if (feature('lm-suleymaniye2')) LM_PREF.mosque2 = 'suleymaniye2';
 if (feature('lm-arc2')) { LM_PREF.arc = 'arc2'; LM_REAL_H.arc2 = 50; }   // Триумфалната арка — моделът на потребителя (Meshy), 50 × 45 × 22 м   // Сюлеймание — моделът на потребителя вместо процедурната джамия
 LANDMARK_NM.maiden2 = LANDMARK_NM.maiden2 || 'Момината кула'; LANDMARK_NM.rockefeller2 = LANDMARK_NM.rockefeller2 || 'Рокфелер Сентър'; LANDMARK_NM.radiocity2 = LANDMARK_NM.radiocity2 || 'Радио Сити Мюзик Хол'; LANDMARK_NM.empire2 = LANDMARK_NM.empire2 || 'Емпайър Стейт Билдинг'; LANDMARK_NM.parliament2 = LANDMARK_NM.parliament2 || 'Уестминстърският дворец и Биг Бен'; LANDMARK_NM.colosseo3 = LANDMARK_NM.colosseo3 || 'Колизеумът'; LANDMARK_NM.vittoriano2 = LANDMARK_NM.vittoriano2 || 'Витториано';
