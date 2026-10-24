@@ -217,6 +217,7 @@ const DEMOS = [
   ['🚗 Движението в крак с часовника: колите ×1,3 по-бързо и по-рязко ускоряват, хората и при ▶▶▶ (Пловдив: центърът, после ▶▶▶)', 'plovdiv', d => { setTimeout(() => d.growLook(false), 5000); setTimeout(() => d.setSpeed(4), 15000); }],   // traffic-pace
   ['🌙 Кметството на Филаделфия нощем — прожектори отдолу, обикаляща светлина, светещ връх (Филаделфия, 22:00)', 'philadelphia', d => { d.time(22); let a = 0; const tk = setInterval(() => { const o = (d.city().landmarks || []).find(q => q.kind === 'cityhall'); if (!o) return; const p = o.group.position; a += 0.01; d.camAt(p.x + Math.sin(a) * 85, 42, p.z + Math.cos(a) * 85, p.x, 15, p.z); }, 50); setTimeout(() => clearInterval(tk), 90000); }],   // night-cityhall
   ['🇺🇸 Вашингтон: Капитолият с лице към Мола, после Юниън Стейшън в истински ръст', 'washington', d => { setTimeout(() => { d.time(12); d.wasLook('capitol'); }, 5000); setTimeout(() => d.wasLook('union'), 14000); }],   // was-look
+  ['🏙️ Ню Йорк: централата на ниво 8 — истинска кула между небостъргачите (случайният облик — само истинските кули)', 'newyork', d => { setTimeout(() => { d.time(12); d.office(8); const h = d.city().hq; d.camAt(h.x + 110, 70, h.z + 150, h.x, 35, h.z); }, 6000); }],   // hq-real
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

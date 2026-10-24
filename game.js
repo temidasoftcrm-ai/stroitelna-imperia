@@ -4177,7 +4177,7 @@ function hqCard(kind) {
 let styleOpen = false;   // списъкът с облици е разгънат
 // облик на кулата по подразбиране — случаен за всеки град (постоянен — по името на града), докато играчът не избере (Лабораторията → office-random)
 const officeStylesOk = () => OFFICE_STYLES.filter(x => x.id !== 'std' && (x.lm || x.sf || A[x.model]));
-function officeAutoStyle() { if (!feature('office-random') || !S) return null; const L = officeStylesOk(); return L.length ? L[hashStr('ostyle:' + S.cityId) % L.length].id : null; }
+function officeAutoStyle() { if (!feature('office-random') || !S) return null; const L = officeStylesOk().filter(x => !feature('hq-real') || !x.model);   /* hq-real (55): случайният облик — само истинските кули (sf/lm, ≥ 48 м); детските модели бяха ~18 м (Ню Йорк) — иначе новите нива (office2) в истинска височина */ return L.length ? L[hashStr('ostyle:' + S.cityId) % L.length].id : null; }
 function officeStyleHtml() {
   const lv = S.officeLevel || 1, cur = S.officeStyle || officeAutoStyle() || 'std';
   if ((S.officeStyle || (lv >= STYLE_LV && officeAutoStyle())) && !styleOpen) { const x = OFFICE_STYLES.find(q => q.id === cur); return `<div class="row" style="margin-top:8px"><span class="meta" style="margin:0">🏙️ Облик: <b style="color:var(--txt)">${x ? x.nm : cur}</b></span><button class="btn2" id="bStyleOpen" style="padding:4px 9px;font-size:12px">🔄 Смени</button></div>`; }
