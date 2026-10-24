@@ -946,10 +946,13 @@ const LV_TOWERS = {   // контурите на кулите отгоре (x, z
   cosmopolitan: [[[143,1,182],[95,1,179],[90,-4,184],[90,-44,184],[145,-47,179],[148,-36,171]], [[15,41,187],[-45,41,192],[-105,17,190],[-149,15,191],[-150,-8,189],[-91,-13,191],[-43,7,190],[15,9,191]]],
   aria: [[[161,-84,188],[121,-84,190],[59,-108,188],[19,-108,190],[16,-133,188],[73,-138,190],[127,-116,186],[161,-116,189]], [[27,116,152],[18,99,152],[32,83,152],[40,65,152],[44,19,150],[65,-2,146],[70,19,155],[66,69,155],[50,107,155]],
     [[1,270,183],[-10,253,188],[-20,223,187],[-22,163,186],[-10,121,184],[7,112,178],[16,129,182],[6,153,185],[2,197,185],[6,223,185],[16,245,181],[10,261,188]]],
-  vdara: [[[52,18,147],[20,2,147],[-8,0,147],[-18,-10,180],[-46,-2,180],[-65,-17,173],[-56,-24,173],[-24,-34,173],[28,-32,173],[38,-16,180],[57,-7,180],[53,3,180],[59,9,147]]] };
-const LV_EDGE = { planethollywood: { base: 40 }, cosmopolitan: { col: 0x2f6bff, base: 45 }, aria: { col: 0xdfe9ff, base: 45 }, vdara: { col: 0xdfe9ff, base: 45 } };
+  vdara: [[[52,18,147],[20,2,147],[-8,0,147],[-18,-10,180],[-46,-2,180],[-65,-17,173],[-56,-24,173],[-24,-34,173],[28,-32,173],[38,-16,180],[57,-7,180],[53,3,180],[59,9,147]]],
+  mgmgrand: [[[105,117,92],[84,114,93],[79,9,93],[-1,7,62],[-32,-6,53],[-13,-19,55],[63,-19,94],[76,-28,91],[82,-128,94],[89,-133,93],[108,-128,94],[108,-46,94],[117,-19,92],[220,-16,94],[215,5,90],[123,5,94],[108,14,93]],
+    [[-40,4,42],[-153,4,42],[-153,-16,42],[-40,-16,42]]] };   // lv-night3: кулата-кръст на MGM (горе) и ниското западно крило
+const LV_EDGE = { planethollywood: { base: 40 }, cosmopolitan: { col: 0x2f6bff, base: 45 }, aria: { col: 0xdfe9ff, base: 45 }, vdara: { col: 0xdfe9ff, base: 45 }, mgmgrand: { col: 0x2bff8a, base: 15 } };
 const LV_VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
 function lvNight2(nm, node, m, g) {
+  if ((nm === 'mgmgrand' || nm === 'nyny') && !feature('lv-night3')) return;   // lv-night3 (f9): нощта на MGM Grand и Ню Йорк-Ню Йорк (lv-hotels2)
   const U = { uT: { value: 0 }, uN: { value: 0 }, uSc: { value: node.scale.x }, uTr: { value: node.position.clone() } }, add = [];   // add — светлините, които гаснат денем
   const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.3, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
   const sprite = (col, x, y, z, sx, sy) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 })); sp.position.set(x, y, z); sp.scale.set(sx, sy, 1); g.add(sp); add.push([sp.material, 1]); return sp; };
@@ -976,6 +979,30 @@ function lvNight2(nm, node, m, g) {
       g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(P), 40, 0.55, 4, false), gold)); }
     U.beacon = sprite(0xfff1c8, -87.6, 151, -33.4, 10, 14); sprite(0xff6fb0, -125.5, 44, 88, 34, 46);
   }
+  // lv-night3: MGM — кулата-кръст свети в смарагдово зелено (стъклото по текстурата, вълна нагоре), подиумът — топло отдолу;
+  // Ню Йорк-Ню Йорк — короната на „Емпайър“ сменя цветовете на 12 с (бяло-златно, червено-бяло-синьо, зелено, лилаво), шпилът на „Крайслер“ — бели шеврони
+  const LV3 = { mgmgrand: `float inA = min(1.0, step(78.0, lp.x) * step(lp.x, 113.0) * step(-136.0, lp.z) * step(lp.z, 121.0) + step(-19.0, lp.z) * step(lp.z, 8.0) * step(-156.0, lp.x) * step(lp.x, 222.0)) * smoothstep(14.0, 20.0, lp.y);
+          vec3 lv = inA * vec3(0.1, 1.0, 0.5) * (0.1 + 0.75 * lum) * (0.5 + 0.6 * lp.y / 94.0) * (0.75 + 0.25 * sin(lp.y * 0.12 - uT * 0.8));
+          lv += (1.0 - inA) * vec3(1.0, 0.85, 0.6) * diffuseColor.rgb * pow(1.0 - clamp(lp.y / 40.0, 0.0, 1.0), 2.0) * 0.6; float cut = inA * 0.4;`,
+    nyny: `vec2 de = abs(lp.xz - vec2(-55.5, 26.5)); float we = lp.y < 144.0 ? 16.5 : 6.0, inE = step(124.0, lp.y) * (1.0 - smoothstep(we, we + 1.5, max(de.x, de.y)));
+          float th = mod(floor(uT / 12.0), 4.0), tr = mod(floor((lp.y - 124.0) / 5.0), 3.0);
+          vec3 ec = th < 0.5 ? vec3(1.0, 0.86, 0.6) : th < 1.5 ? (tr < 0.5 ? vec3(1.0, 0.1, 0.1) : tr < 1.5 ? vec3(1.0) : vec3(0.15, 0.3, 1.0)) : th < 2.5 ? vec3(0.1, 1.0, 0.35) : mix(vec3(0.7, 0.2, 1.0), vec3(1.0, 0.4, 0.8), tr * 0.5);
+          vec2 dc = abs(lp.xz - vec2(7.0, -89.0)); float hw = 12.5 - (lp.y - 104.0) * 0.27, inC = step(104.0, lp.y) * (1.0 - smoothstep(hw + 0.5, hw + 2.0, max(dc.x, dc.y)));
+          float chev = step(fract((lp.y + 0.9 * min(dc.x, dc.y)) / 5.0), 0.3);   // шевроните — по лицата на шпила, към средата нагоре
+          vec3 lv = inE * ec * (0.45 + 1.3 * lum) + inC * vec3(0.95, 0.95, 1.0) * (0.25 * lum + chev * (0.6 + 1.0 * lum));
+          float inL = (1.0 - smoothstep(0.0, 3.0, max(max(75.0 - lp.x, lp.x - 95.0), max(60.0 - lp.z, lp.z - 78.0)))) * (1.0 - smoothstep(30.0, 38.0, lp.y));   // Статуята на свободата (по f6: ъгълът към Тропикана) — мек зелен прожектор отдолу
+          lv += inL * vec3(0.3, 1.0, 0.75) * diffuseColor.rgb * (0.2 + 0.4 * (1.0 - clamp(lp.y / 38.0, 0.0, 1.0)));
+          float cut = max(inE, inC); lv += (1.0 - cut) * vec3(1.0, 0.82, 0.6) * diffuseColor.rgb * pow(1.0 - clamp(lp.y / 60.0, 0.0, 1.0), 2.5) * 0.5;` };
+  if (LV3[nm]) m.traverse(o => { if (!o.isMesh) return; const mt = o.material;
+    mt.onBeforeCompile = sh => { Object.assign(sh.uniforms, U);
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uSc; uniform vec3 uTr; varying vec3 vLvP;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvLvP = position * uSc + uTr;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uT; uniform float uN; varying vec3 vLvP;')
+        .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        { vec3 lp = vLvP; float lum = dot(diffuseColor.rgb, vec3(0.333)); ${LV3[nm]}
+          totalEmissiveRadiance = totalEmissiveRadiance * (1.0 - 0.6 * cut * uN) + lv * uN; }`); };
+    mt.customProgramCacheKey = () => 'lv-night3-' + nm; mt.needsUpdate = true; });
+  if (nm === 'nyny') { U.emp = sprite(0xffd9a0, -55.5, 140, 26.5, 44, 34); sprite(0xe8eeff, 7, 128, -89, 26, 40);   // ореолите над двете корони
+    U.blink = [sprite(0xff2020, -55.5, 163.5, 26.5, 5, 5), sprite(0xff2020, 7, 149.5, -89, 5, 5)]; }   // червените светлини на върховете
   // ръбовете на кулите: светещи ивици по покрива и по ъглите (InstancedMesh от кутийки)
   const T = LV_TOWERS[nm], E = LV_EDGE[nm];
   if (T && E) { const L = []; for (const poly of T) for (let i = 0; i < poly.length; i++) { const p = poly[i], q = poly[(i + 1) % poly.length], o = poly[(i + poly.length - 1) % poly.length];
@@ -998,10 +1025,13 @@ function lvNight2(nm, node, m, g) {
   if (nm === 'planethollywood') { const sc = new THREE.Mesh(new THREE.PlaneGeometry(80, 19), led(0.0)); sc.position.set(-86.2, 22.5, 12); sc.rotation.y = -Math.PI / 2; g.add(sc); sprite(0xb060ff, -92, 20, 12, 90, 30); }
   if (nm === 'cosmopolitan') { const hat = new THREE.Mesh(new THREE.BoxGeometry(12, 3, 46), led(0.55)); hat.position.set(162, 13, 32); g.add(hat);
     const sc = new THREE.Mesh(new THREE.PlaneGeometry(58, 13), led(0.3)); sc.position.set(167.6, 23.5, 32); sc.rotation.y = Math.PI / 2; g.add(sc); sprite(0xff5fd0, 172, 12, 32, 60, 22); }
+  if (nm === 'mgmgrand') { const py = new THREE.Mesh(new THREE.BoxGeometry(12.2, 40, 7), led(0.12)); py.position.set(-177.3, 52, 45.6); g.add(py); sprite(0x40ffa0, -177.3, 52, 45.6, 30, 56); }   // lv-night3: пилонът-екран на ъгъла
   const prev = g.userData.sparkle, hc = new THREE.Color();
   g.userData.sparkle = (t, night) => { if (prev) prev(t, night); U.uT.value = t; U.uN.value = night;
     for (const [mt, k] of add) mt.opacity = k * night;
     if (U.beacon) U.beacon.material.opacity = night * (0.6 + 0.4 * Math.sin(t * 2.5));
+    if (U.blink) for (const b of U.blink) b.material.opacity = night * (Math.sin(t * 3) > 0.4 ? 1 : 0.1);
+    if (U.emp) U.emp.material.color.setHex([0xffd9a0, 0xff9aa8, 0x40ff80, 0xc060ff][Math.floor(t / 12) % 4]);   // ореолът — в цвета на короната
     const e = U.edges; if (e && e.chase && night > 0.01) { e.L.forEach((b, i) => e.im.setColorAt(i, hc.setHSL((0.75 + 0.12 * Math.sin(t * 0.7 - b[7] * 0.02 - i * 0.35)) % 1, 1, 0.55))); e.im.instanceColor.needsUpdate = true; } };   // V-кулата: лилаво ↔ розово ↔ синьо, вълна по ъглите
 }
 Object.assign(BUILD, { lvparis: () => lvHotel('paris'), lvph: () => lvHotel('planethollywood'), lvcosmo: () => lvHotel('cosmopolitan'), lvaria: () => lvHotel('aria'), lvvdara: () => lvHotel('vdara') });
