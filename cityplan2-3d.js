@@ -820,7 +820,7 @@ function* romeBlocks(G, P, style, ROADS = P.roads) {   // генератор: yi
   const romeOuter = (x, z) => { const L = lotAt(x, z); return !!L && (L.tier || 1) >= 3; };
   const list = [], m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
   const IST = style === 'istanbul', PAR = style === 'paris', LON = style === 'london', NY = style === 'newyork', MOS = style === 'moscow', WAS = style === 'washington', DEP0 = IST ? 12 : 15, STEP = IST ? 10 : PAR ? 13 : LON ? 11 : NY ? 17 : 14, used = new Set(); MIN2 = (0.72 * Math.min(STEP, IST ? 8 : DEP0)) ** 2;
-  const BG = style === 'bg', VAR = (PAR || IST) && feature('bg-variety'), XK = VAR || BG;   // bg-variety: Париж/Истанбул — разнообразни; bg-fill: градовете по плана без карта (bgblocks.js)
+  const BG = style === 'bg', VAR = (PAR || IST || (WAS && feature('was-fed'))) && feature('bg-variety'), XK = VAR || BG;   /* was-fed (55): и Вашингтон — федералният варовик */   // bg-variety: Париж/Истанбул — разнообразни; bg-fill: градовете по плана без карта (bgblocks.js)
   for (const rd of BG ? [] : ROADS) { if (rd.w > 14) continue; yield 0;
     const T = rd.L[rd.L.length - 1];
     for (let e0 = 6 - STEP / 2, SW = STEP, s = 6; s < T - 6; e0 += SW, SW = VAR ? varW(rd.id, e0, STEP) : STEP, s = e0 + SW / 2) { let i = 1;   /* SW — ширината (bg-variety: по-тесни/по-широки) */ while (i < rd.L.length - 1 && rd.L[i] < s) i++; const a = rd.pts[i - 1], b = rd.pts[i], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, t = (s - rd.L[i - 1]) / ((rd.L[i] - rd.L[i - 1]) || 1), ux = (b[0] - a[0]) / l, uz = (b[1] - a[1]) / l;

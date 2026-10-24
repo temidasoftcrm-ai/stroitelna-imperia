@@ -73,6 +73,28 @@ function coopC() { return paint(7, 3, g => { g.fillStyle = '#f4efe6'; g.fillRect
 function houseC() { return paint(10, 6, g => { g.fillStyle = '#f6f1e8'; g.fillRect(0, 0, 10, 6); g.fillStyle = 'rgba(100,90,80,0.22)'; g.fillRect(0, 2.95, 10, 0.1); g.fillStyle = '#d8d0c2'; g.fillRect(0, 5.5, 10, 0.5);   // цокълът
   for (const cx of [1.8, 5, 8.2]) win(g, cx - 0.6, 0.8, 1.2, 1.3); for (const cx of [1.8, 8.2]) win(g, cx - 0.6, 3.6, 1.2, 1.3); g.fillStyle = '#6a4a34'; g.fillRect(4.45, 3.4, 1.1, 2.1); g.fillStyle = 'rgba(0,0,0,0.2)'; g.fillRect(4.2, 3.25, 1.6, 0.12); }); }
 
+// ---- Вашингтон (was-fed): федерална сграда от светъл варовик — рустиран партер (4,2 м), n етажа (3,3 м), 3 оси по bay м;
+// прозорци с бели рамки и каменни прегради (на 1-вия етаж — триъгълни фронтони), фриз и тежък корниз с дентикули отгоре
+function fedC(n, bay) { const W = 3 * bay, G0 = 4.2, FH = 3.3, TOP = 1.4, H = TOP + n * FH + G0;
+  return [paint(W, H, g => {
+    g.fillStyle = '#f1ebdf'; g.fillRect(0, 0, W, H); g.fillStyle = 'rgba(140,125,100,0.14)'; for (let y = TOP; y < H - G0; y += 0.6) g.fillRect(0, y, W, 0.03);   // фугите на камъка
+    g.fillStyle = '#e6dfd0'; g.fillRect(0, 0, W, TOP); g.fillStyle = 'rgba(80,70,55,0.5)'; g.fillRect(0, TOP - 0.16, W, 0.16); g.fillStyle = 'rgba(80,70,55,0.35)'; for (let x = 0.1; x < W; x += 0.3) g.fillRect(x, 0.35, 0.14, 0.18);   // корнизът и дентикулите
+    for (let f = 1; f <= n; f++) { const yb = TOP + (n - f + 1) * FH;
+      for (let k = 0; k < 3; k++) { const cx = (k + 0.5) * bay, ww = Math.min(1.25, bay * 0.42), wh = f === 1 ? 2.35 : f === n ? 1.7 : 2.05, wy = yb - 0.75 - wh;
+        win(g, cx - ww / 2, wy, ww, wh, '#fbfaf6'); g.fillStyle = 'rgba(95,85,70,0.4)'; g.fillRect(cx - ww / 2 - 0.18, wy + wh + 0.06, ww + 0.36, 0.12);   // перваз
+        g.fillStyle = '#e2dacb'; if (f === 1) { g.beginPath(); g.moveTo(cx - ww / 2 - 0.25, wy - 0.12); g.lineTo(cx, wy - 0.62); g.lineTo(cx + ww / 2 + 0.25, wy - 0.12); g.fill(); g.fillStyle = 'rgba(90,80,65,0.35)'; g.fillRect(cx - ww / 2 - 0.25, wy - 0.14, ww + 0.5, 0.06); }
+        else { g.fillRect(cx - ww / 2 - 0.15, wy - 0.32, ww + 0.3, 0.26); g.fillStyle = 'rgba(90,80,65,0.25)'; g.fillRect(cx - ww / 2 - 0.15, wy - 0.08, ww + 0.3, 0.05); } } }   // фронтон / права преграда
+    g.fillStyle = 'rgba(90,80,65,0.32)'; g.fillRect(0, H - G0 - 0.22, W, 0.22);   // поясът над партера
+    g.fillStyle = '#e3dccd'; g.fillRect(0, H - G0, W, G0); g.fillStyle = 'rgba(110,95,75,0.3)'; for (let y = H - G0 + 0.5; y < H; y += 0.5) g.fillRect(0, y, W, 0.06);   // рустиката
+    for (let k = 0; k < 3; k++) { const cx = (k + 0.5) * bay;
+      if (k === 1) { g.fillStyle = '#e3dccd'; g.fillRect(cx - 1.05, H - 3.6, 2.1, 3.6); g.fillStyle = '#2f2a26'; g.fillRect(cx - 0.75, H - 3.2, 1.5, 3.2); g.beginPath(); g.arc(cx, H - 3.2, 0.75, Math.PI, 0); g.fill(); }   // входът с арка
+      else win(g, cx - 0.62, H - 3.4, 1.24, 2.2, '#fbfaf6'); } }), W, H];
+}
+// редова къща (Джорджтаун / Капитол Хил): 3 етажа тухла, бели рамки и корниз, стълби към входа
+function rowC() { const W = 6, H = 11; return paint(W, H, g => { g.fillStyle = '#b5644a'; g.fillRect(0, 0, W, H); g.fillStyle = 'rgba(70,30,20,0.18)'; for (let y = 0.3; y < H; y += 0.22) g.fillRect(0, y, W, 0.03);   // тухлите
+  g.fillStyle = '#f2ede4'; g.fillRect(0, 0, W, 0.75); g.fillStyle = 'rgba(60,50,40,0.45)'; g.fillRect(0, 0.65, W, 0.1);   // корнизът
+  for (let f = 0; f < 3; f++) { const y = 1.4 + f * 3.1; for (const cx of f === 2 ? [1.3, 4.6] : [1.3, 3, 4.7]) { if (f === 2 && cx === 1.3) continue; win(g, cx - 0.5, y, 1, 1.9, '#f7f4ee'); g.fillStyle = '#efe8dc'; g.fillRect(cx - 0.6, y - 0.22, 1.2, 0.18); } }
+  g.fillStyle = '#efe8dc'; g.fillRect(0.6, H - 3.3, 1.5, 0.2); g.fillStyle = '#3a2e28'; g.fillRect(0.75, H - 3.1, 1.2, 2.5); g.fillStyle = '#d9d2c4'; g.fillRect(0.4, H - 0.6, 1.9, 0.6); win(g, 2.6, H - 2.9, 3, 1.7, '#f7f4ee'); }); }   // входът, стълбите, витрина/прозорец
 // ---- покриви с UV (u — по дължината на сградата/било, v — нагоре по ската): мансарда (стръмни скатове и плосък връх) и на две води
 function roofUV(V, F) { const pos = [], uv = []; for (const [ids, side] of F) { const tri = ids.length === 4 ? [ids[0], ids[1], ids[2], ids[0], ids[2], ids[3]] : ids;
   for (const i of tri) { const p = V[i]; pos.push(...p); uv.push(side ? p[2] + 0.5 : 0.02, side ? p[1] : 0.5); } }   // челата и върхът — едно петно гладка ламарина (между шевовете, над улука)
@@ -105,6 +127,9 @@ const KD = [
   ['COOP', () => fmat(coopC(), 7, 3, { seed: 83 }), 'tile', 0.25, { ph: 3 }],
   ['HOUSE', () => fmat(houseC(), 10, 0, { seed: 89, lit: 0.35 }), 'tile', 0.42, { H: 6 }],
   ['APW', () => KM.balc(), 'flat', 0, { ph: 3 }],
+  ['FED4', () => fmat(fedC(4, 3.2)[0], 9.6, 0, { seed: 101 }), 'flat', 0, { H: 1.4 + 4 * 3.3 + 4.2 }],   // was-fed: Вашингтон
+  ['FED6', () => fmat(fedC(6, 3)[0], 9, 0, { seed: 103 }), 'flat', 0, { H: 1.4 + 6 * 3.3 + 4.2 }],
+  ['ROW', () => fmat(rowC(), 6, 0, { seed: 107, thr: 60 }), 'flat', 0, { H: 11 }],
 ];
 const KM = { _b: null, balc() { return this._b || (this._b = fmat(balcC(), 9, 3, { seed: 97 })); } };   // APF/APP/APW — една и съща фасада, различни покриви
 export const K = Object.fromEntries(KD.map((k, i) => [k[0], 7 + i]));
@@ -120,6 +145,8 @@ const PAST = [0xf4d8c4, 0xf2e2b0, 0xd6e2ea, 0xecd0d6, 0xf6f2ea, 0xdce8d0, 0xf0d0
 export function varPick(style, h, h2, ty) { const h3 = (h * 7.31 + h2 * 3.77) % 1, h4 = (h * 13.7 + h2 * 5.3) % 1;
   if (style === 'paris') { const t = h2 < 0.36 ? K.H5 : h2 < 0.64 ? K.H6 : h2 < 0.8 ? K.H7 : h2 < 0.92 ? K.FAUB : K.PMOD, k = kind(t);
     return { t, H: k[4].H || 2.9 * (7 + Math.floor(h * 3)) /* модерните: 7–9 етажа */, col: t === K.FAUB ? pick(FAUBC, h3) : t === K.PMOD ? pick(FLAT, h3) : pick(STONE, h3), rc: t === K.FAUB ? (h4 < 0.5 ? pick(TILE, h3) : pick(ZINC, h3)) : t === K.PMOD ? pick(FLAT, h4) : pick(ZINC, h4) }; }
+  if (style === 'washington') { const t = h2 < 0.42 ? K.FED4 : h2 < 0.7 ? K.FED6 : K.ROW;   // was-fed: федерален варовик (4 и 6 етажа, ограничението за височина) и тухлени редови къщи
+    return { t, H: kind(t)[4].H, col: t === K.ROW ? pick([0xffffff, 0xf2e2d8, 0xe6d2c4, 0xf8ece0], h3) : pick([0xffffff, 0xf6f2ea, 0xece6da, 0xf2eadc, 0xe4e0d8], h3), rc: pick(FLAT, h4) }; }
   if (ty === 1) { const t = h < 0.45 ? K.O2 : K.O3; return { t, H: kind(t)[4].H, col: pick(OTTOC, h3), rc: pick(TILE, h4) }; }   // Истанбул: османските къщи
   const n = 3 + Math.floor(h * 6), t = h2 < 0.3 ? K.APW : h2 < 0.62 ? K.APF : h2 < 0.82 ? K.APP : K.CON;   // блоковете: 3–8 етажа
   return { t, H: n * 3, col: t === K.CON ? pick([0xe6e0d4, 0xd8d4cc, 0xeadcc0], h3) : t === K.APW ? 0xf8f6f0 : pick(PAST, h3), rc: t === K.APF || t === K.APW ? pick(FLAT, h4) : pick(TILE, h4), ex: t === K.APF || (t === K.APW && h4 < 0.6) ? 'tank' : null };
