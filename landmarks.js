@@ -508,7 +508,7 @@ function reichstag() {
 // ---- забележителности от готови модели (assets/heavy/lm/*.glb, Sketchfab, CC-BY — виж assets/heavy/CREDITS.txt)
 // h — височина в метри на играта; fit — най-много толкова ширина/дължина (парцелът е ~15 м); grid — пакет от сгради, подредени в квартал
 const GLB_LM = {
-  burj: { h: 70, fit: 14 }, cntower: { h: 58, fit: 14 }, willis: { h: 46, fit: 14, onLoad: (w, g) => { if (feature('night-willis')) willisLights(w, g); } }, shtower: { h: 56, fit: 14 },
+  burj: { h: 70, fit: 14, onLoad: (w, g) => { if (feature('night-burj2')) burjLights(w, g); } }, cntower: { h: 58, fit: 14 }, willis: { h: 46, fit: 14, onLoad: (w, g) => { if (feature('night-willis')) willisLights(w, g); } }, shtower: { h: 56, fit: 14 },
   liberty: { h: 22, fit: 13, plate: 0x7d9a6a }, redeemer: { h: 18, fit: 14, plate: 0x6f8f55 }, stbasil: { h: 20, fit: 15, plate: 0xb9b0a3 },
   opera: { h: 30, fit: 40, plate: 0x4f86b8 }, manhattan: { h: 34, fit: 15, grid: true },
   colosseo: { h: 13, fit: 15, plate: 0xb9ad98 },   // Рим: Колизеумът (Carlos.Maciel)
@@ -699,6 +699,42 @@ function pyramids() {   // Гиза: Хеопс, Хефрен (с бялата �
 // Петронас нощем: кулите светят сребристо-бели (прожекторите — floodK), а на двата шпила мигат червени светлини за самолетите
 const _ws = new THREE.Vector3();
 // Уилис тауър нощем (night-willis): двете антени — червени светлини за самолетите на върха и по средата, мигат на смени
+// 🌃 Бурж Халифа нощем (флаг night-burj2): LED лентите по ръбовете на крилата, които следват стъпалата, пръстени-подсветки при основата и на всяко
+// стъпало, червена светлина и ореол на върха — изпечени в Блендър от профила на модела (_source/burj_lights.py → assets/heavy/lm/burj-lights.glb,
+// в координатите на burj.glb). Светлината: по лентите се катерят светли „вълни“, цветът бавно прелива синьо ↔ златно (като шоуто на фасадата).
+let burjLm = null;
+function burjLights(w, g) {
+  const m = w.children[0]; if (!m) return;
+  const U = { uT: { value: 0 }, uN: { value: 0 } };
+  const led = new THREE.ShaderMaterial({ uniforms: U, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `uniform float uT; uniform float uN; varying vec2 vUv;
+      void main(){ float v = vUv.y, s = vUv.x;
+        float wave = pow(fract(v * 2.2 - uT * 0.11 + s * 0.5), 8.0) + 0.6 * pow(fract(v * 5.0 - uT * 0.23 + s * 1.7), 14.0);   // светлите вълни се катерят нагоре
+        float hue = 0.5 + 0.5 * sin(uT * 0.17 + v * 2.5);   // синьо ↔ златно, бавно
+        vec3 c = mix(vec3(0.25, 0.55, 1.0), vec3(1.0, 0.72, 0.32), hue);
+        gl_FragColor = vec4(c * (0.22 + 1.6 * wave) * (0.75 + 0.25 * v) * uN, 1.0); }` });
+  const ring = new THREE.ShaderMaterial({ uniforms: U, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `uniform float uT; uniform float uN; varying vec2 vUv;
+      void main(){ float k = pow(1.0 - vUv.y, 2.2);   // подсветка отдолу — избледнява нагоре
+        vec3 c = mix(vec3(1.0, 0.86, 0.62), vec3(0.6, 0.75, 1.0), 0.5 + 0.5 * sin(uT * 0.17 + vUv.x * 3.0));
+        gl_FragColor = vec4(c * k * 1.3 * uN, 1.0); }` });
+  const red = new THREE.MeshBasicMaterial({ color: 0xff2020 }), gc = document.createElement('canvas'); gc.width = gc.height = 64;
+  { const x = gc.getContext('2d'), gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.25, 'rgba(255,240,220,0.5)'); gr.addColorStop(1, 'rgba(255,240,220,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); }
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(gc), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 }));
+  (burjLm || (burjLm = new GLTFLoader().loadAsync('assets/heavy/lm/burj-lights.glb').then(gl => gl.scene).catch(() => null))).then(src => {
+    if (!src) return; const L = src.clone(true); let tip = null;
+    L.traverse(o => { if (!o.isMesh) return; o.castShadow = o.receiveShadow = false; o.frustumCulled = false;
+      o.material = /Led/.test(o.name) ? led : /Ring/.test(o.name) ? ring : red; if (/Tip/.test(o.name)) tip = o; });
+    m.add(L);
+    if (tip) { tip.geometry.computeBoundingBox(); const c = tip.geometry.boundingBox.getCenter(new THREE.Vector3()); glow.position.copy(c); m.add(glow); glow.userData.r = tip.geometry.boundingBox.getSize(new THREE.Vector3()).x; }
+  });
+  const prev = g.userData.sparkle;
+  g.userData.sparkle = (t, night) => { if (prev) prev(t, night); U.uT.value = t; U.uN.value = night;
+    const on = (t % 2) < 0.9; red.color.setRGB(on ? 1 : 0.15, on ? 0.12 : 0.02, on ? 0.12 : 0.02);   // авиационната светлина
+    glow.material.opacity = night * (0.75 + 0.25 * Math.sin(t * 2.3)); if (glow.userData.r) glow.scale.setScalar(glow.userData.r * (on ? 9 : 6)); };
+}
 function willisLights(w, g) {
   w.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(w), H = b.max.y - b.min.y, v = new THREE.Vector3(), top = [];
   w.traverse(o => { if (!o.isMesh) return; const P = o.geometry.attributes.position; for (let i = 0; i < P.count; i += 2) { v.fromBufferAttribute(P, i).applyMatrix4(o.matrixWorld); if (v.y > b.min.y + H * 0.88) top.push(v.clone()); } });
