@@ -170,7 +170,7 @@ const RIVER_W = 26;
 // с бензиностанция (истинските модели на играта), тревен остров и обратно включване. Връща пътя за колите (hwtraffic.js):
 // { z0, z1, zs, xE, lotX } — в координатите на изгледа (z по оста, x напреки)
 const SVC_L = 160, SVC_GAS = ['gas-big', 'gas-modern', 'gas-green', 'gas-lowpoly'];
-function serviceArea(g, gear, A, { W, H, zs }) {
+function serviceArea(g, gear, A, { W, H, zs, py: pyNear = false }) {
   const y = H() + 0.04, xE = -W / 2, z0 = zs - SVC_L / 2, z1 = zs + SVC_L / 2, lotX = xE - 20, add = (o, z = zs) => { o.userData.z = z; g.add(o); gear.push(o); return o; };
   const poly = (pts, mat, yy) => { const sh = new THREE.Shape(pts.map(([x, z]) => new THREE.Vector2(x, -z))), m = new THREE.Mesh(new THREE.ShapeGeometry(sh), mat); m.rotation.x = -Math.PI / 2; m.position.y = yy; m.receiveShadow = true; return m; };
   // асфалтът: лента, отбивка, паркинг, отбивка, лента — един многоъгълник; островът е отгоре
@@ -192,7 +192,8 @@ function serviceArea(g, gear, A, { W, H, zs }) {
   x.fillStyle = '#fff'; x.font = 'bold 30px system-ui'; [['A95', '2.65'], ['A100', '2.95'], ['Дизел', '2.55'], ['LPG', '1.29']].forEach(([a, b], k) => { x.textAlign = 'left'; x.fillText(a, 10, 160 + k * 66); x.textAlign = 'right'; x.fillStyle = '#ffd54a'; x.fillText(b, 152, 160 + k * 66); x.fillStyle = '#fff'; });
   const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace;
   const py = new THREE.Mesh(new THREE.BoxGeometry(4, 10, 0.6), [0, 0, 0, 0, 1, 1].map(k => k ? new THREE.MeshBasicMaterial({ map: tx }) : new THREE.MeshStandardMaterial({ color: 0x223344 })));
-  py.position.set(xE - 9, y + 5, z0 + 26); py.castShadow = true; add(py, z0 + 26);
+  if (pyNear) { py.position.set(xE - 10, y + 5, zs - 6); py.castShadow = true; add(py, zs - 6); }   // hw-link: на тревния остров срещу колонките (не на ръба на насипа)
+  else { py.position.set(xE - 9, y + 5, z0 + 26); py.castShadow = true; add(py, z0 + 26); }
   const b = abBoard(['⛽ 🍴 P', '500 м'], 5, 2.6); b.rotation.y = Math.PI; b.position.set(xE - 2.5, y + 3.4, z0 - 200); add(b, z0 - 200);
   const bp = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3.4, 0.2), new THREE.MeshStandardMaterial({ color: 0x8a9096 })); bp.position.set(xE - 2.5, y + 1.7, z0 - 200); add(bp, z0 - 200);
   // нощем: две лампи над паркинга
@@ -204,6 +205,15 @@ function serviceArea(g, gear, A, { W, H, zs }) {
   return { z0, z1, zs, xE, lotX };
 }
 
+// плочката без външната мантинела (страна sd: триъгълниците в крайните 5 % по x) — геометрията се пази за всички плочки
+const RAIL_CUT = new Map();
+function railCut(t, sd) {
+  t.traverse(m => { if (!m.isMesh) return; const k = m.geometry.uuid + sd; if (!RAIL_CUT.has(k)) { const g0 = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry, P = g0.attributes.position; g0.computeBoundingBox(); const bb = g0.boundingBox, lim = sd > 0 ? bb.max.x - 0.05 * (bb.max.x - bb.min.x) : bb.min.x + 0.05 * (bb.max.x - bb.min.x), keep = [];
+    for (let f = 0; f < P.count; f += 3) { const cx = (P.getX(f) + P.getX(f + 1) + P.getX(f + 2)) / 3; if (sd > 0 ? cx < lim : cx > lim) keep.push(f, f + 1, f + 2); }
+    const r = new THREE.BufferGeometry(); for (const [nm, a] of Object.entries(g0.attributes)) { const arr = new a.array.constructor(keep.length * a.itemSize); keep.forEach((i, j) => { for (let c = 0; c < a.itemSize; c++) arr[j * a.itemSize + c] = a.getComponent(i, c); }); r.setAttribute(nm, new THREE.BufferAttribute(arr, a.itemSize, a.normalized)); }
+    r.computeBoundingSphere(); RAIL_CUT.set(k, r); }
+    m.geometry = RAIL_CUT.get(k); });
+}
 function clone(A, n, s) {
   const o = A[n].scene.clone(true);
   o.scale.setScalar(s);
@@ -221,9 +231,22 @@ function reveal(list, front) { for (const o of list) o.visible = o.userData.z <=
 // { group, paths: { nearOff, nearOn, farOff, farOn } } — пътищата за колите (hwtraffic.js) в координатите на изгледа [x, z]
 const rSmooth = P => { const out = []; for (let i = 0; i < P.length - 1; i++) { const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)], n = Math.max(2, Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / 2)); for (let k = 0; k < n; k++) { const t = k / n, t2 = t * t, t3 = t2 * t; out.push([0, 1].map(j => 0.5 * (2 * p1[j] + (-p0[j] + p2[j]) * t + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * t2 + (-p0[j] + 3 * p1[j] - 3 * p2[j] + p3[j]) * t3))); } } out.push(P[P.length - 1]); return out; };
 // пътищата на рампите (без three — и за теста): { paths, ramps: [pts…] (асфалтът на рампите), xT }
-export function rampPaths(W, cx, xs, xr) {
-  const xe = W / 2, xT = -(xe + 30), lane = 1.75, ramps = [], ramp = P => { const pts = rSmooth(P); ramps.push(pts); return pts; };
-  const paths = {
+// lanes (hw-link): със забавителна/ускорителна лента покрай платното (~75 м, по рамото на разширения насип), после рампата слиза;
+// началото на изходите (cx ± 330) и краят на входовете (cx − 290 / cx + 330) са същите — колите (hwtraffic.js) отбиват и се вливат там
+// blvd (hw-link, градовете с план): изходът и входът се отделят направо от улицата на града (булеварда) с лек завой — без „южната улица“
+export function rampPaths(W, cx, xs, xr, lanes = false, blvd = false) {
+  const xe = W / 2, xT = -(xe + 30), lane = 1.75, ramps = [], ramp = P => { const pts = rSmooth(P); ramps.push(pts); return pts; }, xl = xe + 1.8;
+  const xb = xs + 12, paths = lanes && blvd ? {
+    nearOff: ramp([[xr, cx + 330], [xl, cx + 292], [xl, cx + 215], [xe + 4, cx + 112], [xe + 8, cx + 60], [xs - 8, cx + 17], [xs, cx + 6], [xb, cx + 3]]).concat(rSmooth([[xb, cx + 3], [xb + 30, cx + 3]]).slice(1)),
+    nearOn: rSmooth([[xb + 30, cx - 3], [xb, cx - 3]]).concat(ramp([[xb, cx - 3], [xs, cx - 6], [xs - 8, cx - 17], [xe + 8, cx - 60], [xe + 4, cx - 112], [xl, cx - 165], [xl, cx - 245], [xr, cx - 290]]).slice(1)),
+    farOff: ramp([[-xr, cx - 330], [-xl, cx - 292], [-xl, cx - 215], [-(xe + 9), cx - 160], [xT - 6, cx - 70], [xT - 6, cx - 12]]).concat(rSmooth([[xT - 6, cx - 12], [xT - 3, cx - 3], [xT + 4, cx + lane], [xb + 30, cx + lane]]).slice(1)),
+    farOn: rSmooth([[xb + 30, cx - lane], [xT + 4, cx - lane], [xT - 3, cx + 3], [xT - 6, cx + 12]]).concat(ramp([[xT - 6, cx + 12], [xT - 6, cx + 70], [-(xe + 9), cx + 160], [-xl, cx + 215], [-xl, cx + 290], [-xr, cx + 330]]).slice(1)),
+  } : lanes ? {
+    nearOff: ramp([[xr, cx + 330], [xl, cx + 292], [xl, cx + 215], [xe + 6, cx + 172], [xs - 9, cx + 120], [xs - 4.5, cx + 95]]).concat(rSmooth([[xs - 4.5, cx + 95], [xs, cx + 91], [xs + lane, cx + 84], [xs + lane, cx + 40]]).slice(1)),
+    nearOn: rSmooth([[xs + lane, cx - 30], [xs + lane, cx - 52], [xs, cx - 58]]).concat(ramp([[xs - 4.5, cx - 62], [xs - 9, cx - 82], [xe + 6, cx - 128], [xl, cx - 165], [xl, cx - 245], [xr, cx - 290]]).slice(1)),
+    farOff: ramp([[-xr, cx - 330], [-xl, cx - 292], [-xl, cx - 215], [-(xe + 9), cx - 160], [xT - 6, cx - 70], [xT - 6, cx - 12]]).concat(rSmooth([[xT - 6, cx - 12], [xT - 3, cx - 3], [xT + 4, cx + lane], [xs - 6, cx + lane], [xs + lane, cx + 6], [xs + lane, cx + 40]]).slice(1)),
+    farOn: rSmooth([[xs + lane, cx - 40], [xs + lane, cx - 8], [xs - 6, cx - lane], [xT + 4, cx - lane], [xT - 3, cx + 3], [xT - 6, cx + 12]]).concat(ramp([[xT - 6, cx + 12], [xT - 6, cx + 70], [-(xe + 9), cx + 160], [-xl, cx + 215], [-xl, cx + 290], [-xr, cx + 330]]).slice(1)),
+  } : {
     // откъм града: изход от посоката −z → Т с южната улица (завой наляво към западната лента на улицата)
     nearOff: ramp([[xr, cx + 330], [xe + 1.8, cx + 272], [xe + 5.5, cx + 235], [xe + 9, cx + 190], [xs - 9, cx + 120], [xs - 4.5, cx + 95]]).concat(rSmooth([[xs - 4.5, cx + 95], [xs, cx + 91], [xs + lane, cx + 84], [xs + lane, cx + 40]]).slice(1)),
     // вход от южната улица (западната лента) → посоката −z
@@ -233,20 +256,25 @@ export function rampPaths(W, cx, xs, xr) {
     // от града под магистралата → Т-то → наляво по входа → посоката +z
     farOn: rSmooth([[xs + lane, cx - 40], [xs + lane, cx - 8], [xs - 6, cx - lane], [xT + 4, cx - lane], [xT - 3, cx + 3], [xT - 6, cx + 12]]).concat(ramp([[xT - 6, cx + 12], [xT - 6, cx + 70], [-(xe + 12), cx + 170], [-(xe + 5.5), cx + 235], [-(xe + 1.8), cx + 272], [-xr, cx + 330]]).slice(1)),
   };
-  return { paths, ramps, xT, xe };
+  return { paths, ramps, xT, xe, lanes: lanes ? [[1, cx + 200, cx + 335], [1, cx - 295, cx - 150], [-1, cx - 335, cx - 200], [-1, cx + 150, cx + 335]] : [] };   // [страна, z0, z1] — без мантинела, насипът — по-широк
 }
 // височината на рампа в точка с напречно x: върху насипа (до W/2 + 3) — на нивото на платното, после слиза плавно до земята (6 м)
 export const rampY = (xe, vx, y0 = 0.25, top = 0.95) => { const t = Math.max(0, Math.min(1, (Math.abs(vx) - xe - 3) / 6)); return top - (top - y0) * t * t * (3 - 2 * t); };
-function cityRamps(W, cx, xs, xr, y0 = 0.25) {   // над терена на града (иначе тревата го покрива)
+// o (hw-link): lanes — с успоредните ленти; tfix — площадката на Т-то стига рампите; front — улица покрай магистралата откъм града (градовете с план нямат „южна улица“);
+// link: [[x, z]…] — пътят от нея до най-близката улица на града (linkW — ширината)
+function cityRamps(W, cx, xs, xr, y0 = 0.25, o = {}) {   // над терена на града (иначе тревата го покрива)
   const g = new THREE.Group(), xe = W / 2, asph = new THREE.MeshStandardMaterial({ color: 0x55585e, roughness: 0.95, side: THREE.DoubleSide }), paint = new THREE.MeshBasicMaterial({ color: 0xf0f0f0, side: THREE.DoubleSide });
   g.userData.keep = true;   /* perf-cliff (citycull.js) не ги слива — видимостта им следва етапа на магистралата */
   const band = (pts, w, y, mat, hy = false) => { const pos = [], idx = []; pts.forEach((p, i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1, nx = -dz / l, nz = dx / l, yy = hy ? rampY(xe, p[0], y) + (y - y0) : y; pos.push(p[0] + nx * w / 2, yy, p[1] + nz * w / 2, p[0] - nx * w / 2, yy, p[1] - nz * w / 2); if (i) { const k = 2 * i; idx.push(k - 2, k - 1, k, k - 1, k + 1, k); } });
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals(); const m = new THREE.Mesh(geo, mat); m.receiveShadow = true; g.add(m); return m; };
   const off = (pts, d) => pts.map((p, i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return [p[0] - dz / l * d, p[1] + dx / l * d]; });
-  const R = rampPaths(W, cx, xs, xr), xT = R.xT;
+  const R = rampPaths(W, cx, xs, xr, !!o.lanes, !!o.blvd), xT = R.xT, tw = o.tfix ? 14.5 : 9;
   for (const pts of R.ramps) { band(pts, 5, y0, asph, true); for (const d of [2.25, -2.25]) band(off(pts, d), 0.15, y0 + 0.02, paint, true); }   /* от насипа плавно надолу */
   // пътят от града под магистралата до Т-то от далечната страна (две ленти, прекъсната ос) и площадката на Т-то
-  { const pts = rSmooth([[xs - 4, cx], [xT - 6, cx]]); band(pts, 7.5, y0 - 0.01, asph); for (let x = xs - 6; x > xT; x -= 6) band([[x, cx], [x - 3, cx]], 0.15, y0 + 0.02, paint); band([[xT - 6, cx - 9], [xT - 6, cx + 9]], 7.5, y0 - 0.005, asph); }
+  { const pts = rSmooth([[o.blvd ? xs + 12 : xs - 4, cx], [xT - 6, cx]]); band(pts, 7.5, y0 - 0.01, asph); for (let x = xs - 6; x > xT; x -= 6) band([[x, cx], [x - 3, cx]], 0.15, y0 + 0.02, paint); band([[xT - 6, cx - tw], [xT - 6, cx + tw]], 7.5, y0 - 0.005, asph); }
+  const dash = (pts, y) => { let d = 0; for (let i = 1; i < pts.length; i++) { const l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); if (d % 6 < 3) band([pts[i - 1], pts[i]], 0.15, y, paint); d += l; } };
+  if (o.front && !o.blvd) { const pts = rSmooth([[xs, cx - 78], [xs, cx + 108]]); band(pts, 7.5, y0 - 0.012, asph); dash(pts, y0 + 0.02); }   // откъм града: улицата, в която влизат изходът и входът
+  if (o.link && o.link.length > 1) { band(o.link, o.linkW || 7.5, y0 - 0.014, asph); dash(o.link, y0 + 0.018); }
   // табели „Изход“ преди отбивките
   for (const [x, z, ry] of [[xe + 3, cx + 380, 0], [-(xe + 3), cx - 380, Math.PI]]) { const b = abBoard(['↗ ИЗХОД', 'ГРАД'], 4.5, 2.4); b.rotation.y = ry; b.position.set(x, 3.6, z); g.add(b); const p = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3.6, 0.2), new THREE.MeshStandardMaterial({ color: 0x8a9096 })); p.position.set(x, 1.8, z); g.add(p); }
   R.paths.xe = xe; return { group: g, paths: R.paths };
@@ -291,6 +319,7 @@ export function buildHighwayView(A, opts = {}) {
   // opts.ab — аутобан: по 4 ленти във всяка посока (3,6 м), по-широк разделител, асфалт с маркировка вместо плочките на магистралата
   const AB = !!opts.ab, cw = AB ? AB_CW : CW, med = AB ? AB_MED : MED;
   const W = cw * 2 + med;
+  const LZ = opts.ramps && opts.ramps.lanes ? rampPaths(W, opts.ramps.cx, opts.ramps.xs, 0, true).lanes : [], noRail = (sd, z) => LZ.some(([s, a, b]) => s === sd && z > a && z < b);   // hw-link: успоредните ленти — без външната мантинела
   // 1) насип (пръст) — сегменти по 10 м
   const earth = [], gravel = [], asphalt = [], gear = [];
   const earthMat = new THREE.MeshStandardMaterial({ color: 0x7a5a3a, roughness: 1 });
@@ -302,6 +331,10 @@ export function buildHighwayView(A, opts = {}) {
     e.position.set(0, 0.3, zc); e.receiveShadow = true; e.userData.z = zc; g.add(e); earth.push(e);
     const gr = new THREE.Mesh(new THREE.BoxGeometry(W + 1, 0.3, 10), gravelMat);
     gr.position.set(0, 0.75, zc); gr.receiveShadow = true; gr.userData.z = zc; g.add(gr); gravel.push(gr);
+  }
+  for (const [sd, a, b] of LZ) {   // насипът под успоредната лента: по-широк с 5 м
+    const e = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.6, b - a), earthMat); e.position.set(sd * (W / 2 + 2.75), 0.3, (a + b) / 2); e.receiveShadow = true; e.userData.z = (a + b) / 2; g.add(e); earth.push(e);
+    const gr = new THREE.Mesh(new THREE.BoxGeometry(5, 0.3, b - a), gravelMat); gr.position.set(sd * (W / 2 + 2.5), 0.75, (a + b) / 2); gr.receiveShadow = true; gr.userData.z = (a + b) / 2; g.add(gr); gravel.push(gr);
   }
   // мост: колони + плоча (колоните се появяват в етап 1, плочата в етап 2)
   for (let z = RIVER_Z - RIVER_W / 2 - 4; z <= RIVER_Z + RIVER_W / 2 + 4; z += 9) {
@@ -321,6 +354,7 @@ export function buildHighwayView(A, opts = {}) {
     const zc = z + 5;
     for (const sd of [-1, 1]) {
       const a = new THREE.Mesh(new THREE.PlaneGeometry(cw, 10), abLaneMat()); a.rotation.x = -Math.PI / 2; if (sd > 0) a.rotation.z = Math.PI; a.position.set(sd * (cw + med) / 2, H(zc) + 0.03, zc); a.receiveShadow = true; a.userData.z = zc; g.add(a); asphalt.push(a);
+      if (noRail(sd, zc)) continue;
       const rail = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.7, 10), abRailMat); rail.position.set(sd * (W / 2 + 0.1), H(zc) + 0.4, zc); rail.userData.z = zc; g.add(rail); asphalt.push(rail);
     }
   }
@@ -328,6 +362,7 @@ export function buildHighwayView(A, opts = {}) {
     const zc = z + CW / 2;
     for (const x of [-(CW + MED) / 2, (CW + MED) / 2]) {
       const t = clone(A, 'road-straight-barrier', CW);
+      if (noRail(Math.sign(x), zc)) railCut(t, Math.sign(x));
       t.position.set(x, H(zc) + 0.02, zc);
       if (onBridge(zc)) { const deck = new THREE.Mesh(new THREE.BoxGeometry(CW, 0.8, CW), gravelMat); deck.position.set(x, H(zc) - 0.4, zc); deck.castShadow = true; deck.userData.z = zc; g.add(deck); asphalt.push(deck); }
       t.userData.z = zc; g.add(t); asphalt.push(t);
@@ -349,8 +384,8 @@ export function buildHighwayView(A, opts = {}) {
       const pl = new THREE.Mesh(new THREE.PlaneGeometry(14, 18), hwPoolMat()); pl.rotation.x = -Math.PI / 2; pl.position.set(sd * (cw + med) / 2, H(z) + 0.07, z); pl.userData.z = z; pl.renderOrder = 2; g.add(pl); gear.push(pl);
     }
   }
-  const service = opts.service != null ? serviceArea(g, gear, A, { W, H, zs: opts.service }) : null;
-  const ramps = opts.ramps ? cityRamps(W, opts.ramps.cx, opts.ramps.xs, AB ? med / 2 + cw * 7 / 8 : med / 2 + cw * 3 / 4) : null; if (ramps) g.add(ramps.group);   // изходите към града (hw-ramps)
+  const service = opts.service != null ? serviceArea(g, gear, A, { W, H, zs: opts.service, py: !!opts.svcPy }) : null;
+  const ramps = opts.ramps ? cityRamps(W, opts.ramps.cx, opts.ramps.xs, AB ? med / 2 + cw * 7 / 8 : med / 2 + cw * 3 / 4, 0.25, opts.ramps) : null; if (ramps) g.add(ramps.group);   // изходите към града (hw-ramps)
   if (AB && opts.exit !== false) abExit(g, gear, { W, cw, med, z0, LEN, H, zE: opts.exitZ ?? z0 + LEN * 0.22, name: opts.abName || 'A', exitTo: opts.exitTo || '' });
   for (const z of [z0 + 30, z0 + LEN - 40]) {
     const sgn = clone(A, 'sign-highway-wide', 11); sgn.position.set(W / 2 + 1.5, 0, z); sgn.rotation.y = Math.PI / 2; sgn.userData.z = z; g.add(sgn); gear.push(sgn);

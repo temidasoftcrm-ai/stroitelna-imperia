@@ -8721,13 +8721,15 @@ function buildCityHighway() {
   const g = new THREE.Group();
   // градовете по истинската карта: магистралата е при изхода от плана (anchors.highway — Истанбул на север, не през Мраморно море), напречно на посоката му
   const HA = city.plan && city.plan.p2 && city.plan.osm && city.plan.anchors && city.plan.anchors.highway;
-  const hLen = HA ? 900 : Math.max(1200, 2 * (tx(NI - 1) + 380)) - 10, hcx = 0;   // от край до край на земята (като релсите) — не свършва рязко
+  let hLen = HA ? 900 : Math.max(1200, 2 * (tx(NI - 1) + 380)) - 10, hcx = 0;   // от край до край на земята (като релсите) — не свършва рязко
   const OVER = [{ c: STATION_X - 15 - hcx, w: 48 }];   // надлез над коловозите на гарата: от X+8 до X−40 — петте гарови и коловоза на минаващите влакове (outerX = X−32,5)
   const seg0 = done || mine.find(s => s.id === job.seg), isAb = ALL_AB.some(x => x.id === seg0.id), far = isAb ? cityById(seg0.a === S.cityId ? seg0.b : seg0.a) : null;
   const hz = HA ? (isAb ? 42 : 34) : tx(NJ - 1) + (isAb ? 42 : 34);   // аутобанът е по-широк (4 ленти на посока) — малко по-далеч от града
-  const RAMPS = feature('hw-ramps') && !HA ? { cx: (city.plan?.hwX ?? tx(3 * Math.floor(NB / 2))) - hcx, xs: hz - tx(NJ - 1) } : null;   /* изходите към града: пътят от града минава под магистралата (тя се вдига като над релсите) */
+  const HL = feature('hw-link') && feature('hw-ramps') && !HA ? hwLinkPlan(hz, isAb) : null;   /* hw-link (55): до края на земята, изходите — срещу улицата на града, пътят до нея */
+  if (HL) { hLen = HL.len; hcx = HL.hcx; OVER[0].c = STATION_X - 15 - hcx; }
+  const RAMPS = feature('hw-ramps') && !HA ? { cx: (HL ? HL.cx : (city.plan?.hwX ?? tx(3 * Math.floor(NB / 2)))) - hcx, xs: hz - tx(NJ - 1), ...(HL ? { lanes: true, tfix: true, front: HL.front, blvd: HL.front, link: HL.link, linkW: HL.linkW } : {}) } : null;   /* изходите към града: пътят от града минава под магистралата (тя се вдига като над релсите) */
   if (RAMPS) OVER.push({ c: RAMPS.cx, w: 14 });
-  const v = buildHighwayView(A, { ramps: RAMPS, len: hLen, river: false, ground: !!HA, ab: isAb, abName: isAb ? 'A' + (1 + (hashStr(seg0.id) % 9)) : '', exitTo: far ? far.nm : '', over: OVER, exitZ: hLen * 0.28, service: feature('hw-service') ? 70 : null });   // крайпътният комплекс — между надлеза над гарата и изхода на аутобана   // изходът на аутобана — откъм другия край, далеч от гарата
+  const v = buildHighwayView(A, { ramps: RAMPS, len: hLen, river: false, ground: !!HA, ab: isAb, abName: isAb ? 'A' + (1 + (hashStr(seg0.id) % 9)) : '', exitTo: far ? far.nm : '', over: OVER, exitZ: hLen * 0.28, service: feature('hw-service') ? (HL ? HL.svc : 70) : null, svcPy: !!HL });   // крайпътният комплекс — между надлеза над гарата и изхода на аутобана   // изходът на аутобана — откъм другия край, далеч от гарата
   v.group.rotation.y = Math.PI / 2;
   v.group.position.set(hcx, 0, hz);
   g.add(v.group);
@@ -8745,6 +8747,33 @@ function buildCityHighway() {
   const tg = new THREE.Group(); tg.position.x = hcx; g.add(tg); tg.userData.keep = true;   // трафикът — не се слива
   { const sid = cityHw.seg; g.userData.mergeWhen = () => hwAll().includes(sid) && cityHw && cityHw.g === g; }   // ⚡ perf-cliff: готовата магистрала в града (колоните, лампите, мантинелите) — сливане по материал
   cityHw.traffic = createHwTraffic(tg, model, A, hz, hLen, 0.92, isAb, x => overLift(OVER, x), v.service, v.ramps && v.ramps.paths);
+}
+// 🛣️ hw-link (55): магистралата край града — докъде стига земята (с план: земята на плана, не на решетката — иначе висеше над празното),
+// къде са изходите (срещу улицата на града, която свършва най-близо до магистралата) и пътят от тях до нея; крайпътният комплекс — далеч
+// от рампите и надлеза над гарата. Връща { len, hcx, cx, front, link, linkW, svc } — link и svc в координатите на изгледа (x напреки, z по оста)
+function hwLinkPlan(hz, isAb) {
+  const P = city.plan, Zf = tx(NJ - 1), stc = STATION_X - 15, pv = city.planView;
+  let x0 = -(Math.max(1200, 2 * (tx(NI - 1) + 380)) - 10) / 2, x1 = -x0;
+  if (pv) { pv.updateMatrixWorld(true); const bs = [];
+    pv.traverse(o => { if (!o.isMesh || !o.geometry || o.material?.isMeshPhysicalMaterial || o.material?.transparent) return; o.geometry.computeBoundingBox(); const b = o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld); if (b.max.y - b.min.y < 1 && b.max.y < 0.6 && b.max.x - b.min.x > 250 && b.min.z < hz - 20 && b.max.z > hz + 20) bs.push(b); });
+    const on = x => bs.some(b => x >= b.min.x && x <= b.max.x);
+    if (on(0)) { let a = 0, c = 0; while (a < 4000 && on(-(a + 10))) a += 10; while (c < 4000 && on(c + 10)) c += 10; x0 = Math.max(x0, -a + 20); x1 = Math.min(x1, c - 20); } }
+  const hcx = (x0 + x1) / 2, len = x1 - x0, ok = x => Math.abs(x - stc) > 24 + 80 + 332 && x > x0 + 400 && x < x1 - 400;   // рампите (cx ± 330) — не на рампата на надлеза над гарата и не отвъд края
+  let cx = P?.hwX ?? tx(3 * Math.floor(NB / 2)), link = null, linkW = 7.5;
+  if (P && P.streets) {
+    const key = p => Math.round(p[0] / 2) + ',' + Math.round(p[1] / 2), cnt = new Map(); for (const s of P.streets) for (const p of s.pts) cnt.set(key(p), (cnt.get(key(p)) || 0) + 1);
+    let best = null;   // свободен край на улица, който гледа на юг — най-близо до линията на „южната улица“ (Zf)
+    for (const s of P.streets) { if (s.cls === 'quay' || s.closed || s.pts.length < 2) continue;
+      for (const k of [0, s.pts.length - 1]) { const p = s.pts[k], q = s.pts[k ? k - 1 : 1], l = Math.hypot(p[0] - q[0], p[1] - q[1]) || 1, u = [(p[0] - q[0]) / l, (p[1] - q[1]) / l];
+        if (cnt.get(key(p)) > 1 || u[1] < 0.3 || p[1] > hz - 12 || !ok(p[0])) continue; const sc = Math.abs(Zf - p[1]); if (!best || sc < best.sc) best = { p, u, sc, w: s.w }; } }
+    let a = null, u = null;
+    if (best && best.sc < 260) { cx = best.p[0]; a = best.p; u = best.u; linkW = Math.max(7.5, Math.min(12, best.w || 7.5)); }
+    else { let d = 1e9; for (const s of P.streets) if (s.cls !== 'quay') for (const p of s.pts) { const e = Math.hypot(p[0] - cx, p[1] - Zf); if (e < d) { d = e; a = p; } } if (a) { const l = Math.hypot(cx - a[0], Zf - a[1]) || 1; u = [(cx - a[0]) / l, (Zf - a[1]) / l]; } }
+    if (a && a[1] < Zf - 2) { const k = Math.min(25, Math.hypot(cx - a[0], Zf - a[1]) / 3); link = sampleCurve([a, [a[0] + u[0] * k, a[1] + u[1] * k], [cx, Zf - k], [cx, Zf]], 2).map(([x, z]) => [hz - z, x - hcx]); }
+  }
+  const r = cx - hcx, so = stc - hcx, L2 = len / 2, exZ = isAb ? len * 0.28 : null;   // комплексът: най-близо до старото място (z = 70), извън рампите, надлеза и изхода на аутобана
+  let svc = null; for (let d = 0; d < L2 && svc == null; d += 10) for (const z of [70 + d, 70 - d]) if (svc == null && z > -L2 + 120 && z < L2 - 100 && Math.abs(z - r) > 330 + 80 + 20 && Math.abs(z - so) > 24 + 80 + 80 && (exZ == null || Math.abs(z - exZ) > 200)) svc = z;
+  return { len, hcx, cx, front: !!(P && P.streets), link, linkW, svc };
 }
 // 🛣️ порталите над магистралата (hwsigns.js): над всяко платно ~през 1 км и пред изхода към града (≈450 м преди него);
 // в рамката на изгледа (v.group): пътят е по z, платното x < 0 — колите към +z (табелите гледат към −z), x > 0 — към −z
@@ -11611,6 +11640,9 @@ if (AUTOTEST) {
     hwLook(dx = 0, h = 60) { if (!cityHw) return; const p = new THREE.Vector3(); cityHw.g.getWorldPosition(p); const sv = cityHw.v.service; controls.target.set(p.x + (sv ? sv.zs : 0) + dx, 0, p.z + cityHw.v.group.position.z - (sv ? sv.xE - 20 : 0)); camera.position.set(controls.target.x + h * 0.5, h, controls.target.z + h * 0.8); },
     hwRampInfo() { if (!cityHw || !cityHw.v.ramps) return null; const g = cityHw.v.ramps.group; g.updateWorldMatrix(true, true); const b = new THREE.Box3().setFromObject(g); return { vis: g.visible, n: g.children.length, min: b.min.toArray().map(Math.round), max: b.max.toArray().map(Math.round), groundY: city.ground ? city.ground.position.y : null }; },
     hwLookAt(dz, dx, h = 70) { if (!cityHw || !cityHw.v.ramps) return false; const cx = cityHw.v.ramps.paths.nearOff[0][1] - 330 + cityHw.v.group.position.x, z = cityHw.v.group.position.z; controls.target.set(cx + dz, 0, z - dx); camera.position.set(cx + dz + 1, h, z - dx + 2); return true; },   /* hw-ramps: отгоре — dz по оста, dx напреки (откъм града +) */
+    hwTop(dz = 0, dx = 0, h = 200) { if (!cityHw || !cityHw.v.ramps) return false; const cx = cityHw.v.ramps.paths.nearOff[0][1] - 330 + cityHw.v.group.position.x, z = cityHw.v.group.position.z; showMap(false); controls.target.set(cx + dz, 0, z - dx); camera.position.set(cx + dz, h, z - dx + h * 0.02); controls.update(); fly = null; return { cx: Math.round(cx), z: Math.round(z) }; },   /* hw-link (55): отвесно отгоре — градът е нагоре, dz по оста, dx напреки (откъм града +) */
+    hwLinkLook(k = 0) { if (!cityHw || !cityHw.v.ramps) return false; const G = cityHw.v.group.position, P = cityHw.v.ramps.paths, cx = P.nearOff[0][1] - 330, sv = cityHw.v.service, W = (vx, vz) => [G.x + vz, G.z - vx], at = (vx, vz, dx, h, dz) => { const [x, z] = W(vx, vz); showMap(false); controls.target.set(x, 0, z); camera.position.set(x + dx, h, z + dz); controls.update(); fly = null; };   /* hw-link (55): 0 — отгоре, 1 — Т-то, 2 — ускорителната лента, 3 — бензиностанцията, 4 — краят */
+      if (k === 0) return this.hwTop(0, 10, 330); if (k === 1) at(-(P.xe + 36), cx, 45, 40, 55); else if (k === 2) at(P.xe + 2, cx - 205, 55, 16, -40); else if (k === 3 && sv) at(sv.xE - 12, sv.zs, -45, 28, 45); else if (k === 4) at(0, cityHw.v.length / 2, -110, 45, -70); else return false; return { cx: Math.round(G.x + cx), len: cityHw.v.length, svc: sv && sv.zs }; },
     hwLookRamps(h = 120) { if (!cityHw || !cityHw.v.ramps) return false; const cx = cityHw.v.ramps.paths.nearOff[0][1] - 330 + cityHw.v.group.position.x, z = cityHw.v.group.position.z; const sd = __dbg.__rampSide || 1; controls.target.set(cx, 0, z - 20); camera.position.set(cx + h * 1.3, h, z - 20 - sd * h * 0.9); return true; },   /* hw-ramps: изгледът към изходите */
     // 🚧 hw-incidents: инцидент по магистралата до града (type: rear | truck | fire | spill; dir ±1 — платното), камерата — откъм банкета, зад мястото;
     // night — 22 ч (и времето тече). hwIncLook(назад, височина, встрани, напред) — пак към мястото; hwIncStep(s) — превърта s игрови секунди (тестовете)
