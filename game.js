@@ -1083,7 +1083,7 @@ function bgFreeAt(b, osm = false) { if (!city.p2Map) return false;   /* osm — 
   const C = bgFreeAt.c && performance.now() - bgFreeAt.c.t < 200 ? bgFreeAt.c : (bgFreeAt.c = { t: performance.now(), own: bgOwn(), done: city.lots.filter(l => l.built && l.obj && !l.busy) }), own = C.own, cx = b.x + o[0], cz = b.z + o[1], R = Math.hypot(b.w, b.d) / 2 + 2, inL = (l, m) => { const r = lotRot(l), c = Math.cos(r), s = Math.sin(r), [W0, D0] = lotHalf(l), mn = osm && own.has(l.id) ? 9.5 : 0, W = Math.max(W0, mn), D = Math.max(D0, mn);   /* osm: своите парцели — поне колкото дворът на централата/гаража (~19 × 19 м), и в тесните парцели на Париж */ return pts.some(([x, z]) => { const dx = x - l.x, dz = z - l.z; return Math.abs(dx * c - dz * s) < W + m && Math.abs(dx * s + dz * c) < D + m; }); };
   for (const l of city.lots) { if (b.lot ? !own.has(l.id) : osm ? l.busy === 'bg' || (!l.busy && !l.built && !l.obj && !own.has(l.id)) : !l.busy && !l.built && !l.obj && !own.has(l.id)) continue; const lr = Math.hypot(l.w || 16, l.d || 16) / 2 + R + 4; if (Math.abs(l.x - cx) > lr || Math.abs(l.z - cz) > lr) continue; if (inL(l, osm ? (own.has(l.id) ? 4 : 1.5) : 2)) return false; }
   const cp = city.campusPlot, h = city.hq; if (cp && cp.all && h) { const r = lotRot(h), c = Math.cos(r), s = Math.sin(r); if (pts.some(([x, z]) => { const dx = x - h.x, dz = z - h.z, u = dx * c - dz * s, v = dx * s + dz * c; return u > cp.all.x0 - 2 && u < cp.all.x1 + 2 && v > cp.all.z0 - 2 && v < cp.all.z1 + 2; })) return false; }
-  const A = city.dl && city.dl.analysis; if (A && A.comps) { const done = C.done;
+  const A = !osm && city.dl && city.dl.analysis; if (A && A.comps) { const done = C.done;   /* osm: анализът на districts.js не знае за фоновите сгради — всичко е „свободно“ */
     for (const [x, z] of pts) { const k = A.at(x, z); if (k < 0) continue; if (A.taken && A.taken[k]) return false; const c = A.comps[A.comp[k]]; if (!c) continue;
       if (c.park || (c.area >= 60 && c.maxDt >= 2 && done.some(l => Math.hypot(l.x - c.x, l.z - c.z) < 60))) return false; } }   // паркът / кътчето заема цялата свободна площ
   return true; }
@@ -1701,7 +1701,7 @@ function garageMesh(level, w, d) {
 function wh2Mesh(level) {
   const lv = Math.max(1, Math.min(10, level)), n = 'wh2-l' + (feature('real-sizes') && lv >= 7 ? (lv % 2 ? 5 : 4) : lv); if (!A[n]) return null;   /* №18 (55): нива 7–10 — високите халета (4 и 5), отрязани да влязат в парцела; терминалите и мега-комплексът (40–62 м, с навеси) не влизат — остават за пристанища/индустриални зони */
   const g = new THREE.Group(), o = A[n].scene.clone(true); g.add(o); g.updateMatrixWorld(true);
-  const b = new THREE.Box3().setFromObject(g); g.userData.h = b.max.y - b.min.y; g.userData.wh2 = n; return g;
+  const b = new THREE.Box3().setFromObject(g); g.userData.h = b.max.y - b.min.y; g.userData.wh2 = n; g.userData.src = n; return g;
 }
 function warehouseMesh(level, old = false) {
   if (!old && feature('wh-levels2')) { const g2 = wh2Mesh(level); if (g2) return g2; }
@@ -3197,7 +3197,7 @@ function bbHits(x, z, fw, ry = 0) {
     if (!b.isEmpty() && pts.some(([px, pz]) => px > b.min.x - 2 && px < b.max.x + 2 && pz > b.min.z - 2 && pz < b.max.z + 2)) return true; }
   return false;
 }
-let bbCullT = 0;
+let bbCullT = 0, ovStuckT = 0, ovChkT = 0;
 const bbCull = () => { if (city.billboards && city.billboards.cull && feature('bb-clear')) city.billboards.cull(s => bbHits(s.x, s.z, s.fw || 12, s.ry)); };
 function bbPlaceOpts() {
   if (!feature('bb-place')) return {};
@@ -4940,8 +4940,8 @@ function hwDonePath(a, b) {
     if (u === b) break;
     seen.add(u);
     for (const x of adj.get(u) || []) {
-      const v = x.a === u ? x.b : x.a, nd = dist.get(u) + x.km;
-      if (!dist.has(v) || nd < dist.get(v)) { dist.set(v, nd); prev.set(v, [u, x]); }
+      const v = x.a === u ? x.b : x.a, nd = du + x.km;
+      if (!dist.has(v) || nd < dist.get(v)) { dist.set(v, nd); prev.set(v, [u, x]); hPush([nd, v]); }
     }
   }
   let result = null;
@@ -6566,6 +6566,7 @@ const LM_TURN = { vittoriano2: Math.PI };   // завъртане на моде�
 // моделите на потребителя (Meshy AI) имат предимство пред процедурните и по-старите: в градовете по истинската карта винаги те
 const LM_PREF = { empire: 'empire2', radiocity: 'radiocity2', rockefeller: 'rockefeller2', maiden: 'maiden2', bluemosque: 'mosque', bigben: 'parliament2', bigben2: 'parliament2', colosseo: 'colosseo3', vittoriano: 'vittoriano2' };
 const lmPref = k => (LM_PREF[k] && hasLandmark(LM_PREF[k])) ? LM_PREF[k] : k;
+const LM_DRY = feature('nd-dry') ? { notredame: 0.42 } : {};   // дълбочина/дължина на модела
 const LM_SHORE = feature('kotel-shore') ? { kotel: 0.56 } : {};   // потребителят: Котелническа влизаше в реката — сградата се изтегля на сушата (стойността — дълбочина/ширина на модела, основата е по x)
 const LM_REAL_K = feature('washington-osm') ? { washington: 0.7 } : {};   /* потребителят избра „по средата“ (×0,7): Капитолият ~62 м, Монументът ~118 м */   // потребителят: във Вашингтон забележителностите — в истински размер 1:1 (Капитолият 229 м, куполът 88 м), не ×K на картата
 if (feature('washington-osm')) { Object.assign(LM_PREF, { capitol: 'capitol2', whitehouse: 'whitehouse2' }); Object.assign(LM_REAL_H, { capitol2: 88, whitehouse2: 22, wmonument: 169, lincoln: 24, jefferson: 39 }); }   // 🇺🇸 Вашингтон по картата: истинските височини (×K като другите) — Капитолият до върха на купола, Белият дом без обелиска (Монументът — отделно)
@@ -6593,6 +6594,9 @@ function landmarkPlan2(kinds) {
     if (hr) { let h0 = lmH(k); if (!h0) { const sg = feature('washington-osm') && o.group.userData.sign; if (sg) sg.removeFromParent(); box.setFromObject(o.group).getSize(sz); h0 = sz.y || 1; if (sg) o.group.add(sg); }   /* без надписа над модела — иначе процедурните излизат с ~10–15 % по-ниски (Линкълн 20 м вместо 24) */ k0 = Math.min(k0, hr * (LM_REAL_K[S.cityId] ?? (P.p2.osmData?.k || 0.45)) / h0); }   // кулите — и по истинската височина (парцелът на Парламента е 225 м, а моделът е само Биг Бен)
     o.group.scale.multiplyScalar(k0); o.group.rotation.y = at.vrot ?? at.rot ?? 0; if (k === 'stpatrick2') o.group.rotation.y += Math.PI / 2; if (LM_TURN[k]) o.group.rotation.y += LM_TURN[k];   /* дългата ос на модела е z, а на парцела — напреки */ o.group.position.set(at.x, 0.1, at.z);
     if (LM_SHORE[k] && P.waterAt) { const hx = s0 * k0 / 2 + 6, hz = hx * LM_SHORE[k]; for (let it = 0; it < 12; it++) { let wx = 0, wz = 0, n = 0; for (let u = -1; u <= 1.001; u += 0.25) for (let v = -1; v <= 1.001; v += 0.25) { const x = o.group.position.x + u * hx, z = o.group.position.z + v * hz; if (P.waterAt(x, z)) { wx += u; wz += v; n++; } } if (!n) break; const l = Math.hypot(wx, wz) || 1; o.group.position.x -= wx / l * 4; o.group.position.z -= wz / l * 4; } }   /* kotel-shore: изтегля сградата от водата на брега (по парцела, без да я смалява) */
+    if (LM_DRY[k] && P.waterAt) { const r = o.group.rotation.y, c = Math.cos(r), sn = Math.sin(r), x0 = o.group.position.x, z0 = o.group.position.z;   /* nd-dry: потребителят — Нотр Дам слизаше в реката; смалява се, докато целият отпечатък е на сушата */
+      const wet = h => { for (let u = -1; u <= 1.001; u += 0.2) for (let v = -1; v <= 1.001; v += 0.25) { const lx = u * h, lz = v * h * LM_DRY[k]; if (P.waterAt(x0 + lx * c + lz * sn, z0 - lx * sn + lz * c)) return true; } return false; };
+      let f = 1; while (f > 0.45 && wet(s0 * k0 * f / 2 + 2)) f *= 0.93; if (f < 1) o.group.scale.multiplyScalar(f); }
     o.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
     city.group.add(o.group); city.landmarks.push(o);
   }
@@ -9650,7 +9654,7 @@ function railHints() {
   for (const id of own) {
     if (linked(id) || own.length < 2) continue;
     const okCont = o => !((contOf(id) || contOf(o)) && contOf(id) !== contOf(o) && !((contOf(id) || contOf(o)).land && !(contOf(id) && contOf(o))));
-    const near = own.filter(o => o !== id && okCont(o) && dev.best() >= cityLv(o) && !crossesSahara(id, o)).map(o => ({ o, km: kmBetween(id, o) })).sort((a, b) => a.km - b.km)[0];
+    const near = own.filter(o => o !== id && okCont(o) && dev.best() >= cityLv(o)).map(o => ({ o, km: kmBetween(id, o) })).sort((a, b) => a.km - b.km).find(x => !crossesSahara(id, x.o));   /* ⚡ Сахара — само докато се намери най-близкият */
     if (!near || near.km > 2500) continue;
     const key = [id, near.o].sort().join('|'); if (out.some(x => x.key === key)) continue;   // една двойка — една подсказка
     const bld = (S.rails || []).find(r => !r.built && (r.a === id || r.b === id));
@@ -10956,7 +10960,7 @@ cine.start();
 const ldFinish = () => { const el = $('loading'); if (!el) return; $('ldTxt').textContent = 'Готово!'; setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 700); }, AUTOTEST ? 0 : 900); };
 renderer.debug.checkShaderErrors = params.has('shadercheck');   /* ⚡ иначе getProgramInfoLog чака всяка компилация синхронно (както в directors3d.js); ?shadercheck — за отстраняване на грешки */
 const ldWarm = async () => { if (!renderer.compileAsync || !S || !city || !city.group) return; const t = $('ldTxt'); if (t) t.textContent = 'Подготвям графиката…';
-  try { await Promise.race([renderer.compileAsync(scene, camera), new Promise(r => setTimeout(r, 8000))]); } catch (e) { console.warn('compileAsync', e); } };
+  try { await Promise.race([renderer.compileAsync(scene, camera), new Promise(r => setTimeout(r, 15000))]); } catch (e) { console.warn('compileAsync', e); } };
 perf.ready();
 const saved = loadSave();
 if (saved && !AUTOTEST) backupRaw(currentSlot(), localStorage.getItem(SAVE_KEY), 'старт');
@@ -11306,7 +11310,7 @@ if (AUTOTEST) {
       if (city.bldA) city.group.remove(city.bldA); const G = city.bldA = new THREE.Group(), o = model(n, fitScale(n, SHOP_FIT) * lotK(l)); realHeight(o, n, l.plan ? Math.min(l.w, l.d) - 1.5 : 15 * lotK(l));
       const b = new THREE.Box3().setFromObject(o), s = b.getSize(new THREE.Vector3()); o.position.set(l.x - (b.min.x + b.max.x) / 2, -b.min.y, l.z - (b.min.z + b.max.z) / 2); G.add(o); dayNight.registerWindows(o);
       const man = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.8, 0.3), new THREE.MeshStandardMaterial({ color: 0xd04040 })); man.position.set(l.x, 0.9, l.z + s.z / 2 + 2); G.add(man); city.group.add(G);
-      __dbg.camAt(l.x + 6, 14, l.z + 30, l.x, 4, l.z); return { lot: l.id, sect: o.userData.sect || 'building-a', size: [+s.x.toFixed(1), +s.y.toFixed(1), +s.z.toFixed(1)] }; },
+      __dbg.camAt(l.x + 6, 6 + s.y * 0.9, l.z + 22 + s.y, l.x, s.y * 0.4, l.z); return { lot: l.id, sect: o.userData.sect || n, size: [+s.x.toFixed(1), +s.y.toFixed(1), +s.z.toFixed(1)] }; },
     whFitLook(lv = 1) {   // 📦 №18 (55): складът на ниво lv на своя парцел — в истински размер, в парцела
       S.whLevel = lv; if (S.whLot == null || !city.lots[S.whLot]) { const l = city.lots.find(x => !x.built && !x.busy && x !== city.hq && x.plan) || city.lots.find(x => !x.built && !x.busy && x !== city.hq); if (!l) return null; S.whLot = l.id; l.busy = 'wh'; }
       buildWarehouse(); refreshWarehouse && refreshWarehouse(); const l = city.lots[S.whLot], w = city.whGroup.children.find(c => c.userData.wh2), b = w ? new THREE.Box3().setFromObject(w).getSize(new THREE.Vector3()) : null;
@@ -11592,6 +11596,8 @@ if (AUTOTEST) {
     hwRampInfo() { if (!cityHw || !cityHw.v.ramps) return null; const g = cityHw.v.ramps.group; g.updateWorldMatrix(true, true); const b = new THREE.Box3().setFromObject(g); return { vis: g.visible, n: g.children.length, min: b.min.toArray().map(Math.round), max: b.max.toArray().map(Math.round), groundY: city.ground ? city.ground.position.y : null }; },
     hwLookAt(dz, dx, h = 70) { if (!cityHw || !cityHw.v.ramps) return false; const cx = cityHw.v.ramps.paths.nearOff[0][1] - 330 + cityHw.v.group.position.x, z = cityHw.v.group.position.z; controls.target.set(cx + dz, 0, z - dx); camera.position.set(cx + dz + 1, h, z - dx + 2); return true; },   /* hw-ramps: отгоре — dz по оста, dx напреки (откъм града +) */
     hwLookRamps(h = 120) { if (!cityHw || !cityHw.v.ramps) return false; const cx = cityHw.v.ramps.paths.nearOff[0][1] - 330 + cityHw.v.group.position.x, z = cityHw.v.group.position.z; const sd = __dbg.__rampSide || 1; controls.target.set(cx, 0, z - 20); camera.position.set(cx + h * 1.3, h, z - 20 - sd * h * 0.9); return true; },   /* hw-ramps: изгледът към изходите */
+    // 🚧 hw-incidents: инцидент по магистралата до града (type: rear | truck | fire | spill; dir ±1 — платното), камерата — откъм банкета, зад мястото;
+    // night — 22 ч (и времето тече). hwIncLook(назад, височина, встрани, напред) — пак към мястото; hwIncStep(s) — превърта s игрови секунди (тестовете)
     hwInc(type = 'rear', dir = 1, night = false) { if (!cityHw) this.hwOpen(); const T = cityHw && cityHw.traffic; if (!T || !T.inc) return 'off'; showMap(false); if (night) { this.time(22); setSpeed(1); } return Promise.resolve(T.inc.start(type, { dir })).then(r => new Promise(ok => { let k = 0; const tick = () => { if (T.inc.spot() || !r || r.fail || ++k > 80) { this.hwIncLook(); ok({ ...r, ...T.inc.info() }); } else setTimeout(tick, 250); }; tick(); })); },   /* чака подходяща кола на мястото */
     hwIncLook(back = 80, h = 26, side = 34, ahead = 0) { const T = cityHw && cityHw.traffic, p = T && T.inc && T.inc.spot(); if (!p) return null; T.group.updateWorldMatrix(true, false); const w = (x, yy, z) => T.group.localToWorld(new THREE.Vector3(x, yy, z)); controls.target.copy(w(p.x - p.D * (10 - ahead), 1, p.z)); camera.position.copy(w(p.x - p.D * (back - ahead), h, p.z + p.D * side)); fly = null; return T.inc.info(); },
     hwIncStep(sec = 10, full = false) { const T = cityHw && cityHw.traffic; if (!T || !T.inc) return null; for (let t = 0; t < sec; t += 0.2) T.update(0.2); return T.inc.info(full); },
@@ -11761,7 +11767,7 @@ if (AUTOTEST) {
       const fr = [0.9, 0.6, 0.35, 1, 0.75, 0.5, 0.8, 0.25, 0.65]; this.campus2Look(lv); Object.keys(ECON.MATERIALS).forEach((m, i) => { econ.s.stock[m] = Math.round(matCap(m) * fr[i % fr.length] * 10) / 10; });
       buildWarehouse(); $('panel').classList.add('hidden'); this.time(h); const y = city.whYard, P = campusPlot(); if (!y) return 'няма склад'; y.updateMatrixWorld(true);
       const p = y.getWorldPosition(new THREE.Vector3()), r = lotRot(city.hq), sx = Math.sin(r), cz = Math.cos(r);
-      this.camAt(p.x + (sx + cz * a) * d * 0.3, d * 1.5, p.z + (cz - sx * a) * d * 0.3, p.x, 1, p.z);   /* стръмно отгоре — над съседните сгради */ const g = city.whGroup, ry = g.rotation.y; g.rotation.y = 0; g.updateMatrixWorld(true); const wb = new THREE.Box3().setFromObject(g.children.find(c => c.userData.h != null)); g.rotation.y = ry; g.updateMatrixWorld(true);
+      this.camAt(p.x + (sx + cz * a) * d * 0.3, d * 1.5, p.z + (cz - sx * a) * d * 0.3, p.x, 1, p.z);   /* стръмно отгоре — над съседните сгради */ if (city.hqGroup) city.hqGroup.traverse(o => { if (/^(office2-l|hotel5-)/.test(o.userData.src || '')) o.visible = false; });   /* демото: кулата на офиса скрита — иначе закрива двора (f6) */ const g = city.whGroup, ry = g.rotation.y; g.rotation.y = 0; g.updateMatrixWorld(true); const wb = new THREE.Box3().setFromObject(g.children.find(c => c.userData.h != null)); g.rotation.y = ry; g.updateMatrixWorld(true);
       return { camp: campusIn('warehouse'), area: y.userData.area, wr: P && P.wh, whZ: [+(wb.min.z - g.position.z).toFixed(1), +(wb.max.z - g.position.z).toFixed(1)], whX: +(wb.max.x - wb.min.x).toFixed(1), k: y.scale.x, vis: y.visible, kids: y.children.length }; },
     whRow() { if (city.whRowG) city.group.remove(city.whRowG); const g = city.whRowG = new THREE.Group(), z0 = tx(NJ - 1) + 60; let x = tx(0);
       for (let lv = 1; lv <= 10; lv++) { const n = wh2Mesh(lv), o = warehouseMesh(lv, true), w = n ? new THREE.Box3().setFromObject(n).getSize(new THREE.Vector3()).x : 12;
