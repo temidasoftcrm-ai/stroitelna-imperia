@@ -117,6 +117,7 @@ if (feature('bld-a-real')) SECTIONS['building-a'] = { H: 9.5, axis: 'x', cuts: [
 // bld-ef-real (55): офисите building-e (6 етажа + мансарда, 2,0 × 0,78 × 1,02) и building-f (7–8 етажа, 2,0 × 0,89 × 1,73) бяха „2 етажа“ (6–7 м) —
 // в истинска височина 24 / 26 м са ~60 × 30–50 м; режат се по двете оси (ъгълът с входа, лицето +z) до ~14,5 или ~11 м
 if (feature('bld-ef-real')) Object.assign(SECTIONS, { 'building-e': { H: 24, axis: 'x', cuts: [[['x', 0.118], ['z', -0.234]], [['x', 0.09], ['z', -0.18]]] }, 'building-f': { H: 26, axis: 'x', cuts: [[['x', 0.125], ['z', -0.144]], [['x', 0.095], ['z', -0.11]]] } });
+import { createParkLife } from './parklife.js';   // 🅿️ park-life (f6, №5): сутрин колите излизат от паркингите, вечер се връщат — с истински хора
 import { createParkings } from './parking.js';   // 🅿️ park-api (55, №5): местата, входът/изходът и свободните места на паркингите — за трафика (2a)
 const parks = createParkings();
 // градски планове: извити улици и парцели покрай тях (cityplan*.js) — само за градовете в S.plans; другите са на мрежата 9×9
@@ -1085,6 +1086,7 @@ function buildCity(cityId) {
   if (city.planView) { if (city.planView.userData.dispose) city.planView.userData.dispose(); else city.planView.traverse(o => { if (o.geometry) o.geometry.dispose(); }); city.planView = null; }   // геометрията на стария план (материалите са общи)
   const g = city.group = new THREE.Group();
   scene.add(g); city.lineObj = null;
+  try { parkLife.clear(); } catch (e) {}   // park-life: колите и хората, които се движат в стария град
   parks.clear();   // park-api: паркингите на стария град
   const r = rng(hashStr(cityId));
   migrateMegaLots(cityId);
@@ -2305,6 +2307,21 @@ const schoolBus = createSchoolBus({ agents: () => feature('school-bus') ? jpAgen
   bus: () => { const n = schoolBusFor(carRegion(S.cityId)); return A[n] ? model(n, 1) : null; }, n: () => city.lots.filter(l => l.built).length > 200 ? 2 : 1, kid: () => makeKid(), prep: () => loadPeds(), get side() { return city.plan?.p2?.drive === 'L' ? -1 : 1; } });
 const cityBus = createCityBus({ agents: () => feature('city-bus') ? jpAgents() : null, lanes: () => tr2 ? tr2.lanes : [], center: () => city.plan?.p2?.center || { x: 0, z: 0 }, R: () => city.plan?.p2?.R || 400,
   bus: () => A['sf-car-Bus'] ? model('sf-car-Bus', 1) : null, want: () => { const b = city.lots.filter(l => l.built).length; return { lines: b > 120 ? 2 : 1, perLine: Math.min(3, 1 + Math.floor(b / 90)) }; } });
+// 🅿️ park-life (f6, №5): паркингите оживяват — сутрин (7–9 ч.) човек отива до колата, тя излиза на заден и влиза в трафика; вечер (17–19 ч.) — обратно;
+// заетостта следва часа (parklife.js — върху park-api на 55 и агентите на трафика jpAgents(), като градските автобуси)
+const parkCarNames = () => Object.keys(A).filter(n => n.startsWith('sf-car-') && !/Bus|Truck|Firetruck|Ambulance|Police|Limousine|Van/.test(n));
+function parkPed() {   // истински минувач само за паркинга (не е в peds — води го parklife.js)
+  loadPeds(); if (!pedReal.length) return null;
+  const src = pick(pedReal), m = cloneSkinned(src.scene); m.scale.setScalar(src.k * rand(0.94, 1.06)); m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } }); scene.add(m);
+  const mixer = new THREE.AnimationMixer(m), wc = src.animations.find(c => c.name === 'Walk') || src.animations.find(c => /Walk/.test(c.name)); if (wc) mixer.clipAction(wc).play();
+  return { m, mixer };
+}
+const parkLife = createParkLife({ parks, agents: () => feature('park-life') ? jpAgents() : null, lanes: () => tr2 ? tr2.lanes : [], off: () => tr2G ? tr2G.position : { x: 0, z: 0 },
+  hour: () => (todF() * 24 + 6) % 24, cam: () => controls.target, root: () => city.group,
+  car: () => { const L = parkCarNames(); return L.length ? model(pick(L), 1) : null; },
+  dark: o => { darkParked(o); o.traverse(m => { if (m.isMesh && [].concat(m.material).some(x => x.transparent && x.opacity < 0.9)) m.visible = false; }); },   // като паркираните (decorLot)
+  ped: () => parkPed(), dropPed: w => { if (w.m.parent) w.m.parent.remove(w.m); },
+  bld: (x, z) => { let b = null, bd = 70; for (const l of city.lots) { if (!l.built) continue; const dd = Math.hypot(l.x - x, l.z - z); if (dd > 4 && dd < bd) { bd = dd; b = l; } } return b ? lotPt(b, rand(-2, 2), (b.d || 16) / 2 + 0.8) : { x: x + 14, z: z + 6 }; } });   // тротоарът пред най-близката сграда
 // #6 (jam-call, bl25-05): задръстване/заклещени коли → известие „🚓 Извикай полиция“ + „🎥 гледай“; без натискане полицията идва сама след 90 s
 // (заклещените — винаги, обикновеното задръстване — през раз); при полицая трафикът разплита заклещените (traffic.js: ghT)
 let jamAsk = null, articForce = 0;   // articForce — __dbg.articLook: следващите N коли в трафика са съчленени автобуси
@@ -9470,7 +9487,7 @@ function teardownCity() {
   if (passing) { passing.clear(); passing = null; }
   for (const t of traffic) scene.remove(t.obj); traffic.length = 0;
   if (tr2) { tr2.clear(); tr2 = null; } if (tr2G) { scene.remove(tr2G); tr2G = null; }
-  incidents.clear(); tirs.clear(); cityBus.clear();
+  incidents.clear(); tirs.clear(); cityBus.clear(); parkLife.clear();
   const old = city.group, pv = city.planView;
   if (old) scene.remove(old);
   { const seen = new Set(); dropGpu(old, seen); for (const o of gone) dropGpu(o, seen); }   /* преди dispose на модулите — те махат групите си от града и копията на текстурите им иначе остават */
@@ -10772,6 +10789,7 @@ function frame() {
       chaseFollow(rdt);   // #3: камерата след беглеца
       roadNotice();   // #6: радио-известие при затворена/отворена улица
       cityBus.update(rdt * Math.max(1, speed));   // #15: градските автобуси
+      if (feature('park-life')) parkLife.update(rdt * Math.max(1, speed));   // №5: колите на паркингите
       schoolBus.update(rdt * Math.max(1, speed));   // №7: училищният автобус
     }
     updateProjects(dt / DAY_SEC);
@@ -11224,7 +11242,13 @@ if (AUTOTEST) {
         o.scale.setScalar(1 / k); o.position.set(x + 2, 0.05, z0); o.rotation.y = 0.5; G.add(o); x += 7; }
       const man = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.8, 0.3), new THREE.MeshStandardMaterial({ color: 0xd04040 })); man.position.set(x0 - 2, 0.9, z0 + 4); G.add(man);
       city.group.add(G); fly = null; if (night != null) __dbg.time(night ? 21.5 : 12); __dbg.camAt((x0 + x) / 2, 7, z0 + 17, (x0 + x) / 2, 1.5, z0); return G.children.length - 1; },
-    parks: () => parks,   // 🅿️ park-api (55, №5): паркингите (parking.js) — места, вход/изход, свободни
+    parks: () => parks,
+    // 🅿️ park-life: mode 'am' — кола излиза (човек → колата → трафика), 'pm' — кола от трафика паркира (и слиза човек); k — паркингът (иначе най-големият);
+    // часът — 7:20 / 17:20, времето тече; камерата — над паркинга. parkLifeInfo() — какво се движи сега
+    parkLife(mode = 'am', k = null) { const L = parks.list.filter(P => P.spots.length >= 4 && (mode === 'pm' ? parks.freeSpot(P) : parks.takenSpot(P))).sort((a, b) => b.spots.length - a.spots.length), P = k != null ? parks.list[k] : L[0];
+      if (!P) return 'няма паркинг (park-api / yards-real)'; showMap(false); this.time(mode === 'pm' ? 17.3 : 7.3); setSpeed(1); this.camAt(P.x + P.s * 26 + 10, 30, P.z + P.c * 26 + 6, P.x, 0, P.z); const ok = parkLife.force(P, mode); return { ok, id: P.id, spots: P.spots.length, ...parkLife.info() }; },
+    parkLifeInfo: () => parkLife.info(), parkLifeDbg: () => parkLife.dbg(), parkLifeMoves: () => parkLife.moves(),
+    parkLifeStep(sec = 5) { for (let t = 0; t < sec; t += 0.1) { if (tr2 && tr2On()) tr2.update(0.1); parkLife.update(0.1); } return parkLife.info(); },   /* тестовете: превърта sec секунди (трафика и паркинга) */   // 🅿️ park-api (55, №5): паркингите (parking.js) — места, вход/изход, свободни
     parkLook(k = 0, show = true) {   // 🅿️ park-api: k-тият паркинг — пътищата на всяко място: навън (жълто, от мястото до улицата) и навътре (синьо); точки — вратите на шофьорите
       if (city.parkDbg) { city.group.remove(city.parkDbg); city.parkDbg = null; } const P = parks.list[k]; if (!P || !show) return P ? null : 'няма паркинг (park-api / yards-real)';
       const G = city.parkDbg = new THREE.Group(), ln = (pts, col, y) => G.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts.map(([x, z]) => new THREE.Vector3(x, y, z))), new THREE.LineBasicMaterial({ color: col, depthTest: false })));
