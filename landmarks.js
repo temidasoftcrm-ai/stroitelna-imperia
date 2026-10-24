@@ -727,7 +727,10 @@ function cityhallNight(w, g) {
           totalEmissiveRadiance = e * uN;`);
     }; m.customProgramCacheKey = () => 'cityhall-night'; m.needsUpdate = true; }
   const prev = g.userData.sparkle;
-  g.userData.sparkle = (t, night) => { if (prev) prev(t, night); U.uT.value = t; U.uN.value = night; };
+  let mk = '';   // lm-fit-sq (55) мащабира/мести забележителността след зареждането — височината и центърът се смятат наново, щом матрицата се смени
+  g.userData.sparkle = (t, night) => { if (prev) prev(t, night); U.uT.value = t; U.uN.value = night;
+    if (night > 0) { w.updateMatrixWorld(); const e = w.matrixWorld.elements, k = e[0].toFixed(4) + e[5].toFixed(4) + e[12].toFixed(2) + e[13].toFixed(2) + e[14].toFixed(2);
+      if (k !== mk) { mk = k; b.setFromObject(w); b.getCenter(c); U.uY0.value = b.min.y; U.uY1.value = b.max.y; U.uC.value.set(c.x, c.z); U.uCell.value = (b.max.y - b.min.y) / 60; } } };
 }
 // 🎰 „Welcome to Fabulous Las Vegas“ нощем (флаг night-vegas2): общото осветяване (кремав emissive) затриваше цветовете на табелата —
 // тук всеки материал свети със своя цвят: крушките (жълтите) — бягаща вълна около табелата, буквите — бяло и червено, звездата мига; меко сияние на земята
