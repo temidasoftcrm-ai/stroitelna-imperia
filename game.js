@@ -2336,7 +2336,7 @@ function jamNotice(j) {
   if (jamAsk || jamNode != null || incidents.active) return;
   const o = tr2G ? tr2G.position : { x: 0, z: 0 }, x = j.x + o.x, z = j.z + o.z, nm = streetNm(x, z);
   const done = () => { if (jamAsk) clearTimeout(jamAsk.t); jamAsk = null; };
-  askNotice(`🚦 ${j.lock ? 'Заклещени коли' : 'Задръстване'}${nm ? ` при „${nm}“` : ''}`, [['🚓 Извикай полиция', () => { done(); jamPolice(j, true); }, true], ['🎥 гледай', () => flyTo({ x, z })]]);
+  askNotice(`🚦 ${j.lock ? 'Заклещени коли' : 'Задръстване'}${nm ? ` при „${nm}“` : ''}`, [['🚓 Извикай полиция', () => { done(); Sound.file('assets/sfx/police-call.mp3', 0.6); jamPolice(j, true); }, true], ['🎥 гледай', () => flyTo({ x, z })]]);
   Sound.file('assets/sfx/radio-road.mp3', 0.45);
   jamAsk = { t: setTimeout(() => { done(); if (j.lock || Math.random() < 0.5) jamPolice(j, true); }, 90000) };
 }
