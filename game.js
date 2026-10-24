@@ -1206,6 +1206,8 @@ function buildCity(cityId) {
   city.center = LMC ? city.lots.filter(l => Math.abs(l.bi - c) <= 2 && Math.abs(l.bj - c) <= 2) : null;
   city.hq.busy = 'hq';
   // Рим по истинската карта: ~60% от парцелите (и всички за реставрация) са чужди — там са римските фонови квартали на 3D изгледа
+  if (P && P.p2 && P.osm && plan2.view.yardOf) { const LS = P.p2.lots.find(q => plan2.view.yardOf(q)); if (LS) for (const lot of city.lots) { const q = P.p2.lots[lot.p2]; if (!q || lot.under) continue; const c = Math.cos(q.rot || 0), s = Math.sin(q.rot || 0);   /* was-union (f9): парцелите върху гаровия терен на Юниън Стейшън — заети (там са сградата и пероните) */
+    for (const [a, b] of [[0, 0], [1, 1], [1, -1], [-1, 1], [-1, -1], [1, 0], [-1, 0], [0, 1], [0, -1]]) { const du = a * q.w * 0.45, dv = b * q.d * 0.45; if (plan2.view.inYard(LS, q.x + du * c + dv * s, q.z - du * s + dv * c)) { lot.under = LS.lm; break; } } } }
   if (P && P.p2 && P.osm) { for (const lot of city.lots) if (lot.under && !lot.busy && !(S.built || []).some(b => b.lot === lot.id)) lot.busy = 'lm';   // под късна забележителност (Св. Патрик) — заето; ако там вече има твоя сграда, остава
     for (const lot of city.lots) if (!lot.busy && (lot.reno || r() < 0.6)) lot.busy = 'bg'; city.p2Map = new Map(city.lots.map(l => [l.p2, l])); muni.attach(); pv.userData.refill(); muni.draw(THREE); }   // и обществените сгради (muniorders.js) — на мястото на фоновите
   // готов град: ~60% от парцелите са застроени (според зоната)
@@ -6605,14 +6607,15 @@ function landmarkPlan2(kinds) {
 // в централата и в съседните кули). Търси се място около площада (до 24 м встрани), където квадратът fit·k (моделът е побран в него) е най-голям:
 // всяка точка — на площада или върху парцел (не на улица), нито една — в твой парцел (централа, гараж, склад, кампус, твоите сгради, обектите).
 // Чуждите сгради под него се махат (като в центъра на градовете без план). Връща { k, x, z }.
-function lmSquareFit(sq, k0, fit) {
+function lmSquareFit(sq, k0, fit, kMin = 0) {   // kMin — burj-size: кулите не се смаляват под него (търси се място по-далеч от площада)
   const own = bgOwn(); for (const b of S.built || []) if (b.lot != null) own.add(b.lot); for (const l of city.lots) if (l.busy && l.busy !== 'bg' && l.busy !== 'landmark' && l.busy !== 'reserved') own.add(l.id);
   const near = city.lots.filter(l => Math.hypot(l.x - sq.x, l.z - sq.z) < 160), inL = (l, x, z, m) => { const r = lotRot(l), c = Math.cos(r), s = Math.sin(r), [W, D] = lotHalf(l), dx = x - l.x, dz = z - l.z; return Math.abs(dx * c - dz * s) < W + m && Math.abs(dx * s + dz * c) < D + m; };
   const pts = (x, z, h) => { const P = [], n = Math.max(2, Math.ceil(2 * h / 3)); for (let i = 0; i <= n; i++) for (let j = 0; j <= n; j++) P.push([x - h + 2 * h * i / n, z - h + 2 * h * j / n]); return P; };
-  const ok = (x, z, h) => pts(x, z, h).every(([px, pz]) => (Math.hypot(px - sq.x, pz - sq.z) < sq.r || near.some(l => inL(l, px, pz, 0.5))) && !near.some(l => own.has(l.id) && inL(l, px, pz, 1.5)));
+  const ok = (x, z, h) => pts(x, z, h).every(([px, pz]) => (Math.hypot(px - sq.x, pz - sq.z) < sq.r || near.some(l => inL(l, px, pz, 0.5)) || (kMin && Math.max(Math.abs(px - x), Math.abs(pz - z)) > h * 0.55)) && !near.some(l => own.has(l.id) && inL(l, px, pz, 1.5)));   /* kMin (кулите): по улицата може само подиумът (външната половина) — сърцевината е в квартала */
   let best = { k: 0, x: sq.x, z: sq.z, d: 0 };
-  for (const d of [0, 8, 16, 24]) for (let a = 0; a < (d ? 8 : 1); a++) { const x = sq.x + Math.cos(a * Math.PI / 4) * d, z = sq.z + Math.sin(a * Math.PI / 4) * d;
-    let k = k0; while (k > 0.6 && !ok(x, z, fit * k / 2)) k *= 0.93; if (k > best.k + 0.05) best = { k, x, z, d }; }
+  for (const d of kMin ? [0, 8, 16, 24, 36, 48, 64, 80] : [0, 8, 16, 24]) for (let a = 0; a < (d ? 8 : 1); a++) { const x = sq.x + Math.cos(a * Math.PI / 4) * d, z = sq.z + Math.sin(a * Math.PI / 4) * d;
+    let k = k0; while (k > Math.max(0.6, kMin) && !ok(x, z, fit * k / 2)) k *= 0.93; if (kMin && !ok(x, z, fit * k / 2)) continue; if (k > best.k + 0.05) best = { k, x, z, d }; }
+  if (kMin && !best.k) return lmSquareFit(sq, k0, fit, 0);   // никъде не се побира в ръст — както досега (смалена, без да влиза в твоите парцели)
   const P = pts(best.x, best.z, fit * best.k / 2 + 1);
   for (const l of near) if (!own.has(l.id) && P.some(([px, pz]) => inL(l, px, pz, 0))) { if (l.obj) city.group.remove(l.obj); for (const t of l.trees || []) city.group.remove(t); l.obj = null; l.built = null; l.trees = []; l.busy = 'landmark'; }   // чуждите сгради под забележителността
   return best;
@@ -6621,7 +6624,7 @@ function landmarkPlan(kinds) {
   if (city.plan.p2 && city.plan.osm) return landmarkPlan2(kinds);
   const sq = city.plan.square, mem = S.landmarks[S.cityId], shade = o => o.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
   if (kinds[0] === 'manhattan' && feature('ny-spread')) { nySpread(); kinds = kinds.slice(1); if (!kinds.length) return; kinds = ['__none', ...kinds]; }
-  if (kinds[0] !== '__none') { const main = buildLandmark(kinds[0], { label }); main.group.position.set(sq.x, 0.1, sq.z); main.group.scale.setScalar(LM_MAIN_SCALE[kinds[0]] || 3.2); if (feature('lm-fit-sq')) { const f = lmSquareFit(sq, LM_MAIN_SCALE[kinds[0]] || 3.2, lmFit(kinds[0]) || 15); main.group.scale.setScalar(f.k); main.group.position.set(f.x, 0.1, f.z); }   /* lm-fit-sq (55): на площада, без да влиза в твоите парцели и в улиците */ main.group.rotation.y = (hashStr(kinds[0]) % 4) * Math.PI / 2;
+  if (kinds[0] !== '__none') { const main = buildLandmark(kinds[0], { label }); main.group.position.set(sq.x, 0.1, sq.z); main.group.scale.setScalar(LM_MAIN_SCALE[kinds[0]] || 3.2); if (feature('lm-fit-sq')) { const k0 = LM_MAIN_SCALE[kinds[0]] || 3.2, tall = feature('burj-size') && (lmH(kinds[0]) || 0) / (lmFit(kinds[0]) || 15) > 3, f = lmSquareFit(sq, k0, lmFit(kinds[0]) || 15, tall ? k0 * 0.85 : 0);   /* burj-size (55): кулите (Бурж Халифа 70/14) не се смаляват до игла (беше 46 м, ×0,65) — поне ×0,85 (~190 м), по-далеч от площада */ main.group.scale.setScalar(f.k); main.group.position.set(f.x, 0.1, f.z); }   /* lm-fit-sq (55): на площада, без да влиза в твоите парцели и в улиците */ main.group.rotation.y = (hashStr(kinds[0]) % 4) * Math.PI / 2;
   shade(main); city.group.add(main.group); city.landmarks.push(main); }
   kinds.slice(1).forEach((k, i) => {
     if (k === 'notredame' && feature('paris-spread')) { const o = lmRiverSpot(k, mem); if (o) { shade(o); city.group.add(o.group); city.landmarks.push(o); return; } }

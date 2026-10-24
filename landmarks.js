@@ -652,7 +652,7 @@ export const lmFit = kind => (GLB_LM[kind] && GLB_LM[kind].fit) || null;
 export const lmH = kind => (GLB_LM[kind] && GLB_LM[kind].h) || null;   // височината на модела (след зареждането)
 function glbLm(kind) {
   const C = GLB_LM[kind], g = new THREE.Group(), flood = [];
-  box(g, 15, 0.3, 15, mat(C.plate ?? 0x9a9a92, 0.95), 0, 0.15, 0);
+  const plate = box(g, 15, 0.3, 15, mat(C.plate ?? 0x9a9a92, 0.95), 0, 0.15, 0);
   const ph = add(g, new THREE.BoxGeometry(4, C.h, 4), mat(0x9aa4ae, 0.8, 0, { transparent: true, opacity: 0.25 }), 0, C.h / 2, 0);   // докато се зарежда
   g.userData.flood = flood;
   loadLm(kind).then(src => {
@@ -662,7 +662,8 @@ function glbLm(kind) {
     if (C.cut) cutLm(w, m, C.cut);
     const b = new THREE.Box3().setFromObject(w, !!(C.ry || C.crop)), s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3());
     const k = Math.min(C.h / s.y, C.fit / Math.max(s.x, s.z));
-    m.position.set(-c.x, -b.min.y, -c.z); w.scale.setScalar(k); w.position.y = 0.3 - (C.sink || 0) * s.y * k; w.position.z = C.dz || 0; if (C.sy) w.scale.y *= C.sy;   // sy — по-стръмно (ниските модели от Meshy)
+    const y0 = feature('lm-ground') && !plate.visible ? 0 : 0.3;   // lm-ground: на истинската карта плочата е скрита (landmarkPlan2) — моделът стъпва на земята, не на 0,3 над нея (×мащаба: Капитолият висеше на ~3 м и сянката се отделяше от основата)
+    m.position.set(-c.x, -b.min.y, -c.z); w.scale.setScalar(k); w.position.y = y0 - (C.sink || 0) * s.y * k; w.position.z = C.dz || 0; if (C.sy) w.scale.y *= C.sy;   // sy — по-стръмно (ниските модели от Meshy)
     w.traverse(o => {
       if (!o.isMesh) return; o.castShadow = o.receiveShadow = true;
       if (C.matte && o.material) { o.material = o.material.clone(); o.material.color.set(C.matte); o.material.metalness = 0; o.material.roughness = 0.8; o.material.metalnessMap = o.material.roughnessMap = o.material.map = null; o.material.needsUpdate = true; }   // светла фасада (Белият дом): текстурата е тъмна — само бял цвят + релефът (normalMap)
@@ -670,7 +671,7 @@ function glbLm(kind) {
       const mt = o.material; if (mt && mt.metalness > 0.4) { mt.metalness = 0.25; mt.roughness = Math.max(mt.roughness ?? 0.5, 0.45); }   // без огледална среда металът излиза черен
       if (mt && mt.emissive && !mt.emissiveMap && !flood.includes(mt)) { mt.emissive.set(0xffe4b8); if (mt.map) { mt.emissiveMap = mt.map; mt.needsUpdate = true; } mt.emissiveIntensity = 0; if (C.floodK) mt.userData.floodK = C.floodK; flood.push(mt); }   // прожектори: светва текстурата, не плосък бежов цвят
     });
-    if (C.base) box(g, s.x * k + 0.6, 0.35, s.z * k + 0.6, mat(C.base, 0.9), 0, 0.3 + 0.175, C.dz || 0);   // каменна основа — назъбените краища на скана се сливат с нея
+    if (C.base) box(g, s.x * k + 0.6, 0.35, s.z * k + 0.6, mat(C.base, 0.9), 0, y0 + 0.175, C.dz || 0);   // каменна основа — назъбените краища на скана се сливат с нея
     g.add(w);
     if (C.onLoad) C.onLoad(w, g);
     if (g.userData.sign) g.userData.sign.position.y = s.y * k + 4;
