@@ -532,7 +532,7 @@ const GLB_LM = {
   capitol: { h: 11, fit: 15, plate: 0x6f8f55, floodK: 3 },   // Вашингтон: Капитолият (Meshy AI, от потребителя — 18.10; преди: фотоскан на ycpan3468)
   // 🇺🇸 Вашингтон по истинската карта (washington-osm): същите модели, но h = истинската височина на модела при основа 15 (иначе lmH лъже и game.js го смачква) — Капитолият 229 × 88 м, Белият дом без обелиска (Монументът е отделно, на истинското си място)
   capitol2: { file: 'capitol', h: 5.75, fit: 15, plate: 0x6f8f55, floodK: 3, ...(feature('was-look') ? { ry: Math.PI } : {}) },   // was-look (55): западната фасада (с терасата) — към Мола whitehouse2: { file: 'whitehouse', h: 1.8, fit: 15, plate: 0x6f9a55, matte: 0xf4f1ea, rx: -0.28, cut: [[-0.35, 0.95, 0.8, 1.6]], floodK: 2.2 },
-  vegassign: { h: 14, fit: 12, plate: 0xc9b98a },   // Лас Вегас: табелата „Welcome to Fabulous Las Vegas“ (sipulitrade)
+  vegassign: { h: 14, fit: 12, plate: 0xc9b98a, onLoad: (w, g) => { if (feature('night-vegas2')) vegasSignNight(w, g); } },   // Лас Вегас: табелата „Welcome to Fabulous Las Vegas“ (sipulitrade)
   mgu: { h: 16, fit: 15, plate: 0x6f8f55 },
   kotel: { file: 'mgu', h: 14.6, fit: 15, plate: 0x8a8580, crop: [-4.4, 4.4, -3.9, 1.0] },   // Москва: Котелническа висотка (lm-kotel) — моделът на МГУ, изрязан до централната кула с крилата (без парка и площада); ръстът 176 м — game.js LM_REAL_H   // Москва: МГУ — сталинският небостъргач с крилата и парка (Meshy AI); голяма зона 2×2 (BIG_LANDMARKS)
   eiffel: { h: 26, fit: 15, plate: 0xc9bfa8, onLoad: eiffelLights },   // Париж: Айфеловата кула (Meshy AI); нощем златни светлини и проблясване
@@ -729,6 +729,30 @@ function cityhallNight(w, g) {
   const prev = g.userData.sparkle;
   g.userData.sparkle = (t, night) => { if (prev) prev(t, night); U.uT.value = t; U.uN.value = night; };
 }
+// 🎰 „Welcome to Fabulous Las Vegas“ нощем (флаг night-vegas2): общото осветяване (кремав emissive) затриваше цветовете на табелата —
+// тук всеки материал свети със своя цвят: крушките (жълтите) — бягаща вълна около табелата, буквите — бяло и червено, звездата мига; меко сияние на земята
+function vegasSignNight(w, g) {
+  const fl = g.userData.flood || [], U = { uT: { value: 0 }, uN: { value: 0 } }, by = {};
+  w.traverse(o => { if (!o.isMesh || !o.material) return; const m = o.material, i = fl.indexOf(m); if (i >= 0) fl.splice(i, 1); by[m.name] = by[m.name] || []; by[m.name].push(o); });
+  const glow = (nm, col) => (by[nm] || []).forEach(o => { o.material.emissive.set(col); o.material.emissiveMap = null; o.material.emissiveIntensity = 0; o.material.needsUpdate = true; });
+  glow('Material.011', 0xffffff); glow('Material.002', 0xff2a1a); glow('Material.007', 0x1a2a9a); glow('Material', 0xffc040);
+  for (const o of by['Material.006'] || []) {   // крушките — бягаща светлина по ъгъла около средата на табелата
+    o.geometry.computeBoundingBox(); const c = o.geometry.boundingBox.getCenter(new THREE.Vector3()), m = o.material; m.emissive.set(0xffe27a); m.emissiveIntensity = 1;
+    m.onBeforeCompile = sh => { Object.assign(sh.uniforms, U); sh.uniforms.uCc = { value: new THREE.Vector2(c.x, c.z) };
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vVsP;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvVsP = position;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vVsP; uniform float uT; uniform float uN; uniform vec2 uCc;')
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\nfloat vsA = atan(vVsP.z - uCc.y, vVsP.x - uCc.x) / 6.2832; float vsOn = 0.25 + 0.75 * step(0.5, fract(vsA * 14.0 - uT * 1.6));\ntotalEmissiveRadiance *= vsOn * uN * 1.6;'); };
+    m.customProgramCacheKey = () => 'vegas-bulbs'; m.needsUpdate = true; }
+  const b = new THREE.Box3().setFromObject(w), sz = b.getSize(new THREE.Vector3()), gc = document.createElement('canvas'); gc.width = gc.height = 64;
+  { const x = gc.getContext('2d'), gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,200,120,1)'); gr.addColorStop(1, 'rgba(255,120,60,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); }
+  const pool = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(gc), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
+  pool.rotation.x = -Math.PI / 2; pool.position.set(0, 0.36, w.position.z || 0); pool.scale.set(Math.max(sz.x, sz.z) * 1.4, Math.max(sz.x, sz.z) * 1.1, 1); g.add(pool);
+  const prev = g.userData.sparkle;
+  g.userData.sparkle = (t, night) => { if (prev) prev(t, night); U.uT.value = t; U.uN.value = night;
+    for (const nm of ['Material.011', 'Material.002', 'Material.007']) for (const o of by[nm] || []) o.material.emissiveIntensity = night * (nm === 'Material.007' ? 0.6 : 1.3);
+    const star = (t % 1.6) < 0.8; for (const o of by['Material'] || []) o.material.emissiveIntensity = night * (star ? 2.2 : 0.4);   // звездата
+    pool.material.opacity = 0.55 * night; };
+}
 let burjLm = null;
 function burjLights(w, g) {
   const m = w.children[0]; if (!m) return;
@@ -865,12 +889,25 @@ function bellagio() {
     jets.push({ j, i });
   }
   g.userData.flood = g.userData.flood || [];
+  const V2 = feature('night-vegas2');   // нощем: истински водни струи (адитивни, светят отдолу), мъгла отгоре, отблясък по водата
+  let jetM = null, mistM = null, glowW = null;
+  if (V2) { const c = document.createElement('canvas'); c.width = 32; c.height = 128; const x = c.getContext('2d');
+    const gx = x.createLinearGradient(0, 0, 32, 0); gx.addColorStop(0, 'rgba(255,255,255,0)'); gx.addColorStop(0.5, 'rgba(255,255,255,1)'); gx.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gx; x.fillRect(0, 0, 32, 128);
+    x.globalCompositeOperation = 'destination-in'; const gy = x.createLinearGradient(0, 0, 0, 128); gy.addColorStop(0, 'rgba(0,0,0,0)'); gy.addColorStop(0.25, 'rgba(0,0,0,0.8)'); gy.addColorStop(1, 'rgba(0,0,0,1)'); x.fillStyle = gy; x.fillRect(0, 0, 32, 128);
+    jetM = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), color: 0xdff2ff, transparent: true, depthWrite: false, opacity: 0.85 });
+    const m = document.createElement('canvas'); m.width = m.height = 64; const y = m.getContext('2d'), gr = y.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,0.8)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); y.fillStyle = gr; y.fillRect(0, 0, 64, 64);
+    mistM = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(m), color: 0xe8f6ff, transparent: true, depthWrite: false, opacity: 0.5 });
+    glowW = add(g, new THREE.PlaneGeometry(14, 5.6), new THREE.MeshBasicMaterial({ map: mistM.map, color: 0x6fb8ff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }), 0, 0.39, 4.2); glowW.rotation.x = -Math.PI / 2;
+    for (const J of jets) { J.j.visible = false; const s = new THREE.Sprite(jetM); s.center.set(0.5, 0); s.position.copy(J.j.position); g.add(s); J.s = s; const mi = new THREE.Sprite(mistM); g.add(mi); J.m = mi; } }
   g.userData.sparkle = (t, night) => {
     const show = Math.floor(t / 12) % 3, ph = t % 12;   // три „номера“, всеки по 12 s
-    for (const { j, i } of jets) {
+    for (const J of jets) { const { j, i } = J;
       let h = show === 0 ? 2.5 + 2 * Math.sin(t * 2.2 - i * 0.45) : show === 1 ? (Math.abs(i - 12.5) < ph * 1.4 ? 5.5 - Math.abs(i - 12.5) * 0.25 : 0.2) : 1.5 + 4 * Math.max(0, Math.sin(t * 3 + (i % 2) * Math.PI));
-      j.scale.set(1, Math.max(0.05, h), 1); j.visible = h > 0.15;
+      j.scale.set(1, Math.max(0.05, h), 1); j.visible = !V2 && h > 0.15;
+      if (V2) { const on = h > 0.15, H = Math.max(0.05, h) * 1.25; J.s.visible = J.m.visible = on; if (on) { J.s.scale.set(0.22 + 0.03 * H, H, 1); J.m.position.set(J.j.position.x, 0.37 + H * 0.92, J.j.position.z); J.m.scale.setScalar(0.45 + H * 0.12); } }
     }
+    if (V2) { jetM.blending = mistM.blending = night > 0.3 ? THREE.AdditiveBlending : THREE.NormalBlending; jetM.color.setRGB(0.75 + 0.25 * night, 0.88 + 0.12 * night, 1); jetM.opacity = 0.55 + 0.15 * night; mistM.opacity = 0.2 + 0.1 * night;   // нощем светят отдолу (бяло-синьо)
+      let sum = 0; for (const J of jets) sum += J.j.scale.y; glowW.material.opacity = night * Math.min(0.45, sum / jets.length / 8); }
     wm.emissiveIntensity = 1.4 * night; lake.material.emissiveIntensity = 0.8 * night;
   };
   return g;
