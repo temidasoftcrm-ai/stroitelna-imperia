@@ -1006,6 +1006,10 @@ function lvNight2(nm, node, m, g) {
 }
 Object.assign(BUILD, { lvparis: () => lvHotel('paris'), lvph: () => lvHotel('planethollywood'), lvcosmo: () => lvHotel('cosmopolitan'), lvaria: () => lvHotel('aria'), lvvdara: () => lvHotel('vdara') });
 Object.assign(LANDMARK_NM, { lvparis: 'Парис Лас Вегас', lvph: 'Планет Холивуд', lvcosmo: 'Космополитън', lvaria: 'Ария', lvvdara: 'Вдара' });
+// 🎰 lv-hotels2: от същия скан — MGM Grand (зелената кула-кръст, казиното и входът на ъгъла с Тропикана) и Ню Йорк-Ню Йорк (небостъргачите,
+// Статуята на свободата, Бруклинският мост, влакчето) — възлите mgmgrand и nyny в lvstrip-hotels.glb (с нощните карти като другите)
+Object.assign(BUILD, { lvmgm: () => lvHotel('mgmgrand'), lvnyny: () => lvHotel('nyny') });
+Object.assign(LANDMARK_NM, { lvmgm: 'Ем Джи Ем Гранд', lvnyny: 'Ню Йорк-Ню Йорк' });
 // 🇺🇸 Вашингтон по истинската карта (washington-osm): Монументът на Вашингтон, Мемориалите на Линкълн и Джеферсън — процедурни, в истински метри
 // (game.js ги свежда до мащаба на картата по LM_REAL_H, както другите); без квадратната плоча — стоят на Мола
 function wmonument() {   // обелискът: 169 м, основа 16,8 м → 10,5 м под пирамидката; долната трета (до 46 м) — по-светъл мрамор (строежът спрял 1854–1879); кръг от 50 знамена

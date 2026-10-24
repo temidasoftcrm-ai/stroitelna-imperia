@@ -6608,10 +6608,13 @@ function landmarkPlan2(kinds) {
 // 🎰 lv-hotels: хотелите от сканирания Стрип (landmarks.js lvHotel) на запазените места на казината (OSM2.lasvegas.resorts): Парис (с Айфеловата
 // кула и балона), Планет Холивуд, Космополитън, Ария и Вдара (в парцела на Ария). Сканът е вписан в картата (север нагоре; Стрипът — x ≈ −152):
 // центровете са оттам, напреки — мащабът на картата (~0,4 на метър, хотелите не влизат в улиците и един в друг), на височина — истинската ×0,7 (като Беладжио)
+// lv-hotels2: MGM Grand и Ню Йорк-Ню Йорк — в южния край сканът е ~10 % по-къс по Стрипа, затова там е вписан наново по кръстовището
+// Стрип / Тропикана (същото z·(m − am) + bm, bm = −172.47 + 295.88i вместо −166.47 + 253.88i; после с 4–5 единици на север (NYNY и 2 на запад) — да не стъпват на тротоарите на Тропикана и Стрипа); мащабът е същият
+const LV_HOTELS2 = { lvmgm: ['mgmgrand', -63.4, 610.7], lvnyny: ['nyny', -221.0, 622.1] };
 const LV_HOTELS = { lvparis: ['paris', -89.4, 126.0], lvph: ['planethollywood', -108.9, 221.2], lvcosmo: ['cosmopolitan', -242.1, 228.3], lvaria: ['aria', -308.1, 278.7], lvvdara: ['aria', -341.1, 254.1] };
 function lvHotelsPlace() {
   const R = new Set((city.plan.p2?.osmData?.resorts || []).map(r => r.k)), [ox, oz] = city.plan.offset || [0, 0], kxz = 0.4, ky = LM_REAL_K.lasvegas ?? 0.7;   // offset — от суровите координати на OSM към плана (като P.landmarks)
-  for (const [k, [rk, x, z]] of Object.entries(LV_HOTELS)) { if (!R.has(rk)) continue;
+  for (const [k, [rk, x, z]] of Object.entries({ ...LV_HOTELS, ...(feature('lv-hotels2') ? LV_HOTELS2 : {}) })) { if (!R.has(rk)) continue;
     const o = buildLandmark(k, { label }); o.group.scale.set(kxz, ky, kxz); o.group.position.set(x + ox, 0.05, z + oz);
     const sg = o.group.userData.sign; if (sg) sg.scale.x *= ky / kxz;   // надписът — без да се сплеска от различния мащаб
     city.group.add(o.group); city.landmarks.push(o); }
