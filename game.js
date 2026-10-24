@@ -3415,6 +3415,21 @@ function urgentDispatch(p) {
   if (out.sent.length) { dispatch(); save(); }
   return out;
 }
+// 🚨 urgent-btn (bl25 №12, f6): бутонът до „✖ Откажи поръчката“ — urgentDispatch (2a) праща/доставя всичко за етапа; каквото го няма в града —
+// прозорец „🛒 Купи · N €“: купува се и тръгва направо към обекта
+function urgentGo(p) {
+  const r = urgentDispatch(p); if (!r) return;
+  const T = t => ECON.UNIT_TYPES[t], cnt = {}; for (const t of r.sent) cnt[t] = (cnt[t] || 0) + 1;
+  const list = L => L.map(([t, n]) => `${T(t).ico} ${T(t).nm.toLowerCase()}${n > 1 ? ' ×' + n : ''}`).join(', ');
+  const sent = list(Object.entries(cnt));
+  if (sent) { toast(`🚨 „${p.title}“: ${sent} — вече ${r.sent.length > 1 ? 'са' : 'е'} на обекта.`, 'good'); Sound.play('click'); }
+  if (r.missing.length) {
+    const cost = r.missing.reduce((a, m) => a + m.cost, 0), what = list(r.missing.map(m => [m.role, m.n]));
+    modal('🚨 Няма свободна техника', `За етап „${BTYPES[p.type].stages[p.stage].nm}“ на „${p.title}“ липсва <b>${what}</b> — в града няма свободна${sent ? ` (${sent} вече ${r.sent.length > 1 ? 'са' : 'е'} на обекта)` : ''}. Купи я и тръгва направо към обекта.`,
+      [['По-късно', null], [`🛒 Купи · ${fmt(cost)} €`, () => { let k = 0; for (const m of r.missing) k += fillUnits(m.role, m.n); if (k) { urgentDispatch(p); toast(`🛒 Купи ${k} и ${k > 1 ? 'тръгнаха' : 'тръгна'} направо към „${p.title}“.`, 'good'); } renderPanel(); }]]);
+  } else if (!sent) toast('Всичко нужно за етапа вече е на обекта.', '');
+  renderPanel();
+}
 // защо липсва техниката (картата на обекта): няма такава в града / заета на друг обект / прибира се
 function unitWhy(p, role) {
   const us = units.filter(u => u.type === role); if (!us.length) return 'няма в града — купи';
@@ -3911,6 +3926,26 @@ function needHtml(p) {
     return `<span class="${cls}">${t.ico} ${t.nm} ${r.cnt > 1 ? '×' + r.cnt : ''} · ${txt}</span>`;
   }).join('');
 }
+// 🚜 offer-gear (bl25 №8): етикетите на техниката в офертата — спрямо машините в ГРАДА: колко трябват (най-много за един етап) срещу колко имаш
+// (и на път насам); имаш и са свободни → зелено ✓; имаш, но са на други обекти → жълто „заета“; нямаш (или не стигат) → червено „липсва кран ×N · цена“.
+// Поръчката се приема и без тях; „🛒 Купи липсващото · N €“ — направо от картата
+function offerGear(o) {
+  const st = BTYPES[o.type].stages, want = {};
+  for (const s of st) for (const [r, n] of Object.entries(s.need)) want[r] = Math.max(want[r] || 0, n);
+  const inc = garTransit(S.cityId).map(m => m.t);
+  return Object.entries(want).map(([r, n]) => {
+    const have = units.filter(u => u.type === r).length + inc.filter(t => t === r).length, free = units.filter(u => u.type === r && !u.proj && (u.state === 'idle' || u.state === 'returning')).length + inc.filter(t => t === r).length;
+    return { r, n, have, free, miss: Math.max(0, n - have), st: have < n ? 'miss' : free >= n ? 'ok' : 'busy' };
+  });
+}
+function offerGearHtml(o) {
+  const G = offerGear(o), T = r => ECON.UNIT_TYPES[r], cost = G.reduce((a, g) => a + g.miss * T(g.r).cost, 0);
+  const tag = g => { const t = T(g.r), x = g.n > 1 ? ` ×${g.n}` : '';
+    return g.st === 'ok' ? `<span class="ok" title="Имаш ${g.have}, свободни ${g.free}">${t.ico} ${t.nm}${x} ✓</span>`
+      : g.st === 'busy' ? `<span class="go" title="Имаш ${g.have}, но ${g.have - g.free} са на други обекти — ще дойдат, щом се освободят">${t.ico} ${t.nm}${x} · заета</span>`
+      : `<span class="miss" title="Трябват ${g.n}, имаш ${g.have}">${t.ico} ${g.have ? `${t.nm} ${g.have}/${g.n} · липсва ${g.miss}` : `липсва ${t.nm.toLowerCase()}${g.miss > 1 ? ' ×' + g.miss : ''}`} · ${fmt(g.miss * T(g.r).cost)} €</span>`; };
+  return `<div class="need">${G.map(tag).join('')}</div>` + (cost ? `<div class="meta late" style="margin:4px 0 2px">Можеш да приемеш и без нея, но етапът ще я чака.</div><button class="btn2" data-offbuy="${o.id}" style="width:100%" ${econ.canAfford(cost) ? '' : 'disabled'}>🛒 Купи липсващото · ${fmt(cost)} €</button>` : '');
+}
 function renderPanel() {
   updFinBtn();
   if (!S) return;
@@ -3942,8 +3977,8 @@ function renderPanel() {
       h += `<div class="card" data-lot="${o.lot}" ${o.demolish ? 'style="border-color:#ff9e5e;box-shadow:0 0 0 1px #ff9e5e inset"' : ''}><h3><span class="ico">${o.demolish ? '🏚️→' : ''}${bt.ico}</span>${bt.nm}${o.floors ? ` · ${o.floors} етажа` : ''}${o.demolish ? ' · <span style="color:#ff9e5e">със събаряне</span>' : ''}</h3>
         ${o.demolish ? `<div class="meta" style="color:#ffcfae">🏗️ Инвеститорът купи къща. Първо я събаряш, после строиш на мястото ѝ.</div>` : ''}
         <div class="meta">Клиент: ${o.client}<br>Срок: ${o.days} дни · Офертата важи до ден ${o.expires}</div>${rivals.offerLine(o)}
-        <div class="need">${roles.map(r => `<span class="${units.some(u => u.type === r) ? 'ok' : 'miss'}">${ECON.UNIT_TYPES[r].ico} ${ECON.UNIT_TYPES[r].nm}</span>`).join('')}</div>
-        ${lacking.length ? `<div class="meta late">Нямаш: ${lacking.map(r => ECON.UNIT_TYPES[r].nm).join(', ')}. Купи от „Техника“.</div>` : ''}
+        ${feature('offer-gear') ? offerGearHtml(o) : `<div class="need">${roles.map(r => `<span class="${units.some(u => u.type === r) ? 'ok' : 'miss'}">${ECON.UNIT_TYPES[r].ico} ${ECON.UNIT_TYPES[r].nm}</span>`).join('')}</div>
+        ${lacking.length ? `<div class="meta late">Нямаш: ${lacking.map(r => ECON.UNIT_TYPES[r].nm).join(', ')}. Купи от „Техника“.</div>` : ''}`}
         ${econ.materialCost ? `<div class="meta">📦 Материали ~${fmt([0, 1, 2, 3].reduce((a, k) => a + econ.materialCost(o.type, k, connected(), supplyOpts()), 0))} € · печалба ~<b style="color:var(--ok)">${fmt(o.reward - [0, 1, 2, 3].reduce((a, k) => a + econ.materialCost(o.type, k, connected(), supplyOpts()), 0))} €</b></div>` : ''}
         ${bidHtml(o, bidSel[o.id], S.rep, fmt)}
         <div class="row"><span class="money">+${fmt(Math.round(o.reward * (bidSel[o.id] || 1) / 500) * 500)} €</span><span><button class="btn2" data-dec="${o.id}">Откажи</button> <button class="btn" data-acc="${o.id}">Предложи</button></span></div></div>`;
@@ -3963,7 +3998,8 @@ function renderPanel() {
         ${p.adv ? `<div class="meta" style="margin:2px 0">💶 Аванс 30% получен (${fmt(p.adv)} €) · остават 70% при завършване</div>` : ''}
         <div class="bar"><i style="width:${(p.prog * 100).toFixed(1)}%"></i></div>
         <div class="need">${needHtml(p)}${matHtml(p)}</div>
-        ${!(p.own || p.invest || p.reno || p.maint || p.remodel || p.park) ? `<div class="row" style="justify-content:flex-end;margin-top:2px"><button class="btn2" data-cancelp="${p.id}" style="font-size:12px;padding:4px 9px">✖ Откажи поръчката</button></div>` : ''}
+        ${(() => { const can = !(p.own || p.invest || p.reno || p.maint || p.remodel || p.park), urg = feature('urgent-btn') && missingRoles(p).some(r => r.working < r.cnt);   /* 🚨 urgent-btn (bl25 №12) */
+          return can || urg ? `<div class="row" style="justify-content:flex-end;gap:6px;flex-wrap:wrap;margin-top:2px">${urg ? `<button class="btn2" data-urgent="${p.id}" style="font-size:12px;padding:4px 9px;border-color:#ff6b6b;color:#ffb3b3" title="Цялата липсваща техника за етапа — веднага на обекта: заседналата се доставя, свободната от града тръгва; каквото липсва — купуваш">🚨 Тръгвайте спешно</button>` : ''}${can ? `<button class="btn2" data-cancelp="${p.id}" style="font-size:12px;padding:4px 9px">✖ Откажи поръчката</button>` : ''}</div>` : ''; })()}
         <div class="row">${p.own ? `<span class="meta">Собствен строеж — новото ниво влиза в сила, когато е готов</span>` : p.invest ? `<span class="meta">🔑 Твоя инвестиция — ще носи наем</span><span class="money">~${fmt(RENT[p.type])} €/ден</span>` : p.reno ? `<span class="meta">🔨 Ремонт на твоя къща — след него наемът става</span><span class="money">~550 €/ден</span>` : `<span class="meta">Плащане при завършване</span><span class="money">${fmt(p.reward)} €</span>`}</div></div>`;
     }
   } else if (tab === 'fleet') {
@@ -4003,7 +4039,9 @@ function renderPanel() {
   if ($('bOfferAll')) $('bOfferAll').onclick = offerAll;
   el.querySelectorAll('[data-muni]').forEach(b => b.onclick = e => { e.stopPropagation(); if (b.dataset.muni === 'yes') muni.accept(); else { muni.decline(); renderPanel(); } });
   el.querySelectorAll('[data-acc]').forEach(b => b.onclick = e => { e.stopPropagation(); acceptOffer(+b.dataset.acc); });
+  el.querySelectorAll('[data-offbuy]').forEach(b => b.onclick = e => { e.stopPropagation(); const o = S.offers.find(x => x.id === +b.dataset.offbuy); if (!o) return; let k = 0; for (const g of offerGear(o)) if (g.miss) k += fillUnits(g.r, g.miss); toast(k ? `🛒 Купи ${k} ${k === 1 ? 'машина' : 'машини'} за ${BTYPES[o.type].nm.toLowerCase()}.` : 'Няма място или пари.', k ? 'good' : 'bad'); renderPanel(); });   // offer-gear
   el.querySelectorAll('[data-dec]').forEach(b => b.onclick = e => { e.stopPropagation(); declineOffer(+b.dataset.dec); });
+  el.querySelectorAll('[data-urgent]').forEach(b => b.onclick = e => { e.stopPropagation(); const p = projects.find(q => q.id === +b.dataset.urgent); if (p) urgentGo(p); });   // urgent-btn
   el.querySelectorAll('[data-cancelp]').forEach(b => b.onclick = e => { e.stopPropagation(); const p = projects.find(q => q.id === +b.dataset.cancelp); if (p) modal('✖ Откажи поръчката?', `„${p.title}“ — обектът се изоставя, вложените материали и труд се губят, клиентът е недоволен (−0.2 ⭐ репутация). Техниката се връща свободна.`, [['Не', null], ['✖ Откажи', () => cancelProject(p)]]); });
   el.querySelectorAll('[data-bid]').forEach(b => b.onclick = e => { e.stopPropagation(); const [id, m] = b.dataset.bid.split(':'); bidSel[+id] = +m; renderPanel(); });
   el.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => buyUnit(b.dataset.buy));

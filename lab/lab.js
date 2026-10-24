@@ -201,6 +201,8 @@ const DEMOS = [
   ['🚓 Задръстване/заклещени коли → известие „🚓 Извикай полиция“ + „🎥 гледай“ (натисни бутона — идва полицаят и разплита колите)', 'plovdiv', d => { setTimeout(() => d.jamCallTest(true), 7000); }],   // jam-call (#6)
   ['🧱 Тухлената двуетажна (building-a) — в истинска височина 9,5 м, в парцела (червеният куб — човек 1,8 м; Пловдив)', 'plovdiv', d => { setTimeout(() => d.bldALook(1), 3000); }],   // bld-a-real
   ['🅿️ Паркингът за колите на трафика: пътищата навън (жълто) и навътре (синьо), вратите на шофьорите (червено — заето, зелено — свободно; Пловдив)', 'plovdiv', d => { let k = 0; const go = () => { d.parkLook(k++ % Math.max(1, d.parks().list.length)); }; setTimeout(go, 3000); setInterval(go, 8000); }],   // park-api
+  ['🚨 „Тръгвайте спешно“ — бутонът до „Откажи поръчката“: техниката за етапа веднага на обекта (Пловдив, таб „Обекти“)', 'plovdiv', d => { setTimeout(() => { document.querySelector('#tabs button[data-t=projects]')?.click(); document.querySelector('[data-urgent]')?.scrollIntoView({ block: 'center' }); }, 4000); }],   // urgent-btn
+  ['🏢 Офисите building-e и building-f — в истинска височина 22 м (6–7 етажа), секция в парцела; на всеки 8 s — другата (Пловдив)', 'plovdiv', d => { let k = 0; const go = () => d.bldALook(1, k++ % 2 ? 'building-f' : 'building-e'); setTimeout(go, 3000); setInterval(go, 8000); }],   // bld-ef-real
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
