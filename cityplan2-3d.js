@@ -835,7 +835,7 @@ function* romeBlocks(G, P, style, ROADS = P.roads) {   // генератор: yi
   const V = new THREE.Vector3(), Q = new THREE.Quaternion(), Sc = new THREE.Vector3(), C = new THREE.Color();
   let hidden = null, fl = () => true, fa = null;
   const XS = {}, draw = XK ? () => xDraw(G, list, parts, b => (b.lot && !fl(b.lot)) || !!(fa && !fa(b)) || (hidden && hidden.has(b)), XS) : () => { const n = [0, 0, 0, 0, 0, 0, 0];
-    for (const b of list) { if ((b.lot && !fl(b.lot)) || (hidden && hidden.has(b))) continue; const t = b.t || 0, { box, roof } = parts[t], i = n[t]++;
+    for (const b of list) { if ((b.lot && !fl(b.lot)) || (hidden && hidden.has(b)) || (fa && !fa(b))) continue; const t = b.t || 0, { box, roof } = parts[t], i = n[t]++;   /* fa — и тук (bg-room: OSM градовете без bg-variety) */
       box.setMatrixAt(i, b.M); box.setColorAt(i, C.setHex(b.col)); b.M.decompose(V, Q, Sc);
       roof.setMatrixAt(i, m.compose(V.set(V.x, V.y + Sc.y / 2, V.z), Q, t === 2 || t === 5 ? Sc.set(Sc.x * (t === 5 ? 0.8 : 1.02), t === 5 ? 3 : 0.6, Sc.z * (t === 5 ? 0.8 : 1.02)) : Sc.set(Sc.x, Math.min(4, Sc.x * RF[t][2]), Sc.z))); }
     parts.forEach(({ box, roof }, t) => { box.count = roof.count = n[t]; box.instanceMatrix.needsUpdate = roof.instanceMatrix.needsUpdate = true; if (box.instanceColor) box.instanceColor.needsUpdate = true; }); };
