@@ -143,7 +143,7 @@ export function createTraffic(opts) {
   // таван: ~30% от местата по лентите (иначе на късите улици между кръстовищата решетката се задръства)
   const capacity = Math.floor(lanes.reduce((t, l) => t + l.len, 0) / (4.5 + S0 + 2) * 0.3);
   let acc = 0, steps = 0, left = 0, parked = 0;
-  const drop = v => { if (v.remove) v.remove(); else if (v.obj) opts.scene.remove(v.obj); };   // колата: обект (obj) или инстанция (set/remove)
+  const drop = v => { if (v.remove) v.remove(); else if (v.obj) opts.scene.remove(v.obj); if (v.trailer?.obj) opts.scene.remove(v.trailer.obj); };   // #4: и задната секция на съчленения   // колата: обект (obj) или инстанция (set/remove)
   const free = (p, s, L) => p.cars.every(c => Math.abs(c.s - s) > (c.L + L) / 2 + S0 * 2);
   function spawn() {
     for (let k = 0; k < 12; k++) {
@@ -154,10 +154,11 @@ export function createTraffic(opts) {
       const s = fromEdge ? 3 : 2 + rnd() * (p.len - 4);   // от входа на града — в началото на лентата
       if (!free(p, s, v.len)) { drop(v); continue; }   // без нова кола на заето място
       const c = { em: v.obj ? sirenKind(v.obj) : null, obj: v.obj, set: v.set, rm: v.remove, w: v.w || 1.9, h: v.h || 1.45, L: v.len, kind: v.kind, heavy: heavyKind(v), p, s, v: 0, next: null, px: 0, pz: 0, pyaw: 0, x: 0, z: 0, yaw: 0, y: 0, py: 0, wait: 0, a: 0 };
-      c.rear = []; c.blinkL = []; c.blinkR = []; if (v.obj) v.obj.traverse(m => { const l = m.userData.lamp; if (l === 'rear') c.rear.push(m); else if (l === 'blink') (m.userData.side === 'L' ? c.blinkL : c.blinkR).push(m); });
+      if (v.trailer) { c.trl = v.trailer.len; c.cab = v.cab || 6; c.tr = { obj: v.trailer.obj, x: 0, z: 0, yaw: 0, hitch: v.trailer.hitch, k: v.trailer.k, ax: v.trailer.ax }; c.trV = v.trailer; }   // #4: съчлененият автобус — задната секция като ремарке
+      c.rear = []; c.blinkL = []; c.blinkR = []; for (const o of [v.obj, v.trailer?.obj]) if (o) o.traverse(m => { const l = m.userData.lamp; if (l === 'rear') c.rear.push(m); else if (l === 'blink') (m.userData.side === 'L' ? c.blinkL : c.blinkR).push(m); });
       c.rearMat = c.rear[0]?.material; c.brake = false;
       c.hist = [];
-      insert(p, c); pickNext(c); at(p, s, tmp); c.x = c.px = tmp.x; c.z = c.pz = tmp.z; c.y = c.py = tmp.y; c.yaw = c.pyaw = tmp.yaw; cars.push(c); return c;
+      insert(p, c); pickNext(c); at(p, s, tmp); c.x = c.px = tmp.x; c.z = c.pz = tmp.z; c.y = c.py = tmp.y; c.yaw = c.pyaw = tmp.yaw; if (c.tr) { pose(c); c.px = c.x; c.pz = c.z; c.pyaw = c.yaw; c.tr.px = c.tr.x; c.tr.pz = c.tr.z; c.tr.pyaw = c.tr.yaw; } cars.push(c); return c;
     }
     return null;
   }
@@ -182,9 +183,11 @@ export function createTraffic(opts) {
     c.x = (pa.x + pb.x) / 2; c.z = (pa.z + pb.z) / 2; c.y = (pa.y + pb.y) / 2;
     if (Math.hypot(pa.x - pb.x, pa.z - pb.z) > 0.05) c.yaw = Math.atan2(pa.x - pb.x, pa.z - pb.z);
     if (c.trl) {
-      const hz = head - c.cab / 2 + 0.9; along(c, hz, pa); along(c, hz - c.trl * 0.78, pb);   // шарнирът и задната ос на ремаркето
-      const yw = Math.hypot(pa.x - pb.x, pa.z - pb.z) > 0.05 ? Math.atan2(pa.x - pb.x, pa.z - pb.z) : c.tr.yaw, k = c.trl / 2 - 0.9;
-      c.tr.yaw = yw; c.tr.x = pa.x - Math.sin(yw) * k; c.tr.z = pa.z - Math.cos(yw) * k;
+      const hz = head - c.cab / 2 + (c.tr.hitch ?? 0.9); along(c, hz, pa); along(c, hz - (c.tr.ax ?? c.trl * 0.78), pb);   // шарнирът и задната ос на ремаркето (#4 съчлененият: шарнирът в хармониката)
+      if (c.tr.hitch != null) { const d = c.tr.hitch - c.cab / 2; pa.x = c.x + Math.sin(c.yaw) * d; pa.z = c.z + Math.cos(c.yaw) * d; }   /* #4: шарнирът — на самата предна секция (без процеп в хармониката на завоите) */
+      const yw = Math.hypot(pa.x - pb.x, pa.z - pb.z) > 0.05 ? Math.atan2(pa.x - pb.x, pa.z - pb.z) : c.tr.yaw, k = c.tr.k ?? c.trl / 2 - 0.9;
+      let yt = yw; if (c.tr.hitch != null) { const dy = Math.atan2(Math.sin(yw - c.yaw), Math.cos(yw - c.yaw)), M = 0.96; if (Math.abs(dy) > M) yt = c.yaw + Math.sign(dy) * M; }   /* #4: хармониката — до ~55° (по острите чупки на лентите не се сгъва) */
+      c.tr.yaw = yt; c.tr.x = pa.x - Math.sin(yt) * k; c.tr.z = pa.z - Math.cos(yt) * k;
     }
   }
   const insert = (p, c) => { let k = 0; while (k < p.cars.length && p.cars[k].s < c.s) k++; p.cars.splice(k, 0, c); };
@@ -345,9 +348,9 @@ export function createTraffic(opts) {
       if (jp && c.tailC && (c.p !== c.tailC.outL || c.s - c.L / 2 > 0.5)) { c.tailC.tails.delete(c); c.tailC = null; }
       if (jp) pose(c); else { at(c.p, c.s, tmp); c.x = tmp.x; c.z = tmp.z; c.y = tmp.y; c.yaw = tmp.yaw; }
     }
-    for (let k = cars.length - 1; k >= 0; k--) { const c = cars[k]; if (c.gone) { unlist(c); if (!c.agent) drop({ obj: c.obj, remove: c.rm }); cars.splice(k, 1); left++; } }
+    for (let k = cars.length - 1; k >= 0; k--) { const c = cars[k]; if (c.gone) { unlist(c); if (!c.agent) drop({ obj: c.obj, remove: c.rm, trailer: c.trV }); cars.splice(k, 1); left++; } }
     // блокирана дълго (вечно задръстване на затворен кръг) — изчезва и се появява на свободно място (трафикът е само за гледане); агентите — не
-    for (let k = cars.length - 1; k >= 0; k--) { const c = cars[k]; if (c.v < 0.05) c.stuck = (c.stuck || 0) + H; else c.stuck = 0; if (c.stuck > 40 && !c.agent) { unlist(c); drop({ obj: c.obj, remove: c.rm }); cars.splice(k, 1); } }
+    for (let k = cars.length - 1; k >= 0; k--) { const c = cars[k]; if (c.v < 0.05) c.stuck = (c.stuck || 0) + H; else c.stuck = 0; if (c.stuck > 40 && !c.agent) { unlist(c); drop({ obj: c.obj, remove: c.rm, trailer: c.trV }); cars.splice(k, 1); } }
     steps++;
   }
   // стопове, мигачи и истинските прожектори
@@ -398,7 +401,7 @@ export function createTraffic(opts) {
       if (opts.onSignal) for (const nd of nodes.values()) if (nd.sig) opts.onSignal(nd, sigView(nd.sig));
       lights();
     },
-    clear() { if (POOL) { opts.scene.remove(POOL); POOL.geometry.dispose(); POOL.material.map.dispose(); POOL.material.dispose(); POOL.dispose(); POOL = null; } for (const sp of spots) { opts.scene.remove(sp); opts.scene.remove(sp.target); sp.dispose(); } spots.length = 0; for (const c of cars) drop({ obj: c.obj, remove: c.rm }); cars.length = 0; if (LI) { LI.clear(); LI = null; } for (const l of lanes) l.cars.length = 0; for (const n of nodes.values()) for (const c of n.conns) c.cars.length = 0; },
+    clear() { if (POOL) { opts.scene.remove(POOL); POOL.geometry.dispose(); POOL.material.map.dispose(); POOL.material.dispose(); POOL.dispose(); POOL = null; } for (const sp of spots) { opts.scene.remove(sp); opts.scene.remove(sp.target); sp.dispose(); } spots.length = 0; for (const c of cars) drop({ obj: c.obj, remove: c.rm, trailer: c.trV }); cars.length = 0; if (LI) { LI.clear(); LI = null; } for (const l of lanes) l.cars.length = 0; for (const n of nodes.values()) for (const c of n.conns) c.cars.length = 0; },
     // светофарите: [{ node, x, z, arms: sigArms }] — за всички кръстовища със светофар (или само nodeId)
     // смяна на лента на агента (автобусът тръгва от спирката): същото s на успоредната лента, ако е свободно; рисуването — плавно (c.off → 0)
     laneTo(c, L2) { if (c.p === L2) return true; if (!isSib(c.p, L2)) return false; return hopTo(c, L2); },
@@ -411,7 +414,7 @@ export function createTraffic(opts) {
     addAgent(a) {
       const r = a.route, p = r.paths[0], c = { obj: a.obj, w: a.w || 2.4, h: a.h || 3, L: a.len, kind: a.kind || 'truck', heavy: a.kind !== 'car', p, s: r.s0, v: 0, next: null, x: 0, z: 0, yaw: 0, y: 0, wait: 0, a: 0,
         agent: a, route: r.paths, ri: 0, goal: r.s1, vk: a.vk || 1, hist: [], rear: [], blinkL: [], blinkR: [], brake: false };
-      if (a.trailer) { c.trl = a.trailer.len; c.cab = a.cab || 6; c.tr = { obj: a.trailer.obj, x: 0, z: 0, yaw: 0 }; }
+      if (a.trailer) { c.trl = a.trailer.len; c.cab = a.cab || 6; c.tr = { obj: a.trailer.obj, x: 0, z: 0, yaw: 0, hitch: a.trailer.hitch, k: a.trailer.k, ax: a.trailer.ax }; }   // hitch/k/ax — по избор (#4 съчлененият)
       if (a.obj) a.obj.traverse(m => { const l = m.userData.lamp; if (l === 'rear') c.rear.push(m); else if (l === 'blink') (m.userData.side === 'L' ? c.blinkL : c.blinkR).push(m); });
       c.rearMat = c.rear[0]?.material;
       insert(p, c); pickNext(c); pose(c); c.px = c.x; c.pz = c.z; c.py = c.y; c.pyaw = c.yaw; if (c.tr) { c.tr.px = c.tr.x; c.tr.pz = c.tr.z; c.tr.pyaw = c.tr.yaw; }
@@ -422,7 +425,7 @@ export function createTraffic(opts) {
     // мрежата е променена (roadnet.js update): колите на махнатите пътеки — навън (агентите — също; собственикът им вижда, че не са живи);
     // следващата пътека е махната — нов избор
     invalidate(removed) { for (let k = cars.length - 1; k >= 0; k--) { const c = cars[k], gone = removed.has(c.p) || (c.route && c.route.slice(c.ri).some(p => removed.has(p))) || c.hist.some(p => removed.has(p) && c.tailC === p);
-        if (gone) { unlist(c); if (!c.agent) drop({ obj: c.obj, remove: c.rm }); else nAg--; cars.splice(k, 1); continue; } if (c.next && removed.has(c.next)) pickNext(c); } },
+        if (gone) { unlist(c); if (!c.agent) drop({ obj: c.obj, remove: c.rm, trailer: c.trV }); else nAg--; cars.splice(k, 1); continue; } if (c.next && removed.has(c.next)) pickNext(c); } },
     removeAgent(c) { const k = cars.indexOf(c); if (k < 0) return; unlist(c); cars.splice(k, 1); nAg--; },
   };
   return api;

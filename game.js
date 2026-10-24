@@ -2260,6 +2260,9 @@ function traffic2Make() {
   tr2 = createTraffic({ scene: tr2G || scene, camera, movers: () => moversNow(), onJam: j => jamPolice(j), ringClaim: feature('jam-call'), jp: feature('junction-paths'), drive: p2 && p2.drive === 'L' ? 'left' : 'right', maxCars: wantedTraffic(), spawnW: p => laneW(p), crossings: () => crossingsNow(), blockers: () => [...(railx && !feature('railx-stop') ? railx.blockers() : []), ...(incidents.blockers?.() || [])].map(b => p2 ? { x: b.x - city.plan.offset[0], z: b.z - city.plan.offset[1] } : b),   /* + затворената улица при инцидент (incidents2, 55) */   // camera — истинските фарове само за най-близките коли
     ...(p2 ? { built: planNetwork(p2, { jp: feature('junction-paths') }) } : { net: gridNetwork({ NBI, NBJ, tx, isRoad, TILE, signal: (i, j) => signals.some(s => s.i === i && s.j === j) }) }),
     makeCar: () => { addCar(); const t = traffic.pop(); if (!t) return null; const heavy = /Bus|Truck|Firetruck|firetruck|kenworth|sf-bus-/.test(t.obj.userData.src || '');
+      if (tr2G && (t.obj.userData.src === 'sf-bus-artic' || articForce > 0 && articForce--) && feature('artic-bend') && A['sf-bus-artic-f'] && A['sf-bus-artic-r']) {   // #4 (artic-bend): съчлененият — две секции; задната следва като ремарке от шарнира в хармониката (traffic.js pose)
+        t.obj.removeFromParent(); const f = model('sf-bus-artic-f', 1), r = model('sf-bus-artic-r', 1); tr2G.add(f, r);
+        return { obj: f, len: ARTIC.len, kind: 'bus', w: 2.55, h: 3.1, cab: ARTIC.f, trailer: { obj: r, len: ARTIC.r, hitch: ARTIC.f / 2 + ARTIC.pf, k: ARTIC.pr, ax: 7.5 } }; }
       if (tr2G) { const k = t.len > 3 && t.len < 14 ? 1 : (heavy ? 11 : 4.5) / (t.len || 4.5);   /* колите вече са в истинския размер (sf-car-* и резервите с kidK) — не ги изравняваме до 4,5 м; само ако мярката е сбъркана (55) */ t.obj.scale.multiplyScalar(k); t.len = (t.len || 4.5) * k; tr2G.add(t.obj); }   // планът v2 е в истински метри — колите в истинския си размер
       return { obj: t.obj, len: t.len || 4.5, kind: heavy ? 'bus' : 'car' }; },   // автобус/камион — само по улици ≥ 6 м
     onSignal: (n, v) => { const s = sigMap.get(n.id); if (!s || !v) return; for (const h of s.heads) { const mine = h.axis === v.axis && !v.red; h.gr.visible = mine && !v.yellow; h.y.visible = mine && v.yellow; h.r.visible = !mine; } } });
@@ -2289,7 +2292,7 @@ const cityBus = createCityBus({ agents: () => feature('city-bus') ? jpAgents() :
   bus: () => A['sf-car-Bus'] ? model('sf-car-Bus', 1) : null, want: () => { const b = city.lots.filter(l => l.built).length; return { lines: b > 120 ? 2 : 1, perLine: Math.min(3, 1 + Math.floor(b / 90)) }; } });
 // #6 (jam-call, bl25-05): задръстване/заклещени коли → известие „🚓 Извикай полиция“ + „🎥 гледай“; без натискане полицията идва сама след 90 s
 // (заклещените — винаги, обикновеното задръстване — през раз); при полицая трафикът разплита заклещените (traffic.js: ghT)
-let jamAsk = null;
+let jamAsk = null, articForce = 0;   // articForce — __dbg.articLook: следващите N коли в трафика са съчленени автобуси
 // известие с бутони (не се изрязва от другите известия — data-keep): btns [[текст, onclick, затваря?]], ms — колко стои
 function askNotice(html, btns, ms = 25000) {
   const el = document.createElement('div'); el.className = 'toast bad'; el.style.pointerEvents = 'auto'; el.dataset.keep = '1';
@@ -11519,6 +11522,7 @@ if (AUTOTEST) {
     unitRepair: () => unitRepair(),
     jamCallTest(lock = true) { if (!tr2) return null; const n = [...tr2.nodes.values()].find(q => q.deg >= 3 && !q.ring && q.conns.some(C => C.ringIn)) || [...tr2.nodes.values()].find(q => q.deg >= 3 && !q.ring); jamNotice({ node: n.id, x: n.x, z: n.z, q: 3, lock }); const o = tr2G ? tr2G.position : { x: 0, z: 0 }; __dbg.camAt(n.x + o.x + 30, 34, n.z + o.z + 42, n.x + o.x, 0, n.z + o.z); return { node: n.id, ask: !!jamAsk }; },   /* #6: известието „🚓 Извикай полиция“ */
     chaseLook() { const r = incidents.start('chase'); if (!r) return r; chaseCam = 2; fly = null; $('panel').classList.add('hidden'); return r; },   /* #3: полицейско преследване, камерата след беглеца */
+    articLook(n = 3) { if (!tr2) return null; const c = tr2.cars.find(q => q.trV && q.v > 2) || tr2.cars.find(q => q.trV); if (!c) { articForce = n; tr2.cars.filter(q => !q.agent && !q.trV).slice(0, n).forEach(q => { q.gone = true; }); return { forced: n }; } const o = tr2G ? tr2G.position : { x: 0, z: 0 }; __dbg.camAt(c.x + o.x + 18, 22, c.z + o.z + 24, c.x + o.x, 0, c.z + o.z); return { bend: +((Math.atan2(Math.sin(c.yaw - c.tr.yaw), Math.cos(c.yaw - c.tr.yaw))) * 57.3).toFixed(1), v: +c.v.toFixed(1), p: c.p.kind, ring: c.p.ring != null }; },   /* #4: съчлененият автобус на 2 секции */
     chaseState: () => { const a = incidents.active; return a && { ...a, follow: incidents.follow(), cam: chaseCam }; },
     urgent: (i = 0) => urgentDispatch(projects[i]),   /* #12: „🚨 Тръгвайте спешно“ */
     needOf: (i = 0) => projects[i] && { t: projects[i].title, stage: projects[i].stage, roles: missingRoles(projects[i]) },
