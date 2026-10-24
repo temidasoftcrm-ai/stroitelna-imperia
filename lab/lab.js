@@ -211,6 +211,7 @@ const DEMOS = [
   ['🅿️ Паркингът сутрин (7:20): човек отива до колата, тя излиза на заден и влиза в трафика (София)', 'sofia', d => { setTimeout(() => d.parkLife('am'), 4000); }],   // park-life
   ['🅿️ Паркингът вечер (17:20): кола от трафика влиза, паркира, слиза човек (София)', 'sofia', d => { setTimeout(() => d.parkLife('pm'), 4000); }],   // park-life
   ['🚓 Новите патрулки: Dacia Logan „ПОЛИЦИЯ“ (България/Европа), Duster „ДПС“ (Русия) и американските — денем, после нощем с бурканите', 'plovdiv', d => { setTimeout(() => d.polLook(false), 3000); setTimeout(() => d.polLook(true), 9000); }],   // pol-new
+  ['🔥 Голям пожар нощем: пламъци по покрива, тъмен дим, искри, отблясък (София, 22:00)', 'sofia', d => { d.time(22); const L = d.city().lots.filter(l => l.obj && l.built && !l.busy && /^building-[a-c]$/.test(l.obj.userData.src || '')), l = L[0]; if (!l) return; const cam = () => { d.city().lots.forEach(o => { if (o !== l && o.obj && Math.hypot(o.x - l.x, o.z - l.z) < 60) o.obj.visible = false; }); d.camAt(l.x + 30, 22, l.z + 34, l.x, 12, l.z); }; cam(); const id = d.fireTest(1.3, true); setTimeout(() => { const f = (d.state().fires || []).find(q => q.id === id); if (f) { f.inten = 1; f.hp = 55; } cam(); }, 2500); }],   // fire-big
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

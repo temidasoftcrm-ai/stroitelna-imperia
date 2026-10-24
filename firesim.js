@@ -11,11 +11,13 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { flameSprite } from './fireflip.js';
+import { feature } from './lab/feature.js';
 
 export const FIRE_ST = { travel: '🚒 Пожарната пътува', fight: '🚒 Гасене', saved: '✅ Спасена', burned: '⬛ Изгоряла', repair: '🏗️ Ремонт', secured: '🚧 Обезопасена', done: '✅ Възстановена' };
 const TRAVEL = 0.45, KNOCK = 0.9, BURN = 60;   // дни път; колко сила на огъня свалят пожарникарите за ден; колко % здравина на ден при пълна сила × sev
 const STAGES = [['🦺 Обезопасяване', 1], ['🏗️ Конструкция', 3], ['🎨 Фасада', 2]], CLEAR = [['🚜 Разчистване', 2], ['🏗️ Нов строеж', 5]];
 const fmt = n => Math.round(n).toLocaleString('bg-BG');
+const BIG = feature('fire-big'), FIRE_LIT = new THREE.Color(0x8a4a1c);   // задача #11 — по-големи пожари (по-долу: buildBig / updBig); цветът на дима, осветен отдолу
 // 0% — изгорялата сграда се сменя с руина (Sketchfab, CC BY — assets/heavy/burned/CREDITS.txt): висока → тухлената, ниска → дървената, малка къща → скелетът;
 // при разчистването руината става скелет и се снишава, после новата сграда расте под скелето
 const RUIN = { tower: 'assets/heavy/burned/burned-tower.glb', wood: 'assets/heavy/burned/burned-wood.glb', frame: 'assets/heavy/burned/burned-frame.glb' }, ruinCache = {};
@@ -55,6 +57,11 @@ export function createFires(deps) {
     o.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(o), h = b.max.y - b.min.y, ctr = b.getCenter(new THREE.Vector3());
     const r = (lot.rot || 0), n = new THREE.Vector3(Math.sin(r), 0, Math.cos(r)), side = new THREE.Vector3(n.z, 0, -n.x);
     const half = Math.abs((b.max.x - b.min.x) * n.x) + Math.abs((b.max.z - b.min.z) * n.z), wid = Math.abs((b.max.x - b.min.x) * side.x) + Math.abs((b.max.z - b.min.z) * side.z);
+    if (BIG && Math.abs(Math.sin(o.rotation.y * 2)) > 0.05) {   // fire-big: завъртяната сграда — рамката по нейните оси (световната е по-голяма и пламъците излизаха над улицата)
+      const ry = o.rotation.y; o.rotation.y = 0; o.updateMatrixWorld(true); const b0 = new THREE.Box3().setFromObject(o), c0 = b0.getCenter(new THREE.Vector3()).sub(o.position).applyAxisAngle(new THREE.Vector3(0, 1, 0), ry).add(o.position); o.rotation.y = ry; o.updateMatrixWorld(true);
+      const n2 = new THREE.Vector3(Math.sin(ry), 0, Math.cos(ry)), s2 = new THREE.Vector3(n2.z, 0, -n2.x), W2 = b0.max.x - b0.min.x, D2 = b0.max.z - b0.min.z, pts = [], rows = h > 14 ? [0.25, 0.5, 0.75] : [0.35, 0.7];
+      for (const fy of rows) for (const fx of [-0.33, -0.11, 0.11, 0.33]) pts.push(c0.clone().addScaledVector(n2, D2 / 2 + 0.25).addScaledVector(s2, fx * W2).setY(b.min.y + fy * h));
+      pts.sort((p, q) => p.y - q.y || p.x - q.x); return { pts, h, top: b.max.y, ctr: c0.setY(ctr.y), n: n2, side: s2, half: D2, wid: W2 }; }
     const pts = []; const rows = h > 14 ? [0.25, 0.5, 0.75] : [0.35, 0.7];
     for (const fy of rows) for (const fx of [-0.33, -0.11, 0.11, 0.33]) pts.push(ctr.clone().addScaledVector(n, half / 2 + 0.25).addScaledVector(side, fx * wid).setY(b.min.y + fy * h));
     pts.sort((a, c) => a.y - c.y || a.x - c.x);   // огънят тръгва отдолу
@@ -75,6 +82,41 @@ export function createFires(deps) {
     const s = Math.min(W.wid * 0.95 / sz.x, W.half * 0.95 / sz.z, W.h * 1.05 / sz.y), inner = src.clone(), r = new THREE.Group();
     inner.position.set(-c.x, -b.min.y, -c.z); r.add(inner); r.scale.setScalar(s); r.userData.s = s; r.userData.h = sz.y * s; r.rotation.y = rot; r.position.set(W.ctr.x, W.top - W.h, W.ctr.z);
     return r;
+  }
+  // 🔥 fire-big (задача #11): големи пламъци по покрива, тъмен стълб дим, искри, трептящ отблясък по стената и земята — по силата на огъня и големината на сградата
+  function buildBig(v) {
+    const W = v.W, g = v.g, B = { roof: [], col: [], fx: [] }, n = Math.max(3, Math.min(7, Math.round(W.wid / 3.5)));
+    for (let i = 0; i < n; i++) { const fl = flameSprite(1); fl.userData.u = n > 1 ? i / (n - 1) - 0.5 : 0; fl.userData.d = (i % 2 ? 0.15 : -0.15); fl.userData.ph = i * 2.3 + 0.7; fl.visible = false; g.add(fl); B.roof.push(fl); }   // по билото, на зиг-заг
+    for (let i = 0; i < 10; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: puff, color: 0x1d1b19, transparent: true, opacity: 0, depthWrite: false })); s.userData.ph = i / 10; s.visible = false; g.add(s); B.col.push(s); }   // стълбът дим
+    const N = 48, pos = new Float32Array(N * 3), sp = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(pos, 3)), new THREE.PointsMaterial({ color: 0xffb347, size: 0.35, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    sp.userData.r = Array.from({ length: N }, () => [Math.random(), Math.random() * 6.28, 0.3 + Math.random() * 0.7, Math.random() - 0.5]); sp.frustumCulled = false; sp.visible = false; g.add(sp); B.sparks = sp;   // [фаза, ъгъл, скорост, място по билото]
+    B.wall = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowT, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); B.wall.visible = false; g.add(B.wall);   // отблясъкът по фасадата
+    B.ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: glowT, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); B.ground.rotation.x = -Math.PI / 2; B.ground.visible = false; g.add(B.ground);   // по земята пред сградата (без истинска светлина — нова светлина прекомпилира всички шейдъри)
+    return B;
+  }
+  function updBig(v, f, burning, now) {
+    const hr = (6 + (now % 1) * 24) % 24, nk = hr >= 21 || hr < 5 ? 1 : hr >= 19 ? (hr - 19) / 2 : hr < 7 ? (7 - hr) / 2 : 0;   // нощта 0…1 (както часовника: 0 = 06:00)
+    const B = v.big, W = v.W, t = v.t, I = f.inten, dmg = (100 - f.hp) / 100, size = Math.max(W.wid, W.half), H = W.h;
+    const fk = 0.75 + 0.25 * Math.sin(t * 11.3) * Math.sin(t * 7.1 + 1.3) + 0.08 * Math.sin(t * 23.7);   // трептенето — общо за светлините
+    const on = burning && I > 0.03, nR = Math.ceil(B.roof.length * Math.min(1, 0.25 + I * 0.6 + dmg * 0.5));
+    B.roof.forEach((s, i) => { const vis = on && i < nR; s.visible = vis; if (!vis) return; const k = 0.8 + 0.3 * Math.sin(t * 8 + s.userData.ph) * Math.sin(t * 5.1 + s.userData.ph * 1.7), h = (4 + 0.6 * H + 0.3 * size) * (0.55 + 0.7 * I) * (0.7 + 0.5 * f.sev / 2) * k;
+      s.scale.set(h * 0.85, h, 1); s.position.copy(W.ctr).addScaledVector(W.side, s.userData.u * W.wid * 0.8).addScaledVector(W.n, s.userData.d * W.half); s.position.y = W.top - 0.15 * h; });
+    // дим: при горене — гъст и тъмен, нагоре и по вятъра; спасена — изтънява за ~1 ден
+    const sv = f.st === 'saved' && f.out != null ? Math.max(0, 1 - (now - f.out) / 1.0) : 0, sOn = on || sv > 0, top = W.top + (on ? 1.5 : 0);
+    B.col.forEach(s => { s.visible = sOn; if (!sOn) return; const ph = (t * (on ? 0.09 : 0.05) + s.userData.ph) % 1, rise = ph * (H * 1.2 + 14 + 10 * I);
+      s.position.copy(W.ctr).addScaledVector(W.side, Math.sin(ph * 5 + s.userData.ph * 9) * 1.2); s.position.x += ph * ph * 7; s.position.z += ph * ph * 3; s.position.y = top + rise;   // вятърът
+      s.scale.setScalar((on ? 3 + size * 0.25 : 2.5) + ph * (on ? 6 + size * 0.5 : 6)); if (on) s.material.color.setHex(0x1d1b19).lerp(FIRE_LIT, nk * Math.max(0, 1 - ph * 2.2) * 0.8); else s.material.color.setHex(0x4a4744);   /* нощем — отдолу осветен от огъня */
+      s.material.opacity = (on ? 0.9 * Math.min(1, 0.45 + I) : 0.6 * sv) * Math.min(1, ph * 6) * Math.pow(1 - ph, 0.7); });
+    // искри — само отблизо
+    const near = deps.cam().distanceTo(W.ctr) < 140; B.sparks.visible = on && near;
+    if (B.sparks.visible) { const a = B.sparks.geometry.attributes.position, r = B.sparks.userData.r;
+      for (let i = 0; i < r.length; i++) { const [p0, ang, sp, u] = r[i], ph = (t * 0.35 * sp + p0) % 1, rad = 0.6 + ph * 2.5;
+        a.setXYZ(i, W.ctr.x + W.side.x * u * W.wid * 0.7 + Math.cos(ang + t * 2 * sp) * rad + ph * 4, W.top + ph * (8 + 6 * I), W.ctr.z + W.side.z * u * W.wid * 0.7 + Math.sin(ang + t * 2 * sp) * rad); }
+      a.needsUpdate = true; B.sparks.material.opacity = 0.9 * I; B.sparks.material.size = 0.25 + 0.2 * Math.abs(Math.sin(t * 13)); }
+    // светлината от огъня — сияние по фасадата и петно по земята, трептят
+    B.wall.visible = B.ground.visible = on; if (on) {
+      const fc = W.ctr.clone().addScaledVector(W.n, W.half / 2 + 0.6); B.wall.position.set(fc.x, W.top - H * 0.45, fc.z); B.wall.scale.setScalar((H * 1.5 + size) * (0.6 + 0.4 * I)); B.wall.material.opacity = (0.3 + 0.5 * I) * fk * (0.2 + 0.8 * nk);   /* денем — едва (иначе избелва фасадата) */
+      const gc = W.ctr.clone().addScaledVector(W.n, W.half / 2 + 3); B.ground.position.set(gc.x, W0(v) + 0.06, gc.z); B.ground.scale.set(size * 2.2 + 8, size * 1.6 + 8, 1); B.ground.material.opacity = (0.35 + 0.5 * I) * fk * (0.15 + 0.85 * nk); }
   }
   function build(f) {
     const lot = lotOf(f), grp = deps.group(); if (!lot || !grp) return null;
@@ -109,6 +151,7 @@ export function createFires(deps) {
     const wmat = new THREE.MeshBasicMaterial({ color: 0xbfe6ff, transparent: true, opacity: 0.55, depthWrite: false });
     v.water = [0, 1].map(() => { const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(new THREE.Vector3(), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)), 12, 0.12, 6), wmat); tube.visible = false; g.add(tube); return tube; });
     v.hose = new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(new THREE.Vector3(), new THREE.Vector3(0, 0, 1)), 2, 0.08, 6), new THREE.MeshStandardMaterial({ color: 0x8a1c1c })); v.hose.visible = false; g.add(v.hose);
+    if (BIG) v.big = buildBig(v);
     vis.set(f.id, v); return v;
   }
   function drop(id) { const v = vis.get(id); if (!v) return; { const f = st().find(q => q.id === id), lot = f && lotOf(f); if (lot && lot.obj) { lot.obj.visible = true; if (lot.obj.userData.sy0 != null) lot.obj.scale.y = lot.obj.userData.sy0; } } for (const k in v.ruins) { const r = v.ruins[k]; if (r.isObject3D && r.parent) r.parent.remove(r); }   /* руините делят геометрията с кеша — не се освобождават */ v.g.parent && v.g.parent.remove(v.g); v.g.traverse(o => { if (o.geometry && !o.isSkinnedMesh) o.geometry.dispose(); if (o.isSkinnedMesh && o.skeleton) o.skeleton.dispose(); if (o.material && o.material.map && o.material.map !== puff && o.material.map !== glowT && o.material.map.isCanvasTexture) o.material.map.dispose(); }); vis.delete(id); }
@@ -201,7 +244,8 @@ export function createFires(deps) {
       const burning = f.st === 'travel' || f.st === 'fight';
       const lit = Math.ceil(v.flames.length * Math.min(1, 0.15 + f.inten * (0.35 + (100 - f.hp) / 140)));   // колкото по-силно и по-разрушено — толкова повече прозорци
       v.t = (v.t || 0) + dd * 24;   // „секунди“ по игровото време (24 s за ден на 1×)
-      v.flames.forEach((s, i) => { const on = burning && i < lit; s.visible = on; v.glows[i].visible = on; if (on) { const k = 0.8 + 0.25 * Math.sin(v.t * 9 + s.userData.ph) * Math.sin(v.t * 6.3 + s.userData.ph * 2), h = (1.6 + 2.6 * f.inten) * k; s.scale.set(h * 0.8, h, 1); s.position.y = v.W.pts[i].y + h * 0.35; v.glows[i].material.opacity = 0.5 * f.inten; } });
+      v.flames.forEach((s, i) => { const on = burning && i < lit; s.visible = on; v.glows[i].visible = on; if (on) { const k = 0.8 + 0.25 * Math.sin(v.t * 9 + s.userData.ph) * Math.sin(v.t * 6.3 + s.userData.ph * 2), h = (1.6 + 2.6 * f.inten) * k * (BIG ? 1.5 + Math.min(1, v.W.h / 20) : 1);   /* fire-big: по-високи езици от прозорците */ s.scale.set(h * 0.8, h, 1); s.position.y = v.W.pts[i].y + h * 0.35; v.glows[i].material.opacity = 0.5 * f.inten; } });
+      if (v.big) updBig(v, f, burning, now);
       const clr = f.st === 'repair' && f.order && f.order.kind === 'clear', d0 = CLEAR[0][1] / (CLEAR[0][1] + CLEAR[1][1]), k0 = clr ? f.order.prog / d0 : 0;
       const ruinOn = f.hp <= 0 && (f.st === 'burned' || f.st === 'secured' || (clr && f.order.stage === 0)), gy = W0(v);
       v.smoke.forEach(s => { const i = s.userData.i, on = (burning && i < lit) || (f.st === 'saved' && f.out != null && now - f.out < 0.4 && i < 3) || (ruinOn && !clr && i < 2); s.visible = on; if (!on) return; const ph = (v.t * (burning ? 0.12 : 0.06) + s.userData.ph) % 1, o = burning ? s.userData.o : (s.userData.ro || (s.userData.ro = v.W.ctr.clone().addScaledVector(v.W.side, (s.userData.ph - 0.5) * v.W.wid * 0.5))).setY(gy + 0.8 * ((v.ruins[v.ruinK] || {}).userData?.h || 3));   /* тлее — от върха на руината */ s.position.set(o.x + v.W.n.x * ph * 2, o.y + ph * 9, o.z + v.W.n.z * ph * 2); const sm = !burning && ruinOn; s.scale.setScalar(sm ? 5 + ph * 10 : 2 + ph * 6); s.material.color.setHex(sm ? 0x4a4744 : 0x2a2a2a); s.material.opacity = (burning ? 0.55 : sm ? 0.85 : 0.3) * (1 - ph * ph); });
