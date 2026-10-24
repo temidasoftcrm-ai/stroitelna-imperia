@@ -222,6 +222,7 @@ const DEMOS = [
   ['🎰 „Welcome to Fabulous Las Vegas“ нощем — бягащи крушки, звездата мига (Лас Вегас, 22:00)', 'lasvegas', d => { d.time(22); const go = () => { const o = (d.city().landmarks || []).find(q => q.kind === 'vegassign'); if (!o) return setTimeout(go, 1000); const p = o.group.position; d.camAt(p.x + 14, 8, p.z + 20, p.x, 5, p.z); }; setTimeout(go, 2500); }],   // night-vegas2
   ['🧱 Фасадите на фоновите сгради — без черни стени (Вашингтон, обед; презареди няколко пъти)', 'washington', d => { setTimeout(() => { d.time(12); const h = d.city().hq; d.camAt(h.x + 60, 70, h.z + 90, h.x, 3, h.z); }, 8000); }],   // fac-reup
   ['🏛️ Вашингтон: федералните сгради от светъл варовик и тухлените редови къщи — денем, после нощем', 'washington', d => { const go = (hr, y) => { d.time(hr); const h = d.city().hq; d.camAt(h.x + 40, y, h.z + 50, h.x + 10, 8, h.z); }; setTimeout(() => go(12, 14), 8000); setTimeout(() => go(22, 30), 18000); }],   // was-fed
+  ['🏛️ Филаделфия (по плана): кметството на площада — без да влиза в централата и в съседните сгради', 'philadelphia', d => { setTimeout(() => { const L = (d.city().landmarks || []).find(o => o.kind === 'cityhall'); if (!L) return; const p = L.group.position; d.time(12); d.camAt(p.x + 25, 95, p.z + 45, p.x, 8, p.z); }, 8000); }],   // lm-fit-sq
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
