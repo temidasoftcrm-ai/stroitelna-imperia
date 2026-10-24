@@ -11201,6 +11201,13 @@ if (AUTOTEST) {
     carLensLook() {   // 🚗 car-lens (55): нощ, камерата зад кола от трафика (фаровете ѝ — напред)
       __dbg.time && __dbg.time(22); const c = tr2 && tr2.cars.find(c => !c.heavy) || (tr2 && tr2.cars[0]); if (!c) return null; const ox = tr2G ? tr2G.position.x : 0, oz = tr2G ? tr2G.position.z : 0, x = c.rx + ox, z = c.rz + oz, fx = Math.sin(c.ryaw), fz = Math.cos(c.ryaw);
       __dbg.camAt(x - fx * 9 + fz * 5, 6, z - fz * 9 - fx * 5, x + fx * 6, 0.5, z + fz * 6); return [Math.round(x), Math.round(z)]; },
+    schoolLook(night) {   // 🚌 school-bus (55, №7): училищните автобуси в редица до града — американският и микробусите с табелите (bg / ru / eu); червеният куб — човек 1,8 м
+      if (city.schoolRow) city.group.remove(city.schoolRow); const G = city.schoolRow = new THREE.Group(), x0 = tx(NI - 1) + 40, z0 = tx(0) - 30; let x = x0;
+      for (const n of ['sf-bus-school', 'sf-bus-schoolvan-bg', 'sf-bus-schoolvan-ru', 'sf-bus-schoolvan-eu']) { if (!A[n]) continue; const o = model(n), b = new THREE.Box3(); o.updateMatrixWorld(true);
+        o.traverse(m => { let p = m, l = false; while (p) { l ||= !!p.userData.carLights; p = p.parent; } if (m.isMesh && !l) b.expandByObject(m, true); }); const k = b.getSize(new THREE.Vector3()).z / (n === 'sf-bus-school' ? 11.6 : 6.2);
+        o.scale.setScalar(1 / k); o.position.set(x + 2, 0.05, z0); o.rotation.y = 0.5; G.add(o); x += 7; }
+      const man = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.8, 0.3), new THREE.MeshStandardMaterial({ color: 0xd04040 })); man.position.set(x0 - 2, 0.9, z0 + 4); G.add(man);
+      city.group.add(G); fly = null; if (night != null) __dbg.time(night ? 21.5 : 12); __dbg.camAt((x0 + x) / 2, 7, z0 + 17, (x0 + x) / 2, 1.5, z0); return G.children.length - 1; },
     parks: () => parks,   // 🅿️ park-api (55, №5): паркингите (parking.js) — места, вход/изход, свободни
     parkLook(k = 0, show = true) {   // 🅿️ park-api: k-тият паркинг — пътищата на всяко място: навън (жълто, от мястото до улицата) и навътре (синьо); точки — вратите на шофьорите
       if (city.parkDbg) { city.group.remove(city.parkDbg); city.parkDbg = null; } const P = parks.list[k]; if (!P || !show) return P ? null : 'няма паркинг (park-api / yards-real)';

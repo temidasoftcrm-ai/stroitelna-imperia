@@ -35,6 +35,7 @@ function wrap(obj, yaw = 0, k = null) {
 export function loadVehModels(load, A, base = 'assets/heavy/gear/') {
   const jobs = Object.entries(GEAR).map(([k, c]) => load(base + c.f + '.glb').then(g => { A['sf-' + k] = { scene: wrap(g.scene, c.yaw) }; }).catch(e => console.warn('vehmodels', k, e)));
   if (feature('cars-more')) jobs.push(loadMoreCars(load, A));
+  if (feature('school-bus')) jobs.push(loadSchoolBuses(load, A));   // school-bus (55, №7): училищните автобуси
   if (feature('buses-more')) jobs.push(loadMoreBuses(load, A));   // buses-more (55, №15): градските автобуси по региони   // cars-more (55): още 18 градски коли по региони
   jobs.push(Promise.resolve().then(() => feature('cars-real') && loadRealCars(load, A)).then(() => loadVans(load, A, M_PER)).then(() => feature('trucks-real') && loadRealTrucks(load, A)).then(() => loadPoliceCars(load, A)));
   return Promise.all(jobs);
@@ -80,6 +81,27 @@ function loadMoreBuses(load, A) {
 // A['sf-bus-artic-f'] / A['sf-bus-artic-r'] — центрирани като другите (wrap: център по x/z, основа y=0, +z напред); в метри × M_PER.
 // Шарнирът: в предната — на z = ARTIC.pf от центъра ѝ; в задната — на z = ARTIC.pr от центъра ѝ (дължините f/r — с застъпването)
 export const ARTIC = { f: 10.3, r: 8.6, pf: -4.75, pr: 3.9, len: 18.1 };
+// school-bus (55, backlog 25.10 №7): училищните автобуси (Sketchfab, CC-BY — assets/heavy/CREDITS.txt), нормализирани в Blender (+z напред, в метри):
+// bus-school — жълтият американски с муцуна (11,6 м); bus-schoolvan — бял микробус Hyundai H350 (6,2 м) с жълта табела отпред и отзад
+// (по региона: bg „УЧИЛИЩЕН“, ru „ДЕТИ“, иначе „SCHOOL BUS“). A['sf-bus-school'], A['sf-bus-schoolvan-bg' | '-ru' | '-eu']; schoolBusFor(рег) → името
+const SCHOOL_TXT = { bg: 'УЧИЛИЩЕН', ru: 'ДЕТИ', eu: 'SCHOOL BUS' };
+function schoolSign(txt) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64; const x = c.getContext('2d');
+  x.fillStyle = '#f7c600'; x.fillRect(0, 0, 256, 64); x.strokeStyle = '#111'; x.lineWidth = 6; x.strokeRect(3, 3, 250, 58);
+  x.fillStyle = '#111'; x.font = 'bold 34px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(txt, 128, 34, 236);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return new THREE.MeshStandardMaterial({ map: t, roughness: 0.6 });
+}
+function loadSchoolBuses(load, A) {
+  const prep = g => { g.scene.traverse(o => { if (o.isMesh) { o.castShadow = false; for (const m of [].concat(o.material)) { if (m.metalness > 0.5) m.metalness = 0.3; if (m.emissiveMap) { m.emissive?.setScalar(0.35); } } } }); return g; };   /* емисивната карта на американския (светлините) — не на пълна сила денем */
+  return Promise.all([
+    load('assets/heavy/cars/bus-school.glb').then(g => { const sc = wrap(prep(g).scene, 0, M_PER); addCarLights(sc); A['sf-bus-school'] = { scene: sc }; }).catch(e => console.warn('school-bus', e)),
+    load('assets/heavy/cars/bus-schoolvan.glb').then(g => { prep(g); for (const [r, txt] of Object.entries(SCHOOL_TXT)) {
+      const sc = wrap(g.scene.clone(true), 0, M_PER); sc.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(sc), s = b.getSize(new THREE.Vector3()), mat = schoolSign(txt);
+      for (const f of [1, -1]) { const p = new THREE.Mesh(new THREE.PlaneGeometry(s.x * 0.62, s.x * 0.155), mat); p.position.set((b.min.x + b.max.x) / 2, b.max.y - s.y * 0.07, f > 0 ? b.max.z - s.z * 0.115 : b.min.z - 0.02); if (f < 0) p.rotation.y = Math.PI; else p.rotation.x = -0.35; sc.add(p); }   /* отпред — над челното стъкло, леко наклонена; отзад — на вратите */
+      addCarLights(sc); A['sf-bus-schoolvan-' + r] = { scene: sc }; } }).catch(e => console.warn('school-bus van', e)),
+  ]);
+}
+export const schoolBusFor = reg => reg === 'am' ? 'sf-bus-school' : 'sf-bus-schoolvan-' + (reg === 'bg' ? 'bg' : reg === 'ru' ? 'ru' : 'eu');
 export const busesFor = (reg, A) => [...Object.entries(BUS_POOL).filter(([k, [, w]]) => w[reg] && A['sf-bus-' + k]).map(([k, [, w]]) => ['sf-bus-' + k, w[reg]]), ...((reg === 'eu' || reg === 'bg') && A['sf-car-Bus'] ? [['sf-car-Bus', 2]] : [])];
 // колите за региона: [[име в A, тегло]…]
 export const carsFor = (reg, A) => Object.entries(CAR_POOL).filter(([k, [, w]]) => w[reg] && A['sf-cv-' + k]).map(([k, [, w]]) => ['sf-cv-' + k, w[reg]]);
