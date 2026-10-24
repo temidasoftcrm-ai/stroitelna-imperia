@@ -359,7 +359,7 @@ function* furniture(G, P, o = {}) {   // генератор: yield след вс
     if (main && T > 120) for (let s = 60; s < T - 40; s += 260) { const [x, z, ux, uz] = at(rd, s), o = rd.w / 2 + rd.walk - 1.2; stops.push([x - uz * o, z + ux * o, Math.atan2(ux, uz)]); }   // спирки (с навес)
   }
   // площадите на забележителностите: пейки, кошчета, фонтан
-  for (const L of P.lots.filter(q => q.lm || q.big === 'park')) { const R0 = Math.max(L.w, L.d) / 2 + (L.guard || 4) - 2;
+  for (const L of P.lots.filter(q => (q.lm && !yardOf(q)) || q.big === 'park')) { const R0 = Math.max(L.w, L.d) / 2 + (L.guard || 4) - 2;
     for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2, x = L.x + Math.cos(a) * R0, z = L.z + Math.sin(a) * R0; (k % 3 ? benches : bins).push([x, z, a + Math.PI / 2]); }
     if (['navona', 'popolo', 'trevi', 'spanishsteps'].includes(L.lm) || L.big === 'park') fountains.push([L.x, L.z]); }
   // road-geo: лампи около кръговите (по тротоара, без входовете) и прожектори в острова, насочени нагоре (светят с нощта — общият фенер)
@@ -780,23 +780,32 @@ function timesSquareView(L0, model) {
     w.traverse(m => { if (m.isMesh) m.castShadow = m.receiveShadow = true; }); g.add(w); }
   return g;
 }
+// was-union (f9): Юниън Стейшън (Вашингтон) — гаровият терен в осите на парцела (u — напречно, v — назад от площада, м от центъра му):
+// сградата (bu) с лицето (v = front) към Columbus Circle / Massachusetts Ave, перонните навеси (pu) зад нея до H Street (v = back);
+// фоновите сгради, пейките и парцелите за строеж — не върху него (парцелът на забележителността е по-голям и стърчеше над кръговото)
+export const STATION_YARD = { unionstation: { bu: [-16, 70], front: -36, pu: [-16, 70], back: 134, maxH: 44 } };   // maxH — по-висока от was-look (34 м): кулата на station-big ограничава ръста
+export const yardOf = L => (feature('was-union') && L && STATION_YARD[L.lm]) || null;
+export const inYard = (L, x, z, pad = 0) => { const Y = yardOf(L); if (!Y) return null; const r = L.rot || 0, dx = x - L.x, dz = z - L.z, u = dx * Math.cos(r) - dz * Math.sin(r), v = -dx * Math.sin(r) - dz * Math.cos(r);
+  return (u > Y.bu[0] - pad && u < Y.bu[1] + pad && v > Y.front - pad && v < Y.front + 60 + pad) || (u > Y.pu[0] - pad && u < Y.pu[1] + pad && v > Y.front - pad && v < Y.back + pad); };
 function terminiView(L0, model, sf = {}) {
   const L = L0.vrot != null ? { ...L0, rot: L0.vrot } : L0;   // vrot — истинското завъртане (Ню Йорк)
   const g = new THREE.Group(), nx = -Math.sin(L.rot), nz = -Math.cos(L.rot), tx = Math.cos(L.rot), tz = -Math.sin(L.rot), len = 140, N = 9;
   const roof = new THREE.MeshStandardMaterial({ color: 0xc9ccd0, roughness: 0.5, metalness: 0.4 }), plat = M(0xb9b2a4), rail = M(0x5a544c), col = M(0x6d7278);
+  const Y = yardOf(L0) && { ...yardOf(L0) };   // was-union: гаровият терен (сградата и пероните само в него)
   // сградата: моделът, побран в предните 55 % от парцела, с лицето към площада
   const ms = model && new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3()), sq = ms && Math.abs(ms.x / ms.z - 1) < 0.25;   // квадратен модел (Сен Лазар — сграда около двор) — по-дълбоко в парцела
   const dep = sf.depth || (sq ? 1 : 0.55), back = L.d * Math.max(0.3, dep - 0.5), bw = sq ? L.d : L.w, bd = L.d * dep, bx =   /* квадратният модел — квадрат с цялата дълбочина */ L.x - nx * (L.d - bd) / 2, bz = L.z - nz * (L.d - bd) / 2;
   if (model) { const o = model.clone(true), w = new THREE.Group(), inner = new THREE.Group(); o.userData.extShared = 1; inner.add(o); w.add(inner);
     let b = new THREE.Box3().setFromObject(inner), sz = b.getSize(new THREE.Vector3()); if ((sz.x > sz.z) !== (bw > bd)) { inner.rotation.y = Math.PI / 2; b = new THREE.Box3().setFromObject(inner); sz = b.getSize(new THREE.Vector3()); }
     if (sf.face === '-z') inner.rotation.y += Math.PI;   // лицето (−z) — към улицата пред гарата, пероните — зад нея
-    const k = Math.min(bw / sz.x, bd / sz.z, sf.maxW ? sf.maxW / sz.x : 1e9, sf.maxH ? sf.maxH / sz.y : 1e9);   /* maxH — и по височина (Юниън Стейшън с кулата на station-big) */ inner.scale.setScalar(k); b = new THREE.Box3().setFromObject(inner); const c = b.getCenter(new THREE.Vector3()); inner.position.set(-c.x, -b.min.y, -c.z);   // maxW — най-широката фасада (Гранд Сентрал — иначе огромна)
-    const ad = sz.z * k; w.position.set(L.x - nx * (L.d - ad) / 2, 0, L.z - nz * (L.d - ad) / 2);   /* лицето — на улицата отпред, колкото и да е дълбока сградата */ w.rotation.y = L.rot; w.traverse(m => { if (m.isMesh) m.castShadow = m.receiveShadow = true; }); g.add(w); }
+    const k = Math.min(bw / sz.x, bd / sz.z, sf.maxW ? sf.maxW / sz.x : 1e9, (Y && Y.maxH || sf.maxH) ? (Y && Y.maxH || sf.maxH) / sz.y : 1e9);   /* maxH — и по височина (Юниън Стейшън с кулата на station-big) */ inner.scale.setScalar(k); b = new THREE.Box3().setFromObject(inner); const c = b.getCenter(new THREE.Vector3()); inner.position.set(-c.x, -b.min.y, -c.z);   // maxW — най-широката фасада (Гранд Сентрал — иначе огромна)
+    const ad = sz.z * k; w.position.set(L.x - nx * (L.d - ad) / 2, 0, L.z - nz * (L.d - ad) / 2); if (Y) { const bu = (Y.bu[0] + Y.bu[1]) / 2, v = Y.front + ad / 2; w.position.set(L.x + tx * bu + nx * v, 0, L.z + tz * bu + nz * v); Y.v0 = Y.front + ad + 3; }   /* was-union: лицето — на Y.front, пероните — зад сградата */   /* лицето — на улицата отпред, колкото и да е дълбока сградата */ w.rotation.y = L.rot; w.traverse(m => { if (m.isMesh) m.castShadow = m.receiveShadow = true; }); g.add(w); }
   else { const o = new THREE.Mesh(new THREE.BoxGeometry(bw, 12, bd), M(0xd8d2c4)); o.position.set(bx, 6, bz); o.rotation.y = L.rot; o.castShadow = true; g.add(o); }
-  for (let i = 0; i < N; i++) { const u = (i - (N - 1) / 2) * (L.w * 0.9 / N), c = [L.x + tx * u + nx * (back + len / 2), L.z + tz * u + nz * (back + len / 2)];
-    const p2 = new THREE.Mesh(new THREE.BoxGeometry(3, 0.9, len), plat), r2 = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.25, len), roof), tr = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.12, len + 30), rail);
-    for (const [o, y, off] of [[p2, 0.45, 0], [r2, 5.2, 0], [tr, 0.06, L.w * 0.45 / N]]) { o.position.set(c[0] + tx * off + nx * (o === tr ? 15 : 0), y, c[1] + tz * off + nz * (o === tr ? 15 : 0)); o.rotation.y = L.rot; o.castShadow = o !== tr; o.receiveShadow = true; g.add(o); }
-    for (let k = -len / 2 + 8; k < len / 2; k += 16) { const cl = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 4.6, 6), col); cl.position.set(c[0] + nx * k, 2.9, c[1] + nz * k); g.add(cl); } }
+  const v0 = Y ? (Y.v0 ?? Y.front + 40) : 0, YL = Y ? Y.back - v0 : len, YN = Y ? Math.max(4, Math.round((Y.pu[1] - Y.pu[0]) / 9.5)) : N, YS = Y ? (Y.pu[1] - Y.pu[0]) / YN : 0;   // was-union: от гърба на сградата до H Street, през ширината pu
+  for (let i = 0; i < YN; i++) { const u = Y ? Y.pu[0] + YS * (i + 0.25) : (i - (N - 1) / 2) * (L.w * 0.9 / N), vc = Y ? v0 + YL / 2 : back + len / 2, c = [L.x + tx * u + nx * vc, L.z + tz * u + nz * vc], len2 = Y ? YL : len, tx2 = Y ? 0 : 15;
+    const p2 = new THREE.Mesh(new THREE.BoxGeometry(3, 0.9, len2), plat), r2 = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.25, len2), roof), tr = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.12, len2 + 2 * tx2), rail);
+    for (const [o, y, off] of [[p2, 0.45, 0], [r2, 5.2, 0], [tr, 0.06, Y ? YS / 2 : L.w * 0.45 / N]]) { o.position.set(c[0] + tx * off + nx * (o === tr ? tx2 : 0), y, c[1] + tz * off + nz * (o === tr ? tx2 : 0)); o.rotation.y = L.rot; o.castShadow = o !== tr; o.receiveShadow = true; g.add(o); }
+    for (let k = -len2 / 2 + 8; k < len2 / 2; k += 16) { const cl = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 4.6, 6), col); cl.position.set(c[0] + nx * k, 2.9, c[1] + nz * k); g.add(cl); } }
   return g;
 }
 // Рим: затворено застрояване — по двете страни на всяка улица редица от сгради (14 м фасада, 15 м дълбочина, 13–21 м височина),
@@ -808,7 +817,7 @@ function* romeBlocks(G, P, style, ROADS = P.roads) {   // генератор: yi
   const nearRoad = (x, z, own) => { const i = Math.floor(x / gc), j = Math.floor(z / gc); for (let a = i - 2; a <= i + 2; a++) for (let b = j - 2; b <= j + 2; b++) for (const [px, pz, r, id] of rg.get(a * 100003 + b) || []) if (id !== own && Math.hypot(px - x, pz - z) < r) return true; return false; };
   const GB = (P.greensSrc || []).map(g => { const xs = g.poly.map(p => p[0]), zs = g.poly.map(p => p[1]); return [Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs), g.poly]; });
   const GG = new Map(); for (const gb of GB) for (let i = Math.floor(gb[0] / 50); i <= Math.floor(gb[2] / 50); i++) for (let j = Math.floor(gb[1] / 50); j <= Math.floor(gb[3] / 50); j++) { const k = i * 100003 + j; (GG.get(k) || GG.set(k, []).get(k)).push(gb); }   // парковете в мрежа 50 м
-  const green = (x, z) => { const c = GG.get(Math.floor(x / 50) * 100003 + Math.floor(z / 50)); return !!c && c.some(([x0, z0, x1, z1, poly]) => x >= x0 && x <= x1 && z >= z0 && z <= z1 && inPoly2([x, z], poly)); }, lms = P.lots.filter(L => L.lm), inLm = (x, z) => lms.some(L => Math.hypot(L.x - x, L.z - z) < Math.max(L.w, L.d) / 2 + (L.guard || 4) + 4);
+  const green = (x, z) => { const c = GG.get(Math.floor(x / 50) * 100003 + Math.floor(z / 50)); return !!c && c.some(([x0, z0, x1, z1, poly]) => x >= x0 && x <= x1 && z >= z0 && z <= z1 && inPoly2([x, z], poly)); }, lms = P.lots.filter(L => L.lm), inLm = (x, z) => lms.some(L => inYard(L, x, z, 4) ?? Math.hypot(L.x - x, L.z - z) < Math.max(L.w, L.d) / 2 + (L.guard || 4) + 4);   /* was-union: гаровият терен вместо кръга */
   // парцелите (за fillLot): кой парцел е под мястото на сградата
   const lg = new Map(), lk = (x, z) => Math.floor(x / 40) * 100003 + Math.floor(z / 40); for (const L of P.lots) { const k = lk(L.x, L.z); (lg.get(k) || lg.set(k, []).get(k)).push(L); }
   const lotAt = (x, z) => { const i = Math.floor(x / 40), j = Math.floor(z / 40); for (let a = i - 1; a <= i + 1; a++) for (let b = j - 1; b <= j + 1; b++) for (const L of lg.get(a * 100003 + b) || []) { const c = Math.cos(L.rot), s = Math.sin(L.rot), dx = x - L.x, dz = z - L.z; if (Math.abs(dx * c - dz * s) < L.w / 2 + 4 && Math.abs(dx * s + dz * c) < L.d / 2 + 4) return L; } return null; };
