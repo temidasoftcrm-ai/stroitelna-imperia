@@ -10,6 +10,7 @@ import { SERVICES, baseFor, districtFor, modelOf, TIER_NM } from './services.js'
 import { emergCar } from './vehmodels.js';
 import { prepNightFloors } from './nightfloors.js';
 import { feature } from './lab/feature.js';
+import { pickPart } from './blkcut.js';
 
 const cache = {}, loader = new GLTFLoader(), SHARED = new WeakSet();
 const load = p => cache[p] || (cache[p] = loader.loadAsync(p).then(g => { prepNightFloors(g.scene, 'svc-' + p.split('/').pop().replace('.glb', ''));   /* нощем — прозорците (nightfloors.js, флаг night-civic) */ g.scene.traverse(o => { if (o.geometry) SHARED.add(o.geometry); for (const m of o.material ? [].concat(o.material) : []) SHARED.add(m); }); return g; }).catch(() => null));
@@ -37,9 +38,9 @@ export function buildService(k, lvl, lot, opt = {}) {
   // opt.fill (градовете по истинската карта): GLB-то заема повече от парцела; opt.minH — най-малката височина спрямо фоновите блокове наоколо
   // (кметство/болница/университет — колкото блок, полиция/пожарна/училище — 0,8, другите — 0,6); по-ниските се изтеглят нагоре (до ×2,5), без да излизат от парцела
   const HK = { hall: 1, hosp: 1, uni: 1, police: 1, fire: 0.8, school: 0.8, voc: 0.8 };
-  const glb = (path, depthK = 0.6, wK = 0.9, maxH) => tasks.push(load(path).then(g => { if (!g) return; if (opt.fill) { depthK = Math.max(depthK, 0.72); wK = 0.95; } const o = fit(g.scene.clone(true), w * wK, d * depthK, maxH), nat = feature('school-fit') && (k === 'school' || k === 'voc');   /* school-fit (55): училището — в естествените пропорции на модела (без разтягане по фасадата и на височина), колкото се побира в парцела */
+  const glb = (path, depthK = 0.6, wK = 0.9, maxH, gy = false) => tasks.push(load(path).then(g => { if (!g) return; if (opt.fill) { depthK = Math.max(depthK, 0.72); wK = 0.95; } const o = gy ? fit(pickPart(g.scene, -0.76, 0.5, -0.66, 0.66), w * 0.62, d * 0.9, maxH) /* school-fit: само главният корпус (салонът с колоните) — вдясно, по цялата дълбочина */ : fit(g.scene.clone(true), w * wK, d * depthK, maxH), nat = feature('school-fit') && (k === 'school' || k === 'voc');   /* school-fit (55): училището — в естествените пропорции на модела (без разтягане по фасадата и на височина), колкото се побира в парцела */
     if (opt.fill && !nat && o.userData.sz[0] < w * wK * 0.8) { const sx = Math.min(1.8, w * wK / o.userData.sz[0]); o.scale.x *= sx; o.userData.sz[0] *= sx; }   // тесният модел — по-широк по фасадата (болница/училище — дълги сгради)
-    const tH = opt.hAbs || (opt.minH || 0) * (HK[k] ?? 0.6); if (tH && !nat && o.userData.sz[1] < tH) { const sy = Math.min(opt.hAbs ? 3.5 : 2.2, tH / o.userData.sz[1]);   /* opt.hAbs — по блоковете наоколо (servicesplace.js), до ×3,5 */ o.scale.y *= sy; o.userData.sz[1] *= sy; } o.position.z = back + o.userData.sz[2] / 2 + 1; o.traverse(q => { if (q.isMesh) { q.castShadow = q.receiveShadow = true; } }); group.add(o); return o; }));
+    const tH = opt.hAbs || (opt.minH || 0) * (HK[k] ?? 0.6); if (tH && !nat && o.userData.sz[1] < tH) { const sy = Math.min(opt.hAbs ? 3.5 : 2.2, tH / o.userData.sz[1]);   /* opt.hAbs — по блоковете наоколо (servicesplace.js), до ×3,5 */ o.scale.y *= sy; o.userData.sz[1] *= sy; } o.position.z = back + o.userData.sz[2] / 2 + 1; if (gy) o.position.x = w / 2 - o.userData.sz[0] / 2 - 1; o.traverse(q => { if (q.isMesh) { q.castShadow = q.receiveShadow = true; } }); group.add(o); return o; }));
   // trees-more: истинско дърво (протото от играта — opt.trees), височина ~8·s м; геометриите са общи (SHARED — dispose() не ги пипа)
   const TP = feature('trees-more') && opt.trees && opt.trees.length ? opt.trees : null;
   const tree = (x, z, s = 1) => { if (TP) { const P = TP[Math.abs(Math.round(x * 7 + z * 13 + (opt.seed || 0))) % TP.length], o = P.clone(true); o.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(P), h = (b.max.y - b.min.y) || 1;
@@ -73,12 +74,13 @@ export function buildService(k, lvl, lot, opt = {}) {
     for (let i = 0; i < 5; i++) flat(0.12, d * pk * 0.8, white, -w * 0.3 + i * w * 0.15, front - d * pk / 2, 0.04);
     cars('police', lvl === 's' ? 2 : 3, front - d * pk / 2);
   } else if (k === 'school' || k === 'voc') {   // училище, двор с игрище и ограда
-    glb(modelOf(k, lvl, seed) || 'assets/heavy/civic/school.glb', 0.55, 0.85);
-    const court = M(k === 'voc' ? 0x4a7a9a : 0xb5523a); flat(w * 0.5, d * 0.28, court, -w * 0.15, front - d * 0.2, 0.03);
-    flat(w * 0.4, 0.1, white, -w * 0.15, front - d * 0.2, 0.05); for (const x of [-w * 0.38, w * 0.08]) box(0.1, 3, 1.6, white, x, 0, front - d * 0.2);
+    const mp = modelOf(k, lvl, seed), gy = feature('school-fit') && (!mp || /civic\/school\.glb$/.test(mp)), cw = gy ? 0.34 : 0.5, cx = gy ? -0.32 : -0.15;   // school-fit (55): от school.glb — само корпусът (вдясно), игрището — вляво
+    glb(mp || 'assets/heavy/civic/school.glb', 0.55, 0.85, undefined, gy);
+    const court = M(k === 'voc' ? 0x4a7a9a : 0xb5523a); flat(w * cw, d * 0.28, court, w * cx, front - d * 0.2, 0.03);
+    flat(w * cw * 0.8, 0.1, white, w * cx, front - d * 0.2, 0.05); for (const x of [w * (cx - cw * 0.46), w * (cx + cw * 0.46)]) box(0.1, 3, 1.6, white, x, 0, front - d * 0.2);
     for (let x = -w / 2; x <= w / 2; x += 2.5) box(0.06, 1.4, 0.06, M(0x3a3a3a, { metalness: 0.6 }), x, 0, front - 0.3); box(w, 0.06, 0.06, M(0x3a3a3a), 0, 1.35, front - 0.3);
-    for (const x of [w * 0.32, w * 0.42]) tree(x, front - d * 0.2, 0.9);
-    if (k === 'voc') { const sg = box(6, 1, 0.2, M(0x1d2a38), w * 0.2, 0, front - d * 0.35); }
+    for (const x of gy ? [-w * 0.42, -w * 0.24] : [w * 0.32, w * 0.42]) tree(x, gy ? back + d * 0.18 : front - d * 0.2, 0.9);
+    if (k === 'voc') { const sg = box(6, 1, 0.2, M(0x1d2a38), gy ? w * cx : w * 0.2, 0, front - d * (gy ? 0.04 : 0.35)); }
   } else if (k === 'kinder') {   // ниска сграда с цветни стени, площадка с пързалка и пясъчник
     const wallM = M([0xf2c94c, 0x7fc8a9, 0xf28c8c, 0x9ab8f2][seed % 4]), roofM = M(R.roof);
     box(w * 0.7, 3.6, d * 0.4, wallM, 0, 0, back + d * 0.22); box(w * 0.74, 0.5, d * 0.44, roofM, 0, 3.6, back + d * 0.22);
