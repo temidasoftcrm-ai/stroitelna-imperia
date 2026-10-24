@@ -119,7 +119,7 @@ function loadRealCars(load, A) {
 // всички с мигащи буркани; при няколко одобрени — A[...].variants (game.js model() може да ги редува)
 const EMERG_K = { Police_Sedan: 1, Ambulance: 1, Firetruck: 1 };   // всички коли са в истински метри (1 м ≈ 1 единица, хората ~1,9) — спешните вече не се уголемяват
 const EMERG = {
-  Police_Sedan: [['pol-charger', 5.1], ['pol-crownvic', 5.4], ['pol-interceptor', 5.3], ['pol-nypd', 5.1], ['pol-volga', 4.1]],   // pol-volga — вече ВАЗ 2101 на КАТ (файлът — EMERG_FILE)
+  Police_Sedan: [['pol-charger', 5.1], ['pol-crownvic', 5.4], ['pol-interceptor', 5.3], ['pol-nypd', 5.1], ...(feature('pol-new') ? [['pol-logan', 4.36], ['pol-duster', 4.34]] : [['pol-volga', 4.1]])],   // pol-volga — вече ВАЗ 2101 на КАТ (файлът — EMERG_FILE); pol-new — вместо нея Logan и Duster
   Firetruck: [['fire-us', 10], ['fire-man', 10.5]],   // fire-red — изтрита
   Ambulance: [['amb-gaz', RS ? 6.2 : 7], ['amb-us', 7.5], ['amb-eu', 7.2]],
 };
@@ -141,14 +141,18 @@ export const CAR_FLIP = new Set(['amb-eu']);
 export function emergCar(src, len, kind = 'police', name = '') { const sc0 = src.clone(true); sc0.traverse(m => { if (m.isMesh) m.castShadow = false; }); const [yaw, L0, W0] = tidyCar(sc0), k = capW(len / L0, W0), sc = wrap(sc0, yaw + (CAR_FLIP.has(name) ? Math.PI : 0), k); addBeacons(sc, L0 * k, kind); sc.userData.noSiren = 1; return sc; }
 // отбелязаните в Лабораторията „Изтрий и намери нов подобен“: флагът (одобреният) остава, файлът — новият модел (55)
 const EMERG_FILE = { 'fire-us': 'fire-us2', 'pol-volga': 'pol-vaz' };
+// pol-new (55): полицейските коли от наличните (Blender, _source: scratchpad polcar.py) — Dacia Logan (бяла, синя лента „ПОЛИЦИЯ“, сини буркани) за България/Европа
+// и Dacia Duster („ДПС ПОЛИЦИЯ“, червено-синя лента) за Русия; американските — за Америка. Всяка кола — с региона си (userData.polReg), model() избира по града
+const POL_REG = { 'pol-logan': ['bg', 'eu', 'xx'], 'pol-duster': ['ru'], 'pol-charger': ['am', 'xx'], 'pol-crownvic': ['am', 'xx'], 'pol-interceptor': ['am', 'xx'], 'pol-nypd': ['am'] };
+export const polVariants = (V, reg) => { const r = V.filter(v => !v.userData.polReg || v.userData.polReg.includes(reg)); return r.length ? r : V; };
 // фаровете на спешните коли (отчетени в Blender отпред, лъч до стъклото): [дял от полуширината, дял от височината, колко са навътре от предницата (дял от дължината)]
 // emergLights слага там мигащите на смени фарове (emerg-wigwag); без запис — общите места (addTruckLamps)
 const LENS = { 'pol-charger': [0.64, 0.47, 0.067], 'pol-crownvic': [0.5, 0.42, 0.033], 'pol-interceptor': [0.6, 0.45, 0.06], 'pol-nypd': [0.64, 0.42, 0.073], 'pol-vaz': [0.7, 0.38, 0.036],
   'car-polsuv': [0.64, 0.5, 0.052], 'fire-us2': [0.46, 0.3, 0.057], 'fire-man': [0.7, 0.3, 0.061], 'amb-gaz': [0.66, 0.36, 0.012], 'amb-us': [0.74, 0.4, 0.047], 'amb-eu': [0.68, 0.28, 0.023] };   // Firetruck (OzerGokmen, CC BY) · VAZ 2101 Road Police (eightismore, CC BY)
 export function loadPoliceCars(load, A) {
   return Promise.all(Object.entries(EMERG).map(([nm, opts]) => {
-    const ok = opts.filter(([f]) => feature(f)); if (!ok.length) return null;
-    return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + (feature('sirens-real') ? 'sirens/' : '') + (EMERG_FILE[f] || f) + '.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = false; }); const [yaw, L0, W0] = tidyCar(g.scene), K = L0 * capW(EMERG_K[nm] * len * M_PER / L0, W0 / M_PER) /* real-sizes: ширината ≤ 2,6 м */, sc = wrap(g.scene, yaw + (CAR_FLIP.has(f) ? Math.PI : 0), K / L0); /* мащабът е във вътрешната група — model() пипа само външния */ sc.userData.lens = LENS[EMERG_FILE[f] || f] || null; addBeacons(sc, K, nm === 'Firetruck' ? 'fire' : nm === 'Ambulance' ? 'ambulance' : 'police'); if (feature('car-lens')) addCarLights(sc); /* car-lens: и спешните коли — с фарове (нямаха) */ return sc; }).catch(() => null)))
+    const ok = opts.filter(([f]) => feature(f) || (feature('pol-new') && (f === 'pol-logan' || f === 'pol-duster'))); if (!ok.length) return null;   /* pol-new: новите — с общия флаг */
+    return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + (feature('sirens-real') ? 'sirens/' : '') + (EMERG_FILE[f] || f) + '.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = false; }); const [yaw, L0, W0] = tidyCar(g.scene), K = L0 * capW(EMERG_K[nm] * len * M_PER / L0, W0 / M_PER) /* real-sizes: ширината ≤ 2,6 м */, sc = wrap(g.scene, yaw + (CAR_FLIP.has(f) ? Math.PI : 0), K / L0); /* мащабът е във вътрешната група — model() пипа само външния */ sc.userData.lens = LENS[EMERG_FILE[f] || f] || null; if (feature('pol-new') && POL_REG[f]) sc.userData.polReg = POL_REG[f]; addBeacons(sc, K, nm === 'Firetruck' ? 'fire' : nm === 'Ambulance' ? 'ambulance' : 'police'); if (feature('car-lens')) addCarLights(sc); /* car-lens: и спешните коли — с фарове (нямаха) */ return sc; }).catch(() => null)))
       .then(list => { list = list.filter(Boolean); if (list.length) A['sf-car-' + nm] = { scene: list[0], variants: list }; });
   }));
 }

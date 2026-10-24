@@ -41,7 +41,7 @@ export function createIncidents(ctx) {
   }
   // пътят до мястото; последната точка се отмества назад по посоката на идване — колите не застават една в друга
   function pathTo(x0, z0, at, back) {
-    const path = ctx.route(x0, z0, at.x, at.z).map(p => ({ x: p.x, z: p.z }));
+    const path = ctx.route(x0, z0, at.x, at.z).map(p => ({ x: p.x, z: p.z, ln: p.ln, rg: p.rg }));
     if (!path.length) return null;
     if (back > 0) {   // спира back м преди мястото, по пътя си (не кара до самото място и после назад — през останките)
       let rem = back; while (path.length > 1) { const a = path[path.length - 2], b = path[path.length - 1], l = Math.hypot(b.x - a.x, b.z - a.z); if (l > rem) { const t = rem / l; path[path.length - 1] = { x: b.x + (a.x - b.x) * t, z: b.z + (a.z - b.z) * t }; break; } rem -= l; path.pop(); }
@@ -50,7 +50,8 @@ export function createIncidents(ctx) {
       path[path.length - 1].last = true; return path;
     }
     const e = path[path.length - 1], pv = path[path.length - 2] || { x: x0, z: z0 }, dx = e.x - pv.x, dz = e.z - pv.z, l = Math.hypot(dx, dz) || 1;
-    path.push({ x: at.x - dx / l * back, z: at.z - dz / l * back, last: true });
+    const ro = path[0].ln ? LANE : 0;   // пътят по лентите — и последната точка в лентата (вдясно от оста на улицата)
+    path.push({ x: at.x - dx / l * back - dz / l * ro, z: at.z - dz / l * back + dx / l * ro, last: true });
     return path;
   }
 
@@ -234,7 +235,7 @@ export function createIncidents(ctx) {
     const st = pickStart(at); if (!st) return null; let mid = null;
     for (let k = 0; k < 40 && !mid; k++) { const p = ctx.point(); if (p && Math.hypot(p.x - at.x, p.z - at.z) > 120 && Math.hypot(p.x - at.x, p.z - at.z) < 330 && Math.hypot(p.x - st.x, p.z - st.z) > 120) mid = p; }
     const r1 = ctx.route(st.x, st.z, (mid || at).x, (mid || at).z), r2 = mid ? ctx.route(mid.x, mid.z, at.x, at.z) : [];
-    const path = [...r1, ...r2.slice(1)].map(p => ({ x: p.x, z: p.z })); if (path.length < 2) return null;
+    const path = [...r1, ...r2.slice(1)].map(p => ({ x: p.x, z: p.z, ln: p.ln, rg: p.rg })); if (path.length < 2) return null;
     const R = I2() ? roadFrame(at) : null, g = new THREE.Group(); g.position.set(at.x, 0, at.z); ctx.scene.add(g);
     const cars = [], fo = car(); fo.position.set(st.x, 0, st.z); ctx.scene.add(fo);
     cars.push({ o: fo, x: st.x, z: st.z, yaw: Math.atan2(path[1].x - path[0].x, path[1].z - path[0].z), path, pi: 0, stage: 'go', delay: 0, kind: null, flee: true, spd: 16, dist: 0, lat: 0 });
@@ -249,9 +250,9 @@ export function createIncidents(ctx) {
   // #3: скоростта по пътя — беглецът изпреварва (насрещното платно) на моменти; полицаите го настигат, но не минават през колата пред себе си
   function chaseStep(rdt, dt) {
     const C = inc.cars, F = C[0], t = inc.t;
-    if (F.stage === 'go') { const want = Math.sin(t * 0.55) > 0.55 ? -2 * LANE : 0; F.lat += (want - F.lat) * Math.min(1, rdt * 2.5); F.spd = 15 + 3 * Math.abs(Math.sin(t * 0.3)); }
+    if (F.stage === 'go') { const wp = F.path && F.path[Math.min(F.path.length - 1, F.pi + 8)], want = Math.sin(t * 0.55) > 0.55 && !(wp && wp.rg) && !(F.path && F.path[F.pi]?.rg) ? -2 * LANE : 0;   /* в кръстовището/кръговото — без изпреварване (не в острова) */ F.lat += (want - F.lat) * Math.min(1, rdt * 2.5); F.spd = 15 + 3 * Math.abs(Math.sin(t * 0.3)); }
     for (let k = 1; k < C.length; k++) { const c = C[k], ld = C[k - 1]; if (c.stage !== 'go' || c.delay > 0) continue; const gap = c.pi < ld.pi ? Math.hypot(ld.x - c.x, ld.z - c.z) : 0;   // по пътя (точките са на ~2 м): само зад колата пред себе си
-      c.spd = Math.min(18.5, Math.max(0, gap - 7) / Math.max(dt, 1e-3));   // не по-близо от 7 м (и при голям кадър) c.lat += ((k % 2 ? -1.2 : 0) - c.lat) * Math.min(1, rdt * 2);   // в лявата половина — вижда беглеца
+      c.spd = Math.min(18.5, Math.max(0, gap - 7) / Math.max(dt, 1e-3));   // не по-близо от 7 м (и при голям кадър) c.lat += ((k % 2 && !c.path?.[Math.min(c.path.length - 1, c.pi + 6)]?.rg ? -1.2 : 0) - c.lat) * Math.min(1, rdt * 2);   // в лявата половина — вижда беглеца
       if (ld.stage !== 'go' && gap < 8.5 && c.spd < 0.5) { c.stage = 'hold'; c.path = null; if (c.cop === 1) { c.yaw += 0.5; c.o.rotation.y = c.yaw; } } }   // заклещват го; втората — накриво
     if (!inc.arrest && inc.hold !== undefined) arrest();
   }
@@ -272,7 +273,7 @@ export function createIncidents(ctx) {
     while (c.path && st > 1e-4) {
       const wp = c.path[c.pi];
       let x2 = wp.x, z2 = wp.z;
-      if (c.pi > 0) { const pv = c.path[c.pi - 1], dx = wp.x - pv.x, dz = wp.z - pv.z, l = Math.hypot(dx, dz) || 1, lo = LANE + (c.lat || 0); x2 += -dz / l * lo; z2 += dx / l * lo; }
+      if (c.pi > 0) { const pv = c.path[c.pi - 1], dx = wp.x - pv.x, dz = wp.z - pv.z, l = Math.hypot(dx, dz) || 1, lo = (c.path[0].ln ? 0 : LANE) + (c.lat || 0);   /* ln — пътят е по лентите на трафика (вече вдясно) */ x2 += -dz / l * lo; z2 += dx / l * lo; }
       const dx = x2 - c.x, dz = z2 - c.z, d = Math.hypot(dx, dz);
       if (d <= st) { c.x = x2; c.z = z2; st -= d; if (++c.pi >= c.path.length) c.path = null; }
       else { c.x += dx / d * st; c.z += dz / d * st; st = 0; const w = Math.atan2(dx, dz); let dy = w - c.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); c.yaw += dy * Math.min(1, dt * 8); }
@@ -340,7 +341,7 @@ export function createIncidents(ctx) {
       inc.leave = true;
       inc.cars.forEach((c, n) => {
         c.o.userData.beaconsOn = 0;
-        const to = c.home || pickStart(inc.at), path = to && ctx.route(c.x, c.z, to.x, to.z).map(p => ({ x: p.x, z: p.z }));
+        const to = c.home || pickStart(inc.at), path = to && ctx.route(c.x, c.z, to.x, to.z).map(p => ({ x: p.x, z: p.z, ln: p.ln, rg: p.rg }));
         c.stage = 'leave'; c.path = path && path.length ? path : null; c.pi = 0; c.wait = n * 3; c.spd = SPEED; c.lat = 0;
         if (c.flee) c.wait = inc.cars.length * 3;   // #3: колата на беглеца — последна (кара я полицай)
         if (!c.path) { c.stage = 'gone'; ctx.scene.remove(c.o); }

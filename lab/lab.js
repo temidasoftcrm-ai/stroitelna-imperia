@@ -210,6 +210,7 @@ const DEMOS = [
   ['🚌 Училищният автобус: следобедният курс — децата се качват пред училището, после слизат в кварталите (камерата го следва; Пловдив)', 'plovdiv', d => { setTimeout(() => d.schoolGo('pm'), 6000); let n = 0; const t = setInterval(() => { if (++n > 240) return clearInterval(t); d.schoolCam(); }, 500); }],   // school-bus — линията (№7, 2a)
   ['🅿️ Паркингът сутрин (7:20): човек отива до колата, тя излиза на заден и влиза в трафика (София)', 'sofia', d => { setTimeout(() => d.parkLife('am'), 4000); }],   // park-life
   ['🅿️ Паркингът вечер (17:20): кола от трафика влиза, паркира, слиза човек (София)', 'sofia', d => { setTimeout(() => d.parkLife('pm'), 4000); }],   // park-life
+  ['🚓 Новите патрулки: Dacia Logan „ПОЛИЦИЯ“ (България/Европа), Duster „ДПС“ (Русия) и американските — денем, после нощем с бурканите', 'plovdiv', d => { setTimeout(() => d.polLook(false), 3000); setTimeout(() => d.polLook(true), 9000); }],   // pol-new
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

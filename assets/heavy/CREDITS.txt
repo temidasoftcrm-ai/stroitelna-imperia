@@ -320,3 +320,5 @@ City buses (55, buses-more) — Sketchfab, normalized in Blender (front +z, real
 - cars/bus-xd40.glb — „SEPTA XD40 With Bike Rack“ by jbbikeco (@jbbikeco), CC Attribution — https://sketchfab.com/3d-models/74874862ac5644f389dcbac53a72c089
 - cars/bus-school.glb — „School Bus“ by Macaroni (@Macaroniii), CC Attribution — https://sketchfab.com/3d-models/a959ee8ce17d434f9fdbc93cad199a21
 - cars/bus-schoolvan.glb — „2019 Hyundai H350 Solati“ by nguyenhoanglam20100609 (@nguyenhoanglam20100609), CC Attribution — https://sketchfab.com/3d-models/b4b954c0d8c54a6e80b6cc2a8cc96d26 (табелите „УЧИЛИЩЕН“/„ДЕТИ“/„SCHOOL BUS“ — добавени в играта)
+- cars/pol-logan.glb, cars/sirens/pol-logan.glb — полицейска версия (бяла, синя лента „ПОЛИЦИЯ“, лента с буркани — добавени в Blender) на „Dacia Logan Low Poly“ by solid3DDD (@solid3ddd), CC Attribution — https://sketchfab.com/3d-models/aedc2d2f43fb40639d17b77f3f5c8d47
+- cars/pol-duster.glb, cars/sirens/pol-duster.glb — полицейска версия („ДПС ПОЛИЦИЯ“, лента с буркани — добавени в Blender) на „Dacia Duster Low Poly“ by solid3DDD (@solid3ddd), CC Attribution — https://sketchfab.com/3d-models/ea275644cd634593b6a97eacf0ede405
