@@ -963,7 +963,7 @@ function lvNight2(nm, node, m, g) {
           vec2 de = lp.xz - vec2(-87.6, -33.4); float rc = 4.0 + 22.0 * exp(-(lp.y - 30.0) / 30.0);   // кулата — ромб с ребрата по осите (L1 радиус)
           float inT = step(29.0, lp.y) * (1.0 - smoothstep(rc * 1.08, rc * 1.3, abs(de.x) + abs(de.y)));
           float h = fract(sin(dot(floor(lp * 1.3), vec3(12.9898, 78.233, 37.719))) * 43758.5453), spk = step(0.975, fract(h * 7.0 + uT * 0.9)) * step(0.5, fract(uT / 20.0));   // искри — 10 с от всеки 20
-          vec3 lv = inT * (vec3(1.0, 0.62, 0.18) * (0.5 + 2.2 * lum) + spk * vec3(1.0, 0.95, 0.85) * 5.0);
+          vec3 lv = inT * (vec3(1.0, 0.5, 0.08) * (0.35 + 1.5 * lum) + spk * vec3(1.0, 0.95, 0.85) * 5.0);
           vec3 db = lp - vec3(-125.5, 44.0, 88.0); float inB = 1.0 - smoothstep(12.8, 14.5, length(db));   // балонът
           vec3 bc = mix(vec3(1.0, 0.3, 0.65), vec3(0.35, 0.6, 1.0), 0.5 + 0.5 * sin(uT * 0.6 + atan(db.z, db.x) * 2.0));
           lv += inB * bc * (0.5 + lum) * (0.5 + 1.3 * pow(0.5 + 0.5 * sin(lp.y * 0.9 - uT * 2.2), 3.0));
@@ -984,7 +984,7 @@ function lvNight2(nm, node, m, g) {
       if (turn > 0.5) L.push([p[0], (E.base + p[2]) / 2, p[1], 0.9, p[2] - E.base, 0.9, 0, p[2]]); }   // ъгъл (завой > 30°) — вертикална ивица
     const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0 }), L.length), M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), c = new THREE.Color(E.col || 0xffffff);
     L.forEach((b, i) => { im.setMatrixAt(i, M4.compose(new THREE.Vector3(b[0], b[1], b[2]), Q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), b[6]), new THREE.Vector3(b[3], b[4], b[5]))); im.setColorAt(i, c); });
-    im.frustumCulled = false; g.add(im); add.push([im.material, E.col === 0xdfe9ff ? 0.6 : 0.9]); U.edges = { im, L, chase: nm === 'planethollywood' };
+    im.frustumCulled = false; g.add(im); add.push([im.material, E.col === 0xdfe9ff ? 0.75 : 0.9]); U.edges = { im, L, chase: nm === 'planethollywood' };
     for (const poly of T) { const tp = poly.reduce((a, p) => p[2] > a[2] ? p : a); sprite(E.col || 0xd070ff, tp[0], tp[2] + 2, tp[1], 26, 18); }   // ореол над покрива
   }
   // LED екрани: Планет Холивуд — по фасадата на подиума към Стрипа (−x); Космополитън — „шапката“ над входа и екранът над нея (+x)
