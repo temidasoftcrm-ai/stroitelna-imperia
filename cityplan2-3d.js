@@ -66,6 +66,12 @@ function barrier(e, ang, w) {
 export function quad(a, b, c, d, y) { return { pos: [a[0], y, a[1], b[0], y, b[1], c[0], y, c[1], d[0], y, d[1]], idx: [0, 2, 1, 0, 3, 2] }; }
 // ---- нощем светят прозорците на фоновите сгради: emissiveMap от фасадата — тъмните петна (прозорците) се намират като свързани области
 // и половината светват топло (случайно, постоянно). Яркостта — emissiveIntensity (daynight.js: winMats → n × winK; демото — setNight).
+// fac-reup (55): фасадите на фоновите сгради (платна 128–512 px, InstancedMesh) понякога излизаха черни — стените, не покривите
+// (второ зареждане в същия профил, Париж и Вашингтон; в JS текстурите и материалите са същите като при нормалните). Платната се качват
+// наново във видеокартата 3, 12 и 40 s след строежа и след всяко пълнене (евтино — малки са); GLB картинките (memfix tex-free) не се пипат.
+const FREUP = feature('fac-reup'), RU_AT = [3, 12, 40, Infinity];
+function reupCanvas(G) { const seen = new Set(); G.traverse(o => { if (!o.isInstancedMesh) return; for (const m of [].concat(o.material)) { if (!m || seen.has(m)) continue; seen.add(m);
+  for (const t of [m.map, m.emissiveMap]) if (t && t.isCanvasTexture && t.image && t.image.width > 0) t.needsUpdate = true; } }); }
 const WIN_MATS = [];
 export function nightWin(mat, c, o = {}) {   // export — и за bgblocks.js
   const W = c.width, H = c.height, src = c.getContext('2d').getImageData(0, 0, W, H).data, lab = new Int32Array(W * H).fill(-1), out = document.createElement('canvas'); out.width = W; out.height = H;
@@ -644,7 +650,7 @@ export function buildPlan2View(P, opts = {}) {
     ST.FP = (D || opts.blocks === 'bg') && opts.freeLot ? freePlots(G, P) : null;
     refill(); tm('fill');
   }
-  const refill = () => { if (ST.BL) ST.BL.fill(opts.fillLot || (() => true), opts.fillAt);   /* fillAt(b) — bg-fill: сградите без парцел (вътре в квартала) */ if (ST.FP) ST.FP.set(opts.freeLot); };
+  const refill = () => { ST.ruT = 0; ST.ruI = 0;   /* fac-reup: след всяко пълнене — отново 3 / 12 / 40 s */ if (ST.BL) ST.BL.fill(opts.fillLot || (() => true), opts.fillAt);   /* fillAt(b) — bg-fill: сградите без парцел (вътре в квартала) */ if (ST.FP) ST.FP.set(opts.freeLot); };
   let sigT = 0;
   const off = opts.offset || [0, 0];
   const job = all(), EST = P.roads.length * 4 + P.nodes.length * 2 + P.rounds.length + 40; let done = false, cancelled = false, units = 0, maxStep = 0, maxAt = '', work = 0, tUsable = 0;
@@ -665,6 +671,7 @@ export function buildPlan2View(P, opts = {}) {
     // signals — tr.signals() на трафика (traffic.js); camera — дребното се крие отдалеч
     update(dt, o = {}) {
       const F = ST.F;
+      if (FREUP) { ST.ruT = (ST.ruT || 0) + dt; if (ST.ruT >= RU_AT[ST.ruI || 0]) { ST.ruI = (ST.ruI || 0) + 1; reupCanvas(G); } }   // fac-reup: фасадите — пак във видеокартата
       if (F && o.camera) F.FURN.visible = o.camera.position.y < 420;
       if (F && F.SIG.tl && o.camera) F.SIG.tl.visible = F.SIG.ped.visible = o.camera.position.y < 220;   // street-real: светофарите (~2,5 хил. триъгълника всеки) — само отблизо
       if (ST.FP && o.camera) ST.FP.near(o.camera.position.y < 260);   // оградите и табелите — само отблизо

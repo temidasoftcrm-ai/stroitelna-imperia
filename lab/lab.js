@@ -220,6 +220,7 @@ const DEMOS = [
   ['🏙️ Ню Йорк: централата на ниво 8 — истинска кула между небостъргачите (случайният облик — само истинските кули)', 'newyork', d => { setTimeout(() => { d.time(12); d.office(8); const h = d.city().hq; d.camAt(h.x + 110, 70, h.z + 150, h.x, 35, h.z); }, 6000); }],   // hq-real
   ['⛲ Беладжио нощем — фонтаните светят и танцуват на вълни (Лас Вегас, 22:00)', 'lasvegas', d => { d.time(22); const go = () => { const o = (d.city().landmarks || []).find(q => q.kind === 'bellagio'); if (!o) return setTimeout(go, 1000); const p = o.group.position; d.camAt(p.x + 8, 14, p.z + 34, p.x, 3, p.z); }; setTimeout(go, 2500); }],   // night-vegas2
   ['🎰 „Welcome to Fabulous Las Vegas“ нощем — бягащи крушки, звездата мига (Лас Вегас, 22:00)', 'lasvegas', d => { d.time(22); const go = () => { const o = (d.city().landmarks || []).find(q => q.kind === 'vegassign'); if (!o) return setTimeout(go, 1000); const p = o.group.position; d.camAt(p.x + 14, 8, p.z + 20, p.x, 5, p.z); }; setTimeout(go, 2500); }],   // night-vegas2
+  ['🧱 Фасадите на фоновите сгради — без черни стени (Вашингтон, обед; презареди няколко пъти)', 'washington', d => { setTimeout(() => { d.time(12); const h = d.city().hq; d.camAt(h.x + 60, 70, h.z + 90, h.x, 3, h.z); }, 8000); }],   // fac-reup
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
