@@ -99,11 +99,12 @@ import('./autobahn.js').then(m => { AB = m; }).catch(() => {});
 import { HIGHWAYS, HW_STAGES, HW_NEED_OLD, HW_FLEET, HW_REP, HW_MODELS, TOLL_PER_KM_DAY, segId, segmentQuote, buildHighwayView, overLift } from './highways.js';
 import { createTirs } from './trucks.js';
 import { createCityBus } from './citybus.js';   // 🚌 city-bus (#15): градски автобус със спирки
+import { createSchoolBus } from './schoolbus.js';   // 🚌 school-bus (№7): училищният автобус — сутрин и следобед до училищата
 import { createHwTrucks } from './hwtrucks.js';
 import { createOrient, OE_ROUTE } from './orient.js';
 import { createRoute66, R66_ROUTE } from './route66.js';
 import { loadTrainModels, hasTrainModel, trainCar } from './trainmodels.js';
-import { loadVehModels, carsFor, darkParked, busesFor, ARTIC } from './vehmodels.js';
+import { loadVehModels, carsFor, darkParked, busesFor, ARTIC, schoolBusFor } from './vehmodels.js';
 import { openGlobe } from './globe.js';
 import { clientName } from './names.js';
 import { createConquest } from './conquest.js';
@@ -2288,6 +2289,20 @@ function roadNotice() {
   else if (!on && roadShut) { toast(`✅ Пътят${roadShut.nm ? ` при „${roadShut.nm}“` : ''} е отворен`, 'good'); Sound.file('assets/sfx/radio-road.mp3', 0.45); roadShut = null; }
 }
 // #15 (city-bus): 1–2 линии по главните улици, 4–8 спирки; автобусите — агенти в трафика (citybus.js); броят расте с града
+// №7 (school-bus): училищният автобус — в 7 ч. от кварталите до училищата (децата слизат), в 13 ч. обратно (качват се пред училището);
+// училищата — от общинските сгради (muni: училище/детска градина), моделът — по региона (55: жълтият американски / микробусът с табелата)
+function makeKid() {
+  loadPeds(); if (!pedReal.length) return null; const src = pick(pedReal), m = cloneSkinned(src.scene); m.scale.setScalar(src.k * rand(0.55, 0.68)); m.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; } });
+  const mixer = new THREE.AnimationMixer(m), walk = src.animations.find(c => c.name === 'Walk') || src.animations.find(c => /Walk/.test(c.name)), wa = walk ? mixer.clipAction(walk) : null;
+  return { obj: m, tick: dt => mixer.update(dt), walk: on => { if (wa) { if (on) wa.play(); else wa.stop(); } } };
+}
+const schoolBus = createSchoolBus({ agents: () => feature('school-bus') ? jpAgents() : null, lanes: () => tr2 ? tr2.lanes : [], hour: () => S ? todF() * 24 : 0,
+  schools: () => { const o = tr2G ? tr2G.position : { x: 0, z: 0 }, M = (muni.stations?.() || []).filter(q => q.k === 'school' || q.k === 'kinder'); if (M.length) return M.map(q => ({ x: q.x - o.x, z: q.z - o.z }));
+    const A0 = city.lots.filter(l => l.built); if (!A0.length) return []; const cx = A0.reduce((t, l) => t + l.x, 0) / A0.length, cz = A0.reduce((t, l) => t + l.z, 0) / A0.length, rd = l => Math.hypot(l.x - cx, l.z - cz), med = A0.map(rd).sort((p, q) => p - q)[A0.length >> 1];
+    const B = A0.filter(l => rd(l) <= med).slice(0, 300); let a = B[0], b = null, bd = 0; for (const p of B) for (const q of B) { const d = Math.hypot(p.x - q.x, p.z - q.z); if (d > bd) { bd = d; a = p; b = q; } }   // генерираният град (без общината): двете най-раздалечени сгради във вътрешната половина на застроеното
+    return (b && bd > 150 ? [a, b] : [a]).map(l => ({ x: l.x - o.x, z: l.z - o.z })); },
+  homes: () => { const o = tr2G ? tr2G.position : { x: 0, z: 0 }, B = city.lots.filter(l => l.built), out = B.filter(l => l.zone === 'outer'); return (out.length >= 3 ? out : B).map(l => ({ x: l.x - o.x, z: l.z - o.z })); }, center: () => city.plan?.p2?.center || { x: 0, z: 0 },
+  bus: () => { const n = schoolBusFor(carRegion(S.cityId)); return A[n] ? model(n, 1) : null; }, n: () => city.lots.filter(l => l.built).length > 200 ? 2 : 1, kid: () => makeKid(), prep: () => loadPeds(), get side() { return city.plan?.p2?.drive === 'L' ? -1 : 1; } });
 const cityBus = createCityBus({ agents: () => feature('city-bus') ? jpAgents() : null, lanes: () => tr2 ? tr2.lanes : [], center: () => city.plan?.p2?.center || { x: 0, z: 0 }, R: () => city.plan?.p2?.R || 400,
   bus: () => A['sf-car-Bus'] ? model('sf-car-Bus', 1) : null, want: () => { const b = city.lots.filter(l => l.built).length; return { lines: b > 120 ? 2 : 1, perLine: Math.min(3, 1 + Math.floor(b / 90)) }; } });
 // #6 (jam-call, bl25-05): задръстване/заклещени коли → известие „🚓 Извикай полиция“ + „🎥 гледай“; без натискане полицията идва сама след 90 s
@@ -10757,6 +10772,7 @@ function frame() {
       chaseFollow(rdt);   // #3: камерата след беглеца
       roadNotice();   // #6: радио-известие при затворена/отворена улица
       cityBus.update(rdt * Math.max(1, speed));   // #15: градските автобуси
+      schoolBus.update(rdt * Math.max(1, speed));   // №7: училищният автобус
     }
     updateProjects(dt / DAY_SEC);
     updateRails(dt / DAY_SEC);
@@ -11532,6 +11548,9 @@ if (AUTOTEST) {
     jamCallTest(lock = true) { if (!tr2) return null; const n = [...tr2.nodes.values()].find(q => q.deg >= 3 && !q.ring && q.conns.some(C => C.ringIn)) || [...tr2.nodes.values()].find(q => q.deg >= 3 && !q.ring); jamNotice({ node: n.id, x: n.x, z: n.z, q: 3, lock }); const o = tr2G ? tr2G.position : { x: 0, z: 0 }; __dbg.camAt(n.x + o.x + 30, 34, n.z + o.z + 42, n.x + o.x, 0, n.z + o.z); return { node: n.id, ask: !!jamAsk }; },   /* #6: известието „🚓 Извикай полиция“ */
     chaseLook() { const r = incidents.start('chase'); if (!r) return r; chaseCam = 2; fly = null; $('panel').classList.add('hidden'); return r; },   /* #3: полицейско преследване, камерата след беглеца */
     articLook(n = 3) { if (!tr2) return null; const c = tr2.cars.find(q => q.trV && q.v > 2) || tr2.cars.find(q => q.trV); if (!c) { articForce = n; tr2.cars.filter(q => !q.agent && !q.trV).slice(0, n).forEach(q => { q.gone = true; }); return { forced: n }; } const o = tr2G ? tr2G.position : { x: 0, z: 0 }; __dbg.camAt(c.x + o.x + 18, 22, c.z + o.z + 24, c.x + o.x, 0, c.z + o.z); return { bend: +((Math.atan2(Math.sin(c.yaw - c.tr.yaw), Math.cos(c.yaw - c.tr.yaw))) * 57.3).toFixed(1), v: +c.v.toFixed(1), p: c.p.kind, ring: c.p.ring != null }; },   /* #4: съчлененият автобус на 2 секции */
+    schoolGo(kind = 'am') { const r = schoolBus.start(kind), st = schoolBus.state(), b = st.buses[0]; if (b) { const o = tr2G ? tr2G.position : { x: 0, z: 0 }; __dbg.camAt(b.x + o.x + 9, 34, b.z + o.z + 13, b.x + o.x, 0, b.z + o.z); } return { r, ...st }; },   /* №7: училищният автобус — курсът веднага */
+    schoolState: () => schoolBus.state(),
+    schoolCam() { const b = schoolBus.state().buses[0]; if (!b) return null; const o = tr2G ? tr2G.position : { x: 0, z: 0 }; __dbg.camAt(b.x + o.x + 9, 34, b.z + o.z + 13, b.x + o.x, 0, b.z + o.z); return b; },
     chaseState: () => { const a = incidents.active; return a && { ...a, follow: incidents.follow(), cam: chaseCam }; },
     urgent: (i = 0) => urgentDispatch(projects[i]),   /* #12: „🚨 Тръгвайте спешно“ */
     needOf: (i = 0) => projects[i] && { t: projects[i].title, stage: projects[i].stage, roles: missingRoles(projects[i]) },

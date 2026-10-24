@@ -207,6 +207,7 @@ const DEMOS = [
   ['🚌 Съчлененият автобус на 2 секции — пречупва се в хармониката на завоите и кръговото (камерата го следва; Пловдив)', 'plovdiv', d => { setTimeout(() => d.articLook(4), 5000); let n = 0; const t = setInterval(() => { if (++n > 160) return clearInterval(t); d.articLook(4); }, 500); }],   // artic-bend (#4)
   ['🚌 Училищните автобуси: жълтият американски и белите микробуси с табела „УЧИЛИЩЕН“ / „ДЕТИ“ / „SCHOOL BUS“ (до града; червеният куб — човек 1,8 м)', 'plovdiv', d => { setTimeout(() => d.schoolLook(), 3000); }],   // school-bus
   ['🧱 Тухлената сграда с арките и черната кула нощем — светят по прозорци (София: ден → 22:00 → 02:00)', 'sofia', d => { d.blkLook('brick', [-150, -150]); d.blkLook('modoffice', [-122, -150]); const go = hr => { d.time(hr); d.camAt(-136, 14, -110, -136, 8, -150); }; setTimeout(() => go(13), 3000); setTimeout(() => go(22), 9000); setTimeout(() => go(2), 16000); }],   // blk-night2
+  ['🚌 Училищният автобус: следобедният курс — децата се качват пред училището, после слизат в кварталите (камерата го следва; Пловдив)', 'plovdiv', d => { setTimeout(() => d.schoolGo('pm'), 6000); let n = 0; const t = setInterval(() => { if (++n > 240) return clearInterval(t); d.schoolCam(); }, 500); }],   // school-bus — линията (№7, 2a)
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
