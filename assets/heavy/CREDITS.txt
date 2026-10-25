@@ -339,3 +339,8 @@ City buses (55, buses-more) — Sketchfab, normalized in Blender (front +z, real
 - churches/boyana.glb — "Boyana Church" by Dimitar Ignatov (iwalk) (CC-BY 4.0) — https://sketchfab.com/3d-models/aedecd4a29a542f3a9b1d75da1b1ca0d
 - churches/karelian.glb — "Karelian Orthodox Chapel" by andrea.notarstefano (CC-BY 4.0) — https://sketchfab.com/3d-models/0dbc0ad6c0e5447cb817711f2167f76f
 - churches/bojidarkn.glb — "Church (Free Model)" by BozhidarKN (bojidarkn) (CC-BY 4.0) — https://sketchfab.com/3d-models/e2e892b9cf00421abe9e18cc056cb834 (скан; само сградата)
+Гарите по нива (feature 'station-models', f9; свалени 25.10.2026 от Sketchfab, CC-BY 4.0 — в Blender: само сградата, центрирани, текстурите в WebP; оригиналите — _source/downloads/stations/):
+- station/lv1.glb — "Ticket office Melkombinat" by sklerozz (CC-BY 4.0) — https://sketchfab.com/3d-models/3f3ab907db5d4b5597725d3df5c34f71 (ниво 1 — спирка)
+- station/lv4.glb — "LowPoly Train Station" by JG3D (jg-3d) (CC-BY 4.0) — https://sketchfab.com/3d-models/7f15f88072e9410490ef867ba6855fc5 (ниво 2 — само сградата, без релсите, паркинга и дърветата)
+- station/lv2.glb — "Baku-Sabunchi-Surakhani Railway Station" by Karpulya (CC-BY 4.0) — https://sketchfab.com/3d-models/669ed1acd9554f07a4ceb5aa41c46523 (ниво 3)
+- station/lv3.glb — "Old Station (industrial building series no:1)" by simple and extensive design (simpleandextensivedesign) (CC-BY 4.0) — https://sketchfab.com/3d-models/33cb2ead0c3b4f34a2f04d88ab30da0a (ниво 4 — без релсите)

@@ -3,10 +3,14 @@
 import * as THREE from 'three';
 import { hasTrainModel, trainCar } from './trainmodels.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { feature } from './lab/feature.js';
 // истински гарови сгради (Sketchfab, CC-BY): small — „Train Station - Nieborowice“ (нива 2–4), big — „Milwaukee Road Depot“ (ниво 5)
 const ST_MODEL = {};
 let stLoad = null;
-const loadStationModels = () => stLoad || (stLoad = Promise.all(['small', 'big'].map(k => new Promise(res => new GLTFLoader().load(`assets/heavy/station/${k}.glb`, g => { ST_MODEL[k] = g.scene; res(); }, undefined, () => res())))));
+// 🚉 station-models (f9): сграда за всяко ниво (Sketchfab, CC-BY — assets/heavy/CREDITS.txt): 1 — будката „Мелькомбинат“, 2 — нискополигонната гара (JG3D),
+// 3 — гарата Баку-Сабунчи (с куполите), 4 — „Old Station“ (две двуетажни сгради), 5 — Milwaukee Road Depot (както досега). [модел, дължина по перона, ширина] — горни граници
+const SM = feature('station-models'), ST_SPEC = { 1: ['lv1', 5.5, 4.4], 2: ['lv4', 22, 16], 3: ['lv2', 26, 26], 4: ['lv3', 42, 30] };
+const loadStationModels = () => stLoad || (stLoad = Promise.all([...['small', 'big'], ...(SM ? ['lv1', 'lv2', 'lv3', 'lv4'] : [])].map(k => new Promise(res => new GLTFLoader().load(`assets/heavy/station/${k}.glb`, g => { ST_MODEL[k] = g.scene; res(); }, undefined, () => res())))));
 // сградата, вписана в кутия: дължина L по z, без да надвишава ширина W; основата на y = 0
 function stationBuilding(k, L, W) {
   const src = ST_MODEL[k]; if (!src) return null;
@@ -112,10 +116,11 @@ export function createStation(deps) {
       }
       // гарова сграда в северния край на перона; расте с нивото
       const hw = 6, hh = 3.5 + lv * 1.3, hl = 8 + lv * 3;
-      const real = lv >= 2 ? stationBuilding(lv >= 5 ? 'big' : 'small', lv >= 5 ? 47 : hl + 4, lv >= 5 ? 18 : 10) : null;
-      if (lv >= 2 && !real && !stLoad) loadStationModels().then(() => { if (level === lv) build(lv, buildingNow); });
+      const sp = SM && ST_SPEC[lv], real = sp ? stationBuilding(sp[0], sp[1], sp[2]) : lv >= 2 ? stationBuilding(lv >= 5 ? 'big' : 'small', lv >= 5 ? 47 : hl + 4, lv >= 5 ? 18 : 10) : null;
+      if ((lv >= 2 || sp) && !real && !stLoad) loadStationModels().then(() => { if (level === lv) build(lv, buildingNow); });
       if (real) {   // истинската сграда — до перона, в северния му край
-        real.position.set(X + 5.5 + (lv >= 5 ? 6 : 3), 0, lv >= 5 ? plen + 24.5 : -plen - (hl + 4) / 2 - 1); if (lv >= 5) real.rotation.y = Math.PI; g.add(real);
+        if (sp) { const b = new THREE.Box3().setFromObject(real), w = b.max.x - b.min.x, l = b.max.z - b.min.z; real.position.set(X + 3.5 + w / 2, 0, -plen - l / 2 - 1); }   // station-models: в северния край, източно от главния коловоз
+        else real.position.set(X + 5.5 + (lv >= 5 ? 6 : 3), 0, lv >= 5 ? plen + 24.5 : -plen - (hl + 4) / 2 - 1); if (lv >= 5) real.rotation.y = Math.PI; g.add(real);
         { const r0 = real; g.userData.mergeWhen = () => [r0]; }   // ⚡ perf-cliff (citycull.js): гаровата сграда е статична — частите ѝ се сливат по материал (паркираните влакове — не)
         { const seen = new Set(); real.traverse(o => { if (!o.isMesh) return; for (const m of [].concat(o.material)) { if (!m || seen.has(m) || !('emissive' in m)) continue; seen.add(m); m.emissive.set(0xffd9a0); if (m.map) m.emissiveMap = m.map; m.needsUpdate = true; glows.push([m, 0.55]); } }); }   // нощем сградата е осветена
         const lab = deps.label(`🚉 ${STATION_LEVELS[lv - 1].nm.toUpperCase()} · ${lv} ${lv === 1 ? 'коловоз' : 'коловоза'}`, '#ffffff', 9);

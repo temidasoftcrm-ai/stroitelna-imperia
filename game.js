@@ -1856,6 +1856,47 @@ function refreshWarehouse() {
     nl.position.copy(lb.position); lb.parent.add(nl); lb.parent.remove(lb); city.whGroup.userData.label = nl;
   }
 }
+// 🧱 no-overlap (f6, потребителят: „СКЛАД 6 — старият модел и строежът стоят един в друг“):
+//  • надстройка на склада/гаража на същия парцел — старият модел се скрива, докато върви площадката със скелето; новият идва при завършване (buildHQ);
+//  • офисът, гаражът и складът (кампус, общ парцел, стари записи) не влизат един в друг: по-късно сложеният се смалява около основата си (до ×0,6),
+//    после се отмества встрани; дворът с палетите се скрива, ако е в сграда;
+//  • при влизане: чужди строежи/сгради/имоти/пачки в парцелите на фирмата (склад, гараж, общия парцел) → на свободни парцели; офертите там отпадат.
+const NO_OVERLAP = feature('no-overlap');
+const firmLots = () => new Set([S.whLot, S.garageLot, ...(((S.campus2 || {})[S.cityId]) || [])].filter(v => v != null));
+function ownUpgHide() {
+  for (const [kind, m] of [['warehouse', city.whModel], ['garage', city.garModel]]) { if (!m) continue;
+    const up = projects.some(p => p.own === kind && (p.type === 'own_wh' || p.type === 'own_garage')); m.visible = !up; }
+}
+function firmUnclash() {
+  const V = THREE.Vector3, objs = [city.officeModel, city.garModel, city.whModel].filter(o => o && o.parent && o.visible);
+  const box = o => { o.updateWorldMatrix(true, true); const b = new THREE.Box3(); o.traverse(m => { if (m.isMesh && m.visible && m.geometry) { if (!m.geometry.boundingBox) m.geometry.computeBoundingBox(); b.union(m.geometry.boundingBox.clone().applyMatrix4(m.matrixWorld)); } }); return b; };   // без надписите
+  const ov = (a, b) => Math.min(a.max.x, b.max.x) - Math.max(a.min.x, b.min.x) > 0.4 && Math.min(a.max.z, b.max.z) - Math.max(a.min.z, b.min.z) > 0.4;
+  const moveW = (o, d) => { const w = o.getWorldPosition(new V()).add(d); o.parent.updateWorldMatrix(true, false); o.position.copy(w.applyMatrix4(new THREE.Matrix4().copy(o.parent.matrixWorld).invert())); };   // отместване в света → в координатите на родителя
+  let n = 0;
+  for (let i = 1; i < objs.length; i++) { const o = objs[i];
+    for (let it = 0; it < 9; it++) { const b = box(o), hit = objs.slice(0, i).map(box).find(x => ov(b, x)); if (!hit) break; n++;
+      const c0 = b.getCenter(new V()); c0.y = b.min.y;
+      if (it < 4) { o.scale.multiplyScalar(0.88); const b2 = box(o), c1 = b2.getCenter(new V()); c1.y = b2.min.y; moveW(o, c0.sub(c1)); continue; }   // по-малък, на същото място
+      const hc = hit.getCenter(new V()), dir = new V(c0.x - hc.x, 0, c0.z - hc.z); if (dir.lengthSq() < 1e-4) dir.set(1, 0, 0); dir.normalize();
+      const px = Math.min(b.max.x, hit.max.x) - Math.max(b.min.x, hit.min.x), pz = Math.min(b.max.z, hit.max.z) - Math.max(b.min.z, hit.min.z);
+      moveW(o, dir.multiplyScalar(Math.min(px, pz) + 0.4)); } }
+  if (city.whYard && city.whYard.visible && city.whYard.children.length) { const y = box(city.whYard); if (!y.isEmpty() && objs.some(o => ov(y, box(o)))) city.whYard.visible = false; }
+  city.unclash = n; return n;
+}
+function firmLotsFix() {   // при влизане (след thamesRelocate): чуждото в парцелите на фирмата → на свободни парцели
+  const F = firmLots(); if (!F.size) return 0;
+  const est0 = S.estate || {}, used = new Set([...(S.built || []).map(b => b.lot), ...(est0.owned || []).map(o => o.lot), ...(est0.land || []), ...F, ...(S.projects || []).map(p => p.lot), city.hq?.id]);
+  const free = city.lots.filter(l => !l.busy && !l.built && !l.fresh && !used.has(l.id) && !l.river).concat(city.lots.filter(l => !l.busy && !l.built && l.fresh && !used.has(l.id) && !l.river));
+  const map = new Map(), to = id => { if (!F.has(id)) return id; if (!map.has(id)) { const l = free.shift(); if (!l) return id; map.set(id, l.id); } return map.get(id); };
+  for (const b of S.built || []) b.lot = to(b.lot);
+  for (const o of est0.owned || []) o.lot = to(o.lot);
+  if (est0.land) est0.land = est0.land.map(to);
+  for (const p of S.projects || []) if (!p.own) p.lot = to(p.lot);
+  for (const c of S.cash || []) c.lot = to(c.lot);
+  S.offers = (S.offers || []).filter(o => !F.has(o.lot));
+  if (map.size) toast(`🧱 ${map.size} ${map.size === 1 ? 'обект беше' : 'обекта бяха'} върху склада/гаража — преместени на свободни парцели.`, 'good');
+  return map.size;
+}
 function buildWarehouse() {
   if (city.whGroup) { city.group.remove(city.whGroup); city.whGroup = city.whYard = null; }
   if (S.whLot == null) return;
@@ -1875,7 +1916,7 @@ function buildWarehouse() {
   if (!camp && wh.userData.wh2) { if (whReal) { const hw = lot.w / 2 - 0.8, hd = lot.d / 2 - 0.8; campusFit(wh, -hw, hw, -hd, Math.min(hd - 5, hd * 0.35)); } else campusFit(wh, -7.4, 7.4, -7.4, 2.6); }   /* №18: в целия парцел (отпред — дворът), не в 15 × 10 м */   // истинският склад — в парцела (отпред — дворът с палетите)
   if (wr) { const hw = (wr.x1 - wr.x0) / 2, hd = (wr.z1 - wr.z0) / 2; campusFit(wh, -hw, hw, -hd, hd); }
   else if (camp) { const [W, D] = lotHalf(lot); campusFit(wh, -(W - 0.7) / 2, (W - 0.7) / 2, -(D - 0.7) / 2, (D - 0.7) / 2); }   // в своята четвъртина, по рамката
-  g.add(wh);
+  g.add(wh); city.whModel = wh;
   const lb = label(`📦 СКЛАД ${S.whLevel}`, '#ffffff', 6.5);
   lb.position.set(0, wh.userData.h * wh.scale.y + 2, camp ? 0 : -4); g.add(lb); g.userData.label = lb;
   city.whYard = new THREE.Group(); city.whYard.position.set(0, 0, 4); city.whYard.visible = !camp; g.add(city.whYard);   // в кампуса — без двора с палетите (беше отпред, върху офиса)
@@ -1883,6 +1924,7 @@ function buildWarehouse() {
     wh.position.z += -hd - (b.min.z - g.position.z); const z0 = b.max.z - g.position.z + (-hd - (b.min.z - g.position.z)) + 0.6, dd = hd - z0 - 0.2;
     if (dd >= 2.4) { city.whYard.position.set(0, 0, z0 + dd / 2); city.whYard.visible = true; city.whYard.userData.area = [2 * hw - 0.4, dd]; } }
   refreshWarehouse();
+  if (NO_OVERLAP) { ownUpgHide(); firmUnclash(); }   // no-overlap: надстройката в ход — старият модел скрит; офис/гараж/склад — без застъпване
 }
 // офисът и (докато е малък) гаражът стоят на парцела на централата; голямият гараж и складът — на свои парцели
 // 🏨 hotel5-* (55): одобрените модели за 5★/Гранд хотел — по региона на града (Залива → Бурж, Азия → Марина Бей, Америка → Мариот, изтокът → Роза Хутор, Европа → Острив);
@@ -1950,7 +1992,7 @@ function buildHQ() {
   else if (CP) { const o0 = CP.office; campusFit(office, o0.x0, o0.x1, o0.z0, o0.z1); }   // общият парцел: офисът — целият парцел на централата
   else if (campusAny()) { const [W, D] = lotHalf(city.hq); campusFit(office, -W + 0.5, W - 0.5, 0.4, D - 0.5); }   // кампус: офисът — цялата предна половина, по истинската си рамка (големите кули се смаляват)
   office.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
-  g.add(office);
+  g.add(office); city.officeModel = office;   // no-overlap: за проверката на застъпване
   const ob = new THREE.Box3().setFromObject(office);
   g.userData.officeTop = ob.max.y - g.position.y;
   // табела на фирмата с нивото на офиса и бригадите
@@ -1988,7 +2030,7 @@ function buildHQ() {
     gar.position.set(3.8, 0, -4.3);
     if (CP) { gar = garageMesh(Math.min(gLevel, 8), Math.min(15, 8 + gLevel * 0.7), 6 + Math.min(gLevel, 8) * 0.15); campusFit(gar, CP.garage.x0, CP.garage.x1, CP.garage.z0, CP.garage.z1); }   // общият парцел: истинският хангар отзад на съседа
     else if (campusAny()) { const [W, D] = lotHalf(city.hq); campusFit(gar, 0.3, W - 0.4, -D + 0.4, -0.3); }   // кампус: задната дясна четвъртина
-    g.add(gar);
+    g.add(gar); city.garModel = gar;
   } else {       // свой парцел: хангар отзад, паркинг отпред
     const gg = city.garGroup = new THREE.Group();
     gg.position.set(away.x, 0, away.z); gg.rotation.y = lotRot(away); gg.scale.setScalar(lotK(away));
@@ -2000,7 +2042,7 @@ function buildHQ() {
     if (!feature('hq-yard')) parkingLines(gg, 8, -6, 1.5);
     gar = garageMesh(gLevel, Math.min(15, 8 + gLevel * 0.7), 6 + Math.min(gLevel, 8) * 0.15);
     gar.position.set(0, 0, -4.2);
-    gg.add(gar);
+    gg.add(gar); city.garModel = gar;
   }
   gl = label(`🔧 ГАРАЖ ${gLevel} · техника ${machineCount()}/${garageLv().cap}`, '#ffffff', 6.5);
   gl.position.y = gar.userData.h + 1.8; gar.add(gl);
@@ -2822,6 +2864,7 @@ function makeOwnSite(p) {
   scene.add(g);
   const v = p.vis = { g, own: true };
   const inHQ = lot === city.hq, fresh = p.type === 'own_garage_new' || p.type === 'own_wh_new';
+  if (NO_OVERLAP && !fresh) setTimeout(ownUpgHide, 0);   // no-overlap: старият склад/гараж — скрит, докато върви площадката (projects вече съдържа p)
   // зоната на строежа в координатите на парцела: [x, z, ширина, дълбочина, височина]
   const area = p.own === 'office' ? [-3.6, -3.6, 9, 9, (city.hqGroup?.userData.officeTop || 4) + 1.5]
     : inHQ ? [3.8, -4.3, 8, 7, 5.5] : fresh ? [0, 0, 15.5, 15.5, 6] : [0, -4.2, 16, 8, 7];
@@ -3350,6 +3393,7 @@ function setupWorld() {
   if (econ.setCity) econ.setCity(S.cityId);   // оборотът от обекти се води по градове
   buildCity(S.cityId);
   thamesRelocate();   // 🌊 нищо не остава на парцелите в реката
+  if (NO_OVERLAP) firmLotsFix();   // 🧱 no-overlap: и нищо чуждо в парцелите на склада/гаража
   for (const u of units) scene.remove(u.obj);
   units.length = 0;
   // стари записи: общото ниво на централата става ниво и на офиса, и на гаража (гаражът остава в централата)
@@ -3414,7 +3458,8 @@ function setupWorld() {
 
 function freeLots(type) {
   const pref = type === 'house' ? ['outer', 'mid'] : type === 'shop' ? ['mid', 'outer', 'center'] : ['center', 'mid'];
-  return city.lots.filter(l => !l.built && !l.busy).sort((a, b) => pref.indexOf(a.zone) - pref.indexOf(b.zone) + (Math.random() - 0.5) * 1.5);
+  const F = NO_OVERLAP ? firmLots() : null;   // no-overlap: никога в парцела на склада/гаража (дори ако заетостта му се е изгубила)
+  return city.lots.filter(l => !l.built && !l.busy && !(F && F.has(l.id))).sort((a, b) => pref.indexOf(a.zone) - pref.indexOf(b.zone) + (Math.random() - 0.5) * 1.5);
 }
 function makeOffer() {
   const tier = cityTier(S.cityId);
@@ -11850,6 +11895,9 @@ if (AUTOTEST) {
     kremlin(a = 0, d = 300, h = 120) { const g = scene.getObjectByName('kremlin2'), LY = g && g.parent.userData.kremlin2; if (!LY) return false; const n = LY.poly.length, v = g.parent.localToWorld(new THREE.Vector3(LY.poly.reduce((s, p) => s + p[0], 0) / n, 0, LY.poly.reduce((s, p) => s + p[1], 0) / n));   /* lm-kremlin2: камерата около Кремъл (a — ъгъл: 0 откъм реката, ~2,3 — откъм Червения площад) */
       showMap(false); controls.target.set(v.x, 12, v.z); camera.position.set(v.x + Math.sin(a) * d, h, v.z + Math.cos(a) * d); fly = null; return { towers: LY.towers.length, walls: LY.walls.length, x: Math.round(v.x), z: Math.round(v.z) }; },
     lookLm(i = 0, d = 120) { const o = (city.landmarks || [])[i]; if (!o) return false; const v = o.group.position; showMap(false); controls.target.set(v.x, 20, v.z); camera.position.set(v.x + d * 0.8, d * 0.6, v.z + d); fly = null; return city.landmarks.length; },
+    whUpDemo(lv = 5) { this.whFitLook(lv); econ.earn(5e7, 'друго', 'тест'); startUpgrade('warehouse'); const l = city.lots[S.whLot]; showMap(false); controls.target.set(l.x, 3, l.z); camera.position.set(l.x + 18, 24, l.z + 26); controls.update(); fly = null;   // 🧱 no-overlap: надстройка на склада на място
+      return { lv: S.whLevel, up: projects.filter(p => p.own === 'warehouse').map(p => p.type), oldHidden: !!city.whModel && !city.whModel.visible, unclash: city.unclash || 0 }; },
+    whUpFinish() { const p = projects.find(q => q.own === 'warehouse'); if (!p) return null; completeProject(p); return { lv: S.whLevel, done: !projects.includes(p), visible: !!city.whModel && city.whModel.visible }; },
     churchLook(i = 0, d = 70) { const L = city.lots.filter(l => l.reserved === 'church'); const l = L[i]; if (!l) return { n: 0 }; showMap(false); controls.target.set(l.x, 4, l.z); camera.position.set(l.x + d * 0.7, d * 0.6, l.z + d); controls.update(); fly = null; return { n: L.length, k: l.church }; },   // ⛪ churches: Лабораторията
     osmFill(on = true) { osmFillOn = !!on && OSM_FILL; city.planView?.userData?.refill?.(); return osmFillOn; },   // 🏙️ osm-fill: Лабораторията — преди (false) / след (true)
     lookLmKind(k, d = 120) { const i = (city.landmarks || []).findIndex(o => o.kind === k); return i < 0 ? false : this.lookLm(i, d); },   // 🗽 liberty-island: по вида (liberty2)
@@ -12142,7 +12190,7 @@ if (AUTOTEST) {
       setTimeout(() => { const r = sendErrors(); modal('🐞 Телеметрия на грешките', `Изпращане: <b>${r.sent ? 'изпратени ' + r.sent + ' (засега само в конзолата и localStorage)' : r.reason === 'no-consent' ? 'не — няма съгласие за анализи' : 'няма нови'}</b><br>Това би тръгнало:<pre style="white-space:pre-wrap;font-size:11px;max-height:50vh;overflow:auto;text-align:left">${JSON.stringify(errPayload(), null, 1).replace(/</g, '&lt;')}</pre>`, [['OK', null]]); }, 800); return true; },
     wx2Go(kind = 'snow', from = S.day, dayOnly = true) { const c = wx2C(S.cityId); for (let t = from; t < from + 400; t += 0.02) { const h = (((t - 1) / CYCLE_DAYS) % 1) * 24 + 6; if (dayOnly && (h % 24 < 9 || h % 24 > 17)) continue; if (wx2Kind(c, t, CYCLE_DAYS, monthOf) === kind) { S.day = Math.floor(t); S.dayT = (t % 1) * DAY_SEC; weather.set(kind); S.weather = kind; return { day: S.day, month: monthOf(S.day), clock: clockText(todF()) }; } } return null; },   // 🌦️ weather2: Лабораторията — до следващия сняг/дъжд в града
     wx2Stats(id = S.cityId, days = 360) { const c = wx2C(id), out = {}; let prev = null, eps = 0; for (let t = 1; t < 1 + days; t += 0.02) { const k = wx2Kind(c, t, CYCLE_DAYS, monthOf); out[k] = (out[k] || 0) + 0.02; if (k !== prev && ['rain', 'snow', 'storm'].includes(k)) eps++; prev = k; } return { id, lat: c.lat, desert: c.desert, eps, perMonth: +(eps / (days / 30)).toFixed(1), days: Object.fromEntries(Object.entries(out).map(([k, v]) => [k, Math.round(v)])), cycleSec: CYCLE_DAYS * DAY_SEC }; },
-    stAccess(lv) { if (lv != null) { S.stationLevel = lv; S.stationBuild = null; buildStation(); } const gp = city.plan, ac = gp && gp.p2 && gp.p2.access; if (!ac) return null; const g = (p) => p && gp.toGame(p[0], p[1]).map(Math.round);   // 🚉 station-access: Лабораторията
+    stAccess(lv) { if (lv != null) { S.stationLevel = lv; S.stationBuild = null; if (station) { station.build(lv); parkedSig = ''; refreshPassing(); stationPark(); } else buildStation(); } const gp = city.plan, ac = gp && gp.p2 && gp.p2.access; if (!ac) return null; const g = (p) => p && gp.toGame(p[0], p[1]).map(Math.round);   // 🚉 station-access: Лабораторията
       return { len: ac.len, split: ac.split, bend: ac.bend, a: g(ac.a), b: g(ac.b), park: ac.park && { at: g([ac.park.x, ac.park.z]), w: ac.park.w, d: ac.park.d, fore: !!ac.park.fore }, cars: city.stPark ? city.stPark.children.length - 1 : 0, stX: STATION_X }; },
     skyDemo(kind = 'sunset', sec = 24) { clearInterval(window.__skyIv); const [from, to] = kind === 'sunrise' ? [4.8, 8] : [18, 21.2], t = controls.target, w = kind === 'sunrise' ? 1 : -1, t0 = performance.now();   // 🌅 sky-sun: Лабораторията — залез/изгрев с бързо превъртане
       S.wxLock = 'clear'; weather.set('clear'); showMap(false); this.camAt(t.x - w * 150, 45, t.z + 40, t.x + w * 220, 75, t.z - 30);
