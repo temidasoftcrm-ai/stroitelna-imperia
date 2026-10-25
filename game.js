@@ -78,6 +78,7 @@ import { pickModel as impPick, decor as impDecor, IMP_MODELS, IMP_H } from './im
 import { createNeom, NEOM_CITY, NEOM_ID, DISTRICTS as NEOM_DISTRICTS, FOUND_COST as NEOM_FOUND } from './neom.js';
 import { buildSite3D } from './mine3d.js';
 import { LANDMARK_NM, CITY_LANDMARKS, LANDMARK_CENTER, BIG_LANDMARKS, SEA_LANDMARKS, buildLandmark, buildSeaLandmark, manhattanTowers, lmFit, lmH, hasLandmark, setLmTrees } from './landmarks.js';
+import { buildRioHill } from './riohill.js';
 import { OFFICE_STYLES, STYLE_LV, STYLE_COST, buildOfficeTower } from './officestyle.js';
 import { shipRange, PORT_LEVELS, portMax, SHIPS, seaKm, seaPath, SEA_ROUTE_COST, voyagePay, shipDaily, SEA_LV } from './seaways.js';
 import { makeTrackMap, placeCars } from './trackpath.js';
@@ -6636,9 +6637,19 @@ function lmSquareFit(sq, k0, fit, kMin = 0) {   // kMin — burj-size: кули�
   for (const l of near) if (!own.has(l.id) && P.some(([px, pz]) => inL(l, px, pz, 0))) { if (l.obj) city.group.remove(l.obj); for (const t of l.trees || []) city.group.remove(t); l.obj = null; l.built = null; l.trees = []; l.busy = 'landmark'; }   // чуждите сгради под забележителността
   return best;
 }
+// 🇧🇷 rio-hill (55): потребителят — „да го сложим на някакъв хълм“ (Христос Спасителя беше на централния площад). Генерираният Рио е равен,
+// затова хълмът е отделен (riohill.js): в залива точно на север от площада (~250 м — вижда се от центъра под мъглата), южното му подножие
+// стига до брега, пътят тръгва от крайбрежната улица (quay). Лодките са по-навътре в морето (z < −165), пристанището — на изток.
+function rioHill(sq) {
+  const P = city.plan, cc = new Map(), coastAt = x => { const k = Math.round(x); if (!cc.has(k)) { let z = sq.z; while (z > sq.z - 900 && !P.waterAt(k, z)) z -= 1; cc.set(k, z + 0.5); } return cc.get(k); };
+  const hx = sq.x - 30, zc = coastAt(hx); if (zc < sq.z - 600) return null;   // няма море пред центъра
+  let st = [hx, zc + 9], bd = 1e9; for (const s of P.streets) if (s.cls === 'quay') for (const [x, z] of s.pts) { const d = Math.hypot(x - hx, z - zc); if (d < bd && z > zc) { bd = d; st = [x, z]; } }
+  return buildRioHill({ x: hx, coast: zc, coastAt, start: st, statue: buildLandmark('redeemer', { label }) });
+}
 function landmarkPlan(kinds) {
   if (city.plan.p2 && city.plan.osm) return landmarkPlan2(kinds);
   const sq = city.plan.square, mem = S.landmarks[S.cityId], shade = o => o.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+  if (kinds[0] === 'redeemer' && feature('rio-hill') && city.plan.p2 && !city.plan.osm) { const o = rioHill(sq); if (o) { shade(o); city.group.add(o.group); city.landmarks.push(o); kinds = ['__none', ...kinds.slice(1)]; } }   // rio-hill (55): статуята — на хълм в залива пред центъра, площадът остава свободен
   if (kinds[0] === 'manhattan' && feature('ny-spread')) { nySpread(); kinds = kinds.slice(1); if (!kinds.length) return; kinds = ['__none', ...kinds]; }
   if (kinds[0] !== '__none') { const main = buildLandmark(kinds[0], { label }); main.group.position.set(sq.x, 0.1, sq.z); main.group.scale.setScalar(LM_MAIN_SCALE[kinds[0]] || 3.2); if (feature('lm-fit-sq')) { const k0 = LM_MAIN_SCALE[kinds[0]] || 3.2, tall = feature('burj-size') && (lmH(kinds[0]) || 0) / (lmFit(kinds[0]) || 15) > 3, f = lmSquareFit(sq, k0, lmFit(kinds[0]) || 15, tall ? k0 * 0.85 : 0);   /* burj-size (55): кулите (Бурж Халифа 70/14) не се смаляват до игла (беше 46 м, ×0,65) — поне ×0,85 (~190 м), по-далеч от площада */ main.group.scale.setScalar(f.k); main.group.position.set(f.x, 0.1, f.z); }   /* lm-fit-sq (55): на площада, без да влиза в твоите парцели и в улиците */ main.group.rotation.y = (hashStr(kinds[0]) % 4) * Math.PI / 2;
   shade(main); city.group.add(main.group); city.landmarks.push(main); }
