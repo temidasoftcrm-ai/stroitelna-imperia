@@ -2,7 +2,7 @@
 // Включва се само при feature('ads') && ADS_CLIENT (config.js; празен = изключено, нищо не се зарежда) && !autotest && компютър.
 // Локално и в Лабораторията — data-adbreak-test="on" (тестови реклами). В Лабораторията без ID — вграден симулатор (сива „ТЕСТОВА РЕКЛАМА“),
 // за да се види целият път: пауза на играта и звука → реклама → връщане; наградата.
-// Съгласие (consent.js): без window.consent.has('ads') → requestNonPersonalizedAds = 1 (неперсонализирани). Промяната важи от следващото зареждане.
+// Съгласие: с Google — неговият CMP (GDPR съобщението в AdSense, TCF) решава персонализацията; само симулаторът гледа consent.has('ads').
 // Места (game.js): next('city') при смяна на град, next('level') при ново ниво — изпълнява се, когато няма кино/диалог/урок;
 // най-много веднъж на 5 мин и не през първите 10 мин. Наградата: бутон „🎬 Реклама за бонус“ — само когато adBreak каже, че има такава (beforeReward);
 // най-много 3 пъти на ден (localStorage 'stroi-ads').
@@ -14,10 +14,18 @@ const GAP = 5 * 60e3, WARM = 10 * 60e3, REWARD_MAX = 3, KEY = 'stroi-ads';
 const LOCAL = IN_LAB || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
 const pub = String(ADS_CLIENT || '').trim().replace(/^ca-/, ''), CLIENT = /^pub-\d{10,20}$/.test(pub) ? 'ca-' + pub : '';
 const SIM = IN_LAB && !CLIENT;   // Лабораторията без ID — симулатор вместо Google
+const AUTOTEST = /[?&]autotest/.test(location.search);
+// истинските реклами на Google ще се заредят (createAds) — тогава съгласието за тях е на Google CMP (GDPR съобщението в AdSense, IAB TCF), не на нашия банер (consent.js)
+export const ADS_LIVE = feature('ads') && !!CLIENT && (!AUTOTEST || IN_LAB) && !isTouchDevice();
+// ⚙️ Поверителност → „Реклами — настройки за съгласие“: съобщението на Google CMP наново; false — скриптът на Google не е зареден (блокер)
+export function adsConsent() {
+  window.googlefc = window.googlefc || {}; window.googlefc.callbackQueue = window.googlefc.callbackQueue || [];
+  window.googlefc.callbackQueue.push({ CONSENT_DATA_READY: () => window.googlefc.showRevocationMessage() });
+  return typeof window.googlefc.showRevocationMessage === 'function';
+}
 
 export function createAds(deps) {
   const off = { next() { }, state: () => ({ on: false }) };
-  const AUTOTEST = /[?&]autotest/.test(location.search);
   if (!feature('ads') || (!CLIENT && !SIM) || (AUTOTEST && !IN_LAB) || isTouchDevice()) return off;
   let armed = !AUTOTEST;   // Лабораторията (там играта е с autotest): нищо не тръгва само — само от демото (skipWait)
   let t0 = Date.now(), last = -Infinity, pend = null, adOn = false, ready = false, rewardBtn = null, rewardFn = null, asking = false;
@@ -29,7 +37,7 @@ export function createAds(deps) {
   // ── зареждане ──
   window.adsbygoogle = window.adsbygoogle || [];
   const push = o => { try { window.adsbygoogle.push(o); } catch (e) { console.warn('ads', e); } };
-  if (!window.consent?.has('ads')) window.adsbygoogle.requestNonPersonalizedAds = 1;
+  if (SIM && !window.consent?.has('ads')) window.adsbygoogle.requestNonPersonalizedAds = 1;   // с Google — решава CMP (TCF), не ръчно
   if (SIM) simulator();
   else {
     const s = document.createElement('script'); s.async = true; s.crossOrigin = 'anonymous';
@@ -112,6 +120,6 @@ export function createAds(deps) {
     q.forEach(run);
   }
 
-  return { next, state: () => ({ on: true, sim: SIM, ready, pend: pend?.name || null, last, adOn, reward: !!rewardFn, today: got(), npa: !window.consent?.has('ads') }),
+  return { next, state: () => ({ on: true, sim: SIM, ready, pend: pend?.name || null, last, adOn, reward: !!rewardFn, today: got(), npa: !!window.adsbygoogle.requestNonPersonalizedAds }),
     skipWait: IN_LAB ? () => { armed = true; t0 = 0; last = -Infinity; } : undefined };   // Лабораторията: без 10-те минути и 5-те между рекламите
 }
