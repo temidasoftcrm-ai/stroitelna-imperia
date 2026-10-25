@@ -2,6 +2,10 @@
 // прожекторни мачти със светещи глави, светли петна по кея (адитивни кръгове с плавен ръб), слаб конус светлина
 // и червени сигнални лампи по върховете на крановете, които мигат. Без истински светлини — евтино за GPU.
 import * as THREE from 'three';
+import { feature } from './lab/feature.js';
+import { gfx } from './gfxpresets.js';
+
+const LITE = feature('gfx-lite');
 
 let poolTex = null;
 function poolMap() {
@@ -22,6 +26,7 @@ export function createPortLights() {
   const beacon = new THREE.MeshStandardMaterial({ color: 0xff3030, emissive: 0xff1010, emissiveIntensity: 0.3 });
   const glows = [];   // [материал, сила] — прозорци и др., които светят нощем
   let night = 0;
+  if (LITE) pool.visible = cone.visible = false;   // gfx-lite: до първата нощ
 
   // прожекторна мачта: (x, z) — място, y — височината на кея, h — височина на мачтата, r — радиус на светлото петно
   function mast(parent, x, z, { y = 1.2, h = 20, r = 24 } = {}) {
@@ -46,6 +51,7 @@ export function createPortLights() {
       pool.opacity = 0.62 * n; cone.opacity = 0.05 * n;
       for (const [m, k] of glows) m.emissiveIntensity = 0.05 + k * n;
     }
+    if (LITE) pool.visible = cone.visible = n > 0.01 && gfx().night;   // gfx-lite: денем (прозрачност 0) не се рисуват; „Нощни светлини“ — изключени
     beacon.emissiveIntensity = 0.3 + (n > 0.2 ? (Math.sin(t * 3) > 0 ? 2.5 : 0.3) * n : 0);
   }
   return { mast, beaconAt, glow, setNight };

@@ -333,3 +333,9 @@ City buses (55, buses-more) — Sketchfab, normalized in Blender (front +z, real
 - statues/st-ernst.glb — „Equestrian Monument Ernst II. (Coburg)“ by DigitalSouls, CC Attribution — https://sketchfab.com/3d-models/b5391bc961de4a4c8e04ef6e9509030d (олекотен; statues)
 - statues/st-masaryk.glb — „Memorial of President T. Masaryk - Brno“ by 3dhdscan, CC Attribution — https://sketchfab.com/3d-models/79db408340924199963082f569cbe65a (statues)
 - statues/st-strauss.glb — „Johann-Strauß-Denkmal“ by noe-3d.at (@www.noe-3d.at), CC Attribution — https://sketchfab.com/3d-models/d7b1cf114af248e4a9258eaa7325951f (олекотен; statues)
+
+Православни църкви (feature 'churches', f6; свалени 25.10.2026 от Sketchfab, CC-BY 4.0 — олекотени в Blender: сканираните изрязани до сградата, decimate, текстурите в WebP; оригиналите — _source/downloads/churches/):
+- lm/nevsky.glb — "Alexander Nevsky Cathedral – Sofia" by Dimitar Ignatov (iwalk) (CC-BY 4.0) — https://sketchfab.com/3d-models/d46c08dacb074203bb629503e7025292 (плочите отдолу махнати)
+- churches/boyana.glb — "Boyana Church" by Dimitar Ignatov (iwalk) (CC-BY 4.0) — https://sketchfab.com/3d-models/aedecd4a29a542f3a9b1d75da1b1ca0d
+- churches/karelian.glb — "Karelian Orthodox Chapel" by andrea.notarstefano (CC-BY 4.0) — https://sketchfab.com/3d-models/0dbc0ad6c0e5447cb817711f2167f76f
+- churches/bojidarkn.glb — "Church (Free Model)" by BozhidarKN (bojidarkn) (CC-BY 4.0) — https://sketchfab.com/3d-models/e2e892b9cf00421abe9e18cc056cb834 (скан; само сградата)

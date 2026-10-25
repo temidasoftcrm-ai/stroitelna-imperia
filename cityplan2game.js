@@ -24,6 +24,7 @@ export async function loadPlan2(cityId) {
 export function gamePlan2(P, o = {}) {
   const osm = P.osmData, B = P.boundary, x0 = Math.min(...B.map(p => p[0])), z0 = Math.min(...B.map(p => p[1]));
   const ox = EDGE - x0, oz = EDGE - z0, sh = ([x, z]) => [x + ox, z + oz];
+  if (o.prep) P = o.prep(P, ox, oz);   // station-access (f9): пътят до гарата — в графа на плана, преди всичко друго (копие; кешът не се пипа)
   // улиците: [улица] = път от плана (същите индекси); възел 0 — площадът (cityplanroute.js го свързва с центъра)
   const streets = P.roads.map(r => { const pts = r.pts.map(sh); return { id: r.id, cls: r.cls, w: r.w, pts, L: cumLen(pts), noCars: !!r.noCars, oneway: !!r.oneway, name: r.nm || '' }; });
   const K = osm?.k, toXZ = (la, lo) => [(lo - osm.center[1]) * Math.cos(osm.center[0] * Math.PI / 180) * 111320 * K, -(la - osm.center[0]) * 110540 * K];
@@ -102,5 +103,5 @@ export function gamePlan2Gen(cityId, o = {}) {
     const hw = ex.slice().sort((a, b) => b.x - a.x)[0] || null, ap = hw ? ex.filter(e => e !== hw).sort((a, b) => Math.hypot(b.x - hw.x, b.z - hw.z) - Math.hypot(a.x - hw.x, a.z - hw.z))[0] || null : null;
     P.anchors = { station: st ? { x: st.x, z: st.z, w: st.w, d: st.d, lot: st.id, name: 'Гара' } : null, highway: hw ? { ...hw, name: 'Магистрала' } : null, airport: ap ? { ...ap, name: 'Летище' } : null };
   }
-  return gamePlan2(P, { count: o.count, mega: o.mega, ...(P.tiered ? { tier: 99 } : {}) });   /* с нивата от редактора: всички парцели, подредени по ниво (count отрязва неотключените) */
+  return gamePlan2(P, { count: o.count, mega: o.mega, prep: o.prep, ...(P.tiered ? { tier: 99 } : {}) });   /* с нивата от редактора: всички парцели, подредени по ниво (count отрязва неотключените) */
 }

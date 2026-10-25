@@ -145,10 +145,14 @@ import { planRoute, randomRoadPoint } from './cityplanroute.js';
 import { ROME_FILES, IT_FILES, IT_PICK, romePrep } from './romenear.js';   // 🇮🇹 rome-bld (f9): Рим отблизо — италианските сгради; it-bld — и в другите италиански градове
 import { STATUE_FILES, statuePrep } from './statues.js';   // ⛲ statues (f9): фонтани и статуи в градовете
 import { GFX, GFX_ORDER, gfx, gfxLevel, setGfx } from './gfxpresets.js';   // 🎨 gfx-presets (f9): графиката Ниско / Средно / Високо
+import { openGfx } from './gfxlite.js';   // 🟠 gfx-lite (55): „Много ниско“ и „⚙️ Подробно“ за слаби компютри
+import { CHURCH_FILES, churchKinds, churchLots, churchPrep, churchAt } from './churches.js';   // ⛪ churches (f6): православните църкви и Невски в София
 import { createUsage } from './usage.js';   // 📊 usage-stats (f6): анонимна статистика за ползването — само със съгласие 'analytics'
 import { createAwaySummary } from './awaysum.js';   // 👋 away-summary (f6): „Докато те нямаше“ — обобщение и начислен пасивен приход при връщане
 import { createAds } from './ads.js';   // 📺 флаг ads: AdSense за игри — реклама между нещата и по желание за бонус
-import { createOnboarding } from './onboarding.js';   // 🎓 onboarding (f9): урокът при първа игра — камера, парцел, строеж, пари, град, настройки
+import { createOnboarding } from './onboarding.js';
+import { stationAccess } from './stationaccess.js';
+import { createSkySun } from './skysun.js';   // 🌅 sky-sun (f9): небе с градиент спрямо слънцето, видимо слънце, залез/изгрев, луна и звезди   // 🚉 station-access (f9): път от гарата до улица и паркинг до нея (градовете с плана v2)   // 🎓 onboarding (f9): урокът при първа игра — камера, парцел, строеж, пари, град, настройки
 import { initErrTelemetry, errPayload, sendErrors } from './errtelem.js';   // 🐞 err-telemetry (f9): грешките в буфер за изпращане (само със съгласие за анализи)
 import { pcGate, perfCheck } from './perfmeter.js';   // 🖥️ perf-meter (f9): играта е за компютър — екран за телефон/таблет и „Проверка на компютъра“
 
@@ -443,7 +447,7 @@ const renderer = (() => {
   try {
     const c = document.createElement('canvas');
     if (!window.WebGLRenderingContext || !(c.getContext('webgl2') || c.getContext('webgl'))) throw new Error('WebGL не е наличен');
-    return new THREE.WebGLRenderer({ antialias: true });
+    return new THREE.WebGLRenderer({ antialias: !(feature('gfx-presets') && feature('gfx-lite') && gfx().aa === false) });   // gfx-lite: „Много ниско“ — без изглаждане (при зареждането)
   } catch (e) { webglFail(e); throw e; }   // спира модула — без него играта не може да тръгне
 })();
 setMainRenderer(renderer);   // memfix.js 'tex-free': картинките на моделите се пускат след качването в този рендер
@@ -453,7 +457,8 @@ const texImOf = t => { const f = t.source && t.source.__free; return !f ? t.imag
 let perfFr = 0, perfT = 0, perfN = 0, perfHigh = null, perfDownAt = -1e9;
 const CPOL = feature('city-polish');   // ✨ city-polish (f9): мъглата отгоре в шаблонните градове, без стъклени кули в старите европейски градове, мекото сияние на забележителностите
 const GFXON = feature('gfx-presets'), gfxK = k => GFXON ? gfx()[k] : 1, prMax = () => GFXON ? gfx().pr() : Math.min(devicePixelRatio, 1.5);   // gfx-presets: нивото на графиката (Средно = досегашното)
-const cityCull = createCityCull({ group: () => city.group, target: () => controls.target, camDist: () => camera.position.distanceTo(controls.target), peds: () => [...standers, ...peds.map(p => p.m)], on: () => feature('perf-cliff') && !window.__noCull });   // __noCull — за сравнение преди/след от конзолата
+const GLITE = GFXON && feature('gfx-lite'), GLOADED = GLITE ? { tex: gfx().tex, aa: gfx().aa } : null, liteDet = () => GLITE ? gfx().detail : 1;   // 🟠 gfx-lite: детайлите наоколо (0…1); текстурите/изглаждането — каквито са заредени
+const cityCull = createCityCull({ group: () => city.group, target: () => controls.target, camDist: () => camera.position.distanceTo(controls.target), peds: () => [...standers, ...peds.map(p => p.m)], on: () => feature('perf-cliff') && !window.__noCull, detailK: liteDet });   // __noCull — за сравнение преди/след от конзолата
 function perfTune(rdt) {
   const high = camera.position.distanceTo(controls.target) > 230;
   cityCull.tick(rdt, high);
@@ -462,7 +467,7 @@ function perfTune(rdt) {
   if (!high && perfFr % (megaBase ? 8 : 4) === 0) renderer.shadowMap.needsUpdate = true;   // статичният град се променя рядко; обновяваме сенките през 4/8 кадъра
   if (high !== perfHigh) {
     perfHigh = high;
-    if (city.group) for (const o of city.group.children) if (o.userData.detail) o.visible = !high;
+    if (city.group) for (const o of city.group.children) if (o.userData.detail) o.visible = !high && liteDet() > 0;   // gfx-lite: „Детайли наоколо“ 0 — и отблизо не
     renderer.shadowMap.needsUpdate = true;
   }
   if ((perfFr % 30 === 0 || high) && (high || !feature('perf-cliff'))) { for (const m of standers) m.visible = !high; for (const p of peds) p.m.visible = !high; }   // perf-cliff: близо — по разстояние (citycull.js)   // и новодошлите
@@ -488,7 +493,7 @@ const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 1, 900)
 camera.position.set(60, 95, 110);
 const controls = new MapControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.maxPolarAngle = 1.25;
+controls.maxPolarAngle = feature('sky-sun') ? 1.42 : 1.25;   // sky-sun (f9): по-полегата камера — да се вижда небето и залезът над хоризонта
 controls.minDistance = 25;
 controls.maxDistance = 320;
 const hemi = new THREE.HemisphereLight(0xdfefff, 0x6b7b55, 1.3);
@@ -498,6 +503,7 @@ sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -110, right: 110, top: 110, bottom: -110, near: 1, far: 400 });
 sun.shadow.bias = -0.0004;
+const skySun = feature('sky-sun') ? createSkySun(scene) : null, SKY_CLOUD = { clear: 0, cloudy: 0.55, rain: 0.9, storm: 1, snow: 0.85, fog: 0.8 };   // sky-sun: колко облаци крият слънцето
 scene.add(sun, sun.target);
 const farBase = () => city.osmView ? 3200 : 900, gfxCtx = () => ({ renderer, sun, camera, farBase });   // gfx-presets: далечината без нивото (city — по-долу; ползва се чак при смяна)
 if (GFXON) setGfx(gfxLevel(), { renderer, sun }, false);   // далечината — при влизането в града (camera.far там)
@@ -807,7 +813,9 @@ async function plan2Need(s) {
     await plan2Preload(s);
   }
 }
-const plan2Plan = id => { const t = plan2Tier(), c = plan2.cache; if (c && c.id === id && c.t === t) return c.P; const P = plan2.mod.gamePlan2(plan2.data[id], { tier: t }); plan2.cache = { id, t, P }; return P; };
+// 🚉 station-access (f9): пътят до гарата — в графа на плана (stationaccess.js); гарата е на STATION_X (източният ръб на перона +8), около z = 0
+const STACC = feature('station-access'), stPrep = STACC ? (P, ox, oz) => { try { return stationAccess(P, { x: STATION_X + 8 - ox, z0: -45 - oz, z1: 45 - oz }); } catch (e) { console.warn('station-access', e); return P; } } : null;
+const plan2Plan = id => { const t = plan2Tier(), c = plan2.cache; if (c && c.id === id && c.t === t) return c.P; const P = plan2.mod.gamePlan2(plan2.data[id], { tier: t, prep: stPrep }); plan2.cache = { id, t, P }; return P; };
 // старите записи: градът по истинската карта идва сам, ако още нямаш нищо там; иначе — по избор с изкупуване (plan2Move)
 const plan2Ready = (id = S && S.cityId) => !!id && feature(id + '-osm') && feature(id + '-game');
 const plan2Touched = (s, id) => s.cityId === id || s.hqCity === id || !!(s.cities || {})[id] || (s.branches || []).includes(id);
@@ -839,7 +847,7 @@ const plan2GenOn = id => !!(S && S.plan2gen && plan2.mod && !(S.plan2 && S.plan2
 const plan2GenPlan = id => { const mega = MEGAPOLIS.has(id), t = cityTier(id), cnt = planCountOf(id, S.cityExt || 0), c = plan2.cache;
   const ed = S.planEd && plan2.edits ? (id in S.planEd ? S.planEd[id] : (S.planEd[id] = plan2.edits[id] || 0)) : 0;   /* #29 plan-edit: редакцията се копира в записа при първото влизане в града — по-късните промени в редактора не местят улиците на тази игра */
   if (c && c.id === id && c.t === 'g' + cnt + (S.roadGeo ? 'r' : '') + (S.jfix ? 'j' : '') + (ed ? 'e' : '')) return c.P;   /* road-geo — друг план (само новите игри) */
-  const P = plan2.mod.gamePlan2Gen(id, { edit: ed || null, roadGeo: !!S.roadGeo, jfix: !!S.jfix, tier: mega ? 'xl' : t === 'xl' ? 'xl' : t === 'l' ? 'l' : t === 's' ? 's' : 'm', coastal: SEASIDE.includes(id), region: isAm(id) ? 'us' : null, mega, count: cnt, minLots: mega ? MEGA_LOTS : PLAN_CORE + extLotsOf(id) * Math.max(MAX_EXT, extRule(id)) });
+  const P = plan2.mod.gamePlan2Gen(id, { prep: stPrep, edit: ed || null, roadGeo: !!S.roadGeo, jfix: !!S.jfix, tier: mega ? 'xl' : t === 'xl' ? 'xl' : t === 'l' ? 'l' : t === 's' ? 's' : 'm', coastal: SEASIDE.includes(id), region: isAm(id) ? 'us' : null, mega, count: cnt, minLots: mega ? MEGA_LOTS : PLAN_CORE + extLotsOf(id) * Math.max(MAX_EXT, extRule(id)) });
   plan2.cache = { id, t: 'g' + cnt + (S.roadGeo ? 'r' : '') + (S.jfix ? 'j' : '') + (ed ? 'e' : ''), P }; return P; };
 const planOf = id => plan2On(id) ? plan2Plan(id) : plan2GenOn(id) ? plan2GenPlan(id) : planOn(id) ? gamePlan(id, { exts: Math.max(MAX_EXT, extRule(id)), landmark: !!CITY_LANDMARKS[id], seaside: SEASIDE.includes(id), mega: MEGAPOLIS.has(id), bigZone: bigZoneOf(id), clean: S.planAll >= 6, clean2: S.planAll >= 9, tpl: (S.planAll >= 7 && PLAN_TPL7[id]) || (S.planAll >= 5 && PLAN_TPL5[id]) || (S.planAll >= 4 ? PLAN_TPL4[id] : undefined) }) : null;
 // запазената зона в плана за голямата забележителност: колкото W×D парцела на мрежата ((3W − 1) плочки − 2 м)
@@ -1072,7 +1080,7 @@ const osmFog = { on: false, near: 180, far: 420 };   // мъглата в гра
 const weather = createWeather({ scene, hemi, sun, camera, fogBase: () => osmFog.on ? osmFog : null });
 // 🌦️ weather2 (f9): времето по календара — дъжд/сняг на епизоди, детерминистично по град и игрален момент (weather.js wx2Kind)
 const W2 = feature('weather2'), wx2C = id => ({ id, lat: cityById(id)?.lat ?? 45, desert: isDesert(id) });
-const wx2Now = () => events.stormy() ? 'storm' : wx2Kind(wx2C(S.cityId), S.day + S.dayT / DAY_SEC, CYCLE_DAYS, monthOf);
+const wx2Now = () => S?.wxLock ? S.wxLock : events.stormy() ? 'storm' : wx2Kind(wx2C(S.cityId), S.day + S.dayT / DAY_SEC, CYCLE_DAYS, monthOf);
 // парцелите, по които записът има нещо (сграда, обект, имот, парк, склад, гараж…)
 function occupiedLots(cityId) {
   const s = new Set(), add = v => { if (v != null) s.add(+v); }, E = S.estate || {};
@@ -1325,6 +1333,11 @@ function buildCity(cityId) {
     placeBuilding(lot, n, rot, r);
   }
   if (city.center) for (const l of city.center) { if (l.obj) g.remove(l.obj); l.obj = null; l.built = null; l.busy = 'landmark'; }
+  // ⛪ churches (f6): 1–2 православни църкви близо до центъра (churches.js) — парцелът се запазва веднага, моделът идва, щом се зареди
+  if (CHURCHES) { const kinds = churchKinds(cityById(cityId)?.cc || '🇧🇬'); if (kinds) { const ctr = (city.plan && city.plan.square) || city.hq, n = (cityById(cityId)?.sz || 1) >= 2 ? 2 : 1;
+    churchLots(city.lots.filter(l => l !== city.hq), ctr, n, hashStr('ch:' + cityId)).forEach((lot, i) => { const k = kinds[(hashStr('chk:' + cityId) + i) % kinds.length], hold = new THREE.Group();
+      hold.userData.src = 'church-' + k; g.add(hold); (lot.trees = lot.trees || []).push(hold); lot.busy = 'reserved'; lot.reserved = 'church'; lot.church = k;
+      churchModel(k).then(sc => { if (sc && hold.parent) hold.add(churchAt(k, churchPrep(k, sc, m => { try { dayNight.winMats.add(m); } catch (e) { } }), lot, lot.plan ? lot.rot || 0 : 0)); }); }); } }
   // зелени парцели — по малко дървета
   for (const lot of city.lots) {
     if (lot.built || lot.busy) continue;
@@ -5011,7 +5024,7 @@ const coop = createCoop({ addXp: n => dev.add(n), lv: () => dev.rawBest(),
 const tutorial = createTutorial({ S: () => S, projects: () => projects, units: () => units, save,
   onMap: () => !$('mapScreen').classList.contains('hidden'), openTab: t => { tab = t; renderPanel(); } });
 const onboard = feature('onboarding') ? createOnboarding({ auto: !AUTOTEST, S: () => S, camera, canvas: renderer.domElement, projects: () => projects,   // 🎓 onboarding (f9)
-  onMap: () => !$('mapScreen').classList.contains('hidden'), perfCheck: () => perfCheck(renderer, GFXON ? lv => applyGfx(lv) : null),
+  onMap: () => !$('mapScreen').classList.contains('hidden'), perfCheck: () => perfCheck(renderer, GFXON ? lv => applyGfx(lv) : null, gfxMore()),
   ready: () => !!S && !!city?.ready && !$('loading') && !$('cine') && $('modal').classList.contains('hidden') }) : null;
 const resorts = createResorts({ xp: n => xpMore(n),
   S: () => S, econ: () => econ, toast, modal, proj, fmt, save, devBest: () => dev.best(), symK: () => (mapEU ? 2.6 : (mapWide ? 1.6 : 1) * (mapNear() ? 1 : 0.7)) * mapK(),   // отдалеч курортите са по-малки
@@ -5315,7 +5328,7 @@ const topSetRows = () => { const C = topSetCounts(), tap = id => () => { const b
     { ico: () => txt('btnNotif') || '🔔', nm: () => ((document.getElementById('btnNotif') || {}).title || 'Известия').replace(/ — натисни за смяна$/, ''), fn: tap('btnNotif'), keep: true, on: !!document.getElementById('btnNotif') },
     { ico: () => '❓', nm: () => 'Помощ — обиколка на бутоните', fn: tap('btnTour'), on: !!document.getElementById('btnTour') },
     { ico: () => '💡', nm: () => 'Съвет — как да печелиш и да не фалираш', fn: tap('btnTips'), on: !!document.getElementById('btnTips') },
-    { ico: () => '🖥️', nm: () => 'Проверка на компютъра — ще върви ли добре', fn: () => perfCheck(renderer, GFXON ? lv => applyGfx(lv) : null), on: feature('perf-meter') },   // perf-meter (f9); gfx-presets — „Приложи“ предложеното ниво
+    { ico: () => '🖥️', nm: () => 'Проверка на компютъра — ще върви ли добре', fn: () => perfCheck(renderer, GFXON ? lv => applyGfx(lv) : null, gfxMore()), on: feature('perf-meter') },   // perf-meter (f9); gfx-presets — „Приложи“ предложеното ниво
     { ico: () => '🎨', nm: () => `Графика: ${gfx().nm}`, fn: () => openGfxUI(), on: GFXON },
     { ico: () => '🎓', nm: () => 'Покажи урока пак — първите стъпки', fn: () => onboard.restart(), on: !!onboard },   // 🎓 onboarding (f9)   // gfx-presets (f9)   // perf-meter (f9)
   ].filter(r => r.on); };
@@ -5325,8 +5338,11 @@ if (feature('top-set')) {
   // 24.10: 📋 Задачи — пак горе (със своя брояч), 🎯 Куести — в менюто „Империята“; на ⚙️ вече няма брояч
 }
 // 🎨 gfx-presets (f9): изборът на графиката — веднага, без презареждане (сенките, рязкостта, видимостта; колите и хората — постепенно)
-function applyGfx(lv) { setGfx(lv, gfxCtx()); toast(`🎨 Графика: ${GFX[lv].nm} — ${GFX[lv].desc}.`, 'good'); }
-function openGfxUI() { modal('🎨 Графика', `Сега: <b>${gfx().ico} ${gfx().nm}</b>.<br>${GFX_ORDER.map(k => `<b>${GFX[k].ico} ${GFX[k].nm}</b> — ${GFX[k].desc}`).join('<br>')}<br><small>Не знаеш кое? ⚙️ → „Проверка на компютъра“ ще предложи.</small>`,
+function applyGfx(lv, o = null) { setGfx(lv, gfxCtx(), true, o); if (!o) toast(`🎨 Графика: ${GFX[lv].nm} — ${GFX[lv].desc}.`, 'good'); }   // gfx-lite: o — „⚙️ Подробно“ (свои стойности, без съобщение); ново ниво — без тях
+// 🟠 gfx-lite: прозорецът „🎨 Графика“ — всички нива и „⚙️ Подробно“; от проверката на компютъра — с предложеното ниво
+const gfxDeps = () => ({ apply: applyGfx, stats: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, pr: renderer.getPixelRatio() }), loaded: GLOADED, save: () => { try { save(); } catch (e) { } } });
+const gfxMore = () => GLITE ? { order: GFX_ORDER, GFX, open: (sug, detail) => openGfx(gfxDeps(), { suggest: sug, detail }) } : null;
+function openGfxUI() { if (GLITE) return openGfx(gfxDeps()); modal('🎨 Графика', `Сега: <b>${gfx().ico} ${gfx().nm}</b>.<br>${GFX_ORDER.map(k => `<b>${GFX[k].ico} ${GFX[k].nm}</b> — ${GFX[k].desc}`).join('<br>')}<br><small>Не знаеш кое? ⚙️ → „Проверка на компютъра“ ще предложи.</small>`,
   [...GFX_ORDER.map(k => [`${GFX[k].ico} ${GFX[k].nm}`, () => applyGfx(k)]), ['Затвори', null]]); }
 const openSettingsUI = () => window.__settings ? window.__settings({ audio: feature('music') ? (() => { try { return music; } catch { return null; } })() : null, quick: feature('top-set') ? topSetRows : null, credits: showCredits, saves: openSavesUI, rename: S && S.brand ? renameBrand : null, newGame: () => modal('Нова игра?', 'Сегашната фирма ще бъде изтрита.', [['Отказ', null], ['Изтрий и започни', wipeSlot]]), lock: () => { save(); saveLock = true; } })
   : modal('⚙️ Още', 'Авторите на моделите и музиката · или започни нова игра в този слот.', [['Затвори', null], ['📜 Автори', showCredits], ['🗑️ Нова игра', () => modal('Нова игра?', 'Сегашната фирма ще бъде изтрита.', [['Отказ', null], ['Изтрий и започни', wipeSlot]])]]);
@@ -6833,6 +6849,18 @@ function landmarkPlan(kinds) {
     shade(o); city.group.add(o.group); city.landmarks.push(o);
   });
 }
+// ⛪ churches (f6): моделите на църквите — веднъж, при първия православен град
+const CHURCHES = feature('churches'), chLoad = {}, churchModel = k => chLoad[k] ||= new GLTFLoader().loadAsync('assets/heavy/' + CHURCH_FILES[k]).then(gl => gl.scene).catch(() => null);
+// ⛪ churches: храм-паметникът „Св. Александър Невски“ в София (по плана) — на запазеното място за забележителност („special“) най-близо до площада.
+// Истински ръст 52 м при основа 62 × 79 м (с цокъла); кварталът е 56 × 46 м — смалява се, докато се побере (+2 м тротоар от всяка страна): ~×0,76 → ~39 м.
+function nevskyPlace() {
+  const P = city.plan, sq = P && P.square; if (!sq) return;
+  const B = (P.bigs || []).filter(b => b.kind === 'special').sort((a, b) => Math.hypot(a.x - sq.x, a.z - sq.z) - Math.hypot(b.x - sq.x, b.z - sq.z))[0]; if (!B) return;
+  const o = buildLandmark('nevsky', { label }), lw = Math.max(B.w, B.d), sw = Math.min(B.w, B.d), f = Math.min(1, (lw + 4) / 79.4, (sw + 4) / 62.1);
+  const pl = o.group.children.find(c => c.isMesh && c.geometry?.parameters?.width === 15); if (pl) pl.visible = false;   // плочата 15 × 15 — моделът стъпва на земята
+  o.group.scale.setScalar(f * 51.7 / 15); o.group.rotation.y = (B.rot || 0) + (B.w >= B.d ? Math.PI / 2 : 0); o.group.position.set(B.x, 0.1, B.z);   // дългата ос на модела (z) — по дългата страна
+  o.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); city.group.add(o.group); city.landmarks.push(o);
+}
 function refreshLandmarks() {
   for (const o of city.landmarks || []) if (!o.big) city.group.remove(o.group);
   city.landmarks = [...(city.bigLm || [])];   // големите (МГУ…) живеят в refreshMines3D
@@ -6841,6 +6869,7 @@ function refreshLandmarks() {
     o.group.position.set(x0 + (p.xMax - x0) * (0.28 + i * 0.2), 0, p.z - 75); o.group.rotation.y = Math.PI;
     city.group.add(o.group); city.landmarks.push(o);
   });
+  if (CHURCHES && S.cityId === 'sofia' && city.plan && city.plan.p2 && !city.plan.osm) nevskyPlace();   // ⛪ churches: Невски
   const kinds = CITY_LANDMARKS[S.cityId] && [...CITY_LANDMARKS[S.cityId], ...(city.bigFail || [])]; if (!kinds || !city.lots) return;
   S.landmarks = S.landmarks || {}; const mem = S.landmarks[S.cityId] = S.landmarks[S.cityId] || {};
   const used = [];
@@ -7500,6 +7529,23 @@ function buildStation() {
   station.build(stationLv(), S.stationBuild ? S.stationBuild.target : null);
   parkedSig = '';
   refreshPassing();
+  stationPark();
+}
+// 🚉 station-access (f9): паркингът до гарата (мястото — P.access.park от stationaccess.js): асфалт, места, бордюр; колите — повече с нивото
+function stationPark(again = 0) {
+  if (city.stPark) { city.group.remove(city.stPark); city.stPark = null; }
+  { const i = parks.list.findIndex(q => q.id === 'station'); if (i >= 0) parks.list.splice(i, 1); }   // при ново ниво — наново
+  const gp = city.plan, pk = STACC && gp && gp.p2 && gp.p2.access && gp.p2.access.park, lv = stationLv(); if (!pk || lv < 1) return;
+  const [x, z] = gp.toGame(pk.x, pk.z), rot = pk.rot, Lp = parkLayout(pk.w - 1, pk.d - 1); if (!Lp.n) return;
+  const g = new THREE.Group(); g.name = 'stPark'; g.position.set(x, 0, z); city.group.add(g); city.stPark = g;
+  const pg = parkMesh(Lp, 0.5); pg.rotation.y = rot; g.add(pg);
+  const c = Math.cos(rot), sn = Math.sin(rot), h = hashStr('stp:' + S.cityId), cars = Object.keys(A).filter(n => n.startsWith('sf-car-') && !/Bus|Truck|Firetruck|Ambulance|Police|Limousine|Van/.test(n)), pc = {};
+  const want = Math.min(Lp.spots.length, 2 + lv * 3);   // ниво 1 — 5 коли, ниво 5 — 17 (колкото места има)
+  if (!cars.length && again < 6) { const cityG = city.group; setTimeout(() => { if (city.group === cityG && city.stPark === g) stationPark(again + 1); }, 4000); }   // колите (Sketchfab) още се зареждат
+  let nc = 0; Lp.spots.forEach(([a, b, da, db], k) => { if (nc >= want || !cars.length || ((h >>> (k % 24)) & 3) === 0 && Lp.spots.length - k > want - nc) return;
+    const n = cars[(h + k * 7) % cars.length], o = darkParked(model(n, 1)); o.traverse(m => { if (m.isMesh && [].concat(m.material).some(x2 => x2.transparent && x2.opacity < 0.9)) m.visible = false; });
+    o.rotation.y = rot + Math.atan2(da, db); o.position.set(a * c + b * sn, 0.13, -a * sn + b * c); o.userData.detail = true; g.add(o); pc[k] = o; nc++; });
+  if (feature('park-api') && !pk.fore) parks.add({ id: 'station', x, z, rot, L: Lp, ext: 0.5, cars: pc });   /* park-api: колите на трафика могат да паркират тук (само до пътя — площадът пред гарата е без устие към улица) */
 }
 function refreshPassing() {
   if (passing) passing.clear();
@@ -7664,6 +7710,7 @@ function updateStationBuild(dtDays) {
   station.build(S.stationLevel);
   parkedSig = '';
   refreshPassing();
+  stationPark();   // station-access: паркингът расте с нивото
   SFXcash();
   toast(`🚉 Гарата е готова: ${STATION_LEVELS[S.stationLevel - 1].nm} с ${S.stationLevel} ${S.stationLevel === 1 ? 'коловоз' : 'коловоза'}. Побира ${S.stationLevel} ${S.stationLevel === 1 ? 'влак' : 'влака'}.`, 'good');
   save(); renderPanel();
@@ -11175,7 +11222,8 @@ function frame() {
     if (window.__overlay3d > 0) return;
   }   // директорската зала (directors3d.js) е втори WebGL на цял екран — градът под нея не се рисува (иначе две сцени на кадър)
   controls.update();
-  if (S) { dayNight.update(todF(), controls.target); weather.update(rdt, controls.target); setSiteLightsNight(dayNight.night); if (cityHw && cityHw.signs) for (const G of cityHw.signs) G.setNight(dayNight.night); if (city.billboards) { city.billboards.setNight(dayNight.night); city.billboards.update && city.billboards.update(rdt); } }
+  if (S) { dayNight.update(todF(), controls.target); weather.update(rdt, controls.target); if (skySun) skySun.update((6 + todF() * 24) % 24, camera, controls.target, SKY_CLOUD[weather.kind] ?? 0, sun);   /* sky-sun: след денонощието и времето */ setSiteLightsNight(dayNight.night); if (cityHw && cityHw.signs) for (const G of cityHw.signs) G.setNight(dayNight.night); if (city.billboards) { city.billboards.setNight(dayNight.night); city.billboards.update && city.billboards.update(rdt); } }
+  if (GLITE) dayNight.glowMat.visible = dayNight.poolMat.visible = dayNight.night > 0.01 && gfx().night;   // 🟠 gfx-lite: ореолите на лампите — денем (прозрачност 0) без рисуване; „Нощни светлини“ — изключени
   perfTune(rdt);
   perf.lap('prep');
   renderer.render(scene, camera);
@@ -11787,6 +11835,9 @@ if (AUTOTEST) {
     tenderInfo() { const by = {}; for (const t of TENDERS) { const k = COUNTRIES.find(c => c.cities.includes(t.city)); const n = k ? k.nm : '?'; by[n] = (by[n] || 0) + 1; } const low = COUNTRIES.filter(k => (by[k.nm] || 0) < 2).map(k => k.nm); return { total: TENDERS.length, low, sample: TENDERS.filter(t => t.id.startsWith('st-')).slice(0, 6).map(t => [t.nm, t.budget, t.dev]) }; },
     civicLook(kind, prog = 1, ext = [42, 42]) { S.day = 1; S.dayT = DAY_SEC * 0.3; if (city.civT) city.civT.dispose(); const l = city.lots.find(q => q.zone === 'outer' && !q.busy) || city.lots[5]; city.civT = buildCivic(city.group, { label }, { x: l.x, z: l.z, scale: 1, prog, sign: kind, kind, ext }); showMap(false); controls.target.set(l.x, 0, l.z); camera.position.set(l.x + 45, 50, l.z + 55); controls.update(); fly = null; return TENDERS.filter(t => t.kind === kind).length; },
     tenderGo(id) { S.dev.xp = 260000; S.dev.lv = 10; S.rep = 5; econ.earn(2e8, 'друго', 'тест'); __dbg.tender(id, 0.8, 0.5); refreshTender3D(); const t = TENDERS.find(x => x.id === id); const lot = city.lots[S.tenderLots?.[id]]; if (lot) { showMap(false); controls.target.set(lot.x, 0, lot.z); camera.position.set(lot.x + 40, 45, lot.z + 50); controls.update(); fly = null; } return { ok: !!city.tender3D[id], st: tenders.state(id).st, x: lot?.x, z: lot?.z }; },
+    gfxEnv: () => ({ renderer, scene, camera, controls, sun, THREE, city, peds, standers }),   // gfx-lite (55): измерванията за слаби компютри (Лабораторията/тестовете)
+    gfxDemo(from = 'mid', to = 'vlow') { const ls = (v => () => { try { v == null ? localStorage.removeItem('stroi-gfx') : localStorage.setItem('stroi-gfx', v); } catch (e) { } })(localStorage.getItem('stroi-gfx'));   // gfx-lite: демото не сменя избора за другите демота
+      applyGfx(from); ls(); setTimeout(() => { openGfx(gfxDeps(), { detail: true, suggest: to }); setTimeout(() => { applyGfx(to); ls(); }, 6000); }, 1500); },
     perf() { renderer.info.reset ? 0 : 0; const i = renderer.info; let meshes = 0, tris = 0, lights = 0; scene.traverse(o => { if (o.isMesh && o.visible) { meshes++; } if (o.isLight) lights++; }); return { calls: i.render.calls, tris: i.render.triangles, geoms: i.memory.geometries, tex: i.memory.textures, meshes, lights, pr: renderer.getPixelRatio(), shadow: renderer.shadowMap.enabled }; },
     spurCityTest() { const id = S.cityId, other = id === 'sofia' ? 'pleven' : 'sofia'; S.spurs = [{ a: id, b: other }]; S.hwDone = [abSegId(id, other)]; delete S.cities; sessionStorage.setItem('stroiAT', JSON.stringify(S, (k, v) => k === 'vis' ? undefined : v)); setTimeout(() => location.reload(), 50); return 'reload'; },
     spurCityCheck() { return { hw: !!cityHw, hubs: roadHubs().has(S.cityId), need: linkNeeds(S.cityId).road }; },
@@ -11799,6 +11850,7 @@ if (AUTOTEST) {
     kremlin(a = 0, d = 300, h = 120) { const g = scene.getObjectByName('kremlin2'), LY = g && g.parent.userData.kremlin2; if (!LY) return false; const n = LY.poly.length, v = g.parent.localToWorld(new THREE.Vector3(LY.poly.reduce((s, p) => s + p[0], 0) / n, 0, LY.poly.reduce((s, p) => s + p[1], 0) / n));   /* lm-kremlin2: камерата около Кремъл (a — ъгъл: 0 откъм реката, ~2,3 — откъм Червения площад) */
       showMap(false); controls.target.set(v.x, 12, v.z); camera.position.set(v.x + Math.sin(a) * d, h, v.z + Math.cos(a) * d); fly = null; return { towers: LY.towers.length, walls: LY.walls.length, x: Math.round(v.x), z: Math.round(v.z) }; },
     lookLm(i = 0, d = 120) { const o = (city.landmarks || [])[i]; if (!o) return false; const v = o.group.position; showMap(false); controls.target.set(v.x, 20, v.z); camera.position.set(v.x + d * 0.8, d * 0.6, v.z + d); fly = null; return city.landmarks.length; },
+    churchLook(i = 0, d = 70) { const L = city.lots.filter(l => l.reserved === 'church'); const l = L[i]; if (!l) return { n: 0 }; showMap(false); controls.target.set(l.x, 4, l.z); camera.position.set(l.x + d * 0.7, d * 0.6, l.z + d); controls.update(); fly = null; return { n: L.length, k: l.church }; },   // ⛪ churches: Лабораторията
     osmFill(on = true) { osmFillOn = !!on && OSM_FILL; city.planView?.userData?.refill?.(); return osmFillOn; },   // 🏙️ osm-fill: Лабораторията — преди (false) / след (true)
     lookLmKind(k, d = 120) { const i = (city.landmarks || []).findIndex(o => o.kind === k); return i < 0 ? false : this.lookLm(i, d); },   // 🗽 liberty-island: по вида (liberty2)
     tclose(id, rivalM) { const s = tenders.state(id); if (rivalM) s.bids.forEach(b => b.m = rivalM); tenders.close(id); renderPanel(); return { st: tenders.state(id), money: Math.round(econ.s.money) }; },
@@ -11920,7 +11972,7 @@ if (AUTOTEST) {
     afHwView(rail = false) { S.dev.lv = 10; S.dev.xp = 260000; if (rail) { S.rails = [...(S.rails || []), { a: 'cairo', b: 'alexandria', km: 180, days: 10, prog: 0.5, built: false }]; openHwView('rail:cairo-alexandria'); return 1; } const sg = ALL_AB.find(x => x.id === 'ab:alexandria-cairo'); S.hwJobs = [{ seg: sg.id, ab: true, km: 180, ...abQuoteSeg(sg, 180), stage: 4, prog: 0.3, mat: {}, start: S.day, v2: true, city: S.cityId }]; openHwView(sg.id); return sg.id; },
     hwView() { const s = allSegs()[0]; openHwView(s.id); return s.id; },
     abSegView(stage = 2, prog = 0.5) { const sg = ALL_AB[0]; S.hwJobs = [{ seg: sg.id, ab: true, km: 100, ...abQuote(100), stage, prog, mat: {}, start: S.day, v2: true, city: S.cityId }]; openHwView(sg.id); return sg.id; },
-    wx(k, cover) { weather.set(k); if (cover != null) weather.setCover(cover); return weather.kind; },
+    wx(k, cover) { if (S) S.wxLock = k || null; weather.set(k);   /* weather2: тестовете/демата — времето стои (иначе календарът го сменя всяка секунда) */ if (cover != null) weather.setCover(cover); return weather.kind; },
     event: () => { for (let k = 0; k < 40; k++) { S.events && (S.events.last = -9); const e = events.dailyTick(S.day + k * 3); if (e) return e.title; } return null; },
     p2Signs: () => city.p2Signs ? { n: city.p2Signs.n, counts: city.p2Signs.counts, meshes: city.p2Signs.group.children.length } : null,   /* road-signs в плана v2 */
     lookSign(kind = 'stop', k = 0, h = 14) { const g = city.p2Signs && city.p2Signs.group, im = g && g.children.find(m => m.userData.roadSign === kind); if (!im || k >= im.count) return false; const M = new THREE.Matrix4(); im.getMatrixAt(k, M); const p = new THREE.Vector3().setFromMatrixPosition(M).applyMatrix4(g.matrixWorld); controls.target.set(p.x, 1.5, p.z); camera.position.set(p.x + h * 0.7, h * 0.6, p.z + h * 0.7); return [Math.round(p.x), Math.round(p.z)]; },
@@ -12090,6 +12142,11 @@ if (AUTOTEST) {
       setTimeout(() => { const r = sendErrors(); modal('🐞 Телеметрия на грешките', `Изпращане: <b>${r.sent ? 'изпратени ' + r.sent + ' (засега само в конзолата и localStorage)' : r.reason === 'no-consent' ? 'не — няма съгласие за анализи' : 'няма нови'}</b><br>Това би тръгнало:<pre style="white-space:pre-wrap;font-size:11px;max-height:50vh;overflow:auto;text-align:left">${JSON.stringify(errPayload(), null, 1).replace(/</g, '&lt;')}</pre>`, [['OK', null]]); }, 800); return true; },
     wx2Go(kind = 'snow', from = S.day, dayOnly = true) { const c = wx2C(S.cityId); for (let t = from; t < from + 400; t += 0.02) { const h = (((t - 1) / CYCLE_DAYS) % 1) * 24 + 6; if (dayOnly && (h % 24 < 9 || h % 24 > 17)) continue; if (wx2Kind(c, t, CYCLE_DAYS, monthOf) === kind) { S.day = Math.floor(t); S.dayT = (t % 1) * DAY_SEC; weather.set(kind); S.weather = kind; return { day: S.day, month: monthOf(S.day), clock: clockText(todF()) }; } } return null; },   // 🌦️ weather2: Лабораторията — до следващия сняг/дъжд в града
     wx2Stats(id = S.cityId, days = 360) { const c = wx2C(id), out = {}; let prev = null, eps = 0; for (let t = 1; t < 1 + days; t += 0.02) { const k = wx2Kind(c, t, CYCLE_DAYS, monthOf); out[k] = (out[k] || 0) + 0.02; if (k !== prev && ['rain', 'snow', 'storm'].includes(k)) eps++; prev = k; } return { id, lat: c.lat, desert: c.desert, eps, perMonth: +(eps / (days / 30)).toFixed(1), days: Object.fromEntries(Object.entries(out).map(([k, v]) => [k, Math.round(v)])), cycleSec: CYCLE_DAYS * DAY_SEC }; },
+    stAccess(lv) { if (lv != null) { S.stationLevel = lv; S.stationBuild = null; buildStation(); } const gp = city.plan, ac = gp && gp.p2 && gp.p2.access; if (!ac) return null; const g = (p) => p && gp.toGame(p[0], p[1]).map(Math.round);   // 🚉 station-access: Лабораторията
+      return { len: ac.len, split: ac.split, bend: ac.bend, a: g(ac.a), b: g(ac.b), park: ac.park && { at: g([ac.park.x, ac.park.z]), w: ac.park.w, d: ac.park.d, fore: !!ac.park.fore }, cars: city.stPark ? city.stPark.children.length - 1 : 0, stX: STATION_X }; },
+    skyDemo(kind = 'sunset', sec = 24) { clearInterval(window.__skyIv); const [from, to] = kind === 'sunrise' ? [4.8, 8] : [18, 21.2], t = controls.target, w = kind === 'sunrise' ? 1 : -1, t0 = performance.now();   // 🌅 sky-sun: Лабораторията — залез/изгрев с бързо превъртане
+      S.wxLock = 'clear'; weather.set('clear'); showMap(false); this.camAt(t.x - w * 150, 45, t.z + 40, t.x + w * 220, 75, t.z - 30);
+      window.__skyIv = setInterval(() => { const k = Math.min(1, (performance.now() - t0) / 1000 / sec); this.time(from + (to - from) * k); if (k >= 1) clearInterval(window.__skyIv); }, 50); return kind; },
     onbDemo() { onboard?.restart(); return onboard?.step(); },   // 🎓 onboarding: Лабораторията (под autotest урокът не тръгва сам)
     ads: () => ads,   // 📺 ads: Лабораторията (skipWait, next, state)
     awayDemo(h = 9, bankMin = 60, more = true) { if (!awaySum) return null; if (more) S.branches = [...new Set([...(S.branches || []), 'plovdiv', 'varna', 'istanbul'])]; ads?.skipWait?.(); return awaySum.demo(h, bankMin); },   // 👋 away-summary: отсъствие h ч с bankMin мин игра (more — още 3 града за списъка)

@@ -32,7 +32,7 @@ const licOf = (s, host) => /CC.?BY.?NC/i.test(s) ? 'CC-BY-NC-4.0' : /CC.?BY.?SA|
 // вид по папката на файла
 const KIND = [
   ['Забележителности', /^(lm|stadium2?|hotels5)\//], ['Паметници и фонтани', /^statues\//],
-  ['Сгради', /^(blocks2?|sky|civic2?|commercial2?|houses2?|office|wh2|rome|industry|port|gas|resort|hospital|station|mines|burned|metro|people\/hotel|people\/skihotel|air\/term|air\/tower)\b|^(building|h2-|office-|wh-l|it-|burned-|hotel)/],
+  ['Сгради', /^(blocks2?|churches|sky|civic2?|commercial2?|houses2?|office|wh2|rome|industry|port|gas|resort|hospital|station|mines|burned|metro|people\/hotel|people\/skihotel|air\/term|air\/tower)\b|^(building|h2-|office-|wh-l|it-|burned-|hotel)/],
   ['Превозни средства и техника', /^(cars|vans|trucks|trains|ships|boats|marina|air|gear|inc|ops|riot|construct\/sf-mixer|lift)\b|^(car-|bus-|pol-|fire-|amb-|bulldozer|dump|crane|rescue|heli|ladder|burnt|riot-van)/],
 ];
 const kindOf = (f, file) => /music\//.test(file) ? 'Музика' : /sfx\//.test(file) ? 'Звуци' : /(^|\/)(people\/(people|peds)|riot-cop|firefighter|paramedic)/.test(f) ? 'Хора' : (KIND.find(([, re]) => re.test(f)) || ['Улица, природа и обзавеждане'])[0];

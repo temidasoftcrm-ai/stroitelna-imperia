@@ -5,6 +5,8 @@
 // Обектите Texture остават отделни (свои offset/repeat), сменя се само източникът. Зарежда се преди game.js.
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { feature } from './lab/feature.js';
+import { Texture } from 'three';
+import { gfx } from './gfxpresets.js';   // 🟠 gfx-lite: „Много ниско“ — текстурите до 256 px и без анизотропно филтриране (при зареждането)
 
 const N = 128, cv = document.createElement('canvas'); cv.width = cv.height = N;
 const g2 = cv.getContext('2d', { willReadFrequently: true });
@@ -37,7 +39,8 @@ function share(tex) {
 }
 // по-малки текстури (feature 'tex512'): картинка над 512 px се смалява до 512 по по-дългата страна — камерата никога не стига толкова близо,
 // а 1024² е 4× паметта (и в браузъра, и във видеокартата). Забележителностите (assets/heavy/lm) остават с пълната си разделителна способност.
-const MAXT = 512, small = new WeakSet(), shrunk = { n: 0, savedMB: 0 };
+const LITE_T = feature('gfx-lite') && gfx().tex < 512, MAXT = LITE_T ? gfx().tex : 512, small = new WeakSet(), shrunk = { n: 0, savedMB: 0 };
+if (LITE_T) Object.defineProperty(Texture.prototype, 'anisotropy', { get: () => 1, set() { }, configurable: true });   // gfx-lite: всички текстури (и платната на града) — анизотропия 1
 function shrink(tex) {
   if (!tex || !tex.isTexture || !tex.source || small.has(tex.source)) return; small.add(tex.source);
   const img = tex.source.data; if (!img || tex.isDataTexture || tex.isCompressedTexture) return;
@@ -51,7 +54,7 @@ export function shareTextures(root, path = '') {
   shareTextures0(root);   // първо общите картинки (подписът се смята от оригинала — бързо), после смаляване веднъж на източник
   if (SHRINK && !/\/lm\//.test(path)) root.traverse(o => { for (const m of [].concat(o.material || [])) for (const key in m) { const v = m[key]; if (v && v.isTexture) shrink(v); } });
 }
-const SHRINK = feature('tex512') && !/[?&]notex512/.test(location.search);   // ?notex512 — за сравнение в тестовете
+const SHRINK = (feature('tex512') || LITE_T) && !/[?&]notex512/.test(location.search);   // ?notex512 — за сравнение в тестовете
 function shareTextures0(root) {
   root.traverse(o => {
     for (const m of [].concat(o.material || [])) for (const key in m) { const v = m[key]; if (v && v.isTexture) share(v); }

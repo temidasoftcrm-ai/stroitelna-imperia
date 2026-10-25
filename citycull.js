@@ -50,7 +50,7 @@ export function mergeKids(o, minMeshes = 6) {
   return removed - 0;
 }
 
-// deps: { group() → city.group, target() → controls.target, camDist() → разстоянието на камерата, peds() → [обекти], on() → флагът }
+// deps: { group() → city.group, target() → controls.target, camDist() → разстоянието на камерата, peds() → [обекти], on() → флагът, detailK() → 0…1 (gfx-lite) }
 export function createCityCull(deps) {
   let t = 0, queue = [], qSig = '';
   return {
@@ -66,10 +66,12 @@ export function createCityCull(deps) {
       let budget = 12; while (budget-- > 0 && queue.length) { const o = queue.shift(); if (o.parent === g) try { mergeKids(o); } catch (e) { o.userData.merged = true; } }
       t += dt; if (t < 0.5) return; t = 0;
       if (high) return;   // отдалечено: perfTune така или иначе крие детайлите
-      const tg = deps.target(), cd = deps.camDist(), R = 125 + Math.max(0, cd - 150) * 0.5, Rp = 80 + Math.max(0, cd - 150) * 0.3;   // ~130 м (f1: над ~140 м се печелят най-много кадри); по-далеч само при отдалечена камера
+      const K = deps.detailK ? deps.detailK() : 1;   /* gfx-lite: „Детайли“ — част от радиуса (0 — без тях) */
+      const tg = deps.target(), cd = deps.camDist(), R0 = 125 + Math.max(0, cd - 150) * 0.5, R = R0 * K, Rp = 80 + Math.max(0, cd - 150) * 0.3;   // ~130 м (f1: над ~140 м се печелят най-много кадри); по-далеч само при отдалечена камера
       for (const o of g.children) {
         if (!o.userData.detail) continue;
-        const s = sphereOf(o); if (s.r > R * 0.5) { o.visible = true; continue; }   // огромното (напр. площад) — винаги
+        const s = sphereOf(o); if (s.r > R0 * 0.5) { o.visible = true; continue; }   // огромното (напр. площад) — винаги (gfx-lite: и при по-малък радиус)
+        if (K <= 0) { o.visible = false; continue; }
         const d = Math.hypot(s.x - tg.x, s.z - tg.z) - s.r;
         if (o.visible && d > R * 1.06) o.visible = false; else if (!o.visible && d < R * 0.94) o.visible = true;
       }

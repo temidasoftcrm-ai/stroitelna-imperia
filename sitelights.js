@@ -1,6 +1,10 @@
 // sitelights.js — прожектори на строежите нощем: стълбове в ъглите на оградата с лампи, светлинни конуси
 // към обекта и светло петно на земята. Без истински светлини (евтино) — само светещи материали.
 import * as THREE from 'three';
+import { feature } from './lab/feature.js';
+import { gfx } from './gfxpresets.js';
+
+const LITE = feature('gfx-lite');
 
 const poleMat = new THREE.MeshStandardMaterial({ color: 0x3a3f46, roughness: 0.7 });
 const headMat = new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0xfff2c8, emissiveIntensity: 0 });
@@ -34,4 +38,5 @@ export function setSiteLightsNight(n) {
   headMat.emissiveIntensity = n * 3;
   beamMat.opacity = n * 0.16;
   poolMat.opacity = n * 0.45;
+  if (LITE) beamMat.visible = poolMat.visible = n > 0.01 && gfx().night;   // gfx-lite: денем (прозрачност 0) не се рисуват; „Нощни светлини“ — изключени
 }

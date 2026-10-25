@@ -82,7 +82,8 @@ function verdict(g, t, ram, cores, scr) {
   ].filter(Boolean);
   return { lv, why, tips };
 }
-export async function perfCheck(main, apply) {   // apply(ниво) — gfx-presets: „Приложи“ предложената графика ('high' / 'mid' / 'low')   // main — рендерът на играта (резервен, ако браузърът не дава нов контекст)
+export async function perfCheck(main, apply, more) {   // more — gfx-lite: { order, GFX, open(предложено, подробно) } — бутони за всички нива и „⚙️ Подробно“   // apply(ниво) — gfx-presets: „Приложи“ предложената графика ('high' / 'mid' / 'low')   // main — рендерът на играта (резервен, ако браузърът не дава нов контекст)
+  const sugOf = lv => more ? ['high', 'mid', 'vlow'][lv] : ['high', 'mid', 'low'][lv];   // gfx-lite: червено → „Много ниско“
   const d = box(`<h2>🖥️ Проверка на компютъра</h2><p>Кратък тест (~5 s): видеокарта, бърза сцена като голям град, памет, ядра и екран.</p><div class="bar"><i id="pcBar"></i></div><small id="pcSt">Видеокартата…</small>`);
   const bar = d.querySelector('#pcBar'), st = d.querySelector('#pcSt');
   const g = gpuInfo(main); st.textContent = 'Бързата сцена…';
@@ -92,9 +93,13 @@ export async function perfCheck(main, apply) {   // apply(ниво) — gfx-pres
   d.querySelector('.in').innerHTML = `<h2>🖥️ Проверка на компютъра</h2><div class="light">${L[0]}</div><h2 style="font-size:18px">${L[1]}</h2>
     <p>Защо: ${esc(v.why.join(', '))}.</p><ul>${v.tips.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
     <p><small>Видеокарта: ${esc(g ? g.name : 'няма WebGL')}${g ? ` · текстури до ${g.maxTex}` : ''}${t ? ` · кадър в теста ~${t.ms.toFixed(1)} ms` : ''}${ram ? '' : ' · паметта — браузърът не я казва'}</small></p>
-    ${apply ? `<p style="margin-top:8px">Предложение: графика <b>${['🟢 Високо', '🟡 Средно', '🔴 Ниско'][v.lv]}</b>.</p>` : ''}
-    <div class="row">${apply ? `<button class="go" id="pcApply">Приложи: ${['Високо', 'Средно', 'Ниско'][v.lv]}</button>` : ''}<button class="${apply ? '' : 'go'}" id="pcOk">${apply ? 'Не сега' : 'Добре'}</button><button id="pcAgain">↻ Пак</button></div>`;
-  window.__perfCheck = { lv: v.lv, why: v.why, gpu: g && g.name, ms: t && t.ms, ram, cores };   // за Лабораторията/тестовете
-  return new Promise(res => { d.querySelector('#pcOk').onclick = () => { d.remove(); res(v); }; d.querySelector('#pcAgain').onclick = () => { d.remove(); perfCheck(main, apply).then(res); };
+    ${apply && more ? `<p style="margin-top:8px">Предложение: графика <b>${more.GFX[sugOf(v.lv)].ico} ${esc(more.GFX[sugOf(v.lv)].nm)}</b>. Избери ниво:</p>
+    <div class="row" style="margin-top:6px;display:grid;grid-template-columns:repeat(${more.order.length},1fr)">${more.order.map(k => `<button class="${k === sugOf(v.lv) ? 'go' : ''}" data-lv="${k}" style="min-width:0;padding:10px 4px" title="${esc(more.GFX[k].desc)}">${more.GFX[k].ico} ${esc(more.GFX[k].nm)}</button>`).join('')}</div>
+    <div class="row" style="margin-top:8px"><button id="pcDet">⚙️ Подробно</button><button id="pcOk">Не сега</button><button id="pcAgain">↻ Пак</button></div>`
+    : `${apply ? `<p style="margin-top:8px">Предложение: графика <b>${['🟢 Високо', '🟡 Средно', '🔴 Ниско'][v.lv]}</b>.</p>` : ''}
+    <div class="row">${apply ? `<button class="go" id="pcApply">Приложи: ${['Високо', 'Средно', 'Ниско'][v.lv]}</button>` : ''}<button class="${apply ? '' : 'go'}" id="pcOk">${apply ? 'Не сега' : 'Добре'}</button><button id="pcAgain">↻ Пак</button></div>`}`;
+  window.__perfCheck = { lv: v.lv, why: v.why, gpu: g && g.name, ms: t && t.ms, ram, cores, sug: apply ? sugOf(v.lv) : null };   // за Лабораторията/тестовете
+  return new Promise(res => { d.querySelector('#pcOk').onclick = () => { d.remove(); res(v); }; d.querySelector('#pcAgain').onclick = () => { d.remove(); perfCheck(main, apply, more).then(res); };
+    if (apply && more) { d.querySelectorAll('[data-lv]').forEach(b => b.onclick = () => { d.remove(); apply(b.dataset.lv); res(v); }); d.querySelector('#pcDet').onclick = () => { d.remove(); more.open(sugOf(v.lv), true); res(v); }; }
     const ap = d.querySelector('#pcApply'); if (ap) ap.onclick = () => { d.remove(); apply(['high', 'mid', 'low'][v.lv]); res(v); }; });
 }

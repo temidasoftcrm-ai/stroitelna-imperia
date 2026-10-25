@@ -54,6 +54,10 @@ Object.assign(UNLOCKS, IMP_UNLOCKS);
 export const unlockText = lv => UNLOCKS[lv] || '';
 export const LV = { BG_ALL: 2, LINKS: 2, STAFF: 4, BALKANS: 5, FOREIGN: 6, OFFERS: 6, STOCKS: 7, EUROPE: 8, AIR: 9, WORLD: 10, MEGAHUB: 11, NA: 12, MEGA_EU: 13, SA: 14, SKY40: 15, AS: 16, FAST: 17, OC: 18, MEGA_WORLD: 19, EMPIRE: 20 };
 export const OFFERS_LV = LV.OFFERS, STOCKS_LV = LV.STOCKS;
+// xp-city-bar (f6, 25.10 — „XP пак не се качва“): опитът е на града, в който си (S.dev — CITY_KEYS в game.js), а лентата на фирмата — на най-развития град
+// (firmXP = max). В по-изостанал град фирмената лента стои, докато той не задмине — затова се показва и напредъкът на самия град.
+const CITY_BAR = feature('xp-city-bar');
+const cityK = d => { const a = THRESH[d.lv - 1] ?? 0, b = THRESH[d.lv]; return b > a ? Math.max(0, Math.min(1, (d.xp - a) / (b - a))) : 1; };
 const lvOf = xp => { let l = 1; for (let i = 0; i < THRESH.length; i++) if (xp >= THRESH[i]) l = i + 1; return l; };
 
 export function createDevLevel(deps) {
@@ -133,7 +137,7 @@ export function createDevLevel(deps) {
     if (typeof document === 'undefined' || document.body.classList.contains('ntf-off')) return;
     const el = document.createElement('div');
     el.className = 'xpfloat';
-    el.textContent = `+${Math.round(n).toLocaleString('bg-BG')} XP`;
+    const d = st(); el.textContent = `+${Math.round(n).toLocaleString('bg-BG')} XP` + (CITY_BAR && d && best() > d.lv && deps.cityName ? ` · ${deps.cityName()}` : '');   // xp-city-bar: в кой град отива
     el.style.left = `${15 + Math.random() * 70}vw`; el.style.top = `${25 + Math.random() * 45}vh`;
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 1700);
@@ -165,7 +169,8 @@ export function createDevLevel(deps) {
     const bd = bst > d.lv ? (Object.values(deps.S().cities || {}).map(c => c.dev).find(x => x && x.lv === bst) || { lv: bst, xp: THRESH[bst - 1] }) : d;
     const top = bst >= THRESH.length, nx = top && bst < 35 && deps.impRatio ? deps.impRatio(bst + 1) : null;   // над 20 — напредъкът към следващото ниво по условията на града (imperial.js)
     const a = THRESH[bd.lv - 1], b = THRESH[bd.lv] ?? a, k = top ? (nx ?? 1) : Math.max(0, Math.min(1, (bd.xp - a) / (b - a)));
-    btn.innerHTML = `🏢 Фирма ${bst}<span class="dbar"><i style="width:${(k * 100).toFixed(0)}%"></i></span>${waiting() ? `<span style="font-size:11px;opacity:.85">⏳ чакаш партньора (ниво ${bst})</span>` : partnerAhead() ? `<span style="font-size:11px;opacity:.85">${partnerAhead() > rawBest() + 2 ? '⏳ партньорът те чака' : '🤝 партньорът е напред'} (ниво ${partnerAhead()})</span>` : ''}`;
+    const cityTag = CITY_BAR && bst > d.lv ? `<span style="font-size:11px;opacity:.9" title="Опитът от строежите отива в града, в който си">🏙️ ${deps.cityName ? deps.cityName() : 'градът'} ${d.lv} · ${Math.round(cityK(d) * 100)}%</span>` : '';   // xp-city-bar
+    btn.innerHTML = `🏢 Фирма ${bst}<span class="dbar"><i style="width:${(k * 100).toFixed(0)}%"></i></span>${cityTag}${waiting() ? `<span style="font-size:11px;opacity:.85">⏳ чакаш партньора (ниво ${bst})</span>` : partnerAhead() ? `<span style="font-size:11px;opacity:.85">${partnerAhead() > rawBest() + 2 ? '⏳ партньорът те чака' : '🤝 партньорът е напред'} (ниво ${partnerAhead()})</span>` : ''}`;
     btn.title = `Ниво на развитие на фирмата: ${bst} (по най-развития град — оттам идват отключванията)${bst > d.lv ? ` · ${deps.cityName ? deps.cityName() : 'този град'}: ниво ${d.lv}` : ''}${nx != null ? ` · към ниво ${bst + 1}: ${Math.round(nx * 100)}%${deps.impNeed ? ` — ${deps.impNeed(bst + 1)}` : ''}` : ''}`;
   }
   const firmXP = () => { const S = deps.S(), d = st(); return Math.max(d ? d.xp : 0, ...Object.values(S?.cities || {}).map(c => c.dev?.xp || 0)) + (S?.holding ? S.hxp || 0 : 0); };
@@ -185,7 +190,7 @@ export function createDevLevel(deps) {
       + `<div class="meta" style="margin:10px 0 4px;color:#ffd54a">🏙️ Нива 21–25 — Империал Сити, 26–35 — президентът (по постижения, не по опит)</div>` + [21, 22, 23, 24, 25, ...(L >= 25 ? [26, 27, 28, 29, 30, 31, 32, 33, 34, 35] : [])].map(n => `<div class="dvrow ${n <= L ? 'on' : ''} ${n === L ? 'cur' : ''}"><b>${n <= L ? '✅' : '🔒'} Ниво ${n}</b><span class="meta" style="margin:0;flex:1;${n > L ? 'filter:blur(6px);user-select:none;pointer-events:none' : ''}" ${n > L ? 'aria-hidden="true"' : ''}>${UNLOCKS[n]}</span></div>${barHtml(n)}`).join('')
       + (L >= 19 && L < 35 && deps.impNeed ? `<div class="meta" style="margin:6px 0 0;color:#7dd3ff">🎯 Към ниво ${Math.max(21, L + 1)}: ${deps.impNeed(Math.max(21, L + 1))}</div>` : '');
     const nxt = THRESH[d.lv];
-    deps.modal(`🏢 Ниво на развитие на фирмата · ${L}`, `Всеки твой град се развива отделно. Отключванията (градове, линии, Балканите, Европа, борса) идват от най-развития ти град; специалистите — от нивото на текущия град.<br>Опит: <b>${Math.round(d.xp)} XP</b>${nxt != null ? ` · до ниво ${d.lv + 1}: ${Math.round(nxt - d.xp)} XP` : ' · максимално ниво'}<br>
+    deps.modal(`🏢 Ниво на развитие на фирмата · ${L}`, `Всеки твой град се развива отделно. Отключванията (градове, линии, Балканите, Европа, борса) идват от най-развития ти град; специалистите — от нивото на текущия град.<br>${CITY_BAR && L > d.lv ? `<div style="margin:6px 0;padding:6px 8px;border-radius:8px;background:rgba(125,211,255,.1);color:#bfe6ff">🏙️ Опитът от строежите отива в <b>${deps.cityName ? deps.cityName() : 'този град'}</b> — той е на ниво ${d.lv} (${Math.round(cityK(d) * 100)}% до ниво ${d.lv + 1}). Лентата на фирмата (ниво ${L}) е на най-развития ти град и тръгва, щом някой град го задмине.</div>` : ''}Опит${CITY_BAR ? ' в този град' : ''}: <b>${Math.round(d.xp)} XP</b>${nxt != null ? ` · до ниво ${d.lv + 1}: ${Math.round(nxt - d.xp)} XP` : ' · максимално ниво'}<br>
       <span style="color:var(--mut)">XP: къща ${XP.house}, магазин ${XP.shop}, офис ${XP.office}, небостъргач ${XP.tower}, ${feature('xp-km') ? `магистрала ~${XP_KM.highway} на км (аутобан ×2), жп линия ~${XP_KM.rail} на км, филиал ${XP.branch}, куест ${XP.quest} · покупки: ТИР ${XP_BUY.truck}, влак ${XP_BUY.train}, кораб ${XP_BUY.ship}–${XP_BUY.shipBig}, самолет ${XP_BUY.plane} · общо имаш ${Math.round(firmXP()).toLocaleString('bg-BG')} XP` : `жп линия ${XP.rail}, участък магистрала ${XP.highway}, филиал ${XP.branch}, куест ${XP.quest}`}.</span><br><br>${deps.playSummary ? deps.playSummary() + '<br>' : ''}${rows}`, [['Затвори', null]]);
     // на живо: лентите се обновяват всяка секунда, докато прозорецът е отворен
     clearInterval(dvTimer); dvTimer = setInterval(() => { const els = document.querySelectorAll('[data-dvn]'); if (!els.length) { clearInterval(dvTimer); return; }
