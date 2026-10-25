@@ -23,6 +23,10 @@ GLTFLoader.prototype.parse = function (...a) { if (!this.meshoptDecoder) this.se
 
 window.__assetBase = ASSET_BASE;   // за тестовете и конзолата
 
+// 📺 AdSense за игри (ads.js, флаг 'ads'): Publisher ID — 'ca-pub-…' или 'pub-…'. Празен = рекламите са изключени (нищо не се зарежда).
+// deploy.mjs прави от него dist/ads.txt (google.com, pub-…, DIRECT, f08c47fec0942fa0).
+export const ADS_CLIENT = '';
+
 // DEV — локално true; deploy.mjs → false в dist/ (сайтът), освен с --dev (за тестовете на dist). На сайта инструментите за разработка ги няма:
 //   • параметрите от адреса за тестове/отстраняване (?autotest с „rich“, „sim“…, ?debug, ?profile, ?shadercheck, ?nomemfix…) се махат от адреса,
 //     преди играта да ги прочете (този модул е първият; mobile.js, ?pc=1/?phone=1, ?w=/?inv= на онлайн страницата и ?code= от входа остават);

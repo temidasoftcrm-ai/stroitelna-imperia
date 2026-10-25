@@ -143,6 +143,7 @@ import { planRoute, randomRoadPoint } from './cityplanroute.js';
 import { ROME_FILES, IT_FILES, IT_PICK, romePrep } from './romenear.js';   // 🇮🇹 rome-bld (f9): Рим отблизо — италианските сгради; it-bld — и в другите италиански градове
 import { STATUE_FILES, statuePrep } from './statues.js';   // ⛲ statues (f9): фонтани и статуи в градовете
 import { GFX, GFX_ORDER, gfx, gfxLevel, setGfx } from './gfxpresets.js';   // 🎨 gfx-presets (f9): графиката Ниско / Средно / Високо
+import { createAds } from './ads.js';   // 📺 флаг ads: AdSense за игри — реклама между нещата и по желание за бонус
 import { createOnboarding } from './onboarding.js';   // 🎓 onboarding (f9): урокът при първа игра — камера, парцел, строеж, пари, град, настройки
 import { initErrTelemetry, errPayload, sendErrors } from './errtelem.js';   // 🐞 err-telemetry (f9): грешките в буфер за изпращане (само със съгласие за анализи)
 import { pcGate, perfCheck } from './perfmeter.js';   // 🖥️ perf-meter (f9): играта е за компютър — екран за телефон/таблет и „Проверка на компютъра“
@@ -4925,7 +4926,7 @@ const rivals = createRivals({ S: () => S, acquired: id => corp.acquired(id), toa
 // Фаза 7: ниво на развитие (devlevel.js)
 // maxLevel минава през всички градове — пази се до края на текущата задача (картата пита dev.has() стотици пъти на рисуване)
 let maxLevelC = null;
-const dev = createDevLevel({ levelBonus: lv => { if (lv !== 2 || !S || !feature('start-easy') || S.lvBonus2) return ''; S.lvBonus2 = 1; econ.earn(100000, 'друго', 'Бонус за ниво 2'); return ' 🎁 Бонус за ниво 2: +100 000 €'; },   // 🌱 веднъж, записва се
+const dev = createDevLevel({ levelBonus: lv => { adsNext('level'); if (lv !== 2 || !S || !feature('start-easy') || S.lvBonus2) return ''; S.lvBonus2 = 1; econ.earn(100000, 'друго', 'Бонус за ниво 2'); return ' 🎁 Бонус за ниво 2: +100 000 €'; },   // 🌱 веднъж, записва се
   partnerLv: () => feature('coop-lv') ? S?.coopPartnerLv ?? null : null,   // #4: последното известно ниво на партньора (coopCap го пази) — за надписа „партньорът те чака“
   coopCap: () => { if (!S || !feature('coop-lv')) return null; let p = null, cst = null; try { p = coop.partnerLv?.() ?? null; cst = coop.state?.() ?? null; } catch { }   /* coop се създава след dev */ if (p != null) { S.coopPartnerLv = p; if (S.coopLvFloor == null) S.coopLvFloor = dev.rawBest(); return Math.max(p + 2, S.coopLvFloor); }   /* до 2 нива пред партньора, после чака (потребителят 22.10) */ if (cst && cst.pair?.status !== 'active') { delete S.coopLvFloor; delete S.coopPartnerLv; return null; } /* данните още не са дошли (старт, без връзка) — последното известно ниво на партньора; иначе при всяко презареждане чакането изчезваше */ return S.coopLvFloor != null && S.coopPartnerLv != null ? Math.max(S.coopPartnerLv + 2, S.coopLvFloor) : null; },   /* 🤝 общото ниво: не над партньора (каквото си имал при свързването — остава) */ impRatio: n => imperial.ratio(n), impLv: () => S?.imp?.lv || 0, impNeed: n => n === 21 ? 'Основи Империал Сити и избери държавата (ниво 19)' : imperial.NEED[n] || '', S: () => S, lvTime: l => playtime.levelTxt(l), playSummary: () => playtime.summaryHtml(), cityName: () => S ? cityName() : '', maxLevel: () => maxLevelC ?? (queueMicrotask(() => { maxLevelC = null; }), maxLevelC = Math.max(S?.dev?.lv || 1, ...Object.values(S?.cities || {}).map(c => c.dev?.lv || 1), holdLv())), toast, sound: n => Sound.play(n), save, modal, pop: (k, a, b) => { if (k === 'lv-5' && !S.balkansPop) { S.balkansPop = S.day; return showEventPop('balkans-open', '👑 Балканите са твои!', 'Ниво 5: жп линии и магистрали до Сърбия, Румъния, Гърция, Турция и С. Македония.'); } return showEventPop(k, a, b); }, balkansOpen: () => true });   // първото ниво 5 — „Балканите са твои“
 // ⏱️ изиграно време и кога е достигнато всяко ниво (playtime.js)
@@ -9688,6 +9689,7 @@ function stashCity() {
 function switchCity(id) {
   if (FIXSTAB && swapping) return;   // fix-stab: друг град още се зарежда
   if (id === S.cityId) return enterCity();
+  adsNext('city');   // 📺 ads: реклама, щом градът се зареди
   syncFinishedFleet();
   stashCity();
   if (econ.stashStock) S.cities[S.cityId].mat = econ.stashStock();   // складът е на града
@@ -11199,6 +11201,12 @@ addEventListener('unhandledrejection', e => { if (!AUTOTEST) logError('promise: 
 const cine = createCinema({ S: () => S, sound: () => Sound, ready: () => !!S && city.ready, cityById, speed: () => speed, setSpeed, save, lv20: () => dev.has('EMPIRE'),
   firstPlane: () => !!S.firstAirport, firstOil: () => mines.state().sites.some(x => x.kind === 'oilwell'), auto: () => !AUTOTEST });
 cine.start();
+// 📺 ads (ads.js): рекламата чака, докато няма зареждане, кино, диалог или урок; наградата — +10% от дневния приход на всички градове
+const ads = createAds({ speed: () => speed, setSpeed, audioCtx: () => Sound.ctx, toast,
+  busy: () => !S || !city?.ready || swapping || !!$('loading') || !!$('cine') || !!cine.playing() || !!onboard?.active() || !$('modal').classList.contains('hidden') || !!document.querySelector('#cloudDlg,#consentBar,#consentDlg,#regGate'),
+  reward: () => { const d = ownedCities().reduce((a, id) => a + Math.max(0, econ.isFinished?.(id) ? econ.s.finished[id].daily : econ.cityAvgDaily(id) || 0), 0), v = Math.max(1000, Math.round(d * 0.1 / 100) * 100);
+    econ.earn(v, 'друго', '🎬 Бонус за реклама'); save(); return v; } });
+function adsNext(n) { try { ads.next(n); } catch { } }   // switchCity/нивото може да дойдат преди ads да е създаден
 // ⚡ (55, „забива при зареждане“): екранът стои, докато градът се построи и видеокартата компилира шейдърите (~200 програми) —
 // паралелно (KHR_parallel_shader_compile, renderer.compileAsync), а не една по една при първия кадър (замръзване ~19 s след „Готово!“)
 const ldFinish = () => { const el = $('loading'); if (!el) return; $('ldTxt').textContent = 'Готово!'; setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 700); }, AUTOTEST ? 0 : 900); };
@@ -12016,7 +12024,8 @@ if (AUTOTEST) {
     },
     errDemo() { initErrTelemetry({ ctx: () => ({ city: S?.cityId, gfx: gfxLevel(), day: S?.day }) }); setTimeout(() => { throw new Error('тест на телеметрията от Лабораторията (ivan@example.com, ?token=abc)'); }); Promise.reject(new Error('тест: отхвърлен promise'));   // 🐞 err-telemetry: Лабораторията
       setTimeout(() => { const r = sendErrors(); modal('🐞 Телеметрия на грешките', `Изпращане: <b>${r.sent ? 'изпратени ' + r.sent + ' (засега само в конзолата и localStorage)' : r.reason === 'no-consent' ? 'не — няма съгласие за анализи' : 'няма нови'}</b><br>Това би тръгнало:<pre style="white-space:pre-wrap;font-size:11px;max-height:50vh;overflow:auto;text-align:left">${JSON.stringify(errPayload(), null, 1).replace(/</g, '&lt;')}</pre>`, [['OK', null]]); }, 800); return true; },
-    onbDemo() { onboard?.restart(); return onboard?.step(); },   // 🎓 onboarding: Лабораторията (под autotest урокът не тръгва сам)
+    onbDemo() { onboard?.restart(); return onboard?.step(); },
+    ads: () => ads,   // 📺 ads: Лабораторията (skipWait, next, state)   // 🎓 onboarding: Лабораторията (под autotest урокът не тръгва сам)
     settingsOpen() { openSettingsUI(); return { badge: document.querySelector('#btnSettings .setB')?.textContent || null, rows: topSetRows().map(r => r.nm().replace(/<[^>]+>/g, '')) }; },   // ⚙️ Лабораторията (top-set)
     // 🏢 Лабораторията (campus2): общият парцел на фирмата при ниво lv (офис, гараж, склад)
     campus2Look(lv = 5) { S.officeLevel = lv; S.garageLevel = Math.min(10, Math.max(1, lv)); S.whLevel = Math.max(1, Math.min(10, lv)); if (S.whLot == null) S.whLot = city.hq.id;

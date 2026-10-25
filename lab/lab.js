@@ -258,6 +258,7 @@ const DEMOS = [
   ['🐞 Телеметрия на грешките: тестова грешка и отхвърлен promise → буферът (без имейли/адреси) и какво би се изпратило', 'sofia', d => d.errDemo()],   // err-telemetry
   ['🔒 Поверителност: банерът при първо пускане (Приемам / Само необходимите / Настройки) с линкове към Поверителност и Условия', 'sofia', () => setTimeout(() => { $('fr').contentWindow.consent?.banner(); }, 4000)],   // consent
   ['☁️ По-лек облак: записът на слота — колко KB се качват компресирани и връща ли се същият', 'sofia', () => setTimeout(() => { const w = $('fr').contentWindow; w.__cloudLiteTest?.().then(r => w.document.getElementById('toasts')?.insertAdjacentHTML('afterbegin', `<div class="toast ${r.same ? 'good' : 'bad'}">☁️ Запис ${Math.round(r.raw / 1024)} KB → качва се ${Math.round(r.sent / 1024)} KB (${(r.raw / Math.max(1, r.sent)).toFixed(1)}× по-малко) · ${r.same ? '✅ връща се същият' : '❌ различен'}</div>`)); }, 6000)],   // cloud-lite
+  ['📺 Реклами (симулатор, без Google): „смяна на град“ → реклама 3 с с пауза на играта, после горе бутонът „🎬 Реклама за бонус“ (+10% от дневния приход)', 'sofia', () => setTimeout(() => { const A = $('fr').contentWindow.__dbg?.ads?.(); if (!A?.skipWait) return; A.skipWait(); A.next('city'); }, 5000)],   // ads
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

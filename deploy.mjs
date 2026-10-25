@@ -50,6 +50,11 @@ if (!c0.includes(LINE)) throw new Error('config.js: няма реда с ASSET_B
 const DLINE = 'export const DEV = true;'; if (!c0.includes(DLINE)) throw new Error('config.js: няма реда с DEV');
 writeFileSync(cfg, c0.replace(LINE, `export const ASSET_BASE = '${BASE.replace(/\/?$/, '/')}';`).replace(DLINE, `export const DEV = ${DEV};`));   // DEV = false: без инструментите за разработка (config.js)
 
+// 3б) ads.txt за AdSense — от ADS_CLIENT в config.js (празен → без файл)
+const adsPub = ((/export const ADS_CLIENT = '([^']*)'/.exec(c0) || [])[1] || '').trim().replace(/^ca-/, '');
+if (/^pub-\d{10,20}$/.test(adsPub)) writeFileSync(join(DIST, 'ads.txt'), `google.com, ${adsPub}, DIRECT, f08c47fec0942fa0\n`);
+else if (adsPub) console.warn('⚠️ ADS_CLIENT в config.js не прилича на pub-… — ads.txt не е направен');
+
 // 4) кеш: страниците — винаги проверка; скриптовете носят ?v=<хеш> (stamp.mjs), но и без него — кратко; assets — седмица
 writeFileSync(join(DIST, '_headers'), `/*.html\n  Cache-Control: no-cache\n/\n  Cache-Control: no-cache\n/*.js\n  Cache-Control: public, max-age=600\n/assets/*\n  Cache-Control: public, max-age=604800\n`);
 
@@ -58,7 +63,7 @@ const walk = d => readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirec
 const all = walk(DIST), size = all.reduce((a, f) => a + statSync(f).size, 0), big = all.filter(f => statSync(f).size > 25 * 2 ** 20);
 const rootJs = readdirSync(ROOT).filter(f => /\.m?js$/.test(f)), left = rootJs.filter(f => !need.has(f));
 writeFileSync(join(ROOT, 'dist-files.txt'), all.map(f => relative(DIST, f)).sort().join('\n') + '\n');
-console.log(`dist/: ${all.length} файла, ${Math.round(size / 2 ** 20)} MB · скриптове: ${need.size} · ASSET_BASE = ${BASE} · DEV = ${DEV}`);
+console.log(`dist/: ${all.length} файла, ${Math.round(size / 2 ** 20)} MB · скриптове: ${need.size} · ASSET_BASE = ${BASE} · DEV = ${DEV} · ads.txt: ${existsSync(join(DIST, 'ads.txt')) ? adsPub : '—'}`);
 console.log('lab/ в dist:', [...need].filter(f => f.startsWith('lab/')).join(', ') || '—');
 console.log('*.js в корена, които НЕ влизат (до тях не се стига):', left.join(', ') || '—');
 if (big.length) console.log('⚠️ над 25 MB (лимитът на Pages):', big.map(f => relative(DIST, f)).join(', '));
