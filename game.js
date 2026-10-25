@@ -11,6 +11,7 @@ import { createPassingTrains } from './passtrains.js';
 import { createQuests } from './quests.js';
 import { createSupply } from './supply.js';
 import { saveKey, openSaves, currentSlot, backupNow, backupRaw, logError, SAVE_FORMAT, tooNew } from './saves.js';
+import { createMusic, SUNNY as MUSIC_SUNNY } from './music.js';   // 🎵 флаг music: фонова музика + плъзгачите Музика / Ефекти / Град
 import { createVerNotice } from './vernotice.js';   // 🆕 ver-notice: „Излезе нова версия“ и записи от по-нова версия
 import { createTutorial } from './tutorial.js';
 import { createMega } from './megaorders.js';
@@ -5300,7 +5301,7 @@ if (feature('top-set')) {
 function applyGfx(lv) { setGfx(lv, gfxCtx()); toast(`🎨 Графика: ${GFX[lv].nm} — ${GFX[lv].desc}.`, 'good'); }
 function openGfxUI() { modal('🎨 Графика', `Сега: <b>${gfx().ico} ${gfx().nm}</b>.<br>${GFX_ORDER.map(k => `<b>${GFX[k].ico} ${GFX[k].nm}</b> — ${GFX[k].desc}`).join('<br>')}<br><small>Не знаеш кое? ⚙️ → „Проверка на компютъра“ ще предложи.</small>`,
   [...GFX_ORDER.map(k => [`${GFX[k].ico} ${GFX[k].nm}`, () => applyGfx(k)]), ['Затвори', null]]); }
-const openSettingsUI = () => window.__settings ? window.__settings({ quick: feature('top-set') ? topSetRows : null, credits: showCredits, saves: openSavesUI, rename: S && S.brand ? renameBrand : null, newGame: () => modal('Нова игра?', 'Сегашната фирма ще бъде изтрита.', [['Отказ', null], ['Изтрий и започни', wipeSlot]]), lock: () => { save(); saveLock = true; } })
+const openSettingsUI = () => window.__settings ? window.__settings({ audio: feature('music') ? (() => { try { return music; } catch { return null; } })() : null, quick: feature('top-set') ? topSetRows : null, credits: showCredits, saves: openSavesUI, rename: S && S.brand ? renameBrand : null, newGame: () => modal('Нова игра?', 'Сегашната фирма ще бъде изтрита.', [['Отказ', null], ['Изтрий и започни', wipeSlot]]), lock: () => { save(); saveLock = true; } })
   : modal('⚙️ Още', 'Авторите на моделите и музиката · или започни нова игра в този слот.', [['Затвори', null], ['📜 Автори', showCredits], ['🗑️ Нова игра', () => modal('Нова игра?', 'Сегашната фирма ще бъде изтрита.', [['Отказ', null], ['Изтрий и започни', wipeSlot]])]]);
 { let after = $('btnMapToggle');
   for (const [id, txt, title, fn] of [['btnSettings', '⚙️', 'Настройки: вход, изход, данни, хора онлайн, ъпдейти', openSettingsUI]]) {
@@ -11236,6 +11237,10 @@ const ldWarm = async () => { if (!renderer.compileAsync || !S || !city || !city.
 perf.ready();
 const saved = loadSave();
 const verN = createVerNotice({ save: () => save(true) }); if (newerSave) verN.blockNewer();   // 🆕 ver-notice
+// 🎵 music (music.js): менюто/картата → menu; градът → city (+ sunny денем), активна игра → work; заглъхва при кино, видео и песента на града
+const music = createMusic({ sound: Sound, mode: () => !S || !city?.ready || !$('mapScreen').classList.contains('hidden') ? 'menu' : 'city', active: () => speed >= 2 || projects.length >= 3,
+  night: () => dayNight.night || 0, sunny: () => MUSIC_SUNNY.has(S?.cityId), muted: () => Sound.muted,
+  duck: () => !!$('cine') || !!cine.playing() || [...document.querySelectorAll('video')].some(v => !v.paused && !v.muted && v.volume > 0) || Object.entries(Sound.files || {}).some(([k, a]) => k.includes('assets/local/') && !a.paused) });
 if (saved && !AUTOTEST) backupRaw(currentSlot(), localStorage.getItem(SAVE_KEY), 'старт');
 // 💾 автозапис: записва всяка минута и при затваряне; на всеки 5 минути пази и резервно копие (🕒 Автозаписи)
 if (!AUTOTEST) {
@@ -12049,6 +12054,7 @@ if (AUTOTEST) {
     ads: () => ads,   // 📺 ads: Лабораторията (skipWait, next, state)
     awayDemo(h = 9, bankMin = 60, more = true) { if (!awaySum) return null; if (more) S.branches = [...new Set([...(S.branches || []), 'plovdiv', 'varna', 'istanbul'])]; ads?.skipWait?.(); return awaySum.demo(h, bankMin); },   // 👋 away-summary: отсъствие h ч с bankMin мин игра (more — още 3 града за списъка)
     verNotice: () => verN,   // 🆕 ver-notice: Лабораторията (show, blockNewer, cloudNewer)
+    music: () => music,   // 🎵 music: Лабораторията (state, mood, set)
     settingsOpen() { openSettingsUI(); return { badge: document.querySelector('#btnSettings .setB')?.textContent || null, rows: topSetRows().map(r => r.nm().replace(/<[^>]+>/g, '')) }; },   // ⚙️ Лабораторията (top-set)
     // 🏢 Лабораторията (campus2): общият парцел на фирмата при ниво lv (офис, гараж, склад)
     campus2Look(lv = 5) { S.officeLevel = lv; S.garageLevel = Math.min(10, Math.max(1, lv)); S.whLevel = Math.max(1, Math.min(10, lv)); if (S.whLot == null) S.whLot = city.hq.id;

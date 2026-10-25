@@ -35,7 +35,7 @@ const KIND = [
   ['Сгради', /^(blocks2?|sky|civic2?|commercial2?|houses2?|office|wh2|rome|industry|port|gas|resort|hospital|station|mines|burned|metro|people\/hotel|people\/skihotel|air\/term|air\/tower)\b|^(building|h2-|office-|wh-l|it-|burned-|hotel)/],
   ['Превозни средства и техника', /^(cars|vans|trucks|trains|ships|boats|marina|air|gear|inc|ops|riot|construct\/sf-mixer|lift)\b|^(car-|bus-|pol-|fire-|amb-|bulldozer|dump|crane|rescue|heli|ladder|burnt|riot-van)/],
 ];
-const kindOf = (f, file) => /sfx\//.test(file) ? 'Звуци' : /(^|\/)(people\/(people|peds)|riot-cop|firefighter|paramedic)/.test(f) ? 'Хора' : (KIND.find(([, re]) => re.test(f)) || ['Улица, природа и обзавеждане'])[0];
+const kindOf = (f, file) => /music\//.test(file) ? 'Музика' : /sfx\//.test(file) ? 'Звуци' : /(^|\/)(people\/(people|peds)|riot-cop|firefighter|paramedic)/.test(f) ? 'Хора' : (KIND.find(([, re]) => re.test(f)) || ['Улица, природа и обзавеждане'])[0];
 
 const out = [], warn = [], seen = new Map();
 const add = e => {   // едно произведение — един ред (еднакъв линк → файловете се сливат)
@@ -82,7 +82,7 @@ for (const file of files.sort()) {
     const l = lic || secLic || (host === 'poly.pizza' ? 'CC-BY-3.0' : host === 'sketchfab.com' ? 'CC-BY-4.0' : null);
     if (!l) warn.push(`${file}: без лиценз: ${line.slice(0, 120)}`);
     const src = host === 'sketchfab.com' ? 'Sketchfab' : host === 'poly.pizza' ? 'Poly Pizza' : /Pixabay/.test(line) ? 'Pixabay' : host || secSrc;
-    const e = { t: title, a: by.replace(/^Pixabay$/, 'Pixabay'), l: l || 'CC-BY-4.0', u: urls[0] || (/Pixabay/.test(line) && (line.match(/sound (\d+)/) || [])[1] ? `https://pixabay.com/sound-effects/${line.match(/sound (\d+)/)[1]}/` : ''), f, k: kindOf(f[0] || base, file), s: src };
+    const e = { t: title, a: by.replace(/^Pixabay$/, 'Pixabay'), l: l || 'CC-BY-4.0', u: urls[0] || (/Pixabay/.test(line) && (line.match(/sound (\d+)/) || [])[1] ? `https://pixabay.com/sound-effects/${line.match(/sound (\d+)/)[1]}/` : /Pixabay/.test(line) && (line.match(/music (\d+)/) || [])[1] ? `https://pixabay.com/music/${line.match(/music (\d+)/)[1]}/` : ''), f, k: kindOf(f[0] || base, file), s: src };
     if (e.l === 'CC-BY-NC-4.0') { e.nc = 1; warn.push(`${file}: CC-BY-NC (некомерсиален — не бива в игра с реклама): ${title} by ${by} — ${f.join(', ')}`); }
     add(e);
   }

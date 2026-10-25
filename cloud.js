@@ -355,6 +355,8 @@ function openSettings(h) {
   const ppl = online();
   const el = dlg(`<button id="stX" title="Затвори" aria-label="Затвори" style="position:sticky;top:0;display:block;margin:0 0 -34px auto;z-index:2;width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:#1b2433;color:var(--txt);font-size:18px;line-height:1;cursor:pointer">✕</button><h2 style="font-size:19px;color:var(--acc)">⚙️ Настройки</h2>
     ${hooks.quick ? sec('⚡ Бързо', `<div style="display:flex;flex-direction:column;gap:6px">${hooks.quick().map((r, i) => `<button class="btn2" id="stQ${i}" style="display:flex;align-items:center;gap:10px;text-align:left;padding:9px 12px"><span style="font-size:20px;width:26px;text-align:center">${r.ico()}</span><span style="flex:1">${r.nm()}</span></button>`).join('')}</div>`) : ''}
+    ${hooks.audio ? sec('🔊 Звук', ['music:🎵 Музика', 'fx:🔔 Ефекти', 'city:🏙️ Град'].map(r => { const [k, t] = r.split(':'), v = Math.round((hooks.audio.levels()[k] ?? 1) * 100);
+      return `<label style="display:flex;align-items:center;gap:10px;font-size:14px;margin:4px 0"><span style="width:90px">${t}</span><input type="range" min="0" max="100" step="5" value="${v}" data-mix="${k}" style="flex:1"><span style="width:38px;text-align:right;color:var(--mut)">${v}%</span></label>`; }).join('')) : ''}
     ${sec('☁️ Акаунт', user ? `<div style="font-size:14px;color:var(--mut);line-height:1.5">Влязъл си като <b style="color:var(--txt)">${esc(user.email)}</b> — играта се пази в облака.${lastErr ? `<br><span style="color:var(--bad)">Последна грешка: ${esc(lastErr)}</span>` : ''}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${sbtn('stCloud', '☁️ Записи в облака')}${sbtn('stOut', '🚪 Изход')}</div>`
       : `<div style="font-size:14px;color:var(--mut);line-height:1.5">Не си влязъл. С вход (имейл + код, без парола) играта се пази в облака и можеш да играеш от няколко устройства.</div><div style="margin-top:8px">${sbtn('stIn', '☁️ Вход', 'btn')}</div>`)}
@@ -374,6 +376,7 @@ function openSettings(h) {
   on('stWipe', () => confirmWipe(false)); on('stDel', () => confirmWipe(true));
   if (hooks.quick) hooks.quick().forEach((r, i) => { const b = el.querySelector('#stQ' + i); if (!b) return;   // (top-set) звукът и известията — на място (надписът се сменя), другите затварят настройките
     b.onclick = () => { if (!r.keep) el.remove(); r.fn(); if (r.keep) { const s = b.querySelectorAll('span'); s[0].textContent = r.ico(); s[1].innerHTML = r.nm(); } }; });
+  el.querySelectorAll('[data-mix]').forEach(r => r.oninput = () => { hooks.audio?.set(r.dataset.mix, r.value / 100); r.nextElementSibling.textContent = r.value + '%'; });   // 🎵 music: плъзгачите
   pplEl = el;
 }
 const pplHtml = L => L.length ? L.map(p => `<div>${p.me ? '🟢' : '🟡'} <b>${esc(p.name || 'Играч')}</b>${p.me ? ' (ти)' : ''} <span style="color:var(--mut)">· ${esc(p.city || '')}${p.day ? ` · ден ${p.day | 0}` : ''}</span></div>`).join('') : '<span style="color:var(--mut)">Свързвам се…</span>';
