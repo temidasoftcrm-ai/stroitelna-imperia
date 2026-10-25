@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Поверителност · Строителна империя</title>
+<!-- privacy.html — политика за поверителност (БГ + EN, превключване с #en); линкове от банера (consent.js) и ⚙️ Настройки (cloud.js) -->
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; background:#05070b; color:#e6edf6; font:16px/1.65 system-ui,sans-serif; }
+  main { max-width:760px; margin:0 auto; padding:24px 16px 60px; }
+  h1 { color:#ffd54a; font-size:26px; margin:8px 0 4px; }
+  h2 { color:#f5b942; font-size:19px; margin:28px 0 6px; }
+  a { color:#ffd54a; }
+  .mut { color:#8b96a8; font-size:14px; }
+  .lang { display:flex; gap:8px; justify-content:flex-end; }
+  .lang a { padding:4px 10px; border:1px solid #3a4560; border-radius:8px; text-decoration:none; color:#e6edf6; font-size:14px; }
+  .lang a.on { background:#f5b942; color:#111; border-color:#f5b942; }
+  table { border-collapse:collapse; width:100%; font-size:14px; }
+  td, th { border:1px solid #2a3446; padding:6px 8px; text-align:left; vertical-align:top; }
+  th { background:#0f141c; }
+  [data-l] { display:none; } body.bg [data-l=bg], body.en [data-l=en] { display:block; }
+</style>
+</head>
+<body class="bg">
+<main>
+<div class="lang"><a href="#bg" id="lBg">БГ</a><a href="#en" id="lEn">EN</a></div>
+
+<section data-l="bg">
+<h1>🔒 Политика за поверителност</h1>
+<div class="mut">„Строителна империя“ · в сила от 25.10.2026</div>
+
+<h2>1. Кой отговаря за данните</h2>
+<p><b>ТЕМИДАСОФТ ООД</b> е администратор на личните данни, обработвани в играта „Строителна империя“. Връзка: <a href="mailto:temidasoftcrm@gmail.com">temidasoftcrm@gmail.com</a>.</p>
+
+<h2>2. Какви данни обработваме и защо</h2>
+<table>
+<tr><th>Данни</th><th>Цел</th><th>Основание (чл. 6 GDPR)</th></tr>
+<tr><td>Записите на играта на твоето устройство (localStorage)</td><td>Играта да продължи оттам, докъдето си стигнал</td><td>Необходимо за услугата, която поиска (б. „б“)</td></tr>
+<tr><td>Имейл адрес и, ако си сложиш, парола (само като защитен отпечатък)</td><td>Вход в акаунта; кода за вход пращаме на имейла</td><td>Договор (б. „б“)</td></tr>
+<tr><td>Записите на играта в облака (до 3 слота) и кратко описание (град, ден, пари, обекти)</td><td>Да играеш от няколко устройства и да не загубиш играта</td><td>Договор (б. „б“)</td></tr>
+<tr><td>„👥 Онлайн сега“: името на фирмата ти в играта, градът и денят</td><td>Другите играчи виждат кой играе в момента; не се пази след затваряне на играта</td><td>Договор (б. „б“)</td></tr>
+<tr><td>Онлайн режимите (партньорство, онлайн империя): името на фирмата и данните от играта, които сам споделяш</td><td>Съвместната игра</td><td>Договор (б. „б“)</td></tr>
+<tr><td>Изборът ти за поверителност (localStorage „stroi-consent“)</td><td>Да помним какво си разрешил</td><td>Законово задължение (б. „в“)</td></tr>
+<tr><td>Реклами (в бъдеще)</td><td>Играта да е безплатна</td><td>Само с твоето съгласие (б. „а“)</td></tr>
+<tr><td>Анонимна статистика (в бъдеще): брой посещения, грешки, скорост — без бисквитки и без идентификатор</td><td>Да подобряваме играта</td><td>Само с твоето съгласие (б. „а“)</td></tr>
+</table>
+<p>Без вход в акаунт играта не изпраща записите ти никъде — те остават само на устройството. Не продаваме данни и не правим профилиране.</p>
+
+<h2>3. Бисквитки и местно хранилище</h2>
+<p>Играта не ползва рекламни или проследяващи бисквитки. Използва местното хранилище на браузъра (localStorage и IndexedDB) за записите, автозаписите, настройките и сесията за вход. Те са необходими за работата на играта. Рекламите и статистиката, ако бъдат добавени, ще работят само след съгласие в банера „🔒 Поверителност“. Можеш да го промениш по всяко време от ⚙️ Настройки → 🔒 Поверителност.</p>
+
+<h2>4. Кой още вижда данните (обработващи)</h2>
+<ul>
+<li><b>Supabase Inc.</b> — база данни и вход (акаунт, записи в облака, онлайн режимите).</li>
+<li><b>Cloudflare Inc.</b> — хостинг на играта и файловете ѝ.</li>
+<li><b>jsDelivr</b> — CDN за библиотеките на играта (вижда IP адреса ти при зареждане).</li>
+<li>В бъдеще — рекламна мрежа и услуга за статистика, само при съгласие; ще бъдат изброени тук.</li>
+</ul>
+<p>Някои от тях може да обработват данни извън ЕИП. Тогава предаването е въз основа на стандартните договорни клаузи на Европейската комисия или на решение за адекватност.</p>
+
+<h2>5. Колко дълго пазим данните</h2>
+<p>Записите в облака и акаунта — докато имаш акаунт. „Онлайн сега“ — само докато играта е отворена. Записите на устройството — докато не ги изтриеш (⚙️ Настройки → 🗑️ Изтрий данните) или не изчистиш данните на браузъра.</p>
+
+<h2>6. Твоите права</h2>
+<p>По GDPR имаш право на достъп, поправка, изтриване, ограничаване, преносимост и възражение, както и да оттеглиш съгласието си по всяко време (без това да засяга вече извършената обработка).</p>
+<ul>
+<li><b>Изтриване:</b> в играта — ⚙️ Настройки → ❌ Изтрий акаунта (трие акаунта, записите в облака и онлайн данните). Или ни пиши от имейла на акаунта на <a href="mailto:temidasoftcrm@gmail.com">temidasoftcrm@gmail.com</a> — изтриваме до 30 дни.</li>
+<li><b>Копие на записите:</b> 💾 Записи → изтегляне във файл; или по имейл.</li>
+<li><b>Жалба:</b> Комисия за защита на личните данни, <a href="https://www.cpdp.bg" target="_blank" rel="noopener">www.cpdp.bg</a>.</li>
+</ul>
+
+<h2>7. Деца</h2>
+<p>Акаунт могат да създават лица навършили 16 години или с разрешение от родител.</p>
+
+<h2>8. Промени</h2>
+<p>При съществена промяна ще обновим датата горе и ще те уведомим в играта (🆕 Ъпдейти).</p>
+<p class="mut"><a href="terms.html">Условия за ползване</a> · <a href="./">Към играта</a></p>
+</section>
+
+<section data-l="en">
+<h1>🔒 Privacy Policy</h1>
+<div class="mut">“Строителна империя” (Construction Empire) · effective 25 Oct 2026</div>
+
+<h2>1. Controller</h2>
+<p><b>TEMIDASOFT OOD</b> (ТЕМИДАСОФТ ООД, Bulgaria) is the controller of personal data processed in the game. Contact: <a href="mailto:temidasoftcrm@gmail.com">temidasoftcrm@gmail.com</a>.</p>
+
+<h2>2. What we process and why</h2>
+<table>
+<tr><th>Data</th><th>Purpose</th><th>Legal basis (Art. 6 GDPR)</th></tr>
+<tr><td>Game saves on your device (localStorage)</td><td>Continue where you left off</td><td>Necessary for the service you requested (b)</td></tr>
+<tr><td>Email address and, if you set one, a password (stored only as a secure hash)</td><td>Account sign-in; sign-in codes are emailed to you</td><td>Contract (b)</td></tr>
+<tr><td>Cloud saves (up to 3 slots) and a short summary (city, day, money, buildings)</td><td>Play on several devices without losing progress</td><td>Contract (b)</td></tr>
+<tr><td>“👥 Online now”: your in-game company name, city and day</td><td>Other players see who is playing; not kept after you close the game</td><td>Contract (b)</td></tr>
+<tr><td>Online modes (partnership, online empire): company name and game data you choose to share</td><td>Multiplayer features</td><td>Contract (b)</td></tr>
+<tr><td>Your privacy choice (localStorage “stroi-consent”)</td><td>Remember what you allowed</td><td>Legal obligation (c)</td></tr>
+<tr><td>Ads (future)</td><td>Keep the game free</td><td>Only with your consent (a)</td></tr>
+<tr><td>Anonymous statistics (future): visits, errors, performance — cookie-less, no identifier</td><td>Improve the game</td><td>Only with your consent (a)</td></tr>
+</table>
+<p>Without signing in, your saves never leave your device. We do not sell data or build profiles.</p>
+
+<h2>3. Cookies and local storage</h2>
+<p>The game uses no advertising or tracking cookies. It uses the browser’s local storage (localStorage, IndexedDB) for saves, autosaves, settings and the sign-in session; these are strictly necessary. Ads and statistics, if added, run only after consent in the “🔒 Privacy” banner, which you can change any time in ⚙️ Settings → 🔒 Privacy.</p>
+
+<h2>4. Processors</h2>
+<ul>
+<li><b>Supabase Inc.</b> — database and authentication (account, cloud saves, online modes).</li>
+<li><b>Cloudflare Inc.</b> — hosting of the game and its files.</li>
+<li><b>jsDelivr</b> — CDN for the game’s libraries (sees your IP address when loading).</li>
+<li>In the future — an ad network and a statistics service, only with consent; they will be listed here.</li>
+</ul>
+<p>Some of them may process data outside the EEA; such transfers rely on the European Commission’s Standard Contractual Clauses or an adequacy decision.</p>
+
+<h2>5. Retention</h2>
+<p>Account and cloud saves — while you have an account. “Online now” — only while the game is open. On-device saves — until you delete them (⚙️ Settings → 🗑️ Delete data) or clear your browser data.</p>
+
+<h2>6. Your rights</h2>
+<p>Under the GDPR you have the right of access, rectification, erasure, restriction, portability and objection, and you may withdraw consent at any time (without affecting prior processing).</p>
+<ul>
+<li><b>Erasure:</b> in the game — ⚙️ Settings → ❌ Delete account (removes the account, cloud saves and online data). Or email us from your account address at <a href="mailto:temidasoftcrm@gmail.com">temidasoftcrm@gmail.com</a>; we delete within 30 days.</li>
+<li><b>Copy of your saves:</b> 💾 Saves → download to a file, or by email.</li>
+<li><b>Complaint:</b> Bulgarian Commission for Personal Data Protection, <a href="https://www.cpdp.bg" target="_blank" rel="noopener">www.cpdp.bg</a>, or your local authority.</li>
+</ul>
+
+<h2>7. Children</h2>
+<p>Accounts may be created by persons aged 16 or over, or with parental permission.</p>
+
+<h2>8. Changes</h2>
+<p>For material changes we will update the date above and notify you in the game (🆕 Updates).</p>
+<p class="mut"><a href="terms.html#en">Terms of Use</a> · <a href="./">Back to the game</a></p>
+</section>
+</main>
+<script>
+  const L = () => { const en = location.hash === '#en' || (!location.hash && !/^bg/i.test(navigator.language || '')); document.body.className = en ? 'en' : 'bg'; document.documentElement.lang = en ? 'en' : 'bg'; document.getElementById('lBg').className = en ? '' : 'on'; document.getElementById('lEn').className = en ? 'on' : ''; };
+  addEventListener('hashchange', L); L();
+</script>
+</body>
+</html>

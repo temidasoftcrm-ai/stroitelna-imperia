@@ -143,12 +143,15 @@ import { planRoute, randomRoadPoint } from './cityplanroute.js';
 import { ROME_FILES, IT_FILES, IT_PICK, romePrep } from './romenear.js';   // 🇮🇹 rome-bld (f9): Рим отблизо — италианските сгради; it-bld — и в другите италиански градове
 import { STATUE_FILES, statuePrep } from './statues.js';   // ⛲ statues (f9): фонтани и статуи в градовете
 import { GFX, GFX_ORDER, gfx, gfxLevel, setGfx } from './gfxpresets.js';   // 🎨 gfx-presets (f9): графиката Ниско / Средно / Високо
+import { createOnboarding } from './onboarding.js';   // 🎓 onboarding (f9): урокът при първа игра — камера, парцел, строеж, пари, град, настройки
+import { initErrTelemetry, errPayload, sendErrors } from './errtelem.js';   // 🐞 err-telemetry (f9): грешките в буфер за изпращане (само със съгласие за анализи)
 import { pcGate, perfCheck } from './perfmeter.js';   // 🖥️ perf-meter (f9): играта е за компютър — екран за телефон/таблет и „Проверка на компютъра“
 
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 const FIXSTAB = feature('fix-stab');   // fix-stab (f6): стабилност и памет — смяна на град по време на зареждане, неуспешен план v2, изгледите на магистралите/курортите, нощните материали, WebGL
 const AUTOTEST = params.has('autotest');
+if (feature('err-telemetry') && !AUTOTEST) initErrTelemetry({ ctx: () => ({ city: S?.cityId, gfx: gfxLevel(), day: S?.day }) });   // 🐞 err-telemetry (f9): преди всичко друго — да хване и грешките при зареждането
 window.__stroiLv = () => { try { return S ? dev.best() : 0; } catch { return 0; } };   // нивото на фирмата — за tips.js (съветите сами — до ниво 10)
 const SAVE_KEY = saveKey();   // зависи от текущия слот (saves.js)
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -4975,6 +4978,9 @@ const coop = createCoop({ addXp: n => dev.add(n), lv: () => dev.rawBest(),
   } });
 const tutorial = createTutorial({ S: () => S, projects: () => projects, units: () => units, save,
   onMap: () => !$('mapScreen').classList.contains('hidden'), openTab: t => { tab = t; renderPanel(); } });
+const onboard = feature('onboarding') ? createOnboarding({ auto: !AUTOTEST, S: () => S, camera, canvas: renderer.domElement, projects: () => projects,   // 🎓 onboarding (f9)
+  onMap: () => !$('mapScreen').classList.contains('hidden'), perfCheck: () => perfCheck(renderer, GFXON ? lv => applyGfx(lv) : null),
+  ready: () => !!S && !!city?.ready && !$('loading') && !$('cine') && $('modal').classList.contains('hidden') }) : null;
 const resorts = createResorts({ xp: n => xpMore(n),
   S: () => S, econ: () => econ, toast, modal, proj, fmt, save, devBest: () => dev.best(), symK: () => (mapEU ? 2.6 : (mapWide ? 1.6 : 1) * (mapNear() ? 1 : 0.7)) * mapK(),   // отдалеч курортите са по-малки
   onExtDone: key => { if (key === 'hotel') quests.emit('resortHotel'); },
@@ -5278,7 +5284,8 @@ const topSetRows = () => { const C = topSetCounts(), tap = id => () => { const b
     { ico: () => '❓', nm: () => 'Помощ — обиколка на бутоните', fn: tap('btnTour'), on: !!document.getElementById('btnTour') },
     { ico: () => '💡', nm: () => 'Съвет — как да печелиш и да не фалираш', fn: tap('btnTips'), on: !!document.getElementById('btnTips') },
     { ico: () => '🖥️', nm: () => 'Проверка на компютъра — ще върви ли добре', fn: () => perfCheck(renderer, GFXON ? lv => applyGfx(lv) : null), on: feature('perf-meter') },   // perf-meter (f9); gfx-presets — „Приложи“ предложеното ниво
-    { ico: () => '🎨', nm: () => `Графика: ${gfx().nm}`, fn: () => openGfxUI(), on: GFXON },   // gfx-presets (f9)   // perf-meter (f9)
+    { ico: () => '🎨', nm: () => `Графика: ${gfx().nm}`, fn: () => openGfxUI(), on: GFXON },
+    { ico: () => '🎓', nm: () => 'Покажи урока пак — първите стъпки', fn: () => onboard.restart(), on: !!onboard },   // 🎓 onboarding (f9)   // gfx-presets (f9)   // perf-meter (f9)
   ].filter(r => r.on); };
 if (feature('top-set')) {
   document.body.classList.add('topSet');
@@ -12007,6 +12014,9 @@ if (AUTOTEST) {
       const sz = q => q && [+(q.x1 - q.x0).toFixed(1), +(q.z1 - q.z0).toFixed(1)];
       return P ? { city: S.cityId, hq: h.id, lots: P.lots, cleared, gar: S.garageLot, wh: S.whLot, office: sz(P.office), garage: sz(P.garage), whRect: sz(P.wh), yard: (P.yard || []).map(sz), all: sz(P.all), hotel5: o.hotel ? hotel5Of(S.cityId) || 'зарежда се…' : null } : { err: 'campusPlot() = null (флагът campus2?)' };
     },
+    errDemo() { initErrTelemetry({ ctx: () => ({ city: S?.cityId, gfx: gfxLevel(), day: S?.day }) }); setTimeout(() => { throw new Error('тест на телеметрията от Лабораторията (ivan@example.com, ?token=abc)'); }); Promise.reject(new Error('тест: отхвърлен promise'));   // 🐞 err-telemetry: Лабораторията
+      setTimeout(() => { const r = sendErrors(); modal('🐞 Телеметрия на грешките', `Изпращане: <b>${r.sent ? 'изпратени ' + r.sent + ' (засега само в конзолата и localStorage)' : r.reason === 'no-consent' ? 'не — няма съгласие за анализи' : 'няма нови'}</b><br>Това би тръгнало:<pre style="white-space:pre-wrap;font-size:11px;max-height:50vh;overflow:auto;text-align:left">${JSON.stringify(errPayload(), null, 1).replace(/</g, '&lt;')}</pre>`, [['OK', null]]); }, 800); return true; },
+    onbDemo() { onboard?.restart(); return onboard?.step(); },   // 🎓 onboarding: Лабораторията (под autotest урокът не тръгва сам)
     settingsOpen() { openSettingsUI(); return { badge: document.querySelector('#btnSettings .setB')?.textContent || null, rows: topSetRows().map(r => r.nm().replace(/<[^>]+>/g, '')) }; },   // ⚙️ Лабораторията (top-set)
     // 🏢 Лабораторията (campus2): общият парцел на фирмата при ниво lv (офис, гараж, склад)
     campus2Look(lv = 5) { S.officeLevel = lv; S.garageLevel = Math.min(10, Math.max(1, lv)); S.whLevel = Math.max(1, Math.min(10, lv)); if (S.whLot == null) S.whLot = city.hq.id;

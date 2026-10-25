@@ -5,6 +5,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
 import { backupRaw, dropBackups } from './saves.js';
 import { feature, IN_LAB } from './lab/feature.js';
+import './consent.js';   // 🍪 GDPR съгласие (feature 'consent') — window.consent
 
 const URL_ = 'https://lpzjscttqieqnqozscpk.supabase.co';
 const KEY = 'sb_publishable_3Gats6iSx7BoyFUh63N1vQ__pHCBrul';   // публичен ключ — достъпът се пази от RLS
@@ -25,6 +26,22 @@ function sig(s) { if (!s) return ''; if (!FIX) { let h = 2166136261; for (let i 
 // един и същ запис като текст независимо от реда на ключовете (jsonb в облака ги пренарежда — JSON.stringify(c.data) !== raw дори без промяна)
 const canon = v => Array.isArray(v) ? '[' + v.map(canon).join(',') + ']' : v && typeof v === 'object' ? '{' + Object.keys(v).sort().filter(k => v[k] !== undefined).map(k => JSON.stringify(k) + ':' + canon(v[k])).join(',') + '}' : JSON.stringify(v) ?? 'null';
 const sameSave = (data, raw) => { try { return canon(data) === canon(JSON.parse(raw)); } catch { return false; } };
+// ☁️ cloud-lite: записът (до ~2.5 MB JSON) се качва компресиран (gzip → base64, ~5× по-малко) в същата колона data jsonb — { $z: 'gzip64', d, n };
+// четенето разпознава и двата вида винаги (и без флага), за да не се счупи устройство, на което флагът още е изключен
+const LITE = feature('cloud-lite');
+const b64 = buf => { const u = new Uint8Array(buf); let t = ''; for (let i = 0; i < u.length; i += 32768) t += String.fromCharCode.apply(null, u.subarray(i, i + 32768)); return btoa(t); };
+async function pack(raw) {
+  if (!LITE || typeof CompressionStream === 'undefined') return JSON.parse(raw);
+  const b = await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
+  return { $z: 'gzip64', d: b64(b), n: raw.length };
+}
+const packed = d => !!d && typeof d === 'object' && d.$z === 'gzip64' && typeof d.d === 'string';
+async function unpack(d) {
+  if (!packed(d)) return d;
+  if (typeof DecompressionStream === 'undefined') throw new Error('браузърът не може да разархивира записа');
+  const u = Uint8Array.from(atob(d.d), c => c.charCodeAt(0));
+  return JSON.parse(await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
+}
 const getSync = n => { try { return JSON.parse(localStorage.getItem(syncKey(n))) || null; } catch { return null; } };
 const setSync = (n, v) => { try { localStorage.setItem(syncKey(n), JSON.stringify(v)); } catch {} };
 function metaOf(raw) { try { const s = JSON.parse(raw); return { city: s.hqCity || s.cityId, day: s.day | 0, money: Math.round(s.econ?.money ?? 0), done: s.done | 0, rep: s.rep ?? 0 }; } catch { return {}; } }
@@ -336,13 +353,14 @@ function openSettings(h) {
     ${sec(`👥 Онлайн сега: <span id="stN">${ppl.length}</span>`, `<div id="stPpl" style="font-size:13px;line-height:1.7;max-height:150px;overflow:auto">${pplHtml(ppl)}</div>`)}
     ${sec(`🆕 Ъпдейти <span style="font-weight:400;color:var(--mut);font-size:13px">· версия ${VERSION}</span>`, `<div style="max-height:170px;overflow:auto">${changesHtml()}</div>`)}
     ${sec('🎮 Игра', `<div style="display:flex;gap:6px;flex-wrap:wrap">${hooks.saves ? sbtn('stSaves', '💾 Записи') : ''}${hooks.rename ? sbtn('stRen', '✏️ Име на фирмата') : ''}${hooks.credits ? sbtn('stCred', '📜 Автори') : ''}${hooks.newGame ? sbtn('stNew', '🔄 Нова игра') : ''}</div>`)}
+    ${feature('consent') ? sec('🔒 Поверителност', `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">${sbtn('stCons', '🍪 Съгласие: реклами и статистика')}<a href="privacy.html" target="_blank" rel="noopener" style="color:var(--acc);font-size:14px">Поверителност</a><span style="color:var(--mut)">·</span><a href="terms.html" target="_blank" rel="noopener" style="color:var(--acc);font-size:14px">Условия</a></div>`) : ''}
     ${sec('⚠️ Опасна зона', `<div style="font-size:13px;color:var(--mut);line-height:1.5">„Изтрий данните“ маха всички записи на това устройство${user ? ' и в облака. „Изтрий акаунта“ маха и самия акаунт (имейла) завинаги' : ''}.</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${sbtn('stWipe', '🗑️ Изтрий данните', 'btn2', 'color:var(--bad)')}${user ? sbtn('stDel', '❌ Изтрий акаунта', 'btn2', 'color:var(--bad)') : ''}</div>`)}`,
     [['Затвори', null, 1]]);
   el.firstElementChild.style.maxHeight = '92vh'; el.firstElementChild.style.overflow = 'auto';
   const on = (id, f) => { const b = el.querySelector('#' + id); if (b) b.onclick = () => { el.remove(); f(); }; };
   { const x = el.querySelector('#stX'); if (x) x.onclick = () => el.remove(); }   // ✕ горе — без да скролваш до „Затвори“
-  on('stIn', () => loginEmail()); on('stCloud', openCloud); on('stCred', () => hooks.credits()); on('stRen', () => hooks.rename()); on('stSaves', () => hooks.saves()); on('stNew', () => hooks.newGame());
+  on('stIn', () => loginEmail()); on('stCloud', openCloud); on('stCred', () => hooks.credits()); on('stRen', () => hooks.rename()); on('stSaves', () => hooks.saves()); on('stNew', () => hooks.newGame()); on('stCons', () => window.consent?.open());
   on('stOut', () => dlg(`<h2 style="font-size:19px;color:var(--acc)">🚪 Изход?</h2><p style="color:var(--mut);font-size:14px;line-height:1.5">Играта на това устройство остава. Влез пак със същия имейл, за да продължи да се пази в облака.</p>`,
     [['Отказ', null], ['🚪 Изход', () => { syncAll(false).finally(() => sb.auth.signOut().then(() => toast('🚪 Излезе от акаунта.'))); }, 1]]));
   on('stWipe', () => confirmWipe(false)); on('stDel', () => confirmWipe(true));
@@ -396,11 +414,12 @@ function presRender() {
   if (n) n.textContent = L.length; if (box) box.innerHTML = pplHtml(L);
 }
 const meInfo = () => { try { return window.__stroiMe?.() || null; } catch { return null; } };
-let lastMe = '';
+let lastMe = '', lastAt = 0, presTm = 0, idleTm = 0;
 function presTrack() {
   if (!pres) return;
-  const me = meInfo() || { name: 'Нов играч', city: '', day: 0 }, k = JSON.stringify(me);
-  if (k !== lastMe) { lastMe = k; pres.track(me).catch(() => { }); }
+  const me = meInfo() || { name: 'Нов играч', city: '', day: 0 }, k = LITE ? me.name + '|' + me.city : JSON.stringify(me);
+  if (LITE && k === lastMe && Date.now() - lastAt < 600000) return;   // cloud-lite: денят — най-много на 10 мин; име/град — веднага
+  if (k !== lastMe || LITE) { lastMe = k; lastAt = Date.now(); pres.track(me).catch(() => { }); }
 }
 function presStart() {
   if (pres || AUTOTEST) return;
@@ -408,13 +427,19 @@ function presStart() {
     pres = sb.channel('stroi-online', { config: { presence: { key: myKey } } });
     pres.on('presence', { event: 'sync' }, () => { presState = pres.presenceState(); presRender(); })
       .subscribe(st => { if (st === 'SUBSCRIBED') { lastMe = ''; presTrack(); } });
-    setInterval(presTrack, 30000);
+    if (!presTm) presTm = setInterval(presTrack, LITE ? 60000 : 30000);
   } catch { pres = null; }
+}
+// cloud-lite: таб, скрит над 3 мин, затваря връзката за „👥 Онлайн“ (по-малко едновременни връзки към сървъра); при връщане — пак
+function presIdle(hidden) {
+  clearTimeout(idleTm);
+  if (!hidden) { presStart(); return; }
+  idleTm = setTimeout(() => { if (!pres) return; sb.removeChannel(pres).catch(() => { }); pres = null; presState = {}; }, 180000);
 }
 
 // ── синхронизация ──
 async function upload(n, raw) {
-  const { data, error } = await sb.from('saves').upsert({ user_id: user.id, slot: 's' + n, data: JSON.parse(raw), meta: metaOf(raw), updated_at: new Date().toISOString() }).select('updated_at').single();
+  const { data, error } = await sb.from('saves').upsert({ user_id: user.id, slot: 's' + n, data: await pack(raw), meta: metaOf(raw), updated_at: new Date().toISOString() }).select('updated_at').single();
   if (error) throw error;
   setSync(n, { ts: data.updated_at, sig: sig(raw) });
   try { localStorage.removeItem(emptyKey(n)); } catch { }
@@ -432,8 +457,10 @@ async function take(n, row) {
 }
 // при старт / вход: сравнява всеки слот с облака
 async function pullAll(rowsIn) {   // rowsIn — само тестът в Лабораторията (__cloudPullTest)
+  if (LITE && !rowsIn && await unchanged()) return pushChanged();   // cloud-lite: в облака нищо ново → без да се свалят целите записи
   const { data: rows, error } = rowsIn ? { data: rowsIn } : await sb.from('saves').select('slot,data,meta,updated_at');
   if (error) throw error;
+  for (const r of rows || []) r.data = await unpack(r.data);
   const cloud = Object.fromEntries((rows || []).map(r => [r.slot, r]));
   let reload = false;
   for (let n = 1; n <= SLOTS; n++) {
@@ -465,6 +492,18 @@ async function pullAll(rowsIn) {   // rowsIn — само тестът в Лаб
     } else if (localChanged) await upload(n, raw);
   }
   if (reload) { toast('☁️ Зареждам по-новия запис от облака…'); setTimeout(() => location.reload(), 900); }
+}
+// cloud-lite: само слот + час от облака — ако съвпадат с последно качените/свалените и няма висящ конфликт или „нарочно празен“ слот, пълното сравнение не трябва
+async function unchanged() {
+  if (held.size) return false;
+  const { data, error } = await sb.from('saves').select('slot,updated_at');
+  if (error) throw error;
+  const ts = Object.fromEntries((data || []).map(r => [r.slot, r.updated_at]));
+  for (let n = 1; n <= SLOTS; n++) {
+    const raw = localStorage.getItem(keyOf(n)), s = getSync(n), t = ts['s' + n];
+    if (localStorage.getItem(emptyKey(n)) || (t ? !s || s.ts !== t : !!raw)) return false;
+  }
+  return true;
 }
 // периодично: качва слотовете, които са се променили
 async function pushChanged() {
@@ -499,7 +538,7 @@ function regGate() {
   el.innerHTML = `<div style="width:min(420px,100%);background:#0c1018;border:1px solid #c9a14a;border-radius:16px;padding:20px 20px 14px;color:#e6edf6;box-shadow:0 20px 60px #000">
     <div style="font:900 24px system-ui,sans-serif;color:#ffd54a;text-align:center">🏗️ Строителна империя</div>
     <div id="rgBody"></div>
-    <div style="text-align:center;margin-top:12px"><a href="#" id="rgSkip" style="color:#8b96a8;font-size:13px">Играй без регистрация</a></div></div>`;
+    <div style="text-align:center;margin-top:12px"><a href="#" id="rgSkip" style="color:#8b96a8;font-size:13px">Играй без регистрация</a></div>${feature('consent') ? '<div style="text-align:center;margin-top:8px;font-size:12px;color:#6b7688">С регистрацията приемаш <a href="terms.html" target="_blank" rel="noopener" style="color:#8b96a8">Условията</a> и <a href="privacy.html" target="_blank" rel="noopener" style="color:#8b96a8">Поверителността</a></div>' : ''}</div>`;
   document.body.appendChild(el);
   const body = el.querySelector('#rgBody'), close = () => { el.remove(); };
   el.querySelector('#rgSkip').onclick = e => { e.preventDefault(); close(); };
@@ -599,11 +638,13 @@ if (!AUTOTEST && feature('reg-gate') && ((window.top === window && !LOCAL) || /[
 window.__regGate = regGate;
 window.__settings = openSettings;
 if (IN_LAB) window.__cloudPullTest = rows => pullAll(rows).then(() => ({ held: [...held] }));   // fix-saves: конфликт без вход — облачните редове се подават наготово
+if (IN_LAB) window.__cloudLiteTest = async () => { const raw = localStorage.getItem(keyOf(curSlot())) || '{}', p = await pack(raw), back = await unpack(p); return { raw: raw.length, sent: JSON.stringify(p).length, same: sameSave(back, raw) }; };   // cloud-lite: колко се качва и връща ли се същото
 window.__wipeAll = () => confirmWipe(false, true);   // „🆕 Нова игра“ на картата (game.js)
 if (!AUTOTEST) {
   presStart();
-  setInterval(syncTick, 20000);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') syncAll(false); else syncAll(true); });
+  setInterval(syncTick, LITE ? 60000 : 20000);   // cloud-lite: на 60 с (и при скрит таб / изход), само ако записът се е променил
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') syncAll(false); else syncAll(true); if (LITE) presIdle(document.visibilityState === 'hidden'); });
+  if (LITE) addEventListener('pagehide', () => syncAll(false));
   if (document.readyState === 'loading') addEventListener('DOMContentLoaded', mountBtn); else mountBtn();
 }
 export const cloud = { sb, syncAll, user: () => user, openSettings };
