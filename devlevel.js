@@ -45,6 +45,11 @@ const UNLOCKS = {
   19: '🏙️ Твоят град от нулата · 🛰️ мегапоръчки (Панама, Дариен, Транссибирска, „Гън“)',
   20: '👑 Световна империя: поглъщане на конгломерати · 🌐 световни концесии · надпревара за №1',
 };
+if (feature('bank-simple')) {   // bank-simple (f9): изкупуването на фалирали фирми — от 10, IPO (емисии и транши) — от 15, ниво 17 — само своята банка
+  UNLOCKS[10] += ' · 🏢 изкупуване на фалирали фирми (дъщерни)';
+  UNLOCKS[15] += ' · 📈 твоята фирма на борсата (IPO, транши, дивиденти)';
+  UNLOCKS[17] = UNLOCKS[17].replace(' · 📈 фондова борса (IPO, транши, дивиденти)', '');
+}
 Object.assign(UNLOCKS, IMP_UNLOCKS);
 export const unlockText = lv => UNLOCKS[lv] || '';
 export const LV = { BG_ALL: 2, LINKS: 2, STAFF: 4, BALKANS: 5, FOREIGN: 6, OFFERS: 6, STOCKS: 7, EUROPE: 8, AIR: 9, WORLD: 10, MEGAHUB: 11, NA: 12, MEGA_EU: 13, SA: 14, SKY40: 15, AS: 16, FAST: 17, OC: 18, MEGA_WORLD: 19, EMPIRE: 20 };

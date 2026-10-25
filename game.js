@@ -4475,6 +4475,12 @@ function withLoan(cost, note, doBuy) {
   const ut = units.map(u => u.type), need = Math.ceil((cost - econ.s.money + cost * 0.1) / 10000) * 10000, max = econ.invMax(ut), T = econ.invTerms(need, ut);
   if (!T || need > max) { toast(`🏦 Банката дава общо до ${fmt(max)} € инвестиционни кредити (250% от нетната стойност) — нужни са ${fmt(need)} €.`, 'bad'); return; }
   const daily = Math.ceil(need / T.days) + Math.ceil(need * T.rate / T.days), risky = T.rate > ECON.INV_RATE;
+  if (feature('bank-simple')) {   // bank-simple (f9): „Кредит за N месеца — X €/ден“; „Друг срок“ → банката, таб „Кредити“ (сумата там решава срока)
+    const mo = Math.round(T.days / 30);
+    modal(`🏦 Кредит за ${mo} месеца`, `За „${note}“ ти трябват още <b>${fmt(cost - econ.s.money)} €</b>.<br>Банката предлага <b>${fmt(need)} €</b> (с 10% резерв) за <b>${mo} месеца</b> — вноска <b>${fmt(daily)} €/ден</b>, изплаща се сама. Лихва <b style="color:${risky ? 'var(--bad)' : 'var(--ok)'}">${Math.round(T.rate * 100)}%</b> за целия срок.${risky ? `<br>⚠️ Дългът ще е ${Math.round(T.ratio * 100)}% от стойността на фирмата — затова лихвата е по-висока.` : ''}`,
+      [['Отказ', null], ['📋 Друг срок', () => { try { localStorage.setItem('stroi-bank-tab', 'credit'); } catch (e) { } openBig('bank'); }], [`Вземи ${fmt(need)} € и купи`, () => { econ.invTake(need, note, T.rate, T.days); doBuy(); renderPanel(); }]]);
+    return;
+  }
   modal(`🏦 Инвестиционен кредит`, `За „${note}“ ти трябват още <b>${fmt(cost - econ.s.money)} €</b>.<br>Банката предлага <b>${fmt(need)} €</b> (с 10% резерв): <b style="color:${risky ? 'var(--bad)' : 'var(--ok)'}">${Math.round(T.rate * 100)}% лихва</b> за целия срок, изплаща се сама за ${T.days} дни — вноска ~<b>${fmt(daily)} €/ден</b>.${risky ? `<br>⚠️ Дългът ще е ${Math.round(T.ratio * 100)}% от нетната стойност на фирмата — затова лихвата е по-висока.` : ''} Можеш да го погасиш предсрочно от „Банка“ (без лихвата за остатъка).`,
     [['Отказ', null], [`Вземи ${fmt(need)} € и купи`, () => { econ.invTake(need, note, T.rate, T.days); doBuy(); renderPanel(); }]]);
 }
