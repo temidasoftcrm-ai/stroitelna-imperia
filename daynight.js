@@ -2,6 +2,7 @@
 // Един игрови ден = едно денонощие. f = част от деня (0..1); 0 = 06:00 сутринта.
 import * as THREE from 'three';
 import { NF_MATS, NF_T } from './nightfloors.js';
+import { feature } from './lab/feature.js';
 
 // ключови моменти (час → цветове/сила)
 const KEYS = [
@@ -77,7 +78,7 @@ export class DayNight {
   // позиции на уличните лампи: [{x, y, z}] — y е височината на лампата
   setLamps(list) {
     this.lamps.clear();
-    const poolGeo = new THREE.PlaneGeometry(9, 9).rotateX(-Math.PI / 2);
+    const poolGeo = feature('fix-stab') ? (this.poolGeo ||= new THREE.PlaneGeometry(9, 9).rotateX(-Math.PI / 2)) : new THREE.PlaneGeometry(9, 9).rotateX(-Math.PI / 2);   // fix-stab: една обща (беше нова при всеки град)
     for (const p of list) {
       const s = new THREE.Sprite(this.glowMat); s.position.set(p.x, p.y, p.z); s.scale.set(3.2, 3.2, 1); this.lamps.add(s);
       const pool = new THREE.Mesh(poolGeo, this.poolMat); pool.position.set(p.x, 0.06, p.z); this.lamps.add(pool);   // светло петно на асфалта
@@ -107,6 +108,6 @@ export class DayNight {
     this.lamps.visible = n > 0.01;
     for (const m of this.winMats) m.emissiveIntensity = n * (m.userData.winK || 1);
     NF_T.value = performance.now() / 1000;
-    for (const m of NF_MATS) m.emissiveIntensity = n * (m.userData.nfK || 1);   // nfK — по-ярко (Петронас)   // нощните етажи (nightfloors.js) — и на забележителностите, заредени по-късно
+    for (const m of NF_MATS) m.emissiveIntensity = window.__gfxNF === false ? 0 : n * (m.userData.nfK || 1);   /* gfx-presets: Ниско — без светещите етажи */   // nfK — по-ярко (Петронас)   // нощните етажи (nightfloors.js) — и на забележителностите, заредени по-късно
   }
 }

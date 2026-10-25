@@ -82,7 +82,7 @@ function verdict(g, t, ram, cores, scr) {
   ].filter(Boolean);
   return { lv, why, tips };
 }
-export async function perfCheck(main) {   // main — рендерът на играта (резервен, ако браузърът не дава нов контекст)
+export async function perfCheck(main, apply) {   // apply(ниво) — gfx-presets: „Приложи“ предложената графика ('high' / 'mid' / 'low')   // main — рендерът на играта (резервен, ако браузърът не дава нов контекст)
   const d = box(`<h2>🖥️ Проверка на компютъра</h2><p>Кратък тест (~5 s): видеокарта, бърза сцена като голям град, памет, ядра и екран.</p><div class="bar"><i id="pcBar"></i></div><small id="pcSt">Видеокартата…</small>`);
   const bar = d.querySelector('#pcBar'), st = d.querySelector('#pcSt');
   const g = gpuInfo(main); st.textContent = 'Бързата сцена…';
@@ -92,7 +92,9 @@ export async function perfCheck(main) {   // main — рендерът на иг
   d.querySelector('.in').innerHTML = `<h2>🖥️ Проверка на компютъра</h2><div class="light">${L[0]}</div><h2 style="font-size:18px">${L[1]}</h2>
     <p>Защо: ${esc(v.why.join(', '))}.</p><ul>${v.tips.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
     <p><small>Видеокарта: ${esc(g ? g.name : 'няма WebGL')}${g ? ` · текстури до ${g.maxTex}` : ''}${t ? ` · кадър в теста ~${t.ms.toFixed(1)} ms` : ''}${ram ? '' : ' · паметта — браузърът не я казва'}</small></p>
-    <div class="row"><button class="go" id="pcOk">Добре</button><button id="pcAgain">↻ Пак</button></div>`;
+    ${apply ? `<p style="margin-top:8px">Предложение: графика <b>${['🟢 Високо', '🟡 Средно', '🔴 Ниско'][v.lv]}</b>.</p>` : ''}
+    <div class="row">${apply ? `<button class="go" id="pcApply">Приложи: ${['Високо', 'Средно', 'Ниско'][v.lv]}</button>` : ''}<button class="${apply ? '' : 'go'}" id="pcOk">${apply ? 'Не сега' : 'Добре'}</button><button id="pcAgain">↻ Пак</button></div>`;
   window.__perfCheck = { lv: v.lv, why: v.why, gpu: g && g.name, ms: t && t.ms, ram, cores };   // за Лабораторията/тестовете
-  return new Promise(res => { d.querySelector('#pcOk').onclick = () => { d.remove(); res(v); }; d.querySelector('#pcAgain').onclick = () => { d.remove(); perfCheck(main).then(res); }; });
+  return new Promise(res => { d.querySelector('#pcOk').onclick = () => { d.remove(); res(v); }; d.querySelector('#pcAgain').onclick = () => { d.remove(); perfCheck(main, apply).then(res); };
+    const ap = d.querySelector('#pcApply'); if (ap) ap.onclick = () => { d.remove(); apply(['high', 'mid', 'low'][v.lv]); res(v); }; });
 }

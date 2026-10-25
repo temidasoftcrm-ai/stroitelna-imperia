@@ -75,6 +75,7 @@ const FREUP = feature('fac-reup'), RU_AT = [3, 12, 40, Infinity];
 function reupCanvas(G) { const seen = new Set(); G.traverse(o => { if (!o.isInstancedMesh) return; for (const m of [].concat(o.material)) { if (!m || seen.has(m)) continue; seen.add(m);
   for (const t of [m.map, m.emissiveMap]) if (t && t.isCanvasTexture && t.image && t.image.width > 0) t.needsUpdate = true; } }); }
 const WIN_MATS = [];
+export function winDrop(set) { for (let i = WIN_MATS.length - 1; i >= 0; i--) if (set.has(WIN_MATS[i])) WIN_MATS.splice(i, 1); }   // fix-stab (game.js winForget): материалите на стария град
 export function nightWin(mat, c, o = {}) {   // export — и за bgblocks.js
   const W = c.width, H = c.height, src = c.getContext('2d').getImageData(0, 0, W, H).data, lab = new Int32Array(W * H).fill(-1), out = document.createElement('canvas'); out.width = W; out.height = H;
   const g = out.getContext('2d'), img = g.createImageData(W, H), D = img.data; let seed = o.seed || 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
