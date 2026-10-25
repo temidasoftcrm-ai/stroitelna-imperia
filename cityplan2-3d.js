@@ -13,7 +13,8 @@ import { varPick, varW, xParts, xDraw, bgPlace } from './bgblocks.js';   // bg-v
 import { crossingsOf } from './pedpaths.js';   // road-geo: зебрите — същите, по които пресичат пешеходците
 import { streetReal, lampField, tlightField, lensGeo, pedGeo, lensMatrix, CLASSIC } from './streetreal.js';   // street-real: истинските лампи и светофари (opts.streetReal)
 import { kremlinEnsemble } from './kremlin2.js';   // lm-kremlin2: Кремъл от моделите на потребителя (Meshy)
-import { romeNear } from './romenear.js';   // rome-bld: Рим отблизо — италианските сгради на местата на фасадите (opts.romeNear)
+import { romeNear } from './romenear.js';
+import { placeStatues, parkSpots } from './statues.js';   // statues: фонтаните и статуите в парковете, зелените площи и по булевардите (opts.statues)   // rome-bld: Рим отблизо — италианските сгради на местата на фасадите (opts.romeNear)
 
 const M = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.92 });
 let MAT = null;
@@ -368,7 +369,7 @@ function* furniture(G, P, o = {}) {   // генератор: yield след вс
   // площадите на забележителностите: пейки, кошчета, фонтан
   for (const L of P.lots.filter(q => (q.lm && !yardOf(q)) || q.big === 'park')) { const R0 = Math.max(L.w, L.d) / 2 + (L.guard || 4) - 2;
     for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2, x = L.x + Math.cos(a) * R0, z = L.z + Math.sin(a) * R0; (k % 3 ? benches : bins).push([x, z, a + Math.PI / 2]); }
-    if (['navona', 'popolo', 'trevi', 'spanishsteps'].includes(L.lm) || L.big === 'park') fountains.push([L.x, L.z]); }
+    if (['navona', 'popolo', 'trevi', 'spanishsteps'].includes(L.lm) || (L.big === 'park' && !o.statues)) fountains.push([L.x, L.z]); }   // statues: в парка — истинският фонтан (statues.js)
   // road-geo: лампи около кръговите (по тротоара, без входовете) и прожектори в острова, насочени нагоре (светят с нощта — общият фенер)
   const ups = []; if (o.roadGeo) for (const r of P.rounds || []) { const n = P.nodes[r.node], ro = r.outer + 1.6, ri = r.outer - Math.min(5.5, r.outer - 6) - 2;
     for (let k = 0; k < 8; k++) { const a = (k + 0.5) / 8 * Math.PI * 2; if (n.arms.some(q => Math.abs(Math.atan2(Math.sin(q.angle - a), Math.cos(q.angle - a))) < Math.asin(Math.min(0.95, (P.roads[q.road].w / 2 + 2.5) / ro)))) continue; lamps.push([r.x + Math.cos(a) * ro, r.z + Math.sin(a) * ro, ...(SR ? [Math.atan2(-Math.cos(a), -Math.sin(a)), 'cobra'] : [])]); }
@@ -600,7 +601,7 @@ export function buildPlan2View(P, opts = {}) {
   }
   // дърветата на парковете (големите места park) и на островите на кръговите
   const parkTrees = () => {
-    for (const L of P.lots) if (L.big === 'park') for (let k = 0; k < Math.floor(L.w * L.d / 70); k++) { const h = 4 + (k * 7 % 5), u = ((k * 0.7548776662 + 0.5) % 1 - 0.5) * (L.w - 6), v = ((k * 0.5698402910 + 0.5) % 1 - 0.5) * (L.d - 6), c = Math.cos(L.rot), s = Math.sin(L.rot); trees.push([L.x + u * c + v * s, L.z - u * s + v * c, h]); }
+    for (const L of P.lots) if (L.big === 'park') { const SP = opts.statues ? parkSpots(L) : [];   /* statues: поляните за фонтана и статуята — без дървета */ for (let k = 0; k < Math.floor(L.w * L.d / 70); k++) { const h = 4 + (k * 7 % 5), u = ((k * 0.7548776662 + 0.5) % 1 - 0.5) * (L.w - 6), v = ((k * 0.5698402910 + 0.5) % 1 - 0.5) * (L.d - 6), c = Math.cos(L.rot), s = Math.sin(L.rot), tx = L.x + u * c + v * s, tz = L.z - u * s + v * c; if (!SP.some(([x, z, r]) => Math.hypot(tx - x, tz - z) < r)) trees.push([tx, tz, h]); } }
     if (trees.length && opts.treeModels && opts.treeModels.length && realTrees(G, trees, opts.treeModels)) {}
     else if (trees.length) {
       const tg = new THREE.CylinderGeometry(0.2, 0.3, 1, 6).translate(0, 0.5, 0), cg = new THREE.IcosahedronGeometry(1, 0), T1 = new THREE.InstancedMesh(tg, M(0x6b4a2e), trees.length), T2 = new THREE.InstancedMesh(cg, M(0x4f8a3a), trees.length), m = new THREE.Matrix4();
@@ -684,6 +685,7 @@ export function buildPlan2View(P, opts = {}) {
       if (F && F.SIG.tl && o.camera) F.SIG.tl.visible = F.SIG.ped.visible = o.camera.position.y < 220;   // street-real: светофарите (~2,5 хил. триъгълника всеки) — само отблизо
       if (ST.FP && o.camera) ST.FP.near(o.camera.position.y < 260);   // оградите и табелите — само отблизо
       if (ST.LB && o.camera) ST.LB.update(o.camera);
+      if (opts.statues && done && ST.SM === undefined && opts.statues.V) ST.SM = placeStatues(G, P, opts.statues.V, opts.statues.o);   // statues: веднъж, когато градът и моделите са готови
       if (opts.romeNear && ST.BL && o.camera) { if (ST.RN === undefined && opts.romeNear.V) ST.RN = romeNear(G, ST.BL, opts.romeNear.V, { ...opts.romeNear.o, roads: P.roads }); if (ST.RN) ST.RN.update(o.camera); }   // rome-bld / it-bld: италианските сгради около камерата ({ V — моделите (може да дойдат по-късно), o — опциите })
       if (ST.BT) ST.BT.update(dt);
       if (ST.TSA) ST.TSA.update(performance.now() / 1000);   // рекламите на Таймс Скуеър се сменят
@@ -694,7 +696,7 @@ export function buildPlan2View(P, opts = {}) {
       F.SIG.bulbs.instanceColor.needsUpdate = true; if (F.SIG.ped) F.SIG.ped.instanceColor.needsUpdate = true;
     },
     // освобождава геометриите, материалите и текстурите на изгледа — без общите (MAT, фасадите) и без чуждите модели (гарата, корабите, мостът)
-    dispose() { api.cancel(); if (ST.TSA) ST.TSA.dispose(); if (ST.RN) ST.RN.dispose(); const keep = new Set([...Object.values(MAT).flat(), FAC_MAT, OTTO_MAT, APT_MAT, HAUSS_MAT, BRICK_MAT, GLASS_MAT].filter(Boolean));
+    dispose() { api.cancel(); if (ST.TSA) ST.TSA.dispose(); if (ST.RN) ST.RN.dispose(); if (ST.SM) ST.SM.dispose(); const keep = new Set([...Object.values(MAT).flat(), FAC_MAT, OTTO_MAT, APT_MAT, HAUSS_MAT, BRICK_MAT, GLASS_MAT].filter(Boolean));
       const freeMat = m => { if (!m || keep.has(m)) return; for (const k in m) { const v = m[k]; if (v && v.isTexture) v.dispose(); } m.dispose(); };
       const walk = o => { if (o.userData && o.userData.extShared) return; if (o.isInstancedMesh) o.dispose(); if (o.geometry) o.geometry.dispose(); if (o.material) [].concat(o.material).forEach(freeMat); for (const c of o.children) walk(c); };
       walk(G); },
