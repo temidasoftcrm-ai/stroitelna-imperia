@@ -13,6 +13,7 @@ import { varPick, varW, xParts, xDraw, bgPlace } from './bgblocks.js';   // bg-v
 import { crossingsOf } from './pedpaths.js';   // road-geo: зебрите — същите, по които пресичат пешеходците
 import { streetReal, lampField, tlightField, lensGeo, pedGeo, lensMatrix, CLASSIC } from './streetreal.js';   // street-real: истинските лампи и светофари (opts.streetReal)
 import { kremlinEnsemble } from './kremlin2.js';   // lm-kremlin2: Кремъл от моделите на потребителя (Meshy)
+import { romeNear } from './romenear.js';   // rome-bld: Рим отблизо — италианските сгради на местата на фасадите (opts.romeNear)
 
 const M = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.92 });
 let MAT = null;
@@ -657,7 +658,7 @@ export function buildPlan2View(P, opts = {}) {
     ST.FP = (D || opts.blocks === 'bg') && opts.freeLot ? freePlots(G, P) : null;
     refill(); tm('fill');
   }
-  const refill = () => { ST.ruT = 0; ST.ruI = 0;   /* fac-reup: след всяко пълнене — отново 3 / 12 / 40 s */ if (ST.BL) ST.BL.fill(opts.fillLot || (() => true), opts.fillAt);   /* fillAt(b) — bg-fill: сградите без парцел (вътре в квартала) */ if (ST.FP) ST.FP.set(opts.freeLot); };
+  const refill = () => { ST.ruT = 0; ST.ruI = 0; if (ST.RN) ST.RN.dirty();   /* rome-bld: парцелите се смениха — наново */   /* fac-reup: след всяко пълнене — отново 3 / 12 / 40 s */ if (ST.BL) ST.BL.fill(opts.fillLot || (() => true), opts.fillAt);   /* fillAt(b) — bg-fill: сградите без парцел (вътре в квартала) */ if (ST.FP) ST.FP.set(opts.freeLot); };
   let sigT = 0;
   const off = opts.offset || [0, 0];
   const job = all(), EST = P.roads.length * 4 + P.nodes.length * 2 + P.rounds.length + 40; let done = false, cancelled = false, units = 0, maxStep = 0, maxAt = '', work = 0, tUsable = 0;
@@ -683,6 +684,7 @@ export function buildPlan2View(P, opts = {}) {
       if (F && F.SIG.tl && o.camera) F.SIG.tl.visible = F.SIG.ped.visible = o.camera.position.y < 220;   // street-real: светофарите (~2,5 хил. триъгълника всеки) — само отблизо
       if (ST.FP && o.camera) ST.FP.near(o.camera.position.y < 260);   // оградите и табелите — само отблизо
       if (ST.LB && o.camera) ST.LB.update(o.camera);
+      if (opts.romeNear && ST.BL && o.camera) { if (ST.RN === undefined && opts.romeNear.V) ST.RN = romeNear(G, ST.BL, opts.romeNear.V, { ...opts.romeNear.o, roads: P.roads }); if (ST.RN) ST.RN.update(o.camera); }   // rome-bld / it-bld: италианските сгради около камерата ({ V — моделите (може да дойдат по-късно), o — опциите })
       if (ST.BT) ST.BT.update(dt);
       if (ST.TSA) ST.TSA.update(performance.now() / 1000);   // рекламите на Таймс Скуеър се сменят
       if (!F || !F.SIG.heads || !o.signals || (sigT = (sigT + 1) % 6)) return;
@@ -692,7 +694,7 @@ export function buildPlan2View(P, opts = {}) {
       F.SIG.bulbs.instanceColor.needsUpdate = true; if (F.SIG.ped) F.SIG.ped.instanceColor.needsUpdate = true;
     },
     // освобождава геометриите, материалите и текстурите на изгледа — без общите (MAT, фасадите) и без чуждите модели (гарата, корабите, мостът)
-    dispose() { api.cancel(); if (ST.TSA) ST.TSA.dispose(); const keep = new Set([...Object.values(MAT).flat(), FAC_MAT, OTTO_MAT, APT_MAT, HAUSS_MAT, BRICK_MAT, GLASS_MAT].filter(Boolean));
+    dispose() { api.cancel(); if (ST.TSA) ST.TSA.dispose(); if (ST.RN) ST.RN.dispose(); const keep = new Set([...Object.values(MAT).flat(), FAC_MAT, OTTO_MAT, APT_MAT, HAUSS_MAT, BRICK_MAT, GLASS_MAT].filter(Boolean));
       const freeMat = m => { if (!m || keep.has(m)) return; for (const k in m) { const v = m[k]; if (v && v.isTexture) v.dispose(); } m.dispose(); };
       const walk = o => { if (o.userData && o.userData.extShared) return; if (o.isInstancedMesh) o.dispose(); if (o.geometry) o.geometry.dispose(); if (o.material) [].concat(o.material).forEach(freeMat); for (const c of o.children) walk(c); };
       walk(G); },
@@ -871,7 +873,7 @@ function* romeBlocks(G, P, style, ROADS = P.roads) {   // генератор: yi
       box.setMatrixAt(i, b.M); box.setColorAt(i, C.setHex(b.col)); b.M.decompose(V, Q, Sc);
       roof.setMatrixAt(i, m.compose(V.set(V.x, V.y + Sc.y / 2, V.z), Q, t === 2 || t === 5 ? Sc.set(Sc.x * (t === 5 ? 0.8 : 1.02), t === 5 ? 3 : 0.6, Sc.z * (t === 5 ? 0.8 : 1.02)) : Sc.set(Sc.x, Math.min(4, Sc.x * RF[t][2]), Sc.z))); }
     parts.forEach(({ box, roof }, t) => { box.count = roof.count = n[t]; box.instanceMatrix.needsUpdate = roof.instanceMatrix.needsUpdate = true; if (box.instanceColor) box.instanceColor.needsUpdate = true; }); };
-  return { list, fill(f, at) { fl = f; fa = at || null; draw(); }, hide(set) { hidden = set; draw(); } };
+  return { list, fill(f, at) { fl = f; fa = at || null; draw(); }, hide(set) { hidden = set; draw(); }, shown: b => !((b.lot && !fl(b.lot)) || (fa && !fa(b))) };   // shown — rome-bld: дали фасадата е там (без скритите)
 }
 // ---- свободните парцели: петно трева с пръст (по целия парцел), ниска дървена ограда отзад и отстрани, табела „ПРОДАВА СЕ“ отпред
 // (лицето на парцела е локално +z — към улицата). Инстанции; set(fn) — кои парцели са свободни; near(on) — оградите/табелите само отблизо.
