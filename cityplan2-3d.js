@@ -225,7 +225,13 @@ function kremlinView(G, D) {
   for (const [la, lo, s4] of [[55.7505, 37.6167, 1], [55.7499, 37.6174, 0.8], [55.7509, 37.6185, 0.75]]) { const [x, z] = at(la, lo);   // катедралите: Успенска, Архангелска, Благовещенска — бели, по 5 златни купола
     put('box', 'white', x, z, 30 * s4, 22 * s4, 38 * s4); for (const [dx, dz, k2] of [[0, 0, 1.3], [-8, -9, 1], [8, -9, 1], [-8, 9, 1], [8, 9, 1]]) { put('box', 'white', x + dx * s4, z + dz * s4, 4 * k2 * s4, 6 * s4, 4 * k2 * s4, 22 * s4); put('dome', 'gold', x + dx * s4, z + dz * s4, 6 * k2 * s4, 6 * k2 * s4, 6 * k2 * s4, 28 * s4); } } }   /* !K2 */
   const [gx, gz] = at(55.7547, 37.6215);   // ГУМ — по дължината на Червения площад: светла фасада, стъклени покриви на пасажите
-  put('box', 'cream', gx, gz, 70, 20, 200, 0, 0.82); for (const o of [-22, 0, 22]) { const ox2 = Math.cos(0.82) * o, oz2 = -Math.sin(0.82) * o; put('box', 'glass', gx + ox2, gz + oz2, 12, 5, 195, 20, 0.82); }
+  if (feature('lm-gum') && D._gum) {   // lm-gum (f6): моделът от Blender (в метри; лицето — към −x, т.е. към Кремъл) в мащаба на картата
+    const gm = D._gum.clone(true); gm.scale.setScalar(K); gm.rotation.y = 0.82; gm.position.set(gx, 0.05, gz);
+    gm.traverse(o => { if (!o.isMesh) return; o.castShadow = o.receiveShadow = true; const m = o.material = o.material.clone();
+      if (m.emissiveMap) { m.emissive = new THREE.Color(0xffffff); m.emissiveIntensity = 0; m.userData.winK = 1; m.userData.flood = 1; WIN_MATS.push(m); }   // нощната карта: прозорците и подсветката на фасадата
+      else if (/glass/.test(m.name)) { m.emissive = new THREE.Color(0xffd9a0); m.emissiveIntensity = 0; m.userData.winK = 0.45; m.userData.flood = 1; WIN_MATS.push(m); } });   // стъклените покриви — леко светят отвътре
+    floodMats(gm, 0xffd8a0, 0.3); G.add(gm);   // куличките, шатрите — осветени
+  } else { put('box', 'cream', gx, gz, 70, 20, 200, 0, 0.82); for (const o of [-22, 0, 22]) { const ox2 = Math.cos(0.82) * o, oz2 = -Math.sin(0.82) * o; put('box', 'glass', gx + ox2, gz + oz2, 12, 5, 195, 20, 0.82); } }
   const glass = new THREE.MeshStandardMaterial({ color: 0xbfd0cc, roughness: 0.2, metalness: 0.5 });
   const MAT2 = { red, green, white, cream, yellow, gold, glass }, GEO = { box, cone, dome };
   for (const kind in L) for (const col in L[kind]) { const arr = L[kind][col]; if (!arr.length) continue; const im = new THREE.InstancedMesh(GEO[kind], MAT2[col], arr.length); arr.forEach((mm, i) => im.setMatrixAt(i, mm)); im.castShadow = im.receiveShadow = true; G.add(im); }
@@ -412,7 +418,7 @@ function* furniture(G, P, o = {}) {   // генератор: yield след вс
 export function buildPlan2View(P, opts = {}) {
   const TM = {}, T0 = performance.now(); let tm0 = T0, phase = 'start'; const tm = k => { const t = performance.now(); TM[k] = (TM[k] || 0) + t - tm0; tm0 = t; phase = 'after ' + k; };   // замерване по части (userData.timing)
   mats();
-  const G = new THREE.Group(), D = opts.osm ? { ...opts.osm, _models: opts.bridgeModels || {}, _kremlin: opts.kremlinModels || null } : null;   // bridgeModels: { bosphorus } — висящите мостове G.userData.plan = P;
+  const G = new THREE.Group(), D = opts.osm ? { ...opts.osm, _models: opts.bridgeModels || {}, _kremlin: opts.kremlinModels || null, _gum: opts.gumModel || null } : null;   // bridgeModels: { bosphorus } — висящите мостове G.userData.plan = P;
   if (opts.offset) G.position.set(opts.offset[0], 0, opts.offset[1]);
   const RR = P.R * 1.6, g0 = new THREE.Mesh(new THREE.PlaneGeometry(RR * 2.4, RR * 2.4).rotateX(-Math.PI / 2), D ? MAT.urban : MAT.grass); g0.receiveShadow = true; if (D && D.sea) g0.geometry = seaGround(D.sea); else if (D) g0.geometry = romeGround(RR, D); G.add(g0); G.userData.groundMat = g0.material;   // Рим: дворовете и площадите — светъл камък, тревата — само в парковете
   if (P.coastZ) { const sh = new THREE.Shape(); sh.moveTo(-RR * 1.2, -RR * 1.2); for (let i = 0; i <= 80; i++) { const x = -RR * 1.2 + i * RR * 2.4 / 80; sh.lineTo(x, P.coastZ(x)); } sh.lineTo(RR * 1.2, -RR * 1.2); const wg = new THREE.ShapeGeometry(sh); wg.rotateX(Math.PI / 2); const wm = new THREE.Mesh(wg, MAT.water); wm.position.y = 0.02; G.add(wm);
