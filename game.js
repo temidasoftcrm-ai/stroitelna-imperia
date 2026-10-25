@@ -4910,7 +4910,7 @@ const playtime = createPlaytime({ S: () => S, level: () => dev.best(), speed: ()
 // 💥 фалит: дълъг минус → несъстоятелност (15 дни) → синдикът продава активите; ако не стигнат — край на играта
 const bust = createBankrupt({ S: () => S, econ: () => econ, toast, modal, fmt, save, sound: n => Sound.play(n),
   sellHere: t => sellUnit(t, true), unitsHere: () => units.filter(u => !u.proj).map(u => u.type), cityName: id => cityById(id)?.nm || id,
-  newGame: () => wipeSlot(), openSaves: () => openSaves({ modal, toast, fmt, save, cityName: id => cityById(id)?.nm || id, lock: () => { saveLock = true; } }),
+  newGame: () => wipeSlot(), openSaves: () => openSaves({ modal, toast, fmt, save, cityName: id => cityById(id)?.nm || id, lock: () => { saveLock = true; }, unlock: () => { saveLock = false; } }),
   playDays: () => playtime.hrs(playtime.state()?.sec) + ' игра', loan: (why, need, force) => offerLoan(why, need, force) });
 setTimeout(() => { try { if (S) bust.banner(); } catch {} }, 3000);
 window.__stroiMe = () => { if (!S || !S.hqCity) return null; const b = brandOf(S); return { name: b ? `${b.ico} ${b.nm}` : 'Фирма', city: cityById(S.cityId)?.nm || S.cityId, day: S.day | 0 }; };   // за „👥 Онлайн сега“ в ⚙️ Настройки (cloud.js)
@@ -5027,7 +5027,7 @@ function clickCity(id) {
   else if (railPick) railClick(id);
   else if (S.cityId === id) enterCity();
   else if (ownedCities().includes(id)) modal(`${id === S.hqCity ? '🏗️ Централа' : '🏢 Филиал'} в ${c.nm}`, `Влез и играй в ${c.nm}: свои поръчки, обекти, имоти и техника. Парите и репутацията са общи.<br>Докато не си там, градът носи около ${fmt(1400 + 350 * S.rep + 120 * (S.officeLevel || 1))} € на ден, а обектите му продължават.${factoryInfo(id)}`, [['Отказ', null], [`Влез в ${c.nm}`, () => switchCity(id)]]);
-  else if (coopCity(id)) { const pn = window.__coopShared.name || 'партньора';
+  else if (coopCity(id)) { const pn = escH(window.__coopShared.name || 'партньора');
     modal(`🤝 ${c.cc ? c.cc + ' ' : ''}${c.nm} — град на ${pn}`, `${pn} вече има филиал тук. Като партньори влизаш <b>безплатно</b> — без покупка и без разрешителни.<br>Градът става и твой: свои поръчки, обекти и техника; виждаш кой къде строи (розово — ${pn}). Поддръжката е като на обикновен филиал.`,
       [['Отказ', null], [`🤝 Влез ${/^[ВвФф]/.test(c.nm) ? 'във' : 'в'} ${c.nm}`, () => joinCoopCity(id)]]); }
   else if (dev.best() < (isWorld(id) ? 10 : isForeign(id) && !isEurope(id) ? 6 : cityLv(id))) modal(`${c.cc ? c.cc + ' ' : ''}${c.nm}`, `${lockTxt(isForeign(id) && !isEurope(id) ? 6 : cityLv(id))}<br>${isForeign(id) && !isEurope(id) && dev.best() >= 5 ? `Междувременно можеш да построиш жп линия до ${c.nm}.` : ''}${factoryInfo(id)}`, [['Добре', null]]);
@@ -5060,6 +5060,7 @@ function coopInfraSync(I, pn) {
   if (got.length) { toast(`🤝 Общо развитие с ${pn}: ${got.join(', ')}.`, 'good'); save(); renderPanel(); }
 }
 const coopCity = id => !!S && !ownedCities().includes(id) && (window.__coopShared?.cities || []).includes(id);
+const escH = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);   // името на партньора (coop.js) — в innerHTML само escape-нато
 // Лабораторията → coop-br (потребителят: „когато играеш с партньор — това, което си купил ти като филиал, да не му излиза и на него да го закупува“):
 // градът на партньора не се предлага за купуване (списъкът „Без филиал“, бордът, първият филиал на континента) — влизаш безплатно
 const coopFree = id => feature('coop-br') && coopCity(id);
@@ -5176,7 +5177,7 @@ function showMap(on) {
       $('mapTitle').textContent = 'Избери град';
       $('mapText').textContent = `Къде ще основеш строителната си фирма? Натисни град на картата. (слот ${currentSlot()})`;
       $('mapBtns').innerHTML = '<button class="btn2" id="mbSaves">💾 Записи</button><button class="btn2" id="mbCredits">📜 Автори</button>';
-      if ($('mbCredits')) $('mbCredits').onclick = showCredits; $('mbSaves').onclick = () => openSaves({ modal, toast, fmt, save, cityName: id => cityById(id)?.nm || id, lock: () => { saveLock = true; } });
+      if ($('mbCredits')) $('mbCredits').onclick = showCredits; $('mbSaves').onclick = () => openSaves({ modal, toast, fmt, save, cityName: id => cityById(id)?.nm || id, lock: () => { saveLock = true; }, unlock: () => { saveLock = false; } });
     }
   } else {
     if (S) $('panel').classList.remove('hidden');
@@ -5245,7 +5246,7 @@ function globeData() {
   return { won: new Set(won.map(k => k.iso)), partial, cities, stats: { won: won.length, total: COUNTRIES.length }, focus: [hq.lat, hq.lon] };
 }
 // 💾 Записи и ⚙️ Настройки — и в горната лента (до „Карта“), не само на картата
-const openSavesUI = () => openSaves({ modal, toast, fmt, save, cityName: id => cityById(id)?.nm || id, lock: () => { saveLock = true; } });
+const openSavesUI = () => openSaves({ modal, toast, fmt, save, cityName: id => cityById(id)?.nm || id, lock: () => { saveLock = true; }, unlock: () => { saveLock = false; } });
 // ⚙️ (top-set) (на телефона бутоните са в #topRow2 — ⚙️ веднага след „Карта“, с брояча) потребителят: „звук, известия, помощ, задачи и съвети — да ги сложим в settings“: бутоните остават в DOM (скрити — логиката и броячите им
 // си работят), а в настройките са редове, които ги натискат; ⚙️ има брояч, когато има задачи или куести за награда (да не се изпускат)
 const topSetCounts = () => { const num = el => +(((el && el.textContent) || '').match(/\d+/) || [0])[0]; const t = num(document.querySelector('#btnTasks b')), q = num(document.querySelector('#qBtn .qb')); return { t, q, total: t + q }; };
@@ -8422,7 +8423,7 @@ const hwAll = () => { const own = hwDone(), sh = window.__coopShared; if (!sh ||
   if (own !== _hwOwn || sh.v !== _hwV) { _hwOwn = own; _hwV = sh.v; _hwAll = [...new Set([...own, ...sh.hw])]; } return _hwAll; };
 const hwMine = id => hwDone().includes(id);
 // Лабораторията → coop-col (потребителят: линията, построена от партньора, да е в НЕГОВИЯ цвят — и на двете карти): цветът на марката му (coop.js → __coopShared.col)
-const coopCol = () => (feature('coop-col') && window.__coopShared?.col) || window.__coopCol || '#2f8cff';
+const coopCol = () => (feature('coop-col') && /^#[0-9a-f]{3,8}$/i.test(window.__coopShared?.col || '') && window.__coopShared.col) || window.__coopCol || '#2f8cff';   // само #hex — цветът идва от чужд клиент (SVG stroke)
 const hwPartner = id => feature('coop-col') && !hwMine(id) && hwAll().includes(id);   // участъкът е построен от партньора   // цветът на партньора (син; ако твоята марка е синя — оранжев)
 const JCOL = '#b45cff';   // общ строеж (магистрала/линия, която строите заедно) — лилав
 const coopJoint = (kind, ref) => !!window.__coopJoint?.[kind]?.has(ref);
@@ -10342,7 +10343,7 @@ function buyBranchHtml() {
   if (!rows.length) return `<div class="card"><div class="meta" style="margin:0">Няма отключени градове без филиал в този обхват — смени филтъра горе или вдигни нивото на фирмата.</div>${hidNote}</div>`;
   const by = new Map(); for (const r of rows) { const cc = r.c.cc || '🇧🇬', k = COUNTRIES.find(x => x.cc === cc); if (!by.has(cc)) by.set(cc, { cc, nm: k ? k.nm : '', rs: [] }); by.get(cc).rs.push(r); }
   const SZ = ['', 'малък', 'среден', 'голям', 'мегаполис'];
-  return [...by.values()].sort((a, b) => a.rs[0].price - b.rs[0].price).map(g => bwCard(`${g.cc} ${g.nm}`, g.rs.sort((a, b) => a.price - b.price).map(({ c, price, coop }) => `<div class="row" style="margin:4px 0;align-items:center;gap:8px"><span class="meta" style="margin:0;flex:1"><b style="color:var(--txt)">${c.nm}</b> · ${SZ[Math.min(4, (c.sz || 1) + (MEGAPOLIS.has(c.id) ? 1 : 0))]}${CAPITALS.has(c.id) ? ' · столица' : ''}${COUNTRIES.some(k => k.cities.includes(c.id)) ? ' · 🗺️ ключов' : ''}${coop ? ` · 🤝 градът на ${window.__coopShared?.name || 'партньора'}` : ''}</span><button class="btn" data-buybr="${c.id}" ${coop || econ.canAfford(price) ? '' : 'title="Ще се предложи банков кредит"'}>${coop ? '🤝 Влез безплатно' : `🛒 ${fmt(price)} €`}</button></div>`).join(''))).join('') + (hidNote ? `<div class="card">${hidNote}</div>` : '');
+  return [...by.values()].sort((a, b) => a.rs[0].price - b.rs[0].price).map(g => bwCard(`${g.cc} ${g.nm}`, g.rs.sort((a, b) => a.price - b.price).map(({ c, price, coop }) => `<div class="row" style="margin:4px 0;align-items:center;gap:8px"><span class="meta" style="margin:0;flex:1"><b style="color:var(--txt)">${c.nm}</b> · ${SZ[Math.min(4, (c.sz || 1) + (MEGAPOLIS.has(c.id) ? 1 : 0))]}${CAPITALS.has(c.id) ? ' · столица' : ''}${COUNTRIES.some(k => k.cities.includes(c.id)) ? ' · 🗺️ ключов' : ''}${coop ? ` · 🤝 градът на ${escH(window.__coopShared?.name || 'партньора')}` : ''}</span><button class="btn" data-buybr="${c.id}" ${coop || econ.canAfford(price) ? '' : 'title="Ще се предложи банков кредит"'}>${coop ? '🤝 Влез безплатно' : `🛒 ${fmt(price)} €`}</button></div>`).join(''))).join('') + (hidNote ? `<div class="card">${hidNote}</div>` : '');
 }
 // 📜 Оферти: доставчиците (материали на заводска цена) и отворените държавни търгове — на едно място
 function offersWinHtml() {
@@ -10921,7 +10922,7 @@ let saveAt = 0, saveTimer = null;
 function save(now) { if (batchN > 0) { batchDirty = true; return; } if (!now && !AUTOTEST) { const t = Date.now(); if (t - saveAt < 2000) { if (!saveTimer) saveTimer = setTimeout(() => { saveTimer = null; save(true); }, 2000 - (t - saveAt)); return; } } if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; } saveAt = Date.now(); syncFinishedFleet(); if (AUTOTEST || !S || saveLock) return; try { S.projects = projects; if (city.ready) syncUnits(); localStorage.setItem(SAVE_KEY, JSON.stringify(S, (k, v) => k === 'vis' ? undefined : v)); saveWarned = false; }
   catch (e) { logError('запис: ' + (e?.message || e), { day: S?.day }); if (!saveWarned) { saveWarned = true; toast('⚠️ Играта не успя да се запише в браузъра (няма място?). Автозаписите в „💾 Записи“ са запазени.', 'bad'); } } }
 // „Нова игра“: първо пази копие (може да се върне от „💾 Записи“ → „🕒 Автозаписи“), после трие слота
-function wipeSlot() { save(true); saveLock = true; backupNow('преди нова игра').finally(() => { localStorage.removeItem(SAVE_KEY); location.reload(); }); }
+function wipeSlot() { save(true); saveLock = true; backupNow('преди нова игра').finally(() => { localStorage.removeItem(SAVE_KEY); if (feature('fix-saves')) try { localStorage.setItem(`stroi-cloud-empty-s${currentSlot()}`, '1'); } catch { } location.reload(); }); }   // fix-saves: „нарочно празен“ — cloud.js не сваля стария запис (фалиралата фирма) обратно
 function loadSave() { if (AUTOTEST) return null; try { return JSON.parse(localStorage.getItem(SAVE_KEY)); } catch { return null; } }
 
 // клик върху парцел в 3D → избира обекта или офертата

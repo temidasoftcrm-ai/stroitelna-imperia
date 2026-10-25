@@ -1,5 +1,6 @@
 // saves.js — 3 слота за запис + експорт/импорт във файл.
 // Слот 1 ползва стария ключ (съвместимост със старите записи).
+import { feature } from './lab/feature.js';
 export const SLOTS = 3;
 const keyOf = n => n === 1 ? 'stroi-save-v1' : `stroi-save-v1-s${n}`;
 export function currentSlot() { try { return Math.min(SLOTS, Math.max(1, +localStorage.getItem('stroi-slot') || 1)); } catch { return 1; } }
@@ -62,7 +63,8 @@ function summary(n) {
   try {
     const raw = localStorage.getItem(keyOf(n)); if (!raw) return null;
     const s = JSON.parse(raw);
-    return { city: s.hqCity || s.cityId, day: s.day, money: s.econ?.money ?? 0, rep: s.rep ?? 0, done: s.done ?? 0, size: Math.round(raw.length / 1024) };
+    const c = s.hqCity || s.cityId;   // записът може да е внесен от файл — в innerHTML само id и числа
+    return { city: /^[\w-]{1,40}$/.test(c) ? c : '?', day: +s.day | 0, money: +s.econ?.money || 0, rep: Math.max(0, Math.min(5, +s.rep || 0)), done: +s.done | 0, size: Math.round(raw.length / 1024) };
   } catch { return { broken: true }; }
 }
 
@@ -109,7 +111,9 @@ export function openSaves(deps) {
     el.innerHTML = list.length ? list.map(b => `<div class="row" style="margin:3px 0"><span class="meta" style="margin:0">${ago(b.t)} · ${deps.cityName(b.city)} · ден ${b.day} · ${deps.fmt(b.money)} € · ${b.done} обекта <span style="opacity:.6">(${b.reason})</span></span><button class="btn2" data-bak="${b.id}">↩️ Върни</button></div>`).join('')
       : '<div class="meta">Още няма — първият се прави до 5 минути игра.</div>';
     el.querySelectorAll('[data-bak]').forEach(x => x.onclick = () => deps.modal('↩️ Да върна ли този автозапис?', 'Сегашната игра в слота се заменя с избрания автозапис (тя също се пази като автозапис, за да можеш да се върнеш).',
-      [['Отказ', null], ['↩️ Върни', async () => { deps.lock?.(); if (await restoreBackup(+x.dataset.bak)) { deps.toast('↩️ Автозаписът е върнат — зареждам…', 'good'); setTimeout(() => location.reload(), 600); } else deps.toast('Автозаписът не се намери.', 'bad'); }]]));
+      [['Отказ', null], ['↩️ Върни', async () => { deps.lock?.(); if (feature('fix-saves')) { let ok = false; try { ok = await restoreBackup(+x.dataset.bak); } catch (e) { deps.unlock?.(); deps.toast(`Автозаписът не се върна (${(e && e.message) || 'грешка'}) — играта продължава.`, 'bad'); return; }   // fix-saves: setItem (няма място) / IndexedDB може да хвърли — без това играта оставаше заключена и нищо не се записваше
+        if (ok) { deps.toast('↩️ Автозаписът е върнат — зареждам…', 'good'); setTimeout(() => location.reload(), 600); } else { deps.unlock?.(); deps.toast('Автозаписът не се намери.', 'bad'); } return; }
+        if (await restoreBackup(+x.dataset.bak)) { deps.toast('↩️ Автозаписът е върнат — зареждам…', 'good'); setTimeout(() => location.reload(), 600); } else deps.toast('Автозаписът не се намери.', 'bad'); }]]));
   });
   const file = box.querySelector('#slotFile');
   let target = 1;
@@ -119,7 +123,8 @@ export function openSaves(deps) {
     try {
       const txt = await f.text(), s = JSON.parse(txt);
       if (!s || !s.econ || !s.cityId) throw new Error('не е запис от играта');
-      localStorage.setItem(keyOf(target), txt);
+      if (target === cur && feature('fix-saves')) deps.lock?.();   // fix-saves: иначе pagehide → save(true) записва старата игра в паметта върху внесената
+      try { localStorage.setItem(keyOf(target), txt); } catch (e) { if (target === cur) deps.unlock?.(); throw e; }
       deps.toast(`⬆️ Записът е зареден в слот ${target}.`, 'good');
       if (target === cur) location.reload(); else { close(); openSaves(deps); }
     } catch (e) { deps.toast(`Файлът не е валиден запис (${e.message}).`, 'bad'); }

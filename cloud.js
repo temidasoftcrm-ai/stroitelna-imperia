@@ -4,21 +4,27 @@
 // Таблица public.saves (user_id, slot 's1'…'s3', data jsonb, meta jsonb, updated_at); RLS: всеки вижда само своите.
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
 import { backupRaw, dropBackups } from './saves.js';
-import { feature } from './lab/feature.js';
+import { feature, IN_LAB } from './lab/feature.js';
 
 const URL_ = 'https://lpzjscttqieqnqozscpk.supabase.co';
 const KEY = 'sb_publishable_3Gats6iSx7BoyFUh63N1vQ__pHCBrul';   // публичен ключ — достъпът се пази от RLS
 const SLOTS = 3;
 const keyOf = n => n === 1 ? 'stroi-save-v1' : `stroi-save-v1-s${n}`;
 const syncKey = n => `stroi-cloud-s${n}`;   // { ts: updated_at в облака, sig: отпечатък на качения запис }
+const emptyKey = n => `stroi-cloud-empty-s${n}`;   // fix-saves: слотът е нарочно празен („Нова игра“, game.js wipeSlot) — облачният запис не се сваля, а се заменя с новата игра
 const curSlot = () => { try { return Math.min(SLOTS, Math.max(1, +localStorage.getItem('stroi-slot') || 1)); } catch { return 1; } };
 const AUTOTEST = /[?&]autotest/.test(location.search);
 
 const sb = createClient(URL_, KEY, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'stroi-auth' } });
 let user = null, busy = false, lastErr = '';
 
-// бърз отпечатък на текст (за „промени ли се записът“)
-function sig(s) { if (!s) return ''; let h = 2166136261; for (let i = 0; i < s.length; i += 7) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36) + ':' + s.length; }
+// отпечатък на текст (за „промени ли се записът“): fix-saves — целият низ (преди — всеки 7-и знак: промяна между тях оставаше незабелязана), два 32-битови хеша
+const FIX = feature('fix-saves');
+function sig(s) { if (!s) return ''; if (!FIX) { let h = 2166136261; for (let i = 0; i < s.length; i += 7) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36) + ':' + s.length; }
+  let h = 2166136261, g = 5381; for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); h = Math.imul(h ^ c, 16777619); g = (Math.imul(g, 33) + c) | 0; } return (h >>> 0).toString(36) + (g >>> 0).toString(36) + ':' + s.length; }
+// един и същ запис като текст независимо от реда на ключовете (jsonb в облака ги пренарежда — JSON.stringify(c.data) !== raw дори без промяна)
+const canon = v => Array.isArray(v) ? '[' + v.map(canon).join(',') + ']' : v && typeof v === 'object' ? '{' + Object.keys(v).sort().filter(k => v[k] !== undefined).map(k => JSON.stringify(k) + ':' + canon(v[k])).join(',') + '}' : JSON.stringify(v) ?? 'null';
+const sameSave = (data, raw) => { try { return canon(data) === canon(JSON.parse(raw)); } catch { return false; } };
 const getSync = n => { try { return JSON.parse(localStorage.getItem(syncKey(n))) || null; } catch { return null; } };
 const setSync = (n, v) => { try { localStorage.setItem(syncKey(n), JSON.stringify(v)); } catch {} };
 function metaOf(raw) { try { const s = JSON.parse(raw); return { city: s.hqCity || s.cityId, day: s.day | 0, money: Math.round(s.econ?.money ?? 0), done: s.done | 0, rep: s.rep ?? 0 }; } catch { return {}; } }
@@ -344,7 +350,7 @@ function openSettings(h) {
     b.onclick = () => { if (!r.keep) el.remove(); r.fn(); if (r.keep) { const s = b.querySelectorAll('span'); s[0].textContent = r.ico(); s[1].innerHTML = r.nm(); } }; });
   pplEl = el;
 }
-const pplHtml = L => L.length ? L.map(p => `<div>${p.me ? '🟢' : '🟡'} <b>${esc(p.name || 'Играч')}</b>${p.me ? ' (ти)' : ''} <span style="color:var(--mut)">· ${esc(p.city || '')}${p.day ? ` · ден ${p.day}` : ''}</span></div>`).join('') : '<span style="color:var(--mut)">Свързвам се…</span>';
+const pplHtml = L => L.length ? L.map(p => `<div>${p.me ? '🟢' : '🟡'} <b>${esc(p.name || 'Играч')}</b>${p.me ? ' (ти)' : ''} <span style="color:var(--mut)">· ${esc(p.city || '')}${p.day ? ` · ден ${p.day | 0}` : ''}</span></div>`).join('') : '<span style="color:var(--mut)">Свързвам се…</span>';
 // изтриване: пишеш ИЗТРИЙ, за да няма случайно натискане
 function confirmWipe(account, fresh = false) {   // fresh — „🆕 Нова игра“ от картата: същото изтриване, друго заглавие
   const el = dlg(`<h2 style="font-size:19px;color:var(--bad)">${account ? '❌ Изтрий акаунта' : fresh ? '🆕 Нова игра — изтрива всичко' : '🗑️ Изтрий данните'}</h2>
@@ -381,7 +387,7 @@ let pres = null, pplEl = null, presState = {};
 const myKey = (() => { let k = ''; try { k = sessionStorage.getItem('stroi-pres') || ''; if (!k) { k = crypto.randomUUID(); sessionStorage.setItem('stroi-pres', k); } } catch { k = String(Math.random()); } return k; })();
 function online() {
   const L = [];
-  for (const [k, arr] of Object.entries(presState)) { const p = arr[arr.length - 1]; if (p) L.push({ ...p, me: k === myKey }); }
+  for (const [k, arr] of Object.entries(presState)) { const p = Array.isArray(arr) && arr[arr.length - 1]; if (p && typeof p === 'object') L.push({ name: String(p.name ?? '').slice(0, 40), city: String(p.city ?? '').slice(0, 40), day: Math.max(0, +p.day | 0), me: k === myKey }); }   // presence приема всичко от всеки клиент — само тези три полета, низове/число
   return L.sort((a, b) => (b.me - a.me) || (b.day | 0) - (a.day | 0)).slice(0, 50);
 }
 function presRender() {
@@ -411,6 +417,7 @@ async function upload(n, raw) {
   const { data, error } = await sb.from('saves').upsert({ user_id: user.id, slot: 's' + n, data: JSON.parse(raw), meta: metaOf(raw), updated_at: new Date().toISOString() }).select('updated_at').single();
   if (error) throw error;
   setSync(n, { ts: data.updated_at, sig: sig(raw) });
+  try { localStorage.removeItem(emptyKey(n)); } catch { }
 }
 // записът на текущия слот, свален от облака, не бива да се презапише от играта (тя още държи стария в паметта) преди презареждането
 const setItem0 = Storage.prototype.setItem; let locked = null;
@@ -424,28 +431,36 @@ async function take(n, row) {
   setSync(n, { ts: row.updated_at, sig: sig(raw) });
 }
 // при старт / вход: сравнява всеки слот с облака
-async function pullAll() {
-  const { data: rows, error } = await sb.from('saves').select('slot,data,meta,updated_at');
+async function pullAll(rowsIn) {   // rowsIn — само тестът в Лабораторията (__cloudPullTest)
+  const { data: rows, error } = rowsIn ? { data: rowsIn } : await sb.from('saves').select('slot,data,meta,updated_at');
   if (error) throw error;
   const cloud = Object.fromEntries((rows || []).map(r => [r.slot, r]));
   let reload = false;
   for (let n = 1; n <= SLOTS; n++) {
     const raw = localStorage.getItem(keyOf(n)), c = cloud['s' + n], s = getSync(n);
     if (!c) { if (raw) await upload(n, raw); continue; }
+    if (FIX && localStorage.getItem(emptyKey(n))) { if (raw) await upload(n, raw); continue; }   // нова игра след „Нова игра“: тя е истинската, облачната — старата
     const localChanged = raw && (!s || s.sig !== sig(raw));
     const cloudNewer = !s || c.updated_at !== s.ts;
     // облакът е по-нов, но играта в него е по-назад (по-малко дни или друга фирма) → никога без питане
     const lm0 = raw ? metaOf(raw) : null, cm0 = c.meta || metaOf(JSON.stringify(c.data)), behind = lm0 && cm0 && ((cm0.day | 0) < (lm0.day | 0) || (cm0.city && lm0.city && cm0.city !== lm0.city));
     if (!raw || (cloudNewer && !localChanged && !behind)) { if (cloudNewer || !raw) { await take(n, c); if (n === curSlot()) reload = true; } }
     else if (cloudNewer && (localChanged || behind)) {
-      if (sig(JSON.stringify(c.data)) === sig(raw)) { setSync(n, { ts: c.updated_at, sig: sig(raw) }); continue; }
+      if (FIX ? sameSave(c.data, raw) : sig(JSON.stringify(c.data)) === sig(raw)) { setSync(n, { ts: c.updated_at, sig: sig(raw) }); continue; }   // fix-saves: еднакво съдържание → не е конфликт
       const choice = await new Promise(res => {
         const lm = metaOf(raw), cm = c.meta || metaOf(JSON.stringify(c.data));
-        dlg(`<h2 style="font-size:19px;color:var(--acc)">☁️ Два различни записа (слот ${n})</h2>
+        const el = dlg(`<h2 style="font-size:19px;color:var(--acc)">☁️ Два различни записа (слот ${n})</h2>
           <p style="color:var(--mut);font-size:14px;line-height:1.6">На това устройство: <b style="color:var(--txt)">ден ${lm.day} · ${fmt(lm.money)} € · ${lm.done} обекта</b><br>
           В облака (от друго устройство): <b style="color:var(--txt)">ден ${cm.day} · ${fmt(cm.money)} € · ${cm.done} обекта</b><br><br>${behind ? '<b style="color:var(--bad)">⚠️ В облака играта е по-назад — може би е започната отначало на друго устройство.</b><br>' : ''}Кой да остане? Другият ще бъде заменен (но остава в „💾 Записи“ → „🕒 Автозаписи“).</p>`,
           [['📱 Този тук', () => res('local'), behind ? 1 : 0], ['☁️ От облака', () => res('cloud'), behind ? 0 : 1]]);
+        if (FIX) {   // fix-saves: друг dlg() (⚙️ Настройки) маха този без отговор → без избор (иначе busy оставаше true завинаги и облакът спираше); след 10 мин — също
+          const done = () => { mo.disconnect(); clearTimeout(tm); res(null); };
+          const mo = new MutationObserver(() => { if (!el.isConnected) done(); }); mo.observe(document.body, { childList: true });
+          const tm = setTimeout(() => { el.remove(); done(); }, 600000);
+        }
       });
+      if (!choice) { held.add(n); heldAt = Date.now(); continue; }   // нищо не се качва/сваля — пита се пак (syncTick)
+      held.delete(n);
       if (choice === 'cloud') { await take(n, c); if (n === curSlot()) reload = true; } else await upload(n, raw);
     } else if (localChanged) await upload(n, raw);
   }
@@ -455,9 +470,12 @@ async function pullAll() {
 async function pushChanged() {
   for (let n = 1; n <= SLOTS; n++) {
     const raw = localStorage.getItem(keyOf(n)), s = getSync(n);
-    if (raw && (!s || s.sig !== sig(raw))) await upload(n, raw);
+    if (raw && (!s || s.sig !== sig(raw)) && !held.has(n)) await upload(n, raw);   // held — неразрешен конфликт: не се презаписва облакът
   }
 }
+// fix-saves: слотовете с неразрешен конфликт (диалогът е затворен без избор) — периодично се пита пак, но не върху друг диалог
+const held = new Set(); let heldAt = 0;
+const syncTick = () => syncAll(held.size > 0 && Date.now() - heldAt > 120000 && !document.getElementById('cloudDlg'));
 async function syncAll(full) {
   if (!user || busy || AUTOTEST) return;
   busy = true; paint();
@@ -580,10 +598,11 @@ if (!AUTOTEST && feature('reg-gate') && ((window.top === window && !LOCAL) || /[
   sb.auth.getSession().then(({ data }) => { if (!data?.session) { if (document.body) regGate(); else addEventListener('DOMContentLoaded', regGate); } });
 window.__regGate = regGate;
 window.__settings = openSettings;
+if (IN_LAB) window.__cloudPullTest = rows => pullAll(rows).then(() => ({ held: [...held] }));   // fix-saves: конфликт без вход — облачните редове се подават наготово
 window.__wipeAll = () => confirmWipe(false, true);   // „🆕 Нова игра“ на картата (game.js)
 if (!AUTOTEST) {
   presStart();
-  setInterval(() => syncAll(false), 20000);
+  setInterval(syncTick, 20000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') syncAll(false); else syncAll(true); });
   if (document.readyState === 'loading') addEventListener('DOMContentLoaded', mountBtn); else mountBtn();
 }

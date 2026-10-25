@@ -20,6 +20,44 @@ const hueOf = hex => { const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) r
 const PEND = 'stroi-coop-pending', NAME = 'stroi-coop-name', POLL = 10000, SNAP_EVERY = 20000;
 const AUTOTEST = /[?&]autotest/.test(location.search);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+// данните от партньора (coop_snap, coop_status2) идват от чужд клиент — сървърът не ги проверява (вж. бележката SERVER-VALIDATION долу):
+// текстът — без HTML знаци, числата — числа, id-тата — само [\w.-], цветът — #hex; така нищо не стига до innerHTML/SVG сурово
+const txt = (s, n = 40) => String(s ?? '').replace(/[<>&"'`\\]/g, '').slice(0, n);
+const num = x => Number.isFinite(+x) ? +x : 0;
+const idOk = x => typeof x === 'number' ? Number.isFinite(x) : typeof x === 'string' && /^[\w.-]{1,48}$/.test(x);
+const refOk = x => typeof x === 'string' && /^[\w.-]{1,48}\|[\w.-]{1,48}$/.test(x);
+export const colOk = c => typeof c === 'string' && /^#[0-9a-f]{3,8}$/i.test(c) ? c : null;
+const arrOf = (a, ok, n) => Array.isArray(a) ? a.filter(ok).slice(0, n) : [];
+function cleanSnap(P) {
+  if (!P || typeof P !== 'object') return null;
+  const obj = o => o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+  return { ...P, name: txt(P.name, 24) || 'Партньор', brand: idOk(P.brand) ? P.brand : null, ico: txt(P.ico, 8), col: colOk(P.col),
+    money: num(P.money), worth: num(P.worth), loan: num(P.loan), day: num(P.day) | 0, rep: Math.max(0, Math.min(5, num(P.rep))), office: num(P.office) | 0,
+    hq: idOk(P.hq) ? P.hq : null, here: idOk(P.here) ? P.here : null, cities: arrOf(P.cities, idOk, 80),
+    sites: Object.fromEntries(Object.entries(obj(P.sites)).filter(([k]) => idOk(k)).map(([k, L]) => [k, arrOf(L, x => x && typeof x === 'object', 120).map(x => ({ x: num(x.x), z: num(x.z), k: x.k === 'p' ? 'p' : 'b', t: idOk(x.t) ? x.t : undefined }))])),
+    stats: Object.fromEntries(Object.entries(obj(P.stats)).map(([k, v]) => [txt(k, 20), num(v)])),
+    hwDone: arrOf(P.hwDone, idOk, 200), hwJobs: arrOf(P.hwJobs, idOk, 200), rails: arrOf(P.rails, refOk, 200),
+    railKm: Object.fromEntries(Object.entries(obj(P.railKm)).filter(([k]) => refOk(k)).slice(0, 200).map(([k, v]) => [k, num(v)])),
+    infra: Object.fromEntries(Object.entries(obj(P.infra)).filter(([k, a]) => idOk(k) && Array.isArray(a)).map(([k, a]) => [k, a.slice(0, 3).map(num)])),
+    lv: P.lv == null ? null : num(P.lv), fleet: arrOf(P.fleet, x => x && typeof x === 'object', 300).map(x => ({ ...x, ref: txt(x.ref, 100), cost: num(x.cost), nm: txt(x.nm) })) };
+}
+// coop_status2: общите строежи, наемите, изненадите, задачите — полетата, които партньорът задава сам
+function cleanSt2(r) {
+  if (!r || typeof r !== 'object') return r;
+  const L = a => Array.isArray(a) ? a : [];
+  return { ...r, joints: L(r.joints).map(j => ({ ...j, kind: j.kind === 'rail' ? 'rail' : 'hw', ref: txt(j.ref, 100), title: txt(j.title, 80), km: num(j.km) })),
+    rentals: L(r.rentals).map(x => ({ ...x, type: UNIT_TYPES[x.type] ? x.type : '', price: Math.max(0, Math.round(num(x.price))), hours: num(x.hours) | 0 })).filter(x => x.type),
+    surprises_mine: L(r.surprises_mine).map(x => ({ ...x, city: idOk(x.city) ? x.city : '', text: txt(x.text, 60), amount: num(x.amount) })),
+    quests: L(r.quests).map(q => ({ ...q, nm: txt(q.nm, 80), progress: num(q.progress), target: num(q.target) || 1, reward: num(q.reward) })) };
+}
+// данните на пратка (coop_claim / история): типът — само от UNIT_TYPES, материалът — само от MATERIALS
+const cleanD = D => { D = D && typeof D === 'object' ? D : {}; return { ...D, type: UNIT_TYPES[D.type] ? D.type : '', mat: MATERIALS[D.mat] ? D.mat : '', n: Math.max(1, Math.min(50, num(D.n) | 0 || 1)), qty: Math.max(0, num(D.qty)),
+  amount: num(D.amount), owed: num(D.owed), hours: num(D.hours) | 0, nm: txt(D.nm, 60) }; };
+// SERVER-VALIDATION (бележка за по-късно — миграция, сега НЕ): клиентът по-горе пази само себе си; сървърът (Supabase RPC) приема
+// каквото му пратят. Да се добави в SQL: coop_snap — p_data: name ≤24 знака без <>&"'`, col ~ '^#[0-9a-f]{3,8}$', числата numeric, cities/hwDone/rails
+// масиви от [\w.-] (≤80/200), размер на jsonb ≤ 64 KB; coop_send / coop_rent_* — type ∈ UNIT_TYPES, mat ∈ MATERIALS, qty/amount/price ≥ 0 и с горна граница,
+// hours ∈ (2,6,12,24,48,72); coop_say — text ≤300; coop_joint — title ≤80, kind ∈ (hw, rail); surprises — text ≤60. Presence (stroi-online, cloud.js)
+// не минава през база — там остава само проверката при показване.
 const uid = () => crypto.randomUUID();
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const ago = iso => { const s = (Date.now() - Date.parse(iso)) / 1000; return s < 90 ? 'току-що' : s < 3600 ? `преди ${Math.round(s / 60)} мин` : s < 86400 ? `преди ${Math.round(s / 3600)} ч` : `преди ${Math.round(s / 86400)} дни`; };
@@ -118,7 +156,7 @@ export function createCoop(d) {
         if (feature('coop-center2') && x.kind === 'unit' && x.data?.city && x.data.city !== d.cityId() && d.ownedCities().includes(x.data.city)) continue;
         let r; try { r = await rpc('coop_claim', { p_id: x.id }, 2); } catch { break; }
         if (!r?.ok) continue;
-        const D = r.data || {}, pn = partnerName();
+        const D = cleanD(r.data), pn = partnerName();
         if (r.kind === 'unit') {
           const t = UNIT_TYPES[D.type]; if (!t) continue;
           for (let i = 0; i < (D.n || 1); i++) {
@@ -155,7 +193,7 @@ export function createCoop(d) {
     }
   }
 
-  const partnerName = () => st?.partner?.snap?.name || 'партньора';
+  const partnerName = () => txt(st?.partner?.snap?.name) || 'партньора';
 
   // 🗺️ обща карта: магистралите, жп линиите и градовете на партньора стават част от твоята карта (game.js: hwAll, railEdges, coopCity)
   let shareSig = '';
@@ -167,7 +205,7 @@ export function createCoop(d) {
       cities = (P.cities || []).filter(x => typeof x === 'string'), infra = P.infra && typeof P.infra === 'object' ? P.infra : {}, sig = JSON.stringify([P.name, hw, rails, cities, infra, P.col || null]);
     if (sig === shareSig) return;
     shareSig = sig;
-    window.__coopShared = { v: (window.__coopShared?.v || 0) + 1, name: P.name || 'партньора', hw, rails, cities, infra, col: P.col || null };   // col — цветът на марката му (линиите на картата, флаг coop-col)
+    window.__coopShared = { v: (window.__coopShared?.v || 0) + 1, name: txt(P.name) || 'партньора', hw, rails, cities, infra, col: colOk(P.col) };   // col — цветът на марката му (линиите на картата, флаг coop-col)
     try { d.infraSync && d.infraSync(infra, P.name || 'партньора'); } catch (e) { console.warn('coop infra', e); }
   }
   async function tick() {
@@ -180,9 +218,10 @@ export function createCoop(d) {
       const r = await rpc('coop_status', {}, 1);
       pickCol();
       const before = JSON.stringify([st?.partner?.snap?.cities || [], st2?.joints || [], window.__coopShared?.v, PCOL]);
+      if (r && r.ok && r.partner) r.partner = { ...r.partner, snap: cleanSnap(r.partner.snap) };   // чуждите данни — изчистени веднъж тук
       st = r && r.ok ? r : st; if (r && r.ok) fetchedAt = Date.now();
       const r2 = st?.pair?.status === 'active' ? await rpc('coop_status2', {}, 1) : null;
-      st2 = r2 && r2.ok && r2.active ? r2 : null;
+      st2 = r2 && r2.ok && r2.active ? cleanSt2(r2) : null;
       const r3 = st2 ? await rpc('coop_status3', {}, 1).catch(() => null) : null;
       st3 = r3 && r3.ok && r3.active ? r3 : null;
       const r4 = st2 && feature('coop-center2') ? await rpc('coop_status4', {}, 1).catch(() => null) : null;   // правилата на общата каса (миграция coop4 — без нея няма карта)
@@ -412,9 +451,9 @@ export function createCoop(d) {
         h += `<h3>📦 Материали</h3>` + (stock.length ? `<div class="card">${stock.map(([k, q]) => `<div class="led"><span>${MATERIALS[k].ico} ${MATERIALS[k].nm} · ${Math.round(q * 100) / 100} ${MATERIALS[k].unit}</span><span class="row" style="margin:0"><input data-mq="${k}" inputmode="decimal" value="${Math.round(q * 100) / 100}" style="width:80px"><button class="btn2" data-c="mat:${k}">Изпрати</button></span></div>`).join('')}</div>` : '<div class="mut">Складът е празен.</div>');
       // история
         const KN = { gift: '🎁 подарък', loan: '💸 заем', repay: '💸 връщане', refund: '↩️ върнато', unit: '🚜 техника', mat: '📦 материали', mega: '🏗️ поръчка' };
-        if (st.history.length) h += `<h3>📜 История</h3><div class="card">${st.history.map(x => { const D = x.data || {};
-          const what = x.kind === 'unit' ? `${UNIT_TYPES[D.type]?.ico || ''} ${UNIT_TYPES[D.type]?.nm || D.type}` : x.kind === 'mat' ? `${MATERIALS[D.mat]?.ico || ''} ${D.qty} ${MATERIALS[D.mat]?.unit || ''} ${MATERIALS[D.mat]?.nm || D.mat}` : `${f(D.amount || 0)} €`;
-          return `<div class="led"><span>${x.out ? '→' : '←'} ${KN[x.kind] || x.kind} · ${what}</span><span class="mut">${ago(x.at)}${x.status === 'sent' ? ' · ⏳' : ''}</span></div>`; }).join('')}</div>`;
+        if (st.history.length) h += `<h3>📜 История</h3><div class="card">${st.history.map(x => { const D = cleanD(x.data);
+          const what = x.kind === 'unit' ? `${UNIT_TYPES[D.type]?.ico || ''} ${UNIT_TYPES[D.type]?.nm || ''}` : x.kind === 'mat' ? `${MATERIALS[D.mat]?.ico || ''} ${D.qty} ${MATERIALS[D.mat]?.unit || ''} ${MATERIALS[D.mat]?.nm || ''}` : `${f(D.amount || 0)} €`;
+          return `<div class="led"><span>${x.out ? '→' : '←'} ${KN[x.kind] || esc(x.kind)} · ${what}</span><span class="mut">${ago(x.at)}${x.status === 'sent' ? ' · ⏳' : ''}</span></div>`; }).join('')}</div>`;
       } else if (tab === 'build') h += buildHtml();
       else if (tab === 'quest') h += questHtml();
       else if (tab === 'hold') h += holdHtml();
@@ -452,7 +491,7 @@ export function createCoop(d) {
       if (r.status === 'offered') b = r.out ? `<button class="btn2" data-c="ract:${r.id}:cancel">Оттегли</button>` : `<button class="btn" data-c="rpay:${r.id}:${r.price}">✅ Наеми${r.price ? ` за ${f(r.price)} €` : ' (безплатно)'}</button><button class="btn2" data-c="ract:${r.id}:decline">Откажи</button>`;
       if (r.status === 'active' && !r.out) b = `<button class="btn2" data-c="rback:${r.id}:${r.type}">Върни сега</button>`;
       const s_ = r.status === 'offered' ? (r.out ? '⏳ чака отговор' : `📨 ${pn} предлага`) : r.status === 'active' ? `при ${r.out ? pn : 'теб'} още ${left(r.until)}` : '✅ върната';
-      return `<div class="led"><span>${u.ico || ''} ${u.nm || r.type} ${r.out ? '→' : '←'} · ${r.hours} ч · ${r.price ? f(r.price) + ' €' : 'помощ'}<br><span class="mut">${s_}</span></span><span class="row" style="margin:0">${b}</span></div>`; }).join('')}</div>`;
+      return `<div class="led"><span>${u.ico || ''} ${u.nm || ''} ${r.out ? '→' : '←'} · ${r.hours} ч · ${r.price ? f(r.price) + ' €' : 'помощ'}<br><span class="mut">${s_}</span></span><span class="row" style="margin:0">${b}</span></div>`; }).join('')}</div>`;
     // изненада в общ град
     const shared = (P.cities || []).includes(S.cityId);
     h += `<h3>🎁 Изненада в общ град</h3>` + (shared ? `<div class="mut">Остави табела (и подарък, ако искаш) на парцел в ${esc(d.cityName(S.cityId))} — ${pn} ще види кутия-подарък, когато влезе в града, и ще я отвори.</div>
