@@ -29,7 +29,6 @@ const MODE = { ...Object.fromEntries([3, 4, 5, 6, 7, 8, 9, 10].map(l => [`office
   // 'aux': маската е от друга карта в модела (game.js я слага в m.userData.nfAux = { tex, kind }) — panel12: белите прозорци на черно, gamecity/asian: розовите
   // 'darkC': като 'dark', но с по-силно изчистване — снимковите текстури иначе дават шум от светли точки
   // новите къщи (houses2): стъклото — цялото; lodge има интериор — светят подът и таванът зад прозорците; с една текстура — 'darkC'
-  'it-sf-medkit': [null, [/stacco|Clay_plaster/i, 'darkC']],   // mid-bld (55): средиземноморската сграда в средните градове — прозорците по-тъмни от мазилката (Рим — с изпечената night_ карта, romenear.js)
   'h2-greyporch': [null, [/Glass|^material_0$/i, 'solidW']], 'h2-swedish': [null, [/^Glass$/, 'solidW']], 'h2-lodge': [null, [/Floor|CEILING/i, 'solidW']],   // solidW — цялото стъкло, топло
   'h2-pink': [null, [/WindowsAndDoors/i, 'darkC']], 'h2-townhouse': 'darkC', 'h2-porch': [null, [/^lambert9SG$/, 'solidW']], 'h2-brickcabin': 'whiteS', 'h2-blue': 'solidW',   // porch: стъклото е lambert9SG; h2-blue — само прозорците (MESH_MODE)
   manhattan: ['grid', [/^empire_state$/, 'empire']],
