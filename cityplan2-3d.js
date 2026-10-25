@@ -375,6 +375,7 @@ function* furniture(G, P, o = {}) {   // генератор: yield след вс
   else if (lamps.length) {
   inst(new THREE.CylinderGeometry(0.09, 0.14, 4.6, 6).translate(0, 2.3, 0), iron, lamps, P1(0, 0, 0), true);   // стълб
   inst(new THREE.CylinderGeometry(0.32, 0.18, 0.7, 6).translate(0, 4.75, 0), lampG, lamps, P1(0, 0, 0)).userData.lamp = 1; }   // фенерът (свети нощем)
+  if (o.treeClear) { const C = o.treeClear.map(([k, r]) => [P.lots.find(L => L.lm === k), r]).filter(c => c[0]); for (let i = trees.length - 1; i >= 0; i--) if (C.some(([L, r]) => Math.hypot(trees[i][0] - L.x, trees[i][1] - L.z) < r)) trees.splice(i, 1); }   // lv-sign-clear (f6): без палмите около знака (на ивицата и тротоарите) — вижда се отгоре и отстрани
   if (!(o.treeModels && o.treeModels.length && realTrees(G, trees, o.treeModels))) {
   inst(new THREE.CylinderGeometry(0.22, 0.32, 1, 6).translate(0, 0.5, 0), M(0x6b5a44), trees, (it, v, q, sc) => { v.set(it[0], 0, it[1]); q.identity(); sc.set(1, it[2] * 0.4, 1); }, true);
   inst(new THREE.IcosahedronGeometry(1, 0), M(0x5d8a3e), trees, (it, v, q, sc) => { v.set(it[0], it[2] * 0.62, it[1]); q.identity(); sc.set(it[2] * 0.33, it[2] * 0.28, it[2] * 0.33); }, true); }
