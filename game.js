@@ -3093,9 +3093,11 @@ function SFXcash() { Sound.play('cash'); }
 function collectAllCash(why = '') {
   if (!S || !S.cash || !S.cash.length) return 0;
   let tot = 0, n = 0;
-  for (const g of cashObjs) { const c = g.userData.cash; if (!c || g.userData.fly != null) continue; g.userData.fly = 0; tot += c.amount; n++; S.cash.splice(S.cash.indexOf(c), 1); }
+  const got = [];   // fix-econ: и тук 40% → общия холдинг (кооп), както при ръчното прибиране
+  for (const g of cashObjs) { const c = g.userData.cash; if (!c || g.userData.fly != null) continue; g.userData.fly = 0; tot += c.amount; n++; got.push(c); S.cash.splice(S.cash.indexOf(c), 1); }
   if (!n) return 0;
   econ.earn(tot, 'обект', `Прибрани пари от ${n} обекта`, { city: true });
+  if (feature('fix-econ')) for (const c of got) { try { window.__coopOrder?.(c.amount, c.title); } catch (e) { console.warn('coop order', e); } }
   SFXcash(); toast(`💶 +${fmt(tot)} € — прибрани автоматично от ${n} ${n === 1 ? 'обект' : 'обекта'}${why}`, 'good');
   save(); renderPanel();
   return tot;
@@ -4779,7 +4781,7 @@ const corp = createCorp({ xp: n => xpMore(n), S: () => S, econ: () => econ, empi
   network: () => (S.rails || []).filter(r => r.built).length * 5e7 + hwDone().length * 8e7 + Object.values(S.ports || {}).reduce((a, p) => a + (p.lv || 0), 0) * 1.5e8 + Object.values(S.airports || {}).reduce((a, p) => a + (p.lv || 0), 0) * 2.5e8
     + Object.keys(econ.s.finished || {}).length * 5e8 + wonCountries(x => econ.isFinished(x)).length * 2e9, extraValue: () => mw.value() + hotels.value() + bank.value() + neom.value(), fmt, toast, save, sound: n => Sound.play(n), pop: (k, a, b) => showEventPop(k, a, b), brandName: () => groupName(S) || 'Твоят холдинг',
   netWorth: () => { const h = econ.s.worthHist; return h && h.length ? h[h.length - 1][1] : econ.s.money; },
-  dailyNet: () => { const h = (econ.s.history || []).slice(-30), skip = new Set(['кредит', 'борса', 'друго', 'покупка', 'придобивания', 'Тест']);   // само редовната печалба — без кредити, акции, покупки и еднократни суми
+  dailyNet: () => { const h = (econ.s.history || []).slice(-30), skip = new Set(['кредит', 'борса', 'друго', 'покупка', 'придобивания', 'Тест', ...(feature('fix-econ') ? ['продажба', 'филиал±'] : [])]);   /* fix-econ: и еднократните продажби (имоти, техника, филиали, разпродажби) — не са редовна печалба */   // само редовната печалба — без кредити, акции, покупки и еднократни суми
     return h.length ? h.reduce((a, d) => a + Object.entries(d.cats || {}).reduce((b, [k, v]) => b + (skip.has(k) ? 0 : (typeof v === 'number' ? v : (v.in || 0) - (v.out || 0))), 0), 0) / h.length + (S.corp?.incDay || 0) : 0; },
   localFirms: () => { const seen = new Set(), out = []; for (const id of ownedCities()) { const cc = cityById(id)?.cc || '🇧🇬'; if (seen.has(cc)) continue; seen.add(cc);
     const cnm = cc === '🇧🇬' ? 'България' : COUNTRIES.find(k => k.cc === cc)?.nm || '', tier = cc === '🇧🇬' ? 1 : isEurope(id) || !isWorld(id) ? 3 : 6;
@@ -8007,14 +8009,19 @@ function offerFleetMove() {
 }
 function sellBranchCard() {
   if (!econ.branchSalePrice || S.cityId === S.hqCity) return '';
-  const f = econ.isFinished && econ.isFinished(S.cityId) ? econ.s.finished[S.cityId] : null;
-  const price = econ.branchSalePrice({ assets: cityAssets(), dailyProfit: f ? f.daily : econ.cityAvgDaily(S.cityId) });
+  const price = branchPrice(S.cityId);
   return `<div class="card"><h3><span class="ico">💼</span>Продай филиала</h3><div class="meta">Купувач предлага <b style="color:var(--ok)">${fmt(price)} €</b> за целия филиал (сгради, техника, имоти и бизнеса му). След продажбата се връщаш в централата.</div>
     <div class="row" style="justify-content:flex-end"><button class="btn2" id="bSellBranch">Продай филиала</button></div></div>`;
 }
+// fix-econ (f9): цената на филиала — без безплатната начална техника (всеки нов град я получава — иначе цикъл „влез/продай“)
+// и без вече получените аванси на текущите обекти (купувачът ги довършва)
+function branchPrice(id) { const f = econ.isFinished && econ.isFinished(id) ? econ.s.finished[id] : null, p = econ.branchSalePrice({ assets: cityAssets(), dailyProfit: f ? f.daily : econ.cityAvgDaily(id) });
+  if (!feature('fix-econ')) return p;
+  const left = [...S.units], free = ECON.START.units.reduce((a, t) => { const i = left.indexOf(t); if (i < 0) return a; left.splice(i, 1); return a + (econ.sellPrice ? econ.sellPrice(t) : 0); }, 0), adv = projects.reduce((a, q) => a + (q.adv || 0), 0);
+  return Math.max(0, Math.round((p - free - adv) / 1000) * 1000); }
 function sellBranch() {
-  const id = S.cityId, nm = cityName(), f = econ.isFinished && econ.isFinished(id) ? econ.s.finished[id] : null;
-  const price = econ.branchSalePrice({ assets: cityAssets(), dailyProfit: f ? f.daily : econ.cityAvgDaily(id) });
+  const id = S.cityId, nm = cityName();
+  const price = branchPrice(id);
   modal(`💼 Продай филиала в ${nm}?`, `Получаваш <b>${fmt(price)} €</b>. Сградите, техниката, имотите и складът остават на купувача. Влаковете ти, които са тук, се връщат в централата. <b>Не може да се върне.</b>`,
     [['Отказ', null], ['Продай', () => {
       econ.sellBranch(id, price, nm);
@@ -8971,7 +8978,7 @@ function buyLand(id) {
   if (est().land.length >= MAX_LAND) { toast(`Имаш ${MAX_LAND} празни парцела в ${cityName()} — застрой или продай някой, преди да купиш нов.`, 'bad'); Sound.play('error'); return; }
   if (!econ.canAfford(price)) { toast('Нямаш достатъчно пари за парцела.', 'bad'); Sound.play('error'); return; }
   econ.spend(price, 'покупка', `Парцел (${lot.zone === 'center' ? 'център' : lot.zone === 'mid' ? 'среден пояс' : 'покрайнини'})`);
-  lot.busy = 'land'; est().land.push(id); lot.landPrice = price; S.landPrice = { ...(S.landPrice || {}), [id]: price };
+  lot.busy = 'land'; est().land.push(id); lot.landPrice = price; S.landPrice = { ...(S.landPrice || {}), [id]: price }; if (feature('fix-econ')) S.landDay = { ...(S.landDay || {}), [id]: S.day };   // fix-econ: от кога го държиш (поскъпването)
   for (const t of lot.trees || []) city.group.remove(t);
   lot.trees = [];
   Sound.play('buy'); toast('🟩 Купи парцел. Избери какво да построиш на него в „Имоти“.', 'good');
@@ -9082,7 +9089,8 @@ function takeoverAssets(id) {
       lot.busy = 'owned'; poofAt(lot.x, lot.z); got.push(BTYPES[k].nm.toLowerCase());
     }
   }
-  if (T.land) { const c = city.lots.filter(l => !l.built && !l.busy && l !== city.hq).slice(0, T.land); for (const l of c) est().land.push(l.id); if (c.length) got.push(`${c.length} парцела`); }
+  if (T.land) { const fx = feature('fix-econ'), c = city.lots.filter(l => !l.built && !l.busy && l !== city.hq).slice(0, fx ? Math.max(0, Math.min(T.land, MAX_LAND - est().land.length)) : T.land);   // fix-econ: заети (не се купуват пак), с цена и в границата MAX_LAND
+    for (const l of c) { est().land.push(l.id); if (fx) { const pr = Math.round(lotPrice(l) * 0.5 / 500) * 500; l.busy = 'land'; l.landPrice = pr; S.landPrice = { ...(S.landPrice || {}), [l.id]: pr }; S.landDay = { ...(S.landDay || {}), [l.id]: S.day }; } } if (c.length) got.push(`${c.length} парцела`); }
   for (const type of T.units || []) { S.units.push(type); const u = spawnUnit(type); poofAt(u.x, u.z); }
   if (T.units) { syncUnits(); refreshGarageLabel(); got.push(`${T.units.length} техника/бригади`); }
   if (T.stock) { for (const m of ['sand', 'gravel', 'concrete', 'bricks', 'steel', 'wood', 'glass']) econ.s.stock[m] = (econ.s.stock[m] || 0) + T.stock; got.push('пълен склад'); }
@@ -9498,7 +9506,11 @@ function finishPark(p) {
 }
 // ---- продажба на твой имот: купувач се появява след 1–3 дни
 function listForSale(lotId) { const o = ownedAt(lotId); if (!o || o.sale) return; o.sale = { day: S.day + 1 + (Math.random() * 3 | 0), price: null }; toast('🏷️ Имотът е обявен за продан. Купувач ще се появи до няколко дни.'); refreshEstateSigns(); save(); renderPanel(); }
-function sellLand(id) { const price = Math.round(((S.landPrice || {})[id] || lotPrice(city.lots[id])) * rand(1.0, 1.2) / 500) * 500; econ.earn(price, 'продажба', 'Продаден парцел'); est().land = est().land.filter(x => x !== id); city.lots[id].busy = null; Sound.play('cash'); toast(`Продаде парцела за ${fmt(price)} €.`, 'good'); refreshEstateSigns(); save(); renderPanel(); }
+// fix-econ (f9): продажба на парцел — не повече от платеното (и от днешната цена), с 2–15% отстъпка за бързата продажба;
+// печалба — само от поскъпването с времето: +12% на година държане (до +40%) — иначе купи/продай веднага даваше пари без край
+function landSalePrice(id) { const paid = (S.landPrice || {})[id] || lotPrice(city.lots[id]), base = Math.min(paid, lotPrice(city.lots[id])), held = Math.max(0, S.day - ((S.landDay || {})[id] ?? S.day));
+  return Math.round(base * (rand(0.85, 0.98) + Math.min(0.4, held / 365 * 0.12)) / 500) * 500; }
+function sellLand(id) { const price = feature('fix-econ') ? landSalePrice(id) : Math.round(((S.landPrice || {})[id] || lotPrice(city.lots[id])) * rand(1.0, 1.2) / 500) * 500; if (feature('fix-econ') && S.landPrice) { delete S.landPrice[id]; if (S.landDay) delete S.landDay[id]; } econ.earn(price, 'продажба', 'Продаден парцел'); est().land = est().land.filter(x => x !== id); city.lots[id].busy = null; Sound.play('cash'); toast(`Продаде парцела за ${fmt(price)} €.`, 'good'); refreshEstateSigns(); save(); renderPanel(); }
 function acceptSale(lotId) {
   const o = ownedAt(lotId); if (!o?.sale?.price) return;
   econ.earn(o.sale.price, 'продажба', `Продаден имот: ${BTYPES[o.kind].nm}`);
@@ -10419,7 +10431,7 @@ function gridCheck() {
 const HOLDING_LV = 15;
 // 🏅 опитът на холдинга: от ерата на холдинга нивото е общо за фирмата — опитът на най-развития град + S.hxp.
 // S.hxp расте всеки ден с редовната печалба (1 опит на 10 000 €) и с наградите по пътя (междинни цели).
-const regNet = () => { const h = (econ?.s?.history || []).slice(-30), skip = new Set(['кредит', 'борса', 'друго', 'покупка', 'придобивания', 'Тест']);
+const regNet = () => { const h = (econ?.s?.history || []).slice(-30), skip = new Set(['кредит', 'борса', 'друго', 'покупка', 'придобивания', 'Тест', ...(feature('fix-econ') ? ['продажба', 'филиал±'] : [])]);   /* fix-econ: и еднократните продажби (имоти, техника, филиали, разпродажби) — не са редовна печалба */
   return h.length ? h.reduce((a, d) => a + Object.entries(d.cats || {}).reduce((b, [k, v]) => b + (skip.has(k) ? 0 : v), 0), 0) / h.length : 0; };
 function holdLv() {
   if (!S?.holding) return 1; const x = Math.max(S.dev?.xp || 0, ...Object.values(S.cities || {}).map(c => c.dev?.xp || 0)) + (S.hxp || 0);
@@ -11215,6 +11227,11 @@ if (AUTOTEST) {
     gantryLook(i = 0, d = 60) { const G = cityHw && cityHw.signs && cityHw.signs[i]; if (!G) return null; const p = new THREE.Vector3(), q = new THREE.Vector3(0, 0, 1); G.root.getWorldPosition(p); q.applyQuaternion(G.root.getWorldQuaternion(new THREE.Quaternion())); controls.target.set(p.x, 6, p.z); camera.position.set(p.x + q.x * d + 6, 12, p.z + q.z * d + 6); fly = null; return cityHw.signs.length; },   // 🛣️ демо: портал i отпред
     billboardLook(i = 0) { const s = city.billboards?.spots?.[i]; if (!s) return null; controls.target.set(s.x, 8, s.z); camera.position.set(s.x + Math.sin(s.ry) * 34 + 8, 14, s.z + Math.cos(s.ry) * 34); fly = null; return city.billboards.spots.length; },   // 🪧 демо
     muni: () => muni,   // 🏛️ поръчките на общината (тест)
+    // fix-econ (f9): цикъл купи/продай земя, депозит спрямо кредит, дневната печалба след голяма продажба, цената на филиала
+    econTest(n = 20) { econ.earn(5e7, 'друго', 'тест'); const m0 = econ.s.money, lot = city.lots.find(l => !l.built && !l.busy && l !== city.hq); let paid = 0, got = 0;
+      for (let i = 0; i < n; i++) { const a = econ.s.money; buyLand(lot.id); paid += a - econ.s.money; const b = econ.s.money; sellLand(lot.id); got += econ.s.money - b; $('modal')?.classList.add('hidden'); }
+      const dep = ECON.depInterest(1e6) / 1e6, loan = ECON.INV_RATE / ECON.INV_DAYS * ECON.DEPOSIT_MONTH_DAYS, H = econ.s.history || (econ.s.history = []), v0 = corp.myValue(); H.push({ cats: { 'продажба': 2e7 } }); const v1 = corp.myValue(); H.pop();   // ден с продажба за 20 млн. — колко скача оценката на холдинга (транша)
+      return { landCycles: n, paid, got, landNet: got - paid, depPerMonth: dep, cheapestLoanPerMonth: +loan.toFixed(4), depBelowLoan: dep < loan, valueBefore: v0, valueAfterBigSaleDay: v1, liq: (() => { const c = ECON.COMPANIES[0], q = econ.s.market.c[c.id]; delete (econ.s.subs || {})[c.id]; delete q.bust; if (econ.s.boughtOut) delete econ.s.boughtOut[c.id]; econ.goBust(c.id, S.day); const p0 = q.price, cost = econ.takeover(c.id); econ.liquidate(c.id, cost); const p1 = q.price; let again = 0; for (let d = 1; d <= 300; d++) { econ.bustTick(S.day + d); if (q.bust) { again = d; break; } } return { firm: c.id, crashPrice: p0, priceAfterSale: p1, listPrice: c.price, bustAgainAfterDays: again || 'не в 300 дни' }; })(), branch: S.cityId !== S.hqCity ? branchPrice(S.cityId) : null }; },
     ownTest() { econ.earn(1e9, 'друго', 'тест'); const ls = city.lots.filter(l => !l.built && !l.busy && l !== city.hq).slice(0, 8); for (const l of ls) buyLand(l.id); $('modal')?.classList.add('hidden'); return { own: ownCount(), land: est().land.length }; },
     fleetCapTest() { econ.earn(5e10, 'друго', 'тест'); S.dev.lv = 12; S.dev.xp = 6e5; S.airports = {}; S.ports = {}; for (const id of ['sofia', 'varna', 'burgas', 'plovdiv', 'istanbul', 'athens', 'rome', 'paris', 'london', 'berlin']) { S.airports[id] = { lv: 7, build: null }; S.ports[id] = { lv: 5, build: null, xb: 4 }; } S.planes = S.planes || []; const p0 = S.planes.length; for (let i = 0; i < 90; i++) buyPlane('prop'); const s0 = (S.ships || []).length; for (let i = 0; i < 90; i++) { try { buyShip('boat'); } catch (e) { break; } } $('modal')?.classList.add('hidden'); return { gates: airGates(), planeCap: fleetCap.plane(), planes: S.planes.length - p0, berths: portBerths(), shipCap: fleetCap.ship(), ships: (S.ships || []).length - s0 }; },
     pickTest(a, kind = 'hw') { mapEU = true; showMap(true); if (kind === 'hw') { railPick = null; hwPick = a || 'pickA'; } else { hwPick = null; railPick = a || 'pickA'; } drawMap(); return pickSvg().split('<line').length - 1; },

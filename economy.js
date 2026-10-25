@@ -1,6 +1,7 @@
 // economy.js — парите на фирмата: покупки, заплати, гориво, кредити, плащания за обекти.
 // ИНТЕРФЕЙС: game.js вика само експортираните неща по-долу. Вътрешността може да се развива свободно.
 // Всички суми са в евро.
+import { feature } from './lab/feature.js';   // fix-econ (f9)
 
 // Видове техника/хора, които фирмата може да купи
 export const UNIT_TYPES = {
@@ -65,7 +66,8 @@ export const RAIL_DISCOUNT = 0.40, ROAD_DISCOUNT = 0.25, AB_DISCOUNT = 0.30;   /
 // Депозит в банката: 1% на месец (30 дни). Лихвата се натрупва всеки ден и в края на месеца става за взимане.
 export const DEPOSIT_MONTHLY = 0.01, DEPOSIT_MONTH_DAYS = 30;   // DEPOSIT_MONTHLY — остаряло, лихвата идва от DEP_TIERS
 // Лихвата е по стъпала (като данъчни скоби): първият 1 млн. носи 5% на месец, от 1 до 10 млн. — 3%, над 10 млн. — 2%.
-export const DEP_TIERS = [[1000000, 0.05], [10000000, 0.03], [Infinity, 0.02]];
+// fix-econ (f9): депозитът — винаги под най-евтиния кредит (10% за 120 дни = 2,5% на месец), иначе кредит → депозит е печалба без риск
+export const DEP_TIERS = feature('fix-econ') ? [[1000000, 0.01], [10000000, 0.007], [Infinity, 0.005]] : [[1000000, 0.05], [10000000, 0.03], [Infinity, 0.02]];
 export const depInterest = amt => { let r = 0, lo = 0; for (const [hi, p] of DEP_TIERS) { if (amt <= lo) break; r += (Math.min(amt, hi) - lo) * p; lo = hi; } return r; };
 // Борса: измислени български фирми. Цената се движи всеки ден (случайно + тенденция); vol = дневна волатилност,
 // drift = средно поскъпване на ден, div = месечен дивидент като дял от цената.
@@ -604,7 +606,8 @@ export class Economy {
         }
         continue;
       }
-      if (day < 60 || Object.values(m.c).some(x => x.bust) || (this.hooks.stocksOpen && !this.hooks.stocksOpen())) continue;   // не в началото и не две наведнъж
+      if (day < 60 || Object.values(m.c).some(x => x.bust) || (this.hooks.stocksOpen && !this.hooks.stocksOpen())) continue;
+      if (feature('fix-econ') && this.s.boughtOut && day - (this.s.boughtOut[c.id] ?? -1e9) < 365) continue;   // fix-econ: изкупената и разпродадена — година без нов фалит   // не в началото и не две наведнъж
       if (this.hooks.stockVisible && !this.hooks.stockVisible(c) && !this.s.shares[c.id]) continue;   // чужда фирма от държава, където нямаш филиал
       const low = q.price < c.price * BUST.below;
       if (Math.random() < (low ? BUST.chanceLow : BUST.chanceAny)) this.goBust(c.id, day);
@@ -639,7 +642,9 @@ export class Economy {
   liquidate(id, total, days = 0, label = '') {
     const c = COMPANIES.find(x => x.id === id), sub = (this.s.subs || {})[id], paid = sub ? sub.paid : 0;
     if (this.s.subs) delete this.s.subs[id];
-    if (!days) { this.earn(total, 'дъщерни', `Разпродажба: ${c.nm}`); this.liqDone(c, total, paid); return total; }
+    const FX = feature('fix-econ'), q = this.s.market.c[id];
+    if (FX && q) { q.price = Math.max(q.price, Math.round(c.price * BUST.recover * 100) / 100); q.hist.push(q.price); (this.s.boughtOut ||= {})[id] = this.s.day; }   // fix-econ: цената се възстановява и година не фалира пак — без цикъл „изкупи евтино → разпродай“
+    if (!days) { this.earn(total, FX ? 'продажба' : 'дъщерни', `Разпродажба: ${c.nm}`); this.liqDone(c, total, paid); return total; }   /* fix-econ: еднократно — не е дневната печалба на дъщерните */
     (this.s.liq = this.s.liq || []).push({ id, total, left: total, per: Math.ceil(total / days), paid, label });
     if (this.hooks.toast) this.hooks.toast(`💰 Разпродажбата на ${c.nm} започна — ${fmt(total)} за ${days} дни.`, 'good');
     return 0;
@@ -652,7 +657,7 @@ export class Economy {
   liqTick() {
     for (const l of [...(this.s.liq || [])]) {
       const n = Math.min(l.left, l.per); l.left -= n;
-      this.earn(n, 'дъщерни', `Разпродажба: ${COMPANIES.find(x => x.id === l.id).nm}`);
+      this.earn(n, feature('fix-econ') ? 'продажба' : 'дъщерни', `Разпродажба: ${COMPANIES.find(x => x.id === l.id).nm}`);
       if (l.left <= 0) { this.s.liq.splice(this.s.liq.indexOf(l), 1); this.liqDone(COMPANIES.find(x => x.id === l.id), l.total, l.paid); }
     }
   }
