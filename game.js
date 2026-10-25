@@ -41,7 +41,7 @@ import { createDemolition2, machineWork, craneLift, loadSiteRigs, rigPlay, swapR
 import { createDistricts, parkLayout, parkMesh } from './districts.js';   // 🏡 districts-look (55): дворове, паркове и площадки в кварталите на плана v2
 import { siteK, realScaleK, REAL_BLD, TOO_LONG, kidK, SECTIONS, sectName, pickSection } from './scale.js';   // 🏗️ флаг site-anim: истински кран при събаряне, машините работят, кранът вдига
 import { createEvents } from './events.js';
-import { createWeather, rollWeather } from './weather.js';
+import { createWeather, rollWeather, wx2Kind, wx2SnowFrac } from './weather.js';
 import { bidHtml, resolveBid } from './bidding.js';
 import { addSiteLights, setSiteLightsNight } from './sitelights.js';
 import { createHwTraffic } from './hwtraffic.js';
@@ -1066,7 +1066,10 @@ function fitScale(n, target = 12.5) { const s = sizeOf(n).getSize(new THREE.Vect
 const dayNight = new DayNight(scene, hemi, sun);
 // времето (weather.js): дъжд, сняг, мъгла, буря — върху светлината на денонощието
 const osmFog = { on: false, near: 180, far: 420 };   // мъглата в градовете по истинската карта — по разстоянието на камерата (frame)
-const weather = createWeather({ scene, hemi, sun, fogBase: () => osmFog.on ? osmFog : null });
+const weather = createWeather({ scene, hemi, sun, camera, fogBase: () => osmFog.on ? osmFog : null });
+// 🌦️ weather2 (f9): времето по календара — дъжд/сняг на епизоди, детерминистично по град и игрален момент (weather.js wx2Kind)
+const W2 = feature('weather2'), wx2C = id => ({ id, lat: cityById(id)?.lat ?? 45, desert: isDesert(id) });
+const wx2Now = () => events.stormy() ? 'storm' : wx2Kind(wx2C(S.cityId), S.day + S.dayT / DAY_SEC, CYCLE_DAYS, monthOf);
 // парцелите, по които записът има нещо (сграда, обект, имот, парк, склад, гараж…)
 function occupiedLots(cityId) {
   const s = new Set(), add = v => { if (v != null) s.add(+v); }, E = S.estate || {};
@@ -3369,7 +3372,7 @@ function setupWorld() {
   for (const p of S.projects) if (city.lots[p.lot] !== city.hq) city.lots[p.lot].busy = 'project';
   spawnTraffic(wantedTraffic());
   buildStation();
-  weather.set(isDesert(S.cityId) && ['snow', 'rain', 'fog'].includes(S.weather) ? 'clear' : S.weather || 'clear'); weather.setCover(isDesert(S.cityId) ? 0 : S.snowCover || 0);
+  weather.set(W2 ? wx2Now() : isDesert(S.cityId) && ['snow', 'rain', 'fog'].includes(S.weather) ? 'clear' : S.weather || 'clear'); weather.setCover(isDesert(S.cityId) ? 0 : S.snowCover || 0);
   S.hwJobs = S.hwJobs || []; S.hwDone = S.hwDone || [];
   for (const j of S.hwJobs) for (const u of units) if (u.proj && u.proj.seg === j.seg) u.proj = j;
   restoreSpurs();   // собствените участъци (напр. Монтана — София) трябва да са известни, преди да се нарисува пътят в града
@@ -3966,9 +3969,9 @@ const events = createEvents({
 function dayWeatherAndEvents() {
   const m = monthOf(S.day + 1);
   const af = isDesert(S.cityId);   // в Африка — без сняг (сухо и слънчево)
-  weather.dailyTick([11, 0, 1, 2].includes(m) && !af);
+  weather.dailyTick([11, 0, 1, 2].includes(m) && !af, W2 ? wx2SnowFrac(wx2C(S.cityId), S.day, CYCLE_DAYS, monthOf) : undefined);   // weather2: покривката — по това колко е валяло днес
   const ev = events.dailyTick(S.day + 1);
-  weather.set(events.stormy() ? 'storm' : af ? (Math.random() < 0.8 ? 'clear' : 'cloudy') : rollWeather(m));
+  weather.set(W2 ? wx2Now() : events.stormy() ? 'storm' : af ? (Math.random() < 0.8 ? 'clear' : 'cloudy') : rollWeather(m));
   S.weather = weather.kind; S.snowCover = weather.cover;
   if (ev) renderPanel();
 }
@@ -11046,7 +11049,7 @@ renderer.domElement.addEventListener('pointerup', e => {
 
 // ============================================================ главен цикъл
 const DAY_SEC = 24;
-const CYCLE_DAYS = 3;   // едно денонощие трае 3 игрови дни — по-бавни изгреви и залези
+const CYCLE_DAYS = feature('day-slow') ? 8 : 3;   // едно денонощие трае 3 игрови дни — по-бавни изгреви и залези; day-slow (f9): 8 дни ≈ 3,2 мин (икономическият ден DAY_SEC — същият)
 const todF = () => (((S.day - 1) + S.dayT / DAY_SEC) / CYCLE_DAYS) % 1;
 const clock = new THREE.Clock();
 let panelT = 0, simT = 0, mapT = 0, mapMoveT = 0, autoT = 3, questT = 0;
@@ -11086,7 +11089,7 @@ function frame() {
   const onMap = !$('mapScreen').classList.contains('hidden');
   if (S && city.ready && onMap) { mapT -= rdt; if (mapT <= 0) { mapT = 1; renderMapHud(); drawMapRailsOnly(); } mapMoveT -= rdt; if (mapMoveT <= 0 && !lodLow()) { mapMoveT = 1 / 15; updateMapTrains(); updateMapPlanes(); updateMapShips(); updateMapTrucks(); } }   // подвижните знаци — 15 пъти в секунда (SVG се пресъздава)
   if (S && city.ready) {
-    questT -= rdt; if (questT <= 0) { questT = 1; afCheckOpen(); updFinBtn(); updBuiltChip(); updResBtn(); syncSeaFleet(); autoCollectFinished(); processBuildQ(); if (bigWin) renderBig(); quests.tick(); if (!AUTOTEST) tutorial.tick(); }
+    questT -= rdt; if (questT <= 0) { questT = 1; if (W2 && S) { const k = wx2Now(); if (k !== weather.kind) { weather.set(k); S.weather = k; } }   /* weather2: епизодите почват/свършват през деня */ afCheckOpen(); updFinBtn(); updBuiltChip(); updResBtn(); syncSeaFleet(); autoCollectFinished(); processBuildQ(); if (bigWin) renderBig(); quests.tick(); if (!AUTOTEST) tutorial.tick(); }
     simT += dt;
     // физиката на движението на малки стъпки, за да не „прескачат“ при висока скорост
     let left = dt;
@@ -12082,6 +12085,8 @@ if (AUTOTEST) {
       const st = usage.stats(), B = usage.buffer(); modal('📊 Статистика за ползването', `Съгласие: <b>${st.consent ? 'да' : 'не'}</b> · localhost: <b>${st.local ? 'да — нищо не се праща' : 'не'}</b> · в буфера: <b>${st.buffered}</b> · минути игра: ${st.playMin}<br><pre style="max-height:52vh;overflow:auto;font-size:11px;text-align:left;background:#0e141d;padding:8px;border-radius:6px">${B.slice(-25).map(e => JSON.stringify(e)).join('\n').replace(/</g, '&lt;')}</pre>`, [['OK', null]]); return { st, B }; },
     errDemo() { initErrTelemetry({ ctx: () => ({ city: S?.cityId, gfx: gfxLevel(), day: S?.day }) }); setTimeout(() => { throw new Error('тест на телеметрията от Лабораторията (ivan@example.com, ?token=abc)'); }); Promise.reject(new Error('тест: отхвърлен promise'));   // 🐞 err-telemetry: Лабораторията
       setTimeout(() => { const r = sendErrors(); modal('🐞 Телеметрия на грешките', `Изпращане: <b>${r.sent ? 'изпратени ' + r.sent + ' (засега само в конзолата и localStorage)' : r.reason === 'no-consent' ? 'не — няма съгласие за анализи' : 'няма нови'}</b><br>Това би тръгнало:<pre style="white-space:pre-wrap;font-size:11px;max-height:50vh;overflow:auto;text-align:left">${JSON.stringify(errPayload(), null, 1).replace(/</g, '&lt;')}</pre>`, [['OK', null]]); }, 800); return true; },
+    wx2Go(kind = 'snow', from = S.day, dayOnly = true) { const c = wx2C(S.cityId); for (let t = from; t < from + 400; t += 0.02) { const h = (((t - 1) / CYCLE_DAYS) % 1) * 24 + 6; if (dayOnly && (h % 24 < 9 || h % 24 > 17)) continue; if (wx2Kind(c, t, CYCLE_DAYS, monthOf) === kind) { S.day = Math.floor(t); S.dayT = (t % 1) * DAY_SEC; weather.set(kind); S.weather = kind; return { day: S.day, month: monthOf(S.day), clock: clockText(todF()) }; } } return null; },   // 🌦️ weather2: Лабораторията — до следващия сняг/дъжд в града
+    wx2Stats(id = S.cityId, days = 360) { const c = wx2C(id), out = {}; let prev = null, eps = 0; for (let t = 1; t < 1 + days; t += 0.02) { const k = wx2Kind(c, t, CYCLE_DAYS, monthOf); out[k] = (out[k] || 0) + 0.02; if (k !== prev && ['rain', 'snow', 'storm'].includes(k)) eps++; prev = k; } return { id, lat: c.lat, desert: c.desert, eps, perMonth: +(eps / (days / 30)).toFixed(1), days: Object.fromEntries(Object.entries(out).map(([k, v]) => [k, Math.round(v)])), cycleSec: CYCLE_DAYS * DAY_SEC }; },
     onbDemo() { onboard?.restart(); return onboard?.step(); },   // 🎓 onboarding: Лабораторията (под autotest урокът не тръгва сам)
     ads: () => ads,   // 📺 ads: Лабораторията (skipWait, next, state)
     awayDemo(h = 9, bankMin = 60, more = true) { if (!awaySum) return null; if (more) S.branches = [...new Set([...(S.branches || []), 'plovdiv', 'varna', 'istanbul'])]; ads?.skipWait?.(); return awaySum.demo(h, bankMin); },   // 👋 away-summary: отсъствие h ч с bankMin мин игра (more — още 3 града за списъка)
