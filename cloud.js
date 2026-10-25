@@ -5,6 +5,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
 import { backupRaw, dropBackups, tooNew } from './saves.js';
 import { feature, IN_LAB } from './lab/feature.js';
+import { TURNSTILE_SITEKEY } from './config.js';   // 🔑 pw-login: Cloudflare Turnstile (празен = без проверка)
 import './consent.js';   // 🍪 GDPR съгласие (feature 'consent') — window.consent
 
 const URL_ = 'https://lpzjscttqieqnqozscpk.supabase.co';
@@ -90,6 +91,8 @@ function openCloud() {
 }
 
 function loginEmail(pre = '') {
+  if (PW) { const el = dlg(`<h2 style="font-size:19px;color:var(--acc)">☁️ Вход</h2><div id="pwBox"></div>`, [['Затвори', null]]);   // 🔑 pw-login
+    pwForm(el.querySelector('#pwBox'), { inp: DLG_INP, go: DLG_GO, link: 'var(--acc)', mut: 'var(--mut)', onIn: (email, isNew) => { el.remove(); toast(`☁️ ${isNew ? 'Акаунтът е създаден' : 'Влезе'} — ${email}. Играта вече се пази в облака.`); } }, pre ? 'login' : undefined, pre || undefined); return; }
   const el = dlg(`<h2 style="font-size:19px;color:var(--acc)">☁️ Вход</h2>
     <p style="color:var(--mut);font-size:14px;line-height:1.5">Въведи имейла си — ще ти пратим код за вход. Без парола. След това играта ти се пази в облака и можеш да продължиш от телефона, таблета или друг компютър.</p>
     <input id="cloudEmail" type="email" autocomplete="email" inputmode="email" placeholder="ime@primer.com" value="${pre}" style="width:100%;padding:11px;border-radius:9px;border:1px solid var(--line);background:#0f141c;color:var(--txt);font-size:16px">
@@ -121,6 +124,87 @@ function loginCode(email) {
       return false;
     }, 1]]);
   setTimeout(() => el.querySelector('#cloudCode')?.focus(), 50);
+}
+
+// ── 🔑 флаг pw-login: вход и регистрация само с имейл + парола — без писма (няма услуга за имейли). Кодът по имейл не се показва.
+// „Забравена парола“ — пиши ни, сменяме я ръчно. Cloudflare Turnstile (config.js TURNSTILE_SITEKEY; празен = без проверка):
+// скриптът се зарежда чак при показване на формата, токенът отива в options.captchaToken на signUp / signInWithPassword.
+const PW = feature('pw-login');
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const mailGet = () => { try { return localStorage.getItem('stroi-email') || ''; } catch { return ''; } }, mailKeep = m => { try { localStorage.setItem('stroi-email', m); } catch { } };
+const tsKey = () => IN_LAB && window.__tsTest ? '1x00000000000000000000AA' : TURNSTILE_SITEKEY;   // демото в Лабораторията: тестовият ключ на Cloudflare (винаги минава)
+let tsP = null;
+const tsLoad = () => tsP = tsP || new Promise((res, rej) => {
+  if (window.turnstile) return res(window.turnstile);
+  const s = document.createElement('script'); s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'; s.async = true;
+  s.onload = () => res(window.turnstile); s.onerror = () => { tsP = null; rej(new Error('captcha')); }; document.head.appendChild(s);
+});
+function captcha(el) {   // { token(): Promise<string|undefined>, reset() }
+  const key = tsKey(); if (!key) return { token: async () => undefined, reset() { } };
+  let id = null, tok = ''; const wait = [];
+  tsLoad().then(ts => { id = ts.render(el, { sitekey: key, appearance: 'interaction-only', theme: 'dark', language: 'bg',
+    callback: t => { tok = t; wait.splice(0).forEach(f => f(t)); }, 'expired-callback': () => { tok = ''; }, 'error-callback': () => { tok = ''; } }); }).catch(() => { });
+  return { token: () => tok ? Promise.resolve(tok) : new Promise((res, rej) => { wait.push(res); setTimeout(() => rej(new Error('captcha')), 30000); }),
+    reset() { tok = ''; try { if (id != null) window.turnstile.reset(id); } catch { } } };
+}
+const pwErr = m => /invalid login/i.test(m) ? 'Грешен имейл или парола.' : /already|registered|exists/i.test(m) ? 'Този имейл вече има акаунт — влез с паролата.' : /captcha/i.test(m) ? 'Проверката срещу ботове не мина — опитай пак.'
+  : /not confirmed/i.test(m) ? 'Акаунтът още не е потвърден — пиши ни на temidasoftcrm@gmail.com.' : /rate|seconds|too many/i.test(m) ? 'Твърде много опити — изчакай малко.' : /weak|short|least|characters/i.test(m) ? 'Паролата е твърде слаба — поне 8 знака.' : /same|different/i.test(m) ? 'Това е старата парола — избери друга.' : m;
+// формата (в екрана за вход regGate и в диалога ☁️ Вход): o = { inp, go, link, mut — стилове/цветове; onIn(email, isNew) }
+function pwForm(box, o, mode = mailGet() ? 'login' : 'new', pre = mailGet()) {
+  const P = t => `<p style="color:${o.mut};font-size:14px;line-height:1.5;margin:10px 0 4px">${t}</p>`;
+  const I = (id, type, ac, ph) => `<input id="${id}" type="${type}" autocomplete="${ac}"${type === 'email' ? ' inputmode="email"' : ''} placeholder="${ph}" style="${o.inp}">`;
+  const A = (id, t, c) => `<a href="#" id="${id}" style="color:${c}">${t}</a>`;
+  if (mode === 'forgot') {
+    box.innerHTML = P('🔁 <b>Забравена парола</b><br>Пиши ни на <b>temidasoftcrm@gmail.com</b> от имейла на акаунта — ще я сменим ръчно и ще ти отговорим.') + `<button id="pwBack" style="${o.go}">← Към входа</button>`;
+    box.querySelector('#pwBack').onclick = () => pwForm(box, o, 'login', pre); return;
+  }
+  const isNew = mode === 'new';
+  box.innerHTML = P(isNew ? '🆕 <b>Нов акаунт</b> — имейл и парола. Играта ти се пази в облака и играеш от всяко устройство.' : '🔑 <b>Влез</b> с имейла и паролата си — играта ти чака в облака.')
+    + I('pwEmail', 'email', isNew ? 'email' : 'username', 'ime@primer.com') + I('pwP1', 'password', isNew ? 'new-password' : 'current-password', isNew ? 'парола (поне 8 знака)' : 'парола')
+    + (isNew ? I('pwP2', 'password', 'new-password', 'паролата още веднъж') : '')
+    + '<div id="pwTs" style="display:flex;justify-content:center"></div><div class="pwMsg" style="font-size:13px;min-height:18px"></div>'
+    + `<button id="pwGo" style="${o.go}">${isNew ? '🆕 Създай акаунт' : '▶ Влез'}</button>`
+    + `<div style="display:flex;justify-content:space-between;margin-top:10px;font-size:13px">${A('pwSw', isNew ? '← Имам акаунт' : '🆕 Нов акаунт', o.link)}${isNew ? '' : A('pwForgot', 'Забравена парола?', o.mut)}</div>`;
+  const q = s => box.querySelector(s), e = q('#pwEmail'), p1 = q('#pwP1'), p2 = q('#pwP2'), btn = q('#pwGo');
+  e.value = pre || ''; setTimeout(() => (pre && !isNew ? p1 : e).focus(), 50);
+  const msg = (t, bad) => { const m = q('.pwMsg'); m.style.color = bad ? '#ff6b6b' : o.mut; m.textContent = t; };
+  const cap = captcha(q('#pwTs'));
+  q('#pwSw').onclick = ev => { ev.preventDefault(); pwForm(box, o, isNew ? 'login' : 'new', e.value.trim()); };
+  const fg = q('#pwForgot'); if (fg) fg.onclick = ev => { ev.preventDefault(); pwForm(box, o, 'forgot', e.value.trim()); };
+  const submit = async () => {
+    const email = e.value.trim(), password = p1.value;
+    if (!EMAIL_RE.test(email)) return msg('Невалиден имейл.', true);
+    if (isNew ? password.length < 8 : !password) return msg(isNew ? 'Паролата е поне 8 знака.' : 'Въведи паролата.', true);
+    if (isNew && password !== p2.value) return msg('Двете пароли се различават.', true);
+    btn.disabled = true; msg(tsKey() ? 'Проверка срещу ботове…' : isNew ? 'Създавам акаунта…' : 'Влизам…');
+    try {
+      const captchaToken = await cap.token(), options = captchaToken ? { captchaToken } : undefined;
+      msg(isNew ? 'Създавам акаунта…' : 'Влизам…');
+      const { data, error } = isNew ? await sb.auth.signUp({ email, password, options }) : await sb.auth.signInWithPassword({ email, password, options });
+      if (error) throw error;
+      if (isNew && !data?.session) { msg('Акаунтът е създаден, но чака потвърждение — пиши ни на temidasoftcrm@gmail.com.', true); return; }
+      mailKeep(email); o.onIn(email, isNew);
+    } catch (x) { msg(x?.message === 'captcha' ? 'Проверката срещу ботове не се зареди — опитай пак (или спри блокера за сайта).' : pwErr(x?.message || 'няма връзка'), true); cap.reset(); }
+    finally { btn.disabled = false; }
+  };
+  btn.onclick = submit; for (const x of [e, p1, p2]) if (x) x.onkeydown = ev => { if (ev.key === 'Enter') submit(); };
+}
+const DLG_INP = 'width:100%;box-sizing:border-box;padding:11px;border-radius:9px;border:1px solid var(--line);background:#0f141c;color:var(--txt);font-size:16px;margin:5px 0';
+const DLG_GO = 'width:100%;padding:12px;border:0;border-radius:11px;background:#f5b942;color:#111;font:800 16px system-ui,sans-serif;cursor:pointer;margin-top:6px';
+// ⚙️ → 🔑 Смени паролата (влезли): updateUser — без писмо
+function changePw() {
+  const el = dlg(`<h2 style="font-size:19px;color:var(--acc)">🔑 Смени паролата</h2>
+    <input id="cpP1" type="password" autocomplete="new-password" placeholder="нова парола (поне 8 знака)" style="${DLG_INP}">
+    <input id="cpP2" type="password" autocomplete="new-password" placeholder="още веднъж" style="${DLG_INP}"><div id="cpMsg" style="font-size:13px;color:var(--bad);min-height:18px"></div>`,
+    [['Отказ', null], ['💾 Запази', () => {
+      const p1 = el.querySelector('#cpP1').value, p2 = el.querySelector('#cpP2').value, m = el.querySelector('#cpMsg');
+      if (p1.length < 8) { m.textContent = 'Паролата е поне 8 знака.'; return false; }
+      if (p1 !== p2) { m.textContent = 'Двете пароли се различават.'; return false; }
+      m.style.color = 'var(--mut)'; m.textContent = 'Запазвам…';
+      sb.auth.updateUser({ password: p1 }).then(({ error }) => { if (error) { m.style.color = 'var(--bad)'; m.textContent = pwErr(error.message); return; } el.remove(); toast('🔑 Паролата е сменена.'); });
+      return false;
+    }, 1]]);
+  setTimeout(() => el.querySelector('#cpP1')?.focus(), 50);
 }
 
 // ── ⚙️ Настройки: вход/изход, хора онлайн, изтриване на данните и на акаунта ──
@@ -358,8 +442,8 @@ function openSettings(h) {
     ${hooks.audio ? sec('🔊 Звук', ['music:🎵 Музика', 'fx:🔔 Ефекти', 'city:🏙️ Град'].map(r => { const [k, t] = r.split(':'), v = Math.round((hooks.audio.levels()[k] ?? 1) * 100);
       return `<label style="display:flex;align-items:center;gap:10px;font-size:14px;margin:4px 0"><span style="width:90px">${t}</span><input type="range" min="0" max="100" step="5" value="${v}" data-mix="${k}" style="flex:1"><span style="width:38px;text-align:right;color:var(--mut)">${v}%</span></label>`; }).join('')) : ''}
     ${sec('☁️ Акаунт', user ? `<div style="font-size:14px;color:var(--mut);line-height:1.5">Влязъл си като <b style="color:var(--txt)">${esc(user.email)}</b> — играта се пази в облака.${lastErr ? `<br><span style="color:var(--bad)">Последна грешка: ${esc(lastErr)}</span>` : ''}</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${sbtn('stCloud', '☁️ Записи в облака')}${sbtn('stOut', '🚪 Изход')}</div>`
-      : `<div style="font-size:14px;color:var(--mut);line-height:1.5">Не си влязъл. С вход (имейл + код, без парола) играта се пази в облака и можеш да играеш от няколко устройства.</div><div style="margin-top:8px">${sbtn('stIn', '☁️ Вход', 'btn')}</div>`)}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${sbtn('stCloud', '☁️ Записи в облака')}${PW ? sbtn('stPw', '🔑 Смени паролата') : ''}${sbtn('stOut', '🚪 Изход')}</div>`
+      : `<div style="font-size:14px;color:var(--mut);line-height:1.5">Не си влязъл. С вход (${PW ? 'имейл и парола' : 'имейл + код, без парола'}) играта се пази в облака и можеш да играеш от няколко устройства.</div><div style="margin-top:8px">${sbtn('stIn', '☁️ Вход', 'btn')}</div>`)}
     ${sec(`👥 Онлайн сега: <span id="stN">${ppl.length}</span>`, `<div id="stPpl" style="font-size:13px;line-height:1.7;max-height:150px;overflow:auto">${pplHtml(ppl)}</div>`)}
     ${sec(`🆕 Ъпдейти <span style="font-weight:400;color:var(--mut);font-size:13px">· версия ${VERSION}</span>`, `<div style="max-height:170px;overflow:auto">${changesHtml()}</div>`)}
     ${sec('🎮 Игра', `<div style="display:flex;gap:6px;flex-wrap:wrap">${hooks.saves ? sbtn('stSaves', '💾 Записи') : ''}${hooks.rename ? sbtn('stRen', '✏️ Име на фирмата') : ''}${hooks.credits ? sbtn('stCred', '📜 Автори') : ''}${hooks.newGame ? sbtn('stNew', '🔄 Нова игра') : ''}</div>`)}
@@ -370,7 +454,7 @@ function openSettings(h) {
   el.firstElementChild.style.maxHeight = '92vh'; el.firstElementChild.style.overflow = 'auto';
   const on = (id, f) => { const b = el.querySelector('#' + id); if (b) b.onclick = () => { el.remove(); f(); }; };
   { const x = el.querySelector('#stX'); if (x) x.onclick = () => el.remove(); }   // ✕ горе — без да скролваш до „Затвори“
-  on('stIn', () => loginEmail()); on('stCloud', openCloud); on('stCred', () => hooks.credits()); on('stRen', () => hooks.rename()); on('stSaves', () => hooks.saves()); on('stNew', () => hooks.newGame()); on('stCons', () => window.consent?.open()); on('stAdsCons', () => window.consent?.adsOpen());
+  on('stIn', () => loginEmail()); on('stPw', changePw); on('stCloud', openCloud); on('stCred', () => hooks.credits()); on('stRen', () => hooks.rename()); on('stSaves', () => hooks.saves()); on('stNew', () => hooks.newGame()); on('stCons', () => window.consent?.open()); on('stAdsCons', () => window.consent?.adsOpen());
   on('stOut', () => dlg(`<h2 style="font-size:19px;color:var(--acc)">🚪 Изход?</h2><p style="color:var(--mut);font-size:14px;line-height:1.5">Играта на това устройство остава. Влез пак със същия имейл, за да продължи да се пази в облака.</p>`,
     [['Отказ', null], ['🚪 Изход', () => { syncAll(false).finally(() => sb.auth.signOut().then(() => toast('🚪 Излезе от акаунта.'))); }, 1]]));
   on('stWipe', () => confirmWipe(false)); on('stDel', () => confirmWipe(true));
@@ -647,7 +731,8 @@ function regGate() {
     body.querySelector('b').textContent = email;
     body.querySelector('#rgIn').onclick = close;
   };
-  PASS ? (lastMail() ? stepLogin() : stepEmail('', 'new')) : stepEmail();   // познат имейл на това устройство → вход с парола; иначе — нов акаунт
+  if (PW) pwForm(body, { inp, go, link: '#ffd54a', mut: '#8b96a8', onIn: (email, isNew) => { close(); toast(`☁️ ${isNew ? 'Акаунтът е създаден' : 'Влезе'} — ${email}. Играта ти се пази в облака.`); } });   // 🔑 pw-login
+  else PASS ? (lastMail() ? stepLogin() : stepEmail('', 'new')) : stepEmail();   // познат имейл на това устройство → вход с парола; иначе — нов акаунт
 }
 const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);   // на localhost (разработка) — без екрана, освен с ?gate
 if (!AUTOTEST && feature('reg-gate') && ((window.top === window && !LOCAL) || /[?&]gate/.test(location.search)))

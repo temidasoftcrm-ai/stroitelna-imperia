@@ -25,6 +25,9 @@ window.__assetBase = ASSET_BASE;   // за тестовете и конзола�
 
 // 📺 AdSense за игри (ads.js, флаг 'ads'): Publisher ID — 'ca-pub-…' или 'pub-…'. Празен = рекламите са изключени (нищо не се зарежда).
 // deploy.mjs прави от него dist/ads.txt (google.com, pub-…, DIRECT, f08c47fec0942fa0).
+// 🔑 Cloudflare Turnstile (флаг pw-login): sitekey за проверката срещу ботове при вход и регистрация (cloud.js). Празен = без проверка.
+// Ако е попълнен, в Supabase → Auth → Bot and Abuse Protection трябва да е включен Turnstile със secret key-а (иначе обратното: Supabase иска токен, а тук го няма).
+export const TURNSTILE_SITEKEY = '0x4AAAAAAFldr75V2CGjQIiZ';   // публичен (хостове imperia.temidasoft.com + localhost, Managed)
 export const ADS_CLIENT = 'ca-pub-5675663846214661';
 
 // DEV — локално true; deploy.mjs → false в dist/ (сайтът), освен с --dev (за тестовете на dist). На сайта инструментите за разработка ги няма:

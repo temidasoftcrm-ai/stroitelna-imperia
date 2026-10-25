@@ -120,6 +120,7 @@
 {"t":"Philadelphia City Hall","a":"Темидасофт","l":"OWN","u":"","f":["lm/cityhall.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
 {"t":"Blue Mosque (Sultan Ahmed)","a":"Темидасофт","l":"OWN","u":"","f":["lm/mosque.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
 {"t":"Notre-Dame de Paris","a":"Темидасофт","l":"OWN","u":"","f":["lm/notredame.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
+{"t":"Liberty Island Diorama","a":"Темидасофт","l":"OWN","u":"","f":["lm/liberty2.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
 {"t":"Видеата в кината и пътешествията","a":"Темидасофт","l":"OWN","u":"","f":["cinema/newyork.mp4","cinema/vegas.mp4","cinema/paris.mp4","cinema/dubai.mp4","cinema/plane.mp4","cinema/oil.mp4","cinema/sofia.mp4","cinema/tokyo.mp4","cinema/lv20.mp4","cinema/sydney.mp4","cinema/cairo.mp4","cinema/rio.mp4","cinema/orient.mp4","cinema/route66.mp4","cinema/silk.mp4","cinema/chunnel.mp4","cinema/transsib.mp4","cinema/capecairo.mp4","cinema/darien.mp4","cinema/ghan.mp4","cinema/panama.mp4"],"k":"Видео","s":"Kling AI"},
 {"t":"Tudor Stone Quarry","a":"novusod","l":"CC-BY-4.0","u":"https://sketchfab.com/3d-models/00e48528e4394e5fa6ebdc2a9cb35898","f":["mines/quarry.glb"],"k":"Сгради","s":"Sketchfab"},
 {"t":"Shacman F3000 Dump Truck","a":"benjamintang2012","l":"CC-BY-4.0","u":"https://sketchfab.com/3d-models/010b0518d3f946b98e2ae3bddf52fbd8","f":["gear/dump.glb"],"k":"Превозни средства и техника","s":"Sketchfab"},

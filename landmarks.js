@@ -25,7 +25,7 @@ export const CITY_LANDMARKS = {
 export const SEA_LANDMARKS = { newyork: ['liberty'], sydney: ['opera'] };   // Сидни: операта на нос в залива (не на площада в центъра)
 // големите забележителности в отделна зона W×D парцела встрани от центъра (game.js: refreshMines3D → bigLandmarks)
 export const BIG_LANDMARKS = { moscow: [['mgu', 4, 2, 0.52]], lasvegas: [['luxor', 2, 2]], istanbul: [['mosque', 3, 2, 0.59, 1]], washington: [['capitol', 3, 3, 1, 0, [3, 2]]] };   // [вид, W, D, дълбочина/ширина на модела, завъртян на 90° (дългата страна на модела е по z), [W, D] ако няма място (малък град) — щом градът порасне, се мести в голямата]
-export const LANDMARK_NM = { arc2: 'Триумфалната арка', kotel: 'Котелническа висотка', suleymaniye2: 'Сюлеймание', bluemosque: 'Синята джамия', topkapi: 'Топкапъ', maiden: 'Момината кула', grandbazaar: 'Гранд базар', haydarpasa: 'Гара Хайдарпаша', bigben2: 'Биг Бен', londoneye2: 'Лондонското око', whitehouse: 'Белият дом', capitol: 'Капитолият', vegassign: '„Welcome to Fabulous Las Vegas“', bellagio: 'Беладжо', luxor: 'Луксор', cityhall: 'Кметството на Филаделфия', ststephen: 'Базилика „Св. Стефан“', mgu: 'Московският университет (МГУ)', pyramids: 'Пирамидите в Гиза', burj: 'Бурж Халифа', manhattan: 'Манхатън', liberty: 'Статуята на свободата', opera: 'Операта в Сидни', stbasil: 'Храмът „Св. Василий Блажени“', cntower: 'Си Ен Тауър', willis: 'Уилис Тауър', shtower: 'Шанхайската кула', redeemer: 'Христос Спасителя', mosque: 'Синята джамия', mosque2: 'Сюлейманийе', galata: 'Галатска кула', sapphire: 'Истанбул Сапфир', twist: 'Левент Туист', twin: 'Левент Туинс', colosseum: 'Колизеума', hagia: 'Света София', colosseo: 'Колизеума', sagrada: 'Саграда Фамилия', vatican: 'Ватикана и „Св. Петър“', stpeter: 'Базилика „Св. Петър“', pantheon: 'Пантеона', vittoriano: 'Витториано', erasmus: 'Мостът Еразъм', cubes: 'Кубичните къщи', markthal: 'Маркетхал', derotterdam: 'Де Ротердам', euromast: 'Евромаст', canal: 'Канал с къщи', canal2: 'Канал с къщи', rijks: 'Райксмузеум', centraal: 'Централна гара', adam: 'A’DAM Лукаут', windmill: 'Вятърна мелница', eiffel: 'Айфеловата кула', arc: 'Триумфалната арка', notredame: 'Нотр Дам', ladefense: 'Ла Дефанс', bigben: 'Биг Бен', londoneye: 'Лондонското око', towerbridge: 'Тауър Бридж', shard: 'Шард', brandenburg: 'Бранденбургската врата', fernsehturm: 'Телевизионната кула', reichstag: 'Райхстагът' };
+export const LANDMARK_NM = { liberty2: 'Статуята на свободата', arc2: 'Триумфалната арка', kotel: 'Котелническа висотка', suleymaniye2: 'Сюлеймание', bluemosque: 'Синята джамия', topkapi: 'Топкапъ', maiden: 'Момината кула', grandbazaar: 'Гранд базар', haydarpasa: 'Гара Хайдарпаша', bigben2: 'Биг Бен', londoneye2: 'Лондонското око', whitehouse: 'Белият дом', capitol: 'Капитолият', vegassign: '„Welcome to Fabulous Las Vegas“', bellagio: 'Беладжо', luxor: 'Луксор', cityhall: 'Кметството на Филаделфия', ststephen: 'Базилика „Св. Стефан“', mgu: 'Московският университет (МГУ)', pyramids: 'Пирамидите в Гиза', burj: 'Бурж Халифа', manhattan: 'Манхатън', liberty: 'Статуята на свободата', opera: 'Операта в Сидни', stbasil: 'Храмът „Св. Василий Блажени“', cntower: 'Си Ен Тауър', willis: 'Уилис Тауър', shtower: 'Шанхайската кула', redeemer: 'Христос Спасителя', mosque: 'Синята джамия', mosque2: 'Сюлейманийе', galata: 'Галатска кула', sapphire: 'Истанбул Сапфир', twist: 'Левент Туист', twin: 'Левент Туинс', colosseum: 'Колизеума', hagia: 'Света София', colosseo: 'Колизеума', sagrada: 'Саграда Фамилия', vatican: 'Ватикана и „Св. Петър“', stpeter: 'Базилика „Св. Петър“', pantheon: 'Пантеона', vittoriano: 'Витториано', erasmus: 'Мостът Еразъм', cubes: 'Кубичните къщи', markthal: 'Маркетхал', derotterdam: 'Де Ротердам', euromast: 'Евромаст', canal: 'Канал с къщи', canal2: 'Канал с къщи', rijks: 'Райксмузеум', centraal: 'Централна гара', adam: 'A’DAM Лукаут', windmill: 'Вятърна мелница', eiffel: 'Айфеловата кула', arc: 'Триумфалната арка', notredame: 'Нотр Дам', ladefense: 'Ла Дефанс', bigben: 'Биг Бен', londoneye: 'Лондонското око', towerbridge: 'Тауър Бридж', shard: 'Шард', brandenburg: 'Бранденбургската врата', fernsehturm: 'Телевизионната кула', reichstag: 'Райхстагът' };
 // кои стоят в центъра на града (останалите — в стария град извън центъра)
 export const LANDMARK_CENTER = new Set(['pyramids', 'burj', 'manhattan', 'cntower', 'willis', 'shtower', 'eiffel', 'arc', 'bigben', 'shard', 'brandenburg', 'reichstag', 'ladefense', 'sapphire', 'twist', 'twin', 'colosseum', 'colosseo', 'vatican', 'vittoriano', 'derotterdam', 'markthal', 'cubes', 'canal', 'rijks', 'centraal']);
 // 🇬🇧 Лондон с истински модели (feature 'london-real'): Биг Бен и London Eye от Poly Pizza вместо процедурните
@@ -543,7 +543,12 @@ const GLB_LM = {
   hagia: { h: 14, fit: 15, plate: 0xc9b99a },   // Истанбул: Света София (Meshy AI)
   notredame: { h: 60, fit: 69, plate: 0xc9bfa8 },   // Париж: Нотр Дам (Meshy AI) — по-голям: катедралата е дълга сграда, иначе изглеждаше като къща
   bellagio: { h: 9, fit: 15, plate: 0xb9b09a, dz: -3.6 },
-  luxor: { h: 9, fit: 15, sy: 1.9, plate: 0xd9c08a, onLoad: luxorBeam },   // Лас Вегас: „Луксор“ — черната пирамида със сфинкса (Meshy AI); нощем лъч от върха   // Лас Вегас: хотел „Беладжо“ (Meshy AI) — отпред езерото с фонтаните (bellagio() по-долу)
+  luxor: { h: 9, fit: 15, sy: 1.9, plate: 0xd9c08a, onLoad: luxorBeam },
+  // Ню Йорк: островът Либърти — диорама на Темидасофт (Meshy AI, платен план; feature 'liberty-island'). В Blender: синята вода и блокът под нея
+  // изрязани (по цвета на текстурата и под водната повърхност; подводните камъни и кеят — до водата), 744 → 140 хил. △, 31 → 3,7 MB;
+  // материали island / monument (пиедесталът и статуята — прожектори) / torch (пламъкът — свети нощем). h/fit = истинското отношение (1,12 × 1,745):
+  // мащабът в game.js е по височината (93 м до върха на факлата), не по парцела. seaY — водата на картата (cityplan2-3d: −1,2): основата е там.
+  liberty2: { h: 15, fit: 23.4, plate: 0x3f6f96, seaY: -1.2, onLoad: libertyIsland },   // Лас Вегас: „Луксор“ — черната пирамида със сфинкса (Meshy AI); нощем лъч от върха   // Лас Вегас: хотел „Беладжо“ (Meshy AI) — отпред езерото с фонтаните (bellagio() по-долу)
 };
 const glbCache = {};
 // стомана и стъкло: текстурата се обезцветява и изсветлява (Meshy дава кафеникав камък), металът блести малко
@@ -869,6 +874,31 @@ function eiffelLights(w, g) {
 }
 
 // „Луксор“: най-силният прожектор на света — лъч от върха на пирамидата право в небето (само нощем)
+// Островът Либърти (liberty2): основата на модела — на водната повърхност на картата; нощем прожектори само по пиедестала и статуята, пламъкът свети
+function libertyIsland(w, g) {
+  const fl = g.userData.flood || [], mats = {}; w.traverse(o => { if (o.isMesh) for (const m of [].concat(o.material)) if (m) mats[m.name] = m; });
+  const isl = mats.island, mon = mats.monument, tor = mats.torch;
+  for (const m of [isl, tor]) { const i = fl.indexOf(m); if (m && i >= 0) fl.splice(i, 1); }   // островът (трева, алеи, дървета) — тъмен; пламъкът — отделно
+  if (isl) { isl.emissiveIntensity = 0; isl.emissiveMap = null; isl.emissive?.set(0x000000); isl.needsUpdate = true; }
+  if (mon) mon.userData.floodK = 1.3;
+  if (tor) { tor.emissive = new THREE.Color(0xffb347); tor.emissiveMap = tor.map || null; tor.emissiveIntensity = 0.3; tor.needsUpdate = true; }
+  noFlood(g);   // играта (game.js floodMats на истинската карта) не осветява острова
+  // пламъкът: върхът на модела + ореол нощем
+  g.updateMatrixWorld(true);
+  const top = new THREE.Vector3(0, -1e9, 0), v = new THREE.Vector3(), inv = new THREE.Matrix4().copy(g.matrixWorld).invert();
+  w.traverse(o => { if (!o.isMesh) return; const pa = o.geometry.attributes.position; for (let i = 0; i < pa.count; i += 2) { v.fromBufferAttribute(pa, i).applyMatrix4(o.matrixWorld); if (v.y > top.y) top.copy(v); } });
+  top.applyMatrix4(inv);
+  const gm = new THREE.MeshBasicMaterial({ color: 0xffc56a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+  const glow = add(g, new THREE.SphereGeometry(0.45, 12, 8), gm, top.x, top.y - 0.25, top.z); glow.castShadow = false; glow.visible = false;
+  // водата: основата на модела (локално y0 в групата) — на seaY в света на града; групата е мащабирана и вдигната от landmarkPlan2 (game.js)
+  const base = w.position.y; let sy = 0, py = NaN;
+  const sit = () => { if (g.scale.y === sy && g.position.y === py) return; sy = g.scale.y; py = g.position.y; w.position.y = base + (GLB_LM.liberty2.seaY - py) / (sy || 1); };
+  const prev = g.userData.sparkle;
+  g.userData.sparkle = (t, night) => { prev && prev(t, night); sit();
+    if (tor) tor.emissiveIntensity = 0.3 + 2.4 * night * (0.93 + 0.07 * Math.sin(t * 9));
+    glow.visible = night > 0.05; gm.opacity = 0.75 * night * (0.9 + 0.1 * Math.sin(t * 7)); };
+  sit();
+}
 function luxorBeam(w, g) {
   g.updateMatrixWorld(true);
   const top = new THREE.Vector3(0, -1e9, 0), v = new THREE.Vector3(), inv = new THREE.Matrix4().copy(g.matrixWorld).invert();
