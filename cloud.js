@@ -656,3 +656,4 @@ if (!AUTOTEST) {
   if (document.readyState === 'loading') addEventListener('DOMContentLoaded', mountBtn); else mountBtn();
 }
 export const cloud = { sb, syncAll, user: () => user, openSettings };
+export const SB_REST = { url: URL_, key: KEY };   // errtelem.js: report_errors с fetch keepalive (тръгва и при затваряне на таба)

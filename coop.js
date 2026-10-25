@@ -80,7 +80,7 @@ export function createCoop(d) {
       if (!sb) throw new Error('Няма връзка с облака.');
       let r; try { r = await sb.rpc(fn, args); } catch (e) { r = { error: e }; }
       if (!r.error) return r.data;
-      if (i >= tries || /not_authenticated|JWT|permission|PGRST202|Could not find the function/i.test((r.error.message || '') + (r.error.code || ''))) throw r.error;
+      if (i >= tries || /not_authenticated|JWT|permission|PGRST202|Could not find the function|coop_limit/i.test((r.error.message || '') + (r.error.code || ''))) throw r.error;   // coop_limit — тавана на сървъра (миграция coop_guard): не се повтаря
       await sleep(wait); wait = Math.min(6000, wait * 1.8);
     }
   }
@@ -123,8 +123,9 @@ export function createCoop(d) {
   async function runOp(op) {
     let r;
     try { r = await rpc(op.fn, op.args); } catch (e) {
-      if (!/PGRST202|Could not find the function/i.test((e?.message || '') + (e?.code || ''))) return false;   // остава в опашката — ще опита пак
-      r = { ok: false, msg: 'Сървърът още не поддържа това — парите се връщат.' };   // старият сървър (без новата функция) → връщане, не вечно чакане
+      if (/coop_limit/.test(e?.message || '')) r = { ok: false, msg: String(e.message).replace(/^.*?coop_limit:\s*/, '') + ' Парите се връщат.' };   // coop_guard (сървърът): над тавана → връщане
+      else if (!/PGRST202|Could not find the function/i.test((e?.message || '') + (e?.code || ''))) return false;   // остава в опашката — ще опита пак
+      else r = { ok: false, msg: 'Сървърът още не поддържа това — парите се връщат.' };   // старият сървър (без новата функция) → връщане, не вечно чакане
     }
     setPend(pend().filter(x => x.args.p_req !== op.args.p_req));
     if (r && r.ok === false) { refund(op.refund, r.msg); return r; }
