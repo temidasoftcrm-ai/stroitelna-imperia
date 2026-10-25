@@ -326,10 +326,11 @@ const WASH_LM = new Set(['colosseo', 'vittoriano', 'pantheon', 'stpeter', 'eiffe
 function floodWash(G, P) {
   const lms = P.lots.filter(L => L.lm && WASH_LM.has(L.lm)); if (!lms.length) return null;   // само забележителностите с модел (не празните запазени места)
   const c = document.createElement('canvas'); c.width = 4; c.height = 64; const g = c.getContext('2d'), gr = g.createLinearGradient(0, 64, 0, 0); gr.addColorStop(0, '#fff'); gr.addColorStop(0.35, '#555'); gr.addColorStop(1, '#000'); g.fillStyle = gr; g.fillRect(0, 0, 4, 64);
-  const mat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffc070, emissiveMap: new THREE.CanvasTexture(c), emissiveIntensity: 0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
-  mat.userData.winK = 0.16;
+  const CP = feature('city-polish');   /* city-polish (f9): отгоре двустранният висок цилиндър изглеждаше като светещ „купол“ около големите парцели (Истанбул) — само външната страна, по-нисък и по-мек */
+  const mat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffc070, emissiveMap: new THREE.CanvasTexture(c), emissiveIntensity: 0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: CP ? THREE.FrontSide : THREE.DoubleSide });
+  mat.userData.winK = CP ? 0.11 : 0.16;
   const im = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1.15, 1, 28, 1, true).translate(0, 0.5, 0), mat, lms.length), m = new THREE.Matrix4();
-  lms.forEach((L, i) => { const r = Math.max(L.w, L.d) * 0.5; im.setMatrixAt(i, m.makeScale(r * 0.92, Math.min(14, 4 + r * 0.2), r * 0.92).setPosition(L.x, 0.2, L.z));   /* ниско сияние при основата, не „звънец“ */ });
+  lms.forEach((L, i) => { const r = Math.max(L.w, L.d) * 0.5; im.setMatrixAt(i, m.makeScale(r * 0.92, CP ? Math.min(6, 3 + r * 0.08) : Math.min(14, 4 + r * 0.2), r * 0.92).setPosition(L.x, 0.2, L.z));   /* ниско сияние при основата, не „звънец“ */ });
   im.frustumCulled = false; im.renderOrder = 3; G.add(im); return mat;
 }
 // материалите на модел-забележителност светват нощем (прожектори): emissive = топъл цвят, emissiveMap = текстурата; вече светещите (nightfloors) — не
@@ -630,7 +631,16 @@ export function buildPlan2View(P, opts = {}) {
   function* all() {
     const R = byD(P.roads, rd => rd.pts[rd.pts.length >> 1]), N = byD(P.nodes, n => [n.x, n.z]), Tu = byD(P.turns || [], t => [t.x, t.z]), Ro = byD(P.rounds, r => [r.x, r.z]);
     const CUT = [0, 0.15, 0.4, 0.7, 1], part = (arr, k) => arr.slice(Math.floor(arr.length * CUT[k]), Math.floor(arr.length * CUT[k + 1]));
-    for (let k = 0; k < 4; k++) { yield* streets(part(R, k), part(N, k), part(Tu, k), part(Ro, k)); tm('streets' + k); if (!k) yield 'usable'; }
+    // фоновите квартали и свободните парцели: osm-fill (opts.blocksEarly) — веднага след най-близките улици (иначе — накрая, след ~25 s при бавен браузър:
+    // около централата „пустиня“ от бежови парцели); те ползват само плана (P), не мешовете на улиците
+    function* blocksFill() {
+      if ((D && opts.blocks !== false) || opts.blocks === 'bg') ST.BL = yield* romeBlocks(G, P, D ? D.style : 'bg', R);   // 'bg' (bg-fill) — градовете по плана без карта
+      tm('blocks'); yield 0;
+      // свободните парцели (истинската карта): трева с пръст, ниска ограда отзад и отстрани, табела „Продава се“ откъм улицата (opts.freeLot)
+      ST.FP = (D || opts.blocks === 'bg') && opts.freeLot ? freePlots(G, P) : null;
+      refill(); tm('fill');
+    }
+    for (let k = 0; k < 4; k++) { yield* streets(part(R, k), part(N, k), part(Tu, k), part(Ro, k)); tm('streets' + k); if (!k) { yield 'usable'; if (opts.blocksEarly) { yield* blocksFill(); yield 0; } } }
     parkTrees(); tm('trees'); yield 0;
     if (opts.furniture !== false) { const F = ST.F = yield* furniture(G, P, opts);
       if (F && F.lamps.length && opts.lampGlow !== false) {
@@ -654,11 +664,7 @@ export function buildPlan2View(P, opts = {}) {
     if (D && D.style === 'moscow') kremlinView(G, D);
     tm('labels+boats'); yield 0;
     // фоновите квартали — фасади с покриви (за парцелите, които играта не ползва: opts.fillLot); пътищата — от най-близките
-    if ((D && opts.blocks !== false) || opts.blocks === 'bg') ST.BL = yield* romeBlocks(G, P, D ? D.style : 'bg', R);   // 'bg' (bg-fill) — градовете по плана без карта
-    tm('blocks'); yield 0;
-    // свободните парцели (истинската карта): трева с пръст, ниска ограда отзад и отстрани, табела „Продава се“ откъм улицата (opts.freeLot)
-    ST.FP = (D || opts.blocks === 'bg') && opts.freeLot ? freePlots(G, P) : null;
-    refill(); tm('fill');
+    if (!opts.blocksEarly) yield* blocksFill();
   }
   const refill = () => { ST.ruT = 0; ST.ruI = 0; if (ST.RN) ST.RN.dirty();   /* rome-bld: парцелите се смениха — наново */   /* fac-reup: след всяко пълнене — отново 3 / 12 / 40 s */ if (ST.BL) ST.BL.fill(opts.fillLot || (() => true), opts.fillAt);   /* fillAt(b) — bg-fill: сградите без парцел (вътре в квартала) */ if (ST.FP) ST.FP.set(opts.freeLot); };
   let sigT = 0;

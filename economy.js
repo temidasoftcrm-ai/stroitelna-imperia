@@ -830,6 +830,9 @@ const this_liqBtn = (econ, c) => `<button class="btn2" data-stk="subsell:${c.id}
 // ============================================================ таб „Банка / Финанси“
 // плъзгач за депозита: от 0 до наличните пари (внасяне) или до сумата в депозита (теглене); стойността се помни между пречертаванията
 const depPick = { in: 0, out: 0 };
+// 🏦 bank-simple (f9): „Кредит“ със срок (инвестиционният — вече и с бутон), „Кредитна линия“ (старият), табове Пари · Кредити · Борса · Компания (последният се помни)
+const crPick = { v: 0 }, BS_LV = { company: 10, ipo: 15 };
+const bsTab = v => { try { if (v) localStorage.setItem('stroi-bank-tab', v); return localStorage.getItem('stroi-bank-tab') || 'money'; } catch { return v || 'money'; } };
 function depSlider(kind, max, cur) {
   const v = Math.min(depPick[kind], max), step = max > 2e6 ? 10000 : 1000, inn = kind === 'in';
   const after = inn ? cur + v : cur - v;
@@ -840,6 +843,27 @@ function depSlider(kind, max, cur) {
     <div class="meta dep-after" style="margin:0 0 4px">След това: депозит ${fmt(after)} · лихва ~${fmt(depInterest(after))}/мес.</div>
     <div class="fin-btns" style="margin-top:4px"><button class="${inn ? 'btn' : 'btn2'}" data-depgo="${kind}" ${v > 0 ? '' : 'disabled'}>${inn ? '🏦 Внеси' : '💶 Изтегли'} ${fmt(v)}</button></div>
   </div>`;
+}
+// bank-simple: условията на кредита със срок за сумата v (t = invTerms)
+function crTerms(v, t) {
+  if (!v) return '';
+  if (!t) return '<span style="color:var(--bad)">Толкова голям кредит не може — дългът ще е над 250% от стойността на фирмата.</span>';
+  const daily = Math.ceil(v / t.days), int = Math.ceil(v * t.rate / t.days);
+  return `Лихва <b style="color:var(--txt)">${Math.round(t.rate * 100)}%</b> · срок <b style="color:var(--txt)">${Math.round(t.days / 30)} месеца</b> (${t.days} дни) · вноска <b style="color:var(--txt)">${fmt(daily + int)}/ден</b> · общо връщаш ${fmt(v + int * t.days)}`;
+}
+// bank-simple: картите с data-bt → табове Пари · Кредити · Борса · Компания (статистиката — свита в „Пари“); заключените — с 🔒 и нивото
+function bsTabs(el, opts, LVL) {
+  const T = [['money', '💶 Пари'], ['credit', '🏦 Кредити'], ['stock', '📈 Борса', opts.stocksOpen === false ? (opts.stocksLevel || 7) : 0], ['company', '🏢 Компания', LVL < BS_LV.company ? BS_LV.company : 0]];
+  let cur = bsTab(); if (!T.some(t => t[0] === cur)) cur = 'money';
+  const bar = document.createElement('div'); bar.className = 'bs-tabs'; bar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;position:sticky;top:0;z-index:2;padding:4px 0;background:inherit';
+  const panes = {}; for (const [k] of T) { panes[k] = document.createElement('div'); panes[k].dataset.pane = k; panes[k].style.cssText = 'display:flex;flex-direction:column;gap:10px'; }
+  const st = document.createElement('details'); st.className = 'card'; st.innerHTML = '<summary style="cursor:pointer;font-weight:700">📊 Статистика, последните 7 дни, по категории, счетоводна книга</summary>'; const stIn = document.createElement('div'); stIn.style.cssText = 'display:flex;flex-direction:column;gap:10px;margin-top:8px'; st.appendChild(stIn);
+  for (const c of [...el.children]) { const k = c.dataset.bt; if (k === 'stats') stIn.appendChild(c); else if (panes[k]) panes[k].appendChild(c); }
+  if (stIn.children.length) panes.money.appendChild(st);
+  const show = k => { cur = bsTab(k); for (const [q] of T) panes[q].style.display = q === k ? 'flex' : 'none'; bar.querySelectorAll('button').forEach(b => { b.className = b.dataset.t === k ? 'btn' : 'btn2'; }); };
+  bar.innerHTML = T.map(([k, nm, lock]) => `<button data-t="${k}" style="flex:1 1 auto">${nm}${lock ? ` 🔒${lock}` : ''}</button>`).join('');
+  bar.querySelectorAll('button').forEach(b => b.onclick = () => show(b.dataset.t));
+  el.prepend(bar); for (const [k] of T) el.appendChild(panes[k]); show(cur);
 }
 export const fmt = n => `${Math.round(n).toLocaleString('bg-BG')} €`;
 const fmtN = n => Math.round(n).toLocaleString('bg-BG');   // брой (акции), без €
@@ -936,12 +960,13 @@ export function renderFinance(el, econ, rep = 0, rerender = () => {}, unitTypes 
   // видимите на борсата: родните, чуждите от държави с твой филиал (econ.hooks.stockVisible) и тези, в които имаш акции/дъщерна
   const visCo = c => !econ.hooks.stockVisible || econ.hooks.stockVisible(c) || (econ.s.shares || {})[c.id] || (econ.s.subs || {})[c.id];
   ensureStyle();
+  const BS = feature('bank-simple'), BT = k => BS ? ` data-bt="${k}"` : '', LVL = opts.devLevel ?? 99;   // bank-simple: в кой таб е картата
   const s = econ.s, max = econ.maxLoan(rep), step = econ.loanStep(rep), room = econ.loanRoom(rep);
   const interest = Math.round(s.loan * LOAN_DAILY_RATE);
   const days = econ.lastDays(7);
   const wk = days.reduce((a, d) => ({ in: a.in + d.in, out: a.out + d.out }), { in: 0, out: 0 });
 
-  let html = `<div class="card">
+  let html = `<div class="card"${BT('money')}>
     <h3><span class="ico">💶</span>Сметка</h3>
     <div class="fin-big ${s.money < 0 ? 'neg' : ''}">${fmt(s.money)}</div>
     ${econ.hooks.bustHtml ? econ.hooks.bustHtml() : s.money < 0 ? `<div class="meta late">На минус: 1% лихва на ден.</div>` : ''}`;
@@ -952,6 +977,37 @@ export function renderFinance(el, econ, rep = 0, rerender = () => {}, unitTypes 
   }
   html += `</div>`;
 
+  if (BS) {
+    const UT = unitTypes || [], im = econ.invMax(UT), v = Math.max(im >= 10000 ? 10000 : 0, Math.min(im, crPick.v || Math.min(im, 100000))), t = v ? econ.invTerms(v, UT) : null;
+    const inv = s.inv || [], perDay = Math.round(s.loan * LOAN_DAILY_RATE) + inv.reduce((a, l) => a + Math.min(l.left, l.daily) + l.interest, 0);
+    html += `<div class="card" data-bt="credit"><h3><span class="ico">🏦</span>Кредит</h3>
+    <div class="meta" style="margin:0 0 6px">Взимаш сумата наведнъж и я връщаш сам — с равни вноски всеки ден, докато се изплати. Лихвата и срокът зависят от дълга ти спрямо стойността на фирмата.</div>
+    <div class="cr-sl" data-max="${im}">
+      <div class="fin-kv">Сума <b class="cr-v" style="color:var(--txt)">${fmt(v)}</b></div>
+      <input type="range" min="${im >= 10000 ? 10000 : 0}" max="${im}" step="10000" value="${v}" ${im >= 10000 ? '' : 'disabled'} style="width:100%;accent-color:#ffc93c">
+      <div class="meta cr-terms" style="margin:4px 0">${crTerms(v, t)}</div>
+      <div class="fin-btns"><button class="btn" data-crgo ${t && v ? '' : 'disabled'}>🏦 Вземи кредит · +${fmt(v)}</button></div>
+    </div>
+    ${im < 10000 ? '<div class="meta">Сега няма място за нов кредит — изплати някой или увеличи стойността на фирмата.</div>' : ''}
+    <div class="meta">${INV_TIERS.map(([r, rate, d], i) => `${i ? `до ${Math.round(r * 100)}%` : `до ${Math.round(r * 100)}%`} от стойността — ${Math.round(rate * 100)}% за ${Math.round(d / 30)} мес.`).join(' · ')}</div></div>`;
+    html += `<div class="card" data-bt="credit"><h3><span class="ico">💳</span>Кредитна линия</h3>
+    <div class="meta" style="margin:0 0 6px">Без срок: теглиш и връщаш, когато поискаш — и на минус, за да избегнеш фалит. Удобна за кратко, за дълго е скъпа (${(LOAN_DAILY_RATE * 100).toFixed(1)}% на ден ≈ ${(LOAN_DAILY_RATE * 3000).toFixed(0)}% на месец).</div>
+    <div class="fin-kv">Изтеглено <b>${fmt(s.loan)}</b></div>
+    <div class="fin-kv">Лимит (репутация и нетна стойност: до 2× при 5 ★) <b>${fmt(max)}</b></div>
+    <div class="bar"><i style="width:${Math.min(100, s.loan / max * 100)}%"></i></div>
+    <div class="fin-kv">Лихва <b>${fmt(interest)} / ден</b></div>
+    <div class="fin-btns">
+      <button class="btn" data-fin="take" ${econ.canTakeLoan(rep, step) ? '' : 'disabled'}>Изтегли ${fmt(step)}</button>
+      <button class="btn" data-fin="takeall" ${room > 0 && econ.canTakeLoan(rep, room) ? '' : 'disabled'}>Изтегли всичко · ${fmt(room)}</button>
+      <button class="btn2" data-fin="repay" ${econ.canRepay(step) ? '' : 'disabled'}>Върни ${fmt(Math.min(step, s.loan || step))}</button>
+      <button class="btn2" data-fin="repayall" ${s.loan > 0 && econ.canAfford(s.loan) ? '' : 'disabled'}>Върни всичко${s.loan ? ' · ' + fmt(s.loan) : ''}</button>
+    </div></div>`;
+    html += `<div class="card" data-bt="credit"><h3><span class="ico">📋</span>Твоите кредити</h3>
+    ${s.loan || inv.length ? `<div class="fin-kv">Общо дължиш <b>${fmt(s.loan + econ.invDebt())}</b></div><div class="fin-kv">Плащаш на ден (вноски и лихви) <b class="fin-neg">${fmt(perDay)}</b></div>` : '<div class="meta">Нямаш кредити.</div>'}
+    ${s.loan ? `<div class="fin-row"><span>💳</span><span class="n">Кредитна линия<br><span style="color:var(--mut)">без срок · лихва ${fmt(interest)}/ден</span></span><span class="a">${fmt(s.loan)}</span></div>` : ''}
+    ${inv.map((l, i) => `<div class="fin-row" style="flex-wrap:wrap"><span>🏦</span><span class="n">${esc(l.note)}<br><span style="color:var(--mut)">остават ${fmt(l.left)} · вноска ${fmt(l.daily + l.interest)}/ден · още ~${Math.ceil(l.left / l.daily)} дни</span></span><button class="btn2" data-inv="${i}" ${econ.canAfford(l.left) ? '' : 'disabled'}>Погаси · ${fmt(l.left)}</button></div>`).join('')}
+    <div class="meta">Предсрочното погасяване струва само остатъка — без лихвата за оставащите дни.</div></div>`;
+  } else
   html += `<div class="card">
     <h3><span class="ico">🏦</span>Кредит</h3>
     <div class="fin-kv">Дълг <b>${fmt(s.loan)}</b></div>
@@ -970,17 +1026,17 @@ export function renderFinance(el, econ, rep = 0, rerender = () => {}, unitTypes 
 
   // блокирани пари: гаранции за участие в държавни поръчки (opts.blocked = [{ nm, amount, why }])
   const blk = (opts.blocked || []).filter(b => b.amount > 0);
-  if (blk.length) html += `<div class="card" style="border-color:#ffb46b"><h3><span class="ico">🔐</span>Блокирани пари · ${fmt(blk.reduce((a, b) => a + b.amount, 0))}</h3>
+  if (blk.length) html += `<div class="card"${BT('money')} style="border-color:#ffb46b"><h3><span class="ico">🔐</span>Блокирани пари · ${fmt(blk.reduce((a, b) => a + b.amount, 0))}</h3>
     ${blk.map(b => `<div class="fin-kv"><span>${esc(b.nm)}<br><span style="color:var(--mut);font-size:12px">${esc(b.why || '')}</span></span><b>${fmt(b.amount)}</b></div>`).join('')}
     <div class="meta">Гаранциите за участие в търгове не са твои пари, докато не ги върнат: загубилите търга си ги получават при отварянето на офертите, спечелилият — при предаването на обекта.</div></div>`;
   // депозит (със своя банка — не трябва: печелиш от дивидентите ѝ)
   const dep = econ.depositInfo(), canIn = n => s.money >= n;
-  if (s.ownBank) html += `<div class="card"><h3><span class="ico">🏦</span>Депозит</h3><div class="meta">Имаш своя банка — депозит вече не ти трябва. Печалбата на банката идва като <b>месечен дивидент</b> (процентът се избира в 🏦 банката).</div></div>`;
-  else html += `<div class="card">
+  if (s.ownBank) html += `<div class="card"${BT('money')}><h3><span class="ico">🏦</span>Депозит</h3><div class="meta">Имаш своя банка — депозит вече не ти трябва. Печалбата на банката идва като <b>месечен дивидент</b> (процентът се избира в 🏦 банката).</div></div>`;
+  else html += `<div class="card"${BT('money')}>
     <h3><span class="ico">🏦</span>Депозит · до ${(DEP_TIERS[0][1] * 100).toFixed(0)}% на месец</h3>
     <div class="fin-big" style="font-size:22px">${fmt(dep.amount)}</div>
     <div class="fin-kv">Лихва на месец <b class="fin-pos">${fmt(dep.monthly)}${dep.amount ? ` <span style="color:var(--mut);font-weight:400">(${(dep.monthly / dep.amount * 100).toFixed(1)}%)</span>` : ''}</b></div>
-    <div class="meta" style="margin:2px 0 6px">${DEP_TIERS.map(([hi, p], i) => { const lo = i ? DEP_TIERS[i - 1][0] : 0, on = dep.amount > lo; return `<span style="${on ? 'color:var(--ok);font-weight:700' : ''}">${hi === Infinity ? `над ${fmt(lo)}` : `${lo ? `${fmt(lo)}–` : 'до '}${fmt(hi)}`}: ${(p * 100).toFixed(0)}%</span>`; }).join(' · ')}</div>
+    <div class="meta" style="margin:2px 0 6px">${DEP_TIERS.map(([hi, p], i) => { const lo = i ? DEP_TIERS[i - 1][0] : 0, on = dep.amount > lo; return `<span style="${on ? 'color:var(--ok);font-weight:700' : ''}">${hi === Infinity ? `над ${fmt(lo)}` : `${lo ? `${fmt(lo)}–` : 'до '}${fmt(hi)}`}: ${+(p * 100).toFixed(1)}%</span>`; }).join(' · ')}</div>
     <div class="fin-kv">Натрупана лихва (+${fmt(dep.monthly / DEPOSIT_MONTH_DAYS)} на ден) <b class="fin-pos">${fmt(dep.ready)}</b></div>
     <div class="fin-btns"><button class="btn" data-dep="collect" ${dep.ready > 0 ? '' : 'disabled'}>💰 Вземи лихвата${dep.ready > 0 ? ` · +${fmt(dep.ready)}` : ''}</button></div>
     ${depSlider('in', Math.floor(s.money), dep.amount)}
@@ -990,11 +1046,11 @@ export function renderFinance(el, econ, rep = 0, rerender = () => {}, unitTypes 
 
   // ---- борса (отключва се на ниво на развитие opts.stocksLevel, по подразбиране 7; opts.stocksOpen идва от game.js)
   const mk = s.market, pv = econ.portfolioValue(), pc = econ.portfolioCost();
-  if (opts.stocksOpen === false) html += `<div class="card" style="opacity:.8"><h3><span class="ico">🔒</span>Борса</h3>
+  if (opts.stocksOpen === false) html += `<div class="card"${BT('stock')} style="opacity:.8"><h3><span class="ico">🔒</span>Борса</h3>
     <div class="meta">Стоковата борса се отключва на ниво ${opts.stocksLevel || 7} на развитие${opts.devLevel != null ? ` (сега: ниво ${opts.devLevel})` : ''}.</div>
     ${pv ? `<div class="fin-kv">Акции, купени по-рано <b>${fmt(pv)}</b></div><div class="meta">Дивидентите от тях продължават да идват.</div>` : ''}</div>`;
   else {
-  html += `<div class="card"><h3><span class="ico">📈</span>Борса</h3>
+  html += `<div class="card"${BT('stock')}><h3><span class="ico">📈</span>Борса</h3>
     <div class="fin-kv">Портфейл <b>${fmt(pv)}</b></div>
     ${pc ? `<div class="fin-kv">Печалба/загуба <b class="${pv - pc >= 0 ? 'fin-pos' : 'fin-neg'}">${sign(pv - pc)}</b></div>` : ''}` +
     (() => {   // общ съвет: настроението на пазара и най-добрата покупка
@@ -1008,11 +1064,12 @@ export function renderFinance(el, econ, rep = 0, rerender = () => {}, unitTypes 
     })() +
     COMPANIES.filter(visCo).map(c => {
       const q = mk.c[c.id], prev = q.hist[q.hist.length - 2] || q.price, ch = (q.price / prev - 1) * 100, h = s.shares[c.id];
+      if ((s.subs || {})[c.id] && BS) return '';   // bank-simple: дъщерните — в таб „Компания“
       if ((s.subs || {})[c.id]) return `<div class="fin-row"><span>${c.ico}</span><span class="n">${esc(c.nm)}<br><span style="color:var(--ok)">✅ твоя дъщерна фирма от ден ${s.subs[c.id].day}</span></span><span class="a fin-pos">+${fmt(c.subDaily)}/ден</span>${this_liqBtn(econ, c)}</div>`;
       if (q.bust) { const tp = econ.takeoverPrice(c.id); return `<div class="fin-row" style="flex-wrap:wrap;border:1px solid var(--bad);border-radius:8px;padding:6px"><span>${c.ico}</span><span class="n">${esc(c.nm)}<br><span style="color:var(--bad);font-weight:700">💥 ФАЛИТ · още ${q.bust.until - s.day} дни</span></span>
         <span class="a" style="text-align:right">${q.price.toFixed(2)} €</span>
         <div class="meta" style="width:100%">Изкупи цялата фирма и вземи: <b style="color:var(--txt)">${c.gets}</b>. После носи <b class="fin-pos">+${fmt(c.subDaily)}/ден</b>.${h ? ` Твоите ${h.qty} акции се приспадат.` : ''}</div>
-        <div class="fin-btns" style="width:100%"><button class="btn" data-stk="take:${c.id}" ${econ.canAfford(tp) ? '' : 'disabled'}>🏢 Изкупи цялата · ${fmt(tp)}</button></div></div>`; }
+        <div class="fin-btns" style="width:100%">${BS && LVL < BS_LV.company ? `<span class="meta">🔒 Изкупуването на фирми — от ниво ${BS_LV.company}</span>` : `<button class="btn" data-stk="take:${c.id}" ${econ.canAfford(tp) ? '' : 'disabled'}>🏢 Изкупи цялата · ${fmt(tp)}</button>`}</div></div>`; }
       const mine = h ? h.qty : 0, free = Math.max(0, c.shares - mine), canBuy = Math.min(free, Math.floor(Math.max(0, s.money) / q.price)), val = Math.round(mine * q.price), pl = h ? val - Math.round(h.cost) : 0;
       return `<div class="fin-row" style="flex-wrap:wrap"><span>${c.ico}</span><span class="n">${esc(c.nm)}<br><span style="color:var(--mut)">${c.sector}${c.div ? ` · дивидент ${(c.div * 100).toFixed(1)}%/мес.` : ''}${h ? ` · имаш <b style="color:var(--txt)">${fmtN(mine)}</b>` : ''}</span></span>
         ${spark(q.hist.slice(-30), 70, 24, ch >= 0 ? 'var(--ok)' : 'var(--bad)')}
@@ -1030,7 +1087,8 @@ export function renderFinance(el, econ, rep = 0, rerender = () => {}, unitTypes 
     }).join('');
   // твоята фирма на борсата
   const worth = unitTypes ? econ.netWorth(unitTypes) : null;
-  if (s.ipo) html += `<div class="sect" style="margin-top:8px">🏗️ Твоята фирма на борсата</div>
+  if (BS) html += '';   // bank-simple: IPO — в таб „Компания“
+  else if (s.ipo) html += `<div class="sect" style="margin-top:8px">🏗️ Твоята фирма на борсата</div>
     <div class="fin-kv">Цена на акция <b>${s.ipo.price.toFixed(2)} €</b></div>${spark(s.ipo.hist, 280, 30)}
     <div class="fin-kv">Външни акционери ${s.ipo.outside ? `(${(IPO.share * 100).toFixed(0)}%)` : ''} <b>${s.ipo.outside ? fmt(econ.ipoDebt()) : 'няма — фирмата е изцяло твоя'}</b></div>
     ${s.ipo.outside ? `<div class="fin-btns"><button class="btn2" data-stk="buyback" ${econ.canAfford(econ.ipoDebt()) ? '' : 'disabled'}>Изкупи обратно · ${fmt(econ.ipoDebt())}</button></div>` : ''}`;
@@ -1040,12 +1098,26 @@ export function renderFinance(el, econ, rep = 0, rerender = () => {}, unitTypes 
   html += `</div>`;
   }
 
+  if (BS) {   // bank-simple: дъщерните фирми от борсата и IPO
+    const subs = COMPANIES.filter(c => (s.subs || {})[c.id]), w2 = unitTypes ? econ.netWorth(unitTypes) : null;
+    if (LVL < BS_LV.company && !subs.length && !s.ipo) html += `<div class="card" data-bt="company" style="opacity:.8"><h3><span class="ico">🔒</span>Компания</h3><div class="meta">От ниво ${BS_LV.company}: изкупуваш фалирали фирми от борсата и те стават твои дъщерни (носят приход всеки ден). От ниво ${BS_LV.ipo}: пускаш своята фирма на борсата (IPO).${opts.devLevel != null ? ` Сега: ниво ${opts.devLevel}.` : ''}</div></div>`;
+    else {
+      html += `<div class="card" data-bt="company"><h3><span class="ico">🏢</span>Дъщерни фирми</h3>` + (subs.length ? subs.map(c => `<div class="fin-row"><span>${c.ico}</span><span class="n">${esc(c.nm)}<br><span style="color:var(--ok)">✅ твоя от ден ${s.subs[c.id].day}</span></span><span class="a fin-pos">+${fmt(c.subDaily)}/ден</span>${this_liqBtn(econ, c)}</div>`).join('') : `<div class="meta">Нямаш дъщерни фирми. Когато акция на борсата падне много, фирмата фалира — тогава можеш да я изкупиш цялата (таб „Борса“).</div>`) + `</div>`;
+      html += `<div class="card" data-bt="company">` + (LVL < BS_LV.ipo && !s.ipo ? `<h3><span class="ico">🔒</span>Твоята фирма на борсата (IPO)</h3><div class="meta">От ниво ${BS_LV.ipo}.</div>` : s.ipo ? `<h3><span class="ico">🏗️</span>Твоята фирма на борсата</h3>
+        <div class="fin-kv">Цена на акция <b>${s.ipo.price.toFixed(2)} €</b></div>${spark(s.ipo.hist, 280, 30)}
+        <div class="fin-kv">Външни акционери ${s.ipo.outside ? `(${(IPO.share * 100).toFixed(0)}%)` : ''} <b>${s.ipo.outside ? fmt(econ.ipoDebt()) : 'няма — фирмата е изцяло твоя'}</b></div>
+        ${s.ipo.outside ? `<div class="fin-btns"><button class="btn2" data-stk="buyback" ${econ.canAfford(econ.ipoDebt()) ? '' : 'disabled'}>Изкупи обратно · ${fmt(econ.ipoDebt())}</button></div>` : ''}
+        <div class="meta">Още емисии (транши до 49%) и дивидент — в 🏛️ Холдинг → Борса.</div>` : `<h3><span class="ico">🔔</span>Пусни фирмата на борсата (IPO)</h3>
+        <div class="meta">Първа емисия: продаваш ${(IPO.share * 100).toFixed(0)}% от фирмата на ${IPO.premium}× нетната ѝ стойност и взимаш парите веднага. После — още транши до 49% в 🏛️ Холдинг. Нужна е нетна стойност поне ${fmt(IPO.minWorth)}${w2 != null ? ` (сега: ${fmt(w2)})` : ''}.</div>
+        <div class="fin-btns"><button class="btn" data-stk="ipo" ${unitTypes && econ.canIPO(unitTypes) ? '' : 'disabled'}>Пусни на борсата${w2 != null ? ` · +${fmt(w2 * IPO.premium * IPO.share)}` : ''}</button></div>`) + `</div>`;
+    }
+  }
   // ---- статистика: приход/разход по месеци, нетна стойност във времето, най-печеливши обекти
   const months = [];
   for (const d of s.history) { const k = Math.floor((d.day - 1) / DEPOSIT_MONTH_DAYS); (months[k] = months[k] || { k, in: 0, out: 0 }); months[k].in += d.in; months[k].out += d.out; }
   const ml = months.filter(Boolean).slice(-6), mmax = Math.max(1, ...ml.map(m => Math.max(m.in, m.out)));
   const wh = (s.worthHist || []).map(x => x[1]);
-  html += `<div class="card"><h3><span class="ico">📊</span>Статистика</h3>
+  html += `<div class="card"${BT('stats')}><h3><span class="ico">📊</span>Статистика</h3>
     <div class="sect">Нетна стойност на фирмата</div>${spark(wh.slice(-200), 300, 50, 'var(--acc)')}
     <div class="fin-kv">${wh.length ? `От ${fmt(wh[0])} до <b>${fmt(wh[wh.length - 1])}</b>` : 'Още няма данни — идват в края на деня.'}</div>
     <div class="sect" style="margin-top:8px">Приход и разход по месеци</div>
@@ -1059,7 +1131,7 @@ export function renderFinance(el, econ, rep = 0, rerender = () => {}, unitTypes 
     ${(s.topProjects || []).slice(0, 5).map((t, i) => `<div class="fin-row"><span class="d">${i + 1}.</span><span class="n" title="${esc(t.note)}">${esc(t.note)}</span><span class="a fin-pos">${fmt(t.amount)}</span></div>`).join('') || '<div class="meta">Още няма завършени обекти.</div>'}
   </div>`;
 
-  html += `<div class="card">
+  html += `<div class="card"${BT('stats')}>
     <h3><span class="ico">📊</span>Последните 7 дни</h3>
     ${chartSvg(days)}
     <div class="fin-leg"><span><i style="background:var(--ok)"></i>приход</span><span><i style="background:var(--bad)"></i>разход</span></div>
@@ -1071,7 +1143,7 @@ export function renderFinance(el, econ, rep = 0, rerender = () => {}, unitTypes 
   const cats = Object.entries(econ.byCategory(7)).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
   if (cats.length) {
     const cmax = Math.max(...cats.map(c => Math.abs(c[1])));
-    html += `<div class="card"><h3><span class="ico">🧾</span>По категории (7 дни)</h3>` + cats.map(([c, v]) => {
+    html += `<div class="card"${BT('stats')}><h3><span class="ico">🧾</span>По категории (7 дни)</h3>` + cats.map(([c, v]) => {
       const ci = CATS[c] || CATS['друго'];
       return `<div class="fin-cat"><span class="n">${ci.ico} ${ci.nm}</span><span class="b"><i style="width:${Math.abs(v) / cmax * 100}%;background:${v >= 0 ? 'var(--ok)' : 'var(--bad)'}"></i></span><span class="a ${v >= 0 ? 'fin-pos' : 'fin-neg'}">${sign(v)}</span></div>`;
     }).join('') + `</div>`;
@@ -1079,7 +1151,7 @@ export function renderFinance(el, econ, rep = 0, rerender = () => {}, unitTypes 
 
   // склад: наличност, пазарна цена и заводската (с влак), ако има връзка до завода
   const conn = opts.connectedCityIds || [], ropts = { roadCityIds: opts.roadCityIds || [] };
-  html += `<div class="card"><h3><span class="ico">📦</span>Склад</h3>
+  if (!BS) html += `<div class="card"><h3><span class="ico">📦</span>Склад</h3>
     <div class="fin-kv">Стойност на склада (пазарна) <b>${fmt(econ.stockValue())}</b></div>` + Object.entries(MATERIALS).map(([id, m]) => {
     const d = transportDiscount(id, conn, ropts), sup = supplierOf(id, conn, ropts), price = materialPrice(id, conn, ropts);
     const via = d.via === 'rail' ? `🚆 Жп връзка · спестявате ${d.pct * 100}%` : d.via === 'road' ? `🛣️ Магистрала · спестявате ${d.pct * 100}%` : 'без връзка до доставчика';
@@ -1088,12 +1160,17 @@ export function renderFinance(el, econ, rep = 0, rerender = () => {}, unitTypes 
   }).join('') + `<div class="meta">Без връзка: пазарна цена + доставка ${fmt(DELIVERY_FEE.base)} и ${DELIVERY_FEE.rate * 100}%. Готова магистрала до доставчика: −${ROAD_DISCOUNT * 100}%, жп връзка: −${RAIL_DISCOUNT * 100}% (без такса за доставка).</div></div>`;
 
   const led = s.ledger.slice(-30).reverse();
-  html += `<div class="sect">Счетоводна книга</div><div class="card">` + (led.length ? led.map(e => {
+  html += `<div class="sect"${BT('stats')}>Счетоводна книга</div><div class="card"${BT('stats')}>` + (led.length ? led.map(e => {
     const ci = CATS[e.cat] || CATS['друго'];
     return `<div class="fin-row"><span class="d">Д ${e.day || '–'}</span><span title="${esc(ci.nm)}">${ci.ico}</span><span class="n" title="${esc(e.note)}">${esc(e.note || ci.nm)}</span><span class="a ${e.amount >= 0 ? 'fin-pos' : 'fin-neg'}">${sign(e.amount)}</span></div>`;
   }).join('') : `<div class="empty">Още няма движения по сметката.</div>`) + `</div>`;
 
   el.innerHTML = html;
+  if (BS) bsTabs(el, opts, LVL);
+  el.querySelectorAll('.cr-sl').forEach(box => { const r = box.querySelector('input'), go = box.querySelector('[data-crgo]'), UT = unitTypes || [];
+    const show = () => { const v = +r.value, t = v ? econ.invTerms(v, UT) : null; crPick.v = v; box.querySelector('.cr-v').textContent = fmt(v); box.querySelector('.cr-terms').innerHTML = crTerms(v, t); go.textContent = `🏦 Вземи кредит · +${fmt(v)}`; go.disabled = !t || !v; };
+    r.oninput = show;
+    go.onclick = () => { const v = +r.value, t = econ.invTerms(v, UT); if (!v || !t) return; const n = econ.invTake(v, 'кредит от банката', t.rate, t.days); if (n && econ.hooks.toast) econ.hooks.toast(`🏦 Кредит: +${fmt(n)} — връщаш по ${fmt(Math.ceil(n / t.days) + Math.ceil(n * t.rate / t.days))} на ден за ${Math.round(t.days / 30)} месеца.`, 'good'); crPick.v = 0; rerender(); }; });
   el.querySelectorAll('[data-stk]').forEach(b => b.onclick = () => {
     const [act, id, q] = b.dataset.stk.split(':'), t = econ.hooks.toast || (() => {});
     if (act === 'buy') { const c = econ.buyShares(id, +q); if (c) t(`📈 Купи ${q} акции за ${fmt(c)}`, 'good'); }
