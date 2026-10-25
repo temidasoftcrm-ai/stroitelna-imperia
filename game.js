@@ -1656,12 +1656,12 @@ function campusPlot() {
   const h = city.hq, r = lotRot(h), c = Math.cos(r), sn = Math.sin(r), [W, D] = lotHalf(h);
   const loc = l => { const dx = l.x - h.x, dz = l.z - h.z; return [dx * c - dz * sn, dx * sn + dz * c]; };
   const mine = new Set([S.garageLot, S.whLot].filter(v => v != null)), saved = ((S.campus2 || {})[S.cityId] || []).filter(id => city.lots[id]);
-  const occ = occupiedLots(S.cityId), side = s0 => city.lots.filter(l => l !== h && l.plan && Math.abs(Math.atan2(Math.sin(lotRot(l) - r), Math.cos(lotRot(l) - r))) < 0.06)
+  const split = feature('hq-split'), occ = occupiedLots(S.cityId), side = s0 => city.lots.filter(l => l !== h && l.plan && Math.abs(Math.atan2(Math.sin(lotRot(l) - r), Math.cos(lotRot(l) - r))) < 0.06)
     .map(l => { const [u, v] = loc(l); return { l, u, v }; }).filter(o => Math.sign(o.u) === s0 && Math.abs(o.v) < 2.5 && Math.abs(Math.abs(o.u) - (W + lotHalf(o.l)[0])) < 3)
-    .filter(o => saved.includes(o.l.id) || mine.has(o.l.id) || (!o.l.built && !o.l.busy && !occ.has(o.l.id)))[0] || null;
+    .filter(o => saved.includes(o.l.id) || mine.has(o.l.id) || ((!o.l.built || (split && o.l.busy !== 'landmark')) && (!o.l.busy || (split && o.l.busy === 'bg')) && !occ.has(o.l.id)))[0] || null;   /* hq-split: и съседът с чужда (фонова) сграда — тя се маха */
   const R = side(1), Lf = side(-1), nb = [R, Lf].filter(Boolean);
   if (!nb.length) return (city.campusPlot = null);
-  for (const o of nb) { const l = o.l; if (!mine.has(l.id)) l.busy = 'campus'; for (const t of l.trees || []) city.group.remove(t); l.trees = []; }
+  for (const o of nb) { const l = o.l; if (!mine.has(l.id)) l.busy = 'campus'; for (const t of l.trees || []) city.group.remove(t); l.trees = []; if (split && l.obj && !mine.has(l.id)) { city.group.remove(l.obj); l.obj = null; l.built = null; } }   // hq-split (55): чуждата сграда на съседа се маха — офисът, гаражът и складът са отделни в общия парцел
   S.campus2 = { ...(S.campus2 || {}), [S.cityId]: nb.map(o => o.l.id) };
   // старите парцели на гаража/склада (далеч) се освобождават; логиката (нужен парцел от ниво 4, склад) сочи към съседите
   for (const [key, o] of [['garageLot', R || Lf], ['whLot', Lf || R]]) {
@@ -11446,6 +11446,8 @@ if (AUTOTEST) {
       city.group.add(G); if (night != null) __dbg.time && __dbg.time(night ? 22 : 12); const mid = (x0 + x) / 2 + 70; __dbg.camAt(mid, 80, z0 + (x - x0) * 0.8, mid, 12, z0); return Math.round(x - x0); },
     nightScan() { const names = [...new Set([...HOUSES, ...SHOPS, ...MODERN, ...SF_BLK(), ...Object.values(blk2Pick()).flat().map(k => 'b2-' + k), ...SKY, ...MODERN_SKY, ...SF_SKY(), ...Object.keys(A).filter(n => /^(h2-|wh2-|sf-ind|ind-|b2-|sf-blk-|svc-|hotel|gas-)/.test(n))])].filter(n => A[n]);   /* кои сгради нямат нощно светене (blk-night2 скан) */
       const out = { lit: [], dark: [] }; for (const n of names) { let lit = false; const R0 = A[n].scene || A[n]; if (!R0.traverse) continue; R0.traverse(o => { if (o.isMesh) for (const m of [].concat(o.material || [])) if (m && (m.userData.nightFloors || /FakeInterior_[123]|colormap/i.test(m.name || ''))) lit = true; }); out[lit ? 'lit' : 'dark'].push(n); } out.nLit = out.lit.length; delete out.lit; return out; },
+    hqNb(R = 60) { const h = city.hq, r = lotRot(h), c = Math.cos(r), sn = Math.sin(r), occ = occupiedLots(S.cityId);   /* hq-split (55): парцелите около централата — в рамката ѝ (u по улицата, v навътре), завъртането спрямо нея, заети ли са */
+      return { hq: [h.id, Math.round(h.x), Math.round(h.z), +r.toFixed(3), ...lotHalf(h)], nb: city.lots.filter(l => l !== h && Math.hypot(l.x - h.x, l.z - h.z) < R).map(l => { const dx = l.x - h.x, dz = l.z - h.z; return [l.id, +(dx * c - dz * sn).toFixed(1), +(dx * sn + dz * c).toFixed(1), +Math.atan2(Math.sin(lotRot(l) - r), Math.cos(lotRot(l) - r)).toFixed(3), ...lotHalf(l), l.busy || '', l.built ? 'b' : '', occ.has(l.id) ? 'occ' : '', l.street]; }), st: h.street }; },
     lmDiag(side = 30, R = 140, step = 8) { const sq = city.plan?.square; if (!sq) return null; const own = bgOwn(); for (const b of S.built || []) if (b.lot != null) own.add(b.lot); for (const l of city.lots) if (l.busy && l.busy !== 'bg' && l.busy !== 'landmark' && l.busy !== 'reserved') own.add(l.id);   /* lm-big-min (55): къде около площада се побира квадрат side × side — точките на улица (st, в сърцевината — stC) и в твои парцели (own) */
       const near = city.lots.filter(l => Math.hypot(l.x - sq.x, l.z - sq.z) < R + 60), inL = (l, x, z, m) => { const r = lotRot(l), c = Math.cos(r), s = Math.sin(r), [W, D] = lotHalf(l), dx = x - l.x, dz = z - l.z; return Math.abs(dx * c - dz * s) < W + m && Math.abs(dx * s + dz * c) < D + m; }, h = side / 2, out = [], SR = [];   /* SR — точките по улиците (през 2 м) с половината ширина + тротоара */
       for (const st of city.plan.streets) { const e = (st.w || 6) / 2 + 2; for (const [x, z] of st.pts) if (Math.hypot(x - sq.x, z - sq.z) < R + 80) SR.push({ x, z, e }); }
