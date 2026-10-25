@@ -33,3 +33,4 @@ xp.mp3 — „xp gain magic tone“ (humordome, Pixabay, sound 453274), Pixabay 
 church-bell.mp3 — „church bell“ (freesound_community, Pixabay, sound 5993), Pixabay Content License — камбаната в града на ~10 мин (game.js), първите 18 s
 train-pass.mp3 — „train railroad traffic sound“ (juliush, Pixabay, sound 8002), Pixabay Content License — минаващите влакове в града, целият запис (38 s), изравнена сила
 rail-crossing-bell.mp3 — „steam train bell arrive (microcassette, Wakefield, fall 2002)“ (freesound_community, Pixabay, sound 59688), Pixabay Content License — звънецът на прелеза, докато бариерите са спуснати (railx.js bell), първите 27 s — на безшевен цикъл (последните 1,5 s преливат в началото)
+police-call.mp3, police-scanner.mp3, radio-alert.mp3, radio-road.mp3 — безплатни звуци, предоставени от собственика (ТЕМИДАСОФТ ООД), с лиценз за безплатно ползване — обаждането на 112, радиостанцията при гонка и съобщенията за пътя
