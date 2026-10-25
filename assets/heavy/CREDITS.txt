@@ -190,8 +190,8 @@ blocks2/office3.glb — "Low rise wall to wall office building" by aitortilla01,
 blocks2/office4.glb — "Mid rise wall to wall office building" by aitortilla01, CC-BY-4.0 — https://sketchfab.com/3d-models/mid-rise-wall-to-wall-office-building-4d2c3f3450ef4e849056b88b49873ce2
 blocks2/office5.glb — "Low rise wall to wall office building" by aitortilla01, CC-BY-4.0 — https://sketchfab.com/3d-models/low-rise-wall-to-wall-office-building-be7583ca46f5411d8921ac85d8c33f3f
 blocks2/office6.glb — "Low rise wall to wall office building" by aitortilla01, CC-BY-4.0 — https://sketchfab.com/3d-models/low-rise-wall-to-wall-office-building-6488ad5edd1d454884b3fe030f5f04b1
-blocks2/oldbank.glb — "Old Bank" by 23ThomasStreet, CC-BY-NC-4.0 — https://sketchfab.com/3d-models/old-bank-2ffb569b9aab4d0eb0fe2fe703126d4e
-blocks2/townhouse.glb — "Town House A" by 23ThomasStreet, CC-BY-NC-4.0 — https://sketchfab.com/3d-models/town-house-a-11dac814b2cf4ae8bc733f55b5ca88e5
+blocks2/lenox.glb — "Lenox Brownstones" by hamma085, CC-BY-4.0 — https://sketchfab.com/3d-models/cfcb6487165a4cd6ae24a787dae73acc
+blocks2/n1st.glb — "115 N 1st Street" by hamma085, CC-BY-4.0 — https://sketchfab.com/3d-models/83587cdd0dd045db8378def23d26cdaf
 blocks2/usbank.glb — "US Bank Tower" by Mitya Petrov, CC-BY-4.0 — https://sketchfab.com/3d-models/us-bank-tower-82227908aa5c446395c4b9847284da4a
 blocks2/washst.glb — "317 Washington Street" by hamma085, CC-BY-4.0 — https://sketchfab.com/3d-models/317-washington-street-1c16cac26e2b484387ac1311e0f5b57e
 blocks2/pp-apart.glb — "Apartment building" by Poly by Google, CC-BY — https://poly.pizza/m/01lqee-dZAr

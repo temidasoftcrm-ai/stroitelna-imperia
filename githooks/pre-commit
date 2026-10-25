@@ -1,3 +1,7 @@
 #!/bin/sh
 # версия към скриптовете при всеки commit (stamp.mjs): хешовете — от staged версиите; index.html се обновява и в commit-а
 node "$(git rev-parse --show-toplevel)/stamp.mjs" --staged || { echo "stamp.mjs се провали — commit-ът е спрян" >&2; exit 1; }
+# credits-full: при променен CREDITS/License файл — assets/credits.json наново (credits.mjs) и в commit-а
+if git diff --cached --name-only | grep -qE '^assets/.*/(CREDITS|LICENSE|License)[^/]*\.txt$'; then
+  node "$(git rev-parse --show-toplevel)/credits.mjs" --staged || { echo "credits.mjs се провали — commit-ът е спрян" >&2; exit 1; }
+fi

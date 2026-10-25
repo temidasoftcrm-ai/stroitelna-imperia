@@ -140,8 +140,9 @@ import { cutMirror, pickPart } from './blkcut.js';   // real-sizes (55): по-к
 import { makeWater } from './water.js';   // 🌊 Темза в Лондон (feature 'thames')
 import { LOD, LOD_NM, lodOf, CONT_AT, CONT_NM as LOD_CONT_NM, cityScore, topPerGroup, corridors, searchCities } from './maplod.js';   // степени на детайлност на картата (feature 'map-lod')
 import { planRoute, randomRoadPoint } from './cityplanroute.js';
-import { ROME_FILES, IT_FILES, IT_PICK, romePrep } from './romenear.js';
-import { STATUE_FILES, statuePrep } from './statues.js';   // ⛲ statues (f9): фонтани и статуи в градовете   // 🇮🇹 rome-bld (f9): Рим отблизо — италианските сгради; it-bld — и в другите италиански градове
+import { ROME_FILES, IT_FILES, IT_PICK, romePrep } from './romenear.js';   // 🇮🇹 rome-bld (f9): Рим отблизо — италианските сгради; it-bld — и в другите италиански градове
+import { STATUE_FILES, statuePrep } from './statues.js';   // ⛲ statues (f9): фонтани и статуи в градовете
+import { pcGate, perfCheck } from './perfmeter.js';   // 🖥️ perf-meter (f9): играта е за компютър — екран за телефон/таблет и „Проверка на компютъра“
 
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -425,6 +426,7 @@ function webglFail(err) {
     <div style="color:#6f7d90;font-size:12px;margin-top:12px">Техническо: ${String(err && err.message || err).replace(/[<>&]/g, '')}</div></div>`;
   document.body.appendChild(d);
 }
+await pcGate();   // perf-meter: на телефон/таблет — „Играта е за компютър“ (до „Опитай все пак“ 3D не се зарежда)
 const renderer = (() => {
   try {
     const c = document.createElement('canvas');
@@ -524,6 +526,8 @@ const office2Cache = {}, office2Load = L => office2Cache[L.url] = office2Cache[L
 // мащабът на нивото: височината h, но основата — не по-голяма от мястото (w × d); връща { k, h, w, d } — истинските размери след мащаба
 function office2Fit(src, L, w = 1e9, d = 1e9) { const b = new THREE.Box3().setFromObject(src), s = b.getSize(new THREE.Vector3()), k = Math.min(L.h / s.y, w / s.x, d / s.z); return { k, h: s.y * k, w: s.x * k, d: s.z * k }; }
 const A = {};
+// nc-free (f6): oldbank и townhouse са CC-BY-NC (некомерсиален лиценз) — при флага не се зареждат и не влизат в US_OLD
+const NC_MODELS = new Set(feature('nc-free') ? ['oldbank', 'townhouse'] : []), NC_NEW = feature('nc-free') ? ['lenox', 'n1st'] : [];   // заместниците (hamma085, CC-BY): Lenox Brownstones (тухлен ред) и 115 N 1st Street (стара каменна търговска)
 const perfPanel = createPerfPanel({ renderer, A: () => A, THREE, enabled: () => feature('perf-panel') });
 let europe = null;
 {
@@ -555,7 +559,7 @@ let europe = null;
   for (const k of ['sing', 'rand', 'usb', 'blue', 'night']) jobs.push(load(`assets/heavy/sky/${k}.glb`).then(g => { g.scene.traverse(m => { if (m.isMesh && m.material && m.material.metalness > 0.5) m.material.metalness = 0.35; }); A['sf-sky-' + k] = g; prepNightFloors(g.scene, 'sf-sky-' + k); }).catch(() => {}));   // истински небостъргачи (Sketchfab) — за разнообразие в града
   for (const [n, path] of Object.entries(IMP_MODELS)) jobs.push(load(path).then(g => { A[n] = g; prepNightFloors(g.scene, n); }).catch(() => {}));   // Империал Сити: сталинската кула (impstyle.js)
   for (const k of new Set(Object.values(blk2Pick()).flat())) jobs.push(load(`assets/heavy/blocks2/${k}.glb`).then(g => { if (k === 'brooklyn') { const w = new THREE.Group(); g.scene.rotation.y = -Math.PI / 2; w.add(g.scene); g.scene = w; }   /* blk-more: бруклинският ред — фасадата (+x) към улицата (+z) */ g.scene.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; if (m.material && m.material.metalness > 0.5) m.material.metalness = 0.3; } }); A['b2-' + k] = g; prepNightFloors(g.scene, 'b2-' + k); blkSections('b2-' + k); }).catch(() => {}));   // истинските блокове вместо стъклените (Лабораторията → blocks-real)
-  for (const [n, f] of [...(feature('mid-bld') ? [['b2-pp-office', 'blocks2/pp-office'], ['it-sf-medkit', 'rome/it-sf-medkit']] : []), ...(feature('us-oldbld') ? ['brickshop', 'washst', 'oldbank', 'townhouse', 'nyhirise'].map(k => ['b2-' + k, 'blocks2/' + k]) : [])]) jobs.push(load(`assets/heavy/${f}.glb`).then(g => { const xs = []; g.scene.traverse(m => { if (m.isLight || m.isCamera) xs.push(m); }); xs.forEach(m => m.removeFromParent()); /* pp-office носи светлина и камера от Blender (KHR_lights_punctual) */ g.scene.traverse(m => { if (!m.isMesh) return; m.castShadow = m.receiveShadow = true; const c = !m.material.map && m.material.color; if (c && c.r > 0.8 && c.g < 0.25 && c.b < 0.25) m.material.color.setHex(0xd9a066); m.material.metalness = Math.min(m.material.metalness, n === 'b2-pp-office' ? 0 : 0.3); }); A[n] = g; let baked = false; if (n === 'it-sf-medkit') g.scene.traverse(m => { if (m.isMesh) for (const mt of [].concat(m.material)) if (mt.emissiveMap) { mt.emissive.setRGB(1, 1, 1); mt.emissiveIntensity = 0; mt.userData.winK = 1.6; const add = () => { try { dayNight.winMats.add(mt); } catch (e) { setTimeout(add, 300); } }; add(); baked = true; } });   /* dayNight може още да не е създаден (зареждането тръгва по-рано) — после */   /* медкитът с изпечената нощна карта (f9, като romenear.js nightOf) — денем не свети, нощем — по дневния цикъл */ if (!baked) prepNightFloors(g.scene, n === 'it-sf-medkit' ? 'mk-medkit' : n); }).catch(() => {}));   // 🏢 mid-bld (55): още две сгради за средните градове (червеният „заместител“ без текстура → охра, както romePrep; офис сградата — без метал, иначе без отражения излиза черна); 🇺🇸 us-oldbld — старите американски
+  for (const [n, f] of [...(feature('mid-bld') ? [['b2-pp-office', 'blocks2/pp-office'], ['it-sf-medkit', 'rome/it-sf-medkit']] : []), ...(feature('us-oldbld') ? ['brickshop', 'washst', 'oldbank', 'townhouse', 'nyhirise', ...NC_NEW].filter(k => !NC_MODELS.has(k)).map(k => ['b2-' + k, 'blocks2/' + k]) : [])]) jobs.push(load(`assets/heavy/${f}.glb`).then(g => { const xs = []; g.scene.traverse(m => { if (m.isLight || m.isCamera) xs.push(m); }); xs.forEach(m => m.removeFromParent()); /* pp-office носи светлина и камера от Blender (KHR_lights_punctual) */ g.scene.traverse(m => { if (!m.isMesh) return; m.castShadow = m.receiveShadow = true; const c = !m.material.map && m.material.color; if (c && c.r > 0.8 && c.g < 0.25 && c.b < 0.25) m.material.color.setHex(0xd9a066); m.material.metalness = Math.min(m.material.metalness, n === 'b2-pp-office' ? 0 : 0.3); }); A[n] = g; let baked = false; if (n === 'it-sf-medkit') g.scene.traverse(m => { if (m.isMesh) for (const mt of [].concat(m.material)) if (mt.emissiveMap) { mt.emissive.setRGB(1, 1, 1); mt.emissiveIntensity = 0; mt.userData.winK = 1.6; const add = () => { try { dayNight.winMats.add(mt); } catch (e) { setTimeout(add, 300); } }; add(); baked = true; } });   /* dayNight може още да не е създаден (зареждането тръгва по-рано) — после */   /* медкитът с изпечената нощна карта (f9, като romenear.js nightOf) — денем не свети, нощем — по дневния цикъл */ if (!baked) prepNightFloors(g.scene, n === 'it-sf-medkit' ? 'mk-medkit' : n); }).catch(() => {}));   // 🏢 mid-bld (55): още две сгради за средните градове (червеният „заместител“ без текстура → охра, както romePrep; офис сградата — без метал, иначе без отражения излиза черна); 🇺🇸 us-oldbld — старите американски
   for (const k of ['richmond', 'panel12', 'gamecity', 'soviet', 'oldbld', 'dbrick', 'brick', 'asian', 'modoffice', 'jade']) jobs.push(load(`assets/heavy/blocks/${k}.glb`).then(g => { g.scene.traverse(m => { if (m.isMesh && m.material && m.material.metalness > 0.5) m.material.metalness = 0.3; });
     if (feature('real-sizes')) { const lod1 = []; g.scene.traverse(m => { if (m.isMesh && /LOD1/.test(m.name)) lod1.push(m); }); lod1.forEach(m => m.removeFromParent()); }   // real-sizes (55): panel12 носи и второ копие (LOD1) на 32 м отзад — на снимката стояха два блока
     if (k === 'oldbld') {   // моделът е кух отгоре (само стени) — плосък покрив малко под ръба и няколко кутии на покрива
@@ -967,7 +971,7 @@ const MED_CC = new Set(['🇬🇷', '🇮🇹', '🇪🇸', '🇵🇹', '🇨�
 const midSouth = id => MED_IDS.has(id) || MED_CC.has(cityById(id)?.cc);
 // 🇺🇸 us-oldbld (55): старите американски сгради (blocks2: тухлената с магазина, 317 Washington St, старата банка, градската къща) — в старите
 // квартали и центъра на американските градове (най-много във Филаделфия, Бостън, Вашингтон, Ню Йорк и Чикаго); nyhirise — сред кулите на Ню Йорк и Чикаго
-const US_OLD = ['brickshop', 'washst', 'oldbank', 'townhouse'], US_CORE = new Set(['philadelphia', 'boston', 'washington', 'newyork', 'chicago']);
+const US_OLD = ['brickshop', 'washst', 'oldbank', 'townhouse', ...NC_NEW].filter(k => !NC_MODELS.has(k)), US_CORE = new Set(['philadelphia', 'boston', 'washington', 'newyork', 'chicago']);
 function usOld(cityId, lot, n, h) {
   if (!feature('us-oldbld') || cityById(cityId)?.cc !== '🇺🇸') return null;
   const core = US_CORE.has(cityId), u = (h >>> 11) % 10;
@@ -998,7 +1002,7 @@ const FACTORY_CITIES = new Set(ECON.FACTORIES.map(f => f.cityId));
 // мащаб, с който сградата се вписва в парцела 16×16 м
 // истинските височини (feature 'real-heights'): къща на 2 етажа ~8 м, блок на 5 етажа ~16 м, 10 етажа ~30 м, небостъргач — по етажите (~2.8 м),
 // за да не стои къща колкото половин небостъргач. Ширината се сбива само ако иначе не се побира на парцела (maxW).
-const H10 = { 'b2-pp-office': 16, 'it-sf-medkit': 18, 'b2-brickshop': 12, 'b2-washst': 16, 'b2-oldbank': 14, 'b2-townhouse': 11, 'b2-nyhirise': 55, 'b2-pp-townhouse': 14, 'b2-midwest': 14, 'b2-office4': 30, 'b2-office5': 20, 'b2-office2': 20, 'b2-office3': 22, 'b2-hirise': 70, 'b2-office6': 22, 'sf-blk-soviet': 29, 'sf-blk-panel12': 36, 'sf-blk-richmond': 24, 'sf-blk-dbrick': 26, 'sf-blk-asian': 30, 'Building_Medium_2_001': 30,   /* blk-more (f6): */ 'b2-brooklyn': 15, 'b2-montgomery': 70, 'b2-office1': 32, 'b2-pp-apart': 20, 'b2-pp-bigbld': 16, 'b2-pp-brown': 16, 'b2-pp-burhouse': 12, 'b2-pp-green': 14, 'b2-pp-redcorner': 14 };
+const H10 = { 'b2-pp-office': 16, 'it-sf-medkit': 18, 'b2-brickshop': 12, 'b2-washst': 16, 'b2-oldbank': 14, 'b2-townhouse': 11, 'b2-nyhirise': 55, 'b2-pp-townhouse': 14, 'b2-midwest': 14, 'b2-office4': 30, 'b2-office5': 20, 'b2-office2': 20, 'b2-office3': 22, 'b2-hirise': 70, 'b2-office6': 22, 'sf-blk-soviet': 29, 'sf-blk-panel12': 36, 'sf-blk-richmond': 24, 'sf-blk-dbrick': 26, 'sf-blk-asian': 30, 'Building_Medium_2_001': 30,   /* blk-more (f6): */ 'b2-brooklyn': 15, 'b2-montgomery': 70, 'b2-office1': 32, 'b2-pp-apart': 20, 'b2-pp-bigbld': 16, 'b2-pp-brown': 16, 'b2-pp-burhouse': 12, 'b2-pp-green': 14, 'b2-pp-redcorner': 14,   /* nc-free (f6): */ 'b2-lenox': 14, 'b2-n1st': 15 };
 const SKY_H = { 'sf-sky-sing': 50, 'sf-sky-rand': 55, 'sf-sky-usb': 70, 'sf-sky-blue': 50, 'sf-sky-night': 60, ...IMP_H };
 function realH(n) {
   const [base, fl] = n.split('@');
@@ -5102,6 +5106,7 @@ function factoryInfo(id) {
 }
 // екран „Автори“: моделите и звуците в играта (CC-BY изисква посочване на автора)
 function showCredits() {
+  if (feature('credits-full')) return showCreditsFull();
   modal('📜 Автори', `<div style="line-height:1.6;font-size:13px">
     <b>3D модели (CC0):</b> Kenney — City Kit (Commercial, Suburban, Industrial, Roads), Car Kit, Train Kit, Watercraft Kit, Nature Kit, Modular Buildings, Holiday Kit · <a href="https://kenney.nl" target="_blank">kenney.nl</a><br>
     Majadroid (Maik Hoffmann) — House Construction Site (CC0)<br>
@@ -5114,6 +5119,29 @@ function showCredits() {
     <b>Звуци (CC0):</b> Kenney — Music Jingles и UI Audio<br>
     <b>Карта:</b> Natural Earth (public domain)<br>
     <span style="color:var(--mut)">Лицензът CC-BY 3.0: creativecommons.org/licenses/by/3.0 — подробности в assets/heavy/CREDITS.txt.</span></div>`, [['Затвори', null]]);
+}
+// credits-full (55): пълният списък — от assets/credits.json (node credits.mjs събира всички CREDITS файлове; пуска се и от pre-commit)
+// групите — по лиценз, вътре по вид; търсене по модел, автор, файл; CC-BY-NC не се показва с nc-free (тези модели ги няма в играта)
+const CRED_ORDER = ['CC-BY-4.0', 'CC-BY-3.0', 'CC-BY-SA-4.0', 'ODbL', 'CC-BY-NC-4.0', 'SF-STD', 'PIXABAY', 'MIXAMO', 'CC0', 'PD', 'OWN'];
+async function showCreditsFull() {
+  modal('📜 Автори', 'Зареждам…', [['Затвори', null]]);
+  const box = $('modalBox'), p = box.querySelector(':scope > p');
+  let D; try { D = await (await fetch('assets/credits.json', { cache: 'no-cache' })).json(); } catch (e) { p.textContent = 'Списъкът не се зареди.'; return; }
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const items = D.items.filter(e => !(e.nc && feature('nc-free'))), lics = CRED_ORDER.filter(l => items.some(e => e.l === l)).concat([...new Set(items.map(e => e.l))].filter(l => !CRED_ORDER.includes(l)));
+  const row = e => `<div class="crow" data-q="${esc((e.t + ' ' + e.a + ' ' + e.s + ' ' + e.f.join(' ')).toLowerCase())}">„${esc(e.t)}“ — <b>${esc(e.a)}</b>${e.u ? ` · <a href="${esc(e.u)}" target="_blank" rel="noopener">${esc(e.s || 'линк')}</a>` : e.s ? ` · ${esc(e.s)}` : ''}</div>`;
+  const div = document.createElement('div'); div.className = 'credits';
+  div.innerHTML = `<style>.credits{font-size:13px;line-height:1.5;color:var(--txt)}.credits details{border-top:1px solid var(--line);padding:6px 0}.credits summary{cursor:pointer;font-weight:600}.credits summary i{color:var(--mut);font-style:normal;font-weight:400}.credits h4{margin:8px 0 2px;font-size:12px;color:var(--acc)}.credits .crow{padding:1px 0 1px 10px}.credits a{color:#8cc4ff}.credits .cnote{color:var(--mut);margin:4px 0 8px}</style>
+    <div class="cnote">Моделите, звуците и данните в играта и авторите им. Лицензите CC BY изискват посочване на автора — благодарим на всички! Модели по поръчка: Темидасофт (Meshy AI). Видео: Kling AI.</div>
+    <input id="credQ" type="search" placeholder="🔎 Търси модел, автор или файл… (${items.length})" autocomplete="off">
+    ${lics.map(l => { const L = items.filter(e => e.l === l), [nm, url] = D.lic[l] || [l, ''], kinds = [...new Set(L.map(e => e.k))].sort((a, b) => a.localeCompare(b, 'bg'));
+      return `<details data-l="${l}"><summary>${esc(nm)} <i>· ${L.length}</i></summary>${url ? `<div class="cnote"><a href="${url}" target="_blank" rel="noopener">${url}</a></div>` : ''}${kinds.map(k => `<div class="ckind"><h4>${esc(k)}</h4>${L.filter(e => e.k === k).sort((a, b) => a.t.localeCompare(b.t)).map(row).join('')}</div>`).join('')}</details>`; }).join('')}`;
+  p.replaceWith(div);
+  const q = div.querySelector('#credQ');
+  q.oninput = () => { const s = q.value.trim().toLowerCase();
+    div.querySelectorAll('details').forEach(d => { let n = 0;
+      d.querySelectorAll('.ckind').forEach(k => { let m = 0; k.querySelectorAll('.crow').forEach(r => { const on = !s || r.dataset.q.includes(s); r.style.display = on ? '' : 'none'; m += on; }); k.style.display = m ? '' : 'none'; n += m; });
+      d.style.display = n ? '' : 'none'; d.open = !!s && n > 0; d.querySelector('summary i').textContent = `· ${n}`; }); };
 }
 // 🆕 Нова игра: всичко се трие — слотовете, автозаписите и записите в облака (cloud.js, пишеш ИЗТРИЙ)
 function newGameAll() {
@@ -5225,6 +5253,7 @@ const topSetRows = () => { const C = topSetCounts(), tap = id => () => { const b
     { ico: () => txt('btnNotif') || '🔔', nm: () => ((document.getElementById('btnNotif') || {}).title || 'Известия').replace(/ — натисни за смяна$/, ''), fn: tap('btnNotif'), keep: true, on: !!document.getElementById('btnNotif') },
     { ico: () => '❓', nm: () => 'Помощ — обиколка на бутоните', fn: tap('btnTour'), on: !!document.getElementById('btnTour') },
     { ico: () => '💡', nm: () => 'Съвет — как да печелиш и да не фалираш', fn: tap('btnTips'), on: !!document.getElementById('btnTips') },
+    { ico: () => '🖥️', nm: () => 'Проверка на компютъра — ще върви ли добре', fn: () => perfCheck(renderer), on: feature('perf-meter') },   // perf-meter (f9)
   ].filter(r => r.on); };
 if (feature('top-set')) {
   document.body.classList.add('topSet');
@@ -11119,6 +11148,7 @@ if (AUTOTEST) {
   window.__dbg = {
     state: () => S,
     city: () => city,   // districts-look (55): диагностиката на парцелите
+    credits: () => showCredits(),   // credits-full (55): демото в Лабораторията
     districts: (cmd, k) => districtsDbg(cmd, k),   // 🏡 districts-look: 'diag' | 'nodiag' | 'focus' | 'off' | 'on' | (числата)
     fireTest(sev = 1, travel) { const tg = controls.target; const L = city.lots.filter(l => l.obj && l.built && !l.busy).sort((a, b) => Math.hypot(a.x - tg.x, a.z - tg.z) - Math.hypot(b.x - tg.x, b.z - tg.z))[0]; if (!L) return null; const f = fires.start(L.id, { sev, travel }); flyTo(L); return f && f.id; },   // 🔥 fire-seq: пожар в най-близката сграда
     busModels(ns = ['sf-bus-liaz', 'sf-bus-town', 'sf-bus-roaz']) {   // buses-more2 (f6): автобусите един зад друг пред камерата, откъм вратите (−x) — колелата, дверите, ръстът
