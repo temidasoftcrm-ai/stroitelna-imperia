@@ -4,7 +4,7 @@
 // Големият кремълски дворец (бял камък, зелен покрив) с фасадата към реката, вътре — катедралите, „Иван Велики“ и Сенатът.
 // Всичко е в истински метри × K (мащабът на картата, като другите забележителности). Стената се отдръпва навътре от улиците (без застъпване).
 // Моделите (assets/heavy/lm): kremlin-parts.glb (kr_vodo, kr_palace, kr_tower, kr_church, kr_house), kremlin-spasskaya.glb (kr_spass),
-// kremlin-wall.glb (kr_wall, kr_firs). Смяна на стената: KR_WALL (името на възела) и KR_SEG (дължината на сегмента, м).
+// kremlin-wall.glb (kr_wall, kr_firs); lm-kremlin3 — kremlin-inner.glb (kr_senate, kr_ivan, kr_uspensky, kr_archangel, kr_annunc — от Blender). Смяна на стената: KR_WALL (името на възела) и KR_SEG (дължината на сегмента, м).
 import * as THREE from 'three';
 
 export const KR_WALL = 'kr_wall', KR_FIRS = 'kr_firs', KR_SEG = 46.44;   // сегментът от Meshy: 46,4 × 4,7 × 16 м (лицето навън = +z)
@@ -57,7 +57,7 @@ export function kremlinLayout(D, sizes = {}) {
 
 // сглобяването: G — групата на изгледа; KM = { parts, spass, wall } (сцените от GLTFLoader); flood(obj, col, k) — floodMats от cityplan2-3d.js
 export function kremlinEnsemble(G, D, KM, flood) {
-  const nodes = {}; for (const sc of [KM.parts, KM.spass, KM.wall]) if (sc) { sc.updateMatrixWorld(true); sc.traverse(o => { if (/^kr_/.test(o.name || '') && !nodes[o.name]) nodes[o.name] = o; }); }
+  const nodes = {}; for (const sc of [KM.parts, KM.spass, KM.wall, KM.inner]) if (sc) { sc.updateMatrixWorld(true); sc.traverse(o => { if (/^kr_/.test(o.name || '') && !nodes[o.name]) nodes[o.name] = o; }); }
   const part = nm => { const o = nodes[nm]; if (!o) return null; const L = []; o.traverse(m => { if (m.isMesh) L.push({ geo: m.geometry, mat: m.material, mw: m.matrixWorld.clone() }); }); return L; };
   const sizes = {}, bb = new THREE.Box3(), v = new THREE.Vector3(); for (const nm in nodes) { bb.setFromObject(nodes[nm]).getSize(v); sizes[nm] = { w: Math.max(v.x, v.z), h: v.y }; }
   const LY = kremlinLayout(D, sizes), K = LY.K, grp = new THREE.Group(); grp.name = 'kremlin2';
@@ -65,11 +65,17 @@ export function kremlinEnsemble(G, D, KM, flood) {
   const M = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 }), { white, green, yellow, gold, star } = PMAT || (PMAT = { white: M(0xf1ece0), green: M(0x3f6b4c), yellow: M(0xe8cf8a), gold: new THREE.MeshStandardMaterial({ color: 0xe6b84a, roughness: 0.3, metalness: 0.8 }), star: new THREE.MeshStandardMaterial({ color: 0x8a1a1a, roughness: 0.35, metalness: 0.3, emissive: 0xff1a1a, emissiveIntensity: 0 }) });   // веднъж (нощните материали на изгледа са общ списък)
   // инстанции: за всяка част на модела — един InstancedMesh (матрица = място × матрицата на възела в сцената)
   const inst = (nm, list) => { const P = part(nm); if (!P || !list.length) return; for (const p of P) { const im = new THREE.InstancedMesh(p.geo, p.mat, list.length); list.forEach((t, i) => im.setMatrixAt(i, m4.compose(new THREE.Vector3(t.x, 0.05, t.z), q.setFromAxisAngle(up, t.rot), new THREE.Vector3(t.sx || t.s, t.s, t.s)).multiply(p.mw)));
-    im.castShadow = im.receiveShadow = true; im.computeBoundingSphere(); grp.add(im); } };
+    im.name = nm; im.castShadow = im.receiveShadow = true; im.computeBoundingSphere(); grp.add(im); } };   // името — за Лабораторията (lm-kremlin3: камерата към сградата)
   inst(KR_WALL, LY.walls); inst(KR_FIRS, LY.walls.filter(w => w.firs));
   for (const k of ['kr_vodo', 'kr_tower', 'kr_spass']) inst(k, LY.towers.filter(t => t.k === k));
   for (const t of LY.inner) inst(t.k, [{ x: t.p[0], z: t.p[1], rot: t.rot, s: t.s }]);
-  if (flood) flood(grp, 0xffd8a0, 0.5);   // нощем — прожекторите по стените, кулите и двореца
+  // lm-kremlin3 (55): Сенатът, „Иван Велики“ и трите катедрали — моделите от Blender (kremlin-inner.glb, в метри: +x — изток, основата в 0) на истинските места × K
+  const IN = KM.inner && nodes.kr_senate ? [['kr_uspensky', 55.7508, 37.6167, 0], ['kr_archangel', 55.7500, 37.6175, 0], ['kr_annunc', 55.7503, 37.6161, 0], ['kr_ivan', 55.7506, 37.6175, 0], ['kr_senate', 55.7521, 37.6193, null]] : [];
+  const out3 = LY.edges[FIRS_EDGE].nin, sRot = Math.atan2(out3[1], -out3[0]);   // Сенатът: върхът с ротондата (+x на модела) — към Червения площад (навън през стената при него)
+  for (const [k, la, lo, r] of IN) { const [x, z] = LY.at(la, lo); inst(k, [{ x, z, rot: r ?? sRot, s: K }]); }
+  if (flood) flood(grp, 0xffd8a0, 0.5);
+  if (IN.length) grp.traverse(o => { if (!o.isMesh) return; for (const m of [].concat(o.material)) { const n = (m && m.name) || ''; if (!/^kr3_/.test(n) || m.userData.kr3) continue; m.userData.kr3 = 1;   /* нощем: топли прозорци, куполите хващат прожекторите, фасадите — осветени */
+    const [c, k] = /_win$/.test(n) ? [0xffc070, 1.1] : /_gold$/.test(n) ? [0xffb030, 0.45] : /_silver$/.test(n) ? [0xdfe6ff, 0.32] : /_green$|_roof$/.test(n) ? [0x9fd8b8, 0.18] : /_flag_/.test(n) ? [0xffffff, 0.3] : [0xffd2a0, 0.3]; if (m.emissive) m.emissive.setHex(c); m.userData.winK = k; } });   // нощем — прожекторите по стените, кулите и двореца
   // върхът на кулата (най-високият връх на модела — шпилът не е в средата на основата: Спаската е с предна част)
   const tops = {}, tv = new THREE.Vector3(); for (const k of ['kr_vodo', 'kr_tower', 'kr_spass']) { const P = part(k); if (!P) continue; let best = null; for (const p of P) { const a = p.geo.attributes.position; for (let i = 0; i < a.count; i++) { tv.fromBufferAttribute(a, i).applyMatrix4(p.mw); if (!best || tv.y > best.y) best = tv.clone(); } } tops[k] = best; }
   // рубинените звезди: нощем светят червено (адитивно ядро + ореол), денем — тъмночервени
@@ -82,10 +88,11 @@ export function kremlinEnsemble(G, D, KM, flood) {
   const box = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), dome = new THREE.SphereGeometry(0.5, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 1.6, 1), BX = { white: [], green: [], yellow: [] }, DM = { gold: [], green: [] };
   const put = (L, x, z, w, h, d, y = 0, a = 0) => L.push(m4.compose(new THREE.Vector3(x, y * K, z), q.setFromAxisAngle(up, a), new THREE.Vector3(w * K, h * K, d * K)).clone());
   const [sx, sz] = LY.at(55.7520, 37.6198), [ix, iz] = LY.at(55.7508, 37.6176);
+  if (!IN.length) {   // без моделите (lm-kremlin3) — процедурните кутии
   put(BX.yellow, sx, sz, 95, 22, 70, 0, 0.75); put(BX.green, sx, sz, 95, 3, 70, 22, 0.75); put(DM.green, sx, sz, 24, 14, 24, 25);   // Сенатът с купола
   put(BX.white, ix, iz, 13, 60, 13); put(BX.white, ix, iz, 10, 16, 10, 60); put(DM.gold, ix, iz, 10, 12, 10, 76);   // „Иван Велики“ (81 м)
   for (const [la, lo, s4] of [[55.7507, 37.6168, 1], [55.7502, 37.6180, 0.8], [55.7510, 37.6186, 0.75]]) { const [x, z] = LY.at(la, lo);   // Успенска, Архангелска, Благовещенска
-    put(BX.white, x, z, 30 * s4, 22 * s4, 38 * s4); for (const [dx, dz, k2] of [[0, 0, 1.3], [-8, -9, 1], [8, -9, 1], [-8, 9, 1], [8, 9, 1]]) { put(BX.white, x + dx * s4 * K, z + dz * s4 * K, 4 * k2 * s4, 6 * s4, 4 * k2 * s4, 22 * s4); put(DM.gold, x + dx * s4 * K, z + dz * s4 * K, 6 * k2 * s4, 6 * k2 * s4, 6 * k2 * s4, 28 * s4); } }
+    put(BX.white, x, z, 30 * s4, 22 * s4, 38 * s4); for (const [dx, dz, k2] of [[0, 0, 1.3], [-8, -9, 1], [8, -9, 1], [-8, 9, 1], [8, 9, 1]]) { put(BX.white, x + dx * s4 * K, z + dz * s4 * K, 4 * k2 * s4, 6 * s4, 4 * k2 * s4, 22 * s4); put(DM.gold, x + dx * s4 * K, z + dz * s4 * K, 6 * k2 * s4, 6 * k2 * s4, 6 * k2 * s4, 28 * s4); } } }
   const MT = { white, green, yellow, gold }, pg = new THREE.Group(); for (const [geo, S] of [[box, BX], [dome, DM]]) for (const c in S) if (S[c].length) { const im = new THREE.InstancedMesh(geo, MT[c], S[c].length); S[c].forEach((mm, i) => im.setMatrixAt(i, mm)); im.castShadow = im.receiveShadow = true; im.computeBoundingSphere(); pg.add(im); }
   grp.add(pg); if (flood) { flood(pg, 0xffc890, 0.16); MT.gold.emissive.setHex(0xffb030); MT.gold.userData.winK = 0.35; }   // процедурните (без текстура) — по-слабо, иначе стават плоски бели петна
   G.add(grp); G.userData.kremlin2 = LY; return LY;
