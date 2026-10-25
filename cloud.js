@@ -3,7 +3,7 @@
 // сравнява с облака: ако на друго устройство има по-нов запис — сваля го и презарежда.
 // Таблица public.saves (user_id, slot 's1'…'s3', data jsonb, meta jsonb, updated_at); RLS: всеки вижда само своите.
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
-import { backupRaw, dropBackups } from './saves.js';
+import { backupRaw, dropBackups, tooNew } from './saves.js';
 import { feature, IN_LAB } from './lab/feature.js';
 import './consent.js';   // 🍪 GDPR съгласие (feature 'consent') — window.consent
 
@@ -457,6 +457,7 @@ const setItem0 = Storage.prototype.setItem; let locked = null;
 let wiping = false;
 Storage.prototype.setItem = function (k, v) { if (k === locked || (wiping && /^stroi/.test(k))) return; return setItem0.call(this, k, v); };
 async function take(n, row) {
+  if (tooNew(row.data)) return newerIn(n);   // ver-notice: по-нов формат — не се сваля
   await backupRaw(n, localStorage.getItem(keyOf(n)), 'преди облака');   // сегашният запис остава в „🕒 Автозаписи“
   const raw = JSON.stringify(row.data);
   setItem0.call(localStorage, keyOf(n), raw);
@@ -473,6 +474,8 @@ async function pullAll(rowsIn) {   // rowsIn — само тестът в Лаб
   let reload = false;
   for (let n = 1; n <= SLOTS; n++) {
     const raw = localStorage.getItem(keyOf(n)), c = cloud['s' + n], s = getSync(n);
+    if (c && tooNew(c.data)) { newerIn(n); continue; }   // ver-notice: записът в облака е от по-нова версия — нито се сваля, нито се презаписва
+    newer.delete(n);
     if (!c) { if (raw) await upload(n, raw); continue; }
     if (FIX && localStorage.getItem(emptyKey(n))) { if (raw) await upload(n, raw); continue; }   // нова игра след „Нова игра“: тя е истинската, облачната — старата
     const localChanged = raw && (!s || s.sig !== sig(raw));
@@ -517,11 +520,14 @@ async function unchanged() {
 async function pushChanged() {
   for (let n = 1; n <= SLOTS; n++) {
     const raw = localStorage.getItem(keyOf(n)), s = getSync(n);
-    if (raw && (!s || s.sig !== sig(raw)) && !held.has(n)) await upload(n, raw);   // held — неразрешен конфликт: не се презаписва облакът
+    if (raw && (!s || s.sig !== sig(raw)) && !held.has(n) && !newer.has(n)) await upload(n, raw);   // held — неразрешен конфликт: не се презаписва облакът
   }
 }
 // fix-saves: слотовете с неразрешен конфликт (диалогът е затворен без избор) — периодично се пита пак, но не върху друг диалог
 const held = new Set(); let heldAt = 0;
+// ver-notice: слотовете, чийто запис в облака е от по-нова версия на играта (cloud ↔ vernotice — през window, без import)
+const newer = new Set();
+function newerIn(n) { newer.add(n); const f = window.__verNotice?.cloudNewer; if (f) f(n); else (window.__verPend = window.__verPend || []).push(n); }
 const syncTick = () => syncAll(held.size > 0 && Date.now() - heldAt > 120000 && !document.getElementById('cloudDlg'));
 async function syncAll(full) {
   if (!user || busy || AUTOTEST) return;

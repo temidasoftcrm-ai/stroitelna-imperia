@@ -2,6 +2,11 @@
 // Слот 1 ползва стария ключ (съвместимост със старите записи).
 import { feature } from './lab/feature.js';
 export const SLOTS = 3;
+// 🆕 ver-notice: номерът на формата на записа (S.fmt). Вдигни го, когато новата версия пише записи, които старата не може да чете.
+// Стари записи без номер = 1. Запис с по-голям номер от този — не се зарежда, не се презаписва (game.js, cloud.js, внасянето тук).
+export const SAVE_FORMAT = 1;
+export const fmtOf = s => { if (typeof s === 'string') try { s = JSON.parse(s); } catch { return 1; } return s && typeof s === 'object' && +s.fmt > 0 ? +s.fmt : 1; };
+export const tooNew = s => feature('ver-notice') && fmtOf(s) > SAVE_FORMAT;
 const keyOf = n => n === 1 ? 'stroi-save-v1' : `stroi-save-v1-s${n}`;
 export function currentSlot() { try { return Math.min(SLOTS, Math.max(1, +localStorage.getItem('stroi-slot') || 1)); } catch { return 1; } }
 export const saveKey = () => keyOf(currentSlot());
@@ -123,6 +128,7 @@ export function openSaves(deps) {
     try {
       const txt = await f.text(), s = JSON.parse(txt);
       if (!s || !s.econ || !s.cityId) throw new Error('не е запис от играта');
+      if (tooNew(s)) throw new Error('записът е от по-нова версия на играта — презареди страницата и опитай пак');   // ver-notice
       if (target === cur && feature('fix-saves')) deps.lock?.();   // fix-saves: иначе pagehide → save(true) записва старата игра в паметта върху внесената
       try { localStorage.setItem(keyOf(target), txt); } catch (e) { if (target === cur) deps.unlock?.(); throw e; }
       deps.toast(`⬆️ Записът е зареден в слот ${target}.`, 'good');

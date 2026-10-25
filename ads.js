@@ -25,7 +25,7 @@ export function adsConsent() {
 }
 
 export function createAds(deps) {
-  const off = { next() { }, state: () => ({ on: false }) };
+  const off = { next() { }, state: () => ({ on: false }), offer: () => Promise.resolve(null) };
   if (!feature('ads') || (!CLIENT && !SIM) || (AUTOTEST && !IN_LAB) || isTouchDevice()) return off;
   let armed = !AUTOTEST;   // Лабораторията (там играта е с autotest): нищо не тръгва само — само от демото (skipWait)
   let t0 = Date.now(), last = -Infinity, pend = null, adOn = false, ready = false, rewardBtn = null, rewardFn = null, asking = false;
@@ -94,6 +94,24 @@ export function createAds(deps) {
     top.insertBefore(rewardBtn, top.querySelector('.sp'));
   }
 
+  // ── награда по повод (away-summary, f6: „🎬 Удвои с реклама“ в „Докато те нямаше“): offer(name, viewed) → Promise<{ show, release } | null>
+  // null — няма реклама с награда, днешният таван (REWARD_MAX — общ с бонуса горе) е стигнат или вече се пита. show() — пуска рекламата
+  // (viewed() при гледане докрай); release() — прозорецът е затворен без реклама: тя остава за бутона горе „🎬 Реклама за бонус“ (обичайната награда).
+  function offer(name, viewed) {
+    return new Promise(res => {
+      if (adOn || asking || rewardFn || got() >= REWARD_MAX) return res(null);
+      asking = true; let done = false, onView = viewed, show = null;
+      const fin = v => { if (!done) { done = true; res(v); } };
+      push({ type: 'reward', name: 'stroi-' + name, beforeAd: pause, afterAd: resume,
+        beforeReward: f => { show = f; const o = { show: () => f(), release: () => { onView = () => { const v = deps.reward?.(); if (v) deps.toast?.(`🎬 Благодарим! Бонус +${v.toLocaleString('bg-BG')} € (днес ${got()}/${REWARD_MAX})`); }; if (!rewardFn && got() < REWARD_MAX) { rewardFn = f; showBtn(); } } };
+          if (done) o.release(); else fin(o); },   // закъсняла (след 6 с) — направо за бутона горе
+        adDismissed: () => { deps.toast?.('🎬 Рекламата е спряна преди края — без бонус.', 'bad'); },
+        adViewed: () => { gotInc(); onView?.(); },
+        adBreakDone: info => { asking = false; if (rewardFn === show) hideBtn(); if (adOn) resume(); fin(null); deps.log?.('reward', info?.breakStatus); } });
+      setTimeout(() => fin(null), 6000);   // Google не отговори — без бутон
+    });
+  }
+
   setInterval(() => { fire(); if (deps.reward) askReward(); }, 3000);
 
   // ── симулатор (само Лабораторията без ID): същият интерфейс като adsbygoogle — 3 с сив екран ──
@@ -120,6 +138,6 @@ export function createAds(deps) {
     q.forEach(run);
   }
 
-  return { next, state: () => ({ on: true, sim: SIM, ready, pend: pend?.name || null, last, adOn, reward: !!rewardFn, today: got(), npa: !!window.adsbygoogle.requestNonPersonalizedAds }),
+  return { next, offer, state: () => ({ on: true, sim: SIM, ready, pend: pend?.name || null, last, adOn, reward: !!rewardFn, today: got(), npa: !!window.adsbygoogle.requestNonPersonalizedAds }),
     skipWait: IN_LAB ? () => { armed = true; t0 = 0; last = -Infinity; } : undefined };   // Лабораторията: без 10-те минути и 5-те между рекламите
 }

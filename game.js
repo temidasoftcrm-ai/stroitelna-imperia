@@ -10,7 +10,8 @@ import { Sound } from './sound.js';
 import { createPassingTrains } from './passtrains.js';
 import { createQuests } from './quests.js';
 import { createSupply } from './supply.js';
-import { saveKey, openSaves, currentSlot, backupNow, backupRaw, logError } from './saves.js';
+import { saveKey, openSaves, currentSlot, backupNow, backupRaw, logError, SAVE_FORMAT, tooNew } from './saves.js';
+import { createVerNotice } from './vernotice.js';   // 🆕 ver-notice: „Излезе нова версия“ и записи от по-нова версия
 import { createTutorial } from './tutorial.js';
 import { createMega } from './megaorders.js';
 import { createSilkRoad, SILK } from './silkroad.js';
@@ -143,6 +144,7 @@ import { planRoute, randomRoadPoint } from './cityplanroute.js';
 import { ROME_FILES, IT_FILES, IT_PICK, romePrep } from './romenear.js';   // 🇮🇹 rome-bld (f9): Рим отблизо — италианските сгради; it-bld — и в другите италиански градове
 import { STATUE_FILES, statuePrep } from './statues.js';   // ⛲ statues (f9): фонтани и статуи в градовете
 import { GFX, GFX_ORDER, gfx, gfxLevel, setGfx } from './gfxpresets.js';   // 🎨 gfx-presets (f9): графиката Ниско / Средно / Високо
+import { createAwaySummary } from './awaysum.js';   // 👋 away-summary (f6): „Докато те нямаше“ — обобщение и начислен пасивен приход при връщане
 import { createAds } from './ads.js';   // 📺 флаг ads: AdSense за игри — реклама между нещата и по желание за бонус
 import { createOnboarding } from './onboarding.js';   // 🎓 onboarding (f9): урокът при първа игра — камера, парцел, строеж, пари, град, настройки
 import { initErrTelemetry, errPayload, sendErrors } from './errtelem.js';   // 🐞 err-telemetry (f9): грешките в буфер за изпращане (само със съгласие за анализи)
@@ -150,6 +152,7 @@ import { pcGate, perfCheck } from './perfmeter.js';   // 🖥️ perf-meter (f9)
 
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
+let awaySum = null;   // 👋 away-summary (f6): създава се след ads (долу); save() го вика — затова let тук, не const там
 const FIXSTAB = feature('fix-stab');   // fix-stab (f6): стабилност и памет — смяна на град по време на зареждане, неуспешен план v2, изгледите на магистралите/курортите, нощните материали, WebGL
 const AUTOTEST = params.has('autotest');
 if (feature('err-telemetry') && !AUTOTEST) initErrTelemetry({ ctx: () => ({ city: S?.cityId, gfx: gfxLevel(), day: S?.day }) });   // 🐞 err-telemetry (f9): преди всичко друго — да хване и грешките при зареждането
@@ -9356,7 +9359,7 @@ const cityPanel = createCityPanel({ S: () => S, firmLv: () => dev.best(), firmUp
   mk('btnOffers', '📜 Оферти', 'Оферти от доставчици и търгове', 'offers');
   mk('btnMines', '⛏️ Добив', 'Кариери, мини и заводи в Азия · енергия в Австралия · автоматизация', 'mines');
   mk('btnUpg', '🏢 Подобрения', 'Офис, склад, гараж и гара във всеки град', 'upg'); $('btnUpg').style.display = 'none'; }   // подобренията са подтаб в „🏙️ Градове“
-if (feature('top-hub')) setTimeout(() => mountHub($('top'), $('devBtn'), { extra: hubProgHtml, version: true }), 0);   // лентата на един ред: останалото — в „📊 Империя ▾“
+if (feature('top-hub')) setTimeout(() => mountHub($('top'), $('devBtn'), { extra: hubProgHtml, version: !feature('ver-notice') }), 0);   // лентата на един ред: останалото — в „📊 Империя ▾“
 // всеки ден: готовите строежи от картата (в другите градове, и в текущия, ако си влязъл там междувременно)
 function rbuildTick() {
   const done = (c, id) => {
@@ -10984,11 +10987,12 @@ function syncFinishedFleet() { if (S && city.ready && econ.setFinishedFleet && e
 var saveLock = false, saveWarned = false;   // saveLock: друг раздел/връщане на автозапис — този раздел вече не записва
 // записът е скъп (~110 ms при голяма игра): не по-често от веднъж на 2 s — останалите се събират в един отложен (perf-report: 4× = 3 записа на ден); save(true) — веднага
 let saveAt = 0, saveTimer = null;
-function save(now) { if (batchN > 0) { batchDirty = true; return; } if (!now && !AUTOTEST) { const t = Date.now(); if (t - saveAt < 2000) { if (!saveTimer) saveTimer = setTimeout(() => { saveTimer = null; save(true); }, 2000 - (t - saveAt)); return; } } if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; } saveAt = Date.now(); syncFinishedFleet(); if (AUTOTEST || !S || saveLock) return; try { S.projects = projects; if (city.ready) syncUnits(); localStorage.setItem(SAVE_KEY, JSON.stringify(S, (k, v) => k === 'vis' ? undefined : v)); saveWarned = false; }
+function save(now) { if (batchN > 0) { batchDirty = true; return; } if (!now && !AUTOTEST) { const t = Date.now(); if (t - saveAt < 2000) { if (!saveTimer) saveTimer = setTimeout(() => { saveTimer = null; save(true); }, 2000 - (t - saveAt)); return; } } if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; } saveAt = Date.now(); syncFinishedFleet(); if (AUTOTEST || !S || saveLock) return; try { S.projects = projects; if (city.ready) syncUnits(); S.fmt = SAVE_FORMAT; awaySum?.stamp(S); localStorage.setItem(SAVE_KEY, JSON.stringify(S, (k, v) => k === 'vis' ? undefined : v)); saveWarned = false; }
   catch (e) { logError('запис: ' + (e?.message || e), { day: S?.day }); if (!saveWarned) { saveWarned = true; toast('⚠️ Играта не успя да се запише в браузъра (няма място?). Автозаписите в „💾 Записи“ са запазени.', 'bad'); } } }
 // „Нова игра“: първо пази копие (може да се върне от „💾 Записи“ → „🕒 Автозаписи“), после трие слота
-function wipeSlot() { save(true); saveLock = true; backupNow('преди нова игра').finally(() => { localStorage.removeItem(SAVE_KEY); if (feature('fix-saves')) try { localStorage.setItem(`stroi-cloud-empty-s${currentSlot()}`, '1'); } catch { } location.reload(); }); }   // fix-saves: „нарочно празен“ — cloud.js не сваля стария запис (фалиралата фирма) обратно
-function loadSave() { if (AUTOTEST) return null; try { return JSON.parse(localStorage.getItem(SAVE_KEY)); } catch { return null; } }
+function wipeSlot() { if (newerSave) return; save(true); saveLock = true; backupNow('преди нова игра').finally(() => { localStorage.removeItem(SAVE_KEY); if (feature('fix-saves')) try { localStorage.setItem(`stroi-cloud-empty-s${currentSlot()}`, '1'); } catch { } location.reload(); }); }   // fix-saves: „нарочно празен“ — cloud.js не сваля стария запис (фалиралата фирма) обратно
+var newerSave = false;   // ver-notice: записът на слота е от по-нова версия — не се зарежда и не се пипа
+function loadSave() { if (AUTOTEST) return null; try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && tooNew(s)) { newerSave = true; saveLock = true; return null; } return s; } catch { return null; } }
 
 // клик върху парцел в 3D → избира обекта или офертата
 const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
@@ -11207,6 +11211,22 @@ const ads = createAds({ speed: () => speed, setSpeed, audioCtx: () => Sound.ctx,
   reward: () => { const d = ownedCities().reduce((a, id) => a + Math.max(0, econ.isFinished?.(id) ? econ.s.finished[id].daily : econ.cityAvgDaily(id) || 0), 0), v = Math.max(1000, Math.round(d * 0.1 / 100) * 100);
     econ.earn(v, 'друго', '🎬 Бонус за реклама'); save(); return v; } });
 function adsNext(n) { try { ads.next(n); } catch { } }   // switchCity/нивото може да дойдат преди ads да е създаден
+// 👋 away-summary (f6, awaysum.js): пасивният приход на ден — по градове (формулите на dayTick „без теб“ и payFinished) и на фирмата (историята, 30 дни)
+const awayBusy = () => !S || swapping || !!$('loading') || !!$('cine') || !!cine.playing() || !!onboard?.active() || !$('modal').classList.contains('hidden') || !!document.querySelector('#cloudDlg,#consentBar,#consentDlg,#regGate,#adSim,#awayDlg') || ($('tutBox') && $('tutBox').style.display !== 'none');
+const awayRates = () => { const base = 1400 + 350 * (S.rep || 0) + 120 * (S.officeLevel || 1), F = econ.s.finished || {};
+  return [...new Set(ownedCities())].filter(Boolean).map(id => { const c = cityById(id), f = F[id]; let n = (isForeign(id) ? 1.8 : 1) * base;   // „без теб“ (dayTick: филиали; чуждите ×1,8)
+    if (f) n += f.daily * f.share / (f.share0 || f.share) * econ.maintOf(f) * (econ.hooks.incomeMul ? econ.hooks.incomeMul(id) : 1);   // завършен (payFinished)
+    return { id, nm: c?.nm || id, ico: c?.cc || '🇧🇬', fin: !!f, daily: Math.round(n) }; }); };
+const AWAY_CATS = ['наеми', 'дъщерни', 'превози', 'тол', 'дивиденти'];
+const awayFirm = () => { const h = (econ.s.history || []).slice(-30); if (!h.length) return 0; return Math.round(Math.max(0, h.reduce((a, d) => a + AWAY_CATS.reduce((b, k) => b + (typeof d.cats?.[k] === 'number' ? d.cats[k] : 0), 0), 0) / h.length)); };
+const awayWaiting = () => { const w = [], dep = econ.depositInfo?.()?.ready || 0;
+  if (projects.length) w.push(`🏗️ ${projects.length} ${projects.length === 1 ? 'обект в строеж' : 'обекта в строеж'} — продължават, щом пуснеш времето`);
+  if (S.offers?.length) w.push(`📨 ${S.offers.length} ${S.offers.length === 1 ? 'поръчка чака' : 'поръчки чакат'} отговор`);
+  if (cashObjs.length) w.push(`💵 ${cashObjs.length} ${cashObjs.length === 1 ? 'пачка за прибиране' : 'пачки за прибиране'} в града`);
+  if (dep > 0) w.push(`🏦 Лихва по депозита: ${fmt(dep)} € — вземи я от Банката`);
+  return w; };
+if (feature('away-summary')) awaySum = createAwaySummary({ S: () => S, econ: () => econ, fmt, save, toast, ads, busy: awayBusy, rates: awayRates, firm: awayFirm, waiting: awayWaiting,
+  play: () => !!S && !!city?.ready && speed > 0 && !swapping && !awayBusy() });   // в autotest save() не записва и arm() не се вика — само демото
 // ⚡ (55, „забива при зареждане“): екранът стои, докато градът се построи и видеокартата компилира шейдърите (~200 програми) —
 // паралелно (KHR_parallel_shader_compile, renderer.compileAsync), а не една по една при първия кадър (замръзване ~19 s след „Готово!“)
 const ldFinish = () => { const el = $('loading'); if (!el) return; $('ldTxt').textContent = 'Готово!'; setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 700); }, AUTOTEST ? 0 : 900); };
@@ -11215,6 +11235,7 @@ const ldWarm = async () => { if (!renderer.compileAsync || !S || !city || !city.
   try { await Promise.race([renderer.compileAsync(scene, camera), new Promise(r => setTimeout(r, 15000))]); } catch (e) { console.warn('compileAsync', e); } };
 perf.ready();
 const saved = loadSave();
+const verN = createVerNotice({ save: () => save(true) }); if (newerSave) verN.blockNewer();   // 🆕 ver-notice
 if (saved && !AUTOTEST) backupRaw(currentSlot(), localStorage.getItem(SAVE_KEY), 'старт');
 // 💾 автозапис: записва всяка минута и при затваряне; на всеки 5 минути пази и резервно копие (🕒 Автозаписи)
 if (!AUTOTEST) {
@@ -12024,8 +12045,10 @@ if (AUTOTEST) {
     },
     errDemo() { initErrTelemetry({ ctx: () => ({ city: S?.cityId, gfx: gfxLevel(), day: S?.day }) }); setTimeout(() => { throw new Error('тест на телеметрията от Лабораторията (ivan@example.com, ?token=abc)'); }); Promise.reject(new Error('тест: отхвърлен promise'));   // 🐞 err-telemetry: Лабораторията
       setTimeout(() => { const r = sendErrors(); modal('🐞 Телеметрия на грешките', `Изпращане: <b>${r.sent ? 'изпратени ' + r.sent + ' (засега само в конзолата и localStorage)' : r.reason === 'no-consent' ? 'не — няма съгласие за анализи' : 'няма нови'}</b><br>Това би тръгнало:<pre style="white-space:pre-wrap;font-size:11px;max-height:50vh;overflow:auto;text-align:left">${JSON.stringify(errPayload(), null, 1).replace(/</g, '&lt;')}</pre>`, [['OK', null]]); }, 800); return true; },
-    onbDemo() { onboard?.restart(); return onboard?.step(); },
-    ads: () => ads,   // 📺 ads: Лабораторията (skipWait, next, state)   // 🎓 onboarding: Лабораторията (под autotest урокът не тръгва сам)
+    onbDemo() { onboard?.restart(); return onboard?.step(); },   // 🎓 onboarding: Лабораторията (под autotest урокът не тръгва сам)
+    ads: () => ads,   // 📺 ads: Лабораторията (skipWait, next, state)
+    awayDemo(h = 9, bankMin = 60, more = true) { if (!awaySum) return null; if (more) S.branches = [...new Set([...(S.branches || []), 'plovdiv', 'varna', 'istanbul'])]; ads?.skipWait?.(); return awaySum.demo(h, bankMin); },   // 👋 away-summary: отсъствие h ч с bankMin мин игра (more — още 3 града за списъка)
+    verNotice: () => verN,   // 🆕 ver-notice: Лабораторията (show, blockNewer, cloudNewer)
     settingsOpen() { openSettingsUI(); return { badge: document.querySelector('#btnSettings .setB')?.textContent || null, rows: topSetRows().map(r => r.nm().replace(/<[^>]+>/g, '')) }; },   // ⚙️ Лабораторията (top-set)
     // 🏢 Лабораторията (campus2): общият парцел на фирмата при ниво lv (офис, гараж, склад)
     campus2Look(lv = 5) { S.officeLevel = lv; S.garageLevel = Math.min(10, Math.max(1, lv)); S.whLevel = Math.max(1, Math.min(10, lv)); if (S.whLot == null) S.whLot = city.hq.id;
@@ -12059,7 +12082,7 @@ if (AUTOTEST) {
     cash: () => (S.cash || []).map(c => c.lot),
   };
 }
-else if (saved) { S = saved; pruneCities(S); setTimeout(() => { if (S && !S.brand) brandPick(); }, 2500); if (sessionStorage.getItem('stroiEnter')) { sessionStorage.removeItem('stroiEnter'); enterCity(); const tb = sessionStorage.getItem('stroiTab'); if (tb) { sessionStorage.removeItem('stroiTab'); setTimeout(() => { tab = tb; renderPanel(); }, 600); }  } else { setupWorld(); fastForward(); showMap(true); } }
+else if (saved) { S = saved; awaySum?.arm(saved); pruneCities(S); setTimeout(() => { if (S && !S.brand) brandPick(); }, 2500); if (sessionStorage.getItem('stroiEnter')) { sessionStorage.removeItem('stroiEnter'); enterCity(); const tb = sessionStorage.getItem('stroiTab'); if (tb) { sessionStorage.removeItem('stroiTab'); setTimeout(() => { tab = tb; renderPanel(); }, 600); }  } else { setupWorld(); fastForward(); showMap(true); } }
 else { showMap(true); if (!AUTOTEST) setTimeout(() => showIntro({ start: true, sound: n => Sound.play(n) }), 1700); }   // без запис: картинката „Зареждане“ → интро → картата
 if (params.has('profile')) {
   window.__benchReady = () => !!(S && city.ready);

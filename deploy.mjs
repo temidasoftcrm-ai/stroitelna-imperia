@@ -55,8 +55,12 @@ const adsPub = ((/export const ADS_CLIENT = '([^']*)'/.exec(c0) || [])[1] || '')
 if (/^pub-\d{10,20}$/.test(adsPub)) writeFileSync(join(DIST, 'ads.txt'), `google.com, ${adsPub}, DIRECT, f08c47fec0942fa0\n`);
 else if (adsPub) console.warn('⚠️ ADS_CLIENT в config.js не прилича на pub-… — ads.txt не е направен');
 
+// 3в) version.json — за „🆕 Излезе нова версия“ (vernotice.js, флаг ver-notice): VERSION от cloud.js
+const VER = (/export const VERSION = '([^']+)'/.exec(readFileSync(join(ROOT, 'cloud.js'), 'utf8')) || [])[1];
+if (VER) writeFileSync(join(DIST, 'version.json'), JSON.stringify({ v: VER, at: new Date().toISOString() }) + '\n'); else console.warn('⚠️ cloud.js: няма VERSION — version.json не е направен');
+
 // 4) кеш: страниците — винаги проверка; скриптовете носят ?v=<хеш> (stamp.mjs), но и без него — кратко; assets — седмица
-writeFileSync(join(DIST, '_headers'), `/*.html\n  Cache-Control: no-cache\n/\n  Cache-Control: no-cache\n/*.js\n  Cache-Control: public, max-age=600\n/assets/*\n  Cache-Control: public, max-age=604800\n`);
+writeFileSync(join(DIST, '_headers'), `/version.json\n  Cache-Control: no-store\n/*.html\n  Cache-Control: no-cache\n/\n  Cache-Control: no-cache\n/*.js\n  Cache-Control: public, max-age=600\n/assets/*\n  Cache-Control: public, max-age=604800\n`);
 
 // 5) отчет
 const walk = d => readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)]);
