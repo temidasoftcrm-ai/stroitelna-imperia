@@ -199,17 +199,6 @@
     "img": "night/gas-lowpoly.webp"
    },
    {
-    "k": "gas-modern",
-    "nm": "Бензиностанция (модерна)",
-    "n": 3,
-    "cities": [
-     "newyork",
-     "sofia",
-     "tokyo"
-    ],
-    "img": ""
-   },
-   {
     "k": "gas-big",
     "nm": "Бензиностанция (голяма)",
     "n": 2,

@@ -169,7 +169,7 @@ const RIVER_W = 26;
 // крайпътен комплекс (Лабораторията → hw-service): откъм −x (посоката към +z) — забавителна лента, отбивка към паркинг
 // с бензиностанция (истинските модели на играта), тревен остров и обратно включване. Връща пътя за колите (hwtraffic.js):
 // { z0, z1, zs, xE, lotX } — в координатите на изгледа (z по оста, x напреки)
-const SVC_L = 160, SVC_GAS = ['gas-big', 'gas-modern', 'gas-green', 'gas-lowpoly'];
+const SVC_L = 160, SVC_GAS = ['gas-big', 'gas-green', 'gas-lowpoly'];
 function serviceArea(g, gear, A, { W, H, zs, py: pyNear = false }) {
   const y = H() + 0.04, xE = -W / 2, z0 = zs - SVC_L / 2, z1 = zs + SVC_L / 2, lotX = xE - 20, add = (o, z = zs) => { o.userData.z = z; g.add(o); gear.push(o); return o; };
   const poly = (pts, mat, yy) => { const sh = new THREE.Shape(pts.map(([x, z]) => new THREE.Vector2(x, -z))), m = new THREE.Mesh(new THREE.ShapeGeometry(sh), mat); m.rotation.x = -Math.PI / 2; m.position.y = yy; m.receiveShadow = true; return m; };

@@ -80,7 +80,7 @@ const DEMOS = [
   ['📊 Горната лента: „Империя ▾“', 'sofia', d => { d.hubOpen(); }],
   ['🎲 Имоти: строй изненада', 'sofia', d => { d.rollDemo(); }],
   ['🏅 Ново ниво: картинка', 'sofia', d => { for (let n = 1; n <= 20; n++) d.lvShow(n); }],   // всичките 20 една след друга (клик — следващата)
-  ['⛽ Бензиностанции — 4 кандидата', 'sofia', d => d.gasLook()],
+  ['⛽ Бензиностанции — 3 кандидата', 'sofia', d => d.gasLook()],
   ['🏛️ Дъщерна фирма: екран с логото', 'sofia', d => { d.subShowTest('rail', 'ask'); }],
   ['🏨 5★ хотели — 5 кандидата', 'sofia', d => d.hotel5Look()],
   ['🏛️ Директорската зала', 'sofia', () => $('fr').contentWindow.eval("import('/directors3d.js').then(m => m.demoBoardroom())")],
