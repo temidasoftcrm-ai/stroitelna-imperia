@@ -67,6 +67,9 @@ function loadMoreCars(load, A) {
 export const BUS_POOL = {
   artic: [18.1, { eu: 2, bg: 1, xx: 2 }], roaz: [12.0, { bg: 2, ru: 3, eu: 1 }], trolley: [12.0, { bg: 2, ru: 3 }], xd40: [12.2, { am: 4 }],
 };
+// buses-more2 (f6): още два от галерията с неизползваните модели (Sketchfab, CC-BY) — ЛиАЗ-5292 (бяло-зелен, московски) предимно в Русия,
+// Украйна, Беларус… и малко в България; „Generic Town Bus“ (бял, червен покрив, жълто-червени ленти) — още един вариант навсякъде другаде
+if (feature('buses-more2')) Object.assign(BUS_POOL, { liaz: [12.0, { ru: 4, bg: 1 }], town: [12.0, { eu: 1, bg: 1, xx: 2, am: 1 }] });
 function loadMoreBuses(load, A) {
   return Promise.all(Object.keys(BUS_POOL).map(k => load('assets/heavy/cars/bus-' + k + '.glb').then(g => {
     g.scene.traverse(o => { if (o.isMesh) { o.castShadow = false; if (o.material && o.material.metalness > 0.5) o.material.metalness = 0.3; } });

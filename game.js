@@ -11049,6 +11049,11 @@ if (AUTOTEST) {
     city: () => city,   // districts-look (55): диагностиката на парцелите
     districts: (cmd, k) => districtsDbg(cmd, k),   // 🏡 districts-look: 'diag' | 'nodiag' | 'focus' | 'off' | 'on' | (числата)
     fireTest(sev = 1, travel) { const tg = controls.target; const L = city.lots.filter(l => l.obj && l.built && !l.busy).sort((a, b) => Math.hypot(a.x - tg.x, a.z - tg.z) - Math.hypot(b.x - tg.x, b.z - tg.z))[0]; if (!L) return null; const f = fires.start(L.id, { sev, travel }); flyTo(L); return f && f.id; },   // 🔥 fire-seq: пожар в най-близката сграда
+    busModels(ns = ['sf-bus-liaz', 'sf-bus-town', 'sf-bus-roaz']) {   // buses-more2 (f6): автобусите един зад друг пред камерата, откъм вратите (−x) — колелата, дверите, ръстът
+      if (city.busLook) city.busLook.removeFromParent(); const g = new THREE.Group(), tg = controls.target, ok = ns.filter(n => A[n]); let z = 0, L = 1;
+      for (const n of ok) { const o = model(n, 1), b = new THREE.Box3(); o.updateMatrixWorld(true); o.traverse(m => { if (m.isMesh && !m.material?.transparent) b.expandByObject(m); }); L = b.max.z - b.min.z; o.position.z = z; z -= L * 1.25; g.add(o); }   /* без лъча на фаровете */
+      g.position.set(tg.x, 0.05, tg.z + (ok.length - 1) * L * 0.625); city.group.add(g); city.busLook = g; fly = null; __dbg.camAt(tg.x - L * 2.2, L * 0.45, tg.z + L * 0.5, tg.x, L * 0.12, tg.z); return ok;
+    },
     articLook(deg = 25) {   // bus-artic2 (55, №4): двете секции на съчленения, пречупени на deg° в шарнира (за 2a — проверка на отместванията)
       if (city.artic) city.artic.removeFromParent(); if (!A['sf-bus-artic-f']) return 'няма секции (buses-more?)'; const tg = controls.target, g = new THREE.Group(), f = model('sf-bus-artic-f'), r = model('sf-bus-artic-r');
       const bb = new THREE.Box3(); f.updateMatrixWorld(true); f.traverse(o => { let p = o, l = false; while (p) { l ||= !!p.userData.carLights; p = p.parent; } if (o.isMesh && !l) bb.expandByObject(o, true); });   /* без фаровете и лъча */
