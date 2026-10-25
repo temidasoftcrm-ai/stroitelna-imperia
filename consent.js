@@ -10,7 +10,7 @@ const ON = feature('consent');
 const AUTOTEST = /[?&]autotest/.test(location.search);
 const KINDS0 = [
   ['ads', '📺 Реклами', 'Показване на реклами (за да е играта безплатна). Без съгласие — рекламите, ако има, не са персонализирани.'],
-  ['analytics', '📊 Анонимна статистика', 'Колко хора играят и къде играта се бави — без бисквитки и без да се знае кой си.'],
+  ['analytics', '📊 Анонимна статистика', 'Кои части на играта се ползват и къде се бави — с анонимен номер, без име и без бисквитки.'],
 ];
 const KINDS = ADS_LIVE ? KINDS0.filter(k => k[0] !== 'ads') : KINDS0;
 const read = () => { try { const c = JSON.parse(localStorage.getItem(KEY)); return c && c.v === V ? c : null; } catch { return null; } };

@@ -43,24 +43,25 @@
 <tr><td>Онлайн режимите (партньорство, онлайн империя): името на фирмата и данните от играта, които сам споделяш</td><td>Съвместната игра</td><td>Договор (б. „б“)</td></tr>
 <tr><td>Изборът ти за поверителност (localStorage „stroi-consent“)</td><td>Да помним какво си разрешил</td><td>Законово задължение (б. „в“)</td></tr>
 <tr><td>Реклами (в бъдеще)</td><td>Играта да е безплатна</td><td>Само с твоето съгласие (б. „а“)</td></tr>
-<tr><td>Анонимна статистика (в бъдеще): брой посещения, грешки, скорост — без бисквитки и без идентификатор</td><td>Да подобряваме играта</td><td>Само с твоето съгласие (б. „а“)</td></tr>
+<tr><td>Технически грешки: версия на играта, вид браузър, град, ден и графика в играта, съобщението и стекът на грешката (без имейли, адреси и ключове) и случаен номер само за сесията</td><td>Да откриваме и поправяме грешки</td><td>Законен интерес (б. „е“) — без лични данни; пазим ги 30 дни</td></tr>
+<tr><td>Анонимна статистика: кои части на играта се ползват (кино, банка, борса, партньорство…), ниво, смяна на град, минути игра, скорост — с анонимен номер на устройството (localStorage „stroi-errtel-id“), без име, имейл и бисквитки; с него се свързват и техническите грешки</td><td>Да подобряваме играта</td><td>Само с твоето съгласие (б. „а“); пазим я 180 дни</td></tr>
 </table>
 <p>Без вход в акаунт играта не изпраща записите ти никъде — те остават само на устройството. Не продаваме данни и не правим профилиране.</p>
 
 <h2>3. Бисквитки и местно хранилище</h2>
-<p>Играта не ползва рекламни или проследяващи бисквитки. Използва местното хранилище на браузъра (localStorage и IndexedDB) за записите, автозаписите, настройките и сесията за вход. Те са необходими за работата на играта. Рекламите и статистиката, ако бъдат добавени, ще работят само след съгласие в банера „🔒 Поверителност“. Можеш да го промениш по всяко време от ⚙️ Настройки → 🔒 Поверителност.</p>
+<p>Играта не ползва рекламни или проследяващи бисквитки. Използва местното хранилище на браузъра (localStorage и IndexedDB) за записите, автозаписите, настройките и сесията за вход. Те са необходими за работата на играта. Анонимният номер за статистиката се записва само след съгласие; рекламите — също само след съгласие в банера „🔒 Поверителност“. Можеш да го промениш по всяко време от ⚙️ Настройки → 🔒 Поверителност.</p>
 
 <h2>4. Кой още вижда данните (обработващи)</h2>
 <ul>
 <li><b>Supabase Inc.</b> — база данни и вход (акаунт, записи в облака, онлайн режимите).</li>
 <li><b>Cloudflare Inc.</b> — хостинг на играта и файловете ѝ; Cloudflare Turnstile — проверка срещу ботове при вход и регистрация (вижда IP адреса и данни за браузъра, без бисквитки за реклама).</li>
 <li><b>jsDelivr</b> — CDN за библиотеките на играта (вижда IP адреса ти при зареждане).</li>
-<li>В бъдеще — рекламна мрежа и услуга за статистика, само при съгласие; ще бъдат изброени тук.</li>
+<li>Техническите грешки и анонимната статистика се пазят също в Supabase (нашата база), без трети страни. В бъдеще — рекламна мрежа, само при съгласие; ще бъде изброена тук.</li>
 </ul>
 <p>Някои от тях може да обработват данни извън ЕИП. Тогава предаването е въз основа на стандартните договорни клаузи на Европейската комисия или на решение за адекватност.</p>
 
 <h2>5. Колко дълго пазим данните</h2>
-<p>Записите в облака и акаунта — докато имаш акаунт. „Онлайн сега“ — само докато играта е отворена. Записите на устройството — докато не ги изтриеш (⚙️ Настройки → 🗑️ Изтрий данните) или не изчистиш данните на браузъра.</p>
+<p>Записите в облака и акаунта — докато имаш акаунт. „Онлайн сега“ — само докато играта е отворена. Техническите грешки — 30 дни, анонимната статистика — 180 дни. Записите на устройството — докато не ги изтриеш (⚙️ Настройки → 🗑️ Изтрий данните) или не изчистиш данните на браузъра.</p>
 
 <h2>6. Твоите права</h2>
 <p>По GDPR имаш право на достъп, поправка, изтриване, ограничаване, преносимост и възражение, както и да оттеглиш съгласието си по всяко време (без това да засяга вече извършената обработка).</p>
@@ -95,24 +96,25 @@
 <tr><td>Online modes (partnership, online empire): company name and game data you choose to share</td><td>Multiplayer features</td><td>Contract (b)</td></tr>
 <tr><td>Your privacy choice (localStorage “stroi-consent”)</td><td>Remember what you allowed</td><td>Legal obligation (c)</td></tr>
 <tr><td>Ads (future)</td><td>Keep the game free</td><td>Only with your consent (a)</td></tr>
-<tr><td>Anonymous statistics (future): visits, errors, performance — cookie-less, no identifier</td><td>Improve the game</td><td>Only with your consent (a)</td></tr>
+<tr><td>Technical errors: game version, browser family, in-game city, day and graphics level, the error message and stack (stripped of e-mails, addresses and keys) and a random per-session number</td><td>Find and fix bugs</td><td>Legitimate interest (f) — no personal data; kept 30 days</td></tr>
+<tr><td>Anonymous statistics: which parts of the game are used (cinema, bank, exchange, partnership…), level, city changes, minutes played, performance — with an anonymous device number (localStorage “stroi-errtel-id”), no name, e-mail or cookies; technical errors are linked to it too</td><td>Improve the game</td><td>Only with your consent (a); kept 180 days</td></tr>
 </table>
 <p>Without signing in, your saves never leave your device. We do not sell data or build profiles.</p>
 
 <h2>3. Cookies and local storage</h2>
-<p>The game uses no advertising or tracking cookies. It uses the browser’s local storage (localStorage, IndexedDB) for saves, autosaves, settings and the sign-in session; these are strictly necessary. Ads and statistics, if added, run only after consent in the “🔒 Privacy” banner, which you can change any time in ⚙️ Settings → 🔒 Privacy.</p>
+<p>The game uses no advertising or tracking cookies. It uses the browser’s local storage (localStorage, IndexedDB) for saves, autosaves, settings and the sign-in session; these are strictly necessary. The anonymous statistics number is stored only after consent; ads also run only after consent in the “🔒 Privacy” banner, which you can change any time in ⚙️ Settings → 🔒 Privacy.</p>
 
 <h2>4. Processors</h2>
 <ul>
 <li><b>Supabase Inc.</b> — database and authentication (account, cloud saves, online modes).</li>
 <li><b>Cloudflare Inc.</b> — hosting of the game and its files; Cloudflare Turnstile — bot check at sign-in and sign-up (sees your IP address and browser data, no advertising cookies).</li>
 <li><b>jsDelivr</b> — CDN for the game’s libraries (sees your IP address when loading).</li>
-<li>In the future — an ad network and a statistics service, only with consent; they will be listed here.</li>
+<li>Technical errors and anonymous statistics are also stored in Supabase (our database), with no third parties. In the future — an ad network, only with consent; it will be listed here.</li>
 </ul>
 <p>Some of them may process data outside the EEA; such transfers rely on the European Commission’s Standard Contractual Clauses or an adequacy decision.</p>
 
 <h2>5. Retention</h2>
-<p>Account and cloud saves — while you have an account. “Online now” — only while the game is open. On-device saves — until you delete them (⚙️ Settings → 🗑️ Delete data) or clear your browser data.</p>
+<p>Account and cloud saves — while you have an account. “Online now” — only while the game is open. Technical errors — 30 days, anonymous statistics — 180 days. On-device saves — until you delete them (⚙️ Settings → 🗑️ Delete data) or clear your browser data.</p>
 
 <h2>6. Your rights</h2>
 <p>Under the GDPR you have the right of access, rectification, erasure, restriction, portability and objection, and you may withdraw consent at any time (without affecting prior processing).</p>

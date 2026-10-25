@@ -50,6 +50,7 @@ export function createAwaySummary(d) {
     if (shown && !demo) return; shown = true; armed = null;
     const S = d.S(), econ = d.econ(); if (!S || !econ) return;
     const r = calc(a.ms, a.bank), f = d.fmt, m0 = Math.round(econ.money);
+    d.track?.('away', 'shown', Math.round(r.days));
     if (r.total > 0) { econ.earn(r.total, 'друго', `👋 Докато те нямаше: ${dur(r.hC)} (${Math.round(r.days)} игрални дни × 50%)`); bank = Math.max(0, bank - Math.ceil(r.days / AWAY.DAY_PER_PLAY_MIN - 0.05)); d.save(); }
     const W = d.waiting() || [];
     const top = r.rows.slice(0, 8), rest = r.rows.slice(8), restSum = rest.reduce((s, c) => s + c.got, 0);
@@ -73,7 +74,7 @@ export function createAwaySummary(d) {
     const close = () => { el.remove(); if (offer && offer.release) offer.release(); };
     el.querySelector('#awayOk').onclick = close;
     if (r.total > 0 && d.ads && d.ads.offer) d.ads.offer('away', () => {   // гледана докрай → още толкова
-      d.econ().earn(r.total, 'друго', '🎬 Удвоено с реклама: докато те нямаше'); d.save(); d.toast?.(`🎬 Благодарим! Още +${f(r.total)} €`, 'good');
+      d.econ().earn(r.total, 'друго', '🎬 Удвоено с реклама: докато те нямаше'); d.save(); d.track?.('away', 'doubled', Math.round(r.days)); d.toast?.(`🎬 Благодарим! Още +${f(r.total)} €`, 'good');
     }).then(o => { offer = o; if (!o || !document.body.contains(el)) { if (o && o.release) o.release(); return; }
       const b = document.createElement('button'); b.className = 'btn2'; b.id = 'awayAd'; b.textContent = `🎬 Удвои с реклама (+${f(r.total)} €)`;
       b.onclick = () => { const s = o.show; offer = null; el.remove(); s(); };

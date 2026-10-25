@@ -11,7 +11,7 @@ import { createPassingTrains } from './passtrains.js';
 import { createQuests } from './quests.js';
 import { createSupply } from './supply.js';
 import { saveKey, openSaves, currentSlot, backupNow, backupRaw, logError, SAVE_FORMAT, tooNew } from './saves.js';
-import { createMusic, SUNNY as MUSIC_SUNNY } from './music.js';   // 🎵 флаг music: фонова музика + плъзгачите Музика / Ефекти / Град
+import { createMusic, SUNNY as MUSIC_SUNNY, loadMix } from './music.js';   // 🎵 флаг music: фонова музика + плъзгачите Музика / Ефекти / Град
 import { createVerNotice } from './vernotice.js';   // 🆕 ver-notice: „Излезе нова версия“ и записи от по-нова версия
 import { createTutorial } from './tutorial.js';
 import { createMega } from './megaorders.js';
@@ -145,6 +145,7 @@ import { planRoute, randomRoadPoint } from './cityplanroute.js';
 import { ROME_FILES, IT_FILES, IT_PICK, romePrep } from './romenear.js';   // 🇮🇹 rome-bld (f9): Рим отблизо — италианските сгради; it-bld — и в другите италиански градове
 import { STATUE_FILES, statuePrep } from './statues.js';   // ⛲ statues (f9): фонтани и статуи в градовете
 import { GFX, GFX_ORDER, gfx, gfxLevel, setGfx } from './gfxpresets.js';   // 🎨 gfx-presets (f9): графиката Ниско / Средно / Високо
+import { createUsage } from './usage.js';   // 📊 usage-stats (f6): анонимна статистика за ползването — само със съгласие 'analytics'
 import { createAwaySummary } from './awaysum.js';   // 👋 away-summary (f6): „Докато те нямаше“ — обобщение и начислен пасивен приход при връщане
 import { createAds } from './ads.js';   // 📺 флаг ads: AdSense за игри — реклама между нещата и по желание за бонус
 import { createOnboarding } from './onboarding.js';   // 🎓 onboarding (f9): урокът при първа игра — камера, парцел, строеж, пари, град, настройки
@@ -153,6 +154,7 @@ import { pcGate, perfCheck } from './perfmeter.js';   // 🖥️ perf-meter (f9)
 
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
+let usage = null;   // 📊 usage-stats (f6): създава се след ads (долу); нивото, градът, прозорците го викат с usage?.
 let awaySum = null;   // 👋 away-summary (f6): създава се след ads (долу); save() го вика — затова let тук, не const там
 const FIXSTAB = feature('fix-stab');   // fix-stab (f6): стабилност и памет — смяна на град по време на зареждане, неуспешен план v2, изгледите на магистралите/курортите, нощните материали, WebGL
 const AUTOTEST = params.has('autotest');
@@ -4949,7 +4951,7 @@ const rivals = createRivals({ S: () => S, acquired: id => corp.acquired(id), toa
 // Фаза 7: ниво на развитие (devlevel.js)
 // maxLevel минава през всички градове — пази се до края на текущата задача (картата пита dev.has() стотици пъти на рисуване)
 let maxLevelC = null;
-const dev = createDevLevel({ levelBonus: lv => { adsNext('level'); if (lv !== 2 || !S || !feature('start-easy') || S.lvBonus2) return ''; S.lvBonus2 = 1; econ.earn(100000, 'друго', 'Бонус за ниво 2'); return ' 🎁 Бонус за ниво 2: +100 000 €'; },   // 🌱 веднъж, записва се
+const dev = createDevLevel({ levelBonus: lv => { adsNext('level'); usage?.track('level', null, lv); if (lv !== 2 || !S || !feature('start-easy') || S.lvBonus2) return ''; S.lvBonus2 = 1; econ.earn(100000, 'друго', 'Бонус за ниво 2'); return ' 🎁 Бонус за ниво 2: +100 000 €'; },   // 🌱 веднъж, записва се
   partnerLv: () => feature('coop-lv') ? S?.coopPartnerLv ?? null : null,   // #4: последното известно ниво на партньора (coopCap го пази) — за надписа „партньорът те чака“
   coopCap: () => { if (!S || !feature('coop-lv')) return null; let p = null, cst = null; try { p = coop.partnerLv?.() ?? null; cst = coop.state?.() ?? null; } catch { }   /* coop се създава след dev */ if (p != null) { S.coopPartnerLv = p; if (S.coopLvFloor == null) S.coopLvFloor = dev.rawBest(); return Math.max(p + 2, S.coopLvFloor); }   /* до 2 нива пред партньора, после чака (потребителят 22.10) */ if (cst && cst.pair?.status !== 'active') { delete S.coopLvFloor; delete S.coopPartnerLv; return null; } /* данните още не са дошли (старт, без връзка) — последното известно ниво на партньора; иначе при всяко презареждане чакането изчезваше */ return S.coopLvFloor != null && S.coopPartnerLv != null ? Math.max(S.coopPartnerLv + 2, S.coopLvFloor) : null; },   /* 🤝 общото ниво: не над партньора (каквото си имал при свързването — остава) */ impRatio: n => imperial.ratio(n), impLv: () => S?.imp?.lv || 0, impNeed: n => n === 21 ? 'Основи Империал Сити и избери държавата (ниво 19)' : imperial.NEED[n] || '', S: () => S, lvTime: l => playtime.levelTxt(l), playSummary: () => playtime.summaryHtml(), cityName: () => S ? cityName() : '', maxLevel: () => maxLevelC ?? (queueMicrotask(() => { maxLevelC = null; }), maxLevelC = Math.max(S?.dev?.lv || 1, ...Object.values(S?.cities || {}).map(c => c.dev?.lv || 1), holdLv())), toast, sound: n => Sound.play(n), save, modal, pop: (k, a, b) => { if (k === 'lv-5' && !S.balkansPop) { S.balkansPop = S.day; return showEventPop('balkans-open', '👑 Балканите са твои!', 'Ниво 5: жп линии и магистрали до Сърбия, Румъния, Гърция, Турция и С. Македония.'); } return showEventPop(k, a, b); }, balkansOpen: () => true });   // първото ниво 5 — „Балканите са твои“
 // ⏱️ изиграно време и кога е достигнато всяко ниво (playtime.js)
@@ -9713,7 +9715,7 @@ function stashCity() {
 function switchCity(id) {
   if (FIXSTAB && swapping) return;   // fix-stab: друг град още се зарежда
   if (id === S.cityId) return enterCity();
-  adsNext('city');   // 📺 ads: реклама, щом градът се зареди
+  adsNext('city'); usage?.track('city', id, ownedCities().includes(id) ? 0 : 1);   // 📊 usage-stats: 1 — нов град   // 📺 ads: реклама, щом градът се зареди
   syncFinishedFleet();
   stashCity();
   if (econ.stashStock) S.cities[S.cityId].mat = econ.stashStock();   // складът е на града
@@ -9945,6 +9947,7 @@ function hintsHtml(kind) {
 }
 function openBig(kind) {
   if (!S) return;
+  usage?.open(kind === 'upg' ? 'cities' : kind);   // 📊 usage-stats (банката — и таба: usage.js)
   if (kind === 'upg') { S.cpTab = 'upg'; kind = 'cities'; }   // „Подобрения“ — подтаб на „Градове“
   if (bigWin !== kind) bwScope = null;   // ново отваряне — обхватът пак следва картата
   bigWin = kind;
@@ -11228,7 +11231,7 @@ const cine = createCinema({ S: () => S, sound: () => Sound, ready: () => !!S && 
   firstPlane: () => !!S.firstAirport, firstOil: () => mines.state().sites.some(x => x.kind === 'oilwell'), auto: () => !AUTOTEST });
 cine.start();
 // 📺 ads (ads.js): рекламата чака, докато няма зареждане, кино, диалог или урок; наградата — +10% от дневния приход на всички градове
-const ads = createAds({ speed: () => speed, setSpeed, audioCtx: () => Sound.ctx, toast,
+const ads = createAds({ speed: () => speed, setSpeed, audioCtx: () => Sound.ctx, toast, log: (t, st) => { if (st === 'viewed' || st === 'dismissed') usage?.track('ad', `${t}:${st}`); },   /* 📊 usage-stats: само показаните (опитите без реклама — на 3 s — не) */
   busy: () => !S || !city?.ready || swapping || !!$('loading') || !!$('cine') || !!cine.playing() || !!onboard?.active() || !$('modal').classList.contains('hidden') || !!document.querySelector('#cloudDlg,#consentBar,#consentDlg,#regGate'),
   reward: () => { const d = ownedCities().reduce((a, id) => a + Math.max(0, econ.isFinished?.(id) ? econ.s.finished[id].daily : econ.cityAvgDaily(id) || 0), 0), v = Math.max(1000, Math.round(d * 0.1 / 100) * 100);
     econ.earn(v, 'друго', '🎬 Бонус за реклама'); save(); return v; } });
@@ -11247,7 +11250,11 @@ const awayWaiting = () => { const w = [], dep = econ.depositInfo?.()?.ready || 0
   if (cashObjs.length) w.push(`💵 ${cashObjs.length} ${cashObjs.length === 1 ? 'пачка за прибиране' : 'пачки за прибиране'} в града`);
   if (dep > 0) w.push(`🏦 Лихва по депозита: ${fmt(dep)} € — вземи я от Банката`);
   return w; };
-if (feature('away-summary')) awaySum = createAwaySummary({ S: () => S, econ: () => econ, fmt, save, toast, ads, busy: awayBusy, rates: awayRates, firm: awayFirm, waiting: awayWaiting,
+if (feature('usage-stats')) usage = createUsage({ ctx: () => ({ day: S?.day, lv: S?.dev?.lv, city: S?.cityId }), gfx: gfxLevel, playing: () => !!S && speed > 0, bigWin: () => bigWin,
+  mix: () => feature('music') ? loadMix() : null,
+  tut: () => { let o = null; try { o = JSON.parse(localStorage.getItem('stroi-tut') || 'null'); } catch { }   // onboarding (7 стъпки; done без всички — пропуснат), иначе старият урок
+    if (o && !o.old) return { step: o.step, done: !!o.done && o.step >= 7, off: !!o.done && o.step < 7 }; return S?.tut ? { step: S.tut.step, off: !!S.tut.off, done: S.tut.step >= 99 } : null; } });
+if (feature('away-summary')) awaySum = createAwaySummary({ S: () => S, econ: () => econ, fmt, save, toast, ads, track: (...a) => usage?.track(...a), busy: awayBusy, rates: awayRates, firm: awayFirm, waiting: awayWaiting,
   play: () => !!S && !!city?.ready && speed > 0 && !swapping && !awayBusy() });   // в autotest save() не записва и arm() не се вика — само демото
 // ⚡ (55, „забива при зареждане“): екранът стои, докато градът се построи и видеокартата компилира шейдърите (~200 програми) —
 // паралелно (KHR_parallel_shader_compile, renderer.compileAsync), а не една по една при първия кадър (замръзване ~19 s след „Готово!“)
@@ -12071,6 +12078,8 @@ if (AUTOTEST) {
       const sz = q => q && [+(q.x1 - q.x0).toFixed(1), +(q.z1 - q.z0).toFixed(1)];
       return P ? { city: S.cityId, hq: h.id, lots: P.lots, cleared, gar: S.garageLot, wh: S.whLot, office: sz(P.office), garage: sz(P.garage), whRect: sz(P.wh), yard: (P.yard || []).map(sz), all: sz(P.all), hotel5: o.hotel ? hotel5Of(S.cityId) || 'зарежда се…' : null } : { err: 'campusPlot() = null (флагът campus2?)' };
     },
+    usageDemo() { if (!usage) return null; usage.open('bank'); usage.track('level', null, (S.dev?.lv || 1) + 1); usage.track('city', 'plovdiv', 1); usage.track('tut', 'skip', 3);   // 📊 usage-stats: Лабораторията — буферът (от localhost не се праща)
+      const st = usage.stats(), B = usage.buffer(); modal('📊 Статистика за ползването', `Съгласие: <b>${st.consent ? 'да' : 'не'}</b> · localhost: <b>${st.local ? 'да — нищо не се праща' : 'не'}</b> · в буфера: <b>${st.buffered}</b> · минути игра: ${st.playMin}<br><pre style="max-height:52vh;overflow:auto;font-size:11px;text-align:left;background:#0e141d;padding:8px;border-radius:6px">${B.slice(-25).map(e => JSON.stringify(e)).join('\n').replace(/</g, '&lt;')}</pre>`, [['OK', null]]); return { st, B }; },
     errDemo() { initErrTelemetry({ ctx: () => ({ city: S?.cityId, gfx: gfxLevel(), day: S?.day }) }); setTimeout(() => { throw new Error('тест на телеметрията от Лабораторията (ivan@example.com, ?token=abc)'); }); Promise.reject(new Error('тест: отхвърлен promise'));   // 🐞 err-telemetry: Лабораторията
       setTimeout(() => { const r = sendErrors(); modal('🐞 Телеметрия на грешките', `Изпращане: <b>${r.sent ? 'изпратени ' + r.sent + ' (засега само в конзолата и localStorage)' : r.reason === 'no-consent' ? 'не — няма съгласие за анализи' : 'няма нови'}</b><br>Това би тръгнало:<pre style="white-space:pre-wrap;font-size:11px;max-height:50vh;overflow:auto;text-align:left">${JSON.stringify(errPayload(), null, 1).replace(/</g, '&lt;')}</pre>`, [['OK', null]]); }, 800); return true; },
     onbDemo() { onboard?.restart(); return onboard?.step(); },   // 🎓 onboarding: Лабораторията (под autotest урокът не тръгва сам)

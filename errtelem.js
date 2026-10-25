@@ -1,8 +1,10 @@
 // errtelem.js — 🐞 err-telemetry (f9): грешките в играта (window.onerror / unhandledrejection) в буфер за изпращане.
 // Без лични данни: само версия, град, ниво на графиката, съобщение и стек (до 1 KB) — адресите без сайта и параметрите, имейлите и дългите числа/ключове се махат.
 // Еднаквите се броят (n), до 20 различни на сесия. sendErrors() праща към Supabase public.report_errors (миграция error_reports; f6) със случаен
-// anon id (localStorage 'stroi-errtel-id', не е акаунтът) и пази копие в localStorage 'stroi-errtel-sent'; само със съгласие window.consent?.has('analytics')
-// и не от localhost (Лабораторията/разработката — само конзолата).
+// id и пази копие в localStorage 'stroi-errtel-sent'; не от localhost (Лабораторията/разработката — само конзолата).
+// Праща се ВИНАГИ (законен интерес — чл. 6(1)(е) GDPR: техническите грешки, без лични данни; privacy.html, 30 дни). id-то:
+//   • със съгласие 'analytics' — постоянният анонимен (localStorage 'stroi-errtel-id', общ с usage.js; не е акаунтът);
+//   • без съгласие — случаен за сесията, само в паметта (нищо не се пише на устройството за проследяване — ePrivacy чл. 5(3)).
 // deps: ctx() → { city, gfx, day }
 const MAX = 20, STACK = 1024, MSG = 300, BUF = 'stroi-errtel', SENT = 'stroi-errtel-sent';
 let buf = [], lost = 0, ver = '?', deps = null, on = false, rest = null;
@@ -30,14 +32,14 @@ const UA = () => { const u = navigator.userAgent; return /Firefox/.test(u) ? 'fi
 export const errPayload = (list = buf.filter(e => !e.sent || e.n > e.sent)) => ({ v: ver, ua: UA(), lost, errors: list.map(({ key, sent, ...e }) => ({ ...e, n: e.n - (sent || 0) })) });   // какво би тръгнало
 // POST към report_errors (keepalive — тръгва и при затваряне) + конзола + localStorage (последните 50 изпратени)
 const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
-const anonId = () => { try { let id = localStorage.getItem('stroi-errtel-id'); if (!id) localStorage.setItem('stroi-errtel-id', id = crypto.randomUUID()); return id; } catch { return crypto.randomUUID(); } };
+const SESSION_ID = crypto.randomUUID();
+export const anonId = () => { try { let id = localStorage.getItem('stroi-errtel-id'); if (!id) localStorage.setItem('stroi-errtel-id', id = crypto.randomUUID()); return id; } catch { return crypto.randomUUID(); } };
 export function sendErrors() {
   const fresh = buf.filter(e => !e.sent || e.n > e.sent);
   if (!fresh.length) return { sent: 0 };
-  if (!window.consent?.has?.('analytics')) return { sent: 0, reason: 'no-consent' };
   const payload = errPayload(fresh);
   console.info('[err-telemetry]', payload);
-  if (rest && !LOCAL) try { fetch(rest.url + '/rest/v1/rpc/report_errors', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', apikey: rest.key, Authorization: 'Bearer ' + rest.key }, body: JSON.stringify({ p_anon: anonId(), p: payload }) }).catch(() => { }); } catch { }
+  if (rest && !LOCAL) try { fetch(rest.url + '/rest/v1/rpc/report_errors', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', apikey: rest.key, Authorization: 'Bearer ' + rest.key }, body: JSON.stringify({ p_anon: window.consent?.has?.('analytics') ? anonId() : SESSION_ID, p: payload }) }).catch(() => { }); } catch { }
   try { const L = JSON.parse(localStorage.getItem(SENT) || '[]'); L.unshift({ t: Date.now(), ...payload }); localStorage.setItem(SENT, JSON.stringify(L.slice(0, 50))); } catch { }
   for (const e of fresh) e.sent = e.n;
   store(); return { sent: fresh.length };

@@ -269,6 +269,7 @@ const DEMOS = [
   ['✨ Истанбул нощем: сиянието около Св. София и Синята джамия — ниско и меко, не „купол“', 'istanbul', d => { d.time(22); const b = d.bigInfo().ctr; d.camAt(b[0] + 160, 130, b[1] + 160, b[0], 0, b[1]); }],   // city-polish
   ['🏦 По-проста банка: табове Пари · Кредити · Борса · Компания; „Кредит“ със срок + „Кредитна линия“; ниво 10 (Компания отключена, IPO — 🔒15)', 'sofia', d => { d.money(3e6); d.devLv(10); d.bigOpen('bank'); setTimeout(() => document.querySelector('.bs-tabs [data-t=credit]')?.click(), 400); }],   // bank-simple
   ['🏦 По-проста банка на ниво 1: Борса 🔒7, Компания 🔒10 — началото', 'sofia', d => { d.devLv(1); d.bigOpen('bank'); setTimeout(() => document.querySelector('.bs-tabs [data-t=money]')?.click(), 400); }],   // bank-simple
+  ['📊 Статистика за ползването: няколко примерни събития (банка, ниво, нов град, пропуснат урок) и буферът — от localhost нищо не се праща', 'sofia', d => setTimeout(() => d.usageDemo(), 20000)],   // usage-stats
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
