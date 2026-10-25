@@ -281,6 +281,7 @@ const DEMOS = [
   ['🌄 Изгрев: Виена, 4:48 → 8:00 за 24 s — на изток, по-хладно розово-златно', 'vienna', d => { d.skyDemo('sunrise', 24); }],   // sky-sun
   ['🧱 Надстройка на склада: старият склад се скрива, докато върви площадката със скелето — новият идва при завършване (без застъпване)', 'sofia', d => setTimeout(() => d.whUpDemo(5), 5000)],   // no-overlap
   ['🚉 Гарите по нива: Виена — нива 1→5 през 4 s (будка, малка гара, Баку-Сабунчи, Old Station, Milwaukee)', 'vienna', d => { let lv = 1; const go = () => { d.stAccess(lv); const x = d.stAccess().stX; if (lv < 5) d.camAt(x + 75, 40, -40, x + 10, 4, -70); else d.camAt(x + 80, 45, 120, x + 10, 4, 75); if (++lv <= 5) setTimeout(go, 4000); }; go(); }],   // station-models
+  ['☁️ Облаци: Виена — залез с розово-оранжеви облаци (24 s), в конзолата __dbg.wx(\'cloudy\') или \'rain\' — повече и по-тъмни', 'vienna', d => { d.skyDemo('sunset', 24); }],   // sky-clouds
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
