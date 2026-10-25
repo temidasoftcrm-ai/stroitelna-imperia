@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Неизползвани модели</title>
+<style>
+  :root { --bg:#14161b; --card:#1d2027cc; --txt:#e8e8ea; --mut:#9aa0aa; --acc:#4ea1ff; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--txt); font:14px/1.45 system-ui,sans-serif; overflow:hidden; }
+  #v { position:fixed; inset:0; }
+  .hd { position:fixed; top:10px; left:10px; right:10px; z-index:5; pointer-events:none; display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap; }
+  .hd > * { pointer-events:auto; }
+  .box { background:var(--card); border-radius:10px; padding:8px 12px; max-width:620px; backdrop-filter:blur(4px); }
+  h1 { font-size:17px; margin:0 0 2px; } .lead { color:var(--mut); margin:0; font-size:12.5px; }
+  button { background:#262a33; color:var(--txt); border:1px solid #333a45; border-radius:8px; padding:5px 10px; font:inherit; cursor:pointer; } button:hover { border-color:var(--acc); }
+  #st { color:var(--mut); font-size:12px; margin-top:4px; }
+  .lb { text-align:center; pointer-events:none; text-shadow:0 1px 3px #000, 0 0 6px #000; max-width:170px; }
+  .lb b { display:block; font-size:12px; word-break:break-all; } .lb small { display:block; font-size:10.5px; color:#b9c0cb; word-break:break-all; } .lb i { font-size:10px; color:#8f96a3; font-style:normal; }
+  .grp { font-size:15px; font-weight:700; color:#ffd27a; text-shadow:0 1px 4px #000; pointer-events:none; white-space:nowrap; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head><body>
+<div id="v"></div>
+<div class="hd">
+  <div class="box"><h1>🗃️ Неизползвани 3D модели</h1>
+    <p class="lead">Само преглед — играта не се променя. Всички са с еднаква височина (широките са свити да се поберат в клетката). Влачи — въртене, колелце — приближаване, десен бутон — местене; двоен клик върху модел — отблизо.</p>
+    <div id="st">Зарежда се…</div></div>
+  <div class="box"><button id="bAll">⌂ Всички</button> <button id="bBg">Светъл фон</button></div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+// списъкът (f1, 25.10): 1) в assets, но кодът не ги зарежда; 2) свалени в _source/downloads/models, но невключени.
+// Meshy моделите са тежки (до 132 MB) — тук са олекотени копия (_source/unused-preview: ~5 % от триъгълниците, текстури 1024 webp)
+const B2 = ['brickshop', 'brooklyn', 'montgomery', 'nyhirise', 'office1', 'oldbank', 'usbank', 'washst', 'townhouse', 'pp-apart', 'pp-bigbld', 'pp-brown', 'pp-burhouse', 'pp-green', 'pp-office', 'pp-redcorner', 'pp-sfhouse'];
+const IT = ['it-corner-shop', 'it-palazzo-big', 'it-palazzo-small', 'it-sf-hotel', 'it-sf-medkit', 'it-sf-palazzo3', 'it-sf-store', 'it-townhouse-terracotta'];
+const DL = '_source/downloads/models/', PV = '_source/unused-preview/';
+const MESHY = [['Art_Deco_Skyscraper_1020144933', 'art-deco-skyscraper'], ['Parisian_Elegance_1023161906', 'parisian-elegance'], ['Evergreens_by_the_Bri_1023161954', 'evergreens-by-the-bri'], ['Luminous_Tech_Talisma_1023154936', 'luminous-tech-talisma'], ['Kremlin_Skyline_1023161442', 'kremlin-skyline']];
+const GROUPS = [
+  ['1. В assets, но кодът не ги зарежда', [...B2.map(n => ['assets/heavy/blocks2/' + n + '.glb']), ...IT.map(n => ['assets/heavy/rome/' + n + '.glb']), ['assets/heavy/cars/sirens/fire-red.glb']]],
+  ['2. Свалени, но невключени (_source/downloads/models)', [...['mack_semi', 'liaz_5292', 'generic_town_bus', 'school-minibus-eu', 'money-crate'].map(n => [DL + n + '.glb']),
+    ...MESHY.map(([f, n]) => [PV + 'meshy-' + n + '.glb', DL + 'Meshy_AI_' + f + '_texture.glb'])]],   // [какво се зарежда, кое е истинското (за надписа)]
+];
+const H = 10, FOOT = 17, CELL = 30, COLS = 7;   // височина на всеки модел, най-много толкова на ширина/дълбочина, стъпка на решетката
+
+const host = document.getElementById('v'), st = document.getElementById('st');
+const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; host.appendChild(renderer.domElement);
+const css = new CSS2DRenderer(); css.domElement.style.cssText = 'position:fixed;inset:0;pointer-events:none'; document.body.appendChild(css.domElement);
+const scene = new THREE.Scene(); let dark = true; const bg = () => scene.background = new THREE.Color(dark ? 0x1b1d22 : 0xc9d3dc); bg();
+const pmrem = new THREE.PMREMGenerator(renderer); scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x3a3326, 0.6)); const sun = new THREE.DirectionalLight(0xfff1dc, 1.6); sun.position.set(60, 120, 80); scene.add(sun);
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 5000), controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
+const size = () => { const w = innerWidth, h = innerHeight; renderer.setSize(w, h); css.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); }; addEventListener('resize', size); size();
+
+// клетките: групите една под друга (по z), във всяка — редове по COLS
+const cells = []; let z = 0;
+const labels = [], label = (html, cls, x, y, zz) => { const d = document.createElement('div'); d.className = cls; d.innerHTML = html; const o = new CSS2DObject(d); o.position.set(x, y, zz); scene.add(o); if (cls === 'lb') labels.push(o); return o; };
+for (const [title, list] of GROUPS) {
+  label(title, 'grp', -CELL / 2, 0, z - CELL * 0.55).center.set(0, 0.5);
+  list.forEach(([url, real], i) => cells.push({ url, real: real || url, x: (i % COLS) * CELL, z: z + Math.floor(i / COLS) * CELL }));
+  z += Math.ceil(list.length / COLS) * CELL + CELL * 0.6;
+}
+const W = (COLS - 1) * CELL, D = z - CELL * 1.6;
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(W + CELL * 2, D + CELL * 2.4), new THREE.MeshStandardMaterial({ color: 0x2a2d34, roughness: 1 })); ground.rotation.x = -Math.PI / 2; ground.position.set(W / 2, -0.02, D / 2); scene.add(ground);
+for (const c of cells) { const pad = new THREE.Mesh(new THREE.CircleGeometry(FOOT * 0.55, 40), new THREE.MeshStandardMaterial({ color: 0x343844, roughness: 1 })); pad.rotation.x = -Math.PI / 2; pad.position.set(c.x, 0, c.z); scene.add(pad); }
+const home = () => { const f = Math.max(1, 1.25 / camera.aspect); controls.target.set(W / 2, 0, D / 2 + CELL * 0.35); camera.position.set(W / 2, W * 1.15 * f, D / 2 + W * 0.95 * f); controls.update(); }; home();
+document.getElementById('bAll').onclick = home;
+document.getElementById('bBg').onclick = e => { dark = !dark; bg(); e.target.textContent = dark ? 'Светъл фон' : 'Тъмен фон'; };
+
+const mb = n => (n / 1048576).toFixed(n < 1048576 ? 2 : 1) + ' MB';
+const SZ = {"brickshop":548876,"brooklyn":643396,"montgomery":925400,"nyhirise":488164,"office1":125716,"oldbank":1443352,"usbank":304776,"washst":517052,"townhouse":362388,"pp-apart":166756,"pp-bigbld":450504,"pp-brown":59000,"pp-burhouse":451280,"pp-green":122916,"pp-office":220948,"pp-redcorner":139288,"pp-sfhouse":159380,"it-corner-shop":136632,"it-palazzo-big":418568,"it-palazzo-small":342468,"it-sf-hotel":808436,"it-sf-medkit":725988,"it-sf-palazzo3":427600,"it-sf-store":279460,"it-townhouse-terracotta":854500,"fire-red":664592,"mack_semi":3428996,"liaz_5292":1202904,"generic_town_bus":3982360,"school-minibus-eu":607216,"money-crate":1469404,"Meshy_AI_Art_Deco_Skyscraper_1020144933_texture":87705988,"Meshy_AI_Parisian_Elegance_1023161906_texture":131589212,"Meshy_AI_Evergreens_by_the_Bri_1023161954_texture":43328148,"Meshy_AI_Luminous_Tech_Talisma_1023154936_texture":21189628,"Meshy_AI_Kremlin_Skyline_1023161442_texture":26325812};   // размерите на файловете (25.10)
+const sizeOf = u => SZ[u.split('/').pop().slice(0, -4)] || 0;
+const loader = new GLTFLoader(), picks = [];
+let done = 0, bad = 0;
+async function one(c) {
+  const name = c.real.split('/').pop(), dir = c.real.slice(0, c.real.length - name.length - 1), lite = c.real !== c.url;
+  const lb = label(`<b>${name}</b><small>${dir}</small><i>…</i>`, 'lb', c.x, 0, c.z + FOOT * 0.62); lb.center.set(0.5, 0);
+  try {
+    const g = await loader.loadAsync('/' + c.url), sz = sizeOf(c.real);
+    const o = g.scene; o.traverse(m => { if (m.isLight) m.visible = false; });   // някои носят свои лампи (KHR_lights_punctual)
+    o.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(o), s = b.getSize(new THREE.Vector3()), ct = b.getCenter(new THREE.Vector3());
+    const k = Math.min(H / (s.y || 1), FOOT / (Math.max(s.x, s.z) || 1)), w = new THREE.Group(); w.add(o);
+    o.position.set(-ct.x, -b.min.y, -ct.z); w.scale.setScalar(k); w.position.set(c.x, 0, c.z); scene.add(w);
+    let tris = 0; o.traverse(m => { if (m.isMesh) { const gg = m.geometry; tris += (gg.index ? gg.index.count : gg.attributes.position.count) / 3 * (m.isInstancedMesh ? m.count : 1); } });
+    lb.element.querySelector('i').textContent = `${s.x.toFixed(1)} × ${s.y.toFixed(1)} × ${s.z.toFixed(1)} · ${mb(sz)} · ${Math.round(tris).toLocaleString('bg')} △${lite ? ' (олекотено копие)' : ''}`;
+    picks.push([w, c]);
+  } catch (e) { bad++; lb.element.querySelector('i').textContent = 'не се зарежда'; lb.element.style.color = '#fca5a5'; console.warn(c.url, e); }
+  done++; st.textContent = `Заредени ${done} от ${cells.length}` + (bad ? ` · ${bad} с грешка` : '') + ' · 1-ва група: ' + GROUPS[0][1].length + ', 2-ра: ' + GROUPS[1][1].length;
+}
+(async () => { const q = [...cells]; await Promise.all([0, 1, 2, 3].map(async () => { while (q.length) await one(q.shift()); })); })();
+
+// двоен клик — приближава модела
+const ray = new THREE.Raycaster(), p = new THREE.Vector2();
+renderer.domElement.addEventListener('dblclick', e => {
+  p.set(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1); ray.setFromCamera(p, camera);
+  const hit = ray.intersectObjects(picks.map(x => x[0]), true)[0]; if (!hit) return;
+  let w = hit.object; while (w && !picks.some(x => x[0] === w)) w = w.parent; if (!w) return;
+  near(w.position.x, w.position.z);
+});
+// надписите според близостта: отдалеч — само имената, отблизо — близките, с папката, размера и триъгълниците
+const lod = () => { const t = camera.position.distanceTo(controls.target), far = t > 140;   // далечен изглед — всички имена; отблизо — само съседите
+  for (const o of labels) { const d = camera.position.distanceTo(o.position), e = o.element; e.style.display = far || d < t * 1.8 ? '' : 'none'; for (const k of e.querySelectorAll('small,i')) k.style.display = !far && d < t * 1.2 ? '' : 'none'; } };
+function near(x, z) { controls.target.set(x, H * 0.35, z + 3); camera.position.set(x + 16, H * 1.5, z + 30); controls.update(); }
+window.__look = i => near(cells[i].x, cells[i].z);   // за проверка отвън
+const loop = () => { requestAnimationFrame(loop); controls.update(); lod(); renderer.render(scene, camera); css.render(scene, camera); }; loop();
+</script>
+</body></html>
