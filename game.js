@@ -114,6 +114,7 @@ import { createMapLayers } from './maplayers.js';
 import { applyRoadLook, makeCrosswalks } from './roadlook.js';
 // №10 (55, bld-a-real): тухлената двуетажна (building-a, 2,0 × 0,79 × 0,6 — 2 етажа ~4 м + корниз) беше смалена до ~5,6 м (15,7 м дълга → в 15 м парцел);
 // в истинска височина 9,5 м е 24 × 7 м — реже се по дължината (секции 14 / 10,5 м) и влиза в парцела без смаляване
+if (feature('blk-more')) SECTIONS['b2-brooklyn'] = { H: 15, axis: 'x', cuts: [[['x', 0.15], ['z', -0.45]], [['x', 0.1], ['z', -0.4]]] };   // blk-more: бруклинският ред (66 × 20 м, 4 етажа с магазините) → 20 или 13 м отпред
 if (feature('bld-a-real')) SECTIONS['building-a'] = { H: 9.5, axis: 'x', cuts: [-0.3, -0.22] };   // от края с вратата
 // bld-ef-real (55): офисите building-e (6 етажа + мансарда, 2,0 × 0,78 × 1,02) и building-f (7–8 етажа, 2,0 × 0,89 × 1,73) бяха „2 етажа“ (6–7 м) —
 // в истинска височина 24 / 26 м са ~60 × 30–50 м; режат се по двете оси (ъгълът с входа, лицето +z) до ~14,5 или ~11 м
@@ -551,7 +552,8 @@ let europe = null;
   // хотел за ски курортите (resortview.js го ползва вместо кулите на Kenney)
   for (const k of ['sing', 'rand', 'usb', 'blue', 'night']) jobs.push(load(`assets/heavy/sky/${k}.glb`).then(g => { g.scene.traverse(m => { if (m.isMesh && m.material && m.material.metalness > 0.5) m.material.metalness = 0.35; }); A['sf-sky-' + k] = g; prepNightFloors(g.scene, 'sf-sky-' + k); }).catch(() => {}));   // истински небостъргачи (Sketchfab) — за разнообразие в града
   for (const [n, path] of Object.entries(IMP_MODELS)) jobs.push(load(path).then(g => { A[n] = g; prepNightFloors(g.scene, n); }).catch(() => {}));   // Империал Сити: сталинската кула (impstyle.js)
-  for (const k of new Set(Object.values(blk2Pick()).flat())) jobs.push(load(`assets/heavy/blocks2/${k}.glb`).then(g => { g.scene.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; if (m.material && m.material.metalness > 0.5) m.material.metalness = 0.3; } }); A['b2-' + k] = g; prepNightFloors(g.scene, 'b2-' + k); blkSections('b2-' + k); }).catch(() => {}));   // истинските блокове вместо стъклените (Лабораторията → blocks-real)
+  for (const k of new Set(Object.values(blk2Pick()).flat())) jobs.push(load(`assets/heavy/blocks2/${k}.glb`).then(g => { if (k === 'brooklyn') { const w = new THREE.Group(); g.scene.rotation.y = -Math.PI / 2; w.add(g.scene); g.scene = w; }   /* blk-more: бруклинският ред — фасадата (+x) към улицата (+z) */ g.scene.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; if (m.material && m.material.metalness > 0.5) m.material.metalness = 0.3; } }); A['b2-' + k] = g; prepNightFloors(g.scene, 'b2-' + k); blkSections('b2-' + k); }).catch(() => {}));   // истинските блокове вместо стъклените (Лабораторията → blocks-real)
+  for (const [n, f] of [...(feature('mid-bld') ? [['b2-pp-office', 'blocks2/pp-office'], ['it-sf-medkit', 'rome/it-sf-medkit']] : []), ...(feature('us-oldbld') ? ['brickshop', 'washst', 'oldbank', 'townhouse', 'nyhirise'].map(k => ['b2-' + k, 'blocks2/' + k]) : [])]) jobs.push(load(`assets/heavy/${f}.glb`).then(g => { const xs = []; g.scene.traverse(m => { if (m.isLight || m.isCamera) xs.push(m); }); xs.forEach(m => m.removeFromParent()); /* pp-office носи светлина и камера от Blender (KHR_lights_punctual) */ g.scene.traverse(m => { if (!m.isMesh) return; m.castShadow = m.receiveShadow = true; const c = !m.material.map && m.material.color; if (c && c.r > 0.8 && c.g < 0.25 && c.b < 0.25) m.material.color.setHex(0xd9a066); m.material.metalness = Math.min(m.material.metalness, n === 'b2-pp-office' ? 0 : 0.3); }); A[n] = g; prepNightFloors(g.scene, n === 'it-sf-medkit' ? 'mk-medkit' : n); }).catch(() => {}));   // 🏢 mid-bld (55): още две сгради за средните градове (червеният „заместител“ без текстура → охра, както romePrep; офис сградата — без метал, иначе без отражения излиза черна); 🇺🇸 us-oldbld — старите американски
   for (const k of ['richmond', 'panel12', 'gamecity', 'soviet', 'oldbld', 'dbrick', 'brick', 'asian', 'modoffice', 'jade']) jobs.push(load(`assets/heavy/blocks/${k}.glb`).then(g => { g.scene.traverse(m => { if (m.isMesh && m.material && m.material.metalness > 0.5) m.material.metalness = 0.3; });
     if (feature('real-sizes')) { const lod1 = []; g.scene.traverse(m => { if (m.isMesh && /LOD1/.test(m.name)) lod1.push(m); }); lod1.forEach(m => m.removeFromParent()); }   // real-sizes (55): panel12 носи и второ копие (LOD1) на 32 м отзад — на снимката стояха два блока
     if (k === 'oldbld') {   // моделът е кух отгоре (само стени) — плосък покрив малко под ръба и няколко кутии на покрива
@@ -891,10 +893,15 @@ const realHouses = true;   // детските файлове вече не се
 const houseOf = (n, seed) => KID_HOUSES.has(n) ? REAL_HOUSES[hashStr(n + ':' + seed) % REAL_HOUSES.length] : n;
 const HOUSE_POOL = realHouses ? REAL_HOUSES : HOUSES;
 // истинските блокове вместо стъклените building-i…n — изборът от Лабораторията (lab/blocks.html); всеки парцел — един от избраните за тази сграда
-function blk2Pick() { return { 'building-i': ['pp-townhouse', 'midwest'], 'building-j': ['office4', 'office5'], 'building-k': ['office2'], 'building-l': ['office3'], 'building-m': ['hirise'], 'building-n': ['office6'] }; }
+function blk2Pick() { const P = { 'building-i': ['pp-townhouse', 'midwest'], 'building-j': ['office4', 'office5'], 'building-k': ['office2'], 'building-l': ['office3'], 'building-m': ['hirise'], 'building-n': ['office6'] };
+  // 🏙️ blk-more (f6): още 9 от blocks2 (CREDITS) — ниските тухлени (poly.pizza) и бруклинският ред при градските къщи, по-високите при офисите
+  // на 5–6 етажа, office1 (aitortilla01) при office2, Монтгомъри (кулата с часовника) при hirise; brooklyn и montgomery — само в САЩ/Канада (blockOf)
+  if (feature('blk-more')) { P['building-i'].push('pp-brown', 'pp-green', 'pp-redcorner', 'pp-burhouse', 'brooklyn'); P['building-j'].push('pp-apart', 'pp-bigbld'); P['building-k'].push('office1'); P['building-m'].push('montgomery'); }
+  return P; }
 const BLK2_PICK = blk2Pick();
 const blk2Loaded = () => [...new Set(Object.values(BLK2_PICK).flat())].filter(k => A['b2-' + k]);
-const blockOf = (n, seed) => { if (!BLK2_PICK[n]) return n; let L = BLK2_PICK[n].filter(k => A['b2-' + k]); if (!L.length) L = blk2Loaded(); return L.length ? 'b2-' + L[hashStr(n + ':' + seed) % L.length] : 'building-a'; };   // не се зареди нищо → обикновен магазин
+const B2_US = new Set(['brooklyn', 'montgomery']), b2Us = () => ['🇺🇸', '🇨🇦'].includes(S && cityById(S.cityId)?.cc);   // blk-more: американските — само там (и там по два пъти — по-често)
+const blockOf = (n, seed) => { if (!BLK2_PICK[n]) return n; let L = BLK2_PICK[n].filter(k => A['b2-' + k]); if (B2_US.size && L.some(k => B2_US.has(k))) L = b2Us() ? L.flatMap(k => B2_US.has(k) ? [k, k] : [k]) : L.filter(k => !B2_US.has(k)); if (!L.length) L = blk2Loaded(); return L.length ? 'b2-' + L[hashStr(n + ':' + seed) % L.length] : 'building-a'; };   // не се зареди нищо → обикновен магазин
 // истинските къщи (house-a тухлената с веранда, house-b каменната) — с 40% по-големи от Kenney къщите
 // (истинските не минават през tintRoof — копията на материалите губят нощното светене)
 function houseFit(n) { return n === 'building-type-a' || n === 'building-type-b' ? 15 : n === 'h2-blue' || n === 'h2-porch' ? 10.5 : n.startsWith('h2-') ? 14 : 11; }   // синята и бялата с верандата — тесни и високи, при 14 излизаха огромни
@@ -914,7 +921,7 @@ const PANELS = () => ['sf-blk-soviet', 'sf-blk-panel12'].filter(n => A[n]);
 const isTowerName = n => /skyscraper|^sf-sky-|@\d+$/.test(n);
 function regionTilt(cityId, lot, n) {
   const k = panelTilt(cityId), P = PANELS(); if (!k || !P.length || !n) return n;
-  if (HOUSES.includes(n) || /^h2-|^building-type-|^ind-/.test(n)) return n;   // къщите и заводите остават
+  if (HOUSES.includes(n) || /^h2-|^building-type-|^ind-|^b2-pp-office$|^it-sf-medkit$/.test(n)) return n;   /* mid-bld: двете нови сгради не стават панели */   // къщите и заводите остават
   const h = hashStr('east:' + cityId + ':' + lot.id), u = (h % 1000) / 1000, pn = P[(h >>> 10) % P.length], core = lot.zone === 'center', big = /^(l|xl)$/.test(cityTier(cityId));
   if (isTowerName(n)) {
     if (core && big) { if (u < 0.3 * k) return pn; if (n === 'sf-sky-usb' && k >= 1) { const o = SF_SKY().filter(x => x !== 'sf-sky-usb'); return o.length ? o[(h >>> 4) % o.length] : pn; } return n; }   // центърът на големия град: повечето кули остават
@@ -928,7 +935,30 @@ const TOWER_FLOORS0 = { s: [], m: [10], l: [10, 15, 20], xl: [20, 25, 30] };
 // мегаполисите: от ниво 15 — и 40 етажа
 const TOWER_FLOORS = new Proxy(TOWER_FLOORS0, { get: (o, k) => k === 'xl' && S && dev.has('SKY40') && A['building-skyscraper-d@40'] ? [25, 30, 40] : o[k] });
 // замяна на модела според големината (решава се по хеш на града и парцела, без нови r() — градовете не се разместват)
-const tierModel = (cityId, lot, n) => regionTilt(cityId, lot, tierModel0(cityId, lot, n));   // + обликът по региони (панелите в България)
+const tierModel = (cityId, lot, n) => regionTilt(cityId, lot, blkMore(cityId, lot, tierModel0(cityId, lot, n)));
+// 🏙️ blk-more (f6): в средните и големите градове всеки ~6-и обикновен блок (не в покрайнините) — една от новите 9 от blocks2; в САЩ/Канада
+// и бруклинският ред, а Монтгомъри (кулата с часовника) — само в центъра на големите. Решава се по хеш на града и парцела (без r())
+const BLK_MORE = ['pp-brown', 'pp-green', 'pp-redcorner', 'pp-burhouse', 'pp-apart', 'pp-bigbld', 'office1'];
+function blkMore(cityId, lot, n) {
+  if (!feature('blk-more') || !SHOPS.includes(n) || lot.zone === 'outer' || cityTier(cityId) === 's') return n;
+  const h = hashStr('blkm:' + cityId + ':' + lot.id); if (h % 6) return n;
+  const us = ['🇺🇸', '🇨🇦'].includes(cityById(cityId)?.cc), big = cityTier(cityId) === 'l' || cityTier(cityId) === 'xl';
+  const L = [...BLK_MORE, ...(us ? ['brooklyn', 'brooklyn', ...(big && lot.zone === 'center' ? ['montgomery'] : [])] : [])].filter(k => A['b2-' + k]);
+  return L.length ? 'b2-' + L[(h >>> 7) % L.length] : n;
+}   // + обликът по региони (панелите в България)
+// mid-bld (55): южните и средиземноморските градове (медкитът — „Modular modernist mediterranean buildings kit“)
+const MED_CC = new Set(['🇬🇷', '🇮🇹', '🇪🇸', '🇵🇹', '🇨🇾', '🇲🇹', '🇹🇷', '🇭🇷', '🇲🇪', '🇦🇱', '🇲🇰', '🇲🇦', '🇹🇳', '🇩🇿', '🇪🇬', '🇱🇧', '🇮🇱', '🇫🇷']), MED_IDS = new Set(['burgas', 'stz', 'varna', 'plovdiv']);   // южна България — Бургас, Стара Загора (и големите Варна, Пловдив)
+const midSouth = id => MED_IDS.has(id) || MED_CC.has(cityById(id)?.cc);
+// 🇺🇸 us-oldbld (55): старите американски сгради (blocks2: тухлената с магазина, 317 Washington St, старата банка, градската къща) — в старите
+// квартали и центъра на американските градове (най-много във Филаделфия, Бостън, Вашингтон, Ню Йорк и Чикаго); nyhirise — сред кулите на Ню Йорк и Чикаго
+const US_OLD = ['brickshop', 'washst', 'oldbank', 'townhouse'], US_CORE = new Set(['philadelphia', 'boston', 'washington', 'newyork', 'chicago']);
+function usOld(cityId, lot, n, h) {
+  if (!feature('us-oldbld') || cityById(cityId)?.cc !== '🇺🇸') return null;
+  const core = US_CORE.has(cityId), u = (h >>> 11) % 10;
+  if (SHOPS.includes(n) && lot.zone !== 'outer' && u < (core ? 4 : 2)) { const L = US_OLD.filter(k => A['b2-' + k]); if (L.length) return 'b2-' + L[(h >>> 15) % L.length]; }
+  if (SKY.includes(n) && A['b2-nyhirise'] && u < (cityId === 'newyork' || cityId === 'chicago' ? 4 : 1)) return 'b2-nyhirise';
+  return null;
+}
 function tierModel0(cityId, lot, n) {
   const t = cityTier(cityId), h = hashStr('tier:' + cityId + ':' + lot.id);
   if (t === 's') {
@@ -936,6 +966,8 @@ function tierModel0(cityId, lot, n) {
     if (lot.zone === 'center' && SHOPS.includes(n) && h % 4 === 0) return HOUSES[(h >>> 3) % HOUSES.length];
     return n;
   }
+  const us = usOld(cityId, lot, n, h); if (us) return us;   // us-oldbld
+  if (t === 'm' && feature('mid-bld') && SHOPS.includes(n) && cityId !== 'rome') { const so = midSouth(cityId), u = (h >>> 9) % (so ? 3 : 5); if (so && u === 1 && A['it-sf-medkit']) return 'it-sf-medkit'; if ((u === 0 || (!so && u === 1)) && A['b2-pp-office']) return 'b2-pp-office'; }   // mid-bld (55): в южните градове по един от всеки три блока — модерната офис сграда и средиземноморската (medkit); другаде офисът — 2 от 5
   if (t === 'm') return SKY.includes(n) ? (h % 2 ? `${n}@10` : SHOPS[h % SHOPS.length]) : n;
   if (SHOPS.includes(n) && t !== 's' && SF_BLK().length && h % 3 === 1) return SF_BLK()[(h >>> 5) % SF_BLK().length];   // всеки трети блок — истински модел
   if (SKY.includes(n) && (t === 'l' || t === 'xl') && SF_SKY().length && h % 3 === 0) return SF_SKY()[(h >>> 4) % SF_SKY().length];   // всеки трети — истински модел
@@ -950,7 +982,7 @@ const FACTORY_CITIES = new Set(ECON.FACTORIES.map(f => f.cityId));
 // мащаб, с който сградата се вписва в парцела 16×16 м
 // истинските височини (feature 'real-heights'): къща на 2 етажа ~8 м, блок на 5 етажа ~16 м, 10 етажа ~30 м, небостъргач — по етажите (~2.8 м),
 // за да не стои къща колкото половин небостъргач. Ширината се сбива само ако иначе не се побира на парцела (maxW).
-const H10 = { 'b2-pp-townhouse': 14, 'b2-midwest': 14, 'b2-office4': 30, 'b2-office5': 20, 'b2-office2': 20, 'b2-office3': 22, 'b2-hirise': 70, 'b2-office6': 22, 'sf-blk-soviet': 29, 'sf-blk-panel12': 36, 'sf-blk-richmond': 24, 'sf-blk-dbrick': 26, 'sf-blk-asian': 30, 'Building_Medium_2_001': 30 };
+const H10 = { 'b2-pp-office': 16, 'it-sf-medkit': 18, 'b2-brickshop': 12, 'b2-washst': 16, 'b2-oldbank': 14, 'b2-townhouse': 11, 'b2-nyhirise': 55, 'b2-pp-townhouse': 14, 'b2-midwest': 14, 'b2-office4': 30, 'b2-office5': 20, 'b2-office2': 20, 'b2-office3': 22, 'b2-hirise': 70, 'b2-office6': 22, 'sf-blk-soviet': 29, 'sf-blk-panel12': 36, 'sf-blk-richmond': 24, 'sf-blk-dbrick': 26, 'sf-blk-asian': 30, 'Building_Medium_2_001': 30,   /* blk-more (f6): */ 'b2-brooklyn': 15, 'b2-montgomery': 70, 'b2-office1': 32, 'b2-pp-apart': 20, 'b2-pp-bigbld': 16, 'b2-pp-brown': 16, 'b2-pp-burhouse': 12, 'b2-pp-green': 14, 'b2-pp-redcorner': 14 };
 const SKY_H = { 'sf-sky-sing': 50, 'sf-sky-rand': 55, 'sf-sky-usb': 70, 'sf-sky-blue': 50, 'sf-sky-night': 60, ...IMP_H };
 function realH(n) {
   const [base, fl] = n.split('@');
@@ -6624,6 +6656,30 @@ function lvHotelsPlace() {
 // в централата и в съседните кули). Търси се място около площада (до 24 м встрани), където квадратът fit·k (моделът е побран в него) е най-голям:
 // всяка точка — на площада или върху парцел (не на улица), нито една — в твой парцел (централа, гараж, склад, кампус, твоите сгради, обектите).
 // Чуждите сгради под него се махат (като в центъра на градовете без план). Връща { k, x, z }.
+// 🏛️ lm-big-min (55): потребителят — „да проверим размера на Саграда Фамилия“ (в Барселона излизаше ×0,65 — 11 м, по-ниска от квартала).
+// Големите забележителности (LM_BIG — височина в м) не се смаляват: търси се най-близкото място до площада (до 160 м), където основата им
+// (квадрат fit·k) не стъпва на улица (+ тротоара), вода, запазено голямо място (гара, болница…) или твой парцел; чуждите сгради под нея се махат.
+// Не се побере ли никъде — до ¾ от ръста, после както досега (lmSquareFit).
+const LM_BIG = { sagrada: 42 };
+function lmBigFit(sq, fit, kWant, R = 160) {
+  const P = city.plan, own = bgOwn(); for (const b of S.built || []) if (b.lot != null) own.add(b.lot); for (const l of city.lots) if (l.busy && l.busy !== 'bg' && l.busy !== 'landmark' && l.busy !== 'reserved') own.add(l.id);
+  const C = 2, E = R + 40, N = Math.ceil(2 * E / C), bad = new Uint8Array(N * N), cell = (x, z) => { const i = Math.floor((x - sq.x + E) / C), j = Math.floor((z - sq.z + E) / C); return i < 0 || j < 0 || i >= N || j >= N ? -1 : j * N + i; };   // маска през 2 м: 1 — не може
+  const mark = (x, z, r) => { for (let dx = -r; dx <= r; dx += C) for (let dz = -r; dz <= r; dz += C) if (dx * dx + dz * dz <= r * r) { const k = cell(x + dx, z + dz); if (k >= 0) bad[k] = 1; } };
+  for (const st of P.streets) { const e = (st.w || 6) / 2 + 2; for (const [x, z] of st.pts) if (Math.abs(x - sq.x) < E + e && Math.abs(z - sq.z) < E + e) mark(x, z, e); }   // улиците с тротоара
+  const rect = (o, m) => { const r = o.rot || 0, c = Math.cos(r), s = Math.sin(r), W = (o.w || 16) / 2 + m, D = (o.d || 16) / 2 + m; for (let u = -W; u <= W; u += C / 2) for (let v = -D; v <= D; v += C / 2) { const k = cell(o.x + u * c + v * s, o.z - u * s + v * c); if (k >= 0) bad[k] = 1; } };
+  for (const b of P.bigs || []) rect(b, 2);   // гарата, болницата, стадионът, парковете…
+  for (const l of city.lots) if (own.has(l.id) && Math.hypot(l.x - sq.x, l.z - sq.z) < E + 40) rect({ x: l.x, z: l.z, w: lotHalf(l)[0] * 2, d: lotHalf(l)[1] * 2, rot: lotRot(l) }, 2);   // твоите парцели (+2 м)
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) if (P.waterAt(sq.x - E + (i + 0.5) * C, sq.z - E + (j + 0.5) * C)) bad[j * N + i] = 1;
+  const free = (x, z, h) => { for (let u = -h; u <= h + 0.01; u += C) for (let v = -h; v <= h + 0.01; v += C) { const k = cell(x + u, z + v); if (k < 0 || bad[k]) return false; } return true; };
+  for (let k = kWant; k >= kWant * 0.75; k *= 0.95) { const h = fit * k / 2; let best = null;
+    for (let dx = -R; dx <= R; dx += 4) for (let dz = -R; dz <= R; dz += 4) { const d = Math.hypot(dx, dz); if (d > R || (best && d >= best.d)) continue; if (free(sq.x + dx, sq.z + dz, h)) best = { k, x: sq.x + dx, z: sq.z + dz, d }; }
+    if (!best) continue;
+    const inL = (l, x, z) => { const r = lotRot(l), c = Math.cos(r), s = Math.sin(r), [W, D] = lotHalf(l), ex = x - l.x, ez = z - l.z; return Math.abs(ex * c - ez * s) < W && Math.abs(ex * s + ez * c) < D; };
+    for (const l of city.lots) { if (own.has(l.id) || Math.hypot(l.x - best.x, l.z - best.z) > h + 40) continue; let hit = false; for (let u = -h - 1; u <= h + 1 && !hit; u += 2) for (let v = -h - 1; v <= h + 1 && !hit; v += 2) hit = inL(l, best.x + u, best.z + v);
+      if (hit) { if (l.obj) city.group.remove(l.obj); for (const t of l.trees || []) city.group.remove(t); l.obj = null; l.built = null; l.trees = []; l.busy = 'landmark'; } }   // чуждите сгради под нея
+    return best; }
+  return null;
+}
 function lmSquareFit(sq, k0, fit, kMin = 0) {   // kMin — burj-size: кулите не се смаляват под него (търси се място по-далеч от площада)
   const own = bgOwn(); for (const b of S.built || []) if (b.lot != null) own.add(b.lot); for (const l of city.lots) if (l.busy && l.busy !== 'bg' && l.busy !== 'landmark' && l.busy !== 'reserved') own.add(l.id);
   const near = city.lots.filter(l => Math.hypot(l.x - sq.x, l.z - sq.z) < 160), inL = (l, x, z, m) => { const r = lotRot(l), c = Math.cos(r), s = Math.sin(r), [W, D] = lotHalf(l), dx = x - l.x, dz = z - l.z; return Math.abs(dx * c - dz * s) < W + m && Math.abs(dx * s + dz * c) < D + m; };
@@ -6651,7 +6707,7 @@ function landmarkPlan(kinds) {
   const sq = city.plan.square, mem = S.landmarks[S.cityId], shade = o => o.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
   if (kinds[0] === 'redeemer' && feature('rio-hill') && city.plan.p2 && !city.plan.osm) { const o = rioHill(sq); if (o) { shade(o); city.group.add(o.group); city.landmarks.push(o); kinds = ['__none', ...kinds.slice(1)]; } }   // rio-hill (55): статуята — на хълм в залива пред центъра, площадът остава свободен
   if (kinds[0] === 'manhattan' && feature('ny-spread')) { nySpread(); kinds = kinds.slice(1); if (!kinds.length) return; kinds = ['__none', ...kinds]; }
-  if (kinds[0] !== '__none') { const main = buildLandmark(kinds[0], { label }); main.group.position.set(sq.x, 0.1, sq.z); main.group.scale.setScalar(LM_MAIN_SCALE[kinds[0]] || 3.2); if (feature('lm-fit-sq')) { const k0 = LM_MAIN_SCALE[kinds[0]] || 3.2, tall = feature('burj-size') && (lmH(kinds[0]) || 0) / (lmFit(kinds[0]) || 15) > 3, f = lmSquareFit(sq, k0, lmFit(kinds[0]) || 15, tall ? k0 * 0.85 : 0);   /* burj-size (55): кулите (Бурж Халифа 70/14) не се смаляват до игла (беше 46 м, ×0,65) — поне ×0,85 (~190 м), по-далеч от площада */ main.group.scale.setScalar(f.k); main.group.position.set(f.x, 0.1, f.z); }   /* lm-fit-sq (55): на площада, без да влиза в твоите парцели и в улиците */ main.group.rotation.y = (hashStr(kinds[0]) % 4) * Math.PI / 2;
+  if (kinds[0] !== '__none') { const main = buildLandmark(kinds[0], { label }); main.group.position.set(sq.x, 0.1, sq.z); main.group.scale.setScalar(LM_MAIN_SCALE[kinds[0]] || 3.2); if (feature('lm-fit-sq')) { const k0 = LM_MAIN_SCALE[kinds[0]] || 3.2, tall = feature('burj-size') && (lmH(kinds[0]) || 0) / (lmFit(kinds[0]) || 15) > 3, big = feature('lm-big-min') && LM_BIG[kinds[0]] ? lmBigFit(sq, lmFit(kinds[0]) || 15, LM_BIG[kinds[0]] / (lmH(kinds[0]) || 17)) : null, f = big || lmSquareFit(sq, k0, lmFit(kinds[0]) || 15, tall ? k0 * 0.85 : 0);   /* lm-big-min (55): Саграда — в ръст, по-далеч от площада */   /* burj-size (55): кулите (Бурж Халифа 70/14) не се смаляват до игла (беше 46 м, ×0,65) — поне ×0,85 (~190 м), по-далеч от площада */ main.group.scale.setScalar(f.k); main.group.position.set(f.x, 0.1, f.z); }   /* lm-fit-sq (55): на площада, без да влиза в твоите парцели и в улиците */ main.group.rotation.y = (hashStr(kinds[0]) % 4) * Math.PI / 2;
   shade(main); city.group.add(main.group); city.landmarks.push(main); }
   kinds.slice(1).forEach((k, i) => {
     if (k === 'notredame' && feature('paris-spread')) { const o = lmRiverSpot(k, mem); if (o) { shade(o); city.group.add(o.group); city.landmarks.push(o); return; } }
@@ -11390,7 +11446,13 @@ if (AUTOTEST) {
       city.group.add(G); if (night != null) __dbg.time && __dbg.time(night ? 22 : 12); const mid = (x0 + x) / 2 + 70; __dbg.camAt(mid, 80, z0 + (x - x0) * 0.8, mid, 12, z0); return Math.round(x - x0); },
     nightScan() { const names = [...new Set([...HOUSES, ...SHOPS, ...MODERN, ...SF_BLK(), ...Object.values(blk2Pick()).flat().map(k => 'b2-' + k), ...SKY, ...MODERN_SKY, ...SF_SKY(), ...Object.keys(A).filter(n => /^(h2-|wh2-|sf-ind|ind-|b2-|sf-blk-|svc-|hotel|gas-)/.test(n))])].filter(n => A[n]);   /* кои сгради нямат нощно светене (blk-night2 скан) */
       const out = { lit: [], dark: [] }; for (const n of names) { let lit = false; const R0 = A[n].scene || A[n]; if (!R0.traverse) continue; R0.traverse(o => { if (o.isMesh) for (const m of [].concat(o.material || [])) if (m && (m.userData.nightFloors || /FakeInterior_[123]|colormap/i.test(m.name || ''))) lit = true; }); out[lit ? 'lit' : 'dark'].push(n); } out.nLit = out.lit.length; delete out.lit; return out; },
-    blkLook(k = 'oldbld', at) { const l = at ? { x: at[0], z: at[1] } : city.lots.find(x => !x.built && !x.busy && x.zone === 'mid') || city.lots.find(x => !x.built && !x.busy && x !== city.hq); const nm = /^(sf-|b2-|h2-)/.test(k) ? k : 'sf-blk-' + k; if (!l || !A[nm]) return null; const o = window.__blk = model(nm, fitScale(nm, 14)); o.position.set(l.x, 0, l.z); city.group.add(o); __dbg.camAt(l.x + 22, 30, l.z + 26, l.x, 6, l.z); return { x: l.x, z: l.z }; },
+    lmDiag(side = 30, R = 140, step = 8) { const sq = city.plan?.square; if (!sq) return null; const own = bgOwn(); for (const b of S.built || []) if (b.lot != null) own.add(b.lot); for (const l of city.lots) if (l.busy && l.busy !== 'bg' && l.busy !== 'landmark' && l.busy !== 'reserved') own.add(l.id);   /* lm-big-min (55): къде около площада се побира квадрат side × side — точките на улица (st, в сърцевината — stC) и в твои парцели (own) */
+      const near = city.lots.filter(l => Math.hypot(l.x - sq.x, l.z - sq.z) < R + 60), inL = (l, x, z, m) => { const r = lotRot(l), c = Math.cos(r), s = Math.sin(r), [W, D] = lotHalf(l), dx = x - l.x, dz = z - l.z; return Math.abs(dx * c - dz * s) < W + m && Math.abs(dx * s + dz * c) < D + m; }, h = side / 2, out = [], SR = [];   /* SR — точките по улиците (през 2 м) с половината ширина + тротоара */
+      for (const st of city.plan.streets) { const e = (st.w || 6) / 2 + 2; for (const [x, z] of st.pts) if (Math.hypot(x - sq.x, z - sq.z) < R + 80) SR.push({ x, z, e }); }
+      for (let dx = -R; dx <= R; dx += step) for (let dz = -R; dz <= R; dz += step) { const x = sq.x + dx, z = sq.z + dz; let st = 0, stC = 0, ow = 0, rd = 0, n = 0; for (let i = 0; i <= 10; i++) for (let j = 0; j <= 10; j++) { const px = x - h + side * i / 10, pz = z - h + side * j / 10; n++; const onL = Math.hypot(px - sq.x, pz - sq.z) < sq.r || near.some(l => inL(l, px, pz, 0.5)); if (!onL) { st++; if (Math.max(Math.abs(px - x), Math.abs(pz - z)) <= h * 0.55) stC++; } if (SR.some(r => Math.abs(px - r.x) < r.e && Math.abs(pz - r.z) < r.e && Math.hypot(px - r.x, pz - r.z) < r.e)) rd++; if (near.some(l => own.has(l.id) && inL(l, px, pz, 1.5))) ow++; } out.push({ dx, dz, st, stC, ow, rd }); }
+      out.sort((a, b) => (a.ow > 0) - (b.ow > 0) || a.rd - b.rd || a.stC - b.stC || a.st - b.st || Math.hypot(a.dx, a.dz) - Math.hypot(b.dx, b.dz)); return { own: [...own].length, hq: city.hq && [Math.round(city.hq.x - sq.x), Math.round(city.hq.z - sq.z)], best: out.slice(0, 8), lotSz: near.slice(0, 12).map(l => [Math.round(l.w), Math.round(l.d)]) }; },
+    bldOn(n, id) { const l = id != null ? city.lots[id] : city.lots.find(x => !x.built && !x.busy && !x.obj && x !== city.hq && x.zone !== 'outer'); if (!l || !A[n]) return null; if (l.obj) city.group.remove(l.obj); l.obj = placeBuilding(l, n); l.built = n; const o = l.obj; o.updateMatrixWorld(true); const r = lotRot(l), c = Math.cos(r), s = Math.sin(r), v = new THREE.Vector3(); let mu = 0, mv = 0, my = 0; o.traverse(m => { if (!m.isMesh) return; const p = m.geometry.attributes.position; for (let i = 0; i < p.count; i += 7) { v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld); const dx = v.x - l.x, dz = v.z - l.z; mu = Math.max(mu, Math.abs(dx * c - dz * s)); mv = Math.max(mv, Math.abs(dx * s + dz * c)); my = Math.max(my, v.y); } }); return { id: l.id, x: Math.round(l.x), z: Math.round(l.z), half: lotHalf(l), u: +mu.toFixed(1), v: +mv.toFixed(1), h: +my.toFixed(1) }; },   // mid-bld (55): сграда n на парцел (както при строеж) — колко излиза от половините на парцела (u, v) и височината
+    blkLook(k = 'oldbld', at) { const l = at ? { x: at[0], z: at[1] } : city.lots.find(x => !x.built && !x.busy && x.zone === 'mid') || city.lots.find(x => !x.built && !x.busy && x !== city.hq); const nm = /^(sf-|b2-|h2-|it-)/.test(k) ? k : 'sf-blk-' + k; if (!l || !A[nm]) return null; const o = window.__blk = model(nm, fitScale(nm, 14)); o.position.set(l.x, 0, l.z); city.group.add(o); __dbg.camAt(l.x + 22, 30, l.z + 26, l.x, 6, l.z); return { x: l.x, z: l.z }; },
     berthTest() { S.dev.xp = 260000; S.dev.lv = 10; econ.earn(2e8, 'друго', 'тест'); S.ports = { varna: { lv: 1, build: null }, burgas: { lv: 2, build: null } }; S.ships = [];
       S.seaRoutes = [['varna', 'istanbul'], ['varna', 'constanta'], ['burgas', 'thessaloniki'], ['burgas', 'athens'], ['varna', 'izmir'], ['burgas', 'patras']].map(([a, b]) => ({ a, b, km: seaRouteKm(a, b) }));
       const before = { berths: portBerths(), plan: berthPlan() }; seaAutoShips(); const mid = (S.ships || []).length; openBig('sea'); const btn = document.querySelector('[data-addberths]')?.innerText;
