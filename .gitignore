@@ -8,3 +8,6 @@ lab-feedback.jsonl
 lab-status.json
 assets/local/
 _source/
+dist/
+dist-heavy/
+dist-files.txt

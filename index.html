@@ -331,6 +331,7 @@
   "./cityplanroute.js": "./cityplanroute.js?v=a0f8c3a0",
   "./civic3d.js": "./civic3d.js?v=d42853d4",
   "./cloud.js": "./cloud.js?v=cf62c2fc",
+  "./config.js": "./config.js?v=5000e0b9",
   "./conquest.js": "./conquest.js?v=9c245ce1",
   "./consent.js": "./consent.js?v=aaa22fdf",
   "./construct.js": "./construct.js?v=eb318e23",
@@ -621,6 +622,7 @@
 <script>/* след ниво 20 (политиката) — новата картина при зареждане */ try { const n = Math.min(3, Math.max(1, +localStorage.getItem('stroi-slot') || 1)), raw = localStorage.getItem(n === 1 ? 'stroi-save-v1' : 'stroi-save-v1-s' + n), lv = raw ? +((JSON.parse(raw) || {}).dev || {}).lv || 0 : 0; if (lv > 20) document.getElementById('loading').classList.add('pol'); } catch (e) {}</script>
 
 <script src="mobile.js?v=7d605a2f"></script>
+<script type="module" src="config.js?v=5000e0b9"></script>
 <script type="module" src="memfix.js?v=ee92ceaf"></script>
 <script type="module" src="game.js?v=884f45fd"></script>
 <script type="module" src="tips.js?v=f58d6ac2"></script>
