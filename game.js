@@ -158,7 +158,8 @@ import { createSkySun } from './skysun.js';
 import { createFootball } from './football.js';
 import { createBirds } from './birds.js';
 import { flagPole, flagTex, flagsTick, inEU } from './flags.js';
-import { createXmas } from './xmas.js';   // 🎄 xmas (f9): Коледа по календара на играта   // 🏳️ flags (f9): знамената на държавата по площада и обществените сгради   // 🐦 birds (f9): гълъби по площадите, чайки над морето   // ⚽ football (f9): мачове на малките игрища в кварталите   // 🌅 sky-sun (f9): небе с градиент спрямо слънцето, видимо слънце, залез/изгрев, луна и звезди   // 🚉 station-access (f9): път от гарата до улица и паркинг до нея (градовете с плана v2)   // 🎓 onboarding (f9): урокът при първа игра — камера, парцел, строеж, пари, град, настройки
+import { createXmas } from './xmas.js';
+import { buildMarket } from './markets.js';   // 🍉 markets (f9): сергии и кафенета около площада   // 🎄 xmas (f9): Коледа по календара на играта   // 🏳️ flags (f9): знамената на държавата по площада и обществените сгради   // 🐦 birds (f9): гълъби по площадите, чайки над морето   // ⚽ football (f9): мачове на малките игрища в кварталите   // 🌅 sky-sun (f9): небе с градиент спрямо слънцето, видимо слънце, залез/изгрев, луна и звезди   // 🚉 station-access (f9): път от гарата до улица и паркинг до нея (градовете с плана v2)   // 🎓 onboarding (f9): урокът при първа игра — камера, парцел, строеж, пари, град, настройки
 import { t, t as tr, fmtNum } from './i18n.js';   // 🌐 lang-en (f6): t() за надписите на платното, числата по езика
 import { initErrTelemetry, errPayload, sendErrors } from './errtelem.js';   // 🐞 err-telemetry (f9): грешките в буфер за изпращане (само със съгласие за анализи)
 import { pcGate, perfCheck } from './perfmeter.js';   // 🖥️ perf-meter (f9): играта е за компютър — екран за телефон/таблет и „Проверка на компютъра“
@@ -1104,17 +1105,28 @@ const birdSites = () => { if (city.birdSites && city.birdSites.id === S.cityId) 
   city.birdSites = { id: S.cityId, L }; return L; };
 const birds = feature('birds') ? createBirds({ parent: () => city.group, sites: birdSites, hour: () => (6 + todF() * 24) % 24, on: () => !!S && !!city.group && $('mapScreen').classList.contains('hidden') }) : null;
 // 🏳️ flags (f9): на площада — държавата, ЕС (ако е член) и пак държавата; кметството — знамената му стават на държавата; училище, полиция, съд — стълб отпред
-const FLAGS = feature('flags'); let flagT = 0;
+const FLAGS = feature('flags'); let flagT = 0, marketT = 0;
 // свободно място до (cx, cz): на ≥ pad м от платното на всяка улица, не във вода и не в парцел; offs — отмествания по x, които също трябва да са свободни
-function freeNear(cx, cz, offs = [0], pad = 3.5, rMax = 60, lotPad = 1.5) {
-  const gp = city.plan; if (!gp) return null;
-  const segD = (x, z, a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / l2)); return Math.hypot(x - a[0] - dx * t, z - a[1] - dz * t); };
-  const free = (x, z) => (gp.streets || []).every(st => { for (let i = 1; i < st.pts.length; i++) if (segD(x, z, st.pts[i - 1], st.pts[i]) < (st.w || 8) / 2 + pad) return false; return true; }) && !(gp.waterAt && gp.waterAt(x, z))
+function spotFree(x, z, pad = 3.5, lotPad = 1.5) {
+  const gp = city.plan; if (!gp) return false;
+  const segD = (a, b) => { const dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / l2)); return Math.hypot(x - a[0] - dx * t, z - a[1] - dz * t); };
+  return (gp.streets || []).every(st => { for (let i = 1; i < st.pts.length; i++) if (segD(st.pts[i - 1], st.pts[i]) < (st.w || 8) / 2 + pad) return false; return true; }) && !(gp.waterAt && gp.waterAt(x, z))
     && !city.lots.some(l => { const c = Math.cos(l.rot || 0), sn = Math.sin(l.rot || 0), dx = x - l.x, dz = z - l.z; return Math.abs(dx * c - dz * sn) < (l.w || 16) / 2 + lotPad && Math.abs(dx * sn + dz * c) < (l.d || 16) / 2 + lotPad; })
     && !(city.flagSq && city.flagSq.children.some(p => Math.hypot(p.position.x - x, p.position.z - z) < pad + 2));
-  for (let r = 0; r <= rMax; r += 4) for (let k = 0, n = Math.max(1, Math.round(r * 1.2)); k < n; k++) { const a = k / n * Math.PI * 2, x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r; if (offs.every(d => free(x + d, z))) return [x, z]; }
+}
+function freeNear(cx, cz, offs = [0], pad = 3.5, rMax = 60, lotPad = 1.5) {
+  if (!city.plan) return null;
+  for (let r = 0; r <= rMax; r += 4) for (let k = 0, n = Math.max(1, Math.round(r * 1.2)); k < n; k++) { const a = k / n * Math.PI * 2, x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r; if (offs.every(d => spotFree(x + d, z, pad, lotPad))) return [x, z]; }
   return null;
 }
+// няколко свободни места около (cx, cz), на ≥ sep м едно от друго и от avoid [[x, z]…]
+function freeSpots(cx, cz, n, sep = 9, pad = 3, lotPad = 2, rMax = 70, avoid = []) {
+  const out = []; if (!city.plan) return out;
+  for (let r = 6; r <= rMax && out.length < n; r += 3) for (let k = 0, m = Math.max(6, Math.round(r * 0.8)); k < m && out.length < n; k++) { const a = k / m * Math.PI * 2 + r * 0.13, x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
+    if ([...out, ...avoid].some(p => Math.hypot(p[0] - x, p[1] - z) < sep)) continue; if (spotFree(x, z, pad, lotPad)) out.push([x, z]); }
+  return out;
+}
+
 function placeFlags() {
   if (!FLAGS || !city.group || !S) return; const cc = cityById(S.cityId)?.cc || '🇧🇬', gp = city.plan;
   if (gp && gp.square && !(city.flagSq && city.flagSq.parent === city.group)) { const g = new THREE.Group(), sq = gp.square, eu = inEU(cc);
@@ -1153,6 +1165,16 @@ function snowRoofs() {
 const xmasSeason = () => { if (!S) return false; const m = monthOf(S.day), d = (S.day - 1) % 30 + 1; return m === 11 || (m === 0 && d <= 6); };
 const xmas = feature('xmas') ? createXmas({ parent: () => city.group, spot: () => { const sq = city.plan && city.plan.square; return sq ? freeNear(sq.x, sq.z, [-5, 0, 5], 4.5, 80, 5) : city.hq ? [city.hq.x + 20, city.hq.z + 14] : null; },
   lamps: () => dayNight.lamps.children.filter(o => o.isSprite).map(o => o.position), season: () => !!S && !!city.group && xmasSeason(), night: () => dayNight.night || 0, winMats: () => dayNight.winMats }) : null;
+// 🍉 markets (f9): около главния площад — на Балканите и по Средиземноморието сергии (пазар) и кафенета, в останалата Европа — кафенета
+const MARKETS = feature('markets'), BALKAN_CC = new Set(['🇧🇬', '🇷🇴', '🇷🇸', '🇲🇰', '🇬🇷', '🇹🇷', '🇦🇱', '🇲🇪', '🇧🇦', '🇭🇷', '🇽🇰', '🇸🇮']);
+function placeMarket() {
+  if (!MARKETS || !city.group || !S || (city.market && city.market.group.parent === city.group)) return; const gp = city.plan, sq = gp && gp.square; if (!sq) return;
+  const c = cityById(S.cityId), cc = c?.cc || '🇧🇬', south = BALKAN_CC.has(cc) || MED_CC.has(cc) || MED_IDS.has(S.cityId), eu = !WORLD_IDS.has(S.cityId);
+  if (!south && !eu) { city.market = { group: { parent: city.group } }; return; }   // извън Европа — не (засега)
+  const avoid = city.flagSq ? city.flagSq.children.map(p => [p.position.x, p.position.z]) : [], P = freeSpots(sq.x, sq.z, south ? 10 : 4, 8.5, 3, 2.5, 70, avoid);
+  const spots = P.map(([x, z], i) => ({ x, z, rot: Math.atan2(sq.x - x, sq.z - z), kind: south && i % 5 < 3 ? 'stall' : 'cafe' }));   // 3 сергии : 2 кафенета
+  if (!spots.length) return; const m = buildMarket(spots); city.group.add(m.group); city.market = m;
+}
 const W2 = feature('weather2'), wx2C = id => ({ id, lat: cityById(id)?.lat ?? 45, desert: isDesert(id) });
 const wx2Now = () => S?.wxLock ? S.wxLock : events.stormy() ? 'storm' : wx2Kind(wx2C(S.cityId), S.day + S.dayT / DAY_SEC, CYCLE_DAYS, monthOf);
 // парцелите, по които записът има нещо (сграда, обект, имот, парк, склад, гараж…)
@@ -6870,7 +6892,8 @@ if (feature('washington-osm')) { Object.assign(LM_PREF, { capitol: 'capitol2', w
 if (feature('lasvegas-osm')) Object.assign(LM_REAL_H, { bellagio: 155, luxor: 107, vegassign: 7.6 });   // 🇺🇸 Лас Вегас по картата (55): Беладжио — кулата 155 м, Луксор — пирамидата 107 м, знакът 7,6 м
 if (feature('lm-suleymaniye2')) LM_PREF.mosque2 = 'suleymaniye2';
 if (feature('liberty-island')) { LM_PREF.liberty = 'liberty2'; LM_REAL_H.liberty2 = 93; }   // 🗽 liberty-island (f6): островът Либърти — диорамата на Темидасофт (Meshy AI) вместо статуята на плоча; 93 м до върха на факлата, островът — на водата
-if (feature('lm-colosseum2')) LM_PREF.colosseo = 'colosseo4';   // 🏛️ lm-colosseum2 (f6): новият Колизеум (Meshy) — и в Рим по картата (OSM)
+if (feature('lm-colosseum2')) LM_PREF.colosseo = 'colosseo4';
+if (feature('lm-westminster')) { Object.assign(LM_PREF, { bigben: 'westminster3', bigben2: 'westminster3', parliament2: 'westminster3' }); LM_REAL_H.westminster3 = 96; }   // 🇬🇧 lm-westminster (f6): новият Уестминстър с Биг Бен (Meshy) на мястото на стария — 96 м до върха на кулата   // 🏛️ lm-colosseum2 (f6): новият Колизеум (Meshy) — и в Рим по картата (OSM)
 if (feature('lm-arc2')) { LM_PREF.arc = 'arc2'; LM_REAL_H.arc2 = 50; }   // Триумфалната арка — моделът на потребителя (Meshy), 50 × 45 × 22 м   // Сюлеймание — моделът на потребителя вместо процедурната джамия
 LANDMARK_NM.maiden2 = LANDMARK_NM.maiden2 || 'Момината кула'; LANDMARK_NM.rockefeller2 = LANDMARK_NM.rockefeller2 || 'Рокфелер Сентър'; LANDMARK_NM.radiocity2 = LANDMARK_NM.radiocity2 || 'Радио Сити Мюзик Хол'; LANDMARK_NM.empire2 = LANDMARK_NM.empire2 || 'Емпайър Стейт Билдинг'; LANDMARK_NM.parliament2 = LANDMARK_NM.parliament2 || 'Уестминстърският дворец и Биг Бен'; LANDMARK_NM.colosseo3 = LANDMARK_NM.colosseo3 || 'Колизеумът'; LANDMARK_NM.vittoriano2 = LANDMARK_NM.vittoriano2 || 'Витториано';
 const LM_LABEL = { kotelnicheskaya: 'Котелническа висотка' };   // надписът, когато моделът е назаем (mgu → Котелническа)
@@ -9971,6 +9994,7 @@ function teardownCity() {
   if (football) football.clear();   // ⚽ football
   if (birds) { birds.clear(); city.birdSites = null; }   // 🐦 birds
   if (xmas) xmas.clear();   // 🎄 xmas
+  if (city.market && city.market.dispose) city.market.dispose(); city.market = null;   // 🍉 markets
   city.ready = false;
   const gone = [];   // махнатото извън групата на града — за dropGpu накрая
   for (const p of projects) if (p.vis) gone.push(p.vis.g);
@@ -11366,7 +11390,7 @@ function frame() {
     if (window.__overlay3d > 0) return;
   }   // директорската зала (directors3d.js) е втори WebGL на цял екран — градът под нея не се рисува (иначе две сцени на кадър)
   controls.update();
-  if (S) { dayNight.update(todF(), controls.target); weather.update(rdt, controls.target); if (skySun) skySun.update((6 + todF() * 24) % 24, camera, controls.target, SKY_CLOUD[weather.kind] ?? 0, sun);   /* sky-sun: след денонощието и времето */ if (football) football.update(rdt, controls.target);   /* ⚽ football: само близо до камерата */ if (birds) birds.update(rdt, camera);   /* 🐦 birds */ if (FLAGS) { flagsTick(performance.now() / 1000); if (performance.now() > flagT) { flagT = performance.now() + 2500; try { placeFlags(); } catch (e) { console.warn('flags', e); } } }   if (SNOWR && performance.now() > snowT) { snowT = performance.now() + 2500; try { snowRoofs(); } catch (e) { console.warn('snow-roofs', e); } }   /* ❄️ snow-roofs */   /* 🏳️ flags */ if (xmas) xmas.update(rdt);   /* 🎄 xmas */ setSiteLightsNight(dayNight.night); if (cityHw && cityHw.signs) for (const G of cityHw.signs) G.setNight(dayNight.night); if (city.billboards) { city.billboards.setNight(dayNight.night); city.billboards.update && city.billboards.update(rdt); } }
+  if (S) { dayNight.update(todF(), controls.target); weather.update(rdt, controls.target); if (skySun) skySun.update((6 + todF() * 24) % 24, camera, controls.target, SKY_CLOUD[weather.kind] ?? 0, sun);   /* sky-sun: след денонощието и времето */ if (football) football.update(rdt, controls.target);   /* ⚽ football: само близо до камерата */ if (birds) birds.update(rdt, camera);   /* 🐦 birds */ if (FLAGS) { flagsTick(performance.now() / 1000); if (performance.now() > flagT) { flagT = performance.now() + 2500; try { placeFlags(); } catch (e) { console.warn('flags', e); } } }   if (SNOWR && performance.now() > snowT) { snowT = performance.now() + 2500; try { snowRoofs(); } catch (e) { console.warn('snow-roofs', e); } }   /* ❄️ snow-roofs */   /* 🏳️ flags */ if (MARKETS && performance.now() > marketT) { marketT = performance.now() + 3000; try { placeMarket(); } catch (e) { console.warn('markets', e); } }   /* 🍉 markets */ if (xmas) xmas.update(rdt);   /* 🎄 xmas */ setSiteLightsNight(dayNight.night); if (cityHw && cityHw.signs) for (const G of cityHw.signs) G.setNight(dayNight.night); if (city.billboards) { city.billboards.setNight(dayNight.night); city.billboards.update && city.billboards.update(rdt); } }
   if (GLITE) dayNight.glowMat.visible = dayNight.poolMat.visible = dayNight.night > 0.01 && gfx().night;   // 🟠 gfx-lite: ореолите на лампите — денем (прозрачност 0) без рисуване; „Нощни светлини“ — изключени
   perfTune(rdt);
   perf.lap('prep');
@@ -12327,6 +12351,7 @@ if (AUTOTEST) {
       const sq = city.plan && city.plan.square, p = sq ? freeNear(sq.x, sq.z, [-5, 0, 5], 4.5, 80, 5) : null; if (p) { const l = city.lots.reduce((a, q) => !a || Math.hypot(q.x - p[0], q.z - p[1]) < Math.hypot(a.x - p[0], a.z - p[1]) ? q : a, null), dx = p[0] - (l ? l.x : p[0] - 1), dz = p[1] - (l ? l.z : p[1]), dl = Math.hypot(dx, dz) || 1; this.camAt(p[0] + dx / dl * 34, 13, p[1] + dz / dl * 34, p[0], 7, p[1]); }   /* откъм свободната страна (далеч от най-близкия парцел) */ return { day: S.day, month: monthOf(S.day), on: xmas ? xmas.on : null, at: p && p.map(Math.round) }; },
     riverLook(k = 0) { const pv = city.planView, L = []; if (pv) pv.traverse(o => { if (o.userData && o.userData.extShared && o.parent && o.parent.parent && o.parent.parent.position.y === -1) L.push(o.parent); }); if (!L.length) return { boats: 0 };   // 🛥️ river-boats: Лабораторията
       const b = L[k % L.length], v = b.getWorldPosition(new THREE.Vector3()); S.wxLock = 'clear'; weather.set('clear'); this.time(15); showMap(false); this.camAt(v.x + 45, 28, v.z + 45, v.x, 0, v.z); return { boats: L.length, at: [Math.round(v.x), Math.round(v.z)] }; },
+    marketLook() { placeMarket(); const sq = city.plan && city.plan.square; if (!sq) return null; S.wxLock = 'clear'; weather.set('clear'); this.time(11); showMap(false); this.camAt(sq.x + 34, 22, sq.z + 40, sq.x, 1, sq.z); return { spots: city.market && city.market.group.children ? city.market.group.children.reduce((a, o) => a + (o.count || 0), 0) : 0 }; },   // 🍉 markets: Лабораторията
     onbDemo() { onboard?.restart(); return onboard?.step(); },   // 🎓 onboarding: Лабораторията (под autotest урокът не тръгва сам)
     ads: () => ads,   // 📺 ads: Лабораторията (skipWait, next, state)
     awayDemo(h = 9, bankMin = 60, more = true) { if (!awaySum) return null; if (more) S.branches = [...new Set([...(S.branches || []), 'plovdiv', 'varna', 'istanbul'])]; ads?.skipWait?.(); return awaySum.demo(h, bankMin); },   // 👋 away-summary: отсъствие h ч с bankMin мин игра (more — още 3 града за списъка)

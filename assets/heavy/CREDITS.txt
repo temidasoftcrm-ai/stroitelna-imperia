@@ -357,3 +357,5 @@ City buses (55, buses-more) — Sketchfab, normalized in Blender (front +z, real
 - lm/colosseo4.glb — „Colosseum“, генериран с Meshy AI от собственика (платен план, ТЕМИДАСОФТ ООД) — в Blender: плочата наоколо изрязана, кръгът → овал 189 × 156 м, ~160 хил. триъгълника, текстури 1024 px WebP
 Атина lm-acropolis (f6; 26.10.2026):
 - lm/parthenon.glb — „Parthenon“, генериран с Meshy AI от собственика (CC0 в Meshy; ТЕМИДАСОФТ ООД) — олекотен 2 млн. → 115 хил. триъгълника, текстури 2048 px WebP; хълмът — процедурен (landmarks.js)
+Лондон lm-westminster (f6; 26.10.2026):
+- lm/westminster3.glb — „England Center“ (Уестминстърският дворец с Биг Бен), генериран с Meshy AI от собственика (платен план, ТЕМИДАСОФТ ООД) — олекотен 986 хил. → 108 хил. триъгълника, изрязани ивиците покрай фасадите, текстура 2048 px WebP

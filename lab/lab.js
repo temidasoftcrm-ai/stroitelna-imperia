@@ -303,6 +303,8 @@ const DEMOS = [
   ['🏛️ Будапеща: Парламентът (Meshy, Темидасофт) до площада; след 5 s — нощ, златисто осветен', 'budapest', d => { d.wx('clear'); d.time(13); d.lookLm(0, 150); setTimeout(() => d.time(21.5), 5000); }],   // lm-budapest
   ['🏛️ Рим: новият Колизеум (модел на Темидасофт) — денем, после нощем (златисто осветен)', 'rome', d => setTimeout(() => { d.time(12); d.lookLmKind('colosseo4', 260); setTimeout(() => { d.time(22); d.lookLmKind('colosseo4', 260); }, 12000); }, 9000)],   // lm-colosseum2
   ['🏛️ Атина: Акрополът — Партенонът на скалистия хълм, денем, после нощем (златисто осветен)', 'athens', d => setTimeout(() => { d.time(12); d.lookLmKind('parthenon', 230); setTimeout(() => { d.time(22); d.lookLmKind('parthenon', 230); }, 12000); }, 9000)],   // lm-acropolis
+  ['🇬🇧 Лондон: новият Уестминстърски дворец с Биг Бен — денем, после нощем (топло осветен, часовникът свети)', 'london', d => setTimeout(() => { d.time(12); d.lookLmKind('westminster3', 260); setTimeout(() => { d.time(22); d.lookLmKind('westminster3', 260); }, 12000); }, 9000)],   // lm-westminster
+  ['🍉 Пазар и кафенета около площада: Пловдив — сергии с раирани навеси и щайги плодове, масички с чадъри', 'plovdiv', d => { d.marketLook(); }],   // markets
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

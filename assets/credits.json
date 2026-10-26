@@ -317,6 +317,7 @@
 {"t":"Tower Residence","a":"Темидасофт","l":"OWN","u":"","f":["towers/ru-blocks.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
 {"t":"Colosseum","a":"Темидасофт","l":"OWN","u":"","f":["lm/colosseo4.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
 {"t":"Parthenon","a":"Темидасофт","l":"OWN","u":"","f":["lm/parthenon.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
+{"t":"England Center","a":"Темидасофт","l":"OWN","u":"","f":["lm/westminster3.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
 {"t":"Street billboard","a":"EVID","l":"CC-BY-4.0","u":"https://sketchfab.com/3d-models/2e0e7e7046044f70b6283547d7f243a9","f":["billboards/bb-small.glb"],"k":"Улица, природа и обзавеждане","s":"Sketchfab"},
 {"t":"Billboard","a":"DARK_2LORD2","l":"CC-BY-4.0","u":"https://sketchfab.com/3d-models/800c324581684cdbaa0a074ab3f01c0c","f":["billboards/bb-medium.glb"],"k":"Улица, природа и обзавеждане","s":"Sketchfab"},
 {"t":"Billboard (.psd layered texture maps included)","a":"TampaJoey","l":"CC-BY-4.0","u":"https://sketchfab.com/3d-models/20d1a51fbfa94373900e29de74a0f9ee","f":["billboards/bb-large.glb"],"k":"Улица, природа и обзавеждане","s":"Sketchfab"},
