@@ -4,6 +4,7 @@
 // setURLModifier: всеки адрес с „assets/heavy/“ от нашия сайт отива на ASSET_BASE — и буквалните, и сглобените (`assets/${dir}/…`,
 // new URL('./assets/heavy/…', import.meta.url)). За адрес извън loader-ите (img, fetch, CSS) — heavyUrl(път).
 // Сгъстените модели (_source/compress-heavy.mjs: EXT_meshopt_compression) искат MeshoptDecoder — закача се на всеки GLTFLoader при parse.
+import './i18n.js';   // 🌐 lang-en (f6): езикът — пръв (речникът и преводът на страницата, преди играта да рисува)
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';

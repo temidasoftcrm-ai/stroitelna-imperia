@@ -6,6 +6,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { backupRaw, dropBackups, tooNew } from './saves.js';
 import { feature, IN_LAB } from './lab/feature.js';
 import { TURNSTILE_SITEKEY } from './config.js';   // 🔑 pw-login: Cloudflare Turnstile (празен = без проверка)
+import { langOn, langButton, setLang, LANG } from './i18n.js';   // 🌐 lang-en: превключвателят в ⚙️ и на входа
 import './consent.js';   // 🍪 GDPR съгласие (feature 'consent') — window.consent
 
 const URL_ = 'https://lpzjscttqieqnqozscpk.supabase.co';
@@ -468,6 +469,7 @@ function openSettings(h) {
     ${sec(`👥 Онлайн сега: <span id="stN">${ppl.length}</span>`, `<div id="stPpl" style="font-size:13px;line-height:1.7;max-height:150px;overflow:auto">${pplHtml(ppl)}</div>`)}
     ${sec(`🆕 Ъпдейти <span style="font-weight:400;color:var(--mut);font-size:13px">· версия ${VERSION}</span>`, `<div style="max-height:170px;overflow:auto">${changesHtml()}</div>`)}
     ${sec('🎮 Игра', `<div style="display:flex;gap:6px;flex-wrap:wrap">${hooks.saves ? sbtn('stSaves', '💾 Записи') : ''}${hooks.rename ? sbtn('stRen', '✏️ Име на фирмата') : ''}${hooks.credits ? sbtn('stCred', '📜 Автори') : ''}${hooks.newGame ? sbtn('stNew', '🔄 Нова игра') : ''}</div>`)}
+    ${langOn() ? sec('🌐 Език · Language', `<div style="display:flex;gap:6px;flex-wrap:wrap" data-noi18n>${sbtn('stLangBg', (LANG === 'bg' ? '✅ ' : '') + '🇧🇬 Български')}${sbtn('stLangEn', (LANG === 'en' ? '✅ ' : '') + '🇬🇧 English')}</div>`) : ''}
     ${feature('consent') ? sec('🔒 Поверителност', `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">${window.consent?.adsLive ? sbtn('stCons', '🍪 Съгласие: статистика') + sbtn('stAdsCons', '📺 Реклами — настройки за съгласие') : sbtn('stCons', '🍪 Съгласие: реклами и статистика')}<a href="privacy.html" target="_blank" rel="noopener" style="color:var(--acc);font-size:14px">Поверителност</a><span style="color:var(--mut)">·</span><a href="terms.html" target="_blank" rel="noopener" style="color:var(--acc);font-size:14px">Условия</a></div>`) : ''}
     ${sec('⚠️ Опасна зона', `<div style="font-size:13px;color:var(--mut);line-height:1.5">„Изтрий данните“ маха всички записи на това устройство${user ? ' и в облака. „Изтрий акаунта“ маха и самия акаунт (имейла) завинаги' : ''}.</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${sbtn('stWipe', '🗑️ Изтрий данните', 'btn2', 'color:var(--bad)')}${user ? sbtn('stDel', '❌ Изтрий акаунта', 'btn2', 'color:var(--bad)') : ''}</div>`)}`,
@@ -478,6 +480,7 @@ function openSettings(h) {
   on('stIn', () => loginEmail()); on('stPw', changePw); on('stCloud', openCloud); on('stCred', () => hooks.credits()); on('stRen', () => hooks.rename()); on('stSaves', () => hooks.saves()); on('stNew', () => hooks.newGame()); on('stCons', () => window.consent?.open()); on('stAdsCons', () => window.consent?.adsOpen());
   on('stOut', () => dlg(`<h2 style="font-size:19px;color:var(--acc)">🚪 Изход?</h2><p style="color:var(--mut);font-size:14px;line-height:1.5">Играта на това устройство остава. Влез пак със същия имейл, за да продължи да се пази в облака.</p>`,
     [['Отказ', null], ['🚪 Изход', () => { syncAll(false).finally(() => sb.auth.signOut().then(() => toast('🚪 Излезе от акаунта.'))); }, 1]]));
+  on('stLangBg', () => setLang('bg')); on('stLangEn', () => setLang('en'));   // 🌐 lang-en
   on('stWipe', () => confirmWipe(false)); on('stDel', () => confirmWipe(true));
   if (hooks.quick) hooks.quick().forEach((r, i) => { const b = el.querySelector('#stQ' + i); if (!b) return;   // (top-set) звукът и известията — на място (надписът се сменя), другите затварят настройките
     b.onclick = () => { if (!r.keep) el.remove(); r.fn(); if (r.keep) { const s = b.querySelectorAll('span'); s[0].textContent = r.ico(); s[1].innerHTML = r.nm(); } }; });
@@ -494,7 +497,7 @@ function confirmWipe(account, fresh = false) {   // fresh — „🆕 Нова �
     <div id="stMsg" style="font-size:13px;color:var(--bad)"></div>`,
     [['Отказ', null], [account ? '❌ Изтрий акаунта' : '🗑️ Изтрий', () => {
       const m = el.querySelector('#stMsg');
-      if (el.querySelector('#stConf').value.trim().toUpperCase() !== 'ИЗТРИЙ') { m.textContent = 'Напиши ИЗТРИЙ.'; return false; }
+      if (!['ИЗТРИЙ', 'DELETE'].includes(el.querySelector('#stConf').value.trim().toUpperCase())) {   /* 🌐 lang-en: и на английски */ m.textContent = 'Напиши ИЗТРИЙ.'; return false; }
       m.style.color = 'var(--mut)'; m.textContent = 'Изтривам…';
       wipeAll(account).catch(e => { m.style.color = 'var(--bad)'; m.textContent = 'Не стана: ' + ((e && e.message) || 'няма връзка') + '. Нищо не е изтрито.'; });
       return false;
@@ -662,6 +665,7 @@ function regGate() {
     <div id="rgBody"></div>
     <div style="text-align:center;margin-top:12px"><a href="#" id="rgSkip" style="color:#8b96a8;font-size:13px">Играй без регистрация</a></div>${feature('consent') ? '<div style="text-align:center;margin-top:8px;font-size:12px;color:#6b7688">С регистрацията приемаш <a href="terms.html" target="_blank" rel="noopener" style="color:#8b96a8">Условията</a> и <a href="privacy.html" target="_blank" rel="noopener" style="color:#8b96a8">Поверителността</a></div>' : ''}</div>`;
   document.body.appendChild(el);
+  if (langOn()) { const lb = langButton(); lb.style.cssText = 'position:absolute;top:12px;right:12px;padding:6px 10px;border-radius:9px;border:1px solid #3a4560;background:#0f141c;color:#e6edf6;font:600 14px system-ui,sans-serif;cursor:pointer'; el.appendChild(lb); }   // 🌐 lang-en
   const body = el.querySelector('#rgBody'), close = () => { el.remove(); };
   el.querySelector('#rgSkip').onclick = e => { e.preventDefault(); close(); };
   const msg = (t, bad) => { const m = body.querySelector('.rgMsg'); m.style.color = bad ? '#ff6b6b' : '#8b96a8'; m.textContent = t; };

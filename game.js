@@ -152,6 +152,7 @@ import { createAwaySummary } from './awaysum.js';   // 👋 away-summary (f6): �
 import { createAds } from './ads.js';   // 📺 флаг ads: AdSense за игри — реклама между нещата и по желание за бонус
 import { createOnboarding } from './onboarding.js';
 import { stationAccess } from './stationaccess.js';
+import { t, t as tr, fmtNum } from './i18n.js';   // 🌐 lang-en (f6): t() за надписите на платното, числата по езика
 import { createSkySun } from './skysun.js';   // 🌅 sky-sun (f9): небе с градиент спрямо слънцето, видимо слънце, залез/изгрев, луна и звезди   // 🚉 station-access (f9): път от гарата до улица и паркинг до нея (градовете с плана v2)   // 🎓 onboarding (f9): урокът при първа игра — камера, парцел, строеж, пари, град, настройки
 import { initErrTelemetry, errPayload, sendErrors } from './errtelem.js';   // 🐞 err-telemetry (f9): грешките в буфер за изпращане (само със съгласие за анализи)
 import { pcGate, perfCheck } from './perfmeter.js';   // 🖥️ perf-meter (f9): играта е за компютър — екран за телефон/таблет и „Проверка на компютъра“
@@ -167,7 +168,7 @@ window.__stroiLv = () => { try { return S ? dev.best() : 0; } catch { return 0; 
 const SAVE_KEY = saveKey();   // зависи от текущия слот (saves.js)
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[(Math.random() * a.length) | 0];
-const fmt = n => Math.round(n).toLocaleString('bg-BG').replace(/ /g, ' ');
+const fmt = n => fmtNum(Math.round(n));   // 🌐 lang-en: 1 234 (БГ) / 1,234 (EN)
 function rng(seed) { let s = seed >>> 0 || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
 function hashStr(str) { let h = 2166136261; for (const c of str) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; }
 
@@ -1565,6 +1566,7 @@ function buildLotPaths() {
 
 // надпис-табела (sprite с canvas текст)
 function label(text, color = '#fff', w = 10, bg = 'rgba(15,20,28,.85)') {
+  text = tr(text);   // 🌐 lang-en: надписите на платното (tr — вътре има const t = текстурата)
   const c = document.createElement('canvas'); c.width = 512; c.height = 96;
   const g = c.getContext('2d');
   g.fillStyle = bg; g.beginPath(); g.roundRect(4, 4, 504, 88, 20); g.fill();
@@ -5002,7 +5004,7 @@ function renameBrand() {
     inp.oninput = () => { ok.textContent = '✓ Запази'; msg.style.color = 'var(--mut)'; msg.textContent = 'Натисни „✓ Запази“.'; };
   }, 50);
 }
-const updLogo = () => { const l = document.querySelector('#top .logo'); if (!l || !S) return; const gn = groupName(S); l.textContent = `🏗️ ${gn ? gn.toUpperCase() + ' · ' : ''}${cityName().toUpperCase()}${gn ? '' : ` · ${S.cityId === (S.hqCity || S.cityId) ? 'ЦЕНТРАЛА' : 'ФИЛИАЛ'}`}`; l.style.cursor = gn ? 'pointer' : ''; l.title = gn ? 'Корпоративната група' : ''; l.onclick = gn ? () => openBig('group') : null; updHoldBtn(); neomName(); };
+const updLogo = () => { const l = document.querySelector('#top .logo'); if (!l || !S) return; const gn = groupName(S); l.textContent = `🏗️ ${gn ? t(gn).toUpperCase() + ' · ' : ''}${t(cityName()).toUpperCase()}${gn ? '' : ` · ${S.cityId === (S.hqCity || S.cityId) ? t('ЦЕНТРАЛА') : t('ФИЛИАЛ')}`}`; l.style.cursor = gn ? 'pointer' : ''; l.title = gn ? t('Корпоративната група') : ''; l.onclick = gn ? () => openBig('group') : null; updHoldBtn(); neomName(); };   // 🌐 lang-en: логото е сглобено — t() на частите
 // конкурентни фирми (rivals.js): вземат поръчки, които не приемеш навреме, и строят на парцела
 const rivals = createRivals({ S: () => S, acquired: id => corp.acquired(id), toast, fmt, cc: () => S && cityById(S.cityId)?.cc,
   onBuilt: (lotId, type, firm) => {

@@ -1,0 +1,9 @@
+{
+ "🆕 Излезе": "🆕 Now available",
+ "🔄 Презареди": "🔄 Reload",
+ "По-късно": "Later",
+ "🆕 Записът е от по-нова версия": "🆕 This save is from a newer version",
+ "Тази игра е записана с по-нова версия, отколкото е заредена сега. За да не се развали, тук не се отваря и не се презаписва. Презареди страницата — ще се зареди новата версия.": "This game was saved with a newer version than the one loaded now. To avoid corrupting it, it won't be opened or overwritten here. Reload the page — the new version will load.",
+ "🔄 Презареди страницата": "🔄 Reload the page",
+ "☁️ В облака има запис от по-нова версия (слот {0}) — тук не се сваля, докато не презаредиш": "☁️ The cloud has a save from a newer version (slot {0}) — it won't be downloaded here until you reload"
+}

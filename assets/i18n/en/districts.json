@@ -1,0 +1,13 @@
+{
+ "ха": "ha",
+ "🏡 Земята на града ({0})": "🏡 City land ({0})",
+ "{0}улици с тротоарите: {1}": "{0}streets with pavements: {1}",
+ "{0}отключени парцели: {1} — {2} бр. ({3} готови, {4} заети, {5} свободни)": "{0}unlocked plots: {1} — {2} in total ({3} built, {4} occupied, {5} free)",
+ "{0}сградите: {1}; сградата заема ~{2} % от парцела": "{0}buildings: {1}; a building covers ~{2} % of its plot",
+ "{0}резерв (следващите квартали): {1} — {2} парцела": "{0}reserve (next districts): {1} — {2} plots",
+ "{0}големите места: {1}": "{0}large spaces: {1}",
+ "{0}вода: {1}": "{0}water: {1}",
+ "свободна земя: {0}": "free land: {0}",
+ "— {0} големи площи ({1}), от тях {2} изцяло вътре в квартала (без излаз на улица); {3} вече са паркове": "— {0} large areas ({1}), of which {2} lie fully inside the district (no street access); {3} are already parks",
+ "Парцелите са само една редица покрай улиците (20 × 24 м); вътрешността на кварталите и ъглите никога не са били парцели. „Почти застроен“ брои само отключените парцели — резервът се отключва с нов квартал от таб „Офис“.": "Plots are only a single row along the streets (20 × 24 m); district interiors and corners were never plots. “Almost built up” counts only unlocked plots — the reserve unlocks with a new district from the “Office” tab."
+}

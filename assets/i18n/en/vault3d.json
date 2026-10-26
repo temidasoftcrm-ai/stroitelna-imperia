@@ -1,0 +1,18 @@
+{
+ "Резерв": "Reserve",
+ "Борис пази поне 1 месец разходи": "Boris keeps at least 1 month of expenses",
+ "За инвестиции": "For investment",
+ "предложенията на директорите харчат само оттук": "the directors' proposals spend only from here",
+ "Свободни": "Free",
+ "твои — дивиденти и ръчни решения": "yours — dividends and manual decisions",
+ "{0} млрд. €": "{0} bn €",
+ "{0} млн. €": "{0} m €",
+ "← Към залата": "← Back to the hall",
+ "🔒 Резерв": "🔒 Reserve",
+ "📈 За инвестиции": "📈 For investment",
+ "💰 Свободни": "💰 Free",
+ "— останалото": "— the rest",
+ "🏦 Трезорът: {0}": "🏦 The vault: {0}",
+ "⚠️ Борис: резервът ({0}) е под месечните разходи ({1}) — вдигни го.": "⚠️ Boris: the reserve ({0}) is below monthly expenses ({1}) — raise it.",
+ "🏦 Трезорът е пълен ({0}) — надгради го, за да се вижда всичко.": "🏦 The vault is full ({0}) — upgrade it to see everything."
+}

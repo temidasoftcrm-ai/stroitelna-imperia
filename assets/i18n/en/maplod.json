@@ -1,0 +1,12 @@
+{
+ "свят": "world",
+ "континент": "continent",
+ "държава": "country",
+ "област": "region",
+ "Европа": "Europe",
+ "Африка": "Africa",
+ "Северна Америка": "North America",
+ "Южна Америка": "South America",
+ "Азия": "Asia",
+ "Австралия и Океания": "Australia and Oceania"
+}

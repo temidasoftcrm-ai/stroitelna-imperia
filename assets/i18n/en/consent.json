@@ -1,0 +1,20 @@
+{
+ "📺 Реклами": "📺 Ads",
+ "Показване на реклами (за да е играта безплатна). Без съгласие — рекламите, ако има, не са персонализирани.": "Showing ads (to keep the game free). Without consent, any ads are not personalised.",
+ "📊 Анонимна статистика": "📊 Anonymous statistics",
+ "Кои части на играта се ползват и къде се бави — с анонимен номер, без име и без бисквитки.": "Which parts of the game are used and where it slows down — with an anonymous number, no name and no cookies.",
+ "Поверителност": "Privacy",
+ "Условия": "Terms",
+ "С твое съгласие може да брои анонимно колко хора играят (за рекламите питаме отделно).": "With your consent it may anonymously count how many people play (we ask about ads separately).",
+ "С твое съгласие може да показва реклами и да брои анонимно колко хора играят.": "With your consent it may show ads and anonymously count how many people play.",
+ "🔒 Поверителност": "🔒 Privacy",
+ "Играта пази записите ти на това устройство (и в облака, ако влезеш). {0} Можеш да промениш избора си по всяко време в ⚙️ Настройки. {1}": "The game keeps your saves on this device (and in the cloud if you sign in). {0} You can change your choice any time in ⚙️ Settings. {1}",
+ "⚙️ Настройки": "⚙️ Settings",
+ "Само необходимите": "Only necessary",
+ "✅ Приемам": "✅ Accept",
+ "🔧 Необходими": "🔧 Necessary",
+ "Записите на играта, входът и облакът (ако влезеш), този избор. Без тях играта не работи.": "Game saves, sign-in and the cloud (if you sign in), this choice. The game does not work without them.",
+ "📺 Реклами — настройки за съгласие (Google)": "📺 Ads — consent settings (Google)",
+ "💾 Запази": "💾 Save",
+ "📺 Настройките за реклами не се отвориха — Google още не ги е заредил или рекламите са спрени в браузъра (блокер).": "📺 The ad settings did not open — Google has not loaded them yet or ads are blocked in the browser (blocker)."
+}
