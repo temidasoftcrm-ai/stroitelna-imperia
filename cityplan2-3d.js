@@ -698,7 +698,7 @@ export function buildPlan2View(P, opts = {}) {
       if (ST.FP && o.camera) ST.FP.near(o.camera.position.y < 260);   // оградите и табелите — само отблизо
       if (ST.LB && o.camera) ST.LB.update(o.camera);
       if (opts.statues && done && ST.SM === undefined && opts.statues.V) ST.SM = placeStatues(G, P, opts.statues.V, opts.statues.o);   // statues: веднъж, когато градът и моделите са готови
-      if (opts.romeNear && ST.BL && o.camera) { if (ST.RN === undefined && opts.romeNear.V) ST.RN = romeNear(G, ST.BL, opts.romeNear.V, { ...opts.romeNear.o, roads: P.roads }); if (ST.RN) ST.RN.update(o.camera); }   // rome-bld / it-bld: италианските сгради около камерата ({ V — моделите (може да дойдат по-късно), o — опциите })
+      if (opts.romeNear && ST.BL && o.camera) { if (ST.RN === undefined && opts.romeNear.V) ST.RN = (opts.romeNear.fn || romeNear)(G, ST.BL, opts.romeNear.V, { ...opts.romeNear.o, roads: P.roads, lots: P.lots, center: P.center });   /* meshy-tower (f6): fn — towers.js */ if (ST.RN) ST.RN.update(o.camera); }   // rome-bld / it-bld: италианските сгради около камерата ({ V — моделите (може да дойдат по-късно), o — опциите })
       if (ST.BT) ST.BT.update(dt); if (ST.RB) ST.RB.update(dt);
       if (ST.TSA) ST.TSA.update(performance.now() / 1000);   // рекламите на Таймс Скуеър се сменят
       if (!F || !F.SIG.heads || !o.signals || (sigT = (sigT + 1) % 6)) return;
@@ -790,7 +790,8 @@ function seaTraffic(G, D, models) {
 // ---- river-boats (f9): реката — линията D.river (Рим) или средата на водата по колони (Париж, Лондон, Москва: реката е в маската sea);
 // по нея — туристически корабчета (ниски, ~28 м) напред-назад в две ленти и малки яхти; само водни ивици 25–260 м (не морето)
 function riverPath(D, P) {
-  if (D.river && D.river.length) { const r = D.river.slice().sort((a, b) => b.length - a.length)[0]; return r.length > 4 ? r : null; }
+  if (D.river && D.river.length) { const r = D.river.slice().sort((a, b) => b.length - a.length)[0], B = P.boundary, ins = p => !B || inPoly2(p, B);   // OSM реката продължава извън града — само най-дългото парче вътре
+    let best = [], cur = []; for (const p of r) { if (ins(p)) cur.push(p); else { if (cur.length > best.length) best = cur; cur = []; } } if (cur.length > best.length) best = cur; return best.length > 4 ? best : null; }
   if (!P.waterAt || !P.boundary) return null;
   const xs = P.boundary.map(p => p[0]), zs = P.boundary.map(p => p[1]), X0 = Math.min(...xs), X1 = Math.max(...xs), Z0 = Math.min(...zs), Z1 = Math.max(...zs), ST = 10;
   const chain = byX => { const pts = [], A0 = byX ? X0 : Z0, A1 = byX ? X1 : Z1, B0 = byX ? Z0 : X0, B1 = byX ? Z1 : X1; let prev = null, best = [], cur = [];

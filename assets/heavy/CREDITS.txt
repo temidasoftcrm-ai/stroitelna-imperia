@@ -348,3 +348,8 @@ City buses (55, buses-more) — Sketchfab, normalized in Blender (front +z, real
 Забележителности lm-more2 (f6; свалени 26.10.2026 от Sketchfab, CC-BY 4.0 — олекотени в Blender, текстурите в WebP; оригиналите — _source/downloads/landmarks2/):
 - lm/duomo.glb — "Milan Cathedral" by mohamedhussien (CC-BY 4.0) — https://sketchfab.com/3d-models/1bcbcd5885f74d1990ddb6cd3edce4e1 (катедралата, изрязана от фотограметрията на площада)
 - lm/romanstadium.glb — "Plovdiv Roman Stadium" by KULTRA LTD (kultraltd) (CC-BY 4.0) — https://sketchfab.com/3d-models/630fc44b32024d8d98c16537af88a39e
+Будапеща (feature 'lm-budapest', f9; 26.10.2026):
+- lm/parliament.glb — „Парламентът в Будапеща“, генериран с Meshy AI от собственика (платен план, ТЕМИДАСОФТ ООД) — в Blender: 2,48 млн → 72 хил. △, текстурите в WebP (оригиналът — _source/downloads/meshy-budapest-parliament/)
+Високи блокове meshy-tower (f6; 26.10.2026):
+- towers/urban-tower.glb — „Urban Tower at Dusk“, генериран с Meshy AI от собственика (платен план, ТЕМИДАСОФТ ООД) — в Blender: изрязана улицата под сградата, ~45 хил. триъгълника, текстури 1024 px WebP, нощната карта на прозорците — изпечена
+- towers/ru-blocks.glb — „Tower Residence“ (руски панелен блок), генериран с Meshy AI от собственика (платен план, ТЕМИДАСОФТ ООД) — текстури 1024 px WebP, нощната карта — изпечена

@@ -2,5 +2,16 @@
  "_note": "ръчни ключове — низове, сглобявани по време на работа (не се виждат цели в кода)",
  "🎵 Музика": "🎵 Music",
  "🔔 Ефекти": "🔔 Effects",
- "🏙️ Град": "🏙️ City"
+ "🏙️ Град": "🏙️ City",
+ "заета": "busy",
+ "заета: {0}": "busy: {0}",
+ "🏢 изкупуване на фалирали фирми (дъщерни)": "🏢 buying out bankrupt companies (subsidiaries)",
+ "🌍 Африка и целият свят · 📈 прогрес на мрежите · 🏢 изкупуване на фалирали фирми (дъщерни)": "🌍 Africa and the whole world · 📈 network progress · 🏢 buying out bankrupt companies (subsidiaries)",
+ "🏦 Своя банка · 🚄 „Стрела“ +30%": "🏦 Your own bank · 🚄 “Strela” express +30%",
+ "🏦 Своя банка": "🏦 Your own bank",
+ "🚄 „Стрела“ +30%": "🚄 “Strela” express +30%",
+ "📦 Място: ×{0} →": "📦 Space: ×{0} →",
+ "📦 Място: ×{0} (напр. бетон {1} м³)": "📦 Space: ×{0} (e.g. concrete {1} m³)",
+ "(напр. бетон {0} →": "(e.g. concrete {0} →",
+ "м³)": "m³)"
 }

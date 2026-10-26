@@ -2577,6 +2577,8 @@
  "железниците": "the railways",
  "Тест: ниво": "Test: level",
  "няма паркинг (park-api / yards-real)": "no parking (park-api / yards-real)",
+ "няма блокове (districts-look)": "no apartment blocks (districts-look)",
+ "няма къща с кола (districts-look + yards-real)": "no house with a car (districts-look + yards-real)",
  "Трейдърът": "The trader",
  "🌍 Африка!": "🌍 Africa!",
  "Нов континент: Сахара, Нил, саваната и Кейптаун.": "New continent: the Sahara, the Nile, the savannah and Cape Town.",

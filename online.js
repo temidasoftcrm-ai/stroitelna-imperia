@@ -1,6 +1,7 @@
 // online.js — „Онлайн империя“: вход → избор на свят → фирма → играта. Всичко, което се вижда, идва от сървъра (ol_state);
 // бутоните само изпращат намерения (online-api.js). Самостоятелната игра и нейните записи не се пипат.
 import { sb, api, read, onConn, OnlineError } from './online-api.js';
+import { t as tr } from './i18n.js';   // 🌐 lang-en: числото + „оферта/оферти“
 
 const BRANDS = [
   { k: 'industrial', nm: 'Индустриал', col: '#ff9a2e', ico: '⚙️' },
@@ -227,7 +228,7 @@ function concHtml(U) {
   h += `<h3 style="margin:4px 0 0;font-size:14px">🔨 Търгове</h3>`;
   h += C.auctions.map(a => { const lock = C.level < a.min_level, draft = concDraft[a.round] ?? (a.my ? a.my / 100 : a.min_bid / 100), full = a.revenue * a.term_days;
     return `<div class="card offer" style="${lock ? 'opacity:.6' : ''}"><h3>${a.ico} ${esc(a.nm)}</h3>
-      <div class="meta">${esc(a.what)} · <b class="ok">${eur(a.revenue)}/ден</b> × ${a.term_days} дни = ${short(full)} · минимум ${short(a.min_bid)} · от ниво ${a.min_level}<br>⏱️ оферти до <b style="color:var(--txt)">${until(a.closes_at)}</b> · ${a.bids} оферт${a.bids === 1 ? 'а' : 'и'}${a.my ? ` · твоята: <b style="color:var(--acc)">${eur(a.my)}</b> (блокирана)` : ''}</div>
+      <div class="meta">${esc(a.what)} · <b class="ok">${eur(a.revenue)}/ден</b> × ${a.term_days} дни = ${short(full)} · минимум ${short(a.min_bid)} · от ниво ${a.min_level}<br>⏱️ оферти до <b style="color:var(--txt)">${until(a.closes_at)}</b> · ${tr(a.bids === 1 ? '{0} оферта' : '{0} оферти', [a.bids])}${a.my ? ` · твоята: <b style="color:var(--acc)">${eur(a.my)}</b> (блокирана)` : ''}</div>
       ${(a.ally_bids || []).length ? `<div class="meta" style="margin-top:4px;color:#9ff0bd">🤝 Съюзници: ${a.ally_bids.map(x => `${esc(x.name)} — ${eur(x.amount)}`).join(' · ')}</div>` : ''}
       <div class="need">${needH(a.need)}</div>
       ${lock ? `<div class="meta" style="margin-top:6px">🔒 нужно ниво ${a.min_level}</div>` : `<div class="row" style="margin-top:8px"><input data-cbin="${a.round}" inputmode="numeric" value="${draft}" style="padding:7px;font-size:15px"><button class="btn" data-cbid="${a.round}">${a.my ? '⬆️ Вдигни' : '📨 Подай'}</button></div>
@@ -269,7 +270,7 @@ function mktHtml() {
   let h = `<div class="card"><div class="meta">📦 Строежите ползват стоки от <b style="color:var(--txt)">склада</b>; липсващото се купува от държавата на пълна цена. На пазара продаваш на цена до държавната (стоката се блокира, докато се продаде или отмениш) — продавачът плаща ${Math.round(R.fee_pct * 100)}% такса. Държавата изкупува на ${Math.round(R.buyback_pct * 100)}%. Заета машина харчи ${qf(R.fuel_per_machine)} т гориво на ден.</div></div>`;
   h += `<div class="row" style="justify-content:flex-start;gap:4px;flex-wrap:wrap">${M.goods.map(x => `<button class="${x.good === g.good ? 'btn' : 'btn2'}" style="padding:5px 9px;font-size:13px" data-good="${x.good}">${x.ico} ${x.nm} <span style="opacity:.75">${qf(x.mine)}</span></button>`).join('')}</div>`;
   h += `<div class="card"><h3>${g.ico} ${g.nm}</h3><div class="meta">Държавна цена ${eur(g.price)}/${g.unit} · изкупува ${eur(g.price * R.buyback_pct)} · в склада <b style="color:var(--txt)">${qf(g.mine)} ${g.unit}</b>${g.last ? ` · последна сделка ${eur(g.last)}` : ''}</div>
-    <div style="margin-top:6px">${g.book.map(b => `<div class="led"><span>${qf(b.qty)} ${g.unit} (${b.n} оферт${b.n === 1 ? 'а' : 'и'})</span><b class="ok">${eur(b.price)}</b></div>`).join('') || '<div class="meta">Няма оферти от други фирми.</div>'}</div>
+    <div style="margin-top:6px">${g.book.map(b => `<div class="led"><span>${qf(b.qty)} ${g.unit} (${tr(b.n === 1 ? '{0} оферта' : '{0} оферти', [b.n])})</span><b class="ok">${eur(b.price)}</b></div>`).join('') || '<div class="meta">Няма оферти от други фирми.</div>'}</div>
     <div class="row" style="margin-top:8px"><input id="byQ" inputmode="decimal" placeholder="колко ${g.unit}" style="padding:7px"><input id="byP" inputmode="numeric" placeholder="до € / ${g.unit}" value="${best ? best.price / 100 : ''}" style="padding:7px"><button class="btn" id="byGo" ${best ? '' : 'disabled'}>Купи</button></div>
     <div class="row" style="margin-top:6px"><input id="slQ" inputmode="decimal" placeholder="колко ${g.unit}" style="padding:7px"><input id="slP" inputmode="numeric" placeholder="€ / ${g.unit}" value="${Math.round(g.price * 0.85 / 100)}" style="padding:7px"><button class="btn2" id="slGo" ${g.mine > 0 ? '' : 'disabled'}>Продай</button></div>
     <div class="row" style="margin-top:6px;justify-content:flex-end"><button class="btn2" id="stGo" ${g.mine > 0 ? '' : 'disabled'} title="продава въведеното количество от реда „Продай“">🏛️ На държавата (${Math.round(R.buyback_pct * 100)}%)</button></div></div>`;
@@ -355,7 +356,7 @@ function tendHtml(s, U, needHtml) {
     h += `<h3 style="margin:4px 0 0;font-size:14px">${TIER[tier]}</h3>`;
     h += list.map(t => { const my = t.my && t.my.status === 'active' ? t.my : null, draft = bidDraft[t.id] ?? (my ? my.price / 100 : '');
       return `<div class="card offer"><h3>${esc(t.title)}</h3>
-        <div class="meta">Бюджет <b class="ok">${eur(t.budget)}</b> · депозит ${eur(t.deposit)} · материали ${eur(t.mat)} · ${t.days} дни изпълнение · старт до ${t.start_days} дни след победата<br>⏱️ оферти до: <b style="color:var(--txt)">${until(t.closes_at)}</b> · ${t.bids} оферт${t.bids === 1 ? 'а' : 'и'}${my ? ` · твоята: <b style="color:var(--acc)">${eur(my.price)}</b>` : t.my && t.my.status === 'withdrawn' ? ' · оттеглена' : ''}</div>
+        <div class="meta">Бюджет <b class="ok">${eur(t.budget)}</b> · депозит ${eur(t.deposit)} · материали ${eur(t.mat)} · ${t.days} дни изпълнение · старт до ${t.start_days} дни след победата<br>⏱️ оферти до: <b style="color:var(--txt)">${until(t.closes_at)}</b> · ${tr(t.bids === 1 ? '{0} оферта' : '{0} оферти', [t.bids])}${my ? ` · твоята: <b style="color:var(--acc)">${eur(my.price)}</b>` : t.my && t.my.status === 'withdrawn' ? ' · оттеглена' : ''}</div>
         ${(t.ally_bids || []).length ? `<div class="meta" style="margin-top:4px;color:#9ff0bd">🤝 Съюзници: ${t.ally_bids.map(x => `${esc(x.name)} — ${eur(x.price)}`).join(' · ')}</div>` : ''}${t.rival_bids ? `<div class="meta" style="margin-top:4px;color:#ffb3b3">⚔️ Наддава и съперник (${t.rival_bids})</div>` : ''}
         <div class="need">${needHtml(t.need)}</div>
         ${t.why_not ? `<div class="meta" style="margin-top:6px;color:#ffb3b3">🚫 ${esc(t.why_not)}</div>` : `

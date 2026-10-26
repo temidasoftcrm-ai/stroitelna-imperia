@@ -297,6 +297,10 @@ const DEMOS = [
   ['🚦 Без двойни зебри и светофари по късите връзки между кръстовищата (двойно платно): Истанбул', 'istanbul', d => { d.wx('clear'); d.streetLook(5, false, 34); }],   // tlight-one
   ['❄️ Сняг по покривите (weather2 сняг): Виена — покривите и върховете побеляват', 'vienna', d => { d.wx('snow', 0.9); d.time(12); const t = d.bigInfo().ctr; d.camAt(t[0] + 90, 70, t[1] + 90, t[0], 0, t[1]); }],   // snow-roofs
   ['🎄 Коледа: Виена на 15 декември привечер — елхата на площада със светлините и звездата, звездички по лампите, топли прозорци', 'vienna', d => { d.xmasLook(true); }],   // xmas
+  ['🛥️ Корабчета по реката: Париж — туристическите по Сена напред-назад и яхтите (k — следващото)', 'paris', d => { const go = n => { const r = d.riverLook(0); if (!r.boats && n < 12) setTimeout(() => go(n + 1), 2000); }; go(0); }],   // river-boats
+  ['🏢 Високите блокове в центъра: Urban Tower (София) — денем отстрани, после нощем (светещите прозорци)', 'sofia', d => setTimeout(() => { d.towersLook(0); setTimeout(() => d.towersLook(1), 9000); setTimeout(() => d.towersLook(0, true), 18000); }, 9000)],   // meshy-tower
+  ['🏢 Руските панелни блокове в центъра на Москва — денем, после нощем', 'moscow', d => setTimeout(() => { d.towersLook(0); setTimeout(() => d.towersLook(1), 9000); setTimeout(() => d.towersLook(0, true), 18000); }, 9000)],   // meshy-tower
+  ['🏛️ Будапеща: Парламентът (Meshy, Темидасофт) до площада; след 5 s — нощ, златисто осветен', 'budapest', d => { d.wx('clear'); d.time(13); d.lookLm(0, 150); setTimeout(() => d.time(21.5), 5000); }],   // lm-budapest
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
