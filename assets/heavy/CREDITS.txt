@@ -344,3 +344,7 @@ City buses (55, buses-more) — Sketchfab, normalized in Blender (front +z, real
 - station/lv4.glb — "LowPoly Train Station" by JG3D (jg-3d) (CC-BY 4.0) — https://sketchfab.com/3d-models/7f15f88072e9410490ef867ba6855fc5 (ниво 2 — само сградата, без релсите, паркинга и дърветата)
 - station/lv2.glb — "Baku-Sabunchi-Surakhani Railway Station" by Karpulya (CC-BY 4.0) — https://sketchfab.com/3d-models/669ed1acd9554f07a4ceb5aa41c46523 (ниво 3)
 - station/lv3.glb — "Old Station (industrial building series no:1)" by simple and extensive design (simpleandextensivedesign) (CC-BY 4.0) — https://sketchfab.com/3d-models/33cb2ead0c3b4f34a2f04d88ab30da0a (ниво 4 — без релсите)
+
+Забележителности lm-more2 (f6; свалени 26.10.2026 от Sketchfab, CC-BY 4.0 — олекотени в Blender, текстурите в WebP; оригиналите — _source/downloads/landmarks2/):
+- lm/duomo.glb — "Milan Cathedral" by mohamedhussien (CC-BY 4.0) — https://sketchfab.com/3d-models/1bcbcd5885f74d1990ddb6cd3edce4e1 (катедралата, изрязана от фотограметрията на площада)
+- lm/romanstadium.glb — "Plovdiv Roman Stadium" by KULTRA LTD (kultraltd) (CC-BY 4.0) — https://sketchfab.com/3d-models/630fc44b32024d8d98c16537af88a39e

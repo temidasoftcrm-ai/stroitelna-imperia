@@ -75,7 +75,7 @@ export function createWeather(deps) {
   const FN = W2 ? 500 : 0, fpos = new Float32Array(FN * 3), FR = 45;
   for (let i = 0; i < FN; i++) fpos.set([(Math.random() - 0.5) * FR, Math.random() * 40, (Math.random() - 0.5) * FR], i * 3);
   const fgeo = new THREE.BufferGeometry(); fgeo.setAttribute('position', new THREE.BufferAttribute(fpos, 3));
-  const flakes = W2 ? new THREE.Points(fgeo, new THREE.PointsMaterial({ color: 0xffffff, size: 1.15, map: flakeTex(true), transparent: true, opacity: 0.95, depthWrite: false, alphaTest: 0.02, sizeAttenuation: true })) : null;
+  const flakes = W2 ? new THREE.Points(fgeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.75, map: flakeTex(true), transparent: true, opacity: 0.95, depthWrite: false, alphaTest: 0.02, sizeAttenuation: true })) : null;
   if (flakes) { flakes.frustumCulled = false; flakes.visible = false; deps.scene.add(flakes); }
 
   const baseFog = deps.scene.fog ? { near: deps.scene.fog.near, far: deps.scene.fog.far } : null;

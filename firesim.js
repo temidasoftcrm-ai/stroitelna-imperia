@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { flameSprite } from './fireflip.js';
 import { feature } from './lab/feature.js';
+import { t as tr } from './i18n.js';   // 🌐 lang-en: надписите на платното (f9, част C)
 
 export const FIRE_ST = { travel: '🚒 Пожарната пътува', fight: '🚒 Гасене', saved: '✅ Спасена', burned: '⬛ Изгоряла', repair: '🏗️ Ремонт', secured: '🚧 Обезопасена', done: '✅ Възстановена' };
 const TRAVEL = 0.45, KNOCK = 0.9, BURN = 60;   // дни път; колко сила на огъня свалят пожарникарите за ден; колко % здравина на ден при пълна сила × sev
@@ -43,7 +44,7 @@ export function createFires(deps) {
       const key = Math.round(hp) + '|' + text; if (key === last) return; last = key;
       const g = c.getContext('2d'); g.clearRect(0, 0, 512, 128);
       g.fillStyle = 'rgba(12,16,24,.86)'; g.beginPath(); g.roundRect(4, 4, 504, 120, 22); g.fill();
-      g.font = 'bold 40px system-ui, sans-serif'; g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.fillText(`🔥 Здравина: ${Math.round(hp)}% · ${text}`, 22, 46, 470);
+      g.font = 'bold 40px system-ui, sans-serif'; g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.fillText(tr('🔥 Здравина: {0}% · {1}', [Math.round(hp), tr(text)]), 22, 46, 470);
       g.fillStyle = 'rgba(255,255,255,.15)'; g.fillRect(22, 86, 468, 18);
       g.fillStyle = hp < 30 ? '#ff4040' : hp < 70 ? '#ffb020' : '#43d17a'; g.fillRect(22, 86, 468 * Math.max(0, hp) / 100, 18);
       t.needsUpdate = true;

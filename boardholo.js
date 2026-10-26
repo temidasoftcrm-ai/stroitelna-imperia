@@ -4,6 +4,7 @@
 // Одобрено → за кратко зелено и „Бюджетът е резервиран“; отложено → кехлибарено „За следващо заседание“. Само линии и надписи — без тежки ефекти.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { t as tr } from './i18n.js';   // 🌐 lang-en: надписите на платното (f9, част C)
 
 const CYAN = 0x5fd0ff, GREEN = 0x5fe39a, AMBER = 0xffb347, RED = 0xff6b6b;
 const W = 1.15, H = 0.72;   // рамката на картата (m)
@@ -153,6 +154,7 @@ function stockChart(g, p, y, k = 1) {
 }
 
 function textSprite(lines, opt = {}) {
+  lines = lines.map(l => tr(l));
   const fs = opt.size || 34, pad = 14, c = document.createElement('canvas'), g = c.getContext('2d');
   g.font = `700 ${fs}px system-ui, sans-serif`;
   const w = Math.ceil(Math.max(...lines.map(l => g.measureText(l).width))) + pad * 2, h = lines.length * fs * 1.3 + pad * 1.4;

@@ -1,5 +1,6 @@
 // lvshow.js — ново ниво на фирмата: черен екран, в средата картинката на нивото (assets/ui/levels/lvN.webp) за ~5 s със звук.
 // Клик или Esc — затваря по-рано. Няколко нива наведнъж — една след друга. Зад feature('lv-pics') (вика го devlevel.js).
+import { t as tr, EN } from './i18n.js';   // 🌐 lang-en (f9)
 export const LV_PICS = new Set([...Array.from({ length: 20 }, (_, i) => i + 1), 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]);   // картинки за нивата 1–20 и Империал Сити (21–25 — добавят се, когато дойде картинката)
 // заглавията на нивата (от потребителя) — над текста с отключванията
 export const LV_TITLE = { 1: 'Малко начало', 2: 'Свързваме България', 3: 'Първият държавен договор', 4: 'От чертежа до големия строеж', 5: 'Към Балканите!',
@@ -32,7 +33,7 @@ function next() {
   if (!document.getElementById('lvShowCss')) { const s = document.createElement('style'); s.id = 'lvShowCss'; s.textContent = css; document.head.appendChild(s); }
   const el = document.createElement('div'); el.id = 'lvShow';
   el.innerHTML = `<div class="rays"></div><img alt="Ниво ${lv}" src="assets/ui/levels/lv${lv}.webp"><div class="tt"></div><div class="tx"></div>`;
-  el.querySelector('.tt').textContent = LV_TITLE[lv] ? `„${LV_TITLE[lv]}“` : ''; el.querySelector('.tx').textContent = text;
+  el.querySelector('.tt').textContent = LV_TITLE[lv] ? (EN ? `“${tr(LV_TITLE[lv])}”` : `„${LV_TITLE[lv]}“`) : ''; el.querySelector('.tx').textContent = EN ? text.split(/(?=\s🎁)/).map(p => tr(p.trim())).join(' ') : text;   /* 🌐 lang-en (f9): заглавието и двете части (отключванията · бонусът) — поотделно; сглобеното не е в речника */
   document.body.appendChild(el);
   try { const a = new Audio('assets/sfx/level-up.mp3'); a.volume = 0.8; a.play().catch(() => { }); } catch { }
   const img = el.querySelector('img');

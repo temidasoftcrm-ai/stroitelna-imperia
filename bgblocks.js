@@ -160,7 +160,7 @@ export function xParts(G, list, FM, RF) { const n = new Map(); for (const b of l
     if (t < 7) { fm = FM[t]; rg = RF[t][0]; rm = new THREE.MeshStandardMaterial({ color: RF[t][1], roughness: 0.85, side: THREE.DoubleSide }); rk = RF[t][2]; flat = t === 2 || t === 5; }
     else { const k = kind(t); fm = k[1](); rg = k[2] === 'mans' ? mansGeo() : k[2] === 'tile' ? gabGeo() : flatGeo(); rm = roofMat(k[2]); rk = k[3]; flat = k[2] === 'flat'; }
     const box = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), fm, c), roof = new THREE.InstancedMesh(rg, rm, c);
-    box.frustumCulled = roof.frustumCulled = false; box.receiveShadow = box.castShadow = true; roof.receiveShadow = true; box.count = roof.count = 0; box.userData.bgBlk = roof.userData.bgBlk = 1; G.add(box, roof); parts[t] = { box, roof, rk, flat, t }; }
+    box.frustumCulled = roof.frustumCulled = false; box.receiveShadow = box.castShadow = true; roof.receiveShadow = true; box.count = roof.count = 0; box.userData.bgBlk = roof.userData.bgBlk = 1; roof.userData.roof = 1;   /* snow-roofs (f9): покривът побелява при сняг */ G.add(box, roof); parts[t] = { box, roof, rk, flat, t }; }
   return parts;
 }
 // бойлерите (Истанбул: бял цилиндър + тъмен соларен панел) и машинните на асансьорите (панелните блокове) — по един InstancedMesh

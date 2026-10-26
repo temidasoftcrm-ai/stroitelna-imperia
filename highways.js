@@ -6,6 +6,7 @@ import { feature } from './lab/feature.js';
 import { loadSigns, sign } from './roadsigns.js';
 import { NF_MATS } from './nightfloors.js';   // daynight.js пали тези материали вечер (emissiveIntensity = нощта)
 import { makeWater } from './water.js';
+import { t as tr } from './i18n.js';   // 🌐 lang-en: надписите на платното (f9, част C)
 
 // Истинските магистрали, разделени на участъци между градовете от картата
 export const HIGHWAYS = [
@@ -128,6 +129,7 @@ const abLaneMat = () => abLaneM || (abLaneM = (() => {
 const abRailMat = new THREE.MeshStandardMaterial({ color: 0xb8bcc2, roughness: 0.4, metalness: 0.6 });
 // синя табела (аутобан) с текст
 function abBoard(lines, w = 12, h = 3.6) {
+  lines = lines.map(l => tr(l));
   const c = document.createElement('canvas'); c.width = 640; c.height = Math.round(640 * h / w); const x = c.getContext('2d');
   x.fillStyle = '#1d4fa8'; x.fillRect(0, 0, c.width, c.height); x.strokeStyle = '#fff'; x.lineWidth = 8; x.strokeRect(10, 10, c.width - 20, c.height - 20);
   x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
@@ -189,7 +191,7 @@ function serviceArea(g, gear, A, { W, H, zs, py: pyNear = false }) {
   // пилон с цените и табела 500 м преди отбивката
   const cv = document.createElement('canvas'); cv.width = 160; cv.height = 400; const x = cv.getContext('2d');
   x.fillStyle = '#123'; x.fillRect(0, 0, 160, 400); x.fillStyle = '#f5b400'; x.fillRect(0, 0, 160, 110); x.fillStyle = '#123'; x.font = 'bold 74px system-ui'; x.textAlign = 'center'; x.fillText('⛽', 80, 82);
-  x.fillStyle = '#fff'; x.font = 'bold 30px system-ui'; [['A95', '2.65'], ['A100', '2.95'], ['Дизел', '2.55'], ['LPG', '1.29']].forEach(([a, b], k) => { x.textAlign = 'left'; x.fillText(a, 10, 160 + k * 66); x.textAlign = 'right'; x.fillStyle = '#ffd54a'; x.fillText(b, 152, 160 + k * 66); x.fillStyle = '#fff'; });
+  x.fillStyle = '#fff'; x.font = 'bold 30px system-ui'; [['A95', '2.65'], ['A100', '2.95'], [tr('Дизел'), '2.55'], ['LPG', '1.29']].forEach(([a, b], k) => { x.textAlign = 'left'; x.fillText(a, 10, 160 + k * 66); x.textAlign = 'right'; x.fillStyle = '#ffd54a'; x.fillText(b, 152, 160 + k * 66); x.fillStyle = '#fff'; });
   const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace;
   const py = new THREE.Mesh(new THREE.BoxGeometry(4, 10, 0.6), [0, 0, 0, 0, 1, 1].map(k => k ? new THREE.MeshBasicMaterial({ map: tx }) : new THREE.MeshStandardMaterial({ color: 0x223344 })));
   if (pyNear) { py.position.set(xE - 10, y + 5, zs - 6); py.castShadow = true; add(py, zs - 6); }   // hw-link: на тревния остров срещу колонките (не на ръба на насипа)
@@ -393,7 +395,7 @@ export function buildHighwayView(A, opts = {}) {
   if (opts.title) {   // табела с името на магистралата
     const c = document.createElement('canvas'); c.width = 512; c.height = 160;
     const x = c.getContext('2d'); x.fillStyle = '#1e5fbf'; x.fillRect(0, 0, 512, 160); x.strokeStyle = '#fff'; x.lineWidth = 8; x.strokeRect(10, 10, 492, 140);
-    x.fillStyle = '#fff'; x.font = 'bold 60px system-ui'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(opts.title, 256, 82, 470);
+    x.fillStyle = '#fff'; x.font = 'bold 60px system-ui'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(tr(opts.title), 256, 82, 470);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
     const board = new THREE.Mesh(new THREE.PlaneGeometry(9, 2.8), new THREE.MeshBasicMaterial({ map: t }));
     board.position.set(0, 8.5, z0 + LEN - 15); board.rotation.y = Math.PI; board.userData.z = z0 + LEN - 15; g.add(board); gear.push(board);

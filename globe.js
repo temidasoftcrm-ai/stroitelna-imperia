@@ -4,6 +4,7 @@
 // openGlobe(data) → { close }; data: { won: Set(ISO3), partial: Map(ISO3 → 0…1), cities: [{ lat, lon, nm, hq, done }], stats: { won, total }, focus: [lat, lon] }
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { t as tr } from './i18n.js';   // 🌐 lang-en: надписите на платното (f9, част C)
 
 let geo = null;
 const loadGeo = () => geo || (geo = fetch('assets/globe/countries.json').then(r => r.json()).catch(() => ({ features: [] })));
@@ -31,6 +32,7 @@ function countryLayer(g, data) {
   return t;
 }
 function labelSprite(text, color = '#fff') {
+  text = tr(text);
   const c = document.createElement('canvas'), x = c.getContext('2d'); x.font = 'bold 40px system-ui, sans-serif';
   const w = Math.ceil(x.measureText(text).width) + 24; c.width = w; c.height = 56;
   x.font = 'bold 40px system-ui, sans-serif'; x.fillStyle = 'rgba(10,16,26,0.7)'; x.beginPath(); x.roundRect(0, 4, w, 48, 12); x.fill();

@@ -97,7 +97,7 @@ export function createIncidents(ctx) {
     roll: { nm: '🙃 Кола по таван', w: 1, hold: 85, heavy: true, cars: [['Police_Sedan', 0], ['Firetruck', 8], ['Ambulance', 21], ['Truck', 30]], props(g) {
       const c = car(); c.position.set(0, 1.5, 0); c.rotation.set(0, rnd(0, 6.28), Math.PI); g.add(c); tape(g, [[-5, -5], [5, -5], [5, 5], [-5, 5]]); return { smoke: [0, 0.5, 0] }; } },
     pile: { nm: '🚗🚗🚗 Верижна катастрофа', w: 1, hold: 80, heavy: true, cars: [['Police_Sedan', 0], ['Police_SUV', 7], ['Ambulance', 15]], props(g) {
-      const y = rnd(0, 6.28), dx = Math.sin(y), dz = Math.cos(y); for (let k = 0; k < 4; k++) { const c = car(); c.position.set(dx * k * 4.3, 0, dz * k * 4.3); c.rotation.y = y + rnd(-0.25, 0.25); g.add(c); }
+      const y = (feature('pile-axis') ? (Math.random() < 0.5 ? 0 : Math.PI) + rnd(-0.12, 0.12) : rnd(0, 6.28)), dx = Math.sin(y), dz = Math.cos(y); for (let k = 0; k < 4; k++) { const c = car(); c.position.set(dx * k * 4.3, 0, dz * k * 4.3); c.rotation.y = y + rnd(-0.25, 0.25); g.add(c); }   // pile-axis (f6): колоната — по улицата (локалната z = посоката на пътя, roadAt), не напреки на тревата
       for (let k = 0; k < 4; k++) { const c = cone(); c.position.set(-dx * (5 + k * 2) + dz * 1.5, 0, -dz * (5 + k * 2) - dx * 1.5); g.add(c); } return { smoke: [dx * 6, 1, dz * 6] }; } },
     carfire: { nm: '🔥 Горяща кола', w: 2, hold: 70, cars: [['Firetruck', 0], ['Police_Sedan', 13]], props(g) {
       const c = car(); c.position.set(0, 0, 0); c.traverse(m => { if (m.isMesh) { m.material = m.material.clone(); m.material.color.multiplyScalar(0.25); } }); g.add(c); return { smoke: [0, 2, 0], fire: [[0, 1.6, 0, 3.2], [1, 1.2, 0.8, 2.2]] }; } },

@@ -14,6 +14,7 @@ import { feature } from './lab/feature.js';
 import { vaultDoor, createVault } from './vault3d.js';
 import { buildAwardsWall, makeTrophy, AWARDS, TIERS } from './awards3d.js';   // 🏆 стената с отличията (флаг awards)
 import { loadMoney, bonusStacks } from './money3d.js';   // 💵 флаг money-real: бонусът — пачки на масата пред директора   // 🏦 трезорът зад борда (флаг vault)   // шум на залата, хартия, чукче, аплодисменти, говор на глас
+import { t as tr } from './i18n.js';   // 🌐 lang-en: надписите на платното (f9, част C)
 
 const DIR = 'assets/heavy/directors/';
 const SIT_HIP = [0, -1, -57];
@@ -216,8 +217,8 @@ function folderTex(name, sub, k) {
   const t = canvasTex(512, 360, (g, w, h) => {
     g.fillStyle = '#17181b'; g.fillRect(0, 0, w, h);
     g.strokeStyle = 'rgba(201,162,74,.8)'; g.lineWidth = 4; g.strokeRect(14, 14, w - 28, h - 28);
-    g.textAlign = 'center'; g.fillStyle = '#e2c27a'; g.font = '700 38px system-ui, sans-serif'; g.fillText(name, w / 2, 262);
-    g.fillStyle = '#9aa1ab'; g.font = '500 24px system-ui, sans-serif'; g.fillText(sub, w / 2, 302);
+    g.textAlign = 'center'; g.fillStyle = '#e2c27a'; g.font = '700 38px system-ui, sans-serif'; g.fillText(tr(name), w / 2, 262);
+    g.fillStyle = '#9aa1ab'; g.font = '500 24px system-ui, sans-serif'; g.fillText(tr(sub), w / 2, 302);
   });
   if (k) { const im = new Image(); im.onload = () => { t.image.getContext('2d').drawImage(im, 256 - 80, 44, 160, 160); t.needsUpdate = true; }; im.src = logoUrl(k); }
   return t;
@@ -375,6 +376,7 @@ function groupMedal(scene, b, gold) {
     g.textAlign = 'center'; g.textBaseline = 'middle'; if (!b.img) { g.font = '300px system-ui, "Noto Color Emoji", sans-serif'; g.fillText(b.ico || '🏛️', c, c + 10); }
     // името — по горния ръб, „· ХОЛДИНГ ·“ — по долния
     const arc = (txt, r, top) => {
+      txt = tr(txt);
       g.font = '800 64px system-ui, sans-serif'; g.fillStyle = '#e8c878';
       const chars = [...txt], step = 0.105, a0 = (top ? -Math.PI / 2 : Math.PI / 2) - (top ? 1 : -1) * step * (chars.length - 1) / 2;
       chars.forEach((ch, i) => { const a = a0 + (top ? 1 : -1) * step * i; g.save(); g.translate(c + Math.cos(a) * r, c + Math.sin(a) * r); g.rotate(a + (top ? Math.PI / 2 : -Math.PI / 2)); g.fillText(ch, 0, 0); g.restore(); });

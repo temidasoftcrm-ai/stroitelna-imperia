@@ -12,7 +12,7 @@ import { pointOn } from './junctionpaths.js';
 
 const NEAR = 380, MAXM = 6, CAR_V = 2.6, PED_V = 1.6, CAR_LEN = 4.6;
 // целевата заетост по часа: нощем пълни, сутрин се изпразват, през деня — наполовина, вечер пак се пълнят
-const target = h => h < 6.5 ? 0.85 : h < 9.5 ? 0.85 - 0.5 * Math.min(1, (h - 6.5) / 2.5) : h < 16.5 ? 0.35 : h < 19.5 ? 0.35 + 0.5 * Math.min(1, (h - 16.5) / 3) : 0.85;
+export const target = h => h < 6.5 ? 0.85 : h < 9.5 ? 0.85 - 0.5 * Math.min(1, (h - 6.5) / 2.5) : h < 16.5 ? 0.35 : h < 19.5 ? 0.35 + 0.5 * Math.min(1, (h - 16.5) / 3) : 0.85;
 const rush = h => (h >= 7 && h < 9.5) ? 'am' : (h >= 17 && h < 19.5) ? 'pm' : null;
 
 export function createParkLife(deps) {
@@ -62,7 +62,7 @@ export function createParkLife(deps) {
     const s = P_.takenSpot(P); if (!s || !s.car || !s.car.parent) return false;
     const car = s.car, b = near20(deps.bld(s.x, s.z), s.in[0]), w = deps.ped();
     const m = { P, s, kind: 'am', car, st: w ? 'walk' : 'start', t: 0, t0: 0, w, wp: [], wi: 0 };
-    if (w) { w.m.position.set(b[0], 0.05, b[1]); m.wp = [b, ...s.in.slice(0, -1), s.door]; }   // от сградата през устието и пътеката до вратата
+    if (w) { m.wp = s.walk ? [...s.walk] : [b, ...s.in.slice(0, -1), s.door]; w.m.position.set(m.wp[0][0], 0.05, m.wp[0][1]); }   /* s.walk — commute: къщата, от вратата ѝ до колата */   // от сградата през устието и пътеката до вратата
     moves.push(m); return true;
   }
   // 🌆 вечер: кола от трафика → устието → мястото; слиза човек → към сградата
@@ -121,7 +121,7 @@ export function createParkLife(deps) {
         m.s.plKeep = null;   // пазената от далечния паркинг — вече не трябва
         P_.park(m.s, m.car); m.car.position.y = 0; deps.dark(m.car);
         const w = deps.ped(), b = near20(deps.bld(m.s.x, m.s.z), m.s.out[m.s.out.length - 1]);
-        if (w) { w.m.position.set(m.s.door[0], 0.05, m.s.door[1]); m.w = w; m.wp = [...m.s.out.slice(1), b]; m.wi = 0; }
+        if (w) { w.m.position.set(m.s.door[0], 0.05, m.s.door[1]); m.w = w; m.wp = m.s.walk ? [...m.s.walk].reverse() : [...m.s.out.slice(1), b]; m.wi = 0; }
         m.st = 'walk'; return;
       }
       if (m.st === 'walk') { if (walk(m, dt)) done(m); return; }
@@ -138,13 +138,14 @@ export function createParkLife(deps) {
     for (const m of [...moves]) step(m, dt);
     const h = deps.hour(), R = rush(h), tg = target(h), c = deps.cam();
     for (const P of P_.list) {
-      const n = P.spots.length; if (n < 2) continue;
-      if (Math.hypot(P.x - c.x, P.z - c.z) > NEAR) { if ((P.plT = (P.plT || 0) + dt) > 0.6) { P.plT = 0; farTick(P, tg); } continue; }
+      const n = P.spots.length; if (n < (deps.minSpots ?? 2)) continue;   // commute (f6): къщите — по 1 място
+      if (Math.hypot(P.x - c.x, P.z - c.z) > NEAR) { if ((P.plT = (P.plT || 0) + dt) > 0.6) { P.plT = 0; (deps.farTick || farTick)(P, tg); } continue; }
       if (nLive() >= MAXM || moves.length >= MAXM * 2 || busy(P) >= cap(P)) continue;
-      const o = P_.occ(P), rate = R ? 0.5 : 0.04;   // в пиковия час — често; иначе рядко (една-две коли за деня)
+      const o = P_.occ(P), rate = (R ? 0.5 : 0.04) * (deps.rateK ?? 1);   /* commute: стотици къщи — по-рядко на къща */   // в пиковия час — често; иначе рядко (една-две коли за деня)
       if (Math.random() > rate * dt) continue;
-      if (o > tg + 0.5 / n && (R === 'am' || (!R && Math.random() < 0.5))) leave(P);
-      else if (o < tg - 0.5 / n && (R === 'pm' || !R)) arrive(P);
+      const want = deps.want ? deps.want(P, tg) : null;   // commute: къщата — дали колата ѝ е вкъщи по часа (хеш), не по заетостта
+      if (want != null ? (o > 0 && !want && (R === 'am' || !R)) : (o > tg + 0.5 / n && (R === 'am' || (!R && Math.random() < 0.5)))) leave(P);
+      else if (want != null ? (o < 1 && want && (R === 'pm' || !R)) : (o < tg - 0.5 / n && (R === 'pm' || !R))) arrive(P);
     }
   }
   function clear() { for (const m of [...moves]) done(m); }

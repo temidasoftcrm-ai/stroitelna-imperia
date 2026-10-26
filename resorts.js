@@ -2,6 +2,7 @@
 // Купуваш земя, строиш вилно селище, после го продаваш с голяма печалба или го държиш за сезонен приход.
 // Сезоните идват от деня в играта: 30 дни = 1 месец, ден 1 е 1 април.
 
+import { EN } from './i18n.js';   // 🌐 lang-en: месеците на английски — с главна буква (f9)
 export const RESORTS = [
   { id: 'borovets', nm: 'Боровец', kind: 'winter', ico: '⛷️', lat: 42.36, lon: 23.58, lab: [0, -13, 'middle'], land: 1000000, build: 2000000, days: 20, sell: 5000000, month: 30000 },   // точката е малко над истинското място, за да не закрива „Пазарджик“
   { id: 'pamporovo', nm: 'Пампорово', kind: 'winter', ico: '🏂', lat: 41.648, lon: 24.690, lab: [0, 21, 'middle'], land: 900000, build: 1800000, days: 18, sell: 4500000, month: 26000 },
@@ -289,7 +290,7 @@ export function createResorts(deps) {
   // прозорецът на курорта
   function open(id) {
     const S = deps.S(), r = R(id), s = st()[id], econ = deps.econ(), enter = deps.enter ? () => deps.enter(id) : null;
-    const season = `${r.kind === 'winter' ? '❄️ Зимен курорт: приход декември–март' : r.kind === 'summer' ? '☀️ Летен курорт: приход юни–септември' : '♨️ Балнео курорт: приход целогодишно'}. Сега е ${monthName(S.day).toLowerCase()} (${SEASON_TXT[seasonOf(S.day)]}).`;
+    const season = `${r.kind === 'winter' ? '❄️ Зимен курорт: приход декември–март' : r.kind === 'summer' ? '☀️ Летен курорт: приход юни–септември' : '♨️ Балнео курорт: приход целогодишно'}. Сега е ${EN ? monthName(S.day) : monthName(S.day).toLowerCase()} (${SEASON_TXT[seasonOf(S.day)]}).`;
     if (!avail(r) && r.need) return deps.modal(`🔒 ${r.cc} ${r.nm}`, `Курортите тук се отключват, когато имаш поне <b>${r.need.n} града</b> в ${r.cc} (сега: ${haveIn(r)}).<br>Купи филиали в: ${r.need.cities.map(id => deps.cityName ? deps.cityName(id) : id).join(', ')}.<br>Земя ${deps.fmt(r.land)} € · вилно селище ${deps.fmt(r.build)} € · продажба ~${deps.fmt(r.sell)} € · наем ${deps.fmt(rentOf(r))} €/мес.<br><br>${season}`, [['Добре', null]]);
     if (!avail(r)) return deps.modal(`🔒 ${r.cc || ''} ${r.nm}`, `${(r.reg || REG[r.cc]) === 'Турция' ? 'Турските курорти' : r.reg === 'Ривиера' ? 'Курортите на Френската ривиера' : 'Курортите в Алпите'} се отключват на <b>ниво ${r.dev} на развитие</b>${deps.devBest ? ` (сега: ${deps.devBest()})` : ''}.<br>Земя ${deps.fmt(r.land)} € · вилно селище ${deps.fmt(r.build)} € · продажба ~${deps.fmt(r.sell)} € · наем ${deps.fmt(rentOf(r))} €/мес.<br><br>${season}`, [['Добре', null]]);
     if (!unlocked()) return deps.modal(`🔒 ${r.nm}`, `Курортите са Фаза 5. Отключват се при репутация ${UNLOCK.rep} ★ или ${UNLOCK.done} завършени обекта.<br><br>${season}`, [['Добре', null]]);

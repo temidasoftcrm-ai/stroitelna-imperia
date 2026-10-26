@@ -110,10 +110,14 @@ function Kit(o = {}) {
       else if (K.bushes.length) { const bg = new THREE.IcosahedronGeometry(0.5, 0).translate(0, 0.4, 0); geoms.push(bg); inst([[bg, new THREE.MeshStandardMaterial({ color: 0x4f7f35, flatShading: true })]], K.bushes, ([x, z, s2]) => M.compose(v.set(x, 0, z), q.identity(), sc.set(s2, s2 * 0.8, s2)).clone(), small); }
       // паркираните коли — истинските модели (o.cars: [име, обект]), в истински размер
       const cp = ((o.carsFn && o.carsFn()) || o.cars || []).map(([n, p]) => [n, protoParts(p, null)]).filter(([, p]) => p.length);
-      if (cp.length) cp.forEach(([, parts], vi) => inst(parts, K.cars.filter((_, i) => i % cp.length === vi), ([x, z, yaw]) => M.compose(v.set(x, 0, z), q.setFromAxisAngle(v.clone().set(0, 1, 0), yaw), sc.set(1, 1, 1)).clone(), small));
+      const carI = []; if (cp.length) cp.forEach(([, parts], vi) => { const n0 = small.children.length; inst(parts, K.cars.filter((_, i) => i % cp.length === vi), ([x, z, yaw]) => M.compose(v.set(x, 0, z), q.setFromAxisAngle(v.clone().set(0, 1, 0), yaw), sc.set(1, 1, 1)).clone(), small); carI.push(small.children.slice(n0)); });
+      { const src = ((o.carsFn && o.carsFn()) || o.cars || []).filter(([, p]) => protoParts(p, null).length), Z = new THREE.Matrix4().makeScale(0, 0, 0), keep = new Map(), tmp = new THREE.Matrix4();   // commute (f6): отделна кола — скрита/показана (инстанцията → нула)
+        G.userData.homes = K.homes || []; G.userData.doors = K.doors || []; G.userData.carSrc = ci => cp.length ? src[ci % cp.length][1] : null;
+        G.userData.carVis = (ci, on) => { if (!cp.length) return; const vi = ci % cp.length, j = (ci - vi) / cp.length; for (const I of carI[vi] || []) { if (j >= I.count) continue; const key = I.id + ':' + j;
+          if (!on) { if (!keep.has(key)) { I.getMatrixAt(j, tmp); keep.set(key, tmp.clone()); } I.setMatrixAt(j, Z); } else if (keep.has(key)) { I.setMatrixAt(j, keep.get(key)); keep.delete(key); } I.instanceMatrix.needsUpdate = true; } }; }
       // 🛝 yards-real: пейките, площадките, оградите — истинските модели
       for (const [key, { small: sm, m }] of reals) inst(protoParts(K.R[key], 'real'), m, x => x, sm ? small : G);
-      G.userData.reals = Object.fromEntries([...reals].map(([k, r]) => [k, r.m.length])); G.userData.plays = K.plays || [];   // за Лабораторията (__dbg.yardsLook)
+      G.userData.reals = Object.fromEntries([...reals].map(([k, r]) => [k, r.m.length])); G.userData.plays = K.plays || []; G.userData.pitches = K.pitches || [];   // за Лабораторията (__dbg.yardsLook)
       G.userData.dispose = () => geoms.forEach(x => x.dispose());
       return G; } };
   return K;
@@ -152,7 +156,7 @@ function playground(K, cx, cz, ang, w, d, seed = 0) { const ca = Math.cos(ang), 
   rail(-w / 2, -d / 2, w / 2, -d / 2); rail(-w / 2, d / 2, -1, d / 2); rail(1, d / 2, w / 2, d / 2); rail(-w / 2, -d / 2, -w / 2, d / 2); rail(w / 2, -d / 2, w / 2, d / 2);
 }
 // малко игрище w × d: изкуствена трева, бели линии, две врати, висока мрежа (стълбове)
-function pitch(K, cx, cz, ang, w, d) { const ca = Math.cos(ang), sa = Math.sin(ang), P = (a, b) => [cx + ca * a - sa * b, cz + sa * a + ca * b];
+function pitch(K, cx, cz, ang, w, d) { const ca = Math.cos(ang), sa = Math.sin(ang), P = (a, b) => [cx + ca * a - sa * b, cz + sa * a + ca * b]; (K.pitches = K.pitches || []).push({ x: cx, z: cz, ang, w, d });   /* football (f9): къде са игрищата — за мачовете */
   const R = (kind, a0, b0, a1, b1) => K.flat(kind, [P(a0, b0), P(a1, b0), P(a1, b1), P(a0, b1)]);
   R('turf', -w / 2, -d / 2, w / 2, d / 2); const lw = 0.1, iw = w / 2 - 1, id = d / 2 - 1;
   R('line', -iw, -id, iw, -id + lw); R('line', -iw, id - lw, iw, id); R('line', -iw, -id, -iw + lw, id); R('line', iw - lw, -id, iw, id); R('line', -lw / 2, -id, lw / 2, id);
@@ -248,6 +252,7 @@ function yard(K, l, f, kind, o) {
   const hedge = (sa, sb, t, along) => { const L = Math.abs(sb - sa); if (L < 0.8) return; along ? K.obox(F, 0x3f6b2e, t, (sa + sb) / 2, 0, 0.7, L, 0.95) : K.obox(F, 0x3f6b2e, (sa + sb) / 2, t, 0, L, 0.7, 0.95); };
   const tree = (t, s, hh) => { const [x, z] = F.at(t, s); K.trees.push([x, z, hh]); };
   const car = (t, s, toStreet = true) => { const [x, z] = F.at(t, s); K.cars.push([x, z, toStreet ? F.r : F.r + Math.PI]); };
+  const home = (t, s) => (K.homes = K.homes || []).push({ lot: l.id, ci: K.cars.length - 1, x: F.at(t, s)[0], z: F.at(t, s)[1], yaw: F.r, out: [F.at(t, s), F.at(D, s), F.at(walkEnd, s)], door: F.at(t, s - 1.3), home: F.at(t1 + 0.4, uc) });   // commute (f6): колата на къщата — излиза/прибира се
   if (kind === 'house') {
     entry('drive', 1.3);
     // навес с кола отстрани (по-широката страна), иначе колата — на алеята пред къщата
@@ -256,8 +261,8 @@ function yard(K, l, f, kind, o) {
       for (const [tt, ss] of [[ts + 0.2, sc - sw / 2 + 0.15], [ts + 0.2, sc + sw / 2 - 0.15], [te - 0.2, sc - sw / 2 + 0.15], [te - 0.2, sc + sw / 2 - 0.15]]) K.obox(F, 0x6e5a48, tt, ss, 0, 0.12, 0.12, 2.4);
       K.obox(F, 0x5d6168, (ts + te) / 2, sc, 2.4, te - ts + 0.3, sw + 0.3, 0.12);
       K.orect(F, 'drive', ts, walkEnd, sc - 1.3, sc + 1.3); gaps.push([sc - 1.6, sc + 1.6]);
-      if (sw >= 2.2 && te - ts >= 4.6) car((ts + te) / 2, sc); }
-    else if (front >= 5.6) car(t1 + front / 2, uc);
+      if (sw >= 2.2 && te - ts >= 4.6) { car((ts + te) / 2, sc); home((ts + te) / 2, sc); } }
+    else if (front >= 5.6) { car(t1 + front / 2, uc); home(t1 + front / 2, uc); }
     const fs = K.R && o.fenceStyle ? o.fenceStyle(l) : null;   // yards-real: 'wood0' | 'wood1' | 'wood2' | 'iron' | 'cement' | 'modern'
     if (fs && K.R['f-' + fs]) { const tf = D - 0.15, run = (sa, sb, t, al) => fenceRun(K, F, fs, sa, sb, t, al);
       let a = -W + 0.15; for (const [g0, g1] of gaps.sort((p, q) => p[0] - q[0])) { run(a, g0, tf, true); a = g1; } run(a, W - 0.15, tf, true);
@@ -294,6 +299,7 @@ function yard(K, l, f, kind, o) {
   }
   // блок: пешеходна алея към входа, ивица настилка около сградата, жив плет отзад и отстрани, паркинг, общ двор
   entry('walk', 1.1);
+  (K.doors = K.doors || []).push({ lot: l.id, door: F.at(t1 + 0.3, uc), mouth: F.at(walkEnd, uc), along: [F.at(walkEnd, uc - 22), F.at(walkEnd, uc + 22)] });   // commute (f6): входът на блока и тротоарът пред него
   K.orect(F, 'pavers', t0 - 1.4, t0, s0 - 1.4, s1 + 1.4); K.orect(F, 'pavers', t1, t1 + Math.min(1.4, front), s0 - 1.4, s1 + 1.4); K.orect(F, 'pavers', t0, t1, s0 - 1.4, s0); K.orect(F, 'pavers', t0, t1, s1, s1 + 1.4);
   const pk = K.R ? bestPark(D, W, t1, s0, s1, uc) : null;   // yards-real (№31): паркингът — отстрани или в едната половина отпред; живият плет и дърветата там се махат
   hedge(-W + 0.4, W - 0.4, -D + 0.4, true); if (!pk || pk.side !== -1) hedge(-D + 0.4, D - 1.5, -W + 0.4, false); if (!pk || pk.side !== 1) hedge(-D + 0.4, D - 1.5, W - 0.4, false);
@@ -430,5 +436,6 @@ export function createDistricts(o) {
   function focus() { if (!A) rebuild(); const done = city.lots.filter(doneLot); let best = null, bs = -1; for (const c of A.comps) { if (c.area < PARK_MIN || c.maxDt < PARK_DT) continue; const n = done.filter(l => Math.hypot(l.x - c.x, l.z - c.z) < 150).length * 1e5 + c.area; if (n > bs) { bs = n; best = c; } } return best && { x: best.x, z: best.z, area: best.area }; }
   function update(camera, target) { if (!G) return; const far = camera.position.distanceTo(target) > 420; G.userData.small.visible = !far; }
   function dispose() { diag(false); if (G) { G.parent && G.parent.remove(G); G.userData.dispose(); G = null; } }
-  return { rebuild, diag, stats, focus, update, dispose, parkLotsOf: () => o.parkLots || [], reals: () => G && G.userData.reals, plays: () => (G && G.userData.plays) || [], get analysis() { return A; } };
+  const UD = () => (G && G.userData) || {};   // commute (f6)
+  return { homes: () => UD().homes || [], doors: () => UD().doors || [], carVis: (ci, on) => UD().carVis && UD().carVis(ci, on), carSrc: ci => UD().carSrc && UD().carSrc(ci), group: () => G, rebuild, diag, stats, focus, update, dispose, parkLotsOf: () => o.parkLots || [], reals: () => G && G.userData.reals, plays: () => (G && G.userData.plays) || [], pitches: () => (G && G.userData.pitches) || [], get analysis() { return A; } };
 }

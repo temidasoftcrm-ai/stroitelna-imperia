@@ -15,6 +15,7 @@ import { streetReal, lampField, tlightField, lensGeo, pedGeo, lensMatrix, CLASSI
 import { kremlinEnsemble } from './kremlin2.js';   // lm-kremlin2: Кремъл от моделите на потребителя (Meshy)
 import { romeNear } from './romenear.js';
 import { placeStatues, parkSpots } from './statues.js';   // statues: фонтаните и статуите в парковете, зелените площи и по булевардите (opts.statues)   // rome-bld: Рим отблизо — италианските сгради на местата на фасадите (opts.romeNear)
+import { t as tr } from './i18n.js';   // 🌐 lang-en: надписите на платното (f9, част C)
 
 const M = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.92 });
 let MAT = null;
@@ -316,7 +317,7 @@ function streetGlow(G, P, style) {
   const c = document.createElement('canvas'); c.width = 64; c.height = 1; const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 64, 0);
   gr.addColorStop(0, '#000'); gr.addColorStop(0.12, '#d8d8d8'); gr.addColorStop(0.3, '#383838'); gr.addColorStop(0.5, '#202020'); gr.addColorStop(0.7, '#383838'); gr.addColorStop(0.88, '#d8d8d8'); gr.addColorStop(1, '#000'); g.fillStyle = gr; g.fillRect(0, 0, 64, 1);
   const t = new THREE.CanvasTexture(c), mat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: { rome: 0xff7a18, istanbul: 0xffb27a, paris: 0xffb860, london: 0xffa850, moscow: 0xffb070 }[style] ?? 0xff9a3a, emissiveMap: t, emissiveIntensity: 0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 });
-  mat.userData.winK = style === 'rome' ? 0.85 : 0.75;   // Рим — натриево (по-оранжево, малко по-силно), Истанбул — смесено (по-бяло)
+  mat.userData.winK = (style === 'rome' ? 0.85 : 0.75) * (feature('road-glow-soft') ? 0.5 : 1);   // road-glow-soft (f9): нощем наполовина — пътищата не са оранжеви ленти   // Рим — натриево (по-оранжево, малко по-силно), Истанбул — смесено (по-бяло)
   const m = merge(parts, mat), uv = m.geometry.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, i % 2, 0.5);   // лентите са двойки връх (ляв, десен) — uv.x напреки
   m.receiveShadow = false; m.renderOrder = 2; G.add(m); return mat;
 }
@@ -350,6 +351,7 @@ function realTrees(G, list, models) {
     L.forEach(([x, z, h], i) => { q.setFromAxisAngle(up, (i * 2.39) % 6.283); I.setMatrixAt(i, m.compose(v.set(x, 0, z), q, sc.set(h, h, h))); }); I.castShadow = true; I.frustumCulled = false; G.add(I); } });
   return true;
 }
+const T1 = feature('tlight-one'), shortArm = (P, n, a) => { if (!T1) return false; const rd = P.roads[a.road], m = P.nodes[a.end ? rd.from : rd.to]; return rd.L[rd.L.length - 1] < 28 && !!m && m.arms.length >= 3 && m.kind !== 'round' && n.arms.length >= 3; };   // tlight-one (горе)
 function* furniture(G, P, o = {}) {   // генератор: yield след всеки път (постепенното строене)
   const FURN = new THREE.Group(); G.add(FURN); let SIG = {};
   const stone = M(0x8a8478), iron = M(0x2a2c2e), lampG = new THREE.MeshStandardMaterial({ color: 0xfff1c8, emissive: 0xffd88a, emissiveIntensity: 0.2 });
@@ -399,7 +401,9 @@ function* furniture(G, P, o = {}) {   // генератор: yield след вс
   for (const [x, z] of fountains) { const f = new THREE.Group(), b = new THREE.Mesh(new THREE.CylinderGeometry(4, 4.4, 0.8, 24), M(0xd8cdb4)), w = new THREE.Mesh(new THREE.CircleGeometry(3.6, 24).rotateX(-Math.PI / 2), MAT.wet), c = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 3, 10), M(0xd8cdb4)), t = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 0.5, 0.5, 14), M(0xd8cdb4));
     b.position.y = 0.4; w.position.y = 0.75; c.position.y = 2; t.position.y = 3.4; f.add(b, w, c, t); f.position.set(x, 0, z); f.traverse(o => { if (o.isMesh) o.castShadow = true; }); FURN.add(f); }
   // светофари: стълб вдясно преди стоп линията и глава с 3 лампи; лампите — по фазата на клона (lightsUpdate)
-  const heads = []; for (const n of P.nodes) { if (n.ctrl !== 'signal') continue; n.arms.forEach((a, ai) => { if (!a.stop) return; const p = a.stop[1], ox = Math.cos(a.angle), oz = Math.sin(a.angle); heads.push({ node: n.id, arm: ai, x: p[0] + ox * 0.6 - oz * 0.9, z: p[1] + oz * 0.6 + ox * 0.9, rot: Math.atan2(ox, oz) }); }); }
+  // tlight-one (f9, T4 от оценката): късата връзка между две кръстовища (двойно платно в OSM) е част от едно голямо кръстовище —
+  // по нея без стоп линии, зебри и светофарни глави (иначе — две зебри и два светофара един срещу друг); движението не се пипа
+  const heads = []; for (const n of P.nodes) { if (n.ctrl !== 'signal') continue; n.arms.forEach((a, ai) => { if (!a.stop || shortArm(P, n, a)) return; const p = a.stop[1], ox = Math.cos(a.angle), oz = Math.sin(a.angle); heads.push({ node: n.id, arm: ai, x: p[0] + ox * 0.6 - oz * 0.9, z: p[1] + oz * 0.6 + ox * 0.9, rot: Math.atan2(ox, oz) }); }); }
   if (heads.length && SR) {   // street-real (#42.5, #42.6): светофар на конзола на тротоара — на бордюра до стоп линията, главата над платното, пешеходният сигнал до зебрата
     for (const h of heads) { const n = P.nodes[h.node], a = n.arms[h.arm], rd = P.roads[a.road], ux = Math.cos(a.angle), uz = Math.sin(a.angle), p = a.stop[1], d = (p[0] - n.x) * ux + (p[1] - n.z) * uz + 0.4, side = rd.w / 2 + 0.7;
       h.x = n.x + ux * d + uz * side; h.z = n.z + uz * d - ux * side; h.yaw = Math.atan2(-uz, ux); }   /* вдясно на идващата кола: (uz, −ux) */
@@ -550,7 +554,7 @@ export function buildPlan2View(P, opts = {}) {
     const dm = zDist(m, b), far = dm ? dm + 1.8 : zoneOf(m, b); if (d + 1.8 + far <= T - 0.5) return true; if (!dm) return false;
     const rank = q => q.kind === 'round' ? 0 : q.ctrl === 'signal' ? 2 : 1; return rank(n) > rank(m) || (rank(n) === rank(m) && n.id < m.id); };
   for (const n of ND) { if (n.arms.length < 3 || n.kind === 'round') continue;
-    n.arms.forEach((a, i) => { if (a.stop) Pt.push(ribbon(a.stop, 0.45, 0.13)); if (RG) { const d = ZBM.get(n.id + ':' + i); if (d) zebra(n, a, d); } else if (n.ctrl === 'signal' || (n.ctrl === 'yield' && !a.prio)) zebra(n, a, (a.t || n.r) + 2.3); }); }   /* road-geo: зебрите на пешеходната мрежа (pedpaths.js — и свързващите) */
+    n.arms.forEach((a, i) => { if (shortArm(P, n, a)) return; if (a.stop) Pt.push(ribbon(a.stop, 0.45, 0.13)); if (RG) { const d = ZBM.get(n.id + ':' + i); if (d) zebra(n, a, d); } else if (n.ctrl === 'signal' || (n.ctrl === 'yield' && !a.prio)) zebra(n, a, (a.t || n.r) + 2.3); }); }   /* road-geo: зебрите на пешеходната мрежа (pedpaths.js — и свързващите) */
   // road-geo: истинско кръгово — платно ~5,5 м, престилка за камионите 2 м (паваж, нисък бордюр), повдигнат остров с бордюр, трева, храсти
   // (opts.plants — истинските модели) и фонтан (opts.fountain) или паметник; бордюрът и линиите — прекъснати на входовете; на всеки вход —
   // разделително островче с бордюр, „отстъпи“ (линия + триъгълници) и една зебра, отдръпната от пръстена
@@ -660,7 +664,8 @@ export function buildPlan2View(P, opts = {}) {
     tm('termini'); yield 0;
     // надписите на картата: водите (Златният рог, Босфорът…, Тибър) и кварталите — спрайтове, отблизо се скриват
     ST.LB = D && opts.labels !== false ? mapLabels(G, D) : null; yield 0;
-    ST.BT = D && D.sea && opts.boats !== false ? seaTraffic(G, D, opts.boatModels || {}) : null;   // Истанбул: фериботи по линиите, кораби по Босфора, лодки в Златния рог
+    ST.BT = D && D.sea && opts.boats !== false ? seaTraffic(G, D, opts.boatModels || {}) : null;
+    ST.RB = D && opts.riverBoats ? riverTraffic(G, D, P, opts.riverBoats) : null;   // river-boats (f9): туристически корабчета и яхти по реката (Тибър, Сена, Темза, Москва)   // Истанбул: фериботи по линиите, кораби по Босфора, лодки в Златния рог
     if (D && D.style === 'moscow') kremlinView(G, D);
     tm('labels+boats'); yield 0;
     // фоновите квартали — фасади с покриви (за парцелите, които играта не ползва: opts.fillLot); пътищата — от най-близките
@@ -694,7 +699,7 @@ export function buildPlan2View(P, opts = {}) {
       if (ST.LB && o.camera) ST.LB.update(o.camera);
       if (opts.statues && done && ST.SM === undefined && opts.statues.V) ST.SM = placeStatues(G, P, opts.statues.V, opts.statues.o);   // statues: веднъж, когато градът и моделите са готови
       if (opts.romeNear && ST.BL && o.camera) { if (ST.RN === undefined && opts.romeNear.V) ST.RN = romeNear(G, ST.BL, opts.romeNear.V, { ...opts.romeNear.o, roads: P.roads }); if (ST.RN) ST.RN.update(o.camera); }   // rome-bld / it-bld: италианските сгради около камерата ({ V — моделите (може да дойдат по-късно), o — опциите })
-      if (ST.BT) ST.BT.update(dt);
+      if (ST.BT) ST.BT.update(dt); if (ST.RB) ST.RB.update(dt);
       if (ST.TSA) ST.TSA.update(performance.now() / 1000);   // рекламите на Таймс Скуеър се сменят
       if (!F || !F.SIG.heads || !o.signals || (sigT = (sigT + 1) % 6)) return;
       const byNode = new Map(); for (const s2 of o.signals) byNode.set(s2.node, s2.arms || {});
@@ -733,6 +738,7 @@ const RIONI_BG = { Monti: 'Монти', Trevi: 'Треви', Esquilino: 'Еск�
 // Париж: „Paris 7e Arrondissement“ → „7-и арондисман“
 const arrBg = nm => { const m = /^Paris (\d+)e/.exec(nm); if (!m) return nm; const n = +m[1], sfx = n === 1 ? 'ви' : n === 2 ? 'ри' : n === 3 || n === 4 ? 'ти' : 'и'; return `${n}-${sfx} арондисман`; };
 function labelSprite(text, kind) {
+  text = tr(text);
   const c = document.createElement('canvas'), g = c.getContext('2d'), F = kind === 'w' ? 'italic 600 46px Georgia, serif' : '700 38px system-ui, sans-serif';
   g.font = F; const w = Math.ceil(g.measureText(text).width) + 24; c.width = w; c.height = 64; g.font = F; g.textBaseline = 'middle'; g.textAlign = 'center';
   g.lineWidth = 7; g.strokeStyle = kind === 'w' ? 'rgba(10,40,70,0.85)' : 'rgba(30,25,20,0.8)'; g.strokeText(text, w / 2, 34); g.fillStyle = kind === 'w' ? '#cfe8ff' : '#fff6e0'; g.fillText(text, w / 2, 34);
@@ -780,6 +786,41 @@ function seaTraffic(G, D, models) {
       let i = 1; while (i < b.L.length - 1 && b.L[i] < b.s) i++; const a = b.path[i - 1], c = b.path[i], t = (b.s - b.L[i - 1]) / ((b.L[i] - b.L[i - 1]) || 1);
       b.obj.position.set(a[0] + (c[0] - a[0]) * t, 0, a[1] + (c[1] - a[1]) * t); b.obj.rotation.y = Math.atan2((c[0] - a[0]) * b.dir, (c[1] - a[1]) * b.dir);
     } } };
+}
+// ---- river-boats (f9): реката — линията D.river (Рим) или средата на водата по колони (Париж, Лондон, Москва: реката е в маската sea);
+// по нея — туристически корабчета (ниски, ~28 м) напред-назад в две ленти и малки яхти; само водни ивици 25–260 м (не морето)
+function riverPath(D, P) {
+  if (D.river && D.river.length) { const r = D.river.slice().sort((a, b) => b.length - a.length)[0]; return r.length > 4 ? r : null; }
+  if (!P.waterAt || !P.boundary) return null;
+  const xs = P.boundary.map(p => p[0]), zs = P.boundary.map(p => p[1]), X0 = Math.min(...xs), X1 = Math.max(...xs), Z0 = Math.min(...zs), Z1 = Math.max(...zs), ST = 10;
+  const chain = byX => { const pts = [], A0 = byX ? X0 : Z0, A1 = byX ? X1 : Z1, B0 = byX ? Z0 : X0, B1 = byX ? Z1 : X1; let prev = null, best = [], cur = [];
+    for (let a = A0; a <= A1; a += ST) { const segs = []; let st = null;
+      for (let b = B0; b <= B1 + ST; b += ST) { const w = b <= B1 && P.waterAt(byX ? a : b, byX ? b : a); if (w && st == null) st = b; else if (!w && st != null) { const wd = b - st; if (wd >= 25 && wd <= 260) segs.push((st + b - ST) / 2); st = null; } }
+      let m = null; if (segs.length) m = prev == null ? segs[0] : segs.reduce((q, v) => Math.abs(v - prev) < Math.abs(q - prev) ? v : q);
+      if (m != null && (prev == null || Math.abs(m - prev) < 45)) { cur.push(byX ? [a, m] : [m, a]); prev = m; } else { if (cur.length > best.length) best = cur; cur = m != null ? [byX ? [a, m] : [m, a]] : []; prev = m; } }
+    return cur.length > best.length ? cur : best; };
+  const a = chain(true), b = chain(false), r = a.length >= b.length ? a : b; return r.length > 20 ? r : null;
+}
+function riverTraffic(G, D, P, models) {
+  const path0 = riverPath(D, P); if (!path0) return null;
+  const grp = new THREE.Group(); grp.position.y = -1.0; G.add(grp);
+  const cum = p => { const L = [0]; for (let i = 1; i < p.length; i++) L.push(L[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1])); return L; };
+  const off = (p, d) => p.map(([x, z], i) => { const a = p[Math.max(0, i - 1)], b = p[Math.min(p.length - 1, i + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [x - (b[1] - a[1]) / l * d, z + (b[0] - a[0]) / l * d]; });
+  const fit = (proto, len, hMax) => { if (!proto) return null; const o = proto.clone(true), w = new THREE.Group(); o.userData.extShared = 1; const b = new THREE.Box3().setFromObject(o), sz = b.getSize(new THREE.Vector3()), long = sz.x > sz.z, k = len / Math.max(sz.x, sz.z), ky = Math.min(k, hMax / Math.max(0.1, sz.y));
+    o.scale.set(k, ky, k); if (long) o.rotation.y = Math.PI / 2; w.add(o); w.updateMatrixWorld(true); const b2 = new THREE.Box3().setFromObject(w), c = b2.getCenter(new THREE.Vector3()); o.position.set(-c.x, -b2.min.y - 0.4, -c.z); return w; };   // ниско — минава под мостовете
+  for (const m of [models.tour, ...(models.small || [])]) if (m) floodMats(m, 0xffe2b0, 0.4);
+  const T = cum(path0).at(-1), boats = [], n = Math.max(1, Math.min(5, Math.round(T / 380)));
+  const add = (obj, path, sp, ph, mode) => { if (!obj) return; const L = cum(path); grp.add(obj); boats.push({ obj, path, L, T: L[L.length - 1], sp, s: ph * L[L.length - 1], dir: 1, wait: 0, mode }); };
+  const lane = Math.max(4, Math.min(14, (D.riverHW || 30) * 0.35));
+  for (let i = 0; i < n; i++) add(fit(models.tour, 28, 4.2), off(i % 2 ? path0.slice().reverse() : path0, lane), 3.2, (i + 0.3) / n, 'shuttle');   // туристическите — по своята лента, обръщат в края
+  (models.small || []).forEach((m, i) => { if (i < 3) add(fit(m, 10, 3.5), off(i % 2 ? path0 : path0.slice().reverse(), -lane * 0.6), 5 + i, (i * 0.37 + 0.1) % 1, 'shuttle'); });
+  return { update(dt) { dt = Math.min(dt || 0, 0.1);
+    for (const b of boats) {
+      if (b.wait > 0) { b.wait -= dt; continue; } b.s += b.dir * b.sp * dt;
+      if (b.s >= b.T || b.s <= 0) { b.s = Math.max(0, Math.min(b.T, b.s)); b.dir *= -1; b.wait = 6; }
+      let i = 1; while (i < b.L.length - 1 && b.L[i] < b.s) i++; const a = b.path[i - 1], c = b.path[i], t = (b.s - b.L[i - 1]) / ((b.L[i] - b.L[i - 1]) || 1);
+      b.obj.position.set(a[0] + (c[0] - a[0]) * t, 0, a[1] + (c[1] - a[1]) * t); b.obj.rotation.y = Math.atan2((c[0] - a[0]) * b.dir, (c[1] - a[1]) * b.dir);
+    } }, info: () => ({ len: Math.round(T), boats: boats.length }) };
 }
 // ---- Таймс Скуеър: ъгловата сграда с билбордове (assets/heavy/lm/timessq.glb, Building-studio, CC BY; плакатите — наши реклами) в 4 копия
 // по двата края на площада (по дългата му ос), обърнати към него; нощем билбордовете светят сами (emissiveMap = map → WIN_MATS)
@@ -875,7 +916,7 @@ function* romeBlocks(G, P, style, ROADS = P.roads) {   // генератор: yi
   // по вид: фасада (текстура) + покрив (римски — на две води; османски — нисък, тъмна керемида; блоковете — плосък)
   const FM = [facadeMat(), ottoMat(), aptMat(), haussMat(), brickMat(), glassMat(), haussMat()], RF = [[roofGeo(), 0xa8553a, 0.3], [roofGeo(), 0x8d4a34, 0.22], [new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), 0xb9b6ae, 0], [mansardGeo(), 0x5e6872, 0.35], [roofGeo(), 0x4f555c, 0.16], [new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), 0x5d646b, 0], [roofGeo(), 0x5f7a66, 0.14]];   // Москва: нисък покрив от боядисана ламарина (зелено-сив)
   const parts = XK ? xParts(G, list, FM, RF) /* само видовете, които ги има */ : [0, 1, 2, 3, 4, 5, 6].map(t => { const n = Math.max(1, list.filter(b => b.t === t).length), box = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), FM[t], n), roof = new THREE.InstancedMesh(RF[t][0], new THREE.MeshStandardMaterial({ color: RF[t][1], roughness: 0.85, side: THREE.DoubleSide }), n);
-    box.frustumCulled = roof.frustumCulled = false; box.receiveShadow = box.castShadow = true; box.count = roof.count = 0; G.add(box, roof); return { box, roof }; });
+    box.frustumCulled = roof.frustumCulled = false; box.receiveShadow = box.castShadow = true; box.count = roof.count = 0; roof.userData.roof = 1; G.add(box, roof); return { box, roof }; });   /* snow-roofs: userData.roof */
   const V = new THREE.Vector3(), Q = new THREE.Quaternion(), Sc = new THREE.Vector3(), C = new THREE.Color();
   let hidden = null, fl = () => true, fa = null;
   const XS = {}, draw = XK ? () => xDraw(G, list, parts, b => (b.lot && !fl(b.lot)) || !!(fa && !fa(b)) || (hidden && hidden.has(b)), XS) : () => { const n = [0, 0, 0, 0, 0, 0, 0];
@@ -894,8 +935,8 @@ function freePlots(G, P) {
   const gt = new THREE.CanvasTexture(cv); gt.colorSpace = THREE.SRGBColorSpace; gt.wrapS = gt.wrapT = THREE.RepeatWrapping;
   const patch = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: gt, roughness: 1, polygonOffset: true, polygonOffsetFactor: -1 }), N);
   const fence = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), M(0x8a7458), N * 3);
-  const sc = document.createElement('canvas'); sc.width = 128; sc.height = 64; const s2 = sc.getContext('2d'); s2.fillStyle = '#f4f1ea'; s2.fillRect(0, 0, 128, 64); s2.fillStyle = '#c62828'; s2.fillRect(0, 0, 128, 18); s2.fillStyle = '#fff'; s2.font = 'bold 14px system-ui'; s2.textAlign = 'center'; s2.fillText('ПРОДАВА СЕ', 64, 14);
-  s2.fillStyle = '#2b2b2b'; s2.font = 'bold 20px system-ui'; s2.fillText('ПАРЦЕЛ', 64, 44); s2.strokeStyle = '#c62828'; s2.lineWidth = 3; s2.strokeRect(1.5, 1.5, 125, 61);
+  const sc = document.createElement('canvas'); sc.width = 128; sc.height = 64; const s2 = sc.getContext('2d'); s2.fillStyle = '#f4f1ea'; s2.fillRect(0, 0, 128, 64); s2.fillStyle = '#c62828'; s2.fillRect(0, 0, 128, 18); s2.fillStyle = '#fff'; s2.font = 'bold 14px system-ui'; s2.textAlign = 'center'; s2.fillText(tr('ПРОДАВА СЕ'), 64, 14);
+  s2.fillStyle = '#2b2b2b'; s2.font = 'bold 20px system-ui'; s2.fillText(tr('ПАРЦЕЛ'), 64, 44); s2.strokeStyle = '#c62828'; s2.lineWidth = 3; s2.strokeRect(1.5, 1.5, 125, 61);
   const st = new THREE.CanvasTexture(sc); st.colorSpace = THREE.SRGBColorSpace;
   const board = new THREE.InstancedMesh(new THREE.PlaneGeometry(1.6, 0.8), new THREE.MeshStandardMaterial({ map: st, roughness: 0.8, side: THREE.DoubleSide }), N), post = new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, 1.9, 0.1).translate(0, 0.95, 0), M(0x5a5048), N);
   for (const m of [patch, fence, board, post]) { m.count = 0; m.frustumCulled = false; G.add(m); } patch.receiveShadow = true; fence.castShadow = board.castShadow = true;

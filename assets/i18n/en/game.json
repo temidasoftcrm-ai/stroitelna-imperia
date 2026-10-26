@@ -277,7 +277,7 @@
  "Плащане {0} € ({1}) — вече е в касата.": "Payment {0} € ({1}) — already in your cash.",
  "Плащане {0} € ({1}) — вземи пачките от покрива!": "Payment {0} € ({1}) — grab the bundles from the roof!",
  "✅ {0} — завършено ({1}). 💶 +{2} € в касата.": "✅ {0} — completed ({1}). 💶 +{2} € in cash.",
- "а": "",
+ "а": "s",
  "✅ {0} е завършен{1} ({2}). Вземи парите от покрива! 💶": "✅ {0} is complete ({2}). Grab the money from the roof! 💶",
  "⭐ Репутацията ти отключи поръчки за {0}!": "⭐ Your reputation has unlocked orders for {0}!",
  "Инженер": "Engineer",

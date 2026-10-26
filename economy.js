@@ -1,7 +1,8 @@
 // economy.js — парите на фирмата: покупки, заплати, гориво, кредити, плащания за обекти.
 // ИНТЕРФЕЙС: game.js вика само експортираните неща по-долу. Вътрешността може да се развива свободно.
 // Всички суми са в евро.
-import { feature } from './lab/feature.js';   // fix-econ (f9)
+import { feature } from './lab/feature.js';
+import { t as tr } from './i18n.js';   // 🌐 lang-en (f9): текстовете, които се сменят от кода (бутоните и реда под плъзгачите на депозита)   // fix-econ (f9)
 
 // Видове техника/хора, които фирмата може да купи
 export const UNIT_TYPES = {
@@ -841,7 +842,7 @@ function depSlider(kind, max, cur) {
     <input type="range" min="0" max="${max}" step="${step}" value="${v}" ${max > 0 ? '' : 'disabled'} style="width:100%;accent-color:${inn ? '#ffc93c' : '#7dd3ff'}">
     <div style="display:flex;gap:6px;margin:4px 0">${[25, 50, 75, 100].map(p => `<button class="btn2" data-deppct="${p}" style="flex:1;padding:4px 0;font-size:12px" ${max > 0 ? '' : 'disabled'}>${p === 100 ? (inn ? 'Всичко' : 'Всичко') : p + '%'}</button>`).join('')}</div>
     <div class="meta dep-after" style="margin:0 0 4px">След това: депозит ${fmt(after)} · лихва ~${fmt(depInterest(after))}/мес.</div>
-    <div class="fin-btns" style="margin-top:4px"><button class="${inn ? 'btn' : 'btn2'}" data-depgo="${kind}" ${v > 0 ? '' : 'disabled'}>${inn ? '🏦 Внеси' : '💶 Изтегли'} ${fmt(v)}</button></div>
+    <div class="fin-btns" style="margin-top:4px"><button class="${inn ? 'btn' : 'btn2'}" data-depgo="${kind}" ${v > 0 ? '' : 'disabled'}>${tr(inn ? '🏦 Внеси' : '💶 Изтегли')} ${fmt(v)}</button></div>
   </div>`;
 }
 // bank-simple: условията на кредита със срок за сумата v (t = invTerms)
@@ -1036,7 +1037,7 @@ export function renderFinance(el, econ, rep = 0, rerender = () => {}, unitTypes 
     <h3><span class="ico">🏦</span>Депозит · до ${(DEP_TIERS[0][1] * 100).toFixed(0)}% на месец</h3>
     <div class="fin-big" style="font-size:22px">${fmt(dep.amount)}</div>
     <div class="fin-kv">Лихва на месец <b class="fin-pos">${fmt(dep.monthly)}${dep.amount ? ` <span style="color:var(--mut);font-weight:400">(${(dep.monthly / dep.amount * 100).toFixed(1)}%)</span>` : ''}</b></div>
-    <div class="meta" style="margin:2px 0 6px">${DEP_TIERS.map(([hi, p], i) => { const lo = i ? DEP_TIERS[i - 1][0] : 0, on = dep.amount > lo; return `<span style="${on ? 'color:var(--ok);font-weight:700' : ''}">${hi === Infinity ? `над ${fmt(lo)}` : `${lo ? `${fmt(lo)}–` : 'до '}${fmt(hi)}`}: ${+(p * 100).toFixed(1)}%</span>`; }).join(' · ')}</div>
+    <div class="meta" style="margin:2px 0 6px">${DEP_TIERS.map(([hi, p], i) => { const lo = i ? DEP_TIERS[i - 1][0] : 0, on = dep.amount > lo; return `<span style="${on ? 'color:var(--ok);font-weight:700' : ''}">${hi === Infinity ? tr('над {0}', [fmt(lo)]) : `${lo ? `${fmt(lo)}–` : tr('до') + ' '}${fmt(hi)}`}: ${+(p * 100).toFixed(1)}%</span>`; }).join(' · ')}</div>
     <div class="fin-kv">Натрупана лихва (+${fmt(dep.monthly / DEPOSIT_MONTH_DAYS)} на ден) <b class="fin-pos">${fmt(dep.ready)}</b></div>
     <div class="fin-btns"><button class="btn" data-dep="collect" ${dep.ready > 0 ? '' : 'disabled'}>💰 Вземи лихвата${dep.ready > 0 ? ` · +${fmt(dep.ready)}` : ''}</button></div>
     ${depSlider('in', Math.floor(s.money), dep.amount)}
@@ -1190,8 +1191,8 @@ export function renderFinance(el, econ, rep = 0, rerender = () => {}, unitTypes 
   });
   el.querySelectorAll('.dep-sl').forEach(box => {
     const k = box.dataset.depk, r = box.querySelector('input'), go = box.querySelector('[data-depgo]'), cur = +box.dataset.cur;
-    const show = () => { const v = +r.value; depPick[k] = v; box.querySelector('.dep-v').textContent = fmt(v); go.textContent = `${k === 'in' ? '🏦 Внеси' : '💶 Изтегли'} ${fmt(v)}`; go.disabled = !v;
-      const a = k === 'in' ? cur + v : cur - v; box.querySelector('.dep-after').textContent = `След това: депозит ${fmt(a)} · лихва ~${fmt(depInterest(a))}/мес.`; };
+    const show = () => { const v = +r.value; depPick[k] = v; box.querySelector('.dep-v').textContent = fmt(v); go.textContent = `${tr(k === 'in' ? '🏦 Внеси' : '💶 Изтегли')} ${fmt(v)}`; go.disabled = !v;
+      const a = k === 'in' ? cur + v : cur - v; box.querySelector('.dep-after').textContent = tr('След това: депозит {0} · лихва ~{1}/мес.', [fmt(a), fmt(depInterest(a))]); };
     r.oninput = show;
     box.querySelectorAll('[data-deppct]').forEach(b => b.onclick = () => { const p = +b.dataset.deppct; r.value = p === 100 ? r.max : Math.round(+r.max * p / 100 / +r.step) * +r.step; show(); });
     go.onclick = () => { const v = +r.value, t = econ.hooks.toast || (() => {}); if (!v) return;

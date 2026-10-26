@@ -5,6 +5,7 @@
 //   state: { [k]: { tier: 'bronze'|'silver'|'gold'|'platinum', day, res } }
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { t as tr } from './i18n.js';   // 🌐 lang-en: надписите на платното (f9, част C)
 
 const HV = 'assets/heavy/awards/';
 // горният рафт — строителство и транспорт; долният — петрол, финанси, хотели, град + общото в средата
@@ -59,6 +60,7 @@ export async function makeTrophy(k, tier, h = 0.4) {
 }
 
 function plaqueTex(lines, on) {
+  lines = lines.map(l => tr(l));
   const c = document.createElement('canvas'); c.width = 512; c.height = 128; const g = c.getContext('2d');
   const gr = g.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, on ? '#d9b45a' : '#3a352c'); gr.addColorStop(1, on ? '#8a6a24' : '#24211c'); g.fillStyle = gr; g.fillRect(0, 0, 512, 128);
   g.strokeStyle = on ? '#fff2c0' : '#5a5246'; g.lineWidth = 4; g.strokeRect(6, 6, 500, 116);
