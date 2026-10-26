@@ -30,7 +30,8 @@ export const LANDMARK_NM = { parliament: 'Парламентът на Унгар
 export const LANDMARK_CENTER = new Set(['pyramids', 'burj', 'manhattan', 'cntower', 'willis', 'shtower', 'eiffel', 'arc', 'bigben', 'shard', 'brandenburg', 'reichstag', 'ladefense', 'sapphire', 'twist', 'twin', 'colosseum', 'colosseo', 'vatican', 'vittoriano', 'derotterdam', 'markthal', 'cubes', 'canal', 'rijks', 'centraal']);
 // 🇬🇧 Лондон с истински модели (feature 'london-real'): Биг Бен и London Eye от Poly Pizza вместо процедурните
 if (feature('lm-vittoriano')) { CITY_LANDMARKS.rome = CITY_LANDMARKS.rome.map(k => k === 'vittoriano' ? 'vittoriano2' : k); LANDMARK_NM.vittoriano2 = LANDMARK_NM.vittoriano || 'Витториано'; if (LANDMARK_CENTER.has('vittoriano')) LANDMARK_CENTER.add('vittoriano2'); }   // процедурният остава, ако флагът е изключен
-if (feature('lm-colosseo3')) { CITY_LANDMARKS.rome = CITY_LANDMARKS.rome.map(k => k === 'colosseo' ? 'colosseo3' : k); LANDMARK_NM.colosseo3 = LANDMARK_NM.colosseo || 'Колизеумът'; LANDMARK_CENTER.add('colosseo3'); }   // Колизеумът, сглобен в Blender от модела на потребителя (Meshy AI) — с нощното осветление (nightfloors.js)
+if (feature('lm-colosseum2')) { CITY_LANDMARKS.rome = CITY_LANDMARKS.rome.map(k => k === 'colosseo' || k === 'colosseo3' ? 'colosseo4' : k); LANDMARK_NM.colosseo4 = LANDMARK_NM.colosseo || 'Колизеумът'; LANDMARK_CENTER.add('colosseo4'); }   // lm-colosseum2 (f6): новият Колизеум на Темидасофт (Meshy AI) — цял модел, овал 189 × 156 м
+else if (feature('lm-colosseo3')) { CITY_LANDMARKS.rome = CITY_LANDMARKS.rome.map(k => k === 'colosseo' ? 'colosseo3' : k); LANDMARK_NM.colosseo3 = LANDMARK_NM.colosseo || 'Колизеумът'; LANDMARK_CENTER.add('colosseo3'); }   // Колизеумът, сглобен в Blender от модела на потребителя (Meshy AI) — с нощното осветление (nightfloors.js)
 if (feature('london-real')) { CITY_LANDMARKS.london = ['bigben2', 'londoneye2', 'towerbridge', 'shard']; LANDMARK_CENTER.add('bigben2'); }
 
 const mat = (c, r = 0.8, m = 0, extra = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m, ...extra });
@@ -522,7 +523,8 @@ const GLB_LM = {
   arc2: { h: 11, fit: 13, plate: 0xbdb5a4, floodK: 1.2 },   // Париж: Триумфалната арка (модел на потребителя, Meshy AI, олекотен 3,2 млн. → 120 хил. △, 5,7 MB; feature 'lm-arc2') — истински ръст 50 м (game.js LM_REAL_H)
   suleymaniye2: { h: 9.5, fit: 15, plate: 0xc9c0ae, floodK: 1.2 },   // Истанбул: джамията Сюлеймание (модел на потребителя, Meshy AI, олекотен 7,8 млн. → 84 хил. △, 3,8 MB; feature 'lm-suleymaniye2') — истински ръст по минаретата (game.js LM_REAL_H 72 м); нощем — прожекторите по текстурата (floodK)
   maiden2: { h: 10, fit: 15, plate: 0x5d6b78 },   // Истанбул: Момината кула (модел на потребителя, Meshy AI, олекотен 1 млн. → 120 хил. △) — нощем златиста (nightfloors.js 'maiden')
-  colosseo3: { h: 13, fit: 15, plate: 0xb9ad98 },   // Рим: Колизеумът от дъгата на Meshy AI (модел на потребителя) — сглобен в Blender в пълен овал, истинските пропорции 190 × 156 × 48 м (feature 'lm-colosseo3')
+  colosseo3: { h: 13, fit: 15, plate: 0xb9ad98 },
+  colosseo4: { h: 13, fit: 15, plate: 0xb9ad98 },   // Рим: Колизеумът (модел на потребителя, Meshy AI, олекотен 1,6 млн. → 160 хил. △; feature 'lm-colosseum2') — в Blender: плочата наоколо изрязана, кръгът → овал 189 × 156 м, височината ~55 м (истинската е 48 — по-ниско арките се смачкват); нощем златист (nightfloors.js 'colosseo')   // Рим: Колизеумът от дъгата на Meshy AI (модел на потребителя) — сглобен в Blender в пълен овал, истинските пропорции 190 × 156 × 48 м (feature 'lm-colosseo3')
   sagrada: { h: 17, fit: 15, plate: 0xc9bfa8 },   // Барселона: Саграда Фамилия (vmmaniac)
   bigben2: { h: 30, fit: 8, plate: 0xb8b0a0 },   // Лондон: Биг Бен (Daqian Dong, Poly Pizza; feature 'london-real')
   londoneye2: { h: 42, fit: 22, plate: 0xb8b0a0 },

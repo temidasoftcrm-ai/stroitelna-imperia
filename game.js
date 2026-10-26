@@ -6870,6 +6870,7 @@ if (feature('washington-osm')) { Object.assign(LM_PREF, { capitol: 'capitol2', w
 if (feature('lasvegas-osm')) Object.assign(LM_REAL_H, { bellagio: 155, luxor: 107, vegassign: 7.6 });   // 🇺🇸 Лас Вегас по картата (55): Беладжио — кулата 155 м, Луксор — пирамидата 107 м, знакът 7,6 м
 if (feature('lm-suleymaniye2')) LM_PREF.mosque2 = 'suleymaniye2';
 if (feature('liberty-island')) { LM_PREF.liberty = 'liberty2'; LM_REAL_H.liberty2 = 93; }   // 🗽 liberty-island (f6): островът Либърти — диорамата на Темидасофт (Meshy AI) вместо статуята на плоча; 93 м до върха на факлата, островът — на водата
+if (feature('lm-colosseum2')) LM_PREF.colosseo = 'colosseo4';   // 🏛️ lm-colosseum2 (f6): новият Колизеум (Meshy) — и в Рим по картата (OSM)
 if (feature('lm-arc2')) { LM_PREF.arc = 'arc2'; LM_REAL_H.arc2 = 50; }   // Триумфалната арка — моделът на потребителя (Meshy), 50 × 45 × 22 м   // Сюлеймание — моделът на потребителя вместо процедурната джамия
 LANDMARK_NM.maiden2 = LANDMARK_NM.maiden2 || 'Момината кула'; LANDMARK_NM.rockefeller2 = LANDMARK_NM.rockefeller2 || 'Рокфелер Сентър'; LANDMARK_NM.radiocity2 = LANDMARK_NM.radiocity2 || 'Радио Сити Мюзик Хол'; LANDMARK_NM.empire2 = LANDMARK_NM.empire2 || 'Емпайър Стейт Билдинг'; LANDMARK_NM.parliament2 = LANDMARK_NM.parliament2 || 'Уестминстърският дворец и Биг Бен'; LANDMARK_NM.colosseo3 = LANDMARK_NM.colosseo3 || 'Колизеумът'; LANDMARK_NM.vittoriano2 = LANDMARK_NM.vittoriano2 || 'Витториано';
 const LM_LABEL = { kotelnicheskaya: 'Котелническа висотка' };   // надписът, когато моделът е назаем (mgu → Котелническа)

@@ -353,3 +353,5 @@ City buses (55, buses-more) — Sketchfab, normalized in Blender (front +z, real
 Високи блокове meshy-tower (f6; 26.10.2026):
 - towers/urban-tower.glb — „Urban Tower at Dusk“, генериран с Meshy AI от собственика (платен план, ТЕМИДАСОФТ ООД) — в Blender: изрязана улицата под сградата, ~45 хил. триъгълника, текстури 1024 px WebP, нощната карта на прозорците — изпечена
 - towers/ru-blocks.glb — „Tower Residence“ (руски панелен блок), генериран с Meshy AI от собственика (платен план, ТЕМИДАСОФТ ООД) — текстури 1024 px WebP, нощната карта — изпечена
+Колизеумът lm-colosseum2 (f6; 26.10.2026):
+- lm/colosseo4.glb — „Colosseum“, генериран с Meshy AI от собственика (платен план, ТЕМИДАСОФТ ООД) — в Blender: плочата наоколо изрязана, кръгът → овал 189 × 156 м, ~160 хил. триъгълника, текстури 1024 px WebP
