@@ -6,6 +6,7 @@
 //   • бутони „Влез“ и „🏁 Завърши града“ (влиза в града и отваря картата за завършване).
 // Градът, в който си, се показва със същите данни, но автопилотът му не работи (там играеш ти).
 // Записът: S.autoCity = { [id]: true }; в града: c.freeLots = [[lotId, zone], …] (пази се при напускане, за новите поръчки).
+import { migrateDevRecord } from './devlevel.js';
 const ZONE_PREF = { house: ['outer', 'mid'], shop: ['mid', 'outer', 'center'], office: ['center', 'mid'], tower: ['center', 'mid'] };
 
 export function createCityPanel(deps) {
@@ -13,14 +14,14 @@ export function createCityPanel(deps) {
   const rec = id => id === S().cityId ? S() : (S().cities || {})[id] || null;
   const auto = id => !!(S().autoCity || {})[id];
   const lvOf = xp => { let l = 1; deps.THRESH.forEach((t, i) => { if (xp >= t) l = i + 1; }); return l; };
-  const devOf = c => c.dev || { xp: 0, lv: 1 };
+  const devOf = c => c.dev = migrateDevRecord(c.dev);
   const projsOf = (id, c) => [...(id === S().cityId ? deps.projects() : c.projects || []), ...(c.autoJobs || [])].filter(p => !p.own && !p.maint && !p.park && !p.reno && !p.invest && !p.remodel);
   const unitsOf = (id, c) => id === S().cityId ? deps.unitTypes() : c.units || [];
   const cap = c => deps.officeLv(c.officeLevel || 1);
 
   // ---- XP и ниво на града (като devlevel.add, но за запис, в който не си)
   function addXp(id, c, n) {
-    const d = c.dev = c.dev || { xp: 0, lv: 1, v: 3 }, f0 = deps.firmLv ? deps.firmLv() : Infinity;   // нивото на фирмата преди опита
+    const d = c.dev = migrateDevRecord(c.dev), f0 = deps.firmLv ? deps.firmLv() : Infinity;   // нивото на фирмата преди опита
     d.xp += n;
     const nl = lvOf(d.xp);
     while (d.lv < nl) {

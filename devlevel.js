@@ -16,9 +16,15 @@ export const kmXp = (kind, km) => Math.max(100, Math.round((km || 0) * XP_KM[kin
 // стари скали (по версия на записа) — за преизчисляване на опита
 const SCALES = { 1: [0, 100, 250, 500, 900, 1500, 2400, 3600, 5200, 7500], 2: [0, 500, 1500, 3500, 7000, 12000, 20000, 35000, 60000, 100000] }, VER = 3;
 // записи със старата скала: същото ниво и същата част от пътя до следващото
-function migrate(d) {
-  if (!d || d.v === VER) return d;
-  const OLD = SCALES[d.v || 1], L = d.lv || 1, a = OLD[L - 1], b = OLD[L] ?? a, f = b > a ? Math.min(1, Math.max(0, (d.xp - a) / (b - a))) : 0;
+export function migrateDevRecord(d) {
+  if (!d) return { xp: 0, lv: 1, v: VER };
+  if (d.v === VER) {
+    d.xp = Number.isFinite(Number(d.xp)) ? Math.max(0, Number(d.xp)) : 0;
+    d.lv = Number.isFinite(Number(d.lv)) ? Math.max(1, Math.min(THRESH.length, Math.floor(Number(d.lv)))) : lvOf(d.xp);
+    return d;
+  }
+  const OLD = SCALES[d.v || 1] || SCALES[1], L = Math.max(1, Math.min(OLD.length, Math.floor(Number(d.lv) || 1))), xp = Number(d.xp) || 0;
+  const a = OLD[L - 1], b = OLD[L] ?? a, f = b > a ? Math.min(1, Math.max(0, (xp - a) / (b - a))) : 0;
   const A = THRESH[L - 1], B = THRESH[L] ?? A;
   d.xp = Math.round(A + f * (B - A)); d.v = VER;
   return d;
@@ -72,7 +78,7 @@ const lvOfFirm = xp => { let l = 1; for (let i = 0; i < FIRM_THRESH.length; i++)
 export function createDevLevel(deps) {
   const st = () => {
     const S = deps.S(); if (!S) return null;
-    if (S.dev) migrate(S.dev);
+    if (S.dev) migrateDevRecord(S.dev);
     if (!S.dev) {   // стар запис: опитът се изчислява от досегашните постижения
       const xp = (S.done || 0) * 100 + (S.rails || []).filter(r => r.built).length * XP.rail + (S.hwDone || []).length * XP.highway
         + (S.branches || []).length * XP.branch + Object.keys((S.quests || {}).claimed || {}).length * XP.quest;

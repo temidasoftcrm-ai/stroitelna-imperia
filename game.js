@@ -27,7 +27,7 @@ import { createCityCull } from './citycull.js';
 import { createFires } from './firesim.js';
 import { gantrySigns } from './hwsigns.js';   // 🛣️ флаг hw-gantry: порталите с табели над магистралата в града
 import { buildBillboards } from './billboards3d.js';   // 🪧 флаг billboards: билбордове с фирмата по булевардите   // 🔥 флаг fire-seq: пожарът като последователност (здравина, гасене, оценка, ремонт/разчистване)   // ⚡ флаг perf-cliff: детайлите и хората по разстояние, сливане на статичните модели   // ⏱️ панел за производителност (флаг perf-panel, F8)
-import { createDevLevel, THRESH as DEV_THRESH, LV as DEV_LV, unlockText, kmXp, XP_BUY } from './devlevel.js';
+import { createDevLevel, THRESH as DEV_THRESH, LV as DEV_LV, unlockText, kmXp, XP_BUY, migrateDevRecord } from './devlevel.js';
 import { createCityPanel } from './citypanel.js';
 import { createPlaytime } from './playtime.js';
 import { createBankrupt } from './bankrupt.js';
@@ -6707,7 +6707,7 @@ function tenderLevelUp(t) {
   const id = t.city;
   if (id === S.cityId) { const d = S.dev || { xp: 0, lv: 1 }; if (d.lv < DEV_THRESH.length) dev.add(tenderXp(d), `държавна поръчка: ${t.nm}`); return; }
   const c = (S.cities || {})[id]; if (!c) return;
-  const d = c.dev = c.dev || { xp: 0, lv: 1, v: 3 }; if (d.lv < DEV_THRESH.length) cityPanel.addXp(id, c, tenderXp(d));
+  const d = c.dev = migrateDevRecord(c.dev); if (d.lv < DEV_THRESH.length) cityPanel.addXp(id, c, tenderXp(d));
 }
 // българските градове нямат cc (знамето по подразбиране е 🇧🇬) — затова българските „st-“ поръчки никога не излизаха; сега cc || 🇧🇬
 const ccOrBg = id => cityById(id) ? cityById(id).cc || '🇧🇬' : null;
