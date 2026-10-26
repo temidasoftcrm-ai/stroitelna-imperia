@@ -360,4 +360,4 @@ City buses (55, buses-more) — Sketchfab, normalized in Blender (front +z, real
 Лондон lm-westminster (f6; 26.10.2026):
 - lm/westminster3.glb — „England Center“ (Уестминстърският дворец с Биг Бен), генериран с Meshy AI от собственика (платен план, ТЕМИДАСОФТ ООД) — олекотен 986 хил. → 108 хил. триъгълника, изрязани ивиците покрай фасадите, текстура 2048 px WebP
 Сергии markets (26.10.2026):
-- markets/stall-a.glb — „market stall“, kiselevmiki, CC BY 4.0, https://sketchfab.com/3d-models/6bb15dc7056241bfac6ee747fc866e45 — без каменната основа, текстури 256 px
+- markets/stall-a.glb — "market stall" by kiselevmiki (CC-BY 4.0) — https://sketchfab.com/3d-models/6bb15dc7056241bfac6ee747fc866e45 (без каменната основа, текстури 256 px)
