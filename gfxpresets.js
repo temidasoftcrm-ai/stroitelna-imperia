@@ -9,16 +9,16 @@ import { feature } from './lab/feature.js';
 
 const LITE = feature('gfx-lite');
 export const GFX = {
-  vlow: { nm: 'Много ниско', ico: '🟠', shadows: false, shadowSize: 1024, nf: false, traffic: 0.3, peds: 0.3, far: 0.6, pr: () => 1, res: 0.7, detail: 0.5, night: false, tex: 256, aa: false, desc: 'за слаб компютър: резолюция 70 %, без сенки и нощни светлини, детайлите само наблизо, по-малко коли и хора, по-малки текстури, без изглаждане' },
-  low: { nm: 'Ниско', ico: '🔴', shadows: false, shadowSize: 1024, nf: false, traffic: 0.5, peds: 0.5, far: 0.7, pr: () => 1, desc: 'без сенки и светещи етажи нощем, половината коли и хора, по-близка видимост, рязкост 1×' },
+  vlow: { nm: 'Много ниско', ico: '🟠', shadows: false, shadowSize: 1024, nf: false, traffic: 0.3, peds: 0.3, far: 0.6, pr: () => 1, res: 0.7, detail: 0.5, yard: 0, deco: false, night: false, tex: 256, aa: false, desc: 'за слаб компютър: резолюция 70 %, без сенки и нощни светлини, без украса, дворове и паркирани коли, детайлите само наблизо, по-малко коли и хора, по-малки текстури, без изглаждане' },
+  low: { nm: 'Ниско', ico: '🔴', shadows: false, shadowSize: 1024, nf: false, traffic: 0.5, peds: 0.5, far: 0.7, yard: 0.5, pr: () => 1, desc: 'без сенки и светещи етажи нощем, половината коли и хора, дворовете само наблизо, по-близка видимост, рязкост 1×' },
   mid: { nm: 'Средно', ico: '🟡', shadows: true, shadowSize: 2048, nf: true, traffic: 1, peds: 1, far: 1, pr: () => Math.min(devicePixelRatio || 1, 1.5), desc: 'сенки, светещи етажи, целият трафик, рязкост до 1,5×' },
   high: { nm: 'Високо', ico: '🟢', shadows: true, shadowSize: 2048, nf: true, traffic: 1, peds: 1, far: 1.2, pr: () => Math.min(devicePixelRatio || 1, 2), desc: 'всичко, по-далечна видимост, пълна рязкост на екрана (до 2×)' },
 };
 export const GFX_ORDER = LITE ? ['vlow', 'low', 'mid', 'high'] : ['low', 'mid', 'high'];
 if (!LITE) delete GFX.vlow;
-for (const k in GFX) { const g = GFX[k] = { res: 1, detail: 1, night: true, tex: 512, aa: true, ...GFX[k] }; g.pr0 = g.pr; g.pr = () => g.pr0() * g.res; }   // gfx-lite: стойностите по подразбиране; pr — с резолюцията на нивото
+for (const k in GFX) { const g = GFX[k] = { res: 1, detail: 1, yard: 1, deco: true, night: true, tex: 512, aa: true, ...GFX[k] }; g.pr0 = g.pr; g.pr = () => g.pr0() * g.res; }   // gfx-lite: стойностите по подразбиране; pr — с резолюцията на нивото
 let cur = null, own = null, merged = null;   // own — „⚙️ Подробно“ (gfx-lite)
-const RANGE = { far: [0.4, 1.2], traffic: [0.1, 1], res: [0.5, 1], detail: [0, 1] }, BOOL = ['shadows', 'night'];
+const RANGE = { far: [0.4, 1.2], traffic: [0.1, 1], res: [0.5, 1], detail: [0, 1], yard: [0, 1] }, BOOL = ['shadows', 'night', 'deco'];   // yard — дворовете и паркираните коли (докъде; 0 — без тях), deco — украсата (сергии, билбордове, знамена, статуи)
 function readOwn(v) { if (!LITE || !v || v[0] !== '{') return null; try { const j = JSON.parse(v), o = {}; for (const k in RANGE) if (typeof j.o?.[k] === 'number') o[k] = Math.max(RANGE[k][0], Math.min(RANGE[k][1], j.o[k])); for (const k of BOOL) if (typeof j.o?.[k] === 'boolean') o[k] = j.o[k]; return GFX[j.lv] ? { lv: j.lv, o } : null; } catch { return null; } }
 export const gfxLevel = () => cur || (cur = (() => { const q = (location.search.match(/[?&]gfx=(vlow|low|mid|high)\b/) || [])[1]; if (q) return q;   /* ?gfx= — за тестовете (не се записва) */ try { const v = localStorage.getItem('stroi-gfx'), j = readOwn(v); if (j) { own = j.o; return j.lv; } return GFX[v] ? v : 'mid'; } catch { return 'mid'; } })());
 // нивото + своите стойности (gfx-lite: трафикът важи и за хората; рязкостта — част от тази на нивото)

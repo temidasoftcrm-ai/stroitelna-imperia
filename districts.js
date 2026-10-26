@@ -434,7 +434,7 @@ export function createDistricts(o) {
   }
   // най-голямата свободна площ с най-много готови сгради наоколо — за снимките „преди/след“
   function focus() { if (!A) rebuild(); const done = city.lots.filter(doneLot); let best = null, bs = -1; for (const c of A.comps) { if (c.area < PARK_MIN || c.maxDt < PARK_DT) continue; const n = done.filter(l => Math.hypot(l.x - c.x, l.z - c.z) < 150).length * 1e5 + c.area; if (n > bs) { bs = n; best = c; } } return best && { x: best.x, z: best.z, area: best.area }; }
-  function update(camera, target) { if (!G) return; const far = camera.position.distanceTo(target) > 420; G.userData.small.visible = !far; }
+  function update(camera, target, yard = 1) { if (!G) return; const far = camera.position.distanceTo(target) > 420 * yard; G.userData.small.visible = yard > 0 && !far; }   // yard (графиката): 1 — до 420 м, 0,5 — до 210 м, 0 — без дворовете и паркираните коли
   function dispose() { diag(false); if (G) { G.parent && G.parent.remove(G); G.userData.dispose(); G = null; } }
   const UD = () => (G && G.userData) || {};   // commute (f6)
   return { homes: () => UD().homes || [], doors: () => UD().doors || [], carVis: (ci, on) => UD().carVis && UD().carVis(ci, on), carSrc: ci => UD().carSrc && UD().carSrc(ci), group: () => G, rebuild, diag, stats, focus, update, dispose, parkLotsOf: () => o.parkLots || [], reals: () => G && G.userData.reals, plays: () => (G && G.userData.plays) || [], pitches: () => (G && G.userData.pitches) || [], get analysis() { return A; } };

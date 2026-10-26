@@ -13,5 +13,9 @@
  "📦 Място: ×{0} →": "📦 Space: ×{0} →",
  "📦 Място: ×{0} (напр. бетон {1} м³)": "📦 Space: ×{0} (e.g. concrete {1} m³)",
  "(напр. бетон {0} →": "(e.g. concrete {0} →",
- "м³)": "m³)"
+ "м³)": "m³)",
+ "За слаб компютър: резолюция 70 %, без сенки и нощни светлини, без украса, дворове и паркирани коли, детайлите само наблизо, по-малко коли и хора, по-малки текстури, без изглаждане": "For a weak computer: 70% resolution, no shadows or night lights, no decoration, yards or parked cars, details only up close, fewer cars and people, smaller textures, no anti-aliasing",
+ "Без сенки и светещи етажи нощем, половината коли и хора, дворовете само наблизо, по-близка видимост, рязкост 1×": "No shadows or lit floors at night, half the cars and people, yards only up close, shorter view distance, sharpness 1×",
+ "Сенки, светещи етажи, целият трафик, рязкост до 1,5×": "Shadows, lit floors, all traffic, sharpness up to 1.5×",
+ "Всичко, по-далечна видимост, пълна рязкост на екрана (до 2×)": "Everything, longer view distance, full screen sharpness (up to 2×)"
 }

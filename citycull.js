@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
+const DECO = new Set(['markets', 'billboards', 'flagsSquare', 'statues']);   // украсата — изключва се изцяло на слабите нива (gfx deco)
 const _v = new THREE.Vector3(), _box = new THREE.Box3(), _inv = new THREE.Matrix4(), _m = new THREE.Matrix4();
 // центърът и радиусът на обекта (веднъж; градът не мърда)
 function sphereOf(o) {
@@ -75,6 +76,7 @@ export function createCityCull(deps) {
         const d = Math.hypot(s.x - tg.x, s.z - tg.z) - s.r;
         if (o.visible && d > R * 1.06) o.visible = false; else if (!o.visible && d < R * 0.94) o.visible = true;
       }
+      if (deps.deco) { const on = deps.deco(); for (const o of g.children) if (DECO.has(o.name)) o.visible = on; }   /* графиката: „✨ Украса“ */
       for (const m of deps.peds()) { if (!m) continue; const d = Math.hypot(m.position.x - tg.x, m.position.z - tg.z); m.visible = d < Rp; }
     },
   };
