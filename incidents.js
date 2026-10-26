@@ -210,6 +210,7 @@ export function createIncidents(ctx) {
     }
     if (T.heavy) lastHeavy = performance.now() / 1000;
     const T2 = I2() && TYPES2[type], R = T2 && roadFrame(at);   // incidents2: в рамката на улицата
+    if (R && R.x != null && type !== 'bfire' && feature('inc-roadframe')) at = { ...at, x: R.x, z: R.z };   // inc-roadframe (f6): мястото понякога беше до пешеходна алея (на тревата, рамката — напреки на истинската улица) → на платното
     if (R && type !== 'bfire') at = carriage(at, R);
     const g = new THREE.Group(); g.position.set(at.x, 0, at.z); g.rotation.y = R ? Math.atan2(R.dx, R.dz) : rnd(0, 6.28); ctx.scene.add(g); g.updateMatrixWorld(true);
     const fx = (T2 ? T2.props(g, at, R) : T.props(g, at)) || {};
@@ -363,5 +364,5 @@ export function createIncidents(ctx) {
   const obstacles = () => !inc ? [] : [...inc.cars.filter(c => c.stage !== 'gone' && c.o.visible).map(c => ({ x: c.x, z: c.z })), ...(inc.leave ? [] : [{ x: inc.at.x, z: inc.at.z }])];
   const movers = () => !inc ? [] : inc.cars.filter(c => c.stage === 'go' && c.o.visible).map(c => ({ x: c.x, z: c.z, yaw: c.yaw, l: 5, w: 2.4, em: !!c.kind }));   // идващите спешни коли (колите от трафика спират пред тях)
   const follow = () => inc && inc.type === 'chase' && !inc.leave ? { x: inc.cars[0].x, z: inc.cars[0].z } : null;   // #3: камерата след беглеца
-  return { update, start, clear, obstacles, blockers, movers, follow, speed: k => { TS = k || 1; return TS; }, spot: () => inc && inc.at, types: () => Object.keys(TYPES), get active() { return inc && { t: Math.round(inc.t), type: inc.type, x: Math.round(inc.at.x), z: Math.round(inc.at.z), stages: inc.cars.map(c => c.stage), hold: inc.hold == null ? null : Math.round(inc.hold), cars: inc.cars.map(c => [c.stage, c.path ? c.path.length - c.pi : 0, Math.round(Math.hypot(c.x - inc.at.x, c.z - inc.at.z)), Math.round(c.delay || 0)]), tow: inc.towC ? (inc.towC.done ? 'done' : inc.towC.load ? 'load' : inc.towC.stage || '?') : null }; } };
+  return { update, start, clear, obstacles, blockers, movers, follow, speed: k => { TS = k || 1; return TS; }, spot: () => inc && inc.at, frame: () => inc && inc.R ? { x: inc.at.x, z: inc.at.z, dx: inc.R.dx, dz: inc.R.dz, hw: inc.R.hw, type: inc.type } : null, types: () => Object.keys(TYPES), get active() { return inc && { t: Math.round(inc.t), type: inc.type, x: Math.round(inc.at.x), z: Math.round(inc.at.z), stages: inc.cars.map(c => c.stage), hold: inc.hold == null ? null : Math.round(inc.hold), cars: inc.cars.map(c => [c.stage, c.path ? c.path.length - c.pi : 0, Math.round(Math.hypot(c.x - inc.at.x, c.z - inc.at.z)), Math.round(c.delay || 0)]), tow: inc.towC ? (inc.towC.done ? 'done' : inc.towC.load ? 'load' : inc.towC.stage || '?') : null }; } };
 }

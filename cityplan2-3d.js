@@ -15,7 +15,8 @@ import { streetReal, lampField, tlightField, lensGeo, pedGeo, lensMatrix, CLASSI
 import { kremlinEnsemble } from './kremlin2.js';   // lm-kremlin2: Кремъл от моделите на потребителя (Meshy)
 import { romeNear } from './romenear.js';
 import { placeStatues, parkSpots } from './statues.js';   // statues: фонтаните и статуите в парковете, зелените площи и по булевардите (opts.statues)   // rome-bld: Рим отблизо — италианските сгради на местата на фасадите (opts.romeNear)
-import { t as tr } from './i18n.js';   // 🌐 lang-en: надписите на платното (f9, част C)
+import { t as tr } from './i18n.js';
+import { bridgesView } from './bridges.js';   // 🌉 bridges-real (f6): истинските мостове над реката (Париж, Лондон, Москва, Ню Йорк, Вашингтон)   // 🌐 lang-en: надписите на платното (f9, част C)
 
 const M = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.92 });
 let MAT = null;
@@ -201,6 +202,33 @@ function seaGround(sea) {
     at += n; v ^= 1; }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
 }
+// banks-smooth (f6): същата суша, но с плавен бряг — полето „суша“ във върховете на клетките (средно от съседните клетки, размито още веднъж),
+// изолинията 0,5 с интерполация по ръбовете (marching squares): пълните клетки — слети в серии по редове, граничните — изрязани по линията
+// (Sutherland–Hodgman на квадрата); общите ръбове се интерполират еднакво — без пролуки
+function seaGroundSmooth(sea, wallD = 0) {   // wallD — bridges-real: каменните стени на кея до водата (м)
+  const NX = sea.nx, NZ = sea.nz, C = sea.cell, land = new Uint8Array(NX * NZ); let at = 0, v = 0;
+  for (const n of sea.runs) { if (!v) land.fill(1, at, Math.min(at + n, land.length)); at += n; v ^= 1; }
+  const VX = NX + 1, VZ = NZ + 1, F0 = new Float32Array(VX * VZ), F = new Float32Array(VX * VZ);
+  for (let j = 0; j < VZ; j++) for (let i = 0; i < VX; i++) { let s = 0, c = 0; for (let dj = -1; dj <= 0; dj++) for (let di = -1; di <= 0; di++) { const x = i + di, z = j + dj; if (x < 0 || z < 0 || x >= NX || z >= NZ) continue; s += land[z * NX + x]; c++; } F0[j * VX + i] = c ? s / c : 0; }
+  for (let j = 0; j < VZ; j++) for (let i = 0; i < VX; i++) { let s = 0, c = 0; for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const x = i + di, z = j + dj; if (x < 0 || z < 0 || x >= VX || z >= VZ) continue; const w = di || dj ? 1 : 2; s += F0[z * VX + x] * w; c += w; } F[j * VX + i] = s / c; }
+  const pos = [], idx = [], T = 0.5, P = (x, z) => { pos.push(x, 0, z); return pos.length / 3 - 1; };
+  for (let j = 0; j < NZ; j++) { let run = -1;
+    const flush = i => { if (run < 0) return; const x0 = sea.x0 + run * C, x1 = sea.x0 + i * C, z0 = sea.z0 + j * C, z1 = z0 + C, b = P(x0, z0); P(x1, z0); P(x1, z1); P(x0, z1); idx.push(b, b + 2, b + 1, b, b + 3, b + 2); run = -1; };
+    for (let i = 0; i < NX; i++) {
+      const q = [[i, j], [i + 1, j], [i + 1, j + 1], [i, j + 1]], f = q.map(([x, z]) => F[z * VX + x]), inN = f.filter(x => x >= T).length;
+      if (inN === 4) { if (run < 0) run = i; continue; }
+      flush(i); if (!inN) continue;
+      const poly = [], cr = []; for (let k = 0; k < 4; k++) { const a = k, b = (k + 1) % 4, fa = f[a], fb = f[b];
+        if (fa >= T) poly.push(q[a]);
+        if ((fa >= T) !== (fb >= T)) { const t = (T - fa) / (fb - fa), c = [q[a][0] + (q[b][0] - q[a][0]) * t, q[a][1] + (q[b][1] - q[a][1]) * t]; poly.push(c); cr.push(c); } }
+      if (wallD) for (let k = 0; k + 1 < cr.length; k += 2) { const [x0, z0] = cr[k], [x1, z1] = cr[k + 1], X0 = sea.x0 + x0 * C, Z0 = sea.z0 + z0 * C, X1 = sea.x0 + x1 * C, Z1 = sea.z0 + z1 * C, w0 = pos.length / 3;
+        pos.push(X0, 0, Z0, X1, 0, Z1, X1, -wallD, Z1, X0, -wallD, Z0, X0, 0, Z0, X1, 0, Z1, X1, -wallD, Z1, X0, -wallD, Z0); idx.push(w0, w0 + 1, w0 + 2, w0, w0 + 2, w0 + 3, w0 + 4, w0 + 6, w0 + 5, w0 + 4, w0 + 7, w0 + 6); }   // стената — от двете страни (посоката на изолинията не е еднаква), отделни върхове — иначе нормалите се унищожават
+      if (poly.length < 3) continue; const b0 = pos.length / 3; for (const [x, z] of poly) P(sea.x0 + x * C, sea.z0 + z * C);
+      for (let k = 1; k < poly.length - 1; k++) idx.push(b0, b0 + k + 1, b0 + k);
+    }
+    flush(NX); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
+}
 // ---- Москва: Кремъл (процедурно) — червените стени по истинския триъгълник с кулите (Спаската — най-висока), вътре камбанарията
 // „Иван Велики“, катедралите със златни куполи, Големият дворец и Сенатът; ГУМ; паважът на Червения площад и на двора. Всичко — инстанции.
 const KREML = [[55.74885, 37.61265], [55.74975, 37.62135], [55.75055, 37.62355], [55.75255, 37.62155], [55.75455, 37.61905], [55.75565, 37.61745], [55.75315, 37.61575], [55.75165, 37.61425], [55.75005, 37.61305]];
@@ -254,12 +282,12 @@ function cutBand(pts, cut) {
   if (cur.length > 1) out.push(cur); return out;
 }
 function seaView(G, D, RR, cut = null) {
-  const S2 = D.sea, IN = D.style === 'paris' || D.style === 'london' || D.style === 'newyork' || D.style === 'moscow' || D.style === 'washington' || D.style === 'lasvegas', w = new THREE.Mesh(new THREE.PlaneGeometry(S2.nx * S2.cell * (IN ? 1 : 1.6), S2.nz * S2.cell * (IN ? 1 : 1.6)).rotateX(-Math.PI / 2), MAT.water); w.position.set(S2.x0 + S2.nx * S2.cell / 2, -1.2, S2.z0 + S2.nz * S2.cell / 2); G.add(w);
+  const S2 = D.sea, IN = D.style === 'paris' || D.style === 'london' || D.style === 'newyork' || D.style === 'moscow' || D.style === 'washington' || D.style === 'lasvegas', w = new THREE.Mesh(new THREE.PlaneGeometry(S2.nx * S2.cell * (IN ? 1 : 1.6), S2.nz * S2.cell * (IN ? 1 : 1.6)).rotateX(-Math.PI / 2), MAT.water); w.position.set(S2.x0 + S2.nx * S2.cell / 2, D.wY ?? -1.2, S2.z0 + S2.nz * S2.cell / 2); G.add(w);
   if (IN) {   // град без море (Париж — само реката): около растера — суша (рамка), не вода
     const W = S2.nx * S2.cell, H = S2.nz * S2.cell, F = 3000, fr = [[-F, -F, W + 2 * F, F], [-F, H, W + 2 * F, F], [-F, 0, F, H], [W, 0, F, H]].map(([x, z, w2, d2]) => new THREE.PlaneGeometry(w2, d2).rotateX(-Math.PI / 2).translate(S2.x0 + x + w2 / 2, 0, S2.z0 + z + d2 / 2));
     for (const f of fr) { const m = new THREE.Mesh(f, MAT.urban); m.receiveShadow = true; G.add(m); } }
   const Pi = []; for (const p of D.piers || []) if (p.length > 1) Pi.push(ribbon(p, 4, -0.2)); if (Pi.length) G.add(merge(Pi, MAT.pier));
-  const Fe = [], seenF = new Set(); for (const f of D.ferries || []) { const key = f.pts.length > 1 ? [f.pts[0], f.pts[f.pts.length - 1]].map(p => Math.round(p[0] / 40) + ',' + Math.round(p[1] / 40)).sort().join('|') : ''; if (seenF.has(key)) continue; seenF.add(key); dashed(f.pts, 5, 22, 0.7, -1.1, Fe); }   // еднаквите линии (двете посоки) — веднъж if (Fe.length) G.add(merge(Fe, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 })));   // фериботните линии по водата
+  const Fe = [], seenF = new Set(); for (const f of D.ferries || []) { const key = f.pts.length > 1 ? [f.pts[0], f.pts[f.pts.length - 1]].map(p => Math.round(p[0] / 40) + ',' + Math.round(p[1] / 40)).sort().join('|') : ''; if (seenF.has(key)) continue; seenF.add(key); dashed(f.pts, 5, 22, 0.7, (D.wY ?? -1.2) + 0.1, Fe); }   // еднаквите линии (двете посоки) — веднъж if (Fe.length) G.add(merge(Fe, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 })));   // фериботните линии по водата
   const Mt = []; for (const r of D.metro || []) if (r.kind !== 'rail') for (const pts of cutBand(r.pts, cut)) Mt.push(ribbon(pts, r.kind === 'tram' ? 2.2 : 2.6, 0.085)); if (Mt.length) G.add(merge(Mt, M(0x9a9184)));   // метро/трамвай на повърхността
   romeBridges(G, D);
   // висящите мостове (Босфорския): моделът — дължината по x, центриран; мащабът — от бряг до бряг
@@ -428,7 +456,8 @@ export function buildPlan2View(P, opts = {}) {
   mats();
   const G = new THREE.Group(), D = opts.osm ? { ...opts.osm, _models: opts.bridgeModels || {}, _kremlin: opts.kremlinModels || null, _gum: opts.gumModel || null } : null;   // bridgeModels: { bosphorus } — висящите мостове G.userData.plan = P;
   if (opts.offset) G.position.set(opts.offset[0], 0, opts.offset[1]);
-  const RR = P.R * 1.6, g0 = new THREE.Mesh(new THREE.PlaneGeometry(RR * 2.4, RR * 2.4).rotateX(-Math.PI / 2), D ? MAT.urban : MAT.grass); g0.receiveShadow = true; if (D && D.sea) g0.geometry = seaGround(D.sea); else if (D) g0.geometry = romeGround(RR, D); G.add(g0); G.userData.groundMat = g0.material;   // Рим: дворовете и площадите — светъл камък, тревата — само в парковете
+  if (D && D.sea && opts.bridgesReal && /^(paris|london|moscow|newyork|washington)$/.test(D.style)) D.wY = -6;   // 🌉 bridges-real (f6): реката — по-дълбоко, кейовете — каменни стени, под мостовете — истинските модели (bridges.js)
+  const RR = P.R * 1.6, g0 = new THREE.Mesh(new THREE.PlaneGeometry(RR * 2.4, RR * 2.4).rotateX(-Math.PI / 2), D ? MAT.urban : MAT.grass); g0.receiveShadow = true; if (D && D.sea) g0.geometry = feature('banks-smooth') || D.wY ? seaGroundSmooth(D.sea, D.wY ? -D.wY + 0.5 : 0) : seaGround(D.sea);   /* banks-smooth (f6): плавен бряг */ else if (D) g0.geometry = romeGround(RR, D); G.add(g0); G.userData.groundMat = g0.material;   // Рим: дворовете и площадите — светъл камък, тревата — само в парковете
   if (P.coastZ) { const sh = new THREE.Shape(); sh.moveTo(-RR * 1.2, -RR * 1.2); for (let i = 0; i <= 80; i++) { const x = -RR * 1.2 + i * RR * 2.4 / 80; sh.lineTo(x, P.coastZ(x)); } sh.lineTo(RR * 1.2, -RR * 1.2); const wg = new THREE.ShapeGeometry(sh); wg.rotateX(Math.PI / 2); const wm = new THREE.Mesh(wg, MAT.water); wm.position.y = 0.02; G.add(wm);
     // бряг: пясъчна ивица по водата и крайбрежна алея до кея; пристанището — кей навътре във водата пред мястото му
     const cl = []; for (let x = -RR * 1.2; x <= RR * 1.2; x += 4) cl.push(x);
@@ -445,6 +474,7 @@ export function buildPlan2View(P, opts = {}) {
   const trees = [];
   if (D) {   // истинската карта: Тибърът (ивица около оста), остров Тиберина, паркове и археологически зони, жп линиите към Термини
     if (D.sea) seaView(G, D, RR, opts.railCut || null); else romeRiver(G, D);
+    if (D.wY) bridgesView(G, P, D, opts.bridgesReal, floodMats);   // bridges-real
     const I = D.island; if (I) { const isl = new THREE.Mesh(new THREE.CircleGeometry(1, 32).rotateX(-Math.PI / 2), M(0xb9ad96)); isl.scale.set(I.w / 2, 1, I.d / 2); isl.rotation.y = I.rot; isl.position.set(I.x, 0.06, I.z); G.add(isl); }
     const gm = { park: M(0x6f9e4f), archaeo: M(0xb7b08a), cemetery: M(0x7d9468), resort: M(0xd8ccb2) };   // resort — lasvegas-osm (55): запазените места на казината (светла настилка, пустинен пейзаж)
     for (const g of P.greensSrc) { const sh = new THREE.Shape(g.poly.map(([x, z]) => new THREE.Vector2(x, z))); const ge = new THREE.ShapeGeometry(sh); ge.rotateX(Math.PI / 2); const m = new THREE.Mesh(ge, gm[g.kind] || gm.park); m.material.side = THREE.DoubleSide; m.position.y = 0.025; m.receiveShadow = true; G.add(m); }
@@ -765,7 +795,7 @@ function ferryModel() {
   for (const o of [hull, keel, d1, w1, d2, fun, top]) { o.castShadow = true; g.add(o); } return g;
 }
 function seaTraffic(G, D, models) {
-  const K = D.k, at = (la, lo) => [(lo - D.center[1]) * Math.cos(D.center[0] * Math.PI / 180) * 111320 * K, -(la - D.center[0]) * 110540 * K], grp = new THREE.Group(); grp.position.y = -1.0; G.add(grp);
+  const K = D.k, at = (la, lo) => [(lo - D.center[1]) * Math.cos(D.center[0] * Math.PI / 180) * 111320 * K, -(la - D.center[0]) * 110540 * K], grp = new THREE.Group(); grp.position.y = (D.wY ?? -1.2) + 0.2; G.add(grp);
   const boats = [], cum = p => { const L = [0]; for (let i = 1; i < p.length; i++) L.push(L[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1])); return L; };
   for (const m of [models.ferry, models.cruise, models.tanker, models.container, ...(models.small || [])]) if (m) floodMats(m, 0xffe2b0, m === models.cruise ? 0.5 : 0.3);   // корабите нощем — с осветени палуби
   const fit = (proto, len) => { if (!proto) return null; const o = proto.clone(true), w = new THREE.Group(); o.userData.extShared = 1; const b = new THREE.Box3().setFromObject(o), sz = b.getSize(new THREE.Vector3()), long = sz.x > sz.z, k = len / Math.max(sz.x, sz.z); o.scale.setScalar(k); const b2 = new THREE.Box3().setFromObject(o), c = b2.getCenter(new THREE.Vector3()); o.position.set(-c.x, -b2.min.y - 0.6, -c.z); if (long) o.rotation.y = Math.PI / 2; w.add(o); return w; };
@@ -804,7 +834,7 @@ function riverPath(D, P) {
 }
 function riverTraffic(G, D, P, models) {
   const path0 = riverPath(D, P); if (!path0) return null;
-  const grp = new THREE.Group(); grp.position.y = -1.0; G.add(grp);
+  const grp = new THREE.Group(); grp.position.y = (D.wY ?? -1.2) + 0.2; G.add(grp);
   const cum = p => { const L = [0]; for (let i = 1; i < p.length; i++) L.push(L[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1])); return L; };
   const off = (p, d) => p.map(([x, z], i) => { const a = p[Math.max(0, i - 1)], b = p[Math.min(p.length - 1, i + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [x - (b[1] - a[1]) / l * d, z + (b[0] - a[0]) / l * d]; });
   const fit = (proto, len, hMax) => { if (!proto) return null; const o = proto.clone(true), w = new THREE.Group(); o.userData.extShared = 1; const b = new THREE.Box3().setFromObject(o), sz = b.getSize(new THREE.Vector3()), long = sz.x > sz.z, k = len / Math.max(sz.x, sz.z), ky = Math.min(k, hMax / Math.max(0.1, sz.y));

@@ -305,6 +305,13 @@ const DEMOS = [
   ['🏛️ Атина: Акрополът — Партенонът на скалистия хълм, денем, после нощем (златисто осветен)', 'athens', d => setTimeout(() => { d.time(12); d.lookLmKind('parthenon', 230); setTimeout(() => { d.time(22); d.lookLmKind('parthenon', 230); }, 12000); }, 9000)],   // lm-acropolis
   ['🇬🇧 Лондон: новият Уестминстърски дворец с Биг Бен — денем, после нощем (топло осветен, часовникът свети)', 'london', d => setTimeout(() => { d.time(12); d.lookLmKind('westminster3', 260); setTimeout(() => { d.time(22); d.lookLmKind('westminster3', 260); }, 12000); }, 9000)],   // lm-westminster
   ['🍉 Пазар и кафенета около площада: Пловдив — сергии с раирани навеси и щайги плодове, масички с чадъри', 'plovdiv', d => { d.marketLook(); }],   // markets
+  ['✈️ Самолети на снижение: София — опашка от самолети по глисадата към летището, нощем с фарове', 'sofia', d => { d.airLook(true); }],   // air-approach
+  ['🚁 Полицейски хеликоптер над инцидент: кръжи над мястото, нощем с прожектор', 'sofia', d => { d.heliLook(true); }],   // police-heli
+  ['🗼 Париж: плавните брегове на Сена (без стъпалата на растера) и Айфеловата кула — изцяло в парка', 'paris', d => setTimeout(() => { d.time(12); d.lookLmKind('eiffel', 170); }, 9000)],   // banks-smooth, eiffel-fix
+  ['🌉 Москва: истинските мостове над реката — каменни с арки, кейовете с каменни стени; после нощем', 'moscow', d => setTimeout(() => { d.bridgesLook(0); setTimeout(() => d.bridgesLook(3), 9000); setTimeout(() => d.bridgesLook(0, true), 18000); }, 9000)],   // bridges-real
+  ['🌉 Париж: мостовете над Сена — каменни с арки', 'paris', d => setTimeout(() => { d.bridgesLook(0); setTimeout(() => d.bridgesLook(2), 9000); setTimeout(() => d.bridgesLook(5), 18000); }, 9000)],   // bridges-real
+  ['💡 Будапеща нощем: площадите пред Парламента и базиликата „Св. Стефан“ — светещите фенери и петната светлина; базиликата — неутрално златиста', 'budapest', d => setTimeout(() => { d.time(22); d.lookLmKind('parliament', 120); setTimeout(() => { d.time(22); d.lookLmKind('ststephen', 80); }, 10000); }, 9000)],   // bud-night
+  ['🚗🚗🚗 Верижна катастрофа по улицата (Москва) — рамката (конуси, лента) по посоката на улицата, на платното', 'moscow', d => setTimeout(() => d.incidentLook(false, 'pile'), 9000)],   // inc-roadframe
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

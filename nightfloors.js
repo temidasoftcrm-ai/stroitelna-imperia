@@ -234,7 +234,8 @@ export function prepNightFloors(root, name) {
         sh.uniforms.uPetro = { value: pg ? new THREE.Vector4(pg.y0, pg.y1, pg.mx, 0) : new THREE.Vector4() }; sh.uniforms.uPTL = { value: pg ? pg.tl : new THREE.Vector2() }; sh.uniforms.uPTR = { value: pg ? pg.tr : new THREE.Vector2() };
         sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vNfY; varying float vNfSeed; varying vec3 vNfW; varying vec3 vNfL; varying vec3 vNfN; varying vec3 vNfWN; uniform vec3 uAx; uniform float uWH;\n#ifdef NF_WINM\nattribute vec3 nfWin; varying vec3 vNfWin;\n#endif')
           .replace('#include <begin_vertex>', '#include <begin_vertex>\nvNfY = uWH > 0.0 ? (modelMatrix * vec4(transformed, 1.0)).y : dot(transformed, uAx); vNfSeed = fract(sin(dot(modelMatrix[3].xz, vec2(12.9898, 78.233))) * 43758.5453); vNfW = (modelMatrix * vec4(transformed, 1.0)).xyz; vNfL = transformed; vNfN = objectNormal; vNfWN = mat3(modelMatrix) * objectNormal;\n#ifdef NF_WINM\nvNfWin = nfWin;\n#endif');
-        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n#ifdef NF_WINM\nvarying vec3 vNfWin;\n#endif\nvarying float vNfY; varying float vNfSeed; uniform float uFloorH; uniform float uWinId; uniform float uWinW; uniform float uIndK; uniform float uY0; uniform float uFlood; uniform float uSolid; uniform float uH; uniform float uCoolW; uniform float uT; uniform float uGrid; varying vec3 vNfW; varying vec3 vNfL; varying vec3 vNfN; varying vec3 vNfWN; uniform vec4 uPetro; uniform vec3 uAx; uniform vec2 uPTL; uniform vec2 uPTR;')
+        sh.uniforms.uNfNeu = { value: name === 'ststephen' && feature('bud-night') ? 1 : 0 };   /* bud-night (f6): базиликата „Св. Стефан“ — неутрално златисто (оранжевата текстура × оранжевото на 'westm' = твърде оранжево) */
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n#ifdef NF_WINM\nvarying vec3 vNfWin;\n#endif\nuniform float uNfNeu; varying float vNfY; varying float vNfSeed; uniform float uFloorH; uniform float uWinId; uniform float uWinW; uniform float uIndK; uniform float uY0; uniform float uFlood; uniform float uSolid; uniform float uH; uniform float uCoolW; uniform float uT; uniform float uGrid; varying vec3 vNfW; varying vec3 vNfL; varying vec3 vNfN; varying vec3 vNfWN; uniform vec4 uPetro; uniform vec3 uAx; uniform vec2 uPTL; uniform vec2 uPTR;')
           .replace('#include <emissivemap_fragment>', `
             #ifdef USE_EMISSIVEMAP
               float nNight = emissive.r;   // нощта 0…1 (daynight.js → emissiveIntensity)
@@ -290,7 +291,7 @@ export function prepNightFloors(root, name) {
                 float hz = clamp((vNfY - uY0) / uH, 0.0, 1.0), lum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
                 vec3 nn = normalize(vNfN); float vt = step(abs(dot(nn, uAx)), 0.35);
                 float dk = clamp((0.08 - lum) * 14.0, 0.0, 1.0) * step(0.03, hz) * step(hz, 0.92) * vt;
-                totalEmissiveRadiance = (diffuseColor.rgb * vec3(1.0, 0.7, 0.32) * 0.85 * (1.0 - 0.2 * hz) + vec3(1.0, 0.82, 0.45) * dk * 1.8) * nNight;
+                totalEmissiveRadiance = (mix(diffuseColor.rgb * vec3(1.0, 0.7, 0.32) * 0.85, vec3(lum) * vec3(1.0, 0.86, 0.62) * 1.05, uNfNeu) * (1.0 - 0.2 * hz) + vec3(1.0, 0.82, 0.45) * dk * 1.8) * nNight;
               } else if (uGrid > 15.5) {   // бензиностанциите: долната страна на навеса (нормалата надолу, над 25% от височината) — ярко бяло; витрините (тъмното, по стените, долу) — топло
                 float hz = clamp((vNfY - uY0) / uH, 0.0, 1.0), lum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
                 vec3 nn = normalize(vNfN); float dn = dot(nn, uAx), vt = step(abs(dn), 0.25);
