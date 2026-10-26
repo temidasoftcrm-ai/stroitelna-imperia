@@ -127,7 +127,8 @@ export function createIncidents(ctx) {
   const carriage = (at, R) => { if (!R.median) return at; const cw = R.hw - R.median / 2, s0 = R.median / 2 + cw / 2; R.hw = cw / 2; R.mid = R.median; return { ...at, x: at.x + R.dz * s0, z: at.z - R.dx * s0 }; };
   const lenOf = o => { const s = K2.bodyBox(o).getSize(new THREE.Vector3()); return Math.max(s.x, s.z); }, hOf = o => K2.bodyBox(o).getSize(new THREE.Vector3()).y;
   function base(g, R, o = {}) {   // кордон през цялата улица (len — половината дължина), конуси през платната отвъд него, полицаи, които спират движението, зяпачи
-    const L = o.len || 10, X = R.hw + R.walk * 0.4, XL = R.mid ? R.hw + 0.4 : X, cl = new THREE.Group(); g.add(cl); cl.visible = false;   // XL — откъм разделителната ивица: до края на платното
+    const L = o.len || 10, X = R.hw + R.walk * 0.4, XL = R.mid ? R.hw + 0.4 : X, cl = new THREE.Group(); g.add(cl); cl.visible = false;
+    if (o.close !== false) R.blkL = Math.max(R.blkL || 0, L + 3);   // traffic-gap: конусите през платната — колите спират пред тях   // XL — откъм разделителната ивица: до края на платното
     if (o.cordon !== false) K2.cordon(cl, o.pts || [[-XL, -L], [X, -L], [X, L], [-XL, L]]);
     if (o.close !== false) for (const z of [-L - 3, L + 3]) for (let x = -R.hw + 0.7; x <= R.hw - 0.6; x += 1.6) { const c = cone(); c.position.set(x, 0, z); cl.add(c); }
     for (let k = 0; k < (o.cops ?? 2); k++) { const sz = k ? 1 : -1; K2.put(g, 'cop', 'wave', sz * R.hw * 0.4, sz * (L + 5), sz * R.hw * 0.4, sz * (L + 30)); }   // с лице към колите, които спира
@@ -353,7 +354,12 @@ export function createIncidents(ctx) {
   }
   // за трафика в game.js: къде стоят/карат спешните коли и ударените — да ги заобикаля
   // incidents2: къде движението спира (traffic.js opts.blockers) — центърът на затворената улица, докато има екипи на място
-  const blockers = () => !inc || inc.leave || !inc.fx || !inc.R || inc.fx.open || !inc.cars.some(c => c.stage === 'hold') ? [] : [{ x: inc.at.x, z: inc.at.z }];
+  const blockers = () => !inc || inc.leave || !inc.fx || !inc.R || inc.fx.open || !inc.cars.some(c => c.stage === 'hold') ? [] : [blk()];
+  // 🚧 traffic-gap: кордонът по улицата — r: от центъра до конусите и до най-далечната спряла спешна кола (+ 3 м), dx/dz — посоката на улицата, w — половината платно;
+  // traffic.js спира колите пред него от двете страни (не в центъра), затваря пътеките наоколо и обръща чакащите дълго
+  const blk = () => { const at = inc.at, R = inc.R; if (!feature('traffic-gap')) return { x: at.x, z: at.z };
+    let r = R.blkL || 13; for (const c of inc.cars) if (c.stage === 'hold' && c.o.visible) r = Math.max(r, Math.abs((c.x - at.x) * R.dx + (c.z - at.z) * R.dz) + 4);
+    return { x: at.x, z: at.z, r: Math.min(r, 45), dx: R.dx, dz: R.dz, w: R.hw + 1.2 }; };
   const obstacles = () => !inc ? [] : [...inc.cars.filter(c => c.stage !== 'gone' && c.o.visible).map(c => ({ x: c.x, z: c.z })), ...(inc.leave ? [] : [{ x: inc.at.x, z: inc.at.z }])];
   const movers = () => !inc ? [] : inc.cars.filter(c => c.stage === 'go' && c.o.visible).map(c => ({ x: c.x, z: c.z, yaw: c.yaw, l: 5, w: 2.4, em: !!c.kind }));   // идващите спешни коли (колите от трафика спират пред тях)
   const follow = () => inc && inc.type === 'chase' && !inc.leave ? { x: inc.cars[0].x, z: inc.cars[0].z } : null;   // #3: камерата след беглеца
