@@ -12,6 +12,7 @@
  "🌃 Нощни светлини": "🌃 Night lights",
  "ореоли на лампите, прожектори, светещи етажи": "lamp halos, floodlights, lit floors",
  "кадъра/с ·": "fps ·",
+ "{0}градът не се рисува (картата е отворена) — влез в града, за да видиш разликата": "{0}the city is not being drawn (the map is open) — enter the city to see the difference",
  "{0}{1} рисувания · {2} M △ · рязкост {3}×": "{0}{1} draw calls · {2} M △ · sharpness {3}×",
  "📊 Преди: {0}": "📊 Before: {0}",
  "📊 Сега:": "📊 Now:",

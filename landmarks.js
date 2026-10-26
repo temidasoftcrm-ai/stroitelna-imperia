@@ -559,7 +559,7 @@ const GLB_LM = {
   // Пловдив — Античният стадион (KULTRA LTD, Sketchfab, CC-BY 4.0; 194 → 70 хил. △, 2,6 MB). h/fit — точното отношение; game.js specialLmPlace — истинският ръст
   // lm-budapest (f9): Будапеща — Парламентът (Темидасофт, Meshy AI, платен план; 2,48 млн → 72 хил. △, 4,7 MB). h/fit — отношението на модела (≈ 96 × 268 м);
   // game.js specialLmPlace — в истински ръст (смален до квартала); нощем — златисто осветен (window.__lmNight → dayNight.winMats)
-  parliament: { h: 15, fit: 42.9, plate: 0xb8b2a6, onLoad: w => goldNight(w, 0xffc56a, 0.55) },
+  parliament: { h: 15, fit: 42.9, plate: 0xb8b2a6 },   // нощем — nightfloors.js 'westm' (прозорците светят), без плоското goldNight
   duomo: { h: 15, fit: 24.5, plate: 0xb8b2a6 },
   romanstadium: { h: 15, fit: 59.2, plate: 0x9a8f7a },
   // Атина (lm-acropolis, f6): Партенонът (Meshy AI, CC0, от потребителя; олекотен 2 млн. → 115 хил. △) на процедурния хълм на Акропола; 15 единици = 18,5 м,

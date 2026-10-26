@@ -59,8 +59,32 @@ else if (adsPub) console.warn('⚠️ ADS_CLIENT в config.js не прилич�
 const VER = (/export const VERSION = '([^']+)'/.exec(readFileSync(join(ROOT, 'cloud.js'), 'utf8')) || [])[1];
 if (VER) writeFileSync(join(DIST, 'version.json'), JSON.stringify({ v: VER, at: new Date().toISOString() }) + '\n'); else console.warn('⚠️ cloud.js: няма VERSION — version.json не е направен');
 
+// 3г) сглобяване на кода (esbuild, флаг --no-bundle — без него): модулите на страниците → b-<име>-<хеш>.js + общи b-chunk-<хеш>.js в корена
+// (в корена — import.meta.url в кода сочи пак спрямо корена: assets/i18n, sfx…); three — от import map-а (външен). После dist/sw.js — бързият кеш.
+const BUNDLE = !process.argv.includes('--no-bundle');
+if (BUNDLE) {
+  const { build } = await import(process.env.ESBUILD || '/home/dimiter/.nvm/versions/node/v20.20.0/lib/node_modules/vercel/node_modules/esbuild/lib/main.js');
+  const tagRe = /<script type="module" src="([^"?]+)(?:\?v=[^"]*)?"><\/script>/g, entries = new Set();
+  for (const pg of PAGES) for (const m of readFileSync(join(DIST, pg), 'utf8').matchAll(tagRe)) entries.add(m[1]);
+  const res = await build({ absWorkingDir: DIST, entryPoints: [...entries], outdir: DIST, bundle: true, splitting: true, format: 'esm', target: 'es2022',
+    minify: true, keepNames: true, entryNames: 'b-[name]-[hash]', chunkNames: 'b-chunk-[hash]', external: ['three', 'three/addons/*'], metafile: true, logLevel: 'warning', legalComments: 'none' });
+  const outOf = {}; for (const [o, m] of Object.entries(res.metafile.outputs)) if (m.entryPoint) outOf[m.entryPoint] = o;
+  const used = new Set(Object.keys(res.metafile.inputs));
+  for (const pg of PAGES) { const f = join(DIST, pg); let h = readFileSync(f, 'utf8');
+    h = h.replace(tagRe, (t, src) => outOf[src] ? `<script type="module" src="${outOf[src]}"></script>` : t)
+      .replace(/^\s*"\.\/[^"]+\.m?js": "[^"]+",?\n/gm, '')   // import map: остават само three
+      .replace(/("three\/addons\/": "[^"]+"),(\s*\})/, '$1$2')
+      .replace('</body>', `<script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => { }));</script>\n</body>`);
+    writeFileSync(f, h); }
+  for (const f of used) if (/\.m?js$/.test(f) && existsSync(join(DIST, f))) rmSync(join(DIST, f));   // изходните модули вече са вътре в b-*.js
+  for (const d of ['lab']) { const p = join(DIST, d); if (existsSync(p) && !readdirSync(p).length) rmSync(p, { recursive: true }); }
+  const code = readdirSync(DIST).filter(f => /^b-.+\.js$/.test(f));
+  writeFileSync(join(DIST, 'sw.js'), readFileSync(join(ROOT, 'tools/sw.js'), 'utf8').replace('__VER__', VER || Date.now()).replace('__CODE__', JSON.stringify(code)).replace('__HEAVY__', BASE.replace(/\/?$/, '/')));
+  console.log(`сглобено: ${entries.size} входа → ${code.length} файла b-*.js, ${Math.round(code.reduce((a, f) => a + statSync(join(DIST, f)).size, 0) / 1024)} KB; sw.js`);
+}
+
 // 4) кеш: страниците — винаги проверка; скриптовете носят ?v=<хеш> (stamp.mjs), но и без него — кратко; assets — седмица
-writeFileSync(join(DIST, '_headers'), `/version.json\n  Cache-Control: no-store\n/*.html\n  Cache-Control: no-cache\n/\n  Cache-Control: no-cache\n/*.js\n  Cache-Control: public, max-age=600\n/assets/*\n  Cache-Control: public, max-age=604800\n`);
+writeFileSync(join(DIST, '_headers'), `/version.json\n  Cache-Control: no-store\n/*.html\n  Cache-Control: no-cache\n/\n  Cache-Control: no-cache\n` + (BUNDLE ? `/sw.js\n  Cache-Control: no-cache\n/b-*\n  Cache-Control: public, max-age=31536000, immutable\n/migrate.js\n  Cache-Control: public, max-age=600\n/mobile.js\n  Cache-Control: public, max-age=600\n` : `/*.js\n  Cache-Control: public, max-age=600\n`) + `/assets/*\n  Cache-Control: public, max-age=604800\n`);   // b-* — с хеш в името: веднъж завинаги
 
 // 5) отчет
 const walk = d => readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)]);

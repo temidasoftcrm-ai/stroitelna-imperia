@@ -6993,6 +6993,7 @@ function landmarkPlan(kinds) {
   if (city.plan.p2 && city.plan.osm) return landmarkPlan2(kinds);
   const sq = city.plan.square, mem = S.landmarks[S.cityId], shade = o => o.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
   if (kinds[0] === 'redeemer' && feature('rio-hill') && city.plan.p2 && !city.plan.osm) { const o = rioHill(sq); if (o) { shade(o); city.group.add(o.group); city.landmarks.push(o); kinds = ['__none', ...kinds.slice(1)]; } }   // rio-hill (55): статуята — на хълм в залива пред центъра, площадът остава свободен
+  if (kinds[0] === 'ststephen' && feature('lm-budapest') && city.plan.p2) kinds = ['__none', ...kinds.slice(1)];   // lm-budapest: базиликата — на своето място с площад (specialLmPlace), не насред кръстовището
   if (kinds[0] === 'manhattan' && feature('ny-spread')) { nySpread(); kinds = kinds.slice(1); if (!kinds.length) return; kinds = ['__none', ...kinds]; }
   if (kinds[0] !== '__none') { const main = buildLandmark(kinds[0], { label }); main.group.position.set(sq.x, 0.1, sq.z); main.group.scale.setScalar(LM_MAIN_SCALE[kinds[0]] || 3.2); if (feature('lm-fit-sq')) { const k0 = LM_MAIN_SCALE[kinds[0]] || 3.2, tall = feature('burj-size') && (lmH(kinds[0]) || 0) / (lmFit(kinds[0]) || 15) > 3, big = feature('lm-big-min') && LM_BIG[kinds[0]] ? lmBigFit(sq, lmFit(kinds[0]) || 15, LM_BIG[kinds[0]] / (lmH(kinds[0]) || 17)) : null, f = big || lmSquareFit(sq, k0, lmFit(kinds[0]) || 15, tall ? k0 * 0.85 : 0);   /* lm-big-min (55): Саграда — в ръст, по-далеч от площада */   /* burj-size (55): кулите (Бурж Халифа 70/14) не се смаляват до игла (беше 46 м, ×0,65) — поне ×0,85 (~190 м), по-далеч от площада */ main.group.scale.setScalar(f.k); main.group.position.set(f.x, 0.1, f.z); }   /* lm-fit-sq (55): на площада, без да влиза в твоите парцели и в улиците */ main.group.rotation.y = (hashStr(kinds[0]) % 4) * Math.PI / 2;
   shade(main); city.group.add(main.group); city.landmarks.push(main); }
@@ -7013,16 +7014,39 @@ const CHURCHES = feature('churches'), chLoad = {}, churchModel = k => chLoad[k] 
 // ⛪/🏛️ забележителност на запазеното място („special“, иначе парк) най-близо до площада на града по плана (без истинска карта): в истински ръст,
 // смалена, ако не се побира (+2 м тротоар от всяка страна); дългата ос — по дългата страна. [вид, ръст м, дължина м, ширина м, флаг]
 window.__lmNight = m => dayNight.winMats.add(m);   // lm-budapest (f9): нощното осветяване на моделите-забележителности (landmarks.js goldNight)
-const SPECIAL_LM = { budapest: ['parliament', 96, 268, 123, 'lm-budapest'], sofia: ['nevsky', 51.7, 79.4, 62.1, 'churches'], milan: ['duomo', 108, 158, 93, 'lm-more2'], plovdiv: ['romanstadium', 7.7, 30.3, 22.5, 'lm-more2'],
+const SPECIAL_LM = { budapest: [['parliament', 96, 268, 123, 'lm-budapest', { plaza: 1 }], ['ststephen', 60, 60, 60, 'lm-budapest', { plaza: 1, len: 0.55 }]], sofia: ['nevsky', 51.7, 79.4, 62.1, 'churches'], milan: ['duomo', 108, 158, 93, 'lm-more2'], plovdiv: ['romanstadium', 7.7, 30.3, 22.5, 'lm-more2'],
   athens: ['parthenon', 18.5, 106, 67, 'lm-acropolis'] };   // 🏛️ lm-acropolis (f6): Партенонът на хълма — ръстът е на храма (18,5 м), дължината/ширината — на хълма
+// lm-budapest: [[…], […]] — няколко забележителности, всяка на следващото запазено място; { plaza } — каменен площад на цялото място,
+// сградата — към задната страна (по-далеч от площада на града), отпред — площадче с лампи, пейки и дървета; { len } — дял от дългата страна (базиликата)
 function specialLmPlace(cityId) {
-  const sp = SPECIAL_LM[cityId], P = city.plan, sq = P && P.square; if (!sp || !feature(sp[4]) || !sq || !P.p2 || P.osm) return;
-  const [kind, H, LL, WW] = sp, d = b => Math.hypot(b.x - sq.x, b.z - sq.z);
-  const B = (P.bigs || []).filter(b => b.kind === 'special').sort((a, b) => d(a) - d(b))[0] || (P.bigs || []).filter(b => b.kind === 'park').sort((a, b) => d(a) - d(b))[0]; if (!B) return;
-  const o = buildLandmark(kind, { label }), lw = Math.max(B.w, B.d), sw = Math.min(B.w, B.d), f = Math.min(1, (lw + 4) / LL, (sw + 4) / WW);
+  for (const o of city.lmPlazas || []) city.group.remove(o); city.lmPlazas = [];
+  const P = city.plan, sq = P && P.square, all = SPECIAL_LM[cityId]; if (!all || !sq || !P.p2 || P.osm) return;
+  const d = b => Math.hypot(b.x - sq.x, b.z - sq.z), spots = [...(P.bigs || []).filter(b => b.kind === 'special').sort((a, b) => d(a) - d(b)), ...(P.bigs || []).filter(b => b.kind === 'park').sort((a, b) => d(a) - d(b))];
+  for (const sp of Array.isArray(all[0]) ? all : [all]) { if (!feature(sp[4])) continue;
+  const [kind, H, LL, WW, , po = {}] = sp, B = spots.shift(); if (!B) return;
+  const lw = Math.max(B.w, B.d), sw = Math.min(B.w, B.d), f = Math.min(1, ((po.len ? lw * po.len : lw) + 4) / LL, ((po.plaza ? sw * 0.7 : sw) + 4) / WW), o = buildLandmark(kind, { label });
   const pl = o.group.children.find(c => c.isMesh && c.geometry?.parameters?.width === 15); if (pl) pl.visible = false;   // плочата 15 × 15 — моделът стъпва на земята
-  o.group.scale.setScalar(f * H / 15); o.group.rotation.y = (B.rot || 0) + (B.w >= B.d ? Math.PI / 2 : 0); o.group.position.set(B.x, 0.1, B.z);   // дългата ос на модела (z) — по дългата страна
-  o.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); city.group.add(o.group); city.landmarks.push(o);
+  const ry = (B.rot || 0) + (B.w >= B.d ? Math.PI / 2 : 0); o.group.scale.setScalar(f * H / 15); o.group.rotation.y = ry; o.group.position.set(B.x, 0.1, B.z);   // дългата ос на модела (z) — по дългата страна
+  if (po.plaza) lmPlaza(o, B, ry, lw, sw, LL * f, WW * f, sq, po);
+  o.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); city.group.add(o.group); city.landmarks.push(o); }
+}
+// площадът пред забележителността: ux/uz — дългата ос на мястото, nx/nz — напреки към площада на града (там е „предът“)
+function lmPlaza(o, B, ry, lw, sw, L, W, sq, po) {
+  const ux = Math.sin(ry), uz = Math.cos(ry); let nx = uz, nz = -ux; if ((sq.x - B.x) * nx + (sq.z - B.z) * nz < 0) { nx = -nx; nz = -nz; }
+  const back = Math.max(0, (sw - W) / 2 - 1.5); o.group.position.x -= nx * back; o.group.position.z -= nz * back;   // сградата — назад
+  if (po.len) { const sh = Math.max(0, (lw - L) / 2 - 1.5); o.group.position.x += ux * sh; o.group.position.z += uz * sh; }   // базиликата — към единия край: площадът е и отстрани
+  const g = new THREE.Group(); g.name = 'lmPlaza';
+  const stone = new THREE.Mesh(new THREE.BoxGeometry(B.w, 0.14, B.d), new THREE.MeshStandardMaterial({ color: 0xcfc6b4, roughness: 0.95 }));
+  stone.position.set(B.x, 0.07, B.z); stone.rotation.y = B.rot || 0; stone.receiveShadow = true; g.add(stone);
+  const fy = (sw - W) / 2 + back, fc = sw / 2 - fy / 2;   // предната ивица: дълбочина и център (от средата на мястото)
+  const at = (a, b) => [B.x + ux * a + nx * b, B.z + uz * a + nz * b], lamps = [], yaw = Math.atan2(nx, nz);
+  for (let a = -lw / 2 + 4; a <= lw / 2 - 4 + 1e-6; a += (lw - 8) / 4) { const [x, z] = at(a, sw / 2 - 1.2); lamps.push([x, z, yaw, 'ornate']); }
+  if (po.len) { const sl = lw - L - 3; for (const b of [-sw / 2 + 4, sw / 2 - 4]) { const [x, z] = at(-lw / 2 + 1.2, b); lamps.push([x, z, yaw + Math.PI / 2, 'ornate']); } if (sl > 6) for (let t = 0; t < 3; t++) { const tr = plazaTree(4.4); const [x, z] = at(-lw / 2 + sl / 2, -sw / 2 + 6 + t * (sw - 12) / 2); tr.position.set(x, 0, z); g.add(tr); } }
+  if (streetReal()) { const LF = lampField(lamps); g.add(LF.group); }
+  if (fy > 7) for (const a of [-lw / 2 + 5, lw / 2 - 5]) { const tr = plazaTree(4.8); const [x, z] = at(a, fc); tr.position.set(x, 0, z); g.add(tr); }   // по дърво в двата ъгъла отпред
+  const bm = new THREE.MeshStandardMaterial({ color: 0x5b4532, roughness: 0.9 });
+  if (fy > 6) for (const a of [-lw / 4, 0, lw / 4]) { const [x, z] = at(a, fc); const b = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, 0.7), bm); b.position.set(x, 0.39, z); b.rotation.y = yaw; b.castShadow = true; g.add(b); }   // пейки
+  city.group.add(g); city.lmPlazas.push(g);
 }
 function refreshLandmarks() {
   for (const o of city.landmarks || []) if (!o.big) city.group.remove(o.group);

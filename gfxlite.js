@@ -34,7 +34,7 @@ export function openGfx(deps, { detail = false, suggest = null } = {}) {
   const sig = () => gfxLevel() + JSON.stringify(gfxOwn());   // нивото е сменено отвън (проверката, демото) — прозорецът се рисува наново
   const loop = () => { if (!alive) return; fr++; const t = performance.now(); if (t - tFr >= 1000) { fps = fr * 1000 / (t - tFr); fr = 0; tFr = t; stat(); } requestAnimationFrame(loop); };
   const snap = () => { const s = deps.stats(); return { fps, calls: s.calls, tris: s.tris, pr: s.pr }; };
-  const line = s => `${s.fps ? fmtN(s.fps) + ' кадъра/с · ' : ''}${fmtN(s.calls)} рисувания · ${(s.tris / 1e6).toFixed(1).replace('.', ',')} M △ · рязкост ${s.pr.toFixed(2).replace('.', ',')}×`;
+  const line = s => !s.calls ? `${s.fps ? fmtN(s.fps) + ' кадъра/с · ' : ''}градът не се рисува (картата е отворена) — влез в града, за да видиш разликата` : `${s.fps ? fmtN(s.fps) + ' кадъра/с · ' : ''}${fmtN(s.calls)} рисувания · ${(s.tris / 1e6).toFixed(1).replace('.', ',')} M △ · рязкост ${s.pr.toFixed(2).replace('.', ',')}×`;
   function stat() { if (sig() !== drawn && document.activeElement?.type !== 'range') return draw(); const el = d.querySelector('#gfxSt'); if (!el) return; const s = snap(); if (!before && performance.now() - t0 > 2000) before = s;
     el.innerHTML = before ? `📊 Преди: ${line(before)}<br>📊 Сега: <b>${line(s)}</b>` : `📊 Сега: ${line(s)}`; }
   const t0 = performance.now();
