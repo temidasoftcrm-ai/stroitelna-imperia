@@ -2,6 +2,11 @@
 // Сергия: плот, четири стълбчета, раиран навес (цветът — по сергията), щайги с плодове/зеленчуци. Кафене: кръгла масичка, 4 стола, голям чадър.
 // build(spots) — spots: [{ x, z, rot, kind: 'stall' | 'cafe' }]; dispose()
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+// сергията от Sketchfab („market stall“, kiselevmiki, CC-BY): раиран навес, плодове, бъчва, табелка — веднъж за всички, по инстанция на част; дотогава — от кутийки
+let stallP = null;
+const stallModel = () => stallP || (stallP = new GLTFLoader().loadAsync('assets/heavy/markets/stall-a.glb').then(gl => { const parts = []; gl.scene.updateMatrixWorld(true);
+  gl.scene.traverse(o => { if (o.isMesh) parts.push([o.geometry.clone().applyMatrix4(o.matrixWorld), o.material]); }); return parts; }).catch(() => null));
 
 const AWN = [[0xd23b3b, 0xf4efe6], [0x2f7d4f, 0xf4efe6], [0x2b5fa8, 0xf4efe6], [0xe39b2b, 0xf4efe6]];
 const UMB = [0xb8342f, 0xf0e6d2, 0x2c6e8f, 0x6a8f3a, 0xd9a441];
@@ -24,6 +29,10 @@ export function buildMarket(spots) {
   const box = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), wood = new THREE.MeshStandardMaterial({ color: 0x8a6a45, roughness: 0.9 });
   const counter = im(box, wood, st.length), posts = im(box, wood, st.length * 4), awn = im(new THREE.BoxGeometry(1, 0.06, 1), new THREE.MeshStandardMaterial({ map: stripes(), roughness: 0.8 }), st.length);
   const crate = im(box, new THREE.MeshStandardMaterial({ color: 0xb0875a, roughness: 0.9 }), st.length * 6), fruit = im(new THREE.SphereGeometry(0.5, 6, 4), new THREE.MeshStandardMaterial({ roughness: 0.7 }), st.length * 6, false);
+  const boxStall = [counter, posts, awn, crate, fruit];
+  if (st.length) stallModel().then(parts => { if (!parts || !g.parent) return;   // истинската сергия — вместо кутийките
+    for (const [geo, mat] of parts) { const o = im(geo.clone(), mat, st.length);   /* clone — dispose() не трябва да чисти общия модел */ st.forEach(s => put(o, s.x, 0, s.z, s.rot)); o.instanceMatrix.needsUpdate = true; }
+    for (const o of boxStall) o.visible = false; });
   st.forEach((s, k) => {
     put(counter, s.x, 0, s.z, s.rot, 2.8, 0.9, 1.1);
     for (const [a, b] of [[-1.4, -0.6], [1.4, -0.6], [-1.4, 0.7], [1.4, 0.7]]) { const [x, z] = W(s, a, b); put(posts, x, 0, z, s.rot, 0.07, 2.4, 0.07); }
