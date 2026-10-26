@@ -158,6 +158,7 @@ import { createSkySun } from './skysun.js';
 import { createFootball } from './football.js';
 import { createBirds } from './birds.js';
 import { createAirCity } from './aircity.js';   // ✈️ air-approach + 🚁 police-heli (f9)
+import { createBikes } from './bikes.js';   // 🚲 bikes (f9)
 import { flagPole, flagTex, flagsTick, inEU } from './flags.js';
 import { createXmas } from './xmas.js';
 import { buildMarket } from './markets.js';   // 🍉 markets (f9): сергии и кафенета около площада   // 🎄 xmas (f9): Коледа по календара на играта   // 🏳️ flags (f9): знамената на държавата по площада и обществените сгради   // 🐦 birds (f9): гълъби по площадите, чайки над морето   // ⚽ football (f9): мачове на малките игрища в кварталите   // 🌅 sky-sun (f9): небе с градиент спрямо слънцето, видимо слънце, залез/изгрев, луна и звезди   // 🚉 station-access (f9): път от гарата до улица и паркинг до нея (градовете с плана v2)   // 🎓 onboarding (f9): урокът при първа игра — камера, парцел, строеж, пари, град, настройки
@@ -1110,6 +1111,11 @@ const birds = feature('birds') ? createBirds({ parent: () => city.group, sites: 
 const airCity = feature('air-approach') || feature('police-heli') ? createAirCity({ parent: () => city.group, airport: () => city.airport ? city.airport.group : null, center: () => city.hq ? [city.hq.x, city.hq.z] : [0, 0], night: () => dayNight.night, simT: () => simT, plane: (k, l) => makePlane(k, l),
   target: () => (incidents.follow && incidents.follow()) || incidents.spot() || null, load: u => new Promise((res, rej) => new GLTFLoader().load(u, res, undefined, rej)),
   approach: () => feature('air-approach') && !!S && !!city.group && $('mapScreen').classList.contains('hidden'), heli: () => feature('police-heli') && !!S && !!city.group && $('mapScreen').classList.contains('hidden') }) : null;
+// 🚲 bikes (f9): велосипедисти и тротинетки по червените велоалеи на булевардите в европейските градове; Нидерландия и Дания — много и по всички улици
+const BIKE_CC = { '🇳🇱': 1, '🇩🇰': 1, '🇩🇪': 0.6, '🇧🇪': 0.6, '🇦🇹': 0.6, '🇨🇭': 0.55, '🇸🇪': 0.6, '🇫🇮': 0.5, '🇳🇴': 0.5 };
+const bikeK = () => { const c = S && cityById(S.cityId); return !c || WORLD_IDS.has(S.cityId) ? 0 : BIKE_CC[c.cc] ?? 0.35; };
+const bikes = feature('bikes') ? createBikes({ parent: () => city.group, plan: () => city.plan && city.plan.p2 && bikeK() ? { P: city.plan.p2, ox: (city.plan.offset || [0, 0])[0], oz: (city.plan.offset || [0, 0])[1], all: bikeK() >= 1 } : null,
+  many: bikeK, hour: () => (6 + todF() * 24) % 24, wet: () => ['rain', 'storm', 'snow'].includes(weather.kind), night: () => dayNight.night, on: () => !!S && !!city.group && $('mapScreen').classList.contains('hidden') }) : null;
 // 🏳️ flags (f9): на площада — държавата, ЕС (ако е член) и пак държавата; кметството — знамената му стават на държавата; училище, полиция, съд — стълб отпред
 const FLAGS = feature('flags'); let flagT = 0, marketT = 0;
 // свободно място до (cx, cz): на ≥ pad м от платното на всяка улица, не във вода и не в парцел; offs — отмествания по x, които също трябва да са свободни
@@ -10044,6 +10050,7 @@ function winRestore() { if (!winGoneN || !city.group) return; city.group.travers
 function teardownCity() {
   if (football) football.clear();   // ⚽ football
   if (airCity) airCity.clear();   // ✈️ air-approach / 🚁 police-heli
+  if (bikes) bikes.clear();   // 🚲 bikes
   if (birds) { birds.clear(); city.birdSites = null; }   // 🐦 birds
   if (xmas) xmas.clear();   // 🎄 xmas
   if (city.market && city.market.dispose) city.market.dispose(); city.market = null;   // 🍉 markets
@@ -11442,7 +11449,7 @@ function frame() {
     if (window.__overlay3d > 0) return;
   }   // директорската зала (directors3d.js) е втори WebGL на цял екран — градът под нея не се рисува (иначе две сцени на кадър)
   controls.update();
-  if (S) { dayNight.update(todF(), controls.target); weather.update(rdt, controls.target); if (skySun) skySun.update((6 + todF() * 24) % 24, camera, controls.target, SKY_CLOUD[weather.kind] ?? 0, sun);   /* sky-sun: след денонощието и времето */ if (football) football.update(rdt, controls.target);   /* ⚽ football: само близо до камерата */ if (birds) birds.update(rdt, camera);   /* 🐦 birds */ if (airCity) airCity.update(rdt);   /* ✈️ air-approach / 🚁 police-heli */ if (FLAGS) { flagsTick(performance.now() / 1000); if (performance.now() > flagT) { flagT = performance.now() + 2500; try { placeFlags(); } catch (e) { console.warn('flags', e); } } }   if (SNOWR && performance.now() > snowT) { snowT = performance.now() + 2500; try { snowRoofs(); } catch (e) { console.warn('snow-roofs', e); } }   /* ❄️ snow-roofs */   /* 🏳️ flags */ if (MARKETS && performance.now() > marketT) { marketT = performance.now() + 3000; try { placeMarket(); } catch (e) { console.warn('markets', e); } }   /* 🍉 markets */ if (xmas) xmas.update(rdt);   /* 🎄 xmas */ setSiteLightsNight(dayNight.night); if (cityHw && cityHw.signs) for (const G of cityHw.signs) G.setNight(dayNight.night); if (city.billboards) { city.billboards.setNight(dayNight.night); city.billboards.update && city.billboards.update(rdt); } }
+  if (S) { dayNight.update(todF(), controls.target); weather.update(rdt, controls.target); if (skySun) skySun.update((6 + todF() * 24) % 24, camera, controls.target, SKY_CLOUD[weather.kind] ?? 0, sun);   /* sky-sun: след денонощието и времето */ if (football) football.update(rdt, controls.target);   /* ⚽ football: само близо до камерата */ if (birds) birds.update(rdt, camera);   /* 🐦 birds */ if (airCity) airCity.update(rdt);   /* ✈️ air-approach / 🚁 police-heli */ if (bikes) bikes.update(rdt, controls.target);   /* 🚲 bikes */ if (FLAGS) { flagsTick(performance.now() / 1000); if (performance.now() > flagT) { flagT = performance.now() + 2500; try { placeFlags(); } catch (e) { console.warn('flags', e); } } }   if (SNOWR && performance.now() > snowT) { snowT = performance.now() + 2500; try { snowRoofs(); } catch (e) { console.warn('snow-roofs', e); } }   /* ❄️ snow-roofs */   /* 🏳️ flags */ if (MARKETS && performance.now() > marketT) { marketT = performance.now() + 3000; try { placeMarket(); } catch (e) { console.warn('markets', e); } }   /* 🍉 markets */ if (xmas) xmas.update(rdt);   /* 🎄 xmas */ setSiteLightsNight(dayNight.night); if (cityHw && cityHw.signs) for (const G of cityHw.signs) G.setNight(dayNight.night); if (city.billboards) { city.billboards.setNight(dayNight.night); city.billboards.update && city.billboards.update(rdt); } }
   if (GLITE) dayNight.glowMat.visible = dayNight.poolMat.visible = dayNight.night > 0.01 && gfx().night;   // 🟠 gfx-lite: ореолите на лампите — денем (прозрачност 0) без рисуване; „Нощни светлини“ — изключени
   perfTune(rdt);
   perf.lap('prep');
@@ -12407,6 +12414,8 @@ if (AUTOTEST) {
       return airCity ? airCity.info() : null; },
     heliLook(night = true, type) { this.time(night ? 21.5 : 14); S.wxLock = 'clear'; weather.set('clear'); showMap(false); if (!incidents.active) incidents.start(type); if (airCity) airCity.heliNow(); const a = incidents.spot();   // 🚁 police-heli: инцидент + камерата отстрани
       if (a) this.camAt(a.x + 90, 70, a.z + 110, a.x, 40, a.z); return { inc: incidents.active, air: airCity ? airCity.info() : null }; },
+    bikeLook(night = false, near = true) { this.time(night ? 20.5 : 9); S.wxLock = 'clear'; weather.set('clear'); showMap(false); if (!bikes) return null;   // 🚲 bikes: Лабораторията — камерата при най-близкия колоездач
+      for (let i = 0; i < 60; i++) bikes.update(0.05, controls.target); const r = bikes.riders()[0]; if (r) { const d = near ? 7 : 26; this.camAt(r.x + Math.sin(r.h + 1.2) * d, near ? 3.5 : 14, r.z + Math.cos(r.h + 1.2) * d, r.x + Math.sin(r.h) * 3, 0.8, r.z + Math.cos(r.h) * 3); } return bikes.info(); },
     birdsLook(kind = 'pigeon', near = false) { const L = birdSites(), q = L.find(x => x.kind === kind) || L[0]; if (!q) return null; S.wxLock = 'clear'; weather.set('clear'); this.time(14); showMap(false);   // 🐦 birds: Лабораторията (near — камерата близо: гълъбите излитат)
       const d = near ? 14 : 55; this.camAt(q.x + d, near ? 9 : 26, q.z + d, q.x, 1, q.z); return { sites: L, flocks: birds ? birds.info() : null }; },
     flagsLook() { placeFlags(); const g = city.flagSq; if (!g) return null; const p = g.children[1].position; S.wxLock = 'clear'; weather.set('clear'); this.time(13); showMap(false); this.camAt(p.x + 14, 9, p.z + 18, p.x, 6, p.z); return [Math.round(p.x), Math.round(p.z)]; },   // 🏳️ flags: Лабораторията

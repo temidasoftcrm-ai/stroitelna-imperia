@@ -312,6 +312,7 @@ const DEMOS = [
   ['🌉 Париж: мостовете над Сена — каменни с арки', 'paris', d => setTimeout(() => { d.bridgesLook(0); setTimeout(() => d.bridgesLook(2), 9000); setTimeout(() => d.bridgesLook(5), 18000); }, 9000)],   // bridges-real
   ['💡 Будапеща нощем: площадите пред Парламента и базиликата „Св. Стефан“ — светещите фенери и петната светлина; базиликата — неутрално златиста', 'budapest', d => setTimeout(() => { d.time(22); d.lookLmKind('parliament', 120); setTimeout(() => { d.time(22); d.lookLmKind('ststephen', 80); }, 10000); }, 9000)],   // bud-night
   ['🚗🚗🚗 Верижна катастрофа по улицата (Москва) — рамката (конуси, лента) по посоката на улицата, на платното', 'moscow', d => setTimeout(() => d.incidentLook(false, 'pile'), 9000)],   // inc-roadframe
+  ['🚲 Велосипедисти и тротинетки по червените велоалеи: Амстердам — много и по всички улици, с фарчета нощем', 'amsterdam', d => { d.bikeLook(); }],   // bikes
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
