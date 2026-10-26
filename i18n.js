@@ -91,17 +91,18 @@ function trText(n) {
   const k = s.trim(), v = look(k); if (v === undefined) { if (miss.size < 5000) miss.set(k, (miss.get(k) || 0) + 1); done.set(n, s); return; }
   const out = s.replace(k, v); done.set(n, out); n.nodeValue = out;
 }
+const FIELD = el => el.tagName === 'INPUT' || el.tagName === 'TEXTAREA', skipAttr = el => FIELD(el) ? skipEl(el.parentElement) : skipEl(el);   // полетата: текст в тях не се пипа, но подсказката (placeholder) — да
 function trAttrs(el) { for (const a of ATTRS) { const s = el.getAttribute && el.getAttribute(a); if (s && CYR.test(s)) { const v = look(s.trim()); if (v !== undefined) el.setAttribute(a, v); } } }
 function trTree(root) {
   if (root.nodeType === 3) { trText(root); return; }
-  if (root.nodeType !== 1 || skipEl(root)) return;
+  if (root.nodeType !== 1) return; if (skipEl(root)) { if (FIELD(root) && !skipAttr(root)) trAttrs(root); return; }
   trAttrs(root);
   const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT); let n;
-  while ((n = w.nextNode())) { if (n.nodeType === 3) trText(n); else if (!SKIP.has(n.tagName)) trAttrs(n); }
+  while ((n = w.nextNode())) { if (n.nodeType === 3) trText(n); else if (!SKIP.has(n.tagName) || FIELD(n)) trAttrs(n); }
 }
 if (EN) {
   const go = () => { trTree(document.body); if (CYR.test(document.title)) document.title = t(document.title);
-    new MutationObserver(ms => { for (const m of ms) { if (m.type === 'characterData') trText(m.target); else if (m.type === 'attributes') { if (m.target.nodeType === 1 && !skipEl(m.target)) trAttrs(m.target); } else for (const x of m.addedNodes) trTree(x); } })
+    new MutationObserver(ms => { for (const m of ms) { if (m.type === 'characterData') trText(m.target); else if (m.type === 'attributes') { if (m.target.nodeType === 1 && !skipAttr(m.target)) trAttrs(m.target); } else for (const x of m.addedNodes) trTree(x); } })
       .observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ATTRS }); };
   if (document.body) go(); else addEventListener('DOMContentLoaded', go);
 }

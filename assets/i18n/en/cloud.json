@@ -345,5 +345,8 @@
  "Паролата е запазена. Влязъл си като": "The password is saved. Signed in as",
  "Регистриран си като": "Registered as",
  "▶ Влез в играта": "▶ Enter the game",
- "☁️ {0} — {1}. Играта ти се пази в облака.": "☁️ {0} — {1}. Your game is kept in the cloud."
+ "☁️ {0} — {1}. Играта ти се пази в облака.": "☁️ {0} — {1}. Your game is kept in the cloud.",
+ "_stale": {
+  "ime@primer.com": "name@example.com"
+ }
 }

@@ -7,6 +7,7 @@ import { backupRaw, dropBackups, tooNew } from './saves.js';
 import { feature, IN_LAB } from './lab/feature.js';
 import { TURNSTILE_SITEKEY } from './config.js';   // 🔑 pw-login: Cloudflare Turnstile (празен = без проверка)
 import { langOn, langButton, setLang, LANG } from './i18n.js';   // 🌐 lang-en: превключвателят в ⚙️ и на входа
+const EMAIL_PH = LANG === 'en' ? 'name@example.com' : 'ime@primer.com';   // примерният имейл в полетата за вход
 import './consent.js';   // 🍪 GDPR съгласие (feature 'consent') — window.consent
 
 const URL_ = 'https://lpzjscttqieqnqozscpk.supabase.co';
@@ -96,7 +97,7 @@ function loginEmail(pre = '') {
     pwForm(el.querySelector('#pwBox'), { inp: DLG_INP, go: DLG_GO, link: 'var(--acc)', mut: 'var(--mut)', onIn: (email, isNew) => { el.remove(); toast(`☁️ ${isNew ? 'Акаунтът е създаден' : 'Влезе'} — ${email}. Играта вече се пази в облака.`); } }, pre ? 'login' : undefined, pre || undefined); return; }
   const el = dlg(`<h2 style="font-size:19px;color:var(--acc)">☁️ Вход</h2>
     <p style="color:var(--mut);font-size:14px;line-height:1.5">Въведи имейла си — ще ти пратим код за вход. Без парола. След това играта ти се пази в облака и можеш да продължиш от телефона, таблета или друг компютър.</p>
-    <input id="cloudEmail" type="email" autocomplete="email" inputmode="email" placeholder="ime@primer.com" value="${pre}" style="width:100%;padding:11px;border-radius:9px;border:1px solid var(--line);background:#0f141c;color:var(--txt);font-size:16px">
+    <input id="cloudEmail" type="email" autocomplete="email" inputmode="email" placeholder="${EMAIL_PH}" value="${pre}" style="width:100%;padding:11px;border-radius:9px;border:1px solid var(--line);background:#0f141c;color:var(--txt);font-size:16px">
     <div id="cloudMsg" style="font-size:13px;color:var(--bad)"></div>`,
     [['Отказ', null], ['📧 Прати код', () => {
       const email = el.querySelector('#cloudEmail').value.trim();
@@ -143,7 +144,7 @@ const tsLoad = () => tsP = tsP || new Promise((res, rej) => {
 function captcha(el) {   // { token(): Promise<string|undefined>, reset() }
   const key = tsKey(); if (!key) return { token: async () => undefined, reset() { } };
   let id = null, tok = ''; const wait = [];
-  tsLoad().then(ts => { id = ts.render(el, { sitekey: key, appearance: 'interaction-only', theme: 'dark', language: 'bg',
+  tsLoad().then(ts => { id = ts.render(el, { sitekey: key, appearance: 'interaction-only', theme: 'dark', language: LANG === 'en' ? 'en' : 'bg',
     callback: t => { tok = t; wait.splice(0).forEach(f => f(t)); }, 'expired-callback': () => { tok = ''; }, 'error-callback': () => { tok = ''; } }); }).catch(() => { });
   return { token: () => tok ? Promise.resolve(tok) : new Promise((res, rej) => { wait.push(res); setTimeout(() => rej(new Error('captcha')), 30000); }),
     reset() { tok = ''; try { if (id != null) window.turnstile.reset(id); } catch { } } };
@@ -161,7 +162,7 @@ function pwForm(box, o, mode = mailGet() ? 'login' : 'new', pre = mailGet()) {
   }
   const isNew = mode === 'new';
   box.innerHTML = P(isNew ? '🆕 <b>Нов акаунт</b> — имейл и парола. Играта ти се пази в облака и играеш от всяко устройство.' : '🔑 <b>Влез</b> с имейла и паролата си — играта ти чака в облака.')
-    + I('pwEmail', 'email', isNew ? 'email' : 'username', 'ime@primer.com') + I('pwP1', 'password', isNew ? 'new-password' : 'current-password', isNew ? 'парола (поне 8 знака)' : 'парола')
+    + I('pwEmail', 'email', isNew ? 'email' : 'username', EMAIL_PH) + I('pwP1', 'password', isNew ? 'new-password' : 'current-password', isNew ? 'парола (поне 8 знака)' : 'парола')
     + (isNew ? I('pwP2', 'password', 'new-password', 'паролата още веднъж') : '')
     + '<div id="pwTs" style="display:flex;justify-content:center"></div><div class="pwMsg" style="font-size:13px;min-height:18px"></div>'
     + `<button id="pwGo" style="${o.go}">${isNew ? '🆕 Създай акаунт' : '▶ Влез'}</button>`
@@ -683,7 +684,7 @@ function regGate() {
   // 🔑 (feature 'reg-pass') вход с имейл и парола — кодът е само за нов акаунт или забравена парола
   const stepLogin = (pre = lastMail()) => {
     body.innerHTML = `<p style="color:#a9b6c8;font-size:14px;line-height:1.5;margin:10px 0 4px">🔑 <b style="color:#fff">Влез</b> с имейла и паролата си — играта ти чака в облака.</p>
-      <input id="rgEmail" type="email" autocomplete="username" inputmode="email" placeholder="ime@primer.com" style="${inp}">
+      <input id="rgEmail" type="email" autocomplete="username" inputmode="email" placeholder="${EMAIL_PH}" style="${inp}">
       <input id="rgPass" type="password" autocomplete="current-password" placeholder="парола" style="${inp}"><div class="rgMsg" style="font-size:13px;min-height:18px"></div>
       <button id="rgLogin" style="${go}">▶ Влез</button>
       <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:13px"><a href="#" id="rgNew" style="color:#ffd54a">🆕 Нов акаунт</a><a href="#" id="rgForgot" style="color:#8b96a8">Забравена парола?</a></div>`;
@@ -726,7 +727,7 @@ function regGate() {
   const stepEmail = (pre = '', mode = 'new') => {
     body.innerHTML = PASS ? `<p style="color:#a9b6c8;font-size:14px;line-height:1.5;margin:10px 0 4px">${mode === 'reset' ? '🔁 <b style="color:#fff">Забравена парола</b> — пращаме код на имейла ти, после си слагаш нова.' : '1️⃣ <b style="color:#fff">Нов акаунт</b> — пращаме код на имейла ти, после си слагаш парола. Играта ти се пази в облака и можеш да играеш от всяко устройство.'}</p>`
       : `<p style="color:#a9b6c8;font-size:14px;line-height:1.5;margin:10px 0 4px">1️⃣ <b style="color:#fff">Регистрирай имейл</b> — ще ти пратим код. Без парола. Играта ти се пази в облака и можеш да играеш от всяко устройство.</p>`;
-    body.innerHTML += `<input id="rgEmail" type="email" autocomplete="email" inputmode="email" placeholder="ime@primer.com" style="${inp}"><div class="rgMsg" style="font-size:13px;min-height:18px"></div>
+    body.innerHTML += `<input id="rgEmail" type="email" autocomplete="email" inputmode="email" placeholder="${EMAIL_PH}" style="${inp}"><div class="rgMsg" style="font-size:13px;min-height:18px"></div>
       <button id="rgSend" style="${go}">📧 ${PASS ? 'Прати код' : 'Регистрирай'}</button>${PASS ? '<div style="text-align:center;margin-top:8px"><a href="#" id="rgHave" style="color:#8b96a8;font-size:13px">← Имам акаунт — вход с парола</a></div>' : ''}`;
     const e = body.querySelector('#rgEmail'); e.value = pre; setTimeout(() => e.focus(), 50);
     const have = body.querySelector('#rgHave'); if (have) have.onclick = ev => { ev.preventDefault(); stepLogin(e.value.trim()); };
