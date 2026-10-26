@@ -7030,7 +7030,7 @@ const CHURCHES = feature('churches'), chLoad = {}, churchModel = k => chLoad[k] 
 // ⛪/🏛️ забележителност на запазеното място („special“, иначе парк) най-близо до площада на града по плана (без истинска карта): в истински ръст,
 // смалена, ако не се побира (+2 м тротоар от всяка страна); дългата ос — по дългата страна. [вид, ръст м, дължина м, ширина м, флаг]
 window.__lmNight = m => dayNight.winMats.add(m);   // lm-budapest (f9): нощното осветяване на моделите-забележителности (landmarks.js goldNight)
-const SPECIAL_LM = { budapest: [['parliament', 96, 268, 123, 'lm-budapest', { plaza: 1 }], ['ststephen', 60, 60, 60, 'lm-budapest', { plaza: 1, len: 0.55 }]], sofia: ['nevsky', 51.7, 79.4, 62.1, 'churches'], milan: ['duomo', 108, 158, 93, 'lm-more2'], plovdiv: ['romanstadium', 7.7, 30.3, 22.5, 'lm-more2'],
+const SPECIAL_LM = { budapest: [['parliament', 96, 268, 123, 'lm-budapest', { plaza: 1, turn: Math.PI / 2 }], ['ststephen', 60, 60, 60, 'lm-budapest', { plaza: 1, len: 0.55 }]], sofia: ['nevsky', 51.7, 79.4, 62.1, 'churches'], milan: ['duomo', 108, 158, 93, 'lm-more2'], plovdiv: ['romanstadium', 7.7, 30.3, 22.5, 'lm-more2'],
   athens: ['parthenon', 18.5, 106, 67, 'lm-acropolis'] };   // 🏛️ lm-acropolis (f6): Партенонът на хълма — ръстът е на храма (18,5 м), дължината/ширината — на хълма
 // lm-budapest: [[…], […]] — няколко забележителности, всяка на следващото запазено място; { plaza } — каменен площад на цялото място,
 // сградата — към задната страна (по-далеч от площада на града), отпред — площадче с лампи, пейки и дървета; { len } — дял от дългата страна (базиликата)
@@ -7044,6 +7044,7 @@ function specialLmPlace(cityId) {
   const pl = o.group.children.find(c => c.isMesh && c.geometry?.parameters?.width === 15); if (pl) pl.visible = false;   // плочата 15 × 15 — моделът стъпва на земята
   const ry = (B.rot || 0) + (B.w >= B.d ? Math.PI / 2 : 0); o.group.scale.setScalar(f * H / 15); o.group.rotation.y = ry; o.group.position.set(B.x, 0.1, B.z);   // дългата ос на модела (z) — по дългата страна
   if (po.plaza) lmPlaza(o, B, ry, lw, sw, LL * f, WW * f, sq, po);
+  if (po.turn) o.group.rotation.y += po.turn;   // моделът е дълъг по своята ос x (Парламентът) — по дългата страна на мястото
   o.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); city.group.add(o.group); city.landmarks.push(o); }
 }
 // площадът пред забележителността: ux/uz — дългата ос на мястото, nx/nz — напреки към площада на града (там е „предът“)
