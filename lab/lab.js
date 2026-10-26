@@ -313,6 +313,7 @@ const DEMOS = [
   ['💡 Будапеща нощем: площадите пред Парламента и базиликата „Св. Стефан“ — светещите фенери и петната светлина; базиликата — неутрално златиста', 'budapest', d => setTimeout(() => { d.time(22); d.lookLmKind('parliament', 120); setTimeout(() => { d.time(22); d.lookLmKind('ststephen', 80); }, 10000); }, 9000)],   // bud-night
   ['🚗🚗🚗 Верижна катастрофа по улицата (Москва) — рамката (конуси, лента) по посоката на улицата, на платното', 'moscow', d => setTimeout(() => d.incidentLook(false, 'pile'), 9000)],   // inc-roadframe
   ['🚲 Велосипедисти и тротинетки по червените велоалеи: Амстердам — много и по всички улици, с фарчета нощем', 'amsterdam', d => { d.bikeLook(); }],   // bikes
+  ['🚧 Инцидент на магистралата край града (София): удар отзад, после горяща кола нощем — полиция, конуси, линейка, пожарна, пътна помощ', 'sofia', d => setTimeout(async () => { d.setSpeed(1); d.time(13); await d.hwInc('rear', 1); setTimeout(() => d.hwIncLook(), 20000); setTimeout(async () => { await d.hwInc('fire', -1, true); setTimeout(() => d.hwIncLook(), 20000); }, 200000); }, 4000)],   // hw-incidents
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 

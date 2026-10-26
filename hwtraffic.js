@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';
 import { kidK } from './scale.js';   // детските коли (резервата) в истинския размер
+import { createHwIncidents } from './hwincidents.js';   // 🚧 hw-incidents: катастрофи/аварии по платната, полиция, конуси, отбиване
 
 const CARS = ['sedan', 'suv', 'taxi', 'van', 'sedan-sports', 'suv-luxury', 'hatchback-sports', 'police'];
 const TRUCKS = ['truck', 'truck-flat', 'truck-dump-red', 'truck-concrete-red'];
@@ -24,7 +25,7 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
   const list = [], half = len / 2, NL = ab ? 4 : 2, RIGHT = NL - 1;
   // посока +x (на изток) е откъм +z (дясно движение), −x е откъм −z; лента 0 = бърза (към разделителната ивица)
   const laneZ = (dir, lane) => ab ? zc + dir * (2 + 1.8 + lane * 3.6) : zc + dir * (6 + (lane ? 2.2 : -2.2));
-  const lenOf = o => { o.updateMatrixWorld(true); const s = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3()); return Math.max(3.5, Math.min(20, Math.max(s.x, s.z))); };
+  const lenOf = o => { o.updateMatrixWorld(true); const b = new THREE.Box3(); if (feature('hw-incidents')) o.traverse(m => { if (m.isMesh && !(m.material && m.material.transparent)) b.expandByObject(m); }); if (b.isEmpty()) b.setFromObject(o); const s = b.getSize(new THREE.Vector3()); return   /* hw-incidents: дължината без лъчите на фаровете (car-lights ги правеше ~13 м) — опашката е плътна, ударът — броня в броня */ Math.max(3.5, Math.min(20, Math.max(s.x, s.z))); };
   const realCars = REAL_CARS.filter(([n]) => A['sf-car-' + n]), wsum = realCars.reduce((t, [, w]) => t + w, 0);
   const pickCar = r => { let t = r * wsum; for (const [n, w] of realCars) { if ((t -= w) <= 0) return 'sf-car-' + n; } return 'sf-car-' + realCars[0][0]; };
   let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -60,7 +61,7 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
   function leaderIn(c, lane) { const zl = laneZ(c.dir, lane); let best = null, bd = 1e9; for (const q of list) { if (q === c || q.dir !== c.dir || q.s || q.away || !inLane(q, lane, zl)) continue; const d = ahead(c, q); if (d > 0.01 && d < bd) { bd = d; best = q; } } return best ? { q: best, gap: bd - (best.L + c.L) / 2 } : null; }
   function followerIn(c, lane) { const zl = laneZ(c.dir, lane); let best = null, bd = 1e9; for (const q of list) { if (q === c || q.dir !== c.dir || q.s || q.away || !inLane(q, lane, zl)) continue; const d = ahead(q, c); if (d > 0.01 && d < bd) { bd = d; best = q; } } return best ? { q: best, gap: bd - (best.L + c.L) / 2 } : null; }
   const freeLane = (c, lane, back = 22, front = 30) => { const l = leaderIn(c, lane), f = followerIn(c, lane); return (!l || l.gap > front) && (!f || f.gap > back + Math.max(0, f.q.v - c.v) * 2); };
-  const idm = (c, ld) => { let a = A_MAX * (1 - Math.pow(c.v / c.v0, 4)); if (ld) { const dv = c.v - ld.q.v, ss = S0 + Math.max(0, c.v * T_HEAD + c.v * dv / (2 * Math.sqrt(A_MAX * B_COMF))); a -= A_MAX * Math.pow(ss / Math.max(0.5, ld.gap), 2); } return Math.max(-8, Math.min(A_MAX, a)); };
+  const idm = (c, ld) => { let a = A_MAX * (1 - Math.pow(c.v / (c.vl || c.v0), 4));   /* vl — ограничението около инцидента (hw-incidents) */ if (ld) { const dv = c.v - ld.q.v, ss = S0 + Math.max(0, c.v * T_HEAD + c.v * dv / (2 * Math.sqrt(A_MAX * B_COMF))); a -= A_MAX * Math.pow(ss / Math.max(0.5, ld.gap), 2); } return Math.max(-8, Math.min(A_MAX, a)); };
 
   // ---- крайпътният комплекс: пътят по асфалта (координати на изгледа x напреки, z по оста → света: x = z, z = zc − x)
   const W = (vx, vz) => [vz, zc - vx];
@@ -100,39 +101,48 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
   function comeBack(c) { const near = Math.random() < 0.5, L = near ? RP.nearOn : RP.farOn, p0 = L.pts[0]; if (list.some(q => q.s && Math.hypot(q.x - p0[0], q.z - p0[1]) < 12)) { c.away = 3; return; }
     c.away = 0; c.o.visible = true; c.x = p0[0]; c.z = p0[1]; c.v = 6; c.s = { legs: [L], i: 0, d: 0, wait: 0, mdir: near ? -1 : 1 }; }
 
+  // 🚧 hw-incidents (hwincidents.js): ударените коли, спешните и „призраците“ (конусите) са в list с c.inc — движи ги инцидентът;
+  // INC.need — задължително престрояване, INC.ok — не влиза в затворена лента, INC.vcap — бавно покрай мястото, c.rg — спасителният коридор
+  const INC = feature('hw-incidents') ? createHwIncidents({ g, list, laneZ, NL, RIGHT, half, len, y, lift, ab, leaderIn, followerIn, freeLane, mk: n => model(n, SCALE[n] || kidK(n, 1.25)), A, lenOf, rampCx: RP ? rampCx : null, svc, em }) : null;
   function update(dt) {
+    if (INC) INC.update(dt);
     for (const c of list) {
+      if (c.inc) continue;
       if (c.away > 0) { c.away -= dt; if (c.away <= 0) comeBack(c); continue; }
       if (c.s) { svcStep(c, dt); continue; }
       const px = c.x, ld = leaderIn(c, c.lane);
       // изпреварване: по-бавен отпред — наляво, ако там е свободно; после — обратно вдясно
       c.cool -= dt;
-      if (!c.heavy && c.cool <= 0 && Math.abs(c.z - laneZ(c.dir, c.lane)) < 0.3) {
-        if (c.lane > 0 && ld && ld.gap < 45 && ld.q.v < c.v0 - 2.5 && freeLane(c, c.lane - 1)) { c.lane--; c.cool = 4; }
-        else if (c.lane < RIGHT && freeLane(c, c.lane + 1, 18, 45) && (!ld || ld.gap > 35 || ld.q.v > c.v0 - 1)) { c.lane++; c.cool = 6; }
+      const mm = INC && c.cool <= 0 && !c.rg && Math.abs(c.z - laneZ(c.dir, c.lane)) < 0.3 ? INC.need(c) : null;   /* hw-incidents: престрояване пред затворената лента („цип“) */
+      if (mm) { if (freeLane(c, mm.l, mm.b, mm.f)) { c.lane = mm.l; c.cool = 1.5; } }
+      else if (!c.heavy && c.cool <= 0 && Math.abs(c.z - laneZ(c.dir, c.lane)) < 0.3) {
+        if (c.lane > 0 && ld && ld.gap < 45 && ld.q.v < c.v0 - 2.5 && freeLane(c, c.lane - 1) && (!INC || INC.ok(c, c.lane - 1))) { c.lane--; c.cool = 4; }
+        else if (c.lane < RIGHT && (!INC || INC.ok(c, c.lane + 1)) && freeLane(c, c.lane + 1, 18, 45) && (!ld || ld.gap > 35 || ld.q.v > c.v0 - 1)) { c.lane++; c.cool = 6; }
       }
-      let ld2 = leaderIn(c, c.lane); const zc0 = Math.round((c.z - laneZ(c.dir, 0)) / (laneZ(c.dir, 1) - laneZ(c.dir, 0))); if (zc0 !== c.lane && zc0 >= 0 && zc0 <= RIGHT) { const lo = leaderIn(c, zc0); if (lo && (!ld2 || lo.gap < ld2.gap)) ld2 = lo; }   /* при смяна — и предната в старата лента */
+      let ld2 = leaderIn(c, c.lane); const zf = (c.z - laneZ(c.dir, 0)) / (laneZ(c.dir, 1) - laneZ(c.dir, 0)); for (const zc0 of INC ? [Math.floor(zf), Math.ceil(zf)].filter(k => Math.abs(zf - k) < 0.6) : [Math.round(zf)]) if (zc0 !== c.lane && zc0 >= 0 && zc0 <= RIGHT) { const lo = leaderIn(c, zc0); if (lo && (!ld2 || lo.gap < ld2.gap)) ld2 = lo; }   /* при смяна — и предната в старата лента (hw-incidents: във всяка лента, в която е колата) */
+      c.vl = INC ? INC.vcap(c) : 0;
       let a = idm(c, ld2), v = Math.max(0, c.v + a * dt), ds = v * dt;
       if (ld2) { const lim = Math.max(0, ld2.gap - 0.6); if (ds > lim) { ds = lim; v = Math.min(v, lim / Math.max(dt, 1e-3)); } }   // никога през предната
       c.v = v; c.x += c.dir * ds;
       // напреки: плавно към лентата (~1,8 м/с), леко завъртане по посоката
-      const zt = laneZ(c.dir, c.lane), dz = Math.sign(zt - c.z) * Math.min(Math.abs(zt - c.z), 1.8 * dt); c.z += dz;
+      const zt = laneZ(c.dir, c.lane) + (c.rg || 0), dz = Math.sign(zt - c.z) * Math.min(Math.abs(zt - c.z), 1.8 * dt); c.z += dz;
       if (svc && c.dir > 0 && px < svc.z0 - 30 && c.x >= svc.z0 - 30 && c.lane === RIGHT && !c.heavy && Math.random() < 0.45 && list.filter(q => q.s).length < 5) {   // отбива
         const plan = svcPlan(c); if (plan) { c.s = { ...plan, i: 0, d: 0, wait: 0 }; continue; }
       }
-      if (RP && c.lane === RIGHT && !c.s && list.filter(q => q.s || q.away).length < 7) {   // излиза към града (по-рядко камионите)
-        const T = rampCx - c.dir * 330; if ((px - T) * c.dir < 0 && (c.x - T) * c.dir >= 0 && Math.random() < (c.heavy ? 0.06 : 0.16)) { c.s = { legs: [c.dir < 0 ? RP.nearOff : RP.farOff], i: 0, d: 0, wait: 0, exit: true }; continue; } }
+      const dv = INC && INC.divert(c);   /* hw-incidents: платното е затворено — всички излизат (полицията отбива) */
+      if (RP && c.lane === RIGHT && !c.s && (dv || list.filter(q => q.s || q.away).length < 7)) {   // излиза към града (по-рядко камионите)
+        const T = rampCx - c.dir * 330; if ((px - T) * c.dir < 0 && (c.x - T) * c.dir >= 0 && Math.random() < (dv ? 1 : c.heavy ? 0.06 : 0.16)) { c.s = { legs: [c.dir < 0 ? RP.nearOff : RP.farOff], i: 0, d: 0, wait: 0, exit: true }; continue; } }
       if (c.x > half) c.x -= len; else if (c.x < -half) c.x += len;
       c.o.position.set(c.x, y + (lift ? lift(c.x) : 0), c.z);
       c.o.rotation.y = (c.dir > 0 ? Math.PI / 2 : -Math.PI / 2) - c.dir * Math.atan2(dz / Math.max(dt, 1e-3), Math.max(3, c.v)) ;
     }
     if (!em.length) return;
-    if ((emT -= dt) <= 0) { emSend(); emT = 25 + Math.random() * 45; }
+    if ((emT -= dt) <= 0) { if (!INC || !INC.busy) emSend(); emT = 25 + Math.random() * 45; }   /* по време на инцидент — без минаващи спешни */
     for (const e of em) if (e.on) {
       e.x += e.dir * e.v * dt; e.o.position.x = e.x; if (lift) e.o.position.y = y + lift(e.x);
-      for (const c of list) if (!c.s && c.dir === e.dir && c.lane === 0 && (c.x - e.x) * e.dir > 0 && (c.x - e.x) * e.dir < 40 && c.cool <= 0 && freeLane(c, 1, 10, 12)) { c.lane = 1; c.cool = 3; }   // колите отпред се отместват вдясно
+      for (const c of list) if (!c.s && !c.inc && (!INC || INC.ok(c, 1)) && c.dir === e.dir && c.lane === 0 && (c.x - e.x) * e.dir > 0 && (c.x - e.x) * e.dir < 40 && c.cool <= 0 && freeLane(c, 1, 10, 12)) { c.lane = 1; c.cool = 3; }   // колите отпред се отместват вдясно
       if (e.x * e.dir > half + 6) { e.on = false; e.o.visible = false; }
     }
   }
-  return { update, set visible(v) { g.visible = v; }, group: g, list };
+  return { update, set visible(v) { g.visible = v; }, group: g, list, inc: INC };
 }
