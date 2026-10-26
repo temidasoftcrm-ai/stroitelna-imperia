@@ -355,3 +355,5 @@ City buses (55, buses-more) — Sketchfab, normalized in Blender (front +z, real
 - towers/ru-blocks.glb — „Tower Residence“ (руски панелен блок), генериран с Meshy AI от собственика (платен план, ТЕМИДАСОФТ ООД) — текстури 1024 px WebP, нощната карта — изпечена
 Колизеумът lm-colosseum2 (f6; 26.10.2026):
 - lm/colosseo4.glb — „Colosseum“, генериран с Meshy AI от собственика (платен план, ТЕМИДАСОФТ ООД) — в Blender: плочата наоколо изрязана, кръгът → овал 189 × 156 м, ~160 хил. триъгълника, текстури 1024 px WebP
+Атина lm-acropolis (f6; 26.10.2026):
+- lm/parthenon.glb — „Parthenon“, генериран с Meshy AI от собственика (CC0 в Meshy; ТЕМИДАСОФТ ООД) — олекотен 2 млн. → 115 хил. триъгълника, текстури 2048 px WebP; хълмът — процедурен (landmarks.js)

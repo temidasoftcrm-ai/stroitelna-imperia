@@ -6990,7 +6990,8 @@ const CHURCHES = feature('churches'), chLoad = {}, churchModel = k => chLoad[k] 
 // ⛪/🏛️ забележителност на запазеното място („special“, иначе парк) най-близо до площада на града по плана (без истинска карта): в истински ръст,
 // смалена, ако не се побира (+2 м тротоар от всяка страна); дългата ос — по дългата страна. [вид, ръст м, дължина м, ширина м, флаг]
 window.__lmNight = m => dayNight.winMats.add(m);   // lm-budapest (f9): нощното осветяване на моделите-забележителности (landmarks.js goldNight)
-const SPECIAL_LM = { budapest: ['parliament', 96, 268, 123, 'lm-budapest'], sofia: ['nevsky', 51.7, 79.4, 62.1, 'churches'], milan: ['duomo', 108, 158, 93, 'lm-more2'], plovdiv: ['romanstadium', 7.7, 30.3, 22.5, 'lm-more2'] };
+const SPECIAL_LM = { budapest: ['parliament', 96, 268, 123, 'lm-budapest'], sofia: ['nevsky', 51.7, 79.4, 62.1, 'churches'], milan: ['duomo', 108, 158, 93, 'lm-more2'], plovdiv: ['romanstadium', 7.7, 30.3, 22.5, 'lm-more2'],
+  athens: ['parthenon', 18.5, 106, 67, 'lm-acropolis'] };   // 🏛️ lm-acropolis (f6): Партенонът на хълма — ръстът е на храма (18,5 м), дължината/ширината — на хълма
 function specialLmPlace(cityId) {
   const sp = SPECIAL_LM[cityId], P = city.plan, sq = P && P.square; if (!sp || !feature(sp[4]) || !sq || !P.p2 || P.osm) return;
   const [kind, H, LL, WW] = sp, d = b => Math.hypot(b.x - sq.x, b.z - sq.z);

@@ -25,7 +25,7 @@ export const CITY_LANDMARKS = {
 export const SEA_LANDMARKS = { newyork: ['liberty'], sydney: ['opera'] };   // Сидни: операта на нос в залива (не на площада в центъра)
 // големите забележителности в отделна зона W×D парцела встрани от центъра (game.js: refreshMines3D → bigLandmarks)
 export const BIG_LANDMARKS = { moscow: [['mgu', 4, 2, 0.52]], lasvegas: [['luxor', 2, 2]], istanbul: [['mosque', 3, 2, 0.59, 1]], washington: [['capitol', 3, 3, 1, 0, [3, 2]]] };   // [вид, W, D, дълбочина/ширина на модела, завъртян на 90° (дългата страна на модела е по z), [W, D] ако няма място (малък град) — щом градът порасне, се мести в голямата]
-export const LANDMARK_NM = { parliament: 'Парламентът на Унгария', duomo: 'Миланската катедрала (Дуомо)', romanstadium: 'Античният стадион', nevsky: 'Храм-паметник „Св. Александър Невски“', liberty2: 'Статуята на свободата', arc2: 'Триумфалната арка', kotel: 'Котелническа висотка', suleymaniye2: 'Сюлеймание', bluemosque: 'Синята джамия', topkapi: 'Топкапъ', maiden: 'Момината кула', grandbazaar: 'Гранд базар', haydarpasa: 'Гара Хайдарпаша', bigben2: 'Биг Бен', londoneye2: 'Лондонското око', whitehouse: 'Белият дом', capitol: 'Капитолият', vegassign: '„Welcome to Fabulous Las Vegas“', bellagio: 'Беладжо', luxor: 'Луксор', cityhall: 'Кметството на Филаделфия', ststephen: 'Базилика „Св. Стефан“', mgu: 'Московският университет (МГУ)', pyramids: 'Пирамидите в Гиза', burj: 'Бурж Халифа', manhattan: 'Манхатън', liberty: 'Статуята на свободата', opera: 'Операта в Сидни', stbasil: 'Храмът „Св. Василий Блажени“', cntower: 'Си Ен Тауър', willis: 'Уилис Тауър', shtower: 'Шанхайската кула', redeemer: 'Христос Спасителя', mosque: 'Синята джамия', mosque2: 'Сюлейманийе', galata: 'Галатска кула', sapphire: 'Истанбул Сапфир', twist: 'Левент Туист', twin: 'Левент Туинс', colosseum: 'Колизеума', hagia: 'Света София', colosseo: 'Колизеума', sagrada: 'Саграда Фамилия', vatican: 'Ватикана и „Св. Петър“', stpeter: 'Базилика „Св. Петър“', pantheon: 'Пантеона', vittoriano: 'Витториано', erasmus: 'Мостът Еразъм', cubes: 'Кубичните къщи', markthal: 'Маркетхал', derotterdam: 'Де Ротердам', euromast: 'Евромаст', canal: 'Канал с къщи', canal2: 'Канал с къщи', rijks: 'Райксмузеум', centraal: 'Централна гара', adam: 'A’DAM Лукаут', windmill: 'Вятърна мелница', eiffel: 'Айфеловата кула', arc: 'Триумфалната арка', notredame: 'Нотр Дам', ladefense: 'Ла Дефанс', bigben: 'Биг Бен', londoneye: 'Лондонското око', towerbridge: 'Тауър Бридж', shard: 'Шард', brandenburg: 'Бранденбургската врата', fernsehturm: 'Телевизионната кула', reichstag: 'Райхстагът' };
+export const LANDMARK_NM = { parthenon: 'Акрополът (Партенонът)', parliament: 'Парламентът на Унгария', duomo: 'Миланската катедрала (Дуомо)', romanstadium: 'Античният стадион', nevsky: 'Храм-паметник „Св. Александър Невски“', liberty2: 'Статуята на свободата', arc2: 'Триумфалната арка', kotel: 'Котелническа висотка', suleymaniye2: 'Сюлеймание', bluemosque: 'Синята джамия', topkapi: 'Топкапъ', maiden: 'Момината кула', grandbazaar: 'Гранд базар', haydarpasa: 'Гара Хайдарпаша', bigben2: 'Биг Бен', londoneye2: 'Лондонското око', whitehouse: 'Белият дом', capitol: 'Капитолият', vegassign: '„Welcome to Fabulous Las Vegas“', bellagio: 'Беладжо', luxor: 'Луксор', cityhall: 'Кметството на Филаделфия', ststephen: 'Базилика „Св. Стефан“', mgu: 'Московският университет (МГУ)', pyramids: 'Пирамидите в Гиза', burj: 'Бурж Халифа', manhattan: 'Манхатън', liberty: 'Статуята на свободата', opera: 'Операта в Сидни', stbasil: 'Храмът „Св. Василий Блажени“', cntower: 'Си Ен Тауър', willis: 'Уилис Тауър', shtower: 'Шанхайската кула', redeemer: 'Христос Спасителя', mosque: 'Синята джамия', mosque2: 'Сюлейманийе', galata: 'Галатска кула', sapphire: 'Истанбул Сапфир', twist: 'Левент Туист', twin: 'Левент Туинс', colosseum: 'Колизеума', hagia: 'Света София', colosseo: 'Колизеума', sagrada: 'Саграда Фамилия', vatican: 'Ватикана и „Св. Петър“', stpeter: 'Базилика „Св. Петър“', pantheon: 'Пантеона', vittoriano: 'Витториано', erasmus: 'Мостът Еразъм', cubes: 'Кубичните къщи', markthal: 'Маркетхал', derotterdam: 'Де Ротердам', euromast: 'Евромаст', canal: 'Канал с къщи', canal2: 'Канал с къщи', rijks: 'Райксмузеум', centraal: 'Централна гара', adam: 'A’DAM Лукаут', windmill: 'Вятърна мелница', eiffel: 'Айфеловата кула', arc: 'Триумфалната арка', notredame: 'Нотр Дам', ladefense: 'Ла Дефанс', bigben: 'Биг Бен', londoneye: 'Лондонското око', towerbridge: 'Тауър Бридж', shard: 'Шард', brandenburg: 'Бранденбургската врата', fernsehturm: 'Телевизионната кула', reichstag: 'Райхстагът' };
 // кои стоят в центъра на града (останалите — в стария град извън центъра)
 export const LANDMARK_CENTER = new Set(['pyramids', 'burj', 'manhattan', 'cntower', 'willis', 'shtower', 'eiffel', 'arc', 'bigben', 'shard', 'brandenburg', 'reichstag', 'ladefense', 'sapphire', 'twist', 'twin', 'colosseum', 'colosseo', 'vatican', 'vittoriano', 'derotterdam', 'markthal', 'cubes', 'canal', 'rijks', 'centraal']);
 // 🇬🇧 Лондон с истински модели (feature 'london-real'): Биг Бен и London Eye от Poly Pizza вместо процедурните
@@ -508,6 +508,7 @@ function reichstag() {
 
 // ---- забележителности от готови модели (assets/heavy/lm/*.glb, Sketchfab, CC-BY — виж assets/heavy/CREDITS.txt)
 // h — височина в метри на играта; fit — най-много толкова ширина/дължина (парцелът е ~15 м); grid — пакет от сгради, подредени в квартал
+const ACRO = { h: 12, top: [16, 32], bot: [27, 43] };   // lm-acropolis: хълмът (acropolisHill)
 const GLB_LM = {
   burj: { h: 70, fit: 14, onLoad: (w, g) => { if (feature('night-burj2')) burjLights(w, g); } }, cntower: { h: 58, fit: 14 }, willis: { h: 46, fit: 14, onLoad: (w, g) => { if (feature('night-willis')) willisLights(w, g); } }, shtower: { h: 56, fit: 14 },
   liberty: { h: 22, fit: 13, plate: 0x7d9a6a }, redeemer: { h: 18, fit: 14, plate: 0x6f8f55 }, stbasil: { h: 20, fit: 15, plate: 0xb9b0a3 },
@@ -560,10 +561,37 @@ const GLB_LM = {
   parliament: { h: 15, fit: 42.9, plate: 0xb8b2a6, onLoad: w => goldNight(w, 0xffc56a, 0.55) },
   duomo: { h: 15, fit: 24.5, plate: 0xb8b2a6 },
   romanstadium: { h: 15, fit: 59.2, plate: 0x9a8f7a },
+  // Атина (lm-acropolis, f6): Партенонът (Meshy AI, CC0, от потребителя; олекотен 2 млн. → 115 хил. △) на процедурния хълм на Акропола; 15 единици = 18,5 м,
+  // хълмът — ~15 м висок (истинският е ~70 м над града — смален, иначе закрива квартала), платото — около храма; мястото за забележителност е ~56 × 46 м →
+  // цялото ×~0,58 (храмът ~40 м); нощем — златист (като истинския)
+  parthenon: { h: 15, fit: 56.8, plate: 0x9c8f78, ry: Math.PI / 2, lift: ACRO.h, under: g => g.add(acropolisHill()), onLoad: w => goldNight(w, 0xffc56a, 0.6) },
   liberty2: { h: 15, fit: 23.4, plate: 0x3f6f96, seaY: -1.2, onLoad: libertyIsland },   // Лас Вегас: „Луксор“ — черната пирамида със сфинкса (Meshy AI); нощем лъч от върха   // Лас Вегас: хотел „Беладжо“ (Meshy AI) — отпред езерото с фонтаните (bellagio() по-долу)
 };
 const glbCache = {};
 // нощно златисто осветяване на модел-забележителност: emissive = цвят, emissiveMap = текстурата; играта ги пали нощем (window.__lmNight)
+// хълмът на Акропола: елипсовидно плато (дългата ос — z), стръмни скалисти склонове, долу — зеленина (маслини, храсти); единиците — на модела (1 = 1,23 м)
+function acropolisHill() {
+  const g = new THREE.Group(), N = 72, R = 7, pos = [], col = [], idx = [], c = new THREE.Color(), rnd = (i, j) => { const v = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return v - Math.floor(v); };
+  // пръстени отдолу нагоре (r = 0 — подножието, R — ръбът на платото) + центърът на платото
+  for (let r = 0; r <= R; r++) { const t = r / R, e = t < 0.25 ? t * 0.6 : 0.15 + (t - 0.25) * 1.13, y = ACRO.h * Math.min(1, Math.pow(t, 0.85));   // скалата — стръмна в горната част
+    for (let i = 0; i < N; i++) { const a = i / N * Math.PI * 2, n = r === R || r === 0 ? 0 : (rnd(i, r) - 0.5) * 0.12, k = 1 - Math.min(1, e) + n;
+      const rx = ACRO.top[0] + (ACRO.bot[0] - ACRO.top[0]) * k, rz = ACRO.top[1] + (ACRO.bot[1] - ACRO.top[1]) * k;
+      pos.push(Math.sin(a) * rx, r === 0 ? -0.5 : y + (r < R ? (rnd(r, i) - 0.5) * 1.6 : 0), Math.cos(a) * rz);
+      c.setHex(t < 0.16 ? 0x6f8a4a : t < 0.3 ? 0x8f8c66 : r === R ? 0xbdb196 : 0xb0a385).offsetHSL(0, 0, (rnd(i * 3, r) - 0.5) * 0.06); col.push(c.r, c.g, c.b); } }
+  for (let r = 0; r < R; r++) for (let i = 0; i < N; i++) { const a = r * N + i, b = r * N + (i + 1) % N, d = a + N, e = b + N; idx.push(a, b, d, b, e, d); }
+  const ci = pos.length / 3; pos.push(0, ACRO.h, 0); c.setHex(0xb3a88f); col.push(c.r, c.g, c.b);
+  for (let i = 0; i < N; i++) idx.push(ci, R * N + i, R * N + (i + 1) % N);
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+  const hill = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true })); hill.castShadow = hill.receiveShadow = true; g.add(hill);
+  // маслините и храстите по долните склонове
+  const bush = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: 0x5d7a3c, roughness: 0.9, flatShading: true }), 40), m = new THREE.Matrix4(), q = new THREE.Quaternion();
+  const ring = t => {   /* t ≤ 0.3 — само в подножието */ const e = t < 0.25 ? t * 0.6 : 0.15 + (t - 0.25) * 1.13; return [1 - Math.min(1, e), ACRO.h * Math.min(1, Math.pow(t, 0.85))]; };   // като пръстените горе
+  for (let i = 0; i < 40; i++) { const a = rnd(i, 7) * Math.PI * 2, [k, y] = ring(rnd(i, 9) * 0.22), s = 0.9 + rnd(i, 11) * 1.1;
+    const rx = ACRO.top[0] + (ACRO.bot[0] - ACRO.top[0]) * k, rz = ACRO.top[1] + (ACRO.bot[1] - ACRO.top[1]) * k;
+    bush.setMatrixAt(i, m.compose(new THREE.Vector3(Math.sin(a) * rx, y + s * 0.4, Math.cos(a) * rz), q, new THREE.Vector3(s, s * 0.8, s))); }
+  bush.castShadow = true; g.add(bush);
+  return g;
+}
 function goldNight(w, col, k) { const seen = new Set(); w.traverse(o => { if (!o.isMesh) return; for (const m of [].concat(o.material)) { if (!m || seen.has(m) || !('emissive' in m)) continue; seen.add(m);
   m.emissive = new THREE.Color(col); if (m.map) m.emissiveMap = m.map; m.emissiveIntensity = 0; m.userData.winK = k; m.needsUpdate = true; if (window.__lmNight) window.__lmNight(m); } }); }
 // стомана и стъкло: текстурата се обезцветява и изсветлява (Meshy дава кафеникав камък), металът блести малко
@@ -673,6 +701,7 @@ export const lmH = kind => (GLB_LM[kind] && GLB_LM[kind].h) || null;   // вис
 function glbLm(kind) {
   const C = GLB_LM[kind], g = new THREE.Group(), flood = [];
   const plate = box(g, 15, 0.3, 15, mat(C.plate ?? 0x9a9a92, 0.95), 0, 0.15, 0);
+  if (C.under) C.under(g);   // lm-acropolis: хълмът под модела (веднага, без да чака модела)
   const ph = add(g, new THREE.BoxGeometry(4, C.h, 4), mat(0x9aa4ae, 0.8, 0, { transparent: true, opacity: 0.25 }), 0, C.h / 2, 0);   // докато се зарежда
   g.userData.flood = flood;
   loadLm(kind).then(src => {
@@ -683,7 +712,7 @@ function glbLm(kind) {
     const b = new THREE.Box3().setFromObject(w, !!(C.ry || C.crop)), s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3());
     const k = Math.min(C.h / s.y, C.fit / Math.max(s.x, s.z));
     const y0 = feature('lm-ground') && !plate.visible ? 0 : 0.3;   // lm-ground: на истинската карта плочата е скрита (landmarkPlan2) — моделът стъпва на земята, не на 0,3 над нея (×мащаба: Капитолият висеше на ~3 м и сянката се отделяше от основата)
-    m.position.set(-c.x, -b.min.y, -c.z); w.scale.setScalar(k); w.position.y = y0 - (C.sink || 0) * s.y * k; w.position.z = C.dz || 0; if (C.sy) w.scale.y *= C.sy;   // sy — по-стръмно (ниските модели от Meshy)
+    m.position.set(-c.x, -b.min.y, -c.z); w.scale.setScalar(k); w.position.y = y0 + (C.lift || 0) - (C.sink || 0) * s.y * k; w.position.z = C.dz || 0; if (C.sy) w.scale.y *= C.sy;   // sy — по-стръмно (ниските модели от Meshy)
     w.traverse(o => {
       if (!o.isMesh) return; o.castShadow = o.receiveShadow = true;
       if (C.matte && o.material) { o.material = o.material.clone(); o.material.color.set(C.matte); o.material.metalness = 0; o.material.roughness = 0.8; o.material.metalnessMap = o.material.roughnessMap = o.material.map = null; o.material.needsUpdate = true; }   // светла фасада (Белият дом): текстурата е тъмна — само бял цвят + релефът (normalMap)
@@ -694,7 +723,7 @@ function glbLm(kind) {
     if (C.base) box(g, s.x * k + 0.6, 0.35, s.z * k + 0.6, mat(C.base, 0.9), 0, y0 + 0.175, C.dz || 0);   // каменна основа — назъбените краища на скана се сливат с нея
     g.add(w);
     if (C.onLoad) C.onLoad(w, g);
-    if (g.userData.sign) g.userData.sign.position.y = s.y * k + 4;
+    if (g.userData.sign) g.userData.sign.position.y = s.y * k + 4 + (C.lift || 0);
   });
   return g;
 }
