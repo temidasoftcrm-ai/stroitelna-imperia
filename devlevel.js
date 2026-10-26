@@ -59,6 +59,15 @@ export const OFFERS_LV = LV.OFFERS, STOCKS_LV = LV.STOCKS;
 const CITY_BAR = feature('xp-city-bar');
 const cityK = d => { const a = THRESH[d.lv - 1] ?? 0, b = THRESH[d.lv]; return b > a ? Math.max(0, Math.min(1, (d.xp - a) / (b - a))) : 1; };
 const lvOf = xp => { let l = 1; for (let i = 0; i < THRESH.length; i++) if (xp >= THRESH[i]) l = i + 1; return l; };
+// 🏢 firm-xp-sum (f6, 25.10 — потребителят избра „сборът“): опитът на ФИРМАТА = сборът от опита на всички градове (+ холдинга, както досега);
+// нивата на градовете остават (специалистите, офертите на града). Прагове на фирмата — старите × K: от ниво 5 нататък играеш в няколко града,
+// затова праговете са по-високи (иначе сборът би прескачал нива); темпото — приблизително като в един град + бонус от останалите.
+// При първото пускане (S.firm липсва): отместване off, така че сборът − off е точно на същото място в новата скала, на което беше старият напредък
+// (същото ниво, същата част от пътя) — нивото на фирмата не пада и не скача; оттук нататък всеки XP от всеки град движи фирмата.
+const FSUM = feature('firm-xp-sum');
+const FIRM_K = L => L <= 4 ? 1 : L === 5 ? 1.15 : L === 6 ? 1.3 : L === 7 ? 1.4 : L === 8 ? 1.5 : L === 9 ? 1.6 : 1.7;
+export const FIRM_THRESH = THRESH.map((t, i) => Math.round(t * FIRM_K(i + 1) / 500) * 500);   // FIRM_THRESH[L − 1] — началото на ниво L
+const lvOfFirm = xp => { let l = 1; for (let i = 0; i < FIRM_THRESH.length; i++) if (xp >= FIRM_THRESH[i]) l = i + 1; return l; };
 
 export function createDevLevel(deps) {
   const st = () => {
@@ -74,7 +83,16 @@ export function createDevLevel(deps) {
   const level = () => (st() || { lv: 1 }).lv;
   const offerMul = () => 1 + 0.02 * (level() - 1);
   // общите за фирмата неща (оферти, борса) се отключват от най-развития ти град
-  const rawBest = () => Math.max(level(), deps.maxLevel ? deps.maxLevel() : 1, deps.impLv ? deps.impLv() : 0);
+  // firm-xp-sum: сборът и нивото на фирмата (S.firm = { off, lv — най-високото показано, v })
+  const sumXP = () => { const S = deps.S(), d = st(); let x = d ? d.xp : 0; for (const c of Object.values(S?.cities || {})) x += c.dev?.xp || 0; return x + (S?.holding ? S.hxp || 0 : 0); };
+  const oldBestXP = () => { const S = deps.S(), d = st(); return Math.max(d ? d.xp : 0, ...Object.values(S?.cities || {}).map(c => c.dev?.xp || 0)) + (S?.holding ? S.hxp || 0 : 0); };
+  const firmRec = () => { const S = deps.S(); if (!S) return null; if (S.firm && S.firm.v === 1) return S.firm;
+    const L0 = Math.min(THRESH.length, Math.max(level(), deps.maxLevel ? deps.maxLevel() : 1)), x0 = oldBestXP(), a = THRESH[L0 - 1], b = THRESH[L0] ?? a, f = b > a ? Math.max(0, Math.min(1, (x0 - a) / (b - a))) : 0;
+    const A = FIRM_THRESH[L0 - 1], B = FIRM_THRESH[L0] ?? A, pos = A + f * (B - A);
+    return (S.firm = { off: Math.round(sumXP() - pos), lv: L0, v: 1 }); };   // миграция: същото ниво и същата част от пътя
+  const firmXp = () => { const r = firmRec(); return r ? sumXP() - r.off : 0; };
+  const firmLv = () => { const r = firmRec(); return r ? Math.max(r.lv, lvOfFirm(firmXp())) : 1; };   // не пада
+  const rawBest = () => FSUM ? Math.max(firmLv(), deps.impLv ? deps.impLv() : 0) : Math.max(level(), deps.maxLevel ? deps.maxLevel() : 1, deps.impLv ? deps.impLv() : 0);
   // 🤝 общото ниво с партньора (флаг coop-lv, game.js → deps.coopCap): който е напред, чака — опитът се трупа, отключванията — щом и партньорът стигне
   const capLv = () => { const c = deps.coopCap ? deps.coopCap() : null; return c == null ? Infinity : c; };
   const best = () => Math.min(rawBest(), capLv());
@@ -110,6 +128,16 @@ export function createDevLevel(deps) {
   let forceAdd = false;
   const flushNow = () => { if (!held) return; clearTimeout(heldT); heldT = 0; const n = held; held = 0; const d = st(); if (!d) return; d.xp -= n; forceAdd = true; try { add(n); } finally { forceAdd = false; } };
   if (typeof window !== 'undefined') { addEventListener('pagehide', flushNow); document.addEventListener('visibilitychange', () => { if (document.hidden) flushNow(); }); }
+  // firm-xp-sum: новите нива на фирмата (и от опит, дошъл направо в другите градове — търговете) — картинка/известие за всяко, веднъж
+  function firmCheck() {
+    if (!FSUM) return; const r = firmRec(); if (!r) return; const L = Math.min(FIRM_THRESH.length, lvOfFirm(firmXp()));
+    while (r.lv < L) { r.lv++; const lv = r.lv;
+      if (lv > capLv()) { const S = deps.S(); if (S.coopWait == null) S.coopWait = lv - 1; deps.toast(`⏳ Ниво ${lv} е готово, но чака партньора (ниво ${capLv()}) — отключванията идват, щом и той стигне`, 'good'); continue; }
+      const ut = (UNLOCKS[lv] || '') + (deps.levelBonus ? deps.levelBonus(lv) : '');
+      deps.toast(`🏅 Фирмата е ниво ${lv}! ${ut}`, 'good', open);
+      if (feature('lv-pics') && LV_PICS.has(lv)) { showLevel(lv, ut); continue; }
+      deps.sound('lvup'); if (deps.pop && !deps.pop(`lv-${lv}`, `🏅 Ниво на развитие ${lv}`, ut)) deps.pop('office-up', `🏅 Ниво на развитие ${lv}`, ut); }
+  }
   function add(n, why) {
     const d = st(); if (!d || !n) return;
     if (n > 0 && inRoom() && !forceAdd) { d.xp += n; held += n; if (!heldT) heldT = setTimeout(flushHeld, 700); return; }
@@ -117,6 +145,7 @@ export function createDevLevel(deps) {
     d.xp += n;
     if (n > 0) xpFloat(n);
     const nl = lvOf(d.xp);
+    if (FSUM) { while (d.lv < nl) { d.lv++; deps.toast(`🏙️ ${deps.cityName ? deps.cityName() : 'Градът'} стигна ниво ${d.lv}`, 'good'); } firmCheck(); render(); deps.save(); return; }   // firm-xp-sum
     while (d.lv < nl) {
       d.lv++;
       if (d.lv <= firm0) { deps.toast(`🏙️ ${deps.cityName ? deps.cityName() : 'Градът'} стигна ниво ${d.lv}`, 'good'); continue; }
@@ -168,8 +197,9 @@ export function createDevLevel(deps) {
     const bst = best();   // в лентата — само нивото на фирмата (= най-развитият град, от него идват отключванията); лентата — неговият напредък
     const bd = bst > d.lv ? (Object.values(deps.S().cities || {}).map(c => c.dev).find(x => x && x.lv === bst) || { lv: bst, xp: THRESH[bst - 1] }) : d;
     const top = bst >= THRESH.length, nx = top && bst < 35 && deps.impRatio ? deps.impRatio(bst + 1) : null;   // над 20 — напредъкът към следващото ниво по условията на града (imperial.js)
-    const a = THRESH[bd.lv - 1], b = THRESH[bd.lv] ?? a, k = top ? (nx ?? 1) : Math.max(0, Math.min(1, (bd.xp - a) / (b - a)));
-    const cityTag = CITY_BAR && bst > d.lv ? `<span style="font-size:11px;opacity:.9" title="Опитът от строежите отива в града, в който си">🏙️ ${deps.cityName ? deps.cityName() : 'градът'} ${d.lv} · ${Math.round(cityK(d) * 100)}%</span>` : '';   // xp-city-bar
+    const a = THRESH[bd.lv - 1], b = THRESH[bd.lv] ?? a, k = top ? (nx ?? 1) : FSUM ? (() => { const fa = FIRM_THRESH[bst - 1], fb = FIRM_THRESH[bst] ?? fa; return fb > fa ? Math.max(0, Math.min(1, (firmXp() - fa) / (fb - fa))) : 1; })() : Math.max(0, Math.min(1, (bd.xp - a) / (b - a)));   // firm-xp-sum: сборът
+    const cityTag = CITY_BAR && (FSUM || bst > d.lv) ? `<span style="font-size:11px;opacity:.9" title="Опитът от строежите отива в града, в който си">🏙️ ${deps.cityName ? deps.cityName() : 'градът'} ${d.lv} · ${Math.round(cityK(d) * 100)}%</span>` : '';   // xp-city-bar
+    if (FSUM) firmCheck();   // и опитът, дошъл направо в други градове
     btn.innerHTML = `🏢 Фирма ${bst}<span class="dbar"><i style="width:${(k * 100).toFixed(0)}%"></i></span>${cityTag}${waiting() ? `<span style="font-size:11px;opacity:.85">⏳ чакаш партньора (ниво ${bst})</span>` : partnerAhead() ? `<span style="font-size:11px;opacity:.85">${partnerAhead() > rawBest() + 2 ? '⏳ партньорът те чака' : '🤝 партньорът е напред'} (ниво ${partnerAhead()})</span>` : ''}`;
     btn.title = `Ниво на развитие на фирмата: ${bst} (по най-развития град — оттам идват отключванията)${bst > d.lv ? ` · ${deps.cityName ? deps.cityName() : 'този град'}: ниво ${d.lv}` : ''}${nx != null ? ` · към ниво ${bst + 1}: ${Math.round(nx * 100)}%${deps.impNeed ? ` — ${deps.impNeed(bst + 1)}` : ''}` : ''}`;
   }
@@ -177,7 +207,7 @@ export function createDevLevel(deps) {
   function prog(n) {
     const L = best(); if (n <= L) return { k: 1, t: '✅ изпълнено' };
     if (n > 20) { const k = deps.impRatio ? Math.max(0, Math.min(1, deps.impRatio(n) || 0)) : 0; return { k, t: `${Math.round(k * 100)}% от условията` }; }
-    const xp = firmXP(), a = THRESH[n - 2] ?? 0, b = THRESH[n - 1], k = Math.max(0, Math.min(1, (xp - a) / Math.max(1, b - a)));
+    const T = FSUM ? FIRM_THRESH : THRESH, xp = FSUM ? firmXp() : firmXP(), a = T[n - 2] ?? 0, b = T[n - 1], k = Math.max(0, Math.min(1, (xp - a) / Math.max(1, b - a)));
     return { k, t: `${Math.round(k * 100)}% · остават ${Math.max(0, Math.round(b - xp)).toLocaleString('bg-BG')} XP` };
   }
   const barHtml = n => { if (n !== best() + 1) return '';   // само следващото ниво — жълтата лента, която расте (изпълнените — без лента)
@@ -186,15 +216,15 @@ export function createDevLevel(deps) {
   function open() {
     const d = st(); if (!d) return;
     const L = best();   // по нивото на фирмата (както в лентата горе); заключените — замъглени, за да е изненада
-    const rows = THRESH.map((t, i) => `<div class="dvrow ${i + 1 <= L ? 'on' : ''} ${i + 1 === L ? 'cur' : ''}"><b>${i + 1 <= L ? '✅' : '🔒'} Ниво ${i + 1}</b><span class="meta" style="margin:0;flex:1;${i + 1 > L ? 'filter:blur(6px);user-select:none;pointer-events:none' : ''}" ${i + 1 > L ? 'aria-hidden="true"' : ''}>${UNLOCKS[i + 1] || 'Начало'}</span><span class="meta" style="margin:0">${i + 1 <= L ? '' : `${t} XP`}${deps.lvTime && deps.lvTime(i + 1) ? `${i + 1 <= L ? '' : '<br>'}<span style="color:#7dd3ff">⏱️ ${deps.lvTime(i + 1)}</span>` : ''}</span></div>${barHtml(i + 1)}`).join('')
+    const rows = (FSUM ? FIRM_THRESH : THRESH).map((t, i) => `<div class="dvrow ${i + 1 <= L ? 'on' : ''} ${i + 1 === L ? 'cur' : ''}"><b>${i + 1 <= L ? '✅' : '🔒'} Ниво ${i + 1}</b><span class="meta" style="margin:0;flex:1;${i + 1 > L ? 'filter:blur(6px);user-select:none;pointer-events:none' : ''}" ${i + 1 > L ? 'aria-hidden="true"' : ''}>${UNLOCKS[i + 1] || 'Начало'}</span><span class="meta" style="margin:0">${i + 1 <= L ? '' : `${t} XP`}${deps.lvTime && deps.lvTime(i + 1) ? `${i + 1 <= L ? '' : '<br>'}<span style="color:#7dd3ff">⏱️ ${deps.lvTime(i + 1)}</span>` : ''}</span></div>${barHtml(i + 1)}`).join('')
       + `<div class="meta" style="margin:10px 0 4px;color:#ffd54a">🏙️ Нива 21–25 — Империал Сити, 26–35 — президентът (по постижения, не по опит)</div>` + [21, 22, 23, 24, 25, ...(L >= 25 ? [26, 27, 28, 29, 30, 31, 32, 33, 34, 35] : [])].map(n => `<div class="dvrow ${n <= L ? 'on' : ''} ${n === L ? 'cur' : ''}"><b>${n <= L ? '✅' : '🔒'} Ниво ${n}</b><span class="meta" style="margin:0;flex:1;${n > L ? 'filter:blur(6px);user-select:none;pointer-events:none' : ''}" ${n > L ? 'aria-hidden="true"' : ''}>${UNLOCKS[n]}</span></div>${barHtml(n)}`).join('')
       + (L >= 19 && L < 35 && deps.impNeed ? `<div class="meta" style="margin:6px 0 0;color:#7dd3ff">🎯 Към ниво ${Math.max(21, L + 1)}: ${deps.impNeed(Math.max(21, L + 1))}</div>` : '');
     const nxt = THRESH[d.lv];
-    deps.modal(`🏢 Ниво на развитие на фирмата · ${L}`, `Всеки твой град се развива отделно. Отключванията (градове, линии, Балканите, Европа, борса) идват от най-развития ти град; специалистите — от нивото на текущия град.<br>${CITY_BAR && L > d.lv ? `<div style="margin:6px 0;padding:6px 8px;border-radius:8px;background:rgba(125,211,255,.1);color:#bfe6ff">🏙️ Опитът от строежите отива в <b>${deps.cityName ? deps.cityName() : 'този град'}</b> — той е на ниво ${d.lv} (${Math.round(cityK(d) * 100)}% до ниво ${d.lv + 1}). Лентата на фирмата (ниво ${L}) е на най-развития ти град и тръгва, щом някой град го задмине.</div>` : ''}Опит${CITY_BAR ? ' в този град' : ''}: <b>${Math.round(d.xp)} XP</b>${nxt != null ? ` · до ниво ${d.lv + 1}: ${Math.round(nxt - d.xp)} XP` : ' · максимално ниво'}<br>
+    deps.modal(`🏢 Ниво на развитие на фирмата · ${L}`, `Всеки твой град се развива отделно. Отключванията (градове, линии, Балканите, Европа, борса) идват от най-развития ти град; специалистите — от нивото на текущия град.<br>${FSUM ? `<div style="margin:6px 0;padding:6px 8px;border-radius:8px;background:rgba(125,211,255,.1);color:#bfe6ff">🏢 Всеки XP от всеки твой град се добавя към фирмата (сега фирмата има ${Math.round(firmXp()).toLocaleString('bg-BG')} XP). 🏙️ ${deps.cityName ? deps.cityName() : 'Този град'} — ниво ${d.lv} (${Math.round(cityK(d) * 100)}% до ниво ${d.lv + 1}).</div>` : CITY_BAR && L > d.lv ? `<div style="margin:6px 0;padding:6px 8px;border-radius:8px;background:rgba(125,211,255,.1);color:#bfe6ff">🏙️ Опитът от строежите отива в <b>${deps.cityName ? deps.cityName() : 'този град'}</b> — той е на ниво ${d.lv} (${Math.round(cityK(d) * 100)}% до ниво ${d.lv + 1}). Лентата на фирмата (ниво ${L}) е на най-развития ти град и тръгва, щом някой град го задмине.</div>` : ''}Опит${CITY_BAR ? ' в този град' : ''}: <b>${Math.round(d.xp)} XP</b>${nxt != null ? ` · до ниво ${d.lv + 1}: ${Math.round(nxt - d.xp)} XP` : ' · максимално ниво'}<br>
       <span style="color:var(--mut)">XP: къща ${XP.house}, магазин ${XP.shop}, офис ${XP.office}, небостъргач ${XP.tower}, ${feature('xp-km') ? `магистрала ~${XP_KM.highway} на км (аутобан ×2), жп линия ~${XP_KM.rail} на км, филиал ${XP.branch}, куест ${XP.quest} · покупки: ТИР ${XP_BUY.truck}, влак ${XP_BUY.train}, кораб ${XP_BUY.ship}–${XP_BUY.shipBig}, самолет ${XP_BUY.plane} · общо имаш ${Math.round(firmXP()).toLocaleString('bg-BG')} XP` : `жп линия ${XP.rail}, участък магистрала ${XP.highway}, филиал ${XP.branch}, куест ${XP.quest}`}.</span><br><br>${deps.playSummary ? deps.playSummary() + '<br>' : ''}${rows}`, [['Затвори', null]]);
     // на живо: лентите се обновяват всяка секунда, докато прозорецът е отворен
     clearInterval(dvTimer); dvTimer = setInterval(() => { const els = document.querySelectorAll('[data-dvn]'); if (!els.length) { clearInterval(dvTimer); return; }
       for (const e of els) { const n = +e.dataset.dvn, p = prog(n); e.style.width = (p.k * 100).toFixed(1) + '%'; e.style.background = p.k >= 1 ? '#43d17a' : 'linear-gradient(90deg,#c9a14a,#ffd54a)'; const t = document.querySelector(`[data-dvt="${n}"]`); if (t && t.textContent !== p.t) t.textContent = p.t; } }, 1000);
   }
-  return { cityUp, add, level, best, rawBest, waiting, has, offerMul, offersOpen, stocksOpen, render, open, XP };
+  return { firmXp, firmLv, cityUp, add, level, best, rawBest, waiting, has, offerMul, offersOpen, stocksOpen, render, open, XP };
 }
