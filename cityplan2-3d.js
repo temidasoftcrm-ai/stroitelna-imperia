@@ -33,7 +33,7 @@ export function mats() {
   for (const k of ['curb', 'apron']) Object.assign(MAT[k], { polygonOffset: true, polygonOffsetFactor: -5, polygonOffsetUnits: -5 });
   return MAT;
 }
-function ctex(n, draw, rep2 = 1) { const c = document.createElement('canvas'); c.width = c.height = n; draw(c.getContext('2d'), n); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep2, rep2); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; }
+function ctex(n, draw, rep2 = 1) { const c = document.createElement('canvas'); c.width = c.height = n; draw(c.getContext('2d', FCPU), n); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep2, rep2); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; }
 // ---- геометрия (слива се в малко мешове)
 export function ribbon(pts, w, y, closed = false) {
   const pos = [], idx = [];
@@ -59,7 +59,7 @@ export const circle = (x, z, r, n = 64) => Array.from({ length: n + 1 }, (_, k) 
 // road-geo: бариера на правия край на улица (към бъдещ квартал / булевард без продължение): два стълба и греда на червено-бели ивици
 let BAR_M = null;
 function barrier(e, ang, w) {
-  if (!BAR_M) { const c = document.createElement('canvas'); c.width = 128; c.height = 16; const g = c.getContext('2d'); for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#f4f4f0' : '#d32f2f'; g.fillRect(i * 16, 0, 16, 16); } const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping;
+  if (!BAR_M) { const c = document.createElement('canvas'); c.width = 128; c.height = 16; const g = c.getContext('2d', FCPU); for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#f4f4f0' : '#d32f2f'; g.fillRect(i * 16, 0, 16, 16); } const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping;
     BAR_M = { beam: new THREE.MeshStandardMaterial({ map: t, roughness: 0.6 }), post: new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.5, metalness: 0.4 }), tex: t }; }
   const g = new THREE.Group(), L = Math.max(3, w - 0.6), beam = new THREE.Mesh(new THREE.BoxGeometry(L, 0.28, 0.14), BAR_M.beam);
   BAR_M.tex.repeat.set(Math.round(L / 2), 1); beam.position.y = 0.95; g.add(beam);
@@ -74,13 +74,16 @@ export function quad(a, b, c, d, y) { return { pos: [a[0], y, a[1], b[0], y, b[1
 // (второ зареждане в същия профил, Париж и Вашингтон; в JS текстурите и материалите са същите като при нормалните). Платната се качват
 // наново във видеокартата 3, 12 и 40 s след строежа и след всяко пълнене (евтино — малки са); GLB картинките (memfix tex-free) не се пипат.
 const FREUP = feature('fac-reup'), RU_AT = [3, 12, 40, Infinity];
+// fac-cpu (T1, 26.10): платната на фасадите — в паметта на процесора (willReadFrequently), не в ускорения 2D canvas: Chrome понякога
+// изхвърля съдържанието на ускорените платна (при натоварена видеокарта) — те остават празни/черни и fac-reup няма какво да качи наново
+export const FCPU = { willReadFrequently: true };
 function reupCanvas(G) { const seen = new Set(); G.traverse(o => { if (!o.isInstancedMesh) return; for (const m of [].concat(o.material)) { if (!m || seen.has(m)) continue; seen.add(m);
   for (const t of [m.map, m.emissiveMap]) if (t && t.isCanvasTexture && t.image && t.image.width > 0) t.needsUpdate = true; } }); }
 const WIN_MATS = [];
 export function winDrop(set) { for (let i = WIN_MATS.length - 1; i >= 0; i--) if (set.has(WIN_MATS[i])) WIN_MATS.splice(i, 1); }   // fix-stab (game.js winForget): материалите на стария град
 export function nightWin(mat, c, o = {}) {   // export — и за bgblocks.js
-  const W = c.width, H = c.height, src = c.getContext('2d').getImageData(0, 0, W, H).data, lab = new Int32Array(W * H).fill(-1), out = document.createElement('canvas'); out.width = W; out.height = H;
-  const g = out.getContext('2d'), img = g.createImageData(W, H), D = img.data; let seed = o.seed || 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const W = c.width, H = c.height, src = c.getContext('2d', FCPU).getImageData(0, 0, W, H).data, lab = new Int32Array(W * H).fill(-1), out = document.createElement('canvas'); out.width = W; out.height = H;
+  const g = out.getContext('2d', FCPU), img = g.createImageData(W, H), D = img.data; let seed = o.seed || 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const dark = i => (src[i * 4] * 0.3 + src[i * 4 + 1] * 0.59 + src[i * 4 + 2] * 0.11) < (o.thr || 95);
   for (let i = 0; i < W * H; i++) { if (lab[i] >= 0 || !dark(i)) continue; const st = [i], px = []; lab[i] = i;
     while (st.length) { const k = st.pop(); px.push(k); const x = k % W, y = (k / W) | 0; for (const n of [x > 0 && k - 1, x < W - 1 && k + 1, y > 0 && k - W, y < H - 1 && k + W]) if (n !== false && lab[n] < 0 && dark(n)) { lab[n] = i; st.push(n); } }
@@ -113,7 +116,7 @@ export function tileByScale(mat, pw, ph) {   // ph = 0 — без повторе
 let FAC_MAT = null, lodRoof = null;
 function facadeMat() {
   if (FAC_MAT) return FAC_MAT;
-  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d', FCPU);
   g.fillStyle = '#f4ece0'; g.fillRect(0, 0, 128, 128);
   for (let r = 0; r < 4; r++) for (let k = 0; k < 3; k++) { const x = 14 + k * 38, y = 8 + r * 24; g.fillStyle = '#3d3a36'; g.fillRect(x + 5, y, 12, 16); g.fillStyle = '#5f7a4a'; g.fillRect(x, y, 5, 16); g.fillRect(x + 17, y, 5, 16); g.fillStyle = '#e8e0d2'; g.fillRect(x + 3, y + 16, 16, 2); }
   g.fillStyle = '#d9cfbf'; g.fillRect(0, 104, 128, 24); for (let k = 0; k < 3; k++) { g.fillStyle = '#4a4540'; g.beginPath(); g.moveTo(16 + k * 38, 128); g.lineTo(16 + k * 38, 112); g.arc(27 + k * 38, 112, 11, Math.PI, 0); g.lineTo(38 + k * 38, 128); g.fill(); }
@@ -129,7 +132,7 @@ const BRICK = [0x9a5a3e, 0xb06c4a, 0xc89c6a, 0xd2b07c, 0x8c4a36, 0xbfa07a, 0xa86
 const CITY = [0xe8e4da, 0xd9d6cf, 0xc9ccd0, 0xb8c2c8, 0xe2ddd0];   // Сити: офиси от портландски камък и стъкло
 function brickMat() {
   if (BRICK_MAT) return BRICK_MAT;
-  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d', FCPU);
   g.fillStyle = '#e6e0d8'; g.fillRect(0, 0, 128, 128); g.fillStyle = 'rgba(70,55,45,0.16)'; for (let y = 0; y < 128; y += 4) { g.fillRect(0, y, 128, 1); for (let x = (y / 4) % 2 ? 0 : 4; x < 128; x += 8) g.fillRect(x, y, 1, 4); }   // тухлите
   for (let r = 0; r < 4; r++) for (let k = 0; k < 3; k++) { const x = 14 + k * 40, y = 8 + r * 25; g.fillStyle = '#f4f2ec'; g.fillRect(x - 2, y - 2, 18, 22); g.fillStyle = '#2c3440'; g.fillRect(x, y, 14, 18); g.fillStyle = '#f4f2ec'; g.fillRect(x, y + 8, 14, 1.5); g.fillRect(x + 6.3, y, 1.4, 18); }   // бели рамки, прозорци с плъзгащо се крило
   g.fillStyle = '#f2efe6'; g.fillRect(0, 106, 128, 3); g.fillStyle = '#1e2a24'; g.fillRect(56, 110, 16, 18); g.fillStyle = '#f4f2ec'; g.fillRect(52, 110, 3, 18); g.fillRect(73, 110, 3, 18);   // врата с колонки
@@ -143,10 +146,10 @@ const GLASS = [0x9fb4c8, 0x8aa2b8, 0xb5c3cf, 0x7f95a8, 0xa8b8c4, 0x6f8598];
 const NYST = [0xcfc6b4, 0xb9a58a, 0x9c8d7a, 0xd8d0c0, 0x8f7f6c, 0xc2b49c];
 function glassMat() {
   if (GLASS_MAT) return GLASS_MAT;
-  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d', FCPU);
   const gr = g.createLinearGradient(0, 0, 128, 128); gr.addColorStop(0, '#dfe8f0'); gr.addColorStop(1, '#aebfcd'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
   g.fillStyle = 'rgba(40,50,60,0.55)'; for (let y = 0; y < 128; y += 8) g.fillRect(0, y, 128, 1.2); for (let x = 0; x < 128; x += 10.67) g.fillRect(x, 0, 1, 128);   // етажите и профилите
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; const cc = document.createElement('canvas'); cc.width = cc.height = 128; const g2 = cc.getContext('2d'); g2.fillStyle = '#fff'; g2.fillRect(0, 0, 128, 128); g2.fillStyle = '#000';
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; const cc = document.createElement('canvas'); cc.width = cc.height = 128; const g2 = cc.getContext('2d', FCPU); g2.fillStyle = '#fff'; g2.fillRect(0, 0, 128, 128); g2.fillStyle = '#000';
   for (let y = 0; y < 16; y++) for (let x = 0; x < 12; x++) g2.fillRect(Math.round(x * 10.67) + 2, y * 8 + 2, 7, 5);   // стъклото: всяка клетка (етаж × профил) — прозорец
   return GLASS_MAT = tileByScale(nightWin(new THREE.MeshStandardMaterial({ map: t, roughness: 0.25, metalness: 0.35 }), cc, { lit: 0.32, k: 0.8, seed: 99, rep: 1 }), 16, 48);   // 12 профила ≈ 16 м, 16 етажа ≈ 48 м
 }
@@ -154,7 +157,7 @@ let HAUSS_MAT = null;
 const HAUSS = [0xf0e6d2, 0xe9dcc3, 0xf3ead9, 0xe4d6bd, 0xeee2cc];
 function haussMat() {
   if (HAUSS_MAT) return HAUSS_MAT;
-  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d', FCPU);
   g.fillStyle = '#f6efe2'; g.fillRect(0, 0, 128, 128); g.fillStyle = 'rgba(120,105,85,0.25)'; for (let y = 0; y < 128; y += 21) g.fillRect(0, y, 128, 1.5);   // корнизите на етажите
   for (let r = 0; r < 5; r++) for (let k = 0; k < 4; k++) { const x = 9 + k * 30, y = 6 + r * 21; g.fillStyle = '#3a4250'; g.fillRect(x, y, 12, 15); g.fillStyle = '#e8dcc6'; g.fillRect(x - 2, y - 2, 16, 2); }
   g.fillStyle = '#1d2024'; for (const y of [27, 90]) { g.fillRect(0, y, 128, 2); for (let x = 0; x < 128; x += 3) g.fillRect(x, y - 4, 1, 4); }   // ковани балкони (2-ри и 5-и етаж)
@@ -167,7 +170,7 @@ let OTTO_MAT = null, APT_MAT = null;
 const OTTO = [0xd9a066, 0xe8c6a0, 0xc97d5d, 0xa9c4cf, 0xb7c9a0, 0xe2d6c0, 0x8a5a3c, 0xd4a9a9], APT = [0xf2efe6, 0xe9e3d4, 0xf3e8d2, 0xe0dcd2, 0xefe2c8];
 function ottoMat() {
   if (OTTO_MAT) return OTTO_MAT;
-  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d', FCPU);
   g.fillStyle = '#f4ece0'; g.fillRect(0, 0, 128, 128); g.strokeStyle = 'rgba(80,60,40,0.25)'; g.lineWidth = 1; for (let y = 2; y < 128; y += 5) { g.beginPath(); g.moveTo(0, y); g.lineTo(128, y); g.stroke(); }   // дъски
   g.fillStyle = 'rgba(60,45,30,0.35)'; g.fillRect(34, 8, 60, 56); g.fillStyle = '#f7f3ea'; g.fillRect(36, 10, 56, 52);   // еркерът (по-светъл, със сянка)
   for (const [x, y] of [[40, 16], [58, 16], [76, 16], [40, 40], [58, 40], [76, 40], [8, 22], [106, 22], [8, 46], [106, 46]]) { g.fillStyle = '#ffffff'; g.fillRect(x - 1, y - 1, 14, 18); g.fillStyle = '#35404a'; g.fillRect(x, y, 12, 16); }
@@ -176,7 +179,7 @@ function ottoMat() {
 }
 function aptMat() {
   if (APT_MAT) return APT_MAT;
-  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d', FCPU);
   g.fillStyle = '#f6f3ec'; g.fillRect(0, 0, 128, 128);
   for (let r = 0; r < 5; r++) for (let k = 0; k < 4; k++) { const x = 6 + k * 31, y = 4 + r * 22; g.fillStyle = '#4a5866'; g.fillRect(x, y, 20, 13); g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(x - 3, y + 13, 26, 4); g.fillStyle = '#d8d4cc'; g.fillRect(x - 3, y + 12, 26, 2); }   // прозорци и балкони
   g.fillStyle = '#c9c4ba'; g.fillRect(0, 114, 128, 14); g.fillStyle = '#3e4a54'; for (let k = 0; k < 4; k++) g.fillRect(8 + k * 31, 116, 18, 12);   // партер — магазини
@@ -342,7 +345,7 @@ function romeBridges(G, D) {
 function streetGlow(G, P, style) {
   const parts = []; for (const rd of P.roads) if (!rd.noCars && rd.pts.length > 1) parts.push(ribbon(rd.pts, rd.w + 2 * (rd.walk || 2), 0.16));
   if (!parts.length) return null;
-  const c = document.createElement('canvas'); c.width = 64; c.height = 1; const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 64, 0);
+  const c = document.createElement('canvas'); c.width = 64; c.height = 1; const g = c.getContext('2d', FCPU), gr = g.createLinearGradient(0, 0, 64, 0);
   gr.addColorStop(0, '#000'); gr.addColorStop(0.12, '#d8d8d8'); gr.addColorStop(0.3, '#383838'); gr.addColorStop(0.5, '#202020'); gr.addColorStop(0.7, '#383838'); gr.addColorStop(0.88, '#d8d8d8'); gr.addColorStop(1, '#000'); g.fillStyle = gr; g.fillRect(0, 0, 64, 1);
   const t = new THREE.CanvasTexture(c), mat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: { rome: 0xff7a18, istanbul: 0xffb27a, paris: 0xffb860, london: 0xffa850, moscow: 0xffb070 }[style] ?? 0xff9a3a, emissiveMap: t, emissiveIntensity: 0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 });
   mat.userData.winK = (style === 'rome' ? 0.85 : 0.75) * (feature('road-glow-soft') ? 0.5 : 1);   // road-glow-soft (f9): нощем наполовина — пътищата не са оранжеви ленти   // Рим — натриево (по-оранжево, малко по-силно), Истанбул — смесено (по-бяло)
@@ -354,7 +357,7 @@ function streetGlow(G, P, style) {
 const WASH_LM = new Set(['colosseo', 'vittoriano', 'pantheon', 'stpeter', 'eiffel', 'notredame', 'arc', 'bigben', 'londoneye', 'shard', 'empire', 'chrysler', 'stpatrick', 'rockefeller', 'radiocity', 'hagia', 'bluemosque', 'galata', 'topkapi', 'grandbazaar', 'suleymaniye', 'stbasil', 'kotelnicheskaya']);
 function floodWash(G, P) {
   const lms = P.lots.filter(L => L.lm && WASH_LM.has(L.lm)); if (!lms.length) return null;   // само забележителностите с модел (не празните запазени места)
-  const c = document.createElement('canvas'); c.width = 4; c.height = 64; const g = c.getContext('2d'), gr = g.createLinearGradient(0, 64, 0, 0); gr.addColorStop(0, '#fff'); gr.addColorStop(0.35, '#555'); gr.addColorStop(1, '#000'); g.fillStyle = gr; g.fillRect(0, 0, 4, 64);
+  const c = document.createElement('canvas'); c.width = 4; c.height = 64; const g = c.getContext('2d', FCPU), gr = g.createLinearGradient(0, 64, 0, 0); gr.addColorStop(0, '#fff'); gr.addColorStop(0.35, '#555'); gr.addColorStop(1, '#000'); g.fillStyle = gr; g.fillRect(0, 0, 4, 64);
   const CP = feature('city-polish');   /* city-polish (f9): отгоре двустранният висок цилиндър изглеждаше като светещ „купол“ около големите парцели (Истанбул) — само външната страна, по-нисък и по-мек */
   const mat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffc070, emissiveMap: new THREE.CanvasTexture(c), emissiveIntensity: 0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: CP ? THREE.FrontSide : THREE.DoubleSide });
   mat.userData.winK = CP ? 0.11 : 0.16;
@@ -454,6 +457,7 @@ function* furniture(G, P, o = {}) {   // генератор: yield след вс
 export function buildPlan2View(P, opts = {}) {
   const TM = {}, T0 = performance.now(); let tm0 = T0, phase = 'start'; const tm = k => { const t = performance.now(); TM[k] = (TM[k] || 0) + t - tm0; tm0 = t; phase = 'after ' + k; };   // замерване по части (userData.timing)
   mats();
+  { const gr = opts.ground || {}; MAT.grass.color.setHex(gr.grass ?? 0x7fa462); MAT.median.color.setHex(gr.median ?? 0x5f9a45); MAT.island.color.setHex(gr.island ?? 0x6aa84f); }   // T2 dubai-look: пясъкът и настилката вместо тревата (общите материали — всеки град си ги задава)
   const G = new THREE.Group(), D = opts.osm ? { ...opts.osm, _models: opts.bridgeModels || {}, _kremlin: opts.kremlinModels || null, _gum: opts.gumModel || null } : null;   // bridgeModels: { bosphorus } — висящите мостове G.userData.plan = P;
   if (opts.offset) G.position.set(opts.offset[0], 0, opts.offset[1]);
   if (D && D.sea && opts.bridgesReal && /^(paris|london|moscow|newyork|washington)$/.test(D.style)) D.wY = -6;   // 🌉 bridges-real (f6): реката — по-дълбоко, кейовете — каменни стени, под мостовете — истинските модели (bridges.js)
@@ -668,7 +672,7 @@ export function buildPlan2View(P, opts = {}) {
     // фоновите квартали и свободните парцели: osm-fill (opts.blocksEarly) — веднага след най-близките улици (иначе — накрая, след ~25 s при бавен браузър:
     // около централата „пустиня“ от бежови парцели); те ползват само плана (P), не мешовете на улиците
     function* blocksFill() {
-      if ((D && opts.blocks !== false) || opts.blocks === 'bg') ST.BL = yield* romeBlocks(G, P, D ? D.style : 'bg', R);   // 'bg' (bg-fill) — градовете по плана без карта
+      if ((D && opts.blocks !== false) || opts.blocks === 'bg') ST.BL = yield* romeBlocks(G, P, D ? D.style : 'bg', R, opts.roofs);   // 'bg' (bg-fill) — градовете по плана без карта
       tm('blocks'); yield 0;
       // свободните парцели (истинската карта): трева с пръст, ниска ограда отзад и отстрани, табела „Продава се“ откъм улицата (opts.freeLot)
       ST.FP = (D || opts.blocks === 'bg') && opts.freeLot ? freePlots(G, P) : null;
@@ -678,7 +682,7 @@ export function buildPlan2View(P, opts = {}) {
     parkTrees(); tm('trees'); yield 0;
     if (opts.furniture !== false) { const F = ST.F = yield* furniture(G, P, opts);
       if (F && F.lamps.length && opts.lampGlow !== false) {
-        const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 1, 32, 32, 31); gr.addColorStop(0, 'rgba(255,214,140,0.9)'); gr.addColorStop(0.5, 'rgba(255,190,110,0.3)'); gr.addColorStop(1, 'rgba(255,170,90,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+        const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d', FCPU), gr = g.createRadialGradient(32, 32, 1, 32, 32, 31); gr.addColorStop(0, 'rgba(255,214,140,0.9)'); gr.addColorStop(0.5, 'rgba(255,190,110,0.3)'); gr.addColorStop(1, 'rgba(255,170,90,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
         ST.pools = new THREE.InstancedMesh(new THREE.PlaneGeometry(9, 9).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -6 }), F.lamps.length);
         const m = new THREE.Matrix4(); F.lamps.forEach(([x, z, y], i) => ST.pools.setMatrixAt(i, y > 7 ? m.makeScale(1.6, 1, 1.6).setPosition(x, 0.15, z) : m.makeTranslation(x, 0.15, z)));   /* street-real: под високите LED — по-широко петно */ ST.pools.visible = false; ST.pools.frustumCulled = false; F.FURN.add(ST.pools);
       }
@@ -769,7 +773,7 @@ const RIONI_BG = { Monti: 'Монти', Trevi: 'Треви', Esquilino: 'Еск�
 const arrBg = nm => { const m = /^Paris (\d+)e/.exec(nm); if (!m) return nm; const n = +m[1], sfx = n === 1 ? 'ви' : n === 2 ? 'ри' : n === 3 || n === 4 ? 'ти' : 'и'; return `${n}-${sfx} арондисман`; };
 function labelSprite(text, kind) {
   text = tr(text);
-  const c = document.createElement('canvas'), g = c.getContext('2d'), F = kind === 'w' ? 'italic 600 46px Georgia, serif' : '700 38px system-ui, sans-serif';
+  const c = document.createElement('canvas'), g = c.getContext('2d', FCPU), F = kind === 'w' ? 'italic 600 46px Georgia, serif' : '700 38px system-ui, sans-serif';
   g.font = F; const w = Math.ceil(g.measureText(text).width) + 24; c.width = w; c.height = 64; g.font = F; g.textBaseline = 'middle'; g.textAlign = 'center';
   g.lineWidth = 7; g.strokeStyle = kind === 'w' ? 'rgba(10,40,70,0.85)' : 'rgba(30,25,20,0.8)'; g.strokeText(text, w / 2, 34); g.fillStyle = kind === 'w' ? '#cfe8ff' : '#fff6e0'; g.fillText(text, w / 2, 34);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
@@ -901,7 +905,7 @@ function terminiView(L0, model, sf = {}) {
 // Рим: затворено застрояване — по двете страни на всяка улица редица от сгради (14 м фасада, 15 м дълбочина, 13–21 м височина),
 // в цветовете на Рим; не върху улица, вода, парк/археология или забележителност. Рисуват се като фасада + керемиден покрив (2 инстанции).
 const ROMA = [0xd9a066, 0xc8794e, 0xe2c27a, 0xb5654a, 0xd8b48a, 0xe7d3a8, 0xc98f5b, 0xa9583f];
-function* romeBlocks(G, P, style, ROADS = P.roads) {   // генератор: yield след всеки път; ROADS — подредени (най-близките първи)
+function* romeBlocks(G, P, style, ROADS = P.roads, ROOFS = null) {   // ROOFS — покривите на града (tokyo-look / dubai-look / sg-look): [{ col, flat }] по вида   // генератор: yield след всеки път; ROADS — подредени (най-близките първи)
   const rg = new Map(), gc = 12, key = (x, z) => Math.floor(x / gc) * 100003 + Math.floor(z / gc);   // числови ключове (низовете бяха половината време)
   P.roads.forEach(rd => rd.pts.forEach(p => { const k = key(p[0], p[1]); (rg.get(k) || rg.set(k, []).get(k)).push([p[0], p[1], rd.w / 2 + rd.walk + 0.8, rd.id]); }));
   const nearRoad = (x, z, own) => { const i = Math.floor(x / gc), j = Math.floor(z / gc); for (let a = i - 2; a <= i + 2; a++) for (let b = j - 2; b <= j + 2; b++) for (const [px, pz, r, id] of rg.get(a * 100003 + b) || []) if (id !== own && Math.hypot(px - x, pz - z) < r) return true; return false; };
@@ -920,7 +924,7 @@ function* romeBlocks(G, P, style, ROADS = P.roads) {   // генератор: yi
   const romeOuter = (x, z) => { const L = lotAt(x, z); return !!L && (L.tier || 1) >= 3; };
   const list = [], m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
   const IST = style === 'istanbul', PAR = style === 'paris', LON = style === 'london', NY = style === 'newyork', MOS = style === 'moscow', WAS = style === 'washington', LV = style === 'lasvegas', DEP0 = IST ? 12 : 15, STEP = IST ? 10 : PAR ? 13 : LON ? 11 : NY ? 17 : 14, used = new Set(); MIN2 = (0.72 * Math.min(STEP, IST ? 8 : DEP0)) ** 2;
-  const BG = style === 'bg', VAR = (PAR || IST || (WAS && feature('was-fed'))) && feature('bg-variety'), XK = VAR || BG;   /* was-fed (55): и Вашингтон — федералният варовик */
+  const BG = style === 'bg', VAR = (PAR || IST || (WAS && feature('was-fed')) || (MOS && feature('dc-msk-fac'))) && feature('bg-variety'),   /* T2 dc-msk-fac: и Москва */ XK = VAR || BG;   /* was-fed (55): и Вашингтон — федералният варовик */
   // was-fed (55): във Вашингтон парцелите са тесни (12 м), а сградите — до 19 м: всяка сграда — в своя парцел (по осите му, 0,6 м от ръбовете, лицето към улицата),
   // по една на парцел и без застъпване с вече сложените (правоъгълниците, не само центровете); wasFit → { x, z, w — по улицата, d, ax, az — посоката на улицата } или null
   const WF = WAS && feature('was-fed'), WU = new Set(), RG = new Map(), rgk = (x, z) => Math.floor(x / 30) * 100003 + Math.floor(z / 30);
@@ -940,33 +944,53 @@ function* romeBlocks(G, P, style, ROADS = P.roads) {   // генератор: yi
         const h = ((rd.id * 7919 + Math.round(s) * 31 + (sg > 0 ? 17 : 0)) >>> 0) % 1000 / 1000, h2 = ((rd.id * 104729 + Math.round(s) * 13 + (sg > 0 ? 5 : 0)) >>> 0) % 1000 / 1000;
         // Истанбул: османски дървени къщи с еркери (историческият полуостров, Галата — европейският бряг) и бели жилищни блокове
         let ty = WAS ? (h2 < 0.3 ? 4 : 2) /* Вашингтон: федерални сгради от светъл камък (ограничението за височина — ниски) и тухлени къщи */ : LV ? 2 /* Лас Вегас: ниски бежови сгради с плосък покрив зад казината */ : MOS ? (h2 < 0.2 ? 4 : 6) : NY ? (h2 < 0.3 ? 5 : 2) : LON ? (x > 150 && h2 < 0.5 ? 2 : 4) /* Лондон: тухлени къщи; в Сити (на изток) — половината офиси */ : PAR ? 3 : !IST ? 0 : (x < 250 && h2 < 0.55) ? 1 : 2, H = ty === 1 ? 8 + h * 4 : ty === 6 ? 15 + h * 9 : ty === 5 ? (42 + h * h * 58) * 0.85 /* потребителят: сините кули −15 %; */ /* Ню Йорк: кулите 42–100 м — Емпайър Стейт (171 м в играта) стърчи като на снимките */ : ty === 4 && MOS ? 14 + h * 6 : ty === 2 ? (NY ? 18 + h * 24 : LON ? 22 + h * 16 : WAS ? 15 + h * 9 : LV ? 8 + h * 10 : 15 + h * 8) : ty === 4 ? 12 + h * 5 : ty === 3 ? 18 + h * 4 : (romeOuter(x, z) ? 15 + h * 9 : 13 + h * 7) /* Рим: центърът 13–20 м (4–6 ет.), външните рионе 15–24 м (до 7) */, col = ty === 1 ? OTTO[Math.floor(h * OTTO.length)] : ty === 6 ? MOSC[Math.floor(h * MOSC.length)] : ty === 4 && MOS ? MOSB[Math.floor(h * MOSB.length)] : ty === 5 ? GLASS[Math.floor(h * GLASS.length)] : ty === 2 ? (NY ? NYST : LON || WAS ? CITY : APT)[Math.floor(h * (NY ? NYST : LON || WAS ? CITY : APT).length)] : ty === 4 ? BRICK[Math.floor(h * BRICK.length)] : ty === 3 ? HAUSS[Math.floor(h * HAUSS.length)] : ROMA[Math.floor(h * ROMA.length)];   // Париж: османовите сгради — еднаква височина (~6 етажа)
-        let rc = null, ex = null; if (VAR) ({ t: ty, H, col, rc, ex } = varPick(style, h, h2, ty));   // bg-variety: вид, етажи, цвят, покрив (bgblocks.js)
+        let rc = null, ex = null; if (VAR) ({ t: ty, H, col, rc, ex } = varPick(style, h, h2, MOS ? (romeOuter(x, z) ? 9 : 0) : ty));   /* dc-msk-fac: Москва — външните райони (tier ≥ 3) панелни */   // bg-variety: вид, етажи, цвят, покрив (bgblocks.js)
         q.setFromAxisAngle(up, Math.atan2(fx, fz));
         list.push({ x, z, w: bw, d: bd, h: H, rot: Math.atan2(fz * sg, -fx * sg), t: ty, col, rc, ex, M: m.compose(new THREE.Vector3(x, H / 2, z), q, new THREE.Vector3(ty === 5 ? bd * 0.8 : bd, H, ty === 5 ? bw * 0.78 : bw + (WF ? 0 : 0.3))).clone(), lot: lotAt(x, z) }); break; } } }   // небостъргачите — по-тесни от стъпката: улички между кулите, не слепени
   if (BG) yield* bgPlace(P, list);   // bg-fill: по парцелите и във вътрешността на кварталите
   // по вид: фасада (текстура) + покрив (римски — на две води; османски — нисък, тъмна керемида; блоковете — плосък)
   const FM = [facadeMat(), ottoMat(), aptMat(), haussMat(), brickMat(), glassMat(), haussMat()], RF = [[roofGeo(), 0xa8553a, 0.3], [roofGeo(), 0x8d4a34, 0.22], [new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), 0xb9b6ae, 0], [mansardGeo(), 0x5e6872, 0.35], [roofGeo(), 0x4f555c, 0.16], [new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), 0x5d646b, 0], [roofGeo(), 0x5f7a66, 0.14]];   // Москва: нисък покрив от боядисана ламарина (зелено-сив)
+  if (ROOFS) ROOFS.forEach((r, i) => { if (r && RF[i]) RF[i] = [r.flat ? new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0) : RF[i][0], r.col ?? RF[i][1], r.flat ? 0 : RF[i][2]]; });   // T2: tokyo-look / dubai-look / sg-look
   const parts = XK ? xParts(G, list, FM, RF) /* само видовете, които ги има */ : [0, 1, 2, 3, 4, 5, 6].map(t => { const n = Math.max(1, list.filter(b => b.t === t).length), box = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), FM[t], n), roof = new THREE.InstancedMesh(RF[t][0], new THREE.MeshStandardMaterial({ color: RF[t][1], roughness: 0.85, side: THREE.DoubleSide }), n);
     box.frustumCulled = roof.frustumCulled = false; box.receiveShadow = box.castShadow = true; box.count = roof.count = 0; roof.userData.roof = 1; G.add(box, roof); return { box, roof }; });   /* snow-roofs: userData.roof */
   const V = new THREE.Vector3(), Q = new THREE.Quaternion(), Sc = new THREE.Vector3(), C = new THREE.Color();
   let hidden = null, fl = () => true, fa = null;
+  // 🎰 lv-neon (T1): Лас Вегас нощем — неон по фоновите сгради: светещ контур по ръба на покрива, вертикална неонова лента на ъгъла
+  // и светещ надпис-лента на фасадата (~2/3 от сградите), пет неонови цвята; денем — тъмни тънки ленти. Една InstancedMesh на цвят.
+  const NE = LV && feature('lv-neon') ? (() => {
+    const COLS = [0xff2bd6, 0x22e6ff, 0xffc21a, 0x8a3dff, 0x3dff7a], geo = new THREE.BoxGeometry(1, 1, 1), per = 8;
+    const ims = COLS.map(c => { const m = new THREE.MeshStandardMaterial({ color: 0x15151a, roughness: 0.5, emissive: c, emissiveIntensity: 0, toneMapped: false }); m.userData.winK = 2.4; m.userData.flood = 1; WIN_MATS.push(m);
+      const im = new THREE.InstancedMesh(geo, m, Math.max(1, list.length * per)); im.count = 0; im.frustumCulled = false; G.add(im); return im; });
+    const L4 = new THREE.Matrix4(), O = new THREE.Matrix4(), P3 = new THREE.Vector3(), S3 = new THREE.Vector3(), Q0 = new THREE.Quaternion();
+    return () => { const n = COLS.map(() => 0);
+      for (const b of list) { if ((b.lot && !fl(b.lot)) || (hidden && hidden.has(b)) || (fa && !fa(b))) continue;
+        const hh = ((Math.round(b.x * 7) * 73856093) ^ (Math.round(b.z * 7) * 19349663)) >>> 0; if (hh % 3 === 0) continue;
+        const ci = (hh >>> 3) % COLS.length, im = ims[ci], H = b.h, sx = b.M.elements, X = Math.hypot(sx[0], sx[1], sx[2]), Z = Math.hypot(sx[8], sx[9], sx[10]), t = 0.5;
+        const put = (px, py, pz, kx, ky, kz) => { L4.compose(P3.set(px, py, pz), Q0, S3.set(kx, ky, kz)); im.setMatrixAt(n[ci]++, O.multiplyMatrices(b.M, L4)); };
+        for (const sz of [-0.5, 0.5]) put(0, 0.5, sz, 1 + t / X, t / H, t / Z);   // контурът на покрива
+        for (const sx2 of [-0.5, 0.5]) put(sx2, 0.5, 0, t / X, t / H, 1 + t / Z);
+        if (hh % 5 < 3) for (const cz of [-0.5, 0.5]) put(0.5, 0, cz, 0.6 / X, 0.94, 0.6 / Z);   // вертикалните ленти на ъглите
+        if (hh % 7 < 4 && H > 6) for (const fx2 of [-1, 1]) put(fx2 * (0.5 + 0.08 / X), 0.5 - 2.6 / H, 0, 0.16 / X, 2.2 / H, 0.75);   // надписът под покрива — на двете дълги фасади (локално ±x е към улицата и отзад)
+      }
+      ims.forEach((im, i) => { im.count = n[i]; im.instanceMatrix.needsUpdate = true; }); };
+  })() : null;
   const XS = {}, draw = XK ? () => xDraw(G, list, parts, b => (b.lot && !fl(b.lot)) || !!(fa && !fa(b)) || (hidden && hidden.has(b)), XS) : () => { const n = [0, 0, 0, 0, 0, 0, 0];
     for (const b of list) { if ((b.lot && !fl(b.lot)) || (hidden && hidden.has(b)) || (fa && !fa(b))) continue; const t = b.t || 0, { box, roof } = parts[t], i = n[t]++;   /* fa — и тук (bg-room: OSM градовете без bg-variety) */
       box.setMatrixAt(i, b.M); box.setColorAt(i, C.setHex(b.col)); b.M.decompose(V, Q, Sc);
       roof.setMatrixAt(i, m.compose(V.set(V.x, V.y + Sc.y / 2, V.z), Q, t === 2 || t === 5 ? Sc.set(Sc.x * (t === 5 ? 0.8 : 1.02), t === 5 ? 3 : 0.6, Sc.z * (t === 5 ? 0.8 : 1.02)) : Sc.set(Sc.x, Math.min(4, Sc.x * RF[t][2]), Sc.z))); }
     parts.forEach(({ box, roof }, t) => { box.count = roof.count = n[t]; box.instanceMatrix.needsUpdate = roof.instanceMatrix.needsUpdate = true; if (box.instanceColor) box.instanceColor.needsUpdate = true; }); };
-  return { list, fill(f, at) { fl = f; fa = at || null; draw(); }, hide(set) { hidden = set; draw(); }, shown: b => !((b.lot && !fl(b.lot)) || (fa && !fa(b))) };   // shown — rome-bld: дали фасадата е там (без скритите)
+  return { list, fill(f, at) { fl = f; fa = at || null; draw(); if (NE) NE(); }, hide(set) { hidden = set; draw(); if (NE) NE(); }, shown: b => !((b.lot && !fl(b.lot)) || (fa && !fa(b))) };   // shown — rome-bld: дали фасадата е там (без скритите)
 }
 // ---- свободните парцели: петно трева с пръст (по целия парцел), ниска дървена ограда отзад и отстрани, табела „ПРОДАВА СЕ“ отпред
 // (лицето на парцела е локално +z — към улицата). Инстанции; set(fn) — кои парцели са свободни; near(on) — оградите/табелите само отблизо.
 function freePlots(G, P) {
   const lots = P.lots.filter(L => !L.big && !L.lm), N = Math.max(1, lots.length);
-  const cv = document.createElement('canvas'); cv.width = cv.height = 128; const g = cv.getContext('2d'); g.fillStyle = '#7d9a55'; g.fillRect(0, 0, 128, 128);
+  const cv = document.createElement('canvas'); cv.width = cv.height = 128; const g = cv.getContext('2d', FCPU); g.fillStyle = '#7d9a55'; g.fillRect(0, 0, 128, 128);
   for (let i = 0; i < 260; i++) { const x = Math.random() * 128, y = Math.random() * 128, r = 2 + Math.random() * 7; g.fillStyle = Math.random() < 0.35 ? 'rgba(122,98,66,0.55)' : `rgba(${90 + Math.random() * 40 | 0},${120 + Math.random() * 40 | 0},${60 + Math.random() * 20 | 0},0.5)`; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
   const gt = new THREE.CanvasTexture(cv); gt.colorSpace = THREE.SRGBColorSpace; gt.wrapS = gt.wrapT = THREE.RepeatWrapping;
   const patch = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: gt, roughness: 1, polygonOffset: true, polygonOffsetFactor: -1 }), N);
   const fence = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), M(0x8a7458), N * 3);
-  const sc = document.createElement('canvas'); sc.width = 128; sc.height = 64; const s2 = sc.getContext('2d'); s2.fillStyle = '#f4f1ea'; s2.fillRect(0, 0, 128, 64); s2.fillStyle = '#c62828'; s2.fillRect(0, 0, 128, 18); s2.fillStyle = '#fff'; s2.font = 'bold 14px system-ui'; s2.textAlign = 'center'; s2.fillText(tr('ПРОДАВА СЕ'), 64, 14);
+  const sc = document.createElement('canvas'); sc.width = 128; sc.height = 64; const s2 = sc.getContext('2d', FCPU); s2.fillStyle = '#f4f1ea'; s2.fillRect(0, 0, 128, 64); s2.fillStyle = '#c62828'; s2.fillRect(0, 0, 128, 18); s2.fillStyle = '#fff'; s2.font = 'bold 14px system-ui'; s2.textAlign = 'center'; s2.fillText(tr('ПРОДАВА СЕ'), 64, 14);
   s2.fillStyle = '#2b2b2b'; s2.font = 'bold 20px system-ui'; s2.fillText(tr('ПАРЦЕЛ'), 64, 44); s2.strokeStyle = '#c62828'; s2.lineWidth = 3; s2.strokeRect(1.5, 1.5, 125, 61);
   const st = new THREE.CanvasTexture(sc); st.colorSpace = THREE.SRGBColorSpace;
   const board = new THREE.InstancedMesh(new THREE.PlaneGeometry(1.6, 0.8), new THREE.MeshStandardMaterial({ map: st, roughness: 0.8, side: THREE.DoubleSide }), N), post = new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, 1.9, 0.1).translate(0, 0.95, 0), M(0x5a5048), N);

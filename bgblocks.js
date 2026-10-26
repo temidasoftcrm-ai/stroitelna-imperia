@@ -6,9 +6,12 @@
 // Прозорците нощем светят както досега (nightWin — emissiveMap от тъмните петна на платното).
 import * as THREE from 'three';
 import { nightWin, tileByScale } from './cityplan2-3d.js';
+import { feature } from './lab/feature.js';
+const DCMSK = feature('dc-msk-fac');   // T2: Вашингтон (Боз-ар с пиластри) и Москва (сталински, модерн, панелни)
+const FCPU2 = { willReadFrequently: true };   // fac-cpu: платната — в паметта на процесора (виж cityplan2-3d.js)
 
 const PX = 16;   // пиксела на метър в платната на фасадите
-function paint(wm, hm, draw) { const c = document.createElement('canvas'); c.width = Math.round(wm * PX); c.height = Math.round(hm * PX); const g = c.getContext('2d'); g.scale(PX, PX); draw(g, wm, hm); return c; }
+function paint(wm, hm, draw) { const c = document.createElement('canvas'); c.width = Math.round(wm * PX); c.height = Math.round(hm * PX); const g = c.getContext('2d', FCPU2); g.scale(PX, PX); draw(g, wm, hm); return c; }
 // фасада: платното е pw м широко (повтаря се по ширината на сградата); ph — височината на повторението (0 — цялата фасада, етажите са нарисувани)
 function fmat(c, pw, ph, o = {}) { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
   return tileByScale(nightWin(new THREE.MeshStandardMaterial({ map: t, roughness: o.r || 0.9 }), c, { seed: o.seed || 31, rep: 1, thr: o.thr || 70, lit: o.lit || 0.25 }), pw, ph); }
@@ -95,6 +98,35 @@ function rowC() { const W = 6, H = 11; return paint(W, H, g => { g.fillStyle = '
   g.fillStyle = '#f2ede4'; g.fillRect(0, 0, W, 0.75); g.fillStyle = 'rgba(60,50,40,0.45)'; g.fillRect(0, 0.65, W, 0.1);   // корнизът
   for (let f = 0; f < 3; f++) { const y = 1.4 + f * 3.1; for (const cx of f === 2 ? [1.3, 4.6] : [1.3, 3, 4.7]) { if (f === 2 && cx === 1.3) continue; win(g, cx - 0.5, y, 1, 1.9, '#f7f4ee'); g.fillStyle = '#efe8dc'; g.fillRect(cx - 0.6, y - 0.22, 1.2, 0.18); } }
   g.fillStyle = '#efe8dc'; g.fillRect(0.6, H - 3.3, 1.5, 0.2); g.fillStyle = '#3a2e28'; g.fillRect(0.75, H - 3.1, 1.2, 2.5); g.fillStyle = '#d9d2c4'; g.fillRect(0.4, H - 0.6, 1.9, 0.6); win(g, 2.6, H - 2.9, 3, 1.7, '#f7f4ee'); }); }   // входът, стълбите, витрина/прозорец
+// ---- dc-msk-fac (T2, дизайнерът: „Вашингтон и Москва — море от еднакви кутии“) ----
+// Вашингтон: Боз-ар — гигантски ред пиластри (през 3 етажа) между осите, капители, тежък корниз с балюстрада; база — рустика; варовик (тонът — по инстанцията)
+function fedPilC(n, bay) { const W = 4 * bay, G0 = 4.4, FH = 3.4, TOP = 1.8, H = TOP + n * FH + G0;
+  return [paint(W, H, g => { g.fillStyle = '#f4efe4'; g.fillRect(0, 0, W, H); g.fillStyle = 'rgba(140,125,100,0.12)'; for (let y = TOP; y < H - G0; y += 0.6) g.fillRect(0, y, W, 0.03);
+    g.fillStyle = '#e9e2d3'; g.fillRect(0, 0, W, TOP); g.fillStyle = 'rgba(80,70,55,0.5)'; g.fillRect(0, TOP - 0.2, W, 0.2); for (let x = 0.15; x < W; x += 0.45) { g.fillStyle = 'rgba(80,70,55,0.35)'; g.fillRect(x, 0.25, 0.12, 0.9); }   // корнизът и балюстрадата
+    for (let k = 0; k <= 4; k++) { const x = k * bay; g.fillStyle = '#fbf8f1'; g.fillRect(x - 0.32, TOP, 0.64, n * FH); g.fillStyle = 'rgba(90,80,65,0.28)'; g.fillRect(x + 0.26, TOP, 0.06, n * FH); g.fillStyle = '#e4dccb'; g.fillRect(x - 0.48, TOP, 0.96, 0.45); }   // пиластрите с капители
+    for (let f = 1; f <= n; f++) { const yb = TOP + (n - f + 1) * FH; for (let k = 0; k < 4; k++) { const cx = (k + 0.5) * bay, ww = Math.min(1.3, bay * 0.42), wh = f === n ? 1.6 : 2.2, wy = yb - 0.7 - wh; win(g, cx - ww / 2, wy, ww, wh, '#fbfaf6'); g.fillStyle = 'rgba(95,85,70,0.35)'; g.fillRect(cx - ww / 2 - 0.15, wy + wh + 0.05, ww + 0.3, 0.1); } }
+    g.fillStyle = 'rgba(90,80,65,0.35)'; g.fillRect(0, H - G0 - 0.25, W, 0.25); g.fillStyle = '#e6dfd0'; g.fillRect(0, H - G0, W, G0); g.fillStyle = 'rgba(110,95,75,0.3)'; for (let y = H - G0 + 0.55; y < H; y += 0.55) g.fillRect(0, y, W, 0.06);
+    for (let k = 0; k < 4; k++) { const cx = (k + 0.5) * bay; g.fillStyle = '#2f2a26'; g.fillRect(cx - 0.7, H - 3.4, 1.4, 3.4); g.beginPath(); g.arc(cx, H - 3.4, 0.7, Math.PI, 0); g.fill(); } }), W, H];
+}
+// Москва: сталинска сграда — рустиран партер на 2 етажа, пиластри през етажите, пояси, тежък корниз; охра/кремаво (по инстанцията)
+function stalC(n, bay) { const W = 4 * bay, G0 = 7, FH = 3.2, TOP = 2.0, H = TOP + n * FH + G0;
+  return [paint(W, H, g => { g.fillStyle = '#f2e6cc'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#e8d9b8'; g.fillRect(0, 0, W, TOP); g.fillStyle = 'rgba(90,70,40,0.55)'; g.fillRect(0, TOP - 0.3, W, 0.3); g.fillStyle = 'rgba(90,70,40,0.3)'; for (let x = 0.1; x < W; x += 0.35) g.fillRect(x, TOP - 0.62, 0.16, 0.22);   // корнизът с модилиони
+    for (let k = 0; k <= 4; k++) { const x = k * bay; g.fillStyle = '#f8f0dc'; g.fillRect(x - 0.3, TOP, 0.6, n * FH); g.fillStyle = 'rgba(100,80,50,0.25)'; g.fillRect(x + 0.24, TOP, 0.06, n * FH); }
+    for (let f = 1; f <= n; f++) { const yb = TOP + (n - f + 1) * FH; if (f % 3 === 0) { g.fillStyle = 'rgba(100,80,50,0.3)'; g.fillRect(0, yb - 0.12, W, 0.12); }
+      for (let k = 0; k < 4; k++) { const cx = (k + 0.5) * bay, ww = Math.min(1.25, bay * 0.4), wh = 1.85, wy = yb - 0.65 - wh; win(g, cx - ww / 2, wy, ww, wh, '#fbf6ea'); g.fillStyle = '#efe2c4'; g.fillRect(cx - ww / 2 - 0.15, wy - 0.3, ww + 0.3, 0.22); if (f === n - 1 && k % 3 === 0) rail(g, cx - ww / 2 - 0.2, wy + wh - 0.6, ww + 0.4, 0.55, '#d8c9a8', 0.18); } }
+    g.fillStyle = '#d9c7a2'; g.fillRect(0, H - G0, W, G0); g.fillStyle = 'rgba(100,80,50,0.32)'; for (let y = H - G0 + 0.6; y < H; y += 0.6) g.fillRect(0, y, W, 0.07); g.fillRect(0, H - G0, W, 0.3);
+    for (let k = 0; k < 4; k++) { const cx = (k + 0.5) * bay; g.fillStyle = '#2a2622'; g.fillRect(cx - bay * 0.34, H - 3.6, bay * 0.68, 3.6); win(g, cx - 0.7, H - G0 + 0.8, 1.4, 1.6, '#f3e8cf'); } }), W, H];
+}
+// Москва: модерн (началото на XX век) — едри прозорци с дъги, мозаечен фриз под корниза, еркер с извит фронтон в средата
+function mskModC(n) { const W = 12, G0 = 4.5, FH = 3.4, TOP = 2.2, H = TOP + n * FH + G0;
+  return [paint(W, H, g => { g.fillStyle = '#f0ece2'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#4f7f73'; g.fillRect(0, TOP - 1.0, W, 0.8); g.fillStyle = '#e8c86a'; for (let x = 0.3; x < W; x += 0.9) { g.beginPath(); g.arc(x, TOP - 0.6, 0.22, 0, Math.PI * 2); g.fill(); }   // мозаечният фриз
+    g.fillStyle = '#e4ddcc'; g.beginPath(); g.moveTo(3.6, TOP); g.quadraticCurveTo(6, -0.6, 8.4, TOP); g.fill(); g.fillStyle = 'rgba(80,70,55,0.4)'; g.fillRect(0, TOP - 0.15, W, 0.15);
+    g.fillStyle = 'rgba(0,0,0,0.08)'; g.fillRect(3.8, TOP, 4.4, n * FH);   // еркерът
+    for (let f = 1; f <= n; f++) { const yb = TOP + (n - f + 1) * FH; for (const cx of [1.6, 6, 10.4]) { const ww = cx === 6 ? 2.6 : 1.5, wh = 2.2, wy = yb - 0.6 - wh; win(g, cx - ww / 2, wy, ww, wh, '#f7f3ea'); g.fillStyle = '#f7f3ea'; g.beginPath(); g.arc(cx, wy, ww / 2, Math.PI, 0); g.fill(); g.fillStyle = GLASS; g.beginPath(); g.arc(cx, wy + 0.02, ww / 2 - 0.1, Math.PI, 0); g.fill(); } }
+    g.fillStyle = '#d6cdb8'; g.fillRect(0, H - G0, W, G0); for (const cx of [2, 6, 10]) { g.fillStyle = '#2a2b2e'; g.fillRect(cx - 1.4, H - 3.8, 2.8, 3.8); } }), W, H];
+}
 // ---- покриви с UV (u — по дължината на сградата/било, v — нагоре по ската): мансарда (стръмни скатове и плосък връх) и на две води
 function roofUV(V, F) { const pos = [], uv = []; for (const [ids, side] of F) { const tri = ids.length === 4 ? [ids[0], ids[1], ids[2], ids[0], ids[2], ids[3]] : ids;
   for (const i of tri) { const p = V[i]; pos.push(...p); uv.push(side ? p[2] + 0.5 : 0.02, side ? p[1] : 0.5); } }   // челата и върхът — едно петно гладка ламарина (между шевовете, над улука)
@@ -130,6 +162,10 @@ const KD = [
   ['FED4', () => fmat(fedC(4, 3.2)[0], 9.6, 0, { seed: 101 }), 'flat', 0, { H: 1.4 + 4 * 3.3 + 4.2 }],   // was-fed: Вашингтон
   ['FED6', () => fmat(fedC(6, 3)[0], 9, 0, { seed: 103 }), 'flat', 0, { H: 1.4 + 6 * 3.3 + 4.2 }],
   ['ROW', () => fmat(rowC(), 6, 0, { seed: 107, thr: 60 }), 'flat', 0, { H: 11 }],
+  ['FEDP', () => fmat(fedPilC(5, 3.2)[0], 12.8, 0, { seed: 109 }), 'flat', 0, { H: 1.8 + 5 * 3.4 + 4.4 }],   // dc-msk-fac: Вашингтон — Боз-ар с пиластри (~23 м)
+  ['STAL8', () => fmat(stalC(8, 3.2)[0], 12.8, 0, { seed: 113 }), 'flat', 0, { H: 2 + 8 * 3.2 + 7 }],   // dc-msk-fac: Москва — сталинска (~35 м)
+  ['STAL11', () => fmat(stalC(11, 3)[0], 12, 0, { seed: 127 }), 'flat', 0, { H: 2 + 11 * 3.2 + 7, ex: 'tower' }],   // по-високата — с кулички по ъглите
+  ['MSKMOD', () => fmat(mskModC(5)[0], 12, 0, { seed: 131 }), 'flat', 0, { H: 2.2 + 5 * 3.4 + 4.5 }],   // dc-msk-fac: Москва — модерн в центъра
 ];
 const KM = { _b: null, balc() { return this._b || (this._b = fmat(balcC(), 9, 3, { seed: 97 })); } };   // APF/APP/APW — една и съща фасада, различни покриви
 export const K = Object.fromEntries(KD.map((k, i) => [k[0], 7 + i]));
@@ -140,11 +176,20 @@ const pick = (a, u) => a[Math.min(a.length - 1, Math.floor(u * a.length))];
 const STONE = [0xf6ecd8, 0xeee0c4, 0xe8d6b2, 0xddd8ce, 0xf2e6d0, 0xe2cca8, 0xd6d0c4];   // варовик: кремав, охра, сив
 const FAUBC = [0xeed2a8, 0xe0bc94, 0xeadcc4, 0xd2cabc, 0xe6c4a4, 0xf0e2c8];
 const ZINC = [0x9aa6b2, 0x86929e, 0x737e88, 0xa8b0b8, 0x66707a], TILE = [0xc0603c, 0xa8553a, 0xb86e48, 0x9a4a32], FLAT = [0xc8c4bc, 0xb4b0a8, 0xd2cec6];
+// T2 tokyo-look / dubai-look / sg-look: цветът на „керемидите“ според града (Япония — тъмносиви, Заливът и Сингапур — светли); null — червените
+const TILE0 = [...TILE];
+export function setBgRoofs(cols) { TILE.length = 0; TILE.push(...(cols || TILE0)); }
 const OTTOC = [0xd9a066, 0xe8c6a0, 0xc97d5d, 0xa9c4cf, 0xb7c9a0, 0xe2d6c0, 0x9a6a4a, 0xd4a9a9, 0xe8d8a0];
 const PAST = [0xf4d8c4, 0xf2e2b0, 0xd6e2ea, 0xecd0d6, 0xf6f2ea, 0xdce8d0, 0xf0d0a8, 0xe8e0d4];
 export function varPick(style, h, h2, ty) { const h3 = (h * 7.31 + h2 * 3.77) % 1, h4 = (h * 13.7 + h2 * 5.3) % 1;
   if (style === 'paris') { const t = h2 < 0.36 ? K.H5 : h2 < 0.64 ? K.H6 : h2 < 0.8 ? K.H7 : h2 < 0.92 ? K.FAUB : K.PMOD, k = kind(t);
     return { t, H: k[4].H || 2.9 * (7 + Math.floor(h * 3)) /* модерните: 7–9 етажа */, col: t === K.FAUB ? pick(FAUBC, h3) : t === K.PMOD ? pick(FLAT, h3) : pick(STONE, h3), rc: t === K.FAUB ? (h4 < 0.5 ? pick(TILE, h3) : pick(ZINC, h3)) : t === K.PMOD ? pick(FLAT, h4) : pick(ZINC, h4) }; }
+  if (style === 'moscow') {   // dc-msk-fac: ty — 9 във външните райони (панелни блокове), иначе сталински / модерн
+    if (ty === 9) { const t = h2 < 0.55 ? K.PAN1 : K.PAN2; return { t, H: 2.8 * (9 + Math.floor(h * 8)), col: pick([0xe8e6e0, 0xdedcd4, 0xd4d8dc, 0xf0dcb0, 0xe6d6c4], h3), rc: pick(FLAT, h4), ex: 'lift' }; }
+    const t = h2 < 0.3 ? K.MSKMOD : h2 < 0.72 ? K.STAL8 : K.STAL11, k = kind(t);
+    return { t, H: k[4].H, col: t === K.MSKMOD ? pick([0xffffff, 0xf4efe6, 0xe8f0ea, 0xf6e8e0], h3) : pick([0xf2d9a2, 0xeccf98, 0xf6e4bc, 0xe8d4b0, 0xf0dcc0, 0xe2c79a], h3), rc: pick(FLAT, h4), ex: k[4].ex || null }; }
+  if (style === 'washington' && DCMSK) { const t = h2 < 0.3 ? K.FED4 : h2 < 0.52 ? K.FED6 : h2 < 0.78 ? K.FEDP : K.ROW;   // dc-msk-fac: и Боз-ар с пиластри; варовикът — бял/кремав/бежов
+    return { t, H: kind(t)[4].H, col: t === K.ROW ? pick([0xffffff, 0xf2e2d8, 0xe6d2c4, 0xf8ece0], h3) : pick([0xffffff, 0xf6f2ea, 0xece2cc, 0xe8dcc2, 0xf2e6cc, 0xdcd2bc], h3), rc: pick(FLAT, h4) }; }
   if (style === 'washington') { const t = h2 < 0.42 ? K.FED4 : h2 < 0.7 ? K.FED6 : K.ROW;   // was-fed: федерален варовик (4 и 6 етажа, ограничението за височина) и тухлени редови къщи
     return { t, H: kind(t)[4].H, col: t === K.ROW ? pick([0xffffff, 0xf2e2d8, 0xe6d2c4, 0xf8ece0], h3) : pick([0xffffff, 0xf6f2ea, 0xece6da, 0xf2eadc, 0xe4e0d8], h3), rc: pick(FLAT, h4) }; }
   if (ty === 1) { const t = h < 0.45 ? K.O2 : K.O3; return { t, H: kind(t)[4].H, col: pick(OTTOC, h3), rc: pick(TILE, h4) }; }   // Истанбул: османските къщи
@@ -165,13 +210,14 @@ export function xParts(G, list, FM, RF) { const n = new Map(); for (const b of l
 }
 // бойлерите (Истанбул: бял цилиндър + тъмен соларен панел) и машинните на асансьорите (панелните блокове) — по един InstancedMesh
 let EXG = null;
-function exGeo() { if (EXG) return EXG; EXG = { tank: new THREE.CylinderGeometry(0.42, 0.42, 1.7, 10).rotateZ(Math.PI / 2).translate(0, 1.0, -0.35), pan: new THREE.BoxGeometry(1.8, 0.06, 1.1).rotateX(-0.6).translate(0, 0.7, 0.35), lift: new THREE.BoxGeometry(3, 2.4, 4.2).translate(0, 1.2, 0) }; return EXG; }
+function exGeo() { if (EXG) return EXG; EXG = { tank: new THREE.CylinderGeometry(0.42, 0.42, 1.7, 10).rotateZ(Math.PI / 2).translate(0, 1.0, -0.35), pan: new THREE.BoxGeometry(1.8, 0.06, 1.1).rotateX(-0.6).translate(0, 0.7, 0.35), lift: new THREE.BoxGeometry(3, 2.4, 4.2).translate(0, 1.2, 0), tower: new THREE.BoxGeometry(3.2, 6, 3.2).translate(0, 3, 0), spire: new THREE.ConeGeometry(1.6, 5, 8).translate(0, 8.5, 0) }; return EXG; }
 export function xDraw(G, list, parts, skip, st) { const m = new THREE.Matrix4(), V = new THREE.Vector3(), Q = new THREE.Quaternion(), Sc = new THREE.Vector3(), C = new THREE.Color(), L = new THREE.Matrix4(), W = new THREE.Matrix4(), cnt = [];
-  const ex = st.ex || (st.ex = (() => { const nT = list.filter(b => b.ex === 'tank').length * 3, nL = list.filter(b => b.ex === 'lift').length * 2; if (!nT && !nL) return {}; const g = exGeo(), o = {};
+  const ex = st.ex || (st.ex = (() => { const nT = list.filter(b => b.ex === 'tank').length * 3, nL = list.filter(b => b.ex === 'lift').length * 2, nW = list.filter(b => b.ex === 'tower').length * 2; if (!nT && !nL && !nW) return {}; const g = exGeo(), o = {};
     if (nT) { o.tank = new THREE.InstancedMesh(g.tank, new THREE.MeshStandardMaterial({ color: 0xf2f2ee, roughness: 0.4, metalness: 0.3 }), nT); o.pan = new THREE.InstancedMesh(g.pan, new THREE.MeshStandardMaterial({ color: 0x1f2a3a, roughness: 0.3, metalness: 0.5 }), nT); }
     if (nL) o.lift = new THREE.InstancedMesh(g.lift, new THREE.MeshStandardMaterial({ color: 0xb8b4ac, roughness: 0.9 }), nL);
+    if (nW) { o.tower = new THREE.InstancedMesh(g.tower, new THREE.MeshStandardMaterial({ color: 0xeedcae, roughness: 0.9 }), nW); o.spire = new THREE.InstancedMesh(g.spire, new THREE.MeshStandardMaterial({ color: 0x8a7a52, roughness: 0.5, metalness: 0.4 }), nW); }   // dc-msk-fac: сталинските кулички
     for (const k in o) { o[k].userData.bgBlk = 1; o[k].frustumCulled = false; o[k].castShadow = true; o[k].count = 0; G.add(o[k]); } return o; })());
-  let nt = 0, nl = 0;
+  let nt = 0, nl = 0, nw = 0;
   for (const b of list) { if (skip(b)) continue; const t = b.t || 0, P = parts[t], i = cnt[t] = (cnt[t] || 0) + 1, j = i - 1;
     P.box.setMatrixAt(j, b.M); P.box.setColorAt(j, C.setHex(b.col)); b.M.decompose(V, Q, Sc);
     const top = V.y + Sc.y / 2; V.y = top;
@@ -179,10 +225,12 @@ export function xDraw(G, list, parts, skip, st) { const m = new THREE.Matrix4(),
     if (t >= 7 || b.rc != null) P.roof.setColorAt(j, C.setHex(b.rc != null ? b.rc : 0xffffff));
     if (b.ex) { b.M.decompose(V, Q, Sc); const d = Sc.x, w = Sc.z, hs = ((b.x * 7.1 + b.z * 3.3) % 1 + 1) % 1; W.compose(V.set(V.x, top + 0.6, V.z), Q, Sc.set(1, 1, 1));
       if (b.ex === 'tank' && ex.tank) for (let k = 0, nk = 1 + Math.floor(hs * 3); k < nk; k++) { L.makeTranslation((hs - 0.5) * d * 0.4 + (k % 2) * 1.6 - 0.8, 0, (k - (nk - 1) / 2) * 2.6); L.premultiply(W); ex.tank.setMatrixAt(nt, L); ex.pan.setMatrixAt(nt++, L); }
+      else if (b.ex === 'tower' && ex.tower) for (const k of [-1, 1]) { L.makeTranslation(0, -0.6, k * (w / 2 - 1.8)); L.premultiply(W); ex.tower.setMatrixAt(nw, L); ex.spire.setMatrixAt(nw++, L); }
       else if (b.ex === 'lift' && ex.lift) for (let k = 0, nk = w > 26 ? 2 : 1; k < nk; k++) { L.makeTranslation(0, 0, nk > 1 ? (k ? 1 : -1) * w * 0.25 : 0); L.premultiply(W); ex.lift.setMatrixAt(nl++, L); } } }
   parts.forEach(P => { if (!P) return; P.box.count = P.roof.count = cnt[P.t] || 0; P.box.instanceMatrix.needsUpdate = P.roof.instanceMatrix.needsUpdate = true; if (P.box.instanceColor) P.box.instanceColor.needsUpdate = true; if (P.roof.instanceColor) P.roof.instanceColor.needsUpdate = true; });
   if (ex.tank) { ex.tank.count = ex.pan.count = nt; ex.tank.instanceMatrix.needsUpdate = ex.pan.instanceMatrix.needsUpdate = true; }
   if (ex.lift) { ex.lift.count = nl; ex.lift.instanceMatrix.needsUpdate = true; }
+  if (ex.tower) { ex.tower.count = ex.spire.count = nw; ex.tower.instanceMatrix.needsUpdate = ex.spire.instanceMatrix.needsUpdate = true; }
 }
 
 // ---- bg-fill: градовете по плана без карта. 1) по свободните парцели (b.lot — играта решава кои: fillLot), 2) вътрешността на кварталите — там,

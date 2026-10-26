@@ -6,6 +6,7 @@
 // point() → случайна точка по улица, focus() → накъде гледа камерата. update(dt движение, rdt истинско време) — в кадъра.
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';
+import { spinWheels } from './wheelspin.js';
 import { kidK } from './scale.js';   // детските коли (резервата) в истинския размер
 import { playSiren, sirenKind } from './vehmodels.js';
 import { flameSprite, flameSize } from './fireflip.js';
@@ -281,7 +282,7 @@ export function createIncidents(ctx) {
       else { c.x += dx / d * st; c.z += dz / d * st; st = 0; const w = Math.atan2(dx, dz); let dy = w - c.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); c.yaw += dy * Math.min(1, dt * 8); }
     }
     if (c.dist != null) c.dist += st0 - st;
-    c.o.position.set(c.x, 0, c.z); c.o.rotation.y = c.yaw;
+    c.o.position.set(c.x, 0, c.z); c.o.rotation.y = c.yaw; spinWheels(c.o);   // fire-titan / fire-cyber (f6): колелата на моделите от Blender (wheel_*; другите коли — без промяна)
   }
   // пътната помощ (incidents2, горяща кола): идва след гасенето, спира пред останките, повдига ги отзад за 3 s и тръгва с тях
   function towStep(rdt, fireOn) {

@@ -27,13 +27,16 @@ let DICT = new Map(), PAT = new Map();   // PAT: префикс (до първи
 if (EN) {
   try { const r = await fetch(new URL('./assets/i18n/en.json', import.meta.url)); if (r.ok) DICT = new Map(Object.entries(await r.json())); } catch (e) { console.warn('i18n', e); }
   for (const [k, v] of DICT) { if (!/\{\w+\}/.test(k)) continue;
-    { const c = k.replace(/\{\w+\}/g, '').replace(/[^А-Яа-яЁё]/g, '').length; if (c > 0 && c < 3) continue; }   // „{0} в {1}“ — кратка кирилица в литерала би хващала всяко „в“; без кирилица („🏠 {0}“, „{0} — {1}“) — безопасно
+    const c = k.replace(/\{\w+\}/g, '').replace(/[^А-Яа-яЁё]/g, '').length, num = c > 0 && c < 3;
+    if (num && (k.match(/\{\w+\}/g) || []).length !== 1) continue;   // „{0} в {1}“ — кратка кирилица в литерала би хващала всяко „в“; без кирилица („🏠 {0}“, „{0} — {1}“) — безопасно; кратка с един {…} („{0} км“, „Д {0}“, „от {0}“) — само за число
     const ids = [], parts = k.split(/\{(\w+)\}/), esc = t => t.replace(/[.*+?^$()|[\]\\{}]/g, '\\$&');
     const lits = parts.map((t, i) => i % 2 ? null : esc(t).replace(/\s+/g, '\\s+')), L = parts.length - 1;
     if (L >= 2 && parts[L] === '') lits[L - 2] = lits[L - 2].replace(/\\s\+$/, '\\s*');   // ключът свършва с {…}: интервалът преди него — по желание (възелът свършва преди линка)
-    if (L >= 2 && parts[0] === '') lits[2] = lits[2].replace(/^\\s\+/, '\\s*');   // започва с {…}: интервалът след него — по желание
+    if (L >= 2 && parts[0] === '' && !/^\s+[А-Яа-яЁёA-Za-z]/.test(parts[2])) lits[2] = lits[2].replace(/^\\s\+/, '\\s*');   // започва с {…}: интервалът след него — по желание (но не пред дума: „{0} дни“ хващаше „Международни“)
     let src = '^';
-    for (let i = 0; i <= L; i++) { if (i % 2) { ids.push(parts[i]); src += '([\\s\\S]*?)'; } else src += lits[i]; }
+    if (num) lits[0] = esc(parts[0]).replace(/\s+/g, '\\s+'), lits[2] = esc(parts[2]).replace(/\s+/g, '\\s+');   // без „по желание“ интервали
+    const q = num && /„\{\w+\}“/.test(k);   // „АМ „{0}“ — в кавички: името, не число
+    for (let i = 0; i <= L; i++) { if (i % 2) { ids.push(parts[i]); src += num && !q ? '([−+~]?\\d[\\d\\s.,]*?)' : '([\\s\\S]*?)'; } else src += lits[i]; }
     const re = new RegExp(src + '$'), pre = k.slice(0, k.search(/\{\w+\}/)).slice(0, 6);
     (PAT.get(pre) || PAT.set(pre, []).get(pre)).push({ re, out: v, ids, w: k.replace(/\{\w+\}/g, '').length }); }
   for (const L of PAT.values()) L.sort((a, b) => b.w - a.w);   // по-специфичните (по-дълъг литерал) — първи
@@ -43,12 +46,18 @@ const miss = new Map();   // непреведените (на EN) — за Ла�
 // стойността в {…}: точно, после без значение от главните букви (СОФИЯ → София → Sofia → SOFIA)
 function trVal(g) { const k = g.trim(); let v = DICT.get(k); if (v !== undefined) return g.replace(k, v);
   if (CYR.test(k) && k === k.toUpperCase() && k !== k.toLowerCase()) { const c = k.toLowerCase().replace(/(^|[\s-])(\S)/g, (m, a, b) => a + b.toUpperCase()); v = DICT.get(c) ?? DICT.get(k[0] + k.slice(1).toLowerCase()); if (v !== undefined) return g.replace(k, v.toUpperCase()); }
+  if (CYR.test(k) && /^[а-яё]/.test(k)) { v = DICT.get(k[0].toUpperCase() + k.slice(1)); if (v !== undefined && !/\{/.test(v)) return g.replace(k, v[0].toLowerCase() + v.slice(1)); }   // „Разпродажба: тухли“ → „Тухли“
+  if (CYR.test(k) && /^[А-ЯЁ][а-яё]/.test(k)) { v = DICT.get(k[0].toLowerCase() + k.slice(1)); if (v !== undefined && !/\{/.test(v)) return g.replace(k, v[0].toUpperCase() + v.slice(1)); }   // „Бонус при подписване…“ → „бонус при…“
+  if (CYR.test(k) && DEPTH < 4) { DEPTH++; try { v = look(k); } finally { DEPTH--; } if (v !== undefined) return g.replace(k, v); }   // стойността — и тя сглобен текст („25 €/т · без връзка …“)
   return g; }
+let DEPTH = 0;
 function look1(s) {
   const d = DICT.get(s); if (d !== undefined) return d;
+  let first;   // първият съвпаднал модел; ако стойностите му останат на кирилица — следващите модели, докато някой преведе всичко
   for (const L of PRE_LENS) { const c = PAT.get(s.slice(0, L)); if (!c) continue;
-    for (const p of c) { const m = p.re.exec(s); if (!m) continue; const val = {}; p.ids.forEach((id, i) => { const g = m[i + 1]; val[id] = trVal(g); }); return p.out.replace(/\{(\w+)\}/g, (x, id) => val[id] ?? x); } }
-  return undefined;
+    for (const p of c) { const m = p.re.exec(s); if (!m) continue; const val = {}; p.ids.forEach((id, i) => { const g = m[i + 1]; val[id] = trVal(g); }); const r = p.out.replace(/\{(\w+)\}/g, (x, id) => val[id] ?? x).trim();   // празен {0} в „{0} {1} …“ — без водещ интервал
+      if (!CYR.test(r)) return r; if (first === undefined) first = r; } }
+  return first;
 }
 // резервно: сглобен текст без свой ключ („{0} 🔒“, „{0} — {1}“, „🚚 Самосвал ✓“, „1. Изкоп“) — по части между разделителите;
 // само ако ВСИЧКИ кирилски части се преведат (иначе остава на български — без смесица)
@@ -61,16 +70,26 @@ function part(x) {
   v = trVal(k); return v !== k && !CYR.test(v) ? x.replace(k, v) : undefined;
 }
 function look(s) {
-  const v = look1(s); if (v !== undefined) return v;
-  const P = s.split(SEP); if (P.length < 2 && !/^[^\p{L}]/u.test(s)) return undefined;
-  const out = []; for (const x of P) { const y = SEP.test(x) && x.trim().length <= 2 ? x : part(x); if (y === undefined) return undefined; out.push(y); }
-  const r = out.join(''); return r !== s ? r : undefined;
+  const v = look1(s); if (v !== undefined && !CYR.test(v)) return v;
+  if (DEPTH < 4) {   // водещите знаци („⬜ 🏦 Твоята банка…“ — и след всеки от тях), после частите между „ · “ и изброяването „, “ (всяка — цял превод, и тя с модели)
+    const sub = x => { DEPTH++; try { return look(x); } finally { DEPTH--; } };
+    const m = /^([^\p{L}\p{N}„"“(«]+)(\S[\s\S]*)$/u.exec(s);
+    if (m) { const cut = [...m[1].matchAll(/\s+/g)].map(x => x.index + x[0].length).filter(i => i < m[1].length);
+      for (const i of [...cut, m[1].length]) { const w = sub(s.slice(i)); if (w !== undefined && !CYR.test(w)) return s.slice(0, i) + w; } }
+    const q = /^([\s\S]*?[^\s\d])(\s+(?:×\s?)?[−+~]?\d[\d.,/]*\s?%?)$/.exec(s);   // число накрая („Багер ×1“, „Кметство и площад 24%“, „Варна 0/5“)
+    if (q && CYR.test(q[1])) { const w = sub(q[1]); if (w !== undefined && !CYR.test(w)) return w + q[2]; }
+    for (const sep of [/(\s+·\s+)/, /(,\s+)/]) { const Q = s.split(sep);
+      if (Q.length > 2) { const r = Q.map((x, i) => { const k = x.trim(); if (i % 2 || !CYR.test(k)) return x; const w = sub(k); return w === undefined ? x : x.replace(k, w); }).join(''); if (!CYR.test(r)) return r; } }
+  }
+  const P = s.split(SEP); if (P.length < 2 && !/^[^\p{L}]/u.test(s)) return v;
+  const out = []; for (const x of P) { const y = SEP.test(x) && x.trim().length <= 2 ? x : part(x); if (y === undefined) return v; out.push(y); }
+  const r = out.join(''); return r !== s ? r : v;
 }
 const CYR = /[А-Яа-яЁё]/;
 export function t(s, p) {
   let r = s;
   if (EN && s && CYR.test(s)) { const v = look(s.trim()); if (v !== undefined) r = s.replace(s.trim(), v); else if (miss.size < 5000) miss.set(s.trim(), (miss.get(s.trim()) || 0) + 1); }
-  if (p != null) r = r.replace(/\{(\w+)\}/g, (m, k) => (Array.isArray(p) ? p[+k] : p[k]) ?? m);
+  if (p != null) r = r.replace(/\{(\w+)\}/g, (m, k) => { const x = (Array.isArray(p) ? p[+k] : p[k]) ?? m; return EN && typeof x === 'string' && CYR.test(x) ? trVal(x) : x; });   // EN: и параметрите („Къща — сем. Джонсън“)
   return r;
 }
 window.__i18n = { look: x => look(x), t: (x, p) => t(x, p), has: x => has(x) };   // тестовете и конзолата
@@ -83,7 +102,7 @@ export const fmtMoney = n => EN ? (n < 0 ? '−€' : '€') + fmtNum(Math.abs(M
 export const fmtDate = (d, o = { day: 'numeric', month: 'short', year: 'numeric' }) => new Intl.DateTimeFormat(LOCALE, o).format(d instanceof Date ? d : new Date(d));
 
 // ── автоматичният превод на страницата (само EN) ──
-const SKIP = new Set(['SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT', 'CODE', 'PRE']), ATTRS = ['title', 'placeholder', 'aria-label'], done = new WeakMap();
+const SKIP = new Set(['SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT', 'CODE', 'PRE']), ATTRS = ['title', 'placeholder', 'aria-label', 'alt'], done = new WeakMap();
 const skipEl = el => { for (let e = el; e; e = e.parentElement) { if (SKIP.has(e.tagName) || e.isContentEditable || (e.dataset && 'noi18n' in e.dataset)) return true; } return false; };
 function trText(n) {
   const s = n.nodeValue; if (!s || !CYR.test(s) || done.get(n) === s) return;

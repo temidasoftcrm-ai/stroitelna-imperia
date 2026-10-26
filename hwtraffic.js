@@ -31,7 +31,8 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
   let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   for (let k = 0; k < (ab ? 64 : 44); k++) {   // потребителят: „повече движение по магистралата“ (беше 44 / 28)
     const truck = k % 3 === 0, bus = !truck && k % 7 === 3 && A['sf-car-Bus'], dir = k % 2 ? 1 : -1;
-    const semis = feature('trucks-real') && A['sf-semi-0'] ? ['sf-semi-0', 'sf-semi-1', ...(A['sf-car-Truck'] ? ['sf-car-Truck'] : [])] : ['sf-car-Truck'];   /* №2: без детските TRUCKS */
+    const semis = feature('trucks-real') && A['sf-semi-0'] ? ['sf-semi-0', 'sf-semi-1', ...(A['sf-car-Truck'] ? ['sf-car-Truck'] : [])] : ['sf-car-Truck'];
+    if (feature('truck-box') && A['sf-car-BoxTruck']) semis.push('sf-car-BoxTruck');   /* truck-box (T1): белият камион-фургон — един от 3–4 тежки */   /* №2: без детските TRUCKS */
     const names = (truck ? semis : bus ? ['sf-car-Bus'] : realCars.length ? [pickCar(rnd())] : []).filter(n => A[n]);   /* №2 (55): само истински коли — без детските CARS */   // модерните ТИР-ове (trucks-real)
     if (!names.length) continue;
     const n = names[(rnd() * names.length) | 0], o = model(n, SCALE[n] || kidK(n, 1.25));
@@ -90,6 +91,7 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
     if (S.d >= L.len) { if (L.stop) { S.wait = L.stop; S.d = L.len; } else if (last && S.exit) return away(c); else if (last) { const md = S.mdir || 1, ghost = { x: L.pts[L.pts.length - 1][0], dir: md, L: c.L, v: 12, lane: RIGHT, z: laneZ(md, RIGHT) }; if (freeLane(ghost, RIGHT, 30, 20)) return done(c); S.d = L.len - 0.01; c.v = 0; } else { S.i++; S.d = 0; } }   /* края на ускорителната лента — включване само в свободно място, иначе чака */
     const L2 = S.legs[Math.min(S.i, S.legs.length - 1)], p = at(L2, Math.min(S.d, L2.len)), q = at(L2, Math.min(S.d + 1.5, L2.len)), q0 = at(L2, Math.max(0, S.d - 1.5));
     c.x = p[0]; c.z = p[1]; c.o.position.set(p[0], L2.ramp ? rampY(zc - p[1]) : y, p[1]); const dx = q[0] - q0[0], dz = q[1] - q0[1]; if (Math.hypot(dx, dz) > 0.05) c.o.rotation.y = Math.atan2(dx, dz) + (L2.rev ? Math.PI : 0);
+    if (SM) pose(c, dt);   // truck-smooth
   }
   const at = (L, s) => { let i = 1; while (i < L.cum.length - 1 && L.cum[i] < s) i++; const a = L.pts[i - 1], b = L.pts[i], t = (s - L.cum[i - 1]) / ((L.cum[i] - L.cum[i - 1]) || 1); return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; };
   function done(c) { const md = c.s.mdir || 1; if (c.s.res) c.s.res.busy = null; c.s = null; c.dir = md; c.lane = RIGHT; c.z = laneZ(md, RIGHT); c.o.rotation.y = md > 0 ? Math.PI / 2 : -Math.PI / 2; c.v = Math.max(c.v, 12); }
@@ -97,6 +99,24 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
   const RP = ramps ? Object.fromEntries(Object.entries(ramps).filter(([k]) => k !== 'xe').map(([k, P]) => [k, legOf(P.map(([vx, vz]) => W(vx, vz)), { slow: 9, ramp: true })])) : null;
   const rampY = vx => { const t = Math.max(0, Math.min(1, (Math.abs(vx) - ramps.xe - 3) / 6)); return y + (0.25 - 0.95) * t * t * (3 - 2 * t); };   // като highways.js rampY: от насипа — до земята
   const rampCx = ramps ? (ramps.nearOff[0][1] - 330) : 0;
+  // 🚛 truck-smooth (T1): наклон по истинския наклон на пътя (височината под предната и задната ос, изгладено), полуремаркето — на шарнира
+  // на седлото (следва го със своята ос, със собствен наклон и завъртане), колелата се въртят; плавно престрояване (странична скорост с ускорение)
+  const SM = feature('truck-smooth'), TQ = new THREE.Vector3();
+  const hAt = (c, wx, wz) => { const L = c.s && c.s.legs[Math.min(c.s.i, c.s.legs.length - 1)]; return L ? (L.ramp ? rampY(zc - wz) : y) : y + (lift ? lift(wx) : 0); };
+  const rigOf = c => { const S = c.o.userData.semi, W = []; c.o.traverse(m => { if (m.userData.wheelR) W.push(m); }); return { T: S ? c.o.getObjectByName('semi-trailer') : null, zf: S ? S.zf : (c.L || 4.5) * 0.32, zr: S ? S.zr : -(c.L || 4.5) * 0.32, zk: S ? S.zk : 0, D: S ? -S.za : 0, W }; };
+  function pose(c, dt) {
+    const o = c.o, R = c.rig || (c.rig = rigOf(c)), h = o.rotation.y, fx = Math.sin(h), fz = Math.cos(h), px = o.position.x, pz = o.position.z, k = Math.min(1, dt * 5);
+    const hf = hAt(c, px + fx * R.zf, pz + fz * R.zf), hr = hAt(c, px + fx * R.zr, pz + fz * R.zr), tp = Math.atan2(hf - hr, R.zf - R.zr);
+    c.pt = c.pt == null ? tp : c.pt + (tp - c.pt) * k; o.rotation.order = 'YXZ'; o.rotation.x = -c.pt; o.position.y = hr - R.zr * Math.sin(c.pt);   // задната ос — на платното
+    for (const w of R.W) w.rotation.x += (c.v || 0) * dt / w.userData.wheelR;
+    if (!R.T) return;
+    const kx = px + fx * R.zk, kz = pz + fz * R.zk;   // седлото; оста на ремаркето го следва (теглене): A = K − посока(K − A)·D
+    if (!c.ta || Math.hypot(kx - c.ta.x, kz - c.ta.z) > R.D * 1.5) c.ta = { x: kx - fx * R.D, z: kz - fz * R.D };
+    TQ.set(kx - c.ta.x, 0, kz - c.ta.z).normalize(); c.ta.x = kx - TQ.x * R.D; c.ta.z = kz - TQ.z * R.D;
+    let rel = Math.atan2(TQ.x, TQ.z) - h; rel = Math.max(-0.9, Math.min(0.9, Math.atan2(Math.sin(rel), Math.cos(rel))));
+    const hk = o.position.y + R.zk * Math.sin(c.pt), ha = hAt(c, c.ta.x, c.ta.z), tq = Math.atan2(hk - ha, R.D); c.tpt = c.tpt == null ? tq : c.tpt + (tq - c.tpt) * k;
+    R.T.rotation.set(-(c.tpt - c.pt), rel, 0, 'YXZ');
+  }
   function away(c) { c.s = null; c.away = 6 + Math.random() * 20; c.o.visible = false; c.v = 0; }
   function comeBack(c) { const near = Math.random() < 0.5, L = near ? RP.nearOn : RP.farOn, p0 = L.pts[0]; if (list.some(q => q.s && Math.hypot(q.x - p0[0], q.z - p0[1]) < 12)) { c.away = 3; return; }
     c.away = 0; c.o.visible = true; c.x = p0[0]; c.z = p0[1]; c.v = 6; c.s = { legs: [L], i: 0, d: 0, wait: 0, mdir: near ? -1 : 1 }; }
@@ -125,7 +145,9 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
       if (ld2) { const lim = Math.max(0, ld2.gap - 0.6); if (ds > lim) { ds = lim; v = Math.min(v, lim / Math.max(dt, 1e-3)); } }   // никога през предната
       c.v = v; c.x += c.dir * ds;
       // напреки: плавно към лентата (~1,8 м/с), леко завъртане по посоката
-      const zt = laneZ(c.dir, c.lane) + (c.rg || 0), dz = Math.sign(zt - c.z) * Math.min(Math.abs(zt - c.z), 1.8 * dt); c.z += dz;
+      const zt = laneZ(c.dir, c.lane) + (c.rg || 0); let dz = Math.sign(zt - c.z) * Math.min(Math.abs(zt - c.z), 1.8 * dt);
+      if (SM) { const want = Math.max(-1.8, Math.min(1.8, (zt - c.z) * 1.4)); c.vz = (c.vz || 0) + Math.max(-1.6 * dt, Math.min(1.6 * dt, want - (c.vz || 0))); dz = c.vz * dt; }   // truck-smooth: странична скорост с ускорение — без рязко тръгване/спиране встрани
+      c.z += dz;
       if (svc && c.dir > 0 && px < svc.z0 - 30 && c.x >= svc.z0 - 30 && c.lane === RIGHT && !c.heavy && Math.random() < 0.45 && list.filter(q => q.s).length < 5) {   // отбива
         const plan = svcPlan(c); if (plan) { c.s = { ...plan, i: 0, d: 0, wait: 0 }; continue; }
       }
@@ -135,11 +157,12 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
       if (c.x > half) c.x -= len; else if (c.x < -half) c.x += len;
       c.o.position.set(c.x, y + (lift ? lift(c.x) : 0), c.z);
       c.o.rotation.y = (c.dir > 0 ? Math.PI / 2 : -Math.PI / 2) - c.dir * Math.atan2(dz / Math.max(dt, 1e-3), Math.max(3, c.v)) ;
+      if (SM) pose(c, dt);   // truck-smooth
     }
     if (!em.length) return;
     if ((emT -= dt) <= 0) { if (!INC || !INC.busy) emSend(); emT = 25 + Math.random() * 45; }   /* по време на инцидент — без минаващи спешни */
     for (const e of em) if (e.on) {
-      e.x += e.dir * e.v * dt; e.o.position.x = e.x; if (lift) e.o.position.y = y + lift(e.x);
+      e.x += e.dir * e.v * dt; e.o.position.x = e.x; if (lift) e.o.position.y = y + lift(e.x); if (SM) pose(e, dt);   /* truck-smooth */
       for (const c of list) if (!c.s && !c.inc && (!INC || INC.ok(c, 1)) && c.dir === e.dir && c.lane === 0 && (c.x - e.x) * e.dir > 0 && (c.x - e.x) * e.dir < 40 && c.cool <= 0 && freeLane(c, 1, 10, 12)) { c.lane = 1; c.cool = 3; }   // колите отпред се отместват вдясно
       if (e.x * e.dir > half + 6) { e.on = false; e.o.visible = false; }
     }

@@ -43,6 +43,11 @@
   #tabs button { font-size:11.5px; padding:12px 1px; letter-spacing:-.01em; min-width:0; }
   #tabs .badge { margin-left:2px; padding:0 4px; font-size:10px; }
   #tabs button.on { color:var(--txt); border-bottom-color:var(--acc); }
+  /* 🌐 EN: по-кратки надписи (data-en) с въздух между табовете — „EquipmentWarehouseProperty“ се сливаха */
+  html[lang="en"] #tabs { gap:2px; }
+  html[lang="en"] #tabs button[data-en] { font-size:0; padding:12px 3px; letter-spacing:0; }
+  html[lang="en"] #tabs button[data-en]::before { content:attr(data-en); font-size:11.5px; }
+  html[lang="en"] body.mob #tabs button[data-en]::before { font-size:11px; }
   #tabs .badge { display:inline-block; min-width:18px; padding:0 5px; border-radius:9px; background:var(--acc); color:#1a1200; font-size:11px; margin-left:4px; }
   #panelBody { flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:10px; }
   .card { background:rgba(255,255,255,.05); border:1px solid var(--line); border-radius:12px; padding:12px; }
@@ -302,7 +307,7 @@
   "./ads.js": "./ads.js?v=070b5666",
   "./africa.js": "./africa.js?v=f669f0b4",
   "./aircity.js": "./aircity.js?v=eaf7c7b8",
-  "./airport.js": "./airport.js?v=b6a38701",
+  "./airport.js": "./airport.js?v=f59b9674",
   "./airways.js": "./airways.js?v=476639c7",
   "./asia.js": "./asia.js?v=cb19211a",
   "./autobahn.js": "./autobahn.js?v=e10c2496",
@@ -310,9 +315,9 @@
   "./awaysum.js": "./awaysum.js?v=fc5883ab",
   "./bank.js": "./bank.js?v=e01db14f",
   "./bankrupt.js": "./bankrupt.js?v=0b4869fe",
-  "./bgblocks.js": "./bgblocks.js?v=2c124aa2",
+  "./bgblocks.js": "./bgblocks.js?v=279bbe24",
   "./bidding.js": "./bidding.js?v=648fcc62",
-  "./bikes.js": "./bikes.js?v=39d4b520",
+  "./bikes.js": "./bikes.js?v=200a909a",
   "./billboards3d.js": "./billboards3d.js?v=b95ad9fa",
   "./birds.js": "./birds.js?v=5bea0648",
   "./blkcut.js": "./blkcut.js?v=b0cc82cf",
@@ -323,22 +328,24 @@
   "./bridges.js": "./bridges.js?v=2c147154",
   "./campaign-ru.js": "./campaign-ru.js?v=83fbf030",
   "./campaign.js": "./campaign.js?v=6ed4bd10",
+  "./canals.js": "./canals.js?v=29e7e52c",
   "./churches.js": "./churches.js?v=cfb514e1",
   "./cinema.js": "./cinema.js?v=3e3c75f4",
   "./citybus.js": "./citybus.js?v=42d4b8fa",
   "./citycull.js": "./citycull.js?v=162140cb",
+  "./cityground.js": "./cityground.js?v=71b64e3b",
   "./citypanel.js": "./citypanel.js?v=9f7dd7f9",
   "./cityplan-osm.js": "./cityplan-osm.js?v=f768f29e",
   "./cityplan.js": "./cityplan.js?v=90754501",
-  "./cityplan2-3d.js": "./cityplan2-3d.js?v=182080b0",
+  "./cityplan2-3d.js": "./cityplan2-3d.js?v=24aecd67",
   "./cityplan2-osm.js": "./cityplan2-osm.js?v=6934b7b8",
-  "./cityplan2.js": "./cityplan2.js?v=c58997d9",
-  "./cityplan2game.js": "./cityplan2game.js?v=90df539b",
-  "./cityplan3d.js": "./cityplan3d.js?v=bcf34e44",
+  "./cityplan2.js": "./cityplan2.js?v=b42e5c5a",
+  "./cityplan2game.js": "./cityplan2game.js?v=cb5a90e6",
+  "./cityplan3d.js": "./cityplan3d.js?v=32728347",
   "./cityplangame.js": "./cityplangame.js?v=c46a186b",
   "./cityplanroute.js": "./cityplanroute.js?v=a0f8c3a0",
   "./civic3d.js": "./civic3d.js?v=d42853d4",
-  "./cloud.js": "./cloud.js?v=f0b7abc8",
+  "./cloud.js": "./cloud.js?v=02c88974",
   "./commute.js": "./commute.js?v=f0af72b1",
   "./config.js": "./config.js?v=894b1ab6",
   "./conquest.js": "./conquest.js?v=9c245ce1",
@@ -361,10 +368,10 @@
   "./errtelem.js": "./errtelem.js?v=d3e1a1c3",
   "./events.js": "./events.js?v=a1fc7ecf",
   "./fireflip.js": "./fireflip.js?v=d7d0932a",
-  "./firesim.js": "./firesim.js?v=4972deb3",
+  "./firesim.js": "./firesim.js?v=ff936314",
   "./flags.js": "./flags.js?v=2ca3dc15",
   "./football.js": "./football.js?v=f685ba80",
-  "./game.js": "./game.js?v=e3911d64",
+  "./game.js": "./game.js?v=46cfdc8c",
   "./geomap.js": "./geomap.js?v=323a6497",
   "./gfxlite.js": "./gfxlite.js?v=4f76df13",
   "./gfxpresets.js": "./gfxpresets.js?v=cf4f186c",
@@ -379,24 +386,24 @@
   "./hub.js": "./hub.js?v=ae9656eb",
   "./hwincidents.js": "./hwincidents.js?v=c6e95621",
   "./hwsigns.js": "./hwsigns.js?v=86a63e6a",
-  "./hwtraffic.js": "./hwtraffic.js?v=a8d39d0c",
+  "./hwtraffic.js": "./hwtraffic.js?v=e8638d01",
   "./hwtrucks.js": "./hwtrucks.js?v=6d8e6abf",
-  "./i18n.js": "./i18n.js?v=2ee6156b",
+  "./i18n.js": "./i18n.js?v=42bea135",
   "./impcivic.js": "./impcivic.js?v=110c343d",
   "./imperial.js": "./imperial.js?v=ae03667c",
   "./impstyle.js": "./impstyle.js?v=18730dd2",
-  "./incidents.js": "./incidents.js?v=fd3af400",
+  "./incidents.js": "./incidents.js?v=7ecfeb5d",
   "./incidents2.js": "./incidents2.js?v=0b45a446",
   "./industry.js": "./industry.js?v=5619ca3d",
   "./intro.js": "./intro.js?v=2f432dac",
   "./junctionpaths.js": "./junctionpaths.js?v=1a817a71",
   "./kremlin2.js": "./kremlin2.js?v=054ea886",
-  "./lab/approved.js": "./lab/approved.js?v=3b69cbea",
+  "./lab/approved.js": "./lab/approved.js?v=4ea41706",
   "./lab/feature.js": "./lab/feature.js?v=9473fa25",
-  "./lab/features.js": "./lab/features.js?v=b8dbdaf1",
-  "./lab/lab.js": "./lab/lab.js?v=6fd51a3e",
+  "./lab/features.js": "./lab/features.js?v=400e7d65",
+  "./lab/lab.js": "./lab/lab.js?v=91e215eb",
   "./lab/viewer.js": "./lab/viewer.js?v=6f5878d9",
-  "./landmarks.js": "./landmarks.js?v=b763efba",
+  "./landmarks.js": "./landmarks.js?v=e9566d6f",
   "./liftmodel.js": "./liftmodel.js?v=c993c5e1",
   "./linkoffers.js": "./linkoffers.js?v=fc0c7d15",
   "./lvshow.js": "./lvshow.js?v=92ec49c8",
@@ -406,6 +413,7 @@
   "./megaorders.js": "./megaorders.js?v=d9ffd8af",
   "./megaworld.js": "./megaworld.js?v=d7f83f35",
   "./memfix.js": "./memfix.js?v=82487f96",
+  "./meshysky.js": "./meshysky.js?v=64f56ebf",
   "./migrate.js": "./migrate.js?v=da552741",
   "./mine3d.js": "./mine3d.js?v=e84b0475",
   "./mines.js": "./mines.js?v=9c8761ad",
@@ -419,7 +427,7 @@
   "./namerica.js": "./namerica.js?v=8d0adef7",
   "./names.js": "./names.js?v=6e08f568",
   "./neom.js": "./neom.js?v=c5cb2313",
-  "./nightfloors.js": "./nightfloors.js?v=e389bb25",
+  "./nightfloors.js": "./nightfloors.js?v=87e5ff39",
   "./notif.js": "./notif.js?v=d4a6fbe0",
   "./oceania.js": "./oceania.js?v=b2557de3",
   "./officestyle.js": "./officestyle.js?v=9de1577f",
@@ -428,7 +436,7 @@
   "./online-api.js": "./online-api.js?v=2e8ec1ca",
   "./online-btn.js": "./online-btn.js?v=9a77fd8b",
   "./online.js": "./online.js?v=e4f7e614",
-  "./online3d.js": "./online3d.js?v=9fe13b61",
+  "./online3d.js": "./online3d.js?v=c6e3c165",
   "./ops.js": "./ops.js?v=b830284a",
   "./ops3d.js": "./ops3d.js?v=5be84fcb",
   "./opsaid.js": "./opsaid.js?v=91fe5cc6",
@@ -459,6 +467,7 @@
   "./resortview.js": "./resortview.js?v=385adabe",
   "./riohill.js": "./riohill.js?v=8ca948bc",
   "./rivals.js": "./rivals.js?v=1bc6e27e",
+  "./rivers.js": "./rivers.js?v=180a7f87",
   "./roadlook.js": "./roadlook.js?v=2b96e288",
   "./roadnet-plan2.js": "./roadnet-plan2.js?v=e50fd0d1",
   "./roadnet.js": "./roadnet.js?v=ca08d9ee",
@@ -472,17 +481,17 @@
   "./samerica.js": "./samerica.js?v=9bf115c2",
   "./saves.js": "./saves.js?v=072efcc3",
   "./scale.js": "./scale.js?v=5844835d",
-  "./scenery.js": "./scenery.js?v=89698a48",
+  "./scenery.js": "./scenery.js?v=451382cd",
   "./schoolbus.js": "./schoolbus.js?v=6d531e9c",
-  "./seaside.js": "./seaside.js?v=a7eeedc5",
+  "./seaside.js": "./seaside.js?v=61ac8d7f",
   "./seaways.js": "./seaways.js?v=d24f58f3",
   "./services.js": "./services.js?v=e8b77ebf",
   "./services3d.js": "./services3d.js?v=164a0bc6",
   "./servicesplace.js": "./servicesplace.js?v=e9090657",
-  "./shipmodels.js": "./shipmodels.js?v=1242dc15",
+  "./shipmodels.js": "./shipmodels.js?v=063a97ca",
   "./silkroad.js": "./silkroad.js?v=b3901de7",
   "./sitelights.js": "./sitelights.js?v=6b841953",
-  "./sitework.js": "./sitework.js?v=1a0150ea",
+  "./sitework.js": "./sitework.js?v=5774d9dd",
   "./skysun.js": "./skysun.js?v=6760d085",
   "./sound.js": "./sound.js?v=226878d7",
   "./stadiums.js": "./stadiums.js?v=acb9f36c",
@@ -492,7 +501,7 @@
   "./statues.js": "./statues.js?v=5747ef9b",
   "./streetreal.js": "./streetreal.js?v=6b74bf77",
   "./subshow.js": "./subshow.js?v=02dcbd49",
-  "./supply.js": "./supply.js?v=25a8a07c",
+  "./supply.js": "./supply.js?v=1d797eea",
   "./tall.js": "./tall.js?v=2fd89737",
   "./tasks.js": "./tasks.js?v=212bbcec",
   "./tender3d.js": "./tender3d.js?v=99754ff4",
@@ -504,16 +513,18 @@
   "./trackpath.js": "./trackpath.js?v=6c27555a",
   "./traffic.js": "./traffic.js?v=17653702",
   "./trainmodels.js": "./trainmodels.js?v=602355b5",
-  "./trucks.js": "./trucks.js?v=c09d9140",
+  "./treesplit.js": "./treesplit.js?v=fdbfc633",
+  "./trucks.js": "./trucks.js?v=d6aa7276",
   "./tutorial.js": "./tutorial.js?v=5528143c",
   "./ukraine.js": "./ukraine.js?v=cdd1018c",
   "./usage.js": "./usage.js?v=9e27bdab",
   "./vanlogo.js": "./vanlogo.js?v=d7b4469c",
   "./vault3d.js": "./vault3d.js?v=8172f333",
-  "./vehmodels.js": "./vehmodels.js?v=a02b91ff",
+  "./vehmodels.js": "./vehmodels.js?v=afa11566",
   "./vernotice.js": "./vernotice.js?v=ca702e83",
   "./water.js": "./water.js?v=4e762cbe",
   "./weather.js": "./weather.js?v=ec69850d",
+  "./wheelspin.js": "./wheelspin.js?v=8a4597b4",
   "./whmats.js": "./whmats.js?v=38064952",
   "./worldevents.js": "./worldevents.js?v=47514ca4",
   "./worldpol.js": "./worldpol.js?v=3c6ff5cf",
@@ -616,12 +627,12 @@
 
 <div id="panel" class="hidden">
   <div id="tabs">
-    <button data-t="offers" class="on">Поръчки</button>
-    <button data-t="projects">Обекти</button>
-    <button data-t="fleet">Техника</button>
-    <button data-t="store">Склад</button>
-    <button data-t="estate">Имоти</button>
-    <button data-t="hq">Офис</button>
+    <button data-t="offers" class="on" data-en="Orders">Поръчки</button>
+    <button data-t="projects" data-en="Sites">Обекти</button>
+    <button data-t="fleet" data-en="Fleet">Техника</button>
+    <button data-t="store" data-en="Stock">Склад</button>
+    <button data-t="estate" data-en="Property">Имоти</button>
+    <button data-t="hq" data-en="Office">Офис</button>
   </div>
   <div id="panelBody"></div>
 </div>
@@ -647,10 +658,10 @@
 <script src="mobile.js?v=7d605a2f"></script>
 <script type="module" src="config.js?v=894b1ab6"></script>
 <script type="module" src="memfix.js?v=82487f96"></script>
-<script type="module" src="game.js?v=e3911d64"></script>
+<script type="module" src="game.js?v=46cfdc8c"></script>
 <script type="module" src="tips.js?v=f58d6ac2"></script>
 <script type="module" src="panelintro.js?v=783edae6"></script>
-<script type="module" src="cloud.js?v=f0b7abc8"></script>
+<script type="module" src="cloud.js?v=02c88974"></script>
 <script type="module" src="online-btn.js?v=9a77fd8b"></script>
 </body>
 </html>

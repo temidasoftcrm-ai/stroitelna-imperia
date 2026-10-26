@@ -4,6 +4,8 @@
 // Записът е в S.supply = { offers: [...], deals: [...] } (общ за фирмата, не за града).
 // deps: S(), econ(), MATERIALS, FACTORIES, cityName(id), rail(a, b) → bool, road(a, b) → bool, ownedCities(),
 //       toast, fmt, save, sound, onRailDelivery(text), isForeign(id), cityOk?(id) — градът е отключен за оферти
+import { t } from './i18n.js';   // 🌐 lang-en: количеството — мярката и материалът поотделно през речника („164 м³ бетон“)
+const qtyTxt = (q, M) => `${q} ${t(M.unit)} ${t(M.nm).toLowerCase()}`;   // на БГ — същото като преди
 const OFFER_DAYS = 6, DEAL_DAYS = 90, MAX_OFFERS = 3;
 // количества за една оферта (в единиците на материала)
 const LOT = { sand: 300, gravel: 300, concrete: 150, bricks: 40, steel: 20, wood: 60, glass: 300, furniture: 30, marble: 250 };
@@ -30,7 +32,7 @@ export function createSupply(deps) {
     const disc = Math.round(rnd(deps.isForeign(f.cityId) ? 0.30 : 0.22, deps.isForeign(f.cityId) ? 0.45 : 0.35) * 100) / 100;
     const value = qty * M.buyPrice, price = Math.round(value * (1 - disc) / 100) * 100;
     st().offers.push({ id: (S.seq = (S.seq || 1) + 1), from: f.cityId, fname: f.nm, mat: f.materialId, qty, value, price, disc, expires: S.day + OFFER_DAYS });
-    deps.toast(`📜 Оферта от ${deps.cityName(f.cityId)}: ${M.ico} ${qty} ${M.unit} ${M.nm.toLowerCase()} с −${Math.round(disc * 100)}%. Виж картата → „Оферти“.`, 'good');
+    deps.toast(`📜 Оферта от ${deps.cityName(f.cityId)}: ${M.ico} ${qtyTxt(qty, M)} с −${Math.round(disc * 100)}%. Виж картата → „Оферти“.`, 'good');
   }
 
   function accept(id) {
@@ -55,7 +57,7 @@ export function createSupply(deps) {
       econ.spend(d.price, 'материали', `Договор: ${M.nm} от ${deps.cityName(d.from)}`);
       econ.s.stock[d.mat] = (econ.s.stock[d.mat] || 0) + d.qty;
       s.deals.splice(s.deals.indexOf(d), 1);
-      const txt = `${l.via === 'rail' ? '🚆' : l.via === 'road' ? '🚛' : '📦'} ${d.qty} ${M.unit} ${M.nm.toLowerCase()} от ${deps.cityName(d.from)} пристигнаха в склада (спести ${deps.fmt(d.value - d.price)} €).`;
+      const txt = `${l.via === 'rail' ? '🚆' : l.via === 'road' ? '🚛' : '📦'} ${qtyTxt(d.qty, M)} от ${deps.cityName(d.from)} пристигнаха в склада (спести ${deps.fmt(d.value - d.price)} €).`;
       if (l.via === 'rail' && deps.onRailDelivery) deps.onRailDelivery(txt); else deps.toast(txt, 'good');
       deps.sound('cash');
     }
@@ -79,11 +81,11 @@ export function createSupply(deps) {
     let h = `<div class="sect">📜 Оферти от доставчици</div>`;
     for (const d of s.deals) {
       const M = deps.MATERIALS[d.mat], l = linkOf(d.from);
-      h += `<div class="meta">🤝 <b style="color:var(--txt)">${M.ico} ${d.qty} ${M.unit} ${M.nm.toLowerCase()}</b> от ${deps.cityName(d.from)} · ${deps.fmt(d.price)} €<br>${l ? '🚚 доставя се…' : `<span class="late">чака жп линия или магистрала до ${deps.cityName(d.from)} · остават ${d.deadline - deps.S().day} дни</span>`}</div>`;
+      h += `<div class="meta">🤝 <b style="color:var(--txt)">${M.ico} ${qtyTxt(d.qty, M)}</b> от ${deps.cityName(d.from)} · ${deps.fmt(d.price)} €<br>${l ? '🚚 доставя се…' : `<span class="late">чака жп линия или магистрала до ${deps.cityName(d.from)} · остават ${d.deadline - deps.S().day} дни</span>`}</div>`;
     }
     for (const o of s.offers) {
       const M = deps.MATERIALS[o.mat], l = linkOf(o.from);
-      h += `<div class="card" style="padding:8px 10px"><div class="meta" style="margin:0"><b style="color:var(--txt)">${M.ico} ${o.qty} ${M.unit} ${M.nm.toLowerCase()}</b> · ${o.fname}<br><s>${deps.fmt(o.value)} €</s> <b style="color:var(--ok)">${deps.fmt(o.price)} €</b> (−${Math.round(o.disc * 100)}%) · важи до ден ${o.expires}<br>${l ? `✅ Има връзка (${l.via === 'rail' ? 'жп' : l.via === 'road' ? 'магистрала' : 'същия град'}) — стоката идва веднага` : `🔗 Нужна е жп линия или магистрала до ${deps.cityName(o.from)}`}</div>
+      h += `<div class="card" style="padding:8px 10px"><div class="meta" style="margin:0"><b style="color:var(--txt)">${M.ico} ${qtyTxt(o.qty, M)}</b> · ${o.fname}<br><s>${deps.fmt(o.value)} €</s> <b style="color:var(--ok)">${deps.fmt(o.price)} €</b> (−${Math.round(o.disc * 100)}%) · важи до ден ${o.expires}<br>${l ? `✅ Има връзка (${l.via === 'rail' ? 'жп' : l.via === 'road' ? 'магистрала' : 'същия град'}) — стоката идва веднага` : `🔗 Нужна е жп линия или магистрала до ${deps.cityName(o.from)}`}</div>
         <div class="row" style="justify-content:flex-end;margin-top:4px;gap:6px"><button class="btn2" data-sdec="${o.id}">Откажи</button><button class="btn" data-sacc="${o.id}">Приеми</button></div></div>`;
     }
     return h;

@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { feature } from './lab/feature.js';
 import { addTruckLamps } from './vehmodels.js';
 import { trimRoute } from './junctionpaths.js';
+import { spinWheels } from './wheelspin.js';
 
 const SPEED = 12, UNLOAD = 2.2, LANE = 1.9;
 // в големите градове (плановете по истинска карта, ~1,3 км) пътят от входа до обекта беше 4–5 игрови дни на етап → къщите закъсняваха.
@@ -106,7 +107,25 @@ export function createTirs(deps) {
     const e = { id: t.order.id, mat: t.order.matId, qty: t.order.qty, m: Math.round(t.len || 0), s: +(t.age || 0).toFixed(1), how };
     log.push(e); if (log.length > 60) log.shift(); if (typeof window !== 'undefined') { window.__tirLog = log; if (window.__tirDebug) console.info('[ТИР]', e); }
   }
+  // 🚚 mats-truck2: камионите на потребителя (Meshy, раздвижени в Blender: cab/trailer, колела wheel_*, светлини head_*/tail_*) — на всяка втора
+  // доставка с платформа (тухли, стомана, дърво, мрамор) или фургон (мебели, стъкло); моделът е в метри, предницата към +z
+  const MATS2 = { flat: 'sf-mats-flat', box: 'sf-mats-box', glass: 'sf-mats-box' };
+  function build2(order, art) {
+    const key = feature('mats-truck2') && deps.model && order.id % 2 === 0 && MATS2[KIND[order.matId]]; if (!key) return null;
+    let m; try { m = deps.model(key, 1); } catch (e) { return null; }
+    const cabN = m.getObjectByName('cab'), trlN = m.getObjectByName('trailer'); if (!cabN || !trlN) return null;
+    const k = cabN.parent.scale.x, B = new THREE.Box3(), part = n => { const g = new THREE.Group(); n.removeFromParent(); n.position.set(0, n.position.y, 0); g.add(n); g.scale.setScalar(k); g.updateMatrixWorld(true); g.userData.len = B.setFromObject(g).getSize(new THREE.Vector3()).z; return g; };
+    const cab0 = part(cabN), trl = part(trlN), root = new THREE.Group(), gap = 0.2, cab = new THREE.Group();
+    cab.add(cab0); cab.userData.len = cab0.userData.len; addTruckLamps(cab, cab.userData.len, 2.5, 1.1);   // лъчите на фаровете нощем — както на sf-trk
+    root.add(cab);
+    if (!art) { cab.position.z = trl.userData.len / 2 + gap / 2; trl.position.z = -cab.userData.len / 2 - gap / 2; root.add(trl); }
+    const mi = deps.matInfo(order.matId), tag = deps.label(`🚚 ${mi.ico} ${mi.nm} · ${order.qty} ${mi.unit}`, '#ffffff', 7);
+    tag.position.y = 5.2; root.add(tag);
+    if (art) { art.add(root); art.add(trl); } else deps.scene.add(root);
+    return { root, trl: art ? trl : null, mover: null, load: [], tag, cabL: cab.userData.len, trlL: trl.userData.len + 0.4, wheels: [cab, trl] };
+  }
   function build(order, art) {   // art — влекачът и ремаркето поотделно (агент в трафика: ремаркето следва шарнира)
+    { const b2 = build2(order, art); if (b2) return b2; }
     const root = new THREE.Group();
     let cab = null;
     const CL = feature('real-scale') ? 6 : 4.6;   /* real-scale (55): истинската кабина на влекача — 6 м */
@@ -129,7 +148,7 @@ export function createTirs(deps) {
   function agentStart(t, A) {
     const r = trimRoute(A.route(deps.entry(), t.target, true), AG_MAX); if (!r) return false;
     if (A.free && !A.free(r.paths[0], r.s0, CAB_L() + TRL_L() + 0.4)) { t.t = -1.5; t.wq = t.wq || 0; return true; }   /* мястото на тръгване е заето — след малко */
-    t.agent = A.add({ obj: t.root, len: CAB_L() + TRL_L() + 0.4, w: 2.5, h: 3.8, kind: 'truck', name: 'ТИР ' + t.order.id, route: r, cab: CAB_L(), trailer: { obj: t.trl, len: TRL_L() },
+    t.agent = A.add({ obj: t.root, len: (t.cabL ?? CAB_L()) + (t.trlL ?? TRL_L()) + 0.4, w: 2.5, h: 3.8, kind: 'truck', name: 'ТИР ' + t.order.id, route: r, cab: t.cabL ?? CAB_L(), trailer: { obj: t.trl, len: t.trlL ?? TRL_L() },
       onArrive: () => { if (t.state === 'go') { t.state = 'unload'; t.u = 0; } else if (t.state === 'back') t.done = true; } });
     t.A = A; t.len = r.len; t.age = 0; t.lim = 12 + r.len / 8; t.root.visible = t.trl.visible = true; return true;   /* t.lim — след толкова секунди без пристигане доставката минава направо (без безкрайно обикаляне) */
   }
@@ -172,7 +191,7 @@ export function createTirs(deps) {
     if (t.t < 0 || !t.agent) { t.t += dt; if (t.t < 0) { if (t.wq != null && (t.wq += dt) > 20) { logDel(t, 'няма място'); t.onArrive && t.onArrive(t.order); dropT(t); } return; }   /* t.wq — колко чака свободно място за тръгване; след 20 с — направо */ const A = deps.agents && deps.agents(); if (!A || !agentStart(t, A)) { logDel(t, 'без път'); t.onArrive && t.onArrive(t.order); dropT(t); } return; }   // без трафик (друг град) — доставено без пътя
     { const gp = t.A.group.position; t.x = t.agent.x + gp.x; t.z = t.agent.z + gp.z; t.state2 = t.agent.why || ''; }   /* за камерата (lookTir) и дебъга */
     if (!t.A.alive(t.agent)) { if (t.state === 'go') { logDel(t, 'друг град'); t.onArrive && t.onArrive(t.order); } dropT(t); return; }   // трафикът е сменен (друг град)
-    t.age += dt;
+    t.age += dt; if (t.wheels) for (const w of t.wheels) spinWheels(w);   // mats-truck2: колелата се въртят
     if (t.state === 'go' && t.age > t.lim) { logDel(t, 'направо'); t.onArrive && t.onArrive(t.order); dropT(t); return; }   // заседнал/обикаля — стоката е доставена направо
     if (t.state === 'back' && t.age > 40) { dropT(t); return; }   // празен на връщане — изчезва след 40 с, без да обикаля
     if (t.mover && t.mover.kind === 'mixer') t.mover.obj.rotation.z += dt * (t.state === 'unload' ? 6 : 2);
@@ -195,6 +214,7 @@ export function createTirs(deps) {
       if (t.mover && t.mover.kind === 'mixer') t.mover.obj.rotation.z += dt * (t.state === 'unload' ? 6 : 2);
       if (t.state !== 'unload' && deps.blocked && deps.blocked(t.x, t.z, t.yaw)) { t.wb = (t.wb || 0) + dt; if (t.wb < 8) continue; } else t.wb = 0;   // кола отпред — чака (до 8 s)
       if (t.state === 'go') {
+        if (t.wheels) for (const w of t.wheels) spinWheels(w);
         t.age += dt; if (follow(t, dt)) { t.state = 'unload'; t.u = 0; }
       } else if (t.state === 'unload') {
         t.u += dt;

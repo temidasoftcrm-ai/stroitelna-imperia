@@ -112,7 +112,7 @@ export function addRouteScenery(group, deps, opts = {}) {
       if (!free(x, z)) continue;
       const nice = ['sf-tree-0', 'sf-tree-1', 'sf-tree-2', 'sf-pine-0', 'sf-pine-1'].filter(q => deps.A[q]);
       const n = nice.length && r() < 0.75 ? nice[(r() * nice.length) | 0] : r() < 0.5 ? 'tree-large' : 'tree-small';
-      if (!deps.A[n]) continue;
+      if (!deps.A[n] && !n.startsWith('tree-')) continue;   // trees-kenney-off: tree-large/small не са заредени — model() ги дава от горския пакет
       const t = deps.model(n, n.startsWith('sf-') ? 7 + r() * 6 : 6 + r() * 4); t.position.set(x, 0, z); t.rotation.y = r() * 6; g.add(t);
     }
   }

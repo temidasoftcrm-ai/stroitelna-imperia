@@ -144,7 +144,7 @@ function pointGrid(cell) {
 }
 
 // ---- скелет по семейство: граница, вода, главни пътища (линии с клас), центрове на квартали
-function skeleton(fam, size, r, rk = 1) {
+function skeleton(fam, size, r, rk = 1, canals = false, river = null) {
   const Z = SIZE[size], R = Z.R * (fam === 'coast' ? 1.3 : 1) * rk /* крайбрежният — по-голям радиус: половината кръг е вода */, rr = (a, b) => lerp(a, b, r()), lines = [], hubs = [{ x: 0, z: 0, main: true }];
   const big = size === 'l' || size === 'xl';
   let bnd = [], waterAt = () => false, coastZ = null;
@@ -198,10 +198,34 @@ function skeleton(fam, size, r, rk = 1) {
     bnd = bnd.map(([x, z]) => [x, Math.max(z, coastZ(x) - 2)]);
     hubs[0] = { x: 0, z: coastZ(0) + R * 0.22, main: true };
     if (size === 'xl') hubs.push({ x: -R * 0.55, z: coastZ(-R * 0.55) + R * 0.2 }, { x: R * 0.55, z: coastZ(R * 0.55) + R * 0.2 });
+    if (canals) {   // 🛶 ams-canals (f6): Амстердам — грахтенгордел: три полукръгли канала около залива (Херенграхт, Кайзерсграхт, Принсенграхт) с кейове; мостовете — сами (пътищата над вода)
+      const CN = canalRing([0, coastZ(0)], [0.3, 0.4, 0.5].map(f => f * R)), sea = waterAt;
+      waterAt = (x, z) => sea(x, z) || canalWater(CN, x, z);
+      for (const rc of CN.rings) for (const d of [-1, 1]) { const p = []; for (let k = 0; k <= 48; k++) { const a = Math.PI * k / 48, rq = rc + d * (CN.hw + 7); p.push([CN.c[0] + Math.cos(a) * rq, CN.c[1] + Math.sin(a) * rq]); } lines.push({ cls: 'quay', pts: p.filter(([x, z]) => z > coastZ(x) + 10) }); }
+      return { R, bnd, lines, hubs, waterAt, coastZ, canals: CN };
+    }
+  }
+  if (river) {   // 🌊 bg-rivers (T2): река по плана — Дунав по северния/източния край (дъга извън границата), Марица през града от запад на изток
+    const RV = riverSpec(river, R, r), w0 = waterAt; waterAt = (x, z) => w0(x, z) || riverWater(RV, x, z);
+    for (const d of RV.quays) lines.push({ cls: 'quay', pts: riverOffset(RV, d) });   // кейовете (кейовите улици) — по бреговете
+    return { R, bnd, lines, hubs, waterAt, coastZ, river: RV };
   }
   return { R, bnd, lines, hubs, waterAt, coastZ };
 }
+// реката (bg-rivers): kind 'edge' — дъга около центъра извън границата (Видин, Дунав: на север и изток), 'cross' — през града на север от центъра (Пловдив, Марица)
+function riverSpec(o, R, r) {
+  const pts = [];
+  if (o.kind === 'edge') { const hw = R * (o.w || 0.16), rc = R * 1.08 + hw, a0 = o.a0 ?? -2.9, a1 = o.a1 ?? 0.35; for (let k = 0; k <= 60; k++) { const a = a0 + (a1 - a0) * k / 60, f = 1 + 0.03 * Math.sin(a * 3 + 1); pts.push([Math.cos(a) * rc * f, Math.sin(a) * rc * f]); } return { pts, hw, quays: [] }; }
+  const hw = o.hw || 18, z0 = -R * (o.z || 0.34); for (let k = 0; k <= 60; k++) { const x = -R * 1.25 + R * 2.5 * k / 60; pts.push([x, z0 + R * 0.06 * Math.sin(x / R * 2.4 + 0.7)]); }
+  return { pts, hw, quays: [-(hw + 7), hw + 7] };
+}
+function riverOffset(RV, d) { const P = RV.pts, out = []; for (let i = 0; i < P.length; i++) { const a = P[Math.max(0, i - 1)], b = P[Math.min(P.length - 1, i + 1)], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; out.push([P[i][0] - dz / l * d, P[i][1] + dx / l * d]); } return out; }
+const RVG = new WeakMap();   // решетката на реката — извън обекта (планът се записва като JSON)
+function riverWater(RV, x, z) { let g = RVG.get(RV); if (!g) { g = pointGrid(16); resample(RV.pts, 3).forEach(p => g.add(p, 1)); RVG.set(RV, g); } let w = false; g.near([x, z], RV.hw, () => { w = true; }); return w; }
 
+// каналите (ams-canals): център на полукръговете, радиуси, полуширина; водата — пръстен около всеки радиус, само на юг от центъра (откъм сушата)
+const canalRing = (c, rings, hw = 7) => ({ c, rings, hw });
+const canalWater = (CN, x, z) => z > CN.c[1] - 2 && CN.rings.some(rc => Math.abs(Math.hypot(x - CN.c[0], z - CN.c[1]) - rc) < CN.hw);
 // ---- истинска карта (OpenStreetMap, cityplan2-osm.js — подава се от извикващия: plan2('rome', { osm: OSM2.rome })):
 // без измислен скелет — улиците са от картата (тесните улички вече са опростени при генерирането на данните), а графът,
 // правилата за възлите и парцелите — същите. Двойните еднопосочни платна на булевардите стават един път с ленти в двете посоки.
@@ -419,15 +443,17 @@ export function plan2Load(data, osm) {
     const isl = osm.island, inIsl = (x, z) => { if (!isl) return false; const c = Math.cos(isl.rot), s2 = Math.sin(isl.rot), dx = x - isl.x, dz = z - isl.z, u = dx * c - dz * s2, v = dx * s2 + dz * c; return (u / (isl.w / 2)) ** 2 + (v / (isl.d / 2)) ** 2 < 1; };
     const sea = seaMask(osm.sea); P.waterAt = (x, z) => { if (sea && sea(x, z)) return true; let w = false; rg.near([x, z], hw, () => { w = true; }); return w && !inIsl(x, z); }; }
   else P.waterAt = () => false;
+  if (P.canals) { const w0 = P.waterAt; P.waterAt = (x, z) => w0(x, z) || canalWater(P.canals, x, z); }   // ams-canals: записаният план помни каналите
+  if (P.river) { const w0 = P.waterAt; P.waterAt = (x, z) => w0(x, z) || riverWater(P.river, x, z); }   // bg-rivers: и реката
   return attachPlan2(P);
 }
 // ---- основното: plan2(cityId, { fam, size, seed, ext })
 const cache = new Map();
 export function plan2(cityId, o = {}) {
-  const fam = o.fam || 'eu', size = o.size || 'm', seed = o.seed ?? hashStr(cityId), ext = o.ext || 0, RG = !!o.roadGeo && !o.osm, JF = !!o.jfix && !o.osm, ED = !o.osm && o.edit && (o.edit.add?.length || o.edit.cut?.length) ? o.edit : null, key = [cityId, fam, size, seed, ext, o.rk || 1, RG ? 'rg' : '', JF ? 'jf' : '', ED ? 'ed' + hashStr(JSON.stringify([ED.add, ED.cut])) : ''].join(':');   /* ED — редакциите от Лаб редактора (#29, plan-edit): начертани и изтрити улици */   // RG — road-geo (само нови игри: парцелите се местят)
+  const fam = o.fam || 'eu', size = o.size || 'm', seed = o.seed ?? hashStr(cityId), ext = o.ext || 0, RG = !!o.roadGeo && !o.osm, JF = !!o.jfix && !o.osm, ED = !o.osm && o.edit && (o.edit.add?.length || o.edit.cut?.length) ? o.edit : null, key = [cityId, fam, size, seed, ext, o.rk || 1, RG ? 'rg' : '', JF ? 'jf' : '', o.river ? 'rv' + o.river.kind : '', ED ? 'ed' + hashStr(JSON.stringify([ED.add, ED.cut])) : '', o.canals ? 'cn' : ''].join(':');   /* ED — редакциите от Лаб редактора (#29, plan-edit): начертани и изтрити улици */   // RG — road-geo (само нови игри: парцелите се местят)
   if (cache.has(key)) return cache.get(key);
   const t0 = Date.now(), r = rng(hashStr(`plan2:${cityId}:${fam}:${size}:${seed}`));
-  const sk = o.osm ? osmSkeleton(o.osm) : skeleton(fam, size, r, o.rk || 1);   // rk — по-голям радиус (играта иска повече парцели)
+  const sk = o.osm ? osmSkeleton(o.osm) : skeleton(fam, size, r, o.rk || 1, !!o.canals, o.river || null);   // rk — по-голям радиус (играта иска повече парцели)
   // главните пътища: мрежа от точки (за отстоянието на кварталните)
   const mg = pointGrid(24); sk.lines.forEach((L, li) => L.pts.forEach(p => mg.add(p, li)));
   const majorNear = (p, rad) => { let hit = null; mg.near(p, rad + widthOf('blvd') / 2, (q, li) => { if (hit === null && dist(p, q) < rad + widthOf(sk.lines[li].cls) / 2) hit = li; }); return hit; };
@@ -500,7 +526,7 @@ export function plan2(cityId, o = {}) {
   // изход: възли (само използваните), пътища с параметри
   const live = new Map(); const nodeOut = [];
   const nid = i => { if (!live.has(i)) { live.set(i, nodeOut.length); nodeOut.push({ id: nodeOut.length, x: G.nodes[i].x, z: G.nodes[i].z, arms: [] }); } return live.get(i); };
-  const P = { osm: !!o.osm, greensSrc: sk.greens || [], v: PLAN2_V, cityId, fam, size, seed, ext, drive: o.drive || 'R', center: { x: sk.hubs[0].x, z: sk.hubs[0].z }, R: sk.R, boundary: sk.bnd, waterAt: sk.waterAt, coastZ: sk.coastZ, hubs: sk.hubs,
+  const P = { osm: !!o.osm, greensSrc: sk.greens || [], v: PLAN2_V, cityId, fam, size, seed, ext, drive: o.drive || 'R', center: { x: sk.hubs[0].x, z: sk.hubs[0].z }, R: sk.R, boundary: sk.bnd, waterAt: sk.waterAt, coastZ: sk.coastZ, hubs: sk.hubs, ...(sk.canals ? { canals: sk.canals } : {}), ...(sk.river ? { river: { pts: sk.river.pts, hw: sk.river.hw, quays: sk.river.quays } } : {}),
     roads: [], nodes: nodeOut, rounds: [], lots: [], blocks: [], greens: [], landmarks: [] };
   roads.forEach(rd => {
     const k = CLS[rd.cls], pts = resample(RG ? filletRoad(rd.pts) : rd.pts, P.osm ? 5 : 2), id = P.roads.length, a = nid(rd.from), b = nid(rd.to);

@@ -1,11 +1,11 @@
 {
- "📜 Оферта от {0}: {1} {2} {3} {4} с −{5}%. Виж картата → „Оферти“.": "📜 Offer from {0}: {1} {2} {3} {4} at −{5}%. See the map → “Offers”.",
+ "📜 Оферта от {0}: {1} {2} с −{3}%. Виж картата → „Оферти“.": "📜 Offer from {0}: {1} {2} at −{3}%. See the map → “Offers”.",
  "🤝 Договорът с {0} е сключен — стоката тръгва.": "🤝 The contract with {0} is signed — the goods are on their way.",
  "🤝 Договорът е сключен. Построй жп линия или магистрала до {0} до {1} дни, за да получиш стоката.": "🤝 The contract is signed. Build a railway line or motorway to {0} within {1} days to receive the goods.",
  "⚠️ Стоката от {0} е готова, но нямаш {1} € да я платиш.": "⚠️ The goods from {0} are ready, but you don't have {1} € to pay for them.",
  "материали": "materials",
  "Договор: {0} от {1}": "Contract: {0} from {1}",
- "{0} {1} {2} {3} от {4} пристигнаха в склада (спести {5} €).": "{0} {1} {2} {3} from {4} arrived at the warehouse (saved {5} €).",
+ "{0} {1} от {2} пристигнаха в склада (спести {3} €).": "{0} {1} from {2} arrived at the warehouse (saved {3} €).",
  "❌ Договорът за {0} от {1} пропадна — нямаше връзка навреме.": "❌ The contract for {0} from {1} fell through — there was no connection in time.",
  "и с отключени Балканите (3 ★)": "and with the Balkans unlocked (3 ★)",
  "📜 Оферти от доставчици": "📜 Supplier offers",
@@ -22,5 +22,9 @@
  "🔗 Нужна е жп линия или магистрала до {0}": "🔗 A railway line or motorway to {0} is needed",
  "(−{0}%) · важи до ден {1}": "(−{0}%) · valid until day {1}",
  "Откажи": "Decline",
- "Приеми": "Accept"
+ "Приеми": "Accept",
+ "_stale": {
+  "📜 Оферта от {0}: {1} {2} {3} {4} с −{5}%. Виж картата → „Оферти“.": "📜 Offer from {0}: {1} {2} {3} {4} at −{5}%. See the map → “Offers”.",
+  "{0} {1} {2} {3} от {4} пристигнаха в склада (спести {5} €).": "{0} {1} {2} {3} from {4} arrived at the warehouse (saved {5} €)."
+ }
 }

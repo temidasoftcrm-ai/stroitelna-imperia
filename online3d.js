@@ -7,6 +7,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { feature } from './lab/feature.js';
 import { loadConstruct } from './construct.js';
+import { splitTrees } from './treesplit.js';
 
 const TILE = 8, NB = 9, N = NB * 3 + 1, C = (NB - 1) / 2, HQ = [4, 5];
 const tx = i => (i - (N - 1) / 2) * TILE;
@@ -20,9 +21,11 @@ const hFit = n => n.startsWith('h2-') ? 14 : n === 'building-type-a' || n === 'b
 const SHOPS = 'abcdefgh'.split('').map(c => 'building-' + c);
 const SKY = ['building-skyscraper-a', 'building-skyscraper-b', 'building-skyscraper-c'];
 const OFFICES = ['building-skyscraper-d', 'building-skyscraper-e', 'office3', 'hirise'];   // office3, hirise — истинските от heavy/blocks2
+// trees-kenney-off (Лабораторията 21.10: „Изтрий окончателно“ за tree-large/tree-small): вместо конусите на Kenney — дърветата от горския пакет
+const TREES_OFF = feature('trees-kenney-off');
 const LIST = {
   roads: ['road-straight', 'road-crossroad', 'road-intersection', 'road-bend', 'construction-cone', 'light-square'],
-  houses: [...(REAL ? ['building-type-a', 'building-type-b'] : KENNEY), 'tree-large', 'tree-small'],
+  houses: [...(REAL ? ['building-type-a', 'building-type-b'] : KENNEY), ...(TREES_OFF ? [] : ['tree-large', 'tree-small'])],
   'heavy/houses2': REAL ? H2 : [],
   commercial: [...SHOPS, ...SKY],
   commercial2: ['building-skyscraper-d', 'building-skyscraper-e'],
@@ -55,11 +58,19 @@ export async function createCity3D(el, { onProgress } = {}) {
   // ── модели ──
   const A = {}, loader = new GLTFLoader(), jobs = [];
   for (const [dir, list] of Object.entries(LIST)) for (const n of list) jobs.push(new Promise(res => loader.load(`assets/${dir}/${n}.glb`, g => { A[n] = g.scene; res(); }, undefined, () => res())));
+  const SF = [];   // trees-kenney-off: отделните дървета (височина 1, основа в 0)
+  if (TREES_OFF) for (const [f, opt] of [['forest', { trunksOnly: true }], ['pine', {}]]) jobs.push(new Promise(res => loader.load(`assets/heavy/trees/${f}.glb`, g => { SF.push(...splitTrees(g.scene, opt)); res(); }, undefined, () => res())));
   let done = 0; jobs.forEach(j => j.then(() => onProgress && onProgress(++done / jobs.length)));
   await Promise.all(jobs);
   await loadConstruct(url => new Promise((res, rej) => loader.load(url, res, undefined, rej)), A, true);   // строежите — истинските (construct.js); детските са изтрити
   const size = n => new THREE.Box3().setFromObject(A[n]).getSize(new THREE.Vector3());
+  let treeK = 0;
   const model = (n, target) => {
+    if (TREES_OFF && n.startsWith('tree-')) {   // истинско дърво ~1,6 × target м високо (конусите на Kenney бяха тънки и до 30 м)
+      const o = SF.length ? SF[(treeK++ * 7 + 3) % SF.length].clone(true) : new THREE.Group(); o.scale.setScalar(target * 1.6); o.rotation.y = treeK * 2.39;
+      o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+      return o;
+    }
     const o = A[n].clone(true), s = size(n); o.scale.setScalar(target / Math.max(s.x, s.z));
     o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
     return o;

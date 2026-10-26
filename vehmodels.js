@@ -123,7 +123,7 @@ function loadRealCars(load, A) {
 const EMERG_K = { Police_Sedan: 1, Ambulance: 1, Firetruck: 1 };   // всички коли са в истински метри (1 м ≈ 1 единица, хората ~1,9) — спешните вече не се уголемяват
 const EMERG = {
   Police_Sedan: [['pol-charger', 5.1], ['pol-crownvic', 5.4], ['pol-interceptor', 5.3], ['pol-nypd', 5.1], ...(feature('pol-new') ? [['pol-logan', 4.36], ['pol-duster', 4.34]] : [['pol-volga', 4.1]])],   // pol-volga — вече ВАЗ 2101 на КАТ (файлът — EMERG_FILE); pol-new — вместо нея Logan и Duster
-  Firetruck: [['fire-us', 10], ['fire-man', 10.5]],   // fire-red — изтрита
+  Firetruck: [['fire-us', 10], ['fire-man', 10.5], ['fire-titan', 10.8], ['fire-cyber', 10.5]],   // fire-red — изтрита; fire-titan / fire-cyber (f6) — Meshy, Blender: колела wheel_*, буркани siren_*, стълба Ladder
   Ambulance: [['amb-gaz', RS ? 6.2 : 7], ['amb-us', 7.5], ['amb-eu', 7.2]],
 };
 // почиства модел на кола: маха плоските мешове (сянка/земя под колата — от тях amb-eu беше квадрат 5,8×5,8 и наполовина висок);
@@ -147,6 +147,11 @@ const EMERG_FILE = { 'fire-us': 'fire-us2', 'pol-volga': 'pol-vaz' };
 // pol-new (55): полицейските коли от наличните (Blender, _source: scratchpad polcar.py) — Dacia Logan (бяла, синя лента „ПОЛИЦИЯ“, сини буркани) за България/Европа
 // и Dacia Duster („ДПС ПОЛИЦИЯ“, червено-синя лента) за Русия; американските — за Америка. Всяка кола — с региона си (userData.polReg), model() избира по града
 const POL_REG = { 'pol-logan': ['bg', 'eu', 'xx'], 'pol-duster': ['ru'], 'pol-charger': ['am', 'xx'], 'pol-crownvic': ['am', 'xx'], 'pol-interceptor': ['am', 'xx'], 'pol-nypd': ['am'] };
+// 🚒 fire-titan / fire-cyber (f6, решението на потребителя): Red Titan — американските градове; киберпънк пожарната (със стълбата) — само модерните мегаполиси;
+// Европа (и останалите) — MAN със стълбата. Действа, щом някоя от двете е включена (иначе пожарните се редуват както досега)
+const FIRE_REG = { 'fire-titan': ['am'], 'fire-cyber': ['cyber'], 'fire-man': ['bg', 'eu', 'ru', 'xx'], 'fire-us': ['xx'] };   // в Америка — само Red Titan
+export const FIRE_CYBER = new Set(['dubai', 'singapore', 'tokyo', 'shanghai']);
+export const fireVariants = (V, reg, cityId) => { if (!feature('fire-titan') && !feature('fire-cyber')) return V; const k = FIRE_CYBER.has(cityId) ? 'cyber' : reg, r = V.filter(v => (v.userData.fireReg || []).includes(k)); return r.length ? r : V; };
 export const polVariants = (V, reg) => { const r = V.filter(v => !v.userData.polReg || v.userData.polReg.includes(reg)); return r.length ? r : V; };
 // фаровете на спешните коли (отчетени в Blender отпред, лъч до стъклото): [дял от полуширината, дял от височината, колко са навътре от предницата (дял от дължината)]
 // emergLights слага там мигащите на смени фарове (emerg-wigwag); без запис — общите места (addTruckLamps)
@@ -155,7 +160,7 @@ const LENS = { 'pol-charger': [0.64, 0.47, 0.067], 'pol-crownvic': [0.5, 0.42, 0
 export function loadPoliceCars(load, A) {
   return Promise.all(Object.entries(EMERG).map(([nm, opts]) => {
     const ok = opts.filter(([f]) => feature(f) || (feature('pol-new') && (f === 'pol-logan' || f === 'pol-duster'))); if (!ok.length) return null;   /* pol-new: новите — с общия флаг */
-    return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + (feature('sirens-real') ? 'sirens/' : '') + (EMERG_FILE[f] || f) + '.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = false; }); const [yaw, L0, W0] = tidyCar(g.scene), K = L0 * capW(EMERG_K[nm] * len * M_PER / L0, W0 / M_PER) /* real-sizes: ширината ≤ 2,6 м */, sc = wrap(g.scene, yaw + (CAR_FLIP.has(f) ? Math.PI : 0), K / L0); /* мащабът е във вътрешната група — model() пипа само външния */ sc.userData.lens = LENS[EMERG_FILE[f] || f] || null; if (feature('pol-new') && POL_REG[f]) sc.userData.polReg = POL_REG[f]; addBeacons(sc, K, nm === 'Firetruck' ? 'fire' : nm === 'Ambulance' ? 'ambulance' : 'police'); if (feature('car-lens')) addCarLights(sc); /* car-lens: и спешните коли — с фарове (нямаха) */ return sc; }).catch(() => null)))
+    return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + (feature('sirens-real') ? 'sirens/' : '') + (EMERG_FILE[f] || f) + '.glb').then(g => { g.scene.traverse(m => { if (m.isMesh) m.castShadow = false; }); const [yaw, L0, W0] = tidyCar(g.scene), K = L0 * capW(EMERG_K[nm] * len * M_PER / L0, W0 / M_PER) /* real-sizes: ширината ≤ 2,6 м */, sc = wrap(g.scene, yaw + (CAR_FLIP.has(f) ? Math.PI : 0), K / L0); /* мащабът е във вътрешната група — model() пипа само външния */ sc.userData.lens = LENS[EMERG_FILE[f] || f] || null; if (feature('pol-new') && POL_REG[f]) sc.userData.polReg = POL_REG[f]; if (FIRE_REG[f]) sc.userData.fireReg = FIRE_REG[f]; addBeacons(sc, K, nm === 'Firetruck' ? 'fire' : nm === 'Ambulance' ? 'ambulance' : 'police'); if (feature('car-lens')) addCarLights(sc); /* car-lens: и спешните коли — с фарове (нямаха) */ return sc; }).catch(() => null)))
       .then(list => { list = list.filter(Boolean); if (list.length) A['sf-car-' + nm] = { scene: list[0], variants: list }; });
   }));
 }
@@ -205,8 +210,35 @@ export function addCarLights(sc) {
   addTruckLamps(g, len, s.x, s.y * 0.42);
   const pl = new THREE.Mesh(new THREE.PlaneGeometry(s.x * 2.2, len * 2.2), carBeam()); pl.rotation.x = -Math.PI / 2; pl.position.set(0, 0.06, len / 2 + len * 1.1); pl.renderOrder = 2; g.add(pl);
 }
+// truck-smooth (T1): полуремаркето — отделен възел „semi-trailer“ с шарнир на седлото (userData: zk — седлото, za — оста на ремаркето
+// спрямо седлото, zf/zr — предната и задната ос на влекача, в координатите на композицията); колелата — на собствени оси (userData.wheelR),
+// въртят се около x. Влекачите имат отделни колела в GLB (Scania: Vheel*, Volvo: Wheel*) — оста е в центъра на всяко.
+function semiRig(semi, cab, trL, cabL) {
+  semi.updateMatrixWorld(true);
+  const zk = trL / 2 - 1.3 * M_PER, T = new THREE.Group(); T.name = 'semi-trailer'; T.position.z = zk;
+  semi.userData.semi = { zk, za: -trL / 2 + 1.85 * M_PER - zk, zf: trL / 2 + cabL - HITCH * M_PER - 1.5 * M_PER, zr: zk };
+  const rim = new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.4, metalness: 0.5 }), dark = new THREE.MeshStandardMaterial({ color: 0x15171a });
+  for (const c of [...semi.children]) if (c !== cab && c.position.z < trL / 2 - 0.01) {
+    semi.remove(c); c.position.z -= zk; T.add(c);
+    if (c.geometry?.type === 'CylinderGeometry') { c.userData.wheelR = 0.5 * M_PER;   // джанта с греди — да се вижда въртенето
+      c.add(new THREE.Mesh(new THREE.CylinderGeometry(0.3 * M_PER, 0.3 * M_PER, 0.37 * M_PER, 10).rotateZ(Math.PI / 2), rim), new THREE.Mesh(new THREE.BoxGeometry(0.38 * M_PER, 0.07 * M_PER, 0.58 * M_PER), dark)); }
+  }
+  semi.add(T);
+  const B = new THREE.Box3(), W = []; cab.traverse(m => { if (m.isMesh && /^(vheel|wheel)/i.test(m.name)) W.push(m); });
+  for (const m of W) { B.setFromObject(m); const P = new THREE.Group(), s = B.getSize(new THREE.Vector3()); B.getCenter(P.position); P.userData.wheelR = Math.max(0.2, s.y / 2); semi.add(P); P.updateMatrixWorld(true); P.attach(m); }
+}
+// truck-box (T1): бял камион-фургон (Meshy AI, ТЕМИДАСОФТ) — 8 × 2,6 × 3,3 м, гледа към +z; в Blender: трите оси с колелата — отделни възли
+// (wheel_front / wheel_rear1 / wheel_rear2, началото — на оста), фаровете и стоповете — емисионни възли (lamp_head_* / lamp_tail_*). A['sf-car-BoxTruck'] — в мащаба на града
+function loadBoxTruck(load, A) {
+  return load('assets/heavy/trucks/box-truck.glb').then(g => {
+    g.scene.traverse(m => { if (m.isMesh) m.castShadow = false; if (/^wheel_/.test(m.name)) m.userData.wheelR = 0.49 * M_PER; });
+    const o = new THREE.Group(); g.scene.scale.setScalar(M_PER); o.add(g.scene); addTruckLamps(o, 8 * M_PER, 2.6 * M_PER, 0.8 * M_PER);
+    A['sf-car-BoxTruck'] = { scene: o };
+  }).catch(e => console.warn('box truck', e));
+}
 function loadRealTrucks(load, A) {
-  return Promise.all(TRK.map((f, i) => load('assets/heavy/trucks/' + f + '.glb').then(g => {
+  const box = feature('truck-box') ? loadBoxTruck(load, A) : null;   // truck-box — заедно с влекачите (магистралата чака и него)
+  return Promise.all([box, ...TRK.map((f, i) => load('assets/heavy/trucks/' + f + '.glb').then(g => {
     g.scene.traverse(m => { if (m.isMesh) { m.castShadow = false; if (f === 'volvo') { m.material = m.material.clone(); m.material.color.multiplyScalar(2.2); } } });   // черният Volvo — малко по-светъл
     A['sf-trk-' + i] = { scene: wrap(g.scene, 0, null) };
     // полуремарке за магистралата: влекач 6 м + ремарке 13,6 м
@@ -217,8 +249,9 @@ function loadRealTrucks(load, A) {
     for (const z of [-trL / 2 + 1.2 * M_PER, -trL / 2 + 2.5 * M_PER]) for (const x of [-1, 1]) { const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.5 * M_PER, 0.5 * M_PER, 0.35 * M_PER, 12).rotateZ(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x15171a })); wh.position.set(x * W * 0.42, 0.5 * M_PER, z); semi.add(wh); }
     addTruckLamps(semi, 0, W, 0.9 * M_PER, -trL / 2);
     for (const c of semi.children) if (c.geometry?.type === 'PlaneGeometry' && c.position.z > 0) c.position.z = trL / 2 + cabL - HITCH * M_PER + 0.05;   // фаровете — на челото на влекача
+    if (feature('truck-smooth')) semiRig(semi, cab, trL, cabL);
     A['sf-semi-' + i] = { scene: semi };
-  }).catch(e => console.warn('real truck', f, e))));
+  }).catch(e => console.warn('real truck', f, e)))]);
 }
 
 // сирена: когато бурканите светнат на кола близо до камерата — веднъж на включване, не по-често от 14 s за всички

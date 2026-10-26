@@ -3,6 +3,7 @@
 // Самолетите: истински модели от Sketchfab (loadAirModels), иначе процедурни — регионален, A320, широкофюзелажен и карго.
 // Един самолет каца (подход от юг над магистралата → пробег → излиза на рулежката), друг излита на север над морето.
 import * as THREE from 'three';
+import { feature } from './lab/feature.js';
 
 const mat = (c, r = 0.8, m = 0, e) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m, ...(e ? { emissive: e, emissiveIntensity: 0 } : {}) });
 const box = (w, h, d, m, x, y, z, g) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; g.add(o); return o; };
@@ -27,7 +28,11 @@ export const PLANE_KINDS = {
 //   yaw — завъртане около y, след което носът е към +z (моделите са завъртени различно)
 const AIR_CFG = { regional: { f: 'regional', yaw: 0.26 }, a320: { f: 'a320', yaw: Math.PI / 2 }, wide: { f: 'wide', yaw: 0 }, cargo: { f: 'cargo', yaw: -0.28, tint: 0xe8e2d4 }, tower: { f: 'tower' },
   // терминалите по нива: малко летище (1–2), регионално (3), международно (4–5)
-  term_s: { f: 'term-s' }, term_m: { f: 'term-m' }, term_l: { f: 'term-l' } };
+  term_s: { f: 'term-s' }, term_m: { f: 'term-m' }, term_l: { f: 'term-l' },
+  // plane-wizz (T1): A320neo на Wizz Air (Meshy AI, Темидасофт) — нос към +z, колесникът (gear_*) и светлините (nav_/strobe_/beacon_) — отделни възли
+  ...(feature('plane-wizz') ? { wizz: { f: 'wizz-a320', yaw: 0 } } : {}) };
+// plane-wizz: колко от A320-ите са на Wizz Air — в Европа често, другаде рядко (buildAirport → opts.eu)
+let WIZZ_P = 0.15;
 const AIR = {};
 // прозорците на самолетите: тъмни денем, топло светят нощем (update → winM.emissiveIntensity)
 const winTex = (() => { const c = document.createElement('canvas'); c.width = 32; c.height = 16; const x = c.getContext('2d'); x.fillStyle = '#000'; x.fillRect(0, 0, 32, 16); x.fillStyle = '#fff'; x.beginPath(); x.roundRect ? x.roundRect(9, 3, 14, 10, 4) : x.rect(9, 3, 14, 10); x.fill(); const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; return t; })();
@@ -72,7 +77,7 @@ export function loadAirModels(load, base = 'assets/heavy/air/') {
     sc.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true;
       if (m.material.isMeshBasicMaterial) m.material = new THREE.MeshStandardMaterial({ map: m.material.map, color: m.material.color, roughness: 0.45, metalness: 0.15 });   // KHR_materials_unlit (a320) светеше бяло нощем
       if (c.tint) { m.material = m.material.clone(); m.material.color.setHex(c.tint); } } });
-    AIR[k] = k === 'tower' || k.startsWith('term') ? sc : normPlane(sc, PLANE_KINDS[k], c.yaw);
+    AIR[k] = k === 'tower' || k.startsWith('term') ? sc : normPlane(sc, PLANE_KINDS[k] || PLANE_KINDS.a320, c.yaw);
   }).catch(e => console.warn('airmodels', k, e))));
 }
 
@@ -86,6 +91,12 @@ export const airTowerModel = () => AIR.tower ? AIR.tower.clone(true) : null;
 // процедурен самолет: нос към +z
 export function makePlane(kind = 'a320', livery = 0) {
   const K = PLANE_KINDS[kind] || PLANE_KINDS.a320, g = new THREE.Group();
+  if (kind === 'a320' && AIR.wizz && ((livery * 2654435761) >>> 0) % 1000 < WIZZ_P * 1000) {   // plane-wizz: светлините са в модела (навигационни, строби, маяци) — мигат нощем като nav
+    const o = AIR.wizz.clone(true), nav = []; o.traverse(m => { if (m.isMesh && /^(nav|strobe|beacon)_/.test(m.name)) { m.castShadow = false; nav.push(m); } });
+    o.userData = { kind, gearY: K.r + K.r * 0.8, nav, len: K.len, span: AIR.wizz.userData.span, wizz: true };
+    AIR.wizz.userData.fus ??= fusOf(AIR.wizz, K.len * 1.25, K); addWindows(o, AIR.wizz.userData.fus, K.len * 1.25 * 0.92);
+    return o;
+  }
   if (AIR[kind]) {   // истинският модел + навигационните светлини на върховете на крилата
     const o = AIR[kind].clone(true), half = AIR[kind].userData.span / 2;
     const navR = new THREE.Mesh(new THREE.SphereGeometry(0.35, 6, 6), mat(0xff2020, 0.5, 0, 0xff2020)), navG = new THREE.Mesh(new THREE.SphereGeometry(0.35, 6, 6), mat(0x20ff40, 0.5, 0, 0x20ff40));
@@ -134,6 +145,7 @@ function sample(keys, t) {
 
 // group: групата на града; deps: { A, model, label(text, color, w) }; opts: { lv (1–7), x, z, seed }
 export function buildAirport(group, deps, opts = {}) {
+  if (opts.eu != null) WIZZ_P = opts.eu ? 0.45 : 0.08;   // plane-wizz: Европа — често, другаде — рядко
   const g = new THREE.Group(); group.add(g);
   g.position.set(opts.x || 0, 0, opts.z || 0);
   const lights = [], beacons = [], windows = [], towerGlows = [], smalls = [];

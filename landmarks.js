@@ -20,7 +20,10 @@ export const CITY_LANDMARKS = {
   // истински модели от Sketchfab (GLB_LM по-долу)
   cairo: ['pyramids'], giza: ['pyramids'],
   dubai: ['burj'], newyork: ['manhattan'], kualalumpur: ['petronas'], moscow: ['stbasil'], toronto: ['cntower'], chicago: ['willis'], shanghai: ['shtower'], rio: ['redeemer'], washington: ['whitehouse'], lasvegas: ['bellagio', 'vegassign'],
-};
+};if (feature('dubai-look')) CITY_LANDMARKS.dubai = [...(CITY_LANDMARKS.dubai || ['burj']), 'burjarab'];   // 🇦🇪 dubai-look
+if (feature('sg-look')) CITY_LANDMARKS.singapore = ['mbs2', 'supertrees'];   // 🇸🇬 sg-look
+if (feature('tokyo-look')) CITY_LANDMARKS.tokyo = ['skytree'];   // 🇯🇵 tokyo-look: Токио — Skytree (дотогава без забележителност)
+
 // забележителности в морето пред града (game.js: refreshLandmarks, само при крайморските градове)
 export const SEA_LANDMARKS = { newyork: ['liberty'], sydney: ['opera'] };   // Сидни: операта на нос в залива (не на площада в центъра)
 // големите забележителности в отделна зона W×D парцела встрани от центъра (game.js: refreshMines3D → bigLandmarks)
@@ -515,6 +518,12 @@ const GLB_LM = {
   opera: { h: 30, fit: 40, plate: 0x4f86b8 }, manhattan: { h: 34, fit: 15, grid: true },
   colosseo: { h: 13, fit: 15, plate: 0xb9ad98 },   // Рим: Колизеумът (Carlos.Maciel)
   empire2: { h: 45, fit: 15, plate: 0x8a8580 },   // Ню Йорк: Емпайър Стейт (модел на потребителя, Meshy AI, олекотен 1,3 млн. → 160 хил. △) — вместо кулата от пакета Манхатън; нощем тъмно тяло с прозорци, светла корона и шпил — nightfloors 'empire2'
+  skytree: { h: 63.4, fit: 7.6, plate: 0x8a8a86 },   // Токио: Tokyo Skytree (Void.com, CC BY 4.0, Sketchfab; 248 → 120 хил. △, 3,9 MB; feature 'tokyo-look') — h/fit = отношението 634 × 76 м; нощем синьо-виолетово (nightfloors 'rock')
+  burjarab: { file: '../hotels5/hotel5-burj', h: 32, fit: 10, plate: 0xd8c39a, floodK: 2.4 },   // Дубай: Burj Al Arab (одобреният модел за 5★ хотел — hotel5-burj, CREDITS.txt; feature 'dubai-look') — 321 м; нощем прожектори (floodK)
+  mbs2: { file: '../hotels5/hotel5-mbs', h: 20, fit: 34, plate: 0x8a9a8a, floodK: 1.6 },   // Сингапур: Marina Bay Sands (одобреният hotel5-mbs; feature 'sg-look') — 3 кули по 194 м и „корабът“ отгоре; нощем светли
+  supertrees: { h: 25, fit: 25, plate: 0x6f9a55, onLoad: superLights },   // Сингапур: Supertree Grove (isrichards6, CC BY 4.0; feature 'sg-look') — три „дървета“ 25–50 м; нощем короните светят виолетово-синьо
+  galata2: { file: 'galata', h: 56.5, fit: 15, plate: 0xb9b0a0 },   // Истанбул: кулата Галата (модел на потребителя, Meshy AI, олекотен 1,12 млн. → 85 хил. △, 2,9 MB; feature 'lm-galata2') — h/fit = отношението 63 × 16,5 м; ръстът — game.js LM_REAL_H; нощем — nightfloors 'galata2' (топло отдолу, галерията и конусът светят)
+  chrysler2: { file: 'chrysler', h: 56, fit: 10, plate: 0x8a8580, onLoad: topBeacon },   // Ню Йорк: Крайслер Билдинг (модел на потребителя, Meshy AI, олекотен 565 → 153 хил. △, 4,8 MB; feature 'lm-chrysler2') — вместо кулата от пакета Манхатън; h/fit — отношението на модела (5,6); ръстът 319 м — game.js LM_REAL_H; нощем — nightfloors 'chrysler2' (короната с триъгълните прозорци свети)
   radiocity2: { h: 40, fit: 15, plate: 0x8a8580 },   // Ню Йорк: Радио Сити Мюзик Хол (модел на потребителя, Meshy AI) — в Blender: кулата по-широка и напред до надписите, неоновите „RADIO CITY“ (вертикалните и на таблото около ъгъла), стената под таблото; нощем — nightfloors 'radio'/'neon'
   rockefeller2: { h: 40, fit: 15, plate: 0x8a8580 },   // Ню Йорк: 30 Rockefeller Plaza (модел на потребителя, Meshy AI, олекотен 2,6 млн. → 180 хил. △); нощем синьо-виолетово, нагоре по-светло — nightfloors.js 'rock'
   parliament2: { h: 9, fit: 15, plate: 0x5f6d4f },
@@ -561,7 +570,7 @@ const GLB_LM = {
   // game.js specialLmPlace — в истински ръст (смален до квартала); нощем — златисто осветен (window.__lmNight → dayNight.winMats)
   parliament: { h: 15, fit: 42.9, plate: 0xb8b2a6 },   // нощем — nightfloors.js 'westm' (прозорците светят), без плоското goldNight
   duomo: { h: 15, fit: 24.5, plate: 0xb8b2a6 },
-  romanstadium: { h: 15, fit: 59.2, plate: 0x9a8f7a },
+  romanstadium: { h: 15, fit: 59.2, plate: 0x9a8f7a, floodK: feature('bg-rivers') ? 2.4 : 1 },   // bg-rivers: нощем — прожектори (дизайнерът: „малък и тъмен нощем“)
   // Атина (lm-acropolis, f6): Партенонът (Meshy AI, CC0, от потребителя; олекотен 2 млн. → 115 хил. △) на процедурния хълм на Акропола; 15 единици = 18,5 м,
   // хълмът — ~15 м висок (истинският е ~70 м над града — смален, иначе закрива квартала), платото — около храма; мястото за забележителност е ~56 × 46 м →
   // цялото ×~0,58 (храмът ~40 м); нощем — златист (като истинския)
@@ -719,7 +728,8 @@ function glbLm(kind) {
       if (C.matte && o.material) { o.material = o.material.clone(); o.material.color.set(C.matte); o.material.metalness = 0; o.material.roughness = 0.8; o.material.metalnessMap = o.material.roughnessMap = o.material.map = null; o.material.needsUpdate = true; }   // светла фасада (Белият дом): текстурата е тъмна — само бял цвят + релефът (normalMap)
       if (C.flat && o.material) { o.material = o.material.clone(); o.material.flatShading = true; o.material.vertexColors = !!o.geometry.attributes.color; o.material.needsUpdate = true; }   // плоско осветени стени (без нормали от модела)
       const mt = o.material; if (mt && mt.metalness > 0.4) { mt.metalness = 0.25; mt.roughness = Math.max(mt.roughness ?? 0.5, 0.45); }   // без огледална среда металът излиза черен
-      if (mt && mt.emissive && !mt.emissiveMap && !flood.includes(mt)) { mt.emissive.set(0xffe4b8); if (mt.map) { mt.emissiveMap = mt.map; mt.needsUpdate = true; } mt.emissiveIntensity = 0; if (C.floodK) mt.userData.floodK = C.floodK; flood.push(mt); }   // прожектори: светва текстурата, не плосък бежов цвят
+      if (mt && mt.emissive && !mt.emissiveMap && !flood.includes(mt)) { mt.emissive.set(0xffe4b8); if (mt.map) { mt.emissiveMap = mt.map; mt.needsUpdate = true; } mt.emissiveIntensity = 0; if (C.floodK) mt.userData.floodK = C.floodK; flood.push(mt);   // прожектори: светва текстурата, не плосък бежов цвят
+        if (C.matte && feature('wh-flood')) { mt.userData.floodK = 1.3; mt.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  { vec3 wN = inverseTransformDirection(normal, viewMatrix); totalEmissiveRadiance *= 0.16 + 0.84 * pow(1.0 - abs(wN.y), 1.6); }'); }; mt.customProgramCacheKey = () => 'wh-flood'; } }   // wh-flood (T1): Белият дом — прожектори отдолу: стените (и колоните с релефа) светят, покривите и терасите — едва; без плоско бяло петно
     });
     if (C.base) box(g, s.x * k + 0.6, 0.35, s.z * k + 0.6, mat(C.base, 0.9), 0, y0 + 0.175, C.dz || 0);   // каменна основа — назъбените краища на скана се сливат с нея
     g.add(w);
@@ -853,6 +863,20 @@ function willisLights(w, g) {
     for (const [f, k] of [[1, 0], [0.55, 1]]) { const m = new THREE.Mesh(new THREE.SphereGeometry(Math.max(r, 0.05), 8, 6), reds[k]); m.position.copy(loc(c.x, a.min.y + (a.max.y - a.min.y) * f + (f === 1 ? r * ws : 0), c.z)); w.add(m); } });
   const prev = g.userData.sparkle;
   g.userData.sparkle = (t, night) => { if (prev) prev(t, night); const on = Math.sin(t * 2.0) > 0.25; reds[0].emissiveIntensity = (on ? 2.6 : 0.12) * (0.2 + night); reds[1].emissiveIntensity = (!on ? 2.0 : 0.12) * (0.2 + night); };
+}
+// червена авиационна светлина на върха на шпила (lm-chrysler2): отделен меш 'beacon', мига по-силно нощем
+function topBeacon(w, g) {
+  w.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(w), c = b.getCenter(new THREE.Vector3()), ws = w.getWorldScale(new THREE.Vector3()).x || 1;
+  const red = mat(0x400000, 0.4, 0, { emissive: 0xff2020, emissiveIntensity: 0 }), r = new THREE.Mesh(new THREE.SphereGeometry(0.18 / ws, 8, 6), red);
+  r.name = 'beacon'; r.position.copy(w.worldToLocal(new THREE.Vector3(c.x, b.max.y + 0.05, c.z))); w.add(r);
+  const prev = g.userData.sparkle;
+  g.userData.sparkle = (t, night) => { if (prev) prev(t, night); red.emissiveIntensity = (Math.sin(t * 2.2) > 0.6 ? 2.5 : 0.08) * (0.25 + night); };
+}
+// Supertree Grove нощем: короните (мрежите — Shell) светят виолетово/синьо и бавно сменят цвета (sg-look)
+function superLights(w, g) {
+  const mats = []; w.traverse(o => { if (o.isMesh && /Shell/i.test(o.name)) { o.material = o.material.clone(); o.material.emissive = new THREE.Color(0x8a3cff); o.material.emissiveIntensity = 0; mats.push(o.material); } });
+  const prev = g.userData.sparkle, c = new THREE.Color();
+  g.userData.sparkle = (t, night) => { if (prev) prev(t, night); for (let i = 0; i < mats.length; i++) { c.setHSL((0.72 + 0.12 * Math.sin(t * 0.4 + i * 1.7)) % 1, 0.9, 0.55); mats[i].emissive.copy(c); mats[i].emissiveIntensity = 1.6 * night; } };
 }
 function petronasLights(w, g) {
   // върховете — от самия меш (кутията на групата включва и други неща): върховете над 90% от височината, разделени на две по дългата ос
@@ -1217,9 +1241,10 @@ export function buildLandmark(kind, deps = {}) {
   }
   const lit0 = g.userData;
   const flood = { get length() { return (lit0.flood || []).length; }, [Symbol.iterator]() { return (lit0.flood || [])[Symbol.iterator](); } }, lit = g.userData.lit || [], glass = g.userData.glass || [], blink = g.userData.blink || [];
+  const VB = feature('lv-neon') && /^(bellagio|luxor|vegassign|lv[a-z]+)$/.test(kind) ? 1.8 : 1;   // 🎰 lv-neon (T1): кулите на Стрипа нощем — по-силно осветени
   function update(t, night = 0) {
     for (const m of lit) m.emissiveIntensity = 0.1 + 1.6 * night;
-    for (const m of flood) m.emissiveIntensity = (m.emissiveMap ? 0.55 : 0.28) * (m.userData.floodK || 1) * night;   // floodK — по-силно (Айфеловата кула)
+    for (const m of flood) m.emissiveIntensity = (m.emissiveMap ? 0.55 : 0.28) * (m.userData.floodK || 1) * night * VB;   // floodK — по-силно (Айфеловата кула)   // VB — lv-neon
     for (const m of glass) m.emissiveIntensity = 0.02 + 1.1 * night;
     for (const m of blink) m.emissiveIntensity = (Math.sin(t * 3) > 0.5 ? 2 : 0.2) * (0.3 + night);
     if (g.userData.sparkle) g.userData.sparkle(t, night);
@@ -1227,3 +1252,5 @@ export function buildLandmark(kind, deps = {}) {
   }
   return { group: g, update, kind };   // kind — за златния надпис в играта
 }
+LANDMARK_NM.skytree = LANDMARK_NM.skytree || 'Токио Скайтри';   // 🇯🇵 tokyo-look
+LANDMARK_NM.burjarab = LANDMARK_NM.burjarab || 'Бурж ал Араб'; LANDMARK_NM.mbs2 = LANDMARK_NM.mbs2 || 'Марина Бей Сандс'; LANDMARK_NM.supertrees = LANDMARK_NM.supertrees || 'Градините край залива';

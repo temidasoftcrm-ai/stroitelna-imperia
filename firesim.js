@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { flameSprite } from './fireflip.js';
 import { feature } from './lab/feature.js';
+import { spinWheels } from './wheelspin.js';   // 🚒 fire-titan / fire-cyber: колелата на пожарните от Blender (wheel_*)
 import { t as tr } from './i18n.js';   // 🌐 lang-en: надписите на платното (f9, част C)
 
 export const FIRE_ST = { travel: '🚒 Пожарната пътува', fight: '🚒 Гасене', saved: '✅ Спасена', burned: '⬛ Изгоряла', repair: '🏗️ Ремонт', secured: '🚧 Обезопасена', done: '✅ Възстановена' };
@@ -157,6 +158,16 @@ export function createFires(deps) {
   }
   function drop(id) { const v = vis.get(id); if (!v) return; { const f = st().find(q => q.id === id), lot = f && lotOf(f); if (lot && lot.obj) { lot.obj.visible = true; if (lot.obj.userData.sy0 != null) lot.obj.scale.y = lot.obj.userData.sy0; } } for (const k in v.ruins) { const r = v.ruins[k]; if (r.isObject3D && r.parent) r.parent.remove(r); }   /* руините делят геометрията с кеша — не се освобождават */ v.g.parent && v.g.parent.remove(v.g); v.g.traverse(o => { if (o.geometry && !o.isSkinnedMesh) o.geometry.dispose(); if (o.isSkinnedMesh && o.skeleton) o.skeleton.dispose(); if (o.material && o.material.map && o.material.map !== puff && o.material.map !== glowT && o.material.map.isCanvasTexture) o.material.map.dispose(); }); vis.delete(id); }
 
+  // 🚒 fire-cyber: стълбата (възел Ladder, шарнирът на въртящата се основа отзад) — при гасене се завърта към сградата и се вдига ~50°; иначе — легнала
+  const _lq = new THREE.Vector3();
+  function fireLadder(tk, up, ctr) {
+    const L = tk.userData.ladder === undefined ? (tk.userData.ladder = tk.getObjectByName('Ladder') || null) : tk.userData.ladder; if (!L) return;
+    L.rotation.order = 'YXZ'; let yaw = 0;
+    if (up) { tk.updateMatrixWorld(true); _lq.copy(ctr).setY(L.getWorldPosition(new THREE.Vector3()).y); L.parent.worldToLocal(_lq).sub(L.position); yaw = Math.atan2(_lq.x, _lq.z); }
+    const dy = Math.atan2(Math.sin(yaw - L.rotation.y), Math.cos(yaw - L.rotation.y));
+    L.rotation.y += dy * 0.04; L.rotation.x += ((up ? -0.9 : 0) - L.rotation.x) * 0.03;
+  }
+
   // ---------- последователността ----------
   function start(lotId, o = {}) {
     const lot = (deps.lots() || [])[lotId]; if (!lot || !lot.obj || st().some(f => f.lot === lotId && f.city === deps.cityId() && !['done'].includes(f.st))) return null;
@@ -268,6 +279,7 @@ export function createFires(deps) {
         for (let i = 1; i < v.path.length; i++) { const L = v.path[i].distanceTo(v.path[i - 1]); if (acc + L >= d) { p = v.path[i - 1].clone().lerp(v.path[i], (d - acc) / Math.max(1e-6, L)); dir = v.path[i].clone().sub(v.path[i - 1]).normalize(); break; } acc += L; }
         v.truck.position.copy(p); if (f.st === 'travel') v.truck.rotation.y = Math.atan2(dir.x, dir.z);
         const showT = burning || (f.out != null && now - f.out < 0.5); v.truck.visible = showT;
+        if (showT) { spinWheels(v.truck); fireLadder(v.truck, f.st === 'fight', v.W.ctr); }   // fire-titan / fire-cyber: колелата; стълбата се вдига към сградата при гасене
         if (v.beacons) { const b = Math.sin(v.t * 14) > 0; v.beacons[0].visible = showT && b; v.beacons[1].visible = showT && !b; }
       }
       // пожарникарите и водата — само при гасене и отблизо

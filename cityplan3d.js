@@ -338,36 +338,44 @@ export function buildPlanView(P0, opts = {}) {
   }
   // истински дървета (Лабораторията → trees-real): прототипите от горския пакет на играта (основа в 0, височина 1),
   // всеки меш на прототипа — една InstancedMesh; широколистните в града, боровете по хълмовете
+  const treeKey = t => `${Math.round(t[0] * 10)},${Math.round(t[1] * 10)}`;
+  const erasedTrees = opts.erasedTrees || new Set();
+  const visibleTrees = trees.filter(t => !erasedTrees.has(treeKey(t)));
+  g.userData.treeKeys = trees.map(treeKey);
   const protos = feature('trees-real') ? (opts.treeProtos || []) : [];
-  if (protos.length) {
+  if (!opts.hideTrees && protos.length) {
     const broad = protos.filter(p => !p.userData.pine), pines = protos.filter(p => p.userData.pine);
     const groups = new Map();   // прототип → [матрици]
     const q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3(), e = new THREE.Euler();
-    trees.forEach(([x, z, s, pine], i) => {
+    visibleTrees.forEach(([x, z, s, pine], i) => {
       const list = pine && pines.length ? pines : broad.length ? broad : pines, pr = list[(i * 7 + 3) % list.length], H = (pine ? 9 : 7.5) * s;
-      (groups.get(pr) || groups.set(pr, []).get(pr)).push(new THREE.Matrix4().compose(v.set(x, P.heightAt(x, z), z), q.setFromEuler(e.set(0, i * 2.39, 0)), sc.set(H, H, H)));
+      (groups.get(pr) || groups.set(pr, []).get(pr)).push({ matrix: new THREE.Matrix4().compose(v.set(x, P.heightAt(x, z), z), q.setFromEuler(e.set(0, i * 2.39, 0)), sc.set(H, H, H)), key: treeKey([x, z]) });
     });
-    for (const [pr, mats] of groups) {
+    for (const [pr, entries] of groups) {
       pr.updateMatrixWorld(true);
       pr.traverse(o => {
         if (!o.isMesh || o.visible === false) return;
-        const geo = o.geometry.clone().applyMatrix4(o.matrixWorld), im = new THREE.InstancedMesh(geo, o.material, mats.length);
-        mats.forEach((m, k) => im.setMatrixAt(k, m)); im.castShadow = true; im.receiveShadow = true; g.add(im);
+        const geo = o.geometry.clone().applyMatrix4(o.matrixWorld), im = new THREE.InstancedMesh(geo, o.material, entries.length);
+        entries.forEach((entry, k) => im.setMatrixAt(k, entry.matrix)); im.userData.treeKeys = entries.map(entry => entry.key); im.name = 'erasableTrees'; im.castShadow = true; im.receiveShadow = true; g.add(im);
       });
     }
     g.userData.lod = cam => { const d = cam.position.distanceTo(opts.target || new THREE.Vector3()); detail.visible = d < (opts.detailDist || 420); };
     return g;
   }
   const cone = new THREE.ConeGeometry(2.2, 6, 7), ball = new THREE.IcosahedronGeometry(2.6, 0), stem = new THREE.CylinderGeometry(0.28, 0.36, 2.4, 5);
-  const N = [trees.filter(t => !t[3]).length, trees.filter(t => t[3]).length];
-  const tr = new THREE.InstancedMesh(stem, M.trunk, trees.length), lb = new THREE.InstancedMesh(ball, M.leaf, N[0]), lc = new THREE.InstancedMesh(cone, M.pine, N[1]);
+  const treeRows = opts.hideTrees ? [] : visibleTrees;
+  const N = [treeRows.filter(t => !t[3]).length, treeRows.filter(t => t[3]).length], trunkKeys = [], leafKeys = [[], []];
+  const tr = new THREE.InstancedMesh(stem, M.trunk, treeRows.length), lb = new THREE.InstancedMesh(ball, M.leaf, N[0]), lc = new THREE.InstancedMesh(cone, M.pine, N[1]);
+  tr.name = 'erasableTrees'; lb.name = 'erasableTrees'; lc.name = 'erasableTrees';
   const q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3(); let i0 = 0, i1 = 0;
-  trees.forEach(([x, z, s, pine], i) => {
+  treeRows.forEach(([x, z, s, pine], i) => {
     const y = P.heightAt(x, z);
+    trunkKeys.push(treeKey([x, z]));
     tr.setMatrixAt(i, m4.compose(v.set(x, y + 1.2 * s, z), q, sc.set(s, s, s)));
-    if (pine) lc.setMatrixAt(i1++, m4.compose(v.set(x, y + (2.4 + 3) * s, z), q, sc.set(s, s, s)));
-    else lb.setMatrixAt(i0++, m4.compose(v.set(x, y + (2.4 + 2) * s, z), q, sc.set(s, s * 1.15, s)));
+    if (pine) { leafKeys[1].push(treeKey([x, z])); lc.setMatrixAt(i1++, m4.compose(v.set(x, y + (2.4 + 3) * s, z), q, sc.set(s, s, s))); }
+    else { leafKeys[0].push(treeKey([x, z])); lb.setMatrixAt(i0++, m4.compose(v.set(x, y + (2.4 + 2) * s, z), q, sc.set(s, s * 1.15, s))); }
   });
+  tr.userData.treeKeys = trunkKeys; lb.userData.treeKeys = leafKeys[0]; lc.userData.treeKeys = leafKeys[1];
   for (const o of [tr, lb, lc]) { o.castShadow = true; g.add(o); }
   // --- подробности само отблизо
   g.userData.lod = cam => { const d = cam.position.distanceTo(opts.target || new THREE.Vector3()); detail.visible = d < (opts.detailDist || 420); };

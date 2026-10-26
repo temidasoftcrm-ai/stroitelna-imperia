@@ -90,5 +90,21 @@
   "resort-lantern": {
     "from": "/assets/holiday/lantern.glb",
     "to": "/assets/holiday/lantern-new.glb"
+  },
+  "mod-tower-a": {
+    "from": "/assets/modular/building-sample-tower-a.glb",
+    "to": "/assets/modular/building-sample-tower-a-new.glb"
+  },
+  "mod-tower-c": {
+    "from": "/assets/modular/building-sample-tower-c.glb",
+    "to": "/assets/modular/building-sample-tower-c-new.glb"
+  },
+  "mod-tower-d": {
+    "from": "/assets/modular/building-sample-tower-d.glb",
+    "to": "/assets/modular/building-sample-tower-d-new.glb"
+  },
+  "mod-house-c": {
+    "from": "/assets/modular/building-sample-house-c.glb",
+    "to": "/assets/modular/building-sample-house-c-new.glb"
   }
 }

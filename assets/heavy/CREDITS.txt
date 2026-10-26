@@ -353,6 +353,11 @@ City buses (55, buses-more) — Sketchfab, normalized in Blender (front +z, real
 Високи блокове meshy-tower (f6; 26.10.2026):
 - towers/urban-tower.glb — „Urban Tower at Dusk“, генериран с Meshy AI от собственика (платен план, ТЕМИДАСОФТ ООД) — в Blender: изрязана улицата под сградата, ~45 хил. триъгълника, текстури 1024 px WebP, нощната карта на прозорците — изпечена
 - towers/ru-blocks.glb — „Tower Residence“ (руски панелен блок), генериран с Meshy AI от собственика (платен план, ТЕМИДАСОФТ ООД) — текстури 1024 px WebP, нощната карта — изпечена
+- sky/gold.glb — „Golden Tower“, генериран с Meshy AI от собственика (платен план, ТЕМИДАСОФТ ООД) — в Blender: 70 хил. триъгълника (от 1,03 млн.), възли Body / Beacon (авиационна лампа, клип „beacon“) / Accent (нощното осветяване отдолу), текстура 1024 px WebP, Meshopt (meshy-sky2)
+- sky/bluespire.glb — „Blue Spire Oasis“, генериран с Meshy AI от собственика (платен план, ТЕМИДАСОФТ ООД) — в Blender: 80 хил. триъгълника (от 1,67 млн.), възли Body / Beacon / Accent, текстури 1024 px WebP, Meshopt (meshy-sky2)
+- ships/msc-irina.glb — „MSC Irina Fully Loaded“, генериран с Meshy AI от собственика (платен план, ТЕМИДАСОФТ ООД) — в Blender: 45 хил. триъгълника (от 382 хил.), 400 м, носът към +z, възли Hull / Radar (клип „radar“) / NavLights (червена, зелена, бели) / DeckLights / Wake (клип „wake“), текстура 1024 px WebP, Meshopt (ship-msc)
+- cars/sirens/fire-cyber.glb — „Cyberpunk Fire Engine“, генериран с Meshy AI от собственика (платен план, ТЕМИДАСОФТ ООД) — в Blender: 25 хил. + 11,6 хил. триъгълника (от 2,1 млн.), стеснен с 28 %, възли wheel_* (6), siren_L1/L2/R1/R2, headlight_L/R, Ladder (шарнир отзад; клипове ladder_up, nozzle), WebP 1024, Meshopt (fire-cyber)
+- cars/sirens/fire-titan.glb — „Red Titan Fire Engine“ от cool.vana (общността на Meshy), CC0 — https://creativecommons.org/publicdomain/zero/1.0/ — в Blender: 25 хил. + 10 хил. триъгълника (от 1,94 млн.), възли wheel_* (8, вкл. трите задни оси), siren_*, headlight_*, WebP 1024, Meshopt (fire-titan)
 Колизеумът lm-colosseum2 (f6; 26.10.2026):
 - lm/colosseo4.glb — „Colosseum“, генериран с Meshy AI от собственика (платен план, ТЕМИДАСОФТ ООД) — в Blender: плочата наоколо изрязана, кръгът → овал 189 × 156 м, ~160 хил. триъгълника, текстури 1024 px WebP
 Атина lm-acropolis (f6; 26.10.2026):
@@ -362,3 +367,21 @@ City buses (55, buses-more) — Sketchfab, normalized in Blender (front +z, real
 Сергии markets (26.10.2026):
 - markets/stall-a.glb — "market stall" by kiselevmiki (CC-BY 4.0) — https://sketchfab.com/3d-models/6bb15dc7056241bfac6ee747fc866e45 (без каменната основа, текстури 256 px)
 - markets/stall-b.glb — "stand" by kiselevmiki (CC-BY 4.0) — https://sketchfab.com/3d-models/f2b418c194a340e8ae52937e97d57af8 (моделът е без текстури — оцветен по части, 2,6 м)
+Ню Йорк lm-chrysler2 (f6; 26.10.2026):
+- lm/chrysler.glb — „Chrysler Building in New York“, генериран с Meshy AI от собственика (платен план, ТЕМИДАСОФТ ООД) — олекотен 565 хил. → 153 хил. триъгълника, текстура 2048 px WebP, Meshopt (без квантизация)
+Истанбул lm-galata2 (f6; 26.10.2026):
+- lm/galata.glb — „Galata Tower“, генериран с Meshy AI от собственика (платен план, ТЕМИДАСОФТ ООД) — олекотен 1,12 млн. → 85 хил. триъгълника, изрязан случаен къс до основата, текстура 2048 px WebP, Meshopt (без квантизация)
+Камиони gear-dump2 / mats-truck2 (26.10.2026):
+- gear/dump2-rig.glb — самосвал „Truck 3D Design“, Meshy AI от собственика (ТЕМИДАСОФТ ООД) — 1,19 млн. → 22 хил. △; в Blender: колела wheel_*, кош bed (клип „dump“), светлини head_*/tail_*; текстура 1024 WebP, Meshopt
+- gear/mats-box.glb — влекач с фургон „Truck 3D Design“, Meshy AI от собственика — 761 хил. → 25 хил. △; cab/trailer, колела, светлини
+- gear/mats-flat.glb — „Orange Hauler“, Meshy AI от собственика — 796 хил. → 25 хил. △; cab/trailer, колела, светлини
+Токио / Сингапур / Дубай — tokyo-look, sg-look, dubai-look (26.10.2026; Burj Al Arab и Marina Bay Sands — вече одобрените hotels5/hotel5-burj, hotel5-mbs):
+- lm/skytree.glb — "Tokyo Skytree" by Void.com (CC-BY 4.0) — https://sketchfab.com/3d-models/51eb94d46e0045d294eaa0f4add20ba6
+- asia/jp-narrow.glb — "Japan House - PS1 Low Poly" by wersaus33 (CC-BY 4.0) — https://sketchfab.com/3d-models/76d6b31a2d2e474facdcdd93d78945e2
+- asia/jp-trad.glb — "Japanese House Model" by Chezkaqua (CC-BY 4.0) — https://sketchfab.com/3d-models/a7c83dbb82464a86a560673b206f00f2
+- asia/jp-modern.glb — "Tokyo Japanese House / Casa Japonesa [Low Poly]" by SitoNyaa (CC-BY 4.0) — https://sketchfab.com/3d-models/05e04ee0c3d04ff9a2fe4c348b3c1bcd
+- asia/jp-home1.glb — "Japanese Residential Home 01" by reckzilla (CC-BY 4.0) — https://sketchfab.com/3d-models/d690f83d8e8d48e6a532bebe84901595
+- asia/jp-home2.glb — "Japanese Residential Home 02" by reckzilla (CC-BY 4.0) — https://sketchfab.com/3d-models/c31697f09152453cb3ed215482e7a810
+- asia/jp-home3.glb — "Japanese Residential Home 03" by reckzilla (CC-BY 4.0) — https://sketchfab.com/3d-models/1c53f4f37fc44c32a8874464025aea48
+- asia/jp-neon.glb — "Japanese neon sign set (low poly for background)" by ydvisual (CC-BY 4.0) — https://sketchfab.com/3d-models/188e5d8dd2cb4f098871b5dd5f6fa990
+- lm/supertrees.glb — "Marina Bay Supertrees" by isrichards6 (CC-BY 4.0) — https://sketchfab.com/3d-models/88267285fe85470b8b428e6e116542cc

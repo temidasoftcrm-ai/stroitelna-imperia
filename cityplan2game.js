@@ -90,12 +90,14 @@ export function lotEdits(P, ops, ext = 27, core = 81) {
   return { ...P, lots, tiered: true };
 }
 // gamePlan2Gen(cityId, { fam, size, seed, count, minLots, mega }) — count: колко парцела са отключени (ядро + купените квартали; f1 ги смята)
+// 🌊 bg-rivers (T2): реките на градовете по плана без истинска карта — само новите игри (S.rivers)
+const RIVERS2 = { vidin: { kind: 'edge', w: 0.16 }, plovdiv: { kind: 'cross', hw: 18, z: 0.34 } };
 export function gamePlan2Gen(cityId, o = {}) {
   const fs = o.fam && o.size ? { fam: o.fam, size: o.size } : famSizeOf(cityId, o), seed = o.seed ?? strHash(cityId);
   // minLots: колкото играта ще отключи най-много (ядро + всички квартали) — ако шаблонът е по-малък, радиусът расте (×1,12 до 6 пъти)
   let P, rk = 1; const ED = o.edit && o.edit.fam ? o.edit : null;   /* #29 plan-edit: планът от Лаб редактора — точно с параметрите, с които е чертан (без търсенето на радиуса) */
   if (ED) P = plan2(cityId, { fam: ED.fam, size: ED.size, seed: ED.seed, rk: ED.rk || 1, roadGeo: ED.roadGeo ?? !!o.roadGeo, jfix: ED.jfix ?? !!o.jfix, edit: ED });
-  else for (let k = 0; k < 7; k++) { P = plan2(cityId, { fam: fs.fam, size: fs.size, seed, rk, roadGeo: !!o.roadGeo, jfix: !!o.jfix });   /* junction-fix (#22) — също само новите игри (S.jfix) */   /* road-geo — само новите игри (S.roadGeo) */ if (!o.minLots || P.lots.filter(L => !L.big && !L.lm).length >= o.minLots) break; rk *= 1.12; }
+  else for (let k = 0; k < 7; k++) { P = plan2(cityId, { fam: fs.fam, size: fs.size, seed, rk, roadGeo: !!o.roadGeo, jfix: !!o.jfix, canals: !!o.canals && cityId === 'amsterdam' && fs.fam === 'coast', river: o.rivers && RIVERS2[cityId] && fs.fam !== 'coast' ? RIVERS2[cityId] : null });   /* ams-canals (f6): каналите — само новите игри (S.canals) */   /* junction-fix (#22) — също само новите игри (S.jfix) */   /* road-geo — само новите игри (S.roadGeo) */ if (!o.minLots || P.lots.filter(L => !L.big && !L.lm).length >= o.minLots) break; rk *= 1.12; }
   if (ED && ED.lots && ED.lots.length) P = lotEdits(P, ED.lots, ED.extLots || 27);   /* #29: кварталите (ниво), парковете и свободните зони от редактора */
   if (!P.anchors) {   // котви: гарата — голямото място „station“; магистралата и летището — изходите към другите градове (най-източният и най-далечният от него)
     const st = P.lots.find(L => L.big === 'station'), C = P.center;
