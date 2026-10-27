@@ -373,8 +373,20 @@ export function buildResortView(A, r, st, season, deps) {
     const deck = new THREE.Mesh(new THREE.BoxGeometry(18, 0.15, 12), mat(0xd9cbb0)); deck.position.set(plot.x, 0.05, plot.z); g.add(deck);
     if (stage === 'building') {   // кран и ограда
       const yel = mat(0xffc400), cr = new THREE.Group();
-      const mast = new THREE.Mesh(new THREE.BoxGeometry(1.2, 22, 1.2), yel); mast.position.y = 11; cr.add(mast);
-      const jib = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 30), yel); jib.position.set(0, 22, 10); cr.add(jib);
+      // 🏗️ real-crane (T2; потребителят: „кранът е жълта Г-рамка от две пръчки“): истинският кулокран от строежите в града (cs-real, construct.js) —
+      // завърта се около мачтата, червена светлина на върха; около него — изкопът и строителният двор (фургон, тоалетна, дъски, самосвал, бетоновоз)
+      if (feature('real-crane') && A['crane-tower'] && deps.model) {
+        const k = 0.62, m = deps.model('crane-tower', k); m.position.set(-6 * k, 0, 10.75 * k); cr.add(m);   // мачтата на модела е в (6, −10.75)
+        const red = new THREE.Mesh(new THREE.SphereGeometry(0.45, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff2a1a, toneMapped: false })); red.position.set(0, 54.5 * k, 0); cr.add(red); anim.craneLamp = red;
+        const dirt = new THREE.Mesh(new THREE.PlaneGeometry(64, 46).rotateX(-Math.PI / 2), mat(summer ? 0xb59a6a : 0x7a6247)); dirt.position.set(plot.x, 0.04, plot.z); dirt.receiveShadow = true; g.add(dirt);
+        const prop = (n, sc, x, z, ry) => { if (!A[n]) return; const o = deps.model(n, sc); o.position.set(plot.x + x, 0.05, plot.z + z); o.rotation.y = ry; g.add(o); };
+        prop('container-office-green', 0.9, -33, 22, 0); prop('container-office-red', 0.9, -26, 22, 0); prop('toilet-portable', 1.1, -20, 25, Math.PI);
+        prop('planks-wood-a', 0.9, 30, 24, 0.3); prop('box-stack-brown', 1, 33, 18, 0); prop('container-rubble-red', 0.9, 30, -24, Math.PI / 2);
+        prop('truck-dump-red', 1, 22, -10, -0.6); prop('truck-concrete-red', 1, -22, -12, 0.8); prop('barrel', 1, 34, 10, 0);
+      } else {
+        const mast = new THREE.Mesh(new THREE.BoxGeometry(1.2, 22, 1.2), yel); mast.position.y = 11; cr.add(mast);
+        const jib = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 30), yel); jib.position.set(0, 22, 10); cr.add(jib);
+      }
       cr.position.set(plot.x - 36, 0, plot.z - 24); g.add(cr); anim.crane = cr;
       const fence = mat(0xff7a00);
       for (const [x, z, w, d] of [[0, -32, 80, 0.2], [0, 32, 80, 0.2], [-40, 0, 0.2, 64], [40, 0, 0.2, 64]]) {
@@ -573,7 +585,8 @@ export function buildResortView(A, r, st, season, deps) {
         q.p.position.set(q.x + dx, 0, q.z); q.p.rotation.y = Math.cos(t * 0.15 * q.sp + q.ph) > 0 ? Math.PI / 2 : -Math.PI / 2;
       }
     }
-    if (anim.crane) anim.crane.rotation.y = Math.sin(t * 0.3) * 0.8;
+    if (anim.crane) anim.crane.rotation.y = (anim.craneLamp ? 0.4 : 0) + Math.sin(t * (anim.craneLamp ? 0.12 : 0.3)) * 0.8;   // real-crane: бавно
+    if (anim.craneLamp) anim.craneLamp.visible = Math.sin(t * 3.2) > -0.2;   // червената светлина на върха мига
   }
   // подсказки за game.js: камера (кадрира плажа/селището), граници за местене, мъгла и цвят на хоризонта
   const view = {

@@ -24,3 +24,19 @@ export function drawable(img) {
   c.getContext('2d', CPU).putImageData(new ImageData(new Uint8ClampedArray(img.data.buffer, img.data.byteOffset, img.width * img.height * 4), img.width, img.height), 0, 0);
   DRAW.set(img, c); return c;
 }
+
+// fac-data (T1): проверка след качването — текстура с данни в паметта, но празна във видеокартата (качването изгубено) → още едно качване.
+// Сравнява средното на ЦЕЛИЯ образ (не ъгъла — ореолите и лъчите са прозрачни по краищата). Връща { checked, fixed }; window.__texGuard — броячът.
+export function texGuard(renderer, scene) {
+  const gl = renderer.getContext(), P = renderer.properties, fb = gl.createFramebuffer(), seen = new Set(), st = { checked: 0, fixed: 0, list: [] };
+  const meanA = (d, n) => { let s = 0; const k = Math.max(1, Math.floor(n / 4096)); let c = 0; for (let i = 0; i < n; i += k, c++) s += d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2] + d[i * 4 + 3]; return s / c / 4; };
+  const pr = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+  scene.traverse(o => { if (!o.isMesh) return; for (const m of [].concat(o.material)) { const t = m && m.map; if (!t || !t.isDataTexture || seen.has(t)) continue; seen.add(t);
+    const im = t.image, gt = P.get(t).__webglTexture; if (!im || !im.data || !gt || !gl.isTexture(gt)) continue; const W = im.width, H = im.height; if (W * H > 512 * 512) continue;
+    const cpu = meanA(im.data, W * H); if (cpu < 8) continue; st.checked++;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, gt, 0);
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) continue; const px = new Uint8Array(W * H * 4); gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    if (meanA(px, W * H) < 2) { t.needsUpdate = true; st.fixed++; st.list.push(W + 'x' + H); } } });
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, null, 0); gl.bindFramebuffer(gl.FRAMEBUFFER, pr); gl.deleteFramebuffer(fb);
+  if (typeof window !== 'undefined') { const g = window.__texGuardStat ||= { runs: 0, fixed: 0 }; g.runs++; g.fixed += st.fixed; } return st;
+}

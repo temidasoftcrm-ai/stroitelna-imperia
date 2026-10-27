@@ -11,7 +11,7 @@ let stLoad = null;
 // 🚉 station-models (f9): сграда за всяко ниво (Sketchfab, CC-BY — assets/heavy/CREDITS.txt): 1 — будката „Мелькомбинат“, 2 — нискополигонната гара (JG3D),
 // 3 — гарата Баку-Сабунчи (с куполите), 4 — „Old Station“ (две двуетажни сгради), 5 — Milwaukee Road Depot (както досега). [модел, дължина по перона, ширина] — горни граници
 const SM = feature('station-models'), ST_SPEC = { 1: ['lv1', 5.5, 4.4], 2: ['lv4', 22, 16], 3: ['lv2', 26, 26], 4: ['lv3', 42, 30] };
-const loadStationModels = () => stLoad || (stLoad = Promise.all([...['small', 'big'], ...(SM ? ['lv1', 'lv2', 'lv3', 'lv4'] : [])].map(k => new Promise(res => new GLTFLoader().load(`assets/heavy/station/${k}.glb`, g => { ST_MODEL[k] = g.scene; res(); }, undefined, () => res())))));
+const loadStationModels = () => stLoad || (stLoad = Promise.all([...['small', 'big'], ...(SM ? ['lv1', 'lv2', 'lv3', 'lv4'] : [])].map(k => new Promise(res => new GLTFLoader().load(`assets/heavy/station/${k}.glb`, g => { if (feature('station-opaque')) g.scene.traverse(m => { if (m.isMesh) for (const mt of [].concat(m.material)) if (mt && mt.transparent) { mt.transparent = false; mt.alphaTest = 0.5; mt.depthWrite = true; mt.needsUpdate = true; } });   /* station-opaque (T1): стените бяха alphaMode BLEND — прозрачни, сортирането ги чупеше („прозрачна“ гара) */ ST_MODEL[k] = g.scene; res(); }, undefined, () => res())))));
 // сградата, вписана в кутия: дължина L по z, без да надвишава ширина W; основата на y = 0
 function stationBuilding(k, L, W) {
   const src = ST_MODEL[k]; if (!src) return null;

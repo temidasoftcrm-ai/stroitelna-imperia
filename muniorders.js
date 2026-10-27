@@ -42,13 +42,13 @@ export function createMuni(deps) {
     if (!on()) return;
     clear(); const my = gen;
     const g = deps.group(); if (!g) return;
-    try { const ly = await servicesLayer(gp(), rec(), { region: 'eu', hallTop: deps.hallTop ? deps.hallTop() : null, blocks: deps.blocks ? deps.blocks() : null, trees: deps.trees ? deps.trees() : null });   /* блоковете наоколо — за височината (svc-height) */ if (my !== gen || deps.group() !== g) { ly.dispose(); return; } layer = ly; g.add(layer.group); layer.setNight(deps.night()); } catch (e) { console.warn('muni 3D', e); }
+    try { const ly = await servicesLayer(gp(), rec(), { region: 'eu', hallTop: deps.hallTop ? deps.hallTop() : null, blocks: deps.blocks ? deps.blocks() : null, trees: deps.trees ? deps.trees() : null });   /* блоковете наоколо — за височината (svc-height) */ if (my !== gen || deps.group() !== g) { ly.dispose(); return; } layer = ly; if (setNight.n) ly.setNight(true); g.add(layer.group); layer.setNight(deps.night()); } catch (e) { console.warn('muni 3D', e); }
     const s = st(); if (s.job && s.job.lots && s.job.lots.length) {   // строителната площадка (servicesplace.js serviceSite: ограда, скелет по етажи, кран, контейнери)
       const p = servicePlacer(gp()).spot(s.job.k, s.job.lvl, s.job.lots), site = await serviceSite(s.job.k, s.job.lvl, p, s.job.prog || 0);
       if (my !== gen || deps.group() !== g) { site.dispose(); return; } site.group.position.set(p.x, 0, p.z); site.group.rotation.y = p.rot; g.add(site.group); sites.push(site); }
   }
   function clear() { gen++; if (layer) { layer.group.parent?.remove(layer.group); layer.dispose(); layer = null; } for (const o of sites) o.dispose(); sites = []; }
-  const setNight = n => { if (layer) layer.setNight(n); };
+  const setNight = n => { setNight.n = n; if (layer) layer.setNight(n); };   // одитът №5: запомня се — новият слой (draw) светва веднага, ако е нощ
 
   // всеки ден: нова поръчка, когато няма; строежът напредва, ако има пари за материалите
   function dailyTick() {

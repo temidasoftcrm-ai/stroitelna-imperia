@@ -320,7 +320,7 @@ export function createCoop(d) {
     }
     if (S.day % 30 === 0) rpc('coop_dividend', {}, 1).then(r => {
       if (r?.ok && r.paid > 0) d.toast(`🏦 Месечен дивидент: холдингът раздаде ${f(r.paid)} € (30% от печалбата) — по ${f(r.each)} € на двамата${r.investors ? `, ${f(r.investors)} € на акционерите` : ''}.`, 'good');
-      if (r?.ok && r.paid > 0) d.modal('🏦 Холдингът разпредели печалбата', `Месечен дивидент: <b>${f(r.paid)} €</b> (30% от печалбата) — по <b>${f(r.each)} €</b> за теб и за ${esc(partnerName())}.`, [['Супер! 💰', null]]);
+      // dividend-once: прозорецът излиза само веднъж — когато дялът пристигне (vault „Дивидент“ по-горе); тук остава само съобщението
     }).catch(() => {});
   }
   // 🏁 завършените градове (economy.js payFinished): 40% от дневния им приход → общия холдинг
@@ -356,7 +356,7 @@ export function createCoop(d) {
       const c = cityById(id); if (!c) continue;
       const [x, y] = proj(c.lon, c.lat), r = 6 * k, hq = id === P.hq;
       h += `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${PCOL}" stroke-width="${2.6 * k}" stroke-dasharray="${hq ? '' : `${3 * k} ${2 * k}`}" opacity=".95"/>`;
-      if (hq) h += `<text x="${x}" y="${y - r - 4 * k}" text-anchor="middle" font-size="${11 * k}" font-weight="800" fill="${PCOL}" stroke="#0008" stroke-width="${2.4 * k}" paint-order="stroke">🤝 ${esc(P.name)}${st.partner.online ? ' 🟢' : ''}</text>`;
+      if (hq) h += `<text x="${x}" y="${feature('map-clean') ? y + r + 13 * k : y - r - 4 * k}" text-anchor="middle" font-size="${11 * k}" font-weight="800" fill="${PCOL}" stroke="#0008" stroke-width="${2.4 * k}" paint-order="stroke">🤝 ${esc(P.name)}${st.partner.online ? ' 🟢' : ''}</text>`;
     }
     return h + '</g>';
   };

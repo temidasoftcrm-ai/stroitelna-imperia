@@ -232,6 +232,7 @@ export function createIncidents(ctx) {
       cars.push({ home, o, x: st.x, z: st.z, yaw: 0, path, pi: 0, stage: 'go', delay: n * rnd(1.5, 4), kind: sirenKind(o) || { Firetruck: 'fire', Ambulance: 'ambulance' }[k] || (k === 'Truck' ? null : 'police') });
     });
     inc = { at, g, cars, puffs, flames, type, hold0: T.hold, t: 0, force: !!force, fx, hoses, R };
+    if (feature('ui-batch2') && type !== 'jam') ctx.started && ctx.started(type, at, T.nm);   // ui-batch2: известието с „👁️ Гледай“ (game.js)
     return { x: Math.round(at.x), z: Math.round(at.z), cars: cars.length, type, nm: T.nm };
   }
   // #3: беглецът тръгва 120–300 м от мястото на ареста, минава през още една точка (по-дълго гонене) и спира в at; полицията — по същия път след него

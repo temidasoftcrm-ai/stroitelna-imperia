@@ -6,8 +6,9 @@
 //   game.js: при зареждането — meshySkyPrep(gltf.scene, () => dayNight.night); в SF_SKY — само в MESHY_SKY_CITIES.
 import * as THREE from 'three';
 
-export const MESHY_SKY = { gold: 'sky/gold.glb', bluespire: 'sky/bluespire.glb', skyspire: 'sky/skyspire.glb', skyspire2: 'sky/skyspire2.glb' };   // „Skyspire Nexus“ — в Blender разделен на две: извитата двойна кула (skyspire, 110 м) и единичната (skyspire2, 95 м) — целият комплекс е широк колкото е висок и на парцел излизаше 15 м
-export const MESHY_SKY_H = { 'sf-sky-gold': 80, 'sf-sky-bluespire': 95, 'sf-sky-skyspire': 110, 'sf-sky-skyspire2': 95 };
+export const MESHY_SKY = { gold: 'sky/gold.glb', bluespire: 'sky/bluespire.glb', skyspire: 'sky/skyspire.glb', skyspire2: 'sky/skyspire2.glb', skyw: 'sky/sky-white.glb', skywarm: 'sky/sky-warm.glb', skyblue: 'sky/sky-blue.glb', skyviolet: 'sky/sky-violet.glb' };   // + четири кули (Meshy) с различни акценти нощем: бяло, топло, синьо, виолетово
+export const MESHY_SKY_NY = { nydeco: 'sky/nydeco.glb' };   // 🇺🇸 lm-ny2: каменната ар деко кула — само в Ню Йорк   // „Skyspire Nexus“ — в Blender разделен на две: извитата двойна кула (skyspire, 110 м) и единичната (skyspire2, 95 м) — целият комплекс е широк колкото е висок и на парцел излизаше 15 м
+export const MESHY_SKY_H = { 'sf-sky-gold': 80, 'sf-sky-bluespire': 95, 'sf-sky-skyspire': 110, 'sf-sky-skyspire2': 95, 'sf-sky-skyw': 180, 'sf-sky-skywarm': 200, 'sf-sky-skyblue': 170, 'sf-sky-skyviolet': 190, 'sf-sky-nydeco': 200 };
 // градовете със стъклени небостъргачи (не старите европейски центрове)
 export const MESHY_SKY_CITIES = new Set(['newyork', 'chicago', 'losangeles', 'toronto', 'mexicocity', 'saopaulo', 'dubai', 'mumbai', 'singapore', 'hongkong', 'shanghai', 'beijing', 'seoul', 'tokyo', 'sydney', 'moscow',
   'houston', 'miami', 'sanfrancisco', 'abudhabi', 'doha', 'kualalumpur', 'bangkok', 'osaka', 'taipei', 'shenzhen', 'jakarta']);

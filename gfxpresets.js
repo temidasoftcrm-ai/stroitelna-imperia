@@ -20,7 +20,10 @@ for (const k in GFX) { const g = GFX[k] = { res: 1, detail: 1, yard: 1, deco: tr
 let cur = null, own = null, merged = null;   // own — „⚙️ Подробно“ (gfx-lite)
 const RANGE = { far: [0.4, 1.2], traffic: [0.1, 1], res: [0.5, 1], detail: [0, 1], yard: [0, 1] }, BOOL = ['shadows', 'night', 'deco'];   // yard — дворовете и паркираните коли (докъде; 0 — без тях), deco — украсата (сергии, билбордове, знамена, статуи)
 function readOwn(v) { if (!LITE || !v || v[0] !== '{') return null; try { const j = JSON.parse(v), o = {}; for (const k in RANGE) if (typeof j.o?.[k] === 'number') o[k] = Math.max(RANGE[k][0], Math.min(RANGE[k][1], j.o[k])); for (const k of BOOL) if (typeof j.o?.[k] === 'boolean') o[k] = j.o[k]; return GFX[j.lv] ? { lv: j.lv, o } : null; } catch { return null; } }
-export const gfxLevel = () => cur || (cur = (() => { const q = (location.search.match(/[?&]gfx=(vlow|low|mid|high)\b/) || [])[1]; if (q) return q;   /* ?gfx= — за тестовете (не се записва) */ try { const v = localStorage.getItem('stroi-gfx'), j = readOwn(v); if (j) { own = j.o; return j.lv; } return GFX[v] ? v : 'mid'; } catch { return 'mid'; } })());
+// ui-batch2: запазеният избор не се губи, ако записът е от другия вид (с „⚙️ Подробно“ — без gfx-lite, или „Много ниско“ — без него → Ниско)
+const lvOf = v => { if (!feature('ui-batch2') || !v) return null; if (v[0] === '{') { try { v = JSON.parse(v).lv; } catch { return null; } } return GFX[v] ? v : v === 'vlow' && GFX.low ? 'low' : null; };
+export const gfxSaved = () => { try { return !!localStorage.getItem('stroi-gfx'); } catch { return false; } };   // ui-batch2: има ли запазен избор на този компютър
+export const gfxLevel = () => cur || (cur = (() => { const q = (location.search.match(/[?&]gfx=(vlow|low|mid|high)\b/) || [])[1]; if (q) return q;   /* ?gfx= — за тестовете (не се записва) */ try { const v = localStorage.getItem('stroi-gfx'), j = readOwn(v); if (j) { own = j.o; return j.lv; } return GFX[v] ? v : lvOf(v) || 'mid'; } catch { return 'mid'; } })());
 // нивото + своите стойности (gfx-lite: трафикът важи и за хората; рязкостта — част от тази на нивото)
 export const gfx = () => { const lv = gfxLevel(); if (!own) return GFX[lv]; if (merged?.lv === lv) return merged; const g = GFX[lv], o = own;
   return merged = { ...g, ...o, lv, peds: o.traffic ?? g.peds, pr: () => g.pr0() * (o.res ?? g.res) }; };

@@ -42,6 +42,7 @@ function boardTrailer(right) {
   return g;
 }
 
+const HW_NM = { rear: '💥 Катастрофа на магистралата', truck: '🚛 Аварирал ТИР на магистралата', fire: '🔥 Горяща кола на магистралата', spill: '📦 ТИР изсипа товара на магистралата' };   // ui-batch2: известието
 // T — от hwtraffic.js: групата, списъкът с колите, лентите, препятствията (leaderIn/followerIn/freeLane) и моделите
 export function createHwIncidents(T) {
   const { g, list, laneZ, NL, RIGHT, half, y, lift, ab, freeLane, leaderIn, followerIn, mk, A, lenOf, rampCx, svc, em } = T;
@@ -117,7 +118,7 @@ export function createHwIncidents(T) {
     const D = I.D, x = -D * (half - 4), lane = I.cones.length || I.div ? firstOpen() : 0;
     if (list.some(q => q.dir === D && !q.ghost && Math.abs(q.x - x) < 35 && Math.abs(q.z - laneZ(D, lane)) < 2.6)) return null;
     let m = null, L = null;
-    if (kind === 'tow') { m = K2 && K2.tow(); if (!m) return null; if (o.big) m.scale.setScalar(10 / TOW_L); L = o.big ? 10 : TOW_L; }
+    if (kind === 'tow') { m = K2 && K2.tow(!!o.big); if (!m) return null;   /* tow-trucks: на магистралата при голям ремонт — тежкият влекач */ if (o.big) m.scale.setScalar(10 / TOW_L); L = o.big ? 10 : TOW_L; }
     else { const n = KINDS[kind].find(q => A[q]); if (!n) return null; m = mk(n); m.userData.beaconsOn = 1; m.userData.sirenOn = false; }
     m.rotation.y = YAW(D);
     const c = { o: m, dir: D, x, lane, z: laneZ(D, lane), v: 24, v0: 28, L: L ?? lenOf(m), heavy: false, cool: 0, inc: 'resp', R: { kind, slot, ph: 'go', stopX: xOf(slot[0]), corrT: 0, big: o.big } };
@@ -202,6 +203,10 @@ export function createHwIncidents(T) {
     a.inc = 'stop'; a.dec = type === 'rear' ? 8 : type === 'spill' ? 4.5 : 2.6; a.zt = laneZ(D, a.lane) + (type === 'truck' || type === 'fire' ? D * (ab ? 0.45 : 0.7) : 0);
     if (b) { b.inc = 'crash'; b.zt = laneZ(D, 0); }
     for (const c of I.wreck) { c.rg = 0; c.haz = []; c.o.traverse(m => { if (m.userData.lamp === 'blink') c.haz.push(m); }); I.haz.push(...c.haz); }
+    if (feature('ui-batch2')) try {   // ui-batch2: известието с „👁️ Гледай“ (game.js incNotice) — мястото и камерата като в hwIncLook, в световни координати
+      const p = spot(); g.updateWorldMatrix(true, false); const w = (x, yy, z) => g.localToWorld(new THREE.Vector3(x, yy, z)), at = w(p.x - p.D * 10, 1, p.z), cam = w(p.x - p.D * 80, 26, p.z + p.D * 34);
+      dispatchEvent(new CustomEvent('stroi-inc', { detail: { nm: HW_NM[type] || '🚧 Инцидент на магистралата', x: at.x, z: at.z, cam: { x: cam.x, y: cam.y, z: cam.z } } }));
+    } catch { }
     return { type, dir: D, x: Math.round(a.x), lane: a.lane, pair: !!b };
   }
   // ударът: първата спира рязко (или плавно — аварирала/горяща), втората се забива в нея

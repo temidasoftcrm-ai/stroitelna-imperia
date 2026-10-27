@@ -58,9 +58,9 @@ export function buildService(k, lvl, lot, opt = {}) {
     const granite = (w2, d2) => M(0xffffff, { map: tex((g, n) => { const c = n / 8; g.fillStyle = '#77736c'; g.fillRect(0, 0, n, n); for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const v = 168 + Math.floor(Math.random() * 26); g.fillStyle = `rgb(${v},${v - 3},${v - 8})`; g.fillRect(x * c + 1.5, y * c + 1.5, c - 3, c - 3); } }, [w2 / 8, d2 / 8]) });
     if (lvl === 'l' && opt.hallTop) { flat(88, pd * 1.6 + 2, M(0x6f6a62), 0, front - pd * 0.8, 0.04); flat(86, pd * 1.6, granite(86, pd * 1.6), 0, front - pd * 0.8, 0.045); }
     // hall-gilded (T2): в големите европейски градове главното кметство (ниво l) — „Позлатената катедрала“ на потребителя (Meshy); нощем фасадата и куполът светят топло
-    if (lvl === 'l' && opt.hallTop) { group.userData.gildHall = true; glb(opt.hallTop, 0.55, 0.92); const i = tasks.length - 1; tasks[i] = tasks[i].then(() => { group.traverse(m => { if (m.isMesh && m.material && m.material.map && !glows.includes(m.material) && !m.userData.gild) { m.userData.gild = 1; m.material = m.material.clone(); m.material.emissive = new THREE.Color(0x6a5434); m.material.emissiveMap = m.material.map; m.material.emissiveIntensity = 0; glows.push(m.material); } });
+    if (lvl === 'l' && opt.hallTop) { group.userData.gildHall = true; glb(opt.hallTop, 0.55, 0.92); const i = tasks.length - 1; tasks[i] = tasks[i].then(o => { if (!o) return; o.traverse(m => { if (m.isMesh && m.material && m.material.map && !glows.includes(m.material) && !m.userData.gild) { m.userData.gild = 1; m.material = m.material.clone(); m.material.emissive = new THREE.Color(0x6a5434); m.material.emissiveMap = m.material.map; m.material.emissiveIntensity = group.userData.nightOn ? 1.4 : 0; glows.push(m.material); } });
       // по-голяма от парцела: ~80 м по фасадата (като истинско Hôtel de Ville) — назад, отпред остава площадът
-      const o = group.children.find(c => { let t = false; c.traverse(q => { if (q.userData.gild) t = true; }); return t; }); if (!o) return;
+      /* одитът №5: само самият модел (беше group.traverse — хващаше и паважа на площада, и него уголемяваше вместо сградата) */
       const b = new THREE.Box3().setFromObject(o), sz = b.getSize(new THREE.Vector3()), kk = 80 / Math.max(sz.x, sz.z, 1); if (kk <= 1) return;
       o.scale.multiplyScalar(kk); o.updateMatrixWorld(true); const b2 = new THREE.Box3().setFromObject(o); o.position.z += (front - pd) - b2.max.z; o.position.y -= b2.min.y; }); }
     else glb(modelOf(k, lvl, seed), 0.5, 0.8);
@@ -125,7 +125,7 @@ export function buildService(k, lvl, lot, opt = {}) {
   }
   // граница на парцела (тънка линия) — за преглед в Лабораторията
   if (opt.outline) { const e = new THREE.EdgesGeometry(new THREE.PlaneGeometry(w, d)); own.push(e); const l = new THREE.LineSegments(e, new THREE.LineBasicMaterial({ color: 0xffd54a })); own.push(l.material); l.rotation.x = -Math.PI / 2; l.position.y = 0.08; group.add(l); }
-  return { group, ready: Promise.all(tasks), setNight(on) { for (const m of glows) m.emissiveIntensity = on ? 1.4 : 0; },
+  return { group, ready: Promise.all(tasks), setNight(on) { group.userData.nightOn = on; for (const m of glows) m.emissiveIntensity = on ? 1.4 : 0; },
     dispose() { group.parent && group.parent.remove(group); for (const x of own) x.dispose && x.dispose(); group.traverse(o => { if (o.geometry && !SHARED.has(o.geometry) && !own.includes(o.geometry)) o.geometry.dispose(); }); } };
 }
 

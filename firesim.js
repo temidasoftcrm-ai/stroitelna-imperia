@@ -173,7 +173,10 @@ export function createFires(deps) {
   function start(lotId, o = {}) {
     const lot = (deps.lots() || [])[lotId]; if (!lot || !lot.obj || st().some(f => f.lot === lotId && f.city === deps.cityId() && !['done'].includes(f.st))) return null;
     const f = { id: `f${Date.now().toString(36)}${seq++}`, city: deps.cityId(), lot: lotId, hp: 100, inten: 0.35, sev: o.sev ?? (0.5 + Math.random() * 1.2), st: 'travel', t0: deps.day(), arrive: deps.day() + (o.travel ?? TRAVEL), out: null, order: null };
-    st().push(f); deps.toast(`🔥 Пожар в сграда (${lot.zone === 'center' ? 'център' : 'квартал'})! Пожарната тръгна.`, 'bad', () => deps.fly(lot)); deps.save(); return f;
+    st().push(f);
+    if (feature('ui-batch2')) dispatchEvent(new CustomEvent('stroi-inc', { detail: { nm: `🔥 Пожар в сграда (${lot.zone === 'center' ? 'център' : 'квартал'})! Пожарната тръгна.`, x: lot.x, z: lot.z } }));   // ui-batch2: известието с „👁️ Гледай“ (game.js incNotice)
+    else deps.toast(`🔥 Пожар в сграда (${lot.zone === 'center' ? 'център' : 'квартал'})! Пожарната тръгна.`, 'bad', () => deps.fly(lot));
+    deps.save(); return f;
   }
   // гасенето приключи: оценка на щетите → поръчка
   function assess(f) {

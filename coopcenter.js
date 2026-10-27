@@ -319,7 +319,8 @@ function fin(C) {
   h += THREE_HTML(C, s, pn);
   if (V.fin === 'tr') {
     if (V.helpMsg) { const m = (st2?.messages || []).find(x => x.id === V.helpMsg); if (m) h += `<div class="ac" style="border-left-color:var(--bad)"><div>🆘 Помагаш на ${pn}: „${esc(m.text)}“<div class="mut">Подари сумата, после натисни „✅ Помогнах“ — партньорът вижда, че е изпълнено.</div></div><button class="btn2" data-c="helped:${m.id}">✅ Помогнах</button></div>`; }
-    h += `<h3>🎁 Подари пари</h3><div class="row"><input id="cpAmt" inputmode="numeric" placeholder="сума в €" value="${V.giftA || ''}"><button class="btn" data-c="gift">🎁 Подари на ${pn}</button></div><div class="mut">Парите тръгват от твоите средства веднага.</div>`;
+    if (feature('ui-batch2')) { const G = giftCtx(C); h += `<h3>🎁 Подари пари</h3><div class="card"><input id="cpAmt" type="hidden" value="${Math.min(V.giftA || 0, G.max) || ''}">${moneySliderHtml({ id: 'gift', kind: 'in', label: `🎁 Подари на ${pn}`, max: G.max, value: V.giftA || 0, after: G.after, go: G.go })}<div class="mut">Парите тръгват от твоите средства веднага.</div></div>`; }   // ui-batch2: плъзгачът като „Обща касичка“
+    else h += `<h3>🎁 Подари пари</h3><div class="row"><input id="cpAmt" inputmode="numeric" placeholder="сума в €" value="${V.giftA || ''}"><button class="btn" data-c="gift">🎁 Подари на ${pn}</button></div><div class="mut">Парите тръгват от твоите средства веднага.</div>`;
     const sh = (C.st.partner?.snap?.cities || []).includes(C.d.S().cityId);
     h += `<h3>🎁 Изненада в общ град</h3>` + (sh ? `<div class="row"><input id="cpST" maxlength="60" placeholder="Текст на табелата" style="width:200px"><input id="cpSA" inputmode="numeric" placeholder="подарък € (по желание)" style="width:150px"><button class="btn2" data-c="surp">🎁 Остави тук</button></div>` : `<div class="mut">Отиди в град, в който и ${pn} има фирма, за да оставиш изненада.</div>`);
     const SM = st2?.surprises_mine || []; if (SM.length) h += `<div class="card">${SM.map(x => `<div class="led"><span>🎁 ${esc(C.d.cityName(x.city))} · „${esc(x.text)}“${x.amount ? ` · ${f(x.amount)} €` : ''}</span>${chip(x.status === 'found' ? 'done' : 'wait')}</div>`).join('')}</div>`;
@@ -376,8 +377,19 @@ function holdSliders(C, bal) {
   const K = holdCtx(C, bal);
   return `<input id="cpV" type="hidden" value="">` + ['in', 'out'].map(k => moneySliderHtml({ id: k, kind: k, max: K[k].max, value: V.hpick[k], after: K[k].after, go: K[k].go })).join('');
 }
+// ui-batch2: „🎁 Подари пари“ — същият плъзгач (25% / 50% / 75% / Всичко, „След това: …“); попълва скритото #cpAmt, което coop.js чете (data-c="gift")
+function giftCtx(C) {
+  const { f, esc } = C, pn = esc(C.partnerName()), cash = Math.max(0, Math.floor(C.E().money || 0)), pm = C.st.partner?.snap?.money;
+  return { max: cash, after: v => `След това: у теб ${f(cash - v)} €${pm != null ? ` · у ${pn} ~${f(pm + v)} €` : ''}`, go: v => ({ txt: `🎁 Подари ${f(v)} € на ${pn}`, c: 'gift' }) };
+}
+function wireGift(el, C) {
+  const box = el.querySelector('.msl[data-msl="gift"]'), hid = el.querySelector('#cpAmt'); if (!box || !hid) return;
+  const w = wireMoneySlider(box, { ...giftCtx(C), onPick: v => { V.giftA = v; hid.value = v; } });
+  box.querySelector('.msl-go').addEventListener('click', () => { hid.value = w.value(); V.giftA = 0; }, true);   // преди onclick-а на coop.js, който чете #cpAmt
+}
 function wireHold(el, C) {
-  const boxes = el.querySelectorAll('.msl[data-msl]'); if (!boxes.length) return;
+  wireGift(el, C);
+  const boxes = el.querySelectorAll('.msl[data-msl="in"],.msl[data-msl="out"]'); if (!boxes.length) return;
   const hid = el.querySelector('#cpV'), bal = C.st2?.vault?.balance || 0, K = holdCtx(C, bal);
   boxes.forEach(box => { const k = box.dataset.msl, w = wireMoneySlider(box, { ...K[k], onPick: v => { V.hpick[k] = v; hid.value = v; } });
     box.querySelector('.msl-go').addEventListener('click', () => { hid.value = w.value(); V.hpick[k] = 0; }, true); });   // преди onclick-а на coop.js, който чете #cpV

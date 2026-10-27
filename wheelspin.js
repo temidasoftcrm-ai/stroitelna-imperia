@@ -16,3 +16,9 @@ export function spinWheels(obj) {
   else u.wp = new THREE.Vector3();
   u.wp.copy(P);
 }
+// hubWheels(root) — веднъж, на заредения модел (преди клонирането): възелът wheel_* — точно в главината (центъра на геометрията по y и z).
+// Иначе колелото се върти около изместена ос и гумата влиза под пътя (одитът №11: fire-titan и сметосъбирачът — до −0,21 м)
+export function hubWheels(root) {
+  root.traverse(o => { if (!o.isMesh || !/^wheel_/.test(o.name) || o.geometry.userData.hub) return; const g = o.geometry; g.computeBoundingBox(); const c = g.boundingBox.getCenter(new THREE.Vector3());
+    if (Math.abs(c.y) + Math.abs(c.z) < 1e-4) return; g.translate(0, -c.y, -c.z); g.userData.hub = 1; o.position.add(new THREE.Vector3(0, c.y, c.z).multiply(o.scale).applyQuaternion(o.quaternion)); });
+}

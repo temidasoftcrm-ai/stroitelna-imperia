@@ -5,6 +5,7 @@
 // памет, ядра, екран → светофар 🟢 / 🟡 (засича в мегаполисите) / 🔴 (слаб) с кратко „защо“ и съвет.
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';
+import { gfx as gfxNow, gfxOwn, gfxSaved } from './gfxpresets.js';   // ui-batch2: „Сега: … — пази се на този компютър“ (проверката само предлага, не сменя)
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const CSS = `.pcBox{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.92);font:15px/1.5 system-ui,sans-serif;color:#e8e8ea;padding:16px;box-sizing:border-box}
@@ -93,6 +94,7 @@ export async function perfCheck(main, apply, more) {   // more — gfx-lite: { o
   d.querySelector('.in').innerHTML = `<h2>🖥️ Проверка на компютъра</h2><div class="light">${L[0]}</div><h2 style="font-size:18px">${L[1]}</h2>
     <p>Защо: ${esc(v.why.join(', '))}.</p><ul>${v.tips.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
     <p><small>Видеокарта: ${esc(g ? g.name : 'няма WebGL')}${g ? ` · текстури до ${g.maxTex}` : ''}${t ? ` · кадър в теста ~${t.ms.toFixed(1)} ms` : ''}${ram ? '' : ' · паметта — браузърът не я казва'}</small></p>
+    ${apply && feature('ui-batch2') && gfxSaved() ? (g0 => `<p style="margin-top:8px"><small>💾 Сега: <b>${g0.ico} ${esc(g0.nm)}</b>${gfxOwn() ? ' (с твои настройки)' : ''} — твоят избор, пази се на този компютър. Проверката само предлага — нищо не се сменя, докато не избереш.</small></p>`)(gfxNow()) : ''}
     ${apply && more ? `<p style="margin-top:8px">Предложение: графика <b>${more.GFX[sugOf(v.lv)].ico} ${esc(more.GFX[sugOf(v.lv)].nm)}</b>. Избери ниво:</p>
     <div class="row" style="margin-top:6px;display:grid;grid-template-columns:repeat(${more.order.length},1fr)">${more.order.map(k => `<button class="${k === sugOf(v.lv) ? 'go' : ''}" data-lv="${k}" style="min-width:0;padding:10px 4px" title="${esc(more.GFX[k].desc)}">${more.GFX[k].ico} ${esc(more.GFX[k].nm)}</button>`).join('')}</div>
     <div class="row" style="margin-top:8px"><button id="pcDet">⚙️ Подробно</button><button id="pcOk">Не сега</button><button id="pcAgain">↻ Пак</button></div>`

@@ -4,10 +4,10 @@
 // wire: wireMoneySlider(box, { after, go, onPick(v) }) — пречертава реда и бутона при местене; onPick — стойността (за помнене / скритото поле)
 const fmt = n => `${Math.round(n).toLocaleString('bg-BG')} €`;
 export const msStep = max => max > 2e6 ? 10000 : max > 20000 ? 1000 : 100;
-export function moneySliderHtml({ id, kind, max, value = 0, after, go }) {
+export function moneySliderHtml({ id, kind, max, value = 0, after, go, label }) {   // label — заглавието вместо „➕ Внеси / ➖ Изтегли“ (ui-batch2: подаръкът на партньора)
   max = Math.max(0, Math.floor(max)); const v = Math.min(value, max), inn = kind === 'in', g = go(v), dis = max > 0 ? '' : 'disabled';
   return `<div class="msl" data-msl="${id}" style="margin-top:10px">
-    <div class="led" style="border:0"><span>${inn ? '➕ Внеси' : '➖ Изтегли'}</span><b class="msl-v">${fmt(v)}</b></div>
+    <div class="led" style="border:0"><span>${label || (inn ? '➕ Внеси' : '➖ Изтегли')}</span><b class="msl-v">${fmt(v)}</b></div>
     <input type="range" min="0" max="${max}" step="${msStep(max)}" value="${v}" ${dis} style="width:100%;padding:0;accent-color:${inn ? '#ffc93c' : '#7dd3ff'}">
     <div style="display:flex;gap:6px;margin:4px 0">${[25, 50, 75, 100].map(p => `<button class="btn2" data-mspct="${p}" style="flex:1;padding:4px 0;font-size:12px" ${dis}>${p === 100 ? 'Всичко' : p + '%'}</button>`).join('')}</div>
     <div class="mut msl-after" style="margin:0 0 4px">${after(v)}</div>

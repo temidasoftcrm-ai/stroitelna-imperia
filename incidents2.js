@@ -7,6 +7,11 @@ import * as THREE from 'three';
 import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { feature } from './lab/feature.js';
+// 🚚 tow-trucks (T1): влекачите на потребителя (Meshy AI, Темидасофт) — лекият (пикап със стрела) в града, тежкият (3 оси, стрела) на магистралата;
+// в Blender: колелата (wheel_*), стрелата (boom, шарнир в основата), бурканите (beacon_*) и фаровете — отделни; тук: колелата се въртят по пътя,
+// бурканите мигат, стрелата се вдига, щом нещо е закачено. Предницата — към +z.
+const TOW2 = feature('tow-trucks');
 
 const H = new URL('./assets/heavy/', import.meta.url).href,   /* от модула — и от Лабораторията (lab/) */ PEDS = ['adam', 'brian', 'steve', 'elizabeth', 'kate', 'louise'].map(k => `${H}people/peds/ped-${k}.glb`);
 const FILES = [`${H}people/peds/peds-anims.glb`, `${H}riot/riot-cop.glb`, `${H}ops/firefighter.glb`, `${H}inc/paramedic.glb`, `${H}inc/moto.glb`, `${H}inc/towtruck.glb`];
@@ -14,12 +19,13 @@ const NEAR = 180;   // м — по-далеч анимациите на хора
 let lib = null;
 export function loadInc2() {
   if (lib) return lib; const L = new GLTFLoader(), ld = u => L.loadAsync(u).catch(e => { console.warn('incidents2', u, e); return null; });
-  return lib = Promise.all([...PEDS.map(ld), ...FILES.map(ld)]).then(gs => {
-    const peds = gs.slice(0, PEDS.length).filter(Boolean), [an, cop, ff, medic, moto, tow] = gs.slice(PEDS.length), clips = {};
+  return lib = Promise.all([...PEDS.map(ld), ...FILES.map(ld), ...(TOW2 ? [ld(`${H}inc/tow-light.glb`), ld(`${H}inc/tow-heavy.glb`)] : [])]).then(gs => {
+    const peds = gs.slice(0, PEDS.length).filter(Boolean), [an, cop, ff, medic, moto, tow, towL, towH] = gs.slice(PEDS.length), clips = {};
     for (const g of peds) { g.scene.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(g.scene, true); g.k = 1.75 / ((b.max.y - b.min.y) || 1); for (const c of g.animations) clips[c.name] = clips[c.name] || c; }
     if (an) for (const c of an.animations) clips[c.name] = c;
-    for (const g of [cop, ff, medic, moto, tow]) if (g) g.scene.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
-    return { peds, clips, cop, ff, medic, moto, tow };
+    for (const g of [cop, ff, medic, moto, tow, towL, towH]) if (g) g.scene.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+    for (const g of [towL, towH]) if (g) g.scene.traverse(m => { if (m.isMesh && m.material) { m.material.metalness = Math.min(m.material.metalness ?? 0, 0.3); if (/^beacon|^lamp/.test(m.name)) m.castShadow = false; } });   // tow-trucks: металността 1 без огледална среда — черно
+    return { peds, clips, cop, ff, medic, moto, tow, towL, towH };
   });
 }
 // размерите само по непрозрачните части (без лъчите на фаровете)
@@ -74,7 +80,17 @@ export function createInc2Kit(L) {
     streams.push(S); return S; }
   // ---- превозните средства
   const moto = () => { if (!L.moto) return null; const w = wrapTo(L.moto.scene, 2.07), g = new THREE.Group(); w.rotation.z = Math.PI / 2 - 0.14; w.position.y = 0.42; g.add(w); return g; };   // легнал на една страна
-  const tow = () => L.tow ? wrapTo(L.tow.scene, 5.66, L.towYaw ?? -Math.PI / 2) : null;   // по +z, предницата напред (моделът е по x)
+  const tow = (big = false) => { const T2 = big ? L.towH || L.towL : L.towL || L.towH; if (TOW2 && T2) return towAnim(wrapTo(T2.scene, 5.66)); return L.tow ? wrapTo(L.tow.scene, 5.66, L.towYaw ?? -Math.PI / 2) : null; };   // по +z, предницата напред (моделът е по x); tow-trucks — big: тежкият
+  // tow-trucks: колелата по изминатия път, мигащите буркани, стрелата нагоре, щом нещо е закачено (останките — дете на влекача)
+  function towAnim(w) { const wh = [], bc = [], V0 = new THREE.Vector3(), V1 = new THREE.Vector3(); let boom = null, body = null, last = null, base = 0;
+    w.traverse(m => { if (/^wheel_/.test(m.name)) { const b = new THREE.Box3().setFromObject(m); wh.push(m); m.userData.r = Math.max(0.1, (b.max.y - b.min.y) / 2); }
+      else if (m.name === 'boom') boom = m; else if (m.isMesh && /^beacon/.test(m.name)) { m.material = m.material.clone(); m.material.emissive = new THREE.Color(0xff8a10); bc.push(m.material); } else if (m.isMesh && !body && m.name === 'body') body = m; });
+    base = w.children.length;
+    if (body) body.onBeforeRender = () => { const t = performance.now() / 1000; w.getWorldPosition(V1); const ws = w.getWorldScale(V0).x || 1, d = last ? V1.distanceTo(last) : 0; last = (last || new THREE.Vector3()).copy(V1);
+      if (d > 0.001 && d < 5) for (const m of wh) m.rotation.x += d / ws / (m.userData.r / ws * ws);   // r — в мащаба на света
+      for (const m of bc) m.emissiveIntensity = Math.sin(t * 9) > 0.2 ? 4 : 0.3;
+      if (boom) { const tg = w.children.length > base ? 0.32 : 0; boom.rotation.x += (tg - boom.rotation.x) * 0.05; } };
+    return w; }
   // анимациите — само близо до камерата; dt — игровото време
   function update(dt, cam) { for (const P of people) { if (!P.mixer || !P.o.parent) continue; P.o.getWorldPosition(V); if (!cam || V.distanceToSquared(cam) < NEAR * NEAR) P.mixer.update(dt); } }
   function reset() { for (const P of people) if (P.mixer) P.mixer.stopAllAction(); people.length = 0; for (const s of streams) s.dispose(); streams.length = 0; }

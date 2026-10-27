@@ -392,7 +392,9 @@ function realTrees(G, list, models) {
   if (!vars.length) return false;
   const by = vars.map(() => []); list.forEach((t, i) => by[(i * 7 + 3) % vars.length].push(t));
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), v = new THREE.Vector3(), sc = new THREE.Vector3();
-  vars.forEach((parts, vi) => { const L = by[vi]; if (!L.length) return; for (const [g, mat] of parts) { const I = new THREE.InstancedMesh(g, mat, L.length);
+  vars.forEach((parts, vi) => { const L = by[vi]; if (!L.length) return; for (const [g, mat] of parts) { const tt = mat && mat.userData && mat.userData.ttInst, I = new THREE.InstancedMesh(g, tt ? mat.userData.ttInst() : mat, L.length);   /* tree-colors (T2): оцветимите листа — със семе по дърво (aSeed) */
+      if (tt) I.customDepthMaterial = I.material.userData.depth;
+      if (tt) g.setAttribute('aSeed', new THREE.InstancedBufferAttribute(Float32Array.from(L, ([x, z]) => { const h = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453; return h - Math.floor(h); }), 1));
     L.forEach(([x, z, h], i) => { q.setFromAxisAngle(up, (i * 2.39) % 6.283); I.setMatrixAt(i, m.compose(v.set(x, 0, z), q, sc.set(h, h, h))); }); I.castShadow = true; I.frustumCulled = false; G.add(I); } });
   return true;
 }
