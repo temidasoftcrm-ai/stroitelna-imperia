@@ -2,6 +2,7 @@
 // Сергия: плот, четири стълбчета, раиран навес (цветът — по сергията), щайги с плодове/зеленчуци. Кафене: кръгла масичка, 4 стола, голям чадър.
 // build(spots) — spots: [{ x, z, rot, kind: 'stall' | 'cafe' }]; dispose()
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 // сергиите от Sketchfab (kiselevmiki, CC-BY): „market stall“ (stall-a — раиран навес, плодове, бъчва, табелка) и „stand“ (stall-b — зелен навес, щайги,
 // висящи банани, дини на бъчва, черна дъска) — през една; веднъж за всички, по инстанция на част; дотогава — от кутийки
@@ -17,7 +18,7 @@ function stripes() {
   if (stripeTex) return stripeTex;
   const c = document.createElement('canvas'); c.width = 64; c.height = 8; const g = c.getContext('2d');
   for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#ffffff' : '#9a9a9a'; g.fillRect(i * 8, 0, 8, 8); }
-  stripeTex = new THREE.CanvasTexture(c); stripeTex.colorSpace = THREE.SRGBColorSpace; return stripeTex;
+  stripeTex = canvasTex(c); stripeTex.colorSpace = THREE.SRGBColorSpace; return stripeTex;
 }
 export function buildMarket(spots) {
   const g = new THREE.Group(); g.name = 'markets';

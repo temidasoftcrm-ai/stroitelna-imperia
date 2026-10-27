@@ -2,6 +2,7 @@
 // с лифт. Вилното селище се вижда според етапа: празен парцел → строеж (вилите растат) → готово (басейн, алеи).
 // Извън сезона: плажът е празен (затворени чадъри), а зимният курорт е зелен, без сняг.
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { feature } from './lab/feature.js';
 import { EXTRAS, hotelStylesOf, rentOf, SEASON_M, OFF_SEASON } from './resorts.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -24,7 +25,7 @@ function noiseTex(base, spread, n = 2600, rep = 60) {
     t.copy(col).offsetHSL((Math.random() - 0.5) * 0.03, (Math.random() - 0.5) * 0.12, (Math.random() - 0.5) * spread);
     g.fillStyle = '#' + t.getHexString(); const s = 1 + Math.random() * 4; g.fillRect(Math.random() * 256, Math.random() * 256, s, s);
   }
-  const tx = new THREE.CanvasTexture(c); tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.repeat.set(rep, rep); tx.colorSpace = THREE.SRGBColorSpace;
+  const tx = canvasTex(c); tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.repeat.set(rep, rep); tx.colorSpace = THREE.SRGBColorSpace;
   return tx;
 }
 // небе: голяма полусфера с преливане от хоризонта (horizon) към зенита (zenith); не се влияе от мъглата

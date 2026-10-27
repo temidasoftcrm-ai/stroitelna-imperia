@@ -4,6 +4,7 @@
 // 'both' (по подразбиране) — моделите + иконката, само когато камерата е близо. Броят/височината следят наличността. 1 единица = 1 м.
 // Моделите (CC-BY, assets/heavy/CREDITS.txt): assets/heavy/whmat/mat-*.glb; стъклата, мраморът и арматурата — процедурни.
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { pickPart } from './blkcut.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
@@ -58,7 +59,7 @@ function marbleMap() {
   const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
   g.fillStyle = '#f1efea'; g.fillRect(0, 0, 256, 256); g.strokeStyle = 'rgba(120,120,130,.45)';
   for (let i = 0; i < 9; i++) { g.lineWidth = 0.6 + (i % 3); g.beginPath(); let x = (i * 53) % 256, y = 0; g.moveTo(x, y); while (y < 256) { x += Math.sin(y * 0.05 + i) * 9 + 4; y += 16; g.lineTo(x % 256, y); } g.stroke(); }
-  marbleTex = new THREE.CanvasTexture(c); marbleTex.colorSpace = THREE.SRGBColorSpace; return marbleTex;
+  marbleTex = canvasTex(c); marbleTex.colorSpace = THREE.SRGBColorSpace; return marbleTex;
 }
 function glassRack(n) {
   const g = new THREE.Group(), steel = mat('rack', () => new THREE.MeshStandardMaterial({ color: 0x3a4a5c, roughness: 0.6, metalness: 0.5 })),
@@ -112,7 +113,7 @@ function iconSprite(m, q, f, unit) {
   g.fillStyle = '#fff'; g.font = 'bold 50px system-ui, sans-serif'; g.fillText(`${Math.round(f * 100)}%`, 96, 140, 176);
   g.fillStyle = '#c9d3dd'; g.font = '28px system-ui, sans-serif'; g.fillText(`${Math.round(q * 10) / 10} ${unit || ''}`, 96, 180, 176);
   g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(22, 198, 148, 10); g.fillStyle = f > 0.66 ? '#5fd17a' : f > 0.25 ? '#f2c94c' : '#eb5757'; g.fillRect(22, 198, 148 * Math.min(1, f), 10);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace;
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, fog: false, transparent: true })); s.renderOrder = 11; return s;
 }
 const _w = new THREE.Vector3(), _s = new THREE.Vector3();

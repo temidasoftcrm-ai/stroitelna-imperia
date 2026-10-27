@@ -7,6 +7,7 @@
 // const a = createAirCity({ parent, airport() → Group | null, center() → [x, z], night() → 0…1, simT() → s, plane(kind, livery),
 //   target() → { x, z } | null, load(url) → Promise<gltf>, approach() → bool, heli() → bool });  a.update(dt); a.clear()
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 
 const T = 70, V = 34, SLOPE = 0.075, D0 = 1300, RT = 700, HAND = { x: 46, z: 110 + 700, y: 90 };   // цикълът и мястото на предаване — като LAND в airport.js
 const HELI = 'assets/heavy/ops/heli.glb';
@@ -15,7 +16,7 @@ function glow() {
   if (glowTex) return glowTex;
   const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
   gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.25, 'rgba(255,255,255,0.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
-  glowTex = new THREE.CanvasTexture(c); return glowTex;
+  glowTex = canvasTex(c); return glowTex;
 }
 const sprite = (col, s) => { const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow(), color: col, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 })); m.scale.set(s, s, 1); return m; };
 function fit(o, len) {   // най-дългата хоризонтална страна → len; носът по −z (както в opsfire)

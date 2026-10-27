@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { canvasTex, drawable } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import './glbfix.js';   // ⚡ флаг perf-fix: стъклата без transmission и прозрачните двустранни на един проход — за всички GLB
 import { splitTrees } from './treesplit.js';   // горските пакети → отделни дървета (и за online3d.js)
@@ -1718,7 +1719,7 @@ function label(text, color = '#fff', w = 10, bg = 'rgba(15,20,28,.85)') {
   g.fillStyle = bg; g.beginPath(); g.roundRect(4, 4, 504, 88, 20); g.fill();
   g.font = 'bold 44px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
   g.fillStyle = color; g.fillText(text, 256, 50, 480);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace;
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false }));
   s.scale.set(w, w * 96 / 512, 1);
   s.renderOrder = 10;
@@ -1734,7 +1735,7 @@ function goldLabel(text, w = 64) {
   const gr = g.createLinearGradient(0, 30, 0, 100); gr.addColorStop(0, '#fff3b0'); gr.addColorStop(0.5, '#ffd54a'); gr.addColorStop(1, '#b8860b');
   if (bare) { g.shadowColor = 'rgba(0,0,0,.6)'; g.shadowBlur = 8; g.shadowOffsetY = 3; g.lineWidth = 3; g.strokeStyle = 'rgba(60,40,0,.45)'; g.strokeText(text, 384, 66, 720); g.shadowColor = 'transparent'; g.fillStyle = gr; g.fillText(text, 384, 66, 720); }
   else { g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,.55)'; g.strokeText(text, 384, 66, 720); g.fillStyle = gr; g.fillText(text, 384, 66, 720); }
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace;
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true })); s.scale.set(w, w * 128 / 768, 1); s.renderOrder = 11; return s;
 }
 const lmBox = new THREE.Box3(), lmTmp = new THREE.Box3(); let lmLabT = 0;
@@ -1759,7 +1760,7 @@ function updMyBeams() {
   const d = camera.position.distanceTo(controls.target), on = d > 260;
   if (!myBeams.mesh || myBeams.mesh.parent !== city.group) {
     const geo = new THREE.CylinderGeometry(1.6, 3.2, 1, 10, 1, true).translate(0, 0.5, 0), cv = document.createElement('canvas'); cv.width = 4; cv.height = 128; const cg = cv.getContext('2d'), gr = cg.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.55, 'rgba(255,255,255,.35)'); gr.addColorStop(1, 'rgba(255,255,255,1)'); cg.fillStyle = gr; cg.fillRect(0, 0, 4, 128);
-    const am = new THREE.CanvasTexture(cv), mat = new THREE.MeshBasicMaterial({ color: 0xffffff, alphaMap: am, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.FrontSide, fog: false });   // ярка долу, разтапя се нагоре
+    const am = canvasTex(cv), mat = new THREE.MeshBasicMaterial({ color: 0xffffff, alphaMap: am, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.FrontSide, fog: false });   // ярка долу, разтапя се нагоре
     myBeams.mesh = new THREE.InstancedMesh(geo, mat, 512); myBeams.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(512 * 3), 3); myBeams.mesh.frustumCulled = false; myBeams.mesh.renderOrder = 12; city.group.add(myBeams.mesh); myBeams.t = 0;
   }
   myBeams.mesh.visible = on; if (!on) return;
@@ -1818,7 +1819,7 @@ function roofLogo(g, office, level) {
   cg.font = '150px "Noto Color Emoji", sans-serif'; cg.fillText(b.ico || '🏗️', 40, 132);
   cg.shadowColor = b.col || '#ffb300'; cg.shadowBlur = 20; cg.fillStyle = '#ffffff'; cg.font = '900 104px system-ui, sans-serif'; cg.fillText((b.nm || '').toUpperCase(), 230, 92, 760);
   cg.fillStyle = b.col || '#ffd54a'; cg.font = '800 62px system-ui, sans-serif'; cg.fillText('КОНСТРЪКШЪН', 232, 190, 760);
-  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const tex = canvasTex(c); tex.colorSpace = THREE.SRGBColorSpace;
   g.updateMatrixWorld(true); const gi = new THREE.Matrix4().copy(g.matrixWorld).invert(), lb = new THREE.Box3().setFromObject(office).applyMatrix4(gi), roofW = Math.min(lb.max.x - lb.min.x, lb.max.z - lb.min.z);
   const bw = Math.max(5, Math.min(16, roofW * 0.85)), bh = bw / 4, top = lb.max.y, cx = (lb.min.x + lb.max.x) / 2, cz = (lb.min.z + lb.max.z) / 2, bmat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
   const board = new THREE.Group();
@@ -1922,7 +1923,7 @@ const doorTex = (() => {
   const c = document.createElement('canvas'); c.width = 64; c.height = 64;
   const g = c.getContext('2d'); g.fillStyle = '#cfd4da'; g.fillRect(0, 0, 64, 64);
   for (let y = 0; y < 64; y += 6) { g.fillStyle = '#9aa1a9'; g.fillRect(0, y, 64, 2); }
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 })();
 function parkingLines(g, n, x0, z0) {
   for (let k = 0; k < n; k++) {
@@ -2161,7 +2162,7 @@ function buildHQ() {
     cg.font = '900 112px system-ui, sans-serif'; cg.textAlign = 'center'; cg.textBaseline = 'middle';
     cg.shadowColor = '#ffb300'; cg.shadowBlur = 24; cg.fillStyle = '#ffd54a'; cg.fillText('СТРОИТЕЛНА', 512, 82);
     cg.font = '900 96px system-ui, sans-serif'; cg.fillStyle = '#ffffff'; cg.fillText('ИМПЕРИЯ', 512, 190);
-    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    const tex = canvasTex(c); tex.colorSpace = THREE.SRGBColorSpace;
     const bw = 11, bh = bw / 4, top = ob.max.y - g.position.y, bmat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
     const board = new THREE.Group();
     for (const ry of [0, Math.PI]) { const f = new THREE.Mesh(new THREE.PlaneGeometry(bw, bh), bmat); f.rotation.y = ry; f.position.z = ry ? -0.06 : 0.06; board.add(f); }
@@ -2997,7 +2998,7 @@ const fenceTex = (() => {
   const c = document.createElement('canvas'); c.width = 64; c.height = 16;
   const g = c.getContext('2d');
   for (let k = 0; k < 8; k++) { g.fillStyle = k % 2 ? '#ffffff' : '#ff7a00'; g.fillRect(k * 8, 0, 8, 16); }
-  const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.repeat.set(6, 1); t.colorSpace = THREE.SRGBColorSpace;
+  const t = canvasTex(c); t.wrapS = THREE.RepeatWrapping; t.repeat.set(6, 1); t.colorSpace = THREE.SRGBColorSpace;
   return t;
 })();
 const dirtMat = new THREE.MeshStandardMaterial({ color: 0x7a5a3a, roughness: 1 });
@@ -3268,14 +3269,14 @@ const noteTex = (() => {
   g.strokeStyle = '#e8f5e9'; g.lineWidth = 6; g.strokeRect(8, 8, 240, 112);
   g.fillStyle = '#ffffff'; g.font = 'bold 54px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('100 €', 128, 66);
   g.fillStyle = '#ffd54a'; g.fillRect(112, 0, 32, 128);   // банд
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 })();
 const edgeTex = (() => {
   const c = document.createElement('canvas'); c.width = 64; c.height = 64;
   const g = c.getContext('2d');
   for (let y = 0; y < 64; y += 3) { g.fillStyle = y % 6 ? '#f2fff2' : '#7dff9a'; g.fillRect(0, y, 64, 3); }
   g.fillStyle = '#ffd54a'; g.fillRect(26, 0, 12, 64);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 })();
 // пачките светят със собствената си текстура (emissiveMap), за да се виждат ясно и нощем
 const stackGeo = new THREE.BoxGeometry(2.6, 1.0, 1.3);
@@ -3286,7 +3287,7 @@ const beamTex = (() => {
   const g = c.getContext('2d'), grd = g.createLinearGradient(0, 0, 0, 128);
   grd.addColorStop(0, 'rgba(125,255,168,0)'); grd.addColorStop(1, 'rgba(125,255,168,1)');
   g.fillStyle = grd; g.fillRect(0, 0, 4, 128);
-  return new THREE.CanvasTexture(c);
+  return canvasTex(c);
 })();
 const beamGeo = new THREE.CylinderGeometry(1.6, 2.4, 40, 20, 1, true).translate(0, 20, 0);
 const BEAM_SOFT = feature('beam-soft'), tmpV3b = new THREE.Vector3(); let beamK = 1;   // ✨ beam-soft (f9)
@@ -3296,7 +3297,7 @@ const haloTex = (() => {
   const g = c.getContext('2d'), grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
   grd.addColorStop(0, 'rgba(255,240,150,0.9)'); grd.addColorStop(0.4, 'rgba(125,255,168,0.45)'); grd.addColorStop(1, 'rgba(125,255,168,0)');
   g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
-  return new THREE.CanvasTexture(c);
+  return canvasTex(c);
 })();
 const cashObjs = [];
 function spawnCash(cash) {
@@ -6904,20 +6905,55 @@ function nyCenter(lots) {
 // Изборът се помни в S.landmarks (mem[k + '@'] = [x, z, rot, ...id]) — не скача при следващо зареждане.
 const LM_FP = { notredame: [72, 30] };   // мястото при мащаб 1 (катедралата е ~69 м); ако няма — по-малко (×0.83, ×0.7) и катедралата се смалява
 // 🇦🇪 dubai-look: Burj Al Arab — на малък изкуствен остров в морето (~45 м от брега), с мост до брега; най-близкият бряг до площада
+const NO_PLATE = new Set(['skytree']);
+// квадратната плоча 15 × 15 на моделите (GLB_LM) — скрита (моделът стъпва на своята основа: остров, насип, площад)
+const hidePlate = o => { const pl = o.group.children.find(c => c.isMesh && c.geometry?.type === 'BoxGeometry' && c.geometry.parameters?.width === 15 && c.geometry.parameters?.depth === 15); if (pl) pl.visible = false; return o; };
+const SG_MBS3 = feature('sg-look');
+// колко парцела заемат забележителностите на града (главната на площада + по една на парцел); без '__none' и без тези на насипа/острова (sgBay, lmShoreIsland)
+const OFF_LOT = new Set(['__none', 'mbs2', 'supertrees', 'burjarab']);
+const lmOnLots = id => 1 + (CITY_LANDMARKS[id] || []).slice(1).filter(k => !OFF_LOT.has(k)).length;   // sg-look: новият модел на потребителя (mbs3); mbs2 (hotel5-mbs) остава резерва в кода
+// 🇸🇬 sg-look: Марина Бей Сандс (~195 м, в истински ръст като сградите — real-scale) и Supertree Grove (25–50 м) на насип в залива (Marina Bay е насипана земя):
+// правоъгълник 1,1 м над водата, допрян до най-близкия до площада бряг; нощем — топла светлина по настилката
+function sgBay(sq) {
+  const P = city.plan; if (!P || !P.waterAt || !sq) return null;
+  const LEN = 420, DEP = 230;
+  // целият насип трябва да е във вода (не река/канал, не отсрещен бряг): 7 × 4 точки от правоъгълника (без първите 10 м до брега); най-близкият годен бряг
+  const wet = (sx, sz, dx, dz) => { const rx = dz, rz = -dx; let n = 0; for (let i = 0; i <= 6; i++) for (let j = 0; j <= 3; j++) { const u = (i / 6 - 0.5) * LEN, v = 10 + j / 3 * (DEP - 16); if (P.waterAt(sx + rx * u + dx * v, sz + rz * u + dz * v)) n++; } return n >= 26; };   // ≥ 26 от 28 точки — брегът не е прав
+  let best = null;
+  for (let a = 0; a < 32; a++) { const dx = Math.cos(a / 32 * Math.PI * 2), dz = Math.sin(a / 32 * Math.PI * 2);
+    for (let r = 80; r < 1400; r += 6) if (P.waterAt(sq.x + dx * r, sq.z + dz * r)) { for (let e = 0; e <= 80; e += 10) if ((!best || r + e < best.r) && wet(sq.x + dx * (r + e), sq.z + dz * (r + e), dx, dz)) { best = { r: r + e, dx, dz }; break; } break; } }   // e — малко по-навътре, ако брегът е неравен
+  if (!best) return null;   // няма място в морето — Марина Бей е на парцел (както досега)
+  const { dx, dz } = best, ang = Math.atan2(dx, dz), TOPY = 1.1, sx = sq.x + dx * best.r, sz = sq.z + dz * best.r, cx = sx + dx * (DEP / 2 - 6), cz = sz + dz * (DEP / 2 - 6), g = new THREE.Group();
+  const sand = new THREE.MeshStandardMaterial({ color: 0xd9ccb0, roughness: 1 }), pave = new THREE.MeshStandardMaterial({ color: 0xe8e2d4, roughness: 0.85, emissive: 0xffc88a, emissiveIntensity: 0 }), lawn = new THREE.MeshStandardMaterial({ color: 0x5f9a48, roughness: 1 });
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(LEN, TOPY + 1.5, DEP), sand); slab.position.set(cx, (TOPY - 1.5) / 2, cz); slab.rotation.y = ang; g.add(slab);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(LEN * 0.55, 0.1, DEP * 0.86), pave), gar = new THREE.Mesh(new THREE.BoxGeometry(LEN * 0.4, 0.1, DEP * 0.86), lawn);
+  const rx = Math.cos(ang), rz = -Math.sin(ang);   // по брега (напреки на посоката към водата)
+  top.position.set(cx - rx * LEN * 0.21, TOPY + 0.05, cz - rz * LEN * 0.21); gar.position.set(cx + rx * LEN * 0.27, TOPY + 0.05, cz + rz * LEN * 0.27); top.rotation.y = gar.rotation.y = ang; g.add(top, gar);
+  g.traverse(m => { if (m.isMesh) m.receiveShadow = true; });
+  const mk = SG_MBS3 ? 'mbs3' : 'mbs2', mbs = buildLandmark(mk, { label }); hidePlate(mbs); mbs.group.position.copy(top.position).setY(TOPY + 0.1); mbs.group.rotation.y = ang + Math.PI; mbs.group.scale.setScalar(195 / 20);   // h 20 → 195 м; mbs3 — моделът на потребителя (диорамата ~235 × 200 м), mbs2 (hotel5-mbs) — резервата
+  const st = buildLandmark('supertrees', { label }); hidePlate(st); st.group.position.copy(gar.position).setY(TOPY + 0.1); st.group.rotation.y = ang; st.group.scale.setScalar(2.2);   // h 25 → ~35–50 м
+  const base = { group: g, kind: 'sgbay', update: (t, night = 0) => { pave.emissiveIntensity = 0.12 * night; } };
+  return [base, mbs, st];
+}
 function lmShoreIsland(k, sq) {
   const P = city.plan; if (!P || !P.waterAt || !sq) return null;
   let best = null;
   for (let a = 0; a < 32; a++) { const dx = Math.cos(a / 32 * Math.PI * 2), dz = Math.sin(a / 32 * Math.PI * 2);
     for (let r = 120; r < 1200; r += 6) if (P.waterAt(sq.x + dx * r, sq.z + dz * r)) { if (!best || r < best.r) best = { r, dx, dz }; break; } }
   if (!best) return null;
-  const sx = sq.x + best.dx * best.r, sz = sq.z + best.dz * best.r, D = 46, R = 22, ix = sx + best.dx * D, iz = sz + best.dz * D, g = new THREE.Group();
-  const sand = new THREE.MeshStandardMaterial({ color: 0xd8c39a, roughness: 1 }), pave = new THREE.MeshStandardMaterial({ color: 0xc9c2b2, roughness: 0.9 });
-  const isl = new THREE.Mesh(new THREE.CylinderGeometry(R, R * 1.15, 3.4, 40), sand); isl.position.set(ix, -1.4, iz); g.add(isl);
-  const top = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.82, R * 0.82, 0.25, 40), pave); top.position.set(ix, 0.42, iz); g.add(top);
-  const L = D - R * 0.6, br = new THREE.Mesh(new THREE.BoxGeometry(6, 0.6, L + 6), pave); br.position.set(sx + best.dx * L / 2, 0.25, sz + best.dz * L / 2); br.rotation.y = Math.atan2(best.dx, best.dz); g.add(br);
-  const o = buildLandmark(k, { label }); o.group.position.set(ix, 0.3, iz); o.group.rotation.y = Math.atan2(best.dx, best.dz) + Math.PI; o.group.scale.multiplyScalar(LM_SEC_SCALE[k] || 1);
+  { const ix = sq.x + best.dx * (best.r + 46), iz = sq.z + best.dz * (best.r + 46); if (![[0, 0], [26, 0], [-26, 0], [0, 26], [0, -26]].every(([a, b]) => P.waterAt(ix + a, iz + b))) return null; }   // островът — изцяло във водата (иначе — на парцел)
+  // островът: 1,1 м над водата (морето е на ~0), пясъчен бряг и светла настилка отгоре; сградата стъпва на настилката; мостът — от брега (0,3) до острова
+  const sx = sq.x + best.dx * best.r, sz = sq.z + best.dz * best.r, D = 46, R = 22, TOPY = 1.1, ix = sx + best.dx * D, iz = sz + best.dz * D, g = new THREE.Group();
+  const sand = new THREE.MeshStandardMaterial({ color: 0xe6d3a8, roughness: 1 }), pave = new THREE.MeshStandardMaterial({ color: 0xeae4d6, roughness: 0.85, emissive: 0xffc88a, emissiveIntensity: 0 });
+  const isl = new THREE.Mesh(new THREE.CylinderGeometry(R, R * 1.12, TOPY + 1.5, 40), sand); isl.position.set(ix, (TOPY - 1.5) / 2, iz); g.add(isl);
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.84, R * 0.84, 0.12, 40), pave); top.position.set(ix, TOPY + 0.06, iz); g.add(top);
+  const L = D - R * 0.85, br = new THREE.Mesh(new THREE.BoxGeometry(6, 0.5, L), pave), ang = Math.atan2(best.dx, best.dz);
+  br.position.set(sx + best.dx * L / 2, (0.3 + TOPY) / 2 - 0.05, sz + best.dz * L / 2); br.rotation.order = 'YXZ'; br.rotation.y = ang; br.rotation.x = -Math.atan2(TOPY - 0.3, L); g.add(br);   // наклон от брега към острова
+  g.traverse(m => { if (m.isMesh) { m.receiveShadow = true; } });
+  const o = hidePlate(buildLandmark(k, { label }));   // без квадратната плоча — стъпва на острова
+  o.group.position.set(ix, TOPY + 0.12, iz); o.group.rotation.y = ang + Math.PI; o.group.scale.multiplyScalar(LM_SEC_SCALE[k] || 1);
   g.add(o.group); o.group.updateMatrixWorld(true);
-  return { ...o, group: g, kind: k, update: o.update };
+  return { ...o, group: g, kind: k, update: (t, night = 0) => { if (o.update) o.update(t, night); pave.emissiveIntensity = 0.35 * night; } };   // нощем — топла светлина около основата
 }
 function lmRiverSpot(k, mem) {
   const P = city.plan, sq = P && P.square; if (!P || !P.waterAt || !P.lots) return null;
@@ -7081,10 +7117,13 @@ function landmarkPlan(kinds) {
   if (kinds[0] === 'redeemer' && feature('rio-hill') && city.plan.p2 && !city.plan.osm) { const o = rioHill(sq); if (o) { shade(o); city.group.add(o.group); city.landmarks.push(o); kinds = ['__none', ...kinds.slice(1)]; } }   // rio-hill (55): статуята — на хълм в залива пред центъра, площадът остава свободен
   if (kinds[0] === 'ststephen' && feature('lm-budapest') && city.plan.p2) kinds = ['__none', ...kinds.slice(1)];   // lm-budapest: базиликата — на своето място с площад (specialLmPlace), не насред кръстовището
   if (kinds[0] === 'manhattan' && feature('ny-spread')) { nySpread(); kinds = kinds.slice(1); if (!kinds.length) return; kinds = ['__none', ...kinds]; }
-  if (kinds[0] !== '__none') { const main = buildLandmark(kinds[0], { label }); main.group.position.set(sq.x, 0.1, sq.z); main.group.scale.setScalar(LM_MAIN_SCALE[kinds[0]] || 3.2); if (feature('lm-fit-sq')) { const k0 = LM_MAIN_SCALE[kinds[0]] || 3.2, tall = feature('burj-size') && (lmH(kinds[0]) || 0) / (lmFit(kinds[0]) || 15) > 3, big = feature('lm-big-min') && LM_BIG[kinds[0]] ? lmBigFit(sq, lmFit(kinds[0]) || 15, LM_BIG[kinds[0]] / (lmH(kinds[0]) || 17)) : null, f = big || lmSquareFit(sq, k0, lmFit(kinds[0]) || 15, tall ? k0 * 0.85 : 0);   /* lm-big-min (55): Саграда — в ръст, по-далеч от площада */   /* burj-size (55): кулите (Бурж Халифа 70/14) не се смаляват до игла (беше 46 м, ×0,65) — поне ×0,85 (~190 м), по-далеч от площада */ main.group.scale.setScalar(f.k); main.group.position.set(f.x, 0.1, f.z); }   /* lm-fit-sq (55): на площада, без да влиза в твоите парцели и в улиците */ main.group.rotation.y = (hashStr(kinds[0]) % 4) * Math.PI / 2;
+  // T2: skytree (NO_PLATE) — без квадратната плоча 15×15 (беше 48 м и покриваше улиците); не по-малко от ×2,6
+  if (kinds[0] !== '__none') { const main = buildLandmark(kinds[0], { label }); if (NO_PLATE.has(kinds[0])) hidePlate(main); main.group.position.set(sq.x, 0.1, sq.z); main.group.scale.setScalar(LM_MAIN_SCALE[kinds[0]] || 3.2); if (feature('lm-fit-sq')) { const k0 = LM_MAIN_SCALE[kinds[0]] || 3.2, tall = feature('burj-size') && (lmH(kinds[0]) || 0) / (lmFit(kinds[0]) || 15) > 3, big = feature('lm-big-min') && LM_BIG[kinds[0]] ? lmBigFit(sq, lmFit(kinds[0]) || 15, LM_BIG[kinds[0]] / (lmH(kinds[0]) || 17)) : null, f = big || lmSquareFit(sq, k0, lmFit(kinds[0]) || 15, tall ? k0 * 0.85 : 0);   /* lm-big-min (55): Саграда — в ръст, по-далеч от площада */   /* burj-size (55): кулите (Бурж Халифа 70/14) не се смаляват до игла (беше 46 м, ×0,65) — поне ×0,85 (~190 м), по-далеч от площада */ main.group.scale.setScalar(NO_PLATE.has(kinds[0]) ? Math.max(f.k, 2.6) : f.k); main.group.position.set(f.x, 0.1, f.z); }   /* T2: Skytree — поне ×2,6 (~165 м; основата ~20 м остава в площада) */   /* lm-fit-sq (55): на площада, без да влиза в твоите парцели и в улиците */ main.group.rotation.y = (hashStr(kinds[0]) % 4) * Math.PI / 2;
   shade(main); city.group.add(main.group); city.landmarks.push(main); }
   kinds.slice(1).forEach((k, i) => {
     if (k === 'notredame' && feature('paris-spread')) { const o = lmRiverSpot(k, mem); if (o) { shade(o); city.group.add(o.group); city.landmarks.push(o); return; } }
+    if (k === 'mbs2') { const os = sgBay(sq); if (os) { for (const o of os) { shade(o); city.group.add(o.group); city.landmarks.push(o); } return; } }   // sg-look: Марина Бей Сандс и Градините край залива — на насипа в залива
+    if (k === 'supertrees' && city.landmarks.some(o => o.kind === 'supertrees')) return;
     if (k === 'burjarab') { const o = lmShoreIsland(k, sq); if (o) { shade(o); city.group.add(o.group); city.landmarks.push(o); return; } }   // dubai-look: на изкуствен остров с мост
     const l = city.lots[1 + i]; if (!l || l === city.hq) return;
     mem[k] = l.id;
@@ -7144,7 +7183,7 @@ function specialLmPlace(cityId) {
 let plazaGlowM = null;
 function plazaGlow(g, lamps, heads) {
   if (!plazaGlowM) { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 1, 32, 32, 31); gr.addColorStop(0, '#fff'); gr.addColorStop(0.45, '#6a6a6a'); gr.addColorStop(1, '#000'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64);
-    const t = new THREE.CanvasTexture(c), mk = (k, op) => { const m = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffd49a, emissiveMap: t, emissiveIntensity: 0, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }); m.userData.winK = k; dayNight.winMats.add(m); return m; };
+    const t = canvasTex(c), mk = (k, op) => { const m = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffd49a, emissiveMap: t, emissiveIntensity: 0, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }); m.userData.winK = k; dayNight.winMats.add(m); return m; };
     plazaGlowM = { pool: mk(0.9, 1), halo: mk(1.2, 0.8), pg: new THREE.PlaneGeometry(13, 13).rotateX(-Math.PI / 2), hg: new THREE.PlaneGeometry(2.6, 2.6) }; }
   const M = new THREE.Matrix4(), P = new THREE.InstancedMesh(plazaGlowM.pg, plazaGlowM.pool, lamps.length); lamps.forEach(([x, z], i) => P.setMatrixAt(i, M.makeTranslation(x, 0.17, z))); P.frustumCulled = false; P.renderOrder = 2; g.add(P);
   const H = new THREE.Group(); for (const h of heads) { for (const r of [0, Math.PI / 2]) { const m = new THREE.Mesh(plazaGlowM.hg, plazaGlowM.halo); m.position.set(h.x, h.y, h.z); m.rotation.y = r; m.renderOrder = 3; H.add(m); } } g.add(H);   // кръстосани плочки — сиянието се вижда отвсякъде
@@ -7175,7 +7214,7 @@ function refreshLandmarks() {
     city.group.add(o.group); city.landmarks.push(o);
   });
   specialLmPlace(S.cityId); bgRiverLm(S.cityId);   // 🌊 bg-rivers: Баба Вида, тепетата   // ⛪ churches: Невски (София); 🏛️ lm-more2: Дуомо (Милано), Античният стадион (Пловдив)
-  const kinds = CITY_LANDMARKS[S.cityId] && [...CITY_LANDMARKS[S.cityId], ...(city.bigFail || [])]; if (!kinds || !city.lots) return;
+  const kinds = CITY_LANDMARKS[S.cityId] && [...CITY_LANDMARKS[S.cityId], ...(city.bigFail || [])].filter(k => city.plan || k !== '__none'); if (!kinds || !kinds.length || !city.lots) return;   // '__none' (sg-look) — само за плана; другаде главната е първата истинска
   S.landmarks = S.landmarks || {}; const mem = S.landmarks[S.cityId] = S.landmarks[S.cityId] || {};
   const used = [];
   // площадът на главната забележителност: 2×2 парцела в центъра, улиците между тях стават площад
@@ -8088,7 +8127,7 @@ function virtualLots(cityId, cs) {
     lot.built = 1;
   }
   if (LMC) for (const l of lots) if (inC(l)) { l.built = 0; l.busy = 1; }
-  if (VP && CITY_LANDMARKS[cityId]) for (const l of lots.slice(1, CITY_LANDMARKS[cityId].length)) { l.built = 0; l.busy = 1; }   // забележителностите до площада (landmarkPlan)
+  if (VP && CITY_LANDMARKS[cityId]) for (const l of lots.slice(1, lmOnLots(cityId))) { l.built = 0; l.busy = 1; }   // забележителностите до площада (landmarkPlan)
   { const Z = LMC && bigZoneSpec(cityId); if (Z) for (const l of lots) if (!l.fresh && inBigZone(Z, l)) { l.built = 0; l.busy = 1; } }   // и зоната на голямата забележителност
   for (const id of cs.cleared || []) if (lots[id]) lots[id].built = 0;
   for (const id of used) if (lots[id] && !(cs.cleared || []).includes(id)) lots[id].busy = 1;
@@ -9124,10 +9163,10 @@ function desertify(root) {
     if (!o.isMesh || hide.has(o.parent)) return;
     const m = Array.isArray(o.material) ? o.material[0] : o.material; if (!m || !m.color) return;
     box.setFromObject(o).getSize(sz); const big = Math.max(sz.x, sz.z) > 30;
-    const isGreen = green(m.color) || (m.map && m.map.image && m.map.image.getContext && (() => { try { const d = m.map.image.getContext('2d').getImageData(4, 4, 1, 1).data; return d[1] > d[0] * 1.05 && d[1] > d[2] * 1.1; } catch { return false; } })());
+    const isGreen = green(m.color) || (m.map && m.map.image && (m.map.image.getContext || m.map.isDataTexture) && (() => { try { const d = drawable(m.map.image).getContext('2d').getImageData(4, 4, 1, 1).data;   /* fac-data: и процедурните DataTexture */ return d[1] > d[0] * 1.05 && d[1] > d[2] * 1.1; } catch { return false; } })());
     const flatField = o.geometry?.type === 'PlaneGeometry' && m.map && sz.y < 1;   // нивите (райета)
     if (big && m.vertexColors && !mats.has(m) && ![...mats.values()].includes(m)) { const nm = m.clone(); nm.vertexColors = false; nm.color.setHex(0xd9b97e); nm.needsUpdate = true; mats.set(m, nm); o.material = nm; return; }   // хълмове с цветове по върховете → дюни
-    if (big && m.map && !isGreen && !flatField && !(m.map.image && m.map.image.getContext) && !mats.has(m) && ![...mats.values()].includes(m)) { const nm = m.clone(); nm.color.setHex(0xe6c58e); mats.set(m, nm); o.material = nm; return; }   // планините/хълмовете (текстури) — пясъчен оттенък
+    if (big && m.map && !isGreen && !flatField && !(m.map.image && (m.map.image.getContext || m.map.isDataTexture)) && !mats.has(m) && ![...mats.values()].includes(m)) { const nm = m.clone(); nm.color.setHex(0xe6c58e); mats.set(m, nm); o.material = nm; return; }   // планините/хълмовете (текстури) — пясъчен оттенък
     if (big && (isGreen || flatField)) { if (!mats.has(m)) { const nm = m.clone(); nm.map = null; nm.color.setHex(sand[mats.size % sand.length]); nm.needsUpdate = true; mats.set(m, nm); } o.material = mats.get(m); return; }
     if (!big && isGreen) {   // дърво/храст: скрива се целият обект (ствол + корона)
       let p = o; while (p.parent && p.parent !== root && p.parent.parent && p.parent.parent !== root && (box.setFromObject(p.parent).getSize(sz), Math.max(sz.x, sz.y, sz.z) < 25)) p = p.parent;

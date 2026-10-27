@@ -359,5 +359,7 @@
  "🏙️ Крайслер Билдинг в Ню Йорк и кулата Галата в Истанбул — нощем светят": "🏙️ The Chrysler Building in New York and the Galata Tower in Istanbul — lit at night",
  "🌳 Истински дървета навсякъде и нюйоркски жилищни блокове с аварийни стълби": "🌳 Real trees everywhere and New York apartment blocks with fire escapes",
  "🌐 Английската версия вече е без останал български текст": "🌐 The English version no longer shows leftover Bulgarian text",
- "🏚️ Поправено: сградите в Лондон, Париж и Лас Вегас понякога бяха черни денем": "🏚️ Fixed: buildings in London, Paris and Las Vegas were sometimes black by day"
+ "🏚️ Поправено: сградите в Лондон, Париж и Лас Вегас понякога бяха черни денем": "🏚️ Fixed: buildings in London, Paris and Las Vegas were sometimes black by day",
+ "🏚️ Наистина поправено: сградите, пътищата и надписите вече не стават черни, когато браузърът изгуби картинките си": "🏚️ Properly fixed: buildings, roads and signs no longer turn black when the browser drops their images",
+ "🚙 Поправено: белият джип и полицейската Лада вече не светят като бели силуети нощем": "🚙 Fixed: the white jeep and the police Lada no longer glow as white silhouettes at night"
 }

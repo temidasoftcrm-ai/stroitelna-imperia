@@ -3,6 +3,7 @@
 // портрети, печат с орел и знамена, овална махагонова маса, кожени столове. 🇷🇺 Кремълска зала: бяло и злато, пиластри, полилеи, червена пътека,
 // двуглав орел и трикольори, дълга маса от светло дърво. Всичко е процедурно (канвас текстури, кутии) — без външни модели.
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 // истинските модели (Sketchfab, CC BY — assets/heavy/presroom/CREDITS.txt): завеси, знамена и камина; докато се заредят — процедурните
@@ -23,7 +24,7 @@ function realModel(scene, n, { w = null, h = null, d = null, x = 0, z = 0, ry = 
 }
 
 const std = (c, r = 0.8, m = 0, extra = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m, ...extra });
-function tex(w, h, draw, rep) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; if (rep) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(...rep); } return t; }
+function tex(w, h, draw, rep) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; if (rep) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(...rep); } return t; }
 const rng = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
 const addBox = (g, w, h, d, m, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; g.add(o); return o; };
 const addCyl = (g, r1, r2, h, m, x, y, z, seg = 16) => { const o = new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, h, seg), m); o.position.set(x, y, z); o.castShadow = true; g.add(o); return o; };

@@ -5,6 +5,7 @@
 // Евтино: всичко е InstancedMesh (стълбове, рамки, лампи — по един; платната — по един на дизайн), текстурите — общи.
 // buildBillboards(group, { roads: [{ pts: [[x, z]…], w }], brand: { nm, col, ico }, company, years, images, max, gap }) → { group, spots, setNight(k), dispose }
 import * as THREE from 'three';
+import { canvasTex, drawable } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeKids } from './citycull.js';
 
@@ -28,7 +29,7 @@ function design(i, b) {
     g.strokeStyle = '#1b2433'; g.lineWidth = 6; g.font = '800 86px system-ui, sans-serif'; g.strokeText(co, 512, 170, 960); g.fillStyle = '#ffffff'; g.fillText(co, 512, 170, 960);
   }
   g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 8; g.strokeRect(4, 4, 1016, 334);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
 }
 
 // размерът по класа на улицата (f1: „мега на стълб до двулентов път стърчи над всичко“): булевард/широка — голям 12 × 4 (долу на ~7 м),
@@ -118,7 +119,7 @@ function overlayTex(img, b) {
   g.textBaseline = 'middle'; g.font = `${bh * 0.62}px "Noto Color Emoji", sans-serif`; g.fillText(b.ico || '🏗️', x + bh * 0.12, y + bh / 2);
   g.fillStyle = '#ffffff'; g.font = `800 ${bh * 0.3}px system-ui, sans-serif`; g.fillText((b.company || b.nm || '').toUpperCase(), x + bh * 0.95, y + bh * 0.36, bw - bh * 1.05);
   g.fillStyle = b.col || '#ffd54a'; g.font = `700 ${bh * 0.2}px Georgia, serif`; g.fillText(b.slogan || 'Строим бъдещето', x + bh * 0.97, y + bh * 0.72, bw - bh * 1.05);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
 }
 async function loadArt(list, brand) {
   const out = [];
@@ -132,11 +133,11 @@ async function loadArt(list, brand) {
 // изрязване на картината по пропорциите на платното (a = ширина/височина): по-тясното — откъм логото
 const LOGO_X = { left: [0, 0.47], right: [0.6, 1], center: [0.02, 0.47] };   // къде е блокът с логото в картината (center — марката, нарисувана отгоре вляво)
 function portraitTex(art, a, full) {   // тясно/вертикално платно: блокът с логото, вписан по ширина, върху тъмен фон
-  const img = art.tex.image, H = 1024, W = Math.round(H * a), c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+  const img = drawable(art.tex.image), H = 1024, W = Math.round(H * a), c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
   const [x0, x1] = full ? [0, 1] : LOGO_X[art.logo] || LOGO_X.center, sw = (x1 - x0) * img.width, sh = img.height, dh = W * sh / sw;
   const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#0b1a3a'); gr.addColorStop(1, '#14284f'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
   g.drawImage(img, x0 * img.width, 0, sw, sh, 0, (H - dh) / 2, W, dh);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
 }
 function cropTex(art, a) {
   if (a < 1.2 && art.tex.image && art.tex.image.width) return portraitTex(art, a, !!art.design);

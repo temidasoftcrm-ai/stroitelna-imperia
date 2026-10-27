@@ -4,6 +4,7 @@
 // циментов и стъкларски завод. Всичко е процедурно (нисколигонно, като Kenney), освен рафинерията и резервоарите.
 // buildSite3D(group, deps, { kind, lv, x, z, scale, ext }) → { group, update(t, night), dispose }
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { feature } from './lab/feature.js';
 
@@ -23,7 +24,7 @@ function smokeTexture() {
   if (smokeTex) return smokeTex;
   const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 2, 32, 32, 30);
   gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64);
-  return (smokeTex = new THREE.CanvasTexture(c));
+  return (smokeTex = canvasTex(c));
 }
 function smoke(g, x, y, z, { n = 8, col = 0x9a9a9a, h = 10, w = 3 } = {}) {
   const ps = [];
@@ -119,7 +120,7 @@ function panelMat() {
   x.fillStyle = '#1b2f5a'; x.fillRect(0, 0, 256, 64); x.strokeStyle = '#8fa6c8'; x.lineWidth = 1.5;
   for (let i = 0; i <= 256; i += 16) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, 64); x.stroke(); }
   for (let j = 0; j <= 64; j += 16) { x.beginPath(); x.moveTo(0, j); x.lineTo(256, j); x.stroke(); }
-  const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.repeat.set(4, 1); t.colorSpace = THREE.SRGBColorSpace;
+  const t = canvasTex(c); t.wrapS = THREE.RepeatWrapping; t.repeat.set(4, 1); t.colorSpace = THREE.SRGBColorSpace;
   return (panelM = new THREE.MeshStandardMaterial({ map: t, roughness: 0.25, metalness: 0.5 }));
 }
 const KINDS = {

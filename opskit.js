@@ -4,6 +4,7 @@
 // екипи, решения, хроника) и чистото затваряне (кадър, миксери, звуци, собствени геометрии/материали; общите модели остават).
 // Мисията е в ops.js / opskinds.js — тук само я показваме; времето на мисията тече от сцената, докато е отворена.
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
@@ -61,7 +62,7 @@ export function openOpsScene(ops, o, cfg) {
   Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, near: 10, far: 180 }); scene.add(sun);
 
   // ---- малки помощници за сцената
-  const ctex = (w, h, draw, rep) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = own(new THREE.CanvasTexture(c)); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; if (rep) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(...rep); } return t; };
+  const ctex = (w, h, draw, rep) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = own(canvasTex(c)); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; if (rep) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(...rep); } return t; };
   const mat = (c, ex = {}) => own(new THREE.MeshStandardMaterial({ color: c, roughness: 0.9, ...ex }));
   const plane = (w, d, m, x, y, z) => { const p = new THREE.Mesh(own(new THREE.PlaneGeometry(w, d)), m); p.rotation.x = -Math.PI / 2; p.position.set(x, y, z); p.receiveShadow = true; scene.add(p); return p; };
   const box = (w, h, d, m, x, y, z, par = scene) => { const b = new THREE.Mesh(own(new THREE.BoxGeometry(w, h, d)), m); b.position.set(x, y, z); b.castShadow = b.receiveShadow = true; par.add(b); return b; };

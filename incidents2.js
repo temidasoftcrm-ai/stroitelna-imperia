@@ -4,6 +4,7 @@
 // Моделите се зареждат веднъж (loadInc2); анимациите вървят само близо до камерата и по игровото време.
 // Кредити: assets/heavy/CREDITS.txt (inc/), assets/heavy/people/peds/CREDITS.txt, assets/heavy/riot, assets/heavy/ops.
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
@@ -55,7 +56,7 @@ export function createInc2Kit(L) {
   function crowd(g, n, x, z0, z1, cx = 0, cz = 0) { for (let k = 0; k < n; k++) { const z = z0 + (z1 - z0) * (n > 1 ? k / (n - 1) : 0.5) + (Math.random() - 0.5) * 0.8; put(g, 'ped', pick(['look', 'phone', 'phone', 'talk', 'idle', 'look']), x + (Math.random() - 0.5) * 0.9, z, cx, cz); } }
   // ---- кордон: стълбчета през ~3 м с раирана лента; pts — затворен многоъгълник в рамката на групата
   const tapeTex = (() => { const c = document.createElement('canvas'); c.width = 64; c.height = 8; const x = c.getContext('2d'); for (let i = 0; i < 4; i++) { x.fillStyle = i % 2 ? '#ffffff' : '#d81e1e'; x.beginPath(); x.moveTo(i * 16, 8); x.lineTo(i * 16 + 8, 0); x.lineTo(i * 16 + 24, 0); x.lineTo(i * 16 + 16, 8); x.fill(); }
-    return c; })(), tapeT = L2 => { const t = new THREE.CanvasTexture(tapeTex); t.wrapS = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.repeat.set(L2 / 0.5, 1); return t; };   // без .clone() (празна текстура при качването)
+    return c; })(), tapeSrc = canvasTex(tapeTex), tapeT = L2 => { const t = tapeSrc.clone(); t.wrapS = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.repeat.set(L2 / 0.5, 1); t.needsUpdate = true; return t; };   // fac-data: един общ източник (данните), своя repeat на лента   // без .clone() (празна текстура при качването)
   const postM = new THREE.MeshStandardMaterial({ color: 0xe8e8e8, roughness: 0.6 }), postRed = new THREE.MeshStandardMaterial({ color: 0xc81e1e, roughness: 0.6 }), postG = new THREE.CylinderGeometry(0.035, 0.035, 1, 6).translate(0, 0.5, 0), baseG = new THREE.CylinderGeometry(0.16, 0.18, 0.05, 10);
   function cordon(g, pts) {
     const post = (x, z) => { const p = new THREE.Mesh(postG, postM); p.position.set(x, 0, z); p.scale.y = 1.02; g.add(p); const t = new THREE.Mesh(postG, postRed); t.position.set(x, 0.75, z); t.scale.y = 0.27; g.add(t); const b = new THREE.Mesh(baseG, postRed); b.position.set(x, 0.025, z); g.add(b); };
@@ -66,7 +67,7 @@ export function createInc2Kit(L) {
   // ---- водна струя: прозрачна тръба по дъга с течащи ивици; a, b — в света
   const streakT = (() => { const c = document.createElement('canvas'); c.width = 32; c.height = 128; const x = c.getContext('2d'); for (let k = 0; k < 18; k++) { const px = Math.random() * 32, py = Math.random() * 128, l = 20 + Math.random() * 50, gr = x.createLinearGradient(0, py, 0, py + l); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(225,240,255,.95)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(px, py, 3, l); }
     return c; })();
-  function stream(scene) { const T = new THREE.CanvasTexture(streakT); T.wrapS = T.wrapT = THREE.RepeatWrapping; const mesh = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ map: T, transparent: true, depthWrite: false, side: THREE.DoubleSide, opacity: 0.8, color: 0xdcecff })); mesh.visible = false; mesh.frustumCulled = false; scene.add(mesh); let key = '';
+  function stream(scene) { const T = canvasTex(streakT); T.wrapS = T.wrapT = THREE.RepeatWrapping; const mesh = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ map: T, transparent: true, depthWrite: false, side: THREE.DoubleSide, opacity: 0.8, color: 0xdcecff })); mesh.visible = false; mesh.frustumCulled = false; scene.add(mesh); let key = '';
     const S = { mesh, set(a, b, arc = 2) { const k = [a.x, a.y, a.z, b.x, b.y, b.z].map(v => v.toFixed(1)).join(); if (k === key) return; key = k; mesh.geometry.dispose();
         const mid = a.clone().add(b).multiplyScalar(0.5); mid.y += arc; const cv = new THREE.QuadraticBezierCurve3(a.clone(), mid, b.clone()); mesh.geometry = new THREE.TubeGeometry(cv, 20, 0.09, 6, false); T.repeat.set(1, Math.max(2, cv.getLength() / 2.5)); },
       update(dt, on) { mesh.visible = on; if (on) T.offset.y -= dt * 2.4; }, dispose() { scene.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); T.dispose(); } };

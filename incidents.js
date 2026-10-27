@@ -5,6 +5,7 @@
 // game.js дава: scene, model(име, мащаб), has(име) — дали моделът е зареден, route(x0,z0,x1,z1) → точки по улиците,
 // point() → случайна точка по улица, focus() → накъде гледа камерата. update(dt движение, rdt истинско време) — в кадъра.
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { feature } from './lab/feature.js';
 import { spinWheels } from './wheelspin.js';
 import { kidK } from './scale.js';   // детските коли (резервата) в истинския размер
@@ -25,7 +26,7 @@ export function createIncidents(ctx) {
   const rnd = (a, b) => a + Math.random() * (b - a);
   const smokeTex = (() => {
     const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 2, 32, 32, 31);
-    g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c);
+    g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return canvasTex(c);
   })();
   const vehName = k => ctx.has('sf-car-' + k) ? ['sf-car-' + k, 1] : [null, 1];   /* №2 (55): без детските резерви — колата просто не идва */   /* резервата в истинския размер (55) */
 
@@ -73,7 +74,7 @@ export function createIncidents(ctx) {
     for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length], l = Math.hypot(b[0] - a[0], b[1] - a[1]); const m = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.08, l), M(i % 2 ? 0xffffff : 0xe02020)); m.position.set((a[0] + b[0]) / 2, 0.75, (a[1] + b[1]) / 2); m.rotation.y = Math.atan2(b[0] - a[0], b[1] - a[1]); g.add(m); }
     for (const [x, z] of pts) { const c = cone(); c.position.set(x, 0, z); g.add(c); }
   }
-  const fireTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 40, 2, 32, 34, 30); g.addColorStop(0, 'rgba(255,250,200,1)'); g.addColorStop(0.35, 'rgba(255,170,40,0.9)'); g.addColorStop(1, 'rgba(255,60,0,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
+  const fireTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 40, 2, 32, 34, 30); g.addColorStop(0, 'rgba(255,250,200,1)'); g.addColorStop(0.35, 'rgba(255,170,40,0.9)'); g.addColorStop(1, 'rgba(255,60,0,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return canvasTex(c); })();
   const car = (k, sc = 1) => { const wn = (k ? [k] : ['Sedan', 'Hatchback', 'SUV', 'Taxi', 'Pickup']).map(n => 'sf-car-' + n).filter(ctx.has); return wn.length ? ctx.model(wn[(Math.random() * wn.length) | 0], sc) : new THREE.Group(); };   /* №2 (55): без детската кола */
   function moto() { const m = new THREE.Group(), dk = M(0x222222), rd = M(0xc81e1e, 0.4);
     for (const z of [-0.65, 0.65]) { const w = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.08, 6, 14), dk); w.position.set(0, 0.32, z); w.rotation.y = Math.PI / 2; m.add(w); }

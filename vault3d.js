@@ -5,6 +5,7 @@
 // o: { money() → наличните €, split: { res, inv } (%; свободните — останалото), onSplit(split), monthCost() → разходите за месец, night() → 0…1, onBack() }
 // Пълен трезор: 500 млрд. € (скалата е логаритмична — и малките суми се виждат). Над това — „трезорът е пълен — надгради“.
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { feature } from './lab/feature.js';
 import { loadMoney } from './money3d.js';   // 💵 флаг money-real: истински пачки и кюлчета
@@ -70,7 +71,7 @@ function cashTex() {
   g.fillStyle = 'rgba(230,245,225,.45)'; g.beginPath(); g.arc(70, 64, 26, 0, Math.PI * 2); g.fill();
   g.font = 'bold 42px Georgia, serif'; g.fillStyle = 'rgba(240,250,235,.85)'; g.fillText('500', 140, 80);
   g.fillStyle = '#f2ead2'; g.fillRect(112, 0, 26, 128); g.fillStyle = '#b8862e'; g.fillRect(112, 54, 26, 20);   // бандерол
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
 }
 function metalTex() {
   const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
@@ -78,7 +79,7 @@ function metalTex() {
   for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(255,255,255,${Math.random() * 0.05})`; g.fillRect(Math.random() * 256, Math.random() * 256, 1 + Math.random() * 40, 1); }
   g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 2; for (let k = 0; k <= 256; k += 64) { g.beginPath(); g.moveTo(0, k); g.lineTo(256, k); g.stroke(); }
   for (let x = 16; x < 256; x += 32) for (let y = 16; y < 256; y += 64) { g.fillStyle = 'rgba(200,205,212,.5)'; g.beginPath(); g.arc(x, y, 2.2, 0, 7); g.fill(); }
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
 }
 
 // ---------- трезорът ----------

@@ -1,6 +1,7 @@
 // sitelights.js — прожектори на строежите нощем: стълбове в ъглите на оградата с лампи, светлинни конуси
 // към обекта и светло петно на земята. Без истински светлини (евтино) — само светещи материали.
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { feature } from './lab/feature.js';
 import { gfx } from './gfxpresets.js';
 
@@ -14,7 +15,7 @@ const poolTex = (() => {
   const g = c.getContext('2d'), r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
   r.addColorStop(0, 'rgba(255,240,200,1)'); r.addColorStop(1, 'rgba(255,240,200,0)');
   g.fillStyle = r; g.fillRect(0, 0, 64, 64);
-  return new THREE.CanvasTexture(c);
+  return canvasTex(c);
 })();
 const poolMat = new THREE.MeshBasicMaterial({ map: poolTex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
 

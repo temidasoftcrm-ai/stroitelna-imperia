@@ -5,7 +5,7 @@
 //    (2-ри/3-ти ред зад улицата): панелни блокове (6–12 ет.), кооперации (3–5 ет.), къщи в покрайнините.
 // Прозорците нощем светят както досега (nightWin — emissiveMap от тъмните петна на платното).
 import * as THREE from 'three';
-import { nightWin, tileByScale } from './cityplan2-3d.js';
+import { nightWin, tileByScale, canvasTex } from './cityplan2-3d.js';
 import { feature } from './lab/feature.js';
 const DCMSK = feature('dc-msk-fac');   // T2: Вашингтон (Боз-ар с пиластри) и Москва (сталински, модерн, панелни)
 const FCPU2 = { willReadFrequently: true };   // fac-cpu: платната — в паметта на процесора (виж cityplan2-3d.js)
@@ -13,7 +13,7 @@ const FCPU2 = { willReadFrequently: true };   // fac-cpu: платната — �
 const PX = 16;   // пиксела на метър в платната на фасадите
 function paint(wm, hm, draw) { const c = document.createElement('canvas'); c.width = Math.round(wm * PX); c.height = Math.round(hm * PX); const g = c.getContext('2d', FCPU2); g.scale(PX, PX); draw(g, wm, hm); return c; }
 // фасада: платното е pw м широко (повтаря се по ширината на сградата); ph — височината на повторението (0 — цялата фасада, етажите са нарисувани)
-function fmat(c, pw, ph, o = {}) { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+function fmat(c, pw, ph, o = {}) { const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
   return tileByScale(nightWin(new THREE.MeshStandardMaterial({ map: t, roughness: o.r || 0.9 }), c, { seed: o.seed || 31, rep: 1, thr: o.thr || 70, lit: o.lit || 0.25 }), pw, ph); }
 const GLASS = '#262d36', IRON = '#55575a';   // стъклото е тъмно (< прага → прозорец, свети нощем), парапетите — над прага (не светят)
 const win = (g, x, y, w, h, fr = '#efe9de', mull = true) => { g.fillStyle = fr; g.fillRect(x - 0.1, y - 0.1, w + 0.2, h + 0.2); g.fillStyle = GLASS; g.fillRect(x, y, w, h); if (mull) { g.fillStyle = fr; g.fillRect(x + w / 2 - 0.04, y, 0.08, h); g.fillRect(x, y + h * 0.33, w, 0.06); } };
@@ -137,8 +137,8 @@ const mansGeo = () => roofUV(MANS_V, [[[0, 3, 7, 4], 1], [[1, 5, 6, 2], 1], [[0,
 const gabGeo = () => roofUV(GAB_V, [[[0, 3, 5, 4], 1], [[1, 4, 5, 2], 1], [[0, 4, 1], 0], [[3, 2, 5], 0]]);
 const flatGeo = () => new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
 const ROOFM = {};   // общите материали на покривите (бял × цвета на инстанцията)
-const roofMat = k => ROOFM[k] || (ROOFM[k] = k === 'mans' ? (() => { const c = mansardC(), t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return tileByScale(nightWin(new THREE.MeshStandardMaterial({ map: t, roughness: 0.55, metalness: 0.25, side: THREE.DoubleSide }), c, { seed: 57, rep: 1, thr: 70, lit: 0.2 }), 9, 0); })()
-  : k === 'tile' ? (() => { const t = new THREE.CanvasTexture(tileC()); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; const m = new THREE.MeshStandardMaterial({ map: t, roughness: 0.85, side: THREE.DoubleSide }); return tileByScale(m, 4, 0); })()
+const roofMat = k => ROOFM[k] || (ROOFM[k] = k === 'mans' ? (() => { const c = mansardC(), t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return tileByScale(nightWin(new THREE.MeshStandardMaterial({ map: t, roughness: 0.55, metalness: 0.25, side: THREE.DoubleSide }), c, { seed: 57, rep: 1, thr: 70, lit: 0.2 }), 9, 0); })()
+  : k === 'tile' ? (() => { const t = canvasTex(tileC()); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; const m = new THREE.MeshStandardMaterial({ map: t, roughness: 0.85, side: THREE.DoubleSide }); return tileByScale(m, 4, 0); })()
   : new THREE.MeshStandardMaterial({ roughness: 0.9 }));
 
 // ---- видовете (индекси от 7 нататък — 0–6 са старите на romeBlocks): фасада, покрив (геометрия, материал, височина = min(4, дълбочина × rk)), H — фиксирана височина

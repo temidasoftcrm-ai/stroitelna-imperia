@@ -2,6 +2,7 @@
 // Истанбул: джамия с купол и минарета, Галатската кула и модерни кули като в Левент (Сапфир, извита кула, двойни кули).
 // game.js ги слага на парцели в центъра на града (вместо обикновени небостъргачи); всяка сграда се побира в ~15×15.
 import * as THREE from 'three';
+import { canvasTex, drawable } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { prepNightFloors } from './nightfloors.js';
 import { feature } from './lab/feature.js';
@@ -21,7 +22,7 @@ export const CITY_LANDMARKS = {
   cairo: ['pyramids'], giza: ['pyramids'],
   dubai: ['burj'], newyork: ['manhattan'], kualalumpur: ['petronas'], moscow: ['stbasil'], toronto: ['cntower'], chicago: ['willis'], shanghai: ['shtower'], rio: ['redeemer'], washington: ['whitehouse'], lasvegas: ['bellagio', 'vegassign'],
 };if (feature('dubai-look')) CITY_LANDMARKS.dubai = [...(CITY_LANDMARKS.dubai || ['burj']), 'burjarab'];   // 🇦🇪 dubai-look
-if (feature('sg-look')) CITY_LANDMARKS.singapore = ['mbs2', 'supertrees'];   // 🇸🇬 sg-look
+if (feature('sg-look')) CITY_LANDMARKS.singapore = ['__none', 'mbs2', 'supertrees'];   // '__none' — без главна на площада: двете са на насипа в залива (game.js sgBay)   // 🇸🇬 sg-look
 if (feature('tokyo-look')) CITY_LANDMARKS.tokyo = ['skytree'];   // 🇯🇵 tokyo-look: Токио — Skytree (дотогава без забележителност)
 
 // забележителности в морето пред града (game.js: refreshLandmarks, само при крайморските градове)
@@ -55,7 +56,7 @@ function windowTex(cols, rows, seed, base = '#5d7f9a', frame = '#c9d6df') {
     x.fillStyle = base; x.fillRect(i * 8 + 1, j * 8 + 1, 6, 6);
     if (rnd() < 0.45) { y.fillStyle = rnd() < 0.7 ? '#ffd890' : '#cfe6ff'; y.fillRect(i * 8 + 1, j * 8 + 1, 6, 6); }
   }
-  const t1 = new THREE.CanvasTexture(c), t2 = new THREE.CanvasTexture(e);
+  const t1 = canvasTex(c), t2 = canvasTex(e);
   for (const t of [t1, t2]) { t.colorSpace = THREE.SRGBColorSpace; t.magFilter = THREE.NearestFilter; }
   return { map: t1, emissiveMap: t2 };
 }
@@ -520,6 +521,7 @@ const GLB_LM = {
   empire2: { h: 45, fit: 15, plate: 0x8a8580 },   // Ню Йорк: Емпайър Стейт (модел на потребителя, Meshy AI, олекотен 1,3 млн. → 160 хил. △) — вместо кулата от пакета Манхатън; нощем тъмно тяло с прозорци, светла корона и шпил — nightfloors 'empire2'
   skytree: { h: 63.4, fit: 7.6, plate: 0x8a8a86 },   // Токио: Tokyo Skytree (Void.com, CC BY 4.0, Sketchfab; 248 → 120 хил. △, 3,9 MB; feature 'tokyo-look') — h/fit = отношението 634 × 76 м; нощем синьо-виолетово (nightfloors 'rock')
   burjarab: { file: '../hotels5/hotel5-burj', h: 32, fit: 10, plate: 0xd8c39a, floodK: 2.4 },   // Дубай: Burj Al Arab (одобреният модел за 5★ хотел — hotel5-burj, CREDITS.txt; feature 'dubai-look') — 321 м; нощем прожектори (floodK)
+  mbs3: { h: 20, fit: 23.9, plate: 0x8a9a8a, floodK: 1.4, onLoad: skyParkLights },   // Сингапур: Марина Бей Сандс — моделът на потребителя (Meshy AI, ТЕМИДАСОФТ; 4,7 млн. → 110 хил. △; диорама с ArtScience и водата; feature 'sg-look') — h/fit = 1,586 × 1,898; нощем прожектори + светещата SkyPark отгоре
   mbs2: { file: '../hotels5/hotel5-mbs', h: 20, fit: 34, plate: 0x8a9a8a, floodK: 1.6 },   // Сингапур: Marina Bay Sands (одобреният hotel5-mbs; feature 'sg-look') — 3 кули по 194 м и „корабът“ отгоре; нощем светли
   supertrees: { h: 25, fit: 25, plate: 0x6f9a55, onLoad: superLights },   // Сингапур: Supertree Grove (isrichards6, CC BY 4.0; feature 'sg-look') — три „дървета“ 25–50 м; нощем короните светят виолетово-синьо
   galata2: { file: 'galata', h: 56.5, fit: 15, plate: 0xb9b0a0 },   // Истанбул: кулата Галата (модел на потребителя, Meshy AI, олекотен 1,12 млн. → 85 хил. △, 2,9 MB; feature 'lm-galata2') — h/fit = отношението 63 × 16,5 м; ръстът — game.js LM_REAL_H; нощем — nightfloors 'galata2' (топло отдолу, галерията и конусът светят)
@@ -609,11 +611,11 @@ function silverize(root, k = 1.25) {
   const done = new Set();
   root.traverse(o => { if (!o.isMesh) return; for (const m of [].concat(o.material)) {
     if (!m || done.has(m)) continue; done.add(m);
-    const img = m.map && m.map.image; if (img && img.width) {
+    const img = m.map && drawable(m.map.image); if (img && img.width) {   // fac-data: и DataTexture
       const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.drawImage(img, 0, 0);
       const d = x.getImageData(0, 0, c.width, c.height), a = d.data;
       for (let i = 0; i < a.length; i += 4) { const l = Math.min(255, (a[i] * 0.3 + a[i + 1] * 0.59 + a[i + 2] * 0.11) * k + 18); a[i] = l * 0.97; a[i + 1] = l * 0.99; a[i + 2] = Math.min(255, l * 1.04); }
-      x.putImageData(d, 0, 0); const t = new THREE.CanvasTexture(c); t.colorSpace = m.map.colorSpace; t.flipY = m.map.flipY; t.wrapS = m.map.wrapS; t.wrapT = m.map.wrapT; m.map = t;
+      x.putImageData(d, 0, 0); const t = canvasTex(c); t.colorSpace = m.map.colorSpace; t.flipY = m.map.flipY; t.wrapS = m.map.wrapS; t.wrapT = m.map.wrapT; m.map = t;
     }
     m.metalness = 0.45; m.roughness = 0.35; m.needsUpdate = true;
   } });
@@ -810,7 +812,7 @@ function vegasSignNight(w, g) {
     m.customProgramCacheKey = () => 'vegas-bulbs'; m.needsUpdate = true; }
   const b = new THREE.Box3().setFromObject(w), sz = b.getSize(new THREE.Vector3()), gc = document.createElement('canvas'); gc.width = gc.height = 64;
   { const x = gc.getContext('2d'), gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,200,120,1)'); gr.addColorStop(1, 'rgba(255,120,60,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); }
-  const pool = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(gc), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
+  const pool = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: canvasTex(gc), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
   pool.rotation.x = -Math.PI / 2; pool.position.set(0, 0.36, w.position.z || 0); pool.scale.set(Math.max(sz.x, sz.z) * 1.4, Math.max(sz.x, sz.z) * 1.1, 1); g.add(pool);
   const prev = g.userData.sparkle;
   g.userData.sparkle = (t, night) => { if (prev) prev(t, night); U.uT.value = t; U.uN.value = night;
@@ -838,7 +840,7 @@ function burjLights(w, g) {
         gl_FragColor = vec4(c * k * 1.3 * uN, 1.0); }` });
   const red = new THREE.MeshBasicMaterial({ color: 0xff2020 }), gc = document.createElement('canvas'); gc.width = gc.height = 64;
   { const x = gc.getContext('2d'), gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.25, 'rgba(255,240,220,0.5)'); gr.addColorStop(1, 'rgba(255,240,220,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); }
-  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(gc), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 }));
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: canvasTex(gc), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 }));
   (burjLm || (burjLm = new GLTFLoader().loadAsync('assets/heavy/lm/burj-lights.glb').then(gl => gl.scene).catch(() => null))).then(src => {
     if (!src) return; const L = src.clone(true); let tip = null;
     L.traverse(o => { if (!o.isMesh) return; o.castShadow = o.receiveShadow = false; o.frustumCulled = false;
@@ -878,6 +880,13 @@ function superLights(w, g) {
   const prev = g.userData.sparkle, c = new THREE.Color();
   g.userData.sparkle = (t, night) => { if (prev) prev(t, night); for (let i = 0; i < mats.length; i++) { c.setHSL((0.72 + 0.12 * Math.sin(t * 0.4 + i * 1.7)) % 1, 0.9, 0.55); mats[i].emissive.copy(c); mats[i].emissiveIntensity = 1.6 * night; } };
 }
+// Марина Бей Сандс нощем: SkyPark (корабът) — светеща лента по горния ръб (отделен меш 'skypark_lights'), прозорците — от прожекторите (floodK)
+function skyParkLights(w, g) {
+  w.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(w), s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3()), ws = w.getWorldScale(new THREE.Vector3()).x || 1;
+  const m = mat(0x222222, 0.5, 0, { emissive: 0xfff0d0, emissiveIntensity: 0 }), bar = new THREE.Mesh(new THREE.BoxGeometry(s.x * 0.62 / ws, s.y * 0.012 / ws, s.z * 0.1 / ws), m);
+  bar.name = 'skypark_lights'; bar.position.copy(w.worldToLocal(new THREE.Vector3(c.x, b.min.y + s.y * 0.885, c.z - s.z * 0.12))); w.add(bar);
+  const prev = g.userData.sparkle; g.userData.sparkle = (t, night) => { if (prev) prev(t, night); m.emissiveIntensity = 2.2 * night; };
+}
 function petronasLights(w, g) {
   // върховете — от самия меш (кутията на групата включва и други неща): върховете над 90% от височината, разделени на две по дългата ос
   w.updateMatrixWorld(true); let big = null; w.traverse(o => { if (o.isMesh && (!big || o.geometry.attributes.position.count > big.geometry.attributes.position.count)) big = o; });
@@ -895,7 +904,7 @@ function petronasLights(w, g) {
     const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'), gr = x.createRadialGradient(64, 64, 0, 64, 64, 64);
     gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.15, 'rgba(255,248,230,0.7)'); gr.addColorStop(0.5, 'rgba(255,240,210,0.12)'); gr.addColorStop(1, 'rgba(255,240,210,0)');
     x.fillStyle = gr; x.fillRect(0, 0, 128, 128); x.fillStyle = 'rgba(255,250,240,0.55)'; x.fillRect(0, 62, 128, 4); x.fillRect(62, 0, 4, 128);
-    const sm = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 });
+    const sm = new THREE.SpriteMaterial({ map: canvasTex(c), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 });
     glints = tips.map(t => { const s = new THREE.Sprite(sm); s.position.copy(loc(t.x, b.max.y - (b.max.y - b.min.y) * 0.06, t.z)); w.add(s); return s; });
   }
   g.userData.sparkle = (t, night) => { if (prev) prev(t, night); red.emissiveIntensity = (Math.sin(t * 2.2) > 0.2 ? 2.4 : 0.15) * (0.25 + night);
@@ -998,9 +1007,9 @@ function bellagio() {
   if (V2) { const c = document.createElement('canvas'); c.width = 32; c.height = 128; const x = c.getContext('2d');
     const gx = x.createLinearGradient(0, 0, 32, 0); gx.addColorStop(0, 'rgba(255,255,255,0)'); gx.addColorStop(0.5, 'rgba(255,255,255,1)'); gx.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gx; x.fillRect(0, 0, 32, 128);
     x.globalCompositeOperation = 'destination-in'; const gy = x.createLinearGradient(0, 0, 0, 128); gy.addColorStop(0, 'rgba(0,0,0,0)'); gy.addColorStop(0.25, 'rgba(0,0,0,0.8)'); gy.addColorStop(1, 'rgba(0,0,0,1)'); x.fillStyle = gy; x.fillRect(0, 0, 32, 128);
-    jetM = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), color: 0xdff2ff, transparent: true, depthWrite: false, opacity: 0.85 });
+    jetM = new THREE.SpriteMaterial({ map: canvasTex(c), color: 0xdff2ff, transparent: true, depthWrite: false, opacity: 0.85 });
     const m = document.createElement('canvas'); m.width = m.height = 64; const y = m.getContext('2d'), gr = y.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,0.8)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); y.fillStyle = gr; y.fillRect(0, 0, 64, 64);
-    mistM = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(m), color: 0xe8f6ff, transparent: true, depthWrite: false, opacity: 0.5 });
+    mistM = new THREE.SpriteMaterial({ map: canvasTex(m), color: 0xe8f6ff, transparent: true, depthWrite: false, opacity: 0.5 });
     glowW = add(g, new THREE.PlaneGeometry(14, 5.6), new THREE.MeshBasicMaterial({ map: mistM.map, color: 0x6fb8ff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }), 0, 0.39, 4.2); glowW.rotation.x = -Math.PI / 2;
     for (const J of jets) { J.j.visible = false; const s = new THREE.Sprite(jetM); s.center.set(0.5, 0); s.position.copy(J.j.position); g.add(s); J.s = s; const mi = new THREE.Sprite(mistM); g.add(mi); J.m = mi; } }
   g.userData.sparkle = (t, night) => {
@@ -1053,7 +1062,7 @@ const LV_VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projection
 function lvNight2(nm, node, m, g) {
   if ((nm === 'mgmgrand' || nm === 'nyny') && !feature('lv-night3')) return;   // lv-night3 (f9): нощта на MGM Grand и Ню Йорк-Ню Йорк (lv-hotels2)
   const U = { uT: { value: 0 }, uN: { value: 0 }, uSc: { value: node.scale.x }, uTr: { value: node.position.clone() } }, add = [];   // add — светлините, които гаснат денем
-  const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.3, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
+  const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.3, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); return canvasTex(c); })();
   const sprite = (col, x, y, z, sx, sy) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: col, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 })); sp.position.set(x, y, z); sp.scale.set(sx, sy, 1); g.add(sp); add.push([sp.material, 1]); return sp; };
   // Парис: шейдърът на скана — решетката на кулата, балонът, подсветката (само за paris_mat)
   if (nm === 'paris') m.traverse(o => { if (!o.isMesh) return; const mt = o.material;
@@ -1253,4 +1262,4 @@ export function buildLandmark(kind, deps = {}) {
   return { group: g, update, kind };   // kind — за златния надпис в играта
 }
 LANDMARK_NM.skytree = LANDMARK_NM.skytree || 'Токио Скайтри';   // 🇯🇵 tokyo-look
-LANDMARK_NM.burjarab = LANDMARK_NM.burjarab || 'Бурж ал Араб'; LANDMARK_NM.mbs2 = LANDMARK_NM.mbs2 || 'Марина Бей Сандс'; LANDMARK_NM.supertrees = LANDMARK_NM.supertrees || 'Градините край залива';
+LANDMARK_NM.burjarab = LANDMARK_NM.burjarab || 'Бурж ал Араб'; LANDMARK_NM.mbs2 = LANDMARK_NM.mbs2 || 'Марина Бей Сандс'; LANDMARK_NM.mbs3 = 'Марина Бей Сандс'; LANDMARK_NM.supertrees = LANDMARK_NM.supertrees || 'Градините край залива';

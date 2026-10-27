@@ -2,6 +2,7 @@
 // Данни за истинските български магистрали + 3D модел на участък, който се „строи“ по етапи.
 // game.js ползва: HIGHWAYS, HW_STAGES, segmentQuote(km), HW_MODELS, buildHighwayView(A, opts).
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { feature } from './lab/feature.js';
 import { loadSigns, sign } from './roadsigns.js';
 import { NF_MATS } from './nightfloors.js';   // daynight.js пали тези материали вечер (emissiveIntensity = нощта)
@@ -123,7 +124,7 @@ const abLaneMat = () => abLaneM || (abLaneM = (() => {
   for (let k = 0; k < 900; k++) { x.fillStyle = `rgba(${Math.random() < 0.5 ? '0,0,0' : '255,255,255'},0.05)`; x.fillRect(Math.random() * 288, Math.random() * 200, 2, 2); }
   x.fillStyle = '#f2f2f2'; x.fillRect(4, 0, 5, 200); x.fillRect(279, 0, 5, 200);   // ръбовете (плътни)
   for (let l = 1; l < 4; l++) for (let y = 0; y < 200; y += 100) x.fillRect(l * 72 - 2, y + 20, 4, 60);   // между лентите (прекъснати)
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
   return new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 });
 })());
 const abRailMat = new THREE.MeshStandardMaterial({ color: 0xb8bcc2, roughness: 0.4, metalness: 0.6 });
@@ -134,7 +135,7 @@ function abBoard(lines, w = 12, h = 3.6) {
   x.fillStyle = '#1d4fa8'; x.fillRect(0, 0, c.width, c.height); x.strokeStyle = '#fff'; x.lineWidth = 8; x.strokeRect(10, 10, c.width - 20, c.height - 20);
   x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
   lines.forEach((ln, i) => { x.font = `bold ${i ? 46 : 64}px system-ui`; x.fillText(ln, c.width / 2, c.height * (lines.length === 1 ? 0.5 : 0.3 + i * 0.42), c.width - 40); });
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace;
   const m = new THREE.MeshBasicMaterial({ map: t });
   const back = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ color: 0x8a9096, metalness: 0.4 })); back.rotation.y = Math.PI; back.position.z = -0.02;
   const o = new THREE.Mesh(new THREE.PlaneGeometry(w, h), m); o.add(back); return o;
@@ -192,7 +193,7 @@ function serviceArea(g, gear, A, { W, H, zs, py: pyNear = false }) {
   const cv = document.createElement('canvas'); cv.width = 160; cv.height = 400; const x = cv.getContext('2d');
   x.fillStyle = '#123'; x.fillRect(0, 0, 160, 400); x.fillStyle = '#f5b400'; x.fillRect(0, 0, 160, 110); x.fillStyle = '#123'; x.font = 'bold 74px system-ui'; x.textAlign = 'center'; x.fillText('⛽', 80, 82);
   x.fillStyle = '#fff'; x.font = 'bold 30px system-ui'; [['A95', '2.65'], ['A100', '2.95'], [tr('Дизел'), '2.55'], ['LPG', '1.29']].forEach(([a, b], k) => { x.textAlign = 'left'; x.fillText(a, 10, 160 + k * 66); x.textAlign = 'right'; x.fillStyle = '#ffd54a'; x.fillText(b, 152, 160 + k * 66); x.fillStyle = '#fff'; });
-  const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace;
+  const tx = canvasTex(cv); tx.colorSpace = THREE.SRGBColorSpace;
   const py = new THREE.Mesh(new THREE.BoxGeometry(4, 10, 0.6), [0, 0, 0, 0, 1, 1].map(k => k ? new THREE.MeshBasicMaterial({ map: tx }) : new THREE.MeshStandardMaterial({ color: 0x223344 })));
   if (pyNear) { py.position.set(xE - 10, y + 5, zs - 6); py.castShadow = true; add(py, zs - 6); }   // hw-link: на тревния остров срещу колонките (не на ръба на насипа)
   else { py.position.set(xE - 9, y + 5, z0 + 26); py.castShadow = true; add(py, z0 + 26); }
@@ -297,7 +298,7 @@ function hwPoolMat() {
   if (!HW_POOL) {
     const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'), gr = x.createRadialGradient(64, 64, 0, 64, 64, 64);
     gr.addColorStop(0, 'rgb(255,225,170)'); gr.addColorStop(0.3, 'rgb(120,104,78)'); gr.addColorStop(0.65, 'rgb(30,26,19)'); gr.addColorStop(1, 'rgb(0,0,0)'); x.fillStyle = '#000'; x.fillRect(0, 0, 128, 128); x.fillStyle = gr; x.fillRect(0, 0, 128, 128);   // адитивно — важи само цветът: избледнява към черно
-    HW_POOL = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffd8a0, emissiveMap: new THREE.CanvasTexture(c), emissiveIntensity: 0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+    HW_POOL = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffd8a0, emissiveMap: canvasTex(c), emissiveIntensity: 0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
     NF_MATS.add(HW_POOL); HW_POOL.userData.nfK = 0.8;
   }
   return HW_POOL;
@@ -396,7 +397,7 @@ export function buildHighwayView(A, opts = {}) {
     const c = document.createElement('canvas'); c.width = 512; c.height = 160;
     const x = c.getContext('2d'); x.fillStyle = '#1e5fbf'; x.fillRect(0, 0, 512, 160); x.strokeStyle = '#fff'; x.lineWidth = 8; x.strokeRect(10, 10, 492, 140);
     x.fillStyle = '#fff'; x.font = 'bold 60px system-ui'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(tr(opts.title), 256, 82, 470);
-    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace;
     const board = new THREE.Mesh(new THREE.PlaneGeometry(9, 2.8), new THREE.MeshBasicMaterial({ map: t }));
     board.position.set(0, 8.5, z0 + LEN - 15); board.rotation.y = Math.PI; board.userData.z = z0 + LEN - 15; g.add(board); gear.push(board);
     const post = new THREE.Mesh(new THREE.BoxGeometry(W + 2, 0.4, 0.4), new THREE.MeshStandardMaterial({ color: 0x888888 }));

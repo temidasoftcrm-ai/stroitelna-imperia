@@ -94,7 +94,7 @@ export function debugLayer(tr, group) {
   const mat = c => new THREE.LineBasicMaterial({ color: c, depthTest: false, transparent: true });
   const M = Object.fromEntries(Object.entries(COL).map(([k, c]) => [k, mat(c)]));
   const tags = new Map();
-  const tag = c => { let t = tags.get(c); if (!t) { const cv = document.createElement('canvas'); cv.width = 256; cv.height = 48; const tex = new THREE.CanvasTexture(cv); t = { cv, tex, spr: new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false })), txt: '' }; t.spr.scale.set(8, 1.5, 1); g.add(t.spr); tags.set(c, t); } return t; };
+  const tag = c => { let t = tags.get(c); if (!t) { const cv = document.createElement('canvas'); cv.width = 256; cv.height = 48; const tex = new THREE.CanvasTexture(cv); cv.addEventListener('contextrestored', () => { if (t) t.txt = null; });   /* fac-data: изгубено платно — прерисува се при следващото обновяване */ t = { cv, tex, spr: new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false })), txt: '' }; t.spr.scale.set(8, 1.5, 1); g.add(t.spr); tags.set(c, t); } return t; };
   const line = (pts, y, k) => { const geo = new THREE.BufferGeometry().setFromPoints(pts.map(p => new THREE.Vector3(p[0], y, p[1]))); const l = new THREE.Line(geo, M[k]); l.renderOrder = 9; g.add(l); };
   let last = 0;
   return {

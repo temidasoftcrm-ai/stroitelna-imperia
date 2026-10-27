@@ -2,6 +2,7 @@
 // прожекторни мачти със светещи глави, светли петна по кея (адитивни кръгове с плавен ръб), слаб конус светлина
 // и червени сигнални лампи по върховете на крановете, които мигат. Без истински светлини — евтино за GPU.
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { feature } from './lab/feature.js';
 import { gfx } from './gfxpresets.js';
 
@@ -13,7 +14,7 @@ function poolMap() {
     const c = document.createElement('canvas'); c.width = c.height = 128;
     const x = c.getContext('2d'), gr = x.createRadialGradient(64, 64, 0, 64, 64, 64);
     gr.addColorStop(0, 'rgba(255,240,205,1)'); gr.addColorStop(0.4, 'rgba(255,226,170,0.6)'); gr.addColorStop(1, 'rgba(255,215,150,0)');
-    x.fillStyle = gr; x.fillRect(0, 0, 128, 128); poolTex = new THREE.CanvasTexture(c);
+    x.fillStyle = gr; x.fillRect(0, 0, 128, 128); poolTex = canvasTex(c);
   }
   return poolTex;
 }

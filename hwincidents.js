@@ -9,6 +9,7 @@
 // Колите не минават през конусите и останките: в лентите стоят „призраци“ (неподвижни препятствия в списъка на трафика).
 // Хората, кордонът, маркучите и пътната помощ — от incidents2.js; спешните коли — моделите на играта (sf-car-*), с бурканите.
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { feature } from './lab/feature.js';
 import { loadInc2, createInc2Kit } from './incidents2.js';
 import { flameSprite, flameSize } from './fireflip.js';
@@ -20,11 +21,11 @@ const KINDS = { police: ['sf-car-Police_SUV', 'sf-car-Police_Sedan', 'police'], 
 const TOW_L = 5.66;
 let TX = null, CM = null;
 const tex = () => TX || (TX = (() => {
-  const rad = st => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 2, 32, 32, 31); for (const [o, col] of st) gr.addColorStop(o, col); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); };
+  const rad = st => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 2, 32, 32, 31); for (const [o, col] of st) gr.addColorStop(o, col); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); return canvasTex(c); };
   const c = document.createElement('canvas'); c.width = 128; c.height = 96; const x = c.getContext('2d'); x.fillStyle = '#111'; x.fillRect(0, 0, 128, 96); x.fillStyle = '#ffb21a';
   const dot = (px, py) => { x.beginPath(); x.arc(px, py, 5.5, 0, 7); x.fill(); };
   for (let i = 0; i < 7; i++) dot(18 + i * 13, 48); for (let i = 1; i <= 3; i++) { dot(96 - i * 11, 48 - i * 11); dot(96 - i * 11, 48 + i * 11); }   // стрелка надясно от точки
-  const arrow = new THREE.CanvasTexture(c); arrow.colorSpace = THREE.SRGBColorSpace;
+  const arrow = canvasTex(c); arrow.colorSpace = THREE.SRGBColorSpace;
   return { smoke: rad([[0, 'rgba(255,255,255,0.9)'], [1, 'rgba(255,255,255,0)']]), fire: rad([[0, 'rgba(255,250,200,1)'], [0.35, 'rgba(255,170,40,0.9)'], [1, 'rgba(255,60,0,0)']]), arrow };
 })());
 const cones = () => CM || (CM = { g: new THREE.ConeGeometry(0.24, 0.72, 10).translate(0, 0.41, 0), b: new THREE.CylinderGeometry(0.14, 0.18, 0.12, 10).translate(0, 0.45, 0), f: new THREE.BoxGeometry(0.46, 0.05, 0.46).translate(0, 0.025, 0),

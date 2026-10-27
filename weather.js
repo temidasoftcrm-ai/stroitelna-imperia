@@ -2,6 +2,7 @@
 // Частиците (дъжд/сняг) следват камерата; светлината и мъглата се приглушават върху стойностите на денонощието.
 // При снеговалеж земята постепенно побелява, а напролет снегът се стопява.
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { feature } from './lab/feature.js';
 const W2 = feature('weather2');   // 🌦️ weather2 (f9): снежинки вместо квадрати; времето по календара (епизоди дъжд/сняг), детерминистично по град и ден
 
@@ -51,7 +52,7 @@ function flakeTex(star) {
   else { g.translate(32, 32); g.strokeStyle = 'rgba(255,255,255,.95)'; g.lineCap = 'round'; g.shadowColor = '#fff'; g.shadowBlur = 4;
     for (let i = 0; i < 6; i++) { g.rotate(Math.PI / 3); g.lineWidth = 3.2; g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -26); g.stroke(); g.lineWidth = 2.2; g.beginPath(); g.moveTo(0, -15); g.lineTo(-7, -21); g.moveTo(0, -15); g.lineTo(7, -21); g.stroke(); }
     const r = g.createRadialGradient(0, 0, 0, 0, 0, 7); r.addColorStop(0, '#fff'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(-8, -8, 16, 16); }
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 
 // deps: { scene, hemi, sun, ground?: Material (земята на града) }

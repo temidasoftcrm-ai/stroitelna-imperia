@@ -2,7 +2,7 @@
 // в рамката на плана (детето на planView): вода, каменни кейови стени, крайбрежна алея с фенери; мостовете са пътищата над водата (cityplan2.js ги прави сам).
 //   game.js: pv.add(riversView(P.p2, () => dayNight.night)) — само в новите игри (S.rivers) с флага.
 import * as THREE from 'three';
-import { FCPU } from './cityplan2-3d.js';   // fac-cpu (T1): платната — в паметта на процесора (иначе под натоварване стават черни)
+import { FCPU, canvasTex } from './cityplan2-3d.js';   // fac-cpu (T1): платната — в паметта на процесора (иначе под натоварване стават черни)
 
 const WATER = new THREE.MeshStandardMaterial({ color: 0x3f6a78, roughness: 0.12, metalness: 0.3 });
 const STONE = new THREE.MeshStandardMaterial({ color: 0x9a948a, roughness: 0.85 });
@@ -45,7 +45,7 @@ function stoneTex() {
   g.fillStyle = '#6f675c'; g.fillRect(0, 0, 256, 256);   // фугите
   for (let y = 0, r = 0; y < 256; r++) { const h = 22 + rnd() * 18; let x = -rnd() * 40; while (x < 256) { const w = 34 + rnd() * 42, v = 150 + rnd() * 55, t = rnd() * 14; g.fillStyle = `rgb(${v + t},${v - 4},${v - 18 - t})`; g.fillRect(x + 2, y + 2, w - 4, h - 4);
     for (let k = 0; k < 14; k++) { const q = v - 30 + rnd() * 50; g.fillStyle = `rgba(${q},${q - 6},${q - 16},0.35)`; g.fillRect(x + 2 + rnd() * (w - 8), y + 2 + rnd() * (h - 8), 3 + rnd() * 6, 2 + rnd() * 4); } x += w; } y += h; }
-  STONE_T = new THREE.CanvasTexture(c); STONE_T.colorSpace = THREE.SRGBColorSpace; STONE_T.wrapS = STONE_T.wrapT = THREE.RepeatWrapping; STONE_T.anisotropy = 4; return STONE_T;
+  STONE_T = canvasTex(c); STONE_T.colorSpace = THREE.SRGBColorSpace; STONE_T.wrapS = STONE_T.wrapT = THREE.RepeatWrapping; STONE_T.anisotropy = 4; return STONE_T;
 }
 // UV на кутията в метри (текстурата се повтаря на rep м) + цвят по височината: по-тъмно и мъхово отдолу (влага), светло горе
 function mUV(geo, w, h, d, y0, rep = 2.4) { const uv = geo.attributes.uv, n = geo.attributes.normal, p = geo.attributes.position, col = new Float32Array(p.count * 3);

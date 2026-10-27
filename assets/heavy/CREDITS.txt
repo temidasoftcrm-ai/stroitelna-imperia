@@ -385,3 +385,4 @@ City buses (55, buses-more) — Sketchfab, normalized in Blender (front +z, real
 - asia/jp-home3.glb — "Japanese Residential Home 03" by reckzilla (CC-BY 4.0) — https://sketchfab.com/3d-models/1c53f4f37fc44c32a8874464025aea48
 - asia/jp-neon.glb — "Japanese neon sign set (low poly for background)" by ydvisual (CC-BY 4.0) — https://sketchfab.com/3d-models/188e5d8dd2cb4f098871b5dd5f6fa990
 - lm/supertrees.glb — "Marina Bay Supertrees" by isrichards6 (CC-BY 4.0) — https://sketchfab.com/3d-models/88267285fe85470b8b428e6e116542cc
+- lm/mbs3.glb — Марина Бей Сандс („Sky Garden Arcology“), Meshy AI от собственика (ТЕМИДАСОФТ ООД) — 4,7 млн. → 110 хил. △, текстура 2048 WebP, Meshopt; sg-look (27.10.2026)

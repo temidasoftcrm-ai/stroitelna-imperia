@@ -4,6 +4,7 @@
 // buildAwardsWall(scene, { x, z, ry }) → { group, hits, setState(state), reveal(k), infoAt(hitObj), update(dt, night), dispose }
 //   state: { [k]: { tier: 'bronze'|'silver'|'gold'|'platinum', day, res } }
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { t as tr } from './i18n.js';   // 🌐 lang-en: надписите на платното (f9, част C)
 
@@ -67,7 +68,7 @@ function plaqueTex(lines, on) {
   g.textAlign = 'center'; g.fillStyle = on ? '#1c1408' : '#a89e8c';
   g.font = `bold ${on ? 38 : 30}px Georgia, serif`; g.fillText(lines[0], 256, 52, 480);
   g.font = `${on ? 28 : 24}px Georgia, serif`; g.fillText(lines[1] || '', 256, 98, 480);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
 }
 
 export function buildAwardsWall(scene, { x = 4.95, z = -3.2, ry = -Math.PI / 2, W = 2.7, H = 2.15, TH = 0.36 } = {}) {

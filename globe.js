@@ -3,6 +3,7 @@
 // твоите градове като светещи точки с имена. Върти се с мишката, приближава се с колелцето.
 // openGlobe(data) → { close }; data: { won: Set(ISO3), partial: Map(ISO3 → 0…1), cities: [{ lat, lon, nm, hq, done }], stats: { won, total }, focus: [lat, lon] }
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { t as tr } from './i18n.js';   // 🌐 lang-en: надписите на платното (f9, част C)
 
@@ -28,7 +29,7 @@ function countryLayer(g, data) {
       x.lineWidth = won ? 3 : 1.4; x.strokeStyle = won ? 'rgba(150,255,170,0.95)' : 'rgba(255,255,255,0.35)'; x.stroke();
     }
   }
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
   return t;
 }
 function labelSprite(text, color = '#fff') {
@@ -37,7 +38,7 @@ function labelSprite(text, color = '#fff') {
   const w = Math.ceil(x.measureText(text).width) + 24; c.width = w; c.height = 56;
   x.font = 'bold 40px system-ui, sans-serif'; x.fillStyle = 'rgba(10,16,26,0.7)'; x.beginPath(); x.roundRect(0, 4, w, 48, 12); x.fill();
   x.fillStyle = color; x.textBaseline = 'middle'; x.fillText(text, 12, 29);
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: true, transparent: true, sizeAttenuation: false }));
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: canvasTex(c), depthTest: true, transparent: true, sizeAttenuation: false }));
   s.scale.set(w / 56 * 0.032, 0.032, 1); s.center.set(-0.12, 0.5);   // постоянен размер на екрана при приближаване
   return s;
 }

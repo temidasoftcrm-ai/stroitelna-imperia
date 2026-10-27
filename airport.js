@@ -3,6 +3,7 @@
 // Самолетите: истински модели от Sketchfab (loadAirModels), иначе процедурни — регионален, A320, широкофюзелажен и карго.
 // Един самолет каца (подход от юг над магистралата → пробег → излиза на рулежката), друг излита на север над морето.
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { feature } from './lab/feature.js';
 
 const mat = (c, r = 0.8, m = 0, e) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m, ...(e ? { emissive: e, emissiveIntensity: 0 } : {}) });
@@ -35,7 +36,7 @@ const AIR_CFG = { regional: { f: 'regional', yaw: 0.26 }, a320: { f: 'a320', yaw
 let WIZZ_P = 0.15;
 const AIR = {};
 // прозорците на самолетите: тъмни денем, топло светят нощем (update → winM.emissiveIntensity)
-const winTex = (() => { const c = document.createElement('canvas'); c.width = 32; c.height = 16; const x = c.getContext('2d'); x.fillStyle = '#000'; x.fillRect(0, 0, 32, 16); x.fillStyle = '#fff'; x.beginPath(); x.roundRect ? x.roundRect(9, 3, 14, 10, 4) : x.rect(9, 3, 14, 10); x.fill(); const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; return t; })();
+const winTex = (() => { const c = document.createElement('canvas'); c.width = 32; c.height = 16; const x = c.getContext('2d'); x.fillStyle = '#000'; x.fillRect(0, 0, 32, 16); x.fillStyle = '#fff'; x.beginPath(); x.roundRect ? x.roundRect(9, 3, 14, 10, 4) : x.rect(9, 3, 14, 10); x.fill(); const t = canvasTex(c); t.wrapS = THREE.RepeatWrapping; return t; })();
 const winM = new THREE.MeshStandardMaterial({ color: 0x1c2733, roughness: 0.25, metalness: 0.2, emissive: 0xffd48a, emissiveIntensity: 0, emissiveMap: winTex, alphaMap: winTex, transparent: true, depthWrite: false });
 // фюзелажът на истинския модел: горният ръб и полуширината в средата (веднъж на вид)
 function fusOf(o, L, K) {
@@ -296,7 +297,7 @@ export function buildAirport(group, deps, opts = {}) {
     if (sign) { sign.position.set(TERM.x - 6, 16, tz); }
   }
   // нощно осветление: прожекторни мачти на перона (сияние + светло петно), стробове на подхода, фарове на самолетите
-  const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 1, 32, 32, 31); gr.addColorStop(0, 'rgba(255,240,200,1)'); gr.addColorStop(0.25, 'rgba(255,220,150,0.55)'); gr.addColorStop(1, 'rgba(255,200,120,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
+  const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 1, 32, 32, 31); gr.addColorStop(0, 'rgba(255,240,200,1)'); gr.addColorStop(0.25, 'rgba(255,220,150,0.55)'); gr.addColorStop(1, 'rgba(255,200,120,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); return canvasTex(c); })();
   const glowM = new THREE.SpriteMaterial({ map: glowTex, color: 0xffe2a8, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 });
   const poolM = new THREE.MeshBasicMaterial({ color: 0xffd890, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 });
   const strobeM = new THREE.SpriteMaterial({ map: glowTex, color: 0xffffff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 });

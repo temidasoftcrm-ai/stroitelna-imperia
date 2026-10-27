@@ -5,6 +5,7 @@
 // Зареждат се асинхронно; докато не са готови (или ако не се заредят), играта ползва старите модели на Kenney.
 // Всеки вагон е THREE.Group с предница към +z, център в началото, колела на y = 0 и userData.len — дължината му.
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { feature } from './lab/feature.js';
 import { NF_MATS } from './nightfloors.js';   // нощем daynight.js вдига emissiveIntensity на тези материали
@@ -118,7 +119,7 @@ function addHeadlights(o, len) {
   if (!lightMat) {
     const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 1, 32, 32, 31);
     gr.addColorStop(0, 'rgba(255,250,225,1)'); gr.addColorStop(0.3, 'rgba(255,235,180,0.6)'); gr.addColorStop(1, 'rgba(255,220,150,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64);
-    const tex = new THREE.CanvasTexture(c);
+    const tex = canvasTex(c);
     lightMat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xc8bc98, emissiveMap: tex, emissiveIntensity: 0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
     beamMat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0x4a4434, emissiveMap: tex, emissiveIntensity: 0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
     NF_MATS.add(lightMat); NF_MATS.add(beamMat);

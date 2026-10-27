@@ -3,6 +3,7 @@
 // Моделите са същите като в самостоятелната игра (Kenney/Quaternius от assets/). Мрежата е като в game.js: плочки 8 м,
 // улица на всеки 3 плочки, ядро 9×9 парцела, офисът на (4,5).
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { feature } from './lab/feature.js';
@@ -114,7 +115,7 @@ export async function createCity3D(el, { onProgress } = {}) {
     const c = document.createElement('canvas'); c.width = 512; c.height = 96; const g = c.getContext('2d');
     g.fillStyle = 'rgba(15,20,28,.85)'; g.beginPath(); g.roundRect(4, 4, 504, 88, 20); g.fill();
     g.font = 'bold 42px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = color; g.fillText(text, 256, 50);
-    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace;
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false })); s.scale.set(16, 3, 1); s.renderOrder = 10; return s;
   }
   const setLabel = (s, text, color) => { const nw = label(text, color); s.material.map.dispose(); s.material.map = nw.material.map; s.material.needsUpdate = true; };

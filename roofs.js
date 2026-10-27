@@ -2,6 +2,7 @@
 // Покривите вземат цвета си от зелените ивици в общата текстура colormap.png. Тук се правят копия на текстурата,
 // в които зеленото е пребоядисано в керемидено червено или сиво, и всяка къща получава случаен вариант.
 import * as THREE from 'three';
+import { canvasTex, drawable } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 
 // [hue (0–1), наситеност, яркост] на новия цвят; null = оригиналното зелено
 export const ROOF_VARIANTS = [
@@ -19,7 +20,7 @@ const matCache = new Map();   // оригинален материал → [ма
 
 // копие на текстурата: всеки „зелен“ пиксел (зеленото доминира) получава новия оттенък, яркостта се пази
 function recolor(tex, hsl) {
-  const img = tex.image, c = document.createElement('canvas');
+  const img = drawable(tex.image), c = document.createElement('canvas');   // fac-data: и DataTexture
   c.width = img.width; c.height = img.height;
   const g = c.getContext('2d');
   g.drawImage(img, 0, 0);
@@ -33,7 +34,7 @@ function recolor(tex, hsl) {
     px[i] = col.r * 255; px[i + 1] = col.g * 255; px[i + 2] = col.b * 255;
   }
   g.putImageData(d, 0, 0);
-  const t = new THREE.CanvasTexture(c);
+  const t = canvasTex(c);
   t.colorSpace = tex.colorSpace; t.flipY = tex.flipY; t.wrapS = tex.wrapS; t.wrapT = tex.wrapT;
   t.magFilter = tex.magFilter; t.minFilter = tex.minFilter;
   return t;

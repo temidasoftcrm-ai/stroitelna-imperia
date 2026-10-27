@@ -3,6 +3,7 @@
 // Всеки сегмент и всеки възел — своя група: update({ nodes, segs }) прерисува само тях (не целия град).
 // buildRoadView(net, { plants, fountain }) → { group, update(changed), lights(signals), dispose() }
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { mats, ribbon, disc, merge, offLine, dashed, circle, quad } from './cityplan2-3d.js';
 import { at, cumLen } from './roadnet.js';
 
@@ -15,7 +16,7 @@ const trimS = (pts, L, s0, s1) => { const T = L[L.length - 1]; if (T - s0 - s1 <
 export function buildRoadView(net, opts = {}) {
   const MAT = mats(), G = new THREE.Group(), segG = new Map(), nodeG = new Map(), heads = new Map();
   G.name = 'roadnet';
-  const BAR = (() => { const c = document.createElement('canvas'); c.width = 128; c.height = 16; const g = c.getContext('2d'); for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#f4f4f0' : '#d32f2f'; g.fillRect(i * 16, 0, 16, 16); } const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; return { beam: new THREE.MeshStandardMaterial({ map: t, roughness: 0.6 }), post: new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.5, metalness: 0.4 }) }; })();
+  const BAR = (() => { const c = document.createElement('canvas'); c.width = 128; c.height = 16; const g = c.getContext('2d'); for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#f4f4f0' : '#d32f2f'; g.fillRect(i * 16, 0, 16, 16); } const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; return { beam: new THREE.MeshStandardMaterial({ map: t, roughness: 0.6 }), post: new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.5, metalness: 0.4 }) }; })();
   const iron = new THREE.MeshStandardMaterial({ color: 0x2a2c2e, roughness: 0.6 }), deck = new THREE.MeshStandardMaterial({ color: 0xb9b4aa, roughness: 0.9 });
   const lampOn = { r: new THREE.MeshBasicMaterial({ color: 0xff2a1a }), y: new THREE.MeshBasicMaterial({ color: 0xffc21a }), g: new THREE.MeshBasicMaterial({ color: 0x27e36b }), off: new THREE.MeshBasicMaterial({ color: 0x2a2a2a }) };
   const signMat = { yield: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x220000 }), prio: new THREE.MeshStandardMaterial({ color: 0xf2c230 }), red: new THREE.MeshStandardMaterial({ color: 0xd32f2f }) };

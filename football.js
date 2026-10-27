@@ -5,6 +5,7 @@
 // Само близо до камерата (R м) и до 2 игрища наведнъж — иначе нищо не се рисува. Нощем — празни (игрищата нямат прожектори).
 // const fb = createFootball({ parent, body, pitches, hour, wet, on });  fb.update(dt, target);  fb.clear()
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 
 const R = 140, MAXP = 2, WALK_V = 1.4;   // радиус (м) около целта на камерата; колко игрища наведнъж; скоростта на ходенето в клипа
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -13,7 +14,7 @@ function ballMesh() {
   if (!ballGeo) {
     const c = document.createElement('canvas'); c.width = 128; c.height = 64; const g = c.getContext('2d'); g.fillStyle = '#f4f4f4'; g.fillRect(0, 0, 128, 64);
     g.fillStyle = '#1b1b1b'; for (const [x, y] of [[16, 16], [48, 40], [80, 14], [112, 38], [32, 54], [96, 58], [64, 30]]) { g.beginPath(); for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2; g.lineTo(x + Math.cos(a) * 7, y + Math.sin(a) * 7); } g.fill(); }
-    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace;
     ballGeo = new THREE.SphereGeometry(0.22, 14, 10); ballMat = new THREE.MeshStandardMaterial({ map: t, roughness: 0.6 });
   }
   const m = new THREE.Mesh(ballGeo, ballMat); m.castShadow = true; return m;

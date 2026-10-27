@@ -2,6 +2,7 @@
 // скали, малко село; а по трасето — строителни табели, предупредителни знаци, конуси, бариери с мигащи лампи
 // и строителен лагер (фургони, тоалетна, материали). Трасето е по оста z (от −len/2 до len/2), центрирано в x = 0.
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { loadMountains, mtnModel } from './mtn.js';
 
 const flat = (c, r = 1) => new THREE.MeshStandardMaterial({ color: c, roughness: r, flatShading: true });
@@ -16,7 +17,7 @@ function board(w, h, lines, bg = '#f2f2ee', border = '#ffb300') {
   g.textAlign = 'center'; g.textBaseline = 'middle';
   const step = c.height / (lines.length + 1);
   lines.forEach(([t, col, size], i) => { g.fillStyle = col; g.font = `900 ${size}px system-ui, sans-serif`; g.fillText(t, c.width / 2, step * (i + 1), c.width - 60); });
-  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const tex = canvasTex(c); tex.colorSpace = THREE.SRGBColorSpace;
   const o = new THREE.Group();
   const face = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 })); face.position.y = h / 2 + 2.2; o.add(face);
   const back = new THREE.Mesh(new THREE.BoxGeometry(w + 0.2, h + 0.2, 0.15), flat(0x6b4a2b)); back.position.set(0, h / 2 + 2.2, -0.1); o.add(back);
@@ -31,7 +32,7 @@ function warnSign() {
   g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(128, 14); g.lineTo(244, 230); g.lineTo(12, 230); g.closePath(); g.fill();
   g.strokeStyle = '#d62828'; g.lineWidth = 22; g.stroke();
   g.fillStyle = '#111'; g.font = '900 120px system-ui'; g.textAlign = 'center'; g.fillText('⚒', 128, 190);
-  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const tex = canvasTex(c); tex.colorSpace = THREE.SRGBColorSpace;
   const o = new THREE.Group();
   const face = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.6), new THREE.MeshStandardMaterial({ map: tex, transparent: true, alphaTest: 0.5 })); face.position.y = 2.6; o.add(face);
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.6), flat(0x8a9097)); pole.position.y = 1.3; o.add(pole);
@@ -44,7 +45,7 @@ function rowsTex(col, w, d) {
   const c = document.createElement('canvas'); c.width = 64; c.height = 64; const x = c.getContext('2d'), base = new THREE.Color(col);
   x.fillStyle = '#' + base.getHexString(); x.fillRect(0, 0, 64, 64);
   x.fillStyle = '#' + base.clone().multiplyScalar(0.78).getHexString(); for (let k = 0; k < 64; k += 8) x.fillRect(0, k, 64, 3);
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(w / 16, d / 6); t.colorSpace = THREE.SRGBColorSpace;
+  const t = canvasTex(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(w / 16, d / 6); t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
 // opts: { len = 240, half = 12 (половин ширина на трасето), riverZ = 20, riverW = 26, title, kind: 'rail' | 'road', seed }
@@ -131,7 +132,7 @@ export function addRouteScenery(group, deps, opts = {}) {
   { const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d');
     x.fillStyle = '#8fb36a'; x.fillRect(0, 0, 256, 256);
     for (let k = 0; k < 900; k++) { const px = r() * 256, py = r() * 256, rr = 2 + r() * 14; x.fillStyle = r() < 0.5 ? 'rgba(70,110,45,0.1)' : 'rgba(200,200,120,0.09)'; x.beginPath(); x.arc(px, py, rr, 0, 7); x.fill(); }
-    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(14, 14); t.colorSpace = THREE.SRGBColorSpace;
+    const t = canvasTex(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(14, 14); t.colorSpace = THREE.SRGBColorSpace;
     const gm = new THREE.MeshStandardMaterial({ map: t, roughness: 1 });   // между земята на изгледа (y −0.02) и реката/нивите
     // без ивицата на реката (иначе тревата я закрива)
     const cut = rz < 1e8 ? [rz - rw + 4, rz + rw - 4] : [0, 0], parts = cut[0] === cut[1] ? [[-450, 450]] : [[-450, cut[0]], [cut[1], 450]];

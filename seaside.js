@@ -2,6 +2,7 @@
 // морето е на север от града, с плаж и крайбрежна алея с палми, пристанище с кей, портални кранове и контейнери,
 // фар на вълнолома, кораби на котва и лодки, които плават. Жп линията минава по насип през морето.
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { createPortLights } from './portlights.js';
 import { makeWater } from './water.js';
 import { loadShipModels, hasShipModel, shipModel, setShipNight, mscTick } from './shipmodels.js';
@@ -21,7 +22,7 @@ function wakeTex() {
   const gr = x.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
   x.fillStyle = gr; x.globalAlpha = 0.28; x.beginPath(); x.moveTo(29, 0); x.lineTo(35, 0); x.lineTo(64, 256); x.lineTo(0, 256); x.closePath(); x.fill();   // разбърканата вода между ръкавите
   x.globalAlpha = 1; x.strokeStyle = gr; x.lineWidth = 5; x.beginPath(); x.moveTo(32, 2); x.lineTo(3, 256); x.moveTo(32, 2); x.lineTo(61, 256); x.stroke();   // двата ръкава на V-то
-  return (WAKE_T = new THREE.CanvasTexture(c));
+  return (WAKE_T = canvasTex(c));
 }
 // sea-coast: с колко брегът (извит) влиза навътре спрямо допирателната в x ± h — с толкова кеят се отмества към морето, за да не стъпва на пясъка в ъглите
 const coastBulge = (CO, x, h) => { const sl = (CO(x + 20) - CO(x - 20)) / 40; let m = 0; for (const d of [-h, -h / 2, h / 2, h]) m = Math.max(m, CO(x) + sl * d - CO(x + d)); return m; };

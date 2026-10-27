@@ -3,6 +3,7 @@
 //   import { crewVan } from './vanlogo.js';
 //   const van = crewVan(gltf.scene, { brand: { nm, col, ico }, len: 5.9 }) → THREE.Group (дължината по z, предницата към +z, колелата на y = 0)
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 
 export const VANS = {   // [файл, истинска дължина в м]
   sprinter: ['assets/heavy/vans/van-sprinter.glb', 5.9],
@@ -17,7 +18,7 @@ export function brandTex(b) {
   g.clearRect(0, 0, 1024, 256);
   g.font = '120px "Noto Color Emoji", system-ui, sans-serif'; g.textBaseline = 'middle'; g.textAlign = 'left'; g.fillText(b.ico, 40, 132);
   g.font = '900 104px system-ui, sans-serif'; g.lineWidth = 12; g.strokeStyle = 'rgba(20,24,32,0.85)'; g.strokeText(b.nm.toUpperCase(), 200, 128); g.fillStyle = b.col; g.fillText(b.nm.toUpperCase(), 200, 128);   // само логото: иконата и името в цвета на марката (потребителят: без лента и надпис)
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; texCache.set(key, t); return t;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; texCache.set(key, t); return t;
 }
 export function crewVan(src, o = {}) {
   const obj = src.clone(true), inner = new THREE.Group(), g = new THREE.Group(); inner.add(obj); g.add(inner);

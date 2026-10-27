@@ -6,6 +6,7 @@
 //   deps.center() → { x, z } (координатите на плана); deps.R() — радиусът на града; deps.bus() → THREE.Object3D | null (моделът);
 //   deps.want() → { lines, perLine } — колко линии и автобуса (растат с града)
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { pointOn } from './junctionpaths.js';
 
 const DWELL = 12, MAIN = /^(blvd|avenue|ring)$/;
@@ -18,7 +19,7 @@ function shelter() {
   const glass = new THREE.Mesh(new THREE.BoxGeometry(3.5, 2.3, 0.05), new THREE.MeshStandardMaterial({ color: 0xbfe0f0, transparent: true, opacity: 0.35, roughness: 0.1 })); glass.position.set(0, 1.3, -0.8); g.add(glass);
   for (const x of [-1.7, 1.7]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.5, 0.08), mat(0x2b2f36)); p.position.set(x, 1.25, -0.78); g.add(p); }
   const bench = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.08, 0.45), mat(0x7a5a3a)); bench.position.set(0, 0.48, -0.5); g.add(bench);
-  if (!SIGN) { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const x = cv.getContext('2d'); x.fillStyle = '#1d5fbf'; x.fillRect(0, 0, 64, 64); x.fillStyle = '#fff'; x.font = 'bold 26px sans-serif'; x.textAlign = 'center'; x.fillText('BUS', 32, 42); SIGN = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv) }); }
+  if (!SIGN) { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const x = cv.getContext('2d'); x.fillStyle = '#1d5fbf'; x.fillRect(0, 0, 64, 64); x.fillStyle = '#fff'; x.font = 'bold 26px sans-serif'; x.textAlign = 'center'; x.fillText('BUS', 32, 42); SIGN = new THREE.MeshBasicMaterial({ map: canvasTex(cv) }); }
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 3, 6), mat(0x8a8f96)); pole.position.set(2.3, 1.5, 0.3); g.add(pole);
   const sign = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.04), [mat(0x8a8f96), mat(0x8a8f96), mat(0x8a8f96), mat(0x8a8f96), SIGN, SIGN]); sign.position.set(2.3, 2.75, 0.3); sign.rotation.y = Math.PI / 2; g.add(sign);
   g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });

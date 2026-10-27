@@ -1,6 +1,7 @@
 // station.js — гарата на фирмата в града: нива 1–5, по един коловоз на ниво. Влаковете, които са у дома,
 // стоят паркирани на коловозите. Главната линия (коловоз 0) минава през целия град; останалите са гарови.
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { hasTrainModel, trainCar } from './trainmodels.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { feature } from './lab/feature.js';
@@ -43,7 +44,7 @@ function pool() {
     const c = document.createElement('canvas'); c.width = c.height = 128;
     const x = c.getContext('2d'), gr = x.createRadialGradient(64, 64, 0, 64, 64, 64);
     gr.addColorStop(0, 'rgba(255,236,190,1)'); gr.addColorStop(0.45, 'rgba(255,220,160,0.55)'); gr.addColorStop(1, 'rgba(255,210,150,0)');
-    x.fillStyle = gr; x.fillRect(0, 0, 128, 128); poolTex = new THREE.CanvasTexture(c);
+    x.fillStyle = gr; x.fillRect(0, 0, 128, 128); poolTex = canvasTex(c);
   }
   return new THREE.MeshBasicMaterial({ map: poolTex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
 }

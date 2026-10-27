@@ -2,6 +2,7 @@
 // разделителна ивица, мост над река и тунел в хълма, червено-бели мантинели, портални табели и много движение.
 // game.js ползва: AB_STAGES, AB_COST_MUL, AB_TOLL_MUL, AB_FULL_BONUS, AB_MAT_DISC, AB_MODELS, buildAutobahnView(A, opts).
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { loadMountains, mtnModel } from './mtn.js';
 import { makeWater } from './water.js';
 
@@ -44,7 +45,7 @@ function laneTex() {
   g.fillStyle = '#f2f2ee';
   g.fillRect(4, 0, 8, 256); g.fillRect(500, 0, 8, 256);
   for (let l = 1; l < LANES; l++) { const x = 8 + l * (496 / LANES); for (let y = 0; y < 256; y += 64) g.fillRect(x - 3, y, 6, 36); }
-  const t = new THREE.CanvasTexture(c); t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  const t = canvasTex(c); t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
   return t;
 }
 // червено-бяла мантинела (ивици)
@@ -52,7 +53,7 @@ function barrierTex() {
   const c = document.createElement('canvas'); c.width = 128; c.height = 16;
   const g = c.getContext('2d');
   for (let k = 0; k < 8; k++) { g.fillStyle = k % 2 ? '#ffffff' : '#d62828'; g.fillRect(k * 16, 0, 16, 16); }
-  const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
+  const t = canvasTex(c); t.wrapS = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
 // синя портална табела над платната (два реда текст)
@@ -63,7 +64,7 @@ function gantrySign(text1, text2) {
   g.fillStyle = '#d62828'; g.fillRect(30, 40, 150, 80); g.fillStyle = '#fff'; g.font = 'bold 64px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('E', 105, 82);
   g.font = 'bold 76px system-ui'; g.textAlign = 'left'; g.fillText(text1, 210, 84, 790);
   g.font = 'bold 56px system-ui'; g.fillText(text2, 210, 186, 790);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
 // машини (процедурни): асфалтополагач, валяк, самосвал

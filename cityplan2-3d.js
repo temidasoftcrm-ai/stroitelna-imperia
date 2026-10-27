@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { timesSquareAds } from './timessq-ads.js';   // Таймс Скуеър: светещите екрани с рекламите
 import { makeWater } from './water.js';   // sea2: водата — общият шейдър с вълните
 import { feature } from './lab/feature.js';
+import { canvasTex } from './texdata.js';   // fac-data (T1): платната → собствени данни
 import { varPick, varW, xParts, xDraw, bgPlace } from './bgblocks.js';   // bg-variety / bg-fill: разнообразните и допълнителните фонови сгради
 import { crossingsOf } from './pedpaths.js';   // road-geo: зебрите — същите, по които пресичат пешеходците
 import { streetReal, lampField, tlightField, lensGeo, pedGeo, lensMatrix, CLASSIC } from './streetreal.js';   // street-real: истинските лампи и светофари (opts.streetReal)
@@ -33,7 +34,7 @@ export function mats() {
   for (const k of ['curb', 'apron']) Object.assign(MAT[k], { polygonOffset: true, polygonOffsetFactor: -5, polygonOffsetUnits: -5 });
   return MAT;
 }
-function ctex(n, draw, rep2 = 1) { const c = document.createElement('canvas'); c.width = c.height = n; draw(c.getContext('2d', FCPU), n); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep2, rep2); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; }
+function ctex(n, draw, rep2 = 1) { const c = document.createElement('canvas'); c.width = c.height = n; draw(c.getContext('2d', FCPU), n); const t = canvasTex(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep2, rep2); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; }
 // ---- геометрия (слива се в малко мешове)
 export function ribbon(pts, w, y, closed = false) {
   const pos = [], idx = [];
@@ -59,7 +60,7 @@ export const circle = (x, z, r, n = 64) => Array.from({ length: n + 1 }, (_, k) 
 // road-geo: бариера на правия край на улица (към бъдещ квартал / булевард без продължение): два стълба и греда на червено-бели ивици
 let BAR_M = null;
 function barrier(e, ang, w) {
-  if (!BAR_M) { const c = document.createElement('canvas'); c.width = 128; c.height = 16; const g = c.getContext('2d', FCPU); for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#f4f4f0' : '#d32f2f'; g.fillRect(i * 16, 0, 16, 16); } const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping;
+  if (!BAR_M) { const c = document.createElement('canvas'); c.width = 128; c.height = 16; const g = c.getContext('2d', FCPU); for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#f4f4f0' : '#d32f2f'; g.fillRect(i * 16, 0, 16, 16); } const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping;
     BAR_M = { beam: new THREE.MeshStandardMaterial({ map: t, roughness: 0.6 }), post: new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.5, metalness: 0.4 }), tex: t }; }
   const g = new THREE.Group(), L = Math.max(3, w - 0.6), beam = new THREE.Mesh(new THREE.BoxGeometry(L, 0.28, 0.14), BAR_M.beam);
   BAR_M.tex.repeat.set(Math.round(L / 2), 1); beam.position.y = 0.95; g.add(beam);
@@ -77,8 +78,12 @@ const FREUP = feature('fac-reup'), RU_AT = [3, 12, 40, Infinity];
 // fac-cpu (T1, 26.10): платната на фасадите — в паметта на процесора (willReadFrequently), не в ускорения 2D canvas: Chrome понякога
 // изхвърля съдържанието на ускорените платна (при натоварена видеокарта) — те остават празни/черни и fac-reup няма какво да качи наново
 export const FCPU = { willReadFrequently: true };
+// fac-data (T1, 27.10): willReadFrequently не стига — Chrome пак губи съдържанието на платната (2D „contextlost“ при натоварване) и при всяко
+// следващо качване (needsUpdate, нов материал, след загубен WebGL контекст) текстурата става черна. Затова платното се снима веднага след
+// рисуването в собствени байтове (Uint8Array → DataTexture, редовете — обърнати, със същите mipmaps) и текстурата вече не зависи от живо платно.
+export { canvasTex };   // fac-data: помощникът е в texdata.js (общ за всички модули)
 function reupCanvas(G) { const seen = new Set(); G.traverse(o => { if (!o.isInstancedMesh) return; for (const m of [].concat(o.material)) { if (!m || seen.has(m)) continue; seen.add(m);
-  for (const t of [m.map, m.emissiveMap]) if (t && t.isCanvasTexture && t.image && t.image.width > 0) t.needsUpdate = true; } }); }
+  for (const t of [m.map, m.emissiveMap]) if (t && (t.isCanvasTexture || t.isDataTexture) && t.image && t.image.width > 0) t.needsUpdate = true;   /* fac-data: вече DataTexture — качва се наново от собствените данни */ } }); }
 const WIN_MATS = [];
 export function winDrop(set) { for (let i = WIN_MATS.length - 1; i >= 0; i--) if (set.has(WIN_MATS[i])) WIN_MATS.splice(i, 1); }   // fix-stab (game.js winForget): материалите на стария град
 export function nightWin(mat, c, o = {}) {   // export — и за bgblocks.js
@@ -92,7 +97,7 @@ export function nightWin(mat, c, o = {}) {   // export — и за bgblocks.js
     if (rnd() > (VIV ? Math.max(o.lit || 0.25, 0.42) : (o.lit || 0.25))) continue; const warm = rnd() < 0.9, k2 = VIV ? 0.6 + rnd() * 0.4 : 0.45 + rnd() * 0.4,   /* потребителят: „като дискотека“ — светнали ~25 %, по-тъмни, 10 % бели */ col = VIV ? (h => h < 0.42 ? [255, 160, 70] : h < 0.7 ? [255, 196, 110] : h < 0.83 ? [245, 222, 185] : h < 0.93 ? [190, 210, 255] : [90, 120, 255])(rnd()) : warm ? [255, 196, 110] : [200, 225, 255];
     for (const q of px) { D[q * 4] = col[0] * k2; D[q * 4 + 1] = col[1] * k2; D[q * 4 + 2] = col[2] * k2; } }
   for (let i = 3; i < D.length; i += 4) D[i] = 255;
-  g.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(out); t.colorSpace = THREE.SRGBColorSpace;
+  g.putImageData(img, 0, 0); const t = canvasTex(out); t.colorSpace = THREE.SRGBColorSpace;
   const R = o.rep ?? 2, RX = Array.isArray(R) ? R[0] : R, RY = Array.isArray(R) ? R[1] : R;   // [по хоризонтала, по вертикала]   // потребителят (чрез 2a): фасадите 2× по-ситно — двойно повече и по-малки прозорци; map и emissiveMap — еднакво, за да съвпадат
   if (mat.map) { if (RX !== 1 || RY !== 1) { mat.map.wrapS = mat.map.wrapT = THREE.RepeatWrapping; mat.map.repeat.set(RX, RY); t.repeat.set(RX, RY); } t.wrapS = mat.map.wrapS; t.wrapT = mat.map.wrapT; }
   mat.emissive = new THREE.Color(0xffffff); mat.emissiveMap = t; mat.emissiveIntensity = 0; mat.userData.winK = o.k || 0.62; WIN_MATS.push(mat); return mat;
@@ -121,7 +126,7 @@ function facadeMat() {
   for (let r = 0; r < 4; r++) for (let k = 0; k < 3; k++) { const x = 14 + k * 38, y = 8 + r * 24; g.fillStyle = '#3d3a36'; g.fillRect(x + 5, y, 12, 16); g.fillStyle = '#5f7a4a'; g.fillRect(x, y, 5, 16); g.fillRect(x + 17, y, 5, 16); g.fillStyle = '#e8e0d2'; g.fillRect(x + 3, y + 16, 16, 2); }
   g.fillStyle = '#d9cfbf'; g.fillRect(0, 104, 128, 24); for (let k = 0; k < 3; k++) { g.fillStyle = '#4a4540'; g.beginPath(); g.moveTo(16 + k * 38, 128); g.lineTo(16 + k * 38, 112); g.arc(27 + k * 38, 112, 11, Math.PI, 0); g.lineTo(38 + k * 38, 128); g.fill(); }
   g.fillStyle = '#cfc5b4'; g.fillRect(0, 0, 128, 4);   // корниз
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
   return FAC_MAT = nightWin(new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 }), c, { seed: 91, thr: 125, rep: [2, 1] });
 }
 // Истанбул: османска къща — дъски, бели рамки на прозорците, еркер (cumba) на горните етажи; блок — светли балкони и парапети
@@ -136,7 +141,7 @@ function brickMat() {
   g.fillStyle = '#e6e0d8'; g.fillRect(0, 0, 128, 128); g.fillStyle = 'rgba(70,55,45,0.16)'; for (let y = 0; y < 128; y += 4) { g.fillRect(0, y, 128, 1); for (let x = (y / 4) % 2 ? 0 : 4; x < 128; x += 8) g.fillRect(x, y, 1, 4); }   // тухлите
   for (let r = 0; r < 4; r++) for (let k = 0; k < 3; k++) { const x = 14 + k * 40, y = 8 + r * 25; g.fillStyle = '#f4f2ec'; g.fillRect(x - 2, y - 2, 18, 22); g.fillStyle = '#2c3440'; g.fillRect(x, y, 14, 18); g.fillStyle = '#f4f2ec'; g.fillRect(x, y + 8, 14, 1.5); g.fillRect(x + 6.3, y, 1.4, 18); }   // бели рамки, прозорци с плъзгащо се крило
   g.fillStyle = '#f2efe6'; g.fillRect(0, 106, 128, 3); g.fillStyle = '#1e2a24'; g.fillRect(56, 110, 16, 18); g.fillStyle = '#f4f2ec'; g.fillRect(52, 110, 3, 18); g.fillRect(73, 110, 3, 18);   // врата с колонки
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return BRICK_MAT = nightWin(new THREE.MeshStandardMaterial({ map: t, roughness: 0.92 }), c, { seed: 117, rep: [2, 1] });
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return BRICK_MAT = nightWin(new THREE.MeshStandardMaterial({ map: t, roughness: 0.92 }), c, { seed: 117, rep: [2, 1] });
 }
 // Ню Йорк: стъклени небостъргачи (окачена фасада — синкаво стъкло с тънки метални профили); старите каменни сгради — тип 2 с NYST
 const MOSC = [0xe8c88a, 0xf0dca8, 0xe9b98a, 0xf2e6cc, 0xd9a878, 0xe6d2a2, 0xf1d0c0, 0xdcc49c];   // Москва: охра, жълто, праскова, крем, розово (класицизъм и модерн)
@@ -149,7 +154,7 @@ function glassMat() {
   const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d', FCPU);
   const gr = g.createLinearGradient(0, 0, 128, 128); gr.addColorStop(0, '#dfe8f0'); gr.addColorStop(1, '#aebfcd'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
   g.fillStyle = 'rgba(40,50,60,0.55)'; for (let y = 0; y < 128; y += 8) g.fillRect(0, y, 128, 1.2); for (let x = 0; x < 128; x += 10.67) g.fillRect(x, 0, 1, 128);   // етажите и профилите
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; const cc = document.createElement('canvas'); cc.width = cc.height = 128; const g2 = cc.getContext('2d', FCPU); g2.fillStyle = '#fff'; g2.fillRect(0, 0, 128, 128); g2.fillStyle = '#000';
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; const cc = document.createElement('canvas'); cc.width = cc.height = 128; const g2 = cc.getContext('2d', FCPU); g2.fillStyle = '#fff'; g2.fillRect(0, 0, 128, 128); g2.fillStyle = '#000';
   for (let y = 0; y < 16; y++) for (let x = 0; x < 12; x++) g2.fillRect(Math.round(x * 10.67) + 2, y * 8 + 2, 7, 5);   // стъклото: всяка клетка (етаж × профил) — прозорец
   return GLASS_MAT = tileByScale(nightWin(new THREE.MeshStandardMaterial({ map: t, roughness: 0.25, metalness: 0.35 }), cc, { lit: 0.32, k: 0.8, seed: 99, rep: 1 }), 16, 48);   // 12 профила ≈ 16 м, 16 етажа ≈ 48 м
 }
@@ -162,7 +167,7 @@ function haussMat() {
   for (let r = 0; r < 5; r++) for (let k = 0; k < 4; k++) { const x = 9 + k * 30, y = 6 + r * 21; g.fillStyle = '#3a4250'; g.fillRect(x, y, 12, 15); g.fillStyle = '#e8dcc6'; g.fillRect(x - 2, y - 2, 16, 2); }
   g.fillStyle = '#1d2024'; for (const y of [27, 90]) { g.fillRect(0, y, 128, 2); for (let x = 0; x < 128; x += 3) g.fillRect(x, y - 4, 1, 4); }   // ковани балкони (2-ри и 5-и етаж)
   g.fillStyle = '#d9cdb5'; g.fillRect(0, 108, 128, 20); g.fillStyle = '#2f3a44'; for (let k = 0; k < 4; k++) g.fillRect(6 + k * 31, 111, 22, 17);   // витрините
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return HAUSS_MAT = nightWin(new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 }), c, { seed: 117, rep: [2, 1] });
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return HAUSS_MAT = nightWin(new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 }), c, { seed: 117, rep: [2, 1] });
 }
 function mansardGeo() { const g = new THREE.BufferGeometry(), v = [-0.5, 0, -0.5, 0.5, 0, -0.5, 0.5, 0, 0.5, -0.5, 0, 0.5, -0.3, 1, -0.5, 0.3, 1, -0.5, 0.3, 1, 0.5, -0.3, 1, 0.5];   // мансарда: стръмни скатове и плосък връх
   g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); g.setIndex([0, 4, 7, 0, 7, 3, 1, 2, 6, 1, 6, 5, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 3, 7, 6, 3, 6, 2]); g.computeVertexNormals(); return g; }
@@ -175,7 +180,7 @@ function ottoMat() {
   g.fillStyle = 'rgba(60,45,30,0.35)'; g.fillRect(34, 8, 60, 56); g.fillStyle = '#f7f3ea'; g.fillRect(36, 10, 56, 52);   // еркерът (по-светъл, със сянка)
   for (const [x, y] of [[40, 16], [58, 16], [76, 16], [40, 40], [58, 40], [76, 40], [8, 22], [106, 22], [8, 46], [106, 46]]) { g.fillStyle = '#ffffff'; g.fillRect(x - 1, y - 1, 14, 18); g.fillStyle = '#35404a'; g.fillRect(x, y, 12, 16); }
   g.fillStyle = '#ffffff'; g.fillRect(0, 70, 128, 3); g.fillStyle = '#4a3a2c'; g.fillRect(52, 90, 24, 38); g.fillStyle = '#35404a'; for (const x of [12, 96]) g.fillRect(x, 92, 18, 22);   // корниз, вратата, прозорците на партера
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return OTTO_MAT = nightWin(new THREE.MeshStandardMaterial({ map: t, roughness: 0.85 }), c, { seed: 104, rep: [2, 1] });
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return OTTO_MAT = nightWin(new THREE.MeshStandardMaterial({ map: t, roughness: 0.85 }), c, { seed: 104, rep: [2, 1] });
 }
 function aptMat() {
   if (APT_MAT) return APT_MAT;
@@ -183,7 +188,7 @@ function aptMat() {
   g.fillStyle = '#f6f3ec'; g.fillRect(0, 0, 128, 128);
   for (let r = 0; r < 5; r++) for (let k = 0; k < 4; k++) { const x = 6 + k * 31, y = 4 + r * 22; g.fillStyle = '#4a5866'; g.fillRect(x, y, 20, 13); g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(x - 3, y + 13, 26, 4); g.fillStyle = '#d8d4cc'; g.fillRect(x - 3, y + 12, 26, 2); }   // прозорци и балкони
   g.fillStyle = '#c9c4ba'; g.fillRect(0, 114, 128, 14); g.fillStyle = '#3e4a54'; for (let k = 0; k < 4; k++) g.fillRect(8 + k * 31, 116, 18, 12);   // партер — магазини
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return APT_MAT = tileByScale(nightWin(new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 }), c, { seed: 91, rep: 1 }), 12, 16);
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return APT_MAT = tileByScale(nightWin(new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 }), c, { seed: 91, rep: 1 }), 12, 16);
 }
 function roofGeo() { const g = new THREE.BufferGeometry(), v = [-0.5, 0, -0.5, 0.5, 0, -0.5, 0.5, 0, 0.5, -0.5, 0, 0.5, 0, 1, -0.5, 0, 1, 0.5];   // покрив на две води (било по z)
   g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); g.setIndex([0, 4, 5, 0, 5, 3, 1, 2, 5, 1, 5, 4, 0, 1, 4, 3, 5, 2]); g.computeVertexNormals(); return g; }
@@ -347,7 +352,7 @@ function streetGlow(G, P, style) {
   if (!parts.length) return null;
   const c = document.createElement('canvas'); c.width = 64; c.height = 1; const g = c.getContext('2d', FCPU), gr = g.createLinearGradient(0, 0, 64, 0);
   gr.addColorStop(0, '#000'); gr.addColorStop(0.12, '#d8d8d8'); gr.addColorStop(0.3, '#383838'); gr.addColorStop(0.5, '#202020'); gr.addColorStop(0.7, '#383838'); gr.addColorStop(0.88, '#d8d8d8'); gr.addColorStop(1, '#000'); g.fillStyle = gr; g.fillRect(0, 0, 64, 1);
-  const t = new THREE.CanvasTexture(c), mat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: { rome: 0xff7a18, istanbul: 0xffb27a, paris: 0xffb860, london: 0xffa850, moscow: 0xffb070 }[style] ?? 0xff9a3a, emissiveMap: t, emissiveIntensity: 0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 });
+  const t = canvasTex(c), mat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: { rome: 0xff7a18, istanbul: 0xffb27a, paris: 0xffb860, london: 0xffa850, moscow: 0xffb070 }[style] ?? 0xff9a3a, emissiveMap: t, emissiveIntensity: 0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 });
   mat.userData.winK = (style === 'rome' ? 0.85 : 0.75) * (feature('road-glow-soft') ? 0.5 : 1);   // road-glow-soft (f9): нощем наполовина — пътищата не са оранжеви ленти   // Рим — натриево (по-оранжево, малко по-силно), Истанбул — смесено (по-бяло)
   const m = merge(parts, mat), uv = m.geometry.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, i % 2, 0.5);   // лентите са двойки връх (ляв, десен) — uv.x напреки
   m.receiveShadow = false; m.renderOrder = 2; G.add(m); return mat;
@@ -359,7 +364,7 @@ function floodWash(G, P) {
   const lms = P.lots.filter(L => L.lm && WASH_LM.has(L.lm)); if (!lms.length) return null;   // само забележителностите с модел (не празните запазени места)
   const c = document.createElement('canvas'); c.width = 4; c.height = 64; const g = c.getContext('2d', FCPU), gr = g.createLinearGradient(0, 64, 0, 0); gr.addColorStop(0, '#fff'); gr.addColorStop(0.35, '#555'); gr.addColorStop(1, '#000'); g.fillStyle = gr; g.fillRect(0, 0, 4, 64);
   const CP = feature('city-polish');   /* city-polish (f9): отгоре двустранният висок цилиндър изглеждаше като светещ „купол“ около големите парцели (Истанбул) — само външната страна, по-нисък и по-мек */
-  const mat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffc070, emissiveMap: new THREE.CanvasTexture(c), emissiveIntensity: 0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: CP ? THREE.FrontSide : THREE.DoubleSide });
+  const mat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffc070, emissiveMap: canvasTex(c), emissiveIntensity: 0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: CP ? THREE.FrontSide : THREE.DoubleSide });
   mat.userData.winK = CP ? 0.11 : 0.16;
   const im = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1.15, 1, 28, 1, true).translate(0, 0.5, 0), mat, lms.length), m = new THREE.Matrix4();
   lms.forEach((L, i) => { const r = Math.max(L.w, L.d) * 0.5; im.setMatrixAt(i, m.makeScale(r * 0.92, CP ? Math.min(6, 3 + r * 0.08) : Math.min(14, 4 + r * 0.2), r * 0.92).setPosition(L.x, 0.2, L.z));   /* ниско сияние при основата, не „звънец“ */ });
@@ -683,7 +688,7 @@ export function buildPlan2View(P, opts = {}) {
     if (opts.furniture !== false) { const F = ST.F = yield* furniture(G, P, opts);
       if (F && F.lamps.length && opts.lampGlow !== false) {
         const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d', FCPU), gr = g.createRadialGradient(32, 32, 1, 32, 32, 31); gr.addColorStop(0, 'rgba(255,214,140,0.9)'); gr.addColorStop(0.5, 'rgba(255,190,110,0.3)'); gr.addColorStop(1, 'rgba(255,170,90,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
-        ST.pools = new THREE.InstancedMesh(new THREE.PlaneGeometry(9, 9).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -6 }), F.lamps.length);
+        ST.pools = new THREE.InstancedMesh(new THREE.PlaneGeometry(9, 9).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: canvasTex(c), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -6 }), F.lamps.length);
         const m = new THREE.Matrix4(); F.lamps.forEach(([x, z, y], i) => ST.pools.setMatrixAt(i, y > 7 ? m.makeScale(1.6, 1, 1.6).setPosition(x, 0.15, z) : m.makeTranslation(x, 0.15, z)));   /* street-real: под високите LED — по-широко петно */ ST.pools.visible = false; ST.pools.frustumCulled = false; F.FURN.add(ST.pools);
       }
       ST.lampsOut = F.lamps.filter((_, i) => i % Math.max(1, Math.ceil(F.lamps.length / 160)) === 0).map(([x, z, y]) => ({ x: x + off[0], y: y || 4.8, z: z + off[1] }));
@@ -776,7 +781,7 @@ function labelSprite(text, kind) {
   const c = document.createElement('canvas'), g = c.getContext('2d', FCPU), F = kind === 'w' ? 'italic 600 46px Georgia, serif' : '700 38px system-ui, sans-serif';
   g.font = F; const w = Math.ceil(g.measureText(text).width) + 24; c.width = w; c.height = 64; g.font = F; g.textBaseline = 'middle'; g.textAlign = 'center';
   g.lineWidth = 7; g.strokeStyle = kind === 'w' ? 'rgba(10,40,70,0.85)' : 'rgba(30,25,20,0.8)'; g.strokeText(text, w / 2, 34); g.fillStyle = kind === 'w' ? '#cfe8ff' : '#fff6e0'; g.fillText(text, w / 2, 34);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace;
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthTest: false, depthWrite: false })); sp.renderOrder = 10; sp.userData.ar = w / 64; return sp;
 }
 function mapLabels(G, D) {
@@ -987,12 +992,12 @@ function freePlots(G, P) {
   const lots = P.lots.filter(L => !L.big && !L.lm), N = Math.max(1, lots.length);
   const cv = document.createElement('canvas'); cv.width = cv.height = 128; const g = cv.getContext('2d', FCPU); g.fillStyle = '#7d9a55'; g.fillRect(0, 0, 128, 128);
   for (let i = 0; i < 260; i++) { const x = Math.random() * 128, y = Math.random() * 128, r = 2 + Math.random() * 7; g.fillStyle = Math.random() < 0.35 ? 'rgba(122,98,66,0.55)' : `rgba(${90 + Math.random() * 40 | 0},${120 + Math.random() * 40 | 0},${60 + Math.random() * 20 | 0},0.5)`; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
-  const gt = new THREE.CanvasTexture(cv); gt.colorSpace = THREE.SRGBColorSpace; gt.wrapS = gt.wrapT = THREE.RepeatWrapping;
+  const gt = canvasTex(cv); gt.colorSpace = THREE.SRGBColorSpace; gt.wrapS = gt.wrapT = THREE.RepeatWrapping;
   const patch = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: gt, roughness: 1, polygonOffset: true, polygonOffsetFactor: -1 }), N);
   const fence = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), M(0x8a7458), N * 3);
   const sc = document.createElement('canvas'); sc.width = 128; sc.height = 64; const s2 = sc.getContext('2d', FCPU); s2.fillStyle = '#f4f1ea'; s2.fillRect(0, 0, 128, 64); s2.fillStyle = '#c62828'; s2.fillRect(0, 0, 128, 18); s2.fillStyle = '#fff'; s2.font = 'bold 14px system-ui'; s2.textAlign = 'center'; s2.fillText(tr('ПРОДАВА СЕ'), 64, 14);
   s2.fillStyle = '#2b2b2b'; s2.font = 'bold 20px system-ui'; s2.fillText(tr('ПАРЦЕЛ'), 64, 44); s2.strokeStyle = '#c62828'; s2.lineWidth = 3; s2.strokeRect(1.5, 1.5, 125, 61);
-  const st = new THREE.CanvasTexture(sc); st.colorSpace = THREE.SRGBColorSpace;
+  const st = canvasTex(sc); st.colorSpace = THREE.SRGBColorSpace;
   const board = new THREE.InstancedMesh(new THREE.PlaneGeometry(1.6, 0.8), new THREE.MeshStandardMaterial({ map: st, roughness: 0.8, side: THREE.DoubleSide }), N), post = new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, 1.9, 0.1).translate(0, 0.95, 0), M(0x5a5048), N);
   for (const m of [patch, fence, board, post]) { m.count = 0; m.frustumCulled = false; G.add(m); } patch.receiveShadow = true; fence.castShadow = board.castShadow = true;
   const T = new THREE.Matrix4(), L4 = new THREE.Matrix4(), O = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), V = new THREE.Vector3(), S3 = new THREE.Vector3(), C = new THREE.Color();

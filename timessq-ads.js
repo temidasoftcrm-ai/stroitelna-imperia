@@ -4,6 +4,7 @@
 //   const ads = timesSquareAds(L, { side }); G.add(ads.group); … ads.update(t); ads.setNight(n)
 // L: { x, z, w, d, rot } — площадът; side — на колко метра от оста на площада са фасадите (по подразбиране половината ширина + 4 м)
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 
 const WORDS = ['BROADWAY', 'LIVE!', 'NEW YORK', 'SHOW', 'MUSIC', 'NEWS 24', 'SALE', 'CINEMA', 'TONIGHT', 'SODA', 'PHONE X', 'JEANS', 'DANCE', 'COMEDY', 'HOTEL', 'TAXI'];
 const COLS = [['#ff2d55', '#ffd60a'], ['#0a84ff', '#64d2ff'], ['#30d158', '#ffffff'], ['#bf5af2', '#ff9f0a'], ['#ff9f0a', '#1c1c1e'], ['#ffffff', '#ff375f'], ['#5e5ce6', '#ffd60a'], ['#ff453a', '#ffffff']];
@@ -20,14 +21,14 @@ function adAtlas() {
     g.fillStyle = '#fff'; g.strokeStyle = 'rgba(0,0,0,0.55)'; g.lineWidth = 6; g.textAlign = 'center'; g.textBaseline = 'middle';
     const w = WORDS[i % WORDS.length]; g.font = `900 ${w.length > 7 ? 40 : 56}px system-ui, sans-serif`; g.strokeText(w, 128, 88); g.fillText(w, 128, 88);
     g.font = '700 20px system-ui, sans-serif'; g.fillText(['★ NOW ★', 'TIMES SQ', 'ONLY TODAY', 'NEW!'][i % 4], 128, 150); g.restore(); }
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
 }
 // бягащата лента: дълъг ред с новини, повтаря се (offset се мести)
 function tickerCanvas() {
   const c = document.createElement('canvas'); c.width = 1024; c.height = 64; const g = c.getContext('2d');
   g.fillStyle = '#05070c'; g.fillRect(0, 0, 1024, 64); g.fillStyle = '#ffd60a'; g.font = '800 40px system-ui, sans-serif'; g.textBaseline = 'middle';
   g.fillText('  ★ BREAKING: NEW YORK NEVER SLEEPS ★ SHOWS TONIGHT ★ WEATHER 18°C ★ STOCKS ↑ ★ ', 0, 34);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; return t;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; return t;
 }
 
 // 2 draw calls: всички екрани — една слята геометрия с атласа (смяната на реклама = нови uv на 4-те върха, най-много 2 пъти в секунда);

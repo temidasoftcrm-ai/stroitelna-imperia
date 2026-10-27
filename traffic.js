@@ -19,6 +19,7 @@
 // Мрежата: { nodes: [{ id, x, z, signal }], edges: [{ a, b, pts?: [[x,z]…], lanes: 1, w, rank }] } — сега от решетката
 // на града (gridNetwork), после — от плана на улиците (част A).
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { lampMats, truckLamps, sirenKind, beaconsLit } from './vehmodels.js';
 import { feature } from './lab/feature.js';   // car-lens (55): по-малките лещи на фаровете
 import { makeRouter } from './junctionpaths.js';
@@ -478,7 +479,7 @@ export function createTraffic(opts) {
 function poolMesh(scene, max) {
   const cv = document.createElement('canvas'); cv.width = 64; cv.height = 128; const x = cv.getContext('2d'), g = x.createRadialGradient(32, 8, 2, 32, 30, 70);
   g.addColorStop(0, 'rgba(255,240,210,1)'); g.addColorStop(0.45, 'rgba(255,235,200,0.45)'); g.addColorStop(1, 'rgba(255,230,190,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 128);
-  const m = new THREE.InstancedMesh(new THREE.PlaneGeometry(4.4, 10).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending, color: 0xfff0d8 }), max);
+  const m = new THREE.InstancedMesh(new THREE.PlaneGeometry(4.4, 10).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: canvasTex(cv), transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending, color: 0xfff0d8 }), max);
   m.count = 0; m.frustumCulled = false; m.renderOrder = 2; m.userData.max = max; scene.add(m); return m;
 }
 export function lampInstances(scene, max) {
@@ -488,7 +489,7 @@ export function lampInstances(scene, max) {
   const bc = document.createElement('canvas'); bc.width = 64; bc.height = 128; const bx = bc.getContext('2d'); bx.fillStyle = '#000'; bx.fillRect(0, 0, 64, 128);
   for (let y = 0; y < 128; y++) { const q = y / 127, w = 10 + q * 26, a = Math.pow(1 - q, 1.6) * (q < 0.06 ? q / 0.06 : 1), g = bx.createLinearGradient(32 - w, 0, 32 + w, 0); g.addColorStop(0, '#000'); g.addColorStop(0.5, `rgb(${Math.round(255 * a)},${Math.round(236 * a)},${Math.round(190 * a)})`); g.addColorStop(1, '#000'); bx.fillStyle = g; bx.fillRect(32 - w, y, 2 * w, 1); }
   const beamGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);   // единичен квадрат на земята; горният край на текстурата (тясното) — към колата (−z), петното е напред (+z)
-  const BM = new THREE.InstancedMesh(beamGeo, new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(bc), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2 }), max);
+  const BM = new THREE.InstancedMesh(beamGeo, new THREE.MeshBasicMaterial({ map: canvasTex(bc), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2 }), max);
   for (const m of [F, R, K, BM]) { m.frustumCulled = false; m.renderOrder = 3; scene.add(m); }
   const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), P = new THREE.Vector3(), S = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0), dim = new THREE.Color(0x5a0808), hot = new THREE.Color(0xff2020);
   let nf = 0, nr = 0, nk = 0, nb = 0, night = 0; const SB = new THREE.Vector3();

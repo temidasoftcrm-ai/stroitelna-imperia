@@ -4,6 +4,7 @@
 // Етажът и „коя сграда“: височината в модела и мястото на сградата → различно светене и при еднакви модели.
 // daynight.js пали материалите вечер (emissiveIntensity = нощта 0…1). Зад feature('night-floors') — първо в Лабораторията.
 import * as THREE from 'three';
+import { canvasTex, drawable } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { feature } from './lab/feature.js';
 // night-dim (т. 42.9): прозорците нощем — по-малко светещи, по-топли и по-тъмни, без студено-белите „решетки“ по кулите
 const ND = feature('night-dim');
@@ -123,7 +124,7 @@ function labelIds(p, w, h) {
     n++; }
 }
 function maskFor(tex, mode, ids = false) {
-  const img = tex.image; if (!img || !img.width) return null;
+  const img = drawable(tex.image); if (!img || !img.width) return null;   // fac-data: и DataTexture
   const mk0 = mode + (ids ? ':ids' : ''), byMode = masks.get(mk0) || masks.set(mk0, new WeakMap()).get(mk0); if (byMode.has(img)) return byMode.get(img);
   const w = img.width, h = img.height, c = document.createElement('canvas'); c.width = w; c.height = h;
   const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0);
@@ -134,14 +135,14 @@ function maskFor(tex, mode, ids = false) {
     for (let i = 0; i < w * h; i++) { const r = p[4 * i], gg = p[4 * i + 1], b = p[4 * i + 2], on = mode === 'white' ? L[i] > 0.5 : mode === 'whiteS' ? L[i] > 0.93 && p[4 * i + 3] < 0.5 : r > 150 && b > 150 && gg < 110; p[4 * i] = p[4 * i + 1] = p[4 * i + 2] = on ? 255 : 0; p[4 * i + 3] = 255; }
     if (ids) labelIds(p, w, h);
     g.putImageData(d, 0, 0);
-    const t = new THREE.CanvasTexture(c); t.flipY = tex.flipY; t.colorSpace = ids ? THREE.NoColorSpace : THREE.SRGBColorSpace; if (ids) { t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; }   /* номерата на прозорците не бива да се размиват в mip нивата */ t.wrapS = tex.wrapS; t.wrapT = tex.wrapT; byMode.set(img, t); return t;
+    const t = canvasTex(c); t.flipY = tex.flipY; t.colorSpace = ids ? THREE.NoColorSpace : THREE.SRGBColorSpace; if (ids) { t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; }   /* номерата на прозорците не бива да се размиват в mip нивата */ t.wrapS = tex.wrapS; t.wrapT = tex.wrapT; byMode.set(img, t); return t;
   }
   if (mode.startsWith('rects:') || mode === 'houseB') {   // прозорците от RECTS — свети целият правоъгълник без най-тъмните пиксели на рамката
     const R = RECTS[mode === 'houseB' ? 'houseB' : mode.slice(6)];
     for (let i = 0; i < w * h; i++) { const u = (i % w) / w, v = ((i / w) | 0) / h, on = (ids || L[i] > 0.12) && R.some(([u0, v0, u1, v1]) => u > u0 && u < u1 && v > v0 && v < v1); p[4 * i] = p[4 * i + 1] = p[4 * i + 2] = on ? 255 : 0; p[4 * i + 3] = 255; }
     if (ids) labelIds(p, w, h);
     g.putImageData(d, 0, 0);
-    const t = new THREE.CanvasTexture(c); t.flipY = tex.flipY; t.colorSpace = ids ? THREE.NoColorSpace : THREE.SRGBColorSpace; if (ids) { t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; }   /* номерата на прозорците не бива да се размиват в mip нивата */ t.wrapS = tex.wrapS; t.wrapT = tex.wrapT; byMode.set(img, t); return t;
+    const t = canvasTex(c); t.flipY = tex.flipY; t.colorSpace = ids ? THREE.NoColorSpace : THREE.SRGBColorSpace; if (ids) { t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; }   /* номерата на прозорците не бива да се размиват в mip нивата */ t.wrapS = tex.wrapS; t.wrapT = tex.wrapT; byMode.set(img, t); return t;
   }
   if (mode === 'coolW' || mode === 'led') return tex;   // Бурж: самата текстура, меко сребристо (без петна)   // прожектори / осветени стаи: самата текстура свети
   const dk = mode === 'dark' || mode === 'darkC', R = mode === 'darkC' ? Math.max(2, (Math.min(w, h) / 160) | 0) : 1;
@@ -156,7 +157,7 @@ function maskFor(tex, mode, ids = false) {
   for (let i = 0; i < w * h; i++) { const v = m[i] > (ids ? 0.15 : 0.3) ? 255 : 0; p[4 * i] = p[4 * i + 1] = p[4 * i + 2] = v; p[4 * i + 3] = 255; }   // ids — по-широко: цялото стъкло
   if (ids) labelIds(p, w, h);
   g.putImageData(d, 0, 0);
-  const t = new THREE.CanvasTexture(c); t.flipY = tex.flipY; t.colorSpace = ids ? THREE.NoColorSpace : THREE.SRGBColorSpace; if (ids) { t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; }   /* номерата на прозорците не бива да се размиват в mip нивата */ t.wrapS = tex.wrapS; t.wrapT = tex.wrapT;
+  const t = canvasTex(c); t.flipY = tex.flipY; t.colorSpace = ids ? THREE.NoColorSpace : THREE.SRGBColorSpace; if (ids) { t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; }   /* номерата на прозорците не бива да се размиват в mip нивата */ t.wrapS = tex.wrapS; t.wrapT = tex.wrapT;
   byMode.set(img, t);
   return t;
 }
@@ -171,7 +172,7 @@ function gasPool(root) {
       e1.subVectors(b, a); e2.subVectors(c, a); e1.cross(e2); const L = e1.length(); if (L < 1e-9) continue; e1.divideScalar(L);
       if (e1.y < -0.7 && a.y > bb.min.y + 0.25 * H) { box.expandByPoint(a); box.expandByPoint(b); box.expandByPoint(c); } } });   // долните страни на навеса
   if (box.isEmpty()) return;
-  if (!poolTex) { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d'), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, '#fff'); gr.addColorStop(0.55, '#8a8a8a'); gr.addColorStop(1, '#000'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); poolTex = new THREE.CanvasTexture(cv); }
+  if (!poolTex) { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d'), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, '#fff'); gr.addColorStop(0.55, '#8a8a8a'); gr.addColorStop(1, '#000'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); poolTex = canvasTex(cv); }
   const w = (box.max.x - box.min.x) * 1.3, d = (box.max.z - box.min.z) * 1.3;
   const mt = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xf0f3ff, emissiveMap: poolTex, emissiveIntensity: 0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
   mt.userData.nfK = 0.55; mt.userData.nightFloors = true; NF_MATS.add(mt);   // nightFloors — да не го пипа traverse-ът по-долу
@@ -194,7 +195,7 @@ export function prepNightFloors(root, name) {
   if (!MODE[name] || !feature(FEAT[name] || 'night-floors')) return;
   if (name === 'sf-blk-modoffice' && BLK(name) && feature('blk-night2') && !root.getObjectByName('nfPanes')) {   // кулата: етажите са рамки с отвори (4 на стена) зад тъмно стъкло — в отворите плоскости, които нощем светят
     const PAL = ['#ff9438', '#ffbd6b', '#f2d9b3', '#b3ccff', '#ffa94d', '#ffd08a', '#000', '#000', '#000', '#000', '#000', '#5d75ff'], cv = document.createElement('canvas'); cv.width = PAL.length; cv.height = 1;   // като blk-night: кехлибарено, жълто, топло/хладно бяло, телевизор; ~40% тъмни
-    const g = cv.getContext('2d'); PAL.forEach((c, k) => { g.fillStyle = c; g.fillRect(k, 0, 1, 1); }); const pal = new THREE.CanvasTexture(cv); pal.magFilter = pal.minFilter = THREE.NearestFilter; pal.generateMipmaps = false; pal.colorSpace = THREE.SRGBColorSpace;
+    const g = cv.getContext('2d'); PAL.forEach((c, k) => { g.fillStyle = c; g.fillRect(k, 0, 1, 1); }); const pal = canvasTex(cv); pal.magFilter = pal.minFilter = THREE.NearestFilter; pal.generateMipmaps = false; pal.colorSpace = THREE.SRGBColorSpace;
     const mat = new THREE.MeshStandardMaterial({ color: 0x0b0c0f, roughness: 0.35, emissive: 0xffffff, emissiveMap: pal, emissiveIntensity: 0, name: 'nfPanes' }); mat.userData.nfK = 7; mat.userData.nightFloors = true; NF_MATS.add(mat);   // daynight.js: яркостта нощем (силно — гледа се през тъмното стъкло)
     const L = []; root.traverse(o => { if (o.isMesh && /^Layer/.test(o.name) && /BlackStone/.test(o.material && o.material.name || '')) L.push(o); });
     L.forEach((o, li) => { const pos = [], nor = [], uv = []; let q0 = 0;

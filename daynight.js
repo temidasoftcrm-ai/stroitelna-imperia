@@ -1,6 +1,7 @@
 // daynight.js — денонощие: слънце, небе, мъгла, светлини и светещи лампи нощем.
 // Един игрови ден = едно денонощие. f = част от деня (0..1); 0 = 06:00 сутринта.
 import * as THREE from 'three';
+import { canvasTex, drawable } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { NF_MATS, NF_T } from './nightfloors.js';
 import { feature } from './lab/feature.js';
 
@@ -32,7 +33,7 @@ export class DayNight {
       const g = c.getContext('2d'), r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
       r.addColorStop(0, 'rgba(255,230,160,1)'); r.addColorStop(0.35, 'rgba(255,200,110,.55)'); r.addColorStop(1, 'rgba(255,180,80,0)');
       g.fillStyle = r; g.fillRect(0, 0, 64, 64);
-      return new THREE.CanvasTexture(c);
+      return canvasTex(c);
     })();
     this.glowMat = new THREE.SpriteMaterial({ map: this.glowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 });
     this.poolMat = new THREE.MeshBasicMaterial({ map: this.glowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 });
@@ -58,7 +59,7 @@ export class DayNight {
     });
   }
   maskFor(tex) {
-    const img = tex.image; if (!img || !img.width) return null;
+    const img = drawable(tex.image); if (!img || !img.width) return null;   // fac-data: и DataTexture
     if (this.masks.has(img)) return this.masks.get(img);
     const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
     const g = c.getContext('2d'); g.drawImage(img, 0, 0);
@@ -71,7 +72,7 @@ export class DayNight {
     }
     if (!any) { this.masks.set(img, null); return null; }   // без стъкла — няма какво да свети (и излишна черна текстура в паметта)
     g.putImageData(d, 0, 0);
-    const t = new THREE.CanvasTexture(c); t.flipY = tex.flipY; t.colorSpace = THREE.SRGBColorSpace;
+    const t = canvasTex(c); t.flipY = tex.flipY; t.colorSpace = THREE.SRGBColorSpace;
     this.masks.set(img, t);
     return t;
   }

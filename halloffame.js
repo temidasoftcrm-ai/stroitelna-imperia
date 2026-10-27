@@ -3,6 +3,7 @@
 // на витрината. Просто, в стила на залата: сцена, трибуна, аватар (directors3d.js directorRig), снимка, два прожектора.
 // openHallOfFame({ k: ключът на отличието (awards3d.js AWARDS), tier, onClose }) → { close }
 import * as THREE from 'three';
+import { canvasTex as canvasData } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { AWARDS, TIERS, makeTrophy } from './awards3d.js';
 import { directorRig } from './directors3d.js';
@@ -82,7 +83,7 @@ const css = `#hallFame{position:fixed;inset:0;z-index:2147483000;background:#050
 #hallFame .sub.on{opacity:1}#hallFame .sub b{color:#ffd36a;display:block;font-size:13px;margin-bottom:4px;letter-spacing:.03em}
 #hallFame .sub:after{content:'';position:absolute;left:50%;top:-10px;margin-left:-10px;border:10px solid transparent;border-top:0;border-bottom-color:#d4a73a}`;
 
-function canvasTex(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; }
+function canvasTex(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = canvasData(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; }
 
 export function openHallOfFame({ k, tier = 'gold', onClose } = {}) {
   const A = AWARDS.find(x => x.k === k); if (!A) return null; const T = TIERS[tier] || TIERS.gold, dk = A.dir || DIR_K[k] || 'glob';

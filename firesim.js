@@ -9,6 +9,7 @@
 //         day() → игрови дни (с дробната част), cam() → Vector3, econ(), hasStaff(k), crewFree() → bool, modal(t, html, buttons), toast(t, kind),
 //         fly(lot), save(), rebuild(lot) (нова сграда на парцела), cityId(), early?() → по-чести пожари (под 3 града) }
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { flameSprite } from './fireflip.js';
 import { feature } from './lab/feature.js';
@@ -33,8 +34,8 @@ export function createFires(deps) {
   const lotOf = f => (deps.lots() || [])[f.lot];
 
   // ---------- общи текстури ----------
-  const puff = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 2, 32, 32, 31); g.addColorStop(0, 'rgba(255,255,255,.9)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); const t = new THREE.CanvasTexture(c); return t; })();
-  const glowT = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 1, 32, 32, 31); g.addColorStop(0, 'rgba(255,190,90,1)'); g.addColorStop(1, 'rgba(255,90,0,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
+  const puff = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 2, 32, 32, 31); g.addColorStop(0, 'rgba(255,255,255,.9)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); const t = canvasTex(c); return t; })();
+  const glowT = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 1, 32, 32, 31); g.addColorStop(0, 'rgba(255,190,90,1)'); g.addColorStop(1, 'rgba(255,90,0,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return canvasTex(c); })();
 
   // табелата над сградата: „🔥 Здравина: 24% · 🚒 Гасене“ + лента
   function makeLabel() {

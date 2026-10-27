@@ -4,6 +4,7 @@
 // gantrySigns(scene, roadW) — roadW: ширината на платното на едната посока (порталът е над едно платно, ~16 м в оригинала) → { root, set({ a, b, exit, km, road } | { debug }), setNight(k), dispose() }
 //   scene — сцената на модела (клонира се); порталът се завърта напречно на оста z и се мащабира по ширината на пътя roadW (м).
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 
 const LAT = { а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sht', ъ: 'a', ь: 'y', ю: 'yu', я: 'ya' };
 // обтекаемата система (закон за транслитерацията): София → Sofia, Пловдив → Plovdiv
@@ -72,7 +73,7 @@ export function gantrySigns(scene, roadW = 26) {
     set(s) {
       for (const x of own) x.dispose(); for (const q of planes) root.remove(q); own.length = 0; mats.length = 0; planes.length = 0;
       for (const sl of slots) {   // нашето платно — 3 см пред лицето на табелата от модела
-        const H = 512, W = Math.round(H * Math.max(0.5, Math.min(4, sl.fw / Math.max(0.1, sl.fh)))), t = new THREE.CanvasTexture(draw(sl.k, s, W, H)); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+        const H = 512, W = Math.round(H * Math.max(0.5, Math.min(4, sl.fw / Math.max(0.1, sl.fh)))), t = canvasTex(draw(sl.k, s, W, H)); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
         const mt = new THREE.MeshStandardMaterial({ map: t, emissiveMap: t, emissive: 0xffffff, emissiveIntensity: 0.04, roughness: 0.55 }), geo = new THREE.PlaneGeometry(sl.fw, sl.fh), pl = new THREE.Mesh(geo, mt);
         pl.position.set(sl.c.x, sl.c.y, sl.zf + sl.dir * 0.03); if (sl.dir < 0) pl.rotation.y = Math.PI; pl.receiveShadow = true; root.add(pl);
         own.push(t, mt, geo); mats.push(mt); planes.push(pl);

@@ -3,6 +3,7 @@
 // p.geo = { country: 'ESP' (a3 от assets/globe/countries.json), kind: 'hotel'|'branch'|'route'|'airport'|'port'|'oil'|'rail'|'district', cities: [{ nm, lat, lon }], route: [[i, j]] }
 // Одобрено → за кратко зелено и „Бюджетът е резервиран“; отложено → кехлибарено „За следващо заседание“. Само линии и надписи — без тежки ефекти.
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { t as tr } from './i18n.js';   // 🌐 lang-en: надписите на платното (f9, част C)
 
@@ -162,7 +163,7 @@ function textSprite(lines, opt = {}) {
   if (opt.bg !== false) { g.fillStyle = 'rgba(6,22,40,.72)'; g.strokeStyle = opt.col || '#5fd0ff'; g.lineWidth = 3; g.beginPath(); g.roundRect(1.5, 1.5, w - 3, h - 3, 12); g.fill(); g.stroke(); }
   g.font = `700 ${fs}px system-ui, sans-serif`; g.textBaseline = 'top';
   lines.forEach((l, i) => { g.fillStyle = i === 0 ? (opt.col || '#bfeaff') : '#e8f6ff'; g.fillText(l, pad, pad * 0.7 + i * fs * 1.3); });
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace;
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false, toneMapped: false }));
   const k = (opt.h || 0.06) / (fs * 1.3); s.scale.set(w * k, h * k, 1); s.renderOrder = 5;
   return s;
@@ -170,7 +171,7 @@ function textSprite(lines, opt = {}) {
 // 🆘 тревога: голямо червено „SOS“ (светещо) и триъгълни знаци „внимание“ — платна за спрайтове
 function canvasSprite(w, h, draw, H) {
   const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace;
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false, toneMapped: false })); s.scale.set(H * w / h, H, 1); s.renderOrder = 6; return s;
 }
 const sosSprite = H => canvasSprite(640, 280, (g, w, h) => {

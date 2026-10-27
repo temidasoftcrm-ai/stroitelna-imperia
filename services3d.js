@@ -5,6 +5,7 @@
 // buildService(k, lvl, lot { w, d }, { seed, region }) → { group, ready: Promise, setNight(on), dispose() }.
 // demoServices(tier) — Лабораторията: всички услуги на града от този размер, на мостра от парцели край улица.
 import * as THREE from 'three';
+import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { SERVICES, baseFor, districtFor, modelOf, TIER_NM } from './services.js';
 import { emergCar } from './vehmodels.js';
@@ -29,7 +30,7 @@ export function buildService(k, lvl, lot, opt = {}) {
   const box = (w, h, d, m, x, y, z, par = group) => { const g = new THREE.BoxGeometry(w, h, d); own.push(g); const o = new THREE.Mesh(g, m); o.position.set(x, y + h / 2, z); o.castShadow = o.receiveShadow = true; par.add(o); return o; };
   const cyl = (r, h, m, x, y, z, seg = 12) => { const g = new THREE.CylinderGeometry(r, r, h, seg); own.push(g); const o = new THREE.Mesh(g, m); o.position.set(x, y + h / 2, z); o.castShadow = true; group.add(o); return o; };
   const flat = (w, d, m, x, z, y = 0.02) => { const g = new THREE.PlaneGeometry(w, d); own.push(g); const o = new THREE.Mesh(g, m); o.rotation.x = -Math.PI / 2; o.position.set(x, y, z); o.receiveShadow = true; group.add(o); return o; };
-  const tex = (draw, rep) => { const c = document.createElement('canvas'); c.width = c.height = 256; draw(c.getContext('2d'), 256); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(...rep); own.push(t); return t; };
+  const tex = (draw, rep) => { const c = document.createElement('canvas'); c.width = c.height = 256; draw(c.getContext('2d'), 256); const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(...rep); own.push(t); return t; };
   const paving = (w, d) => M(0xffffff, { map: tex((g, n) => { g.fillStyle = R.pave; g.fillRect(0, 0, n, n); for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { g.fillStyle = `rgba(0,0,0,${Math.random() * 0.08})`; g.fillRect(x * 32 + 1, y * 32 + 1, 30, 30); } }, [w / 6, d / 6]) });
   const asphalt = M(0x3d4045, { roughness: 0.95 }), grass = M(0x6d9a4a), white = M(0xf2f2f2);
   const { w, d } = lot, front = d / 2, back = -d / 2;
