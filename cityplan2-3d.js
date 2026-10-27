@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { timesSquareAds } from './timessq-ads.js';   // Таймс Скуеър: светещите екрани с рекламите
 import { makeWater } from './water.js';   // sea2: водата — общият шейдър с вълните
 import { feature } from './lab/feature.js';
-import { canvasTex } from './texdata.js';   // fac-data (T1): платната → собствени данни
+import { canvasTex, isEmpty } from './texdata.js';   // fac-data (T1): платната → собствени данни
 import { varPick, varW, xParts, xDraw, bgPlace } from './bgblocks.js';   // bg-variety / bg-fill: разнообразните и допълнителните фонови сгради
 import { crossingsOf } from './pedpaths.js';   // road-geo: зебрите — същите, по които пресичат пешеходците
 import { streetReal, lampField, tlightField, lensGeo, pedGeo, lensMatrix, CLASSIC } from './streetreal.js';   // street-real: истинските лампи и светофари (opts.streetReal)
@@ -86,8 +86,17 @@ function reupCanvas(G) { const seen = new Set(); G.traverse(o => { if (!o.isInst
   for (const t of [m.map, m.emissiveMap]) if (t && (t.isCanvasTexture || t.isDataTexture) && t.image && t.image.width > 0) t.needsUpdate = true;   /* fac-data: вече DataTexture — качва се наново от собствените данни */ } }); }
 const WIN_MATS = [];
 export function winDrop(set) { for (let i = WIN_MATS.length - 1; i >= 0; i--) if (set.has(WIN_MATS[i])) WIN_MATS.splice(i, 1); }   // fix-stab (game.js winForget): материалите на стария град
+// fac-data (T1, 27.10): ако платното на фасадата е било празно още при снимката (изгубено при рисуването) — резервна фасада направо в данните
+// (светла стена, решетка от тъмни прозорци, партер), за да не е черна; броят — window.__facEmpty (за __dbg.facDiag)
+function facFallback(t) {
+  const { width: W, height: H, data: d } = t.image;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4, win = y < H * 0.82 && (x % 16) >= 4 && (x % 16) < 12 && (y % 22) >= 5 && (y % 22) < 17, base = y >= H * 0.86;
+    const c = win ? [58, 64, 74] : base ? [196, 188, 174] : [222, 214, 200]; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255; }
+  t.needsUpdate = true; if (typeof window !== 'undefined') window.__facEmpty = (window.__facEmpty || 0) + 1; console.warn('fac-data: празно платно на фасада — резервна фасада', W + 'x' + H);
+}
 export function nightWin(mat, c, o = {}) {   // export — и за bgblocks.js
-  const W = c.width, H = c.height, src = c.getContext('2d', FCPU).getImageData(0, 0, W, H).data, lab = new Int32Array(W * H).fill(-1), out = document.createElement('canvas'); out.width = W; out.height = H;
+  const MD = mat.map && mat.map.isDataTexture && mat.map.image && mat.map.image.data; if (MD && isEmpty(MD)) facFallback(mat.map);   // fac-data
+  const W = c.width, H = c.height, src0 = c.getContext('2d', FCPU).getImageData(0, 0, W, H).data, src = isEmpty(src0) && MD && MD.length === W * H * 4 ? MD : src0, lab   /* празното платно — от данните (стъклото подава отделна маска cc) */ = new Int32Array(W * H).fill(-1), out = document.createElement('canvas'); out.width = W; out.height = H;
   const g = out.getContext('2d', FCPU), img = g.createImageData(W, H), D = img.data; let seed = o.seed || 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const dark = i => (src[i * 4] * 0.3 + src[i * 4 + 1] * 0.59 + src[i * 4 + 2] * 0.11) < (o.thr || 95);
   for (let i = 0; i < W * H; i++) { if (lab[i] >= 0 || !dark(i)) continue; const st = [i], px = []; lab[i] = i;
@@ -610,7 +619,9 @@ export function buildPlan2View(P, opts = {}) {
     for (let k = 0; k < nb; k++) { const a = k / nb * TAU, rr = ri - 1.6 - (k % 2) * 1.4, x = r.x + Math.cos(a) * rr, z = r.z + Math.sin(a) * rr;
       if (pl.length) { const o = pl[k % pl.length].clone(); o.scale.multiplyScalar(1.1 + (k % 3) * 0.25); o.position.set(x, 0.34, z); o.rotation.y = a * 3; G.add(o); } else Fl[k % 3].push(disc(x, z, 0.8, 0.36, 0, 10)); }
     if (ri > 8) for (let k = 0; k < 4; k++) { const a = (k + 0.5) / 4 * TAU, rr = ri * 0.55; rTrees.push([r.x + Math.cos(a) * rr, r.z + Math.sin(a) * rr, 6]); }
-    if (opts.fountain) { const f = opts.fountain.clone(), b = new THREE.Box3().setFromObject(f), sz = b.getSize(new THREE.Vector3()), k = Math.min(ri * 0.55, 8) / Math.max(sz.x, sz.z); f.scale.multiplyScalar(k); f.position.set(r.x, 0.34 - b.min.y * k, r.z); G.add(f); }
+    // ⛲ roundabout-deco (T2): светлият фонтан с вода и струи или паметник (game.js roundDecoOf → roundabout.js)
+    if (opts.roundDeco) G.add(opts.roundDeco({ x: r.x, z: r.z, ri, seed: n.id + 1 }));
+    else if (opts.fountain) { const f = opts.fountain.clone(), b = new THREE.Box3().setFromObject(f), sz = b.getSize(new THREE.Vector3()), k = Math.min(ri * 0.55, 8) / Math.max(sz.x, sz.z); f.scale.multiplyScalar(k); f.position.set(r.x, 0.34 - b.min.y * k, r.z); G.add(f); }
     else { const f = new THREE.Group(), bR = Math.min(3.4, ri * 0.32), basin = new THREE.Mesh(new THREE.CylinderGeometry(bR, bR + 0.25, 0.7, 32), MAT.stone), water = new THREE.Mesh(new THREE.CircleGeometry(bR - 0.3, 32).rotateX(-Math.PI / 2), MAT.wet), col = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.45, 2.2, 16), MAT.stone), bowl = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 0.35, 0.35, 24), MAT.stone);
       basin.position.y = 0.69; water.position.y = 1.0; col.position.y = 1.5; bowl.position.y = 2.6; f.add(basin, water, col, bowl); f.position.set(r.x, 0, r.z); f.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); G.add(f); }
     for (const a of n.arms) { const rd = P.roads[a.road], ux = Math.cos(a.angle), uz = Math.sin(a.angle), vx = -uz, vz = ux, at = (d, t) => [r.x + ux * d + vx * t, r.z + uz * d + vz * t];

@@ -20,7 +20,21 @@ if (!LOCAL) THREE.DefaultLoadingManager.setURLModifier(url => {
 });
 
 const parse0 = GLTFLoader.prototype.parse;
-GLTFLoader.prototype.parse = function (...a) { if (!this.meshoptDecoder) this.setMeshoptDecoder(MeshoptDecoder); return parse0.apply(this, a); };
+// v3.2.2 (светещи модели нощем): материалите с KHR_materials_unlit идват като MeshBasicMaterial — без светлина; нощем светят с пълна яркост
+// (палмите, камъните, A320, ВЛ82, болницата, църквата, стадионът…). Тук → MeshStandardMaterial (същите map, цвят, прозрачност, alphaTest, страна,
+// цветове по върховете); мешовете без нормали получават изчислени (unlit моделите често нямат — без тях осветеният материал е черен).
+// Не се пипат нарочно светещите (userData.keep / neon / emissive) и ефектите (смесване, различно от нормалното).
+function gltfLit(gltf) {
+  const P = gltf.parser, J = P && P.json, A = P && P.associations; if (!J || !(J.extensionsUsed || []).includes('KHR_materials_unlit') || !A) return;
+  const done = new Map(), lit = m => { if (!m || !m.isMeshBasicMaterial || done.has(m)) return done.get(m) || m;
+    const as = A.get(m), def = as && J.materials ? J.materials[as.materials] : (J.materials || []).find(d => d.name === m.name && (d.extensions || {}).KHR_materials_unlit);   /* копията (цветове по върховете) нямат запис — по името */
+    const u = m.userData || {}; if (!def || !(def.extensions || {}).KHR_materials_unlit || u.keep || u.neon || u.emissive || m.blending !== THREE.NormalBlending) { done.set(m, m); return m; }
+    const n = new THREE.MeshStandardMaterial({ name: m.name, map: m.map, color: m.color, transparent: m.transparent, opacity: m.opacity, alphaTest: m.alphaTest, side: m.side, vertexColors: m.vertexColors, roughness: 0.8, metalness: 0 });
+    n.userData = { ...u, wasUnlit: true }; done.set(m, n); return n; };
+  for (const sc of gltf.scenes || [gltf.scene]) sc.traverse(o => { if (!o.isMesh || o.isSprite || o.isPoints || o.isLine) return; const m0 = o.material; o.material = Array.isArray(m0) ? m0.map(lit) : lit(m0);
+    if (o.material !== m0 && o.geometry && !o.geometry.attributes.normal) o.geometry.computeVertexNormals(); });
+}
+GLTFLoader.prototype.parse = function (...a) { if (!this.meshoptDecoder) this.setMeshoptDecoder(MeshoptDecoder); if (typeof a[2] === 'function') { const ok = a[2]; a[2] = gltf => { try { gltfLit(gltf); } catch (e) { console.warn('gltfLit', e); } ok(gltf); }; } return parse0.apply(this, a); };
 
 window.__assetBase = ASSET_BASE;   // за тестовете и конзолата
 

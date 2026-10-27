@@ -1148,6 +1148,28 @@ Object.assign(LANDMARK_NM, { lvparis: 'Парис Лас Вегас', lvph: 'П�
 // Статуята на свободата, Бруклинският мост, влакчето) — възлите mgmgrand и nyny в lvstrip-hotels.glb (с нощните карти като другите)
 Object.assign(BUILD, { lvmgm: () => lvHotel('mgmgrand'), lvnyny: () => lvHotel('nyny') });
 Object.assign(LANDMARK_NM, { lvmgm: 'Ем Джи Ем Гранд', lvnyny: 'Ню Йорк-Ню Йорк' });
+// 🏛️ lm-caesars (f6): „Сизърс Палас“ (Meshy AI, собствен — assets/heavy/CREDITS.txt) — в истински метри (кулата 115 м), фасадата към +z; game.js го слага
+// на парцела на казиното с мащаба на другите хотели (×0,4 напреки, ×0,7 на височина — като Беладжио). Възли: Body; Uplight — „плащ“ около долните 40 %
+// със златен градиент (адитивно, нощем); Pediment — двата фронтона (топло, нощем). Фасадата — топло осветена нощем (flood → lv-neon я усилва, VB).
+let caesarsSrc = null;
+function lvCaesars() {
+  const g = new THREE.Group(), flood = [], add = []; g.userData.flood = flood;
+  const ph = new THREE.Mesh(new THREE.BoxGeometry(150, 80, 150), mat(0xe8dcc4, 0.8, 0, { transparent: true, opacity: 0.25 })); ph.position.y = 40; g.add(ph);   // докато се зарежда
+  (caesarsSrc ||= new GLTFLoader().loadAsync('assets/heavy/lm/caesars.glb').catch(() => null)).then(gl => {
+    g.remove(ph); if (!gl) return; const m = gl.scene.clone(true);
+    m.traverse(o => { if (!o.isMesh) return; const nm = o.name + ' ' + (o.parent && o.parent.name);
+      if (/Uplight/.test(nm)) { const mt = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }); o.material = mt; add.push([mt, 0.9]); o.renderOrder = 2; return; }
+      if (/Pediment/.test(nm)) { const mt = new THREE.MeshBasicMaterial({ color: 0xffd58a, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }); o.material = mt; add.push([mt, 1]); return; }
+      o.castShadow = o.receiveShadow = true; const mt = o.material = o.material.clone(); mt.metalness = 0; mt.metalnessMap = null;
+      mt.color.multiplyScalar(1.2); mt.roughness = 0.85;   /* денем — кремав, не сив (Meshy: металността без околна карта затъмнява) */
+      mt.emissive = new THREE.Color(0xffc98a); mt.emissiveMap = mt.map; mt.emissiveIntensity = 0; mt.userData.floodK = 0.42; flood.push(mt); });   // топлата фасада нощем (прозорците и колоните)
+    g.add(m);
+  });
+  g.userData.sparkle = (t, night) => { for (const [mt, k] of add) mt.opacity = k * night; };
+  return g;
+}
+Object.assign(BUILD, { lvcaesars: lvCaesars });
+Object.assign(LANDMARK_NM, { lvcaesars: 'Сизърс Палас' });
 // 🇺🇸 Вашингтон по истинската карта (washington-osm): Монументът на Вашингтон, Мемориалите на Линкълн и Джеферсън — процедурни, в истински метри
 // (game.js ги свежда до мащаба на картата по LM_REAL_H, както другите); без квадратната плоча — стоят на Мола
 function wmonument() {   // обелискът: 169 м, основа 16,8 м → 10,5 м под пирамидката; долната трета (до 46 м) — по-светъл мрамор (строежът спрял 1854–1879); кръг от 50 знамена

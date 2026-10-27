@@ -361,5 +361,8 @@
  "🌐 Английската версия вече е без останал български текст": "🌐 The English version no longer shows leftover Bulgarian text",
  "🏚️ Поправено: сградите в Лондон, Париж и Лас Вегас понякога бяха черни денем": "🏚️ Fixed: buildings in London, Paris and Las Vegas were sometimes black by day",
  "🏚️ Наистина поправено: сградите, пътищата и надписите вече не стават черни, когато браузърът изгуби картинките си": "🏚️ Properly fixed: buildings, roads and signs no longer turn black when the browser drops their images",
- "🚙 Поправено: белият джип и полицейската Лада вече не светят като бели силуети нощем": "🚙 Fixed: the white jeep and the police Lada no longer glow as white silhouettes at night"
+ "🚙 Поправено: белият джип и полицейската Лада вече не светят като бели силуети нощем": "🚙 Fixed: the white jeep and the police Lada no longer glow as white silhouettes at night",
+ "🚜 Поправено: прозорецът „Гараж — цялата техника“ отново показва техниката": "🚜 Fixed: the \"Garage — all equipment\" window shows the equipment again",
+ "🌴 Палмите, скалите, самолетите и още модели вече не светят нощем": "🌴 Palms, rocks, planes and other models no longer glow at night",
+ "🏚️ Още една защита срещу черни сгради при натоварен компютър": "🏚️ One more safeguard against black buildings on a busy computer"
 }
