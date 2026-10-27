@@ -42,8 +42,8 @@ function monument(o, R, night) {
   return g;
 }
 
-export function roundDeco({ x, z, ri, seed = 1, style = '', statues = [], night = () => 0 }) {
-  const R = Math.min(3.6, ri * 0.33), u = ((seed * 2654435761) >>> 0) % 1000 / 1000;
+export function roundDeco({ x, z, ri, seed = 1, style = '', statues = [], night = () => 0, mustMonument = false }) {
+  const R = Math.min(3.6, ri * 0.33), u0 = ((seed * 2654435761) >>> 0) % 1000 / 1000, u = mustMonument ? u0 * 0.33 : u0;   // mustMonument — задължително паметник (най-близкото до центъра)
   let g;
   if (u < 0.34) {   // паметник: в България/на Балканите — фигура на пиедестал; Париж/Рим — обелиск или колона; другаде — смес
     const v = (u * 3) % 1, classic = /paris|rome|london|washington/.test(style);

@@ -66,15 +66,16 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
 
   // ---- крайпътният комплекс: пътят по асфалта (координати на изгледа x напреки, z по оста → света: x = z, z = zc − x)
   const W = (vx, vz) => [vz, zc - vx];
-  const bays = [{ busy: null, dz: -7 }, { busy: null, dz: 3 }], spaces = [];
+  const bays = feature('hw-gas2') ? [{ busy: null, dz: -1.8 }, { busy: null, dz: 6 }] : [{ busy: null, dz: -7 }, { busy: null, dz: 3 }], spaces = [];   // hw-gas2: до колонките, в лентата между островите (извън стълбовете)
   if (svc) for (let z = svc.z0 + 58; z <= svc.z1 - 58; z += 4) if (Math.abs(z - svc.zs) > 18) spaces.push({ z, busy: null });
   // гладка крива през точките (Катмул–Ром), точка на ~1 м
   function smooth(P) { const out = []; for (let i = 0; i < P.length - 1; i++) { const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)], n = Math.max(2, Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]))); for (let k = 0; k < n; k++) { const t = k / n, t2 = t * t, t3 = t2 * t; out.push([0, 1].map(j => 0.5 * (2 * p1[j] + (-p0[j] + p2[j]) * t + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * t2 + (-p0[j] + 3 * p1[j] - 3 * p2[j] + p3[j]) * t3))); } } out.push(P[P.length - 1]); return out; }
   const legOf = (P, o = {}) => { const pts = smooth(P), cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])); return { pts, cum, len: cum[cum.length - 1], ...o }; };
   function svcPlan(c) {
     const { xE, z0, z1, zs } = svc, aisle = xE - 19, inn = [[c.x, c.z], W(xE + 1.8, z0 + 2), W(xE - 2.3, z0 + 24), W(xE - 9.5, z0 + 44), W(aisle, z0 + 60)], out = z => [W(aisle, z), W(aisle, z1 - 60), W(xE - 9.5, z1 - 44), W(xE - 2.3, z1 - 24), W(xE + 1.8, z1 - 2), [z1 + 30, laneZ(1, RIGHT)]];
-    const bay = Math.random() < 0.75 && bays.find(b => !b.busy), sp = !bay && spaces.filter(q => !q.busy);
-    if (bay) { bay.busy = c; const zb = zs + bay.dz; return { res: bay, legs: [legOf([...inn, W(aisle - 4, zb - 20), W(xE - 29, zb - 6), W(xE - 30, zb)], { stop: 8 + Math.random() * 5, slow: 5 }), legOf([W(xE - 30, zb), W(xE - 29, zb + 8), W(aisle - 2, zb + 20), ...out(zb + 28)], { slow: 6 })] }; }   /* колонката: ~10 s зареждане */
+    const G2 = feature('hw-gas2'), bay = Math.random() < 0.75 && bays.find(b => !b.busy), sp = !bay && spaces.filter(q => !q.busy);   // hw-gas2: навесът е ~3 м — ТИР-овете не влизат
+    if (bay) { bay.busy = c; const zb = zs + bay.dz; if (G2) { const zin = zs - 16, zo = zs + 17; return { res: bay, legs: [legOf([...inn, W(aisle - 3, zin - 8), W(xE - 30, zin), W(xE - 30, zb)], { stop: 10 + Math.random() * 10, slow: 5 }), legOf([W(xE - 30, zb), W(xE - 30, zo), W(aisle - 2, zo + 10), ...out(zo + 18)], { slow: 6 })] }; }   // hw-gas2: влиза и излиза право по лентата
+      return { res: bay, legs: [legOf([...inn, W(aisle - 4, zb - 20), W(xE - 29, zb - 6), W(xE - 30, zb)], { stop: 8 + Math.random() * 5, slow: 5 }), legOf([W(xE - 30, zb), W(xE - 29, zb + 8), W(aisle - 2, zb + 20), ...out(zb + 28)], { slow: 6 })] }; }   /* колонката: ~10 s зареждане */
     if (sp && sp.length) { const q = sp[(Math.random() * sp.length) | 0]; q.busy = c; const za = q.z - 9;
       return { res: q, legs: [legOf([...inn, W(aisle, za), W(aisle - 12, q.z - 2), W(xE - 49, q.z)], { stop: 20 + Math.random() * 40, slow: 4 }), legOf([W(xE - 49, q.z), W(aisle - 12, q.z + 1), W(aisle - 2, q.z + 7)], { rev: true, slow: 2.5 }), legOf([W(aisle - 2, q.z + 7), W(aisle, q.z + 14), ...out(q.z + 20).slice(1)], { slow: 6 })] }; }
     return null;
@@ -167,5 +168,9 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
       if (e.x * e.dir > half + 6) { e.on = false; e.o.visible = false; }
     }
   }
-  return { update, set visible(v) { g.visible = v; }, group: g, list, inc: INC };
+  // hw-gas2 (Лабораторията): една кола — веднага пред колонка (после стои 10–20 s и се връща по ускорителната лента)
+  function svcForce() { if (!svc) return null; for (const c of list) { if (c.s || c.away > 0 || c.inc || c.heavy || c.dir < 0) continue;
+      for (let k = 0; k < 6; k++) { const plan = svcPlan(c); if (!plan) break; if (plan.legs[0].stop) { c.s = { ...plan, i: 0, d: plan.legs[0].len - 0.4, wait: 0 }; c.lane = RIGHT; c.v = 1; return c; } plan.res.busy = null; } }
+    return null; }
+  return { update, svcForce, set visible(v) { g.visible = v; }, group: g, list, inc: INC };
 }

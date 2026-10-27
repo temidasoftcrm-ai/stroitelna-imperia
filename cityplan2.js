@@ -226,6 +226,20 @@ function riverWater(RV, x, z) { let g = RVG.get(RV); if (!g) { g = pointGrid(16)
 // каналите (ams-canals): център на полукръговете, радиуси, полуширина; водата — пръстен около всеки радиус, само на юг от центъра (откъм сушата)
 const canalRing = (c, rings, hw = 7) => ({ c, rings, hw });
 const canalWater = (CN, x, z) => z > CN.c[1] - 2 && CN.rings.some(rc => Math.abs(Math.hypot(x - CN.c[0], z - CN.c[1]) - rc) < CN.hw);
+// 🛣️ edge-blvd (f6, потребителят: „улиците, които свършват в нищото, да се съединяват в един булевард“): булевард по ръба на града (на 0,93 от границата) —
+// главен път; кварталните улици се доизтеглят до него (snapEnd, до 44 м), радиалните булеварди го пресичат (кръстовища) и продължават навън (изходите).
+// Крайбрежният — само по сушата (отворени дъги, без водата). Само новите игри (S.edgeBlvd): парцелите се местят.
+function edgeBlvd(sk) {
+  const ring = sk.bnd.map(([x, z]) => [x * 0.93, z * 0.93]), pts = closedCurve(ring);
+  if (!sk.coastZ) { sk.lines.push({ cls: 'blvd', pts, closed: true, edge: true });
+    // пътищата навън на запад — през жп линията (тя е на ~15–40 м западно от плана: game.js STATION_X) → прелези с бариери (rail-crossings), отвъд — rail-road
+    const x0 = Math.min(...sk.bnd.map(p => p[0])), R = sk.R;
+    for (const zf of [-0.35, 0.3]) { const z = zf * R, xr = Math.min(...pts.filter(p => Math.abs(p[1] - z) < 12).map(p => p[0]), x0 * 0.9);
+      sk.lines.push({ cls: 'blvd', pts: resample([[xr + 20, z], [x0 - Math.max(70, R * 0.18), z]], 4), edge: true, out: true }); }
+    return; }
+  let cur = []; const out = []; for (const p of pts) { if (sk.waterAt(p[0], p[1] - 20)) { if (cur.length > 8) out.push(cur); cur = []; } else cur.push(p); } if (cur.length > 8) out.push(cur);
+  for (const c of out) sk.lines.push({ cls: 'blvd', pts: c, edge: true });
+}
 // ---- истинска карта (OpenStreetMap, cityplan2-osm.js — подава се от извикващия: plan2('rome', { osm: OSM2.rome })):
 // без измислен скелет — улиците са от картата (тесните улички вече са опростени при генерирането на данните), а графът,
 // правилата за възлите и парцелите — същите. Двойните еднопосочни платна на булевардите стават един път с ленти в двете посоки.
@@ -450,10 +464,11 @@ export function plan2Load(data, osm) {
 // ---- основното: plan2(cityId, { fam, size, seed, ext })
 const cache = new Map();
 export function plan2(cityId, o = {}) {
-  const fam = o.fam || 'eu', size = o.size || 'm', seed = o.seed ?? hashStr(cityId), ext = o.ext || 0, RG = !!o.roadGeo && !o.osm, JF = !!o.jfix && !o.osm, ED = !o.osm && o.edit && (o.edit.add?.length || o.edit.cut?.length) ? o.edit : null, key = [cityId, fam, size, seed, ext, o.rk || 1, RG ? 'rg' : '', JF ? 'jf' : '', o.river ? 'rv' + o.river.kind : '', ED ? 'ed' + hashStr(JSON.stringify([ED.add, ED.cut])) : '', o.canals ? 'cn' : ''].join(':');   /* ED — редакциите от Лаб редактора (#29, plan-edit): начертани и изтрити улици */   // RG — road-geo (само нови игри: парцелите се местят)
+  const fam = o.fam || 'eu', size = o.size || 'm', seed = o.seed ?? hashStr(cityId), ext = o.ext || 0, RG = !!o.roadGeo && !o.osm, JF = !!o.jfix && !o.osm, ED = !o.osm && o.edit && (o.edit.add?.length || o.edit.cut?.length) ? o.edit : null, key = [cityId, fam, size, seed, ext, o.rk || 1, RG ? 'rg' : '', JF ? 'jf' : '', o.river ? 'rv' + o.river.kind : '', ED ? 'ed' + hashStr(JSON.stringify([ED.add, ED.cut])) : '', o.canals ? 'cn' : '', o.edgeBlvd ? 'eb' : ''].join(':');   /* ED — редакциите от Лаб редактора (#29, plan-edit): начертани и изтрити улици */   // RG — road-geo (само нови игри: парцелите се местят)
   if (cache.has(key)) return cache.get(key);
   const t0 = Date.now(), r = rng(hashStr(`plan2:${cityId}:${fam}:${size}:${seed}`));
   const sk = o.osm ? osmSkeleton(o.osm) : skeleton(fam, size, r, o.rk || 1, !!o.canals, o.river || null);   // rk — по-голям радиус (играта иска повече парцели)
+  if (o.edgeBlvd && !o.osm) edgeBlvd(sk);   // 🛣️ edge-blvd (f6): периферният булевард — улиците по ръба вече не свършват в нищото
   // главните пътища: мрежа от точки (за отстоянието на кварталните)
   const mg = pointGrid(24); sk.lines.forEach((L, li) => L.pts.forEach(p => mg.add(p, li)));
   const majorNear = (p, rad) => { let hit = null; mg.near(p, rad + widthOf('blvd') / 2, (q, li) => { if (hit === null && dist(p, q) < rad + widthOf(sk.lines[li].cls) / 2) hit = li; }); return hit; };

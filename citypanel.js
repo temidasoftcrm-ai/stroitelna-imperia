@@ -7,11 +7,16 @@
 // Градът, в който си, се показва със същите данни, но автопилотът му не работи (там играеш ти).
 // Записът: S.autoCity = { [id]: true }; в града: c.freeLots = [[lotId, zone], …] (пази се при напускане, за новите поръчки).
 import { migrateDevRecord } from './devlevel.js';
+import { feature } from './lab/feature.js';
+// 📦 wh-auto-default (T1): автоматичното пълнене е включено по подразбиране във всеки град със склад ниво 2+ (както прави и autoFill() в града);
+// старите записи на другите градове (on: false) се включват веднъж тук — без „🔄 Включи“ във всяка карта; изключване — само в раздел „Склад“ на града
+const WHAD = feature('wh-auto-default'), UIC = feature('ui-cleanup');
+const whAutoFix = c => { if (WHAD && c && (c.whLevel || 0) >= 2 && !(c.autoFill && c.autoFill.on)) c.autoFill = { budget: 50000, spent: 0, day: 0, ...(c.autoFill || {}), on: true }; return c; };
 const ZONE_PREF = { house: ['outer', 'mid'], shop: ['mid', 'outer', 'center'], office: ['center', 'mid'], tower: ['center', 'mid'] };
 
 export function createCityPanel(deps) {
   const S = () => deps.S(), f = n => deps.fmt(n);
-  const rec = id => id === S().cityId ? S() : (S().cities || {})[id] || null;
+  const rec = id => whAutoFix(id === S().cityId ? S() : (S().cities || {})[id] || null);   // wh-auto-default
   const auto = id => !!(S().autoCity || {})[id];
   const lvOf = xp => { let l = 1; deps.THRESH.forEach((t, i) => { if (xp >= t) l = i + 1; }); return l; };
   const devOf = c => c.dev = migrateDevRecord(c.dev);
@@ -182,7 +187,7 @@ export function createCityPanel(deps) {
     if (!canFin) h += `<div class="meta" style="margin:6px 0 0">🏁 За завършване: ${ck(okExt)} квартали ${fs.ext}/${fs.need} · ${ck(okFree)} свободни парцели ${fs.free == null ? '? (влез веднъж в града)' : `${fs.free} (най-много ${fs.freeMax ?? 1})`} · ${ck(okSh)} пазарен дял ${Math.round(fs.share * 100)}% (поне 60%)${fs.airNeed ? ` · ${ck(fs.air)} ✈️ летище` : ''}</div>`;
     if (!canFin && fs.airNeed && !fs.air) h += `<div class="row" style="margin:4px 0 0;gap:6px;align-items:center"><span class="meta" style="margin:0;flex:1">✈️ За завършване на ${deps.cityName(id)} трябва летище — строи се оттук, без да влизаш в града.</span><button class="btn" data-airport="${id}">✈️ Строй летище</button></div>`;   // data-airport — общият бутон в големите прозорци (game.js buildAirport)
     // 📦 складът: автоматичното пълнене се включва и оттук (всеки град има свое — c.autoFill)
-    if (!(c.autoFill && c.autoFill.on)) h += `<div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0 auto 0 0">📦 Склад: <span class="late">автоматичното пълнене е изключено</span></span><button class="btn2" data-cpaf="${id}" title="Складът сам поръчва ТИР-ове с материали (до 50 000 € на ден)">🔄 Включи</button></div>`;
+    if (!WHAD && !(c.autoFill && c.autoFill.on)) h += `<div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0 auto 0 0">📦 Склад: <span class="late">автоматичното пълнене е изключено</span></span><button class="btn2" data-cpaf="${id}" title="Складът сам поръчва ТИР-ове с материали (до 50 000 € на ден)">🔄 Включи</button></div>`;
     // 🏘️ нови квартали — купуват се и оттук, без да влизаш в града
     const dq = deps.district && !deps.isFinished(id) ? deps.district(id) : null;
     if (dq && dq.ext < dq.max) h += `<div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0 auto 0 0">🏘️ Квартали <b style="color:var(--txt)">${dq.ext}/${dq.max}</b>${dq.ext < fs.need ? ` · за завършване ${fs.need}` : ''}</span>
@@ -233,7 +238,7 @@ export function createCityPanel(deps) {
         <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0 auto 0 0">🚜 Липсват <b style="color:${g.total ? 'var(--bad)' : 'var(--ok)'}">${g.total}</b>${g.moveN ? ` · ${g.moveN} идват от другите градове` : ''}${g.buy.length ? ` · за купуване ${g.buy.reduce((a, b) => a + b[2], 0)}` : ''}</span>
           ${g.total ? `${g.moveN ? `<button class="btn2" data-cpbuyall="1" title="Евтино, но техниката пътува няколко дни">🚚 Изпрати ${g.moveN}${g.cost ? ` + купи · ${f(g.cost)} €` : ''}</button>` : ''}<button class="btn" data-cpbuynow="1" ${deps.econ().canAfford(Math.min(...g.now.map(([, t]) => deps.ECON.UNIT_TYPES[t].cost))) ? '' : 'disabled'} title="Купува всичко липсващо веднага във всеки град">🛒 Купи всичко необходимо · ${f(g.costNow)} €</button>` : '<span class="meta" style="margin:0;color:var(--ok)">✅ Нищо не липсва</span>'}</div>
         <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0 auto 0 0">📦 Складове с автоматично пълнене: <b style="color:var(--txt)">${own.length - afOff - own.filter(id => deps.isFinished(id)).length}</b> от ${own.filter(id => !deps.isFinished(id)).length}</span>
-          ${afOff ? '<button class="btn" data-cpafall="1">📦 Включи всички</button>' : '<span class="meta" style="margin:0;color:var(--ok)">✅ Всички са включени</span>'}</div>${distRow()}</div>`;
+          ${afOff && !WHAD ? '<button class="btn" data-cpafall="1">📦 Включи всички</button>' : '<span class="meta" style="margin:0;color:var(--ok)">✅ Автоматично</span>'}</div>${distRow()}</div>`;
       const shown = order.filter(visible);
       for (const id of shown) h += cityCard(id);
       h += finNote(order);
@@ -242,8 +247,8 @@ export function createCityPanel(deps) {
     }
     let h = `<div class="card"><div class="meta" style="margin:0">Тук управляваш всички градове, без да влизаш във всеки. С <b>🤖 Автопилот</b> градът сам приема поръчки и ги строи със своята техника, а парите и опитът идват всеки ден.
       Нивото на всеки град расте от обектите в него; летищата се отключват, щом <b>един</b> град стигне ниво 9.</div>
-      <div class="row" style="justify-content:flex-end;gap:6px;margin-top:6px"><span class="meta" style="margin:0 auto 0 0">🤖 включен в ${on} от ${open.length} града</span>
-      <button class="btn2" data-cpall="1">🤖 Включи всички</button><button class="btn2" data-cpall="0">Изключи всички</button></div></div>`;
+      ${UIC ? `<div class="meta" style="margin:6px 0 0">🤖 Градовете работят сами с автопилот (в ${on} от ${open.length}); изключва се в картата на града.</div></div>` : `<div class="row" style="justify-content:flex-end;gap:6px;margin-top:6px"><span class="meta" style="margin:0 auto 0 0">🤖 включен в ${on} от ${open.length} града</span>
+      <button class="btn2" data-cpall="1">🤖 Включи всички</button><button class="btn2" data-cpall="0">Изключи всички</button></div></div>`}`;   // ui-cleanup (T1): без „Включи/Изключи всички“
     const shown = order.filter(visible);   // обхватът горе: България · Балкани · Европа · …; завършените и оставените — скрити
     for (const id of shown) h += cityCard(id);
     h += finNote(order);

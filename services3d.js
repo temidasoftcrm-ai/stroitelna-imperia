@@ -53,7 +53,17 @@ export function buildService(k, lvl, lot, opt = {}) {
   // ---- по вид
   if (k === 'hall') {   // кметство отзад, площад отпред (фонтан, знамена, пейки, дървета)
     const pd = d * 0.45; flat(w, pd, paving(w, pd), 0, front - pd / 2, 0.03);
-    glb(modelOf(k, lvl, seed), 0.5, 0.8);
+    // hall-gilded: площадът отпред — по-широк (на свободното пред кметството)
+    // гранитни плочи 1×1 м с тъмни фуги и рамка — да се различава от земята (в Париж бежовият R.pave се сливаше с пясъка)
+    const granite = (w2, d2) => M(0xffffff, { map: tex((g, n) => { const c = n / 8; g.fillStyle = '#77736c'; g.fillRect(0, 0, n, n); for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const v = 168 + Math.floor(Math.random() * 26); g.fillStyle = `rgb(${v},${v - 3},${v - 8})`; g.fillRect(x * c + 1.5, y * c + 1.5, c - 3, c - 3); } }, [w2 / 8, d2 / 8]) });
+    if (lvl === 'l' && opt.hallTop) { flat(88, pd * 1.6 + 2, M(0x6f6a62), 0, front - pd * 0.8, 0.04); flat(86, pd * 1.6, granite(86, pd * 1.6), 0, front - pd * 0.8, 0.045); }
+    // hall-gilded (T2): в големите европейски градове главното кметство (ниво l) — „Позлатената катедрала“ на потребителя (Meshy); нощем фасадата и куполът светят топло
+    if (lvl === 'l' && opt.hallTop) { group.userData.gildHall = true; glb(opt.hallTop, 0.55, 0.92); const i = tasks.length - 1; tasks[i] = tasks[i].then(() => { group.traverse(m => { if (m.isMesh && m.material && m.material.map && !glows.includes(m.material) && !m.userData.gild) { m.userData.gild = 1; m.material = m.material.clone(); m.material.emissive = new THREE.Color(0x6a5434); m.material.emissiveMap = m.material.map; m.material.emissiveIntensity = 0; glows.push(m.material); } });
+      // по-голяма от парцела: ~80 м по фасадата (като истинско Hôtel de Ville) — назад, отпред остава площадът
+      const o = group.children.find(c => { let t = false; c.traverse(q => { if (q.userData.gild) t = true; }); return t; }); if (!o) return;
+      const b = new THREE.Box3().setFromObject(o), sz = b.getSize(new THREE.Vector3()), kk = 80 / Math.max(sz.x, sz.z, 1); if (kk <= 1) return;
+      o.scale.multiplyScalar(kk); o.updateMatrixWorld(true); const b2 = new THREE.Box3().setFromObject(o); o.position.z += (front - pd) - b2.max.z; o.position.y -= b2.min.y; }); }
+    else glb(modelOf(k, lvl, seed), 0.5, 0.8);
     const fz = front - pd / 2; cyl(2.4, 0.5, M(0xb8b2a6), 0, 0, fz, 24); const wt = cyl(2.1, 0.06, M(0x6fa8c8, { roughness: 0.15, metalness: 0.2 }), 0, 0.45, fz, 24); cyl(0.25, 1.6, M(0xb8b2a6), 0, 0.5, fz);
     for (const x of [-w * 0.3, w * 0.3]) { cyl(0.06, 9, M(0xdddddd, { metalness: 0.6 }), x, 0, fz - pd * 0.3); box(1.4, 0.9, 0.02, M([0x2e5aa8, 0xc62828, 0xf2f2f2][seed % 3]), x + 0.75, 7.6, fz - pd * 0.3); }
     for (const x of [-w * 0.38, w * 0.38]) { tree(x, front - 2.5); bench(x * 0.6, front - 2.5); }

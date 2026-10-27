@@ -620,7 +620,8 @@ export function buildPlan2View(P, opts = {}) {
       if (pl.length) { const o = pl[k % pl.length].clone(); o.scale.multiplyScalar(1.1 + (k % 3) * 0.25); o.position.set(x, 0.34, z); o.rotation.y = a * 3; G.add(o); } else Fl[k % 3].push(disc(x, z, 0.8, 0.36, 0, 10)); }
     if (ri > 8) for (let k = 0; k < 4; k++) { const a = (k + 0.5) / 4 * TAU, rr = ri * 0.55; rTrees.push([r.x + Math.cos(a) * rr, r.z + Math.sin(a) * rr, 6]); }
     // ⛲ roundabout-deco (T2): светлият фонтан с вода и струи или паметник (game.js roundDecoOf → roundabout.js)
-    if (opts.roundDeco) G.add(opts.roundDeco({ x: r.x, z: r.z, ri, seed: n.id + 1 }));
+    // поне един паметник в град с ≥ 3 кръгови — на най-близкото до центъра (детерминирано)
+    if (opts.roundDeco) { const AR = P.rounds || RO, near = AR.length >= 3 && AR.reduce((b, q) => Math.hypot(q.x - P.center.x, q.z - P.center.z) < Math.hypot(b.x - P.center.x, b.z - P.center.z) ? q : b) === r; G.add(opts.roundDeco({ x: r.x, z: r.z, ri, seed: n.id + 1, mustMonument: near })); }
     else if (opts.fountain) { const f = opts.fountain.clone(), b = new THREE.Box3().setFromObject(f), sz = b.getSize(new THREE.Vector3()), k = Math.min(ri * 0.55, 8) / Math.max(sz.x, sz.z); f.scale.multiplyScalar(k); f.position.set(r.x, 0.34 - b.min.y * k, r.z); G.add(f); }
     else { const f = new THREE.Group(), bR = Math.min(3.4, ri * 0.32), basin = new THREE.Mesh(new THREE.CylinderGeometry(bR, bR + 0.25, 0.7, 32), MAT.stone), water = new THREE.Mesh(new THREE.CircleGeometry(bR - 0.3, 32).rotateX(-Math.PI / 2), MAT.wet), col = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.45, 2.2, 16), MAT.stone), bowl = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 0.35, 0.35, 24), MAT.stone);
       basin.position.y = 0.69; water.position.y = 1.0; col.position.y = 1.5; bowl.position.y = 2.6; f.add(basin, water, col, bowl); f.position.set(r.x, 0, r.z); f.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); G.add(f); }

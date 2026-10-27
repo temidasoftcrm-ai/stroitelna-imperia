@@ -137,7 +137,10 @@ export function createBikes(deps) {
         // срез при възлите: колкото е половината от най-широката улица в тях (иначе алеята влиза в кръстовището)
         const from = dir > 0 ? rd.from : rd.to, to = dir > 0 ? rd.to : rd.from, cutOf = n => { const N = P.nodes[n]; return N && N.arms && N.arms.length > 1 ? Math.max(...N.arms.map(a => P.roads[a.road] ? P.roads[a.road].w / 2 + 1.5 : 6)) : 0; };
         const L = [0]; for (let i = 1; i < line.length; i++) L.push(L[i - 1] + Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
-        const s0 = cutOf(from), s1 = L[L.length - 1] - cutOf(to); if (s1 - s0 < 8) continue;
+        // кръгово: алеята спира преди външния ръб на пръстена (колоездачите го обикалят — next())
+        const rnd = n => P.nodes[n] && P.nodes[n].kind === 'round' && P.rounds.find(r2 => r2.node === n), Lt = L[L.length - 1];
+        const cutR = (Ro, end) => { const Rr = Ro.outer + 1.5; for (let k = 0; k < Lt; k += 0.5) { const [x, z] = at({ line, L }, end ? Lt - k : k); if (Math.hypot(x - Ro.x, z - Ro.z) >= Rr) return k; } return Lt; };
+        const r0 = rnd(from), r1 = rnd(to), s0 = r0 ? cutR(r0, false) : cutOf(from), s1 = Lt - (r1 ? cutR(r1, true) : cutOf(to)); if (s1 - s0 < 8) continue;
         const ln = { rd, dir, line, L, s0, s1, from, to, key: rd.id + ':' + dir }; lanes.set(ln.key, ln);
         if (!byNode.has(from)) byNode.set(from, []); byNode.get(from).push(ln);
       }
@@ -148,10 +151,15 @@ export function createBikes(deps) {
   // ---- червените ивици (една геометрия за целия град)
   function paint(N) {
     const pos = [], idx = []; let n = 0;
+    // улица, която минава през кръгово, без да е свързана с него — без червено върху пръстена и острова
     for (const ln of N.lanes) { const sgn = N.P.drive === 'L' ? -1 : 1;
-      for (let s = ln.s0; s < ln.s1; s += 4) { const s2 = Math.min(ln.s1, s + 4); for (const ss of [s, s2]) { const [x, z, h] = at(ln, ss), nx = -Math.cos(h) * sgn, nz = Math.sin(h) * sgn;   // навън към бордюра (линията е изместена по (−dz, dx))
+      for (let s = ln.s0; s < ln.s1; s += 4) { const s2 = Math.min(ln.s1, s + 4), [mx, mz] = at(ln, (s + s2) / 2); if (N.P.rounds.some(Ro => Math.hypot(mx - Ro.x, mz - Ro.z) < Ro.outer + 1)) continue; for (const ss of [s, s2]) { const [x, z, h] = at(ln, ss), nx = -Math.cos(h) * sgn, nz = Math.sin(h) * sgn;   // навън към бордюра (линията е изместена по (−dz, dx))
           pos.push(x + N.ox - nx * 0.45, 0.07, z + N.oz - nz * 0.45, x + N.ox + nx * 0.45, 0.07, z + N.oz + nz * 0.45); }
         idx.push(n, n + 1, n + 2, n + 1, n + 3, n + 2); n += 4; } }
+    // червен пръстен по външния ръб на кръговите, до които стигат алеи
+    const rs = new Set(); for (const ln of N.lanes) for (const n of [ln.from, ln.to]) { const Ro = N.P.nodes[n] && N.P.nodes[n].kind === 'round' && N.P.rounds.find(r2 => r2.node === n); if (Ro) rs.add(Ro); }
+    for (const Ro of rs) { const R = Ro.outer - 0.9, K = 64; for (let k = 0; k < K; k++) { for (const a of [k / K * 6.2832, (k + 1) / K * 6.2832]) { const c = Math.cos(a), sn = Math.sin(a); pos.push(Ro.x + N.ox + c * (R - 0.45), 0.07, Ro.z + N.oz + sn * (R - 0.45), Ro.x + N.ox + c * (R + 0.45), 0.07, Ro.z + N.oz + sn * (R + 0.45)); }
+      idx.push(n, n + 1, n + 2, n + 1, n + 3, n + 2); n += 4; } }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
     const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x9e3b32, roughness: 0.95, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -5, polygonOffsetUnits: -5 })); m.receiveShadow = true; m.name = 'bike-lanes'; return m;
   }
@@ -192,12 +200,26 @@ export function createBikes(deps) {
     const n = r.ln.to, opts = (N.byNode.get(n) || []).filter(l => l.rd !== r.ln.rd), back = N.lanes.find(l => l.rd === r.ln.rd && l.dir === -r.ln.dir);
     const nl = opts.length ? opts[(Math.random() * opts.length) | 0] : back; if (!nl) return false;
     const [ax, az] = at(r.ln, r.ln.s1), [bx, bz] = at(nl, nl.s0), Nd = N.P.nodes[n], c = Nd ? [Nd.x, Nd.z] : [(ax + bx) / 2, (az + bz) / 2];
+    // кръгово: по външния ръб на пръстена в посоката на движението (дясно — обратно на часовника отгоре, ъгълът намалява), не през острова
+    const Ro = Nd && Nd.kind === 'round' && N.P.rounds.find(r2 => r2.node === n);
+    if (Ro) { const dir = N.P.drive === 'R' ? -1 : 1, R = Ro.outer - 0.9, dist = p => Math.hypot(p[0] - Ro.x, p[1] - Ro.z);
+      // по линията на алеята (по платното) до радиуса на пръстена, после дъга, после по линията на следващата алея
+      let sa = r.ln.s1; while (sa < r.ln.L[r.ln.L.length - 1] && dist(at(r.ln, sa)) > R) sa += 0.5; let sb = nl.s0; while (sb > 0 && dist(at(nl, sb)) > R) sb -= 0.5;
+      const pa = at(r.ln, sa), pb = at(nl, sb), ta = Math.atan2(pa[1] - Ro.z, pa[0] - Ro.x), tb = Math.atan2(pb[1] - Ro.z, pb[0] - Ro.x);
+      let dt = ((tb - ta) * dir) % 6.2832; if (dt < 0) dt += 6.2832; if (dt < 0.2) dt += 6.2832;
+      const l1 = Math.hypot(pa[0] - ax, pa[1] - az), l2 = dt * R, l3 = Math.hypot(bx - pb[0], bz - pb[1]);
+      r.tr = { arc: { x: Ro.x, z: Ro.z, ta, dt: dt * dir, R, a: [ax, az], pa, pb, b: [bx, bz], l1, l2, l3 }, t: 0, len: Math.max(2, l1 + l2 + l3), nl }; return true; }
     const cx = nl === back ? (ax + bx) / 2 + (c[0] - (ax + bx) / 2) * 0.5 : c[0] * 0.5 + (ax + bx) / 4, cz = nl === back ? (az + bz) / 2 + (c[1] - (az + bz) / 2) * 0.5 : c[1] * 0.5 + (az + bz) / 4;
     const len = Math.hypot(cx - ax, cz - az) + Math.hypot(bx - cx, bz - cz); r.tr = { a: [ax, az], c: [cx, cz], b: [bx, bz], t: 0, len: Math.max(2, len), nl }; return true;
   }
   function step(N, r, dt) {
     let x, z, h;
-    if (r.tr) { const T = r.tr; T.t += r.v * 0.8 * dt / T.len; const t = Math.min(1, T.t), m = 1 - t;
+    if (r.tr && r.tr.arc) { const T = r.tr, A = T.arc; T.t += r.v * dt / T.len; const t = Math.min(1, T.t);
+      const p = u => { const d = u * T.len, lr = (P, Q, k) => [P[0] + (Q[0] - P[0]) * k, P[1] + (Q[1] - P[1]) * k]; if (d < A.l1) return lr(A.a, A.pa, d / (A.l1 || 1)); if (d > A.l1 + A.l2) return lr(A.pb, A.b, Math.min(1, (d - A.l1 - A.l2) / (A.l3 || 1)));
+        const th = A.ta + A.dt * (d - A.l1) / (A.l2 || 1); return [A.x + Math.cos(th) * A.R, A.z + Math.sin(th) * A.R]; };
+      [x, z] = p(t); const [x2, z2] = p(Math.min(1, t + 0.01)), [x0, z0] = p(Math.max(0, t - 0.01)); h = Math.atan2(x2 - x0, z2 - z0);
+      if (T.t >= 1) { r.ln = T.nl; r.s = T.nl.s0; r.tr = null; } }
+    else if (r.tr) { const T = r.tr; T.t += r.v * 0.8 * dt / T.len; const t = Math.min(1, T.t), m = 1 - t;
       x = m * m * T.a[0] + 2 * m * t * T.c[0] + t * t * T.b[0]; z = m * m * T.a[1] + 2 * m * t * T.c[1] + t * t * T.b[1];
       const dx = 2 * m * (T.c[0] - T.a[0]) + 2 * t * (T.b[0] - T.c[0]), dz = 2 * m * (T.c[1] - T.a[1]) + 2 * t * (T.b[1] - T.c[1]); h = Math.atan2(dx, dz);
       if (T.t >= 1) { r.ln = T.nl; r.s = T.nl.s0; r.tr = null; } }
@@ -307,5 +329,5 @@ export function createBikes(deps) {
     for (const o of Object.values(M)) { o.instanceMatrix.needsUpdate = true; if (o.instanceColor) o.instanceColor.needsUpdate = true; if (o.geometry.attributes.aPants) for (const k of ['aPants', 'aSkin', 'aHair', 'aBeard']) o.geometry.attributes[k].needsUpdate = true; }
   }
   function clear() { riders.length = 0; if (G) { G.parent && G.parent.remove(G); G.traverse(o => { if (o.geometry) o.geometry.dispose(); }); } G = null; M = null; net = null; netP = null; }
-  return { update, clear, info: () => ({ lanes: net ? net.lanes.length : 0, riders: riders.length, scoot: riders.filter(r => r.scoot).length, at: riders.slice(0, 3).map(r => [Math.round(r.x), Math.round(r.z)]) }), riders: () => riders };
+  return { update, clear, info: () => ({ lanes: net ? net.lanes.length : 0, riders: riders.length, scoot: riders.filter(r => r.scoot).length, arc: riders.filter(r => r.tr && r.tr.arc).length, at: riders.slice(0, 3).map(r => [Math.round(r.x), Math.round(r.z)]) }), riders: () => riders };
 }

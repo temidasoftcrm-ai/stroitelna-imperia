@@ -184,8 +184,24 @@ function serviceArea(g, gear, A, { W, H, zs, py: pyNear = false }) {
   const lineM = new THREE.MeshBasicMaterial({ color: 0xeeeeee });
   for (let z = z0 + 56; z <= z1 - 56; z += 4) { const l = new THREE.Mesh(new THREE.PlaneGeometry(5.5, 0.15), lineM); l.rotation.x = -Math.PI / 2; l.position.set(xE - 51, y + 0.02, z); add(l); }
   // бензиностанцията: първият одобрен модел, ~26 м, с навеса към паркинга
-  const gk = SVC_GAS.find(n => A[n]);
-  if (gk) {
+  const gk = SVC_GAS.find(n => A[n]), G2 = feature('hw-gas2');
+  if (G2) {   // ⛽ hw-gas2 (T1): бензиностанцията на потребителя (Meshy AI, Темидасофт; 20 × 23 м — по колите: колонката ~2,7 м, под навеса ~3 м): навесът — над колонките (xE − 30, където спират колите
+    // в hwtraffic.js), магазинът — към паркинга; нощем светят панелите под навеса и пилонът с цените (NF_MATS), под навеса — светло петно
+    const gs = new THREE.Group(); gs.position.set(xE - 34.5, y - 0.04, zs); gs.rotation.y = Math.PI / 2; add(gs);   // островите с колонките — успоредни на алеята; лентата между тях — при xE − 30 (там спират колите, hwtraffic.js)
+    import('three/addons/loaders/GLTFLoader.js').then(({ GLTFLoader }) => new GLTFLoader().loadAsync('assets/heavy/gas/gas-hw2.glb')).then(gl => {
+      const lit = {}; gl.scene.traverse(o => { if (!o.isMesh) return; o.castShadow = o.receiveShadow = true;
+        if (o.name === 'price_sign') {   // таблото: кубът от Blender е с развивка-кръст (текстурата излизаше изрязана) — нова кутия със същия размер и пълно UV на всяка страна; цените — четливо, светят нощем
+          o.geometry.computeBoundingBox(); const bb = o.geometry.boundingBox, sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3());
+          const pc = document.createElement('canvas'); pc.width = 256; pc.height = 640; const q = pc.getContext('2d'); q.fillStyle = '#0d1a2b'; q.fillRect(0, 0, 256, 640); q.fillStyle = '#f5b400'; q.fillRect(0, 0, 256, 150); q.fillStyle = '#0d1a2b'; q.font = 'bold 110px system-ui'; q.textAlign = 'center'; q.fillText('⛽', 128, 118);
+          [['A95', '1.39'], ['A100', '1.55'], [tr('Дизел'), '1.35'], ['LPG', '0.69']].forEach(([a, v], k) => { const yy = 230 + k * 112;   /* € (не лв.) */ q.fillStyle = '#ffffff'; q.font = 'bold 44px system-ui'; q.textAlign = 'left'; q.fillText(a, 14, yy); q.fillStyle = '#ffc020'; q.font = 'bold 64px system-ui'; q.textAlign = 'right'; q.fillText(v, 244, yy + 4); });
+          const pt = canvasTex(pc); pt.colorSpace = THREE.SRGBColorSpace; pt.anisotropy = 4;
+          o.geometry = new THREE.BoxGeometry(sz.x, sz.y, sz.z).translate(c.x, c.y, c.z); o.material = new THREE.MeshStandardMaterial({ map: pt, emissive: 0xffffff, emissiveMap: pt, emissiveIntensity: 0, roughness: 0.6 }); o.material.userData.nfK = 1.2; NF_MATS.add(o.material); return; }
+        const m = o.material, k = /^canopy_light/.test(o.name) ? 5 : /^canopy_band/.test(o.name) ? 1.8 : 0;   // панелите под навеса и лентата по челото му: денем — сиви, нощем светят (emissive × нощта)
+        if (k && m) { if (!lit[m.uuid]) { m.emissiveIntensity = 0; m.userData.nfK = k; NF_MATS.add(m); lit[m.uuid] = 1; } o.castShadow = false; } });
+      gs.add(gl.scene);
+    }).catch(e => console.warn('hw-gas2', e));
+    for (const [dx, dz] of [[0, -3], [0, 9]]) { const pl = new THREE.Mesh(new THREE.PlaneGeometry(14, 12), hwPoolMat()); pl.rotation.x = -Math.PI / 2; pl.position.set(xE - 30 + dx, y + 0.68, zs + dz); pl.renderOrder = 3; add(pl); }   // светлото петно — под целия навес (над плочата на станцията)   // светлото петно под навеса
+  } else if (gk) {
     const o = clone(A, gk, 1); o.updateMatrixWorld(true); const sz = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3());
     o.scale.setScalar(26 / Math.max(sz.x, sz.z)); o.rotation.y = -Math.PI / 2; o.position.set(xE - 38, y - 0.04, zs); add(o);
   }
@@ -195,7 +211,8 @@ function serviceArea(g, gear, A, { W, H, zs, py: pyNear = false }) {
   x.fillStyle = '#fff'; x.font = 'bold 30px system-ui'; [['A95', '2.65'], ['A100', '2.95'], [tr('Дизел'), '2.55'], ['LPG', '1.29']].forEach(([a, b], k) => { x.textAlign = 'left'; x.fillText(a, 10, 160 + k * 66); x.textAlign = 'right'; x.fillStyle = '#ffd54a'; x.fillText(b, 152, 160 + k * 66); x.fillStyle = '#fff'; });
   const tx = canvasTex(cv); tx.colorSpace = THREE.SRGBColorSpace;
   const py = new THREE.Mesh(new THREE.BoxGeometry(4, 10, 0.6), [0, 0, 0, 0, 1, 1].map(k => k ? new THREE.MeshBasicMaterial({ map: tx }) : new THREE.MeshStandardMaterial({ color: 0x223344 })));
-  if (pyNear) { py.position.set(xE - 10, y + 5, zs - 6); py.castShadow = true; add(py, zs - 6); }   // hw-link: на тревния остров срещу колонките (не на ръба на насипа)
+  if (G2) { }   // hw-gas2: пилонът е в модела
+  else if (pyNear) { py.position.set(xE - 10, y + 5, zs - 6); py.castShadow = true; add(py, zs - 6); }   // hw-link: на тревния остров срещу колонките (не на ръба на насипа)
   else { py.position.set(xE - 9, y + 5, z0 + 26); py.castShadow = true; add(py, z0 + 26); }
   const b = abBoard(['⛽ 🍴 P', '500 м'], 5, 2.6); b.rotation.y = Math.PI; b.position.set(xE - 2.5, y + 3.4, z0 - 200); add(b, z0 - 200);
   const bp = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3.4, 0.2), new THREE.MeshStandardMaterial({ color: 0x8a9096 })); bp.position.set(xE - 2.5, y + 1.7, z0 - 200); add(bp, z0 - 200);

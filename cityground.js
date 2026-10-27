@@ -12,7 +12,7 @@ const CG = {
 };
 export const cityGroundOn = id => !!CG[id];
 
-function groundMat(c, base) {
+export function groundMat(c, base) {
   const m = new THREE.MeshStandardMaterial({ color: c.col, roughness: 0.95 });
   m.onBeforeCompile = sh => {
     sh.uniforms.uTile = { value: c.tile || 1 }; sh.uniforms.uKind = { value: c.kind === 'grass' ? 1 : 0 };

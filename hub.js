@@ -1,3 +1,4 @@
+import { feature } from './lab/feature.js';
 // hub.js — „📊 Империя ▾“: бутоните от втория ред на горната лента (гараж, транспорт, курорти, „на ден“, градове, оферти, завладяване…)
 // се местят в падащ панел с плочки, за да е лентата на един ред. Бутоните се преместват (не се копират) — техните onclick и живите
 // надписи (+X €/ден, „Оферти 3“) си остават; кодът, който ги показва/скрива (style.display), продължава да работи.
@@ -47,6 +48,7 @@ export function mountHub(top, after, opts = {}) {
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
   const btn = document.createElement('button'); btn.id = 'btnHub'; btn.className = 'btn2'; btn.textContent = '📊 Империя ▾'; btn.title = 'Гараж, транспорт, курорти, градове, оферти, завладяване…';
   (after && after.parentNode === top ? after.nextSibling : top.firstChild) ? top.insertBefore(btn, after && after.parentNode === top ? after.nextSibling : null) : top.appendChild(btn);
+  if (feature('ui-cleanup')) { const mapNext = () => { const m = document.getElementById('btnMapToggle'); if (m && btn.nextSibling !== m) btn.after(m); }; mapNext(); setTimeout(mapNext, 1500); setTimeout(mapNext, 6000); }   // ui-cleanup (T1): „🗺️ Карта“ — веднага след „Империя ▾“ (другите бутони идват по-късно)
   const hub = document.createElement('div'); hub.id = 'hub'; hub.innerHTML = '<h4>Империята</h4><div class="grid"></div>'; document.body.appendChild(hub);
   const grid = hub.querySelector('.grid');
   const take = () => { for (const id of IDS) { const b = document.getElementById(id); if (b && b.parentNode !== grid) grid.appendChild(b); } sort(); };

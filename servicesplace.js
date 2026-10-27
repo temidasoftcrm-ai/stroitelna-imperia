@@ -93,7 +93,7 @@ export function heightNear(blocks, R = 70) {
 export async function servicesLayer(gp, rec, o = {}) {
   const { buildService } = await import('./services3d.js'), THREE = await import('three');
   const sp = servicePlacer(gp), group = new THREE.Group(), items = [], hNear = feature('svc-height') ? heightNear(o.blocks) : null;
-  for (const s of sp.spots(rec)) { const b = buildService(s.k, s.lvl, { w: s.w, d: s.d }, { seed: s.i + s.k.length, trees: o.trees || null, region: o.region || 'eu', outline: !!o.outline, fill: o.fill ?? !!gp.osm, minH: o.minH ?? (gp.osm ? 24 : 0), hAbs: hNear ? hNear(s.x, s.z, s.k) : null }); /* истинската карта: обществените сгради — едри, колкото блоковете наоколо (20–40 м) */ b.group.position.set(s.x, 0, s.z); b.group.name = 'svc-' + s.k; b.group.rotation.y = s.rot; group.add(b.group); items.push({ ...s, b }); }
+  for (const s of sp.spots(rec)) { const b = buildService(s.k, s.lvl, { w: s.w, d: s.d }, { seed: s.i + s.k.length, hallTop: o.hallTop || null, trees: o.trees || null, region: o.region || 'eu', outline: !!o.outline, fill: o.fill ?? !!gp.osm, minH: o.minH ?? (gp.osm ? 24 : 0), hAbs: hNear ? hNear(s.x, s.z, s.k) : null }); /* истинската карта: обществените сгради — едри, колкото блоковете наоколо (20–40 м) */ b.group.position.set(s.x, 0, s.z); b.group.name = 'svc-' + s.k; b.group.rotation.y = s.rot; group.add(b.group); items.push({ ...s, b }); }
   return { group, items, setNight: on => items.forEach(it => it.b.setNight(on)), dispose: () => items.forEach(it => it.b.dispose()) };
 }
 

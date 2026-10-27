@@ -82,22 +82,26 @@
  "🛒 Купи всичко необходимо · {0} €": "🛒 Buy everything needed · {0} €",
  "✅ Нищо не липсва": "✅ Nothing missing",
  "📦 Включи всички": "📦 Turn all on",
- "✅ Всички са включени": "✅ All are on",
+ "✅ Автоматично": "✅ Automatic",
  "Управляваш империята наведнъж: един бутон праща свободната техника от другите градове и купува останалото, което липсва (бригади, багери, кранове…), а складовете си поръчват материалите сами.": "Run the empire in one go: one button sends free equipment from the other cities and buys whatever else is missing (crews, excavators, cranes…), and the warehouses order their own materials.",
  "🚜 Липсват": "🚜 Missing",
  "📦 Складове с автоматично пълнене:": "📦 Warehouses with auto-restock:",
  "от {0}": "from {0}",
  "Нямаш градове в този обхват.": "You have no cities in this range.",
+ "🤖 Градовете работят сами с автопилот (в {0} от {1}); изключва се в картата на града.": "🤖 Cities run themselves on autopilot ({0} of {1}); switch it off in the city card.",
+ "🤖 включен в {0} от {1} града": "🤖 on in {0} of {1} cities",
+ "🤖 Включи всички": "🤖 Turn all on",
+ "Изключи всички": "Turn all off",
  "Тук управляваш всички градове, без да влизаш във всеки. С": "Here you manage all cities without entering each one. With",
  "🤖 Автопилот": "🤖 Autopilot",
  "градът сам приема поръчки и ги строи със своята техника, а парите и опитът идват всеки ден. Нивото на всеки град расте от обектите в него; летищата се отключват, щом": "the city takes orders itself and builds them with its own equipment, while money and XP arrive every day. Each city's level grows from its sites; airports unlock once",
  "един": "one",
  "град стигне ниво 9.": "city reaches level 9.",
- "🤖 включен в {0} от {1} града": "🤖 on in {0} of {1} cities",
- "🤖 Включи всички": "🤖 Turn all on",
- "Изключи всички": "Turn all off",
  "👋 {0} е оставен — продължава да носи пари, но вече не е в списъка (виж „Покажи ги“).": "👋 {0} has been left — it keeps earning money but is no longer in the list (see “Show them”).",
  "🏘️ Купи {0} квартала за {1} €.": "🏘️ Buy {0} districts for {1} €.",
  "Нямаш достатъчно пари за кварталите на нито един град.": "You don't have enough money for the districts of any city.",
- "📦 Включи автоматичното пълнене на складовете в {0} града.": "📦 Turn on warehouse auto-restock in {0} cities."
+ "📦 Включи автоматичното пълнене на складовете в {0} града.": "📦 Turn on warehouse auto-restock in {0} cities.",
+ "_stale": {
+  "✅ Всички са включени": "✅ All are on"
+ }
 }
