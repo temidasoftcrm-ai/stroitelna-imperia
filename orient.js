@@ -102,10 +102,11 @@ export function createOrient(deps) {
     for (const l of legs()) {
       const r = l.r, nm = `${deps.cityName(l.a)} — ${deps.cityName(l.b)}`;
       let txt, btn = '';
-      if (legDone(l)) txt = '✅ ⚡ готов';
+      if (legDone(l)) txt = r.coop ? '✅ ⚡ готов · 🤝 построен от партньора' : '✅ ⚡ готов';
       else if (!r) { const q = deps.legQuote(l.a, l.b); txt = `⬜ няма линия · ${q.km} км · ${q.days} дни`; if (s.st === 'active') btn = `<button class="btn" data-oe-build="${l.a}:${l.b}" ${deps.econ().canAfford(q.cost) ? '' : 'disabled'}>Строй ${f(q.cost)} €</button>`; }
       else if (!r.built) txt = `🚧 строи се ${Math.floor((r.prog || 0) * 100)}% · после ⚡ модернизация`;
       else if (r.hsBuild) txt = `⚡ модернизира се ${Math.floor(r.hsBuild.prog * 100)}%`;
+      else if (r.coop) txt = '🤝 построена от партньора · ⚡ модернизацията е при него';
       else { const q = deps.hsCost(l.a, l.b); txt = `🛤️ линията е готова · нужна ⚡ модернизация (${q.days} дни)`; if (s.st === 'active') btn = `<button class="btn" data-oe-up="${r.i}" ${deps.econ().canAfford(q.cost) ? '' : 'disabled'}>⚡ ${f(q.cost)} €</button>`; }
       h += `<div class="row" style="margin:4px 0"><span class="meta" style="margin:0"><b style="color:var(--txt)">${nm}</b> · ${txt}</span>${btn}</div>`;
     }

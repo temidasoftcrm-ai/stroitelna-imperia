@@ -158,19 +158,28 @@
  "Отключва се на ниво 8 на развитие.": "Unlocks at development level 8.",
  "друго": "other",
  "Куест: {0}": "Quest: {0}",
+ "🎯🤝 {0} — завършен заедно с {1}: +{2} € (наградата е за теб — построил си повече)": "🎯🤝 {0} — completed together with {1}: +{2} € (the reward is yours — you built more)",
+ "🤝 {0} — завършен заедно с {1}. Наградата ({2} €) получава {3} — построил е повече.": "🤝 {0} — completed together with {1}. The reward ({2} €) goes to {3} — they built more.",
  "📖 Нова глава с куести: {0} {1}!": "📖 New quest chapter: {0} {1}!",
  "Куести": "Quests",
  "🎯 Куести": "🎯 Quests",
  "Банка": "Bank",
  "🏦 Банка": "🏦 Bank",
+ "Изпълнен заедно — наградата получава {0}, построил е повече": "Completed together — the reward goes to {0}, who built more",
+ "🤝 Отбележи · наградата е за {0}": "🤝 Mark done · the reward goes to {0}",
+ "{0}Вземи наградата": "{0}Claim reward",
  "🎯 Текущи": "🎯 Current",
  "✅ Изпълнени ({0})": "✅ Completed ({0})",
- "✅ Изпълнен": "✅ Completed",
+ "· 🤝 наградата получи партньорът": "· 🤝 the reward went to your partner",
+ "✅ Изпълнен{0}": "✅ Completed{0}",
  "Още няма изпълнени куести.": "No completed quests yet.",
  "Вземи наградите за {0} куеста от „{1}“, за да отключиш тази глава.": "Claim the rewards for {0} quests from “{1}” to unlock this chapter.",
  "✅ Всички куести от тази глава са изпълнени.": "✅ All quests in this chapter are completed.",
- "Вземи наградата": "Claim reward",
+ "✅ Изпълнен": "✅ Completed",
  "🎯 Куести{0}": "🎯 Quests{0}",
  "{0} {1} — следващо ниво!": "{0} {1} — next level!",
- "🎯 Куест изпълнен: {0} — вземи наградата!": "🎯 Quest completed: {0} — claim the reward!"
+ "🎯 Куест изпълнен: {0} — вземи наградата!": "🎯 Quest completed: {0} — claim the reward!",
+ "_stale": {
+  "Вземи наградата": "Claim reward"
+ }
 }

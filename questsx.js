@@ -11,7 +11,7 @@ const finished = c => Object.keys((c.econ().s.finished) || {});
 // 🤝 coop-countries: при общо завладяна държава наградата е само за единия партньор (game.js moneyDone); без флага — моите завършени
 const wonDone = c => (c.wonDone && c.wonDone()) || (id => finished(c).includes(id));
 const abDone = c => (c.S().hwDone || []).filter(id => String(id).startsWith('ab:')).length;
-const ab = (c, a, b) => (c.S().hwDone || []).includes(`ab:${[a, b].sort().join('-')}`);
+const ab = (c, a, b) => c.hwHas ? c.hwHas(`ab:${[a, b].sort().join('-')}`) : (c.S().hwDone || []).includes(`ab:${[a, b].sort().join('-')}`);
 const resortsAt = (c, stage) => Object.values(c.S().resorts || {}).filter(r => r && (Array.isArray(stage) ? stage.includes(r.stage) : r.stage === stage)).length;
 const resortExt = c => Object.values(c.S().resorts || {}).reduce((a, r) => a + Object.keys((r && r.ext) || {}).length, 0);
 

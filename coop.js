@@ -39,7 +39,7 @@ function cleanSnap(P) {
     hwDone: arrOf(P.hwDone, idOk, 200), hwJobs: arrOf(P.hwJobs, idOk, 200), rails: arrOf(P.rails, refOk, 200),
     railKm: Object.fromEntries(Object.entries(obj(P.railKm)).filter(([k]) => refOk(k)).slice(0, 200).map(([k, v]) => [k, num(v)])),
     infra: Object.fromEntries(Object.entries(obj(P.infra)).filter(([k, a]) => idOk(k) && Array.isArray(a)).map(([k, a]) => [k, a.slice(0, 3).map(num)])),
-    fin: arrOf(P.fin, idOk, 300), wonC: arrOf(P.wonC, x => typeof x === 'string' && /^[A-Z]{3}$/.test(x), 100),
+    fin: arrOf(P.fin, idOk, 300), wonC: arrOf(P.wonC, x => typeof x === 'string' && /^[A-Z]{3}$/.test(x), 100), hwWonC: arrOf(P.hwWonC, x => typeof x === 'string' && /^[\w.-]{1,40}$/.test(x), 300), railsHs: arrOf(P.railsHs, refOk, 200),
     lv: P.lv == null ? null : num(P.lv), fleet: arrOf(P.fleet, x => x && typeof x === 'object', 300).map(x => ({ ...x, ref: txt(x.ref, 100), cost: num(x.cost), nm: txt(x.nm) })) };
 }
 // coop_status2: общите строежи, наемите, изненадите, задачите — полетата, които партньорът задава сам
@@ -101,6 +101,8 @@ export function createCoop(d) {
       lv: d.lv ? d.lv() : null,
       // 🤝 coop-countries: завършените ми градове (общото завладяване на държави) и държавите, чийто +10% доход съм поел аз (wonC — да не се плаща двойно)
       ...(feature('coop-countries') ? { fin: Object.keys(e.s.finished || {}).slice(0, 300), wonC: Object.keys(S.coopWon || {}).slice(0, 100) } : {}),
+      // 🤝 coop-infra: куестите за обща магистрала/жп, чиято награда съм поел аз (hwWonC — да не се плаща двойно), и моите ⚡ модернизирани линии (Ориент Експрес)
+      ...(feature('coop-infra') ? { hwWonC: Object.keys(S.coopHwWon || {}).slice(0, 300), railsHs: d.rails().filter(r => r.hs).map(r => r.ref).slice(0, 200) } : {}),
       fleet: d.fleet ? d.fleet().slice(0, 300) : [] };   // влаковете, корабите и самолетите [{ ref, cost, nm }] — общият флот (флаг coop-fleet)   // нивото на фирмата (неограничено) — общото ниво (флаг coop-lv, devlevel.js)
   }
   // къде строя по градове: текущият град се чете от играта, другите — от последното посещение (localStorage)
@@ -213,10 +215,12 @@ export function createCoop(d) {
     // ползва се само козметично (картата, таблото, попъпа) и за XP; парите (+10% доход, куестите) се дават само на единия — game.js coopLead
     const known = x => { const n = d.cityName(x); return !!n && n !== x; }, coopC = feature('coop-countries'),
       fin = coopC ? (P.fin || []).filter(x => typeof x === 'string' && known(x)).slice(0, 300) : [], wonC = coopC ? (P.wonC || []).slice(0, 100) : [];
-    const sig2 = sig + JSON.stringify([fin, wonC, coopC ? user?.id || null : null, coopC ? st?.partner?.id || null : null]);
+    // 🤝 coop-infra: наградите за общите магистрали/жп, поети от партньора (hwWonC), и неговите ⚡ модернизирани линии (railsHs)
+    const coopI = feature('coop-infra'), hwWonC = coopI ? (P.hwWonC || []).slice(0, 300) : [], railsHs = coopI ? (P.railsHs || []).slice(0, 200) : [];
+    const sig2 = sig + JSON.stringify([fin, wonC, coopC ? user?.id || null : null, coopC ? st?.partner?.id || null : null]) + (coopI ? JSON.stringify([hwWonC, railsHs, user?.id || null, st?.partner?.id || null]) : '');
     if (sig2 === shareSig) return;
     shareSig = sig2;
-    window.__coopShared = { v: (window.__coopShared?.v || 0) + 1, name: txt(P.name) || 'партньора', hw, rails, cities, infra, col: colOk(P.col), ...(coopC ? { fin, wonC, me: String(user?.id || ''), pid: String(st?.partner?.id || '') } : {}) };   // col — цветът на марката му (линиите на картата, флаг coop-col)
+    window.__coopShared = { v: (window.__coopShared?.v || 0) + 1, name: txt(P.name) || 'партньора', hw, rails, cities, infra, col: colOk(P.col), ...(coopC ? { fin, wonC, me: String(user?.id || ''), pid: String(st?.partner?.id || '') } : {}), ...(coopI ? { hwWonC, railsHs, me: String(user?.id || ''), pid: String(st?.partner?.id || '') } : {}) };   // col — цветът на марката му (линиите на картата, флаг coop-col)
     try { d.infraSync && d.infraSync(infra, P.name || 'партньора'); } catch (e) { console.warn('coop infra', e); }
   }
   async function tick() {

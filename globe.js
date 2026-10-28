@@ -14,6 +14,9 @@ export function ll2v(lat, lon, r = 1) {
   const phi = (90 - lat) * Math.PI / 180, th = (lon + 180) * Math.PI / 180;
   return new THREE.Vector3(-r * Math.sin(phi) * Math.cos(th), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(th));
 }
+// 🤝 coop-map: държавите на партньора — в неговия цвят (data.pcol), общите — райета зелено/неговия цвят (data.by: ISO3 → 'me' | 'pa' | 'duo')
+const hexA = (h, a) => { let s = String(h || '#2f8cff').replace('#', ''); if (s.length < 6) s = s.slice(0, 3).split('').map(c => c + c).join(''); const n = parseInt(s.slice(0, 6), 16) || 0; return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; };
+function duoPat(x, col) { const c = document.createElement('canvas'); c.width = c.height = 24; const g = c.getContext('2d'); g.fillStyle = 'rgba(40,220,90,0.6)'; g.fillRect(0, 0, 24, 24); g.strokeStyle = hexA(col, 0.75); g.lineWidth = 6; g.beginPath(); for (let i = -24; i <= 48; i += 12) { g.moveTo(i, 24); g.lineTo(i + 24, 0); } g.stroke(); return x.createPattern(c, 'repeat'); }
 // слой с държавите (равнопромежутъчна проекция върху платно → текстура на прозрачна сфера над Земята)
 function countryLayer(g, data) {
   const W = 4096, H = 2048, c = document.createElement('canvas'); c.width = W; c.height = H;
@@ -24,7 +27,7 @@ function countryLayer(g, data) {
     const won = data.won.has(a3), part = data.partial.get(a3) || 0;
     for (const rings of polys) {
       path(rings);
-      if (won) { x.fillStyle = 'rgba(40,220,90,0.55)'; x.fill('evenodd'); }
+      if (won) { const t = data.by && data.by.get(a3); x.fillStyle = t === 'pa' ? hexA(data.pcol, 0.6) : t === 'duo' ? duoPat(x, data.pcol) : 'rgba(40,220,90,0.55)'; x.fill('evenodd'); }
       else if (part > 0) { x.fillStyle = `rgba(255,205,60,${0.18 + part * 0.3})`; x.fill('evenodd'); }
       x.lineWidth = won ? 3 : 1.4; x.strokeStyle = won ? 'rgba(150,255,170,0.95)' : 'rgba(255,255,255,0.35)'; x.stroke();
     }
@@ -51,7 +54,7 @@ export function openGlobe(data) {
   el.innerHTML = `<div style="position:absolute;left:16px;bottom:16px;z-index:2;background:rgba(10,16,26,.82);border:1px solid var(--line);border-radius:14px;padding:12px 16px;color:#fff;max-width:340px">
       <div style="font-weight:800;font-size:18px;color:var(--acc)">🌍 Твоята империя</div>
       <div style="margin-top:6px;font-size:14px">Превзети държави: <b style="color:#5dff8a">${data.stats.won}</b> от ${data.stats.total}</div>
-      <div style="margin-top:6px;font-size:12px;color:var(--mut);line-height:1.6"><span style="color:#5dff8a">■</span> превзета · <span style="color:#ffd23f">■</span> започната · <span style="color:#ffd54a">●</span> централа · <span style="color:#7dd3ff">●</span> твой град<br>Върти с мишката, приближавай с колелцето.</div></div>
+      <div style="margin-top:6px;font-size:12px;color:var(--mut);line-height:1.6"><span style="color:#5dff8a">■</span> превзета · ${data.by ? `<span style="color:${data.pcol}">■</span> ${data.pn} · <span style="color:${data.pcol}">▨</span> заедно · ` : ''}<span style="color:#ffd23f">■</span> започната · <span style="color:#ffd54a">●</span> централа · <span style="color:#7dd3ff">●</span> твой град<br>Върти с мишката, приближавай с колелцето.</div></div>
     <button class="btn2" id="globeClose" style="position:absolute;right:16px;top:14px;z-index:2">✕ Затвори</button>`;
   document.body.appendChild(el);
   const r = new THREE.WebGLRenderer({ antialias: true }); r.setPixelRatio(Math.min(2, devicePixelRatio)); r.outputColorSpace = THREE.SRGBColorSpace;

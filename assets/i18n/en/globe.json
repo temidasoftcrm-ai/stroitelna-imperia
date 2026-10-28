@@ -1,11 +1,15 @@
 {
+ "заедно ·": "together ·",
  "🌍 Твоята империя": "🌍 Your empire",
  "Превзети държави:": "Conquered countries:",
  "от {0}": "of {0}",
- "превзета ·": "conquered ·",
+ "превзета · {0}": "conquered · {0}",
  "започната ·": "started ·",
  "централа ·": "headquarters ·",
  "твой град": "your city",
  "Върти с мишката, приближавай с колелцето.": "Rotate with the mouse, zoom with the wheel.",
- "✕ Затвори": "✕ Close"
+ "✕ Затвори": "✕ Close",
+ "_stale": {
+  "превзета ·": "conquered ·"
+ }
 }
