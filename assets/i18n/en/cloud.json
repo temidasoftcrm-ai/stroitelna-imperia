@@ -397,5 +397,6 @@
  "🏛️ Политиката: импийчмънт, мандати, по-добър баланс и въведение на ниво 25": "🏛️ Politics: impeachment, terms of office, better balance and an intro at level 25",
  "⚡ По-леки градове по картата — по-малко дървета и сенки в украсата на кварталите": "⚡ Lighter real-map cities — fewer trees and shadows in the district decor",
  "🛠️ Поправено: играта спираше при зареждане на запис, ако модел на сграда не се е заредил": "🛠️ Fixed: the game stopped while loading a save if a building model failed to load",
- "🏠 Старите записи: модерната двуетажна къща е заменена с къща от региона (вместо празно място)": "🏠 Old saves: the modern two-storey house is replaced with a regional house (instead of an empty spot)"
+ "🏠 Старите записи: модерната двуетажна къща е заменена с къща от региона (вместо празно място)": "🏠 Old saves: the modern two-storey house is replaced with a regional house (instead of an empty spot)",
+ "🗺️ Поправено: парцелите извън кварталите в градовете по картата са „Покрайнини“ (беше италианското „Fuori“)": "🗺️ Fixed: plots outside the districts in real-map cities are now “Outskirts” (was the Italian “Fuori”)"
 }
