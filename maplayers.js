@@ -47,5 +47,7 @@ export function createMapLayers() {
     apply();
   }
   const wrap = (kind, html) => html ? `<g class="lay-${kind}">${html}</g>` : '';
-  return { mount, wrap, apply, isOn: k => !!on[k] };
+  // включва слоя (напр. играчът започва нова жп линия, а слоят „Жп“ е изключен — иначе строежът не се вижда на картата)
+  const show = k => { if (on[k]) return false; on[k] = true; try { localStorage.setItem(LS, JSON.stringify(on)); } catch (e) {} const i = document.querySelector(`#mapLayers input[data-lay="${k}"]`); if (i) { i.checked = true; i.parentNode.classList.remove('off'); } apply(); return true; };
+  return { mount, wrap, apply, show, isOn: k => !!on[k] };
 }

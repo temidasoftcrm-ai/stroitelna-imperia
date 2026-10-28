@@ -2724,5 +2724,13 @@
   "🔒 {0} на макс. ниво": "🔒 {0} at max level",
   "🔒 Няма място: {0}{1}{2} — затова там не може да се купи. Разшири ги (строят се сами за няколко дни).": "🔒 No room: {0}{1}{2} — so you can't buy there. Expand them (they build themselves in a few days).",
   "🤖 Автоматично снабдяване: всеки ден купува липсващата техника на място, праща свободната от градовете без работа и разширява пълните гаражи": "🤖 Auto-supply: every day buys missing equipment on site, sends free equipment from idle cities and expands full garages"
- }
+ },
+ "(всички региони)": "(all regions)",
+ "тол, бруто": "toll, gross",
+ "Няма морски линии тук.": "No sea routes here.",
+ "— виж „🌎 Всички“.": "— see “🌎 All”.",
+ "Няма пристанища в": "No ports in",
+ "Няма летища в": "No airports in",
+ "градовете, до които стигат готовите линии в този обхват": "cities reached by finished lines in this scope",
+ "тол таксите на ден (бруто)": "tolls per day (gross)"
 }

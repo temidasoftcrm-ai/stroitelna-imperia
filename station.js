@@ -51,7 +51,7 @@ function pool() {
 
 // deps: { group, model(name, scale), instanced(name, mats), label(text, color, w), x (оста на главния коловоз) }
 export function createStation(deps) {
-  const X = deps.x;
+  const X = deps.x, ZS = deps.zs || 0;   // zs — гарата е изместена на юг (st-inland: крайморските градове с морето близо на север)
   let g = null, level = 0, parked = [], site = null, lamps = [], pools = [], glows = [], night = 0;
   const trackX = k => X - k * TRACK_GAP;
   // deps.path(x, z) → { x, z, yaw }: в крайморските градове линията свива на запад преди морето (trackpath.js)
@@ -61,18 +61,21 @@ export function createStation(deps) {
     return deps.instanced('track', mats);
   };
   // строи гарата за дадено ниво (0 = само главната линия); building: строи се следващото ниво (ограда и скеле)
-  let buildingNow = null;
+  let buildingNow = null, bldObj = null;   // bldObj — сградата (station-area)
   function build(lv, building = null) {
     buildingNow = building;
     if (g) deps.group.remove(g);
-    g = new THREE.Group(); lamps = []; pools = []; glows = [];
+    g = new THREE.Group(); lamps = []; pools = []; glows = []; bldObj = null; g.position.z = ZS;   // rail-coast A (st-inland): цялата гара — на ZS на юг (коловозите в нея — с отместване назад)
     deps.group.add(g);
     level = lv;
     const LN = deps.len || LEN;   // rail-crossings: до тунелите в края на земята
-    g.add(rails(X, -LN, LN));   // главната линия
+    const ZN = (deps.zN != null ? Math.max(-LN, deps.zN) : -LN) - ZS, LNs = LN - ZS;   // rail-coast: на север — до буферите преди брега; ZS — гарата е изместена (локално)
+    g.add(rails(X, ZN, LNs));   // главната линия
+    if (deps.zN != null) { const bm = mat(0xc62828), wm = mat(0xeeeeee); for (let k = 0; k <= Math.max(0, lv - 1) + 2; k++) { const x = k <= lv - 1 ? trackX(k) : X - 6.5 * k; const b = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.1, 0.5), bm); b.position.set(x, 0.75, ZN - 0.5); b.castShadow = true; g.add(b);
+        const st = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.18, 0.52), wm); st.position.set(x, 1.0, ZN - 0.5); g.add(st); } }   // буферите (червени с бяла ивица)
     if (lv >= 1) {
       const plen = 30 + lv * 8, side = lv >= 3 ? 0x8f8a80 : 0xb9b2a3;
-      for (let k = 1; k < lv; k++) g.add(rails(trackX(k), -LN, LN));   // гаровите коловози също минават от край до край
+      for (let k = 1; k < lv; k++) g.add(rails(trackX(k), ZN, LNs));   // гаровите коловози също минават от край до край
       // перон откъм града + островни перони между коловозите
       const main = new THREE.Mesh(new THREE.BoxGeometry(5, 0.8, plen * 2), mat(side));
       main.position.set(X + 5.5, 0.4, 0); main.receiveShadow = main.castShadow = true; g.add(main);
@@ -119,7 +122,7 @@ export function createStation(deps) {
       const hw = 6, hh = 3.5 + lv * 1.3, hl = 8 + lv * 3;
       const sp = SM && ST_SPEC[lv], real = sp ? stationBuilding(sp[0], sp[1], sp[2]) : lv >= 2 ? stationBuilding(lv >= 5 ? 'big' : 'small', lv >= 5 ? 47 : hl + 4, lv >= 5 ? 18 : 10) : null;
       if ((lv >= 2 || sp) && !real && !stLoad) loadStationModels().then(() => { if (level === lv) build(lv, buildingNow); });
-      if (real) {   // истинската сграда — до перона, в северния му край
+      if (real) { bldObj = real; if (deps.onBuild) setTimeout(() => deps.onBuild(), 0);   /* station-area: площадът — около истинската сграда */   // истинската сграда — до перона, в северния му край
         if (sp) { const b = new THREE.Box3().setFromObject(real), w = b.max.x - b.min.x, l = b.max.z - b.min.z; real.position.set(X + 3.5 + w / 2, 0, -plen - l / 2 - 1); }   // station-models: в северния край, източно от главния коловоз
         else real.position.set(X + 5.5 + (lv >= 5 ? 6 : 3), 0, lv >= 5 ? plen + 24.5 : -plen - (hl + 4) / 2 - 1); if (lv >= 5) real.rotation.y = Math.PI; g.add(real);
         { const r0 = real; g.userData.mergeWhen = () => [r0]; }   // ⚡ perf-cliff (citycull.js): гаровата сграда е статична — частите ѝ се сливат по материал (паркираните влакове — не)
@@ -277,5 +280,5 @@ export function createStation(deps) {
   }
   // външният свободен коловоз за минаващите влакове
   const outerX = () => trackX(Math.max(1, level));
-  return { build, setParked, setNight, outerX, trackX, get level() { return level; } };
+  return { build, setParked, setNight, outerX, trackX, bldBox: () => { if (!bldObj || !bldObj.parent) return null; bldObj.updateWorldMatrix(true, true); return new THREE.Box3().setFromObject(bldObj); }, get level() { return level; } };
 }

@@ -5,6 +5,7 @@
 // линията (свободната ивица до перона), после направо. Не минава през парцели, улици и вода. Парцелите не се пипат (номерата им
 // са в записите); новите възли и пътища са в края на масивите. Работи върху копие — кешираният план остава същият.
 // stationAccess(P, { x, z0, z1 }) — x: източният ръб на перона (в рамката на плана), z0…z1: докъде е перонът → копие на P с P.access (или P)
+// airport-access (T1): същото и за летището — { key: 'airAccess', nm, tag: 'airport', noPark: true, maxLen, ax } (ax — началото на пътя по x, вместо x + полуширината) (пътят е в P[key], паркингът го рисува airportaccess.js)
 import { CLS, widthOf, rectCorners, inPoly, nodeKind, nodeShape, attachPlan2 } from './cityplan2.js';
 
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
@@ -15,7 +16,7 @@ const away = (pts, atEnd) => { const P2 = atEnd ? pts.slice().reverse() : pts, p
 
 export function stationAccess(P, o) {
   if (!P || !P.roads || !P.nodes || o == null) return P;
-  const CL = 'street', K = CLS[CL], W = widthOf(CL), HALF = W / 2 + K.walk, MAXL = o.maxLen || 600;
+  const CL = o.cls || 'street', K = CLS[CL], W = widthOf(CL), HALF = W / 2 + K.walk, MAXL = o.maxLen || 600;
   // препятствията: парцелите (с марж — платното и тротоарът), улиците, водата
   const lotPolys = P.lots.map(L => L.poly || rectCorners(L.x, L.z, L.w / 2, L.d / 2, L.rot || 0));
   const lotBox = P.lots.map(L => { const r = Math.hypot(L.w, L.d) / 2; return [L.x - r, L.z - r, L.x + r, L.z + r]; });
@@ -60,12 +61,12 @@ export function stationAccess(P, o) {
   };
   const byD = (A, L) => L.map(t => [dist(A, t.p || t.J), t]).filter(x => x[0] <= MAXL).sort((a, b) => a[0] - b[0]).map(x => x[1]);   // най-близките първо — щом има път, по-далечните отпадат веднага
   for (let z = o.z0; z <= o.z1; z += 6) {
-    const A = [o.x + HALF + 1, z];
+    const A = [o.ax ?? o.x + HALF + 1, z];
     for (const t of byD(A, tNodes)) consider([A, t.p], t);
     for (const s of byD(A, tOnRoad(A))) consider([A, s.J], { split: s });
   }
-  if (!best) for (let dz = 20; dz <= 260 && !best; dz += 10) for (const sg of [1, -1]) {   // с една чупка: покрай линията (по z), после направо
-    const z = sg > 0 ? o.z1 : o.z0, A = [o.x + HALF + 1, z], C = [A[0], z + sg * dz];
+  if (!best) for (let dz = 20; dz <= 260 && !best; dz += 10) for (const sg of o.bendX ? [1] : [1, -1]) {   // с една чупка: покрай линията (по z), после направо; bendX (летището) — първо по x, навън
+    const z = sg > 0 ? o.z1 : o.z0, A = [o.ax ?? o.x + HALF + 1, z], C = o.bendX ? [A[0] + o.bendX * dz, z] : [A[0], z + sg * dz];
     if (!clear([A, C], new Set())) continue;
     for (const t of byD(C, tNodes)) consider([A, C, t.p], t);
     for (const s of byD(C, tOnRoad(C))) consider([A, C, s.J], { split: s });
@@ -88,7 +89,7 @@ export function stationAccess(P, o) {
   const A = best.path[0], end = { id: Q.nodes.length, x: A[0], z: A[1], arms: [] }; Q.nodes.push(end);
   const rev = best.path.slice().reverse(), pts = [rev[0]];   // от възела към гарата, на ~5 м
   for (let i = 1; i < rev.length; i++) { const a = rev[i - 1], b = rev[i], k = Math.max(1, Math.ceil(dist(a, b) / 5)); for (let j = 1; j <= k; j++) pts.push([a[0] + (b[0] - a[0]) * j / k, a[1] + (b[1] - a[1]) * j / k]); }
-  const rd = { id: Q.roads.length, cls: CL, osmBridge: false, noCars: false, nm: 'Гарова', oneway: false, pts, L: cumLen(pts), lanes: K.lanes.slice(), laneW: K.laneW, median: K.median, walk: K.walk, w: W, from: n.id, to: end.id, bridge: [], deck: [], station: true };
+  const rd = { id: Q.roads.length, cls: CL, osmBridge: false, noCars: false, nm: o.nm || 'Гарова', oneway: false, pts, L: cumLen(pts), lanes: K.lanes.slice(), laneW: K.laneW, median: K.median, walk: K.walk, w: W, from: n.id, to: end.id, bridge: [], deck: [], [o.tag || 'station']: true };
   Q.roads.push(rd);
   n.arms.push({ road: rd.id, end: 0, angle: away(pts, false) });
   end.arms.push({ road: rd.id, end: 1, angle: away(pts, true) });
@@ -98,7 +99,7 @@ export function stationAccess(P, o) {
   // паркингът: правоъгълник до първата права на пътя (от гарата), без парцели/улици/вода; най-големият, който се побира
   const B = best.path[1], l1 = dist(A, B), ux = (B[0] - A[0]) / l1, uz = (B[1] - A[1]) / l1;
   let park = null;
-  for (const [pw, pd] of o.park || [[32, 22], [26, 17], [20, 13]]) for (const side of [1, -1]) for (const along of [pw / 2 + 4, pw / 2 + 14, pw / 2 + 26]) {
+  if (!o.noPark) for (const [pw, pd] of o.park || [[32, 22], [26, 17], [20, 13]]) for (const side of [1, -1]) for (const along of [pw / 2 + 4, pw / 2 + 14, pw / 2 + 26]) {
     if (park || along + pw / 2 > l1 - 12) continue;
     const off = W / 2 + K.walk + pd / 2 + 1, cx = A[0] + ux * along - uz * off * side, cz = A[1] + uz * along + ux * off * side, rot = Math.atan2(uz * side, -ux * side);   /* като парцелите в играта: +v — към улицата, w — по пътя */
     const corners = rectCorners(cx, cz, pw / 2, pd / 2, rot), probe = [...corners, [cx, cz]];
@@ -107,7 +108,7 @@ export function stationAccess(P, o) {
     park = { x: cx, z: cz, w: pw, d: pd, rot, side };
   }
   // иначе — площадът пред гарата: до перона, северно или южно от началото на пътя (входът — откъм пътя)
-  if (!park) for (const [pw, pd] of [[30, 18], [24, 15], [18, 12]]) for (const sg of [-1, 1]) {
+  if (!park && !o.noPark) for (const [pw, pd] of [[30, 18], [24, 15], [18, 12]]) for (const sg of [-1, 1]) {
     if (park) break;
     const cx = o.x + 1 + pw / 2, cz = A[1] + sg * (W / 2 + K.walk + 1 + pd / 2), rot = sg > 0 ? Math.PI : 0;   /* +v (0, cos rot) — към пътя */
     const corners = rectCorners(cx, cz, pw / 2, pd / 2, rot), probe = [...corners, [cx, cz]];
@@ -117,6 +118,6 @@ export function stationAccess(P, o) {
     park = { x: cx, z: cz, w: pw, d: pd, rot, side: 0, fore: true };
   }
   attachPlan2(Q);   // лентите и завоите (lanePath/turnPath) — върху копието, за да виждат новия път
-  Q.access = { split: !!best.split, bend: best.path.length === 3, road: rd.id, node: n.id, end: end.id, a: A, b: [n.x, n.z], len: Math.round(best.len), park };
+  Q[o.key || 'access'] = { split: !!best.split, bend: best.path.length === 3, road: rd.id, node: n.id, end: end.id, a: A, b: [n.x, n.z], len: Math.round(best.len), park };
   return Q;
 }

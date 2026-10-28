@@ -97,9 +97,12 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
   const at = (L, s) => { let i = 1; while (i < L.cum.length - 1 && L.cum[i] < s) i++; const a = L.pts[i - 1], b = L.pts[i], t = (s - L.cum[i - 1]) / ((L.cum[i] - L.cum[i - 1]) || 1); return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; };
   function done(c) { const md = c.s.mdir || 1; if (c.s.res) c.s.res.busy = null; c.s = null; c.dir = md; c.lane = RIGHT; c.z = laneZ(md, RIGHT); c.o.rotation.y = md > 0 ? Math.PI / 2 : -Math.PI / 2; c.v = Math.max(c.v, 12); }
   // изходите към града: колата излиза по рампата и „влиза в града“ (скрива се); след малко се връща по някой от входовете
-  const RP = ramps ? Object.fromEntries(Object.entries(ramps).filter(([k]) => k !== 'xe').map(([k, P]) => [k, legOf(P.map(([vx, vz]) => W(vx, vz)), { slow: 9, ramp: true })])) : null;
+  // hw-interchanges (T2): ramps — един изход (както досега) или масив от изходи (по едно кръстовище на 2–3 км); RP/rampCx — първият (за hw-incidents)
+  const RA = Array.isArray(ramps) ? ramps.filter(Boolean) : ramps ? [ramps] : [];
+  const RPs = RA.map(R => ({ RP: Object.fromEntries(Object.entries(R).filter(([k]) => k !== 'xe').map(([k, P]) => [k, legOf(P.map(([vx, vz]) => W(vx, vz)), { slow: 9, ramp: true })])), cx: R.nearOff[0][1] - 330 }));
+  const RP = RPs.length ? RPs[0].RP : null; ramps = RA[0] || null;
   const rampY = vx => { const t = Math.max(0, Math.min(1, (Math.abs(vx) - ramps.xe - 3) / 6)); return y + (0.25 - 0.95) * t * t * (3 - 2 * t); };   // като highways.js rampY: от насипа — до земята
-  const rampCx = ramps ? (ramps.nearOff[0][1] - 330) : 0;
+  const rampCx = RPs.length ? RPs[0].cx : 0;
   // 🚛 truck-smooth (T1): наклон по истинския наклон на пътя (височината под предната и задната ос, изгладено), полуремаркето — на шарнира
   // на седлото (следва го със своята ос, със собствен наклон и завъртане), колелата се въртят; плавно престрояване (странична скорост с ускорение)
   const SM = feature('truck-smooth'), TQ = new THREE.Vector3();
@@ -119,7 +122,7 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
     R.T.rotation.set(-(c.tpt - c.pt), rel, 0, 'YXZ');
   }
   function away(c) { c.s = null; c.away = 6 + Math.random() * 20; c.o.visible = false; c.v = 0; }
-  function comeBack(c) { const near = Math.random() < 0.5, L = near ? RP.nearOn : RP.farOn, p0 = L.pts[0]; if (list.some(q => q.s && Math.hypot(q.x - p0[0], q.z - p0[1]) < 12)) { c.away = 3; return; }
+  function comeBack(c) { const near = Math.random() < 0.5, R1 = RPs[(Math.random() * RPs.length) | 0].RP, L = near ? R1.nearOn : R1.farOn, p0 = L.pts[0]; if (list.some(q => q.s && Math.hypot(q.x - p0[0], q.z - p0[1]) < 12)) { c.away = 3; return; }
     c.away = 0; c.o.visible = true; c.x = p0[0]; c.z = p0[1]; c.v = 6; c.s = { legs: [L], i: 0, d: 0, wait: 0, mdir: near ? -1 : 1 }; }
 
   // 🚧 hw-incidents (hwincidents.js): ударените коли, спешните и „призраците“ (конусите) са в list с c.inc — движи ги инцидентът;
@@ -154,7 +157,7 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
       }
       const dv = INC && INC.divert(c);   /* hw-incidents: платното е затворено — всички излизат (полицията отбива) */
       if (RP && c.lane === RIGHT && !c.s && (dv || list.filter(q => q.s || q.away).length < 7)) {   // излиза към града (по-рядко камионите)
-        const T = rampCx - c.dir * 330; if ((px - T) * c.dir < 0 && (c.x - T) * c.dir >= 0 && Math.random() < (dv ? 1 : c.heavy ? 0.06 : 0.16)) { c.s = { legs: [c.dir < 0 ? RP.nearOff : RP.farOff], i: 0, d: 0, wait: 0, exit: true }; continue; } }
+        let ex = false; for (const X of RPs) { const T = X.cx - c.dir * 330; if ((px - T) * c.dir < 0 && (c.x - T) * c.dir >= 0 && Math.random() < (dv ? 1 : c.heavy ? 0.06 : 0.16)) { c.s = { legs: [c.dir < 0 ? X.RP.nearOff : X.RP.farOff], i: 0, d: 0, wait: 0, exit: true }; ex = true; break; } } if (ex) continue; }
       if (c.x > half) c.x -= len; else if (c.x < -half) c.x += len;
       c.o.position.set(c.x, y + (lift ? lift(c.x) : 0), c.z);
       c.o.rotation.y = (c.dir > 0 ? Math.PI / 2 : -Math.PI / 2) - c.dir * Math.atan2(dz / Math.max(dt, 1e-3), Math.max(3, c.v)) ;

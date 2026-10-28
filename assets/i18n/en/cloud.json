@@ -382,5 +382,11 @@
  "🚚 Пътна помощ, сметосъбирач, път до летището; фирмата не се натрупва на един парцел": "🚚 Tow trucks, a garbage truck, an airport access road; the company no longer crowds onto one lot",
  "🗺️ По-ясна карта с легенда; пътищата и жп линиите не минават през водата": "🗺️ A clearer map with a legend; roads and railways no longer cross water",
  "⚙️ Графиката се помни; „Гледай“ при инцидент; до 5 имота на град (3 в малките)": "⚙️ Graphics settings are remembered; „Watch“ on incidents; up to 5 properties per city (3 in small ones)",
- "🏙️ Истинска височина: One WTC, Крайслер, Емпайър, Скайтри; Берлин с Бранденбургската врата, Райхстага и телевизионната кула": "🏙️ Real heights: One WTC, Chrysler, Empire, Skytree; Berlin with the Brandenburg Gate, the Reichstag and the TV tower"
+ "🏙️ Истинска височина: One WTC, Крайслер, Емпайър, Скайтри; Берлин с Бранденбургската врата, Райхстага и телевизионната кула": "🏙️ Real heights: One WTC, Chrysler, Empire, Skytree; Berlin with the Brandenburg Gate, the Reichstag and the TV tower",
+ "🚆 Нови влакове и вагони — 4 пътнически и 3 товарни състава, цистерни, платформи, вагони за коли": "🚆 New trains and wagons — 4 passenger and 3 freight consists, tank cars, flatcars, car carriers",
+ "🛤️ Депо с маневри и искри; гарата в крайбрежните градове е навътре, без релси над морето; площад с фонтан до гарата": "🛤️ A rail yard with shunting and sparks; coastal stations moved inland with no tracks over the sea; a plaza with a fountain by the station",
+ "✈️ Пътят до летището е истинска улица с кръстовище; изходи от магистралата и в големите градове по картата": "✈️ The airport road is a real street with a junction; motorway exits in the big map cities too",
+ "🏡 Нови къщи — българска, вила, средиземноморски, възрожденска, селски, редови; аптека и градска бензиностанция; кипариси": "🏡 New houses — Bulgarian, villa, Mediterranean, Revival, rural, terraced; a pharmacy and a city petrol station; cypresses",
+ "🛵 Мотори и скутери в трафика; по-гладки модели на камиони, самолет и дървета": "🛵 Motorbikes and scooters in traffic; smoother truck, plane and tree models",
+ "⚓ Поправено: автоматичните кораби и самолети вече спазват бюджета и изключения бутон; ясни числа по региони": "⚓ Fixed: automatic ships and planes now respect the budget and the off switch; clear numbers per region"
 }

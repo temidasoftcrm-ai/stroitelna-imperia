@@ -91,6 +91,8 @@ export function loadTrainModels(base = 'assets/heavy/trains/') {
       get('hopper2.glb').then(sc => { P.hopper2 = normalize(sc, 0); }),
     ].map(p => p.catch(e => console.warn('trains-real', e))) : []),
     // 🛤️ rail-depot: старите в депото — парен локомотив 0-4-0 (steve_Emfore, CC BY) и съветска цистерна (KojfDiscord, CC BY)
+    ...(TV ? Object.entries(MV).map(([k, [f, L]]) => get(f + '.glb').then(sc => { tame(sc); if (k === 'silverCar' || k === 'nightCar' || k === 'elLoco') winNight(sc);   /* само пътническите */ P[k] = stretchTo(normalize(sc, 0), L); }).catch(e => console.warn('trains-variety', k, e))) : []),
+    ...(TV ? [Promise.resolve().then(() => Object.assign(P, procWagons()))] : []),
     ...(feature('rail-depot') ? [
       get('loco040.glb').then(sc => { tame(sc); P.loco040 = normalize(sc, 0); }),
       get('tank-ussr.glb').then(sc => { tame(sc); P.tankUssr = normalize(sc, 0); }),
@@ -98,6 +100,41 @@ export function loadTrainModels(base = 'assets/heavy/trains/') {
   ]).then(() => { ready = true; }).catch(e => { console.warn('trainmodels', e); ready = false; });
   return loading;
 }
+// 🚆 trains-variety (T1): влаковете на потребителя (Meshy AI, Темидасофт — заварени, основата на 0, олекотени): пътнически — сребрист вагон,
+// мотрисен вагон „нощен влак“, електрически локомотив с пантограф, парен локомотив с тендер; товарни — дизелов локомотив Union Pacific, покрит
+// вагон SRR, въглищен (Western Maryland; „NY Central“ е без текстура — не се ползва), изоставен бункер. Ширина W, дължина — истинска (разтягане по z). Процедурни: цистерна,
+// платформа с трупи, автовоз, отворен вагон. Нощем прозорците на пътническите светят (тъмното по страните, средната височина).
+const TV = feature('trains-variety');
+const MV = { silverCar: ['m-silver', 22], nightCar: ['m-night', 22], elLoco: ['m-elloco', 18], steamLoco: ['m-steam', 22], upLoco: ['m-up', 20], srrCar: ['m-srr', 15], wmCoal: ['m-wm', 13], hopX: ['m-hopx', 12] };
+function stretchTo(g, L) { const k = L / (g.userData.len || L); g.children[0].scale.z *= k; g.children[0].position.z *= k; g.userData.len = L; return g; }
+function winNight(obj) {   // прозорците — по тъмните пиксели на текстурата по страните, в средната лента по височина
+  obj.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(obj);
+  obj.traverse(m => { if (!m.isMesh || !m.material || !m.material.map) return; const mt = m.material = m.material.clone(); mt.emissive = new THREE.Color(0xffd890); mt.emissiveMap = mt.map; mt.emissiveIntensity = 0; mt.userData.nfK = 1.2;
+    const inv = new THREE.Matrix4().copy(m.matrixWorld).invert(), y0 = bb.min.clone().applyMatrix4(inv).y, y1 = bb.max.clone().applyMatrix4(inv).y;
+    mt.onBeforeCompile = sh => { sh.uniforms.uTvY = { value: new THREE.Vector2(Math.min(y0, y1), Math.abs(y1 - y0) || 1) };
+      sh.vertexShader = 'varying vec3 vTvP; varying vec3 vTvN;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vTvP = position; vTvN = normal;');
+      sh.fragmentShader = 'varying vec3 vTvP; varying vec3 vTvN; uniform vec2 uTvY;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        { float ek = max(0.0001, dot(emissive, vec3(0.333))), hy = (vTvP.y - uTvY.x) / uTvY.y, lum = dot(totalEmissiveRadiance, vec3(0.333)) / ek;
+          vec3 nn = normalize(vTvN); float m = step(0.75, abs(nn.x)) * step(0.45, hy) * step(hy, 0.75) * (1.0 - smoothstep(0.08, 0.16, lum));   /* само страните (не челото и покрива) */
+          totalEmissiveRadiance = vec3(1.0, 0.78, 0.45) * m * ek * 0.35; }`); };
+    mt.customProgramCacheKey = () => 'tv-win'; NF_MATS.add(mt); });
+}
+function procWagons() {   // процедурни товарни вагони (основата на y = 0, предницата към +z, ширина W)
+  const M = (c, r = 0.7, m = 0.2) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m }), dark = M(0x1d1f22, 0.8, 0.3), box = (g, w, h, d, m, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; g.add(o); return o; };
+  const base = L => { const g = new THREE.Group(), i = new THREE.Group(); g.add(i); box(i, W * 0.92, 0.25, L - 0.4, dark, 0, 1.1, 0); for (const z of [-L / 2 + 2.2, L / 2 - 2.2]) { box(i, W * 0.8, 0.7, 2.6, dark, 0, 0.55, z); for (const x of [-0.75, 0.75]) for (const dz of [-0.8, 0.8]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.2, 12).rotateZ(Math.PI / 2), dark); w.position.set(x, 0.45, z + dz); i.add(w); } } g.userData.len = L; return { g, i }; };
+  const cis = (() => { const { g, i } = base(16); const t = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.35, 14.6, 20).rotateX(Math.PI / 2), M(0xffffff, 0.45, 0.4)); t.position.y = 2.55; t.castShadow = true; t.userData.tint = 1; i.add(t);
+    for (const z of [-7.3, 7.3]) { const c = new THREE.Mesh(new THREE.SphereGeometry(1.35, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(z > 0 ? Math.PI / 2 : -Math.PI / 2), t.material); c.scale.z = 0.35; c.position.set(0, 2.55, z); i.add(c); }
+    box(i, 0.9, 0.35, 0.9, dark, 0, 4, 0); return g; })();
+  const timber = (() => { const { g, i } = base(16); const log = M(0x7a5434, 0.95, 0), lg = new THREE.CylinderGeometry(0.28, 0.3, 14.8, 8).rotateX(Math.PI / 2);
+    for (let r = 0; r < 3; r++) for (let k = 0; k < 4 - (r % 2); k++) { const o = new THREE.Mesh(lg, log); o.position.set(-0.9 + k * 0.6 + (r % 2) * 0.3, 1.55 + r * 0.52, 0); o.castShadow = true; i.add(o); }
+    for (const z of [-7.6, -2.6, 2.6, 7.6]) for (const x of [-1.3, 1.3]) box(i, 0.12, 1.8, 0.12, dark, x, 2.1, z); return g; })();
+  const autorack = (() => { const { g, i } = base(18); box(i, W * 0.95, 0.15, 17.6, dark, 0, 2.7, 0); for (const z of [-8, -4, 0, 4, 8]) for (const x of [-1.35, 1.35]) box(i, 0.1, 2.6, 0.1, dark, x, 2.1, z);
+    const cols = [0xd62828, 0x1f5fbf, 0xeeeeee, 0x222222, 0xffb300, 0x7d8a96]; let k = 0;
+    for (const y of [1.25, 2.78]) for (const z of [-6, -1.3, 3.4]) { const c = new THREE.Group(), m = M(cols[k++ % cols.length], 0.4, 0.5); box(c, 1.7, 0.6, 4.2, m, 0, 0.45, 0); box(c, 1.5, 0.5, 2.2, m, 0, 0.95, -0.2); c.position.set(0, y, z); i.add(c); } return g; })();
+  const gondola = (() => { const { g, i } = base(15); const w = M(0x6b3e2e, 0.9, 0.2); box(i, W * 0.95, 1.4, 14.6, w, 0, 1.95, 0); const fill = M(0x3a3a3a, 1, 0); box(i, W * 0.85, 0.2, 14.2, fill, 0, 2.55, 0); return g; })();
+  return { cistern: cis, timber, autorack, gondola };
+}
+const TINTS = [0x2b2d31, 0xd9d4c7, 0x1f5fbf, 0xc62828, 0x2d8f4e, 0xe0a020];
 export const trainModelsReady = () => ready;
 export const hasTrainModel = k => ready && !!P[k];
 // нов вагон: 'loco' | 'hopper' | 'flat' | 'ave' | 'hsw' (среден) | 'aveTail' | 'oeLoco' | 'oeCar' (Ориент Експрес) | 'paxLoco' | 'paxCar' | 'vl82' | 'boxcar' | 'hopper2' (trains-real) (обърнат челен вагон); seed — за цвета на контейнера
@@ -110,12 +147,14 @@ export function trainCar(kind, seed = 0) {
     o.traverse(m => { if (m.isMesh && /red/i.test(m.material.name)) { m.material = m.material.clone(); m.material.color.setHex(col); } });
   }
   if (kind === 'paxLoco' || kind === 'vl82') addHeadlights(o, src.userData.len);
+  else if (kind === 'elLoco' || kind === 'steamLoco' || kind === 'upLoco') addHeadlights(o, src.userData.len, { s: 0.38, y: kind === 'steamLoco' ? 2.6 : 1.7, x: 0.62, beamW: 3, beamL: 12 });   // trains-variety: малки светлини и мек конус
+  if (kind === 'cistern') { const col = TINTS[Math.abs(seed) % TINTS.length]; o.traverse(m => { if (m.isMesh && m.userData.tint !== undefined || (m.isMesh && m.material && m.material.color && m.material.color.getHex() === 0xffffff)) { m.material = m.material.clone(); m.material.color.setHex(col); } }); }   // trains-variety: цистерни в различни цветове
   o.userData.len = src.userData.len;
   return o;
 }
 // фаровете на локомотива: светещи петна на челото (нощем — daynight.js през NF_MATS) и сноп напред
 let lightMat = null, beamMat = null;
-function addHeadlights(o, len) {
+function addHeadlights(o, len, H = {}) {
   if (!lightMat) {
     const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 1, 32, 32, 31);
     gr.addColorStop(0, 'rgba(255,250,225,1)'); gr.addColorStop(0.3, 'rgba(255,235,180,0.6)'); gr.addColorStop(1, 'rgba(255,220,150,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64);
@@ -124,6 +163,7 @@ function addHeadlights(o, len) {
     beamMat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0x4a4434, emissiveMap: tex, emissiveIntensity: 0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
     NF_MATS.add(lightMat); NF_MATS.add(beamMat);
   }
-  for (const x of [-0.7, 0.7]) { const q = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.1), lightMat); q.position.set(x, 1.3, len / 2 + 0.05); o.add(q); }
-  const beam = new THREE.Mesh(new THREE.PlaneGeometry(4.5, 16).rotateX(-Math.PI / 2), beamMat); beam.position.set(0, 0.25, len / 2 + 8); o.add(beam);
+  const hs = H.s ?? 1.1, hx = H.x ?? 0.7, hy = H.y ?? 1.3, bw = H.beamW ?? 4.5, bl = H.beamL ?? 16;
+  for (const x of [-hx, hx]) { const q = new THREE.Mesh(new THREE.PlaneGeometry(hs, hs), lightMat); q.position.set(x, hy, len / 2 + 0.05); o.add(q); }
+  const beam = new THREE.Mesh(new THREE.PlaneGeometry(bw, bl).rotateX(-Math.PI / 2), beamMat); beam.position.set(0, 0.25, len / 2 + bl / 2); o.add(beam);
 }

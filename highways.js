@@ -339,7 +339,7 @@ export function buildHighwayView(A, opts = {}) {
   // opts.ab — аутобан: по 4 ленти във всяка посока (3,6 м), по-широк разделител, асфалт с маркировка вместо плочките на магистралата
   const AB = !!opts.ab, cw = AB ? AB_CW : CW, med = AB ? AB_MED : MED;
   const W = cw * 2 + med;
-  const LZ = opts.ramps && opts.ramps.lanes ? rampPaths(W, opts.ramps.cx, opts.ramps.xs, 0, true).lanes : [], noRail = (sd, z) => LZ.some(([s, a, b]) => s === sd && z > a && z < b);   // hw-link: успоредните ленти — без външната мантинела
+  const LZ = [opts.ramps, ...(opts.ramps2 || [])].filter(r => r && r.lanes).flatMap(r => rampPaths(W, r.cx, r.xs, 0, true).lanes), noRail =   /* hw-interchanges (T2): и успоредните ленти на допълнителните кръстовища */ (sd, z) => LZ.some(([s, a, b]) => s === sd && z > a && z < b);   // hw-link: успоредните ленти — без външната мантинела
   // 1) насип (пръст) — сегменти по 10 м
   const earth = [], gravel = [], asphalt = [], gear = [];
   const earthMat = new THREE.MeshStandardMaterial({ color: 0x7a5a3a, roughness: 1 });
@@ -406,6 +406,8 @@ export function buildHighwayView(A, opts = {}) {
   }
   const service = opts.service != null ? serviceArea(g, gear, A, { W, H, zs: opts.service, py: !!opts.svcPy }) : null;
   const ramps = opts.ramps ? cityRamps(W, opts.ramps.cx, opts.ramps.xs, AB ? med / 2 + cw * 7 / 8 : med / 2 + cw * 3 / 4, 0.25, opts.ramps) : null; if (ramps) g.add(ramps.group);   // изходите към града (hw-ramps)
+  // hw-interchanges (T2): допълнителните кръстовища (летището, гарата) — същите рампи и подлез, всяко със своя връзка към улицата
+  const ramps2 = (opts.ramps2 || []).map(r => { const q = cityRamps(W, r.cx, r.xs, AB ? med / 2 + cw * 7 / 8 : med / 2 + cw * 3 / 4, 0.25, r); g.add(q.group); return q; });
   if (AB && opts.exit !== false) abExit(g, gear, { W, cw, med, z0, LEN, H, zE: opts.exitZ ?? z0 + LEN * 0.22, name: opts.abName || 'A', exitTo: opts.exitTo || '' });
   for (const z of [z0 + 30, z0 + LEN - 40]) {
     const sgn = clone(A, 'sign-highway-wide', 11); sgn.position.set(W / 2 + 1.5, 0, z); sgn.rotation.y = Math.PI / 2; sgn.userData.z = z; g.add(sgn); gear.push(sgn);
@@ -489,5 +491,5 @@ export function buildHighwayView(A, opts = {}) {
     });
   }
   update(opts.stage ?? 0, opts.prog ?? 0);
-  return { group: g, update, length: LEN, width: W, service, ramps };
+  return { group: g, update, length: LEN, width: W, service, ramps, ramps2 };
 }
