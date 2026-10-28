@@ -5,7 +5,7 @@
 // лампите на комините мигат червено; от комините винаги излиза дим. Около завода — двор (бетон), площадка за камионите пред рампата, паркинг
 // за служителите, ограда с бариера на входа и път (2 ленти, лампи) до най-близката улица (като airport-access); 2 камиона на рампата и един,
 // който от време на време кара по пътя до града и обратно. Само изглед — графът на движението и парцелите не се пипат.
-//   game.js: placeFactories({ THREE, P, model, group, tier, railX, addWin, roads, lots, truck, poolMat, spin }) → { update(dt, night), clear() }
+//   game.js: placeFactories({ THREE, P, model, group, tier, railX, addWin, roads, lots, truck, poolMat, spin, extra: { model(key), worker(key, clip) → { obj, mixer } } }) → { update(dt, night), clear() }
 import { nearestOn, hitsLot } from './airportaccess.js';
 const FW = 66, APR = 34, YM = 7, RW = 7.5;   // м: страната на завода; дълбочината на площадката отпред; дворът около него; ширината на пътя
 
@@ -27,7 +27,8 @@ export function placeFactories(o) {
     m.traverse(q => { if (q.isMesh && /^Beacon/.test(q.name)) { q.material = new THREE.MeshBasicMaterial({ color: 0xff2a1a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }); q.scale.setScalar(1.3); beacons.push(q.material); } });
     group.add(m); out.push(m); m.updateMatrixWorld(true);
     m.traverse(q => { if (/^Smoke_/.test(q.name)) { const w = q.getWorldPosition(new THREE.Vector3()); smokes.push(plume(THREE, group, tex, w, out)); } });
-    const site = yard(THREE, o, M, c, ry, c.route); group.add(site.g); out.push(site.g); if (site.drive) drives.push(site.drive); }
+    const site = yard(THREE, o, M, c, ry, c.route); group.add(site.g); out.push(site.g); if (site.drive) drives.push(site.drive);
+    if (o.extra) extras(THREE, o, G, c, ry, out, drives); }
   if (!out.length) return null;
   return { grid: G, list: out, at: pick.map(c => ({ x: Math.round(c.x), z: Math.round(c.z), under: !!c.route.under, road: Math.round(c.len), end: c.route[c.route.length - 1].map(Math.round) })),
     update(dt, night) { const t = performance.now() / 1000; for (const b of beacons) b.opacity = t % 1.6 < 0.35 ? 0.12 + 0.88 * night : 0.04 * night;   /* денем — едва */ for (const s of smokes) s(dt, night); for (const d of drives) d(dt); },
@@ -62,6 +63,39 @@ function blockGrid(THREE, o, P) {
     const mid = [X.x, gate[1]]; if (!clear(gate, mid, 0) || !clear(mid, A, 0)) return null; const tail = toRoad(Bp); if (!tail) return null;
     const rt = [gate, mid, A, ...tail]; rt.under = 3; return rt; };
   return { hard, road, route };
+}
+// 🏭 ind-zone2 (f6): около завода — индустриалната зона: старата фабрика (шахтова кула, ind-heritage) и изоставеното хале (ind-decay) от двете страни
+// на двора (където е свободно), жълтият кран на колела (crane-yellow) в предния ъгъл на площадката — бавно се върти, куката се вдига и спуска;
+// работници (worker-build / worker-hivis, Темидасофт): удрят с чук, носят, вървят между рампата и камиона. Нощем прозорците на фабриките светят.
+function extras(THREE, o, G, c, ry, out, drives) {
+  const E = o.extra, cs = Math.cos(ry), sn = Math.sin(ry), W = (u, v) => [c.x + u * cs + v * sn, c.z - u * sn + v * cs], H = FW / 2, U = H + YM + 4, g = new THREE.Group(); g.name = 'indZone'; o.group.add(g); out.push(g);
+  const freeRect = (x, z, w, d) => { for (let u = -w / 2; u <= w / 2; u += 4) for (let v = -d / 2; v <= d / 2; v += 4) { const px = x + u * cs + v * sn, pz = z - u * sn + v * cs; if (G.hard(px, pz) || G.road(px, pz)) return false; } return true; };
+  const conc = new THREE.MeshStandardMaterial({ color: 0x8f8d86, roughness: 0.95 });
+  const put = (key, w, d, side) => { const m = E.model(key); if (!m) return null; const u = side * (U + 6 + w / 2), [x, z] = W(u, 0); if (!freeRect(x, z, w + 8, d + 8)) return null;
+    const pad = new THREE.Mesh(new THREE.PlaneGeometry(w + 8, d + 8), conc); pad.rotation.set(-Math.PI / 2, 0, ry); pad.position.set(x, 0.05, z); pad.receiveShadow = true; g.add(pad);
+    m.position.set(x, 0, z); m.rotation.y = ry; g.add(m); m.userData.side = side; return m; };
+  put('ind-heritage', 62, 26, -1) || put('ind-heritage', 62, 26, 1); const dc = put('ind-decay', 36, 31, 1) || put('ind-decay', 36, 31, -1);
+  const cr = E.model('crane-yellow'); let slew = null, hook = null, h0 = 0;
+  const cside = dc ? dc.userData.side : 1, cu = cside * (U + 6 + (dc ? 36 + 8 : 0) + 14);   // кранът — до халето (на свободното), не върху камионите
+  if (cr && freeRect(...W(cu, 0), 24, 24)) { const [x, z] = W(cu, 0); const pad = new THREE.Mesh(new THREE.PlaneGeometry(24, 24), conc); pad.rotation.set(-Math.PI / 2, 0, ry); pad.position.set(x, 0.05, z); g.add(pad); cr.position.set(x, 0, z); cr.rotation.y = ry + Math.PI / 2; g.add(cr); slew = cr.getObjectByName('Slew'); hook = cr.getObjectByName('Hook'); if (hook) h0 = hook.position.y; }
+  const ws = [], ph = (c.x * 0.37) % 6.28;
+  // работниците — само на свободния асфалт: правоъгълниците (в рамката на двора) на всичко над 0,6 м в двора — камионите, будката, бариерата, оградата, лампите — +1,5 м;
+  // пътят на подвижния камион (u = gu) — също зает. Местата — най-близката свободна клетка (през 1 м) до желаното; носачът — свободна отсечка от 12 м
+  const yard = out.find(q => q.name === 'factoryYard' && !q.userData.used); if (yard) yard.userData.used = 1;
+  const R = [], inv = (x, z) => { const dx = x - c.x, dz = z - c.z; return [dx * cs - dz * sn, dx * sn + dz * cs]; };
+  if (yard) { yard.updateMatrixWorld(true); yard.traverse(m => { if (!m.isMesh || !m.geometry || m.geometry.type === 'PlaneGeometry') return; if (!m.geometry.boundingBox) m.geometry.computeBoundingBox(); const bb = m.geometry.boundingBox; let u0 = 1e9, u1 = -1e9, v0 = 1e9, v1 = -1e9, top = -1e9; const V = new THREE.Vector3();
+    for (const X of [bb.min.x, bb.max.x]) for (const Y of [bb.min.y, bb.max.y]) for (const Z of [bb.min.z, bb.max.z]) { V.set(X, Y, Z).applyMatrix4(m.matrixWorld); const [uu, vv] = inv(V.x, V.z); u0 = Math.min(u0, uu); u1 = Math.max(u1, uu); v0 = Math.min(v0, vv); v1 = Math.max(v1, vv); top = Math.max(top, V.y); }
+    if (top > 0.6 && u1 - u0 < 40 && v1 - v0 < 40) R.push([u0 - 1.5, u1 + 1.5, v0 - 1.5, v1 + 1.5]); }); }
+  const gu = -H * 0.35; R.push([gu - 4, gu + 4, H + 14, H + APR + 6]);   // пътят на подвижния камион
+  const okAt = (u, v) => u > -H + 1 && u < H * 0.25 && v > H + 1 && v < H + APR + 2 && !R.some(([a, b, p, q]) => u > a && u < b && v > p && v < q);
+  const spot = (u, v) => { for (let r = 0; r < 30; r++) for (let a = 0; a < (r ? 8 * r : 1); a++) { const t = a / (8 * r || 1) * Math.PI * 2, uu = u + Math.cos(t) * r, vv = v + Math.sin(t) * r; if (okAt(uu, vv)) return [uu, vv]; } return null; };
+  const path = (u, v) => { for (let r = 0; r < 30; r++) for (let a = 0; a < (r ? 8 * r : 1); a++) { const t = a / (8 * r || 1) * Math.PI * 2, uu = u + Math.cos(t) * r, vv = v + Math.sin(t) * r; let ok = true; for (let f = 0; f <= 12; f += 0.5) if (!okAt(uu, vv + f)) { ok = false; break; } if (ok) return [uu, vv]; } return null; };
+  const taken = []; for (const [k, u, v, clip, rot] of [['worker-build', -H + 6, H + 24, 'work', 0.6], ['worker-hivis', -H + 9, H + 27, 'idle', -2.2], ['worker-build', -H + 2, H + 18, 'carry', 0], ['worker-hivis', 0, H + 23, 'idle', 2.4]]) {
+    if (!E.worker) break; const p = clip === 'carry' ? path(u, v) : spot(u, v); if (!p) continue; R.push([p[0] - 1.2, p[0] + 1.2, p[1] - 1.2, p[1] + (clip === 'carry' ? 13.2 : 1.2)]);   // и един в друг — не
+    const w = E.worker(k, clip); if (!w) continue; const [x, z] = W(p[0], p[1]); w.obj.position.set(x, 0, z); w.obj.rotation.y = ry + rot; g.add(w.obj); ws.push({ ...w, x, z, u: p[0], v: p[1], clip, t: Math.random() * 10 }); taken.push(p.map(Math.round)); }
+  g.userData.workers = taken;
+  drives.push(dt => { const t = performance.now() / 1000; if (slew) slew.rotation.y = Math.sin(t * 0.07 + ph) * 0.9; if (hook) hook.position.y = h0 + (Math.sin(t * 0.21 + ph) * 0.5 + 0.5) * 6;
+    for (const w of ws) { w.mixer.update(dt); if (w.clip === 'carry') { w.t += dt; const s = (w.t * 0.72) % 24, f = s < 12 ? s : 24 - s;   /* по свободната отсечка (path) */ const [x, z] = W(w.u, w.v + f); w.obj.position.set(x, 0, z); w.obj.rotation.y = ry + (s < 12 ? Math.PI : 0);   /* моделите гледат към −z */ } } });
 }
 function mats(THREE, o) {
   const lamp = new THREE.MeshStandardMaterial({ color: 0x3a3a30, emissive: 0xffe0a0, emissiveIntensity: 0 }); lamp.userData.winK = 2.4; if (o.addWin) o.addWin(lamp);

@@ -25,7 +25,7 @@ export function createPassingTrains(deps) {
   let wait = 4 + Math.random() * 6;
   const count = () => lines.reduce((a, L) => a + L.list.length, 0);
 
-  let tvN = 0;   // trains-variety: номерът на влака — коя композиция
+  let tvN = 0, stopsDone = 0;   // stopsDone — колко влака са спрели на гарата (за проверка)   // trains-variety: номерът на влака — коя композиция
   function make(passenger, express) {
     const g = new THREE.Group();
     let n;
@@ -40,10 +40,10 @@ export function createPassingTrains(deps) {
     }
     if (TVAR && (passenger ? hasTrainModel('elLoco') : hasTrainModel('upLoco'))) {   // 🚆 trains-variety (T1): 4 пътнически и 3 товарни композиции — по реда (детерминистично)
       const n = tvN++, r = (k => () => (k = (k * 16807) % 2147483647) / 2147483647)(7919 * (n + 1)), pick = a => a[(r() * a.length) | 0], has = k => hasTrainModel(k);
-      if (passenger) { const v = n % 4, [loco, cars] = v === 0 ? ['elLoco', ['silverCar']] : v === 1 ? ['elLoco', ['nightCar']] : v === 2 ? ['steamLoco', ['paxCar', 'silverCar']] : ['paxLoco', ['paxCar', 'nightCar']];
+      if (passenger) { const v = n % 6, [loco, cars] = v === 0 ? ['elLoco', ['silverCar']] : v === 1 ? ['elLoco', ['nightCar']] : v === 2 ? ['steamLoco', ['paxCar', 'silverCar']] : v === 3 ? ['paxLoco', ['paxCar', 'nightCar']] : v === 4 ? ['gpLoco', ['silverCar', 'paxCar']] : ['steam2Loco', ['paxCar']];   /* +2 (28.10): дизел (GP) + сребристи/сини; парен №2 + сини (ретро) */
         g.add(trainCar(has(loco) ? loco : 'elLoco')); const C = cars.filter(has); for (let i = 0, k = 3 + (r() * 4 | 0); i < k; i++) g.add(trainCar(pick(C.length ? C : ['silverCar'])));
         return { g, len: lenOf() }; }
-      const v = n % 3, loco = v === 1 && has('vl82') ? 'vl82' : 'upLoco', W = (v === 0 ? ['cistern', 'cistern', 'gondola', 'timber', 'srrCar'] : v === 1 ? ['wmCoal', 'wmCoal', 'hopX', 'gondola', 'hopper2'] : ['autorack', 'autorack', 'flat', 'boxcar', 'srrCar', 'timber']).filter(has);
+      const v = n % 4, loco = v === 3 && has('gpLoco') ? 'gpLoco' : v === 1 && has('vl82') ? 'vl82' : 'upLoco',   /* v 3 (28.10): дизел (GP) с цистерни и платформи */ W = (v === 0 || v === 3 ? ['cistern', 'cistern', 'gondola', 'timber', 'srrCar'] : v === 1 ? ['wmCoal', 'wmCoal', 'hopX', 'gondola', 'hopper2'] : ['autorack', 'autorack', 'flat', 'boxcar', 'srrCar', 'timber']).filter(has);
       g.add(trainCar(loco)); if (v === 2 && r() < 0.5) g.add(trainCar('upLoco'));   // понякога — два локомотива
       for (let i = 0, k = 6 + (r() * 7 | 0); i < k; i++) g.add(trainCar(pick(W.length ? W : ['srrCar']), (r() * 99) | 0));
       return { g, len: lenOf() };
@@ -74,15 +74,15 @@ export function createPassingTrains(deps) {
 
   // нов влак на коловоз, на който последният вече е изминал достатъчно (за да не се застъпват)
   function spawn() {
-    const free = lines.filter(L => DEAD ? L.dir < 0 && !L.list.length : (() => { const last = L.list[L.list.length - 1]; return !last || Math.abs(last.z - (-L.dir * LEN)) > last.len + 90; })());
+    const free = lines.filter(L => DEAD ? L.dir < 0 && !L.list.length : !L.list.some(o => o.stopAt || o.dwell > 0) && (() => {   /* train-stops: докато на коловоза има спиращ влак — нов не тръгва (без опашки) */ const last = L.list[L.list.length - 1]; return !last || Math.abs(last.z - (-L.dir * LEN)) > last.len + 90; })());
     if (!free.length) return;
-    const L = free[(Math.random() * free.length) | 0], passenger = Math.random() < 0.45, express = passenger && deps.orient && deps.orient() && Math.random() < 0.3 ? 'oe' : passenger && Math.random() < 0.35;
+    const L = free[(Math.random() * free.length) | 0], passenger = Math.random() < (TVAR && !DEAD ? 0.6 : 0.45),   /* train-stops: повече пътнически — спиране на гарата на ~3–4 мин */ express = passenger && deps.orient && deps.orient() && Math.random() < 0.3 ? 'oe' : passenger && Math.random() < 0.35;
     const { g, len } = make(passenger, express);
     const z = -L.dir * LEN;
     placeCars(g, path, L.x, z, L.dir, CAR, 0.3);
     deps.scene.add(g);
     const speed = express === 'oe' ? 16 + Math.random() * 3 : express ? 34 + Math.random() * 6 : passenger ? 20 + Math.random() * 6 : 11 + Math.random() * 5;
-    L.list.push({ g, z, len, speed, v: speed });
+    L.list.push({ g, z, len, speed, v: speed, stopAt: !DEAD && TVAR && passenger && !express && Math.random() < 0.8 });   // 🚉 train-stops: ~80% (регионалните и междуградските; скоростните и „Ориент“ — не) от пътническите спират на гарата за 20 с
     if (deps.horn && Math.random() < 0.5) deps.horn();
   }
   // dt в секунди игрово време
@@ -96,8 +96,14 @@ export function createPassingTrains(deps) {
         let want = t.speed;
         if (t.back) want = t.speed * 0.7;
         else if (ahead) { const gap = (ahead.z - t.z) * L.dir - ahead.len; if (gap < 60) want = Math.min(want, ahead.v * (gap < 25 ? 0.8 : 1)); }
-        if (DEAD && !t.back) { const left = t.z - Math.max(ZN + 3, deps.stopZ ?? -1e9); want = Math.min(want, Math.max(0, Math.sqrt(2 * 0.6 * Math.max(0, left)))); if (left < 0.5 && t.v < 0.6) { t.v = 0; t.wait = (t.wait ?? 15) - dt; if (t.wait <= 0) { t.back = true; t.z += t.len; } } }   // rail-coast: спира пред буферите, после се връща
-        t.v += (want - t.v) * Math.min(1, dt * 1.5);
+        if (DEAD && !t.back) { const left = t.z - Math.max(ZN + 3, deps.stopZ ?? -1e9); if (!t.brakeSnd && left < 70 && t.v > 1 && deps.onBrake) { t.brakeSnd = 1; deps.onBrake(L.x, t.z); }   /* 🔊 спирането (sfx-batch2) */ want = Math.min(want, Math.max(0, Math.sqrt(2 * 0.6 * Math.max(0, left)))); if (left < 0.5 && t.v < 0.6) { t.v = 0; t.wait = (t.wait ?? 15) - dt; if (t.wait <= 0) { t.back = true; t.z += t.len; } } }   // rail-coast: спира пред буферите, после се връща
+        if (t.stopAt && !t.back) {   // 🚉 train-stops: спира с челото така, че средата на влака е при гарата; ако пред него на коловоза стои/е близо друг — минава без спиране
+          const zH = (deps.stCenter || 0) + L.dir * t.len / 2, left = (zH - t.z) * L.dir;
+          if (t.dwell == null && left < 400 && left > 0 && L.list.some(o => o !== t && (o.dwell > 0 || ((o.z - t.z) * L.dir > 0 && (o.z - t.z) * L.dir < 600)))) t.stopAt = false;
+          else if (t.dwell == null && left > -1) { if (left < 130 && t.v > 2 && deps.onBrake && !t.brakeSnd) { t.brakeSnd = 1; deps.onBrake(L.x, t.z); }
+            want = Math.min(want, Math.sqrt(2 * 0.75 * Math.max(0, left))); if (left < 0.6 && t.v < 0.5) { t.v = 0; t.dwell = 20; stopsDone++; } }
+          else if (t.dwell > 0) { t.dwell -= dt; want = 0; t.v = 0; if (t.dwell <= 0) { t.dwell = 0; t.stopAt = false; } } }
+        t.v += (want - t.v) * Math.min(1, dt * (t.dwell === 0 && !t.stopAt ? 0.25 : 1.5));   /* след спирката — плавно потегляне */
         const dir = t.back ? 1 : L.dir; t.z += dir * t.v * dt;
         placeCars(t.g, path, L.x, t.z, dir, CAR, 0.3);
       }
@@ -110,5 +116,5 @@ export function createPassingTrains(deps) {
   }
   // rail-crossings: всички влакове по линията — главата (z), дължината и скоростта със знака на посоката
   const trainsAt = () => lines.flatMap(L => L.list.map(t => ({ z: t.z, len: t.len, v: L.dir * t.v, x: L.x, ref: t })));
-  return { update, clear, trainsAt, get train() { const t = lines[0].list[0] || lines[1].list[0]; return t ? { z: t.z, v: t.v, stop: 0 } : null; }, count };
+  return { update, clear, trainsAt, get stops() { return { done: stopsDone, now: lines.flatMap(L => L.list).filter(t => t.dwell > 0).length, coming: lines.flatMap(L => L.list).filter(t => t.stopAt && t.dwell == null).length }; }, get train() { const t = lines[0].list[0] || lines[1].list[0]; return t ? { z: t.z, v: t.v, stop: 0 } : null; }, count };
 }

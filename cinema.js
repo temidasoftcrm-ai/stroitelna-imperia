@@ -574,6 +574,7 @@ export function createCinema(deps) {
       const pb = e.target.closest('[data-cplay]'); if (pb) { play(pb.dataset.cplay, true); }
     });
     el.addEventListener('change', e => { const k = e.target.dataset.cset; if (!k) return; set[k] = e.target.checked; saveSet(); });
+    try { deps.albumExtra?.(el.querySelector('.grid')); } catch (e) { console.warn('albumExtra', e); }   // politics-intro: картичката на Част 2 (polintro.js)
     document.body.appendChild(el);
   }
 

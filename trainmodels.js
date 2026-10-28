@@ -105,7 +105,7 @@ export function loadTrainModels(base = 'assets/heavy/trains/') {
 // вагон SRR, въглищен (Western Maryland; „NY Central“ е без текстура — не се ползва), изоставен бункер. Ширина W, дължина — истинска (разтягане по z). Процедурни: цистерна,
 // платформа с трупи, автовоз, отворен вагон. Нощем прозорците на пътническите светят (тъмното по страните, средната височина).
 const TV = feature('trains-variety');
-const MV = { silverCar: ['m-silver', 22], nightCar: ['m-night', 22], elLoco: ['m-elloco', 18], steamLoco: ['m-steam', 22], upLoco: ['m-up', 20], srrCar: ['m-srr', 15], wmCoal: ['m-wm', 13], hopX: ['m-hopx', 12] };
+const MV = { silverCar: ['m-silver', 22], nightCar: ['m-night', 22], elLoco: ['m-elloco', 18], steamLoco: ['m-steam', 22], upLoco: ['m-up', 20], gpLoco: ['m-gp', 16], steam2Loco: ['m-steam2', 19],   /* +2 (28.10): дизел-електрически (GP) и парен с тендер */ srrCar: ['m-srr', 15], wmCoal: ['m-wm', 13], hopX: ['m-hopx', 12] };
 function stretchTo(g, L) { const k = L / (g.userData.len || L); g.children[0].scale.z *= k; g.children[0].position.z *= k; g.userData.len = L; return g; }
 function winNight(obj) {   // прозорците — по тъмните пиксели на текстурата по страните, в средната лента по височина
   obj.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(obj);
@@ -147,7 +147,7 @@ export function trainCar(kind, seed = 0) {
     o.traverse(m => { if (m.isMesh && /red/i.test(m.material.name)) { m.material = m.material.clone(); m.material.color.setHex(col); } });
   }
   if (kind === 'paxLoco' || kind === 'vl82') addHeadlights(o, src.userData.len);
-  else if (kind === 'elLoco' || kind === 'steamLoco' || kind === 'upLoco') addHeadlights(o, src.userData.len, { s: 0.38, y: kind === 'steamLoco' ? 2.6 : 1.7, x: 0.62, beamW: 3, beamL: 12 });   // trains-variety: малки светлини и мек конус
+  else if (kind === 'elLoco' || kind === 'steamLoco' || kind === 'upLoco' || kind === 'gpLoco' || kind === 'steam2Loco') addHeadlights(o, src.userData.len, { s: 0.38, y: kind === 'steamLoco' || kind === 'steam2Loco' ? 2.6 : 1.7, x: 0.62, beamW: 3, beamL: 12 });   // trains-variety: малки светлини и мек конус
   if (kind === 'cistern') { const col = TINTS[Math.abs(seed) % TINTS.length]; o.traverse(m => { if (m.isMesh && m.userData.tint !== undefined || (m.isMesh && m.material && m.material.color && m.material.color.getHex() === 0xffffff)) { m.material = m.material.clone(); m.material.color.setHex(col); } }); }   // trains-variety: цистерни в различни цветове
   o.userData.len = src.userData.len;
   return o;

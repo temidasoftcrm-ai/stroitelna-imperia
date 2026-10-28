@@ -4,6 +4,7 @@
 //             по една детска площадка ИЛИ рамка за тупане на килими на парцел, липи (~1 обект на 150 м²);
 //   'west'  — къщите (предградията): жив плет отпред, 1–2 дървета, пощенска кутия до алеята;
 //   'old'   — старите европейски центрове (сградите, не къщите): павиран вътрешен двор зад сградата, 2 дървета, пейка, сандъчета с цветя.
+//   'plaza' — (само клетки, block-deco-osm) площадчетата между небостъргачите: павета, дървета в сандъци, пейки, кошчета, лампи.
 // Един InstancedMesh на вид за целия град (~12 рисувания), разположението — по хеша на парцела (едно и също при всяко зареждане).
 //   buildBlockDeco(items, { trees, half, lamps, night }) → THREE.Group;  items: [{ l, style, x, z, rot, w, d, b: { t0, t1, u0, u1 }, uc }]
 //   (рамката на парцела: t — към улицата, u — встрани; b — правоъгълникът на сградата в нея, uc — средата на входната алея)
@@ -88,6 +89,9 @@ export function buildBlockDeco(items, opts = {}) {
       if (c.int && h < 0.55) quads.pave.push([[c.x - 2, c.z - 2], [c.x + 2, c.z - 2], [c.x + 2, c.z + 2], [c.x - 2, c.z + 2]]);
       if (h < 0.05) W2(c, 'tree', a, 7 + h2 * 2); else if (h < 0.075) W2(c, 'bench', a); else if (h < 0.1) W2(c, 'planter', a);
     } else if (c.style === 'west') { if (h < 0.07) W2(c, 'tree', a, 7 + h2 * 3); }
+    else if (c.style === 'plaza') {   // block-deco-osm (T3): площадчетата между небостъргачите (Ню Йорк) — павета, дървета в сандъци, пейки, лампи
+      if (c.int && h < 0.7) quads.pave.push([[c.x - 2, c.z - 2], [c.x + 2, c.z - 2], [c.x + 2, c.z + 2], [c.x - 2, c.z + 2]]);
+      if (h < 0.04) { W2(c, 'planter', a, 1.4); W2(c, 'tree', a, 6 + h2 * 2); } else if (h < 0.075) W2(c, 'bench', a); else if (h < 0.09) W2(c, 'bin', a); else if (h < 0.1 && lamps) W2(c, 'lamp'); }
   }
   // пътеките по моравите (желаните пътеки зад панелните блокове): лента 1,8 м, пейка + кошче (+ лампа) на 25–30 м отстрани
   for (const pa of paths) { const [ax, az] = pa.a, [bx, bz] = pa.b, len = Math.hypot(bx - ax, bz - az), ux = (bx - ax) / len, uz = (bz - az) / len, nx = -uz * 0.9, nz = ux * 0.9;
@@ -117,10 +121,10 @@ export function buildBlockDeco(items, opts = {}) {
     const vars = trees.map(src => { src.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(src), h = (bb.max.y - bb.min.y) || 1, parts = [];
       src.traverse(o => { if (o.isMesh) { const g = o.geometry.clone().applyMatrix4(o.matrixWorld); g.translate(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2); g.scale(1 / h, 1 / h, 1 / h); parts.push([g, o.material]); } }); return parts; }).filter(p => p.length);
     const by = vars.map(() => []); L.tree.forEach((t, i) => by[i % vars.length].push(t));
-    vars.forEach((parts, vi) => { const LL = by[vi]; if (!LL.length) return; for (const [g, mat] of parts) { const tt = mat && mat.userData && mat.userData.ttInst;
+    vars.forEach((parts, vi) => { const LL = by[vi]; if (!LL.length) return; for (const [g, mat] of parts) { const tt = mat && mat.__tt && mat.__tt.inst;
       if (tt) g.setAttribute('aSeed', new THREE.InstancedBufferAttribute(Float32Array.from(LL, e => hash(Math.round(e[0] * 13 + e[1] * 7) | 0)), 1));
-      const I = inst(g, tt ? mat.userData.ttInst() : mat, LL, e => { v.set(e[0], 0, e[1]); q.setFromAxisAngle(up, e[2]); sc.set(e[3], e[3], e[3]); });
-      if (I && tt) I.customDepthMaterial = I.material.userData.depth; } });
+      const I = inst(g, tt ? mat.__tt.inst() : mat, LL, e => { v.set(e[0], 0, e[1]); q.setFromAxisAngle(up, e[2]); sc.set(e[3], e[3], e[3]); });
+      if (I && tt) I.customDepthMaterial = I.material.__tt.depth; } });
   }
   // пътеките и павираните дворове — по един меш (квадрите на парцелите)
   for (const [k, col, y] of [['path', 0xc9bfa8, 0.05], ['pave', 0xb4ab9c, 0.045]]) { const Q = quads[k]; if (!Q.length) continue; const pos = [], idx = [];

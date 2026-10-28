@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Истинските релси</title>
+<style>
+  body { margin:0; background:#14161b; color:#e8e8ea; font:14px/1.45 system-ui,sans-serif; overflow:hidden; }
+  #hud { position:absolute; left:12px; top:12px; background:rgba(20,22,27,.88); padding:10px 14px; border-radius:10px; max-width:520px; }
+  h1 { font-size:17px; margin:0 0 4px; } p { margin:0 0 6px; color:#9aa0aa; font-size:13px; }
+  .lbl { position:absolute; transform:translate(-50%,-100%); background:rgba(20,22,27,.82); padding:2px 7px; border-radius:6px; font-size:12px; white-space:nowrap; pointer-events:none; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script></head><body>
+<div id="hud"><h1>🛤️ Релсите — детските срещу истинските</h1>
+<p>Отляво — сегашният коловоз (Kenney). Отдясно — истинският (Sketchfab, CC BY): стоманени релси, бетонни траверси, чакълена основа; 3 м широк, парчетата по 4 м, както в играта (InstancedMesh). Отгоре — истинските влакове; човек 1,75 м за мащаба. Влачи с мишката.</p></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { loadTrainModels, trainCar } from '../trainmodels.js';
+import { scaleFor } from '../scale.js';
+const R = new THREE.WebGLRenderer({ antialias: true }); R.setSize(innerWidth, innerHeight); R.setPixelRatio(Math.min(2, devicePixelRatio)); R.outputColorSpace = THREE.SRGBColorSpace; R.shadowMap.enabled = true; document.body.appendChild(R.domElement);
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0xc9dcec); sc.add(new THREE.HemisphereLight(0xffffff, 0x667788, 1.5));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(30, 40, 20); sun.castShadow = true; Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60 }); sun.shadow.mapSize.set(2048, 2048); sc.add(sun);
+const gnd = new THREE.Mesh(new THREE.PlaneGeometry(200, 200).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x86a064 })); gnd.receiveShadow = true; sc.add(gnd);
+const cam = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.3, 600); cam.position.set(12, 9, 26); const ctl = new OrbitControls(cam, R.domElement); ctl.target.set(0, 1, 0); ctl.update();
+const L = new GLTFLoader(), labels = [];
+// като в играта: deps.instanced('track', mats) — парче през 4 м, мащаб 4
+function track(src, x) { const parts = []; src.updateMatrixWorld(true); src.traverse(m => { if (m.isMesh) parts.push(m); });
+  const mats = []; for (let z = -60; z <= 60; z += 4) mats.push(new THREE.Matrix4().compose(new THREE.Vector3(x, 0, z), new THREE.Quaternion(), new THREE.Vector3(4, 4, 4)));
+  for (const m of parts) { const im = new THREE.InstancedMesh(m.geometry, m.material, mats.length), t = new THREE.Matrix4(); mats.forEach((M, i) => im.setMatrixAt(i, t.multiplyMatrices(M, m.matrixWorld))); im.receiveShadow = true; sc.add(im); } }
+const kid = await L.loadAsync('../assets/trains/track.glb'), real = await L.loadAsync('../assets/heavy/rail/track-tile.glb');
+track(kid.scene, -4); track(real.scene, 4);
+await loadTrainModels('../assets/heavy/trains/');
+for (const [x, k] of [[-4, 'loco'], [4, 'loco']]) { const c = trainCar(k); if (!c) continue; const w = new THREE.Group(); w.add(c); w.position.set(x, 0.23, -2);   /* предницата е към +z (по коловоза) */ sc.add(w); w.traverse(m => { if (m.isMesh) m.castShadow = true; }); }
+const ped = await L.loadAsync('../assets/heavy/people/peds/ped-adam.glb').then(g => g.scene).catch(() => null);
+if (ped) { ped.scale.setScalar(scaleFor('ped-adam', ped)); const b = new THREE.Box3().setFromObject(ped); ped.position.set(0, -b.min.y, 8); sc.add(ped); }
+for (const [x, t] of [[-4, 'детските (Kenney)'], [4, 'истинските']]) { const d = document.createElement('div'); d.className = 'lbl'; d.textContent = t; document.body.appendChild(d); labels.push([d, new THREE.Vector3(x, 0.5, 14)]); }
+const P = new THREE.Vector3();
+R.setAnimationLoop(() => { ctl.update(); R.render(sc, cam); for (const [d, p] of labels) { P.copy(p).project(cam); d.style.left = (P.x * 0.5 + 0.5) * innerWidth + 'px'; d.style.top = (-P.y * 0.5 + 0.5) * innerHeight + 'px'; } });
+addEventListener('resize', () => { R.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); });
+window.__ready = true; window.__cam = (x, y, z, tx, ty, tz) => { cam.position.set(x, y, z); ctl.target.set(tx, ty, tz); ctl.update(); };
+</script></body></html>

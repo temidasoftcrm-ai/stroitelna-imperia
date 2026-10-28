@@ -36,10 +36,10 @@
  "🤝 партньорът е напред": "🤝 your partner is ahead",
  "{0} (ниво {1})": "{0} (level {1})",
  "🏢 Фирма {0}": "🏢 Company {0}",
+ "Ниво на развитие на фирмата: {0} (по най-развития град — оттам идват отключванията)": "Company development level: {0} (based on your most developed city — that's where unlocks come from)",
+ "{0}: ниво {1}": "{0}: level {1}",
  "този град": "this city",
- "· {0}: ниво {1}": "· {0}: level {1}",
- "· към ниво {0}: {1}%{2}": "· to level {0}: {1}%{2}",
- "Ниво на развитие на фирмата: {0} (по най-развития град — оттам идват отключванията){1}{2}": "Company development level: {0} (based on your most developed city — that's where unlocks come from){1}{2}",
+ "към ниво {0}: {1}%": "to level {0}: {1}%",
  "✅ изпълнено": "✅ complete",
  "{0}% от условията": "{0}% of the requirements",
  "{0}% · остават {1} XP": "{0}% · {1} XP left",
@@ -60,5 +60,10 @@
  "Всеки твой град се развива отделно. Отключванията (градове, линии, Балканите, Европа, борса) идват от най-развития ти град; специалистите — от нивото на текущия град.": "Each of your cities develops separately. Unlocks (cities, lines, the Balkans, Europe, stock exchange) come from your most developed city; specialists — from the level of the current city.",
  "{0}Опит{1}:": "{0}Experience{1}:",
  "XP: къща {0}, магазин {1}, офис {2}, небостъргач {3}, {4}.": "XP: house {0}, shop {1}, office {2}, skyscraper {3}, {4}.",
- "Затвори": "Close"
+ "Затвори": "Close",
+ "_stale": {
+  "· {0}: ниво {1}": "· {0}: level {1}",
+  "· към ниво {0}: {1}%{2}": "· to level {0}: {1}%{2}",
+  "Ниво на развитие на фирмата: {0} (по най-развития град — оттам идват отключванията){1}{2}": "Company development level: {0} (based on your most developed city — that's where unlocks come from){1}{2}"
+ }
 }

@@ -3,6 +3,7 @@
 // Отключвания: ниво 5 (+ Балканите) — оферти от доставчици; ниво 8 — стокова борса.
 // Записът е в S.dev = { xp, lv }. deps: S(), toast, sound, save, pop(key, cap, sub), balkansOpen()
 import { feature } from './lab/feature.js';
+import { t as tr } from './i18n.js';
 import { showLevel, LV_PICS } from './lvshow.js';
 import { IMP_UNLOCKS } from './imperial.js';   // нивата 21–25 идват от Империал Сити (не от опит)   // ново ниво — картинка на черен екран (feature 'lv-pics')
 // xp-thresh2 (f6, одит 25.10): нивата 9–15 — ~60–120 реални минути на ниво при 1× (с xp-taper); праговете само се вдигат, нивата в записите не падат
@@ -207,7 +208,7 @@ export function createDevLevel(deps) {
     const cityTag = CITY_BAR && (FSUM || bst > d.lv) ? `<span style="font-size:11px;opacity:.9" title="Опитът от строежите отива в града, в който си">🏙️ ${deps.cityName ? deps.cityName() : 'градът'} ${d.lv} · ${Math.round(cityK(d) * 100)}%</span>` : '';   // xp-city-bar
     if (FSUM) firmCheck();   // и опитът, дошъл направо в други градове
     btn.innerHTML = `🏢 Фирма ${bst}<span class="dbar"><i style="width:${(k * 100).toFixed(0)}%"></i></span>${cityTag}${waiting() ? `<span style="font-size:11px;opacity:.85">⏳ чакаш партньора (ниво ${bst})</span>` : partnerAhead() ? `<span style="font-size:11px;opacity:.85">${partnerAhead() > rawBest() + 2 ? '⏳ партньорът те чака' : '🤝 партньорът е напред'} (ниво ${partnerAhead()})</span>` : ''}`;
-    btn.title = `Ниво на развитие на фирмата: ${bst} (по най-развития град — оттам идват отключванията)${bst > d.lv ? ` · ${deps.cityName ? deps.cityName() : 'този град'}: ниво ${d.lv}` : ''}${nx != null ? ` · към ниво ${bst + 1}: ${Math.round(nx * 100)}%${deps.impNeed ? ` — ${deps.impNeed(bst + 1)}` : ''}` : ''}`;
+    btn.title = tr('Ниво на развитие на фирмата: {0} (по най-развития град — оттам идват отключванията)', [bst]) + (bst > d.lv ? ' · ' + tr('{0}: ниво {1}', [deps.cityName ? deps.cityName() : tr('този град'), d.lv]) : '') + (nx != null ? ' · ' + tr('към ниво {0}: {1}%', [bst + 1, Math.round(nx * 100)]) + (deps.impNeed ? ' — ' + tr(deps.impNeed(bst + 1)) : '') : '');
   }
   const firmXP = () => { const S = deps.S(), d = st(); return Math.max(d ? d.xp : 0, ...Object.values(S?.cities || {}).map(c => c.dev?.xp || 0)) + (S?.holding ? S.hxp || 0 : 0); };
   function prog(n) {

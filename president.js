@@ -5,6 +5,7 @@
 // Помощта е проект: финансиране → доставка → строеж → местен персонал и издръжка. Мирът е поредица стъпки, които другите могат да откажат, и после трябва да се поддържа.
 // Записът: S.pres = { cc, start, res, ind, prom, progs, rel, stab, deals, coal, aid, conf, met, streak, held, crisis, crisisDone, world, lv, cab, skip, seq, log }.
 import { POL, NEED, AID, AID_STAGES, CONFLICTS, PEACE, baseRel, mapSvg } from './worldpol.js';
+import { t as tr } from './i18n.js';
 
 const IND = { econ: ['📈', 'Икономика'], services: ['🏥', 'Обществени услуги'], energy: ['⚡', 'Енергия'], security: ['🛡️', 'Сигурност'], trust: ['🤝', 'Доверие на гражданите'] };
 const REV = { US: 4e11, RU: 1e11 };   // приход на държавата на месец
@@ -18,6 +19,7 @@ const DOM = [
   { k: 'ports', dir: 'sea', ico: '⚓', nm: 'Модернизация на пристанищата и износа', c: 0.8, days: 180, eff: { econ: 6 } },
   { k: 'air', dir: 'air', ico: '✈️', nm: 'Летища и споразумения „Открито небе“', c: 0.6, days: 150, eff: { econ: 4, rel: 2 } },
   { k: 'grid', dir: 'energy', ico: '⚡', nm: 'Нови централи и енергийна мрежа', c: 1.5, days: 360, eff: { energy: 13, econ: 2 } },
+  { k: 'eff', dir: 'energy', ico: '💡', nm: 'Енергийна ефективност и соларни покриви', c: 0.7, days: 150, eff: { energy: 8, econ: 1 } },
   { k: 'def', dir: 'def', ico: '🛡️', nm: 'Готовност, гранична охрана и киберзащита', c: 1.0, days: 200, eff: { security: 11 } },
   { k: 'tax', dir: 'fin', ico: '💰', nm: 'По-ниски данъци за средната класа', c: 0, days: 30, eff: { trust: 7, econ: 2 }, rev: -0.04 },
   { k: 'audit', dir: 'fin', ico: '🧾', nm: 'Одит и борба с разхищенията', c: 0.2, days: 90, eff: { trust: 3 }, rev: 0.03 },
@@ -80,6 +82,16 @@ const DISASTERS = [
   { k: 'flood', ico: '🌊', nm: 'Катастрофални наводнения', iso: ['PAK', 'IND', 'NGA', 'BRA'] },
   { k: 'storm', ico: '🌀', nm: 'Ураган от най-висока категория', iso: ['HTI', 'MEX', 'VEN'] },
 ];
+const STABLE_DAYS = 60, WORLD_DAYS = 180, WORLD_DIP = 10;   // ниво 28: стабилна държава толкова дни; ниво 35: световният мир; допустим кратък спад
+// стабилна държава: средното на 5-те показателя ≥ 55, нито един под 45, резерв ≥ 0 — връща причината, ако не е
+const stableWhy = s => { const v = Object.entries(s.ind), avg = v.reduce((a, [, x]) => a + x, 0) / v.length, low = v.filter(([, x]) => x < 45).map(([k]) => k);
+  return low.length ? { k: 'low', ind: low } : avg < 55 ? { k: 'avg', avg: Math.round(avg) } : s.res < 0 ? { k: 'res' } : null; };
+const BROKEN_DAYS = 180;
+// 🗳️ мандатът и вотът на недоверие: 4 години (1440 дни), най-много 2 мандата; доверие под 20 за 60 поредни дни → вот (30 дни да го вдигнеш над 30)
+const TERM = 1440, MAX_TERMS = 2, REEL_MAX = 150, NC_LOW = 20, NC_WARN = 30, NC_START = 60, NC_DAYS = 30, NC_OK = 30;
+// мерките срещу вота: [действие, министър, икона, текст, цена (× свободните за месец), +доверие]
+const NC_ACTS = [['speech', 'pm', '🎤', 'Десислава: обръщение към нацията и среща с опозицията.', 0, 5], ['reshuffle', 'pm', '🔄', 'Десислава: смяна на двама министри и нов план за 100 дни.', 0.3, 8],
+  ['relief', 'fin', '💶', 'Борис: пакет срещу поскъпването — помощ за семействата.', 1, 12], ['audit', 'fin', '🧾', 'Борис: публичен одит на всички държавни разходи.', 0.2, 5]];   // нарушеното обещание (пропусната вноска) тежи −8 точки в преговорите толкова дни
 const NAMES = { fin: 'Борис', reg: 'Георги', def: 'Ивайло', roads: 'Надя', rail: 'Мария', sea: 'Стефан', air: 'Елена', energy: 'Вера', pm: 'Десислава' };
 
 // deps: { S, fmt, toast, save, sound, pop(key, title, text), brand() → име, brandCol }
@@ -101,7 +113,7 @@ export function createPresidency(deps) {
   function start(cc) {
     const S = deps.S(); if (S.pres) return;
     S.pres = { cc, start: day(), res: REV[cc] * FREE_K * 3, ind: { econ: 55, services: 50, energy: cc === 'RU' ? 60 : 52, security: 56, trust: 64 },
-      prom: PROMISES[cc].map(k => ({ k, done: false })), progs: [], rel: {}, stab: {}, deals: {}, coal: {}, aid: [], conf: {}, met: {}, streak: 0, world: 0, lv: 26, cab: 0, skip: {}, seq: 0, log: [] };
+      prom: PROMISES[cc].map(k => ({ k, done: false })), progs: [], rel: {}, stab: {}, deals: {}, coal: {}, aid: [], conf: {}, met: {}, streak: 0, world: 0, lv: Math.max(26, Math.min(35, S.presBest || 0)), term: 1, termStart: day(), lowT: 0, finale: (S.presBest || 0) >= 35 ? day() : undefined, cab: 0, skip: {}, seq: 0, log: [] };
     for (const c of CONFLICTS) S.pres.conf[c.k] = { step: 0, stab: 0, int: c.int, wait: 0, held: 0 };
     S.pres.hz = { st: 'calm', ship: 100, res: 100, talk: 0 }; S.pres.tr = {};
     log('Встъпване в длъжност. Кабинетът е съставен.'); deps.save();
@@ -111,6 +123,8 @@ export function createPresidency(deps) {
   function proposals() {
     const s = st(); if (!s) return []; const out = [], F = free(), d = day(), skip = id => (s.skip[id] || 0) > d;
     const P = p => { if (!skip(p.id.split(':').slice(0, 2).join(':'))) out.push(p); };
+    // 🗳️ вотът на недоверие — мерките за доверието (извънредни)
+    if (s.nc) for (const [act, dir, ico, text, c, g] of NC_ACTS) if (!s.nc.acts[act]) P({ id: `${dir}:nc-${act}:1`, dir, ico, text, why: `вот на недоверие след ${Math.max(0, s.nc.until - d)} дни — доверието трябва да е над ${NC_OK}`, cost: Math.round(F * c), days: 1, gainTxt: `+${g} доверие`, gain: g, kind: 'nc', act, emergency: true });
     // 🌊 Ормузкият проток — извънредните решения са първи
     const hz = s.hz || {}; if (hz.st && hz.st !== 'calm' && hz.st !== 'safe' || hz.inc) {
       const HZ = (k, dir, ico, text, why, cost, days, gain, x = {}) => P({ id: `${dir}:hz-${k}:1`, dir, ico, text, why, cost: Math.round(cost), days, gainTxt: gain, kind: 'hz', act: k, emergency: true, geo: { country: 'IRN', kind: 'route', cities: [{ nm: 'Ормузкият проток', lat: 26.6, lon: 56.3 }, { nm: 'Рияд', lat: 24.71, lon: 46.68 }] }, ...x });
@@ -153,8 +167,8 @@ export function createPresidency(deps) {
     for (const a of s.aid.filter(x => x.wait)) { const [dir, ico, text, why, c] = WAIT[a.wait];
       P({ id: `${dir}:aidfix-${a.id}-${a.wait}:1`, dir, ico, text: `${text} (${nm(a.iso)} · ${AID[a.need].nm})`, why, cost: Math.round(a.wait === 'upkeep' ? a.up * 2 : AID[a.need].cost * K() * c), days: a.wait === 'staff' ? 45 : 20, gainTxt: a.wait === 'upkeep' ? 'проектът работи отново' : 'проектът продължава', kind: 'aidfix', aid: a.id, emergency: a.wait === 'upkeep', iso: a.iso, geo: geoOf(a.iso) }); }
     // 🕊️ мирът: следващата стъпка за всеки конфликт
-    for (const c of CONFLICTS) { const k = conf(c.k); if (k.step >= 2 && k.step !== 3 && k.step < 5 && !(k.wait > d)) { const party = c.parties.includes(me());
-        P({ id: `pm:pkg-${c.k}-${k.step}:1`, dir: party ? 'def' : 'pm', ico: '📝', text: `${NAMES[party ? 'def' : 'pm']}: ${c.nm} — страните са готови да чуят ${k.step >= 4 ? 'пакет за широко споразумение' : 'мирен пакет'}. Да го съставим заедно?`, why: 'незабавни действия, задължения, проверка, гаранции, възстановяване и следващи преговори — всяка страна претегля различно', cost: 0, days: 30, gainTxt: k.step >= 4 ? '📃 широко споразумение' : '🕊️ прекратяване на огъня', kind: 'pkgHint', ck: c.k, geo: geoOf(c.region) }); continue; }
+    for (const c of CONFLICTS) { const k = conf(c.k); if (k.step >= 2 && k.step < 5 && !(k.wait > d)) { const party = c.parties.includes(me());
+        P({ id: `pm:pkg-${c.k}-${k.step}:1`, dir: party ? 'def' : 'pm', ico: '📝', text: `${NAMES[party ? 'def' : 'pm']}: ${c.nm} — страните са готови да чуят ${k.step >= 4 ? 'пакет за широко споразумение' : 'мирен пакет'}. Да го съставим заедно?`, why: 'незабавни действия, задължения, проверка, гаранции, възстановяване и следващи преговори — всяка страна претегля различно', cost: 0, days: 30, gainTxt: k.step >= 4 ? '📃 широко споразумение' : k.step === 3 ? '🔍 наблюдение и проверка' : '🕊️ прекратяване на огъня', kind: 'pkgHint', ck: c.k, geo: geoOf(c.region) }); continue; }
       if (k.step >= 2) continue; }
     for (const c of CONFLICTS) { const k = conf(c.k); if (k.step >= 2 || k.wait > d) continue; const st6 = PEACE[k.step], party = c.parties.includes(me());
       const dir = party ? 'def' : 'pm', p = Math.round(chance(c) * 100);   // преговорите — дипломатическият екип на Десислава
@@ -187,10 +201,10 @@ export function createPresidency(deps) {
     const score = PKG.reduce((a, P0) => a + (pr.w[P0.k] || 1) * (pkg[P0.k] || 0) * 2, 0) + (trust(iso) - 50) / 3 + (rel(iso) - 50) / 6 + coal * 1.5 - k.int / 10 - (k.broken ? 8 : 0);
     const why = []; for (const [part, bad, txt] of pr.red) if ((pkg[part] || 0) === bad) why.push(txt);
     if ((pkg.gua || 0) === 2 && coal < 3) why.push('Липсва подкрепа от партньор — коалицията е твърде малка за такива гаранции');
-    if (k.broken) why.push('Нарушено предишно обещание');
     if (k.step >= 4 && ((pkg.gua || 0) < 1 || (pkg.next || 0) < 1)) why.push('Широкото споразумение иска механизъм при нарушения и график за преговорите');
     const ok = !why.length && score >= pr.need ? 'yes' : score >= pr.need - 10 && why.length <= 1 ? 'counter' : 'no';
-    return { ok, score: Math.round(score), need: pr.need, why, pr };
+    const note = k.broken ? tr('Нарушено предишно обещание (−8 точки, изтича след {0} дни)', [Math.max(0, BROKEN_DAYS - (day() - (k.brokenAt ?? day())))]) : '';   /* само наказание в точките, не червена линия */
+    return { ok, score: Math.round(score), need: pr.need, why, pr, note };
   }
   // ↩ насрещното предложение на страната: най-малките конкретни промени, с които би приела (без да минава червените линии на другите)
   function counterOf(ck, iso, pkg) {
@@ -209,7 +223,7 @@ export function createPresidency(deps) {
   function evalPkg(ck, pkg) {
     const c = CONFLICTS.find(x => x.k === ck), parties = c.parties.filter(i => i !== me()), resp = [];
     for (const iso of parties) { const J = judge(ck, iso, pkg), co = J.ok === 'yes' ? null : counterOf(ck, iso, pkg);
-      resp.push({ iso, ok: J.ok === 'no' && co ? 'counter' : J.ok, score: J.score, need: J.need, why: J.why.length ? J.why : J.ok === 'yes' ? ['пакетът отговаря на интересите им'] : co ? ['искат промени'] : ['и с най-силния пакет не стига — нужни са повече доверие към теб, по-добри отношения или по-голяма коалиция'], counter: co }); }
+      resp.push({ iso, ok: J.ok === 'no' && co ? 'counter' : J.ok, score: J.score, need: J.need, why: (J.why.length ? J.why : J.ok === 'yes' ? ['пакетът отговаря на интересите им'] : co ? ['искат промени'] : ['и с най-силния пакет не стига — нужни са повече доверие към теб, по-добри отношения или по-голяма коалиция']).concat(J.note ? [J.note] : []), counter: co }); }
     // общото насрещно: исканията на всички страни заедно (по-силното от двете), ако така приемат всички
     let merged = null; if (resp.some(r => r.counter)) { const m = { ...pkg }; for (const r of resp) if (r.counter) for (const P0 of PKG) m[P0.k] = Math.max(m[P0.k] || 0, r.counter.pkg[P0.k] || 0);
       if (parties.every(iso => judge(ck, iso, m).ok === 'yes')) merged = { pkg: m, cost: pkgCost(m) }; }
@@ -235,7 +249,7 @@ export function createPresidency(deps) {
     const s = st(); if (!s) return null; id = String(id).replace(/\|small$/, ''); const p = proposals().find(q => q.id === id); if (!p) return null; const key = id.split(':').slice(0, 2).join(':'), d = day();
     if (a === 'no' || a === 'later') { s.skip[key] = d + (a === 'no' ? 90 : 30); if (a === 'no' && p.kind === 'aid') { s.stab[p.iso] = cl(stab(p.iso) - 3); log(`Отказана помощ за ${nm(p.iso)} — изпусната възможност.`); } deps.save(); return null; }
     const small = a === 'small' && p.small, cost = small ? p.small.cost : p.cost || 0;
-    const urgent = p.emergency || ['ev', 'crisis', 'hold', 'aidfix', 'hz'].includes(p.kind);
+    const urgent = p.emergency || ['ev', 'crisis', 'hold', 'aidfix', 'hz', 'nc'].includes(p.kind);
     if (cost > s.res + (urgent ? free() : 0)) { deps.toast(`💰 Борис: в резерва има ${B(s.res)} — ${urgent ? 'дори с извънредно финансиране не стига' : `програмата струва ${B(cost)}. Да започнем по-малък етап или да изчакаме`}.`, 'bad'); return null; }
     if (cost > s.res) { s.ind.trust = cl(s.ind.trust - 2); log('Извънредно финансиране (дълг).'); }
     s.res -= cost; s.skip[key] = d + 30; if (!s.cab) s.cab = d;
@@ -275,6 +289,7 @@ export function createPresidency(deps) {
         else { hz.st = 'safe'; hz.agree = d; hz.inc = 0; s.tr.IRN = cl(trust('IRN') + 8); for (const i of HZ_PARTNERS) s.rel[i] = cl(rel(i) + 3); deps.pop && deps.pop('empire', '🌊 Ормузкият проток е отворен', 'Споразумението за безопасно корабоплаване е прието. Наблюдението и механизмът срещу инциденти пазят преминаването.'); log('Ормуз: споразумение — протокът е отворен.'); oilShock(false); } }
       else if (p.act === 'div') { hz.div = { prog: 0, days: small ? 360 : 240 }; log('Енергийна диверсификация.'); }
       else if (p.act === 'inc') { hz.inc = 0; hz.esc = Math.max(hz.esc || 0, d + 90); log('Инцидентът в протока е овладян.'); } }
+    else if (p.kind === 'nc') { if (s.nc) { s.nc.acts[p.act] = d; s.ind.trust = cl(s.ind.trust + p.gain); log(`Вот на недоверие: ${p.text.replace(/^\p{Lu}\p{Ll}+: /u, '')}`); } }
     else if (p.kind === 'crisis') { s.crisis.acts = { ...(s.crisis.acts || {}), [p.act]: d }; if (Object.keys(s.crisis.acts).length >= 3) { s.crisis.done = d; s.crisisDone = d; deps.pop && deps.pop('empire', '⚡ Изпитанието е преодоляно', 'Договореностите оцеляха. Коалицията стои зад теб.'); log('Голямото изпитание е преодоляно.'); } }
     deps.sound && deps.sound('buy'); levels(); deps.save(); return null;
   }
@@ -297,8 +312,10 @@ export function createPresidency(deps) {
         deps.toast(`✅ ${nm(a.iso)}: „${AID[a.need].nm}“ работи — ${EFFECT[a.need]}. Сега трябва издръжка.`, 'good'); log(`Помощта за ${nm(a.iso)} работи: ${EFFECT[a.need]}.`); } } }
     // фондовете за възстановяване: месечни вноски; пропусната вноска — нарушено обещание
     for (const c of CONFLICTS) { const k = s.conf[c.k]; if (!k.fund || k.fund.m <= 0 || d < k.fund.next) continue; k.fund.next = d + 30;
-      if (s.res >= k.fund.amt) { s.res -= k.fund.amt; k.fund.m--; k.stab = Math.min(100, k.stab + 3); if (!k.fund.m && k.step === 5) { k.step = 6; deps.pop && deps.pop('empire', '🤝 Гаранции и възстановяване', `${c.nm}: фондът е изплатен докрай — мирът има основа.`); log(`${c.nm}: мирният процес е завършен.`); } }
-      else { k.broken = true; k.stab = Math.max(0, k.stab - 15); for (const i of c.parties) s.tr[i] = cl(trust(i) - 10); deps.toast(`💔 ${c.nm}: пропусната вноска за възстановяването — нарушено обещание.`, 'bad'); log(`${c.nm}: нарушено обещание.`); } }
+      if (s.res >= k.fund.amt) { s.res -= k.fund.amt; k.fund.m--; if (k.broken) { k.broken = false; log(`${c.nm}: вноските са наваксани — обещанието е възстановено.`); } k.stab = Math.min(100, k.stab + 3); if (!k.fund.m && k.step === 5) { k.step = 6; deps.pop && deps.pop('empire', '🤝 Гаранции и възстановяване', `${c.nm}: фондът е изплатен докрай — мирът има основа.`); log(`${c.nm}: мирният процес е завършен.`); } }
+      else { k.broken = true; k.brokenAt = d; k.stab = Math.max(0, k.stab - 15); for (const i of c.parties) s.tr[i] = cl(trust(i) - 10); deps.toast(`💔 ${c.nm}: пропусната вноска за възстановяването — нарушено обещание.`, 'bad'); log(`${c.nm}: нарушено обещание.`); } }
+    // 💔 нарушеното обещание изтича след BROKEN_DAYS дни (или щом вноските са наваксани — по-горе)
+    for (const c of CONFLICTS) { const k = s.conf[c.k]; if (!k.broken) continue; if (k.brokenAt == null) k.brokenAt = d; if (d - k.brokenAt >= BROKEN_DAYS) { k.broken = false; log(`${c.nm}: доверието след нарушеното обещание е възстановено.`); } }
     // мирът — примирията отслабват без поддръжка
     for (const c of CONFLICTS) { const k = s.conf[c.k]; if (k.step < 3 || k.step >= 6) continue; k.held++;
       const aidIn = s.aid.some(a => a.done && a.works !== false && c.parties.concat(c.region).includes(a.iso));
@@ -316,17 +333,37 @@ export function createPresidency(deps) {
       const inc = free() * (1 + (s.ind.econ - 50) / 150 + (s.revK || 0) * 5); let up = 0;
       for (const a of s.aid.filter(x => x.done && x.works !== false)) { if (s.res + inc - up >= a.up) { up += a.up; a.unpaid = 0; } else if ((a.unpaid = (a.unpaid || 0) + 1) >= 2) { a.works = false; a.wait = 'upkeep'; a.stuck = 'издръжката не е платена'; s.stab[a.iso] = cl(stab(a.iso) - 10); if (s.met[a.iso]) delete s.met[a.iso][a.need]; s.tr[a.iso] = cl(trust(a.iso) - 6); deps.toast(`💔 ${nm(a.iso)}: „${AID[a.need].nm}“ спря — неплатена издръжка.`, 'bad'); log(`Помощта за ${nm(a.iso)} угасна.`); } }
       s.res += inc - up; if (s.res < 0) { s.ind.trust = cl(s.ind.trust - 3); s.ind.econ = cl(s.ind.econ - 1); }
-      s.base = s.base || {}; for (const e of Object.keys(s.ind)) { const b = (s.base[e] ?? 50) - (e === 'trust' ? 0 : 0.15); s.base[e] = Math.max(35, b); s.ind[e] = cl(s.ind[e] + (s.base[e] - s.ind[e]) * 0.06); }   // връщане към „нивото“ на държавата; без инвестиции то бавно пада
+      s.base = s.base || {}; for (const e of Object.keys(s.ind)) { const b = (s.base[e] ?? 50) - (e === 'trust' ? 0 : e === 'energy' ? 0.05 : 0.1); s.base[e] = Math.max(35, b); s.ind[e] = cl(s.ind[e] + (s.base[e] - s.ind[e]) * 0.06); }   // връщане към „нивото“ на държавата; без инвестиции то бавно пада
       if (s.ind.energy < 40) s.ind.econ = cl(s.ind.econ - 0.6);
       const avg = (s.ind.econ + s.ind.services + s.ind.energy + s.ind.security) / 4; s.ind.trust = cl(s.ind.trust + (avg - 50) / 8 + s.prom.filter(p => p.done).length * 0.3);
       for (const iso of Object.keys(s.stab)) if (!s.aid.some(a => a.iso === iso && a.done)) s.stab[iso] = cl(s.stab[iso] - 0.5);
     }
-    s.streak = Object.values(s.ind).every(v => v >= 55) && s.res >= 0 ? (s.streak || 0) + 1 : 0;
+    { const why = stableWhy(s); s.streakWhy = why; s.streak = !why ? (s.streak || 0) + 1 : 0; }
     const allPeace = CONFLICTS.every(c => s.conf[c.k].step >= 5), coal = Object.keys(s.coal).length >= 5;
     const calm = !(s.evs || []).some(e => !e.done);
-    s.world = allPeace && coal && s.streak > 0 && s.crisisDone && s.hz?.st === 'safe' && calm ? (s.world || 0) + 1 : 0;
+    if (allPeace && coal && s.streak > 0 && s.crisisDone && s.hz?.st === 'safe' && calm) { s.world = (s.world || 0) + 1; s.worldDip = 0; } else if ((s.world || 0) > 0 && (s.worldDip || 0) < WORLD_DIP) s.worldDip = (s.worldDip || 0) + 1; else { s.world = 0; s.worldDip = 0; }   /* кратък спад до WORLD_DIP дни не нулира брояча */
     levels();
+    termTick(s, d);
   }
+  // 🗳️ вотът на недоверие и мандатът (deps.out(why) — краят на президентството: 'impeach' | 'reelect' | 'exit'; deps.reelect(бонус) — кампания за 2-ри мандат)
+  function termTick(s, d) {
+    if (s.ind.trust < NC_LOW) s.lowT = (s.lowT || 0) + 1; else if (!s.nc) s.lowT = 0;
+    if (!s.nc && s.lowT === NC_WARN) { deps.pop && deps.pop('ship-cargo', tr('⚠️ Доверието е под 20'), tr('{0} дни поред доверието е под 20. Ако остане така още {1} дни, парламентът ще гласува недоверие.', [NC_WARN, NC_START - NC_WARN])); log('Доверието е под 20 от месец — опасност от вот на недоверие.'); }
+    if (!s.nc && s.lowT >= NC_START) { s.nc = { start: d, until: d + NC_DAYS, acts: {} }; log('Вот на недоверие: 30 дни да върнеш доверието над 30.');
+      deps.pop && deps.pop('ship-cargo', tr('🗳️ Вот на недоверие'), tr('Парламентът поиска оставката ти. Имаш {0} дни да вдигнеш доверието над {1} — мерките са в Кабинета и в прозореца на президента.', [NC_DAYS, NC_OK])); deps.pause && deps.pause(); }
+    if (s.nc) { if (s.ind.trust > NC_OK) { s.nc = null; s.lowT = 0; deps.toast(tr('✅ Вотът на недоверие е отхвърлен — доверието е над 30.'), 'good'); log('Вотът на недоверие е отхвърлен.'); }
+      else if (d >= s.nc.until) { s.nc = null; log('Вотът на недоверие е приет.'); deps.out && deps.out('impeach'); return; } }
+    if (s.termStart == null) s.termStart = Math.max(s.start, d - TERM + 180);   // стар запис — поне половин година до изборите
+    if (!s.reel && d - s.termStart >= TERM) {
+      if ((s.term || 1) >= MAX_TERMS) { log('Краят на втория мандат.'); deps.out && deps.out('exit'); return; }
+      s.reel = { start: d }; log('Краят на мандата — кампания за втори мандат.');
+      deps.pop && deps.pop('empire', tr('🗳️ Краят на мандата'), tr('Четири години минаха. Кампанията за втори мандат е по-кратка (8 седмици) и започва с подкрепа според това, което направи.'));
+      deps.reelect && deps.reelect(reBonus(s)); deps.pause && deps.pause(); }
+    if (s.reel && d - s.reel.start >= REEL_MAX && deps.reelectNow) deps.reelectNow();   // кампанията чака твърде дълго — изборите стават сами
+  }
+  // началната подкрепа при преизбиране: доверие, изпълнени обещания, мирни стъпки (± точки навсякъде)
+  const reBonus = s => Math.max(-6, Math.min(8, (s.ind.trust - 50) / 6 + s.prom.filter(p => p.done).length * 1.2 + CONFLICTS.reduce((a, c) => a + Math.min(5, s.conf[c.k].step), 0) / 8));
+  function reelected() { const s = st(); if (!s) return; s.term = (s.term || 1) + 1; s.termStart = day(); s.reel = null; log(`Преизбран — мандат ${s.term}.`); deps.save(); }
   function evTick(s, d) {
     s.evs = s.evs || []; let id = s.evs.length;
     if (!s.evs.some(e => e.kind === 'food') && d >= s.start + FOOD_START) { s.evs.push({ id: ++id, kind: 'food', ico: '🌾', nm: 'Световна продоволствена криза', start: d, until: d + 120 }); s.ind.trust = cl(s.ind.trust - 4); for (const [iso, c] of Object.entries(POL)) if ((c.need || []).includes('food')) s.stab[iso] = cl(stab(iso) - 8); deps.pop && deps.pop('ship-cargo', '🌾 Продоволствена криза', 'Недостиг на доставки и поскъпване. Партньорите искат общ отговор — доставки, транспорт и местно производство.'); log('Продоволствена криза.'); }
@@ -357,17 +394,31 @@ export function createPresidency(deps) {
   // ---- 🏅 нивата 27–35 (по постижения)
   const MEETS = {
     27: s => !!s.cab && s.prom.filter(p => p.done).length >= 2,
-    28: s => s.streak >= 90,
+    28: s => s.streak >= STABLE_DAYS,
     29: s => Object.keys(s.deals).length >= 1 && (s.aid.some(a => a.done && a.works !== false) || Object.values(s.part || {}).some(v => v.done)),
     30: s => CONFLICTS.some(c => s.conf[c.k].step >= 3 && s.conf[c.k].held >= 60),
     31: s => s.aid.some(a => a.done && a.works !== false && (a.post || a.need === 'rebuild')),   // работеща програма за възстановяване
     32: s => Object.keys(s.coal).length >= 5,
     33: s => !!s.crisisDone,
     34: s => CONFLICTS.every(c => s.conf[c.k].step >= 5),
-    35: s => s.world >= 360,
+    35: s => s.world >= WORLD_DAYS,
   };
   function levels() { const s = st(); if (!s) return; for (let l = (s.lv || 26) + 1; l <= 35; l++) { if (!MEETS[l](s)) break; s.lv = l; log(`Ниво ${l}.`); } if (s.lv >= 35 && !s.finale) { s.finale = day(); deps.save(); setTimeout(finale, 6500); } }   // 🏁 ниво 35 — краят на играта (след картинката на нивото)
   const level = () => st()?.lv || 0;
+  const whyTxt = w => w.k === 'low' ? tr('Пречи: {0} под 45', [w.ind.map(k => tr(IND[k][1])).join(', ')]) : w.k === 'avg' ? tr('Пречи: средното е {0} (нужно е 55)', [w.avg]) : tr('Пречи: резервът е на минус');
+  // напредъкът към ниво (0…1) — за лентата „Фирма“ над 26 (imperial.js ratio)
+  const RATIO = {
+    27: s => (s.cab ? 0.2 : 0) + 0.8 * Math.min(2, s.prom.filter(p => p.done).length) / 2,
+    28: s => Math.min(1, (s.streak || 0) / STABLE_DAYS),
+    29: s => ((Object.keys(s.deals).length ? 1 : 0) + (MEETS[29](s) ? 1 : s.aid.length ? 0.5 : 0)) / 2,
+    30: s => Math.max(0, ...CONFLICTS.map(c => s.conf[c.k].step >= 3 ? Math.min(1, s.conf[c.k].held / 60) : s.conf[c.k].step / 6)),
+    31: s => MEETS[31](s) ? 1 : s.aid.some(a => a.post || a.need === 'rebuild') ? 0.5 : 0,
+    32: s => Math.min(1, Object.keys(s.coal).length / 5),
+    33: s => s.crisisDone ? 1 : s.crisis ? Math.min(0.9, Object.keys(s.crisis.acts || {}).length / 3) : 0,
+    34: s => CONFLICTS.reduce((a, c) => a + Math.min(5, s.conf[c.k].step), 0) / (5 * CONFLICTS.length),
+    35: s => Math.min(1, (s.world || 0) / WORLD_DAYS),
+  };
+  const ratio = lv => { const s = st(); if (!s) return 0; if ((s.lv || 0) >= lv) return 1; try { return Math.max(0, Math.min(1, RATIO[lv] ? RATIO[lv](s) : 0)); } catch { return 0; } };
 
   // ---- 🏁 финалът: ниво 35 „Световен мир“ — играта е завършена (може да продължиш да играеш)
   function finale() {
@@ -400,16 +451,20 @@ export function createPresidency(deps) {
   const bar = (v, col) => `<div class="bar"><i style="width:${Math.round(v)}%;background:${col || (v >= 60 ? '#3fae6b' : v >= 40 ? '#ffd54a' : '#ff6b6b')}"></i></div>`;
   async function render() {
     if (!el) return; const s = st(), flag = s.cc === 'RU' ? '🇷🇺' : '🇺🇸', ps = proposals();
-    let h = `<div class="tb"><h2>${flag} Президентът · ${s.cc === 'RU' ? 'Кремъл' : 'Белият дом'} <span class="m">ниво ${s.lv}</span></h2>${[['state', '🏛️ Държава'], ['world', '🌍 Свят']].map(([k, t]) => `<button data-pt="${k}" class="${tab === k ? 'on' : ''}">${t}</button>`).join('')}<button data-pcab="1" class="y">📋 ${s.cc === 'RU' ? 'Министерски съвет' : 'Кабинет на САЩ'} (${ps.length})</button>${s.finale ? '<button data-pend="1">🏁 Финалът</button>' : ''}<button data-px="1">✕</button></div><div class="bd">`;
+    let h = `<div class="tb"><h2>${flag} Президентът · ${s.cc === 'RU' ? 'Кремъл' : 'Белият дом'} <span class="m">ниво ${s.lv}</span></h2>${[['state', '🏛️ Държава'], ['world', '🌍 Свят']].map(([k, t]) => `<button data-pt="${k}" class="${tab === k ? 'on' : ''}">${t}</button>`).join('')}<button data-pcab="1" class="y">📋 ${tr(s.cc === 'RU' ? 'Министерски съвет' : 'Кабинет на САЩ')} (${ps.length})</button>${s.finale ? '<button data-pend="1">🏁 Финалът</button>' : ''}<button data-px="1">✕</button></div><div class="bd">`;
     if (tab === 'state') {
-      h += `<div class="cd"><b>📊 Държавата</b>${Object.entries(IND).map(([k, [i, n]]) => `<div class="m">${i} ${n}: <b style="color:#e6edf6">${Math.round(s.ind[k])}</b></div>${bar(s.ind[k])}`).join('')}<div class="m">⚖️ Стабилна държава: всичко ≥ 55 и резерв ≥ 0 — ${s.streak}/90 дни</div></div>`;
+      { const d = day(), left = Math.max(0, TERM - (d - (s.termStart ?? s.start))), ncP = ps.filter(p => p.kind === 'nc');   /* 🗳️ мандатът и вотът на недоверие */
+        h += `<div class="cd"${s.nc || s.lowT ? ' style="border-color:#ff6b6b"' : ''}><b>🗓️ ${tr('Мандат {0} от {1}', [s.term || 1, MAX_TERMS])}</b><div class="m">${s.reel ? tr('🗳️ Изборите за втори мандат — кампанията тече.') : tr('До края на мандата: {0} дни', [left])}</div>${s.reel ? `<button class="y" data-preel="1" style="margin-top:6px">${tr('🗳️ Към кампанията')}</button>` : ''}`
+          + (s.nc ? `<div class="m" style="color:#ff8a8a;margin-top:6px"><b>${tr('🗳️ Вот на недоверие: остават {0} дни', [Math.max(0, s.nc.until - d)])}</b> · ${tr('доверие {0} — нужно е над {1}', [Math.round(s.ind.trust), NC_OK])}</div>${ncP.map(p => `<div class="m" style="margin-top:4px;color:#e6edf6">${p.ico} ${tr(p.text)} <span class="m">${p.cost ? B(p.cost) + ' · ' : ''}+${p.gain}</span> <button class="y" data-pd="${p.id}|yes">✓</button></div>`).join('')}`
+          : s.lowT ? `<div class="m" style="color:#ffb347;margin-top:6px">${tr('⚠️ Доверие под 20: {0}/{1} дни до вот на недоверие', [s.lowT, NC_START])}</div>` : '') + '</div>'; }
+      h += `<div class="cd"><b>📊 Държавата</b>${Object.entries(IND).map(([k, [i, n]]) => `<div class="m">${i} ${tr(n)}: <b style="color:#e6edf6">${Math.round(s.ind[k])}</b></div>${bar(s.ind[k])}`).join('')}<div class="m">⚖️ Стабилна държава (средно ≥ 55, нито един под 45, резерв ≥ 0): ${s.streak}/${STABLE_DAYS} дни</div>${s.streakWhy ? `<div class="m" style="color:#ffb347">⚠️ ${whyTxt(s.streakWhy)}</div>` : ''}</div>`;
       h += `<div class="cd"><b>💰 Държавният бюджет</b> <span class="m">(отделен от холдинга)</span><div class="m" style="margin-top:6px">Резерв: <b style="color:${s.res >= 0 ? '#7dffa8' : '#ff8a8a'}">${B(s.res)}</b></div><div class="m">Свободни за нови програми на месец: <b style="color:#e6edf6">${B(free())}</b></div><div class="m">Издръжка на помощта: ${B(s.aid.filter(a => a.done).reduce((x, a) => x + a.up, 0))}/месец</div></div>`;
       h += `<div class="cd"><b>📜 Предизборните обещания</b>${s.prom.map(p => { const D = DOM.find(x => x.k === p.k), run = s.progs.find(x => x.k === p.k); return `<div class="m">${p.done ? '✅' : run ? `⏳ ${Math.round(run.prog * 100)}%` : '⬜'} ${D.ico} ${D.nm}</div>`; }).join('')}</div>`;
       h += `<div class="cd"><b>🏗️ Програми в ход</b>${s.progs.length ? s.progs.map(p => `<div class="m">${DOM.find(x => x.k === p.k).ico} ${p.nm}${p.half ? ' (първи етап)' : ''} — ${NAMES[p.dir]}</div>${bar(p.prog * 100, '#4fc3f7')}`).join('') : `<div class="m">Няма — министрите чакат решенията ти в ${s.cc === 'RU' ? 'Министерския съвет' : 'Кабинета'}.</div>`}</div>`;
       { const hz = s.hz || {}, lbl = { calm: '🟢 спокойно', closed: '⛔ затворен', talks: '📞 преговори', safe: '🌊 отворен' }[hz.st] || '';
         h += `<div class="cd"><b>🌊 Ормузкият проток</b> <span class="m">· алтернативна игрова хронология</span><div class="m" style="margin-top:6px">Статус: <b style="color:#e6edf6">${lbl}</b>${hz.inc ? ' · ⚠️ инцидент' : ''}</div><div class="m">Корабоплаване: ${Math.round(hz.ship ?? 100)}%</div>${bar(hz.ship ?? 100, '#4fc3f7')}<div class="m">Стратегически резерв: ${Math.round(hz.res ?? 100)}%</div>${bar(hz.res ?? 100, '#ffd54a')}<div class="m">${hz.alt > day() ? '🚢 алтернативни доставки · ' : ''}${hz.esc > day() ? '🛡️ придружаване и проверка · ' : ''}${hz.div ? (hz.div.done ? '⚡ диверсификация ✅' : `⚡ диверсификация ${Math.round(hz.div.prog * 100)}%`) : ''}</div>${hz.st === 'talks' || hz.st === 'closed' ? `<div class="m">Преговори: ${hz.talk || 0}/2 · доверие на страните към теб: ${Math.round(trust('IRN'))}</div>` : ''}</div>`; }
       { const C = worldConds();
-        h += `<div class="cd"><b>🌍 Световен мир — условията</b>${C.map(([t, ok]) => `<div class="m">${ok ? '✅' : '⬜'} ${t}</div>`).join('')}<div class="m" style="margin-top:4px">Задържани ${s.world || 0}/360 дни</div></div>`; }
+        h += `<div class="cd"><b>🌍 Световен мир — условията</b>${C.map(([t, ok]) => `<div class="m">${ok ? '✅' : '⬜'} ${t}</div>`).join('')}<div class="m" style="margin-top:4px">Задържани ${s.world || 0}/${WORLD_DAYS} дни</div></div>`; }
       h += `<div class="cd"><b>📰 Хроника</b>${(s.log || []).slice(0, 8).map(x => `<div class="m">ден ${x.d}: ${x.t}</div>`).join('')}</div>`;
     } else {
       const svg = await mapSvg({ cc: s.cc, rel, conf, sel, deal: i => !!s.deals[i], aid: i => s.aid.filter(a => a.iso === i) });
@@ -418,7 +473,7 @@ export function createPresidency(deps) {
     el.innerHTML = h + '</div>';
     el.querySelector('[data-px]').onclick = close;
     el.querySelectorAll('[data-pt]').forEach(b => b.onclick = () => { tab = b.dataset.pt; render(); });
-    el.querySelector('[data-pcab]').onclick = cabinet; el.querySelectorAll('[data-pend]').forEach(b => b.onclick = finale);
+    el.querySelector('[data-pcab]').onclick = () => cabinet(false); el.querySelectorAll('[data-preel]').forEach(b => b.onclick = () => { close(); deps.openCamp && deps.openCamp(); }); el.querySelectorAll('[data-pend]').forEach(b => b.onclick = finale);
     el.querySelectorAll('[data-pol]').forEach(g => g.onclick = () => { sel = g.dataset.pol; render(); });
     el.querySelectorAll('[data-conf]').forEach(g => g.onclick = () => { sel = 'c:' + g.dataset.conf; render(); });
     el.querySelectorAll('[data-pd]').forEach(b => b.onclick = () => { const [id, a] = b.dataset.pd.split('|'); decide(id, a); render(); });
@@ -438,7 +493,7 @@ export function createPresidency(deps) {
     const s = st(), ps = proposals();
     const btns = p => `<div class="m" style="margin:6px 0 2px;color:#e6edf6">${p.ico} ${p.text}</div><div class="m">${p.why}${p.cost ? ` · ${B(p.cost)}` : ''}</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 8px"><button class="y" data-pd="${p.id}|yes">✓ Да</button>${p.small ? `<button data-pd="${p.id}|small">½ ${B(p.small.cost)}</button>` : ''}<button data-pd="${p.id}|later">⏳</button><button data-pd="${p.id}|no">✖</button></div>`;
     if (sel && sel.startsWith('c:')) { const c = CONFLICTS.find(x => x.k === sel.slice(2)), k = conf(c.k);
-      return `<b>${c.ico} ${c.nm}</b>${c.note ? `<div class="m">ℹ️ ${c.note}</div>` : ''}<div class="m">Страни: ${c.parties.map(nm).join(', ')}</div><div class="m">Интензитет: ${Math.round(k.int)}</div>${PEACE.map((p, i) => `<div class="m">${i < k.step ? '✅' : i === k.step ? '➡️' : '⬜'} ${p.ico} ${p.nm}</div>`).join('')}${k.step >= 3 ? `<div class="m" style="margin-top:4px">Стабилност на примирието: ${Math.round(k.stab)}${k.ver ? ' · 🔍 наблюдение' : ''}${k.gua ? ' · 🛡️ гаранции' : ''}${k.fund ? ` · 💶 фонд ${12 - k.fund.m}/12` : ''}${k.broken ? ' · 💔 нарушено обещание' : ''}</div>${bar(k.stab)}` : ''}${pkgOpen === c.k ? pkgHtml(c.k) : ps.filter(p => p.ck === c.k).map(btns).join('') + (k.step >= 2 && k.step < 5 && k.step !== 3 && !(k.wait > day()) ? `<button class="y" data-pkgo="${c.k}" style="margin-top:6px">📝 Състави мирен пакет</button>` : k.wait > day() ? `<div class="m">Следващ опит след ден ${k.wait}.</div>` : '')}`; }
+      return `<b>${c.ico} ${c.nm}</b>${c.note ? `<div class="m">ℹ️ ${c.note}</div>` : ''}<div class="m">Страни: ${c.parties.map(nm).join(', ')}</div><div class="m">Интензитет: ${Math.round(k.int)}</div>${PEACE.map((p, i) => `<div class="m">${i < k.step ? '✅' : i === k.step ? '➡️' : '⬜'} ${p.ico} ${p.nm}</div>`).join('')}${k.step >= 3 ? `<div class="m" style="margin-top:4px">Стабилност на примирието: ${Math.round(k.stab)}${k.ver ? ' · 🔍 наблюдение' : ''}${k.gua ? ' · 🛡️ гаранции' : ''}${k.fund ? ` · 💶 фонд ${12 - k.fund.m}/12` : ''}${k.broken ? ' · 💔 нарушено обещание' : ''}</div>${bar(k.stab)}` : ''}${pkgOpen === c.k ? pkgHtml(c.k) : ps.filter(p => p.ck === c.k).map(btns).join('') + (k.step >= 2 && k.step < 5 && !(k.wait > day()) ? `<button class="y" data-pkgo="${c.k}" style="margin-top:6px">📝 Състави мирен пакет</button>` : k.wait > day() ? `<div class="m">Следващ опит след ден ${k.wait}.</div>` : '')}`; }
     if (sel && POL[sel]) { const c = POL[sel], cf = CONFLICTS.filter(x => x.parties.includes(sel) || x.region === sel);
       return `<b>${c.nm}</b> <span class="m">· столица ${c.cap}</span><div class="m" style="margin-top:6px">🤝 Отношения с теб: ${Math.round(rel(sel))}</div>${bar(rel(sel))}<div class="m">🏛️ Стабилност: ${Math.round(stab(sel))}</div>${bar(stab(sel))}
         <div class="m">Нужди: ${(c.need || []).map(n => `${NEED[n][0]} ${NEED[n][1]}${(s.met[sel] || {})[n] ? ' ✅' : ''}`).join(', ') || 'няма спешни'}</div><div class="m">Конфликти: ${cf.map(x => x.nm).join(', ') || 'няма'}</div><div class="m">Споразумение: ${s.deals[sel] ? `✅ от ден ${s.deals[sel]}` : 'няма'}${s.coal[sel] ? ' · 🌐 в коалицията' : ''}</div>
@@ -448,8 +503,11 @@ export function createPresidency(deps) {
   // 📋 кои решения влизат в заседанието: извънредните, после до 3 основни по приоритет (обещания и мир преди обикновените програми)
   const PRIO = { hz: 10, ev: 10, crisis: 10, hold: 9, aidfix: 8, pkgHint: 8, peace: 7, coal: 7, aid: 6, part: 5, deal: 5, dom: 4 };
   function pick(emergency) { const all = proposals(), em = all.filter(p => p.emergency || ['crisis', 'hold', 'ev', 'aidfix'].includes(p.kind));
-    const rest = all.filter(p => !em.includes(p)).sort((a, b) => ((PRIO[b.kind] || 3) + (b.gainTxt?.startsWith('✔') ? 4 : 0)) - ((PRIO[a.kind] || 3) + (a.gainTxt?.startsWith('✔') ? 4 : 0)));
+    const N = CONFLICTS.length, rot = Math.floor(day() / 30), ix = p => ((CONFLICTS.findIndex(c => c.k === p.ck) - rot) % N + N) % N, ckKey = p => conf(p.ck).step * N + ix(p);   // конфликтите: първо най-изостаналият, при равенство — на ротация по месеци
+    const rest = all.filter(p => !em.includes(p)).sort((a, b) => ((PRIO[b.kind] || 3) + (b.gainTxt?.startsWith('✔') ? 4 : 0)) - ((PRIO[a.kind] || 3) + (a.gainTxt?.startsWith('✔') ? 4 : 0)) || (a.ck && b.ck ? ckKey(a) - ckKey(b) : 0));
     const dom = rest.find(p => p.kind === 'dom'), top = rest.filter(p => p !== dom).slice(0, dom ? 2 : 3);
+    { const late = rest.filter(p => p.ck && (p.kind === 'peace' || p.kind === 'pkgHint')).sort((a, b) => ckKey(a) - ckKey(b))[0];   /* най-изостаналата стъпка към мира винаги влиза в заседанието */
+      if (late && !top.includes(late)) { if (top.length >= (dom ? 2 : 3)) top.pop(); top.push(late); } }
     const free0 = rest.filter(p => !top.includes(p) && p !== dom && !p.cost && (p.kind === 'deal' || p.kind === 'coal')).slice(0, 2);   // безплатната дипломация не заема място
     return emergency ? em : [...em, ...top, ...(dom ? [dom] : []), ...free0]; }
   function worldConds() { const s = st(); return [['Няма активни големи въоръжени конфликти', CONFLICTS.every(c => s.conf[c.k].step >= 3)], ['Мирните договорености се изпълняват и наблюдават', CONFLICTS.every(c => s.conf[c.k].step >= 5)], ['Критичните търговски маршрути функционират', s.hz?.st === 'safe'], ['Няма нерешени тежки хуманитарни извънредни ситуации', !(s.evs || []).some(e => !e.done)], ['Коалицията изпълнява задълженията си (5+ държави)', Object.keys(s.coal).length >= 5], ['Голямото изпитание е преодоляно', !!s.crisisDone], ['Собствената държава е стабилна', s.streak > 0]]; }
@@ -483,8 +541,8 @@ export function createPresidency(deps) {
   function cabinet(emergency, focus, onClose) {
     const s = st(); import('./directors3d.js').then(m => { if (!m.openCabinet) return;
       const brief = { id: `fin:brief:${day()}`, dir: 'fin', ico: '💰', info: true, text: '' };
-      m.openCabinet({ onClose, cc: s.cc, title: s.cc === 'RU' ? 'Правителството' : 'The Cabinet', brand: { nm: s.cc === 'RU' ? 'Россия' : 'USA', col: s.cc === 'RU' ? '#d52b1e' : '#3c3b6e', ico: '🦅', group: s.cc === 'RU' ? 'Правителство' : 'Белият дом', sub: s.cc === 'RU' ? '· МИНИСТЕРСКИ СЪВЕТ ·' : '· КАБИНЕТ НА САЩ ·' },
-        title: emergency ? '⛔ Извънредно заседание' : undefined, report: () => briefing(), proposals: () => [brief, ...(focus ? [...proposals().filter(focus), ...pick(emergency).filter(p => !focus(p))].slice(0, 6) : pick(emergency)).map(p => ({ ...p, text: p.text.replace(/^[А-ЯЁ][а-яё]+: /, ''), inBudget: (p.cost || 0) <= s.res }))],   // името на министъра вече е горе на екрана onDecide: (id, a) => { decide(id, a); render(); return null; },
+      m.openCabinet({ onClose, cc: s.cc, brand: { nm: s.cc === 'RU' ? 'Россия' : 'USA', col: s.cc === 'RU' ? '#d52b1e' : '#3c3b6e', ico: '🦅', group: s.cc === 'RU' ? 'Правителство' : 'Белият дом', sub: s.cc === 'RU' ? '· МИНИСТЕРСКИ СЪВЕТ ·' : '· КАБИНЕТ НА САЩ ·' },
+        title: emergency ? '⛔ Извънредно заседание' : undefined, report: () => briefing(), proposals: () => [brief, ...(focus ? [...proposals().filter(focus), ...pick(emergency).filter(p => !focus(p))].slice(0, 6) : pick(emergency)).map(p => ({ ...p, text: tr(p.text).replace(/^\p{Lu}\p{Ll}+: /u, ''), inBudget: (p.cost || 0) <= s.res }))],   // името на министъра вече е горе на екрана onDecide: (id, a) => { decide(id, a); render(); return null; },
         voteOn: id => vote(id), onResolve: (id, how) => { decide(id.replace(/\|small$/, ''), how === 'drop' ? 'later' : how === 'small' ? 'small' : 'yes'); render(); return null; },
         speech: () => `Резервът е ${B(s.res)}. За нови програми имаме по ${B(free())} на месец. ${s.res < free() ? 'Предлагам по-малки първи етапи.' : 'Можем да започнем една голяма и няколко малки програми.'}`,
         frame: () => ({ cash: Math.max(0, s.res), reserved: 0, op: 0, free: Math.max(0, s.res), loan: 0 }),
@@ -492,5 +550,5 @@ export function createPresidency(deps) {
         brief: k => ({ fin: `Резервът е ${B(s.res)}.`, pm: `Обещания: ${s.prom.filter(p => p.done).length}/${s.prom.length}. Ниво ${s.lv}.`, def: `Сигурност ${Math.round(s.ind.security)}/100.`, energy: `Енергия ${Math.round(s.ind.energy)}/100.`, reg: `Услуги ${Math.round(s.ind.services)}/100.` })[k] || '' });
     }); }
   const openPkg = ck => { tab = 'world'; sel = 'c:' + ck; pkgOpen = ck; pkgSel = {}; if (!el) open(); else render(); };
-  return { openPkg, worldConds, rel, stab, conf, me, free, pick, evalPkg, proposePkg, briefing, trust, finale, vote, start, state: st, proposals, decide, dailyTick, level, open, close, cabinet, active: () => !!st() };
+  return { TERM, MAX_TERMS, reBonus: () => st() ? reBonus(st()) : 0, reelected, WORLD_DAYS, STABLE_DAYS, ratio, openPkg, worldConds, rel, stab, conf, me, free, pick, evalPkg, proposePkg, briefing, trust, finale, vote, start, state: st, proposals, decide, dailyTick, level, open, close, cabinet, active: () => !!st() };
 }

@@ -582,7 +582,14 @@ const GLB_LM = {
 };
 // 🇩🇪 lm-berlin2 (f6): Бранденбургската врата, Райхстагът и телевизионната кула — модели на потребителя (Meshy, Темидасофт); h 15 + fit по отношението на модела —
 // game.js SPECIAL_LM ги мащабира до истинския ръст (26 / 47 / 368 м). Нощем (berlinLights): вратата — топли прожектори, квадригата — бронз; куполът и сферата светят; червени лампи на кулата
+// 🌏 lm-world2 (f6): операта в Сидни (183 м, 65 м над водата) и кулата в Токио (333 м) — модели на потребителя (Meshy, Темидасофт); h/fit — по мярката на мястото им
+Object.assign(GLB_LM, { opera2: { h: 21.8, fit: 53.3, plate: 0xcbb79a, floodK: 2.2 }, tokyotower: { h: 15, fit: 3.3, plate: 0x8a8a86, floodK: 1.6, onLoad: tokyoTowerLights } });
 Object.assign(GLB_LM, { brandenburg2: { h: 15, fit: 28.6, plate: 0xcfc6b4, matte: 0xe3d7b8, floodK: 1.8, onLoad: berlinLights }, reichstag2: { h: 15, fit: 41.6, plate: 0xcfc6b4, floodK: 1.3, onLoad: berlinLights }, fernsehturm2: { h: 15, fit: 1.54, plate: 0xcfc6b4, floodK: 0.6, onLoad: berlinLights } });
+// T2 (28.10): новата Бранденбургска врата на потребителя (Meshy, „Temidasoft“, с текстури и зелената квадрига) — вместо белия модел; без matte (иначе губи текстурата)
+GLB_LM.brandenburg2 = { ...GLB_LM.brandenburg2, file: 'brandenburg3', fit: 25.8 }; delete GLB_LM.brandenburg2.matte;
+// lm-ndk (T2): НДК (Meshy, „Temidasoft“) — ~200 × 200 м, 44 м; нощем фасадата свети топло
+if (feature('lm-ndk')) { GLB_LM.ndk = { h: 15, fit: 41.7, plate: 0xbdb8ae, floodK: 1.6 }; LANDMARK_NM.ndk = 'Национален дворец на културата (НДК)'; }
+const EM_KEEP = /^(radiocity2|lv[a-z0-9]*|bellagio|luxor|vegassign)$/;   // нарочните нощни карти (неон, надписи)
 const glbCache = {};
 // нощно златисто осветяване на модел-забележителност: emissive = цвят, emissiveMap = текстурата; играта ги пали нощем (window.__lmNight)
 // хълмът на Акропола: елипсовидно плато (дългата ос — z), стръмни скалисти склонове, долу — зеленина (маслини, храсти); единиците — на модела (1 = 1,23 м)
@@ -734,6 +741,7 @@ function glbLm(kind) {
       if (C.matte && o.material) { o.material = o.material.clone(); o.material.color.set(C.matte); o.material.metalness = 0; o.material.roughness = 0.8; o.material.metalnessMap = o.material.roughnessMap = o.material.map = null; o.material.needsUpdate = true; }   // светла фасада (Белият дом): текстурата е тъмна — само бял цвят + релефът (normalMap)
       if (C.flat && o.material) { o.material = o.material.clone(); o.material.flatShading = true; o.material.vertexColors = !!o.geometry.attributes.color; o.material.needsUpdate = true; }   // плоско осветени стени (без нормали от модела)
       const mt = o.material; if (mt && mt.metalness > 0.4) { mt.metalness = 0.25; mt.roughness = Math.max(mt.roughness ?? 0.5, 0.45); }   // без огледална среда металът излиза черен
+      if (mt && mt.emissiveMap && feature('lm-emfix') && !/[?&]noemfix\b/.test(location.search) && !EM_KEEP.test(kind) && !/^night_/.test(o.name) && !(o.parent && /^night_/.test(o.parent.name))) { mt.emissiveMap = null; mt.needsUpdate = true; }   /* lm-emfix: emissive картата на Meshy (не е нощна маска) — махаме я, за да светнат прожекторите (floodK); без неона на Стрипа и Радио Сити */
       if (mt && mt.emissive && !mt.emissiveMap && !flood.includes(mt)) { mt.emissive.set(0xffe4b8); if (mt.map) { mt.emissiveMap = mt.map; mt.needsUpdate = true; } mt.emissiveIntensity = 0; if (C.floodK) mt.userData.floodK = C.floodK; flood.push(mt);   // прожектори: светва текстурата, не плосък бежов цвят
         if (C.matte && feature('wh-flood')) { mt.userData.floodK = 1.3; mt.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  { vec3 wN = inverseTransformDirection(normal, viewMatrix); totalEmissiveRadiance *= 0.16 + 0.84 * pow(1.0 - abs(wN.y), 1.6); }'); }; mt.customProgramCacheKey = () => 'wh-flood'; } }   // wh-flood (T1): Белият дом — прожектори отдолу: стените (и колоните с релефа) светят, покривите и терасите — едва; без плоско бяло петно
     });
@@ -871,6 +879,14 @@ function willisLights(w, g) {
   g.userData.sparkle = (t, night) => { if (prev) prev(t, night); const on = Math.sin(t * 2.0) > 0.25; reds[0].emissiveIntensity = (on ? 2.6 : 0.12) * (0.2 + night); reds[1].emissiveIntensity = (!on ? 2.0 : 0.12) * (0.2 + night); };
 }
 // 🇺🇸 lm-ny2: възлите от Blender — Beacon (червена лампа на върха, мига) и Accent („плащ“ с градиент в цвета на кулата — нощното осветяване отдолу, адитивно)
+// кулата в Токио нощем: оранжево осветяване отдолу (прожекторите — floodK, в оранжево) и мигащи червени авиационни лампи на върха и на двете платформи
+function tokyoTowerLights(w, g) {
+  for (const m of g.userData.flood || []) m.emissive.set(0xff8a3a);
+  w.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(w), s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3()), ws = w.getWorldScale(new THREE.Vector3()).x || 1;
+  const bm = new THREE.MeshBasicMaterial({ color: 0xff2a1a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  for (const f of [1, 0.75, 0.45]) { const r = new THREE.Mesh(new THREE.SphereGeometry(s.x * 0.012 / ws + 0.02, 8, 6), bm); r.position.copy(w.worldToLocal(new THREE.Vector3(c.x + s.x * 0.06 * (f < 1 ? 1 : 0), b.min.y + s.y * f, c.z))); w.add(r); }
+  const prev = g.userData.sparkle; g.userData.sparkle = (t, night) => { if (prev) prev(t, night); bm.opacity = t % 1.5 < 0.3 ? 0.3 + 0.7 * night : 0.05 * night; };
+}
 function berlinLights(w, g) {
   const fl = g.userData.flood || (g.userData.flood = []); let bm = null;
   w.traverse(o => { if (!o.isMesh) return; const nm = o.name + ' ' + (o.parent && o.parent.name);
@@ -1196,6 +1212,7 @@ function lvCaesars() {
 }
 Object.assign(BUILD, { lvcaesars: lvCaesars });
 Object.assign(LANDMARK_NM, { lvcaesars: 'Сизърс Палас', onewtc: 'Едно Световен търговски център', fourts: '4 Таймс Скуеър' });
+Object.assign(LANDMARK_NM, { opera2: 'Сиднейската опера', tokyotower: 'Токийската кула' });
 Object.assign(LANDMARK_NM, { brandenburg2: 'Бранденбургската врата', reichstag2: 'Райхстагът', fernsehturm2: 'Берлинската телевизионна кула' });   // 🇩🇪 lm-berlin2
 // 🇺🇸 Вашингтон по истинската карта (washington-osm): Монументът на Вашингтон, Мемориалите на Линкълн и Джеферсън — процедурни, в истински метри
 // (game.js ги свежда до мащаба на картата по LM_REAL_H, както другите); без квадратната плоча — стоят на Мола
@@ -1275,6 +1292,7 @@ export function buildSeaLandmark(kind, deps = {}) {
 // Сидни: операта на нос Бенелонг — гранитна площадка в залива, свързана с брега с широка крайбрежна алея; платната гледат към морето.
 // Групата е обърната (rotation.y = π в game.js): локално −z е към брега, +z — към морето.
 function operaPoint(deps) {
+  if (feature('lm-world2')) return opera2Point(deps);
   const o = buildLandmark('opera', deps), g = new THREE.Group();
   const granite = mat(0xcbb79a, 0.95), wall = mat(0x9a8c78, 1), walk = mat(0xd8cdb8, 0.9);
   const plat = box(g, 70, 2.4, 58, granite, 0, 0.0, 6); plat.castShadow = false;   // площадката (~1 м над водата)
@@ -1290,6 +1308,20 @@ function operaPoint(deps) {
   return { group: g, update: (t, night) => { o.update(t, night); lampM.emissiveIntensity = 0.1 + 1.6 * night; } };
 }
 
+// 🌏 lm-world2: истинската опера (модел, 143 × 181 м, 74 м с подиума) на нос в залива — площадката и алеята към брега в мащаба ѝ; нощем платната светят топло-бяло
+function opera2Point(deps) {
+  const o = buildLandmark('opera2', deps), g = new THREE.Group();
+  const granite = mat(0xcbb79a, 0.95), wall = mat(0x9a8c78, 1), walk = mat(0xd8cdb8, 0.9);
+  box(g, 165, 2.4, 205, granite, 0, 0.0, 0).castShadow = false; box(g, 169, 1.6, 209, wall, 0, -0.9, 0);   // носът (Bennelong Point)
+  box(g, 60, 2.3, 120, walk, 0, -0.05, -160).castShadow = false; box(g, 64, 1.6, 124, wall, 0, -0.9, -160);   // алеята към брега (Circular Quay)
+  for (let k = 0; k < 20; k++) { const rt = realTree(deps, 7, k); const x = k % 2 ? 25 : -25, z = -110 - Math.floor(k / 2) * 10; if (rt) { rt.position.set(x, 1.2, z); g.add(rt); } }
+  const lampM = mat(0xfff2c0, 0.4, 0, { emissive: 0xffd890, emissiveIntensity: 0 });
+  for (let k = 0; k < 12; k++) for (const x of [-78, 78]) { cyl(g, 0.15, 0.15, 4, mat(0x444444), x, 3.2, -90 + k * 16, 6); add(g, new THREE.SphereGeometry(0.45, 8, 6), lampM, x, 5.4, -90 + k * 16); }
+  if (o.group.children[0]) o.group.children[0].visible = false;
+  o.group.position.set(0, 1.2, 0); o.group.scale.setScalar(3.4); o.group.rotation.y = Math.PI; g.add(o.group);   // платната — към морето
+  g.userData.flood = o.group.userData.flood; g.userData.sign = o.group.userData.sign;
+  return { group: g, update: (t, night) => { o.update && o.update(t, night); lampM.emissiveIntensity = 0.1 + 1.6 * night; } };
+}
 // kind → { group, update(t, night) }
 export function buildLandmark(kind, deps = {}) {
   const g = (BUILD[kind] || BUILD.galata)();

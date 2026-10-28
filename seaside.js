@@ -9,6 +9,7 @@ import { loadShipModels, hasShipModel, shipModel, setShipNight, mscTick } from '
 import { isRealBoat, isRealShip, realBoat, pendingShip, swapPendingShips } from './boatsreal.js';
 import { portReal } from './portreal.js';
 import { feature } from './lab/feature.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';   // crane-swan (T2)
 
 import { EXTRA_COASTAL } from './countries.js';
 export const SEASIDE = ['varna', 'burgas', 'constanta', 'istanbul', 'thessaloniki', 'athens', 'barcelona', 'amsterdam', 'rotterdam', 'newyork', 'losangeles', 'rio', 'buenosaires', 'capetown', 'dubai', 'mumbai', 'singapore', 'hongkong', 'shanghai', 'tokyo', 'sydney'];
@@ -132,6 +133,13 @@ export function addSeaside(group, deps, opts) {
     g.add(o); if (real) inst.push({ o, key: n });
   }
   let cargo = useModel(A, model, 'ship-cargo-a', 6);
+  // 🏗️ crane-swan (T2): два „лебедови“ портални крана (модел на T3, ind/crane-swan.glb: Body + Slew) в двата края на кея, откъм морето;
+  // горната част (Slew) бавно се върти, червена светлина на върха мига нощем (portlights)
+  const swans = [];
+  if (feature('crane-swan')) new GLTFLoader().loadAsync('assets/heavy/ind/crane-swan.glb').then(gl => {
+    for (const [dx, ph] of [[-47, 0], [47, 2.1]]) { const o = gl.scene.clone(true); o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+      o.position.set(px + dx, 1.2, pSeaZ - 60); o.rotation.y = Math.PI; pg.add(o); const sl = o.getObjectByName('Slew'); const b = new THREE.Box3().setFromObject(o); if (sl) { const sb = new THREE.Box3().setFromObject(sl); PL.beaconAt(sl, 0, (sb.max.y - sb.min.y) * 0.55, 0); } else PL.beaconAt(o, 0, (b.max.y - o.position.y) * 0.8, 0);   /* светлината — върху въртящата се част (кабината), не над стрелата */
+      if (sl) swans.push({ sl, r0: sl.rotation.y, ph }); } }).catch(e => console.warn('crane-swan', e));
   if (cargo) { cargo.position.set(px, 0, pierZ - 18); cargo.rotation.y = Math.PI / 2; pg.add(cargo); }
   // фар на вълнолома (западната част)
   const lx = opts.xMin + 30, lSeaZ = CO ? CO(lx) : seaZ, lz = lSeaZ - 90;   // вълноломът с фара — от брега
@@ -231,6 +239,7 @@ export function addSeaside(group, deps, opts) {
 
   // t: секунди; night: 0…1 (фарът свети и се върти)
   function update(t, night = 0) {
+    for (const w of swans) w.sl.rotation.y = w.r0 + Math.sin(t * 0.12 + w.ph) * 1.1;   // crane-swan: стрелата бавно се върти над кея
     for (const mv of movers) {   // влиза от открито море до кея за ~45 с (или обратно), после пак
       const k = ((t / 45 + mv.ph) % 1), u = mv.arriving ? k : 1 - k, e = u * u * (3 - 2 * u);
       mv.o.position.set(mv.x, Math.sin(t * 0.8) * 0.2, berthZ - 420 + (420 - 30) * e);

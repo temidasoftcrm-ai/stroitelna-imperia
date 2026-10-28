@@ -9,7 +9,14 @@ import { groundMat } from './cityground.js';
 
 export const PLAZA_KIND = { romanstadium: 'ruin', colosseo: 'ruin', colosseo3: 'ruin', colosseo4: 'ruin', nevsky: 'temple', stpeter: 'temple', hagia: 'temple', bluemosque: 'temple',
   sagrada: 'temple', westminster: 'temple', westminster3: 'temple', eiffel: 'tower', burj: 'sky', burj2: 'sky', empire: 'sky', empire2: 'sky' };
-const PAVE = { ruin: 0xc9bfa7, temple: 0xb8b0a2, tower: 0xbab4a8, sky: 0xc4c6c8, monument: 0xb8b0a2 };   // травертин / светъл камък / бетон
+// 🏛️ lm-plaza2 (T2, прегледът на града: „площад пред всяка забележителност“): и всички останали — по вид; без онези във водата/на хълм/с свой площад
+export const PLAZA_KIND2 = { chrysler2: 'sky', onewtc: 'sky', rockefeller2: 'sky', radiocity2: 'sky', petronas: 'sky', ndk: 'sky', mbs3: 'sky', bellagio: 'sky', luxor: 'sky', skytree: 'tower', galata2: 'tower', bigben2: 'tower',
+  stpatrick2: 'temple', suleymaniye2: 'temple', notredame: 'temple', duomo: 'temple', mosque: 'temple', lazare2: 'temple', ststephen: 'temple', parliament: 'square', parliament2: 'square', capitol: 'square', capitol2: 'square',
+  whitehouse: 'square', whitehouse2: 'square', cityhall: 'square', grandcentral2: 'square', vittoriano2: 'square', kotel: 'square', parthenon: 'ruin', arc2: 'monument', vegassign: 'monument' };
+export const PLAZA_SKIP = new Set(['supertrees', 'manhattan', 'liberty', 'liberty2', 'opera', 'mbs2', 'burjarab', 'maiden2', 'redeemer', 'mgu', 'londoneye2']);
+export const plazaKind = (k, plaza2) => PLAZA_KIND[k] || (plaza2 && !PLAZA_SKIP.has(k) ? PLAZA_KIND2[k] || 'auto' : null);
+const PAVE = { ruin: 0xc9bfa7, temple: 0xb8b0a2, tower: 0xbab4a8, sky: 0xc4c6c8, monument: 0xb8b0a2, square: 0xc2b9a8 };   // травертин / светъл камък / бетон
+const inLot = (L, x, z, m = 0) => { const c = Math.cos(L.rot || 0), s = Math.sin(L.rot || 0), dx = x - L.x, dz = z - L.z; return Math.abs(dx * c - dz * s) <= (L.w || 16) / 2 + m && Math.abs(dx * s + dz * c) <= (L.d || 16) / 2 + m; };
 
 let MATS = null;
 const mats = () => MATS || (MATS = {
@@ -41,15 +48,19 @@ function inst(geo, mat, list) {   // list: [[x, y, z, sx, sy, sz, ry]]
   m.count = list.length; m.castShadow = true; m.receiveShadow = true; return m;
 }
 
-// o — забележителността ({ group, kind }); deps: { streets (в рамката на играта), night() → 0…1, low (gfx „Много ниско“ — без дребните неща) }
+// o — забележителността ({ group, kind }); deps: { streets (в рамката на играта), night() → 0…1, low (gfx „Много ниско“ — без дребните неща),
+//   lm-plaza2: plaza2, lots (парцелите — площадът не влиза в чужд), water(x, z), ped() → { m, mixer } (истински минувач) }
 export function lmPlaza(o, deps = {}) {
-  const type = PLAZA_KIND[o.kind] || 'monument', M = mats(), G = new THREE.Group(); G.name = 'lmPlaza';
   o.group.updateMatrixWorld(true); const B = new THREE.Box3().setFromObject(o.group), C = B.getCenter(new THREE.Vector3()), S = B.getSize(new THREE.Vector3());
-  const hx = S.x / 2, hz = S.z / 2, round = type === 'tower' || type === 'monument';
+  const hx = S.x / 2, hz = S.z / 2, k0 = plazaKind(o.kind, deps.plaza2) || 'monument', type = k0 === 'auto' ? (Math.max(hx, hz) < 12 ? 'monument' : 'square') : k0, M = mats(), G = new THREE.Group(); G.name = 'lmPlaza';
+  const round = type === 'tower' || type === 'monument';
   const Hx = Math.min(130, Math.max(hx * 1.8, hx + 20)), Hz = Math.min(130, Math.max(hz * 1.8, hz + 20)), Hr = Math.max(Hx, Hz);
   const inZone = (x, z) => round ? Math.hypot(x - C.x, z - C.z) < Hr : Math.pow(Math.abs(x - C.x) / Hx, 4) + Math.pow(Math.abs(z - C.z) / Hz, 4) < 1;   // заоблен правоъгълник
   const inFoot = (x, z, m = 0) => Math.abs(x - C.x) < hx + m && Math.abs(z - C.z) < hz + m;
-  const onRoad = roadMask(deps.streets, C.x, C.z, Hr + 10);
+  const road = roadMask(deps.streets, C.x, C.z, Hr + 10);
+  // lm-plaza2: без чуждите парцели (своят — този под сградата) и без водата
+  const nearL = deps.plaza2 ? (deps.lots || []).filter(L => Math.abs(L.x - C.x) < Hr + 40 && Math.abs(L.z - C.z) < Hr + 40 && !inLot(L, C.x, C.z, 2) && !(L.busy === 'landmark' && inFoot(L.x, L.z))) : [];
+  const onRoad = deps.plaza2 ? (x, z) => road(x, z) || (deps.water && deps.water(x, z)) || nearL.some(L => inLot(L, x, z, 0.5)) : road;
   // настилката: клетки 2 м в зоната, без улиците (под сградата — също, не се вижда)
   const pos = [], step = 2; for (let x = C.x - Hx; x < C.x + Hx; x += step) for (let z = C.z - Hz; z < C.z + Hz; z += step) {
     const mx = x + step / 2, mz = z + step / 2; if (!inZone(mx, mz) || onRoad(mx, mz)) continue;
@@ -82,7 +93,7 @@ export function lmPlaza(o, deps = {}) {
     G.add(inst(new THREE.BoxGeometry(0.05, 0.05, 1), M.rope, posts.map((p, i) => { const q = posts[(i + 1) % posts.length], dx = q[0] - p[0], dz = q[2] - p[2], L = Math.hypot(dx, dz); return L > 6 ? null : [(p[0] + q[0]) / 2, 0.85, (p[2] + q[2]) / 2, 1, 1, L, Math.atan2(dx, dz)]; }).filter(Boolean)));   // въжето между стълбчетата (не над улиците)
     if (stalls[0]) { const b = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.6, 2.2), M.awning[0]); b.position.set(stalls[0][0], 1.3, stalls[0][1]); G.add(b); }
   }
-  if (type === 'temple') {   // фонтан пред храма — от страната с най-много настилка
+  if (type === 'temple' || type === 'square') {   // фонтан пред храма (и пред обществената сграда — lm-plaza2) — от страната с най-много настилка
     let best = null; for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const x = C.x + dx * (hx + (Hx - hx) * 0.55), z = C.z + dz * (hz + (Hz - hz) * 0.55); if (!onRoad(x, z) && (!best || Math.abs(dx) * Hx + Math.abs(dz) * Hz > best.w)) best = { x, z, w: Math.abs(dx) * Hx + Math.abs(dz) * Hz }; }
     if (best) { const bs = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.4, 0.7, 28), M.stall); bs.position.set(best.x, 0.35, best.z); const w = new THREE.Mesh(new THREE.CylinderGeometry(3.7, 3.7, 0.1, 28), M.water); w.position.set(best.x, 0.68, best.z); const c2 = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 2.2, 10), M.stall); c2.position.set(best.x, 1.4, best.z); G.add(bs, w, c2); }
   }
@@ -93,9 +104,20 @@ export function lmPlaza(o, deps = {}) {
     const fl = []; for (let k = 0; k < 36; k++) { const a = k / 36 * Math.PI * 2, r = Math.max(hx, hz) + 6, x = C.x + Math.cos(a) * r, z = C.z + Math.sin(a) * r; if (!onRoad(x, z)) fl.push([x, 0.25, z, 1, 1, 1]); }
     M.flower.forEach((mt, i) => G.add(inst(new THREE.SphereGeometry(0.5, 6, 5), mt, fl.filter((_, k) => k % 4 === i))));
   }
+  // lm-plaza2: минувачите — по алея на 5 м около основата (обратно, щом алеята свърши в улица/чужд парцел)
+  const walk = [];
+  if (deps.plaza2 && deps.ped && !deps.low && pos.length) {
+    const ax = hx + 5, az = hz + 5, P = []; for (let k = 0; k < 64; k++) { const a = k / 64 * Math.PI * 2, c = Math.cos(a), s = Math.sin(a), e = round ? Math.max(ax, az) : 1 / Math.pow(Math.pow(Math.abs(c) / ax, 4) + Math.pow(Math.abs(s) / az, 4), 0.25), x = C.x + c * e, z = C.z + s * e; P.push(inZone(x, z) && !onRoad(x, z) ? [x, z] : null); }
+    const ok = P.map((p, i) => i).filter(i => P[i]), n = Math.min(8, Math.floor(ok.length / 5));
+    for (let k = 0; k < n; k++) { const w = deps.ped(); if (!w) break; const i = ok[(k * 7919) % ok.length]; w.m.position.set(P[i][0], 0.06, P[i][1]); G.add(w.m); walk.push({ ...w, i, f: 0, dir: k % 2 ? 1 : -1, v: 1.1 + (k % 4) * 0.12 }); }
+    let t0 = 0; const tick = () => { const now = performance.now() / 1000, dt = t0 ? Math.min(0.1, now - t0) : 0; t0 = now; if (!dt) return;
+      for (const w of walk) { let j = (w.i + w.dir + 64) % 64; if (!P[j]) { w.dir = -w.dir; j = (w.i + w.dir + 64) % 64; if (!P[j]) continue; } const a = P[w.i], b = P[j], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+        w.f += w.v * dt / L; if (w.f >= 1) { w.f = 0; w.i = j; continue; } w.m.position.set(a[0] + (b[0] - a[0]) * w.f, 0.06, a[1] + (b[1] - a[1]) * w.f); w.m.rotation.y = Math.atan2(b[0] - a[0], b[1] - a[1]); if (w.mixer) w.mixer.update(dt); } };
+    const pm = G.children[0]; if (walk.length && pm) pm.onBeforeRender = tick;   // само когато площадът е в кадър
+  }
   // нощ: лампите и табелата светят (сградата — със своето осветяване; адитивните „прожектори“ изглеждаха като полупрозрачни листове)
   const night = deps.night || (() => 0);
   M.head.onBeforeRender = () => { const n = night(); M.head.emissiveIntensity = 2.2 * n; M.sign.emissiveIntensity = 0.8 * n; M.water.emissiveIntensity = 0.35 * n;  };
-  G.userData.plaza = { type, lamps: lamps.length, benches: benches.length, trees: trees.length, stalls: stalls.length, cells: pos.length / 18, Hx: Math.round(Hx), Hz: Math.round(Hz) };
+  G.userData.plaza = { type, lamps: lamps.length, benches: benches.length, trees: trees.length, stalls: stalls.length, cells: pos.length / 18, Hx: Math.round(Hx), Hz: Math.round(Hz), walkers: walk.length, kind: o.kind };
   return G;
 }

@@ -89,6 +89,28 @@ createServer(async (req, res) => {
       writeFileSync(F, JSON.stringify(all) + '\n');
       return json(res, { ok: true, cities: Object.keys(all) });
     }
+    // 🔍 Преглед: „🐞 Проблем“ — снимката (JPEG от играта) в lab/issues/, записът в lab-feedback.jsonl (kind 'issue', с града, камерата, обекта и флага)
+    if (url === '/__lab/issue' && req.method === 'POST') {
+      const b = await body(req), at = new Date().toISOString(); let shot = null;
+      if (typeof b.png === 'string' && /^data:image\/(jpeg|png);base64,/.test(b.png) && b.png.length < 8e6) { mkdirSync(join(LAB, 'issues'), { recursive: true }); const ext = b.png.startsWith('data:image/png') ? 'png' : 'jpg';
+        shot = `lab/issues/${at.replace(/[:.]/g, '-')}-${String(b.city || 'x').replace(/[^a-z0-9]/g, '')}.${ext}`; writeFileSync(join(ROOT, shot), Buffer.from(b.png.split(',')[1], 'base64')); }
+      const o = b.obj || {}, rec = { at, target: `Преглед: ${b.city || '?'} · ${o.id || '?'}`.slice(0, 300), kind: b.ok ? 'reviewed' : 'issue', text: String(b.text || '').slice(0, 2000), city: b.city || null, cam: b.cam || null,
+        obj: { id: o.id, kind: o.kind, name: o.name, url: o.url, flag: o.flag, size: o.size, pos: o.pos, lot: o.lot ?? null, p2: o.p2 ?? null }, flag: o.flag || null, shot };
+      appendFileSync(FEED, JSON.stringify(rec) + '\n'); return json(res, { ok: true, shot });
+    }
+    // 🔍 Преглед: „🛠 Оправи сам“ — { city ('*' — моделът навсякъде), id, op: { dx, dz, rot, k, hide, swap } | null } → assets/plans/overrides.json; играта ги чете под флага obj-overrides
+    if (url === '/__lab/override') {
+      const F = join(ROOT, 'assets/plans/overrides.json'), all = readJson(F, {});
+      if (req.method !== 'POST') return json(res, all);
+      const { city, id, op } = await body(req), n = v => v == null || (typeof v === 'number' && Number.isFinite(v) && Math.abs(v) < 1e4);
+      if (!city || !/^([a-z0-9]+|\*)$/.test(city) || !id || typeof id !== 'string' || id.length > 200 || !/^(lot:|lm:|model:)/.test(id)) return json(res, { ok: false, error: 'град/id?' });
+      if (op && !(n(op.dx) && n(op.dz) && n(op.rot) && n(op.k) && (op.k == null || (op.k > 0.05 && op.k < 20)) && (op.swap == null || /^[\w-]+$/.test(op.swap)))) return json(res, { ok: false, error: 'стойности?' });
+      all[city] = all[city] || {};
+      if (op) all[city][id] = { ...(op.dx ? { dx: op.dx } : {}), ...(op.dz ? { dz: op.dz } : {}), ...(op.rot ? { rot: op.rot } : {}), ...(op.k && op.k !== 1 ? { k: op.k } : {}), ...(op.hide ? { hide: true } : {}), ...(op.swap ? { swap: op.swap } : {}) };
+      else delete all[city][id];
+      if (!Object.keys(all[city]).length) delete all[city];
+      writeFileSync(F, JSON.stringify(all, null, 1) + '\n'); log(`Преглед: ${city} · ${id}`, 'override', JSON.stringify(op)); return json(res, { ok: true, n: Object.keys(all[city] || {}).length });
+    }
     // „🗑 Изтрий“: ако никой код не ползва модела — в кошчето (gio trash); ако се ползва — задача за Claude
     if (url === '/__lab/delete' && req.method === 'POST') {
       const { url: u } = await body(req);

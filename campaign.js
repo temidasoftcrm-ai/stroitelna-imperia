@@ -5,6 +5,7 @@
 // Изборната нощ: щатите се обявяват по часовите зони — от изток на запад; при победа — клипът (assets/video/victory-us.mp4) и deps.onWin().
 // Картата: assets/data/us-states.json (Natural Earth 1:50m, обществено достояние — SVG очертания, Аляска и Хаваи долу вляво).
 import { RU_CFG } from './campaign-ru.js';
+import { t as tr } from './i18n.js';
 // Записът: S.camp = { cc: 'US' | 'RU', week, ap, sup: { ST: % за теб }, hq: { ST: 1 }, ads: { ST: n }, log: [], done, won, ev }.
 // deps: { S, econ, fmt, toast, save, sound, name() — името ти/марката, cities() — [{ st, nm }] твоите градове в САЩ (носят подкрепа), onWin(), onLose() }
 
@@ -20,7 +21,7 @@ export const STATES = {
   WI: [10, 0, 5.9, 1], WY: [3, -14, 0.6, 2],
 };
 export const NAMES_BG = { AL: 'Алабама', AK: 'Аляска', AZ: 'Аризона', AR: 'Арканзас', CA: 'Калифорния', CO: 'Колорадо', CT: 'Кънектикът', DE: 'Делауеър', DC: 'Окръг Колумбия', FL: 'Флорида', GA: 'Джорджия', HI: 'Хаваи', ID: 'Айдахо', IL: 'Илинойс', IN: 'Индиана', IA: 'Айова', KS: 'Канзас', KY: 'Кентъки', LA: 'Луизиана', ME: 'Мейн', MD: 'Мериленд', MA: 'Масачузетс', MI: 'Мичиган', MN: 'Минесота', MS: 'Мисисипи', MO: 'Мисури', MT: 'Монтана', NE: 'Небраска', NV: 'Невада', NH: 'Ню Хемпшър', NJ: 'Ню Джърси', NM: 'Ню Мексико', NY: 'Ню Йорк', NC: 'Северна Каролина', ND: 'Северна Дакота', OH: 'Охайо', OK: 'Оклахома', OR: 'Орегон', PA: 'Пенсилвания', RI: 'Род Айлънд', SC: 'Южна Каролина', SD: 'Южна Дакота', TN: 'Тенеси', TX: 'Тексас', UT: 'Юта', VT: 'Върмонт', VA: 'Вирджиния', WA: 'Вашингтон', WV: 'Западна Вирджиния', WI: 'Уисконсин', WY: 'Уайоминг' };
-const RIVAL = 'сенатор Ричард Колинс', WEEKS = 16, AP = 3, WIN = 270, DEBATES = [6, 10, 14];
+const RIVAL = 'сенатор Ричард Колинс', WEEKS = 16, AP = 3, WIN = 270, DEBATES = [6, 10, 14], RETRY = 360;   // след загуба — нов опит след 1 игрова година
 const COST = { rally: 4e6, hq: 12e6, endorse: 0, adPerM: 1.5e6 };   // рекламата: на милион жители
 
 // ---- събитията: текст и два избора → { nat: национално, st: { ST: ± } , cost }
@@ -89,10 +90,12 @@ export function createCampaign(deps) {
   const st = () => S().camp;
   const B = n => n >= 1e9 ? `${(n / 1e9).toLocaleString('bg-BG', { maximumFractionDigits: 1 })} млрд. €` : `${Math.round(n / 1e6).toLocaleString('bg-BG')} млн. €`;
   // начало: подкрепата ти по щати = 50 + наклон×0.6 + шум; щатите с твои градове/бизнес — по-силно за теб
-  function start() {
-    const r = rnd(Math.round((S().day || 1) * 7919)), sup = {}, mine = new Set((deps.cities ? deps.cities() : []).map(c => c.st));
-    for (const [k, [, lean]] of Object.entries(STATES)) sup[k] = clamp(50 + lean * 0.6 + (r() - 0.5) * 4 + (mine.has(k) ? 4 : 0) - 2, 20, 80);
-    S().camp = { cc: C.cc, week: 1, ap: AP, sup, hq: {}, ads: {}, log: [`🗳️ Кампанията започва. Противник: ${RIVAL}.`], done: false, won: null, ev: null, seed: Math.round(r() * 1e6) };
+  // opts (преизбиране): { re: true, weeks: 8, bonus: ± точки навсякъде според управлението }
+  function start(opts = {}) {
+    const r = rnd(Math.round((S().day || 1) * 7919)), sup = {}, mine = new Set((deps.cities ? deps.cities() : []).map(c => c.st)), bonus = opts.bonus || 0;
+    for (const [k, [, lean]] of Object.entries(STATES)) sup[k] = clamp(50 + lean * 0.6 + (r() - 0.5) * 4 + (mine.has(k) ? 4 : 0) - 2 + bonus, 20, 80);
+    const weeks = opts.weeks || WEEKS, debates = weeks === WEEKS ? DEBATES : [Math.round(weeks / 2), weeks - 1];
+    S().camp = { cc: C.cc, week: 1, ap: AP, sup, hq: {}, ads: {}, log: [opts.re ? `🗳️ Кампанията за втори мандат започва (${bonus >= 0 ? '+' : ''}${bonus.toFixed(1).replace('.', ',')}% от управлението). Противник: ${RIVAL}.` : `🗳️ Кампанията започва. Противник: ${RIVAL}.`], done: false, won: null, ev: null, seed: Math.round(r() * 1e6), weeks, debates, re: !!opts.re };
     deps.save && deps.save();
   }
   const evOf = (who) => Object.entries(STATES).reduce((a, [k, [ev]]) => a + ((who === 'me' ? st().sup[k] > 50 : st().sup[k] < 50) ? ev : 0), 0);
@@ -131,9 +134,10 @@ export function createCampaign(deps) {
     if (swing.length) log(`🔴 ${RIVAL[0].toUpperCase() + RIVAL.slice(1)} води кампания в ${swing.map(k => NAMES_BG[k]).join(', ')}.`);
     nat((Math.random() - 0.5) * 0.6);   // шумът на новините
     s.week++; s.ap = AP;
-    if (s.week > WEEKS) { election(); return; }
-    if (DEBATES.includes(s.week)) s.ev = { debate: DEBATES.indexOf(s.week) };
-    else if (Math.random() < 0.55) s.ev = { e: Math.floor(Math.random() * EVENTS.length) };
+    if (s.week > (s.weeks || WEEKS)) { election(); return; }
+    if ((s.debates || DEBATES).includes(s.week)) s.ev = { debate: (s.debates || DEBATES).indexOf(s.week) };
+    else if (Math.random() < 0.55) { if (!s.deck || !s.deck.length) { s.deck = EVENTS.map((_, i) => i); for (let i = s.deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [s.deck[i], s.deck[j]] = [s.deck[j], s.deck[i]]; } }   /* разбъркано тесте — без повторения */
+      s.ev = { e: s.deck.pop() }; }
     deps.save && deps.save();
   }
   function resolveEvent(choice) {
@@ -160,7 +164,11 @@ export function createCampaign(deps) {
 
   // ---- екранът
   let el = null, selK = null, night = null;
+  const retryDay = () => S()?.campLost ? S().campLost.day + RETRY : null;   // след загуба: от кой ден може нова кампания
+  const waiting = () => { const c = S()?.camp, r = retryDay(); return !!(r != null && !S()?.president && !(c && !c.done) && (S().day || 0) < r); };
   function open() {
+    if (waiting()) { deps.toast && deps.toast(tr('🗳️ Следващ шанс за кампания: ден {0}.', [retryDay()]), 'bad'); return; }
+    { const c = S().camp; if (c && c.done && c.won === false && (c.fin || S().campLost)) delete S().camp; }   /* загубата не се преиграва — нова кампания след RETRY дни */
     if (!S().camp) start();
     document.getElementById('camp')?.remove();
     if (!document.getElementById('campCss')) { const c = document.createElement('style'); c.id = 'campCss'; c.textContent = css; document.head.appendChild(c); }
@@ -173,10 +181,10 @@ export function createCampaign(deps) {
   const me = () => deps.brandCol || '#4fc3f7';
   function render() {
     if (!el || !geo) return;
-    const s = st(), P = proj(), np = natPoll(), M = me(), you = deps.name ? deps.name() : 'Ти';
+    const s = st(), P = proj(), np = natPoll(), M = me(), you = tr(deps.name ? deps.name() : 'Ти');
     const shown = s.done && s.shownRes ? s.shownRes : null;
     const sup = k => shown ? (k in shown ? shown[k] : null) : s.sup[k];
-    const rivNm = RIVAL.split(' ').slice(1).join(' '), pct = v => v.toFixed(1).replace('.', ',') + '%';
+    const rivNm = tr(RIVAL).split(' ').slice(1).join(' '), pct = v => v.toFixed(1).replace('.', ',') + '%';
     let bar;
     if (POP) {   // 🇷🇺 пряк вот: лентата е процентът (от отчетените региони в изборната нощ)
       const me = shown ? share(shown, true) : np, done = shown ? Object.keys(shown).reduce((a, k) => a + STATES[k][0], 0) / TOTAL * 100 : 100;
@@ -186,10 +194,10 @@ export function createCampaign(deps) {
       const evMe = shown ? Object.entries(shown).reduce((a, [k, v]) => a + (v > 50 ? STATES[k][0] : 0), 0) : P.me + P.meLean;
       const evRiv = shown ? Object.entries(shown).reduce((a, [k, v]) => a + (v < 50 ? STATES[k][0] : 0), 0) : P.riv + P.rivLean;
       bar = `<div class="ev"><i style="width:${evMe / 538 * 100}%;background:${M}"></i>${shown ? '' : `<i style="width:${P.toss / 538 * 100}%;background:#8a93a6"></i>`}<i style="margin-left:auto;width:${evRiv / 538 * 100}%;background:#e05a4f"></i><span class="mark"></span>
-      <b style="left:8px">${you}: ${evMe}${shown ? '' : ' (+' + P.toss + ' неясни)'}</b><b style="right:8px">${rivNm}: ${evRiv}</b><b style="left:50%;transform:translateX(8px)">270</b></div>`;
+      <b style="left:8px">${you}: ${evMe}${shown ? '' : ' ' + tr('(+{0} неясни)', [P.toss])}</b><b style="right:8px">${rivNm}: ${evRiv}</b><b style="left:50%;transform:translateX(8px)">270</b></div>`;
     }
-    el.innerHTML = `<div class="tb"><h2>${C.flag} Президентска кампания${s.done ? ' — изборната нощ' : ''}</h2>
-      ${s.done ? '' : `<span class="pill">📅 Седмица ${s.week} / ${WEEKS}</span><span class="pill">⚡ Ходове: ${s.ap}</span><span class="pill">📊 Национално: ${np.toFixed(1).replace('.', ',')}%</span>`}
+    el.innerHTML = `<div class="tb"><h2>${C.flag} ${s.re ? 'Кампания за втори мандат' : 'Президентска кампания'}${s.done ? ' — изборната нощ' : ''}</h2>
+      ${s.done ? '' : `<span class="pill">📅 Седмица ${s.week} / ${s.weeks || WEEKS}</span><span class="pill">⚡ Ходове: ${s.ap}</span><span class="pill">📊 Национално: ${np.toFixed(1).replace('.', ',')}%</span>`}
       <button class="x" style="width:auto">✕</button>
       ${bar}</div>
       <div class="main"><div class="map"><svg viewBox="0 0 ${geo.w} ${geo.h}">${Object.entries(geo.s).map(([k, v]) => `<path data-st="${k}" d="${v.d}" fill="${sup(k) == null ? '#1b2740' : color(sup(k) - 50, M)}" class="${k === selK ? 'sel' : ''}"><title>${NAMES_BG[k]} · ${POP ? `${STATES[k][2].toLocaleString('bg-BG')} млн. жители` : `${STATES[k][0]} ел. гласа`}${sup(k) != null ? ` · ${sup(k).toFixed(1).replace('.', ',')}% за теб` : ''}</title></path>`).join('')}${Object.entries(geo.s).filter(([k]) => STATES[k] && C.bigLabel(k)).map(([k, v]) => `<text x="${v.c[0]}" y="${v.c[1] + 3}">${C.label(k)}</text>`).join('')}</svg></div>
@@ -199,11 +207,12 @@ export function createCampaign(deps) {
     const b = (sel, fn) => { const x = el.querySelector(sel); if (x) x.onclick = () => { fn(); render(); }; };
     if (selK) { b('[data-a="rally"]', () => rally(selK)); b('[data-a="hq"]', () => hq(selK)); b('[data-a="ad"]', () => ad(selK)); b('[data-a="end"]', () => endorse(selK)); }
     b('[data-a="week"]', () => { endWeek(); if (st().done) electionNight(); });
+    { const x = el.querySelector('[data-a="skip"]'); if (x) x.onclick = skipNight; }
     if (s.ev && !s.done) modal();
   }
   function side() {
     const s = st(), M = me();
-    if (s.done) return `<h3>🗳️ Изборната нощ</h3><div class="m">${C.nightOrder}</div><div class="log">${s.log.slice(0, 14).map(t => `<div>${t}</div>`).join('')}</div>`;
+    if (s.done) return `<h3>🗳️ Изборната нощ</h3><div class="m">${C.nightOrder}</div>${night ? '<button class="go" data-a="skip" style="margin-top:10px">⏩ Пропусни — покажи резултата</button>' : ''}<div class="log">${s.log.slice(0, 14).map(t => `<div>${t}</div>`).join('')}</div>`;
     let h = '';
     if (selK) {
       const v = s.sup[selK], [ev, , pop] = STATES[selK], adc = Math.round(COST.adPerM * pop / 1e6) * 1e6, m = v - 50;
@@ -215,13 +224,13 @@ export function createCampaign(deps) {
         <button data-a="hq" ${s.ap < 1 || s.hq[selK] ? 'disabled' : ''}>🏢 Изборен щаб · 1 ход · ${B(COST.hq)}</button>
         <button data-a="end" ${s.ap < 1 ? 'disabled' : ''}>🤝 Подкрепа от местни лидери и бизнеса ти · 1 ход</button>`;
     } else h += `<h3>${C.unitPick}</h3><div class="m">${POP ? 'Пряк вот: печели, който събере <b>над 50%</b> от всички гласове. Големите региони тежат повече; сивите са неясни.' : 'Сивите са неясни — там се решават изборите. Нужни са <b>270</b> от 538 електорални гласа.'}</div>`;
-    h += `<button class="go" data-a="week" style="margin-top:12px">${s.week >= WEEKS ? '🗳️ Към изборите →' : `Край на седмица ${s.week} →`}</button>`;
+    h += `<button class="go" data-a="week" style="margin-top:12px">${s.week >= (s.weeks || WEEKS) ? '🗳️ Към изборите →' : `Край на седмица ${s.week} →`}</button>`;
     h += `<div class="log">${s.log.slice(0, 10).map(t => `<div>${t}</div>`).join('')}</div>`;
     return h;
   }
   function modal() {
     const s = st(), E = s.ev, w = document.createElement('div'); w.className = 'modal';
-    if (E.debate != null) { const Q = DEBATE_Q[E.debate]; w.innerHTML = `<div><h3>🎙️ Дебат ${E.debate + 1} от 3</h3><div class="m" style="margin-bottom:8px">Водещият пита: „${Q.q}“</div>${Q.o.map((o, i) => `<button data-c="${i}">${o[0]}</button>`).join('')}</div>`; }
+    if (E.debate != null) { const Q = DEBATE_Q[E.debate]; w.innerHTML = `<div><h3>🎙️ Дебат ${E.debate + 1} от ${(s.debates || DEBATES).length}</h3><div class="m" style="margin-bottom:8px">Водещият пита: „${Q.q}“</div>${Q.o.map((o, i) => `<button data-c="${i}">${o[0]}</button>`).join('')}</div>`; }
     else { const ev = EVENTS[E.e]; w.innerHTML = `<div><h3>📰 Седмица ${s.week}</h3><div style="margin-bottom:10px">${ev.t}</div><button data-c="0">${ev.a[0]}</button><button data-c="1">${ev.b[0]}</button></div>`; }
     el.appendChild(w);
     w.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { resolveEvent(+b.dataset.c); render(); });
@@ -234,29 +243,37 @@ export function createCampaign(deps) {
       if (!el) { clearInterval(night); night = null; return; }
       const k = s.order[i++];
       if (!k) { clearInterval(night); night = null; finish(); return; }
-      s.shownRes[k] = s.res[k]; log(`${s.res[k] > 50 ? '🔵' : '🔴'} ${NAMES_BG[k]}${POP ? '' : ` (${STATES[k][0]})`} — ${s.res[k] > 50 ? 'за теб' : 'за противника'} · ${s.res[k].toFixed(1).replace('.', ',')}%`);
+      s.shownRes[k] = s.res[k]; log(`${s.res[k] > 50 ? '🔵' : '🔴'} ${tr(NAMES_BG[k])}${POP ? '' : ` (${STATES[k][0]})`} — ${tr(s.res[k] > 50 ? 'за теб' : 'за противника')} · ${s.res[k].toFixed(1).replace('.', ',')}%`);
       deps.sound && deps.sound(s.res[k] > 50 ? 'cash' : 'click'); render();
     }, 450);
   }
+  // преизбирането чака твърде дълго: изборите стават сами (без нощта), резултатът — направо
+  function resolveNow() { const s = st(); if (!s || !s.re || s.fin) return; if (!s.done) election(); s.fin = true; close(); const ev = POP ? Math.round(share(s.res) * 10) / 10 : Object.entries(s.res).reduce((a, [k, v]) => a + (v > 50 ? STATES[k][0] : 0), 0);
+    log(tr('🗳️ Изборите минаха без твоята кампания.')); s.won ? deps.onReWin && deps.onReWin(ev) : deps.onReLose && deps.onReLose(ev); }
+  // ⏩ изборната нощ наведнъж: всички щати/региони се обявяват веднага, после резултатът
+  function skipNight() { const s = st(); if (!s.res || !night) return; clearInterval(night); night = null; s.shownRes = { ...s.res }; log(tr('⏩ Всички резултати са обявени.')); render(); finish(); }
   function finish() {
-    const s = st(), ev = POP ? Math.round(share(s.res) * 10) / 10 : Object.entries(s.res).reduce((a, [k, v]) => a + (v > 50 ? STATES[k][0] : 0), 0), evTxt = POP ? `${String(ev).replace('.', ',')}% от гласовете` : `${ev} електорални гласа`;
+    const s = st(), ev = POP ? Math.round(share(s.res) * 10) / 10 : Object.entries(s.res).reduce((a, [k, v]) => a + (v > 50 ? STATES[k][0] : 0), 0), evTxt = POP ? tr('{0}% от гласовете', [String(ev).replace('.', ',')]) : tr('{0} електорални гласа', [ev]);
     deps.save && deps.save();
+    if (s.re) { if (s.fin) return; log(`${s.won ? '🏆' : '😞'} ${evTxt}`); render(); const w = document.createElement('div'); w.className = 'modal';   /* преизбиране: без клипа */
+      w.innerHTML = `<div style="text-align:center"><div style="font-size:48px">${s.won ? '🏆' : '😞'}${C.flag}</div><h3>${s.won ? 'Преизбран за втори мандат!' : 'Изборите за втори мандат са загубени'}</h3><div class="m" style="margin-bottom:10px">${evTxt}. ${tr(s.won ? 'Още четири години.' : 'Мандатът свършва — фирмата и градът остават твои. Можеш да се кандидатираш пак след 1 година.')}</div><button class="go" data-ok>${s.won ? 'Продължи →' : 'Затвори'}</button></div>`;
+      el.appendChild(w); w.querySelector('[data-ok]').onclick = () => { s.fin = true; close(); s.won ? deps.onReWin && deps.onReWin(ev) : deps.onReLose && deps.onReLose(ev); }; deps.sound && deps.sound(s.won ? 'levelup' : 'click'); return; }
     if (s.won) {
-      log(`🏆 ПОБЕДА: ${evTxt}!`); render();
+      log(`🏆 ${tr('ПОБЕДА')}: ${evTxt}!`); render();
       const v = document.createElement('video'); v.src = C.video; v.autoplay = true; v.controls = false; v.playsInline = true;
       const skip = document.createElement('button'); skip.textContent = 'Продължи →'; skip.className = 'go'; Object.assign(skip.style, { position: 'absolute', right: '20px', bottom: '20px', width: 'auto', zIndex: 4 });
       const end = () => { v.remove(); skip.remove(); victoryCard(ev); };
       v.onended = end; v.onerror = end; skip.onclick = end; el.appendChild(v); el.appendChild(skip);
       v.play().catch(() => { v.muted = true; v.play().catch(end); });   // без скорошен клик браузърът не пуска звук — тогава без звук, иначе направо картата
       deps.sound && deps.sound('levelup');
-    } else { log(`Загуба: ${evTxt}${POP ? ' — нужни са над 50%' : ' от 270 нужни'}.`); render(); const w = document.createElement('div'); w.className = 'modal'; w.innerHTML = `<div><h3>😞 Изборите са загубени</h3><div class="m" style="margin-bottom:10px">${evTxt} — ${POP ? 'нужни са над 50%' : 'нужни са 270'}. ${RIVAL[0].toUpperCase() + RIVAL.slice(1)} печели. Можеш да опиташ пак след 4 години.</div><button class="go" data-ok>Затвори</button></div>`; el.appendChild(w); w.querySelector('[data-ok]').onclick = () => { close(); deps.onLose && deps.onLose(ev); }; }
+    } else { log(`${tr('Загуба')}: ${evTxt}${POP ? ' — ' + tr('нужни са над 50%') : ' ' + tr('от 270 нужни')}.`); render(); const w = document.createElement('div'); w.className = 'modal'; w.innerHTML = `<div><h3>😞 Изборите са загубени</h3><div class="m" style="margin-bottom:10px">${evTxt} — ${POP ? 'нужни са над 50%' : 'нужни са 270'}. ${RIVAL[0].toUpperCase() + RIVAL.slice(1)} печели. Можеш да опиташ пак след 1 година.</div><button class="go" data-ok>Затвори</button></div>`; el.appendChild(w); w.querySelector('[data-ok]').onclick = () => { s.fin = true; close(); deps.onLose && deps.onLose(ev); }; }
   }
   function victoryCard(ev) {
     const w = document.createElement('div'); w.className = 'modal';
     w.innerHTML = `<div style="text-align:center"><div style="font-size:54px">🏆${C.flag}</div><h3 style="font-size:24px">${C.winTitle}</h3><div class="m" style="margin-bottom:12px">${POP ? `${String(ev).replace('.', ',')}% от гласовете` : `${ev} електорални гласа`}. Министерският съвет те очаква в ${C.palace}.</div><button class="go" data-ok>${C.palaceBtn}</button></div>`;
     el.appendChild(w); w.querySelector('[data-ok]').onclick = () => { close(); deps.onWin && deps.onWin(ev); };
   }
-  return { open, close, start, state: st, proj, natPoll, active: () => !!S()?.camp && !S().camp.done, won: () => !!S()?.camp?.won };
+  return { open, close, start, state: st, proj, natPoll, retryDay, waiting, resolveNow, active: () => !!S()?.camp && !S().camp.done, won: () => !!S()?.camp?.won };
 }
 
 // демо за Лабораторията: собствен запис в паметта (не пипа играта)

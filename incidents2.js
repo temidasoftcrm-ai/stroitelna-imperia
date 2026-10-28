@@ -34,6 +34,8 @@ export function bodyBox(o) { o.updateMatrixWorld(true); const b = new THREE.Box3
 function wrapTo(src, len, yaw = 0) { const o = src.clone(true), inner = new THREE.Group(); inner.add(o); inner.rotation.y = yaw; const w = new THREE.Group(); w.add(inner);
   const b = bodyBox(w), s = b.getSize(new THREE.Vector3()), k = len ? len / Math.max(s.x, s.z) : 1; inner.scale.setScalar(k); const b2 = bodyBox(w), c = b2.getCenter(new THREE.Vector3()); inner.position.set(-c.x, -b2.min.y, -c.z); return w; }
 
+const TOWS = new Set();   // 🔊 sfx-batch2: пътната помощ на сцената (за лебедката)
+export const towsLive = () => { for (const w of TOWS) if (!w.parent) TOWS.delete(w); return [...TOWS]; };
 export function createInc2Kit(L) {
   const people = [], streams = [], rot = new Map(), V = new THREE.Vector3();
   const bones = {}, boneSet = k => bones[k] || (bones[k] = (() => { const s2 = new Set(); L[k].scene.traverse(o => s2.add(o.name)); return s2; })());
@@ -89,8 +91,8 @@ export function createInc2Kit(L) {
     if (body) body.onBeforeRender = () => { const t = performance.now() / 1000; w.getWorldPosition(V1); const ws = w.getWorldScale(V0).x || 1, d = last ? V1.distanceTo(last) : 0; last = (last || new THREE.Vector3()).copy(V1);
       if (d > 0.001 && d < 5) for (const m of wh) m.rotation.x += d / ws / (m.userData.r / ws * ws);   // r — в мащаба на света
       for (const m of bc) m.emissiveIntensity = Math.sin(t * 9) > 0.2 ? 4 : 0.3;
-      if (boom) { const tg = w.children.length > base ? 0.32 : 0; boom.rotation.x += (tg - boom.rotation.x) * 0.05; } };
-    return w; }
+      if (boom) { const tg = w.children.length > base ? 0.32 : 0; w.userData.winch = Math.abs(tg - boom.rotation.x) > 0.02; boom.rotation.x += (tg - boom.rotation.x) * 0.05; } };   // winch — лебедката работи (sfx-batch2)
+    TOWS.add(w); return w; }
   // анимациите — само близо до камерата; dt — игровото време
   function update(dt, cam) { for (const P of people) { if (!P.mixer || !P.o.parent) continue; P.o.getWorldPosition(V); if (!cam || V.distanceToSquared(cam) < NEAR * NEAR) P.mixer.update(dt); } }
   function reset() { for (const P of people) if (P.mixer) P.mixer.stopAllAction(); people.length = 0; for (const s of streams) s.dispose(); streams.length = 0; }

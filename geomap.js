@@ -4,6 +4,7 @@
 // (president.js); тук само рисуваме — при смяна на изгледа или на данните.
 import { POL, NEED, AID, CONFLICTS, PEACE } from './worldpol.js';
 import { HZ_PARTNERS, PREF } from './president.js';
+import { t as tr } from './i18n.js';
 
 // морските коридори през Ормуз (алтернативна игрова хронология); [lon, lat]
 const HZ_PT = [56.3, 26.6];
@@ -113,7 +114,7 @@ export function createGeoMap(deps) {
     if (sel.k === 'ck' && SCEN[sel.id]) return scenPanel(sel.id, ps);
     if (sel.k === 'ck') { const c = CONFLICTS.find(x => x.k === sel.id), k = P().conf(c.k);
       return `<div class="gh">${c.ico} ${c.nm}</div><div class="gm">ℹ️ алтернативна игрова хронология · страни: ${c.parties.map(nm).join(', ')} · интензитет ${Math.round(k.int)}</div>${PEACE.map((p, i) => `<div class="gm">${i < k.step ? '✅' : i === k.step ? '➡️' : '⬜'} ${p.ico} ${p.nm}</div>`).join('')}${k.step >= 3 ? `<div class="gm">Стабилност на примирието: <b>${Math.round(k.stab)}</b>${k.ver ? ' · 🔍 наблюдение' : ''}${k.gua ? ' · 🛡️ гаранции' : ''}${k.fund ? ` · 💶 фонд ${12 - k.fund.m}/12` : ''}${k.broken ? ' · 💔 нарушено обещание' : ''}</div>` : ''}
-        ${ps.filter(p => p.ck === c.k && p.kind !== 'pkgHint').map(propRow).join('')}<div class="grow">${k.step >= 2 && k.step !== 3 && k.step < 5 ? `<button class="gbtn y" data-gpkg="${c.k}">📝 Мирен пакет</button>` : ''}<button class="gbtn" data-gcab="ck">🏛️ Обсъди с кабинета</button></div>`; }
+        ${ps.filter(p => p.ck === c.k && p.kind !== 'pkgHint').map(propRow).join('')}<div class="grow">${k.step >= 2 && k.step < 5 ? `<button class="gbtn y" data-gpkg="${c.k}">📝 Мирен пакет</button>` : ''}<button class="gbtn" data-gcab="ck">🏛️ Обсъди с кабинета</button></div>`; }
     // държава
     const iso = sel.id, c = POL[iso], war = CONFLICTS.filter(x => x.parties.includes(iso) || x.region === iso), access = !war.some(x => P().conf(x.k).step < 2);
     const aid = s.aid.filter(a => a.iso === iso), commits = war.filter(x => P().conf(x.k).fund).map(x => `💶 фонд за възстановяване: ${12 - P().conf(x.k).fund.m}/12 вноски`);
@@ -147,7 +148,7 @@ export function createGeoMap(deps) {
       <div class="gm"><b>Трудният избор:</b> ${sc.issues}.</div><div class="gm"><b>Успех:</b> ${sc.goal}.</div>
       <div class="gsub">Етапи</div>${PEACE.map((p, i) => `<div class="gm">${i < k.step ? '✅' : i === k.step ? '➡️' : '⬜'} ${p.ico} ${p.nm}</div>`).join('')}${k.step >= 3 ? `<div class="gm">Стабилност на примирието: <b>${Math.round(k.stab)}</b>${k.ver ? ' · 🔍 наблюдение' : ''}${k.gua ? ' · 🛡️ гаранции' : ''}${k.fund ? ` · 💶 фонд ${12 - k.fund.m}/12` : ''}${k.broken ? ' · 💔 нарушено обещание' : ''}</div>` : ''}
       <div class="gsub">Участници</div>${parties}${last}
-      ${ps.filter(p => p.ck === ck && p.kind !== 'pkgHint').map(propRow).join('')}<div class="grow">${k.step >= 2 && k.step !== 3 && k.step < 5 && !(k.wait > deps.day()) ? `<button class="gbtn y" data-gpkg="${ck}">📝 Мирен пакет</button>` : k.wait > deps.day() ? `<span class="gm">Следващ опит след ден ${k.wait}</span>` : ''}<button class="gbtn" data-gcab="ck">🏛️ Обсъди с кабинета</button></div>`;
+      ${ps.filter(p => p.ck === ck && p.kind !== 'pkgHint').map(propRow).join('')}<div class="grow">${k.step >= 2 && k.step < 5 && !(k.wait > deps.day()) ? `<button class="gbtn y" data-gpkg="${ck}">📝 Мирен пакет</button>` : k.wait > deps.day() ? `<span class="gm">Следващ опит след ден ${k.wait}</span>` : ''}<button class="gbtn" data-gcab="ck">🏛️ Обсъди с кабинета</button></div>`;
   }
   function hzPanel(s, ps) {
     const hz = s.hz, d = deps.day(), partners = Object.keys(s.deals).filter(i => HZ_PARTNERS.includes(i)), opt = k => ps.find(p => p.kind === 'hz' && p.act === k);
@@ -169,7 +170,9 @@ export function createGeoMap(deps) {
   }
 
   // ---- целият интерфейс над картата
-  const css = `#geoUI .gtop { position:absolute; top:8px; left:50%; transform:translateX(-50%); display:flex; gap:6px; flex-wrap:wrap; align-items:center; background:rgba(11,18,32,.88); border:1px solid #22304a; border-radius:12px; padding:6px 8px; z-index:6; }
+  const css = `
+body.geo:not(.mob):has(#mapScreen:not(.hidden) #geoUI) #toasts { top:auto; bottom:64px; left:auto; right:380px; }
+#geoUI .gtop { position:absolute; top:8px; left:50%; transform:translateX(-50%); display:flex; gap:6px; flex-wrap:wrap; align-items:center; background:rgba(11,18,32,.88); border:1px solid #22304a; border-radius:12px; padding:6px 8px; z-index:6; }
 #geoUI .gleft { position:absolute; top:64px; left:8px; width:280px; background:rgba(11,18,32,.9); border:1px solid #22304a; border-radius:12px; padding:8px 10px; z-index:6; }
 #geoUI .gright { position:absolute; top:64px; right:8px; bottom:70px; width:360px; overflow:auto; background:rgba(11,18,32,.94); border:1px solid #22304a; border-radius:12px; padding:10px 12px; z-index:6; }
 #geoUI .gbot { position:absolute; left:8px; bottom:8px; max-width:560px; background:rgba(11,18,32,.9); border:1px solid #22304a; border-radius:12px; padding:6px 10px; z-index:6; }
@@ -183,10 +186,10 @@ body.geo #mapHud, body.geo #mapLayers { display:none !important; }`;
     if (!on || !S()) { ui && ui.remove(); ui = null; document.body.classList.remove('geo'); return; }
     document.body.classList.add('geo'); if (!ui) { ui = document.createElement('div'); ui.id = 'geoUI'; host.appendChild(ui); }
     const s = S(), u = urgent(), ms = missions(), C = P().worldConds();
-    ui.innerHTML = `<div class="gtop"><button class="gbtn" data-gmode="eco">💼 Икономическа империя</button><button class="gbtn on">🌍 Геополитика</button><span style="width:10px"></span>${LAYERS.map(([k, t]) => `<button class="gbtn ${layer === k ? 'on' : ''}" data-glay="${k}">${t}</button>`).join('')}<span class="gm" style="margin:0 6px">${LEGEND[layer].map(([c, t]) => `<span style="color:${c}">■</span> ${t}`).join(' · ')}</span><span class="gm" style="margin:0">🏛️ Държавен бюджет: <b style="color:${s.res >= 0 ? '#7dffa8' : '#ff8a8a'}">${B(s.res)}</b> · 🏢 холдинг: ${B(deps.holding())}</span></div>
+    ui.innerHTML = `<div class="gtop"><button class="gbtn" data-gmode="eco">💼 Икономическа империя</button><button class="gbtn on">🌍 Геополитика</button><span style="width:10px"></span>${LAYERS.map(([k, t]) => `<button class="gbtn ${layer === k ? 'on' : ''}" data-glay="${k}">${t}</button>`).join('')}<span class="gm" style="margin:0 6px">${LEGEND[layer].map(([c, t]) => `<span style="color:${c}">■</span> ${tr(t)}`).join(' · ')}</span><span class="gm" style="margin:0">🏛️ Държавен бюджет: <b style="color:${s.res >= 0 ? '#7dffa8' : '#ff8a8a'}">${B(s.res)}</b> · 🏢 холдинг: ${B(deps.holding())}</span></div>
       <div class="gleft"><div class="gh">❗ Изисква решение</div>${u.length ? u.map((x, i) => `<button class="gurg" data-gurg="${i}">${x.ico} ${x.t}</button>`).join('') : '<div class="gm">Нищо спешно — време за дългосрочните програми.</div>'}${ms.length ? `<div class="gh" style="margin-top:8px">📌 Активни мисии</div>${ms.slice(0, 6).map((x, i) => `<button class="gurg" data-gms="${i}">${x.ico} ${x.t}<div class="gm" style="margin:1px 0 0">${x.sub}</div></button>`).join('')}${ms.length > 6 ? `<div class="gm">… и още ${ms.length - 6}</div>` : ''}` : ''}<div class="gm" style="margin-top:6px">🔭 ${{ world: 'Свят', region: 'Регион', country: 'Държава', local: 'Местна зона' }[zoomOf(deps.visW())]}</div></div>
       <div class="gright">${panel()}</div>
-      <div class="gbot"><details><summary style="cursor:pointer">🌍 Път към световен мир — ${C.filter(c => c[1]).length}/${C.length} условия · задържани ${s.world || 0}/360 дни</summary>${C.map(([t, ok]) => `<div class="gm">${ok ? '✅' : '⬜'} ${t}</div>`).join('')}</details></div>`;
+      <div class="gbot"><details><summary style="cursor:pointer">🌍 Път към световен мир — ${C.filter(c => c[1]).length}/${C.length} условия · задържани ${s.world || 0}/${P().WORLD_DAYS || 180} дни</summary>${C.map(([t, ok]) => `<div class="gm">${ok ? '✅' : '⬜'} ${t}</div>`).join('')}</details></div>`;
     const q = (sel2, fn) => ui.querySelectorAll(sel2).forEach(b => b.onclick = e => { e.stopPropagation(); fn(b); });
     q('[data-gmode]', () => setOn(false)); q('[data-glay]', b => { layer = b.dataset.glay; deps.redraw(); });
     q('[data-gurg]', b => { const x = u[+b.dataset.gurg]; sel = x.go; if (x.at) deps.panTo(x.at[0], x.at[1], 3); else deps.redraw(); });

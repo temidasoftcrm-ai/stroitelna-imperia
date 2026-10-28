@@ -60,7 +60,7 @@ const FRAG_TINT = `{
 // вкарва оцветяването в шейдъра на материала o (и на сянката му — MeshDepthMaterial със същото „голо“)
 function inject(o, uSeed, uYr, key) {
   o.onBeforeCompile = sh => {
-    o.userData.ttSh = sh; Object.assign(sh.uniforms, U, { uSeed, uYr });
+    TT(o).sh = sh; Object.assign(sh.uniforms, U, { uSeed, uYr });
     sh.vertexShader = VERT_HEAD + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
 #ifdef TT_INST
   vTTSeed = aSeed;
@@ -72,13 +72,15 @@ function inject(o, uSeed, uYr, key) {
   };
   o.customProgramCacheKey = () => key + Object.keys(o.defines).filter(k => k.startsWith('TT_')).sort().join();
 }
+// оцветимото на материала — в __tt (не в userData: three клонира userData през JSON — кофите/сянката са кръгови, T3: NY)
+const TT = o => o.__tt || Object.defineProperty(o, '__tt', { value: {}, enumerable: false }).__tt;
 function patch(m, defs, yr = [0, 1]) {
   const o = m.clone(); o.defines = { ...(o.defines || {}), ...defs };
-  const uSeed = { value: 0.5 }, uYr = { value: new THREE.Vector2(yr[0], yr[1]) }; o.userData = { ...o.userData, tt: true, uSeed };
+  const uSeed = { value: 0.5 }, uYr = { value: new THREE.Vector2(yr[0], yr[1]) }; o.userData = { ...o.userData, tt: true }; TT(o).uSeed = uSeed;
   inject(o, uSeed, uYr, 'tt');
   // сянката: голото дърво — без корона и в сянката (customDepthMaterial на мешовете)
   const d = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: m.map || null, alphaTest: m.alphaTest || 0, side: m.side });
-  d.defines = { ...defs }; inject(d, uSeed, uYr, 'ttd'); o.userData.depth = d;
+  d.defines = { ...defs }; inject(d, uSeed, uYr, 'ttd'); TT(o).depth = d;
   return o;
 }
 // сменя материалите на листата в дървото (A[…].scene) с оцветимите — веднъж; копията (clone) ги наследяват
@@ -86,20 +88,21 @@ export function ttPatchTree(scene, kind = 'leaf') {
   const done = new Map();
   scene.traverse(o => { if (!o.isMesh || !o.material || Array.isArray(o.material)) return; const m = o.material; if (m.userData.tt || SKIP.test(m.name || '') || !m.isMeshStandardMaterial) return;
     if (!done.has(m)) { o.geometry.computeBoundingBox(); const bb = o.geometry.boundingBox, yr = [bb.min.y, bb.max.y]; const defs = { ...(LEAVES.test(m.name || '') ? { TT_ALL: '' } : {}), ...(kind === 'con' || CONIF.test(m.name || '') ? { TT_CON: '' } : kind === 'palm' ? { TT_PALM: '' } : {}) };
-      const base = patch(m, defs, yr), bk = Array.from({ length: BUCKETS }, (_, i) => { const v = i ? patch(m, defs, yr) : base; v.userData.uSeed.value = (i + 0.5) / BUCKETS; return v; });
-      base.userData.buckets = bk; let inst = null; base.userData.ttInst = () => inst || (inst = patch(m, { ...defs, TT_INST: '' }, [0, 1]))   /* realTrees пече геометрията до височина 0…1 */; done.set(m, base); }
-    o.material = done.get(m); o.customDepthMaterial = o.material.userData.depth; });
+      const base = patch(m, defs, yr), bk = Array.from({ length: BUCKETS }, (_, i) => { const v = i ? patch(m, defs, yr) : base; TT(v).uSeed.value = (i + 0.5) / BUCKETS; return v; });
+      TT(base).buckets = bk; let inst = null; TT(base).inst = () => inst || (inst = patch(m, { ...defs, TT_INST: '' }, [0, 1]))   /* realTrees пече геометрията до височина 0…1 */; done.set(m, base); }
+    o.material = done.get(m); o.customDepthMaterial = TT(o.material).depth; });
   return scene;
 }
 // копие на дърво: материалите на листата — от кофата на семето (0…1)
 export function ttVariant(obj, seed) {
   const b = Math.min(BUCKETS - 1, Math.floor(((seed % 1) + 1) % 1 * BUCKETS));
-  obj.traverse(o => { if (o.isMesh && o.material && o.material.userData && o.material.userData.buckets) { o.material = o.material.userData.buckets[b]; o.customDepthMaterial = o.material.userData.depth; } });
+  obj.traverse(o => { if (o.isMesh && o.material && o.material.__tt && o.material.__tt.buckets) { o.material = o.material.__tt.buckets[b]; o.customDepthMaterial = o.material.__tt.depth; } });
   return obj;
 }
 export const ttSet = (aut, bare, spring = 0) => { U.uAut.value = aut; U.uBare.value = bare; U.uSpring.value = spring; };
 export const ttUniforms = () => ({ aut: U.uAut.value, bare: U.uBare.value, spring: U.uSpring.value });
-export const ttInstMat = m => (m && m.userData && m.userData.ttInst ? m.userData.ttInst() : m);
+export const ttInstMat = m => (m && m.__tt && m.__tt.inst ? m.__tt.inst() : m);
+export const ttOf = m => (m && m.__tt) || null;   // за другите модули: { buckets, depth, inst, sh, uSeed }
 // сезонът (календарът на играта — 30-дневни месеци): есента от 15.09 (все повече до края на октомври), зимата — голи в студените градове,
 // пролетта — светло зелено (март–май); южното полукълбо — с 6 месеца разлика; топлите градове — малко есен, без голи; тропиците — само зелено
 export function ttSeason({ day, monthOf, lat = 45, warm = false }) {

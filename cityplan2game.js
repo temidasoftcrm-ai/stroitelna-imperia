@@ -7,17 +7,19 @@ import { OSM2 } from './cityplan2-osm.js';
 import { LOT_KINDS } from './cityplan.js';
 
 const EDGE = -108;   // както в cityplangame.js
-const SQUARE = { rome: [41.8960, 12.4826], paris: [48.8566, 2.3522], istanbul: [41.0082, 28.9784], london: [51.5007, -0.1263], newyork: [40.7536, -73.9832], moscow: [55.7558, 37.6150], washington: [38.8958, -77.0310], lasvegas: [36.1150, -115.1625] };   /* Лас Вегас: на изток от Стрипа (Коувал / Флеминго) — централата не е върху казината */   /* Вашингтон: Фрийдъм Плаза на Пенсилвания авеню */   // … · Брайънт Парк   // площадът на централата: Пиаца Венеция · Отел дьо Вил   // площадът на централата: Пиаца Венеция
+const SQUARE = { sofia: [42.6977, 23.3228], berlin: [52.5136, 13.3927], rome: [41.8960, 12.4826], paris: [48.8566, 2.3522], istanbul: [41.0082, 28.9784], london: [51.5007, -0.1263], newyork: [40.7536, -73.9832], moscow: [55.7558, 37.6150], washington: [38.8958, -77.0310], lasvegas: [36.1150, -115.1625] };   /* Лас Вегас: на изток от Стрипа (Коувал / Флеминго) — централата не е върху казината */   /* Вашингтон: Фрийдъм Плаза на Пенсилвания авеню */   // … · Брайънт Парк   // площадът на централата: Пиаца Венеция · Отел дьо Вил   // площадът на централата: Пиаца Венеция
 const cache = new Map();
 const cumLen = pts => { const L = [0]; for (let i = 1; i < pts.length; i++) L.push(L[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])); return L; };
 
 // данните — assets/plans/<id>.json (готов план); зарежда се веднъж
-export async function loadPlan2(cityId) {
-  if (cache.has(cityId)) return cache.get(cityId);
+// conn — osm-connect (T2): новите игри — свързаният план (<id>-c.json: мостовете, доизтеглените краища); ако го няма — обикновеният
+export async function loadPlan2(cityId, conn = false) {
+  const key = cityId + (conn ? ':c' : ''); if (cache.has(key)) return cache.get(key);
   const osm = OSM2[cityId]; if (!osm) return null;
-  const data = await fetch(`assets/plans/${cityId}.json`).then(r => r.ok ? r.json() : null).catch(() => null); if (!data) return null;
+  const get = f => fetch(`assets/plans/${f}.json`).then(r => r.ok ? r.json() : null).catch(() => null);
+  const data = (conn && await get(cityId + '-c')) || await get(cityId); if (!data) return null;
   const P = plan2Load(data, osm); P.osmData = osm;
-  cache.set(cityId, P); return P;
+  cache.set(key, P); return P;
 }
 
 // gamePlan2(P, { tier }) — tier: до кое ниво на кварталите са отключени парцелите (1…5); P — от loadPlan2

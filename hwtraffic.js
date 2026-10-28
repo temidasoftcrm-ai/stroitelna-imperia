@@ -33,11 +33,12 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
     const truck = k % 3 === 0, bus = !truck && k % 7 === 3 && A['sf-car-Bus'], dir = k % 2 ? 1 : -1;
     const semis = feature('trucks-real') && A['sf-semi-0'] ? ['sf-semi-0', 'sf-semi-1', ...(A['sf-car-Truck'] ? ['sf-car-Truck'] : [])] : ['sf-car-Truck'];
     if (feature('truck-box') && A['sf-car-BoxTruck']) semis.push('sf-car-BoxTruck');   /* truck-box (T1): белият камион-фургон — един от 3–4 тежки */   /* №2: без детските TRUCKS */
-    const names = (truck ? semis : bus ? ['sf-car-Bus'] : realCars.length ? [pickCar(rnd())] : []).filter(n => A[n]);   /* №2 (55): само истински коли — без детските CARS */   // модерните ТИР-ове (trucks-real)
+    const coach = feature('hw-coach') && !truck && k % 5 === 2 && ['sf-coach-a', 'sf-coach-b'].filter(n => A[n]);   /* hw-coach (T2): междуградските автобуси на потребителя (Meshy) — по няколко във всяка посока */
+    const names = (truck ? semis : coach && coach.length ? coach : bus ? ['sf-car-Bus'] : realCars.length ? [pickCar(rnd())] : []).filter(n => A[n]);   /* №2 (55): само истински коли — без детските CARS */   // модерните ТИР-ове (trucks-real)
     if (!names.length) continue;
-    const n = names[(rnd() * names.length) | 0], o = model(n, SCALE[n] || kidK(n, 1.25));
+    const n = names[(rnd() * names.length) | 0], o = model(n, /^sf-coach-/.test(n) ? 1 : SCALE[n] || kidK(n, 1.25));   /* автобусите — в метри */
     o.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2;
-    const heavy = truck || !!bus, lane = heavy ? RIGHT : (ab ? (k >> 1) % NL : (k % 4 < 2 ? 0 : 1)), v0 = heavy ? 15 + rnd() * 4 : 22 + rnd() * 10;
+    const heavy = truck || !!bus || /^sf-coach-/.test(n), lane = heavy ? RIGHT : (ab ? (k >> 1) % NL : (k % 4 < 2 ? 0 : 1)), v0 = heavy ? 15 + rnd() * 4 : 22 + rnd() * 10;
     const c = { o, dir, x: 0, lane, z: laneZ(dir, lane), v: v0 * 0.8, v0, L: lenOf(o), heavy, cool: 0 };
     g.add(o); list.push(c);
   }

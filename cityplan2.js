@@ -267,6 +267,27 @@ function osmSkeleton(D) {
   return { R: Math.max(x1 - x0, z1 - z0) / 2, bnd, lines, hubs: [{ x: 0, z: 0, main: true }], waterAt, coastZ: null, greens: D.greens || [], osm: D };
 }
 
+// 🔗 osm-connect (T2): мрежата по картата е разкъсана (Рим — 38 части, Истанбул — 2 мрежи заради Босфора; стотици задънени краища) —
+// в графа на OSM (възлите — общите точки на улиците), преди правилата: 1) големите мостове (D.bigBridges — Босфорският) — ребро между
+// най-близките възли на двата бряга (≤ 200 м); 2) всеки задънен възел — ребро до най-близкия друг възел (≤ 40 м, не съсед, не над водата);
+// 3) малките части — до голямата мрежа през най-близката двойка възли (≤ 80 м). Само за новите игри (<град>-c.json).
+function osmConnect(G, D) {
+  const N = G.nodes, E = G.edges, g = pointGrid(12); N.forEach((n, i) => g.add([n.x, n.z], i));
+  const sea = seaMask(D.sea), wet = (a, b) => { if (!sea) return false; for (let k = 1; k < 8; k++) { const t = k / 8; if (sea(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t)) return true; } return false; };
+  const adj = N.map(() => new Set()); for (const e of E) if (!e.noCars) { adj[e.a].add(e.b); adj[e.b].add(e.a); }
+  const mk = (a, b, cls, bridge, mid) => { const pts = resample([[N[a].x, N[a].z], ...(mid || []), [N[b].x, N[b].z]], 4); pts[0] = [N[a].x, N[a].z]; pts[pts.length - 1] = [N[b].x, N[b].z];
+    E.push({ a, b, cls, pts, src: -1, noCars: false, bridge: !!bridge, nm: bridge ? 'Мост' : '', oneway: false, conn: true }); adj[a].add(b); adj[b].add(a); };
+  const nearest = (p, R, ok) => { let best = -1, bd = R; g.near(p, R, (q, j) => { const d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (d < bd && ok(j)) { bd = d; best = j; } }); return best; };
+  let nb = 0, nd = 0, nc = 0;
+  for (const B of D.bigBridges || []) { const ia = nearest(B.a, 200, () => true), ib = nearest(B.b, 200, () => true); if (ia >= 0 && ib >= 0 && ia !== ib) { mk(ia, ib, 'blvd', true, [B.a, B.b]); nb++; } }
+  for (let i = 0; i < N.length; i++) { if (adj[i].size !== 1) continue; const j = nearest([N[i].x, N[i].z], 40, j2 => j2 !== i && !adj[i].has(j2) && adj[j2].size > 0 && !wet(N[i], N[j2])); if (j >= 0) { mk(i, j, 'street'); nd++; } }
+  // части
+  const par = N.map((_, i) => i), find = i => par[i] === i ? i : (par[i] = find(par[i])); for (const e of E) if (!e.noCars) { const a = find(e.a), b = find(e.b); if (a !== b) par[a] = b; }
+  const cnt = new Map(); N.forEach((_, i) => { if (adj[i].size) cnt.set(find(i), (cnt.get(find(i)) || 0) + 1); }); const main = [...cnt.entries()].sort((a, b) => b[1] - a[1])[0]; if (!main) return { nb, nd, nc };
+  const byC = new Map(); N.forEach((_, i) => { if (!adj[i].size) return; const c = find(i); if (c === main[0]) return; (byC.get(c) || byC.set(c, []).get(c)).push(i); });
+  for (const [, ids] of byC) { let best = null; for (const i of ids) { const j = nearest([N[i].x, N[i].z], 80, j2 => find(j2) === main[0] && !wet(N[i], N[j2]));   /* частите — до 80 м (краищата — до 40) */ if (j >= 0) { const d = Math.hypot(N[i].x - N[j].x, N[i].z - N[j].z); if (!best || d < best.d) best = { i, j, d }; } } if (best) { mk(best.i, best.j, 'street'); nc++; } }
+  return { nb, nd, nc };
+}
 // ---- квартални улици: решетка в рамка (ъгъл), изрязана до района, далеч от главните пътища; краищата — до главния път (Т)
 function localStreets(sk, fam, size, r, majorNear) {
   const Z = SIZE[size], R = sk.R, out = [], rr = (a, b) => lerp(a, b, r());
@@ -464,7 +485,7 @@ export function plan2Load(data, osm) {
 // ---- основното: plan2(cityId, { fam, size, seed, ext })
 const cache = new Map();
 export function plan2(cityId, o = {}) {
-  const fam = o.fam || 'eu', size = o.size || 'm', seed = o.seed ?? hashStr(cityId), ext = o.ext || 0, RG = !!o.roadGeo && !o.osm, JF = !!o.jfix && !o.osm, ED = !o.osm && o.edit && (o.edit.add?.length || o.edit.cut?.length) ? o.edit : null, key = [cityId, fam, size, seed, ext, o.rk || 1, RG ? 'rg' : '', JF ? 'jf' : '', o.river ? 'rv' + o.river.kind : '', ED ? 'ed' + hashStr(JSON.stringify([ED.add, ED.cut])) : '', o.canals ? 'cn' : '', o.edgeBlvd ? 'eb' : ''].join(':');   /* ED — редакциите от Лаб редактора (#29, plan-edit): начертани и изтрити улици */   // RG — road-geo (само нови игри: парцелите се местят)
+  const fam = o.fam || 'eu', size = o.size || 'm', seed = o.seed ?? hashStr(cityId), ext = o.ext || 0, RG = !!o.roadGeo && !o.osm, JF = !!o.jfix && !o.osm, ED = !o.osm && o.edit && (o.edit.add?.length || o.edit.cut?.length) ? o.edit : null, key = [cityId, fam, size, seed, ext, o.rk || 1, RG ? 'rg' : '', JF ? 'jf' : '', o.river ? 'rv' + o.river.kind : '', ED ? 'ed' + hashStr(JSON.stringify([ED.add, ED.cut])) : '', o.canals ? 'cn' : '', o.edgeBlvd ? 'eb' : '', o.conn ? 'cc' : ''].join(':');   /* ED — редакциите от Лаб редактора (#29, plan-edit): начертани и изтрити улици */   // RG — road-geo (само нови игри: парцелите се местят)
   if (cache.has(key)) return cache.get(key);
   const t0 = Date.now(), r = rng(hashStr(`plan2:${cityId}:${fam}:${size}:${seed}`));
   const sk = o.osm ? osmSkeleton(o.osm) : skeleton(fam, size, r, o.rk || 1, !!o.canals, o.river || null);   // rk — по-голям радиус (играта иска повече парцели)
@@ -508,6 +529,7 @@ export function plan2(cityId, o = {}) {
   const G = o.osm && o.osm.nodes ? { nodes: o.osm.nodes.map(([x, z]) => ({ x, z, rank: 0 })), edges: o.osm.roads.map((r, i) => { const pts = resample(r.pts, 4); pts[0] = o.osm.nodes[r.a].slice(); pts[pts.length - 1] = o.osm.nodes[r.b].slice();
       return { a: r.a, b: r.b, cls: r.cls, pts, src: i, noCars: !!r.noCars, bridge: !!r.bridge, nm: r.nm || '', oneway: !!r.oneway }; }) }   // истинската карта: възлите са общите точки на улиците в OSM
     : buildGraph(lines, { merge: 7 });
+  if (o.osm && o.osm.nodes && o.conn) G.conn = osmConnect(G, o.osm);   // 🔗 osm-connect (T2)
   let E = applyRules(G, o.osm ? { minAngle: 20 * Math.PI / 180, minLen: 4, minStub: 10 } : { minAngle: 55 * Math.PI / 180, minLen: 30, minStub: 46 });   // истинската карта — по-меки правила (Рим има остри ъгли и къси пресечки)
   if (ED && ED.cut && ED.cut.length) {   // изтритите в редактора: ребро, чиито точки са поне 60% на ≤ 4 м от изтрита улица
     const cg = pointGrid(8); ED.cut.forEach(c => resample(c, 2).forEach(p => cg.add(p, 1)));
@@ -741,7 +763,9 @@ function placeLots(P, sk, r) {
       let best = null, bd = 1e9; for (const r of P.roads) { if (r.noCars || r.cls === 'street') continue; for (const end of [0, 1]) { const q = r.pts[end ? r.pts.length - 1 : 0], d = Math.hypot(q[0] - e[0], q[1] - e[1]); if (d < bd) { bd = d; best = { road: r.id, end, x: q[0], z: q[1] }; } } }
       return { x: e[0], z: e[1], dir: Math.atan2(ux, uz), road: best }; };
     // по град: гарата (запазеното място на забележителността), летището и магистралата — в истинската посока до ръба
-    const AN = { rome: { st: ['termini', 'Roma Termini'], ap: [41.7999, 12.2462, 'Fiumicino (FCO)', 26], hw: [41.835, 12.42, 'A91 Roma–Fiumicino / GRA'] },
+    const AN = { sofia: { st: ['sofiacentral', 'Централна гара София'], ap: [42.6967, 23.4114, 'Летище София (SOF)', 10], hw: [42.665, 23.38, 'АМ „Тракия“ / Околовръстен път'] },   // sofia-osm (T2)
+      berlin: { st: ['hbf', 'Берлин Хауптбанхоф'], ap: [52.3667, 13.5033, 'Летище Берлин-Бранденбург (BER)', 18], hw: [52.535, 13.29, 'A100 / A111'] },   // berlin-osm (T2)
+      rome: { st: ['termini', 'Roma Termini'], ap: [41.7999, 12.2462, 'Fiumicino (FCO)', 26], hw: [41.835, 12.42, 'A91 Roma–Fiumicino / GRA'] },
       lasvegas: { ap: [36.0840, -115.1537, 'Летище Хари Рийд (LAS)', 3], hw: [36.105, -115.19, 'I-15'] },   // lasvegas-osm (55): Стрипът — без гара
       washington: { st: ['unionstation', 'Юниън Стейшън'], ap: [38.8512, -77.0402, 'Летище Роналд Рейгън (DCA)', 6], hw: [38.86, -77.08, 'I-395 / I-66'] },
       moscow: { st: ['kursky', 'Курска гара'], ap: [55.9726, 37.4146, 'Летище Шереметиево (SVO)', 29], hw: [55.75, 37.84, 'Магистрала М7 / МКАД'] },

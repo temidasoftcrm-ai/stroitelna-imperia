@@ -45,8 +45,22 @@ function pipe(g, a, b, y = 0.5, r = 0.18, m = M.steel) {
   o.rotation.z = Math.PI / 2; o.rotation.y = -Math.atan2(dz, dx); return o;
 }
 function tank(g, x, z, r = 2.2, h = 3, m = M.white) { cyl(r, r, h, m, x, h / 2, z, g, 20); cyl(r * 0.98, r * 0.6, 0.5, m, x, h + 0.25, z, g, 20); const st = box(0.2, h, 0.6, M.dark, x + r, h / 2, z, g); st.rotation.y = 0.3; }
+// 🛢️ oil-jacks (T2): помпата на потребителя (Meshy, „Темидасофт“) — възли body, beam (рамото с конската глава; пивот — лагерът), crank (противотежестите; пивот — валът),
+// pitman (мотовилката; пивот — горният край, следва края на рамото); ~8,5 м; люлеят се с различна фаза. Докато моделът се зарежда — процедурната.
+const JACK = { sc: null, p: null }; const loadJack = () => JACK.p || (JACK.p = new GLTFLoader().loadAsync('assets/heavy/gear/pumpjack.glb').then(gl => { gl.scene.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); JACK.sc = gl.scene; }).catch(e => console.warn('oil-jacks', e)));
+if (feature('oil-jacks')) loadJack();
+function realJack(g, x, z, rot, ph) {
+  const p = new THREE.Group(), o = JACK.sc.clone(true), k = 8.5 / 1.9; o.scale.setScalar(k); p.add(o); p.position.set(x, 0, z); p.rotation.y = rot; g.add(p);
+  const beam = o.getObjectByName('beam'), crank = o.getObjectByName('crank'), pit = o.getObjectByName('pitman');
+  const B0 = beam ? beam.position.clone() : null, T0 = pit ? pit.position.clone() : null, br = T0 && B0 ? T0.clone().sub(B0) : null, r0 = beam ? beam.rotation.z : 0, c0 = crank ? crank.rotation.z : 0, p0 = pit ? pit.rotation.z : 0;
+  return (dt, t) => { const a = t * 1.6 + ph, th = Math.sin(a) * 0.22;
+    if (beam) beam.rotation.z = r0 - th;
+    if (crank) crank.rotation.z = c0 - a;
+    if (pit && br) { const c = Math.cos(-th), s2 = Math.sin(-th); pit.position.set(B0.x + br.x * c - br.y * s2, B0.y + br.x * s2 + br.y * c, T0.z); pit.rotation.z = p0 + Math.sin(a + 1.2) * 0.08; } };
+}
 // помпа „люлка“ (pumpjack): A-рамка, люлеещо се рамо с „конска глава“ и въртящ се противотежест
 function pumpjack(g, x, z, rot = 0, ph = 0) {
+  if (feature('oil-jacks') && JACK.sc) return realJack(g, x, z, rot, ph);
   const p = new THREE.Group(); p.position.set(x, 0, z); p.rotation.y = rot; g.add(p);
   box(5.2, 0.3, 1.6, M.conc, 0, 0.15, 0, p);
   for (const s of [-0.5, 0.5]) { const a = box(0.2, 3.4, 0.2, M.yellow, 0, 1.9, s, p); a.rotation.x = -s * 0.25; }   // A-рамка
@@ -127,11 +141,18 @@ const KINDS = {
   oilwell(g, ex, ez, lv, U, alive) {
     box(ex, 0.08, ez, M.sand, 0, 0.04, 0, g);
     for (let i = 0; i < 5; i++) { const s = new THREE.Mesh(new THREE.CircleGeometry(1 + Math.random() * 1.2, 12), M.oil); s.rotation.x = -Math.PI / 2; s.position.set((Math.random() - 0.5) * ex * 0.8, 0.09, (Math.random() - 0.5) * ez * 0.8); g.add(s); }
-    const n = 2 + lv, P = [[-6, -6], [6, -6], [-6, 4], [6, 4], [0, -1]];
+    const n = 2 + lv, RJ = feature('oil-jacks') && JACK.sc;
+    if (RJ) {   // oil-jacks (T2): истинските (8,5 м) — в редове по дългата ос на площадката, ≥ 4 м между тях, еднакво обърнати; без застъпване
+      const along = ex >= ez, Lg = (along ? ex : ez) - 4, step = 8.5 + 4.5, per = Math.max(1, Math.floor(Lg / step)), rows = [-0.22, 0.12].map(f => f * (along ? ez : ex)), P = [];
+      for (const r of rows) for (let c = 0; c < per; c++) { const u = -Lg / 2 + step / 2 + c * step; P.push(along ? [u, r] : [r, u]); }
+      for (let i = 0; i < Math.min(n, P.length); i++) { U.push(pumpjack(g, P[i][0], P[i][1], along ? 0 : Math.PI / 2, i * 1.9)); pipe(g, along ? [P[i][0] - 4.3, P[i][1]] : [P[i][0], P[i][1] + 4.3], along ? [P[i][0] - 4.3, 9] : [9, P[i][1] + 4.3], 0.25, 0.12); }
+    } else {
+    const P = [[-6, -6], [6, -6], [-6, 4], [6, 4], [0, -1]];
     for (let i = 0; i < Math.min(n, P.length); i++) { U.push(pumpjack(g, P[i][0], P[i][1], i * 0.7, i * 1.3)); pipe(g, [P[i][0] + 3, P[i][1]], [P[i][0] + 3, 9], 0.25, 0.12); }
+    }
     pipe(g, [-8, 9], [8, 9], 0.25, 0.2);
     tank(g, -8, 10.5, 1.8, 3.2); tank(g, -3.5, 10.5, 1.8, 3.2); if (lv >= 2) tank(g, 1, 10.5, 1.8, 3.2);
-    const f = flare(g, 10, 10, 10 + lv * 2); U.push((dt, t, n) => f(dt, t, n));
+    const f = feature('oil-jacks') && JACK.sc ? flare(g, ex / 2 - 3.5, -ez / 2 + 5, 10 + lv * 2) : flare(g, 10, 10, 10 + lv * 2); U.push((dt, t, n) => f(dt, t, n));   /* oil-jacks: факелът — в свободния ъгъл, не през помпите */
     U.push(truck(g, [[-ex / 2 + 2, -ez / 2 + 2], [ex / 2 - 2, -ez / 2 + 2], [ex / 2 - 2, ez / 2 - 3], [-ex / 2 + 2, ez / 2 - 3]], 0xe67e22, 3.5));
   },
   refinery(g, ex, ez, lv, U, alive) {

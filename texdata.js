@@ -37,6 +37,6 @@ export function texGuard(renderer, scene) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, gt, 0);
     if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) continue; const px = new Uint8Array(W * H * 4); gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
     if (meanA(px, W * H) < 2) { t.needsUpdate = true; st.fixed++; st.list.push(W + 'x' + H); } } });
-  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, null, 0); gl.bindFramebuffer(gl.FRAMEBUFFER, pr); gl.deleteFramebuffer(fb);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, null, 0); gl.bindFramebuffer(gl.FRAMEBUFFER, pr); gl.deleteFramebuffer(fb);   // fb отново: без проверени текстури е вързан екранът (null) → „framebufferTexture2D: no framebuffer bound“
   if (typeof window !== 'undefined') { const g = window.__texGuardStat ||= { runs: 0, fixed: 0 }; g.runs++; g.fixed += st.fixed; } return st;
 }

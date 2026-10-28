@@ -27,7 +27,7 @@ export const PLANE_KINDS = {
 // ---- истински модели от Sketchfab (CC-BY, авторите са в CREDITS.txt и „📜 Автори“): самолетите по вид и контролна кула.
 // Зареждат се с другите модели на играта (loadAirModels в game.js); ако липсват — процедурните.
 //   yaw — завъртане около y, след което носът е към +z (моделите са завъртени различно)
-const AIR_CFG = { regional: { f: 'regional', yaw: 0.26 }, a320: { f: 'a320', yaw: Math.PI / 2 }, wide: { f: 'wide', yaw: 0 }, cargo: { f: 'cargo', yaw: -0.28, tint: 0xe8e2d4 }, tower: { f: 'tower' },
+const AIR_CFG = { regional: { f: 'regional', yaw: 0.26 }, a320: { f: 'a320', yaw: Math.PI / 2 }, wide: { f: 'wide', yaw: 0 }, cargo: { f: 'cargo', yaw: -0.28, tint: 0xe8e2d4 }, tower: { f: 'tower' }, ...(feature('lm-atc5') ? { atc5: { f: 'atc5' } } : {}), ...(feature('air-hangar2') ? { hangar2: { f: 'hangar2' } } : {}),   /* air-hangar2 (T2): хангарът на потребителя (Meshy) */   /* lm-atc5 (T2): кулата на потребителя (Meshy) — от ниво 5 */
   // терминалите по нива: малко летище (1–2), регионално (3), международно (4–5)
   term_s: { f: 'term-s' }, term_m: { f: 'term-m' }, term_l: { f: 'term-l' },
   // plane-wizz (T1): A320neo на Wizz Air (Meshy AI, Темидасофт) — нос към +z, колесникът (gear_*) и светлините (nav_/strobe_/beacon_) — отделни възли
@@ -61,6 +61,8 @@ function addWindows(o, fus, L) {
 }
 // кулата нощем: фасадата е осветена с прожектори (emissive по текстурата), кабината свети
 const towerMats = new Set();
+// размахът (по x) и дължината (по z) на самолета — носът към +z, преди завъртането
+function planeDims(p) { const r = p.rotation.y; p.rotation.y = 0; p.updateMatrixWorld(true); const s = new THREE.Box3().setFromObject(p).getSize(new THREE.Vector3()); p.rotation.y = r; return { span: s.x, len: s.z }; }
 function normPlane(scene, K, yaw) {
   const g = new THREE.Group(), inner = new THREE.Group(); inner.add(scene); g.add(inner);
   inner.rotation.y = yaw; g.updateMatrixWorld(true);
@@ -78,7 +80,7 @@ export function loadAirModels(load, base = 'assets/heavy/air/') {
     sc.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true;
       if (m.material.isMeshBasicMaterial) m.material = new THREE.MeshStandardMaterial({ map: m.material.map, color: m.material.color, roughness: 0.45, metalness: 0.15 });   // KHR_materials_unlit (a320) светеше бяло нощем
       if (c.tint) { m.material = m.material.clone(); m.material.color.setHex(c.tint); } } });
-    AIR[k] = k === 'tower' || k.startsWith('term') ? sc : normPlane(sc, PLANE_KINDS[k] || PLANE_KINDS.a320, c.yaw);
+    AIR[k] = k === 'tower' || k === 'atc5' || k === 'hangar2' || k.startsWith('term') ? sc : normPlane(sc, PLANE_KINDS[k] || PLANE_KINDS.a320, c.yaw);
   }).catch(e => console.warn('airmodels', k, e))));
 }
 
@@ -252,15 +254,26 @@ export function buildAirport(group, deps, opts = {}) {
     }
     // ръкави (един на ниво) и самолет до всеки
     const kinds = ['regional', 'a320', 'a320', 'wide', 'wide'];
+    let zg = AIR.hangar2 && n >= 5 ? 19 : 21;   // air-hangar2 (T2): ръкавите — по истинския размах (5 м между върховете на крилата); които не се побират до края на терминала — няма ги (широките в ъгъла се пресичаха)
     for (let k = 0; k < n; k++) {
-      const z = 10 - k * 22;
+      const p = makePlane(kinds[k], k + (opts.seed || 0)); const K = PLANE_KINDS[kinds[k]], sp = AIR.hangar2 ? planeDims(p).span : 22;
+      if (AIR.hangar2 && zg - sp < tz - tLen / 2 + 2) break;
+      const z = AIR.hangar2 ? zg - sp / 2 : 10 - k * 22; zg -= sp + 5;
       box(10, 2.6, 2.6, wall, TERM.x + 8, 4.6, z, lvG); box(2.6, 4.2, 2.6, wall, TERM.x + 13, 3, z, lvG);
-      const p = makePlane(kinds[k], k + (opts.seed || 0)); const K = PLANE_KINDS[kinds[k]];
       p.position.set(TERM.x + 15 + K.r, p.userData.gearY, z); p.rotation.y = -Math.PI / 2; lvG.add(p); parked.push(p);
     }
     // контролна кула до северния край на терминала
     const tw = new THREE.Group(); tw.position.set(TERM.x - 4, 0, tz - tLen / 2 - 10); lvG.add(tw);
-    if (AIR.tower) {   // истинската кула, висока колкото процедурната
+    const A5 = big >= 5 && AIR.atc5;   // lm-atc5 (T2): от ниво 5 — голямата кула на потребителя (~65 м), с въртящ се радар и мигаща червена светлина
+    if (A5) { const o = AIR.atc5.clone(true), w = new THREE.Group(); w.add(o); w.updateMatrixWorld(true);
+      const bb = new THREE.Box3().setFromObject(w), sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3()), H = 60, k = H / sz.y;
+      o.position.set(-c.x, -bb.min.y, -c.z); w.scale.setScalar(k); tw.add(w); tw.position.set(TERM.x - 15, 0, tz - tLen / 2 - 9);   /* северно от терминала, основата (~33 м) — изцяло на тревата (z ≥ −114 от −120), далеч от хангарите на юг */   
+      o.traverse(m => { if (m.isMesh) for (const x of [].concat(m.material)) if (!towerMats.has(x)) { x.emissive = new THREE.Color(0xfff0d8); x.emissiveMap = x.map || null; x.emissiveIntensity = 0; x.needsUpdate = true; towerMats.add(x); } });
+      const cab = new THREE.Sprite(glowM.clone()); cab.position.y = H * 0.8; cab.scale.set(H * 0.3, H * 0.18, 1); cab.userData.towerGlow = 1; tw.add(cab); towerGlows.push(cab);
+      const rad = new THREE.Group(); rad.position.y = H + 0.6; const rm = mat(0xd9dde2, 0.5, 0.4); rad.add(new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 1.2, 8).translate(0, 0.6, 0), rm)); const dish = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.9, 0.25), rm); dish.position.y = 1.4; rad.add(dish); tw.add(rad);
+      rad.onBeforeRender = () => { rad.rotation.y = performance.now() / 1000 * 1.2; }; dish.onBeforeRender = rad.onBeforeRender;
+      const rb = mat(0xff2a1a, 0.4, 0, 0xff2a1a); const r0 = new THREE.Mesh(new THREE.SphereGeometry(0.55, 8, 6), rb); r0.position.y = H + 2.6; tw.add(r0); beacons.length = 0; beacons.push(rb);
+    } else if (AIR.tower) {   // истинската кула, висока колкото процедурната
       const o = AIR.tower.clone(true), w = new THREE.Group(); w.add(o); w.updateMatrixWorld(true);
       const bb = new THREE.Box3().setFromObject(w), sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3()), k = (27 + n * 2) / sz.y;
       o.position.set(-c.x, -bb.min.y, -c.z); w.scale.setScalar(k); tw.add(w);
@@ -271,7 +284,7 @@ export function buildAirport(group, deps, opts = {}) {
     const cab = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 3.4, 4, 8), glassM); cab.position.y = 24 + n * 2; tw.add(cab); windows.push(glassM);
     box(9, 0.6, 9, roof, 0, 26.3 + n * 2, 0, tw);
     }
-    const bm = mat(0x40ff60, 0.4, 0, 0x40ff60); const b = new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 6), bm); b.position.y = 27.2 + n * 2; tw.add(b); beacons.length = 0; beacons.push(bm);
+    if (!A5) { const bm = mat(0x40ff60, 0.4, 0, 0x40ff60); const b = new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 6), bm); b.position.y = 27.2 + n * 2; tw.add(b); beacons.length = 0; beacons.push(bm); }
     // паркинг пред терминала
     flat(20, tLen * 0.7, mat(0x3a3d42, 0.95), TERM.x - 26, 0.03, tz, lvG);
     // отбивки от булеварда към паркинга и терминала (в двата края на паркинга) и автобусна спирка
@@ -281,19 +294,45 @@ export function buildAirport(group, deps, opts = {}) {
     const rows = Math.floor(tLen * 0.7 / 5);
     for (let k = 0; k < rows * 2; k++) if (Math.random() < 0.6) box(2, 1.3, 4, mat(LIVERY[k % LIVERY.length], 0.5, 0.3), TERM.x - 26 + (k % 2 ? 4 : -4), 0.65, tz - tLen * 0.35 + 2.5 + Math.floor(k / 2) * 5, lvG);
     // хангари (ниво 3+): полуцилиндри южно от терминала, отворени към рулежката
-    for (let k = 0; k < big - 2; k++) {
+    const HG = AIR.hangar2 ? [40, 22].slice(0, Math.max(0, Math.min(2, big - 2))) : null; const CG = HG && n >= 5; let hz0 = CG ? 73 : 40;   // air-hangar2: голям (40 м — за A320) и малък (22 м); повече не се побират до края на земята; с карго зона (5+) карго самолетът е на перона пред тях, а малкият — на запад, пред носа му
+    for (let k = 0; k < (HG ? HG.length : big - 2); k++) {
+      if (HG) {   // air-hangar2 (T2): истинският хангар, вратата — към рулежката (+x); ролетна врата полуотворена, светлина отвътре нощем
+        const o = AIR.hangar2.clone(true), w = new THREE.Group(); w.add(o); w.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(w), sz = bb.getSize(new THREE.Vector3()), Lh = HG[k], kk = Lh / Math.max(sz.x, sz.z), Wh = Math.min(sz.x, sz.z) * kk, west = CG && k === 1, hx = west ? TERM.x - 17.5 : TERM.x + 6, zc = west ? 26 + Wh / 2 : hz0 + Wh / 2; if (!west) hz0 += Wh + 4;
+        w.scale.setScalar(kk); w.rotation.y = Math.PI / 2; w.position.set(hx, 0, zc); o.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; if (!m.userData.hm) { m.userData.hm = 1; m.material = m.material.clone(); m.material.metalness = 0.1; m.material.roughness = 0.6; m.material.metalnessMap = null; m.material.aoMap = null; m.material.emissive = new THREE.Color(0xffffff); m.material.emissiveMap = m.material.map; m.material.emissiveIntensity = 0.22; m.material.needsUpdate = true; } } }); lvG.add(w);   /* без отражения металът излизаше черен */
+        const L = Lh / 2, f = Lh / 22, dw = 8.9 * f, dh = 5.6 * f, glowM = mat(0x1a1d22, 0.8, 0, 0xffd9a0); glowM.emissiveIntensity = 0; windows.push(glowM);
+        const gl = new THREE.Mesh(new THREE.PlaneGeometry(dw, dh), glowM); gl.rotation.y = Math.PI / 2; gl.position.set(hx + L - 0.4, dh / 2, zc); lvG.add(gl); if (west) flat(TERM.x + 4 - (hx + L), Wh, mat(0x8a8d92, 0.9), (hx + L + TERM.x + 4) / 2, 0.03, zc, lvG);
+        const door = box(0.18, dh, dw, mat(0x9aa0a6, 0.55, 0.3), hx + L + 0.15, 0, zc, lvG), ph = k * 2.3;
+        door.onBeforeRender = () => { const u = 0.5 + 0.5 * Math.sin(performance.now() / 9000 + ph); door.position.y = dh / 2 + dh * 0.5 * u; };   // бавно се вдига до половината и пак се спуска
+      } else {
       const h = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 22, 18).rotateZ(Math.PI / 2), mat(0xb8bec6, 0.5, 0.5));
       h.position.set(TERM.x + 2, 0, 42 + k * 24); h.castShadow = h.receiveShadow = true; lvG.add(h);
       box(0.3, 8, 16, mat(0x2a3038, 0.6), TERM.x + 13.1, 3.5, 42 + k * 24, lvG);
+      }
     }
+    if (AIR.hangar2 && tz - tLen / 2 - 8 < -85) flat(TW.x - TERM.x - 4, -85 - (tz - tLen / 2 - 8), mat(0x8a8d92, 0.9), (TW.x + TERM.x + 4) / 2, 0.03, (-85 + tz - tLen / 2 - 8) / 2, lvG);   // air-hangar2: и на север — под последния ръкав (самолетът беше на тревата)
+    if (HG && HG.length && hz0 - 4 > 85) flat(TW.x - TERM.x - 4, hz0 - 4 - 85, mat(0x8a8d92, 0.9), (TW.x + TERM.x + 4) / 2, 0.03, (85 + hz0 - 4) / 2, lvG);   // air-hangar2: перонът стига до вратите на хангарите (беше трева)
     // карго зона (ниво 5): склад, контейнери и товарен самолет
     if (n >= 5) {
+      if (AIR.hangar2) {   // air-hangar2: карго терминалът — гофрирана облицовка, рампи с ролетни врати откъм сушата, надпис CARGO (вместо оранжевата кутия)
+        const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64; const x = cv.getContext('2d'); x.fillStyle = '#c9ccd0'; x.fillRect(0, 0, 256, 64); for (let i = 0; i < 256; i += 6) { x.fillStyle = i % 12 ? '#b3b7bc' : '#dadde0'; x.fillRect(i, 0, 3, 64); } x.fillStyle = '#d35400'; x.fillRect(0, 0, 256, 7);
+        const tex = canvasTex(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.wrapS = THREE.RepeatWrapping; tex.repeat.set(3, 1); const clad = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7, metalness: 0.1 });
+        box(14, 8, 30, clad, TERM.x - 24, 4, 70, lvG); box(14.6, 0.4, 30.6, mat(0x6b7178, 0.6), TERM.x - 24, 8.2, 70, lvG);   /* 2 м от булеварда (беше 1 м върху него) */
+        for (let q = 0; q < 4; q++) { box(0.2, 3.6, 4, mat(0x4a4f56, 0.6), TERM.x - 31.1, 1.8, 58 + q * 8, lvG); box(1.6, 1.1, 4.6, mat(0x55585e, 0.9), TERM.x - 31.9, 0.55, 58 + q * 8, lvG); }   // рампите
+        const sc2 = document.createElement('canvas'); sc2.width = 256; sc2.height = 64; const y2 = sc2.getContext('2d'); y2.fillStyle = '#1f3f6e'; y2.fillRect(0, 0, 256, 64); y2.fillStyle = '#fff'; y2.font = 'bold 44px sans-serif'; y2.textAlign = 'center'; y2.fillText('CARGO', 128, 48);
+        const st = canvasTex(sc2); st.colorSpace = THREE.SRGBColorSpace; const sm = mat(0xffffff, 0.5, 0, 0xffffff); sm.map = st; sm.emissiveMap = st; windows.push(sm);
+        for (const sd of [-1, 1]) { const sg = new THREE.Mesh(new THREE.PlaneGeometry(10, 2.5), sm); sg.position.set(TERM.x - 24 + sd * 7.06, 6.4, 70); sg.rotation.y = sd * Math.PI / 2; lvG.add(sg); }
+        for (let k = 0; k < 8; k++) box(2.4, 2.4, 6, mat(LIVERY[k % LIVERY.length], 0.6), TERM.x - 30 + (k % 2) * 3, 1.2, 92 + Math.floor(k / 2) * 7, lvG);   // контейнерите — южно от склада, не върху хангарите
+      } else {
       box(14, 7, 30, mat(0xc98a3b, 0.7), TERM.x - 26, 3.5, 70, lvG);
       for (let k = 0; k < 8; k++) box(2.4, 2.4, 6, mat(LIVERY[k % LIVERY.length], 0.6), TERM.x - 16 + (k % 2) * 3, 1.2, 58 + Math.floor(k / 2) * 7, lvG);
-      const c = makePlane('cargo', 1); c.position.set(TW.x - 4, c.userData.gearY, 104); c.rotation.y = -Math.PI / 2; lvG.add(c); parked.push(c);
+      }
+      const c = makePlane('cargo', 1); c.position.set(AIR.hangar2 ? (TW.x + TERM.x + 4) / 2 + 2 : TW.x - 4, c.userData.gearY, AIR.hangar2 ? 46 : 104);   /* air-hangar2: на перона между ръкавите и хангарите (беше на тревата, с крило през малкия хангар) */ c.rotation.y = -Math.PI / 2; lvG.add(c); parked.push(c);
     }
     // мега/световен хъб: още широкофюзелажни самолети на отделния перон до хангарите
-    for (let k = 0; k < big - 5; k++) { const p = makePlane('wide', 7 + k); p.position.set(TW.x - 4, p.userData.gearY, 140 + k * 40); p.rotation.y = -Math.PI / 2; lvG.add(p); parked.push(p); }
+    if (AIR.hangar2) { let zr = 114; for (let k = 0; k < big - 5; k++) {   // air-hangar2: отделният перон на мега хъба — колона на югозапад от хангарите (на изток от x≈26 е коридорът за кацане), земята — продължена на юг
+        const p = makePlane('wide', 7 + k), d = planeDims(p); p.position.set(18 - d.len / 2, p.userData.gearY, zr + d.span / 2); p.rotation.y = -Math.PI / 2; lvG.add(p); parked.push(p); zr += d.span + 5; }
+      if (big > 5) { flat(70, zr - 105, mat(0x6f8f4e, 1), -5, 0.015, (105 + zr + 5) / 2, lvG); flat(56, zr - 108, mat(0x8a8d92, 0.9), -5, 0.03, (108 + zr) / 2, lvG); flat(8, 12, mat(0x3a3d42, 0.95), TW.x - 6, 0.035, 108, lvG); } }
+    else for (let k = 0; k < big - 5; k++) { const p = makePlane('wide', 7 + k); p.position.set(TW.x - 4, p.userData.gearY, 140 + k * 40); p.rotation.y = -Math.PI / 2; lvG.add(p); parked.push(p); }
     if (sign) { sign.position.set(TERM.x - 6, 16, tz); }
   }
   // нощно осветление: прожекторни мачти на перона (сияние + светло петно), стробове на подхода, фарове на самолетите

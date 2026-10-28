@@ -63,7 +63,7 @@ function barrier(e, ang, w) {
   if (!BAR_M) { const c = document.createElement('canvas'); c.width = 128; c.height = 16; const g = c.getContext('2d', FCPU); for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#f4f4f0' : '#d32f2f'; g.fillRect(i * 16, 0, 16, 16); } const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping;
     BAR_M = { beam: new THREE.MeshStandardMaterial({ map: t, roughness: 0.6 }), post: new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.5, metalness: 0.4 }), tex: t }; }
   const g = new THREE.Group(), L = Math.max(3, w - 0.6), beam = new THREE.Mesh(new THREE.BoxGeometry(L, 0.28, 0.14), BAR_M.beam);
-  BAR_M.tex.repeat.set(Math.round(L / 2), 1); beam.position.y = 0.95; g.add(beam);
+  BAR_M.tex.repeat.set(Math.round(L / 2), 1); beam.position.y = 0.95; g.add(beam); g.userData.roadBar = true;   /* hw-interchanges (T2): краят, от който тръгва връзката към магистралата, я сваля */
   for (const sx of [-1, 1]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.1, 8), BAR_M.post); p.position.set(sx * (L / 2 - 0.15), 0.55, 0); g.add(p); }
   g.position.set(e[0] + Math.cos(ang) * 1, 0, e[1] + Math.sin(ang) * 1); g.rotation.y = -(ang + Math.PI / 2);
   g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); return g;
@@ -387,15 +387,27 @@ export function floodMats(obj, col = 0xffd8a0, k = 0.45) {
 }
 // 🌳 истинските дървета (opts.treeModels — trees-real от играта): всяко дърво — части по модел, InstancedMesh; височината = h
 function realTrees(G, list, models) {
-  const vars = models.map(src => { src.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(src), h = (b.max.y - b.min.y) || 1, parts = [];
-    src.traverse(o => { if (o.isMesh) { const g = o.geometry.clone().applyMatrix4(o.matrixWorld); g.translate(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2); g.scale(1 / h, 1 / h, 1 / h); parts.push([g, o.material]); } }); return parts; }).filter(v => v.length);
+  const partsOf = src => { src.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(src), h = (b.max.y - b.min.y) || 1, parts = [];
+    src.traverse(o => { if (o.isMesh) { const g = o.geometry.clone().applyMatrix4(o.matrixWorld); g.translate(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2); g.scale(1 / h, 1 / h, 1 / h); parts.push([g, o.material]); } }); return parts; };
+  // tree-lod (T2): моделът с лек двойник (src.__lod — дърветата на Meshy) — далечните (> LOD_D м) дървета се рисуват с него
+  const vars = models.map(src => ({ parts: partsOf(src), lod: src.__lod ? partsOf(src.__lod) : null })).filter(v => v.parts.length);
   if (!vars.length) return false;
   const by = vars.map(() => []); list.forEach((t, i) => by[(i * 7 + 3) % vars.length].push(t));
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), v = new THREE.Vector3(), sc = new THREE.Vector3();
-  vars.forEach((parts, vi) => { const L = by[vi]; if (!L.length) return; for (const [g, mat] of parts) { const tt = mat && mat.userData && mat.userData.ttInst, I = new THREE.InstancedMesh(g, tt ? mat.userData.ttInst() : mat, L.length);   /* tree-colors (T2): оцветимите листа — със семе по дърво (aSeed) */
-      if (tt) I.customDepthMaterial = I.material.userData.depth;
-      if (tt) g.setAttribute('aSeed', new THREE.InstancedBufferAttribute(Float32Array.from(L, ([x, z]) => { const h = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453; return h - Math.floor(h); }), 1));
-    L.forEach(([x, z, h], i) => { q.setFromAxisAngle(up, (i * 2.39) % 6.283); I.setMatrixAt(i, m.compose(v.set(x, 0, z), q, sc.set(h, h, h))); }); I.castShadow = true; I.frustumCulled = false; G.add(I); } });
+  const seedOf = ([x, z]) => { const h = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453; return h - Math.floor(h); };   /* tree-colors (T2): оцветимите листа — със семе по дърво (aSeed) */
+  const mk = (g, mat, n) => { const tt = mat && mat.__tt && mat.__tt.inst, I = new THREE.InstancedMesh(g, tt ? mat.__tt.inst() : mat, n);
+    if (tt) { I.customDepthMaterial = I.material.__tt.depth; g.setAttribute('aSeed', new THREE.InstancedBufferAttribute(new Float32Array(n), 1)); }
+    I.castShadow = true; I.frustumCulled = false; G.add(I); return I; };
+  vars.forEach((V, vi) => { const L = by[vi]; if (!L.length) return;
+    const M = L.map(([x, z, h], i) => { q.setFromAxisAngle(up, (i * 2.39) % 6.283); return m.compose(v.set(x, 0, z), q, sc.set(h, h, h)).clone(); }), S = L.map(seedOf);
+    const near = V.parts.map(([g, mat]) => mk(g, mat, L.length)), far = V.lod ? V.lod.map(([g, mat]) => mk(g, mat, L.length)) : [];
+    const fill = (set, idx) => { for (const I of set) { idx.forEach((k, n) => I.setMatrixAt(n, M[k])); I.count = idx.length; I.instanceMatrix.needsUpdate = true; const a = I.geometry.attributes.aSeed; if (a) { idx.forEach((k, n) => { a.array[n] = S[k]; }); a.needsUpdate = true; } } };
+    const all = L.map((_, k) => k); fill(near, all); if (!far.length) return; fill(far, []);
+    // разпределение по разстоянието до камерата (в рамката на групата), най-много веднъж на 0,4 s и при преместване > 8 м
+    const LOD_D = 150, cam = new THREE.Vector3(), last = new THREE.Vector3(1e9, 0, 1e9); let t0 = 0;
+    const sortBy = (r, c) => { const now = performance.now(); if (now - t0 < 400) return; t0 = now; cam.copy(c.position); G.worldToLocal(cam); if (cam.distanceTo(last) < 8) return; last.copy(cam);
+      const n = [], f = []; L.forEach(([x, z], k) => (Math.hypot(x - cam.x, z - cam.z) < LOD_D ? n : f).push(k)); fill(near, n); fill(far, f); };
+    for (const I of [near[0], far[0]]) I.onBeforeRender = sortBy; });
   return true;
 }
 const T1 = feature('tlight-one'), shortArm = (P, n, a) => { if (!T1) return false; const rd = P.roads[a.road], m = P.nodes[a.end ? rd.from : rd.to]; return rd.L[rd.L.length - 1] < 28 && !!m && m.arms.length >= 3 && m.kind !== 'round' && n.arms.length >= 3; };   // tlight-one (горе)
@@ -710,7 +722,7 @@ export function buildPlan2View(P, opts = {}) {
     tm('furniture'); yield 0;
     if (D) { ST.glow = streetGlow(G, P, D.style); ST.wash = floodWash(G, P); tm('glow'); yield 0; }
     // Рома Термини (opts.termini): гарата по фасадата към площада (opts.stationModel — моделът на играта, иначе кутия) и перони с навеси и коловози
-    const TL = opts.termini ? P.lots.find(L => L.lm === 'termini' || L.lm === 'sirkeci' || L.lm === 'saintlazare' || L.lm === 'waterloo' || L.lm === 'grandcentral' || L.lm === 'kursky' || L.lm === 'unionstation') : null;   // главната гара: Термини (Рим), Сиркеджи (Истанбул), Сен Лазар (Париж), Ватерло, Гранд Сентрал, Курската
+    const TL = opts.termini ? P.lots.find(L => L.lm === 'termini' || L.lm === 'sirkeci' || L.lm === 'saintlazare' || L.lm === 'waterloo' || L.lm === 'grandcentral' || L.lm === 'kursky' || L.lm === 'unionstation' || L.lm === 'hbf' || L.lm === 'sofiacentral')   /* berlin-osm / sofia-osm (T2) */ : null;   // главната гара: Термини (Рим), Сиркеджи (Истанбул), Сен Лазар (Париж), Ватерло, Гранд Сентрал, Курската
     if (TL) G.add(terminiView(TL, opts.stationModel, opts.stationFacing));   // stationFacing: { face: '-z', depth: 0.8 } — фасадата на модела е към −z (към улицата), сградата заема 80 % от дълбочината
     const TS = opts.timesSquareModel && P.lots.find(L => L.lm === 'timessquare'); if (TS) G.add(timesSquareView(TS, opts.timesSquareModel));   // Ню Йорк: билбордовете около Таймс Скуеър
     { const TSL = P.lots.find(L => L.lm === 'timessquare'); if (TSL) { const L = TSL.vrot != null ? { ...TSL, rot: TSL.vrot } : TSL; ST.TSA = timesSquareAds(L, { side: (L.d >= L.w ? L.w : L.d) / 2 + 2 }); G.add(ST.TSA.group); ST.TSA.setNight(ST.night ? 1 : 0); } }   /* и светещите екрани с рекламите (timessq-ads.js) */
@@ -943,6 +955,7 @@ function* romeBlocks(G, P, style, ROADS = P.roads, ROOFS = null) {   // ROOFS �
   const romeOuter = (x, z) => { const L = lotAt(x, z); return !!L && (L.tier || 1) >= 3; };
   const list = [], m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
   const IST = style === 'istanbul', PAR = style === 'paris', LON = style === 'london', NY = style === 'newyork', MOS = style === 'moscow', WAS = style === 'washington', LV = style === 'lasvegas', DEP0 = IST ? 12 : 15, STEP = IST ? 10 : PAR ? 13 : LON ? 11 : NY ? 17 : 14, used = new Set(); MIN2 = (0.72 * Math.min(STEP, IST ? 8 : DEP0)) ** 2;
+  const OSMH = feature('osm-heights') && !!P.osm;   // osm-heights (T2): височините по нивото на квартала
   const BG = style === 'bg', VAR = (PAR || IST || (WAS && feature('was-fed')) || (MOS && feature('dc-msk-fac'))) && feature('bg-variety'),   /* T2 dc-msk-fac: и Москва */ XK = VAR || BG;   /* was-fed (55): и Вашингтон — федералният варовик */
   // was-fed (55): във Вашингтон парцелите са тесни (12 м), а сградите — до 19 м: всяка сграда — в своя парцел (по осите му, 0,6 м от ръбовете, лицето към улицата),
   // по една на парцел и без застъпване с вече сложените (правоъгълниците, не само центровете); wasFit → { x, z, w — по улицата, d, ax, az — посоката на улицата } или null
@@ -963,7 +976,10 @@ function* romeBlocks(G, P, style, ROADS = P.roads, ROOFS = null) {   // ROOFS �
         const h = ((rd.id * 7919 + Math.round(s) * 31 + (sg > 0 ? 17 : 0)) >>> 0) % 1000 / 1000, h2 = ((rd.id * 104729 + Math.round(s) * 13 + (sg > 0 ? 5 : 0)) >>> 0) % 1000 / 1000;
         // Истанбул: османски дървени къщи с еркери (историческият полуостров, Галата — европейският бряг) и бели жилищни блокове
         let ty = WAS ? (h2 < 0.3 ? 4 : 2) /* Вашингтон: федерални сгради от светъл камък (ограничението за височина — ниски) и тухлени къщи */ : LV ? 2 /* Лас Вегас: ниски бежови сгради с плосък покрив зад казината */ : MOS ? (h2 < 0.2 ? 4 : 6) : NY ? (h2 < 0.3 ? 5 : 2) : LON ? (x > 150 && h2 < 0.5 ? 2 : 4) /* Лондон: тухлени къщи; в Сити (на изток) — половината офиси */ : PAR ? 3 : !IST ? 0 : (x < 250 && h2 < 0.55) ? 1 : 2, H = ty === 1 ? 8 + h * 4 : ty === 6 ? 15 + h * 9 : ty === 5 ? (42 + h * h * 58) * 0.85 /* потребителят: сините кули −15 %; */ /* Ню Йорк: кулите 42–100 м — Емпайър Стейт (171 м в играта) стърчи като на снимките */ : ty === 4 && MOS ? 14 + h * 6 : ty === 2 ? (NY ? 18 + h * 24 : LON ? 22 + h * 16 : WAS ? 15 + h * 9 : LV ? 8 + h * 10 : 15 + h * 8) : ty === 4 ? 12 + h * 5 : ty === 3 ? 18 + h * 4 : (romeOuter(x, z) ? 15 + h * 9 : 13 + h * 7) /* Рим: центърът 13–20 м (4–6 ет.), външните рионе 15–24 м (до 7) */, col = ty === 1 ? OTTO[Math.floor(h * OTTO.length)] : ty === 6 ? MOSC[Math.floor(h * MOSC.length)] : ty === 4 && MOS ? MOSB[Math.floor(h * MOSB.length)] : ty === 5 ? GLASS[Math.floor(h * GLASS.length)] : ty === 2 ? (NY ? NYST : LON || WAS ? CITY : APT)[Math.floor(h * (NY ? NYST : LON || WAS ? CITY : APT).length)] : ty === 4 ? BRICK[Math.floor(h * BRICK.length)] : ty === 3 ? HAUSS[Math.floor(h * HAUSS.length)] : ROMA[Math.floor(h * ROMA.length)];   // Париж: османовите сгради — еднаква височина (~6 етажа)
-        let rc = null, ex = null; if (VAR) ({ t: ty, H, col, rc, ex } = varPick(style, h, h2, MOS ? (romeOuter(x, z) ? 9 : 0) : ty));   /* dc-msk-fac: Москва — външните райони (tier ≥ 3) панелни */   // bg-variety: вид, етажи, цвят, покрив (bgblocks.js)
+        let rc = null, ex = null; if (VAR) ({ t: ty, H, col, rc, ex } = varPick(style, h, h2, MOS ? (romeOuter(x, z) ? 9 : 0) : ty));
+        // osm-heights (T2, одитът): центърът — по-висок, по нивото на квартала (tier 1 — център); ~5 % акценти в центъра — неравна линия на покривите;
+        // Париж и Вашингтон — без (истинските им ограничения за височина)
+        if (OSMH && !PAR && !WAS) { const L0 = lotAt(x, z), tr = L0 ? (L0.tier || 1) : 3; H *= tr <= 1 ? 1.25 : tr === 2 ? 1.1 : tr >= 4 ? 0.85 : 1; if (tr <= 2 && h2 > 0.95) H *= 1.5; }   /* dc-msk-fac: Москва — външните райони (tier ≥ 3) панелни */   // bg-variety: вид, етажи, цвят, покрив (bgblocks.js)
         q.setFromAxisAngle(up, Math.atan2(fx, fz));
         list.push({ x, z, w: bw, d: bd, h: H, rot: Math.atan2(fz * sg, -fx * sg), t: ty, col, rc, ex, M: m.compose(new THREE.Vector3(x, H / 2, z), q, new THREE.Vector3(ty === 5 ? bd * 0.8 : bd, H, ty === 5 ? bw * 0.78 : bw + (WF ? 0 : 0.3))).clone(), lot: lotAt(x, z) }); break; } } }   // небостъргачите — по-тесни от стъпката: улички между кулите, не слепени
   if (BG) yield* bgPlace(P, list);   // bg-fill: по парцелите и във вътрешността на кварталите

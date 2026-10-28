@@ -36,4 +36,11 @@ rail-crossing-bell.mp3 — „steam train bell arrive (microcassette, Wakefield,
 police-call.mp3 — безплатен звук, предоставен от собственика (ТЕМИДАСОФТ ООД), лиценз за безплатно ползване — обаждането на 112 (бутонът „Извикай полиция“)
 police-scanner.mp3 — безплатен звук, предоставен от собственика (ТЕМИДАСОФТ ООД), лиценз за безплатно ползване — радиостанцията при полицейска гонка
 radio-alert.mp3 — безплатен звук, предоставен от собственика (ТЕМИДАСОФТ ООД), лиценз за безплатно ползване — радиосъобщение при затворен/отворен път
-radio-road.mp3 — безплатен звук, предоставен от собственика (ТЕМИДАСОФТ ООД), лиценз за безплатно ползване — радиосъобщение за пътя
+radio-road.mp3 — „radio road (смес от tuning radio и alert)“ (freesound_community, Pixabay, sound 7150), Pixabay Content License — смес от radio-tune.mp3 и radio-alert.mp3 (sound 369027); известието за затворен/отворен път (road-radio).
+police-call.mp3 — „911 call“ (freesound_community, Pixabay, sound 76801), Pixabay Content License — бутонът „🚓 Извикай полиция“ (откъси 0–2 s и 28–31 s).
+police-scanner.mp3 — „Los Angeles South Bay police and fire scanner“ (freesound_community, Pixabay, sound 14646), Pixabay Content License — радиото при гонката (police-chase).
+radio-tune.mp3 — „tuning radio“ (freesound_community, Pixabay, sound 7150), Pixabay Content License — радиошумът на известията.
+radio-alert.mp3 — „alert“ (u_00gvvdfqjf, Pixabay, sound 369027), Pixabay Content License — сигналът на известията.
+radio-road.mp3 — смес от radio-tune.mp3 и radio-alert.mp3 (по-горе) — известието за затворен/отворен път (road-radio).
+levelup.ogg — „Music Jingles“ by Kenney (CC0, https://kenney.nl — LICENSE-kenney-jingles.txt в тази папка) — звукът при ново ниво (sound.js); произходът — по пакета, с който е дошъл файлът (от първата публикация).
+train-stop.mp3 — „train stopping“ (spinopel, Pixabay, sound 381855), Pixabay Content License — влак спира на гарата (sfx-batch2, sfx2.js). 0,4–12,3 s, плавно начало и заглъхване, −19 LUFS, моно 80 kbps.

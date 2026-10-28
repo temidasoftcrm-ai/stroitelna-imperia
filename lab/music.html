@@ -1,0 +1,13 @@
+<!doctype html><meta charset="utf-8"><title>Музика — избор</title>
+<style>body{background:#0c1018;color:#e6edf6;font:15px system-ui;max-width:760px;margin:24px auto;padding:0 16px}h1{color:#ffd54a}h2{margin-top:22px;color:#c9a14a}.t{display:flex;align-items:center;gap:12px;margin:8px 0;padding:8px;border:1px solid #243;border-radius:10px}.t b{width:90px}.t span{flex:1;color:#9ab}audio{width:300px}</style>
+<h1>🎵 Фонова музика — избери</h1><p>Всички са Pixabay Content License (безплатни, и за реклами). Кажи на f1 кои харесваш — напр. „city-2, work-1, menu-1“.</p>
+<div id="L"></div>
+<script>
+const G={'🏙️ Спокойна — в града':[['city-1','City streets / Lofi — LofCosmos'],['city-2','Rainy Lofi City — Lofi_Music_Library'],['city-3','Smooth LoFi Beat — JorisVermeer']],
+'💼 Динамична — когато се строи/работи':[['work-1','Upbeat Happy Corporate — kornevmusic'],['work-2','Upbeat Corporate — The_Mountain'],['work-3','Happy Corporate — AtlasAudio']],
+'🎬 Меню / картата':[['menu-1','Inspiring Cinematic Music — Tunetank'],['menu-2','Inspiring Epic — NastelBom']],
+'☀️ Весела (по избор)':[['sunny-1','Happy Ukulele — AtlasAudio'],['sunny-2','Ukulele Upbeat Pop Rock — ikoliks']]};
+let h='';for(const[g,a]of Object.entries(G)){h+=`<h2>${g}</h2>`;for(const[k,n]of a)h+=`<div class="t"><b>${k}</b><span>${n}</span><audio controls preload="none" src="../_source/downloads/music-candidates/${k}.mp3"></audio></div>`}
+document.getElementById('L').innerHTML=h;
+document.addEventListener('play',e=>{for(const x of document.querySelectorAll('audio'))if(x!==e.target)x.pause()},true);
+</script>

@@ -1,6 +1,7 @@
-// splash.js — оживената начална картина (🧪 splash-anim): докато играта се зарежда, сградата в средата расте с 2 етажа,
-// самосвалът идва напред по пътя от обекта до мястото си (с перспектива), товарът на крана се люлее, облаци, слънчев отблясък, прах; при 100% — блясък по логото.
-// Слоевете (assets/splash/*.webp, ~150 KB) са изрязани от assets/ui/splash.webp (_source: инпейнт зад самосвала и товара).
+// splash.js — оживената начална картина (🧪 splash-anim): докато играта се зарежда, денят преминава в нощ (залез 30–70%, нощ ~90%),
+// сградата в средата расте с 2 етажа, самосвалът идва напред по пътя от обекта до мястото си (с перспектива; нощем — с фарове),
+// товарът на крана се люлее, облаци, слънчев отблясък, прах; нощем трептят светлините на града и крановете, луната свети; при 100% — блясък по логото.
+// Слоевете (assets/splash/*.webp, ~0,5 MB) са изрязани от assets/ui/splash.webp и нощната версия на собственика (night.webp, подравнена; инпейнт зад самосвала и товара).
 // Напредъкът се чете от #ldBar (game.js го пише) — game.js не се пипа. Всичко е върху <canvas> над статичната картина:
 // без canvas, със „намалено движение“, при грешка или липсващ слой — остава статичната картина както досега.
 import { feature } from './lab/feature.js';
@@ -8,6 +9,11 @@ import { feature } from './lab/feature.js';
 const W = 1672, H = 941, DIR = 'assets/splash/';
 // [x, y, w, h] в пикселите на оригинала (1672×941)
 const L = { truck: [1217, 578, 434, 293], 'patch-truck': [1197, 558, 475, 334], load: [449, 347, 62, 55], 'patch-load': [443, 292, 74, 117], build: [365, 208, 323, 239], logo: [416, 0, 832, 326] };
+// нощните слоеве — същата геометрия (build-n, load-n, patch-load-n); logo-n е дневното лого в нощни цветове + 16 px ореол наоколо
+const LN = { night: [0, 0, W, H], 'patch-load-n': [443, 292, 74, 117], 'build-n': [365, 208, 323, 239], 'load-n': [449, 347, 62, 55], 'logo-n': [400, -16, 864, 358] };
+const MOON = [1384, 128];
+const LIGHTS = [166,78,148,149,150,158,131,194,1598,201,105,203,1582,226,1583,232,1594,241,1584,250,1593,255,1599,256,1593,269,1592,277,341,286,1475,294,1462,296,331,300,1593,301,1593,305,1459,307,1586,327,1461,344,1525,366,132,370,1478,376,1486,377,846,379,1604,379,1594,380,1621,380,1585,381,1528,382,22,389,11,392,356,392,1473,394,64,398,714,400,1462,401,1485,406,1422,411,1446,413,1315,417,360,418,970,418,1165,418,975,419,100,422,767,422,195,424,1171,426,1568,428,1325,429,1610,429,1584,430,1524,433,1457,437,1489,437,80,438,261,438,1446,439,1593,439,1030,442,1082,446,1523,449,1609,450,1069,451,1562,455,1168,456,1534,456,1550,456,885,460,1376,460,363,462,1226,462,364,466,55,467,60,467,68,468,262,468,572,468,1173,468,204,472,1540,476,1089,478,1608,480,877,483,1094,483,289,484,826,484,278,489,1038,490,1116,490,223,491,910,492,1120,493,576,495,1031,495,236,497,1064,498,1450,502,222,503,781,505,236,508,1259,509,1073,512,1126,512,888,513,1440,513,1133,515,896,520,1424,523,607,525,1653,526,1402,527,1041,530,1242,530,1282,538,737,540,1250,541,1268,544,1243,545,837,546,1081,549,274,553,247,554,571,554,1320,554,1353,555,1497,575,1484,576,623,577,1626,577,971,578,593,579,1666,581,228,587,1552,588,75,589,459,589,251,593,1594,593,668,594,100,598,633,598,612,599,691,599,692,600,1423,603,148,604,593,605,100,607,682,607,150,608,464,608,346,610,787,623,1139,623,1038,624,1369,625,153,626,104,627,124,628,679,628,1015,628,788,634,856,635,1296,636,1296,640,138,642,935,642,484,645,783,645,789,645,911,647,837,648,673,650,109,652,150,652,884,652,729,655,915,655,775,659,764,662,712,665,493,673,1285,673,1295,673,726,674,1371,677,601,679,678,682,668,683,532,684,1425,684,687,686,565,687,722,688,916,688,924,689,1566,696,450,701,459,713,766,713,1512,714,35,720,442,721,538,721,584,722,591,722,855,722,640,724,871,724,667,726,682,726,463,729,910,730,766,731,776,731,841,731,890,731,915,731,1016,733,529,742,1001,742,547,743,566,744,832,747,529,751,641,751,175,753,505,753,827,756,1484,756,232,757,258,758,269,759,453,759,354,760,364,762,540,762,813,763,1025,778,999,779,703,783,1044,784,694,790,1509,790,690,791,1481,791,1274,800,1285,804,1337,810,1281,822,887,824,1206,826,1304,841,1192,842];   // светлините на нощния град и крановете (x, y), за трептенето
+const HEAD = [[288, 162], [413, 192]];   // фаровете на самосвала (в спрайта)
 const PIVOT = [480.5, 304], CABLES = [468, 477, 484, 495], CABLE_Y = 362;   // куката на крана и закачките на товара
 const SUN = [1272, 325];
 const B_TOP = 447, B_END = 212;   // ръбът на разкриването: от сегашния покрив до новия (2 етажа нагоре)
@@ -24,17 +30,24 @@ function start() {
   const ctx = cv.getContext && cv.getContext('2d'); if (!ctx) return;
   const real = () => { const w = parseFloat(bar.style.width); return Number.isFinite(window.__splashP) ? window.__splashP : Number.isFinite(w) ? Math.min(1, Math.max(0, w / 100)) : 0; };
   const load = src => new Promise((ok, no) => { const i = new Image(); i.decoding = 'async'; i.onload = () => ok(i); i.onerror = no; i.src = src; });
-  Promise.all([load('assets/ui/splash.webp'), ...Object.keys(L).map(k => load(DIR + k + '.webp'))]).then(([bg, ...imgs]) => {
+  const keys = [...Object.keys(L), ...Object.keys(LN)];
+  Promise.all([load('assets/ui/splash.webp'), ...keys.map(k => load(DIR + k + '.webp'))]).then(([bg, ...imgs]) => {
     if (!ld.isConnected || ld.classList.contains('out') || (real() > 0.9 && !Number.isFinite(window.__splashP))) return;   // играта вече е готова — няма смисъл
-    const I = {}; Object.keys(L).forEach((k, i) => { I[k] = imgs[i]; });
+    const I = {}; keys.forEach((k, i) => { I[k] = imgs[i]; });
     run(ld, box, cv, ctx, bg, I, real, txt);
   }).catch(e => { console.warn('splash-anim', e && e.message || e); });
 }
 
 function run(ld, box, cv, ctx, bg, I, real, txt) {
   const off = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; };
-  const [bc, bx] = off(L.build[2], L.build[3]);   // сградата с маската
-  const [sc, sx] = off(L.logo[2], L.logo[3]);     // блясъкът по логото
+  const [bc, bx] = off(L.build[2], L.build[3]);   // сградата с маската (ден)
+  const [bcn, bxn] = off(L.build[2], L.build[3]); // … и нощ
+  const [nc, nx] = off(W, H);                     // нощната сцена — върху дневната с прозрачност
+  const [tc, tcx] = off(L.truck[2], L.truck[3]);  // самосвалът, оцветен за залеза/нощта
+  const [sc, sx] = off(Math.max(L.logo[2], LN['logo-n'][2]), Math.max(L.logo[3], LN['logo-n'][3]));    // блясъкът по логото
+  const [gc, gcx] = off(32, 32); { const g = gcx.createRadialGradient(16, 16, 0, 16, 16, 16); g.addColorStop(0, 'rgba(255,240,200,1)'); g.addColorStop(0.25, 'rgba(255,210,140,.55)'); g.addColorStop(1, 'rgba(255,190,110,0)'); gcx.fillStyle = g; gcx.fillRect(0, 0, 32, 32); }
+  const tw = Array.from({ length: LIGHTS.length / 2 }, () => [0.6 + Math.random() * 2.2, Math.random() * 6.3, 5 + Math.random() * 7]);   // [скорост, фаза, размер]
+  let lastTint = -1;
   const clouds = [0, 1, 2].map(i => cloud(off, 220 + i * 40, 70 + i * 8, i));
   const motes = Array.from({ length: 26 }, () => mote(Math.random() * W));
   const puffs = [], sparks = [];
@@ -52,35 +65,40 @@ function run(ld, box, cv, ctx, bg, I, real, txt) {
     if (shined && tx0 !== lastTxt && t - shineT > 1.6) shineT = t;
     lastTxt = tx0;
 
-    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
-    ctx.drawImage(bg, 0, 0, W, H);
-    const pa = Math.min(1, (1 - p) * 6);   // в последните ~15% мястото около самосвала се връща към оригинала (при 100% — точно като статичната)
-    if (pa > 0) { ctx.globalAlpha = pa; put('patch-truck'); ctx.globalAlpha = 1; }
-    put('patch-load');
-    sun(t);
-    for (const c of clouds) drawCloud(c, t);
+    // 🌇 ден → залез → нощ
+    const n = smooth(0.35, 0.9, p), warm = p > 0.22 && p < 0.85 ? Math.sin(Math.PI * (p - 0.22) / 0.63) : 0;
 
-    // 🏗️ сградата расте: разкриване отдолу нагоре с мек ръб
+    // 🏗️ сградата расте: разкриване отдолу нагоре с мек ръб (еднакво за деня и нощта)
     const e = easeInOut(p), edge = B_TOP + (B_END - B_TOP) * e;
-    if (Math.abs(edge - lastEdge) > 0.05) {
-      lastEdge = edge; const [, by, bw, bh] = L.build, y = edge - by;
-      bx.globalCompositeOperation = 'source-over'; bx.clearRect(0, 0, bw, bh); bx.drawImage(I.build, 0, 0);
-      bx.globalCompositeOperation = 'destination-in';
-      const g = bx.createLinearGradient(0, y - 7, 0, y + 7); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,1)');
-      bx.fillStyle = g; bx.fillRect(0, 0, bw, bh);
-    }
-    if (p > 0.001) ctx.drawImage(bc, L.build[0], L.build[1]);
+    if (Math.abs(edge - lastEdge) > 0.05) { lastEdge = edge; maskBuild(bx, I.build, edge); maskBuild(bxn, I['build-n'], edge); }
     if (target > p + 0.01 && edge < B_TOP - 4 && Math.random() < dt * 9) sparks.push({ x: 380 + Math.random() * 300, y: edge + 4, vx: (Math.random() - 0.5) * 40, vy: -20 - Math.random() * 30, life: 0.5 + Math.random() * 0.4, t: 0 });
+    const a = Math.sin(t * 1.15) * 0.022 + Math.sin(t * 0.47) * 0.008;   // люлеенето на товара
 
-    // 🏗️ товарът на крана се люлее около куката
-    const a = Math.sin(t * 1.15) * 0.022 + Math.sin(t * 0.47) * 0.008;
-    ctx.save(); ctx.translate(PIVOT[0], PIVOT[1]); ctx.rotate(a); ctx.translate(-PIVOT[0], -PIVOT[1]);
-    ctx.strokeStyle = 'rgba(38,32,30,.85)'; ctx.lineWidth = 1.1; ctx.beginPath();
-    for (const cx of CABLES) { ctx.moveTo(PIVOT[0], PIVOT[1] + 2); ctx.lineTo(cx, CABLE_Y); }
-    ctx.stroke(); ctx.fillStyle = 'rgba(40,34,30,.9)'; ctx.fillRect(PIVOT[0] - 3, PIVOT[1] - 1, 6, 6);
-    ctx.drawImage(I.load, L.load[0], L.load[1]); ctx.restore();
-
-    put('logo');
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+    if (n < 1) {
+      ctx.drawImage(bg, 0, 0, W, H);
+      put(ctx, L, 'patch-truck');   // пътят без самосвала (накрая е нощ — затова не се връщаме към дневния самосвал)
+      put(ctx, L, 'patch-load');
+      sun(t);
+      for (const c of clouds) drawCloud(c, t);
+      if (p > 0.001) ctx.drawImage(bc, L.build[0], L.build[1]);
+      hanging(ctx, I.load, a, 'rgba(38,32,30,.85)');
+      put(ctx, L, 'logo');
+      if (warm > 0) {   // залезът: по-топло и по-тъмно
+        ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = `rgba(255,${200 - 50 * warm | 0},${170 - 70 * warm | 0},1)`; ctx.globalAlpha = 0.55 * warm; ctx.fillRect(0, 0, W, H);
+        ctx.globalCompositeOperation = 'soft-light'; ctx.fillStyle = 'rgb(255,120,50)'; ctx.globalAlpha = 0.4 * warm; ctx.fillRect(0, 0, W, H);
+        ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+      }
+    }
+    if (n > 0) {
+      nx.globalCompositeOperation = 'source-over'; nx.globalAlpha = 1;
+      put(nx, LN, 'night'); put(nx, LN, 'patch-load-n');
+      moon(nx, t); twinkle(nx, t);
+      if (p > 0.001) nx.drawImage(bcn, L.build[0], L.build[1]);
+      hanging(nx, I['load-n'], a, 'rgba(20,18,24,.9)');
+      put(nx, LN, 'logo-n');
+      ctx.globalAlpha = n; ctx.drawImage(nc, 0, 0); ctx.globalAlpha = 1;
+    }
 
     // 🚚 самосвалът — напред по пътя: от обекта (горе-вляво, далеч, по-малък) към мястото си долу-вдясно, с перспектива
     const e2 = easeInOut(p), u1 = 1 - e2, s = TRUCK_S0 + (1 - TRUCK_S0) * e2;
@@ -92,9 +110,28 @@ function run(ld, box, cv, ctx, bg, I, real, txt) {
     {
       ctx.save(); ctx.translate(ax, ay - 1); ctx.rotate(-0.06); ctx.scale(s, 0.11 * s);   // мека сянка
       const sg = ctx.createRadialGradient(0, 0, 0, 0, 0, 215); sg.addColorStop(0, 'rgba(42,26,12,.42)'); sg.addColorStop(0.7, 'rgba(42,26,12,.2)'); sg.addColorStop(1, 'rgba(42,26,12,0)');
-      ctx.fillStyle = sg; ctx.globalAlpha = pa; if (pa > 0) ctx.fillRect(-215, -215, 430, 430); ctx.restore();
-      if (s === 1 && !bob) ctx.drawImage(I.truck, L.truck[0], L.truck[1]);   // при 100% — точно като оригинала
-      else ctx.drawImage(I.truck, tx, ty, L.truck[2] * s, L.truck[3] * s);
+      ctx.fillStyle = sg; ctx.globalAlpha = 0.5 + 0.5 * n; ctx.fillRect(-215, -215, 430, 430); ctx.restore();
+      const tint = Math.round((warm + 2 * n) * 50);
+      if (tint !== lastTint) {   // залез — по-топъл, нощ — по-тъмен и син (фаровете светят отгоре)
+        lastTint = tint; tcx.globalCompositeOperation = 'source-over'; tcx.clearRect(0, 0, tc.width, tc.height); tcx.drawImage(I.truck, 0, 0);
+        tcx.globalCompositeOperation = 'source-atop';
+        if (warm > 0) { tcx.fillStyle = `rgba(150,60,20,${0.22 * warm})`; tcx.fillRect(0, 0, tc.width, tc.height); }
+        if (n > 0) { tcx.fillStyle = `rgba(22,22,50,${0.4 * n})`; tcx.fillRect(0, 0, tc.width, tc.height); }
+      }
+      const timg = tint ? tc : I.truck;
+      if (s === 1 && !bob) ctx.drawImage(timg, L.truck[0], L.truck[1]);
+      else ctx.drawImage(timg, tx, ty, L.truck[2] * s, L.truck[3] * s);
+      const hl = Math.max(n, 0.6 * warm);
+      if (hl > 0.02) {   // 🔦 фаровете: ярко ядро, ореол и светло петно на пътя пред самосвала
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        for (const [hx, hy] of HEAD) {
+          const X = tx + hx * s, Y = ty + hy * s;
+          ctx.globalAlpha = hl; ctx.drawImage(gc, X - 30 * s, Y - 30 * s, 60 * s, 60 * s);
+          ctx.globalAlpha = 0.5 * hl; ctx.drawImage(gc, X - 90 * s, Y - 60 * s, 180 * s, 120 * s);
+        }
+        ctx.globalAlpha = 0.28 * hl; ctx.drawImage(gc, tx + 300 * s, ty + 250 * s, 260 * s, 90 * s);
+        ctx.restore();
+      }
       if (v > 3) for (const [wx, wy] of WHEELS) if (Math.random() < dt * Math.min(24, v * 0.4)) puffs.push({ x: tx + wx * s, y: ty0 + wy * s, vx: -12 - Math.random() * 28, vy: -6 - Math.random() * 12, r: (5 + Math.random() * 7) * s, life: 1.2 + Math.random(), t: 0 });   // прахът — назад (горе-вляво)
     }
     particles(dt);
@@ -105,7 +142,35 @@ function run(ld, box, cv, ctx, bg, I, real, txt) {
     raf = requestAnimationFrame(frame);
   };
 
-  const put = k => ctx.drawImage(I[k], L[k][0], L[k][1]);
+  const put = (c, T, k) => c.drawImage(I[k], T[k][0], T[k][1]);
+  function maskBuild(c, img, edge) {
+    const [, by, bw, bh] = L.build, y = edge - by;
+    c.globalCompositeOperation = 'source-over'; c.clearRect(0, 0, bw, bh); c.drawImage(img, 0, 0);
+    c.globalCompositeOperation = 'destination-in';
+    const g = c.createLinearGradient(0, y - 7, 0, y + 7); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,1)');
+    c.fillStyle = g; c.fillRect(0, 0, bw, bh);
+  }
+  function hanging(c, img, a, cable) {   // 🏗️ товарът на крана се люлее около куката
+    c.save(); c.translate(PIVOT[0], PIVOT[1]); c.rotate(a); c.translate(-PIVOT[0], -PIVOT[1]);
+    c.strokeStyle = cable; c.lineWidth = 1.1; c.beginPath();
+    for (const cx of CABLES) { c.moveTo(PIVOT[0], PIVOT[1] + 2); c.lineTo(cx, CABLE_Y); }
+    c.stroke(); c.fillStyle = cable; c.fillRect(PIVOT[0] - 3, PIVOT[1] - 1, 6, 6);
+    c.drawImage(img, L.load[0], L.load[1]); c.restore();
+  }
+  function moon(c, t) {
+    c.save(); c.globalCompositeOperation = 'lighter';
+    const r = 70 + 6 * Math.sin(t * 0.8), g = c.createRadialGradient(MOON[0], MOON[1], 10, MOON[0], MOON[1], r);
+    g.addColorStop(0, 'rgba(200,215,255,.32)'); g.addColorStop(0.4, 'rgba(150,170,230,.12)'); g.addColorStop(1, 'rgba(120,140,220,0)');
+    c.fillStyle = g; c.fillRect(MOON[0] - r, MOON[1] - r, 2 * r, 2 * r); c.restore();
+  }
+  function twinkle(c, t) {   // ✨ светлините на града и крановете леко трептят
+    c.save(); c.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < tw.length; i++) {
+      const [sp, ph, sz] = tw[i], k = Math.sin(t * sp + ph); if (k < 0.2) continue;
+      c.globalAlpha = 0.45 * (k - 0.2); c.drawImage(gc, LIGHTS[2 * i] - sz, LIGHTS[2 * i + 1] - sz, 2 * sz, 2 * sz);
+    }
+    c.restore();
+  }
 
   function sun(t) {
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
@@ -163,13 +228,13 @@ function run(ld, box, cv, ctx, bg, I, real, txt) {
   }
 
   function shine(u) {   // диагонална светла ивица по логото
-    const [, , lw, lh] = L.logo, cx = -60 + (lw + 120) * easeInOut(u);
-    sx.globalCompositeOperation = 'source-over'; sx.clearRect(0, 0, lw, lh); sx.drawImage(I.logo, 0, 0);
+    const T = p > 0.6 ? LN['logo-n'] : L.logo, [lx, ly, lw, lh] = T, cx = -60 + (lw + 120) * easeInOut(u);
+    sx.globalCompositeOperation = 'source-over'; sx.clearRect(0, 0, sc.width, sc.height); sx.drawImage(p > 0.6 ? I['logo-n'] : I.logo, 0, 0);
     sx.globalCompositeOperation = 'source-in';
     const g = sx.createLinearGradient(cx - 90, 0, cx + 90, lh * 0.35);
     g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,250,225,.85)'); g.addColorStop(1, 'rgba(255,255,255,0)');
     sx.fillStyle = g; sx.fillRect(0, 0, lw, lh);
-    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.75 * Math.sin(Math.PI * u); ctx.drawImage(sc, L.logo[0], L.logo[1]); ctx.restore();
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.75 * Math.sin(Math.PI * u); ctx.drawImage(sc, lx, ly); ctx.restore();
   }
 
   const frame = now => { try { draw(now); } catch (e) { console.warn('splash-anim', e); cancelAnimationFrame(raf); cv.remove(); } };   // грешка → статичната картина
@@ -177,6 +242,7 @@ function run(ld, box, cv, ctx, bg, I, real, txt) {
   const guard = setInterval(() => { if (!ld.isConnected) { cancelAnimationFrame(raf); clearInterval(guard); } }, 1000);
 }
 
+const smooth = (a, b, x) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
 const easeInOut = x => x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2;
 
 try { if (feature('splash-anim')) start(); } catch (e) { console.warn('splash-anim', e); }

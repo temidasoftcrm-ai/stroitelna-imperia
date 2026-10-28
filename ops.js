@@ -13,6 +13,7 @@
 // Видове: 'square' (тук), 'flood' и 'fire' (opskinds.js) — по едно активно наведнъж.
 import { POL } from './worldpol.js';
 import { KINDS } from './opskinds.js';   // 🌊 наводнение и 🔥 пожар (логиката; сцените — opsflood.js / opsfire.js)
+import { t as tr } from './i18n.js';
 export { KINDS };
 
 export const OPS_TEAMS = {
@@ -97,6 +98,7 @@ export function createOps(deps) {
   function step(dt) {
     const m = act(); if (!m || dt <= 0) return; dt = Math.min(dt, 1);
     m.t += dt;
+    { const fd = fadeOf(m); if (!m.out && fd && !m.warned && m.t >= fd - 2) { m.warned = true; deps.toast && deps.toast(tr('⏳ {0}: остават ~2 дни — без отговор доверието пада (−4…6), сигурността също (−1…3). Отвори мисията от картата.', [m.city || (KINDS[m.k] || {}).nm || '']), 'bad'); } }   /* предупреждение преди да отмине */
     const TT = teamsOf(m); for (const [k, tm] of Object.entries(m.teams)) if (tm.st === 'enroute' && m.t >= tm.t0 + tm.eta) { tm.st = 'onsite'; log(m, `${TT[k].ico} ${TT[k].nm} — на място.`); }
     if (m.k !== 'square') { if (m.out) { if (m.t - m.outT > KEEP_DAYS && !viewing) archive(); return; } KINDS[m.k].step(m, dt, H); return; }
     if (m.out) { m.crowd = Math.max(m.out === 'partial' ? 35 : 0, m.crowd - 160 * dt); if (m.t - m.outT > KEEP_DAYS && !viewing) archive(); return; }   // архивира се само при затворена карта
@@ -128,7 +130,9 @@ export function createOps(deps) {
   const markers = () => { const m = act(); if (!m) return []; const K = KINDS[m.k]; return [{ id: m.id, ico: m.out ? '✅' : K ? K.ico : '📢', nm: K ? (K.place ? `${K.nm} — ${K.area}` : `${K.nm} — ${K.area.toLowerCase()}, ${m.city}`) : `Протест на площада — ${m.city}`, lon: m.lon, lat: m.lat, m }]; };
   const open = () => { const m = act(), o = { onClose: deps.onClose, muted: deps.muted }; if (m && m.k === 'flood') return import('./opsflood.js').then(M => M.openOpsFlood(api, o)); if (m && m.k === 'fire') return import('./opsfire.js').then(M => M.openOpsFire(api, o)); if (m && m.k === 'aid') return import('./opsaid.js').then(M => M.openOpsAid(api, o)); if (m && m.k === 'strait') return import('./opshormuz.js').then(M => M.openOpsHormuz(api, o)); if (m && m.k === 'rebuild') return import('./opsrebuild.js').then(M => M.openOpsRebuild(api, o)); return import('./ops3d.js').then(M => M.openOpsSquare(api, o)); };
   // кратко за панела на картата
-  const summary = m => { const on = Object.values(m.teams).filter(t => t.st === 'onsite').length, n = Object.keys(m.teams).length - (m.k === 'square' ? 1 : 0), O = m.out;
+  const fadeOf = m => m.k === 'square' ? FADE_DAYS : (KINDS[m.k] || {}).fade || 0;
+  const summary = m => { const t = summary0(m), fd = fadeOf(m); return m.out || !fd ? t : `${t} · ${tr('⚠️ Без отговор след {0} дни: доверие −4…6, сигурност −1…3', [Math.max(0, Math.ceil(fd - m.t))])}`; };
+  const summary0 = m => { const on = Object.values(m.teams).filter(t => t.st === 'onsite').length, n = Object.keys(m.teams).length - (m.k === 'square' ? 1 : 0), O = m.out;
     const res = O ? (O === 'deal' ? '✅ Решено' : O === 'partial' ? '📋 Частично решение' : '🌧️ Без решение') : '';
     if (m.k === 'flood') return res || `🌊 Ниво ${Math.round(m.level)} · 🏠 на покривите: ${Math.round(m.stranded)} · екипи на място: ${on}/${n}`;
     if (m.k === 'rebuild') return res || `🏠 Жилища ${Math.round(m.homes)}% · 🔥 парно ${Math.round(m.heat)}% · 👨‍👩‍👧 върнали се ${Math.round(m.home)}/${m.pop} · екипи на място: ${on}/${n}`;
