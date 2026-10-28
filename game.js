@@ -621,7 +621,7 @@ let europe = null;
   // заводските модели се казват като търговските (building-a…) — пазим ги под 'ind-…'
   // истински храсти, цветя и фонтан (assets/heavy/plants, нормализирани: най-широката страна 1, основа 0) — зад feature('plants-real')
   if (feature('tokyo-look') || feature('dubai-look') || feature('sg-look')) for (const n of ['jp-narrow', 'jp-trad', 'jp-modern', 'jp-home1', 'jp-home2', 'jp-home3', 'jp-neon']) jobs.push(load(`assets/heavy/asia/${n}.glb`).then(g => { g.scene.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => {}));   // 🇯🇵 tokyo-look
-  for (const n of H2) jobs.push(load(`assets/heavy/${MH.has(n) ? 'houses3' : 'houses2'}/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; if (MH.has(n)) { if (MH_READY) mhNight(g.scene); else MH_PENDING.push(g.scene); } else prepNightFloors(g.scene, n); }).catch(() => HOUSES.splice(HOUSES.indexOf(n), 1)));   // не се зареди → не се строи
+  for (const n of H2) jobs.push(load(`assets/heavy/${MH.has(n) ? 'houses3' : 'houses2'}/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; if (MH.has(n)) { if (MH_READY) mhNight(g.scene); else MH_PENDING.push(g.scene); } else prepNightFloors(g.scene, n); }).catch(() => { const i = H2.indexOf(n); if (i >= 0) H2.splice(i, 1); }));   // не се зареди → не се строи
   if (feature('hw-gantry')) jobs.push(load('assets/heavy/highway/hw-gantry.glb').then(g => { A['hw-gantry'] = g; }).catch(() => {}));   // 🛣️ порталът с табелите
   if (feature('office-levels2')) for (const L of OFFICE2) jobs.push(load(L.url).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[`office2-l${L.lv}`] = g; prepNightFloors(g.scene, `office2-l${L.lv}`); blkSections(`office2-l${L.lv}`); }).catch(() => {}));   // 🆕 новите нива на офиса
   for (const n of GAS_KINDS) jobs.push(load(`assets/heavy/gas/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => {}));   // бензиностанции (всяка — свое „✓ OK“); нощем — навесът и магазинът (nightfloors 'gas')
@@ -703,7 +703,7 @@ for (const [n, band] of Object.entries(SKY_BANDS)) {
 // модерните небостъргачи в мегаполисите: 20, 25 и 30 етажа
 for (const [n, band] of Object.entries(SKY_BANDS_MODERN)) if (A[n]) for (const f of [20, 25, 30, 40]) A[`${n}@${f}`] = { scene: makeTallCopy(A[n].scene, band, f) };
 const sizeCache = {};
-const sizeOf = n => sizeCache[n] || (sizeCache[n] = new THREE.Box3().setFromObject(A[n].scene));
+const sizeOf = n => sizeCache[n] || (A[n] ? (sizeCache[n] = new THREE.Box3().setFromObject(A[n].scene)) : new THREE.Box3(new THREE.Vector3(-5, 0, -5), new THREE.Vector3(5, 10, 5)));   // без модел — кутия 10 м (не срив)
 // пакет с дървета → отделни дървета: всяко листо/клон отива при най-близкия ствол; без ствол — само (храст, малко дърво).
 // Всяко дърво е с основа в (0,0,0) и височина 1, затова model('sf-palm-0', 8) е палма от 8 м
 // по-истински дървета навсякъде: вместо конусите на Kenney ('tree-large'/'tree-small') — дърветата от горския пакет (и малко борове);
@@ -1789,6 +1789,8 @@ function placeBuilding(lot, n, rot = 0) {
   if (n === 'shop-petrol' && !petrolFits(lot)) n = 'building-c';   // ⛽ houses-sf: бензиностанцията — само на дълъг парцел
   if (n === 'shop-super' && !superFits(lot)) n = 'building-c';   // 🛒 супермаркетът — само на голям парцел
   if (feature('sky-pool') && PLAYER_SKY.includes(n) && A[n]) n = skyFit(n, lot);   // 🏙️ sky-pool: в истински ръст кулата трябва да влиза в парцела
+  // моделът не се е заредил (мрежа, стар запис с модел зад изключен флаг) → резервна сграда вместо срив при старта
+  if (!A[n]) { console.warn('placeBuilding: няма модел', n); n = HOUSES.includes(n) || !A['building-c'] ? 'building-type-a' : 'building-c'; }
   const isQ = n.startsWith('Building_');
   const s = SHOPS.includes(n) && lot.plan ? fitScale(n, Math.min(lot.w, lot.d) - 1.5) : (isQ ? fitScale(n, 14) : HOUSES.includes(n) ? fitScale(n, houseFit(n)) : fitScale(n, SHOPS.includes(n) ? SHOP_FIT : 12.5)) * lotK(lot);   // в плана — целият парцел
   const o = model(n, s); if (n.startsWith('cafe-')) cafeLights(o, n);   // ☕ shop-cafe: лампите — на поставения (model() слива меша на източника)
