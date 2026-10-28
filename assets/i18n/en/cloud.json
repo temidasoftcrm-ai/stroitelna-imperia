@@ -422,5 +422,7 @@
  "🎬 Нови клипове — първата магистрала и първият кораб": "🎬 New clips — the first motorway and the first ship",
  "🛠️ Поправено: техниката вече не „засяда“ по дългите пътища; летището/пристанището тръгва веднага след основаването на дъщерната фирма": "🛠️ Fixed: machines no longer get “stuck” on long roads; the airport/port starts right after founding the subsidiary",
  "🌍 Входовете към континентите (Александрия, Ню Йорк, Рио, Дубай, Сидни) — линия без ограничения": "🌍 Continent gateways (Alexandria, New York, Rio, Dubai, Sydney) — routes without limits",
- "📈 Нивата 12–20 искат повече опит; парите горе се превъртат": "📈 Levels 12–20 need more XP; the money counter rolls"
+ "📈 Нивата 12–20 искат повече опит; парите горе се превъртат": "📈 Levels 12–20 need more XP; the money counter rolls",
+ "🤝 Партньорство: държава, чиито ключови градове сте завършили двамата, е „Завладяна заедно“ — на картата и в борда; доходът +10% и наградите — за този с повече градове там": "🤝 Partnership: a country whose key cities you finished together is “Conquered together” — on the map and the board; the +10% income and rewards go to whoever finished more cities there",
+ "🛠️ Поправено: пратките и касата на партньорството не се опитват безкрайно, ако сървърът ги откаже — парите се връщат": "🛠️ Fixed: partnership parcels and vault deposits no longer retry forever when the server rejects them — the money is returned"
 }

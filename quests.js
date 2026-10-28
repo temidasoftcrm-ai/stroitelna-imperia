@@ -128,6 +128,7 @@ export function createQuests(deps) {
     firstPct: () => deps.firstPct ? deps.firstPct() : 0,
     S: () => S(),
     econ: () => deps.econ(),
+    wonDone: () => deps.wonDone ? deps.wonDone() : null,   // 🤝 coop-countries: кои градове броят за завладяна държава при парите (game.js moneyDone); null — само моите
     rep: () => S().rep || 0,
     done: () => S().done || 0,
     max: key => Math.max(0, ...cityVals(key)),

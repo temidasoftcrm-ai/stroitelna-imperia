@@ -3960,7 +3960,7 @@ function setupWorld() {
   city.ready = true;
   S.hqCity = S.hqCity || S.cityId; S.cities = S.cities || {};
   if (!S.tut && (S.done || 0) > 3) S.tut = { step: 99, off: true };   // опитен играч — без урок
-  econ = new ECON.Economy(S.econ, { toast, bustHtml: () => bust.statusHtml(), cityName: id => cityById(id)?.nm, isCapital: id => id === 'sofia' || CAPITALS.has(id), changed: () => { save(); renderPanel(); }, takeover: id => takeoverChoice(id), stockVisible: c => !c.cc || ownedCities().some(id => cityById(id)?.cc === c.cc), liquidated: (c, total, pr) => { showEventPop('sold', `💰 Разпродажба: ${c.nm}`, `+${fmt(total)} € · ${pr >= 0 ? 'печалба' : 'загуба'} ${fmt(Math.abs(pr))} € спрямо цената`); quests.emit('liquidate'); }, incomeMul: id => wonIncomeMul(id, x => econ.isFinished(x)), stocksOpen: () => dev.stocksOpen() });
+  econ = new ECON.Economy(S.econ, { toast, bustHtml: () => bust.statusHtml(), cityName: id => cityById(id)?.nm, isCapital: id => id === 'sofia' || CAPITALS.has(id), changed: () => { save(); renderPanel(); }, takeover: id => takeoverChoice(id), stockVisible: c => !c.cc || ownedCities().some(id => cityById(id)?.cc === c.cc), liquidated: (c, total, pr) => { showEventPop('sold', `💰 Разпродажба: ${c.nm}`, `+${fmt(total)} € · ${pr >= 0 ? 'печалба' : 'загуба'} ${fmt(Math.abs(pr))} € спрямо цената`); quests.emit('liquidate'); }, incomeMul: id => wonIncomeMul(id, x => moneyDone(x)), stocksOpen: () => dev.stocksOpen() });
   if (econ.setCity) econ.setCity(S.cityId);   // оборотът от обекти се води по градове
   buildCity(S.cityId);
   thamesRelocate();   // 🌊 нищо не остава на парцелите в реката
@@ -5194,9 +5194,9 @@ function drawMap() {
   svg.classList.toggle('lod', lod); svg.classList.toggle('look', look); svg.dataset.lod = lod ? LOD_NM[L] : '';
   try { if (geoMap.on()) { svg.innerHTML = geoMap.svg(); geoMap.bind(svg); geoMap.overlay(); return; } } catch (e) { if (!(e instanceof ReferenceError)) console.warn('geo', e); }   // 🌍 геополитика (до инициализацията — икономическият изглед)
   let h = mapWorld ? '<rect class="ocean" x="-20000" y="-10000" width="40000" height="25000" fill="#5f9fd6"/>' : '<rect class="ocean" x="-6000" y="-4000" width="12000" height="8000" fill="#5f9fd6"/>';
-  const wonIso = new Set(S && econ ? wonCountries(x => econ.isFinished(x)).map(k => k.iso) : []);
+  const wonIso = new Set(S && econ ? wonCountries(doneJoint).map(k => k.iso) : []);
   // започнатите държави (твой град или завършен ключов град) — бледо златисто; завладените — златни
-  const partIso = new Set(S && econ ? COUNTRIES.filter(k => !wonIso.has(k.iso) && (countryProgress(k, x => econ.isFinished(x)).done || k.cities.some(id => ownedCities().includes(id)))).map(k => k.iso) : []);
+  const partIso = new Set(S && econ ? COUNTRIES.filter(k => !wonIso.has(k.iso) && (countryProgress(k, doneJoint).done || k.cities.some(id => ownedCities().includes(id)))).map(k => k.iso) : []);
   const wonD = [];
   const emp = mapWorld && feature('map-empty') ? emptyIso() : null;
   const bordD = [];   // границите — пак отгоре на „дивото“ (wildSvg го рисува над държавите)
@@ -5220,14 +5220,14 @@ const abEnds = () => new Set([...ALL_AB, ...allSegs()].filter(x => !x.cont || co
 function keyCitiesMine() { const own = new Set(ownedCities()); return new Set(COUNTRIES.filter(k => k.cities.some(id => own.has(id))).flatMap(k => k.cities)); }
 // завладени държави и напредъкът (🇧🇬 4/6) — при държавите, където имаш поне един завършен град или филиал
   if (S && econ) for (const k of COUNTRIES) {
-    const pr = countryProgress(k, x => econ.isFinished(x)); if (!pr.done && !k.cities.some(id => ownedCities().includes(id))) continue;
+    const pr = countryProgress(k, doneJoint), duo = pr.won && !countryProgress(k, x => econ.isFinished(x)).won; if (!pr.done && !k.cities.some(id => ownedCities().includes(id))) continue;
     if (mapCont && !k.cities.some(id => viewOf(mapCont).ids.has(id))) continue;   // изгледът на континент — само неговите държави
     if (!mapEU && !mapWorld && !mapWide && k.iso !== 'BGR') continue;
     if (!mapCont && !mapWorld && k.cities.some(offEU)) continue;   // африканските държави — само на изгледа „Африка“
     if (lod && L === LOD.WORLD) continue;
     const [lo, la] = countryLabelLL(k, cityById), [x, y] = proj(lo, la), fs = 11 * (mapEU ? 3.2 : mapWide ? 1.4 : 1) * mapK();
-    const miss = k.cities.filter(id => !econ.isFinished(id)).map(id => cityById(id)?.nm || id);
-    h += `<text class="cwon ${pr.won ? 'ok' : ''} ${lod && mapIso === k.iso ? 'pin' : ''}" data-cc="${k.cc}" x="${x}" y="${y + fs * 2.2}" font-size="${fs}" text-anchor="middle" style="cursor:help"><title>${pr.won ? `${k.nm} е завладяна` : `За да завладееш ${k.nm}, завърши: ${miss.join(', ')}`}</title>${k.cc} ${pr.won ? '✅ Завладяна' : `${pr.done}/${pr.total}`}</text>`;
+    const miss = k.cities.filter(id => !doneJoint(id)).map(id => cityById(id)?.nm || id);
+    h += `<text class="cwon ${pr.won ? 'ok' : ''} ${lod && mapIso === k.iso ? 'pin' : ''}" data-cc="${k.cc}" x="${x}" y="${y + fs * 2.2}" font-size="${fs}" text-anchor="middle" style="cursor:help"><title>${pr.won ? (duo ? `${k.nm} е завладяна заедно с партньора` : `${k.nm} е завладяна`) : `За да завладееш ${k.nm}, завърши: ${miss.join(', ')}`}</title>${k.cc} ${pr.won ? (duo ? '🤝 Завладяна заедно' : '✅ Завладяна') : `${pr.done}/${pr.total}`}</text>`;
   }
   for (const [iso, [lo, la]] of Object.entries(mapEU ? {} : mapWide ? COUNTRY_LABEL_WIDE : COUNTRY_LABEL_AT)) { const [x, y] = proj(lo, la); h += `<text class="clabel" x="${x}" y="${y}">${COUNTRY_BG[iso]}</text>`; }
   if (!mapWorld) { const [x, y] = proj(28.9, 42.9); h += `<text class="sea" x="${x}" y="${y}">ЧЕРНО МОРЕ</text>`; }
@@ -5434,7 +5434,7 @@ function applySel() {
 // ---- Фаза 5: курорти (resorts.js)
 // главите с куести на континентите излизат, щом континентът е отключен И имаш връзка до „вратата“ му (линия/филиал там)
 for (const [ch, k] of [[AFRICA_CHAPTER, 'af'], [NA_CHAPTER, 'na'], [SA_CHAPTER, 'sa'], [AS_CHAPTER, 'as'], [OC_CHAPTER, 'oc']]) { const f = ch.openIf; ch.openIf = c => { if (!f(c) || !S || !contByKey(k)?.open()) return false; try { return contLinked(k); } catch { return false; } }; ch.lockTxt = (ch.lockTxt || '') + ' После създай линия до „вратата“ на континента.'; }
-const quests = createQuests({ S: () => S, econ: () => econ, toast, fmt, save, sound: n => Sound.play(n),
+const quests = createQuests({ wonDone: () => feature('coop-countries') ? moneyDone : null, S: () => S, econ: () => econ, toast, fmt, save, sound: n => Sound.play(n),
   railPath: (a, b) => railPath(a, b), connectedCities: () => connectedCities(), factories: ECON.FACTORIES, toll: () => hwToll(), isForeign: id => isForeign(id), pop: (k, a, b) => showEventPop(k, a, b), onClaim: () => dev.add(dev.XP.quest), devBest: () => dev.best(),
   firstPct: () => { if (!S || !econ) return 0; const id = S.hqCity || S.cityId; if (econ.isFinished(id)) return 100; if (id === S.cityId) return city && city.lots ? builtPct() : 0; const c = (S.cities || {})[id]; return c && c.lotTotal ? Math.round((1 - (c.freeAll ?? 0) / c.lotTotal) * 100) : 0; } });   /* куестът „Пълен първи град“ */
 // оферти от доставчици (supply.js): стоката идва, щом има жп линия или магистрала до доставчика
@@ -5968,7 +5968,7 @@ if ($('bankBtn')) $('bankBtn').onclick = () => { if (!S) return; $('qPanel')?.cl
 $('btnMapToggle').onclick = () => { if (!S) return; showMap($('mapScreen').classList.contains('hidden')); };
 // 🌍 глобус на империята (globe.js): превзетите държави в зелено, започнатите в жълто, твоите градове като точки
 function globeData() {
-  const done = x => econ.isFinished(x), own = new Set(ownedCities()), partial = new Map();
+  const done = x => doneJoint(x), own = new Set(ownedCities()), partial = new Map();
   for (const k of COUNTRIES) { const pr = countryProgress(k, done); const mine = k.cities.some(id => own.has(id)); if (!pr.won && (pr.done || mine)) partial.set(k.iso, Math.max(0.15, pr.done / pr.total)); }
   const ids = [...new Set([...own, ...Object.keys(econ.s.finished || {})])];
   // надписи само на столиците на държавите, в които имаш присъствие (+ централата)
@@ -6022,7 +6022,7 @@ const openSettingsUI = () => window.__settings ? window.__settings({ audio: feat
   b.onclick = () => { if (!S) return; const ex = document.getElementById('globeView'); if (ex) { ex.querySelector('#globeClose').click(); return; } openGlobe(globeData()); };
   $('btnMapToggle').parentNode.insertBefore(b, $('btnMapToggle')); }
 // завладяването: „само летище“ (Инчхон, Йокохама, Манила) и Империал Сити не се превземат — не се броят
-const conquest = createConquest({ cities: () => CITIES.filter(c => !AIR_ONLY.has(c.id) && c.id !== NEOM_ID).map(c => c.id), contOf: id => contOf(id)?.key || null, conts: () => CONTS, countries: () => COUNTRIES, isFinished: id => !!econ && econ.isFinished(id), hwSegs: () => allSegs(), abSegs: () => ALL_AB, hwDone: () => hwDone(), portMax: id => portMax(id), portLv: id => portLv(id), airMax: id => airportMax(id), airLv: id => airLv(id), modal: (t, h, b) => modal(t, h, b) });
+const conquest = createConquest({ cities: () => CITIES.filter(c => !AIR_ONLY.has(c.id) && c.id !== NEOM_ID).map(c => c.id), contOf: id => contOf(id)?.key || null, conts: () => CONTS, countries: () => COUNTRIES, isFinished: id => doneJoint(id), hwSegs: () => allSegs(), abSegs: () => ALL_AB, hwDone: () => hwDone(), portMax: id => portMax(id), portLv: id => portLv(id), airMax: id => airportMax(id), airLv: id => airLv(id), modal: (t, h, b) => modal(t, h, b) });
 { const b = document.createElement('button'); b.id = 'btnConquest'; b.className = 'btn2'; b.innerHTML = '🏆 Завладяване'; b.title = 'Колко % от всеки континент е твой';
   b.onclick = () => { if (S) conquest.open(); };
   $('btnGlobe').parentNode.insertBefore(b, $('btnGlobe')); }
@@ -6867,11 +6867,44 @@ function gateModal(key) {
     [['Затвори', null], ...(port ? [[`⚓ Създай морска линия`, () => { if (!econ.canAfford(pc)) { withLoan(pc, `Морска линия до ${G.nm}`, () => { openSeaRoute(port.id, g); afCheckOpen(); }); return; } openSeaRoute(port.id, g); afCheckOpen(); }]] : []),
       ...(air ? [[`✈️ Създай авиолиния`, () => { if (!econ.canAfford(ac)) { withLoan(ac, `Авиолиния до ${G.nm}`, () => { openAirRoute(air.id, g); afCheckOpen(); }); return; } openAirRoute(air.id, g); afCheckOpen(); }]] : [])]);
 }
+// 🤝 coop-countries (Лаборатория): общо завладяване на държави с партньора. Завършените градове на партньора (window.__coopShared.fin, coop.js)
+// идват от неговия клиент и сървърът не ги проверява — затова се ползват само за картата, таблото „Завладяване“, попъпа и XP (doneJoint).
+// Парите (+10% доход — wonIncomeMul, куестите w_won1/3/10) са само за единия от двамата (moneyDone/coopLead): за общо завладяна държава —
+// за този с повече завършени градове в нея, при равенство — за по-малкото user id; веднъж поето, остава (S.coopWon, пращано като wonC). Флагът изключен → всичко е както преди.
+function coopFin() { return feature('coop-countries') ? (window.__coopShared?.fin || []) : []; }
+function doneJoint(id) { return !!econ && (econ.isFinished(id) || coopFin().includes(id)); }
+function coopCountryOf(id) { const c = cityById(id); return COUNTRIES.find(k => k.cities.includes(id)) || COUNTRIES.find(k => k.cc === (c?.cc || '🇧🇬')) || null; }
+function coopLead(k) {
+  const P = window.__coopShared; if (!P || !S || !econ) return false;
+  const mine = !!(S.coopWon || {})[k.iso], his = (P.wonC || []).includes(k.iso), lower = !!P.me && !!P.pid && P.me < P.pid;
+  if (mine && his) return lower;
+  if (mine || his) return mine;
+  const fin = P.fin || [], me = countryProgress(k, x => econ.isFinished(x)).done, pa = countryProgress(k, x => fin.includes(x)).done;
+  return me > pa || (me === pa && me > 0 && lower);
+}
+function moneyDone(id) { if (!econ) return false; if (econ.isFinished(id)) return true; if (!coopFin().includes(id)) return false; const k = coopCountryOf(id); return !!k && coopLead(k); }
+// попъпът за новозавладяна държава (с флага): по списък на показаните (S.wonSeen) — ако партньорът напусне, S.wonN не пада и попъпите не се повтарят
+function coopWonCheck() {
+  const won = wonCountries(doneJoint), loc = new Set(wonCountries(x => econ.isFinished(x)).map(k => k.iso)); let changed = false;
+  if (!Array.isArray(S.wonSeen)) S.wonSeen = S.wonN == null ? won.map(k => k.iso) : [...loc];
+  for (const k of won) if (!loc.has(k.iso) && !(S.coopWon || {})[k.iso] && coopLead(k)) { S.coopWon = { ...(S.coopWon || {}), [k.iso]: 1 }; changed = true; }
+  const fresh = won.filter(k => !S.wonSeen.includes(k.iso));
+  if (S.wonN == null || won.length > S.wonN) { S.wonN = won.length; changed = true; }
+  if (fresh.length) {
+    S.wonSeen = [...S.wonSeen, ...fresh.map(k => k.iso)]; changed = true;
+    const k = fresh[fresh.length - 1], joint = !loc.has(k.iso), pn = window.__coopShared?.name || 'партньора', pay = !joint || coopLead(k);
+    Sound.play('country'); xpMore(10000);
+    if (joint) { showEventPop('country-won', `🤝 Завладяхте ${k.cc} ${k.nm} заедно с ${pn}`, pay ? 'Ключовите градове са завършени заедно · +10% към прихода ти в нея' : 'Ключовите градове са завършени заедно · +10 000 XP (+10% доход получава партньорът с повече завършени градове)'); toast(`🤝 Завладяхте ${k.cc} ${k.nm} заедно с ${pn}! +10 000 XP`, 'good'); }
+    else { showEventPop('country-won', `🏆 ${k.cc} ${k.nm} е твоя!`, 'Всички ключови градове са завършени · +10% към прихода им'); toast(`🏆 Завладя ${k.cc} ${k.nm}! Всички ключови градове са завършени — +10% към прихода им.`, 'good'); }
+  }
+  if (changed) save();
+}
 // щом се създаде първата връзка — „Добре дошъл в …“ и другите градове се появяват
 function afCheckOpen() {
   if (!S) return;
   if (dev.has('EMPIRE') && !S.empireShown) { S.empireShown = true; save(); setTimeout(() => showEmpireEnd(), 600); }   // 🏁 финалът на играта
-  { const won = wonCountries(x => econ.isFinished(x)); if (S.wonN == null) S.wonN = won.length;   // 🏆 нова завладяна държава — химн и картина
+  if (feature('coop-countries')) coopWonCheck();
+  else { const won = wonCountries(x => econ.isFinished(x)); if (S.wonN == null) S.wonN = won.length;   // 🏆 нова завладяна държава — химн и картина
     else if (won.length > S.wonN) { const k = won[won.length - 1]; S.wonN = won.length; Sound.play('country'); xpMore(10000); showEventPop('country-won', `🏆 ${k.cc} ${k.nm} е твоя!`, 'Всички ключови градове са завършени · +10% към прихода им'); toast(`🏆 Завладя ${k.cc} ${k.nm}! Всички ключови градове са завършени — +10% към прихода им.`, 'good'); save(); } }
   S.gateOpen = S.gateOpen || (S.afGateOpen ? { af: true } : {});
   for (const key of Object.keys(CONT_GATE)) {
@@ -13642,6 +13675,7 @@ if (AUTOTEST) {
     lookTir(k = 0, dist = 26) { const t = tirs.list[k]; if (!t) return; controls.target.set(t.x, 2, t.z); camera.position.set(t.x + dist * 0.8, dist * 0.6, t.z + dist * 0.7); fly = null; },
     money(n) { econ.earn(n, 'друго', 'тест'); },
     rep(n) { S.rep = n; },
+    coopWinTest(map = false, mine = 2) { const k = COUNTRIES.find(x => x.iso === 'DEU'), cut = k.cities.length - mine; window.__coopShared = { v: (window.__coopShared?.v || 0) + 1, name: 'Тест-партньор', hw: [], rails: [], cities: k.cities.slice(0, cut), infra: {}, col: null, fin: k.cities.slice(0, cut), wonC: [], me: 'a', pid: 'b' }; for (const id of k.cities.slice(cut)) if (!econ.isFinished(id)) econ.finishCity(id, 0.7, {}); afCheckOpen(); if (map) setTimeout(() => showMap(true), 4000); drawMap(); return { flag: feature('coop-countries'), localWon: countryProgress(k, x => econ.isFinished(x)).won, jointWon: countryProgress(k, doneJoint).won, moneyWon: countryProgress(k, moneyDone).won, incomeMul: wonIncomeMul(k.cities[cut], x => moneyDone(x)), lead: coopLead(k), wonN: S.wonN, seen: S.wonSeen, coopWon: S.coopWon || null, board: conquest.stats().eu.countries }; },
     winTest(cc = '🇧🇬') { const k = COUNTRIES.find(x => x.cc === cc); for (const id of k.cities.slice(0, cc === '🇧🇬' ? 99 : 3)) econ.finishCity(id, 0.7, {}); S.dev.lv = 10; S.dev.xp = 250000; return { cities: CITIES.length, won: wonCountries(x => econ.isFinished(x)).map(x => x.nm) }; },
     hsTest() { econ.earn(5e7, 'друго', 'тест'); S.dev.lv = 10; S.dev.xp = 250000; S.rails = [{ a: S.cityId, b: 'belgrade', km: 330, days: 5, prog: 1, built: true }, { a: 'belgrade', b: 'budapest', km: 320, days: 5, prog: 1, built: true }]; openBig('rail'); return document.getElementById('bwBody').innerText.match(/Модернизирай[^\n]*/g); },
     repTest() { econ.earn(1e6, 'друго', 'тест'); for (let i = 0; i < 4; i++) { const l = city.lots.find(x => !x.built && !x.busy); est().owned.push({ cond: 40, lot: l.id, kind: 'house', rent: 400, value: 50000, since: S.day }); l.busy = 'owned'; } tab = 'estate'; renderPanel(); document.getElementById('bRepairAll').click(); return { busy: busyCount(), maint: projects.filter(p => p.maint).length, cap: officeLv().proj }; },
