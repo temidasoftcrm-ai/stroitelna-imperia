@@ -396,5 +396,6 @@
  "🌃 Забележителностите светят нощем; Опера в Сидни, Токийската кула, Голдън Гейт; денонощен магазин и супермаркет": "🌃 Landmarks light up at night; Sydney Opera House, Tokyo Tower, Golden Gate; 24-hour shop and supermarket",
  "🏛️ Политиката: импийчмънт, мандати, по-добър баланс и въведение на ниво 25": "🏛️ Politics: impeachment, terms of office, better balance and an intro at level 25",
  "⚡ По-леки градове по картата — по-малко дървета и сенки в украсата на кварталите": "⚡ Lighter real-map cities — fewer trees and shadows in the district decor",
- "🛠️ Поправено: играта спираше при зареждане на запис, ако модел на сграда не се е заредил": "🛠️ Fixed: the game stopped while loading a save if a building model failed to load"
+ "🛠️ Поправено: играта спираше при зареждане на запис, ако модел на сграда не се е заредил": "🛠️ Fixed: the game stopped while loading a save if a building model failed to load",
+ "🏠 Старите записи: модерната двуетажна къща е заменена с къща от региона (вместо празно място)": "🏠 Old saves: the modern two-storey house is replaced with a regional house (instead of an empty spot)"
 }

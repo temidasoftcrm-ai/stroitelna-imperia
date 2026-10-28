@@ -574,7 +574,7 @@ const MH = new Map(MESHY_HOUSES.map(([n, r, w, h, lot]) => [n, { r, w, h, lot }]
 for (const [n, { h }] of MH) if (h) REAL_BLD[n] = h;   // real-scale: истинската височина
 let MH_READY = false; const MH_PENDING = [];   // моделите идват преди денонощието (dayNight) — светлините се слагат щом е готово
 const NIGHT_LATER = [], atNight = f => MH_READY ? f() : NIGHT_LATER.push(f);   // същото за кафенето, магазините и др.: dayNight.winMats.add — щом е готово
-const MH_RETIRED = new Set(['mh-modern1']);   // 28.10: зарежда се (за старите записи), но не се избира за нови къщи — отгоре изглежда като смачкан покрив
+const MH_RETIRED = new Set(['mh-modern1']);   // 28.10: не се зарежда и не се избира; в старите записи placeBuilding го сменя с текуща къща — отгоре изглежда като смачкан покрив
 H2.push(...[...MH.keys()].filter(n => !MH_RETIRED.has(n)));   // → HOUSES / REAL_HOUSES (поръчките за къщи и парцелите)
 // бензиностанциите (decorLot) — тук, преди зареждането
 // №6 (55, gas-face): накъде гледат колонките на модела (в неговите оси) → завъртане, така че да гледат към улицата (+z на парцела)
@@ -1784,6 +1784,7 @@ function lmPlazaTick() {
     g.userData.plazaDone = true; const ck = cafeFor(S.cityId), pz = lmPlazaZone(o, { streets: city.plan ? city.plan.streets : [], night: () => dayNight.night, ...(P2 ? { plaza2: true, lots: city.lots, water: wat, ped: () => parkPed(), low: gfxK('far') < 0.6 } : {}), cafe: ck ? () => { const m = model(ck, 1); cafeLights(m, ck); return m; } : null });   /* ☕ shop-cafe: и кафене на ръба на площада */ city.group.add(pz); (city.plazas ||= []).push(pz); }
 }
 function placeBuilding(lot, n, rot = 0) {
+  if (MH_RETIRED.has(n)) n = 'building-type-a';   // старите записи с изваден модел (mh-modern1) → текуща къща за региона (houseOf по парцела)
   n = blockOf(houseOf(n, lot.id), lot.id); const n0 = n; n = jpLook(n, lot);   // tokyo-look: японските къщи (записът пази n0)
   if (n === 'shop-mall' && !mallFits(lot)) n = 'building-c';   // 🏪 shops-meshy: молът от поръчката не се побира на тесния парцел — обикновен магазин
   if (n === 'shop-petrol' && !petrolFits(lot)) n = 'building-c';   // ⛽ houses-sf: бензиностанцията — само на дълъг парцел
