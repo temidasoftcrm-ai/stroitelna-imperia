@@ -31,6 +31,7 @@ import { createRivals, LOCAL_FIRMS, FIRMS } from './rivals.js';
 import { perf, createPerfPanel } from './perfpanel.js';
 import { createCityCull } from './citycull.js';
 import { createFires } from './firesim.js';
+import { createBlockRuins } from './fireruins.js';   // 🏚️ fire-ruins: изгорелите фонови сгради (кварталите по плана)
 import { gantrySigns } from './hwsigns.js';   // 🛣️ флаг hw-gantry: порталите с табели над магистралата в града
 import { buildBillboards } from './billboards3d.js';   // 🪧 флаг billboards: билбордове с фирмата по булевардите   // 🔥 флаг fire-seq: пожарът като последователност (здравина, гасене, оценка, ремонт/разчистване)   // ⚡ флаг perf-cliff: детайлите и хората по разстояние, сливане на статичните модели   // ⏱️ панел за производителност (флаг perf-panel, F8)
 import { createDevLevel, THRESH as DEV_THRESH, LV as DEV_LV, unlockText, kmXp, XP_BUY, migrateDevRecord } from './devlevel.js';
@@ -48,6 +49,7 @@ import { createDistricts, parkLayout, parkMesh } from './districts.js';   // �
 import { siteK, realScaleK, REAL_BLD, TOO_LONG, kidK, SECTIONS, sectName, pickSection } from './scale.js';   // 🏗️ флаг site-anim: истински кран при събаряне, машините работят, кранът вдига
 import { createEvents } from './events.js';
 import { createWeather, rollWeather, wx2Kind, wx2SnowFrac } from './weather.js';
+import { createStorm } from './storm.js';   // ⚡ storm-bolts (f6): мълниите и гръмотевиците при буря
 import { bidHtml, resolveBid } from './bidding.js';
 import { addSiteLights, setSiteLightsNight } from './sitelights.js';
 import { createHwTraffic } from './hwtraffic.js';
@@ -165,7 +167,7 @@ import { canalsView } from './canals.js';
 import { cityGround } from './cityground.js';
 import { createGarbage, garbageNarrow } from './garbage.js';   // 🚛 garbage-truck (f6): сметосъбирачът
 import { placeFactories, factoryNight } from './factory.js';   // 🏭 ind-factory (f6): заводът в края на града
-import { lmPlaza as lmPlazaZone, plazaKind } from './lmplaza.js';   // 🏛️ lm-plaza (f6): площадите около забележителностите   // 🧱 city-ground (f6): земята на мегаполисите по картата
+import { lmPlaza as lmPlazaZone, plazaKind, visBox } from './lmplaza.js';   // 🏛️ lm-plaza (f6): площадите около забележителностите   // 🧱 city-ground (f6): земята на мегаполисите по картата
 import { riversView, babaVida, rockyHill, clockTower } from './rivers.js';
 // ⛲ roundabout-deco (T2): светлият фонтан или паметникът в средата на кръговите
 import { roundDeco } from './roundabout.js';   // 🌊 bg-rivers (T2): Дунав във Видин, Марица в Пловдив, Баба Вида, тепетата   // 🛶 ams-canals (f6): каналите на Амстердам
@@ -574,7 +576,7 @@ const MH = new Map(MESHY_HOUSES.map(([n, r, w, h, lot]) => [n, { r, w, h, lot }]
 for (const [n, { h }] of MH) if (h) REAL_BLD[n] = h;   // real-scale: истинската височина
 let MH_READY = false; const MH_PENDING = [];   // моделите идват преди денонощието (dayNight) — светлините се слагат щом е готово
 const NIGHT_LATER = [], atNight = f => MH_READY ? f() : NIGHT_LATER.push(f);   // същото за кафенето, магазините и др.: dayNight.winMats.add — щом е готово
-const MH_RETIRED = new Set(['mh-modern1']);   // 28.10: зарежда се (за старите записи), но не се избира за нови къщи — отгоре изглежда като смачкан покрив
+const MH_RETIRED = new Set(['mh-modern1']);   // 28.10: не се зарежда и не се избира; в старите записи placeBuilding го сменя с текуща къща — отгоре изглежда като смачкан покрив
 H2.push(...[...MH.keys()].filter(n => !MH_RETIRED.has(n)));   // → HOUSES / REAL_HOUSES (поръчките за къщи и парцелите)
 // бензиностанциите (decorLot) — тук, преди зареждането
 // №6 (55, gas-face): накъде гледат колонките на модела (в неговите оси) → завъртане, така че да гледат към улицата (+z на парцела)
@@ -621,7 +623,7 @@ let europe = null;
   // заводските модели се казват като търговските (building-a…) — пазим ги под 'ind-…'
   // истински храсти, цветя и фонтан (assets/heavy/plants, нормализирани: най-широката страна 1, основа 0) — зад feature('plants-real')
   if (feature('tokyo-look') || feature('dubai-look') || feature('sg-look')) for (const n of ['jp-narrow', 'jp-trad', 'jp-modern', 'jp-home1', 'jp-home2', 'jp-home3', 'jp-neon']) jobs.push(load(`assets/heavy/asia/${n}.glb`).then(g => { g.scene.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => {}));   // 🇯🇵 tokyo-look
-  for (const n of H2) jobs.push(load(`assets/heavy/${MH.has(n) ? 'houses3' : 'houses2'}/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; if (MH.has(n)) { if (MH_READY) mhNight(g.scene); else MH_PENDING.push(g.scene); } else prepNightFloors(g.scene, n); }).catch(() => HOUSES.splice(HOUSES.indexOf(n), 1)));   // не се зареди → не се строи
+  for (const n of H2) jobs.push(load(`assets/heavy/${MH.has(n) ? 'houses3' : 'houses2'}/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; if (MH.has(n)) { if (MH_READY) mhNight(g.scene); else MH_PENDING.push(g.scene); } else prepNightFloors(g.scene, n); }).catch(() => { const i = H2.indexOf(n); if (i >= 0) H2.splice(i, 1); }));   // не се зареди → не се строи
   if (feature('hw-gantry')) jobs.push(load('assets/heavy/highway/hw-gantry.glb').then(g => { A['hw-gantry'] = g; }).catch(() => {}));   // 🛣️ порталът с табелите
   if (feature('office-levels2')) for (const L of OFFICE2) jobs.push(load(L.url).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[`office2-l${L.lv}`] = g; prepNightFloors(g.scene, `office2-l${L.lv}`); blkSections(`office2-l${L.lv}`); }).catch(() => {}));   // 🆕 новите нива на офиса
   for (const n of GAS_KINDS) jobs.push(load(`assets/heavy/gas/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => {}));   // бензиностанции (всяка — свое „✓ OK“); нощем — навесът и магазинът (nightfloors 'gas')
@@ -703,7 +705,7 @@ for (const [n, band] of Object.entries(SKY_BANDS)) {
 // модерните небостъргачи в мегаполисите: 20, 25 и 30 етажа
 for (const [n, band] of Object.entries(SKY_BANDS_MODERN)) if (A[n]) for (const f of [20, 25, 30, 40]) A[`${n}@${f}`] = { scene: makeTallCopy(A[n].scene, band, f) };
 const sizeCache = {};
-const sizeOf = n => sizeCache[n] || (sizeCache[n] = new THREE.Box3().setFromObject(A[n].scene));
+const sizeOf = n => sizeCache[n] || (A[n] ? (sizeCache[n] = new THREE.Box3().setFromObject(A[n].scene)) : new THREE.Box3(new THREE.Vector3(-5, 0, -5), new THREE.Vector3(5, 10, 5)));   // без модел — кутия 10 м (не срив)
 // пакет с дървета → отделни дървета: всяко листо/клон отива при най-близкия ствол; без ствол — само (храст, малко дърво).
 // Всяко дърво е с основа в (0,0,0) и височина 1, затова model('sf-palm-0', 8) е палма от 8 м
 // по-истински дървета навсякъде: вместо конусите на Kenney ('tree-large'/'tree-small') — дърветата от горския пакет (и малко борове);
@@ -1309,6 +1311,12 @@ for (const f of NIGHT_LATER.splice(0)) f();   // и другите нощни с
 // времето (weather.js): дъжд, сняг, мъгла, буря — върху светлината на денонощието
 const osmFog = { on: false, near: 180, far: 420 };   // мъглата в градовете по истинската карта — по разстоянието на камерата (frame)
 const weather = createWeather({ scene, hemi, sun, camera, fogBase: () => osmFog.on ? osmFog : null });
+let stormTall = null, stormTallG = null;   // ⚡ storm-bolts: върховете на високите сгради и забележителности в града (веднъж на град)
+const stormTargets = () => { if (!city || !city.group) return []; if (stormTallG === city.group && stormTall) return stormTall; const B = new THREE.Box3(), out = [];
+  for (const l of city.lots || []) if (l.obj) { B.setFromObject(l.obj); if (B.max.y > 35) out.push([l.x, B.max.y, l.z]); }
+  for (const o of city.landmarks || []) if (o.group) { B.setFromObject(o.group); if (B.max.y > 35 && B.max.y < 900) out.push([(B.min.x + B.max.x) / 2, B.max.y, (B.min.z + B.max.z) / 2]); }
+  stormTallG = city.group; return (stormTall = out); };
+const storm = feature('storm-bolts') ? createStorm({ scene, camera, hemi, sun, Sound, target: () => controls.target, night: () => dayNight.night || 0, paused: () => speed === 0, low: () => GFXON && gfxLevel() === 'vlow', targets: stormTargets, rainMat: weather.rainMat }) : null;
 // 🌦️ weather2 (f9): времето по календара — дъжд/сняг на епизоди, детерминистично по град и игрален момент (weather.js wx2Kind)
 const football = feature('football') ? createFootball({ parent: () => city.group, body: fbBody, pitches: () => city.dl ? city.dl.pitches() : [], hour: () => (6 + todF() * 24) % 24,
   wet: () => ['rain', 'storm', 'snow'].includes(weather.kind), on: () => !!S && !!city.group }) : null;   // ⚽ football (f9)
@@ -1777,18 +1785,21 @@ function lmPlazaTick() {
   if (!city || !city.landmarks) return;
   const P2 = feature('lm-plaza2'), wat = typeof city.plan?.waterAt === 'function' ? city.plan.waterAt : null;   // 🏛️ lm-plaza2 (T2): площад пред всяка забележителност (без тези във водата, на хълм, със свой площад)
   for (const o of city.landmarks) { const k = o && o.kind, g = o && o.group; if (!k || !plazaKind(k, P2) || !g || g.userData.plazaDone || !g.parent || (P2 && (o.big || g.userData.hasPlaza))) continue;
-    const b = new THREE.Box3().setFromObject(g), sz = b.getSize(new THREE.Vector3()), sig = Math.round(sz.x) + ':' + Math.round(sz.y) + ':' + Math.round(sz.z);
+    const b = P2 ? visBox(g) : new THREE.Box3().setFromObject(g), sz = b.getSize(new THREE.Vector3()), sig = Math.round(sz.x) + ':' + Math.round(sz.y) + ':' + Math.round(sz.z);
     if (g.userData.plazaSig !== sig) { g.userData.plazaSig = sig; continue; }
     if (P2) { const c = b.getCenter(new THREE.Vector3()); if (Math.max(sz.x, sz.z) > 220 || (wat && wat(c.x, c.z))) { g.userData.plazaDone = true; continue; }
       loadPeds(); if (!pedReal.length && (g.userData.pedWait = (g.userData.pedWait || 0) + 1) < 15) continue; }   // минувачите — щом моделите им са заредени
     g.userData.plazaDone = true; const ck = cafeFor(S.cityId), pz = lmPlazaZone(o, { streets: city.plan ? city.plan.streets : [], night: () => dayNight.night, ...(P2 ? { plaza2: true, lots: city.lots, water: wat, ped: () => parkPed(), low: gfxK('far') < 0.6 } : {}), cafe: ck ? () => { const m = model(ck, 1); cafeLights(m, ck); return m; } : null });   /* ☕ shop-cafe: и кафене на ръба на площада */ city.group.add(pz); (city.plazas ||= []).push(pz); }
 }
 function placeBuilding(lot, n, rot = 0) {
+  if (MH_RETIRED.has(n)) n = 'building-type-a';   // старите записи с изваден модел (mh-modern1) → текуща къща за региона (houseOf по парцела)
   n = blockOf(houseOf(n, lot.id), lot.id); const n0 = n; n = jpLook(n, lot);   // tokyo-look: японските къщи (записът пази n0)
   if (n === 'shop-mall' && !mallFits(lot)) n = 'building-c';   // 🏪 shops-meshy: молът от поръчката не се побира на тесния парцел — обикновен магазин
   if (n === 'shop-petrol' && !petrolFits(lot)) n = 'building-c';   // ⛽ houses-sf: бензиностанцията — само на дълъг парцел
   if (n === 'shop-super' && !superFits(lot)) n = 'building-c';   // 🛒 супермаркетът — само на голям парцел
   if (feature('sky-pool') && PLAYER_SKY.includes(n) && A[n]) n = skyFit(n, lot);   // 🏙️ sky-pool: в истински ръст кулата трябва да влиза в парцела
+  // моделът не се е заредил (мрежа, стар запис с модел зад изключен флаг) → резервна сграда вместо срив при старта
+  if (!A[n]) { console.warn('placeBuilding: няма модел', n); n = HOUSES.includes(n) || !A['building-c'] ? 'building-type-a' : 'building-c'; }
   const isQ = n.startsWith('Building_');
   const s = SHOPS.includes(n) && lot.plan ? fitScale(n, Math.min(lot.w, lot.d) - 1.5) : (isQ ? fitScale(n, 14) : HOUSES.includes(n) ? fitScale(n, houseFit(n)) : fitScale(n, SHOPS.includes(n) ? SHOP_FIT : 12.5)) * lotK(lot);   // в плана — целият парцел
   const o = model(n, s); if (n.startsWith('cafe-')) cafeLights(o, n);   // ☕ shop-cafe: лампите — на поставения (model() слива меша на източника)
@@ -1982,6 +1993,24 @@ function buildLotPaths() {
 }
 
 // надпис-табела (sprite с canvas текст)
+// districts: надписът на квартала — само текст с тънък контур (без тъмна кутия), прозрачен; размерът и прозрачността — в distLabelsTick
+function distLabel(text) {
+  text = tr(text);
+  const c = document.createElement('canvas'), g = c.getContext('2d'), F = '600 40px system-ui, sans-serif'; g.font = F;
+  const w = Math.ceil(g.measureText(text).width) + 20; c.width = w; c.height = 60; g.font = F; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.lineJoin = 'round'; g.lineWidth = 5; g.strokeStyle = 'rgba(25,22,18,0.55)'; g.strokeText(text, w / 2, 31); g.fillStyle = 'rgba(255,244,222,1)'; g.fillText(text, w / 2, 31);
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, opacity: 0, depthTest: false, depthWrite: false }));
+  s.renderOrder = 10; s.userData.ar = w / 60; return s;
+}
+const _distV = new THREE.Vector3();
+// появяват се плавно от ~100 м височина, изчезват над ~1100 м и отблизо (под ~150 м до надписа); размерът — почти постоянен на екрана
+function distLabelsTick(onMap) {
+  const G = city.distG, h = camera.position.y, a = onMap ? 0 : Math.min(1, Math.max(0, (h - 100) / 90)) * Math.min(1, Math.max(0, (1300 - h) / 300));
+  G.visible = a > 0.01; if (!G.visible) return;
+  for (const sp of G.children) { if (!sp.isSprite) continue; sp.getWorldPosition(_distV); const d = camera.position.distanceTo(_distV), k = Math.min(70, Math.max(9, d * 0.028));
+    sp.scale.set(k * (sp.userData.ar || 6), k, 1); sp.material.opacity = 0.78 * a * Math.min(1, Math.max(0, (d - 150) / 200)); }
+}
 function label(text, color = '#fff', w = 10, bg = 'rgba(15,20,28,.85)') {
   text = tr(text);   // 🌐 lang-en: надписите на платното (tr — вътре има const t = текстурата)
   const c = document.createElement('canvas'); c.width = 512; c.height = 96;
@@ -2812,11 +2841,14 @@ function releaseUnit(u) {
 
 // ============================================================ градски трафик (декорация)
 const traffic = [];
+let fireLostP = 0.2;   // 🏚️ fire-ruins: шансът градският пожар в сграда да я изгори (Лабораторията — 1)
 // инцидент от време на време: 2 полицейски, пожарна и линейка идват по улиците, стоят ~1 мин и се разотиват (incidents.js, Лабораторията → incidents)
 const incidents = createIncidents({ scene, model, has: n => !!A[n], route: emRoute, point: () => roadPoint() || { x: tx(3 * ((Math.random() * (NBI + 1)) | 0)), z: tx((Math.random() * NJ) | 0) },
   focus: () => controls.target, cam: () => camera.position, ready: () => S && city.ready && !AUTOTEST,
-  building: (x, z, r = 70) => { let best = null, bd = r * r; for (const l of city.lots || []) if (l.obj && l.built) { const d = (l.obj.position.x - x) ** 2 + (l.obj.position.z - z) ** 2; if (d < bd) { bd = d; best = l.obj; } } if (!best) return null; const b = new THREE.Box3(); best.updateMatrixWorld(true); best.traverse(m => { if (m.isMesh && !m.isSprite && !m.material?.transparent) b.expandByObject(m); }); if (b.isEmpty()) b.setFromObject(best); return { x0: b.min.x, x1: b.max.x, z0: b.min.z, z1: b.max.z, h: b.max.y }; },   /* incidents2 (55): само сградата — без табелите и прозрачните (пламъците бяха в двора) */
+  building: (x, z, r = 70) => { let best = null, bd = r * r; for (const l of city.lots || []) if (l.obj && l.built) { const d = (l.obj.position.x - x) ** 2 + (l.obj.position.z - z) ** 2; if (d < bd) { bd = d; best = l.obj; } } if (!best && feature('fire-ruins')) { const bk = blkRuins.pick(x, z, r); if (bk) return blkRuins.aabb(bk); } if (!best) return null; const b = new THREE.Box3(); best.updateMatrixWorld(true); best.traverse(m => { if (m.isMesh && !m.isSprite && !m.material?.transparent) b.expandByObject(m); }); if (b.isEmpty()) b.setFromObject(best); return { x0: b.min.x, x1: b.max.x, z0: b.min.z, z1: b.max.z, h: b.max.y }; },   /* incidents2 (55): само сградата — без табелите и прозрачните (пламъците бяха в двора) */
   roadAt: (x, z) => roadAtPt(x, z), spotOk: (x, z, ring, node) => spotOkAt(x, z, ring, node),
+  // 🏚️ fire-ruins: пожарната закъсня (lostP) — изгорялата градска сграда (блок от кварталите) става руина (fireruins.js); горяла ли е сграда на играча (по-близо) — не: тя си има пожарите от firesim.js (fire-seq)
+  ruinAt: (x, z, r = 70) => { let bd = r * r; for (const l of city.lots || []) if (l.obj && l.built) bd = Math.min(bd, (l.obj.position.x - x) ** 2 + (l.obj.position.z - z) ** 2); const bb = blkRuins.pick(x, z, r); if (!bb) return null; const a = blkRuins.aabb(bb), cx = (a.x0 + a.x1) / 2, cz = (a.z0 + a.z1) / 2; return (cx - x) ** 2 + (cz - z) ** 2 < bd ? blkRuins.add(bb) : null; }, lostP: () => fireLostP,
   started: (type, at, nm) => { if (type === 'chase') chaseNotice(at); else incNotice({ nm, x: at.x, z: at.z }); },   /* ui-batch2: другите инциденти — „👁️ Гледай“ (incidents.js вика само с флага); #3: полицейското преследване — скенерът и известието с „🎥 гледай“ */
   station: (k, at) => { const want = /^Police/.test(k) ? 'police' : k === 'Ambulance' ? 'hosp' : k === 'Firetruck' ? 'fire' : null, L = want ? (muni.stations?.() || []).filter(s => s.k === want) : []; return L.length ? L.sort((a, b) => Math.hypot(a.x - at.x, a.z - at.z) - Math.hypot(b.x - at.x, b.z - at.z))[0] : null; } });   /* #11: най-близкият участък/болница/пожарна */
 // incidents2 (55): посоката и ширината на улицата в точката — за кордона, зяпачите по тротоарите и затварянето на платната
@@ -2848,6 +2880,8 @@ const fires = createFires({ S: () => S, group: () => city.group, lots: () => cit
   startJob: (f, lot) => startFireJob(f, lot), project: id => projects.find(q => q.id === id) || null,
   early: () => feature('rescue-early') && ownedCities().length < 3,   // #13: под 3 града (централата + 1 филиал) спешните поръчки идват ×2,5 по-често   // поръчките след пожар — обекти
   rebuild: lot => { if (lot.obj) city.group.remove(lot.obj); const b = (S.built || []).find(x => x.lot === lot.id); placeBuilding(lot, b ? b.model : lot.built, b ? b.rot || 0 : lot.rot || 0); } });
+// 🏚️ fire-ruins: фоновата сграда, изгоряла при градски пожар — скрита и сменена с руина за няколко дни (fireruins.js)
+const blkRuins = createBlockRuins({ S: () => S, cityId: () => S.cityId, day: () => S.day + S.dayT / DAY_SEC, group: () => city.group, pv: () => city.planView, toast: (...a) => toast(...a), fly: (x, z) => flyTo({ x, z }), save: () => save() });
 // #11 (emerg-home): спешните коли стоят в участъците и излизат само при инцидент/пожар; в трафика — най-много една патрулка, без буркани
 const patrolOn = () => [...traffic.map(t => t.obj), ...(tr2 ? tr2.cars.map(c => c.obj) : [])].some(o => o && o.userData.patrol);
 function addCar() {
@@ -4151,7 +4185,8 @@ function unitRepair() {
     if (u.proj && !alive.has(u.proj)) { log.push(u.type + ': няма обект'); releaseUnit(u); continue; }
     if (!u.proj && u.state !== 'idle' && u.state !== 'returning') { log.push(u.type + ': без задача'); releaseUnit(u); continue; }
     if (u.proj && u.state === 'idle' && projects.includes(u.proj)) { log.push(u.type + ': на плаца, а вързана за „' + u.proj.title + '“'); assignUnit(u, u.proj); continue; }   // #12 (25.10): стои паркирана, а обектът я чака „на път“ — пак натам
-    if (u.moveD > 1.5) { log.push(u.type + ': заседнал на пътя'); unitArrive(u); }
+    const mv = u.rx == null ? 1e9 : Math.hypot(u.x - u.rx, u.z - u.rz); u.rx = u.x; u.rz = u.z;   /* stuck-fix: изминатото от вчерашната проверка */
+    if (u.moveD > 1.5 && (mv < 8 || u.moveD > 6)) { log.push(u.type + ': заседнал на пътя'); unitArrive(u); }   /* stuck-fix (28.10): заседнала е, ако за ден не е мръднала (или > 6 дни на път) — не всеки дълъг курс: в Берлин (OSM) курсовете са 1–3 км, а 1,5 дни = ~500 м при 14 м/с, и чакането на лентата/колите се трупа */
     if (u.proj && u.state !== 'working' && !u.path && !u.agent && !(u.jpWaitT > 0)) { u.stD = (u.stD || 0) + 1; if (u.stD >= 2) { u.stD = 0; log.push(u.type + ': „на път“ без маршрут'); if (u.dest) unitArrive(u); else releaseUnit(u); } } else u.stD = 0;   // „на път“ 21 дни (24.10): вързана за обекта, но не се движи — 2 дни и се доставя (или се освобождава и dispatch я праща пак)
   }
   for (const q of projects) { const R = missingRoles(q), lack = R.filter(r => r.working + r.coming < r.cnt);
@@ -4655,6 +4690,19 @@ function endOfDay() {
 let tab = 'offers', selProject = null;
 document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { tab = b.dataset.t; renderPanel(); });
 function stars(r) { let s = ''; for (let k = 1; k <= 5; k++) s += r >= k ? '★' : r >= k - 0.5 ? '⯪' : '☆'; return s; }
+// 💶 парите горе: от 1 милиард нагоре — съкратено (1,22 млрд. €), точната сума е в подсказката
+function moneyTxt(v) { const a = Math.abs(v); return a >= 1e9 ? `${(v / 1e9).toLocaleString('bg-BG', { maximumFractionDigits: a >= 1e10 ? 1 : 2, minimumFractionDigits: a >= 1e10 ? 1 : 2 })} млрд. €` : fmt(v) + ' €'; }
+// превъртане: показаната сума върви към истинската за 0,35–0,9 s (по-голямата разлика — по-дълго), с плавно забавяне в края
+var moneyShown = null, moneyAnim = 0;   // var — renderTop може да се извика, докато моделите още се зареждат (преди този ред)
+function moneyRoll() {
+  const el = $('money'), to = econ.money;
+  if (moneyShown == null || !isFinite(moneyShown) || document.hidden) { moneyShown = to; el.textContent = moneyTxt(Math.round(to)); return; }
+  if (moneyAnim || Math.abs(to - moneyShown) < 1) { if (!moneyAnim) el.textContent = moneyTxt(Math.round(to)); return; }
+  const from = moneyShown, t0 = performance.now(), dur = Math.min(900, 350 + Math.log10(Math.abs(to - from) + 1) * 70);
+  const step = now => { const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3), tg = econ.money; moneyShown = from + (tg - from) * e; el.textContent = moneyTxt(Math.round(moneyShown));
+    if (k < 1) moneyAnim = requestAnimationFrame(step); else { moneyAnim = 0; moneyShown = tg; el.textContent = moneyTxt(Math.round(tg)); } };
+  moneyAnim = requestAnimationFrame(step);
+}
 function renderTop() {
   try { updSuperBtn(); } catch {}
   if (!S) return;
@@ -4664,9 +4712,7 @@ function renderTop() {
   try { updDirTiles(); } catch {}
   updLogo();
   updateQuickBuy();
-  { const v = econ.money, a = Math.abs(v);   // от 1 милиард нагоре — съкратено (1,22 млрд. €), точната сума е в подсказката
-    $('money').textContent = a >= 1e9 ? `${(v / 1e9).toLocaleString('bg-BG', { maximumFractionDigits: a >= 1e10 ? 1 : 2, minimumFractionDigits: a >= 1e10 ? 1 : 2 })} млрд. €` : fmt(v) + ' €';
-    $('money').title = fmt(v) + ' €'; }
+  moneyRoll(); $('money').title = fmt(econ.money) + ' €';   // 💶 броячът се превърта до новата сума (цифрите „въртят“)
   $('money').classList.toggle('neg', econ.money < 0);
   $('day').textContent = S.day;
   $('clock').textContent = clockText(todF());
@@ -6343,12 +6389,12 @@ function subScreen(k, mode, text, after) {
     cost: F ? fmt(F.cost) + ' €' : '', canPay: F ? econ.canAfford(F.cost) : true, onFound: () => { if (group.found(k)) { renderPanel(); if (bigWin) renderBig(); after && after(); } } });
   return true;
 }
-function foundGate(k) {
+function foundGate(k, after) {   // after — какво да направи веднага след основаването (летището/пристанището да тръгне, а не само да вземе парите)
   if (!S.foundFirst || (S.group || {})[k] || !FOUND[k]) return true;
-  if (subScreen(k, 'ask')) return false;
+  if (subScreen(k, 'ask', undefined, after)) return false;
   const F = FOUND[k], sb = SUBS.find(x => x.k === k), nm = `${brandOf(S)?.nm || 'Фирмата'} ${sb.suf}`;
   modal(`${sb.ico} Първо основи ${nm}`, `За ${sb.what} ти трябва дъщерна фирма. Основаването струва <b>${fmt(F.cost)} €</b> и дава стартов пакет: <b>${F.gift}</b>.<br><br>${F.next}`,
-    [['По-късно', null], [`Основи · ${fmt(F.cost)} €`, () => { if (group.found(k)) { renderPanel(); if (bigWin) renderBig(); } }]]);
+    [['По-късно', null], [`Основи · ${fmt(F.cost)} €`, () => { if (group.found(k)) { renderPanel(); if (bigWin) renderBig(); after && after(); } }]]);
   return false;
 }
 // стартовият пакет при основаване (group.js FOUND): техника веднага; влак/кораб/самолет — ваучер за първата покупка
@@ -6518,10 +6564,36 @@ const trainImg = (k, h = 46) => `<img src="assets/ui/train-${TRAIN_TYPES[k]?.pax
 const trainWagons = t => t.wagons || trainType(t).wagons;
 // магазинът: две стълбици като при самолетите — купуваш най-малкия и после го надграждаш (плащаш разликата)
 const TRAIN_LADDERS = [['small', 'mid', 'heavy', 'giant'], ['pax', 'express']];
+// 🚆 rail-buy-simple (T2, потребителят: „да го направим като тировете — по-добре е и да е рандом влак товарен или пътнически“): една карта, един бутон и една цена;
+// видът се пада случайно (пътнически — по-често при големи градове по линиите, товарен — при складове), размерът — по линията; „Голям влак“ (гигант / „Стрела“) — само ако мрежата ги позволява
+const RBS = () => feature('rail-buy-simple');
+const TRAIN_FLAT = 110000;   // ~средната цена на малкия, средния, тежкия и пътническия
+const regOf = id => isBGc(id) ? 'България' : isBalkc(id) ? 'Балканите' : CONT_NM[contKeyOf(id)] || '';
+const scopeRails = () => (S.rails || []).filter(r => r.built && (bigWin !== 'rail' || inScope(r.a, r.b, r.c)));
+function railNeed() {   // делът на пътническите (0,3–0,7)
+  let px = 0, fr = 0; const whOf = id => (id === S.cityId ? S.whLevel : (S.cities || {})[id]?.whLevel) || 0;
+  for (const r of scopeRails()) for (const id of [r.a, r.b]) { const c = cityById(id); if (!c) continue; px += Math.max(0, (c.sz || 1) - 2); fr += whOf(id) ? 1 + whOf(id) / 2 : 0.3; }
+  return Math.max(0.3, Math.min(0.7, 0.5 + 0.3 * (px - fr) / (px + fr + 1)));
+}
+function trainStart(home) {   // линията с най-малко влакове на км и гарата в края ѝ
+  const L = scopeRails().filter(r => !r.c), n = r => (S.trains || []).filter(t => t.at === r.a || t.at === r.b).length;
+  const line = L.map(r => ({ r, k: (n(r) + 1) / Math.max(1, r.km || 1) })).sort((a, b) => a.k - b.k)[0]?.r || null;
+  return { line, at: line ? [line.a, line.b].sort((a, b) => stLvOf(b) - stLvOf(a)).find(id => stLvOf(id) > 0) || home : home };
+}
+const bigTrainKinds = at => [...(scopeRails().some(r => (r.km || 0) >= 500) ? ['giant'] : []), ...(dev.has('AIR') && stLvOf(at) >= 5 && hsNeighbors(at).length ? ['express'] : [])];
+function buyRandTrain(big) {
+  const h = trainHome(); if (!h.ok) { toast('🚉 На този континент още нямаш гара — построй гара там (таб „Офис“).', 'bad'); return; }
+  const st = trainStart(h.id); let kind;
+  if (big) { const ks = bigTrainKinds(st.at); if (!ks.length) { toast('🚄 Големите влакове искат линия над 500 км (гигант) или модернизирана линия и гара ниво 5 (Стрела).', 'bad'); return; } kind = ks[(Math.random() * ks.length) | 0]; }
+  else if (Math.random() < railNeed()) kind = 'pax';
+  else { const km = st.line?.km || 0, w = [['small', km < 250 ? 4 : 2], ['mid', 3], ['heavy', km > 300 ? 4 : 1]]; let r = Math.random() * w.reduce((a, x) => a + x[1], 0); kind = w.find(x => (r -= x[1]) < 0)[0]; }
+  buyTrain(kind, st.at, { cost: big ? null : TRAIN_FLAT, line: st.line ? `${cityById(st.line.a).nm} — ${cityById(st.line.b).nm}` : null });
+}
 // градът, където се появява новият влак: текущият, или (при филтър „Африка“ и т.н.) град с гара на този континент
 function trainHome() {
   const sc = typeof scopeNow === 'function' && bigWin === 'rail' ? scopeNow() : '';
   const k = sc.startsWith('c:') ? sc.slice(2) : null, stLv = id => id === S.cityId ? stationLv() : (S.cities || {})[id]?.stationLevel || 0;
+  if (sc && sc !== 'all' && !inScope(S.cityId)) { const e = (S.rails || []).filter(r => r.built && inScope(r.a, r.b, r.c)).flatMap(r => [r.a, r.b]).filter(id => stLv(id) > 0).sort((a, b) => stLv(b) - stLv(a))[0]; if (e) return { id: e, ok: true }; }   // влакът — в раздела, от който го купуваш (Европа без Балканите…): на гара по готова линия там, не в централата извън него
   if (!k || contKeyOf(S.cityId) === k) return { id: S.cityId, ok: true };
   const st = ownedCities().filter(id => contKeyOf(id) === k && stLv(id) > 0).sort((a, b) => stLv(b) - stLv(a))[0];
   return st ? { id: st, ok: true } : { id: ownedCities().find(id => contKeyOf(id) === k) || null, ok: false, k };
@@ -6530,7 +6602,11 @@ function trainShopHtml() {
   if (!totalTracks()) return `<div class="meta late">🚉 Първо построй гара (таб „Офис“ → Гара), за да купуваш влакове.</div>`;
   if ((S.trains || []).length >= fleetCap.train()) return `<div class="meta late">🚆 Влакове ${fleetTxt('train')} — всяка готова жп линия дава място за 2 влака, модернизираната за 4 (общо за всички континенти). Построй или модернизирай линия, за да купиш още.</div>`;   // същото правило като buyTrain — иначе бутонът се вижда, а покупката отказва
   const home = trainHome();
+  if (bigWin === 'rail' && !['all'].includes(scopeNow()) && !(S.rails || []).some(r => r.built && inScope(r.a, r.b, r.c))) return `<div class="meta late">🛤️ Няма готова жп линия в ${scopeLabel()} — влакът ще тръгне от ${home.id ? `${cityById(home.id).nm} (${regOf(home.id)})` : 'друг регион'}. Купи го от раздела с линиите си или построй линия тук. Влаковете общо: ${fleetTxt('train')}.</div>`;   // иначе купеният влак „изчезваше“ от раздела (стоеше в друг регион)
   if (!home.ok) return `<div class="meta late">🚉 На ${CONT_NM[home.k] || 'този континент'} още нямаш гара${home.id ? ` — построй в ${cityById(home.id).nm} (таб „Офис“ → Гара)` : ''}. Влаковете не минават през морето.</div>${home.id ? `<div class="row" style="justify-content:flex-end"><button class="btn" data-goto="${home.id}">🚉 Към ${cityById(home.id).nm}</button></div>` : ''}`;
+  if (RBS()) { const st = trainStart(home.id), ks = bigTrainKinds(st.at), n = (S.trains || []).length, cap = fleetCap.train();
+    return `<div class="meta" style="margin:0 0 6px">${trainImg('mid', 28)} ${trainImg('pax', 28)} Влакът кара сам по готовите ти линии: товарният носи материали и стоки, пътническият — билети. Видът се пада случайно (сега ~${Math.round(railNeed() * 100)}% пътнически — според градовете и складовете по линиите), а размерът — според линията. Поддръжка ${fmt(250)}–${fmt(480)} €/ден. Тръгва от <b style="color:var(--txt)">${cityById(st.at).nm}</b>${st.line ? ` · линия ${cityById(st.line.a).nm} — ${cityById(st.line.b).nm}` : ''}.</div>
+      <div style="display:flex;gap:6px;margin-top:6px"><button class="btn" data-buytrain="rand" style="flex:1" ${econ.canAfford(TRAIN_FLAT) || (S.vouchers || {}).rail ? '' : 'disabled'}>🚆 Купи влак · ${fmt(TRAIN_FLAT)} € · ${n}/${cap}</button>${ks.length ? `<button class="btn2" data-buytrain="big" style="flex:1" title="${ks.map(k => TRAIN_TYPES[k].nm).join(' или ')} — по дългите линии">🚄 Голям влак · ${ks.map(k => fmt(TRAIN_TYPES[k].cost)).join(' / ')} €</button>` : ''}</div>`; }
   const lad = L => `<div style="display:flex;gap:6px;align-items:flex-end;justify-content:space-between;margin:4px 0 8px;flex-wrap:wrap">${L.map((k, i) => { const T = TRAIN_TYPES[k]; return `<div style="text-align:center;flex:1;min-width:90px">${trainImg(k, 44)}<div class="meta" style="margin:2px 0 0"><b style="color:var(--txt)">${i + 1}. ${T.nm}</b><br>${T.wagons} ваг.${T.minKm ? ` · над ${fmt(T.minKm)} км` : ''}<br>${i ? `⬆️ +${fmt(upCost(TRAIN_TYPES[L[i - 1]], T))} €` : `${fmt(T.cost)} €`}</div></div>`; }).join('<div style="align-self:center;color:var(--mut)">→</div>')}</div>`;
   const buy = k => { const T = TRAIN_TYPES[k]; return `<div class="row" style="margin:4px 0;align-items:center"><span class="meta" style="margin:0;flex:1">${trainImg(k, 20)} <b style="color:var(--txt)">${T.nm}</b> · ${T.wagons} ${T.pax ? 'пътнически вагона' : 'вагона'} · поддръжка ${fmt(T.upkeep)} €/ден</span><button class="btn" data-buytrain="${k}" ${econ.canAfford(T.cost) ? '' : 'disabled'}>${fmt(T.cost)} €</button></div>`; };
   return `<div class="meta" style="margin:0 0 2px">🚚 Товарни</div>${lad(TRAIN_LADDERS[0])}<div class="meta" style="margin:0 0 2px">🚃 Пътнически</div>${lad(TRAIN_LADDERS[1])}
@@ -6540,21 +6616,22 @@ function openTrainShop() {
   modal(`${trainImg('mid', 22)} Купи влак`, `Влакове на фирмата: ${fleetTxt('train')} (по 2 на линия, 4 на линия за „Стрела“).<br><br>${trainShopHtml()}`, [['Затвори', null]]);
   document.querySelectorAll('#modalBox [data-buytrain]').forEach(b => b.onclick = () => { $('modal').classList.add('hidden'); buyTrain(b.dataset.buytrain); });
 }
-function buyTrain(kind = 'small', at = null) {
-  const T = TRAIN_TYPES[kind] || TRAIN_TYPES.small;
+function buyTrain(kind = 'small', at = null, o = null) {
+  if (kind === 'rand' || kind === 'big') return buyRandTrain(kind === 'big');   // rail-buy-simple
+  const T = TRAIN_TYPES[kind] || TRAIN_TYPES.small, C = o?.cost ?? T.cost;
   if (!at) { const h = trainHome(); if (!h.ok) { toast('🚉 На този континент още нямаш гара — построй гара там (таб „Офис“).', 'bad'); return; } at = h.id; }
   if (T.express && !dev.has('AIR')) { toast('🚄 Експрес „Стрела“ се отключва на ниво 9 на развитие.', 'bad'); return; }
   if (T.express && stLvOf(at) < 5) { toast(`🚄 Експрес „Стрела“ иска гара ниво 5 в ${cityById(at).nm} (сега ${stLvOf(at)}).`, 'bad'); return; }
   if (!totalTracks()) { toast('🚉 Първо построй гара в града — таб „Офис“ → Гара.', 'bad'); return; }   // гара трябва, за да купиш влак; броят — от линиите
   if ((S.trains || []).length >= fleetCap.train()) { toast(`🚉 Имаш ${fleetTxt('train')} влака — всяка готова жп линия дава място за 2, модернизираната за „Стрела“ — за 4. Построй още линии.`, 'bad'); return; }
-  if (!(S.vouchers || {}).rail && !econ.canAfford(T.cost)) { if (T.cost >= 1000000) withLoan(T.cost, `Влак: ${T.nm}`, () => buyTrain(kind, at)); else toast('Нямаш достатъчно пари за влак.', 'bad'); return; }   // скъпите (Стрела, гигант) — и на кредит
+  if (!(S.vouchers || {}).rail && !econ.canAfford(C)) { if (C >= 1000000) withLoan(C, `Влак: ${T.nm}`, () => buyTrain(kind, at, o)); else toast('Нямаш достатъчно пари за влак.', 'bad'); return; }   // скъпите (Стрела, гигант) — и на кредит
   if (T.express && !hsNeighbors(at).length) toast(`🚄 В ${cityById(at).nm} няма модернизирана линия — „Стрела“ ще отиде сама до най-близкия град със скоростна линия.`, '');
-  useVoucher('rail', T.cost, `първия влак — подарък от ${subName(S, 'rail')}`);
-  econ.spend(T.cost, 'покупка', `Влак: ${T.nm}`);
+  useVoucher('rail', C, `първия влак — подарък от ${subName(S, 'rail')}`);
+  econ.spend(C, 'покупка', `Влак: ${T.nm}`);
   S.trains = S.trains || [];
   const n = S.trains.length + 1;
   S.trains.push({ id: S.seq++, nm: `${T.ico} №${n} ${T.nm.toLowerCase()}`, kind, wagons: T.wagons, at, job: null, path: null, km: 0, total: 0, leg: 'idle' });
-  toast(`${T.ico} Купи ${T.nm.toLowerCase()} влак с ${T.wagons} вагона${at !== S.cityId ? ` — тръгва от ${cityById(at).nm}` : ''}!`, 'good');
+  toast(o ? `🚆 Купи влак: ${T.nm} (${T.wagons} ваг.)${o.line ? ` — ще кара по ${o.line}` : ''}${at !== S.cityId ? ` · тръгва от ${cityById(at).nm} (${regOf(at)})` : ''}` : `${T.ico} Купи ${T.nm.toLowerCase()} влак с ${T.wagons} вагона${at !== S.cityId ? ` — тръгва от ${cityById(at).nm} (${regOf(at)})` : ''}!`, 'good');
   Sound.play('buy');   // свирката на влака — само при строеж на нова линия
   if (feature('xp-km')) { if (batchN > 0) batchXp += XP_BUY.train; else dev.add(XP_BUY.train); }
   parkedSig = ''; if (!batchN) updateParked();   // в партида — кадърът ги пренарежда веднъж
@@ -6776,12 +6853,14 @@ const inCont = (key, id) => contOf(id)?.key === key;
 const contLinked = key => !!S && (ownedCities().some(id => inCont(key, id)) || (S.airRoutes || []).some(r => inCont(key, r.a) || inCont(key, r.b)) || (S.seaRoutes || []).some(r => inCont(key, r.a) || inCont(key, r.b)) || (CONT_GATE[key] && contLandLinked(CONT_GATE[key])));
 const afLinked = () => contLinked('af');
 const gateHidden = id => { if (id === NEOM_ID) return !S?.neom; const k = contOf(id)?.key; return !!(k && CONT_GATE[k] && id !== CONT_GATE[k] && !contLinked(k)); };
+// входната точка на континент (Александрия, Ню Йорк, Рио, Дубай, Сидни), докато континентът още не е свързан — линията до нея се създава без ограниченията (брой линии, ниво на града, хъб)
+const gateFree = b => !!b && Object.values(CONT_GATE).includes(b) && !!contOf(b) && !contLinked(contOf(b).key);
 function gateModal(key) {
   const k = contByKey(key), g = CONT_GATE[key], G = cityById(g);
   const canPort = portMax(g) > 0, canAir = airportMax(g) > 0;
   // най-близкото твое пристанище (по морския път) и най-близкото летище, от което може (хъб за междуконтинентални)
   const port = canPort ? Object.keys(S.ports || {}).filter(id => portLv(id) && !hasSeaRoute(id, g)).map(id => ({ id, km: seaRouteKm(id, g) })).filter(x => x.km).sort((a, b) => a.km - b.km)[0] : null;
-  const air = canAir ? Object.keys(S.airports || {}).filter(id => airLv(id) && !hasRoute(id, g) && !interWhy(id, g)).map(id => ({ id, km: routeKm(id, g) })).sort((a, b) => a.km - b.km)[0] : null;
+  const air = canAir ? Object.keys(S.airports || {}).filter(id => airLv(id) && !hasRoute(id, g)).map(id => ({ id, km: routeKm(id, g) })).sort((a, b) => a.km - b.km)[0] : null;
   const pc = port && SEA_ROUTE_COST(port.km), ac = air && ROUTE_COST(air.km);
   const why = [canPort && !port ? '⚓ Още нямаш пристанище (таб „Офис“ в крайморски град).' : '', canAir && !air ? (Object.keys(S.airports || {}).some(id => airLv(id)) ? `✈️ Летищата ти не са хъб ниво ${HUB_LV}+ (${AIR_HUBS.map(x => cityById(x)?.nm).join(', ')}).` : '✈️ Още нямаш летище (таб „Офис“, ниво 9).') : ''].filter(Boolean).join('<br>');
   modal(`${k.ico} Врата към ${k.nm} — ${G.nm}`, `${G.nm} е входът към континента. Създай линия до него — и ${k.nm} ще се отвори с всичките си градове.<br><br>${port ? `⚓ Морска линия от <b>${cityById(port.id).nm}</b> · ${fmt(port.km)} км · ${fmt(pc)} €<br>` : ''}${air ? `✈️ Авиолиния от <b>${cityById(air.id).nm}</b> · ${fmt(air.km)} км · ${fmt(ac)} €<br>` : ''}${why ? `<span class="meta">${why}</span>` : ''}`,
@@ -6832,7 +6911,7 @@ function buildAirport(id) {
   if (lv >= mx) { toast(`Максимумът за ${cityById(id).nm} е ниво ${mx}.`, 'bad'); return; }
   if (ap?.build || lv >= AIRPORT_LEVELS.length) return;
   if (lv >= 5 && !dev.has('MEGAHUB')) { toast(`🔒 Мега хъбовете (летище ниво 6–7) се отключват на ниво ${DEV_LV.MEGAHUB} на развитие.`, 'bad'); return; }
-  if (!foundGate('air')) return;
+  if (!foundGate('air', () => { buildAirport(id); if (bigWin) renderBig(); })) return;
   const L = amL(AIRPORT_LEVELS[lv], id, 'air');
   if (!lv && (S.vouchers || {}).airHalf) { delete S.vouchers.airHalf; econ.earn(Math.round(L.cost / 2), 'друго', `−50% за първото летище (${subName(S, 'air')})`); }
   if (!econ.canAfford(L.cost)) { withLoan(L.cost, `${L.nm} в ${cityById(id).nm}`, () => buildAirport(id)); return; }
@@ -6856,10 +6935,11 @@ function interWhy(a, b) {
 function openAirRoute(a, b) {
   if (!airLv(a)) { toast('Линията тръгва от твое готово летище.', 'bad'); return; }
   if (!b || a === b || hasRoute(a, b)) { toast('Тази авиолиния вече съществува.', 'bad'); return; }
-  if (dev.best() < cityLv(b)) { toast(`🔒 ${cityById(b).nm} се отключва на ниво ${cityLv(b)} на развитие.`, 'bad'); return; }
-  { const w = interWhy(a, b); if (w) { toast(w, 'bad'); return; } }
+  const gf = gateFree(b);
+  if (!gf && dev.best() < cityLv(b)) { toast(`🔒 ${cityById(b).nm} се отключва на ниво ${cityLv(b)} на развитие.`, 'bad'); return; }
+  if (!gf) { const w = interWhy(a, b); if (w) { toast(w, 'bad'); return; } }
   if (!airportMax(b)) { toast(`✈️ ${cityById(b).nm} няма пътническо летище — ползвай жп и магистрали.`, 'bad'); return; }
-  if ((S.airRoutes || []).length >= maxRoutes()) { toast(maxRoutes() < airGates() * 2 ? `Авиолиниите са до 2 на самолет — самолетите ти са до ${fleetCap.plane()} (общо до ${FLEET_TOP}), значи до ${maxRoutes()} линии.` : `Летищата ти поемат до ${maxRoutes()} авиолинии — надгради ги за още гейтове.`, 'bad'); return; }
+  if (!gf && (S.airRoutes || []).length >= maxRoutes()) { toast(maxRoutes() < airGates() * 2 ? `Авиолиниите са до 2 на самолет — самолетите ти са до ${fleetCap.plane()} (общо до ${FLEET_TOP}), значи до ${maxRoutes()} линии.` : `Летищата ти поемат до ${maxRoutes()} авиолинии — надгради ги за още гейтове.`, 'bad'); return; }
   const km = routeKm(a, b), cost = ROUTE_COST(km);
   if (!econ.canAfford(cost)) { toast('Нямаш достатъчно пари за правата на линията.', 'bad'); return; }
   econ.spend(cost, 'покупка', `Авиолиния ${cityById(a).nm} — ${cityById(b).nm}`); xpMore(50);
@@ -8113,7 +8193,7 @@ function buildPort(id, free = 0) {
   if (lv >= mx) { toast(`Максимумът за ${cityById(id).nm} е ниво ${mx}.`, 'bad'); return; }
   if (p?.build) return;
   const L = amL(PORT_LEVELS[lv], id, 'port');
-  if (!free && !foundGate('sea')) return;
+  if (!free && !foundGate('sea', () => { buildPort(id); if (bigWin) renderBig(); })) return;
   if (!free && (S.vouchers || {}).seaHalf) { delete S.vouchers.seaHalf; econ.earn(Math.round(L.cost / 2), 'друго', `−50% за първото пристанище (${subName(S, 'sea')})`); }
   if (!econ.canAfford(L.cost)) { withLoan(L.cost, `${L.nm} в ${cityById(id).nm}`, () => buildPort(id, free)); return; }
   econ.spend(L.cost, 'покупка', `${L.nm} в ${cityById(id).nm}`);
@@ -8210,8 +8290,9 @@ function openSeaRoute(a, b) {
   if (!portLv(a)) { toast('Линията тръгва от твое готово пристанище.', 'bad'); return; }
   if (!b || a === b || hasSeaRoute(a, b)) { toast('Тази морска линия вече съществува.', 'bad'); return; }
   if (!portMax(b)) { toast(`⚓ ${cityById(b).nm} няма пристанище.`, 'bad'); return; }
-  if (dev.best() < cityLv(b)) { toast(`🔒 ${cityById(b).nm} се отключва на ниво ${cityLv(b)} на развитие.`, 'bad'); return; }
-  if ((S.seaRoutes || []).length >= maxSeaRoutes()) { toast(maxSeaRoutes() < portBerths() * 2 ? `Всяка линия има свой кораб, а корабите ти са до ${fleetCap.ship()} (2 на пристанище, 4 на пристанище на максимално ниво, общо до ${FLEET_TOP}) — нова линия няма да получи кораб.` : `Пристанищата ти поемат до ${maxSeaRoutes()} морски линии — надгради ги за още кейове.`, 'bad'); return; }
+  const gf = gateFree(b);
+  if (!gf && dev.best() < cityLv(b)) { toast(`🔒 ${cityById(b).nm} се отключва на ниво ${cityLv(b)} на развитие.`, 'bad'); return; }
+  if (!gf && (S.seaRoutes || []).length >= maxSeaRoutes()) { toast(maxSeaRoutes() < portBerths() * 2 ? `Всяка линия има свой кораб, а корабите ти са до ${fleetCap.ship()} (2 на пристанище, 4 на пристанище на максимално ниво, общо до ${FLEET_TOP}) — нова линия няма да получи кораб.` : `Пристанищата ти поемат до ${maxSeaRoutes()} морски линии — надгради ги за още кейове.`, 'bad'); return; }
   const km = seaRouteKm(a, b), cost = SEA_ROUTE_COST(km);
   if (!econ.canAfford(cost)) { toast('Нямаш достатъчно пари за линията.', 'bad'); return; }
   econ.spend(cost, 'покупка', `Морска линия ${cityById(a).nm} — ${cityById(b).nm}`); xpMore(50);
@@ -8868,7 +8949,7 @@ function finishCityCard() {
   return `<div class="card"><h3><span class="ico">🏁</span>Завърши града <span class="meta" style="margin:0 0 0 auto"><b style="color:var(--acc)">${bp}%</b> застроен</span></h3><div class="bar" style="height:6px;margin:4px 0 8px"><i style="width:${bp}%;background:linear-gradient(90deg,#3fae5a,#7dffa8)"></i></div>
     <div class="meta">Когато градът е напълно застроен, обявяваш го за завършен: той работи сам и ти носи пари всеки ден, а ти продължаваш в друг град.</div>
     <div class="meta">${(S.cityExt || 0) >= extNeed() ? '✅' : '⬜'} Нови квартали: ${Math.min(S.cityExt || 0, extNeed())}/${extNeed()}<br>${freeLotCount() <= freeMax(S.cityId) ? '✅' : '⬜'} Свободни парцели ≤ ${freeMax(S.cityId)} (сега ${freeLotCount()})<br>${sh >= 60 ? '✅' : '⬜'} Твой дял от пазара ≥ 60% (сега ${sh}%)${airNeedFin(S.cityId) ? `<br>${airOkFin(S.cityId) ? '✅' : '⬜'} ✈️ Летище (голям град)${airOkFin(S.cityId) ? '' : airportOf(S.cityId)?.build ? ' — строи се' : dev.has('AIR') ? ' — построй го от таб „Офис“' : ' — отключва се на ниво 9'}` : ''}</div>
-    <div class="row" style="justify-content:flex-end"><button class="btn" id="bFinishCity" ${ok ? '' : 'disabled'}>🏁 Завърши града</button></div></div>`;
+    <div class="row" style="justify-content:flex-end"><button class="btn" id="bFinishCity" ${ok ? 'style="background:linear-gradient(180deg,#5fe08f,#2fae5c);color:#05230f;border-color:#2fae5c"' : 'disabled'}>🏁 Завърши града</button></div></div>`;
 }
 // завършване на друг град направо от „🏙️ Градове“ (без влизане): същите условия, техниката му остава за поддръжка
 function finishCityRemote(id) {
@@ -10139,6 +10220,7 @@ function factoryBuild() {
   city.factory = placeFactories({ THREE, P: city.plan, group: city.group, model: () => A['factory-meshy'].scene.clone(true), tier: cityTier(S.cityId), railX: STATION_X, addWin: m => dayNight.winMats.add(m), poolMat: dayNight.poolMat, spin: spinWheels, lots: city.lots.filter(l => l.plan),
     truck: () => A['sf-mats-box'] ? A['sf-mats-box'].scene.clone(true) : null, roads: linkW.map(r => r.pts), roadsW, linkW, hwCross: cityHw && cityHw.cross || null,
     block: () => [cityHw && cityHw.g, city.airAccess && city.airAccess.group, city.airport && city.airport.group, station && station.group],
+    streets: feature('ind-streets'),
     extra: feature('ind-zone2') ? { model: k => A[k] ? A[k].scene.clone(true) : null, worker: (k, clip) => { const src = A[k]; if (!src) return null; const obj = cloneSkinned(src.scene), mixer = new THREE.AnimationMixer(obj), c = src.animations.find(a => a.name === clip) || src.animations[0]; if (c) { const ac = mixer.clipAction(c); ac.time = Math.random() * c.duration; ac.play(); }
       if (clip === 'work') { const hd = obj.getObjectByName('hand_R'); if (hd) { const hm = new THREE.Group(), st = new THREE.MeshStandardMaterial({ color: 0x6b4a2b }), hdM = new THREE.MeshStandardMaterial({ color: 0x555a60, metalness: 0.6, roughness: 0.4 }); const sh = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.45, 6), st); sh.position.y = -0.18; const he = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.07, 0.07), hdM); he.position.y = -0.4; hm.add(sh, he); hd.add(hm); } }   /* чукът — в дясната ръка */
       obj.traverse(m => { if (m.isMesh) { m.castShadow = true; m.frustumCulled = false; } }); return { obj, mixer }; } } : null });
@@ -10271,7 +10353,7 @@ function districtsBuild() {
       nm = z === 'center' ? 'Център' : z === 'business' ? 'Бизнес квартал' : z === 'industrial' ? 'Индустриална зона' : sea && z !== 'mid' && P2.waterAt && P2.waterAt(l.x - o[0], l.z - o[1] - 60) ? 'Пристанище' : z === 'outer' ? DIST_DIR[k][1] : DIST_DIR[k][0]; }
     l.dist = nm || null; if (nm) { const g = groups.get(nm) || groups.set(nm, { n: 0, x: 0, z: 0 }).get(nm); g.n++; g.x += l.x; g.z += l.z; } }
   const G = city.distG = new THREE.Group(); G.name = 'districts';
-  const add = (t, x, z) => { const sp = label(`🏘️ ${t}`, '#ffe9b0', 70); if (!sp) return; sp.position.set(x, 45, z); sp.userData.dist = 1; G.add(sp); };
+  const add = (t, x, z) => { const sp = distLabel(t); sp.position.set(x, 45, z); sp.userData.dist = 1; G.add(sp); };
   if (!DS) for (const [nm, g] of groups) if (g.n >= 4) add(nm, g.x / g.n, g.z / g.n);   // по картата надписите на кварталите вече са в изгледа — само индустриалната зона
   if (DS || !groups.has('Индустриална зона')) for (const f of (city.factory && city.factory.at) || []) add('Индустриална зона', f.x, f.z);   // зоната в града (ind-zone2) си има надпис
   G.onBeforeRender = () => {}; city.group.add(G);
@@ -11570,7 +11652,7 @@ function boardProposals0() {
     if (dev.has('AIR')) P({ dir: 'rail', ico: '⚡', key: 'hs', items: (S.rails || []).map((r, i) => ({ r, i })).filter(o => o.r.built && !o.r.hs && !o.r.hsBuild && !o.r.c && o.r.km >= 150).sort((a, b) => b.r.km - a.r.km).slice(0, 10),
       cost: o => hsQuote(o.r).cost, run: o => startHsUpgrade(o.i), text: a => `Мога да модернизирам ${pl(a.length, 'дълга линия', 'дълги линии')} за експрес „Стрела“ (${a.slice(0, 3).map(o => `${cityNm(o.r.a)} — ${cityNm(o.r.b)}`).join(', ')}${a.length > 3 ? '…' : ''}).`,
       why: '„Стрела“ носи скъпи билети по дългите линии', days: a => Math.max(...a.map(o => hsQuote(o.r).days)), goal: a => `${pl(a.length, 'линия', 'линии')} за „Стрела“`, track: a => ({ k: 'hs', pairs: a.map(o => [o.r.a, o.r.b]) }), geo: a => geoOf('rail', a.flatMap(o => [o.r.a, o.r.b]), a.slice(0, 2).map((o, i) => [i * 2, i * 2 + 1])) });
-    P({ dir: 'rail', ico: '⬆️', key: 'trainup', items: (S.trains || []).filter(t => { const to = TRAIN_NEXT[t.kind || 'small']; return to && !TRAIN_TYPES[to].long && !(TRAIN_TYPES[to].express && (!dev.has('AIR') || stLvOf(t.at) < 5)); }).slice(0, 30),
+    P({ dir: 'rail', ico: '⬆️', key: 'trainup', items: (S.trains || []).filter(t => { const to = TRAIN_NEXT[t.kind || 'small']; return !RBS() && to && !TRAIN_TYPES[to].long && !(TRAIN_TYPES[to].express && (!dev.has('AIR') || stLvOf(t.at) < 5)); }).slice(0, 30),
       cost: t => upCost(trainType(t), TRAIN_TYPES[TRAIN_NEXT[t.kind || 'small']]), run: t => upgradeTrain(t.id), text: a => `Мога да надградя ${pl(a.length, 'влак', 'влака')} с повече вагони.`, why: 'повече вагони — по-голям приход от същия курс', days: () => 1, gainTxt: a => `${pl(a.length, 'влак', 'влака')} с повече вагони`, goal: a => `${pl(a.length, 'надграден влак', 'надградени влака')}` });
     if (dev.has('LINKS')) {
       P({ dir: 'rail', ico: '⚡', key: 'short', items: shortcutCands().slice(0, 8), cost: o => o.cost, run: o => mkRail({ a: o.a, b: o.b, q: { cost: o.cost, km: o.km, days: o.days } }), text: a => `Предлагам ${pl(a.length, 'пряка връзка', 'преки връзки')}, които съкращават пътя (${a.slice(0, 3).map(o => `${cityNm(o.a)} — ${cityNm(o.b)}`).join(', ')}${a.length > 3 ? '…' : ''}).`,
@@ -12341,7 +12423,7 @@ let railShowDone = false;   // „▸ Покажи готовите“ в про
 function railWinHtml() {
   const rails = (S.rails || []).filter(r => inScope(r.a, r.b, r.c)), built = rails.filter(r => r.built), building = rails.filter(r => !r.built), trains = (S.trains || []).filter(t => ['all', 'intl'].includes(scopeNow()) || inScope(t.at));
   const km = built.reduce((a, r) => a + (r.km || 0), 0);
-  let h = `<div class="bw-stats"><div><b>${built.length}</b><span>готови линии</span></div><div><b>${fmt(km)} км</b><span>релси</span></div><div><b>${building.length}</b><span>в строеж</span></div><div title="2 влака на жп линия, 4 на линия за „Стрела“"><b>${trains.length} / ${fleetCap.train()}</b><span>влакове / лимит</span> <i style="opacity:.7">(всички региони)</i></div><div title="градовете, до които стигат готовите линии в този обхват"><b>${new Set(built.flatMap(r => [r.a, r.b].filter(Boolean))).size}</b><span>свързани града</span></div></div>`;
+  let h = `<div class="bw-stats"><div><b>${built.length}</b><span>готови линии</span></div><div><b>${fmt(km)} км</b><span>релси</span></div><div><b>${building.length}</b><span>в строеж</span></div><div title="2 влака на жп линия, 4 на линия за „Стрела“"><b>${trains.length} тук · ${(S.trains || []).length} / ${fleetCap.train()}</b><span>влакове: тук · общо / лимит</span></div><div title="градовете, до които стигат готовите линии в този обхват"><b>${new Set(built.flatMap(r => [r.a, r.b].filter(Boolean))).size}</b><span>свързани града</span></div></div>`;
   h += `<div class="row" style="justify-content:flex-end"><button class="btn" id="bwNewRail">🛤️ Строй нова линия</button></div>`;
   if (['c:eu', 'all'].includes(scopeNow())) h += orient.cardHtml();   // Ориент Експрес — само в Европа
   h += fleetCap.train() > (S.trains || []).length ? bwCard(`${trainImg('mid', 20)} Купи влак`, trainShopHtml()) : `<div class="meta">${trainShopHtml()}</div>`;   // магазинът — над линиите
@@ -12357,7 +12439,7 @@ function railWinHtml() {
   const tripTxt = t => { const j = t.job; if (!j) return 'чака курс в ' + cityById(t.at).nm;
     const pct = Math.floor(t.km / Math.max(1, t.total) * 100);
     return `${j.ico} ${j.cargo} ${cityById(j.from).nm} → ${cityById(j.to).nm} · ${t.leg === 'empty' ? `отива за товара (${pct}%)` : `${pct}%`}`; };
-  h += bwCard(`${trainImg('mid', 20)} Влакове · ${trains.length}/${fleetCap.train()} <span class="meta" style="margin:0 0 0 auto">курсовете са случайни</span>`, (trains.length ? trains.map(t => `<div class="row" style="margin:6px 0;align-items:center"><span class="meta" style="margin:0">${trainImg(t.kind || 'small', 26)} <b style="color:var(--txt)">${t.nm}</b> · ${trainWagons(t)} ваг.<br>${tripTxt(t)}</span>${t.job && !t.job.empty ? `<b style="color:var(--ok);font-size:16px">+${fmt(t.job.pay ?? t.job.reward ?? 0)} €</b>` : ''}</div>${(() => { const T = trainType(t), nx0 = TRAIN_NEXT[t.kind || 'small'], lock = nx0 && TRAIN_TYPES[nx0].express && (stLvOf(t.at) < 5 || !dev.has('AIR')), nx = lock ? null : nx0; return `<div class="row" style="margin:0 0 6px;justify-content:flex-end">${lock ? `<span class="meta" style="margin:0 6px 0 0">🔒 „Стрела“ — ${!dev.has('AIR') ? 'ниво 9 на развитие' : `гара ниво 5 в ${cityById(t.at).nm} (сега ${stLvOf(t.at)})`}</span>` : ''}${fleetBtns('train', t.id, nx, nx && TRAIN_TYPES[nx], nx ? upCost(T, TRAIN_TYPES[nx]) : 0, Math.round(T.cost * TRADE_IN / 1000) * 1000)}</div>`; })()}`).join('') : '<div class="meta">Нямаш влакове.</div>') + stationsOverview());
+  h += bwCard(`${trainImg('mid', 20)} Влакове · ${trains.length} тук · ${(S.trains || []).length}/${fleetCap.train()} общо <span class="meta" style="margin:0 0 0 auto">курсовете са случайни</span>`, (trains.length ? trains.map(t => `<div class="row" style="margin:6px 0;align-items:center"><span class="meta" style="margin:0">${trainImg(t.kind || 'small', 26)} <b style="color:var(--txt)">${t.nm}</b> · ${trainWagons(t)} ваг.<br>${tripTxt(t)}</span>${t.job && !t.job.empty ? `<b style="color:var(--ok);font-size:16px">+${fmt(t.job.pay ?? t.job.reward ?? 0)} €</b>` : ''}</div>${(() => { const T = trainType(t), nx0 = TRAIN_NEXT[t.kind || 'small'], lock = !RBS() && nx0 && TRAIN_TYPES[nx0].express && (stLvOf(t.at) < 5 || !dev.has('AIR')), nx = lock || RBS() ? null : nx0; return `<div class="row" style="margin:0 0 6px;justify-content:flex-end">${lock ? `<span class="meta" style="margin:0 6px 0 0">🔒 „Стрела“ — ${!dev.has('AIR') ? 'ниво 9 на развитие' : `гара ниво 5 в ${cityById(t.at).nm} (сега ${stLvOf(t.at)})`}</span>` : ''}${fleetBtns('train', t.id, nx, nx && TRAIN_TYPES[nx], nx ? upCost(T, TRAIN_TYPES[nx]) : 0, Math.round(T.cost * TRADE_IN / 1000) * 1000)}</div>`; })()}`).join('') : '<div class="meta">Нямаш влакове.</div>') + stationsOverview());
   if ((S.jobs || []).length) h += bwCard('📦 Чакащи превози <span class="meta" style="margin:0 0 0 auto">товарните влакове ги поемат сами</span>', S.jobs.map(j => `<div class="row" style="margin:4px 0"><span class="meta" style="margin:0">${j.ico} ${j.wagons} вагона ${j.cargo} · ${cityById(j.from).nm} → ${cityById(j.to).nm} · ${j.km} км</span><b style="color:var(--ok)">+${fmt(j.reward)} €</b></div>`).join(''));
   return h;
 }
@@ -12526,7 +12608,8 @@ function frame() {
     updateSea(dt / DAY_SEC);
     updateStationBuild(dt / DAY_SEC);
     updateParked();
-    if (feature('fire-seq')) fires.update(dt / DAY_SEC);   // игрово време: на пауза (dt = 0) всичко спира
+    if (feature('fire-seq')) fires.update(dt / DAY_SEC);
+    if (feature('fire-ruins')) blkRuins.update(dt / DAY_SEC);   // игрово време: на пауза (dt = 0) всичко спира
     updateTrains(dt / DAY_SEC);
     hwTrucks.update(dt / DAY_SEC);
     updateHighways(dt / DAY_SEC);
@@ -12591,11 +12674,11 @@ function frame() {
     if (window.__overlay3d > 0) return;
   }   // директорската зала (directors3d.js) е втори WebGL на цял екран — градът под нея не се рисува (иначе две сцени на кадър)
   controls.update();
-  if (S) { dayNight.update(todF(), controls.target); weather.update(rdt, controls.target); if (skySun) skySun.update((6 + todF() * 24) % 24, camera, controls.target, SKY_CLOUD[weather.kind] ?? 0, sun);   /* sky-sun: след денонощието и времето */ if (football) football.update(rdt, controls.target);   /* ⚽ football: само близо до камерата */ if (birds) birds.update(rdt, camera);   /* 🐦 birds */ if (airCity) airCity.update(rdt);   /* ✈️ air-approach / 🚁 police-heli */ if (bikes) bikes.update(rdt, controls.target);   /* 🚲 bikes */ if (FLAGS) { flagsTick(performance.now() / 1000); if (performance.now() > flagT) { flagT = performance.now() + 2500; try { placeFlags(); } catch (e) { console.warn('flags', e); } } }   if (SNOWR && performance.now() > snowT) { snowT = performance.now() + 2500; try { snowRoofs(); } catch (e) { console.warn('snow-roofs', e); } }   /* ❄️ snow-roofs */   /* 🏳️ flags */ if (MARKETS && performance.now() > marketT) { marketT = performance.now() + 3000; try { placeMarket(); } catch (e) { console.warn('markets', e); } }   /* 🍉 markets */ if (xmas) xmas.update(rdt);   /* 🎄 xmas */ setSiteLightsNight(dayNight.night); if (cityHw && cityHw.signs) for (const G of cityHw.signs) G.setNight(dayNight.night); if (city.billboards) { city.billboards.setNight(dayNight.night); city.billboards.update && city.billboards.update(rdt); } }
+  if (S) { dayNight.update(todF(), controls.target); weather.update(rdt, controls.target); if (storm) storm.update(rdt, weather.kind === 'storm');   /* ⚡ storm-bolts: след времето (hemi се пресмята всеки кадър) */ if (skySun) skySun.update((6 + todF() * 24) % 24, camera, controls.target, SKY_CLOUD[weather.kind] ?? 0, sun, storm ? { heavy: weather.kind === 'storm' ? 1 : weather.kind === 'rain' ? 0.5 : 0, flash: storm.flash } : null);   /* sky-sun: след денонощието и времето */ if (football) football.update(rdt, controls.target);   /* ⚽ football: само близо до камерата */ if (birds) birds.update(rdt, camera);   /* 🐦 birds */ if (airCity) airCity.update(rdt);   /* ✈️ air-approach / 🚁 police-heli */ if (bikes) bikes.update(rdt, controls.target);   /* 🚲 bikes */ if (FLAGS) { flagsTick(performance.now() / 1000); if (performance.now() > flagT) { flagT = performance.now() + 2500; try { placeFlags(); } catch (e) { console.warn('flags', e); } } }   if (SNOWR && performance.now() > snowT) { snowT = performance.now() + 2500; try { snowRoofs(); } catch (e) { console.warn('snow-roofs', e); } }   /* ❄️ snow-roofs */   /* 🏳️ flags */ if (MARKETS && performance.now() > marketT) { marketT = performance.now() + 3000; try { placeMarket(); } catch (e) { console.warn('markets', e); } }   /* 🍉 markets */ if (xmas) xmas.update(rdt);   /* 🎄 xmas */ setSiteLightsNight(dayNight.night); if (cityHw && cityHw.signs) for (const G of cityHw.signs) G.setNight(dayNight.night); if (city.billboards) { city.billboards.setNight(dayNight.night); city.billboards.update && city.billboards.update(rdt); } }
   if (GLITE) dayNight.glowMat.visible = dayNight.poolMat.visible = dayNight.night > 0.01 && gfx().night;   // 🟠 gfx-lite: ореолите на лампите — денем (прозрачност 0) без рисуване; „Нощни светлини“ — изключени
   perfTune(rdt);
   perf.lap('prep');
-  if (city.distG) { const h = camera.position.y; city.distG.visible = h > 90 && h < 1100 && !onMap; }   // districts: надписите — от средна височина
+  if (city.distG) distLabelsTick(onMap);   // districts: надписите — от средна височина, леко появяване и изчезване
   if (mtnBg) mtnBg.update(camera, scene.fog && scene.fog.color);   // mtn-backdrop: пръстенът — около камерата
   renderer.render(scene, camera);
   perf.lap('render');
@@ -12725,6 +12808,11 @@ if (AUTOTEST) {
     polIntro: () => polIntro.show(true),   // politics-intro: демото в Лабораторията
     districts: (cmd, k) => districtsDbg(cmd, k),   // 🏡 districts-look: 'diag' | 'nodiag' | 'focus' | 'off' | 'on' | (числата)
     fireTest(sev = 1, travel) { const tg = controls.target; const L = city.lots.filter(l => l.obj && l.built && !l.busy).sort((a, b) => Math.hypot(a.x - tg.x, a.z - tg.z) - Math.hypot(b.x - tg.x, b.z - tg.z))[0]; if (!L) return null; const f = fires.start(L.id, { sev, travel }); flyTo(L); return f && f.id; },   // 🔥 fire-seq: пожар в най-близката сграда
+    // 🏚️ fire-ruins: градски пожар в сграда, в който пожарната закъснява (шансът — 1 за 15 s, докато сцената тръгне)
+    ruinFire() { fireLostP = 1; setTimeout(() => { fireLostP = 0.2; }, 15000); return this.incidentLook(false, 'bfire'); },
+    // 🏚️ fire-ruins: камерата на последната руина в града (фонова сграда или парцел; няма ли — изгаря най-близката ниска фонова сграда); night — 22 ч.
+    blkRuins: () => blkRuins,   // 🏚️ fire-ruins: тестовете — add(блок), state()
+    ruinLook(night = false, d = 50) { const tg = controls.target; let p = [...blkRuins.state()].reverse().find(r => r.city === S.cityId); if (!p) { const f = [...fires.state()].reverse().find(q => q.city === S.cityId && q.auto && q.st === 'burned'); if (f) p = city.lots[f.lot]; } if (!p) { const b = blkRuins.pick(tg.x, tg.z, 300, q => q.h < 25); p = b && blkRuins.add(b); } if (!p) return null; showMap(false); $('panel').classList.add('hidden'); const d0 = S.day + S.dayT / DAY_SEC; this.time(night ? 22 : 15); const dd = S.day + S.dayT / DAY_SEC - d0; for (const r of blkRuins.state()) r.t0 += dd; setSpeed(1); __dbg.camAt(p.x + d * 0.25, d * 1.5, p.z + d * 0.5, p.x, 4, p.z); fly = null; return { x: Math.round(p.x), z: Math.round(p.z), blk: blkRuins.state().length }; },   /* time() скача в цикъла на дните — руините пазят възрастта си; отвисоко — гъстите квартали закриваха руината */
     busModels(ns = ['sf-bus-liaz', 'sf-bus-town', 'sf-bus-roaz']) {   // buses-more2 (f6): автобусите един зад друг пред камерата, откъм вратите (−x) — колелата, дверите, ръстът
       if (city.busLook) city.busLook.removeFromParent(); const g = new THREE.Group(), tg = controls.target, ok = ns.filter(n => A[n]); let z = 0, L = 1;
       for (const n of ok) { const o = model(n, 1), b = new THREE.Box3(); o.updateMatrixWorld(true); o.traverse(m => { if (m.isMesh && !m.material?.transparent) b.expandByObject(m); }); L = b.max.z - b.min.z; o.position.z = z; z -= L * 1.25; g.add(o); }   /* без лъча на фаровете */
@@ -13115,6 +13203,9 @@ if (AUTOTEST) {
     gateRoad() { S.dev.lv = 10; S.dev.xp = 260000; S.ports = { varna: { lv: 3, build: null } }; S.seaRoutes = [{ a: 'varna', b: 'alexandria', km: 2400 }]; return { hub: roadHubs().has('alexandria'), need: linkNeeds('alexandria').road, segs: ALL_AB.filter(x => x.a === 'alexandria' || x.b === 'alexandria').map(x => x.id + (abReach(x) ? ' ok' : ' no')) }; },
     saharaTest() { return { a: crossesSahara('algiers', 'lagos'), b: crossesSahara('cairo', 'alexandria'), c: crossesSahara('marrakesh', 'nouakchott'), d: crossesSahara('tripoli', 'kano'), e: crossesSahara('cairo', 'khartoum') }; },
     afTrainHint() { S.dev.lv = 10; S.dev.xp = 260000; S.branches = [...new Set([...(S.branches || []), 'cairo', 'khartoum'])]; S.rails = [...(S.rails || []), { a: 'cairo', b: 'khartoum', km: 1600, days: 40, prog: 1, built: true }]; return railHints().filter(h => h.key.startsWith('tr:')).map(h => h.txt.replace(/<[^>]+>/g, '')); },
+    railBuyTest(scope = 'bg', buys = 0, big = false) { if (!S._rbt) { S._rbt = 1; S.dev.lv = 10; S.dev.xp = 260000; econ.earn(5e7, 'друго', 'тест'); S.stationLevel = 5; buildStation(); S.branches = [...new Set([...(S.branches || []), 'plovdiv', 'varna', 'paris', 'berlin'])]; for (const c of ['plovdiv', 'varna', 'paris', 'berlin']) S.cities[c] = { ...newCityState(), stationLevel: c === 'paris' ? 3 : 2, whLevel: c === 'varna' ? 2 : 0, left: nowDays() }; S.rails = [{ a: S.cityId, b: 'plovdiv', km: 150, days: 5, prog: 1, built: true }, { a: S.cityId, b: 'varna', km: 440, days: 8, prog: 1, built: true }, { a: 'paris', b: 'berlin', km: 1050, days: 12, prog: 1, built: true }]; }   /* rail-buy-simple (T2): мрежа за пробата */
+      S.trTab = 'rail'; openBig('rail'); bwScope = scope; renderBig(); const out = []; for (let i = 0; i < buys; i++) { document.querySelector(`[data-buytrain="${big ? 'big' : 'rand'}"]`)?.click(); out.push(document.querySelector('#toasts .toast')?.textContent || ''); }
+      const b = document.getElementById('bwBody'); return { stats: b.querySelector('.bw-stats')?.innerText.replace(/\s+/g, ' '), shop: (b.innerText.match(/Купи влак[\s\S]{0,520}/) || [''])[0].replace(/\s+/g, ' '), toasts: out, trains: S.trains.map(t => [t.kind, t.wagons, t.at]) }; },
     afTrainBuy() { __dbg.afTrainHint(); econ.earn(5e7, 'друго', 'тест'); S.stationLevel = 5; S.cities.cairo = { ...newCityState(), stationLevel: 3, left: nowDays() }; S.cities.khartoum = { ...newCityState(), left: nowDays() }; S.trTab = 'rail'; openBig('rail'); bwScope = 'c:af'; renderBig(); const shop = document.getElementById('bwBody').innerText; document.querySelector('[data-buytrain="small"]')?.click(); const t = S.trains[S.trains.length - 1]; return { shop: shop.slice(shop.indexOf('Товарни'), shop.indexOf('Товарни') + 400), t: t && [t.kind, t.at] }; },
     view(v) { try { showMap(true); setMapView(v); return [curView(), document.querySelectorAll('#mapSvg g.city').length]; } catch (e) { return 'ERR ' + e.message + ' ' + (e.stack || '').split('\n')[1]; } },
     audit() {   // бърз одит: всички прозорци × филтри, изгледи на картата, табове на панела
@@ -13466,7 +13557,7 @@ if (AUTOTEST) {
       return { it: it.map((t, i) => `${t.k}${i} ${r(t.q)}`), hits, near }; },
     plazaAudit() { lmPlazaTick(); const pz = (city.plazas || []).map(g => g.userData.plaza || {}); return { lms: city.landmarks.filter(o => o.kind).map(o => o.kind + (pz.some(p => p.kind === o.kind) ? '✓' : o.group.userData.hasPlaza ? '(own)' : '✗')), plazas: pz }; },   // 🏛️ lm-plaza2 (T2): кои забележителности имат площад
     plazaLook(kind = null, d = 90, night = false) { this.time(night ? 21 : 15); showMap(false); const g = (city.plazas || []).find(q => !kind || q.userData.plaza?.kind === kind); if (!g) return null; const b = new THREE.Box3().setFromObject(g), c = b.getCenter(new THREE.Vector3()), r = Math.max(30, b.getSize(new THREE.Vector3()).length() / 2) * d / 90;
-      this.camAt(c.x + r * 0.75, r * 0.7, c.z + r * 0.75, c.x, 2, c.z); return g.userData.plaza; },
+      const t = r * 0.28; this.camAt(c.x + r * 0.75, r * 0.6, c.z + r * 0.75, c.x + t, 2, c.z + t); return g.userData.plaza; },   // към близката половина на площада — кулата да не закрива
     airTop(x = 10, z = 60, h = 150) { const g = city.airport?.group; if (!g) return null; const p = g.localToWorld(new THREE.Vector3(x, 0, z)); this.camAt(p.x + 0.1, h, p.z + 0.1, p.x, 0, p.z); return [Math.round(p.x), Math.round(p.z)]; },   // air-hangar2: отгоре над южния край на перона
     hangarLook(night = false, d = 70) { this.airLook(night, 5); let h = null; scene.traverse(o => { if (!h && o.isMesh && o.userData && o.userData.hm) h = o; }); if (!h) return null; const p = h.getWorldPosition(new THREE.Vector3()); this.camAt(p.x + d * 0.9, d * 0.45, p.z + d * 0.6, p.x, 4, p.z + 12); return [Math.round(p.x), Math.round(p.z)]; },
     busCam(k = 0, d = 22) { const L = []; (tr2G || scene).traverse(o => { if (o.userData && /bus/i.test(o.userData.src || '') && o.visible) L.push(o); }); const o = L[k % Math.max(1, L.length)]; if (!o) return { n: 0 }; const p = o.getWorldPosition(new THREE.Vector3()); showMap(false); controls.minDistance = Math.min(controls.minDistance, d * 0.6); this.camAt(p.x + d * 0.7, d * 0.55, p.z + d * 0.7, p.x, 1.5, p.z); return { n: L.length, src: o.userData.src }; },
@@ -13478,6 +13569,9 @@ if (AUTOTEST) {
     railMapDbg(id = S.cityId, w = 1100) { showMap(true); const c = cityById(id), [x, y] = proj(c.lon, c.lat); focusBox(x, y, x, y, w); mapSel = id; drawMap(); const svg = railSvg(); return { lod: mapLod, eu: mapEU, world: mapWorld, cont: mapCont, rails: (S.rails || []).map(r => ({ id: r.a + '-' + r.b, built: !!r.built, mapIn: mapIn(r.a, r.b), pts: r.c ? 2 : railPts(r.a, r.b).length })), brownInRail: svg.split('#8a6a4a').length - 1, brownInDom: document.querySelectorAll('#mapSvg [stroke="#8a6a4a"]').length }; },   // 🗺️ жп в строеж на картата (тест)
     osmDeco() { osmDeco(); return city.osmDecoG ? city.osmDecoG.userData.cells : 0; },   // 🌳 block-deco-osm (тест: ?noosmdeco, после това)
     ggDbg() { return { called: city.ggDbg || null, osm: !!(city.plan && city.plan.osm), sea: !!city.sea }; },   // 🌉 Голдън Гейт (тест)
+    storm() { weather.set('storm'); S.weather = 'storm'; return weather.kind; },   // ⚡ storm-bolts: буря сега
+    bolt(dist, cloud, hold) { return storm ? storm.strike({ dist, cloud, hold }) : null; },
+    stormLight() { return storm ? storm.light : null; },   // ⚡ мълния сега (dist — м от точката, която гледаме)
     hwOpen() { const s = allSegs().find(q => q.a === S.cityId || q.b === S.cityId); if (!s) return null; S.hwDone = [...new Set([...(S.hwDone || []), s.id])]; buildCityHighway(); return s.id; },
     enterResort: id => openHwView('resort:' + id),
     siteStage(n) { const p = projects.find(q => !q.own && q.type !== 'house'); if (!p) return null; p.stage = n; p.prog = 0.3; p.mat = { 0: true, 1: true, 2: true, 3: true }; for (const u of units) if (u.proj === p) releaseUnit(u); dispatch(); return p.lot; },
@@ -13538,6 +13632,11 @@ if (AUTOTEST) {
     blinkLook(d = 16) { if (!tr2) return null; const o = tr2G ? tr2G.position : { x: 0, z: 0 }, c = tr2.cars.find(c => c.lcT > 0 || c.hopW != null) || tr2.cars.find(c => c.next && c.next.kind === 'conn' && (c.next.turn === 'left' || c.next.turn === 'right') && c.p.len - c.s < 45 && c.p.len - c.s > 15); if (!c) return null; __dbg.lookAt(c.x + o.x, c.z + o.z, d); return { kind: c.kind, turn: c.next?.turn, lc: c.lcSide, v: +c.v.toFixed(1) }; },   /* #42.2: камерата към кола преди завой / смяна на лента */
     busLook() { const s = cityBus.stops()[0]; if (!s) return null; const o = tr2G ? tr2G.position : { x: 0, z: 0 }; __dbg.time && __dbg.time(10); __dbg.lookAt(s.x + o.x, s.z + o.z, 30); return cityBus.lines(); },   /* #15: камерата на първата спирка */
     moverHits() { if (!tr2) return null; const M = moversNow(); let n = 0; for (const m of M) for (const c of tr2.cars) if (Math.hypot(c.x - m.x, c.z - m.z) < 2.5) n++; return { movers: M.length, hits: n, yielding: tr2.cars.filter(c => c.why === 'машина отпред').length, waiting: units.filter(u => u.wb > 0).length }; },   /* самосвалът през колите: колко коли са върху техниката извън трафика */
+    urTest(n = 8) { const out = []; for (let k = 0; k < n; k++) { const u = spawnUnit(['truck', 'loader', 'crew', 'tractor'][k % 4]); const far = city.lots[Math.floor(Math.random() * city.lots.length)]; u.state = 'driving'; u.urT = 1; sendTo(u, far.x, far.z, () => { u.state = 'idle'; u.urT = 0; }); out.push(Math.round(Math.hypot(far.x - u.x, far.z - u.z))); } return out; },   // 🔧 unitRepair: n машини към случайни парцели — колко „заседват“
+    plTest(step = 0) { let root = scene; const pv = city.planView; if (step === 1) { const L = new THREE.PointLight(0xffffff, 0, 100, 1); L.name = 'plTest'; scene.add(L); return 'light'; }
+      if (step === 2) { let n = 0; pv.traverse(o => { if (o.isMesh) for (const m of [].concat(o.material)) { const t = m && m.map; if (t && t.isDataTexture) { t.needsUpdate = true; n++; } } }); return 'reup ' + n; }
+      if (step === 3) { const out = {}; pv.traverse(o => { if (!o.isMesh) return; const m = o.material; if (!m || Array.isArray(m)) return; const k = m.type + '|' + (m.onBeforeCompile && m.onBeforeCompile.toString().length > 30 ? 'obc:' + (m.customProgramCacheKey ? m.customProgramCacheKey() : '?') : '-') + '|' + (m.map ? (m.map.isDataTexture ? 'data' : m.map.constructor.name) : 'nomap') + '|' + (o.isInstancedMesh ? 'inst' : 'mesh'); out[k] = (out[k] || 0) + 1; }); return out; }
+      if (step === 4) { scene.remove(scene.getObjectByName('plTest')); return 'removed'; } },   // 🔦 OSM фасадите и точковата светлина (тест)
     unitTest() { const u = units.find(q => q.state === 'idle'); if (!u) return null; const far = [...city.lots].sort((a, b) => Math.hypot(b.x - u.x, b.z - u.z) - Math.hypot(a.x - u.x, a.z - u.z))[0]; u.state = 'driving'; sendTo(u, far.x, far.z, () => { u.state = 'idle'; }); return [u.type, Math.round(Math.hypot(far.x - u.x, far.z - u.z))]; },   /* junction-paths: машина до най-далечния парцел */
     tirTest(m = 'sand', delay = 0) { sendTir({ id: 9e8 + ((Math.random() * 1e6) | 0), matId: m, qty: 1 }, delay); return tirs.list.length; },   /* junction-paths: пробен ТИР (поръчката не съществува — складът не се променя) */
     lookTir(k = 0, dist = 26) { const t = tirs.list[k]; if (!t) return; controls.target.set(t.x, 2, t.z); camera.position.set(t.x + dist * 0.8, dist * 0.6, t.z + dist * 0.7); fly = null; },

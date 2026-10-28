@@ -210,6 +210,49 @@ export function buildAirport(group, deps, opts = {}) {
     t.c.position.set(sg.p[0] + (sg.q[0] - sg.p[0]) * f, 0.06, sg.p[1] + (sg.q[1] - sg.p[1]) * f); t.c.rotation.y = Math.atan2(sg.q[0] - sg.p[0], sg.q[1] - sg.p[1]); } };
   let lastT = null;
   const parked = [];
+  // air-runways2 (T2): писти като на истинските хъбове — ниво 1–2 една, 3–4 две успоредни (80 м), 5–6 три, 7 две двойки близки успоредни (40 м);
+  // всяка с рулежка, бързи изходи, точки за изчакване, номера и прагове в двата края, светлини нощем (емисивни инстанции, без истински светлини); полето — правоъгълник
+  const RW2 = feature('air-runways2');
+  const rwLayout = b => b >= 7 ? { R: [46, 86, 126, 166], T: [26, 106, 146] } : b >= 5 ? { R: [46, 126, 166], T: [26, 106, 146] } : b >= 3 ? { R: [46, 126], T: [26, 106] } : { R: [46], T: [26] };
+  const R2M = RW2 ? { asph: mat(0x2b2d31, 0.95), tw: mat(0x3a3d42, 0.95), grass: mat(0x6f8f4e, 1), white: new THREE.MeshBasicMaterial({ color: 0xf2f2f2 }), yel: new THREE.MeshBasicMaterial({ color: 0xf2c200 }), sign: mat(0xb8261c, 0.6),
+    edge: mat(0xfff4c0, 0.4, 0, 0xffe080), thr: mat(0x50ff70, 0.4, 0, 0x30ff60), end: mat(0xff4a3a, 0.4, 0, 0xff2a1a), blue: mat(0x5a80ff, 0.4, 0, 0x2a5cff), lamp: new THREE.BoxGeometry(0.7, 0.35, 0.7) } : null;
+  if (RW2) lights.push(R2M.edge, R2M.thr, R2M.end, R2M.blue);
+  const strip = (x1, z1, x2, z2, w, m, y, par) => { const L = Math.hypot(x2 - x1, z2 - z1), o = new THREE.Mesh(new THREE.PlaneGeometry(w, L).rotateX(-Math.PI / 2), m); o.position.set((x1 + x2) / 2, y, (z1 + z2) / 2); o.rotation.y = Math.atan2(x2 - x1, z2 - z1); o.receiveShadow = true; par.add(o); return o; };
+  const instAt = (geo, m, P, par) => { if (!P.length) return; const im = new THREE.InstancedMesh(geo, m, P.length), M4 = new THREE.Matrix4(); P.forEach((q, i) => im.setMatrixAt(i, M4.makeTranslation(q[0], q[1], q[2]))); par.add(im); };
+  const numM = new Map(), numMat = t => numM.get(t) || (numM.set(t, (() => { const c = document.createElement('canvas'); c.width = 128; c.height = 192; const x = c.getContext('2d'); x.fillStyle = '#f2f2f2'; x.textAlign = 'center'; x.font = 'bold 92px sans-serif';
+    const [nm, lt] = t.split(' '); x.fillText(nm, 64, 88); if (lt) x.fillText(lt, 64, 182); const tx = canvasTex(c); tx.colorSpace = THREE.SRGBColorSpace; return new THREE.MeshBasicMaterial({ map: tx, transparent: true, depthWrite: false }); })()), numM.get(t));
+  function runways2(b) {
+    const { R, T } = rwLayout(b), M = R2M, z0 = RW.z0, z1 = RW.z1, zc = (z0 + z1) / 2, hw = RW.w / 2, xl = Math.max(...R, ...T), xe = xl + 22, CZ = [z0 + 14, -10, z1 - 14];
+    if (xe > 70) flat(xe - 70, 250, M.grass, (70 + xe) / 2, 0.015, 5, lvG);   // полето — до последната писта (+22 м), колкото е основната земя по z
+    const edges = [], thr = [], ends = [], blue = [];
+    if (xl > RW.x) for (const z of CZ) flat(xl - RW.x, 8, M.tw, (RW.x + xl) / 2, 0.036, z, lvG);   // напречните рулежки до последната (пресичат пистите — с точки за изчакване)
+    T.forEach(x => { if (x !== TW.x) { flat(8, z1 - z0 - 10, M.tw, x, 0.035, zc, lvG); flat(0.25, z1 - z0 - 10, M.yel, x, 0.05, zc, lvG); } for (let z = z0 + 5; z <= z1 - 5; z += 15) for (const sd of [-1, 1]) blue.push([x + sd * 4.4, 0.18, z]); });
+    // номерата: от юг (подход на север) — 36, отсреща 18; успоредните — L/C/R отляво надясно (от север — обратно); ниво 7: западната двойка 35, източната 36
+    const des = R.map((x, i) => { const n = R.length, pair = n === 4, num = pair ? (i < 2 ? 35 : 36) : 36, k = pair ? i % 2 : i, lt = n === 1 ? '' : pair ? 'LR'[k] : n === 2 ? 'LR'[k] : 'LCR'[k], fl = { L: 'R', R: 'L', C: 'C', '': '' };
+      return [`${num}${lt ? ' ' + lt : ''}`, `${num - 18}${lt ? ' ' + fl[lt] : ''}`]; });
+    R.forEach((x, i) => {
+      if (x !== RW.x) {   // главната писта (x = 46) е от основата
+        flat(RW.w, z1 - z0, M.asph, x, 0.04, zc, lvG);
+        for (let z = z0 + 26; z < z1 - 26; z += 12) flat(0.6, 6, M.white, x, 0.06, z, lvG);
+        for (const zz of [z0 + 4, z1 - 4]) for (let q = -5; q <= 5; q += 2) if (q) flat(0.8, 7, M.white, x + q * 0.6, 0.06, zz, lvG);
+        for (const sd of [-1, 1]) flat(0.3, z1 - z0, M.white, x + sd * (hw - 0.6), 0.06, zc, lvG);
+        for (let z = z0; z <= z1; z += 10) for (const sd of [-1, 1]) edges.push([x + sd * (hw + 0.6), 0.18, z]);
+        if (smalls.length < 3) { const sp = makePlane(i % 2 ? 'regional' : 'a320', 10 + i); sp.userData.rw = { x, z0, z1, ph: i * 0.23 }; lvG.add(sp); smalls.push(sp); }   // самолетите кацат и излитат по нея (с отместване във времето)
+      }
+      for (const [zz, rot, t] of [[z1 - 16, 0, des[i][0]], [z0 + 16, Math.PI, des[i][1]]]) { const o = new THREE.Mesh(new THREE.PlaneGeometry(7, 10.5), numMat(t)); o.rotation.set(-Math.PI / 2, 0, rot); o.position.set(x, 0.062, zz); lvG.add(o); }
+      for (let q = -3; q <= 3; q++) { thr.push([x + q * 1.9, 0.18, z1 + 1.2]); ends.push([x + q * 1.9, 0.18, z0 - 1.2]); }   // зелено на прага (подход от юг), червено в края
+      // бързите изходи — под ~30° към своята рулежка, по посоката на кацане (на север)
+      const tx = T.reduce((a, t) => Math.abs(t - x) < Math.abs(a - x) ? t : a, T[0]), sg = Math.sign(tx - x), dx = Math.abs(tx - x), f = (hw + 1) / dx;
+      if (!(R.length === 4 && i === 1)) for (const zs of [44, -22]) {   /* вътрешната от близката двойка — за излитане, без бързи изходи (кръстосваха се със съседните) */ const ex = tx, ez = zs - dx * 1.8; strip(x, zs, ex, ez, 8, M.tw, 0.034, lvG); strip(x + (ex - x) * f, zs + (ez - zs) * f, ex, ez, 0.25, M.yel, 0.05, lvG); }
+      // точките за изчакване на напречните рулежки — по две плътни и две прекъснати жълти линии от двете страни, и червена табела
+      for (const z of CZ) for (const sd of [-1, 1]) { const hx = x + sd * (hw + 5); if (hx > xl + 1 || hx < TW.x + 4) continue;
+        for (const o of [0, 0.7]) flat(0.3, 8, M.yel, hx + sd * o, 0.052, z, lvG); for (const o of [1.6, 2.3]) for (const d of [-3, -1, 1, 3]) flat(0.3, 1.2, M.yel, hx + sd * o, 0.052, z + d, lvG);
+        box(1.8, 0.9, 0.2, M.sign, hx + sd * 1.2, 0.6, z - 5.6, lvG); }
+    });
+    instAt(M.lamp, M.edge, edges, lvG); instAt(M.lamp, M.thr, thr, lvG); instAt(M.lamp, M.end, ends, lvG); instAt(M.lamp, M.blue, blue, lvG);
+    M.gl ||= [0xffe9b0, 0x60ff80, 0xff5040, 0x6a8cff].map(c => new THREE.MeshBasicMaterial({ map: glowTex, color: c, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));   // нощем — меко сияние около всяка светлина (плоско, адитивно)
+    const gq = new THREE.PlaneGeometry(3.2, 3.2).rotateX(-Math.PI / 2); [edges, thr, ends, blue].forEach((P, k) => instAt(gq, M.gl[k], P.map(q => [q[0], 0.3, q[2]]), lvG));
+  }
   let lv = 0;
   function setLevel(n) {
     n = Math.max(1, Math.min(7, n | 0)); if (n === lv) return; lv = n;
@@ -217,7 +260,7 @@ export function buildAirport(group, deps, opts = {}) {
     lvG.clear(); parked.length = 0; windows.length = 0; towerGlows.length = 0; smalls.length = 0;
     const tLen = Math.min(40 + n * 22, 112), tz = -tLen / 2 + 20;   // до 112 — кулата в северния край остава на сушата (не над морето)
     // писти колкото е нивото: ниво 3 — 3 писти, ниво 7 — 7 (успоредни на изток, през 26 м)
-    { const extra = big - 1, wm = new THREE.MeshBasicMaterial({ color: 0xf2f2f2 }), asph = mat(0x2b2d31, 0.95), tw = mat(0x3a3d42, 0.95), em = mat(0xfff4c0, 0.4, 0, 0xffe080);
+    if (RW2) runways2(big); else { const extra = big - 1, wm = new THREE.MeshBasicMaterial({ color: 0xf2f2f2 }), asph = mat(0x2b2d31, 0.95), tw = mat(0x3a3d42, 0.95), em = mat(0xfff4c0, 0.4, 0, 0xffe080);
       for (let k = 1; k <= extra; k++) {
         const x = RW.x + k * 26, z0 = RW.z0 + 10 * k, z1 = RW.z1 - 10 * k;
         flat(RW.w + 14, z1 - z0 + 20, mat(0x6f8f4e, 1), x, 0.016, (z0 + z1) / 2, lvG);   // трева под пистата (земята на летището е до x≈60)
@@ -312,6 +355,7 @@ export function buildAirport(group, deps, opts = {}) {
     if (AIR.hangar2 && tz - tLen / 2 - 8 < -85) flat(TW.x - TERM.x - 4, -85 - (tz - tLen / 2 - 8), mat(0x8a8d92, 0.9), (TW.x + TERM.x + 4) / 2, 0.03, (-85 + tz - tLen / 2 - 8) / 2, lvG);   // air-hangar2: и на север — под последния ръкав (самолетът беше на тревата)
     if (HG && HG.length && hz0 - 4 > 85) flat(TW.x - TERM.x - 4, hz0 - 4 - 85, mat(0x8a8d92, 0.9), (TW.x + TERM.x + 4) / 2, 0.03, (85 + hz0 - 4) / 2, lvG);   // air-hangar2: перонът стига до вратите на хангарите (беше трева)
     // карго зона (ниво 5): склад, контейнери и товарен самолет
+    let cargoP = null;
     if (n >= 5) {
       if (AIR.hangar2) {   // air-hangar2: карго терминалът — гофрирана облицовка, рампи с ролетни врати откъм сушата, надпис CARGO (вместо оранжевата кутия)
         const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64; const x = cv.getContext('2d'); x.fillStyle = '#c9ccd0'; x.fillRect(0, 0, 256, 64); for (let i = 0; i < 256; i += 6) { x.fillStyle = i % 12 ? '#b3b7bc' : '#dadde0'; x.fillRect(i, 0, 3, 64); } x.fillStyle = '#d35400'; x.fillRect(0, 0, 256, 7);
@@ -326,12 +370,13 @@ export function buildAirport(group, deps, opts = {}) {
       box(14, 7, 30, mat(0xc98a3b, 0.7), TERM.x - 26, 3.5, 70, lvG);
       for (let k = 0; k < 8; k++) box(2.4, 2.4, 6, mat(LIVERY[k % LIVERY.length], 0.6), TERM.x - 16 + (k % 2) * 3, 1.2, 58 + Math.floor(k / 2) * 7, lvG);
       }
-      const c = makePlane('cargo', 1); c.position.set(AIR.hangar2 ? (TW.x + TERM.x + 4) / 2 + 2 : TW.x - 4, c.userData.gearY, AIR.hangar2 ? 46 : 104);   /* air-hangar2: на перона между ръкавите и хангарите (беше на тревата, с крило през малкия хангар) */ c.rotation.y = -Math.PI / 2; lvG.add(c); parked.push(c);
+      const c = makePlane('cargo', 1); c.position.set(AIR.hangar2 ? (TW.x + TERM.x + 4) / 2 + 2 : TW.x - 4, c.userData.gearY, AIR.hangar2 ? 46 : 104);   /* air-hangar2: на перона между ръкавите и хангарите (беше на тревата, с крило през малкия хангар) */ c.rotation.y = -Math.PI / 2; lvG.add(c); parked.push(c); if (RW2 && AIR.hangar2) cargoP = c;   /* air-runways2: стоянката — на отделния перон (опашката стърчеше над главната рулежка) */
     }
     // мега/световен хъб: още широкофюзелажни самолети на отделния перон до хангарите
-    if (AIR.hangar2) { let zr = 114; for (let k = 0; k < big - 5; k++) {   // air-hangar2: отделният перон на мега хъба — колона на югозапад от хангарите (на изток от x≈26 е коридорът за кацане), земята — продължена на юг
+    if (AIR.hangar2) { let zr = cargoP ? 120 : 114; if (cargoP) { const d = planeDims(cargoP); cargoP.position.set(18 - d.len / 2, cargoP.userData.gearY, zr + d.span / 2); zr += d.span + 5; }   // air-runways2: карго самолетът — първи на отделния перон (югозападно, далеч от рулежките), след него широките
+      for (let k = 0; k < big - 5; k++) {   // air-hangar2: отделният перон на мега хъба — колона на югозапад от хангарите (на изток от x≈26 е коридорът за кацане), земята — продължена на юг
         const p = makePlane('wide', 7 + k), d = planeDims(p); p.position.set(18 - d.len / 2, p.userData.gearY, zr + d.span / 2); p.rotation.y = -Math.PI / 2; lvG.add(p); parked.push(p); zr += d.span + 5; }
-      if (big > 5) { flat(70, zr - 105, mat(0x6f8f4e, 1), -5, 0.015, (105 + zr + 5) / 2, lvG); flat(56, zr - 108, mat(0x8a8d92, 0.9), -5, 0.03, (108 + zr) / 2, lvG); flat(8, 12, mat(0x3a3d42, 0.95), TW.x - 6, 0.035, 108, lvG); } }
+      if (big > 5 || cargoP) { flat(70, zr - 105, mat(0x6f8f4e, 1), -5, 0.015, (105 + zr + 5) / 2, lvG); flat(56, zr - 108, mat(0x8a8d92, 0.9), -5, 0.03, (108 + zr) / 2, lvG); flat(8, 12, mat(0x3a3d42, 0.95), TW.x - 6, 0.035, 108, lvG); } }
     else for (let k = 0; k < big - 5; k++) { const p = makePlane('wide', 7 + k); p.position.set(TW.x - 4, p.userData.gearY, 140 + k * 40); p.rotation.y = -Math.PI / 2; lvG.add(p); parked.push(p); }
     if (sign) { sign.position.set(TERM.x - 6, 16, tz); }
   }
@@ -389,6 +434,7 @@ export function buildAirport(group, deps, opts = {}) {
       sp.position.set(x, y, z); sp.rotation.set(0, 0, 0); sp.rotateY(Math.PI); sp.rotateX(-pitch); sp.visible = u < 0.98;
       for (const n of sp.userData.nav) n.material.emissiveIntensity = night * (Math.sin(t * 4) > 0.6 ? 1.5 : 0.5); }
     for (const m of lights) m.emissiveIntensity = 0.2 + 2.2 * night;
+    if (R2M && R2M.gl) for (const m of R2M.gl) m.opacity = night * 0.85;
     for (const m of windows) m.emissiveIntensity = 0.05 + 1.8 * night;
     winM.emissiveIntensity = 1.6 * night;
     for (const m of towerMats) m.emissiveIntensity = 0.55 * night;
@@ -404,7 +450,7 @@ export function buildAirport(group, deps, opts = {}) {
   function setPos(x, z) { g.position.set(x, 0, z); }
   function dispose() { group.remove(g); }
   // за клик: дали точка (световни координати) е върху летището
-  const hit = (px, pz) => px > g.position.x - 30 && px < g.position.x + 60 + Math.max(0, lv - 1) * 26 && pz > g.position.z - 115 && pz < g.position.z + 120;
+  const hit = (px, pz) => px > g.position.x - 30 && px < g.position.x + (RW2 ? Math.max(70, Math.max(...rwLayout(lv).R) + 22) : 60 + Math.max(0, lv - 1) * 26) && pz > g.position.z - 115 && pz < g.position.z + 120;
   const refresh = () => { const n = lv; lv = 0; setLevel(n); };   // след като се заредят терминалите
   return { group: g, update, setLevel, setPos, dispose, hit, refresh, get level() { return lv; } };
 }

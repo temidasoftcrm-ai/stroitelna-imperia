@@ -57,9 +57,6 @@
  "🏦 Холдингът е празен — не може да покрие дълга. Помоли партньора (🆘).": "🏦 The holding is empty — it can't cover the debt. Ask your partner (🆘).",
  ", {0} € на акционерите": ", {0} € to shareholders",
  "🏦 Месечен дивидент: холдингът раздаде {0} € (30% от печалбата) — по {1} € на двамата{2}.": "🏦 Monthly dividend: the holding paid out {0} € (30% of profit) — {1} € each to both of you{2}.",
- "Месечен дивидент:": "Monthly dividend:",
- "(30% от печалбата) — по": "(30% of profit) —",
- "за теб и за {0}.": "each for you and {0}.",
  "🏦 40% от завършените градове → холдинга": "🏦 40% from completed cities → holding",
  "🏦 40% от печалбата → холдинга: {0}": "🏦 40% of profit → holding: {0}",
  "🏦 {0} € (40% от печалбата) → общия холдинг": "🏦 {0} € (40% of profit) → shared holding",
@@ -69,6 +66,8 @@
  "още не е влизал": "hasn't logged in yet",
  "Партньор: {0} ({1})": "Partner: {0} ({1})",
  "Свържи се с приятел и си помагайте": "Team up with a friend and help each other",
+ "👤 Играеш като гост — за партньорство е нужен акаунт (⚙️ Настройки → 🆕 Създай акаунт; записите ти остават).": "👤 You are playing as a guest — a partnership needs an account (⚙️ Settings → 🆕 Create account; your saves stay).",
+ "🆕 Създай акаунт": "🆕 Create account",
  "Партньорството минава през облака. Влез с имейла си от бутона ☁️ горе (същият вход като за записите в облака), после се върни тук.": "Partnerships run through the cloud. Sign in with your email using the ☁️ button above (the same login as cloud saves), then come back here.",
  "☁️ Вход": "☁️ Sign in",
  "Първо основи фирмата си и влез в града.": "First found your company and enter the city.",
@@ -312,5 +311,10 @@
  "{0} — обща поръчка": "{0} — joint order",
  "(вложеното + половината от печалбата)": "(your investment + half the profit)",
  "(без печалба — единият е вложил под 20%)": "(no profit — one of you invested under 20%)",
- "✅ Изпълнена поръчка: {0} {1}! +{2} €{3}": "✅ Order completed: {0} {1}! +{2} €{3}"
+ "✅ Изпълнена поръчка: {0} {1}! +{2} €{3}": "✅ Order completed: {0} {1}! +{2} €{3}",
+ "_stale": {
+  "Месечен дивидент:": "Monthly dividend:",
+  "(30% от печалбата) — по": "(30% of profit) —",
+  "за теб и за {0}.": "each for you and {0}."
+ }
 }

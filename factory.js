@@ -73,11 +73,11 @@ function extras(THREE, o, G, c, ry, out, drives) {
   const conc = new THREE.MeshStandardMaterial({ color: 0x8f8d86, roughness: 0.95 });
   const put = (key, w, d, side) => { const m = E.model(key); if (!m) return null; const u = side * (U + 6 + w / 2), [x, z] = W(u, 0); if (!freeRect(x, z, w + 8, d + 8)) return null;
     const pad = new THREE.Mesh(new THREE.PlaneGeometry(w + 8, d + 8), conc); pad.rotation.set(-Math.PI / 2, 0, ry); pad.position.set(x, 0.05, z); pad.receiveShadow = true; g.add(pad);
-    m.position.set(x, 0, z); m.rotation.y = ry; g.add(m); m.userData.side = side; return m; };
-  put('ind-heritage', 62, 26, -1) || put('ind-heritage', 62, 26, 1); const dc = put('ind-decay', 36, 31, 1) || put('ind-decay', 36, 31, -1);
+    m.position.set(x, 0, z); m.rotation.y = ry; g.add(m); m.userData.side = side; m.userData.uw = [u, w, d]; return m; };
+  const ht = put('ind-heritage', 62, 26, -1) || put('ind-heritage', 62, 26, 1); const dc = put('ind-decay', 36, 31, 1) || put('ind-decay', 36, 31, -1);
   const cr = E.model('crane-yellow'); let slew = null, hook = null, h0 = 0;
   const cside = dc ? dc.userData.side : 1, cu = cside * (U + 6 + (dc ? 36 + 8 : 0) + 14);   // кранът — до халето (на свободното), не върху камионите
-  if (cr && freeRect(...W(cu, 0), 24, 24)) { const [x, z] = W(cu, 0); const pad = new THREE.Mesh(new THREE.PlaneGeometry(24, 24), conc); pad.rotation.set(-Math.PI / 2, 0, ry); pad.position.set(x, 0.05, z); g.add(pad); cr.position.set(x, 0, z); cr.rotation.y = ry + Math.PI / 2; g.add(cr); slew = cr.getObjectByName('Slew'); hook = cr.getObjectByName('Hook'); if (hook) h0 = hook.position.y; }
+  let crU = null; if (cr && freeRect(...W(cu, 0), 24, 24)) { crU = cu; const [x, z] = W(cu, 0); const pad = new THREE.Mesh(new THREE.PlaneGeometry(24, 24), conc); pad.rotation.set(-Math.PI / 2, 0, ry); pad.position.set(x, 0.05, z); g.add(pad); cr.position.set(x, 0, z); cr.rotation.y = ry + Math.PI / 2; g.add(cr); slew = cr.getObjectByName('Slew'); hook = cr.getObjectByName('Hook'); if (hook) h0 = hook.position.y; }
   const ws = [], ph = (c.x * 0.37) % 6.28;
   // работниците — само на свободния асфалт: правоъгълниците (в рамката на двора) на всичко над 0,6 м в двора — камионите, будката, бариерата, оградата, лампите — +1,5 м;
   // пътят на подвижния камион (u = gu) — също зает. Местата — най-близката свободна клетка (през 1 м) до желаното; носачът — свободна отсечка от 12 м
@@ -96,6 +96,57 @@ function extras(THREE, o, G, c, ry, out, drives) {
   g.userData.workers = taken;
   drives.push(dt => { const t = performance.now() / 1000; if (slew) slew.rotation.y = Math.sin(t * 0.07 + ph) * 0.9; if (hook) hook.position.y = h0 + (Math.sin(t * 0.21 + ph) * 0.5 + 0.5) * 6;
     for (const w of ws) { w.mixer.update(dt); if (w.clip === 'carry') { w.t += dt; const s = (w.t * 0.72) % 24, f = s < 12 ? s : 24 - s;   /* по свободната отсечка (path) */ const [x, z] = W(w.u, w.v + f); w.obj.position.set(x, 0, z); w.obj.rotation.y = ry + (s < 12 ? Math.PI : 0);   /* моделите гледат към −z */ } } });
+  if (o.streets) indStreets(THREE, o, G, c, ry, g, drives, [ht, dc].filter(Boolean).map(m => m.userData.uw), crU);
+}
+// 🛣️ ind-streets (f6, потребителят: „индустриалната зона — с улици и връзки между заводите“): пред завода и съседните фабрики — промишлена улица
+// (2 широки ленти, бордюри, маркировка, лампи — само светещи материали, без PointLight), от нея — входове с портал към всяка фабрика, бетонни дворове
+// с рампи и паркинг, огради; между завода и старата фабрика — тръбопровод на естакада; трошен камък под цялата зона вместо голата трева;
+// камион обикаля завод → улицата → фабриките и обратно. Улицата се свързва с пътя на завода до града (той пресича улицата при входа).
+function indStreets(THREE, o, G, c, ry, g, drives, B, crU) {
+  const cs = Math.cos(ry), sn = Math.sin(ry), W = (u, v) => [c.x + u * cs + v * sn, c.z - u * sn + v * cs], H = FW / 2, VS = H + APR + 14, RW2 = 11;
+  const M = { asph: new THREE.MeshStandardMaterial({ color: 0x45484e, roughness: 0.95 }), kerb: new THREE.MeshStandardMaterial({ color: 0xb7b4ac, roughness: 0.9 }), conc: new THREE.MeshStandardMaterial({ color: 0x9a978f, roughness: 0.95 }),
+    grav: new THREE.MeshStandardMaterial({ color: 0x7d776c, roughness: 1 }), white: new THREE.MeshBasicMaterial({ color: 0xeeeeee }), yel: new THREE.MeshBasicMaterial({ color: 0xf2c230 }),
+    post: new THREE.MeshStandardMaterial({ color: 0x8a9096, roughness: 0.5, metalness: 0.4 }), pipe: new THREE.MeshStandardMaterial({ color: 0x9aa3a8, roughness: 0.45, metalness: 0.6 }),
+    mesh: new THREE.MeshStandardMaterial({ color: 0x6f7a72, roughness: 0.8, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false }) };
+  const lampM = new THREE.MeshStandardMaterial({ color: 0x3a3a30, emissive: 0xffe0a0, emissiveIntensity: 0 }); lampM.userData.winK = 2.4; if (o.addWin) o.addWin(lampM);
+  const rect = (u0, u1, v0, v1, y, m) => { const p = new THREE.Mesh(new THREE.PlaneGeometry(u1 - u0, v1 - v0), m); p.rotation.set(-Math.PI / 2, 0, ry); const [x, z] = W((u0 + u1) / 2, (v0 + v1) / 2); p.position.set(x, y, z); p.receiveShadow = true; g.add(p); return p; };
+  const box = (u, v, y, w, h, d, m, rot = 0) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); const [x, z] = W(u, v); b.position.set(x, y, z); b.rotation.y = ry + rot; g.add(b); return b; };
+  const freeAt = (u, v) => { const [x, z] = W(u, v); return !G.hard(x, z) && !G.road(x, z); };
+  // докъде стига улицата: от най-лявата до най-дясната фабрика (+ крана), но само докато е свободно
+  let u0 = -H - YM - 4, u1 = H + YM + 4; for (const [u, w] of B) { u0 = Math.min(u0, u - w / 2 - 6); u1 = Math.max(u1, u + w / 2 + 6); } if (crU != null) { u0 = Math.min(u0, crU - 16); u1 = Math.max(u1, crU + 16); }
+  while (u0 < -H && !freeAt(u0, VS)) u0 += 4; while (u1 > H && !freeAt(u1, VS)) u1 -= 4;
+  // трошен камък под цялата зона (вместо голата трева)
+  rect(u0 - 6, u1 + 6, -H - YM - 14, VS + RW2 / 2 + 6, 0.02, M.grav);
+  // улицата: асфалт, бордюри, осева линия, лампи
+  rect(u0, u1, VS - RW2 / 2, VS + RW2 / 2, 0.08, M.asph);
+  for (const dv of [-RW2 / 2 - 0.3, RW2 / 2 + 0.3]) box((u0 + u1) / 2, VS + dv, 0.12, u1 - u0, 0.24, 0.5, M.kerb);
+  for (let u = u0 + 2; u < u1 - 3; u += 9) rect(u, u + 4.5, VS - 0.1, VS + 0.1, 0.1, M.white);
+  const pg = new THREE.CylinderGeometry(0.1, 0.12, 8, 6).translate(0, 4, 0), hg = new THREE.BoxGeometry(1.2, 0.22, 0.45);
+  for (let u = u0 + 8, k = 0; u < u1 - 4; u += 26, k++) { const v = VS + (k % 2 ? 1 : -1) * (RW2 / 2 + 1.2), [x, z] = W(u, v); const p = new THREE.Mesh(pg, M.post); p.position.set(x, 0, z); g.add(p); const h = new THREE.Mesh(hg, lampM); h.position.set(x, 8, z); h.rotation.y = ry + Math.PI / 2; g.add(h);
+    if (o.poolMat) { const pl = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), o.poolMat); pl.rotation.x = -Math.PI / 2; pl.position.set(x, 0.13, z); pl.renderOrder = 2; g.add(pl); } }
+  // всяка съседна фабрика: двор до улицата, вход с портал, рампи, паркинг, ограда
+  const docks = [];
+  for (const [u, w, d] of B) { const yv0 = -d / 2 - 6, yv1 = VS - RW2 / 2 - 1, ua = u - w / 2 - 6, ub = u + w / 2 + 6;
+    rect(ua, ub, yv0, yv1, 0.06, M.conc);   // бетонният двор
+    const gu = u + w * 0.2; rect(gu - 4, gu + 4, yv1 - 1, VS - RW2 / 2 + 0.2, 0.085, M.asph);   // входът от улицата
+    box(gu - 4.6, yv1, 0.6, 0.6, 1.2, 0.6, M.post); box(gu + 4.6, yv1, 0.6, 0.6, 1.2, 0.6, M.post);   // порталът
+    const arm = box(gu, yv1, 1.05, 8, 0.14, 0.14, M.yel); arm.rotation.z = 0;
+    for (let k = 0; k < 4; k++) { box(u - w / 2 + 6 + k * 7, d / 2 + 1.2, 0.6, 5, 1.2, 2.4, M.kerb); rect(u - w / 2 + 3.6 + k * 7, u - w / 2 + 3.8 + k * 7, d / 2 + 2.4, d / 2 + 14, 0.09, M.yel); }   // рампите и местата на камионите
+    const pu0 = gu + 6, pu1 = Math.min(ub - 2, pu0 + 20); if (pu1 - pu0 > 8) { rect(pu0, pu1, yv1 - 13, yv1 - 2, 0.07, M.asph); for (let x = pu0 + 1.5; x <= pu1 - 1; x += 2.6) rect(x - 0.06, x + 0.06, yv1 - 12, yv1 - 7.5, 0.09, M.white); }   // паркингът
+    const fence = (a, b2) => { const L = Math.hypot(b2[0] - a[0], b2[1] - a[1]); if (L < 1) return; const k = Math.ceil(L / 5); for (let i = 0; i <= k; i++) box(a[0] + (b2[0] - a[0]) * i / k, a[1] + (b2[1] - a[1]) * i / k, 1.1, 0.12, 2.2, 0.12, M.post); const p = box((a[0] + b2[0]) / 2, (a[1] + b2[1]) / 2, 1.1, L, 2, 0.04, M.mesh, -Math.atan2(b2[1] - a[1], b2[0] - a[0])); p.castShadow = false; };
+    fence([ua, yv0], [ub, yv0]); fence([ua, yv0], [ua, yv1]); fence([ub, yv0], [ub, yv1]); fence([ua, yv1], [gu - 5, yv1]); fence([gu + 5, yv1], [ub, yv1]);
+    docks.push([gu, u - w / 2 + 6 + 7, d / 2 + 8]); }
+  // тръбопровод на естакада: завод ↔ първата фабрика (суровини/пара)
+  if (B[0]) { const [u, w] = B[0], side = Math.sign(u), ua = side * (H + YM + 2), ub = u - side * (w / 2 + 2), vp = -H * 0.4, L = Math.abs(ub - ua);
+    for (let k = 0; k <= Math.ceil(L / 8); k++) { const uu = ua + (ub - ua) * k / Math.ceil(L / 8); box(uu, vp, 3, 0.4, 6, 0.4, M.post); box(uu, vp, 6.05, 0.3, 0.2, 2.6, M.post); }
+    for (const dv of [-0.6, 0.6]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, L, 10), M.pipe); p.rotation.z = Math.PI / 2; p.rotation.y = ry; const [x, z] = W((ua + ub) / 2, vp + dv); p.position.set(x, 6.55, z); g.add(p); } }
+  // камион: от рампата на завода → входа → по улицата → във всяка фабрика → обратно
+  const T = o.truck && o.truck(); if (T && docks.length) { g.add(T); const gate = [-H * 0.35, H + APR + 4], pts = [[-H * 0.35, H + 20], gate, [gate[0], VS]];
+    for (const [gu, du, dv] of docks) pts.push([gu, VS], [gu, VS - RW2 / 2 - 4], [du, dv], [gu, VS - RW2 / 2 - 4], [gu, VS]);
+    pts.push([gate[0], VS], gate, [-H * 0.35, H + 20]);
+    const P = pts.map(([u, v]) => W(u, v)), segL = P.slice(1).map((p, i) => Math.hypot(p[0] - P[i][0], p[1] - P[i][1])), tot = segL.reduce((a, b) => a + b, 0); let s = 0, wait = 8;
+    drives.push(dt => { if (wait > 0) { wait -= dt; return; } s += 5.5 * dt; if (s >= tot) { s = 0; wait = 20; } let q = s, i = 0; while (i < segL.length - 1 && q > segL[i]) { q -= segL[i]; i++; } const a = P[i], b = P[i + 1], f = Math.min(1, q / (segL[i] || 1)), dx = b[0] - a[0], dz = b[1] - a[1];
+      T.position.set(a[0] + dx * f, 0, a[1] + dz * f); if (Math.hypot(dx, dz) > 0.1) T.rotation.y = Math.atan2(dx, dz); if (o.spin) o.spin(T); }); }
 }
 function mats(THREE, o) {
   const lamp = new THREE.MeshStandardMaterial({ color: 0x3a3a30, emissive: 0xffe0a0, emissiveIntensity: 0 }); lamp.userData.winK = 2.4; if (o.addWin) o.addWin(lamp);

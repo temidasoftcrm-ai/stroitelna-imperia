@@ -195,7 +195,7 @@ export function createCityPanel(deps) {
       ${dq.max - dq.ext > 1 ? `<button class="btn2" data-cpdist="${id}|1" ${deps.econ().canAfford(dq.all) ? '' : 'disabled'}>Всички ${dq.max - dq.ext} · ${f(dq.all)} €</button>` : ''}</div>`;
     h += `<div class="row" style="justify-content:flex-end;gap:6px;margin-top:6px;flex-wrap:wrap">
       ${here ? '' : `<button class="btn2" data-cpgo="${id}">➡️ Влез</button>`}
-      ${canFin ? `<button class="btn" data-cpfin="${id}" title="Завършва града направо оттук">🏁 Завърши града</button>` : ''}</div></div>`;
+      ${canFin ? `<button class="btn" data-cpfin="${id}" title="Завършва града направо оттук" style="background:linear-gradient(180deg,#5fe08f,#2fae5c);color:#05230f;border-color:#2fae5c">🏁 Завърши града</button>` : ''}</div></div>`;
     return h;
   }
   // завършените градове (🏁) не се показват — само ред с броя им и бутон да се покажат

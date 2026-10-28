@@ -77,7 +77,7 @@ function mountBtn() {
 function paint() {
   if (!btn) return;
   btn.textContent = user ? (lastErr ? '☁️⚠️' : busy ? '☁️…' : '☁️✓') : '☁️ Вход';
-  btn.title = user ? `Облак: ${user.email}${lastErr ? ' — ' + lastErr : ''}` : 'Влез, за да пазиш играта в облака и да играеш от няколко устройства';
+  btn.title = user ? `Облак: ${who()}${lastErr ? ' — ' + lastErr : ''}` : 'Влез, за да пазиш играта в облака и да играеш от няколко устройства';
 }
 
 function openPanel() {
@@ -87,9 +87,9 @@ function openPanel() {
 function openCloud() {
   const rows = [];
   for (let n = 1; n <= SLOTS; n++) { const raw = localStorage.getItem(keyOf(n)); if (raw) { const m = metaOf(raw), s = getSync(n); rows.push(`💾 Слот ${n}: ден ${m.day} · ${fmt(m.money)} € ${s && s.sig === sig(raw) ? '· ☁️ в облака' : '· ⏳ чака качване'}`); } }
-  dlg(`<h2 style="font-size:19px;color:var(--acc)">☁️ Облак</h2><p style="color:var(--mut);font-size:14px;line-height:1.5">Влязъл си като <b style="color:var(--txt)">${user.email}</b>.<br>Играта се пази в облака автоматично — влез със същия имейл на друго устройство и продължаваш оттам.${lastErr ? `<br><span style="color:var(--bad)">Последна грешка: ${lastErr}</span>` : ''}</p>
+  dlg(`<h2 style="font-size:19px;color:var(--acc)">☁️ Облак</h2><p style="color:var(--mut);font-size:14px;line-height:1.5">${anonU(user) ? '<b style="color:var(--txt)">👤 Гост</b> — записът е в облака на това устройство. За да продължиш от друго устройство, създай акаунт (⚙️ → 🆕 Създай акаунт).' : `Влязъл си като <b style="color:var(--txt)">${esc(user.email)}</b>.`}<br>Играта се пази в облака автоматично — влез със същия имейл на друго устройство и продължаваш оттам.${lastErr ? `<br><span style="color:var(--bad)">Последна грешка: ${lastErr}</span>` : ''}</p>
     <div style="font-size:13px;line-height:1.7">${rows.join('<br>') || 'Още няма записи.'}</div>`,
-    [['Изход', () => { sb.auth.signOut(); }], ['☁️ Синхронизирай сега', () => { syncAll(true); }], ['Затвори', null, 1]]);
+    [...(anonU(user) ? [] : [['Изход', () => { sb.auth.signOut(); }]]), ['☁️ Синхронизирай сега', () => { syncAll(true); }], ['Затвори', null, 1]]);
 }
 
 function loginEmail(pre = '') {
@@ -141,11 +141,16 @@ const tsLoad = () => tsP = tsP || new Promise((res, rej) => {
   const s = document.createElement('script'); s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'; s.async = true;
   s.onload = () => res(window.turnstile); s.onerror = () => { tsP = null; rej(new Error('captcha')); }; document.head.appendChild(s);
 });
+// джаджите на Turnstile, чиято форма вече я няма (превключване вход ↔ нов акаунт, затворен прозорец) — махат се с turnstile.remove,
+// иначе Cloudflare пише „Cannot find Widget … consider using turnstile.remove()“ в конзолата
+const tsLive = []; let tsSweepT = 0;
+const tsSweep = () => { for (let i = tsLive.length - 1; i >= 0; i--) if (!tsLive[i].el.isConnected) { try { window.turnstile.remove(tsLive[i].id); } catch { } tsLive.splice(i, 1); }
+  if (!tsLive.length && tsSweepT) { clearInterval(tsSweepT); tsSweepT = 0; } };
 function captcha(el) {   // { token(): Promise<string|undefined>, reset() }
   const key = tsKey(); if (!key) return { token: async () => undefined, reset() { } };
   let id = null, tok = ''; const wait = [];
-  tsLoad().then(ts => { id = ts.render(el, { sitekey: key, appearance: 'interaction-only', theme: 'dark', language: LANG === 'en' ? 'en' : 'bg',
-    callback: t => { tok = t; wait.splice(0).forEach(f => f(t)); }, 'expired-callback': () => { tok = ''; }, 'error-callback': () => { tok = ''; } }); }).catch(() => { });
+  tsLoad().then(ts => { tsSweep(); id = ts.render(el, { sitekey: key, appearance: 'interaction-only', theme: 'dark', language: LANG === 'en' ? 'en' : 'bg',
+    callback: t => { tok = t; wait.splice(0).forEach(f => f(t)); }, 'expired-callback': () => { tok = ''; }, 'error-callback': () => { tok = ''; } }); tsLive.push({ id, el }); if (!tsSweepT) tsSweepT = setInterval(tsSweep, 2000); }).catch(() => { });
   return { token: () => tok ? Promise.resolve(tok) : new Promise((res, rej) => { wait.push(res); setTimeout(() => rej(new Error('captcha')), 30000); }),
     reset() { tok = ''; try { if (id != null) window.turnstile.reset(id); } catch { } } };
 }
@@ -193,6 +198,76 @@ function pwForm(box, o, mode = mailGet() ? 'login' : 'new', pre = mailGet()) {
 }
 const DLG_INP = 'width:100%;box-sizing:border-box;padding:11px;border-radius:9px;border:1px solid var(--line);background:#0f141c;color:var(--txt);font-size:16px;margin:5px 0';
 const DLG_GO = 'width:100%;padding:12px;border:0;border-radius:11px;background:#f5b942;color:#111;font:800 16px system-ui,sans-serif;cursor:pointer;margin-top:6px';
+// ── 👤 guest-cloud (T2, потребителят: „като си натиснал да играеш без акаунт да не ти го дава на всяко зареждане, а да прави запис на облака директно“):
+// „Играй без регистрация“ се помни (localStorage 'stroi-guest'), а играта се пази в облака като анонимен потребител (Supabase signInAnonymously, с Turnstile токен);
+// „🆕 Създай акаунт“ после — updateUser (същият user id, записите остават); без анонимен вход в проекта — тихо само на устройството (console.warn веднъж)
+const GC = feature('guest-cloud');
+const GUEST_K = 'stroi-guest', isGuest = () => { try { return localStorage.getItem(GUEST_K) === '1'; } catch { return false; } };
+const setGuest = on => { try { if (on) localStorage.setItem(GUEST_K, '1'); else localStorage.removeItem(GUEST_K); } catch { } };
+const anonU = u => !!(u && u.is_anonymous);
+const who = () => anonU(user) ? '👤 Гост (записът е в облака)' : user?.email || '';
+let anonWarned = false, anonBusy = null;
+// Turnstile за анонимния вход: невидим; само ако Cloudflare поиска отметка — малко каре долу вдясно с надпис; след токена — махнат
+async function anonToken() {
+  const key = tsKey(); if (!key) return undefined;
+  const box = document.createElement('div'); box.style.cssText = 'position:fixed;right:8px;bottom:8px;z-index:10001;display:flex;flex-direction:column;align-items:flex-end;gap:4px';
+  const lab = document.createElement('div'); lab.textContent = '☁️ Играта като гост се пази в облака — след проверката'; lab.style.cssText = 'display:none;font:600 12px system-ui,sans-serif;color:#e6edf6;background:#0c1018;border:1px solid #3a4560;padding:4px 8px;border-radius:8px';
+  const w = document.createElement('div'); box.append(lab, w); document.body.appendChild(box);
+  let id = null;
+  try {
+    const ts = await tsLoad();
+    return await new Promise((res, rej) => { const tm = setTimeout(() => rej(new Error('captcha')), 60000);
+      id = ts.render(w, { sitekey: key, appearance: 'interaction-only', theme: 'dark', language: LANG === 'en' ? 'en' : 'bg', callback: t => { clearTimeout(tm); res(t); },
+        'before-interactive-callback': () => { lab.style.display = 'block'; }, 'error-callback': () => { clearTimeout(tm); rej(new Error('captcha')); } }); });
+  } finally { try { if (id != null) window.turnstile.remove(id); } catch { } box.remove(); }
+}
+function guestSignIn() {
+  if (!GC || AUTOTEST) return Promise.resolve(false);
+  return anonBusy = anonBusy || (async () => {
+    try {
+      const { data } = await sb.auth.getSession(); if (data?.session) return true;
+      const captchaToken = await anonToken();
+      const { error } = await sb.auth.signInAnonymously(captchaToken ? { options: { captchaToken } } : undefined);
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      if (!anonWarned) { anonWarned = true; console.warn('guest-cloud: anonymous sign-in failed, saves stay on this device only (Supabase: Authentication, Allow anonymous sign-ins)', e?.message || e); }
+      return false;
+    } finally { anonBusy = null; }
+  })();
+}
+// ⚙️ → 🆕 Създай акаунт (гост): имейл и парола на същия потребител — updateUser, не signUp
+function guestUpgrade() {
+  const el = dlg(`<h2 style="font-size:19px;color:var(--acc)">🆕 Създай акаунт</h2><p style="color:var(--mut);font-size:14px;line-height:1.5">Записите ти в облака остават същите — само им слагаш имейл и парола, за да играеш и от друго устройство.</p>
+    <input id="guE" type="email" autocomplete="email" inputmode="email" placeholder="${EMAIL_PH}" style="${DLG_INP}"><input id="guP1" type="password" autocomplete="new-password" placeholder="парола (поне 8 знака)" style="${DLG_INP}">
+    <input id="guP2" type="password" autocomplete="new-password" placeholder="паролата още веднъж" style="${DLG_INP}"><div id="guMsg" style="font-size:13px;min-height:18px"></div>`,
+    [['Отказ', null], ['🆕 Създай акаунт', () => { go(); return false; }, 1]]);
+  const q = x => el.querySelector(x), msg = (t, bad) => { const m = q('#guMsg'); if (!m) return; m.style.color = bad ? 'var(--bad)' : 'var(--mut)'; m.textContent = t; };
+  const done = email => { setGuest(false); mailKeep(email); el.remove(); toast(`☁️ Акаунтът е създаден — ${email}. Записите в облака остават същите.`); paint(); };
+  const setPw = async (email, password) => { const { error } = await sb.auth.updateUser({ password }); if (error) throw error; done(email); };
+  const go = async () => {
+    const email = q('#guE').value.trim(), password = q('#guP1').value;
+    if (!EMAIL_RE.test(email)) return msg('Невалиден имейл.', true);
+    if (password.length < 8) return msg('Паролата е поне 8 знака.', true);
+    if (password !== q('#guP2').value) return msg('Двете пароли се различават.', true);
+    msg('Създавам акаунта…');
+    try {
+      const { data, error } = await sb.auth.updateUser({ email }); if (error) throw error;
+      if ((data?.user?.email || '').toLowerCase() === email.toLowerCase()) return await setPw(email, password);
+      if (PW) return msg('Акаунтът чака потвърждение на имейла — пиши ни на temidasoftcrm@gmail.com.', true);
+      el.querySelector('div').innerHTML = `<h2 style="font-size:19px;color:var(--acc)">📧 Провери пощата</h2><p style="color:var(--mut);font-size:14px;line-height:1.5">Пратихме код на <b style="color:var(--txt)">${esc(email)}</b>. Въведи го тук (ако го няма — виж и папка „Спам“).</p>
+        <input id="guC" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456" style="${DLG_INP};letter-spacing:6px;text-align:center"><div id="guMsg" style="font-size:13px;min-height:18px"></div><button class="btn" id="guOk">✅ Потвърди</button>`;
+      q('#guOk').onclick = async () => { const token = q('#guC').value.replace(/\D/g, ''); if (token.length < 6) return msg('Кодът е от 6 цифри.', true);
+        try { const r = await sb.auth.verifyOtp({ email, token, type: 'email_change' }); if (r.error) throw r.error; await setPw(email, password); } catch (x) { msg(/expired|invalid/i.test(x?.message || '') ? 'Грешен или изтекъл код.' : pwErr(x?.message || 'няма връзка'), true); } };
+    } catch (x) { msg(pwErr(x?.message || 'няма връзка'), true); }
+  };
+  setTimeout(() => q('#guE')?.focus(), 50);
+}
+// ⚙️ → 🔑 Имам акаунт (гост): вход в друг, съществуващ акаунт — първо предупреждение; после конфликтът се решава както винаги (pullAll пита)
+function guestLogin() {
+  dlg(`<h2 style="font-size:19px;color:var(--acc)">🔑 Вход в акаунт</h2><p style="color:var(--mut);font-size:14px;line-height:1.5">Влизаш в акаунт с имейл. Играта като гост на това устройство не се губи без питане: ако в акаунта има записи, ще избереш кой да остане (другият отива в „💾 Записи“ → „🕒 Автозаписи“). Облачните записи на госта остават без акаунт.</p>`,
+    [['Отказ', null], ['🔑 Към входа', () => { setTimeout(() => loginEmail(), 0); }, 1]]);
+}
 // ⚙️ → 🔑 Смени паролата (влезли): updateUser — без писмо
 function changePw() {
   const el = dlg(`<h2 style="font-size:19px;color:var(--acc)">🔑 Смени паролата</h2>
@@ -211,8 +286,30 @@ function changePw() {
 
 // ── ⚙️ Настройки: вход/изход, хора онлайн, изтриване на данните и на акаунта ──
 // 🆕 версия и какво е новото — при нова версия: вдигни VERSION и добави най-отгоре в CHANGES
-export const VERSION = '3.4.2';
+export const VERSION = '3.5.0';
 const CHANGES = [
+  ['3.5.0', '28.10.2026', [
+    '⚡ Истински мълнии при буря — разклонени, с гръм според разстоянието; небето притъмнява',
+    '🔥 Изгорели сгради — след пожар в града остава руина, после се разчиства',
+    '🛬 Летищата с истински писти — двойки като на големите хъбове, светлини нощем',
+    '🏛️ Площади пред забележителностите — лампи, пейки, саксии; кафенето не пречи на гледката',
+    '🏭 Индустриалната зона с улица, дворове, рампи, паркинги и тръбопровод между заводите',
+    '🚆 Влак се купува с един бутон — товарен или пътнически по случаен избор; ясен брояч по региони',
+    '👤 Игра като гост — запомня се и пази играта в облака',
+    '🎬 Нови клипове — първата магистрала и първият кораб',
+    '🛠️ Поправено: техниката вече не „засяда“ по дългите пътища; летището/пристанището тръгва веднага след основаването на дъщерната фирма',
+    '🌍 Входовете към континентите (Александрия, Ню Йорк, Рио, Дубай, Сидни) — линия без ограничения',
+    '📈 Нивата 12–20 искат повече опит; парите горе се превъртат',
+  ]],
+  ['3.4.5', '28.10.2026', [
+    '🗺️ Поправено: парцелите извън кварталите в градовете по картата са „Покрайнини“ (беше италианското „Fuori“)',
+  ]],
+  ['3.4.4', '28.10.2026', [
+    '🏠 Старите записи: модерната двуетажна къща е заменена с къща от региона (вместо празно място)',
+  ]],
+  ['3.4.3', '28.10.2026', [
+    '🛠️ Поправено: играта спираше при зареждане на запис, ако модел на сграда не се е заредил',
+  ]],
   ['3.4.2', '28.10.2026', [
     '🚋 Трамваи по булевардите; градските автобуси карат правилно, междуградски автобуси по магистралата',
     '🗺️ София и Берлин по истинската карта — свързани улици, истински височини, НДК и Бранденбургската врата',
@@ -537,21 +634,23 @@ function openSettings(h) {
     ${hooks.quick ? sec('⚡ Бързо', `<div style="display:flex;flex-direction:column;gap:6px">${hooks.quick().map((r, i) => `<button class="btn2" id="stQ${i}" style="display:flex;align-items:center;gap:10px;text-align:left;padding:9px 12px"><span style="font-size:20px;width:26px;text-align:center">${r.ico()}</span><span style="flex:1">${r.nm()}</span></button>`).join('')}</div>`) : ''}
     ${hooks.audio ? sec('🔊 Звук', ['music:🎵 Музика', 'fx:🔔 Ефекти', 'city:🏙️ Град'].map(r => { const [k, t] = r.split(':'), v = Math.round((hooks.audio.levels()[k] ?? 1) * 100);
       return `<label style="display:flex;align-items:center;gap:10px;font-size:14px;margin:4px 0"><span style="width:90px">${t}</span><input type="range" min="0" max="100" step="5" value="${v}" data-mix="${k}" style="flex:1"><span style="width:38px;text-align:right;color:var(--mut)">${v}%</span></label>`; }).join('')) : ''}
-    ${sec('☁️ Акаунт', user ? `<div style="font-size:14px;color:var(--mut);line-height:1.5">Влязъл си като <b style="color:var(--txt)">${esc(user.email)}</b> — играта се пази в облака.${lastErr ? `<br><span style="color:var(--bad)">Последна грешка: ${esc(lastErr)}</span>` : ''}</div>
+    ${sec('☁️ Акаунт', anonU(user) ? `<div style="font-size:14px;color:var(--mut);line-height:1.5"><b style="color:var(--txt)">👤 Гост (записът е в облака)</b> — играта се пази в облака на това устройство. Създай акаунт, за да играеш и от друго устройство и за партньорство.${lastErr ? `<br><span style="color:var(--bad)">Последна грешка: ${esc(lastErr)}</span>` : ''}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${sbtn('stUp', '🆕 Създай акаунт', 'btn')}${sbtn('stHave', '🔑 Имам акаунт')}${sbtn('stCloud', '☁️ Записи в облака')}</div>`
+      : user ? `<div style="font-size:14px;color:var(--mut);line-height:1.5">Влязъл си като <b style="color:var(--txt)">${esc(user.email)}</b> — играта се пази в облака.${lastErr ? `<br><span style="color:var(--bad)">Последна грешка: ${esc(lastErr)}</span>` : ''}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${sbtn('stCloud', '☁️ Записи в облака')}${PW ? sbtn('stPw', '🔑 Смени паролата') : ''}${sbtn('stOut', '🚪 Изход')}</div>`
-      : `<div style="font-size:14px;color:var(--mut);line-height:1.5">Не си влязъл. С вход (${PW ? 'имейл и парола' : 'имейл + код, без парола'}) играта се пази в облака и можеш да играеш от няколко устройства.</div><div style="margin-top:8px">${sbtn('stIn', '☁️ Вход', 'btn')}</div>`)}
+      : `<div style="font-size:14px;color:var(--mut);line-height:1.5">Не си влязъл. С вход (${PW ? 'имейл и парола' : 'имейл + код, без парола'}) играта се пази в облака и можеш да играеш от няколко устройства.</div><div style="margin-top:8px">${GC ? sbtn('stIn', '🔑 Влез', 'btn') + ' ' + sbtn('stNewAcc', '🆕 Създай акаунт') : sbtn('stIn', '☁️ Вход', 'btn')}</div>`)}
     ${sec(`👥 Онлайн сега: <span id="stN">${ppl.length}</span>`, `<div id="stPpl" style="font-size:13px;line-height:1.7;max-height:150px;overflow:auto">${pplHtml(ppl)}</div>`)}
     ${sec(`🆕 Ъпдейти <span style="font-weight:400;color:var(--mut);font-size:13px">· версия ${VERSION}</span>`, `<div style="max-height:170px;overflow:auto">${changesHtml()}</div>`)}
     ${sec('🎮 Игра', `<div style="display:flex;gap:6px;flex-wrap:wrap">${hooks.saves ? sbtn('stSaves', '💾 Записи') : ''}${hooks.rename ? sbtn('stRen', '✏️ Име на фирмата') : ''}${hooks.credits ? sbtn('stCred', '📜 Автори') : ''}${hooks.newGame ? sbtn('stNew', '🔄 Нова игра') : ''}</div>`)}
     ${langOn() ? sec('🌐 Език · Language', `<div style="display:flex;gap:6px;flex-wrap:wrap" data-noi18n>${sbtn('stLangBg', (LANG === 'bg' ? '✅ ' : '') + '🇧🇬 Български')}${sbtn('stLangEn', (LANG === 'en' ? '✅ ' : '') + '🇬🇧 English')}</div>`) : ''}
     ${feature('consent') ? sec('🔒 Поверителност', `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">${window.consent?.adsLive ? sbtn('stCons', '🍪 Съгласие: статистика') + sbtn('stAdsCons', '📺 Реклами — настройки за съгласие') : sbtn('stCons', '🍪 Съгласие: реклами и статистика')}<a href="privacy.html" target="_blank" rel="noopener" style="color:var(--acc);font-size:14px">Поверителност</a><span style="color:var(--mut)">·</span><a href="terms.html" target="_blank" rel="noopener" style="color:var(--acc);font-size:14px">Условия</a></div>`) : ''}
     ${sec('⚠️ Опасна зона', `<div style="font-size:13px;color:var(--mut);line-height:1.5">„Изтрий данните“ маха всички записи на това устройство${user ? ' и в облака. „Изтрий акаунта“ маха и самия акаунт (имейла) завинаги' : ''}.</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${sbtn('stWipe', '🗑️ Изтрий данните', 'btn2', 'color:var(--bad)')}${user ? sbtn('stDel', '❌ Изтрий акаунта', 'btn2', 'color:var(--bad)') : ''}</div>`)}`,
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${sbtn('stWipe', '🗑️ Изтрий данните', 'btn2', 'color:var(--bad)')}${user && !anonU(user) ? sbtn('stDel', '❌ Изтрий акаунта', 'btn2', 'color:var(--bad)') : ''}</div>`)}`,
     [['Затвори', null, 1]]);
   el.firstElementChild.style.maxHeight = '92vh'; el.firstElementChild.style.overflow = 'auto';
   const on = (id, f) => { const b = el.querySelector('#' + id); if (b) b.onclick = () => { el.remove(); f(); }; };
   { const x = el.querySelector('#stX'); if (x) x.onclick = () => el.remove(); }   // ✕ горе — без да скролваш до „Затвори“
-  on('stIn', () => loginEmail()); on('stPw', changePw); on('stCloud', openCloud); on('stCred', () => hooks.credits()); on('stRen', () => hooks.rename()); on('stSaves', () => hooks.saves()); on('stNew', () => hooks.newGame()); on('stCons', () => window.consent?.open()); on('stAdsCons', () => window.consent?.adsOpen());
+  on('stIn', () => GC ? regGate() : loginEmail()); on('stUp', guestUpgrade); on('stHave', guestLogin); on('stNewAcc', regGate);   // 👤 guest-cloud: „🔑 Влез / 🆕 Създай акаунт“ — същият екран, при поискване on('stPw', changePw); on('stCloud', openCloud); on('stCred', () => hooks.credits()); on('stRen', () => hooks.rename()); on('stSaves', () => hooks.saves()); on('stNew', () => hooks.newGame()); on('stCons', () => window.consent?.open()); on('stAdsCons', () => window.consent?.adsOpen());
   on('stOut', () => dlg(`<h2 style="font-size:19px;color:var(--acc)">🚪 Изход?</h2><p style="color:var(--mut);font-size:14px;line-height:1.5">Играта на това устройство остава. Влез пак със същия имейл, за да продължи да се пази в облака.</p>`,
     [['Отказ', null], ['🚪 Изход', () => { syncAll(false).finally(() => sb.auth.signOut().then(() => toast('🚪 Излезе от акаунта.'))); }, 1]]));
   on('stLangBg', () => setLang('bg')); on('stLangEn', () => setLang('en'));   // 🌐 lang-en
@@ -725,6 +824,8 @@ async function syncAll(full) {
 
 sb.auth.onAuthStateChange((ev, session) => {
   const was = user; user = session?.user || null; paint();
+  if (GC && user && !anonU(user)) setGuest(false);
+  if (GC && anonU(was) && user && was.id !== user.id) for (let n = 1; n <= SLOTS; n++) try { localStorage.removeItem(syncKey(n)); } catch { }   // гост → друг акаунт: отпечатъците са на госта — сравнява се наново (при два записа — пита)
   if (user && (!was || was.id !== user.id)) syncAll(true);
 });
 // ── 📧 екранът при отваряне (feature 'reg-gate'): първо „Регистрирай имейл“ (код по пощата), после „▶ Влез в играта“.
@@ -742,7 +843,7 @@ function regGate() {
   document.body.appendChild(el);
   if (langOn()) { const lb = langButton(); lb.style.cssText = 'position:absolute;top:12px;right:12px;padding:6px 10px;border-radius:9px;border:1px solid #3a4560;background:#0f141c;color:#e6edf6;font:600 14px system-ui,sans-serif;cursor:pointer'; el.appendChild(lb); }   // 🌐 lang-en
   const body = el.querySelector('#rgBody'), close = () => { el.remove(); };
-  el.querySelector('#rgSkip').onclick = e => { e.preventDefault(); close(); };
+  el.querySelector('#rgSkip').onclick = e => { e.preventDefault(); if (GC) { setGuest(true); guestSignIn(); } close(); };   // 👤 guest-cloud: изборът се помни, а записът отива в облака като гост
   const msg = (t, bad) => { const m = body.querySelector('.rgMsg'); m.style.color = bad ? '#ff6b6b' : '#8b96a8'; m.textContent = t; };
   const PASS = feature('reg-pass'), lastMail = () => { try { return localStorage.getItem('stroi-email') || ''; } catch { return ''; } }, keepMail = m => { try { localStorage.setItem('stroi-email', m); } catch {} };
   // 🔑 (feature 'reg-pass') вход с имейл и парола — кодът е само за нов акаунт или забравена парола
@@ -835,9 +936,11 @@ function regGate() {
   else PASS ? (lastMail() ? stepLogin() : stepEmail('', 'new')) : stepEmail();   // познат имейл на това устройство → вход с парола; иначе — нов акаунт
 }
 const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);   // на localhost (разработка) — без екрана, освен с ?gate
-if (!AUTOTEST && feature('reg-gate') && ((window.top === window && !LOCAL) || /[?&]gate/.test(location.search)))
-  sb.auth.getSession().then(({ data }) => { if (!data?.session) { if (document.body) regGate(); else addEventListener('DOMContentLoaded', regGate); } });
+const GATE_ON = !AUTOTEST && feature('reg-gate') && ((window.top === window && !LOCAL) || /[?&]gate/.test(location.search));
+if (GATE_ON || (GC && !AUTOTEST && isGuest()))
+  sb.auth.getSession().then(({ data }) => { if (data?.session) return; if (GC && isGuest()) { guestSignIn(); return; } if (document.body) regGate(); else addEventListener('DOMContentLoaded', regGate); });   // 👤 guest-cloud: гостът не вижда екрана — влиза пак като гост
 window.__regGate = regGate;
+if (IN_LAB && GC) window.__guestUi = () => { user = { id: '00000000-0000-0000-0000-000000000000', is_anonymous: true }; busy = true; paint(); openSettings(); return who(); };   // 👤 guest-cloud: изгледът на госта в Лабораторията — без мрежа (busy спира синхронизацията)
 window.__settings = openSettings;
 if (IN_LAB) window.__cloudPullTest = rows => pullAll(rows).then(() => ({ held: [...held] }));   // fix-saves: конфликт без вход — облачните редове се подават наготово
 if (IN_LAB) window.__cloudLiteTest = async () => { const raw = localStorage.getItem(keyOf(curSlot())) || '{}', p = await pack(raw), back = await unpack(p); return { raw: raw.length, sent: JSON.stringify(p).length, same: sameSave(back, raw) }; };   // cloud-lite: колко се качва и връща ли се същото

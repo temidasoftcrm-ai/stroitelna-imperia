@@ -232,6 +232,8 @@ export function createIncidents(ctx) {
       cars.push({ home, o, x: st.x, z: st.z, yaw: 0, path, pi: 0, stage: 'go', delay: n * rnd(1.5, 4), kind: sirenKind(o) || { Firetruck: 'fire', Ambulance: 'ambulance' }[k] || (k === 'Truck' ? null : 'police') });
     });
     inc = { at, g, cars, puffs, flames, type, hold0: T.hold, t: 0, force: !!force, fx, hoses, R };
+    // 🏚️ fire-ruins: понякога пожарната закъснява — сградата изгаря и след гасенето остава руина (game.js ruinAt → firesim.js)
+    if (type === 'bfire' && feature('fire-ruins') && ctx.ruinAt && Math.random() < (ctx.lostP ? ctx.lostP() : 0.2)) inc.lost = true;
     if (feature('ui-batch2') && type !== 'jam') ctx.started && ctx.started(type, at, T.nm);   // ui-batch2: известието с „👁️ Гледай“ (game.js)
     return { x: Math.round(at.x), z: Math.round(at.z), cars: cars.length, type, nm: T.nm };
   }
@@ -344,6 +346,7 @@ export function createIncidents(ctx) {
     }
     if (inc.hold !== undefined && !inc.leave && (inc.hold -= rdt) <= 0 && (!inc.fx?.tow || !K2 || inc.towC?.done || inc.t > inc.hold0 + 150)) {   // с пътна помощ — след като натовари останките   // разотиват се — с малки паузи, всяка в своя посока
       inc.leave = true;
+      if (inc.lost) inc.ruin = ctx.ruinAt(inc.at.x, inc.at.z);
       inc.cars.forEach((c, n) => {
         c.o.userData.beaconsOn = 0;
         const to = c.home || pickStart(inc.at), path = to && ctx.route(c.x, c.z, to.x, to.z).map(p => ({ x: p.x, z: p.z, ln: p.ln, rg: p.rg }));

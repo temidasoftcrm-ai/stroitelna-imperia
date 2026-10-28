@@ -513,7 +513,7 @@ onConn(c => {
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && state) refresh(); });
 
 sb.auth.onAuthStateChange((ev, session) => {
-  const was = user; user = session?.user || null;
+  const was = user; user = session?.user || null; if (user && user.is_anonymous) user = null;   // 👤 guest-cloud: онлайн империята — само с акаунт (гостът вижда входа)
   if (!user) { clearInterval(pollT); state = null; loginScreen(); return; }
   if (!was || was.id !== user.id) worldId ? enterWorld(worldId) : worldsScreen();
 });

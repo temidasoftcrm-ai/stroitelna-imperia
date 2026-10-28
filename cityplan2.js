@@ -747,7 +747,7 @@ function placeLots(P, sk, r) {
     const DS = sk.osm.districts.map(d => { let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of d.poly) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } return { ...d, bb: [x0, z0, x1, z1] }; });
     for (const L of lots) {
       const d = DS.find(q => L.x >= q.bb[0] && L.x <= q.bb[2] && L.z >= q.bb[1] && L.z <= q.bb[3] && inPoly([L.x, L.z], q.poly));
-      L.district = d ? d.nm : 'Fuori'; L.tier = d ? d.tier : 5;
+      L.district = d ? d.nm : sk.osm.city === 'rome' ? 'Fuori' : 'Покрайнини'; L.tier = d ? d.tier : 5;
       if (L.big) continue;
       L.zone = !d ? 'outer' : d.kind === 'quarter' ? (d.keep < 0.4 ? 'center' : 'mid') : 'outer';
       if (d && h(L.id * 7 + 3) > d.keep) L.reserved = 'reno';

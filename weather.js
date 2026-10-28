@@ -10,7 +10,7 @@ export const WEATHER = {
   clear:  { ico: '☀️', nm: 'Ясно',      sun: 1,    hemi: 1,    fog: 1 },
   cloudy: { ico: '☁️', nm: 'Облачно',   sun: 0.55, hemi: 0.85, fog: 0.85 },
   rain:   { ico: '🌧️', nm: 'Дъжд',      sun: 0.35, hemi: 0.7,  fog: 0.6 },
-  storm:  { ico: '⛈️', nm: 'Буря',      sun: 0.2,  hemi: 0.55, fog: 0.45 },
+  storm:  { ico: '⛈️', nm: 'Буря',      sun: 0.2,  hemi: 0.55, fog: feature('storm-bolts') ? 0.36 : 0.45 },   // storm-bolts — по-гъста мъгла под тежкия таван
   snow:   { ico: '🌨️', nm: 'Сняг',      sun: 0.45, hemi: 0.85, fog: 0.55 },
   fog:    { ico: '🌫️', nm: 'Мъгла',     sun: 0.5,  hemi: 0.8,  fog: 0.55 },
 };
@@ -105,7 +105,7 @@ export function createWeather(deps) {
     const bf = (deps.fogBase && deps.fogBase()) || baseFog;   // градовете по истинската карта — мъглата по разстоянието на камерата (game.js)
     if (bf) { deps.scene.fog.near = bf.near * cur.fog; deps.scene.fog.far = bf.far * (0.35 + 0.65 * cur.fog); }
     // мълнии при буря
-    if (kind === 'storm') {
+    if (kind === 'storm' && !feature('storm-bolts')) {   // storm-bolts: мълниите — storm.js
       nextFlash -= dt;
       if (nextFlash <= 0) { flash = 0.25; nextFlash = 3 + Math.random() * 7; }
       if (flash > 0) { flash -= dt; deps.hemi.intensity += 3 * Math.max(0, flash) / 0.25; }
@@ -128,5 +128,5 @@ export function createWeather(deps) {
     }
     if (groundBase) ground.color.copy(groundBase).lerp(white, cover * 0.85);
   }
-  return { set, update, dailyTick, setGround, setCover(c) { cover = c || 0; }, get kind() { return kind; }, get cover() { return cover; }, info: () => WEATHER[kind] };
+  return { rainMat: rain.material, set, update, dailyTick, setGround, setCover(c) { cover = c || 0; }, get kind() { return kind; }, get cover() { return cover; }, info: () => WEATHER[kind] };
 }

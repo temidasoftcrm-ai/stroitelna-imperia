@@ -10,12 +10,15 @@ import { groundMat } from './cityground.js';
 export const PLAZA_KIND = { romanstadium: 'ruin', colosseo: 'ruin', colosseo3: 'ruin', colosseo4: 'ruin', nevsky: 'temple', stpeter: 'temple', hagia: 'temple', bluemosque: 'temple',
   sagrada: 'temple', westminster: 'temple', westminster3: 'temple', eiffel: 'tower', burj: 'sky', burj2: 'sky', empire: 'sky', empire2: 'sky' };
 // 🏛️ lm-plaza2 (T2, прегледът на града: „площад пред всяка забележителност“): и всички останали — по вид; без онези във водата/на хълм/с свой площад
-export const PLAZA_KIND2 = { chrysler2: 'sky', onewtc: 'sky', rockefeller2: 'sky', radiocity2: 'sky', petronas: 'sky', ndk: 'sky', mbs3: 'sky', bellagio: 'sky', luxor: 'sky', skytree: 'tower', galata2: 'tower', bigben2: 'tower',
+export const PLAZA_KIND2 = { chrysler2: 'sky', onewtc: 'sky', rockefeller2: 'sky', radiocity2: 'sky', petronas: 'sky', ndk: 'sky', mbs3: 'sky', bellagio: 'sky', luxor: 'sky', skytree: 'tower', galata2: 'tower', bigben2: 'tower', fernsehturm2: 'tower', cntower: 'tower',
   stpatrick2: 'temple', suleymaniye2: 'temple', notredame: 'temple', duomo: 'temple', mosque: 'temple', lazare2: 'temple', ststephen: 'temple', parliament: 'square', parliament2: 'square', capitol: 'square', capitol2: 'square',
   whitehouse: 'square', whitehouse2: 'square', cityhall: 'square', grandcentral2: 'square', vittoriano2: 'square', kotel: 'square', parthenon: 'ruin', arc2: 'monument', vegassign: 'monument' };
 export const PLAZA_SKIP = new Set(['supertrees', 'manhattan', 'liberty', 'liberty2', 'opera', 'mbs2', 'burjarab', 'maiden2', 'redeemer', 'mgu', 'londoneye2']);
 export const plazaKind = (k, plaza2) => PLAZA_KIND[k] || (plaza2 && !PLAZA_SKIP.has(k) ? PLAZA_KIND2[k] || 'auto' : null);
 const PAVE = { ruin: 0xc9bfa7, temple: 0xb8b0a2, tower: 0xbab4a8, sky: 0xc4c6c8, monument: 0xb8b0a2, square: 0xc2b9a8 };   // травертин / светъл камък / бетон
+// lm-plaza2: рамката само по видимите мешове — без скритата плоча (lm-ground; при телевизионната кула ×36 = 550 м) и без спрайтовете на сиянието
+export function visBox(g) { g.updateMatrixWorld(true); const B = new THREE.Box3(), b = new THREE.Box3();
+  g.traverseVisible(o => { if (!o.isMesh || o.isSprite || !o.geometry) return; if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); B.union(b.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld)); }); return B; }
 const inLot = (L, x, z, m = 0) => { const c = Math.cos(L.rot || 0), s = Math.sin(L.rot || 0), dx = x - L.x, dz = z - L.z; return Math.abs(dx * c - dz * s) <= (L.w || 16) / 2 + m && Math.abs(dx * s + dz * c) <= (L.d || 16) / 2 + m; };
 
 let MATS = null;
@@ -30,6 +33,7 @@ const mats = () => MATS || (MATS = {
   rope: new THREE.MeshStandardMaterial({ color: 0x8a1f1f, roughness: 0.8 }),
   water: new THREE.MeshStandardMaterial({ color: 0x3f7f9f, roughness: 0.1, metalness: 0.3, emissive: 0x2a7fbf, emissiveIntensity: 0 }),
   flower: [0xd8434b, 0xf2c230, 0x9b59c9, 0xf2f2f2].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 })),
+  tub: new THREE.MeshStandardMaterial({ color: 0x9c978d, roughness: 0.95 }), bush: new THREE.MeshStandardMaterial({ color: 0x3f6f34, roughness: 0.95 }),   // lm-plaza2: каменните сандъци с храсти
   sign: new THREE.MeshStandardMaterial({ color: 0x1f3a5a, roughness: 0.6, emissive: 0x6fa0d8, emissiveIntensity: 0 }),
   glow: new THREE.MeshBasicMaterial({ color: 0xffc98a, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }),
 });
@@ -51,7 +55,7 @@ function inst(geo, mat, list) {   // list: [[x, y, z, sx, sy, sz, ry]]
 // o — забележителността ({ group, kind }); deps: { streets (в рамката на играта), night() → 0…1, low (gfx „Много ниско“ — без дребните неща),
 //   lm-plaza2: plaza2, lots (парцелите — площадът не влиза в чужд), water(x, z), ped() → { m, mixer } (истински минувач) }
 export function lmPlaza(o, deps = {}) {
-  o.group.updateMatrixWorld(true); const B = new THREE.Box3().setFromObject(o.group), C = B.getCenter(new THREE.Vector3()), S = B.getSize(new THREE.Vector3());
+  o.group.updateMatrixWorld(true); const B = deps.plaza2 ? visBox(o.group) : new THREE.Box3().setFromObject(o.group), C = B.getCenter(new THREE.Vector3()), S = B.getSize(new THREE.Vector3());
   const hx = S.x / 2, hz = S.z / 2, k0 = plazaKind(o.kind, deps.plaza2) || 'monument', type = k0 === 'auto' ? (Math.max(hx, hz) < 12 ? 'monument' : 'square') : k0, M = mats(), G = new THREE.Group(); G.name = 'lmPlaza';
   const round = type === 'tower' || type === 'monument';
   const Hx = Math.min(130, Math.max(hx * 1.8, hx + 20)), Hz = Math.min(130, Math.max(hz * 1.8, hz + 20)), Hr = Math.max(Hx, Hz);
@@ -71,6 +75,10 @@ export function lmPlaza(o, deps = {}) {
   const ring = [], N = Math.max(12, Math.round(2 * Math.PI * Hr / 12));
   for (let k = 0; k < N; k++) { const a = k / N * Math.PI * 2, c = Math.cos(a), s = Math.sin(a), e = round ? Hr : 1 / Math.pow(Math.pow(Math.abs(c) / Hx, 4) + Math.pow(Math.abs(s) / Hz, 4), 0.25);
     const x = C.x + c * (e - 3), z = C.z + s * (e - 3); if (onRoad(x, z) || inFoot(x, z, 4)) continue; ring.push([x, z, a]); }
+  if (deps.plaza2 && ring.length < 6) for (let r = Hr - 5, r0 = Math.max(hx, hz) + 3; r >= r0; r -= 2) {   // lm-plaza2: ръбът е на улицата (островът в кръговото, arc2) — по-навътре, по най-външния свободен кръг
+    const n = Math.max(8, Math.round(2 * Math.PI * r / 10)), q = [];
+    for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2, x = C.x + Math.cos(a) * r, z = C.z + Math.sin(a) * r; if (!onRoad(x, z) && !inFoot(x, z, 2.5)) q.push([x, z, a]); }
+    if (q.length >= Math.max(6, n / 2)) { ring.length = 0; ring.push(...q); break; } }
   const lamps = [], benches = [], trees = [];
   ring.forEach(([x, z, a], i) => { if (i % 2 === 0) lamps.push([x, z]); else benches.push([x, z, -a + Math.PI / 2]); if (!deps.low && i % 2 === 1) { const tx = x + Math.cos(a) * 2.5, tz = z + Math.sin(a) * 2.5; if (!onRoad(tx, tz)) trees.push([tx, tz]); } });
   G.add(inst(new THREE.CylinderGeometry(0.08, 0.1, 4.2, 6), M.pole, lamps.map(([x, z]) => [x, 2.1, z, 1, 1, 1])));
@@ -79,7 +87,15 @@ export function lmPlaza(o, deps = {}) {
   if (trees.length) { G.add(inst(new THREE.CylinderGeometry(0.18, 0.25, 2.4, 6), M.trunk, trees.map(([x, z]) => [x, 1.2, z, 1, 1, 1]))); G.add(inst(new THREE.SphereGeometry(1.8, 10, 8), M.crown, trees.map(([x, z], i) => [x, 3.4, z, 1, 0.9 + (i % 3) * 0.1, 1]))); }
   // сергии/кафене: 2–4 по ръба (вътре в зоната, между пейките)
   const stalls = []; for (const f of [0.15, 0.4, 0.65, 0.9]) { const p = ring[Math.floor(f * ring.length)]; if (!p) continue; const x = C.x + (p[0] - C.x) * 0.9, z = C.z + (p[1] - C.z) * 0.9; if (!onRoad(x, z) && !inFoot(x, z, 3)) stalls.push([x, z, -p[2] + Math.PI / 2]); }
-  if (deps.cafe && stalls.length > 1) { const cf = deps.cafe(); if (cf) { const s0 = stalls.shift(), b = new THREE.Box3().setFromObject(cf), z = b.getSize(new THREE.Vector3()), k = 12 / Math.max(z.x, z.z, 1);   // ☕ shop-cafe: кафене (~12 м) на мястото на една сергия
+  // lm-plaza2: кафенето — само на площад ≥ ~60 м, на външния ръб, далеч от основата (≥ 1,5×) и извън конуса пред лицето на забележителността
+  const ry = o.group.rotation.y, fx = Math.sin(ry), fz = Math.cos(ry), Rf = Math.max(hx, hz);
+  if (deps.plaza2) for (let i = stalls.length - 1; i >= 0; i--) { const [x, z, r] = stalls[i], dx = x - C.x, dz = z - C.z, L = Math.hypot(dx, dz) || 1;   // сергиите — също извън конуса отпред; твърде близките — навън до 1,5× основата или встрани, иначе без тях
+    if ((dx * fx + dz * fz) / L > 0.64) { stalls.splice(i, 1); continue; }
+    if (L >= 1.5 * Rf) continue; const q = [[1.5 * Rf / L, 0], [1.5 * Rf / L, 0.6], [1.5 * Rf / L, -0.6]].map(([k, da]) => { const a = Math.atan2(dz, dx) + da, R = L * k; return [C.x + Math.cos(a) * R, C.z + Math.sin(a) * R, r - da]; })
+      .find(([x2, z2]) => { const ex = x2 - C.x, ez = z2 - C.z, L2 = Math.hypot(ex, ez) || 1; return !onRoad(x2, z2) && !inFoot(x2, z2, 3) && (ex * fx + ez * fz) / L2 <= 0.64 && L2 >= 1.5 * Rf; });
+    if (q) stalls[i] = q; else stalls.splice(i, 1); }
+  const cafeAt = !deps.plaza2 ? 0 : 2 * Math.min(Hx, Hz) < 60 ? -1 : stalls.findIndex(([x, z]) => { const dx = x - C.x, dz = z - C.z, L = Math.hypot(dx, dz) || 1; return L >= 1.5 * Rf && Math.abs(dx * fx + dz * fz) / L < 0.64; });
+  if (deps.cafe && stalls.length > 1 && cafeAt >= 0) { const cf = deps.cafe(); if (cf) { const s0 = stalls.splice(cafeAt, 1)[0], b = new THREE.Box3().setFromObject(cf), z = b.getSize(new THREE.Vector3()), k = 12 / Math.max(z.x, z.z, 1);   // ☕ shop-cafe: кафене (~12 м) на мястото на една сергия
     cf.scale.multiplyScalar(k); cf.position.set(s0[0], 0.05, s0[1]); cf.rotation.y = s0[2] + Math.PI; G.add(cf); G.userData.cafe = true; } }
   if (!deps.low && stalls.length) { G.add(inst(new THREE.BoxGeometry(2.6, 2.2, 1.8), M.stall, stalls.map(([x, z, r]) => [x, 1.1, z, 1, 1, 1, r])));
     stalls.forEach(([x, z, r], i) => { const aw = new THREE.Mesh(new THREE.BoxGeometry(3, 0.15, 2.4), M.awning[i % 4]); aw.position.set(x, 2.35, z); aw.rotation.y = r; aw.rotation.x = 0.12; G.add(aw); }); }
@@ -100,7 +116,17 @@ export function lmPlaza(o, deps = {}) {
   if (type === 'sky') {   // водни ивици в настилката
     for (const s of [-1, 1]) { const x = C.x + s * (hx + (Hx - hx) * 0.45); if (onRoad(x, C.z)) continue; const w = new THREE.Mesh(new THREE.BoxGeometry(2, 0.06, Math.min(2 * Hz * 0.7, 60)), M.water); w.position.set(x, 0.08, C.z); G.add(w); }
   }
-  if (type === 'monument' || type === 'tower') {   // цветни лехи в кръг
+  if (deps.plaza2) {   // сандъци с храсти и цветя: по двойка до всяка втора пейка (по дългата ѝ ос), при кулата/паметника — и 8 кръгли около основата
+    const tubs = [], round8 = []; benches.forEach(([x, z, r], i) => { if (i % 2) return; const ux = Math.cos(r) * 1.75, uz = -Math.sin(r) * 1.75;
+      for (const s of [-1, 1]) { const tx = x + s * ux, tz = z + s * uz; if (!onRoad(tx, tz) && !inFoot(tx, tz, 2)) tubs.push([tx, tz, r]); } });
+    if (type === 'monument' || type === 'tower') for (let k = 0; k < 8; k++) { const a = (k + 0.5) / 8 * Math.PI * 2, rr = Rf + 6, x = C.x + Math.cos(a) * rr, z = C.z + Math.sin(a) * rr; if (!onRoad(x, z)) round8.push([x, z]); }
+    G.add(inst(new THREE.BoxGeometry(1.1, 0.55, 1.1), M.tub, tubs.map(([x, z, r]) => [x, 0.275, z, 1, 1, 1, r])));
+    G.add(inst(new THREE.CylinderGeometry(1.3, 1.4, 0.5, 16), M.tub, round8.map(([x, z]) => [x, 0.25, z, 1, 1, 1])));
+    const bush = tubs.map(([x, z]) => [x, 0.75, z, 1, 0.65, 1]).concat(round8.map(([x, z]) => [x, 0.7, z, 2.4, 0.7, 2.4]));
+    G.add(inst(new THREE.SphereGeometry(0.48, 10, 7), M.bush, bush));
+    const dots = []; bush.forEach(([x, , z, sx], i) => { for (let k = 0; k < (sx > 1 ? 7 : 3); k++) { const a = k * 2.4 + i, d = 0.25 * sx; dots.push([x + Math.cos(a) * d, 0.98 + (sx > 1 ? 0.02 : 0), z + Math.sin(a) * d, 1, 1, 1]); } });
+    M.flower.forEach((mt, i) => G.add(inst(new THREE.SphereGeometry(0.09, 5, 4), mt, dots.filter((_, k) => k % 4 === i))));
+  } else if (type === 'monument' || type === 'tower') {   // цветни лехи в кръг
     const fl = []; for (let k = 0; k < 36; k++) { const a = k / 36 * Math.PI * 2, r = Math.max(hx, hz) + 6, x = C.x + Math.cos(a) * r, z = C.z + Math.sin(a) * r; if (!onRoad(x, z)) fl.push([x, 0.25, z, 1, 1, 1]); }
     M.flower.forEach((mt, i) => G.add(inst(new THREE.SphereGeometry(0.5, 6, 5), mt, fl.filter((_, k) => k % 4 === i))));
   }

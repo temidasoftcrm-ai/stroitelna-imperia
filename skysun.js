@@ -60,7 +60,8 @@ export function createSkySun(scene) {
   stars.frustumCulled = false; stars.renderOrder = -9; scene.add(stars);
   const dir = new THREE.Vector3(), fv = new THREE.Vector3(), fc = new THREE.Color(), cur = { sunUp: 0, hour: 12 };
   // hour 0…24; camera — куполът е около нея; target — точката на сенките; cloud 0…1; sunLight — DirectionalLight (по желание)
-  function update(hour, camera, target, cloud = 0, sunLight = null) {
+  const SL = new THREE.Color(), FL = new THREE.Color(0xc8c2ff);   // ⚡ storm-bolts: шисто-сивото на бурята и цветът на проблясъка
+  function update(hour, camera, target, cloud = 0, sunLight = null, ex = null) {   // ex — ⚡ storm-bolts: { heavy 0…1 — тъмният тежък облачен таван при буря/дъжд, flash 0…1 — проблясъкът на мълнията }
     // слънцето: изгрев 6:00 на изток (+x), залез 20:00 на запад (−x), до ~50° височина, малко на юг (+z); преди/след — под хоризонта
     const t = (hour - 6) / 14, ang = t * Math.PI, elev = Math.sin(Math.max(-0.35, Math.min(Math.PI + 0.35, ang))) * 0.87;   // ~50° в пладне
     dir.set(Math.cos(ang), elev, 0.35).normalize(); U.sunDir.value.copy(dir);
@@ -70,9 +71,11 @@ export function createSkySun(scene) {
     const P = morning ? DAWN : DUSK, k2 = duskK * (1 - cloud * 0.75);   // облачно — само леко порозовяване
     const pick = i => { tmp.copy(NIGHT[i]).lerp(DAY[i], dayK).lerp(P[i], k2 * (i === 0 ? 0.7 : 1)); if (cloud) tmp.lerp(tmp.clone().lerp(GREY, 0.6).multiplyScalar(0.35 + 0.65 * (1 - nightK)), cloud * 0.8); return tmp; };
     U.zen.value.copy(pick(0)); U.hNear.value.copy(pick(1)); U.hFar.value.copy(pick(2)); U.halo.value.copy(pick(3));
+    const hv = ex ? ex.heavy || 0 : 0, fl = ex ? ex.flash || 0 : 0;
+    if (hv || fl) { SL.setHex(0x3c4452).multiplyScalar(0.35 + 0.65 * (1 - nightK)); for (const u of [U.zen, U.hNear, U.hFar, U.halo]) { u.value.lerp(SL, hv * 0.85); u.value.lerp(FL, fl * 0.55); } }   // буря — тъмен шисто-сив купол; мълнията го осветява за миг
     // мъглата (тя е „небето“ при наклонена камера): по залез/изгрев — топла, когато гледаш към слънцето, синьо-лилава срещу него
     if (scene.fog) { const cd = camera.getWorldDirection(fv), l1 = Math.hypot(cd.x, cd.z) || 1, l2 = Math.hypot(dir.x, dir.z) || 1, tw = ((cd.x * dir.x + cd.z * dir.z) / (l1 * l2)) * 0.5 + 0.5;
-      fc.copy(U.hFar.value).lerp(U.hNear.value, Math.pow(tw, 1.6)); scene.fog.color.lerp(fc, Math.min(1, k2 * 0.9 + nightK * 0.2)); U.fogC.value.copy(scene.fog.color); }
+      fc.copy(U.hFar.value).lerp(U.hNear.value, Math.pow(tw, 1.6)); scene.fog.color.lerp(fc, Math.min(1, k2 * 0.9 + nightK * 0.2)); if (hv || fl) scene.fog.color.lerp(SL, hv * 0.7).lerp(FL, fl * 0.4); U.fogC.value.copy(scene.fog.color); }
     else U.fogC.value.copy(U.hFar.value);
     const vis = (1 - smooth(0.25, 0.5, cloud)) * smooth(-3, 0.5, e);   // дискът — само над хоризонта; облачно/дъжд — скрит
     U.disc.value = vis; U.glow.value = (0.5 + 0.9 * (1 - smooth(8, 35, e))) * (1 - smooth(0.2, 0.6, cloud) * 0.9) * smooth(-7, 0, e);
@@ -80,11 +83,12 @@ export function createSkySun(scene) {
     U.discC.value.setHex(0xfff4d8).lerp(tmp.setHex(morning ? 0xffc27a : 0xff8a3c), 1 - smooth(2, 20, e));   // ниско — оранжево
     if (CL) {   // облаците: ден — бели със сиви сенки; залез/изгрев — лилаво-розови с оранжеви ръбове; нощ — тъмни; облачно/дъжд — повече и по-тъмни
       U.cT.value = performance.now() / 1000;
-      U.cCov.value = 0.52 + 0.4 * cloud;   // ясно — разпръснати облаци (залезът ги оцветява), облачно/дъжд — почти плътно U.cA.value = (0.55 + 0.4 * cloud) * (1 - nightK * 0.45);
+      U.cCov.value = 0.52 + 0.4 * cloud + 0.12 * hv;   // ясно — разпръснати облаци (залезът ги оцветява), облачно/дъжд — почти плътно U.cA.value = (0.55 + 0.4 * cloud) * (1 - nightK * 0.45);
       const dk = 1 - 0.55 * smooth(0.5, 1, cloud);   // дъжд/буря — по-тъмни
       U.cBase.value.setHex(0x1c2444).lerp(tmp.setHex(0xf6f8fc), dayK).lerp(tmp.setHex(morning ? 0xf2c6c0 : 0xe8a0a0), k2 * 0.8).multiplyScalar(dk);
       U.cShade.value.setHex(0x101630).lerp(tmp.setHex(0xaeb7c6), dayK).lerp(tmp.setHex(morning ? 0x8d7fa6 : 0x6e4f78), k2 * 0.85).multiplyScalar(dk);
       U.cRim.value.copy(U.halo.value).multiplyScalar(k2 * (1 - cloud * 0.6) * 0.9);
+      if (hv || fl) { U.cBase.value.multiplyScalar(1 - 0.6 * hv).lerp(FL, fl * 0.7); U.cShade.value.multiplyScalar(1 - 0.65 * hv).lerp(FL, fl * 0.45); }   // ⚡ тежкият таван — тъмен; облаците светват отвътре при мълния
     }
     // луната — срещу слънцето, нощем; звездите — нощем без облаци
     U.moonDir.value.set(-dir.x, Math.max(0.25, -dir.y + 0.2), -0.3).normalize(); U.moon.value = nightK * (1 - cloud);

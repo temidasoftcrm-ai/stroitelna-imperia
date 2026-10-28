@@ -744,7 +744,7 @@ export function buildPlan2View(P, opts = {}) {
   const api = {
     timing: TM, refill,
     get blocks() { return ST.BL ? ST.BL.list : []; },
-    hideBlocks: set => ST.BL && ST.BL.hide(set),
+    hideBlocks: (set, key = 'ruins') => { if (!ST.BL) return; ST.BL.hide(set, key); if (ST.RN) ST.RN.dirty(); },   // fire-ruins: собствен ключ (towers.js / romenear.js крият своите) и близките фасади — наново
     get nightMats() { return [...(ST.F ? [].concat(ST.F.lampMat) : []), ...WIN_MATS, ...(ST.glow ? [ST.glow] : []), ...(ST.wash ? [ST.wash] : [])]; },
     get lamps() { return ST.lampsOut; },   // за daynight.js (до 160) — готови, когато progress стигне 1 (или веднага без progressive)
     setNight(on) { ST.night = !!on; if (ST.TSA) ST.TSA.setNight(on ? 1 : 0); if (ST.F) for (const m of [].concat(ST.F.lampMat)) m.emissiveIntensity = on ? (m.userData.winK || 2.2) : m.userData.winK ? 0 : 0.2; if (ST.pools) ST.pools.visible = !!on; for (const m of [...WIN_MATS, ...(ST.glow ? [ST.glow] : []), ...(ST.wash ? [ST.wash] : [])]) m.emissiveIntensity = on ? (m.userData.winK || 1) : 0; },
@@ -989,7 +989,7 @@ function* romeBlocks(G, P, style, ROADS = P.roads, ROOFS = null) {   // ROOFS �
   const parts = XK ? xParts(G, list, FM, RF) /* само видовете, които ги има */ : [0, 1, 2, 3, 4, 5, 6].map(t => { const n = Math.max(1, list.filter(b => b.t === t).length), box = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), FM[t], n), roof = new THREE.InstancedMesh(RF[t][0], new THREE.MeshStandardMaterial({ color: RF[t][1], roughness: 0.85, side: THREE.DoubleSide }), n);
     box.frustumCulled = roof.frustumCulled = false; box.receiveShadow = box.castShadow = true; box.count = roof.count = 0; roof.userData.roof = 1; G.add(box, roof); return { box, roof }; });   /* snow-roofs: userData.roof */
   const V = new THREE.Vector3(), Q = new THREE.Quaternion(), Sc = new THREE.Vector3(), C = new THREE.Color();
-  let hidden = null, fl = () => true, fa = null;
+  let hidden = null, fl = () => true, fa = null; const HS = {};   // fire-ruins: скритите по ключ ('' — towers.js / romenear.js, 'ruins' — изгорелите), рисува се обединението
   // 🎰 lv-neon (T1): Лас Вегас нощем — неон по фоновите сгради: светещ контур по ръба на покрива, вертикална неонова лента на ъгъла
   // и светещ надпис-лента на фасадата (~2/3 от сградите), пет неонови цвята; денем — тъмни тънки ленти. Една InstancedMesh на цвят.
   const NE = LV && feature('lv-neon') ? (() => {
@@ -1014,7 +1014,7 @@ function* romeBlocks(G, P, style, ROADS = P.roads, ROOFS = null) {   // ROOFS �
       box.setMatrixAt(i, b.M); box.setColorAt(i, C.setHex(b.col)); b.M.decompose(V, Q, Sc);
       roof.setMatrixAt(i, m.compose(V.set(V.x, V.y + Sc.y / 2, V.z), Q, t === 2 || t === 5 ? Sc.set(Sc.x * (t === 5 ? 0.8 : 1.02), t === 5 ? 3 : 0.6, Sc.z * (t === 5 ? 0.8 : 1.02)) : Sc.set(Sc.x, Math.min(4, Sc.x * RF[t][2]), Sc.z))); }
     parts.forEach(({ box, roof }, t) => { box.count = roof.count = n[t]; box.instanceMatrix.needsUpdate = roof.instanceMatrix.needsUpdate = true; if (box.instanceColor) box.instanceColor.needsUpdate = true; }); };
-  return { list, fill(f, at) { fl = f; fa = at || null; draw(); if (NE) NE(); }, hide(set) { hidden = set; draw(); if (NE) NE(); }, shown: b => !((b.lot && !fl(b.lot)) || (fa && !fa(b))) };   // shown — rome-bld: дали фасадата е там (без скритите)
+  return { list, fill(f, at) { fl = f; fa = at || null; draw(); if (NE) NE(); }, hide(set, key = '') { if (set && set.size) HS[key] = set; else delete HS[key]; const ks = Object.keys(HS); hidden = !ks.length ? null : ks.length === 1 ? HS[ks[0]] : new Set(ks.flatMap(k => [...HS[k]])); draw(); if (NE) NE(); }, shown: b => !((b.lot && !fl(b.lot)) || (fa && !fa(b)) || (HS.ruins && HS.ruins.has(b))) };   // shown — rome-bld: дали фасадата е там (без скритите)
 }
 // ---- свободните парцели: петно трева с пръст (по целия парцел), ниска дървена ограда отзад и отстрани, табела „ПРОДАВА СЕ“ отпред
 // (лицето на парцела е локално +z — към улицата). Инстанции; set(fn) — кои парцели са свободни; near(on) — оградите/табелите само отблизо.
