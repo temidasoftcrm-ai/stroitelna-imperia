@@ -2,6 +2,8 @@
 // малка детска площадка (пясъчник, люлка, пързалка), дървета по свободните места. Само на свободната земя: free(x, z) от game.js
 // (без парцели, улици, вода, паркинга на гарата и депото). Решетка 3 м източно от перона (откъм града), по дължината на гарата.
 // const a = buildStationArea({ THREE, parent, X, zs, lv, bld: Box3|null, free, trees: [scene], fountain: () => obj|null, lampMat, poolMat, seed });  a.dispose()
+import { fwFx, fwWaterMat } from './fountainwater.js';   // ⛲ fountain-water: вода, струи и пръски във фонтаните
+import { feature } from './lab/feature.js';
 const C = 3;
 
 export function buildStationArea(o) {
@@ -35,7 +37,7 @@ export function buildStationArea(o) {
     if (best) { const x = cx(best.i), z = cz(best.j); fnt = [x, z]; const f = o.fountain && o.fountain();
       if (f) { const b = new THREE.Box3().setFromObject(f), sz = b.getSize(new THREE.Vector3()), k = 7 / Math.max(sz.x, sz.z, 0.01); f.scale.multiplyScalar(k); f.position.set(x, 0.12, z); g.add(f); }
       else { M(new THREE.CylinderGeometry(3.4, 3.7, 0.7, 28), stone2, x, 0.35, z); const w = M(new THREE.CircleGeometry(3.0, 28), new THREE.MeshStandardMaterial({ color: 0x4f8fb5, roughness: 0.15, metalness: 0.2 }), x, 0.66, z); w.rotation.x = -Math.PI / 2;
-        M(new THREE.CylinderGeometry(0.35, 0.5, 2.0, 12), stone2, x, 1.0, z); M(new THREE.CylinderGeometry(1.1, 0.6, 0.25, 16), stone2, x, 2.0, z); } } }
+        M(new THREE.CylinderGeometry(0.35, 0.5, 2.0, 12), stone2, x, 1.0, z); M(new THREE.CylinderGeometry(1.1, 0.6, 0.25, 16), stone2, x, 2.0, z); if (feature('fountain-water')) { w.material = fwWaterMat(); const fx = fwFx({ water: [[2.09, 1.0]], jet: [2.1, 1.4, 0.07, 0.025], curtains: [[1.12, 2.12, 1.45, 0.67]], splash: [[0.67, 1.45, 22]], crown: [3.5, 2.1, 0.7, 12], u: 7 }); fx.position.set(x, 0, z); g.add(fx); } } } }
   // ---- детската площадка: свободен квадрат 4×4 клетки (12 м), най-близо до площада, но не в него
   let play = null; { let bd = 1e9; for (let i = 0; i < NI - 3; i++) for (let j = 0; j < NJ - 3; j++) if (square(i, j, 4)) { const d = Math.hypot(cx(i + 1.5) - ex, cz(j + 1.5) - ez); if (d > 14 && d < bd) { bd = d; play = [i, j]; } } }
   if (play) { const [pi, pj] = play, x = cx(pi) + 1.5 * C, z = cz(pj) + 1.5 * C; for (let a = 0; a < 4; a++) for (let b = 0; b < 4; b++) cell[(pi + a) * NJ + pj + b] = 3;

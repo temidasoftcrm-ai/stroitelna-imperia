@@ -38,7 +38,8 @@ export function cleanPres(p) {
   const conf = {}; for (const c of CONFLICTS) conf[c.k] = n(o(p.conf)[c.k], 0, 6) | 0;
   const aidL = (Array.isArray(p.aidL) ? p.aidL : []).filter(a => Array.isArray(a) && POL[a[0]] && AID[a[1]]).slice(0, 12).map(a => [a[0], a[1], !!a[2]]);
   const tq = (Array.isArray(p.tq) ? p.tq : []).filter(tOk).slice(0, 12).map(t => ({ id: t.id, k: t.k, ref: t.ref, mine: !!t.mine, st: ['prop', 'acc', 'dec'].includes(t.st) ? t.st : 'dec' }));
-  return { cc: cc(p.cc), icc: cc(p.icc), on: !!p.on && !!cc(p.cc), lv: n(p.lv, 0, 40) | 0, ind, rel, conf, aid: n(p.aid, 0, 999) | 0, aidL, stab: Math.round(n(p.stab, 0, 100)), tq };
+  const pw = p.pw && typeof p.pw === 'object' && !Array.isArray(p.pw) ? { g: (Array.isArray(p.pw.g) ? p.pw.g : []).slice(0, 6).map(x => !!x), m: n(p.pw.m, 0, 12) | 0, won: !!p.pw.won } : null;   /* 🕊️ peace-win: целите на партньора — само за показване */
+  return { cc: cc(p.cc), icc: cc(p.icc), on: !!p.on && !!cc(p.cc), lv: n(p.lv, 0, 40) | 0, ind, rel, conf, aid: n(p.aid, 0, 999) | 0, aidL, stab: Math.round(n(p.stab, 0, 100)), tq, pw };
 }
 
 export function createCoopPres(deps) {
@@ -68,7 +69,7 @@ export function createCoopPres(deps) {
     const conf = {}; for (const c of CONFLICTS) conf[c.k] = p.conf?.[c.k]?.step || 0;
     const ind = {}; for (const k of IND_K) ind[k] = Math.round(p.ind[k]);
     return { pres: { cc: p.cc, icc: s.imp?.cc || p.cc, on: true, lv: p.lv || 0, ind, rel, conf, aid: (p.aid || []).length, aidL: (p.aid || []).slice(-12).map(a => [a.iso, a.need, !!a.done && a.works !== false]),
-      stab: Math.round(IND_K.reduce((a, k) => a + p.ind[k], 0) / IND_K.length), tq: Object.values(p.treaties || {}).slice(-12).map(t => ({ id: t.id, k: t.k, ref: t.ref, mine: t.mine, st: t.st })) } };
+      stab: Math.round(IND_K.reduce((a, k) => a + p.ind[k], 0) / IND_K.length), tq: Object.values(p.treaties || {}).slice(-12).map(t => ({ id: t.id, k: t.k, ref: t.ref, mine: t.mine, st: t.st })), ...(p.pw?.g ? { pw: { g: p.pw.g, m: Math.floor((p.pw.hold || 0) / 30), won: !!p.pw.won } } : {}) } };   /* 🕊️ peace-win: целите (само с флага има p.pw) */
   }
 
   // 🗳️ заетата държава (imperial.js choose): { cc, name } — партньорът вече е избрал

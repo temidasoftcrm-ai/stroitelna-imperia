@@ -245,4 +245,20 @@ function run(ld, box, cv, ctx, bg, I, real, txt) {
 const smooth = (a, b, x) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
 const easeInOut = x => x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2;
 
-try { if (feature('splash-anim')) start(); } catch (e) { console.warn('splash-anim', e); }
+// 🎬 splash-video (29.10): живият клип от Kling (assets/splash/splash-day.mp4, без звук, в цикъл) вместо рисуваната анимация; логото — отгоре
+// (клипът е без надпис), на мястото му в картината (L.logo, в % от 1672×941). Без видео (грешка, „намалено движение“) — старото поведение.
+function startVideo() {
+  const ld = document.getElementById('loading'), box = ld && ld.querySelector('.ld-box');
+  if (!box || ld.classList.contains('pol')) return false;
+  if (matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+  const v = document.createElement('video'); v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true; v.preload = 'auto'; v.poster = DIR + 'splash-day.jpg'; v.src = DIR + 'splash-day.mp4';
+  v.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .5s;pointer-events:none';
+  const [lx, ly, lw, lh] = L.logo, logo = new Image(); logo.src = DIR + 'logo.webp'; logo.alt = '';
+  logo.style.cssText = `position:absolute;left:${lx / W * 100}%;top:${ly / H * 100}%;width:${lw / W * 100}%;height:${lh / H * 100}%;pointer-events:none;filter:drop-shadow(0 4px 14px rgba(0,0,0,.55))`;
+  box.insertBefore(logo, box.firstChild); box.insertBefore(v, box.firstChild);   // лентата и надписът за зареждането остават отгоре
+  v.addEventListener('playing', () => { v.style.opacity = '1'; }, { once: true });
+  v.addEventListener('error', () => { v.remove(); logo.remove(); }, { once: true });
+  const p = v.play(); if (p && p.catch) p.catch(() => {});
+  return true;
+}
+try { if (!(feature('splash-video') && startVideo()) && feature('splash-anim')) start(); } catch (e) { console.warn('splash-anim', e); }

@@ -13,10 +13,15 @@ export const ASSET_BASE = 'assets/heavy/';
 const LOCAL = ASSET_BASE === 'assets/heavy/', KEY = 'assets/heavy/';
 export const heavyUrl = p => { const i = p.indexOf(KEY); return ASSET_BASE + (i >= 0 ? p.slice(i + KEY.length) : p.replace(/^\/+/, '')); };
 
+// подменените модели (същото име, ново съдържание) — версия в адреса, иначе браузърът, Cloudflare (max-age 7 дни) и service worker-ът дават стария.
+// При всяка подмяна на тежък файл: добави/вдигни реда тук (пътят спрямо assets/heavy/).
+const HV = { 'lm/mbs3.glb': 400, 'port/sf-grain.glb': 401, 'office/office-l2.glb': 401, 'towers/urban-tower.glb': 401, 'towers/ru-blocks.glb': 401,
+  'trains/m-elloco.glb': 401, 'trains/m-steam.glb': 401, 'trains/m-steam2.glb': 401, 'trains/m-up.glb': 401, 'trains/m-gp.glb': 401, 'trains/chs200.glb': 401, 'trains/vl82.glb': 401, 'trains/loco040.glb': 401 };
+const hv = p => { const k = p.split('?')[0]; return HV[k] && !p.includes('?') ? `${p}?v=${HV[k]}` : p; };
 if (!LOCAL) THREE.DefaultLoadingManager.setURLModifier(url => {
   const i = url.indexOf(KEY); if (i < 0) return url;
   if (/^[a-z]+:/i.test(url) && !url.startsWith(location.origin + '/')) return url;   // чужд адрес (CDN, blob:, data:) — не се пипа
-  return ASSET_BASE + url.slice(i + KEY.length);
+  return ASSET_BASE + hv(url.slice(i + KEY.length));
 });
 
 const parse0 = GLTFLoader.prototype.parse;

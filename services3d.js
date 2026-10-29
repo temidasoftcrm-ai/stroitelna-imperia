@@ -12,6 +12,7 @@ import { emergCar } from './vehmodels.js';
 import { prepNightFloors } from './nightfloors.js';
 import { feature } from './lab/feature.js';
 import { pickPart } from './blkcut.js';
+import { fwPrepGLB } from './fountainwater.js';   // ⛲ fountain-water: вода във фонтана на парка
 
 const cache = {}, loader = new GLTFLoader(), SHARED = new WeakSet();
 const load = p => cache[p] || (cache[p] = loader.loadAsync(p).then(g => { prepNightFloors(g.scene, 'svc-' + p.split('/').pop().replace('.glb', ''));   /* нощем — прозорците (nightfloors.js, флаг night-civic) */ g.scene.traverse(o => { if (o.geometry) SHARED.add(o.geometry); for (const m of o.material ? [].concat(o.material) : []) SHARED.add(m); }); return g; }).catch(() => null));
@@ -101,7 +102,7 @@ export function buildService(k, lvl, lot, opt = {}) {
     for (let x = -w / 2; x <= w / 2; x += 1.6) box(0.05, 1.1, 0.05, M(0xffffff), x, 0, front - 0.3);
   } else if (k === 'park') {   // морава, алеи на кръст, фонтан, дървета, пейки, детска площадка
     flat(w, d, grass, 0, 0, 0.03); const path = M(0xd8cdb4); flat(w, 2.4, path, 0, 0, 0.05); flat(2.4, d, path, 0, 0, 0.05);
-    tasks.push(load('assets/heavy/plants/fountain.glb').then(g => { if (!g) return; const o = fit(g.scene.clone(true), 5, 5); group.add(o); }));
+    tasks.push(load('assets/heavy/plants/fountain.glb').then(g => { if (!g) return; if (feature('fountain-water') && !g.scene.userData.fwDone) { fwPrepGLB(g.scene, 'pl-fountain'); g.scene.traverse(m => { if (m.geometry) SHARED.add(m.geometry); }); } const o = fit(g.scene.clone(true), 5, 5); group.add(o); }));
     const n = Math.round(w * d / 70); for (let i = 0; i < n; i++) { const x = (Math.random() - 0.5) * (w - 4), z = (Math.random() - 0.5) * (d - 4); if (Math.abs(x) < 2.5 || Math.abs(z) < 2.5) continue; tree(x, z, 0.9 + Math.random() * 0.5); }
     for (const [x, z, r] of [[3, 2, 0], [-3, -2, 0], [2, -3.2, 1.57], [-2, 3.2, 1.57]]) bench(x, z, r);
     if (lvl !== 's') { flat(6, 6, M(0xe6d29a), w * 0.3, -d * 0.3, 0.05); box(0.9, 2, 0.9, M(0x1e88e5), w * 0.3, 0, -d * 0.3); }

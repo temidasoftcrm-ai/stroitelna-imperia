@@ -3,6 +3,8 @@
 // фонтан в центъра на парковете (вместо процедурния), фонтани и статуи в по-големите зелени площи, малките (бюст, фонтан Уолъс) — по разделителната ивица на булевардите.
 // Франция — Уолъс, Обсерваторията и Наполеон; Австрия — Щраус; другаде в Европа — разнообразно; извън Европа — само фонтаните. Нощем — леко осветени.
 import * as THREE from 'three';
+import { feature } from './lab/feature.js';
+import { fwFx, fwWaterMat } from './fountainwater.js';   // ⛲ fountain-water: басейнът на Артемида — вълнички, пръски, нощем сияние
 
 export const STATUE_FILES = Object.fromEntries(['fn-brno', 'fn-wallace', 'fn-artemis', 'fn-observatoire', 'st-napoleon', 'st-ernst', 'st-masaryk', 'st-strauss'].map(k => [k, `statues/${k}.glb`]));
 // h — височината в света (м, с пиедестала); ped — свой пиедестал [ш, д, в]; basin — басейн с вода (радиус)
@@ -20,7 +22,7 @@ export function statuePrep(M, win) {
     if (sp.ped) { const p = new THREE.Mesh(new THREE.BoxGeometry(sp.ped[0], sp.ped[2], sp.ped[1]), stone); p.position.y = sp.ped[2] / 2; p.castShadow = p.receiveShadow = true; g.add(p);
       const p2 = new THREE.Mesh(new THREE.BoxGeometry(sp.ped[0] + 0.6, 0.4, sp.ped[1] + 0.6), stone); p2.position.y = 0.2; g.add(p2); }
     if (sp.basin) { const r = sp.basin, rim = new THREE.Mesh(new THREE.CylinderGeometry(r, r + 0.3, 0.7, 32, 1, true), stone), top = new THREE.Mesh(new THREE.RingGeometry(r - 0.35, r, 32).rotateX(-Math.PI / 2), stone), w = new THREE.Mesh(new THREE.CircleGeometry(r - 0.3, 32).rotateX(-Math.PI / 2), water);
-      rim.position.y = 0.35; top.position.y = 0.7; w.position.y = 0.55; rim.receiveShadow = true; g.add(rim, top, w); }
+      rim.position.y = 0.35; top.position.y = 0.7; w.position.y = 0.55; rim.receiveShadow = true; g.add(rim, top, w); if (feature('fountain-water')) { w.material = fwWaterMat(); g.add(fwFx({ splash: [[0.56, (sp.ped ? sp.ped[0] * 0.75 : 1) + 0.2, 20], [0.56, r * 0.62, 18]], u: 8 })); } }
     const bb = new THREE.Box3().setFromObject(g); g.userData.rad = Math.max(bb.max.x, -bb.min.x, bb.max.z, -bb.min.z); g.userData.h = sp.h + (sp.ped ? sp.ped[2] : 0); V[k] = g; }
   return V;
 }

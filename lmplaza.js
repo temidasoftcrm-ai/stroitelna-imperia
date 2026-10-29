@@ -6,6 +6,8 @@
 //   game.js: lmPlazaTick() → lmPlaza(o, { streets, night, low }) за забележителностите от PLAZA_KIND, щом моделът им е зареден.
 import * as THREE from 'three';
 import { groundMat } from './cityground.js';
+import { feature } from './lab/feature.js';
+import { fwFx, fwWaterMat } from './fountainwater.js';   // ⛲ fountain-water: вода, струи и пръски във фонтаните
 
 export const PLAZA_KIND = { romanstadium: 'ruin', colosseo: 'ruin', colosseo3: 'ruin', colosseo4: 'ruin', nevsky: 'temple', stpeter: 'temple', hagia: 'temple', bluemosque: 'temple',
   sagrada: 'temple', westminster: 'temple', westminster3: 'temple', eiffel: 'tower', burj: 'sky', burj2: 'sky', empire: 'sky', empire2: 'sky' };
@@ -111,7 +113,7 @@ export function lmPlaza(o, deps = {}) {
   }
   if (type === 'temple' || type === 'square') {   // фонтан пред храма (и пред обществената сграда — lm-plaza2) — от страната с най-много настилка
     let best = null; for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const x = C.x + dx * (hx + (Hx - hx) * 0.55), z = C.z + dz * (hz + (Hz - hz) * 0.55); if (!onRoad(x, z) && (!best || Math.abs(dx) * Hx + Math.abs(dz) * Hz > best.w)) best = { x, z, w: Math.abs(dx) * Hx + Math.abs(dz) * Hz }; }
-    if (best) { const bs = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.4, 0.7, 28), M.stall); bs.position.set(best.x, 0.35, best.z); const w = new THREE.Mesh(new THREE.CylinderGeometry(3.7, 3.7, 0.1, 28), M.water); w.position.set(best.x, 0.68, best.z); const c2 = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 2.2, 10), M.stall); c2.position.set(best.x, 1.4, best.z); G.add(bs, w, c2); }
+    if (best) { const bs = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.4, 0.7, 28), M.stall); bs.position.set(best.x, 0.35, best.z); const w = new THREE.Mesh(new THREE.CylinderGeometry(3.7, 3.7, 0.1, 28), M.water); w.position.set(best.x, 0.68, best.z); const c2 = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 2.2, 10), M.stall); c2.position.set(best.x, 1.4, best.z); G.add(bs, w, c2); if (feature('fountain-water')) { w.material = fwWaterMat(); const fx = fwFx({ jet: [2.5, 1.8, 0.09, 0.03], splash: [[0.74, 1.7, 20], [0.74, 0.6, 10]], crown: [4.3, 0.74, 1.6, 16], u: 7 }); fx.position.set(best.x, 0, best.z); G.add(fx); } }
   }
   if (type === 'sky') {   // водни ивици в настилката
     for (const s of [-1, 1]) { const x = C.x + s * (hx + (Hx - hx) * 0.45); if (onRoad(x, C.z)) continue; const w = new THREE.Mesh(new THREE.BoxGeometry(2, 0.06, Math.min(2 * Hz * 0.7, 60)), M.water); w.position.set(x, 0.08, C.z); G.add(w); }

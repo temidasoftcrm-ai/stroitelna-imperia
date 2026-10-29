@@ -48,9 +48,9 @@ function fitSTS(src, tip) {
 // дължина на яхтите (по x) и колко газят (част от височината на корпуса); платноходката — мачтата не се брои
 const YACHTS = [['superyacht', 46, 0.1], ['sportyacht', 18, 0.2], ['motoryacht', 24, 0.2, /^water/], ['sailboat', 14, 0.06]];
 
-// P: { g, lvG, cranes, tower, lamp, px, seaZ, pierZ, x0, x1, seed } — от addSeaside; връща update(t)
+// P: { g, lvG, cranes, tower, lamp, px, seaZ, pierZ, x0, x1, seed, yard } — от addSeaside; връща update(t, night)
 export function portReal(P) {
-  const { g, lvG, px, seaZ } = P, st = { straddles: [], yachts: [] };
+  const { g, lvG, px, seaZ } = P, st = { straddles: [], yachts: [], night: [] };
   const F = ['sf-stscrane', 'sf-lighthouse', 'sf-warehouse', 'sf-grain', 'sf-gantry', 'sf-straddle'];
   Promise.all(F.map(f => load(BASE + f + '.glb'))).then(([sts, lh, wh, grain, gantry, straddle]) => {
     // кранове STS: кутиите се скриват, моделът — в групата на крана; светлините (сферите) — на върха и на края на стрелата
@@ -75,14 +75,17 @@ export function portReal(P) {
     // зърненият терминал (ниво 5) вместо трите силоза — на брега, по дължина на кея
     if (grain) {
       const sil = lvG[4].children.filter(isCyl); sil.forEach(m => { m.visible = false; });
-      if (sil.length) { const o = fit(grain, { len: 40 }), x = sil.reduce((a, m) => a + m.position.x, 0) / sil.length; o.position.set(x - 6, 1.2, seaZ + 8); lvG[4].add(o); }
+      if (sil.length && P.yard) {   // port-real: на разширението (ниво 4+), към сушата от червените кранове — не на пътя и кръговото (беше на seaZ + 8)
+        const o = fit(grain, { len: 42 }); o.position.set(px - 90, 1.2, seaZ - 15); lvG[4].add(o);
+        o.traverse(m => { if (m.isMesh && m.material && m.material.name === 'NightLight') { m.material = m.material.clone(); st.night.push(m.material); } });   // прожекторите по кулата — нощем
+      } else if (sil.length) { const o = fit(grain, { len: 40 }), x = sil.reduce((a, m) => a + m.position.x, 0) / sil.length; o.position.set(x - 6, 1.2, seaZ + 8); lvG[4].add(o); }
     }
     // козлов кран над двата реда контейнери на разширението (ниво 5): релсите — по x, отворът — над редовете
-    if (gantry) { const o = fit(gantry, { len: 40 }); o.position.set(px - 90, 1.2, seaZ - 19.5); lvG[4].add(o); }
+    if (gantry) { const o = fit(gantry, { len: 40 }); if (P.yard) o.position.set(P.yard.gx, 1.2, P.yard.gz); else o.position.set(px - 90, 1.2, seaZ - 19.5); lvG[4].add(o); }   // port-real: над блока на платформата
     // страдъл карите: обикалят по кея (от ниво 1) — бавно напред-назад между крановете и складовете
     if (straddle) for (let k = 0; k < 2; k++) {
-      const o = fit(straddle, { h: 10 }); lvG[0].add(o);
-      st.straddles.push({ o, x0: px - 40 + k * 30, z: seaZ - 22 - k * 12, ph: k * 2.1 });
+      const o = fit(straddle, { h: 10 }); (P.yard ? lvG[1] : lvG[0]).add(o);   // port-real: по платната на контейнерната платформа (ниво 2+), не между складовете
+      st.straddles.push(P.yard ? { o, x0: P.yard.sx, z: P.yard.sz[k], ph: k * 2.1 } : { o, x0: px - 40 + k * 30, z: seaZ - 22 - k * 12, ph: k * 2.1 });
     }
   });
   // яхтите: една по една, през залива (от запад на изток или обратно), с пауза между тях
@@ -98,7 +101,8 @@ export function portReal(P) {
     });
   });
   const span = P.x1 - P.x0, PER = 150;   // всяка яхта — веднъж на PER·броя секунди; пресичането — ~100 с
-  return function update(t) {
+  return function update(t, night = 0) {
+    for (const m of st.night) m.emissiveIntensity = 0.2 + night * 6;
     for (const s of st.straddles) {
       const u = Math.sin(t * 0.08 + s.ph); s.o.position.set(s.x0 + u * 26, 1.2, s.z); s.o.rotation.y = Math.cos(t * 0.08 + s.ph) > 0 ? 0 : Math.PI;
     }

@@ -70,7 +70,7 @@ function tame(obj) { obj.traverse(m => { if (m.isMesh && m.material) for (const 
 
 export function loadTrainModels(base = 'assets/heavy/trains/') {
   if (loading) return loading;
-  const L = new GLTFLoader(), get = f => new Promise((res, rej) => L.load(base + f, g => res(g.scene), undefined, rej));
+  const L = new GLTFLoader(), get = f => new Promise((res, rej) => L.load(base + f, g => { locoLights(g.scene); res(g.scene); }, undefined, rej));
   loading = Promise.all([
     get('gp38.glb').then(sc => {
       // по x: платформа (< −0.885), бункер (−0.885…−0.33), локомотив (> −0.33); предницата на локомотива е към +x
@@ -130,11 +130,37 @@ function procWagons() {   // процедурни товарни вагони (�
     for (const z of [-7.6, -2.6, 2.6, 7.6]) for (const x of [-1.3, 1.3]) box(i, 0.12, 1.8, 0.12, dark, x, 2.1, z); return g; })();
   const autorack = (() => { const { g, i } = base(18); box(i, W * 0.95, 0.15, 17.6, dark, 0, 2.7, 0); for (const z of [-8, -4, 0, 4, 8]) for (const x of [-1.35, 1.35]) box(i, 0.1, 2.6, 0.1, dark, x, 2.1, z);
     const cols = [0xd62828, 0x1f5fbf, 0xeeeeee, 0x222222, 0xffb300, 0x7d8a96]; let k = 0;
-    for (const y of [1.25, 2.78]) for (const z of [-6, -1.3, 3.4]) { const c = new THREE.Group(), m = M(cols[k++ % cols.length], 0.4, 0.5); box(c, 1.7, 0.6, 4.2, m, 0, 0.45, 0); box(c, 1.5, 0.5, 2.2, m, 0, 0.95, -0.2); c.position.set(0, y, z); i.add(c); } return g; })();
+    for (const y of [1.25, 2.78]) for (const z of [-6, -1.3, 3.4]) { const c = new THREE.Group(), m = M(cols[k++ % cols.length], 0.4, 0.5); box(c, 1.7, 0.6, 4.2, m, 0, 0.45, 0); box(c, 1.5, 0.5, 2.2, m, 0, 0.95, -0.2); c.position.set(0, y, z); c.userData.rackCar = 1; i.add(c); } return g; })();   // rackCar — rackLoad() ги сменя с истински коли
   const gondola = (() => { const { g, i } = base(15); const w = M(0x6b3e2e, 0.9, 0.2); box(i, W * 0.95, 1.4, 14.6, w, 0, 1.95, 0); const fill = M(0x3a3a3a, 1, 0); box(i, W * 0.85, 0.2, 14.2, fill, 0, 2.55, 0); return g; })();
   return { cistern: cis, timber, autorack, gondola };
 }
 const TINTS = [0x2b2d31, 0xd9d4c7, 0x1f5fbf, 0xc62828, 0x2d8f4e, 0xe0a020];
+// 🚗 автовозът (29.10): вместо кутии — истинските коли от трафика (sf-car-*; game.js ги дава през setRackCars), InstancedMesh по част на модел
+// (споделени геометрии и материали), по 2 етажа × 3 коли; отдалеч (> 150 м) — пак кутиите (THREE.LOD). Суровите модели не са в метри — всяка кола ~4,3 м, ≤ 1,35 м висока (под горния етаж)
+let rackSrc = () => [], RACK = null;
+export const setRackCars = fn => { rackSrc = fn; };
+function rackModels() {
+  if (RACK) return RACK; const L = rackSrc() || []; if (!L.length) return null;
+  RACK = L.map(sc => { sc.updateMatrixWorld(true); const op = [], tr = [], bb = new THREE.Box3();   // рамката и частите — в едни и същи координати (с въртенето на корена)
+    sc.traverse(m => { if (!m.isMesh || !m.geometry || m.isSkinnedMesh || !m.visible) return; const mt = [].concat(m.material)[0]; if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+      const p = { geo: m.geometry, mat: m.material, mtx: m.matrixWorld.clone(), box: m.geometry.boundingBox.clone().applyMatrix4(m.matrixWorld) }; if (mt && !mt.transparent && mt.blending !== THREE.AdditiveBlending) { op.push(p); bb.union(p.box); } else if (mt && mt.blending !== THREE.AdditiveBlending) tr.push(p); });
+    if (bb.isEmpty()) return [];
+    const sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3()), turn = sz.x > sz.z, len = turn ? sz.x : sz.z, wid = turn ? sz.z : sz.x;
+    if (sz.y / len < 0.22 || sz.y / len > 0.65 || wid / len < 0.3 || wid / len > 0.6) return [];   // не прилича на кола (сноп/плоскост в рамката) — без този модел
+    const big = bb.clone().expandByVector(sz.clone().multiplyScalar(0.15)), parts = op.concat(tr.filter(p => big.containsBox(p.box)));   // прозрачните — само вътре в колата (стъклата); сноповете на фаровете — не
+    const k = Math.min(4.3 / len, 1.35 / sz.y), N = new THREE.Matrix4().makeScale(k, k, k).multiply(new THREE.Matrix4().makeRotationY(turn ? Math.PI / 2 : 0)).multiply(new THREE.Matrix4().makeTranslation(-c.x, -bb.min.y, -c.z));
+    for (const p of parts) p.mtx = N.clone().multiply(p.mtx);
+    return parts; }).filter(p => p.length);
+  return RACK.length ? RACK : (RACK = null);
+}
+function rackLoad(o, seed) {
+  const M = rackModels(); if (!M) return; const boxes = []; o.traverse(m => { if (m.userData.rackCar) boxes.push(m); }); if (!boxes.length) return;
+  const par = boxes[0].parent, near = new THREE.Group(), far = new THREE.Group(), by = new Map();
+  boxes.forEach((b, k) => { far.add(b); const mi = (Math.abs(seed) * 7 + k * 5 + (k * k) % 3) % M.length; (by.get(mi) || by.set(mi, []).get(mi)).push(new THREE.Matrix4().makeTranslation(b.position.x, b.position.y + 0.12, b.position.z).multiply(new THREE.Matrix4().makeRotationY(((seed + k) & 1) * Math.PI))); });
+  const T = new THREE.Matrix4();
+  for (const [mi, slots] of by) for (const pt of M[mi]) { const im = new THREE.InstancedMesh(pt.geo, pt.mat, slots.length); slots.forEach((S, j) => im.setMatrixAt(j, T.multiplyMatrices(S, pt.mtx))); im.computeBoundingSphere(); near.add(im); }
+  const lod = new THREE.LOD(); lod.addLevel(near, 0); lod.addLevel(far, 150); par.add(lod);
+}
 export const trainModelsReady = () => ready;
 export const hasTrainModel = k => ready && !!P[k];
 // нов вагон: 'loco' | 'hopper' | 'flat' | 'ave' | 'hsw' (среден) | 'aveTail' | 'oeLoco' | 'oeCar' (Ориент Експрес) | 'paxLoco' | 'paxCar' | 'vl82' | 'boxcar' | 'hopper2' (trains-real) (обърнат челен вагон); seed — за цвета на контейнера
@@ -147,11 +173,21 @@ export function trainCar(kind, seed = 0) {
     o.traverse(m => { if (m.isMesh && /red/i.test(m.material.name)) { m.material = m.material.clone(); m.material.color.setHex(col); } });
   }
   if (kind === 'paxLoco' || kind === 'vl82') addHeadlights(o, src.userData.len);
-  else if (kind === 'elLoco' || kind === 'steamLoco' || kind === 'upLoco' || kind === 'gpLoco' || kind === 'steam2Loco') addHeadlights(o, src.userData.len, { s: 0.38, y: kind === 'steamLoco' || kind === 'steam2Loco' ? 2.6 : 1.7, x: 0.62, beamW: 3, beamL: 12 });   // trains-variety: малки светлини и мек конус
+  else if (kind === 'elLoco' || kind === 'steamLoco' || kind === 'upLoco' || kind === 'gpLoco' || kind === 'steam2Loco') addHeadlights(o, src.userData.len, { s: 0.7, y: kind === 'steamLoco' || kind === 'steam2Loco' ? 2.6 : 1.7, x: 0.62, beamW: 3, beamL: 12 });   // trains-variety: малки светлини и мек конус
+  if (kind === 'autorack') rackLoad(o, seed);
   if (kind === 'cistern') { const col = TINTS[Math.abs(seed) % TINTS.length]; o.traverse(m => { if (m.isMesh && m.userData.tint !== undefined || (m.isMesh && m.material && m.material.color && m.material.color.getHex() === 0xffffff)) { m.material = m.material.clone(); m.material.color.setHex(col); } }); }   // trains-variety: цистерни в различни цветове
   o.userData.len = src.userData.len;
   return o;
 }
+// 💡 светлините на локомотивите (Blender, 29.10): отделни възли headlight_L/R, headlamp (парните), taillight_L/R (червени, отзад), cabwin_* (кабината — топло),
+// firebox_L/R (огнището под кабината на парните); нощем ги пали daynight.js (NF_MATS: emissiveIntensity = нощ × nfK), денем — 0. Старите модели: „emission“ (Ориент Експрес), „Lights“ (GP38)
+const LL_K = { headlight: 3.2, headlamp: 3.2, taillight: 2.2, cabwin: 0.07, firebox: 1.8 }, LL_SEEN = new Set();
+function locoLights(sc) {
+  sc.traverse(m => { if (!m.isMesh || !m.material) return; const k = (m.name.match(/^(headlight|headlamp|taillight|cabwin|firebox)/) || [])[1] || (/^(emission|Lights)$/.test(m.material.name || '') ? 'headlight' : null);
+    if (!k || LL_SEEN.has(m.material)) return; const mt = m.material; LL_SEEN.add(mt); if (!mt.emissive || !mt.emissive.getHex()) return; mt.emissiveIntensity = 0; mt.userData.nfK = LL_K[k]; if (k === 'cabwin') mt.color.setHex(0x15171a); NF_MATS.add(mt); });   // кабината денем — тъмно стъкло
+}
+// къде са фаровете на модела (в координатите на вагона) — ореолите и снопът отиват там
+function hlSpots(o) { o.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(o.matrixWorld).invert(), r = []; o.traverse(m => { if (m.isMesh && /^(headlight|headlamp)/.test(m.name)) { m.geometry.computeBoundingBox(); r.push(m.geometry.boundingBox.getCenter(new THREE.Vector3()).applyMatrix4(m.matrixWorld).applyMatrix4(inv)); } }); return r; }
 // фаровете на локомотива: светещи петна на челото (нощем — daynight.js през NF_MATS) и сноп напред
 let lightMat = null, beamMat = null;
 function addHeadlights(o, len, H = {}) {
@@ -163,7 +199,7 @@ function addHeadlights(o, len, H = {}) {
     beamMat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0x4a4434, emissiveMap: tex, emissiveIntensity: 0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
     NF_MATS.add(lightMat); NF_MATS.add(beamMat);
   }
-  const hs = H.s ?? 1.1, hx = H.x ?? 0.7, hy = H.y ?? 1.3, bw = H.beamW ?? 4.5, bl = H.beamL ?? 16;
-  for (const x of [-hx, hx]) { const q = new THREE.Mesh(new THREE.PlaneGeometry(hs, hs), lightMat); q.position.set(x, hy, len / 2 + 0.05); o.add(q); }
+  const hs = H.s ?? 1.1, hx = H.x ?? 0.7, hy = H.y ?? 1.3, bw = H.beamW ?? 4.5, bl = H.beamL ?? 16, sp = hlSpots(o);   // фаровете от модела (ако ги има) — ореолът точно върху тях
+  for (const p of sp.length ? sp : [[-hx, hy], [hx, hy]].map(([x, y]) => new THREE.Vector3(x, y, len / 2))) { const q = new THREE.Mesh(new THREE.PlaneGeometry(hs, hs), lightMat); q.position.set(p.x, p.y, p.z + 0.08); o.add(q); }
   const beam = new THREE.Mesh(new THREE.PlaneGeometry(bw, bl).rotateX(-Math.PI / 2), beamMat); beam.position.set(0, 0.25, len / 2 + bl / 2); o.add(beam);
 }

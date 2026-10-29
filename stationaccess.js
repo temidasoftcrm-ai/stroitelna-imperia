@@ -5,6 +5,7 @@
 // линията (свободната ивица до перона), после направо. Не минава през парцели, улици и вода. Парцелите не се пипат (номерата им
 // са в записите); новите възли и пътища са в края на масивите. Работи върху копие — кешираният план остава същият.
 // stationAccess(P, { x, z0, z1 }) — x: източният ръб на перона (в рамката на плана), z0…z1: докъде е перонът → копие на P с P.access (или P)
+// infra-lots (T2): bendMax — докъде може да е чупката (по подразбиране 260 м)
 // airport-access (T1): същото и за летището — { key: 'airAccess', nm, tag: 'airport', noPark: true, maxLen, ax } (ax — началото на пътя по x, вместо x + полуширината) (пътят е в P[key], паркингът го рисува airportaccess.js)
 import { CLS, widthOf, rectCorners, inPoly, nodeKind, nodeShape, attachPlan2 } from './cityplan2.js';
 
@@ -60,12 +61,12 @@ export function stationAccess(P, o) {
     best = { path, len, cost, ang, ...tgt };
   };
   const byD = (A, L) => L.map(t => [dist(A, t.p || t.J), t]).filter(x => x[0] <= MAXL).sort((a, b) => a[0] - b[0]).map(x => x[1]);   // най-близките първо — щом има път, по-далечните отпадат веднага
-  for (let z = o.z0; z <= o.z1; z += 6) {
-    const A = [o.ax ?? o.x + HALF + 1, z];
+  for (const ax of o.xs || [o.ax ?? o.x + HALF + 1]) for (let z = o.z0; z <= o.z1; z += 6) {   // xs (infra-lots): няколко начала по x (южният/северният ръб на парцела на гарата)
+    const A = [ax, z];
     for (const t of byD(A, tNodes)) consider([A, t.p], t);
     for (const s of byD(A, tOnRoad(A))) consider([A, s.J], { split: s });
   }
-  if (!best) for (let dz = 20; dz <= 260 && !best; dz += 10) for (const sg of o.bendX ? [1] : [1, -1]) {   // с една чупка: покрай линията (по z), после направо; bendX (летището) — първо по x, навън
+  if (!best) for (let dz = 20; dz <= (o.bendMax || 260) && !best; dz += 10) for (const sg of o.bendX ? [1] : [1, -1]) {   // с една чупка: покрай линията (по z), после направо; bendX (летището) — първо по x, навън
     const z = sg > 0 ? o.z1 : o.z0, A = [o.ax ?? o.x + HALF + 1, z], C = o.bendX ? [A[0] + o.bendX * dz, z] : [A[0], z + sg * dz];
     if (!clear([A, C], new Set())) continue;
     for (const t of byD(C, tNodes)) consider([A, C, t.p], t);

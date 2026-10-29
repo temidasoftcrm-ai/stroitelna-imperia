@@ -32,7 +32,7 @@ export function placeFactories(o) {
     if (o.extra) extras(THREE, o, G, c, ry, out, drives); }
   if (!out.length) return null;
   return { grid: G, list: out, sdWhy: () => o._sdWhy, railX: o.railX, at: pick.map(c => ({ x: Math.round(c.x), z: Math.round(c.z), under: !!c.route.under, siding: !!c.siding, road: Math.round(c.len), end: c.route[c.route.length - 1].map(Math.round) })),
-    update(dt, night) { const t = performance.now() / 1000; for (const b of beacons) b.opacity = t % 1.6 < 0.35 ? 0.12 + 0.88 * night : 0.04 * night;   /* денем — едва */ for (const s of smokes) s(dt, night); for (const d of drives) d(dt); },
+    update(dt, night) { o._night = night; const t = performance.now() / 1000; for (const b of beacons) b.opacity = t % 1.6 < 0.35 ? 0.12 + 0.88 * night : 0.04 * night;   /* денем — едва */ for (const s of smokes) s(dt, night); for (const d of drives) d(dt); },
     clear() { for (const m of out) m.parent && m.parent.remove(m); } };
 }
 // 🏭 ind-streets2 (T2, координаторът: „жп отклонение до зоната, ако линията е наблизо; камиони и бусове, които завиват от улицата“) — само изглед, без traffic.js:
@@ -145,12 +145,68 @@ function extras(THREE, o, G, c, ry, out, drives) {
   const spot = (u, v) => { for (let r = 0; r < 30; r++) for (let a = 0; a < (r ? 8 * r : 1); a++) { const t = a / (8 * r || 1) * Math.PI * 2, uu = u + Math.cos(t) * r, vv = v + Math.sin(t) * r; if (okAt(uu, vv)) return [uu, vv]; } return null; };
   const path = (u, v) => { for (let r = 0; r < 30; r++) for (let a = 0; a < (r ? 8 * r : 1); a++) { const t = a / (8 * r || 1) * Math.PI * 2, uu = u + Math.cos(t) * r, vv = v + Math.sin(t) * r; let ok = true; for (let f = 0; f <= 12; f += 0.5) if (!okAt(uu, vv + f)) { ok = false; break; } if (ok) return [uu, vv]; } return null; };
   const taken = []; for (const [k, u, v, clip, rot] of [['worker-build', -H + 6, H + 24, 'work', 0.6], ['worker-hivis', -H + 9, H + 27, 'idle', -2.2], ['worker-build', -H + 2, H + 18, 'carry', 0], ['worker-hivis', 0, H + 23, 'idle', 2.4]]) {
-    if (!E.worker) break; const p = clip === 'carry' ? path(u, v) : spot(u, v); if (!p) continue; R.push([p[0] - 1.2, p[0] + 1.2, p[1] - 1.2, p[1] + (clip === 'carry' ? 13.2 : 1.2)]);   // и един в друг — не
+    if (!E.worker || E.crew) break; const p = clip === 'carry' ? path(u, v) : spot(u, v); if (!p) continue; R.push([p[0] - 1.2, p[0] + 1.2, p[1] - 1.2, p[1] + (clip === 'carry' ? 13.2 : 1.2)]);   // и един в друг — не
     const w = E.worker(k, clip); if (!w) continue; const [x, z] = W(p[0], p[1]); w.obj.position.set(x, 0, z); w.obj.rotation.y = ry + rot; g.add(w.obj); ws.push({ ...w, x, z, u: p[0], v: p[1], clip, t: Math.random() * 10 }); taken.push(p.map(Math.round)); }
   g.userData.workers = taken;
+  if (E.crew && E.body) crew(THREE, o, c, ry, g, drives, spot);   // 👷 ind-workers
   drives.push(dt => { const t = performance.now() / 1000; if (slew) slew.rotation.y = Math.sin(t * 0.07 + ph) * 0.9; if (hook) hook.position.y = h0 + (Math.sin(t * 0.21 + ph) * 0.5 + 0.5) * 6;
     for (const w of ws) { w.mixer.update(dt); if (w.clip === 'carry') { w.t += dt; const s = (w.t * 0.72) % 24, f = s < 12 ? s : 24 - s;   /* по свободната отсечка (path) */ const [x, z] = W(w.u, w.v + f); w.obj.position.set(x, 0, z); w.obj.rotation.y = ry + (s < 12 ? Math.PI : 0);   /* моделите гледат към −z */ } } });
   if (o.streets) indStreets(THREE, o, G, c, ry, g, drives, [ht, dc].filter(Boolean).map(m => m.userData.uw), crU);
+}
+// 👷 ind-workers (T2, потребителят: „да добавим още работници — да се вижда действие“): ~15 работници в двора на завода — товарят камионите на рампата
+// (носят кашони между вратата и камиона), мотокар (процедурен) кара палети, вървят между вратата, паркинга и входа, двама пазачи на бариерата,
+// двама оглеждат страната на завода; нощем — смяната е по-малка (под лампите остават 6). Колите на служителите — 60–80% от местата денем, ~25% нощем.
+// Един AnimationMixer за целия двор; по-далеч от 300 м — всичко се крие и не се смята. E.body(k) → { obj, clips }, E.car(k) → obj, E.cam() → позицията на камерата; нощта — o._night (от update)
+function crew(THREE, o, c, ry, g, drives, spot) {
+  const E = o.extra, cs = Math.cos(ry), sn = Math.sin(ry), W = (u, v) => [c.x + u * cs + v * sn, c.z - u * sn + v * cs], H = FW / 2, V1 = H + APR, gu = -H * 0.35, gw = 11;
+  const root = new THREE.Group(); root.name = 'indCrew'; g.add(root); const mixer = new THREE.AnimationMixer(root), people = [];
+  let seed = (Math.abs(Math.round(c.x * 7 + c.z * 13)) % 2147483646) + 1; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const boxM = new THREE.MeshStandardMaterial({ color: 0xb58a55, roughness: 0.9 }), boxG = new THREE.BoxGeometry(0.5, 0.4, 0.4);
+  const man = (k, clip) => { const w = E.body(k); if (!w) return null; root.add(w.obj); const acts = {}; for (const a of w.clips) acts[a.name] = mixer.clipAction(a, w.obj); const cur = acts[clip] || Object.values(acts)[0]; if (!cur) return null; cur.time = rnd() * cur.getClip().duration; cur.play(); return { obj: w.obj, acts, cur }; };
+  const clip = (p, n) => { const a = p.acts[n]; if (!a || a === p.cur) return; p.cur.stop(); a.reset(); a.time = rnd() * a.getClip().duration; a.play(); p.cur = a; };
+  const face = (p, du, dv) => { p.obj.rotation.y = ry + Math.atan2(du, dv) + Math.PI; };   // моделите гледат към −z
+  // job: { k, pts: [[u, v], …] (напред-назад) или at: [u, v], move — клипът в движение, stay — на краищата, dwell (s), v — м/s, box — носи кашон напред, night — и в нощната смяна, look — накъде гледа (u, v) }
+  const jobs = [];
+  for (const [tu, nt] of [[-H + 7, true], [-H + 19, false]]) for (const sd of [-1, 1]) jobs.push({ k: sd < 0 ? 'worker-build' : 'worker-hivis', pts: [[tu + sd * 2.6, H + 1.2], [tu + sd * 2.6, H + 6.5]], move: 'carry', stay: 'work', dwell: 2.2, v: 1.1, box: true, night: nt && sd < 0 });
+  jobs.push({ k: 'worker-hivis', pts: [[2, H + 1.2], [6, H + 12], [12, V1 - 7]], move: 'walk', stay: 'idle', dwell: 6, v: 1.3, night: true });
+  jobs.push({ k: 'worker-build', pts: [[-8, H + 1.2], [-8, H + 11], [gu + gw / 2 + 2.5, V1 - 4]], move: 'walk', stay: 'idle', dwell: 8, v: 1.25 });
+  jobs.push({ k: 'worker-hivis', pts: [[H + 3.2, H - 4], [H + 3.2, -H + 6]], move: 'walk', stay: 'work', dwell: 5, v: 1.0 });
+  jobs.push({ k: 'worker-hivis', at: [gu - gw / 2 - 1.6 + 2.2, V1 - 3.4], stay: 'idle', look: [0, 1], night: true });   // пазачите
+  jobs.push({ k: 'worker-build', at: [gu + gw / 2 + 1.4, V1 - 1.4], stay: 'idle', look: [-1, 0.4], night: true });
+  jobs.push({ k: 'worker-build', at: [H + 3.6, 6], stay: 'work', look: [-1, 0], night: true }, { k: 'worker-hivis', at: [H + 3.6, -9], stay: 'work', look: [-1, 0.2] });   // оглед до стената (стълбите на силозите)
+  jobs.push({ k: 'worker-build', at: [-H + 3, H + 3.2], stay: 'work', look: [0, -1] }, { k: 'worker-hivis', at: [14, H + 5.6], stay: 'idle', look: [1, 0.3] }, { k: 'worker-build', at: [15.3, H + 6.6], stay: 'idle', look: [-1, -0.4] });
+  for (const j of jobs) { const p = man(j.k, j.pts ? j.move : j.stay); if (!p) continue;
+    if (j.at) { const q = spot && j.at[0] < H * 0.25 && j.at[1] > H && j.at[1] < H + 18 ? spot(j.at[0], j.at[1]) || j.at : j.at;   /* на площадката — до най-близкото свободно място */ const [x, z] = W(q[0], q[1]); p.obj.position.set(x, 0, z); face(p, j.look[0], j.look[1]); }
+    const L = j.pts ? j.pts.slice(1).map((q, i) => Math.hypot(q[0] - j.pts[i][0], q[1] - j.pts[i][1])) : null;
+    const bx = j.box ? new THREE.Mesh(boxG, boxM) : null; if (bx) { bx.castShadow = true; root.add(bx); }
+    people.push({ ...j, p, L, tot: L ? L.reduce((a, b) => a + b, 0) : 0, s: rnd() * (L ? L.reduce((a, b) => a + b, 0) : 0), dir: 1, wait: rnd() * 2, bx }); }
+  // мотокарът: жълт, с мачта и вилици; кара палет от рампата до средата на площадката и обратно
+  const fk = new THREE.Group(); { const y = new THREE.MeshStandardMaterial({ color: 0xf2b705, roughness: 0.6 }), d = new THREE.MeshStandardMaterial({ color: 0x2b2d31, roughness: 0.7 }), st = new THREE.MeshStandardMaterial({ color: 0x5a5f66, metalness: 0.6, roughness: 0.4 });
+    const B = (w, h, l, m, x, yy, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, l), m); b.position.set(x, yy, z); b.castShadow = true; fk.add(b); return b; };
+    B(1.2, 0.9, 2.0, y, 0, 0.75, 0.2); B(1.1, 0.12, 1.1, d, 0, 2.15, 0.35); for (const x of [-0.5, 0.5]) { B(0.08, 1.5, 0.08, d, x, 1.45, 0.85); B(0.08, 1.5, 0.08, d, x, 1.45, -0.1); B(0.1, 2.4, 0.1, st, x * 0.9, 1.2, -0.85); B(0.12, 0.06, 1.1, st, x * 0.7, 0.18, -1.45); }
+    for (const [x, z] of [[-0.62, -0.5], [0.62, -0.5], [-0.62, 0.8], [0.62, 0.8]]) B(0.22, 0.5, 0.5, d, x, 0.25, z);
+    const pal = new THREE.Group(); pal.position.set(0, 0.3, -1.45); fk.add(pal); { const b = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.14, 1.1), new THREE.MeshStandardMaterial({ color: 0x9c7a4c })); pal.add(b); const s = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.8, 1.0), boxM); s.position.y = 0.47; s.castShadow = true; pal.add(s); } fk.userData.pal = pal; }
+  root.add(fk); const FK = { a: [-4, H + 2.2], b: [-4, H + 15], s: 0, dir: 1, wait: 1 };
+  // колите на служителите (паркингът: u 0,35H…U−2, редове v = H+9 и V1−9, места през 2,6 м)
+  const cars = []; if (E.car) { const p0 = H * 0.35, p1 = H + YM - 2; let k = 0; for (const v of [H + 9, V1 - 9]) for (let u = p0 + 2.8; u <= p1 - 1.5; u += 2.6, k++) { const m = E.car(k); if (!m) continue; const [x, z] = W(u, v); m.position.set(x, 0, z); m.rotation.y = ry + (rnd() < 0.5 ? 0 : Math.PI); root.add(m); cars.push({ m, r: rnd() }); } }
+  drives.push(dt => {
+    const cam = E.cam && E.cam(), far = cam ? Math.hypot(cam.x - c.x, cam.z - c.z) > 300 : false; root.visible = !far; if (far) return;
+    const night = o._night || 0, ns = night > 0.5;
+    for (const q of cars) q.m.visible = q.r < (ns ? 0.25 : 0.8);
+    for (const j of people) { const on = !ns || j.night; j.p.obj.visible = on; if (j.bx) j.bx.visible = false; if (!on) continue;
+      if (!j.pts) continue;
+      if (j.wait > 0) { j.wait -= dt; clip(j.p, j.stay); continue; }
+      clip(j.p, j.move); j.s += j.dir * j.v * dt; if (j.s >= j.tot) { j.s = j.tot; j.dir = -1; j.wait = j.dwell; } else if (j.s <= 0) { j.s = 0; j.dir = 1; j.wait = j.dwell; }
+      let q = j.s, i = 0; while (i < j.L.length - 1 && q > j.L[i]) { q -= j.L[i]; i++; } const a = j.pts[i], b = j.pts[i + 1], f = Math.min(1, q / (j.L[i] || 1)), u = a[0] + (b[0] - a[0]) * f, v = a[1] + (b[1] - a[1]) * f;
+      const [x, z] = W(u, v); j.p.obj.position.set(x, 0, z); face(j.p, (b[0] - a[0]) * j.dir, (b[1] - a[1]) * j.dir);
+      if (j.bx && j.dir > 0) { const yy = j.p.obj.rotation.y; j.bx.visible = true; j.bx.position.set(x - Math.sin(yy) * 0.42, 1.05, z - Math.cos(yy) * 0.42); j.bx.rotation.y = yy; } }
+    // мотокарът
+    if (FK.wait > 0) FK.wait -= dt; else { FK.s += FK.dir * 2.2 * dt; if (FK.s >= 1) { FK.s = 1; FK.dir = -1; FK.wait = 4; } else if (FK.s <= 0) { FK.s = 0; FK.dir = 1; FK.wait = 5; } }
+    { const L = Math.hypot(FK.b[0] - FK.a[0], FK.b[1] - FK.a[1]), k = Math.min(1, Math.max(0, FK.s)), u = FK.a[0] + (FK.b[0] - FK.a[0]) * k, v = FK.a[1] + (FK.b[1] - FK.a[1]) * k, [x, z] = W(u, v);
+      fk.position.set(x, 0, z); fk.rotation.y = ry + Math.PI;   // вилиците — към рампата (−v): кара напред/назад
+      fk.userData.pal.visible = FK.dir < 0 || FK.s > 0.98 ? false : true; fk.userData.pal.position.y = 0.3 + (FK.wait > 0 && FK.s < 0.02 ? 0.4 : 0); void L; }
+    mixer.update(dt); });
+  g.userData.crew = people.length; return people.length;
 }
 // 🛣️ ind-streets (f6, потребителят: „индустриалната зона — с улици и връзки между заводите“): пред завода и съседните фабрики — промишлена улица
 // (2 широки ленти, бордюри, маркировка, лампи — само светещи материали, без PointLight), от нея — входове с портал към всяка фабрика, бетонни дворове

@@ -15,6 +15,7 @@ import { crossingsOf } from './pedpaths.js';   // road-geo: зебрите — �
 import { streetReal, lampField, tlightField, lensGeo, pedGeo, lensMatrix, CLASSIC } from './streetreal.js';   // street-real: истинските лампи и светофари (opts.streetReal)
 import { kremlinEnsemble } from './kremlin2.js';   // lm-kremlin2: Кремъл от моделите на потребителя (Meshy)
 import { romeNear } from './romenear.js';
+import { fwFx, fwWaterMat } from './fountainwater.js';   // ⛲ fountain-water: вода, струи и пръски във фонтаните
 import { placeStatues, parkSpots } from './statues.js';   // statues: фонтаните и статуите в парковете, зелените площи и по булевардите (opts.statues)   // rome-bld: Рим отблизо — италианските сгради на местата на фасадите (opts.romeNear)
 import { t as tr } from './i18n.js';
 import { bridgesView } from './bridges.js';   // 🌉 bridges-real (f6): истинските мостове над реката (Париж, Лондон, Москва, Ню Йорк, Вашингтон)   // 🌐 lang-en: надписите на платното (f9, част C)
@@ -210,6 +211,16 @@ const RIV = new Map();
 let rivOf = rv => RIV.get(rv) || RIV.set(rv, smoothRiver(rv)).get(rv);
 const riverPoly = (rv, hw) => [...offLine(rivOf(rv), hw), ...offLine(rivOf(rv), -hw).reverse()];
 // море (Истанбул): сушата — слети серии от растера (ред по ред), водата — равнина под нея; кейовете, фериботните линии
+// растерът — разширен с m клетки на всяка страна (крайните клетки се повтарят навън: сушата и протоците продължават) — Истанбул: парцелите и улиците
+// стигат до ~210 м извън растера (city-size), а там нямаше суша, само водната равнина (къщите „във водата“)
+function seaPad(sea, m) {
+  const NX = sea.nx, NZ = sea.nz, W = NX + 2 * m, H = NZ + 2 * m, land = new Uint8Array(NX * NZ); let at = 0, v = 0;
+  for (const n of sea.runs) { if (!v) land.fill(1, at, Math.min(at + n, land.length)); at += n; v ^= 1; }
+  const runs = []; let cur = 1, len = 0;   // първата серия — суша (може и 0), както в seaGround
+  for (let j = 0; j < H; j++) { const r = Math.min(NZ - 1, Math.max(0, j - m)) * NX;
+    for (let i = 0; i < W; i++) { const l = land[r + Math.min(NX - 1, Math.max(0, i - m))]; if (l === cur) len++; else { runs.push(len); cur = l; len = 1; } } }
+  runs.push(len); return { ...sea, x0: sea.x0 - m * sea.cell, z0: sea.z0 - m * sea.cell, nx: W, nz: H, runs };
+}
 function seaGround(sea) {
   const pos = [], idx = [];   // серии по редове: runs са по целия растер — тук се режат на редове
   const NX = sea.nx; let at = 0, v = 0;
@@ -304,7 +315,7 @@ function seaView(G, D, RR, cut = null) {
     const W = S2.nx * S2.cell, H = S2.nz * S2.cell, F = 3000, fr = [[-F, -F, W + 2 * F, F], [-F, H, W + 2 * F, F], [-F, 0, F, H], [W, 0, F, H]].map(([x, z, w2, d2]) => new THREE.PlaneGeometry(w2, d2).rotateX(-Math.PI / 2).translate(S2.x0 + x + w2 / 2, 0, S2.z0 + z + d2 / 2));
     for (const f of fr) { const m = new THREE.Mesh(f, MAT.urban); m.receiveShadow = true; G.add(m); } }
   const Pi = []; for (const p of D.piers || []) if (p.length > 1) Pi.push(ribbon(p, 4, -0.2)); if (Pi.length) G.add(merge(Pi, MAT.pier));
-  const Fe = [], seenF = new Set(); for (const f of D.ferries || []) { const key = f.pts.length > 1 ? [f.pts[0], f.pts[f.pts.length - 1]].map(p => Math.round(p[0] / 40) + ',' + Math.round(p[1] / 40)).sort().join('|') : ''; if (seenF.has(key)) continue; seenF.add(key); dashed(f.pts, 5, 22, 0.7, (D.wY ?? -1.2) + 0.1, Fe); }   // еднаквите линии (двете посоки) — веднъж if (Fe.length) G.add(merge(Fe, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 })));   // фериботните линии по водата
+  const Fe = [], seenF = new Set(); for (const f of D.ferries || []) { const key = f.pts.length > 1 ? [f.pts[0], f.pts[f.pts.length - 1]].map(p => Math.round(p[0] / 40) + ',' + Math.round(p[1] / 40)).sort().join('|') : ''; if (seenF.has(key)) continue; seenF.add(key); dashed(f.pts, 5, 22, 0.7, (D.wY ?? -1.2) + 0.1, Fe); }   /* еднаквите линии (двете посоки) — веднъж */ if (Fe.length) G.add(merge(Fe, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 })));   // фериботните линии по водата
   const Mt = []; for (const r of D.metro || []) if (r.kind !== 'rail') for (const pts of cutBand(r.pts, cut)) Mt.push(ribbon(pts, r.kind === 'tram' ? 2.2 : 2.6, 0.085)); if (Mt.length) G.add(merge(Mt, M(0x9a9184)));   // метро/трамвай на повърхността
   romeBridges(G, D);
   // висящите мостове (Босфорския): моделът — дължината по x, центриран; мащабът — от бряг до бряг
@@ -458,7 +469,7 @@ function* furniture(G, P, o = {}) {   // генератор: yield след вс
   inst(new THREE.CylinderGeometry(0.05, 0.05, 2.4, 5).translate(0, 1.2, 0), iron, signs, P1(0, 0, 0));
   inst(new THREE.CylinderGeometry(0.42, 0.42, 0.06, 8).rotateX(Math.PI / 2).translate(0, 2.35, 0), M(0xc8202a), signs, P1(0, 0, 0));   // „Стоп“
   for (const [x, z] of fountains) { const f = new THREE.Group(), b = new THREE.Mesh(new THREE.CylinderGeometry(4, 4.4, 0.8, 24), M(0xd8cdb4)), w = new THREE.Mesh(new THREE.CircleGeometry(3.6, 24).rotateX(-Math.PI / 2), MAT.wet), c = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 3, 10), M(0xd8cdb4)), t = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 0.5, 0.5, 14), M(0xd8cdb4));
-    b.position.y = 0.4; w.position.y = 0.75; c.position.y = 2; t.position.y = 3.4; f.add(b, w, c, t); f.position.set(x, 0, z); f.traverse(o => { if (o.isMesh) o.castShadow = true; }); FURN.add(f); }
+    b.position.y = 0.4; w.position.y = 0.75; c.position.y = 2; t.position.y = 3.4; f.add(b, w, c, t); if (feature('fountain-water')) { w.material = fwWaterMat(); f.add(fwFx({ water: [[3.6, 1.35]], jet: [3.62, 1.6, 0.08, 0.03], curtains: [[1.54, 3.64, 1.95, 0.77]], splash: [[0.77, 1.95, 24]], crown: [5.22, 3.62, 0.9, 12], u: 7 })); } f.position.set(x, 0, z); f.traverse(o => { if (o.isMesh) o.castShadow = true; }); FURN.add(f); }
   // светофари: стълб вдясно преди стоп линията и глава с 3 лампи; лампите — по фазата на клона (lightsUpdate)
   // tlight-one (f9, T4 от оценката): късата връзка между две кръстовища (двойно платно в OSM) е част от едно голямо кръстовище —
   // по нея без стоп линии, зебри и светофарни глави (иначе — две зебри и два светофара един срещу друг); движението не се пипа
@@ -489,7 +500,7 @@ export function buildPlan2View(P, opts = {}) {
   const G = new THREE.Group(), D = opts.osm ? { ...opts.osm, _models: opts.bridgeModels || {}, _kremlin: opts.kremlinModels || null, _gum: opts.gumModel || null } : null;   // bridgeModels: { bosphorus } — висящите мостове G.userData.plan = P;
   if (opts.offset) G.position.set(opts.offset[0], 0, opts.offset[1]);
   if (D && D.sea && opts.bridgesReal && /^(paris|london|moscow|newyork|washington)$/.test(D.style)) D.wY = -6;   // 🌉 bridges-real (f6): реката — по-дълбоко, кейовете — каменни стени, под мостовете — истинските модели (bridges.js)
-  const RR = P.R * 1.6, g0 = new THREE.Mesh(new THREE.PlaneGeometry(RR * 2.4, RR * 2.4).rotateX(-Math.PI / 2), D ? MAT.urban : MAT.grass); g0.receiveShadow = true; if (D && D.sea) g0.geometry = feature('banks-smooth') || D.wY ? seaGroundSmooth(D.sea, D.wY ? -D.wY + 0.5 : 0) : seaGround(D.sea);   /* banks-smooth (f6): плавен бряг */ else if (D) g0.geometry = romeGround(RR, D); G.add(g0); G.userData.groundMat = g0.material;   // Рим: дворовете и площадите — светъл камък, тревата — само в парковете
+  const RR = P.R * 1.6, g0 = new THREE.Mesh(new THREE.PlaneGeometry(RR * 2.4, RR * 2.4).rotateX(-Math.PI / 2), D ? MAT.urban : MAT.grass); g0.receiveShadow = true; if (D && D.sea) { const S0 = D.style === 'istanbul' ? seaPad(D.sea, 120) : D.sea; g0.geometry = feature('banks-smooth') || D.wY ? seaGroundSmooth(S0, D.wY ? -D.wY + 0.5 : 0) : seaGround(S0); }   /* banks-smooth (f6): плавен бряг */ else if (D) g0.geometry = romeGround(RR, D); G.add(g0); G.userData.groundMat = g0.material;   // Рим: дворовете и площадите — светъл камък, тревата — само в парковете
   if (P.coastZ) { const sh = new THREE.Shape(); sh.moveTo(-RR * 1.2, -RR * 1.2); for (let i = 0; i <= 80; i++) { const x = -RR * 1.2 + i * RR * 2.4 / 80; sh.lineTo(x, P.coastZ(x)); } sh.lineTo(RR * 1.2, -RR * 1.2); const wg = new THREE.ShapeGeometry(sh); wg.rotateX(Math.PI / 2); const wm = new THREE.Mesh(wg, MAT.water); wm.position.y = 0.02; G.add(wm);
     // бряг: пясъчна ивица по водата и крайбрежна алея до кея; пристанището — кей навътре във водата пред мястото му
     const cl = []; for (let x = -RR * 1.2; x <= RR * 1.2; x += 4) cl.push(x);

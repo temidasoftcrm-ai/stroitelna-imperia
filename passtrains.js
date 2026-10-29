@@ -40,8 +40,10 @@ export function createPassingTrains(deps) {
     }
     if (TVAR && (passenger ? hasTrainModel('elLoco') : hasTrainModel('upLoco'))) {   // 🚆 trains-variety (T1): 4 пътнически и 3 товарни композиции — по реда (детерминистично)
       const n = tvN++, r = (k => () => (k = (k * 16807) % 2147483647) / 2147483647)(7919 * (n + 1)), pick = a => a[(r() * a.length) | 0], has = k => hasTrainModel(k);
-      if (passenger) { const v = n % 6, [loco, cars] = v === 0 ? ['elLoco', ['silverCar']] : v === 1 ? ['elLoco', ['nightCar']] : v === 2 ? ['steamLoco', ['paxCar', 'silverCar']] : v === 3 ? ['paxLoco', ['paxCar', 'nightCar']] : v === 4 ? ['gpLoco', ['silverCar', 'paxCar']] : ['steam2Loco', ['paxCar']];   /* +2 (28.10): дизел (GP) + сребристи/сини; парен №2 + сини (ретро) */
-        g.add(trainCar(has(loco) ? loco : 'elLoco')); const C = cars.filter(has); for (let i = 0, k = 3 + (r() * 4 | 0); i < k; i++) g.add(trainCar(pick(C.length ? C : ['silverCar'])));
+      if (passenger) {   // 🚃 една фамилия вагони на влак (не се смесват сребристи и сини); парният — само с класическите сини, иначе тегли стари товарни
+        const v = n % 6, [lo, car] = [['elLoco', 'silverCar'], ['elLoco', 'nightCar'], ['steamLoco', 'paxCar'], ['paxLoco', 'paxCar'], ['gpLoco', 'silverCar'], ['steam2Loco', 'paxCar']][v], loco = has(lo) ? lo : 'elLoco', steam = /^steam/.test(loco);
+        const C = has(car) && loco === lo ? [car] : steam ? ['boxcar', 'gondola', 'timber', 'srrCar'].filter(has) : has('silverCar') ? ['silverCar'] : [];
+        g.add(trainCar(loco)); for (let i = 0, k = 3 + (r() * 4 | 0); i < k && C.length; i++) g.add(trainCar(pick(C), (r() * 99) | 0));
         return { g, len: lenOf() }; }
       const v = n % 4, loco = v === 3 && has('gpLoco') ? 'gpLoco' : v === 1 && has('vl82') ? 'vl82' : 'upLoco',   /* v 3 (28.10): дизел (GP) с цистерни и платформи */ W = (v === 0 || v === 3 ? ['cistern', 'cistern', 'gondola', 'timber', 'srrCar'] : v === 1 ? ['wmCoal', 'wmCoal', 'hopX', 'gondola', 'hopper2'] : ['autorack', 'autorack', 'flat', 'boxcar', 'srrCar', 'timber']).filter(has);
       g.add(trainCar(loco)); if (v === 2 && r() < 0.5) g.add(trainCar('upLoco'));   // понякога — два локомотива

@@ -149,27 +149,27 @@ function sample(keys, t) {
 // group: групата на града; deps: { A, model, label(text, color, w) }; opts: { lv (1–7), x, z, seed }
 export function buildAirport(group, deps, opts = {}) {
   if (opts.eu != null) WIZZ_P = opts.eu ? 0.45 : 0.08;   // plane-wizz: Европа — често, другаде — рядко
-  const g = new THREE.Group(); group.add(g);
+  const g = new THREE.Group(); group.add(g); const rwG = new THREE.Group(); g.add(rwG);   // air-runways2: основната писта и рулежката — от ниво 5 се крият (по-дългите писти са в lvG)
   g.position.set(opts.x || 0, 0, opts.z || 0);
   const lights = [], beacons = [], windows = [], towerGlows = [], smalls = [];
   // земя, писта, рулежка, перон
   flat(AIRPORT_SIZE.w + 20, AIRPORT_SIZE.d + 20, mat(0x6f8f4e, 1), 15, 0.015, 5, g);
-  flat(RW.w, RW.z1 - RW.z0, mat(0x2b2d31, 0.95), RW.x, 0.04, (RW.z0 + RW.z1) / 2, g);
+  flat(RW.w, RW.z1 - RW.z0, mat(0x2b2d31, 0.95), RW.x, 0.04, (RW.z0 + RW.z1) / 2, rwG);
   const white = new THREE.MeshBasicMaterial({ color: 0xf2f2f2 });
-  for (let z = RW.z0 + 22; z < RW.z1 - 22; z += 12) flat(0.6, 6, white, RW.x, 0.06, z, g);   // осева линия
-  for (const zz of [RW.z0 + 4, RW.z1 - 4]) for (let k = -5; k <= 5; k += 2) if (k) flat(0.8, 7, white, RW.x + k * 0.6, 0.06, zz, g);   // прагове
-  for (const sd of [-1, 1]) flat(0.3, RW.z1 - RW.z0, white, RW.x + sd * (RW.w / 2 - 0.6), 0.06, (RW.z0 + RW.z1) / 2, g);
-  flat(8, RW.z1 - RW.z0 - 10, mat(0x3a3d42, 0.95), TW.x, 0.035, (RW.z0 + RW.z1) / 2, g);
+  for (let z = RW.z0 + 22; z < RW.z1 - 22; z += 12) flat(0.6, 6, white, RW.x, 0.06, z, rwG);   // осева линия
+  for (const zz of [RW.z0 + 4, RW.z1 - 4]) for (let k = -5; k <= 5; k += 2) if (k) flat(0.8, 7, white, RW.x + k * 0.6, 0.06, zz, rwG);   // прагове
+  for (const sd of [-1, 1]) flat(0.3, RW.z1 - RW.z0, white, RW.x + sd * (RW.w / 2 - 0.6), 0.06, (RW.z0 + RW.z1) / 2, rwG);
+  flat(8, RW.z1 - RW.z0 - 10, mat(0x3a3d42, 0.95), TW.x, 0.035, (RW.z0 + RW.z1) / 2, rwG);
   const yellow = new THREE.MeshBasicMaterial({ color: 0xf2c200 });
-  flat(0.25, RW.z1 - RW.z0 - 10, yellow, TW.x, 0.05, (RW.z0 + RW.z1) / 2, g);
-  for (const z of [RW.z0 + 14, -10, RW.z1 - 14]) { flat(RW.x - TW.x, 8, mat(0x3a3d42, 0.95), (RW.x + TW.x) / 2, 0.036, z, g); }
+  flat(0.25, RW.z1 - RW.z0 - 10, yellow, TW.x, 0.05, (RW.z0 + RW.z1) / 2, rwG);
+  for (const z of [RW.z0 + 14, -10, RW.z1 - 14]) { flat(RW.x - TW.x, 8, mat(0x3a3d42, 0.95), (RW.x + TW.x) / 2, 0.036, z, rwG); }
   flat(TW.x - TERM.x - 4, 170, mat(0x8a8d92, 0.9), (TW.x + TERM.x + 4) / 2, 0.03, 0, g);   // перон
   // светлини по ръба на пистата
   const lm = mat(0xfff4c0, 0.4, 0, 0xffe080);
-  for (let z = RW.z0; z <= RW.z1; z += 10) for (const sd of [-1, 1]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.4), lm); l.position.set(RW.x + sd * (RW.w / 2 + 0.6), 0.15, z); g.add(l); }
+  for (let z = RW.z0; z <= RW.z1; z += 10) for (const sd of [-1, 1]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.4), lm); l.position.set(RW.x + sd * (RW.w / 2 + 0.6), 0.15, z); rwG.add(l); }
   lights.push(lm);
   const appr = mat(0xff3030, 0.4, 0, 0xff2020);   // подходни светлини на юг
-  for (let k = 1; k <= 5; k++) { const p = box(0.2, 1.5, 0.2, mat(0x888888), RW.x, 0.75, RW.z1 + k * 6, g); const l = new THREE.Mesh(new THREE.BoxGeometry(5, 0.3, 0.4), appr); l.position.set(RW.x, 1.6, RW.z1 + k * 6); g.add(l); }
+  for (let k = 1; k <= 5; k++) { const p = box(0.2, 1.5, 0.2, mat(0x888888), RW.x, 0.75, RW.z1 + k * 6, rwG); const l = new THREE.Mesh(new THREE.BoxGeometry(5, 0.3, 0.4), appr); l.position.set(RW.x, 1.6, RW.z1 + k * 6); rwG.add(l); }
   lights.push(appr);
 
   // терминал, кула, хангари — пресъздават се при смяна на нивото
@@ -213,6 +213,11 @@ export function buildAirport(group, deps, opts = {}) {
   // air-runways2 (T2): писти като на истинските хъбове — ниво 1–2 една, 3–4 две успоредни (80 м), 5–6 три, 7 две двойки близки успоредни (40 м);
   // всяка с рулежка, бързи изходи, точки за изчакване, номера и прагове в двата края, светлини нощем (емисивни инстанции, без истински светлини); полето — правоъгълник
   const RW2 = feature('air-runways2');
+  // 🏗️ infra-lots (T2, потребителят): от ниво 5 пистите са по-дълги — ×1,3 / ×1,5 / ×1,7 (големите хъбове), навън от града (opts.ext 'n' — на север, 's' — на юг);
+  // рулежките, светлините, тревата и пътищата на самолетите — по новите краища (Z0, Z1)
+  const EXT = opts.ext === 's' ? 's' : 'n', rwK = b => RW2 && feature('infra-lots') ? (b >= 7 ? 1.7 : b >= 6 ? 1.5 : b >= 5 ? 1.3 : 1) : 1;
+  const rwZ = b => { const L = (RW.z1 - RW.z0) * rwK(b); return EXT === 's' ? [RW.z0, RW.z0 + L] : [RW.z1 - L, RW.z1]; };
+  let Z0 = RW.z0, Z1 = RW.z1, keysDirty = false;
   const rwLayout = b => b >= 7 ? { R: [46, 86, 126, 166], T: [26, 106, 146] } : b >= 5 ? { R: [46, 126, 166], T: [26, 106, 146] } : b >= 3 ? { R: [46, 126], T: [26, 106] } : { R: [46], T: [26] };
   const R2M = RW2 ? { asph: mat(0x2b2d31, 0.95), tw: mat(0x3a3d42, 0.95), grass: mat(0x6f8f4e, 1), white: new THREE.MeshBasicMaterial({ color: 0xf2f2f2 }), yel: new THREE.MeshBasicMaterial({ color: 0xf2c200 }), sign: mat(0xb8261c, 0.6),
     edge: mat(0xfff4c0, 0.4, 0, 0xffe080), thr: mat(0x50ff70, 0.4, 0, 0x30ff60), end: mat(0xff4a3a, 0.4, 0, 0xff2a1a), blue: mat(0x5a80ff, 0.4, 0, 0x2a5cff), lamp: new THREE.BoxGeometry(0.7, 0.35, 0.7) } : null;
@@ -222,16 +227,19 @@ export function buildAirport(group, deps, opts = {}) {
   const numM = new Map(), numMat = t => numM.get(t) || (numM.set(t, (() => { const c = document.createElement('canvas'); c.width = 128; c.height = 192; const x = c.getContext('2d'); x.fillStyle = '#f2f2f2'; x.textAlign = 'center'; x.font = 'bold 92px sans-serif';
     const [nm, lt] = t.split(' '); x.fillText(nm, 64, 88); if (lt) x.fillText(lt, 64, 182); const tx = canvasTex(c); tx.colorSpace = THREE.SRGBColorSpace; return new THREE.MeshBasicMaterial({ map: tx, transparent: true, depthWrite: false }); })()), numM.get(t));
   function runways2(b) {
-    const { R, T } = rwLayout(b), M = R2M, z0 = RW.z0, z1 = RW.z1, zc = (z0 + z1) / 2, hw = RW.w / 2, xl = Math.max(...R, ...T), xe = xl + 22, CZ = [z0 + 14, -10, z1 - 14];
-    if (xe > 70) flat(xe - 70, 250, M.grass, (70 + xe) / 2, 0.015, 5, lvG);   // полето — до последната писта (+22 м), колкото е основната земя по z
+    const { R, T } = rwLayout(b), M = R2M, [z0, z1] = rwZ(b), ext = z1 - z0 > RW.z1 - RW.z0 + 1, zc = (z0 + z1) / 2, hw = RW.w / 2, xl = Math.max(...R, ...T), xe = xl + 22, CZ = [z0 + 14, -10, z1 - 14];
+    rwG.visible = !ext;   // от ниво 5 — всички писти и рулежката тук, по новата дължина
+    if (ext) { const xm = Math.max(70, xe); flat(xm + 40, z1 - z0 + 50, M.grass, (xm - 40) / 2, 0.016, zc, lvG);
+      const ap = mat(0xff3030, 0.4, 0, 0xff2020); lights.push(ap); for (let k = 1; k <= 5; k++) { box(0.2, 1.5, 0.2, mat(0x888888), RW.x, 0.75, z1 + k * 6, lvG); box(5, 0.3, 0.4, ap, RW.x, 1.6, z1 + k * 6, lvG); } }   // подходните светлини на юг
+    else if (xe > 70) flat(xe - 70, 250, M.grass, (70 + xe) / 2, 0.015, 5, lvG);   // полето — до последната писта (+22 м), колкото е основната земя по z
     const edges = [], thr = [], ends = [], blue = [];
-    if (xl > RW.x) for (const z of CZ) flat(xl - RW.x, 8, M.tw, (RW.x + xl) / 2, 0.036, z, lvG);   // напречните рулежки до последната (пресичат пистите — с точки за изчакване)
-    T.forEach(x => { if (x !== TW.x) { flat(8, z1 - z0 - 10, M.tw, x, 0.035, zc, lvG); flat(0.25, z1 - z0 - 10, M.yel, x, 0.05, zc, lvG); } for (let z = z0 + 5; z <= z1 - 5; z += 15) for (const sd of [-1, 1]) blue.push([x + sd * 4.4, 0.18, z]); });
+    if (xl > RW.x || ext) { const xa = ext ? TW.x : RW.x; for (const z of CZ) flat(xl - xa, 8, M.tw, (xa + xl) / 2, 0.036, z, lvG); }   // напречните рулежки до последната (пресичат пистите — с точки за изчакване)
+    T.forEach(x => { if (x !== TW.x || ext) { flat(8, z1 - z0 - 10, M.tw, x, 0.035, zc, lvG); flat(0.25, z1 - z0 - 10, M.yel, x, 0.05, zc, lvG); } for (let z = z0 + 5; z <= z1 - 5; z += 15) for (const sd of [-1, 1]) blue.push([x + sd * 4.4, 0.18, z]); });
     // номерата: от юг (подход на север) — 36, отсреща 18; успоредните — L/C/R отляво надясно (от север — обратно); ниво 7: западната двойка 35, източната 36
     const des = R.map((x, i) => { const n = R.length, pair = n === 4, num = pair ? (i < 2 ? 35 : 36) : 36, k = pair ? i % 2 : i, lt = n === 1 ? '' : pair ? 'LR'[k] : n === 2 ? 'LR'[k] : 'LCR'[k], fl = { L: 'R', R: 'L', C: 'C', '': '' };
       return [`${num}${lt ? ' ' + lt : ''}`, `${num - 18}${lt ? ' ' + fl[lt] : ''}`]; });
     R.forEach((x, i) => {
-      if (x !== RW.x) {   // главната писта (x = 46) е от основата
+      if (x !== RW.x || ext) {   // главната писта (x = 46) е от основата (от ниво 5 — и тя тук, по-дълга)
         flat(RW.w, z1 - z0, M.asph, x, 0.04, zc, lvG);
         for (let z = z0 + 26; z < z1 - 26; z += 12) flat(0.6, 6, M.white, x, 0.06, z, lvG);
         for (const zz of [z0 + 4, z1 - 4]) for (let q = -5; q <= 5; q += 2) if (q) flat(0.8, 7, M.white, x + q * 0.6, 0.06, zz, lvG);
@@ -253,6 +261,59 @@ export function buildAirport(group, deps, opts = {}) {
     M.gl ||= [0xffe9b0, 0x60ff80, 0xff5040, 0x6a8cff].map(c => new THREE.MeshBasicMaterial({ map: glowTex, color: c, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));   // нощем — меко сияние около всяка светлина (плоско, адитивно)
     const gq = new THREE.PlaneGeometry(3.2, 3.2).rotateX(-Math.PI / 2); [edges, thr, ends, blue].forEach((P, k) => instAt(gq, M.gl[k], P.map(q => [q[0], 0.3, q[2]]), lvG));
   }
+  // 🏗️ infra-lots (T2, потребителят): от ниво 5 — откъм града голям паркинг (многоетажен, 3–5 етажа с нивото, и открит с мачти) и връзка с града:
+  // надземна гара „Ⓜ Летище“ между кулата и терминала (с пасарела до терминала и павилион долу), естакада към града и рампа в тунел (метрото);
+  // совалка (2 вагона) идва от тунела, спира и се връща. Всичко е в lvG (пресъздава се с нивото); shuttle — за update
+  let shuttle = null;
+  const IL = RW2 && feature('infra-lots');
+  function landside(b) {
+    const conc = mat(0xb9b6ae, 0.85), dark = mat(0x5d6066, 0.8), asphL = mat(0x45484d, 0.95), white = new THREE.MeshBasicMaterial({ color: 0xf0f0f0 }), glassL = mat(0x7fa6c4, 0.2, 0.3, 0xffe2a8); windows.push(glassL);
+    const strip = mat(0xfff2d0, 0.5, 0, 0xfff0c0); lights.push(strip);
+    // ---- многоетажният паркинг: x −70…−50, z 6…66; етажи през 3 м; отворени страни, колони, коли по етажите, светли ивици под плочите
+    const nF = b - 2, X0 = -70, X1 = -50, Z0p = 6, Z1p = 66, cx = (X0 + X1) / 2, cz = (Z0p + Z1p) / 2, cols = [0xc62828, 0x1565c0, 0xeeeeee, 0x212121, 0x9e9e9e, 0x2e7d32, 0xf9a825].map(c => mat(c, 0.5, 0.4));
+    let seed = 97 + b; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647, carG = new THREE.BoxGeometry(1.8, 1.3, 4.2);
+    for (let f = 0; f <= nF; f++) { const y = f * 3;
+      box(X1 - X0, 0.35, Z1p - Z0p, conc, cx, y + 0.17, cz, lvG);
+      if (f) for (const x of [X0 + 0.3, X1 - 0.3]) box(0.25, 1.0, Z1p - Z0p, conc, x, y + 0.85, cz, lvG);   // парапетите
+      if (f < nF) { for (let x = X0 + 0.4; x <= X1 - 0.3; x += (X1 - X0 - 0.8) / 2) for (let z = Z0p + 0.4; z <= Z1p - 0.3; z += 10) box(0.5, 2.65, 0.5, conc, x, y + 1.67, z, lvG);
+        box(X1 - X0 - 2, 0.06, 0.3, strip, cx, y + 2.95, cz - 12, lvG); box(X1 - X0 - 2, 0.06, 0.3, strip, cx, y + 2.95, cz + 12, lvG); }
+      if (f) for (let z = Z0p + 3; z < Z1p - 3; z += 2.6) for (const x of [X0 + 3.5, X1 - 3.5]) if (rnd() < 0.7) { const c = new THREE.Mesh(carG, cols[Math.floor(rnd() * cols.length)]); c.position.set(x, y + 1.0, z); c.rotation.y = Math.PI / 2; c.castShadow = true; lvG.add(c); } }
+    box(4, nF * 3 + 3, 4, conc, X0 + 2, (nF * 3 + 3) / 2, Z0p - 2, lvG);   // стълбището/асансьорът
+    if (deps.label) { const p = deps.label('🅿️ ПАРКИНГ', '#ffffff', 8); p.position.set(cx, nF * 3 + 4, cz); lvG.add(p); }
+    flat(12, 7, asphL, -46, 0.05, 30, lvG); flat(8, 7, asphL, -54, 0.05, 30, lvG);   // входът от булеварда
+    // ---- откритият паркинг на север: редове по нивото, мачти с лампи
+    const rows = b - 3, pz0 = -52, pz1 = pz0 + rows * 11 + 2;
+    flat(20, pz1 - pz0, asphL, cx, 0.05, (pz0 + pz1) / 2, lvG);
+    for (let r = 0; r < rows; r++) for (let x = X0 + 1.5; x < X1 - 1; x += 2.6) { flat(0.12, 4.4, white, x, 0.06, pz0 + 3.4 + r * 11, lvG); if (rnd() < 0.6) { const c = new THREE.Mesh(carG, cols[Math.floor(rnd() * cols.length)]); c.position.set(x + 1.3, 0.75, pz0 + 3.4 + r * 11); c.castShadow = true; lvG.add(c); } }
+    for (const z of [pz0 + 2, pz1 - 2]) { box(0.3, 12, 0.3, dark, cx, 6, z, lvG); box(3.2, 0.4, 0.8, strip, cx, 12, z, lvG); }
+    // ---- надземната гара: перон на 7 м (x −40…−12, z ≈ −61), навес, стълби/асансьор, пасарела до терминала, павилион „Ⓜ“ долу
+    const ZL = -61, Y = 7, deck = mat(0xcfd3d8, 0.7), steel = mat(0x7c858f, 0.4, 0.6);
+    box(30, 0.9, 9, deck, -26, Y - 0.45, ZL, lvG);
+    box(28, 0.25, 7, mat(0x3f6e9e, 0.4, 0.3), -26, Y + 4.2, ZL, lvG);   // навесът
+    for (const x of [-38, -26, -14]) for (const sd of [-1, 1]) box(0.3, 4.2, 0.3, steel, x, Y + 2.1, ZL + sd * 3.2, lvG);
+    for (const x of [-38, -26, -14]) box(1.4, Y - 0.9, 1.4, conc, x, (Y - 0.9) / 2, ZL, lvG);
+    box(3.5, Y + 4, 3.5, glassL, -12, (Y + 4) / 2, ZL + 6.5, lvG);   // асансьорът (стъклен)
+    box(3, 3, -36 - (ZL + 4.5), glassL, -14, Y + 1.5, (ZL + 4.5 - 36) / 2, lvG);   // пасарелата до северния край на терминала
+    { const pv = new THREE.Group(); pv.position.set(-30, 0, ZL + 9); lvG.add(pv); box(8, 3.2, 5, glassL, 0, 1.6, 0, pv); box(9, 0.3, 6, dark, 0, 3.35, 0, pv);
+      const M = new THREE.Mesh(new THREE.CircleGeometry(1.1, 24), mat(0xd62828, 0.5, 0, 0xff3030)); lights.push(M.material); M.position.set(0, 4.6, 0); pv.add(M); box(0.2, 1.4, 0.2, dark, 0, 4, 0, pv);
+      if (deps.label) { const l = deps.label('Ⓜ Летище', '#ffffff', 8); l.position.set(0, 7, 0); pv.add(l); } }
+    // ---- естакадата към града и рампата в тунел (портал)
+    const XV = -95, XR = -120, XP = -128;
+    { const L = -40 - XV; box(L, 0.9, 6, deck, (-40 + XV) / 2, Y - 0.45, ZL, lvG); for (let x = -46; x > XV; x -= 12) box(1.2, Y - 0.9, 1.2, conc, x, (Y - 0.9) / 2, ZL, lvG);
+      for (const sd of [-1, 1]) box(L, 0.8, 0.2, conc, (-40 + XV) / 2, Y + 0.4, ZL + sd * 2.9, lvG); }
+    { const L = Math.hypot(XR - XV, Y), r = new THREE.Mesh(new THREE.BoxGeometry(L, 0.9, 6), deck); r.position.set((XV + XR) / 2, Y / 2 - 0.45, ZL); r.rotation.z = -Math.atan2(Y, XV - XR); r.castShadow = r.receiveShadow = true; lvG.add(r);
+      for (const sd of [-1, 1]) { const w = new THREE.Mesh(new THREE.BoxGeometry(L, 1.6, 0.4), conc); w.position.set((XV + XR) / 2, Y / 2 + 0.3, ZL + sd * 3.1); w.rotation.z = r.rotation.z; lvG.add(w); } }
+    box(8, 6, 8, conc, XP, 3, ZL, lvG); { const hole = new THREE.Mesh(new THREE.PlaneGeometry(5, 4.4), new THREE.MeshBasicMaterial({ color: 0x050505 })); hole.rotation.y = Math.PI / 2; hole.position.set(XP + 4.02, 2.2, ZL); lvG.add(hole); }
+    flat(14, 10, mat(0x6f8f4e, 1), XP - 2, 0.02, ZL, lvG);
+    // ---- совалката: 2 вагона по 11 м, бели със синя ивица, светли прозорци
+    const tr = new THREE.Group(), body = mat(0xf2f4f6, 0.4, 0.2), blue = mat(0x1f5fbf, 0.5), win = mat(0x22303c, 0.2, 0.3, 0xfff0c8); windows.push(win);
+    for (const k of [0, 1]) { const o = new THREE.Group(); o.position.x = k * 11.6; tr.add(o); box(11, 3, 2.8, body, 0, 1.9, 0, o); box(11.02, 0.4, 2.82, blue, 0, 1.0, 0, o); box(10, 0.9, 2.86, win, 0, 2.4, 0, o); }
+    lvG.add(tr); shuttle = { tr, ZL, Y, xs: -36, xv: XV, xr: XR, xp: XP };
+  }
+  const shuttleAt = t => { const s = shuttle; if (!s) return; const C = 48, u = (t % C) / C;   // спира 16 s на гарата, 10 s до тунела, 12 s в тунела, 10 s обратно
+    let x; if (u < 1 / 3) x = s.xs; else if (u < 0.5417) x = s.xs + (s.xp - 6 - s.xs) * ((1 - Math.cos(Math.PI * (u - 1 / 3) / 0.2083)) / 2); else if (u < 0.7917) x = s.xp - 30; else x = s.xp - 6 + (s.xs - s.xp + 6) * ((1 - Math.cos(Math.PI * (u - 0.7917) / 0.2083)) / 2);
+    const head = x, y = head > s.xv ? s.Y : head > s.xr ? s.Y * (head - s.xr) / (s.xv - s.xr) : 0;
+    s.tr.position.set(x - 5.5, y, s.ZL); s.tr.visible = x > s.xp - 2; };
   let lv = 0;
   function setLevel(n) {
     n = Math.max(1, Math.min(7, n | 0)); if (n === lv) return; lv = n;
@@ -260,7 +321,8 @@ export function buildAirport(group, deps, opts = {}) {
     lvG.clear(); parked.length = 0; windows.length = 0; towerGlows.length = 0; smalls.length = 0;
     const tLen = Math.min(40 + n * 22, 112), tz = -tLen / 2 + 20;   // до 112 — кулата в северния край остава на сушата (не над морето)
     // писти колкото е нивото: ниво 3 — 3 писти, ниво 7 — 7 (успоредни на изток, през 26 м)
-    if (RW2) runways2(big); else { const extra = big - 1, wm = new THREE.MeshBasicMaterial({ color: 0xf2f2f2 }), asph = mat(0x2b2d31, 0.95), tw = mat(0x3a3d42, 0.95), em = mat(0xfff4c0, 0.4, 0, 0xffe080);
+    shuttle = null; if (IL && big >= 5) landside(big);
+    if (RW2) { runways2(big); [Z0, Z1] = rwZ(big); keysDirty = true; } else { const extra = big - 1, wm = new THREE.MeshBasicMaterial({ color: 0xf2f2f2 }), asph = mat(0x2b2d31, 0.95), tw = mat(0x3a3d42, 0.95), em = mat(0xfff4c0, 0.4, 0, 0xffe080);
       for (let k = 1; k <= extra; k++) {
         const x = RW.x + k * 26, z0 = RW.z0 + 10 * k, z1 = RW.z1 - 10 * k;
         flat(RW.w + 14, z1 - z0 + 20, mat(0x6f8f4e, 1), x, 0.016, (z0 + z1) / 2, lvG);   // трева под пистата (земята на летището е до x≈60)
@@ -394,7 +456,7 @@ export function buildAirport(group, deps, opts = {}) {
   }
   const strobes = [];
   for (let k = 0; k < 8; k++) for (const end of [-1, 1]) {   // подходните светлини пред двата края на пистата
-    const z = end < 0 ? RW.z0 - 12 - k * 10 : RW.z1 + 12 + k * 10, s = new THREE.Sprite(strobeM.clone()); s.position.set(RW.x, 0.8, z); s.scale.set(4, 4, 1); s.userData.k = k; nightG.add(s); strobes.push(s);
+    const z = end < 0 ? RW.z0 - 12 - k * 10 : RW.z1 + 12 + k * 10, s = new THREE.Sprite(strobeM.clone()); s.position.set(RW.x, 0.8, z); s.scale.set(4, 4, 1); s.userData.k = k; s.userData.end = end; nightG.add(s); strobes.push(s);
   }
   const lamp = () => { const s = new THREE.Sprite(glowM.clone()); s.scale.set(7, 7, 1); return s; };
   const sign = deps.label ? deps.label('✈️ ЛЕТИЩЕ', '#ffffff', 12) : null;
@@ -405,16 +467,17 @@ export function buildAirport(group, deps, opts = {}) {
   const T = 70, gy = k => PLANE_KINDS[k].r + PLANE_KINDS[k].r * 0.8;
   const land = makePlane('a320', 2), take = makePlane('wide', 4); g.add(land, take);
   const fars = [land, take].map(p => { const s = lamp(); s.position.set(0, -0.2, (p.userData.len || 26) * 0.55); p.add(s); return s; });   // фарът на носа
-  const LAND = [   // [t, x, y, z, yaw, pitch]
-    [0, RW.x, 90, RW.z1 + 700, Math.PI, -0.06], [16, RW.x, gy('a320'), RW.z1 - 6, Math.PI, -0.03], [17, RW.x, gy('a320'), RW.z1 - 14, Math.PI, 0],
-    [27, RW.x, gy('a320'), RW.z0 + 20, Math.PI, 0], [31, (RW.x + TW.x) / 2, gy('a320'), RW.z0 + 14, Math.PI * 1.5, 0], [34, TW.x, gy('a320'), RW.z0 + 14, 0, 0],
+  let LAND, TAKE; const mkKeys = () => { LAND = [   // [t, x, y, z, yaw, pitch]; Z0/Z1 — краищата на пистата за нивото (infra-lots)
+    [0, RW.x, 90, Z1 + 700, Math.PI, -0.06], [16, RW.x, gy('a320'), Z1 - 6, Math.PI, -0.03], [17, RW.x, gy('a320'), Z1 - 14, Math.PI, 0],
+    [27, RW.x, gy('a320'), Z0 + 20, Math.PI, 0], [31, (RW.x + TW.x) / 2, gy('a320'), Z0 + 14, Math.PI * 1.5, 0], [34, TW.x, gy('a320'), Z0 + 14, 0, 0],
     [52, TW.x, gy('a320'), RW.z1 - 20, 0, 0], [56, TERM.x + 15, gy('a320'), RW.z1 - 20, -Math.PI / 2, 0], [57, TERM.x + 15, gy('a320'), RW.z1 - 20, -Math.PI / 2, 0, 1], [T, TERM.x + 15, gy('a320'), RW.z1 - 20, -Math.PI / 2, 0, 1],
-  ];
-  const TAKE = [
+  ]; TAKE = [
     [0, TERM.x + 15, gy('wide'), RW.z1 - 14, Math.PI / 2, 0, 1], [27, TERM.x + 15, gy('wide'), RW.z1 - 14, Math.PI / 2, 0, 1], [27.01, TERM.x + 15, gy('wide'), RW.z1 - 14, Math.PI / 2, 0], [31, TW.x, gy('wide'), RW.z1 - 14, Math.PI / 2, 0],
     [35, RW.x, gy('wide'), RW.z1 - 14, Math.PI * 0.5, 0], [38, RW.x, gy('wide'), RW.z1 - 18, Math.PI, 0],
-    [50, RW.x, gy('wide'), RW.z0 + 40, Math.PI, 0], [54, RW.x, 10, RW.z0 - 20, Math.PI, 0.16], [T, RW.x, 160, RW.z0 - 800, Math.PI, 0.12],
+    [50, RW.x, gy('wide'), Z0 + 40, Math.PI, 0], [54, RW.x, 10, Z0 - 20, Math.PI, 0.16], [T, RW.x, 160, Z0 - 800, Math.PI, 0.12],
   ];
+    for (const st of strobes) { const k = st.userData.k; st.position.z = st.userData.end < 0 ? Z0 - 12 - k * 10 : Z1 + 12 + k * 10; } };
+  mkKeys();
   const fly = (p, keys, t) => {
     const [, x, y, z, yaw, pitch] = sample(keys, t % T), tt = t % T;
     let k = 0; while (k < keys.length - 1 && keys[k + 1][0] <= tt) k++;
@@ -424,6 +487,8 @@ export function buildAirport(group, deps, opts = {}) {
 
   function update(t, night = 0) {
     { const dt = lastT == null ? 0 : Math.min(0.2, Math.max(0, t - lastT)); lastT = t; moveTraffic(dt); }
+    if (keysDirty) { keysDirty = false; mkKeys(); }
+    shuttleAt(t);
     fly(land, LAND, t); fly(take, TAKE, t + T * 0.5);
     // малките самолети по другите писти: подход от юг → пробег → излитане на север (цикъл T2 s)
     for (const sp of smalls) { const { x, z0, z1, ph } = sp.userData.rw, T2 = 46, u = ((t / T2 + ph) % 1), gy = sp.userData.gearY;
@@ -450,7 +515,7 @@ export function buildAirport(group, deps, opts = {}) {
   function setPos(x, z) { g.position.set(x, 0, z); }
   function dispose() { group.remove(g); }
   // за клик: дали точка (световни координати) е върху летището
-  const hit = (px, pz) => px > g.position.x - 30 && px < g.position.x + (RW2 ? Math.max(70, Math.max(...rwLayout(lv).R) + 22) : 60 + Math.max(0, lv - 1) * 26) && pz > g.position.z - 115 && pz < g.position.z + 120;
+  const hit = (px, pz) => px > g.position.x - 30 && px < g.position.x + (RW2 ? Math.max(70, Math.max(...rwLayout(lv).R) + 22) : 60 + Math.max(0, lv - 1) * 26) && pz > g.position.z + Math.min(-115, Z0 - 15) && pz < g.position.z + Math.max(120, Z1 + 10);
   const refresh = () => { const n = lv; lv = 0; setLevel(n); };   // след като се заредят терминалите
   return { group: g, update, setLevel, setPos, dispose, hit, refresh, get level() { return lv; } };
 }

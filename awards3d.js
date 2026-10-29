@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { t as tr } from './i18n.js';   // 🌐 lang-en: надписите на платното (f9, част C)
+import { feature } from './lab/feature.js';
 
 const HV = 'assets/heavy/awards/';
 // горният рафт — строителство и транспорт; долният — петрол, финанси, хотели, град + общото в средата
@@ -22,6 +23,8 @@ export const AWARDS = [
   { k: 'hotel', dir: 'hotel', who: 'Георги Николов', nm: 'Петзвездна империя', cond: 'хотели 5★ и Гранд по света (1 / 5 / 15 / 40)', model: HV + 'award-georgi.glb', quote: 'Гостът помни как се е чувствал. Благодаря на всеки рецепционист и камериерка по веригата.' },
   { k: 'city', dir: 'mayor', who: 'Десислава Илиева', nm: 'Град за хората', cond: 'Империал Сити: 6 месеца поред удовлетвореност ≥ 60 / 70 / 80 / 90% и баланс на плюс', model: HV + 'award-desislava.glb', quote: 'Градът е на хората, които живеят в него. Благодаря на общините, лекарите и учителите.' },
 ];
+// 🕊️ peace-win (peacewin.js): „Архитект на мира“ — само платина, връчва се при победата (световният мир, задържан 12 месеца); статуетката — на „Борд на годината“
+if (feature('peace-win')) AWARDS.push({ k: 'peace', dir: '', who: 'Целият борд', nm: 'Архитект на мира', cond: 'световен мир: шестте цели, задържани 12 месеца', wide: true, model: HV + 'award-year.glb', quote: 'Започнахме с една бригада. Днес светът е в мир — благодарим на всеки, който вярваше.' });
 export const TIERS = {
   bronze: { nm: 'бронз', ico: '🥉', tint: 0xc07a3a, k: 1, rough: 0.42, metal: 0.95 },
   silver: { nm: 'сребро', ico: '🥈', tint: 0xd9dde3, k: 1, rough: 0.28, metal: 1 },
@@ -74,7 +77,7 @@ function plaqueTex(lines, on) {
 export function buildAwardsWall(scene, { x = 4.95, z = -3.2, ry = -Math.PI / 2, W = 2.7, H = 2.15, TH = 0.36 } = {}) {
   const own = [], M = o => { own.push(o); return o; };
   const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; scene.add(g);
-  const D = 0.42 * Math.max(1, W / 2.7), SH = [0.5 + (H - 0.5) * 0.24, 0.5 + (H - 0.5) * 0.62], N = 5, step = W / N;   // рафтовете — по височината на шкафа
+  const D = 0.42 * Math.max(1, W / 2.7), SH = [0.5 + (H - 0.5) * 0.24, 0.5 + (H - 0.5) * 0.62], N = Math.max(5, Math.ceil(AWARDS.length / 2)), step = W / N;   // рафтовете — по височината на шкафа
   const walnut = M(new THREE.MeshStandardMaterial({ color: 0x3b2416, roughness: 0.45, metalness: 0.05 })), goldTrim = M(new THREE.MeshStandardMaterial({ color: 0xd4a73a, metalness: 1, roughness: 0.3 }));
   const glass = M(new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.14, depthWrite: false }));
   const velvet = M(new THREE.MeshStandardMaterial({ color: 0x1d2a4a, roughness: 0.9 }));

@@ -7,6 +7,9 @@
 //         speed() → текуща скорост, setSpeed(n), save(), lv20() → ниво 20 (империя), firstPlane(), firstOil(), auto() → false в тестове }
 import './notif.js';   // бутонът 🔔 за известията (отделен модул; зарежда се оттук, за да не се пипа index.html)
 import './tour.js';   // ❓ обиколка на бутоните за новия играч (същото)
+import { feature } from './lab/feature.js';
+import { CONFLICTS } from './worldpol.js';
+import { t as tr } from './i18n.js';
 const LS = 'stroiCine';
 const DUR = 6.5;
 const SCENES = [
@@ -39,6 +42,8 @@ const SCENES = [
   { key: 'plane', ico: '🛫', nm: 'Първи самолет', cap: '🛫 Първият ти самолет излита', sub: 'Небето вече е част от империята.', lock: 'Построй първото си летище', video: 'assets/cinema/plane.mp4', poster: 'assets/cinema/plane.jpg' },
   { key: 'oil', ico: '🛢️', nm: 'Първи петрол', cap: '🛢️ Ерата на черното злато', sub: 'Сондата заработи. Петролът потече.', lock: 'Пусни първия си петролен кладенец', video: 'assets/cinema/oil.mp4', poster: 'assets/cinema/oil.jpg' },
   { key: 'lv20', ico: '🌍', nm: 'Ниво 20 — Империя', cap: 'СВЕТОВНА ИМПЕРИЯ', sub: 'Започна с една сграда. Свърза целия свят.', lock: 'Стигни ниво 20', video: 'assets/cinema/lv20.mp4', poster: 'assets/cinema/lv20.jpg' },
+  // 🕊️ peace-win (peacewin.js): финалът „Световен мир“ — без видео, рисувано (глобусът с връзките, подписването, бордът); пуска се само от peacewin.js
+  ...(feature('peace-win') ? [{ key: 'peace', ico: '🕊️', nm: 'Световен мир', cap: '🕊️ Световен мир', sub: 'Започна с една бригада. Остави свят в мир.', lock: 'Задръж шестте цели на мира 12 месеца', dur: 13, videos: ['assets/cinema/peace-1.mp4', 'assets/cinema/peace-2.mp4', 'assets/cinema/peace-3.mp4'] }] : []),   /* по-късно: 3 клипа по 5 s (подписването → възстановените градове → Земята със светещите връзки + „Архитект на мира“); ако ги няма — рисуваната сцена */
 ];
 const CSS = `
 #cine { position:fixed; inset:0; z-index:300; background:#000; opacity:0; transition:opacity .45s; overflow:hidden; user-select:none; }
@@ -168,6 +173,16 @@ const MUSIC = {
     [[67, 0, 0.25], [72, 0.3, 0.25], [76, 0.6, 0.25], [79, 0.9, 1.5]].forEach(([m, t, d]) => A.note(A.mus, 4.5 + t, m, d, 0.06, { type: 'sawtooth', lp: 2200, a: 0.03, vib: 3, det: [-5, 5] }));
     for (const m of [48, 55, 60, 64, 67]) A.note(A.mus, 5.4, m, 1.2, 0.035, { type: 'sawtooth', lp: 1600, a: 0.05 });
     A.drum(A.mus, 4.5, 48, 0.55, 1.1); A.noise(A.mus, 4.5, 1.6, 0.07, { type: 'highpass', f: 5000 });
+  },
+  peace(A) {   // 🕊️ peace-win: тих струнен фон, химн, перото по хартията, аплодисменти и големият акорд
+    for (const m of [41, 48, 53, 57, 60]) A.note(A.mus, 0, m, 5.6, 0.026, { type: 'sawtooth', lp: 800, a: 2.6, det: [-5, 5] });
+    const mel = [[65, 0.8, 0.9], [67, 1.7, 0.45], [69, 2.15, 0.9], [72, 3.05, 1.2], [70, 4.3, 0.45], [69, 4.75, 0.45], [67, 5.2, 1.3]];
+    for (const [m, t, d] of mel) A.note(A.mus, t, m + 12, d, 0.05, { a: 0.08, vib: 3 });
+    for (const m of [46, 53, 58, 62, 65]) A.note(A.mus, 5.6, m, 4.2, 0.024, { type: 'sawtooth', lp: 900, a: 1.4, det: [-5, 5] });
+    for (let i = 0; i < 7; i++) A.noise(A.sfx, 6.4 + i * 0.16, 0.12, 0.03, { f: 3800 + i * 200, q: 4 });   // подписът
+    A.noise(A.sfx, 9.6, 2.6, 0.06, { f: 2200, q: 0.6, a: 0.4 });   // аплодисментите на борда
+    for (const m of [53, 60, 65, 69, 72, 77]) A.note(A.mus, 9.9, m, 3.0, 0.03, { type: 'sawtooth', lp: 1800, a: 0.12, det: [-5, 5] });
+    A.drum(A.mus, 9.9, 46, 0.5, 1.4); A.noise(A.mus, 9.9, 2.0, 0.05, { type: 'highpass', f: 5000 });
   },
 };
 
@@ -413,6 +428,77 @@ const DRAW = {
       c.globalAlpha = 1;
     },
   },
+  // 🕊️ peace-win: глобусът със светещите връзки (конфликтите стават гълъби) → подписването на споразумението → бордът около теб
+  peace: {
+    setup(r, data) { return { stars: Array.from({ length: 180 }, () => [r(), r(), r()]), spark: Array.from({ length: 90 }, () => [r(), r(), r(), r()]), ...data }; },
+    draw(c, t, W, H, s) {
+      c.fillStyle = '#02040b'; c.fillRect(0, 0, W, H);
+      const D = Math.PI / 180, cx = W / 2, cy = H * 0.5;
+      const gA = 1 - clamp((t - 5.0) / 0.8);
+      if (gA > 0) {
+        for (const [x, y, k] of s.stars) { c.fillStyle = `rgba(255,255,255,${(0.25 + 0.5 * k) * gA})`; c.fillRect(x * W, y * H, 1.3, 1.3); }
+        const R = H * 0.37 * lerp(0.3, 1, ease(t / 1.6)) * (1 + 0.04 * t / 5), lon0 = (s.hq ? s.hq[1] : 23) + 30 - t * 9, lat0 = 22;
+        const sl0 = Math.sin(lat0 * D), cl0 = Math.cos(lat0 * D);
+        const pr = (lat, lon) => { const la = lat * D, dl = (lon - lon0) * D, cl = Math.cos(la); return [cx + R * cl * Math.sin(dl), cy - R * (cl0 * Math.sin(la) - sl0 * cl * Math.cos(dl)), sl0 * Math.sin(la) + cl0 * cl * Math.cos(dl)]; };
+        c.globalAlpha = gA;
+        const halo = c.createRadialGradient(cx, cy, R * 0.95, cx, cy, R * 1.28); halo.addColorStop(0, 'rgba(120,200,255,.5)'); halo.addColorStop(1, 'rgba(120,200,255,0)'); c.fillStyle = halo; c.beginPath(); c.arc(cx, cy, R * 1.28, 0, 7); c.fill();
+        const oc = c.createRadialGradient(cx - R * 0.3, cy - R * 0.3, R * 0.1, cx, cy, R); oc.addColorStop(0, '#1d4f8a'); oc.addColorStop(1, '#081a36'); c.fillStyle = oc; c.beginPath(); c.arc(cx, cy, R, 0, 7); c.fill();
+        c.fillStyle = '#2c6a46'; c.strokeStyle = 'rgba(160,220,170,.35)'; c.lineWidth = 0.6;
+        for (const ring of s.rings || []) { const pts = ring.map(([lo, la]) => pr(la, lo)), vis = pts.filter(q => q[2] > 0).length; if (vis < 2) continue;
+          c.beginPath(); let on = false; for (const q of pts) { if (q[2] > 0) { on ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]); on = true; } else on = false; } if (vis === pts.length) { c.closePath(); c.fill(); } c.stroke(); }
+        const links = s.links || [], n = links.length;
+        links.forEach(([a, b], i) => { const k = clamp((t - 0.8 - i * Math.min(0.08, 2.2 / Math.max(1, n))) / 0.7); if (k <= 0) return;
+          const v = (la, lo) => [Math.cos(la * D) * Math.cos(lo * D), Math.cos(la * D) * Math.sin(lo * D), Math.sin(la * D)], A1 = v(...a), B1 = v(...b), om = Math.acos(clamp(A1[0] * B1[0] + A1[1] * B1[1] + A1[2] * B1[2], -1, 1)) || 1e-6;
+          c.strokeStyle = 'rgba(255,205,90,.9)'; c.lineWidth = 2; c.shadowColor = '#ffb400'; c.shadowBlur = 8 + 4 * Math.sin(t * 3 + i); c.beginPath(); let on = false;
+          for (let j = 0; j <= 30 * k; j++) { const u = j / 30, s1 = Math.sin((1 - u) * om) / Math.sin(om), s2 = Math.sin(u * om) / Math.sin(om), x = s1 * A1[0] + s2 * B1[0], y = s1 * A1[1] + s2 * B1[1], z = s1 * A1[2] + s2 * B1[2];
+            const q = pr(Math.asin(clamp(z, -1, 1)) / D, Math.atan2(y, x) / D), lift = 1 + 0.06 * Math.sin(u * Math.PI), X = cx + (q[0] - cx) * lift, Y = cy + (q[1] - cy) * lift;
+            if (q[2] > 0) { on ? c.lineTo(X, Y) : c.moveTo(X, Y); on = true; } else on = false; }
+          c.stroke(); c.shadowBlur = 0; });
+        for (const [la, lo] of s.pts || []) { const q = pr(la, lo); if (q[2] <= 0) continue; c.fillStyle = '#ffd76a'; c.beginPath(); c.arc(q[0], q[1], 3 + 1.5 * Math.sin(t * 4 + la), 0, 7); c.fill(); }
+        (s.wars || []).forEach(([la, lo], i) => { const q = pr(la, lo); if (q[2] <= 0) return; const tk = 1.6 + i * 0.45, p = clamp((t - tk) / 0.6);
+          if (p < 1) { const r0 = 7 + 3 * Math.sin(t * 9 + i); c.fillStyle = `rgba(255,70,70,${0.55 * (1 - p)})`; c.beginPath(); c.arc(q[0], q[1], r0, 0, 7); c.fill(); }
+          if (p > 0) { c.strokeStyle = `rgba(140,220,255,${0.8 * (1 - clamp((t - tk - 0.6) / 1.2))})`; c.lineWidth = 2; c.beginPath(); c.arc(q[0], q[1], 6 + 26 * clamp((t - tk) / 1.8), 0, 7); c.stroke();
+            c.globalAlpha = gA * p; c.font = `${Math.round(H * 0.035)}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('🕊️', q[0], q[1] - 6 * p); c.globalAlpha = gA; } });
+        c.globalAlpha = 1;
+      }
+      // подписването: масата, документът, печатите на блоковете, перото
+      const bA = clamp((t - 5.2) / 0.7) * (1 - clamp((t - 9.4) / 0.7));
+      if (bA > 0) {
+        c.globalAlpha = bA; const bg = c.createRadialGradient(cx, H * 0.35, 10, cx, H * 0.35, W * 0.7); bg.addColorStop(0, '#3a2a14'); bg.addColorStop(1, '#0b0805'); c.fillStyle = bg; c.fillRect(0, 0, W, H);
+        const FL = ['#3c6fd6', '#d52b1e', '#ffb300', '#2d8f4e', '#8e44ad', '#16a1b8', '#e67e22', '#f2f2f2'];
+        FL.forEach((col, i) => { const x = W * (0.08 + i * 0.12), sw = Math.sin(t * 1.6 + i) * 6; c.fillStyle = '#6b5a3a'; c.fillRect(x - 2, H * 0.08, 4, H * 0.42); c.fillStyle = col; c.beginPath(); c.moveTo(x + 2, H * 0.09); c.lineTo(x + 2 + W * 0.05, H * 0.1 + sw); c.lineTo(x + 2 + W * 0.05, H * 0.2 + sw); c.lineTo(x + 2, H * 0.19); c.fill(); });
+        c.fillStyle = '#4a2e18'; c.beginPath(); c.moveTo(W * 0.04, H); c.lineTo(W * 0.16, H * 0.5); c.lineTo(W * 0.84, H * 0.5); c.lineTo(W * 0.96, H); c.fill();
+        c.fillStyle = '#d4a73a'; c.fillRect(W * 0.16, H * 0.5, W * 0.68, 3);
+        const pw = Math.min(W * 0.42, H * 0.62), ph = pw * 0.62, px = cx - pw / 2, py = H * 0.56 - ph * 0.15;
+        c.save(); c.translate(cx, py + ph / 2); c.transform(1, 0, 0, 0.82, 0, 0); c.translate(-cx, -(py + ph / 2));
+        c.fillStyle = '#f4ead2'; c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = 18; c.fillRect(px, py, pw, ph); c.shadowBlur = 0;
+        c.strokeStyle = '#b8862b'; c.lineWidth = 3; c.strokeRect(px + 8, py + 8, pw - 16, ph - 16);
+        c.fillStyle = '#3a2808'; c.textAlign = 'center'; c.textBaseline = 'alphabetic'; c.font = `800 ${Math.round(pw * 0.045)}px Georgia, serif`; c.fillText(tr('СВЕТОВНО СПОРАЗУМЕНИЕ ЗА МИР'), cx, py + ph * 0.17, pw - 30);
+        c.fillStyle = 'rgba(58,40,8,.35)'; for (let l = 0; l < 6; l++) c.fillRect(px + pw * 0.1, py + ph * (0.27 + l * 0.075), pw * (l === 5 ? 0.5 : 0.8), 2);
+        c.strokeStyle = '#3a2808'; c.lineWidth = 1; c.beginPath(); c.moveTo(px + pw * 0.55, py + ph * 0.86); c.lineTo(px + pw * 0.9, py + ph * 0.86); c.stroke();
+        const sg = clamp((t - 6.4) / 1.2), sx0 = px + pw * 0.57, sx1 = px + pw * 0.88, sy = py + ph * 0.82; let ex = sx0, ey = sy;
+        c.strokeStyle = '#1b2f6b'; c.lineWidth = 2.4; c.beginPath(); for (let j = 0; j <= 60 * sg; j++) { const u = j / 60; ex = lerp(sx0, sx1, u); ey = sy - Math.sin(u * 19) * ph * 0.035 * (1 - u * 0.5) - Math.sin(u * 5) * ph * 0.02; j ? c.lineTo(ex, ey) : c.moveTo(ex, ey); } c.stroke();
+        (s.blocs || []).forEach((b, i) => { const k = clamp((t - 5.6 - i * 0.12) / 0.4); if (k <= 0) return; const bx = px + pw * (0.12 + i * 0.075), by = py + ph * 0.82, r0 = pw * 0.03 * (1.6 - 0.6 * k);
+          c.globalAlpha = bA * k; c.fillStyle = '#9b1c1c'; c.beginPath(); c.arc(bx, by, r0, 0, 7); c.fill(); c.font = `${Math.round(r0 * 1.1)}px sans-serif`; c.textBaseline = 'middle'; c.fillText(b, bx, by + 1); c.textBaseline = 'alphabetic'; c.globalAlpha = bA; });
+        const st = clamp((t - 8.0) / 0.35); if (st > 0) { const r0 = pw * 0.07 * (1.8 - 0.8 * st); c.globalAlpha = bA * st; c.fillStyle = '#d4a73a'; c.beginPath(); c.arc(px + pw * 0.86, py + ph * 0.3, r0, 0, 7); c.fill(); c.fillStyle = '#5a3a08'; c.font = `${Math.round(r0)}px sans-serif`; c.textBaseline = 'middle'; c.fillText('🕊️', px + pw * 0.86, py + ph * 0.3); c.textBaseline = 'alphabetic'; c.globalAlpha = bA; }
+        c.restore();
+        if (sg > 0 && sg < 1) { const [qx, qy] = [ex, py + ph / 2 + (ey - py - ph / 2) * 0.82]; c.strokeStyle = '#111'; c.lineWidth = 5; c.beginPath(); c.moveTo(qx, qy); c.lineTo(qx + pw * 0.12, qy - pw * 0.16); c.stroke(); c.strokeStyle = '#d4a73a'; c.lineWidth = 2; c.beginPath(); c.moveTo(qx + pw * 0.06, qy - pw * 0.08); c.lineTo(qx + pw * 0.12, qy - pw * 0.16); c.stroke(); }
+        c.globalAlpha = 1;
+      }
+      // бордът около теб — силуети в златна светлина, имената отдолу
+      const cA = clamp((t - 9.6) / 0.8);
+      if (cA > 0) {
+        c.globalAlpha = cA; const bg = c.createRadialGradient(cx, H * 0.42, 10, cx, H * 0.42, W * 0.65); bg.addColorStop(0, '#5a4214'); bg.addColorStop(0.5, '#1d1508'); bg.addColorStop(1, '#050403'); c.fillStyle = bg; c.fillRect(0, 0, W, H);
+        const who = s.board || [], N = who.length, sc = Math.min(W / (N + 2), H * 0.2);
+        who.forEach((nm, i) => { const k = (i - (N - 1) / 2) / Math.max(1, (N - 1) / 2), x = cx + k * W * 0.4, y = H * 0.62 - (1 - k * k) * H * 0.1, z = 0.8 + 0.25 * (1 - k * k), me = i === Math.floor(N / 2), r0 = sc * 0.28 * z * (me ? 1.25 : 1);
+          c.fillStyle = me ? '#ffd36a' : '#140f07'; c.strokeStyle = me ? '#fff2c0' : 'rgba(255,210,110,.55)'; c.lineWidth = 2;
+          c.beginPath(); c.ellipse(x, y + r0 * 2.6, r0 * 1.7, r0 * 1.5, 0, Math.PI, 0); c.fill(); c.stroke(); c.beginPath(); c.arc(x, y, r0, 0, 7); c.fill(); c.stroke();
+          c.fillStyle = me ? '#ffd36a' : '#e8d9b0'; c.font = `${me ? 800 : 600} ${Math.round(Math.max(10, sc * 0.16))}px system-ui, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'alphabetic'; c.fillText(me ? tr('ТИ') : nm, x, y + r0 * 2.9 + sc * 0.2, sc * 1.1); });
+        for (const [x, y, v, w] of s.spark) { const yy = ((y + (t - 9.6) * (0.08 + v * 0.12)) % 1) * H; c.fillStyle = `rgba(255,${200 + Math.round(w * 50)},90,${0.35 + 0.5 * Math.abs(Math.sin(t * 5 + x * 40))})`; c.fillRect(x * W, yy, 3, 3); }
+        c.globalAlpha = 1;
+      }
+    },
+  },
 };
 
 export function createCinema(deps) {
@@ -426,11 +512,13 @@ export function createCinema(deps) {
   const byKey = k => SCENES.find(x => x.key === k);
 
   function sceneData(key) {
-    if (key !== 'lv20') return {};
+    if (key !== 'lv20' && key !== 'peace') return {};
     const s = S() || {}, ll = id => { const c = deps.cityById(id); return c && c.lat != null ? [c.lat, c.lon] : null; };
     const owned = [s.hqCity, ...(s.branches || [])].map(ll).filter(Boolean);
     const links = [...(s.rails || []).filter(r => r.built && !r.c), ...(s.airRoutes || []), ...(s.seaRoutes || [])].map(r => [ll(r.a), ll(r.b)]).filter(([a, b]) => a && b).slice(0, 60);
     if (!links.length && owned.length > 1) owned.slice(1).forEach(p => links.push([owned[0], p]));
+    if (key === 'peace' && links.length < 8) { const hq = ll(s.hqCity) || [42.7, 23.3]; for (const c of CONFLICTS) links.push([hq, [c.lat, c.lon]]); for (const p of [[38.9, -77.04], [55.75, 37.62], [39.9, 116.4], [-25.75, 28.19], [-15.79, -47.88], [28.61, 77.21]]) links.push([hq, p]); }   /* peace-win: малко връзки (нова игра) — коридорите на мира към конфликтите и столиците */
+    if (key === 'peace') return { hq: ll(s.hqCity) || [42.7, 23.3], pts: owned, links, wars: CONFLICTS.map(c => [c.lat, c.lon]), blocs: ['🇪🇺', '🌐', '🌏', '🕌', '🌍', '🌎'], board: ['Вера', 'Стефан', 'Мария', 'Борис', 'Десислава', '', 'Георги', 'Ивайло', 'Надя', 'Елена'] };   /* peace-win: бордът — 9 министри, ти в средата (празното място) */
     return { hq: ll(s.hqCity) || [42.7, 23.3], pts: owned, links };
   }
 
@@ -456,6 +544,7 @@ export function createCinema(deps) {
     playing = { key, close };
     requestAnimationFrame(() => el.classList.add('on'));
     const So = deps.sound && deps.sound(), wantSnd = !!So && !So.muted && (set.music || set.sfx);
+    if (sc.videos && !set.reduce && await playVideos(sc, el, cap, close, wantSnd, cleanup, f => (tm = f))) return true;   // peace-win: няколко клипа един след друг (ако всички файлове ги има)
     if (sc.video && !set.reduce && await playVideo(sc, el, cap, close, wantSnd, cleanup, f => (tm = f))) return true;
     if (done) return true;
     if (sc.video && (set.reduce || !DRAW[key])) {   // намалено движение или без видео: кадърът с бавно приближаване
@@ -467,7 +556,7 @@ export function createCinema(deps) {
     }
     const dr = DRAW[key], cv = el.querySelector('canvas'), c = cv.getContext('2d');
     const data = sceneData(key);
-    if (key === 'lv20') { try { const g = await Promise.race([loadGeo(), new Promise(r => setTimeout(() => r(null), 1500))]); data.rings = g ? ringsOf(g) : []; } catch (e) { data.rings = []; } }
+    if (key === 'lv20' || key === 'peace') { try { const g = await Promise.race([loadGeo(), new Promise(r => setTimeout(() => r(null), 1500))]); data.rings = g ? ringsOf(g) : []; } catch (e) { data.rings = []; } }
     const st = dr.setup(rng(key.length * 7919 + 13), data);
     let W = 0, H = 0; const t0 = performance.now();
     const fit = () => { const dpr = Math.min(window.devicePixelRatio || 1, innerWidth * innerHeight > 600000 ? 1.5 : 2); W = innerWidth; H = innerHeight; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); c.setTransform(dpr, 0, 0, dpr, 0, 0); };
@@ -481,12 +570,13 @@ export function createCinema(deps) {
       el.querySelector('.snd').style.display = 'none';
     };
     if (wantSnd) { startAudio(); if (!A) { el.querySelector('.snd').style.display = 'block'; el.addEventListener('pointerdown', startAudio); } }
+    const DL = sc.dur || DUR;   // peace-win: по-дългата сцена
     const frame = () => {
       if (done) return;
-      const t = Math.min(DUR, (performance.now() - t0) / 1000);
-      try { dr.draw(c, set.reduce ? DUR * 0.92 : t, W, H, st); } catch (e) { console.warn('cinema draw', e); close(); return; }
-      if (t >= DUR - 2.3) cap.classList.add('on');
-      if (t >= DUR) { tm = setTimeout(close, 1400); return; }
+      const t = Math.min(DL, (performance.now() - t0) / 1000);
+      try { dr.draw(c, set.reduce ? DL * 0.92 : t, W, H, st); } catch (e) { console.warn('cinema draw', e); close(); return; }
+      if (t >= DL - 2.3) cap.classList.add('on');
+      if (t >= DL) { tm = setTimeout(close, 1400); return; }
       raf = requestAnimationFrame(frame);
     };
     frame();
@@ -513,6 +603,14 @@ export function createCinema(deps) {
       });
       setTimeout(() => { if (!ok && v.readyState < 2) fail(); }, 4000);
     });
+  }
+  // peace-win: клиповете на сцената един след друг (peace-1/2/3.mp4) — надписът е на последния; ако някой файл липсва — false (рисуваната сцена)
+  async function playVideos(sc, el, cap, close, wantSnd, cleanup, setTm) {
+    const ok = await Promise.all(sc.videos.map(u => fetch(u, { method: 'HEAD' }).then(r => r.ok && /video|octet/.test(r.headers.get('content-type') || 'video/mp4')).catch(() => false)));
+    if (!ok.every(Boolean) || !el.isConnected) return false;
+    const N = sc.videos.length, noCap = { classList: { add() { } } };
+    const run = i => playVideo({ video: sc.videos[i], poster: '' }, el, i === N - 1 ? cap : noCap, i === N - 1 ? close : () => { el.querySelectorAll('video').forEach(v => { try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) {} v.remove(); }); run(i + 1).then(r => { if (!r) close(); }); }, wantSnd, cleanup, setTm);   // „ended“ → след 1,4 s следващият клип (последният — затваря)
+    return run(0);
   }
   function ringsOf(g) {
     const out = [];

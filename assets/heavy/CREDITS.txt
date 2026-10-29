@@ -130,9 +130,9 @@ cinema/newyork.mp4, cinema/vegas.mp4, cinema/paris.mp4, cinema/dubai.mp4, cinema
 - gear/mcrane.glb — "Mobile Hydraulic Truck Crane (Telescopic)" by doty_aecom (CC-BY 4.0) — https://sketchfab.com/3d-models/8c343b1ce4724631b4623e9ef7778163
 - lm/redeemer.glb — "Christ The Redeemer" by naveenhimal (CC-BY 4.0) — https://sketchfab.com/3d-models/d6f51d0fad7142a08ed26455f84f72ca
 - lm/colosseo.glb — "Colosseum" by alexanderleth (CC-BY 4.0) — https://sketchfab.com/3d-models/c3c5157559344c74b2c0bacc89036692
-- trains/chs200.glb — "CHS200 | электровоз ЧС200" by gildermanvladimir089 (CC-BY 4.0) — https://sketchfab.com/3d-models/8be2bbdd7e7c4f7d89113aab340965fa
+- trains/chs200.glb — "CHS200 | электровоз ЧС200" by gildermanvladimir089 (CC-BY 4.0) — https://sketchfab.com/3d-models/8be2bbdd7e7c4f7d89113aab340965fa (29.10: добавени светлини — фарове, стопове, кабина)
 - trains/paxcar.glb — "Passenger wagon | low-poly model" by nikcore76 (CC-BY 4.0) — https://sketchfab.com/3d-models/31c0e3e63ae84771869c8ac7d89c9018
-- trains/vl82.glb — "VL 82 Electric Locomotive" by eightismore (CC-BY 4.0) — https://sketchfab.com/3d-models/ec138d48868a4633bbd014947f344130 (без релсите)
+- trains/vl82.glb — "VL 82 Electric Locomotive" by eightismore (CC-BY 4.0) — https://sketchfab.com/3d-models/ec138d48868a4633bbd014947f344130 (без релсите; 29.10: добавени светлини — фарове, стопове, кабина)
 - trains/boxcar.glb — "Railway Boxcar Freight Wagon" by saadthedesigner314 (CC-BY 4.0) — https://sketchfab.com/3d-models/6cede42e50cc4042addfbedac1311551
 - trains/hopper2.glb — "Coal Hopper Railway Wagon" by saadthedesigner314 (CC-BY 4.0) — https://sketchfab.com/3d-models/287266d5edf749318cb9869fe583e0ae
 - trucks/scania.glb — "2022 Scania S-Series 730" by mcvehiclessketchfab (CC-BY 4.0) — https://sketchfab.com/3d-models/da65da889d6940d39cac1eec38cb925c
@@ -230,7 +230,7 @@ blocks2/pp-sky.glb — "Skyscraper" by Jarlan Perez, CC-BY — https://poly.pizz
 - port/sf-gantry.glb — "Gantry crane" by Randonavt (CC-BY 4.0) — https://sketchfab.com/3d-models/de8c4164d41742b395f78c20231d18b8 (текстурите 1024 px, WebP)
 - port/sf-warehouse.glb — "Old Industrial Building" by gazdahrco (CC-BY 4.0) — https://sketchfab.com/3d-models/0dafa7aaadfd4666bb4a32776c84b14e (текстурите 1024 px, WebP)
 - port/sf-lighthouse.glb — "lighthouse" by Lora_o (CC-BY 4.0) — https://sketchfab.com/3d-models/dab98033118949728804bfc5f4076b8f (текстурите 1024 px, WebP)
-- port/sf-grain.glb — "VNA Grain Silo" by djarchisa (CC-BY 4.0) — https://sketchfab.com/3d-models/faa649aa4e28400893d847827b18352c (без земята, слят в един меш)
+- port/sf-grain.glb — "VNA Grain Silo" by djarchisa (CC-BY 4.0) — https://sketchfab.com/3d-models/faa649aa4e28400893d847827b18352c (без земята, слят в един меш; 29.10: оцветен в Blender — бетон, покриви, стомана, прожектори и сигнална лампа; махнати разпилените парчета)
 - port/sf-straddle.glb — "Straddle Carrier" by JakeBradley (CC-BY 4.0) — https://sketchfab.com/3d-models/63f733b8d7784ad095849cb60d4df374 (текстурите 1024 px, WebP)
 ships/ferry-bandirma.glb — "Bandırma vapuru" by Batuhan13 (CC-BY 4.0) — https://sketchfab.com/3d-models/bandrma-vapuru-056250c643634288b72cc0160781ae94
 lm/timessq.glb — „Time square building“ by Building-studio (https://sketchfab.com/3d-models/time-square-building-1b19c6729be1428e9a0875df9c33d43a), CC BY 4.0. Changed: the musical posters and two shop signs replaced with fictional in-game ads; the tiled wall texture replaced with a brick facade.
@@ -266,7 +266,7 @@ Rails in assets/heavy/rail/ — Sketchfab, CC BY 4.0.
 - track.glb, track-tile.glb — railway track by hifrak958 — https://sketchfab.com/3d-models/72f4906d6f484cf693a342478f2ae102 (track-tile: one 4 m piece cut in Blender)
 - catenary-mast.glb — "Low poly catenary train system (USA)" by mtafan (@Ogfmh) — https://sketchfab.com/3d-models/412b4ce3ca9345bfaf05f728500ce00a — CC BY 4.0 (one mast with cantilever cut out and coloured in Blender; wires and portals are drawn in game.js)
 - rail/depot-shed.glb — "Engine Shed" by Victor.Rodriguez3D — https://sketchfab.com/3d-models/e3d25798cb1f4acaa6a52d869c60741c — CC BY 4.0 (textures 1024 webp)
-- trains/loco040.glb — "Old 0-4-0 Steam Locomotive" by steve_Emfore — https://sketchfab.com/3d-models/c42f25796d924a15a77c37f88c5a958f — CC BY 4.0 (textures 1024 webp)
+- trains/loco040.glb — "Old 0-4-0 Steam Locomotive" by steve_Emfore — https://sketchfab.com/3d-models/c42f25796d924a15a77c37f88c5a958f — CC BY 4.0 (textures 1024 webp; 29.10: добавени светлини — челна лампа, пещ)
 - trains/tank-ussr.glb — "USSR Railway Tank Wagon (War Thunder)" by KojfDiscord — https://sketchfab.com/3d-models/794af0d5c3be4491a2785c276ac010eb — CC BY 4.0 (converted to metallic-roughness, textures 1024 webp)
 
 Replacements (Lab: "Изтрий и намери нов подобен модел") — Sketchfab, CC BY 4.0, reduced in Blender:

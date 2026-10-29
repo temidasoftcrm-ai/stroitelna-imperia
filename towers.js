@@ -6,6 +6,8 @@
 // или парцел на играча; фасадите на фоновите сгради под нея се скриват (като rome-bld). По хеш на града — едни и същи места при всяко влизане.
 //   cityplan2-3d.js: opts.romeNear = { V, fn: towerNear, o } (куката на rome-bld: update(camera) / dirty() / dispose())
 import * as THREE from 'three';
+import { feature } from './lab/feature.js';
+const TWG = feature('tw-night2');   // 🌙 tw-night2 (потребителят: „можем ли по-добре да осветим този блок“): прозорците по истинските отвори, фасадата не е черна
 
 export const TOWER_FILES = { 'tw-urban': 'towers/urban-tower.glb', 'tw-ru': 'towers/ru-blocks.glb' };
 const EAST = new Set(['🇧🇬', '🇷🇸', '🇷🇴', '🇲🇰', '🇬🇷', '🇲🇪', '🇧🇦', '🇦🇱', '🇽🇰', '🇭🇷', '🇲🇩', '🇵🇱', '🇭🇺', '🇸🇰', '🇨🇿', '🇱🇹', '🇱🇻', '🇪🇪', '🇬🇪', '🇦🇲']), RU = new Set(['🇷🇺', '🇺🇦', '🇧🇾']);
@@ -16,26 +18,38 @@ const TINT = [null, 0xf3d9b8, 0xd5dde6];   // кремаво (както е), п
 // нощните прозорци — правоъгълници в шейдъра (решетка по етажите и колоните по стените на модела; изпечената от текстурата маска даваше петна):
 // етажите между a и b (дял от височината), fl етажа, колоните през cw м; ~40 % светят в 3 топли нюанса; партерът (под a) — витрините
 const WIN = { 'tw-urban': { fl: 15, a: 0.075, b: 0.86, cw: 3.4 }, 'tw-ru': { fl: 16, a: 0.045, b: 0.93, cw: 3.0 } };
-function winShader(mt, geo, k, seed) {
+function winShader(mt, geo, k, seed, tint) {
+  if (TWG && (mt.name === 'Facade' || mt.userData.twBaked)) { mt.userData.twBaked = 1; mt.emissive.setRGB(1, 1, 1);   // tw-night2: фасадата от Blender — изпечената маска по истинската решетка (оси × етажи); само лунната светлина отгоре
+    mt.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', 'vec3 twE0 = totalEmissiveRadiance;\n#include <emissivemap_fragment>\n totalEmissiveRadiance += twE0 * diffuseColor.rgb * 0.07;'); };
+    mt.customProgramCacheKey = () => 'tw-baked'; return; }
+  if (TWG && WIN[k] && k === 'tw-urban') { mt.emissive.setRGB(1, 1, 1); mt.emissiveMap = null;   // tw-night2: покривът/мансардата — без прозорци, само лунната светлина
+    mt.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance = emissive * diffuseColor.rgb * 0.07;'); };
+    mt.customProgramCacheKey = () => 'tw-roof'; return; }
   geo.computeBoundingBox(); const gb = geo.boundingBox, H = gb.max.y - gb.min.y, W = WIN[k], mpu = HM[k] / H;
   mt.emissiveMap = null; mt.emissive.setRGB(1, 1, 1);
   mt.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, { uTwY0: { value: gb.min.y }, uTwH: { value: H }, uTwA: { value: W.a }, uTwB: { value: W.b }, uTwFl: { value: W.fl }, uTwCw: { value: W.cw / mpu }, uTwSeed: { value: seed } });
+    Object.assign(sh.uniforms, { uTwY0: { value: gb.min.y }, uTwH: { value: H }, uTwA: { value: W.a }, uTwB: { value: W.b }, uTwFl: { value: W.fl }, uTwCw: { value: W.cw / mpu }, uTwSeed: { value: seed }, uTwBx: { value: new THREE.Vector2(gb.min.x, gb.max.x) }, uTwBz: { value: new THREE.Vector2(gb.min.z, gb.max.z) }, uTwDp: { value: 2.0 / mpu }, uTwG0: { value: 0.22 }, uTwG1: { value: 0.34 }, uTwTint: { value: new THREE.Color(tint ?? 0xffffff) } });
     sh.vertexShader = 'varying vec3 vTwP; varying vec3 vTwN;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vTwP = position; vTwN = normal;');
-    sh.fragmentShader = 'varying vec3 vTwP; varying vec3 vTwN; uniform float uTwY0, uTwH, uTwA, uTwB, uTwFl, uTwCw, uTwSeed;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', `{
+    sh.fragmentShader = (TWG ? '#define TWG true\n' : '#define TWG false\n') + 'varying vec3 vTwP; varying vec3 vTwN; uniform float uTwY0, uTwH, uTwA, uTwB, uTwFl, uTwCw, uTwSeed, uTwDp, uTwG0, uTwG1; uniform vec2 uTwBx, uTwBz; uniform vec3 uTwTint;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', `{
       vec3 n = normalize(vTwN); float m = 0.0; vec3 tc = vec3(1.0);
       if (abs(n.y) < 0.4) {
-        bool sx = abs(n.x) > abs(n.z); float u = sx ? vTwP.z : vTwP.x, side = sx ? sign(n.x) : 2.0 + sign(n.z), hy = (vTwP.y - uTwY0) / uTwH;
+        bool sx = abs(n.x) > abs(n.z); float u = sx ? vTwP.z : vTwP.x, side = sx ? sign(n.x) : 2.0 + sign(n.z), hy = (vTwP.y - uTwY0) / uTwH, inW = 1.0;
+        if (TWG) { float ax = min(vTwP.x - uTwBx.x, uTwBx.y - vTwP.x), az = min(vTwP.z - uTwBz.x, uTwBz.y - vTwP.z); sx = ax < az; u = sx ? vTwP.z : vTwP.x;   // tw-night2: стената — по най-близката страна на рамката, не по шумните нормали на Meshy (те накъсваха прозорците)
+          side = sx ? (vTwP.x - uTwBx.x < uTwBx.y - vTwP.x ? -1.0 : 1.0) : (vTwP.z - uTwBz.x < uTwBz.y - vTwP.z ? 1.0 : 3.0); inW = step(min(ax, az), uTwDp); }   // по-навътре от uTwDp (дълбоки лоджии) — не
         if (hy > uTwA && hy < uTwB) {
           float fy = (hy - uTwA) / (uTwB - uTwA) * uTwFl, fi = floor(fy), ffy = fract(fy), cx = u / uTwCw, ci = floor(cx), ffx = fract(cx);
           float r = fract(sin(dot(vec3(fi, ci, side), vec3(12.9898, 78.233, 37.719)) + uTwSeed) * 43758.5453), r2 = fract(r * 7.13);
-          m = step(0.22, ffx) * step(ffx, 0.78) * step(0.3, ffy) * step(ffy, 0.82) * step(r, 0.4) * (0.75 + 0.25 * r2);
-          tc = (r2 < 0.45 ? vec3(1.0, 0.62, 0.27) : r2 < 0.8 ? vec3(1.0, 0.72, 0.4) : vec3(0.92, 0.52, 0.22)) * 0.85;
+          vec3 tx = diffuseColor.rgb / max(uTwTint, vec3(0.05)); float L = dot(tx, vec3(0.3, 0.59, 0.11));   // tw-night2: стъклото на текстурата — тъмно и сиво-синкаво (ъглите са тъмнокафяви — не)
+          float glass = TWG ? (1.0 - smoothstep(uTwG0, uTwG1, L)) * smoothstep(0.04, 0.07, L) * smoothstep(-0.01, 0.01, tx.b - tx.r * 0.92) * inW : step(0.22, ffx) * step(ffx, 0.78) * step(0.3, ffy) * step(ffy, 0.82);
+          m = glass * step(r, TWG ? 0.48 : 0.4) * (0.75 + 0.25 * r2);
+          tc = (r2 < 0.42 ? vec3(1.0, 0.62, 0.27) : r2 < 0.74 ? vec3(1.0, 0.74, 0.42) : r2 < 0.9 ? vec3(0.95, 0.88, 0.75) : TWG ? vec3(0.45, 0.6, 1.0) : vec3(0.92, 0.52, 0.22)) * 0.85;   /* топло, кехлибарено, бяло, синкаво — телевизор */
         } else if (hy > 0.004 && hy < uTwA) { float ffx = fract(u / (uTwCw * 1.7)), ffy = hy / uTwA; m = step(0.12, ffx) * step(ffx, 0.88) * step(0.12, ffy) * step(ffy, 0.78) * 0.85; tc = vec3(1.0, 0.75, 0.45); }
       }
-      totalEmissiveRadiance *= tc * m; }`);
+      vec3 em0 = totalEmissiveRadiance; totalEmissiveRadiance *= tc * m;
+      if (TWG) totalEmissiveRadiance += em0 * diffuseColor.rgb * 0.07; }`);   // tw-night2: фасадата нощем не е черна — слаба „лунна“ светлина от самата текстура (em0 = 0 денем)
   };
-  mt.customProgramCacheKey = () => 'tw-win-' + k;
+  mt.customProgramCacheKey = () => 'tw-win-' + k + (TWG ? '-g' : '');
+  mt.userData.twTune = 1;
 }
 
 // веднъж: дългата страна — по x (лицето +z — към улицата), основата — на земята; нощем прозорците светят (win — dayNight.winMats)
@@ -45,7 +59,7 @@ export function towerPrep(M, win) {
     const o = src.clone(true); o.traverse(m => { if (!m.isMesh) return; m.castShadow = m.receiveShadow = true; m.material = m.material.clone(); const mt = m.material;
       mt.metalness = 0; mt.metalnessMap = null; mt.roughnessMap = null; mt.normalMap = null; mt.roughness = 0.85;   // Meshy: металността без env map — почти черна фасада денем
       if (tint) mt.color.multiply(new THREE.Color(tint));
-      winShader(mt, m.geometry, k, (tint || 7) % 97); mt.emissiveIntensity = 0; mt.userData.winK = 0.6; win(mt); });
+      winShader(mt, m.geometry, k, (tint || 7) % 97, tint); mt.emissiveIntensity = 0; mt.userData.winK = 0.6; win(mt); });
     const g = new THREE.Group(); g.add(o); let b = new THREE.Box3().setFromObject(o), s = b.getSize(new THREE.Vector3());
     if (s.z > s.x) { o.rotation.y = Math.PI / 2; o.updateMatrixWorld(true); b = new THREE.Box3().setFromObject(o); s = b.getSize(new THREE.Vector3()); }
     const c = b.getCenter(new THREE.Vector3()); o.position.set(-c.x, -b.min.y, -c.z);

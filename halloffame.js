@@ -72,7 +72,8 @@ export const FAME_LINES = {
     platinum: 'Девет от десет жители са доволни. Градът е на хората — и днес е техен празник.',
   },
 };
-const DIR_K = { year: 'glob', city: 'mayor' };   // „Борд на годината“ — председателят (Глобъл); „Град за хората“ — кметът
+FAME_LINES.peace = { platinum: 'Започнахме с една бригада. Днес конфликтите са прекратени, регионите са възстановени, а светът ни вярва. Тази награда е на всички — от бригадата до кабинета.' };   // 🕊️ peace-win: „Архитект на мира“
+const DIR_K = { year: 'glob', city: 'mayor', peace: 'glob' };   // „Борд на годината“ — председателят (Глобъл); „Град за хората“ — кметът
 
 const css = `#hallFame{position:fixed;inset:0;z-index:2147483000;background:#05070c;opacity:0;transition:opacity .45s;font-family:system-ui,sans-serif}
 #hallFame.on{opacity:1}#hallFame canvas{display:block;width:100%;height:100%}

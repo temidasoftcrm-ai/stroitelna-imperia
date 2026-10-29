@@ -466,6 +466,24 @@ const DEMOS = [
   ['🛤️ Жп трасе (rail-route): София — Атина през Солун', 'sofia', d => setTimeout(() => d.railRouteTest('athens', 10, false), 12000)],   // rail-route
   ['🚚 ТИР-ове по континенти (tir-cont): готови участъци в Европа и Африка, 60 ТИР-а в Европа → разделът „Европа“: „60/60 (Европа)“, бутонът е изключен с обяснение', 'sofia', d => setTimeout(() => d.tirContTest('c:eu', 60), 12000)],   // tir-cont
   ['🚚 ТИР-ове по континенти (tir-cont): същото, разделът „Африка“ — „Купи ТИР“ работи (n/50), ТИР-ът тръгва от Кайро', 'sofia', d => setTimeout(() => { d.tirContTest('c:eu', 60); d.tirContTest('c:af', 0, 2); }, 12000)],   // tir-cont
+  ['⛲ Вода във фонтаните (fountain-water): фонтанът на 3 нива пред гарата отблизо денем — вода в басейна и чашите, струя, завеси, пръски', 'sofia', d => setTimeout(() => { d.setSpeed(1); d.fwLook(false); }, 9000)],   // fountain-water
+  ['⛲ Вода във фонтаните (fountain-water): същият фонтан нощем — сиянието под водата', 'sofia', d => setTimeout(() => { d.setSpeed(1); d.fwLook(true); }, 9000)],   // fountain-water
+  ['🕊️ Път към световния мир (peace-win): ниво 30 — бутонът на картата „4/6 цели“ и панелът: „Региони за победата“ (Хаити и Сомалия със задачите им), конфликтите ✅, възстановяването ✅, помощта ✅, бюджетът ✅; Световното споразумение ⬜ (Евразийският блок, сигурността) — защо и кой министър; броячът — „отключва се на ниво 35“', 'sofia', d => setTimeout(() => d.pwTest('panel30'), 10000)],   // peace-win
+  ['🕊️ Последното изпитание (peace-win): ниво 35 — всичките пет цели изпълнени, Световното споразумение подписано, броячът тече (5/12 месеца)', 'sofia', d => setTimeout(() => d.pwTest('trial35'), 10000)],   // peace-win
+  ['🕊️ Победата (peace-win): последният ден от 12-те месеца → клипът „Световен мир“ (глобусът, подписването, бордът) → личният отчет → церемонията / „Какво следва?“', 'sofia', d => setTimeout(() => d.pwTest('win'), 10000)],   // peace-win
+  ['🕊️ Личният отчет (peace-win): без клипа — градовете, държавите, регионите, времето до победата, най-важните решения, „🏅 Архитект на мира“', 'sofia', d => setTimeout(() => d.pwTest('report'), 10000)],   // peace-win
+  ['🕊️ Криза по време на изпитанието (peace-win): ниво 35, 5/12 месеца — земетресение в Турция преди 3 дни без отговор → броячът е на ПАУЗА „остават 7 дни за реакция“ (не се нулира); „Региони за победата“', 'sofia', d => setTimeout(() => d.pwTest('crisis35'), 10000)],   // peace-win
+  ['🚉 Гарата на свой парцел (infra-lots): София, ниво 5 — голямата класическа гара (досегашното ниво 3) в истински размер до перона, площадът с обръщалото, такситата, спирката и паркингите', 'sofia', d => setTimeout(() => d.lvReview('station', 5), 15000)],   // infra-lots
+  ['🚉 Гарата на свой парцел (infra-lots): София, ниво 5 нощем', 'sofia', d => setTimeout(() => d.lvReview('station', 5, { night: true }), 15000)],   // infra-lots
+  ['🚉 Гарата на свой парцел (infra-lots): София, ниво 1 — същото място и същият площад, сградата е малка', 'sofia', d => setTimeout(() => d.lvReview('station', 1), 15000)],   // infra-lots
+  ['🚉 Гарата на свой парцел (infra-lots): Берлин отгоре, ниво 3 — парцелът, пътят до площада, без улици през него', 'berlin', d => setTimeout(() => d.lvReview('station', 3, { view: 'top' }), 20000)],   // infra-lots
+  ['🚉 Гарата на свой парцел (infra-lots): Пловдив (генериран план), ниво 5', 'plovdiv', d => setTimeout(() => d.lvReview('station', 5), 15000)],   // infra-lots
+  ['✈️ Летището (infra-lots): ниво 7 отгоре — пистите от ниво 5 растат (×1,3 / ×1,5 / ×1,7, навън от града) с рулежките, светлините и тревата', 'sofia', d => setTimeout(() => d.lvReview('air', 7, { view: 'top' }), 15000)],   // infra-lots
+  ['✈️ Летището (infra-lots): ниво 5 откъм града — многоетажният паркинг и откритият с мачтите, гарата „Ⓜ Летище“ на естакада с пасарела до терминала, совалката към тунела', 'sofia', d => setTimeout(() => d.lvReview('air', 5).then(() => { const g = d.city().airport?.group; if (!g) return; const p = g.localToWorld(g.position.clone().set(-50, 0, -20)); d.camAt(p.x - 90, 70, p.z + 80, p.x, 4, p.z); }), 15000)],   // infra-lots
+  ['✈️ Летището (infra-lots): ниво 7 нощем откъм града — 5 етажа паркинг, осветената гара и совалката', 'sofia', d => setTimeout(() => d.lvReview('air', 7, { night: true }).then(() => { const g = d.city().airport?.group; if (!g) return; const p = g.localToWorld(g.position.clone().set(-50, 0, -20)); d.camAt(p.x - 90, 70, p.z + 80, p.x, 4, p.z); }), 15000)],   // infra-lots
+  ['👷 Работниците в завода (ind-workers): Бургас — дворът отвисоко: товарят камионите, мотокарът, пазачите на бариерата, колите на служителите', 'burgas', d => setTimeout(() => d.crewLook(false, true), 25000)],   // ind-workers
+  ['👷 Работниците в завода (ind-workers): отблизо — носят кашони до камионите, мотокарът кара палети', 'burgas', d => setTimeout(() => d.crewLook(false), 25000)],   // ind-workers
+  ['👷 Работниците в завода (ind-workers): нощната смяна — по-малко хора под лампите, по-малко коли', 'burgas', d => setTimeout(() => d.crewLook(true), 25000)],   // ind-workers
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя']];
 
@@ -480,12 +498,13 @@ async function loadApproved() { try { approved = (await (await fetch('/__lab/app
 
 function render() {
   const pending = FEATURES.filter(f => !approved.includes(f.id) && !rejected.has(f.id)).length;
-  $('tabs').innerHTML = [['review', `Ново${pending ? ` (${pending})` : ''}`], ['scenes', 'Сцени'], ['models', '3D модели'], ['sounds', 'Звуци'], ['demos', 'Мисии/демо'], ['inspect', '🔍 Преглед'], ['done', 'Проверени']]
+  $('tabs').innerHTML = [['review', `Ново${pending ? ` (${pending})` : ''}`], ['scenes', 'Сцени'], ['models', '3D модели'], ['sounds', 'Звуци'], ['demos', 'Мисии/демо'], ['inspect', '🔍 Преглед'], ['levels', '🏗️ Нива'], ['done', 'Проверени']]
     .map(([t, l]) => `<button data-tab="${t}" class="${state.tab === t ? 'on' : ''}">${l}</button>`).join('');
   $('tabs').querySelectorAll('[data-tab]').forEach(b => b.onclick = () => pick(b.dataset.tab));
   if (state.tab !== 'models' && state.tab !== 'review' && state.tab !== 'done') closeModel();
   if (state.tab !== 'inspect') renderInspect.key = null;
-  ({ review: () => renderReview('review'), done: () => renderReview('done'), scenes: renderScenes, models: renderModels, sounds: renderSounds, demos: renderDemos, inspect: renderInspect })[state.tab]?.();
+  if (state.tab !== 'levels') { renderLevels.key = null; clearTimeout(lvPlay); }
+  ({ review: () => renderReview('review'), done: () => renderReview('done'), scenes: renderScenes, models: renderModels, sounds: renderSounds, demos: renderDemos, inspect: renderInspect, levels: renderLevels })[state.tab]?.();
 }
 const row = (on, title, sub, attr) => `<button class="row ${on ? 'on' : ''}" ${attr}>${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}</button>`;
 // списъкът вляво пази докъде е превъртян (иначе след клик на 20-ия ред скача пак на 1-ви)
@@ -661,6 +680,52 @@ function inspPanel(msg = '') {
     $('oSave').onclick = async () => { w.__dbg.ovPreview(op()); const j = await post('/__lab/override', { city: cityK, id: p.id, op: op() }); inspPanel(j.ok ? TT('💾 Запазено в assets/plans/overrides.json', '💾 Saved to assets/plans/overrides.json') : '⚠ ' + (j.error || '')); };
     $('oReset').onclick = async () => { w.__dbg.ovPreview({}); const j = await post('/__lab/override', { city: cityK, id: p.id, op: null }); inspPanel(j.ok ? TT('↺ Поправката е махната', '↺ Fix removed') : '⚠ ' + (j.error || '')); };
   };
+}
+
+// ---- 🏗️ Нива (T2, lv-review): гарата, летището, офисът, гаражът и складът — от ниво 1 до най-голямото, на мястото им в София (__dbg.lvReview),
+// с една и съща камера за вида; „▶ Всички“ ги сменя през 4 с; „💬 Обратна връзка“ е за текущото ниво; „🖼️ Лист“ — всички нива на една снимка (PNG).
+const LV_KINDS = [['station', '🚉', 'Гара', 'Station', 5, ['34'], true], ['air', '✈️', 'Летище', 'Airport', 7, ['top', '34']], ['office', '🏢', 'Офис', 'Office', 10, ['34']], ['garage', '🔧', 'Гараж', 'Garage', 10, ['34']], ['wh', '📦', 'Склад', 'Warehouse', 10, ['34']]];
+const LV_VIEW = { top: ['отгоре', 'overhead'], '34': ['3/4', '3/4'] };
+let lvPlay = 0;
+function renderLevels() {
+  const k = LV_KINDS.find(x => x[0] === state.item) || LV_KINDS[0];
+  sideNav(`<div class="grp">${TT('Сградите на фирмата по нива', 'Company buildings by level')}</div>` + LV_KINDS.map(([id, ic, bg, en, n]) => row(k[0] === id, `${ic} ${TT(bg, en)}`, TT(`нива 1–${n}`, `levels 1–${n}`), `data-lk="${id}"`)).join(''));
+  $('side').querySelectorAll('[data-lk]').forEach(b => b.onclick = () => pick('levels', b.dataset.lk));
+  if (renderLevels.key === k[0] && $('fr')) return; renderLevels.key = k[0]; clearTimeout(lvPlay);
+  frame(`${GAME}&plan=1&city=sofia`, `${TT('Нива', 'Levels')}: ${TT(k[2], k[3])}`, d => lvUi(d, k));
+}
+function lvUi(d, k) {
+  const [kind, ic, bg, en, N, views, nightMax] = k; let cur = 0, view = views[0], night = false, fit = 'max', busy = false, play = false;
+  $('main').insertAdjacentHTML('beforeend', `<div class="bar" id="lvBar" style="top:58px;left:10px;right:auto;justify-content:flex-start;max-width:calc(100% - 20px)"></div><div id="lvCap" style="position:absolute;left:10px;top:96px;z-index:5;background:rgba(18,20,26,.9);border:1px solid #333a45;border-radius:8px;padding:8px 12px;max-width:440px;font:13px/1.45 system-ui">⏳</div>`);
+  const btn = (id, txt, on) => `<button class="btn ${on ? 'sky' : ''}" id="${id}">${txt}</button>`;
+  const draw = () => { $('lvBar').innerHTML = Array.from({ length: N }, (_, i) => btn('lvN' + (i + 1), TT('Ниво ', 'Level ') + (i + 1), cur === i + 1)).join('') + btn('lvAll', play ? '⏸ ' + TT('Спри', 'Stop') : '▶ ' + TT('Всички', 'All'), play)
+      + (views.length > 1 ? views.map(v => btn('lvV' + v, '📷 ' + TT(...LV_VIEW[v]), view === v)).join('') : '') + btn('lvNt', '🌙 ' + TT('Нощ', 'Night'), night) + btn('lvFit', '🔍 ' + TT('По нивото', 'Fit level'), fit === 'own') + btn('lvSheet', '🖼️ ' + TT('Лист', 'Sheet'));
+    for (let i = 1; i <= N; i++) $('lvN' + i).onclick = () => { stop(); go(i); };
+    $('lvAll').onclick = () => { if (play) return stop(); play = true; const step = i => { if (!play) return; go(i).then(() => { if (i >= N) { play = false; draw(); } else lvPlay = setTimeout(() => step(i + 1), 4000); }); }; step(cur && cur < N ? cur + 1 : 1); };
+    for (const v of views.length > 1 ? views : []) $('lvV' + v).onclick = () => { view = v; go(cur || 1); };
+    $('lvNt').onclick = () => { night = !night; go(cur || 1); }; $('lvFit').onclick = () => { fit = fit === 'own' ? 'max' : 'own'; go(cur || 1); }; $('lvSheet').onclick = () => { stop(); sheet(); }; };
+  const stop = () => { play = false; clearTimeout(lvPlay); draw(); };
+  const cap = r => `<b>${esc(r.title)}</b> — ${esc(r.nm)}<br>${esc(r.stats.join(' · '))}<br>💶 ${esc(r.cost)}${view !== views[0] || views.length > 1 ? ` · 📷 ${esc(TT(...LV_VIEW[view]))}` : ''}${night ? ' · 🌙' : ''}`;
+  const go = async (n, o = {}) => { while (busy) await new Promise(z => setTimeout(z, 200)); busy = true; cur = n; draw(); $('lvCap').innerHTML = `⏳ ${esc(TT(bg, en))} · ${TT('ниво', 'level')} ${n}…`;
+    let r = null; try { r = await d.lvReview(kind, n, { view: o.view || view, night: o.night ?? night, fit }); } catch (e) { console.warn(e); } busy = false;
+    if (!r || r.err) { $('lvCap').textContent = '⚠ ' + (r?.err || 'lvReview'); return r; }
+    $('lvCap').innerHTML = cap(r); const w = $('fbWrap'); if (w) { w.innerHTML = `<button class="btn sky">💬 ${TT('Обратна връзка', 'Feedback')}</button>`; feedback(w, `${TT('Нива', 'Levels')}: ${r.title} (${r.nm})${(o.night ?? night) ? ' · ' + TT('нощ', 'night') : ''}`); }
+    return r; };
+  // листът: всички нива (за всеки изглед; гарата — и най-голямото нощем) по 5 на ред, с надпис под всеки кадър → PNG за сваляне (и window.__lvSheet за Claude)
+  const sheet = async () => {
+    const list = views.flatMap(v => Array.from({ length: N }, (_, i) => ({ n: i + 1, view: v, night }))).concat(nightMax && !night ? [{ n: N, view: views[0], night: true }] : []), shots = [];
+    for (const f of list) { $('lvCap').innerHTML = `🖼️ ${shots.length + 1}/${list.length}…`; const pv = shots.length ? shots[shots.length - 1] : null, r = await go(f.n, f); if (!r || r.err) continue; await new Promise(z => setTimeout(z, pv && (pv.view !== f.view || pv.night !== f.night) ? 3000 : 2000));   /* нов изглед / нощ — сенките и осветлението; планът маха сградата от новия парцел след малко */ shots.push({ ...f, r, src: d.lvShot(640) }); }
+    const imgs = await Promise.all(shots.map(s => new Promise(z => { const im = new Image(); im.onload = () => z(im); im.onerror = () => z(null); im.src = s.src; })));
+    const cols = N === 7 ? 7 : Math.min(5, N), cw = cols > 5 ? 480 : 640, ch = imgs[0] ? Math.round(imgs[0].height * cw / imgs[0].width) : 400, capH = 62, rows = Math.ceil(shots.length / cols), top = 48;
+    const c = document.createElement('canvas'); c.width = cols * cw + (cols + 1) * 8; c.height = top + rows * (ch + capH + 8); const g = c.getContext('2d');
+    g.fillStyle = '#12141a'; g.fillRect(0, 0, c.width, c.height); g.fillStyle = '#fff'; g.font = '700 26px system-ui'; g.fillText(`${ic} ${TT(bg, en)} — ${TT('нива', 'levels')} 1–${N} · ${TT('София', 'Sofia')}`, 12, 33);
+    shots.forEach((s, i) => { const x = 8 + (i % cols) * (cw + 8), y = top + Math.floor(i / cols) * (ch + capH + 8); if (imgs[i]) g.drawImage(imgs[i], x, y, cw, ch);
+      g.fillStyle = '#1d2129'; g.fillRect(x, y + ch, cw, capH); g.fillStyle = '#fff'; g.font = '700 19px system-ui';
+      g.fillText(`${s.r.title} — ${s.r.nm}${s.view !== views[0] || views.length > 1 ? ` · ${TT(...LV_VIEW[s.view])}` : ''}${s.night ? ' · 🌙' : ''}`, x + 8, y + ch + 24, cw - 16);
+      g.fillStyle = '#b9c2cc'; g.font = '15px system-ui'; g.fillText(`${s.r.stats.join(' · ')} · 💶 ${s.r.cost}`, x + 8, y + ch + 48, cw - 16); });
+    const url = window.__lvSheet = c.toDataURL('image/png');
+    $('lvCap').innerHTML = `🖼️ ${TT('Листът е готов', 'Sheet ready')} (${shots.length}) · <a class="btn ok" download="lv-${kind}.png" href="${url}">⬇ PNG</a> <a class="btn" target="_blank" href="${url}">↗</a>`; return shots.length; };
+  window.__lvSheetRun = sheet; draw(); go(1);
 }
 
 // ---- Мисии/демо

@@ -11,18 +11,27 @@ let stLoad = null;
 // 🚉 station-models (f9): сграда за всяко ниво (Sketchfab, CC-BY — assets/heavy/CREDITS.txt): 1 — будката „Мелькомбинат“, 2 — нискополигонната гара (JG3D),
 // 3 — гарата Баку-Сабунчи (с куполите), 4 — „Old Station“ (две двуетажни сгради), 5 — Milwaukee Road Depot (както досега). [модел, дължина по перона, ширина] — горни граници
 const SM = feature('station-models'), ST_SPEC = { 1: ['lv1', 5.5, 4.4], 2: ['lv4', 22, 16], 3: ['lv2', 26, 26], 4: ['lv3', 42, 30] };
-const loadStationModels = () => stLoad || (stLoad = Promise.all([...['small', 'big'], ...(SM ? ['lv1', 'lv2', 'lv3', 'lv4'] : [])].map(k => new Promise(res => new GLTFLoader().load(`assets/heavy/station/${k}.glb`, g => { if (feature('station-opaque')) g.scene.traverse(m => { if (m.isMesh) for (const mt of [].concat(m.material)) if (mt && mt.transparent) { mt.transparent = false; mt.alphaTest = 0.5; mt.depthWrite = true; mt.needsUpdate = true; } });   /* station-opaque (T1): стените бяха alphaMode BLEND — прозрачни, сортирането ги чупеше („прозрачна“ гара) */ ST_MODEL[k] = g.scene; res(); }, undefined, () => res())))));
+// 🏗️ infra-lots (T2): всички нива — на едно място (откъм града, до главния перон, по средата му, входът — към площада); потребителят: класическата гара
+// с куполите (досега ниво 3) — на ниво 5 и в истински размер (~135 м фасада); на ниво 3 — Milwaukee Road Depot (досегашното ниво 5). ST_FLIP — фасадата към града
+const INFRA = feature('infra-lots'), ST_SPEC2 = { 1: ['lv1', 6, 4.4], 2: ['lv4', 24, 16], 3: ['big', 50, 20], 4: ['lv3', 62, 30], 5: ['lv2', 135, 40] }, ST_FLIP = {};
+const loadStationModels = () => stLoad || (stLoad = Promise.all([...['small', 'big'], ...(SM || INFRA ? ['lv1', 'lv2', 'lv3', 'lv4'] : [])].map(k => new Promise(res => new GLTFLoader().load(`assets/heavy/station/${k}.glb`, g => { if (feature('station-opaque')) g.scene.traverse(m => { if (m.isMesh) for (const mt of [].concat(m.material)) if (mt && mt.transparent) { mt.transparent = false; mt.alphaTest = 0.5; mt.depthWrite = true; mt.needsUpdate = true; } });   /* station-opaque (T1): стените бяха alphaMode BLEND — прозрачни, сортирането ги чупеше („прозрачна“ гара) */ ST_MODEL[k] = g.scene; res(); }, undefined, () => res())))));
 // сградата, вписана в кутия: дължина L по z, без да надвишава ширина W; основата на y = 0
-function stationBuilding(k, L, W) {
+function stationBuilding(k, L, W, il = false) {   // il — infra-lots: автоматично завъртане и точните кутии
   const src = ST_MODEL[k]; if (!src) return null;
   const o = src.clone(true), g = new THREE.Group(), inner = new THREE.Group(); inner.add(o); g.add(inner); g.updateMatrixWorld(true);
-  let bb = new THREE.Box3().setFromObject(g), sz = bb.getSize(new THREE.Vector3());
-  if (sz.x > sz.z) { inner.rotation.y = Math.PI / 2; g.updateMatrixWorld(true); bb = new THREE.Box3().setFromObject(g); sz = bb.getSize(new THREE.Vector3()); }
+  if (il) {   // 🏗️ infra-lots: моделът може да е завъртян в своя файл (lv2 — на 45°): по най-тясната кутия на основата
+    const pts = [], v = new THREE.Vector3(); o.traverse(m => { if (!m.isMesh) return; const pa = m.geometry.attributes.position, st = Math.max(1, Math.floor(pa.count / 1500)); for (let i = 0; i < pa.count; i += st) { v.fromBufferAttribute(pa, i).applyMatrix4(m.matrixWorld); pts.push(v.x, v.z); } });
+    let best = [Infinity, 0]; for (let d = 0; d < 90; d += 3) { const a = d * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a); let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      for (let i = 0; i < pts.length; i += 2) { const x = pts[i] * c - pts[i + 1] * sn, z = pts[i] * sn + pts[i + 1] * c; if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; }
+      if ((x1 - x0) * (z1 - z0) < best[0] * 0.995) best = [(x1 - x0) * (z1 - z0), a]; }
+    o.rotation.y -= best[1]; g.updateMatrixWorld(true); }
+  let bb = new THREE.Box3().setFromObject(g, il), sz = bb.getSize(new THREE.Vector3());
+  if (sz.x > sz.z) { inner.rotation.y = Math.PI / 2; g.updateMatrixWorld(true); bb = new THREE.Box3().setFromObject(g, il); sz = bb.getSize(new THREE.Vector3()); }
   inner.scale.setScalar(Math.min(L / sz.z, W / sz.x)); g.updateMatrixWorld(true);
-  bb = new THREE.Box3().setFromObject(g); const c = bb.getCenter(new THREE.Vector3());
+  bb = new THREE.Box3().setFromObject(g, il); const c = bb.getCenter(new THREE.Vector3());
   inner.position.set(-c.x, -bb.min.y, -c.z);
   g.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; } });
-  g.userData.h = bb.max.y - bb.min.y;
+  g.userData.h = bb.max.y - bb.min.y; g.userData.il = il;
   return g;
 }
 
@@ -120,11 +129,11 @@ export function createStation(deps) {
       }
       // гарова сграда в северния край на перона; расте с нивото
       const hw = 6, hh = 3.5 + lv * 1.3, hl = 8 + lv * 3;
-      const sp = SM && ST_SPEC[lv], real = sp ? stationBuilding(sp[0], sp[1], sp[2]) : lv >= 2 ? stationBuilding(lv >= 5 ? 'big' : 'small', lv >= 5 ? 47 : hl + 4, lv >= 5 ? 18 : 10) : null;
+      const IL = INFRA && deps.infra, sp = IL ? ST_SPEC2[lv] : SM && ST_SPEC[lv], real = sp ? stationBuilding(sp[0], sp[1], sp[2], IL) : lv >= 2 ? stationBuilding(lv >= 5 ? 'big' : 'small', lv >= 5 ? 47 : hl + 4, lv >= 5 ? 18 : 10) : null;
       if ((lv >= 2 || sp) && !real && !stLoad) loadStationModels().then(() => { if (level === lv) build(lv, buildingNow); });
       if (real) { bldObj = real; if (deps.onBuild) setTimeout(() => deps.onBuild(), 0);   /* station-area: площадът — около истинската сграда */   // истинската сграда — до перона, в северния му край
-        if (sp) { const b = new THREE.Box3().setFromObject(real), w = b.max.x - b.min.x, l = b.max.z - b.min.z; real.position.set(X + 3.5 + w / 2, 0, -plen - l / 2 - 1); }   // station-models: в северния край, източно от главния коловоз
-        else real.position.set(X + 5.5 + (lv >= 5 ? 6 : 3), 0, lv >= 5 ? plen + 24.5 : -plen - (hl + 4) / 2 - 1); if (lv >= 5) real.rotation.y = Math.PI; g.add(real);
+        if (sp) { const b = new THREE.Box3().setFromObject(real, IL), w = b.max.x - b.min.x, l = b.max.z - b.min.z; if (IL) { real.position.set(X + 9 + w / 2, 0, 0); if (ST_FLIP[sp[0]]) real.rotation.y = Math.PI; } else real.position.set(X + 3.5 + w / 2, 0, -plen - l / 2 - 1); }   // station-models: в северния край, източно от главния коловоз
+        else real.position.set(X + 5.5 + (lv >= 5 ? 6 : 3), 0, lv >= 5 ? plen + 24.5 : -plen - (hl + 4) / 2 - 1); if (lv >= 5 && !sp) real.rotation.y = Math.PI; g.add(real);
         { const r0 = real; g.userData.mergeWhen = () => [r0]; }   // ⚡ perf-cliff (citycull.js): гаровата сграда е статична — частите ѝ се сливат по материал (паркираните влакове — не)
         { const seen = new Set(); real.traverse(o => { if (!o.isMesh) return; for (const m of [].concat(o.material)) { if (!m || seen.has(m) || !('emissive' in m)) continue; seen.add(m); m.emissive.set(0xffd9a0); if (m.map) m.emissiveMap = m.map; m.needsUpdate = true; glows.push([m, 0.55]); } }); }   // нощем сградата е осветена
         const lab = deps.label(`🚉 ${STATION_LEVELS[lv - 1].nm.toUpperCase()} · ${lv} ${lv === 1 ? 'коловоз' : 'коловоза'}`, '#ffffff', 9);
@@ -280,5 +289,5 @@ export function createStation(deps) {
   }
   // външният свободен коловоз за минаващите влакове
   const outerX = () => trackX(Math.max(1, level));
-  return { build, setParked, setNight, outerX, trackX, bldBox: () => { if (!bldObj || !bldObj.parent) return null; bldObj.updateWorldMatrix(true, true); return new THREE.Box3().setFromObject(bldObj); }, get level() { return level; } };
+  return { build, setParked, setNight, outerX, trackX, bldBox: () => { if (!bldObj || !bldObj.parent) return null; bldObj.updateWorldMatrix(true, true); return new THREE.Box3().setFromObject(bldObj, !!bldObj.userData.il); }, get level() { return level; } };
 }
