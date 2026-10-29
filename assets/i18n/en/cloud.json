@@ -446,5 +446,6 @@
  "⚓ Пристанището — зърнен терминал, контейнерите на отделна платформа и павиран двор; 🏭 работници и мотокар в индустриалната зона": "⚓ The port — a grain terminal, containers on their own platform and a paved yard; 🏭 workers and a forklift in the industrial zone",
  "⛲ Вода във фонтаните; 🏙️ панелните блокове светят нощем с истински прозорци; 🎬 жив клип на началния екран": "⛲ Water in the fountains; 🏙️ panel blocks light real windows at night; 🎬 a live clip on the start screen",
  "🛠️ Поправено: Истанбул вече не стои във водата, фериботните линии се виждат; бутоните в Министерския съвет; парите светват в зелено, докато се превъртат": "🛠️ Fixed: Istanbul no longer stands in water, ferry lines are visible; Cabinet decision buttons; money flashes green while it rolls",
- "✈️ Поправено: летищата в крайморските градове (Варна, Бургас, Истанбул) вече не стоят във водата; по-дългите писти и метрото — към сушата": "✈️ Fixed: airports in coastal cities (Varna, Burgas, Istanbul) no longer stand in the water; longer runways and the metro extend toward land"
+ "✈️ Поправено: летищата в крайморските градове (Варна, Бургас, Истанбул) вече не стоят във водата; по-дългите писти и метрото — към сушата": "✈️ Fixed: airports in coastal cities (Varna, Burgas, Istanbul) no longer stand in the water; longer runways and the metro extend toward land",
+ "🛠️ Поправено: играта спираше на 100% при влизане в град с тесен двор пред склада (напр. Истанбул)": "🛠️ Fixed: the game stopped at 100% when entering a city with a narrow yard in front of the warehouse (e.g. Istanbul)"
 }
