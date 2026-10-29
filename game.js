@@ -1586,7 +1586,7 @@ function buildCity(cityId) {
   if (P) { const [ti, tj] = planTiles(P, TILE); NI = Math.max(NI, ti); NJ = Math.max(NJ, tj); }   // гарата, магистралата и летището се отдръпват до края на плана
   city.railN = railNorth(cityId);   // rail-coast (T1): морето е близо на север — коловозите свършват с буфери преди брега (без извивката над водата)
   city.stZ = city.railN != null && feature('st-inland') ? Math.max(0, Math.ceil(city.railN + 100)) : 0;   // 🌊 st-inland (T1): гарата — навътре в сушата, северният ѝ край (сградата) на ≥ 5 м от буферите
-  city.stLot = null; if (INFRA && P && P.p2) { const [z, c] = stLotZ(P, city.stZ); if (!c) { city.stZ = z; city.stLot = { z }; } else console.info('infra-lots: няма свободно място за гарата', cityId, c); }   // 🏗️ infra-lots: гарата — там, където парцелът ѝ е свободен
+  city.airAt = null; city.airFill = false; city.stLot = null; if (INFRA && P && P.p2) { const [z, c] = stLotZ(P, city.stZ); if (!c) { city.stZ = z; city.stLot = { z }; } else console.info('infra-lots: няма свободно място за гарата', cityId, c); }   // 🏗️ infra-lots: гарата — там, където парцелът ѝ е свободен
   { const air = AIRG && P && P.p2 && !P.p2.airAccess && airLv(cityId) > 0, stz = STACC && (city.stZ || city.stLot) && P && P.p2;   // ✈️ air-junction / 🌊 st-inland: вторият проход на плана — с пътя до летището и пътя до преместената гара
     if (air || stz) { if (air) AIR_AT = airXZ(); ST_ZS = city.stZ; ST_IL = !!city.stLot; plan2.cache = null; try { const Q = planOf(cityId); if (Q && Q.p2) P = city.plan = Q; } catch (e) { console.warn('air-junction', e); } finally { AIR_AT = null; ST_ZS = 0; ST_IL = false; } } }   // ✈️ air-junction: вторият проход — с пътя до летището в графа
   // земя (при мегаполисите — по-широка на изток)
@@ -7386,8 +7386,29 @@ function airSite3D(id) {
   city.airSite = { g, x, pct, setPct };
 }
 // летището: на източния край (tx(NI - 1) + 70, z 0); Рим по истинската карта — на ръба към Фиумичино (P.anchors.airport, ЮЗ), извън града
-const airXZ = () => { const a = city.plan && city.plan.p2 && city.plan.osm && city.plan.anchors && city.plan.anchors.airport; return a ? [a.x + Math.sin(a.dir || 0) * 200 - 30, a.z + Math.cos(a.dir || 0) * 200] : [tx(NI - 1) + 70, 0]; };   // навън от ръба, в посоката на летището
-const airExt = () => { const a = city.plan && city.plan.p2 && city.plan.osm && city.plan.anchors && city.plan.anchors.airport; return a && Math.cos(a.dir || 0) > 0.3 ? 's' : 'n'; };   // 🏗️ infra-lots: по-дългите писти — навън от града (летището е на юг от него → на юг)
+const airXZ0 = () => { const a = city.plan && city.plan.p2 && city.plan.osm && city.plan.anchors && city.plan.anchors.airport; return a ? [a.x + Math.sin(a.dir || 0) * 200 - 30, a.z + Math.cos(a.dir || 0) * 200] : [tx(NI - 1) + 70, 0]; };   // навън от ръба, в посоката на летището
+const airXZ = () => { const b = airXZ0(); if (!INFRA || !city.plan || !city.plan.p2) return b; return city.airAt || (city.airAt = airSpot(b[0], b[1])); };   // 🏗️ infra-lots: на сушата
+// 🏗️ infra-lots (T2, 4.0.2): летището и морето — airWet: водата на плана, а извън растера на морето (OSM) — най-близката му клетка (там се вижда водата на 1,6× плочата);
+// airSpot: ако отпечатъкът (откъм града до последната писта) е във водата — най-близкото сухо място (пръстени през 25 м до 400 м), без парцелите на плана
+const airWet = (x, z) => { const P = city.plan; if (!P) return false; if (P.waterAt && P.waterAt(x, z)) return true; const D = P.p2 && P.p2.osmData, S = D && D.sea; if (!S || !S.mask) return false;
+  if (/^(paris|london|newyork|moscow|washington|lasvegas)$/.test(D.style || '')) return false;   // около растера — суша (cityplan2-3d seaView)
+  const [ox, oz] = P.offset || [0, 0], lx = x - ox, lz = z - oz, pad = (D.style === 'istanbul' ? 120 : 0) * S.cell, X0 = S.x0 - pad, Z0 = S.z0 - pad, X1 = S.x0 + S.nx * S.cell + pad, Z1 = S.z0 + S.nz * S.cell + pad;
+  if (lx >= X0 && lx < X1 && lz >= Z0 && lz < Z1) return lx < S.x0 || lz < S.z0 || lx >= X1 - pad || lz >= Z1 - pad ? S.mask(Math.min(X1 - pad - 1, Math.max(S.x0 + 1, lx)), Math.min(Z1 - pad - 1, Math.max(S.z0 + 1, lz))) : false;   // в полето около растера — като най-близката му клетка
+  const W = S.nx * S.cell, H = S.nz * S.cell, cx = S.x0 + W / 2, cz = S.z0 + H / 2; return Math.abs(lx - cx) < W * 0.8 && Math.abs(lz - cz) < H * 0.8; };   // отвъд земята на плана — водната плоча (1,6× растера)
+const AIR_FP = [-75, -125, 200, 135];   // отпечатъкът в рамката на летището: паркингът (−75) … последната писта (+190), без удължението
+const airDry = (x, z, R = AIR_FP, st = 20) => { for (let u = R[0]; u <= R[2]; u += st) for (let v = R[1]; v <= R[3]; v += st) if (airWet(x + u, z + v)) return false; return true; };
+const airRoad = (x0, z0, x1, z1) => { const P = city.plan, [ox, oz] = P.offset || [0, 0]; for (const r of (P.p2 && P.p2.roads) || []) { if (r.airport || r.station) continue; const p = r.pts;   // 4.0.2: улица на града в правоъгълника (без пътя до летището/гарата)
+    for (let i = 1; i < p.length; i++) { const ax = p[i - 1][0] + ox, az = p[i - 1][1] + oz, bx = p[i][0] + ox, bz = p[i][1] + oz; if (Math.max(ax, bx) < x0 || Math.min(ax, bx) > x1 || Math.max(az, bz) < z0 || Math.min(az, bz) > z1) continue;
+      const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 5)); for (let k = 0; k <= n; k++) { const x = ax + (bx - ax) * k / n, z = az + (bz - az) * k / n; if (x > x0 && x < x1 && z > z0 && z < z1) return true; } } } return false; };
+function airSpot(x0, z0) {
+  if (airDry(x0, z0)) return [x0, z0];   // сухо — както досега
+  const L = (city.plan.lots || []).map(l => [l.x, l.z]), clear = (x, z) => airDry(x, z) && !airRoad(x + AIR_FP[0], z + AIR_FP[1], x + AIR_FP[2], z + AIR_FP[3]) && !L.some(([lx, lz]) => lx > x + AIR_FP[0] - 10 && lx < x + AIR_FP[2] + 10 && lz > z + AIR_FP[1] - 10 && lz < z + AIR_FP[3] + 10);
+  for (let r = 25; r <= 400; r += 25) for (let a = 0; a < 24; a++) { const t = a / 24 * Math.PI * 2, x = x0 + Math.cos(t) * r, z = z0 + Math.sin(t) * r; if (clear(x, z)) return [Math.round(x), Math.round(z)]; }
+  city.airFill = true; return [x0, z0];   // няма сухо място без парцелите на града (Истанбул — носът между града и морето): насип под летището (airport.js opts.fill)
+}   // навън от ръба, в посоката на летището
+const airExt = () => { const a = city.plan && city.plan.p2 && city.plan.osm && city.plan.anchors && city.plan.anchors.airport, pref = a && Math.cos(a.dir || 0) > 0.3 ? 's' : 'n'; if (!INFRA) return pref;
+  const [x, z] = airXZ(), L = 357 - 210 + 30, lots = (city.plan.lots || []), free = (z0, z1) => !lots.some(l => l.x > x - 5 && l.x < x + 215 && l.z > z + z0 - 10 && l.z < z + z1 + 10) && !airRoad(x + 10, z + z0, x + 200, z + z1), dn = airDry(x, z, [10, -100 - L, 200, -100], 15) && free(-100 - L, -100), ds = airDry(x, z, [10, 110, 200, 110 + L], 15) && free(110, 110 + L);   /* 4.0.2: към сушата и без парцелите на града; иначе — без удължение */
+  return pref === 'n' ? (dn ? 'n' : ds ? 's' : 'none') : (ds ? 's' : dn ? 'n' : 'none'); };   // 🏗️ infra-lots: по-дългите писти — навън от града (летището е на юг от него → на юг)
 let AIR_LAMP = null;
 function airAccessBuild(lv) {
   if (city.airAccess) city.airAccess.dispose();
@@ -7406,7 +7427,8 @@ function refreshAirport3D(id = S?.cityId) {
   if (!lv) { if (city.airport) { city.airport.dispose(); city.airport = null; } if (city.airAccess) { city.airAccess.dispose(); city.airAccess = null; } return; }
   if (feature('airport-access') && (!city.airAccess || city.airAccess.lv !== lv)) try { airAccessBuild(lv); } catch (e) { console.warn('airport-access', e); }   // ✈️ airport-access (T1): булевард до града, паркинг, обръщало, лампи — и за старите записи
   if (city.airport) { if (city.airport.level !== lv) city.airport.setLevel(lv); return; }
-  try { city.airport = makeAirport3D(city.group, { A, model, label }, { lv, x: airXZ()[0], z: airXZ()[1], seed: hashStr('air:' + id), eu: !WORLD_IDS.has(id), ext: airExt() }); city.airportNI = NI;   /* plane-wizz: eu — Wizz Air по-често */ } catch (e) { console.warn('airport', e); city.airport = null; }
+  if (INFRA && city.edgeG) try { edgeRoads(); } catch (e) { console.warn('edge-roads', e); }   // 🏗️ infra-lots 4.0.2: новото летище — крайните пътища го заобикалят
+  try { city.airport = makeAirport3D(city.group, { A, model, label }, { lv, x: airXZ()[0], z: airXZ()[1], seed: hashStr('air:' + id), eu: !WORLD_IDS.has(id), ext: airExt(), fill: INFRA && !!city.airFill, dry: INFRA ? (u, v) => (city.airFill && u > -140 && u < 215 && v > -140 && v < 150) || !airWet(airXZ()[0] + u, airXZ()[1] + v) : null }); city.airportNI = NI;   /* plane-wizz: eu — Wizz Air по-често */ } catch (e) { console.warn('airport', e); city.airport = null; }
   loadTerminals(u => new Promise((res, rej) => new GLTFLoader().load(u, res, undefined, rej))).then(() => { if (city.airport && city.airport.refresh) city.airport.refresh(); });
 }
 // ---- транспортни връзки на града (linkoffers.js): твое (земя + строеж) или общинско (такса, само ползване)
@@ -10672,7 +10694,7 @@ function edgeRoads() {
   const P = city.plan, P2 = P && P.p2; if (!feature('edge-roads') || !P2 || P2.osm) return;
   const o = P.offset || [0, 0], A0 = P2.anchors || {}, linked = new Set([A0.highway?.road?.road, A0.airport?.road?.road].filter(x => x != null));
   const air = airLv(S.cityId) ? airXZ() : null, port = city.sea && city.sea.port, hz = cityHw && cityHw.cross ? cityHw.cross.z : null;
-  const bad = (x, z) => (P2.waterAt && P2.waterAt(x - o[0], z - o[1])) || (air && Math.hypot(x - air[0], z - air[1]) < 320) || (port && Math.abs(x - port.x) < 120 && Math.abs(z - port.z) < 150) || x < STATION_X + 30 || (hz != null && Math.abs(z - hz) < 45);
+  const bad = (x, z) => (P2.waterAt && P2.waterAt(x - o[0], z - o[1])) || (air && (INFRA ? x > air[0] - 100 && x < air[0] + 240 && z > air[1] - 290 && z < air[1] + 300 : Math.hypot(x - air[0], z - air[1]) < 320)) || (port && Math.abs(x - port.x) < 120 && Math.abs(z - port.z) < 150) || x < STATION_X + 30 || (hz != null && Math.abs(z - hz) < 45);
   const pos = [], idx = [], dash = [], di = [], posts = [], lamps = [], trees = [], made = [], out = [];
   const band = (pts, w, y, arr, ix) => { const n0 = arr.length / 3; pts.forEach((p, i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1, nx = -dz / l * w / 2, nz = dx / l * w / 2; arr.push(p[0] + nx, y, p[1] + nz, p[0] - nx, y, p[1] - nz); if (i) { const k = n0 + (i - 1) * 2; ix.push(k, k + 2, k + 1, k + 1, k + 2, k + 3); } }); };
   for (const n of P2.nodes) { if (n.arms.length !== 1 || n.endKind !== 'exit') continue; const rd = P2.roads[n.arms[0].road]; if (!rd || linked.has(rd.id) || rd.noCars) continue;
@@ -14298,6 +14320,7 @@ if (AUTOTEST) {
       return { kind, n, max: K.length, title: `${tp} · ниво ${n}`, nm: L.nm, stats: st.filter(Boolean), cost: cost ? `${fmt(cost)} €` : 'в началото', box: B && !B.isEmpty() ? B.getSize(new V()).toArray().map(Math.round) : null };
     },
     lvShot(w = 800) { renderer.render(scene, camera); const c = renderer.domElement, k = Math.min(1, w / c.width), t = document.createElement('canvas'); t.width = Math.round(c.width * k); t.height = Math.round(c.height * k); t.getContext('2d').drawImage(c, 0, 0, t.width, t.height); return t.toDataURL('image/jpeg', 0.85); },   // 🏗️ lv-review: кадърът за листа с нивата (рендира и чете веднага)
+    airWetAt(x, z) { const P = city.plan, S = P && P.p2 && P.p2.osmData && P.p2.osmData.sea, S2 = P && P.p2 && P.p2.osm && P.p2.osm.sea; return { wet: airWet(x, z), plan: !!(P && P.waterAt && P.waterAt(x, z)), S: !!S, mask: !!(S && S.mask), S2: !!S2, same: S === S2, ext: airExt(), at: airXZ() }; },   // 🏗️ infra-lots 4.0.2: проба за водата при летището
     crewLook(night = false, far = false) {   // 👷 ind-workers (T2): камерата към двора на най-близкия до центъра завод (рампата, мотокара, паркинга)
       const F = city.factory; if (!F || !F.at.length) return null; this.time(night ? 22 : 11); this.setSpeed(1); showMap(false); document.getElementById('panel')?.classList.add('hidden');
       const f = F.at.slice().sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z))[0], P = city.plan, sq = P.square || P.center || { x: 0, z: 0 }, dx = sq.x - f.x, dz = sq.z - f.z, L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L, tx0 = f.x + ux * (far ? 52 : 46), tz0 = f.z + uz * (far ? 52 : 46);
