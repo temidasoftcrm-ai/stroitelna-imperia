@@ -102,7 +102,7 @@ export function createSfx2(Sound) {
     for (const m of s.motos || []) { const k = near(m.x, m.z, 70); if (k > 0.15 && gate('moto', 2.5) && Math.random() < 0.35) scooter(0.04 * k, pan(m.x)); }
     // 🌦️ времето: дъжд по повърхностите, вятър при буря/сняг; 🌊 вълни край брега
     const wk = s.weather || 'clear', rainK = wk === 'storm' ? 1 : wk === 'rain' ? 0.65 : 0, windK = wk === 'storm' ? 1 : wk === 'snow' ? 0.6 : 0;
-    set('rain', 0.035 * rainK * (0.5 + 0.5 * Z), 1.5); set('wind', 0.03 * windK, 2); set('waves', 0.04 * (s.sea || 0) * (0.4 + 0.6 * Z), 1.5); set('cable', 0, 1);
+    set('rain', Sound.cs3Rain ? 0 : 0.035 * rainK * (0.5 + 0.5 * Z), 1.5); set('wind', 0.03 * windK, 2); set('waves', 0.04 * (s.sea || 0) * (0.4 + 0.6 * Z), 1.5); set('cable', 0, 1);
   }
   // курортите (отделният изглед): летен — вълни; зимен — вятър и въжената линия; спа — тихо
   function resort(kind) {

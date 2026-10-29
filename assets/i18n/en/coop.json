@@ -56,6 +56,8 @@
  "превозно средство": "vehicle",
  "🤝 Половината от {0} на {1} (общ флот)": "🤝 Half of {0} to {1} (shared fleet)",
  "🤝 Половината от печалбата на общия флот → {0}": "🤝 Half of the shared fleet profit → {0}",
+ "↩️ Натрупаното за партньора се връща (партньорството приключи)": "↩️ The amount saved up for the partner is returned (the partnership ended)",
+ "↩️ {0} € от общия флот и завършените градове се върнаха при теб — партньорството приключи.": "↩️ {0} € from the shared fleet and finished cities came back to you — the partnership ended.",
  "🏦 Холдингът покрива дълга ти: {0} € — идват след миг. {1} е уведомен.": "🏦 The holding is covering your debt: {0} € — arriving in a moment. {1} has been notified.",
  "🏦 Холдингът е празен — не може да покрие дълга. Помоли партньора (🆘).": "🏦 The holding is empty — it can't cover the debt. Ask your partner (🆘).",
  ", {0} € на акционерите": ", {0} € to shareholders",

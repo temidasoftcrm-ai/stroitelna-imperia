@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';
 import { kidK } from './scale.js';   // детските коли (резервата) в истинския размер
+import { createHwChase } from './hwchase.js';   // 🚔 hw-chase: гонка на магистралата (беглец, 3–4 полицейски, хеликоптер; катастрофа или задържане)
 import { createHwIncidents } from './hwincidents.js';   // 🚧 hw-incidents: катастрофи/аварии по платната, полиция, конуси, отбиване
 
 const CARS = ['sedan', 'suv', 'taxi', 'van', 'sedan-sports', 'suv-luxury', 'hatchback-sports', 'police'];
@@ -129,8 +130,10 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
   // 🚧 hw-incidents (hwincidents.js): ударените коли, спешните и „призраците“ (конусите) са в list с c.inc — движи ги инцидентът;
   // INC.need — задължително престрояване, INC.ok — не влиза в затворена лента, INC.vcap — бавно покрай мястото, c.rg — спасителният коридор
   const INC = feature('hw-incidents') ? createHwIncidents({ g, list, laneZ, NL, RIGHT, half, len, y, lift, ab, leaderIn, followerIn, freeLane, mk: n => model(n, SCALE[n] || kidK(n, 1.25)), A, lenOf, rampCx: RP ? rampCx : null, svc, em }) : null;
+  const CH = feature('hw-chase') ? createHwChase({ g, list, laneZ, NL, RIGHT, half, len, y, lift, ab, model, A, lenOf, svc, rampCx: RP ? rampCx : null, inc: () => INC }) : null;   // 🚔 hw-chase (hwchase.js)
   function update(dt) {
-    if (INC) INC.update(dt);
+    if (INC && !(CH && CH.busy && !INC.busy)) INC.update(dt);   /* hw-chase: по време на гонка — без нов инцидент */
+    if (CH) CH.update(dt);
     for (const c of list) {
       if (c.inc) continue;
       if (c.away > 0) { c.away -= dt; if (c.away <= 0) comeBack(c); continue; }
@@ -138,14 +141,14 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
       const px = c.x, ld = leaderIn(c, c.lane);
       // изпреварване: по-бавен отпред — наляво, ако там е свободно; после — обратно вдясно
       c.cool -= dt;
-      const mm = INC && c.cool <= 0 && !c.rg && Math.abs(c.z - laneZ(c.dir, c.lane)) < 0.3 ? INC.need(c) : null;   /* hw-incidents: престрояване пред затворената лента („цип“) */
+      const mm = (INC || CH) && c.cool <= 0 && !c.rg && Math.abs(c.z - laneZ(c.dir, c.lane)) < 0.3 ? (INC && INC.need(c)) || (CH && CH.need(c)) || null : null;   /* hw-incidents: престрояване пред затворената лента („цип“) */
       if (mm) { if (freeLane(c, mm.l, mm.b, mm.f)) { c.lane = mm.l; c.cool = 1.5; } }
       else if (!c.heavy && c.cool <= 0 && Math.abs(c.z - laneZ(c.dir, c.lane)) < 0.3) {
-        if (c.lane > 0 && ld && ld.gap < 45 && ld.q.v < c.v0 - 2.5 && freeLane(c, c.lane - 1) && (!INC || INC.ok(c, c.lane - 1))) { c.lane--; c.cool = 4; }
-        else if (c.lane < RIGHT && (!INC || INC.ok(c, c.lane + 1)) && freeLane(c, c.lane + 1, 18, 45) && (!ld || ld.gap > 35 || ld.q.v > c.v0 - 1)) { c.lane++; c.cool = 6; }
+        if (c.lane > 0 && ld && ld.gap < 45 && ld.q.v < c.v0 - 2.5 && freeLane(c, c.lane - 1) && (!INC || INC.ok(c, c.lane - 1)) && (!CH || CH.ok(c, c.lane - 1))) { c.lane--; c.cool = 4; }
+        else if (c.lane < RIGHT && (!INC || INC.ok(c, c.lane + 1)) && (!CH || CH.ok(c, c.lane + 1)) && freeLane(c, c.lane + 1, 18, 45) && (!ld || ld.gap > 35 || ld.q.v > c.v0 - 1)) { c.lane++; c.cool = 6; }
       }
-      let ld2 = leaderIn(c, c.lane); const zf = (c.z - laneZ(c.dir, 0)) / (laneZ(c.dir, 1) - laneZ(c.dir, 0)); for (const zc0 of INC ? [Math.floor(zf), Math.ceil(zf)].filter(k => Math.abs(zf - k) < 0.6) : [Math.round(zf)]) if (zc0 !== c.lane && zc0 >= 0 && zc0 <= RIGHT) { const lo = leaderIn(c, zc0); if (lo && (!ld2 || lo.gap < ld2.gap)) ld2 = lo; }   /* при смяна — и предната в старата лента (hw-incidents: във всяка лента, в която е колата) */
-      c.vl = INC ? INC.vcap(c) : 0;
+      let ld2 = leaderIn(c, c.lane); const zf = (c.z - laneZ(c.dir, 0)) / (laneZ(c.dir, 1) - laneZ(c.dir, 0)); for (const zc0 of INC || CH ? [Math.floor(zf), Math.ceil(zf)].filter(k => Math.abs(zf - k) < 0.6) : [Math.round(zf)]) if (zc0 !== c.lane && zc0 >= 0 && zc0 <= RIGHT) { const lo = leaderIn(c, zc0); if (lo && (!ld2 || lo.gap < ld2.gap)) ld2 = lo; }   /* при смяна — и предната в старата лента (hw-incidents: във всяка лента, в която е колата) */
+      c.vl = INC ? INC.vcap(c) : 0; if (CH) { const v2 = CH.vcap(c); if (v2 && (!c.vl || v2 < c.vl)) c.vl = v2; }   /* hw-chase: колите пред гонката намаляват, покрай мястото — бавно */
       let a = idm(c, ld2), v = Math.max(0, c.v + a * dt), ds = v * dt;
       if (ld2) { const lim = Math.max(0, ld2.gap - 0.6); if (ds > lim) { ds = lim; v = Math.min(v, lim / Math.max(dt, 1e-3)); } }   // никога през предната
       c.v = v; c.x += c.dir * ds;
@@ -165,7 +168,7 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
       if (SM) pose(c, dt);   // truck-smooth
     }
     if (!em.length) return;
-    if ((emT -= dt) <= 0) { if (!INC || !INC.busy) emSend(); emT = 25 + Math.random() * 45; }   /* по време на инцидент — без минаващи спешни */
+    if ((emT -= dt) <= 0) { if ((!INC || !INC.busy) && !(CH && CH.busy)) emSend(); emT = 25 + Math.random() * 45; }   /* по време на инцидент — без минаващи спешни */
     for (const e of em) if (e.on) {
       e.x += e.dir * e.v * dt; e.o.position.x = e.x; if (lift) e.o.position.y = y + lift(e.x); if (SM) pose(e, dt);   /* truck-smooth */
       for (const c of list) if (!c.s && !c.inc && (!INC || INC.ok(c, 1)) && c.dir === e.dir && c.lane === 0 && (c.x - e.x) * e.dir > 0 && (c.x - e.x) * e.dir < 40 && c.cool <= 0 && freeLane(c, 1, 10, 12)) { c.lane = 1; c.cool = 3; }   // колите отпред се отместват вдясно
@@ -176,5 +179,5 @@ export function createHwTraffic(parent, model, A, zc, len, y = 0.92, ab = false,
   function svcForce() { if (!svc) return null; for (const c of list) { if (c.s || c.away > 0 || c.inc || c.heavy || c.dir < 0) continue;
       for (let k = 0; k < 6; k++) { const plan = svcPlan(c); if (!plan) break; if (plan.legs[0].stop) { c.s = { ...plan, i: 0, d: plan.legs[0].len - 0.4, wait: 0 }; c.lane = RIGHT; c.v = 1; return c; } plan.res.busy = null; } }
     return null; }
-  return { update, svcForce, set visible(v) { g.visible = v; }, group: g, list, inc: INC };
+  return { update, svcForce, set visible(v) { g.visible = v; }, group: g, list, inc: INC, chase: CH };
 }

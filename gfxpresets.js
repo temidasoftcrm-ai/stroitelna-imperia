@@ -10,20 +10,33 @@ import { feature } from './lab/feature.js';
 const LITE = feature('gfx-lite');
 export const GFX = {
   vlow: { nm: 'Много ниско', ico: '🟠', shadows: false, shadowSize: 1024, nf: false, traffic: 0.3, peds: 0.3, far: 0.6, pr: () => 1, res: 0.7, detail: 0.5, yard: 0, deco: false, night: false, tex: 256, aa: false, desc: 'за слаб компютър: резолюция 70 %, без сенки и нощни светлини, без украса, дворове и паркирани коли, детайлите само наблизо, по-малко коли и хора, по-малки текстури, без изглаждане' },
-  low: { nm: 'Ниско', ico: '🔴', shadows: false, shadowSize: 1024, nf: false, traffic: 0.5, peds: 0.5, far: 0.7, yard: 0.5, pr: () => 1, desc: 'без сенки и светещи етажи нощем, половината коли и хора, дворовете само наблизо, по-близка видимост, рязкост 1×' },
+  low: { nm: 'Ниско', ico: '🔴', shadows: false, shadowSize: 1024, nf: false, traffic: 0.5, peds: 0.5, far: 0.7, yard: 0.5, pr: () => 1, ...(feature('perf3-tex') ? { tex: 256 } : {}),   /* ⚡ perf3-tex: текстурите до 256 px (memfix.js; без забележителностите) */ desc: 'без сенки и светещи етажи нощем, половината коли и хора, дворовете само наблизо, по-близка видимост, рязкост 1×' },
   mid: { nm: 'Средно', ico: '🟡', shadows: true, shadowSize: 2048, nf: true, traffic: 1, peds: 1, far: 1, pr: () => Math.min(devicePixelRatio || 1, 1.5), desc: 'сенки, светещи етажи, целият трафик, рязкост до 1,5×' },
   high: { nm: 'Високо', ico: '🟢', shadows: true, shadowSize: 2048, nf: true, traffic: 1, peds: 1, far: 1.2, pr: () => Math.min(devicePixelRatio || 1, 2), desc: 'всичко, по-далечна видимост, пълна рязкост на екрана (до 2×)' },
 };
 export const GFX_ORDER = LITE ? ['vlow', 'low', 'mid', 'high'] : ['low', 'mid', 'high'];
 if (!LITE) delete GFX.vlow;
-for (const k in GFX) { const g = GFX[k] = { res: 1, detail: 1, yard: 1, deco: true, night: true, tex: 512, aa: true, ...GFX[k] }; g.pr0 = g.pr; g.pr = () => g.pr0() * g.res; }   // gfx-lite: стойностите по подразбиране; pr — с резолюцията на нивото
+const FAR3 = { vlow: [110, 200, 350], low: [150, 260, 500], mid: [260, 420, Infinity], high: [260, 420, Infinity] };   // ⚡ perf3-far: дребно (< 2,5 м), средно (< 5 м), дърветата/голямото в дворовете — докъде се рисуват (м)
+for (const k in GFX) { const g = GFX[k] = { res: 1, detail: 1, yard: 1, deco: true, night: true, tex: 512, aa: true, far3: FAR3[k], ...GFX[k] }; g.pr0 = g.pr; g.pr = () => g.pr0() * g.res; }   // gfx-lite: стойностите по подразбиране; pr — с резолюцията на нивото
 let cur = null, own = null, merged = null;   // own — „⚙️ Подробно“ (gfx-lite)
 const RANGE = { far: [0.4, 1.2], traffic: [0.1, 1], res: [0.5, 1], detail: [0, 1], yard: [0, 1] }, BOOL = ['shadows', 'night', 'deco'];   // yard — дворовете и паркираните коли (докъде; 0 — без тях), deco — украсата (сергии, билбордове, знамена, статуи)
 function readOwn(v) { if (!LITE || !v || v[0] !== '{') return null; try { const j = JSON.parse(v), o = {}; for (const k in RANGE) if (typeof j.o?.[k] === 'number') o[k] = Math.max(RANGE[k][0], Math.min(RANGE[k][1], j.o[k])); for (const k of BOOL) if (typeof j.o?.[k] === 'boolean') o[k] = j.o[k]; return GFX[j.lv] ? { lv: j.lv, o } : null; } catch { return null; } }
 // ui-batch2: запазеният избор не се губи, ако записът е от другия вид (с „⚙️ Подробно“ — без gfx-lite, или „Много ниско“ — без него → Ниско)
 const lvOf = v => { if (!feature('ui-batch2') || !v) return null; if (v[0] === '{') { try { v = JSON.parse(v).lv; } catch { return null; } } return GFX[v] ? v : v === 'vlow' && GFX.low ? 'low' : null; };
 export const gfxSaved = () => { try { return !!localStorage.getItem('stroi-gfx'); } catch { return false; } };   // ui-batch2: има ли запазен избор на този компютър
-export const gfxLevel = () => cur || (cur = (() => { const q = (location.search.match(/[?&]gfx=(vlow|low|mid|high)\b/) || [])[1]; if (q) return q;   /* ?gfx= — за тестовете (не се записва) */ try { const v = localStorage.getItem('stroi-gfx'), j = readOwn(v); if (j) { own = j.o; return j.lv; } return GFX[v] ? v : lvOf(v) || 'mid'; } catch { return 'mid'; } })());
+// ⚡ perf3-auto: без запазен избор — слабата машина започва на „Ниско“ (не се записва; изборът на играча винаги е с предимство): софтуерен рендер,
+// вградена видеокарта (Intel HD/UHD/Iris, AMD „Radeon Graphics“/Vega/APU, мобилни) или лаптоп с екран DPR ≤ 1 до 1600 px и ≤ 4 ядра; не в автотестовете
+const W_SOFT = /SwiftShader|llvmpipe|softpipe|Software|Basic Render|Mesa Offscreen/i, W_DISC = /NVIDIA|GeForce|RTX|GTX|Quadro|Radeon (RX|Pro|R9|HD [5-9])|Radeon\(TM\) RX|Arc\(TM\) A|Intel.*Arc/i, W_APPLE = /Apple (M\d|GPU)/i;
+let autoWhy = null;
+export const gfxAutoWhy = () => autoWhy;   // game.js: съобщение веднъж
+function autoLv() {
+  if (!feature('perf3-auto') || /[?&]autotest/.test(location.search)) return 'mid';
+  let gpu = ''; try { const gl = document.createElement('canvas').getContext('webgl2') || document.createElement('canvas').getContext('webgl'), e = gl && gl.getExtension('WEBGL_debug_renderer_info'); gpu = gl ? String((e && gl.getParameter(e.UNMASKED_RENDERER_WEBGL)) || gl.getParameter(gl.RENDERER) || '') : ''; } catch { }
+  const weakGpu = gpu && (W_SOFT.test(gpu) || (!W_DISC.test(gpu) && !W_APPLE.test(gpu))), weakPc = (devicePixelRatio || 1) <= 1 && screen.width <= 1600 && (navigator.hardwareConcurrency || 8) <= 4;
+  if (weakGpu || weakPc) { autoWhy = weakGpu ? gpu.replace(/^ANGLE \((.*)\)$/, '$1').slice(0, 60) : 'лаптоп'; return 'low'; }
+  return 'mid';
+}
+export const gfxLevel = () => cur || (cur = (() => { const q = (location.search.match(/[?&]gfx=(vlow|low|mid|high)\b/) || [])[1]; if (q) return q;   /* ?gfx= — за тестовете (не се записва) */ try { const v = localStorage.getItem('stroi-gfx'), j = readOwn(v); if (j) { own = j.o; return j.lv; } return GFX[v] ? v : lvOf(v) || autoLv(); } catch { return 'mid'; } })());   /* perf3-auto: без запазен избор — autoLv() */
 // нивото + своите стойности (gfx-lite: трафикът важи и за хората; рязкостта — част от тази на нивото)
 export const gfx = () => { const lv = gfxLevel(); if (!own) return GFX[lv]; if (merged?.lv === lv) return merged; const g = GFX[lv], o = own;
   return merged = { ...g, ...o, lv, peds: o.traffic ?? g.peds, pr: () => g.pr0() * (o.res ?? g.res) }; };

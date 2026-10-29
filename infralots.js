@@ -44,6 +44,7 @@ export function buildStationLot(o) {
     for (let x = parkX0 + 1.5; x + 2.6 < parkX1 - 6; x += 2.6) for (const [a, b] of [[za + 0.6, mid - 3.2], [mid + 3.2, zb - 0.6]]) {
       flat(x - 0.06, a, x + 0.06, b, white, 0.17);
       if (edge && Math.sign(a - zs) === edge && Math.abs(x + 1.3 - ex) < 5.5) continue;   // лентата към пътя
+      if (o.stalls) { const zc = (a + b) / 2; rnd(); o.stalls.push({ x: x + 1.3, z: zc, yaw: zc > mid ? 0 : Math.PI, mid, xe: parkX1 - 3 }); continue; }   /* 🚗 city-life3: местата — за lotLife (game.js); колите идват по часа */
       if (rnd() < 0.55) { const c = new THREE.Mesh(cg, cars[Math.floor(rnd() * cars.length)]); c.position.set(x + 1.3, 0.75, (a + b) / 2); c.castShadow = true; g.add(c); const t = new THREE.Mesh(cgT, glass); t.position.set(x + 1.3, 1.75, (a + b) / 2 + 0.2); g.add(t); } }
     flat(parkX1 - 6, mid - 3.2, parkX1 - 0.5, mid + 3.2, asph, 0.14); }
   // ---- лампите: около обръщалото и по паркингите; нощем — светли петна
@@ -57,5 +58,6 @@ export function buildStationLot(o) {
   for (let z = zs - ZC + 5; z <= zs + ZC - 5; z += 11) if (Math.abs(z - ez) > 9) spots.push([E - 2.2, z]);
   if (o.trees && o.trees.length) spots.forEach(([x, z], k) => { const inner = new THREE.Group(); inner.add(o.trees[k % o.trees.length].clone(true)); inner.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(inner), h = (b.max.y - b.min.y) || 1, s = (6 + rnd() * 2.5) / h;
     inner.scale.setScalar(s); inner.position.set(-(b.min.x + b.max.x) / 2 * s, -b.min.y * s, -(b.min.z + b.max.z) / 2 * s); const w = new THREE.Group(); w.add(inner); w.position.set(x, 0, z); w.rotation.y = rnd() * 6.28; w.traverse(m => { if (m.isMesh) m.castShadow = true; }); g.add(w); });
+  if (o.stalls) o.stalls.ent = edge ? [ex, zs + edge * (ZC - 1.5)] : [E - 1, ez];   // city-life3: входът на парцела откъм пътя
   return { group: g, info: { xb: Math.round(xb), ring: [Math.round(rx0), Math.round(rx1)], ez: Math.round(ez) }, dispose() { o.parent.remove(g); own.forEach(x => x.dispose()); } };
 }

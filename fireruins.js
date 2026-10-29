@@ -3,6 +3,8 @@
 // след AUTO дни градът разчиства (руината се снишава) и сградата се връща. Записът: S.blkRuins [{ city, x, z, t0 }]
 import * as THREE from 'three';
 import { loadRuin, ruinKind, fitRuin, ashTex } from './firesim.js';
+import { feature } from './lab/feature.js';
+const FR2 = feature('fire-real2');   // 🔥 fire-real2: incidents.js получава и самия блок (рамката, заместителят с опушения материал)
 
 const AUTO = 3, CLEAR = 0.5;   // дни руина; последните CLEAR дни — разчистване
 const puffT = (() => { let t = null; return () => t || (t = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 2, 32, 32, 31); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.45, 'rgba(255,255,255,0.7)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })()); })();
@@ -31,7 +33,7 @@ export function createBlockRuins(deps) {
     const { yaw, W } = frame(b), c = W.ctr, ax = [Math.cos(yaw), -Math.sin(yaw)], az = [Math.sin(yaw), Math.cos(yaw)], tx = wx - c.x, tz = wz - c.z;
     const F = [[ax, az, W.wid / 2, W.half / 2], [[-ax[0], -ax[1]], az, W.wid / 2, W.half / 2], [az, ax, W.half / 2, W.wid / 2], [[-az[0], -az[1]], ax, W.half / 2, W.wid / 2]].sort((p, q) => (q[0][0] * tx + q[0][1] * tz) - (p[0][0] * tx + p[0][1] * tz))[0];
     const [n, t, D, L] = F, o = D + 2.6, pt = (f, y) => [c.x + n[0] * o + t[0] * (f - 0.5) * L * 1.6, Math.max(1.4, b.h * y), c.z + n[1] * o + t[1] * (f - 0.5) * L * 1.6];   /* 2,6 м пред стената — отвисоко горната половина на спрайта влизаше в стената */
-    r.fire = [pt(0.28, 0.35), pt(0.7, 0.55), pt(0.5, 0.78)]; r.roof = [c.x, b.h + 0.6, c.z]; fireB = { x: wx, z: wz, bx: c.x, bz: c.z }; return r; };
+    r.fire = [pt(0.28, 0.35), pt(0.7, 0.55), pt(0.5, 0.78)]; r.roof = [c.x, b.h + 0.6, c.z]; fireB = { x: wx, z: wz, bx: c.x, bz: c.z }; if (FR2) { r.blk = b; r.pv = deps.pv(); } return r; };
   // блокът, който пожарът (incidents.js) запали от (x, z) — същият става руина (списъкът се подменя и pick можеше да даде съседа)
   const firePick = (x, z) => fireB && Math.hypot(fireB.x - x, fireB.z - z) < 1 ? blockAt(fireB.bx, fireB.bz) : null;
   // скритите — по мястото, не по обекта: при пълненето (refill / bg-fill) записите в списъка се подменят и старият обект вече не крие нищо

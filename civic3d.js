@@ -3,6 +3,10 @@
 // вятърен парк, соларен парк, язовирна стена. Същият интерфейс като tender3d.js: { group, setProg, update, dispose }.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { feature } from './lab/feature.js';
+// 🏛️ civic-size: моделът — вписан в целия правоъгълник на площадката (завъртян, ако така е по-голям), истинските дървета вместо „близалките“, топли прожектори нощем
+const TH2 = feature('theatre2');   // 🎭 theatre2: операта/театърът — моделите на собственика (Meshy): европейски неокласически, в САЩ — арт деко с реклама над входа
+const CIVSZ = feature('civic-size'), FLOOD = new Set(['museum', 'opera', 'cityhall', 'court']);
 
 const mat = (c, r = 0.8, m = 0, e) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m, ...(e ? { emissive: e, emissiveIntensity: 0 } : {}) });
 const box = (w, h, d, m, x, y, z, g) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; g.add(o); return o; };
@@ -41,7 +45,7 @@ function crane(g, h, x, z) {
   const jib = new THREE.Group(); jib.position.y = h; c.add(jib); box(22, 0.8, 0.8, y, -7, 0, 0, jib); box(2, 1.6, 1.6, mat(0x666666), 4, -0.4, 0, jib);
   return { c, jib };
 }
-function placeGlb(url, parent, side, alive, glass, lit) {
+function placeGlb(url, parent, side, alive, glass, lit, rect, flood) {
   loadGlb(url).then(src => {
     if (!src || !alive()) return;
     const o = src.clone(true);
@@ -49,7 +53,11 @@ function placeGlb(url, parent, side, alive, glass, lit) {
       const ms = Array.isArray(m.material) ? m.material : [m.material];
       for (const x of ms) { x.metalness = 0; x.metalnessMap = null; if (x.transparent && x.opacity > 0.9) { x.transparent = false; x.alphaTest = 0.5; x.depthWrite = true; } if (lit) x.color.multiplyScalar(1.8); x.needsUpdate = true; if (/glass|window|vetro|okno/i.test(x.name || '')) { const c = x.clone(); c.emissive = new THREE.Color(0xffd890); c.emissiveIntensity = 0; glass.push(c); m.material = c; } } });
     const bb = new THREE.Box3().setFromObject(o), sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3());
-    const w = new THREE.Group(); w.add(o); o.position.set(-c.x, -bb.min.y, -c.z); w.scale.setScalar(side / Math.max(sz.x, sz.z)); parent.add(w);
+    const w = new THREE.Group(); w.add(o); o.position.set(-c.x, -bb.min.y, -c.z);
+    if (rect) { const [RW, RD] = rect, a = Math.min(RW / sz.x, RD / sz.z), b = Math.min(RW / sz.z, RD / sz.x); if (b > a * 1.02) w.rotation.y = Math.PI / 2; w.scale.setScalar(Math.max(a, b)); }   // civic-size: целият правоъгълник
+    else w.scale.setScalar(side / Math.max(sz.x, sz.z));
+    if (flood) o.traverse(m => { if (!m.isMesh) return; m.material = [].concat(m.material).map(x => { const y = x.clone(); y.emissive = new THREE.Color(0xffc68a); if (y.map) y.emissiveMap = y.map; y.emissiveIntensity = 0; flood.push(y); return y; }); if (m.material.length === 1) m.material = m.material[0]; });   // топлите прожектори по фасадата
+    parent.add(w);
   });
 }
 
@@ -107,12 +115,17 @@ export function buildCivic(group, deps, opts = {}) {
   if (kind === 'bridge') { box(W * 0.4, 0.12, D, mat(0x3f7fa8, 0.15, 0.3), 0, 0.1, 0, done); for (const s of [-1, 1]) box(0.6, 0.6, D, mat(0x8a7f70, 0.95), s * W * 0.2, 0.3, 0, done); }
   if (!PROC[kind]) for (const [x, z] of [[-W / 2 + 2, D / 2 - 2], [W / 2 - 2, D / 2 - 2], [-W / 2 + 2, -D / 2 + 2], [W / 2 - 2, -D / 2 + 2]]) {
     if (kind === 'bridge') continue;
+    const k0 = opts.scale || 1, tr = CIVSZ && deps.tree ? deps.tree(6 + (((x * 3 + z) % 2) + 2) % 2) : null;   // civic-size: истинско дърво (~8–10 м в света)
+    if (tr) { tr.scale.multiplyScalar(1 / k0); tr.position.set(x * 1.02, 0, z * 1.02); tr.rotation.y = (x + z) * 0.7; done.add(tr); continue; }
     cyl(0.22, 0.28, 1.6, mat(0x6b4a2b), x, 0.8, z, done, 6); const c = new THREE.Mesh(new THREE.SphereGeometry(1.3, 10, 8), mat(0x3f8f3a)); c.position.set(x, 2.6, z); c.castShadow = true; done.add(c);
   }
-  const body = new THREE.Group(); g.add(body);
-  const glass = [], rot = [];
+  const body = new THREE.Group(); body.userData.civBody = 1; g.add(body);
+  const glass = [], rot = [], flood = [];
+  // theatre2: американският театър — светеща реклама (лента) над входа отпред
+  const marq = TH2 && kind === 'opera' && opts.region === 'am' ? box(Math.min(W, D) * 0.55, Math.min(W, D) * 0.07, 0.6, new THREE.MeshStandardMaterial({ color: 0x2a1a10, emissive: 0xffd27a, emissiveIntensity: 0, roughness: 0.4 }), 0, Math.min(W, D) * 0.16, D * 0.42, done) : null;
   let alive = true;
-  if (GLB[kind]) placeGlb(GLB[kind].url, body, (kind === 'bridge' ? Math.max(W, D) : Math.min(W, D)) * GLB[kind].fit, () => alive, glass, GLB[kind].lit);
+  const url = TH2 && kind === 'opera' ? (opts.region === 'am' ? 'assets/heavy/civic/theatre-us.glb' : 'assets/heavy/civic/theatre-eu.glb') : GLB[kind] && GLB[kind].url;
+  if (GLB[kind]) placeGlb(url, body, (kind === 'bridge' ? Math.max(W, D) : Math.min(W, D)) * GLB[kind].fit, () => alive, glass, GLB[kind].lit, CIVSZ && kind !== 'bridge' ? [W * 0.84, D * 0.84] : null, (CIVSZ || TH2) && FLOOD.has(kind) ? flood : null);
   else if (PROC[kind]) glass.push(...PROC[kind](body, W, D, rot));
   const sign = deps.label ? deps.label(opts.sign || '🏛️', '#ffe9a8', 16) : null;
   if (sign) { sign.position.set(0, 18, 0); g.add(sign); }
@@ -131,6 +144,8 @@ export function buildCivic(group, deps, opts = {}) {
   function update(t, night = 0) {
     site.glow(0.05 + 0.5 * night);
     for (const m of glass) m.emissiveIntensity = prog >= 1 ? 0.05 + 0.8 * night : 0;
+    for (const m of flood) m.emissiveIntensity = prog >= 1 ? (kind === 'opera' ? 0.85 : 0.6) * night : 0;   // civic-size / theatre2: прожекторите — само нощем (театърът — най-ярко)
+    if (marq) marq.material.emissiveIntensity = prog >= 1 ? 0.15 + 2.2 * night * (0.85 + 0.15 * Math.sin(t * 6)) : 0;
     if (prog >= 1) for (const h of rot) h.rotation.z = t * 1.2;
     if (prog < 1) kit.jib.rotation.y = Math.sin(t * 0.25) * 1.2;
   }

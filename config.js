@@ -15,7 +15,7 @@ export const heavyUrl = p => { const i = p.indexOf(KEY); return ASSET_BASE + (i 
 
 // подменените модели (същото име, ново съдържание) — версия в адреса, иначе браузърът, Cloudflare (max-age 7 дни) и service worker-ът дават стария.
 // При всяка подмяна на тежък файл: добави/вдигни реда тук (пътят спрямо assets/heavy/).
-const HV = { 'lm/mbs3.glb': 400, 'port/sf-grain.glb': 401, 'office/office-l2.glb': 401, 'towers/urban-tower.glb': 401, 'towers/ru-blocks.glb': 401,
+const HV = { 'lm/mbs3.glb': 400, 'port/sf-grain.glb': 401, 'office/office-l2.glb': 401, 'towers/urban-tower.glb': 401, 'towers/ru-blocks.glb': 401, 'sky/sky-violet.glb': 402,
   'trains/m-elloco.glb': 401, 'trains/m-steam.glb': 401, 'trains/m-steam2.glb': 401, 'trains/m-up.glb': 401, 'trains/m-gp.glb': 401, 'trains/chs200.glb': 401, 'trains/vl82.glb': 401, 'trains/loco040.glb': 401 };
 const hv = p => { const k = p.split('?')[0]; return HV[k] && !p.includes('?') ? `${p}?v=${HV[k]}` : p; };
 if (!LOCAL) THREE.DefaultLoadingManager.setURLModifier(url => {

@@ -1,0 +1,29 @@
+{
+ "🚚 ТИР-ове и доставки днес: {0}": "🚚 Lorries and deliveries today: {0}",
+ "🔄 Автоматични действия днес: {0}": "🔄 Automatic actions today: {0}",
+ "плащане": "payment",
+ "плащания": "payments",
+ "💶 Приходи днес: {0} {1}{2}": "💶 Income today: {0} {1}{2}",
+ "Затвори": "Close",
+ "Всички": "All",
+ "🔴 Важни": "🔴 Important",
+ "🟡 Обикновени": "🟡 Normal",
+ "⚪ Рутинни": "⚪ Routine",
+ "Още няма известия.": "No notifications yet.",
+ "👁 Гледай": "👁 Watch",
+ "🔔 Известия": "🔔 Notifications",
+ "Известия — последните 100": "Notifications — the last 100",
+ "да": "yes",
+ "не": "no",
+ "Покажи рутинните известия: {0}": "Show routine notifications: {0}",
+ "Звук за важните известия: {0}": "Sound for important notifications: {0}",
+ "_stale": {
+  "курс": "trip",
+  "курса": "trips",
+  "🚆 Влакове днес: {0} {1} · +{2} €": "🚆 Trains today: {0} {1} · +{2} €",
+  "кацане": "landing",
+  "кацания": "landings",
+  "✈️ Полети днес: {0} {1} · +{2} €": "✈️ Flights today: {0} {1} · +{2} €",
+  "🚢 Кораби днес: {0} {1} · +{2} €": "🚢 Ships today: {0} {1} · +{2} €"
+ }
+}

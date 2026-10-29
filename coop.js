@@ -78,14 +78,25 @@ export function createCoop(d) {
 
   // извикване на сървъра; мрежовите грешки се повтарят със същите аргументи (и същия req_id)
   async function rpc(fn, args = {}, tries = 6) {
-    let wait = 700;
+    let wait = 700; const t0 = Date.now();
     for (let i = 0; ; i++) {
-      if (!sb) throw new Error('Няма връзка с облака.');
+      if (!sb) { rlog(fn, args, t0, i, null, 'Няма връзка с облака.'); throw new Error('Няма връзка с облака.'); }
       let r; try { r = await sb.rpc(fn, args); } catch (e) { r = { error: e }; }
-      if (!r.error) return r.data;
-      if (i >= tries || /not_authenticated|JWT|permission|PGRST202|Could not find the function|coop_limit/i.test((r.error.message || '') + (r.error.code || ''))) throw r.error;   // coop_limit — тавана на сървъра (миграция coop_guard): не се повтаря
+      if (!r.error) { rlog(fn, args, t0, i, r.data, null); return r.data; }
+      if (i >= tries || /not_authenticated|JWT|permission|PGRST202|Could not find the function|coop_limit/i.test((r.error.message || '') + (r.error.code || ''))) { rlog(fn, args, t0, i, null, r.error.message || r.error.code || String(r.error)); throw r.error; }   // coop_limit — тавана на сървъра (миграция coop_guard): не се повтаря
       await sleep(wait); wait = Math.min(6000, wait * 1.8);
     }
+  }
+  // 🤝 Дневник на партньорството (T2, Лабораторията → lab/coop-log.html): последните 200 извиквания — функция, кратко за аргументите, резултат или грешка,
+  // време и опити; window.__coopLog (и sessionStorage — да остане след презареждане). Без лични данни: снимката (p_data) — само ключовете и размерът
+  const RLOG_K = 'stroi-cooplog', RLOG = globalThis.__coopLog = (() => { try { return JSON.parse(sessionStorage.getItem(RLOG_K)) || []; } catch { return []; } })();
+  const shortVal = v => { if (v == null) return String(v); if (typeof v === 'string') return v.length > 40 ? v.slice(0, 40) + '…' : v; if (typeof v !== 'object') return String(v); const j = JSON.stringify(v); return j.length > 60 ? `{${Object.keys(v).slice(0, 6).join(',')}${Object.keys(v).length > 6 ? ',…' : ''}} ${Math.round(j.length / 1024 * 10) / 10} KB` : j; };
+  const sumArgs = a => Object.entries(a || {}).filter(([k]) => k !== 'p_req').map(([k, v]) => `${k.replace(/^p_/, '')}=${shortVal(v)}`).join(' ');
+  function rlog(fn, args, t0, tries, data, err) {
+    const POLL = /^coop_(status\d?|snap)$/; if (POLL.test(fn) && !err) { for (let k = RLOG.length - 1; k >= Math.max(0, RLOG.length - 8); k--) { const e = RLOG[k]; if (!POLL.test(e.fn) || e.err) break; if (e.fn === fn) { e.n = (e.n || 1) + 1; e.at = Date.now(); e.ms = Date.now() - t0; return; } } }   // опресняването на 20 с (status 1–4, snap) — по един ред „×N“
+    RLOG.push({ at: Date.now(), fn, args: sumArgs(args), ms: Date.now() - t0, tries: tries + 1, ok: !err, err: err ? String(err).slice(0, 200) : null, res: err ? null : shortVal(data && typeof data === 'object' && 'ok' in data ? { ok: data.ok, ...(data.err ? { err: data.err } : {}), ...(data.msg ? { msg: data.msg } : {}) } : data) });
+    if (RLOG.length > 200) RLOG.splice(0, RLOG.length - 200);
+    try { sessionStorage.setItem(RLOG_K, JSON.stringify(RLOG)); } catch { }
   }
 
   // ── моето име за партньора ──
@@ -243,6 +254,7 @@ export function createCoop(d) {
       st = r && r.ok ? r : st; if (r && r.ok) fetchedAt = Date.now();
       const r2 = st?.pair?.status === 'active' ? await rpc('coop_status2', {}, 1) : null;
       st2 = r2 && r2.ok && r2.active ? cleanSt2(r2) : null;
+      if (r && r.ok && !st2 && st?.pair?.status !== 'active') batchRefund();   // 📦 партньорството го няма — натрупаното се връща
       const r3 = st2 ? await rpc('coop_status3', {}, 1).catch(() => null) : null;
       st3 = r3 && r3.ok && r3.active ? r3 : null;
       const r4 = st2 && feature('coop-center2') ? await rpc('coop_status4', {}, 1).catch(() => null) : null;   // правилата на общата каса (миграция coop4 — без нея няма карта)
@@ -300,7 +312,7 @@ export function createCoop(d) {
   window.__coopDay = () => {
     const sum = [...activeJoints('hw'), ...activeJoints('rail')].filter(j => j.done).reduce((a, j) => a + j.km * (j.kind === 'hw' ? 3 : 8), 0);
     if (sum > 0) E().earn(sum, 'партньор', `🤝 Общи магистрали и влакове с ${partnerName()}`);
-    holdDay(); fleetDay();
+    holdDay(); fleetDay(); batchTick();
   };
   // 🚆✈️🚢 общият флот (флаг coop-fleet; потребителят: „каквото е купил единият — самолети, кораби или влакове — да ги разделя на двамата“):
   // всяко превозно средство, купено докато сте партньори, е 50/50 — партньорът връща половината от цената (щом има пари),
@@ -320,13 +332,38 @@ export function createCoop(d) {
     }
     const tot = mine.reduce((a, v) => a + v.cost, 0), sh = mine.filter(v => F.mine[v.ref]).reduce((a, v) => a + v.cost, 0), net = d.fleetNet ? d.fleetNet() : 0;
     const send = Math.round(net * 0.5 * (tot > 0 ? sh / tot : 0));   // половината от печалбата на общите — по дела им в целия флот
-    if (send > 0) { E().spend(send, 'партньор', `🤝 Половината от печалбата на общия флот → ${partnerName()}`); fleetSend({ fn: 'coop_send', args: { p_req: uid(), p_kind: 'gift', p_data: { amount: send, fleet: 'income' } }, refund: { money: send } }); }
+    if (send > 0) { E().spend(send, 'партньор', `🤝 Половината от печалбата на общия флот → ${partnerName()}`); batchAdd('fleet', send); }   // пратката — веднъж на BATCH_DAYS дни (batchFlush)
     d.save();
   }
   let fleetSend = op => queue(op);
+  // 📦 пакетиране (T2, 4.0.x — сървърните тавани броят за реални 24 ч, а игралният ден е 24 s): автоматичните дневни преводи — половината от печалбата
+  // на общия флот (подарък) и 40% от завършените градове (касата) — се трупат в записа (S.coopBatch) и тръгват като една сума на BATCH_DAYS игрални дни;
+  // парите излизат от играта всеки ден (както досега), пратката — веднъж. Прекратяване на партньорството — първо се изпраща натрупаното;
+  // ако партньорството вече го няма (партньорът го е прекратил) — натрупаното се връща в играта.
+  const BATCH_DAYS = 10; let vaultSend = op => queue(op);
+  const batch = () => { const S = d.S(); if (!S) return null; return S.coopBatch || (S.coopBatch = { fleet: 0, fin: 0, at: S.day }); };
+  function batchAdd(k, amt) { const B = batch(); if (!B || !(amt > 0)) return; B[k] = (B[k] || 0) + amt; }
+  function batchTick() { const B = batch(), S = d.S(); if (B && S && (B.fleet > 0 || B.fin > 0) && S.day - B.at >= BATCH_DAYS) batchFlush(); }
+  async function batchFlush(only = null) {
+    const B = batch(), S = d.S(); if (!B) return; const f = only === 'fin' ? 0 : Math.round(B.fleet || 0), c = only === 'fleet' ? 0 : Math.round(B.fin || 0);
+    const days = Math.max(1, S.day - (B.sentAt ?? B.at));   // за колко игрални дни е сумата
+    if (only !== 'fin') B.fleet = 0; if (only !== 'fleet') B.fin = 0; if (!only) { B.at = S.day; B.sentAt = S.day; }
+    const ps = [];
+    if (f > 0) ps.push(fleetSend({ fn: 'coop_send', args: { p_req: uid(), p_kind: 'gift', p_data: { amount: f, fleet: 'income', days } }, refund: { money: f } }));
+    if (c > 0) ps.push(vaultSend({ fn: 'coop_vault2', args: { p_req: uid(), p_amount: c, p_kind: 'order' }, refund: { money: c } }));
+    d.save(); await Promise.all(ps.map(p => Promise.resolve(p).catch(() => null)));
+  }
+  // Лабораторията: N игрални дни с измислени суми (без сървъра) → кои пратки биха тръгнали и какво остава натрупано
+  window.__coopBatchTest = (days = 25, fleet = 1000, fin = 500) => { const s0 = st, s20 = st2, sent = [], fs0 = fleetSend, vs0 = vaultSend, S = d.S(); st = { pair: { status: 'active' } }; st2 = st2 || {};
+    fleetSend = op => { sent.push({ day: S.day, ...op.args.p_data }); return Promise.resolve({ ok: true }); }; vaultSend = op => { sent.push({ day: S.day, vault: op.args.p_amount }); return Promise.resolve({ ok: true }); };
+    try { for (let k = 0; k < days; k++) { S.day++; batchAdd('fleet', fleet); batchAdd('fin', fin); batchTick(); } return { sent, left: { ...S.coopBatch } }; } finally { st = s0; st2 = s20; fleetSend = fs0; vaultSend = vs0; } };
+  function batchRefund() {   // партньорството приключи (от другия) — натрупаното се връща
+    const B = d.S() && d.S().coopBatch, n = B ? Math.round((B.fleet || 0) + (B.fin || 0)) : 0; if (!n) return;
+    B.fleet = 0; B.fin = 0; E().earn(n, 'партньор', '↩️ Натрупаното за партньора се връща (партньорството приключи)'); d.toast(`↩️ ${f(n)} € от общия флот и завършените градове се върнаха при теб — партньорството приключи.`, ''); d.save();
+  }
   // тест (без сървъра): фалшив партньор P, пратките — само се записват; връща S.coopFleet и пратките
   window.__coopFleetTest = P => { const s0 = st, s20 = st2, sent = []; st = { pair: { status: 'active' }, partner: { snap: P } }; st2 = st2 || {}; fleetSend = op => { sent.push(op.args.p_data); return Promise.resolve({ ok: true }); };
-    try { fleetDay(); } finally { st = s0; st2 = s20; fleetSend = op => queue(op); } return { F: d.S().coopFleet, sent }; };
+    try { fleetDay(); batchFlush('fleet'); } finally { st = s0; st2 = s20; fleetSend = op => queue(op); } return { F: d.S().coopFleet, sent }; };
   // 🏦 холдингът всеки игрален ден: спасяване от фалит (10-ия ден на минус) и дивидент в края на месеца
   function holdDay() {
     const S = d.S(), b = S?.bust; if (!S || !st2) return;
@@ -349,7 +386,7 @@ export function createCoop(d) {
     const share = Math.round(amount * ORDER_SHARE);
     if (share <= 0) return;
     E().spend(share, 'партньор', `🏦 40% от завършените градове → холдинга`);
-    queue({ fn: 'coop_vault2', args: { p_req: uid(), p_amount: share, p_kind: 'order' }, refund: { money: share } });
+    batchAdd('fin', share);   // вноската — веднъж на BATCH_DAYS дни (batchFlush)
   };
   // 💼 поръчка, платена в моята игра → 40% от печалбата отиват в общия холдинг (вика го game.js при прибирането на парите)
   window.__coopOrder = (amount, title) => {
@@ -656,7 +693,7 @@ export function createCoop(d) {
     if (c === 'say' || c === 'quick') { const txt = c === 'quick' ? QUICK[+a] : el.querySelector('#cpMsg').value; if (!txt) return; if (say(await rpc('coop_say', { p_text: txt }))) tab = 'chat'; return; }
     if (c === 'sos') { say(await rpc('coop_say', { p_text: `Трябва ми помощ! Имам ${f(E().money)} €${E().money < 0 ? ' (на минус!)' : ''}.`, p_sos: true })); d.toast('🆘 Сигналът е изпратен.', 'good'); return; }
     if (c === 'join') { const r = await rpc('coop_join', { p_code: el.querySelector('#cpCode').value }); if (say(r)) d.toast('🤝 Свързани сте! Градовете на партньора ще се появят на картата ти в синьо.', 'good'); return; }
-    if (c === 'leave') { d.modal('Прекрати партньорството?', 'Пратките, които вече са тръгнали, ще пристигнат. После ще можете да се свържете отново с нов код.', [['Не', null], ['Прекрати', async () => { await rpc('coop_leave'); await tick(); }]]); return; }
+    if (c === 'leave') { d.modal('Прекрати партньорството?', 'Пратките, които вече са тръгнали, ще пристигнат. После ще можете да се свържете отново с нов код.', [['Не', null], ['Прекрати', async () => { await batchFlush(); await rpc('coop_leave'); await tick(); }]]); return; }
     if (c === 'name') { try { localStorage.setItem(NAME, el.querySelector('#cpName').value.trim().slice(0, 24)); } catch {} lastSnap = 0; d.toast('Името е запазено.'); return; }
     if (c === 'gift') { const n = amtIn(); if (!money(n)) return; E().spend(n, 'партньор', `🎁 Подарък за ${partnerName()}`);
       const r = await queue({ fn: 'coop_send', args: { p_req: uid(), p_kind: 'gift', p_data: { amount: n } }, refund: { money: n } }); if (r?.ok) d.toast(`🎁 Изпрати ${f(n)} € на ${partnerName()}.`, 'good'); d.renderPanel(); return; }

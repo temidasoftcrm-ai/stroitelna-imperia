@@ -9,6 +9,7 @@
 
 import { FIRMS } from './rivals.js';
 import { feature } from './lab/feature.js';
+import { t as tr } from './i18n.js';
 // feature 'dir-conseq': изборите имат видими последици — защитеният скандал може да се върне по-голям, отстраненият директор не предлага нищо,
 // потвърдената проверка носи глоба; бутоните казват последицата, а в панела се вижда стачка/отстраняване с оставащите дни.
 const CQ = () => feature('dir-conseq');
@@ -108,7 +109,7 @@ export function createDirEvents(deps) {
     deps.toast(`👋 ${nm} напусна${fem(k) ? '' : ''}. ${deps.sub(k) || k} е без директор — назначи нов от „Холдинг“.`, 'bad'); deps.save();
   }
   const fineOf = k => Math.max(1e5, Math.round(payOf(k) * 0.3 / 1e4) * 1e4);
-  const note = (title, text) => { if (document.getElementById('dirEv') || (window.__overlay3d || 0) > 0) deps.toast(`${title}: ${text}`, 'bad'); else ask(title, text, [['Разбрах', () => { }]]); };   // последицата — като прозорец (или известие, ако вече има отворен)
+  const note = (title, text) => { if (document.getElementById('dirEv') || (window.__overlay3d || 0) > 0) deps.toast(`${tr(title)}: ${tr(text)}`, 'bad'); else ask(title, text, [['Разбрах', () => { }]]); };   // последицата — като прозорец (или известие, ако вече има отворен)
   // ✊/⏸️ в панела на холдинга: какво става с дружеството и още колко дни
   const tag = k => { const d = day(), x = h(); if (struck(k)) return `✊ стачка — −50% приход, без бонус, още ${x.strike[k] - d} дни · `; if (away(k)) return `⏸️ отстранен — без бонус и предложения, още ${x.away[k] - d} дни · `; return x.scandal[k] ? '📰 скандалът тлее · ' : ''; };
   const pay = c => { const e = deps.econ(); if (!e.canAfford(c)) { deps.toast(`Нямаш ${B(c)}.`, 'bad'); return false; } e.spend(c, 'заплати', 'Холдинг: директори'); return true; };

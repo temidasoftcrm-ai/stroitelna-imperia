@@ -2,6 +2,7 @@
 // Тръгва сама веднъж — в началото на нова игра (ден ≤ 3), когато няма видео и прозорец. Бутонът ❓ горе я пуска отново.
 // Бутоните, които още не са отключени (не се виждат), се прескачат. Играта е на пауза, докато трае обиколката.
 // Само DOM — game.js не знае за нея. Помни се в браузъра (localStorage 'stroiTour').
+import { feature } from './lab/feature.js';
 const LS = 'stroiTour';
 const tabBtn = re => () => [...document.querySelectorAll('#tabs button')].find(b => re.test(b.innerText));
 const STEPS = [
@@ -115,6 +116,7 @@ let calm = 0;
 const iv = setInterval(() => {
   mount();
   let seen = null; try { seen = localStorage.getItem(LS); } catch (e) {}
+  if (feature('onboard2')) { if (document.getElementById('btnTour')) clearInterval(iv); return; }   // 🧭 onboard2: само по бутона ❓ (урокът е в onboard2.js)
   if (seen || new URLSearchParams(location.search).has('autotest') && !new URLSearchParams(location.search).has('tour')) { if (document.getElementById('btnTour')) clearInterval(iv); return; }
   const day = +(document.getElementById('day')?.textContent || 0), modal = document.getElementById('modal');
   const ok = day >= 1 && vis(document.getElementById('tabs')) && !document.getElementById('cine') && !(modal && !modal.classList.contains('hidden'))

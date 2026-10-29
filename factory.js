@@ -7,6 +7,7 @@
 // който от време на време кара по пътя до града и обратно. Само изглед — графът на движението и парцелите не се пипат.
 //   game.js: placeFactories({ THREE, P, model, group, tier, railX, addWin, roads, lots, truck, poolMat, spin, extra: { model(key), worker(key, clip) → { obj, mixer } } }) → { update(dt, night), clear() }
 import { nearestOn, hitsLot } from './airportaccess.js';
+import { createLotLife } from './citylife3.js';   // 🚗 city-life3: колите на смените идват и си отиват по часа
 const FW = 66, APR = 34, YM = 7, RW = 7.5;   // м: страната на завода; дълбочината на площадката отпред; дворът около него; ширината на пътя
 
 export function placeFactories(o) {
@@ -73,7 +74,7 @@ function visitors(THREE, o, c, ry, rt) {
   const g = new THREE.Group(); g.name = 'indVisitors'; const V = []; g.userData.V = V;
   for (let k = 0; k < 3; k++) { const m = o.visitor(k); if (!m) break; m.visible = false; g.add(m); V.push({ m, s: tot, dir: -1, wait: 15 + k * 22, k }); }   // тръгват от улицата (края на пътя) към рампата
   if (!V.length) return null;
-  const put = v => { let q = v.s, i = 0; while (i < segL.length - 1 && q > segL[i]) { q -= segL[i]; i++; } const a = path[i], b = path[i + 1], f = Math.min(1, q / (segL[i] || 1)), dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1, d = v.dir < 0 ? -1 : 1, lane = 1.9;
+  const put = v => { let q = v.s, i = 0; while (i < segL.length - 1 && q > segL[i]) { q -= segL[i]; i++; } const a = path[i], b = path[i + 1], f = Math.min(1, q / (segL[i] || 1)), dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1, d = v.dir < 0 ? -1 : 1, lane = o.extra && o.extra.commute ? -1.9 * (o.extra.side || 1) : 1.9;   /* city-life3: в дясната лента (беше в лявата) */
     v.m.position.set(a[0] + dx * f + (dz / l) * lane * d, 0, a[1] + dz * f - (dx / l) * lane * d); v.m.rotation.y = Math.atan2(dx * d, dz * d); };   // дясната лента спрямо посоката
   let far = false, chk = 0;
   const drive = dt => {
@@ -188,11 +189,24 @@ function crew(THREE, o, c, ry, g, drives, spot) {
     const pal = new THREE.Group(); pal.position.set(0, 0.3, -1.45); fk.add(pal); { const b = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.14, 1.1), new THREE.MeshStandardMaterial({ color: 0x9c7a4c })); pal.add(b); const s = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.8, 1.0), boxM); s.position.y = 0.47; s.castShadow = true; pal.add(s); } fk.userData.pal = pal; }
   root.add(fk); const FK = { a: [-4, H + 2.2], b: [-4, H + 15], s: 0, dir: 1, wait: 1 };
   // колите на служителите (паркингът: u 0,35H…U−2, редове v = H+9 и V1−9, места през 2,6 м)
-  const cars = []; if (E.car) { const p0 = H * 0.35, p1 = H + YM - 2; let k = 0; for (const v of [H + 9, V1 - 9]) for (let u = p0 + 2.8; u <= p1 - 1.5; u += 2.6, k++) { const m = E.car(k); if (!m) continue; const [x, z] = W(u, v); m.position.set(x, 0, z); m.rotation.y = ry + (rnd() < 0.5 ? 0 : Math.PI); root.add(m); cars.push({ m, r: rnd() }); } }
+  // 🚗 city-life3: паркингът се пълни сутрин (5:00–6:30 — дневната смяна, колите идват от улицата през бариерата) и се празни 16:30–18:00;
+  // нощната смяна (~1/4) идва ~21 ч. и си тръгва ~6 ч.; работникът върви от колата до вратата на завода и вечер обратно
+  let lot = null; if (E.car && E.commute && c.route && c.route.length > 1) { const st = [], p0 = H * 0.35, p1 = H + YM - 2, vm = H + APR / 2, ua = gu + 3.5;
+    for (const v of [H + 9, V1 - 9]) for (let u = p0 + 2.8; u <= p1 - 1.5; u += 2.6) { const [x, z] = W(u, v), [ax, az] = W(u, vm); st.push({ x, z, yaw: Math.atan2(x - ax, z - az), u }); }
+    const rt = c.route.slice().reverse(), q0 = rt[0]; let sd = null, bd = 8;   // по улицата (≤ 70 м от двете страни) до отбивката към завода — не изскачат на кръстовището
+    for (const r of o.linkW || o.roadsW || []) for (let i = 1; i < r.pts.length; i++) { const a = r.pts[i - 1], b = r.pts[i], dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((q0[0] - a[0]) * dx + (q0[1] - a[1]) * dz) / L2)), d = Math.hypot(a[0] + dx * t - q0[0], a[1] + dz * t - q0[1]); if (d < bd) { bd = d; sd = [dx / Math.sqrt(L2), dz / Math.sqrt(L2)]; } }
+    const sch = st.map(() => { const r = rnd(); return r < 0.64 ? { a: 4.4 + rnd() * 1.6, d: 16.5 + rnd() * 1.5 } : r < 0.88 ? { a: 20.6 + rnd() * 1.2, d: 5.7 + rnd() * 0.8, n: 1 } : null; });
+    lot = createLotLife({ parent: root, stalls: st, seed: Math.abs(Math.round(c.x * 3 + c.z)), side: E.side || 1, R: 300, center: [c.x, c.z], hour: E.hour, cam: E.cam, spin: o.spin,
+      path: k => [...(sd ? [[q0[0] + sd[0] * (k % 2 ? 70 : -70), q0[1] + sd[1] * (k % 2 ? 70 : -70)]] : []), ...rt, W(ua, V1 - 2), W(ua, vm), W(st[k].u, vm), [st[k].x, st[k].z]], car: k => E.car(k),
+      want: (k, h) => { const q = sch[k]; return !!q && (q.n ? h >= q.a || h < q.d : h >= q.a && h < q.d); },
+      person: () => { const w = E.body(rnd() < 0.5 ? 'worker-hivis' : 'worker-build'); if (!w) return null; return { obj: w.obj, mixer: new THREE.AnimationMixer(w.obj), walk: w.clips.find(a => a.name === 'walk') }; }, personFlip: true, door: W(2, H + 1.2) });
+    g.userData.lot = lot; }
+  const cars = []; if (E.car && !lot) { const p0 = H * 0.35, p1 = H + YM - 2; let k = 0; for (const v of [H + 9, V1 - 9]) for (let u = p0 + 2.8; u <= p1 - 1.5; u += 2.6, k++) { const m = E.car(k); if (!m) continue; const [x, z] = W(u, v); m.position.set(x, 0, z); m.rotation.y = ry + (rnd() < 0.5 ? 0 : Math.PI); root.add(m); cars.push({ m, r: rnd() }); } }
   drives.push(dt => {
     const cam = E.cam && E.cam(), far = cam ? Math.hypot(cam.x - c.x, cam.z - c.z) > 300 : false; root.visible = !far; if (far) return;
     const night = o._night || 0, ns = night > 0.5;
     for (const q of cars) q.m.visible = q.r < (ns ? 0.25 : 0.8);
+    if (lot) lot.update(dt);
     for (const j of people) { const on = !ns || j.night; j.p.obj.visible = on; if (j.bx) j.bx.visible = false; if (!on) continue;
       if (!j.pts) continue;
       if (j.wait > 0) { j.wait -= dt; clip(j.p, j.stay); continue; }
@@ -311,7 +325,9 @@ export function factoryNight(root, THREE, addWin) {
     mt.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
       { vec3 tx = texture2D(emissiveMap, vEmissiveMapUv).rgb; vec3 wN = inverseTransformDirection(normal, viewMatrix); float lum = dot(tx, vec3(0.333));
         float m = step(abs(wN.y), 0.5) * step(tx.r * 2.5 + 0.01, tx.b) * step(tx.g * 1.5, tx.b) * (1.0 - smoothstep(0.03, 0.06, lum));   /* само най-тъмното синьо стъкло */
-        totalEmissiveRadiance = (vec3(1.0, 0.74, 0.42) * m + tx * vec3(1.0, 0.85, 0.65) * 0.3) * emissive.r; }`); };   /* + меки прожектори по фасадата (иначе нощем е черна маса) */
+        vec3 fq = vFnW / vec3(2.6, 3.2, 2.6), ff = fract(fq); float fwin = step(0.28, ff.y) * step(ff.y, 0.74) * step(fract(sin(dot(floor(fq), vec3(12.9898, 78.233, 37.719))) * 43758.5453), 0.35); m *= fwin;   /* ind-night: стъклото — само в правоъгълни прозорци (не на ивици) */
+        float hy = clamp(vFnY / 26.0, 0.0, 1.0), wash = (1.0 - smoothstep(0.0, 0.35, hy)) * step(abs(wN.y), 0.5) * 0.2;   /* ind-night (T2): вместо цялата фасада ×0,3 (бежови петна) — ниско осветяване отдолу, от прожекторите в двора */
+        totalEmissiveRadiance = (vec3(1.0, 0.74, 0.42) * m * 0.7 + tx * vec3(1.0, 0.85, 0.65) * wash) * emissive.r; }`); sh.vertexShader = 'varying float vFnY; varying vec3 vFnW;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vFnW = (modelMatrix * vec4(position, 1.0)).xyz; vFnY = vFnW.y;'); sh.fragmentShader = 'varying float vFnY; varying vec3 vFnW;\n' + sh.fragmentShader; };
     mt.customProgramCacheKey = () => 'factory-night'; addWin(mt); });
 }
 let SMOKE = null;

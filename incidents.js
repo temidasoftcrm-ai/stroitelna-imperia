@@ -11,12 +11,14 @@ import { spinWheels } from './wheelspin.js';
 import { kidK } from './scale.js';   // детските коли (резервата) в истинския размер
 import { playSiren, sirenKind } from './vehmodels.js';
 import { flameSprite, flameSize } from './fireflip.js';
+import { createFire2, obbOf, obbOfMatrix, scorch2, blockStandIn, ladderRig, outside } from './firefx2.js';   // 🔥 fire-real2: огънят по прозорците и покрива на сградата, стълбата и струята
 import { loadInc2, createInc2Kit } from './incidents2.js';   // 🚨 incidents2 (55): истинските хора, кордон, гасене, пътна помощ, истински мотор   // истинските пламъци (Блендър) — Лабораторията → fire-real
 
 const HOLD = 60;                      // колко стоят на място (истински секунди) — по подразбиране; всеки вид има свое
 const HEAVY_GAP = 600;                // тежките (кола по таван, верижна, изсипан товар, пожар в сграда) — не по-често от веднъж на 10 мин
 const EVERY = [240, 420];             // на колко време идва нов инцидент (истински секунди, само докато гледаш града)
 const SPEED = 14;                     // по-бързи от обикновените коли (11 м/с), минават и на червено
+const FR2 = feature('fire-real2');   // 🔥 fire-real2 (firefx2.js)
 const LANE = 1.9;                     // вдясно от оста на улицата — както колите в game.js
 
 export function createIncidents(ctx) {
@@ -113,7 +115,7 @@ export function createIncidents(ctx) {
       // най-близката сграда до мястото: пламъци от прозорците на фасадата към улицата и черен дим от покрива
       const b = ctx.building && ctx.building(at.x, at.z); if (!b) return { smoke: [0, 3, 6], fire: [[0, 1.5, 6, 4]] };
       const fx = Math.max(b.x0, Math.min(b.x1, at.x)), fz = Math.max(b.z0, Math.min(b.z1, at.z)), nx = Math.sign(at.x - fx) * 0.8, nz = Math.sign(at.z - fz) * 0.8, along = nx ? [0, 1] : [1, 0], h = b.h;
-      return { smokeW: [(b.x0 + b.x1) / 2, h + 1, (b.z0 + b.z1) / 2], fireW: [[fx + nx - along[0] * 2, h * 0.35, fz + nz - along[1] * 2, Math.min(6, 2 + h * 0.12)], [fx + nx + along[0] * 2, h * 0.55, fz + nz + along[1] * 2, Math.min(6, 2 + h * 0.12)], [fx + nx, h * 0.75, fz + nz, Math.min(6, 2 + h * 0.1)]] }; } },
+      return { bld: b, smokeW: [(b.x0 + b.x1) / 2, h + 1, (b.z0 + b.z1) / 2], fireW: [[fx + nx - along[0] * 2, h * 0.35, fz + nz - along[1] * 2, Math.min(6, 2 + h * 0.12)], [fx + nx + along[0] * 2, h * 0.55, fz + nz + along[1] * 2, Math.min(6, 2 + h * 0.12)], [fx + nx, h * 0.75, fz + nz, Math.min(6, 2 + h * 0.1)]] }; } },
     heart: { nm: '❤️ Инфаркт на тротоара', w: 3, hold: 45, cars: [['Ambulance', 0]], props(g) {
       const p = person(true); p.position.set(0, 0, 4.5); g.add(p); for (let k = 0; k < 3; k++) { const s = person(false); s.position.set(-1.5 + k * 1.5, 0, 6); s.rotation.y = Math.PI; g.add(s); } } },
     cat: { nm: '🐈 Котка на дърво', w: 1, hold: 60, cars: [['Firetruck', 0]], props(g) {
@@ -182,7 +184,7 @@ export function createIncidents(ctx) {
       fires.push(b.roof ? [...b.roof, sz * 1.2] : [cx, h - 0.3, cz, sz * 1.2]);
       const bl = g.worldToLocal(new THREE.Vector3(cx, 0, cz)), s = Math.sign(bl.x) || 1, f1 = K2.put(g, 'ff', 'idle', s * (R.hw - 0.6), -3, bl.x, bl.z), f2 = K2.put(g, 'ff', 'idle', s * (R.hw - 0.4), 3.5, bl.x, bl.z);
       K2.put(g, 'ff', 'talk', -s * 1, 6, 0, 0); K2.crowd(g, 7, -s * (R.hw + R.walk * 0.8), -9, 9, bl.x, bl.z);
-      return { smokeW: [cx, h + 1, cz], fireW: fires, hosesW: [[f1, fires[0]], [f2, fires[1]]], closure: cl }; } },
+      return { bld: b, smokeW: [cx, h + 1, cz], fireW: fires, hosesW: [[f1, fires[0]], [f2, fires[1]]], closure: cl }; } },
     heart: { cars: [['Ambulance', 0], ['Police_Sedan', 11]], props(g, at, R) { const x = R.hw + R.walk * 0.5, v = K2.person('ped', 'idle', { lying: true }); v.position.set(x, 0, 0); v.rotation.y = Math.PI / 2; g.add(v);
       medics(g, x, 0); K2.put(g, 'cop', 'talk', x + 0.3, -3, x, 0); K2.put(g, 'ped', 'phone', x - 0.2, 3.2, x, 0);   // който се обади на 112
       const X0 = R.hw + 0.2, X1 = R.hw + R.walk + 1.6; return { closure: base(g, R, { pts: [[X0, -4.5], [X1, -4.5], [X1, 4.5], [X0, 4.5]], close: false, cops: 0, crowd: 4, crowdSide: -1, len: 5 }), open: true }; } },
@@ -219,10 +221,11 @@ export function createIncidents(ctx) {
     const fx = (T2 ? T2.props(g, at, R) : T.props(g, at)) || {};
     g.updateMatrixWorld(true);
     const W = v => new THREE.Vector3(...v).applyMatrix4(g.matrixWorld);
+    const F2 = FR2 && type === 'bfire' && fx.bld ? fire2For(fx.bld, at) : null;   // fire-real2: вместо пламъчетата във въздуха — огънят по сградата
     const puffs = [], flames = [];
-    if (fx.smoke || fx.smokeW) { const o = fx.smokeW ? new THREE.Vector3(...fx.smokeW) : W(fx.smoke); for (let k = 0; k < 8; k++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, color: fx.gas ? 0xcfe0c0 : fx.fire || fx.fireW ? 0x333333 : 0x777777, transparent: true, depthWrite: false, opacity: 0 })); s.userData.ph = k / 8; s.userData.o = o; s.userData.big = fx.fireW ? 3.2 : fx.fire ? 1.8 : fx.gas ? 0.6 : 1; ctx.scene.add(s); puffs.push(s); } }   // пожар в сграда (fireW) — висок стълб дим над покрива (с 1,8 почти не се виждаше)
+    if (!F2 && (fx.smoke || fx.smokeW)) { const o = fx.smokeW ? new THREE.Vector3(...fx.smokeW) : W(fx.smoke); for (let k = 0; k < 8; k++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, color: fx.gas ? 0xcfe0c0 : fx.fire || fx.fireW ? 0x333333 : 0x777777, transparent: true, depthWrite: false, opacity: 0 })); s.userData.ph = k / 8; s.userData.o = o; s.userData.big = fx.fireW ? 3.2 : fx.fire ? 1.8 : fx.gas ? 0.6 : 1; ctx.scene.add(s); puffs.push(s); } }   // пожар в сграда (fireW) — висок стълб дим над покрива (с 1,8 почти не се виждаше)
     for (const sp of fx.smokes || []) { const o = W(sp); for (let k = 0; k < 6; k++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, color: 0x6a6a6a, transparent: true, depthWrite: false, opacity: 0 })); s.userData.ph = k / 6; s.userData.o = o; s.userData.big = 1; ctx.scene.add(s); puffs.push(s); } }   // incidents2: дим от няколко коли
-    for (const f of [...(fx.fire || []).map(f => [W(f.slice(0, 3)), f[3]]), ...(fx.fireW || []).map(f => [new THREE.Vector3(...f.slice(0, 3)), f[3]])]) { const o = f[0]; for (let k = 0; k < 3; k++) { const s = feature('fire-real') ? flameSprite() : new THREE.Sprite(new THREE.SpriteMaterial({ map: fireTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); s.userData.flip = feature('fire-real'); s.userData.o = o; s.userData.sz = f[1]; s.userData.ph = k * 2.1; ctx.scene.add(s); flames.push(s); } }
+    for (const f of F2 ? [] : [...(fx.fire || []).map(f => [W(f.slice(0, 3)), f[3]]), ...(fx.fireW || []).map(f => [new THREE.Vector3(...f.slice(0, 3)), f[3]])]) { const o = f[0]; for (let k = 0; k < 3; k++) { const s = feature('fire-real') ? flameSprite() : new THREE.Sprite(new THREE.SpriteMaterial({ map: fireTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); s.userData.flip = feature('fire-real'); s.userData.o = o; s.userData.sz = f[1]; s.userData.ph = k * 2.1; ctx.scene.add(s); flames.push(s); } }
     const cars = [];
     const hoses = [...(fx.hoses || []).map(([p, t]) => [p, W(t)]), ...(fx.hosesW || []).map(([p, t]) => [p, new THREE.Vector3(t[0], t[1], t[2])])].filter(([p]) => p).map(([p, t]) => ({ p, t, s: K2.stream(ctx.scene) }));   // пожарникарите с маркучите
     ((T2 && T2.cars) || T.cars).forEach(([k, back], n) => {
@@ -232,7 +235,7 @@ export function createIncidents(ctx) {
       o.position.set(st.x, 0, st.z); ctx.scene.add(o);
       cars.push({ home, o, x: st.x, z: st.z, yaw: 0, path, pi: 0, stage: 'go', delay: n * rnd(1.5, 4), kind: sirenKind(o) || { Firetruck: 'fire', Ambulance: 'ambulance' }[k] || (k === 'Truck' ? null : 'police') });
     });
-    inc = { at, g, cars, puffs, flames, type, hold0: T.hold, t: 0, force: !!force, fx, hoses, R };
+    inc = { at, g, cars, puffs, flames, type, hold0: T.hold, t: 0, force: !!force, fx, hoses, R, f2: F2 };
     // 🏚️ fire-ruins: понякога пожарната закъснява — сградата изгаря и след гасенето остава руина (game.js ruinAt → firesim.js)
     if (type === 'bfire' && feature('fire-ruins') && ctx.ruinAt && Math.random() < (ctx.lostP ? ctx.lostP() : 0.2)) inc.lost = true;
     if (feature('ui-batch2') && type !== 'jam') ctx.started && ctx.started(type, at, T.nm);   // ui-batch2: известието с „👁️ Гледай“ (game.js)
@@ -274,6 +277,7 @@ export function createIncidents(ctx) {
     if (!inc) return;
     ctx.scene.remove(inc.g); for (const c of inc.cars) ctx.scene.remove(c.o); for (const s of [...inc.puffs, ...inc.flames]) ctx.scene.remove(s);
     if (inc.wreckOn) ctx.scene.remove(inc.wreckOn); if (K2) K2.reset();
+    if (inc.f2) { inc.f2.fx.dispose(); if (inc.f2.ch) inc.f2.ch.dispose(); }   // fire-real2: сградата — с оригиналните материали (и инстанцията — пак видима)
     inc = null;
   }
   function move(c, dt) {   // колкото път се пада за кадъра — и през няколко точки (иначе при малко кадри в секунда пълзят)
@@ -304,6 +308,27 @@ export function createIncidents(ctx) {
     w.position.lerpVectors(Lo.p0, p1, u); w.quaternion.slerpQuaternions(Lo.q0, q1, u);
     if (Lo.t >= 1) { c.o.attach(w); inc.wreckOn = null; c.done = true; }
   }
+  // 🔥 fire-real2: рамката на горящата сграда (фонов блок — заместител с копие на материала; сграда на играча — копията на материалите)
+  function fire2For(b, at) {
+    let B = null, ch = null, hit = [];
+    if (b.blk && b.pv) { ch = blockStandIn(b.pv, b.blk); B = obbOfMatrix(b.blk.M, b.pv.position.x, b.pv.position.z); if (ch) hit = [ch.g]; }
+    else if (b.obj) { B = obbOf(b.obj); hit = [b.obj]; ch = { set: (k, gl) => scorch2(b.obj, k, gl), dispose: () => scorch2(b.obj, 0, 0) }; }
+    if (!B) return null;
+    return { fx: createFire2(ctx.scene, B, { hit, toward: new THREE.Vector3(at.x, 0, at.z) }), ch, B, t2: new THREE.Vector3(), t3: new THREE.Vector3(), p: { x: 0, z: 0 } };
+  }
+  // етапът: огънят расте, докато пожарната пътува (прозорец → съседните → нагоре → покривът), и намалява при гасенето (fireOn); пожарната със стълбата
+  // паркира извън петното, вдига стълбата към най-високия пламък и пуска струя; маркучите на пожарникарите — към горящите прозорци
+  function fire2Step(fireOn) {
+    const F = inc.f2, k = inc.leave ? 0 : inc.lost ? Math.max(fireOn, 0.7) : fireOn, grow = Math.min(1, 0.15 + inc.t / 30), night = ctx.night ? ctx.night() : 0, fight = inc.hold !== undefined && !inc.leave;
+    const stage = inc.leave ? 0 : grow * (0.25 + 0.75 * k);
+    F.fx.update({ stage, inten: k, night, cam: ctx.cam ? ctx.cam() : null, steam: fight ? (1 - fireOn) * 0.8 : 0 });
+    if (F.ch) F.ch.set(Math.min(0.85, inc.t / 70 + (1 - fireOn) * 0.25), k * stage * (0.15 + 0.5 * night));
+    for (const H of inc.hoses) F.fx.target(1 + inc.hoses.indexOf(H), H.t);
+    const c = inc.cars.find(q => q.kind === 'fire' && q.o.visible); if (!c) { F.fx.setJet(0, null, null, false); return; }
+    if (c.stage === 'hold' && !c.f2chk) { c.f2chk = 1; F.p.x = c.x; F.p.z = c.z; if (outside(F.B, F.p, 2.5)) { c.x = F.p.x; c.z = F.p.z; c.o.position.set(c.x, 0, c.z); } }   // никога в сградата
+    const on = c.stage === 'hold' && !inc.leave && k > 0.02, rig = ladderRig(c.o), tip = rig.update(on ? F.fx.highest(F.t2) : null, on);
+    if (on && rig.deployed()) F.fx.setJet(0, tip.getWorldPosition(F.t3), F.fx.target(0, F.t2)); else F.fx.setJet(0, null, null, false);
+  }
   let TS = 1;   // за тестовете (__dbg.incidentSpeed): по-бързо време на инцидента
   function update(dt, rdt) {
     dt *= TS; rdt *= TS;
@@ -318,6 +343,7 @@ export function createIncidents(ctx) {
     const fireOn = !inc.cars.some(c => c.kind === 'fire') ? 1 : Math.max(0, 1 - (inc.hold0 - (inc.hold ?? inc.hold0)) / (inc.hold0 * 0.7));
     inc.puffs.forEach(s => { const ph = (inc.t * 0.25 + s.userData.ph) % 1, o = s.userData.o, b = s.userData.big; s.position.set(o.x + Math.sin(ph * 9) * 0.6 * b, o.y + ph * 9 * b, o.z + ph * 2); s.scale.setScalar((1.5 + ph * 5) * b); s.material.opacity = inc.leave || inc.towC?.load ? 0 : (b > 3 ? 0.8 : 0.55) * (1 - ph) * (inc.flames.length ? 0.4 + 0.6 * fireOn : 1); });
     inc.flames.forEach(s => { const o = s.userData.o, f = 0.75 + 0.25 * Math.sin(inc.t * 11 + s.userData.ph) * Math.sin(inc.t * 7.3 + s.userData.ph * 2); s.position.set(o.x + Math.sin(inc.t * 3 + s.userData.ph) * 0.2, o.y + (s.userData.ph % 2) * 0.3, o.z); if (s.userData.flip) { s.position.y -= s.userData.sz * 0.45; flameSize(s, s.userData.sz * (1.3 + 0.2 * f)); } else s.scale.set(s.userData.sz * f * 0.8, s.userData.sz * f * 1.25, 1); s.material.opacity = inc.leave ? 0 : fireOn; });
+    if (inc.f2) fire2Step(fireOn);
     // 🚨 incidents2: хората (близо до камерата), кордонът щом екипите пристигнат, маркучите докато гори, пътната помощ след гасенето
     if (inc.fx && K2) {
       const cam = ctx.cam && ctx.cam(); K2.update(dt, cam);
@@ -348,6 +374,7 @@ export function createIncidents(ctx) {
     if (inc.hold !== undefined && !inc.leave && (inc.hold -= rdt) <= 0 && (!inc.fx?.tow || !K2 || inc.towC?.done || inc.t > inc.hold0 + 150)) {   // с пътна помощ — след като натовари останките   // разотиват се — с малки паузи, всяка в своя посока
       inc.leave = true;
       if (inc.lost) inc.ruin = ctx.ruinAt(inc.at.x, inc.at.z);
+      if (inc.f2 && inc.ruin && inc.f2.ch) { inc.f2.ch.dispose(); inc.f2.ch = null; }   // fire-real2: руината скрива блока сама — заместителят (опушеното копие) се маха
       inc.cars.forEach((c, n) => {
         c.o.userData.beaconsOn = 0;
         const to = c.home || pickStart(inc.at), path = to && ctx.route(c.x, c.z, to.x, to.z).map(p => ({ x: p.x, z: p.z, ln: p.ln, rg: p.rg }));

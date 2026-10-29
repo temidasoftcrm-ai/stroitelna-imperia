@@ -10,6 +10,8 @@ import { feature } from './lab/feature.js';
 import { gfxLevel } from './gfxpresets.js';   // bikes-real: на „Ниско“/„Много ниско“ — процедурните части (без GLB)
 
 const R = 420, MAX = 46, LANE_CLS = new Set(['blvd', 'ring', 'quay']);
+// 🚲 city-life3: улиците с червена алея — game.js стеснява крайната лента на колите там (cityplan2 P.bikeOff), за да не влизат колите в алеята
+export const bikeRoad = (rd, all) => !rd.noCars && !rd.oneway && rd.pts.length >= 2 && (LANE_CLS.has(rd.cls) || (!!all && rd.cls === 'street'));
 const TOPS = [0x2b5fa8, 0xd23b3b, 0xf2b630, 0x2f7d4f, 0xeeeeee, 0x333333, 0xe56b1f, 0x8e44ad, 0x5bc0de], FRAMES = [0x1d1d1d, 0x1d1d1d, 0x1d1d1d, 0x8a1c1c, 0x24489c, 0x2f6f4f, 0xd8d2c4];
 const SKIN = [0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffdbac];
 const bone = (w, d) => new THREE.BoxGeometry(w, 1, d).translate(0, 0.5, 0);   // по +y от началото — мащабът по y = дължината
@@ -122,7 +124,7 @@ function riderMat() {   // MeshStandardMaterial + маската: цвят на 
 }
 
 export function createBikes(deps) {
-  let G = null, M = null, net = null, netP = null; const riders = [], REAL = feature('bikes-real');   // bikes-real (T1)
+  let G = null, M = null, net = null, netP = null; const riders = [], REAL = feature('bikes-real'), CL3 = feature('city-life3');   // bikes-real (T1)
   const CAP = REAL ? (/low/.test(gfxLevel()) ? 40 : 90) : MAX, RR = REAL ? 300 : R;   // bikes-real: повече колоездачи по-близо до камерата (потребителят: „да, по-гъсто“); на „Ниско“ — 40
   let glb = null, MG = false; if (REAL && !/low/.test(gfxLevel())) loadBikeGlb().then(g => { glb = g; });   // докато GLB се зареди (или ако не стане) — процедурните части
   const m4 = new THREE.Matrix4(), m4b = new THREE.Matrix4(), m4c = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3(), col = new THREE.Color(), UP = new THREE.Vector3(0, 1, 0), A = new THREE.Vector3(), B = new THREE.Vector3(), D = new THREE.Vector3();
@@ -209,6 +211,14 @@ export function createBikes(deps) {
       let dt = ((tb - ta) * dir) % 6.2832; if (dt < 0) dt += 6.2832; if (dt < 0.2) dt += 6.2832;
       const l1 = Math.hypot(pa[0] - ax, pa[1] - az), l2 = dt * R, l3 = Math.hypot(bx - pb[0], bz - pb[1]);
       r.tr = { arc: { x: Ro.x, z: Ro.z, ta, dt: dt * dir, R, a: [ax, az], pa, pb, b: [bx, bz], l1, l2, l3 }, t: 0, len: Math.max(2, l1 + l2 + l3), nl }; return true; }
+    // 🚲 city-life3: през кръстовището — покрай бордюра: точката, където продълженията на двете алеи се пресичат (надясно — плътно до ъгъла;
+    // наляво — направо до отсрещния ъгъл и оттам наляво, „на два етапа“, без да минава през средата пред колите); направо — по продължението на алеята
+    if (CL3 && nl !== back) { const [, , ha] = at(r.ln, r.ln.s1), [, , hb] = at(nl, nl.s0), da = [Math.sin(ha), Math.cos(ha)], db = [Math.sin(hb), Math.cos(hb)], cr = da[0] * db[1] - da[1] * db[0];
+      if (Math.abs(cr) < 0.35 && da[0] * db[0] + da[1] * db[1] > 0) { r.tr = { a: [ax, az], c: [(ax + bx) / 2, (az + bz) / 2], b: [bx, bz], t: 0, len: Math.max(2, Math.hypot(bx - ax, bz - az)), nl }; return true; }
+      const t1 = ((bx - ax) * db[1] - (bz - az) * db[0]) / cr, t2 = ((bx - ax) * da[1] - (bz - az) * da[0]) / cr;   // a + da·t1 = b + db·t2
+      if (Math.abs(cr) >= 0.35 && t1 > -0.5 && t2 < 0.5 && t1 < 45 && t2 > -45) { const X = [ax + da[0] * t1, az + da[1] * t1], rr = Math.min(3.5, Math.max(0, t1) * 0.45, Math.max(0, -t2) * 0.45);
+        const p1 = [X[0] - da[0] * rr, X[1] - da[1] * rr], p2 = [X[0] + db[0] * rr, X[1] + db[1] * rr], l1 = Math.max(0, t1 - rr), l3 = Math.max(0, -t2 - rr), l2 = 2 * rr * 0.9;
+        r.tr = { poly: { a: [ax, az], p1, X, p2, b: [bx, bz], l1, l2, l3 }, t: 0, len: Math.max(2, l1 + l2 + l3), nl }; return true; } }
     const cx = nl === back ? (ax + bx) / 2 + (c[0] - (ax + bx) / 2) * 0.5 : c[0] * 0.5 + (ax + bx) / 4, cz = nl === back ? (az + bz) / 2 + (c[1] - (az + bz) / 2) * 0.5 : c[1] * 0.5 + (az + bz) / 4;
     const len = Math.hypot(cx - ax, cz - az) + Math.hypot(bx - cx, bz - cz); r.tr = { a: [ax, az], c: [cx, cz], b: [bx, bz], t: 0, len: Math.max(2, len), nl }; return true;
   }
@@ -218,6 +228,11 @@ export function createBikes(deps) {
       const p = u => { const d = u * T.len, lr = (P, Q, k) => [P[0] + (Q[0] - P[0]) * k, P[1] + (Q[1] - P[1]) * k]; if (d < A.l1) return lr(A.a, A.pa, d / (A.l1 || 1)); if (d > A.l1 + A.l2) return lr(A.pb, A.b, Math.min(1, (d - A.l1 - A.l2) / (A.l3 || 1)));
         const th = A.ta + A.dt * (d - A.l1) / (A.l2 || 1); return [A.x + Math.cos(th) * A.R, A.z + Math.sin(th) * A.R]; };
       [x, z] = p(t); const [x2, z2] = p(Math.min(1, t + 0.01)), [x0, z0] = p(Math.max(0, t - 0.01)); h = Math.atan2(x2 - x0, z2 - z0);
+      if (T.t >= 1) { r.ln = T.nl; r.s = T.nl.s0; r.tr = null; } }
+    else if (r.tr && r.tr.poly) { const T = r.tr, Q = T.poly; T.t += r.v * 0.85 * dt / T.len;   // city-life3: права — дъга при ъгъла — права
+      const p = u => { const d = Math.max(0, Math.min(1, u)) * T.len, lr = (A2, B2, k) => [A2[0] + (B2[0] - A2[0]) * k, A2[1] + (B2[1] - A2[1]) * k]; if (d <= Q.l1) return lr(Q.a, Q.p1, d / (Q.l1 || 1)); if (d >= Q.l1 + Q.l2) return lr(Q.p2, Q.b, Math.min(1, (d - Q.l1 - Q.l2) / (Q.l3 || 1)));
+        const k = (d - Q.l1) / (Q.l2 || 1), m = 1 - k; return [m * m * Q.p1[0] + 2 * m * k * Q.X[0] + k * k * Q.p2[0], m * m * Q.p1[1] + 2 * m * k * Q.X[1] + k * k * Q.p2[1]]; };
+      [x, z] = p(T.t); const [x2, z2] = p(T.t + 0.01), [x0, z0] = p(T.t - 0.01); h = Math.atan2(x2 - x0, z2 - z0);
       if (T.t >= 1) { r.ln = T.nl; r.s = T.nl.s0; r.tr = null; } }
     else if (r.tr) { const T = r.tr; T.t += r.v * 0.8 * dt / T.len; const t = Math.min(1, T.t), m = 1 - t;
       x = m * m * T.a[0] + 2 * m * t * T.c[0] + t * t * T.b[0]; z = m * m * T.a[1] + 2 * m * t * T.c[1] + t * t * T.b[1];

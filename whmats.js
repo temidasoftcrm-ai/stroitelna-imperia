@@ -132,11 +132,14 @@ function iconFade(s, near, base, tier, ln) {
 // подредба в зададена площ [ширина, дълбочина]: редове отзад напред; ако не се побира — целият двор се смалява (един мащаб, до 0,5)
 const FOOT = { steel: [6.0, 2.2], glass: [2.4, 1.1], sand: [2.2, 2.2], gravel: [2.2, 2.2], bricks: [2.1, 1.0], concrete: [2.2, 1.0], wood: [2.3, 1.6], furniture: [1.9, 1.8], marble: [1.8, 1.1] };
 function areaLayout(w, d) {
-  const ids = Object.keys(FOOT); let best = null;
-  for (let k = 1; k >= 0.5 && !best; k -= 0.05) { const W = w / k, D = d / k, rows = [[]]; let x = 0;
+  const ids = Object.keys(FOOT); let best = null, last = null;
+  // 29.10: k −= 0,05 стига до 0,4999… < 0,5 и цикълът спира, без да е избрал нищо (тясна площ — Истанбул) → best = null и сривът при зареждане; сега — последният опит
+  for (let k = 1; k >= 0.499 && !best; k -= 0.05) { const W = w / k, D = d / k, rows = [[]]; let x = 0;
     for (const m of ids) { const fw = FOOT[m][0]; if (x + fw > W && rows[rows.length - 1].length) { rows.push([]); x = 0; } rows[rows.length - 1].push(m); x += fw + 0.35; }
     const dep = rows.map(r => Math.max(...r.map(m => FOOT[m][1]))), tot = dep.reduce((a, b) => a + b, 0) + 0.3 * (rows.length - 1);
-    if ((tot <= D && rows.every(r => r.reduce((a, m) => a + FOOT[m][0] + 0.35, -0.35) <= W)) || k < 0.53) best = { k, rows, dep, tot }; }
+    last = { k, rows, dep, tot };
+    if ((tot <= D && rows.every(r => r.reduce((a, m) => a + FOOT[m][0] + 0.35, -0.35) <= W)) || k < 0.53) best = last; }
+  best = best || last; if (!best) return null;
   const S2 = {}; let z = -best.tot / 2;
   best.rows.forEach((r, ri) => { let x = -r.reduce((a, m) => a + FOOT[m][0] + 0.35, -0.35) / 2; z += best.dep[ri] / 2;
     r.forEach((m, j) => { S2[m] = [x + FOOT[m][0] / 2, z, (best.rows.length - 1 - ri) * 2 + j % 2]; x += FOOT[m][0] + 0.35; }); z += best.dep[ri] / 2 + 0.3; });
@@ -146,7 +149,7 @@ export function whMatsYard(y, items, mode = whMatsMode()) {
   for (const t of y.userData.whmTex || []) { t.map && t.map.dispose(); t.dispose(); }
   y.userData.whmTex = [];
   while (y.children.length) y.remove(y.children[0]);
-  const ar = y.userData.area, L = ar ? areaLayout(ar[0], ar[1]) : null; y.scale.setScalar(L ? L.k : 1);   // campus2: площта на ивицата пред склада
+  const ar = y.userData.area, L = ar && ar[0] > 0 && ar[1] > 0 ? areaLayout(ar[0], ar[1]) : null; y.scale.setScalar(L ? L.k : 1);   // campus2: площта на ивицата пред склада
   const ic = []; let top = 0, ti = 0;
   for (const it of items) {
     const f = Math.min(1, it.q / Math.max(1, it.cap)), n = Math.ceil(f * 4), sl = (L ? L.slot : SLOT)[it.m] || [0, 0];

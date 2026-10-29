@@ -40,7 +40,7 @@ export function createCityBus(deps) {
     return out;
   }
   function build() {
-    clear(); A = deps.agents(); if (!A) return false; G = new THREE.Group(); G.name = 'cityBus'; A.group.add(G);
+    clear(); A = deps.agents(); if (!A) return false; if (deps.life) deps.life.removeKind('bus'); G = new THREE.Group(); G.name = 'cityBus'; A.group.add(G);
     const cands = deps.lanes().filter(l => l.kind === 'lane' && l.ring == null && !l.enter && !l.leave && l.len >= 60 && l.edge && (MAIN.test(l.edge.cls) || (l.edge.w || 0) >= 6) && l.laneI === (l.nLanes || 1) - 1)   /* и улиците с една лента (оттам завива на всички страни) */
       .map((p, i) => { const s = p.len / 2, q = pointOn(p, s); return { i, p, s, x: q.x, z: q.z }; });
     const W = deps.want(), R = deps.R(), used = new Set(); DBG = { cands: cands.length, R, lanes: deps.lanes().length, W };
@@ -52,6 +52,9 @@ export function createCityBus(deps) {
         for (let k = 1; k < P.length; k++) { const a = P[k - 1], b = P[k], dx = b[0] - a[0], dz = b[1] - a[1], t = Math.max(0, Math.min(1, ((st.x - a[0]) * dx + (st.z - a[1]) * dz) / (dx * dx + dz * dz || 1))), x = a[0] + dx * t, z = a[1] + dz * t, d = Math.hypot(x - st.x, z - st.z); if (d < bd) { bd = d; cx = x; cz = z; } }
         let nx = st.x - cx, nz = st.z - cz, nl = Math.hypot(nx, nz); if (nl < 0.1) { const a = pointOn(st.p, st.s - 2), b = pointOn(st.p, st.s + 2); nx = -(b.z - a.z); nz = b.x - a.x; nl = Math.hypot(nx, nz) || 1; } nx /= nl; nz /= nl;
         const off = (rd.w || 7) / 2 + (rd.walk || 2.5) * 0.55, sh = shelter(); sh.position.set(cx + nx * off, 0.12, cz + nz * off); sh.rotation.y = Math.atan2(-nx, -nz); G.add(sh); st.sh = sh;
+        if (deps.life) { const gp = A.group.position, X = gp.x + sh.position.x, Z = gp.z + sh.position.z, ux = nz, uz = -nx, Px = (al, la) => [X + ux * al + nx * la, Z + uz * al + nz * la], wk = Math.max(0.6, (rd.walk || 2.5) * 0.55 - 0.45);   /* 🚏 city-life3: хората на спирката — пред навеса и на пейката */
+          const seats = [-0.8, 0, 0.8].map(lx => { const q = Px(lx, 0.45); return { x: q[0], z: q[1], yaw: Math.atan2(-nx, -nz), y: 0.52 }; }), exits = [[Px(6, -wk), Px(35, -wk)], [Px(-6, -wk), Px(-35, -wk)]];
+          deps.life.stop({ key: 'bus:' + L.length + ':' + stops.indexOf(st), kind: 'bus', x: X, z: Z, ux, uz, a: [-4.5, 4.5], l: [-wk - 0.1, -0.5], face: [-nx, -nz], seats, exits, cap: 5, y: 0.12 }); }
       }
       L.push({ stops, buses: [] });
     }
@@ -63,9 +66,14 @@ export function createCityBus(deps) {
     const obj = deps.bus(); if (!obj) return; A.group.add(obj);
     const b = new THREE.Box3().setFromObject(obj), len = Math.max(8, b.max.z - b.min.z), w = Math.max(2.3, b.max.x - b.min.x);
     const bus = { obj, i, st: 'dwell', t: DWELL * Math.random() };
-    bus.c = A.add({ obj, len, w, h: 3.2, kind: 'bus', name: 'Автобус', route: { paths: [st.p], s0: st.s, s1: st.s, len: 0 }, onArrive: () => { if (bus.st === 'go') { bus.st = 'dwell'; bus.t = DWELL; } } });
+    bus.c = A.add({ obj, len, w, h: 3.2, kind: 'bus', name: 'Автобус', route: { paths: [st.p], s0: st.s, s1: st.s, len: 0 }, onArrive: () => { if (bus.st === 'go') { bus.st = 'dwell'; bus.t = DWELL; if (deps.life) bus.ev = arrive(bus); } } });
+    bus.len = len;
     line.buses.push(bus);
   }
+  // 🚏 city-life3: вратите откъм тротоара (дясно при дясно движение) — предната и средната; хората на спирката се качват, други слизат
+  function arrive(bus) { const o = bus.obj, gp = A.group.position, y = o.rotation.y, sx = -(deps.side || 1), Xx = Math.cos(y), Xz = -Math.sin(y), Zx = Math.sin(y), Zz = Math.cos(y), D = [];
+    for (const dz of [(bus.len || 10) / 2 - 1.6, -0.6]) D.push({ x: gp.x + o.position.x + Xx * sx * 1.35 + Zx * dz, z: gp.z + o.position.z + Xz * sx * 1.35 + Zz * dz, nx: Xx * sx, nz: Xz * sx });
+    const ev = deps.life.arriveAt('bus', (D[0].x + D[1].x) / 2, (D[0].z + D[1].z) / 2, D); if (ev) bus.t = Math.max(DWELL * 0.6, ev.need); return ev; }
   function update(dt) {
     const a = deps.agents(); if (!a) { if (A) clear(); return; }
     if (a !== A || !L.length) { if (!build()) return; }
@@ -74,6 +82,7 @@ export function createCityBus(deps) {
       if (line.buses.length < W.perLine) spawn(line);
       for (const bus of line.buses) {
         if (!A.alive(bus.c)) { line.buses.splice(line.buses.indexOf(bus), 1); break; }   // трафикът е сменен — пак отначало
+        if (bus.ev && bus.st === 'dwell' && bus.t - dt <= 0) { if (deps.life.busy(bus.ev) && (bus.evT = (bus.evT || 0) + dt) < 25) continue; bus.ev = null; bus.evT = 0; }   // 🚏 city-life3: чака качващите се и слизащите
         if (bus.st !== 'dwell' || (bus.t -= dt) > 0) continue;
         // следващата спирка (маршрутът сменя лентата по средата на улицата, hop — стигат се ~всички; недостижимите се прескачат); дълго без път — изчезва и пак се появява на спирка
         const c = bus.c, n = line.stops.length; let ok = false;
@@ -86,5 +95,5 @@ export function createCityBus(deps) {
     for (const line of L) for (const bus of line.buses) if (A && A.alive(bus.c)) A.remove(bus.c);
     if (G && G.parent) G.parent.remove(G); G = null; L = []; A = null;
   }
-  return { update, clear, lines: () => L.map(l => ({ stops: l.stops.length, buses: l.buses.map(b => ({ t: +(b.t || 0).toFixed(1), err: b.err, pk: b.c?.p?.kind, i: b.i, st: b.st, v: +(b.c?.v || 0).toFixed(1), why: b.c?.why || '' })) })), debug: () => DBG, stops: () => L.flatMap(l => l.stops.map(s => ({ x: s.x, z: s.z }))) };
+  return { update, clear, lines: () => L.map(l => ({ stops: l.stops.length, buses: l.buses.map(b => ({ t: +(b.t || 0).toFixed(1), err: b.err, pk: b.c?.p?.kind, i: b.i, st: b.st, v: +(b.c?.v || 0).toFixed(1), why: b.c?.why || '' })) })), debug: () => DBG, buses: () => L.flatMap(l => l.buses), stops: () => L.flatMap(l => l.stops.map(s => ({ x: s.x, z: s.z }))) };
 }

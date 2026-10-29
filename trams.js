@@ -61,6 +61,16 @@ export function createTrams(o) {
   if (o.island) { const pg = new THREE.BoxGeometry(2 * OFF - 3.4, 0.32, 30), pm = new THREE.MeshStandardMaterial({ color: 0xbdb6a6, roughness: 0.9 }), cg = new THREE.BoxGeometry(2 * OFF - 3.6, 0.12, 9), cm = new THREE.MeshStandardMaterial({ color: 0x3f6f8f, roughness: 0.5, metalness: 0.3 }), pl = new THREE.CylinderGeometry(0.06, 0.06, 2.6, 6); own.push(pg, cg, pl);
     for (const p of lines) { const ax = lane(p, 0); for (const s of stopsOf(ax.T)) { const c = at(ax, s), a = at(ax, s + 5), y = Math.atan2(a[0] - c[0], a[1] - c[1]); const m = new THREE.Mesh(pg, pm); m.position.set(c[0], 0.16, c[1]); m.rotation.y = y; m.receiveShadow = true; g.add(m);
       const roof = new THREE.Mesh(cg, cm); roof.position.set(c[0], 2.9, c[1]); roof.rotation.y = y; g.add(roof); for (const k of [-3.5, 3.5]) { const q = at(ax, s + k), po = new THREE.Mesh(pl, pm); po.position.set(q[0], 1.6, q[1]); g.add(po); } } } }
+  // 🚏 city-life3: хората на спирките (citylife3.js) — перонът (островът или тротоарът до стълба), пейка под навеса, пътищата за излизане
+  if (o.life) { const wood = new THREE.MeshStandardMaterial({ color: 0x8a6a45, roughness: 0.8 }), bg = new THREE.BoxGeometry(0.46, 0.07, 3.4), lg = new THREE.BoxGeometry(0.4, 0.44, 0.08), kg = new THREE.BoxGeometry(0.06, 0.4, 3.4); own.push(bg, lg, kg);
+    for (const [li, p] of lines.entries()) { const ax = lane(p, 0); for (const s of stopsOf(ax.T)) { const c = at(ax, s), a = at(ax, s + 4), b = at(ax, s - 4), l0 = Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, ux = (a[0] - b[0]) / l0, uz = (a[1] - b[1]) / l0, nx = -uz, nz = ux, P = (al, la) => [c[0] + ux * al + nx * la, c[1] + uz * al + nz * la], so = o.walkOff || OFF + 7;
+      if (o.island) { const W = Math.max(0.3, OFF - 1.7 - 0.5), y = Math.atan2(ux, uz), seats = [];
+        const bn = new THREE.Group(); bn.position.set(c[0] - nx * 0.25, 0.32, c[1] - nz * 0.25); bn.rotation.y = y; g.add(bn); const sb = new THREE.Mesh(bg, wood); sb.position.set(0, 0.46, 0); bn.add(sb); const bk = new THREE.Mesh(kg, wood); bk.position.set(0.22, 0.7, 0); bn.add(bk); for (const z of [-1.4, 1.4]) { const lg2 = new THREE.Mesh(lg, wood); lg2.position.set(0, 0.22, z); bn.add(lg2); }
+        for (const al of [-1.2, -0.4, 0.4, 1.2]) { const q = P(al, -0.2); seats.push({ x: q[0], z: q[1], yaw: Math.atan2(nx, nz), y: 0.46 }); }
+        const exits = []; for (const e of [-1, 1]) for (const sd of [-1, 1]) exits.push([P(e * 14, 0), P(e * 16, sd * so), P(e * 40, sd * so)]);
+        o.life.stop({ key: 'tram:' + li + ':' + Math.round(s), kind: 'tram', x: c[0], z: c[1], ux, uz, a: [-12, 12], l: [-W, W], face: null, seats, exits, cap: 7, y: 0.32 }); }
+      else for (const sd of [-1, 1]) { const d0 = sd * (OFF + 2.4), q = P(0, d0), exits = [[P(-1, sd * so), P(-30, sd * so)], [P(1, sd * so), P(30, sd * so)]];
+        o.life.stop({ key: 'tram:' + li + ':' + Math.round(s) + ':' + sd, kind: 'tram', x: q[0], z: q[1], ux, uz, a: [-6, 6], l: sd > 0 ? [0, 1.2] : [-1.2, 0], face: [-nx * sd, -nz * sd], seats: [], exits, cap: 5 }); } } } }
   // трамваите
   const roofM = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffe2a8, emissiveIntensity: 0.75 }),   /* непрозрачна: прозрачната се губеше зад нощните петна */ nightM = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffe7a8, emissiveIntensity: 1.6 }),   /* emissive — нощното осветяване не ги потъмнява */ headM = new THREE.MeshBasicMaterial({ color: 0xfff6dd }), tailM = new THREE.MeshBasicMaterial({ color: 0xff3020 });
   const pantoM = new THREE.MeshStandardMaterial({ color: 0x30343a, metalness: 0.6, roughness: 0.4 });
@@ -84,14 +94,19 @@ export function createTrams(o) {
     for (const [S, c] of [[t.A, t.s - SEC / 2], [t.B, t.s - SEC * 1.5 - GAP]]) { const p = f(c), a = f(c + SEC / 2 - 2), b = f(c - SEC / 2 + 2); S.s.position.set(p[0], 0.12, p[1]); S.s.rotation.y = Math.atan2(a[0] - b[0], a[1] - b[1]); } };
   trams.forEach(place);
   const LEN = 2 * SEC + GAP;
+  // city-life3: вратите откъм перона (островът — между коловозите, отляво при дясно движение; стълбът — отдясно); по две на секция
+  const doorMid = t => { const sx = (o.island ? 1 : -1) * SD, D = []; for (const S of [t.A, t.B]) { const y = S.s.rotation.y, Xx = Math.cos(y), Xz = -Math.sin(y), Zx = Math.sin(y), Zz = Math.cos(y);
+    for (const dz of [-4, 4]) D.push({ x: S.s.position.x + Xx * sx * 1.4 + Zx * dz, z: S.s.position.z + Xz * sx * 1.4 + Zz * dz, nx: Xx * sx, nz: Xz * sx }); }
+    const mx = D.reduce((a, q) => a + q.x, 0) / D.length, mz = D.reduce((a, q) => a + q.z, 0) / D.length; return [mx, mz, D]; };
   function update(dt, night) {
     if (!dt) return; dt = Math.min(dt, 0.25);
     const CR = o.cars ? o.cars() : [];
     for (const ls of L2) for (const Ln of ls) { Ln.list.sort((a, b) => b.s - a.s);
       Ln.list.forEach((t, i) => {
+        if (t.ev && t.wait - dt <= 0) { if (o.life.busy(t.ev) && (t.evT += dt) < 25) { t.v = 0; return; } t.ev = null; }   // city-life3: чака качващите се и слизащите
         if (t.wait > 0) { t.wait -= dt; t.v = 0; if (t.wait <= 0 && t.endT) { t.endT = 0; const other = ls[1 - t.k]; Ln.list.splice(Ln.list.indexOf(t), 1); t.k = 1 - t.k; t.lane = other; t.s = LEN + 2; other.list.push(t); t.nextStop = other.stops.findIndex(z => z > t.s + 5); } return; }   // обръщане в края: на другия коловоз
         const ln = Ln.ln; let goal = ln.T - 2;   // докъдето може да стигне челото
-        const st = t.nextStop >= 0 ? Ln.stops[t.nextStop] : null; if (st != null) goal = Math.min(goal, st);
+        const st0 = t.nextStop >= 0 ? Ln.stops[t.nextStop] : null, st = st0 == null || !o.life ? st0 : Math.min(ln.T - 2.5, st0 + LEN / 2); if (st != null) goal = Math.min(goal, st);   /* city-life3: средата на трамвая — на средата на перона */
         const ahead = Ln.list[i - 1]; if (ahead) goal = Math.min(goal, ahead.s - LEN - 18);
         // кола отпред в същата посока (≤ 30 м, ≤ 2 м встрани): спира, но най-много 6 с
         let carGap = 1e9; { const p = at(ln, t.s), q = at(ln, t.s + 6), hx = q[0] - p[0], hz = q[1] - p[1], hl = Math.hypot(hx, hz) || 1, ux = hx / hl, uz = hz / hl;
@@ -99,7 +114,7 @@ export function createTrams(o) {
         if (carGap < 1e9) { t.carT += dt; if (t.carT < 6) goal = Math.min(goal, t.s + carGap); } else t.carT = 0;
         const d = goal - t.s; let want = Math.min(vAt(ln, t.s + 4), vAt(ln, t.s + 20) + 2, Math.sqrt(2 * DEC * Math.max(0, d)));
         t.v = want > t.v ? Math.min(want, t.v + ACC * dt) : Math.max(want, t.v - DEC * 1.6 * dt); t.s = Math.max(t.s, Math.min(goal, t.s + t.v * dt));   // никога назад
-        if (st != null && st - t.s < 0.4 && t.v < 0.2) { t.wait = 10 + rnd() * 10; t.nextStop++; if (t.nextStop >= Ln.stops.length) t.nextStop = -1; }
+        if (st != null && st - t.s < 0.4 && t.v < 0.2) { t.ev = o.life ? o.life.arriveAt('tram', ...doorMid(t)) : null; t.evT = 0; t.wait = t.ev ? Math.max(6, t.ev.need) : 10 + rnd() * 10; t.nextStop++; if (t.nextStop >= Ln.stops.length) t.nextStop = -1; }
         else if (ln.T - 2 - t.s < 0.4 && t.v < 0.2) { t.wait = 18 + rnd() * 10; t.endT = 1; }
         place(t); }); }
     const nk = night ? 1 : 0; if (nk !== update.nk) { update.nk = nk; for (const t of trams) for (const S of [t.A, t.B]) { S.win.forEach(w => { w.visible = !!nk; }); S.lt.forEach(h => { h.visible = !!nk || S === t.A; }); } }

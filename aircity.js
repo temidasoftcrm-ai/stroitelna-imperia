@@ -91,13 +91,13 @@ export function createAirCity(deps) {
     if (!tg && (H.st === 'in' || H.st === 'orbit')) { H.st = 'out'; const l = Math.hypot(H.x - H.tx, H.z - H.tz) || 1; H.out = [(H.x - H.tx) / l, (H.z - H.tz) / l]; H.t = 0; }
     if (H.st === 'off') return;
     const px = H.x, pz = H.z; let bank = 0;
-    if (tg) { H.tx = tg.x; H.tz = tg.z; }
+    if (tg) { H.tx = tg.x; H.tz = tg.z; } H.fast = !!(tg && tg.fast);   // hw-chase: бърза цел (гонката на магистралата) — догонва и следи отблизо
     if (H.st === 'in') {
-      const dx = H.tx - H.x, dz = H.tz - H.z, d = Math.hypot(dx, dz), sp = Math.min(42, d * 0.8) * dt;
+      const dx = H.tx - H.x, dz = H.tz - H.z, d = Math.hypot(dx, dz), sp = Math.min(H.fast ? 95 : 42, d * 0.8) * dt;
       if (d > 48) { H.x += dx / d * sp; H.z += dz / d * sp; } else { H.st = 'orbit'; H.ang = Math.atan2(H.x - H.tx, H.z - H.tz); }
       H.y += (Math.max(58, Math.min(120, 58 + (d - 48) * 0.12)) - H.y) * Math.min(1, dt * 0.8);
     } else if (H.st === 'orbit') {
-      H.ang += 0.38 * dt; const ox = H.tx + Math.sin(H.ang) * 46, oz = H.tz + Math.cos(H.ang) * 46, k = Math.min(1, dt * 1.5);
+      H.ang += (H.fast ? 0.15 : 0.38) * dt; const ox = H.tx + Math.sin(H.ang) * 46, oz = H.tz + Math.cos(H.ang) * 46, k = Math.min(1, dt * (H.fast ? 4 : 1.5));
       H.x += (ox - H.x) * k; H.z += (oz - H.z) * k; H.y += (55 - H.y) * Math.min(1, dt * 0.6); bank = 0.2;
     } else {   // отлита навън и се издига
       H.t += dt; H.x += H.out[0] * 45 * dt; H.z += H.out[1] * 45 * dt; H.y += 6 * dt;

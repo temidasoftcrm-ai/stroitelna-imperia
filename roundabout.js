@@ -42,15 +42,15 @@ function monument(o, R, night) {
   return g;
 }
 
-export function roundDeco({ x, z, ri, seed = 1, style = '', statues = [], night = () => 0, mustMonument = false }) {
+export function roundDeco({ x, z, ri, seed = 1, style = '', statues = [], night = () => 0, mustMonument = false, pick = null, pickF = null }) {   // pickF(seed, ri, major) → готов фонтан (statues-meshy: Пегас / Митовете, мащабиран за острова) или null   // pick(seed, ri) → статуя (statues-meshy: по града, без повторения) или null
   const R = Math.min(3.6, ri * 0.33), u0 = ((seed * 2654435761) >>> 0) % 1000 / 1000, u = mustMonument ? u0 * 0.33 : u0;   // mustMonument — задължително паметник (най-близкото до центъра)
   let g;
   if (u < 0.34) {   // паметник: в България/на Балканите — фигура на пиедестал; Париж/Рим — обелиск или колона; другаде — смес
     const v = (u * 3) % 1, classic = /paris|rome|london|washington/.test(style);
-    const kind = statues.length && (!classic || v < 0.4) ? 'statue' : classic ? (v < 0.7 ? 'obelisk' : 'column') : v < 0.5 ? 'column' : 'obelisk';
-    g = monument({ kind, model: statues.length ? statues[(seed >>> 3) % statues.length] : null, h: 4 + v * 1.5 }, R, night);
+    const pm = pick ? pick(seed, ri) : null, kind = pm || (statues.length && (!classic || v < 0.4)) ? 'statue' : classic ? (v < 0.7 ? 'obelisk' : 'column') : v < 0.5 ? 'column' : 'obelisk';
+    g = monument({ kind, model: pm || (statues.length ? statues[(seed >>> 3) % statues.length] : null), h: 4 + v * 1.5 }, R, night);
     g.userData.rdKind = 'monument';
-  } else { g = fountain(R, night); g.scale.setScalar(1.5); g.userData.rdKind = 'fountain'; }   // ×1,5 — фонтанът се вижда над храстите (~5,5 м)
+  } else { const fm = pickF ? pickF(seed, ri, ri >= 14) : null; if (fm) g = fm; else { g = fountain(R, night); g.scale.setScalar(1.5); } g.userData.rdKind = 'fountain'; }   // ×1,5 — фонтанът се вижда над храстите (~5,5 м)
   g.position.set(x, 0, z); g.rotation.y = u * 6.283;
   return g;
 }

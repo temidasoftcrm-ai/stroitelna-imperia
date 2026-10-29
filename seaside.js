@@ -6,6 +6,7 @@ import { canvasTex } from './texdata.js';   // fac-data (T1): статичнит
 import { createPortLights } from './portlights.js';
 import { makeWater } from './water.js';
 import { loadShipModels, hasShipModel, shipModel, setShipNight, mscTick } from './shipmodels.js';
+const SS = feature('ship-scale');   // 🚢 ship-scale: истинските дължини (shipmodels.js) — големите кораби пред целия фронт на пристанището, на котва далеч навътре
 import { isRealBoat, isRealShip, realBoat, pendingShip, swapPendingShips } from './boatsreal.js';
 import { portReal } from './portreal.js';
 import { feature } from './lab/feature.js';
@@ -188,6 +189,7 @@ export function addSeaside(group, deps, opts) {
   // [x, ръбът на кея по z]; морето е към −z
   const berthsAt = () => [[px - 27, pSeaZ - 69], [px + 27, pSeaZ - 69], ...(portLv >= 4 && !(portLv >= 5 && msc) ? [[px - 108, pSeaZ - 55], [px - 72, pSeaZ - 55]] : [])];   // ship-msc: на ниво 5 кеят на разширението е на MSC Irina
   // половината ширина на кораба (по z, след завъртането) — за да стои до кея, а не в него
+  const shipLen = o => { o.position.set(0, 0, 0); o.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(o); return Math.max(b.max.x - b.min.x, b.max.z - b.min.z); };
   const halfBeam = o => { o.position.set(0, 0, 0); o.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(o); return (b.max.z - b.min.z) / 2; };
   function makeShip(kind) {
     if (hasShipModel(kind)) return shipModel(kind);   // истинските кораби (shipmodels.js)
@@ -202,18 +204,23 @@ export function addSeaside(group, deps, opts) {
     fleetG.clear(); movers = []; lastFleet = list;
     for (let k = ships.length - 1; k >= 0; k--) if (ships[k].fleet) ships.splice(k, 1);
     const docked = list.filter(f => f.state === 'docked'), moving = list.filter(f => f.state !== 'docked');
+    let front = null, bi = 0, ai = 0;   // ship-scale: голям кораб (> 120 м) — успоредно пред целия фронт на пристанището (един); малките — на кейовете, ако фронтът е свободен
     docked.forEach((f, i) => {
       const o = makeShip(f.kind);
       const B = berthsAt();
       const small = f.kind === 'boat' || f.kind === 'coaster';
-      if (i < B.length) { o.rotation.y = Math.PI / 2; const hb = halfBeam(o); o.position.set(B[i][0], 0, B[i][1] - hb - (small ? 1 : 2)); }
+      o.rotation.y = Math.PI / 2; const hb = halfBeam(o), L = shipLen(o), big = SS && L > 120;
+      if (big && !front) { front = o; o.position.set(px + 17, 0, pSeaZ - 76 - hb); }
+      else if (!big && !front && bi < B.length) { o.position.set(B[bi][0], 0, B[bi][1] - hb - (small ? 1 : 2)); bi++; }
+      else if (SS) { o.rotation.y = 0.15 * ((ai % 3) - 1); o.position.set(px - 200 + (ai % 4) * 140, 0, pSeaZ - 360 - Math.floor(ai / 4) * 340 - L / 2); ai++; }   // на котва — далеч навътре, носът към брега, по 140 м един от друг
       else { o.position.set(px - 140 + (i - B.length) * 60, 0, pSeaZ - 230 - (i % 2) * 50); o.rotation.y = 0.3 + i; }   // на котва, чакат кей
       fleetG.add(o); ships.push({ o, ph: i * 1.7, fleet: true });
     });
     if (cargo) cargo.visible = !docked.length;   // декоративният кораб отстъпва кея на твоите
+    if (msc && SS) msc.visible = !front;   // ship-scale: MSC на ниво 5 — пред фронта само ако е свободен
     moving.slice(0, 2).forEach((f, i) => {
       const big = f.kind === 'container' && hasShipModel('msc'), o = big ? shipModel('msc') : makeShip(f.kind); fleetG.add(o);   // ship-msc: контейнеровозът, който влиза/излиза — MSC Irina
-      movers.push({ o, arriving: f.state === 'arriving', x: px + 70 + i * 40 + (big ? 30 : 0), ph: i * 0.5, msc: big });
+      movers.push({ o, arriving: f.state === 'arriving', x: SS ? px + 200 + i * 90 : px + 70 + i * 40 + (big ? 30 : 0), ph: i * 0.5, msc: big, L: SS ? shipLen(o) : 0 });   // ship-scale: по 90 м един от друг, източно от пристанището
     });
   }
   // ниво на пристанището 0–5: всяко ниво добавя кранове, контейнери и складове около стария кей
@@ -259,8 +266,8 @@ export function addSeaside(group, deps, opts) {
   loadShipModels().then(() => {
     if (cargo && hasShipModel('tanker')) { const o = shipModel('tanker'), p0 = cargo.position.clone(), hb0 = halfBeam(cargo); cargo.position.copy(p0); o.rotation.y = cargo.rotation.y; const hb = halfBeam(o); o.position.set(p0.x, 0, pSeaZ - 69 - hb - 2); o.visible = cargo.visible; const cp = cargo.parent || g; cp.remove(cargo); cp.add(o); cargo = o; }
     swapPendingShips(g, ships);
-    if (hasShipModel('cruise')) { const o = shipModel('cruise'); o.position.set((opts.xMin + opts.xMax) / 2 - 120, 0, seaZ - 260); o.rotation.y = linerRot; g.add(o); ships.push({ o, ph: r() * 6 }); }   // на котва
-    if (hasShipModel('msc')) { const o = shipModel('msc'); o.rotation.y = Math.PI / 2; const hb = halfBeam(o); o.rotation.y = Math.PI / 2; o.position.set(px - 110, 0, pSeaZ - 55 - hb - 2); lvG[4].add(o); ships.push({ o, ph: r() * 6 }); msc = o; }   // ship-msc: на ниво 5 — на кея до червените кранове
+    if (hasShipModel('cruise')) { const o = shipModel('cruise'); o.position.set((opts.xMin + opts.xMax) / 2 - 120, 0, SS ? seaZ - 420 : seaZ - 260); o.rotation.y = SS ? Math.PI / 2 + 0.25 * Math.sin(linerRot) : linerRot; g.add(o); ships.push({ o, ph: r() * 6 }); }   // на котва
+    if (hasShipModel('msc')) { const o = shipModel('msc'); o.rotation.y = Math.PI / 2; const hb = halfBeam(o); o.rotation.y = Math.PI / 2; if (SS) o.position.set(px + 17, 0, pSeaZ - 76 - hb); else o.position.set(px - 110, 0, pSeaZ - 55 - hb - 2); lvG[4].add(o); ships.push({ o, ph: r() * 6 }); msc = o; }   // ship-msc: на ниво 5 — на кея до червените кранове
     setFleet(lastFleet);
   });
   function setPortLevel(lv = 0) { const was = portLv; portLv = lv; lvG.forEach((q, i) => { q.visible = lv >= i + 1; }); if ((was >= 4) !== (lv >= 4) || (msc && (was >= 5) !== (lv >= 5))) setFleet(lastFleet); }
@@ -270,7 +277,7 @@ export function addSeaside(group, deps, opts) {
     for (const w of swans) w.sl.rotation.y = w.r0 + Math.sin(t * 0.12 + w.ph) * 1.1;   // crane-swan: стрелата бавно се върти над кея
     for (const mv of movers) {   // влиза от открито море до кея за ~45 с (или обратно), после пак
       const k = ((t / 45 + mv.ph) % 1), u = mv.arriving ? k : 1 - k, e = u * u * (3 - 2 * u);
-      mv.o.position.set(mv.x, Math.sin(t * 0.8) * 0.2, berthZ - 420 + (420 - 30) * e);
+      const zEnd = SS ? pSeaZ - 75 - mv.L / 2 : berthZ - 30, zStart = SS ? zEnd - 700 : berthZ - 420; mv.o.position.set(mv.x, Math.sin(t * 0.8) * 0.2, zStart + (zEnd - zStart) * e);   // ship-scale: спира на половин дължина пред кейовете
       mv.o.rotation.y = mv.arriving ? 0 : Math.PI;
     }
     for (const w of waves) {

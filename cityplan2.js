@@ -436,7 +436,7 @@ function attachPlan2(P) {
   P.roadY = (roadId, s) => { const rd = P.roads[roadId]; if (!rd || !rd.deck.length) return 0; const T = rd.L[rd.L.length - 1]; let y = 0;
     for (const [a, b, h] of rd.deck) { const ri = Math.min(DECK_R, a), ro = Math.min(DECK_R, T - b); const f = s >= a && s <= b ? 1 : s < a ? (ri > 0.5 ? (s - (a - ri)) / ri : 0) : (ro > 0.5 ? ((b + ro) - s) / ro : 0); y = Math.max(y, h * Math.max(0, Math.min(1, f))); }
     return y; };
-  P.lanePath = (roadId, dir, i) => { const rd = P.roads[roadId], pts = dir > 0 ? rd.pts : rd.pts.slice().reverse(), off = rd.oneway ? (i + 0.5) * rd.laneW - rd.w / 2 : (rd.median / 2 + (i + 0.5) * rd.laneW) * (P.drive === 'R' ? 1 : -1);   // еднопосочен: ленти от левия ръб надясно
+  P.lanePath = (roadId, dir, i) => { const rd = P.roads[roadId], pts = dir > 0 ? rd.pts : rd.pts.slice().reverse(), bo = P.bikeOff && !rd.oneway && i === ((rd.lanes && rd.lanes[dir > 0 ? 0 : 1]) || 1) - 1 ? P.bikeOff(rd) : 0, off = rd.oneway ? (i + 0.5) * rd.laneW - rd.w / 2 : (rd.median / 2 + (i + 0.5) * rd.laneW - bo) * (P.drive === 'R' ? 1 : -1);   // еднопосочен: ленти от левия ръб надясно   /* 🚲 city-life3 (bo): крайната лента — по-навътре, ако по улицата има червена велоалея (game.js задава P.bikeOff) */
     const o = pts.map((p, k) => { const a = pts[Math.max(0, k - 1)], b = pts[Math.min(pts.length - 1, k + 1)], l = dist(a, b) || 1, tx = (b[0] - a[0]) / l, tz = (b[1] - a[1]) / l; return [p[0] - tz * off, p[1] + tx * off]; });
     const nA = P.nodes[dir > 0 ? rd.from : rd.to], nB = P.nodes[dir > 0 ? rd.to : rd.from];
     return trim(o, nodeR(nA, roadId, dir > 0 ? 0 : 1, false), nodeR(nB, roadId, dir > 0 ? 1 : 0, true)); };

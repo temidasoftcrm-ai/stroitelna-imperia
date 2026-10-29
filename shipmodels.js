@@ -8,13 +8,16 @@ import { prepNightFloors } from './nightfloors.js';
 import { feature } from './lab/feature.js';
 
 // дължина в света на играта, накъде гледа носът в модела (завъртане около y) и газене (част от височината под водата)
+// 🚢 ship-scale (потребителят: „круизните кораби — 10 пъти, виж как е до яхта“): истински дължини — круизен ~300 м (новият модел на собственика „Cruise Majesty“), контейнеровоз 260, танкер 250, MSC 300
+const SS = feature('ship-scale');
+export const SHIP_LEN = k => (CFG[k] || {}).len || 0;
 const CFG = {
-  container: { f: 'container.glb', len: 64, yaw: 0, draft: 0.18 },
-  tanker: { f: 'tanker.glb', len: 66, yaw: 0, draft: 0.3 },
-  cruise: { f: 'cruise.glb', len: 74, yaw: 0, draft: 0.12, lights: true },   // нощем светят прозорците и палубите
+  container: { f: 'container.glb', len: SS ? 260 : 64, yaw: 0, draft: 0.18 },
+  tanker: { f: 'tanker.glb', len: SS ? 250 : 66, yaw: 0, draft: 0.3 },
+  cruise: SS ? { f: 'cruise-majesty.glb', len: 300, yaw: 0, draft: 0.1, lights: true } : { f: 'cruise.glb', len: 74, yaw: 0, draft: 0.12, lights: true },   // нощем светят прозорците и палубите
   // 🚢 ship-msc (f6): „MSC Irina“ (Meshy AI, собствен) — най-големият: на пристанище ниво 5 до крановете и като контейнеровоза, който влиза/излиза.
   // Възли (Blender): Hull, Radar (клип „radar“), NavLights (червена / зелена / бели), DeckLights, Wake (клип „wake“); ватерлинията — 23,6 % от височината
-  ...(feature('ship-msc') ? { msc: { f: 'msc-irina.glb', len: 92, yaw: 0, draft: 0.236, msc: true } } : {}),
+  ...(feature('ship-msc') ? { msc: { f: 'msc-irina.glb', len: SS ? 300 : 92, yaw: 0, draft: 0.236, msc: true } } : {}),
 };
 const P = {}, NIGHT = [];   // NIGHT — материалите, които светят нощем (круизният кораб); копията ги споделят
 let loading = null;

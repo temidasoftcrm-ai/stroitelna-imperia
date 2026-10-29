@@ -251,7 +251,7 @@ function startVideo() {
   const ld = document.getElementById('loading'), box = ld && ld.querySelector('.ld-box');
   if (!box || ld.classList.contains('pol')) return false;
   if (matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
-  const v = document.createElement('video'); v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true; v.preload = 'auto'; v.poster = DIR + 'splash-day.jpg'; v.src = DIR + 'splash-day.mp4';
+  const v = document.createElement('video'); v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true; v.preload = 'auto'; const hr = new Date().getHours(), nt = hr >= 19 || hr < 6 ? 'night' : 'day'; v.poster = DIR + `splash-${nt}.jpg`; v.src = DIR + `splash-${nt}.mp4`;   /* 29.10: нощният клип вечер и нощем (часът при играча) */
   v.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .5s;pointer-events:none';
   const [lx, ly, lw, lh] = L.logo, logo = new Image(); logo.src = DIR + 'logo.webp'; logo.alt = '';
   logo.style.cssText = `position:absolute;left:${lx / W * 100}%;top:${ly / H * 100}%;width:${lw / W * 100}%;height:${lh / H * 100}%;pointer-events:none;filter:drop-shadow(0 4px 14px rgba(0,0,0,.55))`;

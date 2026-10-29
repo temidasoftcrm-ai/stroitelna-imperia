@@ -2,6 +2,8 @@
 // инспекция, бум на имотите, субсидия, срив или ръст на борсата… Част от тях траят няколко дни.
 // game.js чете ефектите през workMul() (скорост на строежите), offerMul() (награди на новите поръчки) и stormy().
 
+import { t as tr } from './i18n.js';
+
 const pick = a => a[(Math.random() * a.length) | 0];
 const MAT_UP = ['steel', 'concrete', 'bricks', 'wood', 'glass'];
 
@@ -62,7 +64,7 @@ export function createEvents(deps) {
     if (res.days) E.active.push(rec);
     E.log.unshift(rec); if (E.log.length > 30) E.log.length = 30;
     E.last = day;
-    deps.toast(`${res.ico} ${res.title}: ${res.text}`, res.kind);
+    deps.toast(`${res.ico} ${tr(res.title)}: ${tr(res.text)}`, res.kind);   // lang-en: заглавието и текстът — поотделно (сглобени не се намират в речника)
     if (deps.show) deps.show(rec);
     return rec;
   }

@@ -83,7 +83,8 @@ export function createSkySun(scene) {
     U.discC.value.setHex(0xfff4d8).lerp(tmp.setHex(morning ? 0xffc27a : 0xff8a3c), 1 - smooth(2, 20, e));   // ниско — оранжево
     if (CL) {   // облаците: ден — бели със сиви сенки; залез/изгрев — лилаво-розови с оранжеви ръбове; нощ — тъмни; облачно/дъжд — повече и по-тъмни
       U.cT.value = performance.now() / 1000;
-      U.cCov.value = 0.52 + 0.4 * cloud + 0.12 * hv;   // ясно — разпръснати облаци (залезът ги оцветява), облачно/дъжд — почти плътно U.cA.value = (0.55 + 0.4 * cloud) * (1 - nightK * 0.45);
+      U.cCov.value = 0.52 + 0.4 * cloud + 0.12 * hv;   // ясно — разпръснати облаци (залезът ги оцветява), облачно/дъжд — почти плътно
+      if (feature('weather3')) U.cA.value = (0.55 + 0.4 * cloud) * (1 - nightK * 0.45);   /* weather3: това беше в коментара по-горе и никога не се изпълняваше — облаците по-плътни при облачно/дъжд */
       const dk = 1 - 0.55 * smooth(0.5, 1, cloud);   // дъжд/буря — по-тъмни
       U.cBase.value.setHex(0x1c2444).lerp(tmp.setHex(0xf6f8fc), dayK).lerp(tmp.setHex(morning ? 0xf2c6c0 : 0xe8a0a0), k2 * 0.8).multiplyScalar(dk);
       U.cShade.value.setHex(0x101630).lerp(tmp.setHex(0xaeb7c6), dayK).lerp(tmp.setHex(morning ? 0x8d7fa6 : 0x6e4f78), k2 * 0.85).multiplyScalar(dk);

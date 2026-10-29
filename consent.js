@@ -77,4 +77,6 @@ window.consent = {
   banner: () => ON ? banner() : null,
   adsLive: ADS_LIVE, adsOpen: () => ADS_LIVE ? adsOpen() : null,   // ⚙️ Поверителност (cloud.js)
 };
-if (ON && !AUTOTEST && !read()) { if (document.body) banner(); else addEventListener('DOMContentLoaded', banner); }
+// 🧭 onboard2: банерът не закрива встъпителната карта — показва се, след като #intro изчезне (или до 25 s)
+const bannerLater = () => { if (!feature('onboard2')) return banner(); let n = 0, seen = false, t = 0; const iv = setInterval(() => { t++; const it = document.getElementById('intro'), on = !!it && it.getBoundingClientRect().width > 0 && getComputedStyle(it).display !== 'none'; if (on) { seen = true; n = 0; return; } if ((seen && ++n >= 4) || (!seen && t > 60)) { clearInterval(iv); if (!read()) banner(); } }, 500); };   /* #intro е position:fixed (offsetParent винаги null); след като е бил и изчезне (2 s), или 30 s без него */
+if (ON && !AUTOTEST && !read()) { if (document.body) bannerLater(); else addEventListener('DOMContentLoaded', bannerLater); }

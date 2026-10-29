@@ -52,11 +52,28 @@ export function mergeKids(o, minMeshes = 6) {
 }
 
 // deps: { group() → city.group, target() → controls.target, camDist() → разстоянието на камерата, peds() → [обекти], on() → флагът, detailK() → 0…1 (gfx-lite) }
+// ⚡ perf3-far: дребните мрежи (радиус < 5 м: коли, хора, реквизит по строежите, бусове) — извън рисуването отдалеч (слой 1, не visible — играта си пипа visible):
+//   < 2,5 м — до 260 м от камерата, < 5 м — до 420 м (на „Ниско“ 150/260, „Много ниско“ 110/200 — gfxpresets far3); тежкият декор (< 25 м, > 20 хил. △: кранове,
+//   статуи) — на слабите нива до 500/350 м (на „Средно“ — без ограничение); без забележителностите и дворовете (те си имат свое); списъкът — наново на ~3 s
+const FAR_L = 1;
+function farCull(deps, st, dt) {
+  const g = deps.group(); if (!g) return; st.t += dt; st.r += dt;
+  if (st.r >= 3 || st.g !== g) { st.r = 0; st.g = g; const skip = deps.skip ? deps.skip() : new Set(), L = [];
+    const fw = [];
+    const walk = n => { for (const m of n.children) { if (m.userData.fw) fw.push(m); if (skip.has(m)) continue; if (m.isMesh && !m.isInstancedMesh) { const ge = m.geometry; if (ge) { if (!ge.boundingSphere) ge.computeBoundingSphere(); const r = ge.boundingSphere ? ge.boundingSphere.radius * m.matrixWorld.getMaxScaleOnAxis() : 99; if (r < 5) L.push([m, r < 2.5 ? 0 : 1]); else if (r < 25 && (ge.index ? ge.index.count : ge.attributes.position.count) / 3 > 20000) L.push([m, 2]); } } if (m.children.length) walk(m); } };
+    walk(g); const X = deps.scene && deps.scene(); if (X) for (const c of X.children) if (c !== g && !c.isCamera && !c.isLight && !skip.has(c)) walk({ children: [c] });   // и колите/агентите направо в сцената (не в city.group)
+    st.fw = fw; const now = new Set(L.map(x => x[0])); for (const [m] of st.list) if (!now.has(m) && m.layers.mask === 1 << FAR_L) m.layers.set(0); st.list = L; }
+  if (st.t < 0.25) return; st.t = 0; { const jets = !deps.jets || deps.jets(); for (const f of st.fw || []) for (const k of f.children) if (k.renderOrder === 2) k.visible = jets; }   // слабите нива: фонтаните без струите (водата остава)
+  const c = deps.cam(), cx = c.x, cy = c.y, cz = c.z, FD = (deps.farD && deps.farD()) || [260, 420, Infinity];   // разстоянията — по нивото на графиката
+  for (const [m, k] of st.list) { const D = FD[k]; const e = m.matrixWorld.elements, dx = e[12] - cx, dy = e[13] - cy, dz = e[14] - cz, d2 = dx * dx + dy * dy + dz * dz, far = m.layers.mask === 1 << FAR_L;
+    if (!far && d2 > D * D * 1.1) m.layers.set(FAR_L); else if (far && d2 < D * D * 0.9) m.layers.set(0); }
+}
 export function createCityCull(deps) {
-  let t = 0, queue = [], qSig = '';
+  let t = 0, queue = [], qSig = ''; const fst = { t: 0, r: 99, g: null, list: [] };
   return {
     // всеки кадър (perfTune): на ~0,5 s — видимостта; всеки кадър — по няколко сливания от опашката
     tick(dt, high) {
+      if (deps.far && deps.far()) farCull(deps, fst, dt); else if (fst.list.length) { for (const [m] of fst.list) m.layers.set(0); fst.list = []; fst.r = 99; }   // ⚡ perf3-far (изключено в движение — всичко обратно)
       if (!deps.on()) return;
       const g = deps.group(); if (!g) return;
       // опашката за сливане: детайлите и сградите (lot.obj) с много части — новите (донесени по-късно модели) влизат сами

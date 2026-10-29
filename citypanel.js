@@ -275,8 +275,7 @@ export function createCityPanel(deps) {
       if (!shown.length) h += '<div class="card"><div class="meta" style="margin:0">Нямаш градове в този обхват.</div></div>';
       return h;
     }
-    let h = `<div class="card"><div class="meta" style="margin:0">Тук управляваш всички градове, без да влизаш във всеки. С <b>🤖 Автопилот</b> градът сам приема поръчки и ги строи със своята техника, а парите и опитът идват всеки ден.
-      Нивото на всеки град расте от обектите в него; летищата се отключват, щом <b>един</b> град стигне ниво 9.</div>
+    let h = `<div class="card"><div class="meta" style="margin:0">Тук управляваш всички градове, без да влизаш във всеки. С <b>🤖 Автопилот</b> градът сам приема поръчки и ги строи със своята техника, а парите и опитът идват всеки ден. Нивото на всеки град расте от обектите в него; летищата се отключват, щом <b>един</b> град стигне ниво 9.</div>
       ${UIC ? `<div class="meta" style="margin:6px 0 0">🤖 Градовете работят сами с автопилот (в ${on} от ${open.length}); изключва се в картата на града.</div></div>` : `<div class="row" style="justify-content:flex-end;gap:6px;margin-top:6px"><span class="meta" style="margin:0 auto 0 0">🤖 включен в ${on} от ${open.length} града</span>
       <button class="btn2" data-cpall="1">🤖 Включи всички</button><button class="btn2" data-cpall="0">Изключи всички</button></div></div>`}`;   // ui-cleanup (T1): без „Включи/Изключи всички“
     const shown = order.filter(visible);   // обхватът горе: България · Балкани · Европа · …; завършените и оставените — скрити

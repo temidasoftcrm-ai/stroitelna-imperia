@@ -9,6 +9,7 @@
 // Всичко — InstancedMesh и слети мешове; дребните неща се крият отдалеч (update).
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';   // park-dark
+const PCULL = feature('perf3-cull');   // ⚡ perf3-cull: дворовете — само видимите инстанции (в зрителното поле и до мъглата; дребните — до 380 м), а не целият град всеки кадър
 
 const CELL = 2, FREE = 0, ROAD = 1, WATER = 2, LOT = 3, RES = 4, BIG = 5, BLD = 6, OUT = 7;
 const PARK_MIN = 1200, PARK_DT = 6;   // м²; м — най-малкият парк (площ и „дебелина“: половината от най-тясното място)
@@ -90,13 +91,25 @@ function Kit(o = {}) {
     obox(F, col, t, s, y, lt, ls, h, small = true) { const [x, z] = F.at(t, s); K.box(col, x, y, z, ls, h, lt, F.r, 0, small); },
     orect(F, kind, ta, tb, sa, sb) { if (tb - ta < 0.2 || sb - sa < 0.2) return; K.flat(kind, [F.at(ta, sa), F.at(ta, sb), F.at(tb, sb), F.at(tb, sa)]); },
     build(o) { const G = new THREE.Group(), small = new THREE.Group(); G.add(small); G.userData.small = small; const geoms = [];
+      // ⚡ perf3-cull: изходните матрици и сферата на всяка инстанция; cull() слага във буфера само видимите (count) — веднъж, щом камерата се смени
+      const CL = [], reg = (I, sm) => { if (!PCULL || !I.count) return; I.geometry.computeBoundingSphere(); const bs = I.geometry.boundingSphere, src = I.instanceMatrix.array.slice(), n = I.count, sph = new Float32Array(n * 4), m = new THREE.Matrix4(), c = new THREE.Vector3();
+        for (let i = 0; i < n; i++) { m.fromArray(src, i * 16); c.copy(bs.center).applyMatrix4(m); sph.set([c.x, c.y, c.z, bs.radius * m.getMaxScaleOnAxis()], i * 4); }
+        I.userData.cs = { I, src, sph, n, small: sm, dirty: true }; CL.push(I.userData.cs); };
+      const FR = new THREE.Frustum(), PM = new THREE.Matrix4(), PM0 = new THREE.Matrix4(), SP = new THREE.Sphere(); let lim0 = '';
+      G.userData.cull = (cam, smallFar, bigFar) => { if (!CL.length) return; if (window.__p3off && window.__p3off.cull) { if (lim0 !== 'off') { for (const c of CL) { c.I.instanceMatrix.array.set(c.src); c.I.count = c.n; c.I.instanceMatrix.needsUpdate = true; } lim0 = 'off'; } return; }   // __p3off.cull — за сравнение (тестовете)
+        PM.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); const lk = smallFar + ',' + bigFar;
+        if (PM.equals(PM0) && lk === lim0 && !CL.some(c => c.dirty)) return; PM0.copy(PM); lim0 = lk; FR.setFromProjectionMatrix(PM); const px = cam.position.x, py = cam.position.y, pz = cam.position.z;
+        for (const c of CL) { const L = c.small ? smallFar : bigFar, L2 = L * L, sph = c.sph, src = c.src, dst = c.I.instanceMatrix.array; let k = 0;
+          if (L > 0) for (let i = 0; i < c.n; i++) { const j = i * 4, dx = sph[j] - px, dy = sph[j + 1] - py, dz = sph[j + 2] - pz; if (dx * dx + dy * dy + dz * dz > L2) continue;
+            SP.center.set(sph[j], sph[j + 1], sph[j + 2]); SP.radius = sph[j + 3] + 6; if (!FR.intersectsSphere(SP)) continue; dst.set(src.subarray(i * 16, i * 16 + 16), k * 16); k++; }   // +6 м — сенките до ръба на кадъра
+          c.I.count = k; c.I.instanceMatrix.needsUpdate = true; c.dirty = false; } };
       const unit = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0); geoms.push(unit);
-      for (const { col, small: sm, m } of boxes.values()) { const I = new THREE.InstancedMesh(unit, new THREE.MeshStandardMaterial({ color: col, roughness: 0.85 }), m.length); m.forEach((x, i) => I.setMatrixAt(i, x)); I.castShadow = !sm; I.receiveShadow = true; I.frustumCulled = false; (sm ? small : G).add(I); }
+      for (const { col, small: sm, m } of boxes.values()) { const I = new THREE.InstancedMesh(unit, new THREE.MeshStandardMaterial({ color: col, roughness: 0.85 }), m.length); m.forEach((x, i) => I.setMatrixAt(i, x)); I.castShadow = !sm; I.receiveShadow = true; I.frustumCulled = false; (sm ? small : G).add(I); reg(I, sm); }
       for (const [kind, list] of flats) { const [col, y] = FLAT[kind], pos = new Float32Array(list.length * 12), idx = [];
         list.forEach((p, i) => { p.forEach(([x, z], j) => pos.set([x, y, z], i * 12 + j * 3)); const b = i * 4; idx.push(b, b + 2, b + 1, b, b + 3, b + 2); });
         const ge = new THREE.BufferGeometry(); ge.setAttribute('position', new THREE.BufferAttribute(pos, 3)); ge.setIndex(idx); ge.computeVertexNormals(); geoms.push(ge);
         const m = new THREE.Mesh(ge, new THREE.MeshStandardMaterial({ color: col, roughness: 0.95, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 })); m.receiveShadow = true; m.matrixAutoUpdate = false; G.add(m); }
-      const inst = (parts, list, mat, grp) => { if (!list.length) return; for (const [ge, mt] of parts) { const I = new THREE.InstancedMesh(ge, mt, list.length); list.forEach((it, i) => I.setMatrixAt(i, mat(it, i))); I.castShadow = grp === G; I.receiveShadow = true; I.frustumCulled = false; grp.add(I); } };
+      const inst = (parts, list, mat, grp) => { if (!list.length) return; for (const [ge, mt] of parts) { const I = new THREE.InstancedMesh(ge, mt, list.length); list.forEach((it, i) => I.setMatrixAt(i, mat(it, i))); I.castShadow = grp === G; I.receiveShadow = true; I.frustumCulled = false; grp.add(I); reg(I, grp !== G); } };
       const sc = new THREE.Vector3();
       // дървета: истинските (o.treeProtos — височина h) или кълбо на ствол
       const tp = (o.treeProtos || []).map(p => protoParts(p, 'h')).filter(p => p.length);
@@ -113,8 +126,9 @@ function Kit(o = {}) {
       const carI = []; if (cp.length) cp.forEach(([, parts], vi) => { const n0 = small.children.length; inst(parts, K.cars.filter((_, i) => i % cp.length === vi), ([x, z, yaw]) => M.compose(v.set(x, 0, z), q.setFromAxisAngle(v.clone().set(0, 1, 0), yaw), sc.set(1, 1, 1)).clone(), small); carI.push(small.children.slice(n0)); });
       { const src = ((o.carsFn && o.carsFn()) || o.cars || []).filter(([, p]) => protoParts(p, null).length), Z = new THREE.Matrix4().makeScale(0, 0, 0), keep = new Map(), tmp = new THREE.Matrix4();   // commute (f6): отделна кола — скрита/показана (инстанцията → нула)
         G.userData.homes = K.homes || []; G.userData.doors = K.doors || []; G.userData.carSrc = ci => cp.length ? src[ci % cp.length][1] : null;
-        G.userData.carVis = (ci, on) => { if (!cp.length) return; const vi = ci % cp.length, j = (ci - vi) / cp.length; for (const I of carI[vi] || []) { if (j >= I.count) continue; const key = I.id + ':' + j;
-          if (!on) { if (!keep.has(key)) { I.getMatrixAt(j, tmp); keep.set(key, tmp.clone()); } I.setMatrixAt(j, Z); } else if (keep.has(key)) { I.setMatrixAt(j, keep.get(key)); keep.delete(key); } I.instanceMatrix.needsUpdate = true; } }; }
+        const getM = (I, j, m) => I.userData.cs ? m.fromArray(I.userData.cs.src, j * 16) : I.getMatrixAt(j, m), setM = (I, j, m) => { if (I.userData.cs) { m.toArray(I.userData.cs.src, j * 16); I.userData.cs.dirty = true; } else I.setMatrixAt(j, m); };   // perf3-cull: по изходните матрици (буферът е само с видимите)
+        G.userData.carVis = (ci, on) => { if (!cp.length) return; const vi = ci % cp.length, j = (ci - vi) / cp.length; for (const I of carI[vi] || []) { if (j >= (I.userData.cs ? I.userData.cs.n : I.count)) continue; const key = I.id + ':' + j;
+          if (!on) { if (!keep.has(key)) { getM(I, j, tmp); keep.set(key, tmp.clone()); } setM(I, j, Z); } else if (keep.has(key)) { setM(I, j, keep.get(key)); keep.delete(key); } I.instanceMatrix.needsUpdate = true; } }; }
       // 🛝 yards-real: пейките, площадките, оградите — истинските модели
       for (const [key, { small: sm, m }] of reals) inst(protoParts(K.R[key], 'real'), m, x => x, sm ? small : G);
       G.userData.reals = Object.fromEntries([...reals].map(([k, r]) => [k, r.m.length])); G.userData.plays = K.plays || []; G.userData.pitches = K.pitches || [];   // за Лабораторията (__dbg.yardsLook)
@@ -434,8 +448,9 @@ export function createDistricts(o) {
   }
   // най-голямата свободна площ с най-много готови сгради наоколо — за снимките „преди/след“
   function focus() { if (!A) rebuild(); const done = city.lots.filter(doneLot); let best = null, bs = -1; for (const c of A.comps) { if (c.area < PARK_MIN || c.maxDt < PARK_DT) continue; const n = done.filter(l => Math.hypot(l.x - c.x, l.z - c.z) < 150).length * 1e5 + c.area; if (n > bs) { bs = n; best = c; } } return best && { x: best.x, z: best.z, area: best.area }; }
+  const cull = (camera, fogFar, yard = 1, bigFar = Infinity) => { if (G && G.userData.cull) G.userData.cull(camera, Math.min(380 * yard, fogFar), Math.min(fogFar, bigFar)); };   // bigFar — дърветата/голямото (слабите нива на графиката)   // ⚡ perf3-cull: всеки кадър (без работа, ако камерата стои)
   function update(camera, target, yard = 1) { if (!G) return; const far = camera.position.distanceTo(target) > 420 * yard; G.userData.small.visible = yard > 0 && !far; }   // yard (графиката): 1 — до 420 м, 0,5 — до 210 м, 0 — без дворовете и паркираните коли
   function dispose() { diag(false); if (G) { G.parent && G.parent.remove(G); G.userData.dispose(); G = null; } }
   const UD = () => (G && G.userData) || {};   // commute (f6)
-  return { homes: () => UD().homes || [], doors: () => UD().doors || [], carVis: (ci, on) => UD().carVis && UD().carVis(ci, on), carSrc: ci => UD().carSrc && UD().carSrc(ci), group: () => G, rebuild, diag, stats, focus, update, dispose, parkLotsOf: () => o.parkLots || [], reals: () => G && G.userData.reals, plays: () => (G && G.userData.plays) || [], pitches: () => (G && G.userData.pitches) || [], get analysis() { return A; } };
+  return { homes: () => UD().homes || [], doors: () => UD().doors || [], carVis: (ci, on) => UD().carVis && UD().carVis(ci, on), carSrc: ci => UD().carSrc && UD().carSrc(ci), group: () => G, rebuild, diag, stats, focus, update, cull, dispose, parkLotsOf: () => o.parkLots || [], reals: () => G && G.userData.reals, plays: () => (G && G.userData.plays) || [], pitches: () => (G && G.userData.pitches) || [], get analysis() { return A; } };
 }

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<base href="../">
+<title>Дневник на партньорството</title>
+<style>
+  :root { --bg:#0f141c; --panel:#141b26; --line:rgba(255,255,255,.12); --acc:#ffb300; --ok:#4cd07d; --bad:#ff6b6b; --txt:#eef1f6; --mut:#9aa3b5; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--txt); font:14px/1.45 system-ui, sans-serif; }
+  #wrap { display:flex; height:100%; } #game { flex:1 1 60%; border:0; min-width:0; background:#000; }
+  #side { flex:0 0 min(560px, 42%); display:flex; flex-direction:column; border-left:1px solid var(--line); background:var(--panel); min-width:0; }
+  header { display:flex; gap:6px; align-items:center; padding:10px 12px; border-bottom:1px solid var(--line); flex-wrap:wrap; } header h1 { font-size:16px; margin:0 8px 0 0; }
+  button { font:inherit; color:inherit; cursor:pointer; } .tab, .btn2 { border:1px solid var(--line); background:rgba(255,255,255,.06); border-radius:9px; padding:5px 10px; font-weight:700; } .tab.on { background:var(--acc); color:#1a1200; border-color:var(--acc); }
+  main { overflow:auto; flex:1; padding:10px 12px; } .mut { color:var(--mut); font-size:12.5px; }
+  .step { border:1px solid var(--line); border-radius:11px; padding:9px 11px; margin:0 0 8px; background:#ffffff06; } .step.done { opacity:.55; }
+  .step label { display:flex; gap:8px; align-items:flex-start; font-weight:700; cursor:pointer; } .step input { margin-top:3px; }
+  .step .who { display:grid; grid-template-columns:auto 1fr; gap:3px 8px; margin:6px 0 0 24px; font-size:13px; } .step .who b { color:var(--acc); white-space:nowrap; } .step .rpc { margin:5px 0 0 24px; font:12px ui-monospace, monospace; color:#8fb3ff; }
+  .sec { margin:12px 0 6px; font-size:12px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--mut); }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; } td, th { padding:5px 6px; border-bottom:1px solid #ffffff10; vertical-align:top; text-align:left; } th { color:var(--mut); font-weight:700; position:sticky; top:0; background:var(--panel); }
+  td.fn { font:12px ui-monospace, monospace; white-space:nowrap; } td.a { font:11.5px ui-monospace, monospace; color:#c9d3e3; word-break:break-all; } tr.err td { background:#ff6b6b14; } tr.err td.r { color:var(--bad); } td.r { font:11.5px ui-monospace, monospace; word-break:break-all; color:var(--ok); }
+  .tools { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:0 0 8px; } .tools input[type=text] { background:#0006; color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:5px 8px; width:150px; }
+  @media (max-width:900px) { #wrap { flex-direction:column; } #side { flex:1 1 auto; max-height:55%; border-left:0; border-top:1px solid var(--line); } #game { flex:1 1 45%; } }
+</style></head><body>
+<div id="wrap"><iframe id="game" src="index.html?plan=1"></iframe>
+<div id="side"><header><h1>🤝 Дневник на партньорството</h1><button class="tab on" data-t="list">📋 Чеклист</button><button class="tab" data-t="log">🧾 Дневник <span id="nLog"></span></button><span style="flex:1"></span><a class="btn2" href="index.html?plan=1" target="_blank" style="text-decoration:none">↗ Играта</a></header>
+<main id="main"></main></div></div>
+<script type="module">
+// lab/coop-log.html (T2): проба с ИСТИНСКИ акаунти — собственикът (А) и партньорът (Б), ~30 мин. Всеки отваря тази страница при себе си (своя акаунт).
+// „📋 Чеклист“ — стъпките (какво прави единият, какво трябва да видят ДВАМАТА); отметките се помнят в този браузър. „🧾 Дневник“ — последните 200
+// извиквания към сървъра от играта отляво (coop.js rpc → window.__coopLog): функция, кратко за аргументите, резултат или грешка, време, опити.
+const $ = id => document.getElementById(id), esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const STEPS = [
+  ['Основаване', [
+    ['А и Б влизат с имейл (не като гост) — всеки в своя браузър', 'В горната лента — името на акаунта; „🤝 Партньор“ се вижда', 'Същото', 'coop_status'],
+    ['А: „🤝 Партньор“ → „🔑 Създай код“', 'Код от 6 знака и „Дай този код на приятеля си“', '—', 'coop_create'],
+    ['Б: „🤝 Партньор“ → въвежда кода → „Свържи се“', 'До 20 s: „Партньор: <Б>“, неговият град на картата с пръстен в неговия цвят', '„Партньор: <А>“, градът на А на картата', 'coop_join · coop_status2'],
+    ['А: име на холдинга → „Запази името“', 'Новото име в Центъра на партньорството', 'Същото име до 20 s', 'coop_vault_name'],
+  ]],
+  ['Обща каса', [
+    ['А: „🏦 Обща каса“ → 50 000 € → „⬆️ Внеси“', 'Парите намаляват с 50 000 €; касата +50 000 €; ред в дневника на касата', 'Касата +50 000 € (до 20 s) и редът „<А> внесе“', 'coop_vault (amount=50000)'],
+    ['Б: 10 000 € → „⬇️ Изтегли“ (под правилото за одобрение)', 'Касата −10 000 €, ред „<Б> изтегли“', 'Парите +10 000 €', 'coop_vault (amount=-10000)'],
+    ['Б: сума над правилото → „🙋 Поискай одобрение за сумата горе“; А: одобрява', '„🙋 Заявка от <Б>“ → „✓ Одобри“', 'След одобрението — парите при Б, касата намалява', 'coop_withdraw_request · coop_withdraw_act'],
+  ]],
+  ['Пратки', [
+    ['А: 20 000 € → „🎁 Подари на <Б>“', 'Парите −20 000 €, „🎁 Изпрати … на <Б>“', '„📦 Пратка от <А>“ → „Вземи“ → +20 000 €', 'coop_send (kind=gift) · coop_claim'],
+    ['А: праща 1 багер и 10 м³ бетон', 'Багерът изчезва от гаража, бетонът — от склада', 'Пратката → „Вземи“ → багерът в гаража му, бетонът в склада', 'coop_send (unit, mat) · coop_claim'],
+  ]],
+  ['Общи обекти', [
+    ['А: „🛣️ Магистрали“ → свободен участък → „🤝 Предложи на партньора“', '„🛣️ Предложението е пратено“', '„🤝 <А> предлага обща магистрала …“ → „Приеми“', 'coop_joint (kind=hw) · coop_joint_act'],
+    ['Някой строи участъка докрай', 'Участъкът — завършен, в Центъра: „Общ обект ✓“ и бонус', 'Същият участък завършен и при него, бонусът — и при двамата', 'coop_joint_bonus'],
+    ['Обща държава: двамата завършват ключовите градове на една държава (или проверка в Лабораторията — coop-map)', 'Картата: държавата на райета в двата цвята; „🤝 Завладяхте … заедно“', 'Същото', '(снимката — coop_snap)'],
+  ]],
+  ['Супер поръчка 50/50', [
+    ['На А идва супер поръчка (Ориент Експрес / Route 66 / …)', '„⭐ Супер поръчки“: оферта, подпиши', 'Същата оферта: „🤝 Обща поръчка с <А> — по 50%“', '(снимката)'],
+    ['И двамата подписват; всеки строи част', 'Авансът — 50% при всеки; напредъкът брои и участъците на Б', 'Същото — общ напредък', '(снимката)'],
+    ['Предаване (или в Лабораторията — d.coopMegaTest)', 'Наградата 50% и дневният приход 50%', 'Същото, веднъж', '—'],
+  ]],
+  ['Президентство и среща на върха (само ако имате запис на президент)', [
+    ['А избира държава (САЩ/Русия)', 'Президентският прозорец', '„🇺🇸 САЩ е избрана от партньора <А>“ — може само другата', '(снимката)'],
+    ['И двамата президенти: „🌐 Срещата на върха“; А предлага примирие', 'Двата флага, отношенията, предложението', '„Приеми“ → бонус при двамата (без пари)', '(снимката)'],
+  ]],
+  ['Чат и молби', [
+    ['А: съобщение в чата; Б отговаря; А: „🆘 Молба“', 'Съобщенията в реда им; молбата с червено', 'Същото, до 20 s; „🆘“ и звук', 'coop_say (sos=true)'],
+  ]],
+];
+const LS = 'stroi-coopcheck', done = (() => { try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch { return {}; } })();
+let tab = 'list', onlyErr = false, q = '';
+const log = () => { try { return $('game').contentWindow.__coopLog || JSON.parse(sessionStorage.getItem('stroi-cooplog') || '[]'); } catch { return []; } };
+function renderList() {
+  let n = 0, k = 0; const h = STEPS.map(([sec, L]) => `<div class="sec">${esc(sec)}</div>` + L.map(([what, a, b, rpc]) => { const id = 's' + (++n), on = !!done[id]; if (on) k++;
+    return `<div class="step ${on ? 'done' : ''}"><label><input type="checkbox" data-s="${id}" ${on ? 'checked' : ''}> ${n}. ${esc(what)}</label><div class="who"><b>А вижда</b><span>${esc(a)}</span><b>Б вижда</b><span>${esc(b)}</span></div><div class="rpc">↔ ${esc(rpc)}</div></div>`; }).join('')).join('');
+  $('main').innerHTML = `<div class="mut" style="margin-bottom:8px">А — собственикът, Б — партньорът. Всеки отваря тази страница при себе си (своя акаунт, своя браузър). Стъпка без очакваното — „🧾 Дневник“ → „📋 Копирай“ и го пратете на Claude. Готови: <b>${k}/${n}</b> · <button class="btn2" id="reset">Изчисти отметките</button></div>` + h;
+  $('main').querySelectorAll('[data-s]').forEach(c => c.onchange = () => { done[c.dataset.s] = c.checked; try { localStorage.setItem(LS, JSON.stringify(done)); } catch { } renderList(); });
+  $('reset').onclick = () => { for (const x in done) delete done[x]; try { localStorage.removeItem(LS); } catch { } renderList(); };
+}
+function renderLog() {
+  const L = log().filter(e => (!onlyErr || e.err) && (!q || (e.fn + ' ' + e.args).includes(q))).slice().reverse(), t = ms => new Date(ms).toLocaleTimeString('bg-BG');
+  const keep = $('main').querySelector('#q') === document.activeElement;
+  $('main').innerHTML = `<div class="tools"><input type="text" id="q" placeholder="функция…" value="${esc(q)}"><label class="mut"><input type="checkbox" id="oe" ${onlyErr ? 'checked' : ''}> само грешките</label><button class="btn2" id="cp">📋 Копирай</button><button class="btn2" id="clr">Изчисти</button><span class="mut">${log().length} / 200</span></div>
+    <table><thead><tr><th>кога</th><th>функция</th><th>аргументи</th><th>резултат</th><th>ms</th></tr></thead><tbody>${L.map(e => `<tr class="${e.err ? 'err' : ''}"><td class="mut">${t(e.at)}</td><td class="fn">${esc(e.fn)}${e.n > 1 ? ` <span class="mut">×${e.n}</span>` : ''}</td><td class="a">${esc(e.args)}</td><td class="r">${esc(e.err || e.res)}${e.tries > 1 ? ` <span class="mut">(${e.tries} опита)</span>` : ''}</td><td class="mut">${e.ms}</td></tr>`).join('') || '<tr><td colspan="5" class="mut">Още няма извиквания — влез с акаунт и отвори „🤝 Партньор“.</td></tr>'}</tbody></table>`;
+  const qi = $('q'); qi.oninput = () => { q = qi.value; renderLog(); }; if (keep) { qi.focus(); qi.setSelectionRange(q.length, q.length); }
+  $('oe').onchange = e => { onlyErr = e.target.checked; renderLog(); };
+  $('cp').onclick = () => navigator.clipboard.writeText(JSON.stringify(log(), null, 1)).then(() => { $('cp').textContent = '✓ Копирано'; }).catch(() => { $('cp').textContent = '⚠ не стана'; });
+  $('clr').onclick = () => { const a = log(); a.length = 0; try { sessionStorage.removeItem('stroi-cooplog'); $('game').contentWindow.sessionStorage.removeItem('stroi-cooplog'); } catch { } renderLog(); };
+}
+const render = () => { document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.t === tab)); (tab === 'list' ? renderList : renderLog)(); };
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => { tab = b.dataset.t; render(); });
+let seen = -1; setInterval(() => { const L = log(), sig = L.length + ':' + (L.length ? L[L.length - 1].at + ':' + (L[L.length - 1].n || 1) : ''); $('nLog').textContent = L.length ? `(${L.length}${L.some(e => e.err) ? ' · ⚠' : ''})` : ''; if (tab === 'log' && sig !== seen) { seen = sig; renderLog(); } }, 1500);
+render();
+</script></body></html>

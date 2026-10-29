@@ -4,29 +4,54 @@
 // Франция — Уолъс, Обсерваторията и Наполеон; Австрия — Щраус; другаде в Европа — разнообразно; извън Европа — само фонтаните. Нощем — леко осветени.
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';
-import { fwFx, fwWaterMat } from './fountainwater.js';   // ⛲ fountain-water: басейнът на Артемида — вълнички, пръски, нощем сияние
+import { fwFx, fwWaterMat, fwPrepGLB } from './fountainwater.js';   // ⛲ fountain-water: басейнът на Артемида — вълнички, пръски, нощем сияние
 
-export const STATUE_FILES = Object.fromEntries(['fn-brno', 'fn-wallace', 'fn-artemis', 'fn-observatoire', 'st-napoleon', 'st-ernst', 'st-masaryk', 'st-strauss'].map(k => [k, `statues/${k}.glb`]));
+// 🗽 statues-meshy (T2): 8 статуи на собственика (Meshy AI, ТЕМИДАСОФТ ООД — assets/heavy/CREDITS.txt), олекотени в Blender (Merge by Distance → ~32k триъгълника,
+// webp 1024, основата на z = 0; гранитен постамент на бюста и крилатия ангел; възел Uplight — 4 осветителя и светъл пръстен в основата, светят нощем)
+const MESHY = feature('statues-meshy'), M_KEYS = ['m-angel-colossal', 'm-angel-grieving', 'm-angel-winged', 'm-lucifer', 'm-orpheus', 'm-venus', 'm-aquarius', 'm-city-shoulder', 'pegasus-fountain', 'myths-fountain'];   // + двата фонтана (вода — fountainwater.js KNOWN)
+export const STATUE_FILES = Object.fromEntries(['fn-brno', 'fn-wallace', 'fn-artemis', 'fn-observatoire', 'st-napoleon', 'st-ernst', 'st-masaryk', 'st-strauss', ...(MESHY ? M_KEYS : [])].map(k => [k, `statues/${k}.glb`]));
 // h — височината в света (м, с пиедестала); ped — свой пиедестал [ш, д, в]; basin — басейн с вода (радиус)
 const SPEC = { 'fn-brno': { h: 3.6 }, 'fn-wallace': { h: 2.7 }, 'fn-artemis': { h: 3.4, ped: [1.6, 1.6, 1.4], basin: 4.2 }, 'fn-observatoire': { h: 8.5 },
-  'st-napoleon': { h: 4.4, ped: [2.8, 4.6, 3.0] }, 'st-ernst': { h: 8.5 }, 'st-masaryk': { h: 2.9 }, 'st-strauss': { h: 6.5 } };
+  'st-napoleon': { h: 4.4, ped: [2.8, 4.6, 3.0] }, 'st-ernst': { h: 8.5 }, 'st-masaryk': { h: 2.9 }, 'st-strauss': { h: 6.5 },
+  'm-angel-colossal': { h: 17 }, 'm-angel-grieving': { h: 9 }, 'm-angel-winged': { h: 11 }, 'm-lucifer': { h: 10 }, 'm-orpheus': { h: 10 }, 'm-venus': { h: 10 }, 'm-aquarius': { h: 9 }, 'm-city-shoulder': { h: 12 }, 'pegasus-fountain': { h: 10 }, 'myths-fountain': { h: 10 } };   // statues-meshy: с постамента
 const STONE = 0xcfc8ba;
 
 // подготовка (веднъж): всеки модел — на земята, центриран, в истински ръст, с пиедестала/басейна; нощем — меко осветен (win(материал) → dayNight)
 export function statuePrep(M, win) {
   const V = {}, stone = new THREE.MeshStandardMaterial({ color: STONE, roughness: 0.85 }), water = new THREE.MeshStandardMaterial({ color: 0x4f7f9c, roughness: 0.08, metalness: 0.3 });
-  for (const k in SPEC) { const src = M[k]; if (!src) continue; const sp = SPEC[k], g = new THREE.Group(), o = src.clone(true);
-    o.traverse(m => { if (!m.isMesh) return; m.castShadow = true; m.receiveShadow = true; for (const mt of [].concat(m.material)) if (mt.emissive && !mt.userData.stNight) { mt.userData.stNight = 1; mt.emissive.setRGB(1, 0.84, 0.62); mt.emissiveMap = mt.map || null; mt.emissiveIntensity = 0; mt.userData.winK = 0.38; mt.needsUpdate = true; win(mt); } });   // нощем — топло, отдолу нагоре (картата на модела)
+  for (const k in SPEC) { const src = M[k]; if (!src) continue; if (/-fountain$/.test(k) && feature('fountain-water')) fwPrepGLB(src, k);   // statues-meshy: водата — към прототипа (clone я носи)
+    const sp = SPEC[k], g = new THREE.Group(), o = src.clone(true);
+    o.traverse(m => { if (!m.isMesh || (m.parent && m.parent.userData.fw)) return; m.castShadow = true; m.receiveShadow = true; for (const mt of [].concat(m.material)) if (mt.emissive && !mt.userData.stNight) { mt.userData.stNight = 1; const up = mt.name === 'Uplight'; mt.emissive.setRGB(1, up ? 0.78 : 0.84, up ? 0.5 : 0.62); mt.emissiveMap = up ? null : mt.map || null; mt.emissiveIntensity = 0; mt.userData.winK = up ? 2.6 : 0.38; mt.needsUpdate = true; win(mt); } });   /* statues-meshy: Uplight — осветителите в основата, по-ярко */   // нощем — топло, отдолу нагоре (картата на модела)
     const b = new THREE.Box3().setFromObject(o), s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3()), py = sp.ped ? sp.ped[2] : 0, k2 = sp.h / s.y;
     o.position.set(-c.x * k2, py - b.min.y * k2, -c.z * k2); o.scale.setScalar(k2); g.add(o);
     if (sp.ped) { const p = new THREE.Mesh(new THREE.BoxGeometry(sp.ped[0], sp.ped[2], sp.ped[1]), stone); p.position.y = sp.ped[2] / 2; p.castShadow = p.receiveShadow = true; g.add(p);
       const p2 = new THREE.Mesh(new THREE.BoxGeometry(sp.ped[0] + 0.6, 0.4, sp.ped[1] + 0.6), stone); p2.position.y = 0.2; g.add(p2); }
     if (sp.basin) { const r = sp.basin, rim = new THREE.Mesh(new THREE.CylinderGeometry(r, r + 0.3, 0.7, 32, 1, true), stone), top = new THREE.Mesh(new THREE.RingGeometry(r - 0.35, r, 32).rotateX(-Math.PI / 2), stone), w = new THREE.Mesh(new THREE.CircleGeometry(r - 0.3, 32).rotateX(-Math.PI / 2), water);
       rim.position.y = 0.35; top.position.y = 0.7; w.position.y = 0.55; rim.receiveShadow = true; g.add(rim, top, w); if (feature('fountain-water')) { w.material = fwWaterMat(); g.add(fwFx({ splash: [[0.56, (sp.ped ? sp.ped[0] * 0.75 : 1) + 0.2, 20], [0.56, r * 0.62, 18]], u: 8 })); } }
-    const bb = new THREE.Box3().setFromObject(g); g.userData.rad = Math.max(bb.max.x, -bb.min.x, bb.max.z, -bb.min.z); g.userData.h = sp.h + (sp.ped ? sp.ped[2] : 0); V[k] = g; }
+    const bb = new THREE.Box3().setFromObject(g); g.userData.rad = Math.max(bb.max.x, -bb.min.x, bb.max.z, -bb.min.z); g.userData.h = sp.h + (sp.ped ? sp.ped[2] : 0); g.userData.key = k; V[k] = g; }
   return V;
 }
 
+// 🗽 statues-meshy: кои нови статуи за града — ангелите и Орфей за европейските столици, Венера и Водолейката за Средиземноморието и курортите,
+// „Градът на рамото“ за мегаполисите; колосалният ангел — само на най-голямото площадче на столица. Редът е по seed (не се мени при зареждане);
+// списъкът се дели на две — за кръговите (round) и за площадите (plaza) — без повторения в града. o: { cc, eu, cap, mega, med, resort, seed }
+const MED = new Set(['🇮🇹', '🇬🇷', '🇪🇸', '🇭🇷', '🇲🇹', '🇨🇾', '🇲🇨', '🇹🇷', '🇲🇪', '🇦🇱', '🇸🇮', '🇵🇹', '🇫🇷']);
+export function meshyFor(o = {}) {
+  if (!MESHY) return { round: [], plaza: [], fountains: [] };
+  const ANG = ['m-angel-winged', 'm-orpheus', 'm-lucifer', 'm-angel-grieving'], SEA = ['m-venus', 'm-aquarius'], med = o.med ?? MED.has(o.cc);
+  let sd = ((o.seed || 7) >>> 0) || 7; const rnd = () => { sd = (Math.imul(sd ^ (sd >>> 15), 2246822519) + 0x9e3779b9) >>> 0; return sd / 4294967296; };
+  const mix = L => L.map(k => [rnd(), k]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
+  let L = [];
+  if (o.mega) L.push('m-city-shoulder');
+  if (o.cap && o.eu) L.push(...mix(ANG)); else if (o.eu && !(med || o.resort)) L.push(...mix(ANG).slice(0, 2));
+  if (med || o.resort) L.push(...mix(SEA)); if ((med || o.resort) && o.eu && !o.cap) L.push(mix(ANG)[0]);
+  L = [...new Set(L)];
+  const round = L.filter((_, i) => i % 2 === 0), plaza = L.filter((_, i) => i % 2 === 1);
+  if (o.cap && o.eu) plaza.unshift('m-angel-colossal');
+  const fountains = rnd() < 0.5 ? ['pegasus-fountain', 'myths-fountain'] : ['myths-fountain', 'pegasus-fountain'];   // фонтаните: [0] — големият за града (главните кръгови и площад), Пегас — на обикновените кръгови
+  plaza.splice(o.cap && o.eu ? 1 : 0, 0, fountains[0]);
+  return { round, plaza, fountains };
+}
 // местата в парка (парцел „park“): фонтанът — в центъра; в по-големите (≥ 40 м) — и статуя на четвърт от ширината встрани; r — поляната без дървета
 export const parkSpots = L => { const c = Math.cos(L.rot || 0), s = Math.sin(L.rot || 0), out = [[L.x, L.z, 7]]; if (Math.min(L.w, L.d) >= 40) out.push([L.x + c * L.w / 4, L.z - s * L.w / 4, 6]); return out; };
 // G — групата на изгледа; P — планът (координатите на изгледа); o: { cc — флагът на държавата, eu — в Европа ли е, seed }
@@ -48,14 +73,18 @@ export function placeStatues(G, P, V, o = {}) {
   const free = (k, x, z, skip, pad = 1.5) => { const r = V[k].userData.rad; if (P.waterAt && P.waterAt(x, z)) return null; const [g, ang] = roadGap(x, z); if (g < r + pad || inLot(x, z, r + pad, skip) || !far(x, z)) return null; return ang; };
   const inPoly = (x, z, poly) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; };
   // 1) парковете (парцелите „park“): фонтанът — в центъра (там беше процедурният)
-  for (const L of P.lots) { if (L.big !== 'park') continue; const [c0, c1] = parkSpots(L), k = pickOf(FOUNT); if (k && V[k].userData.rad <= Math.min(L.w, L.d) * 0.3) put(k, c0[0], c0[1], rnd() * Math.PI * 2);
-    const k2 = c1 && STAT.length && stat(); if (k2 && V[k2].userData.rad <= c1[2] + 1) put(k2, c1[0], c1[1], (L.rot || 0) - Math.PI / 2); }   // статуята — с лице към центъра (фонтана)
+  const MQ = (o.meshy || []).filter(has), mqTake = (test, fits) => { const i = MQ.findIndex(k => test(k) && fits(V[k].userData.rad)); return i < 0 ? null : MQ.splice(i, 1)[0]; };   // statues-meshy: новите — първи
+  for (const L of P.lots) { if (L.big !== 'park') continue; const [c0, c1] = parkSpots(L), side = Math.min(L.w, L.d), mf = mqTake(k => /-fountain$/.test(k), r => r <= side * 0.32), k = mf || pickOf(FOUNT); if (k && (mf || V[k].userData.rad <= side * 0.3)) put(k, c0[0], c0[1], rnd() * Math.PI * 2);
+    const ms = c1 && mqTake(k => !/-fountain$/.test(k) && k !== 'm-angel-colossal', r => r <= c1[2] + 1), k2 = ms || (c1 && STAT.length && stat()); if (k2 && (ms || V[k2].userData.rad <= c1[2] + 1)) put(k2, c1[0], c1[1], (L.rot || 0) - Math.PI / 2); }   // статуята — с лице към центъра (фонтана)
   // 2) зелените площи (истинската карта): по-големите първо; в центъра (или по-навътре към върховете), ако е свободно — редуват се статуя и фонтан
   const GS = (P.greensSrc || []).map(g => { const p = g.poly; let A = 0, cx = 0, cz = 0; for (let i = 0, j = p.length - 1; i < p.length; j = i++) { const f = p[j][0] * p[i][1] - p[i][0] * p[j][1]; A += f; cx += (p[j][0] + p[i][0]) * f; cz += (p[j][1] + p[i][1]) * f; } A /= 2; return { p, A: Math.abs(A), cx: A ? cx / (6 * A) : p[0][0], cz: A ? cz / (6 * A) : p[0][1] }; }).filter(g => g.A > 2500).sort((a, b) => b.A - a.A);
   let n2 = 0;
-  for (const g of GS) { if (n2 >= 14) break; const k = n2 % 2 === 0 && STAT.length ? stat() : pickOf(FOUNT); if (!k) continue;
+  // statues-meshy: каквото остана от опашката — по най-големите зелени площи (колосалният ангел — само на площ над 6000 м²)
+  for (const g of GS) { if (n2 >= 14) break; if (MQ[0] === 'm-angel-colossal' && g.A <= 6000) MQ.shift();   /* площите са по размер — по-голяма няма */
+    const mk = MQ.length ? MQ[0] : null, k = mk || (n2 % 2 === 0 && STAT.length ? stat() : pickOf(FOUNT)); if (!k) continue; const n2a = n2;
     for (const t of [0, 0.3, 0.5]) { let ok = false; for (let v = 0; v < (t ? g.p.length : 1); v += Math.max(1, Math.floor(g.p.length / 6))) { const x = t ? g.cx + (g.p[v][0] - g.cx) * t : g.cx, z = t ? g.cz + (g.p[v][1] - g.cz) * t : g.cz;
-      if (!inPoly(x, z, g.p)) continue; const ang = free(k, x, z, null, 3); if (ang === null) continue; put(k, x, z, ang); n2++; ok = true; break; } if (ok) break; } }
+      if (!inPoly(x, z, g.p)) continue; const ang = free(k, x, z, null, 3); if (ang === null) continue; put(k, x, z, ang); n2++; ok = true; break; } if (ok) break; }
+    if (mk && n2 > n2a) MQ.shift(); }   // statues-meshy: от опашката — само щом е поставена
   // 3) булевардите: по един малък (бюст / фонтан Уолъс) по разделителната ивица — между дърветата, далеч от кръстовищата
   let n3 = 0;
   for (const rd of P.roads) { if (n3 >= 8 || rd.cls !== 'blvd' || !SMALL.length) continue; const T = rd.L[rd.L.length - 1]; if (T < 220) continue; const k = pickOf(SMALL); if (!k || V[k].userData.rad > 1.4) continue;   /* ивицата е ~3 м */
