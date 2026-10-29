@@ -11,14 +11,14 @@ begin
   if u is null or coalesce(amt, 0) <= 0 then return; end if;
   if amt > coop.lim('op_max') then raise exception 'coop_limit: Сумата е над тавана за една операция (% €).', coop.lim('op_max')::bigint; end if;
   perform pg_advisory_xact_lock(hashtextextended('coop_flows:' || u::text, 0));   -- две паралелни заявки на един играч — една след друга
-  select coalesce(sum(amount), 0) into day from coop.flows where user_id = u and at > now() - interval '24 hours';
+  select coalesce(sum(f.amount), 0) from coop.flows f where f.user_id = u and f.at > now() - interval '24 hours' into day;
   if day + amt > coop.lim('day_max') then raise exception 'coop_limit: Над дневния таван на партньорските преводи (% € за 24 ч).', coop.lim('day_max')::bigint; end if;
   select * into s from coop.snaps where user_id = u;
   m := case when s.user_id is not null and jsonb_typeof(s.data -> 'money') = 'number' then (s.data ->> 'money')::numeric end;
   if m is null or s.at < now() - interval '24 hours' then
     if day + amt > coop.lim('no_snap_max') then raise exception 'coop_limit: Играта ти още не е синхронизирана с облака — опитай пак след минута.'; end if;
   else
-    select coalesce(sum(amount), 0) into since from coop.flows where user_id = u and at >= s.at;
+    select coalesce(sum(f.amount), 0) from coop.flows f where f.user_id = u and f.at >= s.at into since;
     cap := greatest(m, 0) * coop.lim('peak_mult') + coop.lim('peak_pad');
     if since + amt > cap then raise exception 'coop_limit: Сумата е повече от парите ти (по последната синхронизация) — опитай пак след минута.'; end if;
   end if;

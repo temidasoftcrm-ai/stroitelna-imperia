@@ -26,9 +26,8 @@ export function createStorm(d) {
   const cc = document.createElement('canvas'); cc.width = cc.height = 64; const c3 = cc.getContext('2d'), g3 = c3.createRadialGradient(32, 32, 1, 32, 32, 31);
   g3.addColorStop(0, 'rgba(255,255,255,1)'); g3.addColorStop(0.45, 'rgba(200,190,255,.45)'); g3.addColorStop(1, 'rgba(160,150,255,0)'); c3.fillStyle = g3; c3.fillRect(0, 0, 64, 64);
   const cloud = new THREE.Sprite(new THREE.SpriteMaterial({ map: canvasTex(cc), color: 0xd8d0ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })); cloud.visible = false; d.scene.add(cloud);
-  // ⚠️ НЕ добавяйте PointLight/SpotLight в сцената: с точкова светлина фасадите на сградите по истинската карта (OSM, изгледът на плана v2) денем
-  // стават черни (проверено в София, 28.10: с лампата — черни, без нея — наред; вероятно техният шейдър не понася NUM_POINT_LIGHTS > 0).
-  // Затова проблясъкът е само през hemi + слънцето + светещия облак; `light` е само обект с данни (за отчета / Лабораторията).
+  // Без PointLight: проблясъкът е през hemi + слънцето + светещия облак (по-евтино; точкова светлина прекомпилира всички шейдъри).
+  // (Черните фасади денем, които първо приписахме на лампата, бяха застинала карта на сенките отвисоко — game.js perfTune, shadow-fix.)
   const light = { intensity: 0, position: new THREE.Vector3() };
   // канал: средни точки с отместване (в равнина + извън нея), после разклоненията
   const P = new Float32Array(MAXP * 3), seg = []; let np = 0, mainSeg = 0;

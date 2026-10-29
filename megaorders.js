@@ -1,6 +1,7 @@
 // megaorders.js — супер поръчки по континентите (като „Ориент Експрес“ и „Route 66“): по една на континент.
 // Видове: 'rail' — жп участъци по маршрута; 'ab' — участъци аутобан; 'works' — един голям строеж (Панамският канал).
 // Записът е в S.mega[key] = { st: 'none'|'offer'|'active'|'done'|'failed'|'declined', at, due, adv, retry, earned, doneAt, build: { prog } }.
+import { jshare, jset, jointHtml, jfee, jointToast } from './coopmega.js';   // 🤝 coop-mega: общата поръчка с партньора — по 50%
 export const MEGA = [
   { key: 'chunnel', cont: 'eu', ico: '🚄', flag: '🇬🇧🇫🇷', nm: 'Тунелът под Ламанша', kind: 'rail', route: ['london', 'paris'], mul: 60, fee: 90000000, days: 300, daily: 150000,
     who: 'Британското и френското правителство', what: 'подводен жп тунел под Ламанша — Лондон и Париж за 2 часа с влак', after: 'влаковете „Евростар“ носят пари от билетите', pic: 'chunnel-done' },
@@ -26,7 +27,7 @@ export function createMega(deps) {
   const day = () => deps.S().day, f = n => deps.fmt(n), byKey = k => MEGA.find(m => m.key === k);
   const routeTxt = m => m.kind === 'works' ? deps.cityName(m.city) : m.route.map(deps.cityName).join(' — ');
   function legs(m) {
-    if (m.kind === 'works') { const s = st(m.key); return [{ works: true, done: s.build && s.build.prog >= 1, prog: s.build ? s.build.prog : null }]; }
+    if (m.kind === 'works') { const s = st(m.key), pw = deps.pWorks ? deps.pWorks(m.key) : 0; return [{ works: true, done: !!(s.build && s.build.prog >= 1) || pw >= 1, prog: s.build ? Math.max(s.build.prog, pw) : pw > 0 ? pw : null, pa: pw > 0 && !(s.build && s.build.prog >= pw) }]; }
     return m.route.slice(1).map((b, i) => {
       const a = m.route[i];
       if (m.kind === 'rail') { const r = deps.railLeg(a, b); return { a, b, done: !!(r && r.built), pct: r && !r.built ? Math.floor(r.prog * 100) : null, started: !!r }; }
@@ -36,7 +37,7 @@ export function createMega(deps) {
   const progress = k => { const L = legs(byKey(k)); return { done: L.filter(l => l.done).length, all: L.length }; };
 
   function offer(m) {
-    const s = st(m.key); s.st = 'offer'; s.at = day();
+    const s = st(m.key); s.st = 'offer'; s.at = day(); jset(s, deps.joint && deps.joint(m.key));
     deps.sound && deps.sound('offer');
     deps.pop && deps.pop(m.pic, `${m.ico}${m.flag} ${m.nm} — специална поръчка!`, `${m.who} търси фирма: ${routeTxt(m)}.`);
     // ⛔ при холдинг с директори — извънредно заседание на борда (group.js emergency): решението е с гласуване, вместо прозореца
@@ -52,18 +53,25 @@ export function createMega(deps) {
       why: `супер поръчка — идва веднъж на милион; срок ${m.days} дни, иначе връщаме аванса и губим 0.3 ★`, gainTxt: `${f(m.fee)} € + ${f(m.daily)} €/ден завинаги`,
       live: () => st(m.key).st === 'offer', accept: () => accept(m.key), decline: () => decline(m.key) };
   }
+  // 🤝 coop-mega: офертата на партньора идва и при мен (j — общият договор); без извънредното заседание на борда
+  function offerJoint(k, j) {
+    const m = byKey(k), s = st(k); if (!m) return; s.st = 'offer'; s.at = day(); s.joint = j;
+    deps.sound && deps.sound('offer');
+    deps.toast(jointToast(j, m.nm), 'good', () => deps.openWin());
+    ask(k);
+  }
   function ask(k) {
-    const m = byKey(k), p = progress(k);
+    const m = byKey(k), p = progress(k), s = st(k);
     const cond = m.kind === 'works' ? `Условие: да построиш новите шлюзове (${f(m.cost)} €, ${m.buildDays} дни строеж) до <b>${m.days} дни</b>.`
       : `Условие: всичките ${p.all} ${m.kind === 'rail' ? 'жп участъка' : 'участъка аутобан'} да са построени до <b>${m.days} дни</b> (вече имаш ${p.done}/${p.all}).`;
-    deps.modal(`${m.ico}${m.flag} ${m.nm}`, `<b>Специална поръчка</b> — идва веднъж на милион.<br><br>${m.who} възлага на твоята фирма ${m.what}:<br><b>${routeTxt(m)}</b><br><br>
-      ${cond}<br>💰 Награда: <b style="color:var(--ok)">${f(m.fee)} €</b> · аванс ${Math.round(P.adv * 100)}% (${f(m.fee * P.adv)} €) веднага.<br>
-      ⭐ След предаването ${m.after}: <b style="color:var(--ok)">+${f(m.daily)} €/ден</b> завинаги и +0.5 ★.<br>⚠️ Ако не успееш в срока — връщаш аванса и губиш 0.3 ★.<br><br>Всичко се строи от прозореца „⭐ Супер поръчки“.`,
+    deps.modal(`${m.ico}${m.flag} ${m.nm}`, `${jointHtml(s, f, m.fee, P.adv)}<b>Специална поръчка</b> — идва веднъж на милион.<br><br>${m.who} възлага на твоята фирма ${m.what}:<br><b>${routeTxt(m)}</b><br><br>
+      ${cond}<br>💰 Награда: <b style="color:var(--ok)">${jfee(s, f, m.fee)}</b> · аванс ${Math.round(P.adv * 100)}% (${f(m.fee * P.adv * jshare(s))} €) веднага.<br>
+      ⭐ След предаването ${m.after}: <b style="color:var(--ok)">+${f(m.daily * jshare(s))} €/ден</b> завинаги и +0.5 ★.<br>⚠️ Ако не успееш в срока — връщаш аванса и губиш 0.3 ★.<br><br>Всичко се строи от прозореца „⭐ Супер поръчки“.`,
       [['Откажи', () => decline(k)], ['По-късно', null], ['✍️ Подпиши договора', () => accept(k)]]);
   }
   function accept(k, quiet) {
     const m = byKey(k), s = st(k); if (s.st !== 'offer') return;
-    s.st = 'active'; s.due = day() + m.days; s.adv = Math.round(m.fee * P.adv);
+    s.st = 'active'; s.due = day() + m.days; s.adv = Math.round(m.fee * P.adv * jshare(s));
     deps.econ().earn(s.adv, 'обект', `Аванс: ${m.nm}`);
     deps.toast(`✍️ Подписа договора за „${m.nm}“! Аванс +${f(s.adv)} €. Срок до ден ${s.due}.`, 'good', () => deps.openWin());
     deps.sound && deps.sound('cash'); deps.save(); if (!quiet) deps.openWin();
@@ -71,10 +79,10 @@ export function createMega(deps) {
   function decline(k) { const m = byKey(k), s = st(k); s.st = 'declined'; s.retry = day() + P.retry; deps.toast(`Отказа „${m.nm}“. Кой знае дали ще дойде пак…`, ''); deps.save(); }
   function complete(m) {
     const s = st(m.key); s.st = 'done'; s.doneAt = day(); s.earned = 0;
-    const rest = m.fee - (s.adv || 0);
+    const rest = Math.max(0, Math.round(m.fee * jshare(s)) - (s.adv || 0)), dl = Math.round(m.daily * jshare(s));
     deps.econ().earn(rest, 'обект', `${m.nm} — предаване`);
     deps.addRep && deps.addRep(0.5); deps.addXp && deps.addXp(6000);
-    deps.pop && deps.pop(m.pic, `${m.ico}${m.flag} ${m.nm} е открит!`, `+${f(rest)} € · ${m.after}: +${f(m.daily)} €/ден.`);
+    deps.pop && deps.pop(m.pic, `${m.ico}${m.flag} ${m.nm} е открит!`, `+${f(rest)} € · ${m.after}: +${f(dl)} €/ден.`);
     deps.toast(`${m.ico}${m.flag} „${m.nm}“ е предаден! +${f(rest)} € и +0.5 ★.`, 'good');
     deps.sound && deps.sound('cash'); deps.save();
   }
@@ -111,9 +119,10 @@ export function createMega(deps) {
         else if (d > s.due) fail(m);
         else if (s.due - d === 30) deps.toast(`⏳ „${m.nm}“: остават 30 дни, готови ${p.done}/${p.all}.`, 'bad', () => deps.openWin());
       } else if (s.st === 'done') {
-        deps.econ().earn(m.daily, 'обект', `${m.nm}: приход`);
-        s.earned = (s.earned || 0) + m.daily;
-        if ((d - s.doneAt) % 7 === 0) deps.toast(`${m.ico} ${m.nm} тази седмица: +${f(m.daily * 7)} € (общо ${f(s.earned)} €)`, 'good');
+        const dl = Math.round(m.daily * jshare(s));
+        deps.econ().earn(dl, 'обект', `${m.nm}: приход`);
+        s.earned = (s.earned || 0) + dl;
+        if ((d - s.doneAt) % 7 === 0) deps.toast(`${m.ico} ${m.nm} тази седмица: +${f(dl * 7)} € (общо ${f(s.earned)} €)`, 'good');
       }
     }
   }
@@ -122,14 +131,14 @@ export function createMega(deps) {
     const d = day(), p = progress(k);
     const head = s.st === 'offer' ? `<span class="meta" style="margin:0 0 0 auto;color:#ffd54a">чака отговор до ден ${s.at + P.offerDays}</span>`
       : s.st === 'active' ? `<span class="meta" style="margin:0 0 0 auto">${p.done}/${p.all} · остават <b style="color:${s.due - d < 30 ? 'var(--bad)' : 'var(--txt)'}">${s.due - d} дни</b></span>`
-      : `<span class="meta" style="margin:0 0 0 auto;color:var(--ok)">открит · +${f(m.daily)} €/ден</span>`;
+      : `<span class="meta" style="margin:0 0 0 auto;color:var(--ok)">открит · +${f(m.daily * jshare(s))} €/ден</span>`;
     let h = `<div class="card" style="border:1px solid #ffb300;box-shadow:0 0 18px rgba(255,179,0,.2)"><h3>${m.ico}${m.flag} ${m.nm} ${head}</h3>
-      <div class="meta">${routeTxt(m)} · награда <b style="color:var(--ok)">${f(m.fee)} €</b>${s.adv ? ` (аванс ${f(s.adv)} € получен)` : ''}</div>`;
+      <div class="meta">${routeTxt(m)} · награда <b style="color:var(--ok)">${jfee(s, f, m.fee)}</b>${s.adv ? ` (аванс ${f(s.adv)} € получен)` : ''}</div>${jointHtml(s, f, m.fee, P.adv)}`;
     if (s.st === 'done') return h + `<div style="display:flex;gap:12px;align-items:center;margin:6px 0"><img src="assets/ui/${k}-done.webp" alt="" onerror="this.remove()" style="width:120px;height:90px;object-fit:cover;border-radius:10px;flex:none"><div class="meta" style="margin:0">Предаден на ден ${s.doneAt}. Спечелено: <b style="color:var(--ok)">${f(s.earned || 0)} €</b>.</div></div></div>`;   // снимката — малка, текстът до нея
     h += `<div class="bar" style="margin:6px 0"><i style="width:${(p.done / p.all * 100).toFixed(0)}%;background:#ffb300"></i></div>`;
     legs(m).forEach((l, i) => {
       if (l.works) {
-        const txt = l.done ? '✅ готово' : l.prog != null ? `🏗️ строи се ${Math.floor(l.prog * 100)}%` : `⬜ нови шлюзове · ${f(m.cost)} € · ${m.buildDays} дни`;
+        const txt = l.done ? '✅ готово' : l.prog != null ? `🏗️ строи се ${Math.floor(l.prog * 100)}%${l.pa ? ' · 🤝 от партньора' : ''}` : `⬜ нови шлюзове · ${f(m.cost)} € · ${m.buildDays} дни`;
         h += `<div class="row" style="margin:4px 0"><span class="meta" style="margin:0"><b style="color:var(--txt)">Шлюзовете</b> · ${txt}</span>${s.st === 'active' && l.prog == null ? `<button class="btn" data-mega-works="${k}">🏗️ Започни · ${f(m.cost)} €</button>` : ''}</div>`;
         return;
       }
@@ -150,5 +159,5 @@ export function createMega(deps) {
     return legs(m).filter(l => !l.done).map(l => l.works ? (l.prog == null ? `🏗️ <b>Шлюзовете</b>: натисни „Започни“ (${f(m.cost)} €)` : `🏗️ <b>Шлюзовете</b>: строят се ${Math.floor(l.prog * 100)}% — сами вървят`)
       : l.pct != null ? `🚧 <b>${deps.cityName(l.a)} — ${deps.cityName(l.b)}</b>: строи се ${l.pct}%` : `${m.kind === 'rail' ? '🛤️' : '🛣️'} <b>${deps.cityName(l.a)} — ${deps.cityName(l.b)}</b>: свободен — натисни „Строй“`);
   }
-  return { legs: k => legs(byKey(k)), dailyTick, cardHtml, hint, ask, accept, offer: k => offer(byKey(k)), build, startWorks, state: st, progress, list: MEGA };
+  return { legs: k => legs(byKey(k)), dailyTick, cardHtml, hint, ask, accept, offer: k => offer(byKey(k)), offerJoint, build, startWorks, state: st, progress, list: MEGA };
 }

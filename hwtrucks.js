@@ -28,9 +28,10 @@ export function createHwTrucks(d) {
   // сам избира следващия курс: до твой град по готови участъци, без задръстените; по-далечните — по-често
   function autoTrip(t) {
     const from = t.at || d.here(); t.at = from;
-    const opts = [];
+    const opts = [], ck = feature('tir-cont') && d.contOf ? (t.cont = t.cont || d.contOf(from)) : null;   // tir-cont: ТИР-ът кара само по своя континент
     for (const id of d.owned()) {
       if (!id || id === from) continue;
+      if (ck && d.contOf(id) !== ck) continue;
       const r = route(from, id); if (!r || !r.segs.length) continue;
       if (r.segs.some(s => segLoad(s.id, t) >= TRUCK.cap)) continue;
       const km = r.segs.reduce((a, s) => a + s.km, 0); if (km < TRUCK.minKm) continue;
@@ -42,12 +43,15 @@ export function createHwTrucks(d) {
     Object.assign(t, { a: from, b: o.id, path: o.r.path, segs: o.r.segs, km: 0, total: o.km, cargo: CARGO[Math.floor(Math.random() * CARGO.length)][0] });
     return true;
   }
-  function buy() {
-    const cap = d.cap ? d.cap() : Infinity;   // лимит: 2 на участък магистрала, 4 на участък аутобан (game.js fleetCap)
+  function buy(k) {
+    const p = feature('tir-cont') && d.tirPick ? d.tirPick(k) : null;   // tir-cont: таван по континенти (game.js tirPick) — k е континентът от раздела, без него — сам избира
+    if (p && p.why) { d.toast(p.why, 'bad'); return; }
+    const cap = p ? Infinity : d.cap ? d.cap() : Infinity;   // лимит: 2 на участък магистрала, 4 на участък аутобан (game.js fleetCap)
     if (L().length >= cap) { d.toast(`🚚 Имаш ${L().length}/${cap} ТИР-а — всеки готов участък магистрала дава място за 2, аутобанът — за 4. Построй още пътища.`, 'bad'); return; }
     if (!E().canAfford(TRUCK.cost)) { d.toast(`ТИР струва ${f(TRUCK.cost)} € — нямаш достатъчно.`, 'bad'); return; }
     E().spend(TRUCK.cost, 'покупка', 'ТИР');
     const S = d.S(), t = { id: (S.seq = (S.seq || 1) + 1), nm: `🚚 ТИР №${L().length + 1}`, at: d.here(), path: null, segs: [], km: 0, total: 0, cond: 100, since: S.day, cargo: 'цимент', trips: 0, earned: 0 };
+    if (p) { t.at = p.start; t.cont = p.k; }
     L().push(t); d.sound?.('truckBuy'); d.onBuy?.(t);
     const ok = autoTrip(t); d.save(); d.redraw(); d.renderPanel();
     if (!d.pop || !d.pop('tir-bought', '🚚 Закупихте ТИР!', ok ? `${t.nm} тръгва: ${name(t.a)} → ${name(t.b)} с ${t.cargo}.` : 'Чака готова магистрала до друг твой град.'))
@@ -110,7 +114,9 @@ export function createHwTrucks(d) {
       const svc = lock ? `<button class="btn2" style="flex:1" disabled title="От ниво 6 на развитие">🔒 Обслужи всички · ниво 6</button>`
         : need.length ? `<button class="btn2" data-trk="svcall:0:${sum}" style="flex:1" ${E().canAfford(sum) ? '' : 'disabled'}>🔧 Обслужи всички (${need.length}) · ${f(sum)} €</button>`
         : `<button class="btn2" style="flex:1" disabled>🔧 Обслужи всички · няма нужда</button>`;
-      h += `<div style="display:flex;gap:6px;margin-top:6px"><button class="btn" data-trk="buy" style="flex:1" ${E().canAfford(TRUCK.cost) && L().length < (d.cap ? d.cap() : Infinity) ? '' : 'disabled'} title="Лимит: 2 ТИР-а на участък магистрала, 4 на аутобан">🚚 Купи ТИР · ${f(TRUCK.cost)} €${d.cap ? ` · ${L().length}/${d.cap()}` : ''}</button>${svc}</div></div>`; }
+      const v = feature('tir-cont') && d.tirView ? d.tirView() : null;   // tir-cont: таванът на континента от раздела („Всички“ — общо срещу сбора)
+      if (v) h += `<div style="display:flex;gap:6px;margin-top:6px"><button class="btn" data-trk="buy:${v.k}" style="flex:1" ${E().canAfford(TRUCK.cost) && !v.why ? '' : 'disabled'} title="${v.why || 'Таван по континенти: Европа 60, Африка 50, Америка 60, Азия 50, Австралия 40 — и 2 ТИР-а на участък магистрала, 4 на аутобан там'}">${v.label ? `🚚 Купи ТИР · ${f(TRUCK.cost)} € · ${v.n}/${v.cap} (${v.label})` : `🚚 Купи ТИР · ${f(TRUCK.cost)} € · ${v.n}/${v.cap}`}</button>${svc}</div>${v.why ? `<div class="meta late" style="margin:4px 0 0">${v.why}</div>` : ''}</div>`;
+      else h += `<div style="display:flex;gap:6px;margin-top:6px"><button class="btn" data-trk="buy" style="flex:1" ${E().canAfford(TRUCK.cost) && L().length < (d.cap ? d.cap() : Infinity) ? '' : 'disabled'} title="Лимит: 2 ТИР-а на участък магистрала, 4 на аутобан">🚚 Купи ТИР · ${f(TRUCK.cost)} €${d.cap ? ` · ${L().length}/${d.cap()}` : ''}</button>${svc}</div></div>`; }
     for (const t of T) {
       const svc = svcOf(t), j = t.path ? jam(t) : 1, sell = Math.round(TRUCK.cost * TRUCK.sell * (t.cond ?? 100) / 100);
       h += `<div class="card" style="padding:9px 11px"><b>${t.nm}</b> <span class="meta" style="margin:0">${t.path ? `${cargoOf(t)[1]} ${name(t.path[0])} → ${name(t.path[t.path.length - 1])} · ${Math.round(t.km)}/${Math.round(t.total)} км · ~${f(legPay(t))} €${legToll(t) ? ` − тол ${f(legToll(t))} €` : ''}` : `⏸ чака в ${name(t.at)} — няма готова магистрала до друг твой град`}</span><br>
@@ -122,7 +128,7 @@ export function createHwTrucks(d) {
   function bind(el) {
     el.querySelectorAll('[data-trk]').forEach(b => b.onclick = () => {
       const [c, id, x] = b.dataset.trk.split(':'), t = L().find(q => q.id === +id);
-      if (c === 'buy') return buy();
+      if (c === 'buy') return buy(id || undefined);
       if (c === 'svcall') { const need = L().filter(q => svcOf(q) > 0), sum = need.reduce((a, q) => a + svcOf(q), 0); if (!E().canAfford(sum)) return;
         E().spend(sum, 'заплати', `ТИР-ове: обслужване на ${need.length}`); for (const q of need) q.cond = 100; d.save(); d.renderPanel(); d.toast(`🔧 ${need.length} ТИР-а са като нови.`, 'good'); return; }
       if (!t) return;

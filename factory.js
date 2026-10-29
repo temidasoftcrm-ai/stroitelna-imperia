@@ -28,11 +28,65 @@ export function placeFactories(o) {
     group.add(m); out.push(m); m.updateMatrixWorld(true);
     m.traverse(q => { if (/^Smoke_/.test(q.name)) { const w = q.getWorldPosition(new THREE.Vector3()); smokes.push(plume(THREE, group, tex, w, out)); } });
     const site = yard(THREE, o, M, c, ry, c.route); group.add(site.g); out.push(site.g); if (site.drive) drives.push(site.drive);
+    if (o.zone2) { const sd = siding(THREE, o, G, c, ry); if (sd) { group.add(sd); out.push(sd); c.siding = 1; } const v = visitors(THREE, o, c, ry, c.route); if (v) { group.add(v.g); out.push(v.g); drives.push(v.drive); } }   // 🏭 ind-streets2
     if (o.extra) extras(THREE, o, G, c, ry, out, drives); }
   if (!out.length) return null;
-  return { grid: G, list: out, at: pick.map(c => ({ x: Math.round(c.x), z: Math.round(c.z), under: !!c.route.under, road: Math.round(c.len), end: c.route[c.route.length - 1].map(Math.round) })),
+  return { grid: G, list: out, sdWhy: () => o._sdWhy, railX: o.railX, at: pick.map(c => ({ x: Math.round(c.x), z: Math.round(c.z), under: !!c.route.under, siding: !!c.siding, road: Math.round(c.len), end: c.route[c.route.length - 1].map(Math.round) })),
     update(dt, night) { const t = performance.now() / 1000; for (const b of beacons) b.opacity = t % 1.6 < 0.35 ? 0.12 + 0.88 * night : 0.04 * night;   /* денем — едва */ for (const s of smokes) s(dt, night); for (const d of drives) d(dt); },
     clear() { for (const m of out) m.parent && m.parent.remove(m); } };
+}
+// 🏭 ind-streets2 (T2, координаторът: „жп отклонение до зоната, ако линията е наблизо; камиони и бусове, които завиват от улицата“) — само изглед, без traffic.js:
+// siding — коловоз от линията на града (o.railX, ако дворът е на 20–320 м): отклонение под ъгъл, после направо до рампа за товарене със стоп-буфер,
+//   баласт, траверси (инстанции), две релси и 3 вагона (o.wagon); не минава през парцели и през повече от 2 клетки улица — иначе няма отклонение;
+// visitors — 2–3 камиона/буса идват от улицата по пътя на завода (в дясната си лента), спират на рампата и си отиват; далеч от камерата (o.near) — скрити и спрени
+function siding(THREE, o, G, c, ry) {
+  if (o.railX == null) return null;
+  const cs = Math.cos(ry), sn = Math.sin(ry), W = (u, v) => [c.x + u * cs + v * sn, c.z - u * sn + v * cs], U = FW / 2 + YM + 10, V0 = -FW / 2 - YM - 10, V1 = FW / 2 + APR;
+  let best = null; const tryP = (u, v) => { const [x, z] = W(u, v), d = Math.abs(x - o.railX); if (!best || d < best.d) best = { d, x, z }; };
+  for (let u = -U; u <= U; u += 6) tryP(u, V0); for (let v = V0; v <= V1 - 10; v += 6) { tryP(-U, v); tryP(U, v); }
+  if (!best || best.d > 320 || best.d < 20) { o._sdWhy = 'dist ' + (best && Math.round(best.d)); return null; }
+  const sg = Math.sign(best.x - o.railX), x0 = o.railX + sg * (o.railOff ?? 0), dz = best.z > c.z ? -1 : 1, X1 = x0 + sg * 14, E = [best.x - sg * 2, best.z], R = Math.max(10, Math.min(40, (Math.abs(E[0] - X1) - 12) / 2));
+  const A = [x0, best.z + dz * (R + 100)], D = [X1, best.z + dz * (R + 40)], pts = [A, D];   // стрелката: от коловоза под малък ъгъл, после успоредно, после дъга R към рампата
+  for (let k = 0; k <= 10; k++) { const t = k / 10 * Math.PI / 2; pts.push([X1 + sg * R - sg * R * Math.cos(t), best.z + dz * R - dz * R * Math.sin(t)]); }
+  pts.push(E); let roadN = 0;
+  for (let i = 1; i < pts.length; i++) { const [a, b] = [pts[i - 1], pts[i]], L = Math.hypot(b[0] - a[0], b[1] - a[1]); for (let s = 0; s <= L; s += 4) { const x = a[0] + (b[0] - a[0]) * s / L, z = a[1] + (b[1] - a[1]) * s / L; if (Math.abs(x - o.railX) < 31) continue; if (G.hard(x, z)) { o._sdWhy = 'hard ' + Math.round(x) + ',' + Math.round(z); return null; } if (G.road(x, z)) roadN++; } }
+  if (roadN > 2) { o._sdWhy = 'roads ' + roadN; return null; }
+  const g = new THREE.Group(); g.name = 'indSiding';
+  const ball = new THREE.MeshStandardMaterial({ color: 0x8a8378, roughness: 1 }), wood = new THREE.MeshStandardMaterial({ color: 0xb1aca2, roughness: 0.95 }), steel = new THREE.MeshStandardMaterial({ color: 0x6d6a66, roughness: 0.4, metalness: 0.7 }),
+    conc = new THREE.MeshStandardMaterial({ color: 0x9a978f, roughness: 0.95 }), red = new THREE.MeshStandardMaterial({ color: 0xc62828, roughness: 0.6 }), sl = [];
+  for (let i = 1; i < pts.length; i++) { const [a, b] = [pts[i - 1], pts[i]], L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 0.5) continue; const ang = Math.atan2(b[0] - a[0], b[1] - a[1]), mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
+    const bl = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.12, L + 2), ball); bl.position.set(mx, 0.06, mz); bl.rotation.y = ang; bl.receiveShadow = true; g.add(bl);
+    for (const off of [-0.72, 0.72]) { const r = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.14, L + 0.8), steel); r.position.set(mx + Math.cos(ang) * off, 0.27, mz - Math.sin(ang) * off); r.rotation.y = ang; g.add(r); }
+    for (let s = 0.4; s < L; s += 0.75) sl.push([a[0] + (b[0] - a[0]) * s / L, a[1] + (b[1] - a[1]) * s / L, ang]); }
+  { const im = new THREE.InstancedMesh(new THREE.BoxGeometry(2.6, 0.12, 0.25), wood, sl.length), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
+    sl.forEach(([x, z, a], i) => im.setMatrixAt(i, m4.compose(new THREE.Vector3(x, 0.16, z), q.setFromAxisAngle(up, a), one))); im.receiveShadow = true; g.add(im); }
+  const F = pts[pts.length - 2], L3 = Math.hypot(E[0] - F[0], E[1] - F[1]), ux = (E[0] - F[0]) / (L3 || 1), uz = (E[1] - F[1]) / (L3 || 1), ang3 = Math.atan2(ux, uz), pl = Math.min(34, L3 - 4), side = dz;   // рампата — от страната на завода
+  if (pl > 8) { const b = new THREE.Mesh(new THREE.BoxGeometry(4.5, 1.1, pl), conc); b.position.set(E[0] - ux * (pl / 2 + 2) - uz * 3.4 * side, 0.55, E[1] - uz * (pl / 2 + 2) + ux * 3.4 * side); b.rotation.y = ang3; b.castShadow = b.receiveShadow = true; g.add(b); }
+  { const bs = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.2, 0.6), red); bs.position.set(E[0], 0.7, E[1]); bs.rotation.y = ang3; g.add(bs); }   // стоп-буферът
+  if (o.wagon) { let s = 3; for (let k = 0; k < 3; k++) { const w = o.wagon(k); if (!w) break; const len = w.userData.len || 14; if (s + len > L3 - 2) break; w.position.set(E[0] - ux * (s + len / 2), 0.28, E[1] - uz * (s + len / 2)); w.rotation.y = ang3; w.traverse(m => { if (m.isMesh) m.castShadow = true; }); g.add(w); s += len + 0.8; } }
+  return g;
+}
+function visitors(THREE, o, c, ry, rt) {
+  if (!o.visitor || !rt || rt.length < 2) return null;
+  const cs = Math.cos(ry), sn = Math.sin(ry), W = (u, v) => [c.x + u * cs + v * sn, c.z - u * sn + v * cs], H = FW / 2, gu = -H * 0.35;
+  const path = [W(gu + 3, H + 14), ...rt], segL = path.slice(1).map((p, i) => Math.hypot(p[0] - path[i][0], p[1] - path[i][1])), tot = segL.reduce((a, b) => a + b, 0); if (tot < 20) return null;
+  const g = new THREE.Group(); g.name = 'indVisitors'; const V = []; g.userData.V = V;
+  for (let k = 0; k < 3; k++) { const m = o.visitor(k); if (!m) break; m.visible = false; g.add(m); V.push({ m, s: tot, dir: -1, wait: 15 + k * 22, k }); }   // тръгват от улицата (края на пътя) към рампата
+  if (!V.length) return null;
+  const put = v => { let q = v.s, i = 0; while (i < segL.length - 1 && q > segL[i]) { q -= segL[i]; i++; } const a = path[i], b = path[i + 1], f = Math.min(1, q / (segL[i] || 1)), dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1, d = v.dir < 0 ? -1 : 1, lane = 1.9;
+    v.m.position.set(a[0] + dx * f + (dz / l) * lane * d, 0, a[1] + dz * f - (dx / l) * lane * d); v.m.rotation.y = Math.atan2(dx * d, dz * d); };   // дясната лента спрямо посоката
+  let far = false, chk = 0;
+  const drive = dt => {
+    if ((chk -= dt) <= 0) { chk = 0.5; const f2 = o.near ? !o.near(c.x, c.z) : false; if (f2 !== far) { far = f2; for (const v of V) if (far) v.m.visible = false; } }
+    if (far) return;
+    V.forEach(v => { if (v.wait > 0) { v.wait -= dt; return; }
+      const ahead = V.some(w => w !== v && w.m.visible && w.dir === v.dir && (w.s - v.s) * v.dir > 0 && (w.s - v.s) * v.dir < 16);   // не се качва върху предния
+      if (!ahead) v.s += v.dir * 6 * dt;
+      if (v.s <= 0) { v.s = 0; v.dir = 1; v.wait = 30 + v.k * 6; }   // на рампата — товари
+      else if (v.s >= tot) { v.s = tot; v.dir = -1; v.wait = 25 + Math.random() * 40; v.m.visible = false; return; }   // отиде в града
+      v.m.visible = true; put(v); if (o.spin) o.spin(v.m); });
+  };
+  return { g, drive };
 }
 // растер 4 м на заетото: hard — магистралата (мешовете на изгледа, без трафика), летищният път, групите в o.block, вода, жп ивицата, парцелите;
 // road — улиците на плана (с ширината им). route(gate) — пътят от входа до най-близката улица: направо, ако не минава през hard;

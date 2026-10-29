@@ -11,8 +11,15 @@ import { feature } from './lab/feature.js';
 // 📦 wh-auto-default (T1): автоматичното пълнене е включено по подразбиране във всеки град със склад ниво 2+ (както прави и autoFill() в града);
 // старите записи на другите градове (on: false) се включват веднъж тук — без „🔄 Включи“ във всяка карта; изключване — само в раздел „Склад“ на града
 const WHAD = feature('wh-auto-default'), UIC = feature('ui-cleanup');
+// 🤖 auto-gear (T2, координаторът: „Атина, техника 7, а пише липсва техника“): заетата техника (има я, но работи по друг обект) — „⏳ чака свободна техника“, не „липсва“;
+// наистина липсващия вид автопилотът купува сам (deps.gearAutoBuy: остават поне 50% от парите и 50 000 €, има място в гаража/офиса); бутоните — само ако не е могъл
+const AG = feature('auto-gear');
 const whAutoFix = c => { if (WHAD && c && (c.whLevel || 0) >= 2 && !(c.autoFill && c.autoFill.on)) c.autoFill = { budget: 50000, spent: 0, day: 0, ...(c.autoFill || {}), on: true }; return c; };
-const ZONE_PREF = { house: ['outer', 'mid'], shop: ['mid', 'outer', 'center'], office: ['center', 'mid'], tower: ['center', 'mid'] };
+// 🏁 fin-fix (бъгфикс, винаги): зоните — по „пръстен“ като freeLots() в game.js (lot-zones): плановете v2 дават center / business / residential / industrial / periphery,
+// старите — center / mid / outer. Преди тук бяха само старите имена → в градовете по истинската карта жилищните/бизнес парцелите не получаваха поръчки („строят се 0/4, свободни 20“)
+const RING = { center: 0, business: 1, mid: 1, residential: 2, outer: 2, low: 2, periphery: 3 }, RING_PREF = { house: [2, 3, 1], shop: [1, 2, 0], office: [0, 1, 2], tower: [0, 1] };
+const ringRank = (type, zone) => { const P = RING_PREF[type] || [1, 0, 2], i = P.indexOf(RING[zone] ?? 2); return i < 0 ? P.length : i; };   // извън предпочитаните — най-накрая, но пак може (иначе последните парцели оставаха празни)
+const lotFits = (type, x) => !(x[2] && x[2].length) || x[2].includes(type);   // x = [id, zone, kinds?] — видовете, които парцелът допуска (план v2)
 
 export function createCityPanel(deps) {
   const S = () => deps.S(), f = n => deps.fmt(n);
@@ -40,20 +47,21 @@ export function createCityPanel(deps) {
     const rep = S().rep || 0, tier = deps.cityTier(id);
     if (!c.freeLots && deps.virtFill) deps.virtFill(id, c);   // не си бил тук — свободните парцели се изчисляват без влизане (game.js)
     const fl0 = c.freeLots;
-    const avail = deps.offerTypes().filter(([k, t]) => rep >= t.rep && !(tier === 's' && (k === 'tower' || (k === 'office' && rep < 4))) && !(k === 'tower' && deps.noTower && deps.noTower(id)))
-      .filter(([k]) => !fl0 || fl0.some(x => (ZONE_PREF[k] || ['mid']).includes(x[1])));   // само видове, за които има подходящ свободен парцел (иначе денят спираше без поръчки)
-    if (!avail.length) return null;
+    const avail = deps.offerTypes().filter(([k, t]) => rep >= t.rep && !(tier === 's' && (k === 'tower' || (k === 'office' && rep < 4))) && !(k === 'tower' && deps.noTower && deps.noTower(id)));
+    if (!avail.length || (fl0 && !fl0.length)) return null;
+    { const fit = fl0 ? avail.filter(([k]) => fl0.some(x => ringRank(k, x[1]) < (RING_PREF[k] || [1, 0, 2]).length && lotFits(k, x))) : avail; if (fit.length) avail.splice(0, avail.length, ...fit); }   // първо видовете с подходящ парцел; няма ли — всеки вид (на най-близкия по пръстен)
     const w = avail.map((_, i) => avail.length - i * 0.6);
     let r = Math.random() * w.reduce((a, b) => a + b, 0), type = avail[0][0];
     for (let i = 0; i < avail.length; i++) if ((r -= w[i]) <= 0) { type = avail[i][0]; break; }
     // парцел: от запомнените/изчислените свободни; иначе (мегаполис, в който не си бил) обектът е „на хартия“ (c.autoJobs) — плаща и дава опит,
     // но сградата не се появява на картата на града
-    const pref = ZONE_PREF[type] || ['mid'], fl = c.freeLots;
+    const fl = c.freeLots;
     let lot = null;
     if (fl) {
-      const k = fl.map((x, i) => [i, pref.indexOf(x[1])]).filter(x => x[1] >= 0).sort((a, b) => a[1] - b[1] + (Math.random() - 0.5) * 1.5)[0];
+      const k = fl.map((x, i) => [i, ringRank(type, x[1]) + (lotFits(type, x) ? 0 : 10) + (Math.random() - 0.5) * 0.9]).sort((a, b) => a[1] - b[1])[0];
       if (!k) return null;
       lot = fl.splice(k[0], 1)[0][0];
+      c.freeAll = c.freeV ? fl.length : Math.max(fl.length, (c.freeAll ?? 0) - 1);   // fin-fix: „% застроен“ и remFree() вървят с автопилота (преди freeAll оставаше от деня на напускане)
     }
     const bt = deps.BTYPES[type], lv = devOf(c).lv;
     let reward = deps.ECON.quoteReward(type, rep) * ((c.staff || {}).architect ? 1.1 : 1) * (1 + 0.02 * (lv - 1)), days = bt.days, floors;
@@ -79,6 +87,7 @@ export function createCityPanel(deps) {
     while (busy() < cap(c).proj && guard-- > 0) { const p = newOrder(id, c); if (!p) break; if (p.lot == null) (c.autoJobs = c.autoJobs || []).push(p); else c.projects.push(p); }
     // 3) строеж: техниката на града се дели между обектите по реда на приемане
     const have = {}; for (const t of c.units || []) have[t] = (have[t] || 0) + 1;
+    const own = { ...have };   // auto-gear: колко има градът (have — колко са свободни днес)
     c.gearAdded = {};
     const eng = (c.staff || {}).engineer ? 1.15 : 1;
     for (const p of [...c.projects, ...(c.autoJobs || [])]) {
@@ -87,8 +96,14 @@ export function createCityPanel(deps) {
       let left = 1;
       while (left > 0) {
         const st = deps.BTYPES[p.type].stages[p.stage]; if (!st) break;
-        { const miss = Object.keys(st.need).filter(r => (have[r] || 0) < 1); if (miss.length) { p.waitGear = true; p.waitNeed = miss; break; } }
-        p.waitGear = false;
+        { let miss = Object.keys(st.need).filter(r => (have[r] || 0) < 1);
+          if (AG && miss.length) {
+            for (const r of miss) if (!(own[r] > 0) && deps.gearAutoBuy && deps.gearAutoBuy(r, id)) { own[r] = 1; have[r] = (have[r] || 0) + 1; c.gearAdded[r] = (c.gearAdded[r] || 0) + 1; }
+            miss = Object.keys(st.need).filter(r => (have[r] || 0) < 1);
+            const lack = miss.filter(r => !(own[r] > 0));
+            if (miss.length) { p.waitGear = lack.length > 0; p.waitNeed = lack; p.waitBusy = !lack.length; break; }
+          } else if (miss.length) { p.waitGear = true; p.waitNeed = miss; break; } }
+        p.waitGear = false; p.waitBusy = false;
         p.mat = p.mat || {};
         if (!p.mat[p.stage]) {
           const cost = econ.materialCost(p.type, p.stage, [], {});
@@ -103,6 +118,19 @@ export function createCityPanel(deps) {
         if (!deps.BTYPES[p.type].stages[p.stage]) { finish(id, c, p); break; }
       }
       for (const [r, k] of Object.entries((deps.BTYPES[p.type].stages[p.stage] || { need: {} }).need)) have[r] = Math.max(0, (have[r] || 0) - k);   // заетата техника
+    }
+    // 🤖 auto-gear (флот, потребителят: „да купува бригади и багери сам според гаража … да не ги купуваме постоянно“): само когато обект стои заради вид,
+    // който градът няма (не зает другаде), веднъж на ~10 дни, ако флотът е под 80% от гаража/офиса — допълва до нуждата на текущите етапи (до 4 покупки);
+    // съществуващите (заети, на път, в ремонт) се броят като налични; бюджетът — както при auto-gear (deps.gearAutoBuy)
+    if (AG && deps.gearAutoBuy && deps.gearCaps) {
+      const blocked = [...c.projects, ...(c.autoJobs || [])].some(p => p.waitGear && (p.waitNeed || []).length) || Object.keys(c.gearAdded).length > 0,   /* или днес е купен липсващ вид — тогава веднъж и за успоредната работа */ C2 = deps.gearCaps(id), owned = deps.gearOwned ? deps.gearOwned(id) : (c.units || []);
+      if (blocked && day - (c.agLast ?? -99) >= 10 && owned.length < 0.8 * (C2.crews + C2.mach)) {
+        const cnt = {}; for (const t of owned) cnt[t] = (cnt[t] || 0) + 1;
+        const dem = {}; for (const p of [...c.projects, ...(c.autoJobs || [])]) { if (p.own || p.maint || p.park || p.reno || p.invest || p.remodel || p.demo) continue; const st = deps.BTYPES[p.type]?.stages[p.stage]; if (st) for (const [r, k] of Object.entries(st.need)) dem[r] = (dem[r] || 0) + k; }
+        const want = Object.entries(dem).map(([t, k]) => [t, k - (cnt[t] || 0)]).filter(([, w]) => w > 0).sort((a, b) => (cnt[a[0]] ? 1 : 0) - (cnt[b[0]] ? 1 : 0) || b[1] - a[1]);   // първо липсващите изцяло
+        let n = 0; for (const [t, w] of want) for (let i = 0; i < w && n < 4; i++) { if (!deps.gearAutoBuy(t, id)) break; n++; c.gearAdded[t] = (c.gearAdded[t] || 0) + 1; }
+        if (n) c.agLast = day;
+      }
     }
     // 4) пачките по покривите (от времето, когато беше там) — направо в банката
     if ((c.cash || []).length) { const sum = c.cash.reduce((a, x) => a + (x.amount || 0), 0); if (sum) econ.earn(sum, 'обект', `${deps.cityName(id)}: пари от покривите`); c.cash = []; }
@@ -121,19 +149,21 @@ export function createCityPanel(deps) {
   }
   function dailyTick() {
     const s = S(); if (!s) return;
-    let n = 0, money = 0;
+    let n = 0, money = 0; const bought = [];
     for (const id of deps.ownedCities()) {
       if (id === s.cityId || !auto(id) || deps.isFinished(id)) continue;
       const c = rec(id); if (!c) continue;
       const m0 = deps.econ().s.money; workDay(id, c); money += deps.econ().s.money - m0; n++;
+      if (AG) { const b = Object.entries(c.gearAdded || {}).filter(([t, k]) => k > 0 && deps.ECON.UNIT_TYPES[t]); if (b.length) bought.push(`${deps.cityName(id)}: купи ${b.map(([t, k]) => `${k} × ${deps.ECON.UNIT_TYPES[t].ico} ${deps.ECON.UNIT_TYPES[t].nm.toLowerCase()}`).join(', ')}`); }   // auto-gear: само в дните с покупка
     }
     if (!n) return;
     s.autoWeek = (s.autoWeek || 0) + money;
+    if (bought.length) deps.toast(`🤖 ${bought.join(' · ')}`, 'good', () => deps.openWin());
     if (s.day % 7 === 0) { deps.toast(`🤖 Автопилот (${n} град${n > 1 ? 'а' : ''}): тази седмица ${s.autoWeek >= 0 ? '+' : ''}${f(Math.round(s.autoWeek))} €. Подробности в „🏙️ Градове“.`, 'good', () => deps.openWin()); s.autoWeek = 0; }
   }
   // при напускане на град: свободните парцели за автопилота
   // и празните парцели на купените квартали (fresh) — иначе градът изглежда „готов за завършване“ отвън, а вътре има десетки свободни (freeV: 2 = новото броене)
-  function stash(c, lots) { c.freeLots = lots.filter(l => !l.built && !l.busy).map(l => [l.id, l.zone]); c.freeV = 2; }
+  function stash(c, lots) { c.freeLots = lots.filter(l => !l.built && !l.busy).map(l => l.kinds && l.kinds.length ? [l.id, l.zone, l.kinds] : [l.id, l.zone]); c.freeV = 2; }
 
   // ---- прозорецът
   // „👋 Остави града“: завършеният град изчезва от списъка (продължава да носи пари); S.cpHide = { [id]: денят }
@@ -161,7 +191,7 @@ export function createCityPanel(deps) {
     }
     for (const p of ps.slice(0, 6)) {
       const st = deps.BTYPES[p.type].stages[p.stage], pct = Math.round(((p.stage + Math.min(1, p.prog || 0)) / deps.BTYPES[p.type].stages.length) * 100);
-      const why = p.demo ? ' · 🧱 събаряне' : p.waitGear ? ' · <span class="late">⏸ липсва техника</span>' : p.waitMoney ? ' · <span class="late">⏸ няма пари за материали</span>' : '';
+      const why = p.demo ? ' · 🧱 събаряне' : p.waitGear ? ' · <span class="late">⏸ липсва техника</span>' : AG && p.waitBusy ? ' · <span style="color:var(--mut)">⏳ чака свободна техника</span>' : p.waitMoney ? ' · <span class="late">⏸ няма пари за материали</span>' : '';
       h += `<div class="row" style="margin:3px 0;gap:8px"><span class="meta" style="margin:0;flex:1">${deps.BTYPES[p.type].ico} ${p.title} · ${st ? st.nm : 'готово'}${why}</span><span class="meta" style="margin:0;min-width:40px;text-align:right">${pct}%</span></div>
         <div class="bar" style="height:4px;margin:0 0 2px"><i style="width:${pct}%"></i></div>`;
     }
@@ -171,7 +201,7 @@ export function createCityPanel(deps) {
       const miss = {}; for (const p of ps) if (p.waitGear) for (const t of p.waitNeed || []) miss[t] = (miss[t] || 0) + 1;
       for (const [t, n] of Object.entries(c.gearAdded || {})) if (miss[t]) miss[t] -= n;   // току-що купени или пратени
       const ts = Object.keys(miss).filter(t => miss[t] > 0 && deps.ECON.UNIT_TYPES[t]);
-      if (ts.length) h += `<div class="row" style="margin:6px 0;gap:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0"><span class="late">🚜 Липсва техника:</span></span>${ts.map(t => {
+      if (ts.length) h += `<div class="row" style="margin:6px 0;gap:6px;flex-wrap:wrap;align-items:center"><span class="meta" style="margin:0"><span class="late">🚜 Липсва техника:</span>${AG && auto(id) ? ' <span style="color:var(--mut)">(автопилотът не можа да я купи — гаражът/офисът е пълен или парите се пазят)</span>' : ''}</span>${ts.map(t => {
         const T = deps.ECON.UNIT_TYPES[t], src = deps.gearSrc(t, id), on = deps.gearComing(t, id);
         if (on) return `<span class="meta" style="margin:0;color:#7dd3ff">🚚 ${T.ico} ${T.nm} на път (ден ${on})</span>`;
         return `${src ? `<button class="btn2" data-cpsend="${t}|${id}|${src}" title="Транспорт 10% от цената">🚚 ${T.ico} ${T.nm} от ${deps.cityName(src)}</button>` : ''}<button class="btn" data-cpbuy="${t}|${id}" ${deps.econ().canAfford(T.cost) ? '' : 'disabled'}>🛒 ${T.ico} ${T.nm} · ${f(T.cost)} €</button>`;

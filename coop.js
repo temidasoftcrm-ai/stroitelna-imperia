@@ -11,6 +11,8 @@
 // със същия req_id (без двойно изпращане); при отказ от сървъра се връща обратно.
 import { UNIT_TYPES, MATERIALS } from './economy.js';
 import { feature } from './lab/feature.js';
+import { cleanMega } from './coopmega.js';   // 🤝 coop-mega: общите супер поръчки в снимката — изчистени
+import { cleanPres } from './coopres.js';   // 🌐 coop-pres: президентството на партньора в снимката — изчистено
 import { centerRender } from './coopcenter.js';   // 🤝 „Център на партньорството“ (feature 'coop-center') — новият прозорец
 
 let PCOL = '#2f8cff';   // цветът на партньора: син, а ако твоята марка е синя — оранжев (pickCol)
@@ -39,7 +41,8 @@ function cleanSnap(P) {
     hwDone: arrOf(P.hwDone, idOk, 200), hwJobs: arrOf(P.hwJobs, idOk, 200), rails: arrOf(P.rails, refOk, 200),
     railKm: Object.fromEntries(Object.entries(obj(P.railKm)).filter(([k]) => refOk(k)).slice(0, 200).map(([k, v]) => [k, num(v)])),
     infra: Object.fromEntries(Object.entries(obj(P.infra)).filter(([k, a]) => idOk(k) && Array.isArray(a)).map(([k, a]) => [k, a.slice(0, 3).map(num)])),
-    lv: P.lv == null ? null : num(P.lv), fleet: arrOf(P.fleet, x => x && typeof x === 'object', 300).map(x => ({ ...x, ref: txt(x.ref, 100), cost: num(x.cost), nm: txt(x.nm) })) };
+    fin: arrOf(P.fin, idOk, 300), wonC: arrOf(P.wonC, x => typeof x === 'string' && /^[A-Z]{3}$/.test(x), 100), hwWonC: arrOf(P.hwWonC, x => typeof x === 'string' && /^[\w.-]{1,40}$/.test(x), 300), railsHs: arrOf(P.railsHs, refOk, 200),
+    lv: P.lv == null ? null : num(P.lv), pres: cleanPres(P.pres), mega: cleanMega(P.mega), fleet: arrOf(P.fleet, x => x && typeof x === 'object', 300).map(x => ({ ...x, ref: txt(x.ref, 100), cost: num(x.cost), nm: txt(x.nm) })) };
 }
 // coop_status2: общите строежи, наемите, изненадите, задачите — полетата, които партньорът задава сам
 function cleanSt2(r) {
@@ -98,6 +101,14 @@ export function createCoop(d) {
       railKm: Object.fromEntries(d.rails().slice(0, 200).map(r => [r.ref, r.km])),
       infra: d.infra ? d.infra() : {},   // { град: [гара, летище, пристанище] } — партньорът ги развива заедно с теб
       lv: d.lv ? d.lv() : null,
+      // 🤝 coop-countries: завършените ми градове (общото завладяване на държави) и държавите, чийто +10% доход съм поел аз (wonC — да не се плаща двойно)
+      ...(feature('coop-countries') ? { fin: Object.keys(e.s.finished || {}).slice(0, 300), wonC: Object.keys(S.coopWon || {}).slice(0, 100) } : {}),
+      // 🤝 coop-infra: куестите за обща магистрала/жп, чиято награда съм поел аз (hwWonC — да не се плаща двойно), и моите ⚡ модернизирани линии (Ориент Експрес)
+      ...(feature('coop-infra') ? { hwWonC: Object.keys(S.coopHwWon || {}).slice(0, 300), railsHs: d.rails().filter(r => r.hs).map(r => r.ref).slice(0, 200) } : {}),
+      // 🌐 coop-pres (coopres.js): { pres: { cc, lv, ind, rel, conf, aid, stab, tq } } — без флага е {}
+      ...(d.presSnap ? d.presSnap() : {}),
+      // 🤝 coop-mega (coopmega.js): { mega: { c, rh, w } } — без флага е {}
+      ...(d.megaSnap ? d.megaSnap() : {}),
       fleet: d.fleet ? d.fleet().slice(0, 300) : [] };   // влаковете, корабите и самолетите [{ ref, cost, nm }] — общият флот (флаг coop-fleet)   // нивото на фирмата (неограничено) — общото ниво (флаг coop-lv, devlevel.js)
   }
   // къде строя по градове: текущият град се чете от играта, другите — от последното посещение (localStorage)
@@ -124,7 +135,9 @@ export function createCoop(d) {
     let r;
     try { r = await rpc(op.fn, op.args); } catch (e) {
       if (/coop_limit/.test(e?.message || '')) r = { ok: false, msg: String(e.message).replace(/^.*?coop_limit:\s*/, '') + ' Парите се връщат.' };   // coop_guard (сървърът): над тавана → връщане
-      else if (!/PGRST202|Could not find the function/i.test((e?.message || '') + (e?.code || ''))) return false;   // остава в опашката — ще опита пак
+      else if (!/PGRST202|Could not find the function/i.test((e?.message || '') + (e?.code || ''))) {   // остава в опашката — ще опита пак, но не безкрайно (28.10: coop_send/coop_vault2 → 400 на всеки ~80 ms)
+        op.tries = (op.tries || 0) + 1; if (op.tries < 3) { setPend(pend().map(x => x.args.p_req === op.args.p_req ? { ...x, tries: op.tries } : x)); return false; }
+        console.warn('coop op', op.fn, e?.message || e); r = { ok: false, msg: 'Сървърът не прие операцията (' + String(e?.message || e?.code || 'грешка').slice(0, 80) + ') — парите се връщат.' }; }
       else r = { ok: false, msg: 'Сървърът още не поддържа това — парите се връщат.' };   // старият сървър (без новата функция) → връщане, не вечно чакане
     }
     setPend(pend().filter(x => x.args.p_req !== op.args.p_req));
@@ -204,9 +217,16 @@ export function createCoop(d) {
     const hw = (P.hwDone || []).filter(x => typeof x === 'string' || typeof x === 'number'),
       rails = (P.rails || []).map(r => String(r).split('|')).filter(x => x.length === 2 && x[0] && x[1]),
       cities = (P.cities || []).filter(x => typeof x === 'string'), infra = P.infra && typeof P.infra === 'object' ? P.infra : {}, sig = JSON.stringify([P.name, hw, rails, cities, infra, P.col || null]);
-    if (sig === shareSig) return;
-    shareSig = sig;
-    window.__coopShared = { v: (window.__coopShared?.v || 0) + 1, name: txt(P.name) || 'партньора', hw, rails, cities, infra, col: colOk(P.col) };   // col — цветът на марката му (линиите на картата, флаг coop-col)
+    // 🤝 coop-countries: завършените градове на партньора — САМО познати id-та (cityName връща самото id за непознат град). Списъкът идва от чуждия клиент (сървърът не го проверява):
+    // ползва се само козметично (картата, таблото, попъпа) и за XP; парите (+10% доход, куестите) се дават само на единия — game.js coopLead
+    const known = x => { const n = d.cityName(x); return !!n && n !== x; }, coopC = feature('coop-countries'),
+      fin = coopC ? (P.fin || []).filter(x => typeof x === 'string' && known(x)).slice(0, 300) : [], wonC = coopC ? (P.wonC || []).slice(0, 100) : [];
+    // 🤝 coop-infra: наградите за общите магистрали/жп, поети от партньора (hwWonC), и неговите ⚡ модернизирани линии (railsHs)
+    const coopI = feature('coop-infra'), hwWonC = coopI ? (P.hwWonC || []).slice(0, 300) : [], railsHs = coopI ? (P.railsHs || []).slice(0, 200) : [];
+    const sig2 = sig + JSON.stringify([fin, wonC, coopC ? user?.id || null : null, coopC ? st?.partner?.id || null : null]) + (coopI ? JSON.stringify([hwWonC, railsHs, user?.id || null, st?.partner?.id || null]) : '');
+    if (sig2 === shareSig) return;
+    shareSig = sig2;
+    window.__coopShared = { v: (window.__coopShared?.v || 0) + 1, name: txt(P.name) || 'партньора', hw, rails, cities, infra, col: colOk(P.col), ...(coopC ? { fin, wonC, me: String(user?.id || ''), pid: String(st?.partner?.id || '') } : {}), ...(coopI ? { hwWonC, railsHs, me: String(user?.id || ''), pid: String(st?.partner?.id || '') } : {}) };   // col — цветът на марката му (линиите на картата, флаг coop-col)
     try { d.infraSync && d.infraSync(infra, P.name || 'партньора'); } catch (e) { console.warn('coop infra', e); }
   }
   async function tick() {
@@ -668,5 +688,6 @@ export function createCoop(d) {
   window.__coopDbg = () => ({ partner: st?.partner?.snap?.name, sites: st?.partner?.snap?.sites, marks: lastMarks, here: d.ready() && d.cityId() });
   // нивото на партньора (активно партньорство) — devlevel.js чака него (coop-lv)
   const partnerLv = () => { const P = st?.pair?.status === 'active' ? st?.partner?.snap : null; return P && Number.isFinite(P.lv) ? P.lv : null; };
-  return { tick, state: () => st, partnerLv };
+  // 🌐 coop-pres (coopres.js): моят id, съобщенията и изпращането през съществуващия чат (coop_say)
+  return { tick, state: () => st, partnerLv, me: () => user?.id || null, msgs: () => st2?.messages || [], say: text => rpc('coop_say', { p_text: String(text || '').slice(0, 280) }) };
 }

@@ -177,8 +177,9 @@ export function createIncidents(ctx) {
       const b = ctx.building && ctx.building(at.x, at.z), cl = base(g, R, { len: 14, crowd: 0 }); if (!b) return { smoke: [0, 3, 6], fire: [[0, 1.5, 6, 4]], closure: cl };
       const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, h = b.h, out = [[b.x0 - at.x, 'x0'], [at.x - b.x1, 'x1'], [b.z0 - at.z, 'z0'], [at.z - b.z1, 'z1']].sort((p, q) => q[0] - p[0])[0][1];
       const fp = f => out === 'x0' ? [b.x0 + 0.5, b.z0 + (b.z1 - b.z0) * f] : out === 'x1' ? [b.x1 - 0.5, b.z0 + (b.z1 - b.z0) * f] : out === 'z0' ? [b.x0 + (b.x1 - b.x0) * f, b.z0 + 0.5] : [b.x0 + (b.x1 - b.x0) * f, b.z1 - 0.5];
-      const sz = Math.min(5, 1.8 + h * 0.08), fires = [[0.28, 0.35], [0.7, 0.55], [0.5, 0.78]].map(([f, y]) => { const [x, z] = fp(f); return [x, Math.max(1.4, h * y), z, sz]; });
-      fires.push([cx, h - 0.3, cz, sz * 1.2]);
+      const sz = Math.min(5, 1.8 + h * 0.08), fires = b.fire ? b.fire.map(p => [p[0], p[1], p[2], sz]) : [[0.28, 0.35], [0.7, 0.55], [0.5, 0.78]].map(([f, y]) => { const [x, z] = fp(f); return [x, Math.max(1.4, h * y), z, sz]; });
+      // fire-ruins: градският блок дава точките по истинската фасада и покрива (b.fire / b.roof), иначе — по рамката
+      fires.push(b.roof ? [...b.roof, sz * 1.2] : [cx, h - 0.3, cz, sz * 1.2]);
       const bl = g.worldToLocal(new THREE.Vector3(cx, 0, cz)), s = Math.sign(bl.x) || 1, f1 = K2.put(g, 'ff', 'idle', s * (R.hw - 0.6), -3, bl.x, bl.z), f2 = K2.put(g, 'ff', 'idle', s * (R.hw - 0.4), 3.5, bl.x, bl.z);
       K2.put(g, 'ff', 'talk', -s * 1, 6, 0, 0); K2.crowd(g, 7, -s * (R.hw + R.walk * 0.8), -9, 9, bl.x, bl.z);
       return { smokeW: [cx, h + 1, cz], fireW: fires, hosesW: [[f1, fires[0]], [f2, fires[1]]], closure: cl }; } },
@@ -219,7 +220,7 @@ export function createIncidents(ctx) {
     g.updateMatrixWorld(true);
     const W = v => new THREE.Vector3(...v).applyMatrix4(g.matrixWorld);
     const puffs = [], flames = [];
-    if (fx.smoke || fx.smokeW) { const o = fx.smokeW ? new THREE.Vector3(...fx.smokeW) : W(fx.smoke); for (let k = 0; k < 8; k++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, color: fx.gas ? 0xcfe0c0 : fx.fire || fx.fireW ? 0x333333 : 0x777777, transparent: true, depthWrite: false, opacity: 0 })); s.userData.ph = k / 8; s.userData.o = o; s.userData.big = fx.fire || fx.fireW ? 1.8 : fx.gas ? 0.6 : 1; ctx.scene.add(s); puffs.push(s); } }
+    if (fx.smoke || fx.smokeW) { const o = fx.smokeW ? new THREE.Vector3(...fx.smokeW) : W(fx.smoke); for (let k = 0; k < 8; k++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, color: fx.gas ? 0xcfe0c0 : fx.fire || fx.fireW ? 0x333333 : 0x777777, transparent: true, depthWrite: false, opacity: 0 })); s.userData.ph = k / 8; s.userData.o = o; s.userData.big = fx.fireW ? 3.2 : fx.fire ? 1.8 : fx.gas ? 0.6 : 1; ctx.scene.add(s); puffs.push(s); } }   // пожар в сграда (fireW) — висок стълб дим над покрива (с 1,8 почти не се виждаше)
     for (const sp of fx.smokes || []) { const o = W(sp); for (let k = 0; k < 6; k++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, color: 0x6a6a6a, transparent: true, depthWrite: false, opacity: 0 })); s.userData.ph = k / 6; s.userData.o = o; s.userData.big = 1; ctx.scene.add(s); puffs.push(s); } }   // incidents2: дим от няколко коли
     for (const f of [...(fx.fire || []).map(f => [W(f.slice(0, 3)), f[3]]), ...(fx.fireW || []).map(f => [new THREE.Vector3(...f.slice(0, 3)), f[3]])]) { const o = f[0]; for (let k = 0; k < 3; k++) { const s = feature('fire-real') ? flameSprite() : new THREE.Sprite(new THREE.SpriteMaterial({ map: fireTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); s.userData.flip = feature('fire-real'); s.userData.o = o; s.userData.sz = f[1]; s.userData.ph = k * 2.1; ctx.scene.add(s); flames.push(s); } }
     const cars = [];
@@ -315,7 +316,7 @@ export function createIncidents(ctx) {
     // дим над ударените коли, докато има някой на място
     // дим и пламъци (пожарната ги гаси: след като пристигне, пламъците намаляват)
     const fireOn = !inc.cars.some(c => c.kind === 'fire') ? 1 : Math.max(0, 1 - (inc.hold0 - (inc.hold ?? inc.hold0)) / (inc.hold0 * 0.7));
-    inc.puffs.forEach(s => { const ph = (inc.t * 0.25 + s.userData.ph) % 1, o = s.userData.o, b = s.userData.big; s.position.set(o.x + Math.sin(ph * 9) * 0.6 * b, o.y + ph * 9 * b, o.z + ph * 2); s.scale.setScalar((1.5 + ph * 5) * b); s.material.opacity = inc.leave || inc.towC?.load ? 0 : 0.55 * (1 - ph) * (inc.flames.length ? 0.4 + 0.6 * fireOn : 1); });
+    inc.puffs.forEach(s => { const ph = (inc.t * 0.25 + s.userData.ph) % 1, o = s.userData.o, b = s.userData.big; s.position.set(o.x + Math.sin(ph * 9) * 0.6 * b, o.y + ph * 9 * b, o.z + ph * 2); s.scale.setScalar((1.5 + ph * 5) * b); s.material.opacity = inc.leave || inc.towC?.load ? 0 : (b > 3 ? 0.8 : 0.55) * (1 - ph) * (inc.flames.length ? 0.4 + 0.6 * fireOn : 1); });
     inc.flames.forEach(s => { const o = s.userData.o, f = 0.75 + 0.25 * Math.sin(inc.t * 11 + s.userData.ph) * Math.sin(inc.t * 7.3 + s.userData.ph * 2); s.position.set(o.x + Math.sin(inc.t * 3 + s.userData.ph) * 0.2, o.y + (s.userData.ph % 2) * 0.3, o.z); if (s.userData.flip) { s.position.y -= s.userData.sz * 0.45; flameSize(s, s.userData.sz * (1.3 + 0.2 * f)); } else s.scale.set(s.userData.sz * f * 0.8, s.userData.sz * f * 1.25, 1); s.material.opacity = inc.leave ? 0 : fireOn; });
     // 🚨 incidents2: хората (близо до камерата), кордонът щом екипите пристигнат, маркучите докато гори, пътната помощ след гасенето
     if (inc.fx && K2) {

@@ -2,6 +2,7 @@
  "✨ Ориент Експрес — специална поръчка!": "✨ Orient Express — special order!",
  "Международен консорциум търси фирма за линията {0}. Такава поръчка идва веднъж на милион!": "An international consortium is looking for a company for the {0} line. An order like this comes once in a million!",
  "✨🚂 Специална международна поръчка: „Ориент Експрес“ {0}! Награда {1} €. Отговори до ден {2}.": "✨🚂 Special international order: “Orient Express” {0}! Reward {1} €. Reply by day {2}.",
+ "Ориент Експрес": "Orient Express",
  "✨🚂 Ориент Експрес": "✨🚂 Orient Express",
  "Специална международна поръчка": "Special international order",
  "— идва веднъж на милион.": "— comes once in a million.",
@@ -43,11 +44,13 @@
  "✨🚂 Ориент Експрес {0}": "✨🚂 Orient Express {0}",
  "{0} · награда": "{0} · reward",
  "Предаден на ден {0}. Спечелено от билети:": "Handed over on day {0}. Earned from tickets:",
+ "✅ ⚡ готов · 🤝 построен от партньора": "✅ ⚡ ready · 🤝 built by your partner",
  "✅ ⚡ готов": "✅ ⚡ ready",
  "⬜ няма линия · {0} км · {1} дни": "⬜ no line · {0} km · {1} days",
  "Строй {0} €": "Build {0} €",
  "🚧 строи се {0}% · после ⚡ модернизация": "🚧 under construction {0}% · then ⚡ upgrade",
  "⚡ модернизира се {0}%": "⚡ upgrading {0}%",
+ "🤝 построена от партньора · ⚡ модернизацията е при него": "🤝 built by your partner · ⚡ the upgrade is up to them",
  "🛤️ линията е готова · нужна ⚡ модернизация ({0} дни)": "🛤️ the line is ready · ⚡ upgrade needed ({0} days)",
  "📜 Виж договора": "📜 View the contract"
 }

@@ -34,7 +34,7 @@ export const STATION_LEVELS = [
   { nm: 'Централна гара', cost: 230000, days: 6 },
 ];
 export const TRACK_GAP = 6.5;   // разстояние между коловозите
-const LEN = 1600, SCALE = 2.2, CAR = 6.2;   // коловозите минават от край до край на земята (до 3200 м — и в мегаполисите, където теренът е по-голям)
+const LEN = 1600, SCALE = 2.2, CAR = 6.2; export const STATION_LEN = LEN;   // коловозите минават от край до край на земята (до 3200 м — и в мегаполисите, където теренът е по-голям)
 
 const mat = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, ...o });
 // нощно осветление: светещи лампи (emissive) и светли петна по земята (адитивен кръг с плавен ръб)

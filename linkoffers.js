@@ -14,8 +14,9 @@ export const cityMul = (c, region) => (SIZE_MUL[c.sz || 1] || 1) * (REGION_MUL[r
 export function linkPrices(c, region, portL1, airL1) {
   const k = cityMul(c, region), r = n => Math.round(n / 10000) * 10000;
   return {
-    portLand: r(portL1 * 0.25 * k), portOwn: r(portL1 * (1 + 0.25 * k)), portMuni: r(portL1 * 0.12 * k),
-    airLand: r(airL1 * 0.3 * k), airOwn: r(airL1 * (1 + 0.3 * k)), airMuni: r(airL1 * 0.12 * k),
+    // 29.10 (потребителят): теренът — най-много 30% от строежа (беше ×k: в Берлин 150% → 250 млн. за летище); по-малките градове — по-малко
+    portLand: r(portL1 * 0.3 * Math.min(1, k)), portOwn: r(portL1 * (1 + 0.3 * Math.min(1, k))), portMuni: r(portL1 * 0.12 * k),
+    airLand: r(airL1 * 0.3 * Math.min(1, k)), airOwn: r(airL1 * (1 + 0.3 * Math.min(1, k))), airMuni: r(airL1 * 0.12 * k),
     roadMuni: r(400000 * k), abMuni: r(900000 * k),
   };
 }

@@ -8,8 +8,10 @@ const WORLD = ['newyork', 'losangeles', 'chicago', 'toronto', 'mexicocity', 'rio
 const SEA = ['varna', 'burgas', 'constanta', 'istanbul', 'thessaloniki', 'athens', 'barcelona', 'amsterdam', 'rotterdam', 'newyork', 'losangeles', 'rio', 'buenosaires', 'capetown', 'dubai', 'mumbai', 'singapore', 'hongkong', 'shanghai', 'tokyo', 'sydney'];
 const owned = c => [c.S().hqCity || c.S().cityId, ...(c.S().branches || [])];
 const finished = c => Object.keys((c.econ().s.finished) || {});
+// 🤝 coop-countries: при общо завладяна държава наградата е само за единия партньор (game.js moneyDone); без флага — моите завършени
+const wonDone = c => (c.wonDone && c.wonDone()) || (id => finished(c).includes(id));
 const abDone = c => (c.S().hwDone || []).filter(id => String(id).startsWith('ab:')).length;
-const ab = (c, a, b) => (c.S().hwDone || []).includes(`ab:${[a, b].sort().join('-')}`);
+const ab = (c, a, b) => c.hwHas ? c.hwHas(`ab:${[a, b].sort().join('-')}`) : (c.S().hwDone || []).includes(`ab:${[a, b].sort().join('-')}`);
 const resortsAt = (c, stage) => Object.values(c.S().resorts || {}).filter(r => r && (Array.isArray(stage) ? stage.includes(r.stage) : r.stage === stage)).length;
 const resortExt = c => Object.values(c.S().resorts || {}).reduce((a, r) => a + Object.keys((r && r.ext) || {}).length, 0);
 
@@ -91,9 +93,9 @@ export const EXTRA_CHAPTERS = [
   { id: 'c12', nm: 'Световна империя', ico: '🌐', quests: [
     { id: 'w_fin5', ico: '🏁', nm: 'Пет завършени града', ds: 'Завърши 5 града.', goal: c => [finished(c).length, 5], money: M(10000000) },
     { id: 'w_fin_bg', ico: '🇧🇬', nm: 'Цяла България', ds: 'Завладей България: завърши София, Пловдив, Варна, Бургас, Велико Търново и Благоевград.', goal: c => [['sofia', 'plovdiv', 'varna', 'burgas', 'vt', 'blg'].filter(id => finished(c).includes(id)).length, 6], money: M(15000000) },
-    { id: 'w_won1', ico: '🟩', nm: 'Първа чужда държава', ds: 'Завладей държава извън България (завърши ключовите ѝ градове).', goal: c => [wonCountries(id => finished(c).includes(id)).filter(k => k.iso !== 'BGR').length, 1], money: M(25000000) },
-    { id: 'w_won3', ico: '🗺️', nm: 'Три държави', ds: 'Завладей 3 държави.', goal: c => [wonCountries(id => finished(c).includes(id)).length, 3], money: M(40000000) },
-    { id: 'w_won10', ico: '🌍', nm: 'Десет държави', ds: 'Завладей 10 държави.', goal: c => [wonCountries(id => finished(c).includes(id)).length, 10], money: M(150000000) },
+    { id: 'w_won1', ico: '🟩', nm: 'Първа чужда държава', ds: 'Завладей държава извън България (завърши ключовите ѝ градове).', goal: c => [wonCountries(wonDone(c)).filter(k => k.iso !== 'BGR').length, 1], money: M(25000000) },
+    { id: 'w_won3', ico: '🗺️', nm: 'Три държави', ds: 'Завладей 3 държави.', goal: c => [wonCountries(wonDone(c)).length, 3], money: M(40000000) },
+    { id: 'w_won10', ico: '🌍', nm: 'Десет държави', ds: 'Завладей 10 държави.', goal: c => [wonCountries(wonDone(c)).length, 10], money: M(150000000) },
     { id: 'w_fin_eu', ico: '🇪🇺', nm: 'Завършена европейска столица', ds: 'Завърши град в Европа.', goal: c => [finished(c).filter(id => EU_CAPS.includes(id)).length, 1], money: M(15000000) },
     { id: 'w_auto', ico: '💶', nm: 'Пари, докато спиш', ds: 'Завършените градове да носят 500 000 €/ден.', goal: c => [Object.entries(c.econ().s.finished || {}).reduce((a, [, f]) => a + Math.round(f.daily * (c.econ().maintOf ? c.econ().maintOf(f) : 1)), 0), 500000], money: M(20000000) },
     { id: 'w_fin10', ico: '🌍', nm: 'Десет завършени града', ds: 'Завърши 10 града.', goal: c => [finished(c).length, 10], money: M(30000000) },

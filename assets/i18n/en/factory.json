@@ -1,0 +1,3 @@
+{
+ "{ vec3 tx = texture2D(emissiveMap, vEmissiveMapUv).rgb; vec3 wN = inverseTransformDirection(normal, viewMatrix); float lum = dot(tx, vec3(0.333)); float m = step(abs(wN.y), 0.5) * step(tx.r * 2.5 + 0.01, tx.b) * step(tx.g * 1.5, tx.b) * (1.0 - smoothstep(0.03, 0.06, lum)); /* само най-тъмното синьо стъкло */ totalEmissiveRadiance = (vec3(1.0, 0.74, 0.42) * m + tx * vec3(1.0, 0.85, 0.65) * 0.3) * emissive.r; }": ""
+}

@@ -74,7 +74,8 @@
  "{0} · награда": "{0} · reward",
  "Предаден на ден {0}. Спечелено:": "Handed over on day {0}. Earned:",
  "✅ готово": "✅ done",
- "🏗️ строи се {0}%": "🏗️ under construction {0}%",
+ "· 🤝 от партньора": "· 🤝 by your partner",
+ "🏗️ строи се {0}%{1}": "🏗️ under construction {0}%{1}",
  "⬜ нови шлюзове · {0} € · {1} дни": "⬜ new locks · {0} € · {1} days",
  "🏗️ Започни · {0} €": "🏗️ Start · {0} €",
  "Шлюзовете": "The locks",
@@ -88,5 +89,8 @@
  ": натисни „Започни“ ({0} €)": ": press “Start” ({0} €)",
  ": строят се {0}% — сами вървят": ": {0}% under construction — progressing on their own",
  ": строи се {0}%": ": {0}% under construction",
- ": свободен — натисни „Строй“": ": free — press “Build”"
+ ": свободен — натисни „Строй“": ": free — press “Build”",
+ "_stale": {
+  "🏗️ строи се {0}%": "🏗️ under construction {0}%"
+ }
 }

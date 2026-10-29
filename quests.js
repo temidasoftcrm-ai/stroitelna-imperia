@@ -116,11 +116,13 @@ export function createQuests(deps) {
   const allEstates = () => { const s = S(); return [s.estate, ...Object.values(s.cities || {}).map(c => c.estate)].filter(Boolean); };
   const hwDone = () => S().hwDone || [];
   const hwSegs = () => HIGHWAYS.flatMap(h => h.segs.map((sg, i) => ({ id: `${h.id}-${i}`, a: sg[0], b: sg[1] })));
-  function hwConnected(a, b) {
-    const done = hwSegs().filter(s => hwDone().includes(s.id)), seen = new Set([a]), q = [a];
-    while (q.length) { const c = q.shift(); if (c === b) return true; for (const s of done) { const n = s.a === c ? s.b : s.b === c ? s.a : null; if (n && !seen.has(n)) { seen.add(n); q.push(n); } } }
-    return false;
+  // пътят по готовите участъци (list — моите или общите с партньора): id-тата на участъците по него или null
+  function hwPath(a, b, list = hwDone()) {
+    const done = hwSegs().filter(s => list.includes(s.id)), prev = new Map([[a, null]]), q = [a];
+    while (q.length) { const c = q.shift(); if (c === b) { const ids = []; for (let k = b; prev.get(k); k = prev.get(k)[0]) ids.push(prev.get(k)[1]); return ids; } for (const s of done) { const n = s.a === c ? s.b : s.b === c ? s.a : null; if (n && !prev.has(n)) { prev.set(n, [c, s.id]); q.push(n); } } }
+    return null;
   }
+  const hwConnected = (a, b) => !!hwPath(a, b);
   const ctx = {
     money: () => deps.econ().money,
     deposit: () => deps.econ().s.deposit || 0,
@@ -128,6 +130,7 @@ export function createQuests(deps) {
     firstPct: () => deps.firstPct ? deps.firstPct() : 0,
     S: () => S(),
     econ: () => deps.econ(),
+    wonDone: () => deps.wonDone ? deps.wonDone() : null,   // 🤝 coop-countries: кои градове броят за завладяна държава при парите (game.js moneyDone); null — само моите
     rep: () => S().rep || 0,
     done: () => S().done || 0,
     max: key => Math.max(0, ...cityVals(key)),
@@ -144,15 +147,74 @@ export function createQuests(deps) {
     trains: () => (S().trains || []).length,
     factoryLink: () => deps.connectedCities().some(id => (deps.factories || []).some(f => f.cityId === id)),
     hwSegs: () => hwDone().length,
+    hwHas: id => hwDone().includes(id),
     hwFull: id => HIGHWAYS.find(h => h.id === id).segs.every((_, i) => hwDone().includes(`${id}-${i}`)),
     hw: hwConnected,
     toll: () => deps.toll ? deps.toll() : 0,
     resorts: () => Object.values(S().resorts || {}).filter(r => r && r.stage).length,
     resortsBuilt: () => Object.values(S().resorts || {}).filter(r => r && (r.stage === 'built' || r.stage === 'sold')).length,
   };
-  function progress(q) {
-    const [cur, tgt] = Array.isArray(q.goal) ? [stat(q.goal[0]), q.goal[1]] : q.goal(ctx);
+  function evalQ(q, c) {
+    const [cur, tgt] = Array.isArray(q.goal) ? [stat(q.goal[0]), q.goal[1]] : q.goal(c);
     return { cur: Math.min(cur, tgt), tgt, ok: cur >= tgt };
+  }
+  // 🤝 coop-infra (Лаборатория): магистралите и жп линиите на двамата партньори са една мрежа — напредъкът на куестите се брои по общата мрежа (deps.coopJ, game.js),
+  // но наградата за куест, изпълнен само заедно, получава единият: този, построил повече от участъците/линиите, които куестът брои (при равенство — по-малкото user id);
+  // веднъж поета — остава (S.coopHwWon → hwWonC в снимката на coop.js), а другият го отбелязва без пари (qs().coopNo). Изпълнен изцяло от теб — наградата си е твоя, както преди.
+  const coopJ = () => deps.coopJ ? deps.coopJ() : null;
+  const edgeK = (a, b) => a < b ? `${a}|${b}` : `${b}|${a}`;
+  const railEdgesOf = rails => rails.filter(r => r.built).flatMap(r => r.c ? [[r.a, r.b], [r.a, r.c]] : [[r.a, r.b]]);
+  const ownedIds = () => [S().hqCity || S().cityId, ...(S().branches || [])];
+  function pathOn(edges, a, b) {
+    if (a === b) return [a];
+    const adj = new Map(), add = (x, y) => { if (!adj.has(x)) adj.set(x, []); adj.get(x).push(y); };
+    for (const [x, y] of edges) { add(x, y); add(y, x); }
+    const prev = new Map([[a, null]]), q = [a];
+    for (let i = 0; i < q.length; i++) for (const n of adj.get(q[i]) || []) if (!prev.has(n)) { prev.set(n, q[i]); if (n === b) { const p = [b]; for (let k = b; prev.get(k) != null;) { k = prev.get(k); p.unshift(k); } return p; } q.push(n); }
+    return null;
+  }
+  // само моите линии — „изпълних го сам“
+  const ctxOwn = { ...ctx, rail: (a, b) => (pathOn(railEdgesOf(S().rails || []), a, b) || []).length > 1, railToOwned: id => { const e = railEdgesOf(S().rails || []); return ownedIds().some(c => c !== id && (pathOn(e, c, id) || []).length > 1); } };
+  // общата мрежа: моите участъци и линии + тези на партньора; rec — кои участъци/линии е погледнал куестът (за „кой е построил повече“)
+  let jKey = '', jS = null, jHw = [], jRails = [], jProxy = null, rec = null;
+  function joint(J) {
+    const s = S(), k = `${J.v}|${(s.hwDone || []).length}|${(s.rails || []).length}|${(s.rails || []).filter(r => r.built).length}`;
+    if (k === jKey && s === jS) return;
+    jKey = k; jS = s; jHw = [...new Set([...(s.hwDone || []), ...J.hw])];
+    const have = new Set(railEdgesOf(s.rails || []).map(([a, b]) => edgeK(a, b)));
+    jRails = [...(s.rails || []), ...J.rails.filter(([a, b]) => !have.has(edgeK(a, b))).map(([a, b]) => ({ a, b, built: true, coop: true }))];
+    jProxy = Object.create(s, { hwDone: { get: () => { if (rec) rec.hwAll = true; return jHw; } }, rails: { get: () => { if (rec) rec.railAll = true; return jRails; } } });
+  }
+  const ctxJ = { ...ctx, S: () => jProxy,
+    rails: () => { if (rec) rec.railAll = true; return jRails.filter(r => r.built).length; },
+    railCities: () => { if (rec) rec.railAll = true; return new Set(jRails.filter(r => r.built).flatMap(r => [r.a, r.b])).size; },
+    rail: (a, b) => { const p = deps.railPath(a, b); if (!p || p.length < 2) return false; if (rec) for (let i = 1; i < p.length; i++) rec.rail.add(edgeK(p[i - 1], p[i])); return true; },
+    railToOwned: id => ownedIds().some(c => c !== id && ctxJ.rail(c, id)),
+    hwSegs: () => { if (rec) rec.hwAll = true; return jHw.length; },
+    hwHas: id => { if (rec) rec.hw.add(id); return jHw.includes(id); },
+    hwFull: id => { const ids = HIGHWAYS.find(h => h.id === id).segs.map((_, i) => `${id}-${i}`); if (rec) ids.forEach(x => rec.hw.add(x)); return ids.every(x => jHw.includes(x)); },
+    hw: (a, b) => { const p = hwPath(a, b, jHw); if (p && rec) p.forEach(x => rec.hw.add(x)); return !!p; } };
+  function progress(q) {
+    const J = !Array.isArray(q.goal) && coopJ();
+    if (!J) return evalQ(q, ctx);
+    joint(J); return evalQ(q, ctxJ);
+  }
+  function coopLead(q, J) {
+    const mine = !!(S().coopHwWon || {})[q.id], his = J.won.includes(q.id);
+    if (mine && his) return J.lower;
+    if (mine || his) return mine;
+    joint(J); rec = { hw: new Set(), rail: new Set(), hwAll: false, railAll: false }; let t;
+    try { q.goal(ctxJ); } finally { t = rec; rec = null; }
+    const oh = new Set(S().hwDone || []), ph = new Set(J.hw), oe = new Set(railEdgesOf(S().rails || []).map(([a, b]) => edgeK(a, b))), pe = new Set(J.rails.map(([a, b]) => edgeK(a, b)));
+    const cnt = (set, all, items) => all ? set.size : [...items].filter(x => set.has(x)).length;
+    const me = cnt(oh, t.hwAll, t.hw) + cnt(oe, t.railAll, t.rail), pa = cnt(ph, t.hwAll, t.hw) + cnt(pe, t.railAll, t.rail);
+    return me > pa || (me === pa && J.lower);
+  }
+  // null — наградата е моя както преди; иначе { pay, J } — куестът е изпълнен само заедно с партньора
+  function coopShare(q) {
+    const J = !Array.isArray(q.goal) && coopJ();
+    if (!J || evalQ(q, ctxOwn).ok) return null;
+    return { pay: coopLead(q, J), J };
   }
   const claimed = q => !!qs().claimed[q.id];
   function chapterOpen(i) {
@@ -166,11 +228,16 @@ export function createQuests(deps) {
   function claim(id) {
     const q = CHAPTERS.flatMap(c => c.quests).find(x => x.id === id);
     if (!q || claimed(q) || !progress(q).ok) return;
+    const sh = coopShare(q);
     qs().claimed[q.id] = S().day;
-    deps.econ().earn(q.money, 'друго', `Куест: ${q.nm}`);
+    if (sh && sh.pay) S().coopHwWon = { ...(S().coopHwWon || {}), [q.id]: 1 };
+    if (sh && !sh.pay) qs().coopNo = { ...(qs().coopNo || {}), [q.id]: 1 };
+    if (!sh || sh.pay) deps.econ().earn(q.money, 'друго', `Куест: ${q.nm}`);
     if (deps.onClaim) deps.onClaim(q);
-    deps.sound('cash');
-    deps.toast(`🎯 ${q.nm}: +${deps.fmt(q.money)} €`, 'good');
+    deps.sound(!sh || sh.pay ? 'cash' : 'done');
+    if (!sh) deps.toast(`🎯 ${q.nm}: +${deps.fmt(q.money)} €`, 'good');
+    else if (sh.pay) deps.toast(`🎯🤝 ${q.nm} — завършен заедно с ${sh.J.name}: +${deps.fmt(q.money)} € (наградата е за теб — построил си повече)`, 'good');
+    else deps.toast(`🤝 ${q.nm} — завършен заедно с ${sh.J.name}. Наградата (${deps.fmt(q.money)} €) получава ${sh.J.name} — построил е повече.`, 'good');
     const ci = CHAPTERS.findIndex(c => c.quests.includes(q));
     if (CHAPTERS[ci + 1] && chapterOpen(ci + 1) && !qs()['open_' + (ci + 1)]) {
       qs()['open_' + (ci + 1)] = true;
@@ -231,6 +298,7 @@ export function createQuests(deps) {
   btn.onclick = () => { if (!S()) return; panel.classList.toggle('hidden'); render(); };
   panel.querySelector('#qClose').onclick = () => panel.classList.add('hidden');
 
+  const claimBtn = q => { const sh = coopShare(q); return sh && !sh.pay ? `<button class="btn2" data-claim="${q.id}" title="Изпълнен заедно — наградата получава ${sh.J.name}, построил е повече">🤝 Отбележи · наградата е за ${sh.J.name}</button>` : `<button class="btn" data-claim="${q.id}">${sh ? '🤝 ' : ''}Вземи наградата</button>`; };
   const fmtN = (v, tgt) => tgt >= 1000 ? `${deps.fmt(v)} / ${deps.fmt(tgt)}` : `${Math.floor(v * 100) / 100} / ${tgt}`;
   function render() {
     if (panel.classList.contains('hidden') || !S()) return;
@@ -243,7 +311,7 @@ export function createQuests(deps) {
       CHAPTERS.forEach(c => {
         const qq = c.quests.filter(claimed); if (!qq.length) return;
         h += `<div class="qch"><span>${c.ico} ${c.nm}</span><span>${qq.length}/${c.quests.length}</span></div>`;
-        for (const q of qq) h += `<div class="qc done"><div class="qi">${q.ico}</div><div class="qn">${q.nm}</div><div class="qr">+${deps.fmt(q.money)} €</div><div class="qd">${q.ds}</div><div class="qp"><span>✅ Изпълнен</span></div></div>`;
+        for (const q of qq) h += `<div class="qc done"><div class="qi">${q.ico}</div><div class="qn">${q.nm}</div><div class="qr">${(qs().coopNo || {})[q.id] ? '🤝' : `+${deps.fmt(q.money)} €`}</div><div class="qd">${q.ds}</div><div class="qp"><span>✅ Изпълнен${(qs().coopNo || {})[q.id] ? ' · 🤝 наградата получи партньорът' : ''}</span></div></div>`;
       });
       if (!h) h = '<div class="meta" style="padding:14px">Още няма изпълнени куести.</div>';
     } else CHAPTERS.forEach((c, i) => {
@@ -258,7 +326,7 @@ export function createQuests(deps) {
         const p = progress(q), done = claimed(q);
         h += `<div class="qc ${done ? 'done' : p.ok ? 'ok' : ''}"><div class="qi">${q.ico}</div><div class="qn">${q.nm}</div><div class="qr">+${deps.fmt(q.money)} €</div><div class="qd">${q.ds}</div>
           ${done ? '' : `<div class="qbar"><i style="width:${(p.cur / p.tgt * 100).toFixed(1)}%"></i></div>`}
-          <div class="qp"><span>${done ? '✅ Изпълнен' : fmtN(p.cur, p.tgt)}</span>${!done && p.ok ? `<button class="btn" data-claim="${q.id}">Вземи наградата</button>` : ''}</div></div>`;
+          <div class="qp"><span>${done ? '✅ Изпълнен' : fmtN(p.cur, p.tgt)}</span>${!done && p.ok ? claimBtn(q) : ''}</div></div>`;
       }
     });
     const list = panel.querySelector('#qList');
@@ -289,5 +357,7 @@ export function createQuests(deps) {
     else if (evt === 'buy') { inc('buy'); inc('buy_' + data.type); }
     else inc(evt);   // reno, invest, sold, delivery
   }
-  return { emit, tick, render, claim, open: () => { panel.classList.remove('hidden'); render(); }, ready, chapters: CHAPTERS };
+  // 🤝 coop-infra: за теста в Лабораторията (game.js __dbg.coopInfraDemo)
+  const coopInfo = id => { const q = CHAPTERS.flatMap(c => c.quests).find(x => x.id === id); if (!q) return null; const sh = coopShare(q); return { p: progress(q), own: evalQ(q, ctxOwn), share: sh ? { pay: sh.pay } : null, claimed: claimed(q) }; };
+  return { emit, tick, render, claim, open: () => { panel.classList.remove('hidden'); render(); }, ready, chapters: CHAPTERS, coopInfo };
 }

@@ -3,10 +3,11 @@
 <h1>🎵 Фонова музика — избери</h1><p>Всички са Pixabay Content License (безплатни, и за реклами). Кажи на f1 кои харесваш — напр. „city-2, work-1, menu-1“.</p>
 <div id="L"></div>
 <script>
-const G={'🏙️ Спокойна — в града':[['city-1','City streets / Lofi — LofCosmos'],['city-2','Rainy Lofi City — Lofi_Music_Library'],['city-3','Smooth LoFi Beat — JorisVermeer']],
-'💼 Динамична — когато се строи/работи':[['work-1','Upbeat Happy Corporate — kornevmusic'],['work-2','Upbeat Corporate — The_Mountain'],['work-3','Happy Corporate — AtlasAudio']],
-'🎬 Меню / картата':[['menu-1','Inspiring Cinematic Music — Tunetank'],['menu-2','Inspiring Epic — NastelBom']],
-'☀️ Весела (по избор)':[['sunny-1','Happy Ukulele — AtlasAudio'],['sunny-2','Ukulele Upbeat Pop Rock — ikoliks']]};
+const G={'🏙️ Спокойна — в града':[['city-1','City streets / Lofi — LofCosmos'],['city-2','Rainy Lofi City — Lofi_Music_Library'],['city-3','Smooth LoFi Beat — JorisVermeer'],['city-4','Lo-Fi Chillhop — AtlasAudio'],['city-5','Chillhop mix — alphaproxy'],['city-6','Tokyo City Rain — lofidreams'],['city-7','Piano Jazz - Rainy Night Music — alex-morgan']],
+'💼 Динамична — когато се строи/работи':[['work-1','Upbeat Happy Corporate — kornevmusic'],['work-2','Upbeat Corporate — The_Mountain'],['work-3','Happy Corporate — AtlasAudio'],['work-4','Positive Energy — AtlasAudio'],['work-5','Corporate Upbeat — The_Mountain']],
+'🎬 Меню / картата':[['menu-1','Inspiring Cinematic Music — Tunetank'],['menu-2','Inspiring Epic — NastelBom'],['menu-3','Inspiring Piano Cinematic Trailer — Kulakovka']],
+'☀️ Весела (по избор)':[['sunny-1','Happy Ukulele — AtlasAudio'],['sunny-2','Ukulele Upbeat Pop Rock — ikoliks']],
+'🌙 Нощ (с city)':[['night-1','Night Dream - Piano — eritnhut1992']]};
 let h='';for(const[g,a]of Object.entries(G)){h+=`<h2>${g}</h2>`;for(const[k,n]of a)h+=`<div class="t"><b>${k}</b><span>${n}</span><audio controls preload="none" src="../_source/downloads/music-candidates/${k}.mp3"></audio></div>`}
 document.getElementById('L').innerHTML=h;
 document.addEventListener('play',e=>{for(const x of document.querySelectorAll('audio'))if(x!==e.target)x.pause()},true);

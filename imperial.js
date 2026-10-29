@@ -198,14 +198,18 @@ export function createImperial(deps) {
   const progress = lv => { const m = st(); if (!m) return ''; const s = stats(); if ((m.lv || 0) >= lv) return '✅'; return NEED[lv] ? `${NEED[lv]}${s ? ` · сега: ${f(s.pop)} души, жилища ${(s.vac * 100).toFixed(0)}%, безработица ${(s.unemp * 100).toFixed(0)}%, услуги ${Math.round(s.svc * 100)}%, транспорт ${Math.round(s.k.transport * 100)}%, ${m.streak || 0}/6 месеца` : ''}` : ''; };
 
   // ---- 🗳️ изборът на държава (веднъж, при основаването; старите записи — веднъж след зареждане)
+  // 🌐 coop-pres: deps.taken() → { cc, name } — държавата, която партньорът вече е избрал; тогава се предлага само другата
   function choose(then) {
-    const card = k => { const c = IMP_CC[k]; return `<div style="flex:1 1 240px;border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:10px;background:rgba(255,255,255,.04)"><img src="assets/ui/imp-${k.toLowerCase()}.webp" alt="" onerror="this.remove()" style="width:100%;border-radius:8px;margin:0 0 6px"><h3 style="margin:0 0 6px">${c.cc} ${c.nm}</h3>
+    const tk = deps.taken ? deps.taken() : null;
+    const card = k => { const c = IMP_CC[k]; if (tk && tk.cc === k) return `<div style="flex:1 1 240px;border:1px dashed rgba(255,255,255,.25);border-radius:12px;padding:10px;background:rgba(255,255,255,.02);opacity:.75"><h3 style="margin:0 0 6px">🔒 ${c.cc} ${c.nm}</h3><div class="meta" style="margin:3px 0;color:#ffb347">${c.cc} ${c.nm} е избрана от партньора ${tk.name}</div><div class="meta" style="margin:3px 0">В партньорство всеки е президент на различна държава — заедно водите мира и договорите на „🌐 Срещата на върха“.</div></div>`; return `<div style="flex:1 1 240px;border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:10px;background:rgba(255,255,255,.04)"><img src="assets/ui/imp-${k.toLowerCase()}.webp" alt="" onerror="this.remove()" style="width:100%;border-radius:8px;margin:0 0 6px"><h3 style="margin:0 0 6px">${c.cc} ${c.nm}</h3>
       <div class="meta" style="margin:3px 0"><b style="color:var(--txt)">Визия:</b> ${c.vision}</div><div class="meta" style="margin:3px 0"><b style="color:var(--txt)">Предизвикателства:</b> ${c.hard}</div><div class="meta" style="margin:3px 0"><b style="color:var(--txt)">Икономика:</b> ${c.econ}</div><div class="meta" style="margin:3px 0"><b style="color:var(--txt)">Следваща глава:</b> ${c.next}</div></div>`; };
     deps.modal('🏙️ Къде ще бъде твоят град?', `<div style="display:flex;gap:10px;flex-wrap:wrap">${card('US')}${card('RU')}</div><div class="meta" style="margin:10px 0 0;color:#ffd54a">⚠️ Този избор определя държавата за бъдещата ти президентска кампания. После не може да се смени. И в двете държави развиваш всички основни отрасли.</div>`,
-      [['По-късно', null], ['🇷🇺 Русия', () => pick('RU', then)], ['🇺🇸 САЩ', () => pick('US', then)]]);
+      [['По-късно', null], ...[['🇷🇺 Русия', () => pick('RU', then)], ['🇺🇸 САЩ', () => pick('US', then)]].filter((b, i) => !tk || tk.cc !== ['RU', 'US'][i])]);
   }
   function pick(cc, then) {
-    const S = deps.S(); S.imp = S.imp || { b: {}, z: {}, zr: [], pop: 0, sat: 70, hist: [], streak: 0 }; if (S.imp.cc) return; S.imp.cc = cc;
+    const S = deps.S(); S.imp = S.imp || { b: {}, z: {}, zr: [], pop: 0, sat: 70, hist: [], streak: 0 }; if (S.imp.cc) return;
+    const tk = deps.taken ? deps.taken() : null; if (tk && tk.cc === cc) { deps.toast && deps.toast(`${IMP_CC[cc].cc} ${IMP_CC[cc].nm} е избрана от партньора ${tk.name}.`, 'bad'); return; }
+    S.imp.cc = cc;
     deps.relocate && deps.relocate(cc); deps.save(); then && then(); levels();
   }
   const needChoice = () => !!deps.S()?.neom && !deps.S()?.imp?.cc;

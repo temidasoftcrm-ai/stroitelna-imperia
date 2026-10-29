@@ -70,7 +70,7 @@ function crossingRoad(g, c, half) {
     if (c.median > 0.5) flat(M.grass, L, c.median, xm, 0, 0.06);
     for (const k of [-1, 1]) { flat(M.line, L, 0.15, xm, k * (w / 2 - 0.4), 0.065); const sw = new THREE.Mesh(new THREE.BoxGeometry(L, 0.16, 2.2), M.walk); sw.position.set(xm, 0.08, k * (w / 2 + 1.1)); sw.receiveShadow = true; g.add(sw); }
     for (let t = 2; t < L - 2; t += 6) for (const k of c.median > 0.5 ? [-1, 1] : [0]) flat(M.line, 3, 0.15, x0 + s * t + s * 1.5, k ? k * (c.median / 2 + (w - c.median) / 4) : 0, 0.065);   // прекъснатата линия по средата на платното
-    const b = endBarrier(w); b.position.set(s * (half + L - 1), 0, 0); b.rotation.y = Math.PI / 2; g.add(b);
+    if (!c.noEnd) { const b = endBarrier(w); b.position.set(s * (half + L - 1), 0, 0); b.rotation.y = Math.PI / 2; g.add(b); }   // noEnd — пътят продължава (giza2: към платото)
   }
 }
 // 🌊 (rail-causeway) каменен насип под коловозите над водата: трапец (горе — ширината на снопа + 3 м от всяка страна, откосите надолу под водата),

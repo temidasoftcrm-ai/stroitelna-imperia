@@ -591,6 +591,7 @@ GLB_LM.brandenburg2 = { ...GLB_LM.brandenburg2, file: 'brandenburg3', fit: 25.8 
 if (feature('lm-ndk')) { GLB_LM.ndk = { h: 15, fit: 41.7, plate: 0xbdb8ae, floodK: 1.6 }; LANDMARK_NM.ndk = 'Национален дворец на културата (НДК)'; }
 const EM_KEEP = /^(radiocity2|lv[a-z0-9]*|bellagio|luxor|vegassign)$/;   // нарочните нощни карти (неон, надписи)
 const glbCache = {};
+export const preloadLm = kind => { if (GLB_LM[kind]) loadLm(kind); };   // 🇸🇬 тежкият модел — още при влизането в града (Марина Бей Сандс: заместителят стоеше ~30 s)
 // нощно златисто осветяване на модел-забележителност: emissive = цвят, emissiveMap = текстурата; играта ги пали нощем (window.__lmNight)
 // хълмът на Акропола: елипсовидно плато (дългата ос — z), стръмни скалисти склонове, долу — зеленина (маслини, храсти); единиците — на модела (1 = 1,23 м)
 function acropolisHill() {

@@ -451,7 +451,7 @@ export function createPresidency(deps) {
   const bar = (v, col) => `<div class="bar"><i style="width:${Math.round(v)}%;background:${col || (v >= 60 ? '#3fae6b' : v >= 40 ? '#ffd54a' : '#ff6b6b')}"></i></div>`;
   async function render() {
     if (!el) return; const s = st(), flag = s.cc === 'RU' ? '🇷🇺' : '🇺🇸', ps = proposals();
-    let h = `<div class="tb"><h2>${flag} Президентът · ${s.cc === 'RU' ? 'Кремъл' : 'Белият дом'} <span class="m">ниво ${s.lv}</span></h2>${[['state', '🏛️ Държава'], ['world', '🌍 Свят']].map(([k, t]) => `<button data-pt="${k}" class="${tab === k ? 'on' : ''}">${t}</button>`).join('')}<button data-pcab="1" class="y">📋 ${tr(s.cc === 'RU' ? 'Министерски съвет' : 'Кабинет на САЩ')} (${ps.length})</button>${s.finale ? '<button data-pend="1">🏁 Финалът</button>' : ''}<button data-px="1">✕</button></div><div class="bd">`;
+    let h = `<div class="tb"><h2>${flag} Президентът · ${s.cc === 'RU' ? 'Кремъл' : 'Белият дом'} <span class="m">ниво ${s.lv}</span></h2>${[['state', '🏛️ Държава'], ['world', '🌍 Свят']].map(([k, t]) => `<button data-pt="${k}" class="${tab === k ? 'on' : ''}">${t}</button>`).join('')}<button data-pcab="1" class="y">📋 ${tr(s.cc === 'RU' ? 'Министерски съвет' : 'Кабинет на САЩ')} (${ps.length})</button>${s.finale ? '<button data-pend="1">🏁 Финалът</button>' : ''}${deps.summitBtn ? deps.summitBtn() : ''}<button data-px="1">✕</button></div><div class="bd">`;
     if (tab === 'state') {
       { const d = day(), left = Math.max(0, TERM - (d - (s.termStart ?? s.start))), ncP = ps.filter(p => p.kind === 'nc');   /* 🗳️ мандатът и вотът на недоверие */
         h += `<div class="cd"${s.nc || s.lowT ? ' style="border-color:#ff6b6b"' : ''}><b>🗓️ ${tr('Мандат {0} от {1}', [s.term || 1, MAX_TERMS])}</b><div class="m">${s.reel ? tr('🗳️ Изборите за втори мандат — кампанията тече.') : tr('До края на мандата: {0} дни', [left])}</div>${s.reel ? `<button class="y" data-preel="1" style="margin-top:6px">${tr('🗳️ Към кампанията')}</button>` : ''}`
@@ -474,6 +474,8 @@ export function createPresidency(deps) {
     el.querySelector('[data-px]').onclick = close;
     el.querySelectorAll('[data-pt]').forEach(b => b.onclick = () => { tab = b.dataset.pt; render(); });
     el.querySelector('[data-pcab]').onclick = () => cabinet(false); el.querySelectorAll('[data-preel]').forEach(b => b.onclick = () => { close(); deps.openCamp && deps.openCamp(); }); el.querySelectorAll('[data-pend]').forEach(b => b.onclick = finale);
+    // 🌐 coop-pres: „Срещата на върха“ (coopres.js) — бутонът е само когато и партньорът е президент
+    el.querySelectorAll('[data-psum]').forEach(b => b.onclick = () => deps.summit && deps.summit());
     el.querySelectorAll('[data-pol]').forEach(g => g.onclick = () => { sel = g.dataset.pol; render(); });
     el.querySelectorAll('[data-conf]').forEach(g => g.onclick = () => { sel = 'c:' + g.dataset.conf; render(); });
     el.querySelectorAll('[data-pd]').forEach(b => b.onclick = () => { const [id, a] = b.dataset.pd.split('|'); decide(id, a); render(); });

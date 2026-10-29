@@ -1,12 +1,12 @@
-// music.js — 🎵 фонова музика (флаг music): 10 песни от Pixabay (assets/music, CREDITS-pixabay.txt) + плъзгачите Музика / Ефекти / Град.
-// Подредба: менюто/картата/глобусът → menu-1/2 на смени; в града спокойно → city-1/2/3 разбъркано (+ sunny-1/2 денем в слънчевите градове);
-// активна игра (скорост ×2/×3 или 3+ строежа) → work-1/2/3 — с хистерезис (20 с вътре, 45 с навън), не на всеки тик; нощ → само city, по-тихо.
+// music.js — 🎵 фонова музика (флаг music): 18 песни от Pixabay (assets/music, CREDITS-pixabay.txt) + плъзгачите Музика / Ефекти / Град.
+// Подредба: менюто/картата/глобусът → menu-1/2 на смени; в града спокойно → city-1…7 разбъркано (+ sunny-1/2 денем в слънчевите градове);
+// активна игра (скорост ×2/×3 или 3+ строежа) → work-1…5 — с хистерезис (20 с вътре, 45 с навън), не на всеки тик; нощ → city + night-1 (пиано), по-тихо.
 // Преливане 3 s, кратка пауза между песните. Заглъхва при кино/видео, песента на града (CITY_STING) и рекламата (ads.js спира всички <audio>).
 // Тръгва след първия клик (autoplay). Само текущата песен се тегли (preload — при пускане). Скрит таб → пауза.
 import { feature, IN_LAB } from './lab/feature.js';
 
 const KEY = 'stroi-mix', DEF = { music: 0.5, fx: 1, city: 1 };
-const POOLS = { menu: ['menu-1', 'menu-2'], city: ['city-1', 'city-2', 'city-3'], work: ['work-1', 'work-2', 'work-3'], sunny: ['sunny-1', 'sunny-2'] };
+const POOLS = { menu: ['menu-1', 'menu-2', 'menu-3'], city: ['city-1', 'city-2', 'city-3', 'city-4', 'city-5', 'city-6', 'city-7'], work: ['work-1', 'work-2', 'work-3', 'work-4', 'work-5'], sunny: ['sunny-1', 'sunny-2'], night: ['night-1'] };
 export const SUNNY = new Set(['rio', 'barcelona', 'naples', 'lasvegas', 'losangeles', 'miami', 'honolulu', 'primorsko', 'sunnybeach', 'antalya', 'bodrum', 'marmaris']);
 const FADE = 3, GAP = [2, 5], TICK = 250;
 const url = n => `assets/music/${n}.mp3`;
@@ -33,17 +33,17 @@ export function createMusic(deps) {
   const kill = t => { if (!t) return; try { t.a.pause(); t.a.removeAttribute('src'); t.a.load(); } catch { } };
   function pick(m) {
     if (m === 'menu') return POOLS.menu[menuI++ % POOLS.menu.length];
-    const pool = m === 'work' ? POOLS.work : m === 'sunny' ? [...POOLS.city, ...POOLS.sunny] : POOLS.city;
+    const pool = m === 'work' ? POOLS.work : m === 'sunny' ? [...POOLS.city, ...POOLS.sunny] : m === 'night' ? [...POOLS.night, ...POOLS.city] : POOLS.city;
     const c = pool.filter(n => n !== last[m] && n !== cur?.name);
     const n = (c.length ? c : pool)[(Math.random() * (c.length || pool.length)) | 0]; last[m] = n; return n;
   }
-  // настроението сега: menu / work / city / sunny (нощ — само city)
+  // настроението сега: menu / work / city / sunny / night (нощ — city + night)
   function moodNow() {
     if (force) return force;
     if (deps.mode() === 'menu') return 'menu';
     const n = deps.night() > 0.6, act = !n && deps.active();
     const now = performance.now();
-    if (n) { want = null; return 'city'; }   // нощ — само lofi, веднага
+    if (n) { want = null; return 'night'; }   // нощ — lofi + пиано, веднага
     const base = deps.sunny() ? 'sunny' : 'city';
     const target = act ? 'work' : base;
     // хистерезис: към work — след 20 s активна игра; обратно — след 45 s спокойствие; city ↔ sunny ↔ menu — веднага
@@ -55,7 +55,7 @@ export function createMusic(deps) {
     }
     return target;
   }
-  const fits = (n, m) => m === 'sunny' ? POOLS.city.includes(n) || POOLS.sunny.includes(n) : POOLS[m].includes(n);
+  const fits = (n, m) => m === 'sunny' ? POOLS.city.includes(n) || POOLS.sunny.includes(n) : m === 'night' ? POOLS.city.includes(n) || POOLS.night.includes(n) : POOLS[m].includes(n);
   const fading = [];
   const fadeOut = t => { t.dir = -1; fading.push(t); };
   function tick() {
