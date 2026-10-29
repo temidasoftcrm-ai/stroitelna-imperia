@@ -182,12 +182,16 @@ function crew(THREE, o, c, ry, g, drives, spot) {
     const bx = j.box ? new THREE.Mesh(boxG, boxM) : null; if (bx) { bx.castShadow = true; root.add(bx); }
     people.push({ ...j, p, L, tot: L ? L.reduce((a, b) => a + b, 0) : 0, s: rnd() * (L ? L.reduce((a, b) => a + b, 0) : 0), dir: 1, wait: rnd() * 2, bx }); }
   // мотокарът: жълт, с мачта и вилици; кара палет от рампата до средата на площадката и обратно
-  const fk = new THREE.Group(); { const y = new THREE.MeshStandardMaterial({ color: 0xf2b705, roughness: 0.6 }), d = new THREE.MeshStandardMaterial({ color: 0x2b2d31, roughness: 0.7 }), st = new THREE.MeshStandardMaterial({ color: 0x5a5f66, metalness: 0.6, roughness: 0.4 });
+  // 🚜 forklift-real (T2): мотокарът на собственика (Meshy, E.fork()) — вилиците (възел forks) вдигат палета на рампата и го носят ниско; без модела — процедурният
+  const fkM = E.fork && E.fork(), fk = new THREE.Group(); if (fkM) { fk.add(fkM); const fo = fkM.getObjectByName('forks'), pal = new THREE.Group();
+    { const b = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.14, 1.1), new THREE.MeshStandardMaterial({ color: 0x9c7a4c })); pal.add(b); const s2 = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.8, 1.0), boxM); s2.position.y = 0.47; s2.castShadow = true; pal.add(s2); }
+    pal.position.set(0, 0.1, fo ? -0.55 : -1.45); (fo || fk).add(pal); fk.userData.pal = pal; fk.userData.forks = fo || null; fk.userData.fy0 = fo ? fo.position.y : 0; }
+  else { const y = new THREE.MeshStandardMaterial({ color: 0xf2b705, roughness: 0.6 }), d = new THREE.MeshStandardMaterial({ color: 0x2b2d31, roughness: 0.7 }), st = new THREE.MeshStandardMaterial({ color: 0x5a5f66, metalness: 0.6, roughness: 0.4 });
     const B = (w, h, l, m, x, yy, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, l), m); b.position.set(x, yy, z); b.castShadow = true; fk.add(b); return b; };
     B(1.2, 0.9, 2.0, y, 0, 0.75, 0.2); B(1.1, 0.12, 1.1, d, 0, 2.15, 0.35); for (const x of [-0.5, 0.5]) { B(0.08, 1.5, 0.08, d, x, 1.45, 0.85); B(0.08, 1.5, 0.08, d, x, 1.45, -0.1); B(0.1, 2.4, 0.1, st, x * 0.9, 1.2, -0.85); B(0.12, 0.06, 1.1, st, x * 0.7, 0.18, -1.45); }
     for (const [x, z] of [[-0.62, -0.5], [0.62, -0.5], [-0.62, 0.8], [0.62, 0.8]]) B(0.22, 0.5, 0.5, d, x, 0.25, z);
     const pal = new THREE.Group(); pal.position.set(0, 0.3, -1.45); fk.add(pal); { const b = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.14, 1.1), new THREE.MeshStandardMaterial({ color: 0x9c7a4c })); pal.add(b); const s = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.8, 1.0), boxM); s.position.y = 0.47; s.castShadow = true; pal.add(s); } fk.userData.pal = pal; }
-  root.add(fk); const FK = { a: [-4, H + 2.2], b: [-4, H + 15], s: 0, dir: 1, wait: 1 };
+  fk.name = 'indForklift'; root.add(fk); const FK = { a: [-4, H + 2.2], b: [-4, H + 15], s: 0, dir: 1, wait: 1 };
   // колите на служителите (паркингът: u 0,35H…U−2, редове v = H+9 и V1−9, места през 2,6 м)
   // 🚗 city-life3: паркингът се пълни сутрин (5:00–6:30 — дневната смяна, колите идват от улицата през бариерата) и се празни 16:30–18:00;
   // нощната смяна (~1/4) идва ~21 ч. и си тръгва ~6 ч.; работникът върви от колата до вратата на завода и вечер обратно
@@ -215,10 +219,11 @@ function crew(THREE, o, c, ry, g, drives, spot) {
       const [x, z] = W(u, v); j.p.obj.position.set(x, 0, z); face(j.p, (b[0] - a[0]) * j.dir, (b[1] - a[1]) * j.dir);
       if (j.bx && j.dir > 0) { const yy = j.p.obj.rotation.y; j.bx.visible = true; j.bx.position.set(x - Math.sin(yy) * 0.42, 1.05, z - Math.cos(yy) * 0.42); j.bx.rotation.y = yy; } }
     // мотокарът
-    if (FK.wait > 0) FK.wait -= dt; else { FK.s += FK.dir * 2.2 * dt; if (FK.s >= 1) { FK.s = 1; FK.dir = -1; FK.wait = 4; } else if (FK.s <= 0) { FK.s = 0; FK.dir = 1; FK.wait = 5; } }
+    if (FK.wait > 0) FK.wait -= dt; else { FK.s += FK.dir * 2.2 * dt / (Math.hypot(FK.b[0] - FK.a[0], FK.b[1] - FK.a[1]) || 1);   /* 2,2 м/s (беше 2,2 дължини/s) */ if (FK.s >= 1) { FK.s = 1; FK.dir = -1; FK.wait = 4; } else if (FK.s <= 0) { FK.s = 0; FK.dir = 1; FK.wait = 5; } }
     { const L = Math.hypot(FK.b[0] - FK.a[0], FK.b[1] - FK.a[1]), k = Math.min(1, Math.max(0, FK.s)), u = FK.a[0] + (FK.b[0] - FK.a[0]) * k, v = FK.a[1] + (FK.b[1] - FK.a[1]) * k, [x, z] = W(u, v);
       fk.position.set(x, 0, z); fk.rotation.y = ry + Math.PI;   // вилиците — към рампата (−v): кара напред/назад
-      fk.userData.pal.visible = FK.dir < 0 || FK.s > 0.98 ? false : true; fk.userData.pal.position.y = 0.3 + (FK.wait > 0 && FK.s < 0.02 ? 0.4 : 0); void L; }
+      fk.userData.pal.visible = FK.dir < 0 || FK.s > 0.98 ? false : true; const up = FK.wait > 0 && FK.s < 0.02, fo = fk.userData.forks;
+      if (fo) { const want = fk.userData.fy0 + (up ? 0.45 : FK.dir > 0 ? 0.22 : 0.04); fo.position.y += (want - fo.position.y) * Math.min(1, dt * 1.6); } else fk.userData.pal.position.y = 0.3 + (up ? 0.4 : 0); void L; }   /* forklift-real: вилиците — плавно нагоре на рампата, ниско по пътя */
     mixer.update(dt); });
   g.userData.crew = people.length; return people.length;
 }

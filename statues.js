@@ -13,7 +13,7 @@ export const STATUE_FILES = Object.fromEntries(['fn-brno', 'fn-wallace', 'fn-art
 // h — височината в света (м, с пиедестала); ped — свой пиедестал [ш, д, в]; basin — басейн с вода (радиус)
 const SPEC = { 'fn-brno': { h: 3.6 }, 'fn-wallace': { h: 2.7 }, 'fn-artemis': { h: 3.4, ped: [1.6, 1.6, 1.4], basin: 4.2 }, 'fn-observatoire': { h: 8.5 },
   'st-napoleon': { h: 4.4, ped: [2.8, 4.6, 3.0] }, 'st-ernst': { h: 8.5 }, 'st-masaryk': { h: 2.9 }, 'st-strauss': { h: 6.5 },
-  'm-angel-colossal': { h: 17 }, 'm-angel-grieving': { h: 9 }, 'm-angel-winged': { h: 11 }, 'm-lucifer': { h: 10 }, 'm-orpheus': { h: 10 }, 'm-venus': { h: 10 }, 'm-aquarius': { h: 9 }, 'm-city-shoulder': { h: 12 }, 'pegasus-fountain': { h: 10 }, 'myths-fountain': { h: 10 } };   // statues-meshy: с постамента
+  'm-angel-colossal': { h: 17 }, 'm-angel-grieving': { h: 9 }, 'm-angel-winged': { h: 11 }, 'm-lucifer': { h: 10 }, 'm-orpheus': { h: 10 }, 'm-venus': { h: 10 }, 'm-aquarius': { h: 9 }, 'm-city-shoulder': { h: 12 }, 'pegasus-fountain': { h: 10 }, 'myths-fountain': { h: 10 }, 'angel-hq': { h: 8, basin: 4.4 } };   // 😇 hq-angel: ангелът сред фонтана — на площада пред централата (game.js towerPlaza)   // statues-meshy: с постамента
 const STONE = 0xcfc8ba;
 
 // подготовка (веднъж): всеки модел — на земята, центриран, в истински ръст, с пиедестала/басейна; нощем — меко осветен (win(материал) → dayNight)
@@ -24,6 +24,8 @@ export function statuePrep(M, win) {
     o.traverse(m => { if (!m.isMesh || (m.parent && m.parent.userData.fw)) return; m.castShadow = true; m.receiveShadow = true; for (const mt of [].concat(m.material)) if (mt.emissive && !mt.userData.stNight) { mt.userData.stNight = 1; const up = mt.name === 'Uplight'; mt.emissive.setRGB(1, up ? 0.78 : 0.84, up ? 0.5 : 0.62); mt.emissiveMap = up ? null : mt.map || null; mt.emissiveIntensity = 0; mt.userData.winK = up ? 2.6 : 0.38; mt.needsUpdate = true; win(mt); } });   /* statues-meshy: Uplight — осветителите в основата, по-ярко */   // нощем — топло, отдолу нагоре (картата на модела)
     const b = new THREE.Box3().setFromObject(o), s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3()), py = sp.ped ? sp.ped[2] : 0, k2 = sp.h / s.y;
     o.position.set(-c.x * k2, py - b.min.y * k2, -c.z * k2); o.scale.setScalar(k2); g.add(o);
+    if (sp.basin) { const up = o.getObjectByName('Uplight'); if (up) { up.updateWorldMatrix(true, false); const ub = new THREE.Box3().setFromObject(up), ur = Math.max(ub.max.x - ub.min.x, ub.max.z - ub.min.z) / 2 || 1, f = (sp.basin + 0.05) / ur;   /* hq-angel: осветителите — на ръба на басейна (иначе са под водата) */
+      up.scale.x *= f; up.scale.z *= f; up.position.y += 0.72 / k2; } }
     if (sp.ped) { const p = new THREE.Mesh(new THREE.BoxGeometry(sp.ped[0], sp.ped[2], sp.ped[1]), stone); p.position.y = sp.ped[2] / 2; p.castShadow = p.receiveShadow = true; g.add(p);
       const p2 = new THREE.Mesh(new THREE.BoxGeometry(sp.ped[0] + 0.6, 0.4, sp.ped[1] + 0.6), stone); p2.position.y = 0.2; g.add(p2); }
     if (sp.basin) { const r = sp.basin, rim = new THREE.Mesh(new THREE.CylinderGeometry(r, r + 0.3, 0.7, 32, 1, true), stone), top = new THREE.Mesh(new THREE.RingGeometry(r - 0.35, r, 32).rotateX(-Math.PI / 2), stone), w = new THREE.Mesh(new THREE.CircleGeometry(r - 0.3, 32).rotateX(-Math.PI / 2), water);

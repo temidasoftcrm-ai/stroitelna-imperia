@@ -85,17 +85,17 @@ export function loadTrainModels(base = 'assets/heavy/trains/') {
     // истинските влакове (Лабораторията → trains-real): ЧС200 + сини пътнически вагони, ВЛ82 + покрити и въглищни вагони
     ...(feature('trains-real') ? [
       get('chs200.glb').then(sc => { P.paxLoco = normalize(sc, 0); }),
-      get('paxcar.glb').then(sc => { tame(sc); sc.traverse(m => { if (m.isMesh && /glass/i.test(m.material?.name || '')) { m.material = m.material.clone(); m.material.emissive = new THREE.Color(0xffd890); m.material.emissiveIntensity = 0; NF_MATS.add(m.material); } }); P.paxCar = normalize(sc, 0); }),
+      get('paxcar.glb').then(sc => { tame(sc); sc.traverse(m => { if (m.isMesh && /glass/i.test(m.material?.name || '')) { m.material = m.material.clone(); m.material.emissive = new THREE.Color(0xffd890); m.material.emissiveIntensity = 0; NF_MATS.add(m.material); } }); P.paxCar = wsize(normalize(sc, 0), 21, 4.3); }),
       get('vl82.glb').then(sc => { sc.traverse(m => { if (m.isMesh && !m.material.isMeshStandardMaterial) m.material = new THREE.MeshStandardMaterial({ map: m.material.map, color: m.material.color, roughness: 0.6, metalness: 0.2 }); }); tame(sc); P.vl82 = normalize(sc, 0); }),   // моделът е „unlit“ — нощем светеше бял
-      get('boxcar.glb').then(sc => { P.boxcar = normalize(sc, 0); }),
-      get('hopper2.glb').then(sc => { P.hopper2 = normalize(sc, 0); }),
+      get('boxcar.glb').then(sc => { P.boxcar = wsize(normalize(sc, 0), 15, 4.0); }),
+      get('hopper2.glb').then(sc => { P.hopper2 = wsize(normalize(sc, 0), 14, 3.8); }),
     ].map(p => p.catch(e => console.warn('trains-real', e))) : []),
     // 🛤️ rail-depot: старите в депото — парен локомотив 0-4-0 (steve_Emfore, CC BY) и съветска цистерна (KojfDiscord, CC BY)
-    ...(TV ? Object.entries(MV).map(([k, [f, L]]) => get(f + '.glb').then(sc => { tame(sc); if (k === 'silverCar' || k === 'nightCar' || k === 'elLoco') winNight(sc);   /* само пътническите */ P[k] = stretchTo(normalize(sc, 0), L); }).catch(e => console.warn('trains-variety', k, e))) : []),
+    ...(TV ? Object.entries(MV).map(([k, [f, L]]) => get(f + '.glb').then(sc => { tame(sc); if ((k === 'silverCar' || k === 'nightCar' || k === 'elLoco') && !(LL2 && sc.getObjectByName('win_glass'))) winNight(sc);   /* само пътническите */ P[k] = stretchTo(normalize(sc, 0), L); }).catch(e => console.warn('trains-variety', k, e))) : []),
     ...(TV ? [Promise.resolve().then(() => Object.assign(P, procWagons()))] : []),
     ...(feature('rail-depot') ? [
       get('loco040.glb').then(sc => { tame(sc); P.loco040 = normalize(sc, 0); }),
-      get('tank-ussr.glb').then(sc => { tame(sc); P.tankUssr = normalize(sc, 0); }),
+      get('tank-ussr.glb').then(sc => { tame(sc); P.tankUssr = wsize(normalize(sc, 0), 13); }),
     ].map(p => p.catch(e => console.warn('rail-depot', e))) : []),
   ]).then(() => { ready = true; }).catch(e => { console.warn('trainmodels', e); ready = false; });
   return loading;
@@ -104,8 +104,11 @@ export function loadTrainModels(base = 'assets/heavy/trains/') {
 // мотрисен вагон „нощен влак“, електрически локомотив с пантограф, парен локомотив с тендер; товарни — дизелов локомотив Union Pacific, покрит
 // вагон SRR, въглищен (Western Maryland; „NY Central“ е без текстура — не се ползва), изоставен бункер. Ширина W, дължина — истинска (разтягане по z). Процедурни: цистерна,
 // платформа с трупи, автовоз, отворен вагон. Нощем прозорците на пътническите светят (тъмното по страните, средната височина).
-const TV = feature('trains-variety');
-const MV = { silverCar: ['m-silver', 22], nightCar: ['m-night', 22], elLoco: ['m-elloco', 18], steamLoco: ['m-steam', 22], upLoco: ['m-up', 20], gpLoco: ['m-gp', 16], steam2Loco: ['m-steam2', 19],   /* +2 (28.10): дизел-електрически (GP) и парен с тендер */ srrCar: ['m-srr', 15], wmCoal: ['m-wm', 13], hopX: ['m-hopx', 12] };
+const TV = feature('trains-variety'), WSZ = feature('wagon-size');
+const MV = { silverCar: ['m-silver', 22], nightCar: ['m-night', 22], elLoco: ['m-elloco', 18], steamLoco: ['m-steam', 22], upLoco: ['m-up', 20], gpLoco: ['m-gp', 16], steam2Loco: ['m-steam2', 19],   /* +2 (28.10): дизел-електрически (GP) и парен с тендер */ srrCar: ['m-srr', 15], wmCoal: ['m-wm', 13], hopX: ['m-hopx', WSZ ? 14 : 12] };
+// 📏 wagon-size (29.10, одобрено от собственика в Blender): вагоните до локомотивите в правилен мащаб — ширината остава W, дължината L (stretchTo),
+// височината H (мащаб по y); userData.len следва дължината → прикачването, разстоянията и дължината на перона (passtrains, depot2, station, trackpath)
+function wsize(g, L, H) { if (!WSZ) return g; stretchTo(g, L); if (H) { const i = g.children[0], h = new THREE.Box3().setFromObject(g).getSize(new THREE.Vector3()).y || H, k = H / h; i.scale.y *= k; i.position.y *= k; } return g; }
 function stretchTo(g, L) { const k = L / (g.userData.len || L); g.children[0].scale.z *= k; g.children[0].position.z *= k; g.userData.len = L; return g; }
 function winNight(obj) {   // прозорците — по тъмните пиксели на текстурата по страните, в средната лента по височина
   obj.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(obj);
@@ -167,7 +170,7 @@ export const hasTrainModel = k => ready && !!P[k];
 export function trainCar(kind, seed = 0) {
   const src = P[kind === 'aveTail' ? 'ave' : kind]; if (!src) return null;
   let o = src.clone(true);
-  if (kind === 'aveTail') { const w = new THREE.Group(); o.rotation.y = Math.PI; w.add(o); o = w; }
+  if (kind === 'aveTail') { const w = new THREE.Group(); o.rotation.y = Math.PI; w.add(o); o = w; if (LL2) o.traverse(m => { if (m.isMesh && /^headlight/.test(m.name) && m.material) m.material = tailMat(m.material); }); }   // loco-lights2: обърнатият нос отзад — червени стопове, не бели фарове (без сноп и ореол)
   if (kind === 'flat') {   // контейнерът на платформата — различен цвят на всеки вагон
     const col = CONT_COLS[Math.abs(seed) % CONT_COLS.length];
     o.traverse(m => { if (m.isMesh && /red/i.test(m.material.name)) { m.material = m.material.clone(); m.material.color.setHex(col); } });
@@ -182,12 +185,21 @@ export function trainCar(kind, seed = 0) {
 // 💡 светлините на локомотивите (Blender, 29.10): отделни възли headlight_L/R, headlamp (парните), taillight_L/R (червени, отзад), cabwin_* (кабината — топло),
 // firebox_L/R (огнището под кабината на парните); нощем ги пали daynight.js (NF_MATS: emissiveIntensity = нощ × nfK), денем — 0. Старите модели: „emission“ (Ориент Експрес), „Lights“ (GP38)
 const LL_K = { headlight: 3.2, headlamp: 3.2, taillight: 2.2, cabwin: 0.07, firebox: 1.8 }, LL_SEEN = new Set();
+// 💡 loco-lights2 (29.10): в моделите (glTF, без Blender) — headlight_T (кръгъл горен челен фар върху челото; свети с фаровете) вместо висящата
+// плоскост cabwin_F, и win_glass — плоскостите на прозорците (на 2–6 см от тялото, по текстурата); нощем топло (нараства с нощта, nfK 1.2), денем
+// невидими (адитивни, черен цвят). Без флага — и двете скрити, cabwin_F както досега.
+const LL2 = feature('loco-lights2');
+let winMat = null; const TAIL_M = new Map();
+function tailMat(m0) { let c = TAIL_M.get(m0.uuid); if (!c) { c = m0.clone(); c.color = new THREE.Color(0x3a0806); c.emissive = new THREE.Color(0xff1a0a); c.emissiveIntensity = 0; c.userData = { ...c.userData, nfK: LL_K.taillight }; NF_MATS.add(c); TAIL_M.set(m0.uuid, c); } return c; }   // фар → стоп (обърнат челен вагон отзад)
+function locoWinMat() { if (!winMat) { winMat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffc078, emissiveIntensity: 0, roughness: 1, metalness: 0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }); winMat.userData.nfK = 1.2; NF_MATS.add(winMat); } return winMat; }
 function locoLights(sc) {
-  sc.traverse(m => { if (!m.isMesh || !m.material) return; const k = (m.name.match(/^(headlight|headlamp|taillight|cabwin|firebox)/) || [])[1] || (/^(emission|Lights)$/.test(m.material.name || '') ? 'headlight' : null);
+  sc.traverse(m => { if (!m.isMesh) return; if (/^(win_glass|headlight_T)/.test(m.name) && !LL2) { m.visible = false; return; } if (LL2 && /^cabwin_F/.test(m.name)) { m.visible = false; return; } if (LL2 && /^win_glass/.test(m.name)) { m.material = locoWinMat(); m.castShadow = m.receiveShadow = false; m.renderOrder = 2; return; }
+    if (LL2 && m.material && !Array.isArray(m.material) && /^(cristal|glass|Screen)$/.test(m.material.name || '') && !LL_SEEN.has(m.material)) { const mt = m.material; LL_SEEN.add(mt); mt.emissive = new THREE.Color(0xffc078); mt.emissiveIntensity = 0; mt.userData.nfK = 1.0; NF_MATS.add(mt); return; }   // loco-lights2: стъклата на моделите с отделен материал (AVE, Ориент Експрес, GP38) — топло нощем
+    if (!m.material) return; const k = (m.name.match(/^(headlight|headlamp|taillight|cabwin|firebox)/) || [])[1] || (/^(emission|Lights)$/.test(m.material.name || '') ? 'headlight' : null);
     if (!k || LL_SEEN.has(m.material)) return; const mt = m.material; LL_SEEN.add(mt); if (!mt.emissive || !mt.emissive.getHex()) return; mt.emissiveIntensity = 0; mt.userData.nfK = LL_K[k]; if (k === 'cabwin') mt.color.setHex(0x15171a); NF_MATS.add(mt); });   // кабината денем — тъмно стъкло
 }
 // къде са фаровете на модела (в координатите на вагона) — ореолите и снопът отиват там
-function hlSpots(o) { o.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(o.matrixWorld).invert(), r = []; o.traverse(m => { if (m.isMesh && /^(headlight|headlamp)/.test(m.name)) { m.geometry.computeBoundingBox(); r.push(m.geometry.boundingBox.getCenter(new THREE.Vector3()).applyMatrix4(m.matrixWorld).applyMatrix4(inv)); } }); return r; }
+function hlSpots(o) { o.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(o.matrixWorld).invert(), r = []; o.traverse(m => { if (m.isMesh && m.visible && /^(headlight|headlamp)/.test(m.name)) { m.geometry.computeBoundingBox(); r.push(m.geometry.boundingBox.getCenter(new THREE.Vector3()).applyMatrix4(m.matrixWorld).applyMatrix4(inv)); } }); return r; }
 // фаровете на локомотива: светещи петна на челото (нощем — daynight.js през NF_MATS) и сноп напред
 let lightMat = null, beamMat = null;
 function addHeadlights(o, len, H = {}) {

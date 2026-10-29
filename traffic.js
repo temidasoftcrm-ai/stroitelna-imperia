@@ -408,7 +408,7 @@ export function createTraffic(opts) {
         LI.car(c.rx, c.rz, c.ryaw, c.L, c.w, c.h, br, blinkOn && (turn === 'left' || turn === 'uturn'), blinkOn && turn === 'right', c.ry); continue;
       }
       const br = c.a < -0.8 || c.v < 0.3;
-      if (br !== c.brake && c.rear.length) { c.brake = br; for (const m of c.rear) m.material = br ? B.brake : c.rearMat; }
+      if (br !== c.brake && c.rear.length) { c.brake = br; for (const m of c.rear) { const R = m.material && m.material.lampSet; m.material = R ? (br ? R.brake : R.night) : br ? B.brake : c.rearMat; } }   /* car-lights2: истинските стопове — свой стоп-материал (lampSet) */
       const turn = turnOf(c);
       const L = blinkOn && (turn === 'left' || turn === 'uturn'), R = blinkOn && turn === 'right';
       for (const m of c.blinkL) m.visible = L; for (const m of c.blinkR) m.visible = R;

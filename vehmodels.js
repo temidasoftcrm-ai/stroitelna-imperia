@@ -35,11 +35,11 @@ function wrap(obj, yaw = 0, k = null) {
 
 // load(url) → Promise<gltf>; A — речникът с модели на играта. Връща Promise (липсващ файл не спира играта).
 export function loadVehModels(load, A, base = 'assets/heavy/gear/') {
-  const jobs = Object.entries(GEAR).map(([k, c]) => load(base + c.f + '.glb').then(g => { A['sf-' + k] = { scene: wrap(g.scene, c.yaw) }; }).catch(e => console.warn('vehmodels', k, e)));
+  const jobs = Object.entries(GEAR).map(([k, c]) => load(base + c.f + '.glb').then(g => { realLamps(g.scene); A['sf-' + k] = { scene: wrap(g.scene, c.yaw) }; })   /* car-lights2: светлините на техниката (грейдерът — работните отзад, без лъч) */.catch(e => console.warn('vehmodels', k, e)));
   if (feature('cars-more')) jobs.push(loadMoreCars(load, A));
   if (feature('school-bus')) jobs.push(loadSchoolBuses(load, A));   // school-bus (55, №7): училищните автобуси
   if (feature('buses-more')) jobs.push(loadMoreBuses(load, A));   // buses-more (55, №15): градските автобуси по региони   // cars-more (55): още 18 градски коли по региони
-  jobs.push(Promise.resolve().then(() => feature('cars-real') && loadRealCars(load, A)).then(() => loadVans(load, A, M_PER)).then(() => feature('trucks-real') && loadRealTrucks(load, A)).then(() => loadPoliceCars(load, A)));
+  jobs.push(Promise.resolve().then(() => feature('cars-real') && loadRealCars(load, A)).then(() => loadVans(load, A, M_PER)).then(() => { for (const k in A) if (/^sf-van-/.test(k)) realLamps(A[k].scene); }).then(() => feature('trucks-real') && loadRealTrucks(load, A)).then(() => loadPoliceCars(load, A)));
   return Promise.all(jobs);
 }
 
@@ -85,7 +85,7 @@ function loadMoreBuses(load, A) {
     const sc = wrap(g.scene, 0, M_PER); addCarLights(sc, [0.38, 0.25]); A['sf-bus-' + k] = { scene: sc };
   }).catch(e => console.warn('buses-more', k, e))).concat(['f', 'r'].map(h => load('assets/heavy/cars/bus-artic-' + h + '.glb').then(g => {   // bus-artic2 (55, №4): двете секции на съчленения
     g.scene.traverse(o => { if (o.isMesh) { o.castShadow = false; if (o.material && o.material.metalness > 0.5) o.material.metalness = 0.3; } });
-    const sc = wrap(g.scene, 0, M_PER); addCarLights(sc); const cut = []; sc.traverse(o => { const l = o.userData.lamp, z = o.position.z; if (h === 'f' ? l === 'rear' || (l === 'blink' && z < 0) : l === 'front' || (l === 'blink' && z > 0) || (!l && o.isMesh && o.geometry?.type === 'PlaneGeometry' && z > 0)) cut.push(o); });
+    const sc = wrap(g.scene, 0, M_PER); addCarLights(sc); const cut = []; sc.traverse(o => { const l = o.userData.lampReal ? null : o.userData.lamp, z = o.position.z; if (h === 'f' ? l === 'rear' || (l === 'blink' && z < 0) : l === 'front' || (l === 'blink' && z > 0) || (!l && o.isMesh && o.geometry?.type === 'PlaneGeometry' && z > 0)) cut.push(o); });
     cut.forEach(o => o.removeFromParent()); A['sf-bus-artic-' + h] = { scene: sc };   /* без стоповете при хармониката (предната) и без фаровете/лъча (задната) */
   }).catch(e => console.warn('bus-artic2', h, e)))));
 }
@@ -211,13 +211,49 @@ const carBeam = () => beamM || (beamM = (() => {
   NF_MATS.add(m); m.userData.nfK = 0.9; return m;
 })());
 // park-dark: паркираната кола — без фарове, стопове и лъч на пътя (групата от addCarLights е в общия модел, копията я носят)
-export const darkParked = o => { if (o && feature('park-dark')) o.traverse(c => { if (c.userData.carLights) c.visible = false; }); return o; };
+export const darkParked = o => { if (o && feature('park-dark')) o.traverse(c => { if (c.userData.carLights) c.visible = false; if (c.material && c.material.lampSet) c.material = c.material.lampSet.off; }); return o; };   // car-lights2: истинските фарове — с изгасения материал
+// 💡 car-lights2 (T2): истинските фарове на модела — възлите lamp_head_L/R, lamp_tail_L/R (и lamp_ind_L/R), отделени в Blender от стените на модела;
+// нощем светят самите стени (фаровете — топло бяло, стоповете — червено, по кривата на нощта — NF_MATS) вместо процедурните кръгчета; при спиране стоповете
+// светят по-силно (material.lampSet — traffic.js); мигачите (кръгчетата, traffic.js ги пали) — върху lamp_ind_*, иначе във външния край на фара/стопа;
+// лъчът на пътя тръгва от фаровете. Модел без възлите — както досега (addTruckLamps).
+const CL2 = feature('car-lights2'), LAMP_RX = /^lamp_(head|tail|ind)_[LRC]/, LAMP_EM = { head: 0xfff1d8, tail: 0xff1a0a }, LAMP_K = { head: 5, tail: 3.5 }, LAMP_M = new Map();
+function lampMat(m, k, brake = false) {   // копие на материала на модела: светещо нощем (NF_MATS) или стоп (свети винаги)
+  const key = m.uuid + k + brake; let c = LAMP_M.get(key); if (c) return c;
+  c = m.isMeshStandardMaterial ? m.clone() : new THREE.MeshStandardMaterial({ color: m.color, map: m.map || null, transparent: m.transparent, opacity: m.opacity, side: m.side });   /* unlit (MeshBasic) — няма emissive */
+  c.emissive = new THREE.Color(LAMP_EM[k]); c.emissiveMap = m.map || null; c.emissiveIntensity = brake ? 6 : 0; c.toneMapped = false; c.userData = { ...c.userData, nfK: LAMP_K[k] };   /* toneMapped — фарът да е бял, не сив */
+  if (!brake) NF_MATS.add(c); LAMP_M.set(key, c); return c;
+}
+// материалите на истинския фар/стоп: night — нощем, brake — при спиране, off — изгасен (паркирана); свойството не се изброява — копията на колата
+// (Object3D.clone копира userData през JSON) делят самите материали, а не плоски обекти
+const lampSet = (m0, k) => { const R = { night: lampMat(m0, k), brake: k === 'tail' ? lampMat(m0, k, true) : null, off: m0 }; for (const m of [R.night, R.brake]) if (m && !m.lampSet) Object.defineProperty(m, 'lampSet', { value: R }); return R; };
+// възлите lamp_* на модела — със светещите материали; → { head, tail, ind: [меш…], box(k, sx) — кутията им в координатите на sc (sx: +1 / −1 — само тази страна) } или null
+function realLamps(sc) {
+  if (!CL2) return null; const L = { head: [], tail: [], ind: [] }, seen = new Set();   /* seen — не userData: копията на вече подготвен модел (clone) носят userData и иначе се пропускат */
+  sc.traverse(o => { const m = o.name && LAMP_RX.exec(o.name); if (m) o.traverse(q => { if (q.isMesh && !seen.has(q)) { seen.add(q); q.userData.lampReal = m[1]; L[m[1]].push(q); } }); });
+  if (!L.head.length && !L.tail.length) return null;
+  for (const k of ['head', 'tail']) for (const q of L[k]) { const m0 = q.material; if (Array.isArray(m0) || !m0 || m0.lampSet) continue; q.material = lampSet(m0, k).night; if (k === 'tail') q.userData.lamp = 'rear'; }
+  sc.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(sc.matrixWorld).invert(), c = new THREE.Vector3();
+  L.box = (k, sx = 0) => { const b = new THREE.Box3(); for (const q of L[k]) { const qb = new THREE.Box3().setFromObject(q).applyMatrix4(inv); if (!sx || Math.sign(qb.getCenter(c).x) === sx) b.union(qb); } return b.isEmpty() ? null : b; };
+  return L;
+}
+export const lampsReal = sc => realLamps(sc);   // car-lights2: истинските светлини и на модели извън колите (мотокарът — forklift-real, техниката, бусовете, влекачите) — само светещите материали, без лъч
+// car-lights2: o — с кръгчетата на addTruckLamps като преки деца; без тях там, където моделът има истински фарове/стопове (мигачите — на истинските места)
+export const lampsFix = o => { const R = realLamps(o); if (R) lampsAt(o, R, 0); return R; };
+// addTruckLamps в g, после: без кръгчетата там, където моделът има истински фарове/стопове; мигачите — на истинските места (z0 — g.position.z)
+function lampsAt(g, R, z0) {
+  for (const o of [...g.children]) {
+    const l = o.userData.lamp, ps = Math.sign(o.position.x) || 1; if ((l === 'front' && R.box('head', ps)) || (l === 'rear' && R.box('tail', ps))) { g.remove(o); continue; } if ((l === 'front' && R.head.length) || (l === 'rear' && R.tail.length)) o.scale.setScalar(0.45);   /* по страна: липсващият фар (напр. cv-moskvich — само левият) остава кръгче */
+    if (l !== 'blink') continue; const sx = o.userData.side === 'L' ? 1 : -1, front = o.position.z > 0, ind = front && R.box('ind', sx), b = ind || R.box(front ? 'head' : 'tail', sx); if (!b) continue;
+    o.position.set(ind ? (b.min.x + b.max.x) / 2 : sx > 0 ? b.max.x - 0.06 : b.min.x + 0.06, (b.min.y + b.max.y) / 2, (front ? b.max.z + 0.04 : b.min.z - 0.04) - z0); o.scale.setScalar(0.6);
+  }
+}
 export function addCarLights(sc) {
   if (!feature('car-lights') || sc.userData.emergLit) return;   // спешните (emerg-lights) си имат свои
+  const R = realLamps(sc);
   sc.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(sc), s = b.getSize(new THREE.Vector3()), len = s.z;
   const g = new THREE.Group(); g.position.z = (b.min.z + b.max.z) / 2; g.userData.carLights = 1; sc.add(g);   // carLights — паркираните копия я крият (park-dark)
-  addTruckLamps(g, len, s.x, s.y * 0.42);
-  const pl = new THREE.Mesh(new THREE.PlaneGeometry(s.x * 2.2, len * 2.2), carBeam()); pl.rotation.x = -Math.PI / 2; pl.position.set(0, 0.06, len / 2 + len * 1.1); pl.renderOrder = 2; g.add(pl);
+  addTruckLamps(g, len, s.x, s.y * 0.42); if (R) lampsAt(g, R, g.position.z);
+  const hb = R && R.box('head'), pl = new THREE.Mesh(new THREE.PlaneGeometry(s.x * 2.2, len * 2.2), carBeam()); pl.rotation.x = -Math.PI / 2; pl.position.set(0, 0.06, (hb ? hb.max.z - g.position.z : len / 2) + len * 1.1); pl.renderOrder = 2; g.add(pl);
 }
 // truck-smooth (T1): полуремаркето — отделен възел „semi-trailer“ с шарнир на седлото (userData: zk — седлото, za — оста на ремаркето
 // спрямо седлото, zf/zr — предната и задната ос на влекача, в координатите на композицията); колелата — на собствени оси (userData.wheelR),
@@ -241,7 +277,7 @@ function semiRig(semi, cab, trL, cabL) {
 function loadBoxTruck(load, A) {
   return load('assets/heavy/trucks/box-truck.glb').then(g => {
     g.scene.traverse(m => { if (m.isMesh) m.castShadow = false; if (/^wheel_/.test(m.name)) m.userData.wheelR = 0.49 * M_PER; });
-    const o = new THREE.Group(); g.scene.scale.setScalar(M_PER); o.add(g.scene); addTruckLamps(o, 8 * M_PER, 2.6 * M_PER, 0.8 * M_PER);
+    const o = new THREE.Group(); g.scene.scale.setScalar(M_PER); o.add(g.scene); addTruckLamps(o, 8 * M_PER, 2.6 * M_PER, 0.8 * M_PER); lampsFix(o);
     A['sf-car-BoxTruck'] = { scene: o };
   }).catch(e => console.warn('box truck', e));
 }
@@ -249,7 +285,7 @@ function loadRealTrucks(load, A) {
   const box = feature('truck-box') ? loadBoxTruck(load, A) : null;   // truck-box — заедно с влекачите (магистралата чака и него)
   return Promise.all([box, ...TRK.map((f, i) => load('assets/heavy/trucks/' + f + '.glb').then(g => {
     g.scene.traverse(m => { if (m.isMesh) { m.castShadow = false; if (f === 'volvo') { m.material = m.material.clone(); m.material.color.multiplyScalar(2.2); } } });   // черният Volvo — малко по-светъл
-    A['sf-trk-' + i] = { scene: wrap(g.scene, 0, null) };
+    realLamps(g.scene); A['sf-trk-' + i] = { scene: wrap(g.scene, 0, null) };   // car-lights2: преди копията (кабината на полуремаркето ги носи)
     // полуремарке за магистралата: влекач 6 м + ремарке 13,6 м
     const semi = new THREE.Group(), cab = wrap(g.scene.clone(true), 0, null), cabL = 6 * M_PER, trL = 13.6 * M_PER, W = 2.5 * M_PER;
     cab.scale.setScalar(cabL); cab.position.z = trL / 2 + cabL / 2 - HITCH * M_PER; semi.add(cab);
@@ -258,6 +294,7 @@ function loadRealTrucks(load, A) {
     for (const z of [-trL / 2 + 1.2 * M_PER, -trL / 2 + 2.5 * M_PER]) for (const x of [-1, 1]) { const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.5 * M_PER, 0.5 * M_PER, 0.35 * M_PER, 12).rotateZ(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x15171a })); wh.position.set(x * W * 0.42, 0.5 * M_PER, z); semi.add(wh); }
     addTruckLamps(semi, 0, W, 0.9 * M_PER, -trL / 2);
     for (const c of semi.children) if (c.geometry?.type === 'PlaneGeometry' && c.position.z > 0) c.position.z = trL / 2 + cabL - HITCH * M_PER + 0.05;   // фаровете — на челото на влекача
+    lampsFix(semi);   // car-lights2: истинските фарове на влекача — без кръгчетата
     if (feature('truck-smooth')) semiRig(semi, cab, trL, cabL);
     A['sf-semi-' + i] = { scene: semi };
   }).catch(e => console.warn('real truck', f, e)))]);
@@ -385,6 +422,9 @@ class ElNight extends THREE.Mesh { onBeforeRender() { const k = this.material.us
 // фаровете на спешната кола: докато бурканите светят — мигат на смени ляво/дясно (по 0,25 s); иначе — като ElNight
 class ElWig extends THREE.Mesh { onBeforeRender() { if (!this.userData.own) { this.material = this.material.clone(); this.userData.own = 1; } const car = carOf(this), t = performance.now() / 1000;
   this.material.opacity = car && beaconState(car, t) ? ((Math.floor(t * 4) + this.userData.side) % 2 ? 0.95 : 0.06) : nightK() * (this.material.userData.k ?? 1); } }
+// car-lights2: истинският фар на спешната кола — като ElWig, но свети самата стена на модела (собствено копие на материала, извън NF_MATS)
+class ElRealWig extends THREE.Mesh { onBeforeRender() { if (!this.userData.own) { this.material = this.material.clone(); this.userData.own = 1; } const car = carOf(this), t = performance.now() / 1000;
+  this.material.emissiveIntensity = car && beaconState(car, t) ? ((Math.floor(t * 4) + this.userData.sideN) % 2 ? 6 : 0.1) : nightK() * LAMP_K.head; } }
 class ElWash extends THREE.Sprite {   // цветното сияние върху каросерията — страната, която свети
   onBeforeRender() { if (!this.userData.own) { this.material = this.material.clone(); this.userData.own = 1; } const car = carOf(this); if (car) this.material.opacity = barLit(car, this.userData.side, 0, performance.now() / 1000) ? this.userData.k * (0.4 + 0.6 * nightK()) : 0; }
 }
@@ -393,7 +433,7 @@ class ElPool extends THREE.Mesh {     // петно на пътя отстран
 }
 const LIVERY = new Map();   // материал на модела → копие, което нощем леко свети с текстурата си
 function emergLights(car, kind) {
-  car.userData.emergLit = 1; car.updateMatrixWorld(true);
+  car.userData.emergLit = 1; const R = realLamps(car); car.updateMatrixWorld(true);   // car-lights2: истинските фарове (възлите lamp_*)
   const bb = new THREE.Box3().setFromObject(car), s = bb.getSize(new THREE.Vector3()), W = s.x, len = s.z, cz = (bb.min.z + bb.max.z) / 2, y0 = bb.min.y, E = elMats();
   let cols = BAR_COL[kind] || BAR_COL.police; const glows = [];
   car.traverse(o => { if (o instanceof BarPool) cols = o.userData.cols; if (o instanceof BarGlow || o instanceof BeaconGlow) glows.push(o); else if (o.isMesh && !(o instanceof Beacon) && !(o instanceof BarPool)) {
@@ -405,9 +445,10 @@ function emergLights(car, kind) {
   const g = new THREE.Group(); g.position.z = cz; car.add(g);
   addTruckLamps(g, len, W, y0 + Math.min(s.y * 0.38, 1.0));
   const LZ = car.userData.lens; if (LZ) for (const o of g.children) if (o.userData.lamp === 'front') o.position.set(Math.sign(o.position.x) * LZ[0] * W / 2, y0 + LZ[1] * s.y, len / 2 - LZ[2] * len + 0.03);   // точно върху фаровете на модела
+  if (R) { lampsAt(g, R, cz); if (feature('emerg-wigwag')) R.head = R.head.map(q => { const w = new ElRealWig(q.geometry, q.material); w.name = q.name; w.position.copy(q.position); w.quaternion.copy(q.quaternion); w.scale.copy(q.scale); w.userData = { ...q.userData, sideN: new THREE.Box3().setFromObject(q).getCenter(new THREE.Vector3()).x > 0 ? 1 : 0 }; q.parent.add(w); q.removeFromParent(); return w; }); }   // фаровете на смени — самите стени
   for (const o of [...g.children]) if (o.userData.lamp === 'front' || o.userData.lamp === 'rear') {   // фаровете/стоповете — без отблясъци денем (MeshBasic); userData.lamp остава за traffic.js
     const front = o.userData.lamp === 'front' && feature('emerg-wigwag'), m = new (front ? ElWig : ElNight)(o.geometry, E[o.userData.lamp]); m.position.copy(o.position); m.rotation.copy(o.rotation); m.userData = front ? { ...o.userData, side: o.position.x > 0 ? 1 : 0 } : o.userData; g.add(m); g.remove(o); }   // фаровете — на смени при бурканите
-  const beam = new ElNight(new THREE.PlaneGeometry(W * 2.2, len * 1.8), E.beam); beam.rotation.x = -Math.PI / 2; beam.position.set(0, y0 + 0.06, len / 2 + len * 0.9); beam.renderOrder = 2; g.add(beam);
+  const beam = new ElNight(new THREE.PlaneGeometry(W * 2.2, len * 1.8), E.beam); beam.rotation.x = -Math.PI / 2; const hb = R && R.box('head'); beam.position.set(0, y0 + 0.06, (hb ? hb.max.z - cz : len / 2) + len * 0.9); beam.renderOrder = 2; g.add(beam);
   for (const side of [0, 1]) {
     const sx = side ? 1 : -1;
     const w = new ElWash(new THREE.SpriteMaterial({ map: glowTex, color: cols[side], transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));

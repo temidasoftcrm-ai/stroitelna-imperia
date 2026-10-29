@@ -1,0 +1,1 @@
+assets/flags/*.svg — знамена от flagcdn.com (Flagpedia; източник Wikimedia Commons) — обществено достояние; ползват се за анимацията flag-wave (game.js flagWave).

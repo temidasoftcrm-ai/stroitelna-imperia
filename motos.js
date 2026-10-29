@@ -4,6 +4,8 @@
 //   motoShare(cc, lat, month) — делът на моторите в трафика (Средиземноморието и Азия — повече, зимата в студените градове — по-малко)
 //   makeMoto(A, rnd, night) → { obj, len, w, h, kind } | null
 import * as THREE from 'three';
+import { feature } from './lab/feature.js';
+const LK = feature('car-lights2') ? /^(?:lamp_)?(head|tail)/ : /^(head|tail)/;   // 💡 car-lights2: светлините на мотора — и възлите lamp_head_C / lamp_tail_C
 
 const MED = new Set(['🇮🇹', '🇪🇸', '🇬🇷', '🇵🇹', '🇹🇷', '🇲🇹', '🇨🇾', '🇭🇷', '🇯🇵', '🇨🇳', '🇹🇼', '🇻🇳', '🇹🇭', '🇮🇳', '🇮🇩', '🇲🇾', '🇵🇭', '🇰🇷', '🇸🇬', '🇧🇷', '🇲🇽']);
 export function motoShare(cc, lat = 45, month = 6) {
@@ -40,13 +42,13 @@ export function makeMoto(A, rnd = Math.random, night = () => 0) {
   const obj = new THREE.Group(), lean = new THREE.Group(), m = src.clone(true); obj.add(lean); lean.add(m); lean.add(rider(f, rnd)); obj.userData.src = k; obj.userData.moto = true;
   const wheels = [], lamps = [];
   m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } if (/^wheel_/.test(o.name)) wheels.push(o);
-    if (o.isMesh && /^(head|tail)/.test(o.name)) { o.material = o.material.clone(); o.material.emissive = new THREE.Color(/^head/.test(o.name) ? 0xfff1d0 : 0xff2a1a); o.material.toneMapped = false; lamps.push(o); if (/^tail/.test(o.name)) o.userData.lamp = 'rear'; } });
+    const lk = LK.exec(o.name); if (o.isMesh && lk) { o.material = o.material.clone(); o.material.emissive = new THREE.Color(lk[1] === 'head' ? 0xfff1d0 : 0xff2a1a); o.material.toneMapped = false; o.userData.lk = lk[1]; lamps.push(o); if (lk[1] === 'tail') o.userData.lamp = 'rear'; } });   /* car-lights2: и възлите lamp_head_C / lamp_tail_C (-58) */
   // колелата по изминатото, наклонът в завоя (по скоростта на завъртане), светлините нощем — веднъж на кадър от първата част
   let px = null, pz = 0, pyaw = 0, pt = 0, L = 0;
   const tick = () => { const now = performance.now(), dt = Math.min(0.1, (now - pt) / 1000 || 0); pt = now; const x = obj.position.x, z = obj.position.z, yaw = obj.rotation.y;
     if (px !== null && dt > 0) { const d = Math.hypot(x - px, z - pz); for (const w of wheels) w.rotation.x += d / 0.3; let dy = yaw - pyaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
       const want = Math.max(-0.45, Math.min(0.45, -(dy / dt) * (d / dt) / 9.8)); L += (want - L) * Math.min(1, dt * 4); lean.rotation.z = L; }
-    px = x; pz = z; pyaw = yaw; const n = night(); for (const l of lamps) l.material.emissiveIntensity = /^head/.test(l.name) ? 0.4 + 2.6 * n : 0.6 + 1.8 * n; };
+    px = x; pz = z; pyaw = yaw; const n = night(); for (const l of lamps) l.material.emissiveIntensity = l.userData.lk === 'head' ? 0.4 + 2.6 * n : 0.6 + 1.8 * n; };
   const first = lean.children[1].children[0]; if (first) first.onBeforeRender = tick;
   return { obj, len: f.len + 0.4, w: f.w, h: 1.5, kind: 'car', moto: true };
 }

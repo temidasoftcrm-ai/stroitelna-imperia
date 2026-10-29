@@ -9,7 +9,8 @@
 //   craneLift(craneGroup, H) → { update(t) } — кука с палет под стрелата на кулокрана
 import * as THREE from 'three';
 import { siteK } from './scale.js';
-import { feature } from './lab/feature.js';   // истинските размери на машините (едно място)
+import { feature } from './lab/feature.js';
+import { lampsReal } from './vehmodels.js';   // car-lights2: светлините на машините (възлите lamp_*)   // истинските размери на машините (едно място)
 
 const dark = new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: 0.6, metalness: 0.4 });
 const steel = new THREE.MeshStandardMaterial({ color: 0xf2b705, roughness: 0.55, metalness: 0.2 });
@@ -20,7 +21,7 @@ const debrisGeo = new THREE.BoxGeometry(1, 1, 1), dustGeo = new THREE.SphereGeom
 // и багерът (кула swing, стрела boom, рамо stick, кофа bucket; клипове dig, work). Нормализирани като vehmodels.js: дължина 1 по z, колелата на y = 0.
 export function loadSiteRigs(load, A) {
   // yaw — като vehmodels.js GEAR (грейдерът е с предницата по +x); бетоновозът — като construct.js (по-дългата страна към z)
-  const one = (f, key, yaw = 0) => load(`assets/heavy/gear/${f}.glb`).then(g => { const inner = new THREE.Group(), w = new THREE.Group(); inner.add(g.scene); inner.rotation.y = yaw; w.add(inner); w.updateMatrixWorld(true);
+  const one = (f, key, yaw = 0) => load(`assets/heavy/gear/${f}.glb`).then(g => { lampsReal(g.scene); const inner = new THREE.Group(), w = new THREE.Group(); inner.add(g.scene); inner.rotation.y = yaw; w.add(inner); w.updateMatrixWorld(true);
     let b = new THREE.Box3().setFromObject(w); const s = b.getSize(new THREE.Vector3()); inner.scale.setScalar(1 / s.z); w.updateMatrixWorld(true); b = new THREE.Box3().setFromObject(w); const c = b.getCenter(new THREE.Vector3()); inner.position.set(-c.x, -b.min.y, -c.z);
     w.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); A[key] = { scene: w, clips: g.animations }; }).catch(e => console.warn('rig', f, e));
   return Promise.all([one('mcrane-rig', 'sf-mcrane-rig'), one('excavator-rig', 'sf-excavator-rig'), one('dump-rig', 'sf-dump-rig'), one('backhoe-rig', 'sf-backhoe-rig'), one('roller-rig', 'sf-roller-rig'),

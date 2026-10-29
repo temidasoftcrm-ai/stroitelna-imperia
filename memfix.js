@@ -6,7 +6,7 @@
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { feature } from './lab/feature.js';
 import { Texture } from 'three';
-import { gfx } from './gfxpresets.js';   // 🟠 gfx-lite: „Много ниско“ — текстурите до 256 px и без анизотропно филтриране (при зареждането)
+import { gfx, gfxLevel, gfxWeakGpu } from './gfxpresets.js';   // 🟠 gfx-lite: „Много ниско“ — текстурите до 256 px и без анизотропно филтриране (при зареждането)
 
 const N = 128, cv = document.createElement('canvas'); cv.width = cv.height = N;
 const g2 = cv.getContext('2d', { willReadFrequently: true });
@@ -118,7 +118,11 @@ function markFree(tex) {
   pend.push(new WeakRef(tex));
 }
 // невидимите още модели (в кеша, скрити по разстояние) — качват се на порции на заден план, после се пускат и техните копия
-const pend = []; setInterval(() => { if (!R || document.hidden) return; for (let n = 0; n < 12 && pend.length;) { const t = pend.shift().deref(); if (!t || t.__gone) continue; const st = t.source.__free; if (!st || st.rel || !st.peek()) continue;
+// ⚡ mem-lite (4.1.x, паметта на слабите компютри): на „Ниско“/„Много ниско“ невидимите модели НЕ се качват предварително — горният цикъл
+// качваше на заден план текстурите на всеки зареден модел (и на неизползваните — други градове, варианти): ~1200 текстури до 512² с мип-нива,
+// ~1,5 GB във видеокартата, която при вградената карта е обща памет (2,4 GB и засичане на картата на света). Сега — само каквото се рисува.
+const MEMLITE = feature('mem-lite') && (/low/.test(gfxLevel()) || gfxWeakGpu());   // и на „Средно“/„Високо“ с вградена видеокарта (там видеопаметта е общата памет)
+const pend = []; setInterval(() => { if (!R || document.hidden || MEMLITE) return; for (let n = 0; n < 12 && pend.length;) { const t = pend.shift().deref(); if (!t || t.__gone) continue; const st = t.source.__free; if (!st || st.rel || !st.peek()) continue;
   if (R.properties.get(t.source).__version === t.source.version) continue; try { R.initTexture(t); n++; } catch { } } }, 1500);
 if (FREE && !/[?&]nomemfix/.test(location.search)) { const p0 = GLTFLoader.prototype.parse; GLTFLoader.prototype.parse = function (data, path, onLoad, onError) {
   return p0.call(this, data, path, gltf => { try { for (const sc of gltf.scenes || [gltf.scene]) sc.traverse(o => { for (const m of [].concat(o.material || [])) for (const k in m) markFree(m[k]); }); } catch (e) { } onLoad(gltf); }, onError); }; }

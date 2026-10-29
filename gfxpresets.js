@@ -29,6 +29,9 @@ export const gfxSaved = () => { try { return !!localStorage.getItem('stroi-gfx')
 const W_SOFT = /SwiftShader|llvmpipe|softpipe|Software|Basic Render|Mesa Offscreen/i, W_DISC = /NVIDIA|GeForce|RTX|GTX|Quadro|Radeon (RX|Pro|R9|HD [5-9])|Radeon\(TM\) RX|Arc\(TM\) A|Intel.*Arc/i, W_APPLE = /Apple (M\d|GPU)/i;
 let autoWhy = null;
 export const gfxAutoWhy = () => autoWhy;   // game.js: съобщение веднъж
+let weakG = null;   // вградена/софтуерна видеокарта (веднъж; mem-lite — и на „Средно“)
+export const gfxWeakGpu = () => { if (weakG !== null) return weakG; let gpu = ''; try { const gl = document.createElement('canvas').getContext('webgl2') || document.createElement('canvas').getContext('webgl'), e = gl && gl.getExtension('WEBGL_debug_renderer_info'); gpu = gl ? String((e && gl.getParameter(e.UNMASKED_RENDERER_WEBGL)) || gl.getParameter(gl.RENDERER) || '') : ''; } catch { }
+  return weakG = !!gpu && (W_SOFT.test(gpu) || (!W_DISC.test(gpu) && !W_APPLE.test(gpu))); };
 function autoLv() {
   if (!feature('perf3-auto') || /[?&]autotest/.test(location.search)) return 'mid';
   let gpu = ''; try { const gl = document.createElement('canvas').getContext('webgl2') || document.createElement('canvas').getContext('webgl'), e = gl && gl.getExtension('WEBGL_debug_renderer_info'); gpu = gl ? String((e && gl.getParameter(e.UNMASKED_RENDERER_WEBGL)) || gl.getParameter(gl.RENDERER) || '') : ''; } catch { }

@@ -57,7 +57,10 @@ export function flagTex(cc, eu = false) {
   const c = document.createElement('canvas'); c.width = 192; c.height = 128; const g = c.getContext('2d');
   if (eu) { g.fillStyle = '#003399'; g.fillRect(0, 0, 192, 128); g.fillStyle = '#ffcc00'; for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, x = 96 + Math.cos(a) * 36, y = 64 + Math.sin(a) * 36; g.beginPath(); for (let q = 0; q < 10; q++) { const b = -Math.PI / 2 + q * Math.PI / 5, r = q % 2 ? 2.4 : 6; g.lineTo(x + Math.cos(b) * r, y + Math.sin(b) * r); } g.fill(); } }
   else if (!draw(g, 192, 128, k)) { g.fillStyle = '#eee'; g.fillRect(0, 0, 192, 128); g.font = '110px serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(cc, 96, 70); }   // непознато — емоджито (на Windows — буквите)
-  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; texCache.set(k, t); return t;
+  const t = canvasTex(c); t.colorSpace = THREE.SRGBColorSpace; texCache.set(k, t);
+  // собственикът (29.10): истинското знаме (герб, звезди…) — assets/flags/<код>.svg; щом се зареди, прерисува същата текстура (рисуваното остава до тогава)
+  if (!eu && k.length === 2 && t.image && t.image.data) { const im = new Image(); im.onload = () => { try { g.clearRect(0, 0, 192, 128); g.drawImage(im, 0, 0, 192, 128); t.image.data.set(g.getImageData(0, 0, 192, 128).data); t.needsUpdate = true; } catch (e) { } }; im.src = new URL(`assets/flags/${k.toLowerCase()}.svg`, import.meta.url).href; }
+  return t;
 }
 // веещият се плат: изместване по z според разстоянието от стълба (x) и времето
 const T = { value: 0 }, clothGeo = new THREE.PlaneGeometry(1, 0.66, 12, 4).translate(0.5, 0, 0);

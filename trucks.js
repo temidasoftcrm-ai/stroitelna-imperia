@@ -3,7 +3,7 @@
 // game.js подава зависимостите (сцена, модели, път по улиците), за да няма кръгови импорти.
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';
-import { addTruckLamps } from './vehmodels.js';
+import { addTruckLamps, lampsFix } from './vehmodels.js';
 import { trimRoute } from './junctionpaths.js';
 import { spinWheels } from './wheelspin.js';
 
@@ -116,7 +116,7 @@ export function createTirs(deps) {
     const cabN = m.getObjectByName('cab'), trlN = m.getObjectByName('trailer'); if (!cabN || !trlN) return null;
     const k = cabN.parent.scale.x, B = new THREE.Box3(), part = n => { const g = new THREE.Group(); n.removeFromParent(); n.position.set(0, n.position.y, 0); g.add(n); g.scale.setScalar(k); g.updateMatrixWorld(true); g.userData.len = B.setFromObject(g).getSize(new THREE.Vector3()).z; return g; };
     const cab0 = part(cabN), trl = part(trlN), root = new THREE.Group(), gap = 0.2, cab = new THREE.Group();
-    cab.add(cab0); cab.userData.len = cab0.userData.len; addTruckLamps(cab, cab.userData.len, 2.5, 1.1);   // лъчите на фаровете нощем — както на sf-trk
+    cab.add(cab0); cab.userData.len = cab0.userData.len; addTruckLamps(cab, cab.userData.len, 2.5, 1.1); lampsFix(cab);   // лъчите на фаровете нощем — както на sf-trk
     root.add(cab);
     if (!art) { cab.position.z = trl.userData.len / 2 + gap / 2; trl.position.z = -cab.userData.len / 2 - gap / 2; root.add(trl); }
     const mi = deps.matInfo(order.matId), tag = deps.label(`🚚 ${mi.ico} ${mi.nm} · ${order.qty} ${mi.unit}`, '#ffffff', 7);
@@ -129,7 +129,7 @@ export function createTirs(deps) {
     const root = new THREE.Group();
     let cab = null;
     const CL = feature('real-scale') ? 6 : 4.6;   /* real-scale (55): истинската кабина на влекача — 6 м */
-    if (feature('trucks-real') && deps.model) try { const m = deps.model('sf-trk-' + (order.id % 2), CL); cab = new THREE.Group(); cab.add(m); addTruckLamps(cab, CL, 2.5, 1.1); } catch (e) { cab = null; }   // модерният влекач (trucks-real); фаровете — на немащабираната група
+    if (feature('trucks-real') && deps.model) try { const m = deps.model('sf-trk-' + (order.id % 2), CL); cab = new THREE.Group(); cab.add(m); addTruckLamps(cab, CL, 2.5, 1.1); lampsFix(cab); } catch (e) { cab = null; }   // модерният влекач (trucks-real); фаровете — на немащабираната група
     if (!cab) cab = tractorUnit(CAB_COLS[order.id % CAB_COLS.length]);
     cab.position.z = art ? 0 : 3.6 + (CL - 4.6) / 2;   // влекачът отпред (+z е посоката на движение)
     root.add(cab);

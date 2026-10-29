@@ -36,6 +36,7 @@ const STEPS = [
   { ico: '🗺️', t: ['Картата', 'The map'], d: ['Натисни <b>🗺️ Карта</b> горе: там са магистралите, жп линиите и другите градове. Първата магистрала е голяма стъпка!', 'Press <b>🗺️ Map</b> at the top: motorways, railways and other cities live there. Your first motorway is a big step!'], el: '#btnMapToggle', done: s => s.onMap || s.hw > 0 },
 ];
 // „❓“ — по таб / прозорец
+const HELP_LV = 6;
 const HELP = {
   offers: ['Поръчките идват всеки ден. „Предложи“ — изпращаш оферта; с бутоните −15%…+20% сваляш или вдигаш цената (по-евтино — по-голям шанс). Аванс 30% при приемане, останалото — при предаване.', 'New orders arrive every day. “Propose” sends your bid; the −15%…+20% buttons lower or raise the price (cheaper — better chance). 30% advance on acceptance, the rest on completion.'],
   projects: ['Тук са обектите ти: етап, прогрес и срок. Техниката отива сама; ако нещо липсва (материали, машина), ще го видиш тук.', 'Your sites: stage, progress and deadline. Equipment drives there by itself; if something is missing (materials, a machine), it shows up here.'],
@@ -56,7 +57,8 @@ body.ob2 #hub .grid > .lockT { display:none !important; }
 #ob2Box .tr { display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--mut,#94a3b8); margin-top:8px; }
 #ob2Ring { position:fixed; z-index:29; pointer-events:none; border:3px solid #ffd54a; border-radius:12px; box-shadow:0 0 0 4px rgba(255,213,74,.25), 0 0 22px rgba(255,213,74,.7); animation:ob2Pulse 1.3s ease-in-out infinite; }
 #ob2Ring::after { content:'⬇'; position:absolute; left:50%; top:-34px; transform:translateX(-50%); font-size:26px; color:#ffd54a; text-shadow:0 2px 6px #000; }
-.ob2Help { float:right; margin:0 0 6px 8px; width:28px; height:28px; border-radius:50%; border:1px solid var(--line,#334); background:#1b2433; color:#ffd54a; font-weight:900; cursor:pointer; }
+#panelBody { position:relative; }
+.ob2Help { position:absolute; top:4px; right:6px; z-index:2; width:22px; height:22px; padding:0; font-size:11px; line-height:20px; border-radius:50%; border:1px solid var(--line,#334); background:#1b2433; color:#ffd54a; font-weight:900; cursor:pointer; opacity:.55; } .ob2Help:hover { opacity:1; }   /* собственикът (29.10): дискретно в ъгъла — не бута съдържанието (иначе при всяко прерисуване на панела то подскачаше) */
 .ob2HelpTx { clear:both; margin:0 0 10px; padding:9px 11px; border-radius:10px; background:#152033; border:1px solid #2c3e5c; font-size:13px; line-height:1.45; color:#cfe0f5; }
 `;
 
@@ -94,11 +96,12 @@ export function createOnboard2(deps) {
     box.style.display = hideOnMap ? 'none' : 'block'; place(hideOnMap ? null : S.el);
   }
   function help() {
+    if (deps.lv() >= HELP_LV) { document.querySelectorAll('.ob2Help, .ob2HelpTx').forEach(e => e.remove()); return; }   // „❓“ — само в началото (до ниво HELP_LV на фирмата)
     const pb = document.getElementById('panelBody'), tab = document.querySelector('#tabs button.on')?.dataset.t;
     if (pb && tab && HELP[tab] && !pb.querySelector(':scope > .ob2Help')) { const b = document.createElement('button'); b.className = 'ob2Help'; b.textContent = '❓'; b.title = T('Какво е това?', 'What is this?');
       b.onclick = () => { const x = pb.querySelector(':scope > .ob2HelpTx'); if (x) { x.remove(); return; } const d = document.createElement('div'); d.className = 'ob2HelpTx'; d.textContent = T(...HELP[tab]); b.after(d); }; pb.prepend(b); }
     for (const [id, key, anchor] of [['mapHud', 'map', 'h2'], ['hub', 'hub', 'h4']]) { const host = document.getElementById(id), h = host && host.querySelector(anchor);
-      if (!h || h.querySelector('.ob2Help')) continue; const b = document.createElement('button'); b.className = 'ob2Help'; b.style.cssText = 'float:none;margin-left:8px;width:24px;height:24px;font-size:12px'; b.textContent = '❓';
+      if (!h || h.querySelector('.ob2Help')) continue; const b = document.createElement('button'); b.className = 'ob2Help'; b.style.cssText = 'position:static;margin-left:8px;width:22px;height:22px;font-size:11px;vertical-align:middle'; b.textContent = '❓';
       b.onclick = e => { e.stopPropagation(); const x = host.querySelector('.ob2HelpTx'); if (x) { x.remove(); return; } const d = document.createElement('div'); d.className = 'ob2HelpTx'; d.textContent = T(...HELP[key]); h.after(d); }; h.appendChild(b); }
   }
   // вика се ~веднъж в секунда (game.js — вместо tutorial.tick)

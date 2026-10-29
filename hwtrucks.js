@@ -105,6 +105,7 @@ export function createHwTrucks(d) {
   }
   // карта в таб „Техника“
   const svcOf = t => Math.round(TRUCK.cost * TRUCK.service * (100 - (t.cond ?? 100)) / 70 / 100) * 100;
+  let tirOpen = false;
   function html() {
     const T = L();
     let h = `<div class="sect">🚚 ТИР-ове по магистралите${T.length ? ` (${T.length})` : ''}</div><div class="card" style="padding:9px 11px">
@@ -117,15 +118,18 @@ export function createHwTrucks(d) {
       const v = feature('tir-cont') && d.tirView ? d.tirView() : null;   // tir-cont: таванът на континента от раздела („Всички“ — общо срещу сбора)
       if (v) h += `<div style="display:flex;gap:6px;margin-top:6px"><button class="btn" data-trk="buy:${v.k}" style="flex:1" ${E().canAfford(TRUCK.cost) && !v.why ? '' : 'disabled'} title="${v.why || 'Таван по континенти: Европа 60, Африка 50, Америка 60, Азия 50, Австралия 40 — и 2 ТИР-а на участък магистрала, 4 на аутобан там'}">${v.label ? `🚚 Купи ТИР · ${f(TRUCK.cost)} € · ${v.n}/${v.cap} (${v.label})` : `🚚 Купи ТИР · ${f(TRUCK.cost)} € · ${v.n}/${v.cap}`}</button>${svc}</div>${v.why ? `<div class="meta late" style="margin:4px 0 0">${v.why}</div>` : ''}</div>`;
       else h += `<div style="display:flex;gap:6px;margin-top:6px"><button class="btn" data-trk="buy" style="flex:1" ${E().canAfford(TRUCK.cost) && L().length < (d.cap ? d.cap() : Infinity) ? '' : 'disabled'} title="Лимит: 2 ТИР-а на участък магистрала, 4 на аутобан">🚚 Купи ТИР · ${f(TRUCK.cost)} €${d.cap ? ` · ${L().length}/${d.cap()}` : ''}</button>${svc}</div></div>`; }
+    if (T.length) h += `<details class="tirList"${tirOpen ? ' open' : ''}><summary class="meta" style="cursor:pointer;margin:8px 0 4px;font-weight:700;color:var(--txt)">📋 Списък с ТИР-овете (${T.length}) · общо спечелили ${f(T.reduce((a, t) => a + (t.earned || 0), 0))} €</summary>`;   // собственикът (29.10): списъкът — свит (акордеон), отваря се при нужда
     for (const t of T) {
       const svc = svcOf(t), j = t.path ? jam(t) : 1, sell = Math.round(TRUCK.cost * TRUCK.sell * (t.cond ?? 100) / 100);
       h += `<div class="card" style="padding:9px 11px"><b>${t.nm}</b> <span class="meta" style="margin:0">${t.path ? `${cargoOf(t)[1]} ${name(t.path[0])} → ${name(t.path[t.path.length - 1])} · ${Math.round(t.km)}/${Math.round(t.total)} км · ~${f(legPay(t))} €${legToll(t) ? ` − тол ${f(legToll(t))} €` : ''}` : `⏸ чака в ${name(t.at)} — няма готова магистрала до друг твой град`}</span><br>
         <span class="meta" style="margin:0">курсове ${t.trips} · спечелил ${f(t.earned)} € · 🔧 ${Math.round(t.cond ?? 100)}%${j < 1 ? ` · <span class="late">🚦 задръстване −${Math.round((1 - j) * 100)}%</span>` : ''}</span>
         <div class="row" style="justify-content:flex-end;gap:6px;margin-top:4px;flex-wrap:wrap">${svc > 0 ? `<button class="btn2" data-trk="svc:${t.id}:${svc}" ${E().canAfford(svc) ? '' : 'disabled'}>🔧 Обслужи · ${f(svc)} €</button>` : ''}<button class="btn2" data-trk="sell:${t.id}:${sell}">Продай · ${f(sell)} €</button></div></div>`;
     }
+    if (T.length) h += `</details>`;
     return h;
   }
   function bind(el) {
+    el.querySelector('details.tirList')?.addEventListener('toggle', e => { tirOpen = e.target.open; });   // помни отворен/свит — панелът се прерисува
     el.querySelectorAll('[data-trk]').forEach(b => b.onclick = () => {
       const [c, id, x] = b.dataset.trk.split(':'), t = L().find(q => q.id === +id);
       if (c === 'buy') return buy(id || undefined);

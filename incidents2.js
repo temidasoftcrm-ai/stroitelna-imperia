@@ -8,6 +8,7 @@ import { canvasTex } from './texdata.js';   // fac-data (T1): статичнит
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { feature } from './lab/feature.js';
+import { lampsReal } from './vehmodels.js';   // car-lights2: фаровете на пътната помощ (lamp_*)
 // 🚚 tow-trucks (T1): влекачите на потребителя (Meshy AI, Темидасофт) — лекият (пикап със стрела) в града, тежкият (3 оси, стрела) на магистралата;
 // в Blender: колелата (wheel_*), стрелата (boom, шарнир в основата), бурканите (beacon_*) и фаровете — отделни; тук: колелата се въртят по пътя,
 // бурканите мигат, стрелата се вдига, щом нещо е закачено. Предницата — към +z.
@@ -24,6 +25,7 @@ export function loadInc2() {
     for (const g of peds) { g.scene.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(g.scene, true); g.k = 1.75 / ((b.max.y - b.min.y) || 1); for (const c of g.animations) clips[c.name] = clips[c.name] || c; }
     if (an) for (const c of an.animations) clips[c.name] = c;
     for (const g of [cop, ff, medic, moto, tow, towL, towH]) if (g) g.scene.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+    for (const g of [tow, towL, towH]) if (g) lampsReal(g.scene);
     for (const g of [towL, towH]) if (g) g.scene.traverse(m => { if (m.isMesh && m.material) { m.material.metalness = Math.min(m.material.metalness ?? 0, 0.3); if (/^beacon|^lamp/.test(m.name)) m.castShadow = false; } });   // tow-trucks: металността 1 без огледална среда — черно
     return { peds, clips, cop, ff, medic, moto, tow, towL, towH };
   });

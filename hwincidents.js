@@ -274,7 +274,7 @@ export function createHwIncidents(T) {
     // аварийните (по игровото време), стоповете на колите отзад, коридорът
     { const on = Math.floor(t * 1.5) % 2 === 0; for (const m of I.haz) m.visible = on; }
     for (const c of list) { if (c.inc || c.s || c.away) continue; c.rg = 0;
-      if (c.dir === D) { const s = sOf(c.x), br = s > -700 && s < I.s1 && ((c.v < (c._pv ?? c.v) - 0.8 * dt) || c.v < 1.5); if (br !== !!c._br) { if (!c._rear) { c._rear = []; c.o.traverse(m => { if (m.userData.lamp === 'rear') c._rear.push(m); }); c._rm = c._rear[0] && c._rear[0].material; } for (const m of c._rear) m.material = br ? BR.brake : c._rm; c._br = br; } }
+      if (c.dir === D) { const s = sOf(c.x), br = s > -700 && s < I.s1 && ((c.v < (c._pv ?? c.v) - 0.8 * dt) || c.v < 1.5); if (br !== !!c._br) { if (!c._rear) { c._rear = []; c.o.traverse(m => { if (m.userData.lamp === 'rear') c._rear.push(m); }); c._rm = c._rear[0] && c._rear[0].material; } for (const m of c._rear) { const R = m.material && m.material.lampSet; m.material = R ? (br ? R.brake : R.night) : br ? BR.brake : c._rm; } c._br = br; } }
       c._pv = c.v; }
     for (const r of I.resp) if (r.R.corr) for (const q of list) { if (q.inc || q.dir !== D || q.s || q.away) continue; const d = (q.x - r.x) * D; if (d > 0 && d < 200 && sOf(q.x) < I.s0 - 150 && Math.abs(q.z - laneZ(D, q.lane)) < SH + 0.35) q.rg = (q.lane === 0 ? -1 : 1) * D * SH; }
     for (const c of I.resp.slice()) if (c.R.ph !== 'gone') drive(c, dt);
