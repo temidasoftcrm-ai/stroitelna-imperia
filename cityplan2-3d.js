@@ -112,6 +112,39 @@ export function nightWin(mat, c, o = {}) {   // export — и за bgblocks.js
   if (mat.map) { if (RX !== 1 || RY !== 1) { mat.map.wrapS = mat.map.wrapT = THREE.RepeatWrapping; mat.map.repeat.set(RX, RY); t.repeat.set(RX, RY); } t.wrapS = mat.map.wrapS; t.wrapT = mat.map.wrapT; }
   mat.emissive = new THREE.Color(0xffffff); mat.emissiveMap = t; mat.emissiveIntensity = 0; mat.userData.winK = o.k || 0.62; WIN_MATS.push(mat); return mat;
 }
+// 🌃 ny-night2 (собственикът: „Ню Йорк нощем — като дискотека“; образецът — снимката на Мидтаун): само шейдърът на фасадите на фоновите сгради (без нови мрежи).
+// NYN.value = 1 само в Ню Йорк (материалите са общи за всички градове — другаде нищо не се мени):
+//  • светнали ~25 % от прозорците (по яркостта на петното — един и същ прозорец винаги), топло бяло / кехлибарено, без наситено синьо;
+//  • всяка сграда — своя гъстота (някои почти тъмни, други — ярки офиси); стъклените кули — по ЕТАЖИ (цели редове светли или тъмни);
+//  • отдалеч (300–500 м) мрежата от прозорци → равно меко сияние (без моаре и кафяв шум при зазоряване)
+export const NYN = { value: 0 }, NYNIGHT = { value: 0 };   // NYNIGHT — нощта (0…1), от цикъла на играта
+export function nyNight(mat, glass = false) {
+  if (mat.userData.nyN) return mat; mat.userData.nyN = 1; const prev = mat.onBeforeCompile, key = mat.customProgramCacheKey;
+  mat.onBeforeCompile = (sh, r) => { if (prev) prev(sh, r); sh.uniforms.uNY = NYN;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vNyId; varying float vNyD;').replace('#include <project_vertex>', `#include <project_vertex>
+      #ifdef USE_INSTANCING
+        vNyId = float(gl_InstanceID);
+      #else
+        vNyId = 0.0;
+      #endif
+      vNyD = -mvPosition.z;`);
+    sh.uniforms.uNyNight = NYNIGHT;
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uNY; uniform float uNyNight; varying float vNyId; varying float vNyD;').replace('#include <map_fragment>', '#include <map_fragment>\n  if (uNY > 0.5) diffuseColor.rgb *= mix(1.0, 0.42, uNyNight);   /* нощем — тъмни стени (тъмносиньо/въглен), не сива „облачна“ фасада */').replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      #ifdef USE_EMISSIVEMAP
+      if (uNY > 0.5) {
+        float lum = dot(totalEmissiveRadiance, vec3(0.333)), base = max(emissive.r, 1e-4), k = lum / base;   // 0…1 — яркостта на петното (за прозореца е постоянна)
+        float bld = fract(sin(vNyId * 12.9898 + 1.7) * 43758.5453), dens = bld < 0.22 ? 0.12 : 0.35 + 0.65 * bld;
+        float keep = step(fract(k * 37.0 + bld * 3.1), 0.42 + 0.22 * bld);   // ~25–45 % от светналите остават
+        ${glass ? `float fl = floor(vEmissiveMapUv.y * 16.0); keep = step(0.45 - 0.25 * bld, fract(sin((fl + vNyId * 7.0) * 78.233) * 43758.5453)) * step(0.02, k);` : ''}
+        float cool = step(0.86, fract(k * 91.0 + bld));
+        float amb = fract(k * 53.0 + bld * 5.3); vec3 warm = amb < 0.4 ? vec3(1.0, 0.5, 0.17) : vec3(1.0, 0.7, 0.32);
+        vec3 col = mix(warm, vec3(0.82, 0.9, 1.0), cool) * base * k * keep * dens * ${glass ? '1.15' : '1.0'};   // наситено топло (ACES избелва яркото)
+        float far = smoothstep(350.0, 1100.0, vNyD);   // отдалеч — същите точки, по-ярки (мипмапите ги размиват), без равна сива пелена
+        totalEmissiveRadiance = col * (1.0 + 0.9 * far);
+      }
+      #endif`); };
+  mat.customProgramCacheKey = () => (key ? key.call(mat) : '') + '|nyN' + (glass ? 'g' : ''); mat.needsUpdate = true; return mat;
+}
 // повтаряща се фасада по истинските размери на инстанцията (небостъргачите не са разтеглени): uv × (ширина/период, височина/период)
 export function tileByScale(mat, pw, ph) {   // ph = 0 — без повторение по височина (етажите са нарисувани на платното; bgblocks.js)
   mat.map.wrapS = mat.map.wrapT = THREE.RepeatWrapping; if (mat.emissiveMap) mat.emissiveMap.wrapS = mat.emissiveMap.wrapT = THREE.RepeatWrapping;
@@ -340,34 +373,59 @@ function osmEdge(G, D, F, edge) {
   const occAt = (x, z) => { const i = Math.floor((x - gx0) / G10), j = Math.floor((z - gz0) / G10); return i < 0 || j < 0 || i >= GW || j >= GH ? 0 : occ[j * GW + i]; };
   const rail = edge.railX != null ? { L: edge.railX - 40, R: edge.railX + 25, z0: edge.railZ ? edge.railZ[0] : -1e9, z1: edge.railZ ? edge.railZ[1] : 1e9 } : null;
   const inRail = (x, z, m = 0) => rail && x > rail.L - m && x < rail.R + m && z > rail.z0 - m && z < rail.z1 + m;
-  // 3) водата: клетки 10 м в лентите, без заетото, растера и жп коридора — слети в серии по редове
-  const pos = [], idx = []; let nw = 0;
+  // 3) рамката и водата на решетка 10 м: суша (y 0, общият материал — city-ground го сменя) и вода на нивото на растера (wY) — без стъпало на ръба на
+  //    растера; там, където водата опира в суша (или в сушата на растера) — вертикална кейова стена от wY до 0, както кейовете вътре
   const bb = quads.map(q => [Math.min(...q.map(p => p[0])), Math.max(...q.map(p => p[0])), Math.min(...q.map(p => p[1])), Math.max(...q.map(p => p[1]))]);
   const isW = (x, z) => !(x > X0 && x < X1 && z > Z0 && z < Z1) && !occAt(x, z) && !inRail(x, z) && quads.some((q, k) => x >= bb[k][0] && x <= bb[k][1] && z >= bb[k][2] && z <= bb[k][3] && inPoly([x, z], q));
-  for (let j = 0; j < GH; j++) { const z = gz0 + (j + 0.5) * G10; let st = -1;
-    for (let i = 0; i <= GW; i++) { const w = i < GW && isW(gx0 + (i + 0.5) * G10, z); if (w && st < 0) st = i; else if (!w && st >= 0) { const xa = gx0 + st * G10, xb = gx0 + i * G10, za = gz0 + j * G10, zb = za + G10, b = pos.length / 3; pos.push(xa, 0.04, za, xb, 0.04, za, xb, 0.04, zb, xa, 0.04, zb); idx.push(b, b + 2, b + 1, b, b + 3, b + 2); nw++; st = -1; } } }
-  if (idx.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); const m = new THREE.Mesh(g, MAT.water); m.name = 'osmEdgeWater'; m.receiveShadow = true; G.add(m); }
-  // 4) ниските квартали: решетка 40 м с отместване; без водата, плана (+40 м), растера и жп коридора (+30 м); до ~2,2 км, все по-редки навън
+  const WY = D.wY ?? -1.2, cellT = new Uint8Array(GW * GH), rasterW = (x, z) => { const i = Math.floor((x - X0) / C), j = Math.floor((z - Z0) / C); return W(i, j); };
+  for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) { const x = gx0 + (i + 0.5) * G10, z = gz0 + (j + 0.5) * G10; cellT[j * GW + i] = x > X0 && x < X1 && z > Z0 && z < Z1 ? 0 : isW(x, z) ? 2 : 1; }
+  const runsMesh = (t, y, mat, name) => { const pos = [], idx = []; let n = 0;
+    for (let j = 0; j < GH; j++) { let st = -1; for (let i = 0; i <= GW; i++) { const on = i < GW && cellT[j * GW + i] === t; if (on && st < 0) st = i; else if (!on && st >= 0) { const xa = gx0 + st * G10, xb = gx0 + i * G10, za = gz0 + j * G10, zb = za + G10, b = pos.length / 3; pos.push(xa, y, za, xb, y, za, xb, y, zb, xa, y, zb); idx.push(b, b + 2, b + 1, b, b + 3, b + 2); n++; st = -1; } } }
+    if (idx.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); const m = new THREE.Mesh(g, mat); m.name = name; m.receiveShadow = true; G.add(m); } return n; };
+  runsMesh(1, 0, MAT.urban, 'osmEdgeLand'); const nw = runsMesh(2, WY, MAT.water, 'osmEdgeWater');
+  // стените: ръб между водна клетка и суша (рамката или сушата на растера); по ръба на растера — и водата на растера срещу сушата на рамката
+  const wp = [], wi = [], wall = (x0, z0, x1, z1) => { const b = wp.length / 3; wp.push(x0, WY - 0.3, z0, x1, WY - 0.3, z1, x1, 0.02, z1, x0, 0.02, z0); wi.push(b, b + 1, b + 2, b, b + 2, b + 3); };
+  const T = (i, j) => i < 0 || j < 0 || i >= GW || j >= GH ? 1 : cellT[j * GW + i], landAt = (i, j) => { const t = T(i, j); if (t === 1) return true; if (t === 2) return false; return !rasterW(gx0 + (i + 0.5) * G10, gz0 + (j + 0.5) * G10); };
+  for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) { const t = cellT[j * GW + i], x = gx0 + i * G10, z = gz0 + j * G10;
+    const wet = t === 2 || (t === 0 && rasterW(x + G10 / 2, z + G10 / 2)); if (!wet) continue;
+    if (t === 2) { if (landAt(i - 1, j)) wall(x, z, x, z + G10); if (landAt(i + 1, j)) wall(x + G10, z, x + G10, z + G10); if (landAt(i, j - 1)) wall(x, z, x + G10, z); if (landAt(i, j + 1)) wall(x, z + G10, x + G10, z + G10); }
+    else { if (T(i - 1, j) === 1) wall(x, z, x, z + G10); if (T(i + 1, j) === 1) wall(x + G10, z, x + G10, z + G10); if (T(i, j - 1) === 1) wall(x, z, x + G10, z); if (T(i, j + 1) === 1) wall(x, z + G10, x + G10, z + G10); } }
+  if (wi.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(wp, 3)); g.setIndex(wi); g.computeVertexNormals(); const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x8f8a80, roughness: 0.95, side: THREE.DoubleSide })); m.name = 'osmEdgeWalls'; m.receiveShadow = true; G.add(m); }
+  // 4) кварталите извън града (гъстотата: до града ~90 %, на ръба ~12 %): улична решетка по преобладаващата посока на улиците в плана (карета 4×3 сгради, улица между тях), по-гъсто до града,
+  //    тухла/кафяво/бежово/сиво, 2–6 етажа; Ню Йорк — Джърси Сити срещу Мидтаун (група кули 60–200 м); и малко дървета. Един InstancedMesh за сградите, един — за дърветата.
   const B = edge.bnd || [], bx0 = Math.min(X0, ...B.map(p => p[0])), bx1 = Math.max(X1, ...B.map(p => p[0])), bz0 = Math.min(Z0, ...B.map(p => p[1])), bz1 = Math.max(Z1, ...B.map(p => p[1]));
-  const hsh = (x, z) => { const h = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453; return h - Math.floor(h); }, M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), V = new THREE.Vector3(), Sc = new THREE.Vector3(), pts = [], R0 = 2200, ST = 40;
-  const busy = (x, z) => occAt(x, z) || occAt(x - 40, z) || occAt(x + 40, z) || occAt(x, z - 40) || occAt(x, z + 40) || (B.length > 2 && inPoly([x, z], B)) || (x > X0 - 20 && x < X1 + 20 && z > Z0 - 20 && z < Z1 + 20);
-  for (let x = bx0 - R0; x <= bx1 + R0; x += ST) for (let z = bz0 - R0; z <= bz1 + R0; z += ST) {
-    const dd = Math.max(bx0 - x, x - bx1, bz0 - z, z - bz1, 0), r = hsh(x, z); if (r > 0.62 - dd / R0 * 0.42) continue;
-    const px = x + (hsh(z, x) - 0.5) * 18, pz = z + (hsh(x + 3, z) - 0.5) * 18;
-    if (busy(px, pz) || inRail(px, pz, 30) || isW(px, pz) || isW(px + 12, pz) || isW(px - 12, pz) || isW(px, pz + 12) || isW(px, pz - 12)) continue; pts.push([px, pz, r]); }
-  if (pts.length) {
-    const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 }), pts.length), col = new THREE.Color();
-    pts.forEach(([x, z, r], i) => { const w = 12 + r * 16, d = 10 + hsh(z, x) * 14, h = 5 + hsh(x * 2, z) * 12; im.setMatrixAt(i, M4.compose(V.set(x, 0, z), Q.setFromAxisAngle(Sc.set(0, 1, 0), (r - 0.5) * 0.3), Sc.set(w, h, d)));
-      im.setColorAt(i, col.setHSL(0.07 + r * 0.05, 0.12 + r * 0.1, 0.5 + hsh(x, z * 3) * 0.2)); });
+  const hsh = (x, z) => { const h = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453; return h - Math.floor(h); }, M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), V = new THREE.Vector3(), Sc = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0);
+  const hist = new Float32Array(18); for (const r of edge.roads || []) for (let k = 1; k < r.pts.length; k++) { const a = r.pts[k - 1], b = r.pts[k], L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 5) continue; let t = Math.atan2(b[1] - a[1], b[0] - a[0]); t = ((t % (Math.PI / 2)) + Math.PI / 2) % (Math.PI / 2); hist[Math.min(17, Math.floor(t / (Math.PI / 2) * 18))] += L; }
+  let hb = 0; for (let k = 1; k < 18; k++) if (hist[k] > hist[hb]) hb = k; const ang = (hb + 0.5) / 18 * Math.PI / 2, ca = Math.cos(ang), sa = Math.sin(ang);
+  const busy = (x, z) => occAt(x, z) || occAt(x - 30, z) || occAt(x + 30, z) || occAt(x, z - 30) || occAt(x, z + 30) || (B.length > 2 && inPoly([x, z], B)) || (x > X0 - 20 && x < X1 + 20 && z > Z0 - 20 && z < Z1 + 20);
+  const dry = (x, z, r) => !isW(x, z) && !isW(x + r, z) && !isW(x - r, z) && !isW(x, z + r) && !isW(x, z - r);
+  const PAL = [0x9b5a46, 0xa8624c, 0x7c5a45, 0x8a6a52, 0xd6c6a6, 0xcdbb98, 0xa9a7a2, 0x8e8c88, 0xc2b8a8], bld = [], trees = [], R0 = 2300, CELL = 26, cx = (bx0 + bx1) / 2, cz = (bz0 + bz1) / 2, HALF = Math.max(bx1 - bx0, bz1 - bz0) / 2 + R0;
+  for (let u = -HALF; u <= HALF; u += CELL) for (let w = -HALF; w <= HALF; w += CELL) {
+    const iu = Math.round(u / CELL), iw = Math.round(w / CELL); if (((iu % 5) + 5) % 5 === 4 || ((iw % 4) + 4) % 4 === 3) continue;   // улиците: всяка 5-а колона и 4-и ред
+    const x = cx + u * ca - w * sa, z = cz + u * sa + w * ca, dd = Math.max(bx0 - x, x - bx1, bz0 - z, z - bz1, 0); if (dd > R0) continue;
+    const r = hsh(x, z), keep = 0.9 - Math.pow(dd / R0, 0.7) * 0.78; if (r > keep) { if (r < keep + 0.12 && !busy(x, z) && !inRail(x, z, 25) && dry(x, z, 6)) trees.push([x, z, 0.6 + hsh(z, x) * 0.7]); continue; }
+    if (busy(x, z) || inRail(x, z, 30) || !dry(x, z, 13)) continue;
+    const st = 2 + Math.floor(Math.pow(hsh(x * 2, z), 2) * 5) + (hsh(z * 3, x) > 0.97 ? 4 : 0);   // 2–6 етажа, рядко по-високо
+    bld.push([x, z, 14 + hsh(z, x) * 6, 12 + hsh(x, z * 2) * 7, st * 3.2, PAL[Math.floor(hsh(x * 5, z * 7) * PAL.length)], 0.86 + hsh(x, z * 5) * 0.28]); }
+  if (D.style === 'newyork') { const jx = X0 - 230, jz = Z1 - 150;   // Джърси Сити: кулите на брега срещу Мидтаун/Финансовия квартал
+    for (let k = 0; k < 16; k++) { const x = jx - hsh(k, 1) * 380, z = jz + (hsh(1, k) - 0.3) * 900; if (inRail(x, z, 30) || !dry(x, z, 20) || busy(x, z)) continue; const h = 60 + Math.pow(hsh(k, 7), 1.5) * 140;
+      bld.push([x, z, 26 + hsh(k, 3) * 16, 24 + hsh(3, k) * 14, h, [0x6d7f92, 0x8a98a6, 0x5a6c7e, 0xb4b8bc][k % 4], 1]); } }
+  if (bld.length) {
+    const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.88 }), bld.length), col = new THREE.Color();
+    Q.setFromAxisAngle(Y, -ang); bld.forEach(([x, z, w, d, h, c, k], i) => { im.setMatrixAt(i, M4.compose(V.set(x, 0, z), Q, Sc.set(w, h, d))); im.setColorAt(i, col.setHex(c).multiplyScalar(k)); });
     im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; im.receiveShadow = true; im.name = 'osmEdgeSuburbs'; G.add(im); }
-  G.userData.osmEdge = { bands: quads.length, waterRuns: nw, suburbs: pts.length };
+  if (trees.length) {
+    const tm = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0).translate(0, 1.4, 0), new THREE.MeshStandardMaterial({ color: 0x4f7f3a, roughness: 0.95, flatShading: true }), trees.length);
+    trees.forEach(([x, z, k], i) => tm.setMatrixAt(i, M4.compose(V.set(x, 0, z), Q.identity(), Sc.set(4.5 * k, 4 * k, 4.5 * k)))); tm.instanceMatrix.needsUpdate = true; tm.name = 'osmEdgeTrees'; G.add(tm); }
+  const pts = bld;
+  G.userData.osmEdge = { bands: quads.length, waterRuns: nw, suburbs: pts.length, trees: trees.length, ang: +(ang * 180 / Math.PI).toFixed(1) }; G.userData.osmEdgeAt = isW;   // водата извън растера (координатите на плана) — за корабите на котва (game.js osmShips)
 }
 function seaView(G, D, RR, cut = null, edge = null) {
   const S2 = D.sea, IN = D.style === 'paris' || D.style === 'london' || D.style === 'newyork' || D.style === 'moscow' || D.style === 'washington' || D.style === 'lasvegas', w = new THREE.Mesh(new THREE.PlaneGeometry(S2.nx * S2.cell * (IN ? 1 : 1.6), S2.nz * S2.cell * (IN ? 1 : 1.6)).rotateX(-Math.PI / 2), MAT.water); w.position.set(S2.x0 + S2.nx * S2.cell / 2, D.wY ?? -1.2, S2.z0 + S2.nz * S2.cell / 2); G.add(w);
   if (IN) {   // град без море (Париж — само реката): около растера — суша (рамка), не вода
     const W = S2.nx * S2.cell, H = S2.nz * S2.cell, F = 3000, fr = [[-F, -F, W + 2 * F, F], [-F, H, W + 2 * F, F], [-F, 0, F, H], [W, 0, F, H]].map(([x, z, w2, d2]) => new THREE.PlaneGeometry(w2, d2).rotateX(-Math.PI / 2).translate(S2.x0 + x + w2 / 2, 0, S2.z0 + z + d2 / 2));
-    const OE = edge && feature('osm-edge'), frM = OE ? Object.assign(MAT.urban.clone(), { polygonOffset: true, polygonOffsetFactor: 3, polygonOffsetUnits: 3 }) : MAT.urban;   // osm-edge: рамката — зад водата, която продължава навън
-    for (const f of fr) { const m = new THREE.Mesh(f, frM); m.receiveShadow = true; G.add(m); }
+    const OE = edge && feature('osm-edge');   // osm-edge: рамката я строи osmEdge — суша и вода на решетка 10 м (водата на нивото на растера, с кейови стени)
+    if (!OE) for (const f of fr) { const m = new THREE.Mesh(f, MAT.urban); m.receiveShadow = true; G.add(m); }
     if (OE) try { osmEdge(G, D, F, edge); } catch (e) { console.warn('osm-edge', e); } }
   const Pi = []; for (const p of D.piers || []) if (p.length > 1) Pi.push(ribbon(p, 4, -0.2)); if (Pi.length) G.add(merge(Pi, MAT.pier));
   const Fe = [], seenF = new Set(); for (const f of D.ferries || []) { const key = f.pts.length > 1 ? [f.pts[0], f.pts[f.pts.length - 1]].map(p => Math.round(p[0] / 40) + ',' + Math.round(p[1] / 40)).sort().join('|') : ''; if (seenF.has(key)) continue; seenF.add(key); dashed(f.pts, 5, 22, 0.7, (D.wY ?? -1.2) + 0.1, Fe); }   /* еднаквите линии (двете посоки) — веднъж */ if (Fe.length) G.add(merge(Fe, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 })));   // фериботните линии по водата
@@ -881,6 +939,7 @@ function mapLabels(G, D) {
   const K = D.k, at = (la, lo) => [(lo - D.center[1]) * Math.cos(D.center[0] * Math.PI / 180) * 111320 * K, -(la - D.center[0]) * 110540 * K], out = [];
   for (const [la, lo, text, kind] of LABELS[D.style || 'rome'] || []) { if (!text) continue; const [x, z] = at(la, lo); out.push({ x, z, text, kind }); }
   for (const d of D.districts || []) { if (d.kind !== 'quarter' && !RIONI_BG[d.nm]) continue; const xs = d.poly.map(p => p[0]), zs = d.poly.map(p => p[1]); out.push({ x: d.lab ? d.lab[0] : xs.reduce((a, b) => a + b) / xs.length, z: d.lab ? d.lab[1] : zs.reduce((a, b) => a + b) / zs.length, text: RIONI_BG[d.nm] || arrBg(d.nm), kind: 'd' }); }
+  if (D.style === 'newyork' && feature('ny-night2')) { const LM = /^(rockefeller|радио сити|radio city|рокфелер)/i; for (let i = out.length - 1; i >= 0; i--) if (out[i].kind !== 'w' && LM.test(out[i].text)) out.splice(i, 1); }   // 🌃 ny-night2: „Рокфелер център“ / „Радио Сити“ — само златният надпис на забележителността (не и кварталът)
   const grp = new THREE.Group(); G.add(grp);
   const L = out.map(o => { const sp = labelSprite(o.text, o.kind); sp.position.set(o.x, o.kind === 'w' ? 6 : 30, o.z); grp.add(sp); return { sp, ...o }; });
   return { list: L, update(cam) {   // размерът — постоянен на екрана (по разстоянието); отблизо (под ~140 м) кварталите се крият, водите остават
@@ -1078,7 +1137,9 @@ function* romeBlocks(G, P, style, ROADS = P.roads, ROOFS = null, D0 = null) {   
         list.push({ x, z, w: bw, d: bd, h: H, rot: Math.atan2(fz * sg, -fx * sg), t: ty, col, rc, ex, ...(NYT ? { nyTall: nyT } : {}), M: m.compose(new THREE.Vector3(x, H / 2, z), q, new THREE.Vector3(ty === 5 ? bd * 0.8 : bd, H, ty === 5 ? bw * 0.78 : bw + (WF ? 0 : 0.3))).clone(), lot: lotAt(x, z) }); break; } } }   // небостъргачите — по-тесни от стъпката: улички между кулите, не слепени
   if (BG) yield* bgPlace(P, list);   // bg-fill: по парцелите и във вътрешността на кварталите
   // по вид: фасада (текстура) + покрив (римски — на две води; османски — нисък, тъмна керемида; блоковете — плосък)
-  const FM = [facadeMat(), ottoMat(), aptMat(), haussMat(), brickMat(), glassMat(), haussMat()], RF = [[roofGeo(), 0xa8553a, 0.3], [roofGeo(), 0x8d4a34, 0.22], [new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), 0xb9b6ae, 0], [mansardGeo(), 0x5e6872, 0.35], [roofGeo(), 0x4f555c, 0.16], [new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), 0x5d646b, 0], [roofGeo(), 0x5f7a66, 0.14]];   // Москва: нисък покрив от боядисана ламарина (зелено-сив)
+  NYN.value = NY && feature('ny-night2') ? 1 : 0;   // 🌃 ny-night2
+  const FM = [facadeMat(), ottoMat(), aptMat(), haussMat(), brickMat(), glassMat(), haussMat()]; if (feature('ny-night2')) { nyNight(FM[2]); nyNight(FM[4]); nyNight(FM[5], true); }
+  const FM_ = FM, RF = [[roofGeo(), 0xa8553a, 0.3], [roofGeo(), 0x8d4a34, 0.22], [new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), 0xb9b6ae, 0], [mansardGeo(), 0x5e6872, 0.35], [roofGeo(), 0x4f555c, 0.16], [new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), 0x5d646b, 0], [roofGeo(), 0x5f7a66, 0.14]];   // Москва: нисък покрив от боядисана ламарина (зелено-сив)
   if (ROOFS) ROOFS.forEach((r, i) => { if (r && RF[i]) RF[i] = [r.flat ? new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0) : RF[i][0], r.col ?? RF[i][1], r.flat ? 0 : RF[i][2]]; });   // T2: tokyo-look / dubai-look / sg-look
   const parts = XK ? xParts(G, list, FM, RF) /* само видовете, които ги има */ : [0, 1, 2, 3, 4, 5, 6].map(t => { const n = Math.max(1, list.filter(b => b.t === t).length), box = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), FM[t], n), roof = new THREE.InstancedMesh(RF[t][0], new THREE.MeshStandardMaterial({ color: RF[t][1], roughness: 0.85, side: THREE.DoubleSide }), n);
     box.frustumCulled = roof.frustumCulled = false; box.receiveShadow = box.castShadow = true; box.count = roof.count = 0; roof.userData.roof = 1; G.add(box, roof); return { box, roof }; });   /* snow-roofs: userData.roof */

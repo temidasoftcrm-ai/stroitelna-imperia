@@ -527,7 +527,7 @@ const GLB_LM = {
   galata2: { file: 'galata', h: 56.5, fit: 15, plate: 0xb9b0a0 },   // Истанбул: кулата Галата (модел на потребителя, Meshy AI, олекотен 1,12 млн. → 85 хил. △, 2,9 MB; feature 'lm-galata2') — h/fit = отношението 63 × 16,5 м; ръстът — game.js LM_REAL_H; нощем — nightfloors 'galata2' (топло отдолу, галерията и конусът светят)
   chrysler2: { file: 'chrysler', h: 56, fit: 10, plate: 0x8a8580, onLoad: topBeacon },
   onewtc: { h: 70, fit: 11.2, plate: 0x8a8580, onLoad: (w, g) => nyTowerLights(w, g) }, fourts: { h: 56, fit: 20.6, plate: 0x8a8580, onLoad: (w, g) => nyTowerLights(w, g) },   // 🇺🇸 lm-ny2 (f6): One World Trade Center (541 м) и 4 Times Square (247 м) — модели на потребителя (Meshy); Body / Beacon / Accent (Blender)   // Ню Йорк: Крайслер Билдинг (модел на потребителя, Meshy AI, олекотен 565 → 153 хил. △, 4,8 MB; feature 'lm-chrysler2') — вместо кулата от пакета Манхатън; h/fit — отношението на модела (5,6); ръстът 319 м — game.js LM_REAL_H; нощем — nightfloors 'chrysler2' (короната с триъгълните прозорци свети)
-  radiocity2: { h: 40, fit: 15, plate: 0x8a8580 },   // Ню Йорк: Радио Сити Мюзик Хол (модел на потребителя, Meshy AI) — в Blender: кулата по-широка и напред до надписите, неоновите „RADIO CITY“ (вертикалните и на таблото около ъгъла), стената под таблото; нощем — nightfloors 'radio'/'neon'
+  radiocity2: { h: 40, fit: 15, plate: 0x8a8580, onLoad: (w, g) => towerFit(w, g) },   // Ню Йорк: Радио Сити Мюзик Хол (модел на потребителя, Meshy AI) — в Blender: кулата по-широка и напред до надписите, неоновите „RADIO CITY“ (вертикалните и на таблото около ъгъла), стената под таблото; нощем — nightfloors 'radio'/'neon'
   rockefeller2: { h: 40, fit: 15, plate: 0x8a8580 },   // Ню Йорк: 30 Rockefeller Plaza (модел на потребителя, Meshy AI, олекотен 2,6 млн. → 180 хил. △); нощем синьо-виолетово, нагоре по-светло — nightfloors.js 'rock'
   parliament2: { h: 9, fit: 15, plate: 0x5f6d4f },
   westminster3: { h: 9, fit: 15, plate: 0x5f6d4f },   // Лондон: Уестминстърският дворец с Биг Бен — новият модел на потребителя (Meshy AI, 986 хил. → 108 хил. △; feature 'lm-westminster'); в Blender — изрязани червено-белите ивици покрай дългите фасади; нощем — nightfloors.js 'westm' (топло, часовникът свети)   // Лондон: Уестминстърският дворец с Биг Бен (модел на потребителя, Meshy AI) — в Blender плочата изрязана до сградите и дворът стеснен (площта ~3 пъти по-малка), 200 хил. △; нощем — nightfloors.js 'westm'
@@ -895,6 +895,18 @@ function berlinLights(w, g) {
     else if (/\b(Dome|Sphere)/.test(nm)) { const m = o.material = o.material.clone(); m.emissive = new THREE.Color(/Dome/.test(nm) ? 0xfff0d0 : 0xf2f6ff); m.emissiveMap = m.map; m.emissiveIntensity = 0; m.userData.floodK = /Dome/.test(nm) ? 3.2 : 2.6; m.needsUpdate = true; fl.push(m); }   // стъкленият купол и сферата — светят отвътре
     else if (/\bBeacon/.test(nm)) { bm = o.material = new THREE.MeshBasicMaterial({ color: 0xff2a1a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }); o.scale.setScalar(2.5); } });
   const prev = g.userData.sparkle; if (bm) g.userData.sparkle = (t, night) => { if (prev) prev(t, night); bm.opacity = t % 1.5 < 0.3 ? 0.3 + 0.7 * night : 0.05 * night; };   // авиационните лампи мигат
+}
+// 🗽 ny-tall: кулата на Радио Сити — до g.userData.towerH метра (в света), като се разтегнат САМО върховете над долните 32 % (залата с надписа — както е); веднъж, на копие на геометрията
+function towerFit(w, g) {
+  const run = () => { const H = g.userData.towerH; if (!H || g.userData.towerDone || !g.parent) return !!g.userData.towerDone; g.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(w), h0 = b.max.y - b.min.y; if (!(h0 > 1) || h0 >= H) { g.userData.towerDone = 1; return true; }
+    const s = (H - 0.32 * h0) / (0.68 * h0), yW = b.min.y + 0.32 * h0;
+    let big = null; w.traverse(o => { if (o.isMesh && !/^sign/.test(o.name) && (!big || o.geometry.attributes.position.count > big.geometry.attributes.position.count)) big = o; });   // тялото — най-големият меш (не надписите)
+    w.traverse(o => { if (!o.isMesh || o !== big) return; const gm = o.geometry = o.geometry.clone(), P0 = gm.attributes.position, P = new THREE.BufferAttribute(new Float32Array(P0.count * 3), 3), M = o.matrixWorld, Mi = M.clone().invert(), v = new THREE.Vector3();
+      for (let i = 0; i < P0.count; i++) P.setXYZ(i, P0.getX(i), P0.getY(i), P0.getZ(i)); gm.setAttribute('position', P);   /* квантизираните (int16) позиции се режат при разтягане — копие във float */
+      for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i).applyMatrix4(M); if (v.y > yW) { v.y = yW + (v.y - yW) * s; v.applyMatrix4(Mi); P.setXYZ(i, v.x, v.y, v.z); } }
+      P.needsUpdate = true; gm.computeBoundingBox(); gm.computeBoundingSphere(); });
+    g.userData.towerDone = 1; g.userData.towerDbg = [Math.round(h0), Math.round(H), +s.toFixed(2)]; if (g.userData.sign) g.userData.sign.position.y *= H / h0; return true; };
+  if (!run()) { let n = 0; const t = setInterval(() => { if (run() || ++n > 40) clearInterval(t); }, 500); }
 }
 function nyTowerLights(w, g) {
   const add = []; let bm = null;

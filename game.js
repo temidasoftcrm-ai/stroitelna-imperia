@@ -442,6 +442,8 @@ const COUNTRY_LABEL_WIDE = { ROU: [24.8, 45.6], SRB: [20.9, 44.2], MKD: [21.7, 4
 // ============================================================ поръчки и етапи на строежа
 // need: колко единици от всеки тип трябва на обекта през етапа; work: обем (единица-дни × RATE)
 const RATE = 20;
+// 🏡 luxury-villa (собственикът): „Луксозна вила“ — най-скъпата къща в „Имоти“ (строиш, после наем или продажба); и няколко вили по брега на крайморските градове
+const VILLA = feature('luxury-villa');
 const BTYPES = {
   house: { nm: 'Къща', ico: '🏠', reward: 28000, days: 11,   /* срокът — 11 дни (беше 8; потребителят 22.10) */ rep: 0, repGain: 0.25,
     stages: [{ nm: 'Изкоп', need: { loader: 1, crew: 1 }, work: 30 }, { nm: 'Основи', need: { truck: 1, crew: 1 }, work: 30 },
@@ -470,6 +472,8 @@ const OWN_TYPES = {
     stages: [{ nm: 'Изкоп', need: { loader: 1, crew: 1 }, work: 20 }, { nm: 'Основи', need: { truck: 1, crew: 1 }, work: 20 }, { nm: 'Строеж', need: { crew: 1 }, work: 30 }] },
 };
 Object.assign(BTYPES, OWN_TYPES);
+if (VILLA) BTYPES.villa = { nm: 'Луксозна вила', ico: '🏡', reward: 240000, days: 18, rep: 2.5, repGain: 0.5, est: true,   // est — само за „Имоти“ (не идва като поръчка); стойността — парцел + 240 хил.
+  stages: [{ nm: 'Изкоп', need: { loader: 1, crew: 1 }, work: 60 }, { nm: 'Основи', need: { truck: 1, crew: 1 }, work: 70 }, { nm: 'Конструкция', need: { crane: 1, crew: 2 }, work: 140 }, { nm: 'Довършване', need: { crew: 2, tractor: 1 }, work: 70 }] };
 const offerTypes = () => Object.entries(BTYPES).filter(([, t]) => !t.own && !t.est);
 const CLIENTS = ['сем. Петрови', 'сем. Георгиеви', 'Иван Димитров', 'Мария Иванова', 'сем. Николови', 'Стоян Тодоров', 'сем. Стоянови',
   '„Булмаркет“ ЕООД', '„Тракия Трейд“', '„Витоша Офис Парк“', '„Дунав Инвест“', '„Черноморие Холдинг“', '„Родопа Билд“', '„Балкан Партнърс“'];
@@ -613,6 +617,7 @@ const mhReg = (r, lot, us) => { const cc = cityById(S.cityId)?.cc, z = lot.zone;
     : r === 'west' ? MH_WEST.has(cc) : r === 'rural' ? (cityTier(S.cityId) === 's' || z === 'outer') && !MH_MED.has(cc) : z !== 'center'; };
 const MH = new Map(MESHY_HOUSES.map(([n, r, w, h, lot]) => [n, { r, w, h, lot }]));
 for (const [n, { h }] of MH) if (h) REAL_BLD[n] = h;   // real-scale: истинската височина
+REAL_BLD['dream-villa'] = 12;   // 🏡 luxury-villa: 2 етажа + висок покрив (~20 м широка при истинския ръст; на по-тесен парцел — по-малка)
 let MH_READY = false; const MH_PENDING = [];   // моделите идват преди денонощието (dayNight) — светлините се слагат щом е готово
 const NIGHT_LATER = [], atNight = f => MH_READY ? f() : NIGHT_LATER.push(f);   // същото за кафенето, магазините и др.: dayNight.winMats.add — щом е готово
 const MH_RETIRED = new Set(['mh-modern1']);   // 28.10: не се зарежда и не се избира; в старите записи placeBuilding го сменя с текуща къща — отгоре изглежда като смачкан покрив
@@ -666,6 +671,7 @@ let europe = null;
   // заводските модели се казват като търговските (building-a…) — пазим ги под 'ind-…'
   // истински храсти, цветя и фонтан (assets/heavy/plants, нормализирани: най-широката страна 1, основа 0) — зад feature('plants-real')
   if (feature('tokyo-look') || feature('dubai-look') || feature('sg-look')) for (const n of ['jp-narrow', 'jp-trad', 'jp-modern', 'jp-home1', 'jp-home2', 'jp-home3', 'jp-neon']) jobs.push(load(`assets/heavy/asia/${n}.glb`).then(g => { g.scene.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => {}));   // 🇯🇵 tokyo-look
+  if (VILLA) jobs.push(load('assets/heavy/houses/dream-villa.glb').then(g => { g.scene.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; for (const m of [].concat(o.material)) if (m) { m.metalness = 0; m.roughness = Math.max(m.roughness ?? 1, 0.8); } } }); A['dream-villa'] = g; g.scene.traverse(o => { if (o.isMesh) for (const m of [].concat(o.material)) if (m && m.emissiveMap) { m.emissive.setRGB(1, 0.92, 0.8); m.emissiveIntensity = 0; m.userData.winK = 3; dayNight.winMats.add(m); } }); }).catch(e => console.warn('luxury-villa', e)));   /* нощем — изпечените прозорци (като тухлените на Ню Йорк) */   // 🏡 luxury-villa: вилата на собственика (Meshy, Темидасофт)
   for (const n of H2) jobs.push(load(`assets/heavy/${MH.has(n) ? 'houses3' : 'houses2'}/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; if (MH.has(n)) { if (MH_READY) mhNight(g.scene); else MH_PENDING.push(g.scene); } else prepNightFloors(g.scene, n); }).catch(() => { const i = H2.indexOf(n); if (i >= 0) H2.splice(i, 1); }));   // не се зареди → не се строи
   if (feature('hw-gantry')) jobs.push(load('assets/heavy/highway/hw-gantry.glb').then(g => { A['hw-gantry'] = g; }).catch(() => {}));   // 🛣️ порталът с табелите
   if (feature('office-levels2')) for (const L of OFFICE2) jobs.push(load(L.url).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[`office2-l${L.lv}`] = g; prepNightFloors(g.scene, `office2-l${L.lv}`); if (!L.tower) blkSections(`office2-l${L.lv}`); }).catch(() => {}));   // 🆕 новите нива на офиса
@@ -1638,7 +1644,8 @@ function osmShips(P) {
       let n = 0; for (const b of BT.boats) if (b.obj.userData.seaShip === 'cruise' || (b.obj.userData.seaShip === 'container' && hasShipModel('msc'))) { const m = shipModel(b.obj.userData.seaShip === 'cruise' ? 'cruise' : 'msc');   /* MSC — със светлините си; пяната (Wake) — скрита: без mscTick всеки кадър тя е неподвижен светъл правоъгълник */ if (!m) continue; m.traverse(q => { if (/^Wake/.test(q.name)) q.visible = false; }); b.obj.clear(); b.obj.add(m); b.obj.scale.setScalar(1); n++; } if (n) { city.osmShips = []; city.osmShipNight = true; BT.cap(); } }).catch(e => console.warn('osm-ships', e)); return; }
   if (!OSM_SHIPS || !P || !P.osm || !P.waterAt || !SEASIDE.includes(S.cityId)) return;
   const cid = S.cityId; loadShipModels().then(() => { if (!S || S.cityId !== cid || !city.planView || city.osmShips) return;
-    const W = (x, z) => { try { return !!P.waterAt(x, z); } catch { return false; } }, R = Math.min(2600, (P.p2 && P.p2.R) || P.R || 1600), run = (x, z, a) => { let d = 0; while (d < 700 && W(x + Math.cos(a) * (d + 25), z + Math.sin(a) * (d + 25))) d += 25; return d; };
+    const EA = city.planView.userData.osmEdgeAt, EO = Array.isArray(P.offset) ? P.offset : [0, 0];   // 🌊 osm-edge: и водата извън растера — корабът цял във водата
+    const W = (x, z) => { try { return !!P.waterAt(x, z) || !!(EA && EA(x - EO[0], z - EO[1])); } catch { return false; } }, R = Math.min(2600, (P.p2 && P.p2.R) || P.R || 1600), run = (x, z, a) => { let d = 0; while (d < 700 && W(x + Math.cos(a) * (d + 25), z + Math.sin(a) * (d + 25))) d += 25; return d; };
     const cand = []; for (let x = -R; x <= R; x += 100) for (let z = -R; z <= R; z += 100) { if (!W(x, z) || !(W(x + 180, z) && W(x - 180, z) || W(x, z + 180) && W(x, z - 180))) continue; let best = 0, ang = 0, side = 1e9;
       for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI, f = run(x, z, a), b = run(x, z, a + Math.PI), s1 = Math.min(run(x, z, a + Math.PI / 2), run(x, z, a - Math.PI / 2)); if (Math.min(f, b) > best && s1 >= 60) { best = Math.min(f, b); ang = a; side = s1; } }
       if (best >= 180) cand.push({ x, z, ang, sc: best + side * 0.5 - Math.hypot(x, z) * 0.05 }); }
@@ -1647,7 +1654,16 @@ function osmShips(P) {
     pick.forEach((q, i) => { const o = shipModel(ks[i]); if (!o) return; o.position.set(q.x, y, q.z); o.rotation.y = Math.PI / 2 - q.ang; o.name = 'osmShip'; o.userData.osmShip = ks[i]; city.group.add(o); out.push(o); });
     city.osmShips = out; }).catch(e => console.warn('osm-ships', e));
 }
+// 🏡 luxury-villa: богаташкият квартал край морето — 3–5 вили на свободни парцели до брега (вода до ~70 м, самият парцел — на сушата), на ≥ 60 м една от друга;
+// само украса (парцелът — зает 'villa', без S.built: при зареждане — наново, по същия ред); не в центъра
+function villaCoast(P) {
+  if (!VILLA || !A['dream-villa'] || !P || !P.waterAt || !SEASIDE.includes(S.cityId) || city.villas) return; city.villas = [];
+  const W = (x, z) => { try { return !!P.waterAt(x, z); } catch { return false; } }, near = l => { for (let a = 0; a < 6.283; a += 0.523) for (const r of [25, 45, 70]) if (W(l.x + Math.cos(a) * r, l.z + Math.sin(a) * r)) return r; return 0; };
+  const C = city.lots.filter(l => l.plan && !l.busy && !l.built && l.zone !== 'center' && l !== city.hq && Math.min(l.w, l.d) >= 16 && !W(l.x, l.z) && !W(l.x + l.w / 2, l.z) && !W(l.x - l.w / 2, l.z) && !W(l.x, l.z + l.d / 2) && !W(l.x, l.z - l.d / 2)).map(l => ({ l, r: near(l) })).filter(q => q.r).sort((a, b) => a.r - b.r || a.l.id - b.l.id);
+  for (const { l } of C) { if (city.villas.length >= 5) break; if (city.villas.some(v => Math.hypot(v.x - l.x, v.z - l.z) < 60)) continue; placeBuilding(l, 'dream-villa'); l.busy = 'villa'; city.villas.push(l); }
+}
 function planViewDone(pv, P) {
+  if (VILLA) setTimeout(() => { try { villaCoast(P); } catch (e) { console.warn('luxury-villa', e); } }, 1500);   // 🏡
   if (OSM_SHIPS) setTimeout(() => { try { osmShips(P); } catch (e) { console.warn('osm-ships', e); } }, 2500);   // 🚢 osm-ships
   if (P && P.osm && feature('block-deco-osm') && !/[?&]noosmdeco\b/.test(location.search)) { const cid = S && S.cityId; setTimeout(() => { if (!S || S.cityId !== cid) return; try { osmDeco(); } catch (e) { console.warn('block-deco-osm', e); } }, 16000); }   /* след texGuard (4 и 15 s): веднага след изгледа фасадите на OSM излизаха черни */   // 🌳 block-deco-osm: украсата между сградите на истинската карта
   if (AUTOTEST) { const al = sessionStorage.getItem('stroiAirLook'); if (al) { sessionStorage.removeItem('stroiAirLook'); const [lv, n] = JSON.parse(al); setTimeout(() => window.__dbg && window.__dbg.airAccessLook(lv, n), 6000); } }   // ✈️ air-junction: демото след презареждането
@@ -3649,6 +3665,7 @@ const scaffoldMat = new THREE.LineBasicMaterial({ color: 0xd9a53a });
 
 function buildingFor(type, floors = 20) {
   if (type === 'house') return pick(HOUSE_POOL);
+  if (type === 'villa') return A['dream-villa'] ? 'dream-villa' : pick(HOUSE_POOL);   // 🏡 luxury-villa
   if (type === 'shop') return feature('real-shops') ? pick(shopPool()) : 'Building_Small_1';   /* real-shops (55): истинските магазини building-a…h */
   const tilt = S ? panelTilt(S.cityId) : 0;   // България (и по-леко бившият соц. блок): панелни блокове, малко американски кули
   if (type === 'office' && tilt && PANELS().length && Math.random() < 0.5 * tilt) return pick(PANELS());
@@ -8136,7 +8153,24 @@ const LM_CHRYSLER2 = feature('lm-chrysler2') && hasLandmark('chrysler2');   // �
 const LM_PROP = {};
 if (feature('lm-ndk')) LM_PROP.ndk = 1;   // НДК — в истински ръст (44 м)
 if (feature('lm-tall')) Object.assign(LM_PROP, { chrysler: 1, chrysler2: 1, empire2: 1, onewtc: 1, fourts: 1 });   // 🗽 lm-tall (одитът): небостъргачите на Ню Йорк — в истински ръст (Крайслер беше 143 м вместо 319, WTC — 243 вместо 541), не ×k
-const LM_TALL = new Set(['chrysler2', 'empire2', 'onewtc', 'fourts']);
+// 🌃 ny-night2 (собственикът — снимките): прожекторите на забележителностите на Ню Йорк — само емисивна ивица по височина (без светлини, без нови мрежи):
+// Емпайър — короната и горните отстъпи топло златно, антената; Крайслер — короната бяло; Уан Уърлд Трейд — хладно бели ръбове (по-светло нагоре) и шпилът; 30 Рок — горе топло
+const LMF_U = { value: 0 }, LM_FLOOD = { empire2: [0.68, 0xffc55a, 2.2], chrysler2: [0.8, 0xfff4e0, 2.4], onewtc: [0.0, 0xdfeeff, 0.9, 1], rockefeller2: [0.86, 0xffd890, 1.6], fourts: [0.9, 0xeef4ff, 1.6] };
+function lmFlood(o) {
+  const F = LM_FLOOD[o.kind]; if (!F || !feature('ny-night2') || !S || S.cityId !== 'newyork') return; let n = 0; const UY = { value: new THREE.Vector2() }, col = new THREE.Color(F[1]);
+  const go = () => { const g = o.group; if (!g.parent) return; g.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(g); if (b.isEmpty()) return; UY.value.set(b.min.y + (b.max.y - b.min.y) * F[0], b.max.y);   /* GLB-ът идва после (първо е заместителят) — всяка секунда: новите материали и височината */
+    g.traverse(m => { if (!m.isMesh) return; for (const mt of [].concat(m.material)) { if (!mt || mt.userData.lmFlood || !('emissive' in mt)) continue; mt.userData.lmFlood = 1; const prev = mt.onBeforeCompile, key = mt.customProgramCacheKey;
+      mt.onBeforeCompile = (sh, r) => { if (prev) prev(sh, r); Object.assign(sh.uniforms, { uLF: LMF_U, uLFy: UY, uLFc: { value: col }, uLFk: { value: F[2] }, uLFe: { value: F[3] ? 1 : 0 } });
+        sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vLFw; varying vec3 vLFn;').replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\n vLFw = (modelMatrix * vec4(transformed, 1.0)).xyz; vLFn = normalize(mat3(modelMatrix) * objectNormal);');
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uLF, uLFk, uLFe; uniform vec2 uLFy; uniform vec3 uLFc; varying vec3 vLFw; varying vec3 vLFn;').replace('#include <aomap_fragment>', `#include <aomap_fragment>
+          { float t = smoothstep(uLFy.x, uLFy.x + (uLFy.y - uLFy.x) * 0.25 + 1.0, vLFw.y), up = clamp((vLFw.y - uLFy.x) / max(1.0, uLFy.y - uLFy.x), 0.0, 1.0);
+            float edge = uLFe > 0.5 ? pow(1.0 - abs(dot(normalize(vLFn.xz + 1e-4), normalize(cameraPosition.xz - vLFw.xz))), 3.0) * (0.35 + 0.65 * up) : 1.0;   // Уан Уърлд: ръбовете (стените отстрани на погледа)
+            totalEmissiveRadiance += uLFc * uLFk * uLF * t * edge * (0.55 + 0.45 * up) * diffuseColor.rgb * 1.6; }`); };
+      mt.customProgramCacheKey = () => (key ? key.call(mt) : '') + '|lmf' + o.kind; mt.needsUpdate = true; } }); };
+  go(); const t = setInterval(() => { go(); if (++n > 90) clearInterval(t); }, 1000);
+}
+const NYTALL = feature('ny-tall'), LM_NYTALL = { rockefeller2: 400, radiocity2: 250 };   // 🗽 ny-tall (собственикът): 30 Rock ≈ колкото Емпайър, кулата на Радио Сити ~250 м
+const LM_TALL = new Set(['chrysler2', 'empire2', 'onewtc', 'fourts', ...(NYTALL ? ['rockefeller2'] : [])]);
 if (feature('lm-galata2') && hasLandmark('galata2')) { LM_PREF.galata = 'galata2'; LM_REAL_H.galata2 = 63; LANDMARK_NM.galata2 = 'Кулата Галата'; LM_PROP.galata2 = 1; }   // 🇹🇷 lm-galata2 (f6): кулата Галата — моделът на потребителя (Meshy) вместо процедурната, на мястото ѝ в Бейоглу (над Златния рог), 63 м с конуса
 if (feature('lm-ny2')) { LM_REAL_H.onewtc = 541; LM_REAL_H.fourts = 247; LM_EXTRA.newyork.add('onewtc'); LM_EXTRA.newyork.add('fourts'); }   // 🇺🇸 lm-ny2 (f6): One WTC и 4 Times Square — точките се добавят в плана (lmNy2Points)
 if (LM_CHRYSLER2) { LM_PREF.chrysler = 'chrysler2'; LM_REAL_H.chrysler2 = 319; LM_EXTRA.newyork.add('chrysler'); LANDMARK_NM.chrysler2 = 'Крайслер Билдинг'; }
@@ -8168,10 +8202,11 @@ function landmarkPlan2(kinds) {
     const o = buildLandmark(k, { label }); if (!o) continue; if (labelNm) o.labelNm = labelNm;
     if (lmFit(k)) { const pl = o.group.children.find(c => c.isMesh && c.geometry?.type === 'BoxGeometry' && c.geometry.parameters?.width === 15 && c.geometry.parameters?.depth === 15); if (pl) pl.visible = false; }   // квадратната плоча на моделите (15×15) — на истинската карта парцелът е правоъгълен и плочата излиза на улиците
     let s0 = lmFit(k); if (!s0) { const sg = o.group.userData.sign; if (sg) sg.removeFromParent(); box.setFromObject(o.group).getSize(sz); s0 = Math.max(sz.x, sz.z) || 1; if (sg) o.group.add(sg); }   // моделите (GLB) се зареждат после — по основата им, не по временната плоча
-    let k0 = Math.max(at.w, at.d) * 0.95 / s0; const hr = LM_REAL_H[k] || LM_REAL_H[k.replace(/\d+$/, '')];
+    let k0 = Math.max(at.w, at.d) * 0.95 / s0; const hr = (NYTALL && LM_NYTALL[k]) || LM_REAL_H[k] || LM_REAL_H[k.replace(/\d+$/, '')];   /* 🗽 ny-tall: 30 Rock и Радио Сити — над повдигнатите кутии */
     if (hr) { let h0 = lmH(k); if (!h0) { const sg = feature('washington-osm') && o.group.userData.sign; if (sg) sg.removeFromParent(); box.setFromObject(o.group).getSize(sz); h0 = sz.y || 1; if (sg) o.group.add(sg); }   /* без надписа над модела — иначе процедурните излизат с ~10–15 % по-ниски (Линкълн 20 м вместо 24) */ k0 = Math.min(k0, hr * (LM_PROP[k] ?? LM_REAL_K[S.cityId] ?? (P.p2.osmData?.k || 0.45)) / h0); }   // кулите — и по истинската височина (парцелът на Парламента е 225 м, а моделът е само Биг Бен)
     o.group.scale.multiplyScalar(k0); o.group.rotation.y = at.vrot ?? at.rot ?? 0; if (k === 'stpatrick2') o.group.rotation.y += Math.PI / 2; if (LM_TURN[k]) o.group.rotation.y += LM_TURN[k];   /* дългата ос на модела е z, а на парцела — напреки */ o.group.position.set(at.x, 0.1, at.z);
-    if (feature('lm-tall') && LM_TALL.has(k) && hr) { const ky = Math.min(1.6, hr / (lmH(k) || 1) / k0); if (ky > 1.01) { o.group.scale.y *= ky; const sg = o.group.userData.sign; if (sg) sg.scale.y /= ky; } }   // 🗽 lm-tall: картата е ×0,45 и парцелът ограничава ширината — небостъргачите стигат истинския ръст по височина (до ×1,6 по-тънки)
+    if (feature('lm-tall') && LM_TALL.has(k) && hr) { const ky = Math.min(NYTALL && LM_NYTALL[k] ? 2.6 : 1.6, hr / (lmH(k) || 1) / k0);   /* ny-tall: 30 Rock — до ×2,6 по височина */ if (ky > 1.01) { o.group.scale.y *= ky; const sg = o.group.userData.sign; if (sg) sg.scale.y /= ky; } }   // 🗽 lm-tall: картата е ×0,45 и парцелът ограничава ширината — небостъргачите стигат истинския ръст по височина (до ×1,6 по-тънки)
+    if (k === 'radiocity2' && NYTALL) o.group.userData.towerH = LM_NYTALL.radiocity2;   // кулата — разтегната отгоре (landmarks.js towerFit), залата и надписът остават
     if (k === 'radiocity2' && feature('ny-radiocity')) { const ku = Math.min(200 / 150, Math.max(at.w, at.d) * 0.95 / (s0 * k0)); if (ku > 1.01) o.group.scale.multiplyScalar(ku);   // 🎭 ny-radiocity (собственикът: „твърде малка“): кулата 1270 6th Ave е ~200 м (беше 150) — по-голяма изцяло, до парцела
       const kx = Math.min(1.45, Math.max(at.w, at.d) * 0.95 / (s0 * k0 * Math.max(1, ku))); if (kx > 1.01) { o.group.scale.x *= kx; o.group.scale.z *= kx; } }   // залата — до парцела (~100 × 75 м), кулата — пропорционално по-широка
     if (k === 'ndk') { const kx = Math.min(1.7, Math.max(at.w, at.d) * 0.95 / (s0 * k0)); if (kx > 1.01) { o.group.scale.x *= kx; o.group.scale.z *= kx; } }   // lm-ndk (T2): НДК е широк и нисък (~200 × 150 м, 44 м) — ръстът по LM_PROP, ширината — до парцела
@@ -8182,7 +8217,7 @@ function landmarkPlan2(kinds) {
       const wet = h => { for (let u = -1; u <= 1.001; u += 0.2) for (let v = -1; v <= 1.001; v += 0.25) { const lx = u * h, lz = v * h * LM_DRY[k]; if (P.waterAt(x0 + lx * c + lz * sn, z0 - lx * sn + lz * c)) return true; } return false; };
       let f = 1; while (f > 0.45 && wet(s0 * k0 * f / 2 + 2)) f *= 0.93; if (f < 1) o.group.scale.multiplyScalar(f); }
     o.group.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
-    city.group.add(o.group); city.landmarks.push(o);
+    city.group.add(o.group); city.landmarks.push(o); lmFlood(o);   // 🌃 ny-night2: прожекторите
   }
   if (feature('lv-hotels') && S.cityId === 'lasvegas') lvHotelsPlace();
   if (feature('lm-caesars') && S.cityId === 'lasvegas') lvCaesarsPlace();   // 🏛️ lm-caesars (f6)
@@ -11233,7 +11268,7 @@ const LAND_PRICE = { outer: 12000, mid: 25000, center: 50000 };
 const HOUSE_PRICE = { outer: 30000, mid: 45000, center: 70000 };
 // генерираните градове (cityplan2: business / residential / periphery) — към трите ценови пояса; иначе цената е NaN
 const pz = z => ({ business: 'center', residential: 'mid', periphery: 'outer' })[z] || (z in LAND_PRICE ? z : 'mid');
-const RENT = { house: 400, shop: 1200, office: 2800, tower: 10000 };
+const RENT = { house: 400, shop: 1200, office: 2800, tower: 10000, ...(VILLA ? { villa: 1900 } : {}) };   // 🏡 вилата: ~1,4 г. до изплащане, като магазина и офиса
 const RENO_COST = 7000;   // материали за ремонт (плащат се при старта)
 const est = () => (S.estate = S.estate || { land: [], owned: [], listings: [] });
 const ownedAt = id => est().owned.find(o => o.lot === id);
@@ -11318,7 +11353,7 @@ function finishInvestment(p) {
   est().owned.push({ cond: 100, lot: p.lot, kind: p.type, rent: Math.round(RENT[p.type] * rand(0.9, 1.1) / 10) * 10, value: land + BTYPES[p.type].reward, since: S.day });
   lot.busy = 'owned';
   Sound.play('done');
-  toast(`🔑 ${BTYPES[p.type].nm} е готов${p.type === 'house' ? 'а' : ''} и вече носи наем!`, 'good');
+  toast(`🔑 ${BTYPES[p.type].nm} е готов${p.type === 'house' || p.type === 'villa' ? 'а' : ''} и вече носи наем!`, 'good');
   showEventPop('done-rent', `🔑 ${BTYPES[p.type].nm} под наем`, `Носи ~${fmt(RENT[p.type])} € на ден.`);
   quests.emit('invest');
 }
@@ -11757,6 +11792,7 @@ const parkMul = lot => 1 + Math.min(2, parksNear(lot)) * 0.15;
 // „🎲 Строй“ (feature 'estate-random'): на твоя парцел се строи случайна сграда — иначе всички винаги избират небостъргача.
 // Тегла: къща 30, магазин 20, офис 30, небостъргач 20, парк 10 (паркът — само ако имаш пари за него). Барабан с иконите се върти ~2 с.
 const EST_ROLL = [['house', 30], ['shop', 20], ['office', 30], ['tower', 20], ['park', 10]];
+if (VILLA) EST_ROLL.push(['villa', 8]);   // 🏡 luxury-villa: и в „Какво ще излезе?“
 const estRolling = new Map();   // парцел → резултат, докато се върти барабанът
 const estIco = k => k === 'park' ? '🌳' : BTYPES[k].ico, estNm = k => k === 'park' ? 'Парк' : BTYPES[k].nm;
 function estRollHtml(id) {
@@ -11765,7 +11801,7 @@ function estRollHtml(id) {
   if (q) return `<div class="row" style="gap:8px;align-items:center"><button class="btn2" disabled style="flex:1;font-size:16px">🎲 Изтеглено: ${estIco(q.type)} ${estNm(q.type)}</button></div>`;
   return `<div class="row" style="flex-wrap:wrap;gap:8px;align-items:center"><button class="btn" data-roll="${id}" style="flex:1;font-size:16px" ${r ? 'disabled' : ''}>🎲 Строй — изненада!</button>
     <div class="reel" id="reel${id}" style="min-width:64px;height:44px;border-radius:10px;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;font-size:30px">${r ? '🎰' : '❔'}</div></div>
-    <div class="meta" style="margin:4px 0 0">Шанс: ${odds}. Наем: 🏠 ${fmt(RENT.house)} · 🏪 ${fmt(RENT.shop)} · 🏢 ${fmt(RENT.office)} · 🌆 ${fmt(RENT.tower)} €/ден · 🌳 парк — +15% наем наоколо.</div>`;
+    <div class="meta" style="margin:4px 0 0">Шанс: ${odds}. Наем: 🏠 ${fmt(RENT.house)} · 🏪 ${fmt(RENT.shop)} · 🏢 ${fmt(RENT.office)} · 🌆 ${fmt(RENT.tower)}${RENT.villa ? ` · 🏡 ${fmt(RENT.villa)}` : ''} €/ден · 🌳 парк — +15% наем наоколо.</div>`;
 }
 function estRoll(id) {
   if (estRolling.has(id)) return;
@@ -13456,6 +13492,7 @@ function frame() {
     updateCityHighway(simT);
     if (city.sea && !gfxStill()) city.sea.update(simT, dayNight.night);   // vlow-still: корабите в пристанището стоят
     if (feature('fountain-water')) fwTick(dt > 0 ? rdt : 0, dayNight.night);
+    if (plan2.view && plan2.view.NYNIGHT) plan2.view.NYNIGHT.value = dayNight.night || 0; LMF_U.value = dayNight.night || 0;   // 🌃 ny-night2: тъмните стени нощем (модулът се зарежда динамично)
     if (city && city.osmShips && (city.osmShips.length || city.osmShipNight)) setShipNight(dayNight.night || 0);   // 🚢 osm-ships: палубите нощем   // ⛲ fountain-water: едно време за всички фонтани (на пауза — стои)
     if (feature('fountain-snd')) try { FSND.tick(rdt, scene, camera, controls.target); } catch (e) { }   // ⛲ fountain-snd
     if (CSND3) try { CSND3.tick(rdt, { onMap, camera, target: controls.target, night: dayNight.night, hour: (todF() * 24 + 6) % 24, cityId: S.cityId, tier: cityTier(S.cityId), own: !!TOWN_SND[S.cityId], mega: MEGAPOLIS.has(S.cityId), speed, bikes, life: cl3Life, square: city.plan && city.plan.square, market: !!city.market, stadiums: () => TENDERS.filter(t => t.city === S.cityId && t.kind === 'stadium' && city.tender3D && city.tender3D[t.id] && tenders.progOf(t.id) >= 1).map(t => city.tender3D[t.id].group), weather, seaside: SEASIDE.includes(S.cityId), waterAt: city.plan && city.plan.waterAt, sea: city.sea }); } catch (e) { }   // 🔊 city-snd3
@@ -13679,6 +13716,9 @@ if (AUTOTEST) {
       const bt = city.planView && city.planView.userData.seaBT; if (!bt) return 'няма'; const b = bt.boats.find(q => q.obj.userData.seaShip === k && (q.lowS != null || q.cut != null)); if (!b) return { none: k, ships: bt.boats.filter(q => q.obj.userData.seaShip).map(q => [q.obj.userData.seaShip, q.low ?? null, q.capped ?? 1]) };
       b.s = b.cut != null ? Math.max(1, Math.min(b.T - 1, b.cut)) : b.lowS; b.wait = 0; showMap(false); $('panel')?.classList.add('hidden'); this.time(night ? 22 : 13); bt.update(0.001); b.wait = 30; const c = b.obj.getWorldPosition(new THREE.Vector3()), yaw = b.obj.rotation.y;
       fly = null; __dbg.camAt(c.x + Math.cos(yaw) * 260, 70, c.z - Math.sin(yaw) * 260, c.x, 30, c.z); return { k, clearance: b.low, capped: b.capped || 1, ships: bt.boats.filter(q => q.obj.userData.seaShip).map(q => [q.obj.userData.seaShip, q.low ?? null, q.capped ?? 1]) }; },
+    villaLook(i = 0, night = false, d = 34) {   // 🏡 luxury-villa (T2): вилата i по брега (или първата построена)
+      const l = (city.villas || [])[i] || city.lots.find(q => q.built === 'dream-villa'); if (!l) return { none: true, villas: (city.villas || []).length }; showMap(false); $('panel')?.classList.add('hidden'); this.time(night ? 22 : 13); S.wxLock = 'clear'; weather.set('clear'); fly = null;
+      this.camAt(l.x + d * 0.9, d * 0.55, l.z + d, l.x, 4, l.z); return { lot: l.id, villas: (city.villas || []).length, size: l.obj ? new THREE.Box3().setFromObject(l.obj).getSize(new THREE.Vector3()).toArray().map(v => Math.round(v * 10) / 10) : null }; },
     hqAngelLook(night = false, d = 16) {   // 😇 hq-angel (T2): камерата пред ангела на площада на централата (от улицата)
       const a = city.hqGroup && city.hqGroup.getObjectByName('hqAngel'); if (!a) return 'няма (ниво 8+ и hq-angel)'; showMap(false); $('panel')?.classList.add('hidden'); this.time(night ? 22 : 13); S.wxLock = 'clear'; weather.set('clear');
       a.updateWorldMatrix(true, false); const p = a.getWorldPosition(new THREE.Vector3()), f = a.localToWorld(new THREE.Vector3(1, 0, 0)).sub(p).setY(0).normalize(), sd = new THREE.Vector3(-f.z, 0, f.x);

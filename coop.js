@@ -11,6 +11,7 @@
 // със същия req_id (без двойно изпращане); при отказ от сървъра се връща обратно.
 import { UNIT_TYPES, MATERIALS } from './economy.js';
 import { feature } from './lab/feature.js';
+import { t as T } from './i18n.js';   // 🌐 надписът „онлайн / офлайн“ до картата
 import { cleanMega } from './coopmega.js';   // 🤝 coop-mega: общите супер поръчки в снимката — изчистени
 import { cleanPres } from './coopres.js';   // 🌐 coop-pres: президентството на партньора в снимката — изчистено
 import { centerRender } from './coopcenter.js';   // 🤝 „Център на партньорството“ (feature 'coop-center') — новият прозорец
@@ -35,13 +36,13 @@ function cleanSnap(P) {
   const obj = o => o && typeof o === 'object' && !Array.isArray(o) ? o : {};
   return { ...P, name: txt(P.name, 24) || 'Партньор', brand: idOk(P.brand) ? P.brand : null, ico: txt(P.ico, 8), col: colOk(P.col),
     money: num(P.money), worth: num(P.worth), loan: num(P.loan), day: num(P.day) | 0, rep: Math.max(0, Math.min(5, num(P.rep))), office: num(P.office) | 0,
-    hq: idOk(P.hq) ? P.hq : null, here: idOk(P.here) ? P.here : null, cities: arrOf(P.cities, idOk, 80),
+    hq: idOk(P.hq) ? P.hq : null, here: idOk(P.here) ? P.here : null, cities: arrOf(P.cities, idOk, 600),   /* беше 80 — в късна игра (100+ града) градовете на партньора след 80-ия му се предлагаха за купуване */
     sites: Object.fromEntries(Object.entries(obj(P.sites)).filter(([k]) => idOk(k)).map(([k, L]) => [k, arrOf(L, x => x && typeof x === 'object', 120).map(x => ({ x: num(x.x), z: num(x.z), k: x.k === 'p' ? 'p' : 'b', t: idOk(x.t) ? x.t : undefined }))])),
     stats: Object.fromEntries(Object.entries(obj(P.stats)).map(([k, v]) => [txt(k, 20), num(v)])),
-    hwDone: arrOf(P.hwDone, idOk, 200), hwJobs: arrOf(P.hwJobs, idOk, 200), rails: arrOf(P.rails, refOk, 200),
-    railKm: Object.fromEntries(Object.entries(obj(P.railKm)).filter(([k]) => refOk(k)).slice(0, 200).map(([k, v]) => [k, num(v)])),
+    hwDone: arrOf(P.hwDone, idOk, 1500), hwJobs: arrOf(P.hwJobs, idOk, 300), rails: arrOf(P.rails, refOk, 1000),
+    railKm: Object.fromEntries(Object.entries(obj(P.railKm)).filter(([k]) => refOk(k)).slice(0, 1000).map(([k, v]) => [k, num(v)])),
     infra: Object.fromEntries(Object.entries(obj(P.infra)).filter(([k, a]) => idOk(k) && Array.isArray(a)).map(([k, a]) => [k, a.slice(0, 3).map(num)])),
-    fin: arrOf(P.fin, idOk, 300), wonC: arrOf(P.wonC, x => typeof x === 'string' && /^[A-Z]{3}$/.test(x), 100), hwWonC: arrOf(P.hwWonC, x => typeof x === 'string' && /^[\w.-]{1,40}$/.test(x), 300), railsHs: arrOf(P.railsHs, refOk, 200),
+    fin: arrOf(P.fin, idOk, 600), wonC: arrOf(P.wonC, x => typeof x === 'string' && /^[A-Z]{3}$/.test(x), 100), hwWonC: arrOf(P.hwWonC, x => typeof x === 'string' && /^[\w.-]{1,40}$/.test(x), 300), railsHs: arrOf(P.railsHs, refOk, 200),
     lv: P.lv == null ? null : num(P.lv), pres: cleanPres(P.pres), mega: cleanMega(P.mega), fleet: arrOf(P.fleet, x => x && typeof x === 'object', 300).map(x => ({ ...x, ref: txt(x.ref, 100), cost: num(x.cost), nm: txt(x.nm) })) };
 }
 // coop_status2: общите строежи, наемите, изненадите, задачите — полетата, които партньорът задава сам
@@ -107,13 +108,13 @@ export function createCoop(d) {
     const S = d.S(), e = E(), b = d.brand();
     return { name: myName(), brand: b?.k || null, ico: b?.ico || '🏗️', col: b?.col || '#ffb300', money: Math.round(e.money), worth: Math.round(d.netWorth()),
       loan: Math.round(e.s.loan || 0), day: S.day, rep: Math.round((S.rep || 0) * 10) / 10, office: S.officeLevel || 1, hq: S.hqCity || S.cityId, here: S.cityId,
-      cities: d.ownedCities().filter(Boolean).slice(0, 80), sites: sites(), stats: d.stats(),
-      hwDone: d.hwInfo().done.slice(0, 200), hwJobs: d.hwInfo().jobs.map(j => j.seg), rails: d.rails().map(r => r.ref).slice(0, 200),
-      railKm: Object.fromEntries(d.rails().slice(0, 200).map(r => [r.ref, r.km])),
+      cities: d.ownedCities().filter(Boolean).slice(0, 600), sites: sites(), stats: d.stats(),
+      hwDone: d.hwInfo().done.slice(0, 1500), hwJobs: d.hwInfo().jobs.map(j => j.seg).slice(0, 300), rails: d.rails().map(r => r.ref).slice(0, 1000),
+      railKm: Object.fromEntries(d.rails().slice(0, 1000).map(r => [r.ref, r.km])),
       infra: d.infra ? d.infra() : {},   // { град: [гара, летище, пристанище] } — партньорът ги развива заедно с теб
       lv: d.lv ? d.lv() : null,
       // 🤝 coop-countries: завършените ми градове (общото завладяване на държави) и държавите, чийто +10% доход съм поел аз (wonC — да не се плаща двойно)
-      ...(feature('coop-countries') ? { fin: Object.keys(e.s.finished || {}).slice(0, 300), wonC: Object.keys(S.coopWon || {}).slice(0, 100) } : {}),
+      ...(feature('coop-countries') ? { fin: Object.keys(e.s.finished || {}).slice(0, 600), wonC: Object.keys(S.coopWon || {}).slice(0, 100) } : {}),
       // 🤝 coop-infra: куестите за обща магистрала/жп, чиято награда съм поел аз (hwWonC — да не се плаща двойно), и моите ⚡ модернизирани линии (Ориент Експрес)
       ...(feature('coop-infra') ? { hwWonC: Object.keys(S.coopHwWon || {}).slice(0, 300), railsHs: d.rails().filter(r => r.hs).map(r => r.ref).slice(0, 200) } : {}),
       // 🌐 coop-pres (coopres.js): { pres: { cc, lv, ind, rel, conf, aid, stab, tq } } — без флага е {}
@@ -232,7 +233,7 @@ export function createCoop(d) {
     // 🤝 coop-countries: завършените градове на партньора — САМО познати id-та (cityName връща самото id за непознат град). Списъкът идва от чуждия клиент (сървърът не го проверява):
     // ползва се само козметично (картата, таблото, попъпа) и за XP; парите (+10% доход, куестите) се дават само на единия — game.js coopLead
     const known = x => { const n = d.cityName(x); return !!n && n !== x; }, coopC = feature('coop-countries'),
-      fin = coopC ? (P.fin || []).filter(x => typeof x === 'string' && known(x)).slice(0, 300) : [], wonC = coopC ? (P.wonC || []).slice(0, 100) : [];
+      fin = coopC ? (P.fin || []).filter(x => typeof x === 'string' && known(x)).slice(0, 600) : [], wonC = coopC ? (P.wonC || []).slice(0, 100) : [];
     // 🤝 coop-infra: наградите за общите магистрали/жп, поети от партньора (hwWonC), и неговите ⚡ модернизирани линии (railsHs)
     const coopI = feature('coop-infra'), hwWonC = coopI ? (P.hwWonC || []).slice(0, 300) : [], railsHs = coopI ? (P.railsHs || []).slice(0, 200) : [];
     // 🤝 coop-split: участъците и линиите, които партньорът строи сега, и изборите му при едновременен строеж
@@ -437,6 +438,14 @@ export function createCoop(d) {
     const P = st?.partner, n = (st?.inbox?.length || 0) + unread();
     b.innerHTML = P ? `🤝 <span style="color:${PCOL}">${esc(P.snap?.name || 'Партньор')}</span>${P.online ? ' 🟢' : ''}${n ? ` <b style="color:var(--acc)">+${n}</b>` : ''}` : '🤝 Партньор';
     b.title = P ? `Партньор: ${P.snap?.name || '—'} (${P.online ? 'онлайн сега' : P.at ? 'последно ' + ago(P.at) : 'още не е влизал'})` : 'Свържи се с приятел и си помагайте';
+    // собственикът (30.10): до „🗺️ Карта“ — дали партньорът е онлайн сега (само при игра с партньор); натискане — панелът на партньорството
+    let c = document.getElementById('coopPres'); const mapB = document.getElementById('btnMapToggle');
+    if (!P) { if (c) c.remove(); return; }
+    if (!c && mapB) { c = document.createElement('button'); c.id = 'coopPres'; c.className = 'btn2'; c.style.cssText = 'white-space:nowrap'; c.onclick = () => { open = true; render(); tick(); }; mapB.after(c); }
+    if (!c) return;
+    const nm = esc(P.snap?.name || T('Партньор'));
+    c.innerHTML = P.online ? `🟢 <span style="color:${PCOL}">${nm}</span> <span style="opacity:.8">${T('онлайн')}</span>` : `⚪ <span style="color:${PCOL};opacity:.8">${nm}</span> <span style="opacity:.6">${P.at ? T('офлайн · {0}', [ago(P.at)]) : T('офлайн')}</span>`;
+    c.title = P.online ? T('Партньорът играе в момента') : T('Партньорът не е в играта');
   }
 
   // ── панелът ──

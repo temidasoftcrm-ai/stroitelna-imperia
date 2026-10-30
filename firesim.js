@@ -14,6 +14,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { flameSprite } from './fireflip.js';
 import { createFire2, obbOf, scorch2, ladderRig, outside, nearPt } from './firefx2.js';   // 🔥 fire-real2: пламъците по прозорците и покрива, димът, отблясъкът, стълбата и струята
 import { feature } from './lab/feature.js';
+const NOTHRASH = feature('fire-nothrash');
 import { spinWheels } from './wheelspin.js';   // 🚒 fire-titan / fire-cyber: колелата на пожарните от Blender (wheel_*)
 import { t as tr } from './i18n.js';   // 🌐 lang-en: надписите на платното (f9, част C)
 
@@ -274,7 +275,7 @@ export function createFires(deps) {
       // визуалното
       const lot = lotOf(f); if (!lot) continue;
       if (f.order && f.order.pid != null) { if (vis.has(f.id)) drop(f.id); continue; }   // обект — визуалното е на строежа (скеле, събаряне)
-      let v = vis.get(f.id); if (!v && f.st !== 'done') v = build(f); if (!v) continue;
+      let v = vis.get(f.id); if (!v && f.st !== 'done' && !(NOTHRASH && f.st === 'saved' && !f.order && f.out != null && now - f.out > 3)) v = build(f); if (!v) continue;   /* fire-nothrash (T3): угасеният преди >3 дни се маха долу — без него се строеше и махаше всеки кадър (raycast + маршрут на пожарната) */
       const near = cam.distanceTo(v.W.ctr) < 160;
       const burning = f.st === 'travel' || f.st === 'fight';
       const lit = Math.ceil(v.flames.length * Math.min(1, 0.15 + f.inten * (0.35 + (100 - f.hp) / 140)));   // колкото по-силно и по-разрушено — толкова повече прозорци
