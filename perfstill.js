@@ -18,14 +18,21 @@ function sig(o) {
 const own = q => { const p = q.position, r = q.quaternion, k = q.scale; let s = p.x * 1.31 + p.y * 2.71 + p.z * 3.11 + r.x * 5.3 + r.y * 7.1 + r.z * 11.3 + r.w * 13.7 + k.x * 17.1 + k.y * 19.3 + k.z * 23.9;
   if (!q.matrixAutoUpdate) { const e = q.matrix.elements; s += e[12] * 47.9 + e[13] * 53.1 + e[14] * 59.3 + e[0] * 29.1 + e[10] * 43.3; } return s; };   // само собственото място на групата
 
-export function createStill() {
-  const st = new WeakMap(), frozen = new Set(); let f = 0;
+// ⚡ perf3-still2 (pin): three.js (r160) — обект с matrixAutoUpdate = true вика updateMatrix() всеки кадър, а тя винаги вдига matrixWorldNeedsUpdate →
+// force = true за ЦЯЛОТО поддърво, и matrixWorldAutoUpdate = false на замразените деца се пренебрегва. Сцената и city.group са такива, т.е.
+// замразяването досега не спестяваше нищо (Истанбул: ~11 ms на кадър за ~26 000 обекта). С pin корените и разделените групи
+// не преизчисляват собствената си матрица сами — само когато мястото им наистина се смени (own), веднъж.
+export function createStill(o = {}) {
+  const st = new WeakMap(), frozen = new Set(), cont = new Set(); let f = 0, pinOn = !!o.pin;
+  const pin = C => { const u = C.userData; if (C.matrixAutoUpdate) { C.updateMatrix(); C.matrixAutoUpdate = false; u.pinned = 1; u.pinOwn = own(C); } else if (u.pinned) { const w = own(C); if (w !== u.pinOwn) { C.updateMatrix(); u.pinOwn = own(C); } } };
+  const unpin = () => { for (const C of cont) if (C.userData.pinned) { C.userData.pinned = 0; C.matrixAutoUpdate = true; } };
   const thaw = o => { o.matrixWorldAutoUpdate = true; o.updateMatrixWorld(true); frozen.delete(o); const s = st.get(o); if (s) { s.frozen = false; s.still = 0; } };
   const thawIn = c => { for (const o of [...frozen]) { for (let q = o.parent; q; q = q.parent) if (q === c) { thaw(o); break; } } };   // всичко замразено вътре в c
   const visit = (P, d) => { const K = P.children;
-    for (let i = 0; i < K.length; i++) { const c = K[i]; if (c.isCamera || c.isLight || c.userData.stillRoot) continue;
+    for (let i = 0; i < K.length; i++) { const c = K[i]; if (c.isCamera || c.isLight || c.userData.stillRoot || c.userData.pedFar) continue;   /* ped-lod: скритият минувач е спрян от pedlod.js */
       let s = st.get(c); if (!s) st.set(c, s = { sig: NaN, still: 0, frozen: false, split: false, own: NaN, n: 0 });
       if (s.split) {   // група, разделена на децата си: само собственото ѝ място — мръдне ли, всичко вътре обратно
+        cont.add(c);
         if ((f + i) % CHK_LIVE === 0) { const w = own(c); if (w !== s.own) { s.own = w; thawIn(c); } }
         visit(c, d + 1); continue; }
       if ((f + i) % (s.frozen ? CHK_FROZEN : CHK_LIVE) !== 0) continue;
@@ -37,11 +44,13 @@ export function createStill() {
   return {
     // roots — корените, чиито деца се следят (city.group, scene); корен вътре в друг корен не се следи като дете
     tick(roots) {
-      f++; for (const R of roots) if (R) R.userData.stillRoot = true;
+      f++; for (const R of roots) if (R) { R.userData.stillRoot = true; cont.add(R); }
+      for (const C of cont) if (!C.parent && !C.isScene) cont.delete(C); else if (pinOn) pin(C);   /* махнатите (старият град) — вън от списъка, иначе остават в паметта */   // perf3-still2: всеки кадър (евтино — няколко десетки контейнера)
       if (f % 30 === 0) for (const o of [...frozen]) { let ok = false; for (let q = o.parent; q; q = q.parent) if (q.userData.stillRoot) { ok = true; break; } if (!ok || !o.parent) { thaw(o); st.delete(o); } }   // махнатото — обратно към нормалното
       for (const R of roots) if (R) visit(R, 1);
     },
-    off() { for (const o of [...frozen]) thaw(o); },   // изключено (сравнение) — всичко обратно
-    stats: () => ({ frozen: frozen.size }),
+    off() { unpin(); for (const o of [...frozen]) thaw(o); },
+    pin(on) { if (!on && pinOn) unpin(); pinOn = !!on; },   // perf3-still2 вкл./изкл. (сравнение в тестовете)   // изключено (сравнение) — всичко обратно
+    stats: () => ({ frozen: frozen.size, pinned: [...cont].filter(C => C.userData.pinned).length }),
   };
 }

@@ -31,8 +31,12 @@ export function romePrep(M, win) {
 // G — групата на изгледа (координатите на блоковете); BL — romeBlocks ({ list, shown(b), hide(set) }); V — от romePrep
 // o: { R — радиус, pick — кои модели, yaws — накъде е лицето спрямо b.rot (Рим: [0]; bg-fill: b.rot е по улицата — [±π/2], по-близката до улица),
 //      roads — улиците (за yaws), only(b) — кои сгради, mix — каква част от тях (0…1) }
+// 🗽 ny-tenements (T2): моделите на собственика (Meshy, Темидасофт) за Ню Йорк — нощем светят изпечените прозорци (emissiveMap в GLB, ~45 % от тях)
+export const NY_FILES = { 'ny-ten-1': 'ny/tenement-1.glb', 'ny-ten-2': 'ny/tenement-2.glb', 'ny-ten-3': 'ny/tenement-3.glb' };
+export function nyPrep(M, win) { const V = {}; for (const k in NY_FILES) { const o = M[k]; if (!o) continue; o.traverse(m => { if (m.isMesh) for (const mt of [].concat(m.material)) { mt.metalness = 0; mt.roughness = Math.max(mt.roughness ?? 1, 0.85); if (mt.metalnessMap) mt.metalnessMap = null; if (k !== 'ny-ten-1') mt.color.setRGB(1.45, 1.38, 1.25); mt.needsUpdate = true; } });   /* собственикът: тъмните ар деко кули — светъл варовик (без метал, матови, по-светли и топли) */
+    o.traverse(m => { if (m.isMesh) for (const mt of [].concat(m.material)) if (mt.emissiveMap) { mt.emissive.setRGB(1, 1, 1); mt.emissiveIntensity = 0; mt.userData.winK = k === 'ny-ten-1' ? 2.2 : 1.8; win(mt); } }); V[k] = o; } return V; }
 export function romeNear(G, BL, V, o = {}) {
-  const R = o.R || 160, keys = (o.pick || ROME_PICK).filter(k => V[k]), YAW = o.yaws || [0], only = o.only || (() => true), mix = o.mix ?? 1; if (!keys.length) return null;
+  if (!Object.keys(V).length) return null; const R = o.R || 160, keys = (o.pick || ROME_PICK).filter(k => V[k] || o.pickFor), YAW = o.yaws || [0], only = o.only || (() => true), mix = o.mix ?? 1; if (!keys.length) return null;
   const root = new THREE.Group(); root.name = 'romeNear'; root.userData.extShared = true; G.add(root);   // extShared: dispose() на изгледа не пипа общите геометрии
   const P = {};   // по модел: частите (геометрия, материал, матрица в модела) и нормализацията (центърът долу, размерът)
   for (const k of new Set(keys)) { const ob = V[k]; ob.updateMatrixWorld(true); const parts = []; ob.traverse(m => { if (m.isMesh) parts.push({ geo: m.geometry, mat: m.material, local: m.matrixWorld.clone() }); });
@@ -52,11 +56,13 @@ export function romeNear(G, BL, V, o = {}) {
     if (!dirty && at && at.distanceTo(cam) < 15) return; at = cam.clone(); dirty = false;
     const near = new Set(), by = {}, R2 = R * R;
     BL.list.forEach((b, i) => { if ((b.x - cam.x) ** 2 + (b.z - cam.z) ** 2 + cam.y * cam.y * 0.25 > R2 || !only(b) || (mix < 1 && (hash(i + 7919) % 1000) / 1000 >= mix) || !BL.shown(b)) return;
-      near.add(b); const k = keys[hash(i) % keys.length]; (by[k] ||= []).push(b); });
+      const ks = o.pickFor ? o.pickFor(b, i).filter(k => V[k]) : keys; if (!ks.length) return;   /* ny-tenements: моделът по височината и основата на сградата */
+      near.add(b); const k = ks[hash(i) % ks.length]; (by[k] ||= []).push(b); });
     for (const k in P) { const p = P[k], L = by[k] || [], out = [];
       // вписан в рамката на фасадата: в дълбочина и до ~1,15 × височината ѝ; тесните (редовите къщи) — по няколко една до друга по улицата,
       // леко разтеглени по ширина (до 1,3 ×), за да запълнят фасадата без празнини; общо — не по-широки от нея (не излизат на улицата)
-      for (const b of L) { const sc = Math.min(b.d * 0.96 / p.s.z, b.h * 1.15 / p.s.y, b.w * 0.96 / p.s.x), W1 = p.s.x * sc, n = Math.max(1, Math.floor(b.w * 0.96 / W1)), sx = Math.min(1.3, b.w * 0.96 / (n * W1));
+      for (const b of L) { if (o.fill) { const ry = face(b), [fw, fh, fd] = o.size ? o.size(b, p.key) : [b.w * 0.97, b.h, b.d * 0.97]; out.push(W.compose(T.set(b.x, 0, b.z), Q.setFromAxisAngle(UP, ry), S.set(fw / p.s.x, fh / p.s.y, fd / p.s.z)).multiply(p.base).clone()); continue; }   /* ny-tenements: по рамката на кутията — основата и височината (x/z — до парцела, y — до височината) */
+        const sc = Math.min(b.d * 0.96 / p.s.z, b.h * 1.15 / p.s.y, b.w * 0.96 / p.s.x), W1 = p.s.x * sc, n = Math.max(1, Math.floor(b.w * 0.96 / W1)), sx = Math.min(1.3, b.w * 0.96 / (n * W1));
         const ry = face(b), c = Math.cos(ry), s = Math.sin(ry);   // посоката по улицата (локалното +x на модела в света)
         for (let i = 0; i < n; i++) { const u = (i - (n - 1) / 2) * W1 * sx; out.push(W.compose(T.set(b.x + u * c, 0, b.z - u * s), Q.setFromAxisAngle(UP, ry), S.set(sc * sx, sc, sc)).multiply(p.base).clone()); } }   // лицето (+z на модела) — към улицата
       ensure(p, out.length);

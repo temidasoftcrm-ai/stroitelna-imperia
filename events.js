@@ -73,7 +73,10 @@ export function createEvents(deps) {
     const S = deps.S(); if (!S) return '';
     const a = active();
     if (!a.length) return '';
-    return a.map(e => `<span class="evchip ${e.kind}" title="${e.text.replace(/"/g, '&quot;')}">${e.ico} ${e.title} · ${e.until - S.day} д.</span>`).join('');
+    // собственикът (30.10): една иконка „⚡ N“ (червена, ако има лошо) — натискане → списък; вместо дълги надписи в лентата
+    const tr = deps.t || (x => x), bad = a.some(e => e.kind === 'bad'), good = a.some(e => e.kind === 'good');
+    const rows = a.map(e => `<div class="evRow ${e.kind}"><b>${e.ico} ${tr(e.title)}</b> <span class="meta" style="margin:0">· ${e.until - S.day} д.</span><div class="meta" style="margin:2px 0 0">${tr(e.text)}</div></div>`).join('');
+    return `<span class="evchip evIco ${bad ? 'bad' : good ? 'good' : ''}" title="${tr('Събития')}">⚡ ${a.length}</span><div class="evPop hidden">${rows}</div>`;
   }
   return { dailyTick, workMul, offerMul, stormy, hudHtml, active, log: () => st().log };
 }

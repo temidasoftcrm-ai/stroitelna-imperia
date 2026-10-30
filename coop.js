@@ -120,6 +120,7 @@ export function createCoop(d) {
       ...(d.presSnap ? d.presSnap() : {}),
       // 🤝 coop-mega (coopmega.js): { mega: { c, rh, w } } — без флага е {}
       ...(d.megaSnap ? d.megaSnap() : {}),
+      ...(feature('coop-split') ? { railJobs: d.railJobs ? d.railJobs().slice(0, 100) : [], splitC: d.splitSnap ? d.splitSnap() : {} } : {}),   // 🤝 coop-split: жп линиите в строеж и изборът „Разделяне на трасето“
       fleet: d.fleet ? d.fleet().slice(0, 300) : [] };   // влаковете, корабите и самолетите [{ ref, cost, nm }] — общият флот (флаг coop-fleet)   // нивото на фирмата (неограничено) — общото ниво (флаг coop-lv, devlevel.js)
   }
   // къде строя по градове: текущият град се чете от играта, другите — от последното посещение (localStorage)
@@ -234,10 +235,13 @@ export function createCoop(d) {
       fin = coopC ? (P.fin || []).filter(x => typeof x === 'string' && known(x)).slice(0, 300) : [], wonC = coopC ? (P.wonC || []).slice(0, 100) : [];
     // 🤝 coop-infra: наградите за общите магистрали/жп, поети от партньора (hwWonC), и неговите ⚡ модернизирани линии (railsHs)
     const coopI = feature('coop-infra'), hwWonC = coopI ? (P.hwWonC || []).slice(0, 300) : [], railsHs = coopI ? (P.railsHs || []).slice(0, 200) : [];
-    const sig2 = sig + JSON.stringify([fin, wonC, coopC ? user?.id || null : null, coopC ? st?.partner?.id || null : null]) + (coopI ? JSON.stringify([hwWonC, railsHs, user?.id || null, st?.partner?.id || null]) : '');
+    // 🤝 coop-split: участъците и линиите, които партньорът строи сега, и изборите му при едновременен строеж
+    const coopS = feature('coop-split'), hwJ = coopS ? (P.hwJobs || []).filter(x => typeof x === 'string' || typeof x === 'number').slice(0, 100) : [], railJ = coopS ? (P.railJobs || []).filter(x => typeof x === 'string' && /^[\w-]+\|[\w-]+$/.test(x)).slice(0, 100) : [],
+      splitC = coopS && P.splitC && typeof P.splitC === 'object' && !Array.isArray(P.splitC) ? Object.fromEntries(Object.entries(P.splitC).filter(([k, v]) => /^(hw|rail):[\w|-]{1,60}$/.test(k) && (v === 'split' || v === 'cancel')).slice(0, 50)) : {};
+    const sig2 = sig + JSON.stringify([fin, wonC, coopC ? user?.id || null : null, coopC ? st?.partner?.id || null : null]) + (coopI ? JSON.stringify([hwWonC, railsHs, user?.id || null, st?.partner?.id || null]) : '') + (coopS ? JSON.stringify([hwJ, railJ, splitC, st?.partner?.id || null]) : '');
     if (sig2 === shareSig) return;
     shareSig = sig2;
-    window.__coopShared = { v: (window.__coopShared?.v || 0) + 1, name: txt(P.name) || 'партньора', hw, rails, cities, infra, col: colOk(P.col), ...(coopC ? { fin, wonC, me: String(user?.id || ''), pid: String(st?.partner?.id || '') } : {}), ...(coopI ? { hwWonC, railsHs, me: String(user?.id || ''), pid: String(st?.partner?.id || '') } : {}) };   // col — цветът на марката му (линиите на картата, флаг coop-col)
+    window.__coopShared = { v: (window.__coopShared?.v || 0) + 1, name: txt(P.name) || 'партньора', hw, rails, cities, infra, col: colOk(P.col), ...(coopC ? { fin, wonC, me: String(user?.id || ''), pid: String(st?.partner?.id || '') } : {}), ...(coopI ? { hwWonC, railsHs, me: String(user?.id || ''), pid: String(st?.partner?.id || '') } : {}), ...(coopS ? { hwJ, railJ, splitC, pid: String(st?.partner?.id || '') } : {}) };   // col — цветът на марката му (линиите на картата, флаг coop-col)
     try { d.infraSync && d.infraSync(infra, P.name || 'партньора'); } catch (e) { console.warn('coop infra', e); }
   }
   async function tick() {
@@ -262,6 +266,7 @@ export function createCoop(d) {
       const r5 = st2 && feature('coop-riv-core') ? await rpc('coop_riv_status', {}, 1).catch(() => null) : null;   // ⚖️ coop-riv-core: режимът и отношенията (миграция coop6 — без нея няма данни)
       stRiv = r5 && r5.ok && r5.active ? r5 : null;
       shareMap();
+      if (feature('coop-split') && d.splitTick) d.splitTick();   // 🤝 coop-split: известията и „Разделяне на трасето“
       const J = (st2?.joints || []).filter(j => j.status === 'active');
       window.__coopJoint = st2 ? { hw: new Set(J.filter(j => j.kind === 'hw').map(j => j.ref)), rail: new Set(J.filter(j => j.kind === 'rail').map(j => j.ref)) } : null;
       if (JSON.stringify([st?.partner?.snap?.cities || [], st2?.joints || [], window.__coopShared?.v, PCOL]) !== before) d.drawMap();

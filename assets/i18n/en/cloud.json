@@ -80,6 +80,11 @@
  "💾 Запази": "💾 Save",
  "Запазвам…": "Saving…",
  "🔑 Паролата е сменена.": "🔑 The password was changed.",
+ "⚖️ С партньор — режим „Конкуренти“: отношения (доверие, свързаност, напрежение), сделки с насрещни предложения, международни търгове и световни кризи": "⚖️ With a partner — the “Competitors” mode: relations (trust, interdependence, tension), deals with counter-offers, international tenders and world crises",
+ "🗽 Манхатън — по-високи сгради около забележителностите (истински силует)": "🗽 Manhattan — taller buildings around the landmarks (a real skyline)",
+ "⬆️ „Надгради всички“ за корабите и самолетите; ⚡ събитията — една иконка горе със списък": "⬆️ “Upgrade all” for ships and planes; ⚡ events — one icon at the top with a list",
+ "💶 Сумите от милиард нагоре — „млрд.“; знамето при завладяна държава — по-гладко и не върху началния екран": "💶 Amounts from a billion up show as “bn”; the country-won flag waves more smoothly and not over the start screen",
+ "🛠️ Поправено: бутонът „Купи липсващата“ при пълен гараж; „Строй летище“ показва, че се строи; лентата на транспорта — на един ред": "🛠️ Fixed: the “Buy missing” button when the garage is full; “Build airport” shows it is being built; the transport bar on one line",
  "🛳️ Истински круизни кораби и в Истанбул и Ню Йорк — по Босфора в две ленти (обръщат преди моста), нощем с осветени палуби": "🛳️ Real cruise ships in Istanbul and New York too — two lanes on the Bosphorus (turning before the bridge), decks lit at night",
  "🏭 Мегаполисите (Истанбул, Лондон, Ню Йорк…) — без индустриална зона; зоната вече никога не е във водата": "🏭 Megacities (Istanbul, London, New York…) have no industrial zone; the zone is never placed in water any more",
  "🛠️ Поправено: изтичане на памет от пешеходците при смяна карта ↔ град; излишните светлини пред някои автобуси": "🛠️ Fixed: memory leak from pedestrians when switching map ↔ city; stray lights in front of some buses",
@@ -464,6 +469,7 @@
  "▶ Влез в играта": "▶ Enter the game",
  "☁️ {0} — {1}. Играта ти се пази в облака.": "☁️ {0} — {1}. Your game is kept in the cloud.",
  "_stale": {
-  "ime@primer.com": "name@example.com"
+  "ime@primer.com": "name@example.com",
+  "🛠️ Поправено: бутонът „Купи липсващата“ при пълен гараж; лентата на транспорта — на един ред": "🛠️ Fixed: the “Buy missing” button when the garage is full; the transport bar on one line"
  }
 }

@@ -399,6 +399,7 @@
 {"t":"California Theatre SF","a":"Темидасофт","l":"OWN","u":"","f":["civic/theatre-us.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
 {"t":"пирамида в Гиза","a":"Темидасофт","l":"OWN","u":"","f":["lm/pyramid-giza.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
 {"t":"Сфинксът","a":"Темидасофт","l":"OWN","u":"","f":["lm/sphinx.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
+{"t":"NY Tenement","a":"Темидасофт","l":"OWN","u":"","f":["ny/tenement-1.glb","ny/tenement-2.glb","ny/tenement-3.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
 {"t":"Street billboard","a":"EVID","l":"CC-BY-4.0","u":"https://sketchfab.com/3d-models/2e0e7e7046044f70b6283547d7f243a9","f":["billboards/bb-small.glb"],"k":"Улица, природа и обзавеждане","s":"Sketchfab"},
 {"t":"Billboard","a":"DARK_2LORD2","l":"CC-BY-4.0","u":"https://sketchfab.com/3d-models/800c324581684cdbaa0a074ab3f01c0c","f":["billboards/bb-medium.glb"],"k":"Улица, природа и обзавеждане","s":"Sketchfab"},
 {"t":"Billboard (.psd layered texture maps included)","a":"TampaJoey","l":"CC-BY-4.0","u":"https://sketchfab.com/3d-models/20d1a51fbfa94373900e29de74a0f9ee","f":["billboards/bb-large.glb"],"k":"Улица, природа и обзавеждане","s":"Sketchfab"},

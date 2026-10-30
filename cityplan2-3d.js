@@ -715,7 +715,7 @@ export function buildPlan2View(P, opts = {}) {
     // фоновите квартали и свободните парцели: osm-fill (opts.blocksEarly) — веднага след най-близките улици (иначе — накрая, след ~25 s при бавен браузър:
     // около централата „пустиня“ от бежови парцели); те ползват само плана (P), не мешовете на улиците
     function* blocksFill() {
-      if ((D && opts.blocks !== false) || opts.blocks === 'bg') ST.BL = yield* romeBlocks(G, P, D ? D.style : 'bg', R, opts.roofs);   // 'bg' (bg-fill) — градовете по плана без карта
+      if ((D && opts.blocks !== false) || opts.blocks === 'bg') ST.BL = yield* romeBlocks(G, P, D ? D.style : 'bg', R, opts.roofs, D);   // 'bg' (bg-fill) — градовете по плана без карта
       tm('blocks'); yield 0;
       // свободните парцели (истинската карта): трева с пръст, ниска ограда отзад и отстрани, табела „Продава се“ откъм улицата (opts.freeLot)
       ST.FP = (D || opts.blocks === 'bg') && opts.freeLot ? freePlots(G, P) : null;
@@ -970,7 +970,7 @@ function terminiView(L0, model, sf = {}) {
 // Рим: затворено застрояване — по двете страни на всяка улица редица от сгради (14 м фасада, 15 м дълбочина, 13–21 м височина),
 // в цветовете на Рим; не върху улица, вода, парк/археология или забележителност. Рисуват се като фасада + керемиден покрив (2 инстанции).
 const ROMA = [0xd9a066, 0xc8794e, 0xe2c27a, 0xb5654a, 0xd8b48a, 0xe7d3a8, 0xc98f5b, 0xa9583f];
-function* romeBlocks(G, P, style, ROADS = P.roads, ROOFS = null) {   // ROOFS — покривите на града (tokyo-look / dubai-look / sg-look): [{ col, flat }] по вида   // генератор: yield след всеки път; ROADS — подредени (най-близките първи)
+function* romeBlocks(G, P, style, ROADS = P.roads, ROOFS = null, D0 = null) {   // ROOFS — покривите на града (tokyo-look / dubai-look / sg-look): [{ col, flat }] по вида   // генератор: yield след всеки път; ROADS — подредени (най-близките първи)
   const rg = new Map(), gc = 12, key = (x, z) => Math.floor(x / gc) * 100003 + Math.floor(z / gc);   // числови ключове (низовете бяха половината време)
   P.roads.forEach(rd => rd.pts.forEach(p => { const k = key(p[0], p[1]); (rg.get(k) || rg.set(k, []).get(k)).push([p[0], p[1], rd.w / 2 + rd.walk + 0.8, rd.id]); }));
   const nearRoad = (x, z, own) => { const i = Math.floor(x / gc), j = Math.floor(z / gc); for (let a = i - 2; a <= i + 2; a++) for (let b = j - 2; b <= j + 2; b++) for (const [px, pz, r, id] of rg.get(a * 100003 + b) || []) if (id !== own && Math.hypot(px - x, pz - z) < r) return true; return false; };
@@ -990,6 +990,10 @@ function* romeBlocks(G, P, style, ROADS = P.roads, ROOFS = null) {   // ROOFS �
   const list = [], m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
   const IST = style === 'istanbul', PAR = style === 'paris', LON = style === 'london', NY = style === 'newyork', MOS = style === 'moscow', WAS = style === 'washington', LV = style === 'lasvegas', DEP0 = IST ? 12 : 15, STEP = IST ? 10 : PAR ? 13 : LON ? 11 : NY ? 17 : 14, used = new Set(); MIN2 = (0.72 * Math.min(STEP, IST ? 8 : DEP0)) ** 2;
   const OSMH = feature('osm-heights') && !!P.osm;   // osm-heights (T2): височините по нивото на квартала
+  // 🗽 ny-tall (собственикът: забележителностите са в истински ръст, обикновените сгради — в мащаба на картата): в Манхатън (Мидтаун — от 8-мо авеню на изток, без Хелс Кичън; Даунтаун/ФиДи)
+  // обикновените сгради — по-високи (кулите ×2, другите ×1,6, до 250 м). Само височината на инстанцията (y) — без нови триъгълници и draw call-ове;
+  // прозорците се повтарят по мащаба (tileByScale) — повече етажи, не разтеглени. Бруклин, Куинс и ниските квартали — както са
+  const OD = D0 && D0.center ? D0 : null, NYT = NY && feature('ny-tall') && OD && OD.k ? (x, z) => { const la = OD.center[0] - z / (110540 * OD.k), lo = OD.center[1] + x / (Math.cos(OD.center[0] * Math.PI / 180) * 111320 * OD.k); return (la > 40.742 && la < 40.768 && lo > -73.992 && lo < -73.965) || (la > 40.700 && la < 40.722 && lo > -74.020 && lo < -73.998); } : null;
   const BG = style === 'bg', VAR = (PAR || IST || (WAS && feature('was-fed')) || (MOS && feature('dc-msk-fac'))) && feature('bg-variety'),   /* T2 dc-msk-fac: и Москва */ XK = VAR || BG;   /* was-fed (55): и Вашингтон — федералният варовик */
   // was-fed (55): във Вашингтон парцелите са тесни (12 м), а сградите — до 19 м: всяка сграда — в своя парцел (по осите му, 0,6 м от ръбовете, лицето към улицата),
   // по една на парцел и без застъпване с вече сложените (правоъгълниците, не само центровете); wasFit → { x, z, w — по улицата, d, ax, az — посоката на улицата } или null
@@ -1013,9 +1017,10 @@ function* romeBlocks(G, P, style, ROADS = P.roads, ROOFS = null) {   // ROOFS �
         let rc = null, ex = null; if (VAR) ({ t: ty, H, col, rc, ex } = varPick(style, h, h2, MOS ? (romeOuter(x, z) ? 9 : 0) : ty));
         // osm-heights (T2, одитът): центърът — по-висок, по нивото на квартала (tier 1 — център); ~5 % акценти в центъра — неравна линия на покривите;
         // Париж и Вашингтон — без (истинските им ограничения за височина)
-        if (OSMH && !PAR && !WAS) { const L0 = lotAt(x, z), tr = L0 ? (L0.tier || 1) : 3; H *= tr <= 1 ? 1.25 : tr === 2 ? 1.1 : tr >= 4 ? 0.85 : 1; if (tr <= 2 && h2 > 0.95) H *= 1.5; }   /* dc-msk-fac: Москва — външните райони (tier ≥ 3) панелни */   // bg-variety: вид, етажи, цвят, покрив (bgblocks.js)
+        if (OSMH && !PAR && !WAS) { const L0 = lotAt(x, z), tr = L0 ? (L0.tier || 1) : 3; H *= tr <= 1 ? 1.25 : tr === 2 ? 1.1 : tr >= 4 ? 0.85 : 1; if (tr <= 2 && h2 > 0.95) H *= 1.5; }
+        const nyT = !!(NYT && NYT(x, z)); if (nyT) H = Math.min(250, H * (ty === 5 ? 2 : 1.6));   // 🗽 ny-tall   /* dc-msk-fac: Москва — външните райони (tier ≥ 3) панелни */   // bg-variety: вид, етажи, цвят, покрив (bgblocks.js)
         q.setFromAxisAngle(up, Math.atan2(fx, fz));
-        list.push({ x, z, w: bw, d: bd, h: H, rot: Math.atan2(fz * sg, -fx * sg), t: ty, col, rc, ex, M: m.compose(new THREE.Vector3(x, H / 2, z), q, new THREE.Vector3(ty === 5 ? bd * 0.8 : bd, H, ty === 5 ? bw * 0.78 : bw + (WF ? 0 : 0.3))).clone(), lot: lotAt(x, z) }); break; } } }   // небостъргачите — по-тесни от стъпката: улички между кулите, не слепени
+        list.push({ x, z, w: bw, d: bd, h: H, rot: Math.atan2(fz * sg, -fx * sg), t: ty, col, rc, ex, ...(NYT ? { nyTall: nyT } : {}), M: m.compose(new THREE.Vector3(x, H / 2, z), q, new THREE.Vector3(ty === 5 ? bd * 0.8 : bd, H, ty === 5 ? bw * 0.78 : bw + (WF ? 0 : 0.3))).clone(), lot: lotAt(x, z) }); break; } } }   // небостъргачите — по-тесни от стъпката: улички между кулите, не слепени
   if (BG) yield* bgPlace(P, list);   // bg-fill: по парцелите и във вътрешността на кварталите
   // по вид: фасада (текстура) + покрив (римски — на две води; османски — нисък, тъмна керемида; блоковете — плосък)
   const FM = [facadeMat(), ottoMat(), aptMat(), haussMat(), brickMat(), glassMat(), haussMat()], RF = [[roofGeo(), 0xa8553a, 0.3], [roofGeo(), 0x8d4a34, 0.22], [new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), 0xb9b6ae, 0], [mansardGeo(), 0x5e6872, 0.35], [roofGeo(), 0x4f555c, 0.16], [new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), 0x5d646b, 0], [roofGeo(), 0x5f7a66, 0.14]];   // Москва: нисък покрив от боядисана ламарина (зелено-сив)

@@ -88,6 +88,7 @@
   #evchips { display:flex; gap:6px; flex-wrap:wrap; max-width:460px; }
   .evchip { font-size:12px; padding:3px 8px; border-radius:9px; background:rgba(255,255,255,.08); border:1px solid var(--line); white-space:nowrap; }
   .evchip.good { background:rgba(76,208,125,.18); color:#9ff0bd; } .evchip.bad { background:rgba(255,107,107,.18); color:#ffb3b3; }
+  #evchips { position:relative; } .evIco { cursor:pointer; font-weight:800; } .evPop { position:absolute; top:calc(100% + 6px); left:0; z-index:40; width:min(320px,90vw); max-height:60vh; overflow:auto; background:linear-gradient(180deg,#1f2a3c,#141b27); border:1px solid var(--line); border-radius:12px; padding:8px 10px; box-shadow:0 10px 28px rgba(0,0,0,.5); } .evPop.hidden { display:none; } .evRow { padding:6px 0; border-bottom:1px solid var(--line); font-size:13px; } .evRow:last-child { border-bottom:0; } .evRow.bad b { color:#ffb3b3; } .evRow.good b { color:#9ff0bd; }
   /* снимките при събития: малка карта долу вляво, под съобщенията (не закриват играта и десния панел) */
   #buyPop { position:fixed; bottom:16px; left:16px; width:min(340px, calc(100vw - 32px)); z-index:11; cursor:pointer; animation:bpIn .35s ease-out; }
   #buyPop.hidden { display:none; }
@@ -342,10 +343,10 @@
   "./citycull.js": "./citycull.js?v=77580268",
   "./cityground.js": "./cityground.js?v=385af7f8",
   "./citylife3.js": "./citylife3.js?v=0fd57c32",
-  "./citypanel.js": "./citypanel.js?v=93bc4cb1",
+  "./citypanel.js": "./citypanel.js?v=8e0fddc8",
   "./cityplan-osm.js": "./cityplan-osm.js?v=f768f29e",
   "./cityplan.js": "./cityplan.js?v=90754501",
-  "./cityplan2-3d.js": "./cityplan2-3d.js?v=fe51fe09",
+  "./cityplan2-3d.js": "./cityplan2-3d.js?v=65d2e74e",
   "./cityplan2-osm.js": "./cityplan2-osm.js?v=456cf3bb",
   "./cityplan2.js": "./cityplan2.js?v=b8acc77f",
   "./cityplan2game.js": "./cityplan2game.js?v=ebf81371",
@@ -354,13 +355,13 @@
   "./cityplanroute.js": "./cityplanroute.js?v=a0f8c3a0",
   "./citysnd3.js": "./citysnd3.js?v=b45cc1a3",
   "./civic3d.js": "./civic3d.js?v=f5ddfa17",
-  "./cloud.js": "./cloud.js?v=57d5258f",
+  "./cloud.js": "./cloud.js?v=4f6cfc62",
   "./commute.js": "./commute.js?v=f0af72b1",
-  "./config.js": "./config.js?v=0ff94ecb",
+  "./config.js": "./config.js?v=48a8a37b",
   "./conquest.js": "./conquest.js?v=9c245ce1",
   "./consent.js": "./consent.js?v=fb78601e",
   "./construct.js": "./construct.js?v=eb318e23",
-  "./coop.js": "./coop.js?v=b60b19f3",
+  "./coop.js": "./coop.js?v=3defc356",
   "./coopcenter.js": "./coopcenter.js?v=71f26b05",
   "./coopholding.js": "./coopholding.js?v=55cdeb91",
   "./coopmega.js": "./coopmega.js?v=998a91c2",
@@ -379,7 +380,7 @@
   "./districts.js": "./districts.js?v=773b2b7c",
   "./economy.js": "./economy.js?v=07c16980",
   "./errtelem.js": "./errtelem.js?v=d3e1a1c3",
-  "./events.js": "./events.js?v=04a7813f",
+  "./events.js": "./events.js?v=7b4c87ed",
   "./factory.js": "./factory.js?v=c844334b",
   "./fireflip.js": "./fireflip.js?v=d7d0932a",
   "./firefx2.js": "./firefx2.js?v=252011ea",
@@ -389,7 +390,7 @@
   "./football.js": "./football.js?v=d74143d7",
   "./fountainsnd.js": "./fountainsnd.js?v=265568af",
   "./fountainwater.js": "./fountainwater.js?v=a8e7f584",
-  "./game.js": "./game.js?v=89d2c498",
+  "./game.js": "./game.js?v=a16e82f2",
   "./garbage.js": "./garbage.js?v=1bc450cc",
   "./geomap.js": "./geomap.js?v=19fe8405",
   "./gfxlite.js": "./gfxlite.js?v=4f76df13",
@@ -421,10 +422,10 @@
   "./intro.js": "./intro.js?v=2f432dac",
   "./junctionpaths.js": "./junctionpaths.js?v=454db68e",
   "./kremlin2.js": "./kremlin2.js?v=054ea886",
-  "./lab/approved.js": "./lab/approved.js?v=f87ca883",
+  "./lab/approved.js": "./lab/approved.js?v=987ccb45",
   "./lab/feature.js": "./lab/feature.js?v=6965eb1e",
-  "./lab/features.js": "./lab/features.js?v=ca0b6f3b",
-  "./lab/lab.js": "./lab/lab.js?v=d2353c10",
+  "./lab/features.js": "./lab/features.js?v=c8374a76",
+  "./lab/lab.js": "./lab/lab.js?v=c2c15a4f",
   "./lab/viewer.js": "./lab/viewer.js?v=6f5878d9",
   "./landmarks.js": "./landmarks.js?v=733e8d37",
   "./liftmodel.js": "./liftmodel.js?v=c993c5e1",
@@ -480,10 +481,11 @@
   "./parklife.js": "./parklife.js?v=e0137400",
   "./passtrains.js": "./passtrains.js?v=88a0c567",
   "./peacewin.js": "./peacewin.js?v=1d3e7665",
+  "./pedlod.js": "./pedlod.js?v=15529bd0",
   "./pedpaths.js": "./pedpaths.js?v=89981e3a",
   "./perfmeter.js": "./perfmeter.js?v=b5457069",
   "./perfpanel.js": "./perfpanel.js?v=e320785e",
-  "./perfstill.js": "./perfstill.js?v=252dd395",
+  "./perfstill.js": "./perfstill.js?v=6e1b6f43",
   "./playtime.js": "./playtime.js?v=d24ad3b3",
   "./polintro.js": "./polintro.js?v=5e1db62d",
   "./portlights.js": "./portlights.js?v=f26e6496",
@@ -504,7 +506,7 @@
   "./roadnet.js": "./roadnet.js?v=ca08d9ee",
   "./roadnet3d.js": "./roadnet3d.js?v=21698152",
   "./roadsigns.js": "./roadsigns.js?v=061f61c6",
-  "./romenear.js": "./romenear.js?v=4bd072e0",
+  "./romenear.js": "./romenear.js?v=93ee431c",
   "./roofs.js": "./roofs.js?v=ca766f36",
   "./roomsound.js": "./roomsound.js?v=763c5778",
   "./roundabout.js": "./roundabout.js?v=68899f66",
@@ -696,12 +698,12 @@
 <script type="module" src="splash.js?v=28b81a00"></script><!-- 🧪 splash-anim: оживената начална картина (canvas върху статичната; без него/при грешка — статичната) -->
 
 <script src="mobile.js?v=7d605a2f"></script>
-<script type="module" src="config.js?v=0ff94ecb"></script>
+<script type="module" src="config.js?v=48a8a37b"></script>
 <script type="module" src="memfix.js?v=ade25811"></script>
-<script type="module" src="game.js?v=89d2c498"></script>
+<script type="module" src="game.js?v=a16e82f2"></script>
 <script type="module" src="tips.js?v=f58d6ac2"></script>
 <script type="module" src="panelintro.js?v=783edae6"></script>
-<script type="module" src="cloud.js?v=57d5258f"></script>
+<script type="module" src="cloud.js?v=4f6cfc62"></script>
 <script type="module" src="online-btn.js?v=9a77fd8b"></script>
 </body>
 </html>
