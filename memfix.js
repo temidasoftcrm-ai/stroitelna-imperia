@@ -41,18 +41,29 @@ function share(tex) {
 // а 1024² е 4× паметта (и в браузъра, и във видеокартата). Забележителностите (assets/heavy/lm) остават с пълната си разделителна способност.
 const LITE_T = feature('gfx-lite') && gfx().tex < 512, MAXT = LITE_T ? gfx().tex : 512, small = new WeakSet(), shrunk = { n: 0, savedMB: 0 };
 if (LITE_T) Object.defineProperty(Texture.prototype, 'anisotropy', { get: () => 1, set() { }, configurable: true });   // gfx-lite: всички текстури (и платната на града) — анизотропия 1
-function shrink(tex) {
+function shrink(tex, maxT = MAXT) {
   if (!tex || !tex.isTexture || !tex.source || small.has(tex.source)) return; small.add(tex.source);
   const img = tex.source.data; if (!img || tex.isDataTexture || tex.isCompressedTexture) return;
-  const w = img.width, h = img.height; if (!(w > MAXT || h > MAXT)) return;
-  const k = MAXT / Math.max(w, h), c = document.createElement('canvas'); c.getContext('2d', { willReadFrequently: true }); c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));
+  const w = img.width, h = img.height; if (!(w > maxT || h > maxT)) return;
+  const k = maxT / Math.max(w, h), c = document.createElement('canvas'); c.getContext('2d', { willReadFrequently: true }); c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));
   try { c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); } catch { return; }
   tex.source.data = c; tex.needsUpdate = true; if (img.close) img.close();   // ImageBitmap — освобождава декодираната картинка
   shrunk.n++; shrunk.savedMB += (w * h - c.width * c.height) * 4 / 2 ** 20;
 }
+// 🟠 vlow-tex (T3, „Много ниско“): още по-малко памет за текстурите — без картите за релеф/грапавост/метал/сенки (нормали, roughness/metalness, AO:
+// на слаб компютър разликата почти не се вижда, а всяка е още една картинка до 512² на модел) и забележителностите до 512 px (досега — в пълен размер).
+// Махат се преди общия кеш (bySig), за да не останат в паметта. Без картата металността ще е 1 навсякъде (тъмно) — затова 0.
+const VLT = feature('vlow-tex') && gfxLevel() === 'vlow' && !/[?&]novlt/.test(location.search), VLT_LM = 512, DROP = ['normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'bumpMap', 'displacementMap', 'clearcoatNormalMap', 'clearcoatRoughnessMap'], vlt = { dropped: 0, mats: 0 };
+function dropMaps(root) {
+  root.traverse(o => { for (const m of [].concat(o.material || [])) { if (!m || m.__vlt) continue; m.__vlt = 1; let n = 0;
+    for (const k of DROP) if (m[k]) { if (k === 'metalnessMap') m.metalness = 0; if (k === 'roughnessMap') m.roughness = Math.max(0.55, m.roughness || 0); m[k] = null; n++; }
+    if (n) { m.needsUpdate = true; vlt.dropped += n; vlt.mats++; } } });
+}
 export function shareTextures(root, path = '') {
+  if (VLT) dropMaps(root);
   shareTextures0(root);   // първо общите картинки (подписът се смята от оригинала — бързо), после смаляване веднъж на източник
-  if (SHRINK && !/\/lm\//.test(path)) root.traverse(o => { for (const m of [].concat(o.material || [])) for (const key in m) { const v = m[key]; if (v && v.isTexture) shrink(v); } });
+  const lm = /\/lm\//.test(path);
+  if (SHRINK && (!lm || VLT)) root.traverse(o => { for (const m of [].concat(o.material || [])) for (const key in m) { const v = m[key]; if (v && v.isTexture) shrink(v, lm ? VLT_LM : MAXT); } });   // vlow-tex: и забележителностите (до 512)
 }
 const SHRINK = (feature('tex512') || LITE_T) && !/[?&]notex512/.test(location.search);   // ?notex512 — за сравнение в тестовете
 function shareTextures0(root) {
@@ -65,7 +76,7 @@ const parse = GLTFLoader.prototype.parse;
 if (!/[?&]nomemfix/.test(location.search)) GLTFLoader.prototype.parse = function (data, path, onLoad, onError) {
   return parse.call(this, data, path, gltf => { try { for (const sc of gltf.scenes || [gltf.scene]) shareTextures(sc, path || ''); } catch (e) { } onLoad(gltf); }, onError);
 };
-window.__texShare = () => ({ shrunk: shrunk.n, shrunkMB: Math.round(shrunk.savedMB), ...stat, savedMB: Math.round(stat.savedMB), ms: Math.round(stat.ms), distinct: bySig.size });
+window.__texShare = () => ({ shrunk: shrunk.n, shrunkMB: Math.round(shrunk.savedMB), ...stat, savedMB: Math.round(stat.savedMB), ms: Math.round(stat.ms), distinct: bySig.size, vlt: VLT ? vlt : null });
 // 🧠 копието в паметта след качването (feature 'tex-free'): смалените платна (по-горе) и картинките на моделите остават в браузъра и след като
 // видеокартата вече ги има — при голям град ~450 MB платна + ~200 MB ImageBitmap. След качване в главния рендер картинката се пуска;
 // ако някой я поиска пак (друга 3D сцена — бордът, услугите; нов вид филтър; roofs/nightfloors), source.data я възстановява синхронно,

@@ -73,6 +73,7 @@ export function lmPlaza(o, deps = {}) {
     pos.push(x, 0, z, x + step, 0, z + step, x + step, 0, z, x, 0, z, x, 0, z + step, x + step, 0, z + step); }
   if (pos.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
     const pm = new THREE.Mesh(g, groundMat({ kind: 'pave', col: PAVE[type], tile: type === 'ruin' ? 1.8 : type === 'sky' ? 3 : 1.4 })); pm.position.y = 0.045; pm.receiveShadow = true; G.add(pm); }
+  if (deps.bare) return G;   // 🎭 ny-radiocity: само настилката — без пейки, лампи, сергии и водни ивици
   // периметърът: точки през ~12 м по ръба на зоната (2 м навътре)
   const ring = [], N = Math.max(12, Math.round(2 * Math.PI * Hr / 12));
   for (let k = 0; k < N; k++) { const a = k / N * Math.PI * 2, c = Math.cos(a), s = Math.sin(a), e = round ? Hr : 1 / Math.pow(Math.pow(Math.abs(c) / Hx, 4) + Math.pow(Math.abs(s) / Hz, 4), 0.25);

@@ -30,6 +30,9 @@ const W_SOFT = /SwiftShader|llvmpipe|softpipe|Software|Basic Render|Mesa Offscre
 let autoWhy = null;
 export const gfxAutoWhy = () => autoWhy;   // game.js: съобщение веднъж
 let weakG = null;   // вградена/софтуерна видеокарта (веднъж; mem-lite — и на „Средно“)
+// 🟠 vlow-still (собственикът: „на Много ниско да няма никакво движение“): украсата, която се движи (коли, хора, колела, автобуси, трамваи, птици,
+// самолети над града, корабите в пристанището, минаващите влакове) — не се създава и не се смята; машините и бригадите на играча остават.
+export const gfxStill = () => feature('vlow-still') && gfxLevel() === 'vlow';
 export const gfxWeakGpu = () => { if (weakG !== null) return weakG; let gpu = ''; try { const gl = document.createElement('canvas').getContext('webgl2') || document.createElement('canvas').getContext('webgl'), e = gl && gl.getExtension('WEBGL_debug_renderer_info'); gpu = gl ? String((e && gl.getParameter(e.UNMASKED_RENDERER_WEBGL)) || gl.getParameter(gl.RENDERER) || '') : ''; } catch { }
   return weakG = !!gpu && (W_SOFT.test(gpu) || (!W_DISC.test(gpu) && !W_APPLE.test(gpu))); };
 function autoLv() {
