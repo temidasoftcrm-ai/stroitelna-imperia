@@ -14,16 +14,19 @@
 // пристанище: общи кораби — по-голям ефект и доверие, сам — видимост и „възстановяване“, но + напрежение). Парите — само у мен, от
 // S.pres.res (печалбата от търга, разходът за корабите), веднъж на събитие (S.pres.rivE). Без флага — нищо (празен обект).
 // Демото: фалшив партньор (window.__coopShared.riv) и фалшиво rpc в паметта — само когато няма истинско партньорство.
+// ЧАСТ 4 (флаг 'coop-riv-finale'): 🏛️ 3D залата на срещата (coopsummit.js) — церемония при всяка подписана сделка, бутон в таба;
+// финалът: двамата — „Архитекти на мира“, лично — „Дипломат на века“ / „Възстановител на света“ по приноса (titles(); peacewin.js отчетът).
 // deps: { S(), pres, coop() → обектът от coop.js, coopPres() → coopres.js, money() → парите на фирмата, toast(text, kind), save(), fmt(n) }
 import { feature } from './lab/feature.js';
 import { t as tr } from './i18n.js';
 import { POL } from './worldpol.js';
 
-const ON = feature('coop-riv-core'), DEALS = feature('coop-riv-deals'), WORLD = feature('coop-riv-world');
+const ON = feature('coop-riv-core'), DEALS = feature('coop-riv-deals'), WORLD = feature('coop-riv-world'), FIN = feature('coop-riv-finale');
 const CNM = { SGP: 'Сингапур', NLD: 'Нидерландия' }, cnm = iso => POL[iso]?.nm || CNM[iso] || iso;
 const PROJ = { port: '⚓ пристанище', rail: '🚆 железница', grid: '⚡ енергийна мрежа', water: '💧 водопровод' };
 const IND = { econ: ['📈', 'Икономика'], services: ['🏥', 'Услуги'], energy: ['⚡', 'Енергия'], security: ['🛡️', 'Сигурност'], trust: ['🤝', 'Доверие'] };
 const PCT = Array.from({ length: 17 }, (_, i) => 10 + i * 5);   // 10, 15 … 90 — и предложенията за компенсация (±10) винаги имат стойност в списъка
+const TITLES = { dip: '🎖️ Дипломат на века', reb: '🏗️ Възстановител на света' };
 const MEGA_COST = 8e9, MEGA_GAIN = 1.5, DAY_S = 60;   // приходът на коридора = цената × 1,5 при изпълнение; 1 ден от срока = 60 s онлайн време на сървъра
 const MODES = { none: ['⚪', 'Без режим'], allies: ['🤝', 'Съюзници'], comp: ['⚖️', 'Конкуренти'], rival: ['⚔️', 'Съперници'] };
 const MODE_HOW = {
@@ -57,7 +60,7 @@ export function cleanRiv(r) {
 }
 
 export function createCoopRival(deps) {
-  const NO = { ok: () => false, state: () => null, html: () => '', bind() { }, badge: () => false, dailyTick() { } };
+  const NO = { ok: () => false, state: () => null, html: () => '', bind() { }, badge: () => false, dailyTick() { }, titles: () => null, hall: () => false };
   if (!ON) return NO;
   const S = () => deps.S();
   const told = new Set();
@@ -138,12 +141,31 @@ export function createCoopRival(deps) {
       + `<div class="m" style="margin-top:6px">${tr('Двете каси никога не се смесват — договорите между държавите не местят пари.')}</div></div>`;
     if (DEALS) { try { dealEffects(r); } catch (e) { console.warn('coop-riv-deals', e); } h += dealsHtml(r); }
     if (WORLD) { try { worldEffects(r); } catch (e) { console.warn('coop-riv-world', e); } h += worldHtml(r); }
+    if (FIN) { const ti = titles(); h += `<div class="cd w"><b>🏛️ ${tr('Залата на срещата на върха')}</b><div class="m">${tr('Всяка подписана сделка — церемония в залата. Във финала (световен мир) печелите заедно „Архитекти на мира“, а признанието е лично — по приноса.')}</div>`
+      + (ti ? `<div class="m" style="margin-top:4px">${tr('Засега')}: ${tr('ти')} — <b style="color:#ffd54a">${tr(TITLES[ti.me])}</b>, ${pn} — <b style="color:#ffd54a">${tr(TITLES[ti.them])}</b> <span>(${tr('дипломация')} ${ti.c.dipMe}:${ti.c.dipThem} · ${tr('възстановяване')} ${ti.c.rebMe}:${ti.c.rebThem})</span></div>` : '')
+      + `<div class="row"><button class="y" data-rvhall="1">🏛️ ${tr('Влез в залата')}</button></div></div>`; }
     return h;
+  }
+  // 🏅 признанието по приноса: точките дипломация (търговете) срещу възстановяване (кризите) — кой е по-силен в кое спрямо другия; поравно — САЩ е „дипломатът“
+  function titles() {
+    const r = state(); if (!FIN || !r || r.mode !== 'comp') return null; const c = r.contrib, sc = (c.dipMe - c.dipThem) - (c.rebMe - c.rebThem), dip = sc > 0 || (sc === 0 && S()?.pres?.cc !== 'RU');
+    return { me: dip ? 'dip' : 'reb', them: dip ? 'reb' : 'dip', meT: tr(TITLES[dip ? 'dip' : 'reb']), themT: tr(TITLES[dip ? 'reb' : 'dip']), c, pn: pname() };
+  }
+  // 🏛️ залата: 'sign' (подписаната сделка d) | 'visit' | 'finale'; САЩ — вляво, Русия — вдясно
+  function hall(mode = 'visit', d = null) {
+    if (!FIN) return false; const me = S()?.pres?.cc === 'RU' ? 'RU' : 'US'; let tk = null; try { tk = deps.coopPres?.()?.taken?.(); } catch { }
+    const them = tk?.cc && tk.cc !== me ? tk.cc : me === 'US' ? 'RU' : 'US', mine = { cc: me, name: tr('Ти') }, their = { cc: them, name: pname() }, [a, b] = me === 'US' ? [mine, their] : [their, mine];
+    const ti = mode === 'finale' ? titles() : null, dn = d ? (d.kind === 'mega' ? `🔌 ${tr('Енергийният коридор')} (8 ${tr('млрд.')} €)` : `🔁 ${tr('Размяна на показатели')}`) : '';
+    const title = mode === 'sign' ? `✍️ ${tr('Подписано')}: ${dn}` : mode === 'finale' ? `🕊️ ${tr('Архитекти на мира')}` : `🏛️ ${tr('Залата на срещата на върха')}`;
+    const sub = mode === 'sign' ? `${tr('Ти и')} ${pname()} ${tr('подписахте договора — следват последствията.')}` : mode === 'finale' ? `${tr('Световният мир е постигнат заедно — ти и')} ${pname()}.` : `${tr('Тук се подписват договорите между двете държави.')}`;
+    const plaques = ti ? [{ who: tr('Ти'), t: ti.meT, d: `${tr('дипломация')} ${ti.c.dipMe} · ${tr('възстановяване')} ${ti.c.rebMe}` }, { who: pname(), t: ti.themT, d: `${tr('дипломация')} ${ti.c.dipThem} · ${tr('възстановяване')} ${ti.c.rebThem}` }] : [];
+    import('./coopsummit.js').then(m => m.openSummitHall({ mode, a, b, title, sub, plaques, sound: deps.sound })).catch(e => console.warn('coop-hall', e)); return true;
   }
   function bind(el) {
     el.querySelectorAll('[data-rvprop]').forEach(b => b.onclick = () => act('propose', b.dataset.rvprop));
     el.querySelectorAll('[data-rvacc]').forEach(b => b.onclick = () => act('accept'));
     el.querySelectorAll('[data-rvdec]').forEach(b => b.onclick = () => act('decline'));
+    el.querySelectorAll('[data-rvhall]').forEach(b => b.onclick = () => hall('visit'));
     if (DEALS) bindDeals(el);
     if (WORLD) bindWorld(el);
   }
@@ -182,7 +204,8 @@ export function createCoopRival(deps) {
     for (const d of r.deals) {
       const m = M[d.id] = M[d.id] || {};
       if (['active', 'done', 'broken'].includes(d.status) && !m.a) {   // влезе в сила
-        m.a = 1; ch = true; const hd = home(d) * (m.ex ? 0.5 : 1); p.ind.trust = cl(p.ind.trust + hd);
+        m.a = 1; ch = true; if (FIN && d.status === 'active') setTimeout(() => hall('sign', d), 600);
+        const hd = home(d) * (m.ex ? 0.5 : 1); p.ind.trust = cl(p.ind.trust + hd);
         if (d.kind === 'mega') { p.res = Math.max(0, (p.res || 0) - d.pledge); deps.toast(`🔌 ${tr('Коридорът започна')}: −${f(d.pledge)} € ${tr('от държавния бюджет')} (${tr('обещанието ти')})`, 'good'); }
         else { const g = gainOf(d); p.ind[g.up] = cl(p.ind[g.up] + d.terms.pts); p.ind[g.down] = cl(p.ind[g.down] - Math.ceil(d.terms.pts / 2)); deps.toast(`🔁 ${tr('Размяната е в сила')}: ${IND[g.up][0]} +${d.terms.pts}, ${IND[g.down][0]} −${Math.ceil(d.terms.pts / 2)}`, 'good'); }
       }
@@ -315,5 +338,5 @@ export function createCoopRival(deps) {
       try { const r = await call('coop_riv_bid', { p_event: id, p_bid: bid, p_req: uid() }); if (!r || r.ok === false) deps.toast(`🌍 ${r?.msg || 'Не стана — опитай пак.'}`, 'bad'); else deps.toast(`📨 ${tr('Офертата е подадена.')}`, 'good'); }
       finally { busy = false; refresh(); } });
   }
-  return { ok, state, html, bind, badge, dailyTick };
+  return { ok, state, html, bind, badge, dailyTick, titles, hall };
 }

@@ -74,7 +74,14 @@ const lvOf = xp => { let l = 1; for (let i = 0; i < THRESH.length; i++) if (xp >
 const FSUM = feature('firm-xp-sum');
 // 28.10 (потребителят: „много бързо прескачам нивата“): ниво 12 — от 5 млн. XP, 13–20 — ~×4 спрямо досега (×6,8 вместо ×1,7)
 const FIRM_K = L => L <= 4 ? 1 : L === 5 ? 1.15 : L === 6 ? 1.3 : L === 7 ? 1.4 : L === 8 ? 1.5 : L === 9 ? 1.6 : L <= 11 ? 1.7 : L === 12 ? 5e6 / 1170000 : 6.8;
-export const FIRM_THRESH = THRESH.map((t, i) => Math.round(t * FIRM_K(i + 1) / 500) * 500);   // FIRM_THRESH[L − 1] — началото на ниво L
+const FIRM_THRESH1 = THRESH.map((t, i) => Math.round(t * FIRM_K(i + 1) / 500) * 500);   // FIRM_THRESH[L − 1] — началото на ниво L
+// ⚖️ xp-pace2 (собственикът, 30.10: „оправи ниво 13 и общото темпо“): 11→12 (3,45 млн.) и 12→13 (4,52 млн.) бяха стени (6,6 реални часа за едно ниво),
+// а 13→15 — почти без стъпка. Сега нивата 12–20 растат плавно, всяко ~15 % по-дълго от предишното (1,2 → 3,6 млн.), ~1,5–2,5 часа на ниво в късна игра.
+// Нивата 1–11 — както досега. Записите (S.firm.v): същото ниво и същата част от пътя в новата скала (firmRec) — нищо не пада и не скача.
+const XP2 = feature('xp-pace2');
+const FIRM_THRESH2 = [...FIRM_THRESH1.slice(0, 11), 2750000, 4150000, 5750000, 7600000, 9700000, 12100000, 14850000, 18000000, 21600000];
+export const FIRM_THRESH = XP2 ? FIRM_THRESH2 : FIRM_THRESH1;
+const FIRM_SC = { 1: FIRM_THRESH1, 2: FIRM_THRESH2 }, FIRM_V = XP2 ? 2 : 1;   // скалата на фирмата по версия на S.firm
 const lvOfFirm = xp => { let l = 1; for (let i = 0; i < FIRM_THRESH.length; i++) if (xp >= FIRM_THRESH[i]) l = i + 1; return l; };
 
 export function createDevLevel(deps) {
@@ -94,10 +101,14 @@ export function createDevLevel(deps) {
   // firm-xp-sum: сборът и нивото на фирмата (S.firm = { off, lv — най-високото показано, v })
   const sumXP = () => { const S = deps.S(), d = st(); let x = d ? d.xp : 0; for (const c of Object.values(S?.cities || {})) x += c.dev?.xp || 0; return x + (S?.holding ? S.hxp || 0 : 0); };
   const oldBestXP = () => { const S = deps.S(), d = st(); return Math.max(d ? d.xp : 0, ...Object.values(S?.cities || {}).map(c => c.dev?.xp || 0)) + (S?.holding ? S.hxp || 0 : 0); };
-  const firmRec = () => { const S = deps.S(); if (!S) return null; if (S.firm && S.firm.v === 1) return S.firm;
+  const firmRec = () => { const S = deps.S(); if (!S) return null; if (S.firm && S.firm.v === FIRM_V) return S.firm;
+    if (S.firm && FIRM_SC[S.firm.v]) {   // xp-pace2: записът е в другата скала на фирмата — същото ниво (показаното, то не пада) и същата част от пътя до следващото
+      const O = FIRM_SC[S.firm.v], N = FIRM_THRESH, x = sumXP() - S.firm.off, lo = xp => { let l = 1; for (let i = 0; i < O.length; i++) if (xp >= O[i]) l = i + 1; return l; };
+      const L = Math.min(N.length, Math.max(S.firm.lv || 1, lo(x))), a = O[L - 1], b = O[L] ?? a, f = b > a ? Math.max(0, Math.min(1, (x - a) / (b - a))) : 0;
+      const A = N[L - 1], B = N[L] ?? A; S.firm.off = Math.round(sumXP() - (A + f * Math.max(0, B - A - 1))); S.firm.lv = L; S.firm.v = FIRM_V; return S.firm; }   /* B − 1: f = 1 (на самия праг) не прескача в следващото ниво */
     const L0 = Math.min(THRESH.length, Math.max(level(), deps.maxLevel ? deps.maxLevel() : 1)), x0 = oldBestXP(), a = THRESH[L0 - 1], b = THRESH[L0] ?? a, f = b > a ? Math.max(0, Math.min(1, (x0 - a) / (b - a))) : 0;
     const A = FIRM_THRESH[L0 - 1], B = FIRM_THRESH[L0] ?? A, pos = A + f * (B - A);
-    return (S.firm = { off: Math.round(sumXP() - pos), lv: L0, v: 1 }); };   // миграция: същото ниво и същата част от пътя
+    return (S.firm = { off: Math.round(sumXP() - pos), lv: L0, v: FIRM_V }); };   // миграция: същото ниво и същата част от пътя
   const firmXp = () => { const r = firmRec(); return r ? sumXP() - r.off : 0; };
   const firmLv = () => { const r = firmRec(); return r ? Math.max(r.lv, lvOfFirm(firmXp())) : 1; };   // не пада
   const rawBest = () => FSUM ? Math.max(firmLv(), deps.impLv ? deps.impLv() : 0) : Math.max(level(), deps.maxLevel ? deps.maxLevel() : 1, deps.impLv ? deps.impLv() : 0);

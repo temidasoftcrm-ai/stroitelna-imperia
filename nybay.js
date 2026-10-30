@@ -36,13 +36,11 @@ const MANHATTAN = [
   [-73.9720, 40.7340], [-73.9704, 40.7450],
 ];
 // островите: гладки (екструдирани) — не на решетката 10 м
-const GOVERNORS = [
-  [-74.0150, 40.6942], [-74.0118, 40.6925], [-74.0108, 40.6898], [-74.0125, 40.6872], [-74.0170, 40.6852], [-74.0240, 40.6838],
-  [-74.0252, 40.6850], [-74.0222, 40.6880], [-74.0192, 40.6918], [-74.0172, 40.6938],
+const GOVERNORS = [   // заоблен триъгълник: тесен на север (към Батъри), широк на юг
+  [-74.0150, 40.6942], [-74.0112, 40.6905], [-74.0122, 40.6862], [-74.0175, 40.6840], [-74.0245, 40.6836], [-74.0250, 40.6858], [-74.0185, 40.6925],
 ];
 const ELLIS = [
-  [-74.0418, 40.7008], [-74.0378, 40.7010], [-74.0372, 40.6982], [-74.0392, 40.6978], [-74.0392, 40.6992], [-74.0405, 40.6992],
-  [-74.0405, 40.6978], [-74.0420, 40.6980],
+  [-74.0416, 40.7008], [-74.0380, 40.7010], [-74.0372, 40.6982], [-74.0420, 40.6980],
 ];
 const BATTERY = [   // паркът на върха
   [-74.0186, 40.7046], [-74.0174, 40.7030], [-74.0160, 40.7012], [-74.0146, 40.7004], [-74.0136, 40.7010], [-74.0140, 40.7030],
@@ -54,13 +52,14 @@ export function nyBay(D) {
   const c = D.center, K = D.k || 0.45, cs = Math.cos(c[0] * Math.PI / 180) * 111320 * K, zs = 110540 * K;
   const LL = ([lo, la]) => [(lo - c[1]) * cs, -(la - c[0]) * zs];
   const poly = L => L.map(LL);
+  const round = (q, n = 3) => { for (let k = 0; k < n; k++) q = q.flatMap((a, i) => { const b = q[(i + 1) % q.length]; return [[a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25], [a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]]; }); return q; };   // ъглите — заоблени (Чайкин)
   const box = q => [Math.min(...q.map(p => p[0])), Math.max(...q.map(p => p[0])), Math.min(...q.map(p => p[1])), Math.max(...q.map(p => p[1]))];
   const inP = (p, q) => { let r = false; for (let i = 0, j = q.length - 1; i < q.length; j = i++) if ((q[i][1] > p[1]) !== (q[j][1] > p[1]) && p[0] < (q[j][0] - q[i][0]) * (p[1] - q[i][1]) / (q[j][1] - q[i][1]) + q[i][0]) r = !r; return r; };
   const shape = (q, b = box(q)) => (x, z) => x >= b[0] && x <= b[1] && z >= b[2] && z <= b[3] && inP([x, z], q);
   // Либърти: овал ~6 ха (×K²), дългата ос СЗ–ЮИ; статуята — в югоизточната половина
   const [lx, lz] = LL(LIBERTY_LL), la = 0.70, lA = 190 * K, lB = 105 * K, lcx = lx - Math.cos(la) * 40 * K, lcz = lz - Math.sin(la) * 40 * K;
   const LIB = []; for (let k = 0; k < 40; k++) { const t = k / 40 * Math.PI * 2, u = Math.cos(t) * lA, v = Math.sin(t) * lB; LIB.push([lcx + u * Math.cos(la) - v * Math.sin(la), lcz + u * Math.sin(la) + v * Math.cos(la)]); }
-  const W = poly(WATER), MAN = poly(MANHATTAN), GOV = poly(GOVERNORS), ELL = poly(ELLIS), BAT = poly(BATTERY);
+  const W = poly(WATER), MAN = poly(MANHATTAN), GOV = round(poly(GOVERNORS)), ELL = round(poly(ELLIS), 2), BAT = poly(BATTERY);
   const isl = [GOV, LIB, ELL].map(q => shape(q));
   return {
     LL, inP, W: shape(W), man: shape(MAN), park: shape(BAT), island: (x, z) => isl.some(f => f(x, z)),

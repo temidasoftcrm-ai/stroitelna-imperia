@@ -315,6 +315,7 @@ export function createPeaceWin(deps) {
     Sx.peaceWin = { d, pd: d - (s.start || 0), sec: Math.round(Sx.play?.sec || 0), est: !!Sx.play?.est, lv: s.lv, cc: s.cc };
     P.won = d; P.g = goals(s).map(g => g.ok); log(s, tr('🕊️ Световен мир — шестте цели са задържани 12 месеца.'));
     Sx.hold = Sx.hold || { lv: {}, dir: {} }; Sx.hold.awards = Sx.hold.awards || {}; Sx.hold.awards.peace = { tier: 'platinum', day: d, res: tr('Световен мир на ден {0}', [d]) };
+    { const ti = rivTi(); if (ti) Sx.peaceWin.coop = { me: ti.me, them: ti.them, pn: ti.pn };   /* 🏛️ coop-riv-finale: признанието в общия финал */ }
     deps.save(); try { deps.pause && deps.pause(); } catch { } clearAll();
     sequence();
   }
@@ -324,10 +325,11 @@ export function createPeaceWin(deps) {
     if (!c) { after(); return; }
     Promise.resolve(c.play('peace', true)).then(ok => { if (!ok) { after(); return; } const iv = setInterval(() => { if (!c.playing()) { clearInterval(iv); setTimeout(after, 500); } }, 400); }).catch(after);
   }
+  const rivTi = () => { try { return deps.riv?.()?.titles?.() || null; } catch { return null; } };   // 🏛️ coop-riv-finale (coopriv.js): „Архитекти на мира“ + личното признание
   function report() {
     const s = st(), Sx = S(), W = Sx.peaceWin; if (!W) return; style(); close(); document.getElementById('pwRep')?.remove();
     let x = {}; try { x = deps.stats ? deps.stats() || {} : {}; } catch { }
-    const P = s ? pw(s) : { key: [] }, D = s ? damaged(s) : new Map(); let rb = 0; if (s) for (const [iso, ns] of D) if ([...ns].every(n => needScore(s, iso, n).v >= 1)) rb++;
+    const ti = rivTi(), P = s ? pw(s) : { key: [] }, D = s ? damaged(s) : new Map(); let rb = 0; if (s) for (const [iso, ns] of D) if ([...ns].every(n => needScore(s, iso, n).v >= 1)) rb++;
     const hrs = Math.floor((W.sec || 0) / 3600), min = Math.floor((W.sec || 0) % 3600 / 60), real = W.sec ? `${W.est ? '~' : ''}${hrs ? tr('{0} ч {1} мин', [hrs, min]) : tr('{0} мин', [min])}` : '—';
     const key = (P.key || []).slice().sort((a, b) => a.d - b.d), pick = key.length > 8 ? [...key.slice(0, 3), ...key.slice(-5)] : key;
     const tiles = [[`${x.cities ?? '—'}`, tr('града построени')], [`${x.finished ?? '—'}`, tr('града завършени')], [`${x.countries ?? '—'}`, tr('свързани държави')], [`${x.conquered ?? '—'}${x.ctot ? '/' + x.ctot : ''}`, tr('завладени държави')], [`${rb}/${D.size}`, tr('възстановени региона')], [`${W.d}`, tr('игрови дни до победата')], [`${W.pd}`, tr('дни като президент')], [real, tr('реално време за игра')]];
@@ -335,11 +337,13 @@ export function createPeaceWin(deps) {
     d.innerHTML = `<div class="box"><div style="font-size:14px;letter-spacing:.3em;color:#ffd54a">🏁 ${tr('ЛИЧЕН ОТЧЕТ')}</div><h1>🕊️ ${tr('Световен мир')}</h1><div style="opacity:.85">${tr('Започна с една бригада. Остави свят в мир.')}</div>
       <div class="tiles">${tiles.map(([v, l]) => `<div class="tl"><b>${v}</b><span>${l}</span></div>`).join('')}</div>
       <div style="opacity:.85;margin:0 0 6px">📰 ${tr('Най-важните решения')}</div><div class="dec">${pick.length ? pick.map(k => `<div>${tr('ден {0}', [k.d])}: ${tr(k.t)}</div>`).join('') : `<div>${tr('Хрониката е празна.')}</div>`}</div>
-      <div style="margin:0 0 14px">🏅 <b style="color:#ffd54a">${tr('Архитект на мира')}</b> — ${tr('платинената награда е на стената в залата на борда, а клипът — в „🎬 Албум“.')}</div>
-      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button data-pwfame="1">🏅 ${tr('Церемонията')}</button><button class="y" data-pwnext="1">${tr('Напред')} ▶</button></div></div>`;
+      ${ti ? `<div style="margin:0 0 14px">🏅 <b style="color:#ffd54a">${tr('Архитекти на мира')}</b> — ${tr('ти и')} ${esc(ti.pn)}, ${tr('заедно')}.<br>${tr('Твоето признание')}: <b style="color:#ffd54a">${esc(ti.meT)}</b> · ${esc(ti.pn)}: <b>${esc(ti.themT)}</b></div>`
+        : `<div style="margin:0 0 14px">🏅 <b style="color:#ffd54a">${tr('Архитект на мира')}</b> — ${tr('платинената награда е на стената в залата на борда, а клипът — в „🎬 Албум“.')}</div>`}
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">${ti ? `<button data-pwhall="1">🏛️ ${tr('Залата на срещата')}</button>` : ''}<button data-pwfame="1">🏅 ${tr('Церемонията')}</button><button class="y" data-pwnext="1">${tr('Напред')} ▶</button></div></div>`;
     document.body.appendChild(d); window.__overlay3d = (window.__overlay3d || 0) + 1; deps.sound && deps.sound('levelup');
     const x2 = () => { d.remove(); window.__overlay3d = Math.max(0, (window.__overlay3d || 1) - 1); };
     d.querySelector('[data-pwnext]').onclick = () => { x2(); if (!pw(st() || {}).chosen) choice(); };
+    d.querySelector('[data-pwhall]')?.addEventListener('click', () => { try { deps.riv().hall('finale'); } catch (e) { console.warn('coop-hall', e); } });
     d.querySelector('[data-pwfame]').onclick = () => { x2(); import('./halloffame.js').then(m => { if (!m.openHallOfFame({ k: 'peace', tier: 'platinum', onClose: () => { if (!pw(st() || {}).chosen) choice(); } })) choice(); }).catch(() => choice()); };
   }
   function choice() {
