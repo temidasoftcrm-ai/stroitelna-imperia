@@ -70,7 +70,7 @@ export function createCoop(d) {
   // облакът се зарежда отделно: ако няма интернет, самостоятелната игра работи както винаги
   let cloud = { user: () => null, sb: null }, sb = null;
   import('./cloud.js').then(m => { cloud = m.cloud; sb = cloud.sb; sb.auth.onAuthStateChange(() => setTimeout(tick, 300)); tick(); }).catch(() => {});
-  let fetchedAt = 0, st4 = null;   // кога за последно дойдоха данните на партньора (горната лента на центъра)
+  let fetchedAt = 0, st4 = null, stRiv = null;   // stRiv — ⚖️ coop-riv-core (coop_riv_status); кога за последно дойдоха данните на партньора (горната лента на центъра)
   let st3 = null, st2 = null, tab = 'help', lastMarks = 0, st = null, open = false, busy = false, lastSnap = 0, user = null, applying = false;
   const E = () => d.econ(), f = n => d.fmt(n);
   const pend = () => { try { return JSON.parse(localStorage.getItem(PEND)) || []; } catch { return []; } };
@@ -259,6 +259,8 @@ export function createCoop(d) {
       st3 = r3 && r3.ok && r3.active ? r3 : null;
       const r4 = st2 && feature('coop-center2') ? await rpc('coop_status4', {}, 1).catch(() => null) : null;   // правилата на общата каса (миграция coop4 — без нея няма карта)
       st4 = r4 && r4.ok && r4.active ? r4 : null;
+      const r5 = st2 && feature('coop-riv-core') ? await rpc('coop_riv_status', {}, 1).catch(() => null) : null;   // ⚖️ coop-riv-core: режимът и отношенията (миграция coop6 — без нея няма данни)
+      stRiv = r5 && r5.ok && r5.active ? r5 : null;
       shareMap();
       const J = (st2?.joints || []).filter(j => j.status === 'active');
       window.__coopJoint = st2 ? { hw: new Set(J.filter(j => j.kind === 'hw').map(j => j.ref)), rail: new Set(J.filter(j => j.kind === 'rail').map(j => j.ref)) } : null;
@@ -726,5 +728,5 @@ export function createCoop(d) {
   // нивото на партньора (активно партньорство) — devlevel.js чака него (coop-lv)
   const partnerLv = () => { const P = st?.pair?.status === 'active' ? st?.partner?.snap : null; return P && Number.isFinite(P.lv) ? P.lv : null; };
   // 🌐 coop-pres (coopres.js): моят id, съобщенията и изпращането през съществуващия чат (coop_say)
-  return { tick, state: () => st, partnerLv, me: () => user?.id || null, msgs: () => st2?.messages || [], say: text => rpc('coop_say', { p_text: String(text || '').slice(0, 280) }) };
+  return { tick, state: () => st, riv: () => stRiv, rivRpc: (fn, args) => rpc(fn, args, 1), partnerLv, me: () => user?.id || null, msgs: () => st2?.messages || [], say: text => rpc('coop_say', { p_text: String(text || '').slice(0, 280) }) };
 }

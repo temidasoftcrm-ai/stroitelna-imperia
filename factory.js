@@ -15,12 +15,14 @@ export function placeFactories(o) {
   const B = (P.p2 && P.p2.boundary || []).map(p => tg(p[0], p[1])); if (B.length < 3) return null;
   const R = FW / 2 + YM + APR, G = blockGrid(THREE, o, P), U = FW / 2 + YM + 4, V0 = -FW / 2 - YM - 4, V1 = FW / 2 + APR + 4;
   // отпечатъкът (заводът + дворът + оградата + 4 м) — свободен ли е: без улици, магистрала, жп, летищния път, вода, парцели, други заводи
-  const fits = (x, z, ry) => { const cs = Math.cos(ry), sn = Math.sin(ry); for (let u = -U; u <= U; u += 4) for (let v = V0; v <= V1; v += 4) { const px = x + u * cs + v * sn, pz = z - u * sn + v * cs; if (G.hard(px, pz) || G.road(px, pz)) return false; } return true; };
+  const wet = (x, z) => { try { return !!(P.waterAt && P.waterAt(x, z)); } catch { return false; } };   // 🏭 никога във водата (Истанбул: зоната стоеше на платформа в морето)
+  const fits = (x, z, ry) => { const cs = Math.cos(ry), sn = Math.sin(ry); for (let u = -U; u <= U; u += 4) for (let v = V0; v <= V1; v += 4) { const px = x + u * cs + v * sn, pz = z - u * sn + v * cs; if (G.hard(px, pz) || G.road(px, pz) || wet(px, pz)) return false; } return true; };
+  const dryRoute = r => { for (let k = 1; k < r.length; k++) { const [ax, az] = r[k - 1], [bx, bz] = r[k], L = Math.hypot(bx - ax, bz - az); for (let t = 0; t <= L; t += 10) { const f = L ? t / L : 0; if (wet(ax + (bx - ax) * f, az + (bz - az) * f)) return false; } } return true; };   // и пътят до града — не през водата
   const n = o.tier === 'l' || o.tier === 'xl' ? 2 : 1, pick = [], step = Math.max(1, Math.floor(B.length / 72)), cand = [];
   for (let i = 0; i < B.length; i += step) { const [bx, bz] = B[i], dx = bx - sq.x, dz = bz - sq.z, l = Math.hypot(dx, dz) || 1, a = Math.atan2(dx, dz), ry = a + Math.PI;
     for (let d = R + 14; d < R + 330; d += 12) { const x = bx + dx / l * d, z = bz + dz / l * d; if (!fits(x, z, ry)) continue;   // първото свободно — най-близо до града (зад магистралата, ако тя е по-близо)
       const gate = [x + (-FW / 2 * 0.35) * Math.cos(ry) + (FW / 2 + APR) * Math.sin(ry), z - (-FW / 2 * 0.35) * Math.sin(ry) + (FW / 2 + APR) * Math.cos(ry)], route = G.route(gate);
-      if (route) { cand.push({ x, z, a, d, route, len: route.reduce((s, p, k) => s + (k ? Math.hypot(p[0] - route[k - 1][0], p[1] - route[k - 1][1]) : 0), 0) }); break; } } }
+      if (route && dryRoute(route)) { cand.push({ x, z, a, d, route, len: route.reduce((s, p, k) => s + (k ? Math.hypot(p[0] - route[k - 1][0], p[1] - route[k - 1][1]) : 0), 0) }); break; } } }
   cand.sort((a, b) => (a.d + a.len * 0.5) - (b.d + b.len * 0.5));
   for (const c of cand) { if (pick.length >= n) break; if (pick.every(p => Math.hypot(p.x - c.x, p.z - c.z) > 2 * R + 40) && pick.every(p => !p.route.some(q => Math.hypot(q[0] - c.x, q[1] - c.z) < R))) pick.push(c); }
   const beacons = [], smokes = [], drives = [], tex = smokeTex(THREE), M = mats(THREE, o);

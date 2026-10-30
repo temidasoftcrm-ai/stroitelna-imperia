@@ -227,13 +227,23 @@ function lampMat(m, k, brake = false) {   // копие на материала 
 // (Object3D.clone копира userData през JSON) делят самите материали, а не плоски обекти
 const lampSet = (m0, k) => { const R = { night: lampMat(m0, k), brake: k === 'tail' ? lampMat(m0, k, true) : null, off: m0 }; for (const m of [R.night, R.brake]) if (m && !m.lampSet) Object.defineProperty(m, 'lampSet', { value: R }); return R; };
 // възлите lamp_* на модела — със светещите материали; → { head, tail, ind: [меш…], box(k, sx) — кутията им в координатите на sc (sx: +1 / −1 — само тази страна) } или null
+// кутията на меша в света — само по върховете от индекса: в някои GLB (автобусите на -58) фарът е подмножество от индексите върху ОБЩИЯ
+// масив с върховете на каросерията — computeBoundingBox би взел цялата каросерия (центърът ~0 → фаровете „от двете страни“ не се разпознават)
+const IDXB = new WeakMap();
+function idxBox(q) {
+  const g = q.geometry, P = g && g.attributes.position; if (!P) return new THREE.Box3();
+  let lb = IDXB.get(g); if (!lb) { lb = new THREE.Box3(); const v = new THREE.Vector3(), I = g.index;
+    if (I) { const a = g.drawRange.start, e = Math.min(I.count, a + g.drawRange.count); for (let i = a; i < e; i++) lb.expandByPoint(v.fromBufferAttribute(P, I.getX(i))); } else { g.computeBoundingBox(); lb.copy(g.boundingBox); }
+    IDXB.set(g, lb); }
+  q.updateWorldMatrix(true, false); return lb.clone().applyMatrix4(q.matrixWorld);
+}
 function realLamps(sc) {
   if (!CL2) return null; const L = { head: [], tail: [], ind: [] }, seen = new Set();   /* seen — не userData: копията на вече подготвен модел (clone) носят userData и иначе се пропускат */
   sc.traverse(o => { const m = o.name && LAMP_RX.exec(o.name); if (m) o.traverse(q => { if (q.isMesh && !seen.has(q)) { seen.add(q); q.userData.lampReal = m[1]; L[m[1]].push(q); } }); });
   if (!L.head.length && !L.tail.length) return null;
   for (const k of ['head', 'tail']) for (const q of L[k]) { const m0 = q.material; if (Array.isArray(m0) || !m0 || m0.lampSet) continue; q.material = lampSet(m0, k).night; if (k === 'tail') q.userData.lamp = 'rear'; }
   sc.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(sc.matrixWorld).invert(), c = new THREE.Vector3();
-  L.box = (k, sx = 0) => { const b = new THREE.Box3(); for (const q of L[k]) { const qb = new THREE.Box3().setFromObject(q).applyMatrix4(inv); if (!sx || Math.sign(qb.getCenter(c).x) === sx) b.union(qb); } return b.isEmpty() ? null : b; };
+  L.box = (k, sx = 0) => { const b = new THREE.Box3(); for (const q of L[k]) { const qb = idxBox(q).applyMatrix4(inv); if (!sx || Math.sign(qb.getCenter(c).x) === sx) b.union(qb); } return b.isEmpty() ? null : b; };
   return L;
 }
 export const lampsReal = sc => realLamps(sc);   // car-lights2: истинските светлини и на модели извън колите (мотокарът — forklift-real, техниката, бусовете, влекачите) — само светещите материали, без лъч
@@ -445,7 +455,7 @@ function emergLights(car, kind) {
   const g = new THREE.Group(); g.position.z = cz; car.add(g);
   addTruckLamps(g, len, W, y0 + Math.min(s.y * 0.38, 1.0));
   const LZ = car.userData.lens; if (LZ) for (const o of g.children) if (o.userData.lamp === 'front') o.position.set(Math.sign(o.position.x) * LZ[0] * W / 2, y0 + LZ[1] * s.y, len / 2 - LZ[2] * len + 0.03);   // точно върху фаровете на модела
-  if (R) { lampsAt(g, R, cz); if (feature('emerg-wigwag')) R.head = R.head.map(q => { const w = new ElRealWig(q.geometry, q.material); w.name = q.name; w.position.copy(q.position); w.quaternion.copy(q.quaternion); w.scale.copy(q.scale); w.userData = { ...q.userData, sideN: new THREE.Box3().setFromObject(q).getCenter(new THREE.Vector3()).x > 0 ? 1 : 0 }; q.parent.add(w); q.removeFromParent(); return w; }); }   // фаровете на смени — самите стени
+  if (R) { lampsAt(g, R, cz); if (feature('emerg-wigwag')) R.head = R.head.map(q => { const w = new ElRealWig(q.geometry, q.material); w.name = q.name; w.position.copy(q.position); w.quaternion.copy(q.quaternion); w.scale.copy(q.scale); w.userData = { ...q.userData, sideN: idxBox(q).applyMatrix4(car.matrixWorld.clone().invert()).getCenter(new THREE.Vector3()).x > 0 ? 1 : 0 }; q.parent.add(w); q.removeFromParent(); return w; }); }   // фаровете на смени — самите стени
   for (const o of [...g.children]) if (o.userData.lamp === 'front' || o.userData.lamp === 'rear') {   // фаровете/стоповете — без отблясъци денем (MeshBasic); userData.lamp остава за traffic.js
     const front = o.userData.lamp === 'front' && feature('emerg-wigwag'), m = new (front ? ElWig : ElNight)(o.geometry, E[o.userData.lamp]); m.position.copy(o.position); m.rotation.copy(o.rotation); m.userData = front ? { ...o.userData, side: o.position.x > 0 ? 1 : 0 } : o.userData; g.add(m); g.remove(o); }   // фаровете — на смени при бурканите
   const beam = new ElNight(new THREE.PlaneGeometry(W * 2.2, len * 1.8), E.beam); beam.rotation.x = -Math.PI / 2; const hb = R && R.box('head'); beam.position.set(0, y0 + 0.06, (hb ? hb.max.z - cz : len / 2) + len * 0.9); beam.renderOrder = 2; g.add(beam);

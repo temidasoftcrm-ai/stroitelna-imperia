@@ -25,7 +25,7 @@ export function createStopLife(o) {
     let c = n === 'walk' ? P.walk : n === 'idle' ? P.idle : n === 'sit' ? P.sit : (P.extra || []).find(q => q.name === n); if (!c) c = P.idle || P.walk; if (!c || P.cur === c) return;
     const a = P.acts[c.name] || (P.acts[c.name] = P.mixer.clipAction(c)); if (P.curA) P.curA.fadeOut(0.3); a.reset().fadeIn(0.3).play(); if (n !== 'walk') a.time = rnd() * c.duration; P.curA = a; P.cur = c; }
   function mk(st) { if (people.length >= CAP) return null; const b = o.ped(); if (!b) return null; const P = { ...b, st, acts: {}, cur: null, curA: null, x: st.x, z: st.z, y: 0, yaw: 0, mode: '', path: null, pi: 0, sp: 1.2 + rnd() * 0.4, t: 0, seat: -1, ev: null }; people.push(P); return P; }
-  function drop(P) { if (P.m.parent) P.m.parent.remove(P.m); P.mixer.stopAllAction(); P.mixer.uncacheRoot(P.m); const i = people.indexOf(P); if (i >= 0) people.splice(i, 1); if (P.st) { const j = P.st.wait.indexOf(P); if (j >= 0) P.st.wait.splice(j, 1); if (P.seat >= 0) P.st.used[P.seat] = null; } }
+  function drop(P) { if (P.m.parent) P.m.parent.remove(P.m); P.mixer.stopAllAction(); P.mixer.uncacheRoot(P.m); if (o.free) o.free(P.m); const i = people.indexOf(P); if (i >= 0) people.splice(i, 1); if (P.st) { const j = P.st.wait.indexOf(P); if (j >= 0) P.st.wait.splice(j, 1); if (P.seat >= 0) P.st.used[P.seat] = null; } }
   const pose = P => { P.m.position.set(P.x, P.y + (P.st ? P.st.y : 0), P.z); P.m.rotation.y = P.yaw; };
   function stop(d) { const s = { y: 0, cap: 5, seats: [], exits: [], ...d, live: false, wait: [], used: (d.seats || []).map(() => null), refT: 2 + rnd() * 5, k: 0.7 + rnd() * 0.6 }; stops.set(d.key, s); return s; }
   const lat = st => [-st.uz, st.ux];

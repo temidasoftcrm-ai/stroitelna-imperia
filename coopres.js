@@ -39,7 +39,7 @@ export function cleanPres(p) {
   const aidL = (Array.isArray(p.aidL) ? p.aidL : []).filter(a => Array.isArray(a) && POL[a[0]] && AID[a[1]]).slice(0, 12).map(a => [a[0], a[1], !!a[2]]);
   const tq = (Array.isArray(p.tq) ? p.tq : []).filter(tOk).slice(0, 12).map(t => ({ id: t.id, k: t.k, ref: t.ref, mine: !!t.mine, st: ['prop', 'acc', 'dec'].includes(t.st) ? t.st : 'dec' }));
   const pw = p.pw && typeof p.pw === 'object' && !Array.isArray(p.pw) ? { g: (Array.isArray(p.pw.g) ? p.pw.g : []).slice(0, 6).map(x => !!x), m: n(p.pw.m, 0, 12) | 0, won: !!p.pw.won } : null;   /* 🕊️ peace-win: целите на партньора — само за показване */
-  return { cc: cc(p.cc), icc: cc(p.icc), on: !!p.on && !!cc(p.cc), lv: n(p.lv, 0, 40) | 0, ind, rel, conf, aid: n(p.aid, 0, 999) | 0, aidL, stab: Math.round(n(p.stab, 0, 100)), tq, pw };
+  return { cc: cc(p.cc), icc: cc(p.icc), on: !!p.on && !!cc(p.cc), lv: n(p.lv, 0, 40) | 0, res: n(p.res, 0, 1e13),   /* ⚖️ coop-riv-deals: държавният бюджет (сървърът проверява обещанията спрямо него) */ ind, rel, conf, aid: n(p.aid, 0, 999) | 0, aidL, stab: Math.round(n(p.stab, 0, 100)), tq, pw };
 }
 
 export function createCoopPres(deps) {
@@ -48,7 +48,8 @@ export function createCoopPres(deps) {
   const S = () => deps.S(), P = () => S()?.pres || null, day = () => S()?.day || 0;
   const myCc = () => P()?.cc || S()?.imp?.cc || null;
   const other = cc => cc === 'RU' ? 'USA' : 'RUS';
-  let el = null, fakeChat = [];
+  let el = null, fakeChat = [], tab = 'sum';   // tab: 'sum' — срещата, 'riv' — ⚖️ Конкуренти (coop-riv-core, coopriv.js)
+  const riv = () => { try { return deps.riv?.() || null; } catch { return null; } };
   const told = new Set();   // кои предложения на партньора вече са показани с тост (в паметта; екранът ги показва винаги)
 
   // 🤝 партньорът: истинското партньорство (coop.js) или фалшивият от Лабораторията (window.__coopShared.pres — само в теста/демото)
@@ -68,7 +69,7 @@ export function createCoopPres(deps) {
     const rel = { x: Math.round(deps.pres.rel(other(p.cc))) }; for (const k of KEYS) rel[k] = Math.round(deps.pres.rel(k));
     const conf = {}; for (const c of CONFLICTS) conf[c.k] = p.conf?.[c.k]?.step || 0;
     const ind = {}; for (const k of IND_K) ind[k] = Math.round(p.ind[k]);
-    return { pres: { cc: p.cc, icc: s.imp?.cc || p.cc, on: true, lv: p.lv || 0, ind, rel, conf, aid: (p.aid || []).length, aidL: (p.aid || []).slice(-12).map(a => [a.iso, a.need, !!a.done && a.works !== false]),
+    return { pres: { cc: p.cc, icc: s.imp?.cc || p.cc, on: true, lv: p.lv || 0, ...(feature('coop-riv-deals') ? { res: Math.max(0, Math.round(p.res || 0)) } : {}), ind, rel, conf, aid: (p.aid || []).length, aidL: (p.aid || []).slice(-12).map(a => [a.iso, a.need, !!a.done && a.works !== false]),
       stab: Math.round(IND_K.reduce((a, k) => a + p.ind[k], 0) / IND_K.length), tq: Object.values(p.treaties || {}).slice(-12).map(t => ({ id: t.id, k: t.k, ref: t.ref, mine: t.mine, st: t.st })), ...(p.pw?.g ? { pw: { g: p.pw.g, m: Math.floor((p.pw.hold || 0) / 30), won: !!p.pw.won } } : {}) } };   /* 🕊️ peace-win: целите (само с флага има p.pw) */
   }
 
@@ -142,8 +143,14 @@ export function createCoopPres(deps) {
   function side(cc, who, lv, ind, aidN) {
     return `<div class="cd"><b style="font-size:16px">${FLAG[cc] || '🏳️'} ${esc(who)}</b> <span class="m">· ${CNM[cc] ? tr(CNM[cc]) : '?'} · ниво ${lv}</span>${IND_K.map(k => `<div class="m">${IND_N[k][0]} ${tr(IND_N[k][1])}: <b style="color:#e6edf6">${Math.round(ind[k])}</b></div>${bar(ind[k])}`).join('')}<div class="m">📦 проекти за помощ: ${aidN}</div></div>`;
   }
+  function tabs() {   // ⚖️ coop-riv-core: табовете горе (без флага — няма)
+    const R = riv(), on = !!R && R.html !== undefined && feature('coop-riv-core'); const t = el?.querySelector('#cpTabs'); if (!t) return on;
+    t.innerHTML = on ? `<button data-cptab="sum"${tab === 'sum' ? ' class="y"' : ''}>🌐 ${tr('Срещата')}</button><button data-cptab="riv"${tab === 'riv' ? ' class="y"' : ''}>⚖️ ${tr('Конкуренти')}${R.badge() ? ' <b style="color:#ffd54a">•</b>' : ''}</button>` : '';
+    t.querySelectorAll('[data-cptab]').forEach(b => b.onclick = () => { tab = b.dataset.cptab; render(); }); return on;
+  }
   function render() {
     if (!el) return; const s = P(), q = partner();
+    if (tabs() && tab === 'riv') { const R = riv(); el.querySelector('.bd').innerHTML = R.html(); R.bind(el); return; }
     if (!s || !q?.p?.on) { el.querySelector('.bd').innerHTML = `<div class="cd w">${s ? `Партньорът още не е президент — „Срещата на върха“ се отваря, когато и двамата сте президенти.` : 'Не си президент.'}</div>`; return; }
     const p = q.p, x = other(s.cc), myX = Math.round(deps.pres.rel(x)), avg = Math.round((myX + p.rel.x) / 2), cx = clash();
     let h = cx ? `<div class="cd w" style="border-color:#ffb347"><b style="color:#ffb347">⚠️ И двамата сте избрали ${FLAG[cx.cc]} ${CNM[cx.cc]}</b><div class="m">Изборът беше едновременен. Никой не сменя държавата (тя е част от града и кампанията); ${cx.host ? 'ти си домакинът на срещата.' : `домакин е ${esc(q.name)}.`} Общият мир и договорите работят.</div></div>` : '';
@@ -169,14 +176,14 @@ export function createCoopPres(deps) {
     const inp = el.querySelector('#cpSay'), send = () => { const v = inp.value; inp.value = ''; say(v); };
     el.querySelectorAll('[data-cpsay]').forEach(b => b.onclick = send); if (inp) inp.onkeydown = e => { if (e.key === 'Enter') send(); };
   }
-  function open() {
-    if (!P()) return; if (!document.getElementById('coopSummitCss')) { const c = document.createElement('style'); c.id = 'coopSummitCss'; c.textContent = CSS; document.head.appendChild(c); }
+  function open(t) {
+    if (!P()) return; if (t === 'riv' || t === 'sum') tab = t; if (!document.getElementById('coopSummitCss')) { const c = document.createElement('style'); c.id = 'coopSummitCss'; c.textContent = CSS; document.head.appendChild(c); }
     try { dailyTick(); } catch (e) { console.warn('coop-pres', e); }
-    if (!el) { el = document.createElement('div'); el.id = 'coopSummit'; el.innerHTML = `<div class="tb"><h2>🌐 Срещата на върха</h2><button data-cpx="1">✕</button></div><div class="bd"></div>`; document.body.appendChild(el); el.querySelector('[data-cpx]').onclick = close; window.__overlay3d = (window.__overlay3d || 0) + 1; }
+    if (!el) { el = document.createElement('div'); el.id = 'coopSummit'; el.innerHTML = `<div class="tb"><h2>🌐 Срещата на върха</h2><span id="cpTabs" style="display:flex;gap:6px"></span><button data-cpx="1">✕</button></div><div class="bd"></div>`; document.body.appendChild(el); el.querySelector('[data-cpx]').onclick = close; window.__overlay3d = (window.__overlay3d || 0) + 1; }
     render();
   }
   function close() { if (!el) return; el.remove(); el = null; window.__overlay3d = Math.max(0, (window.__overlay3d || 1) - 1); }
   // бутонът в горната лента на президентския прозорец (president.js) — само когато и партньорът е президент
-  const btn = () => ok() ? `<button data-psum="1">🌐 Срещата на върха${partner().p.tq.some(t => t.mine && t.st === 'prop' && !(P().treaties || {})[t.id]) ? ' <b style="color:#ffd54a">•</b>' : ''}</button>` : '';
+  const btn = () => ok() ? `<button data-psum="1">🌐 Срещата на върха${partner().p.tq.some(t => t.mine && t.st === 'prop' && !(P().treaties || {})[t.id]) || riv()?.badge?.() ? ' <b style="color:#ffd54a">•</b>' : ''}</button>` : '';
   return { snap, taken, clash, dailyTick, btn, open, close, ok, partner, propose, accept: id => answer(id, true), decline: id => answer(id, false), isOpen: () => !!el };
 }

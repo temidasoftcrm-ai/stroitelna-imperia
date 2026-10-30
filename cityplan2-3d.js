@@ -517,6 +517,7 @@ export function buildPlan2View(P, opts = {}) {
   const trees = [];
   if (D) {   // истинската карта: Тибърът (ивица около оста), остров Тиберина, паркове и археологически зони, жп линиите към Термини
     if (D.sea) seaView(G, D, RR, opts.railCut || null); else romeRiver(G, D);
+    G.userData.wY = (D.wY ?? -1.2) + 0.1;   // 🚢 osm-ships (game.js): нивото на водата — за корабите на котва
     if (D.wY) bridgesView(G, P, D, opts.bridgesReal, floodMats);   // bridges-real
     const I = D.island; if (I) { const isl = new THREE.Mesh(new THREE.CircleGeometry(1, 32).rotateX(-Math.PI / 2), M(0xb9ad96)); isl.scale.set(I.w / 2, 1, I.d / 2); isl.rotation.y = I.rot; isl.position.set(I.x, 0.06, I.z); G.add(isl); }
     const gm = { park: M(0x6f9e4f), archaeo: M(0xb7b08a), cemetery: M(0x7d9468), resort: M(0xd8ccb2) };   // resort — lasvegas-osm (55): запазените места на казината (светла настилка, пустинен пейзаж)
@@ -740,7 +741,7 @@ export function buildPlan2View(P, opts = {}) {
     tm('termini'); yield 0;
     // надписите на картата: водите (Златният рог, Босфорът…, Тибър) и кварталите — спрайтове, отблизо се скриват
     ST.LB = D && opts.labels !== false ? mapLabels(G, D) : null; yield 0;
-    ST.BT = D && D.sea && opts.boats !== false ? seaTraffic(G, D, opts.boatModels || {}) : null;
+    ST.BT = D && D.sea && opts.boats !== false ? seaTraffic(G, D, opts.boatModels || {}) : null; if (ST.BT) G.userData.seaBT = ST.BT;   // 🚢 osm-ships: game.js сменя круизния и пресмята моста отново
     ST.RB = D && opts.riverBoats ? riverTraffic(G, D, P, opts.riverBoats) : null;   // river-boats (f9): туристически корабчета и яхти по реката (Тибър, Сена, Темза, Москва)   // Истанбул: фериботи по линиите, кораби по Босфора, лодки в Златния рог
     if (D && D.style === 'moscow') kremlinView(G, D);
     tm('labels+boats'); yield 0;
@@ -844,16 +845,38 @@ function seaTraffic(G, D, models) {
   const K = D.k, at = (la, lo) => [(lo - D.center[1]) * Math.cos(D.center[0] * Math.PI / 180) * 111320 * K, -(la - D.center[0]) * 110540 * K], grp = new THREE.Group(); grp.position.y = (D.wY ?? -1.2) + 0.2; G.add(grp);
   const boats = [], cum = p => { const L = [0]; for (let i = 1; i < p.length; i++) L.push(L[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1])); return L; };
   for (const m of [models.ferry, models.cruise, models.tanker, models.container, ...(models.small || [])]) if (m) floodMats(m, 0xffe2b0, m === models.cruise ? 0.5 : 0.3);   // корабите нощем — с осветени палуби
-  const fit = (proto, len) => { if (!proto) return null; const o = proto.clone(true), w = new THREE.Group(); o.userData.extShared = 1; const b = new THREE.Box3().setFromObject(o), sz = b.getSize(new THREE.Vector3()), long = sz.x > sz.z, k = len / Math.max(sz.x, sz.z); o.scale.setScalar(k); const b2 = new THREE.Box3().setFromObject(o), c = b2.getCenter(new THREE.Vector3()); o.position.set(-c.x, -b2.min.y - 0.6, -c.z); if (long) o.rotation.y = Math.PI / 2; w.add(o); return w; };
+  const fit = (proto, len, dr = null) => { if (!proto) return null; const o = proto.clone(true), w = new THREE.Group(); o.userData.extShared = 1; const b = new THREE.Box3().setFromObject(o), sz = b.getSize(new THREE.Vector3()), long = sz.x > sz.z, k = len / Math.max(sz.x, sz.z); o.scale.setScalar(k); const b2 = new THREE.Box3().setFromObject(o), c = b2.getCenter(new THREE.Vector3()); o.position.set(-c.x, -b2.min.y - (dr != null ? dr * (b2.max.y - b2.min.y) : 0.6), -c.z); if (long) o.rotation.y = Math.PI / 2; w.add(o); return w; };   /* dr — газенето като част от височината (osm-ships: големите кораби) */
   const add = (obj, path, sp, mode, ph) => { if (!obj || path.length < 2) return; const L = cum(path); grp.add(obj); boats.push({ obj, path, L, T: L[L.length - 1], sp, mode, s: ph * L[L.length - 1], dir: 1, wait: 0 }); };
   // фериботите: еднаквите линии — веднъж; по един ферибот на линия (до 14)
   const seen = new Set(); let n = 0;
   for (const f of D.ferries || []) { if (f.pts.length < 2 || n >= 14) continue; const key = [f.pts[0], f.pts[f.pts.length - 1]].map(p => Math.round(p[0] / 40) + ',' + Math.round(p[1] / 40)).sort().join('|'); if (seen.has(key)) continue; seen.add(key); n++; add(fit(models.ferry, 34) || ferryModel(), f.pts, 7, 'shuttle', (n * 0.37) % 1); }   // моделът (Бандърма вапуру) или процедурният
   const bos = LANES.bosphorus.map(q => at(...q)), horn = LANES.horn.map(q => at(...q)), off = (p, d) => p.map(([x, z], i) => { const a = p[Math.max(0, i - 1)], b = p[Math.min(p.length - 1, i + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [x - (b[1] - a[1]) / l * d, z + (b[0] - a[0]) / l * d]; });
-  [[models.tanker, 95, 0.1, 1], [models.container, 110, 0.55, 1], [models.cruise, 120, 0.4, 1], [models.tanker, 85, 0.3, -1], [models.container, 100, 0.8, -1], [models.cruise, 110, 0.95, -1]].forEach(([m, len, ph, side]) => add(fit(m, len), off(side > 0 ? bos : bos.slice().reverse(), 40 * side), 9, 'loop', ph));   // двупосочно: всяка посока в своя половина
+  const LN = (k, d) => (models.len && models.len[k]) || d, DR = k => models.draft ? models.draft[k] ?? null : null;   // 🚢 osm-ships: истинските дължини (круизният ~300 м) и газенето
+  [['tanker', 95, 0.1, 1], ['container', 110, 0.55, 1], ['cruise', 120, 0.4, 1], ['tanker', 85, 0.3, -1], ['container', 100, 0.8, -1], ['cruise', 110, 0.95, -1]].forEach(([k, len, ph, side]) => { const n0 = boats.length; add(((w) => (w && (w.userData.seaShip = k), w))(fit(models[k], LN(k, len), DR(k))), off(side > 0 ? bos : bos.slice().reverse(), models.len ? 75 : 40 * side), 9, 'loop', ph); if (boats.length > n0) { boats[n0].lane = side; boats[n0].ph = ph; } });   // двупосочно: всяка посока в своя половина (osm-ships: обратният път сам обръща страната — отместването е +75 и за двете посоки)   // двупосочно: всяка посока в своя половина
   (models.small || []).forEach((m, i) => add(fit(m, i % 2 ? 9 : 12), off(i % 2 ? horn : horn.slice().reverse(), (i % 3 - 1) * 25), 4, 'loop', (i * 0.29) % 1));
   const V = new THREE.Vector3();
-  return { update(dt) { dt = Math.min(dt || 0, 0.1);
+  // 🚢 osm-ships: под мостовете — лъч нагоре по пътя на всеки голям кораб (през 40 м); по-висок от долния ръб на моста минус 5 м → смален (еднакво по осите)
+  const cap = () => { if (!models.len) return; G.updateMatrixWorld(true); const wy = grp.getWorldPosition(new THREE.Vector3()).y, rc = new THREE.Raycaster(), UP = new THREE.Vector3(0, 1, 0), P0 = new THREE.Vector3(), bx = new THREE.Box3(), mb = new THREE.Box3();
+    for (const b of boats) { if (!b.obj.userData.seaShip) continue; bx.makeEmpty(); for (const [x, z] of b.path) bx.expandByPoint(G.localToWorld(P0.set(x, 0, z))); bx.expandByScalar(60); bx.min.y = wy + 8; bx.max.y = wy + 400;
+      const T = []; G.traverse(m => { if (!m.isMesh || m.isInstancedMesh || m.isSprite) return; for (let p = m; p; p = p.parent) if (p === grp) return; if (!m.geometry.boundingBox) m.geometry.computeBoundingBox(); mb.copy(m.geometry.boundingBox).applyMatrix4(m.matrixWorld); if (mb.intersectsBox(bx) && mb.max.y > wy + 8) T.push(m); });
+      if (!T.length) continue; let low = Infinity;   /* най-ниският връх над водата (+8 м) до 35 м от пътя — долният ръб на моста там, където корабът минава */
+      const segs = b.path.slice(1).map((c, i) => [G.localToWorld(new THREE.Vector3(b.path[i][0], 0, b.path[i][1])), G.localToWorld(new THREE.Vector3(c[0], 0, c[1]))]);
+      const near = (x, z) => { for (const [p, q] of segs) { const dx = q.x - p.x, dz = q.z - p.z, l2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - p.x) * dx + (z - p.z) * dz) / l2)), ex = p.x + dx * t - x, ez = p.z + dz * t - z; if (ex * ex + ez * ez < 35 * 35) return true; } return false; };
+      for (const m of T) { const A = m.geometry.attributes.position; for (let i = 0; i < A.count; i++) { P0.fromBufferAttribute(A, i).applyMatrix4(m.matrixWorld); const h = P0.y - wy; if (h > 8 && h < low && near(P0.x, P0.z)) { low = h; b.lowP = [P0.x, P0.z]; } } }
+      if (low !== Infinity) { b.low = +low.toFixed(1); const lp = G.worldToLocal(new THREE.Vector3(b.lowP[0], 0, b.lowP[1])); let bs = 0, bd = Infinity; for (let i = 1; i < b.path.length; i++) { const a = b.path[i - 1], c = b.path[i], dx = c[0] - a[0], dz = c[1] - a[1], l2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((lp.x - a[0]) * dx + (lp.z - a[1]) * dz) / l2)), e = Math.hypot(a[0] + dx * t - lp.x, a[1] + dz * t - lp.z); if (e < bd) { bd = e; bs = b.L[i - 1] + t * (b.L[i] - b.L[i - 1]); } } b.lowS = bs; }   /* къде по пътя е мостът (за камерата) */
+      if (low === Infinity) continue; b.obj.updateMatrixWorld(true); const top = new THREE.Box3().setFromObject(b.obj).max.y - wy, lim = low - 5;
+      if (top > lim && top > 0) b.need = true; }
+    // по-висок от моста: пътят на ЦЯЛАТА лента спира преди моста (по-дългата страна) — всички кораби в лентата са по един и същи път, в една посока, с една скорост
+    // и с отместени фази (≥ 0,15 от пътя) → не се застъпват; корабите остават в истински размер. Остане ли по-малко от 600 м — смаляване (както преди)
+    for (const ln of [1, -1]) { const B = boats.filter(q => q.lane === ln && q.obj.userData.seaShip); const need = B.filter(q => q.need && q.lowS != null); if (!need.length || B[0].cut != null) continue;
+      const P0p = B[0].path, L0 = cum(P0p), T0 = L0[L0.length - 1]; let s0 = 0, s1 = T0;
+      for (const q of need) { const hl = new THREE.Box3().setFromObject(q.obj).getSize(new THREE.Vector3()), half = Math.max(hl.x, hl.z) / 2 + 80, a0 = q.lowS - half, a1 = q.lowS + half; if (a0 > T0 - a1) s1 = Math.min(s1, a0); else s0 = Math.max(s0, a1); }
+      if (s1 - s0 < 600) { for (const q of need) { const t2 = new THREE.Box3().setFromObject(q.obj).max.y - wy, l2 = q.low - 5; if (t2 > l2) { q.obj.scale.multiplyScalar(Math.max(0.3, l2 / t2)); q.capped = +(l2 / t2).toFixed(2); } } continue; }
+      const pt = q => { let i = 1; while (i < L0.length - 1 && L0[i] < q) i++; const A = P0p[i - 1], C = P0p[i], f = Math.min(1, Math.max(0, (q - L0[i - 1]) / ((L0[i] - L0[i - 1]) || 1))); return [A[0] + (C[0] - A[0]) * f, A[1] + (C[1] - A[1]) * f]; };
+      const P = [pt(s0)]; for (let i = 1; i < P0p.length - 1; i++) if (L0[i] > s0 && L0[i] < s1) P.push(P0p[i]); P.push(pt(s1)); const L = cum(P), T = L[L.length - 1];
+      for (const q of B) { q.path = P; q.L = L; q.T = T; q.s = (q.ph ?? 0) * T; q.mode = 'loop'; q.cut = s0 > 0 ? 0 : T; q.capped = 'lane'; } } };
+  let capT = 0, capped = false;
+  return { cap, boats, update(dt) { dt = Math.min(dt || 0, 0.1); if (!capped && (capT += dt) > 2) { capped = true; try { cap(); } catch (e) { console.warn('osm-ships cap', e); } }
     for (const b of boats) {
       if (b.wait > 0) { b.wait -= dt; continue; }
       b.s += b.dir * b.sp * dt;
