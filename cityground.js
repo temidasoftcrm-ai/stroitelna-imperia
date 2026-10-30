@@ -3,6 +3,7 @@
 // централата и брегът на Ню Джързи отсреща); в Кремъл — тревните площи. Земята няма UV — шарката е по световните x/z в шейдъра (плочи с фуги / петна трева).
 //   game.js: cityGround(pv, cityId, plan) — преди weather.setGround (снегът оцветява новия материал). Само градовете в CG; другите — както са.
 import * as THREE from 'three';
+import { feature } from './lab/feature.js';
 
 const CG = {
   moscow: { kind: 'pave', col: 0xa9a49c, tile: 1.6, lawns: /kreml/i },   // гранитни павета (Червеният площад), тревата на Кремъл
@@ -36,7 +37,7 @@ export function groundMat(c, base) {
 
 // pv — изгледът (cityplan2-3d.js); plan — планът на града (landmarks в рамката на играта, toPlan)
 export function cityGround(pv, cityId, plan) {
-  const c = CG[cityId]; if (!c || !pv || !pv.userData.groundMat) return false;
+  const c = cityId === 'newyork' && feature('ny-dense') ? { kind: 'pave', col: 0x9c9890, tile: 1.8, apron: 0xbdbcb6 } : CG[cityId]; if (!c || !pv || !pv.userData.groundMat) return false;   // 🗽 ny-dense: Манхатън е застроен до тротоара — бетон, не трева
   const old = pv.userData.groundMat, m = groundMat(c, old);
   pv.traverse(o => { if (o.isMesh && o.material === old) o.material = m; });
   pv.userData.groundMat = m;

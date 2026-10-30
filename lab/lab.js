@@ -541,6 +541,18 @@ const DEMOS = [
   ['✍️ Подписване (coop-riv-finale): сделката влиза в сила → церемония в залата — писалките, печатът, светкавиците на пресата', 'sofia', d => setTimeout(() => { d.coopRivHall('sign'); }, 10000)],   // coop-riv-finale
   ['🕊️ Архитекти на мира (coop-riv-finale): финалът в залата — общото признание и личните (Дипломат на века / Възстановител на света)', 'sofia', d => setTimeout(() => { d.coopRivHall('finale'); }, 10000)],   // coop-riv-finale
   ['🏁 Отчетът за мира с партньор (coop-riv-finale): „Архитекти на мира“ — заедно, и твоето признание по приноса', 'sofia', d => setTimeout(() => { d.coopRivHall('report'); }, 10000)],   // coop-riv-finale
+  ['🤝 Съюзници (coop-riv-allies): търг в Германия — съюзът подава ЕДНА обща оферта срещу трети кандидат, когото смята сървърът', 'sofia', d => setTimeout(() => { d.coopRivAllies('tender'); }, 10000)],   // coop-riv-allies
+  ['🤝 Съюзници (coop-riv-allies): Ормуз затворен — общите кораби по подразбиране; сам — половин ефект и − доверие', 'sofia', d => setTimeout(() => { d.coopRivAllies('crisis'); }, 10000)],   // coop-riv-allies
+  ['🆘 Молба за помощ (coop-riv-allies): съюзникът моли за 500 млн. € — Помогни (→ „Съвместно изявление“ в залата) или Откажи', 'sofia', d => setTimeout(() => { d.coopRivAllies('aidin'); }, 10000)],   // coop-riv-allies
+  ['🆘 Твоята молба (coop-riv-allies): поискай средства или точки — фалшивият съюзник помага след 2 s', 'sofia', d => setTimeout(() => { d.coopRivAllies('aidout'); }, 10000)],   // coop-riv-allies
+  ['🤝 Съюзници (coop-riv-allies): резултатите — съюзът спечели / трети кандидат спечели, обща операция, получената помощ', 'sofia', d => setTimeout(() => { d.coopRivAllies('results'); }, 10000)],   // coop-riv-allies
+  ['⚔️ Разрешението (coop-riv-rivals): „Съперници“ се избира само ако и двамата разрешите враждебен режим — натисни „Разреши“, фалшивият партньор също разрешава', 'sofia', d => setTimeout(() => { d.coopRivRivals('consent'); }, 10000)],   // coop-riv-rivals
+  ['⚔️ Съперници (coop-riv-rivals): превъзходството по 3 цели, обявени действия (12 ч предупреждение), влиянието, новото действие — само държавни пари', 'sofia', d => setTimeout(() => { d.coopRivRivals('rival'); }, 10000)],   // coop-riv-rivals
+  ['⚠️ Обявени санкции срещу теб (coop-riv-rivals): контрамерки (половин ефект) или покана на преговори', 'sofia', d => setTimeout(() => { d.coopRivRivals('incoming'); }, 10000)],   // coop-riv-rivals
+  ['🕊️ Примирие (coop-riv-rivals): партньорът предлага — приеми → „Конкуренти“, − 25 напрежение и подписване в залата', 'sofia', d => setTimeout(() => { d.coopRivRivals('truce'); }, 10000)],   // coop-riv-rivals
+  ['⏳ Оттеглено разрешение (coop-riv-rivals): режимът става „Конкуренти“ след 12 ч онлайн време', 'sofia', d => setTimeout(() => { d.coopRivRivals('revert'); }, 10000)],   // coop-riv-rivals
+  ['🚉 Гара Хайдарпаша (haydarpasa-real): истинският модел на кея в Кадъкьой — денем, от водата', 'istanbul', d => setTimeout(() => { d.haydarLook(false); }, 12000)],   // haydarpasa-real
+  ['🚉 Гара Хайдарпаша нощем (haydarpasa-real): златната фасада от прожекторите, топлите прозорци, осветените кули и тъмният покрив — от водата', 'istanbul', d => setTimeout(() => { d.haydarLook(true); }, 12000)],   // haydarpasa-real
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя'], ['lab/coop-log.html', '🤝 Дневник на партньорството — чеклист за истински акаунти и извикванията към сървъра']];
 

@@ -181,7 +181,12 @@ const TILE0 = [...TILE];
 export function setBgRoofs(cols) { TILE.length = 0; TILE.push(...(cols || TILE0)); }
 const OTTOC = [0xd9a066, 0xe8c6a0, 0xc97d5d, 0xa9c4cf, 0xb7c9a0, 0xe2d6c0, 0x9a6a4a, 0xd4a9a9, 0xe8d8a0];
 const PAST = [0xf4d8c4, 0xf2e2b0, 0xd6e2ea, 0xecd0d6, 0xf6f2ea, 0xdce8d0, 0xf0d0a8, 0xe8e0d4];
-export function varPick(style, h, h2, ty) { const h3 = (h * 7.31 + h2 * 3.77) % 1, h4 = (h * 13.7 + h2 * 5.3) % 1;
+export function varPick(style, h, h2, ty, city = null) { const h3 = (h * 7.31 + h2 * 3.77) % 1, h4 = (h * 13.7 + h2 * 5.3) % 1;
+  if (style === 'moscow' && city && city !== 'moscow' && feature('sofia-low')) {   // 🏘️ sofia-low (собственикът: „София е по-ниска“): центърът — кооперации 4–7 ет. (12–25 м), малко соц-модерн и сталински (без кулите); покрайнините — панели 6–12 ет. и кооперации
+    if (ty === 9) { if (h4 < 0.25) return { t: K.COOP, H: 3 * (4 + Math.floor(h * 3)), col: pick([0xeedcc0, 0xe4c8a0, 0xf0e6d6, 0xd8c8b8, 0xe8c0b0], h3), rc: pick(TILE, h4) };
+      const t = h2 < 0.55 ? K.PAN1 : K.PAN2; return { t, H: 2.8 * (6 + Math.floor(h * 7)), col: pick([0xe8e6e0, 0xdedcd4, 0xd4d8dc, 0xf0dcb0, 0xe6d6c4], h3), rc: pick(FLAT, h4), ex: 'lift' }; }
+    if (h2 < 0.62) return { t: K.COOP, H: 3 * (4 + Math.floor(h * 4)), col: pick([0xeedcc0, 0xe4c8a0, 0xf0e6d6, 0xd8c8b8, 0xe8c0b0, 0xd4ccbc, 0xf2dca8], h3), rc: pick(TILE, h4) };
+    const t = h2 < 0.88 ? K.MSKMOD : K.STAL8, k = kind(t); return { t, H: k[4].H, col: t === K.MSKMOD ? pick([0xffffff, 0xf4efe6, 0xe8f0ea, 0xf6e8e0], h3) : pick([0xf2d9a2, 0xeccf98, 0xf6e4bc, 0xe8d4b0, 0xf0dcc0], h3), rc: pick(FLAT, h4) }; }
   if (style === 'paris') { const t = h2 < 0.36 ? K.H5 : h2 < 0.64 ? K.H6 : h2 < 0.8 ? K.H7 : h2 < 0.92 ? K.FAUB : K.PMOD, k = kind(t);
     return { t, H: k[4].H || 2.9 * (7 + Math.floor(h * 3)) /* модерните: 7–9 етажа */, col: t === K.FAUB ? pick(FAUBC, h3) : t === K.PMOD ? pick(FLAT, h3) : pick(STONE, h3), rc: t === K.FAUB ? (h4 < 0.5 ? pick(TILE, h3) : pick(ZINC, h3)) : t === K.PMOD ? pick(FLAT, h4) : pick(ZINC, h4) }; }
   if (style === 'moscow') {   // dc-msk-fac: ty — 9 във външните райони (панелни блокове), иначе сталински / модерн

@@ -207,8 +207,8 @@ export function createPeaceWin(deps) {
     const lost = CONFLICTS.filter(c => P.c6[c.k] != null && (s.conf[c.k]?.step || 0) < 6);   // приключен конфликт, който се поднови
     for (const c of CONFLICTS) { const k = s.conf[c.k]; if (!k) continue; if (k.step >= 6) { if (P.c6[c.k] == null) P.c6[c.k] = d; } else delete P.c6[c.k]; }
     { const have = new Set(P.key.map(x => x.d + '|' + x.t)); for (const x of [...(s.log || [])].reverse()) if (KEY_RE.test(x.t) && !have.has(x.d + '|' + x.t)) { P.key.push({ d: x.d, t: x.t }); have.add(x.d + '|' + x.t); } if (P.key.length > 60) P.key = P.key.slice(-60); }
-    const G = goals(s), five = G.slice(0, 5).every(g => g.ok); P.g = G.map(g => g.ok);
-    if (!S().peaceWin) { const lvOk = (s.lv || 0) >= PW.lockLv, bad = G.slice(0, 5).find(g => !g.ok);
+    const G = goals(s), rv = rivHot(), five = G.slice(0, 5).every(g => g.ok) && !rv; P.g = G.map(g => g.ok);   // ⚔️ coop-riv-rivals: съперничеството затруднява мира — напрежението трябва да е под 40 (не го блокира)
+    if (!S().peaceWin) { const lvOk = (s.lv || 0) >= PW.lockLv, bad = G.slice(0, 5).find(g => !g.ok) || rv;
       if (lvOk && five) { if (P.grace) { deps.toast(tr('✅ Кризата „{0}“ е овладяна навреме — броячът продължава от {1} дни.', [P.grace.nm, P.hold || 0]), 'good'); P.grace = null; }
         P.hold = (P.hold || 0) + 1; P.best = Math.max(P.best || 0, P.hold); if (P.hold % 30 === 0 && P.hold < PW.holdDays) deps.toast(tr('🕊️ Световният мир се държи: {0}/12 месеца.', [P.hold / 30]), 'good'); }
       else if (lvOk && (P.hold || 0) > 0) {   /* ⏸️ нова случайна криза → пауза до graceDays; собствено решение → нулиране веднага */
@@ -325,6 +325,7 @@ export function createPeaceWin(deps) {
     if (!c) { after(); return; }
     Promise.resolve(c.play('peace', true)).then(ok => { if (!ok) { after(); return; } const iv = setInterval(() => { if (!c.playing()) { clearInterval(iv); setTimeout(after, 500); } }, 400); }).catch(after);
   }
+  const rivHot = () => { try { const r = deps.riv?.()?.state?.(); return r && r.mode === 'rival' && r.tension >= 40 ? { k: 'riv', nm: tr('напрежението със съперника е {0} (нужно е под 40)', [r.tension]) } : null; } catch { return null; } };
   const rivTi = () => { try { return deps.riv?.()?.titles?.() || null; } catch { return null; } };   // 🏛️ coop-riv-finale (coopriv.js): „Архитекти на мира“ + личното признание
   function report() {
     const s = st(), Sx = S(), W = Sx.peaceWin; if (!W) return; style(); close(); document.getElementById('pwRep')?.remove();
@@ -337,7 +338,7 @@ export function createPeaceWin(deps) {
     d.innerHTML = `<div class="box"><div style="font-size:14px;letter-spacing:.3em;color:#ffd54a">🏁 ${tr('ЛИЧЕН ОТЧЕТ')}</div><h1>🕊️ ${tr('Световен мир')}</h1><div style="opacity:.85">${tr('Започна с една бригада. Остави свят в мир.')}</div>
       <div class="tiles">${tiles.map(([v, l]) => `<div class="tl"><b>${v}</b><span>${l}</span></div>`).join('')}</div>
       <div style="opacity:.85;margin:0 0 6px">📰 ${tr('Най-важните решения')}</div><div class="dec">${pick.length ? pick.map(k => `<div>${tr('ден {0}', [k.d])}: ${tr(k.t)}</div>`).join('') : `<div>${tr('Хрониката е празна.')}</div>`}</div>
-      ${ti ? `<div style="margin:0 0 14px">🏅 <b style="color:#ffd54a">${tr('Архитекти на мира')}</b> — ${tr('ти и')} ${esc(ti.pn)}, ${tr('заедно')}.<br>${tr('Твоето признание')}: <b style="color:#ffd54a">${esc(ti.meT)}</b> · ${esc(ti.pn)}: <b>${esc(ti.themT)}</b></div>`
+      ${ti ? `<div style="margin:0 0 14px">🏅 <b style="color:#ffd54a">${tr('Архитекти на мира')}</b> — ${tr('ти и')} ${esc(ti.pn)}, ${tr('заедно')}.<br>${tr('Твоето признание')}: <b style="color:#ffd54a">${esc(ti.meT)}</b> · ${esc(ti.pn)}: <b>${esc(ti.themT)}</b>${ti.ally ? `<br>🤝 <b style="color:#ffd54a">${tr('Верни съюзници')}</b> — ${tr('доверие над 80 до края')}` : ''}</div>`
         : `<div style="margin:0 0 14px">🏅 <b style="color:#ffd54a">${tr('Архитект на мира')}</b> — ${tr('платинената награда е на стената в залата на борда, а клипът — в „🎬 Албум“.')}</div>`}
       <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">${ti ? `<button data-pwhall="1">🏛️ ${tr('Залата на срещата')}</button>` : ''}<button data-pwfame="1">🏅 ${tr('Церемонията')}</button><button class="y" data-pwnext="1">${tr('Напред')} ▶</button></div></div>`;
     document.body.appendChild(d); window.__overlay3d = (window.__overlay3d || 0) + 1; deps.sound && deps.sound('levelup');

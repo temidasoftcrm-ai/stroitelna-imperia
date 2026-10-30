@@ -80,6 +80,14 @@
  "💾 Запази": "💾 Save",
  "Запазвам…": "Saving…",
  "🔑 Паролата е сменена.": "🔑 The password was changed.",
+ "🗽 Ню Йорк — по-жив: стъкла в различни цветове и стъпаловидни върхове, застроени квартали без зелени петна, Ъпър Ийст и Уест Сайд около Сентрал Парк; нови сгради — Уайтхол, Анексът, 500 Пето авеню, 605 Парк авеню и Four Times Square": "🗽 New York comes alive: glass in many colours with stepped tops, fully built blocks without green gaps, the Upper East and West Side around Central Park; new buildings — Whitehall, the Annex, 500 Fifth Avenue, 605 Park Avenue and Four Times Square",
+ "🤝 Кооперативна игра: съюзници и съперници — общи търгове, а съперничеството прави мира по-труден; финал на кампанията": "🤝 Co-op: allies and rivals — joint tenders, and rivalry makes peace harder; campaign finale",
+ "🔕 Известията: червените се махат сами след 15 s (остават в 🔔), а над тях — „✕ Скрий всички“ и „🔕 Изключи“": "🔕 Notifications: red ones now close by themselves after 15 s (they stay in 🔔), with “✕ Hide all” and “🔕 Turn off” above them",
+ "⛶ Бутон „Цял екран“ и подредба за по-малки екрани (лаптоп)": "⛶ Fullscreen button and a layout for smaller screens (laptops)",
+ "🚉 Истинската гара Хайдарпаша в Истанбул — с надписа и осветена нощем": "🚉 The real Haydarpaşa station in Istanbul — with its sign, lit at night",
+ "🏘️ София — с по-ниско застрояване": "🏘️ Sofia — lower-rise buildings",
+ "🗺️ Картата: при посочване на процента на континента — кои градове още не са завършени": "🗺️ Map: hover a continent’s percentage to see which cities are still unfinished",
+ "📈 Ниво 14 идва по-рано (5,4 млн. XP вместо 5,75 млн.), ниво 15 — 7,4 млн.": "📈 Level 14 comes sooner (5.4M XP instead of 5.75M), level 15 at 7.4M",
  "🗽 Ню Йорк: истинският залив — Манхатън завършва с Battery Park и фериботите; островите Либърти (със статуята), Елис и Гавърнърс; реките до хоризонта; Бруклин, Куинс и Джърси Сити наоколо": "🗽 New York: the real bay — Manhattan ends at Battery Park with the ferries; Liberty (with the statue), Ellis and Governors islands; rivers to the horizon; Brooklyn, Queens and Jersey City around",
  "📈 По-плавни нива след 11 — ниво 13 вече не е „стена“ (~2 ч вместо ~6 ч)": "📈 Smoother levels after 11 — level 13 is no longer a “wall” (~2 h instead of ~6 h)",
  "🏙️ Радио Сити — 250 м, Рокфелер — по-висок": "🏙️ Radio City is 250 m, Rockefeller taller",
@@ -484,5 +492,6 @@
  "_stale": {
   "ime@primer.com": "name@example.com",
   "🛠️ Поправено: бутонът „Купи липсващата“ при пълен гараж; лентата на транспорта — на един ред": "🛠️ Fixed: the “Buy missing” button when the garage is full; the transport bar on one line"
- }
+ },
+ "🏙️ Небостъргачите в поръчките — от всички модели, не само два (Москва, Истанбул…)": "🏙️ Skyscraper orders use all models, not just two (Moscow, Istanbul…)"
 }

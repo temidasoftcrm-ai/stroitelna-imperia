@@ -20,6 +20,12 @@ function apply(b) {
   const m = MODES.find(x => x.k === mode);
   if (b) { b.textContent = m.ico; b.title = m.nm + ' — натисни за смяна'; }
 }
+// 🔕 toast-calm: смяна на режима отвън (бутонът над известията) — същото като натискане на 🔔
+export function setNotifMode(k) {
+  if (!MODES.some(m => m.k === k)) return; mode = k;
+  try { localStorage.setItem(LS, mode); } catch (e) {}
+  apply(document.getElementById('btnNotif')); hint(MODES.find(m => m.k === mode).nm);
+}
 function hint(text) {   // кратко съобщение под бутона — извън #toasts, за да се вижда и при 🔕
   const b = document.getElementById('btnNotif'); if (!b) return;
   const r = b.getBoundingClientRect(), d = document.createElement('div');

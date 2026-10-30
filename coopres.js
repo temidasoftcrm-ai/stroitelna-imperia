@@ -145,7 +145,7 @@ export function createCoopPres(deps) {
   }
   function tabs() {   // ⚖️ coop-riv-core: табовете горе (без флага — няма)
     const R = riv(), on = !!R && R.html !== undefined && feature('coop-riv-core'); const t = el?.querySelector('#cpTabs'); if (!t) return on;
-    t.innerHTML = on ? `<button data-cptab="sum"${tab === 'sum' ? ' class="y"' : ''}>🌐 ${tr('Срещата')}</button><button data-cptab="riv"${tab === 'riv' ? ' class="y"' : ''}>⚖️ ${tr('Конкуренти')}${R.badge() ? ' <b style="color:#ffd54a">•</b>' : ''}</button>` : '';
+    t.innerHTML = on ? `<button data-cptab="sum"${tab === 'sum' ? ' class="y"' : ''}>🌐 ${tr('Срещата')}</button><button data-cptab="riv"${tab === 'riv' ? ' class="y"' : ''}>${(m => m === 'allies' ? `🤝 ${tr('Съюзници')}` : m === 'rival' ? `⚔️ ${tr('Съперници')}` : `⚖️ ${tr('Конкуренти')}`)(R.state?.()?.mode)}${R.badge() ? ' <b style="color:#ffd54a">•</b>' : ''}</button>` : '';
     t.querySelectorAll('[data-cptab]').forEach(b => b.onclick = () => { tab = b.dataset.cptab; render(); }); return on;
   }
   function render() {

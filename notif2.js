@@ -5,6 +5,7 @@
 //   Бутонът 🔔 в горната лента — брой непрочетени; панелът — последните 100 (кога, текст, „👁 Гледай“, ако известието е имало действие), филтър по нивото.
 // const N = createNotif2({ box: #toasts, top: #top, day: () => S.day, clock: () => 'ден 12 · 14:30', fmt, sound: () => …, modeOff: () => bool });
 //   N.toast(text, kind, onClick, level?) — level: 'red' | 'yellow' | 'routine' (по избор — иначе по kind и текста); N.rows() — редовете за ⚙️
+import { setNotifMode } from './notif.js';   // 🔕 toast-calm: бутонът „Изключи“ над известията
 const LS_R = 'stroiN2routine', LS_S = 'stroiN2sound';
 const get = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v === '1'; } catch { return d; } };
 const put = (k, v) => { try { localStorage.setItem(k, v ? '1' : '0'); } catch { } };
@@ -27,6 +28,7 @@ export function createNotif2(o) {
   const opt = { routine: get(LS_R, false), sound: get(LS_S, true) };
   addEventListener('pointerdown', () => { lastInput = performance.now(); }, true); addEventListener('keydown', () => { lastInput = performance.now(); }, true);
   const css = document.createElement('style'); css.textContent = `
+    .n2bar { display:flex; gap:6px; pointer-events:auto; } .n2bar button { background:var(--panel); color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:3px 9px; font-size:12px; cursor:pointer; opacity:.9; } .n2bar button:hover { opacity:1; border-color:var(--acc, #f5b301); }
     .toast.n2red { border-left-color:var(--bad); pointer-events:auto; padding-right:30px; position:relative; } .toast.n2red .n2x { position:absolute; right:6px; top:6px; background:none; border:0; color:var(--txt); cursor:pointer; font-size:14px; opacity:.7; }
     .toast.n2rt { opacity:.85; border-left-color:#8a93a0; font-size:13px; } .toast .n2n { display:inline-block; margin-left:6px; padding:0 6px; border-radius:8px; background:rgba(255,255,255,.14); font-size:12px; font-weight:700; }
     #btnN2 { position:relative; } #btnN2 .n2b { position:absolute; top:-4px; right:-4px; min-width:16px; height:16px; padding:0 4px; border-radius:8px; background:var(--bad); color:#fff; font:700 11px/16px system-ui; text-align:center; }
@@ -54,11 +56,24 @@ export function createNotif2(o) {
     const rec = { el: t, n: 1, timer: null }; shown.set(text, rec);
     if (lvl === 'red') { const x = document.createElement('button'); x.className = 'n2x'; x.textContent = '✕'; x.title = 'Затвори'; x.onclick = e => { e.stopPropagation(); t.remove(); }; t.appendChild(x); t.dataset.keep = '1';
       const reds = [...box.querySelectorAll('.toast.n2red')]; while (reds.length >= 3) reds.pop().remove();   // най-много 3 червени — най-старото отпада
-      if (opt.sound && o.sound) try { o.sound(); } catch { } }
+      if (opt.sound && o.sound) try { o.sound(); } catch { }
+      if (o.calm && o.calm()) rec.timer = setTimeout(() => t.remove(), 15000); }   // 🔕 toast-calm: и червените се махат сами след 15 s (остават в дневника 🔔)
     else rec.timer = setTimeout(() => t.remove(), lvl === 'routine' ? 4000 : 6000);
-    box.prepend(t);
+    box.prepend(t); if (o.calm && o.calm()) calmBar(box);
     const rest = [...box.children].filter(x => !x.classList.contains('n2red') && !x.dataset.keep); while (rest.length > 4) rest.pop().remove();
     setTimeout(() => { if (shown.get(text) === rec && !t.isConnected) shown.delete(text); }, 7000);
+  };
+  // 🔕 toast-calm: при 2+ известия — лента над тях: „✕ Скрий всички“ и „🔕 Изключи“ (режимът на 🔔 — после се връща от ⚙️ → 🔔)
+  let bar = null, mo = null;
+  const calmBar = box => {
+    if (!bar) {
+      bar = document.createElement('div'); bar.className = 'n2bar'; bar.dataset.keep = '1';
+      bar.innerHTML = `<button data-a="hide">✕ Скрий всички</button><button data-a="off" title="Изключва изкачащите известия — връщат се от ⚙️ → 🔔. Всичко остава в дневника.">🔕 Изключи</button>`;
+      bar.onclick = e => { const a = e.target.dataset.a; if (!a) return; box.querySelectorAll('.toast').forEach(x => x.remove()); if (a === 'off') setNotifMode('off'); };
+      mo = new MutationObserver(() => { const n = box.querySelectorAll('.toast').length; bar.style.display = n >= 2 ? '' : 'none'; if (box.firstElementChild !== bar) box.prepend(bar); });
+      mo.observe(box, { childList: true });
+    }
+    if (box.firstElementChild !== bar) box.prepend(bar);
   };
   // нов игрален ден — обобщенията на вчерашните рутинни (по едно на вид)
   const flush = () => { for (const g of GROUPS) { const c = counts[g.k]; if (!c || !c.n || !g.sum) { if (c) counts[g.k] = { n: 0, s: 0 }; continue; } const txt = g.sum(c.n, o.fmt ? o.fmt(c.s) : String(c.s)); add(txt, 'yellow'); show(txt, 'yellow', 'good'); counts[g.k] = { n: 0, s: 0 }; } };

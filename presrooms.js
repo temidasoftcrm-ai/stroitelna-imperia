@@ -170,3 +170,45 @@ export function buildPresRoom(scene, cc, H) {
   // столовете: кафява кожа с месинг (САЩ) / слонова кост и злато (Русия)
   return { leather: std(RU ? 0xf1e7cf : 0x5a2e1b, RU ? 0.75 : 0.5), metal: RU ? gold : std(0xb08d57, 0.35, 0.9), gold, update: t => { for (const f of flags) f.update(t); } };
 }
+
+// 🏛️ coop-riv-finale (coopsummit.js): неутралната зала на срещата на върха — ламперия от орех, синият килим със златна шарка, по три високи
+// прозореца с вързаните завеси (истинският модел), два полилея, райски птици по ъглите, гербът с гълъба между знамената на САЩ (вляво)
+// и Русия (вдясно) — същите пилони като в Кабинета; дълга полирана маса. dove — платното на герба. Връща { update(t), table: { x, z, w, d, h } }.
+export function buildSummitRoom(scene, dove) {
+  const W = 4.6, BACK = -4.4, FRONT = 5.6, RH = 3.7, D = FRONT - BACK, cz = (FRONT + BACK) / 2, gold = std(0xd9a53a, 0.3, 1);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * 2, D), std(0xffffff, 0.95, 0, { map: carpetTex('#1d3566', 'rgba(217,180,94,.55)') })); floor.rotation.x = -Math.PI / 2; floor.position.z = cz; floor.receiveShadow = true; scene.add(floor);
+  const wallM = std(0xece4d2, 0.85), panel = woodTex(24, 26); panel.wrapS = panel.wrapT = THREE.RepeatWrapping; panel.repeat.set(3, 0.4); const panelM = std(0xffffff, 0.45, 0, { map: panel });
+  for (const [z, ry] of [[BACK, 0], [FRONT, Math.PI]]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(W * 2, RH), wallM); w.position.set(0, RH / 2, z); w.rotation.y = ry; w.receiveShadow = true; scene.add(w); addBox(scene, W * 2, 1.15, 0.06, panelM, 0, 0.575, z + (ry ? -0.03 : 0.03)); addBox(scene, W * 2, 0.05, 0.1, gold, 0, 1.16, z + (ry ? -0.05 : 0.05)); addBox(scene, W * 2, 0.16, 0.16, std(0xf8f4ea, 0.6), 0, RH - 0.08, z); }
+  for (const side of [-1, 1]) {
+    const x = side * W, wall = new THREE.Mesh(new THREE.PlaneGeometry(D, RH), wallM); wall.position.set(x, RH / 2, cz); wall.rotation.y = -side * Math.PI / 2; scene.add(wall);
+    addBox(scene, 0.06, 1.15, D, panelM, x - side * 0.03, 0.575, cz); addBox(scene, 0.16, 0.16, D, std(0xf8f4ea, 0.6), x - side * 0.08, RH - 0.08, cz);
+    for (let k = 0; k < 3; k++) {
+      const z = BACK + D * (0.2 + k * 0.28), ww = 1.4, wh = 2.3, y0 = 0.9, t = new THREE.TextureLoader().load(PR + (side < 0 ? 'view-south' : 'view-north') + '.webp'); t.colorSpace = THREE.SRGBColorSpace; t.repeat.set(1 / 3, 1); t.offset.set((side < 0 ? 2 - k : k) / 3, 0);
+      const pane = new THREE.Mesh(new THREE.PlaneGeometry(ww, wh), new THREE.MeshBasicMaterial({ map: t, toneMapped: false })); pane.position.set(x - side * 0.04, y0 + wh / 2, z); pane.rotation.y = -side * Math.PI / 2; scene.add(pane);
+      const dr = []; for (const s of [-1, 1]) dr.push(addBox(scene, 0.1, RH - 0.25, 0.42, std(0x23386e, 0.9), x - side * 0.12, (RH - 0.25) / 2, z + s * (ww / 2 + 0.24)));
+      for (const s of [-1, 1]) realModel(scene, 'curtain-tied', { w: 0.7, h: RH - 0.2, d: 0.3, x: x - side * 0.2, z: z + s * (ww / 2 + 0.15), ry: -side * Math.PI / 2, flip: s * side < 0, tint: 0x2c4a8c, hide: dr });
+    }
+  }
+  // гербът с гълъба и знамената (пилоните от Кабинета): САЩ вляво, Русия вдясно
+  const emb = new THREE.Mesh(new THREE.CircleGeometry(0.72, 64), std(0xffffff, 0.5, 0.1, { map: dove })); emb.position.set(0, 2.25, BACK + 0.05); scene.add(emb);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.74, 0.03, 10, 80), gold); ring.position.set(0, 2.25, BACK + 0.06); scene.add(ring);
+  const pole = std(0xc9a24a, 0.3, 1), flags = [flag(scene, -1.75, BACK + 0.5, usFlag, pole), flag(scene, 1.25, BACK + 0.5, ruFlag, pole)];
+  for (const [i, x] of [[0, -1.65], [1, 1.65]]) realModel(scene, 'flag-ru', { h: 2.45, x, z: BACK + 0.5, ry: x < 0 ? 0.5 : Math.PI - 0.5, hide: flags[i].hideAll(), mod: i ? null : o => o.traverse(m => {
+    if (m.isMesh && /^Plane/.test(m.name)) { m.material = m.material.clone(); m.material.map = tex(512, 320, usFlag); m.material.needsUpdate = true; } }) });
+  // райските птици по ъглите
+  for (const [x, z, h] of [[-W + 0.6, BACK + 0.6, 1.7], [W - 0.6, BACK + 0.6, 1.7], [-2.6, BACK + 0.5, 1.5], [2.6, BACK + 0.5, 1.5]]) new GLTFLoader().loadAsync('assets/heavy/plants/paradise.glb').then(g => { const m = g.scene; m.scale.setScalar(h); m.position.set(x, 0, z); m.rotation.y = x * 1.7; m.traverse(c => { if (c.isMesh) { c.castShadow = c.receiveShadow = true; } }); scene.add(m); }).catch(() => { });
+  // таван и два полилея
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(W * 2, D), std(0xf4efe4, 1, 0, { emissive: 0x6b6458 })); ceil.rotation.x = Math.PI / 2; ceil.position.set(0, RH, cz); scene.add(ceil);
+  const bulb = std(0xfff3d6, 0.3, 0, { emissive: 0xffe2a8, emissiveIntensity: 1.6 }), crystal = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.7 });
+  for (const z of [-1.4, 2.0]) { const ch = new THREE.Group(); ch.position.set(0, RH - 0.9, z); scene.add(ch); addCyl(ch, 0.01, 0.01, 0.7, gold, 0, 0.55, 0, 6);
+    for (const [r, y, n] of [[0.5, 0, 12], [0.34, 0.22, 8]]) { const rg = new THREE.Mesh(new THREE.TorusGeometry(r, 0.018, 6, 40), gold); rg.rotation.x = Math.PI / 2; rg.position.y = y; ch.add(rg);
+      for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2, b = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), bulb); b.position.set(Math.cos(a) * r, y + 0.05, Math.sin(a) * r); ch.add(b); const c = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.12, 6), crystal); c.position.set(Math.cos(a) * r, y - 0.08, Math.sin(a) * r); c.rotation.x = Math.PI; ch.add(c); } }
+    const l = new THREE.PointLight(0xffe2b0, 2.4, 8, 1.6); l.position.y = -0.1; ch.add(l); }
+  // масата: полиран орех, зелено сукно отгоре, златен кант
+  const T = { x: 0, z: -0.55, w: 2.6, d: 1.05, h: 0.74 }, wood = woodTex(12, 24); wood.wrapS = wood.wrapT = THREE.RepeatWrapping; wood.repeat.set(1, 0.3);
+  const woodM = new THREE.MeshPhysicalMaterial({ map: wood, roughness: 0.3, clearcoat: 0.9, clearcoatRoughness: 0.12 });
+  addBox(scene, T.w, 0.06, T.d, woodM, T.x, T.h - 0.03, T.z); addBox(scene, T.w - 0.3, 0.008, T.d - 0.25, std(0x2f5e3b, 0.95), T.x, T.h + 0.004, T.z);
+  addBox(scene, T.w - 0.1, T.h - 0.06, 0.05, woodM, T.x, (T.h - 0.06) / 2, T.z + T.d / 2 - 0.08); for (const x of [-T.w / 2 + 0.12, T.w / 2 - 0.12]) addBox(scene, 0.08, T.h - 0.06, T.d - 0.16, woodM, x, (T.h - 0.06) / 2, T.z);
+  addBox(scene, T.w - 0.1, 0.03, 0.02, gold, T.x, T.h - 0.1, T.z + T.d / 2 + 0.005);
+  return { table: T, gold, update: t => { for (const f of flags) f.update(t); } };
+}

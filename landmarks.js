@@ -526,7 +526,8 @@ const GLB_LM = {
   supertrees: { h: 25, fit: 25, plate: 0x6f9a55, onLoad: superLights },   // Сингапур: Supertree Grove (isrichards6, CC BY 4.0; feature 'sg-look') — три „дървета“ 25–50 м; нощем короните светят виолетово-синьо
   galata2: { file: 'galata', h: 56.5, fit: 15, plate: 0xb9b0a0 },   // Истанбул: кулата Галата (модел на потребителя, Meshy AI, олекотен 1,12 млн. → 85 хил. △, 2,9 MB; feature 'lm-galata2') — h/fit = отношението 63 × 16,5 м; ръстът — game.js LM_REAL_H; нощем — nightfloors 'galata2' (топло отдолу, галерията и конусът светят)
   chrysler2: { file: 'chrysler', h: 56, fit: 10, plate: 0x8a8580, onLoad: topBeacon },
-  onewtc: { h: 70, fit: 11.2, plate: 0x8a8580, onLoad: (w, g) => nyTowerLights(w, g) }, fourts: { h: 56, fit: 20.6, plate: 0x8a8580, onLoad: (w, g) => nyTowerLights(w, g) },   // 🇺🇸 lm-ny2 (f6): One World Trade Center (541 м) и 4 Times Square (247 м) — модели на потребителя (Meshy); Body / Beacon / Accent (Blender)   // Ню Йорк: Крайслер Билдинг (модел на потребителя, Meshy AI, олекотен 565 → 153 хил. △, 4,8 MB; feature 'lm-chrysler2') — вместо кулата от пакета Манхатън; h/fit — отношението на модела (5,6); ръстът 319 м — game.js LM_REAL_H; нощем — nightfloors 'chrysler2' (короната с триъгълните прозорци свети)
+  onewtc: { h: 70, fit: 11.2, plate: 0x8a8580, onLoad: (w, g) => nyTowerLights(w, g) }, whitehall: { h: 80, fit: 52.2, plate: 0x8a8580 }, nyannex: { h: 120, fit: 63.5, plate: 0x8a8580 }, fifth500: { h: 212, fit: 71.3, plate: 0x8a8580 }, park605: { h: 62, fit: 49, plate: 0x8a8580 },   // 🗽 ny-dense: Уайтхол и анексът (novusod), 500 Пето авеню (Polskaball), 605 Парк авеню (Fabianto) — Sketchfab, CC BY 4.0
+  fourts: { ...(feature('ny-4ts') ? { file: 'fourts2' } : {}), h: 56, fit: 20.6, plate: 0x8a8580, onLoad: (w, g) => nyTowerLights(w, g) },   // 🇺🇸 lm-ny2 (f6): One World Trade Center (541 м) и 4 Times Square (247 м) — модели на потребителя (Meshy); Body / Beacon / Accent (Blender)   // Ню Йорк: Крайслер Билдинг (модел на потребителя, Meshy AI, олекотен 565 → 153 хил. △, 4,8 MB; feature 'lm-chrysler2') — вместо кулата от пакета Манхатън; h/fit — отношението на модела (5,6); ръстът 319 м — game.js LM_REAL_H; нощем — nightfloors 'chrysler2' (короната с триъгълните прозорци свети)
   radiocity2: { h: 40, fit: 15, plate: 0x8a8580, onLoad: (w, g) => towerFit(w, g) },   // Ню Йорк: Радио Сити Мюзик Хол (модел на потребителя, Meshy AI) — в Blender: кулата по-широка и напред до надписите, неоновите „RADIO CITY“ (вертикалните и на таблото около ъгъла), стената под таблото; нощем — nightfloors 'radio'/'neon'
   rockefeller2: { h: 40, fit: 15, plate: 0x8a8580 },   // Ню Йорк: 30 Rockefeller Plaza (модел на потребителя, Meshy AI, олекотен 2,6 млн. → 180 хил. △); нощем синьо-виолетово, нагоре по-светло — nightfloors.js 'rock'
   parliament2: { h: 9, fit: 15, plate: 0x5f6d4f },
@@ -578,6 +579,7 @@ const GLB_LM = {
   // хълмът — ~15 м висок (истинският е ~70 м над града — смален, иначе закрива квартала), платото — около храма; мястото за забележителност е ~56 × 46 м →
   // цялото ×~0,58 (храмът ~40 м); нощем — златист (като истинския)
   parthenon: { h: 15, fit: 56.8, plate: 0x9c8f78, ry: Math.PI / 2, lift: ACRO.h, under: g => g.add(acropolisHill()), onLoad: w => goldNight(w, 0xffc56a, 0.6) },
+  haydarpasa2: { h: 4.82, fit: 15, plate: 0x8a8378, onLoad: haydarpasaNight },   // 🚉 haydarpasa-real: гара Хайдарпаша — моделът на собственика (Meshy AI, ТЕМИДАСОФТ ООД), в Blender 2,06 млн. → 38 хил. △, цвят и релеф изпечени от оригинала; нощната карта (emissive) — прожектори отдолу по каменната фасада, топли прозорци, осветени кули; тъмен покрив
   liberty2: { h: 15, fit: 23.4, plate: 0x3f6f96, seaY: -1.2, onLoad: libertyIsland },   // Лас Вегас: „Луксор“ — черната пирамида със сфинкса (Meshy AI); нощем лъч от върха   // Лас Вегас: хотел „Беладжо“ (Meshy AI) — отпред езерото с фонтаните (bellagio() по-долу)
 };
 // 🇩🇪 lm-berlin2 (f6): Бранденбургската врата, Райхстагът и телевизионната кула — модели на потребителя (Meshy, Темидасофт); h 15 + fit по отношението на модела —
@@ -589,7 +591,7 @@ Object.assign(GLB_LM, { brandenburg2: { h: 15, fit: 28.6, plate: 0xcfc6b4, matte
 GLB_LM.brandenburg2 = { ...GLB_LM.brandenburg2, file: 'brandenburg3', fit: 25.8 }; delete GLB_LM.brandenburg2.matte;
 // lm-ndk (T2): НДК (Meshy, „Temidasoft“) — ~200 × 200 м, 44 м; нощем фасадата свети топло
 if (feature('lm-ndk')) { GLB_LM.ndk = { h: 15, fit: 41.7, plate: 0xbdb8ae, floodK: 1.6 }; LANDMARK_NM.ndk = 'Национален дворец на културата (НДК)'; }
-const EM_KEEP = /^(radiocity2|lv[a-z0-9]*|bellagio|luxor|vegassign)$/;   // нарочните нощни карти (неон, надписи)
+const EM_KEEP = /^(radiocity2|lv[a-z0-9]*|bellagio|luxor|vegassign|haydarpasa2)$/;   // нарочните нощни карти (неон, надписи)
 const glbCache = {};
 export const preloadLm = kind => { if (GLB_LM[kind]) loadLm(kind); };   // 🇸🇬 тежкият модел — още при влизането в града (Марина Бей Сандс: заместителят стоеше ~30 s)
 // нощно златисто осветяване на модел-забележителност: emissive = цвят, emissiveMap = текстурата; играта ги пали нощем (window.__lmNight)
@@ -1007,6 +1009,11 @@ function eiffelLights(w, g) {
 }
 
 // „Луксор“: най-силният прожектор на света — лъч от върха на пирамидата право в небето (само нощем)
+// 🚉 Хайдарпаша (haydarpasa2): нощната карта от GLB (emissiveMap) — по общата нощна крива на прожекторите (floodK)
+function haydarpasaNight(w, g) {
+  const fl = g.userData.flood || [];
+  w.traverse(o => { if (!o.isMesh) return; for (const m of [].concat(o.material)) { if (m && !m.userData.hyLit) { m.userData.hyLit = 1; m.color.multiplyScalar(1.25); }   /* денем — малко по-светъл камък (текстурата на Meshy е тъмна) */ if (!m || !m.emissiveMap) continue; m.emissive = new THREE.Color(0xffffff); m.emissiveIntensity = 0; m.userData.floodK = 2.4; m.needsUpdate = true; if (!fl.includes(m)) fl.push(m); } });
+}
 // Островът Либърти (liberty2): основата на модела — на водната повърхност на картата; нощем прожектори само по пиедестала и статуята, пламъкът свети
 function libertyIsland(w, g) {
   const fl = g.userData.flood || [], mats = {}; w.traverse(o => { if (o.isMesh) for (const m of [].concat(o.material)) if (m) mats[m.name] = m; });
@@ -1229,7 +1236,7 @@ function lvCaesars() {
   return g;
 }
 Object.assign(BUILD, { lvcaesars: lvCaesars });
-Object.assign(LANDMARK_NM, { lvcaesars: 'Сизърс Палас', onewtc: 'Едно Световен търговски център', fourts: '4 Таймс Скуеър' });
+Object.assign(LANDMARK_NM, { whitehall: 'Уайтхол Билдинг', nyannex: 'Анексът на Уайтхол', fifth500: '500 Пето авеню', park605: '605 Парк авеню', lvcaesars: 'Сизърс Палас', onewtc: 'Едно Световен търговски център', fourts: '4 Таймс Скуеър' });
 Object.assign(LANDMARK_NM, { opera2: 'Сиднейската опера', tokyotower: 'Токийската кула' });
 Object.assign(LANDMARK_NM, { brandenburg2: 'Бранденбургската врата', reichstag2: 'Райхстагът', fernsehturm2: 'Берлинската телевизионна кула' });   // 🇩🇪 lm-berlin2
 // 🇺🇸 Вашингтон по истинската карта (washington-osm): Монументът на Вашингтон, Мемориалите на Линкълн и Джеферсън — процедурни, в истински метри
