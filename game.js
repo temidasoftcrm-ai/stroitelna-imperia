@@ -116,7 +116,7 @@ import { OCEANIA, OC_COUNTRIES, OC_COASTAL, OC_IDS, ocOpen, ocLockTxt, OC_CHAPTE
 import { ASIA, AS_COUNTRIES, AS_COASTAL, AS_IDS, AS_NEW, asOpen, asLockTxt, AS_CHAPTER } from './asia.js';
 import { SAMERICA, SA_COUNTRIES, SA_COASTAL, SA_IDS, SA_NEW, saOpen, saLockTxt, SA_CHAPTER } from './samerica.js';
 import { NAMERICA, NA_COUNTRIES, NA_COASTAL, NA_IDS, NA_NEW, naOpen, naLockTxt, NA_CHAPTER } from './namerica.js';
-import { AUTOBAHNS, AB_UNLOCK, AB_STAGES_DEF, abSegs, corridorSegIds, viaOf, abSegId } from './corridors.js';
+import { AUTOBAHNS, AB_UNLOCK, AB_STAGES_DEF, abSegs, corridorSegIds, viaOf, abSegId, VIA_FIXED } from './corridors.js';
 // autobahn.js (3D изглед и константи на аутобаните) — по избор: докато го няма, се ползват резервните стойности
 let AB = null;
 import('./autobahn.js').then(m => { AB = m; }).catch(() => {});
@@ -5510,6 +5510,7 @@ function keyCitiesMine() { const own = new Set(ownedCities()); return new Set(CO
   const pts = CITIES.map(c => { const [x, y] = proj(c.lon, c.lat), hq = S && (S.hqCity || S.cityId) === c.id, here = S && S.cityId === c.id; return { c, x, y, hq, here, r: (hq || here ? 4 : 1.2 + c.sz * 0.6) * (mapEU ? 4.5 : mapWide ? 1.6 : 1) * mapK() }; }).filter(o => mapCont ? (viewOf(mapCont).ids.has(o.c.id) || (!CONT_ISO[mapCont] && (o.hq || o.here || own.has(o.c.id)))) : mapWorld ? ((isWorld(o.c.id) && (!contOf(o.c.id) || o.c.sz >= 3)) || WORLD_ANCHORS.includes(o.c.id) || o.hq || o.here || own.has(o.c.id) || airportOf(o.c.id) || kcm.has(o.c.id) || abe.has(o.c.id)) : (o.hq || o.here || !(mapEU && offEU(o.c.id))) && (!mapEU || (o.c.sz >= 2 && !isWorld(o.c.id)) || o.hq || o.here || own.has(o.c.id) || kcm.has(o.c.id)));
   // на световния изглед — и всички градове на държавите, в които имаш град (keyCitiesMine; иначе „4/5“, а малкият пети град е скрит)
   for (let i = pts.length - 1; i >= 0; i--) if (gateHidden(pts[i].c.id)) pts.splice(i, 1);
+  if (!mapEU && !mapWorld && !mapCont && feature('map-balk-fix')) for (let i = pts.length - 1; i >= 0; i--) { const o = pts[i]; if ((isWorld(o.c.id) || offEU(o.c.id)) && !o.hq && !o.here) pts.splice(i, 1); }   // map-balk-fix: Балкани/България — без градовете на другите континенти (сушата им не е нарисувана)
   // отдалечено (Европа/свят, зуум < 1.5): само основните градове (ключовите, със звездите), централата, текущият и твоите незавършени —
   // по-малко точки и надписи; при приближаване излизат всички градове на държавата (filter-а горе: keyCitiesMine)
   if (!lod && (mapEU || mapWorld) && mapZoom() < KEY_ZOOM && feature('map-key-only')) for (let i = pts.length - 1; i >= 0; i--) { const o = pts[i], id = o.c.id;
@@ -5592,7 +5593,7 @@ const isoName = iso => { const k = COUNTRIES.find(x => x.iso === iso); if (k) re
 // 🌍 световният изглед: „Европа · 97%“ — завършените градове от всички на континента (само отворените континенти)
 function contSummarySvg() {
   const u = mapUpx(), fs = 20 * u, tot = {}, done = {};
-  for (const c of CITIES) { if (gateHidden(c.id)) continue; const k = lodContOf(c.id); tot[k] = (tot[k] || 0) + 1; if (econ?.isFinished?.(c.id)) done[k] = (done[k] || 0) + 1; }
+  for (const c of CITIES) { if (gateHidden(c.id)) continue; const k = lodContOf(c.id); tot[k] = (tot[k] || 0) + 1; if (econ && doneJoint(c.id)) done[k] = (done[k] || 0) + 1; }   /* с партньор — и неговите завършени градове (същият процент и при двамата; без партньор doneJoint = само твоите) */
   return Object.entries(CONT_AT).filter(([k]) => tot[k] && (k === 'eu' || contByKey(k)?.open())).map(([k, [lo, la]]) => { const [x, y] = proj(lo, la), p = Math.floor(100 * (done[k] || 0) / tot[k]);
     return `<g class="contsum" style="pointer-events:none"><text x="${x}" y="${y}" font-size="${fs}" text-anchor="middle">${LOD_CONT_NM[k]}</text><text class="pct" x="${x}" y="${y + fs * 1.15}" font-size="${fs * 0.8}" text-anchor="middle">${p}%</text></g>`; }).join('');
 }
@@ -6523,7 +6524,7 @@ function landRoute(a, b) {
   return res && a > b ? res.slice().reverse() : res;
 }
 // ръчното трасе (viaOf) — ако не минава през вода; иначе — по сушата (map-water)
-function mapRoute(a, b) { const v = viaOf(a, b); if (!mapWaterOn()) return v; if (v) { const A = cityById(a), B = cityById(b), P = [[A.lon, A.lat], ...v, [B.lon, B.lat]]; if (!P.some((p, i) => i && waterRun(P[i - 1], p, i === 1 || i === P.length - 1 ? 8 : 0) > 3)) return v; } return landRoute(a, b) || v; }
+function mapRoute(a, b) { const v = viaOf(a, b); if (!mapWaterOn()) return v; if (v && feature('map-balk-fix') && VIA_FIXED.has(a < b ? a + '|' + b : b + '|' + a)) return v; if (v) { const A = cityById(a), B = cityById(b), P = [[A.lon, A.lat], ...v, [B.lon, B.lat]]; if (!P.some((p, i) => i && waterRun(P[i - 1], p, i === 1 || i === P.length - 1 ? 8 : 0) > 3)) return v; } return landRoute(a, b) || v; }
 // map-water: километрите на НОВА линия — по трасето (старите пазят своите km в S.rails): правата × (дължина на трасето / права)
 function landKm(a, b) { const k0 = kmBetween(a, b); if (!mapWaterOn()) return k0; const v = mapRoute(a, b); if (!v || !v.length) return k0; const A = cityById(a), B = cityById(b), P = [[A.lon, A.lat], ...v, [B.lon, B.lat]];
   let L = 0; for (let i = 1; i < P.length; i++) L += llKm(P[i - 1], P[i]); const L0 = llKm(P[0], P[P.length - 1]) || 1; return Math.round(k0 * Math.max(1, L / L0)); }
@@ -8146,6 +8147,7 @@ if (feature('lm-colosseum2')) LM_PREF.colosseo = 'colosseo4';
 // lm-westminster: на картата на Лондон слотът е напреки на булеварда (Millbank минаваше под двореца) — дворецът по протежение на пътя,
 // между него и Темза, Биг Бен на север към Уестминстърския мост: център и завъртане в координатите на плана
 const LM_SPOT = feature('lm-westminster') ? { london: { westminster3: { x: 643, z: 961, rot: -1.44 } } } : {};
+if (feature('osm-edge')) LM_SPOT.newyork = { liberty2: { x: -1366, z: 4704, rot: 0.70, top: 2.6 }, liberty: { x: -1366, z: 4704, rot: 0.70 } };   // 🗽 osm-edge: Статуята на свободата — на истинското място (40.6892, −74.0445; план −2258, 3348 + отместването), с лице на югоизток; top — звездата на Форт Ууд (nybay.js)
 if (feature('lm-westminster')) { Object.assign(LM_PREF, { bigben: 'westminster3', bigben2: 'westminster3', parliament2: 'westminster3' }); LM_REAL_H.westminster3 = 96; }   // 🇬🇧 lm-westminster (f6): новият Уестминстър с Биг Бен (Meshy) на мястото на стария — 96 м до върха на кулата   // 🏛️ lm-colosseum2 (f6): новият Колизеум (Meshy) — и в Рим по картата (OSM)
 const LM_CHRYSLER2 = feature('lm-chrysler2') && hasLandmark('chrysler2');   // 🇺🇸 lm-chrysler2 (f6): Крайслер Билдинг — моделът на потребителя (Meshy) на мястото на кулата от пакета Манхатън (Лексингтън и 42-ра, до Гранд Сентръл), 319 м с шпила
 // LM_PROP — мащабът спрямо истинския ръст вместо k на картата: сградите в града са в истински размер (real-scale, блок от 6–7 етажа ≈ 20 м),
@@ -8158,14 +8160,14 @@ if (feature('lm-tall')) Object.assign(LM_PROP, { chrysler: 1, chrysler2: 1, empi
 const LMF_U = { value: 0 }, LM_FLOOD = { empire2: [0.68, 0xffc55a, 2.2], chrysler2: [0.8, 0xfff4e0, 2.4], onewtc: [0.0, 0xdfeeff, 0.9, 1], rockefeller2: [0.86, 0xffd890, 1.6], fourts: [0.9, 0xeef4ff, 1.6] };
 function lmFlood(o) {
   const F = LM_FLOOD[o.kind]; if (!F || !feature('ny-night2') || !S || S.cityId !== 'newyork') return; let n = 0; const UY = { value: new THREE.Vector2() }, col = new THREE.Color(F[1]);
-  const go = () => { const g = o.group; if (!g.parent) return; g.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(g); if (b.isEmpty()) return; UY.value.set(b.min.y + (b.max.y - b.min.y) * F[0], b.max.y);   /* GLB-ът идва после (първо е заместителят) — всяка секунда: новите материали и височината */
+  const go = () => { const g = o.group; if (!g.parent) return; g.updateMatrixWorld(true); const b = new THREE.Box3(), bb = new THREE.Box3(); g.traverse(m => { if (!m.isMesh || !m.visible || [].concat(m.material).some(x => x && (x.transparent || x.blending === THREE.AdditiveBlending))) return; if (!m.geometry.boundingBox) m.geometry.computeBoundingBox(); b.union(bb.copy(m.geometry.boundingBox).applyMatrix4(m.matrixWorld)); }); if (b.isEmpty()) return;   /* без лъчите/надписите (прозрачни) — само сградата */ UY.value.set(b.min.y + (b.max.y - b.min.y) * F[0], b.max.y); o.group.userData.lmfY = [Math.round(UY.value.x), Math.round(UY.value.y)];   /* GLB-ът идва после (първо е заместителят) — всяка секунда: новите материали и височината */
     g.traverse(m => { if (!m.isMesh) return; for (const mt of [].concat(m.material)) { if (!mt || mt.userData.lmFlood || !('emissive' in mt)) continue; mt.userData.lmFlood = 1; const prev = mt.onBeforeCompile, key = mt.customProgramCacheKey;
       mt.onBeforeCompile = (sh, r) => { if (prev) prev(sh, r); Object.assign(sh.uniforms, { uLF: LMF_U, uLFy: UY, uLFc: { value: col }, uLFk: { value: F[2] }, uLFe: { value: F[3] ? 1 : 0 } });
         sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vLFw; varying vec3 vLFn;').replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\n vLFw = (modelMatrix * vec4(transformed, 1.0)).xyz; vLFn = normalize(mat3(modelMatrix) * objectNormal);');
         sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uLF, uLFk, uLFe; uniform vec2 uLFy; uniform vec3 uLFc; varying vec3 vLFw; varying vec3 vLFn;').replace('#include <aomap_fragment>', `#include <aomap_fragment>
           { float t = smoothstep(uLFy.x, uLFy.x + (uLFy.y - uLFy.x) * 0.25 + 1.0, vLFw.y), up = clamp((vLFw.y - uLFy.x) / max(1.0, uLFy.y - uLFy.x), 0.0, 1.0);
             float edge = uLFe > 0.5 ? pow(1.0 - abs(dot(normalize(vLFn.xz + 1e-4), normalize(cameraPosition.xz - vLFw.xz))), 3.0) * (0.35 + 0.65 * up) : 1.0;   // Уан Уърлд: ръбовете (стените отстрани на погледа)
-            totalEmissiveRadiance += uLFc * uLFk * uLF * t * edge * (0.55 + 0.45 * up) * diffuseColor.rgb * 1.6; }`); };
+            totalEmissiveRadiance += uLFc * uLFk * uLF * t * edge * (0.55 + 0.45 * up) * (0.22 + 0.18 * dot(diffuseColor.rgb, vec3(0.333))); }   /* nightfloors тъмни diffuseColor нощем — прожекторът не зависи от него */`); };
       mt.customProgramCacheKey = () => (key ? key.call(mt) : '') + '|lmf' + o.kind; mt.needsUpdate = true; } }); };
   go(); const t = setInterval(() => { go(); if (++n > 90) clearInterval(t); }, 1000);
 }
@@ -8210,7 +8212,7 @@ function landmarkPlan2(kinds) {
     if (k === 'radiocity2' && feature('ny-radiocity')) { const ku = Math.min(200 / 150, Math.max(at.w, at.d) * 0.95 / (s0 * k0)); if (ku > 1.01) o.group.scale.multiplyScalar(ku);   // 🎭 ny-radiocity (собственикът: „твърде малка“): кулата 1270 6th Ave е ~200 м (беше 150) — по-голяма изцяло, до парцела
       const kx = Math.min(1.45, Math.max(at.w, at.d) * 0.95 / (s0 * k0 * Math.max(1, ku))); if (kx > 1.01) { o.group.scale.x *= kx; o.group.scale.z *= kx; } }   // залата — до парцела (~100 × 75 м), кулата — пропорционално по-широка
     if (k === 'ndk') { const kx = Math.min(1.7, Math.max(at.w, at.d) * 0.95 / (s0 * k0)); if (kx > 1.01) { o.group.scale.x *= kx; o.group.scale.z *= kx; } }   // lm-ndk (T2): НДК е широк и нисък (~200 × 150 м, 44 м) — ръстът по LM_PROP, ширината — до парцела
-    { const sp = LM_SPOT[S.cityId]?.[k]; if (sp) { o.group.position.set(sp.x, 0.1, sp.z); o.group.rotation.y = sp.rot; } }   // lm-westminster: точното място и посока (LM_SPOT)
+    { const sp = LM_SPOT[S.cityId]?.[k]; if (sp) { o.group.position.set(sp.x, 0.1, sp.z); o.group.rotation.y = sp.rot; if (sp.top != null) o.group.userData.isleTop = sp.top; } }   // lm-westminster: точното място и посока (LM_SPOT)
     if (k === 'eiffel' && feature('eiffel-fix')) o.group.position.x -= 9;   // 🗼 eiffel-fix (f6): десният крак излизаше на тротоара до кея — малко на запад, към Марсово поле
     if (LM_SHORE[k] && P.waterAt) { const hx = s0 * k0 / 2 + 6, hz = hx * LM_SHORE[k]; for (let it = 0; it < 12; it++) { let wx = 0, wz = 0, n = 0; for (let u = -1; u <= 1.001; u += 0.25) for (let v = -1; v <= 1.001; v += 0.25) { const x = o.group.position.x + u * hx, z = o.group.position.z + v * hz; if (P.waterAt(x, z)) { wx += u; wz += v; n++; } } if (!n) break; const l = Math.hypot(wx, wz) || 1; o.group.position.x -= wx / l * 4; o.group.position.z -= wz / l * 4; } }   /* kotel-shore: изтегля сградата от водата на брега (по парцела, без да я смалява) */
     if (LM_DRY[k] && P.waterAt) { const r = o.group.rotation.y, c = Math.cos(r), sn = Math.sin(r), x0 = o.group.position.x, z0 = o.group.position.z;   /* nd-dry: потребителят — Нотр Дам слизаше в реката; смалява се, докато целият отпечатък е на сушата */
@@ -9089,7 +9091,7 @@ function trainXY(t) {
   }
 }
 // изгледът на континент показва само мрежите в него (жп, пътища, полети, море), Европа — без линиите по света; всичко — само на „Светът“
-const mapIn = (...ids) => mapCont ? ids.every(id => viewOf(mapCont).ids.has(id)) : mapEU && !mapWorld ? !ids.some(id => isWorld(id) || offEU(id)) : true;
+const mapIn = (...ids) => mapCont ? ids.every(id => viewOf(mapCont).ids.has(id)) : (mapEU || feature('map-balk-fix')) && !mapWorld ? !ids.some(id => isWorld(id) || offEU(id)) : true;   // map-balk-fix: и Балканите/България — без пътищата на другите континенти (сушата им не е нарисувана)
 function railSvg() {
   const zs = zShrink() * (mapCont ? (viewOf(mapCont).k || 2.4) : mapWorld ? 6 : 1);   // при приближаване линиите не дебелеят; на континентите/света — по-дебели (картата е по-едра)
   let h = ''; const near = mapNear(), RC = feature('map-clean') ? '#8a6a4a' : '#ff9800';   // map-clean: строежът — на щрихи в цвета на мрежата (кафяво), не оранжево (оранжевото е опашката и избраният град)
@@ -10152,6 +10154,7 @@ function restoreSpurs() { fixSeaSpurs(); for (const sp of (S && S.spurs) || []) 
 // собствен участък само по суша: направо или с една чупка навътре (не през морето — напр. Неапол — Охрид)
 function spurLand(a, b) {
   const A = cityById(a), B = cityById(b); if (!A || !B) return true;
+  if (feature('map-balk-fix') && (RAIL_NO.has(a) || RAIL_NO.has(b))) return false;   // остров — по суша няма път
   if ((A.lon < -30) !== (B.lon < -30)) return false;   // 🌊 Америките и Старият свят — по суша няма път (напр. Империал Сити в САЩ — Гиза)
   if (!europe || !europe.length) return true;
   const pa = [A.lon, A.lat], pb = [B.lon, B.lat];
@@ -10190,6 +10193,9 @@ function fixSeaSpurs(force = false) {
   }
   S.spurFix = 3;
 }
+// map-balk-fix (T2): връзка (spur) през морето — създадена, преди световната карта да се зареди (тогава проверката пропуска); острови (Ираклион) — само ферибот
+const seaSpurC = new Map();
+function seaSpur(sg) { if (RAIL_NO.has(sg.a) || RAIL_NO.has(sg.b)) return true; if (!worldReady()) { loadWorldGeo(); return false; } if (!seaSpurC.has(sg.id)) seaSpurC.set(sg.id, !spurLand(sg.a, sg.b)); return seaSpurC.get(sg.id); }
 const onAnySeg = id => [...allSegs(), ...ALL_AB].some(x => x.a === id || x.b === id);
 // най-близкият град, към който има смисъл да се свърже: първо готов възел на мрежата, иначе град от коридор
 function spurTarget(id) {
@@ -10369,6 +10375,7 @@ function abSvg() {
   for (const sg of ALL_AB) {
     if (!mapIn(sg.a, sg.b)) continue;
     if (sg.cont && !contByKey(sg.cont).open()) continue;
+    if (sg.spur && feature('map-balk-fix') && seaSpur(sg)) continue;   // map-balk-fix: стара връзка през морето (Ираклион — …) — не се рисува
     const A1 = cityById(sg.a), B1 = cityById(sg.b); if (!A1 || !B1) continue;
     const [x1, y1] = proj(A1.lon, A1.lat), [x2, y2] = proj(B1.lon, B1.lat), done = hwAll().includes(sg.id), j = jobs[sg.id], via = mapRoute(sg.a, sg.b);   /* map-water */
     if (upSet) {   // ab-up-fx: покана · преливане · вълна
@@ -14017,6 +14024,7 @@ if (AUTOTEST) {
       if (v === 'rail') at(STATION_X + 700, 420, Z1 + 500, STATION_X, 300);
       if (v === 'east') at(X1 - 200, 480, Z0 + 200, X1 + 300, Z1 + 300);
       if (v === 'far') at((X0 + X1) / 2 + 10, 2400, (Z0 + Z1) / 2 + 900, (X0 + X1) / 2, (Z0 + Z1) / 2);
+      if (v === 'bay') at(-760, 420, 4900, -120, 3900); if (v === 'battery') at(-170, 34, 4110, -1366, 4704); if (v === 'liberty') at(-1366 + 95, 55, 4704 + 85, -1366, 4704); if (v === 'tip') at(-232, 900, 4900, -232, 3900);   // 🗽 заливът (като 207), от Батъри към Либърти, статуята отблизо, върхът отгоре
       return city.planView?.userData?.osmEdge || pv0(); function pv0() { let r = null; city.group.traverse(g => { if (g.userData && g.userData.osmEdge) r = g.userData.osmEdge; }); return r; } },
     coopSplitTest(mode = 'list') {   // 🤝 coop-split: Лабораторията — 'list' (градовете на партньора само за четене) | 'notify' (партньорът купи филиал и започна магистрала/жп) | 'race' (и двамата строите същия участък) | 'click' (клик на град на партньора)
       S.dev.lv = Math.max(S.dev.lv, 10); S.dev.xp = Math.max(S.dev.xp, 260000); econ.earn(2e9, 'друго', 'тест');
@@ -14276,6 +14284,14 @@ if (AUTOTEST) {
       for (let d = 0; d < days; d++) endOfDay();
       openBig('cities'); const P = S.cities.plovdiv, V = S.cities.varna;
       return { money: Math.round(econ.s.money - m0), plovdiv: { lv: P.dev?.lv, xp: P.dev?.xp, proj: P.projects.length, built: P.built.length, log: P.autoLog?.length }, varna: { lv: V.dev?.lv, xp: V.dev?.xp, jobs: (V.autoJobs || []).length, log: V.autoLog?.length } }; },
+    afMap(xp = 5e9) { S.dev.xp = xp; S.dev.lv = 10; const d = S.hwDone = S.hwDone || []; for (const x of ALL_AB.map(q => q.id)) if (!d.includes(x)) d.push(x); mapWorld = true; mapEU = true; mapWide = true; mapCont = 'af'; mapView = null; mapPicked = true; showMap(true);
+      const svg = $('mapSvg'), [x0, y0] = proj(7, 37.5), [x1, y1] = proj(16, 31.5); mapView.vb = [x0, y0, x1 - x0, y1 - y0]; svg.setAttribute('viewBox', mapView.vb.join(' ')); return { vb: mapView.vb.map(Math.round), via: mapRoute('sfax', 'tripoli') }; },
+    floodDbg() { const r = {}; for (const q of city.landmarks) if (q.group.userData.lmfY) { const b = new THREE.Box3().setFromObject(q.group); r[q.kind] = [q.group.userData.lmfY, Math.round(b.min.y), Math.round(b.max.y)]; } r._n = [dayNight.night, LMF_U.value]; r._p = (renderer.info.programs || []).filter(p => /lmf/.test(p.cacheKey)).map(p => [p.cacheKey.slice(-30), p.usedTimes, (renderer.getContext().getProgramParameter(p.program, renderer.getContext().LINK_STATUS))]); const e = city.landmarks.find(q => q.kind === 'empire2'); if (e) { const a = []; e.group.traverse(m => { if (m.isMesh) a.push([m.name, m.material.type, !!m.material.userData.lmFlood, m.material.version, m.visible, !!m.onBeforeRender && String(m.onBeforeRender).slice(0, 60)]); }); r._e = a; } return r; },
+    balkMap(all, xp = 260000) { S.dev.xp = xp; S.dev.lv = 10; S.branches = [...new Set([...(S.branches || []), 'lagos', 'nairobi', 'accra', 'cairo', 'tunis'])]; if (all) { const d = S.hwDone = S.hwDone || []; for (const x of [...ALL_AB.map(q => q.id), ...allSegs().map(q => q.id)]) if (!d.includes(x)) d.push(x); }
+      mapWorld = false; mapEU = false; mapWide = true; mapCont = null; mapView = null; mapPicked = true; showMap(true); const svg = $('mapSvg'), out = [];
+      for (const e of svg.querySelectorAll('polyline,line')) { const pts = e.tagName === 'line' ? [[+e.getAttribute('x1'), +e.getAttribute('y1')], [+e.getAttribute('x2'), +e.getAttribute('y2')]] : (e.getAttribute('points') || '').trim().split(/\s+/).map(p => p.split(',').map(Number)); const [hx, hy] = proj(25.144, 35.339); if (pts.some(([x, y]) => Math.hypot(x - hx, y - hy) < 6)) out.push(e.outerHTML.slice(0, 260)); }
+      { const [, sy] = proj(10, 35.5), [x0, y0] = proj(-2, 37), [x1, y1] = proj(33, 28); mapView.vb = [x0, y0 - 300, x1 - x0, y1 - y0 + 300]; svg.setAttribute('viewBox', mapView.vb.join(' ')); var afN = [...svg.querySelectorAll('polyline,line')].filter(e => (e.tagName === 'line' ? [+e.getAttribute('y1'), +e.getAttribute('y2')] : (e.getAttribute('points') || '').trim().split(/\s+/).map(p => +p.split(',')[1])).some(y => y > sy)).length; }
+      return { afOpen: contByKey('af').open(), afN, vb: svg.getAttribute('viewBox'), her: out.slice(0, 10), segs: [...ALL_AB.filter(q => q.a === 'heraklion' || q.b === 'heraklion').map(q => q.id), ...allSegs().filter(q => q.a === 'heraklion' || q.b === 'heraklion').map(q => q.id)] }; },
     naTest(open) { S.dev.xp = 260000; S.dev.lv = 10; if (open) S.branches = [...(S.branches || []), 'lagos', 'nairobi', 'accra']; mapWorld = true; mapEU = true; mapWide = true; mapCont = 'na'; mapView = null; showMap(true);
       const sp = seaPath(cityById('houston'), cityById('santodomingo')); clickCity('havana');
       return { open: contByKey('na').open(), next: mapNextLbl(), cities: document.querySelectorAll('#mapSvg g.city:not(.lbl)').length, modal: document.getElementById('modalBox')?.innerText.slice(0, 140), sea: sp.km, ab: ALL_AB.filter(x => x.cont === 'na').length, hw: (openBig('hw'), document.getElementById('bigWin')?.innerText.includes('Северна Америка')) }; },

@@ -1024,8 +1024,13 @@ function libertyIsland(w, g) {
   const gm = new THREE.MeshBasicMaterial({ color: 0xffc56a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
   const glow = add(g, new THREE.SphereGeometry(0.45, 12, 8), gm, top.x, top.y - 0.25, top.z); glow.castShadow = false; glow.visible = false;
   // водата: основата на модела (локално y0 в групата) — на seaY в света на града; групата е мащабирана и вдигната от landmarkPlan2 (game.js)
-  const base = w.position.y; let sy = 0, py = NaN;
-  const sit = () => { if (g.scale.y === sy && g.position.y === py) return; sy = g.scale.y; py = g.position.y; w.position.y = base + (GLB_LM.liberty2.seaY - py) / (sy || 1); };
+  // 🗽 osm-edge (Ню Йорк): на истинския остров (game.js LM_SPOT … top) — островът на модела се скрива, паметникът стъпва на звездата на Форт Ууд (y = top)
+  const base = w.position.y, islM = []; w.traverse(o => { if (o.isMesh && [].concat(o.material).includes(isl)) islM.push(o); });
+  let sy = 0, py = NaN, it, lift = null;
+  const sit = () => { const top = g.userData.isleTop; if (g.scale.y === sy && g.position.y === py && top === it) return; sy = g.scale.y; py = g.position.y; it = top;
+    if (top != null && lift == null && islM.length && sy) { const bA = new THREE.Box3().setFromObject(w), bI = new THREE.Box3(); for (const m of islM) bI.expandByObject(m); lift = (bI.max.y - bA.min.y) / sy; }
+    for (const m of islM) m.visible = top == null;
+    const sea = top != null && lift != null ? top - lift * sy : GLB_LM.liberty2.seaY; w.position.y = base + (sea - py) / (sy || 1); };
   const prev = g.userData.sparkle;
   g.userData.sparkle = (t, night) => { prev && prev(t, night); sit();
     if (tor) tor.emissiveIntensity = 0.3 + 2.4 * night * (0.93 + 0.07 * Math.sin(t * 9));
