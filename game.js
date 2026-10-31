@@ -217,6 +217,7 @@ const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 let usage = null;   // 📊 usage-stats (f6): създава се след ads (долу); нивото, градът, прозорците го викат с usage?.
 let awaySum = null;   // 👋 away-summary (f6): създава се след ads (долу); save() го вика — затова let тук, не const там
+const CDISP = feature('city-dispose');   // 🧹 city-dispose (T3): смяна на град — старото дърво се откача (без .parent), за да не го държи една препратка
 const FIXSTAB = feature('fix-stab');   // fix-stab (f6): стабилност и памет — смяна на град по време на зареждане, неуспешен план v2, изгледите на магистралите/курортите, нощните материали, WebGL
 const AUTOTEST = params.has('autotest');
 if (feature('err-telemetry') && !AUTOTEST) initErrTelemetry({ ctx: () => ({ city: S?.cityId, gfx: gfxLevel(), day: S?.day }) });   // 🐞 err-telemetry (f9): преди всичко друго — да хване и грешките при зареждането
@@ -12228,6 +12229,7 @@ function teardownCity() {
   for (const o of [...Object.values(city.mine3D || {}), ...Object.values(city.tender3D || {}), city.airport]) try { o && o.dispose && o.dispose(); } catch (e) { }
   if (city.mm) try { city.mm.dispose(); } catch (e) { }
   if (pv) try { if (pv.userData.dispose) pv.userData.dispose(); } catch (e) { }   // GPU паметта на стария град (общите текстури, ако ги има, се качват пак при нужда); материалите остават — шейдърите за следващия
+  if (CDISP) { const cut = r => { if (!r || !r.isObject3D) return; const st = [r]; while (st.length) { const q = st.pop(); for (const c of q.children) st.push(c); q.parent = null; } }; cut(old); cut(pv); for (const o of gone) cut(o); }   /* 🧹 city-dispose (T3): старият град оставаше жив цял (~100–150 MB на смяна) — една забравена препратка към който и да е обект държеше през .parent цялото дърво; сега държи само своето клонче */
   for (const k of Object.keys(city)) delete city[k];
   Object.assign(city, { group: null, lots: [], hq: null });
   station = null; cityHw = null; signals.length = 0; sigMap = new Map(); parkGroups.length = 0; estSigns.clear();

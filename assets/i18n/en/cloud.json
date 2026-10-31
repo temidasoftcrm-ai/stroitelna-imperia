@@ -80,6 +80,7 @@
  "💾 Запази": "💾 Save",
  "Запазвам…": "Saving…",
  "🔑 Паролата е сменена.": "🔑 The password was changed.",
+ "🧠 Поправено изтичане на памет: при всяка смяна на града старият оставаше в паметта (+150 MB всеки път) — сега се освобождава": "🧠 Fixed a memory leak: every city switch kept the old city in memory (+150 MB each time) — it is now released",
  "🏳️ 27 нови държави за завладяване — досега оставаха сиви: Хърватия, Словения, Албания, Либия, Иран, Казахстан, Боливия, Уругвай, Фиджи и др.": "🏳️ 27 more countries to conquer — they used to stay grey: Croatia, Slovenia, Albania, Libya, Iran, Kazakhstan, Bolivia, Uruguay, Fiji and more",
  "🏘️ Къщите по региони: Латинска Америка, Азия, арабският свят и Африка вече не изглеждат като европейски град — плоски покриви, светли фасади": "🏘️ Regional houses: Latin America, Asia, the Arab world and Africa no longer look like a European town — flat roofs, light facades",
  "🎵 Музика при нов филиал в Ню Йорк, Париж и Лас Вегас": "🎵 Music when you open a branch in New York, Paris and Las Vegas",
