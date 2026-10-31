@@ -164,7 +164,7 @@ export const ROUTE_VIA = {
   'geneva|lausanne': [[6.24, 46.40], [6.50, 46.52]],   // Нион, Морж — по северния бряг на Женевското езеро
 };
 // map-balk-fix (T2): ръчното трасе е истинският път — грубият бряг на световната карта го смята за море (Габес) и автоматичното трасе по сушата правеше примка
-export const VIA_FIXED = new Set(['sfax|tripoli']);
+export const VIA_FIXED = new Set(['sfax|tripoli', 'buenosaires|montevideo']);   // + Буенос Айрес — Монтевидео (собственикът, 31.10): автоматичното трасе по грубия бряг на Рио де ла Плата правеше примка; ръчното — през мостовете Сарате и Гуалегуайчу
 export const viaOf = (a, b) => { const k = [a, b].sort().join('|'), v = ROUTE_VIA[k]; return !v ? null : a <= b ? v : [...v].reverse(); };
 export const abSegId = (a, b) => 'ab:' + [a, b].sort().join('-');
 // всички участъци без повторение; hw е първият коридор, в който участъкът се среща

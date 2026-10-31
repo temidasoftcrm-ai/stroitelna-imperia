@@ -27,7 +27,7 @@ const licOf = (s, host) => /CC.?BY.?NC/i.test(s) ? 'CC-BY-NC-4.0' : /CC.?BY.?SA|
   : /CC.?BY.?3\.0|licenses\/by\/3\.0/i.test(s) ? 'CC-BY-3.0' : /CC.?BY.?4\.0|CC Attribution 4|licenses\/by\/4\.0/i.test(s) ? 'CC-BY-4.0'
   : /CC.?BY\b|CC Attribution|Creative Commons Attribution/i.test(s) ? (host === 'poly.pizza' ? 'CC-BY-3.0' : 'CC-BY-4.0')
   : /\bCC0\b|Creative Commons Zero|publicdomain\/zero/i.test(s) ? 'CC0' : /Sketchfab Free Standard/i.test(s) ? 'SF-STD'
-  : /Pixabay Content License/i.test(s) ? 'PIXABAY' : null;
+  : /Pixabay Content License/i.test(s) ? 'PIXABAY' : /public domain|обществено достояние/i.test(s) ? 'PD' : null;
 
 // вид по папката на файла
 const KIND = [

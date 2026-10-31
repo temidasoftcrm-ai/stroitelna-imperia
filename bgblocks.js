@@ -264,10 +264,11 @@ export function* bgPlace(P, list) {
   const zoneAt = (x, z) => { const d = Math.hypot(x - C0.x, z - C0.z) / R0; return d < 0.25 ? 'center' : d < 0.6 ? 'residential' : 'periphery'; };
   const put = (x, z, ux, uz, w, d, k, u, lot) => {   // (ux, uz) — посоката на улицата пред фасадата; w — по улицата, d — дълбочина
     const u2 = (u * 9.13) % 1, u3 = (u * 17.7) % 1;
-    const t = k === 'pan' ? (u2 < 0.5 ? K.PAN1 : K.PAN2) : k === 'coop' ? K.COOP : K.HOUSE, H = k === 'pan' ? 2.8 * (6 + Math.floor(u3 * 7)) : k === 'coop' ? 3 * (3 + Math.floor(u3 * 3)) : u3 < 0.2 ? 3 : 6;   // блок 6–12 ет., кооперация 3–5, къща 2 (или 1)
-    const col = pick(k === 'pan' ? PANC : k === 'coop' ? COOPC : HOUSEC, u2), rc = k === 'pan' ? pick([0x8a8a86, 0x9c9a94, 0x7a7c80], u3) : pick(TILE, u3);
+    const fl = (P.bgFlat || 0) > ((u * 31.7) % 1);   // bld-region-houses: Азия, Арабия, Африка, Латинска Америка — плоски покриви вместо червените керемиди
+    const t = k === 'pan' ? (u2 < 0.5 ? K.PAN1 : K.PAN2) : k === 'coop' ? (fl ? (u2 < 0.5 ? K.APF : K.APW) : K.COOP) : fl ? K.APW : K.HOUSE, H = k === 'pan' ? 2.8 * (6 + Math.floor(u3 * 7)) : k === 'coop' ? 3 * (3 + Math.floor(u3 * 3)) : u3 < 0.2 ? 3 : 6;   // блок 6–12 ет., кооперация 3–5, къща 2 (или 1)
+    const col = pick(k === 'pan' ? PANC : k === 'coop' ? COOPC : HOUSEC, u2), rc = k === 'pan' || fl ? pick([0x8a8a86, 0x9c9a94, 0x7a7c80], u3) : pick(TILE, u3);
     q.setFromAxisAngle(up, Math.atan2(ux, uz));   // локалното z — по улицата, x — навътре (както в romeBlocks)
-    list.push({ x, z, w, d, h: H, rot: Math.atan2(ux, uz), t, col, rc, ex: k === 'pan' ? 'lift' : null, M: m4.compose(new THREE.Vector3(x, H / 2, z), q, new THREE.Vector3(d, H, w)).clone(), lot }); };
+    list.push({ x, z, w, d, h: H, rot: Math.atan2(ux, uz), t, col, rc, ex: k === 'pan' ? 'lift' : fl && k === 'coop' && u3 < 0.5 ? 'tank' : null, M: m4.compose(new THREE.Vector3(x, H / 2, z), q, new THREE.Vector3(d, H, w)).clone(), lot }); };
   // 1) парцелите: лицето — локално +z (към улицата); сградата — отпред, с отстъп
   let n0 = 0;
   for (const L of P.lots) { if (L.big || L.lm) continue; if (++n0 % 200 === 0) yield 0;

@@ -319,6 +319,24 @@ for (const id of AS_COASTAL) if (!SEASIDE.includes(id)) SEASIDE.push(id);
 for (const c of OCEANIA) if (!WORLD.some(w => w.id === c.id)) { WORLD.push(c); WORLD_IDS.add(c.id); }
 WORLD.push({ ...NEOM_CITY }); WORLD_IDS.add(NEOM_ID);   // 🏙️ градът от нулата (neom.js) — скрит, докато не го основеш
 for (const k of OC_COUNTRIES) if (!COUNTRIES.some(x => x.iso === k.iso)) COUNTRIES.push(k);
+// 🗺️ small-countries (собственикът, 31.10): държавите, чиито градове са в играта, но самите те не бяха в списъка — оставаха сиви завинаги
+// (Балканите, Африка, Азия, Америките, Океания). Ключови — всичките им градове (като градовете-държави); броят се и за куестите.
+// iso — кодът в картата (Natural Earth; Косово — KOS). Хонконг не е тук: на картата е част от Китай.
+const k_ = (cc, nm, iso, ...cities) => ({ cc, nm, iso, cities });
+const SMALL_COUNTRIES = [
+  k_('🇭🇷', 'Хърватия', 'HRV', 'zagreb', 'split'), k_('🇸🇮', 'Словения', 'SVN', 'ljubljana'), k_('🇧🇦', 'Босна и Херцеговина', 'BIH', 'sarajevo'),
+  k_('🇲🇪', 'Черна гора', 'MNE', 'podgorica'), k_('🇦🇱', 'Албания', 'ALB', 'tirana'), k_('🇽🇰', 'Косово', 'KOS', 'pristina'),
+  k_('🇱🇾', 'Либия', 'LBY', 'tripoli'), k_('🇲🇷', 'Мавритания', 'MRT', 'nouakchott'), k_('🇨🇮', 'Кот д’Ивоар', 'CIV', 'abidjan'), k_('🇨🇲', 'Камерун', 'CMR', 'douala'),
+  k_('🇺🇬', 'Уганда', 'UGA', 'kampala'), k_('🇸🇩', 'Судан', 'SDN', 'khartoum'), k_('🇿🇲', 'Замбия', 'ZMB', 'lusaka'), k_('🇿🇼', 'Зимбабве', 'ZWE', 'harare'),
+  k_('🇮🇷', 'Иран', 'IRN', 'tehran'), k_('🇺🇿', 'Узбекистан', 'UZB', 'tashkent'), k_('🇰🇿', 'Казахстан', 'KAZ', 'almaty'), k_('🇵🇰', 'Пакистан', 'PAK', 'karachi'),
+  k_('🇧🇩', 'Бангладеш', 'BGD', 'dhaka'), k_('🇲🇲', 'Мианмар', 'MMR', 'yangon'),
+  k_('🇧🇴', 'Боливия', 'BOL', 'lapaz'), k_('🇵🇾', 'Парагвай', 'PRY', 'asuncion'), k_('🇺🇾', 'Уругвай', 'URY', 'montevideo'),
+  k_('🇸🇻', 'Салвадор', 'SLV', 'sansalvador'), k_('🇳🇮', 'Никарагуа', 'NIC', 'managua'),
+  k_('🇫🇯', 'Фиджи', 'FJI', 'suva'), k_('🇵🇬', 'Папуа Нова Гвинея', 'PNG', 'portmoresby')];
+// и в списъка на своя континент — за отключването на следващия („1 завладяна държава там“) и континенталните куестове (Балканите — само в общия)
+const SMALL_CT = { af: [AFRICA_COUNTRIES, 'LBY MRT CIV CMR UGA SDN ZMB ZWE'], as: [AS_COUNTRIES, 'IRN UZB KAZ PAK BGD MMR'], sa: [SA_COUNTRIES, 'BOL PRY URY'], na: [NA_COUNTRIES, 'SLV NIC'], oc: [OC_COUNTRIES, 'FJI PNG'] };
+if (feature('small-countries')) for (const k of SMALL_COUNTRIES) { if (!COUNTRIES.some(x => x.iso === k.iso)) COUNTRIES.push(k);
+  for (const [L, isos] of Object.values(SMALL_CT)) if (isos.split(' ').includes(k.iso) && !L.some(x => x.iso === k.iso)) L.push(k); }
 // ✈️ само летища (не градове): Инчон (до Сеул), Йокохама (до Токио) и Манила — на картата само самолетче, не се купуват като филиал
 // и не се броят за завладяване на държавата (старите филиали там си остават)
 const AIR_ONLY = new Set(['incheon', 'yokohama', 'manila']);
@@ -1294,6 +1312,7 @@ function tierModel0(cityId, lot, n) {
   if (t === 'm' && feature('mid-bld') && SHOPS.includes(n) && cityId !== 'rome') { const so = midSouth(cityId), u = (h >>> 9) % (so ? 3 : 5); if (so && u === 1 && A['it-sf-medkit']) return 'it-sf-medkit'; if ((u === 0 || (!so && u === 1)) && A['b2-pp-office']) return 'b2-pp-office'; }   // mid-bld (55): в южните градове по един от всеки три блока — модерната офис сграда и средиземноморската (medkit); другаде офисът — 2 от 5
   if (t === 'm') return SKY.includes(n) ? (h % 2 ? `${n}@10` : SHOPS[h % SHOPS.length]) : n;
   if (SHOPS.includes(n) && t !== 's' && SF_BLK().length && h % 3 === 1) return SF_BLK()[(h >>> 5) % SF_BLK().length];   // всеки трети блок — истински модел
+  if (SKY.includes(n) && (t === 'l' || t === 'xl') && feature('sky-real-init')) { const R = [...new Set([...SF_SKY(), ...PLAYER_SKY.filter(k => A[k])])]; if (R.length >= 8) return R[(h >>> 4) % R.length]; }   // 🏙️ sky-real-init (отделно от одобрения sky-real-first): и в първоначалните сгради на града — истински кули вместо разтегнатите детски (при ≥ 8 налични)
   if (SKY.includes(n) && (t === 'l' || t === 'xl') && SF_SKY().length && h % 3 === 0) return SF_SKY()[(h >>> 4) % SF_SKY().length];   // всеки трети — истински модел
   if (t === 'l') return SKY.includes(n) ? `${n}@${h % 3 ? 20 : 15}` : n;
   // мегаполис: стъклени небостъргачи в центъра, модерни сгради в средния пояс
@@ -1331,7 +1350,7 @@ const ASIA_CC = new Set(['🇨🇳', '🇰🇷', '🇮🇳', '🇹🇭', '🇻�
 const ARAB_CC = new Set(['🇪🇬', '🇲🇦', '🇩🇿', '🇹🇳', '🇱🇾', '🇸🇦', '🇦🇪', '🇶🇦', '🇰🇼', '🇧🇭', '🇴🇲', '🇯🇴', '🇱🇧', '🇮🇶', '🇮🇷', '🇮🇱', '🇸🇾', '🇾🇪', '🇸🇩']);
 const OCEANIA_CC = new Set(['🇦🇺', '🇳🇿', '🇫🇯']), AFRICA_CC = new Set(['🇿🇦', '🇳🇬', '🇰🇪', '🇪🇹', '🇬🇭', '🇹🇿', '🇺🇬', '🇨🇩', '🇦🇴', '🇸🇳', '🇨🇮', '🇨🇲', '🇿🇼', '🇿🇲', '🇲🇿', '🇳🇦', '🇧🇼', '🇷🇼', '🇲🇬', '🇲🇺', '🇲🇷', '🇲🇱', '🇬🇳', '🇳🇪', '🇹🇩']);
 const houseRegion = cc => LATAM_CC.has(cc) ? { all: ['sf-medorange', 'sf-medwhite', 'h2-pink', 'h2-blue', 'sf-villa'], outer: ['sf-rural1', 'sf-rural2', 'sf-medwhite', 'h2-pink', 'h2-blue'] }   // цветни и бели, плоски покриви; в покрайнините — селски
-  : ASIA_CC.has(cc) ? { center: () => [...FLAT_BLK(), 'sf-medwhite'], all: ['sf-medwhite', 'sf-villa', 'mh-modern1', 'h2-blue'], outer: ['sf-medwhite', 'sf-villa', 'sf-rural1', 'h2-blue'] }   // модерни блокове и бели къщи
+  : ASIA_CC.has(cc) ? { center: () => [...FLAT_BLK(), 'sf-medwhite'], all: ['sf-medwhite', 'sf-villa', 'mh-modern1', 'sf-medorange'], outer: ['sf-medwhite', 'sf-villa', 'sf-rural1', 'sf-medorange'] }   // модерни блокове и бели къщи
   : ARAB_CC.has(cc) ? { center: () => [...FLAT_BLK(), 'sf-medwhite', 'sf-medorange'], all: ['sf-medwhite', 'sf-medorange'], outer: ['sf-medwhite', 'sf-medorange', 'sf-rural2'] }   // бели и охра, плоски
   : AFRICA_CC.has(cc) ? { all: ['sf-medwhite', 'sf-medorange', 'sf-rural1', 'sf-rural2'] }
   : OCEANIA_CC.has(cc) ? { all: ['h2-greyporch', 'h2-brickcabin', 'h2-porch', 'h2-lodge', 'h2-blue', 'sf-villa'] }   // като в САЩ
@@ -1753,6 +1772,7 @@ function buildCity(cityId) {
   if (P && !P.links) P.links = planLinks(P);   // и в мрежата на маршрутите (cityplanroute.js) — ТИР-овете и техниката карат по тях
   const railCut = P && P.p2 && P.offset && feature('rail-tramcut') && causewayOn(cityId) ? (o => [STATION_X - 45 - o[0], STATION_X + 8 - o[0]])(Array.isArray(P.offset) ? P.offset : [P.offset.x, P.offset.z]) : null;   // (rail-tramcut) жп лентата в координатите на плана
   setBgRoofs(cityRoofs(cityId) ? (cityById(cityId)?.cc === '🇯🇵' ? [0x3d4248, 0x2f3439, 0x454b52, 0x3a3f45] : [0xe8e2d4, 0xd9cfb8, 0xe2dccc, 0xcfc6b2]) : null);   // T2: и фоновите сгради (bgblocks.js)
+  if (P && P.p2 && BRH) { const cc = cityById(S.cityId)?.cc; P.p2.bgFlat = ASIA_CC.has(cc) || ARAB_CC.has(cc) ? 1 : AFRICA_CC.has(cc) ? 0.7 : LATAM_CC.has(cc) ? 0.5 : 0; }   // 🏘️ bld-region-houses: фоновите сгради (bgblocks) — плоски покриви извън Европа
   const pv = P && P.p2 ? plan2.view.buildPlan2View(P.p2, { osmEdge: feature('osm-edge') && P.osm ? (o => ({ railX: STATION_X - o[0], railZ: [-700 - o[1], 1700 - o[1]] }))(Array.isArray(P.offset) ? P.offset : [P.offset?.x || 0, P.offset?.z || 0]) : null,   /* 🌊 osm-edge: жп коридорът (координатите на плана) остава суша */ roofs: cityRoofs(cityId), ground: feature('dubai-look') && isDesert(cityId) && !isAfrica(cityId) ? { grass: 0xd8c39a, median: 0xc9b48a, island: 0xcfb98f } : null, railCut, realSigns: feature('road-signs'), streetReal: feature('street-real'), treeModels: plan2Trees(), treeClear: feature('lv-sign-clear') ? [['vegassign', 32]] : null,   /* lv-sign-clear (f6): Лас Вегас — палмите около „Welcome to Fabulous Las Vegas“ (≈ 32 м) */ roadGeo: feature('road-geo') && !P.osm, ...(feature('plants-real') && A['pl-bush-0'] ? { plants: [A['pl-bush-0'].scene.clone(true)].map(o => (o.scale.setScalar(1.8), o)), fountain: A['pl-fountain']?.scene } : {}),   /* #13: островът на кръговото — истински храсти и фонтан (без тях — цветните точки) */ osm: P.p2.osmData, offset: P.offset, termini: !!P.osm, seaPort: feature('sea-coast') && SEASIDE.includes(cityId) && !P.osm, blocks: P.osm ? true : feature('bg-fill') ? 'bg' : false, ...(P.osm && feature('city-prog') && P.square && P.toPlan ? { progressive: true, focus: P.toPlan(P.square.x, P.square.z) } : {}),   /* поетапно: първо терен и улици около централата */ ...(P.osm ? plan2Opts(cityId) : itBldOn(cityId) ? { romeNear: itNear() } : {}), ...(towerOn(cityId) ? { romeNear: twNear(cityId) } : {}), ...(feature('bridges-real') && plan2.models['br-stone'] ? { bridgesReal: { stone: plan2.models['br-stone'], susp: plan2.models['br-susp'] } } : {}), ...(feature('statues') ? { statues: statNear(cityId) } : {}), ...(feature('roundabout-deco') && (!GFXON || gfx().deco) ? { roundDeco: roundDecoOf(cityId) } : {}), ...(feature('river-boats') && RIVER_CITIES.includes(cityId) && plan2.models['rb-tour'] ? { riverBoats: { tour: plan2.models['rb-tour'], small: ['rb-motor', 'rb-yacht'].map(k => plan2.models[k]).filter(Boolean) } } : {}),   /* 🛥️ river-boats */ stationModel: plan2.models[{ paris: 'lm-lazare2', newyork: 'lm-gc2' }[cityId]] || A['station-big']?.scene, ...(cityId === 'newyork' && plan2.models['lm-gc2'] ? { stationFacing: { face: '-z', depth: 0.8, maxW: 48 } } : {}), ...(cityId === 'washington' && feature('was-look') ? { stationFacing: { depth: 0.6, maxW: 90, maxH: 34 } } : {}),   /* was-look (55): Юниън Стейшън — station-big в истински ръст (беше 130 × 196 м) */ fillAt: P.osm ? (feature('bg-room') ? b => bgFreeAt(b, true) : null) : bgFreeAt, fillLot: L2 => { if (!P.osm) return bgFillTo(L2); const l = city.p2Map && city.p2Map.get(L2.id); return !l || l.busy === 'bg' || (osmFillOn && !L2.big && !L2.lm && osmFillLot(l)); }, blocksEarly: OSM_FILL && !!P.osm,   /* osm-fill (f6): и ~65 % от свободните парцели — чужди фасади (изчезват при покупка/строеж); кварталите — веднага след най-близките улици */
       ...(feature('free-plots') ? { freeLot: L2 => { const l = city.p2Map && city.p2Map.get(L2.id); return !!l && !l.busy && !l.built && !l.reno && !l.under && !l.obj && !(!P.osm && feature('bg-fill') && bgFillLot(l)) && !(P.osm && osmFillOn && osmFillLot(l)); } } : {}) })   // свободните парцели — празни места с ограда и табела   // Рим: фоновите квартали — върху парцелите, които играта не ползва
     : P ? buildPlanView({ ...P, streets: [...P.streets, ...P.links] }, { streetReal: feature('street-real'), size: Math.max(1600, 2 * (tx(NI - 1) + 400)), seg: 170, target: controls.target, lotCount: Math.min(P.lots.length, planCount(P.mega, S.cityExt || 0)),
@@ -6208,7 +6228,7 @@ function openBranchNow(id) {
         S.branchPaid = { ...(S.branchPaid || {}), [id]: cost + extra - disc };   // за оценката при продажба
         dev.add(xpCity(dev.XP.branch, id));
         S.cities[id] = { ...newCityState(), left: nowDays() };   // начален екип: бригада, багер, самосвал
-        toast(`🏢 Отвори филиал в ${c.nm}!`, 'good'); showEventPop('new-branch', `📍 Нов филиал: ${c.nm}`, 'Влез в града от картата и строй и там.'); if (stingOk(id)) setTimeout(() => Sound.file(CITY_STING[id], 0.7), 1200); else Sound.play('branch'); save(); showMap(true); if (feature('branch-clip') && cine.clipFor && cine.clipFor(id)) setTimeout(() => switchCity(id), 1500);   /* №3 (55): град с клип (Ню Йорк, Париж, Токио…) — влизаш в него и клипът тръгва (веднъж) */
+        toast(`🏢 Отвори филиал в ${c.nm}!`, 'good'); showEventPop('new-branch', `📍 Нов филиал: ${c.nm}`, 'Влез в града от картата и строй и там.'); if (stingSrc(id)) { const src = stingSrc(id); setTimeout(() => Sound.file(src, 0.7), 1200); } else Sound.play('branch'); save(); showMap(true); if (feature('branch-clip') && cine.clipFor && cine.clipFor(id)) setTimeout(() => switchCity(id), 1500);   /* №3 (55): град с клип (Ню Йорк, Париж, Токио…) — влизаш в него и клипът тръгва (веднъж) */
 }
 // столиците и големите градове (Рим, Лондон, Барселона…): филиалът е с фиксирана цена CAPITAL_BRANCH, колкото и филиали да имаш
 const CAPITAL_BRANCH = 25000000;
@@ -13545,6 +13565,10 @@ let bellT = 540 + Math.random() * 120; const BELL = 'assets/sfx/church-bell.mp3'
 // assets/local/ не се качва в GitHub (.gitignore); на сайта файлът го няма и просто не свири
 const CITY_STING = { lasvegas: 'assets/local/vegas-elvis.mp3', newyork: 'assets/local/newyork-sinatra.mp3', rio: 'assets/local/rio-timmaia.mp3', cairo: 'assets/local/cairo-tune.mp3', paris: 'assets/local/paris-vieenrose.mp3' };
 const stingOk = id => !!CITY_STING[id] && /^(localhost|127\.0\.0\.1)$/.test(location.hostname);   // песните са само локално — на сайта не се търсят (без 404)
+// 🎵 sting-web (собственикът, 31.10): на сайта — свободни записи вместо защитените (assets/sfx/CREDITS-music.txt): Ню Йорк — „Рапсодия в синьо“ (1924, обществено достояние),
+// Париж — акордеон (Le Croissant, Shane Ivers, CC BY 4.0), Лас Вегас — лаунж (Vegas Glitz, Kevin MacLeod, CC BY 4.0). Локално — както досега (оригиналите в assets/local/).
+const STING_WEB = { newyork: 'assets/sfx/sting-newyork.mp3', paris: 'assets/sfx/sting-paris.mp3', lasvegas: 'assets/sfx/sting-vegas.mp3' };
+const stingSrc = id => stingOk(id) ? CITY_STING[id] : feature('sting-web') && STING_WEB[id] || null;
 function frame() {
   if (FIXSTAB) requestAnimationFrame(frame);   // fix-stab: следващият кадър — преди всичко; едно изключение не спира играта
   perf.frame();
