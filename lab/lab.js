@@ -553,6 +553,10 @@ const DEMOS = [
   ['⏳ Оттеглено разрешение (coop-riv-rivals): режимът става „Конкуренти“ след 12 ч онлайн време', 'sofia', d => setTimeout(() => { d.coopRivRivals('revert'); }, 10000)],   // coop-riv-rivals
   ['🚉 Гара Хайдарпаша (haydarpasa-real): истинският модел на кея в Кадъкьой — денем, от водата', 'istanbul', d => setTimeout(() => { d.haydarLook(false); }, 12000)],   // haydarpasa-real
   ['🚉 Гара Хайдарпаша нощем (haydarpasa-real): златната фасада от прожекторите, топлите прозорци, осветените кули и тъмният покрив — от водата', 'istanbul', d => setTimeout(() => { d.haydarLook(true); }, 12000)],   // haydarpasa-real
+  ['🏡 Луксозна вила денем (luxury-villa): вилата на брега във Варна, градинските лампи изгасени', 'varna', d => setTimeout(() => { d.villaLook(0, false, 40); }, 12000)],   // luxury-villa
+  ['🏡 Луксозна вила нощем (luxury-villa): топлите петна пред входа и по пътеката, градинските лампи, светналите прозорци', 'varna', d => setTimeout(() => { d.villaLook(0, true, 30); }, 12000)],   // luxury-villa
+  ['🌃 Ню Йорк нощем (ny-night2): тъмни фасади, топли точки по прозорците, осветените корони на Емпайър, Крайслер и 30 Рок — над Мидтаун', 'newyork', d => setTimeout(() => { const L = d.city().landmarks.find(q => q.kind === 'empire2'); if (!L) return; const p = L.group.position; d.time(22); d.camAt(p.x + 250, 420, p.z + 900, p.x + 150, 60, p.z - 150); }, 20000)],   // ny-night2
+  ['🌃 Ню Йорк нощем отблизо (ny-night2): по-едрите прозорци до камерата, без пръстените около Рокфелер', 'newyork', d => setTimeout(() => { const L = d.city().landmarks.find(q => q.kind === 'rockefeller2'); if (!L) return; const p = L.group.position; d.time(22); d.camAt(p.x + 260, 60, p.z + 40, p.x + 60, 70, p.z - 260); }, 20000)],   // ny-night2
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя'], ['lab/coop-log.html', '🤝 Дневник на партньорството — чеклист за истински акаунти и извикванията към сървъра']];
 
