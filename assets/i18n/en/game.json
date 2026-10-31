@@ -1059,6 +1059,9 @@
  "Континент": "Continent",
  "🤝 Заедно": "🤝 Together",
  "Общо": "Total",
+ "🏆 {0} завладя {1} {2}": "🏆 {0} conquered {1} {2}",
+ "Всички ключови градове са завършени от партньора ти · +10 000 XP за теб (+10% доход — за него)": "All key cities were finished by your partner · +10,000 XP for you (+10% income goes to them)",
+ "🏆 {0} завладя {1} {2}! +10 000 XP": "🏆 {0} conquered {1} {2}! +10,000 XP",
  "🤝 Завладяхте {0} {1} заедно с {2}": "🤝 You conquered {0} {1} together with {2}",
  "Ключовите градове са завършени заедно · +10% към прихода ти в нея": "The key cities were completed together · +10% to your income there",
  "Ключовите градове са завършени заедно · +10 000 XP (+10% доход получава партньорът с повече завършени градове)": "The key cities were completed together · +10,000 XP (the +10% income goes to the partner with more completed cities)",
@@ -1066,6 +1069,9 @@
  "🏆 {0} {1} е твоя!": "🏆 {0} {1} is yours!",
  "Всички ключови градове са завършени · +10% към прихода им": "All key cities completed · +10% to their income",
  "🏆 Завладя {0} {1}! Всички ключови градове са завършени — +10% към прихода им.": "🏆 You conquered {0} {1}! All key cities completed — +10% to their income.",
+ "({0} {1}: {2}/{3} ключови града)": "({0} {1}: {2}/{3} key cities)",
+ "🏁 {0} завърши {1}{2}": "🏁 {0} finished {1}{2}",
+ "🏁 {0} завърши {1} града: {2}{3}": "🏁 {0} finished {1} cities: {2}{3}",
  "Първи филиал: {0}": "First branch: {0}",
  "🇧🇬 България": "🇧🇬 Bulgaria",
  "🌐 Светът": "🌐 The world",
@@ -3031,6 +3037,7 @@
   "Ако единият избере разделяне, а другият се откаже — строи само този, който остава, и плаща всичко.": "If one chooses to split and the other withdraws, only the one who stays builds it and pays everything.",
   ", толът се дели": ", the toll is shared",
   "✂️ {0}: разделено 50/50 с {1} — върнати {2} €{3}.": "✂️ {0}: split 50/50 with {1} — {2} € refunded{3}.",
-  "Шанс: {0}. Наем: 🏠 {1} · 🏪 {2} · 🏢 {3} · 🌆 {4} €/ден · 🌳 парк — +15% наем наоколо.": "Odds: {0}. Rent: 🏠 {1} · 🏪 {2} · 🏢 {3} · 🌆 {4} €/day · 🌳 park — +15% rent nearby."
+  "Шанс: {0}. Наем: 🏠 {1} · 🏪 {2} · 🏢 {3} · 🌆 {4} €/ден · 🌳 парк — +15% наем наоколо.": "Odds: {0}. Rent: 🏠 {1} · 🏪 {2} · 🏢 {3} · 🌆 {4} €/day · 🌳 park — +15% rent nearby.",
+  " ({0} {1}: {2}/{3} ключови града)": " ({0} {1}: {2}/{3} key cities)"
  }
 }

@@ -1171,7 +1171,8 @@ const SKY = ['building-skyscraper-a', 'building-skyscraper-b', 'building-skyscra
 const MEGA = ['moscow', 'stpetersburg', 'kyiv', 'london', 'paris', 'berlin', 'madrid', 'rome', 'milan', 'amsterdam', 'vienna', 'barcelona', 'munich', ...WORLD.map(c => c.id)];
 const LOWRISE = new Set(['washington']);   // ниски градове: без небостъргачи в поръчките (Вашингтон — ограничение за височина)
 const cityTier = id => MEGA.includes(id) || MEGAPOLIS.has(id) ? 'xl' : (CITIES.find(c => c.id === id)?.sz || 1) >= 3 ? 'l' : (CITIES.find(c => c.id === id)?.sz || 1) === 2 ? 'm' : 's';
-const SF_BLK = () => ['richmond', 'panel12', 'gamecity', 'soviet', 'oldbld', 'dbrick', 'brick', 'asian', 'modoffice', 'jade'].map(k => 'sf-blk-' + k).filter(n => A[n]);   // истински блокове
+const BRF = feature('bld-region-fix');   // 🏘️ bld-region-fix (одитът на сградите, T2): съветските панели — само в Източна Европа и Балканите; без японската къща в Залива
+const SF_BLK = () => ['richmond', 'panel12', 'gamecity', 'soviet', 'oldbld', 'dbrick', 'brick', 'asian', 'modoffice', 'jade'].map(k => 'sf-blk-' + k).filter(n => A[n] && !(BRF && (n === 'sf-blk-soviet' || n === 'sf-blk-panel12') && !(S && panelTilt(S.cityId) > 0)));   // истински блокове
 const SF_SKY = () => ['sing', 'rand', 'usb', 'blue', 'night', ...(S && MESHY_SKY_CITIES.has(S.cityId) ? Object.keys(MESHY_SKY) : []), ...(S && S.cityId === 'newyork' && feature('lm-ny2') ? Object.keys(MESHY_SKY_NY) : [])].map(k => 'sf-sky-' + k).filter(n => A[n]);   /* meshy-sky2: златният и синият — само в градовете със стъклени кули */   // истинските небостъргачи (ако са заредени)
 // 🏢 (55, задачите от играта №1) обликът по региони: в България — много панелни блокове (6–12 етажа), малко американски кули;
 // в бившия соц. блок — същото, по-леко. В центъра на големите градове остават и модерни кули (без цилиндричната американска в БГ).
@@ -1323,11 +1324,25 @@ const isJp = id => feature('tokyo-look') && cityById(id)?.cc === '🇯🇵';
 const GULF_CC = new Set(['🇦🇪', '🇶🇦', '🇸🇦', '🇰🇼', '🇧🇭', '🇴🇲']);
 const isFlatCity = id => (feature('dubai-look') && GULF_CC.has(cityById(id)?.cc)) || (feature('sg-look') && id === 'singapore');
 const FLAT_BLK = () => ['sf-blk-modoffice', 'sf-blk-asian', 'sf-blk-jade', 'b2-office2', 'b2-office3', 'b2-office4', 'b2-office5', 'b2-office6', 'b2-pp-office'].filter(k => A[k]);
+// 🏘️ bld-region-houses (одитът на сградите, T2): регионът на къщите по държавата на града — само от наличните модели
+const BRH = feature('bld-region-houses');
+const LATAM_CC = new Set(['🇲🇽', '🇧🇷', '🇦🇷', '🇨🇱', '🇵🇪', '🇨🇴', '🇻🇪', '🇺🇾', '🇪🇨', '🇧🇴', '🇵🇾', '🇨🇺', '🇩🇴', '🇨🇷', '🇵🇦', '🇬🇹', '🇭🇳', '🇸🇻', '🇳🇮', '🇯🇲', '🇵🇷', '🇭🇹', '🇧🇸', '🇹🇹']);
+const ASIA_CC = new Set(['🇨🇳', '🇰🇷', '🇮🇳', '🇹🇭', '🇻🇳', '🇮🇩', '🇲🇾', '🇵🇭', '🇹🇼', '🇭🇰', '🇧🇩', '🇵🇰', '🇱🇰', '🇳🇵', '🇲🇲', '🇰🇭', '🇸🇬', '🇱🇦', '🇲🇳', '🇰🇿', '🇺🇿']);
+const ARAB_CC = new Set(['🇪🇬', '🇲🇦', '🇩🇿', '🇹🇳', '🇱🇾', '🇸🇦', '🇦🇪', '🇶🇦', '🇰🇼', '🇧🇭', '🇴🇲', '🇯🇴', '🇱🇧', '🇮🇶', '🇮🇷', '🇮🇱', '🇸🇾', '🇾🇪', '🇸🇩']);
+const OCEANIA_CC = new Set(['🇦🇺', '🇳🇿', '🇫🇯']), AFRICA_CC = new Set(['🇿🇦', '🇳🇬', '🇰🇪', '🇪🇹', '🇬🇭', '🇹🇿', '🇺🇬', '🇨🇩', '🇦🇴', '🇸🇳', '🇨🇮', '🇨🇲', '🇿🇼', '🇿🇲', '🇲🇿', '🇳🇦', '🇧🇼', '🇷🇼', '🇲🇬', '🇲🇺', '🇲🇷', '🇲🇱', '🇬🇳', '🇳🇪', '🇹🇩']);
+const houseRegion = cc => LATAM_CC.has(cc) ? { all: ['sf-medorange', 'sf-medwhite', 'h2-pink', 'h2-blue', 'sf-villa'], outer: ['sf-rural1', 'sf-rural2', 'sf-medwhite', 'h2-pink', 'h2-blue'] }   // цветни и бели, плоски покриви; в покрайнините — селски
+  : ASIA_CC.has(cc) ? { center: () => [...FLAT_BLK(), 'sf-medwhite'], all: ['sf-medwhite', 'sf-villa', 'mh-modern1', 'h2-blue'], outer: ['sf-medwhite', 'sf-villa', 'sf-rural1', 'h2-blue'] }   // модерни блокове и бели къщи
+  : ARAB_CC.has(cc) ? { center: () => [...FLAT_BLK(), 'sf-medwhite', 'sf-medorange'], all: ['sf-medwhite', 'sf-medorange'], outer: ['sf-medwhite', 'sf-medorange', 'sf-rural2'] }   // бели и охра, плоски
+  : AFRICA_CC.has(cc) ? { all: ['sf-medwhite', 'sf-medorange', 'sf-rural1', 'sf-rural2'] }
+  : OCEANIA_CC.has(cc) ? { all: ['h2-greyporch', 'h2-brickcabin', 'h2-porch', 'h2-lodge', 'h2-blue', 'sf-villa'] }   // като в САЩ
+  : null;
 function jpLook(n, lot) {
   if (!S || !n || isTowerName(n) || n.startsWith('ind-') || n.startsWith('cafe-') || n.startsWith('shop-')) return n;   // ☕ shop-cafe: кафенето остава кафене
   const h = hashStr('rl:' + S.cityId + ':' + lot.id), pick = L => L.length ? L[h % L.length] : n;
   if (isJp(S.cityId)) { const J = JP_HOUSES.filter(k => A[k]); if (HOUSES.includes(n) || lot.zone !== 'center') return pick(J); return pick([...J.filter(k => k === 'jp-narrow' || k === 'jp-modern'), ...FLAT_BLK()]); }
-  if (isFlatCity(S.cityId)) { const F = FLAT_BLK(); if (HOUSES.includes(n)) return A['jp-modern'] && h % 3 ? 'jp-modern' : pick(F); return pick(F); }
+  if (isFlatCity(S.cityId)) { const F = FLAT_BLK(); if (HOUSES.includes(n)) { const W = BRF ? ['sf-medwhite', 'sf-medorange'].filter(k => A[k]) : A['jp-modern'] ? ['jp-modern'] : []; return W.length && h % 3 ? pick(W) : pick(F); } return pick(F); }   /* bld-region-fix: в Залива и Сингапур — бели плоски средиземноморски къщи, не японската */
+  { const R = BRH && (HOUSES.includes(n) || MH.has(n)) ? houseRegion(cityById(S.cityId)?.cc) : null;   // 🏘️ bld-region-houses: Латинска Америка, Азия, Арабия, Африка, Австралия — своите къщи (от наличните), не европейската с червен покрив
+    if (R) { const fits = k => { const m = MH.get(k); return A[k] && (!m || !m.lot || (lot.plan && Math.min(lot.w, lot.d) >= m.lot)); }, L = (lot.zone === 'center' && R.center ? R.center() : lot.zone === 'outer' && R.outer ? R.outer : R.all).filter(fits); if (L.length) return pick(L); } }
   if (MH.size && HOUSES.includes(n)) {   // houses-meshy: регионът на къщите на потребителя (независимо от eu-houses)
     const us = US_CC.has(cityById(S.cityId)?.cc), ok = k => { const m = MH.get(k); return !m || (mhReg(m.r, lot, us) && (!m.lot || (lot.plan && Math.min(lot.w, lot.d) >= m.lot))); };   // и само ако се побира в истински размер
     if (MH.has(n) && !ok(n)) { const L = REAL_HOUSES.filter(k => !MH.has(k) && A[k] && (!EU_HOUSES_ON || us || EU_HOUSE.has(k))); return pick(L); }
@@ -3704,16 +3719,17 @@ const dirtMat = new THREE.MeshStandardMaterial({ color: 0x7a5a3a, roughness: 1 }
 const concreteMat = new THREE.MeshStandardMaterial({ color: 0xb0b0aa, roughness: 0.9 });
 const scaffoldMat = new THREE.LineBasicMaterial({ color: 0xd9a53a });
 
+const SRF = feature('sky-real-first');   // 🏙️ sky-real-first (одитът, T2): истинските кули и блокове преди детските Kenney
 function buildingFor(type, floors = 20) {
   if (type === 'house') return pick(HOUSE_POOL);
   if (type === 'villa') return A['dream-villa'] ? 'dream-villa' : pick(HOUSE_POOL);   // 🏡 luxury-villa
   if (type === 'shop') return feature('real-shops') ? pick(shopPool()) : 'Building_Small_1';   /* real-shops (55): истинските магазини building-a…h */
   const tilt = S ? panelTilt(S.cityId) : 0;   // България (и по-леко бившият соц. блок): панелни блокове, малко американски кули
   if (type === 'office' && tilt && PANELS().length && Math.random() < 0.5 * tilt) return pick(PANELS());
-  if (type === 'office') return SF_BLK().length && Math.random() < 0.5 ? pick(SF_BLK()) : feature('real-shops') ? pick(['building-e', 'building-c', 'building-f']) : 'Building_Medium_2_001';
+  if (type === 'office') return SF_BLK().length && Math.random() < (SRF ? 0.82 : 0.5) ? pick(SF_BLK()) : feature('real-shops') ? pick(['building-e', 'building-c', 'building-f']) : 'Building_Medium_2_001';
   if (feature('sky-mix') && floors >= 15) {   // 🏙️ sky-mix (собственикът, 30.10: „само кули навсякъде — може ли да са рандом“): равномерно от всички налични небостъргачи — истинските (SF_SKY + подбраните) и разтегливите (по етажи); в БГ без цилиндричната
     const real = [...new Set([...SF_SKY(), ...PLAYER_SKY.filter(n => A[n])])].filter(n => !(tilt >= 1 && n === 'sf-sky-usb')), str = [...MODERN_SKY, ...SKY].filter(n => A[n] || A[n + '@20']);
-    const all = [...real.map(n => [n, 1]), ...str.map(n => [n, 0])]; if (all.length) { const [n, r] = pick(all); return r ? n : skyKey(n, floors) || n; } }
+    const all = [...real.map(n => [n, 1]), ...(SRF && real.length >= 8 ? [] : str.map(n => [n, 0]))];   /* sky-real-first: ≥ 8 истински кули — без разтегнатите детски */ if (all.length) { const [n, r] = pick(all); return r ? n : skyKey(n, floors) || n; } }
   if (feature('sky-pool') && floors >= 15) { const P = PLAYER_SKY.filter(n => A[n]); if (P.length) return pick(P); }   // 🏙️ sky-pool: само подбраните (моделът се пази в поръчката — при зареждане е същият)
   if (floors >= 15 && SF_SKY().length && Math.random() < 0.4 * (1 - 0.7 * tilt)) return pick(tilt >= 1 ? SF_SKY().filter(x => x !== 'sf-sky-usb') : SF_SKY());   // разнообразие: истински небостъргачи (в БГ — по-рядко, без цилиндричната)
   if (floors > 20 || (cityTier(S.cityId) === 'xl' && A['building-skyscraper-d@20'])) return `${pick(MODERN_SKY)}@${Math.max(20, floors)}`;
@@ -7413,17 +7429,33 @@ function coopWonCheck() {
   if (fresh.length) {
     S.wonSeen = [...S.wonSeen, ...fresh.map(k => k.iso)]; changed = true;
     const k = fresh[fresh.length - 1], joint = !loc.has(k.iso), pn = window.__coopShared?.name || 'партньора', pay = !joint || coopLead(k);
-    Sound.play('country'); xpMore(10000); flagWave(k, joint && pn);
-    if (joint) { showEventPop('country-won', `🤝 Завладяхте ${k.cc} ${k.nm} заедно с ${pn}`, pay ? 'Ключовите градове са завършени заедно · +10% към прихода ти в нея' : 'Ключовите градове са завършени заедно · +10 000 XP (+10% доход получава партньорът с повече завършени градове)'); toast(`🤝 Завладяхте ${k.cc} ${k.nm} заедно с ${pn}! +10 000 XP`, 'good'); }
+    const solo = joint && feature('coop-fin-news') && !(k.cities || []).some(x => econ.isFinished(x));   // coop-fin-news: държавата — само от партньора (нито един ключов град не е твой)
+    Sound.play('country'); xpMore(10000); if (!solo) flagWave(k, joint && pn);   /* знамето казва „Вие и … завършихте“ — не и когато е само негова */
+    if (solo) { showEventPop('country-won', `🏆 ${pn} завладя ${k.cc} ${k.nm}`, 'Всички ключови градове са завършени от партньора ти · +10 000 XP за теб (+10% доход — за него)'); toast(`🏆 ${pn} завладя ${k.cc} ${k.nm}! +10 000 XP`, 'good'); }
+    else if (joint) { showEventPop('country-won', `🤝 Завладяхте ${k.cc} ${k.nm} заедно с ${pn}`, pay ? 'Ключовите градове са завършени заедно · +10% към прихода ти в нея' : 'Ключовите градове са завършени заедно · +10 000 XP (+10% доход получава партньорът с повече завършени градове)'); toast(`🤝 Завладяхте ${k.cc} ${k.nm} заедно с ${pn}! +10 000 XP`, 'good'); }
     else { showEventPop('country-won', `🏆 ${k.cc} ${k.nm} е твоя!`, 'Всички ключови градове са завършени · +10% към прихода им'); toast(`🏆 Завладя ${k.cc} ${k.nm}! Всички ключови градове са завършени — +10% към прихода им.`, 'good'); }
   }
   if (changed) save();
+}
+// 🏁 coop-fin-news (собственикът, 31.10): партньорът завърши град → кратко съобщение и при теб, с напредъка на държавата (ключовите градове, заедно).
+// S.coopFinSeen = { pid, ids } — първия път (и при нов партньор) всичко налично се приема за видяно, без поток от стари съобщения;
+// списъкът само расте (празна/непълна снимка на партньора не връща старите като нови). Няколко наведнъж — едно съобщение.
+function coopFinNews() {
+  const P = window.__coopShared; if (!feature('coop-fin-news') || !P?.pid || !econ) return;
+  const fin = coopFin(), sv = S.coopFinSeen;
+  if (!sv || sv.pid !== P.pid) { S.coopFinSeen = { pid: P.pid, ids: [...fin] }; save(); return; }   /* __coopShared идва само с вече дошла снимка — празен fin = наистина нищо завършено */
+  const fresh = fin.filter(id => !sv.ids.includes(id)); if (!fresh.length) return;
+  sv.ids = [...sv.ids, ...fresh].slice(-800); save();
+  const pn = P.name || 'партньора', prog = id => { const k = coopCountryOf(id), ks = k?.cities || []; return k && ks.includes(id) ? ` (${k.cc} ${k.nm}: ${ks.filter(doneJoint).length}/${ks.length} ключови града)` : ''; };
+  const nm = id => cityById(id)?.nm || id;
+  if (fresh.length === 1) toast(`🏁 ${pn} завърши ${nm(fresh[0])}${prog(fresh[0])}`, 'good');
+  else toast(`🏁 ${pn} завърши ${fresh.length} града: ${fresh.slice(0, 5).map(nm).join(', ')}${fresh.length > 5 ? '…' : ''}`, 'good');
 }
 // щом се създаде първата връзка — „Добре дошъл в …“ и другите градове се появяват
 function afCheckOpen() {
   if (!S) return;
   if (dev.has('EMPIRE') && !S.empireShown) { S.empireShown = true; save(); setTimeout(() => showEmpireEnd(), 600); }   // 🏁 финалът на играта
-  if (feature('coop-countries')) coopWonCheck();
+  if (feature('coop-countries')) { coopFinNews(); coopWonCheck(); }
   else { const won = wonCountries(x => econ.isFinished(x)); if (S.wonN == null) S.wonN = won.length;   // 🏆 нова завладяна държава — химн и картина
     else if (won.length > S.wonN) { const k = won[won.length - 1]; S.wonN = won.length; Sound.play('country'); xpMore(10000); flagWave(k); showEventPop('country-won', `🏆 ${k.cc} ${k.nm} е твоя!`, 'Всички ключови градове са завършени · +10% към прихода им'); toast(`🏆 Завладя ${k.cc} ${k.nm}! Всички ключови градове са завършени — +10% към прихода им.`, 'good'); save(); } }
   S.gateOpen = S.gateOpen || (S.afGateOpen ? { af: true } : {});
@@ -8539,7 +8571,7 @@ function refreshLandmarks() {
   for (const o of city.landmarks || []) if (!o.big) city.group.remove(o.group);
   city.landmarks = [...(city.bigLm || [])];   // големите (МГУ…) живеят в refreshMines3D
   if (city.sea?.port) (SEA_LANDMARKS[S.cityId] || []).forEach((k, i) => {   // в морето пред града (Статуята на свободата)
-    const o = buildSeaLandmark(k, { label, trees: plan2Trees() }), p = city.sea.port, x0 = tx(0);
+    const o = buildSeaLandmark(k, { label, trees: plan2Trees() }), p = city.sea.port, x0 = tx(0); if (feature('sydney-opera') && !o.kind) o.kind = k;   // 🎭 sydney-opera (одитът): операта (operaPoint) връщаше обект без вид — етикетът, търсенето по вид и одитът не я виждаха
     o.group.position.set(x0 + (p.xMax - x0) * (0.28 + i * 0.2), 0, p.z - 75); o.group.rotation.y = Math.PI;
     if (k === 'opera' && feature('lm-world2')) operaSpot(o.group);   // 🌏 lm-world2: подиумът — изцяло във водата (≥ 20 м от брега), към брега — само алеята
     city.group.add(o.group); city.landmarks.push(o);
@@ -14823,6 +14855,7 @@ if (AUTOTEST) {
     lookTir(k = 0, dist = 26) { const t = tirs.list[k]; if (!t) return; controls.target.set(t.x, 2, t.z); camera.position.set(t.x + dist * 0.8, dist * 0.6, t.z + dist * 0.7); fly = null; },
     money(n) { econ.earn(n, 'друго', 'тест'); },
     rep(n) { S.rep = n; },
+    cfnState() { return { seen: S.coopFinSeen || null, fin: coopFin(), on: feature('coop-fin-news'), cc: feature('coop-countries'), pid: window.__coopShared?.pid || null }; },   // coop-fin-news: какво е видяно
     coopWinTest(map = false, mine = 2) { const k = COUNTRIES.find(x => x.iso === 'DEU'), cut = k.cities.length - mine; window.__coopShared = { v: (window.__coopShared?.v || 0) + 1, name: 'Тест-партньор', hw: [], rails: [], cities: k.cities.slice(0, cut), infra: {}, col: null, fin: k.cities.slice(0, cut), wonC: [], me: 'a', pid: 'b' }; for (const id of k.cities.slice(cut)) if (!econ.isFinished(id)) econ.finishCity(id, 0.7, {}); afCheckOpen(); if (map) setTimeout(() => showMap(true), 4000); drawMap(); return { flag: feature('coop-countries'), localWon: countryProgress(k, x => econ.isFinished(x)).won, jointWon: countryProgress(k, doneJoint).won, moneyWon: countryProgress(k, moneyDone).won, incomeMul: wonIncomeMul(k.cities[cut], x => moneyDone(x)), lead: coopLead(k), wonN: S.wonN, seen: S.wonSeen, coopWon: S.coopWon || null, board: conquest.stats().eu.countries }; },
     // 🤝 coop-infra (Лаборатория): фалшив партньор — АМ „Черно море“ (A5) наполовину негова, жп Варна — Русе негова, летище и пристанище в Бургас негови
     coopInfraDemo(open = true, lower = false, claim = false) { const A5 = HIGHWAYS.find(h => h.id === 'A5'), ids = A5.segs.map((_, i) => segId(A5, i)), half = Math.ceil(ids.length / 2), pc = 'burgas';
