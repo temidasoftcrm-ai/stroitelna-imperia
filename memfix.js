@@ -5,7 +5,7 @@
 // Обектите Texture остават отделни (свои offset/repeat), сменя се само източникът. Зарежда се преди game.js.
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { feature } from './lab/feature.js';
-import { Texture } from 'three';
+import { Texture, BufferAttribute, StaticDrawUsage } from 'three';
 import { gfx, gfxLevel, gfxWeakGpu } from './gfxpresets.js';   // 🟠 gfx-lite: „Много ниско“ — текстурите до 256 px и без анизотропно филтриране (при зареждането)
 
 const N = 128, cv = document.createElement('canvas'); cv.width = cv.height = N;
@@ -170,4 +170,17 @@ if (DFREE) window.__freeDataTex = t => { if (!t || !t.isDataTexture || t.__dfree
   if (!MEMLITE) dfPend.push(new WeakRef(t)); };   // невидимите (порталите далеч) — качват се на заден план, за да се пусне копието (с дискретна видеокарта паметта отива във видеопаметта; при вградена — не)
 const dfPend = []; if (DFREE) setInterval(() => { if (!R || document.hidden) return; for (let n = 0; n < 4 && dfPend.length;) { const t = dfPend.shift().deref(); if (!t || !t.image || t.image.__rel) continue; try { R.initTexture(t); n++; } catch { } } }, 1000);
 window.__dataFree = () => ({ on: DFREE, ...dfStat, mb: Math.round(dfStat.mb) });
+// 🧠 mem-geo-free (T3, 31.10): масивите с върховете на статичната геометрия (~240 MB в късна игра) остават в паметта и след качването във видеокартата.
+// Атрибут на ARRAY_BUFFER, непроменен 20 s след качването, пуска масива си; поиска ли го някой (лъч при пожар, кутия, ново качване) —
+// чете се обратно синхронно от видеокартата (WebGL2 getBufferSubData през COPY_READ_BUFFER, без да пипа VAO). Индексите не се пипат
+// (ELEMENT_ARRAY_BUFFER не се чете обратно). Загубен контекст → буферите са изгубени → при възстановяване страницата се презарежда (записът е направен).
+const GEO = feature('mem-geo-free') && !/[?&]nogeofree/.test(location.search) && typeof WebGL2RenderingContext !== 'undefined', geoStat = { n: 0, mb: 0, back: 0, fail: 0 }, geoAll = [];
+let lastUp = null, EMPTY_GEO = null;
+if (GEO) { const bd = WebGL2RenderingContext.prototype.bufferData; WebGL2RenderingContext.prototype.bufferData = function (target, src, usage, ...r) { lastUp = target === this.ARRAY_BUFFER && src && src.byteLength > 4096 && usage === this.STATIC_DRAW ? { gl: this, buf: this.getParameter(this.ARRAY_BUFFER_BINDING) } : null; return bd.call(this, target, src, usage, ...r); };
+  BufferAttribute.prototype.onUploadCallback = function () { const u = lastUp; lastUp = null; if (!u || this.__geo || this.usage !== StaticDrawUsage || this.isInstancedBufferAttribute || !R || u.gl !== R.getContext()) return; this.__geo = { gl: u.gl, buf: u.buf, v: this.version, t: performance.now() }; geoAll.push(new WeakRef(this)); };
+  setInterval(() => { if (document.hidden) return; const now = performance.now(); for (let i = geoAll.length - 1; i >= 0; i--) { const at = geoAll[i].deref(); if (!at) { geoAll.splice(i, 1); continue; } const g = at.__geo; if (!g || g.freed) { geoAll.splice(i, 1); continue; } if (at.version !== g.v) { geoAll.splice(i, 1); continue; } if (now - g.t < 20000) continue; geoFree(at); geoAll.splice(i, 1); } }, 5000);
+  addEventListener('webglcontextrestored', () => { if (geoStat.n) { try { sessionStorage.setItem('stroi-geo-reload', '1'); } catch { } location.reload(); } }, true); }
+function geoFree(at) { const g = at.__geo, arr = at.array; if (!arr || !arr.byteLength) return; const C = arr.constructor, len = arr.length; let a = null; g.freed = 1; geoStat.n++; geoStat.mb += arr.byteLength / 2 ** 20;
+  Object.defineProperty(at, 'array', { configurable: true, get() { if (!a && g.freed && window.__lzPeek) return EMPTY_GEO || (EMPTY_GEO = new Float32Array(0)); if (!a && g.freed) { a = new C(len); const gl = g.gl; try { if (gl.isContextLost() || !gl.isBuffer(g.buf)) throw 0; const pb = gl.getParameter(gl.COPY_READ_BUFFER_BINDING); gl.bindBuffer(gl.COPY_READ_BUFFER, g.buf); gl.getBufferSubData(gl.COPY_READ_BUFFER, 0, a); gl.bindBuffer(gl.COPY_READ_BUFFER, pb); geoStat.back++; } catch { geoStat.fail++; } g.freed = 0; } return a; }, set(v) { a = v; g.freed = 0; } }); }
+window.__geoFree = () => ({ on: GEO, ...geoStat, mb: Math.round(geoStat.mb), pending: geoAll.length });
 window.__texFree = () => ({ on: FREE, ...freeStat, freedMB: Math.round(freeStat.freedMB), backMs: Math.round(freeStat.backMs) });

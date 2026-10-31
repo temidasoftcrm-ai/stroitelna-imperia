@@ -80,7 +80,7 @@ export function createCoop(d) {
 
   // извикване на сървъра; мрежовите грешки се повтарят със същите аргументи (и същия req_id)
   async function rpc(fn, args = {}, tries = 6) {
-    if (POLL2 && !/^coop_(status\d?|riv_status|snap)$/.test(fn)) forceFull = true;   // coop-poll2: собствено действие — следващият опрос е пълен
+    if (POLL2 && !/^coop_(status\d?|riv_status|snap|vault2|dividend|fleet\w*|batch\w*)$/.test(fn)) forceFull = true;   /* без автоматичните периодични (касата, дивидент, флота) */   // coop-poll2: собствено действие — следващият опрос е пълен
     let wait = 700; const t0 = Date.now();
     for (let i = 0; ; i++) {
       if (!sb) { rlog(fn, args, t0, i, null, 'Няма връзка с облака.'); throw new Error('Няма връзка с облака.'); }

@@ -559,6 +559,8 @@ const DEMOS = [
   ['🌃 Ню Йорк нощем отблизо (ny-night2): по-едрите прозорци до камерата, без пръстените около Рокфелер', 'newyork', d => setTimeout(() => { const L = d.city().landmarks.find(q => q.kind === 'rockefeller2'); if (!L) return; const p = L.group.position; d.time(22); d.camAt(p.x + 260, 60, p.z + 40, p.x + 60, 70, p.z - 260); }, 20000)],   // ny-night2
   ['🧱 Ню Йорк — тухлените жилищни сгради отблизо (ny-tenements): до ~200 м от камерата — моделите с противопожарните стълби вместо кутиите, денем', 'newyork', d => setTimeout(() => { const L = d.city().landmarks.find(q => q.kind === 'empire2'); if (!L) return; const p = L.group.position; d.time(13); d.camAt(p.x - 120, 45, p.z + 260, p.x - 40, 20, p.z + 80); }, 20000)],   // ny-tenements
   ['🧱 Ню Йорк — тухлените жилищни сгради нощем (ny-tenements): рядко светнали топли прозорци', 'newyork', d => setTimeout(() => { const L = d.city().landmarks.find(q => q.kind === 'empire2'); if (!L) return; const p = L.group.position; d.time(22); d.camAt(p.x - 120, 45, p.z + 260, p.x - 40, 20, p.z + 80); }, 20000)],   // ny-tenements
+  ['🏙️ Двойните кули денем (sky-twin): новият небостъргач на собственика на парцел в Мадрид — 200 м, по истинския път на поръчките', 'madrid', d => setTimeout(() => { d.skyLook('sf-sky-twin', false); }, 12000)],   // sky-twin
+  ['🏙️ Двойните кули нощем (sky-twin): топлите прозорци по етажите', 'madrid', d => setTimeout(() => { d.skyLook('sf-sky-twin', true, 0.6); }, 12000)],   // sky-twin
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя'], ['lab/coop-log.html', '🤝 Дневник на партньорството — чеклист за истински акаунти и извикванията към сървъра']];
 
