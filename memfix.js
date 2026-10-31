@@ -105,10 +105,13 @@ function freeable(src) {   // source.data става „мързеливо“ с
   st.back = raw => { if (st.rel) { d = readBack(st.rel, raw); st.rel = null; } else if (!raw && d instanceof ImageData) d = toCanvas(d); return d; };
   // three.js чете texture.image и само за проверка (клонинг → нова версия на текстурата, без ново качване) — тогава заместител;
   // ако качването наистина стигне до texImage2D/texSubImage2D, заместителят се сменя там с върнатата картинка (по-долу)
-  Object.defineProperty(src, 'data', { configurable: true, get() { if (st.rel) { if (THREE_CHK.test(new Error().stack)) return ph && ph.width === st.rel.w ? ph : (ph = { width: st.rel.w, height: st.rel.h, complete: true, __ph: st }); return st.back(); } return d instanceof ImageData && !THREE_CHK.test(new Error().stack) ? st.back() : d; }, set(v) { d = v; st.rel = null; } });
+  Object.defineProperty(src, 'data', { configurable: true, get() { if (st.rel) { if (THREE_CHK.test(new Error().stack)) return ph && ph.width === st.rel.w ? ph : (ph = { width: st.rel.w, height: st.rel.h, complete: true, __ph: st }); return st.back(); } if (!d && st.blob) { const ph2 = st.lzph || (st.lzph = { width: st.bw, height: st.bh, complete: false }); if (window.__lzPeek) return ph2; if (THREE_CHK.test(new Error().stack)) { st.lazy(); return ph2; } return st.lazy(); }   /* complete: false — three.js не качва, опитва на следващия кадър (докато декодирането свърши); кодът на играта — 4×4 */ return d instanceof ImageData && !THREE_CHK.test(new Error().stack) ? st.back() : d; }, set(v) { d = v; st.rel = null; st.blob = null; } });
   Object.defineProperty(src, 'needsUpdate', { configurable: true, set(v) { if (v === true && !st.rel) src.version++; } });   // пусната = непроменена (никой няма копие) — клонингът не изисква ново качване
   st.drop = () => { const im = d; d = null; if (im && im.close) im.close(); else if (im instanceof HTMLCanvasElement) im.width = im.height = 0; };
   st.peek = () => d;   // без възстановяване (за измерванията)
+  // 🧠 mem-lazy-img: неначертаната картинка — само компресираният файл (Blob); при нужда се декодира отново (докато е готова — 4×4 сиво, после ново качване)
+  st.evict = (b, w, h) => { d = null; st.blob = b; st.bw = w; st.bh = h; st.lzph = null; lazyStat.n++;   /* без close()/0×0: същата картинка може да е и в друг Source (цветови варианти) — пуска се само нашата препратка, събирачът я освобождава */ lazyStat.mb += w * h * 4 / 2 ** 20; };
+  st.lazy = () => { if (!THREE_CHK.test(new Error().stack)) { const f = ((new Error().stack || '').split('\n').slice(2).find(l => !/memfix\.js/.test(l)) || '').replace(/^.*\/([a-z0-9-]+\.js).*$/i, '$1').trim().slice(0, 40); lazyStat.readers[f] = (lazyStat.readers[f] || 0) + 1; } if (!st.dec) { const { blob, opts } = st.blob; lazyStat.req++; st.dec = decQ(() => CIB(blob, ...(opts || []))).then(bm => { if (!st.blob) { bm.close(); return; } d = bm; st.blob = null; st.dec = null; lazyStat.back++; }).catch(() => { st.dec = null; }); } return PH4(); };
   return st;
 }
 function onUp(tex) {   // three.js вика onUpdate след всяко качване — в кой да е рендер; пускаме само когато главният го има
@@ -120,7 +123,7 @@ function onUp(tex) {   // three.js вика onUpdate след всяко кач�
 const THREE_UBYTE = 1009;   // THREE.UnsignedByteType
 const THREE_CHK = /setTexture2D|uploadTexture/;
 if (FREE) for (const P of [window.WebGL2RenderingContext, window.WebGLRenderingContext].filter(Boolean).map(c => c.prototype)) for (const fn of ['texImage2D', 'texSubImage2D']) {
-  const f0 = P[fn]; P[fn] = function (...a) { const l = a[a.length - 1]; if (l && l.__ph) a[a.length - 1] = l.__ph.back(true); return f0.apply(this, a); };
+  const f0 = P[fn]; P[fn] = function (...a) { const l = a[a.length - 1]; if (l && l.__ph) a[a.length - 1] = l.__ph.back(true); return f0.apply(this, a); };   // mem-lazy-img: докато се декодира — 4×4
 }
 function markFree(tex) {
   if (!FREE || !tex || !tex.isTexture || tex.__freeOk || tex.isDataTexture || tex.isCompressedTexture || tex.isVideoTexture || !tex.source) return;
@@ -128,15 +131,43 @@ function markFree(tex) {
   if (im !== 1 && !(im instanceof HTMLCanvasElement || (typeof ImageBitmap !== 'undefined' && im instanceof ImageBitmap))) return;
   tex.__freeOk = 1; freeable(tex.source); const up0 = tex.onUpdate; tex.onUpdate = t => { up0 && up0(t); onUp(t); };
   tex.dispose = function () { this.__gone = 1; const st = this.source.__free; if (st && st.rel) void this.source.data; return Object.getPrototypeOf(this).dispose.call(this); };   // преди изтриването във видеокартата — обратно в паметта
-  pend.push(new WeakRef(tex));
+  pend.push(new WeakRef(tex)); if (LAZY) { tex.source.__born = tex.source.__born || performance.now(); lazyAll.push(new WeakRef(tex)); }
 }
 // невидимите още модели (в кеша, скрити по разстояние) — качват се на порции на заден план, после се пускат и техните копия
 // ⚡ mem-lite (4.1.x, паметта на слабите компютри): на „Ниско“/„Много ниско“ невидимите модели НЕ се качват предварително — горният цикъл
 // качваше на заден план текстурите на всеки зареден модел (и на неизползваните — други градове, варианти): ~1200 текстури до 512² с мип-нива,
 // ~1,5 GB във видеокартата, която при вградената карта е обща памет (2,4 GB и засичане на картата на света). Сега — само каквото се рисува.
+// 🧠 mem-lazy-img (T3/T2, 31.10): в късна игра кешът пази модели на всички градове — неначертаните държат декодираните картинки (1,15 GB ImageBitmap
+// + 304 MB смалени платна на слаб компютър, където фоновото качване е спряно — mem-lite). Картинка, която 30 s след зареждането още не е качвана,
+// пази само компресирания си файл (Blob — webp/png/jpg на GLB, или webp от смаленото платно) и се декодира отново, щом потрябва.
+const LAZY = feature('mem-lazy-img') && !/[?&]nolazyimg/.test(location.search), lazyStat = { n: 0, mb: 0, back: 0, req: 0, readers: {} }, lazyAll = [], BLOB = new WeakMap();
+const CIB = typeof createImageBitmap === 'function' ? createImageBitmap.bind(window) : null;
+if (LAZY && CIB) window.createImageBitmap = function (src, ...a) { const p = CIB(src, ...a); return src instanceof Blob ? p.then(bm => { BLOB.set(bm, { blob: src, opts: a }); return bm; }) : p; };   // GLTFLoader (ImageBitmapLoader): кой Blob стана тази картинка
+let decN = 0; const decW = []; const decQ = f => new Promise((res, rej) => { const go = () => { decN++; f().then(res, rej).finally(() => { decN--; const n = decW.shift(); if (n) n(); }); }; if (decN < 4) go(); else decW.push(go); });   // най-много 4 декодирания наведнъж (без буря при нов изглед)
+let ph4 = null; const PH4 = () => ph4 || (ph4 = (() => { const c = document.createElement('canvas'); c.width = c.height = 4; const g = c.getContext('2d'); g.fillStyle = '#8a8a8a'; g.fillRect(0, 0, 4, 4); return c; })());
+if (LAZY && CIB) setInterval(() => { if (document.hidden) return; const now = performance.now(); let k = 0;
+  for (let i = lazyAll.length - 1; i >= 0 && k < 80; i--) { const t = lazyAll[i].deref(); if (!t || t.__gone) { lazyAll.splice(i, 1); continue; } const src = t.source, st = src.__free; if (!st || st.rel || st.blob || st.dec) { if (st && (st.rel || st.blob)) lazyAll.splice(i, 1); continue; }
+    if (now - (src.__born || now) < 30000) continue; const im = st.peek(); if (!im || !(im.width > 0)) continue;
+    if (R && R.properties.get(src).__version === src.version) continue;   // качена — пуска я tex-free
+    const w = im.width, h = im.height;
+    if (typeof ImageBitmap !== 'undefined' && im instanceof ImageBitmap) { const b = BLOB.get(im); if (b) { st.evict(b, w, h); lazyAll.splice(i, 1); k++; } }
+    else if (im instanceof HTMLCanvasElement) { k++; lazyAll.splice(i, 1); im.toBlob(bl => { if (bl && st.peek() === im && !st.rel && !(R && R.properties.get(src).__version === src.version)) st.evict({ blob: bl, opts: [{ imageOrientation: 'none' }] }, w, h); }, 'image/webp', 0.92); } } }, 4000);
+window.__lazyImg = () => ({ on: LAZY, ...lazyStat, mb: Math.round(lazyStat.mb), pending: lazyAll.length, inflight: decN + decW.length });
 const MEMLITE = feature('mem-lite') && (/low/.test(gfxLevel()) || gfxWeakGpu());   // и на „Средно“/„Високо“ с вградена видеокарта (там видеопаметта е общата памет)
 const pend = []; setInterval(() => { if (!R || document.hidden || MEMLITE) return; for (let n = 0; n < 12 && pend.length;) { const t = pend.shift().deref(); if (!t || t.__gone) continue; const st = t.source.__free; if (!st || st.rel || !st.peek()) continue;
   if (R.properties.get(t.source).__version === t.source.version) continue; try { R.initTexture(t); n++; } catch { } } }, 1500);
 if (FREE && !/[?&]nomemfix/.test(location.search)) { const p0 = GLTFLoader.prototype.parse; GLTFLoader.prototype.parse = function (data, path, onLoad, onError) {
   return p0.call(this, data, path, gltf => { try { for (const sc of gltf.scenes || [gltf.scene]) sc.traverse(o => { for (const m of [].concat(o.material || [])) for (const k in m) markFree(m[k]); }); } catch (e) { } onLoad(gltf); }, onError); }; }
+// 🧠 mem-data-free (T3): големите DataTexture от платната (texdata.js canvasTex — порталите над магистралите, билбордовете; над 512², т.е. извън texGuard)
+// пазеха копие на пикселите (~80 MB в късна игра). След качване в главния рендер копието се пуска; поиска ли го някой (drawable, ново качване) —
+// чете се обратно от видеокартата (readBack), както при tex-free.
+const DFREE = feature('mem-data-free') && !/[?&]nodatafree/.test(location.search), dfStat = { n: 0, mb: 0, back: 0 };
+if (DFREE) window.__freeDataTex = t => { if (!t || !t.isDataTexture || t.__dfree) return; t.__dfree = 1; const up0 = t.onUpdate;
+  t.onUpdate = tt => { up0 && up0(tt); dfStat.calls = (dfStat.calls || 0) + 1; const img = tt.image; if (!R || !img || img.__rel || !img.data) { dfStat.skip = (!R ? 'R' : !img ? 'img' : img.__rel ? 'rel' : 'data'); return; } const p = R.properties.get(tt); if (!p.__webglTexture || tt.type !== THREE_UBYTE) { dfStat.skip = 'wt:' + !!p.__webglTexture + ':' + tt.type; return; }
+    let d = img.data; const rel = { gt: p.__webglTexture, w: img.width, h: img.height, flipY: tt.flipY }; img.__rel = rel; dfStat.n++; dfStat.mb += d.byteLength / 2 ** 20;
+    Object.defineProperty(img, 'data', { configurable: true, get() { if (img.__rel) { const id = readBack(img.__rel, true), px = id && id.data ? id.data : id && id.getContext ? id.getContext('2d').getImageData(0, 0, id.width, id.height).data : new Uint8ClampedArray(img.width * img.height * 4); d = new Uint8Array(px.buffer, px.byteOffset, px.byteLength); img.__rel = null; dfStat.back++; } return d; }, set(v) { d = v; img.__rel = null; } });
+    d = null; };
+  if (!MEMLITE) dfPend.push(new WeakRef(t)); };   // невидимите (порталите далеч) — качват се на заден план, за да се пусне копието (с дискретна видеокарта паметта отива във видеопаметта; при вградена — не)
+const dfPend = []; if (DFREE) setInterval(() => { if (!R || document.hidden) return; for (let n = 0; n < 4 && dfPend.length;) { const t = dfPend.shift().deref(); if (!t || !t.image || t.image.__rel) continue; try { R.initTexture(t); n++; } catch { } } }, 1000);
+window.__dataFree = () => ({ on: DFREE, ...dfStat, mb: Math.round(dfStat.mb) });
 window.__texFree = () => ({ on: FREE, ...freeStat, freedMB: Math.round(freeStat.freedMB), backMs: Math.round(freeStat.backMs) });

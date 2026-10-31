@@ -21,7 +21,7 @@ const JCOL = '#b45cff';   // общ строеж — лилав
 const ORDER_SHARE = 0.4, PROFIT_OF = 0.67;   // 40% от печалбата на поръчката (≈ сумата без материалите, ~⅓) → холдинга
 const hueOf = hex => { const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return null; const n = parseInt(m[1], 16), r = (n >> 16) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), c = mx - mn; if (c < 0.15) return null; const h = mx === r ? ((g - b) / c) % 6 : mx === g ? (b - r) / c + 2 : (r - g) / c + 4; return (h * 60 + 360) % 360; };
 const PEND = 'stroi-coop-pending', NAME = 'stroi-coop-name', POLL = 10000, SNAP_EVERY = 20000;
-const AUTOTEST = /[?&]autotest/.test(location.search);
+const AUTOTEST = /[?&]autotest/.test(location.search) && !/[?&]cooptest/.test(location.search);   // &cooptest — тестът на партньорството с подменен сървър (coop-poll2): опросът върви и в autotest
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 // данните от партньора (coop_snap, coop_status2) идват от чужд клиент — сървърът не ги проверява (вж. бележката SERVER-VALIDATION долу):
 // текстът — без HTML знаци, числата — числа, id-тата — само [\w.-], цветът — #hex; така нищо не стига до innerHTML/SVG сурово
@@ -71,6 +71,7 @@ export function createCoop(d) {
   // облакът се зарежда отделно: ако няма интернет, самостоятелната игра работи както винаги
   let cloud = { user: () => null, sb: null }, sb = null;
   import('./cloud.js').then(m => { cloud = m.cloud; sb = cloud.sb; sb.auth.onAuthStateChange(() => setTimeout(tick, 300)); tick(); }).catch(() => {});
+  const POLL2 = feature('coop-poll2'); let fullAt = 0, rSig = '', forceFull = false, snapSig = '';   // 📡 coop-poll2 (T3): по-рядък опрос (2615 заявки за ~80 мин. → ~3 пъти по-малко)
   let fetchedAt = 0, st4 = null, stRiv = null;   // stRiv — ⚖️ coop-riv-core (coop_riv_status); кога за последно дойдоха данните на партньора (горната лента на центъра)
   let st3 = null, st2 = null, tab = 'help', lastMarks = 0, st = null, open = false, busy = false, lastSnap = 0, user = null, applying = false;
   const E = () => d.econ(), f = n => d.fmt(n);
@@ -79,6 +80,7 @@ export function createCoop(d) {
 
   // извикване на сървъра; мрежовите грешки се повтарят със същите аргументи (и същия req_id)
   async function rpc(fn, args = {}, tries = 6) {
+    if (POLL2 && !/^coop_(status\d?|riv_status|snap)$/.test(fn)) forceFull = true;   // coop-poll2: собствено действие — следващият опрос е пълен
     let wait = 700; const t0 = Date.now();
     for (let i = 0; ; i++) {
       if (!sb) { rlog(fn, args, t0, i, null, 'Няма връзка с облака.'); throw new Error('Няма връзка с облака.'); }
@@ -251,12 +253,17 @@ export function createCoop(d) {
     if (!user) { st = null; mount(); return; }
     for (const op of pend()) await runOp(op);   // недоизпратените от миналия път
     try {
-      if (d.ready() && Date.now() - lastSnap > SNAP_EVERY) { lastSnap = Date.now(); await rpc('coop_snap', { p_data: snapshot() }, 1); }
+      if (d.ready() && Date.now() - lastSnap > SNAP_EVERY) { const sn = snapshot(), sg = POLL2 ? JSON.stringify([sn.cities, sn.hwDone, sn.hwJobs, sn.rails, sn.fin, sn.here, sn.hq, sn.name, sn.col]) : '';
+        if (!POLL2 || sg !== snapSig || Date.now() - lastSnap > 60000) { lastSnap = Date.now(); snapSig = sg; await rpc('coop_snap', { p_data: sn }, 1); } }   /* coop-poll2: снимката — при промяна (градове, мрежи, завършени) или веднъж на минута (парите, деня) */
       const r = await rpc('coop_status', {}, 1);
       pickCol();
       const before = JSON.stringify([st?.partner?.snap?.cities || [], st2?.joints || [], window.__coopShared?.v, PCOL]);
       if (r && r.ok && r.partner) r.partner = { ...r.partner, snap: cleanSnap(r.partner.snap) };   // чуждите данни — изчистени веднъж тук
       st = r && r.ok ? r : st; if (r && r.ok) fetchedAt = Date.now();
+      // 📡 coop-poll2: status2/3/4/riv — пълно на 30 s, веднага при отворен панел, след собствено действие или щом coop_status се промени (действие на партньора)
+      const rs = POLL2 && r && r.ok ? JSON.stringify([r.pair, r.inbox, r.partner && { ...r.partner, at: 0, online: 0, snap: r.partner.snap && [r.partner.snap.cities, r.partner.snap.hwDone, r.partner.snap.hwJobs, r.partner.snap.rails, r.partner.snap.fin] }]) : '';
+      const full = !POLL2 || open || forceFull || rs !== rSig || Date.now() - fullAt > 30000 || st?.pair?.status !== 'active';
+      if (full) { fullAt = Date.now(); rSig = rs; forceFull = false;
       const r2 = st?.pair?.status === 'active' ? await rpc('coop_status2', {}, 1) : null;
       st2 = r2 && r2.ok && r2.active ? cleanSt2(r2) : null;
       if (r && r.ok && !st2 && st?.pair?.status !== 'active') batchRefund();   // 📦 партньорството го няма — натрупаното се връща
@@ -265,7 +272,7 @@ export function createCoop(d) {
       const r4 = st2 && feature('coop-center2') ? await rpc('coop_status4', {}, 1).catch(() => null) : null;   // правилата на общата каса (миграция coop4 — без нея няма карта)
       st4 = r4 && r4.ok && r4.active ? r4 : null;
       const r5 = st2 && feature('coop-riv-core') ? await rpc('coop_riv_status', {}, 1).catch(() => null) : null;   // ⚖️ coop-riv-core: режимът и отношенията (миграция coop6 — без нея няма данни)
-      stRiv = r5 && r5.ok && r5.active ? r5 : null;
+      stRiv = r5 && r5.ok && r5.active ? r5 : null; }
       shareMap();
       if (feature('coop-split') && d.splitTick) d.splitTick();   // 🤝 coop-split: известията и „Разделяне на трасето“
       const J = (st2?.joints || []).filter(j => j.status === 'active');

@@ -12,7 +12,9 @@ export function canvasTex(c) {
   const t0 = performance.now(), W = c.width, H = c.height, d = new Uint8Array(c.getContext('2d', CPU).getImageData(0, 0, W, H).data.buffer);
   STAT.n++; STAT.px += W * H; STAT.ms += performance.now() - t0; if (isEmpty(d)) { STAT.empty++; STAT.emptyAt.push(W + 'x' + H); }   // празно платно (изгубено още при рисуването) — за facDiag
   // като CanvasTexture: flipY = true (редът 0 — горе), за да работи и кодът, който после сменя flipY (напр. по GLB текстурата)
-  const t = new THREE.DataTexture(d, W, H, THREE.RGBAFormat); t.flipY = true; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.needsUpdate = true; return t;
+  const t = new THREE.DataTexture(d, W, H, THREE.RGBAFormat); t.flipY = true; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.needsUpdate = true;
+  if (W * H > 512 * 512 && typeof window !== 'undefined' && window.__freeDataTex) window.__freeDataTex(t);   // 🧠 mem-data-free (memfix.js): големите (извън texGuard) — без копие на пикселите след качване
+  return t;
 }
 // fac-data: кодът, който рисува/чете картинката на текстура (маски, преоцветяване, изрязване), получава платно и за DataTexture
 // (image = { data, width, height }, редът 0 — горе, както в платното); кешира се за всяка картинка
@@ -32,7 +34,7 @@ export function texGuard(renderer, scene) {
   const meanA = (d, n) => { let s = 0; const k = Math.max(1, Math.floor(n / 4096)); let c = 0; for (let i = 0; i < n; i += k, c++) s += d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2] + d[i * 4 + 3]; return s / c / 4; };
   const pr = gl.getParameter(gl.FRAMEBUFFER_BINDING);
   scene.traverse(o => { if (!o.isMesh) return; for (const m of [].concat(o.material)) { const t = m && m.map; if (!t || !t.isDataTexture || seen.has(t)) continue; seen.add(t);
-    const im = t.image, gt = P.get(t).__webglTexture; if (!im || !im.data || !gt || !gl.isTexture(gt)) continue; const W = im.width, H = im.height; if (W * H > 512 * 512) continue;
+    const im = t.image, gt = P.get(t).__webglTexture; if (!im || im.__rel || !(im.width * im.height <= 512 * 512) || !im.data || !gt || !gl.isTexture(gt)) continue; const W = im.width, H = im.height;   /* размерът — преди im.data: mem-data-free пуска данните на големите и четенето им ги връща от видеокартата */
     const cpu = meanA(im.data, W * H); if (cpu < 8) continue; st.checked++;
     gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, gt, 0);
     if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) continue; const px = new Uint8Array(W * H * 4); gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
