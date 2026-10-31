@@ -68,7 +68,7 @@ const FLOORS = n => (n.startsWith('office2-l') ? OFFICE2_FL[+n.slice(9) - 1] : 0
 // когато прозорците са отделна част, но със същия материал като стените: [/името на частта/, режим] — материалът ѝ се клонира
 // 🗽 ny-tenements (T2): тухлените и каменните — прозорците от текстурата ('darkC', като блоковете на Ню Йорк); стъклените кули (2, 4) — мрежа от етажи ('grid2')
 
-Object.assign(MODE, { whitehall: 'darkC', nyannex: 'darkC', fifth500: 'darkC', park605: 'darkC', 'ny-ten-1': 'darkC', 'ny-ten-3': 'darkC', 'ny-ten-5': 'darkC', 'ny-ten-6': 'darkC', 'ny-ten-2': 'grid2', 'ny-ten-4': 'grid2' });
+Object.assign(MODE, { whitehall: 'darkC', nyannex: 'darkC', fifth500: 'darkC', park605: 'darkC', 'ny-ten-1': 'grid2', 'ny-ten-3': 'grid2', 'ny-ten-5': 'grid2', 'ny-ten-6': 'grid2', 'ny-ten-2': 'grid2', 'ny-ten-4': 'grid2' });
 Object.assign(MODE, Object.fromEntries(['jp-narrow', 'jp-trad', 'jp-modern', 'jp-home1', 'jp-home2', 'jp-home3', 'jp-neon'].map(k => [k, 'darkC'])));   // 🇯🇵 одитът №6: японските къщи (tokyo-look) нощем бяха тъмни — прозорците (тъмното по стените) светят
 MODE.mbs3 = 'coolW';   // 🇸🇬 одитът №8: Марина Бей Сандс нощем — етажите на кулите (маска на прозорците), не цялата текстура равно като денем
 const MESH_MODE = { 'h2-blue': [/Windows/i, 'solidW'] };   // синята къща — прозорците светят целите, топло
