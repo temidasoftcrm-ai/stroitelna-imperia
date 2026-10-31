@@ -4540,6 +4540,18 @@ function urgentGo(p) {
   } else if (!sent) toast('Всичко нужно за етапа вече е на обекта.', '');
   renderPanel();
 }
+// 🚨 urgent-auto (собственикът, 31.10): от ниво 7 на фирмата „Тръгвайте спешно“ се натиска само — 10 s (игрово време, не на пауза), след като бутонът се появи.
+// Само наличната техника (urgentDispatch, без прозореца „🛒 Купи“); каквото липсва — бутонът остава за ръчно купуване, нов опит след още 10 s.
+const URG_AUTO_LV = 7, URG_AUTO_S = 10, urgSeen = new WeakMap();
+setInterval(() => {
+  if (!S || !speed || (AUTOTEST && !/[?&]urgtest/.test(location.search)) || !feature('urgent-btn') || !feature('urgent-auto') || dev.best() < URG_AUTO_LV) return;
+  for (const p of projects.slice()) {
+    if (!missingRoles(p).some(r => r.working < r.cnt)) { urgSeen.delete(p); continue; }   // същото условие като бутона
+    const t = (urgSeen.get(p) || 0) + 1; if (t < URG_AUTO_S) { urgSeen.set(p, t); continue; }
+    urgSeen.delete(p); const r = urgentDispatch(p);
+    if (r?.sent.length) { toast(`🚨 „${p.title}“: тръгнаха спешно сами (${r.sent.length}).`, 'good'); renderPanel(); }
+  }
+}, 1000);
 // защо липсва техниката (картата на обекта): няма такава в града / заета на друг обект / прибира се
 function unitWhy(p, role) {
   const us = units.filter(u => u.type === role); if (!us.length) return 'няма в града — купи';
