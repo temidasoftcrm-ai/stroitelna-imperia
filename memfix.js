@@ -53,6 +53,8 @@ function shrink(tex, maxT = MAXT) {
 // 🟠 vlow-tex (T3, „Много ниско“): още по-малко памет за текстурите — без картите за релеф/грапавост/метал/сенки (нормали, roughness/metalness, AO:
 // на слаб компютър разликата почти не се вижда, а всяка е още една картинка до 512² на модел) и забележителностите до 512 px (досега — в пълен размер).
 // Махат се преди общия кеш (bySig), за да не останат в паметта. Без картата металността ще е 1 навсякъде (тъмно) — затова 0.
+// 🧠 mem-tex2 (T3, паметта в късна игра): на „Средно“ текстурите на забележителностите (assets/heavy/lm) — до 1024 px (досега в пълен размер, до 2048² — ~21 MB всяка); на „Високо“ — както досега
+const MT2 = feature('mem-tex2') && gfxLevel() === 'mid', MT2_LM = 1024;
 const VLT = feature('vlow-tex') && gfxLevel() === 'vlow' && !/[?&]novlt/.test(location.search), VLT_LM = 512, DROP = ['normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'bumpMap', 'displacementMap', 'clearcoatNormalMap', 'clearcoatRoughnessMap'], vlt = { dropped: 0, mats: 0 };
 function dropMaps(root) {
   root.traverse(o => { for (const m of [].concat(o.material || [])) { if (!m || m.__vlt) continue; m.__vlt = 1; let n = 0;
@@ -63,7 +65,7 @@ export function shareTextures(root, path = '') {
   if (VLT) dropMaps(root);
   shareTextures0(root);   // първо общите картинки (подписът се смята от оригинала — бързо), после смаляване веднъж на източник
   const lm = /\/lm\//.test(path);
-  if (SHRINK && (!lm || VLT)) root.traverse(o => { for (const m of [].concat(o.material || [])) for (const key in m) { const v = m[key]; if (v && v.isTexture) shrink(v, lm ? VLT_LM : MAXT); } });   // vlow-tex: и забележителностите (до 512)
+  if (SHRINK && (!lm || VLT || MT2)) root.traverse(o => { for (const m of [].concat(o.material || [])) for (const key in m) { const v = m[key]; if (v && v.isTexture) shrink(v, lm ? (VLT ? VLT_LM : MT2_LM) : MAXT); } });   // vlow-tex: и забележителностите (до 512); mem-tex2: на „Средно“ — до 1024
 }
 const SHRINK = (feature('tex512') || LITE_T) && !/[?&]notex512/.test(location.search);   // ?notex512 — за сравнение в тестовете
 function shareTextures0(root) {

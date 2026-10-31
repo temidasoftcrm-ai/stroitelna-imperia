@@ -14501,7 +14501,7 @@ if (AUTOTEST) {
       const L = city.lots.map((l, i) => [l, i]).filter(([l]) => !l.busy && !l.built && !l.obj && (l.w || 16) >= 14).sort((a, b) => Math.hypot(a[0].x - h.x, a[0].z - h.z) - Math.hypot(b[0].x - h.x, b[0].z - h.z)).slice(0, models.length);
       S.officeLevel = OFFICE_LEVELS.length; L.forEach(([l, i], j) => { est().land.push(i); buildOnLand(i, 'tower', true); const p = projects.find(q => q.lot === i); if (p) { p.model = models[j]; out.push({ lot: i, id: p.id, model: p.model }); } }); return out; },
     prLock(v = 1) { window.__prLock = v || 0; if (v) renderer.setPixelRatio(v); return renderer.getPixelRatio(); },   // снимките: пълна резолюция, без автоматичното сваляне при бавни кадри (0 — обратно)
-    time(h) { const f = (((h - 6) / 24) % 1 + 1) % 1 * CYCLE_DAYS; S.day = 1 + Math.floor(f); S.dayT = (f % 1) * DAY_SEC; setSpeed(0); },
+    time(h) { const f = (((h - 6) / 24) % 1 + 1) % 1 * CYCLE_DAYS; S.day = 1 + Math.floor(f); S.dayT = (f % 1) * DAY_SEC; setSpeed(0); try { renderTop(); } catch { } },   // часовникът горе — веднага (на пауза не се обновяваше: демата в Лабораторията показваха 13:00 нощем)
     level(n, gn = n) { S.officeLevel = n; S.garageLevel = gn; buildHQ(); for (const u of units) if (!u.proj) releaseUnit(u); },
     upgrade: k => startUpgrade(k),
     pick: id => pickLot(city.lots[id == null ? city.lots.find(l => !l.built && !l.busy).id : id]),
