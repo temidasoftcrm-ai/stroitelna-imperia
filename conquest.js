@@ -51,6 +51,22 @@ export function createConquest(deps) {
     return m;
   }
 
+  // 📍 conquest-left (собственикът: „на Африка съм 98%, но не знам кои държави и градове остават“): под континента от 80% нагоре —
+  // какво точно липсва; градът е бутон, който го показва на картата (deps.go)
+  const LEFT_MAX = 14;
+  function leftHtml(ck, r) {
+    if (!deps.left || !deps.left() || r.pct >= 100 || (r.pct < 80 && !globalThis.__cqAll)) return '';   // __cqAll — тест: и под 80%
+    const m = missing(), nm = id => deps.cityName ? deps.cityName(id) : id, inC = id => contKey(id) === ck;
+    const city = id => `<button class="btn2" data-cqgo="${id}" style="padding:1px 7px;font-size:12px;margin:2px 3px 2px 0">${nm(id)}</button>`;
+    const items = [];
+    for (const k of m.countries) if (inC(k.cities[0])) items.push(`🏳️ <b style="color:var(--txt)">${k.cc} ${k.nm}</b> — незавършени: ${k.cities.map(city).join('')}`);
+    const segs = (ids, ico, lbl) => { const L = ids.map(id => deps.segEnds && deps.segEnds(id)).filter(e => e && inC(e[0])); if (L.length) items.push(`${ico} ${lbl}: ${L.slice(0, LEFT_MAX).map(([a, b]) => `${city(a)}— ${city(b)}`).join(' · ')}${L.length > LEFT_MAX ? ' …' : ''}`); };
+    segs(m.hw, '🛣️', 'Магистрали'); segs(m.ab, '🔴', 'Аутобани');
+    const pl = (ids, ico, lbl) => { const L = ids.filter(inC); if (L.length) items.push(`${ico} ${lbl}: ${L.slice(0, LEFT_MAX).map(city).join('')}${L.length > LEFT_MAX ? ' …' : ''}`); };
+    pl(m.ports, '⚓', 'Пристанища'); pl(m.air, '✈️', 'Летища');
+    return items.length ? `<div style="margin-top:6px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.04);font-size:12px;line-height:1.9;color:var(--mut)"><b style="color:var(--acc)">📍 До 100% остава:</b><br>${items.join('<br>')}</div>` : '';
+  }
+
   const bar = (pct, h = 8) => `<div style="height:${h}px;border-radius:${h}px;background:rgba(255,255,255,.08);overflow:hidden"><div style="height:100%;width:${pct}%;background:linear-gradient(90deg,var(--acc),var(--ok))"></div></div>`;
 
   function html() {
@@ -62,13 +78,14 @@ export function createConquest(deps) {
       return `<div style="margin:0 0 14px">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><b>${k.ico} ${k.nm}</b><b style="color:var(--acc);font-size:18px">${r.pct}%</b></div>
         ${bar(r.pct)}
-        <div style="color:var(--mut);font-size:12px;margin-top:5px;line-height:1.7">${cats}</div></div>`;
+        <div style="color:var(--mut);font-size:12px;margin-top:5px;line-height:1.7">${cats}</div>${leftHtml(k.key, r)}</div>`;
     }).join('');
     const wp = world[1] ? Math.round(world[0] / world[1] * 100) : 0;
     return `<div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><b>🌍 Целият свят</b><b style="color:var(--ok);font-size:22px">${wp}%</b></div>${bar(wp, 12)}</div>${rows}
       <div style="color:var(--mut);font-size:12px">Държава е завладяна, когато завършиш всичките ѝ ключови градове. Пристанищата и летищата се броят, щом построиш първото ниво.</div>`;
   }
 
-  const open = () => deps.modal('🏆 Завладяване', html(), [['Добре', null]]);
+  const open = () => { deps.modal('🏆 Завладяване', html(), [['Добре', null]]);
+    if (deps.go) document.querySelectorAll('[data-cqgo]').forEach(b => b.onclick = () => deps.go(b.dataset.cqgo)); };
   return { stats, html, open, missing };
 }

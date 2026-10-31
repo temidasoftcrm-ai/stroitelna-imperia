@@ -5,6 +5,8 @@
  "Аутобани": "Autobahns",
  "Пристанища": "Ports",
  "Летища": "Airports",
+ "— незавършени: {0}": "— unfinished: {0}",
+ "📍 До 100% остава:": "📍 Left to reach 100%:",
  "🌍 Целият свят": "🌍 The whole world",
  "Държава е завладяна, когато завършиш всичките ѝ ключови градове. Пристанищата и летищата се броят, щом построиш първото ниво.": "A country is conquered once you complete all its key cities. Ports and airports count as soon as you build the first level.",
  "🏆 Завладяване": "🏆 Conquest",
