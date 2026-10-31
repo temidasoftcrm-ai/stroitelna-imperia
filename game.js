@@ -925,10 +925,11 @@ const twNear = id => { const r = { V: plan2.twV || null, fn: towerNear, o: { key
 const itBldOn = id => feature('it-bld') && id !== 'rome' && cityById(id)?.cc === '🇮🇹';
 // 🗽 ny-tenements (T2): в Ню Йорк около камерата (до ~220 м) — тухлените жилищни сгради на собственика вместо кутиите: ниските (12–34 м, не в Мидтаун/ФиДи) — tenement-1,
 // тесните средни (40–85 м) — tenement-2, рядко (≈1 на 40) на голям парцел — tenement-3 (гражданска сграда); отдалеч — кутиите (romeNear: LOD по разстояние)
+const NYDENSE = feature('ny-dense');   // ny-dense: фасадите са по 13 м — тухлените не по-широки от кутията (иначе се застъпват със съседите)
 const nyNear = () => { const h = b => ((Math.round(b.x * 3) * 73856093) ^ (Math.round(b.z * 3) * 19349663)) >>> 0, r = { V: plan2.nyV || null, o: { R: 200, fill: true, yaws: [0], pick: Object.keys(NY_FILES),
     // собственикът: ниските — в истински ръст (8 етажа ≈ 26–30 м, основата по парцела, ≥ 20 м), по-нагъсто — не (≈ половината от кутиите); кулите (tenement-2) — различна височина: 40…100 % (по мястото)
     pickFor: b => b.t === 5 ? [] : b.h >= 40 && b.h <= 85 && Math.min(b.w, b.d) <= 26 ? ['ny-ten-2', 'ny-ten-4'] : !b.nyTall && b.h >= 12 && b.h <= 34 && Math.min(b.w, b.d) >= 12 && h(b) % 2 === 0 ? (h(b) % 40 === 0 && b.w * b.d > 450 ? ['ny-ten-3'] : ['ny-ten-1', 'ny-ten-5', 'ny-ten-6']) : [],
-    size: (b, k) => k === 'ny-ten-2' || k === 'ny-ten-4' ? [b.w * 0.97, b.h * (0.4 + 0.1 * (h(b) % 7)), b.d * 0.97] : k === 'ny-ten-1' || k === 'ny-ten-5' || k === 'ny-ten-6' ? [Math.max(b.w * 0.97, 20), 26 + (h(b) % 5), Math.max(b.d * 0.97, 20)] : [b.w * 0.97, Math.max(b.h, 24), b.d * 0.97] } };
+    size: (b, k) => k === 'ny-ten-2' || k === 'ny-ten-4' ? [b.w * 0.97, b.h * (0.4 + 0.1 * (h(b) % 7)), b.d * 0.97] : k === 'ny-ten-1' || k === 'ny-ten-5' || k === 'ny-ten-6' ? (NYDENSE ? [Math.max(b.w * 0.97, 12), 26 + (h(b) % 5), Math.max(b.d * 0.97, 12)] : [Math.max(b.w * 0.97, 20), 26 + (h(b) % 5), Math.max(b.d * 0.97, 20)]) : [b.w * 0.97, Math.max(b.h, 24), b.d * 0.97] } };
   if (!plan2.nyV) (plan2.nyLoad ||= Promise.all(Object.entries(NY_FILES).map(([k, u]) => plan2.models[k] ? 0 : new GLTFLoader().loadAsync('assets/heavy/' + u).then(g => { plan2.models[k] = g.scene; }).catch(() => {})))
     .then(() => { plan2.nyV = nyPrep(plan2.models, m => dayNight.winMats.add(m), (o, k) => prepNightFloors(o, k)); })).then(() => { r.V = plan2.nyV; });
   return r; };

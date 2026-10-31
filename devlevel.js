@@ -79,7 +79,7 @@ const FIRM_THRESH1 = THRESH.map((t, i) => Math.round(t * FIRM_K(i + 1) / 500) * 
 // а 13→15 — почти без стъпка. Сега нивата 12–20 растат плавно, всяко ~15 % по-дълго от предишното (1,2 → 3,6 млн.), ~1,5–2,5 часа на ниво в късна игра.
 // Нивата 1–11 — както досега. Записите (S.firm.v): същото ниво и същата част от пътя в новата скала (firmRec) — нищо не пада и не скача.
 const XP2 = feature('xp-pace2');
-const FIRM_THRESH2 = [...FIRM_THRESH1.slice(0, 11), 2750000, 4150000, 5400000, 7400000, 9700000, 12100000, 14850000, 18000000, 21600000];
+const FIRM_THRESH2 = [...FIRM_THRESH1.slice(0, 11), 2750000, 4150000, 5000000, 7400000, 9700000, 12100000, 14850000, 18000000, 21600000];
 export const FIRM_THRESH = XP2 ? FIRM_THRESH2 : FIRM_THRESH1;
 const FIRM_SC = { 1: FIRM_THRESH1, 2: FIRM_THRESH2 }, FIRM_V = XP2 ? 2 : 1;   // скалата на фирмата по версия на S.firm
 const lvOfFirm = xp => { let l = 1; for (let i = 0; i < FIRM_THRESH.length; i++) if (xp >= FIRM_THRESH[i]) l = i + 1; return l; };
