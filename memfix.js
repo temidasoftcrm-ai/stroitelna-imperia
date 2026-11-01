@@ -5,7 +5,7 @@
 // Обектите Texture остават отделни (свои offset/repeat), сменя се само източникът. Зарежда се преди game.js.
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { feature } from './lab/feature.js';
-import { Texture } from 'three';
+import { Texture, Source } from 'three';
 import { gfx, gfxLevel, gfxWeakGpu } from './gfxpresets.js';   // 🟠 gfx-lite: „Много ниско“ — текстурите до 256 px и без анизотропно филтриране (при зареждането)
 
 const N = 128, cv = document.createElement('canvas'); cv.width = cv.height = N;
@@ -23,6 +23,34 @@ function sig(img) {
     for (let i = 0; i < d.length; i++) { a = Math.imul(a ^ d[i], 16777619); b = (Math.imul(b, 31) + d[i]) | 0; }
     return `${w}x${h}:${(a >>> 0).toString(36)}:${(b >>> 0).toString(36)}`;
   } catch { return null; }
+}
+// 🧠 mem-uni (RAM, 01.11): почти половината картинки в моделите са ЕДНОЦВЕТНИ (Sketchfab/Meshy пекат по карта на материал — грапавост, метал,
+// нормали, плътен цвят): в Ню Йорк 432 от 986, ~390 MB декодирани (и ~520 MB с мип-нивата във видеокартата). Такава картинка се сменя с обща
+// 4×4 със същия цвят (средния; отклонението по цялата картинка, в размера до 1024, ≤ 4/255) — материалът и UV остават, изглежда същото. Само непрозрачните (алфа 255).
+const UNI_V = 1024, UNI = feature('mem-uni') && !/[?&]nouni/.test(location.search), uniSrc = new Map(), uniStat = { n: 0, mb: 0, ms: 0, why: { alpha: 0, coarse: 0, fine: 0, err: 0 } };
+function uniCheck(img) {   // първо умалено 128×128, после в размера, в който е в играта (след смаляването — до 512/1024)
+  try { g2.clearRect(0, 0, N, N); g2.drawImage(img, 0, 0, N, N); } catch { return null; } const d = g2.getImageData(0, 0, N, N).data; let mn = [255, 255, 255], mx = [0, 0, 0];
+  for (let i = 0; i < d.length; i += 4) { if (d[i + 3] !== 255) { uniStat.why.alpha++; return null; } for (let j = 0; j < 3; j++) { const v = d[i + j]; if (v < mn[j]) mn[j] = v; if (v > mx[j]) mx[j] = v; } }
+  if (mx[0] - mn[0] > 8 || mx[1] - mn[1] > 8 || mx[2] - mn[2] > 8) { if (Math.max(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]) < 40) uniStat.why.coarse++; return null; }
+  const k = Math.min(1, UNI_V / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));   // проверката — в размера, в който картинката стига до играта (до 512, забележителностите до 1024)
+  const g = c.getContext('2d', { willReadFrequently: true }); g.imageSmoothingQuality = 'high';
+  try { g.drawImage(img, 0, 0, c.width, c.height); } catch { uniStat.why.err++; return null; } const f = g.getImageData(0, 0, c.width, c.height).data; c.width = c.height = 0;
+  const s = [0, 0, 0]; mn = [255, 255, 255]; mx = [0, 0, 0];
+  for (let i = 0; i < f.length; i += 4) { if (f[i + 3] !== 255) { uniStat.why.alpha++; return null; } for (let j = 0; j < 3; j++) { const v = f[i + j]; s[j] += v; if (v < mn[j]) mn[j] = v; if (v > mx[j]) mx[j] = v; } }
+  const n = f.length / 4, av = s.map(v => Math.round(v / n));
+  for (let j = 0; j < 3; j++) if (mx[j] - av[j] > 4 || av[j] - mn[j] > 4) { uniStat.why.fine++; return null; }   // ±4/255 — шумът на компресията (webp/jpg)
+  return av;
+}
+function uniSource(av) {
+  const k = av.join(','); let s = uniSrc.get(k); if (s) return s;
+  const c = document.createElement('canvas'); c.width = c.height = 4; const g = c.getContext('2d'); g.fillStyle = `rgb(${av[0]},${av[1]},${av[2]})`; g.fillRect(0, 0, 4, 4);
+  s = new Source(c); uniSrc.set(k, s); return s;
+}
+const uniDone = new WeakSet();
+function uniPass(root) {   // след смаляването: картинката е точно тази, която играта рисува
+  root.traverse(o => { for (const m of [].concat(o.material || [])) for (const key in m) { const tex = m[key]; if (!tex || !tex.isTexture || uniDone.has(tex) || tex.name === 'nightdata' || tex.isDataTexture || tex.isCompressedTexture) continue; uniDone.add(tex);
+    const img = tex.source && tex.source.data; if (!img || !(img.width > 4)) continue; const t1 = performance.now(), av = uniCheck(img); uniStat.ms += performance.now() - t1;
+    if (av) { tex.source = uniSource(av); tex.needsUpdate = true; tex.__freeOk = 1; uniStat.n++; uniStat.mb += img.width * img.height * 4 / 2 ** 20; } } });   /* __freeOk — tex-free не пипа общата 4×4 */
 }
 function share(tex) {
   if (!tex || !tex.isTexture || done.has(tex)) return;
@@ -42,7 +70,7 @@ function share(tex) {
 const LITE_T = feature('gfx-lite') && gfx().tex < 512, MAXT = LITE_T ? gfx().tex : 512, small = new WeakSet(), shrunk = { n: 0, savedMB: 0 };
 if (LITE_T) Object.defineProperty(Texture.prototype, 'anisotropy', { get: () => 1, set() { }, configurable: true });   // gfx-lite: всички текстури (и платната на града) — анизотропия 1
 function shrink(tex, maxT = MAXT) {
-  if (!tex || !tex.isTexture || !tex.source || small.has(tex.source) || tex.name === 'nightdata') return; small.add(tex.source);   // nightdata (gold-night2, empire-night3) — данни (номера на етажи/прозорци), не картина: смаляването ги размазва
+  if (!tex || !tex.isTexture || !tex.source || small.has(tex.source) || tex.name === 'nightdata' || tex.name === 'winmask') return; small.add(tex.source);   // nightdata (gold-night2, empire-night3) — данни (номера на етажи/прозорци), не картина: смаляването ги размазва
   const img = tex.source.data; if (!img || tex.isDataTexture || tex.isCompressedTexture) return;
   const w = img.width, h = img.height; if (!(w > maxT || h > maxT)) return;
   const k = maxT / Math.max(w, h), c = document.createElement('canvas'); c.getContext('2d', { willReadFrequently: true }); c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));
@@ -65,7 +93,8 @@ export function shareTextures(root, path = '') {
   if (VLT) dropMaps(root);
   shareTextures0(root);   // първо общите картинки (подписът се смята от оригинала — бързо), после смаляване веднъж на източник
   const lm = /\/lm\//.test(path);
-  if (SHRINK && (!lm || VLT || MT2)) root.traverse(o => { for (const m of [].concat(o.material || [])) for (const key in m) { const v = m[key]; if (v && v.isTexture) shrink(v, lm ? (VLT ? VLT_LM : MT2_LM) : MAXT); } });   // vlow-tex: и забележителностите (до 512); mem-tex2: на „Средно“ — до 1024
+  if (SHRINK && (!lm || VLT || MT2)) root.traverse(o => { for (const m of [].concat(o.material || [])) for (const key in m) { const v = m[key]; if (v && v.isTexture) shrink(v, lm ? (VLT ? VLT_LM : MT2_LM) : MAXT); } });
+  if (UNI) uniPass(root);   // vlow-tex: и забележителностите (до 512); mem-tex2: на „Средно“ — до 1024
 }
 const SHRINK = (feature('tex512') || LITE_T) && !/[?&]notex512/.test(location.search);   // ?notex512 — за сравнение в тестовете
 function shareTextures0(root) {
@@ -85,7 +114,7 @@ const GFREE = feature('mem-gltf-free') && !/[?&]nogltffree/.test(location.search
 if (GFREE && !/[?&]nomemfix/.test(location.search)) { const pg = GLTFLoader.prototype.parse; GLTFLoader.prototype.parse = function (data, path, onLoad, onError) {
   return pg.call(this, data, path, gltf => { onLoad(gltf); setTimeout(() => { if (gltf && gltf.parser) { gltf.parser = null; gfStat.n++; } }, 30000); }, onError); }; }
 window.__gltfFree = () => ({ on: GFREE, ...gfStat });
-window.__texShare = () => ({ shrunk: shrunk.n, shrunkMB: Math.round(shrunk.savedMB), ...stat, savedMB: Math.round(stat.savedMB), ms: Math.round(stat.ms), distinct: bySig.size, vlt: VLT ? vlt : null });
+window.__texShare = () => ({ uni: { on: UNI, n: uniStat.n, why: uniStat.why, seen: stat.seen, mb: Math.round(uniStat.mb), ms: Math.round(uniStat.ms), colors: uniSrc.size }, shrunk: shrunk.n, shrunkMB: Math.round(shrunk.savedMB), ...stat, savedMB: Math.round(stat.savedMB), ms: Math.round(stat.ms), distinct: bySig.size, vlt: VLT ? vlt : null });
 // 🧠 копието в паметта след качването (feature 'tex-free'): смалените платна (по-горе) и картинките на моделите остават в браузъра и след като
 // видеокартата вече ги има — при голям град ~450 MB платна + ~200 MB ImageBitmap. След качване в главния рендер картинката се пуска;
 // ако някой я поиска пак (друга 3D сцена — бордът, услугите; нов вид филтър; roofs/nightfloors), source.data я възстановява синхронно,

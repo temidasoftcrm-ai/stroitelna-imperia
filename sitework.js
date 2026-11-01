@@ -25,7 +25,7 @@ export function loadSiteRigs(load, A) {
     let b = new THREE.Box3().setFromObject(w); const s = b.getSize(new THREE.Vector3()); inner.scale.setScalar(1 / s.z); w.updateMatrixWorld(true); b = new THREE.Box3().setFromObject(w); const c = b.getCenter(new THREE.Vector3()); inner.position.set(-c.x, -b.min.y, -c.z);
     w.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); A[key] = { scene: w, clips: g.animations }; }).catch(e => console.warn('rig', f, e));
   return Promise.all([one('mcrane-rig', 'sf-mcrane-rig'), one('excavator-rig', 'sf-excavator-rig'), one('dump-rig', 'sf-dump-rig'), one('backhoe-rig', 'sf-backhoe-rig'), one('roller-rig', 'sf-roller-rig'),
-    one('grader-rig', 'sf-grader-rig', -Math.PI / 2), one('mixer-rig', 'sf-mixer-rig', Math.PI / 2),
+    one('grader-rig', 'sf-grader-rig', -Math.PI / 2), one(feature('mixer-drum2') ? 'mixer-rig2' : 'mixer-rig', 'sf-mixer-rig', Math.PI / 2),   // 🚛 mixer-drum2 (собственикът, 01.11: „да се върти правилно“): целият барабан (пояс + краища) около наклонената си ос (16°) — _source/mixer-drum/
     // 🚛 gear-dump2: самосвалът на потребителя (Meshy, раздвижен в Blender: колела wheel_*, кош bed с клип „dump“, светлини head_*/tail_*) — и като неподвижен модел sf-dump2
     ...(feature('gear-dump2') ? [one('dump2-rig', 'sf-dump2-rig').then(() => { if (A['sf-dump2-rig']) A['sf-dump2'] = { scene: A['sf-dump2-rig'].scene }; })] : [])]);
 }

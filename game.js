@@ -749,7 +749,7 @@ let europe = null;
   for (const k of ['sing', 'rand', 'usb', 'blue', 'night']) jobs.push(load(`assets/heavy/sky/${k}.glb`).then(g => { g.scene.traverse(m => { if (m.isMesh && m.material && m.material.metalness > 0.5) m.material.metalness = 0.35; }); A['sf-sky-' + k] = g; prepNightFloors(g.scene, 'sf-sky-' + k); }).catch(() => {}));   // истински небостъргачи (Sketchfab) — за разнообразие в града
   if (feature('sky-twin')) jobs.push(load('assets/heavy/sky/twin.glb').then(g => { g.scene.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; for (const m of [].concat(o.material)) if (m) { m.metalness = 0; m.roughness = Math.max(m.roughness ?? 1, 0.55); } } }); A['sf-sky-twin'] = g; prepNightFloors(g.scene, 'sf-sky-twin'); g.scene.traverse(o => { if (o.isMesh) for (const m of [].concat(o.material)) if (m && m.userData.nightFloors) m.emissive.setRGB(1, 0.8, 0.55); }); })   /* топли прозорци (собственикът) */.catch(e => console.warn('sky-twin', e)));   // 🏙️ sky-twin: „Twin Towers Skyline“ на собственика (Meshy, Темидасофт) — в пула на небостъргачите (15+ етажа); нощем — прозорците по етажите (grid)
   if (feature('meshy-sky2')) for (const [k, f] of Object.entries({ ...MESHY_SKY, ...(feature('lm-ny2') ? MESHY_SKY_NY : {}), ...MESHY_SKY_BRICK })) jobs.push(load(`assets/heavy/${f}`).then(g => { A['sf-sky-' + k] = g; if (!(k === 'gold' && feature('gold-night2')) && !MESHY_SKY_BRICK[k] /* brick-goth: своята нощ (nightdata) */) prepNightFloors(g.scene, 'sf-sky-' + k); /* gold-night2: своята нощ (meshysky.js goldNight) */ meshySkyPrep(g.scene, () => dayNight.night); }).catch(() => {}));   // meshy-sky2: Body + Beacon + Accent (meshysky.js)
-  if (feature('shop-cafe')) for (const k of ['cafe-corner', 'cafe-prosa']) jobs.push(load(`assets/heavy/shops/${k}.glb`).then(g => { A[k] = g; if (k === 'cafe-corner') atNight(() => cafeNight(g.scene)); else prepNightFloors(g.scene, k); }).catch(() => {}));   // ☕ shop-cafe (f6): кафенетата (Sketchfab, CC BY 4.0)
+  if (feature('shop-cafe')) for (const k of ['cafe-corner', 'cafe-prosa']) jobs.push(load(`assets/heavy/shops/${k === 'cafe-corner' && feature('cafe-night2') ? 'cafe-corner2' : k}.glb`).then(g => { A[k] = g; if (k === 'cafe-corner') atNight(() => cafeNight(g.scene)); else prepNightFloors(g.scene, k); }).catch(() => {}));   // ☕ shop-cafe (f6): кафенетата (Sketchfab, CC BY 4.0)
   if (feature('shops-meshy')) for (const k of ['shop-corner', 'shop-mall']) jobs.push(load(`assets/heavy/shops/${k}.glb`).then(g => { A[k] = g; atNight(() => shopNight(g.scene, k)); }).catch(() => {}));   // 🏪 shops-meshy (f6): кварталното магазинче и молът (Meshy, Темидасофт); нощем — витрините и прозорците (shopNight)
   if (feature('shops-meshy2')) for (const k of ['shop-super', 'shop-24']) jobs.push(load(`assets/heavy/shops/${k}.glb`).then(g => { A[k] = g; atNight(() => shopNight(g.scene, k)); }).catch(() => {}));   // 🛒 shops-meshy2 (f6): супермаркетът и денонощният магазин (Meshy, Темидасофт; чуждите марки по табелите — пребоядисани)
   if (feature('houses-sf')) jobs.push(load('assets/heavy/shops/shop-pharmacy.glb').then(g => { A['shop-pharmacy'] = g; atNight(() => shopNight(g.scene, 'shop-pharmacy')); }).catch(() => {}));   // 💊 houses-sf: аптеката (Conwy Pharmacy, Lost Gecko, CC BY 4.0) — в центровете и в кварталите
@@ -1456,6 +1456,16 @@ function mhNight(root) {
 }
 function cafeNight(root) {
   root.traverse(o => { if (!o.isMesh) return; const g = o.geometry; g.computeBoundingBox(); const y0 = g.boundingBox.min.y, H = g.boundingBox.max.y - y0, mt = o.material = o.material.clone();
+    // ☕ cafe-night2 (собственикът, 01.11: нощем цялата фасада светеше бяло — „да оправим този модел в Блендър“): маската на прозорците е изпечена в модела
+    // (cafe-corner2.glb, emissiveTexture 'winmask'; _source/cafe-night/mkmask.py — витрините долу, прозорците на етажа, капандурите) — светят само те, на всяка машина
+    // (старото — тъмните пиксели на текстурата: в линейни цветове почти цялата светла фасада минаваше за „тъмна“)
+    const WM = mt.emissiveMap && mt.emissiveMap.name === 'winmask' ? mt.emissiveMap : null;
+    if (WM) { WM.colorSpace = THREE.NoColorSpace; WM.generateMipmaps = false; WM.minFilter = WM.magFilter = THREE.NearestFilter; mt.emissive = new THREE.Color(0xffffff); mt.emissiveIntensity = 0; mt.userData.winK = 1.0;
+      mt.onBeforeCompile = sh => { sh.uniforms.uCfY0 = { value: y0 }; sh.uniforms.uCfH = { value: H };
+        sh.vertexShader = 'varying vec3 vCfP;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vCfP = position;');
+        sh.fragmentShader = 'varying vec3 vCfP; uniform float uCfY0, uCfH;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', `{ float hy = (vCfP.y - uCfY0) / uCfH;
+            totalEmissiveRadiance = vec3(1.0, 0.62, 0.28) * texture2D(emissiveMap, vEmissiveMapUv).r * emissive.r * (hy < 0.3 ? 1.3 : 0.9); }`); };
+      mt.customProgramCacheKey = () => 'cafe-night2'; dayNight.winMats.add(mt); return; }
     mt.emissive = new THREE.Color(0xffc070); mt.emissiveMap = mt.map; mt.emissiveIntensity = 0; mt.userData.winK = 3.2;
     mt.onBeforeCompile = sh => { sh.uniforms.uCfY0 = { value: y0 }; sh.uniforms.uCfH = { value: H };
       sh.vertexShader = 'varying vec3 vCfP; varying vec3 vCfN;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vCfP = position; vCfN = normal;');
@@ -12258,6 +12268,11 @@ function dropGpu(root, seen = new Set(), mats = false) {   // mats (fix-stab): �
   root.traverse(o => { if (o.isSkinnedMesh && o.skeleton && o.skeleton.boneTexture) o.skeleton.dispose();   /* хората (Mixamo): текстурата на костите — иначе по една на човек при всяка смяна */
     if (o.geometry && !keep.geo.has(o.geometry)) o.geometry.dispose(); for (const m of [].concat(o.material || [])) if (m && !seen.has(m)) { seen.add(m); for (const t of texOf(m)) if (!keep.tex.has(t)) t.dispose(); if (mats && !keep.mat.has(m)) m.dispose(); } });
 }
+function dropGpuList(list, seen) {   // mem-switch: като dropGpu, но за отделни обекти (вече откачени от града); dispose на общо копие е безопасен — three.js го качва пак при нужда
+  const keep = cityGeoKeep();
+  for (const o of list) { if (o.isSkinnedMesh && o.skeleton && o.skeleton.boneTexture) o.skeleton.dispose(); if (o.geometry && !keep.geo.has(o.geometry)) o.geometry.dispose();
+    for (const m of [].concat(o.material || [])) if (m && !seen.has(m)) { seen.add(m); for (const t of texOf(m)) if (!keep.tex.has(t)) t.dispose(); } }
+}
 // fix-stab: нощните материали на стария град излизат от dayNight.winMats и WIN_MATS (cityplan2-3d.js) — иначе се трупат с всеки град.
 // Общите (кешираните фасади, Рим, статуите) може да дойдат пак в следващия град — winRestore ги връща, щом ги види в новата група.
 const winGone = new WeakSet(); let winGoneN = 0;
@@ -12269,6 +12284,7 @@ function winForget(roots) {
 }
 function winRestore() { if (!winGoneN || !city.group) return; city.group.traverse(o => { for (const m of [].concat(o.material || [])) if (m && winGone.has(m) && !dayNight.winMats.has(m)) dayNight.winMats.add(m); }); }
 function teardownCity() {
+  const pre = []; if (CDISP && city.group) city.group.traverse(o => { if (o.geometry || o.material || o.isSkinnedMesh) pre.push(o); });   /* 🧠 mem-switch (RAM, 01.11): модулите (автобусите, влаковете, корабите, футболът…) махат своите групи от града с .clear() ПРЕДИ dropGpu — геометриите им оставаха във видеокартата (~300–600 на смяна) */
   if (football) football.clear();   // ⚽ football
   if (airCity) airCity.clear();   // ✈️ air-approach / 🚁 police-heli
   if (bikes) bikes.clear();   // 🚲 bikes
@@ -12293,7 +12309,7 @@ function teardownCity() {
   const old = city.group, pv = city.planView;
   if (old) scene.remove(old);
   if (FIXSTAB) try { winForget([old, ...gone]); } catch (e) { console.warn('winForget', e); }
-  { const seen = new Set(); dropGpu(old, seen); for (const o of gone) dropGpu(o, seen); }   /* преди dispose на модулите — те махат групите си от града и копията на текстурите им иначе остават */
+  { const seen = new Set(); dropGpu(old, seen); for (const o of gone) dropGpu(o, seen); if (pre.length) dropGpuList(pre, seen); }   /* преди dispose на модулите — те махат групите си от града и копията на текстурите им иначе остават */
   for (const o of [...Object.values(city.mine3D || {}), ...Object.values(city.tender3D || {}), city.airport]) try { o && o.dispose && o.dispose(); } catch (e) { }
   if (city.mm) try { city.mm.dispose(); } catch (e) { }
   if (pv) try { if (pv.userData.dispose) pv.userData.dispose(); } catch (e) { }   // GPU паметта на стария град (общите текстури, ако ги има, се качват пак при нужда); материалите остават — шейдърите за следващия
@@ -14038,14 +14054,17 @@ if (AUTOTEST) {
     openBig: k => openBig(k), closeBig: () => closeBig(), scene: () => scene,
     coopInfraTest(I) { coopInfraSync(I, 'Тест'); return { here: [stLvOf(S.cityId), airLv(S.cityId), portLv(S.cityId)], infra: coopInfra() }; },
     linkRoute() { const P = city.plan; if (!P) return null; const gap = r => r.reduce((m, p, i) => i ? Math.max(m, Math.hypot(p.x - r[i - 1].x, p.z - r[i - 1].z)) : 0, 0), c = city.lots[0]; return { links: (P.links || []).length, tir: gap(roadRoute(tx(NI - 1), -12, c.x, c.z)), st: gap(roadRoute(STATION_X + 10, 0, c.x, c.z)), hw: P.hwX == null ? null : gap(roadRoute(P.hwX, tx(NJ - 1) + 22, c.x, c.z)) }; },
-    assetMem() {   // тест: какво държат заредените модели (A) — текстури (декодирани МБ) и геометрия, по модел
+    assets: () => A,   // 🧠 тест (RAM): заредените модели
+    renderer: () => renderer,   // 🧠 тест (RAM): колко текстури са качени във видеокартата
+    geoKeep: () => cityGeoKeep(),   // 🧠 тест (RAM): общите геометрии/текстури/материали на моделите (A) — не се освобождават при смяна на града
+    assetMem(nTop = 25) {   // тест: какво държат заредените модели (A) — текстури (декодирани МБ) и геометрия, по модел
       const seenT = new Set(), seenG = new Set(), rows = [];
       for (const [k, g] of Object.entries(A)) { const sc = g && (g.scene || g); if (!sc || !sc.traverse) continue; let t = 0, gm = 0;
         sc.traverse(o => { if (o.geometry) for (const at of [...Object.values(o.geometry.attributes), o.geometry.index]) { const ar = at && (at.array || at.data?.array); if (ar && !seenG.has(ar)) { seenG.add(ar); gm += ar.byteLength; } }   /* по масив: частите на един GLB делят атрибутите (училищният — 7 части с общ буфер), иначе се брояха по 7 пъти */
-          for (const m of [].concat(o.material || [])) for (const q in m) { const x = m[q]; if (x && x.isTexture && x.image && x.image.width && !seenT.has(x.source || x)) { seenT.add(x.source || x); t += x.image.width * x.image.height * 4; } } });
+          for (const m of [].concat(o.material || [])) for (const q in m) { const x = m[q]; if (x && x.isTexture && !seenT.has(x.source || x)) { const im = texImOf(x); if (!im || !im.width) continue; seenT.add(x.source || x); t += im.width * im.height * 4; }   /* texImOf — без да връща пуснатите (tex-free) картинки: x.image ги декодираше обратно и мерачът надуваше паметта */ } });
         rows.push([k, Math.round(t / 2 ** 20), Math.round(gm / 2 ** 20)]); }
       const tot = rows.reduce((a, r) => [a[0] + r[1], a[1] + r[2]], [0, 0]);
-      return { models: rows.length, texMB: tot[0], geoMB: tot[1], top: rows.sort((a, b) => (b[1] + b[2]) - (a[1] + a[2])).slice(0, 25).map(r => `${r[0]} t${r[1]} g${r[2]}`) }; },
+      return { models: rows.length, texMB: tot[0], geoMB: tot[1], top: rows.sort((a, b) => (b[1] + b[2]) - (a[1] + a[2])).slice(0, nTop).map(r => `${r[0]} t${r[1]} g${r[2]}`) }; },
     texHash(n = 60) { const seen = new Map(); scene.traverse(o => { for (const m of [].concat(o.material || [])) if (m.map && m.map.source && (m.map.source.__free || texImOf(m.map) instanceof HTMLCanvasElement || texImOf(m.map) instanceof ImageBitmap)) { const k = (o.name || '') + '|' + (m.name || ''); if (!seen.has(k)) seen.set(k, m.map); } });   /* tex-free: картинките, върнати от видеокартата, = оригиналите? */
       const c = document.createElement('canvas'), g = c.getContext('2d', { willReadFrequently: true }), out = {}; for (const [k, t] of [...seen].sort((a, b) => a[0] < b[0] ? -1 : 1).slice(0, n)) { const im = t.image; if (!im || !im.width) continue; c.width = im.width; c.height = im.height; g.drawImage(im, 0, 0); const d = g.getImageData(0, 0, c.width, c.height).data; let h = 2166136261; for (let i = 0; i < d.length; i += 4) h = Math.imul(h ^ (d[i] >> 2) ^ (d[i + 1] >> 2) << 6 ^ (d[i + 2] >> 2) << 12, 16777619); out[k] = c.width + 'x' + c.height + ':' + (h >>> 0).toString(36); } return out; },
     async texRT(n = 40) { const L = []; scene.traverse(o => { for (const m of [].concat(o.material || [])) if (m.map && m.map.source && m.map.source.__free && m.map.source.__free.rel && !L.includes(m.map)) L.push(m.map); });   /* tex-free: върнато → качено пак → върнато = същите байтове? */
