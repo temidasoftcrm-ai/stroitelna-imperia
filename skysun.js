@@ -40,7 +40,7 @@ export function createSkySun(scene) {
         c += halo * glow * (0.55 * pow(max(cs, 0.0), 12.0) + 0.25 * pow(max(cs, 0.0), 3.0)) * (1.0 - smoothstep(0.1, 0.7, el));   // мекият ореол — силен ниско
         float sd = acos(clamp(cs, -1.0, 1.0)); c = mix(c, discC, disc * (1.0 - smoothstep(discR * 0.82, discR, sd)));   // дискът
         if (mPh2 > 0.5) {   // 🌙 moon-phases v2 (потребителят: „много изкуствена“): по-малък мек диск, слонова кост, плавен терминатор, тъмната част — почти като небето, меко сияние
-          vec3 m = normalize(moonDir), rt = normalize(cross(vec3(0.0, 1.0, 0.0), m)), up = cross(m, rt); float R = 0.019;
+          vec3 m = normalize(moonDir), rt = normalize(cross(vec3(0.0, 1.0, 0.0), m)), up = cross(m, rt); float R = 0.027;
           vec2 q = vec2(dot(d, rt), dot(d, up)) / R; float r2 = dot(q, q), cosm = max(dot(d, m), 0.0), ill = 0.5 - 0.5 * cos(mPh * 6.2832);
           c += vec3(0.62, 0.68, 0.82) * moon * (0.35 + 0.65 * ill) * (0.18 * pow(cosm, 4000.0) + 0.07 * pow(cosm, 400.0) + 0.03 * pow(cosm, 40.0)) * step(0.98, r2);
           if (r2 < 1.0 && dot(d, m) > 0.0) { vec3 n = vec3(q, sqrt(1.0 - r2)); float a = mPh * 6.2832; vec3 L = vec3(sin(a), 0.0, -cos(a));
@@ -104,8 +104,8 @@ export function createSkySun(scene) {
     // луната — срещу слънцето, нощем; звездите — нощем без облаци
     U.moonDir.value.set(-dir.x, Math.max(0.25, -dir.y + 0.2), -0.3).normalize(); U.moon.value = nightK * (1 - cloud);
     if (U.mPh2.value > 0.5) {   // 🌙 moon-phases (потребителят: „луната се върти с камерата — да я позиционираме“): неподвижна в света — изгрява на изток (~20 ч), минава високо на юг и залязва на запад (~6 ч)
-      const tn = ((((hour - 19) % 24) + 24) % 24) / 11, a = Math.PI * Math.min(1, tn), el = 0.22 + 0.62 * Math.sin(a);
-      U.moonDir.value.set(Math.cos(a) * Math.cos(el), Math.sin(el), 0.55 * Math.cos(el)).normalize(); }
+      const tn = ((((hour - 19) % 24) + 24) % 24) / 11, a = Math.PI * Math.min(1, tn), el = 0.07 + 0.13 * Math.sin(a), hx = Math.cos(a), hz = 0.55, hl = Math.hypot(hx, hz);   /* истинска височина 4–11° над хоризонта: камерата на играта гледа почти хоризонтално (cam-tilt) — по-високо луната е над кадъра */
+      U.moonDir.value.set(hx / hl * Math.cos(el), Math.sin(el), hz / hl * Math.cos(el)); }
     stars.material.opacity = nightK * (1 - cloud) * 0.85; stars.visible = stars.material.opacity > 0.01;
     // куполът — около камерата, точно под далечната плоскост
     const R = camera.far * 0.9; dome.position.copy(camera.position); dome.scale.setScalar(R); stars.position.copy(camera.position); stars.scale.setScalar(R * 0.99);
