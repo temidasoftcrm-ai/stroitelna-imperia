@@ -57,11 +57,11 @@ for (const file of files.sort()) {
     const line = raw.trim().replace(/^[-•]\s*/, ''); if (!line) continue;
     const urls = [...line.matchAll(/https?:\/\/[^\s),]+/g)].map(m => m[0].replace(/[.;:]$/, ''));
     const host = urls[0] && new URL(urls[0]).hostname.replace(/^www\./, '');
-    // собствени: Meshy AI, Kling AI, Blender — без атрибуция
-    if (/Meshy AI|Kling AI/.test(line) && !/ by /.test(line)) {
+    // собствени: Meshy AI, Kling AI, Suno (музиката на собственика), Blender — без атрибуция
+    if (/Meshy AI|Kling AI|Suno/.test(line) && !/ by /.test(line)) {
       const f = line.split(/\s+[—–]\s+/)[0].split(/,\s*/).map(s => (secDir && !s.includes('/') ? secDir : '') + s.trim());
       const t = /Kling/.test(line) ? 'Видеата в кината и пътешествията' : (line.match(/[„"“]([^"“”„]+)[“"”]/) || [])[1] || line.split(/\s+[—–]\s+/)[1]?.split(',')[0];
-      add({ t: t || f[0], a: 'Темидасофт', l: 'OWN', u: '', f, k: /Kling/.test(line) ? 'Видео' : 'Модели по поръчка (Meshy AI)', s: /Kling/.test(line) ? 'Kling AI' : 'Meshy AI' });
+      const su = /Suno/.test(line) && !/Meshy AI|Kling AI/.test(line); add({ t: t || f[0], a: 'Темидасофт', l: 'OWN', u: '', f, k: su ? 'Музика' : /Kling/.test(line) ? 'Видео' : 'Модели по поръчка (Meshy AI)', s: su ? 'Suno' : /Kling/.test(line) ? 'Kling AI' : 'Meshy AI' });
       continue;
     }
     const title = (line.match(/[„"“]([^"“”„]+)[“"”]/) || [])[1] || (urls.length && line.match(/\s[—–]\s+([^—–"„“]+?)\s+by\s/) || [])[1];   // и без кавички: „… — railway track by автор — линк“
@@ -74,7 +74,7 @@ for (const file of files.sort()) {
       if (/Sketchfab|poly\.pizza/i.test(line)) secSrc = /Sketchfab/i.test(line) ? 'Sketchfab' : 'Poly Pizza';
       if (dir) secDir = dir + '/';
       if (/Mixamo/.test(line)) add({ t: 'Mixamo (герои и анимации)', a: 'Adobe', l: 'MIXAMO', u: 'https://www.mixamo.com', f: [base], k: 'Хора', s: 'Mixamo' });
-      else if (urls.length && !/creativecommons|majadroid|kenney/.test(line) && !title) warn.push(`${file}: ред с линк, но без „заглавие“ by автор: ${line.slice(0, 120)}`);
+      else if (urls.length && !/creativecommons|majadroid|kenney|pixabay\.com\/service/.test(line) && !title) warn.push(`${file}: ред с линк, но без „заглавие“ by автор: ${line.slice(0, 120)}`);
       continue;
     }
     const f = line.split(/\s+[—–]\s+|\s{3,}/)[0].split(/,\s*/).filter(s => /\.(glb|gltf|mp3|ogg|webp)\b|^[\w.-]+\/[\w.{},-]+$|^wh-l\d+/.test(s)).map(s => s.replace(/\s*\(.*$/, '').trim())
