@@ -344,6 +344,8 @@
 {"t":"Art Deco Tower 256 (New York)","a":"Темидасофт","l":"OWN","u":"","f":["sky/ny256.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
 {"t":"Ambulance Van (EU)","a":"Темидасофт","l":"OWN","u":"","f":["cars/sirens/amb-van.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
 {"t":"UFO Sketch","a":"Темидасофт","l":"OWN","u":"","f":["ufo/ufo.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
+{"t":"Skyscraper Simulation","a":"Темидасофт","l":"OWN","u":"","f":["sky/brickgoth.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
+{"t":"nightdata","a":"Темидасофт","l":"OWN","u":"","f":["mid/midwhite.glb","mid/midglass.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
 {"t":"Box Ambulance (US)","a":"Темидасофт","l":"OWN","u":"","f":["cars/sirens/amb-box.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
 {"t":"Glass Tower White","a":"Темидасофт","l":"OWN","u":"","f":["sky/sky-white.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
 {"t":"Glass Tower Warm","a":"Темидасофт","l":"OWN","u":"","f":["sky/sky-warm.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},

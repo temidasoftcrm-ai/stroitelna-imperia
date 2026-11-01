@@ -42,7 +42,7 @@ function share(tex) {
 const LITE_T = feature('gfx-lite') && gfx().tex < 512, MAXT = LITE_T ? gfx().tex : 512, small = new WeakSet(), shrunk = { n: 0, savedMB: 0 };
 if (LITE_T) Object.defineProperty(Texture.prototype, 'anisotropy', { get: () => 1, set() { }, configurable: true });   // gfx-lite: всички текстури (и платната на града) — анизотропия 1
 function shrink(tex, maxT = MAXT) {
-  if (!tex || !tex.isTexture || !tex.source || small.has(tex.source)) return; small.add(tex.source);
+  if (!tex || !tex.isTexture || !tex.source || small.has(tex.source) || tex.name === 'nightdata') return; small.add(tex.source);   // nightdata (gold-night2, empire-night3) — данни (номера на етажи/прозорци), не картина: смаляването ги размазва
   const img = tex.source.data; if (!img || tex.isDataTexture || tex.isCompressedTexture) return;
   const w = img.width, h = img.height; if (!(w > maxT || h > maxT)) return;
   const k = maxT / Math.max(w, h), c = document.createElement('canvas'); c.getContext('2d', { willReadFrequently: true }); c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));

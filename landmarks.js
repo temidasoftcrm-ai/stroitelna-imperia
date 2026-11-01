@@ -5,6 +5,8 @@ import * as THREE from 'three';
 import { canvasTex, drawable } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { prepNightFloors } from './nightfloors.js';
+import { empireNight, CHRYSLER } from './empirenight.js';   // 🌃 empire-night3, chrysler-night3
+import { lmNight } from './lmnight.js';   // 🌃 lm-night-*: процедурната нощ (Токийската кула, Скайтри…)
 import { feature } from './lab/feature.js';
 
 export const CITY_LANDMARKS = {
@@ -635,9 +637,14 @@ function silverize(root, k = 1.25) {
   } });
 }
 function loadLm(kind) {
-  return glbCache[kind] || (glbCache[kind] = new GLTFLoader().loadAsync(`assets/heavy/lm/${GLB_LM[kind]?.file || kind}.glb`).then(gl => {
+  const EN3 = kind === 'empire2' && feature('empire-night3');   // 🌃 empire-night3: същият модел + изпечената нощ (empirenight.js)
+  const CN3 = kind === 'chrysler2' && feature('chrysler-night3');   // 🌃 chrysler-night3: chrysler.glb + изпечената нощ
+  return glbCache[kind] || (glbCache[kind] = new GLTFLoader().loadAsync(`assets/heavy/lm/${EN3 ? 'empire3' : CN3 ? 'chrysler3' : GLB_LM[kind]?.file || kind}.glb`).then(gl => {
     gl.scene.traverse(o => { if (o.isMesh && !o.geometry.attributes.normal) o.geometry.computeVertexNormals(); });
     if (GLB_LM[kind]?.silver) silverize(gl.scene, GLB_LM[kind].silver);   // преди етажите — маската на прозорците е от вече сребристата текстура
+    if (EN3 && empireNight(gl.scene)) return gl.scene;   // empire-night3: своята нощ (без nightfloors 'empire2')
+    if (CN3 && empireNight(gl.scene, CHRYSLER)) return gl.scene;   // chrysler-night3: своята нощ (без nightfloors 'chrysler2')
+    if (lmNight(gl.scene, kind)) return gl.scene;   // lm-night-*: своята нощ (без nightfloors и общия прожектор)
     prepNightFloors(gl.scene, kind);   // нощем прозорците светват по етажи (само моделите от nightfloors.js — Беладжо)
     return gl.scene;
   }).catch(() => null));
@@ -744,8 +751,8 @@ function glbLm(kind) {
       if (C.matte && o.material) { o.material = o.material.clone(); o.material.color.set(C.matte); o.material.metalness = 0; o.material.roughness = 0.8; o.material.metalnessMap = o.material.roughnessMap = o.material.map = null; o.material.needsUpdate = true; }   // светла фасада (Белият дом): текстурата е тъмна — само бял цвят + релефът (normalMap)
       if (C.flat && o.material) { o.material = o.material.clone(); o.material.flatShading = true; o.material.vertexColors = !!o.geometry.attributes.color; o.material.needsUpdate = true; }   // плоско осветени стени (без нормали от модела)
       const mt = o.material; if (mt && mt.metalness > 0.4) { mt.metalness = 0.25; mt.roughness = Math.max(mt.roughness ?? 0.5, 0.45); }   // без огледална среда металът излиза черен
-      if (mt && mt.emissiveMap && feature('lm-emfix') && !/[?&]noemfix\b/.test(location.search) && !EM_KEEP.test(kind) && !/^night_/.test(o.name) && !(o.parent && /^night_/.test(o.parent.name))) { mt.emissiveMap = null; mt.needsUpdate = true; }   /* lm-emfix: emissive картата на Meshy (не е нощна маска) — махаме я, за да светнат прожекторите (floodK); без неона на Стрипа и Радио Сити */
-      if (mt && mt.emissive && !mt.emissiveMap && !flood.includes(mt)) { mt.emissive.set(0xffe4b8); if (mt.map) { mt.emissiveMap = mt.map; mt.needsUpdate = true; } mt.emissiveIntensity = 0; if (C.floodK) mt.userData.floodK = C.floodK; flood.push(mt);   // прожектори: светва текстурата, не плосък бежов цвят
+      if (mt && mt.emissiveMap && !mt.userData.lmNight /* empire-night3, chrysler-night3: картата е нощна (nightdata) */ && feature('lm-emfix') && !/[?&]noemfix\b/.test(location.search) && !EM_KEEP.test(kind) && !/^night_/.test(o.name) && !(o.parent && /^night_/.test(o.parent.name))) { mt.emissiveMap = null; mt.needsUpdate = true; }   /* lm-emfix: emissive картата на Meshy (не е нощна маска) — махаме я, за да светнат прожекторите (floodK); без неона на Стрипа и Радио Сити */
+      if (mt && mt.emissive && !mt.emissiveMap && !flood.includes(mt) && !mt.userData.lmNight /* lm-night-*: своята нощ */) { mt.emissive.set(0xffe4b8); if (mt.map) { mt.emissiveMap = mt.map; mt.needsUpdate = true; } mt.emissiveIntensity = 0; if (C.floodK) mt.userData.floodK = C.floodK; flood.push(mt);   // прожектори: светва текстурата, не плосък бежов цвят
         if (C.matte && feature('wh-flood')) { mt.userData.floodK = 1.3; mt.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  { vec3 wN = inverseTransformDirection(normal, viewMatrix); totalEmissiveRadiance *= 0.16 + 0.84 * pow(1.0 - abs(wN.y), 1.6); }'); }; mt.customProgramCacheKey = () => 'wh-flood'; } }   // wh-flood (T1): Белият дом — прожектори отдолу: стените (и колоните с релефа) светят, покривите и терасите — едва; без плоско бяло петно
     });
     if (C.base) box(g, s.x * k + 0.6, 0.35, s.z * k + 0.6, mat(C.base, 0.9), 0, y0 + 0.175, C.dz || 0);   // каменна основа — назъбените краища на скана се сливат с нея
