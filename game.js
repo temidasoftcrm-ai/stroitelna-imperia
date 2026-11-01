@@ -37,6 +37,7 @@ import { createStill } from './perfstill.js';   // ⚡ perf3-still
 import { createFires } from './firesim.js';
 import { createBlockRuins } from './fireruins.js';   // 🏚️ fire-ruins: изгорелите фонови сгради (кварталите по плана)
 import { createGhostHunt } from './ghosthunt.js';   // 👻 ghost-hunt: скритата изненада в Ню Йорк (пожарната, зеленото сияние, колата на ловците)
+import { nySouthZ } from './nybay.js';   // 🗽 ny-south-compact: южно от плана на Ню Йорк — по-сгъстено (и забележителностите там)
 import { gantrySigns } from './hwsigns.js';   // 🛣️ флаг hw-gantry: порталите с табели над магистралата в града
 import { buildBillboards } from './billboards3d.js';   // 🪧 флаг billboards: билбордове с фирмата по булевардите   // 🔥 флаг fire-seq: пожарът като последователност (здравина, гасене, оценка, ремонт/разчистване)   // ⚡ флаг perf-cliff: детайлите и хората по разстояние, сливане на статичните модели   // ⏱️ панел за производителност (флаг perf-panel, F8)
 import { createDevLevel, THRESH as DEV_THRESH, LV as DEV_LV, unlockText, kmXp, XP_BUY, migrateDevRecord } from './devlevel.js';
@@ -8339,12 +8340,12 @@ const LM_ALIAS = { suleymaniye: feature('lm-suleymaniye2') ? 'suleymaniye2' : 'm
 // 4 Times Square — на истинското място (43-та и Бродуей, до Таймс Скуеър). В рамката на играта (P.landmarks — като другите точки)
 function lmNy2Points() {
   const P = city.plan, D = P.p2.osmData, [ox, oz] = P.offset || [0, 0]; if (!D) return;
-  const K = D.k, c = D.center, xz = (la, lo) => [(lo - c[1]) * Math.cos(c[0] * Math.PI / 180) * 111320 * K, -(la - c[0]) * 110540 * K];
+  const K = D.k, c = D.center, cz = nySouthZ(D), xz = (la, lo) => [(lo - c[1]) * Math.cos(c[0] * Math.PI / 180) * 111320 * K, cz(-(la - c[0]) * 110540 * K)];   /* ny-south-compact: южно от плана — сгъстено */
   const B = P.p2.boundary, zMax = Math.max(...B.map(p => p[1])), add = (k, x, z, fp) => { if (!P.landmarks.some(L => L.k === k)) P.landmarks.push({ k, x: x + ox, z: z + oz, rot: 0.506, vrot: -0.506, fp, w: fp[0], d: fp[1], guard: 4 }); };   // като другите точки на Манхатън (решетката е завъртяна на 0,506)
   const [tx, tz] = xz(40.7564, -73.9862); add('fourts', tx - 14, tz + 26, [66, 56]);   // до Таймс Скуеър (не върху неговата точка)
   // 🗽 ny-wtc-real (собственикът, 01.11: „да скъсим малко разстоянието от Световния търговски център до [Долен Манхатън] — има много разстояние с празни площи и блокове“):
   // на истинското място (Уест и Визи, 40.7130 / −74.0132) — картата вече стига до Батъри парк; ако точката е извън нея — както досега
-  const [wx, wz] = xz(40.7130, -74.0132), wOk = feature('ny-wtc-real') && wz < zMax - 40;
+  const [wx, wz] = xz(40.7130, -74.0132), wOk = feature('ny-wtc-real') && (feature('ny-south-compact') || wz < zMax - 40);   /* южно от плана — като Уайтхол (там е земята на Долен Манхатън) */
   if (wOk) add('onewtc', wx, wz, [64, 64]); else add('onewtc', -300, Math.min(zMax - 90, 700), [64, 64]);   // в южния край на картата, към Долен Манхатън
   if (feature('ny-dense')) for (const [k, la, lo, fp] of [['whitehall', 40.70438, -74.01555, [53, 22]], ['nyannex', 40.70468, -74.01612, [36, 65]], ['fifth500', 40.75372, -73.98103, [72, 59]], ['park605', 40.76640, -73.96650, [50, 38]]]) { const [x, z] = xz(la, lo); add(k, x, z, fp); }   // ny-dense: по истинските им места (Батъри Плейс, 5-о авеню/42-ра, Парк авеню/65-а)
 }
@@ -8371,7 +8372,7 @@ function landmarkPlan2(kinds) {
     if (k === 'radiocity2' && feature('ny-radiocity') && !feature('ny-lm-heights')) {   /* ny-lm-heights: точната височина, без уголемяването */ const ku = Math.min(200 / 150, Math.max(at.w, at.d) * 0.95 / (s0 * k0)); if (ku > 1.01) o.group.scale.multiplyScalar(ku);   // 🎭 ny-radiocity (собственикът: „твърде малка“): кулата 1270 6th Ave е ~200 м (беше 150) — по-голяма изцяло, до парцела
       const kx = Math.min(1.45, Math.max(at.w, at.d) * 0.95 / (s0 * k0 * Math.max(1, ku))); if (kx > 1.01) { o.group.scale.x *= kx; o.group.scale.z *= kx; } }   // залата — до парцела (~100 × 75 м), кулата — пропорционално по-широка
     if (k === 'ndk') { const kx = Math.min(1.7, Math.max(at.w, at.d) * 0.95 / (s0 * k0)); if (kx > 1.01) { o.group.scale.x *= kx; o.group.scale.z *= kx; } }   // lm-ndk (T2): НДК е широк и нисък (~200 × 150 м, 44 м) — ръстът по LM_PROP, ширината — до парцела
-    { const sp = LM_SPOT[S.cityId]?.[k]; if (sp) { o.group.position.set(sp.x, 0.1, sp.z); o.group.rotation.y = sp.rot; if (sp.top != null) o.group.userData.isleTop = sp.top; } }   // lm-westminster: точното място и посока (LM_SPOT)
+    { const sp = LM_SPOT[S.cityId]?.[k]; if (sp) { const oz = (city.plan && city.plan.offset || [0, 0])[1], spz = S.cityId === 'newyork' && city.plan && city.plan.p2 ? nySouthZ(city.plan.p2.osmData)(sp.z - oz) + oz : sp.z; o.group.position.set(sp.x, 0.1, spz);   /* ny-south-compact: Статуята — със залива */ o.group.rotation.y = sp.rot; if (sp.top != null) o.group.userData.isleTop = sp.top; } }   // lm-westminster: точното място и посока (LM_SPOT)
     if (k === 'eiffel' && feature('eiffel-fix')) o.group.position.x -= 9;   // 🗼 eiffel-fix (f6): десният крак излизаше на тротоара до кея — малко на запад, към Марсово поле
     if (LM_SHORE[k] && P.waterAt) { const hx = s0 * k0 / 2 + 6, hz = hx * LM_SHORE[k]; for (let it = 0; it < 12; it++) { let wx = 0, wz = 0, n = 0; for (let u = -1; u <= 1.001; u += 0.25) for (let v = -1; v <= 1.001; v += 0.25) { const x = o.group.position.x + u * hx, z = o.group.position.z + v * hz; if (P.waterAt(x, z)) { wx += u; wz += v; n++; } } if (!n) break; const l = Math.hypot(wx, wz) || 1; o.group.position.x -= wx / l * 4; o.group.position.z -= wz / l * 4; } }   /* kotel-shore: изтегля сградата от водата на брега (по парцела, без да я смалява) */
     if (LM_DRY[k] && P.waterAt) { const r = o.group.rotation.y, c = Math.cos(r), sn = Math.sin(r), x0 = o.group.position.x, z0 = o.group.position.z;   /* nd-dry: потребителят — Нотр Дам слизаше в реката; смалява се, докато целият отпечатък е на сушата */

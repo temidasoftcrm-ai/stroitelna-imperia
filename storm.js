@@ -13,6 +13,9 @@ import { feature } from './lab/feature.js';
 // по-високи (от ~1,1–1,6 км), по-дебели и по-ярки, облачната основа светва; ~1 от 6 удря връх на небостъргач ≥ 60 м в кадъра (искра на върха).
 // update(dt, 2) — буря: на 3–8 s; update(dt, 1) — силен дъжд с далечни гръмотевични клетки: на 15–40 s; камерата съвсем ниско — по-рядко.
 const W3 = feature('weather3');
+// ⚡ storm-vis (потребителят, 01.11: „не ги виждам на няколко бури“): при камера отгоре (обичайния изглед) точката на удара падаше над горния ръб на екрана (най-малко 300 м) —
+// мълнията не се виждаше, само проблясъкът. Сега ударът е вътре в кадъра (и по-близо, от 70 м), каналът слиза отгоре през екрана до земята.
+const SV = feature('storm-vis');
 
 const MAXP = 72 + 4 * 20, MAXQ = MAXP;   // точки по канала (главен + разклонения); по един правоъгълник на отсечка
 export function createStorm(d) {
@@ -88,8 +91,8 @@ export function createStorm(d) {
       for (const p of (d.targets && d.targets()) || []) { if (p[1] < (o.hit === true ? 35 : 60)) continue;   /* o.hit — Лабораторията: и по-ниска кула (≥ 35 м) */ const r = Math.hypot(p[0] - CAM.x, p[2] - CAM.z); if (r < 150 || r > 3000) continue;
         NDC.set(p[0], p[1], p[2]).project(d.camera); if (NDC.z > 1 || NDC.x < -0.85 || NDC.x > x1 + 0.05 || NDC.y < -0.6 || NDC.y > 0.85) continue; const w = p[1] * p[1] * (0.3 + Math.random()); if (w > bw) { bw = w; best = p; } }
       if (best) return { g: [best[0], best[1], best[2]], hit: true }; }
-    RAY.set(-0.8 + Math.random() * (x1 + 0.8), o.dist != null ? 0.3 : 0.1 + Math.random() * 0.45, 0.5).unproject(d.camera).sub(CAM).normalize(); const hd = Math.hypot(RAY.x, RAY.z) || 1;
-    let r = o.dist; if (r == null) r = RAY.y < -0.02 ? CAM.y / -RAY.y * hd : 800 + Math.random() * 2200; const fg = d.scene.fog, fv = fg && fg.far ? fg.far * 0.85 : 3000; r = Math.max(o.dist != null ? 50 : 300, Math.min(3000, (d.camera.far || 900) * 0.95, Math.max(450, fv), r));   /* дъното — в мараня на хоризонта, не по-далеч от нарисуваната земя */   /* до нарисуваната земя — иначе низът „виси“ над празната ивица до хоризонта */
+    RAY.set(-0.8 + Math.random() * (x1 + 0.8), o.dist != null ? 0.3 : SV ? -0.25 + Math.random() * 0.75 : 0.1 + Math.random() * 0.45, 0.5).unproject(d.camera).sub(CAM).normalize(); const hd = Math.hypot(RAY.x, RAY.z) || 1;
+    let r = o.dist; if (r == null) r = RAY.y < -0.02 ? CAM.y / -RAY.y * hd : 800 + Math.random() * 2200; const fg = d.scene.fog, fv = fg && fg.far ? fg.far * 0.85 : 3000; r = Math.max(o.dist != null ? 50 : SV && RAY.y < -0.02 ? 70 : 300, Math.min(3000, (d.camera.far || 900) * 0.95, Math.max(450, fv), r));   /* дъното — в мараня на хоризонта, не по-далеч от нарисуваната земя */   /* до нарисуваната земя — иначе низът „виси“ над празната ивица до хоризонта */
     return { g: [CAM.x + RAY.x / hd * r, 0, CAM.z + RAY.z / hd * r], hit: false }; }
   // ---- 🌦️ weather3: много канали в един буфер — серия до 5 мълнии + „паяк“ по облачната основа; разклонения до 3 нива (стволът — дебел и ярък,
   // връхчетата — като косъм и бледи). Ширината е ъглова (еднаква на екрана отблизо и отдалеч), яркостта — по върхове (цвят с алфа), лидерът слиза по височината.
@@ -138,10 +141,14 @@ export function createStorm(d) {
     let first = null, end = 0.45;
     for (let k = 0; k < nb; k++) {
       const cloudOnly = k === 0 ? (o.cloud ?? (low || Math.random() < (md === 1 ? 0.3 : 0.2))) : !!low, pk = pick3(k === 0 ? o : { dist: o.dist, hit: false }), g = pk.g;
-      const top = [g[0] + (Math.random() - 0.5) * 300, g[1] + H, g[2] + (Math.random() - 0.5) * 300], dist = Math.hypot(g[0] - CAM.x, g[2] - CAM.z);
+      let top = [g[0] + (Math.random() - 0.5) * 300, g[1] + H, g[2] + (Math.random() - 0.5) * 300];
+      if (SV && !pk.hit) { NDC.set(g[0], g[1], g[2]).project(d.camera); const gx = NDC.x; RAY.set(Math.max(-0.95, Math.min(0.95, gx + (Math.random() - 0.5) * 0.3)), 1.2, 0.5).unproject(d.camera).sub(CAM).normalize();   /* storm-vis: каналът влиза отгоре през ръба на кадъра */
+        const L = Math.hypot(g[0] - CAM.x, g[1] - CAM.y, g[2] - CAM.z) * 1.05, ty = CAM.y + RAY.y * L; if (ty > g[1] + 60) top = [CAM.x + RAY.x * L, Math.min(ty, g[1] + H), CAM.z + RAY.z * L];
+        else if (RAY.y < -0.02) { const yT = g[1] + Math.min(H, Math.max(40, (CAM.y - g[1]) * 0.85)), t = (CAM.y - yT) / -RAY.y; top = [CAM.x + RAY.x * t, yT, CAM.z + RAY.z * t]; } }   /* камерата гледа надолу: горният край — на лъча през ръба на кадъра (не над главата/зад камерата) */
+      const dist = Math.hypot(g[0] - CAM.x, g[2] - CAM.z);
       const far3 = Math.max(Math.hypot(top[0] - CAM.x, top[1] - CAM.y, top[2] - CAM.z), Math.hypot(g[0] - CAM.x, g[1] - CAM.y, g[2] - CAM.z)), sk = Math.min(1, far / Math.max(1, far3));
       const c = CH[nch], ch = nch++; c.t0 = k === 0 || held ? 0 : 0.12 + Math.random() * 0.85; c.kind = cloudOnly ? 1 : 0; c.dist = dist; c.nat = RM ? 0 : 1 + Math.floor(Math.random() * 3); for (let j = 0; j < 3; j++) c.at[j] = 0.13 + j * (0.06 + Math.random() * 0.05);
-      end = Math.max(end, c.t0 + 0.45); tops.push(top);
+      end = Math.max(end, c.t0 + (SV ? 0.45 * 2.2 : 0.45)); tops.push(top);
       if (!cloudOnly) bolt3(ch, top, g, strong, sk);
       if (k === 0) first = { g, top, sk, far3, dist, hit: pk.hit && !cloudOnly };
       if (k < 3) thunder(dist);
@@ -156,7 +163,7 @@ export function createStorm(d) {
     cloud.position.set(sc(g[0] + (top[0] - g[0]) * 0.85, 0), sc(g[1] + (top[1] - g[1]) * 0.85, 1), sc(g[2] + (top[2] - g[2]) * 0.85, 2)); cloud.scale.setScalar(1400 * sk * Math.max(1, far3 / 1800)); cloud.visible = true;
     if (st.hit) { spark.position.set(sc(g[0], 0), sc(g[1], 1), sc(g[2], 2)); sparkS = 26 * sk * Math.max(1, dist / 600); sparkT = 0.9; }
     light.position.set(g[0], Math.max(40, (g[1] + top[1]) / 2), g[2]); return { dist: Math.round(dist), n: nch, bolt: CH[0].kind === 0, hit: st.hit, strong, segs: ns3, pts: np3 }; }
-  const chB = c => { const t = st.t - c.t0; if (t < 0) return 0; if (c.kind === 2) return t < 0.7 ? (0.55 + 0.45 * Math.sin(t * 47)) * (1 - t / 0.7) : 0;
+  const chB = c => { const t = (st.t - c.t0) / (SV && c.kind !== 2 ? 2.2 : 1);   /* storm-vis: каналът свети ~2,2× по-дълго (беше ~0,15 s — едва 1–2 кадъра при натоварване) */ if (t < 0) return 0; if (c.kind === 2) return t < 0.7 ? (0.55 + 0.45 * Math.sin(t * 47)) * (1 - t / 0.7) : 0;
     if (t >= 0.45) return 0; if (t < 0.065) return 0.3; let f = Math.max(0, 1 - (t - 0.065) / 0.09); for (let j = 0; j < c.nat; j++) if (t >= c.at[j] && t < c.at[j] + 0.035) f = Math.max(f, 0.75); if (f < 0.12) f = 0.12 * (1 - (t - 0.065) / 0.385); return f; };
   function ribbon3(me, wA, wM, aM) {   // wA — ъглова ширина (рад), wM — към нея метри; нищо ново на кадър
     const pos = me.geometry.attributes.position.array, col = me.geometry.attributes.color.array; let q = 0;
@@ -170,7 +177,7 @@ export function createStorm(d) {
     if (st.t > st.end) { core3.visible = glow3.visible = false; cloud.visible = false; light.intensity = 0; if (d.rainMat) d.rainMat.opacity = 0.55; st = null; return; }
     let f = 0; for (let c = 0; c < nch; c++) { const h = CH[c], b = chB(h) * (RM ? 0.5 : 1), tc = st.t - h.t0; CB[c] = h.kind === 1 ? 0 : b; CL[c] = h.kind === 0 && tc < 0.065 ? tc / 0.065 : 1; f = Math.max(f, b * (h.kind === 2 ? 0.6 : h.kind === 1 ? 0.7 : 1)); }
     d.camera.getWorldPosition(CAM); const n = d.night ? d.night() : 0, k = 0.45 + 0.55 * n;
-    ribbon3(core3, 0.0014, 0.0006, 1); ribbon3(glow3, 0.0062, 0.0022, 0.4 + 0.35 * n); st.f = f;   /* рад на половин ширина: 1 px ≈ 0,0011 рад при 720 px; денем ореолът — по-слаб */
+    ribbon3(core3, SV ? 0.0055 : 0.0014, SV ? 0.002 : 0.0006, 1); ribbon3(glow3, SV ? 0.03 : 0.0062, SV ? 0.01 : 0.0022, SV ? 0.65 + 0.3 * n : 0.4 + 0.35 * n);   /* storm-vis: каналът ~2,3× по-дебел, ореолът — по-широк и по-силен денем (беше ~1 px — не се виждаше) */ st.f = f;   /* рад на половин ширина: 1 px ≈ 0,0011 рад при 720 px; денем ореолът — по-слаб */
     cloud.material.opacity = Math.min(1, f * k * (st.strong ? 1.3 : 1.05)); light.intensity = 4.5 * f * (0.6 + 1.6 * n); if (d.sun) d.sun.intensity += 1.2 * f * (0.4 + 1.2 * n);
     d.hemi.intensity += 1.8 * f * (0.5 + 1.5 * n) * st.dk * (st.strong ? 1.15 : 1); if (d.rainMat) d.rainMat.opacity = 0.55 + 0.4 * f; }
   // ход на един удар

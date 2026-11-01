@@ -465,7 +465,11 @@ function osmEdge(G, D, F, edge) {
   const hsh = (x, z) => { const h = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453; return h - Math.floor(h); }, M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), V = new THREE.Vector3(), Sc = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0);
   const hist = new Float32Array(18); for (const r of edge.roads || []) for (let k = 1; k < r.pts.length; k++) { const a = r.pts[k - 1], b = r.pts[k], L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 5) continue; let t = Math.atan2(b[1] - a[1], b[0] - a[0]); t = ((t % (Math.PI / 2)) + Math.PI / 2) % (Math.PI / 2); hist[Math.min(17, Math.floor(t / (Math.PI / 2) * 18))] += L; }
   let hb = 0; for (let k = 1; k < 18; k++) if (hist[k] > hist[hb]) hb = k; const ang = (hb + 0.5) / 18 * Math.PI / 2, ca = Math.cos(ang), sa = Math.sin(ang);
-  const busy = (x, z) => occAt(x, z) || occAt(x - 30, z) || occAt(x + 30, z) || occAt(x, z - 30) || occAt(x, z + 30) || (B.length > 2 && inPoly([x, z], B)) || (x > X0 - 20 && x < X1 + 20 && z > Z0 - 20 && z < Z1 + 20) || (NY && (NY.island(x, z) || NY.park(x, z) || Math.hypot(x - NY.term[0], z - NY.term[1]) < 45));
+  // 🗽 ny-edge-facade (собственикът, 01.11: „да пипнем небостъргачите да не са като кутии — да имат прозорци и визия … и тук да направим някоя улица да ги вържем“):
+  // южно от последната улица на плана (zB) — Долен Манхатън влиза и в празната ивица (границата на плана е по-широка от застроеното); фасадите — като на плана; асфалт по улиците
+  const NYE = !!NY && feature('ny-edge-facade'), zB = NYE ? (() => { const zs = []; for (const r of edge.roads || []) for (const q of r.pts) zs.push(q[1]); zs.sort((a, b) => a - b); return zs.length ? zs[Math.floor(zs.length * 0.985)] : 1e9; })() : 1e9;
+  const gapOK = (x, z) => NYE && z > zB + 25 && NY.man(x, z);
+  const busy = (x, z) => occAt(x, z) || occAt(x - 30, z) || occAt(x + 30, z) || occAt(x, z - 30) || occAt(x, z + 30) || (!gapOK(x, z) && ((B.length > 2 && inPoly([x, z], B)) || (x > X0 - 20 && x < X1 + 20 && z > Z0 - 20 && z < Z1 + 20))) || (NY && (NY.island(x, z) || NY.park(x, z) || Math.hypot(x - NY.term[0], z - NY.term[1]) < 45));
   const dry = (x, z, r) => !isW(x, z) && !isW(x + r, z) && !isW(x - r, z) && !isW(x, z + r) && !isW(x, z - r);
   const PAL = [0x9b5a46, 0xa8624c, 0x7c5a45, 0x8a6a52, 0xd6c6a6, 0xcdbb98, 0xa9a7a2, 0x8e8c88, 0xc2b8a8], bld = [], trees = [], R0 = 2300, CELL = 26, cx = (bx0 + bx1) / 2, cz = (bz0 + bz1) / 2, HALF = Math.max(bx1 - bx0, bz1 - bz0) / 2 + R0;
   for (let u = -HALF; u <= HALF; u += CELL) for (let w = -HALF; w <= HALF; w += CELL) {
@@ -483,7 +487,37 @@ function osmEdge(G, D, F, edge) {
   else if (D.style === 'newyork') { const jx = X0 - 230, jz = Z1 - 150;   // Джърси Сити: кулите на брега срещу Мидтаун/Финансовия квартал
     for (let k = 0; k < 16; k++) { const x = jx - hsh(k, 1) * 380, z = jz + (hsh(1, k) - 0.3) * 900; if (inRail(x, z, 30) || !dry(x, z, 20) || busy(x, z)) continue; const h = 60 + Math.pow(hsh(k, 7), 1.5) * 140;
       bld.push([x, z, 26 + hsh(k, 3) * 16, 24 + hsh(3, k) * 14, h, [0x6d7f92, 0x8a98a6, 0x5a6c7e, 0xb4b8bc][k % 4], 1]); } }
-  if (bld.length) {
+  if (bld.length && NYE) {   // ny-edge-facade: три материала от плана — стъкло (кулите), жълтите блокове, тухла (ниските); тонът — по инстанцията
+    const hs = (x, z) => { const h = Math.sin(x * 3.1 + z * 7.7) * 9871.37; return h - Math.floor(h); }, groups = [[], [], []], TG = [0xdfe8f0, 0xcfd8e0, 0xe8eef2, 0xc4ced8], TA = [0xf3ead9, 0xe9dcc3, 0xf0e6d2, 0xe4d6bd], TB = [0x9a5a3e, 0xb06c4a, 0x8c4a36, 0xa8664a, 0xbfa07a];
+    for (const b of bld) { const u = hs(b[0], b[1]); groups[b[4] > 45 ? (u < 0.55 ? 0 : 1) : (u < 0.5 ? 1 : 2)].push(b); }
+    const FMx = [glassMat(), aptMat(), brickMat()], TT = [TG, TA, TB], col = new THREE.Color();
+    groups.forEach((L, gi) => { if (!L.length) return; const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), FMx[gi], L.length);
+      Q.setFromAxisAngle(Y, -ang); L.forEach(([x, z, w, d, h], i) => { im.setMatrixAt(i, M4.compose(V.set(x, 0, z), Q, Sc.set(w, h, d))); im.setColorAt(i, col.setHex(TT[gi][Math.floor(hs(z, x) * TT[gi].length)])); });
+      im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; im.receiveShadow = true; im.castShadow = gi === 0; im.name = 'osmEdgeSuburbs'; G.add(im); });
+    // покривите (собственикът: „да му сложим няколко различни покрива да не са всички квадрат“): кулите — стъпало (по-тясна горна част), пирамида/шпил,
+    // или стъпало + пирамида; ниските — машинно помещение или водна кула на крачета; плоските остават около 1/4
+    const RS = [], RP = [], RM = [], RW = [], q = new THREE.Quaternion().setFromAxisAngle(Y, -ang), q4 = new THREE.Quaternion().setFromAxisAngle(Y, -ang + Math.PI / 4);
+    groups.forEach((L, gi) => L.forEach(([x, z, w, d, h]) => { const r = hs(x * 1.7, z * 2.3);
+      if (h > 45) { if (r < 0.28) RS.push([gi, x, z, w * 0.7, d * 0.7, h, h * (0.12 + 0.1 * r)]); else if (r < 0.40) RP.push([x, z, w * 0.9, d * 0.9, h, Math.min(w, d) * (0.3 + 0.4 * r)]); else if (r < 0.58) { const sh = h * 0.12; RS.push([gi, x, z, w * 0.72, d * 0.72, h, sh]); RP.push([x, z, w * 0.6, d * 0.6, h + sh, Math.min(w, d) * 0.45]); } else if (r < 0.72) RS.push([gi, x, z, w * 0.5, d * 0.5, h, h * 0.06]); }
+      else if (r < 0.45) RM.push([x, z, w * 0.35, d * 0.3, h]); else if (r < 0.75) RW.push([x, z, h]); }));
+    const add = (geo, mat, arr, f, nm) => { if (!arr.length) return; const m = new THREE.InstancedMesh(geo, mat, arr.length); arr.forEach((a, i) => m.setMatrixAt(i, f(a))); m.instanceMatrix.needsUpdate = true; m.castShadow = m.receiveShadow = true; m.name = nm; G.add(m); };
+    const BX = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
+    [0, 1, 2].forEach(gi => add(BX, FMx[gi], RS.filter(a => a[0] === gi), ([, x, z, w, d, h, sh]) => M4.compose(V.set(x, h, z), q, Sc.set(w, sh, d)), 'osmEdgeRoofStep'));
+    add(new THREE.ConeGeometry(0.7071, 1, 4, 1).translate(0, 0.5, 0), new THREE.MeshStandardMaterial({ color: 0x5c6670, roughness: 0.5, metalness: 0.4 }), RP, ([x, z, w, d, h, ph]) => M4.compose(V.set(x, h, z), q4, Sc.set(w, ph, d)), 'osmEdgeRoofSpire');
+    add(BX, new THREE.MeshStandardMaterial({ color: 0x8e8a84, roughness: 0.9 }), RM, ([x, z, w, d, h]) => M4.compose(V.set(x + w * 0.4, h, z), q, Sc.set(w, 3.2, d)), 'osmEdgeRoofBox');
+    add(new THREE.CylinderGeometry(1.6, 1.6, 3.2, 10).translate(0, 4.6, 0), new THREE.MeshStandardMaterial({ color: 0x6b4a32, roughness: 0.95 }), RW, ([x, z, h]) => M4.compose(V.set(x - 2, h, z + 1.5), q, Sc.set(1, 1, 1)), 'osmEdgeWaterTower');
+    add(new THREE.ConeGeometry(1.75, 1.3, 10).translate(0, 6.85, 0), new THREE.MeshStandardMaterial({ color: 0x3e3a36, roughness: 0.9 }), RW, ([x, z, h]) => M4.compose(V.set(x - 2, h, z + 1.5), q, Sc.set(1, 1, 1)), 'osmEdgeWaterTowerCap');
+    add(new THREE.BoxGeometry(2.6, 3, 2.6).translate(0, 1.5, 0), new THREE.MeshStandardMaterial({ color: 0x2c2c2c, wireframe: true }), RW, ([x, z, h]) => M4.compose(V.set(x - 2, h, z + 1.5), q, Sc.set(1, 1, 1)), 'osmEdgeWaterTowerLegs');
+    // асфалтът: улиците на решетката (всяка 5-а колона и 4-и ред) — в Манхатън на юг от плана, вкл. празната ивица
+    const ap = [], au = [], ai = [], quad = (u0, w0, u1, w1) => { const c0 = ap.length / 3; for (const [u, w] of [[u0, w0], [u1, w0], [u1, w1], [u0, w1]]) { const x = cx + u * ca - w * sa, z = cz + u * sa + w * ca; ap.push(x, 0.06, z); au.push(x / 12, z / 12); } ai.push(c0, c0 + 2, c0 + 1, c0, c0 + 3, c0 + 2); };
+    const roadOK = (u, w) => { const x = cx + u * ca - w * sa, z = cz + u * sa + w * ca; return z > zB - 10 && NY.man(x, z) && !isW(x, z) && !occAt(x, z) && !NY.park(x, z); };
+    for (let iu = Math.ceil(-HALF / CELL); iu <= HALF / CELL; iu++) for (let iw = Math.ceil(-HALF / CELL); iw <= HALF / CELL; iw++) { const u = iu * CELL, w = iw * CELL;
+      if (((iu % 5) + 5) % 5 === 4 && roadOK(u, w)) quad(u - 7, w - CELL / 2, u + 7, w + CELL / 2);
+      if (((iw % 4) + 4) % 4 === 3 && roadOK(u, w)) quad(u - CELL / 2, w - 6, u + CELL / 2, w + 6); }
+    if (ai.length) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(ap, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(au, 2)); g.setAttribute('normal', new THREE.Float32BufferAttribute(new Array(ap.length).fill(0).map((_, k) => k % 3 === 1 ? 1 : 0), 3)); g.setIndex(ai);
+      const m = new THREE.Mesh(g, MAT.asph); m.receiveShadow = true; m.name = 'osmEdgeStreets'; G.add(m); }
+  }
+  else if (bld.length) {
     const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.88 }), bld.length), col = new THREE.Color();
     Q.setFromAxisAngle(Y, -ang); bld.forEach(([x, z, w, d, h, c, k], i) => { im.setMatrixAt(i, M4.compose(V.set(x, 0, z), Q, Sc.set(w, h, d))); im.setColorAt(i, col.setHex(c).multiplyScalar(k)); });
     im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; im.receiveShadow = true; im.name = 'osmEdgeSuburbs'; G.add(im); }

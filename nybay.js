@@ -3,6 +3,12 @@
 // отвъд — заливът Ъпър Ню Йорк Бей; островите Губернаторски, Либърти (звездата на Форт Ууд) и Елис.
 // Всичко е в координатите на плана (като растера): toXZ — както в cityplan2game.js (centre, k).
 import * as THREE from 'three';
+import { feature } from './lab/feature.js';
+
+// 🗽 ny-south-compact (собственикът, 01.11: „да скъсим разстоянието … има много разстояние с празни площи и блокове“ → „Събери на юг“): южно от растера на плана
+// (Челси) всичко — Долен Манхатън, Батъри, заливът, островите, Статуята — по-близо: разстоянията на юг от ръба × NY_SOUTH_K; северно — без промяна
+export const NY_SOUTH_K = 0.4;
+export function nySouthZ(D) { const s = D && D.sea; if (!feature('ny-south-compact') || !s) return z => z; const Zc = s.z0 + s.nz * s.cell; return z => z > Zc ? Zc + (z - Zc) * NY_SOUTH_K : z; }
 
 const LON0 = -73.985;   // само за четимост на списъците по-долу
 
@@ -50,7 +56,7 @@ export const LIBERTY_LL = [-74.0445, 40.6892];   // статуята (истин
 
 export function nyBay(D) {
   const c = D.center, K = D.k || 0.45, cs = Math.cos(c[0] * Math.PI / 180) * 111320 * K, zs = 110540 * K;
-  const LL = ([lo, la]) => [(lo - c[1]) * cs, -(la - c[0]) * zs];
+  const cz = nySouthZ(D), LL = ([lo, la]) => [(lo - c[1]) * cs, cz(-(la - c[0]) * zs)];   // ny-south-compact: южно от плана — по-сгъстено
   const poly = L => L.map(LL);
   const round = (q, n = 3) => { for (let k = 0; k < n; k++) q = q.flatMap((a, i) => { const b = q[(i + 1) % q.length]; return [[a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25], [a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]]; }); return q; };   // ъглите — заоблени (Чайкин)
   const box = q => [Math.min(...q.map(p => p[0])), Math.max(...q.map(p => p[0])), Math.min(...q.map(p => p[1])), Math.max(...q.map(p => p[1]))];
