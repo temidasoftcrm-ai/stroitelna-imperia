@@ -535,6 +535,7 @@ export function createCinema(deps) {
     el.querySelector('.cap b').textContent = sc.cap; el.querySelector('.cap span').textContent = sc.sub;
     document.body.appendChild(el);
     if (!manual || !seen()[key]) { seen()[key] = S()?.day || 1; deps.save && deps.save(); }
+    if (key === 'titanic' && feature('holo-history')) import('./holocard.js').then(m => m.showHolo('titanic', 40)).catch(() => { });   // 📜 holo-history: кратката история до клипа
     const prevSpeed = deps.speed ? deps.speed() : 1; if (deps.setSpeed) deps.setSpeed(0);
     let done = false, raf = 0, A = null, tm = 0;
     const cap = el.querySelector('.cap'), cleanup = [];

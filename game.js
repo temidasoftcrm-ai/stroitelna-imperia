@@ -37,6 +37,10 @@ import { createStill } from './perfstill.js';   // ⚡ perf3-still
 import { createFires } from './firesim.js';
 import { createBlockRuins } from './fireruins.js';   // 🏚️ fire-ruins: изгорелите фонови сгради (кварталите по плана)
 import { createGhostHunt } from './ghosthunt.js';   // 👻 ghost-hunt: скритата изненада в Ню Йорк (пожарната, зеленото сияние, колата на ловците)
+import { createUfo } from './ufo.js';   // 🛸 ufo-vegas: скритата изненада — НЛО над Лас Вегас в ясна нощ
+import { createNessie } from './nessie.js';   // 🐉 nessie: Лох Нес в северните крайморски градове
+import { holoWatch } from './holocard.js';   // 📜 holo-history: историята отстрани на изненадите
+import { createGorilla } from './gorilla.js';   // 🦍 kongo: Голямата горила катери Емпайър Стейт в Ню Йорк
 import { nySouthZ } from './nybay.js';   // 🗽 ny-south-compact: южно от плана на Ню Йорк — по-сгъстено (и забележителностите там)
 import { gantrySigns } from './hwsigns.js';   // 🛣️ флаг hw-gantry: порталите с табели над магистралата в града
 import { buildBillboards } from './billboards3d.js';   // 🪧 флаг billboards: билбордове с фирмата по булевардите   // 🔥 флаг fire-seq: пожарът като последователност (здравина, гасене, оценка, ремонт/разчистване)   // ⚡ флаг perf-cliff: детайлите и хората по разстояние, сливане на статичните модели   // ⏱️ панел за производителност (флаг perf-panel, F8)
@@ -191,7 +195,7 @@ import { createCitySnd3 } from './citysnd3.js';   // 🔊 city-snd3: запис�
 const CSND3 = feature('city-snd3') ? createCitySnd3(Sound) : null;
 import { loadShipModels, hasShipModel, shipModel, setShipNight } from './shipmodels.js';   // 🚢 osm-ships: големите кораби на котва в градовете по картата
 import { roundDeco } from './roundabout.js';   // 🌊 bg-rivers (T2): Дунав във Видин, Марица в Пловдив, Баба Вида, тепетата   // 🛶 ams-canals (f6): каналите на Амстердам
-import { MESHY_SKY, MESHY_SKY_NY, MESHY_SKY_H, MESHY_SKY_CITIES, meshySkyPrep } from './meshysky.js';   // 🏙️ meshy-sky2 (f6): златният и синият небостъргач (Meshy) в градовете със стъклени кули
+import { MESHY_SKY, MESHY_SKY_NY, MESHY_SKY_H, MESHY_SKY_CITIES, meshySkyPrep, MESHY_SKY_BRICK, MESHY_SKY_BRICK_CITIES } from './meshysky.js';   // 🏙️ meshy-sky2 (f6): златният и синият небостъргач (Meshy) в градовете със стъклени кули
 import { TOWER_FILES, towerKinds, towerPrep, towerNear } from './towers.js';   // 🏢 meshy-tower (f6): високите блокове (Meshy) в центъра на балканските и източноевропейските градове   // 🇮🇹 rome-bld (f9): Рим отблизо — италианските сгради; it-bld — и в другите италиански градове
 import { STATUE_FILES, statuePrep, meshyFor } from './statues.js';   // ⛲ statues (f9): фонтани и статуи в градовете
 import { GFX, GFX_ORDER, gfx, gfxLevel, setGfx, gfxAutoWhy, gfxStill } from './gfxpresets.js';   // 🎨 gfx-presets (f9): графиката Ниско / Средно / Високо
@@ -739,7 +743,7 @@ let europe = null;
   // хотел за ски курортите (resortview.js го ползва вместо кулите на Kenney)
   for (const k of ['sing', 'rand', 'usb', 'blue', 'night']) jobs.push(load(`assets/heavy/sky/${k}.glb`).then(g => { g.scene.traverse(m => { if (m.isMesh && m.material && m.material.metalness > 0.5) m.material.metalness = 0.35; }); A['sf-sky-' + k] = g; prepNightFloors(g.scene, 'sf-sky-' + k); }).catch(() => {}));   // истински небостъргачи (Sketchfab) — за разнообразие в града
   if (feature('sky-twin')) jobs.push(load('assets/heavy/sky/twin.glb').then(g => { g.scene.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; for (const m of [].concat(o.material)) if (m) { m.metalness = 0; m.roughness = Math.max(m.roughness ?? 1, 0.55); } } }); A['sf-sky-twin'] = g; prepNightFloors(g.scene, 'sf-sky-twin'); g.scene.traverse(o => { if (o.isMesh) for (const m of [].concat(o.material)) if (m && m.userData.nightFloors) m.emissive.setRGB(1, 0.8, 0.55); }); })   /* топли прозорци (собственикът) */.catch(e => console.warn('sky-twin', e)));   // 🏙️ sky-twin: „Twin Towers Skyline“ на собственика (Meshy, Темидасофт) — в пула на небостъргачите (15+ етажа); нощем — прозорците по етажите (grid)
-  if (feature('meshy-sky2')) for (const [k, f] of Object.entries({ ...MESHY_SKY, ...(feature('lm-ny2') ? MESHY_SKY_NY : {}) })) jobs.push(load(`assets/heavy/${f}`).then(g => { A['sf-sky-' + k] = g; if (!(k === 'gold' && feature('gold-night2'))) prepNightFloors(g.scene, 'sf-sky-' + k); /* gold-night2: своята нощ (meshysky.js goldNight) */ meshySkyPrep(g.scene, () => dayNight.night); }).catch(() => {}));   // meshy-sky2: Body + Beacon + Accent (meshysky.js)
+  if (feature('meshy-sky2')) for (const [k, f] of Object.entries({ ...MESHY_SKY, ...(feature('lm-ny2') ? MESHY_SKY_NY : {}), ...MESHY_SKY_BRICK })) jobs.push(load(`assets/heavy/${f}`).then(g => { A['sf-sky-' + k] = g; if (!(k === 'gold' && feature('gold-night2')) && !MESHY_SKY_BRICK[k] /* brick-goth: своята нощ (nightdata) */) prepNightFloors(g.scene, 'sf-sky-' + k); /* gold-night2: своята нощ (meshysky.js goldNight) */ meshySkyPrep(g.scene, () => dayNight.night); }).catch(() => {}));   // meshy-sky2: Body + Beacon + Accent (meshysky.js)
   if (feature('shop-cafe')) for (const k of ['cafe-corner', 'cafe-prosa']) jobs.push(load(`assets/heavy/shops/${k}.glb`).then(g => { A[k] = g; if (k === 'cafe-corner') atNight(() => cafeNight(g.scene)); else prepNightFloors(g.scene, k); }).catch(() => {}));   // ☕ shop-cafe (f6): кафенетата (Sketchfab, CC BY 4.0)
   if (feature('shops-meshy')) for (const k of ['shop-corner', 'shop-mall']) jobs.push(load(`assets/heavy/shops/${k}.glb`).then(g => { A[k] = g; atNight(() => shopNight(g.scene, k)); }).catch(() => {}));   // 🏪 shops-meshy (f6): кварталното магазинче и молът (Meshy, Темидасофт); нощем — витрините и прозорците (shopNight)
   if (feature('shops-meshy2')) for (const k of ['shop-super', 'shop-24']) jobs.push(load(`assets/heavy/shops/${k}.glb`).then(g => { A[k] = g; atNight(() => shopNight(g.scene, k)); }).catch(() => {}));   // 🛒 shops-meshy2 (f6): супермаркетът и денонощният магазин (Meshy, Темидасофт; чуждите марки по табелите — пребоядисани)
@@ -962,8 +966,8 @@ const nyNear = () => { const h = b => ((Math.round(b.x * 3) * 73856093) ^ (Math.
 // стъклените кули на ny-dense (тип 5, ≥ 60 м) — през nyNear: половината — новата кула, другата половина — двете стъклени кули от Meshy (бялата и синята), за разнообразие;
 // височината — 85…115 % от кутията (по мястото), пропорциите на модела (не по-широка от кутията); до 650 м от камерата, по-далеч — кутиите
 const NYSKY_ON = feature('ny-sky256') && feature('ny-dense');
-const NYSKY_FILES = NYSKY_ON ? { 'ny-256': 'sky/ny256.glb', 'ny-skyw': 'sky/sky-white.glb', 'ny-skyb': 'sky/sky-blue.glb' } : {};
-const NYSKY_NF = { 'ny-skyw': 'sf-sky-skyw', 'ny-skyb': 'sf-sky-skyblue' }, NYSKY_PICK = ['ny-256', 'ny-256', 'ny-skyw', 'ny-skyb'], NYSKY_A = {};
+const NYSKY_FILES = NYSKY_ON ? { 'ny-256': 'sky/ny256.glb', 'ny-skyw': 'sky/sky-white.glb', 'ny-skyb': 'sky/sky-blue.glb', ...(feature('brick-goth') ? { 'ny-brick': 'sky/brickgoth.glb' } : {}) } : {};   // 🧱 brick-goth: тухлената готическа кула (80–120 м)
+const NYSKY_NF = { 'ny-skyw': 'sf-sky-skyw', 'ny-skyb': 'sf-sky-skyblue' }, NYSKY_PICK = ['ny-256', 'ny-256', 'ny-skyw', 'ny-skyb', ...(NYSKY_FILES['ny-brick'] ? ['ny-brick', 'ny-brick'] : [])], NYSKY_A = {};
 function nySkyPrep(V) { for (const k in NYSKY_FILES) { const o = plan2.models[k]; if (!o) continue;
   if (NYSKY_NF[k]) prepNightFloors(o, NYSKY_NF[k]); meshySkyPrep(o, () => dayNight.night);   // прозорците нощем — като същите кули в града; Beacon/Accent (meshysky.js)
   const s = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3()); NYSKY_A[k] = [s.x / s.y, s.z / s.y]; V[k] = o; } }
@@ -973,7 +977,7 @@ const NYSKY_SMALL = feature('ny-sky-small');
 // ny-sky-small (собственикът, след замерването: „жълтите сгради са супер … другите трябва да са малко по-високи от тях“): кулата — 15–35 % над най-високата
 // жълта сграда (не стъклените кули, t ≠ 5) до 150 м около нея; не над собствената кутия; без жълти наоколо — 60–80 % от кутията
 const nyYellowMax = (() => { const C = new WeakMap(); return b => { if (C.has(b)) return C.get(b); const B = (city.planView && city.planView.userData.blocks) || []; let m = 0; for (const q of B) if (q.t !== 5 && q.h > m && (q.x - b.x) ** 2 + (q.z - b.z) ** 2 < 22500) m = q.h; if (B.length) C.set(b, m); return m; }; })();
-const nySkySize = (b, k, hh) => { const [ax, az] = NYSKY_A[k]; if (NYSKY_SMALL) { const ym = nyYellowMax(b), want = ym > 0 ? Math.min(Math.max(60, b.h), ym * (1.15 + 0.04 * (hh % 6))) : Math.max(60, b.h) * (0.6 + 0.04 * (hh % 6)), fh = Math.min(Math.max(40, want), b.w * 0.97 / ax, b.d * 0.97 / az);   /* пропорциите — винаги (на много тесен парцел и под 40 м) */ return [Math.min(b.w * 0.97, fh * ax), fh, Math.min(b.d * 0.97, fh * az)]; }
+const nySkySize = (b, k, hh) => { const [ax, az] = NYSKY_A[k]; if (k === 'ny-brick') { const fh = Math.min(80 + 8 * (hh % 6), b.w * 0.97 / ax, b.d * 0.97 / az); return [fh * ax, fh, fh * az]; }   /* brick-goth: 80–120 м, пропорциите на модела (на тесен парцел — по-ниска) */ if (NYSKY_SMALL) { const ym = nyYellowMax(b), want = ym > 0 ? Math.min(Math.max(60, b.h), ym * (1.15 + 0.04 * (hh % 6))) : Math.max(60, b.h) * (0.6 + 0.04 * (hh % 6)), fh = Math.min(Math.max(40, want), b.w * 0.97 / ax, b.d * 0.97 / az);   /* пропорциите — винаги (на много тесен парцел и под 40 м) */ return [Math.min(b.w * 0.97, fh * ax), fh, Math.min(b.d * 0.97, fh * az)]; }
   const fh = Math.max(60, b.h) * (0.85 + 0.06 * (hh % 6)); return [Math.min(b.w * 0.97, fh * ax), fh, Math.min(b.d * 0.97, fh * az)]; };
 const itNear = () => { const r = { V: plan2.itV || null, o: { pick: IT_PICK, yaws: [Math.PI / 2, -Math.PI / 2], only: b => b.h >= 8 && b.h <= 18, mix: 0.6 } };
   if (!plan2.itV) (plan2.itLoad ||= Promise.all(Object.entries(IT_FILES).map(([k, u]) => plan2.models[k] ? 0 : new GLTFLoader().loadAsync('assets/heavy/' + u).then(g => { plan2.models[k] = g.scene; }).catch(() => {})))
@@ -1213,7 +1217,7 @@ const LOWRISE = new Set(['washington']);   // ниски градове: без 
 const cityTier = id => MEGA.includes(id) || MEGAPOLIS.has(id) ? 'xl' : (CITIES.find(c => c.id === id)?.sz || 1) >= 3 ? 'l' : (CITIES.find(c => c.id === id)?.sz || 1) === 2 ? 'm' : 's';
 const BRF = feature('bld-region-fix');   // 🏘️ bld-region-fix (одитът на сградите, T2): съветските панели — само в Източна Европа и Балканите; без японската къща в Залива
 const SF_BLK = () => ['richmond', 'panel12', 'gamecity', 'soviet', 'oldbld', 'dbrick', 'brick', 'asian', 'modoffice', 'jade'].map(k => 'sf-blk-' + k).filter(n => A[n] && !(BRF && (n === 'sf-blk-soviet' || n === 'sf-blk-panel12') && !(S && panelTilt(S.cityId) > 0)));   // истински блокове
-const SF_SKY = () => ['sing', 'rand', 'usb', 'blue', 'night', ...(S && MESHY_SKY_CITIES.has(S.cityId) ? Object.keys(MESHY_SKY) : []), ...(S && S.cityId === 'newyork' && feature('lm-ny2') ? Object.keys(MESHY_SKY_NY) : [])].map(k => 'sf-sky-' + k).filter(n => A[n]);   /* meshy-sky2: златният и синият — само в градовете със стъклени кули */   // истинските небостъргачи (ако са заредени)
+const SF_SKY = () => ['sing', 'rand', 'usb', 'blue', 'night', ...(S && MESHY_SKY_CITIES.has(S.cityId) ? Object.keys(MESHY_SKY) : []), ...(S && S.cityId === 'newyork' && feature('lm-ny2') ? Object.keys(MESHY_SKY_NY) : []), ...(S && MESHY_SKY_BRICK_CITIES.has(S.cityId) ? Object.keys(MESHY_SKY_BRICK) : [])].map(k => 'sf-sky-' + k).filter(n => A[n]);   /* meshy-sky2: златният и синият — само в градовете със стъклени кули */   // истинските небостъргачи (ако са заредени)
 // 🏢 (55, задачите от играта №1) обликът по региони: в България — много панелни блокове (6–12 етажа), малко американски кули;
 // в бившия соц. блок — същото, по-леко. В центъра на големите градове остават и модерни кули (без цилиндричната американска в БГ).
 const EAST_CC = new Set(['🇷🇴', '🇷🇸', '🇲🇰', '🇷🇺', '🇺🇦', '🇧🇾', '🇲🇩', '🇵🇱', '🇨🇿', '🇸🇰', '🇭🇺', '🇦🇱', '🇧🇦', '🇲🇪', '🇭🇷', '🇸🇮', '🇽🇰', '🇱🇹', '🇱🇻', '🇪🇪', '🇬🇪', '🇦🇲', '🇦🇿', '🇰🇿', '🇺🇿']);
@@ -3199,6 +3203,14 @@ const fires = createFires({ S: () => S, group: () => city.group, lots: () => cit
 const blkRuins = createBlockRuins({ S: () => S, cityId: () => S.cityId, day: () => S.day + S.dayT / DAY_SEC, group: () => city.group, pv: () => city.planView, toast: (...a) => toast(...a), fly: (x, z) => flyTo({ x, z }), save: () => save() });
 // 👻 ghost-hunt (собственикът, 01.11: „Ловци на духове“ — САМО наша пародия, без чуждите марки): пожарната в Ню Йорк, нощем — сиянието, лъчът и колата
 const ghostHunt = feature('ghost-hunt') ? createGhostHunt({ scene, S: () => S, pv: () => city.planView, hour: () => ((todF() * 24) + 6) % 24, night: () => dayNight.night, roadRoute: (x0, z0, x1, z1) => roadRoute(x0, z0, x1, z1), roadPoint: () => roadPoint(), toast: (...a) => toast(...a), pop: (k, c, s) => showEventPop(k, c, s), save: () => save() }) : null;
+// 🛸 ufo-vegas (собственикът, 01.11: НЛО — „скрита изненада“, от списъка „НЛО над Розуел“; Розуел го няма → Лас Вегас, до Зона 51): рядко, в ясна нощ, лъч до земята и изчезва
+const ufo = feature('ufo-vegas') ? createUfo({ scene, camera, Sound, S: () => S, target: () => controls.target, night: () => dayNight.night || 0, clear: () => weather.kind === 'clear', cycle: () => Math.floor(((S.day - 1) + S.dayT / DAY_SEC) / CYCLE_DAYS), on: () => !!city.group && $('mapScreen').classList.contains('hidden'), toast: (...a) => toast(...a), pop: (k, c, s2) => showEventPop(k, c, s2), save: () => save() }) : null;
+// 🐉 nessie (собственикът, 01.11: „за Лох Нес — да го анимираме и да го сложим където прецениш“; одобрено в Blender): рядко, в мъгла/облачно сутрин, във водата до града
+const nessieFx = feature('nessie') ? createNessie({ scene, S: () => S, cityId: () => S && S.cityId, water: (x, z) => { const P = city.plan; return !!(P && P.waterAt && P.waterAt(x, z)); }, center: () => city.hq ? [city.hq.x, city.hq.z] : [0, 0], hour: () => ((todF() * 24) + 6) % 24, fog: () => ['fog', 'cloudy', 'rain'].includes(weather.kind), toast: (...a) => toast(...a), pop: (k, c, s2) => showEventPop(k, c, s2), save: () => save() }) : null;
+// 🦍 kongo (собственикът, 01.11: горилата — одобрена в Blender, „давай“): рядко, денем в Ню Йорк — катери Емпайър Стейт, на върха — гърдите, ревът, самолетите
+const kongo = feature('kongo') ? createGorilla({ scene, S: () => S, landmark: k => { const o = (city.landmarks || []).find(q => q.kind === k); return o ? o.group : null; }, camera, hour: () => ((todF() * 24) + 6) % 24, night: () => dayNight.night, plane: (k, l) => makePlane(k, l), toast: (...a) => toast(...a), pop: (k, c, s2) => showEventPop(k, c, s2), save: () => save() }) : null;
+// 📜 holo-history (собственикът, 01.11: „история отстрани на изненадите — за Титаник кратка история, за останалите като холограма“)
+const holoTick = feature('holo-history') ? holoWatch(() => ({ nessie: !!(nessieFx && nessieFx.busy), kongo: !!(kongo && kongo.state()), ufo: !!(ufo && ufo.state().active), ghost: !!(ghostHunt && S && S.cityId === 'newyork' && ghostHunt.state().unlocked && dayNight.night > 0.4) })) : null;
 // #11 (emerg-home): спешните коли стоят в участъците и излизат само при инцидент/пожар; в трафика — най-много една патрулка, без буркани
 const patrolOn = () => [...traffic.map(t => t.obj), ...(tr2 ? tr2.cars.map(c => c.obj) : [])].some(o => o && o.userData.patrol);
 function addCar() {
@@ -9428,7 +9440,7 @@ function stationPark(again = 0) {
 }
 function refreshPassing() {
   if (passing) passing.clear();
-  passing = createPassingTrains({ scene, group: city.group, model, instanced, x: STATION_X, trackX: station.outerX(), path: trackMap, horn: () => {}, orient: () => S?.orient?.st === 'done', len: railLen(), zN: city.railN, stopZ: city.stZ ? city.stZ - 30 : null, stCenter: city.stZ || 0, onBrake: (x, z) => { if (SFX2) SFX2.trainStop(x, z); } });
+  passing = createPassingTrains({ asia: () => carRegion(S.cityId) === 'xx' && !!cityById(S.cityId) && cityById(S.cityId).lon > 60 /* jp-emu: Азия */, scene, group: city.group, model, instanced, x: STATION_X, trackX: station.outerX(), path: trackMap, horn: () => {}, orient: () => S?.orient?.st === 'done', len: railLen(), zN: city.railN, stopZ: city.stZ ? city.stZ - 30 : null, stCenter: city.stZ || 0, onBrake: (x, z) => { if (SFX2) SFX2.trainStop(x, z); } });
   buildRailX();
   try { buildCatenary(); } catch (e) { console.warn('catenary', e); }
   try { buildDepot(); } catch (e) { console.warn('depot', e); }
@@ -13669,7 +13681,11 @@ function frame() {
     updateParked();
     if (feature('fire-seq')) fires.update(dt / DAY_SEC);
     if (feature('fire-ruins')) blkRuins.update(dt / DAY_SEC);   // игрово време: на пауза (dt = 0) всичко спира
+    if (nessieFx) nessieFx.update(dt);   // 🐉 nessie
+    if (holoTick && (holoTick.n = (holoTick.n || 0) + 1) % 15 === 0) holoTick();   // 📜 holo-history
     if (ghostHunt) ghostHunt.update(dt, dt > 0);   // 👻 ghost-hunt: само в Ню Йорк (иначе — нищо)
+    if (kongo) kongo.update(rdt, dt > 0);   // 🦍 kongo: реално време (на пауза — застива)
+    if (ufo) ufo.update(rdt, dt > 0);   // 🛸 ufo-vegas: реално време (на пауза — застива)
     updateTrains(dt / DAY_SEC);
     hwTrucks.update(dt / DAY_SEC);
     updateHighways(dt / DAY_SEC);
@@ -13880,7 +13896,12 @@ if (AUTOTEST) {
     // 🏚️ fire-ruins: камерата на последната руина в града (фонова сграда или парцел; няма ли — изгаря най-близката ниска фонова сграда); night — 22 ч.
     blkRuins: () => blkRuins,   // 🏚️ fire-ruins: тестовете — add(блок), state()
     ghostLook(night = true) { const r = ghostHunt && ghostHunt.look(night); if (!r) return null; showMap(false); $('panel').classList.add('hidden'); this.time(night ? 0.5 : 13); setSpeed(1); __dbg.camAt(r.x + 28, r.h + 95, r.z + 42, r.x, r.h * 0.45, r.z); fly = null; return r; },   // 👻 ghost-hunt: Лабораторията — пожарната (night: 00:30, отключено без запис)
+    async ufo(night = true) { if (!ufo) return 'off'; if (night) this.time(0.5); setSpeed(1); return ufo.now(); },   // 🛸 ufo-vegas: Лабораторията — НЛО сега пред камерата (без постижение)
+    ufoState() { return ufo ? ufo.state() : null; },
     ghostState() { return ghostHunt ? ghostHunt.state() : null; },
+    async kongo() { if (!kongo) return 'off'; showMap(false); $('panel').classList.add('hidden'); this.time(11); setSpeed(1); const L = (city.landmarks || []).find(q => q.kind === 'empire2'); if (!L) return 'няма Емпайър'; const p = L.group.position; __dbg.camAt(p.x + 160, 120, p.z + 205, p.x, 125, p.z); fly = null; return kongo.test([0.62, 0.785]); },   // 🦍 kongo: Лабораторията — пуска горилата сега, камерата към Емпайър
+    kongoState() { return kongo ? kongo.state() : null; },
+    async nessie() { if (!nessieFx) return 'off'; await nessieFx.test(); const p = nessieFx.last(); if (!p) return 'няма вода наблизо'; this.lookAt(p.x, p.z, 90); return [Math.round(p.x), Math.round(p.z)]; },   // 🐉 nessie: показва дракона сега (Лабораторията)
     // 📏 замерване (собственикът: „да измерим църквата и блока до нея — да видим какви метри са“): забележителностите — височина в сцената; блоковете на плана до R м около всяка — височини
     lmMeasure(R = 120) { const pv = city.planView, B = (pv && pv.userData.blocks) || [], W = new THREE.Vector3(); if (pv) pv.updateMatrixWorld(true);
       return (city.landmarks || []).map(o => { const bb = new THREE.Box3().setFromObject(o.group), p = o.group.position, near = B.filter(b => { W.set(b.x, 0, b.z); if (pv) W.applyMatrix4(pv.matrixWorld); return Math.hypot(W.x - p.x, W.z - p.z) < R; }).map(b => Math.round(b.h)).sort((a, c) => c - a);

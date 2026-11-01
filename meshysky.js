@@ -16,7 +16,7 @@ export const MESHY_SKY_NEW = COCOON ? { cocoon: 'sky/cocoon.glb', decomall: 'sky
 const GOLDN = feature('gold-night2');   // 🌃 gold-night2: Golden Tower с нова нощ (gold2.glb — същият модел + карта „nightdata“)
 export const MESHY_SKY = { gold: GOLDN ? 'sky/gold2.glb' : 'sky/gold.glb',bluespire: 'sky/bluespire.glb', skyspire: 'sky/skyspire.glb', skyspire2: 'sky/skyspire2.glb', skyw: 'sky/sky-white.glb', skywarm: 'sky/sky-warm.glb', skyblue: 'sky/sky-blue.glb', skyviolet: 'sky/sky-violet.glb', ...MESHY_SKY_NEW };   // + четири кули (Meshy) с различни акценти нощем: бяло, топло, синьо, виолетово
 export const MESHY_SKY_NY = { nydeco: 'sky/nydeco.glb' };   // 🇺🇸 lm-ny2: каменната ар деко кула — само в Ню Йорк   // „Skyspire Nexus“ — в Blender разделен на две: извитата двойна кула (skyspire, 110 м) и единичната (skyspire2, 95 м) — целият комплекс е широк колкото е висок и на парцел излизаше 15 м
-export const MESHY_SKY_H = { 'sf-sky-gold': 80, 'sf-sky-bluespire': 95, 'sf-sky-skyspire': 110, 'sf-sky-skyspire2': 95, 'sf-sky-skyw': 180, 'sf-sky-skywarm': 200, 'sf-sky-skyblue': 170, 'sf-sky-skyviolet': 190, 'sf-sky-nydeco': 200, 'sf-sky-cocoon': 204, 'sf-sky-decomall': 190 };
+export const MESHY_SKY_H = { 'sf-sky-gold': 80, 'sf-sky-bluespire': 95, 'sf-sky-skyspire': 110, 'sf-sky-skyspire2': 95, 'sf-sky-skyw': 180, 'sf-sky-skywarm': 200, 'sf-sky-skyblue': 170, 'sf-sky-skyviolet': 190, 'sf-sky-nydeco': 200, 'sf-sky-cocoon': 204, 'sf-sky-decomall': 190, 'sf-sky-brickgoth': 100 };
 // sky-cocoon: изпечените нощни прозорци (Body.emissiveMap) — денем 0, нощем daynight.js ги пали през NF_MATS; без nightfloors.js (там няма MODE за тях)
 // sky-cocoon: същото за облика на офиса (officestyle.js няма dayNight) — нощта се чете от изпечения материал (daynight.js му дава n × nfK)
 const BAKED_K = 1.2;   // яркостта на изпечените прозорци нощем (daynight.js: n × nfK)
@@ -59,6 +59,11 @@ export function meshyBakedNight(root) {   // → изпеченият матер
   if (!bm.userData.nightFloors) { bm.emissive.setRGB(1, 1, 1); bm.emissiveIntensity = 0; bm.userData.nightFloors = true; bm.userData.nfK = BAKED_K; NF_MATS.add(bm); }
   return bm;
 }
+// 🧱 brick-goth (собственикът — „отдавна“ я иска за Ню Йорк/Чикаго/Лондон): тухлената готическа кула (Meshy; ~100 м, бели готически горни етажи и шпилове; плочата-основа махната).
+// Нощем — като одобреното за Golden Tower (goldNight по-горе): изпечена карта 'nightdata' — R прозорците (тъмното стъкло от текстурата, само стените, без плочата между етажите), G етаж, B прозорец, A короната.
+// В Ню Йорк — през nyNear (game.js NYSKY_FILES 'ny-brick', 80–120 м); в Чикаго и Лондон — в истинските небостъргачи (SF_SKY → sky-mix).
+export const MESHY_SKY_BRICK = feature('brick-goth') ? { brickgoth: 'sky/brickgoth.glb' } : {};
+export const MESHY_SKY_BRICK_CITIES = new Set(['newyork', 'chicago', 'london']);
 // градовете със стъклени небостъргачи (не старите европейски центрове)
 export const MESHY_SKY_CITIES = new Set(['newyork', 'chicago', 'losangeles', 'toronto', 'mexicocity', 'saopaulo', 'dubai', 'mumbai', 'singapore', 'hongkong', 'shanghai', 'beijing', 'seoul', 'tokyo', 'sydney', 'moscow',
   'houston', 'miami', 'sanfrancisco', 'abudhabi', 'doha', 'kualalumpur', 'bangkok', 'osaka', 'taipei', 'shenzhen', 'jakarta']);

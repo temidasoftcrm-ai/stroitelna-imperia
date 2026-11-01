@@ -109,7 +109,7 @@ export function loadTrainModels(base = 'assets/heavy/trains/') {
 const TV = feature('trains-variety'), WSZ = feature('wagon-size');
 // 🚆 trains-meshy4: [файл, дължина в м, пътнически (светят прозорците нощем)]; моделите са с предница към +z, ширина W, разтегнати еднакво (~1,3–1,7×)
 const TM4 = feature('trains-meshy4');
-const MV4 = { umbLoco: ['tr-umb-loco', 16, 0], umbB: ['tr-umb-b', 15.5, 0], ddCar: ['tr-dd-car', 21, 1], el2Loco: ['tr-el-loco', 18, 1], el2Car: ['tr-el-car', 15, 1], iceLead: ['tr-ice-lead', 22, 1], iceMid: ['tr-ice-mid', 16, 1] };
+const MV4 = { ...(feature('jp-emu') ? { jpEmu: ['tr-jp-emu', 20, 0] } : {}),   /* 🚃 jp-emu (потребителят свали японската мотриса): бяла със синя ивица, кабина отпред */ ...(feature('steam-green') ? { greenLoco: ['tr-steam-green', 24, 0] } : {}),   /* 🚂 steam-green (потребителят, 01.11: „ето този за зеления влак — повече ми харесва“): зелен парен локомотив с тендер, ретро пътнически */ umbLoco: ['tr-umb-loco', 16, 0], umbB: ['tr-umb-b', 15.5, 0], ddCar: ['tr-dd-car', 21, 1], el2Loco: ['tr-el-loco', 18, 1], el2Car: ['tr-el-car', 15, 1], iceLead: ['tr-ice-lead', 22, 1], iceMid: ['tr-ice-mid', 16, 1] };
 const MV = { silverCar: ['m-silver', 22], nightCar: ['m-night', 22], elLoco: ['m-elloco', 18], steamLoco: ['m-steam', 22], upLoco: ['m-up', 20], gpLoco: ['m-gp', 16], steam2Loco: ['m-steam2', 19],   /* +2 (28.10): дизел-електрически (GP) и парен с тендер */ srrCar: ['m-srr', 15], wmCoal: ['m-wm', 13], hopX: ['m-hopx', WSZ ? 14 : 12] };
 // 📏 wagon-size (29.10, одобрено от собственика в Blender): вагоните до локомотивите в правилен мащаб — ширината остава W, дължината L (stretchTo),
 // височината H (мащаб по y); userData.len следва дължината → прикачването, разстоянията и дължината на перона (passtrains, depot2, station, trackpath)
@@ -183,7 +183,7 @@ export function trainCar(kind, seed = 0) {
     o.traverse(m => { if (m.isMesh && /red/i.test(m.material.name)) { m.material = m.material.clone(); m.material.color.setHex(col); } });
   }
   if (kind === 'paxLoco' || kind === 'vl82') addHeadlights(o, src.userData.len);
-  else if (kind === 'elLoco' || kind === 'steamLoco' || kind === 'upLoco' || kind === 'gpLoco' || kind === 'steam2Loco' || kind === 'umbLoco' || kind === 'el2Loco' || kind === 'iceLead') addHeadlights(o, src.userData.len, { s: 0.7, y: kind === 'steamLoco' || kind === 'steam2Loco' ? 2.6 : 1.7, x: 0.62, beamW: 3, beamL: 12 });   // trains-variety: малки светлини и мек конус
+  else if (kind === 'elLoco' || kind === 'steamLoco' || kind === 'upLoco' || kind === 'gpLoco' || kind === 'steam2Loco' || kind === 'umbLoco' || kind === 'greenLoco' || kind === 'el2Loco' || kind === 'iceLead') addHeadlights(o, src.userData.len, { s: 0.7, y: kind === 'steamLoco' || kind === 'steam2Loco' ? 2.6 : 1.7, x: 0.62, beamW: 3, beamL: 12 });   // trains-variety: малки светлини и мек конус
   if (kind === 'autorack') rackLoad(o, seed);
   if (kind === 'cistern') { const col = TINTS[Math.abs(seed) % TINTS.length]; o.traverse(m => { if (m.isMesh && m.userData.tint !== undefined || (m.isMesh && m.material && m.material.color && m.material.color.getHex() === 0xffffff)) { m.material = m.material.clone(); m.material.color.setHex(col); } }); }   // trains-variety: цистерни в различни цветове
   o.userData.len = src.userData.len;
