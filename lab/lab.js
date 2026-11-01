@@ -566,6 +566,8 @@ const DEMOS = [
   ['👻 Ловци на духове (ghost-hunt): старата пожарна в Ню Йорк в полунощ — зеленото сияние, лъчът към небето и колата на ловците с бурканите (отключено за демото)', 'newyork', d => setTimeout(() => { d.ghostLook(true); }, 15000)],   // ghost-hunt
   ['👻 Ловци на духове денем (ghost-hunt): пожарната на мястото на нисък блок, колата паркирана отпред', 'newyork', d => setTimeout(() => { d.ghostLook(false); }, 15000)],   // ghost-hunt
   ['🎺 Ню Йорк — новият фанфар (ny-brass): отваря филиал в Ню Йорк и засвирва лекият вариант на Brass Fanfare (включи звука)', 'sofia', d => setTimeout(() => { d.stingTest('newyork'); }, 9000)],   // ny-brass
+  ['🗽 Ню Йорк — силуетът (ny-lm-heights, ny-sky-small): Мидтаун — жълтите блокове (до ~150 м), кулите-игли малко над тях, Емпайър 190 м, One WTC 210 м, Крайслер 180 м, Рокфелер 175 м', 'newyork', d => setTimeout(() => { const L = d.lmMeasure(1), e = L.find(o => o.kind === 'empire2') || L[0]; d.time(13); if (e) d.camAt(e.x + 620, 300, e.z + 860, e.x + 120, 70, e.z - 160); }, 20000)],   // ny-lm-heights, ny-sky-small
+  ['🗽 One World Trade Center на истинското място (ny-wtc-real): Долен Манхатън — кулата до Уайтхол и Батъри парк', 'newyork', d => setTimeout(() => { const L = d.lmMeasure(1), w = L.find(o => o.kind === 'onewtc'); d.time(13); if (w) d.camAt(w.x + 420, 260, w.z + 520, w.x, 60, w.z); }, 20000)],   // ny-wtc-real
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя'], ['lab/coop-log.html', '🤝 Дневник на партньорството — чеклист за истински акаунти и извикванията към сървъра']];
 
@@ -811,7 +813,7 @@ function lvUi(d, k) {
 }
 
 // ---- Мисии/демо
-const demoOk = nm => ['reviewed', 'done'].includes(mstatus.status['demo:' + nm]?.state);   // ✓ одобрено в „Мисии/демо“
+const demoOk = nm => { const k = ('Демо: ' + nm).slice(0, 300).slice(6); return ['reviewed', 'done'].includes((mstatus.status['demo:' + nm] || mstatus.status['demo:' + k])?.state); };   /* сървърът пази целта до 300 знака — дългите имена на демата се записваха съкратени и одобрението „не се помнеше“ */   // ✓ одобрено в „Мисии/демо“
 function renderDemos() {
   if (!renderDemos.loaded) { renderDemos.loaded = 1; fetch('/__lab/status').then(r => r.json()).then(s => { mstatus = s; if (state.tab === 'demos') renderDemos(); }).catch(() => { }); }
   sideNav(`<label class="chk" style="display:block;margin:6px 10px"><input type="checkbox" id="hideOkD" ${hideOk ? 'checked' : ''}> Скрий одобрените</label><div class="grp">В града <i>(действие след зареждане)</i></div>` + DEMOS.map(([nm, c], i) => hideOk && demoOk(nm) && state.item !== 'd' + i ? '' : row(state.item === 'd' + i, (demoOk(nm) ? '✓ ' : '') + nm, c, `data-d="d${i}"`)).join('')

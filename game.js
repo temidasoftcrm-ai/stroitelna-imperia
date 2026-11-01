@@ -969,7 +969,10 @@ function nySkyPrep(V) { for (const k in NYSKY_FILES) { const o = plan2.models[k]
 // 🗽 ny-sky-small (собственикът, 01.11: „много кули тип игла — хубави са, но да ги направим по-малки“; тънката синя — „тоя чак е странен“): ~70 % от височината
 // и пропорциите на модела — на тесен парцел кулата е по-ниска, не по-тънка (досега ширината се режеше по парцела, а височината оставаше → игла)
 const NYSKY_SMALL = feature('ny-sky-small');
-const nySkySize = (b, k, hh) => { const [ax, az] = NYSKY_A[k]; if (NYSKY_SMALL) { const fh = Math.min(Math.max(40, Math.max(60, b.h) * (0.6 + 0.04 * (hh % 6))), b.w * 0.97 / ax, b.d * 0.97 / az);   /* пропорциите — винаги (на много тесен парцел и под 40 м) */ return [Math.min(b.w * 0.97, fh * ax), fh, Math.min(b.d * 0.97, fh * az)]; }
+// ny-sky-small (собственикът, след замерването: „жълтите сгради са супер … другите трябва да са малко по-високи от тях“): кулата — 15–35 % над най-високата
+// жълта сграда (не стъклените кули, t ≠ 5) до 150 м около нея; не над собствената кутия; без жълти наоколо — 60–80 % от кутията
+const nyYellowMax = (() => { const C = new WeakMap(); return b => { if (C.has(b)) return C.get(b); const B = (city.planView && city.planView.userData.blocks) || []; let m = 0; for (const q of B) if (q.t !== 5 && q.h > m && (q.x - b.x) ** 2 + (q.z - b.z) ** 2 < 22500) m = q.h; if (B.length) C.set(b, m); return m; }; })();
+const nySkySize = (b, k, hh) => { const [ax, az] = NYSKY_A[k]; if (NYSKY_SMALL) { const ym = nyYellowMax(b), want = ym > 0 ? Math.min(Math.max(60, b.h), ym * (1.15 + 0.04 * (hh % 6))) : Math.max(60, b.h) * (0.6 + 0.04 * (hh % 6)), fh = Math.min(Math.max(40, want), b.w * 0.97 / ax, b.d * 0.97 / az);   /* пропорциите — винаги (на много тесен парцел и под 40 м) */ return [Math.min(b.w * 0.97, fh * ax), fh, Math.min(b.d * 0.97, fh * az)]; }
   const fh = Math.max(60, b.h) * (0.85 + 0.06 * (hh % 6)); return [Math.min(b.w * 0.97, fh * ax), fh, Math.min(b.d * 0.97, fh * az)]; };
 const itNear = () => { const r = { V: plan2.itV || null, o: { pick: IT_PICK, yaws: [Math.PI / 2, -Math.PI / 2], only: b => b.h >= 8 && b.h <= 18, mix: 0.6 } };
   if (!plan2.itV) (plan2.itLoad ||= Promise.all(Object.entries(IT_FILES).map(([k, u]) => plan2.models[k] ? 0 : new GLTFLoader().loadAsync('assets/heavy/' + u).then(g => { plan2.models[k] = g.scene; }).catch(() => {})))
@@ -1780,7 +1783,7 @@ function buildCity(cityId) {
   if (P && megaBase) NI = NJ = 3 * NB + 1;   // мегаполис с план: размерите са от плана, не от спиралата от квартали
   if (P) { const [ti, tj] = planTiles(P, TILE); NI = Math.max(NI, ti); NJ = Math.max(NJ, tj); }   // гарата, магистралата и летището се отдръпват до края на плана
   city.railN = railNorth(cityId);   // rail-coast (T1): морето е близо на север — коловозите свършват с буфери преди брега (без извивката над водата)
-  city.stZ = city.railN != null && feature('st-inland') ? Math.max(0, Math.ceil(city.railN + 100)) : 0;   // 🌊 st-inland (T1): гарата — навътре в сушата, северният ѝ край (сградата) на ≥ 5 м от буферите
+  city.stZ = city.railN != null && (feature('st-inland') || (cityId === 'istanbul' && feature('ist-edge-fix'))) ? Math.max(0, Math.ceil(city.railN + 100)) : 0;   // 🌊 st-inland (T1): гарата — навътре в сушата, северният ѝ край (сградата) на ≥ 5 м от буферите
   city.airAt = null; city.airFill = false; city.stLot = null; if (INFRA && P && P.p2) { const [z, c] = stLotZ(P, city.stZ); if (!c) { city.stZ = z; city.stLot = { z }; } else console.info('infra-lots: няма свободно място за гарата', cityId, c); }   // 🏗️ infra-lots: гарата — там, където парцелът ѝ е свободен
   { const air = AIRG && P && P.p2 && !P.p2.airAccess && airLv(cityId) > 0, stz = STACC && (city.stZ || city.stLot) && P && P.p2;   // ✈️ air-junction / 🌊 st-inland: вторият проход на плана — с пътя до летището и пътя до преместената гара
     if (air || stz) { if (air) AIR_AT = airXZ(); ST_ZS = city.stZ; ST_IL = !!city.stLot; plan2.cache = null; try { const Q = planOf(cityId); if (Q && Q.p2) P = city.plan = Q; } catch (e) { console.warn('air-junction', e); } finally { AIR_AT = null; ST_ZS = 0; ST_IL = false; } } }   // ✈️ air-junction: вторият проход — с пътя до летището в графа
@@ -1800,6 +1803,7 @@ function buildCity(cityId) {
   // крайбрежните градове: море на север с плаж, пристанище, фар и кораби (seaside.js)
   city.airport = null; city.airportNI = 0; city.airSite = null; city.airAccess = null; refreshAirport3D(cityId);
   if (cl3Life) { cl3Life.removeKind('tram'); cl3Life.removeKind('bus'); } if (cl3Lots) cl3Lots.length = 0;   // 🚏 city-life3: новият град — без старите спирки
+  if (pv && cityId === 'istanbul' && feature('ist-edge-fix')) istLand(pv, P);   // 🌊 ist-edge-fix: сушата на запад от стария град (Еюп, Фатих, Зейтинбурну) — не „плоча в морето“
   city.trams = null; city.tramCut = railCut;   // 🚋 trams: строят се в цикъла, щом моделът е зареден
   // крайморски град: жп линията свива на запад преди брега (концентрични дъги; най-западният коловоз е с радиус 12)
   { const westmost = tx(0) - 16 - 6 * 6.5, cx = westmost - 12, seaZ = tx(0) - TILE / 2 - 2 - 22; trackMap = SEASIDE.includes(cityId) && !causewayOn(cityId) && city.railN == null ? makeTrackMap({ cx, zC: seaZ + 6 + (tx(0) - 16 - cx) }) : makeTrackMap(null); }
@@ -8317,12 +8321,16 @@ function lmFlood(o) {
       mt.customProgramCacheKey = () => (key ? key.call(mt) : '') + '|lmf' + o.kind; mt.needsUpdate = true; } }); };
   go(); const t = setInterval(() => { go(); if (++n > 90) clearInterval(t); }, 1000);
 }
-const NYTALL = feature('ny-tall'), LM_NYTALL = { rockefeller2: 400, radiocity2: 250 };   // 🗽 ny-tall (собственикът): 30 Rock ≈ колкото Емпайър, кулата на Радио Сити ~250 м
+const NYTALL = feature('ny-tall'), LM_NYTALL = { rockefeller2: 400, radiocity2: 250 };
+   // 🗽 ny-tall (собственикът): 30 Rock ≈ колкото Емпайър, кулата на Радио Сити ~250 м
 const LM_TALL = new Set(['chrysler2', 'empire2', 'onewtc', 'fourts', ...(feature('ny-dense') ? ['whitehall', 'nyannex', 'fifth500', 'park605'] : []), ...(NYTALL ? ['rockefeller2'] : [])]);
 if (feature('lm-galata2') && hasLandmark('galata2')) { LM_PREF.galata = 'galata2'; LM_REAL_H.galata2 = 63; LANDMARK_NM.galata2 = 'Кулата Галата'; LM_PROP.galata2 = 1; }   // 🇹🇷 lm-galata2 (f6): кулата Галата — моделът на потребителя (Meshy) вместо процедурната, на мястото ѝ в Бейоглу (над Златния рог), 63 м с конуса
 if (feature('ny-dense')) { Object.assign(LM_REAL_H, { whitehall: 80, nyannex: 120, fifth500: 212, park605: 55 }); for (const k of ['whitehall', 'nyannex', 'fifth500', 'park605']) { LM_EXTRA.newyork.add(k); LM_PROP[k] = 1; } }   // 🗽 ny-dense: четирите истински сгради (точките — lmNy2Points)
 if (feature('lm-ny2')) { LM_REAL_H.onewtc = 541; LM_REAL_H.fourts = 247; LM_EXTRA.newyork.add('onewtc'); LM_EXTRA.newyork.add('fourts'); }   // 🇺🇸 lm-ny2 (f6): One WTC и 4 Times Square — точките се добавят в плана (lmNy2Points)
 if (LM_CHRYSLER2) { LM_PREF.chrysler = 'chrysler2'; LM_REAL_H.chrysler2 = 319; LM_EXTRA.newyork.add('chrysler'); LANDMARK_NM.chrysler2 = 'Крайслер Билдинг'; }
+// 🗽 ny-lm-heights (собственикът, 01.11, след замерването — Емпайър 489 м, One WTC 577, Крайслер 346, Рокфелер 444: „нека да са над жълтите блокове, да кажем 170–180 метра,
+// Емпайър — 190 метра, Световният търговски — 210“): точните височини (жълтите сгради в Мидтаун са до ~150 м); моделите — в пропорции (равномерно мащабирани)
+if (feature('ny-lm-heights')) { const T = { onewtc: 196, empire2: 171, chrysler2: 166, rockefeller2: 156, fifth500: 171, fourts: 156, radiocity2: 147 };   /* целите 210/190/180/175/175/170/170 м — минус антените/шпиловете (кутията на модела е ~7–11 % по-висока, замерено) */ Object.assign(LM_REAL_H, T); for (const k in T) LM_PROP[k] = 1; if (NYTALL) Object.assign(LM_NYTALL, { rockefeller2: 156, radiocity2: 147 }); }
 if (feature('lm-arc2')) { LM_PREF.arc = 'arc2'; LM_REAL_H.arc2 = 50; }   // Триумфалната арка — моделът на потребителя (Meshy), 50 × 45 × 22 м   // Сюлеймание — моделът на потребителя вместо процедурната джамия
 LANDMARK_NM.maiden2 = LANDMARK_NM.maiden2 || 'Момината кула'; LANDMARK_NM.rockefeller2 = LANDMARK_NM.rockefeller2 || 'Рокфелер Сентър'; LANDMARK_NM.radiocity2 = LANDMARK_NM.radiocity2 || 'Радио Сити Мюзик Хол'; LANDMARK_NM.empire2 = LANDMARK_NM.empire2 || 'Емпайър Стейт Билдинг'; LANDMARK_NM.parliament2 = LANDMARK_NM.parliament2 || 'Уестминстърският дворец и Биг Бен'; LANDMARK_NM.colosseo3 = LANDMARK_NM.colosseo3 || 'Колизеумът'; LANDMARK_NM.vittoriano2 = LANDMARK_NM.vittoriano2 || 'Витториано';
 const LM_LABEL = { kotelnicheskaya: 'Котелническа висотка' };   // надписът, когато моделът е назаем (mgu → Котелническа)
@@ -8334,7 +8342,10 @@ function lmNy2Points() {
   const K = D.k, c = D.center, xz = (la, lo) => [(lo - c[1]) * Math.cos(c[0] * Math.PI / 180) * 111320 * K, -(la - c[0]) * 110540 * K];
   const B = P.p2.boundary, zMax = Math.max(...B.map(p => p[1])), add = (k, x, z, fp) => { if (!P.landmarks.some(L => L.k === k)) P.landmarks.push({ k, x: x + ox, z: z + oz, rot: 0.506, vrot: -0.506, fp, w: fp[0], d: fp[1], guard: 4 }); };   // като другите точки на Манхатън (решетката е завъртяна на 0,506)
   const [tx, tz] = xz(40.7564, -73.9862); add('fourts', tx - 14, tz + 26, [66, 56]);   // до Таймс Скуеър (не върху неговата точка)
-  add('onewtc', -300, Math.min(zMax - 90, 700), [64, 64]);   // в южния край на картата, към Долен Манхатън
+  // 🗽 ny-wtc-real (собственикът, 01.11: „да скъсим малко разстоянието от Световния търговски център до [Долен Манхатън] — има много разстояние с празни площи и блокове“):
+  // на истинското място (Уест и Визи, 40.7130 / −74.0132) — картата вече стига до Батъри парк; ако точката е извън нея — както досега
+  const [wx, wz] = xz(40.7130, -74.0132), wOk = feature('ny-wtc-real') && wz < zMax - 40;
+  if (wOk) add('onewtc', wx, wz, [64, 64]); else add('onewtc', -300, Math.min(zMax - 90, 700), [64, 64]);   // в южния край на картата, към Долен Манхатън
   if (feature('ny-dense')) for (const [k, la, lo, fp] of [['whitehall', 40.70438, -74.01555, [53, 22]], ['nyannex', 40.70468, -74.01612, [36, 65]], ['fifth500', 40.75372, -73.98103, [72, 59]], ['park605', 40.76640, -73.96650, [50, 38]]]) { const [x, z] = xz(la, lo); add(k, x, z, fp); }   // ny-dense: по истинските им места (Батъри Плейс, 5-о авеню/42-ра, Парк авеню/65-а)
 }
 function landmarkPlan2(kinds) {
@@ -8357,7 +8368,7 @@ function landmarkPlan2(kinds) {
     o.group.scale.multiplyScalar(k0); o.group.rotation.y = at.vrot ?? at.rot ?? 0; if (k === 'stpatrick2') o.group.rotation.y += Math.PI / 2; if (LM_TURN[k]) o.group.rotation.y += LM_TURN[k];   /* дългата ос на модела е z, а на парцела — напреки */ o.group.position.set(at.x, 0.1, at.z);
     if (feature('lm-tall') && LM_TALL.has(k) && hr) { const ky = Math.min(NYTALL && LM_NYTALL[k] ? 2.6 : 1.6, hr / (lmH(k) || 1) / k0);   /* ny-tall: 30 Rock — до ×2,6 по височина */ if (ky > 1.01) { o.group.scale.y *= ky; const sg = o.group.userData.sign; if (sg) sg.scale.y /= ky; } }   // 🗽 lm-tall: картата е ×0,45 и парцелът ограничава ширината — небостъргачите стигат истинския ръст по височина (до ×1,6 по-тънки)
     if (k === 'radiocity2' && NYTALL) o.group.userData.towerH = LM_NYTALL.radiocity2;   // кулата — разтегната отгоре (landmarks.js towerFit), залата и надписът остават
-    if (k === 'radiocity2' && feature('ny-radiocity')) { const ku = Math.min(200 / 150, Math.max(at.w, at.d) * 0.95 / (s0 * k0)); if (ku > 1.01) o.group.scale.multiplyScalar(ku);   // 🎭 ny-radiocity (собственикът: „твърде малка“): кулата 1270 6th Ave е ~200 м (беше 150) — по-голяма изцяло, до парцела
+    if (k === 'radiocity2' && feature('ny-radiocity') && !feature('ny-lm-heights')) {   /* ny-lm-heights: точната височина, без уголемяването */ const ku = Math.min(200 / 150, Math.max(at.w, at.d) * 0.95 / (s0 * k0)); if (ku > 1.01) o.group.scale.multiplyScalar(ku);   // 🎭 ny-radiocity (собственикът: „твърде малка“): кулата 1270 6th Ave е ~200 м (беше 150) — по-голяма изцяло, до парцела
       const kx = Math.min(1.45, Math.max(at.w, at.d) * 0.95 / (s0 * k0 * Math.max(1, ku))); if (kx > 1.01) { o.group.scale.x *= kx; o.group.scale.z *= kx; } }   // залата — до парцела (~100 × 75 м), кулата — пропорционално по-широка
     if (k === 'ndk') { const kx = Math.min(1.7, Math.max(at.w, at.d) * 0.95 / (s0 * k0)); if (kx > 1.01) { o.group.scale.x *= kx; o.group.scale.z *= kx; } }   // lm-ndk (T2): НДК е широк и нисък (~200 × 150 м, 44 м) — ръстът по LM_PROP, ширината — до парцела
     { const sp = LM_SPOT[S.cityId]?.[k]; if (sp) { o.group.position.set(sp.x, 0.1, sp.z); o.group.rotation.y = sp.rot; if (sp.top != null) o.group.userData.isleTop = sp.top; } }   // lm-westminster: точното място и посока (LM_SPOT)
@@ -9306,7 +9317,17 @@ function renderMapHud() {
 const STATION_X = tx(0) - 16;
 // 🌊 rail-coast (T1): крайморски град по истинската карта — първата вода северно от гарата по ширината на коловозите (x от −50 до +5 от оста);
 // по-близо от 600 м → краят на линията (z, отрицателно) 20 м преди брега, иначе null (както досега — извивката покрай брега)
+// 🌊 ist-edge-fix: истинската вода около гарата в Истанбул — гарата е извън растера (Златният рог при Еюп): x се приближава до растера, а на север/юг от него е вода
+function istWater(x, z) { const P = city.plan, D = P && P.p2 && P.p2.osmData && P.p2.osmData.sea; if (!D || !P.p2.waterAt) return false; const [ox, oz] = P.offset || [0, 0], xp = x - ox, zp = z - oz, X1 = D.x0 + D.nx * D.cell, Z1 = D.z0 + D.nz * D.cell;
+  if (zp < D.z0 || zp > Z1) return true; return !!P.p2.waterAt(Math.max(D.x0 + D.cell, Math.min(X1 - D.cell, xp)), zp); }
+// ist-edge-fix: истинската суша на запад от растера на картата (там е градът, не море): равнина с материала на земята на плана, от западния ръб на растера до хоризонта,
+// между северния и южния му ръб (на север от растера остава водата на горния Златен рог — там свършват и релсите; на юг — Мраморно море)
+function istLand(pv, P) { const D = P && P.p2 && P.p2.osmData && P.p2.osmData.sea, gm = pv.userData.groundMat; if (!D || !gm) return; const X0 = D.x0 + 6, Z0 = D.z0, Z1 = D.z0 + D.nz * D.cell, W = 9000;   /* в координатите на плана (изгледът е преместен с отместването) */
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(W, Z1 - Z0).rotateX(-Math.PI / 2), gm); m.position.set(X0 - W / 2, -0.04, (Z0 + Z1) / 2); m.receiveShadow = true; m.name = 'istLand'; pv.add(m); }
+function istRailN() { const W = z => [-50, -28, -6].some(dx => istWater(STATION_X + dx, z)); if (!W(0)) { for (let z = 0; z >= -900; z -= 10) if (W(z)) return z + 22; return null; }   // гарата е на суша — буферите преди брега на север
+  for (let z = 0; z <= 1400; z += 10) { let ok = true; for (let d = 0; d <= 250; d += 10) if (W(z + d)) { ok = false; break; } if (ok) return z + 22; } return null; }   // гарата е във водата — релсите почват там, където сушата е поне 250 м
 function railNorth(id) {
+  if (id === 'istanbul' && feature('ist-edge-fix')) return istRailN();
   const P = city.plan; if (!feature('rail-coast') || !SEASIDE.includes(id) || causewayOn(id) || !P || !P.waterAt) return null;
   for (let z = 0; z >= -600; z -= 5) for (let dx = -50; dx <= 5; dx += 11) if (P.waterAt(STATION_X + dx, z)) return z + 22;   // waterAt тук е в координатите на играта (проверено с __dbg.waterProbe спрямо рендера)
   return null;
@@ -9507,7 +9528,7 @@ function buildCatenary() {
 // североизточно, суша до линията няма. Вместо крайбрежната извивка на града с решетка (минаваше над морето) — права линия на каменен насип
 // по цялата дължина, с тунелите в краищата (на насипа).
 const CAUSEWAY = new Set(['istanbul']);
-const causewayOn = (id = S && S.cityId) => feature('rail-causeway') && CAUSEWAY.has(id) && !!(S && S.plan2 && S.plan2[id]);
+const causewayOn = (id = S && S.cityId) => feature('rail-causeway') && CAUSEWAY.has(id) && !!(S && S.plan2 && S.plan2[id]) && !(id === 'istanbul' && feature('ist-edge-fix'));   // ist-edge-fix (собственикът): в Истанбул — без насипа през водата; релсите свършват на сушата
 const railOn = () => feature('rail-crossings') && !!city && (!SEASIDE.includes(S.cityId) || causewayOn());   // крайморските — линията завива покрай брега (trackpath.js)
 // 🛤️ rail-ends2 (T2, потребителят: „коловозите свършват до моста“): крайморските градове без насип (railOn() — не) нямаха railEnd — гарата чертаеше главната
 // по своя LEN (1600 м), а минаващите влакове, контактната мрежа и депото — по 600 м: два коловоза свършваха ~40 м след магистралата. railLen — едно и също за всички
