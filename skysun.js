@@ -18,11 +18,13 @@ const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a
 
 export function createSkySun(scene) {
   const U = { sunDir: { value: new THREE.Vector3(1, 0.1, 0.3).normalize() }, zen: { value: C(0) }, hNear: { value: C(0) }, hFar: { value: C(0) }, halo: { value: C(0) },
-    fogC: { value: C(0) }, disc: { value: 1 }, discC: { value: C(0xffe8b0) }, discR: { value: 0.03 }, glow: { value: 1 }, moonDir: { value: new THREE.Vector3(0, 1, 0) }, moon: { value: 0 },
+    fogC: { value: C(0) }, disc: { value: 1 }, discC: { value: C(0xffe8b0) }, discR: { value: 0.03 }, glow: { value: 1 }, moonDir: { value: new THREE.Vector3(0, 1, 0) }, moon: { value: 0 }, mPh: { value: 0.5 }, mPh2: { value: 0 },
     cT: { value: 0 }, cCov: { value: 0.3 }, cBase: { value: C(0xffffff) }, cShade: { value: C(0xb0b8c6) }, cRim: { value: C(0xffb070) }, cA: { value: 0.9 } };
   const mat = new THREE.ShaderMaterial({ uniforms: U, defines: CL ? { CLOUDS: 1 } : {}, side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false, toneMapped: false,   /* цветовете — точно (тоналното съпоставяне избелваше диска) */
     vertexShader: `varying vec3 vD; void main() { vD = normalize((modelMatrix * vec4(position, 0.0)).xyz); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: `uniform vec3 sunDir, zen, hNear, hFar, halo, fogC, discC, moonDir; uniform float disc, discR, glow, moon; varying vec3 vD;
+    fragmentShader: `uniform vec3 sunDir, zen, hNear, hFar, halo, fogC, discC, moonDir; uniform float disc, discR, glow, moon, mPh, mPh2; varying vec3 vD;
+      float mh(vec2 p) { p = fract(p * vec2(127.1, 311.7)); p += dot(p, p + 34.7); return fract(p.x * p.y); }
+      float mn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(mh(i), mh(i + vec2(1, 0)), f.x), mix(mh(i + vec2(0, 1)), mh(i + vec2(1, 1)), f.x), f.y); }
       #ifdef CLOUDS
       uniform float cT, cCov, cA; uniform vec3 cBase, cShade, cRim;
       float hsh(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
@@ -37,7 +39,15 @@ export function createSkySun(scene) {
         float cs = dot(d, normalize(sunDir));
         c += halo * glow * (0.55 * pow(max(cs, 0.0), 12.0) + 0.25 * pow(max(cs, 0.0), 3.0)) * (1.0 - smoothstep(0.1, 0.7, el));   // мекият ореол — силен ниско
         float sd = acos(clamp(cs, -1.0, 1.0)); c = mix(c, discC, disc * (1.0 - smoothstep(discR * 0.82, discR, sd)));   // дискът
-        float md = acos(clamp(dot(d, normalize(moonDir)), -1.0, 1.0)); c = mix(c, vec3(0.93, 0.95, 1.0), moon * (1.0 - smoothstep(0.016, 0.02, md))); c += vec3(0.5, 0.6, 0.9) * moon * 0.25 * pow(max(dot(d, normalize(moonDir)), 0.0), 60.0);   // луната
+        if (mPh2 > 0.5) {   // 🌙 moon-phases v2 (потребителят: „много изкуствена“): по-малък мек диск, слонова кост, плавен терминатор, тъмната част — почти като небето, меко сияние
+          vec3 m = normalize(moonDir), rt = normalize(cross(vec3(0.0, 1.0, 0.0), m)), up = cross(m, rt); float R = 0.019;
+          vec2 q = vec2(dot(d, rt), dot(d, up)) / R; float r2 = dot(q, q), cosm = max(dot(d, m), 0.0), ill = 0.5 - 0.5 * cos(mPh * 6.2832);
+          c += vec3(0.62, 0.68, 0.82) * moon * (0.35 + 0.65 * ill) * (0.18 * pow(cosm, 4000.0) + 0.07 * pow(cosm, 400.0) + 0.03 * pow(cosm, 40.0)) * step(0.98, r2);
+          if (r2 < 1.0 && dot(d, m) > 0.0) { vec3 n = vec3(q, sqrt(1.0 - r2)); float a = mPh * 6.2832; vec3 L = vec3(sin(a), 0.0, -cos(a));
+            float lit = smoothstep(-0.12, 0.18, dot(n, L)), mare = smoothstep(0.5, 0.75, mn(q * 2.3 + 3.0)) * 0.18 + smoothstep(0.55, 0.8, mn(q * 5.0 + 9.0)) * 0.08, cr = smoothstep(0.78, 0.95, mn(q * 18.0 + 1.7)) * 0.05;
+            vec3 col = vec3(0.98, 0.96, 0.9) * (1.0 - mare - cr) * (0.78 + 0.22 * pow(n.z, 0.5)) * 1.15; float edge = 1.0 - smoothstep(0.86, 1.0, r2);
+            c = mix(c, mix(c * 0.94, col, lit), moon * edge * (0.25 + 0.75 * lit) / (0.25 + 0.75 * lit + 1e-4)); }
+        } else { float md = acos(clamp(dot(d, normalize(moonDir)), -1.0, 1.0)); c = mix(c, vec3(0.93, 0.95, 1.0), moon * (1.0 - smoothstep(0.016, 0.02, md))); c += vec3(0.5, 0.6, 0.9) * moon * 0.25 * pow(max(dot(d, normalize(moonDir)), 0.0), 60.0); }   // луната
         #ifdef CLOUDS
         if (el > 0.0) {   // облаците: равнина над главата (по-далечните — по-сплескани към хоризонта), вятърът ги носи бавно
           vec2 uv = d.xz / (el + 0.12) * 1.05 + vec2(cT * 0.010, cT * 0.0035);
@@ -93,6 +103,9 @@ export function createSkySun(scene) {
     }
     // луната — срещу слънцето, нощем; звездите — нощем без облаци
     U.moonDir.value.set(-dir.x, Math.max(0.25, -dir.y + 0.2), -0.3).normalize(); U.moon.value = nightK * (1 - cloud);
+    if (U.mPh2.value > 0.5) {   // 🌙 moon-phases (потребителят: „луната се върти с камерата — да я позиционираме“): неподвижна в света — изгрява на изток (~20 ч), минава високо на юг и залязва на запад (~6 ч)
+      const tn = ((((hour - 19) % 24) + 24) % 24) / 11, a = Math.PI * Math.min(1, tn), el = 0.22 + 0.62 * Math.sin(a);
+      U.moonDir.value.set(Math.cos(a) * Math.cos(el), Math.sin(el), 0.55 * Math.cos(el)).normalize(); }
     stars.material.opacity = nightK * (1 - cloud) * 0.85; stars.visible = stars.material.opacity > 0.01;
     // куполът — около камерата, точно под далечната плоскост
     const R = camera.far * 0.9; dome.position.copy(camera.position); dome.scale.setScalar(R); stars.position.copy(camera.position); stars.scale.setScalar(R * 0.99);
@@ -100,5 +113,8 @@ export function createSkySun(scene) {
     if (sunLight && target && e > -2) { const le = Math.max(7, e) * Math.PI / 180, hd = Math.hypot(dir.x, dir.z); sunLight.position.set(target.x + dir.x / hd * Math.cos(le) * 160, Math.sin(le) * 160, target.z + dir.z / hd * Math.cos(le) * 160); sunLight.target.position.set(target.x, 0, target.z); }
     cur.sunUp = e; cur.hour = hour;
   }
-  return { update, dome, stars, get elev() { return cur.sunUp; }, dispose() { scene.remove(dome); scene.remove(stars); dome.geometry.dispose(); mat.dispose(); sg.dispose(); stars.material.dispose(); } };
+  const MV = new THREE.Vector3(), MT = new THREE.Vector3();
+  // moon-phases: фазата 0…1 (0 — новолуние, 0,5 — пълнолуние), от game.js по игровия ден (синодичен месец 29,53 дни)
+  const setMoonPhase = ph => { U.mPh.value = ((ph % 1) + 1) % 1; U.mPh2.value = feature('moon-phases') ? 1 : 0; };
+  return { update, setMoonPhase, dome, stars, get elev() { return cur.sunUp; }, dispose() { scene.remove(dome); scene.remove(stars); dome.geometry.dispose(); mat.dispose(); sg.dispose(); stars.material.dispose(); } };
 }

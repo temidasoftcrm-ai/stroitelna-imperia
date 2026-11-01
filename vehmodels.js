@@ -132,8 +132,8 @@ function loadRealCars(load, A) {
 const EMERG_K = { Police_Sedan: 1, Ambulance: 1, Firetruck: 1 };   // всички коли са в истински метри (1 м ≈ 1 единица, хората ~1,9) — спешните вече не се уголемяват
 const EMERG = {
   Police_Sedan: [['pol-charger', 5.1], ['pol-crownvic', 5.4], ['pol-interceptor', 5.3], ['pol-nypd', 5.1], ...(feature('pol-new') ? [['pol-logan', 4.36], ['pol-duster', 4.34]] : [['pol-volga', 4.1]])],   // pol-volga — вече ВАЗ 2101 на КАТ (файлът — EMERG_FILE); pol-new — вместо нея Logan и Duster
-  Firetruck: [['fire-us', 10], ['fire-man', 10.5], ['fire-titan', 10.8], ['fire-cyber', 10.5]],   // fire-red — изтрита; fire-titan / fire-cyber (f6) — Meshy, Blender: колела wheel_*, буркани siren_*, стълба Ladder
-  Ambulance: [['amb-gaz', RS ? 6.2 : 7], ['amb-us', 7.5], ['amb-eu', 7.2]],
+  Firetruck: [['fire-us', 10], ['fire-man', 10.5], ['fire-titan', 10.8], ['fire-cyber', 10.5], ['fire-brigade', 8.6], ['fire-airport', 11]],   // fire-brigade / fire-airport (01.11, Meshy, Blender) — европейската цистерна и летищната   // fire-red — изтрита; fire-titan / fire-cyber (f6) — Meshy, Blender: колела wheel_*, буркани siren_*, стълба Ladder
+  Ambulance: [['amb-gaz', RS ? 6.2 : 7], ['amb-us', 7.5], ['amb-eu', 7.2], ['amb-van', 6.8], ['amb-box', 7.5]],   // amb-van / amb-box (01.11, Meshy, Blender: dimiter-8e) — европейският бус и американската с кутията
 };
 // почиства модел на кола: маха плоските мешове (сянка/земя под колата — от тях amb-eu беше квадрат 5,8×5,8 и наполовина висок);
 // връща завъртането, ако колата лежи по x (дължината трябва да е по z)
@@ -155,12 +155,14 @@ export function emergCar(src, len, kind = 'police', name = '') { const sc0 = src
 const EMERG_FILE = { 'fire-us': 'fire-us2', 'pol-volga': 'pol-vaz' };
 // pol-new (55): полицейските коли от наличните (Blender, _source: scratchpad polcar.py) — Dacia Logan (бяла, синя лента „ПОЛИЦИЯ“, сини буркани) за България/Европа
 // и Dacia Duster („ДПС ПОЛИЦИЯ“, червено-синя лента) за Русия; американските — за Америка. Всяка кола — с региона си (userData.polReg), model() избира по града
+// amb-van / amb-box (потребителят: „полиция пожарна болница по градовете“): линейките по региона на града — само щом е включена някоя от новите
+const AMB_REG = { 'amb-van': ['bg', 'eu', 'xx'], 'amb-box': ['am'], 'amb-us': ['am', 'xx'], 'amb-eu': ['eu', 'bg'], 'amb-gaz': ['ru', 'bg'] };
 const POL_REG = { 'pol-logan': ['bg', 'eu', 'xx'], 'pol-duster': ['ru'], 'pol-charger': ['am', 'xx'], 'pol-crownvic': ['am', 'xx'], 'pol-interceptor': ['am', 'xx'], 'pol-nypd': ['am'] };
 // 🚒 fire-titan / fire-cyber (f6, решението на потребителя): Red Titan — американските градове; киберпънк пожарната (със стълбата) — само модерните мегаполиси;
 // Европа (и останалите) — MAN със стълбата. Действа, щом някоя от двете е включена (иначе пожарните се редуват както досега)
-const FIRE_REG = { 'fire-titan': ['am'], 'fire-cyber': ['cyber'], 'fire-man': ['bg', 'eu', 'ru', 'xx'], 'fire-us': ['xx'] };   // в Америка — само Red Titan
+const FIRE_REG = { 'fire-titan': ['am'], 'fire-cyber': ['cyber'], 'fire-man': ['bg', 'eu', 'ru', 'xx'], 'fire-us': ['xx'], 'fire-brigade': ['bg', 'eu', 'ru', 'xx'], 'fire-airport': ['airport'] };   // fire-airport — само на летищата (A['sf-car-FireAirport'], airport.js)   // в Америка — само Red Titan
 export const FIRE_CYBER = new Set(['dubai', 'singapore', 'tokyo', 'shanghai']);
-export const fireVariants = (V, reg, cityId) => { if (!feature('fire-titan') && !feature('fire-cyber')) return V; const k = FIRE_CYBER.has(cityId) ? 'cyber' : reg, r = V.filter(v => (v.userData.fireReg || []).includes(k)); return r.length ? r : V; };
+export const fireVariants = (V, reg, cityId) => { if (reg !== 'airport') { const V2 = V.filter(v => (v.userData.fireReg || [])[0] !== 'airport'); if (V2.length) V = V2; }   /* летищната пожарна не излиза в града */ if (!feature('fire-titan') && !feature('fire-cyber')) return V; const k = FIRE_CYBER.has(cityId) ? 'cyber' : reg, r = V.filter(v => (v.userData.fireReg || []).includes(k)); return r.length ? r : V; };
 export const polVariants = (V, reg) => { const r = V.filter(v => !v.userData.polReg || v.userData.polReg.includes(reg)); return r.length ? r : V; };
 // фаровете на спешните коли (отчетени в Blender отпред, лъч до стъклото): [дял от полуширината, дял от височината, колко са навътре от предницата (дял от дължината)]
 // emergLights слага там мигащите на смени фарове (emerg-wigwag); без запис — общите места (addTruckLamps)
@@ -169,8 +171,9 @@ const LENS = { 'pol-charger': [0.64, 0.47, 0.067], 'pol-crownvic': [0.5, 0.42, 0
 export function loadPoliceCars(load, A) {
   return Promise.all(Object.entries(EMERG).map(([nm, opts]) => {
     const ok = opts.filter(([f]) => feature(f) || (feature('pol-new') && (f === 'pol-logan' || f === 'pol-duster'))); if (!ok.length) return null;   /* pol-new: новите — с общия флаг */
-    return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + (feature('sirens-real') ? 'sirens/' : '') + (EMERG_FILE[f] || f) + '.glb').then(g => { litMats(g.scene); hubWheels(g.scene); g.scene.traverse(m => { if (m.isMesh) m.castShadow = false; }); const [yaw, L0, W0] = tidyCar(g.scene), K = L0 * capW(EMERG_K[nm] * len * M_PER / L0, W0 / M_PER) /* real-sizes: ширината ≤ 2,6 м */, sc = wrap(g.scene, yaw + (CAR_FLIP.has(f) ? Math.PI : 0), K / L0); /* мащабът е във вътрешната група — model() пипа само външния */ sc.userData.lens = LENS[EMERG_FILE[f] || f] || null; if (feature('pol-new') && POL_REG[f]) sc.userData.polReg = POL_REG[f]; if (FIRE_REG[f]) sc.userData.fireReg = FIRE_REG[f]; addBeacons(sc, K, nm === 'Firetruck' ? 'fire' : nm === 'Ambulance' ? 'ambulance' : 'police'); if (feature('car-lens')) addCarLights(sc); /* car-lens: и спешните коли — с фарове (нямаха) */ return sc; }).catch(() => null)))
-      .then(list => { list = list.filter(Boolean); if (list.length) A['sf-car-' + nm] = { scene: list[0], variants: list }; });
+    return Promise.all(ok.map(([f, len]) => load('assets/heavy/cars/' + (feature('sirens-real') ? 'sirens/' : '') + (EMERG_FILE[f] || f) + '.glb').then(g => { litMats(g.scene); hubWheels(g.scene); g.scene.traverse(m => { if (m.isMesh) m.castShadow = false; }); const [yaw, L0, W0] = tidyCar(g.scene), K = L0 * capW(EMERG_K[nm] * len * M_PER / L0, W0 / M_PER) /* real-sizes: ширината ≤ 2,6 м */, sc = wrap(g.scene, yaw + (CAR_FLIP.has(f) ? Math.PI : 0), K / L0); /* мащабът е във вътрешната група — model() пипа само външния */ sc.userData.lens = LENS[EMERG_FILE[f] || f] || null; if (feature('pol-new') && POL_REG[f]) sc.userData.polReg = POL_REG[f]; if (FIRE_REG[f]) sc.userData.fireReg = FIRE_REG[f]; if (AMB_REG[f] && (feature('amb-van') || feature('amb-box'))) sc.userData.polReg = AMB_REG[f]; addBeacons(sc, K, nm === 'Firetruck' ? 'fire' : nm === 'Ambulance' ? 'ambulance' : 'police'); if (feature('car-lens')) addCarLights(sc); /* car-lens: и спешните коли — с фарове (нямаха) */ return sc; }).catch(() => null)))
+      .then(list => { list = list.filter(Boolean); const air = list.find(v => (v.userData.fireReg || [])[0] === 'airport'); if (air) A['sf-car-FireAirport'] = { scene: air };   /* fire-airport — отделно, за летищата */
+        if (air && list.length > 1) list = list.filter(v => v !== air); if (list.length) A['sf-car-' + nm] = { scene: list[0], variants: list }; });
   }));
 }
 
@@ -356,7 +359,10 @@ const BEACON = { r: new THREE.MeshStandardMaterial({ color: 0x501010, emissive: 
 // дясната страна (~1,4 Hz), вътрешните сегменти закъсняват малко (пробягване); ореол над всяка страна и цветно петно на пътя.
 const BAR_COL = { police: [0xff2a2a, 0x2a6bff], ambulance: [0xff2a2a, 0x2a6bff], fire: [0xff2a2a, 0xff7a1a], utility: [0xffa000, 0xffc400] };   // utility — аварийните (енергетици, пътна помощ)
 const BAR_T = 0.7, BAR_ON = [[0, 0.07], [0.12, 0.19], [0.24, 0.31]];
-const barLit = (car, side, j, t) => { if (!beaconState(car, t)) return false; const u = (((t + (car.id || 0) * 0.37 - j * 0.025) / BAR_T) % 1 + 1) % 1 - side * 0.5; return BAR_ON.some(([a, b]) => u >= a && u < b); };
+// 🚨 emerg-rhythm (01.11, одобрено в Blender: „бурканите 2 пъти ляво, два пъти дясно — ляво, дясно“, „да ги направим еднакви и при полицията и пожарните“):
+// цикъл 1 s от 24 кадъра — ляво {0,1,3,4,12,13,14}, дясно {6,7,9,10,17,18,19}; еднакво за полиция, пожарни и линейки
+const ER = feature('emerg-rhythm'), ER_ON = [new Set([0, 1, 3, 4, 12, 13, 14]), new Set([6, 7, 9, 10, 17, 18, 19])];
+const barLit = (car, side, j, t) => { if (!beaconState(car, t)) return false; if (ER) return ER_ON[side ? 1 : 0].has(Math.floor((((t + (car.id || 0) * 0.37) % 1) + 1) % 1 * 24)); const u = (((t + (car.id || 0) * 0.37 - j * 0.025) / BAR_T) % 1 + 1) % 1 - side * 0.5; return BAR_ON.some(([a, b]) => u >= a && u < b); };
 class BarSeg extends Beacon {
   onBeforeRender(renderer, scene, camera) { super.onBeforeRender(renderer, scene, camera); const car = carOf(this); if (car) this.material.emissiveIntensity = barLit(car, this.userData.side, this.userData.j, performance.now() / 1000) ? 2.6 : 0.35; }   /* угасналата страна — слабо в своя цвят (иначе лентата изглежда едноцветна) */
 }
@@ -430,11 +436,14 @@ const elMats = () => EL || (EL = (() => {
 })());
 class ElNight extends THREE.Mesh { onBeforeRender() { const k = this.material.userData.k; if (k != null) this.material.opacity = nightK() * k; } }   // стоповете при спиране (traffic.js сменя материала) — без k
 // фаровете на спешната кола: докато бурканите светят — мигат на смени ляво/дясно (по 0,25 s); иначе — като ElNight
-class ElWig extends THREE.Mesh { onBeforeRender() { if (!this.userData.own) { this.material = this.material.clone(); this.userData.own = 1; } const car = carOf(this), t = performance.now() / 1000;
-  this.material.opacity = car && beaconState(car, t) ? ((Math.floor(t * 4) + this.userData.side) % 2 ? 0.95 : 0.06) : nightK() * (this.material.userData.k ?? 1); } }
+// emerg-rhythm: фаровете мигат на смени само „от време на време“ и само докато сирените са включени — последните 1,5 s от всеки 5 s, смяна на 0,125 s;
+// иначе светят нормално. Връща -1 (нормално) или 0/1 — коя страна свети сега
+const wigNow = (car, t) => { if (!car || !beaconState(car, t)) return -1; if (!ER) return Math.floor(t * 4) % 2; const u = ((t + (car.id || 0) * 0.37) % 5 + 5) % 5; return u < 3.5 ? -1 : Math.floor((u - 3.5) / 0.125) % 2; };
+class ElWig extends THREE.Mesh { onBeforeRender() { if (!this.userData.own) { this.material = this.material.clone(); this.userData.own = 1; } const car = carOf(this), t = performance.now() / 1000, w = wigNow(car, t);
+  this.material.opacity = w >= 0 ? ((w + this.userData.side) % 2 ? 0.95 : 0.06) : nightK() * (this.material.userData.k ?? 1); } }
 // car-lights2: истинският фар на спешната кола — като ElWig, но свети самата стена на модела (собствено копие на материала, извън NF_MATS)
-class ElRealWig extends THREE.Mesh { onBeforeRender() { if (!this.userData.own) { this.material = this.material.clone(); this.userData.own = 1; } const car = carOf(this), t = performance.now() / 1000;
-  this.material.emissiveIntensity = car && beaconState(car, t) ? ((Math.floor(t * 4) + this.userData.sideN) % 2 ? 6 : 0.1) : nightK() * LAMP_K.head; } }
+class ElRealWig extends THREE.Mesh { onBeforeRender() { if (!this.userData.own) { this.material = this.material.clone(); this.userData.own = 1; } const car = carOf(this), t = performance.now() / 1000, w = wigNow(car, t);
+  this.material.emissiveIntensity = w >= 0 ? ((w + this.userData.sideN) % 2 ? 6 : 0.1) : nightK() * LAMP_K.head; } }
 class ElWash extends THREE.Sprite {   // цветното сияние върху каросерията — страната, която свети
   onBeforeRender() { if (!this.userData.own) { this.material = this.material.clone(); this.userData.own = 1; } const car = carOf(this); if (car) this.material.opacity = barLit(car, this.userData.side, 0, performance.now() / 1000) ? this.userData.k * (0.4 + 0.6 * nightK()) : 0; }
 }
@@ -473,5 +482,28 @@ function emergLights(car, kind) {
   } else if (kind === 'ambulance') {   // задните прожектори горе в ъглите + петно зад колата
     for (const sx of [-1, 1]) plate(sx * W * 0.4, y0 + s.y * 0.86, -len / 2 - 0.05, Math.PI, 0.45);
     ground(0, -len / 2 - len * 0.22, W * 1.6, len * 0.45, E.scene);
+  }
+  if (ER) erFlashers(car, kind, cols, R);
+}
+// emerg-rhythm: мигащите лампи отстрани и отзад (в ритъма на бурканите) и белият стробоскоп на решетката на линейките —
+// залепени за каросерията (лъч към колата), не висят във въздуха; ако лъчът не уцели колата — лампа няма
+class ElFlash extends THREE.Mesh { onBeforeRender() { if (!this.userData.own) { this.material = this.material.clone(); this.userData.own = 1; } const car = carOf(this); if (car) this.material.opacity = barLit(car, this.userData.side, 0, performance.now() / 1000) ? 1 : 0.05; } }
+class ElStrobe extends THREE.Mesh { onBeforeRender() { if (!this.userData.own) { this.material = this.material.clone(); this.userData.own = 1; } const car = carOf(this), t = performance.now() / 1000;
+  this.material.opacity = car && beaconState(car, t) && Math.floor(((t + (car.id || 0) * 0.37) % 1 + 1) % 1 * 24) % 4 === (this.userData.side ? 2 : 0) ? 1 : 0.04; } }
+function erFlashers(car, kind, cols, R) {
+  car.updateMatrixWorld(true); const meshes = []; car.traverse(o => { if (o.isMesh && o.visible && !(o.material?.blending === THREE.AdditiveBlending) && !(o instanceof Beacon)) meshes.push(o); });
+  const bb = new THREE.Box3(); for (const m of meshes) bb.expandByObject(m); if (bb.isEmpty()) return; const s = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3());
+  const rc = new THREE.Raycaster(), inv = car.matrixWorld.clone().invert();
+  const stick = (p, dir) => { rc.set(p.clone().addScaledVector(dir, -4), dir); rc.far = 8; const h = rc.intersectObjects(meshes, false)[0]; return h ? h.point.addScaledVector(dir, -0.012) : null; };
+  const lamp = (Cls, col, at, dir, w, h, side) => { const p = stick(at, dir); if (!p) return; const m = new Cls(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+    m.position.copy(p.applyMatrix4(inv)); m.lookAt(m.position.clone().add(dir.clone().negate())); m.userData.side = side; m.renderOrder = 3; car.add(m); };
+  const X = new THREE.Vector3(1, 0, 0), Z = new THREE.Vector3(0, 0, 1), V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const H = kind === 'police' ? 0.6 : kind === 'fire' ? 0.8 : 0.75, ys = c.y - s.y / 2 + s.y * H, zs = kind === 'police' ? [0.3] : kind === 'fire' ? [-0.35, 0, 0.3] : [-0.35, 0.3];
+  zs.forEach((f, i) => { lamp(ElFlash, cols[1], V(bb.min.x - 1, ys, c.z + f * s.z), X, 0.3, 0.08, 1 - i % 2); lamp(ElFlash, cols[0], V(bb.max.x + 1, ys, c.z + f * s.z), X.clone().negate(), 0.3, 0.08, i % 2); });   /* хоризонтална ивица по дължината */   /* лъчът е към колата; страната на ритъма се редува по дължината */
+  const yr = c.y - s.y / 2 + s.y * (kind === 'police' ? 0.5 : 0.84);
+  for (const sx of [-1, 1]) lamp(ElFlash, cols[sx < 0 ? 0 : 1], V(c.x + sx * s.x * 0.36, yr, bb.min.z - 1), Z, 0.26, 0.12, sx < 0 ? 0 : 1);   // отзад горе (предницата е към +z)
+  if (kind === 'ambulance') {   // „на решетката две светлини — флаш бързо бяло, премигващо постоянно“
+    const hb = R && R.box('head'), yg = hb ? (hb.min.y + hb.max.y) / 2 + 0.06 : c.y - s.y / 2 + s.y * 0.36;
+    for (const sx of [-1, 1]) lamp(ElStrobe, 0xffffff, V(c.x + sx * s.x * 0.12, yg, bb.max.z + 1), Z.clone().negate(), 0.2, 0.07, sx < 0 ? 0 : 1);
   }
 }

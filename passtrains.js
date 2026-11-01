@@ -4,6 +4,7 @@ import { feature } from './lab/feature.js';
 import * as THREE from 'three';
 import { placeCars } from './trackpath.js';
 const TVAR = feature('trains-variety');
+const TM4 = feature('trains-meshy4');   // 🚆 4-те нови влака (ICE, мотриса, двуетажен, товарен „Темидасофт Rail“)
 import { hasTrainModel, trainCar } from './trainmodels.js';
 
 const LEN0 = 600, CAR = 6.2, SCALE = 2.2, GAP = 6.5, MAX = 5;   // от край до край на земята
@@ -34,6 +35,10 @@ export function createPassingTrains(deps) {
       g.add(trainCar('oeLoco')); for (let i = 0; i < 5; i++) g.add(trainCar('oeCar'));
       return { g, len: lenOf(), express: true };
     }
+    if (express && TM4 && hasTrainModel('iceLead') && (!hasTrainModel('ave') || Math.random() < 0.5)) {   // trains-meshy4: „Стрела“ — скоростният като ICE (бял с червена ивица) или AVE, случайно
+      g.add(trainCar('iceLead')); if (hasTrainModel('iceMid')) for (let i = 0; i < 2 + (Math.random() * 3 | 0); i++) g.add(trainCar('iceMid')); g.add(trainCar('iceTail'));
+      return { g, len: lenOf(), express: true };
+    }
     if (express && hasTrainModel('ave')) {   // „Стрела“ — скоростен влак (челен вагон отпред и отзад)
       g.add(trainCar('ave')); if (hasTrainModel('hsw')) for (let i = 0; i < 2 + (Math.random() * 3 | 0); i++) g.add(trainCar('hsw')); g.add(trainCar('aveTail'));
       return { g, len: lenOf(), express: true };
@@ -41,10 +46,17 @@ export function createPassingTrains(deps) {
     if (TVAR && (passenger ? hasTrainModel('elLoco') : hasTrainModel('upLoco'))) {   // 🚆 trains-variety (T1): 4 пътнически и 3 товарни композиции — по реда (детерминистично)
       const n = tvN++, r = (k => () => (k = (k * 16807) % 2147483647) / 2147483647)(7919 * (n + 1)), pick = a => a[(r() * a.length) | 0], has = k => hasTrainModel(k);
       if (passenger) {   // 🚃 една фамилия вагони на влак (не се смесват сребристи и сини); парният — само с класическите сини, иначе тегли стари товарни
-        const v = n % 6, [lo, car] = [['elLoco', 'silverCar'], ['elLoco', 'nightCar'], ['steamLoco', 'paxCar'], ['paxLoco', 'paxCar'], ['gpLoco', 'silverCar'], ['steam2Loco', 'paxCar']][v], loco = has(lo) ? lo : 'elLoco', steam = /^steam/.test(loco);
+        const PV = [['elLoco', 'silverCar'], ['elLoco', 'nightCar'], ['steamLoco', 'paxCar'], ['paxLoco', 'paxCar'], ['gpLoco', 'silverCar'], ['steam2Loco', 'paxCar'], ...(TM4 ? [['el2Loco', 'el2Car'], ['elLoco', 'ddCar']] : [])];   // trains-meshy4: + синьо-бяло-оранжевата мотриса с вагоните си, ЕЛ + двуетажни
+        if (TM4 && n % PV.length === 6 && has('el2Loco') && has('el2Car')) { g.add(trainCar('el2Loco')); for (let i = 0, k = 6 + (r() * 3 | 0); i < k; i++) g.add(trainCar('el2Car')); return { g, len: lenOf() }; }   // мотрисата — с 6–8 вагона
+        const v = n % PV.length, [lo, car] = PV[v], loco = has(lo) ? lo : 'elLoco', steam = /^steam/.test(loco);
         const C = has(car) && loco === lo ? [car] : steam ? ['boxcar', 'gondola', 'timber', 'srrCar'].filter(has) : has('silverCar') ? ['silverCar'] : [];
         g.add(trainCar(loco)); for (let i = 0, k = 3 + (r() * 4 | 0); i < k && C.length; i++) g.add(trainCar(pick(C), (r() * 99) | 0));
         return { g, len: lenOf() }; }
+      if (TM4 && n % 5 === 4 && has('umbLoco')) {   // trains-meshy4: тежкият товарен „Темидасофт Rail“ — локомотив + бустер + 9–14 вагона
+        g.add(trainCar('umbLoco')); if (has('umbB')) g.add(trainCar('umbB')); const WU = ['cistern', 'boxcar', 'srrCar', 'hopper2', 'wmCoal', 'autorack'].filter(has);
+        for (let i = 0, k = 9 + (r() * 6 | 0); i < k && WU.length; i++) g.add(trainCar(pick(WU), (r() * 99) | 0));
+        return { g, len: lenOf() };
+      }
       const v = n % 4, loco = v === 3 && has('gpLoco') ? 'gpLoco' : v === 1 && has('vl82') ? 'vl82' : 'upLoco',   /* v 3 (28.10): дизел (GP) с цистерни и платформи */ W = (v === 0 || v === 3 ? ['cistern', 'cistern', 'gondola', 'timber', 'srrCar'] : v === 1 ? ['wmCoal', 'wmCoal', 'hopX', 'gondola', 'hopper2'] : ['autorack', 'autorack', 'flat', 'boxcar', 'srrCar', 'timber']).filter(has);
       g.add(trainCar(loco)); if (v === 2 && r() < 0.5) g.add(trainCar('upLoco'));   // понякога — два локомотива
       for (let i = 0, k = 6 + (r() * 7 | 0); i < k; i++) g.add(trainCar(pick(W.length ? W : ['srrCar']), (r() * 99) | 0));

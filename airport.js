@@ -208,7 +208,7 @@ export function buildAirport(group, deps, opts = {}) {
   ];
   for (const R of routes) {
     let L = 0; R.seg = R.pts.map((p, i) => { const q = R.pts[(i + 1) % R.pts.length], l = Math.hypot(q[0] - p[0], q[1] - p[1]); const s0 = L; L += l; return { p, q, l, s0 }; }); R.L = L;
-    for (let k = 0; k < R.n; k++) { const c = mkCar(k, R === routes[1] && k === 0); g.add(c); traffic.push({ c, R, s: k * L / R.n, v: 9 + (k % 3) * 2 }); }
+    for (let k = 0; k < R.n; k++) { const c = R === routes[1] && k === 2 && feature('fire-airport') && deps.A?.['sf-car-FireAirport'] && deps.model ? deps.model('sf-car-FireAirport', 1) : mkCar(k, R === routes[1] && k === 0); g.add(c);   /* 🚒 fire-airport: летищната пожарна обикаля летището */ traffic.push({ c, R, s: k * L / R.n, v: 9 + (k % 3) * 2 }); }
   }
   const moveTraffic = dt => { for (const t of traffic) { t.s = (t.s + t.v * dt) % t.R.L; const sg = t.R.seg.find(q => t.s >= q.s0 && t.s < q.s0 + q.l) || t.R.seg[0], f = (t.s - sg.s0) / sg.l;
     t.c.position.set(sg.p[0] + (sg.q[0] - sg.p[0]) * f, 0.06, sg.p[1] + (sg.q[1] - sg.p[1]) * f); t.c.rotation.y = Math.atan2(sg.q[0] - sg.p[0], sg.q[1] - sg.p[1]); } };

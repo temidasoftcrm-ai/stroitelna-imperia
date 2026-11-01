@@ -45,7 +45,7 @@ export function romeNear(G, BL, V, o = {}) {
   if (!Object.keys(V).length) return null; const R = o.R || 160, keys = (o.pick || ROME_PICK).filter(k => V[k] || o.pickFor), YAW = o.yaws || [0], only = o.only || (() => true), mix = o.mix ?? 1; if (!keys.length) return null;
   const root = new THREE.Group(); root.name = 'romeNear'; root.userData.extShared = true; G.add(root);   // extShared: dispose() на изгледа не пипа общите геометрии
   const P = {};   // по модел: частите (геометрия, материал, матрица в модела) и нормализацията (центърът долу, размерът)
-  for (const k of new Set(keys)) { const ob = V[k]; ob.updateMatrixWorld(true); const parts = []; ob.traverse(m => { if (m.isMesh) parts.push({ geo: m.geometry, mat: m.material, local: m.matrixWorld.clone() }); });
+  for (const k of new Set(keys)) { const ob = V[k]; if (!ob) continue; /* ny-sky256: незареден модел — без него */ ob.updateMatrixWorld(true); const parts = []; ob.traverse(m => { if (m.isMesh) parts.push({ geo: m.geometry, mat: m.material, local: m.matrixWorld.clone() }); });
     const b = new THREE.Box3().setFromObject(ob), s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3());
     P[k] = { key: k, parts, s, base: new THREE.Matrix4().makeTranslation(-c.x, -b.min.y, -c.z), ims: [], cap: 0 }; }
   const ensure = (p, n) => { if (n <= p.cap) return; for (const im of p.ims) { root.remove(im); im.dispose(); }
@@ -61,7 +61,7 @@ export function romeNear(G, BL, V, o = {}) {
     cam.copy(camera.position); G.worldToLocal(cam);
     if (!dirty && at && at.distanceTo(cam) < 15) return; at = cam.clone(); dirty = false;
     const near = new Set(), by = {}, R2 = R * R;
-    BL.list.forEach((b, i) => { if ((b.x - cam.x) ** 2 + (b.z - cam.z) ** 2 + cam.y * cam.y * 0.25 > R2 || !only(b) || (mix < 1 && (hash(i + 7919) % 1000) / 1000 >= mix) || !BL.shown(b)) return;
+    BL.list.forEach((b, i) => { if ((b.x - cam.x) ** 2 + (b.z - cam.z) ** 2 + cam.y * cam.y * 0.25 > (o.Rfor ? o.Rfor(b) ** 2 : R2) /* ny-sky256: радиус по сграда (кулите — по-далеч) */ || !only(b) || (mix < 1 && (hash(i + 7919) % 1000) / 1000 >= mix) || !BL.shown(b)) return;
       const ks = o.pickFor ? o.pickFor(b, i).filter(k => V[k]) : keys; if (!ks.length) return;   /* ny-tenements: моделът по височината и основата на сградата */
       near.add(b); const k = ks[hash(i) % ks.length]; (by[k] ||= []).push(b); });
     for (const k in P) { const p = P[k], L = by[k] || [], out = [];

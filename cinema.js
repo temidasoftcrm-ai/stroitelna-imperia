@@ -39,6 +39,9 @@ const SCENES = [
   { key: 'rail', when: s => (s.rails || []).some(r => r.built), ico: '🚆', nm: 'Първа жп линия', cap: 'Първата жп линия е открита!', sub: 'Влакът потегли. Нови градове, нови възможности.', lock: 'Построй първата си жп линия', video: 'assets/cinema/train.mp4', poster: 'assets/cinema/train.jpg' },
   { key: 'highway', when: s => (s.hwDone || []).length > 0, ico: '🛣️', nm: 'Първа магистрала', cap: 'Магистралата е открита!', sub: 'Първият ТИР потегли. Империята се свързва.', lock: 'Построй първия участък магистрала', video: 'assets/cinema/highway.mp4', poster: 'assets/cinema/highway.jpg' },
   { key: 'ship', when: s => (s.ships || []).length > 0, ico: '🚢', nm: 'Първи кораб', cap: 'Първата корабостроителница е открита!', sub: 'Първият гигант потегля. Океанът те очаква.', lock: 'Построй пристанище и първия си кораб', video: 'assets/cinema/ship.mp4', poster: 'assets/cinema/ship.jpg' },
+  // 🚢 titanic (01.11, одобрено в Blender): „няма добър край — когато го отвориш 1-вия път, като ретроспекция, а след това сцената да е само потъналият Титаник на 2 части под водата“.
+  // Пуска се веднъж при първата морска линия Ливърпул/Лондон — Ню Йорк: потъването (сепия) + останките; от албума после — само останките (replay)
+  ...(feature('titanic') ? [{ key: 'titanic', when: s => (s.seaRoutes || []).some(r => (r.a === 'newyork' || r.b === 'newyork') && ['liverpool', 'london'].some(k => r.a === k || r.b === k)), ico: '🚢', nm: 'Титаник', cap: '15 АПРИЛ 1912, 2:20 Ч.', sub: 'Атлантическият океан пази „непотопяемия“ кораб.', lock: 'Открий морска линия Ливърпул или Лондон — Ню Йорк', dur: 46, videos: ['assets/cinema/titanic-sink.mp4', 'assets/cinema/titanic-wreck.mp4'], replay: 'assets/cinema/titanic-wreck.mp4', video: 'assets/cinema/titanic-wreck.mp4', poster: 'assets/cinema/titanic.jpg' }] : []),
   { key: 'plane', ico: '🛫', nm: 'Първи самолет', cap: '🛫 Първият ти самолет излита', sub: 'Небето вече е част от империята.', lock: 'Построй първото си летище', video: 'assets/cinema/plane.mp4', poster: 'assets/cinema/plane.jpg' },
   { key: 'oil', ico: '🛢️', nm: 'Първи петрол', cap: '🛢️ Ерата на черното злато', sub: 'Сондата заработи. Петролът потече.', lock: 'Пусни първия си петролен кладенец', video: 'assets/cinema/oil.mp4', poster: 'assets/cinema/oil.jpg' },
   { key: 'lv20', ico: '🌍', nm: 'Ниво 20 — Империя', cap: 'СВЕТОВНА ИМПЕРИЯ', sub: 'Започна с една сграда. Свърза целия свят.', lock: 'Стигни ниво 20', video: 'assets/cinema/lv20.mp4', poster: 'assets/cinema/lv20.jpg' },
@@ -524,7 +527,8 @@ export function createCinema(deps) {
 
   // ---------- плейърът ----------
   async function play(key, manual = false) {
-    const sc = byKey(key); if (!sc || playing || (!DRAW[key] && !sc.video)) return false;
+    let sc = byKey(key); if (sc && sc.replay && manual && seen()[key]) sc = { ...sc, video: sc.replay, videos: null };   /* titanic: от албума — само останките */
+    if (!sc || playing || (!DRAW[key] && !sc.video && !sc.videos)) return false;
     style();
     const el = document.createElement('div'); el.id = 'cine';
     el.innerHTML = `<canvas></canvas><div class="bar t"></div><div class="bar b"></div><div class="cap"><b></b><span></span></div><button class="skip">Пропусни ⏭</button><button class="unm">🔊 Звук</button><div class="snd">🔊 Докосни за звук</div>`;

@@ -9,6 +9,21 @@
 //   // при отключен квартал (ново ниво): mm.setTier(t); при смяна на града: mm.dispose()
 // gp — от gamePlan2 / gamePlan2Gen (рамката на играта: streets, waterAt, landmarks, anchors, offset, p2).
 
+// 📍 mm-lm-pins (потребителят, 01.11: „да добавим на забележителностите нещо в картата — пинче или някакъв отличителен знак“):
+// лилаво пинче (капка) с бяла рамка и иконка по вида — храм, джамия, кула, мост, статуя, дворец, античност; върхът е точно върху мястото
+import { feature } from './lab/feature.js';   // mm-lm-pins
+const PINS = feature('mm-lm-pins');
+const LM_ICO = [[/mosque|suleym|bluemosque|hagia/, '🕌'], [/church|nevsky|stpeter|stpatrick|notredame|duomo|sagrada|stbasil|ststephen|redeemer|cathedral|kotel/, '⛪'], [/trevi|navona|fontana|fountain/, '⛲'], [/castel|castle|angelo|tower_of_london/, '🏰'], [/spagna|steps|forum|foro|circo|circus|vatican|musei|museum|termae|terme|caracalla/, '🏛️'], [/villa|borghese|garden|park/, '🌳'], [/eiffel|tower|cntower|skytree|fernseh|galata|maiden|bigben|westminster|shard|burj|petronas|willis|empire|chrysler|onewtc|fourts|sky|manhattan|rockefeller|fifth|park605|nyannex|whitehall/, '🏙️'],
+  [/bridge|goldengate|bosphorus/, '🌉'], [/liberty|statue|sphinx|redeemer/, '🗽'], [/palace|kremlin|topkapi|whitehouse|capitol|parliament|reichstag|cityhall|hall|gum/, '🏰'], [/colosseo|stadium|parthenon|pyramid|arc|brandenburg|vittoriano|pantheon|roman|forum|luxor/, '🏛️'],
+  [/opera|theatre|ndk|radiocity|mgu|station|termini|haydar|grandcentral|lazare/, '🎭'], [/eye|vegas|bellagio|caesars|timessq|supertrees|mbs/, '🎡']];
+const lmIco = k => (LM_ICO.find(([r]) => r.test(k || '')) || [0, '⭐'])[1];
+function lmPin(g, u, v, ico, D) {
+  const r = 7 * D, cy = v - r * 1.55;
+  g.save(); g.shadowColor = 'rgba(0,0,0,0.45)'; g.shadowBlur = 4 * D; g.shadowOffsetY = D;
+  g.beginPath(); g.moveTo(u, v); g.bezierCurveTo(u - r * 0.35, v - r * 0.55, u - r, cy + r * 0.55, u - r, cy); g.arc(u, cy, r, Math.PI, 0); g.bezierCurveTo(u + r, cy + r * 0.55, u + r * 0.35, v - r * 0.55, u, v); g.closePath();
+  g.fillStyle = '#7a3fc8'; g.fill(); g.shadowColor = 'transparent'; g.lineWidth = 1.4 * D; g.strokeStyle = '#fff'; g.stroke();
+  g.font = `${9.5 * D}px system-ui, 'Noto Color Emoji'`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(ico, u, cy + 0.5 * D); g.restore();
+}
 const TIER_C = ['#e6c35a', '#7fb2e5', '#9ad08a', '#d79ad6', '#e59a6a'];   // нива 1…5 — оцветяване на кварталите
 const LM_NM = { colosseo: 'Колизеума', stpeter: 'Св. Петър', vittoriano: 'Витториано', pantheon: 'Пантеона', termini: 'Термини', hagia: 'Света София', bluemosque: 'Синята джамия',
   topkapi: 'Топкапъ', galata: 'Галата', maiden: 'Момината кула', eiffel: 'Айфеловата кула', notredame: 'Нотр Дам', arc: 'Триумфалната арка', louvre: 'Лувъра', bigben: 'Биг Бен',
@@ -78,7 +93,8 @@ export function createMinimap(gp, o = {}) {
     if (small) return; last = s;
     g.drawImage(base, 0, 0); g.drawImage(distLayer, 0, 0);
     // забележителности
-    for (const L of lms) { g.fillStyle = '#7a4fb0'; g.strokeStyle = '#fff'; g.lineWidth = DPR; g.beginPath(); g.arc(px(L.x), pz(L.z), 3.2 * DPR, 0, 7); g.fill(); g.stroke(); }
+    if (PINS) { for (const L of lms) lmPin(g, px(L.x), pz(L.z), lmIco(L.k), DPR); }   // 📍 mm-lm-pins: лилаво пинче с иконка по вида на забележителността
+    else for (const L of lms) { g.fillStyle = '#7a4fb0'; g.strokeStyle = '#fff'; g.lineWidth = DPR; g.beginPath(); g.arc(px(L.x), pz(L.z), 3.2 * DPR, 0, 7); g.fill(); g.stroke(); }
     // гара / летище / магистрала (котвите)
     const A = gp.anchors || {}; g.font = `${10 * DPR}px system-ui`; g.textAlign = 'center'; g.textBaseline = 'middle';
     for (const [key, ico] of [['station', '🚉'], ['airport', '✈️'], ['highway', '🛣️']]) { const a = A[key]; if (!a) continue; const u = Math.min(W - 8 * DPR, Math.max(8 * DPR, px(a.x))), v = Math.min(W - 8 * DPR, Math.max(8 * DPR, pz(a.z))); g.fillText(ico, u, v); }

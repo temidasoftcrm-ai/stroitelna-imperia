@@ -2,6 +2,7 @@
 // в рамката на плана (детето на planView): вода, каменни кейови стени, крайбрежна алея с фенери; мостовете са пътищата над водата (cityplan2.js ги прави сам).
 //   game.js: pv.add(riversView(P.p2, () => dayNight.night)) — само в новите игри (S.rivers) с флага.
 import * as THREE from 'three';
+import { feature } from './lab/feature.js';   // tepe2
 import { FCPU, canvasTex } from './cityplan2-3d.js';   // fac-cpu (T1): платната — в паметта на процесора (иначе под натоварване стават черни)
 
 const WATER = new THREE.MeshStandardMaterial({ color: 0x3f6a78, roughness: 0.12, metalness: 0.3 });
@@ -66,6 +67,7 @@ export function babaVida(size = 34) {
 
 // ⛰️ тепетата (Пловдив) — скалист хълм с горички: неправилна „шапка“ от икосаедър (сплескан), скали и зелени петна по цвета на върховете; r — радиус, h — височина
 export function rockyHill(r, h, seed = 1) {
+  if (feature('tepe2')) return rockyHill2(r, h, seed);
   const g = new THREE.Group(); let s = seed * 9301 + 49297; const rnd = () => ((s = (s * 9301 + 49297) % 233280) / 233280);
   const geo = new THREE.IcosahedronGeometry(1, 3), P = geo.attributes.position, col = new Float32Array(P.count * 3), v = new THREE.Vector3(), rock = new THREE.Color(0x8a8070), grn = new THREE.Color(0x5f7f45), c = new THREE.Color();
   for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i); const n = 0.82 + 0.3 * Math.sin(v.x * 5.1 + seed) * Math.cos(v.z * 4.3 + seed * 2) + 0.12 * rnd(); v.y = Math.max(0, v.y); v.set(v.x * r * n, v.y * h * (0.85 + 0.25 * n), v.z * r * n); P.setXYZ(i, v.x, v.y, v.z);
@@ -73,6 +75,40 @@ export function rockyHill(r, h, seed = 1) {
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3)); geo.computeVertexNormals();
   const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true })); m.castShadow = m.receiveShadow = true; g.add(m);
   g.userData.top = h * 0.95; return g;
+}
+
+// ⛰️ tepe2 (потребителят, 01.11: „тепетата на Пловдив по-реалистични — така са като купчина триъгълници“): гладък хълм (радиална мрежа 48×24, без плоско осветяване),
+// профил на купол с неравни склонове (fbm), голи сиенитни скали (розово-сиви) по стръмното и по върха, тревисти поляни и тъмна гора по склоновете,
+// инстанцирани дървета (широколистни и бори) и каменни блокове; основата се слива със земята (полите — плавно към 0)
+function rockyHill2(r, h, seed = 1) {
+  const g = new THREE.Group(); let s = (seed * 9301 + 49297) % 233280; const rnd = () => ((s = (s * 9301 + 49297) % 233280) / 233280);
+  const hs = (x, y) => { const q = Math.sin(x * 127.1 + y * 311.7 + seed * 17.3) * 43758.5453; return q - Math.floor(q); };
+  const vn = (x, y) => { const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j, ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy); return (hs(i, j) * (1 - ux) + hs(i + 1, j) * ux) * (1 - uy) + (hs(i, j + 1) * (1 - ux) + hs(i + 1, j + 1) * ux) * uy; };
+  const fbm = (x, y) => { let v = 0, a = 0.5; for (let k = 0; k < 5; k++) { v += a * vn(x, y); x = x * 2.03 + 5.2; y = y * 2.03 + 1.3; a *= 0.5; } return v; };
+  const NR = 24, NA = 48, pos = [], col = [], idx = [], rock = new THREE.Color(0x9a8a80), rockL = new THREE.Color(0xb8a89a), grass = new THREE.Color(0x7d9a4e), forest = new THREE.Color(0x3f5f32), c = new THREE.Color();
+  const H = (x, z) => { const d = Math.hypot(x, z) / r; if (d >= 1) return 0; const base = Math.pow(Math.cos(d * Math.PI / 2), 1.15), n = fbm(x / r * 2.2 + seed, z / r * 2.2 - seed); return Math.max(0, h * 1.3 * base * (0.8 + 0.4 * n) * (1 - Math.pow(d, 6))); };
+  for (let i = 0; i <= NR; i++) for (let j = 0; j < NA; j++) { const d = i / NR, a = j / NA * Math.PI * 2 + (i % 2) * Math.PI / NA, wob = 1 + 0.12 * (fbm(Math.cos(a) * 1.5 + seed, Math.sin(a) * 1.5) - 0.5), x = Math.cos(a) * d * r * wob, z = Math.sin(a) * d * r * wob; pos.push(x, i === NR ? 0 : H(x, z), z); }
+  pos.push(0, H(0, 0), 0); const top = pos.length / 3 - 1;
+  for (let i = 0; i < NR; i++) for (let j = 0; j < NA; j++) { const a = i * NA + j, b = i * NA + (j + 1) % NA, c2 = (i + 1) * NA + j, d2 = (i + 1) * NA + (j + 1) % NA; idx.push(a, c2, b, b, c2, d2); }
+  for (let j = 0; j < NA; j++) idx.push(top, j, (j + 1) % NA);
+  for (let k = 0; k < idx.length; k += 3) { const t = idx[k + 1]; idx[k + 1] = idx[k + 2]; idx[k + 2] = t; }   /* лицата — нагоре (иначе се вижда вътрешността — черен хълм) */
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+  const N = geo.attributes.normal, P = geo.attributes.position, trees = [], rocks = [];
+  for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i), z = P.getZ(i), slope = 1 - N.getY(i), hy = y / h, n = fbm(x * 0.09 + 7, z * 0.09 - 3), rk = slope > 0.5 || (hy > 0.8 && n > 0.5) || n > 0.8;
+    if (rk) c.copy(rock).lerp(rockL, n); else { c.copy(grass).lerp(forest, Math.max(0, Math.min(1, (n - 0.35) * 2.4 + (0.6 - hy) * 0.6))); }
+    c.multiplyScalar(0.92 + 0.16 * hs(x, z)); col.push(c.r, c.g, c.b);
+    if (!rk && y > 0.6 && n > 0.45 && hs(x * 3, z * 3) > 0.62) trees.push([x, y, z, n]); else if (rk && y > h * 0.15 && hs(x * 5, z * 5) > 0.95) rocks.push([x, y, z]); }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 })); m.castShadow = m.receiveShadow = true; g.add(m);
+  const dum = new THREE.Object3D(), TS = Math.max(1, r / 22);
+  if (trees.length) { const crown = new THREE.IcosahedronGeometry(1.1 * TS, 1), trunk = new THREE.CylinderGeometry(0.18 * TS, 0.25 * TS, 1.6 * TS, 5).translate(0, 0.8 * TS, 0);
+    const im = new THREE.InstancedMesh(crown, new THREE.MeshStandardMaterial({ color: 0x5c8a40, roughness: 0.9 }), trees.length), it = new THREE.InstancedMesh(trunk, new THREE.MeshStandardMaterial({ color: 0x5a4130 }), trees.length);
+    trees.forEach(([x, y, z, n], k) => { const sc = 0.75 + 0.6 * hs(x, z); dum.position.set(x, y + 1.9 * TS * sc, z); dum.scale.set(sc, sc * (0.9 + 0.4 * n), sc); dum.rotation.y = n * 6; dum.updateMatrix(); im.setMatrixAt(k, dum.matrix);
+      im.setColorAt(k, c.setHex(0x5c8a40).offsetHSL((hs(z, x) - 0.5) * 0.05, 0, (hs(x * 2, z) - 0.5) * 0.12)); dum.position.y = y - 0.2; dum.scale.setScalar(sc); dum.updateMatrix(); it.setMatrixAt(k, dum.matrix); });
+    im.castShadow = true; g.add(im, it); }
+  if (rocks.length) { const rg = new THREE.DodecahedronGeometry(1.2 * TS, 0), ir = new THREE.InstancedMesh(rg, new THREE.MeshStandardMaterial({ color: 0xa89888, roughness: 1 }), rocks.length);
+    rocks.forEach(([x, y, z], k) => { const sc = 0.6 + 1.2 * hs(z, x); dum.position.set(x, y + 0.2, z); dum.scale.set(sc, sc * 0.6, sc * 0.9); dum.rotation.set(hs(x, 1), hs(z, 2) * 6, 0); dum.updateMatrix(); ir.setMatrixAt(k, dum.matrix); }); ir.castShadow = ir.receiveShadow = true; g.add(ir); }
+  g.userData.top = H(0, 0) * 0.98; return g;
 }
 
 // 🕰️ Часовниковата кула на Сахат тепе — каменна кула с дървен покрив и циферблати (светят нощем)

@@ -50,7 +50,15 @@ export function buildService(k, lvl, lot, opt = {}) {
       o.scale.multiplyScalar(8 * s / h); o.position.set(x, 0, z); o.rotation.y = (x * 3.1 + z * 1.7) % 6.28; o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; if (m.geometry) SHARED.add(m.geometry); } }); group.add(o); return o; }
  const t = cyl(0.18 * s, 2.2 * s, M(0x6b4a2a), x, 0, z, 6); const cr = new THREE.SphereGeometry(1.5 * s, 10, 8); own.push(cr); const o = new THREE.Mesh(cr, M(0x4f7f3a)); o.position.set(x, 3 * s, z); o.castShadow = true; group.add(o); return t; };
   const bench = (x, z, ry = 0) => { const b = box(1.6, 0.45, 0.5, M(R.trim), x, 0, z); b.rotation.y = ry; };
-  const cars = (kind, n, z0) => tasks.push(load({ ambulance: 'assets/heavy/cars/' + EMV + 'amb-eu.glb', fire: 'assets/heavy/cars/' + EMV + 'fire-man.glb', police: 'assets/heavy/cars/' + EMV + 'pol-crownvic.glb' }[kind]).then(g => { if (!g) return; for (let i = 0; i < n; i++) { const c = emergCar(g.scene, kind === 'fire' ? 10.5 : kind === 'ambulance' ? 7 : 5.2, kind, kind === 'ambulance' ? 'amb-eu' : ''); c.position.set(-((n - 1) * 3.6) / 2 + i * 3.6, 0, z0); c.rotation.y = Math.PI; group.add(c); } }));
+  // 🚓 svc-cars-reg (потребителят: „полиция пожарна болница по градовете“ — „където да се паркират колите“): пред участъка, пожарната и болницата — колите
+  // на региона на града (същите като в трафика: vehmodels.js POL_REG / FIRE_REG / AMB_REG), редуват се; без флага — както досега (Crown Vic, MAN, жълтата линейка)
+  const SVC_CARS = { police: { am: ['pol-crownvic', 'pol-charger', 'pol-nypd'], ru: ['pol-duster', 'pol-vaz'], eu: ['pol-logan', 'pol-duster'], bg: ['pol-logan', 'pol-duster'], xx: ['pol-logan', 'pol-crownvic'] },
+    fire: { am: ['fire-titan', 'fire-us2'], ru: ['fire-brigade', 'fire-man'], eu: ['fire-brigade', 'fire-man'], bg: ['fire-brigade', 'fire-man'], xx: ['fire-man', 'fire-brigade'] },
+    ambulance: { am: ['amb-box', 'amb-us'], ru: ['amb-gaz'], eu: ['amb-van', 'amb-eu'], bg: ['amb-van', 'amb-eu'], xx: ['amb-van', 'amb-eu'] } };
+  const SVC_LEN = { 'fire-titan': 10.8, 'fire-us2': 10, 'fire-man': 10.5, 'fire-brigade': 8.6, 'amb-box': 7.5, 'amb-us': 7.5, 'amb-van': 6.8, 'amb-eu': 7, 'amb-gaz': 6.2, 'pol-vaz': 4.1, 'pol-logan': 4.36, 'pol-duster': 4.34 };
+  const svcCarOk = f => (f !== 'fire-brigade' && f !== 'amb-van' && f !== 'amb-box' || feature(f)) && (f !== 'fire-titan' || !!EMV);   /* fire-titan е само в cars/sirens */
+  const cars = (kind, n, z0) => { const L0 = feature('svc-cars-reg') && opt.carReg ? (SVC_CARS[kind][opt.carReg] || SVC_CARS[kind].xx).filter(svcCarOk) : [], F = L0.length ? L0 : [{ ambulance: 'amb-eu', fire: 'fire-man', police: 'pol-crownvic' }[kind]];
+    for (let i = 0; i < n; i++) { const f = F[(i + seed) % F.length]; tasks.push(load('assets/heavy/cars/' + EMV + f + '.glb').then(g => { if (!g) return; const c = emergCar(g.scene, SVC_LEN[f] || (kind === 'fire' ? 10.5 : kind === 'ambulance' ? 7 : 5.2), kind, f); c.position.set(-((n - 1) * 3.6) / 2 + i * 3.6, 0, z0); c.rotation.y = Math.PI; group.add(c); })); } };
 
   // ---- по вид
   if (k === 'hall') {   // кметство отзад, площад отпред (фонтан, знамена, пейки, дървета)

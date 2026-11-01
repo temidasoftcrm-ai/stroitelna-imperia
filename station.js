@@ -262,9 +262,14 @@ export function createStation(deps) {
       const n = t.wagons || 3;
       const parts = Array.from({ length: n }, (_, j) => FREIGHT[(j + t.id) % FREIGHT.length]);   // резерва без истинските модели — само вагони (детските локомотиви и мотриси са изтрити)
       // истински модели (trainmodels.js): „Стрела“ — скоростният влак, товарните — дизелов локомотив с бункери и платформи
-      const real = t.pax && !t.express && hasTrainModel('paxLoco') ? ['paxLoco', ...Array(Math.max(1, n - 1)).fill('paxCar')]
+      const m4 = feature('trains-meshy4'), h = hasTrainModel;   // 🚆 trains-meshy4: новите — по номера на влака (ICE ↔ AVE, мотриса/двуетажни ↔ сини, „Темидасофт Rail“ за тежките)
+      const real4 = !m4 ? null : t.express && h('iceLead') && t.id % 2 === 0 ? ['iceLead', ...Array(h('iceMid') ? Math.min(4, Math.max(1, n - 2)) : 0).fill('iceMid'), 'iceTail']
+        : t.pax && !t.express && t.id % 3 === 1 && h('el2Loco') && h('el2Car') ? ['el2Loco', ...Array(Math.max(1, n - 1)).fill('el2Car')]
+        : t.pax && !t.express && t.id % 3 === 2 && h('elLoco') && h('ddCar') ? ['elLoco', ...Array(Math.max(1, n - 1)).fill('ddCar')]
+        : !t.pax && !t.express && (t.kind === 'heavy' || t.kind === 'giant') && h('umbLoco') ? ['umbLoco', ...(h('umbB') ? ['umbB'] : []), ...Array.from({ length: n }, (_, j) => ['boxcar', 'hopper2', 'flat'][(j + t.id) % 3]).filter(h)] : null;
+      const real = real4 || (t.pax && !t.express && hasTrainModel('paxLoco') ? ['paxLoco', ...Array(Math.max(1, n - 1)).fill('paxCar')]
         : !t.pax && !t.express && hasTrainModel('vl82') ? ['vl82', ...Array.from({ length: n }, (_, j) => ['boxcar', 'hopper2', 'flat'][(j + t.id) % 3])]
-        : t.express && hasTrainModel('ave') ? ['ave', ...Array(hasTrainModel('hsw') ? Math.min(4, Math.max(1, n - 2)) : 0).fill('hsw'), 'aveTail'] : !t.pax && !t.express && hasTrainModel('loco') ? ['loco', ...Array.from({ length: n }, (_, j) => (j + t.id) % 3 === 1 ? 'hopper' : 'flat')] : null;
+        : t.express && hasTrainModel('ave') ? ['ave', ...Array(hasTrainModel('hsw') ? Math.min(4, Math.max(1, n - 2)) : 0).fill('hsw'), 'aveTail'] : !t.pax && !t.express && hasTrainModel('loco') ? ['loco', ...Array.from({ length: n }, (_, j) => (j + t.id) % 3 === 1 ? 'hopper' : 'flat')] : null);
       if (real) {
         let z = 0;
         real.forEach((kd, j) => { const m = trainCar(kd, t.id * 7 + j); z -= m.userData.len / 2; m.position.z = z; z -= m.userData.len / 2 + 0.5; o.add(m); });

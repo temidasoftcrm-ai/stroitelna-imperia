@@ -149,7 +149,7 @@ export function createFire2(parent, B, o = {}) {
   const jet = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(jp, 3)), new THREE.PointsMaterial({ map: T.dot, color: 0xd6ecff, size: 0.9, transparent: true, opacity: 0.9, depthWrite: false }));
   jet.frustumCulled = false; jet.renderOrder = 6; jet.visible = false; g.add(jet);
   const jr = Float32Array.from({ length: JP * 3 }, () => Math.random() - 0.5);
-  let act = [], last = 0;   // запалените точки (за целите на водата)
+  let act = [], last = 0, pAcc = 0, pT = null;   // pAcc — натрупаната фаза на дима (rate се мени с огъня: t * rate вървеше назад при гасене)   // запалените точки (за целите на водата)
   const st = { stage: 0, inten: 0 };
   function update(p) {
     const t = now(), stage = Math.max(0, Math.min(1, p.stage || 0)), I = Math.max(0, Math.min(1, p.inten || 0)), night = p.night || 0, steam = p.steam || 0;
@@ -169,7 +169,8 @@ export function createFire2(parent, B, o = {}) {
     if (TALL && hiA) sb.set(hiA.p.x + hiA.n[0] * 1.5, hiA.p.y + hiA.fh, hiA.p.z + hiA.n[1] * 1.5); else if (!TALL) sb.set(B.c.x, top + 0.8, B.c.z);
     // димът: тъмен стълб нагоре и по вятъра; нощем отдолу — оранжев; при гасене — пара (светъл)
     const sm = Math.min(1, stage * 2) * (0.5 + 0.5 * I), sv = Math.min(1, sm + steam * 0.7), Hc = 18 + size * 1.1 + 22 * stage, rate = 0.03 + 0.025 * I, stK = sv > 0 ? Math.min(1, steam * 0.7 / sv) : 0;
-    for (let i = 0; i < NPUFF; i++) { const s = puffs[i]; s.visible = sv > 0.02; if (!s.visible) continue; const u = s.userData, ph = (t * rate + u.ph) % 1, rise = ph * Hc, dr = rise * 0.2 + ph * ph * Hc * 0.45;
+    pAcc += rate * (pT == null ? 0 : Math.min(0.25, Math.max(0, t - pT))); pT = t;   // кълбата винаги нагоре, колкото и да се мени силата
+    for (let i = 0; i < NPUFF; i++) { const s = puffs[i]; s.visible = sv > 0.02; if (!s.visible) continue; const u = s.userData, ph = (pAcc + u.ph) % 1, rise = ph * Hc, dr = rise * 0.2 + ph * ph * Hc * 0.45;
       s.position.set(sb.x + WIND.x * dr + Math.sin(ph * 6 + u.j * 9) * 1.4 * ph * (1 + size * 0.05), sb.y + rise, sb.z + WIND.z * dr + Math.cos(ph * 5 + u.j * 7) * 1.2 * ph);
       s.scale.setScalar(((2.5 + size * 0.22) * (0.6 + 0.4 * stage) + ph * (7 + size * 0.45)) * (0.85 + 0.3 * u.j)); s.material.rotation += 0.002;
       _c.copy(S_DAY).lerp(S_NIGHT, night * 0.7).lerp(S_LIT, Math.min(1, night * (1 - ph) * (1 - ph) * stage * I * 1.1)).lerp(S_STEAM, stK); s.material.color.copy(_c);

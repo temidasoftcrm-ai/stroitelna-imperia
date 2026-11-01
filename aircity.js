@@ -8,9 +8,11 @@
 //   target() → { x, z } | null, load(url) → Promise<gltf>, approach() → bool, heli() → bool });  a.update(dt); a.clear()
 import * as THREE from 'three';
 import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
+import { feature } from './lab/feature.js';   // heli-police2
 
 const T = 70, V = 34, SLOPE = 0.075, D0 = 1300, RT = 700, HAND = { x: 46, z: 110 + 700, y: 90 };   // цикълът и мястото на предаване — като LAND в airport.js
-const HELI = 'assets/heavy/ops/heli.glb';
+const HMED = feature('heli-medic'), HELI_MED = 'assets/heavy/ops/heli-med.glb';   // 🚁 heli-medic (потребителят: „хеликоптер за болницата“): при инцидент с линейка — спасителният (оранжев), иначе полицейският
+const HELI2 = feature('heli-police2'), HELI = HELI2 ? 'assets/heavy/ops/heli-pol.glb' : 'assets/heavy/ops/heli.glb';   // 🚁 heli-police2 (потребителят, 01.11: „да сложим полицейския хеликоптер вместо синия“): Meshy, бял/син POLICE, ротор rotor_pales
 let glowTex = null;
 function glow() {
   if (glowTex) return glowTex;
@@ -68,22 +70,24 @@ export function createAirCity(deps) {
     const L = p.userData.landL; L.material.opacity = landOn ? 0.15 + 0.85 * night : 0; const s = 9 + 14 * night; L.scale.set(s, s, 1);
   }
   // ---- хеликоптерът
-  function heliMake() {
+  function heliMake(kind = 'pol') {
     if (heliLoading || H) return; heliLoading = true;
-    deps.load(HELI).then(gl => {
+    deps.load(kind === 'med' ? HELI_MED : HELI).then(gl => {
       const v = fit(gl.scene.clone(true), 11), rot = [];
-      v.traverse(q => { if (q.isMesh) { q.castShadow = true; q.material = q.material.clone(); if (/cabine/.test(q.name)) { q.material.map = null; q.material.color.setHex(0x24489c); } }   /* кабината — полицейско синьо (моделът е червен) */ if (/rotor_pales|moyeu/.test(q.name)) rot.push([q, 'y']); else if (/rotor_anticouple/.test(q.name)) rot.push([q, 'x']); });
-      const red = sprite(0xff2a2a, 3.2), blue = sprite(0x2a5bff, 3.2); red.position.set(-1, 0.3, 0); blue.position.set(1, 0.3, 0); v.add(red, blue);
+      v.traverse(q => { if (q.isMesh) { q.castShadow = true; q.material = q.material.clone(); if (!HELI2 && kind !== 'med' && /cabine/.test(q.name)) { q.material.map = null; q.material.color.setHex(0x24489c); } }   /* кабината — полицейско синьо (моделът е червен) */ if (/rotor_pales|moyeu/.test(q.name)) rot.push([q, 'y']); else if (/rotor_anticouple/.test(q.name)) rot.push([q, 'x']); });
+      const red = sprite(0xff2a2a, 3.2), blue = sprite(kind === 'med' ? 0xffffff : 0x2a5bff, 3.2);   /* спасителният — червено/бяло */ red.position.set(-1, 0.3, 0); blue.position.set(1, 0.3, 0); v.add(red, blue);
       const cone = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 7, 1, 20, 1, true).translate(0, -0.5, 0).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xfff6d8, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
       const pool = new THREE.Mesh(new THREE.CircleGeometry(9, 28).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: glow(), color: 0xfff1cc, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
       cone.frustumCulled = pool.frustumCulled = false;
-      H = { v, rot, red, blue, cone, pool, st: 'off', x: 0, y: 0, z: 0, ang: 0, hdg: 0, out: [1, 0], t: 0 }; heliLoading = false;
+      H = { kind, v, rot, red, blue, cone, pool, st: 'off', x: 0, y: 0, z: 0, ang: 0, hdg: 0, out: [1, 0], t: 0 }; heliLoading = false;
     }).catch(e => { heliLoading = false; console.warn('police-heli', e); });
   }
   function heliShow(on) { const p = deps.parent(); for (const o of [H.v, H.cone, H.pool]) { if (on && o.parent !== p) p.add(o); if (!on && o.parent) o.parent.remove(o); } }
   function updHeli(dt, t, night) {
     const tg = deps.heli() ? deps.target() : null;
-    if (tg && !H) { heliMake(); return; } if (!H) return;
+    const want = HMED && deps.med && deps.med() ? 'med' : 'pol';
+    if (tg && H && H.st === 'off' && H.kind !== want) { heliShow(false); H = null; }   /* heli-medic: друг вид за новия инцидент */
+    if (tg && !H) { heliMake(want); return; } if (!H) return;
     if (tg && (H.st === 'off' || H.st === 'out')) {
       if (H.st === 'off') { const a = Math.random() * 6.28; H.out = [Math.sin(a), Math.cos(a)]; H.x = tg.x + H.out[0] * 700; H.z = tg.z + H.out[1] * 700; H.y = 120; H.ang = a; }
       H.st = 'in'; heliShow(true); if (skipIn) { skipIn = false; H.tx = tg.x; H.tz = tg.z; H.x = tg.x + Math.sin(H.ang) * 46; H.z = tg.z + Math.cos(H.ang) * 46; H.y = 55; H.st = 'orbit'; }

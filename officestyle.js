@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { buildLandmark } from './landmarks.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { prepNightFloors } from './nightfloors.js';
+import { MESHY_SKY_NEW, meshyOfficePrep } from './meshysky.js';   // sky-cocoon
 import { feature } from './lab/feature.js';
 import { canvasTex } from './texdata.js';
 // 🏢 office-styles2 (потребителят: „Сапфир, Туист, Близнаци — много тънки“): процедурните кули за офиса — свои, с пропорции ~6:1, фасада с истинска решетка
@@ -65,7 +66,7 @@ function office2(kind) { seedN = 11 + kind.length * 7; const o = O2B[kind](); o.
   return { group: o.g, update(t, night = 0) { for (const m of o.glass) m.emissiveIntensity = 0.02 + 1.25 * night; for (const m of o.lit) m.emissiveIntensity = 0.08 + 1.8 * night; for (const m of o.blink) m.emissiveIntensity = (Math.sin(t * 3) > 0.5 ? 2 : 0.2) * (0.3 + night); } }; }
 // истински небостъргачи от Sketchfab (CC-BY, авторите са в CREDITS.txt и „📜 Автори“) — зареждат се при първо ползване
 const SKY = {}, skyLoad = {};
-const loadSky = k => skyLoad[k] || (skyLoad[k] = new Promise(res => new GLTFLoader().load(`assets/heavy/sky/${k}.glb`, g => { prepNightFloors(g.scene, 'sf-sky-' + k); SKY[k] = g.scene; res(g.scene); }, undefined, () => res(null))));   // нощем — като същите небостъргачи в града (nightfloors.js)
+const loadSky = k => skyLoad[k] || (skyLoad[k] = new Promise(res => new GLTFLoader().load(`assets/heavy/sky/${k}.glb`, g => { prepNightFloors(g.scene, 'sf-sky-' + k); if (MESHY_SKY_NEW[k]) meshyOfficePrep(g.scene); SKY[k] = g.scene; res(g.scene); }, undefined, () => res(null))));   // sky-cocoon: изпечените прозорци + Beacon/Accent   // нощем — като същите небостъргачи в града (nightfloors.js)
 
 export const STYLE_LV = 7, STYLE_COST = 50000;
 export const OFFICE_STYLES = [
@@ -83,6 +84,9 @@ export const OFFICE_STYLES = [
   { id: 'usb', ico: '🗼', nm: 'Кръгла кула', sf: 'usb', ds: 'Стъклена цилиндрична кула с корона' },
   { id: 'blue', ico: '💠', nm: 'Синьо стъкло', sf: 'blue', ds: 'Модерна извита кула от синьо стъкло с шпил' },
   { id: 'night', ico: '🌙', nm: 'Нощна кула', sf: 'night', ds: 'Тъмна кула със светещи прозорци' },
+  ...(feature('sky-cocoon') ? [   // 🏙️ sky-cocoon (собственикът, 01.11: „да е моделът на офиса на ниво 10“ — допълнителен стил, office-l10 остава)
+    { id: 'cocoon', ico: '🕸️', nm: 'Кокон', sf: 'cocoon', ds: 'Бяла кула с кръстосана решетка (като Cocoon Tower, Токио)' },
+    { id: 'decomall', ico: '🏬', nm: 'Ар деко с мол', sf: 'decomall', ds: 'Ар деко кула със стъпаловиден връх и мол с арки отдолу' }] : []),
 ];
 // style → { group, update(t, night) }; width — ширината на офиса в двора на централата
 export function buildOfficeTower(style, deps, width) {

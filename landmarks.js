@@ -574,7 +574,7 @@ const GLB_LM = {
   // game.js specialLmPlace — в истински ръст (смален до квартала); нощем — златисто осветен (window.__lmNight → dayNight.winMats)
   parliament: { h: 15, fit: 42.9, plate: 0xb8b2a6 },   // нощем — nightfloors.js 'westm' (прозорците светят), без плоското goldNight
   duomo: { h: 15, fit: 24.5, plate: 0xb8b2a6 },
-  romanstadium: { h: 15, fit: 59.2, plate: 0x9a8f7a, floodK: feature('bg-rivers') ? 2.4 : 1 },   // bg-rivers: нощем — прожектори (дизайнерът: „малък и тъмен нощем“)
+  romanstadium: { h: 15, fit: 59.2, plate: 0x9a8f7a, floodK: feature('bg-rivers') ? 2.4 : 1, onLoad: (w, g) => { if (feature('rstad-wall')) stadiumWall(w); } },   // bg-rivers: нощем — прожектори (дизайнерът: „малък и тъмен нощем“)
   // Атина (lm-acropolis, f6): Партенонът (Meshy AI, CC0, от потребителя; олекотен 2 млн. → 115 хил. △) на процедурния хълм на Акропола; 15 единици = 18,5 м,
   // хълмът — ~15 м висок (истинският е ~70 м над града — смален, иначе закрива квартала), платото — около храма; мястото за забележителност е ~56 × 46 м →
   // цялото ×~0,58 (храмът ~40 м); нощем — златист (като истинския)
@@ -927,6 +927,28 @@ function topBeacon(w, g) {
   g.userData.sparkle = (t, night) => { if (prev) prev(t, night); red.emissiveIntensity = (Math.sin(t * 2.2) > 0.6 ? 2.5 : 0.08) * (0.25 + night); };
 }
 // Supertree Grove нощем: короните (мрежите — Shell) светят виолетово/синьо и бавно сменят цвета (sg-look)
+// 🏛️ rstad-wall (потребителят, 01.11: „да направим античния стадион да има стена“): сканът е тънка кора — по ръба се вижда долната страна и „виси“.
+// По целия контур на модела — каменна подпорна стена от земята до ръба на скамейките (височината по клетка 0,4 м от скана) и тъмен парапет отгоре
+function stadiumWall(w) {
+  w.updateMatrixWorld(true); const inv = w.matrixWorld.clone().invert(), v = new THREE.Vector3(), C = 0.4, cell = new Map(); let x0 = 1e9, z0 = 1e9;
+  const pts = []; w.traverse(o => { if (!o.isMesh || !o.geometry?.attributes.position) return; const P = o.geometry.attributes.position, M = inv.clone().multiply(o.matrixWorld); for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i).applyMatrix4(M); pts.push(v.x, v.y, v.z); if (v.x < x0) x0 = v.x; if (v.z < z0) z0 = v.z; } });
+  const key = (i, j) => i * 4096 + j;
+  for (let n = 0; n < pts.length; n += 3) { const i = Math.floor((pts[n] - x0) / C), j = Math.floor((pts[n + 2] - z0) / C), k = key(i, j); cell.set(k, Math.max(cell.get(k) ?? -1e9, pts[n + 1])); }
+  for (let it = 0; it < 2; it++) { const add = []; for (const k of cell.keys()) { const i = Math.floor(k / 4096), j = k % 4096; for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const q = key(i + a, j + b); if (cell.has(q)) continue; let nb = 0, hy = -1e9; for (const [c, d] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const r = cell.get(key(i + a + c, j + b + d)); if (r != null) { nb++; hy = Math.max(hy, r); } } if (nb >= 3) add.push([q, hy]); } } for (const [q, h] of add) cell.set(q, h); }   /* дупките в скана — запълнени */
+  const pos = [], uv = [], rail = [], ws = w.getWorldScale(new THREE.Vector3()).x || 1;
+  const quad = (A, B, y0, y1, out, U) => { out.push(A[0], y0, A[1], B[0], y0, B[1], B[0], y1, B[1], A[0], y0, A[1], B[0], y1, B[1], A[0], y1, A[1]); if (U) { const L = C * ws / 3, H0 = y0 * ws / 3, H1 = y1 * ws / 3; U.push(0, H0, L, H0, L, H1, 0, H0, L, H1, 0, H1); } };
+  for (const [k, h] of cell) { if (h < 0.12) continue; const i = Math.floor(k / 4096), j = k % 4096, X = x0 + i * C, Z = z0 + j * C;
+    for (const [a, b, A, B] of [[1, 0, [X + C, Z + C], [X + C, Z]], [-1, 0, [X, Z], [X, Z + C]], [0, 1, [X, Z + C], [X + C, Z + C]], [0, -1, [X + C, Z], [X, Z]]]) {
+      if (cell.has(key(i + a, j + b))) continue; quad(A, B, -0.05, h + 0.05, pos, uv); quad(A, B, h + 0.05, h + 0.05 + 0.3 / ws, rail); } }   /* ниска каменна корона отгоре (тъмният парапет беше черна ивица) */
+  if (!pos.length) return;
+  const cv = document.createElement('canvas'); cv.width = cv.height = 128; const x = cv.getContext('2d'); x.fillStyle = '#a89c86'; x.fillRect(0, 0, 128, 128);
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) { const l = 160 + Math.floor(Math.random() * 40); x.fillStyle = `rgb(${l + 18},${l + 10},${l - 6})`; x.fillRect(c * 32 + (r % 2) * 16 - 16 + 1, r * 32 + 1, 30, 30); x.fillRect(c * 32 + (r % 2) * 16 + 16 + 1, r * 32 + 1, 30, 30); }
+  const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
+  const g1 = new THREE.BufferGeometry(); g1.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g1.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g1.computeVertexNormals();
+  const wall = new THREE.Mesh(g1, new THREE.MeshStandardMaterial({ map: t, color: 0xfff4e0, roughness: 0.95, side: THREE.DoubleSide, emissive: 0x3a3226, emissiveIntensity: 0.25 }));   /* по-светъл варовик (в сянка беше почти черен) */ wall.name = 'rstadWall'; wall.castShadow = wall.receiveShadow = true; w.add(wall);
+  const g2 = new THREE.BufferGeometry(); g2.setAttribute('position', new THREE.Float32BufferAttribute(rail, 3)); g2.computeVertexNormals();
+  const rl = new THREE.Mesh(g2, new THREE.MeshStandardMaterial({ color: 0xcfc6b2, roughness: 0.9, side: THREE.DoubleSide })); rl.name = 'rstadRail'; w.add(rl);
+}
 function superLights(w, g) {
   const mats = []; w.traverse(o => { if (o.isMesh && /Shell/i.test(o.name)) { o.material = o.material.clone(); o.material.emissive = new THREE.Color(0x8a3cff); o.material.emissiveIntensity = 0; mats.push(o.material); } });
   const prev = g.userData.sparkle, c = new THREE.Color();
