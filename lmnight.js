@@ -1,7 +1,7 @@
 // lmnight.js — 🌃 процедурната нощ на забележителностите (собственикът, 01.11: „да топ са вкарваме ги“; одобрено в Blender — scratchpad lm5/*.blend).
 // Без изпечена карта: светлината се смята в шейдъра от мястото в модела (q — 0…1 по кутията на модела, y — нагоре) и яркостта на текстурата (lum),
 // по същата формула като прегледа в Blender (vertex color 'night'). Нощем: emissiveIntensity = нощта × nfK (daynight.js през NF_MATS); фасадата тъмнее.
-//   lm-night-sf: Голдън Гейт; lm-night-london: Уестминстър с Биг Бен (циферблатите), Лондонското око.
+//   lm-night-sofia: Александър Невски; lm-night-sf: Голдън Гейт; lm-night-london: Уестминстър с Биг Бен (циферблатите), Лондонското око.
 //   lm-night-tokyo: Токийската кула — наситено оранжева решетка (Landmark Light), двете обсерватории — бели пояси, антената — бяла;
 //                   Tokyo Skytree — синя решетка (нагоре по-светла), бавно минава в лилаво и обратно (Iki ↔ Miyabi), обсерваториите — бели пръстени.
 import * as THREE from 'three';
@@ -46,6 +46,15 @@ const CFG = {
     if (lum > 0.06 && lum < 0.14) c = col * 1.1;
     else if (lum >= 0.14 && lum < 0.3) c = col * 0.35;
     else if (lum > 0.6) c = vec3(1.0, 0.93, 0.8);` },
+  // lm-night-sofia: Александър Невски (собственикът, 01.11: снимка — „ето как свети“; одобрено в Blender „ок вкарваме го“): фасадите — наситено златисто-жълти
+  // прожектори, барабанът под главния купол — кремаво бял, зелените куполи — тъмнозелени, позлатените — златни, прозорците и вратите — тъмни (частите — по материалите AN_*)
+  nevsky: { flag: 'lm-night-sofia', nfK: 1.0, cls: n => /roof_Gold/.test(n) ? 2 : n === 'AN_roof' ? 1 : /windows/.test(n) ? 3 : /door/.test(n) ? 4 : 0, glsl: `
+    float h = q.y, k = clamp((h - 0.55) / 0.15, 0.0, 1.0), cl = glass;
+    vec3 c = mix(vec3(1.0, 0.6, 0.18), vec3(1.0, 0.9, 0.72), k) * (0.12 + 1.0 * pow(lum, 1.6));
+    if (cl > 0.5 && cl < 1.5) c = vec3(0.2, 0.55, 0.32) * (0.1 + 0.6 * pow(lum, 1.3));
+    else if (cl > 1.5 && cl < 2.5) c = vec3(1.0, 0.62, 0.12) * (0.4 + 1.3 * lum);
+    else if (cl > 2.5 && cl < 3.5) c = vec3(1.0, 0.6, 0.3) * 0.05;
+    else if (cl > 3.5) c = vec3(1.0, 0.6, 0.3) * 0.1;` },
 };
 export const lmNightKinds = () => Object.keys(CFG).filter(k => feature(CFG[k].flag));
 // → броят на материалите (0 — няма настройка за този вид или флагът е изключен)
@@ -60,7 +69,7 @@ export function lmNight(root, kind) {
   let n = 0;
   root.traverse(o => { if (!o.isMesh) return; const M = new THREE.Matrix4().multiplyMatrices(norm, inv).multiply(o.matrixWorld);
     o.material = [].concat(o.material).map(m0 => { if (!m0 || !('emissive' in m0)) return m0; const m = m0.clone();
-      const glass = C.glass && C.glass.test(m.name) ? 1 : 0;
+      const glass = C.cls ? C.cls(m.name) : C.glass && C.glass.test(m.name) ? 1 : 0;   // cls — номер на частта по името на материала (Невски)
       m.userData.lmNight = 1; m.userData.nightFloors = true; m.userData.nfK = C.nfK; m.emissive.setRGB(1, 1, 1); m.emissiveIntensity = 0; NF_MATS.add(m); n++;
       m.onBeforeRender = () => { T.value = performance.now() / 1000; HOL.value = holidayNow() ? 1 : 0; };
       m.onBeforeCompile = sh => { sh.uniforms.uLnM = { value: M }; sh.uniforms.uLnT = T; sh.uniforms.uLnG = { value: glass }; sh.uniforms.uLnS = { value: S }; sh.uniforms.uLnH = HOL;

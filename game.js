@@ -39,8 +39,11 @@ import { createBlockRuins } from './fireruins.js';   // 🏚️ fire-ruins: из
 import { createGhostHunt } from './ghosthunt.js';   // 👻 ghost-hunt: скритата изненада в Ню Йорк (пожарната, зеленото сияние, колата на ловците)
 import { createUfo } from './ufo.js';   // 🛸 ufo-vegas: скритата изненада — НЛО над Лас Вегас в ясна нощ
 import { createNessie } from './nessie.js';   // 🐉 nessie: Лох Нес в северните крайморски градове
+import { createXmasConvoy } from './xmasconvoy.js';   // 🎄 xmas-convoy: коледният керван на 25 декември
 import { holoWatch } from './holocard.js';   // 📜 holo-history: историята отстрани на изненадите
 import { createGorilla } from './gorilla.js';   // 🦍 kongo: Голямата горила катери Емпайър Стейт в Ню Йорк
+import { createBeachPeople } from './beachpeople.js';   // 🏖️ beach-people: хората по плажовете (повечето лежат, няколко се разхождат)
+let beachPeople = null;   // 🏖️ beach-people (createBeachPeople — при строенето на крайморски град; старият е в групата на стария град)
 import { setEmpireHoliday } from './empirenight.js';
 import { lmNight } from './lmnight.js';   // 🌃 lm-night-*: Голдън Гейт (останалите — в landmarks.js)   // 🌃 empire-night3: празничното осветяване (Лабораторията)
 import { nySouthZ } from './nybay.js';   // 🗽 ny-south-compact: южно от плана на Ню Йорк — по-сгъстено (и забележителностите там)
@@ -1819,6 +1822,9 @@ function buildCity(cityId) {
   { const westmost = tx(0) - 16 - 6 * 6.5, cx = westmost - 12, seaZ = tx(0) - TILE / 2 - 2 - 22; trackMap = SEASIDE.includes(cityId) && !causewayOn(cityId) && city.railN == null ? makeTrackMap({ cx, zC: seaZ + 6 + (tx(0) - 16 - cx) }) : makeTrackMap(null); }
   city.sea = SEASIDE.includes(cityId) && !(P && P.osm) ? addSeaside(g, { A, model, label }, { zEdge: tx(0) - TILE / 2 - 2, xMin: tx(0), xMax: tx(NI - 1), railX: [-1e9, -1e9], seed: hashStr(cityId), ...seaCoastOpts(P) }) : null;
   seaFleetSig = ''; if (city.sea) city.sea.setPortLevel?.(portLv(cityId));
+  beachPeople = null;   // 🏖️ beach-people: хората по плажа — по брега на новия град (старите си отиват с групата на стария град)
+  if (feature('beach-people') && city.sea) { const co = seaCoastOpts(P), zE = tx(0) - TILE / 2 - 2, px = co.coast && co.port ? co.port.x : tx(NI - 1) - 60;
+    beachPeople = createBeachPeople({ parent: g, camera, night: () => dayNight.night, seed: hashStr(cityId), beach: { coast: co.coast ? x => co.coast(x) : null, seaZ: zE - 22, x0: tx(0), x1: tx(NI - 1), land: 1, ...(co.coast ? { sand: [1.4, 2.2], wet: 0.5, swim: [-5, -13], along: true } : { sand: [3, 13], wet: 1, swim: [-5, -15] }) }, avoid: [[px - 200, px + 200]] }); }
   ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; ground.receiveShadow = true;
   if (pv) { pv.position.y = 0; g.add(pv); city.planView = pv; } else g.add(ground);
   if (pv && P.p2 && P.p2.river && feature('bg-rivers')) try { pv.add(riversView(P.p2, () => dayNight.night)); } catch (e) { console.warn('river', e); }   // 🌊 bg-rivers: водата, кейовете и алеята
@@ -3212,6 +3218,8 @@ const ghostHunt = feature('ghost-hunt') ? createGhostHunt({ scene, S: () => S, p
 const ufo = feature('ufo-vegas') ? createUfo({ scene, camera, Sound, S: () => S, target: () => controls.target, night: () => dayNight.night || 0, clear: () => weather.kind === 'clear', cycle: () => Math.floor(((S.day - 1) + S.dayT / DAY_SEC) / CYCLE_DAYS), on: () => !!city.group && $('mapScreen').classList.contains('hidden'), toast: (...a) => toast(...a), pop: (k, c, s2) => showEventPop(k, c, s2), save: () => save() }) : null;
 // 🐉 nessie (собственикът, 01.11: „за Лох Нес — да го анимираме и да го сложим където прецениш“; одобрено в Blender): рядко, в мъгла/облачно сутрин, във водата до града
 const nessieFx = feature('nessie') ? createNessie({ scene, S: () => S, cityId: () => S && S.cityId, water: (x, z) => { const P = city.plan; return !!(P && P.waterAt && P.waterAt(x, z)); }, center: () => city.hq ? [city.hq.x, city.hq.z] : [0, 0], hour: () => ((todF() * 24) + 6) % 24, fog: () => ['fog', 'cloudy', 'rain'].includes(weather.kind), toast: (...a) => toast(...a), pop: (k, c, s2) => showEventPop(k, c, s2), save: () => save() }) : null;
+// 🎄 xmas-convoy (собственикът, 01.11: „на 25 декември да пуснем коледните камиони по улиците — като изненада, само веднъж“): НАШ керван, без чуждата марка
+const xmasConvoy = feature('xmas-convoy') ? createXmasConvoy({ scene, S: () => S, hour: () => ((todF() * 24) + 6) % 24, night: () => dayNight.night, roadRoute: (x0, z0, x1, z1) => roadRoute(x0, z0, x1, z1), roadPoint: () => roadPoint(), center: () => city.hq ? [city.hq.x, city.hq.z] : [0, 0], toast: (...a) => toast(...a), pop: (k, c, s2) => showEventPop(k, c, s2), save: () => save() }) : null;
 // 🦍 kongo (собственикът, 01.11: горилата — одобрена в Blender, „давай“): рядко, денем в Ню Йорк — катери Емпайър Стейт, на върха — гърдите, ревът, самолетите
 const kongo = feature('kongo') ? createGorilla({ scene, S: () => S, landmark: k => { const o = (city.landmarks || []).find(q => q.kind === k); return o ? o.group : null; }, camera, hour: () => ((todF() * 24) + 6) % 24, night: () => dayNight.night, plane: (k, l) => makePlane(k, l), toast: (...a) => toast(...a), pop: (k, c, s2) => showEventPop(k, c, s2), save: () => save() }) : null;
 // 📜 holo-history (собственикът, 01.11: „история отстрани на изненадите — за Титаник кратка история, за останалите като холограма“)
@@ -13689,6 +13697,7 @@ function frame() {
     if (feature('fire-seq')) fires.update(dt / DAY_SEC);
     if (feature('fire-ruins')) blkRuins.update(dt / DAY_SEC);   // игрово време: на пауза (dt = 0) всичко спира
     if (nessieFx) nessieFx.update(dt);   // 🐉 nessie
+    if (xmasConvoy) xmasConvoy.update(dt > 0 ? rdt : 0);   // 🎄 xmas-convoy: в реално време (на пауза стои)
     if (holoTick && (holoTick.n = (holoTick.n || 0) + 1) % 15 === 0) holoTick();   // 📜 holo-history
     if (ghostHunt) ghostHunt.update(dt, dt > 0);   // 👻 ghost-hunt: само в Ню Йорк (иначе — нищо)
     if (kongo) kongo.update(rdt, dt > 0);   // 🦍 kongo: реално време (на пауза — застива)
@@ -13698,6 +13707,7 @@ function frame() {
     updateHighways(dt / DAY_SEC);
     updateCityHighway(simT);
     if (city.sea && !gfxStill()) city.sea.update(simT, dayNight.night);   // vlow-still: корабите в пристанището стоят
+    if (beachPeople && !gfxStill()) beachPeople.update(rdt);   // 🏖️ beach-people (реално време; денем)
     if (feature('fountain-water')) fwTick(dt > 0 ? rdt : 0, dayNight.night);
     if (plan2.view && plan2.view.NYNIGHT) plan2.view.NYNIGHT.value = dayNight.night || 0; LMF_U.value = dayNight.night || 0;   // 🌃 ny-night2: тъмните стени нощем (модулът се зарежда динамично)
     if (city && city.osmShips && (city.osmShips.length || city.osmShipNight)) setShipNight(dayNight.night || 0);   // 🚢 osm-ships: палубите нощем   // ⛲ fountain-water: едно време за всички фонтани (на пауза — стои)
@@ -13906,8 +13916,11 @@ if (AUTOTEST) {
     async ufo(night = true) { if (!ufo) return 'off'; if (night) this.time(0.5); setSpeed(1); return ufo.now(); },   // 🛸 ufo-vegas: Лабораторията — НЛО сега пред камерата (без постижение)
     ufoState() { return ufo ? ufo.state() : null; },
     ghostState() { return ghostHunt ? ghostHunt.state() : null; },
+    async xmas() { if (!xmasConvoy) return 'off'; return await xmasConvoy.test(); },   // 🎄 xmas-convoy: керванът сега (Лабораторията)
     async kongo() { if (!kongo) return 'off'; showMap(false); $('panel').classList.add('hidden'); this.time(11); setSpeed(1); const L = (city.landmarks || []).find(q => q.kind === 'empire2'); if (!L) return 'няма Емпайър'; const p = L.group.position; __dbg.camAt(p.x + 160, 120, p.z + 205, p.x, 125, p.z); fly = null; return kongo.test([0.62, 0.785]); },   // 🦍 kongo: Лабораторията — пуска горилата сега, камерата към Емпайър
     kongoState() { return kongo ? kongo.state() : null; },
+    beachState() { return beachPeople ? beachPeople.state() : null; },
+    beachLook() { const c = beachPeople && beachPeople.look(); if (!c) return null; showMap(false); $('panel').classList.add('hidden'); this.time(13); setSpeed(1); __dbg.camAt(c.x + c.nx * 45 + c.tx * 25, 18, c.z + c.nz * 45 + c.tz * 25, c.x + c.nx * 6, 0, c.z + c.nz * 6); fly = null; return c; },   // 🏖️ beach-people: Лабораторията — камерата над плажа
     empireHol(on = true) { setEmpireHoliday(on); return on; },   // 🌃 empire-night3: празникът насила (true/false; null — по датата)
     async nessie() { if (!nessieFx) return 'off'; await nessieFx.test(); const p = nessieFx.last(); if (!p) return 'няма вода наблизо'; this.lookAt(p.x, p.z, 90); return [Math.round(p.x), Math.round(p.z)]; },   // 🐉 nessie: показва дракона сега (Лабораторията)
     // 📏 замерване (собственикът: „да измерим църквата и блока до нея — да видим какви метри са“): забележителностите — височина в сцената; блоковете на плана до R м около всяка — височини
