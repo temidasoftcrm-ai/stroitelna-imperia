@@ -19,6 +19,8 @@ const emptyKey = n => `stroi-cloud-empty-s${n}`;   // fix-saves: слотът е
 const curSlot = () => { try { return Math.min(SLOTS, Math.max(1, +localStorage.getItem('stroi-slot') || 1)); } catch { return 1; } };
 const AUTOTEST = /[?&]autotest/.test(location.search);
 
+// сесия от стария сървър (Supabase Cloud, до 02.11.2026): токенът е подписан там — новият сървър го отхвърля (партньорът „изчезваше“). Махаме я → вход наново.
+try { const j = JSON.parse(localStorage.getItem('stroi-auth') || 'null'), t = j && (j.access_token || (j.currentSession && j.currentSession.access_token)); if (t) { const p = JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); if (p.iss && !String(p.iss).startsWith(URL_)) localStorage.removeItem('stroi-auth'); } } catch (e) { }
 const sb = createClient(URL_, KEY, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'stroi-auth' } });
 let user = null, busy = false, lastErr = '';
 
@@ -286,8 +288,11 @@ function changePw() {
 
 // ── ⚙️ Настройки: вход/изход, хора онлайн, изтриване на данните и на акаунта ──
 // 🆕 версия и какво е новото — при нова версия: вдигни VERSION и добави най-отгоре в CHANGES
-export const VERSION = '5.2.2';
+export const VERSION = '5.2.3';
 const CHANGES = [
+  ['5.2.3', '02.11.2026', [
+    '👥 Партньорът отново се вижда: старият вход от предишния сървър се изчиства — влез в профила си отново',
+  ]],
   ['5.2.2', '02.11.2026', [
     '⛪ Саграда Фамилия нощем: топло златисто, по празниците — синьо и червено',
   ]],

@@ -6,6 +6,8 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 const URL_ = 'https://imperia-db.temidasoft.com';   // TemidaBase (02.11.2026; беше Supabase Cloud lpzjscttqieqnqozscpk)
 const KEY = 'sb_publishable_5rqOuEHce2mAPQx25XEDZD_jFLiRNnB';   // публичен ключ — таблиците на онлайн режима са недостъпни, само ol_* функциите
+// сесия от стария сървър (Supabase Cloud, до 02.11.2026): токенът е подписан там — новият сървър го отхвърля (партньорът „изчезваше“). Махаме я → вход наново.
+try { const j = JSON.parse(localStorage.getItem('stroi-auth') || 'null'), t = j && (j.access_token || (j.currentSession && j.currentSession.access_token)); if (t) { const p = JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); if (p.iss && !String(p.iss).startsWith(URL_)) localStorage.removeItem('stroi-auth'); } } catch (e) { }
 export const sb = createClient(URL_, KEY, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'stroi-auth' } });
 
 // ── състояние на връзката: 'ok' | 'retry' | 'offline' ──
