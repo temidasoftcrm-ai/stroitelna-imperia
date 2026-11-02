@@ -9377,6 +9377,26 @@ function railSvg() {
   return h;
 }
 var tendOpen = (() => { try { return !!localStorage.getItem('stroi-tendopen'); } catch { return false; } })();   // „🏛️ Държавни поръчки“ в десния панел — свити по подразбиране
+// 🚆 map-train-cars (потребителят: „иконите на влаковете да завиват — да не са като моливи“, „да ги срежем между вагоните“): картинката отгоре
+// е нарязана по вагоните (px в 600-широката train-top-*.webp, челото — вдясно); всеки вагон стои на свое място по линията (на дъгата зад челото)
+// и е завъртян по посоката там; между вагоните — пролука ~20% от вагон (поне 1 px на екрана)
+const TRAIN_CARS = { express: { h: 61, cars: [[430, 600], [287, 426], [143, 283], [0, 139]] }, pax: { h: 57, cars: [[411, 600], [234, 401], [0, 223]] }, freight: { h: 59, cars: [[404, 600], [308, 397], [199, 293], [99, 187], [0, 93]] } };
+function trainCarsSvg(t, x, y, L, Ht, fwd, on, k) {
+  const kind = trainType(t).express ? 'express' : trainType(t).pax ? 'pax' : 'freight', T = TRAIN_CARS[kind], sg = fwd ? 1 : -1, km0 = t.km || 0;
+  const at = dkm => trainXY({ ...t, km: Math.max(0, Math.min(t.total || 0, km0 + dkm)) });
+  const [xa, ya] = at(sg * 0.5), [xb, yb] = at(-sg * 0.5), perKm = Math.max(1e-6, Math.hypot(xa - xb, ya - yb));   // единици на картата за 1 км (тук)
+  const u = L / 600, avg = T.cars.reduce((a, [p, q]) => a + q - p, 0) / T.cars.length, gap = Math.max(avg * u * 0.2, mapPx ? mapPx(1) : 0);
+  let d = 0, h = `<g${on} style="pointer-events:none;filter:drop-shadow(0 0 ${(1.5 * k).toFixed(1)}px rgba(0,0,0,.6))">`;   // d — от челото назад
+  const front = L / 2;   // челото е на L/2 пред средата (както при цялата картинка)
+  for (const [p, q] of T.cars) {
+    const w = (q - p) * u, c = front - d - w / 2;   // средата на вагона: c напред от позицията на влака
+    const [cx, cy] = at(sg * c / perKm), [fx, fy] = at(sg * (c + w / 2) / perKm), [rx, ry] = at(sg * (c - w / 2) / perKm);
+    const ang = (Math.hypot(fx - rx, fy - ry) > 1e-6 ? Math.atan2(fy - ry, fx - rx) : Math.atan2(ya - yb, xa - xb)) * 180 / Math.PI;
+    h += `<g transform="translate(${cx.toFixed(1)},${cy.toFixed(1)}) rotate(${ang.toFixed(1)})"><svg x="${(-w / 2).toFixed(2)}" y="${(-Ht / 2).toFixed(2)}" width="${w.toFixed(2)}" height="${Ht.toFixed(2)}" viewBox="${p} 0 ${q - p} ${T.h}" preserveAspectRatio="none" overflow="hidden"><image href="assets/ui/train-top-${kind}.webp" width="600" height="${T.h}"/></svg></g>`;
+    d += w + gap;
+  }
+  return h + '</g>';
+}
 function updateMapTrains() {
   const g = document.getElementById('trainLayer'); if (!g || !S) return; if (lodLow()) { g.replaceChildren(); return; }
   const k = (mapEU ? 4 : mapWide ? 1.6 : 1) * mapK(), near = mapNear();
@@ -9387,6 +9407,7 @@ function updateMapTrains() {
       const on = selId() && (t.path || [t.at]).includes(selId()) ? ' class="on"' : '';
       if (!near) { const tt = trainType(t), col = tt.express ? '#e53935' : tt.pax ? '#1e88e5' : '#8d5a2b', l = 9 * k, w2 = 3.6 * k;   // отдалеч — само локомотив (без вагоните)
         return `<g${on} transform="translate(${x},${y}) rotate(${ang.toFixed(1)})" style="pointer-events:none"><rect x="${-l / 2}" y="${-w2 / 2}" width="${l}" height="${w2}" rx="${w2 * 0.35}" fill="${col}" stroke="#fff" stroke-width="${(0.9 * k).toFixed(2)}"/><path d="M${l / 2} ${-w2 / 2}L${l / 2 + w2 * 0.7} 0L${l / 2} ${w2 / 2}Z" fill="${col}"/></g>`; }
+      if (feature('map-train-cars')) return trainCarsSvg(t, x, y, L, Ht, fwd, on, k);   // map-train-cars: вагон по вагон по линията (не „молив“)
       return `<image${on} href="assets/ui/train-top-${trainType(t).express ? 'express' : trainType(t).pax ? 'pax' : 'freight'}.webp" x="${-L / 2}" y="${-Ht / 2}" width="${L}" height="${Ht}" transform="translate(${x},${y}) rotate(${ang.toFixed(1)})" style="pointer-events:none;filter:drop-shadow(0 0 ${(1.5 * k).toFixed(1)}px rgba(0,0,0,.45))"/>`;
     }
     // обърнат хоризонтално, ако се движи на запад
