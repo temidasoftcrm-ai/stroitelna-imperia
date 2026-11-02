@@ -414,7 +414,7 @@ export function createCoop(d) {
   };
 
   // ── партньорът на картата: пръстен в неговия цвят около градовете му, звезда и име при централата ──
-  window.__coopMap = (proj, k, cityById) => {
+  window.__coopMap = (proj, k, cityById, dots = false) => {   // dots (coop-dots, потребителят: „да“): отдалеч — малки плътни сини точки вместо пунктирните пръстени; централата — по-голяма, с бял ръб
     const P = st?.partner?.snap; if (!P || !P.cities) return '';
     let h = '<g class="coop-map" style="pointer-events:none">';
     const segs = d.segs();
@@ -427,7 +427,8 @@ export function createCoop(d) {
     for (const id of P.cities) {
       const c = cityById(id); if (!c) continue;
       const [x, y] = proj(c.lon, c.lat), r = 6 * k, hq = id === P.hq;
-      h += `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${PCOL}" stroke-width="${2.6 * k}" stroke-dasharray="${hq ? '' : `${3 * k} ${2 * k}`}" opacity=".95"/>`;
+      if (dots) h += `<circle cx="${x}" cy="${y}" r="${(hq ? 3.4 : 2) * k}" fill="${PCOL}" stroke="${hq ? '#fff' : 'none'}" stroke-width="${hq ? 1.2 * k : 0}" opacity=".95"/>`;
+      else h += `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${PCOL}" stroke-width="${2.6 * k}" stroke-dasharray="${hq ? '' : `${3 * k} ${2 * k}`}" opacity=".95"/>`;
       if (hq) h += `<text x="${x}" y="${feature('map-clean') ? y + r + 13 * k : y - r - 4 * k}" text-anchor="middle" font-size="${11 * k}" font-weight="800" fill="${PCOL}" stroke="#0008" stroke-width="${2.4 * k}" paint-order="stroke">🤝 ${esc(P.name)}${st.partner.online ? ' 🟢' : ''}</text>`;
     }
     return h + '</g>';

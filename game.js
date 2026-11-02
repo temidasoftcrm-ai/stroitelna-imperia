@@ -5765,7 +5765,7 @@ function keyCitiesMine() { const own = new Set(ownedCities()); return new Set(CO
   h = h.replace('<g class="city lbl', superRouteSvg() + oilMapSvg() + mwMapSvg() + '<g class="city lbl');   // трасетата на супер поръчките — над всички мрежи
   if (lod ? L >= LOD.COUNTRY : !(feature('map-key-only') && (mapEU || mapWorld) && mapZoom() < KEY_ZOOM)) h += resorts.svg(mapCont || null);   // отдалечено — без курортите (излизат при приближаване)   // Фаза 5: курортите — европейските на картата на Европа, африканските на изгледа „Африка“
   h += '<g class="lay-rail"><g id="trainLayer"></g></g><g class="lay-air"><g id="planeLayer"></g></g><g class="lay-sea"><g id="shipLayer"></g></g>';
-  if (window.__coopMap) h += window.__coopMap((lo, la) => proj(lo, la), (mapEU ? 4.5 : mapWide ? 1.6 : 1) * mapK(), id => cityById(id));   // партньорът (coop.js) — в друг цвят
+  if (window.__coopMap) h += window.__coopMap((lo, la) => proj(lo, la), (mapEU ? 4.5 : mapWide ? 1.6 : 1) * mapK(), id => cityById(id), feature('coop-dots') && (mapEU || mapWorld) && mapZoom() < KEY_ZOOM);   /* coop-dots: отдалеч — точки */   // партньорът (coop.js) — в друг цвят
   const rlfOld = svg.querySelector('#rlfG') || rlfKeep;   // релефът не се пресъздава при зуум — иначе картината се декодира наново („мъгла“)
   svg.innerHTML = h;
   { const slot = svg.querySelector('#rlfSlot'); if (slot) { const key = wonD.map(w => w[0]).join(',') + (mapWorld ? 'W' : ''); let g = rlfOld && rlfOld.dataset.key === key ? rlfOld : null;
@@ -5846,7 +5846,7 @@ function corridorSvg(L) {
     road: [...allSegs(), ...ALL_AB].filter(sg => ab.has(sg.id) && vis(sg)),
     air: (S.airRoutes || []).filter(vis), sea: (S.seaRoutes || []).filter(vis) };
   const COL = { rail: '#e0685f', road: '#c62828', air: '#3d8bfd', sea: '#18a999' }, NM = { rail: 'жп линии', road: 'магистрали', air: 'авиолинии', sea: 'морски линии' }, out = {};
-  for (const [kind, ls] of Object.entries(links)) out[kind] = corridors(ls, grp, xy, L === LOD.WORLD ? 10 : 16).map(({ ga, gb, n, a, b }) => {
+  for (const [kind, ls] of Object.entries(links)) out[kind] = corridors(ls, grp, xy, L === LOD.WORLD ? 10 : 16, feature('map-corr-real')).map(({ ga, gb, n, a, b }) => {
     const w = (1.2 + Math.log2(n + 1) * 0.9) * u, dash = kind === 'air' || kind === 'sea' ? ` stroke-dasharray="${4 * u} ${4 * u}"` : '';
     return `<line x1="${a[0].toFixed(0)}" y1="${a[1].toFixed(0)}" x2="${b[0].toFixed(0)}" y2="${b[1].toFixed(0)}" stroke="${COL[kind]}" stroke-width="${w.toFixed(1)}" stroke-linecap="round" opacity="${dash ? ".45" : ".75"}"${dash}><title>${gnm(ga)} ↔ ${gnm(gb)}: ${n} ${NM[kind]}</title></line>`; }).join('');
   return out;
@@ -12540,7 +12540,9 @@ function reliefSvg(won) {
 }
 function saharaSvg(land) {
   if (!mapWorld || (mapCont && mapCont !== 'af')) return '';
-  if (land) { const inner = saharaSvg(null); return `<defs><clipPath id="saharaLand"><path d="${land.join('')}"/></clipPath></defs><g clip-path="url(#saharaLand)">${inner}</g>`; }   // map-no-blobs: изрязана по брега (не стърчи в морето)
+  if (land) { const inner = saharaSvg(null), DES = new Set(['DZA', 'LBY', 'EGY', 'MRT', 'MLI', 'NER', 'TCD', 'SDN', 'ESH', 'TUN', 'MAR']), des = (worldGeo || []).filter(c => DES.has(c.iso)).map(c => countryD.get(c)?.d || '').join(''), dd = 'M' + SAHARA.map(([lo, la]) => proj(lo, la).map(v => v.toFixed(0)).join(',')).join('L') + 'Z';
+    if (des && feature('map-sahara-soft')) return `<defs><clipPath id="saharaLand"><path d="${des}"/></clipPath><filter id="saharaBlur" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="90"/></filter><mask id="saharaSoft" maskUnits="userSpaceOnUse" x="-20000" y="-10000" width="40000" height="25000"><path d="${dd}" fill="#fff" filter="url(#saharaBlur)" transform="translate(0 0)"/></mask></defs><g clip-path="url(#saharaLand)" mask="url(#saharaSoft)">${inner}</g>`;   // map-sahara-soft: само в държавите на пустинята, ръбът — разлят (не правоъгълник)
+    return `<defs><clipPath id="saharaLand"><path d="${land.join('')}"/></clipPath></defs><g clip-path="url(#saharaLand)">${inner}</g>`; }   // map-no-blobs: изрязана по брега (не стърчи в морето)
   const d = 'M' + SAHARA.map(([lo, la]) => proj(lo, la).map(v => v.toFixed(0)).join(',')).join('L') + 'Z', [cx, cy] = proj(8, 24), fs = (mapCont ? 230 : 160) * mapLS();
   return `<defs><pattern id="dunes" width="120" height="60" patternUnits="userSpaceOnUse"><path d="M0 40 Q30 20 60 40 T120 40" fill="none" stroke="#c9a463" stroke-width="5" opacity=".55"/><path d="M-30 15 Q0 0 30 15 T90 15" fill="none" stroke="#c9a463" stroke-width="4" opacity=".4"/></pattern></defs>
     <path d="${d}" fill="#ecd29a" opacity=".75" style="pointer-events:none"/><path d="${d}" fill="url(#dunes)" stroke="#c39a52" stroke-width="6" stroke-dasharray="40 24" style="pointer-events:none"/>
