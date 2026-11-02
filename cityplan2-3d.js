@@ -542,6 +542,9 @@ function seaView(G, D, RR, cut = null, edge = null) {
   romeBridges(G, D);
   // висящите мостове (Босфорския): моделът — дължината по x, центриран; мащабът — от бряг до бряг
   for (const B of D.bigBridges || []) { const proto = (D._models || {})[B.k]; if (!proto) continue; if (!lmNight(proto, B.k)) floodMats(proto, 0xd8e8ff, 0.35);   /* 🌃 lm-night-istanbul: Босфорският — цветните LED (lmnight.js) */   // нощем — осветен (студено бяло, като Босфорския)
+    // bos-visible (потребителят: „1“ — без мъглата и по-тъмна стомана): мостът е на 1,3–1,9 км от обичайната камера, а мъглата свършва на ~420–560 м —
+    // ажурната конструкция (тънки пилони, въжета, решетката на платното) оставаше тънка линия; сега мъглата не го пипа и стоманата е по-тъмна (личи на фона на мараята)
+    if (feature('bos-visible') && !proto.userData.bosVis) { proto.userData.bosVis = 1; proto.traverse(m => { if (!m.isMesh) return; for (const mt of [].concat(m.material)) if (mt && mt.color) { mt.fog = false; mt.color.multiplyScalar(0.72); mt.needsUpdate = true; } }); }
     const o = proto.clone(true); o.userData.extShared = 1; const bb = new THREE.Box3().setFromObject(o), len = Math.hypot(B.b[0] - B.a[0], B.b[1] - B.a[1]), k = len / (bb.max.x - bb.min.x);
     const w = new THREE.Group(); o.scale.setScalar(k); o.position.set(-(bb.min.x + bb.max.x) / 2 * k, -bb.min.y * k - 1.2, -(bb.min.z + bb.max.z) / 2 * k); w.add(o);
     w.position.set((B.a[0] + B.b[0]) / 2, 0, (B.a[1] + B.b[1]) / 2); w.rotation.y = -Math.atan2(B.b[1] - B.a[1], B.b[0] - B.a[0]); w.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); G.add(w); }
