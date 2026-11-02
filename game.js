@@ -154,6 +154,7 @@ import { loadVehModels, carsFor, darkParked, busesFor, ARTIC, schoolBusFor, polV
 import { openGlobe } from './globe.js';
 import { clientName } from './names.js';
 import { createConquest } from './conquest.js';
+import { siteNet } from './sitenet.js';   // 🏗️ site-net: опънатата мрежа по скелето и банерът с логото на фирмата
 import { addVanLogo, vanDoors } from './vanlogo.js';   // 🚐 бусът на бригадата: логото отстрани и вратите на Спринтера (флаг crew-van)
 import { createMapLayers } from './maplayers.js';
 import { applyRoadLook, makeCrosswalks } from './roadlook.js';
@@ -3870,6 +3871,8 @@ function makeOwnSite(p) {
   const inHQ = lot === city.hq, fresh = p.type === 'own_garage_new' || p.type === 'own_wh_new';
   if (NO_OVERLAP && !fresh) setTimeout(ownUpgHide, 0);   // no-overlap: старият склад/гараж — скрит, докато върви площадката (projects вече съдържа p)
   // зоната на строежа в координатите на парцела: [x, z, ширина, дълбочина, височина]
+// 🏗️ site-net (собственикът, 02.11: „скелето предлагам да го направим като в градовете — опънати чаршафи с логото на играча; и след като свърши строежа се махат“) — sitenet.js
+const SITE_NET = feature('site-net'), siteBrand = () => brandOf(S) || { nm: 'Империя', col: '#ffb300', ico: '🏗️' };
   const area = p.own === 'office' ? [-3.6, -3.6, 9, 9, (city.hqGroup?.userData.officeTop || 4) + 1.5]
     : inHQ ? [3.8, -4.3, 8, 7, 5.5] : fresh ? [0, 0, 15.5, 15.5, 6] : [0, -4.2, 16, 8, 7];
   const [ax, az, aw, ad, ah] = area;
@@ -3899,6 +3902,11 @@ function makeOwnSite(p) {
 }
 function updateOwnSite(p) {
   const v = p.vis, k = p.prog;
+function siteBoxOf(obj, g) {   // 🏗️ site-net: кутията на обекта в координатите на площадката g (по върховете на кутиите на мешовете — без раздуването при завъртян парцел)
+  g.updateMatrixWorld(true); obj.updateMatrixWorld(true); const inv = g.matrixWorld.clone().invert(), M = new THREE.Matrix4(), bb = new THREE.Box3(), t = new THREE.Box3();
+  obj.traverse(o => { if (!o.isMesh || !o.visible || !o.geometry) return; if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); bb.union(t.copy(o.geometry.boundingBox).applyMatrix4(M.multiplyMatrices(inv, o.matrixWorld))); });
+  return bb.isEmpty() ? null : bb;
+}
   if (!v.dirt) return;
   v.mound.visible = p.stage <= 1;
   if (p.stage === 0) { v.mound.scale.set(1, 0.2 + k * 3, 1); v.mound.position.y = (0.2 + k * 3) / 2; }
@@ -3909,6 +3917,7 @@ function updateOwnSite(p) {
   if (p.stage >= 2) { v.preview.scale.y = Math.max(0.02, k); v.preview.position.y = 0.3; }
 }
 // събаряне: скеле, кран с топка, сградата пада на части; техниката чака, докато свърши
+  if (SITE_NET && p.own === 'office' && city.officeModel && city.officeModel.parent) { const ob = siteBoxOf(city.officeModel, g); if (ob) { const w = Math.max(9, ob.max.x - ob.min.x + 1.2), d = Math.max(9, ob.max.z - ob.min.z + 1.2); area.splice(0, 5, (ob.min.x + ob.max.x) / 2, (ob.min.z + ob.max.z) / 2, w, d, Math.max(area[4], ob.max.y + 1.5)); } }   // 🏗️ site-net: скелето (и мрежата) — по истинската кутия на офиса, а не 9 × 9 (кулата на ниво 5+ стърчеше)
 function makeDemoSite(p) {
   const lot = city.lots[p.lot], g = new THREE.Group();
   g.position.set(lot.x, 0, lot.z); g.rotation.y = lotRot(lot); g.scale.setScalar(lotK(lot));
@@ -3925,6 +3934,7 @@ function finishDemo(p) {
   makeSite(p);
   refreshEstateSigns();
   toast(`🧱 Старата сграда е съборена. Започва строежът на „${p.title}“.`, 'good');
+  if (SITE_NET) v.scaffold.add(siteNet({ x: ax, z: az, w: 2 * W, d: 2 * D, y0: 0, h: ah, brand: siteBrand() }));   // 🏗️ site-net: дете на скелето — появява се и се маха с него
   dispatch();
   save();
 }
@@ -4019,6 +4029,7 @@ function makeTowerCrane(h) {
 }
 function updateSite(p, t) {
   if (p.vis && p.vis.demoOnly) { const v = p.vis, dt = v.t == null ? 0 : Math.min(0.2, Math.max(0, t - v.t)); v.t = t; v.demo.update(p.demo.prog, dt, camera.position.distanceTo(v.g.position) < 260); return; }
+  if (SITE_NET && v.H > 6) v.scaffold.add(siteNet({ w: 2 * W, d: 2 * W, y0: 0.6, h: H, brand: siteBrand(), clip: v.scaffClip }));   // 🏗️ site-net: расте и се маха със скелето (същата равнина); ниските къщи — без мрежа
   const v = p.vis; if (!v) return;
   if (v.own) return updateOwnSite(p);
   if (v.reno || !v.building) return;   // площадката не е довършена (makeSite е гръмнал) — без грешка на всеки кадър
@@ -14780,6 +14791,10 @@ if (AUTOTEST) {
     time(h) { const f = (((h - 6) / 24) % 1 + 1) % 1 * CYCLE_DAYS; S.day = 1 + Math.floor(f); S.dayT = (f % 1) * DAY_SEC; setSpeed(0); try { renderTop(); } catch { } },   // часовникът горе — веднага (на пауза не се обновяваше: демата в Лабораторията показваха 13:00 нощем)
     level(n, gn = n) { S.officeLevel = n; S.garageLevel = gn; buildHQ(); for (const u of units) if (!u.proj) releaseUnit(u); },
     upgrade: k => startUpgrade(k),
+    netDemo(lv = 5, d = 1) {   // 🏗️ site-net: надстройка на офиса от ниво lv (собствена площадка със скелето — като на снимката 5 → 6); камерата — към офиса отпред
+      econ.earn(5e8, 'друго', 'тест'); if (!projects.some(q => q.own === 'office')) { S.officeLevel = lv; buildHQ(); } startUpgrade('office'); const p = projects.find(q => q.own === 'office');
+      const l = city.hq; showMap(false); $('panel').classList.add('hidden'); this.time(13); const r = lotRot(l), c = Math.cos(r), sn = Math.sin(r), k = lotK(l), fx = sn, fz = c;   /* +z на парцела — към улицата */
+      controls.target.set(l.x - 3.6 * k, 8 * k, l.z - 3.6 * k); camera.position.set(l.x + fx * 34 * k * d + c * 10 * k, 22 * k * d, l.z + fz * 34 * k * d - sn * 10 * k); controls.update(); fly = null; return !!p; },
     pick: id => pickLot(city.lots[id == null ? city.lots.find(l => !l.built && !l.busy).id : id]),
     buy: (m, q) => { buyForStock(m, q); refreshWarehouse(); return econ.stock(m); },
     tab(t) { tab = t; renderPanel(); },
