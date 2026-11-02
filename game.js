@@ -5665,8 +5665,8 @@ function drawMap() {
     if (emp) bordD.push(d);
     h += `<path class="country ${c.iso === 'BGR' ? 'bg' : ''} ${wonIso.has(c.iso) ? 'won' : partIso.has(c.iso) && c.iso !== 'BGR' ? 'part' : ''} ${mapCont && CONT_ISO[mapCont] && !CONT_ISO[mapCont].has(c.iso) ? 'dim' : ''} ${emp && emp.has(c.iso) ? (emp.get(c.iso) ? 'empty ice' : 'empty') : ''} ${lod && mapIso === c.iso ? 'selc' : ''}" data-iso="${c.iso}" d="${d}" fill-rule="evenodd"${wonByIso && wonIso.has(c.iso) ? coopPathEnd(wonByIso.get(c.iso)) : '/>'}`;
   }
-  if (emp && worldGeo && worldGeo.length) h += wildSvg(wonIso) + `<path d="${bordD.join('')}" fill="none" stroke="#a99e86" stroke-width=".8" vector-effect="non-scaling-stroke" style="pointer-events:none"/>`;
-  h += saharaSvg();
+  if (emp && worldGeo && worldGeo.length) h += (feature('map-no-blobs') ? '' : wildSvg(wonIso))   /* map-no-blobs (потребителят: „да оправим нещата с тея балончета“): без „дивото“ — то покриваше държавите и оставяше кръгли дупки (600 км) около градовете, затова и избраната държава светеше на балончета */ + `<path d="${bordD.join('')}" fill="none" stroke="#a99e86" stroke-width=".8" vector-effect="non-scaling-stroke" style="pointer-events:none"/>`;
+  h += saharaSvg(feature('map-no-blobs') && worldGeo && worldGeo.length ? bordD.length ? bordD : worldGeo.map(c => countryD.get(c)?.d || '') : null);   // map-no-blobs: Сахара — само по сушата
   if (wonD.length && !(mapCont && mapCont !== 'eu')) h += '<g id="rlfSlot"></g>';
   // ключовите градове на държавите, където имаш град — винаги на картата (и малките, напр. В. Търново), за да се вижда какво остава до 🇧🇬 6/6
 // златен пръстен на картата: ключовите градове на държавите (за завладяване) и столиците/големите
@@ -12469,8 +12469,9 @@ function reliefSvg(won) {
   h += won.map(([, d]) => `<path d="${d}" fill="none" stroke="#c99a00" stroke-width="${mapWorld ? 3.6 : 2.4}" fill-rule="evenodd"/>`).join('');   // златната граница остава
   return h + '</g>';
 }
-function saharaSvg() {
+function saharaSvg(land) {
   if (!mapWorld || (mapCont && mapCont !== 'af')) return '';
+  if (land) { const inner = saharaSvg(null); return `<defs><clipPath id="saharaLand"><path d="${land.join('')}"/></clipPath></defs><g clip-path="url(#saharaLand)">${inner}</g>`; }   // map-no-blobs: изрязана по брега (не стърчи в морето)
   const d = 'M' + SAHARA.map(([lo, la]) => proj(lo, la).map(v => v.toFixed(0)).join(',')).join('L') + 'Z', [cx, cy] = proj(8, 24), fs = (mapCont ? 230 : 160) * mapLS();
   return `<defs><pattern id="dunes" width="120" height="60" patternUnits="userSpaceOnUse"><path d="M0 40 Q30 20 60 40 T120 40" fill="none" stroke="#c9a463" stroke-width="5" opacity=".55"/><path d="M-30 15 Q0 0 30 15 T90 15" fill="none" stroke="#c9a463" stroke-width="4" opacity=".4"/></pattern></defs>
     <path d="${d}" fill="#ecd29a" opacity=".75" style="pointer-events:none"/><path d="${d}" fill="url(#dunes)" stroke="#c39a52" stroke-width="6" stroke-dasharray="40 24" style="pointer-events:none"/>
