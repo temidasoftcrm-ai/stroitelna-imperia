@@ -591,6 +591,7 @@ const DEMOS = [
   ['🚓 Без Police Interceptor от Need for Speed (pol-no-nfs): полицейските коли на Ню Йорк в редица — Charger, Crown Victoria, NYPD (денем, после нощем с бурканите); сравнение: ?off=pol-no-nfs', 'newyork', d => { setTimeout(() => d.polLook(false), 4000); setTimeout(() => d.polLook(true), 10000); }],   // pol-no-nfs
   ['🚓 Новите американски патрулки (pol-suburban, pol-belasco, pol-grille): черният джип и белият седан в редицата на Ню Йорк — денем, после нощем със сирените: фаровете мигат на смени, стробоскопите в решетката, стоповете, мигачите отстрани', 'newyork', d => { setTimeout(() => d.polLook(false), 4000); setTimeout(() => d.polLook(true), 10000); }],   // pol-suburban / pol-belasco / pol-grille
   ['🚓 Без Crown Victoria и мигачите отстрани на NYPD (pol-no-crownvic, pol-side-fix): Ню Йорк нощем със сирените — в редицата няма Crown Victoria, NYPD Charger мига отстрани като другите; сравнение: ?off=pol-no-crownvic,pol-side-fix', 'newyork', d => { setTimeout(() => d.polLook(true), 5000); }],   // pol-no-crownvic / pol-side-fix
+  ['🏰 Кремъл (kr-tex-keep): дворецът и Спаската кула вече не са черни — денем, после нощем с осветлението', 'moscow', d => setTimeout(() => { d.time(13); d.camAt(1016, 121, 1140, 826, 5, 950); setTimeout(() => d.time(22), 7000); }, 2500)],
 ];
 const PAGES = [['index.html', 'Играта от началото (отделен запис на :3610)'], ['online.html', 'Онлайн империя'], ['lab/coop-log.html', '🤝 Дневник на партньорството — чеклист за истински акаунти и извикванията към сървъра']];
 

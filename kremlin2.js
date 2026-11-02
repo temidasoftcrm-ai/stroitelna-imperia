@@ -6,6 +6,7 @@
 // Моделите (assets/heavy/lm): kremlin-parts.glb (kr_vodo, kr_palace, kr_tower, kr_church, kr_house), kremlin-spasskaya.glb (kr_spass),
 // kremlin-wall.glb (kr_wall, kr_firs); lm-kremlin3 — kremlin-inner.glb (kr_senate, kr_ivan, kr_uspensky, kr_archangel, kr_annunc — от Blender). Смяна на стената: KR_WALL (името на възела) и KR_SEG (дължината на сегмента, м).
 import * as THREE from 'three';
+import { feature } from './lab/feature.js';   // kr-tex-keep
 import { lmNightInst } from './lmnight.js';   // 🌃 lm-night-moscow: стената, кулите, дворецът и катедралите — топлото осветяване (до flood — тогава flood ги прескача)
 
 export const KR_WALL = 'kr_wall', KR_FIRS = 'kr_firs', KR_SEG = 46.44;   // сегментът от Meshy: 46,4 × 4,7 × 16 м (лицето навън = +z)
@@ -59,6 +60,9 @@ export function kremlinLayout(D, sizes = {}) {
 // сглобяването: G — групата на изгледа; KM = { parts, spass, wall } (сцените от GLTFLoader); flood(obj, col, k) — floodMats от cityplan2-3d.js
 export function kremlinEnsemble(G, D, KM, flood) {
   const nodes = {}; for (const sc of [KM.parts, KM.spass, KM.wall, KM.inner]) if (sc) { sc.updateMatrixWorld(true); sc.traverse(o => { if (/^kr_/.test(o.name || '') && !nodes[o.name]) nodes[o.name] = o; }); }
+  // 🧠 kr-tex-keep (потребителят, 02.11: „давай кремъл“): дворецът и Спаската бяха черни (и денем) — mem-lazy-img пускаше картинките им преди
+  // инстанциите да ги качат, а обратното декодиране не стигаше до тях. Картинките на частите на Кремъл остават в паметта.
+  if (feature('kr-tex-keep')) for (const sc of [KM.parts, KM.spass, KM.wall, KM.inner]) if (sc) sc.traverse(o => { if (o.isMesh) for (const m of [].concat(o.material)) for (const k in m) { const t = m && m[k]; if (t && t.isTexture && t.source) t.source.__keep = 1; } });
   const part = nm => { const o = nodes[nm]; if (!o) return null; const L = []; o.traverse(m => { if (m.isMesh) L.push({ geo: m.geometry, mat: m.material, mw: m.matrixWorld.clone() }); }); return L; };
   const sizes = {}, bb = new THREE.Box3(), v = new THREE.Vector3(); for (const nm in nodes) { bb.setFromObject(nodes[nm]).getSize(v); sizes[nm] = { w: Math.max(v.x, v.z), h: v.y }; }
   const LY = kremlinLayout(D, sizes), K = LY.K, grp = new THREE.Group(); grp.name = 'kremlin2';

@@ -183,7 +183,7 @@ let decN = 0; const decW = []; const decQ = f => new Promise((res, rej) => { con
 let ph4 = null; const PH4 = () => ph4 || (ph4 = (() => { const c = document.createElement('canvas'); c.width = c.height = 4; const g = c.getContext('2d'); g.fillStyle = '#8a8a8a'; g.fillRect(0, 0, 4, 4); return c; })());
 if (LAZY && CIB) setInterval(() => { if (document.hidden) return; const now = performance.now(); let k = 0;
   for (let i = lazyAll.length - 1; i >= 0 && k < 80; i--) { const t = lazyAll[i].deref(); if (!t || t.__gone) { lazyAll.splice(i, 1); continue; } const src = t.source, st = src.__free; if (!st || st.rel || st.blob || st.dec) { if (st && (st.rel || st.blob)) lazyAll.splice(i, 1); continue; }
-    if (now - (src.__born || now) < 30000) continue; const im = st.peek(); if (!im || !(im.width > 0)) continue;
+    if (src.__keep || now - (src.__born || now) < 30000) continue;   /* __keep — моделът го пази (kr-tex-keep: Кремъл) */ const im = st.peek(); if (!im || !(im.width > 0)) continue;
     if (R && R.properties.get(src).__version === src.version) continue;   // качена — пуска я tex-free
     const w = im.width, h = im.height;
     if (typeof ImageBitmap !== 'undefined' && im instanceof ImageBitmap) { const b = BLOB.get(im); if (b) { st.evict(b, w, h); lazyAll.splice(i, 1); k++; } }
