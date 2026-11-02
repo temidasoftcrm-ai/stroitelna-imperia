@@ -155,7 +155,8 @@ export function createBikes(deps) {
     const pos = [], idx = []; let n = 0;
     // улица, която минава през кръгово, без да е свързана с него — без червено върху пръстена и острова
     for (const ln of N.lanes) { const sgn = N.P.drive === 'L' ? -1 : 1;
-      for (let s = ln.s0; s < ln.s1; s += 4) { const s2 = Math.min(ln.s1, s + 4), [mx, mz] = at(ln, (s + s2) / 2); if (N.P.rounds.some(Ro => Math.hypot(mx - Ro.x, mz - Ro.z) < Ro.outer + 1)) continue; for (const ss of [s, s2]) { const [x, z, h] = at(ln, ss), nx = -Math.cos(h) * sgn, nz = Math.sin(h) * sgn;   // навън към бордюра (линията е изместена по (−dz, dx))
+      const hi = feature('bos-wide') && ln.rd.osmBridge ? (ln.rd.bridge || []).filter(([a, b]) => b - a > 300) : [];   // bos-wide: над Босфора пътят е на платното на моста (~30 м горе) — ивицата долу по водата изглеждаше като път до моста
+      for (let s = ln.s0; s < ln.s1; s += 4) { if (hi.some(([a, b]) => s > a && s < b)) continue; const s2 = Math.min(ln.s1, s + 4), [mx, mz] = at(ln, (s + s2) / 2); if (N.P.rounds.some(Ro => Math.hypot(mx - Ro.x, mz - Ro.z) < Ro.outer + 1)) continue; for (const ss of [s, s2]) { const [x, z, h] = at(ln, ss), nx = -Math.cos(h) * sgn, nz = Math.sin(h) * sgn;   // навън към бордюра (линията е изместена по (−dz, dx))
           pos.push(x + N.ox - nx * 0.45, 0.07, z + N.oz - nz * 0.45, x + N.ox + nx * 0.45, 0.07, z + N.oz + nz * 0.45); }
         idx.push(n, n + 1, n + 2, n + 1, n + 3, n + 2); n += 4; } }
     // червен пръстен по външния ръб на кръговите, до които стигат алеи
