@@ -716,7 +716,7 @@ let europe = null;
   // истински храсти, цветя и фонтан (assets/heavy/plants, нормализирани: най-широката страна 1, основа 0) — зад feature('plants-real')
   if (feature('tokyo-look') || feature('dubai-look') || feature('sg-look')) for (const n of ['jp-narrow', 'jp-trad', 'jp-modern', 'jp-home1', 'jp-home2', 'jp-home3', 'jp-neon']) jobs.push(load(`assets/heavy/asia/${n}.glb`).then(g => { g.scene.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => {}));   // 🇯🇵 tokyo-look
   if (VILLA) jobs.push(load('assets/heavy/houses/dream-villa.glb').then(g => { g.scene.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; for (const m of [].concat(o.material)) if (m) { m.metalness = 0; m.roughness = Math.max(m.roughness ?? 1, 0.8); } } }); A['dream-villa'] = g; const reg = () => { try { sizeOf('dream-villa'); g.scene.traverse(o => { if (o.isMesh) for (const m of [].concat(o.material)) if (m && m.emissiveMap && !m.userData.vlNight) { m.emissive.setRGB(1, 0.62, 0.3); m.emissiveIntensity = 0; m.userData.winK = 3.5; m.userData.vlNight = 1; villaWinWide(m); dayNight.winMats.add(m); } }); villaGlow(g.scene); } catch { setTimeout(reg, 400); } }; reg(); })   /* зарежда се преди dayNight (TDZ) — прозорците и лампите се записват, щом той е готов */.catch(e => console.warn('luxury-villa', e)));   /* размерът — само на къщата (без лампите в градината) */   /* нощем — изпечените прозорци (като тухлените на Ню Йорк) */   // 🏡 luxury-villa: вилата на собственика (Meshy, Темидасофт)
-  for (const n of H2) jobs.push(load(`assets/heavy/${MH.has(n) ? 'houses3' : 'houses2'}/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; if (MH.has(n)) { if (MH_READY) mhNight(g.scene); else MH_PENDING.push(g.scene); } else prepNightFloors(g.scene, n); }).catch(() => { const i = H2.indexOf(n); if (i >= 0) H2.splice(i, 1); }));   // не се зареди → не се строи
+  for (const n of H2) jobs.push(load(`assets/heavy/${MH.has(n) ? 'houses3' : 'houses2'}/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; if (MH.has(n)) { g.scene.userData.mhName = n; if (MH_READY) mhNight(g.scene); else MH_PENDING.push(g.scene); } else prepNightFloors(g.scene, n); }).catch(() => { const i = H2.indexOf(n); if (i >= 0) H2.splice(i, 1); }));   // не се зареди → не се строи
   if (feature('hw-gantry')) jobs.push(load('assets/heavy/highway/hw-gantry.glb').then(g => { A['hw-gantry'] = g; }).catch(() => {}));   // 🛣️ порталът с табелите
   if (feature('office-levels2')) for (const L of OFFICE2) jobs.push(load(L.url).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[`office2-l${L.lv}`] = g; prepNightFloors(g.scene, `office2-l${L.lv}`); if (!L.tower) blkSections(`office2-l${L.lv}`); }).catch(() => {}));   // 🆕 новите нива на офиса
   for (const n of GAS_KINDS) jobs.push(load(`assets/heavy/gas/${n}.glb`).then(g => { g.scene.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); A[n] = g; prepNightFloors(g.scene, n); }).catch(() => {}));   // бензиностанции (всяка — свое „✓ OK“); нощем — навесът и магазинът (nightfloors 'gas')
@@ -1442,11 +1442,26 @@ function realH(n) {
 const shopPool = () => { const p = feature('real-scale') ? SHOPS.filter(n => !TOO_LONG.has(n)) : SHOPS; const c = cafeFor(S && S.cityId); return [...(c ? [...p, c, c] : p), ...shopsMeshy(S && S.cityId)]; };   // ☕ shop-cafe: кафенето — и в поръчките за магазин (×2 — по-често)
 // ☕ shop-cafe: нощем при старата сграда светят само витрините и прозорците долу — тъмните пиксели по стените (не покрива), до 42 % от височината, топло
 // houses-meshy: нощем — прозорците (тъмното по стените под стряхата) светят топло; лампите (lamp_*) — също; lamp_pool — петното светлина пред входа
+// 🏠 house-night2 (собственикът, 02.11: „да погледнем този модел — да го осветим по-хубаво“; прегледът в Blender — scratchpad house/night.py):
+// mhNight палеше всяко тъмно място по стените — тъмните стени (плочите на sf-terrace-be, камъкът, бръшлянът) светеха целите като абажур.
+// Сега — само прозорците: rects — правоъгълниците на прозорците в текстурата (UV, отгоре) и в тях тъмното (стъклото, без рамките); mats — материалите на прозорците
+// (тъмното в тях); solid — стъклото, цялото; останалото — тъмно. hmin — от каква височина (кофите пред medorange). Без запис тук — както преди.
+const MH_WIN = feature('house-night2') ? {
+  'sf-terrace-be': { rects: [[0.02, 0.02, 0.105, 0.28], [0.24, 0.085, 0.345, 0.28], [0.015, 0.355, 0.115, 0.53], [0.245, 0.355, 0.345, 0.53], [0.44, 0.21, 0.5, 0.32], [0.42, 0.355, 0.515, 0.45], [0.42, 0, 0.53, 0.1]] },
+  'sf-terrace-fr': { rects: [[0.83, 0.36, 0.98, 0.43], [0.32, 0.42, 0.55, 0.51]] },
+  'sf-revival': { rects: [[0.16, 0.17, 0.29, 0.31]], rmat: /#29/ },
+  'sf-euhouse': { mats: /WindowsAndDoors/ }, 'sf-rural1': { mats: /^Material\.0(01|06|08|09|10|11|12)$/ }, 'sf-medorange': { mats: /^(pretos|azul)$/, hmin: 0.12 },
+  'sf-villa': { solid: /^03_-_Default$/ }, 'sf-rural2': { porch: 1 },   // rural2 — фото-атлас без видими прозорци: лампата на входа (+z) и мекото ѝ петно по стената
+} : {};
 function mhNight(root) {
+  const W = MH_WIN[root.userData.mhName];
   root.traverse(o => { if (!o.isMesh) return;
     if (o.name.startsWith('lamp_pool')) { o.material = dayNight.poolMat; o.renderOrder = 2; o.castShadow = o.receiveShadow = false; return; }
     if (o.name.startsWith('lamp_')) { const m = o.material = o.material.clone(); if (/glow/.test(m.name) || o.name.includes('door') || o.name.includes('garden')) { m.emissive = new THREE.Color(0xffd08a); m.emissiveIntensity = 0; m.userData.winK = 3; dayNight.winMats.add(m); } o.castShadow = false; return; }
-    const g = o.geometry; g.computeBoundingBox(); const y0 = g.boundingBox.min.y, H = g.boundingBox.max.y - y0, mt = o.material = o.material.clone();
+    const g = o.geometry; g.computeBoundingBox(); const y0 = g.boundingBox.min.y, H = g.boundingBox.max.y - y0;
+    if (W) { const P = W.porch ? mhPorch(o, g.boundingBox, H) : null;   // house-night2: по материал
+      o.material = Array.isArray(o.material) ? o.material.map(m => mhWin(m, W, y0, H, P)) : mhWin(o.material, W, y0, H, P); return; }
+    const mt = o.material = o.material.clone();
     mt.emissive = new THREE.Color(0xffc070); mt.emissiveMap = mt.map; mt.emissiveIntensity = 0; mt.userData.winK = 1.1;
     mt.onBeforeCompile = sh => { sh.uniforms.uMhY0 = { value: y0 }; sh.uniforms.uMhH = { value: H };
       sh.vertexShader = 'varying vec3 vMhP; varying vec3 vMhN;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vMhP = position; vMhN = normal;');
@@ -1455,6 +1470,28 @@ function mhNight(root) {
           float m = step(abs(normalize(vMhN).y), 0.4) * step(hy, 0.62) * step(0.06, hy) * (1.0 - smoothstep(0.1, 0.2, lum));
           totalEmissiveRadiance = vec3(1.0, 0.66, 0.32) * m * ek; }`); };
     mt.customProgramCacheKey = () => 'mh-night'; dayNight.winMats.add(mt); });
+}
+// house-night2: един материал → нощният му вид по MH_WIN (без прозорци — непроменен, тъмен нощем)
+// лампата на входа (porch): крушка на 42 % от височината, в средата на лицето към +z (входът на houses3); → [точката, радиус] в координатите на геометрията
+function mhPorch(o, bb, H) { const p = new THREE.Vector3((bb.min.x + bb.max.x) / 2, bb.min.y + 0.42 * H, bb.max.z), r = 0.035 * H;
+  const lm = new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0xffd08a, emissiveIntensity: 0 }); lm.userData.winK = 3; dayNight.winMats.add(lm);
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), lm); bulb.position.copy(p).add(new THREE.Vector3(0, 0, r * 1.2)); bulb.castShadow = false; bulb.name = 'lamp_porch'; o.add(bulb);
+  return [p, 0.75 * H]; }
+function mhWin(m0, W, y0, H, P = null) {
+  const nm = m0.name || '', solid = W.solid && W.solid.test(nm), R = W.rects && (!W.rmat || W.rmat.test(nm)) && m0.map ? W.rects.slice(0, 8) : null, dark = W.mats && W.mats.test(nm) && m0.map;
+  if (!solid && !R && !dark && !P) return m0;
+  const win = solid || R || dark, mt = m0.clone(); mt.emissive = new THREE.Color(0xffc070); mt.emissiveMap = solid || !win ? null : mt.map; mt.emissiveIntensity = 0; mt.userData.winK = 1.1;
+  const RV = (R || []).map(r => new THREE.Vector4(...r)); while (RV.length < 8) RV.push(new THREE.Vector4(2, 2, 2, 2));
+  mt.onBeforeCompile = sh => { Object.assign(sh.uniforms, { uMhY0: { value: y0 }, uMhH: { value: H }, uMhR: { value: RV }, uMhLo: { value: W.hmin ?? 0.06 }, uMhP: { value: P ? P[0] : new THREE.Vector3(0, -1e5, 0) }, uMhPr: { value: P ? P[1] : 1 } });
+    sh.vertexShader = 'varying vec3 vMhP; varying vec3 vMhN;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vMhP = position; vMhN = normal;');
+    sh.fragmentShader = 'varying vec3 vMhP; varying vec3 vMhN; uniform float uMhY0, uMhH, uMhLo, uMhPr; uniform vec4 uMhR[8]; uniform vec3 uMhP;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      { float ek = max(0.0001, dot(emissive, vec3(0.333))), hy = (vMhP.y - uMhY0) / uMhH;
+        float m = ${win ? 'step(abs(normalize(vMhN).y), 0.4) * step(hy, 0.62) * step(uMhLo, hy)' : '0.0'};
+        ${solid || !win ? '' : `float lum = dot(totalEmissiveRadiance, vec3(0.333)) / ek; m *= 1.0 - smoothstep(0.1, 0.2, lum);`}
+        ${R ? `float inR = 0.0; for (int i = 0; i < 8; i++) { vec4 r = uMhR[i]; inR = max(inR, step(r.x, vEmissiveMapUv.x) * step(vEmissiveMapUv.x, r.z) * step(r.y, vEmissiveMapUv.y) * step(vEmissiveMapUv.y, r.w)); } m *= inR;` : ''}
+        float pw = 1.0 - smoothstep(0.0, uMhPr, distance(vMhP, uMhP));   /* porch: мекото петно от лампата на входа */
+        totalEmissiveRadiance = vec3(1.0, 0.66, 0.32) * m * ek + vec3(1.0, 0.72, 0.42) * pw * pw * 0.45 * ek; }`); };
+  mt.customProgramCacheKey = () => 'mh-night2' + (solid ? 's' : R ? 'r' : dark ? 'd' : 'p'); dayNight.winMats.add(mt); return mt;
 }
 function cafeNight(root) {
   root.traverse(o => { if (!o.isMesh) return; const g = o.geometry; g.computeBoundingBox(); const y0 = g.boundingBox.min.y, H = g.boundingBox.max.y - y0, mt = o.material = o.material.clone();
