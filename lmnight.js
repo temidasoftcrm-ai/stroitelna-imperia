@@ -2,6 +2,7 @@
 // Без изпечена карта: светлината се смята в шейдъра от мястото в модела (q — 0…1 по кутията на модела, y — нагоре) и яркостта на текстурата (lum),
 // по същата формула като прегледа в Blender (vertex color 'night'). Нощем: emissiveIntensity = нощта × nfK (daynight.js през NF_MATS); фасадата тъмнее.
 //   lm-night-istanbul: Босфорският мост; lm-night-rome: Колизеумът; lm-night-sofia: Александър Невски; lm-night-sf: Голдън Гейт; lm-night-london: Уестминстър с Биг Бен (циферблатите), Лондонското око.
+//   lm-night-barcelona: Саграда Фамилия — топло златисто, на празник синьо и червено по фасадите.
 //   lm-night-rock: 30 Rock — хладно бяло отдолу нагоре, светли ребра, разпръснати топли прозорци.
 //   lm-night-toronto: CN Tower — стволът в сменящ се цвят на LED прожекторите, прозорците на шайбата — топло бели.
 //   lm-night-tokyo: Токийската кула — наситено оранжева решетка (Landmark Light), двете обсерватории — бели пояси, антената — бяла;
@@ -109,6 +110,16 @@ const CFG = {
   // наситеното синьо/зелено (куполите) остава в своя цвят; Спаската (glass = 1) — светлите циферблати и от четирите страни
   stbasil: { flag: 'lm-night-moscow', nfK: 1.0, glsl: MOSCOW },
   kremlin: { flag: 'lm-night-moscow', nfK: 1.0, cls: (m, o) => o === 'kr_spass' ? 1 : 0, glsl: MOSCOW },
+  // lm-night-barcelona: Саграда Фамилия (собственикът, 02.11 — снимката sagrada-61; прегледът в Blender — scratchpad sag/night.py): обикновено — топло златисто от прожекторите,
+  // вдлъбнатините тъмни, кулите нагоре по-ярки, кръстът на централната кула — светъл; празник (holidayNow, както Лондонското око) — фасадите отдолу в синьо (средата) и червено (вдясно),
+  // с меки преходи, нагоре минават в златисто. Вместо nightfloors 'floodUp' (night-sagrada): lmNight връща модела преди prepNightFloors
+  sagrada: { flag: 'lm-night-barcelona', nfK: 1.0, glsl: `
+    float h = q.y, kc = 0.05 + 2.2 * lum * lum, low = (1.0 - smoothstep(0.55, 0.75, h)) * hol;
+    vec3 c = vec3(1.0, 0.58, 0.18) * (0.03 + 2.4 * lum * lum) * (0.65 + 0.9 * h);
+    float bw = smoothstep(0.3, 0.42, q.x) * (1.0 - smoothstep(0.58, 0.7, q.x)), rw = smoothstep(0.62, 0.76, q.x);
+    c = mix(c, vec3(0.1, 0.28, 1.0) * kc, low * bw * 0.9);
+    c = mix(c, vec3(1.0, 0.14, 0.1) * kc, low * rw * 0.9);
+    if (h > 0.93) c = vec3(1.8, 1.65, 1.35);` },
 };
 export const lmNightKinds = () => Object.keys(CFG).filter(k => feature(CFG[k].flag));
 // → броят на материалите (0 — няма настройка за този вид или флагът е изключен)
