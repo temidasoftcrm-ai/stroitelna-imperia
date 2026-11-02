@@ -6424,7 +6424,8 @@ function showMap(on) {
   }
 }
 let rlfKeep = null;
-$('btnSound').onclick = () => { Sound.init(); $('btnSound').textContent = Sound.toggle() ? '🔇' : '🔊'; };
+$('btnSound').onclick = () => { Sound.init(); const m = Sound.toggle(); $('btnSound').textContent = m ? '🔇' : '🔊'; try { localStorage.setItem('stroi-mute', m ? '1' : '0'); } catch { } };
+try { if (localStorage.getItem('stroi-mute') === '1') { Sound.setMuted(true); $('btnSound').textContent = '🔇'; } } catch { }   // ⚙️ „Звук: изключен“ — остава и след презареждане (преди се връщаше на включен)
 $('quickBuy').onclick = () => { buyForProjects(); refreshWarehouse(); save(); renderPanel(); Sound.play('buy'); };
 $('buyPop').onclick = () => { $('buyPop').classList.add('out'); setTimeout(() => $('buyPop').classList.add('hidden'), 500); };
 { const c = () => { const r = $('mapSvg').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };

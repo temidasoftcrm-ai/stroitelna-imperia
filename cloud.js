@@ -852,7 +852,8 @@ function openSettings(h) {
   el.firstElementChild.style.maxHeight = '92vh'; el.firstElementChild.style.overflow = 'auto';
   const on = (id, f) => { const b = el.querySelector('#' + id); if (b) b.onclick = () => { el.remove(); f(); }; };
   { const x = el.querySelector('#stX'); if (x) x.onclick = () => el.remove(); }   // ✕ горе — без да скролваш до „Затвори“
-  on('stIn', () => GC ? regGate() : loginEmail()); on('stUp', guestUpgrade); on('stHave', guestLogin); on('stNewAcc', regGate);   // 👤 guest-cloud: „🔑 Влез / 🆕 Създай акаунт“ — същият екран, при поискване on('stPw', changePw); on('stCloud', openCloud); on('stCred', () => hooks.credits()); on('stRen', () => hooks.rename()); on('stSaves', () => hooks.saves()); on('stNew', () => hooks.newGame()); on('stCons', () => window.consent?.open()); on('stAdsCons', () => window.consent?.adsOpen());
+  on('stIn', () => GC ? regGate() : loginEmail()); on('stUp', guestUpgrade); on('stHave', guestLogin); on('stNewAcc', regGate);   // 👤 guest-cloud: „🔑 Влез / 🆕 Създай акаунт“ — същият екран, при поискване
+  on('stPw', changePw); on('stCloud', openCloud); on('stCred', () => hooks.credits()); on('stRen', () => hooks.rename()); on('stSaves', () => hooks.saves()); on('stNew', () => hooks.newGame()); on('stCons', () => window.consent?.open()); on('stAdsCons', () => window.consent?.adsOpen());
   on('stOut', () => dlg(`<h2 style="font-size:19px;color:var(--acc)">🚪 Изход?</h2><p style="color:var(--mut);font-size:14px;line-height:1.5">Играта на това устройство остава. Влез пак със същия имейл, за да продължи да се пази в облака.</p>`,
     [['Отказ', null], ['🚪 Изход', () => { syncAll(false).finally(() => sb.auth.signOut().then(() => toast('🚪 Излезе от акаунта.'))); }, 1]]));
   on('stLangBg', () => setLang('bg')); on('stLangEn', () => setLang('en'));   // 🌐 lang-en
