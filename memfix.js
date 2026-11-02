@@ -122,6 +122,13 @@ window.__texShare = () => ({ uni: { on: UNI, n: uniStat.n, why: uniStat.why, see
 const FREE = feature('tex-free') && !/[?&]notexfree/.test(location.search), freeStat = { freed: 0, freedMB: 0, back: 0, backMs: 0, lost: 0 };
 let R = null, fb = null;
 export function setMainRenderer(r) { R = r; }
+// 🧠 lazy-live-keep (потребителят, 02.11: „давай проверката за черни сгради“): mem-lazy-img пускаше и картинките на моделите в ТЕКУЩИЯ град, които
+// още не са качени (инстанциите се правят по-късно, сградата е зад камерата) — щом потрябват, докато се декодират, сградата е черна (Кремъл).
+// Сега се пускат само картинките на моделите извън сцената (кешът на другите градове); тези в сцената се качват на заден план и после ги пуска tex-free.
+let SCN = null, live = null, liveT = 0; const LIVEK = feature('lazy-live-keep');
+export function setMainScene(s) { SCN = s; }
+function liveSet(now) { if (!SCN) return null; if (live && now - liveT < 8000) return live; liveT = now; live = new Set();
+  SCN.traverse(o => { for (const m of [].concat(o.material || [])) if (m) for (const k in m) { const t = m[k]; if (t && t.isTexture && t.source) live.add(t.source); } }); return live; }
 function readBack(rel, raw) {   // текстурата от видеокартата → ImageData (raw — за качване: точно същите байтове) или ново платно
   const t0 = performance.now(), { w, h } = rel; let c = null;
   try {
@@ -181,9 +188,9 @@ const CIB = typeof createImageBitmap === 'function' ? createImageBitmap.bind(win
 if (LAZY && CIB) window.createImageBitmap = function (src, ...a) { const p = CIB(src, ...a); return src instanceof Blob ? p.then(bm => { BLOB.set(bm, { blob: src, opts: a }); return bm; }) : p; };   // GLTFLoader (ImageBitmapLoader): кой Blob стана тази картинка
 let decN = 0; const decW = []; const decQ = f => new Promise((res, rej) => { const go = () => { decN++; f().then(res, rej).finally(() => { decN--; const n = decW.shift(); if (n) n(); }); }; if (decN < 4) go(); else decW.push(go); });   // най-много 4 декодирания наведнъж (без буря при нов изглед)
 let ph4 = null; const PH4 = () => ph4 || (ph4 = (() => { const c = document.createElement('canvas'); c.width = c.height = 4; const g = c.getContext('2d'); g.fillStyle = '#8a8a8a'; g.fillRect(0, 0, 4, 4); return c; })());
-if (LAZY && CIB) setInterval(() => { if (document.hidden) return; const now = performance.now(); let k = 0;
+if (LAZY && CIB) setInterval(() => { if (document.hidden) return; const now = performance.now(); let k = 0; const LV = LIVEK ? liveSet(now) : null;
   for (let i = lazyAll.length - 1; i >= 0 && k < 80; i--) { const t = lazyAll[i].deref(); if (!t || t.__gone) { lazyAll.splice(i, 1); continue; } const src = t.source, st = src.__free; if (!st || st.rel || st.blob || st.dec) { if (st && (st.rel || st.blob)) lazyAll.splice(i, 1); continue; }
-    if (src.__keep || now - (src.__born || now) < 30000) continue;   /* __keep — моделът го пази (kr-tex-keep: Кремъл) */ const im = st.peek(); if (!im || !(im.width > 0)) continue;
+    if (src.__keep || (LV && LV.has(src)) || now - (src.__born || now) < 30000) continue;   /* __keep — моделът го пази (kr-tex-keep: Кремъл) */ const im = st.peek(); if (!im || !(im.width > 0)) continue;
     if (R && R.properties.get(src).__version === src.version) continue;   // качена — пуска я tex-free
     const w = im.width, h = im.height;
     if (typeof ImageBitmap !== 'undefined' && im instanceof ImageBitmap) { const b = BLOB.get(im); if (b) { st.evict(b, w, h); lazyAll.splice(i, 1); k++; } }

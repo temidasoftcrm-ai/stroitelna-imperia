@@ -176,7 +176,7 @@ import { loadIndustry } from './industry.js';
 import { loadConstruct } from './construct.js';
 import { showIntro } from './intro.js';
 import { feature } from './lab/feature.js';
-import { setMainRenderer } from './memfix.js';
+import { setMainRenderer, setMainScene } from './memfix.js';
 import { mountHub } from './hub.js';
 import { showLevel } from './lvshow.js';
 import { showSub } from './subshow.js';   // дъщерните дружества — екран с логото (feature 'sub-screen')   // картинката на ниво 1 — при основаването на фирмата (feature 'lv-pics')   // „📊 Империя ▾“ — бутоните от втория ред на лентата в падащ панел (feature 'top-hub')
@@ -609,7 +609,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.localClippingEnabled = true;
 $('app').appendChild(renderer.domElement);
-const scene = new THREE.Scene();
+const scene = new THREE.Scene(); setMainScene(scene);   /* 🧠 lazy-live-keep (memfix.js): картинките в сцената не се пускат */
 scene.background = new THREE.Color(0xbcd9ee);
 scene.fog = new THREE.Fog(0xbcd9ee, 180, 420);
 const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 1, 900);
