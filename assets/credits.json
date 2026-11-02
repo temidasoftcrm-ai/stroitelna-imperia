@@ -327,6 +327,8 @@
 {"t":"Sea Dragon","a":"Темидасофт","l":"OWN","u":"","f":["nessie/nessie.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
 {"t":"Coast Guard Helicopter","a":"Темидасофт","l":"OWN","u":"","f":["ops/heli-med.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
 {"t":"Police Helicopter","a":"Темидасофт","l":"OWN","u":"","f":["ops/heli-pol.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
+{"t":"Police SUV (US)","a":"Темидасофт","l":"OWN","u":"","f":["cars/pol-suburban.glb","cars/sirens/pol-suburban.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
+{"t":"Police Sedan (US)","a":"Темидасофт","l":"OWN","u":"","f":["cars/pol-belasco.glb","cars/sirens/pol-belasco.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
 {"t":"Fire Brigade Truck","a":"Темидасофт","l":"OWN","u":"","f":["cars/sirens/fire-brigade.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
 {"t":"Airport Fire Truck","a":"Темидасофт","l":"OWN","u":"","f":["cars/sirens/fire-airport.glb"],"k":"Модели по поръчка (Meshy AI)","s":"Meshy AI"},
 {"t":"Red Titan Fire Engine","a":"cool.vana","l":"CC0","u":"https://creativecommons.org/publicdomain/zero/1.0/","f":["cars/sirens/fire-titan.glb"],"k":"Превозни средства и техника","s":"creativecommons.org"},

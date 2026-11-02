@@ -131,7 +131,7 @@ function loadRealCars(load, A) {
 // всички с мигащи буркани; при няколко одобрени — A[...].variants (game.js model() може да ги редува)
 const EMERG_K = { Police_Sedan: 1, Ambulance: 1, Firetruck: 1 };   // всички коли са в истински метри (1 м ≈ 1 единица, хората ~1,9) — спешните вече не се уголемяват
 const EMERG = {
-  Police_Sedan: [['pol-charger', 5.1], ['pol-crownvic', 5.4], ...(feature('pol-no-nfs') ? [] : [['pol-interceptor', 5.3]]) /* pol-no-nfs: Police Interceptor е от Need for Speed Hot Pursuit 2 (EA) — не може в публикуваната игра */, ['pol-nypd', 5.1], ...(feature('pol-new') ? [['pol-logan', 4.36], ['pol-duster', 4.34]] : [['pol-volga', 4.1]])],   // pol-volga — вече ВАЗ 2101 на КАТ (файлът — EMERG_FILE); pol-new — вместо нея Logan и Duster
+  Police_Sedan: [['pol-charger', 5.1], ['pol-crownvic', 5.4], ...(feature('pol-no-nfs') ? [] : [['pol-interceptor', 5.3]]) /* pol-no-nfs: Police Interceptor е от Need for Speed Hot Pursuit 2 (EA) — не може в публикуваната игра */, ['pol-nypd', 5.1], ['pol-suburban', 5.7], ['pol-belasco', 5.4] /* pol-suburban / pol-belasco (02.11, Meshy, Blender: без марките, собствени фарове/стопове lamp_*, лентата — siren_L/R) — американската полиция вместо Interceptor */, ...(feature('pol-new') ? [['pol-logan', 4.36], ['pol-duster', 4.34]] : [['pol-volga', 4.1]])],   // pol-volga — вече ВАЗ 2101 на КАТ (файлът — EMERG_FILE); pol-new — вместо нея Logan и Duster
   Firetruck: [['fire-us', 10], ['fire-man', 10.5], ['fire-titan', 10.8], ['fire-cyber', 10.5], ['fire-brigade', 8.6], ['fire-airport', 11]],   // fire-brigade / fire-airport (01.11, Meshy, Blender) — европейската цистерна и летищната   // fire-red — изтрита; fire-titan / fire-cyber (f6) — Meshy, Blender: колела wheel_*, буркани siren_*, стълба Ladder
   Ambulance: [['amb-gaz', RS ? 6.2 : 7], ['amb-us', 7.5], ['amb-eu', 7.2], ['amb-van', 6.8], ['amb-box', 7.5]],   // amb-van / amb-box (01.11, Meshy, Blender: dimiter-8e) — европейският бус и американската с кутията
 };
@@ -157,7 +157,7 @@ const EMERG_FILE = { 'fire-us': 'fire-us2', 'pol-volga': 'pol-vaz' };
 // и Dacia Duster („ДПС ПОЛИЦИЯ“, червено-синя лента) за Русия; американските — за Америка. Всяка кола — с региона си (userData.polReg), model() избира по града
 // amb-van / amb-box (потребителят: „полиция пожарна болница по градовете“): линейките по региона на града — само щом е включена някоя от новите
 const AMB_REG = { 'amb-van': ['bg', 'eu', 'xx'], 'amb-box': ['am'], 'amb-us': ['am', 'xx'], 'amb-eu': ['eu', 'bg'], 'amb-gaz': ['ru', 'bg'] };
-const POL_REG = { 'pol-logan': ['bg', 'eu', 'xx'], 'pol-duster': ['ru'], 'pol-charger': ['am', 'xx'], 'pol-crownvic': ['am', 'xx'], 'pol-interceptor': ['am', 'xx'], 'pol-nypd': ['am'] };
+const POL_REG = { 'pol-logan': ['bg', 'eu', 'xx'], 'pol-duster': ['ru'], 'pol-charger': ['am', 'xx'], 'pol-crownvic': ['am', 'xx'], 'pol-interceptor': ['am', 'xx'], 'pol-nypd': ['am'], 'pol-suburban': ['am'], 'pol-belasco': ['am', 'xx'] };
 // 🚒 fire-titan / fire-cyber (f6, решението на потребителя): Red Titan — американските градове; киберпънк пожарната (със стълбата) — само модерните мегаполиси;
 // Европа (и останалите) — MAN със стълбата. Действа, щом някоя от двете е включена (иначе пожарните се редуват както досега)
 const FIRE_REG = { 'fire-titan': ['am'], 'fire-cyber': ['cyber'], 'fire-man': ['bg', 'eu', 'ru', 'xx'], 'fire-us': ['xx'], 'fire-brigade': ['bg', 'eu', 'ru', 'xx'], 'fire-airport': ['airport'] };   // fire-airport — само на летищата (A['sf-car-FireAirport'], airport.js)   // в Америка — само Red Titan
@@ -502,8 +502,10 @@ function erFlashers(car, kind, cols, R) {
   zs.forEach((f, i) => { lamp(ElFlash, cols[1], V(bb.min.x - 1, ys, c.z + f * s.z), X, 0.3, 0.08, 1 - i % 2); lamp(ElFlash, cols[0], V(bb.max.x + 1, ys, c.z + f * s.z), X.clone().negate(), 0.3, 0.08, i % 2); });   /* хоризонтална ивица по дължината */   /* лъчът е към колата; страната на ритъма се редува по дължината */
   const yr = c.y - s.y / 2 + s.y * (kind === 'police' ? 0.5 : 0.84);
   for (const sx of [-1, 1]) lamp(ElFlash, cols[sx < 0 ? 0 : 1], V(c.x + sx * s.x * 0.36, yr, bb.min.z - 1), Z, 0.26, 0.12, sx < 0 ? 0 : 1);   // отзад горе (предницата е към +z)
-  if (kind === 'ambulance') {   // „на решетката две светлини — флаш бързо бяло, премигващо постоянно“
+  // pol-grille (потребителят: „1 да“ — лампите в решетката и при полицията): американската полиция — същите два стробоскопа на решетката, в червено и синьо
+  const polGrille = kind === 'police' && feature('pol-grille') && (!car.userData.polReg || car.userData.polReg.includes('am'));
+  if (kind === 'ambulance' || polGrille) {   // „на решетката две светлини — флаш бързо бяло, премигващо постоянно“
     const hb = R && R.box('head'), yg = hb ? (hb.min.y + hb.max.y) / 2 + 0.06 : c.y - s.y / 2 + s.y * 0.36;
-    for (const sx of [-1, 1]) lamp(ElStrobe, 0xffffff, V(c.x + sx * s.x * 0.12, yg, bb.max.z + 1), Z.clone().negate(), 0.2, 0.07, sx < 0 ? 0 : 1);
+    for (const sx of [-1, 1]) lamp(ElStrobe, polGrille ? cols[sx < 0 ? 0 : 1] : 0xffffff, V(c.x + sx * s.x * 0.12, yg, bb.max.z + 1), Z.clone().negate(), 0.2, 0.07, sx < 0 ? 0 : 1);
   }
 }
