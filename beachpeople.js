@@ -10,6 +10,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const BASE = 'assets/heavy/beach/';
 const STATIC = ['beach_lie_w1', 'beach_lie_m1', 'beach_sit', 'beach_kneel', 'beach_swim', 'beach_umbrella', 'beach_umbrella2'];
@@ -39,18 +40,30 @@ export function createBeachPeople(deps) {
     const b = deps.beach, r = rnd((deps.seed >>> 0) || 4242), g = new THREE.Group(); g.name = 'beach-people';
     const P = Object.fromEntries(STATIC.map(n => [n, proto(n)]));
     const spots = { towel: [], beach_lie_w1: [], beach_lie_m1: [], beach_sit: [], beach_kneel: [], beach_swim: [], beach_umbrella: [], beach_umbrella2: [] };
-    const avoid = x => (deps.avoid || []).some(([a, c]) => x > a - 25 && x < c + 25);
+    const pad = b.avoidPad ?? 25, avoid = x => (deps.avoid || []).some(([a, c]) => x > a - pad && x < c + pad);
     const Q = new THREE.Quaternion(), E = new THREE.Euler(), S = new THREE.Vector3(1, 1, 1), V = new THREE.Vector3(), Mx = new THREE.Matrix4();
-    const place = (key, x, z, yaw, lay = false) => {
+    const place = (key, x, z, yaw, lay = false, up = 0) => {
       const p = key === 'towel' ? null : P[key]; if (key !== 'towel' && !p) return;
       E.set(lay ? -Math.PI / 2 : 0, yaw, 0, 'YXZ'); Q.setFromEuler(E);
-      const G = 0.06;   // пясъкът на плана е на ~5 см
+      const G = (b.ground ?? 0.06) + up;   // пясъкът на плана е на ~5 см; up — върху шезлонга
       let y = G + 0.02; if (p) { if (lay) y = -p.bb.min.z + G + 0.04; else y = -p.bb.min.y + G; if (key === 'beach_swim') y -= 0.42 + G; }   // плувецът — до кръста във водата
       V.set(x, y, z); Mx.compose(V, Q, S); spots[key].push(Mx.clone());
     };
     const people = ['beach_lie_w1', 'beach_lie_m1', 'beach_lie_w1', 'beach_lie_m1', 'beach_lie_w1', 'beach_sit', 'beach_kneel'];   // ~70 % лежат
-    let walkSegs = [];
-    for (let x = b.x0; x <= b.x1; x += 9 + r() * 14) {
+    const loungers = [], rings = [], pedals = [];
+    if (b.layout === 'resort') {   // 🏖️ resort-beach2: курортът — редове чадъри (сламени/раирани) с по 2 шезлонга, хора на тях и на кърпи между редовете, плувци, пояси, водни колела
+      for (const [ri, dz] of b.rows.entries()) for (let x = b.x0 + (ri % 2) * 3; x <= b.x1; x += 6) {
+        if (avoid(x)) continue;
+        const z = b.seaZ + dz; place((Math.round(x / 6) + ri) % 2 ? 'beach_umbrella' : 'beach_umbrella2', x, z, r() * 6.28);
+        for (const dx of [-0.85, 0.85]) { loungers.push([x + dx, z + 1.6, (Math.round(x / 6) + ri) % 4]); if (r() < 0.65) place(r() < 0.55 ? 'beach_lie_w1' : 'beach_lie_m1', x + dx, z + 0.75, Math.PI, true, 0.38); }   // главата — към облегалката (към сушата)
+        if (r() < 0.4) { const tx = x + 3 + (r() - 0.5), tz = z - 4.5 + (r() - 0.5); place('towel', tx, tz, 0); const k = people[Math.floor(r() * people.length)];
+          if (k.startsWith('beach_lie')) place(k, tx, tz - 0.85, Math.PI, true); else place(k, tx, tz, Math.PI); }
+      }
+      for (let i = 0; i < Math.round((b.x1 - b.x0) / 9); i++) place('beach_swim', b.x0 + r() * (b.x1 - b.x0), b.seaZ - 5 - r() * 16, r() * 6.28);
+      for (let i = 0; i < Math.round((b.x1 - b.x0) / 30); i++) rings.push([b.x0 + r() * (b.x1 - b.x0), b.seaZ - 6 - r() * 14, i % 4]);
+      for (let i = 0; i < Math.max(2, Math.round((b.x1 - b.x0) / 80)); i++) pedals.push([b.x0 + 20 + r() * (b.x1 - b.x0 - 40), b.seaZ - 24 - r() * 12, r() * 6.28]);
+    }
+    for (let x = b.x0; x <= b.x1 && b.layout !== 'resort'; x += 9 + r() * 14) {
       if (avoid(x)) continue;
       const s = shore(x), [s0, s1] = b.sand || [3, 13], depth = s0 + r() * (s1 - s0), cx = s.x + s.nx * depth, cz = s.z + s.nz * depth, yaw = b.along ? Math.atan2(s.tx, s.tz) * 1 + (r() < 0.5 ? Math.PI : 0) + (r() - 0.5) * 0.15 : Math.atan2(s.nx, s.nz) + (r() - 0.5) * 0.6;   // главата — към сушата (тясна ивица — успоредно на водата)
       if (r() < 0.82) {
@@ -72,6 +85,26 @@ export function createBeachPeople(deps) {
       im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; im.computeBoundingSphere(); g.add(im);
       if (key === 'beach_swim') g.userData.swim = { im, base: list.map(m => m.clone()) };
     }
+    // шезлонгите (бяла рамка + цветна възглавница — две инстансирани мрежи), поясите (тор), водните колела
+    if (loungers.length) {
+      const box = (w, h, d, x, y, z, rx = 0) => new THREE.BoxGeometry(w, h, d).rotateX(rx).translate(x, y, z);
+      const fr = new THREE.InstancedMesh(mergeGeometries([box(0.66, 0.05, 1.9, 0, 0.28, 0.05), box(0.05, 0.28, 0.05, -0.3, 0.14, -0.8), box(0.05, 0.28, 0.05, 0.3, 0.14, -0.8), box(0.05, 0.28, 0.05, -0.3, 0.14, 0.8), box(0.05, 0.28, 0.05, 0.3, 0.14, 0.8)]), new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.6 }), loungers.length);
+      const cu = new THREE.InstancedMesh(mergeGeometries([box(0.62, 0.08, 1.35, 0, 0.34, -0.15), box(0.62, 0.08, 0.6, 0, 0.55, 0.75, -0.75)]), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 }), loungers.length);
+      const LC = [0x2f6fd8, 0xf2c230, 0xd94a4a, 0x3aa86b], m4 = new THREE.Matrix4();
+      loungers.forEach(([x, z, c], i) => { m4.makeTranslation(x, b.ground ?? 0, z - 1.6 + 1.6); fr.setMatrixAt(i, m4); cu.setMatrixAt(i, m4); cu.setColorAt(i, col.setHex(LC[c])); });
+      for (const im of [fr, cu]) { im.castShadow = im.receiveShadow = true; im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); g.add(im); } cu.instanceColor.needsUpdate = true; fr.name = 'beach-lounger'; cu.name = 'beach-cushion';
+    }
+    if (rings.length) {
+      const im = new THREE.InstancedMesh(new THREE.TorusGeometry(0.55, 0.2, 10, 20).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 }), rings.length), RC = [0xff5a1a, 0xffd21a, 0x33cc66, 0xff4d9a], m4 = new THREE.Matrix4();
+      rings.forEach(([x, z, c], i) => { m4.makeTranslation(x, 0.1, z); im.setMatrixAt(i, m4); im.setColorAt(i, col.setHex(RC[c])); }); im.instanceColor.needsUpdate = true; im.name = 'beach-ring'; g.add(im); g.userData.rings = { im, base: rings };
+    }
+    const pboats = pedals.map(([x, z, yaw]) => {
+      const p = new THREE.Group(), wm = new THREE.MeshStandardMaterial({ color: 0xf4f4f4, roughness: 0.5 }), bm = new THREE.MeshStandardMaterial({ color: 0x1a8ce6, roughness: 0.5 });
+      for (const dx of [-0.75, 0.75]) { const m = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.45, 3.2), wm); m.position.set(dx, 0.15, 0); p.add(m); }
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.25, 1.0), bm); seat.position.set(0, 0.55, -0.2); p.add(seat);
+      const sl = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.08, 1.6), bm); sl.position.set(0, 1.0, 1.2); sl.rotation.x = -0.6; p.add(sl);
+      p.traverse(m => { if (m.isMesh) m.castShadow = true; }); p.position.set(x, 0, z); p.rotation.y = yaw; g.add(p); return p; });
+    g.userData.pedals = pboats;
     // разхождащите се: до 4, по мократа ивица (1,5 м от водата), отсечки по 40–80 м
     const walkers = [];
     for (let i = 0; i < 4; i++) {
@@ -81,7 +114,7 @@ export function createBeachPeople(deps) {
       const o = cloneSkinned(src.scene); o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.frustumCulled = false; } }); g.add(o);
       const clips = Object.fromEntries(src.animations.map(c => [c.name, c])), walk = stripRoot(clips[W[1]]), idle = clips[W[2]];
       const mixer = new THREE.AnimationMixer(o), aw = mixer.clipAction(walk.clip), ai = idle ? mixer.clipAction(idle) : null; aw.play();
-      walkers.push({ o, mixer, aw, ai, speed: walk.speed, xa, xb: xa + 40 + r() * 40, s: r(), dir: r() < 0.5 ? 1 : -1, pause: 0, inner: 1.4 + r() * 0.8 });
+      walkers.push({ o, mixer, aw, ai, speed: walk.speed, xa, xb: Math.min(b.x1, xa + 40 + r() * 40), s: r(), dir: r() < 0.5 ? 1 : -1, pause: 0, inner: 1.4 + r() * 0.8 });
     }
     deps.parent.add(g);
     return { g, walkers, center: shore((b.x0 + b.x1) / 2) };
@@ -101,17 +134,19 @@ export function createBeachPeople(deps) {
       if (!M) { load(); return; }
       if (!built) { built = build(); }
       const c = built.center, cam = deps.camera, day = (deps.night ? deps.night() : 0) < 0.45;
-      const near = Math.hypot(cam.position.x - c.x, cam.position.z - c.z) < FAR + (deps.beach.x1 - deps.beach.x0) / 2;
+      const near = !cam || Math.hypot(cam.position.x - c.x, cam.position.z - c.z) < FAR + (deps.beach.x1 - deps.beach.x0) / 2;   // без камера (курортът) — винаги
       built.g.visible = day && near; if (!built.g.visible || dt <= 0) return;
       t += dt;
       const sw = built.g.userData.swim;   // плувците: поклащане и бавно завъртане
       if (sw) { const m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3(), rq = new THREE.Quaternion(), Y = new THREE.Vector3(0, 1, 0);
         sw.base.forEach((b0, i) => { b0.decompose(p, q, s); p.y += 0.06 * Math.sin(t * 1.3 + i * 1.7); rq.setFromAxisAngle(Y, 0.25 * Math.sin(t * 0.13 + i)); q.premultiply(rq); m.compose(p, q, s); sw.im.setMatrixAt(i, m); }); sw.im.instanceMatrix.needsUpdate = true; }
+      const rg = built.g.userData.rings; if (rg) { const m = new THREE.Matrix4(); rg.base.forEach(([x, z], i) => { m.makeTranslation(x, 0.1 + 0.06 * Math.sin(t * 1.4 + i), z); rg.im.setMatrixAt(i, m); }); rg.im.instanceMatrix.needsUpdate = true; }
+      (built.g.userData.pedals || []).forEach((p, i) => { p.position.y = 0.05 * Math.sin(t * 1.1 + i * 2); p.rotation.z = 0.03 * Math.sin(t * 0.9 + i); });
       for (const w of built.walkers) {
         w.mixer.update(dt);
         if (w.pause > 0) { w.pause -= dt; if (w.pause <= 0) fade(w.ai, w.aw); }
         else { w.s += w.dir * w.speed * dt / (w.xb - w.xa); if (w.s > 1 || w.s < 0) { w.s = Math.min(1, Math.max(0, w.s)); w.dir *= -1; w.pause = 3 + Math.random() * 5; fade(w.aw, w.ai || w.aw); } }
-        const x = w.xa + (w.xb - w.xa) * w.s, s = shore(x); const o = (deps.beach.wet ?? 1) + w.inner - 1.4; w.o.position.set(s.x + s.nx * o, 0.06, s.z + s.nz * o);
+        const x = w.xa + (w.xb - w.xa) * w.s, s = shore(x); const o = (deps.beach.wet ?? 1) + w.inner - 1.4; w.o.position.set(s.x + s.nx * o, deps.beach.ground ?? 0.06, s.z + s.nz * o);
         w.o.rotation.y = Math.atan2(s.tx * w.dir, s.tz * w.dir);
       }
     },

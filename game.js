@@ -15050,6 +15050,7 @@ if (AUTOTEST) {
     mapMode(w, e) { mapWide = w; mapEU = e; showMap(true); drawMap(); },
     // 🧭🏗️ resort-menu / real-crane (T2): курорт в даден етап ('land' | 'building' | 'built'), prog — колко е построено; money — парите
     resortStage(id, stage = 'building', prog = 0.3, money = 5e6) { S.resortsOpen = true; S.resorts = S.resorts || {}; econ.earn(money - econ.s.money, 'друго', 'тест'); S.resorts[id] = { stage, since: S.day, start: S.day, prog, earned: 0, ext: {} }; openHwView('resort:' + id); return resorts.actions(id); },
+    resortBeach(id = 'sunnybeach') { let d = S.day; for (let i = 0; i < 400 && seasonOf(d) !== 'summer'; i++) d++; S.day = d; this.resortEnter(id); setTimeout(() => this.resortCam(20, 6, -20, 0, 0.5, -36), 2500); return d; },   // 🏖️ resort-beach2: Лабораторията — лято, в курорта, камерата над плажа
     resortEnter(id) { S.resortsOpen = true; S.resorts = S.resorts || {}; S.resorts[id] = { stage: 'built', since: S.day, earned: 0, ext: { hotel: true } }; openHwView('resort:' + id); },
     devLv(n) { S.dev = { xp: [0, 1000, 4000, 10000, 20000, 40000, 70000, 110000, 170000, 250000][n - 1], lv: n, v: 3 }; },
     xp: () => units.map(u => [u.type, Math.round((u.xp || 0) * 10) / 10, unitLv(u)]),

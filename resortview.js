@@ -11,7 +11,9 @@ import { BOAT_FILES, isRealBoat, realBoat } from './boatsreal.js';
 import { loadLift, liftPart } from './liftmodel.js';
 
 import { loadMountains, mtnModel } from './mtn.js';
+import { createBeachPeople } from './beachpeople.js';   // 🏖️ resort-beach2: курортният плаж (хората, шезлонгите, чадърите, плувците — beachpeople.js)
 
+const RB2 = feature('resort-beach2');
 const mat = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9, ...o });
 const rnd = (seed => () => (seed = (seed * 16807) % 2147483647) / 2147483647);
 
@@ -210,7 +212,9 @@ export function buildResortView(A, r, st, season, deps) {
     for (let k = 0; k < 7; k++) { const b = useModel(A, deps.model, BM[k], BM[k].includes('row') ? 1.4 : 2.2) || boatMesh([0x2b6fff, 0xd62828, 0x1f9a6a, 0xffb300][k % 4], k % 2 === 0); b.position.set(-200 + k * 60 + rand() * 20, 0, -100 - rand() * 160); b.rotation.y = rand() * 6; g.add(b); anim.boats.push({ b, ph: rand() * 6, x0: b.position.x, sp: 0.5 + rand() }); }
     // плаж: чадъри и шезлонги (в сезона отворени, иначе прибрани)
     const cols = [0xff5a5a, 0xffd23f, 0x3fa7ff, 0x50d18b, 0xff8ad8];
-    for (let k = 0; k < 34; k++) {
+    // 🏖️ resort-beach2 (собственикът, 02.11: „видях го плажа, ок е“; одобрено в Blender): в сезона — гъстият плаж от beachpeople.js вместо простите чадъри и хората
+    if (RB2 && inSeason) anim.beach = createBeachPeople({ parent: g, seed: 7 + r.id.length * 131, beach: { layout: 'resort', coast: null, seaZ: -48, x0: -140, x1: 150, land: 1, ground: 0, wet: 1.5, rows: [10, 16, 22], avoidPad: 2 }, avoid: [[26, 34]] });   // avoid — дървената пътека и барът (x 30)
+    for (let k = 0; k < (anim.beach ? 0 : 34); k++) {
       const x = -130 + (k % 17) * 16 + rand() * 4, z = -38 + Math.floor(k / 17) * 14 + rand() * 4;
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3), mat(0xeeeeee)); pole.position.set(x, 1.5, z); g.add(pole);
       const pm = inSeason && useModel(A, deps.model, k % 2 ? 'detail-parasol-a' : 'detail-parasol-b', 9);
@@ -402,7 +406,7 @@ export function buildResortView(A, r, st, season, deps) {
   }
   // ---------- хора (Sketchfab „Lowpoly People“ — A['sf-person-N']): в сезона на плажа / долу при пистата, иначе малко разходка
   { const P = [0, 1, 2, 3, 4, 5].map(i => `sf-person-${i}`).filter(n => A[n]), pr = rnd(7);
-    const n = P.length ? (inSeason ? 46 : 10) : 0;
+    const n = P.length ? (inSeason ? (summer && anim.beach ? 0 : 46) : 10) : 0;   // resort-beach2: плажните хора — от beachpeople.js
     for (let k = 0; k < n; k++) {
       const [x, z] = summer ? [-130 + pr() * 260, -44 + pr() * 34] : [-60 + pr() * 120, -8 + pr() * 22];
       const m = deps.model(P[k % P.length], 1.8 + pr() * 0.25); m.position.set(x, 0, z); m.rotation.y = pr() * 6.28; g.add(m);
@@ -539,6 +543,7 @@ export function buildResortView(A, r, st, season, deps) {
   // t: секунди; prog: прогрес на строежа (0…1)
   function update(t, prog = 1) {
     if (anim.water) anim.water.update(t);
+    if (anim.beach) { anim.beach.update(anim.bt == null ? 0 : Math.min(0.1, Math.max(0, t - anim.bt))); anim.bt = t; }   // resort-beach2: dt от абсолютното t
     if (anim.waves) {
       const a = anim.waves.geo.attributes.position, b = anim.waves.base;
       for (let i = 0; i < a.count; i++) { const x = b[i * 3], z = b[i * 3 + 2]; const amp = Math.max(0.15, Math.min(1, (750 - z) / 80)); a.array[i * 3 + 1] = (Math.sin(x * 0.05 + t * 1.3) * 0.35 + Math.cos(z * 0.07 + t * 0.9) * 0.3) * amp; }   // до брега вълните са по-ниски
