@@ -2018,7 +2018,7 @@ function decorLot(g, lot, cityId) {
   } else if (kind === 3 && yr) {   // 🅿️ yards-real (№31): истински паркинг — места 2,5 × 5 м (бусове 3 × 6), пътека 6 м, отбивка до тротоара, стрелки, бордюр
     const w = lot.plan ? lot.w : 2 * L + 3, d = lot.plan ? lot.d : 2 * L + 3, Lp = parkLayout(w - 1, d - 1); if (!Lp.n) return false;
     const pg = parkMesh(Lp, lot.plan ? 2.3 : 0.5); pg.rotation.y = rot; at(pg, 0, 0, 0);
-    const real = Object.keys(A).filter(n => n.startsWith('sf-car-') && !/Bus|Truck|Firetruck|Ambulance|Police|Limousine|Van/.test(n)), cars = real   /* №2 (55): само истински коли — без детските резерви */, van = A['sf-car-Van'] ? 'sf-car-Van' : null;   /* №2: без детския бус */ let nc = 0; const pc = {};   // истинските коли още не са заредени при първия строеж → тези на Kenney
+    const real = Object.keys(A).filter(n => n.startsWith('sf-car-') && !/Bus|Truck|Firetruck|Ambulance|Police|Limousine|Van/.test(n) && notAirFire(n)), cars = real   /* №2 (55): само истински коли — без детските резерви */, van = A['sf-car-Van'] ? 'sf-car-Van' : null;   /* №2: без детския бус */ let nc = 0; const pc = {};   // истинските коли още не са заредени при първия строеж → тези на Kenney
     Lp.spots.forEach(([a, b, da, db, isVan], k) => { if (nc >= 8 || ((h >>> (k % 24)) & 3) === 0 || rr() < 0.3) return; const n = isVan && van ? van : cars[(h + k * 7) % Math.max(1, cars.length)]; if (!n || !A[n]) return;
       const o = darkParked(model(n, n.startsWith('sf-') ? 1 : kidK(n, 1.15))), back = rr() < 0.25 ? Math.PI : 0; o.traverse(m => { if (m.isMesh && [].concat(m.material).some(x => x.transparent && x.opacity < 0.9)) m.visible = false; });   /* паркираните — без лъчите на фаровете */ o.rotation.y = rot + Math.atan2(da, db) + back; o.userData.parkBack = !!back; at(o, a, b, 0.13); nc++; pc[k] = o; });
     if (feature('park-api')) parks.add({ id: lot.id, x: lot.x, z: lot.z, rot, L: Lp, ext: lot.plan ? 2.3 : 0.5, cars: pc });   /* park-api (55, №5): за колите на 2a */
@@ -2032,7 +2032,7 @@ function decorLot(g, lot, cityId) {
   } else if (kind === 3) {   // паркинг: асфалт, маркировка, 2–4 коли
     flat(L * 2, L * 1.6, 0x4a4d52, 0, 0, 0.13);
     for (let k = -2; k <= 2; k++) flat(0.15, L * 0.6, 0xf2f2f2, k * 2.8, -L * 0.45, 0.15), flat(0.15, L * 0.6, 0xf2f2f2, k * 2.8, L * 0.45, 0.15);
-    const real = Object.keys(A).filter(n => n.startsWith('sf-car-') && !/Bus|Truck|Firetruck|Ambulance|Police|Limousine/.test(n));   // истинските коли (трафика), ако са заредени
+    const real = Object.keys(A).filter(n => n.startsWith('sf-car-') && !/Bus|Truck|Firetruck|Ambulance|Police|Limousine/.test(n) && notAirFire(n));   // истинските коли (трафика), ако са заредени
     const cars = real   /* №2 (55): само истински коли — без детските резерви */, n = 2 + (h >>> 4) % 3;
     for (let k = 0; k < n && cars.length; k++) { const o = model(cars[(h >>> (k * 3)) % cars.length], real.length ? 1 : kidK(cars[(h >>> (k * 3)) % cars.length], 1.15)); o.rotation.y = rot + (k % 2 ? Math.PI : 0); at(o, (-1.5 + (k % 4)) * 2.8 + 1.4, (k % 2 ? 1 : -1) * L * 0.45); }
     put('plant_bush', 2.5, -L + 0.8, L - 0.8); put('plant_bush', 2.5, L - 0.8, -L + 0.8);
@@ -3308,7 +3308,9 @@ const cityBus = createCityBus({ agents: () => feature('city-bus') ? jpAgents() :
   bus: () => A['sf-car-Bus'] ? model('sf-car-Bus', 1) : null, want: () => { const b = city.lots.filter(l => l.built).length, n = city.lots.length; return { lines: n > 2000 ? 4 : n > 800 ? 3 : 2, perLine: Math.min(4, 2 + Math.floor(b / 90)) }; } });   /* T2 (28.10, „нямаме нито един автобус“): по размера на града, не по построеното — в нова игра беше 1 линия с 1 автобус за целия град */
 // 🅿️ park-life (f6, №5): паркингите оживяват — сутрин (7–9 ч.) човек отива до колата, тя излиза на заден и влиза в трафика; вечер (17–19 ч.) — обратно;
 // заетостта следва часа (parklife.js — върху park-api на 55 и агентите на трафика jpAgents(), като градските автобуси)
-const parkCarNames = () => Object.keys(A).filter(n => n.startsWith('sf-car-') && !/Bus|Truck|Firetruck|Ambulance|Police|Limousine|Van/.test(n));
+const parkCarNames = () => Object.keys(A).filter(n => n.startsWith('sf-car-') && !/Bus|Truck|Firetruck|Ambulance|Police|Limousine|Van/.test(n) && notAirFire(n));
+// 🚒 fire-air-only (потребителят: „зелените пожарни да са само на летището“): летищната пожарна (sf-car-FireAirport) не минаваше през /Firetruck/ и излизаше като обикновена кола — в трафика и на паркингите в града
+function notAirFire(n) { return !(n === 'sf-car-FireAirport' && feature('fire-air-only')); }
 function parkPed() {   // истински минувач само за паркинга (не е в peds — води го parklife.js)
   if (gfxStill()) return null;   // vlow-still: без минувачи (площадите, паркингите, пътуващите)
   loadPeds(); if (!pedReal.length) return null;
@@ -9477,7 +9479,7 @@ function stationPark(again = 0) {
   const [x, z] = gp.toGame(pk.x, pk.z), rot = pk.rot, Lp = parkLayout(pk.w - 1, pk.d - 1); if (!Lp.n) return;
   const g = new THREE.Group(); g.name = 'stPark'; g.position.set(x, 0, z); city.group.add(g); city.stPark = g;
   const pg = parkMesh(Lp, 0.5); pg.rotation.y = rot; g.add(pg);
-  const c = Math.cos(rot), sn = Math.sin(rot), h = hashStr('stp:' + S.cityId), cars = Object.keys(A).filter(n => n.startsWith('sf-car-') && !/Bus|Truck|Firetruck|Ambulance|Police|Limousine|Van/.test(n)), pc = {};
+  const c = Math.cos(rot), sn = Math.sin(rot), h = hashStr('stp:' + S.cityId), cars = Object.keys(A).filter(n => n.startsWith('sf-car-') && !/Bus|Truck|Firetruck|Ambulance|Police|Limousine|Van/.test(n) && notAirFire(n)), pc = {};
   const want = Math.min(Lp.spots.length, 2 + lv * 3);   // ниво 1 — 5 коли, ниво 5 — 17 (колкото места има)
   if (!cars.length && again < 6) { const cityG = city.group; setTimeout(() => { if (city.group === cityG && city.stPark === g) stationPark(again + 1); }, 4000); }   // колите (Sketchfab) още се зареждат
   let nc = 0; Lp.spots.forEach(([a, b, da, db], k) => { if (nc >= want || !cars.length || ((h >>> (k % 24)) & 3) === 0 && Lp.spots.length - k > want - nc) return;
