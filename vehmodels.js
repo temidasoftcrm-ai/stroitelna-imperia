@@ -131,7 +131,7 @@ function loadRealCars(load, A) {
 // всички с мигащи буркани; при няколко одобрени — A[...].variants (game.js model() може да ги редува)
 const EMERG_K = { Police_Sedan: 1, Ambulance: 1, Firetruck: 1 };   // всички коли са в истински метри (1 м ≈ 1 единица, хората ~1,9) — спешните вече не се уголемяват
 const EMERG = {
-  Police_Sedan: [['pol-charger', 5.1], ['pol-crownvic', 5.4], ['pol-interceptor', 5.3], ['pol-nypd', 5.1], ...(feature('pol-new') ? [['pol-logan', 4.36], ['pol-duster', 4.34]] : [['pol-volga', 4.1]])],   // pol-volga — вече ВАЗ 2101 на КАТ (файлът — EMERG_FILE); pol-new — вместо нея Logan и Duster
+  Police_Sedan: [['pol-charger', 5.1], ['pol-crownvic', 5.4], ...(feature('pol-no-nfs') ? [] : [['pol-interceptor', 5.3]]) /* pol-no-nfs: Police Interceptor е от Need for Speed Hot Pursuit 2 (EA) — не може в публикуваната игра */, ['pol-nypd', 5.1], ...(feature('pol-new') ? [['pol-logan', 4.36], ['pol-duster', 4.34]] : [['pol-volga', 4.1]])],   // pol-volga — вече ВАЗ 2101 на КАТ (файлът — EMERG_FILE); pol-new — вместо нея Logan и Duster
   Firetruck: [['fire-us', 10], ['fire-man', 10.5], ['fire-titan', 10.8], ['fire-cyber', 10.5], ['fire-brigade', 8.6], ['fire-airport', 11]],   // fire-brigade / fire-airport (01.11, Meshy, Blender) — европейската цистерна и летищната   // fire-red — изтрита; fire-titan / fire-cyber (f6) — Meshy, Blender: колела wheel_*, буркани siren_*, стълба Ladder
   Ambulance: [['amb-gaz', RS ? 6.2 : 7], ['amb-us', 7.5], ['amb-eu', 7.2], ['amb-van', 6.8], ['amb-box', 7.5]],   // amb-van / amb-box (01.11, Meshy, Blender: dimiter-8e) — европейският бус и американската с кутията
 };
