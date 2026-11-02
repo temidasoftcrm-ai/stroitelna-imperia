@@ -11,7 +11,7 @@ const N = 5, LEN = 17, GAP = 9, SPEED = 9;   // камиони; м дължин�
 let proto = null, loading = null;
 const load = () => loading || (loading = new Promise(res => new GLTFLoader().load('assets/heavy/xmas/xmas-truck.glb', g => {
   g.scene.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(g.scene), s = b.getSize(new THREE.Vector3()), k = LEN / Math.max(s.x, s.z);
-  const w = new THREE.Group(), inner = g.scene; inner.scale.setScalar(k); inner.rotation.y = s.x > s.z ? -Math.PI / 2 : 0;   // моделът е по x (кабината към −x) → кабината към +z
+  const w = new THREE.Group(), inner = g.scene; inner.scale.setScalar(k); inner.rotation.y = s.x > s.z ? Math.PI / 2 : 0;   /* +π/2: −x → +z (с −π/2 кабината гледаше назад) */   // моделът е по x (кабината към −x) → кабината към +z
   w.add(inner); w.updateMatrixWorld(true); const b2 = new THREE.Box3().setFromObject(w); inner.position.y -= b2.min.y; inner.position.x -= (b2.min.x + b2.max.x) / 2; inner.position.z -= (b2.min.z + b2.max.z) / 2;
   w.traverse(o => { if (o.isMesh) { o.castShadow = true; if (o.material) { o.material = o.material.clone(); o.material.emissive = new THREE.Color(0xffffff); o.material.emissiveMap = o.material.map; o.material.emissiveIntensity = 0; } } });
   proto = w; res(w); }, undefined, () => res(null))));

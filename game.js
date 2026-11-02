@@ -40,6 +40,7 @@ import { createGhostHunt } from './ghosthunt.js';   // 👻 ghost-hunt: скри
 import { createUfo } from './ufo.js';   // 🛸 ufo-vegas: скритата изненада — НЛО над Лас Вегас в ясна нощ
 import { createNessie } from './nessie.js';   // 🐉 nessie: Лох Нес в северните крайморски градове
 import { createXmasConvoy } from './xmasconvoy.js';   // 🎄 xmas-convoy: коледният керван на 25 декември
+import { createXmasShow } from './xmasshow.js';   // 🎄 xmas-plovdiv: Коледа в Пловдив — керванът запалва булеварда
 import { holoWatch } from './holocard.js';   // 📜 holo-history: историята отстрани на изненадите
 import { createGorilla } from './gorilla.js';   // 🦍 kongo: Голямата горила катери Емпайър Стейт в Ню Йорк
 import { createBeachPeople } from './beachpeople.js';   // 🏖️ beach-people: хората по плажовете (повечето лежат, няколко се разхождат)
@@ -3230,6 +3231,38 @@ const ufo = feature('ufo-vegas') ? createUfo({ scene, camera, Sound, S: () => S,
 const nessieFx = feature('nessie') ? createNessie({ scene, S: () => S, cityId: () => S && S.cityId, water: (x, z) => { const P = city.plan; return !!(P && P.waterAt && P.waterAt(x, z)); }, center: () => city.hq ? [city.hq.x, city.hq.z] : [0, 0], hour: () => ((todF() * 24) + 6) % 24, fog: () => ['fog', 'cloudy', 'rain'].includes(weather.kind), toast: (...a) => toast(...a), pop: (k, c, s2) => showEventPop(k, c, s2), save: () => save() }) : null;
 // 🎄 xmas-convoy (собственикът, 01.11: „на 25 декември да пуснем коледните камиони по улиците — като изненада, само веднъж“): НАШ керван, без чуждата марка
 const xmasConvoy = feature('xmas-convoy') ? createXmasConvoy({ scene, S: () => S, hour: () => ((todF() * 24) + 6) % 24, night: () => dayNight.night, roadRoute: (x0, z0, x1, z1) => roadRoute(x0, z0, x1, z1), roadPoint: () => roadPoint(), center: () => city.hq ? [city.hq.x, city.hq.z] : [0, 0], toast: (...a) => toast(...a), pop: (k, c, s2) => showEventPop(k, c, s2), save: () => save() }) : null;
+// 🎄 xmas-plovdiv (потребителят, 02.11: „камионите в Пловдив по централния булевард — сняг отвсякъде и като минават сградите да се осветяват“;
+// „без значение къде си — да те пуска в Пловдив да го видиш; да вали много сняг“): на 25 декември (датата на компютъра), вечерта (19:30–23:30 ч), веднъж
+// в годината — играта спира, отиваме в Пловдив (и ако няма филиал там — само на гости), шоуто тече, после се връщаме в града, откъдето сме тръгнали.
+const XMAS_PLV = 'plovdiv';
+const xmasShow = feature('xmas-plovdiv') ? createXmasShow({ scene, camera, Sound, song: 'assets/music/xmas-show.mp3', cityGroup: () => city.group, plan: () => city.plan,
+  setCam: (px, py, pz, tx, ty, tz) => { camera.position.set(px, py, pz); controls.target.set(tx, ty, tz); camera.lookAt(tx, ty, tz); }, onEnd: sk => xmasShowEnd(sk) }) : null;
+let xmasShowT = 3, xmasHid = [];
+function xmasShowTick(rdt) {
+  if (!xmasShow || !S) return; if (xmasShow.busy) { xmasShow.update(rdt, camera); xmasShowT -= rdt; if (xmasShowT <= 0 && city.group) { xmasShowT = 1; city.group.traverse(o => { if ((o.isSprite || o.userData.lm) && o.visible) { o.visible = false; xmasHid.push(o); } }); } return; }   // и новите надписи (появяват се, щом моделът се зареди)
+  xmasShowT -= rdt; if (xmasShowT > 0) return; xmasShowT = 3; const X = S.xmasShow;
+  if (X && X.st === 'done') { if (S.cityId !== XMAS_PLV) { if (!ownedCities().includes(XMAS_PLV) && S.cities) delete S.cities[XMAS_PLV]; delete S.xmasShow; } return; }   // гостуването не оставя следа
+  if (X && (X.st === 'go' || X.st === 'run')) { if (S.cityId === XMAS_PLV && city.ready && city.group && !swapping) xmasShowBegin(); return; }
+  const d = new Date(), yr = d.getFullYear(); if (AUTOTEST || !(d.getMonth() === 11 && d.getDate() === 25) || S.xmasPlv === yr) return;
+  const h = ((todF() * 24) + 6) % 24; if (h < 19.5 || h >= 23.5 || !city.ready || swapping) return; xmasShowGo();
+}
+function xmasShowGo() {
+  S.xmasShow = { st: 'go', from: S.cityId, sp: speed || 1, lock: S.wxLock || null, wk: S.weather, cov: S.snowCover || 0, yr: new Date().getFullYear() };
+  setSpeed(0); fly = null; try { closeBig(); showMap(false); } catch (e) { } $('modal')?.classList.add('hidden');
+  if (S.cityId !== XMAS_PLV) { toast('🎄 Коледната нощ! Отиваме в Пловдив…', 'good'); save(); switchCity(XMAS_PLV); } else xmasShowBegin();
+}
+async function xmasShowBegin() {
+  const X = S.xmasShow; X.st = 'show'; setSpeed(0); fly = null; S.wxLock = 'snow'; weather.set('snow'); weather.setCover(1); $('panel')?.classList.add('hidden'); controls.enabled = false; if (city.mm) city.mm.el.style.visibility = 'hidden';
+  xmasHid = []; const hid = o => { if (o && o.visible) { o.visible = false; xmasHid.push(o); } }; hid(tr2G); hid(myBeams.mesh); if (city.group) city.group.traverse(o => { if (o.isSprite || o.userData.lm) hid(o); });   // без трафика (колите не карат редом с кервана) и без надписите над града
+  let r = null; try { r = await xmasShow.start(); } catch (e) { console.warn('xmas-plovdiv', e); } if (!r) xmasShowEnd(true); else console.log('xmas-plovdiv', JSON.stringify(r));
+}
+function xmasShowEnd(sk) {
+  const X = S.xmasShow || { from: S.cityId, sp: 1 }; controls.enabled = true; if (X.lock) S.wxLock = X.lock; else delete S.wxLock;
+  if (X.wk) S.weather = X.wk; S.snowCover = X.cov || 0; weather.set(W2 ? wx2Now() : S.weather || 'clear'); weather.setCover(S.snowCover); $('panel')?.classList.remove('hidden'); if (city.mm) city.mm.el.style.visibility = ''; for (const o of xmasHid) o.visible = true; xmasHid = []; setSpeed(X.sp || 1);
+  const first = S.xmasPlv == null; S.xmasPlv = X.yr || new Date().getFullYear(); X.st = 'done';
+  if (first) showEventPop('xmas-plovdiv', '🎄 Коледно чудо в Пловдив!', 'Коледният керван мина по булеварда и запали светлините на града. Постижение: „Коледно чудо“.');
+  if (X.from && X.from !== XMAS_PLV) setTimeout(() => { save(); switchCity(X.from); }, first ? 3500 : 800); else { delete S.xmasShow; save(); }
+}
 // 🦍 kongo (собственикът, 01.11: горилата — одобрена в Blender, „давай“): рядко, денем в Ню Йорк — катери Емпайър Стейт, на върха — гърдите, ревът, самолетите
 const kongo = feature('kongo') ? createGorilla({ scene, S: () => S, landmark: k => { const o = (city.landmarks || []).find(q => q.kind === k); return o ? o.group : null; }, camera, hour: () => ((todF() * 24) + 6) % 24, night: () => dayNight.night, plane: (k, l) => makePlane(k, l), toast: (...a) => toast(...a), pop: (k, c, s2) => showEventPop(k, c, s2), save: () => save() }) : null;
 // 📜 holo-history (собственикът, 01.11: „история отстрани на изненадите — за Титаник кратка история, за останалите като холограма“)
@@ -13737,7 +13770,7 @@ function frame() {
     if (feature('fire-seq')) fires.update(dt / DAY_SEC);
     if (feature('fire-ruins')) blkRuins.update(dt / DAY_SEC);   // игрово време: на пауза (dt = 0) всичко спира
     if (nessieFx) nessieFx.update(dt);   // 🐉 nessie
-    if (xmasConvoy) xmasConvoy.update(dt > 0 ? rdt : 0);   // 🎄 xmas-convoy: в реално време (на пауза стои)
+    if (xmasConvoy && !xmasShow) xmasConvoy.update(dt > 0 ? rdt : 0);   // 🎄 xmas-convoy: в реално време (на пауза стои)
     if (holoTick && (holoTick.n = (holoTick.n || 0) + 1) % 15 === 0) holoTick();   // 📜 holo-history
     if (ghostHunt) ghostHunt.update(dt, dt > 0);   // 👻 ghost-hunt: само в Ню Йорк (иначе — нищо)
     if (kongo) kongo.update(rdt, dt > 0);   // 🦍 kongo: реално време (на пауза — застива)
@@ -13814,7 +13847,7 @@ function frame() {
   }   // директорската зала (directors3d.js) е втори WebGL на цял екран — градът под нея не се рисува (иначе две сцени на кадър)
   controls.update();
   if (S && skySun && skySun.setMoonPhase && feature('moon-phases')) skySun.setMoonPhase(window.__moonPh != null ? window.__moonPh : ((S.day || 1) + todF()) / 29.53 + 0.5);   /* __moonPh — Лабораторията (__dbg.moon) */   // 🌙 moon-phases: на ден 1 — пълнолуние
-  if (S) { dayNight.update(todF(), controls.target); weather.update(rdt, controls.target); if (storm) storm.update(rdt, WX3 ? weather.thunder : weather.kind === 'storm');   /* ⚡ storm-bolts: след времето (hemi се пресмята всеки кадър) */ if (skySun) skySun.update((6 + todF() * 24) % 24, camera, controls.target, WX3 ? weather.sky : SKY_CLOUD[weather.kind] ?? 0, sun, storm ? { heavy: WX3 ? weather.heavy : weather.kind === 'storm' ? 1 : weather.kind === 'rain' ? 0.5 : 0, flash: storm.flash } : null);   /* sky-sun: след денонощието и времето */ if (football) football.update(rdt, controls.target);   /* ⚽ football: само близо до камерата */ if (birds) birds.update(rdt, camera);   /* 🐦 birds */ if (airCity) airCity.update(rdt);   /* ✈️ air-approach / 🚁 police-heli */ if (bikes) bikes.update(rdt, controls.target);   /* 🚲 bikes */ if (FLAGS) { flagsTick(performance.now() / 1000); if (performance.now() > flagT) { flagT = performance.now() + 2500; try { placeFlags(); } catch (e) { console.warn('flags', e); } } }   if (SNOWR && performance.now() > snowT) { snowT = performance.now() + 2500; try { snowRoofs(); } catch (e) { console.warn('snow-roofs', e); } }   /* ❄️ snow-roofs */   /* 🏳️ flags */ if (MARKETS && performance.now() > marketT) { marketT = performance.now() + 3000; try { placeMarket(); } catch (e) { console.warn('markets', e); } }   /* 🍉 markets */ if (xmas) xmas.update(rdt);   /* 🎄 xmas */ setSiteLightsNight(dayNight.night); if (cityHw && cityHw.signs) for (const G of cityHw.signs) G.setNight(dayNight.night); if (city.billboards) { city.billboards.setNight(dayNight.night); city.billboards.update && city.billboards.update(rdt); } }
+  if (S) { dayNight.update(todF(), controls.target); weather.update(rdt, controls.target); if (storm) storm.update(rdt, WX3 ? weather.thunder : weather.kind === 'storm');   /* ⚡ storm-bolts: след времето (hemi се пресмята всеки кадър) */ if (skySun) skySun.update((6 + todF() * 24) % 24, camera, controls.target, WX3 ? weather.sky : SKY_CLOUD[weather.kind] ?? 0, sun, storm ? { heavy: WX3 ? weather.heavy : weather.kind === 'storm' ? 1 : weather.kind === 'rain' ? 0.5 : 0, flash: storm.flash } : null);   /* sky-sun: след денонощието и времето */ if (football) football.update(rdt, controls.target);   /* ⚽ football: само близо до камерата */ if (birds) birds.update(rdt, camera);   /* 🐦 birds */ if (airCity) airCity.update(rdt);   /* ✈️ air-approach / 🚁 police-heli */ if (bikes) bikes.update(rdt, controls.target);   /* 🚲 bikes */ if (FLAGS) { flagsTick(performance.now() / 1000); if (performance.now() > flagT) { flagT = performance.now() + 2500; try { placeFlags(); } catch (e) { console.warn('flags', e); } } }   if (SNOWR && performance.now() > snowT) { snowT = performance.now() + 2500; try { snowRoofs(); } catch (e) { console.warn('snow-roofs', e); } }   /* ❄️ snow-roofs */   /* 🏳️ flags */ if (MARKETS && performance.now() > marketT) { marketT = performance.now() + 3000; try { placeMarket(); } catch (e) { console.warn('markets', e); } }   /* 🍉 markets */ if (xmas) xmas.update(rdt);   /* 🎄 xmas */ xmasShowTick(rdt);   /* 🎄 xmas-plovdiv */ setSiteLightsNight(dayNight.night); if (cityHw && cityHw.signs) for (const G of cityHw.signs) G.setNight(dayNight.night); if (city.billboards) { city.billboards.setNight(dayNight.night); city.billboards.update && city.billboards.update(rdt); } }
   if (GLITE) dayNight.glowMat.visible = dayNight.poolMat.visible = dayNight.night > 0.01 && gfx().night;   // 🟠 gfx-lite: ореолите на лампите — денем (прозрачност 0) без рисуване; „Нощни светлини“ — изключени
   perfTune(rdt);
   perf.lap('prep');
@@ -13918,7 +13951,7 @@ const verN = createVerNotice({ save: () => save(true) }); if (newerSave) verN.bl
 // 🎵 music (music.js): менюто/картата → menu; градът → city (+ sunny денем), активна игра → work; заглъхва при кино, видео и песента на града
 const music = createMusic({ sound: Sound, mode: () => !S || !city?.ready || !$('mapScreen').classList.contains('hidden') ? 'menu' : 'city', active: () => speed >= 2 || projects.length >= 3,
   night: () => dayNight.night || 0, sunny: () => MUSIC_SUNNY.has(S?.cityId), muted: () => Sound.muted,
-  duck: () => !!$('cine') || !!cine.playing() || [...document.querySelectorAll('video')].some(v => !v.paused && !v.muted && v.volume > 0) || Object.entries(Sound.files || {}).some(([k, a]) => k.includes('assets/local/') && !a.paused) });
+  duck: () => !!$('cine') || !!cine.playing() || !!(xmasShow && xmasShow.busy) || [...document.querySelectorAll('video')].some(v => !v.paused && !v.muted && v.volume > 0) || Object.entries(Sound.files || {}).some(([k, a]) => k.includes('assets/local/') && !a.paused) });
 if (saved && !AUTOTEST) backupRaw(currentSlot(), localStorage.getItem(SAVE_KEY), 'старт');
 // 💾 автозапис: записва всяка минута и при затваряне; на всеки 5 минути пази и резервно копие (🕒 Автозаписи)
 if (!AUTOTEST) {
@@ -13956,7 +13989,10 @@ if (AUTOTEST) {
     async ufo(night = true) { if (!ufo) return 'off'; if (night) this.time(0.5); setSpeed(1); return ufo.now(); },   // 🛸 ufo-vegas: Лабораторията — НЛО сега пред камерата (без постижение)
     ufoState() { return ufo ? ufo.state() : null; },
     ghostState() { return ghostHunt ? ghostHunt.state() : null; },
-    async xmas() { if (!xmasConvoy) return 'off'; return await xmasConvoy.test(); },   // 🎄 xmas-convoy: керванът сега (Лабораторията)
+    async xmas() { if (!xmasConvoy) return 'off'; return await xmasConvoy.test(); },
+    xmasShow() { if (!xmasShow) return 'off'; if (xmasShow.busy) return 'busy'; delete S.xmasPlv; xmasShowGo(); return S.xmasShow; },   // 🎄 xmas-plovdiv: шоуто сега (от всеки град — отива в Пловдив)
+    xmasShowSeek(t) { if (!xmasShow || !xmasShow.busy) return 'не тече'; xmasShow.seek(t, camera); return xmasShow.info(); },
+    xmasShowInfo() { return xmasShow ? { st: S.xmasShow && S.xmasShow.st, city: S.cityId, ...(xmasShow.info() || {}) } : 'off'; },   // 🎄 xmas-convoy: керванът сега (Лабораторията)
     async kongo() { if (!kongo) return 'off'; showMap(false); $('panel').classList.add('hidden'); this.time(11); setSpeed(1); const L = (city.landmarks || []).find(q => q.kind === 'empire2'); if (!L) return 'няма Емпайър'; const p = L.group.position; __dbg.camAt(p.x + 160, 120, p.z + 205, p.x, 125, p.z); fly = null; return kongo.test([0.62, 0.785]); },   // 🦍 kongo: Лабораторията — пуска горилата сега, камерата към Емпайър
     kongoState() { return kongo ? kongo.state() : null; },
     beachState() { return beachPeople ? beachPeople.state() : null; },
