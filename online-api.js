@@ -4,8 +4,8 @@
 // без втори разход или втора награда. Входът е общ с облачните записи (същият storageKey).
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
 
-const URL_ = 'https://lpzjscttqieqnqozscpk.supabase.co';
-const KEY = 'sb_publishable_3Gats6iSx7BoyFUh63N1vQ__pHCBrul';   // публичен ключ — таблиците на онлайн режима са недостъпни, само ol_* функциите
+const URL_ = 'https://imperia-db.temidasoft.com';   // TemidaBase (02.11.2026; беше Supabase Cloud lpzjscttqieqnqozscpk)
+const KEY = 'sb_publishable_5rqOuEHce2mAPQx25XEDZD_jFLiRNnB';   // публичен ключ — таблиците на онлайн режима са недостъпни, само ol_* функциите
 export const sb = createClient(URL_, KEY, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'stroi-auth' } });
 
 // ── състояние на връзката: 'ok' | 'retry' | 'offline' ──

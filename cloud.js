@@ -10,8 +10,8 @@ import { langOn, langButton, setLang, LANG } from './i18n.js';   // 🌐 lang-en
 const EMAIL_PH = LANG === 'en' ? 'name@example.com' : 'ime@primer.com';   // примерният имейл в полетата за вход
 import './consent.js';   // 🍪 GDPR съгласие (feature 'consent') — window.consent
 
-const URL_ = 'https://lpzjscttqieqnqozscpk.supabase.co';
-const KEY = 'sb_publishable_3Gats6iSx7BoyFUh63N1vQ__pHCBrul';   // публичен ключ — достъпът се пази от RLS
+const URL_ = 'https://imperia-db.temidasoft.com';   // TemidaBase (02.11.2026; беше Supabase Cloud lpzjscttqieqnqozscpk)
+const KEY = 'sb_publishable_5rqOuEHce2mAPQx25XEDZD_jFLiRNnB';   // публичен ключ — достъпът се пази от RLS
 const SLOTS = 3;
 const keyOf = n => n === 1 ? 'stroi-save-v1' : `stroi-save-v1-s${n}`;
 const syncKey = n => `stroi-cloud-s${n}`;   // { ts: updated_at в облака, sig: отпечатък на качения запис }
