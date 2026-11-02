@@ -5,6 +5,7 @@
 // Пожарните коли спират пред блока, пожарникарите гасят с водни струи; хеликоптерът хвърля вода отгоре;
 // полицията затваря улицата (коли на двата края, лента) и изтегля зяпачите зад лентата.
 import { openOpsScene, THREE } from './opskit.js';
+import { feature } from './lab/feature.js';   // pol-no-crownvic
 
 const BLK = ['brick', 'dbrick', 'richmond', 'soviet'].map(k => `assets/heavy/blocks/${k}.glb`), OPP = ['modoffice', 'jade'].map(k => `assets/heavy/blocks/${k}.glb`);
 const CARS = 'assets/heavy/cars/', OPS = 'assets/heavy/ops/';
@@ -18,7 +19,7 @@ export function openOpsFire(ops, o = {}) {
     cars: {
       fire: [['fire-man', -24], ['fire-us2', 8], ['fire-man', 22]].map(([n, x], i) => ({ model: CARS + n + '.glb', kind: 'fire', len: 9, path: [[-95, LANE], [x, LANE]], delay: i * 0.02 })),
       ladder: [{ model: OPS + 'ladder-truck.glb', len: 10, path: [[95, LANE], [-7, LANE]], beacons: true, beaconY: 3.2, lbY: 4 }],
-      pol: [{ model: CARS + 'pol-crownvic.glb', kind: 'police', len: 5.4, path: [[-95, ROAD_Z + 2], [-36, ROAD_Z + 0.5]] }, { model: CARS + 'pol-charger.glb', kind: 'police', len: 5.1, path: [[95, ROAD_Z - 2], [36, ROAD_Z - 0.5]], delay: 0.02 }, { model: CARS + 'pol-interceptor.glb', kind: 'police', len: 5.3, path: [[95, ROAD_Z + 2], [30, ROAD_Z + 2.5]], delay: 0.04 }],
+      pol: [{ model: CARS + (feature('pol-no-crownvic') ? 'pol-belasco' : 'pol-crownvic') + '.glb', kind: 'police', len: 5.4, path: [[-95, ROAD_Z + 2], [-36, ROAD_Z + 0.5]] }, { model: CARS + 'pol-charger.glb', kind: 'police', len: 5.1, path: [[95, ROAD_Z - 2], [36, ROAD_Z - 0.5]], delay: 0.02 }, { model: CARS + 'pol-interceptor.glb', kind: 'police', len: 5.3, path: [[95, ROAD_Z + 2], [30, ROAD_Z + 2.5]], delay: 0.04 }],
       med: [{ model: CARS + 'amb-eu.glb', kind: 'ambulance', len: 7.2, path: [[95, ROAD_Z + 2.2], [27, ROAD_Z + 2.2]] }, { model: CARS + 'amb-us.glb', kind: 'ambulance', len: 7.5, path: [[95, ROAD_Z + 2.2], [18, ROAD_Z + 2.2]], delay: 0.03 }],
     },
     labelAt: (k) => k === 'heli' ? heliLb : null,

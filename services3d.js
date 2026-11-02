@@ -52,7 +52,8 @@ export function buildService(k, lvl, lot, opt = {}) {
   const bench = (x, z, ry = 0) => { const b = box(1.6, 0.45, 0.5, M(R.trim), x, 0, z); b.rotation.y = ry; };
   // 🚓 svc-cars-reg (потребителят: „полиция пожарна болница по градовете“ — „където да се паркират колите“): пред участъка, пожарната и болницата — колите
   // на региона на града (същите като в трафика: vehmodels.js POL_REG / FIRE_REG / AMB_REG), редуват се; без флага — както досега (Crown Vic, MAN, жълтата линейка)
-  const SVC_CARS = { police: { am: ['pol-crownvic', 'pol-charger', 'pol-nypd'], ru: ['pol-duster', 'pol-vaz'], eu: ['pol-logan', 'pol-duster'], bg: ['pol-logan', 'pol-duster'], xx: ['pol-logan', 'pol-crownvic'] },
+  const CV = feature('pol-no-crownvic') ? 'pol-belasco' : 'pol-crownvic';   // pol-no-crownvic: вместо Crown Victoria — белият седан
+  const SVC_CARS = { police: { am: [CV, 'pol-charger', 'pol-nypd'], ru: ['pol-duster', 'pol-vaz'], eu: ['pol-logan', 'pol-duster'], bg: ['pol-logan', 'pol-duster'], xx: ['pol-logan', CV] },
     fire: { am: ['fire-titan', 'fire-us2'], ru: ['fire-brigade', 'fire-man'], eu: ['fire-brigade', 'fire-man'], bg: ['fire-brigade', 'fire-man'], xx: ['fire-man', 'fire-brigade'] },
     ambulance: { am: ['amb-box', 'amb-us'], ru: ['amb-gaz'], eu: ['amb-van', 'amb-eu'], bg: ['amb-van', 'amb-eu'], xx: ['amb-van', 'amb-eu'] } };
   const SVC_LEN = { 'fire-titan': 10.8, 'fire-us2': 10, 'fire-man': 10.5, 'fire-brigade': 8.6, 'amb-box': 7.5, 'amb-us': 7.5, 'amb-van': 6.8, 'amb-eu': 7, 'amb-gaz': 6.2, 'pol-vaz': 4.1, 'pol-logan': 4.36, 'pol-duster': 4.34 };

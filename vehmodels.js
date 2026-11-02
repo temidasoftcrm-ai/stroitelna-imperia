@@ -47,7 +47,7 @@ export function loadVehModels(load, A, base = 'assets/heavy/gear/') {
 // Заместват част от „Free Low Poly Vehicles Pack“ под същите имена; дължината — истинската в метри × мащаба на града.
 const REAL_CARS = {   // име: [файл, дължина в м]
   Sedan: ['car-polo', RS ? 4.05 : 4.4], Hatchback: ['car-p206', 3.8], SUV: ['car-renegade', 4.25], Pickup: ['car-hilux', 5.3], Taxi: ['car-taxi', 4.9],
-Muscle: ['car-accord', RS ? 4.9 : 4.7], Muscle_2: ['car-corolla', RS ? 4.63 : 4.2], Police_Sedan: ['pol-crownvic', 5.4], Bus: ['bus-citaro', 12], Limousine: ['car-limo', 7.6], Police_SUV: ['car-polsuv', RS ? 6.0 : 4.9], Truck: ['car-truck', 6.5],
+Muscle: ['car-accord', RS ? 4.9 : 4.7], Muscle_2: ['car-corolla', RS ? 4.63 : 4.2], Police_Sedan: feature('pol-no-crownvic') ? ['pol-belasco', 5.4] : ['pol-crownvic', 5.4] /* pol-no-crownvic: Crown Victoria — възможно от игра (Burnin' Rubber) */, Bus: ['bus-citaro', 12], Limousine: ['car-limo', 7.6], Police_SUV: ['car-polsuv', RS ? 6.0 : 4.9], Truck: ['car-truck', 6.5],
 };
 const M_PER = CAR_LEN / 4.5;   // седанът от пакета (≈4,5 м) е CAR_LEN в света на играта
 // cars-more (55): още градски коли (Sketchfab, CC-BY; нормализирани в Blender — предница +z, колела на 0, истинска дължина в м).
@@ -131,7 +131,7 @@ function loadRealCars(load, A) {
 // всички с мигащи буркани; при няколко одобрени — A[...].variants (game.js model() може да ги редува)
 const EMERG_K = { Police_Sedan: 1, Ambulance: 1, Firetruck: 1 };   // всички коли са в истински метри (1 м ≈ 1 единица, хората ~1,9) — спешните вече не се уголемяват
 const EMERG = {
-  Police_Sedan: [['pol-charger', 5.1], ['pol-crownvic', 5.4], ...(feature('pol-no-nfs') ? [] : [['pol-interceptor', 5.3]]) /* pol-no-nfs: Police Interceptor е от Need for Speed Hot Pursuit 2 (EA) — не може в публикуваната игра */, ['pol-nypd', 5.1], ['pol-suburban', 5.7], ['pol-belasco', 5.4] /* pol-suburban / pol-belasco (02.11, Meshy, Blender: без марките, собствени фарове/стопове lamp_*, лентата — siren_L/R) — американската полиция вместо Interceptor */, ...(feature('pol-new') ? [['pol-logan', 4.36], ['pol-duster', 4.34]] : [['pol-volga', 4.1]])],   // pol-volga — вече ВАЗ 2101 на КАТ (файлът — EMERG_FILE); pol-new — вместо нея Logan и Duster
+  Police_Sedan: [['pol-charger', 5.1], ...(feature('pol-no-crownvic') ? [] : [['pol-crownvic', 5.4]]) /* pol-no-crownvic: тагът „burninrubber“ — може да е от игра */, ...(feature('pol-no-nfs') ? [] : [['pol-interceptor', 5.3]]) /* pol-no-nfs: Police Interceptor е от Need for Speed Hot Pursuit 2 (EA) — не може в публикуваната игра */, ['pol-nypd', 5.1], ['pol-suburban', 5.7], ['pol-belasco', 5.4] /* pol-suburban / pol-belasco (02.11, Meshy, Blender: без марките, собствени фарове/стопове lamp_*, лентата — siren_L/R) — американската полиция вместо Interceptor */, ...(feature('pol-new') ? [['pol-logan', 4.36], ['pol-duster', 4.34]] : [['pol-volga', 4.1]])],   // pol-volga — вече ВАЗ 2101 на КАТ (файлът — EMERG_FILE); pol-new — вместо нея Logan и Duster
   Firetruck: [['fire-us', 10], ['fire-man', 10.5], ['fire-titan', 10.8], ['fire-cyber', 10.5], ['fire-brigade', 8.6], ['fire-airport', 11]],   // fire-brigade / fire-airport (01.11, Meshy, Blender) — европейската цистерна и летищната   // fire-red — изтрита; fire-titan / fire-cyber (f6) — Meshy, Blender: колела wheel_*, буркани siren_*, стълба Ladder
   Ambulance: [['amb-gaz', RS ? 6.2 : 7], ['amb-us', 7.5], ['amb-eu', 7.2], ['amb-van', 6.8], ['amb-box', 7.5]],   // amb-van / amb-box (01.11, Meshy, Blender: dimiter-8e) — европейският бус и американската с кутията
 };
@@ -495,7 +495,11 @@ function erFlashers(car, kind, cols, R) {
   const bb = new THREE.Box3(); for (const m of meshes) bb.expandByObject(m); if (bb.isEmpty()) return; const s = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3());
   const rc = new THREE.Raycaster(), inv = car.matrixWorld.clone().invert();
   const stick = (p, dir) => { rc.set(p.clone().addScaledVector(dir, -4), dir); rc.far = 8; const h = rc.intersectObjects(meshes, false)[0]; return h ? h.point.addScaledVector(dir, -0.012) : null; };
-  const lamp = (Cls, col, at, dir, w, h, side) => { const p = stick(at, dir); if (!p) return; const m = new Cls(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+  // pol-side-fix (потребителят: „да, може“): лъчът минава през дупка (калника над колелото на NYPD) — още няколко опита малко встрани, после — ръбът на кутията
+  const stick2 = (at, dir) => { let p = stick(at, dir); if (p || !feature('pol-side-fix')) return p;
+    for (const [dy, dz] of [[-0.08, 0], [0.08, 0], [0, -0.12], [0, 0.08], [-0.12, -0.12], [0.06, -0.2]]) { p = stick(at.clone().add(new THREE.Vector3(0, dy * s.y, dz * s.z)), dir); if (p) return p; }
+    return dir.y === 0 && dir.z === 0 ? new THREE.Vector3(dir.x > 0 ? bb.min.x : bb.max.x, at.y, at.z).addScaledVector(dir, -0.012) : null; };
+  const lamp = (Cls, col, at, dir, w, h, side) => { const p = stick2(at, dir); if (!p) return; const m = new Cls(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
     m.position.copy(p.applyMatrix4(inv)); m.lookAt(m.position.clone().add(dir.clone().negate())); m.userData.side = side; m.renderOrder = 3; car.add(m); };
   const X = new THREE.Vector3(1, 0, 0), Z = new THREE.Vector3(0, 0, 1), V = (x, y, z) => new THREE.Vector3(x, y, z);
   const H = kind === 'police' ? 0.6 : kind === 'fire' ? 0.8 : 0.75, ys = c.y - s.y / 2 + s.y * H, zs = kind === 'police' ? [0.3] : kind === 'fire' ? [-0.35, 0, 0.3] : [-0.35, 0.3];
