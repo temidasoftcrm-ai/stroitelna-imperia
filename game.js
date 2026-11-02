@@ -8341,7 +8341,7 @@ if (feature('lm-tall')) Object.assign(LM_PROP, { chrysler: 1, chrysler2: 1, empi
 // 🌃 ny-night2 (собственикът — снимките): прожекторите на забележителностите на Ню Йорк — само емисивна ивица по височина (без светлини, без нови мрежи):
 // Емпайър — короната и горните отстъпи топло златно, антената; Крайслер — короната бяло; Уан Уърлд Трейд — хладно бели ръбове (по-светло нагоре) и шпилът; 30 Рок — горе топло
 const LMF_U = { value: 0 }, LM_FLOOD = { empire2: [0.68, 0xffc55a, 2.2], chrysler2: [0.8, 0xfff4e0, 2.4], onewtc: [0.0, 0xdfeeff, 0.9, 1], rockefeller2: [0.86, 0xffd890, 1.6], fifth500: [0.8, 0xffe2b0, 1.2], fourts: feature('ny-4ts') ? [0.74, 0xfff0d8, 0.55] : [0.9, 0xeef4ff, 1.6] };
-if (feature('empire-night3')) delete LM_FLOOD.empire2; if (feature('chrysler-night3')) delete LM_FLOOD.chrysler2;   // 🌃 chrysler-night3 — същото за Крайслер   // 🌃 empire-night3: Емпайър има своята изпечена нощ (empirenight.js) — без общия прожектор
+if (feature('lm-night-rock')) delete LM_FLOOD.rockefeller2;   /* 🌃 lm-night-rock: 30 Rock има своята нощ (lmnight.js) — без общия прожектор */ if (feature('empire-night3')) delete LM_FLOOD.empire2; if (feature('chrysler-night3')) delete LM_FLOOD.chrysler2;   // 🌃 chrysler-night3 — същото за Крайслер   // 🌃 empire-night3: Емпайър има своята изпечена нощ (empirenight.js) — без общия прожектор
 // 🗽 ny-dense: фоновите кутии на osm-edge (ФиДи) върху парцела на Уайтхол и анекса — скрити (по отпечатъка + 6 м); osm-edge се строи на части — няколко пъти
 function lmEdgeClear(o, at) { const pv = city.planView; if (!pv || !pv.userData.edgeClear) return; const r = Math.hypot(at.w || 40, at.d || 40) / 2 + 25; let n = 0;
   const go = () => { pv.updateMatrixWorld(true); const c = pv.worldToLocal(o.group.position.clone()); pv.userData.edgeClear((x, z) => (x - c.x) ** 2 + (z - c.z) ** 2 < r * r); if (++n < 6) setTimeout(go, 3000); }; go(); }
@@ -8358,9 +8358,12 @@ function lmFlood(o) {
       mt.customProgramCacheKey = () => (key ? key.call(mt) : '') + '|lmf' + o.kind; mt.needsUpdate = true; } }); };
   go(); const t = setInterval(() => { go(); if (++n > 90) clearInterval(t); }, 1000);
 }
+// 🗽 ny-rock-tall (собственикът, 02.11: „да“ — 30 Rock по-висока от Radio City): кулата излизаше 120 м вместо 156 (ny-lm-heights) — lmH дава 40 (GLB_LM.h),
+// а моделът е тесен и висок (0,93 × 0,39 × 1,90) и landmarks.js го събира по основата (fit 15) → истински 30,8 на височина; разтягането (lm-tall) се смяташе от 40 и не тръгваше
+const NYROCK = feature('ny-rock-tall'), LM_H_REAL = NYROCK ? { rockefeller2: 15 * 1.9013 / 0.9264 } : {};
 const NYTALL = feature('ny-tall'), LM_NYTALL = { rockefeller2: 400, radiocity2: 250 };
    // 🗽 ny-tall (собственикът): 30 Rock ≈ колкото Емпайър, кулата на Радио Сити ~250 м
-const LM_TALL = new Set(['chrysler2', 'empire2', 'onewtc', 'fourts', ...(feature('ny-dense') ? ['whitehall', 'nyannex', 'fifth500', 'park605'] : []), ...(NYTALL ? ['rockefeller2'] : [])]);
+const LM_TALL = new Set(['chrysler2', 'empire2', 'onewtc', 'fourts', ...(feature('ny-dense') ? ['whitehall', 'nyannex', 'fifth500', 'park605'] : []), ...(NYTALL || NYROCK ? ['rockefeller2'] : [])]);
 if (feature('lm-galata2') && hasLandmark('galata2')) { LM_PREF.galata = 'galata2'; LM_REAL_H.galata2 = 63; LANDMARK_NM.galata2 = 'Кулата Галата'; LM_PROP.galata2 = 1; }   // 🇹🇷 lm-galata2 (f6): кулата Галата — моделът на потребителя (Meshy) вместо процедурната, на мястото ѝ в Бейоглу (над Златния рог), 63 м с конуса
 if (feature('ny-dense')) { Object.assign(LM_REAL_H, { whitehall: 80, nyannex: 120, fifth500: 212, park605: 55 }); for (const k of ['whitehall', 'nyannex', 'fifth500', 'park605']) { LM_EXTRA.newyork.add(k); LM_PROP[k] = 1; } }   // 🗽 ny-dense: четирите истински сгради (точките — lmNy2Points)
 if (feature('lm-ny2')) { LM_REAL_H.onewtc = 541; LM_REAL_H.fourts = 247; LM_EXTRA.newyork.add('onewtc'); LM_EXTRA.newyork.add('fourts'); }   // 🇺🇸 lm-ny2 (f6): One WTC и 4 Times Square — точките се добавят в плана (lmNy2Points)
@@ -8374,10 +8377,29 @@ const LM_LABEL = { kotelnicheskaya: 'Котелническа висотка' };
 const LM_ALIAS = { suleymaniye: feature('lm-suleymaniye2') ? 'suleymaniye2' : 'mosque2', stpatrick: 'stpatrick2', kotelnicheskaya: feature('lm-kotel') ? 'kotel' : 'mgu' }, LM_NOT = new Set(['termini', 'sirkeci', 'saintlazare', 'haydarpasa_st']);   // гарите ги рисува изгледът на града
 // 🇺🇸 lm-ny2: One WTC е в Долен Манхатън — извън картата на плана (~1,4 км южно от нея): в южния край на плана, към Долен Манхатън;
 // 4 Times Square — на истинското място (43-та и Бродуей, до Таймс Скуеър). В рамката на играта (P.landmarks — като другите точки)
+// 🏛️ lm-no-overlap (собственикът, 02.11: „провери има ли имоти/парцели, в които се застъпват 2 сгради“): Уайтхол и Анексът му в Ню Йорк се застъпваха с 65 %
+// (ny-south-compact сгъстява юга ×0,4 и двете точки се сближиха). Общо правило за добавените точки: забележителност не стои върху друга — най-малкото
+// преместване, докато отпечатъците (w × d, завъртени) се разделят с 2 м; страната остава същата (Анексът — пак зад Уайтхол). Не във водата, най-много 80 м.
+const LMNO = feature('lm-no-overlap');
+function lmNoOverlap(P, L) {
+  if (!LMNO) return L; const GAP = 2, x0 = L.x, z0 = L.z;
+  for (let it = 0; it < 6; it++) { let moved = false;
+    for (const E of P.landmarks) { if (E === L || !(E.w > 0) || !(E.d > 0)) continue; const dx = L.x - E.x, dz = L.z - E.z;
+      if (Math.abs((E.rot || 0) - (L.rot || 0)) < 0.02) {   // една и съща решетка — правоъгълниците в общата рамка
+        const r = L.rot || 0, ux = Math.cos(r), uz = -Math.sin(r), du = dx * ux + dz * uz, dv = dx * -uz + dz * ux;   // локалното x (w) — (cos r, −sin r), z (d) — (sin r, cos r)
+        const ou = (L.w + E.w) / 2 + GAP - Math.abs(du), ov = (L.d + E.d) / 2 + GAP - Math.abs(dv); if (ou <= 0 || ov <= 0) continue;
+        if (ou <= ov) { const m = ou * (du < 0 ? -1 : 1); L.x += m * ux; L.z += m * uz; } else { const m = ov * (dv < 0 ? -1 : 1); L.x += m * -uz; L.z += m * ux; } moved = true;
+      } else {   // различно завъртени — по описаните кръгове, по линията на центровете
+        const rr = (Math.hypot(L.w, L.d) + Math.hypot(E.w, E.d)) / 2 + GAP, dd = Math.hypot(dx, dz); if (dd >= rr) continue; const l = dd || 1; L.x += dx / l * (rr - dd); L.z += dz / l * (rr - dd); moved = true; } }
+    if (!moved) break; }
+  if (Math.hypot(L.x - x0, L.z - z0) > 80 || (P.waterAt && P.waterAt(L.x, L.z))) { L.x = x0; L.z = z0; }   // далеч или във водата — остава на мястото си
+  else if (L.x !== x0 || L.z !== z0) L.moved = [Math.round(L.x - x0), Math.round(L.z - z0)];
+  return L;
+}
 function lmNy2Points() {
   const P = city.plan, D = P.p2.osmData, [ox, oz] = P.offset || [0, 0]; if (!D) return;
   const K = D.k, c = D.center, cz = nySouthZ(D), xz = (la, lo) => [(lo - c[1]) * Math.cos(c[0] * Math.PI / 180) * 111320 * K, cz(-(la - c[0]) * 110540 * K)];   /* ny-south-compact: южно от плана — сгъстено */
-  const B = P.p2.boundary, zMax = Math.max(...B.map(p => p[1])), add = (k, x, z, fp) => { if (!P.landmarks.some(L => L.k === k)) P.landmarks.push({ k, x: x + ox, z: z + oz, rot: 0.506, vrot: -0.506, fp, w: fp[0], d: fp[1], guard: 4 }); };   // като другите точки на Манхатън (решетката е завъртяна на 0,506)
+  const B = P.p2.boundary, zMax = Math.max(...B.map(p => p[1])), add = (k, x, z, fp) => { if (!P.landmarks.some(L => L.k === k)) P.landmarks.push(lmNoOverlap(P, { k, x: x + ox, z: z + oz, rot: 0.506, vrot: -0.506, fp, w: fp[0], d: fp[1], guard: 4 })); };   // като другите точки на Манхатън (решетката е завъртяна на 0,506)
   const [tx, tz] = xz(40.7564, -73.9862); add('fourts', tx - 14, tz + 26, [66, 56]);   // до Таймс Скуеър (не върху неговата точка)
   // 🗽 ny-wtc-real (собственикът, 01.11: „да скъсим малко разстоянието от Световния търговски център до [Долен Манхатън] — има много разстояние с празни площи и блокове“):
   // на истинското място (Уест и Визи, 40.7130 / −74.0132) — картата вече стига до Батъри парк; ако точката е извън нея — както досега
@@ -8403,7 +8425,7 @@ function landmarkPlan2(kinds) {
     let k0 = Math.max(at.w, at.d) * 0.95 / s0; const hr = (NYTALL && LM_NYTALL[k]) || LM_REAL_H[k] || LM_REAL_H[k.replace(/\d+$/, '')];   /* 🗽 ny-tall: 30 Rock и Радио Сити — над повдигнатите кутии */
     if (hr) { let h0 = lmH(k); if (!h0) { const sg = feature('washington-osm') && o.group.userData.sign; if (sg) sg.removeFromParent(); box.setFromObject(o.group).getSize(sz); h0 = sz.y || 1; if (sg) o.group.add(sg); }   /* без надписа над модела — иначе процедурните излизат с ~10–15 % по-ниски (Линкълн 20 м вместо 24) */ k0 = Math.min(k0, hr * (LM_PROP[k] ?? LM_REAL_K[S.cityId] ?? (P.p2.osmData?.k || 0.45)) / h0); }   // кулите — и по истинската височина (парцелът на Парламента е 225 м, а моделът е само Биг Бен)
     o.group.scale.multiplyScalar(k0); o.group.rotation.y = at.vrot ?? at.rot ?? 0; if (k === 'stpatrick2') o.group.rotation.y += Math.PI / 2; if (LM_TURN[k]) o.group.rotation.y += LM_TURN[k];   /* дългата ос на модела е z, а на парцела — напреки */ o.group.position.set(at.x, 0.1, at.z);   if (feature('eye-turn') && /^londoneye/.test(k) && P.waterAt) { const dry = (x, z) => [0, 1, 2, 3, 4, 5, 6, 7].every(i => !P.waterAt(x + Math.cos(i * 0.785) * 34, z + Math.sin(i * 0.785) * 34)) && !P.waterAt(x, z); if (!dry(at.x, at.z)) { let best = null; for (let r = 8; r <= 140 && !best; r += 6) for (let i = 0; i < 24; i++) { const x = at.x + Math.cos(i * 0.2618) * r, z = at.z + Math.sin(i * 0.2618) * r; if (dry(x, z)) { best = [x, z]; break; } } if (best) o.group.position.set(best[0], 0.1, best[1]); } }   /* eye-turn: Окото — изцяло на брега (колелото и опорите не над Темза) */
-    if (feature('lm-tall') && LM_TALL.has(k) && hr) { const ky = Math.min(NYTALL && LM_NYTALL[k] ? 2.6 : 1.6, hr / (lmH(k) || 1) / k0);   /* ny-tall: 30 Rock — до ×2,6 по височина */ if (ky > 1.01) { o.group.scale.y *= ky; const sg = o.group.userData.sign; if (sg) sg.scale.y /= ky; } }   // 🗽 lm-tall: картата е ×0,45 и парцелът ограничава ширината — небостъргачите стигат истинския ръст по височина (до ×1,6 по-тънки)
+    if (feature('lm-tall') && LM_TALL.has(k) && hr) { const ky = Math.min(NYTALL && LM_NYTALL[k] ? 2.6 : 1.6, hr / (LM_H_REAL[k] || lmH(k) || 1) / k0);   /* ny-tall: 30 Rock — до ×2,6 по височина */ if (ky > 1.01) { o.group.scale.y *= ky; const sg = o.group.userData.sign; if (sg) sg.scale.y /= ky; } }   // 🗽 lm-tall: картата е ×0,45 и парцелът ограничава ширината — небостъргачите стигат истинския ръст по височина (до ×1,6 по-тънки)
     if (k === 'radiocity2' && NYTALL) o.group.userData.towerH = LM_NYTALL.radiocity2;   // кулата — разтегната отгоре (landmarks.js towerFit), залата и надписът остават
     if (k === 'radiocity2' && feature('ny-radiocity') && !feature('ny-lm-heights')) {   /* ny-lm-heights: точната височина, без уголемяването */ const ku = Math.min(200 / 150, Math.max(at.w, at.d) * 0.95 / (s0 * k0)); if (ku > 1.01) o.group.scale.multiplyScalar(ku);   // 🎭 ny-radiocity (собственикът: „твърде малка“): кулата 1270 6th Ave е ~200 м (беше 150) — по-голяма изцяло, до парцела
       const kx = Math.min(1.45, Math.max(at.w, at.d) * 0.95 / (s0 * k0 * Math.max(1, ku))); if (kx > 1.01) { o.group.scale.x *= kx; o.group.scale.z *= kx; } }   // залата — до парцела (~100 × 75 м), кулата — пропорционално по-широка

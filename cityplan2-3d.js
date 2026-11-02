@@ -6,6 +6,7 @@
 // opts: { osm (данните от cityplan2-osm.js — за Рим), offset: [ox, oz] (изместване към рамката на играта), fillLot(lot) → bool, freeLot(lot) → bool (свободен за строеж — трева, ограда, табела),
 //         blocks: true (фоновите квартали в Рим), furniture: true, lampGlow: true (собствени светли петна под фенерите) }
 import * as THREE from 'three';
+import { lmNight } from './lmnight.js';   // 🌃 lm-night-istanbul: Босфорският мост нощем
 import { timesSquareAds } from './timessq-ads.js';   // Таймс Скуеър: светещите екрани с рекламите
 import { makeWater } from './water.js';   // sea2: водата — общият шейдър с вълните
 import { feature } from './lab/feature.js';
@@ -540,7 +541,7 @@ function seaView(G, D, RR, cut = null, edge = null) {
   const Mt = []; for (const r of D.metro || []) if (r.kind !== 'rail') for (const pts of cutBand(r.pts, cut)) Mt.push(ribbon(pts, r.kind === 'tram' ? 2.2 : 2.6, 0.085)); if (Mt.length) G.add(merge(Mt, M(0x9a9184)));   // метро/трамвай на повърхността
   romeBridges(G, D);
   // висящите мостове (Босфорския): моделът — дължината по x, центриран; мащабът — от бряг до бряг
-  for (const B of D.bigBridges || []) { const proto = (D._models || {})[B.k]; if (!proto) continue; floodMats(proto, 0xd8e8ff, 0.35);   // нощем — осветен (студено бяло, като Босфорския)
+  for (const B of D.bigBridges || []) { const proto = (D._models || {})[B.k]; if (!proto) continue; if (!lmNight(proto, B.k)) floodMats(proto, 0xd8e8ff, 0.35);   /* 🌃 lm-night-istanbul: Босфорският — цветните LED (lmnight.js) */   // нощем — осветен (студено бяло, като Босфорския)
     const o = proto.clone(true); o.userData.extShared = 1; const bb = new THREE.Box3().setFromObject(o), len = Math.hypot(B.b[0] - B.a[0], B.b[1] - B.a[1]), k = len / (bb.max.x - bb.min.x);
     const w = new THREE.Group(); o.scale.setScalar(k); o.position.set(-(bb.min.x + bb.max.x) / 2 * k, -bb.min.y * k - 1.2, -(bb.min.z + bb.max.z) / 2 * k); w.add(o);
     w.position.set((B.a[0] + B.b[0]) / 2, 0, (B.a[1] + B.b[1]) / 2); w.rotation.y = -Math.atan2(B.b[1] - B.a[1], B.b[0] - B.a[0]); w.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); G.add(w); }

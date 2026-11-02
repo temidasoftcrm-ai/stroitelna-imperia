@@ -6,6 +6,7 @@
 // Моделите (assets/heavy/lm): kremlin-parts.glb (kr_vodo, kr_palace, kr_tower, kr_church, kr_house), kremlin-spasskaya.glb (kr_spass),
 // kremlin-wall.glb (kr_wall, kr_firs); lm-kremlin3 — kremlin-inner.glb (kr_senate, kr_ivan, kr_uspensky, kr_archangel, kr_annunc — от Blender). Смяна на стената: KR_WALL (името на възела) и KR_SEG (дължината на сегмента, м).
 import * as THREE from 'three';
+import { lmNightInst } from './lmnight.js';   // 🌃 lm-night-moscow: стената, кулите, дворецът и катедралите — топлото осветяване (до flood — тогава flood ги прескача)
 
 export const KR_WALL = 'kr_wall', KR_FIRS = 'kr_firs', KR_SEG = 46.44;   // сегментът от Meshy: 46,4 × 4,7 × 16 м (лицето навън = +z)
 // върховете на стената (истински lat/lon; същите като процедурния Кремъл) и кулите по тях: [модел, височина м, звезда]
@@ -65,7 +66,7 @@ export function kremlinEnsemble(G, D, KM, flood) {
   const M = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 }), { white, green, yellow, gold, star } = PMAT || (PMAT = { white: M(0xf1ece0), green: M(0x3f6b4c), yellow: M(0xe8cf8a), gold: new THREE.MeshStandardMaterial({ color: 0xe6b84a, roughness: 0.3, metalness: 0.8 }), star: new THREE.MeshStandardMaterial({ color: 0x8a1a1a, roughness: 0.35, metalness: 0.3, emissive: 0xff1a1a, emissiveIntensity: 0 }) });   // веднъж (нощните материали на изгледа са общ списък)
   // инстанции: за всяка част на модела — един InstancedMesh (матрица = място × матрицата на възела в сцената)
   const inst = (nm, list) => { const P = part(nm); if (!P || !list.length) return; for (const p of P) { const im = new THREE.InstancedMesh(p.geo, p.mat, list.length); list.forEach((t, i) => im.setMatrixAt(i, m4.compose(new THREE.Vector3(t.x, 0.05, t.z), q.setFromAxisAngle(up, t.rot), new THREE.Vector3(t.sx || t.s, t.s, t.s)).multiply(p.mw)));
-    im.name = nm; im.castShadow = im.receiveShadow = true; im.computeBoundingSphere(); grp.add(im); } };   // името — за Лабораторията (lm-kremlin3: камерата към сградата)
+    im.name = nm; im.castShadow = im.receiveShadow = true; im.computeBoundingSphere(); lmNightInst(im, 'kremlin', p.mw); grp.add(im); } };   // името — за Лабораторията (lm-kremlin3: камерата към сградата)
   inst(KR_WALL, LY.walls); inst(KR_FIRS, LY.walls.filter(w => w.firs));
   for (const k of ['kr_vodo', 'kr_tower', 'kr_spass']) inst(k, LY.towers.filter(t => t.k === k));
   for (const t of LY.inner) inst(t.k, [{ x: t.p[0], z: t.p[1], rot: t.rot, s: t.s }]);
@@ -74,7 +75,7 @@ export function kremlinEnsemble(G, D, KM, flood) {
   const out3 = LY.edges[FIRS_EDGE].nin, sRot = Math.atan2(out3[1], -out3[0]);   // Сенатът: върхът с ротондата (+x на модела) — към Червения площад (навън през стената при него)
   for (const [k, la, lo, r] of IN) { const [x, z] = LY.at(la, lo); inst(k, [{ x, z, rot: r ?? sRot, s: K }]); }
   if (flood) flood(grp, 0xffd8a0, 0.5);
-  if (IN.length) grp.traverse(o => { if (!o.isMesh) return; for (const m of [].concat(o.material)) { const n = (m && m.name) || ''; if (!/^kr3_/.test(n) || m.userData.kr3) continue; m.userData.kr3 = 1;   /* нощем: топли прозорци, куполите хващат прожекторите, фасадите — осветени */
+  if (IN.length) grp.traverse(o => { if (!o.isMesh) return; for (const m of [].concat(o.material)) { const n = (m && m.name) || ''; if (!/^kr3_/.test(n) || m.userData.kr3 || m.userData.lmNight) continue; m.userData.kr3 = 1;   /* нощем: топли прозорци, куполите хващат прожекторите, фасадите — осветени */
     const [c, k] = /_win$/.test(n) ? [0xffc070, 1.1] : /_gold$/.test(n) ? [0xffb030, 0.45] : /_silver$/.test(n) ? [0xdfe6ff, 0.32] : /_green$|_roof$/.test(n) ? [0x9fd8b8, 0.18] : /_flag_/.test(n) ? [0xffffff, 0.3] : [0xffd2a0, 0.3]; if (m.emissive) m.emissive.setHex(c); m.userData.winK = k; } });   // нощем — прожекторите по стените, кулите и двореца
   // върхът на кулата (най-високият връх на модела — шпилът не е в средата на основата: Спаската е с предна част)
   const tops = {}, tv = new THREE.Vector3(); for (const k of ['kr_vodo', 'kr_tower', 'kr_spass']) { const P = part(k); if (!P) continue; let best = null; for (const p of P) { const a = p.geo.attributes.position; for (let i = 0; i < a.count; i++) { tv.fromBufferAttribute(a, i).applyMatrix4(p.mw); if (!best || tv.y > best.y) best = tv.clone(); } } tops[k] = best; }
