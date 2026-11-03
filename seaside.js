@@ -73,7 +73,7 @@ export function addSeaside(group, deps, opts) {
   // море: две части — от двете страни на жп насипа
   const water = makeWater({ color: 0x2f86c8, repeat: 60 }), seaMat = water.material;   // вълни с отблясъци (water.js)
   const parts = [[x0, Math.min(rx1, x1)], [Math.max(rx2, x0), x1]].filter(([a, b]) => b - a > 1);
-  const seaD = 900, waves = [];
+  const seaD = 900, waves = [], SEA_LIFT = feature('sea-no-green');
   for (const [a, b] of parts) {
     const geo = new THREE.PlaneGeometry(b - a, seaD, Math.max(2, Math.round((b - a) / 20)), 40); geo.rotateX(-Math.PI / 2);
     const s = new THREE.Mesh(geo, seaMat); s.position.set((a + b) / 2, 0.04, seaZ - seaD / 2); g.add(s);
@@ -282,7 +282,8 @@ export function addSeaside(group, deps, opts) {
     }
     for (const w of waves) {
       const a = w.geo.attributes.position, b = w.base;
-      for (let i = 0; i < a.count; i++) a.array[i * 3 + 1] = Math.sin(b[i * 3] * 0.04 + t * 1.2) * 0.04 + Math.cos(b[i * 3 + 2] * 0.05 + t) * 0.03;
+      const lift = SEA_LIFT ? 0.07 : 0, kk = SEA_LIFT ? 0.5 : 1;   // 🌊 sea-no-green (потребителят: „защо плуват зелени петна по морето“): вълните бяха ±7 см около 0.04 — долините слизаха под земята (y 0) и тя прозираше на плуващи петна 30–80 м; сега само нагоре (0…7 см), върхът — както преди
+      for (let i = 0; i < a.count; i++) a.array[i * 3 + 1] = (Math.sin(b[i * 3] * 0.04 + t * 1.2) * 0.04 + Math.cos(b[i * 3 + 2] * 0.05 + t) * 0.03 + lift) * kk;
       a.needsUpdate = true;
     }
     foam.material.opacity = 0.35 + Math.sin(t * 1.5) * 0.2;
