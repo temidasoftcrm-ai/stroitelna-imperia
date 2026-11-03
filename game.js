@@ -7854,6 +7854,27 @@ const flowAvg = k => { const h = S && S.flow && S.flow[k] && S.flow[k].h; return
 // 3D летището в града (airport.js): източно от решетката; строи се/надгражда се, когато летището е готово
 // камерата към летището (или площадката му) — източно от града
 function lookAirport() { if (!S) return; const x = tx(NI - 1) + 85; showMap(false); controls.target.set(x, 0, 0); camera.position.set(x - 160, 140, 150); controls.update(); fly = null; }
+// 🏗️ airport-cranes (собственикът, 03.11: „да сложим истински кранове на летището при строежа“): вместо жълтите Г-образни „кранове“ — истинският кулокран
+// на строежите (construct.js 'crane-tower', ~44 м), два — над терминала и над пистата, стрелите бавно се въртят (като на другите обекти); вместо разпръснатите
+// жълто-черни кубчета — непрекъсната строителна ограда: сиви мрежести панели (2 м) на колове през 3,5 м, с жълто-черна лента отдолу при входа
+const AIR_CRANES = feature('airport-cranes');
+function airSiteReal(g, M) {
+  if (A['crane-tower']) for (const [cx, cz, ph] of [[-22, -28, 0], [36, 52, 2.1]]) {
+    const k = 0.78, pivot = new THREE.Group(), m = model('crane-tower', k);
+    m.position.set(-6 * k, 0, 10.75 * k);   // мачтата на модела — в оста на завъртане (както на обектите)
+    pivot.add(m); pivot.position.set(cx, 0.1, cz); g.add(pivot);
+    let mesh = null; m.traverse(o => { if (!mesh && o.isMesh) mesh = o; });
+    if (mesh) { const base = Math.PI / 4 + ph; mesh.onBeforeRender = () => { pivot.rotation.y = base + Math.sin(performance.now() / 1000 * 0.25 + ph * 3) * 0.7; }; }
+  }
+  // оградата: правоъгълникът −30…60 × −110…120 (както кубчетата), без входа откъм града (x −30, z −8…8)
+  const pm = new THREE.MeshStandardMaterial({ color: 0x9aa3a8, roughness: 0.7, metalness: 0.2, transparent: true, opacity: 0.55, depthWrite: false }), po = M(0x6d7377), tape = [M(0xffc400), M(0x1d1d1d)];
+  const panels = [], posts = [], seg = (x0, z0, x1, z1) => { const L = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.round(L / 3.5)); for (let i = 0; i < n; i++) { const a = i / n, b = (i + 1) / n, x = x0 + (x1 - x0) * (a + b) / 2, z = z0 + (z1 - z0) * (a + b) / 2; panels.push([x, z, Math.atan2(x1 - x0, z1 - z0), L / n]); posts.push([x0 + (x1 - x0) * a, z0 + (z1 - z0) * a]); } posts.push([x1, z1]); };
+  seg(-30, -110, 60, -110); seg(60, -110, 60, 120); seg(60, 120, -30, 120); seg(-30, 120, -30, 8); seg(-30, -8, -30, -110);
+  const pg = new THREE.BoxGeometry(0.06, 2, 1), ig = new THREE.InstancedMesh(pg, pm, panels.length), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), m4 = new THREE.Matrix4();
+  panels.forEach(([x, z, r, l], i) => ig.setMatrixAt(i, m4.compose(new THREE.Vector3(x, 1.15, z), q.setFromAxisAngle(up, r), new THREE.Vector3(1, 1, l * 0.98)))); g.add(ig);
+  const ip = new THREE.InstancedMesh(new THREE.BoxGeometry(0.12, 2.3, 0.12), po, posts.length); posts.forEach(([x, z], i) => ip.setMatrixAt(i, m4.makeTranslation(x, 1.15, z))); ip.castShadow = true; g.add(ip);
+  for (const [z, s] of [[-8, -1], [8, 1]]) for (let i = 0; i < 6; i++) { const o = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.9, 1.2), tape[i % 2]); o.position.set(-30, 0.45, z + s * (0.6 + i * 1.2)); o.castShadow = true; g.add(o); }   // жълто-черните бариери при входа
+}
 // строежът на първото ниво: площадката на летището (кал, ограда, кранове, табела с процента) — да се вижда къде е
 function airSite3D(id) {
   const ap = airportOf(id), x = airXZ()[0];
@@ -7866,8 +7887,11 @@ function airSite3D(id) {
   B(90, 0.1, 230, M(0x7a5c3e), 15, 0.05, 5);
   B(14, 0.12, 120, M(0x55575c), 46, 0.08, 5 + 55 * (1 - Math.min(1, ap.build.prog * 1.4)));   // пистата расте
   const yel = M(0xffc400), blk = M(0x1d1d1d);
+  if (AIR_CRANES) airSiteReal(g, M);   // 🏗️ airport-cranes: истинските кулокрани и оградата
+  else {
   for (let i = 0; i < 64; i++) { const t = i / 64, per = 2 * (90 + 230), d = t * per; let px, pz; if (d < 90) { px = -30 + d; pz = -110; } else if (d < 320) { px = 60; pz = -110 + (d - 90); } else if (d < 410) { px = 60 - (d - 320); pz = 120; } else { px = -30; pz = 120 - (d - 410); } B(2.5, 1.6, 2.5, i % 2 ? blk : yel, px, 0.8, pz); }
   for (const [cx, cz] of [[-6, -30], [10, 40]]) { B(1.4, 26, 1.4, yel, cx, 13, cz); B(24, 1, 1, yel, cx - 8, 26, cz); B(2.5, 2, 2.5, M(0x666666), cx + 3, 25, cz); }
+  }
   B(18, 4 + pct * 0.06, 50, new THREE.MeshStandardMaterial({ color: 0x9aa0a6, wireframe: true }), -6, (4 + pct * 0.06) / 2, -10);
   let lab = null; const setPct = p => { if (lab) g.remove(lab); lab = label(`🚧 ЛЕТИЩЕ · ${p}%`, '#ffe9a8', 14); lab.position.set(15, 24, 5); g.add(lab); };
   setPct(pct);
