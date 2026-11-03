@@ -382,7 +382,7 @@ function realSirens(car, kind) {
   for (const o of nodes) { const side = o.userData.side ?? (/_R/.test(o.name) ? 1 : 0), col = SIREN_COL[o.userData.col] ?? cols[side]; cols[side] = col;
     const ms = []; o.traverse(m => { if (m.isMesh) ms.push(m); });
     for (const m of ms) { const mat = BEACON[side ? 'b' : 'r'].clone(); mat.emissive.setHex(col); mat.color.setHex(col).multiplyScalar(0.25); mat.transparent = true; mat.opacity = 0.6; mat.depthWrite = false;
-      const sg = new BarSeg(m.geometry, mat); sg.name = m.name; sg.position.copy(m.position); sg.quaternion.copy(m.quaternion); sg.scale.set(1, 1, 1); sg.castShadow = false;
+      const sg = new BarSeg(m.geometry, mat); sg.name = m.name; sg.position.copy(m.position); sg.quaternion.copy(m.quaternion); sg.scale.copy(m.scale); sg.castShadow = false;   /* мащабът на лещата — като в модела (fire-man: 0,001 — с 1 ставаше огромен квадрат над кабината; потребителят, 03.11: „защо се получават такива квадрати от светлините на пожарната?“) */
       sg.userData = { red: false, kind, side, j: 0 }; m.parent.add(sg); m.parent.remove(m); segs.push(sg); } }
   (segs.find(x => x.userData.side === 0) || segs[0]).userData.red = true;   // звукът и sirenKind — от една леща
   car.updateMatrixWorld(true);
