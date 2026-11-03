@@ -6,11 +6,12 @@
 // deps: { group() → city.group, plan() → city.plan, cityId(), S(), hour(), night(), fog() → bool, Sound?, toast, pop, save, focus(x, z)? }
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';   // на сайта моделите са сгъстени (EXT_meshopt_compression)
 
 export const SHERLOCK_CITY = 'london';
 const DUR = 32, WALK = 1.25;   // s; м/с
 let proto = null, loading = null;
-const load = () => loading || (loading = new Promise(res => new GLTFLoader().load('assets/heavy/people/detective.glb', g => {
+const load = () => loading || (loading = new Promise(res => (() => { const l = new GLTFLoader(); l.setMeshoptDecoder(MeshoptDecoder); return l; })().load('assets/heavy/people/detective.glb', g => {
   const o = g.scene; o.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(o), k = 2.3 / (b.max.y - b.min.y); o.scale.setScalar(k); o.position.y = -b.min.y * k;
   o.traverse(m => { if (m.isMesh) { m.castShadow = true; m.material.vertexColors = true; m.material.emissive = new THREE.Color(0x2a2018); m.material.emissiveIntensity = 1; } });   /* малко собствена светлина — да се четат в мъглата */ const w = new THREE.Group(); w.add(o); proto = w; res(w);   /* обвивка: позицията на вървящия не трие отместването на модела */ }, undefined, () => res(null))));
 

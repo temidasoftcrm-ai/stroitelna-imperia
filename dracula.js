@@ -6,11 +6,12 @@
 // deps: { group() → city.group, plan() → city.plan, cityId(), S(), hour(), night(), moon() → 0…1 (0,5 пълнолуние), Sound?, toast, pop, save, add(o, nm) }
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';   // на сайта моделите са сгъстени (EXT_meshopt_compression)
 
 export const DRACULA_CITY = 'cluj';
 const NB = 60, DUR = 36;
 let proto = null, loading = null;
-const load = () => loading || (loading = new Promise(res => new GLTFLoader().load('assets/heavy/lm/dracula-castle.glb', g => { g.scene.traverse(m => { const c = m.isMesh && m.geometry.attributes.color; if (c) { for (let i = 0; i < c.array.length; i++) if ((i % c.itemSize) < 3) c.array[i] = Math.pow(c.array[i], 1 / 2.2); c.needsUpdate = true; } });   /* цветовете в Blender са „двойно линейни“ — връщаме ги */
+const load = () => loading || (loading = new Promise(res => (() => { const l = new GLTFLoader(); l.setMeshoptDecoder(MeshoptDecoder); return l; })().load('assets/heavy/lm/dracula-castle.glb', g => { g.scene.traverse(m => { const c = m.isMesh && m.geometry.attributes.color; if (c) { for (let i = 0; i < c.count; i++) { c.setX(i, Math.pow(c.getX(i), 1 / 2.2)); c.setY(i, Math.pow(c.getY(i), 1 / 2.2)); c.setZ(i, Math.pow(c.getZ(i), 1 / 2.2)); } c.needsUpdate = true; }   /* и при сгъстени (нормализирани) цветове */ });   /* цветовете в Blender са „двойно линейни“ — връщаме ги */
   proto = g.scene; res(proto); }, undefined, () => res(null))));
 
 export function createDracula(deps) {
