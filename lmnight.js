@@ -137,6 +137,26 @@ const CFG = {
     float h = q.y, zy = 1.0 - q.z, rec = h < 0.42 ? mix(0.25, 1.0, smoothstep(0.22, 0.4, abs(zy - 0.5))) : 1.0;
     vec3 c = vec3(1.0, 0.72, 0.42) * (0.02 + 1.5 * lum * lum) * (1.25 - 0.75 * h) * rec;
     if (h > 0.68 && abs(q.x - 0.5) < 0.1) c = vec3(1.0, 0.7, 0.38) * (0.3 + 1.2 * lum);` },
+  // lm-night-paris: Нотр Дам (прегледът в Blender — scratchpad lm6/lm-night3.blend, n.py): топло златист прожектор — западната фасада и кулите (q.x < 0,17)
+  // най-ярко, нагоре затихва (контрафорсите долу — светли); покривът тъмен, шпилът — слабо; розетките (западната между кулите и двете на трансепта) — меко виолетово
+  notredame: { flag: 'lm-night-paris', nfK: 1.0, glsl: `
+    float L = dot(dc, vec3(0.2126, 0.7152, 0.0722));
+    float fac = 1.0 - smoothstep(0.17, 0.27, q.x), up = clamp(1.2 - 0.9 * q.y, 0.25, 1.2), det = 0.25 + 2.2 * pow(L, 1.3);
+    vec3 c = (dc / max(L, 1e-3) * 0.6 + 0.4) * vec3(1.0, 0.58, 0.22) * (0.2 + 0.6 * fac) * up * det * 0.9;
+    bool spire = abs(q.x - 0.535) < 0.035 && abs(q.z - 0.5) < 0.07;
+    if (q.x > 0.25 && q.y > 0.43 && !spire) c *= 0.08;
+    if (spire && q.y > 0.62) c *= 0.5;
+    float d = length(vec2((q.z - 0.5) * s.z, q.y - 0.42)), k = (1.0 - smoothstep(0.035, 0.053, d)) * step(0.12, q.x) * step(q.x, 0.18);
+    float d2 = length(vec2((q.x - 0.544) * s.x, q.y - 0.33)), k2 = (1.0 - smoothstep(0.05, 0.072, d2)) * max(step(q.z, 0.1), step(0.9, q.z));
+    c = mix(c, vec3(0.5, 0.32, 1.0) * (0.35 + 1.6 * L), max(k, k2));` },
+  // lm-night-rio: Христос Спасителя — студено бял прожектор отдолу и отпред (+z — лицето), ярко срещу небето; постаментът — топъл и по-тъмен;
+  // на празник (holidayNow) статуята бавно сменя цвета, като истинската
+  redeemer: { flag: 'lm-night-rio', nfK: 1.0, glsl: `
+    float L = dot(dc, vec3(0.2126, 0.7152, 0.0722)), front = 0.55 + 0.45 * smoothstep(0.3, 0.8, q.z), up = 1.05 - 0.35 * smoothstep(0.25, 1.0, q.y);
+    vec3 cool = vec3(0.82, 0.9, 1.0);
+    if (hol > 0.5) cool = clamp(abs(mod(fract(t * 0.02) * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0) * 0.8 + 0.2;
+    vec3 c = cool * (0.35 + 1.3 * L) * front * up * 1.25;
+    if (q.y < 0.23) c = dc * vec3(1.0, 0.8, 0.6) * 0.7;` },
 };
 export const lmNightKinds = () => Object.keys(CFG).filter(k => feature(CFG[k].flag));
 // → броят на материалите (0 — няма настройка за този вид или флагът е изключен)
