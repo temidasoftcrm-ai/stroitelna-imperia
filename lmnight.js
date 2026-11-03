@@ -157,6 +157,18 @@ const CFG = {
     if (hol > 0.5) cool = clamp(abs(mod(fract(t * 0.02) * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0) * 0.8 + 0.2;
     vec3 c = cool * (0.35 + 1.3 * L) * front * up * 1.25;
     if (q.y < 0.23) c = dc * vec3(1.0, 0.8, 0.6) * 0.7;` },
+  // lm-night-shanghai: Шанхайската кула (собственикът, 03.11: „да ок е“ — след 3 забележки по първия вариант; прегледът — scratchpad lm6/shanghai-night2.blend, shnodes.py):
+  // стъклото — меко студено синьо с фина светла линия на всеки етаж (128), по-широки и ярки пояси на 9-те зони (скай-лобитата); ръбът (прорезът) —
+  // тънка ярка линия, която се завърта ~110° до върха (оста на сечението се отмества нагоре — измерено по модела); короната — 24 светещи вертикални ребра с пръстени
+  shtower: { flag: 'lm-night-shanghai', nfK: 1.0, glsl: `
+    float cx = 0.53 + 0.05 * q.y, cz = 0.58 + 0.07 * q.y, a = fract(atan((q.z - cz) * s.z, (q.x - cx) * s.x) / 6.2831853 + 1.0);
+    float f = fract(q.y * 128.0), fl = 1.0 - smoothstep(0.0, 0.07, min(f, 1.0 - f));
+    float z9 = fract(q.y * 9.0), lob = (1.0 - smoothstep(0.0175, 0.035, min(z9, 1.0 - z9))) * step(0.05, q.y);
+    vec3 c = vec3(0.025, 0.045, 0.09) + vec3(0.55, 0.72, 1.0) * (0.32 * fl + 1.3 * lob);
+    float e = abs(fract(a - (0.49 + 0.30 * q.y) + 1.5) - 0.5), edge = (1.0 - smoothstep(0.0014, 0.0035, e)) * step(0.02, q.y);
+    c = mix(c, vec3(0.8, 0.9, 1.0) * (2.0 + q.y), edge);
+    if (q.y > 0.925) { float fa = fract(a * 24.0), fin = 1.0 - smoothstep(0.03, 0.07, min(fa, 1.0 - fa)), fr = fract(q.y * 40.0), rg = 1.0 - smoothstep(0.0, 0.08, min(fr, 1.0 - fr));
+      c = vec3(0.02, 0.03, 0.05) + vec3(0.75, 0.88, 1.0) * max(fin, 0.6 * rg) * 2.2; }` },
 };
 export const lmNightKinds = () => Object.keys(CFG).filter(k => feature(CFG[k].flag));
 // → броят на материалите (0 — няма настройка за този вид или флагът е изключен)
