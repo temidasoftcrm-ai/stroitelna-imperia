@@ -69,7 +69,7 @@ export const VEH_SPEC = {
   'car-polo': [4.05, 1.75, 1.46, 'VW Polo'], 'car-p206': [3.84, 1.67, 1.43, 'Peugeot 206'], 'car-renegade': [4.24, 1.81, 1.69, 'Jeep Renegade'], 'car-hilux': [5.33, 1.86, 1.82, 'Toyota Hilux'],
   'car-taxi': [5.0, 1.85, 1.5, 'такси'], 'car-accord': [4.9, 1.86, 1.45, 'Honda Accord'], 'car-corolla': [4.63, 1.78, 1.44, 'Toyota Corolla'],
   'bus-citaro': [12.0, 2.55, 3.1, 'Mercedes Citaro'], 'car-limo': [7.6, 2.0, 1.5, 'лимузина'], 'car-polsuv': [5.05, 2.0, 1.78, 'полицейски джип'], 'car-truck': [6.5, 2.3, 3.0, 'камион с фургон'],
-  'pol-charger': [5.08, 1.9, 1.48, 'Dodge Charger'], 'pol-crownvic': [5.39, 1.98, 1.47, 'Crown Victoria'], 'pol-interceptor': [5.05, 2.0, 1.78, 'Police Interceptor'], 'pol-suburban': [5.7, 2.03, 1.94, 'полицейски джип (САЩ)'], 'pol-belasco': [5.4, 2.0, 1.5, 'полицейски седан (САЩ)'], 'pol-nypd': [5.08, 1.9, 1.48, 'Charger NYPD'],
+  'pol-charger': [5.08, 1.9, 1.48, 'Dodge Charger'], 'pol-suburban': [5.7, 2.03, 1.94, 'полицейски джип (САЩ)'], 'pol-belasco': [5.4, 2.0, 1.5, 'полицейски седан (САЩ)'], 'pol-nypd': [5.08, 1.9, 1.48, 'Charger NYPD'],
   'fire-us': [10.0, 2.5, 3.0, 'пожарна (САЩ)'], 'fire-us2': [10.0, 2.5, 3.0, 'пожарна (САЩ, помпена)'], 'pol-vaz': [4.07, 1.61, 1.44, 'ВАЗ 2101 на КАТ'], 'fire-man': [10.5, 2.5, 3.4, 'MAN със стълба'],
   'amb-gaz': [6.2, 2.1, 2.6, 'ГАЗела'], 'amb-us': [7.0, 2.4, 2.9, 'линейка (САЩ)'], 'amb-eu': [6.9, 2.1, 2.9, 'линейка (Европа)'],
   'van-sprinter': [5.9, 2.0, 2.5, 'Sprinter'], 'van-ducato': [5.4, 2.05, 2.5, 'Ducato'], 'van-mb207': [5.3, 2.0, 2.5, 'Mercedes 207'], 'van-transit': [5.2, 1.97, 2.3, 'Transit'],

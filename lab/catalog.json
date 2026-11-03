@@ -415,42 +415,6 @@
    "used": true
   },
   {
-   "id": "pol-crownvic",
-   "cat": "Полицейски коли",
-   "title": "Полиция: Ford Crown Victoria",
-   "file": "assets/heavy/cars/pol-crownvic.glb",
-   "size": 236448,
-   "licence": "CC BY 4.0",
-   "author": "aeroux",
-   "uses": [
-    "ops3d.js:25",
-    "ops3d.js:293",
-    "opsfire.js:21",
-    "scale.js:72",
-    "services3d.js:44",
-    "vehmodels.js:45"
-   ],
-   "flag": [],
-   "used": true
-  },
-  {
-   "id": "pol-interceptor",
-   "cat": "Полицейски коли",
-   "title": "Полиция: Police Interceptor",
-   "file": "assets/heavy/cars/pol-interceptor.glb",
-   "size": 344504,
-   "licence": "CC BY 4.0",
-   "author": "vj32621",
-   "uses": [
-    "ops3d.js:293",
-    "opsfire.js:21",
-    "scale.js:72",
-    "vehmodels.js:62"
-   ],
-   "flag": [],
-   "used": true
-  },
-  {
    "id": "pol-volga",
    "cat": "Полицейски коли",
    "title": "Полиция: Волга на КАТ",
