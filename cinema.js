@@ -46,6 +46,9 @@ const SCENES = [
   { key: 'oil', ico: '🛢️', nm: 'Първи петрол', cap: '🛢️ Ерата на черното злато', sub: 'Сондата заработи. Петролът потече.', lock: 'Пусни първия си петролен кладенец', video: 'assets/cinema/oil.mp4', poster: 'assets/cinema/oil.jpg' },
   { key: 'lv20', ico: '🌍', nm: 'Ниво 20 — Империя', cap: 'СВЕТОВНА ИМПЕРИЯ', sub: 'Започна с една сграда. Свърза целия свят.', lock: 'Стигни ниво 20', video: 'assets/cinema/lv20.mp4', poster: 'assets/cinema/lv20.jpg' },
   // 🕊️ peace-win (peacewin.js): финалът „Световен мир“ — без видео, рисувано (глобусът с връзките, подписването, бордът); пуска се само от peacewin.js
+  // 🌀 bermuda (03.11, одобрено в Blender — „ок“): само призрак — корабът на играча не се пипа. Веднъж при първата морска линия до Маями или Канкун (през триъгълника):
+  // нощ, мъгла, призрачен ветроход (Летящия холандец — легенда, обществено достояние) излиза от мъглата, минава и се разтваря; после — от албума
+  ...(feature('bermuda') ? [{ key: 'bermuda', when: s => (s.seaRoutes || []).some(r => ['miami', 'cancun'].includes(r.a) !== ['miami', 'cancun'].includes(r.b)), ico: '🌀', nm: 'Бермудският триъгълник', cap: 'БЕРМУДСКИЯТ ТРИЪГЪЛНИК', sub: 'В мъглата нещо плава от три века насам.', lock: 'Открий морска линия до Маями или Канкун', video: 'assets/cinema/bermuda.mp4', poster: 'assets/cinema/bermuda.jpg' }] : []),
   ...(feature('peace-win') ? [{ key: 'peace', ico: '🕊️', nm: 'Световен мир', cap: '🕊️ Световен мир', sub: 'Започна с една бригада. Остави свят в мир.', lock: 'Задръж шестте цели на мира 12 месеца', dur: 13, videos: ['assets/cinema/peace-1.mp4', 'assets/cinema/peace-2.mp4', 'assets/cinema/peace-3.mp4'] }] : []),   /* по-късно: 3 клипа по 5 s (подписването → възстановените градове → Земята със светещите връзки + „Архитект на мира“); ако ги няма — рисуваната сцена */
 ];
 const CSS = `
@@ -535,7 +538,7 @@ export function createCinema(deps) {
     el.querySelector('.cap b').textContent = sc.cap; el.querySelector('.cap span').textContent = sc.sub;
     document.body.appendChild(el);
     if (!manual || !seen()[key]) { seen()[key] = S()?.day || 1; deps.save && deps.save(); }
-    if (key === 'titanic' && feature('holo-history')) import('./holocard.js').then(m => m.showHolo('titanic', 40)).catch(() => { });   // 📜 holo-history: кратката история до клипа
+    if ((key === 'titanic' || key === 'bermuda') && feature('holo-history')) import('./holocard.js').then(m => m.showHolo(key, key === 'titanic' ? 40 : 28)).catch(() => { });   /* bermuda — и тя */   // 📜 holo-history: кратката история до клипа
     const prevSpeed = deps.speed ? deps.speed() : 1; if (deps.setSpeed) deps.setSpeed(0);
     let done = false, raf = 0, A = null, tm = 0;
     const cap = el.querySelector('.cap'), cleanup = [];
