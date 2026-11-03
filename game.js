@@ -40,6 +40,7 @@ import { createGhostHunt } from './ghosthunt.js';   // 👻 ghost-hunt: скри
 import { createUfo } from './ufo.js';   // 🛸 ufo-vegas: скритата изненада — НЛО над Лас Вегас в ясна нощ
 import { createNessie } from './nessie.js';   // 🐉 nessie: Лох Нес в северните крайморски градове
 import { createDracula } from './dracula.js';   // 🦇 dracula: замъкът в Клуж, прилепите при пълнолуние
+import { createSherlock } from './sherlock.js';   // 🕵️ sherlock: Лондон, мъгла — детективът и спътникът му
 import { createXmasConvoy } from './xmasconvoy.js';   // 🎄 xmas-convoy: коледният керван на 25 декември
 import { createXmasShow } from './xmasshow.js';   // 🎄 xmas-plovdiv: Коледа в Пловдив — керванът запалва булеварда
 import { holoWatch } from './holocard.js';   // 📜 holo-history: историята отстрани на изненадите
@@ -3309,7 +3310,11 @@ const kongo = feature('kongo') ? createGorilla({ scene, S: () => S, landmark: k 
 const draculaFx = feature('dracula') ? createDracula({ group: () => city.group, plan: () => city.plan, cityId: () => S && S.cityId, S: () => S, hour: () => ((todF() * 24) + 6) % 24, night: () => dayNight.night,
   moon: () => window.__moonPh != null ? window.__moonPh : ((S.day || 1) + todF()) / 29.53 + 0.5, Sound, toast: (...a) => toast(...a), pop: (k, c, s2) => showEventPop(k, c, s2), save: () => save(),
   add: (o, nm) => { city.group.add(o.group); (city.landmarks = city.landmarks || []).push(o); if (nm) { const b = new THREE.Box3().setFromObject(o.group), sg = label(nm, '#ffe9a8', 9); sg.position.set((b.min.x + b.max.x) / 2, b.max.y + 4, (b.min.z + b.max.z) / 2); city.group.add(sg); } } }) : null;
-const holoTick = feature('holo-history') ? holoWatch(() => ({ dracula: !!(draculaFx && draculaFx.busy), nessie: !!(nessieFx && nessieFx.busy), kongo: !!(kongo && kongo.state()), ufo: !!(ufo && ufo.state().active), ghost: !!(ghostHunt && S && S.cityId === 'newyork' && ghostHunt.state().unlocked && dayNight.night > 0.4) })) : null;
+// 🕵️ sherlock (потребителят, 03.11: „да направим и Шерлок“, моделът — „нека остане така, супер е“): Лондон, вечер в мъгла — по улица с газени фенери
+const sherlockFx = feature('sherlock') ? createSherlock({ group: () => city.group, plan: () => city.plan, cityId: () => S && S.cityId, S: () => S, hour: () => ((todF() * 24) + 6) % 24, night: () => dayNight.night,
+  fog: () => ['fog', 'cloudy', 'rain'].includes(weather.kind), Sound, toast: (...a) => toast(...a), pop: (k, c, s2) => showEventPop(k, c, s2), save: () => save(), focus: (x, z) => { fly = { from: controls.target.clone(), to: new THREE.Vector3(x, 0, z), t: 0, off: camera.position.clone().sub(controls.target) }; },
+  setCam: (px, py, pz, tx, ty, tz) => { camera.position.set(px, py, pz); controls.target.set(tx, ty, tz); camera.lookAt(tx, ty, tz); } }) : null;
+const holoTick = feature('holo-history') ? holoWatch(() => ({ sherlock: !!(sherlockFx && sherlockFx.busy), dracula: !!(draculaFx && draculaFx.busy), nessie: !!(nessieFx && nessieFx.busy), kongo: !!(kongo && kongo.state()), ufo: !!(ufo && ufo.state().active), ghost: !!(ghostHunt && S && S.cityId === 'newyork' && ghostHunt.state().unlocked && dayNight.night > 0.4) })) : null;
 // #11 (emerg-home): спешните коли стоят в участъците и излизат само при инцидент/пожар; в трафика — най-много една патрулка, без буркани
 const patrolOn = () => [...traffic.map(t => t.obj), ...(tr2 ? tr2.cars.map(c => c.obj) : [])].some(o => o && o.userData.patrol);
 function addCar() {
@@ -13848,6 +13853,7 @@ function frame() {
     if (feature('fire-seq')) fires.update(dt / DAY_SEC);
     if (feature('fire-ruins')) blkRuins.update(dt / DAY_SEC);   // игрово време: на пауза (dt = 0) всичко спира
     if (nessieFx) nessieFx.update(dt);   // 🐉 nessie
+    if (sherlockFx) sherlockFx.update(rdt, dt > 0);   // 🕵️ sherlock
     if (draculaFx) draculaFx.update(rdt, dt > 0);   // 🦇 dracula: в реално време (и на пауза — шоуто тече; чакането — само в игра)
     if (xmasConvoy && !xmasShow) xmasConvoy.update(dt > 0 ? rdt : 0);   // 🎄 xmas-convoy: в реално време (на пауза стои)
     if (holoTick && (holoTick.n = (holoTick.n || 0) + 1) % 15 === 0) holoTick();   // 📜 holo-history
@@ -14072,6 +14078,8 @@ if (AUTOTEST) {
     xmasShow() { if (!xmasShow) return 'off'; if (xmasShow.busy) return 'busy'; delete S.xmasPlv; xmasShowGo(); return S.xmasShow; },   // 🎄 xmas-plovdiv: шоуто сега (от всеки град — отива в Пловдив)
     xmasShowSeek(t) { if (!xmasShow || !xmasShow.busy) return 'не тече'; xmasShow.seek(t, camera); return xmasShow.info(); },
     xmasShowInfo() { return xmasShow ? { st: S.xmasShow && S.xmasShow.st, city: S.cityId, ...(xmasShow.info() || {}) } : 'off'; },   // 🎄 xmas-convoy: керванът сега (Лабораторията)
+    async sherlock() { if (!sherlockFx) return 'off'; if (S.cityId !== 'london') return 'само в Лондон'; showMap(false); $('panel')?.classList.add('hidden'); this.time(21.5); S.wxLock = 'fog'; weather.set('fog'); fly = null;   /* 🕵️ Лабораторията */
+      const r = await sherlockFx.test(); fly = null; return r; },   /* камерата върви зад тях (sherlock.js follow) */
     async dracula(night = true) { if (!draculaFx) return 'off'; if (S.cityId !== 'cluj') return 'само в Клуж'; showMap(false); $('panel')?.classList.add('hidden'); this.time(night ? 22 : 13); this.moon(0.5); S.wxLock = 'clear'; weather.set('clear'); fly = null;   /* 🦇 Лабораторията: замъкът и прилепите сега */
       const ok = await draculaFx.test(); const c = draculaFx.castle(); if (c) { const b = new THREE.Box3().setFromObject(c), m = b.getCenter(new THREE.Vector3()), h = b.max.y; this.camAt(m.x + h * 1.4, h * 1.25, m.z + h * 1.8, m.x, h * 0.62, m.z); } return ok; },
     async kongo() { if (!kongo) return 'off'; showMap(false); $('panel').classList.add('hidden'); this.time(11); setSpeed(1); const L = (city.landmarks || []).find(q => q.kind === 'empire2'); if (!L) return 'няма Емпайър'; const p = L.group.position; __dbg.camAt(p.x + 160, 120, p.z + 205, p.x, 125, p.z); fly = null; return kongo.test([0.62, 0.785]); },   // 🦍 kongo: Лабораторията — пуска горилата сега, камерата към Емпайър
