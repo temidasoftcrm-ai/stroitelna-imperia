@@ -243,6 +243,10 @@ export function xDraw(G, list, parts, skip, st) { const m = new THREE.Matrix4(),
 const PANC = [0xd8d6d0, 0xe2dccc, 0xc8c6c0, 0xf0dcb0, 0xeac8b4, 0xd4e0c8, 0xe0d4e4, 0xf2e8d0, 0xd0d8e0], COOPC = [0xeedcc0, 0xe4c8a0, 0xf0e6d6, 0xd8c8b8, 0xe8c0b0, 0xd4ccbc, 0xf2dca8], HOUSEC = [0xf4ece0, 0xeedcb8, 0xe8d0b0, 0xf0e4d0, 0xe0c8a8, 0xdcd6cc];
 function inPoly(x, z, poly) { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; }
 export function* bgPlace(P, list) {
+  // 🏜️ africa-fill (собственикът, 03.11: „много са празни улиците — аз съм в Александрия, Африка, но ми се струва, че е много празно“): P.bgDense (game.js — Египет и Магреба)
+  // — гъсто като истинска Александрия: и в средата на големите квартали (улица до 150 м, не до 70), почти без празни места, повече средноетажни (4–8 ет.),
+  // пясъчни/кремави/охрени фасади; плоските покриви с бойлерите — bgFlat (bld-region-houses)
+  const DEN = !!P.bgDense, SANDC = [0xe8d5b0, 0xdcc39a, 0xf0e2c4, 0xd9b98a, 0xe6cfa8, 0xc9a77a, 0xeedfc4, 0xd8c4a4];
   const hsh = (a, b) => (((Math.imul(Math.round(a * 10) | 0, 73856093) ^ Math.imul(Math.round(b * 10) | 0, 19349663)) >>> 0) % 10007) / 10007;
   // улиците: точки през 4 м с посоката и полуширината (с тротоара), в мрежа 20 м
   const RG = new Map(), rk = (i, j) => i * 100003 + j;
@@ -260,13 +264,13 @@ export function* bgPlace(P, list) {
   const OC = new Set(), ok = (cx, cz, ux, uz, hw, hd, set) => { const out = []; for (let a = -hw; a <= hw + 0.01; a += Math.min(2.5, hw)) for (let b = -hd; b <= hd + 0.01; b += Math.min(2.5, hd)) { const x = cx + ux * a - uz * b, z = cz + uz * a + ux * b, k = rk(Math.floor(x / 3), Math.floor(z / 3)); if (!set && OC.has(k)) return false; out.push(k); } if (set) for (const k of out) OC.add(k); return true; };
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), C0 = P.center || { x: 0, z: 0 }, R0 = P.R || 600;
   // вид по пояса: центърът — блокове и кооперации, средата — кооперации и блокове, покрайнините — къщи
-  const kindAt = (zone, u) => zone === 'center' || zone === 'business' ? (u < 0.55 ? 'pan' : 'coop') : zone === 'residential' ? (u < 0.3 ? 'pan' : u < 0.75 ? 'coop' : 'house') : (u < 0.12 ? 'pan' : u < 0.3 ? 'coop' : 'house');
+  const kindAt = (zone, u) => DEN ? (zone === 'center' ? (u < 0.3 ? 'pan' : 'coop') : zone === 'residential' ? (u < 0.18 ? 'pan' : 'coop') : (u < 0.7 ? 'coop' : 'house')) : zone === 'center' || zone === 'business' ? (u < 0.55 ? 'pan' : 'coop') : zone === 'residential' ? (u < 0.3 ? 'pan' : u < 0.75 ? 'coop' : 'house') : (u < 0.12 ? 'pan' : u < 0.3 ? 'coop' : 'house');
   const zoneAt = (x, z) => { const d = Math.hypot(x - C0.x, z - C0.z) / R0; return d < 0.25 ? 'center' : d < 0.6 ? 'residential' : 'periphery'; };
   const put = (x, z, ux, uz, w, d, k, u, lot) => {   // (ux, uz) — посоката на улицата пред фасадата; w — по улицата, d — дълбочина
     const u2 = (u * 9.13) % 1, u3 = (u * 17.7) % 1;
     const fl = (P.bgFlat || 0) > ((u * 31.7) % 1);   // bld-region-houses: Азия, Арабия, Африка, Латинска Америка — плоски покриви вместо червените керемиди
-    const t = k === 'pan' ? (u2 < 0.5 ? K.PAN1 : K.PAN2) : k === 'coop' ? (fl ? (u2 < 0.5 ? K.APF : K.APW) : K.COOP) : fl ? K.APW : K.HOUSE, H = k === 'pan' ? 2.8 * (6 + Math.floor(u3 * 7)) : k === 'coop' ? 3 * (3 + Math.floor(u3 * 3)) : u3 < 0.2 ? 3 : 6;   // блок 6–12 ет., кооперация 3–5, къща 2 (или 1)
-    const col = pick(k === 'pan' ? PANC : k === 'coop' ? COOPC : HOUSEC, u2), rc = k === 'pan' || fl ? pick([0x8a8a86, 0x9c9a94, 0x7a7c80], u3) : pick(TILE, u3);
+    const t = k === 'pan' ? (u2 < 0.5 ? K.PAN1 : K.PAN2) : k === 'coop' ? (fl ? (u2 < 0.5 ? K.APF : K.APW) : K.COOP) : fl ? K.APW : K.HOUSE, H = k === 'pan' ? 2.8 * (6 + Math.floor(u3 * 7)) : k === 'coop' ? 3 * (DEN ? 4 + Math.floor(u3 * 5) : 3 + Math.floor(u3 * 3)) : u3 < 0.2 ? 3 : 6;   // блок 6–12 ет., кооперация 3–5 (africa-fill: 4–8), къща 2 (или 1)
+    const col = pick(DEN ? SANDC : k === 'pan' ? PANC : k === 'coop' ? COOPC : HOUSEC, u2), rc = k === 'pan' || fl ? pick([0x8a8a86, 0x9c9a94, 0x7a7c80], u3) : pick(TILE, u3);
     q.setFromAxisAngle(up, Math.atan2(ux, uz));   // локалното z — по улицата, x — навътре (както в romeBlocks)
     list.push({ x, z, w, d, h: H, rot: Math.atan2(ux, uz), t, col, rc, ex: k === 'pan' ? 'lift' : fl && k === 'coop' && u3 < 0.5 ? 'tank' : null, M: m4.compose(new THREE.Vector3(x, H / 2, z), q, new THREE.Vector3(d, H, w)).clone(), lot }); };
   // 1) парцелите: лицето — локално +z (към улицата); сградата — отпред, с отстъп
@@ -280,8 +284,8 @@ export function* bgPlace(P, list) {
   const B = P.boundary || []; if (!B.length) return; let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of B) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
   let row = 0;
   for (let gz = z0 + 6; gz < z1; gz += 12) { if (++row % 4 === 0) yield 0;
-    for (let gx = x0 + 6; gx < x1; gx += 12) { const u = hsh(gx, gz); if (u < 0.1) continue;   // тук-там двор/празно място
-      const r = road(gx, gz); if (!r || r[0] < 3 || !inPoly(gx, gz, B) || inLot(gx, gz, 1) || blocked(gx, gz)) continue;
+    for (let gx = x0 + 6; gx < x1; gx += 12) { const u = hsh(gx, gz); if (u < (DEN ? 0.03 : 0.1)) continue;   // тук-там двор/празно място
+      const r = road(gx, gz, DEN ? 150 : 70); if (!r || r[0] < 3 || !inPoly(gx, gz, B) || inLot(gx, gz, 1) || blocked(gx, gz)) continue;
       const [dist, ux, uz, nx, nz] = r, k = kindAt(zoneAt(gx, gz), u), back = k === 'coop' ? 1.5 : k === 'pan' ? 5 : 4;   // отстъп от тротоара
       const SZ = k === 'house' ? [[10 + u * 2, 9], [8, 8]] : k === 'pan' ? [[24 + u * 12, 12], [16, 12], [12, 11]] : [[14 + u * 4, 12], [11, 11], [9, 9]];
       for (const [w, d] of SZ) { const sh = dist < d / 2 + back + 8 ? dist - d / 2 - back : 0, cx = gx - nx * sh, cz = gz - nz * sh;   // близо до улица — лицето на линия с отстъпа
