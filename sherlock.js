@@ -67,7 +67,9 @@ export function createSherlock(deps) {
     const c = cur; c.t += dt; const t = c.t, fin = Math.min(1, t / 3) * (1 - Math.max(0, Math.min(1, (t - (DUR - 3)) / 3)));
     c.F.m.opacity = 0.5 * fin; c.F.L.forEach(s => { s.position.x += s.userData.v * dt; });
     // вървят: от 8 % до 92 % от улицата; появяват се/изчезват в мъглата (прозрачност)
-    const go = (o, s, side) => { const p = c.lp.at(Math.max(0, Math.min(c.lp.tot, s))); o.position.set(p.x - p.tz * side, c.gy + 0.03 + Math.abs(Math.sin(t * 5.2)) * 0.03, p.z + p.tx * side); o.rotation.y = Math.atan2(p.tx, p.tz); return p; };   /* по терена (Лондон не е равен) */
+    const go = (o, s, side) => { const p = c.lp.at(Math.max(0, Math.min(c.lp.tot, s))); const w = t * 6 + side * 2, sw = Math.sin(w);   // крачката: ~1,9 крачки/s при 1,25 м/с; спътникът — малко разминат
+      o.position.set(p.x - p.tz * side, c.gy + 0.03 + Math.abs(Math.cos(w)) * 0.035, p.z + p.tx * side); o.rotation.y = Math.atan2(p.tx, p.tz) + 0.04 * sw; o.rotation.z = 0.025 * sw;
+      const L = o.userData.legs || (o.userData.legs = [o.getObjectByName('LegL'), o.getObjectByName('LegR')]); if (L[0]) L[0].rotation.x = 0.38 * sw; if (L[1]) L[1].rotation.x = -0.38 * sw; return p; };   /* краката — от шарнира под палтото */   /* по терена (Лондон не е равен) */
     const s0 = c.lp.tot * 0.08 + WALK * t, vis = Math.min(1, t / 4) * (1 - Math.max(0, Math.min(1, (t - (DUR - 5)) / 4)));
     const ph = go(c.hol, s0, 0.45); go(c.wat, s0 - 0.6, -0.55);
     [c.hol, c.wat].forEach(o => o.traverse(m => { if (m.isMesh) { m.material.transparent = vis < 1; m.material.opacity = vis; } }));
