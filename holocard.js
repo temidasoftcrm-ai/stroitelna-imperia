@@ -73,13 +73,14 @@ function css() {
   document.head.appendChild(s);
 }
 export function hideHolo() { if (!el) return; const e = el; el = null; clearTimeout(timer); clearInterval(typing); e.classList.remove('on'); setTimeout(() => e.remove(), 480); }
-export function showHolo(key, dur = 16) {
+export function showHolo(key, dur = 70) {   // потребителят, 03.11: „да се задържат по-дълго, поне 1 мин — така не мога да ги прочета“
+  dur = Math.max(60, dur);
   const H = HOLO[key]; if (!H || typeof document === 'undefined') return false; css(); hideHolo();
   const d = document.createElement('div'); d.id = 'holo'; d.className = H.paper ? 'p' : 'h';
   d.innerHTML = `<span class="x" title="Затвори">✕</span><b class="t">${H.ico} ${H.t}</b><ul>${H.l.map(x => `<li>${x}</li>`).join('')}</ul>`;
   d.querySelector('.x').onclick = e => { e.stopPropagation(); hideHolo(); };
   document.body.appendChild(d); el = d; requestAnimationFrame(() => d.classList.add('on'));
-  const li = [...d.querySelectorAll('li')]; let i = 0; typing = setInterval(() => { if (i < li.length) li[i++].classList.add('v'); else clearInterval(typing); }, 900);
+  const li = [...d.querySelectorAll('li')]; let i = 0; typing = setInterval(() => { if (i < li.length) li[i++].classList.add('v'); else clearInterval(typing); }, 1600);   /* по-бавно — ред по ред за четене */
   timer = setTimeout(hideHolo, dur * 1000); return true;
 }
 // следи изненадите (без да се пипат модулите им): при прехода „неактивна → активна“ — картата; get() → { nessie, kongo, ufo, ghost } булеви
