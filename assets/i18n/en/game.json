@@ -3066,5 +3066,11 @@
   "✂️ {0}: разделено 50/50 с {1} — върнати {2} €{3}.": "✂️ {0}: split 50/50 with {1} — {2} € refunded{3}.",
   "Шанс: {0}. Наем: 🏠 {1} · 🏪 {2} · 🏢 {3} · 🌆 {4} €/ден · 🌳 парк — +15% наем наоколо.": "Odds: {0}. Rent: 🏠 {1} · 🏪 {2} · 🏢 {3} · 🌆 {4} €/day · 🌳 park — +15% rent nearby.",
   " ({0} {1}: {2}/{3} ключови града)": " ({0} {1}: {2}/{3} key cities)"
- }
+ },
+ "🏁 Край на демото": "🏁 End of the demo",
+ "Стигна ниво {0} — поздравления! В пълната игра те чакат още градове по целия свят, холдинг, банка, магистрали и скрити изненади. Можеш да продължиш да строиш тук, но нови нива в демото няма.": "You reached level {0} — congratulations! The full game has more cities around the world, a holding company, a bank, highways and hidden surprises. You can keep building here, but the demo has no further levels.",
+ "🛒 Вземи пълната игра": "🛒 Get the full game",
+ "🔜 Скоро в Steam": "🔜 Coming soon to Steam",
+ "🎨 По-добра картина": "🎨 Better picture",
+ "контактни сенки, сияние, цветове": "contact shadows, glow, colour grading"
 }

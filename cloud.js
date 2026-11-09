@@ -5,6 +5,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
 import { backupRaw, dropBackups, tooNew } from './saves.js';
 import { feature, IN_LAB } from './lab/feature.js';
+import { DESKTOP } from './edition.js';   // пълната игра за компютър — без екран за вход
 import { TURNSTILE_SITEKEY } from './config.js';   // 🔑 pw-login: Cloudflare Turnstile (празен = без проверка)
 import { langOn, langButton, setLang, LANG } from './i18n.js';   // 🌐 lang-en: превключвателят в ⚙️ и на входа
 const EMAIL_PH = LANG === 'en' ? 'name@example.com' : 'ime@primer.com';   // примерният имейл в полетата за вход
@@ -1183,7 +1184,7 @@ function regGate() {
 const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);   // на localhost (разработка) — без екрана, освен с ?gate
 const GATE_ON = !AUTOTEST && feature('reg-gate') && ((window.top === window && !LOCAL) || /[?&]gate/.test(location.search));
 if (GATE_ON || (GC && !AUTOTEST && isGuest()))
-  sb.auth.getSession().then(({ data }) => { if (data?.session) return; if (GC && isGuest()) { guestSignIn(); return; } if (document.body) regGate(); else addEventListener('DOMContentLoaded', regGate); });   // 👤 guest-cloud: гостът не вижда екрана — влиза пак като гост
+  if (!DESKTOP) sb.auth.getSession().then(({ data }) => { if (data?.session) return; if (GC && isGuest()) { guestSignIn(); return; } if (document.body) regGate(); else addEventListener('DOMContentLoaded', regGate); });   // 👤 guest-cloud: гостът не вижда екрана — влиза пак като гост
 window.__regGate = regGate;
 if (IN_LAB && GC) window.__guestUi = () => { user = { id: '00000000-0000-0000-0000-000000000000', is_anonymous: true }; busy = true; paint(); openSettings(); return who(); };   // 👤 guest-cloud: изгледът на госта в Лабораторията — без мрежа (busy спира синхронизацията)
 window.__settings = openSettings;

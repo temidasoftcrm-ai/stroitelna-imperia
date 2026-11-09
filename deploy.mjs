@@ -12,7 +12,7 @@
 import { readFileSync, writeFileSync, mkdirSync, rmSync, cpSync, readdirSync, statSync, existsSync } from 'fs';
 import { join, dirname, relative, normalize } from 'path';
 
-const ROOT = new URL('.', import.meta.url).pathname, DIST = join(ROOT, 'dist');
+const ROOT = new URL('.', import.meta.url).pathname, DIST = join(ROOT, process.argv.includes('--out') ? process.argv[process.argv.indexOf('--out') + 1] : 'dist');   // --out — папка за пълната игра (desktop/build.mjs)
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 const BASE = arg('--base', 'https://assets.imperia.temidasoft.com/');
 const PAGES = ['index.html', 'online.html', 'privacy.html', 'terms.html'], DEV = process.argv.includes('--dev');
@@ -49,6 +49,15 @@ const cfg = join(DIST, 'config.js'), c0 = readFileSync(cfg, 'utf8'), LINE = "exp
 if (!c0.includes(LINE)) throw new Error('config.js: няма реда с ASSET_BASE');
 const DLINE = 'export const DEV = true;'; if (!c0.includes(DLINE)) throw new Error('config.js: няма реда с DEV');
 writeFileSync(cfg, c0.replace(LINE, `export const ASSET_BASE = '${BASE.replace(/\/?$/, '/')}';`).replace(DLINE, `export const DEV = ${DEV};`));   // DEV = false: без инструментите за разработка (config.js)
+
+// 3а) --demo: сайтът е демо до ниво 5 (edition.js)
+if (process.argv.includes('--demo')) { const ef = join(DIST, 'edition.js'), e0 = readFileSync(ef, 'utf8'), EL = "export const EDITION = 'full';"; if (!e0.includes(EL)) throw new Error('edition.js: няма реда с EDITION'); writeFileSync(ef, e0.replace(EL, "export const EDITION = 'demo';")); }
+
+// 3а2) --desktop (desktop/build.mjs): пълната игра — без реклами, supabase е в пакета (desktop/supabase.vendor.mjs)
+if (process.argv.includes('--desktop')) { const ef = join(DIST, 'edition.js'), DL = 'export const DESKTOP = false;', e1 = readFileSync(ef, 'utf8'); if (!e1.includes(DL)) throw new Error('edition.js: няма реда с DESKTOP'); writeFileSync(ef, e1.replace(DL, 'export const DESKTOP = true;'));
+  const cc = readFileSync(cfg, 'utf8'); writeFileSync(cfg, cc.replace(/export const ADS_CLIENT = '[^']*'/, "export const ADS_CLIENT = ''"));
+  mkdirSync(join(DIST, 'vendor'), { recursive: true }); cpSync(join(ROOT, 'desktop/supabase.vendor.mjs'), join(DIST, 'vendor/supabase.mjs'));
+  for (const f of ['cloud.js', 'online-api.js']) { const p = join(DIST, f); if (existsSync(p)) writeFileSync(p, readFileSync(p, 'utf8').replace(/https:\/\/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@[\d.]+\/\+esm/, './vendor/supabase.mjs')); } }
 
 // 3б) ads.txt за AdSense — от ADS_CLIENT в config.js (празен → без файл)
 const adsPub = ((/export const ADS_CLIENT = '([^']*)'/.exec(c0) || [])[1] || '').trim().replace(/^ca-/, '');

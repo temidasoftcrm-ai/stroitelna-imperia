@@ -5,6 +5,7 @@
 import { feature } from './lab/feature.js';
 import { t as tr } from './i18n.js';
 import { showLevel, LV_PICS } from './lvshow.js';
+import { DEMO, DEMO_LV } from './edition.js';   // демото (сайтът): нивото спира на 5
 import { IMP_UNLOCKS } from './imperial.js';   // нивата 21–25 идват от Империал Сити (не от опит)   // ново ниво — картинка на черен екран (feature 'lv-pics')
 // xp-thresh2 (f6, одит 25.10): нивата 9–15 — ~60–120 реални минути на ниво при 1× (с xp-taper); праговете само се вдигат, нивата в записите не падат
 export const THRESH = feature('xp-thresh2') ? [0, 1000, 4000, 10000, 20000, 40000, 70000, 150000, 320000, 630000, 910000, 1170000, 1400000, 1630000, 1840000, 2250000, 2850000, 3600000, 4500000, 5600000]
@@ -111,7 +112,9 @@ export function createDevLevel(deps) {
     return (S.firm = { off: Math.round(sumXP() - pos), lv: L0, v: FIRM_V }); };   // миграция: същото ниво и същата част от пътя
   const firmXp = () => { const r = firmRec(); return r ? sumXP() - r.off : 0; };
   const firmLv = () => { const r = firmRec(); return r ? Math.max(r.lv, lvOfFirm(firmXp())) : 1; };   // не пада
-  const rawBest = () => FSUM ? Math.max(firmLv(), deps.impLv ? deps.impLv() : 0) : Math.max(level(), deps.maxLevel ? deps.maxLevel() : 1, deps.impLv ? deps.impLv() : 0);
+  const rawBest0 = () => FSUM ? Math.max(firmLv(), deps.impLv ? deps.impLv() : 0) : Math.max(level(), deps.maxLevel ? deps.maxLevel() : 1, deps.impLv ? deps.impLv() : 0);
+  const demoCap = () => DEMO && !!(deps.S() || {}).demo;   // S.demo — новите игри в демото; старите записи остават пълни
+  const rawBest = () => demoCap() ? Math.min(DEMO_LV, rawBest0()) : rawBest0();
   // 🤝 общото ниво с партньора (флаг coop-lv, game.js → deps.coopCap): който е напред, чака — опитът се трупа, отключванията — щом и партньорът стигне
   const capLv = () => { const c = deps.coopCap ? deps.coopCap() : null; return c == null ? Infinity : c; };
   const best = () => Math.min(rawBest(), capLv());
@@ -150,7 +153,8 @@ export function createDevLevel(deps) {
   // firm-xp-sum: новите нива на фирмата (и от опит, дошъл направо в другите градове — търговете) — картинка/известие за всяко, веднъж
   function firmCheck() {
     if (!FSUM) return; const r = firmRec(); if (!r) return; const L = Math.min(FIRM_THRESH.length, lvOfFirm(firmXp()));
-    while (r.lv < L) { r.lv++; const lv = r.lv;
+    if (demoCap() && Math.max(r.lv, L) > DEMO_LV) { r.lv = Math.min(r.lv, DEMO_LV); if (L > DEMO_LV && deps.demoEnd) deps.demoEnd(); }   // края на демото — вместо ниво 6
+    while (r.lv < (demoCap() ? Math.min(L, DEMO_LV) : L)) { r.lv++; const lv = r.lv;
       if (lv > capLv()) { const S = deps.S(); if (S.coopWait == null) S.coopWait = lv - 1; deps.toast(`⏳ Ниво ${lv} е готово, но чака партньора (ниво ${capLv()}) — отключванията идват, щом и той стигне`, 'good'); continue; }
       const ut = (UNLOCKS[lv] || '') + (deps.levelBonus ? deps.levelBonus(lv) : '');
       deps.toast(`🏅 Фирмата е ниво ${lv}! ${ut}`, 'good', open);
@@ -163,7 +167,7 @@ export function createDevLevel(deps) {
     const firm0 = best();   // нивото на фирмата (най-развитият град) преди опита — картинката е само когато то се вдигне, не при всеки град
     d.xp += n;
     if (n > 0) xpFloat(n);
-    const nl = lvOf(d.xp);
+    const nl = demoCap() ? Math.min(DEMO_LV, lvOf(d.xp)) : lvOf(d.xp);
     if (FSUM) { while (d.lv < nl) { d.lv++; deps.toast(`🏙️ ${deps.cityName ? deps.cityName() : 'Градът'} стигна ниво ${d.lv}`, 'good'); } firmCheck(); render(); deps.save(); return; }   // firm-xp-sum
     while (d.lv < nl) {
       d.lv++;

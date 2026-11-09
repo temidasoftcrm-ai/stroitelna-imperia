@@ -1,0 +1,17 @@
+{
+  "name": "stroitelna-imperia-desktop",
+  "productName": "Stroitelna Imperia",
+  "version": "1.0.0",
+  "description": "Строителна империя — пълната игра за компютър",
+  "author": "ТЕМИДАСОФТ ООД",
+  "main": "main.cjs",
+  "private": true,
+  "scripts": { "build": "node build.mjs", "start": "electron app" },
+  "devDependencies": {
+    "@electron/packager": "^18.3.6",
+    "@supabase/supabase-js": "2.45.4",
+    "electron": "^33.2.1",
+    "esbuild": "^0.24.0",
+    "three": "0.160.0"
+  }
+}

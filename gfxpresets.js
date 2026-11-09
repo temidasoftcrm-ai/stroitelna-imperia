@@ -17,9 +17,9 @@ export const GFX = {
 export const GFX_ORDER = LITE ? ['vlow', 'low', 'mid', 'high'] : ['low', 'mid', 'high'];
 if (!LITE) delete GFX.vlow;
 const FAR3 = { vlow: [110, 200, 350], low: [150, 260, 500], mid: [260, 420, Infinity], high: [260, 420, Infinity] };   // ⚡ perf3-far: дребно (< 2,5 м), средно (< 5 м), дърветата/голямото в дворовете — докъде се рисуват (м)
-for (const k in GFX) { const g = GFX[k] = { res: 1, detail: 1, yard: 1, deco: true, night: true, tex: 512, aa: true, far3: FAR3[k], ...GFX[k] }; g.pr0 = g.pr; g.pr = () => g.pr0() * g.res; }   // gfx-lite: стойностите по подразбиране; pr — с резолюцията на нивото
+for (const k in GFX) { const g = GFX[k] = { res: 1, detail: 1, yard: 1, deco: true, night: true, post: k === 'mid' || k === 'high', tex: 512, aa: true, far3: FAR3[k], ...GFX[k] }; g.pr0 = g.pr; g.pr = () => g.pr0() * g.res; }   // gfx-lite: стойностите по подразбиране; pr — с резолюцията на нивото
 let cur = null, own = null, merged = null;   // own — „⚙️ Подробно“ (gfx-lite)
-const RANGE = { far: [0.4, 1.2], traffic: [0.1, 1], res: [0.5, 1], detail: [0, 1], yard: [0, 1] }, BOOL = ['shadows', 'night', 'deco'];   // yard — дворовете и паркираните коли (докъде; 0 — без тях), deco — украсата (сергии, билбордове, знамена, статуи)
+const RANGE = { far: [0.4, 1.2], traffic: [0.1, 1], res: [0.5, 1], detail: [0, 1], yard: [0, 1] }, BOOL = ['shadows', 'night', 'deco', 'post'];   // yard — дворовете и паркираните коли (докъде; 0 — без тях), deco — украсата (сергии, билбордове, знамена, статуи)
 function readOwn(v) { if (!LITE || !v || v[0] !== '{') return null; try { const j = JSON.parse(v), o = {}; for (const k in RANGE) if (typeof j.o?.[k] === 'number') o[k] = Math.max(RANGE[k][0], Math.min(RANGE[k][1], j.o[k])); for (const k of BOOL) if (typeof j.o?.[k] === 'boolean') o[k] = j.o[k]; return GFX[j.lv] ? { lv: j.lv, o } : null; } catch { return null; } }
 // ui-batch2: запазеният избор не се губи, ако записът е от другия вид (с „⚙️ Подробно“ — без gfx-lite, или „Много ниско“ — без него → Ниско)
 const lvOf = v => { if (!feature('ui-batch2') || !v) return null; if (v[0] === '{') { try { v = JSON.parse(v).lv; } catch { return null; } } return GFX[v] ? v : v === 'vlow' && GFX.low ? 'low' : null; };

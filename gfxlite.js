@@ -2,7 +2,8 @@
 // и „⚙️ Подробно“ — свои стойности върху нивото: сенки, далечина, трафик и хора, резолюция, нощни светлини, детайли наоколо (дървета, лампи, табели).
 // Всичко се прилага веднага (gfxpresets.js → setGfx) и се пази в localStorage 'stroi-gfx'. Долу — кадри/с и рисувания (draw calls) „преди → сега“:
 // „преди“ се мери 2 s след отварянето, „сега“ — всяка секунда. По-малките текстури и изглаждането (Много ниско) — след презареждане (memfix.js, game.js).
-import { GFX, GFX_ORDER, gfx, gfxLevel, gfxOwn } from './gfxpresets.js';
+import { feature } from './lab/feature.js';
+import { GFX, GFX_ORDER, gfx, gfxLevel, gfxOwn, gfxWeakGpu } from './gfxpresets.js';
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const CSS = `.gfxBox{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.72);font:15px/1.5 system-ui,sans-serif;color:#e8e8ea;padding:16px;box-sizing:border-box}
@@ -24,7 +25,7 @@ const SL = [   // плъзгачите: ключ, надпис, мин/макс 
   ['detail', '🌳 Детайли наоколо', 0, 100, 'дървета, лампи, светофари, табели — докъде около камерата (0 — без тях)'],
   ['yard', '🏡 Дворове и паркирани коли', 0, 100, 'храсти, пейки, площадки и колите пред блоковете — най-тежкото в кварталите (0 — без тях)'],
 ];
-const CB = [['shadows', '🌑 Сенки', 'най-скъпото за видеокартата'], ['night', '🌃 Нощни светлини', 'ореоли на лампите, прожектори, светещи етажи'], ['deco', '✨ Украса', 'сергии, билбордове, знамена, статуи']];
+const CB = [['shadows', '🌑 Сенки', 'най-скъпото за видеокартата'], ['night', '🌃 Нощни светлини', 'ореоли на лампите, прожектори, светещи етажи'], ['deco', '✨ Украса', 'сергии, билбордове, знамена, статуи'], ['post', '🎨 По-добра картина', 'контактни сенки, сияние, цветове']].filter(c => c[0] !== 'post' || feature('post-fx'));
 const fmtN = n => Math.round(n).toLocaleString('bg-BG');
 
 // deps: apply(lv, own|null|undefined) — прилага и пази; stats() → { calls, tris, pr }; loaded — { tex, aa } при зареждането; suggest — ниво (проверката на компютъра)
@@ -41,7 +42,7 @@ export function openGfx(deps, { detail = false, suggest = null } = {}) {
   const t0 = performance.now();
   function draw() {
     const lv = gfxLevel(), g = gfx(), own = gfxOwn(), L = deps.loaded || {}; drawn = sig();
-    const val = k => k === 'res' ? g.res : k === 'traffic' ? g.traffic : g[k];
+    const val = k => k === 'post' && gfxWeakGpu() && !(gfxOwn() || {}).post ? false : k === 'res' ? g.res : k === 'traffic' ? g.traffic : g[k];   // post-fx: на вградена видеокарта е изключено, докато играчът не го избере
     const reload = (GFX[lv].tex !== L.tex || GFX[lv].aa !== L.aa) && L.tex;
     d.innerHTML = `<div class="in"><h2>🎨 Графика</h2><p>Сега: <b>${g.ico} ${esc(g.nm)}</b>${own ? ' <small>(с твои настройки)</small>' : ''}<br><small>${esc(GFX[lv].desc[0].toUpperCase() + GFX[lv].desc.slice(1))}.</small></p>
       <div class="lv">${GFX_ORDER.map(k => `<button data-lv="${k}" class="${k === lv && !own ? 'on' : ''} ${k === suggest ? 'sug' : ''}" title="${esc(GFX[k].desc)}">${GFX[k].ico} ${esc(GFX[k].nm)}</button>`).join('')}</div>

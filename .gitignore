@@ -11,3 +11,9 @@ _source/
 dist/
 dist-heavy/
 dist-files.txt
+
+desktop/node_modules/
+desktop/app/
+desktop/out/
+desktop/package-lock.json
+desktop/supabase.vendor.mjs
