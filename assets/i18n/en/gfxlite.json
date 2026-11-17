@@ -29,5 +29,10 @@
  "🎨 Графика": "🎨 Graphics",
  "Сега:": "Now:",
  "{0} ⚙️ Подробно": "{0} ⚙️ Details",
- "Готово": "Done"
+ "Готово": "Done",
+ "🎨 По-добра картина": "🎨 Better picture",
+ "контактни сенки, сияние, цветове": "contact shadows, glow, colours",
+ "(🤖 автоматично — по кадрите, до „Средно“, без „По-добра картина“; избор на ниво я спира)": "(🤖 automatic — by frame rate, up to “Medium”, without “Better picture”; picking a level turns it off)",
+ "нивото се сменя само по кадрите в секунда (от „Ниско“ до „Средно“)": "the level changes by itself based on frames per second (from “Low” to “Medium”)",
+ "🤖 Автоматично": "🤖 Automatic"
 }

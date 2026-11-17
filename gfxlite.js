@@ -3,7 +3,7 @@
 // Всичко се прилага веднага (gfxpresets.js → setGfx) и се пази в localStorage 'stroi-gfx'. Долу — кадри/с и рисувания (draw calls) „преди → сега“:
 // „преди“ се мери 2 s след отварянето, „сега“ — всяка секунда. По-малките текстури и изглаждането (Много ниско) — след презареждане (memfix.js, game.js).
 import { feature } from './lab/feature.js';
-import { GFX, GFX_ORDER, gfx, gfxLevel, gfxOwn, gfxWeakGpu } from './gfxpresets.js';
+import { GFX, GFX_ORDER, gfx, gfxLevel, gfxOwn, gfxWeakGpu, gfxAutoOn } from './gfxpresets.js';
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const CSS = `.gfxBox{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.72);font:15px/1.5 system-ui,sans-serif;color:#e8e8ea;padding:16px;box-sizing:border-box}
@@ -33,7 +33,7 @@ export function openGfx(deps, { detail = false, suggest = null } = {}) {
   css(); document.querySelector('.gfxBox')?.remove();
   const d = document.createElement('div'); d.className = 'gfxBox'; document.body.appendChild(d);
   let open = detail, before = null, fr = 0, tFr = performance.now(), fps = 0, alive = true, drawn = '';
-  const sig = () => gfxLevel() + JSON.stringify(gfxOwn());   // нивото е сменено отвън (проверката, демото) — прозорецът се рисува наново
+  const sig = () => gfxLevel() + JSON.stringify(gfxOwn()) + gfxAutoOn();   // нивото е сменено отвън (проверката, демото) — прозорецът се рисува наново
   const loop = () => { if (!alive) return; fr++; const t = performance.now(); if (t - tFr >= 1000) { fps = fr * 1000 / (t - tFr); fr = 0; tFr = t; stat(); } requestAnimationFrame(loop); };
   const snap = () => { const s = deps.stats(); return { fps, calls: s.calls, tris: s.tris, pr: s.pr }; };
   const line = s => !s.calls ? `${s.fps ? fmtN(s.fps) + ' кадъра/с · ' : ''}градът не се рисува (картата е отворена) — влез в града, за да видиш разликата` : `${s.fps ? fmtN(s.fps) + ' кадъра/с · ' : ''}${fmtN(s.calls)} рисувания · ${(s.tris / 1e6).toFixed(1).replace('.', ',')} M △ · рязкост ${s.pr.toFixed(2).replace('.', ',')}×`;
@@ -44,10 +44,10 @@ export function openGfx(deps, { detail = false, suggest = null } = {}) {
     const lv = gfxLevel(), g = gfx(), own = gfxOwn(), L = deps.loaded || {}; drawn = sig();
     const val = k => k === 'post' && gfxWeakGpu() && !(gfxOwn() || {}).post ? false : k === 'res' ? g.res : k === 'traffic' ? g.traffic : g[k];   // post-fx: на вградена видеокарта е изключено, докато играчът не го избере
     const reload = (GFX[lv].tex !== L.tex || GFX[lv].aa !== L.aa) && L.tex;
-    d.innerHTML = `<div class="in"><h2>🎨 Графика</h2><p>Сега: <b>${g.ico} ${esc(g.nm)}</b>${own ? ' <small>(с твои настройки)</small>' : ''}<br><small>${esc(GFX[lv].desc[0].toUpperCase() + GFX[lv].desc.slice(1))}.</small></p>
-      <div class="lv">${GFX_ORDER.map(k => `<button data-lv="${k}" class="${k === lv && !own ? 'on' : ''} ${k === suggest ? 'sug' : ''}" title="${esc(GFX[k].desc)}">${GFX[k].ico} ${esc(GFX[k].nm)}</button>`).join('')}</div>
+    d.innerHTML = `<div class="in"><h2>🎨 Графика</h2><p>Сега: <b>${g.ico} ${esc(g.nm)}</b>${own ? ' <small>(с твои настройки)</small>' : ''}${gfxAutoOn() ? ' <small>(🤖 автоматично — по кадрите, до „Средно“, без „По-добра картина“; избор на ниво я спира)</small>' : ''}<br><small>${esc(GFX[lv].desc[0].toUpperCase() + GFX[lv].desc.slice(1))}.</small></p>
+      <div class="lv">${GFX_ORDER.map(k => `<button data-lv="${k}" class="${k === lv && !own && !gfxAutoOn() ? 'on' : ''} ${k === suggest ? 'sug' : ''}" title="${esc(GFX[k].desc)}">${GFX[k].ico} ${esc(GFX[k].nm)}</button>`).join('')}</div>
       ${suggest ? `<small>Жълтата рамка — предложението от проверката на компютъра.</small>` : ''}
-      <div class="row" style="margin-top:6px"><button id="gfxDet">${open ? '▾' : '▸'} ⚙️ Подробно</button></div>
+      <div class="row" style="margin-top:6px">${deps.auto ? `<button id="gfxAuto" class="${gfxAutoOn() ? 'on' : ''}" title="нивото се сменя само по кадрите в секунда (от „Ниско“ до „Средно“)">🤖 Автоматично</button>` : ''}<button id="gfxDet">${open ? '▾' : '▸'} ⚙️ Подробно</button></div>
       ${open ? `<div class="det">${CB.map(([k, t, h]) => `<label title="${esc(h)}"><span>${t}<br><small>${esc(h)}</small></span><input type="checkbox" data-k="${k}" ${val(k) ? 'checked' : ''}></label>`).join('')}
         ${SL.map(([k, t, a, b, h]) => `<label title="${esc(h)}"><span>${t}<br><small>${esc(h)}</small></span><input type="range" data-k="${k}" min="${a}" max="${b}" step="5" value="${Math.round(val(k) * 100)}"><b>${Math.round(val(k) * 100)}%</b></label>`).join('')}
         ${own ? `<button id="gfxReset">↺ Точно „${esc(GFX[lv].nm)}“ (без моите)</button>` : ''}</div>` : ''}
@@ -56,6 +56,7 @@ export function openGfx(deps, { detail = false, suggest = null } = {}) {
       <div class="row"><button class="on" id="gfxOk">Готово</button></div></div>`;
     d.querySelectorAll('[data-lv]').forEach(b => b.onclick = () => { deps.apply(b.dataset.lv, null); draw(); });
     d.querySelector('#gfxDet').onclick = () => { open = !open; draw(); };
+    d.querySelector('#gfxAuto')?.addEventListener('click', () => { if (!gfxAutoOn()) deps.auto(); draw(); });   // 🤖 gfx-auto
     d.querySelector('#gfxReset')?.addEventListener('click', () => { deps.apply(lv, null); draw(); });
     d.querySelector('#gfxReload')?.addEventListener('click', () => { deps.save?.(); location.reload(); });
     d.querySelectorAll('[data-k]').forEach(inp => {

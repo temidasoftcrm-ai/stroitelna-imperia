@@ -5,6 +5,8 @@
 // Трафикът: секциите са „машини“ за колите (movers — спират пред тях); трамваят спира пред кола в същата посока отпред (≤ 6 с — после има предимство).
 // const T = createTrams({ THREE, parent, segs: [[[x, z], …]], off: [ox, oz], cut: [x0, x1] | null, proto: { A, B }, cars: () => [{ x, z, yaw }], seed });
 //   T.update(dt, night); T.movers() → [{ x, z, l, w }]; T.info(); T.dispose()
+import { feature } from './lab/feature.js';
+const TGAP = feature('tram-gap');   // T: отзив 17.11 — два трамвая минаха един през друг
 const SEC = 14.0, GAP = 0.35, STOP = 400, VMAX = 12, ACC = 1.0, DEC = 1.3, ALAT = 0.9;
 
 const d2 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
@@ -111,6 +113,17 @@ export function createTrams(o) {
         // кола отпред в същата посока (≤ 30 м, ≤ 2 м встрани): спира, но най-много 6 с
         let carGap = 1e9; { const p = at(ln, t.s), q = at(ln, t.s + 6), hx = q[0] - p[0], hz = q[1] - p[1], hl = Math.hypot(hx, hz) || 1, ux = hx / hl, uz = hz / hl;
           for (const c of CR) { const dx = c.x - p[0], dz = c.z - p[1], fw = dx * ux + dz * uz; if (fw < 1 || fw > 30) continue; if (Math.abs(dx * uz - dz * ux) > 2.0) continue; if (Math.sin(c.yaw) * ux + Math.cos(c.yaw) * uz < 0.5 && fw > 8) continue; carGap = Math.min(carGap, fw - 4); } }
+        if (TGAP && t.tgOff > 0) t.tgOff -= dt;   // tram-gap: след 25 s чакане на друг трамвай — 12 s без проверката (иначе заклещване на общ коловоз/пресичане)
+        if (TGAP && !(t.tgOff > 0)) { const g0 = goal, p = at(ln, t.s), q = at(ln, t.s + 6), hl = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1, ux = (q[0] - p[0]) / hl, uz = (q[1] - p[1]) / hl, me = trams.indexOf(t);   // tram-gap: трамваите от другите линии (общ участък, пресичане) — не минават един през друг
+          const inFront = (px, pz, hx, hz, x, z) => { const dx = x - px, dz = z - pz, fw = dx * hx + dz * hz; return fw > -6 && fw < 40 && Math.abs(dx * hz - dz * hx) < 2.8 ? fw : null; };
+          for (const o2 of trams) { if (o2 === t || o2.lane === Ln) continue; let fw = null;
+            for (const S of [o2.A, o2.B]) { const ry = S.s.rotation.y; for (const k of [-6, 0, 6]) { const f = inFront(p[0], p[1], ux, uz, S.s.position.x + Math.sin(ry) * k, S.s.position.z + Math.cos(ry) * k); if (f != null && (fw == null || f < fw)) fw = f; } }   // краищата и средата на всяка секция
+            if (fw == null) continue;
+            // и аз ли съм пред него? (пресичане/насрещно) — тогава отстъпва само по-късният, за да не се заклещят
+            const yo = o2.A.s.rotation.y, mutual = [t.A, t.B].some(S => inFront(o2.A.s.position.x, o2.A.s.position.z, Math.sin(yo), Math.cos(yo), S.s.position.x, S.s.position.z) != null);
+            if (mutual && trams.indexOf(o2) > me) continue;
+            goal = Math.min(goal, Math.max(t.s, t.s + fw - 4)); }
+          if (goal < g0 && t.v < 0.2) { if ((t.tgT = (t.tgT || 0) + dt) > 25) { t.tgT = 0; t.tgOff = 12; } } else t.tgT = 0; }
         if (carGap < 1e9) { t.carT += dt; if (t.carT < 6) goal = Math.min(goal, t.s + carGap); } else t.carT = 0;
         const d = goal - t.s; let want = Math.min(vAt(ln, t.s + 4), vAt(ln, t.s + 20) + 2, Math.sqrt(2 * DEC * Math.max(0, d)));
         t.v = want > t.v ? Math.min(want, t.v + ACC * dt) : Math.max(want, t.v - DEC * 1.6 * dt); t.s = Math.max(t.s, Math.min(goal, t.s + t.v * dt));   // никога назад

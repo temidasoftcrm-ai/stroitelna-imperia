@@ -205,7 +205,7 @@
  "„Рифт Вали Билдърс“": "“Rift Valley Builders”",
  "„Крунг Тхеп Девелъпмънт“": "“Krung Thep Development”",
  "„Руб ал-Хали Контрактинг“": "“Rub' al Khali Contracting”",
- "{0} {1} взе поръчката „{2}“ ({3} €) — изпревари те!": "{0} {1} took the contract “{2}” ({3} €) — they beat you to it!",
+ "{0} {1} взе офертата „{2}“ ({3} €), която не прие навреме. Обектите, които строиш, не са засегнати.": "{0} {1} took the offer “{2}” ({3} €) that you didn’t accept in time. Your own building sites are not affected.",
  "🏁 Конкуренция": "🏁 Competition",
  "Твоят дял:": "Your share:",
  "днес": "today",

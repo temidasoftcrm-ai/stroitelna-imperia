@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { feature } from './lab/feature.js';
+const BGAP = feature('bike-gap');
 import { gfxLevel } from './gfxpresets.js';   // bikes-real: на „Ниско“/„Много ниско“ — процедурните части (без GLB)
 
 const R = 420, MAX = 46, LANE_CLS = new Set(['blvd', 'ring', 'quay']);
@@ -337,7 +338,11 @@ export function createBikes(deps) {
     if (REAL && glb && !MG) { for (const o of Object.values(M)) { G.remove(o); o.geometry.dispose(); } M = meshes(); }   // bikes-real: GLB дойде — сменяме частите
     const h = deps.hour(), tod = h < 6 || h > 23 ? 0.12 : h < 7 || h > 21 ? 0.45 : 1, want = Math.round(CAP * deps.many() * tod * (deps.wet() ? 0.35 : 1));
     const d = Math.min(0.1, dt);
-    for (let i = riders.length - 1; i >= 0; i--) { const r = riders[i]; if (!step(net, r, d) || Math.hypot(r.x - tgt.x, r.z - tgt.z) > RR * 1.25 || i >= want) riders.splice(i, 1); }
+    const CR = BGAP && deps.cars ? deps.cars() : null;   // bike-gap (отзив 17.11 — колелата минаваха през колите): спира пред кола до 4,5 м отпред в своята лента, най-много 5 с
+    const blocked = r => { if (!CR || !CR.length) return false; const fx = Math.sin(r.h), fz = Math.cos(r.h);
+      for (const c of CR) { const dx = c.x - r.x, dz = c.z - r.z, fw = dx * fx + dz * fz; if (fw > 0.5 && fw < 4.5 && Math.abs(dx * fz - dz * fx) < 1.3) return true; } return false; };
+    for (let i = riders.length - 1; i >= 0; i--) { const r = riders[i]; let dd = d; if (CR) { if (blocked(r) && (r.wt = (r.wt || 0) + d) < 5) dd = 0; else if (r.wt >= 7) r.wt = 0; else if (r.wt) r.wt += d; }
+      if (!step(net, r, dd) || Math.hypot(r.x - tgt.x, r.z - tgt.z) > RR * 1.25 || i >= want) riders.splice(i, 1); }
     if (riders.length < want) { const r = spawn(net, tgt, riders.length > 0); if (r) { step(net, r, 0); r.h = at(r.ln, r.s)[2]; riders.push(r); } }
     if (REAL && riders[0] && riders[0].scoot) { const i = riders.findIndex(r => !r.scoot); if (i > 0) [riders[0], riders[i]] = [riders[i], riders[0]]; }   // демото (bikeLook) гледа първия — нека е колоездач
     for (const o of Object.values(M)) o.count = 0;

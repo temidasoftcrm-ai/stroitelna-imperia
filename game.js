@@ -209,7 +209,8 @@ import { DEMO, DEMO_LV, STORE_URL } from './edition.js';
 import { MESHY_SKY, MESHY_SKY_NY, MESHY_SKY_H, MESHY_SKY_CITIES, meshySkyPrep, MESHY_SKY_BRICK, MESHY_SKY_BRICK_CITIES, meshyBakedNight } from './meshysky.js';   // 🏙️ meshy-sky2 (f6): златният и синият небостъргач (Meshy) в градовете със стъклени кули
 import { TOWER_FILES, towerKinds, towerPrep, towerNear } from './towers.js';   // 🏢 meshy-tower (f6): високите блокове (Meshy) в центъра на балканските и източноевропейските градове   // 🇮🇹 rome-bld (f9): Рим отблизо — италианските сгради; it-bld — и в другите италиански градове
 import { STATUE_FILES, statuePrep, meshyFor } from './statues.js';   // ⛲ statues (f9): фонтани и статуи в градовете
-import { GFX, GFX_ORDER, gfx, gfxLevel, setGfx, gfxAutoWhy, gfxStill, gfxWeakGpu, gfxOwn } from './gfxpresets.js';   // 🎨 gfx-presets (f9): графиката Ниско / Средно / Високо
+import { GFX, GFX_ORDER, gfx, gfxLevel, setGfx, gfxAutoWhy, gfxStill, gfxWeakGpu, gfxOwn, gfxAutoOn, gfxAutoOk, gfxAutoResume } from './gfxpresets.js';   // 🎨 gfx-presets (f9): графиката Ниско / Средно / Високо
+import { createGfxAuto } from './gfxauto.js';   // 🤖 gfx-auto: графиката сама по кадрите (от „Ниско“, до „Средно“)
 import { openGfx } from './gfxlite.js';   // 🟠 gfx-lite (55): „Много ниско“ и „⚙️ Подробно“ за слаби компютри
 import { CHURCH_FILES, churchKinds, churchLots, churchPrep, churchAt } from './churches.js';   // ⛪ churches (f6): православните църкви и Невски в София
 import { createUsage } from './usage.js';   // 📊 usage-stats (f6): анонимна статистика за ползването — само със съгласие 'analytics'
@@ -598,7 +599,7 @@ function perfTune(rdt) {
   perfT += rdt; perfN++;
   if (perfT > 2.5) {
     const fps = perfN / perfT, pr = renderer.getPixelRatio(); perfT = 0; perfN = 0;
-    if (PHINT && GFXON && !perfHint.done && city.ready) { if (!perfHint.t0) perfHint.t0 = performance.now(); if (performance.now() - perfHint.t0 > 20000) { perfHint.low = fps < 25 ? perfHint.low + 2.5 : 0;   /* ⚡ perf3-hint: < 25 кадъра/s за 10 s (след зареждането) — веднъж на сесия предлага по-ниско ниво */
+    if (PHINT && GFXON && !perfHint.done && city.ready && !gfxAutoOn()) { if (!perfHint.t0) perfHint.t0 = performance.now(); if (performance.now() - perfHint.t0 > 20000) { perfHint.low = fps < 25 ? perfHint.low + 2.5 : 0;   /* ⚡ perf3-hint: < 25 кадъра/s за 10 s (след зареждането) — веднъж на сесия предлага по-ниско ниво */
       if (perfHint.low >= 10) { perfHint.done = true; try { sessionStorage.setItem('stroi-perfhint', '1'); } catch (e) { } const i = GFX_ORDER.indexOf(gfxLevel()), lv = i > 0 ? GFX_ORDER[i - 1] : null;
         if (lv) toast(t('🐢 Играта засича (~{0} кадъра/s). Натисни тук за по-лека графика: {1} {2}.', [Math.round(fps), GFX[lv].ico, t(GFX[lv].nm)]), 'bad', () => applyGfx(lv)); } } }
     // вдига се само при много добри кадри и поне минута след последното сваляне — иначе резолюцията скача нагоре-надолу (накъсване)
@@ -639,6 +640,7 @@ const skySun = feature('sky-sun') ? createSkySun(scene) : null, SKY_CLOUD = { cl
 scene.add(sun, sun.target);
 const farBase = () => city.osmView ? 3200 : 900, gfxCtx = () => ({ renderer, sun, camera, farBase });   // gfx-presets: далечината без нивото (city — по-долу; ползва се чак при смяна)
 if (GFXON) setGfx(gfxLevel(), { renderer, sun }, false);   // далечината — при влизането в града (camera.far там)
+const gfxAutoC = GFXON && gfxAutoOk() ? createGfxAuto({ apply: lv => setGfx(lv, gfxCtx(), false), active: () => !!S && !!city.ready && !!city.group && $('mapScreen').classList.contains('hidden'), say: (m, dir) => toast(m, dir === 'down' ? '' : 'good') }) : null;   // 🤖 gfx-auto (gfxauto.js): без избор на играча — нивото по кадрите
 if (GFXON && gfxAutoWhy()) setTimeout(() => { try { if (localStorage.getItem('stroi-gfxauto')) return; localStorage.setItem('stroi-gfxauto', '1'); } catch (e) { } toast(`🎨 Графиката е на „${GFX[gfxLevel()].nm}“ — за тази видеокарта (${gfxAutoWhy()}). Смени от ⚙️ Настройки → Графика.`, 'good'); }, 9000);   // ⚡ perf3-auto: веднъж на компютър
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 
@@ -1588,7 +1590,8 @@ const airCity = feature('air-approach') || feature('police-heli') ? createAirCit
 const BIKE_CC = { '🇳🇱': 1, '🇩🇰': 1, '🇩🇪': 0.6, '🇧🇪': 0.6, '🇦🇹': 0.6, '🇨🇭': 0.55, '🇸🇪': 0.6, '🇫🇮': 0.5, '🇳🇴': 0.5 };
 const bikeK = () => { const c = S && cityById(S.cityId); return !c || WORLD_IDS.has(S.cityId) ? 0 : BIKE_CC[c.cc] ?? 0.35; };
 const bikes = feature('bikes') ? createBikes({ parent: () => city.group, plan: () => city.plan && city.plan.p2 && bikeK() ? { P: city.plan.p2, ox: (city.plan.offset || [0, 0])[0], oz: (city.plan.offset || [0, 0])[1], all: bikeK() >= 1 } : null,
-  many: bikeK, hour: () => (6 + todF() * 24) % 24, wet: () => ['rain', 'storm', 'snow'].includes(weather.kind), night: () => dayNight.night, on: () => !gfxStill() && !!S && !!city.group && $('mapScreen').classList.contains('hidden') }) : null;
+  many: bikeK, hour: () => (6 + todF() * 24) % 24, wet: () => ['rain', 'storm', 'snow'].includes(weather.kind), night: () => dayNight.night, on: () => !gfxStill() && !!S && !!city.group && $('mapScreen').classList.contains('hidden'),
+  cars: () => { if (!tr2 || !feature('bike-gap')) return null; const o = tr2G ? tr2G.position : { x: 0, z: 0 }; return tr2.cars.map(c => ({ x: c.x + o.x, z: c.z + o.z })); } }) : null;   // bike-gap: колелото спира пред кола
 // 🏳️ flags (f9): на площада — държавата, ЕС (ако е член) и пак държавата; кметството — знамената му стават на държавата; училище, полиция, съд — стълб отпред
 const FLAGS = feature('flags'); let flagT = 0, marketT = 0;
 // свободно място до (cx, cz): на ≥ pad м от платното на всяка улица, не във вода и не в парцел; offs — отмествания по x, които също трябва да са свободни
@@ -2246,7 +2249,7 @@ function blockDeco() {
       let L = 0; while (L < 30 && free(sx + ux * (L + 1), sz + uz * (L + 1))) L += 1; if (L >= 8) paths.push({ a: [sx, sz], b: [sx + ux * L, sz + uz * L] }); }
   }
   const low = GFXON && /low/.test(gfxLevel());
-  city.decoGroup = buildBlockDeco(items, { trees: plan2Trees() || [], half: low, lamps: !low, night: () => dayNight.night || 0, cells, paths });
+  city.decoGroup = buildBlockDeco(items, { trees: plan2Trees() || [], half: low, lite: low && feature('deco-lite-trees'), lamps: !low, night: () => dayNight.night || 0, cells, paths });
   city.group.add(city.decoGroup);
 }
 // 🌳 block-deco-osm (f6): градовете по истинската карта (Париж, Ню Йорк, Лондон, Рим…) нямат парцели с наши сгради — украсата отива на свободната
@@ -2273,7 +2276,7 @@ function osmDeco() {
   for (const s of F) { const [x, z] = s.split(',').map(Number); cells.push({ x, z, style, lot: Math.floor(x / 60) * 997 + Math.floor(z / 60), int: F.has((x + C) + ',' + z) && F.has((x - C) + ',' + z) && F.has(x + ',' + (z + C)) && F.has(x + ',' + (z - C)), h: ((Math.imul(x * 73856093 ^ z * 19349663, 2654435761) >>> 0) % 10000) / 10000 }); }
   if (!cells.length) return;
   const low = GFXON && /low/.test(gfxLevel());
-  city.osmDecoG = buildBlockDeco([], { trees: (plan2Trees() || []).slice(0, 2), half: low, lamps: !low, night: () => dayNight.night || 0, cells, paths: [] }); city.osmDecoG.name = 'block-deco-osm'; city.osmDecoG.traverse(m => { if (m.isMesh) m.castShadow = false; });   /* регресията v3.4.2: в Ню Йорк +390 рисувания и +3 млн. △ — само 2 вида дървета, без сенки (всеки вид × части × сенките = отделно рисуване) */ city.osmDecoG.userData.cells = cells.length; city.group.add(city.osmDecoG);
+  city.osmDecoG = buildBlockDeco([], { trees: (plan2Trees() || []).slice(0, 2), half: low, lite: low && feature('deco-lite-trees'), lamps: !low, night: () => dayNight.night || 0, cells, paths: [] }); city.osmDecoG.name = 'block-deco-osm'; city.osmDecoG.traverse(m => { if (m.isMesh) m.castShadow = false; });   /* регресията v3.4.2: в Ню Йорк +390 рисувания и +3 млн. △ — само 2 вида дървета, без сенки (всеки вид × части × сенките = отделно рисуване) */ city.osmDecoG.userData.cells = cells.length; city.group.add(city.osmDecoG);
 }
 function buildLotPaths() {
   if (!city || !city.group) return;
@@ -3577,6 +3580,7 @@ function sfx2Src(tg, zoom, speed) {
 function moversNow() {
   const o = tr2G ? tr2G.position : { x: 0, z: 0 }, out = [];
   if (city.trams) for (const m of city.trams.movers()) out.push({ ...m, x: m.x - o.x, z: m.z - o.z });   // 🚋 trams: колите не минават през трамвая
+  if (bikes && feature('bike-gap')) for (const r of bikes.riders()) if (!r.tr) out.push({ x: r.x - o.x, z: r.z - o.z, l: 2, w: 0.7 });   // bike-gap (отзив 17.11): колите спират зад колелото
   for (const u of units) if (u.path && !u.agent && u.obj.parent) out.push({ x: u.x - o.x, z: u.z - o.z, l: u.jpSize?.[0] || 6, w: u.jpSize?.[1] || 2.6 });
   for (const t of tirs.list) if (!t.agent && !t.trl && t.root.visible) out.push({ x: t.x - o.x, z: t.z - o.z, l: 12, w: 2.6 });
   for (const m of [...(incidents.movers?.() || []), ...(feature('fire-seq') ? fires.movers?.() || [] : [])]) out.push({ ...m, x: m.x - o.x, z: m.z - o.z });   // + пожарната на път
@@ -6566,7 +6570,7 @@ const topSetRows = () => { const C = topSetCounts(), tap = id => () => { const b
     { ico: () => '❓', nm: () => 'Помощ — обиколка на бутоните', fn: tap('btnTour'), on: !!document.getElementById('btnTour') },
     { ico: () => '💡', nm: () => 'Съвет — как да печелиш и да не фалираш', fn: tap('btnTips'), on: !!document.getElementById('btnTips') },
     { ico: () => '🖥️', nm: () => 'Проверка на компютъра — ще върви ли добре', fn: () => perfCheck(renderer, GFXON ? lv => applyGfx(lv) : null, gfxMore()), on: feature('perf-meter') },   // perf-meter (f9); gfx-presets — „Приложи“ предложеното ниво
-    { ico: () => '🎨', nm: () => `Графика: ${gfx().nm}`, fn: () => openGfxUI(), on: GFXON },
+    { ico: () => '🎨', nm: () => `Графика: ${gfx().nm}${gfxAutoOn() ? ' (🤖 автоматично)' : ''}`, fn: () => openGfxUI(), on: GFXON },
     { ico: () => '🎓', nm: () => 'Покажи урока пак — първите стъпки', fn: () => onboard.restart(), on: !!onboard },
     ...(N2 ? N2.rows() : []),   // 🔔 notif2: рутинните известия и звукът за важните   // 🎓 onboarding (f9)   // gfx-presets (f9)   // perf-meter (f9)
   ].filter(r => r.on); };
@@ -6578,7 +6582,7 @@ if (feature('top-set')) {
 // 🎨 gfx-presets (f9): изборът на графиката — веднага, без презареждане (сенките, рязкостта, видимостта; колите и хората — постепенно)
 function applyGfx(lv, o = null) { setGfx(lv, gfxCtx(), true, o); if (!o) toast(`🎨 Графика: ${GFX[lv].nm} — ${GFX[lv].desc}.`, 'good'); }   // gfx-lite: o — „⚙️ Подробно“ (свои стойности, без съобщение); ново ниво — без тях
 // 🟠 gfx-lite: прозорецът „🎨 Графика“ — всички нива и „⚙️ Подробно“; от проверката на компютъра — с предложеното ниво
-const gfxDeps = () => ({ apply: applyGfx, stats: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, pr: renderer.getPixelRatio() }), loaded: GLOADED, save: () => { try { save(); } catch (e) { } } });
+const gfxDeps = () => ({ apply: applyGfx, stats: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, pr: renderer.getPixelRatio() }), loaded: GLOADED, save: () => { try { save(); } catch (e) { } }, auto: gfxAutoC ? () => { if (gfxAutoResume()) { setGfx(gfxLevel(), gfxCtx(), false); toast('🤖 Графика: автоматично — нивото се сменя само по кадрите (до „Средно“).', 'good'); } } : null });   // 🤖 gfx-auto: обратно на автоматично
 const gfxMore = () => GLITE ? { order: GFX_ORDER, GFX, open: (sug, detail) => openGfx(gfxDeps(), { suggest: sug, detail }) } : null;
 function openGfxUI() { if (GLITE) return openGfx(gfxDeps()); modal('🎨 Графика', `Сега: <b>${gfx().ico} ${gfx().nm}</b>.<br>${GFX_ORDER.map(k => `<b>${GFX[k].ico} ${GFX[k].nm}</b> — ${GFX[k].desc}`).join('<br>')}<br><small>Не знаеш кое? ⚙️ → „Проверка на компютъра“ ще предложи.</small>`,
   [...GFX_ORDER.map(k => [`${GFX[k].ico} ${GFX[k].nm}`, () => applyGfx(k)]), ['Затвори', null]]); }
@@ -13971,6 +13975,7 @@ function frame() {
   if (S) { dayNight.update(todF(), controls.target); weather.update(rdt, controls.target); if (storm) storm.update(rdt, WX3 ? weather.thunder : weather.kind === 'storm');   /* ⚡ storm-bolts: след времето (hemi се пресмята всеки кадър) */ if (skySun) skySun.update((6 + todF() * 24) % 24, camera, controls.target, WX3 ? weather.sky : SKY_CLOUD[weather.kind] ?? 0, sun, storm ? { heavy: WX3 ? weather.heavy : weather.kind === 'storm' ? 1 : weather.kind === 'rain' ? 0.5 : 0, flash: storm.flash } : null);   /* sky-sun: след денонощието и времето */ if (football) football.update(rdt, controls.target);   /* ⚽ football: само близо до камерата */ if (birds) birds.update(rdt, camera);   /* 🐦 birds */ if (airCity) airCity.update(rdt);   /* ✈️ air-approach / 🚁 police-heli */ if (bikes) bikes.update(rdt, controls.target);   /* 🚲 bikes */ if (FLAGS) { flagsTick(performance.now() / 1000); if (performance.now() > flagT) { flagT = performance.now() + 2500; try { placeFlags(); } catch (e) { console.warn('flags', e); } } }   if (SNOWR && performance.now() > snowT) { snowT = performance.now() + 2500; try { snowRoofs(); } catch (e) { console.warn('snow-roofs', e); } }   /* ❄️ snow-roofs */   /* 🏳️ flags */ if (MARKETS && performance.now() > marketT) { marketT = performance.now() + 3000; try { placeMarket(); } catch (e) { console.warn('markets', e); } }   /* 🍉 markets */ if (xmas) xmas.update(rdt);   /* 🎄 xmas */ xmasShowTick(rdt);   /* 🎄 xmas-plovdiv */ setSiteLightsNight(dayNight.night); if (cityHw && cityHw.signs) for (const G of cityHw.signs) G.setNight(dayNight.night); if (city.billboards) { city.billboards.setNight(dayNight.night); city.billboards.update && city.billboards.update(rdt); } }
   if (GLITE) dayNight.glowMat.visible = dayNight.poolMat.visible = dayNight.night > 0.01 && gfx().night;   // 🟠 gfx-lite: ореолите на лампите — денем (прозрачност 0) без рисуване; „Нощни светлини“ — изключени
   perfTune(rdt);
+  if (gfxAutoC) gfxAutoC.tick(rdt);   // 🤖 gfx-auto
   perf.lap('prep');
   if (city.distG) distLabelsTick(onMap);   // districts: надписите — от средна височина, леко появяване и изчезване
   if (mtnBg) mtnBg.update(camera, scene.fog && scene.fog.color);   // mtn-backdrop: пръстенът — около камерата
@@ -15307,8 +15312,8 @@ if (AUTOTEST) {
     // 🚏🚗 city-life3: Лабораторията и тестовете — трамвай/автобус на спирка (превърта, докато спре), заводски/гаров/летищен паркинг в даден час
     cl3Info() { return { stops: cl3Life ? cl3Life.info() : null, tramStops: cl3Life ? cl3Life.stops().filter(q => q.kind === 'tram').length : 0, busStops: cl3Life ? cl3Life.stops().filter(q => q.kind === 'bus').length : 0, lots: cl3Lots.map(L => L.info()), fac: ((city.factory && city.factory.list) || []).filter(o => o.userData.lot).map(o => o.userData.lot.info()), air: city.airport && city.airport.lot ? city.airport.lot.info() : null }; },
     cl3Prep() { const b = cl3Ped(); return { peds: pedReal.length, sit: !!cl3Sit, clips: pedClips.length, b: !!b }; },   /* зарежда минувачите и седналия клип */
-    cl3BikeGap(sec = 60) { if (!bikes || !tr2) return 'няма'; let n = 0, close = 0, near = 0; const o = tr2G ? tr2G.position : { x: 0, z: 0 };   /* 🚲 city-life3: колко често кола е на < 1,4 м от колоездач (центровете) */
-      for (let t = 0; t < sec; t += 0.1) { tr2.update(0.1); bikes.update(0.1, controls.target); if (Math.round(t * 10) % 5) continue; for (const r of bikes.riders()) { if (r.tr) continue; n++; let dm = 1e9; for (const c of tr2.cars) { const d = Math.hypot(c.x + o.x - r.x, c.z + o.z - r.z); if (d < dm) dm = d; } if (dm < 1.4) close++; else if (dm < 2.2) near++; } }
+    cl3BikeGap(sec = 60, all = false) { if (!bikes || !tr2) return 'няма'; let n = 0, close = 0, near = 0; const o = tr2G ? tr2G.position : { x: 0, z: 0 };   /* 🚲 city-life3: колко често кола е на < 1,4 м от колоездач (центровете) */
+      for (let t = 0; t < sec; t += 0.1) { tr2.update(0.1); bikes.update(0.1, controls.target); if (Math.round(t * 10) % 5) continue; for (const r of bikes.riders()) { if (r.tr && !all) continue; n++; let dm = 1e9; for (const c of tr2.cars) { const d = Math.hypot(c.x + o.x - r.x, c.z + o.z - r.z); if (d < dm) dm = d; } if (dm < 1.4) close++; else if (dm < 2.2) near++; } }
       return { samples: n, close, near, bikeOff: !!(city.plan.p2.bikeOff) }; },
     cl3Step(sec = 2) { for (let t = 0; t < sec; t += 0.1) { if (city.trams) city.trams.update(0.1, 0); if (this._cl3Bus) { if (tr2) tr2.update(0.1); cityBus.update(0.1); } if (cl3Life) cl3Life.update(0.1); } return cl3Life ? cl3Life.info() : null; },
     cl3Cam(cx, cz, nx, nz, ax, az, d = 15, y = 9) { fly = null; controls.target.set(cx, 1, cz); camera.position.set(cx + nx * d + ax * 0.3, y, cz + nz * d + az * 0.3); controls.update(); },

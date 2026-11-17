@@ -29,7 +29,7 @@ function merge(gs) { let n = 0; for (const g of gs) n += g.attributes.position.c
   const m = new THREE.BufferGeometry(); m.setAttribute('position', new THREE.BufferAttribute(pos, 3)); m.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); m.setIndex(idx); return m; }
 
 export function buildBlockDeco(items, opts = {}) {
-  const { trees = [], half = false, lamps = true, night = () => 0, cells = [], paths = [] } = opts, G = new THREE.Group(); G.name = 'block-deco';
+  const { trees = [], half = false, lamps = true, night = () => 0, cells = [], paths = [], lite = false } = opts, G = new THREE.Group(); G.name = 'block-deco';
   const L = { bench: [], bin: [], lamp: [], frame: [], swing: [], sand: [], hedge: [], mail: [], planter: [], tree: [] }, quads = { path: [], pave: [] };
   const keep = half ? 0.5 : 1, m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), v = new THREE.Vector3(), sc = new THREE.Vector3();
   const dbg = { items: items.length, noZone: 0, big: 0, ex: [] };
@@ -117,7 +117,7 @@ export function buildBlockDeco(items, opts = {}) {
     if (H) H.onBeforeRender = () => { hm.emissiveIntensity = 2.2 * night(); };
   }
   // липите/дърветата: моделите на играта (основата 0, височина 1), инстанции по части; със семе за tree-colors (aSeed)
-  if (L.tree.length && trees.length) {
+  if (L.tree.length && trees.length && !lite) {
     const vars = trees.map(src => { src.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(src), h = (bb.max.y - bb.min.y) || 1, parts = [];
       src.traverse(o => { if (o.isMesh) { const g = o.geometry.clone().applyMatrix4(o.matrixWorld); g.translate(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2); g.scale(1 / h, 1 / h, 1 / h); parts.push([g, o.material]); } }); return parts; }).filter(p => p.length);
     const by = vars.map(() => []); L.tree.forEach((t, i) => by[i % vars.length].push(t));
@@ -125,6 +125,11 @@ export function buildBlockDeco(items, opts = {}) {
       if (tt) g.setAttribute('aSeed', new THREE.InstancedBufferAttribute(Float32Array.from(LL, e => hash(Math.round(e[0] * 13 + e[1] * 7) | 0)), 1));
       const I = inst(g, tt ? mat.__tt.inst() : mat, LL, e => { v.set(e[0], 0, e[1]); q.setFromAxisAngle(up, e[2]); sc.set(e[3], e[3], e[3]); });
       if (I && tt) I.customDepthMaterial = I.material.__tt.depth; } });
+  }
+  // deco-lite-trees (отзив 17.11 — прегряване): на „Ниско“ — прости дървета (~30 △ вместо ~10 500 на модел; в София 1559 дървета = 16 млн. △)
+  else if (L.tree.length && lite) {
+    inst(new THREE.CylinderGeometry(0.035, 0.05, 1, 5).translate(0, 0.5, 0), M(0x6b4a2e, { roughness: 1 }), L.tree, e => { v.set(e[0], 0, e[1]); q.setFromAxisAngle(up, e[2]); sc.set(e[3], e[3] * 0.45, e[3]); }, false);
+    inst(new THREE.IcosahedronGeometry(1, 0), M(0x4f7f38, { roughness: 1, flatShading: true }), L.tree, e => { v.set(e[0], e[3] * 0.62, e[1]); q.setFromAxisAngle(up, e[2]); sc.set(e[3] * 0.3, e[3] * 0.34, e[3] * 0.3); }, false);
   }
   // пътеките и павираните дворове — по един меш (квадрите на парцелите)
   for (const [k, col, y] of [['path', 0xc9bfa8, 0.05], ['pave', 0xb4ab9c, 0.045]]) { const Q = quads[k]; if (!Q.length) continue; const pos = [], idx = [];

@@ -35,7 +35,21 @@ let weakG = null;   // вградена/софтуерна видеокарта 
 export const gfxStill = () => feature('vlow-still') && gfxLevel() === 'vlow';
 export const gfxWeakGpu = () => { if (weakG !== null) return weakG; let gpu = ''; try { const gl = document.createElement('canvas').getContext('webgl2') || document.createElement('canvas').getContext('webgl'), e = gl && gl.getExtension('WEBGL_debug_renderer_info'); gpu = gl ? String((e && gl.getParameter(e.UNMASKED_RENDERER_WEBGL)) || gl.getParameter(gl.RENDERER) || '') : ''; } catch { }
   return weakG = !!gpu && (W_SOFT.test(gpu) || (!W_DISC.test(gpu) && !W_APPLE.test(gpu))); };
+// 🤖 gfx-auto (бета тестерите: „зарежда бавно и насича“, MacBook M5 — 4 GB и прегряване): без запазен избор графиката започва на „Ниско“
+// без следобработката (post-fx) и сама се сменя по кадрите — gfxauto.js. Изборът на играча (setGfx с keep) я спира; ?gfx= и автотестовете — без нея
+// (?gfxauto=1 — и в автотестовете, за мерене). Нивото, до което е стигнала, се помни отделно ('stroi-gfxauto-lv' — не е „избор на играча“).
+const Q = typeof location !== 'undefined' ? location.search : '';
+const AUTO_OK = feature('gfx-auto') && !/[?&]gfx=/.test(Q) && (!/[?&]autotest/.test(Q) || /[?&]gfxauto=1/.test(Q));
+let autoOn = AUTO_OK && !gfxSaved();
+export const gfxAutoOn = () => autoOn;
+export const gfxAutoOk = () => AUTO_OK;   // може ли да се включи (бутонът „🤖 Автоматично“ в прозореца — gfxlite.js)
+export const gfxAutoResume = () => { if (!AUTO_OK) return false; try { localStorage.removeItem('stroi-gfx'); } catch { } own = null; merged = null; autoOn = true; return true; };   // изборът на играча се забравя
+const AUTO_MAX = 'mid';   // автоматично — не над „Средно“
+export const gfxAutoMax = () => AUTO_MAX;
+function autoStartLv() { let v = null; try { v = localStorage.getItem('stroi-gfxauto-lv'); } catch { } const O = Object.keys(GFX);   /* редът на нивата (vlow — само с gfx-lite) */
+  return GFX[v] && O.indexOf(v) <= O.indexOf(AUTO_MAX) ? v : 'low'; }
 function autoLv() {
+  if (autoOn) return autoStartLv();   // gfx-auto: от „Ниско“ (или докъдето е стигнала последния път)
   if (!feature('perf3-auto') || /[?&]autotest/.test(location.search)) return 'mid';
   let gpu = ''; try { const gl = document.createElement('canvas').getContext('webgl2') || document.createElement('canvas').getContext('webgl'), e = gl && gl.getExtension('WEBGL_debug_renderer_info'); gpu = gl ? String((e && gl.getParameter(e.UNMASKED_RENDERER_WEBGL)) || gl.getParameter(gl.RENDERER) || '') : ''; } catch { }
   const weakGpu = gpu && (W_SOFT.test(gpu) || (!W_DISC.test(gpu) && !W_APPLE.test(gpu))), weakPc = (devicePixelRatio || 1) <= 1 && screen.width <= 1600 && (navigator.hardwareConcurrency || 8) <= 4;
@@ -44,14 +58,16 @@ function autoLv() {
 }
 export const gfxLevel = () => cur || (cur = (() => { const q = (location.search.match(/[?&]gfx=(vlow|low|mid|high)\b/) || [])[1]; if (q) return q;   /* ?gfx= — за тестовете (не се записва) */ try { const v = localStorage.getItem('stroi-gfx'), j = readOwn(v); if (j) { own = j.o; return j.lv; } return GFX[v] ? v : lvOf(v) || autoLv(); } catch { return 'mid'; } })());   /* perf3-auto: без запазен избор — autoLv() */
 // нивото + своите стойности (gfx-lite: трафикът важи и за хората; рязкостта — част от тази на нивото)
-export const gfx = () => { const lv = gfxLevel(); if (!own) return GFX[lv]; if (merged?.lv === lv) return merged; const g = GFX[lv], o = own;
+const AUTOV = {};   // gfx-auto: същите нива, но без следобработката (post-fx)
+export const gfx = () => { const lv = gfxLevel(); if (!own) return autoOn ? AUTOV[lv] || (AUTOV[lv] = { ...GFX[lv], post: false }) : GFX[lv]; if (merged?.lv === lv) return merged; const g = GFX[lv], o = own;
   return merged = { ...g, ...o, lv, peds: o.traffic ?? g.peds, pr: () => g.pr0() * (o.res ?? g.res) }; };
 export const gfxOwn = () => own;   // gfx-lite: „⚙️ Подробно“ (null — точно нивото)
 
 // ctx: { renderer, sun, camera, farBase() — далечината на камерата без нивото }
 export function setGfx(lv, ctx, keep = true, o) {   // keep — да се запомни (при старта — не); o — gfx-lite „⚙️ Подробно“ (null — точно нивото, undefined — без промяна)
   if (!GFX[lv]) return; cur = lv; if (o !== undefined) { own = LITE && o && Object.keys(o).length ? readOwn(JSON.stringify({ lv, o })).o : null; merged = null; }
-  if (keep) try { localStorage.setItem('stroi-gfx', own ? JSON.stringify({ lv, o: own }) : lv); } catch { }
+  if (keep) { autoOn = false; try { localStorage.setItem('stroi-gfx', own ? JSON.stringify({ lv, o: own }) : lv); } catch { } }   // gfx-auto: изборът на играча спира автоматиката
+  else if (autoOn) try { localStorage.setItem('stroi-gfxauto-lv', lv); } catch { }
   const g = gfx(), { renderer, sun, camera } = ctx || {};
   if (renderer) { renderer.setPixelRatio(g.pr()); renderer.shadowMap.needsUpdate = true; }
   if (sun) { sun.castShadow = g.shadows; if (sun.shadow.mapSize.x !== g.shadowSize) { sun.shadow.mapSize.set(g.shadowSize, g.shadowSize); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; } } }   // без сенки — шейдърите се превключват сами

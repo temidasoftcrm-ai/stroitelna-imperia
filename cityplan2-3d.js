@@ -648,12 +648,17 @@ function realTrees(G, list, models) {
   return true;
 }
 const T1 = feature('tlight-one'), shortArm = (P, n, a) => { if (!T1) return false; const rd = P.roads[a.road], m = P.nodes[a.end ? rd.from : rd.to]; return rd.L[rd.L.length - 1] < 28 && !!m && m.arms.length >= 3 && m.kind !== 'round' && n.arms.length >= 3; };   // tlight-one (горе)
+// tree-road (отзив 17.11 — дървета насред пътя): точката върху платното на друг път (не own) → true; мрежа 20 м с точки през 2 м
+function asphaltTest(P) { const G = new Map(), gk = (i, j) => i * 100003 + j;
+  for (const rd of P.roads) { const L = rd.L, T = L[L.length - 1]; for (let s0 = 0, i = 1; s0 <= T; s0 += 2) { while (i < L.length - 1 && L[i] < s0) i++; const a = rd.pts[i - 1], b = rd.pts[i], t = (s0 - L[i - 1]) / ((L[i] - L[i - 1]) || 1), x = a[0] + (b[0] - a[0]) * t, z = a[1] + (b[1] - a[1]) * t, k = gk(Math.floor(x / 20), Math.floor(z / 20)); (G.get(k) || G.set(k, []).get(k)).push(x, z, rd); } }
+  return (x, z, own) => { const i = Math.floor(x / 20), j = Math.floor(z / 20); for (let a = i - 1; a <= i + 1; a++) for (let b = j - 1; b <= j + 1; b++) { const c = G.get(gk(a, b)); if (c) for (let k = 0; k < c.length; k += 3) { const rd = c[k + 2]; if (rd !== own && Math.hypot(c[k] - x, c[k + 1] - z) < rd.w / 2 + 1.2) return true; } } return false; }; }
 function* furniture(G, P, o = {}) {   // генератор: yield след всеки път (постепенното строене)
   const FURN = new THREE.Group(); G.add(FURN); let SIG = {};
   const stone = M(0x8a8478), iron = M(0x2a2c2e), lampG = new THREE.MeshStandardMaterial({ color: 0xfff1c8, emissive: 0xffd88a, emissiveIntensity: 0.2 });
   const lamps = [], trees = [], benches = [], bins = [], stops = [], signs = [], fountains = [], at = (rd, s) => { const L = rd.L; let i = 1; while (i < L.length - 1 && L[i] < s) i++; const a = rd.pts[i - 1], b = rd.pts[i], t = (s - L[i - 1]) / ((L[i] - L[i - 1]) || 1), l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, (b[0] - a[0]) / l, (b[1] - a[1]) / l]; };
   const NG = new Map(), ngk = (i, j) => i * 100003 + j; for (const n of P.nodes) if (n.arms.length >= 3) { const k = ngk(Math.floor(n.x / 30), Math.floor(n.z / 30)); (NG.get(k) || NG.set(k, []).get(k)).push(n); }   // кръстовищата в мрежа 30 м
-  const nearNode = (x, z) => { const i = Math.floor(x / 30), j = Math.floor(z / 30); for (let a = i - 1; a <= i + 1; a++) for (let b = j - 1; b <= j + 1; b++) for (const n of NG.get(ngk(a, b)) || []) if (Math.hypot(n.x - x, n.z - z) < (n.r || 6) + 4) return true; return false; };
+  const nearNode = (x, z, ex = 4) => { const i = Math.floor(x / 30), j = Math.floor(z / 30); for (let a = i - 1; a <= i + 1; a++) for (let b = j - 1; b <= j + 1; b++) for (const n of NG.get(ngk(a, b)) || []) if (Math.hypot(n.x - x, n.z - z) < (n.r || 6) + ex) return true; return false; };
+  const TR = feature('tree-road'), onAsph = TR ? asphaltTest(P) : () => false;
   // street-real: улиците и булевардите — модерни LED по 9 м на бордюра (двойните — на разделителната ивица), старият център (по картата — всички улички), кейовете и пешеходните — класически ~5 м
   const SR = o.streetReal && streetReal(), OLD = P.osm ? 1e9 : (P.R || 1200) * 0.45, cx0 = P.center ? P.center.x : 0, cz0 = P.center ? P.center.z : 0;
   for (const rd of P.roads) { yield 0;
@@ -662,8 +667,8 @@ function* furniture(G, P, o = {}) {   // генератор: yield след вс
       if (kind === 'cobra2') { for (let s = 29; s < T - 10; s += 30) { const [x, z, ux, uz] = at(rd, s); if (!nearNode(x, z)) lamps.push([x, z, Math.atan2(uz, -ux), kind]); } }   /* на ивицата между платната: рамената — към двете платна */
       else for (let s = 10; s < T - 6; s += step) { const [x, z, ux, uz] = at(rd, s); for (const sg of sides) { const o2 = old ? rd.w / 2 + rd.walk - 0.5 : rd.w / 2 + 0.6, px = x - uz * o2 * sg, pz = z + ux * o2 * sg; if (!nearNode(px, pz)) lamps.push([px, pz, Math.atan2(uz * sg, -ux * sg), kind]); } } }
     else for (let s = 10; s < T - 6; s += step) { const [x, z, ux, uz] = at(rd, s); for (const sg of sides) { const o = rd.w / 2 + rd.walk - 0.5, px = x - uz * o * sg, pz = z + ux * o * sg; if (!nearNode(px, pz)) lamps.push([px, pz]); } }
-    if (rd.median) for (let s = 14; s < T - 10; s += 30) { const [x, z] = at(rd, s); if (!nearNode(x, z)) trees.push([x, z, 7]); }   // дървета по разделителната ивица
-    if (rd.cls === 'quay' || (P.osm && rd.cls === 'blvd')) for (let s = 6; s < T - 6; s += 11) { const [x, z, ux, uz] = at(rd, s); for (const sg of [1, -1]) { const o = rd.w / 2 + rd.walk * 0.55, px = x - uz * o * sg, pz = z + ux * o * sg; if (!nearNode(px, pz) && !(P.waterAt && P.waterAt(px, pz))) trees.push([px, pz, 11]); } }   // платаните по Лунготевере
+    if (rd.median) for (let s = 14; s < T - 10; s += 30) { const [x, z] = at(rd, s); if (!nearNode(x, z, TR ? rd.w / 2 + 4 : 4) && !onAsph(x, z, rd)) trees.push([x, z, 7]); }   // дървета по разделителната ивица
+    if (rd.cls === 'quay' || (P.osm && rd.cls === 'blvd')) for (let s = 6; s < T - 6; s += 11) { const [x, z, ux, uz] = at(rd, s); for (const sg of [1, -1]) { const o = rd.w / 2 + rd.walk * 0.55, px = x - uz * o * sg, pz = z + ux * o * sg; if (!nearNode(px, pz) && !(P.waterAt && P.waterAt(px, pz)) && !onAsph(px, pz, rd)) trees.push([px, pz, 11]); } }   // платаните по Лунготевере
     if (main && T > 120) for (let s = 60; s < T - 40; s += 260) { const [x, z, ux, uz] = at(rd, s), o = rd.w / 2 + rd.walk - 1.2; stops.push([x - uz * o, z + ux * o, Math.atan2(ux, uz)]); }   // спирки (с навес)
   }
   // площадите на забележителностите: пейки, кошчета, фонтан
@@ -720,6 +725,7 @@ function* furniture(G, P, o = {}) {   // генератор: yield след вс
 
 // ---- основното
 export function buildPlan2View(P, opts = {}) {
+  const RSEAM = feature('road-seams');
   const TM = {}, T0 = performance.now(); let tm0 = T0, phase = 'start'; const tm = k => { const t = performance.now(); TM[k] = (TM[k] || 0) + t - tm0; tm0 = t; phase = 'after ' + k; };   // замерване по части (userData.timing)
   mats();
   { const gr = opts.ground || {}; MAT.grass.color.setHex(gr.grass ?? 0x7fa462); MAT.median.color.setHex(gr.median ?? 0x5f9a45); MAT.island.color.setHex(gr.island ?? 0x6aa84f); }   // T2 dubai-look: пясъкът и настилката вместо тревата (общите материали — всеки град си ги задава)
@@ -798,7 +804,7 @@ export function buildPlan2View(P, opts = {}) {
   const trimS = (rd, s0, s1) => { const L = rd.L, T = L[L.length - 1]; if (T - s0 - s1 < 0.5) return []; const out = [atS(rd, s0).p]; for (let k = 0; k < L.length; k++) if (L[k] > s0 + 0.05 && L[k] < T - s1 - 0.05) out.push(rd.pts[k]); out.push(atS(rd, T - s1).p); return out; };
   for (const rd of RD) { yield 0; const nA = P.nodes[rd.from], nB = P.nodes[rd.to], T = rd.L[rd.L.length - 1], ov = n => n.arms.length >= 3 && n.kind !== 'round' ? 2 : 0, c0 = Math.max(0, endCut(nA, rd, 0) - ov(nA), bendCut(nA)), c1 = Math.max(0, endCut(nB, rd, 1) - ov(nB), bendCut(nB)), pr = trimS(rd, c0, c1); if (pr.length < 2) continue;   // асфалтът влиза 2 м под кръстовището — без процеп при извит път
     (rd.noCars ? W : As).push(ribbon(pr, rd.w, rd.noCars ? 0.05 : 0.07));   // пешеходна — паваж
-    for (const sg of [1, -1]) { const ps = trimS(rd, sideCut(nA, rd, 0, sg), sideCut(nB, rd, 1, sg)); if (ps.length > 1) { const q = P.osm ? ps.filter((_, k) => k % 2 === 0 || k === ps.length - 1) : ps; W.push(ribbon(offLine(q, sg * (rd.w / 2 + rd.walk / 2)), rd.walk, 0.04)); if (!P.osm || rd.cls !== 'street') Cb.push(ribbon(offLine(q, sg * (rd.w / 2 + 0.15)), 0.3, 0.09)); } }   // Рим: по-рядка геометрия, бордюр само по главните   // тротоар и бордюр — до среза на своята страна
+    for (const sg of [1, -1]) { const ps = trimS(rd, sideCut(nA, rd, 0, sg), sideCut(nB, rd, 1, sg)); if (ps.length > 1) { const q = P.osm && !RSEAM ? ps.filter((_, k) => k % 2 === 0 || k === ps.length - 1) : ps;   /* road-seams (отзив 17.11): тротоарът — по всички точки на платното, без процепи по завоите */ W.push(ribbon(offLine(q, sg * (rd.w / 2 + rd.walk / 2)), rd.walk, 0.04)); if (!P.osm || rd.cls !== 'street') Cb.push(ribbon(offLine(q, sg * (rd.w / 2 + 0.15)), 0.3, 0.09)); } }   // Рим: по-рядка геометрия, бордюр само по главните   // тротоар и бордюр — до среза на своята страна
     if (rd.median) {   // разделителната ивица свършва зад стоп линията с нос (стеснява се до 0,4 м)
       const m0 = Math.max(endCut(nA, rd, 0, ST + 3.2), deadCut(nA, 3, true)), m1 = Math.max(endCut(nB, rd, 1, ST + 3.2), deadCut(nB, 3, true)), pm = trimS(rd, m0, m1); if (pm.length < 2 || T - m0 - m1 < 4) continue; Md.push(ribbon(pm, rd.median, 0.1));   // късият път между две близки кръстовища — без ивица
       for (const [n, s, dir] of [[nA, m0, -1], [nB, T - m1, 1]]) { if ((n.arms.length < 3 && !(RG && endType(n))) || n.kind === 'round') continue;   /* road-geo: и пред бариерата ивицата свършва с нос */ const A2 = atS(rd, s), B2 = atS(rd, s + dir * 3), v = [-A2.u[1], A2.u[0]], hw = rd.median / 2;
@@ -911,8 +917,8 @@ export function buildPlan2View(P, opts = {}) {
   for (const [arr, mat] of [[As, MAT.asph], [W, MAT.walk], [Cb, MAT.curb], [Pt, MAT.paint], [Md, MAT.median], [Is, MAT.island], [Ap, MAT.apron], ...Fl.map((f, i) => [f, MAT.flower[i]])]) if (arr.length) { G.add(merge(arr, mat)); yield 0; }   // сливането — по материал, на стъпки
   }
   // дърветата на парковете (големите места park) и на островите на кръговите
-  const parkTrees = () => {
-    for (const L of P.lots) if (L.big === 'park') { const SP = opts.statues ? parkSpots(L) : [];   /* statues: поляните за фонтана и статуята — без дървета */ for (let k = 0; k < Math.floor(L.w * L.d / 70); k++) { const h = 4 + (k * 7 % 5), u = ((k * 0.7548776662 + 0.5) % 1 - 0.5) * (L.w - 6), v = ((k * 0.5698402910 + 0.5) % 1 - 0.5) * (L.d - 6), c = Math.cos(L.rot), s = Math.sin(L.rot), tx = L.x + u * c + v * s, tz = L.z - u * s + v * c; if (!SP.some(([x, z, r]) => Math.hypot(tx - x, tz - z) < r)) trees.push([tx, tz, h]); } }
+  const parkTrees = () => { const onAsph = feature('tree-road') ? asphaltTest(P) : () => false;   // tree-road: OSM парковете се пресичат от пътища
+    for (const L of P.lots) if (L.big === 'park') { const SP = opts.statues ? parkSpots(L) : [];   /* statues: поляните за фонтана и статуята — без дървета */ for (let k = 0; k < Math.floor(L.w * L.d / 70); k++) { const h = 4 + (k * 7 % 5), u = ((k * 0.7548776662 + 0.5) % 1 - 0.5) * (L.w - 6), v = ((k * 0.5698402910 + 0.5) % 1 - 0.5) * (L.d - 6), c = Math.cos(L.rot), s = Math.sin(L.rot), tx = L.x + u * c + v * s, tz = L.z - u * s + v * c; if (!SP.some(([x, z, r]) => Math.hypot(tx - x, tz - z) < r) && !onAsph(tx, tz)) trees.push([tx, tz, h]); } }
     if (trees.length && opts.treeModels && opts.treeModels.length && realTrees(G, trees, opts.treeModels)) {}
     else if (trees.length) {
       const tg = new THREE.CylinderGeometry(0.2, 0.3, 1, 6).translate(0, 0.5, 0), cg = new THREE.IcosahedronGeometry(1, 0), T1 = new THREE.InstancedMesh(tg, M(0x6b4a2e), trees.length), T2 = new THREE.InstancedMesh(cg, M(0x4f8a3a), trees.length), m = new THREE.Matrix4();

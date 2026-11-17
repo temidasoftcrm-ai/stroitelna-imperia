@@ -3072,5 +3072,8 @@
  "🛒 Вземи пълната игра": "🛒 Get the full game",
  "🔜 Скоро в Steam": "🔜 Coming soon to Steam",
  "🎨 По-добра картина": "🎨 Better picture",
- "контактни сенки, сияние, цветове": "contact shadows, glow, colour grading"
+ "контактни сенки, сияние, цветове": "contact shadows, glow, colour grading",
+ "(🤖 автоматично)": "(🤖 automatic)",
+ "Графика: {0}{1}": "Graphics: {0}{1}",
+ "🤖 Графика: автоматично — нивото се сменя само по кадрите (до „Средно“).": "🤖 Graphics: automatic — the level changes by itself based on frame rate (up to “Medium”)."
 }

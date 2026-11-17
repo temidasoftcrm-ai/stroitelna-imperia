@@ -1,5 +1,5 @@
 // i18n.js — 🌐 езикът на играта (флаг 'lang-en', f6): български (по подразбиране — самият текст в кода) и английски (assets/i18n/en.json).
-// Изборът: localStorage 'stroi-lang' ('bg' | 'en'); без него — по браузъра: bg → БГ, всичко друго → EN. Смяна — setLang() (презарежда).
+// Изборът: localStorage 'stroi-lang' ('bg' | 'en'); без него — БГ, ако браузърът има bg сред езиците или зоната е Europe/Sofia; иначе EN. Смяна — setLang() (презарежда).
 // Преводът — без пренаписване на кода наведнъж:
 //   • t('български текст', { n: 5 } | [5]) — в кода; ключът е българският текст ({0}/{name} — параметрите); на БГ връща текста;
 //   • автоматично (само на EN): MutationObserver превежда текстовите възли и атрибутите title/placeholder/aria-label по речника —
@@ -16,7 +16,10 @@ function detect() {
   const q = (location.search.match(/[?&]lang=(bg|en)\b/) || [])[1]; if (q) return q;   // ?lang=en — за тестовете и Лабораторията
   let l = null; try { l = localStorage.getItem(KEY); } catch { }
   if (l === 'bg' || l === 'en') return l;
-  return /^bg\b/i.test(navigator.language || '') ? 'bg' : 'en';
+  // БГ, ако българският е сред езиците на браузъра или часовата зона е София — много българи са с английски браузър/Mac (отзив от тестерите 17.11)
+  const langs = [...(navigator.languages || []), navigator.language || ''];
+  let tz = ''; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { }
+  return langs.some(x => /^bg\b/i.test(x)) || tz === 'Europe/Sofia' ? 'bg' : 'en';
 }
 export const LANG = detect(), EN = LANG === 'en', LOCALE = EN ? 'en-GB' : 'bg-BG';
 document.documentElement.lang = LANG;

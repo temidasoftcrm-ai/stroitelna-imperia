@@ -124,6 +124,7 @@ export function createRivals(deps) {
   // при нова оферта: с някакъв шанс конкурент също я иска (по-често за по-големите и при по-висока репутация на пазара)
   function attach(o) {
     const S = deps.S(), big = { house: 0.25, shop: 0.4, office: 0.5, tower: 0.6 }[o.type] ?? 0.3;
+    if ((S.day || 0) < 7) return o;   // първата седмица — без конкуренти: новият играч първо да научи поръчките (отзив от тестерите 17.11)
     if (Math.random() > big * (0.6 + 0.1 * Math.min(4, S.day / 60))) return o;
     const list = firmsFor(deps.cc && deps.cc()).filter(x => !(deps.acquired && deps.acquired(x.id))), f = list[(Math.random() * list.length) | 0];   // изкупените (corp.js) вече не се борят
     if (!f) return o;
@@ -139,7 +140,7 @@ export function createRivals(deps) {
       const f = firmById(o.rival.firm);
       s.firms[f.id] = s.firms[f.id] || { won: 0 }; s.firms[f.id].won++;
       s.sites.push({ city: S.cityId, lot: o.lot, firm: f.id, type: o.type, ready: S.day + Math.round({ house: 6, shop: 9, office: 14, tower: 22 }[o.type] / f.power) });
-      deps.toast(`${f.ico} ${f.nm} взе поръчката „${o.client}“ (${deps.fmt(o.rival.bid)} €) — изпревари те!`, 'bad');
+      deps.toast(`${f.ico} ${f.nm} взе офертата „${o.client}“ (${deps.fmt(o.rival.bid)} €), която не прие навреме. Обектите, които строиш, не са засегнати.`, 'bad');
     }
     for (const site of [...s.sites]) if (S.day >= site.ready && (site.city || S.cityId) === S.cityId) { s.sites.splice(s.sites.indexOf(site), 1); deps.onBuilt(site.lot, site.type, firmById(site.firm)); }
     return taken;
