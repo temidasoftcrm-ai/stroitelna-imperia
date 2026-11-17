@@ -14114,6 +14114,10 @@ if (AUTOTEST) {
       for (const [k, v] of Object.entries(A)) v && v.scene && walk(v.scene, 'A:' + k); walk(scene, 'scene');
       let tot = 0, used = 0; const big = []; for (const [b, e] of B) { tot += e.size; used += Math.min(e.used, e.size); if (e.size > 2 ** 20) big.push([Math.round(e.size / 2 ** 20 * 10) / 10, Math.round(e.used / 2 ** 20 * 10) / 10, e.n, [...e.own].slice(0, 3).join(' ')]); }
       big.sort((a, b) => b[0] - a[0]); return { buffers: B.size, totMB: Math.round(tot / 2 ** 20), usedMB: Math.round(used / 2 ** 20), big: big.slice(0, 25) }; },
+    geoLeak() {   /* геометрии, които рендерът още пази (рисувани, не dispose-нати), а ги няма в сцената → изтичане */
+      const inScene = new Set(); scene.traverse(o => { if (o.geometry) inScene.add(o.geometry); });
+      const inA = new Set(); for (const v of Object.values(A)) v && v.scene && v.scene.traverse(o => { if (o.geometry) inA.add(o.geometry); });
+      return { rendererGeos: renderer.info.memory.geometries, sceneGeos: inScene.size, aGeos: inA.size, sceneAndA: new Set([...inScene, ...inA]).size }; },
     heldImg() {   /* декодираните картинки, които още стоят в паметта (не освободени от memfix) */
       const seen = new Set(), out = { n: 0, mb: 0, bitmap: 0, canvas: 0, img: 0, small: 0, uploaded: 0, upMB: 0, notUp: 0, notUpMB: 0, inScene: 0, inSceneMB: 0 }, R = renderer, inS = new Set();
       scene.traverse(o => { for (const m of [].concat(o.material || [])) for (const k in m) { const t = m[k]; if (t && t.isTexture) inS.add(t.source); } });
