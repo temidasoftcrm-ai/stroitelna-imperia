@@ -106,7 +106,7 @@ setInterval(() => {
   if ((window.__stroiLv ? window.__stroiLv() : 0) > 10) return;   // сами — само до ниво 10 на фирмата (после се отварят само с 💡)
   const d = day(); if (!d || d === st.last) return;
   const modal = document.getElementById('modal');
-  if (document.getElementById('cine') || document.getElementById('tourCard') || document.getElementById('tipCard') || (modal && !modal.classList.contains('hidden')) || vis(document.getElementById('mapScreen')) || !vis(document.getElementById('tabs'))) return;
+  if (document.getElementById('cine') || document.getElementById('tourCard') || document.getElementById('tipCard') || (document.getElementById('ob2Box')?.style.display !== 'none' && !!document.getElementById('ob2Box')) ||   /* first-steps: не върху урока (на същото място долу вляво) */ (modal && !modal.classList.contains('hidden')) || vis(document.getElementById('mapScreen')) || !vis(document.getElementById('tabs'))) return;
   if (d < 2 || (st.last && d - st.last < 3 && !(money() < 0 && !st.seen.includes('neg')))) return;
   st.last = d; keep();
   show(pickTip());

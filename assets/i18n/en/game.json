@@ -3075,5 +3075,6 @@
  "контактни сенки, сияние, цветове": "contact shadows, glow, colour grading",
  "(🤖 автоматично)": "(🤖 automatic)",
  "Графика: {0}{1}": "Graphics: {0}{1}",
- "🤖 Графика: автоматично — нивото се сменя само по кадрите (до „Средно“).": "🤖 Graphics: automatic — the level changes by itself based on frame rate (up to “Medium”)."
+ "🤖 Графика: автоматично — нивото се сменя само по кадрите (до „Средно“).": "🤖 Graphics: automatic — the level changes by itself based on frame rate (up to “Medium”).",
+ "❌ Клиентът избра {0} — тази поръчка не е твоя. Опитай друга; с по-ниска цена (−5%, −10%) шансът е по-голям.": "❌ The client chose {0} — this job is not yours. Try another one; a lower price (−5%, −10%) gives a better chance."
 }

@@ -150,7 +150,7 @@ export function createTirs(deps) {
     if (A.free && !A.free(r.paths[0], r.s0, CAB_L() + TRL_L() + 0.4)) { t.t = -1.5; t.wq = t.wq || 0; return true; }   /* мястото на тръгване е заето — след малко */
     t.agent = A.add({ obj: t.root, len: (t.cabL ?? CAB_L()) + (t.trlL ?? TRL_L()) + 0.4, w: 2.5, h: 3.8, kind: 'truck', name: 'ТИР ' + t.order.id, route: r, cab: t.cabL ?? CAB_L(), trailer: { obj: t.trl, len: t.trlL ?? TRL_L() },
       onArrive: () => { if (t.state === 'go') { t.state = 'unload'; t.u = 0; } else if (t.state === 'back') t.done = true; } });
-    t.A = A; t.len = r.len; t.age = 0; t.lim = 12 + r.len / 8; t.root.visible = t.trl.visible = true; return true;   /* t.lim — след толкова секунди без пристигане доставката минава направо (без безкрайно обикаляне) */
+    t.A = A; t.len = r.len; t.age = 0; t.lim = 12 + r.len / 8; if (deps.maxT) t.lim = Math.min(t.lim, deps.maxT()); t.root.visible = t.trl.visible = true; return true;   /* t.lim — след толкова секунди без пристигане доставката минава направо (без безкрайно обикаляне) */
   }
   // order: { id, matId, qty }; target: { x, z } — дворът на склада; onArrive(order) се вика при разтоварване.
   // ТИР-ът спира на улицата пред склада (най-близката плочка път), разтоварва и се връща празен откъдето е дошъл.

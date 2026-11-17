@@ -3159,6 +3159,9 @@ function spawnUnit(type, at) {
   units.push(u);
   return u;
 }
+// 🚚 unit-eta: пътят до обекта има срок в игрово време — до 1 игрови ден (≈ разстоянието с 14 м/с + 6 игрови часа); после машината се доставя (unitArrive).
+// Иначе в трафика (светофари, заобиколни маршрути ~2 км, задръствания) курсът траеше 8–15 игрови дни при всяка скорост и първата къща не стигаше срока (11 дни).
+const UETA = feature('unit-eta'), etaDays = len => Math.min(1, 0.25 + 1.15 * len / (SPEED * DAY_SEC));
 function sendTo(u, x, z, onArrive) {
   u.dest = { x, z, cb: onArrive }; u.moveD = 0;   // #12: накъдето е тръгнала (unitRepair я доставя, ако заседне)
   u.jp = null; u.jpWaitT = 0; u.jpTry = 0; u.jpDone = false;   // #12 (25.10, трактор „на път“ 3 дни на плаца): старият маршрут (чакаше място на лентата към плаца) иначе тръгваше след новата задача и я прибираше „idle“ с обекта
@@ -3167,9 +3170,10 @@ function sendTo(u, x, z, onArrive) {
   // junction-paths: по улиците — агент в трафика (лентите, кривите на кръстовищата, кръговите); до лентата и от нея до обекта — по старому
   if (u.agent) { const A0 = jpAgents(); if (A0 && A0.alive(u.agent)) A0.remove(u.agent); u.agent = null; u.jp = null; u.jpDone = false; scene.add(u.obj); u.obj.position.set(u.x, 0, u.z); }   /* нова задача насред пътя — само една система движи машината */
   { const A = jpAgents(), r = A && A.route({ x: u.x, z: u.z }, { x, z }, true);
-    if (r && r.len > 40) { const p0 = A.point(r.paths[0], r.s0); u.path = [{ x: p0.x, z: p0.z, road: false }]; u.pi = 0; u.jp = { r, x, z, cb: onArrive }; u.onArrive = () => jpUnitGo(u); if (u.state !== 'returning') u.state = 'driving'; return; } }
+    if (r && r.len > 40) { u.etaD = etaDays(r.len + Math.hypot(x - u.x, z - u.z) * 0.3); const p0 = A.point(r.paths[0], r.s0); u.path = [{ x: p0.x, z: p0.z, road: false }]; u.pi = 0; u.jp = { r, x, z, cb: onArrive }; u.onArrive = () => jpUnitGo(u); if (u.state !== 'returning') u.state = 'driving'; return; } }
   u.path = roadRoute(u.x, u.z, x, z).map(p => ({ x: p.x, z: p.z, road: true }));
   u.path.push({ x, z, road: false });
+  { let L = 0, px = u.x, pz = u.z; for (const q of u.path) { L += Math.hypot(q.x - px, q.z - pz); px = q.x; pz = q.z; } u.etaD = etaDays(L); }   // unit-eta
   u.pi = 0; u.state = u.state === 'working' || u.state === 'idle' ? 'driving' : u.state; u.onArrive = onArrive;
   if (u.state !== 'returning') u.state = 'driving';
 }
@@ -3189,8 +3193,9 @@ function jpUnitEnd(u) {
 function updateUnits(dt) {
   for (const u of units) {
     u.obj.userData.doors?.mixer.update(dt);
-    if (u.agent) { const A = jpAgents(); if (!A || !A.alive(u.agent)) jpUnitEnd(u); else { const gp = A.group.position; u.x = u.agent.x + gp.x; u.z = u.agent.z + gp.z; u.yaw = u.agent.yaw; econ.addFuel(u.agent.v * dt); if (u.jpDone) jpUnitEnd(u); else continue; } }
+    if (u.agent) { const A = jpAgents(); if (!A || !A.alive(u.agent)) jpUnitEnd(u); else { const gp = A.group.position; u.x = u.agent.x + gp.x; u.z = u.agent.z + gp.z; u.yaw = u.agent.yaw; econ.addFuel(u.agent.v * dt); if (u.jpDone) jpUnitEnd(u); else { if (UETA) { u.moveD = (u.moveD || 0) + dt / DAY_SEC; if (u.dest && u.moveD > (u.etaD || 1)) unitArrive(u); } continue; } } }   /* unit-eta: и в трафика се брои (иначе moveD стоеше 0 и unitRepair не я виждаше) */
     u.moveD = u.path || u.agent || u.jpWaitT > 0 ? (u.moveD || 0) + dt / DAY_SEC : 0;   // #12: колко игрови дни е на път
+    if (UETA && u.dest && u.moveD > (u.etaD || 1)) { unitArrive(u); continue; }   // unit-eta: срокът на курса изтече — направо на мястото
     if (u.jpWaitT > 0) { u.jpWaitT -= dt; if (u.jpWaitT <= 0) jpUnitGo(u); continue; }
     if (u.path && u.path[u.pi]?.road && carBlocks(u.x, u.z, u.yaw, u.jpSize?.[0] || 6)) { u.wb = (u.wb || 0) + dt; if (u.wb < 8) continue; } else u.wb = 0;   // кола отпред — чака (до 8 s, после минава)
     if (!u.path) {
@@ -4298,6 +4303,7 @@ const tirs = createTirs({
   matInfo: id => ECON.MATERIALS[id],
   blocked: (x, z, yaw) => carBlocks(x, z, yaw, 12),   /* ТИР-ът без агент чака колата пред себе си */
   agents: () => jpAgents(),   /* junction-paths: ТИР-ът — агент в трафика по лентите (градовете с плана v2) */
+  maxT: UETA ? () => DAY_SEC : null,   /* 🚚 unit-eta: ТИР-ът с материалите — най-много 1 игрови ден на път (беше 12 s + 1 s на 8 м — от края на града ~10+ дни) */
 });
 const whTarget = () => S.whLot != null ? { x: city.lots[S.whLot].x, z: city.lots[S.whLot].z + 3.5 } : { x: city.hq.x, z: city.hq.z + 5 };
 function sendTir(order, delay = 0) {
@@ -4611,11 +4617,12 @@ function acceptOffer(id) {
   // предлагаш цена: по-ниската печели по-често; губиш ли — поръчката отива при конкурента
   if (!AUTOTEST || params.has('bids')) {
     const ofr = S.offers[i], bid = resolveBid(ofr, bidSel[id] || 1, S.rep);
+    if (feature('first-steps') && !(S.done > 0) && !projects.length && !bid.win) { bid.win = true; }   // first-steps (отзив 17.11): първата поръчка на новия играч винаги е негова — първо да види как се строи
     delete bidSel[id];
     if (!bid.win) {
       S.offers.splice(i, 1); city.lots[ofr.lot].busy = null;
       if (bulkOffer) return;
-      toast(`❌ ${bid.rivalNm} предложи по-изгодна цена и взе поръчката „${BTYPES[ofr.type].nm} — ${ofr.client}“.`, 'bad');
+      toast(feature('first-steps') ? `❌ Клиентът избра ${bid.rivalNm} — тази поръчка не е твоя. Опитай друга; с по-ниска цена (−5%, −10%) шансът е по-голям.` : `❌ ${bid.rivalNm} предложи по-изгодна цена и взе поръчката „${BTYPES[ofr.type].nm} — ${ofr.client}“.`, 'bad');
       Sound.play('error'); save(); renderPanel(); return;
     }
     if (bid.price !== ofr.reward && !bulkOffer) toast(`🤝 Клиентът прие офертата ти: ${fmt(bid.price)} €.`, 'good');
@@ -5306,11 +5313,11 @@ function renderPanel() {
   let h = '';
   if (tab === 'offers') {
     if (!S.offers.length) h = `<div class="empty">Няма нови поръчки. Утре ще дойдат още.</div>`;
-    if (S.offers.length > 1) h += S.rep >= 3
+    const FS0 = feature('first-steps') && !(S.done > 0);   // first-steps: до първата завършена сграда — само поръчките (без общината, конкуренцията и заключените бутони)
+    if (S.offers.length > 1 && !(FS0 && S.rep < 3)) h += S.rep >= 3
       ? `<div class="row" style="margin:0 0 8px;flex-wrap:wrap;gap:6px"><span class="meta" style="margin:0;flex:1 1 160px">📨 Всички ${S.offers.length} оферти наведнъж — с избраните цени · място в офиса: <b>${Math.max(0, officeLv().proj - busyCount())}</b></span><button class="btn" id="bOfferAll" style="touch-action:manipulation">📨 Предложи всички</button></div>`
       : `<div class="meta" style="margin:0 0 8px;opacity:.7">🔒 „📨 Предложи всички“ се отключва при репутация 3 ★ (сега ${S.rep.toFixed(1)} ★).</div>`;
-    h += muni.cardHtml();
-    h += rivals.marketHtml();
+    if (!FS0) { h += muni.cardHtml(); h += rivals.marketHtml(); }
     if (tenderDir()) { const n = TENDERS.filter(t => tenders.state(t.id)?.st === 'open').length; if (n) h += `<div class="card"><div class="row" style="margin:0;align-items:center;gap:8px"><span class="meta" style="margin:0;flex:1">🏛️ <b style="color:var(--txt)">${tenderDir()}</b> подготвя оферти за ${n} ${n === 1 ? 'търг' : 'търга'}.</span><button class="btn2" data-dtend="1">Предложенията му →</button></div></div>`; }
     else h += tenders.cardsHtml('open');   // взетите (в строеж) — в „📜 Оферти“; от ниво 15 с директор — търговете са негови предложения
     if (freeLotCount() < 3) h += `<div class="meta" style="text-align:center;color:var(--acc)">🏙️ Градът е почти застроен — купи нов квартал от таб „Офис“.</div>`;
@@ -13926,7 +13933,7 @@ function frame() {
     if (cl3Life && !gfxStill()) { cl3Life.update(Math.min(dt, 0.25)); for (let i = cl3Lots.length - 1; i >= 0; i--) { const L = cl3Lots[i]; if (!L.group.parent || !L.group.parent.parent) cl3Lots.splice(i, 1); else L.update(Math.min(dt, 0.25)); } }   // 🚏🚗 city-life3
     ovTick(rdt || 0.016);   // 🔍 поправките от Прегледа (obj-overrides)
     railTick(Math.min(dt, 0.25));
-    tirs.update(Math.min(dt, 0.25));
+    if (UETA) for (let l = dt; l > 1e-6; l -= 0.25) tirs.update(Math.min(l, 0.25)); else tirs.update(Math.min(dt, 0.25));   // unit-eta: при ▶▶/▶▶▶ (dt > 0,25) часовникът на ТИР-овете не изостава от играта
     if (!onMap) {
       const tg = controls.target, near = units.filter(u => u.state === 'working' && Math.hypot(u.x - tg.x, u.z - tg.z) < 60).length;
       const zoom = Math.max(0, 1 - camera.position.distanceTo(tg) / 260);
@@ -14101,6 +14108,44 @@ if (AUTOTEST) {
   setSpeed(1);
   // достъп за headless тестовете
   window.__dbg = {
+    abufs() {   /* кои ArrayBuffer-и държат геометриите: уникални буфери по размер и дял от тях, използван от атрибутите */
+      const B = new Map(); const add = (arr, own) => { const b = arr.buffer; const e = B.get(b) || { size: b.byteLength, used: 0, n: 0, own: new Set() }; e.used += arr.byteLength; e.n++; e.own.add(own); B.set(b, e); };
+      const walk = (root, own) => root.traverse(o => { const g = o.geometry; if (!g) return; for (const k in g.attributes) { const a = g.attributes[k]; add(a.isInterleavedBufferAttribute ? a.data.array : a.array, own); } if (g.index) add(g.index.array, own); if (o.isInstancedMesh) add(o.instanceMatrix.array, own); });
+      for (const [k, v] of Object.entries(A)) v && v.scene && walk(v.scene, 'A:' + k); walk(scene, 'scene');
+      let tot = 0, used = 0; const big = []; for (const [b, e] of B) { tot += e.size; used += Math.min(e.used, e.size); if (e.size > 2 ** 20) big.push([Math.round(e.size / 2 ** 20 * 10) / 10, Math.round(e.used / 2 ** 20 * 10) / 10, e.n, [...e.own].slice(0, 3).join(' ')]); }
+      big.sort((a, b) => b[0] - a[0]); return { buffers: B.size, totMB: Math.round(tot / 2 ** 20), usedMB: Math.round(used / 2 ** 20), big: big.slice(0, 25) }; },
+    heldImg() {   /* декодираните картинки, които още стоят в паметта (не освободени от memfix) */
+      const seen = new Set(), out = { n: 0, mb: 0, bitmap: 0, canvas: 0, img: 0, small: 0, uploaded: 0, upMB: 0, notUp: 0, notUpMB: 0, inScene: 0, inSceneMB: 0 }, R = renderer, inS = new Set();
+      scene.traverse(o => { for (const m of [].concat(o.material || [])) for (const k in m) { const t = m[k]; if (t && t.isTexture) inS.add(t.source); } });
+      const chk = t => { const src = t.source; if (!src || seen.has(src)) return; seen.add(src); const st = src.__free, im = st && st.peek ? st.peek() : src.data; if (!im || !(im.width > 4)) { out.small++; return; }
+        const mb = im.width * im.height * 4 / 2 ** 20; out.n++; if (!st) out.noState = (out.noState || 0) + 1; else { if (st.rel) out.rel = (out.rel || 0) + 1; if (st.blob) out.blobSt = (out.blobSt || 0) + 1; if (st.dec) out.dec = (out.dec || 0) + 1; } if (src.__keep) out.keep = (out.keep || 0) + 1; if (!src.__born) out.noBorn = (out.noBorn || 0) + 1; out.mb += mb; if (typeof ImageBitmap !== 'undefined' && im instanceof ImageBitmap) out.bitmap++; else if (im instanceof HTMLCanvasElement) out.canvas++; else out.img++;
+        const up = R.properties.get(src).__version === src.version; if (up) { out.uploaded++; out.upMB += mb; } else { out.notUp++; out.notUpMB += mb; } if (inS.has(src)) { out.inScene++; out.inSceneMB += mb; } };
+      const all = []; for (const v of Object.values(A)) v && v.scene && all.push(v.scene); all.push(scene);
+      for (const r of all) r.traverse(o => { for (const m of [].concat(o.material || [])) for (const k in m) { const t = m[k]; if (t && t.isTexture) chk(t); } });
+      for (const k of ['mb', 'upMB', 'notUpMB', 'inSceneMB']) out[k] = Math.round(out[k]); return out; },
+    assetGeo(k) { const out = []; A[k]?.scene?.traverse(o => { if (o.geometry) out.push([o.name, o.type, o.geometry.attributes.position.count, Object.entries(o.geometry.attributes).map(([n, a]) => n + ':' + a.array.constructor.name + '/' + a.itemSize), !!o.geometry.index, o.isInstancedMesh ? o.count : 0]); }); return out; },
+    memProbe() {   /* памет: геометрия и текстури — в сцената по групи и в кеша на моделите A (без heap snapshot) */
+      const seenB = new Set(), seenSrc = new Set();   /* всеки буфер и всяка картинка (source) — веднъж: GLB-тата делят масиви, memfix дели картинките */
+      const ab = arr => { const B = arr.buffer || arr; if (seenB.has(B)) return 0; seenB.add(B); return B.byteLength; };
+      const gb = g => { let b = 0; for (const k in g.attributes) b += ab(g.attributes[k].array); if (g.index) b += ab(g.index.array); for (const k in (g.morphAttributes || {})) for (const m of g.morphAttributes[k]) b += ab(m.array); return b; };
+      const tb = t => { if (!t || seenSrc.has(t.source)) return 0; seenSrc.add(t.source); const im = t.image || t.source?.data; if (!im) return 0; const w = im.width || 0, h = im.height || 0; return w * h * 4 * (t.generateMipmaps === false ? 1 : 1.33); };
+      const seenG = new Set(), seenT = new Set(), MB = x => +(x / 2 ** 20).toFixed(1);
+      const walk = (root, acc) => root.traverse(o => { if (o.geometry && !seenG.has(o.geometry)) { seenG.add(o.geometry); acc.g += gb(o.geometry); acc.ng++; }
+        for (const m of [].concat(o.material || [])) for (const k in m) { const t = m[k]; if (t && t.isTexture && !seenT.has(t)) { seenT.add(t); acc.t += tb(t); acc.nt++; } } });
+      const sceneGroups = scene.children.map(ch => { const acc = { g: 0, t: 0, ng: 0, nt: 0 }; walk(ch, acc); return { nm: ch.name || ch.type, ...acc }; });
+      const cityG = city.group ? city.group.children.map(ch => { const acc = { g: 0, t: 0, ng: 0, nt: 0 }; walk(ch, acc); return { nm: ch.name || ch.type, ...acc }; }) : [];
+      seenG.clear(); seenT.clear(); seenB.clear(); seenSrc.clear();
+      const assets = Object.entries(A).map(([k, v]) => { const acc = { g: 0, t: 0, ng: 0, nt: 0 }; if (v && v.scene) walk(v.scene, acc); return { nm: k, ...acc }; });
+      const top = (arr, n) => arr.sort((a, b) => (b.g + b.t) - (a.g + a.t)).slice(0, n).map(x => [x.nm, MB(x.g), MB(x.t), x.ng, x.nt]);
+      const sum = arr => arr.reduce((a, x) => ({ g: a.g + x.g, t: a.t + x.t }), { g: 0, t: 0 });
+      const sa = sum(assets), ss = sum(sceneGroups);
+      seenB.clear(); seenSrc.clear(); const inG = new Set(), inS = new Set(); scene.traverse(o => { if (o.geometry) inG.add(o.geometry); for (const m of [].concat(o.material || [])) for (const k in m) { const t = m[k]; if (t && t.isTexture) inS.add(t.source); } });
+      const unused = Object.entries(A).map(([k, v]) => { if (!v || !v.scene) return null; let used = false, g = 0, t = 0; const ss = new Set(); v.scene.traverse(o => { if (o.geometry) { if (inG.has(o.geometry)) used = true; g += gb(o.geometry); }
+        for (const m of [].concat(o.material || [])) for (const kk in m) { const tx = m[kk]; if (tx && tx.isTexture && !ss.has(tx.source)) { ss.add(tx.source); if (inS.has(tx.source)) used = true; t += tb(tx); } } }); return used ? null : { nm: k, g, t, ng: 0, nt: 0 }; }).filter(Boolean);
+      const su = sum(unused), sizes = {}; seenT.clear(); for (const v of Object.values(A)) v && v.scene && v.scene.traverse(o => { for (const m of [].concat(o.material || [])) for (const kk in m) { const tx = m[kk]; if (tx && tx.isTexture && !seenT.has(tx.source)) { seenT.add(tx.source); const im = tx.image; const w = im && im.width || 0; sizes[w] = (sizes[w] || 0) + 1; } } });
+      return { heapMB: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 2 ** 20) : null, renderer: renderer.info.memory, assetsN: assets.length, unusedN: unused.length, unusedMB: [MB(su.g), MB(su.t)], topUnused: top(unused, 20), unusedNames: unused.map(x => x.nm), texSizes: sizes,
+        assetsMB: [MB(sa.g), MB(sa.t)], sceneMB: [MB(ss.g), MB(ss.t)], topAssets: top(assets, 25), topScene: top(sceneGroups, 12), topCity: top(cityG, 15) };
+    },
     state: () => S,
     city: () => city,   // districts-look (55): диагностиката на парцелите
     credits: () => showCredits(),   // credits-full (55): демото в Лабораторията
@@ -15135,7 +15180,7 @@ if (AUTOTEST) {
     passing: () => passing && passing.train ? { z: Math.round(passing.train.z), v: +passing.train.v.toFixed(1), stop: +passing.train.stop.toFixed(1) } : null,
     tirs: () => tirs.list.map(t => `${t.order.matId}:${t.state}`),
     jpAg: () => tr2 && tr2.cars.filter(c => c.agent).map(c => [c.agent.name, c.p.kind, +c.s.toFixed(1), +c.p.len.toFixed(1), +c.v.toFixed(2), c.why, +c.wait.toFixed(1), c.ri, c.route.length, +c.goal.toFixed(1)]),   /* junction-paths: агентите */
-    units: () => units.map(u => ({ t: u.type, st: u.state, proj: u.proj ? (projects.includes(u.proj) ? u.proj.title : S.hwJobs?.includes(u.proj) ? 'магистрала' : 'МЪРТЪВ') : null, moveD: +(u.moveD || 0).toFixed(2), jpTry: u.jpTry || 0, wb: +(u.wb || 0).toFixed(1), path: u.path ? u.path.length : 0, agent: !!u.agent })),   /* #12: техниката в града */
+    units: () => units.map(u => ({ t: u.type, st: u.state, proj: u.proj ? (projects.includes(u.proj) ? u.proj.title : S.hwJobs?.includes(u.proj) ? 'магистрала' : 'МЪРТЪВ') : null, moveD: +(u.moveD || 0).toFixed(2), jpTry: u.jpTry || 0, wb: +(u.wb || 0).toFixed(1), path: u.path ? u.path.length : 0, agent: !!u.agent, x: Math.round(u.obj.getWorldPosition(new THREE.Vector3()).x), z: Math.round(u.obj.getWorldPosition(new THREE.Vector3()).z), v: u.agent ? +(u.agent.v ?? u.agent.speed ?? -1).toFixed(1) : null, jpDone: !!u.jpDone, why: u.agent ? u.agent.why || null : null, stT: u.agent ? +(u.agent.stT || 0).toFixed(1) : null, left: u.agent && u.agent.route ? (u.agent.route.length - 1 - u.agent.route.indexOf(u.agent.p)) + ':' + Math.round(u.agent.p.len - u.agent.s) : null, rl: u.jp ? Math.round(u.jp.r.len) : null, dest: u.dest ? [Math.round(u.dest.x), Math.round(u.dest.z), Math.round(Math.hypot(u.dest.x - u.x, u.dest.z - u.z))] : null })),   /* #12: техниката в града */
     unitRepair: () => unitRepair(),
     jamCallTest(lock = true) { if (!tr2) return null; const n = [...tr2.nodes.values()].find(q => q.deg >= 3 && !q.ring && q.conns.some(C => C.ringIn)) || [...tr2.nodes.values()].find(q => q.deg >= 3 && !q.ring); jamNotice({ node: n.id, x: n.x, z: n.z, q: 3, lock }); const o = tr2G ? tr2G.position : { x: 0, z: 0 }; __dbg.camAt(n.x + o.x + 30, 34, n.z + o.z + 42, n.x + o.x, 0, n.z + o.z); return { node: n.id, ask: !!jamAsk }; },   /* #6: известието „🚓 Извикай полиция“ */
     chaseLook() { const r = incidents.start('chase'); if (!r) return r; chaseCam = 2; fly = null; $('panel').classList.add('hidden'); return r; },   /* #3: полицейско преследване, камерата след беглеца */
