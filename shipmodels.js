@@ -17,7 +17,7 @@ const CFG = {
   cruise: SS ? { f: 'cruise-majesty.glb', len: 300, yaw: 0, draft: 0.1, lights: true } : { f: 'cruise.glb', len: 74, yaw: 0, draft: 0.12, lights: true },   // нощем светят прозорците и палубите
   // 🚢 ship-msc (f6): „MSC Irina“ (Meshy AI, собствен) — най-големият: на пристанище ниво 5 до крановете и като контейнеровоза, който влиза/излиза.
   // Възли (Blender): Hull, Radar (клип „radar“), NavLights (червена / зелена / бели), DeckLights, Wake (клип „wake“); ватерлинията — 23,6 % от височината
-  ...(feature('ship-msc') ? { msc: { f: 'msc-irina.glb', len: SS ? 300 : 92, yaw: 0, draft: 0.236, msc: true } } : {}),
+  ...(feature('ship-msc') && !feature('no-brands') ? { msc: { f: 'msc-irina.glb', len: SS ? 300 : 92, yaw: 0, draft: 0.236, msc: true } } : {}),
 };
 const P = {}, NIGHT = [];   // NIGHT — материалите, които светят нощем (круизният кораб); копията ги споделят
 let loading = null;

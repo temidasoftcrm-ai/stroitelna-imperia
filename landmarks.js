@@ -1398,3 +1398,5 @@ export function buildLandmark(kind, deps = {}) {
 }
 LANDMARK_NM.skytree = LANDMARK_NM.skytree || 'Токио Скайтри';   // 🇯🇵 tokyo-look
 LANDMARK_NM.burjarab = LANDMARK_NM.burjarab || 'Бурж ал Араб'; LANDMARK_NM.mbs2 = LANDMARK_NM.mbs2 || 'Марина Бей Сандс'; LANDMARK_NM.mbs3 = 'Марина Бей Сандс'; LANDMARK_NM.supertrees = LANDMARK_NM.supertrees || 'Градините край залива';
+// 🏷️ no-brands (Z-Axis Awards, правило 6(a)): казината и хотелите — с наши измислени имена вместо марките (Luxor → Luster и т.н.); моделите не се сменят
+if (feature('no-brands')) Object.assign(LANDMARK_NM, { bellagio: 'Белависта', luxor: 'Лъстър', lvcaesars: 'Цезарион', lvmgm: 'Емералд Гранд', lvnyny: 'Манхатън Плаза', lvparis: 'Ле Петит Пари', lvph: 'Старлайт', lvcosmo: 'Метрополис', lvaria: 'Аурелия', lvvdara: 'Вента', mbs2: 'Кулите на залива', mbs3: 'Кулите на залива' });

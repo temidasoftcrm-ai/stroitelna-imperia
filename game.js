@@ -14427,7 +14427,7 @@ if (AUTOTEST) {
       return new Promise(r => setTimeout(() => { let n = null, sz = null; city.group.traverse(o => { if (!n && /^hotel5-/.test(o.userData.src || '')) { n = o.userData.src; const s = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3()); sz = [s.x, s.y, s.z].map(v => +v.toFixed(1)); } }); r({ city: S.cityId, model: n, size: sz }); }, 4000)); },
     hotel5Look() {   // Лабораторията: кандидатите за 5★/Гранд хотел (assets/heavy/hotels5) един до друг извън града; височина ~60 м (широките — до ~110 м), кола и човек за мащаб
       showMap(false); const h = { x: tx(NI - 1) + 120, z: tx(NJ - 1) + 120 }, g = new THREE.Group(); g.position.set(h.x, 0, h.z); scene.add(g);
-      const L = [['burj', 'Бурж ал Араб'], ['mbs', 'Марина Бей'], ['marriott', 'Мариот'], ['ostriv', 'Острив'], ['rosa', 'Роза Хутор']];
+      const L = [['burj', 'Бурж ал Араб'], ['mbs', 'Марина Бей'], ['marriott', 'Маркиз'], ['ostriv', 'Острив'], ['rosa', 'Роза Хутор']];
       L.forEach(([n, nm], i) => loader.load(`assets/heavy/hotels5/hotel5-${n}.glb`, gl => { const o = gl.scene, sz = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3()), k = Math.min(60 / sz.y, 90 / Math.max(sz.x, sz.z)), x = [-75, 0, 75, -38, 38][i], zz = i < 3 ? 0 : 90;   // два реда — да се съберат в мъглата
         o.scale.setScalar(k); o.position.set(x, 0, zz); o.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; } }); g.add(o);
         const lb = label(`${i + 1} · ${nm}`, '#ffd54a', 14); lb.position.set(x, sz.y * k + 12, zz); g.add(lb);

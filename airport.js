@@ -32,7 +32,7 @@ const AIR_CFG = { regional: { f: 'regional', yaw: 0.26 }, a320: { f: 'a320', yaw
   // терминалите по нива: малко летище (1–2), регионално (3), международно (4–5)
   term_s: { f: 'term-s' }, term_m: { f: 'term-m' }, term_l: { f: 'term-l' },
   // plane-wizz (T1): A320neo на Wizz Air (Meshy AI, Темидасофт) — нос към +z, колесникът (gear_*) и светлините (nav_/strobe_/beacon_) — отделни възли
-  ...(feature('plane-wizz') ? { wizz: { f: 'wizz-a320', yaw: 0 } } : {}) };
+  ...(feature('plane-wizz') && !feature('no-brands') ? { wizz: { f: 'wizz-a320', yaw: 0 } } : {}) };
 // plane-wizz: колко от A320-ите са на Wizz Air — в Европа често, другаде рядко (buildAirport → opts.eu)
 let WIZZ_P = 0.15;
 const AIR = {};
