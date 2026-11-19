@@ -5322,18 +5322,19 @@ function renderPanel() {
     if (tenderDir()) { const n = TENDERS.filter(t => tenders.state(t.id)?.st === 'open').length; if (n) h += `<div class="card"><div class="row" style="margin:0;align-items:center;gap:8px"><span class="meta" style="margin:0;flex:1">🏛️ <b style="color:var(--txt)">${tenderDir()}</b> подготвя оферти за ${n} ${n === 1 ? 'търг' : 'търга'}.</span><button class="btn2" data-dtend="1">Предложенията му →</button></div></div>`; }
     else h += tenders.cardsHtml('open');   // взетите (в строеж) — в „📜 Оферти“; от ниво 15 с директор — търговете са негови предложения
     if (freeLotCount() < 3) h += `<div class="meta" style="text-align:center;color:var(--acc)">🏙️ Градът е почти застроен — купи нов квартал от таб „Офис“.</div>`;
+    const SC = feature('simple-card') && FS0;   // 🧾 simple-card (собственикът, 19.11): до първата завършена сграда картата е проста — какво, срок, цена, „Приеми“ (без шанс, ±%, аванс, материали, конкурента)
     for (const o of [...S.offers].sort((a, b) => (b.demolish ? 1 : 0) - (a.demolish ? 1 : 0))) {
       const bt = BTYPES[o.type];
       const roles = [...new Set(bt.stages.flatMap(s => Object.keys(s.need)))];
       const lacking = roles.filter(r => !units.some(u => u.type === r));
       h += `<div class="card" data-lot="${o.lot}" ${o.demolish ? 'style="border-color:#ff9e5e;box-shadow:0 0 0 1px #ff9e5e inset"' : ''}><h3><span class="ico">${o.demolish ? '🏚️→' : ''}${bt.ico}</span>${bt.nm}${o.floors ? ` · ${o.floors} етажа` : ''}${o.demolish ? ' · <span style="color:#ff9e5e">със събаряне</span>' : ''}</h3>
         ${o.demolish ? `<div class="meta" style="color:#ffcfae">🏗️ Инвеститорът купи къща. Първо я събаряш, после строиш на мястото ѝ.</div>` : ''}
-        <div class="meta">Клиент: ${o.client}<br>Срок: ${o.days} дни · Офертата важи до ден ${o.expires}</div>${rivals.offerLine(o)}
-        ${feature('offer-gear') ? offerGearHtml(o) : `<div class="need">${roles.map(r => `<span class="${units.some(u => u.type === r) ? 'ok' : 'miss'}">${ECON.UNIT_TYPES[r].ico} ${ECON.UNIT_TYPES[r].nm}</span>`).join('')}</div>
+        ${SC ? `<div class="meta">Срок: <b style="color:var(--txt)">${o.days} дни</b></div>` : `<div class="meta">Клиент: ${o.client}<br>Срок: ${o.days} дни · Офертата важи до ден ${o.expires}</div>${rivals.offerLine(o)}`}
+        ${SC ? (lacking.length ? `<div class="meta late">Нямаш: ${lacking.map(r => ECON.UNIT_TYPES[r].nm).join(', ')}. Купи от „Техника“.</div>` : '') : feature('offer-gear') ? offerGearHtml(o) : `<div class="need">${roles.map(r => `<span class="${units.some(u => u.type === r) ? 'ok' : 'miss'}">${ECON.UNIT_TYPES[r].ico} ${ECON.UNIT_TYPES[r].nm}</span>`).join('')}</div>
         ${lacking.length ? `<div class="meta late">Нямаш: ${lacking.map(r => ECON.UNIT_TYPES[r].nm).join(', ')}. Купи от „Техника“.</div>` : ''}`}
-        ${econ.materialCost ? `<div class="meta">📦 Материали ~${fmt([0, 1, 2, 3].reduce((a, k) => a + econ.materialCost(o.type, k, connected(), supplyOpts()), 0))} € · печалба ~<b style="color:var(--ok)">${fmt(o.reward - [0, 1, 2, 3].reduce((a, k) => a + econ.materialCost(o.type, k, connected(), supplyOpts()), 0))} €</b></div>` : ''}
-        ${bidHtml(o, bidSel[o.id], S.rep, fmt, feature('first-sure') && feature('first-steps') && !(S.done > 0) && !projects.length)}
-        <div class="row"><span class="money">+${fmt(Math.round(o.reward * (bidSel[o.id] || 1) / 500) * 500)} €</span><span><button class="btn2" data-dec="${o.id}">Откажи</button> <button class="btn" data-acc="${o.id}">Предложи</button></span></div></div>`;
+        ${!SC && econ.materialCost ? `<div class="meta">📦 Материали ~${fmt([0, 1, 2, 3].reduce((a, k) => a + econ.materialCost(o.type, k, connected(), supplyOpts()), 0))} € · печалба ~<b style="color:var(--ok)">${fmt(o.reward - [0, 1, 2, 3].reduce((a, k) => a + econ.materialCost(o.type, k, connected(), supplyOpts()), 0))} €</b></div>` : ''}
+        ${SC ? '' : bidHtml(o, bidSel[o.id], S.rep, fmt, feature('first-sure') && feature('first-steps') && !(S.done > 0) && !projects.length)}
+        <div class="row"><span class="money">+${fmt(Math.round(o.reward * (bidSel[o.id] || 1) / 500) * 500)} €</span><span><button class="btn2" data-dec="${o.id}">Откажи</button> <button class="btn" data-acc="${o.id}">${SC ? 'Приеми' : 'Предложи'}</button></span></div></div>`;
     }
     const lockedNext = offerTypes().map(e => e[1]).find(t => S.rep < t.rep);
     if (lockedNext) h += `<div class="meta" style="text-align:center">🔒 ${lockedNext.ico} ${lockedNext.nm} — нужна репутация ${lockedNext.rep} ★</div>`;
