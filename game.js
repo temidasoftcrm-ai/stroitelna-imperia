@@ -3585,8 +3585,9 @@ function sfx2Src(tg, zoom, speed) {
 function moversNow() {
   const o = tr2G ? tr2G.position : { x: 0, z: 0 }, out = [];
   if (city.trams) for (const m of city.trams.movers()) out.push({ ...m, x: m.x - o.x, z: m.z - o.z });   // 🚋 trams: колите не минават през трамвая
-  if (bikes && feature('bike-gap')) for (const r of bikes.riders()) if (!r.tr) out.push({ x: r.x - o.x, z: r.z - o.z, l: 2, w: 0.7 });   // bike-gap (отзив 17.11): колите спират зад колелото
+  if (bikes && feature('bike-gap')) for (const r of bikes.riders()) if (!r.tr || feature('no-clip')) out.push({ x: r.x - o.x, z: r.z - o.z, l: 2, w: 0.7 });   // bike-gap (отзив 17.11): колите спират зад колелото
   for (const u of units) if (u.path && !u.agent && u.obj.parent) out.push({ x: u.x - o.x, z: u.z - o.z, l: u.jpSize?.[0] || 6, w: u.jpSize?.[1] || 2.6 });
+  if (feature('no-clip')) for (const p of peds) if (p.xOk && p.m && p.m.parent) out.push({ x: p.x - o.x, z: p.z - o.z, l: 0.8, w: 0.8 });   // 🧱 no-clip: колите спират пред човека, който вече пресича по зебрата (досега — само той чакаше колите)
   for (const t of tirs.list) if (!t.agent && !t.trl && t.root.visible) out.push({ x: t.x - o.x, z: t.z - o.z, l: 12, w: 2.6 });
   for (const m of [...(incidents.movers?.() || []), ...(feature('fire-seq') ? fires.movers?.() || [] : [])]) out.push({ ...m, x: m.x - o.x, z: m.z - o.z });   // + пожарната на път
   return out;
@@ -5331,7 +5332,7 @@ function renderPanel() {
         ${feature('offer-gear') ? offerGearHtml(o) : `<div class="need">${roles.map(r => `<span class="${units.some(u => u.type === r) ? 'ok' : 'miss'}">${ECON.UNIT_TYPES[r].ico} ${ECON.UNIT_TYPES[r].nm}</span>`).join('')}</div>
         ${lacking.length ? `<div class="meta late">Нямаш: ${lacking.map(r => ECON.UNIT_TYPES[r].nm).join(', ')}. Купи от „Техника“.</div>` : ''}`}
         ${econ.materialCost ? `<div class="meta">📦 Материали ~${fmt([0, 1, 2, 3].reduce((a, k) => a + econ.materialCost(o.type, k, connected(), supplyOpts()), 0))} € · печалба ~<b style="color:var(--ok)">${fmt(o.reward - [0, 1, 2, 3].reduce((a, k) => a + econ.materialCost(o.type, k, connected(), supplyOpts()), 0))} €</b></div>` : ''}
-        ${bidHtml(o, bidSel[o.id], S.rep, fmt)}
+        ${bidHtml(o, bidSel[o.id], S.rep, fmt, feature('first-sure') && feature('first-steps') && !(S.done > 0) && !projects.length)}
         <div class="row"><span class="money">+${fmt(Math.round(o.reward * (bidSel[o.id] || 1) / 500) * 500)} €</span><span><button class="btn2" data-dec="${o.id}">Откажи</button> <button class="btn" data-acc="${o.id}">Предложи</button></span></div></div>`;
     }
     const lockedNext = offerTypes().map(e => e[1]).find(t => S.rep < t.rep);
@@ -9593,7 +9594,9 @@ function tramsBuild() {
   else if (!segs || !segs.length) return;
   const sc = A['tram-silver'].scene, node = n => sc.getObjectByName(n); if (!node('tramA') || !node('tramB')) return;
   try { city.trams = createTrams({ THREE, parent: city.group, segs: segs || [], lines, off: lines ? [0, 0] : P.offset || [0, 0], cut: lines ? null : city.tramCut || null, trackOff: lines ? 3.15 : 1.6, island: !!lines, maxLines: lines ? 2 : 20, minLen: lines ? 300 : 220, drive: P.p2.drive, proto: { A: node('tramB'), B: node('tramA') }, seed: hashStr('tram:' + S.cityId), life: cl3Life, walkOff: lines ? 9.6 : undefined,   /* 🚏 city-life3: хората на спирките; walkOff — тротоарът на булеварда */   /* износът: Blender Y → −Z, кабината на tramB гледа напред (+Z) */
-    cars: () => { if (!tr2) return []; const o = tr2G ? tr2G.position : { x: 0, z: 0 }; return tr2.cars.map(c => ({ x: c.x + o.x, z: c.z + o.z, yaw: c.yaw })); } }); } catch (e) { console.warn('trams', e); city.trams = false; }
+    cars: () => { if (!tr2) return []; const o = tr2G ? tr2G.position : { x: 0, z: 0 }, L = tr2.cars.map(c => ({ x: c.x + o.x, z: c.z + o.z, yaw: c.yaw, l: c.L, w: c.w, why: c.why }));   /* why — no-clip: чака ли самият трамвай (взаимно чакане → 8 s) */
+      if (feature('no-clip')) { if (bikes) for (const r of bikes.riders()) L.push({ x: r.x, z: r.z, yaw: r.h || 0, l: 1.8, w: 0.7 }); for (const p of peds) if (p.xOk && p.m && p.m.parent) L.push({ x: p.x, z: p.z, yaw: p.yaw || 0, l: 0.6, w: 0.6 }); }   // 🧱 no-clip: трамваят спира и пред колелата и хората на зебрата
+      return L; } }); } catch (e) { console.warn('trams', e); city.trams = false; }
 }
 // 🌳 station-area (T1): площадът пред гаровата сграда (павета, фонтан, пейки, лампи), детска площадка и дървета — само на свободната земя
 // източно от перона: без парцели, големите места и забележителностите, улиците (с тротоарите), водата, паркинга на гарата и депото
@@ -15228,6 +15231,24 @@ if (AUTOTEST) {
     growLook(far) { const B = city.lots.filter(l => l.built); if (!B.length) return null; const cx = B.reduce((t, l) => t + l.x, 0) / B.length, cz = B.reduce((t, l) => t + l.z, 0) / B.length; let p = { x: cx, z: cz }; if (far) { let bd = -1; for (const l of city.lots) { if (l.built) continue; const d = Math.min(...B.map(b => Math.hypot(b.x - l.x, b.z - l.z))); if (d > bd) { bd = d; p = l; } } } __dbg.lookAt(p.x, p.z, 140); return __dbg.growInfo(); },   /* #42.8: камерата над застроеното / над най-празното */
     blinkLook(d = 16) { if (!tr2) return null; const o = tr2G ? tr2G.position : { x: 0, z: 0 }, c = tr2.cars.find(c => c.lcT > 0 || c.hopW != null) || tr2.cars.find(c => c.next && c.next.kind === 'conn' && (c.next.turn === 'left' || c.next.turn === 'right') && c.p.len - c.s < 45 && c.p.len - c.s > 15); if (!c) return null; __dbg.lookAt(c.x + o.x, c.z + o.z, d); return { kind: c.kind, turn: c.next?.turn, lc: c.lcSide, v: +c.v.toFixed(1) }; },   /* #42.2: камерата към кола преди завой / смяна на лента */
     busLook() { const s = cityBus.stops()[0]; if (!s) return null; const o = tr2G ? tr2G.position : { x: 0, z: 0 }; __dbg.time && __dbg.time(10); __dbg.lookAt(s.x + o.x, s.z + o.z, 30); return cityBus.lines(); },   /* #15: камерата на първата спирка */
+    // 🧱 no-clip (собственикът, 19.11: „колите, пешеходците и цялото движение да не минават едно през друго“): колко пъти за sec секунди
+    // се застъпват движещите се — по двойки видове (кола, мотор, човек, колело, трамвай, техника); пример с мястото. Само за мерене.
+    overlapProbe(sec = 30, every = 0.25) { return new Promise(res => { const pairs = {}, ex = {}; let snaps = 0;
+      const vis = q => { for (; q; q = q.parent) if (!q.visible) return false; return true; };   // само видимото (колите извън кадъра/скритите не се броят)
+      const snap = () => { const o = tr2G ? tr2G.position : { x: 0, z: 0 }, L = [];
+        if (tr2) for (const c of tr2.cars) if (c.obj && vis(c.obj)) L.push({ k: c.obj.userData.moto ? 'moto' : 'car', x: c.x + o.x, z: c.z + o.z, r: c.obj.userData.moto ? 0.4 : 0.9, v: c.v, id: c, why: c.why || '' });
+        for (const p of peds) if (p.m && p.m.visible !== false && p.m.parent) L.push({ k: 'ped', x: p.m.position.x, z: p.m.position.z, r: 0.28, v: 1, id: p });
+        if (bikes) for (const r of bikes.riders()) L.push({ k: 'bike', x: r.x, z: r.z, r: 0.35, v: 1, id: r });
+        if (city.trams) for (const m of city.trams.movers()) L.push({ k: 'tram', x: m.x, z: m.z, r: 1.2, v: m.v ?? 1, id: m.tram || m.id || m, why: m.carT > 0 ? 'трамвай чака ' + m.carT.toFixed(0) + ' s' : '' });
+        for (const u of units) if (u.obj && u.obj.parent && u.path) L.push({ k: 'unit', x: u.x, z: u.z, r: 1.1, v: 1, id: u });
+        const G = new Map(), C = 4, key = (i, j) => i * 100003 + j;
+        for (const a of L) { const k = key(Math.floor(a.x / C), Math.floor(a.z / C)); let b = G.get(k); if (!b) G.set(k, b = []); b.push(a); }
+        for (const a of L) { const i0 = Math.floor(a.x / C), j0 = Math.floor(a.z / C);
+          for (let i = i0 - 1; i <= i0 + 1; i++) for (let j = j0 - 1; j <= j0 + 1; j++) for (const b of G.get(key(i, j)) || []) {
+            if (b === a || b.id === a.id || (a.k > b.k) || (a.k === b.k && a.x > b.x)) continue; if (a.v < 0.2 && b.v < 0.2 && a.k === 'car' && b.k === 'car') continue;
+            const d = Math.hypot(a.x - b.x, a.z - b.z); if (d < a.r + b.r) { const pk = a.k + '-' + b.k; pairs[pk] = (pairs[pk] || 0) + 1; (ex[pk] = ex[pk] || []).length < 6 && ex[pk].push([Math.round(a.x), Math.round(a.z), +d.toFixed(2), +(a.v || 0).toFixed(1), +(b.v || 0).toFixed(1), (a.why || '') + '|' + (b.why || '')]); } } }
+        snaps++; return L.length; };
+      let n0 = 0; const t = setInterval(() => { n0 = snap(); }, every * 1000); setTimeout(() => { clearInterval(t); res({ snaps, movers: n0, perSnap: Object.fromEntries(Object.entries(pairs).map(([k, v]) => [k, +(v / snaps).toFixed(2)])), total: pairs, ex }); }, sec * 1000); }); },
     moverHits() { if (!tr2) return null; const M = moversNow(); let n = 0; for (const m of M) for (const c of tr2.cars) if (Math.hypot(c.x - m.x, c.z - m.z) < 2.5) n++; return { movers: M.length, hits: n, yielding: tr2.cars.filter(c => c.why === 'машина отпред').length, waiting: units.filter(u => u.wb > 0).length }; },   /* самосвалът през колите: колко коли са върху техниката извън трафика */
     urTest(n = 8) { const out = []; for (let k = 0; k < n; k++) { const u = spawnUnit(['truck', 'loader', 'crew', 'tractor'][k % 4]); const far = city.lots[Math.floor(Math.random() * city.lots.length)]; u.state = 'driving'; u.urT = 1; sendTo(u, far.x, far.z, () => { u.state = 'idle'; u.urT = 0; }); out.push(Math.round(Math.hypot(far.x - u.x, far.z - u.z))); } return out; },   // 🔧 unitRepair: n машини към случайни парцели — колко „заседват“
     plTest(step = 0) { let root = scene; const pv = city.planView; if (step === 1) { const L = new THREE.PointLight(0xffffff, 0, 100, 1); L.name = 'plTest'; scene.add(L); return 'light'; }
