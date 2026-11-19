@@ -6256,6 +6256,7 @@ const tutorial = createTutorial({ S: () => S, projects: () => projects, units: (
 // 🧭 onboard2 (feature): вместо tutorial.js + onboarding.js — урокът по действия, отключването на бутоните/табовете и ❓; onboard2-pace — първите 3 къщи ~3× по-бързо (само нова игра, първите 2 дни)
 const OB2 = feature('onboard2'), OB2P = feature('onboard2-pace');
 const onb2 = OB2 ? createOnboard2({ S: () => S, lv: () => S?.dev?.lv || 1, projects: () => projects, units: () => units, onMap: () => !$('mapScreen').classList.contains('hidden'), toast: (m, k) => toast(m, k), save: () => save(), openTab: t => { tab = t; renderPanel(); }, autotest: AUTOTEST }) : null;
+window.__lessonOn = () => feature('one-lesson') && !!onb2 && !!S && onb2.active();   // 🎓 one-lesson (backlog 18.11: „шест системи за обучение се застъпват“): докато върви урокът (onboard2) — без съветите и обясненията над прозорците
 const onboard = feature('onboarding') && !OB2 ? createOnboarding({ auto: !AUTOTEST, S: () => S, camera, canvas: renderer.domElement, projects: () => projects,   // 🎓 onboarding (f9)
   onMap: () => !$('mapScreen').classList.contains('hidden'), perfCheck: () => perfCheck(renderer, GFXON ? lv => applyGfx(lv) : null, gfxMore()),
   ready: () => !!S && !!city?.ready && !$('loading') && !$('cine') && $('modal').classList.contains('hidden') }) : null;

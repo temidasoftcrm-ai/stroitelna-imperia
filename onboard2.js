@@ -106,7 +106,8 @@ export function createOnboard2(deps) {
   }
   // вика се ~веднъж в секунда (game.js — вместо tutorial.tick)
   function tick() { const o = O(); if (!o) return; const s = snap(); applyUnlocks(s); tutorial(s); help(); }
-  return { tick, ok, fresh: () => { const o = O(); return !!(o && o.fresh && !o.legacy); }, legacy: () => { const o = O(); return !o || o.legacy; },
+  const active = () => { const o = O(); return !!(o && !o.off && !o.legacy && o.step < STEPS.length); };   // 🎓 one-lesson: урокът тече (съветите и обясненията мълчат)
+  return { tick, ok, active, fresh: () => { const o = O(); return !!(o && o.fresh && !o.legacy); }, legacy: () => { const o = O(); return !o || o.legacy; },
     reset: () => { const S = deps.S(); if (!S) return; S.ob2 = { fresh: true, legacy: false, u: {}, step: 0, off: false }; shownStep = -1; tick(); },   // Лабораторията: като нова игра
     state: () => O() };
 }

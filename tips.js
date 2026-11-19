@@ -97,6 +97,7 @@ setInterval(() => {
   mount();
   const params = new URLSearchParams(location.search);
   if (params.has('autotest') && !params.has('tips')) return;
+  if (window.__lessonOn && window.__lessonOn()) return;   // 🎓 one-lesson: по време на урока съветите не излизат сами (бутонът 💡 работи)
   { const lv = window.__stroiLv ? window.__stroiLv() : 0;   // ново ниво с нещо ново → съвет (след картинката на нивото)
     if (lv && st.lvSeen == null) { st.lvSeen = lv; keep(); }   // първо пускане със стар запис — само за следващите нива
     if (lv > (st.lvSeen || 0)) { const modal = document.getElementById('modal');

@@ -52,6 +52,7 @@ function check() {
   const head = t.closest('.bw-head');
   if (head && !document.getElementById('pIntroQ')) { const q = document.createElement('button'); q.id = 'pIntroQ'; q.className = 'btn2'; q.textContent = '❓'; q.title = 'Какво е този прозорец?'; q.onclick = () => { const P2 = keyOf(document.getElementById('bwTitle')?.textContent || ''); if (!P2) return; document.getElementById('pIntro') ? document.getElementById('pIntro').remove() : card(P2); }; head.insertBefore(q, document.getElementById('bwClose')); }
   if (P[0] === cur) return;
+  if (window.__lessonOn && window.__lessonOn()) return;   // 🎓 one-lesson: по време на урока — не (излиза при следващото отваряне след него; ❓ работи)
   cur = P[0]; document.getElementById('pIntro')?.remove();
   if (!seen[P[0]] && !seen.__all) card(P);   // първото отваряне на този прозорец — докато не натиснеш „Разбрах“ веднъж
 }
