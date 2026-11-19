@@ -6,7 +6,7 @@
 // const T = createTrams({ THREE, parent, segs: [[[x, z], …]], off: [ox, oz], cut: [x0, x1] | null, proto: { A, B }, cars: () => [{ x, z, yaw }], seed });
 //   T.update(dt, night); T.movers() → [{ x, z, l, w }]; T.info(); T.dispose()
 import { feature } from './lab/feature.js';
-const TGAP = feature('tram-gap'), NOCLIP = feature('no-clip');   // T: отзив 17.11 — два трамвая минаха един през друг
+const TGAP = feature('tram-gap'), NOCLIP = feature('no-clip'), TSNAP = feature('tram-snap');   // T: отзив 17.11 — два трамвая минаха един през друг
 const SEC = 14.0, GAP = 0.35, STOP = 400, VMAX = 12, ACC = 1.0, DEC = 1.3, ALAT = 0.9;
 
 const d2 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
@@ -48,7 +48,22 @@ export function createTrams(o) {
   lines.sort((a, b) => lenOf(b) - lenOf(a));
   { // OSM: всеки коловоз е отделен път — успоредният (≥ 60% от точките на ≤ 9 м от вече взета линия) отпада; взетата линия носи и двата коловоза
     const G = 10, grid = new Set(), key = (x, z) => Math.floor(x / G) + ',' + Math.floor(z / G), near = (x, z) => { for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) if (grid.has((Math.floor(x / G) + i) + ',' + (Math.floor(z / G) + j))) return true; return false; };
-    const keep = []; for (const p of lines) { const sm = p.filter((_, i) => i % 4 === 0), hit = sm.filter(q => near(q[0], q[1])).length; if (hit > sm.length * 0.6) continue;
+    // 🚋 tram-snap (собственикът, 19.11: „да оправим трамвайните линии“ — София: линии 6 и 7 по 144 м на ~1 м една от друга, други двойки на 4–8 м
+    // около кръстовищата → коловозите и трамваите им едни през други): там, където линията върви УСПОРЕДНО на вече взета (≤ 9 м, посоките ±25°),
+    // точките ѝ легват точно върху взетата — общ коловоз (трамваите на двете линии се редят един зад друг — tram-gap); пресичащите се не се пипат
+    const KP = new Map(), kpKey = (i, j) => i + ',' + j, KC = 6;
+    const kpAdd = p => { for (let i = 0; i < p.length; i++) { const a = p[Math.max(0, i - 1)], b = p[Math.min(p.length - 1, i + 1)], l = d2(a, b) || 1, k = kpKey(Math.floor(p[i][0] / KC), Math.floor(p[i][1] / KC)); let L = KP.get(k); if (!L) KP.set(k, L = []); L.push([p[i][0], p[i][1], (b[0] - a[0]) / l, (b[1] - a[1]) / l]); } };
+    const snap = p => { let n = 0; const out = p.map((q, i) => { const a = p[Math.max(0, i - 1)], b = p[Math.min(p.length - 1, i + 1)], l = d2(a, b) || 1, ux = (b[0] - a[0]) / l, uz = (b[1] - a[1]) / l; let best = null, bd = 81;
+        const ci = Math.floor(q[0] / KC), cj = Math.floor(q[1] / KC); for (let di = -2; di <= 2; di++) for (let dj = -2; dj <= 2; dj++) for (const r of KP.get(kpKey(ci + di, cj + dj)) || []) { const dd = (r[0] - q[0]) ** 2 + (r[1] - q[1]) ** 2; if (dd < bd && Math.abs(ux * r[2] + uz * r[3]) > 0.9) { bd = dd; best = r; } }
+        if (best) { n++; return [best[0], best[1]]; } return q; }); return n ? resample(chaikin(resample(out.filter((q, i) => i === 0 || d2(q, out[i - 1]) > 0.05), 3)), 1.5) : p; };   /* изглаждане на влизането в общия участък */
+    // tram-snap: OSM кръг „отиване + връщане“ по същата улица (София, линия 4 — 47% от точките) — обратното минаване на ≤ 9 м отпада
+    // (иначе 4 коловоза на една улица и трамваите на линията един през друг); остават парчетата от поне 150 м, трамваите обръщат в края
+    const selfCut = p => { const dir = i => { const a = p[Math.max(0, i - 2)], b = p[Math.min(p.length - 1, i + 2)], l = d2(a, b) || 1; return [(b[0] - a[0]) / l, (b[1] - a[1]) / l]; };
+      const bad = p.map((q, i) => { if (i < 60) return false; const di = dir(i); for (let j = 0; j < i - 60; j++) { if (d2(q, p[j]) < 9) { const dj = dir(j); if (di[0] * dj[0] + di[1] * dj[1] < -0.85) return true; } } return false; });
+      if (!bad.some(Boolean)) return [p]; const runs = []; let cur = []; p.forEach((q, i) => { if (bad[i]) { if (cur.length > 1) runs.push(cur); cur = []; } else cur.push(q); }); if (cur.length > 1) runs.push(cur);
+      return runs.filter(r => lenOf(r) >= 150); };
+    if (TSNAP) lines = lines.flatMap(selfCut).sort((a, b) => lenOf(b) - lenOf(a));
+    const keep = []; for (let p of lines) { if (TSNAP && keep.length) p = snap(p); const sm = p.filter((_, i) => i % 4 === 0), hit = sm.filter(q => near(q[0], q[1])).length; if (hit > sm.length * 0.6) continue; if (TSNAP) kpAdd(p);
       keep.push(p); for (const q of p) grid.add(key(q[0], q[1])); if (keep.length >= (o.maxLines || 12)) break; }
     lines = keep; }
   const own = [];
@@ -107,7 +122,8 @@ export function createTrams(o) {
     for (const ls of L2) for (const Ln of ls) { Ln.list.sort((a, b) => b.s - a.s);
       Ln.list.forEach((t, i) => {
         if (t.ev && t.wait - dt <= 0) { if (o.life.busy(t.ev) && (t.evT += dt) < 25) { t.v = 0; return; } t.ev = null; }   // city-life3: чака качващите се и слизащите
-        if (t.wait > 0) { t.wait -= dt; t.v = 0; if (t.wait <= 0 && t.endT) { t.endT = 0; const other = ls[1 - t.k]; Ln.list.splice(Ln.list.indexOf(t), 1); t.k = 1 - t.k; t.lane = other; t.s = LEN + 2; other.list.push(t); t.nextStop = other.stops.findIndex(z => z > t.s + 5); } return; }   // обръщане в края: на другия коловоз
+        if (t.wait > 0) { t.wait -= dt; t.v = 0; if (t.wait <= 0 && t.endT && NOCLIP && ls[1 - t.k].list.some(o2 => o2 !== t && o2.s < 2 * LEN + 8)) t.wait = 1;   /* 🧱 no-clip: обръща чак когато началото на насрещния коловоз е свободно (иначе — в трамвая, който чака там) */
+        if (t.wait <= 0 && t.endT) { t.endT = 0; const other = ls[1 - t.k]; Ln.list.splice(Ln.list.indexOf(t), 1); t.k = 1 - t.k; t.lane = other; t.s = LEN + 2; other.list.push(t); t.nextStop = other.stops.findIndex(z => z > t.s + 5); } return; }   // обръщане в края: на другия коловоз
         const ln = Ln.ln; let goal = ln.T - 2;   // докъдето може да стигне челото
         const st0 = t.nextStop >= 0 ? Ln.stops[t.nextStop] : null, st = st0 == null || !o.life ? st0 : Math.min(ln.T - 2.5, st0 + LEN / 2); if (st != null) goal = Math.min(goal, st);   /* city-life3: средата на трамвая — на средата на перона */
         const ahead = Ln.list[i - 1]; if (ahead) goal = Math.min(goal, ahead.s - LEN - 18);
