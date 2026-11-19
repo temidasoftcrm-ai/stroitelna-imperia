@@ -3601,7 +3601,7 @@ function carBlocks(x, z, yaw, len = 6) {
 function jpAgents() {
   if (!tr2 || !tr2.opts.jp || !tr2G || !city.plan || !city.plan.p2 || !tr2On()) return null;
   if (!jpR || jpR.tr !== tr2) { const o = city.plan.offset, L = q => q.p ? q : { x: q.x - o[0], z: q.z - o[1] }, R = makeRouter(tr2);
-    jpR = { tr: tr2, group: tr2G, route: (a, b, heavy, o2) => R.route(L(a), L(b), { heavy, ...(o2 || {}) }), laneTo: (c, L2) => tr2.laneTo(c, L2), add: sp => tr2.addAgent(sp), retarget: (c, r) => tr2.retarget(c, r), remove: c => tr2.removeAgent(c), alive: c => jpR.tr === tr2 && tr2.cars.includes(c), free: (p, s, len) => p.cars.every(c => Math.abs(c.s - s) > (c.L + len) / 2 + 3), point: (p, s) => { const q = pointOn(p, s); return { x: q.x + o[0], z: q.z + o[1] }; } }; }
+    jpR = { tr: tr2, group: tr2G, route: (a, b, heavy, o2) => R.route(L(a), L(b), { heavy, ...(o2 || {}) }), laneTo: (c, L2) => tr2.laneTo(c, L2), add: sp => tr2.addAgent(sp), retarget: (c, r) => tr2.retarget(c, r), remove: c => { if (tr2) tr2.removeAgent(c); },   /* swap-tir (19.11): teardownCity маха трафика преди ТИР-овете — без трафик няма от какво да се маха */ alive: c => jpR.tr === tr2 && tr2.cars.includes(c), free: (p, s, len) => p.cars.every(c => Math.abs(c.s - s) > (c.L + len) / 2 + 3), point: (p, s) => { const q = pointOn(p, s); return { x: q.x + o[0], z: q.z + o[1] }; } }; }
   return jpR;
 }
 function spawnTraffic(n) {
@@ -12488,8 +12488,9 @@ function teardownCity() {
   if (cityTrain) { scene.remove(cityTrain.g); cityTrain = null; }
   if (passing) { passing.clear(); passing = null; }
   for (const t of traffic) scene.remove(t.obj); traffic.length = 0;
+  tirs.clear();   // swap-tir (собственикът, 19.11: „Page Unresponsive“ Йоханесбург → Пловдив): ТИР-овете на пътя — преди трафика им (иначе removeAgent на null → teardown гърми → пълно презареждане)
   if (tr2) { tr2.clear(); tr2 = null; } if (tr2G) { scene.remove(tr2G); tr2G = null; }
-  incidents.clear(); tirs.clear(); cityBus.clear(); schoolBus.clear(); parkLife.clear(); commute.clear(); garbage.clear();
+  incidents.clear(); cityBus.clear(); schoolBus.clear(); parkLife.clear(); commute.clear(); garbage.clear();
   const old = city.group, pv = city.planView;
   if (old) scene.remove(old);
   if (FIXSTAB) try { winForget([old, ...gone]); } catch (e) { console.warn('winForget', e); }
@@ -12510,6 +12511,12 @@ async function swapInPlace(from) {
     plan2Adopt(S); await plan2Preload(S);
     if (FIXSTAB) { await plan2Need(S); swapCover(false); swapping = false; }
     setupWorld(); fastForward(); freezeDetail();
+    // 🔥 swap-warm (собственикът, 19.11: „Page Unresponsive“ при смяна на град): първият кадър на новия град компилираше шейдърите му синхронно
+    // (1,4–3,9 s спиране). Сега градът се компилира на заден план (compileAsync, KHR_parallel_shader_compile), откачен от сцената — рендерът
+    // не го рисува, докато не е готов; покривалото „Зареждане…“ стои, кликовете са спрени. Най-много 6 s, после — както досега.
+    if (feature('swap-warm') && renderer.compileAsync && city.group && city.group.parent === scene) { const g = city.group, tw = performance.now(); swapping = true; swapCover(true); scene.remove(g);
+      try { await Promise.race([renderer.compileAsync(g, camera, scene), new Promise(r => setTimeout(r, 6000))]); } catch (e) { console.warn('swap-warm', e); }
+      if (!g.parent) scene.add(g); swapping = false; swapCover(false); window.__swapWarmMs = Math.round(performance.now() - tw); }
     showMap(false); $('panel').classList.remove('hidden'); renderPanel();
     save(true);
     console.log(`city-swap ${from} → ${S.cityId}: ${Math.round(performance.now() - t0)} ms`); window.__swapMs = performance.now() - t0;
