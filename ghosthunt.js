@@ -105,7 +105,7 @@ export function createGhostHunt(deps) {
       }
     },
     // Лабораторията: отключено (без запис), камерата към пожарната; night — 0:30
-    park: () => park(),   // Лабораторията: след смяна на window.__ghLat
+    park: () => park(),   // Лабораторията: колата обратно на мястото ѝ пред пожарната (__dbg.ghostPark)
     look(night = true) { force = true; if (!lot || !baseG) return null; baseG.updateMatrixWorld(true); const p = new THREE.Vector3().setFromMatrixPosition(baseG.matrixWorld), sc = new THREE.Vector3().setFromMatrixScale(baseG.matrixWorld).x || 1; return { x: p.x, z: p.z, h: baseG.userData.h * sc, w: Math.max(lot.w, lot.d) * sc }; },
     state: () => { const S = deps.S(), pv = deps.pv && deps.pv(), B = (pv && pv.userData.blocks) || []; return { lot: !!lot, base: !!baseG, car: !!car, unlocked: unlocked(), route: route.length, upd, M: !!M, city: S && S.cityId, pv: !!pv, blocks: B.length, cand: B.filter(b => b.h >= 15 && b.h <= 45 && Math.min(b.w, b.d) >= 12 && Math.max(b.w, b.d) >= 22).length, hs: B.slice(0, 5).map(b => [Math.round(b.x), Math.round(b.z), Math.round(b.w), Math.round(b.d), Math.round(b.h)]) }; },
   };
