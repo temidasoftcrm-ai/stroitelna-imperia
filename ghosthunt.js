@@ -5,10 +5,14 @@
 // Постижение „👻 Кого ще повикаш?“ (S.ghost). Денем колата стои пред пожарната.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { feature } from './lab/feature.js';
 
 const BASE = 'assets/heavy/gh/';
 const L_ON = new Set([0, 1, 3, 4, 12, 13, 14]), R_ON = new Set([6, 7, 9, 10, 17, 18, 19]);   // от 24 кадъра в секунда — общият ритъм на спешните коли
 const CAR_LEN = 6.2, SPEED = 11;   // м, м/с
+// 👻 ghost-front (собственикът, 20.11: „да я направим по-видима пожарната“, „колата поне да е пред пожарната“): пожарната — на открито място
+// (най-ниските съседи до 40 м около нея, не най-близкото до центъра), колата — пред гаражната врата, с муцуната към улицата (не напряко в процепа до съседа)
+const FRONT = feature('ghost-front'), GARAGE = 0.53;   // моделът: пожарната (+x) и черната съседна сграда с аварийните стълби (−x), лицата — към +z; гаражната врата — на 0,53 от половината ширина
 
 // deps: { scene, S(), pv() — изгледът на плана (blocks, hideBlocks), hour() 0..24, night() 0..1, roadRoute(x0, z0, x1, z1), roadPoint(), toast(msg, kind), pop(key, cap, sub), save() }
 export function createGhostHunt(deps) {
@@ -18,7 +22,10 @@ export function createGhostHunt(deps) {
   // нисък блок (15–45 м; основа ≥ 12 × 22 м — моделът е 2:1, фасадите в Ню Йорк са по 13 м) на 120–600 м от центъра — най-близкият; детерминистично
   function pickLot(pv) {
     const L = (pv.userData.blocks || []).filter(b => b.h >= 15 && b.h <= 45 && Math.min(b.w, b.d) >= 12 && Math.max(b.w, b.d) >= 22 && Math.max(b.w, b.d) <= 60 && Math.hypot(b.x, b.z) >= 120 && Math.hypot(b.x, b.z) <= 600);
-    L.sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z)); return L[0] || null;
+    L.sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z));
+    if (FRONT && L.length) { const B = pv.userData.blocks, nb = b => { let m = 0; for (const q of B) if (q !== b && q.h > m && (q.x - b.x) ** 2 + (q.z - b.z) ** 2 < 1600) m = q.h; return m; };   // най-високият съсед до 40 м
+      let best = null, bs = Infinity; for (const b of L.slice(0, 120)) { const sc = nb(b) + Math.hypot(b.x, b.z) * 0.02; if (sc < bs) { bs = sc; best = b; } } return best; }
+    return L[0] || null;
   }
   function placeBase(pv) {
     lot = pickLot(pv); if (!lot) return;
@@ -27,7 +34,7 @@ export function createGhostHunt(deps) {
     const turn = (s.x > s.z) !== (sz.x > sz.z), mx = turn ? sz.z : sz.x, mz = turn ? sz.x : sz.z, k = Math.min(s.x / mx, s.z / mz) * 0.98;   // по дългата ос на парцела (моделът е 2:1, тясната страна с пожарната — към улицата); вписан
     o.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; if (m.material && m.material.emissiveMap) { m.material = m.material.clone(); m.material.emissiveIntensity = 0; } } });
     baseG = new THREE.Group(); baseG.name = 'ghost-base'; const inner = new THREE.Group(); inner.add(o); if (turn) inner.rotation.y = Math.PI / 2; o.scale.setScalar(k); o.position.set(-(bb.min.x + bb.max.x) / 2 * k, -bb.min.y * k, -(bb.min.z + bb.max.z) / 2 * k);
-    baseG.add(inner); baseG.position.set(p.x, 0, p.z); baseG.quaternion.copy(q); baseG.userData.h = sz.y * k; baseG.userData.front = mz * k / 2; baseG.userData.turn = turn;
+    baseG.add(inner); baseG.position.set(p.x, 0, p.z); baseG.quaternion.copy(q); baseG.userData.h = sz.y * k; baseG.userData.front = mz * k / 2; baseG.userData.hx = sz.x * k / 2; baseG.userData.hz = sz.z * k / 2; baseG.userData.turn = turn;
     pv.add(baseG); pv.userData.hideBlocks(new Set([lot]), 'ghost');
     // сиянието и лъчът (адитивни, зелени; нощем)
     const gm = new THREE.MeshBasicMaterial({ color: 0x39ff6a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
@@ -69,6 +76,8 @@ export function createGhostHunt(deps) {
   function park() {
     if (!car || !baseG) return; baseG.updateMatrixWorld(true); const W = baseG.matrixWorld, sc = new THREE.Vector3().setFromMatrixScale(W).x || 1;
     const dir = new THREE.Vector3(baseG.userData.turn ? 1 : 0, 0, baseG.userData.turn ? 0 : 1).transformDirection(W), p = new THREE.Vector3().setFromMatrixPosition(W);
+    if (FRONT) { const u = baseG.userData, lat = new THREE.Vector3(u.turn ? 0 : 1, 0, u.turn ? -1 : 0).transformDirection(W), f = u.hz * sc + CAR_LEN / 2 + 0.6, l = GARAGE * u.hx * sc;   // dir — +z на модела (лицето)
+      car.position.set(p.x + dir.x * f + lat.x * l, 0, p.z + dir.z * f + lat.z * l); car.rotation.set(0, Math.atan2(dir.x, dir.z), 0); route = []; return; }   // пред гаражната врата, муцуната към улицата
     car.position.set(p.x + dir.x * (baseG.userData.front * sc + 4), 0, p.z + dir.z * (baseG.userData.front * sc + 4)); car.rotation.set(0, Math.atan2(dir.x, dir.z) + Math.PI / 2, 0); route = []; }
 
   return {
@@ -96,6 +105,7 @@ export function createGhostHunt(deps) {
       }
     },
     // Лабораторията: отключено (без запис), камерата към пожарната; night — 0:30
+    park: () => park(),   // Лабораторията: след смяна на window.__ghLat
     look(night = true) { force = true; if (!lot || !baseG) return null; baseG.updateMatrixWorld(true); const p = new THREE.Vector3().setFromMatrixPosition(baseG.matrixWorld), sc = new THREE.Vector3().setFromMatrixScale(baseG.matrixWorld).x || 1; return { x: p.x, z: p.z, h: baseG.userData.h * sc, w: Math.max(lot.w, lot.d) * sc }; },
     state: () => { const S = deps.S(), pv = deps.pv && deps.pv(), B = (pv && pv.userData.blocks) || []; return { lot: !!lot, base: !!baseG, car: !!car, unlocked: unlocked(), route: route.length, upd, M: !!M, city: S && S.cityId, pv: !!pv, blocks: B.length, cand: B.filter(b => b.h >= 15 && b.h <= 45 && Math.min(b.w, b.d) >= 12 && Math.max(b.w, b.d) >= 22).length, hs: B.slice(0, 5).map(b => [Math.round(b.x), Math.round(b.z), Math.round(b.w), Math.round(b.d), Math.round(b.h)]) }; },
   };

@@ -987,7 +987,7 @@ const NYDENSE = feature('ny-dense');   // ny-dense: фасадите са по 1
 const nyNear = () => { const h = b => ((Math.round(b.x * 3) * 73856093) ^ (Math.round(b.z * 3) * 19349663)) >>> 0, r = { V: plan2.nyV || null, o: { R: 200, fill: true, yaws: [0], pick: [...Object.keys(NY_FILES), ...Object.keys(NYSKY_FILES)] /* ny-sky256 */,
     // собственикът: ниските — в истински ръст (8 етажа ≈ 26–30 м, основата по парцела, ≥ 20 м), по-нагъсто — не (≈ половината от кутиите); кулите (tenement-2) — различна височина: 40…100 % (по мястото)
     ...(NYSKY_ON ? { Rfor: b => b.t === 5 ? 3000 : 200 } : {}),   // ny-sky256: кулите — в целия град (силуетът се вижда отдалеч; инстанции — няколко draw call-а); тухлените — до 200 м
-    pickFor: b => b.t === 5 ? (NYSKY_ON && b.h >= 60 ? NYSKY_PICK : []) : b.h >= 40 && b.h <= 85 && Math.min(b.w, b.d) <= 26 ? ['ny-ten-2', 'ny-ten-4'] : !b.nyTall && b.h >= 12 && b.h <= 34 && Math.min(b.w, b.d) >= 12 && h(b) % 2 === 0 ? (h(b) % 40 === 0 && b.w * b.d > 450 ? ['ny-ten-3'] : ['ny-ten-1', 'ny-ten-5', 'ny-ten-6']) : [],
+    pickFor: b => b.t === 5 ? (NYSKY_ON && b.h >= 60 ? nySkyPick(b) : []) : b.h >= 40 && b.h <= 85 && Math.min(b.w, b.d) <= 26 ? ['ny-ten-2', 'ny-ten-4'] : !b.nyTall && b.h >= 12 && b.h <= 34 && Math.min(b.w, b.d) >= 12 && h(b) % 2 === 0 ? (h(b) % 40 === 0 && b.w * b.d > 450 ? ['ny-ten-3'] : ['ny-ten-1', 'ny-ten-5', 'ny-ten-6']) : [],
     size: (b, k) => NYSKY_A[k] ? nySkySize(b, k, h(b)) : k === 'ny-ten-2' || k === 'ny-ten-4' ? [b.w * 0.97, b.h * (0.4 + 0.1 * (h(b) % 7)), b.d * 0.97] : k === 'ny-ten-1' || k === 'ny-ten-5' || k === 'ny-ten-6' ? (NYDENSE ? [Math.max(b.w * 0.97, 12), 26 + (h(b) % 5), Math.max(b.d * 0.97, 12)] : [Math.max(b.w * 0.97, 20), 26 + (h(b) % 5), Math.max(b.d * 0.97, 20)]) : [b.w * 0.97, Math.max(b.h, 24), b.d * 0.97] } };
   if (!plan2.nyV) (plan2.nyLoad ||= Promise.all(Object.entries({ ...NY_FILES, ...NYSKY_FILES }).map(([k, u]) => plan2.models[k] ? 0 : new GLTFLoader().loadAsync('assets/heavy/' + u).then(g => { plan2.models[k] = g.scene; }).catch(() => {})))
     .then(() => { plan2.nyV = nyPrep(plan2.models, m => dayNight.winMats.add(m), (o, k) => prepNightFloors(o, k)); nySkyPrep(plan2.nyV); })).then(() => { r.V = plan2.nyV; });
@@ -1004,6 +1004,10 @@ function nySkyPrep(V) { for (const k in NYSKY_FILES) { const o = plan2.models[k]
 // 🗽 ny-sky-small (собственикът, 01.11: „много кули тип игла — хубави са, но да ги направим по-малки“; тънката синя — „тоя чак е странен“): ~70 % от височината
 // и пропорциите на модела — на тесен парцел кулата е по-ниска, не по-тънка (досега ширината се режеше по парцела, а височината оставаше → игла)
 const NYSKY_SMALL = feature('ny-sky-small');
+// 🗽 ny-sky-fit (собственикът, 20.11: „има 2 небостъргача мини, а не трябва да са мини“): стъклените кули (бялата, синята) са широки — на парцел 13 м
+// с пропорциите си излизаха 22–31 м (по-ниски от съседите); там — ар деко кулата (тясна, ≥ 77 м); широките — само където стават поне 50 м
+const NYSKY_FIT = feature('ny-sky-fit'), NYSKY_MINH = 50;
+const nySkyPick = b => { if (!NYSKY_FIT) return NYSKY_PICK; const ok = NYSKY_PICK.filter(k => { const a = NYSKY_A[k]; return !a || Math.min(b.w * 0.97 / a[0], b.d * 0.97 / a[1]) >= NYSKY_MINH; }); return ok.length ? ok : ['ny-256']; };
 // ny-sky-small (собственикът, след замерването: „жълтите сгради са супер … другите трябва да са малко по-високи от тях“): кулата — 15–35 % над най-високата
 // жълта сграда (не стъклените кули, t ≠ 5) до 150 м около нея; не над собствената кутия; без жълти наоколо — 60–80 % от кутията
 const nyYellowMax = (() => { const C = new WeakMap(); return b => { if (C.has(b)) return C.get(b); const B = (city.planView && city.planView.userData.blocks) || []; let m = 0; for (const q of B) if (q.t !== 5 && q.h > m && (q.x - b.x) ** 2 + (q.z - b.z) ** 2 < 22500) m = q.h; if (B.length) C.set(b, m); return m; }; })();
@@ -14190,6 +14194,7 @@ if (AUTOTEST) {
     async ufo(night = true) { if (!ufo) return 'off'; if (night) this.time(0.5); setSpeed(1); return ufo.now(); },   // 🛸 ufo-vegas: Лабораторията — НЛО сега пред камерата (без постижение)
     ufoState() { return ufo ? ufo.state() : null; },
     ghostState() { return ghostHunt ? ghostHunt.state() : null; },
+    ghostPark() { return ghostHunt && ghostHunt.park(); },
     async xmas() { if (!xmasConvoy) return 'off'; return await xmasConvoy.test(); },
     xmasShow() { if (!xmasShow) return 'off'; if (xmasShow.busy) return 'busy'; delete S.xmasPlv; xmasShowGo(); return S.xmasShow; },   // 🎄 xmas-plovdiv: шоуто сега (от всеки град — отива в Пловдив)
     xmasShowSeek(t) { if (!xmasShow || !xmasShow.busy) return 'не тече'; xmasShow.seek(t, camera); return xmasShow.info(); },
