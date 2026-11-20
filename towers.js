@@ -7,7 +7,7 @@
 //   cityplan2-3d.js: opts.romeNear = { V, fn: towerNear, o } (куката на rome-bld: update(camera) / dirty() / dispose())
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';
-const TWG = feature('tw-night2');   // 🌙 tw-night2 (потребителят: „можем ли по-добре да осветим този блок“): прозорците по истинските отвори, фасадата не е черна
+const TWG = feature('tw-night2'), CALM = feature('dist-calm');   // 🌙 tw-night2 (потребителят: „можем ли по-добре да осветим този блок“): прозорците по истинските отвори, фасадата не е черна
 
 export const TOWER_FILES = { 'tw-urban': 'towers/urban-tower.glb', 'tw-ru': 'towers/ru-blocks.glb' };
 const EAST = new Set(['🇧🇬', '🇷🇸', '🇷🇴', '🇲🇰', '🇬🇷', '🇲🇪', '🇧🇦', '🇦🇱', '🇽🇰', '🇭🇷', '🇲🇩', '🇵🇱', '🇭🇺', '🇸🇰', '🇨🇿', '🇱🇹', '🇱🇻', '🇪🇪', '🇬🇪', '🇦🇲']), RU = new Set(['🇷🇺', '🇺🇦', '🇧🇾']);
@@ -83,7 +83,7 @@ export function towerNear(G, BL, V, o = {}) {
   const bigs = (o.lots || []).filter(L => L.big || L.lm);   // паркове, забележителности, площади
   let dirty = true;
   function place() {
-    root.clear(); const ctr = o.center || { x: 0, z: 0 }, N = o.n || 6, out = [], hide = new Set();
+    if (!CALM) root.clear(); const ctr = o.center || { x: 0, z: 0 }, N = o.n || 6, out = [], hide = new Set(), plan = [];
     const cand = BL.list.map((b, i) => [b, i]).filter(([b]) => b.h >= 9 && BL.shown(b) && Math.hypot(b.x - ctr.x, b.z - ctr.z) < (o.R || 900)).sort((a, b) => hash(a[1]) - hash(b[1]));
     const why = { bl: BL.list.length, cand: cand.length, road: 0, big: 0, near: 0, own: 0 }; root.userData.why = why;
     for (const [b, i] of cand) { if (out.length >= N) break;
@@ -102,9 +102,11 @@ export function towerNear(G, BL, V, o = {}) {
       const under = BL.list.filter(q => inR(q.x, q.z, 2));
       if (under.some(q => !BL.shown(q))) { why.own++; continue; }   // парцел на играча / зает — не
       under.forEach(q => hide.add(q));
-      const t = m.clone(true); t.position.set(cx, 0, cz); t.rotation.y = r; t.userData.src = 'tower-' + k; root.add(t);
+      if (CALM) plan.push([m, k, cx, cz, r]); else { const t = m.clone(true); t.position.set(cx, 0, cz); t.rotation.y = r; t.userData.src = 'tower-' + k; root.add(t); }
       out.push({ x: cx, z: cz, R: Math.hypot(L, D) / 2, k });
     }
+    if (CALM) { const key = plan.map(q => q[1] + '@' + q[2].toFixed(1) + ',' + q[3].toFixed(1) + ',' + q[4].toFixed(2)).join('|');   // ⚡ dist-calm: същите кули на същите места — без ново клониране
+      if (key !== root.userData.planKey) { root.userData.planKey = key; root.clear(); for (const [m, k, cx, cz, r] of plan) { const t = m.clone(true); t.position.set(cx, 0, cz); t.rotation.y = r; t.userData.src = 'tower-' + k; root.add(t); } } }
     BL.hide(hide); root.userData.placed = out;
   }
   return { update() { if (dirty) { dirty = false; place(); } }, dirty() { dirty = true; }, dispose() { G.remove(root); }, placed: () => root.userData.placed || [] };
