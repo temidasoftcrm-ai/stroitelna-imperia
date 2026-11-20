@@ -9,6 +9,7 @@
 // Всичко — InstancedMesh и слети мешове; дребните неща се крият отдалеч (update).
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';   // park-dark
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 const PCULL = feature('perf3-cull');
 const CALM = feature('dist-calm'), SEGC = 30, SEGG = new WeakMap();   // ⚡ dist-calm: решетката на отсечките на улиците (за freeParks.nearRoad), веднъж за плана
 function segGridOf(roads, ox, oz) { let G = SEGG.get(roads); if (G && G.ox === ox && G.oz === oz) return G; G = new Map(); G.ox = ox; G.oz = oz;
@@ -73,6 +74,21 @@ export function analyze(P, lots) {
 // ---- набор: кутии (InstancedMesh по цвят), плоски настилки (слети), дървета, храсти, коли (части на моделите — InstancedMesh)
 const FLAT = { plaza: [0xcfc8bb, 0.03], pavers: [0xb59f86, 0.032], asphalt: [0x4a4d52, 0.034], gravel: [0xd9cdb0, 0.036], rubber: [0xb5523b, 0.04], turf: [0x4f9a45, 0.04], line: [0xf2f2f2, 0.05], sand: [0xe6d29a, 0.052], soil: [0x5b4330, 0.05], walk: [0xbdb6a8, 0.045], drive: [0x55585e, 0.045], dirt: [0x9a8466, 0.04], rubberG: [0x5f8a4e, 0.04] };   // dirt, rubberG — yards-real: пръстта под старата площадка и зелената гумена настилка
 const partCache = new WeakMap();
+// ⚡ dist-merge: частите на един модел (паркирана кола, пейка, люлка, ограда, дърво) с общ материал — една геометрия → един InstancedMesh.
+// Мерене (20.11, Пловдив): кварталите бяха 170 рисувания при 90 материала, 111 от тях — паркираните коли (всяка част на модела отделно).
+// Всичко тук е неподвижно и вече в координатите на модела, затова сливането е само по материал; масивите от материали остават отделно.
+const MERGE = feature('dist-merge');
+const attrSig = g => Object.keys(g.attributes).sort().map(n => n + ':' + g.attributes[n].itemSize).join(',') + (g.index ? '#i' : '#n');
+function mergeParts(parts) {
+  const groups = new Map(), out = [];
+  for (const pm of parts) { const [g, mt] = pm; if (Array.isArray(mt) || !mt) { out.push(pm); continue; } const k = mt.uuid + '|' + attrSig(g); (groups.get(k) || groups.set(k, []).get(k)).push(pm); }
+  for (const list of groups.values()) {
+    if (list.length < 2) { out.push(list[0]); continue; }
+    let mg = null; try { mg = mergeGeometries(list.map(([g]) => { g.morphAttributes = {}; g.clearGroups(); return g; }), false); } catch (e) { mg = null; }
+    if (!mg) { out.push(...list); continue; }
+    for (const [g] of list) g.dispose(); out.push([mg, list[0][1]]); }
+  return out;
+}
 function protoParts(src, norm) {
   const key = src, c = partCache.get(key); if (c && c.norm === norm) return c.parts;
   src.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(src), k = norm === 'h' ? 1 / ((b.max.y - b.min.y) || 1) : norm === 'w' ? 1 / (Math.max(b.max.x - b.min.x, b.max.z - b.min.z) || 1) : 1, parts = [];
@@ -82,7 +98,8 @@ function protoParts(src, norm) {
   // №14 (55): центърът — по останалите части (без фаровете и лъча, който стърчи ~2 дължини напред): иначе паркираните коли се изместваха назад от мястото си
   const pb = new THREE.Box3(); for (const [g] of parts) { g.computeBoundingBox(); pb.union(g.boundingBox); } const bb = parts.length ? pb : b;
   for (const [g] of parts) { g.translate(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2); g.scale(k, k, k); }
-  partCache.set(key, { norm, parts }); return parts;
+  const out = MERGE ? mergeParts(parts) : parts;
+  partCache.set(key, { norm, parts: out }); return out;
 }
 // 🛝 yards-real: истинските модели (o.real[ключ] — Object3D в истински размер, дължината по x, лицето към +z) — по един InstancedMesh на част
 export const realSize = p => { if (!p.userData.sz) { p.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(p); p.userData.sz = [b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z]; } return p.userData.sz; };
