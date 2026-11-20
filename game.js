@@ -181,6 +181,7 @@ import { loadIndustry } from './industry.js';
 import { loadConstruct } from './construct.js';
 import { showIntro } from './intro.js';
 import { feature } from './lab/feature.js';
+import { createShadowSmall } from './shadowsmall.js';
 import { setMainRenderer, setMainScene } from './memfix.js';
 import { mountHub } from './hub.js';
 import { showLevel } from './lvshow.js';
@@ -579,6 +580,8 @@ const GLITE = GFXON && feature('gfx-lite'), GLOADED = GLITE ? { tex: gfx().tex, 
 const cityCull = createCityCull({ group: () => city.group, target: () => controls.target, camDist: () => camera.position.distanceTo(controls.target), peds: () => [...standers, ...peds.map(p => p.m)], on: () => feature('perf-cliff') && !window.__noCull, detailK: liteDet, deco: () => !GLITE || gfx().deco !== false, far: () => PFAR && !window.__noCull && !(window.__p3off && window.__p3off.far), farD: () => GFXON ? gfx().far3 : null, jets: () => !GFXON || !/low/.test(gfxLevel()), scene: () => scene, cam: () => camera.position, skip: () => new Set([...(city.landmarks || []).map(l => l.group), city.dl && city.dl.group && city.dl.group()].filter(Boolean)) });   /* ⚡ perf3-far: дребното отдалеч — извън рисуването */   // __noCull — за сравнение преди/след от конзолата
 const SH_D = new THREE.Vector3(), SH_P = new THREE.Vector3(), SH_T = new THREE.Vector3(1e9, 0, 0);
 const PSHADOW = feature('perf3-shadow'), SH_C = new THREE.Vector3(1e9, 0, 0); let SH_K = -1;
+const SHSTILL = feature('shadow-still'), SH_M = [new THREE.Vector3(1e9, 0, 0), new THREE.Vector3()]; let shMov = -99;   /* ⚡ shadow-still: докато камерата се движи — без преизчисляване на сенките (~+720 рисувания всеки път); веднъж, щом спре */
+const SHSMALL = feature('shadow-small') ? createShadowSmall() : null; window.__shSmall = () => SHSMALL && SHSMALL.stats();   // ⚡ shadow-small (shadowsmall.js): дребното (< 1,5 м) без сянка
 const PHINT = feature('perf3-hint'), perfHint = { done: (() => { try { return sessionStorage.getItem('stroi-perfhint') === '1'; } catch (e) { return false; } })(), low: 0, t0: 0 };
 function perfTune(rdt) {
   if (PEDLOD) { if (window.__p3off && window.__p3off.ped) PEDLOD.off(); else PEDLOD.tick(camera, rdt); }   // __p3off.ped — сравнение в тестовете
@@ -588,10 +591,13 @@ function perfTune(rdt) {
   if (PEDLOD) { const on = !(window.__p3off && window.__p3off.ped); for (const m of standers) m.matrixWorldAutoUpdate = !on || m.visible; for (const q of peds) q.m.matrixWorldAutoUpdate = !on || q.m.visible; }   // ped-lod: скритите от cityCull (стоящите, пешеходците) — без матриците на костите
   renderer.shadowMap.autoUpdate = false;
   perfFr++;
-  if (PSHADOW && !(window.__p3off && window.__p3off.shadow)) { const nk = city.group ? city.group.children.length : 0; if (!high && (perfFr % 120 === 0 || nk !== SH_K || SH_C.distanceToSquared(controls.target) > 36)) { SH_C.copy(controls.target); SH_K = nk; renderer.shadowMap.needsUpdate = true; } }   /* ⚡ perf3-shadow: сенките — при преместване на камерата (> 6 м), нова/махната сграда и рядко (120 кадъра: кранове, строежи), не през 4 */
+  if (SHSTILL && (SH_M[0].distanceToSquared(camera.position) > 1e-4 || SH_M[1].distanceToSquared(controls.target) > 1e-4)) { shMov = perfFr; SH_M[0].copy(camera.position); SH_M[1].copy(controls.target); }
+  const shHold = SHSTILL && perfFr - shMov < 8;   // камерата се е движила в последните 8 кадъра
+  if (SHSMALL && SHSMALL.tick(scene)) renderer.shadowMap.needsUpdate = true;
+  if (PSHADOW && !(window.__p3off && window.__p3off.shadow)) { const nk = city.group ? city.group.children.length : 0; if (!high && !shHold && (perfFr % 120 === 0 || nk !== SH_K || SH_C.distanceToSquared(controls.target) > 36)) { SH_C.copy(controls.target); SH_K = nk; renderer.shadowMap.needsUpdate = true; } }   /* ⚡ perf3-shadow: сенките — при преместване на камерата (> 6 м), нова/махната сграда и рядко (120 кадъра: кранове, строежи), не през 4 */
   else if (!high && perfFr % (megaBase ? 8 : 4) === 0) renderer.shadowMap.needsUpdate = true;   // статичният град се променя рядко; обновяваме сенките през 4/8 кадъра
   { const d = SH_D.subVectors(sun.position, sun.target.position).normalize();   /* shadow-fix (черните фасади денем): отвисоко (high) сенките не се обновяваха — след скок във времето/залез картата застиваше със старото (ниско) слънце и фасадите оставаха в сянка; сега — при всяка промяна на посоката на слънцето (> ~0,6°) или преместване на целта > 25 м */
-    if (SH_P.dot(d) < 0.99995 || SH_T.distanceToSquared(sun.target.position) > 625) { SH_P.copy(d); SH_T.copy(sun.target.position); renderer.shadowMap.needsUpdate = true; } }
+    if (SH_P.dot(d) < 0.99995 || (!shHold && SH_T.distanceToSquared(sun.target.position) > 625)) { SH_P.copy(d); SH_T.copy(sun.target.position); renderer.shadowMap.needsUpdate = true; } }
   if (high !== perfHigh) {
     perfHigh = high;
     if (city.group) for (const o of city.group.children) if (o.userData.detail) o.visible = !high && liteDet() > 0;   // gfx-lite: „Детайли наоколо“ 0 — и отблизо не
