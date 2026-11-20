@@ -6,7 +6,7 @@
 // const T = createTrams({ THREE, parent, segs: [[[x, z], …]], off: [ox, oz], cut: [x0, x1] | null, proto: { A, B }, cars: () => [{ x, z, yaw }], seed });
 //   T.update(dt, night); T.movers() → [{ x, z, l, w }]; T.info(); T.dispose()
 import { feature } from './lab/feature.js';
-const TGAP = feature('tram-gap'), NOCLIP = feature('no-clip'), TSNAP = feature('tram-snap');   // T: отзив 17.11 — два трамвая минаха един през друг
+const TGAP = feature('tram-gap'), NOCLIP = feature('no-clip'), TSNAP = feature('tram-snap'), TJUN = feature('tram-junction');   // T: отзив 17.11 — два трамвая минаха един през друг
 const SEC = 14.0, GAP = 0.35, STOP = 400, VMAX = 12, ACC = 1.0, DEC = 1.3, ALAT = 0.9;
 
 const d2 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
@@ -108,6 +108,19 @@ export function createTrams(o) {
     for (const [k, Ln] of lanes.entries()) for (let i = 0; i < n; i++) { const A = section(o.proto.A, true), B = section(o.proto.B, false), s0 = (Ln.ln.T - 60) * (i + 0.5 * k) / n + 40;
       const t = { li, k, A, B, s: Math.min(Ln.ln.T - 2, s0), v: 0, wait: rnd() * 6, lane: Ln, nextStop: 0, carT: 0 }; t.nextStop = Ln.stops.findIndex(z => z > t.s + 5); Ln.list.push(t); trams.push(t); } });
   L2.forEach(ls => ls.forEach(Ln => Ln.list.sort((a, b) => b.s - a.s)));
+  // 🔀 tram-junction (собственикът, 20.11: „довърши двете кръстовища“ — София (280, 1600) и (360, 960): линиите се разклоняват под 45–70°,
+  // коловозите им се пресичат и трамваите минаваха един през друг): местата, където коловози на различни линии се доближават под 2,8 м
+  // под ъгъл (пресичане/сливане; успоредните в една посока — не, там се редят един зад друг), са зони; в зоната — по един трамвай:
+  // който я наближи пръв, я запазва, другият спира 3 м преди нея; запазил, но стоящ пред нея над 15 s — губи я (без заклещване)
+  const CZ = [];
+  if (TJUN) { const LA = []; L2.forEach((ls, li) => ls.forEach(Ln => { Ln.cz = []; LA.push(Ln); }));
+    const G = new Map(), gk = (x, z) => Math.floor(x / 6) + ',' + Math.floor(z / 6), dirAt = (P, i) => { const a = P[Math.max(0, i - 2)], b = P[Math.min(P.length - 1, i + 2)], l = d2(a, b) || 1; return [(b[0] - a[0]) / l, (b[1] - a[1]) / l]; };
+    LA.forEach((Ln, ai) => { const P = Ln.ln.P; for (let i = 0; i < P.length; i += 2) { const k = gk(P[i][0], P[i][1]); let b = G.get(k); if (!b) G.set(k, b = []); b.push([ai, i]); } });
+    const clusterAt = (x, z) => { for (let c = 0; c < CZ.length; c++) if (Math.hypot(CZ[c].x - x, CZ[c].z - z) < 12) return c; CZ.push({ x, z, owner: null, oz: null, ot: 0 }); return CZ.length - 1; };
+    LA.forEach((Ln, ai) => { const P = Ln.ln.P, seen = new Map();
+      for (let i = 0; i < P.length; i += 2) { const q = P[i], ci = Math.floor(q[0] / 6), cj = Math.floor(q[1] / 6), da = dirAt(P, i); let hit = false;
+        for (let di = -1; di <= 1 && !hit; di++) for (let dj = -1; dj <= 1 && !hit; dj++) for (const [bi, j] of G.get((ci + di) + ',' + (cj + dj)) || []) { if (bi === ai) continue; const r = LA[bi].ln.P[j]; if (d2(q, r) > 2.8) continue; const db = dirAt(LA[bi].ln.P, j); if (da[0] * db[0] + da[1] * db[1] > 0.966) continue; hit = true; break; }
+        if (!hit) continue; const c = clusterAt(q[0], q[1]), z = seen.get(c), sv = Ln.ln.L[i]; if (z) { z.s0 = Math.min(z.s0, sv); z.s1 = Math.max(z.s1, sv); } else { const nz = { c, s0: sv, s1: sv }; seen.set(c, nz); Ln.cz.push(nz); } } }); }
   const place = t => { const ln = t.lane.ln, f = s => at(ln, s);
     for (const [S, c] of [[t.A, t.s - SEC / 2], [t.B, t.s - SEC * 1.5 - GAP]]) { const p = f(c), a = f(c + SEC / 2 - 2), b = f(c - SEC / 2 + 2); S.s.position.set(p[0], 0.12, p[1]); S.s.rotation.y = Math.atan2(a[0] - b[0], a[1] - b[1]); } };
   trams.forEach(place);
@@ -146,6 +159,12 @@ export function createTrams(o) {
             goal = Math.min(goal, Math.max(t.s, t.s + fw - 4)); }
           if (goal < g0 && t.v < 0.2) { if ((t.tgT = (t.tgT || 0) + dt) > 25) { t.tgT = 0; t.tgOff = 12; } } else t.tgT = 0; }
         t.cg = carGap; t.ncr = CR.length;   // no-clip: за __dbg (какво вижда трамваят)
+        if (TJUN && Ln.cz && Ln.cz.length) { const look = t.s + 8 + t.v * t.v / (2 * DEC);   // 🔀 tram-junction: зоните пред мен (и тази, в която съм)
+          for (const z of Ln.cz) { const C = CZ[z.c]; if (C.owner === t && t.s - LEN - 3 > z.s1) { C.owner = null; continue; }   // минах цял — освобождавам
+            if (z.s1 + LEN + 3 < t.s || z.s0 > look) continue;
+            if (C.owner && C.owner !== t && C.owner.lane !== C.ol) C.owner = null;   // обърнал в края на линията — вече не е тук
+            if (C.owner && C.owner !== t) { const w = C.owner, wz = C.oz; if (w.v < 0.2 && wz && w.s < wz.s0 - 1 && (C.ot += dt) > 15) { C.owner = null; } else { if (t.s < z.s0) goal = Math.min(goal, Math.max(t.s, z.s0 - 3)); continue; } }
+            if (C.owner !== t) { C.owner = t; C.oz = z; C.ol = Ln; C.ot = 0; } } }
         if (carGap < 1e9) { if (!NOCLIP || t.v < 0.3) t.carT += dt; if (t.carT < (NOCLIP ? (t.blkMut ? 8 : 30) : 6)) goal = Math.min(goal, t.s + carGap); } else t.carT = 0;   // no-clip: чака до 20 s (иначе — 6 s и минаваше през колата); времето тече само докато стои — в гъстия трафик не изтичаше, докато пълзи зад колите
         const d = goal - t.s; let want = Math.min(vAt(ln, t.s + 4), vAt(ln, t.s + 20) + 2, Math.sqrt(2 * DEC * Math.max(0, d)));
         t.v = want > t.v ? Math.min(want, t.v + ACC * dt) : Math.max(want, t.v - DEC * 1.6 * dt); t.s = Math.max(t.s, Math.min(goal, t.s + t.v * dt));   // никога назад
@@ -155,7 +174,7 @@ export function createTrams(o) {
     const nk = night ? 1 : 0; if (nk !== update.nk) { update.nk = nk; for (const t of trams) for (const S of [t.A, t.B]) { S.win.forEach(w => { w.visible = !!nk; }); S.lt.forEach(h => { h.visible = !!nk || S === t.A; }); } }
   }
   const movers = () => { const out = []; for (const t of trams) for (const S of [t.A, t.B]) { const y = S.s.rotation.y, sx = Math.sin(y), cz = Math.cos(y); for (const k of [-4.5, 0, 4.5]) out.push({ x: S.s.position.x + sx * k, z: S.s.position.z + cz * k, l: 5, w: 2.6, v: t.v, tram: t, carT: t.carT }); } return out; };
-  const info = () => ({ lines: lines.length, km: +(lines.reduce((a, p) => a + lenOf(p), 0) / 1000).toFixed(1), trams: trams.length, moving: trams.filter(t => t.v > 0.5).length, stops: L2.reduce((a, ls) => a + ls[0].stops.length, 0), first: trams[0] ? { x: Math.round(trams[0].A.s.position.x), z: Math.round(trams[0].A.s.position.z) } : null });
+  const info = () => ({ zones: CZ.length, lines: lines.length, km: +(lines.reduce((a, p) => a + lenOf(p), 0) / 1000).toFixed(1), trams: trams.length, moving: trams.filter(t => t.v > 0.5).length, stops: L2.reduce((a, ls) => a + ls[0].stops.length, 0), first: trams[0] ? { x: Math.round(trams[0].A.s.position.x), z: Math.round(trams[0].A.s.position.z) } : null });
   update(0.01, false);
   return { group: g, update, movers, info, trams, lines, dispose() { o.parent.remove(g); own.forEach(x => x.dispose && x.dispose()); } };
 }
