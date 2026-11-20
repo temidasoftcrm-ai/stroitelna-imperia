@@ -8,6 +8,7 @@
 //   import { mergeVeh } from './vehmerge.js';  mergeVeh(шаблон, { clips: [AnimationClip…] }) — веднъж, преди клонирането
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+const GETC = ['getX', 'getY', 'getZ', 'getW'];   // three r160: BufferAttribute няма getComponent (от r161)
 
 const KEEP_RX = /^(wheel_|lamp_|siren|beacon|door|semi|ladder|nav_|strobe)/i;   // ladder — стълбата на пожарната (firesim.js я търси по име)
 const plainRender = THREE.Mesh.prototype.onBeforeRender;
@@ -16,7 +17,7 @@ const plainRender = THREE.Mesh.prototype.onBeforeRender;
 function flat(g) {
   for (const n of Object.keys(g.attributes)) { const a = g.attributes[n];
     if (a.isInterleavedBufferAttribute || a.normalized || !(a.array instanceof Float32Array)) { const f = new Float32Array(a.count * a.itemSize);
-      for (let i = 0; i < a.count; i++) for (let c = 0; c < a.itemSize; c++) f[i * a.itemSize + c] = a.getComponent(i, c);
+      for (let i = 0; i < a.count; i++) for (let c = 0; c < a.itemSize; c++) f[i * a.itemSize + c] = a[GETC[c]](i);
       g.setAttribute(n, new THREE.BufferAttribute(f, a.itemSize)); } }
   return g;
 }

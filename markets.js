@@ -6,6 +6,7 @@ import { canvasTex } from './texdata.js';   // fac-data (T1): статичнит
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { feature } from './lab/feature.js';
+const GETC = ['getX', 'getY', 'getZ', 'getW'];   // three r160: BufferAttribute няма getComponent (от r161)
 // ⚡ market-bake: частите само с цвят (без текстура, непрозрачни) — в една геометрия с цвят по връх. stall-b („stand“): 20 материала → 1 рисуване.
 const MBAKE = feature('market-bake');
 let MB_MAT = null;
@@ -13,7 +14,7 @@ function bakeParts(parts) {
   const plain = parts.filter(([g, m]) => m && !Array.isArray(m) && !m.map && !m.transparent && m.color && !(m.emissive && m.emissive.getHex())), rest = parts.filter(p => !plain.includes(p));
   if (plain.length < 2) return parts;
   const geos = plain.map(([g0, m]) => { const g = g0.index ? g0.clone() : g0.clone(); for (const n of Object.keys(g.attributes)) if (n !== 'position' && n !== 'normal') g.deleteAttribute(n);
-    for (const n of Object.keys(g.attributes)) { const a = g.attributes[n]; if (a.isInterleavedBufferAttribute || a.normalized || !(a.array instanceof Float32Array)) { const f = new Float32Array(a.count * a.itemSize); for (let i = 0; i < a.count; i++) for (let c = 0; c < a.itemSize; c++) f[i * a.itemSize + c] = a.getComponent(i, c); g.setAttribute(n, new THREE.BufferAttribute(f, a.itemSize)); } }
+    for (const n of Object.keys(g.attributes)) { const a = g.attributes[n]; if (a.isInterleavedBufferAttribute || a.normalized || !(a.array instanceof Float32Array)) { const f = new Float32Array(a.count * a.itemSize); for (let i = 0; i < a.count; i++) for (let c = 0; c < a.itemSize; c++) f[i * a.itemSize + c] = a[GETC[c]](i); g.setAttribute(n, new THREE.BufferAttribute(f, a.itemSize)); } }
     g.morphAttributes = {}; g.clearGroups(); const k = g.attributes.position.count, col = new Float32Array(k * 3); for (let i = 0; i < k; i++) col.set([m.color.r, m.color.g, m.color.b], i * 3); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); return g; });
   const ix = geos.every(g => g.index), L = ix ? geos : geos.map(g => g.index ? g.toNonIndexed() : g); let mg = null; try { mg = mergeGeometries(L, false); } catch (e) { mg = null; }
   if (!mg) return parts;

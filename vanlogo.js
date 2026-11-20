@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { feature } from './lab/feature.js';
+const GETC = ['getX', 'getY', 'getZ', 'getW'];   // three r160: BufferAttribute няма getComponent (от r161)
 
 export const VANS = {   // [файл, истинска дължина в м]
   sprinter: ['assets/heavy/vans/van-sprinter.glb', 5.9],
@@ -68,7 +69,7 @@ function shutDoors(van, clip) {
   van.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(van.matrixWorld).invert(), M = new THREE.Matrix4(), by = new Map();
   for (const d of top) d.traverse(m => { if (!m.isMesh || m.isSkinnedMesh || Array.isArray(m.material) || !m.visible || m.children.length) return;
     M.multiplyMatrices(inv, m.matrixWorld); if (M.determinant() <= 0) return; const g = m.geometry.clone(); for (const n of Object.keys(g.attributes)) { const a = g.attributes[n];
-      if (a.isInterleavedBufferAttribute || a.normalized || !(a.array instanceof Float32Array)) { const f = new Float32Array(a.count * a.itemSize); for (let i = 0; i < a.count; i++) for (let c = 0; c < a.itemSize; c++) f[i * a.itemSize + c] = a.getComponent(i, c); g.setAttribute(n, new THREE.BufferAttribute(f, a.itemSize)); } }
+      if (a.isInterleavedBufferAttribute || a.normalized || !(a.array instanceof Float32Array)) { const f = new Float32Array(a.count * a.itemSize); for (let i = 0; i < a.count; i++) for (let c = 0; c < a.itemSize; c++) f[i * a.itemSize + c] = a[GETC[c]](i); g.setAttribute(n, new THREE.BufferAttribute(f, a.itemSize)); } }
     g.morphAttributes = {}; g.clearGroups(); g.applyMatrix4(M); const k = m.material.uuid + '|' + Object.keys(g.attributes).sort().join(',') + (g.index ? 'i' : 'n') + m.castShadow + m.receiveShadow;
     (by.get(k) || by.set(k, []).get(k)).push([g, m]); });
   const shut = new THREE.Group(); shut.name = 'doorsShut';
