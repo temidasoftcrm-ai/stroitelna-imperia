@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { groundMat } from './cityground.js';
 import { feature } from './lab/feature.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { fwFx, fwWaterMat } from './fountainwater.js';   // ⛲ fountain-water: вода, струи и пръски във фонтаните
 
 export const PLAZA_KIND = { romanstadium: 'ruin', colosseo: 'ruin', colosseo3: 'ruin', colosseo4: 'ruin', nevsky: 'temple', stpeter: 'temple', hagia: 'temple', bluemosque: 'temple',
@@ -46,6 +47,30 @@ function roadMask(streets, cx, cz, R) {
     for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], ax = a.x ?? a[0], az = a.z ?? a[1], bx = b.x ?? b[0], bz = b.z ?? b[1];
       if (Math.min(ax, bx) > cx + R + hw || Math.max(ax, bx) < cx - R - hw || Math.min(az, bz) > cz + R + hw || Math.max(az, bz) < cz - R - hw) continue; P.push([ax, az, bx, bz, hw]); } }
   return (x, z) => { for (const [ax, az, bx, bz, hw] of P) { const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2)), px = ax + dx * t - x, pz = az + dz * t - z; if (px * px + pz * pz < hw * hw) return true; } return false; };
+}
+
+// ⚡ plaza-bake: неподвижните части на площада с обикновен цвят (пейки, стълбове, дървета, сергии, навеси, въжета, сандъци, храсти, цветя)
+// — в една геометрия с цвят по връх и един общ материал. Мерене (20.11, Пловдив): ~11 рисувания на площад → 2 (металните стълбове отделно).
+// Не се пипат: главите на лампите (нощем светят и движат нощта на табелата и водата), водата, табелата, сиянието, настилката, кафенето, минувачите.
+const BAKE = feature('plaza-bake');
+let BMAT = null;
+function bake(G, M) {
+  const keep = new Set([M.bench, M.trunk, M.crown, M.stall, M.rope, M.tub, M.bush, ...M.awning, ...M.flower]), metal = new Set([M.pole]);
+  const bins = [[keep, []], [metal, []]], rm = [], mx = new THREE.Matrix4(), c = new THREE.Color();
+  const add = (list, geo, mat, m) => { const g = geo.clone(); g.applyMatrix4(m); for (const n of Object.keys(g.attributes)) if (n !== 'position' && n !== 'normal') g.deleteAttribute(n);
+    c.copy(mat.color);   /* color на материала вече е линеен — както и цветът по връх */ const n = g.attributes.position.count, col = new Float32Array(n * 3); for (let i = 0; i < n; i++) col.set([c.r, c.g, c.b], i * 3); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    list.push(g); };
+    for (const ch of G.children) { if (!ch.isMesh || ch.isSkinnedMesh || ch.children.length || Array.isArray(ch.material)) continue; const bin = bins.find(([set]) => set.has(ch.material)); if (!bin) continue;
+    ch.updateMatrix();
+    if (ch.isInstancedMesh) { for (let i = 0; i < ch.count; i++) { ch.getMatrixAt(i, mx); add(bin[1], ch.geometry, ch.material, mx.premultiply(ch.matrix)); } }
+    else add(bin[1], ch.geometry, ch.material, ch.matrix);
+    rm.push(ch); }
+  if (!rm.length) return;
+  if (!BMAT) BMAT = [new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.4 })];
+  bins.forEach(([, list], k) => { if (!list.length) return; const ix = list.every(g => g.index), L = ix ? list : list.map(g => g.index ? g.toNonIndexed() : g);
+    const mg = mergeGeometries(L, false); L.forEach(g => g.dispose()); if (!mg) throw new Error('merge');
+    const me = new THREE.Mesh(mg, BMAT[k]); me.castShadow = true; me.receiveShadow = true; me.name = 'plazaBaked'; me.userData.bakedOf = list.length; G.add(me); });
+  for (const ch of rm) { G.remove(ch); ch.geometry.dispose(); if (ch.isInstancedMesh) ch.dispose(); }
 }
 
 function inst(geo, mat, list) {   // list: [[x, y, z, sx, sy, sz, ry]]
@@ -147,6 +172,7 @@ export function lmPlaza(o, deps = {}) {
   // нощ: лампите и табелата светят (сградата — със своето осветяване; адитивните „прожектори“ изглеждаха като полупрозрачни листове)
   const night = deps.night || (() => 0);
   M.head.onBeforeRender = () => { const n = night(); M.head.emissiveIntensity = 2.2 * n; M.sign.emissiveIntensity = 0.8 * n; M.water.emissiveIntensity = 0.35 * n;  };
+  if (BAKE) try { bake(G, M); } catch (e) { console.warn('plaza-bake', e); }
   G.userData.plaza = { type, lamps: lamps.length, benches: benches.length, trees: trees.length, stalls: stalls.length, cells: pos.length / 18, Hx: Math.round(Hx), Hz: Math.round(Hz), walkers: walk.length, kind: o.kind };
   return G;
 }
