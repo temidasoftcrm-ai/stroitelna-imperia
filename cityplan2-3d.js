@@ -783,7 +783,10 @@ export function buildPlan2View(P, opts = {}) {
   const deadCut = (n, extra = 0, med = false) => { if (RG && n.kind === 'round') { const o = P.rounds.find(r => r.node === n.id).outer; return med ? o + 14 : o + 9.6; }   /* кръгово: линиите — след зебрата, ивицата — след разделителното островче */
     const b = bendOf(n); if (b) return b.L; const t = endType(n); return !t ? 0 : t.kind === 'bulb' ? t.r + extra : t.kind === 'bar' ? 1.5 + extra : t.kind === 'join' ? t.cut + extra : 0; };
   // възел с два клона (една улица завива): дъга с постоянна ширина вместо чупка — клоновете се режат на L = R·tan(θ/2) (R ≤ 15 м, L ≤ 40% от късия)
-  const BN = new Map(), bendOf = n => { if (!RG || n.arms.length !== 2 || n.kind === 'round') return null; if (BN.has(n.id)) return BN.get(n.id);
+  // 🛣️ osm-bends (backlog 18.11: „пътищата на картите с истински градове — заобляне на завоите“): чупката, където две улици с еднаква ширина се срещат
+  // под ъгъл, и по истинските карти (OSM) е дъга — като на генерираните (road-geo); краищата на задънените — както досега
+  const OB = !RG && !!P.osm && feature('osm-bends');
+  const BN = new Map(), bendOf = n => { if ((!RG && !OB) || n.arms.length !== 2 || n.kind === 'round') return null; if (BN.has(n.id)) return BN.get(n.id);
     const [a, b] = n.arms, ra = P.roads[a.road], rb = P.roads[b.road]; let t = null;
     const gap = Math.abs(Math.atan2(Math.sin(a.angle - b.angle), Math.cos(a.angle - b.angle))), th = Math.PI - gap;
     if (th > 0.15 && a.road !== b.road && Math.abs(ra.w - rb.w) < 0.6 && !ra.median === !rb.median && !ra.noCars && !rb.noCars) {
@@ -831,7 +834,7 @@ export function buildPlan2View(P, opts = {}) {
       As.push(disc(e[0], e[1], r, 0.075)); W.push(ribbon(arcPts(e[0], e[1], r + w / 2, t.ang + aW, t.ang + Math.PI * 2 - aW), w, 0.044)); Cb.push(ribbon(arcPts(e[0], e[1], r + 0.15, t.ang + aC, t.ang + Math.PI * 2 - aC), 0.3, 0.09)); continue; }
     BARS.push(t);   /* 'bar' — прав край: бариерата (обект) се слага след сливането */
   }
-  if (RG) for (const n of ND) { const b = bendOf(n); if (!b) continue;   /* дъгата на завоя: асфалт, тротоари, бордюри, ивица и маркировка — като на улицата */
+  if (RG || OB) for (const n of ND) { const b = bendOf(n); if (!b) continue;   /* дъгата на завоя: асфалт, тротоари, бордюри, ивица и маркировка — като на улицата */
     const pt = (arm, rd) => { const T = rd.L[rd.L.length - 1]; return atS(rd, arm.end ? T - b.L : b.L).p; }, pA = pt(b.a, b.ra), pB = pt(b.b, b.rb), rd = b.ra, arc = bez(pA, [n.x, n.z], pB, 14);
     As.push(ribbon(arc, rd.w, 0.07));
     for (const sg of [1, -1]) { W.push(ribbon(offLine(arc, sg * (rd.w / 2 + rd.walk / 2)), rd.walk, 0.04)); if (!P.osm || rd.cls !== 'street') Cb.push(ribbon(offLine(arc, sg * (rd.w / 2 + 0.15)), 0.3, 0.09)); }
@@ -839,7 +842,7 @@ export function buildPlan2View(P, opts = {}) {
     if (rd.cls === 'street' && !rd.median) dashed(arc, 3, 4, 0.18, 0.12, Pt);
     else if (rd.cls !== 'street') for (const sg of [1, -1]) { Pt.push(ribbon(offLine(arc, sg * (rd.w / 2 - 0.4)), 0.15, 0.12)); if (rd.lanes[0] > 1) dashed(offLine(arc, sg * ((rd.median || 0) / 2 + rd.laneW)), 3, 6, 0.15, 0.12, Pt); }
   }
-  else for (const n of ND) { if (n.arms.length !== 1 || !ends.inside(n.x, n.z)) continue; const a = n.arms[0], rd = P.roads[a.road], pts = rd.pts, e = a.end ? pts[pts.length - 1] : pts[0], pr = a.end ? pts[pts.length - 2] : pts[1];
+  if (!RG) for (const n of ND) { if (n.arms.length !== 1 || !ends.inside(n.x, n.z)) continue; const a = n.arms[0], rd = P.roads[a.road], pts = rd.pts, e = a.end ? pts[pts.length - 1] : pts[0], pr = a.end ? pts[pts.length - 2] : pts[1];
     if (ends.onRoad(e, rd.id)) continue;   // #21: стъпва върху друга улица — без кръг
     const q = ends.near(e, rd.id, [e[0] - pr[0], e[1] - pr[1]]);
     if (q) { As.push(ribbon([e, q], rd.w, 0.072)); W.push(ribbon([e, q], rd.w + 2 * rd.walk, 0.044)); }
