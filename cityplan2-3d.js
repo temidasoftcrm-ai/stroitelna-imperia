@@ -33,6 +33,10 @@ export function mats() {
   const PAVE_T = ctex(256, (g, n) => { g.fillStyle = '#cbc6ba'; g.fillRect(0, 0, n, n); g.strokeStyle = 'rgba(120,112,100,0.55)'; g.lineWidth = 2; for (let i = 0; i <= 4; i++) { g.beginPath(); g.moveTo(i * n / 4, 0); g.lineTo(i * n / 4, n); g.moveTo(0, i * n / 4); g.lineTo(n, i * n / 4); g.stroke(); } for (let i = 0; i < 2500; i++) { g.fillStyle = `rgba(90,85,75,${Math.random() * 0.15})`; g.fillRect(Math.random() * n, Math.random() * n, 2, 2); } });
   const COB_T = ctex(256, (g, n) => { g.fillStyle = '#9d8f7c'; g.fillRect(0, 0, n, n); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const v = 130 + Math.random() * 40 | 0; g.fillStyle = `rgb(${v},${v - 12},${v - 28})`; g.fillRect(x * 16 + (y % 2) * 8 + 1, y * 16 + 1, 14, 14); } }, 3);
   MAT.asph.map = ASPH_T; MAT.asph.color.setHex(0xffffff); MAT.walk.map = PAVE_T; MAT.walk.color.setHex(0xffffff);
+  // 🚦 jn-flick (backlog 18.11: „трептенето на кръстовищата“): плочата на кръстовището (0,075) лежи 5 мм над асфалта на улиците (0,070) в същия
+  // материал — с камера near = 1 точността на дълбочината е ~5 мм на 300 м, ~15 мм на 500 м (OSM изгледът — до 900 м) → трептят. Кръстовищата,
+  // краищата и кръговите — в свой материал с по-силно изместване (в стъпки на дълбочината — еднакво на всяко разстояние); разделителите и маркировката — още по-горе
+  if (JNF) { MAT.asphJ = MAT.asph.clone(); Object.assign(MAT.asphJ, { polygonOffsetFactor: -2, polygonOffsetUnits: -4 }); Object.assign(MAT.median, { polygonOffsetFactor: -3, polygonOffsetUnits: -6 }); Object.assign(MAT.paint, { polygonOffsetFactor: -4, polygonOffsetUnits: -8 }); }
   Object.assign(MAT, { urban: M(0xcdbf9f), curb: M(0xe2ded5), apron: new THREE.MeshStandardMaterial({ map: COB_T, roughness: 0.95 }), flower: [M(0xd8434b), M(0xf2c230), M(0x9b59c9)], stone: M(0xb9b2a4), wet: new THREE.MeshStandardMaterial({ color: 0x5aa6d6, roughness: 0.1, metalness: 0.2 }) });
   for (const k of ['curb', 'apron']) Object.assign(MAT[k], { polygonOffset: true, polygonOffsetFactor: -5, polygonOffsetUnits: -5 });
   return MAT;
@@ -77,7 +81,7 @@ export function quad(a, b, c, d, y) { return { pos: [a[0], y, a[1], b[0], y, b[1
 // fac-reup (55): фасадите на фоновите сгради (платна 128–512 px, InstancedMesh) понякога излизаха черни — стените, не покривите
 // (второ зареждане в същия профил, Париж и Вашингтон; в JS текстурите и материалите са същите като при нормалните). Платната се качват
 // наново във видеокартата 3, 12 и 40 s след строежа и след всяко пълнене (евтино — малки са); GLB картинките (memfix tex-free) не се пипат.
-const FREUP = feature('fac-reup'), RU_AT = [3, 12, 40, Infinity];
+const JNF = feature('jn-flick'), FREUP = feature('fac-reup'), RU_AT = [3, 12, 40, Infinity];
 // fac-cpu (T1, 26.10): платната на фасадите — в паметта на процесора (willReadFrequently), не в ускорения 2D canvas: Chrome понякога
 // изхвърля съдържанието на ускорените платна (при натоварена видеокарта) — те остават празни/черни и fac-reup няма какво да качи наново
 export const FCPU = { willReadFrequently: true };
@@ -764,7 +768,7 @@ export function buildPlan2View(P, opts = {}) {
   // ---- улиците, кръстовищата, кръговите и маркировката — на пръстени около фокуса (opts.focus, иначе центъра): всеки пръстен — свои слети
   // мрежи; при opts.progressive първият пръстен е веднага, другите — на порции (pump). RD/ND/TU/RO — пътищата, възлите, обратите, кръговите на пръстена.
   function* streets(RD, ND, TU, RO) {
-  const W = [], As = [], Md = [], Pt = [], Is = [], Cb = [];
+  const W = [], As = [], Md = [], Pt = [], Is = [], Cb = [], AJ = [], AsJ = JNF ? AJ : As;   // jn-flick: AsJ — кръстовищата, краищата и кръговите
   // пътят спира на ръба на кръговото; разделителната ивица — на ръба на всяко кръстовище
   const cut = (pts, n0, r0, n1, r1) => pts.filter(p => Math.hypot(p[0] - n0.x, p[1] - n0.z) >= r0 && Math.hypot(p[0] - n1.x, p[1] - n1.z) >= r1);
   // срезовете по дължината на пътя: кръгово — до пръстена; кръстовище — до очертанието му (arm.t от плана, + отместване)
@@ -820,7 +824,7 @@ export function buildPlan2View(P, opts = {}) {
   const bez = (p0, c, p1, m = 10) => Array.from({ length: m + 1 }, (_, k) => { const t = k / m, u = 1 - t; return [u * u * p0[0] + 2 * u * t * c[0] + t * t * p1[0], u * u * p0[1] + 2 * u * t * c[1] + t * t * p1[1]]; });
   const Ap = [], Fl = [[], [], []], rTrees = [], BARS = [];
   for (const n of ND) { if (n.arms.length < 3 || n.kind === 'round' || !n.outline) continue; yield 0;
-    As.push(fan(n.x, n.z, n.outline, 0.075));
+    AsJ.push(fan(n.x, n.z, n.outline, 0.075));
     for (const c of n.corners) { const curve = c.c ? bez(c.p0, c.c, c.p1) : [c.p0, c.p1], ww = Math.min(P.roads[n.arms[c.a].road].walk, P.roads[n.arms[c.b].road].walk);
       const mid = curve[curve.length >> 1], tst = offLine(curve, 1)[curve.length >> 1], sg = Math.hypot(tst[0] - n.x, tst[1] - n.z) > Math.hypot(mid[0] - n.x, mid[1] - n.z) ? 1 : -1;
       W.push(ribbon(offLine(curve, sg * ww / 2), ww, 0.045)); Cb.push(ribbon(offLine(curve, sg * 0.15), 0.3, 0.09)); }
@@ -831,7 +835,7 @@ export function buildPlan2View(P, opts = {}) {
     if (t.kind === 'cont') { As.push(ribbon([e, t.q], rd.w, 0.072)); W.push(ribbon([e, t.q], rd.w + 2 * rd.walk, 0.044)); continue; }
     if (t.kind === 'bulb') {   /* компактна площадка: асфалтов кръг, тротоарът и бордюрът — дъга без входа (не пресичат улицата) */
       const r = t.r, w = rd.walk, aW = Math.asin(Math.min(0.99, (rd.w / 2 + w / 2) / (r + w / 2))), aC = Math.asin(Math.min(0.99, (rd.w / 2) / (r + 0.15)));
-      As.push(disc(e[0], e[1], r, 0.075)); W.push(ribbon(arcPts(e[0], e[1], r + w / 2, t.ang + aW, t.ang + Math.PI * 2 - aW), w, 0.044)); Cb.push(ribbon(arcPts(e[0], e[1], r + 0.15, t.ang + aC, t.ang + Math.PI * 2 - aC), 0.3, 0.09)); continue; }
+      AsJ.push(disc(e[0], e[1], r, 0.075)); W.push(ribbon(arcPts(e[0], e[1], r + w / 2, t.ang + aW, t.ang + Math.PI * 2 - aW), w, 0.044)); Cb.push(ribbon(arcPts(e[0], e[1], r + 0.15, t.ang + aC, t.ang + Math.PI * 2 - aC), 0.3, 0.09)); continue; }
     BARS.push(t);   /* 'bar' — прав край: бариерата (обект) се слага след сливането */
   }
   if (RG || OB) for (const n of ND) { const b = bendOf(n); if (!b) continue;   /* дъгата на завоя: асфалт, тротоари, бордюри, ивица и маркировка — като на улицата */
@@ -846,8 +850,8 @@ export function buildPlan2View(P, opts = {}) {
     if (ends.onRoad(e, rd.id)) continue;   // #21: стъпва върху друга улица — без кръг
     const q = ends.near(e, rd.id, [e[0] - pr[0], e[1] - pr[1]]);
     if (q) { As.push(ribbon([e, q], rd.w, 0.072)); W.push(ribbon([e, q], rd.w + 2 * rd.walk, 0.044)); }
-    else { const r = Math.max(5.5, rd.w / 2 + 2.5); W.push(disc(n.x, n.z, r + rd.walk, 0.045)); As.push(disc(n.x, n.z, r, 0.075)); Cb.push(ribbon(circle(n.x, n.z, r + 0.15, 32), 0.3, 0.09)); } }
-  if (!RG) for (const t of TU) { W.push(disc(t.x, t.z, t.r + 2.5, 0.045)); As.push(disc(t.x, t.z, t.r, 0.075)); }   /* road-geo: без кръговете на плана (P.turns) — видът на края е по-горе */
+    else { const r = Math.max(5.5, rd.w / 2 + 2.5); W.push(disc(n.x, n.z, r + rd.walk, 0.045)); AsJ.push(disc(n.x, n.z, r, 0.075)); Cb.push(ribbon(circle(n.x, n.z, r + 0.15, 32), 0.3, 0.09)); } }
+  if (!RG) for (const t of TU) { W.push(disc(t.x, t.z, t.r + 2.5, 0.045)); AsJ.push(disc(t.x, t.z, t.r, 0.075)); }   /* road-geo: без кръговете на плана (P.turns) — видът на края е по-горе */
   // маркировка по пътищата: бордюри до среза; булевард — крайни линии, линии до разделителната ивица, прекъснати между лентите (до стоп линията)
   for (const rd of RD) { yield 0;
     const nA = P.nodes[rd.from], nB = P.nodes[rd.to];
@@ -873,7 +877,7 @@ export function buildPlan2View(P, opts = {}) {
     const lane = Math.min(5.5, r.outer - 6), rin = r.outer - lane, ri = rin - 2, sg = P.drive === 'R' ? 1 : -1, TAU = Math.PI * 2;
     const gaps = n.arms.map(a => { const rd = P.roads[a.road]; return [a.angle, Math.asin(Math.min(0.95, (rd.w / 2 + 0.6) / r.outer))]; });
     const arcs = (rr, pad = 0) => { const A = gaps.map(([c, h]) => [c - h - pad, c + h + pad]).sort((p, q) => p[0] - q[0]), out = []; for (let k = 0; k < A.length; k++) { const a0 = A[k][1], a1 = A[(k + 1) % A.length][0] + (k + 1 === A.length ? TAU : 0); if (a1 - a0 > 0.05) out.push(arcPts(r.x, r.z, rr, a0, a1, Math.max(6, Math.ceil((a1 - a0) * rr / 2)))); } return out; };
-    W.push(disc(r.x, r.z, r.outer + 2.5, 0.045)); As.push(disc(r.x, r.z, r.outer, 0.075, rin - 0.1));
+    W.push(disc(r.x, r.z, r.outer + 2.5, 0.045)); AsJ.push(disc(r.x, r.z, r.outer, 0.075, rin - 0.1));
     for (const c of arcs(r.outer + 0.15)) Cb.push(ribbon(c, 0.3, 0.09)); for (const c of arcs(r.outer - 0.45, 0.04)) Pt.push(ribbon(c, 0.15, 0.12));
     Ap.push(disc(r.x, r.z, rin, 0.1, ri)); Cb.push(ribbon(circle(r.x, r.z, rin + 0.05), 0.22, 0.11));   /* престилката: паваж, нисък бордюр (камионите минават по нея) */
     const wall = new THREE.Mesh(new THREE.CylinderGeometry(ri, ri, 0.34, 64, 1, true), MAT.curb); wall.position.set(r.x, 0.17, r.z); wall.receiveShadow = true; G.add(wall);   /* повдигнатият остров */
@@ -901,7 +905,7 @@ export function buildPlan2View(P, opts = {}) {
   // кръгови: пръстен с бордюри и линии, павирана ивица около острова, трева с цветя и дървета, фонтан; на входовете — островче, „отстъпи“, зебра
   for (const r of RO) { yield 0; const n = P.nodes[r.node];
     if (RG) { roundReal(r, n); continue; }
-    W.push(disc(r.x, r.z, r.outer + 2.5, 0.045)); As.push(disc(r.x, r.z, r.outer, 0.075, r.island));
+    W.push(disc(r.x, r.z, r.outer + 2.5, 0.045)); AsJ.push(disc(r.x, r.z, r.outer, 0.075, r.island));
     Cb.push(ribbon(circle(r.x, r.z, r.outer + 0.15), 0.3, 0.09)); Pt.push(ribbon(circle(r.x, r.z, r.outer - 0.45), 0.15, 0.12)); Pt.push(ribbon(circle(r.x, r.z, r.island + 0.4), 0.15, 0.12));
     Ap.push(disc(r.x, r.z, r.island, 0.12, r.island - 2.4)); Cb.push(ribbon(circle(r.x, r.z, r.island), 0.3, 0.14)); Cb.push(ribbon(circle(r.x, r.z, r.island - 2.4), 0.3, 0.2)); Is.push(disc(r.x, r.z, r.island - 2.4, 0.2));
     const bedR = (r.island - 2.4) * 0.72; for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; Fl[k % 3].push(disc(r.x + Math.cos(a) * bedR, r.z + Math.sin(a) * bedR, 0.9 + (r.island > 10 ? 0.6 : 0), 0.24, 0, 12)); if (k % 2 === 0 && r.island > 10) rTrees.push([r.x + Math.cos(a + 0.3) * bedR * 0.7, r.z + Math.sin(a + 0.3) * bedR * 0.7, 4.5]); }
@@ -917,7 +921,7 @@ export function buildPlan2View(P, opts = {}) {
   }
   if (rTrees.length) trees.push(...rTrees);
   for (const t of BARS) G.add(barrier(t.e, t.ang, t.rd.w));   /* road-geo: бариерите на правите краища */
-  for (const [arr, mat] of [[As, MAT.asph], [W, MAT.walk], [Cb, MAT.curb], [Pt, MAT.paint], [Md, MAT.median], [Is, MAT.island], [Ap, MAT.apron], ...Fl.map((f, i) => [f, MAT.flower[i]])]) if (arr.length) { G.add(merge(arr, mat)); yield 0; }   // сливането — по материал, на стъпки
+  for (const [arr, mat] of [[As, MAT.asph], ...(JNF ? [[AJ, MAT.asphJ]] : []), [W, MAT.walk], [Cb, MAT.curb], [Pt, MAT.paint], [Md, MAT.median], [Is, MAT.island], [Ap, MAT.apron], ...Fl.map((f, i) => [f, MAT.flower[i]])]) if (arr.length) { G.add(merge(arr, mat)); yield 0; }   // сливането — по материал, на стъпки
   }
   // дърветата на парковете (големите места park) и на островите на кръговите
   const parkTrees = () => { const onAsph = feature('tree-road') ? asphaltTest(P) : () => false;   // tree-road: OSM парковете се пресичат от пътища
