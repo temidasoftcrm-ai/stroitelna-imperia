@@ -4,6 +4,8 @@
 //   const van = crewVan(gltf.scene, { brand: { nm, col, ico }, len: 5.9 }) → THREE.Group (дължината по z, предницата към +z, колелата на y = 0)
 import * as THREE from 'three';
 import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { feature } from './lab/feature.js';
 
 export const VANS = {   // [файл, истинска дължина в м]
   sprinter: ['assets/heavy/vans/van-sprinter.glb', 5.9],
@@ -53,5 +55,25 @@ export function addVanLogo(van, brand) {
 // вратите на спринтера: open(true/false) — пуска анимацията напред/назад; mixer.update(dt) — от играта
 export function vanDoors(van) {
   const clips = VAN_CLIPS[van.userData.van]; if (!clips) return null; const mixer = new THREE.AnimationMixer(van), act = mixer.clipAction(clips[0]); act.setLoop(THREE.LoopOnce, 1); act.clampWhenFinished = true;
-  return { mixer, open(on) { act.paused = false; act.timeScale = on ? 1 : -1; if (!act.isRunning()) { if (!on) act.time = act.getClip().duration; act.play(); } } };
+  const sh = feature('van-shut') ? shutDoors(van, clips[0]) : null; let open = false;
+  if (sh) { const up = mixer.update.bind(mixer); mixer.update = dt => { const r = up(dt); if (!open && sh.out && (!act.isRunning() || act.time <= 0)) sh.show(false); return r; }; }
+  return { mixer, open(on) { open = on; if (on && sh) sh.show(true); act.paused = false; act.timeScale = on ? 1 : -1; if (!act.isRunning()) { if (!on) act.time = act.getClip().duration; act.play(); } } };
 }
+// ⚡ van-shut: докато вратите са затворени (по пътя — почти винаги), частите им са слети по материал в позата „затворено“: бусът ~45 → ~33 рисувания.
+// open(true) → истинските врати (анимацията); затворят ли се докрай → пак слетите.
+function shutDoors(van, clip) {
+  const names = new Set(clip.tracks.map(t => THREE.PropertyBinding.parseTrackName(t.name).nodeName)), doors = [];
+  van.traverse(o => { if (names.has(o.name) || names.has(THREE.PropertyBinding.sanitizeNodeName(o.name || ''))) doors.push(o); });
+  const top = doors.filter(d => !doors.some(e => e !== d && isAnc(e, d))); if (!top.length) return null;
+  van.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(van.matrixWorld).invert(), M = new THREE.Matrix4(), by = new Map();
+  for (const d of top) d.traverse(m => { if (!m.isMesh || m.isSkinnedMesh || Array.isArray(m.material) || !m.visible || m.children.length) return;
+    M.multiplyMatrices(inv, m.matrixWorld); if (M.determinant() <= 0) return; const g = m.geometry.clone(); for (const n of Object.keys(g.attributes)) { const a = g.attributes[n];
+      if (a.isInterleavedBufferAttribute || a.normalized || !(a.array instanceof Float32Array)) { const f = new Float32Array(a.count * a.itemSize); for (let i = 0; i < a.count; i++) for (let c = 0; c < a.itemSize; c++) f[i * a.itemSize + c] = a.getComponent(i, c); g.setAttribute(n, new THREE.BufferAttribute(f, a.itemSize)); } }
+    g.morphAttributes = {}; g.clearGroups(); g.applyMatrix4(M); const k = m.material.uuid + '|' + Object.keys(g.attributes).sort().join(',') + (g.index ? 'i' : 'n') + m.castShadow + m.receiveShadow;
+    (by.get(k) || by.set(k, []).get(k)).push([g, m]); });
+  const shut = new THREE.Group(); shut.name = 'doorsShut';
+  for (const list of by.values()) { let mg = null; try { mg = mergeGeometries(list.map(x => x[0]), false); } catch (e) { mg = null; } list.forEach(x => x[0].dispose()); if (!mg) return null;
+    const a = list[0][1], me = new THREE.Mesh(mg, a.material); me.castShadow = a.castShadow; me.receiveShadow = a.receiveShadow; me.userData.mergedOf = list.length; shut.add(me); }
+  van.add(shut); const S = { out: false, show(on) { S.out = on; shut.visible = !on; for (const d of top) d.visible = on; } }; S.show(false); return S;
+}
+const isAnc = (a, b) => { for (let q = b.parent; q; q = q.parent) if (q === a) return true; return false; };
