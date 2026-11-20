@@ -341,13 +341,13 @@ function freeParks(K, A, P, o) {
   const need = o.needPark || []; if (!need.length) return []; const { g, comp, comps, cx, cz, NX } = A, [ox, oz] = P.offset, roads = P.p2.roads, out = [], served = new Set();
   const edge = []; for (const c of comps) { if (c.area < 150) continue; for (const k of c.cells) { const i = k % NX; if ([1, -1, NX, -NX].some(d => g[k + d] === ROAD && (d !== 1 || i < NX - 1) && (d !== -1 || i > 0))) edge.push(k); } }
   const nearRoad0 = (x, z) => { let bd = 1e9, best = null; for (const rd of roads) for (let k = 1; k < rd.pts.length; k++) { const ax = rd.pts[k - 1][0] + ox, az = rd.pts[k - 1][1] + oz, dx = rd.pts[k][0] + ox - ax, dz = rd.pts[k][1] + oz - az, L2 = dx * dx + dz * dz || 1, t = ((x - ax) * dx + (z - az) * dz) / L2;
+      const tc = Math.max(0, Math.min(1, t)), px = ax + dx * tc, pz = az + dz * tc, d = Math.hypot(x - px, z - pz); if (d < bd) { bd = d; best = { px, pz, d, end: t < 0.02 || t > 0.98, hw: rd.w / 2 + (rd.walk || 0) }; } } return best; };
   // ⚡ dist-calm (собственикът, 20.11: „рам над 2,3 GB“ — тук се трупаха ~70 MB боклук в секунда): само улиците в съседните клетки (решетка 30 м
   // от отсечките, веднъж за плана); няма ли там — както досега, по всички улици
   const SG = CALM ? segGridOf(roads, ox, oz) : null;
   const nearRoad = !SG ? nearRoad0 : (x, z) => { const i0 = Math.floor(x / SEGC), j0 = Math.floor(z / SEGC); let bd = 1e9, bs = null, bt = 0;
     for (let i = i0 - 1; i <= i0 + 1; i++) for (let j = j0 - 1; j <= j0 + 1; j++) for (const sg of SG.get(i * 100003 + j) || []) { const [ax, az, dx, dz, L2] = sg, t = ((x - ax) * dx + (z - az) * dz) / L2, tc = t < 0 ? 0 : t > 1 ? 1 : t, px = ax + dx * tc, pz = az + dz * tc, d = Math.hypot(x - px, z - pz); if (d < bd) { bd = d; bs = sg; bt = t; } }
     if (!bs || bd > SEGC) return nearRoad0(x, z); const tc = bt < 0 ? 0 : bt > 1 ? 1 : bt; return { px: bs[0] + bs[2] * tc, pz: bs[1] + bs[3] * tc, d: bd, end: bt < 0.02 || bt > 0.98, hw: bs[5] }; };
-      const tc = Math.max(0, Math.min(1, t)), px = ax + dx * tc, pz = az + dz * tc, d = Math.hypot(x - px, z - pz); if (d < bd) { bd = d; best = { px, pz, d, end: t < 0.02 || t > 0.98, hw: rd.w / 2 + (rd.walk || 0) }; } } return best; };
   const fits = (x0, z0, fx, fz, w, d) => { for (let a = -w / 2 - 0.5; a <= w / 2 + 0.5; a += 1) for (let b = -d / 2; b <= d / 2 - 1; b += 1) { const k = A.at(x0 + fz * a + fx * b, z0 - fx * a + fz * b); if (k < 0 || g[k] !== FREE || A.taken[k]) return false; } return true; };
   const SIZES = [[17.5, 15], [17.5, 11], [12, 14], [12, 9]];
   for (const l of need) { if (served.has(l.id) || out.length >= 40) continue;
