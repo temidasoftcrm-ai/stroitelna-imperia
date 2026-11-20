@@ -6,6 +6,7 @@ import './glbfix.js';   // ⚡ флаг perf-fix: стъклата без transm
 import { splitTrees } from './treesplit.js';   // горските пакети → отделни дървета (и за online3d.js)
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { mergeSkinned } from './skinmerge.js';   // ⚡ ped-merge
 import * as ECON from './economy.js';
 import { tintRoof } from './roofs.js';
 import { DayNight, clockText } from './daynight.js';
@@ -3722,6 +3723,7 @@ function canEnter(i, j, axis) {
 const peds = [];
 const PED_SIDE = 3.3;   // разстояние от оста на улицата до тротоара
 // истински минувачи (Mixamo, от „Бригада“ — assets/heavy/people/peds): зареждат се при нужда, зад feature('peds-real')
+const PEDMERGE = feature('ped-merge');
 const PED_REAL = ['adam', 'brian', 'steve', 'elizabeth', 'kate', 'louise'], pedReal = [], pedClips = [], standMix = [];
 let pedLoad = null;
 function loadPeds() {
@@ -3731,6 +3733,7 @@ function loadPeds() {
     g.scene.updateMatrixWorld(true); g.scene.traverse(o => { if (o.isSkinnedMesh) o.skeleton.update(); });
     const b = new THREE.Box3().setFromObject(g.scene, true), h = b.max.y - b.min.y || 1;   // точно (костите на Mixamo са ×0.01)
     g.k = 1.9 / h;   // като досегашните минувачи (~1.9 м в играта)
+    if (PEDMERGE) try { mergeSkinned(g.scene); } catch (e) { console.warn('ped-merge', e); }   // ⚡ ped-merge: частите на човека по материал (~6 → 2–3 рисувания)
     pedReal.push(g);
   }).catch(() => {}))).then(() => { if (!pedReal.length) return; for (const p of [...peds]) if (!p.real) { scene.remove(p.m); peds.splice(peds.indexOf(p), 1); } for (const m of [...standers]) if (!m.userData.mixer) { scene.remove(m); standers.splice(standers.indexOf(m), 1); } });   // старите (от кубчета) — сменят се с истински
 }
