@@ -157,7 +157,8 @@ import { openGlobe } from './globe.js';
 import { clientName } from './names.js';
 import { createConquest } from './conquest.js';
 import { siteNet } from './sitenet.js';   // 🏗️ site-net: опънатата мрежа по скелето и банерът с логото на фирмата
-import { addVanLogo, vanDoors } from './vanlogo.js';   // 🚐 бусът на бригадата: логото отстрани и вратите на Спринтера (флаг crew-van)
+import { addVanLogo, vanDoors, VAN_CLIPS } from './vanlogo.js';
+import { mergeVeh } from './vehmerge.js';   // ⚡ veh-merge: неподвижните части на колите — слети по материал   // 🚐 бусът на бригадата: логото отстрани и вратите на Спринтера (флаг crew-van)
 import { createMapLayers } from './maplayers.js';
 import { applyRoadLook, makeCrosswalks } from './roadlook.js';
 // №10 (55, bld-a-real): тухлената двуетажна (building-a, 2,0 × 0,79 × 0,6 — 2 етажа ~4 м + корниз) беше смалена до ~5,6 м (15,7 м дълга → в 15 м парцел);
@@ -739,7 +740,7 @@ let europe = null;
     blkSections(n);   /* bld-a-real (55, №10): секциите на building-a (само ако е в SECTIONS) */
     if (n === 'building-type-b') g.scene.traverse(o => { if (o.isMesh && o.material?.name === 'phong1') o.visible = false; }); }));   // бръшлянът на house-b е JPEG без прозрачност → черни петна   // нощем етажите светват (nightfloors.js)
   // истинска строителна техника и коли за трафика (vehmodels.js, Sketchfab)
-  jobs.push(loadVehModels(load, A));
+  jobs.push(loadVehModels(load, A).then(() => { if (VMERGE) for (const k in A) if (VMERGE_RX.test(k)) { vehMergeT(A[k].scene); for (const v of A[k].variants || []) vehMergeT(v); } }));   // ⚡ veh-merge: шаблоните — веднъж, преди копията
   jobs.push(loadAirModels(load));   // самолети и контролна кула (airport.js)
   // модели за курортите (resortview.js); липсващ файл не спира играта
   for (const [dir, list] of Object.entries(RESORT_MODELS)) for (const n of list) jobs.push(load(`assets/${dir}/${n}.glb`).then(g => { A[n] = g; }).catch(() => {}));
@@ -854,12 +855,16 @@ let OVR = null, ovT = 0;   // 🔍 Преглед: поправките (assets/
 const ovOn = () => feature('obj-overrides');
 // 🏙️ разтегливият небостъргач на най-близкия наличен брой етажи (10/15/20 за класическите, 20–40 за модерните) — „име@25“ може да няма
 function skyKey(n, floors) { const fs = [10, 15, 20, 25, 30, 40].filter(f => A[`${n}@${f}`]); if (!fs.length) return A[n] ? n : null; const f = fs.reduce((a, b) => Math.abs(b - floors) < Math.abs(a - floors) ? b : a); return `${n}@${f}`; }
+// ⚡ veh-merge: колите, бусовете, камионите, автобусите — неподвижните им части в едно рисуване на материал (бусът: 68 → ~10); техниката (багер, кран…) — не
+const VMERGE = feature('veh-merge'), VMERGE_RX = /^sf-(car-|em-|bus|van|truck|trk-)/;
+function vehMergeT(t) { if (t && t.isObject3D) try { mergeVeh(t, { clips: VAN_CLIPS[t.userData.van] }); } catch (e) { console.warn('veh-merge', e); } }
+const vehMergeIf = (n, t) => { if (VMERGE && VMERGE_RX.test(n)) vehMergeT(t); return t; };
 function model(n, scale = 1, shadow = true) {
   let rot = null;
   if (!A[n] && n.includes('@')) { const [b, f] = n.split('@'); n = skyKey(b, +f || 20) || n; }   // стари поръчки със „сграда@етажи“, каквато няма
   if (!A[n] && n !== 'tree-large' && n !== 'tree-small') { const fb = /^sf-sky-|@/.test(n) ? [...MODERN_SKY, ...SKY].map(b => skyKey(b, 20)).find(Boolean) : null; if (!fb) return new THREE.Group(); n = fb; }   // незареден модел: небостъргач — друг зареден, иначе празно (не срив)
   if (n === 'tree-large' || n === 'tree-small') { const t = niceTree(n, scale); if (t) { n = t[0]; scale = t[1]; rot = treeN * 2.39; } else if (!A[n]) return new THREE.Group(); }   // trees-kenney-off: без горския пакет — без дърво
-  const V0 = A[n].variants, V = V0 && n === 'sf-car-Police_Sedan' && feature('pol-new') ? polVariants(V0, carRegion(S.cityId)) : V0 && n === 'sf-car-Firetruck' ? fireVariants(V0, carRegion(S.cityId), S.cityId) : V0 && n === 'sf-car-Ambulance' ? polVariants(V0, carRegion(S.cityId)) /* amb-van/amb-box: линейките по региона */ : V0, o = (V ? V[(model.k = (model.k || 0) + 1) % V.length] : A[n].scene).clone(true);   /* pol-new (55): полицията — по региона на града */   // одобрените варианти (полиция, пожарни, линейки) се редуват
+  const V0 = A[n].variants, V = V0 && n === 'sf-car-Police_Sedan' && feature('pol-new') ? polVariants(V0, carRegion(S.cityId)) : V0 && n === 'sf-car-Firetruck' ? fireVariants(V0, carRegion(S.cityId), S.cityId) : V0 && n === 'sf-car-Ambulance' ? polVariants(V0, carRegion(S.cityId)) /* amb-van/amb-box: линейките по региона */ : V0, o = vehMergeIf(n, V ? V[(model.k = (model.k || 0) + 1) % V.length] : A[n].scene).clone(true);   /* pol-new (55): полицията — по региона на града */   // одобрените варианти (полиция, пожарни, линейки) се редуват
   if (rot != null) { o.rotation.y = rot; freezeKids(o); if (feature('tree-colors')) ttVariant(o, (treeN * 0.6180339) % 1); }   // дърво (tree-colors: своят цвят)
   o.scale.setScalar(scale); o.userData.src = n; { const gv = OVR && ovOn() && OVR['*'] && OVR['*']['model:' + n]; if (gv) { if (gv.k) o.scale.multiplyScalar(gv.k); if (gv.rot) o.rotation.y += gv.rot * Math.PI / 180; if (gv.hide) o.visible = false; } }   /* 🔍 поправка на модела навсякъде (Прегледът → 📦 Модели) */
   if (shadow && isVehModel(n)) shadow = false;   /* колите и техниката — без сянка (картата на сенките е статична и сянката изостава) */
