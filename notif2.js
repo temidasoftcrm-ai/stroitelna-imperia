@@ -5,7 +5,8 @@
 //   Бутонът 🔔 в горната лента — брой непрочетени; панелът — последните 100 (кога, текст, „👁 Гледай“, ако известието е имало действие), филтър по нивото.
 // const N = createNotif2({ box: #toasts, top: #top, day: () => S.day, clock: () => 'ден 12 · 14:30', fmt, sound: () => …, modeOff: () => bool });
 //   N.toast(text, kind, onClick, level?) — level: 'red' | 'yellow' | 'routine' (по избор — иначе по kind и текста); N.rows() — редовете за ⚙️
-import { setNotifMode } from './notif.js';   // 🔕 toast-calm: бутонът „Изключи“ над известията
+import { setNotifMode } from './notif.js';
+import { feature } from './lab/feature.js';   // 🔕 toast-calm: бутонът „Изключи“ над известията
 const LS_R = 'stroiN2routine', LS_S = 'stroiN2sound';
 const get = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v === '1'; } catch { return d; } };
 const put = (k, v) => { try { localStorage.setItem(k, v ? '1' : '0'); } catch { } };
@@ -20,6 +21,10 @@ const GROUPS = [
   { k: 'income', re: /^(💶 \+.*(прибрани автоматично|от „)|💵 Дивиденти)/, sum: (n, s) => `💶 Приходи днес: ${n} ${n === 1 ? 'плащане' : 'плащания'}${s !== '0' ? ` · +${s} €` : ''}` },
 ];
 const RED = /🔥|пожар|🚨|инцидент|авари|катастроф|фалит|фалира|банкрут|търг|оферта.*(спечел|загуб)|🏆|🎉|ново ниво|ниво \d+ на развитие|🤝|партньор|кооп|мир(а|ът)?\b|война|криза|земетрес|наводн|бур[яи]|стачк|ултиматум|просроч|изтича|неустойк|опасност/i;
+// 📊 notif-calm (бета тестерите: „съобщенията за пазара всеки ден са шум“; мерено: 97 игрови дни → по 5+ отчета на ден): дневните отчети
+// (влакове, полети, кораби, завършени градове, приходи, автоматични действия, ТИР-ове) — едно съобщение на ден; всеки — в дневника 🔔
+const CALM = feature('notif-calm'), DAILY = /^(🚆 Влакове днес|✈️ Полети днес|🚢 Морски рейсове днес|🏁 Завършени градове:)/;
+const netOf = t => { const m = t.match(/→ ([+−-])([\d\s  .,]+(?:млн\.|хил\.)?)\s?€/) || t.match(/([+−-])([\d\s  .,]+(?:млн\.|хил\.)?)\s?€?\s?днес/) || t.match(/(\+)([\d\s  .,]+(?:млн\.|хил\.)?)\s?€/); return m ? (m[1] === '-' ? '−' : m[1]) + m[2].trim() + ' €' : ''; };
 const amount = t => { const m = t.match(/\+\s?([\d\s .,]+)\s?€/); return m ? +m[1].replace(/[^\d]/g, '') || 0 : 0; };
 
 export function createNotif2(o) {
@@ -76,13 +81,21 @@ export function createNotif2(o) {
     if (box.firstElementChild !== bar) box.prepend(bar);
   };
   // нов игрален ден — обобщенията на вчерашните рутинни (по едно на вид)
-  const flush = () => { for (const g of GROUPS) { const c = counts[g.k]; if (!c || !c.n || !g.sum) { if (c) counts[g.k] = { n: 0, s: 0 }; continue; } const txt = g.sum(c.n, o.fmt ? o.fmt(c.s) : String(c.s)); add(txt, 'yellow'); show(txt, 'yellow', 'good'); counts[g.k] = { n: 0, s: 0 }; } };
+  const flush = () => { for (const g of GROUPS) { const c = counts[g.k]; if (!c || !c.n || !g.sum) { if (c) counts[g.k] = { n: 0, s: 0 }; continue; } const txt = g.sum(c.n, o.fmt ? o.fmt(c.s) : String(c.s)); add(txt, 'yellow'); if (CALM) digest(txt); else show(txt, 'yellow', 'good'); counts[g.k] = { n: 0, s: 0 }; } };
   setInterval(() => { const d = o.day(); if (d !== day) { flush(); day = d; } }, 1000);
   function toast(text, kind = '', onClick = null, level = null) {
     text = String(text); const lvl = lvlOf(text, kind, onClick, level);
     if (lvl === 'routine') { const g = GROUPS.find(x => x.re.test(text)) || { k: 'auto' }; const c = counts[g.k] || (counts[g.k] = { n: 0, s: 0 }); c.n++; c.s += amount(text); add(text, lvl, onClick); if (opt.routine) show(text, lvl, kind, onClick); return; }
+    if (CALM && DAILY.test(text)) { add(text, 'yellow', onClick); digest(text); return; }   // notif-calm: в отчета на деня
     add(text, lvl, onClick); show(text, lvl, kind, onClick);
   }
+  let dig = [], digT = 0;
+  const icoOf = t => (t.match(/^\S+/) || [''])[0];
+  function digest(text) { if (dig.some(t => icoOf(t) === icoOf(text))) { clearTimeout(digT); digShow(); }   // вече има такъв отчет — нов ден (при ▶▶▶ денят е под 1,5 s)
+    dig.push(text); clearTimeout(digT); digT = setTimeout(digShow, 1500); }
+  function digShow() { if (!dig.length) return;
+    const parts = dig.map(t => { const ico = (t.match(/^\S+/) || [''])[0], n = netOf(t); return n ? `${ico} ${n}` : ico + ' ' + t.replace(/^\S+\s*/, '').replace(/ днес:?/, '').slice(0, 28); });
+    const txt = `📊 Днес: ${parts.join(' · ')}`; dig = []; show(txt, 'yellow', 'good', () => open()); }
   // панелът
   const draw = () => {
     if (!panel) return; const L = log.filter(e => filt === 'all' || e.lvl === filt), ic = { red: '🔴', yellow: '🟡', routine: '⚪' };
