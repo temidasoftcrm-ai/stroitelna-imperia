@@ -51,6 +51,19 @@ export function ribbon(pts, w, y, closed = false) {
 }
 export function disc(x, z, r, y, r0 = 0, seg = 40) { const pos = [], idx = []; for (let k = 0; k <= seg; k++) { const a = k / seg * Math.PI * 2; pos.push(x + Math.cos(a) * r0, y, z + Math.sin(a) * r0, x + Math.cos(a) * r, y, z + Math.sin(a) * r); if (k) { const i = 2 * k; idx.push(i - 2, i, i - 1, i - 1, i, i + 1); } } return { pos, idx }; }
 // сливане на плоските части (ленти, дискове, четириъгълници) в една геометрия: типизирани масиви наведнъж, нормалите — нагоре (всичко е хоризонтално)
+// ⚡ ground-rings: улиците се строят на 4 пръстена — всеки със свой асфалт, тротоар, бордюр, маркировка, ивици, островчета, цветя (по една мрежа на материал).
+// Щом и четирите са готови — мрежите с един и същ материал се сливат в една: ~35 → ~9 рисувания на земята (Пловдив). Видимото не се променя.
+const RINGS = feature('ground-rings'), RINGM = [];
+function ringMerge(G, list) {
+  const by = new Map(); for (const m of list) if (m.parent === G && !Array.isArray(m.material)) (by.get(m.material) || by.set(m.material, []).get(m.material)).push(m);
+  for (const [mat, L] of by) { if (L.length < 2) continue; let nv = 0, ni = 0; for (const m of L) { nv += m.geometry.attributes.position.count; ni += m.geometry.index.count; }
+    const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), uv = new Float32Array(nv * 2), idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni); let v = 0, i = 0;
+    for (const m of L) { const g = m.geometry, n = g.attributes.position.count; pos.set(g.attributes.position.array, v * 3); nor.set(g.attributes.normal.array, v * 3); uv.set(g.attributes.uv.array, v * 2);
+      const I = g.index.array; for (let k = 0; k < I.length; k++) idx[i + k] = I[k] + v; v += n; i += I.length; }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setIndex(new THREE.BufferAttribute(idx, 1));
+    const me = new THREE.Mesh(g, mat); me.receiveShadow = L[0].receiveShadow; me.castShadow = L[0].castShadow; me.renderOrder = L[0].renderOrder; me.userData.ringsOf = L.length;
+    G.add(me); for (const m of L) { G.remove(m); m.geometry.dispose(); } }
+}
 export function merge(parts, mat, flat = true) { let nv = 0, ni = 0; for (const p of parts) { nv += p.pos.length; ni += p.idx.length; }
   const pos = new Float32Array(nv), uv = new Float32Array(nv / 3 * 2), nor = new Float32Array(nv), idx = nv / 3 > 65535 ? new Uint32Array(ni) : new Uint16Array(ni); let o = 0, oi = 0;
   for (const p of parts) { const b = o / 3, P0 = p.pos, I0 = p.idx; for (let i = 0; i < P0.length; i++) pos[o + i] = P0[i]; for (let i = 0; i < I0.length; i++) idx[oi + i] = I0[i] + b; o += P0.length; oi += I0.length; }
@@ -921,7 +934,7 @@ export function buildPlan2View(P, opts = {}) {
   }
   if (rTrees.length) trees.push(...rTrees);
   for (const t of BARS) G.add(barrier(t.e, t.ang, t.rd.w));   /* road-geo: бариерите на правите краища */
-  for (const [arr, mat] of [[As, MAT.asph], ...(JNF ? [[AJ, MAT.asphJ]] : []), [W, MAT.walk], [Cb, MAT.curb], [Pt, MAT.paint], [Md, MAT.median], [Is, MAT.island], [Ap, MAT.apron], ...Fl.map((f, i) => [f, MAT.flower[i]])]) if (arr.length) { G.add(merge(arr, mat)); yield 0; }   // сливането — по материал, на стъпки
+  for (const [arr, mat] of [[As, MAT.asph], ...(JNF ? [[AJ, MAT.asphJ]] : []), [W, MAT.walk], [Cb, MAT.curb], [Pt, MAT.paint], [Md, MAT.median], [Is, MAT.island], [Ap, MAT.apron], ...Fl.map((f, i) => [f, MAT.flower[i]])]) if (arr.length) { const mm = merge(arr, mat); G.add(mm); if (RINGS) RINGM.push(mm); yield 0; }   // сливането — по материал, на стъпки
   }
   // дърветата на парковете (големите места park) и на островите на кръговите
   const parkTrees = () => { const onAsph = feature('tree-road') ? asphaltTest(P) : () => false;   // tree-road: OSM парковете се пресичат от пътища
@@ -963,6 +976,7 @@ export function buildPlan2View(P, opts = {}) {
       refill(); tm('fill');
     }
     for (let k = 0; k < 4; k++) { yield* streets(part(R, k), part(N, k), part(Tu, k), part(Ro, k)); tm('streets' + k); if (!k) { yield 'usable'; if (opts.blocksEarly) { yield* blocksFill(); yield 0; } } }
+    if (RINGS) { ringMerge(G, RINGM); RINGM.length = 0; yield 0; }   // ⚡ ground-rings
     parkTrees(); tm('trees'); yield 0;
     if (opts.furniture !== false) { const F = ST.F = yield* furniture(G, P, opts);
       if (F && F.lamps.length && opts.lampGlow !== false) {

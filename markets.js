@@ -4,11 +4,27 @@
 import * as THREE from 'three';
 import { canvasTex } from './texdata.js';   // fac-data (T1): статичните платна → собствени данни (не се губят)
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { feature } from './lab/feature.js';
+// ⚡ market-bake: частите само с цвят (без текстура, непрозрачни) — в една геометрия с цвят по връх. stall-b („stand“): 20 материала → 1 рисуване.
+const MBAKE = feature('market-bake');
+let MB_MAT = null;
+function bakeParts(parts) {
+  const plain = parts.filter(([g, m]) => m && !Array.isArray(m) && !m.map && !m.transparent && m.color && !(m.emissive && m.emissive.getHex())), rest = parts.filter(p => !plain.includes(p));
+  if (plain.length < 2) return parts;
+  const geos = plain.map(([g0, m]) => { const g = g0.index ? g0.clone() : g0.clone(); for (const n of Object.keys(g.attributes)) if (n !== 'position' && n !== 'normal') g.deleteAttribute(n);
+    for (const n of Object.keys(g.attributes)) { const a = g.attributes[n]; if (a.isInterleavedBufferAttribute || a.normalized || !(a.array instanceof Float32Array)) { const f = new Float32Array(a.count * a.itemSize); for (let i = 0; i < a.count; i++) for (let c = 0; c < a.itemSize; c++) f[i * a.itemSize + c] = a.getComponent(i, c); g.setAttribute(n, new THREE.BufferAttribute(f, a.itemSize)); } }
+    g.morphAttributes = {}; g.clearGroups(); const k = g.attributes.position.count, col = new Float32Array(k * 3); for (let i = 0; i < k; i++) col.set([m.color.r, m.color.g, m.color.b], i * 3); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); return g; });
+  const ix = geos.every(g => g.index), L = ix ? geos : geos.map(g => g.index ? g.toNonIndexed() : g); let mg = null; try { mg = mergeGeometries(L, false); } catch (e) { mg = null; }
+  if (!mg) return parts;
+  if (!MB_MAT) MB_MAT = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 });
+  return [...rest, [mg, MB_MAT]];
+}
 // сергиите от Sketchfab (kiselevmiki, CC-BY): „market stall“ (stall-a — раиран навес, плодове, бъчва, табелка) и „stand“ (stall-b — зелен навес, щайги,
 // висящи банани, дини на бъчва, черна дъска) — през една; веднъж за всички, по инстанция на част; дотогава — от кутийки
 const stallP = {};
 const stallModel = f => stallP[f] || (stallP[f] = new GLTFLoader().loadAsync('assets/heavy/markets/' + f).then(gl => { const parts = []; gl.scene.updateMatrixWorld(true);
-  gl.scene.traverse(o => { if (o.isMesh) parts.push([o.geometry.clone().applyMatrix4(o.matrixWorld), o.material]); }); return parts; }).catch(() => null));
+  gl.scene.traverse(o => { if (o.isMesh) parts.push([o.geometry.clone().applyMatrix4(o.matrixWorld), o.material]); }); return MBAKE ? bakeParts(parts) : parts; }).catch(() => null));
 
 const AWN = [[0xd23b3b, 0xf4efe6], [0x2f7d4f, 0xf4efe6], [0x2b5fa8, 0xf4efe6], [0xe39b2b, 0xf4efe6]];
 const UMB = [0xb8342f, 0xf0e6d2, 0x2c6e8f, 0x6a8f3a, 0xd9a441];
