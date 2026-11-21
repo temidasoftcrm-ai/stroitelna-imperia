@@ -3,6 +3,8 @@
 // game.js чете ефектите през workMul() (скорост на строежите), offerMul() (награди на новите поръчки) и stormy().
 
 import { t as tr } from './i18n.js';
+import { feature } from './lab/feature.js';
+const EARLY = feature('early-fines');
 
 const pick = a => a[(Math.random() * a.length) | 0];
 const MAT_UP = ['steel', 'concrete', 'bricks', 'wood', 'glass'];
@@ -26,7 +28,7 @@ export const EVENTS = [
   { id: 'inspection', w: 2, run: c => {
     const ok = Math.random() < 0.55 + c.S.rep * 0.06;
     if (ok) { c.S.rep = Math.min(5, c.S.rep + 0.15); return { ico: '🧑‍💼', title: 'Инспекцията мина отлично', text: 'Строителната инспекция похвали обектите ти. Репутация +0.15 ★.', kind: 'good' }; }
-    const fine = Math.round((5000 + Math.random() * 15000) / 500) * 500;
+    const fine = Math.round((5000 + Math.random() * 15000) * (EARLY ? Math.min(1, 0.25 + ((c.S.dev && c.S.dev.lv) || 1) * 0.15) : 1) / 500) * 500;   // ⚡ early-fines: на ниво 1 глобата е 40% (2–8 хил. вместо 5–20 хил. при начални 20 хил.), пълна от ниво 5
     c.econ.spend(fine, 'глоба', 'Глоба от строителната инспекция');
     return { ico: '🚨', title: 'Глоба от инспекцията', text: `Инспекторите намериха нарушения на обект. Глоба ${c.fmt(fine)} €.`, kind: 'bad' };
   } },

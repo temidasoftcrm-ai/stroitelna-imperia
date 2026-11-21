@@ -14,7 +14,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { flameSprite } from './fireflip.js';
 import { createFire2, obbOf, scorch2, ladderRig, outside, nearPt } from './firefx2.js';   // 🔥 fire-real2: пламъците по прозорците и покрива, димът, отблясъкът, стълбата и струята
 import { feature } from './lab/feature.js';
-const NOTHRASH = feature('fire-nothrash');
+const NOTHRASH = feature('fire-nothrash'), FAIR = feature('fire-fair');   // fire-fair — вж. offer()
 import { spinWheels } from './wheelspin.js';   // 🚒 fire-titan / fire-cyber: колелата на пожарните от Blender (wheel_*)
 import { t as tr } from './i18n.js';   // 🌐 lang-en: надписите на платното (f9, част C)
 
@@ -208,14 +208,17 @@ export function createFires(deps) {
     const o = f.order, stg = o.kind === 'clear' ? CLEAR : STAGES, days = stg.reduce((a, s) => a + s[1], 0);
     return `<b>${o.kind === 'clear' ? '🏗️ Разчистване и нов строеж' : '🏗️ Спешно възстановяване'}</b> · остатъчна здравина <b style="color:${f.hp < 30 ? '#ff6b6b' : '#ffd54a'}">${Math.round(f.hp)}%</b><br>
       Етапи: ${stg.map(s => `${s[0]} (${s[1]} ${s[1] === 1 ? 'ден' : 'дни'})`).join(' → ')}<br>
-      Нужни: 👷 бригада и техника (щом се освободят) · 📦 материали ~<b>${fmt(o.cost)} €</b> (от склада, по етапи)<br>
+      Нужни: 👷 бригада и техника (щом се освободят) · 📦 ${FAIR && deps.startJob ? 'материали (купуват се сами, както на всеки обект)' : `материали ~<b>${fmt(o.cost)} €</b> (от склада, по етапи)`}<br>
       Възнаграждение: <b style="color:#43d17a">${fmt(o.reward)} €</b> · срок: ${days + 6} дни (до ден ${Math.ceil(o.deadline)})`;
   }
   function offer(f, kind) {
     if (f.order) return;   // по една поръчка на инцидент
     const lot = lotOf(f), base = 120000 * (lot && lot.zone === 'center' ? 2 : 1) * (lot && lot.plan ? 1.5 : 1), dmg = kind === 'clear' ? 1.6 : (100 - f.hp) / 100;
     const days = (kind === 'clear' ? CLEAR : STAGES).reduce((a, s) => a + s[1], 0);
-    f.order = { kind, st: 'offer', cost: Math.round(base * dmg / 1000) * 1000, reward: Math.round(base * dmg * 1.4 / 1000) * 1000, deadline: deps.day() + days + 6, prog: 0, stage: 0 };
+    // ⚡ fire-fair (тест нов играч 21.11): с deps.startJob материалите НЕ се плащат предварително (обектът си ги купува, ~200 €), а наградата
+    // беше 1,4 × цената им → нов играч на ниво 1 вземаше 270–440 хил. € за пожар (къщата е ~25 хил.). Сега — само печалбата (0,4 ×), по нивото (пълна от ниво 8), поне 15 хил.
+    const fair = FAIR && deps.startJob, lvK = Math.min(1, (deps.lv ? deps.lv() : 8) / 8), rw = fair ? Math.max(15000, base * dmg * 0.4 * lvK) : base * dmg * 1.4;
+    f.order = { kind, st: 'offer', cost: Math.round(base * dmg / 1000) * 1000, reward: Math.round(rw / 1000) * 1000, deadline: deps.day() + days + 6, prog: 0, stage: 0 };
     ask(f);
   }
   function ask(f) {
@@ -224,7 +227,7 @@ export function createFires(deps) {
       ['Откажи', () => decline(f.id)], ['Покажи сградата', () => { lot && deps.fly(lot); setTimeout(() => f.order && f.order.st === 'offer' && ask(f), 2500); }], ['Приеми', () => accept(f.id)]]);
   }
   function accept(id) {
-    const f = st().find(q => q.id === id); if (!f || !f.order || f.order.st !== 'offer') return false;
+    const f = st().find(q => q.id === id); if (!f || !f.order || f.order.st !== 'offer') { if (FAIR && f && f.order && f.order.st === 'declined') deps.toast('⌛ Срокът на тази поръчка изтече — сградата остава обезопасена.', 'bad'); return false; }   // fire-fair: прозорецът стоеше отворен след срока и „Приеми“ не правеше нищо
     if (deps.startJob) {   // истински обект в „Обекти“: етапите, бригадата (щом се освободи), техниката и материалите — като всеки строеж; плаща се при завършване
       const lot = lotOf(f), pid = lot && deps.startJob(f, lot); if (!pid) return false;
       f.order.st = 'work'; f.order.pid = pid; f.order.t0 = deps.day(); f.st = 'repair'; drop(f.id);

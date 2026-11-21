@@ -28,7 +28,7 @@ const RULES = [
 ];
 // урокът: стъпка → таб/бутон за подсветка, условие за отметка
 const STEPS = [
-  { ico: '📋', t: ['Първата поръчка', 'Your first order'], d: ['Отвори <b>„Поръчки“</b> вдясно и натисни <b>„Предложи“</b> на една къща. Клиентът приема или отказва — опитай пак, ако откаже.', 'Open <b>“Orders”</b> on the right and press <b>“Propose”</b> on a house. The client accepts or declines — try again if they decline.'], el: '#tabs [data-t="offers"]', done: s => s.proj > 0 || s.done > 0 },
+  { ico: '📋', t: ['Първата поръчка', 'Your first order'], d: ['Отвори <b>„Поръчки“</b> вдясно и натисни <b>„Приеми“</b> на една къща.', 'Open <b>“Orders”</b> on the right and press <b>“Accept”</b> on a house.'], el: '#tabs [data-t="offers"]', done: s => s.proj > 0 || s.done > 0 },
   { ico: '🚜', t: ['Обектът тръгва', 'The site starts'], d: ['Бригадата, багерът и самосвалът отиват сами. Следи етапите в <b>„Обекти“</b>; с <b>▶▶</b> горе времето върви по-бързо.', 'Your crew, excavator and dump truck drive there by themselves. Follow the stages in <b>“Sites”</b>; <b>▶▶</b> at the top speeds time up.'], el: '#tabs [data-t="projects"]', done: s => s.stage1 || s.done > 0 },
   { ico: '💶', t: ['Прибери парите', 'Collect the money'], d: ['Когато къщата е готова, на покрива ѝ се появяват <b>пачки пари</b> — натисни ги.', 'When the house is finished, <b>stacks of cash</b> appear on its roof — tap them.'], el: '#tabs [data-t="projects"]', done: s => s.done > 0 && !s.cash },
   { ico: '🛒', t: ['Още техника', 'More equipment'], d: ['В <b>„Техника“</b> купи още един багер или бус — така поемаш по два обекта наведнъж.', 'In <b>“Fleet”</b> buy another excavator or van — then you can run two sites at once.'], el: '#tabs [data-t="fleet"]', done: s => s.units > 3 },

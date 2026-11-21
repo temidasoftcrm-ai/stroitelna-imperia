@@ -3295,6 +3295,7 @@ const fires = createFires({ S: () => S, group: () => city.group, lots: () => cit
   startPoint: at => { let best = null, bs = -1; for (let k = 0; k < 30; k++) { const p = roadPoint(); if (!p) continue; const d = Math.hypot(p.x - at.x, p.z - at.z), sc = d < 120 ? d : d > 300 ? 600 - d : 300; if (sc > bs) { bs = sc; best = p; } } return best; },
   day: () => S.day + S.dayT / DAY_SEC, cam: () => camera.position, econ: () => econ, hasStaff: k => hasStaff(k), crewFree: () => units.some(u => u.type === 'crew' && u.state === 'idle'),
   modal: (...a) => modal(...a), toast: (...a) => toast(...a), fly: lot => flyTo(lot), save: () => save(),   // обвити — дефинирани по-долу във файла
+  lv: () => S?.dev?.lv || 1,   // 🔥 fire-fair: наградата расте с нивото на фирмата
   startJob: (f, lot) => startFireJob(f, lot), project: id => projects.find(q => q.id === id) || null,
   early: () => feature('rescue-early') && ownedCities().length < 3,   // #13: под 3 града (централата + 1 филиал) спешните поръчки идват ×2,5 по-често   // поръчките след пожар — обекти
   rebuild: lot => { if (lot.obj) city.group.remove(lot.obj); const b = (S.built || []).find(x => x.lot === lot.id); placeBuilding(lot, b ? b.model : lot.built, b ? b.rot || 0 : lot.rot || 0); } });
