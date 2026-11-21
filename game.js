@@ -5369,7 +5369,7 @@ function renderPanel() {
   } else if (tab === 'projects') {
     if (pd) h += muni.cardHtml();   // с директор „Поръчки“ ги няма — общината е тук
     h += `<label class="meta" style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" id="autoBuy" ${S.autoBuy !== false ? 'checked' : ''}> Автоматично купувай материали за обектите</label>`;
-    if (!projects.length) h += `<div class="empty">Нямаш активни обекти.<br>Приеми поръчка от „Поръчки“.</div>`;
+    if (!projects.length) h += `<div class="empty">Нямаш активни обекти.<br>${panelDir() ? `${panelDir()} приема поръчките — новите обекти ще се появят тук.` : 'Приеми поръчка от „Поръчки“.'}</div>`;   // ерата на холдинга: таб „Поръчки“ го няма
     for (const p of projects) {
       const bt = BTYPES[p.type], st = bt.stages[p.stage], mine = p.own || p.invest || p.reno, left = mine ? 0 : p.deadlineDay - S.day;
       h += `<div class="card ${selProject === p.id ? 'sel' : ''}" data-lot="${p.lot}" data-proj="${p.id}"><h3><span class="ico">${bt.ico}</span>${p.title}</h3>

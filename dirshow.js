@@ -25,7 +25,8 @@ export function showDirector(o) {
   const t = el.querySelector('.t'); t.append('Назначихте ', Object.assign(document.createElement('b'), { textContent: o.name }), ` за ${o.role || 'директор'} на ${o.company}`);
   el.querySelector('.s').textContent = o.text || '';
   document.body.appendChild(el);
-  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
+  const go = () => requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));   // първо снимката (до 1,5 s) — иначе рамката излизаше празна, докато се тегли
+  Promise.race([img.decode ? img.decode().catch(() => {}) : Promise.resolve(), new Promise(r => setTimeout(r, 1500))]).then(go);
   o.sound && o.sound('levelup');
   let shut = false;
   const close = () => { if (shut) return; shut = true; removeEventListener('keydown', key); el.classList.remove('on'); setTimeout(() => el.remove(), 500); };
