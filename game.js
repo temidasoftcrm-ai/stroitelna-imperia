@@ -5345,7 +5345,7 @@ function renderPanel() {
     if (!FS0) { h += muni.cardHtml(); h += rivals.marketHtml(); }
     if (tenderDir()) { const n = TENDERS.filter(t => tenders.state(t.id)?.st === 'open').length; if (n) h += `<div class="card"><div class="row" style="margin:0;align-items:center;gap:8px"><span class="meta" style="margin:0;flex:1">🏛️ <b style="color:var(--txt)">${tenderDir()}</b> подготвя оферти за ${n} ${n === 1 ? 'търг' : 'търга'}.</span><button class="btn2" data-dtend="1">Предложенията му →</button></div></div>`; }
     else h += tenders.cardsHtml('open');   // взетите (в строеж) — в „📜 Оферти“; от ниво 15 с директор — търговете са негови предложения
-    if (freeLotCount() < 3) h += `<div class="meta" style="text-align:center;color:var(--acc)">🏙️ Градът е почти застроен — купи нов квартал от таб „Офис“.</div>`;
+    if (freeLotCount() < 3) h += `<div class="meta" style="text-align:center;color:var(--acc)">${(S.cityExt || 0) >= extNeed() ? '🏁 Градът е застроен докрай — в таб „Офис“ натисни „Завърши града“ и продължи в друг град.' : '🏙️ Градът е почти застроен — купи нов квартал от таб „Офис“.'}</div>`;   // тест нов играч: при 3/3 квартала съветът сочеше несъществуващ бутон
     const SC = feature('simple-card') && FS0;   // 🧾 simple-card (собственикът, 19.11): до първата завършена сграда картата е проста — какво, срок, цена, „Приеми“ (без шанс, ±%, аванс, материали, конкурента)
     for (const o of [...S.offers].sort((a, b) => (b.demolish ? 1 : 0) - (a.demolish ? 1 : 0))) {
       const bt = BTYPES[o.type];
@@ -8036,6 +8036,7 @@ function maybeLinkOffer() {
   const id = S.cityId, n = linkNeeds(id); S.linkAsk = S.linkAsk || {};
   if (!n.any || (S.linkAsk[id] && S.day - S.linkAsk[id] < 60)) return;
   if (n.road && !n.port && !n.air && !dev.has('LINKS')) return;
+  if (!linksHtml(id)) return;   // тест нов играч (ниво 9): летището в текущия град не е ред тук → прозорецът излизаше празен
   S.linkAsk[id] = S.day;
   modal(`🔗 Транспортни връзки — ${cityName()}`, `Общината предлага да включиш фирмата в транспорта на града. Строиш ли сам — плащаш терена и строежа, после печелиш изцяло. Общинското участие е по-евтино, но само за ползване.<div id="linkBox" style="margin-top:8px">${linksHtml(id)}</div>`, [['По-късно (таб „Офис“)', null]]);
   document.querySelectorAll('#linkBox [data-link]').forEach(x => x.onclick = () => { $('modal').classList.add('hidden'); linkAct(x.dataset.link); });
