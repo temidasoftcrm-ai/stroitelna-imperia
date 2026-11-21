@@ -1622,7 +1622,7 @@ function spotFree(x, z, pad = 3.5, lotPad = 1.5) {
   return (gp.streets || []).every(st => { for (let i = 1; i < st.pts.length; i++) if (segD(st.pts[i - 1], st.pts[i]) < (st.w || 8) / 2 + pad) return false; return true; }) && !(gp.waterAt && gp.waterAt(x, z))
     && !city.lots.some(l => { const c = Math.cos(l.rot || 0), sn = Math.sin(l.rot || 0), dx = x - l.x, dz = z - l.z; return Math.abs(dx * c - dz * sn) < (l.w || 16) / 2 + lotPad && Math.abs(dx * sn + dz * c) < (l.d || 16) / 2 + lotPad; })
     && !(city.flagSq && city.flagSq.children.some(p => Math.hypot(p.position.x - x, p.position.z - z) < pad + 2))
-    && !(FLAGPARK && ((city.dl?.analysis?.() || {}).freeParks || []).some(q => Math.hypot(q.x - x, q.z - z) < Math.max(q.w, q.d) / 2 + 3));   // ⚡ flag-park: не върху паркингите на кварталите
+    && !(FLAGPARK && (city.dl?.analysis?.freeParks || []).some(q => Math.hypot(q.x - x, q.z - z) < Math.max(q.w, q.d) / 2 + 3));   // ⚡ flag-park: не върху паркингите на кварталите
 }
 function freeNear(cx, cz, offs = [0], pad = 3.5, rMax = 60, lotPad = 1.5) {
   if (!city.plan) return null;
