@@ -367,6 +367,7 @@ function freeParks(K, A, P, o) {
     if (!bs || bd > SEGC) return nearRoad0(x, z); const tc = bt < 0 ? 0 : bt > 1 ? 1 : bt; return { px: bs[0] + bs[2] * tc, pz: bs[1] + bs[3] * tc, d: bd, end: bt < 0.02 || bt > 0.98, hw: bs[5] }; };
   const fits = (x0, z0, fx, fz, w, d) => { for (let a = -w / 2 - 0.5; a <= w / 2 + 0.5; a += 1) for (let b = -d / 2; b <= d / 2 - 1; b += 1) { const k = A.at(x0 + fz * a + fx * b, z0 - fx * a + fz * b); if (k < 0 || g[k] !== FREE || A.taken[k]) return false; } return true; };
   const SIZES = [[17.5, 15], [17.5, 11], [12, 14], [12, 9]];
+  for (const [fx0, fz0] of (o.avoid ? o.avoid() : [])) for (let a = -4; a <= 4; a += 1) for (let b = -4; b <= 4; b += 1) { const k = A.at(fx0 + a, fz0 + b); if (k >= 0) A.taken[k] = 1; }   // flag-park: знамената (game.js) — паркингът не отива върху тях
   for (const l of need) { if (served.has(l.id) || out.length >= 40) continue;
     const cand = edge.map(k => { const i = k % NX, x = cx(i), z = cz((k - i) / NX); return [k, x, z, Math.hypot(x - l.x, z - l.z)]; }).filter(e => e[3] < 75 && !A.taken[e[0]]).sort((p, q) => p[3] - q[3]).slice(0, 60);
     let done = null;

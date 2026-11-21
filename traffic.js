@@ -396,8 +396,14 @@ export function createTraffic(opts) {
   // стопове, мигачи и истинските прожектори
   const spots = []; let nightOn = false, LI = null, POOL = null; const _f = new THREE.Vector3(), _pm = new THREE.Matrix4(), _pq = new THREE.Quaternion(), _pv = new THREE.Vector3(), _ps = new THREE.Vector3(1, 1, 1), _Y = new THREE.Vector3(0, 1, 0);
   // мигачът: завоят на връзката (в нея и 28 м преди нея); #42.2 blink-lane — и ~4 s преди завоя при скорост, при смяна на лента (3 s) и при отбиване пред спешна
+  // ⚡ blink-real (собственикът 21.11: „завиват надясно, а мигачите са наляво“): етикетът turn на връзката (ленти, светофари) излиза обърнат спрямо
+  // истинската посока (проверка: всички завои в Пловдив) — мигачът се пали по посоката на самата крива: расте ли yaw — наляво (вляво е (cos yaw, −sin yaw))
+  const realTurn = p => { if (p.realTurn !== undefined) return p.realTurn; const P = p.pts; if (!P || P.length < 3 || p.turn === 'straight' || p.turn === 'uturn') return (p.realTurn = p.turn);
+    const a = P[0], b = P[1], y = P[P.length - 2], z = P[P.length - 1]; let d = Math.atan2(z[0] - y[0], z[1] - y[1]) - Math.atan2(b[0] - a[0], b[1] - a[1]); d = (d + Math.PI * 3) % (Math.PI * 2) - Math.PI;
+    return (p.realTurn = Math.abs(d) < 0.35 ? p.turn : d > 0 ? 'left' : 'right'); };
+  const BREAL = feature('blink-real'), turnLbl = p => BREAL ? realTurn(p) : p.turn;
   const turnOf = c => { const BL = feature('blink-lane'); if (BL && c.lcT > 0) return c.lcSide; if (BL && c.yieldT > 0) return opts.drive === 'left' ? 'left' : 'right';
-    return c.p.kind === 'conn' ? c.p.turn : c.next && c.next.kind === 'conn' && c.p.len - c.s < (BL ? Math.max(28, c.v * 4) : 28) ? c.next.turn : null; };
+    return c.p.kind === 'conn' ? turnLbl(c.p) : c.next && c.next.kind === 'conn' && c.p.len - c.s < (BL ? Math.max(28, c.v * 4) : 28) ? turnLbl(c.next) : null; };
   function lights() {
     const blinkOn = (performance.now() % 800) < 400, B = lampMats();
     if (!LI && cars.some(c => c.set)) LI = lampInstances(opts.scene, Math.max(64, (opts.maxCars || 40) * 2));

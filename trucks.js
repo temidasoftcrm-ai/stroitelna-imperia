@@ -3,6 +3,7 @@
 // game.js подава зависимостите (сцена, модели, път по улиците), за да няма кръгови импорти.
 import * as THREE from 'three';
 import { feature } from './lab/feature.js';
+const TIRGAP = feature('tir-gap');
 import { addTruckLamps, lampsFix } from './vehmodels.js';
 import { trimRoute } from './junctionpaths.js';
 import { spinWheels } from './wheelspin.js';
@@ -168,6 +169,7 @@ export function createTirs(deps) {
     return t;
   }
   function follow(t, dt) {
+    t.moved = true;
     const wp = t.path[t.pi];
     let tx = wp.x, tz = wp.z;
     if (!wp.last && t.pi > 0) {   // дясно движение
@@ -206,11 +208,27 @@ export function createTirs(deps) {
       }
     } else if (t.done) dropT(t);
   }
+  // ⚡ tir-gap (собственикът 21.11: „камионите за материалите вървят един в друг“ — пускат се по няколко по един и същи път с еднаква скорост,
+  // мерено: до 11 камиона, засичания на 0 м): всеки спира, щом до задницата на камиона пред него (по 3D модела) остане ~2,5 м; на едно място — по-късният чака
+  const lenOf = t => t.L || (t.L = (() => { const ry = t.root.rotation.y; t.root.rotation.y = 0; t.root.updateMatrixWorld(true); const b = new THREE.Box3(), mb = new THREE.Box3();
+    t.root.traverse(m => { if (m.isMesh && !m.isSprite && m !== t.tag && m.visible !== false && m.geometry) { if (!m.geometry.boundingBox) m.geometry.computeBoundingBox(); b.union(mb.copy(m.geometry.boundingBox).applyMatrix4(m.matrixWorld)); } });
+    t.root.rotation.y = ry; t.root.updateMatrixWorld(true); const z = b.isEmpty() ? 8 : b.max.z - b.min.z; return Math.min(20, Math.max(4, z)); })());   // само моделът (без надписа над него), по дължината (z)
+  function truckAhead(t, k) {
+    const fx = Math.sin(t.yaw), fz = Math.cos(t.yaw), Lt = lenOf(t);
+    for (let j = 0; j < list.length; j++) { const o = list[j]; if (o === t || o.A !== undefined || o.trl || o.t < 0 || !o.root.visible) continue;
+      const dx = o.x - t.x, dz = o.z - t.z, pr = dx * fx + dz * fz, lat = Math.abs(dx * fz - dz * fx); if (lat > 2.4) continue;
+      if (Math.cos(o.yaw - t.yaw) < -0.7 && o.state !== 'unload') continue;   // насрещният (в другата лента lat > 2,4 и без това)
+      const need = (Lt + lenOf(o)) / 2 + 2.5;
+      if (pr > 0.3 && pr < need) { const pr2 = -(dx * Math.sin(o.yaw) + dz * Math.cos(o.yaw)); if (!(pr2 > 0.3 && pr2 < need) || j < k) return true; continue; }   // взаимно (напреки) — чака само по-късният
+      if (Math.abs(pr) <= 0.3 && j < k) return true; }   // един върху друг — по-късно тръгналият чака
+    return false;
+  }
   function update(dt) {
     for (let k = list.length - 1; k >= 0; k--) {
       const t = list[k];
       if (t.A !== undefined || t.trl) { updAgent(t, dt); continue; }
       if (t.t < 0) { t.t += dt; if (t.t >= 0) t.root.visible = true; else continue; }
+      if (TIRGAP && t.state !== 'unload' && truckAhead(t, k)) { t.wg = (t.wg || 0) + dt; if (!t.moved && t.state === 'go') { t.root.visible = false; t.hidW = 1; } if (t.wg < 30) continue; t.root.visible = true; t.hidW = 0; } else { t.wg = 0; if (t.hidW) { t.root.visible = true; t.hidW = 0; } }   // още на входа и чака — невидим (не стои върху тръгващия)   // пред него разтоварва (UNLOAD) — опашка; след 30 s — напред (да не заседне)   // tir-gap: до 8 s, после — напред (да не заседне)
       if (t.mover && t.mover.kind === 'mixer') t.mover.obj.rotation.z += dt * (t.state === 'unload' ? 6 : 2);
       if (t.state !== 'unload' && deps.blocked && deps.blocked(t.x, t.z, t.yaw)) { t.wb = (t.wb || 0) + dt; if (t.wb < 8) continue; } else t.wb = 0;   // кола отпред — чака (до 8 s)
       if (t.state === 'go') {
