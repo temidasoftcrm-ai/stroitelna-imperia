@@ -154,7 +154,7 @@ export function createImperial(deps) {
   // ---- 🗓️ ден: строежи, население, удовлетвореност, издръжка, месечен отчет, нивата
   function dailyTick() {
     const m = st(); if (!m || !m.cc) return; const d = day();
-    for (const k of Object.keys(m.b)) for (const u of m.b[k]) if (u.run) { u.prog += 1 / (u.days || BUILD[k].days); if (u.prog >= 1) { u.run = false; if (u.up) { u.lv = (u.lv || 1) + 1; u.up = false; } deps.toast(`${BUILD[k].ico} ${landNm(k)}${u.lv > 1 ? ` — ниво ${u.lv}` : ''} е готов${k === 'landmark' ? ' — градът има своя символ!' : ''}.`, 'good'); } }
+    for (const k of Object.keys(m.b)) for (const u of m.b[k]) if (u.run) { u.prog += 1 / (u.days || BUILD[k].days); if (u.prog >= 1) { u.run = false; if (u.up) { u.lv = (u.lv || 1) + 1; u.up = false; } deps.toast(`${BUILD[k].ico} ${landNm(k)}${u.lv > 1 ? ` — ниво ${u.lv}` : ''} — строежът завърши${k === 'landmark' ? ', градът има своя символ!' : '.'}`, 'good'); } }
     for (const r of [...m.zr]) { r.prog += 1 / ZONES[r.k].days; if (r.prog >= 1) { m.zr.splice(m.zr.indexOf(r), 1); m.z[r.k] = (m.z[r.k] || 0) + 1; deps.toast(`${ZONES[r.k].ico} ${ZONES[r.k].nm} в ${cityNm()} е готова.`, 'good'); } }
     const s = stats();
     // хората идват, когато има жилища, работа и добър живот; при лош живот си тръгват

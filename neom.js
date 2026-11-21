@@ -51,7 +51,7 @@ export function createNeom(deps) {
     if (d.n) { let seed = d.key.length * 977; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
       for (const id of lotsFor(d)) { const kind = d.kind === 'mix' ? (rnd() < 0.5 ? 'sky' : 'shop') : d.kind; st().used.push(id); deps.place(id, deps.pickModel(kind, rnd), Math.floor(rnd() * 4) * Math.PI / 2); } }
     if (d.final) deps.pop && deps.pop('empire', `🪞 „Линията“ е готова!`, `${deps.brand()} Сити има своята мегаструктура — огледален град-стена. Градът на бъдещето е твой.`);
-    else deps.pop && deps.pop('city-done', `${d.ico} ${d.nm} е готов!`, `${deps.brand()} Сити расте — +${deps.fmt(d.inc)} €/ден.`);
+    else deps.pop && deps.pop('city-done', `${d.ico} ${d.nm} — готово!`, `${deps.brand()} Сити расте — +${deps.fmt(d.inc)} €/ден.`);
     deps.sound && deps.sound('levelup');
   }
   function dailyTick() {
