@@ -201,7 +201,7 @@ export function createBoardLogic(deps) {
   function propHtml(p) {
     if (p.info) return `<div class="meta" style="margin:0">🏦 ${bankSpeech()}</div>`;
     const q = (k, v) => v ? `<div class="meta" style="margin:1px 0"><b style="color:var(--mut)">${k}:</b> ${v}</div>` : '';
-    return `<div class="meta" style="margin:0 0 4px;color:var(--txt)">${p.ico || ''} ${p.text}</div>${q('Защо', p.why)}${q('Колко', p.cost ? B(p.cost) : 'без разход')}${q('Кога', p.days ? `~${p.days} дни` : 'веднага')}${q('Очакваме', p.gainTxt || (p.gain ? `+${B(p.gain)}/месец` : ''))}${p.inBudget === false ? '<div class="meta" style="margin:2px 0;color:var(--bad)">⚠️ над бюджета за инвестиции</div>' : p.inBudget ? '<div class="meta" style="margin:2px 0;color:var(--ok)">✅ в рамките на бюджета за инвестиции</div>' : ''}`;
+    return `<div class="meta" style="margin:0 0 4px;color:var(--txt)">${p.ico || ''} ${p.text}</div>${q('Защо', p.why)}${q('Колко', p.cost ? B(p.cost) : 'без разход')}${q('Кога', p.days ? (p.days === 1 ? '~1 ден' : `~${p.days} дни`) : 'веднага')}${q('Очакваме', p.gainTxt || (p.gain ? `+${B(p.gain)}/месец` : ''))}${p.inBudget === false ? '<div class="meta" style="margin:2px 0;color:var(--bad)">⚠️ над бюджета за инвестиции</div>' : p.inBudget ? '<div class="meta" style="margin:2px 0;color:var(--ok)">✅ в рамките на бюджета за инвестиции</div>' : ''}`;
   }
   // HTML на вота: обясненията и решенията (собственикът решава винаги)
   function voteHtml(r) {
