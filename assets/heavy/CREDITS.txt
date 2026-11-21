@@ -192,7 +192,6 @@ blocks2/office5.glb — "Low rise wall to wall office building" by aitortilla01,
 blocks2/office6.glb — "Low rise wall to wall office building" by aitortilla01, CC-BY-4.0 — https://sketchfab.com/3d-models/low-rise-wall-to-wall-office-building-6488ad5edd1d454884b3fe030f5f04b1
 blocks2/lenox.glb — "Lenox Brownstones" by hamma085, CC-BY-4.0 — https://sketchfab.com/3d-models/cfcb6487165a4cd6ae24a787dae73acc
 blocks2/n1st.glb — "115 N 1st Street" by hamma085, CC-BY-4.0 — https://sketchfab.com/3d-models/83587cdd0dd045db8378def23d26cdaf
-blocks2/usbank.glb — "US Bank Tower" by Mitya Petrov, CC-BY-4.0 — https://sketchfab.com/3d-models/us-bank-tower-82227908aa5c446395c4b9847284da4a
 blocks2/washst.glb — "317 Washington Street" by hamma085, CC-BY-4.0 — https://sketchfab.com/3d-models/317-washington-street-1c16cac26e2b484387ac1311e0f5b57e
 blocks2/pp-apart.glb — "Apartment building" by Poly by Google, CC-BY — https://poly.pizza/m/01lqee-dZAr
 blocks2/pp-bigbld.glb — "Big Building" by Quaternius, CC0 — https://poly.pizza/m/AVCS8jUd2l
