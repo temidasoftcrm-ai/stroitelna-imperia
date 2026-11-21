@@ -4,6 +4,10 @@
 // Кварталите идват от neom.js (жилищни/делови) плюс повторяемите зони тук (жилищни блокове, делови и промишлени паркове).
 // Записът: S.imp = { cc, lv, b: { [key]: [{ lv, run, prog }] }, z: { [zone]: n }, zr: [{ k, prog }], pop, sat, hist: [{ m, bal, sat }], streak, holdRes, asked }.
 
+import { feature } from './lab/feature.js';
+const UPOPEN = feature('imp-up-open');   // ⚡ флаг imp-up-open: при разширение сградата работи на старото си ниво (иначе ×0 — без болници, докато трае)
+const working = u => !u.run || (UPOPEN && u.up);
+
 export const IMP_CC = {
   US: { cc: '🇺🇸', iso: 'USA', nm: 'САЩ', lat: 28.8, lon: -96.9, title: 'кмет',
     vision: 'Делови център с небостъргачи, предградия и широки булеварди', hard: 'Скъпа земя, автомобилен трафик, растящи нужди от услуги',
@@ -97,7 +101,7 @@ export function createImperial(deps) {
     for (const [k, z] of Object.entries(ZONES)) { const n = m.z[k] || 0; house += z.house * n; jobs += z.jobs * n; if (z.poll) indJobs += z.jobs * n; }
     const pop = Math.min(m.pop || 0, house), workers = pop * 0.5, unemp = workers > 0 ? Math.max(0, (workers - jobs) / workers) : 0, vac = house > 0 ? (house - pop) / house : 0;
     const ev = m.ev && m.ev.until > day() ? evOf(m.ev.k) : null, evCap = c => ev && ev.cat === c && ev.cap ? ev.cap : 1, evNeed = c => ev && ev.cat === c && ev.need ? ev.need : 1;
-    const cap = cat => evCap(cat) * Object.keys(BUILD).filter(k => BUILD[k].cat === cat).reduce((a, k) => a + units(k).filter(u => !u.run).reduce((s, u) => s + capOf(k, u), 0), 0);
+    const cap = cat => evCap(cat) * Object.keys(BUILD).filter(k => BUILD[k].cat === cat).reduce((a, k) => a + units(k).filter(working).reduce((s, u) => s + capOf(k, u), 0), 0);
     const cov = (have, need) => need <= 0 ? 1 : Math.min(1, have / need);
     const trips = (pop * 0.6 + jobs * 0.4) * c.trafficK, heat = c.heatK * (win ? 1.15 : 1);
     const green = units('park').filter(u => !u.run).reduce((a, u) => a + BUILD.park.green * (u.lv || 1), 0);
@@ -111,7 +115,7 @@ export function createImperial(deps) {
     const expect = Math.min(12, pop / 50000 * 1.5), satT = Math.max(0, Math.round(Object.entries(W).reduce((a, [x, w]) => a + w * Math.pow(k[x], 1.6), 0) * 100 - expect));   // голям град — по-високи очаквания
     // оперативният баланс на града: приход от кварталите и зоните минус издръжката на сградите
     const zinc = Object.entries(ZONES).reduce((a, [kk, z]) => a + z.inc * (m.z[kk] || 0), 0) * (house > 0 ? Math.min(1, pop / house + 0.2) : 0);
-    const up = Object.keys(BUILD).reduce((a, kk) => a + units(kk).reduce((s, u) => s + BUILD[kk].up * (1 + 0.4 * ((u.lv || 1) - 1)) * (BUILD[kk].winter && win ? c.winterK : 1), 0), 0);
+    const up = Object.keys(BUILD).reduce((a, kk) => a + units(kk).filter(u => !UPOPEN || working(u)).reduce((s, u) => s + BUILD[kk].up * (1 + 0.4 * ((u.lv || 1) - 1)) * (BUILD[kk].winter && win ? c.winterK : 1), 0), 0);
     const inc = (N?._inc || 0) + zinc, svc = (k.health + k.school + k.fire) / 3, infra = Math.min(k.power, k.water, k.waste);
     const why = Object.entries(k).filter(([x, v]) => v < 0.85).sort((a, b) => (1 - b[1]) * W[b[0]] - (1 - a[1]) * W[a[0]]).map(([x, v]) => ({ k: x, v, txt: WHY[x] }));
     return { ev: ev ? { ...ev, left: m.ev.until - day() } : null, pop, house, jobs, workers, unemp, vac, k, svc, infra, satT, sat: m.sat ?? 70, inc, zinc, up, bal: inc - up, pollution, why, indJobs };
@@ -249,7 +253,8 @@ export function createImperial(deps) {
     h += ind('👥', 'Население', f(s.pop), s.house ? s.pop / s.house : 0, `жилища ${f(s.house)} · свободни ${(s.vac * 100).toFixed(1)}%`);
     h += ind('💼', 'Заетост', `${(100 - s.unemp * 100).toFixed(1)}%`, s.k.jobs, `работни места ${f(s.jobs)} · търсят ${f(s.workers)}`);
     h += ind('🏥', 'Услуги', `${Math.round(s.svc * 100)}%`, s.svc, `болници ${Math.round(s.k.health * 100)}% · училища ${Math.round(s.k.school * 100)}% · пожарни ${Math.round(s.k.fire * 100)}%`);
-    h += ind('🚇', 'Транспорт', `${Math.round(s.k.transport * 100)}%`, s.k.transport, `ток ${Math.round(s.k.power * 100)}% · вода ${Math.round(s.k.water * 100)}% · отпадъци ${Math.round(s.k.waste * 100)}%`);
+    h += ind('🚇', 'Транспорт', `${Math.round(s.k.transport * 100)}%`, s.k.transport, `автобуси · трамваи · метро`);
+    h += ind('🔌', 'Инфраструктура', `${Math.round(s.infra * 100)}%`, s.infra, `ток ${Math.round(s.k.power * 100)}% · вода ${Math.round(s.k.water * 100)}% · отпадъци ${Math.round(s.k.waste * 100)}%`);   // беше под „Транспорт“ — объркваше
     h += ind('💶', 'Оперативен баланс', `${s.bal >= 0 ? '+' : ''}${f(s.bal)} €/ден`, s.bal >= 0 ? 1 : 0.3, `приход ${f(s.inc)} · издръжка ${f(s.up)}`);
     h += ind('😊', 'Удовлетвореност', `${Math.round(s.sat)}%`, s.sat / 100, `${m.streak || 0}/6 добри месеца подред`);
     if (s.ev) h += `<div class='meta' style='margin:8px 0 0;color:#ffb300'>${s.ev.ico} <b>${s.ev.nm}</b> — още ${s.ev.left} дни.</div>`;
@@ -257,7 +262,7 @@ export function createImperial(deps) {
     const next = [22, 23, 24, 25].find(l => (m.lv || 20) < l);
     if (next) h += `<div class="card"><div class="meta" style="margin:0">🏅 Към ниво ${next}: ${NEED[next]}</div></div>`; else h += `<div class="card" style="border:1px solid #ffd54a"><div class="meta" style="margin:0;color:#ffd54a">🏅 „Град за пример“ — президентската кампания в ${c.nm} те чака.</div></div>`;
     const row = k => { const b = BUILD[k], us = units(k), ok = lvOk(k), e = canExpand(k), c0 = costOf(k), run = us.filter(u => u.run);
-      return `<div class="row" style="margin:4px 0;align-items:center;gap:6px;${ok ? '' : 'opacity:.5'}"><span class="meta" style="margin:0;flex:1">${b.ico} <b style="color:var(--txt)">${landNm(k)}</b> ×${us.filter(u => !u.run).length}${run.length ? ` · строят се ${run.map(u => Math.round(u.prog * 100) + '%').join(', ')}` : ''} · издръжка ${f(b.up)} €/ден${b.lv && !ok ? ` · 🔒 ниво ${b.lv}` : ''}</span>${e ? `<button class="btn2" data-impup="${k}">⬆️ ${B(upCost(k, us.find(u => !u.run && (u.lv || 1) < LV_MAX)))}</button>` : ''}${ok && !(b.one && us.length) ? `<button class="btn2" data-impb="${k}" ${deps.econ().canAfford(c0) ? '' : 'disabled'}>＋ ${B(c0)}</button>` : ''}</div>`; };
+      return `<div class="row" style="margin:4px 0;align-items:center;gap:6px;${ok ? '' : 'opacity:.5'}"><span class="meta" style="margin:0;flex:1">${b.ico} <b style="color:var(--txt)">${landNm(k)}</b> ×${us.filter(working).length}${run.length ? ` · ${UPOPEN && run.every(u => u.up) ? 'разширяват се (работят)' : 'строят се'} ${run.map(u => Math.round(u.prog * 100) + '%').join(', ')}` : ''} · издръжка ${f(b.up)} €/ден${b.lv && !ok ? ` · 🔒 ниво ${b.lv}` : ''}</span>${e ? `<button class="btn2" data-impup="${k}">⬆️ ${B(upCost(k, us.find(u => !u.run && (u.lv || 1) < LV_MAX)))}</button>` : ''}${ok && !(b.one && us.length) ? `<button class="btn2" data-impb="${k}" ${deps.econ().canAfford(c0) ? '' : 'disabled'}>＋ ${B(c0)}</button>` : ''}</div>`; };
     h += `<div class="card"><h3 style="margin:0 0 6px">🏛️ Обществени сгради</h3>${Object.keys(BUILD).map(row).join('')}</div>`;
     h += `<div class="card"><h3 style="margin:0 0 6px">🗺️ Зони</h3>${Object.entries(ZONES).map(([k, z]) => `<div class="row" style="margin:4px 0;align-items:center;gap:6px"><span class="meta" style="margin:0;flex:1">${z.ico} <b style="color:var(--txt)">${z.nm}</b> ×${m.z[k] || 0}${m.zr.filter(r => r.k === k).length ? ` · строят се ${m.zr.filter(r => r.k === k).map(r => Math.round(r.prog * 100) + '%').join(', ')}` : ''} · ${z.house ? `+${f(z.house)} жилища` : `+${f(z.jobs)} работни места`}${z.poll ? ' · замърсява' : ''}</span><button class="btn2" data-impz="${k}" ${deps.econ().canAfford(zoneCost(k)) ? '' : 'disabled'}>＋ ${B(zoneCost(k))}</button></div>`).join('')}</div>`;
     return h;
