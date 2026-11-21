@@ -29,6 +29,20 @@ if (!LOCAL) THREE.DefaultLoadingManager.setURLModifier(url => {
   return ASSET_BASE + hv(url.slice(i + KEY.length));
 });
 
+// 📊 model-stats (21.11): кои 3D модели реално са заредени в сесията — по група (папката под assets/heavy/ или assets/). Само в паметта (без мрежа,
+// без localStorage); usage.js ги праща като събитие 'model' (k: групата, n: колко различни файла) — само с флага и съгласието 'analytics'.
+// Целта: колко играчи виждат забележителностите, летищата, събитията… (window.__glbSeen в конзолата).
+export const glbSeen = new Map();
+{ const M = THREE.DefaultLoadingManager, end0 = M.itemEnd.bind(M), err0 = M.itemError.bind(M), bad = new Set();
+  M.itemError = url => { bad.add(url); return err0(url); };
+  M.itemEnd = url => {
+    try { if (typeof url === 'string' && /\.glb(\?|$)/i.test(url) && !bad.has(url)) {
+      const u = url.split('?')[0], rel = u.startsWith(ASSET_BASE) ? u.slice(ASSET_BASE.length) : u.replace(/^.*?assets\/(heavy\/)?/, ''), g = rel.includes('/') ? rel.split('/')[0] : '-';
+      (glbSeen.get(g) || glbSeen.set(g, new Set()).get(g)).add(rel); } } catch { }
+    return end0(url);
+  };
+  if (typeof window !== 'undefined') window.__glbSeen = glbSeen; }
+
 const parse0 = GLTFLoader.prototype.parse;
 // v3.2.2 (светещи модели нощем): материалите с KHR_materials_unlit идват като MeshBasicMaterial — без светлина; нощем светят с пълна яркост
 // (палмите, камъните, A320, ВЛ82, болницата, църквата, стадионът…). Тук → MeshStandardMaterial (същите map, цвят, прозрачност, alphaTest, страна,

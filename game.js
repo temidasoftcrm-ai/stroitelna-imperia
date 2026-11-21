@@ -14130,6 +14130,7 @@ const awayWaiting = () => { const w = [], dep = econ.depositInfo?.()?.ready || 0
   if (dep > 0) w.push(`🏦 Лихва по депозита: ${fmt(dep)} € — вземи я от Банката`);
   return w; };
 if (feature('usage-stats')) usage = createUsage({ ctx: () => ({ day: S?.day, lv: S?.dev?.lv, city: S?.cityId }), gfx: gfxLevel, playing: () => !!S && speed > 0, bigWin: () => bigWin,
+  models: feature('model-stats') ? () => window.__glbSeen : null,   // 📊 model-stats (21.11): кои групи 3D модели реално се зареждат (config.js)
   mix: () => feature('music') ? loadMix() : null,
   tut: () => { let o = null; try { o = JSON.parse(localStorage.getItem('stroi-tut') || 'null'); } catch { }   // onboarding (7 стъпки; done без всички — пропуснат), иначе старият урок
     if (o && !o.old) return { step: o.step, done: !!o.done && o.step >= 7, off: !!o.done && o.step < 7 }; return S?.tut ? { step: S.tut.step, off: !!S.tut.off, done: S.tut.step >= 99 } : null; } });

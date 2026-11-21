@@ -12,7 +12,7 @@
 //   usage.track(ev, k, n)  ·  usage.open(k)  ·  usage.buffer()  ·  usage.flush()
 import { anonId } from './errtelem.js';
 
-const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname), EVENTS = new Set(['session', 'play_min', 'level', 'city', 'open', 'tut', 'ad', 'away', 'music']);
+const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname), EVENTS = new Set(['session', 'play_min', 'level', 'city', 'open', 'tut', 'ad', 'away', 'music', 'model']);
 const MAX_BUF = 200, PLAY = [10, 30, 60, 120];
 const ok = () => !!window.consent?.has?.('analytics');
 const s40 = v => v == null ? null : String(v).replace(/[\u0000-\u001f]/g, '').slice(0, 40);
@@ -53,6 +53,9 @@ export function createUsage(deps) {
     try { const m = deps.mix?.(); if (m) { const z = +m.music === 0; if (mus0 === false && z) track('music', 'off', 0); mus0 = z; } } catch { }
     try { if (document.getElementById('bigWin') && deps.bigWin?.() === 'bank') { const bt = localStorage.getItem('stroi-bank-tab') || 'money'; if (bt !== bankTab0) { bankTab0 = bt; open('bank:' + bt); } } else bankTab0 = null; } catch { }
   }, 5000);
+  // 📊 model-stats: заредените 3D модели по група (config.js → glbSeen) — на 60 s само групите, в които броят е нараснал (k: групата, n: колко файла)
+  if (deps.models) { const last = {}; setInterval(() => { try { const m = deps.models(); if (!m) return;
+    for (const [g, set] of m) if (set.size > (last[g] || 0)) { last[g] = set.size; track('model', g, set.size); } } catch { } }, 60e3); }
   // прозорците, които модулите сами създават: кино, съветът на директорите, президентът, кампаниите
   const IDS = { cine: 'cinema', boardRoom: 'board', pres: 'president', camp: 'campaign' };
   new MutationObserver(ms => { for (const m of ms) for (const el of m.addedNodes) if (el.id && IDS[el.id]) open(IDS[el.id]); }).observe(document.body, { childList: true });
