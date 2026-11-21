@@ -7,6 +7,7 @@ import { splitTrees } from './treesplit.js';   // горските пакети 
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { mergeSkinned } from './skinmerge.js';   // ⚡ ped-merge
+import { mergeProps, bakeWorker } from './sitemerge.js';   // ⚡ site-merge
 import * as ECON from './economy.js';
 import { tintRoof } from './roofs.js';
 import { DayNight, clockText } from './daynight.js';
@@ -181,6 +182,7 @@ import { loadIndustry } from './industry.js';
 import { loadConstruct } from './construct.js';
 import { showIntro } from './intro.js';
 import { feature } from './lab/feature.js';
+const VMERGE = feature('veh-merge'), VMERGE_RX = /^sf-(car-|em-|bus|van|truck|trk-)/;
 import { createShadowSmall } from './shadowsmall.js';
 import { setMainRenderer, setMainScene } from './memfix.js';
 import { mountHub } from './hub.js';
@@ -802,6 +804,7 @@ let europe = null;
   jobs.forEach(j => j.then(() => { const k = Math.round(++done / jobs.length * 100); $('ldBar').style.width = Math.max(3, k) + '%'; $('ldTxt').textContent = `Зареждане… ${k}%`; }));
   await Promise.all(jobs.map(j => Promise.resolve(j).catch(e => console.warn('asset', e && e.message || e))));   // липсващ/недостъпен модел не спира играта
   await loadConstruct(load, A);
+  if (feature('site-merge')) window.__siteMerge = mergeProps(A, ['crane-tower', 'container-office-green', 'container-office-red', 'toilet-portable', 'planks-wood-a', 'box-stack-brown', 'container-rubble-red', 'barrel']);   // ⚡ site-merge (sitemerge.js): частите на неподвижния реквизит на строежите по материал (2 строежа ~226 → ? рисувания)
   if (feature('site-anim')) await loadSiteRigs(load, A).catch(() => {});
   if (feature('mats-truck2')) for (const k of ['box', 'flat']) jobs.push(load(`assets/heavy/gear/mats-${k}.glb`).then(g => { g.scene.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); A['sf-mats-' + k] = g; }).catch(() => {}));   // 🚚 mats-truck2: камионите за материалите (trucks.js build2)   // 🏗️ кранът и багерът с истински стави (Blender)   // строежите: кулокран, контейнери, тоалетна, материали, самосвали, бетоновоз — истинските (construct.js) под старите имена
   await loadIndustry(load, A);   // истинските заводи, водни кули, турбини и соларни панели (industry.js) — заместват детските 'ind-*' (Лабораторията → ind-real)
@@ -863,7 +866,7 @@ const ovOn = () => feature('obj-overrides');
 // 🏙️ разтегливият небостъргач на най-близкия наличен брой етажи (10/15/20 за класическите, 20–40 за модерните) — „име@25“ може да няма
 function skyKey(n, floors) { const fs = [10, 15, 20, 25, 30, 40].filter(f => A[`${n}@${f}`]); if (!fs.length) return A[n] ? n : null; const f = fs.reduce((a, b) => Math.abs(b - floors) < Math.abs(a - floors) ? b : a); return `${n}@${f}`; }
 // ⚡ veh-merge: колите, бусовете, камионите, автобусите — неподвижните им части в едно рисуване на материал (бусът: 68 → ~10); техниката (багер, кран…) — не
-const VMERGE = feature('veh-merge'), VMERGE_RX = /^sf-(car-|em-|bus|van|truck|trk-)/;
+// VMERGE — горе, до импортите (зареждането на колите на ред ~751 го ползва; оттук беше „before initialization“ и veh-merge понякога тихо се прескачаше)
 function vehMergeT(t) { if (t && t.isObject3D) try { mergeVeh(t, { clips: VAN_CLIPS[t.userData.van] }); } catch (e) { console.warn('veh-merge', e); } }
 const vehMergeIf = (n, t) => { if (VMERGE && VMERGE_RX.test(n)) vehMergeT(t); return t; };
 function model(n, scale = 1, shadow = true) {
@@ -4143,9 +4146,11 @@ function updateSite(p, t) {
     d.hook.position.set(0, -drop, reach);
   }
 }
+const SITEMERGE = feature('site-merge');
 const WORK_CLIPS = ['Interact', 'Punch_Right', 'Sword_Slash', 'Interact'];
 function makeWorker(g) {
   const src = A[Math.random() < 0.6 ? 'worker_male' : 'worker_male_alt'];
+  if (SITEMERGE) try { bakeWorker(src.scene); } catch (e) { console.warn('site-merge', e); }   // ⚡ site-merge: едноцветните части на работника → един материал (13 → 1–2 рисувания)
   const m = cloneSkinned(src.scene);
   m.scale.setScalar(1.15);
   m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
