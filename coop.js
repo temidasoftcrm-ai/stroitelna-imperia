@@ -486,7 +486,7 @@ export function createCoop(d) {
     let h = `<button class="x" data-c="close">×</button><h2>🤝 Партньор</h2>`;
     if (!cloud.user || !cloud.user() || cloud.user().is_anonymous) {
       if (cloud.user && cloud.user()?.is_anonymous) h += `<p class="mut">👤 Играеш като гост — за партньорство е нужен акаунт (⚙️ Настройки → 🆕 Създай акаунт; записите ти остават).</p><div class="row"><button class="btn" data-c="login">🆕 Създай акаунт</button></div>`;
-      else h += `<p class="mut">Партньорството минава през облака. Влез с имейла си от бутона ☁️ горе (същият вход като за записите в облака), после се върни тук.</p><div class="row"><button class="btn" data-c="login">☁️ Вход</button></div>`;
+      else h += `<p class="mut">Партньорството минава през облака. Влез с имейла си — бутонът „☁️ Вход“ по-долу (същият вход като за записите в облака), после се върни тук.</p><div class="row"><button class="btn" data-c="login">☁️ Вход</button></div>`;
       el.innerHTML = h; bind(el); return;
     }
     if (!S || !d.ready()) { h += '<p class="mut">Първо основи фирмата си и влез в града.</p>'; el.innerHTML = h; bind(el); return; }
