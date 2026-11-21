@@ -4,7 +4,7 @@
 
 import { t as tr } from './i18n.js';
 import { feature } from './lab/feature.js';
-const EARLY = feature('early-fines');
+const EARLY = feature('early-fines'), EARLY_M = feature('market-fair');   // market-fair: ръстът = сривът (0,04)
 
 const pick = a => a[(Math.random() * a.length) | 0];
 const MAT_UP = ['steel', 'concrete', 'bricks', 'wood', 'glass'];
@@ -39,7 +39,7 @@ export const EVENTS = [
     c.econ.earn(n, 'друго', 'Държавна субсидия за строителство');
     return { ico: '🏛️', title: 'Държавна субсидия', text: `Общината ти отпусна ${c.fmt(n)} € за обновяване на квартала.`, kind: 'good' };
   } },
-  { id: 'rally', w: 1, run: c => { c.econ.marketMood(0.03); return { ico: '🚀', title: 'Ръст на борсата', text: 'Инвеститорите са оптимисти — акциите поскъпват няколко дни.', kind: 'good' }; } },
+  { id: 'rally', w: 1, run: c => { c.econ.marketMood(EARLY_M ? 0.04 : 0.03); return { ico: '🚀', title: 'Ръст на борсата', text: 'Инвеститорите са оптимисти — акциите поскъпват няколко дни.', kind: 'good' }; } },
   { id: 'crash', w: 1, run: c => { c.econ.marketMood(-0.04); c.econ.marketShock('строителство', -0.06); return { ico: '💥', title: 'Срив на борсата', text: 'Паника на пазара — акциите (особено строителните) падат.', kind: 'bad' }; } },
   { id: 'tourism', w: 1, run: c => { c.econ.marketShock('туризъм', 0.08); return { ico: '✈️', title: 'Рекорден туристически сезон', text: 'Акциите на туристическите фирми скачат.', kind: 'good' }; } },
 ];

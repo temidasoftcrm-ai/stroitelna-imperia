@@ -2,6 +2,7 @@
 // ИНТЕРФЕЙС: game.js вика само експортираните неща по-долу. Вътрешността може да се развива свободно.
 // Всички суми са в евро.
 import { feature } from './lab/feature.js';
+const MFAIR = feature('market-fair');
 import { t as tr } from './i18n.js';   // 🌐 lang-en (f9): текстовете, които се сменят от кода (бутоните и реда под плъзгачите на депозита)   // fix-econ (f9)
 
 // Видове техника/хора, които фирмата може да купи
@@ -577,7 +578,8 @@ export class Economy {
       if (q.bust) { q.price = Math.max(0.5, Math.round(q.price * (1 + (Math.random() - 0.55) * 0.03) * 100) / 100); q.hist.push(q.price); if (q.hist.length > 90) q.hist.shift(); continue; }
       const z = (Math.random() + Math.random() + Math.random() - 1.5) * 2;   // ~N(0,1)
       const shock = (m.shock && (m.shock.sector === c.sector || m.shock.sector === '*')) ? m.shock.pct : 0;
-      q.price = Math.max(0.5, Math.round(q.price * (1 + c.drift + mood + shock + z * c.vol) * 100) / 100);
+      const rev = MFAIR ? Math.max(-0.004, Math.min(0.004, 0.004 * (1 - q.price / c.price))) : 0;   // ⚡ market-fair: лека тяга към началната цена (до ±0,4%/ден) — без нея сривовете (−20%) надвиваха ръстовете (+15%) и на ден ~850 пет от шест акции бяха „близо до фалит“
+      q.price = Math.max(0.5, Math.round(q.price * (1 + c.drift + rev + mood + shock + z * c.vol) * 100) / 100);
       q.hist.push(q.price); if (q.hist.length > 90) q.hist.shift();
     }
     m.shock = null; m.mood = mood * 0.8;   // ефектът от събитията отшумява
