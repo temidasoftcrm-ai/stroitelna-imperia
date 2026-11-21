@@ -8,6 +8,7 @@ import { loadSigns, sign } from './roadsigns.js';
 import { NF_MATS } from './nightfloors.js';   // daynight.js пали тези материали вечер (emissiveIntensity = нощта)
 import { makeWater } from './water.js';
 import { t as tr } from './i18n.js';   // 🌐 lang-en: надписите на платното (f9, част C)
+const HW_FAIR = feature('hw-pay-fair');
 
 // Истинските магистрали, разделени на участъци между градовете от картата
 export const HIGHWAYS = [
@@ -42,8 +43,10 @@ export const HW_REP = 2;              // нужна репутация за дъ
 export const TOLL_PER_KM_DAY = 6;     // основна тол такса, € на км на ден (расте с дължината на магистралата — виж hwToll в game.js)
 
 // Цена, срок и материали за участък с дължина km (държавата плаща reward при завършване)
-export function segmentQuote(km) {
-  const reward = Math.round((km * 5200 + 60000) / 5000) * 5000;
+// ⚡ hw-pay-fair (тест нов играч 21.11): материалите на участъка са ~7 500 €/км (+доставка), а държавата плащаше 5 200 €/км + 60 000 € —
+// всеки участък беше на загуба (96 км: 741 хил. материали срещу 560 хил.). Сега 9 400 €/км + 60 000 € (~+25% печалба). base — старата формула (аутобаните ×2,5 са на печалба и без това)
+export function segmentQuote(km, base = false) {
+  const reward = Math.round((km * (HW_FAIR && !base ? 9400 : 5200) + 60000) / 5000) * 5000;
   const days = Math.max(6, Math.round(km / 9));
   // материалите по етапи (ще се купуват през economy.js)
   const mats = [

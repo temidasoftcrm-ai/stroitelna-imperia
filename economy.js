@@ -236,7 +236,7 @@ export const CATS = {
   'лихва+':   { ico: '💰', nm: 'Лихва по депозит' },
   'акции':    { ico: '📈', nm: 'Акции (покупка/продажба)' },
   'дивиденти': { ico: '💵', nm: 'Дивиденти' },
-  'дъщерни':  { ico: '🏢', nm: 'Дъщерни фирми' },
+  'дъщерни':  { ico: '🏢', nm: 'Изкупени фирми' },   // фирмите от борсата (не дъщерните дружества — Толроуд, Рейл… — те са в group.js)
   'полети':   { ico: '✈️', nm: 'Полети' },
   'гаранция': { ico: '🔐', nm: 'Гаранции за търгове' },
   'кораби':   { ico: '🚢', nm: 'Кораби' },
@@ -615,7 +615,7 @@ export class Economy {
       const low = q.price < c.price * BUST.below;
       if (Math.random() < (low ? BUST.chanceLow : BUST.chanceAny)) this.goBust(c.id, day);
     }
-    if (inc) this.earn(inc, 'дъщерни', `Ден ${day}: дъщерни фирми`);
+    if (inc) this.earn(inc, 'дъщерни', `Ден ${day}: изкупени фирми`);
   }
   goBust(id, day = this.s.day) {
     const c = COMPANIES.find(x => x.id === id), q = this.s.market.c[id];
@@ -1068,7 +1068,7 @@ export function renderFinance(el, econ, rep = 0, rerender = () => {}, unitTypes 
     COMPANIES.filter(visCo).map(c => {
       const q = mk.c[c.id], prev = q.hist[q.hist.length - 2] || q.price, ch = (q.price / prev - 1) * 100, h = s.shares[c.id];
       if ((s.subs || {})[c.id] && BS) return '';   // bank-simple: дъщерните — в таб „Компания“
-      if ((s.subs || {})[c.id]) return `<div class="fin-row"><span>${c.ico}</span><span class="n">${esc(c.nm)}<br><span style="color:var(--ok)">✅ твоя дъщерна фирма от ден ${s.subs[c.id].day}</span></span><span class="a fin-pos">+${fmt(c.subDaily)}/ден</span>${this_liqBtn(econ, c)}</div>`;
+      if ((s.subs || {})[c.id]) return `<div class="fin-row"><span>${c.ico}</span><span class="n">${esc(c.nm)}<br><span style="color:var(--ok)">✅ изкупена от теб на ден ${s.subs[c.id].day}</span></span><span class="a fin-pos">+${fmt(c.subDaily)}/ден</span>${this_liqBtn(econ, c)}</div>`;
       if (q.bust) { const tp = econ.takeoverPrice(c.id); return `<div class="fin-row" style="flex-wrap:wrap;border:1px solid var(--bad);border-radius:8px;padding:6px"><span>${c.ico}</span><span class="n">${esc(c.nm)}<br><span style="color:var(--bad);font-weight:700">💥 ФАЛИТ · още ${q.bust.until - s.day} дни</span></span>
         <span class="a" style="text-align:right">${q.price.toFixed(2)} €</span>
         <div class="meta" style="width:100%">Изкупи цялата фирма и вземи: <b style="color:var(--txt)">${c.gets}</b>. После носи <b class="fin-pos">+${fmt(c.subDaily)}/ден</b>.${h ? ` Твоите ${h.qty} акции се приспадат.` : ''}</div>
@@ -1105,7 +1105,7 @@ export function renderFinance(el, econ, rep = 0, rerender = () => {}, unitTypes 
     const subs = COMPANIES.filter(c => (s.subs || {})[c.id]), w2 = unitTypes ? econ.netWorth(unitTypes) : null;
     if (LVL < BS_LV.company && !subs.length && !s.ipo) html += `<div class="card" data-bt="company" style="opacity:.8"><h3><span class="ico">🔒</span>Компания</h3><div class="meta">От ниво ${BS_LV.company}: изкупуваш фалирали фирми от борсата и те стават твои дъщерни (носят приход всеки ден). От ниво ${BS_LV.ipo}: пускаш своята фирма на борсата (IPO).${opts.devLevel != null ? ` Сега: ниво ${opts.devLevel}.` : ''}</div></div>`;
     else {
-      html += `<div class="card" data-bt="company"><h3><span class="ico">🏢</span>Дъщерни фирми</h3>` + (subs.length ? subs.map(c => `<div class="fin-row"><span>${c.ico}</span><span class="n">${esc(c.nm)}<br><span style="color:var(--ok)">✅ твоя от ден ${s.subs[c.id].day}</span></span><span class="a fin-pos">+${fmt(c.subDaily)}/ден</span>${this_liqBtn(econ, c)}</div>`).join('') : `<div class="meta">Нямаш дъщерни фирми. Когато акция на борсата падне много, фирмата фалира — тогава можеш да я изкупиш цялата (таб „Борса“).</div>`) + `</div>`;
+      html += `<div class="card" data-bt="company"><h3><span class="ico">🏢</span>Изкупени фирми</h3>` + (subs.length ? subs.map(c => `<div class="fin-row"><span>${c.ico}</span><span class="n">${esc(c.nm)}<br><span style="color:var(--ok)">✅ твоя от ден ${s.subs[c.id].day}</span></span><span class="a fin-pos">+${fmt(c.subDaily)}/ден</span>${this_liqBtn(econ, c)}</div>`).join('') : `<div class="meta">Нямаш изкупени фирми. Когато акция на борсата падне много, фирмата фалира — тогава можеш да я изкупиш цялата (таб „Борса“) и тя ти носи пари всеки ден.<br>Твоите <b>дъщерни фирми</b> (магистрали, жп, кораби, самолети) са друго — основаваш ги от „Империя → Транспорт“.</div>`) + `</div>`;
       html += `<div class="card" data-bt="company">` + (LVL < BS_LV.ipo && !s.ipo ? `<h3><span class="ico">🔒</span>Твоята фирма на борсата (IPO)</h3><div class="meta">От ниво ${BS_LV.ipo}.</div>` : s.ipo ? `<h3><span class="ico">🏗️</span>Твоята фирма на борсата</h3>
         <div class="fin-kv">Цена на акция <b>${s.ipo.price.toFixed(2)} €</b></div>${spark(s.ipo.hist, 280, 30)}
         <div class="fin-kv">Външни акционери ${s.ipo.outside ? `(${(IPO.share * 100).toFixed(0)}%)` : ''} <b>${s.ipo.outside ? fmt(econ.ipoDebt()) : 'няма — фирмата е изцяло твоя'}</b></div>

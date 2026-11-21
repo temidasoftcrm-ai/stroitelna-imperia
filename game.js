@@ -4147,7 +4147,7 @@ function updateSite(p, t) {
     d.hook.position.set(0, -drop, reach);
   }
 }
-const SITEMERGE = feature('site-merge');
+const SITEMERGE = feature('site-merge'), GROWHINT = feature('grow-hint');
 const WORK_CLIPS = ['Interact', 'Punch_Right', 'Sword_Slash', 'Interact'];
 function makeWorker(g) {
   const src = A[Math.random() < 0.6 ? 'worker_male' : 'worker_male_alt'];
@@ -5345,7 +5345,8 @@ function renderPanel() {
     if (!FS0) { h += muni.cardHtml(); h += rivals.marketHtml(); }
     if (tenderDir()) { const n = TENDERS.filter(t => tenders.state(t.id)?.st === 'open').length; if (n) h += `<div class="card"><div class="row" style="margin:0;align-items:center;gap:8px"><span class="meta" style="margin:0;flex:1">🏛️ <b style="color:var(--txt)">${tenderDir()}</b> подготвя оферти за ${n} ${n === 1 ? 'търг' : 'търга'}.</span><button class="btn2" data-dtend="1">Предложенията му →</button></div></div>`; }
     else h += tenders.cardsHtml('open');   // взетите (в строеж) — в „📜 Оферти“; от ниво 15 с директор — търговете са негови предложения
-    if (freeLotCount() < 3) h += `<div class="meta" style="text-align:center;color:var(--acc)">${(S.cityExt || 0) >= extNeed() ? '🏁 Градът е застроен докрай — в таб „Офис“ натисни „Завърши града“ и продължи в друг град.' : '🏙️ Градът е почти застроен — купи нов квартал от таб „Офис“.'}</div>`;   // тест нов играч: при 3/3 квартала съветът сочеше несъществуващ бутон
+    if (freeLotCount() < 3) h += `<div class="meta" style="text-align:center;color:var(--acc)">${(S.cityExt || 0) >= extNeed() ? '🏁 Градът е застроен докрай — в таб „Офис“ натисни „Завърши града“ и продължи в друг град.' : '🏙️ Градът е почти застроен — купи нов квартал от таб „Офис“.'}</div>`;
+    if (GROWHINT && freeLotCount() < 3 && dev.best() >= 3) h += `<div class="card" style="border-color:var(--acc)"><h3><span class="ico">🚀</span>Как да растеш по-бързо</h3><div class="meta">Поръчките тук намаляват. Най-много опит носят: <b>🏢 филиал в друг град</b> (+3000 и нови поръчки там), <b>🛣️ магистрали</b> и <b>🛤️ жп линии</b> между твоите градове, по-големите сгради (офис, небостъргач).</div><div class="row" style="margin:6px 0 0;gap:6px;flex-wrap:wrap"><button class="btn" id="bGrowMap">🗺️ Карта — нов филиал</button></div></div>`;   // ⚡ grow-hint (тест нов играч: ниво 5→7 ~200 дни на ниво, щом градът се застрои)   // тест нов играч: при 3/3 квартала съветът сочеше несъществуващ бутон
     const SC = feature('simple-card') && FS0;   // 🧾 simple-card (собственикът, 19.11): до първата завършена сграда картата е проста — какво, срок, цена, „Приеми“ (без шанс, ±%, аванс, материали, конкурента)
     for (const o of [...S.offers].sort((a, b) => (b.demolish ? 1 : 0) - (a.demolish ? 1 : 0))) {
       const bt = BTYPES[o.type];
@@ -5416,6 +5417,7 @@ function renderPanel() {
   if ($('bOfferAll')) $('bOfferAll').onclick = offerAll;
   el.querySelectorAll('[data-muni]').forEach(b => b.onclick = e => { e.stopPropagation(); if (b.dataset.muni === 'yes') muni.accept(); else { muni.decline(); renderPanel(); } });
   el.querySelectorAll('[data-acc]').forEach(b => b.onclick = e => { e.stopPropagation(); acceptOffer(+b.dataset.acc); });
+  { const g = el.querySelector('#bGrowMap'); if (g) g.onclick = () => showMap(true); }
   el.querySelectorAll('[data-offbuy]').forEach(b => b.onclick = e => { e.stopPropagation(); const o = S.offers.find(x => x.id === +b.dataset.offbuy); if (!o) return; let k = 0; for (const g of offerGear(o)) if (g.miss) k += fillUnits(g.r, g.miss); toast(k ? `🛒 Купи ${k} ${k === 1 ? 'машина' : 'машини'} за ${BTYPES[o.type].nm.toLowerCase()}.` : 'Няма място или пари.', k ? 'good' : 'bad'); renderPanel(); });   // offer-gear
   el.querySelectorAll('[data-dec]').forEach(b => b.onclick = e => { e.stopPropagation(); declineOffer(+b.dataset.dec); });
   el.querySelectorAll('[data-urgent]').forEach(b => b.onclick = e => { e.stopPropagation(); const p = projects.find(q => q.id === +b.dataset.urgent); if (p) urgentGo(p); });   // urgent-btn
@@ -10652,7 +10654,7 @@ const abQuoteSeg = (sg, km) => { let q = abQuote(km);
   if (sg && (isAm(sg.a) || isAm(sg.b))) q = { ...q, reward: Math.round(q.reward * AM_K.reward / 5000) * 5000, mats: q.mats.map(m => m && Object.fromEntries(Object.entries(m).map(([k, v]) => [k, Math.round(v * AM_K.hw)]))), america: true };   // Америка: материалите ×3, наградата ×2
   return sg && (isAfrica(sg.a) || isAfrica(sg.b)) ? { ...q, days: AF_HW_DAYS(q.days), africa: true } : q; };
 function abQuote(km) {
-  const q = segmentQuote(km), k = AB_K();
+  const q = segmentQuote(km, true), k = AB_K();   // аутобанът — по старата основа (hw-pay-fair вдига само обикновените участъци)
   return { ...q, reward: Math.round(q.reward * k.cost / 5000) * 5000, days: Math.min(90, Math.max(10, Math.round(q.days * 1.4))),
     mats: [q.mats[0], { steel: Math.round(km * 2), concrete: Math.round(km * 12) }, q.mats[1], q.mats[2], q.mats[3]] };
 }
@@ -11832,7 +11834,7 @@ function takeoverChoice(id) {
   const c = ECON.COMPANIES.find(x => x.id === id), paid = (econ.s.subs || {})[id]?.paid || 0, v = takeoverValue(id), fast = Math.round(v * 0.85), slow = Math.round(v * 0.95);
   const pr = n => `<b style="color:${n - paid >= 0 ? 'var(--ok)' : 'var(--bad)'}">${n - paid >= 0 ? '+' : '−'}${fmt(Math.abs(n - paid))} €</b>`;
   modal(`🏢 ${c.nm} е твоя!`, `Плати ${fmt(paid)} €. Какво да правиш с нея?<br><br>
-    🏢 <b>Задръж като дъщерна</b>: взимаш ${c.gets} · носи <b style="color:var(--ok)">+${fmt(c.subDaily)} €/ден</b> (~${fmt(c.subDaily * 360)} €/год.)<br>
+    🏢 <b>Задръж я</b> (изкупена фирма): взимаш ${c.gets} · носи <b style="color:var(--ok)">+${fmt(c.subDaily)} €/ден</b> (~${fmt(c.subDaily * 360)} €/год.)<br>
     💰 <b>Разпродай веднага</b>: +${fmt(fast)} € (печалба ${pr(fast)})<br>
     ⏳ <b>Разпродай за 10 дни</b>: +${fmt(slow)} € на части (печалба ${pr(slow)})`,
     [['⏳ За 10 дни', () => { econ.liquidate(id, slow, 10); renderPanel(); }], ['💰 Веднага', () => { econ.liquidate(id, fast); renderPanel(); }], ['🏢 Задръж', () => takeoverAssets(id)]]);
