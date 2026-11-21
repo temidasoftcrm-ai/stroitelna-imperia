@@ -5460,7 +5460,7 @@ function hqCard(kind) {
   const up = c => `<b style="color:var(--ok)">${c}</b>`;
   const where = kind === 'garage' ? ` · ${S.garageLot == null ? 'в двора на централата' : 'на свой парцел'}` : kind === 'warehouse' && !lv ? ' · още нямаш склад' : '';
   const stats = (X, Y) => kind === 'office'
-    ? `👷 Бригади: ${Y ? `${X.crews} → ${up(Y.crews)}` : `${crewCount()}/${X.crews}`}<br>🏗️ Обекти наведнъж: ${Y ? `${X.proj} → ${up(Y.proj)}` : `${projects.filter(p => !p.own).length}/${X.proj}`}<br>📋 Поръчки на таблото: ${Y ? `${X.offers} → ${up(Y.offers)}` : `до ${X.offers}`}`
+    ? `👷 Бригади: ${Y ? `${X.crews} → ${up(Y.crews)}` : `${crewCount()}/${X.crews}`}<br>🏗️ Обекти наведнъж: ${Y ? `${X.proj} → ${up(Y.proj)}` : `${projects.filter(p => !p.own).length}/${X.proj}`}${Y && Y.offers === X.offers ? '' : `<br>📋 Поръчки на таблото: ${Y ? `${X.offers} → ${up(Y.offers)}` : `до ${X.offers}`}`}`   /* тест нов играч: без „5 → 5“ */
     : kind === 'garage' ? `🚜 Места за техника: ${Y ? `${X.cap} → ${up(Y.cap)}` : `${machineCount()}/${X.cap}${units.some(u => isRoadGear(u.type)) ? ` (+${units.filter(u => isRoadGear(u.type)).length} пътни в пътната база)` : ''}`}`
     : `📦 Място: ${Y ? `×${X.mul} → ${up('×' + Y.mul)}` : `×${X.mul}`} (напр. бетон ${Y ? `${Math.round(WH_BASE.concrete * X.mul)} → ${up(Math.round(WH_BASE.concrete * Y.mul))}` : Math.round(WH_BASE.concrete * X.mul)} м³)`;
   let h = `<div class="card"><h3><span class="ico">${KIND_NM[kind].slice(0, 2)}</span>${KIND_NM[kind].slice(3)} · ниво ${lv}/10</h3>
@@ -12383,6 +12383,7 @@ function estateHtml() {
   h += `<div class="sect">Свободни парцели · твои ${E.land.length}/${MAX_LAND}</div>`;
   if (landFull) h += `<div class="meta late">Имаш максимума от ${MAX_LAND} празни парцела — застрой или продай някой, за да купиш нов.</div>`;
   const free = city.lots.filter(l => !l.built && !l.busy).sort((a, b) => lotPrice(a) - lotPrice(b));
+  if (!free.length && !landFull) h += `<div class="meta">Няма свободни парцели — градът е застроен. Нов квартал се купува от таб „Офис“.</div>`;   // тест нов играч: празен списък без обяснение
   for (const lot of [...free.filter(l => l.zone === 'outer').slice(0, 2), ...free.filter(l => l.zone === 'mid').slice(0, 2), ...free.filter(l => l.zone === 'center').slice(0, 1)])
     h += `<div class="row card" style="margin:0" data-lot="${lot.id}"><span class="meta" style="margin:0">🟩 ${lot.zone === 'center' ? 'Център' : lot.zone === 'mid' ? 'Среден пояс' : 'Покрайнини'}</span><button class="btn" data-land="${lot.id}" ${econ.canAfford(lotPrice(lot)) && !landFull ? '' : 'disabled'} ${ownCapAttr()}>Купи ${fmt(lotPrice(lot))} €</button></div>`;
   return h;
