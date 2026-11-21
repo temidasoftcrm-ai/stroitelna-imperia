@@ -1,4 +1,4 @@
--- НЕ Е ПРИЛОЖЕНА (21.11.2026). Прилага се като 20261025150000_usage_events.sql — през SQL Editor / supabase db query --linked -f, НЕ с db push.
+-- ПРИЛОЖЕНА в TemidaBase 21.11.2026 (стек imperia на станцията: ssh 192.168.1.120 'docker exec -i imperia-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 --single-transaction' < файла). Не с db push.
 -- model-stats (lab/features.js, usage.js + config.js): ново събитие 'model' — k: групата 3D модели (папката: lm, air, trains, riot…),
 -- n: колко различни файла от групата са заредени в сесията (праща се при нарастване, най-много веднъж на 60 s за група).
 -- Без лични данни, същите тавани (50 на заявка, 300 на час на anon id). Може да се пуска повече от веднъж.
