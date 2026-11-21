@@ -36,7 +36,7 @@ export const AID = {
 export const AID_STAGES = [['fin', '💰 Финансиране'], ['sea', '🚢 Доставка'], ['build', '🏗️ Строеж'], ['pm', '👥 Местен персонал и пускане']];
 // глобалните конфликти в игровата хронология; parties — страните, region — къде се води
 export const CONFLICTS = [
-  { k: 'east', ico: '⚔️', nm: 'Войната в Украйна', parties: ['UKR', 'RUS'], region: 'UKR', lat: 48.5, lon: 37.5, int: 85, note: 'алтернативна игрова хронология' },
+  { k: 'east', ico: '🕊️', nm: 'Мирният процес за Украйна', parties: ['UKR', 'RUS'], region: 'UKR', lat: 48.5, lon: 37.5, int: 85, note: 'алтернативна игрова хронология' },
   { k: 'sudan', ico: '🔥', nm: 'Гражданската война в Судан', parties: ['SDN'], region: 'SDN', lat: 13.5, lon: 28, int: 80 },
   { k: 'mideast', ico: '⚠️', nm: 'Близкоизточният конфликт', parties: ['ISR', 'PSX'], region: 'PSX', lat: 31.4, lon: 34.4, int: 75 },
   { k: 'yemen', ico: '🔥', nm: 'Войната в Йемен', parties: ['YEM', 'SAU'], region: 'YEM', lat: 15, lon: 46, int: 60 },
