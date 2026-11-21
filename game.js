@@ -4147,7 +4147,7 @@ function updateSite(p, t) {
     d.hook.position.set(0, -drop, reach);
   }
 }
-const SITEMERGE = feature('site-merge'), GROWHINT = feature('grow-hint');
+const SITEMERGE = feature('site-merge'), GROWHINT = feature('grow-hint'), FINEARN = feature('fin-earned'), GIFTSON = feature('city-gifts');
 const WORK_CLIPS = ['Interact', 'Punch_Right', 'Sword_Slash', 'Interact'];
 function makeWorker(g) {
   const src = A[Math.random() < 0.6 ? 'worker_male' : 'worker_male_alt'];
@@ -5404,7 +5404,7 @@ function renderPanel() {
   } else if (tab === 'bank') {
     h += `<div id="financeBox"></div>`;
   } else if (tab === 'hq') {
-    h += plan2MoveCard() + hqCard('office') + (onb2 && !onb2.ok('links') ? '' : linksCard()) + (onb2 && !onb2.ok('station') ? '' : stationCard()) + (onb2 && !onb2.ok('links') ? '' : airportCard()) + districtCard() + finishCityCard() + sellBranchCard();
+    h += plan2MoveCard() + hqCard('office') + (onb2 && !onb2.ok('links') ? '' : linksCard()) + (onb2 && !onb2.ok('station') ? '' : stationCard()) + (onb2 && !onb2.ok('links') ? '' : airportCard()) + districtCard() + finishCityCard() + giftCard() + sellBranchCard();
   } else if (tab === 'store') {
     h += storeHtml();
   }
@@ -5431,6 +5431,7 @@ function renderPanel() {
   if (tab === 'bank') renderBank($('financeBox'));
   if (tab === 'estate') bindEstate(el);
   if ($('bFinishCity')) $('bFinishCity').onclick = finishCity;
+  el.querySelectorAll('[data-gift]').forEach(b => b.onclick = () => giveGift(b.dataset.gift));
   if ($('bMoveFleet')) $('bMoveFleet').onclick = offerFleetMove;
   if ($('bSellBranch')) $('bSellBranch').onclick = sellBranch;
   el.querySelectorAll('[data-staff]').forEach(b => b.onclick = () => hireStaff(b.dataset.staff));
@@ -9976,6 +9977,22 @@ function virtFill(id, c) {
 // 🏁 fin-fix (Лаборатория): всеки град се завършва и с 1 свободен парцел (останалите условия — квартали, дял ≥ 60%, летище — същите)
 const FINFIX = feature('fin-fix');
 const freeMax = id => FINFIX ? 1 : CAPITALS.has(id) || MEGAPOLIS.has(id) || (cityById(id)?.sz || 0) >= 3 ? 0 : 1;   // важните градове (жълтата точка, като KEY_CITY в drawMap) се завършват само без нито един свободен парцел
+// ⚡ city-gifts (собственикът 21.11: „парите се трупат без какво да купиш“ + „нивата 5→7 са бавни“): дарение за града — веднъж на град всяко;
+// парите стават опит и репутация (~1,5 опит на 1000 €). Записът — в econ.s.gifts[град] (общ за всички градове)
+function giftList() { return [{ k: 'park', ico: '🌳', nm: 'Голям градски парк', cost: 1e6, xp: 1500, rep: 0.05 }, { k: 'hosp', ico: '🏥', nm: 'Нова болница', cost: 5e6, xp: 8000, rep: 0.1 }, { k: 'stad', ico: '🏟️', nm: 'Стадион', cost: 20e6, xp: 30000, rep: 0.2 }]; }
+function giftsOf(id) { return  ((econ.s.gifts = econ.s.gifts || {})[id] = econ.s.gifts[id] || []); }
+function giftCard() {
+  if (!GIFTSON || !S || dev.best() < 4) return '';
+  const got = giftsOf(S.cityId), rows = giftList().map(g => got.includes(g.k) ? `<div class="meta" style="margin:2px 0">✅ ${g.ico} ${g.nm} — дарен</div>`
+    : `<div class="row" style="margin:4px 0;align-items:center;gap:8px"><span class="meta" style="margin:0;flex:1">${g.ico} <b>${g.nm}</b> · +${fmt(g.xp)} опит · +${g.rep} ★</span><button class="btn2" data-gift="${g.k}" ${econ.canAfford(g.cost) ? '' : 'disabled'}>${fmt(g.cost)} €</button></div>`).join('');
+  return `<div class="card"><h3><span class="ico">🏛️</span>Дарение за ${cityName()}</h3><div class="meta">Подари на града нещо голямо — фирмата расте (опит) и хората те харесват (репутация). Всяко — веднъж на град.</div>${rows}</div>`;
+}
+function giveGift(k) {
+  const g = giftList().find(x => x.k === k), got = giftsOf(S.cityId); if (!g || got.includes(k)) return;
+  if (!econ.canAfford(g.cost)) { toast('Нямаш достатъчно пари.', 'bad'); return; }
+  econ.spend(g.cost, 'покупка', `Дарение: ${g.nm} (${cityName()})`); got.push(k); dev.add(g.xp, 'дарение'); S.rep = Math.min(5, S.rep + g.rep);
+  toast(`${g.ico} ${g.nm} — дарение за ${cityName()}: +${fmt(g.xp)} опит, +${g.rep} ★`, 'good'); Sound.play('buy'); save(); renderPanel();
+}
 function finishCityCard() {
   if (!econ.finishCity) return '';
   if (econ.isFinished(S.cityId)) {
@@ -9998,6 +10015,7 @@ function finishCityRemote(id) {
   if ((c.cityExt || 0) < need || remFree(c, id) == null || remFree(c, id) > freeMax(id) || share < 0.6 || !airOkFin(id)) { toast(`${cityById(id).nm} още не е готов за завършване.`, 'bad'); return; }
   const stats = { built: (c.built || []).length, owned: ((c.estate || {}).owned || []).length, day: S.day };
   const r = econ.finishCity(id, share, stats);
+  if (FINEARN) r.cap = Math.max(40000, Math.round(econ.cityAvgDaily(id, 120) * 3 / 1000) * 1000);   // ⚡ fin-earned: 3× средната дневна печалба на града (последните 120 дни), до тавана по размер
   if (econ.setFinishedFleet) econ.setFinishedFleet(id, c.units || []);
   S.finishedCount = (S.finishedCount || 0) + 1; S.branchDiscounts = (S.branchDiscounts || 0) + 1; xpMore(xpCity(5000, id));
   clampFinished();
@@ -10008,6 +10026,7 @@ function finishCity() {
   if (!canFinishCity()) return;
   const share = rivals.share(), stats = { built: S.built.length, owned: est().owned.length, day: S.day };
   const r = econ.finishCity(S.cityId, share, stats);
+  if (FINEARN) r.cap = Math.max(40000, Math.round(econ.cityAvgDaily(S.cityId, 120) * 3 / 1000) * 1000);   // ⚡ fin-earned: 3× средната дневна печалба на града (последните 120 дни), до тавана по размер
   S.finishedCount = (S.finishedCount || 0) + 1; S.branchDiscounts = (S.branchDiscounts || 0) + 1; xpMore(xpCity(5000, S.cityId));
   clampFinished();
   showEventPop('city-done', `🏁 ${cityName()} е завършен!`, `${stats.built} сгради · дял ${Math.round(share * 100)}% · носи ~${fmt(r.daily)} €/ден, докато си другаде. Следващият филиал е −30%.`);
@@ -13637,7 +13656,7 @@ const finIds = () => Object.keys((econ && econ.s.finished) || {});
 // (държава от 5 града ≈ 4–5 млн. на ден); делът на пазара (share) и поддръжката на техниката го коригират, наемите от имотите си идват отделно
 const FIN_CAP = [0, 500000, 700000, 1000000, 2000000];
 const finTarget = id => FIN_CAP[MEGAPOLIS.has(id) ? 4 : Math.min(3, cityById(id)?.sz || 1)];
-function clampFinished() { for (const [id, f] of Object.entries((econ && econ.s.finished) || {})) { const c = finTarget(id); if (f.daily !== c) f.daily = c; } }
+function clampFinished() { for (const [id, f] of Object.entries((econ && econ.s.finished) || {})) { const c = f.cap ? Math.min(finTarget(id), f.cap) : finTarget(id); if (f.daily !== c) f.daily = c; } }   // fin-earned: f.cap — само новозавършените (старите записи — както досега)
 // 🏙️ top-built (bl25 №9): „🏙️ 77%“ с тънка лента — до „📊 Империя ▾“, докато си в града (не на картата); клик → „🏁 Завърши града“ (таб „Офис“);
 // при 100% — зелено (и напомняне за куеста „Пълен първи град“); на телефона — компактно, веднага след „Карта“
 const openBuiltCard = () => { if (!S) return; if (bigWin) closeBig(); showMap(false); $('panel').classList.remove('hidden'); tab = 'hq'; renderPanel();
